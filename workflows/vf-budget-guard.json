@@ -1,0 +1,130 @@
+{
+  "nodes": [
+    {
+      "id": "node-1",
+      "name": "Cron Daily Midnight",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24,
+              "triggerAtHour": 0
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "node-2",
+      "name": "Read Budget JSON",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [460, 300],
+      "parameters": {
+        "command": "cat /root/video_factory/data/budget.json"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "node-3",
+      "name": "Parse & Check Cap",
+      "type": "n8n-nodes-base.code",
+      "position": [680, 300],
+      "parameters": {
+        "javascriptCode": "const raw = $input.first().json.stdout;\nconst budget = JSON.parse(raw);\nconst monthly = parseFloat(budget.monthly_total_usd);\nconst softCap = parseFloat(process.env.MONTHLY_SOFT_CAP_USD 20);\nconst hardCap = parseFloat(process.env.MONTHLY_HARD_CAP_USD 25);\nreturn [{\n  json: {\n    monthly_total: monthly,\n    soft_cap: softCap,\n    hard_cap: hardCap,\n    alert_soft: monthly >= softCap,\n    alert_hard: monthly >= hardCap\n  }\n}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "node-4",
+      "name": "Should Alert?",
+      "type": "n8n-nodes-base.if",
+      "position": [900, 300],
+      "parameters": {
+        "conditions": {
+          "bold": true,
+          "items": [
+            {
+              "id": "cond-1",
+              "leftValue": "= $json.alert_soft",
+              "rightValue": true,
+              "operator": "equals"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "node-5",
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [1120, 200],
+      "parameters": {
+        "command": "python3 -c \"import os,requests; bot=os.getenv('TELEGRAM_BOT_TOKEN'); chat=os.getenv('TELEGRAM_CHAT_ID'); msg='⚠️ BUDGET ALERT\\\\nTháng này đã chi: $\"+$json.monthly_total.toFixed(2)+\" / $\" + $json.softCap +\"\\\\nKiểm tra ngay dashboard!\"}; requests.post(f'https://api.telegram.org/bot{bot}/sendMessage', json={{'channel_id':chat,'text':msg}})\""
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "node-6",
+      "name": "No Alert Needed",
+      "type": "n8n-nodes-base.noOp",
+      "position": [1120, 400],
+      "parameters": {},
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Cron Daily Midnight": {
+      "main": [
+        {
+          "node": "Read Budget JSON",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    },
+    "Read Budget JSON": {
+      "main": [
+        {
+          "node": "Parse & Check Cap",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    },
+    "Parse & Check Cap": {
+      "main": [
+        {
+          "node": "Should Alert?",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    },
+    "Should Alert?": {
+      "main": [
+        {
+          "node": "Send Telegram Alert",
+          "type": "main",
+          "index": 0
+        },
+        {
+          "node": "No Alert Needed",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    }
+  },
+  "parameters": {
+    "executionOrder": "v1",
+    "failureMode": "continue"
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

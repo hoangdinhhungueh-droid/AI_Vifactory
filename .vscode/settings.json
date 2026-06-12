@@ -1,0 +1,7 @@
+{
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.env.linux": {
+    "VIRTUAL_ENV": "/root/video_factory/venv",
+    "PATH": "/root/video_factory/venv/bin:${env:PATH}"
+  }
+}

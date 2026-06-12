@@ -1,0 +1,11 @@
+venv/
+logs/
+n8n-data/
+backups/
+_bak_archive/
+checkpoints/
+data/
+__pycache__/
+*.pyc
+*.env
+nohup.out
