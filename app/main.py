@@ -22,10 +22,29 @@ from app.llm_router import llm_call
 
 app = FastAPI(title="AI Video Factory API", version="v11.8")
 
+# --- Prometheus metrics endpoint (G6-8) ---
+try:
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry, REGISTRY
+    from fastapi.responses import Response as _Resp
+    @app.get("/metrics")
+    def metrics_endpoint():
+        return _Resp(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
+except ImportError:
+    pass
+
 # ── Health ───────────────────────────────────────────────────────────────────
 @app.get("/api/v1/health")
 def health():
     return {"status": "ok"}
+
+@app.get("/api/v1/diag")
+def diag():
+    """Enhance D: provider audit — usage, health, scores, chains."""
+    try:
+        from app.llm_router import router_diag
+        return router_diag()
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
 
 # ── §1.3 Pipeline LLM endpoint (n8n → quota-tracked via llm_router) ─────────
 class LLMRequest(BaseModel):
@@ -344,3 +363,92 @@ async def oai_chat_completions(request: Request):
 @app.get("/v1/models")
 def oai_models():
     return {"object": "list", "data": [{"id": "auto", "object": "model", "owned_by": "vpsRouter"}]}
+
+# S1 trend scoring + pipeline entrypoint (page 03/05 spec, 2026-06-12)
+# DISABLED 28/07/2026: legacy CPM/niche S1 scorer (pre-dates trend_gate_ai.py
+# 26/07 redesign). Not wired into current raw-pool/gate flow; no active cron,
+# n8n workflow, or celery beat calls it (verified). Disabled to stop duplicate
+# "TREND_READY" Telegram noti alongside the RAW POOL / GATE noti. Kept
+# importable (app.tasks still imports score_pipeline_run), just not routed.
+# from app.s1_score import router as s1_router
+# app.include_router(s1_router)
+
+from app.routes.mpt_g5 import router as mpt_g5_router
+app.include_router(mpt_g5_router)
+
+# -- S2 run-episode route (full pipeline) --------------------------------
+from app.routes.run_episode_route import router as run_episode_router
+from app.routes.produce_episode_route import router as produce_episode_router
+app.include_router(run_episode_router)
+app.include_router(produce_episode_router)
+
+# Trend/keyword discovery engine (free crawl + SerpApi-confirm top-N), 18/06
+# REMOVED 27/07/2026: trend_discovery.py (v3) is superseded by discover-v5
+# (repointed 26/06; discover-v5 is the sole live n8n cron target and the
+# only Notion-AI-gated writer). File renamed to .deprecated_<ts> for
+# rollback safety; no longer imported or routed.
+
+from app import log_redact  # noqa: F401  # mask api_key in logs (b)
+from app import log_redact  # noqa: F401  (mask api_key in logs)
+
+# discover-digest router (N1, 18/06)
+# ARCHIVED 09/08/2026 Phase-1: trend_digest router retired (v3 flow superseded)
+# ARCHIVED 09/08/2026 Phase-1: trend_digest include removed
+
+# DISABLED 22/07 - trend_reasoning superseded by Smart Trend-Keyword Cache Gate1/Gate2
+# (stops unwanted 'VF REASONING' Telegram spam). Kept importable, just not routed.
+# from app.services.trend_reasoning import router as _reason_router
+# app.include_router(_reason_router)
+
+
+# -- Telegram inline-button poller (two-way approval loop, Phase 4) ---------
+try:
+    from app.services.telegram_poller import start_poller as _vf_start_tg_poller
+
+    @app.on_event("startup")
+    async def _vf_startup_tg_poller():
+        try:
+            _vf_start_tg_poller()
+        except Exception as _e:  # noqa: BLE001
+            import logging as _lg
+            _lg.getLogger("app.main").warning("tg poller start failed: %s", _e)
+except Exception as _e:  # noqa: BLE001
+    import logging as _lg
+    _lg.getLogger("app.main").warning("tg poller import failed: %s", _e)
+
+
+# DISABLED 28/07/2026: discover-v5 fully superseded by trend_gate_ai.py
+# (/api/v1/trend-raw + /api/v1/trend-commit, 26/07 "Notion AI is the crawl
+# brain" redesign). VPS cron that called this was already disabled 26/07
+# (see /etc/crontab). Also disabled because _persist_brain_v5() writes
+# accepted candidates DIRECTLY to the Notion Brain DB, bypassing the gate -
+# conflicts with "Notion AI gate is the ONLY library writer" design. Kept
+# importable, just not routed, to stop duplicate "DISCOVER-v5"/"RAW POOL"
+# Telegram noti and prevent unreviewed writes.
+# from app.services.trend_discovery_v5 import router as _discover_v5_router
+# app.include_router(_discover_v5_router)
+
+
+# Notion AI = crawl brain + curation gate (26/07/2026): /api/v1/trend-raw + /api/v1/trend-commit
+from app.services.trend_gate_ai import router as _trend_gate_router
+from app.services.trend_verify import router as _trend_verify_router
+app.include_router(_trend_gate_router)
+app.include_router(_trend_verify_router)
+# Phase 2b (10/08/2026): story-check endpoint — gate story from Story
+# Library body, write scores back to Notion (Luong chuan v1 BUOC 3).
+from app.services.story_check import router as _story_check_router
+app.include_router(_story_check_router)
+# Phase 2b (10/08/2026): generate-images endpoint — compile from Notion
+# then BG/FG generation + chroma-key (Rule 76) + R2 + IAL rows (BUOC 6).
+from app.services.episode_images import router as _episode_images_router
+app.include_router(_episode_images_router)
+# Phase 2b (10/08/2026): preflight endpoint — combined green-light gate
+# before render (compile --require-images + hash match + duration + TTS).
+from app.services.preflight_episode import router as _preflight_router
+app.include_router(_preflight_router)
+
+
+
+
+from app.services.artifact_sync import router as _sync_router
+app.include_router(_sync_router)

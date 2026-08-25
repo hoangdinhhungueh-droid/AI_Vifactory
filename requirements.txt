@@ -31,3 +31,4 @@ pytest-asyncio
 pytest-cov
 numpy<2.0
 numpy<2.0
+pandas==3.0.3
