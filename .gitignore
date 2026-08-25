@@ -32,3 +32,32 @@ tests/archive_legacy_20260822/
 # Temporary Files
 *.tmp
 .tmp_*
+
+# Pha 5 I-04: backup folders (giu local, khong commit)
+_backups_*/
+
+# Virtualenvs (all variants)
+venv*/
+
+# Node
+node_modules/
+remotion/node_modules/
+
+# Large media / render artifacts
+assets/
+remotion/public/
+checkpoints/
+
+# Runtime data & logs
+logs/
+n8n-data/
+data/
+db/*.log
+db/*.on
+db/*.pid
+
+# Archives & backups
+_archive/
+_bak_archive/
+_backups_*/
+archive_legacy_*/
