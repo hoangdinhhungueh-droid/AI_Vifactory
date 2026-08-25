@@ -3,6 +3,8 @@ import os
 import logging
 import json
 
+from app.utils.security import mask_exception_text
+
 logger = logging.getLogger(__name__)
 
 def _send_telegram(message: str):
@@ -14,8 +16,9 @@ def _send_telegram(message: str):
         if not token or not chat_id:
             logger.warning("Telegram token/chat_id not set -- skipping notification")
             return
+        api_url = f"https://api.telegram.org/bot{token}/sendMessage"
         resp = requests.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
+            api_url,
             json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
             timeout=10,
         )
@@ -31,7 +34,7 @@ def _send_telegram(message: str):
             if resp.status_code != 200:
                 logger.warning(f"Telegram plain send failed: {resp.status_code}")
     except Exception as e:
-        logger.warning(f"Telegram notification error: {e}")
+        logger.warning(f"Telegram notification error: {mask_exception_text(str(e))}")
 
 
 def send_audit_notification(episode_id: str, audit_type: str, stage: str,

@@ -16,6 +16,8 @@ from typing import List, Tuple, Optional
 from datetime import datetime, timezone
 import httpx
 
+from app.utils.security import mask_exception_text
+
 logger = logging.getLogger(__name__)
 
 DB_DIR = os.environ.get("VF_DB_DIR", "/root/video_factory/db")
@@ -133,10 +135,13 @@ async def send_with_buttons(text: str, buttons: list, parse_mode: str = "HTML") 
                 logger.info(f"[tg-btn] Sent button message (id={msg_id}) to {_chat_id()}")
                 return msg_id
             else:
-                logger.error(f"[tg-btn] Failed to send button message: {res.status_code} {res.text}")
+                logger.error(
+                    f"[tg-btn] Failed to send button message: {res.status_code} "
+                    f"{mask_exception_text(res.text)}"
+                )
                 return None
     except Exception as e:
-        logger.error(f"[tg-btn] Exception sending button message: {e}")
+        logger.error(f"[tg-btn] Exception sending button message: {mask_exception_text(str(e))}")
         return None
 
 async def send_gate1_card(en_pack: dict, jp_pack: dict, kr_pack: dict) -> Optional[int]:

@@ -1,5 +1,7 @@
 import os, sys, argparse, glob, json
 import boto3
+sys.path.insert(0, '/root/video_factory')
+from app.utils.security import mask_sensitive_url
 from scripts.gdrive_backup import backup_episode_to_gdrive
 from scripts.ag_notion_bridge import _req, query_db, resolve_id
 
@@ -90,7 +92,7 @@ def main():
         r2_key = f"episodes/{args.episode}/assets/{ast_name}"
         
         r2_url = _r2_upload(img_path, r2_key, s3, bucket)
-        print(f"[R2] Uploaded: {ast_name} -> {r2_url}")
+        print(f"[R2] Uploaded: {ast_name} -> {mask_sensitive_url(r2_url)}")
         
         # Decide metadata based on extension or name
         is_bg = ast_name.endswith(".jpg")

@@ -4,10 +4,19 @@ from typing import Optional
 
 
 def mask_telegram_token(token: str) -> str:
-    """Mask Telegram bot token (first 10 chars visible, rest hidden)."""
-    if not token or len(token) < 15:
+    """Mask a Telegram bot token.
+
+    Telegram tokens look like ``<bot_id>:<secret>``. The numeric bot_id is not
+    a credential on its own, so it is kept to make logs debuggable, while the
+    secret half is removed entirely.
+    """
+    if not token:
         return "[MASKED_TOKEN]"
-    return f"{token[:10]}...{token[-4:]}"
+    if ":" in token:
+        bot_id, _secret = token.split(":", 1)
+        if bot_id.isdigit():
+            return f"{bot_id}:[MASKED_SECRET]"
+    return "[MASKED_TOKEN]"
 
 
 def mask_sensitive_url(url: str) -> str:
