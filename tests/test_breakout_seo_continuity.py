@@ -389,12 +389,14 @@ class TestR3PipelineContinuityAndPayloadAudit:
         res = extract_clean_rising_queries([{"query": "Test Query", "value": "Breakout"}])
         assert res == ["Test Query"]
 
+    @pytest.mark.integration
     def test_telegram_buttons_token_and_gate1_formatting(self):
         from app.services.telegram_buttons import _token, is_enabled, send_gate1_card
         token = _token()
         assert token.startswith("8757795778"), f"Expected bot token to start with 8757795778, got {token[:10]}"
         assert is_enabled() is True
 
+    @pytest.mark.integration
     def test_hhtech_reasoner_prompt_structure(self):
         from app.services.hhtech_reasoner import reason_topic_niche
         import app.services.hhtech_reasoner as hht

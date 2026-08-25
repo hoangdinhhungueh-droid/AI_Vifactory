@@ -109,6 +109,7 @@ class TestR1AdversarialBreakoutSorting:
 class TestR2AdversarialHHTechReasoning:
     """Stress test R2: GPT-5.6-Sol prompt construction, breakout formatting, and niche reasoning."""
 
+    @pytest.mark.integration
     @patch("app.services.hhtech_reasoner.call_gpt56_sol")
     def test_reason_topic_niche_prompt_formatting_and_breakout_capture(self, mock_call):
         mock_response = json.dumps({
@@ -172,6 +173,7 @@ class TestR2AdversarialHHTechReasoning:
 class TestR3AdversarialB10SEOAndTelegram:
     """Stress test R3: Multi-layer SEO injection, Telegram Bot token, and packaging integrity."""
 
+    @pytest.mark.integration
     def test_telegram_buttons_token_uses_vf_tg_bot_token(self):
         """_token() must prioritize VF_TG_BOT_TOKEN starting with 8757795778."""
         token = tb._token()
@@ -279,6 +281,7 @@ class TestR3AdversarialB10SEOAndTelegram:
 class TestNotionAndDownstreamContinuity:
     """Stress test Notion sync properties and downstream episode loading."""
 
+    @pytest.mark.integration
     def test_pending_task_cache_and_commit_roundtrip(self, tmp_path):
         """Test local caching of pending tasks with rising & breakout queries."""
         task_id = "EN_EP0099_test_topic"

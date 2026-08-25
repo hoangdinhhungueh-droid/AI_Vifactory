@@ -30,8 +30,8 @@ jobs:
       - name: Lint with ruff
         run: ruff check app/ scripts/ --exit-zero
       
-      - name: Run unit tests
-        run: pytest -v --cov=app --cov-report=term-missing tests/
+      - name: Run hermetic tests (unit + contract)
+        run: pytest -m "not integration" -v --cov=app --cov-report=term-missing tests/
       
       - name: Upload coverage
         uses: codecov/codecov-action@v3
