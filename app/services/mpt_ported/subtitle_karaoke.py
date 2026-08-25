@@ -195,7 +195,7 @@ def _merge_over_cap(chunks: list, cap: float) -> list:
                 cand_dur = max(nxt["end_ms"] - c["start_ms"], 0) / 1000.0
                 cand_cps = len(cand_text.replace(chr(10), "")) / cand_dur if cand_dur > 0 else 0
                 if cand_cps <= cap and len(cand_text) <= MAX_LINE_CHARS:
-                    merged[i] = {"start_ms": c["start_ms"], "end_ms": nxt["end_ms"], "text": cand_text}
+                    merged[i] = {"start_ms": c["start_ms"], "end_ms": nxt["end_ms"], "text": cand_text, "words": (c.get("words") or []) + (nxt.get("words") or [])}
                     del merged[i + 1]
                     changed = True
                     break
@@ -205,7 +205,7 @@ def _merge_over_cap(chunks: list, cap: float) -> list:
                 cand_dur = max(c["end_ms"] - prev["start_ms"], 0) / 1000.0
                 cand_cps = len(cand_text.replace(chr(10), "")) / cand_dur if cand_dur > 0 else 0
                 if cand_cps <= cap and len(cand_text) <= MAX_LINE_CHARS:
-                    merged[i - 1] = {"start_ms": prev["start_ms"], "end_ms": c["end_ms"], "text": cand_text}
+                    merged[i - 1] = {"start_ms": prev["start_ms"], "end_ms": c["end_ms"], "text": cand_text, "words": (prev.get("words") or []) + (c.get("words") or [])}
                     del merged[i]
                     changed = True
                     break
