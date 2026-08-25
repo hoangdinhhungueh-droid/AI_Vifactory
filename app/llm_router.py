@@ -24,7 +24,7 @@ MISTRAL_API_KEY          = os.getenv("MISTRAL_API_KEY", "")
 MISTRAL_BASE_URL         = os.getenv("MISTRAL_BASE_URL", "https://api.mistral.ai/v1")
 MISTRAL_MODEL            = os.getenv("MISTRAL_MODEL", "mistral-medium-latest")   # >28K tok auto -> mistral-large-latest (256K)
 BROWSER_UA               = os.getenv("BENCH_UA", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-TELEGRAM_BOT_TOKEN       = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_TOKEN       = os.getenv("VF_TG_BOT_TOKEN", "") or os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID         = os.getenv("TELEGRAM_CHAT_ID", "")
 
 # -- Daily usage tracking: BOTH request count AND token count (reset 00:00 UTC) --
@@ -50,11 +50,19 @@ def _inc_usage(service: str, tokens: int = 0):
             conn.commit()
 
 def _send_telegram(msg: str):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    # Fix 30/06: doc token call-time, VF bot ONLY (khong fallback OC bot).
+    # Module-level TELEGRAM_BOT_TOKEN bi dong bang luc import (truoc defensive
+    # dotenv load trong trend_signals), nen luon tro OC bot 8734205060.
+    # Thay bang os.environ.get() call-time de lay VF_TG_BOT_TOKEN tu .env.
+    tok  = os.environ.get("VF_TG_BOT_TOKEN", "").strip()
+    chat = (os.environ.get("VF_TG_CHAT_ID", "").strip()
+            or os.environ.get("TELEGRAM_CHAT_ID", "").strip())
+    if not tok or not chat:
         return
     try:
-        requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                      json={"chat_id": TELEGRAM_CHAT_ID, "text": msg}, timeout=10)
+        requests.post(
+            f"https://api.telegram.org/bot{tok}/sendMessage",
+            json={"chat_id": chat, "text": msg}, timeout=10)
     except Exception as e:
         logger.warning(f"Telegram alert failed: {e}")
 
@@ -162,11 +170,11 @@ OR_PRIORITY = [
 CEREBRAS_MODELS = {"big": "gpt-oss-120b", "fast": "gpt-oss-120b"}
 
 # Free fallback chains v8 (page 08): Gemini 2.5 FL RE-ADDED; OnMay LUON CUOI; Ollama DROPPED; Cerebras ctx cap 64K.
-CHAIN_BRAIN     = ["openrouter_free", "cerebras_free", "gemini", "mistral", "onmay"]   # Groq loai (big 413)
-CHAIN_CREATIVE  = ["cerebras_free", "openrouter_free", "gemini", "groq", "mistral", "onmay"]
-CHAIN_REASONING = ["openrouter_free", "cerebras_free", "gemini", "mistral", "onmay"]
-CHAIN_UTILITY   = ["groq", "gemini", "cerebras_free", "mistral", "onmay"]
-CHAIN_CODE      = ["openrouter_free", "gemini", "mistral", "cerebras_free", "onmay"]
+CHAIN_BRAIN     = ["openrouter_free", "cerebras_free", "gemini", "onmay"]   # 15/08: Groq 404 + Mistral 402 (free tier dead) — removed from chains
+CHAIN_CREATIVE  = ["cerebras_free", "openrouter_free", "gemini", "onmay"]
+CHAIN_REASONING = ["openrouter_free", "cerebras_free", "gemini", "onmay"]
+CHAIN_UTILITY   = ["gemini", "cerebras_free", "onmay"]
+CHAIN_CODE      = ["openrouter_free", "gemini", "cerebras_free", "onmay"]
 
 # 15 task key — dong bo key name voi page 08
 TASK_CHAIN = {
@@ -279,6 +287,84 @@ def _is_retryable(err: Exception) -> bool:
     return any(k in s for k in ["429", "rate limit", "quota", "upstream", "enginecore",
                                 "timeout", "timed out", "503", "502", "overloaded"])
 
+# -- Enhance D (26/06): provider health scoring + audit (process-local) --
+ROUTER_SCORED = str(os.getenv("ROUTER_SCORED", "0")).strip() == "1"
+_HEALTH = {}  # provider -> {ok, fail, lat_ema, last_err, last_ts}
+
+
+def _health(provider):
+    return _HEALTH.setdefault(provider, {"ok": 0, "fail": 0, "lat_ema": 0.0,
+                                         "last_err": "", "last_ts": 0.0})
+
+
+def _record_health(provider, ok, latency, err=""):
+    h = _health(provider)
+    if ok:
+        h["ok"] += 1
+    else:
+        h["fail"] += 1
+        h["last_err"] = str(err)[:200]
+    h["lat_ema"] = latency if h["lat_ema"] == 0 else 0.7 * h["lat_ema"] + 0.3 * latency
+    h["last_ts"] = time.time()
+
+
+def _quota_frac(provider, est_tokens=0):
+    lim = PROVIDER_LIMITS.get(provider)
+    if not lim:
+        return 1.0
+    try:
+        u = _get_usage(provider)
+    except Exception:
+        return 1.0
+    rpd_cap = lim["rpd"] * lim["margin"]
+    tpd_cap = lim["tpd"] * lim["margin"]
+    req_frac = max(0.0, (rpd_cap - u["calls"]) / rpd_cap) if rpd_cap else 1.0
+    tok_frac = max(0.0, (tpd_cap - (u["tokens"] + est_tokens)) / tpd_cap) if tpd_cap else 1.0
+    return min(req_frac, tok_frac)
+
+
+def _provider_score(provider, est_tokens=0):
+    h = _health(provider)
+    total = h["ok"] + h["fail"]
+    success = (h["ok"] / total) if total else 0.8
+    quota = _quota_frac(provider, est_tokens)
+    lat = h["lat_ema"]
+    lat_term = (1.0 / (1.0 + lat / 10.0)) if lat else 0.9
+    return round(0.5 * success + 0.35 * quota + 0.15 * lat_term, 4)
+
+
+def _ordered_chain(chain, est_tokens=0):
+    if not ROUTER_SCORED:
+        return chain
+    return sorted(chain, key=lambda p: _provider_score(p, est_tokens), reverse=True)
+
+
+def router_diag(est_tokens=2000):
+    out = {}
+    for p in PROVIDER_LIMITS:
+        if p == "ollama":
+            continue
+        h = _health(p)
+        total = h["ok"] + h["fail"]
+        try:
+            u = _get_usage(p)
+        except Exception:
+            u = {"calls": 0, "tokens": 0}
+        out[p] = {
+            "usage": u,
+            "limits": PROVIDER_LIMITS[p],
+            "health": {"ok": h["ok"], "fail": h["fail"],
+                       "success_rate": round(h["ok"] / total, 3) if total else None,
+                       "lat_ema_s": round(h["lat_ema"], 2),
+                       "last_err": h["last_err"]},
+            "quota_frac": round(_quota_frac(p, est_tokens), 3),
+            "score": _provider_score(p, est_tokens),
+        }
+    return {"scored_routing": ROUTER_SCORED,
+            "task_chains": {k: list(v) for k, v in TASK_CHAIN.items()},
+            "providers": out}
+
+
 def llm_call(prompt: str, task_type: str = "SETUP_ORCHESTRATE", system: str = "",
              expect_json: bool = False) -> dict:
     """Unified router: PREVENT -> route free chain -> DETECT -> AWAKE (switch+retry) -> exhaust = ABORT + Telegram."""
@@ -294,7 +380,7 @@ def llm_call(prompt: str, task_type: str = "SETUP_ORCHESTRATE", system: str = ""
                   "mistral": "mistral-medium/large-latest"}
     last_err = None
 
-    for provider in chain:
+    for provider in _ordered_chain(chain, est):
         if provider != "ollama" and not _has_quota(provider, est):
             logger.info(f"[Router] {provider} near/at daily cap — pre-switch")
             continue
@@ -302,15 +388,20 @@ def llm_call(prompt: str, task_type: str = "SETUP_ORCHESTRATE", system: str = ""
         caller = CALLERS[provider]
         for attempt in range(3):                          # AWAKE: retry 3 lan voi backoff
             try:
+                _t0 = time.time()
                 text = caller(prompt, system)
+                _lat = time.time() - _t0
                 if is_garbage_output(text, expect_json=expect_json):
                     logger.warning(f"[Router] {provider} garbage output — next provider")
                     last_err = RuntimeError(f"{provider} garbage output")
+                    _record_health(provider, False, _lat, "garbage output")
                     break
                 _inc_usage(provider, _est_tokens(prompt, system, text))
+                _record_health(provider, True, _lat)
                 return {"text": text, "model": model_name[provider], "provider": provider}
             except Exception as e:
                 last_err = e
+                _record_health(provider, False, time.time() - _t0, e)
                 if _is_retryable(e) and attempt < 2:
                     wait = 2 ** attempt
                     logger.warning(f"[Router] {provider} retryable ({e}); wait {wait}s")
