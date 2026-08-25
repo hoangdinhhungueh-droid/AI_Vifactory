@@ -1,11 +1,34 @@
-venv/
-logs/
-n8n-data/
-backups/
-_bak_archive/
-checkpoints/
-data/
-__pycache__/
-*.pyc
+# Environment & Secrets
 *.env
-nohup.out
+.env.local
+.env.*.local
+secrets.env.txt
+
+# Cache & Generated
+db/*.json
+*.bak_*
+.coverage
+*.pyc
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Test Archives (legacy, exclude from collection)
+tests/archive_legacy_20260822/
+
+# Temporary Files
+*.tmp
+.tmp_*
