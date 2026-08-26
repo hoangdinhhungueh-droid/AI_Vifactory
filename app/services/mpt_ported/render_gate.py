@@ -17,6 +17,8 @@ Env:
   QA_SILENCE_MAX   '12'    max dead-air seconds (first 60s of deliverable)
   QA_DUR_TOL_FRAC  '0.15'  allowed |out-audio| duration drift (fraction)
   QA_DUR_TOL_MIN   '3'     min absolute duration tolerance (seconds)
+  QA_LUFS_TARGET   '-14.0' integrated-loudness delivery target (LUFS)
+  QA_LUFS_TOL      '2.0'   allowed |LUFS - target| before loudness_off
   QA_GATE_HARD     '0'     '1' -> raise RenderGateError on primary-aspect fail
 """
 import asyncio
@@ -118,6 +120,26 @@ async def _mean_volume_db(path: str, sample_s: int = 60) -> float:
         except Exception:
             return -91.0
     return -91.0
+
+
+async def _integrated_lufs(path: str):
+    """Integrated program loudness (LUFS) via ebur128, over the whole file.
+    Returns the final Summary 'I:' value, or None when unparseable -- a
+    measurement failure must not, on its own, fail an otherwise-good render.
+    Real -14 LUFS delivery is the target; digital silence reads far lower."""
+    try:
+        out = await _run([
+            "ffmpeg", "-hide_banner", "-nostats",
+            "-i", path, "-af", "ebur128=peak=true", "-f", "null", "-"], timeout=300)
+    except Exception:
+        return None
+    vals = re.findall(r"I:\s*(-?[0-9.]+)\s*LUFS", out)
+    if not vals:
+        return None
+    try:
+        return float(vals[-1])
+    except Exception:
+        return None
 
 
 async def pre_render_check(clip_paths: list, audio_path: str) -> dict:
@@ -248,6 +270,19 @@ async def post_render_check(output_path: str, audio_path: str = "",
         if mean_db <= _f("QA_SILENT_DB", -60.0):
             issues.append("silent_audio:%.1fdB" % mean_db)
 
+    # C-02: integrated-loudness compliance. volumedetect/silencedetect above
+    # only catch silence, not whether the program hits the -14 LUFS delivery
+    # target. Only meaningful when real (non-silent) audio is present; a
+    # measurement failure (None) is not treated as a gate failure. Fails the
+    # gate at the QA_GATE_HARD tier, like black/bars/drift.
+    integrated_lufs = None
+    lufs_target = _f("QA_LUFS_TARGET", -14.0)
+    lufs_tol = _f("QA_LUFS_TOL", 2.0)
+    if pr.get("has_audio") and not any(i.startswith("silent_audio") for i in issues):
+        integrated_lufs = await _integrated_lufs(output_path)
+        if integrated_lufs is not None and abs(integrated_lufs - lufs_target) > lufs_tol:
+            issues.append("loudness_off:%.1fLUFS" % integrated_lufs)
+
     audio_dur = 0.0
     if audio_path and Path(str(audio_path)).exists():
         audio_dur = (await _probe(audio_path)).get("duration", 0.0)
@@ -265,6 +300,7 @@ async def post_render_check(output_path: str, audio_path: str = "",
         "has_video": pr.get("has_video"),
         "has_audio": pr.get("has_audio"),
         "mean_volume_db": mean_db,
+        "integrated_lufs": integrated_lufs,
     }
     ok = not issues
     logger.info("[render_gate] post-check %s ok=%s issues=%s %s",

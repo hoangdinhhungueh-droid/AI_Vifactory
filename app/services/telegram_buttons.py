@@ -226,7 +226,7 @@ async def send_gate2_card(episode_id: str, video_id: str, title_a: str, title_b:
         f"🎬 <b>Episode ID:</b> <code>{safe_ep}</code>\n"
         f"⏱️ <b>Thời lượng:</b> {safe_dur} (Full HD 1080p / 30fps)\n"
         "🎨 <b>Visual:</b> Layer 1 (16:9) + Layer 2 (1:1 Chroma Key Cutout)\n"
-        "🎙️ <b>Audio:</b> Edge-TTS en-US-GuyNeural (-14 LUFS) + BGM (-24dB)\n"
+        "🎙️ <b>Audio:</b> Edge-TTS en-US-GuyNeural (target -14 LUFS) + BGM (-24dB)\n"
         "🏷️ <b>Nhãn AI:</b> Altered or Synthetic Content: <b>BẬT (Yes)</b>\n"
         "🛡️ <b>Trạng thái hiện tại:</b> <b>Không công khai (Unlisted)</b>\n\n"
         "📌 <b>GÓI PACKAGING YOUTUBE 2026 (Rule 113/119):</b>\n"
