@@ -41,6 +41,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 PENDING_DIR = "/var/vf/pending_tasks"
+PENDING_CACHE_TTL_HOURS = 24
 STORY_DB_ID = "b0301989-2400-836b-bdb5-8131fea17736"
 NOTION_PAGES_URL = "https://api.notion.com/v1/pages"
 
@@ -176,6 +177,26 @@ def _write_story_library_row(episode_id: str, market: str, data: dict) -> bool:
         return False
 
 
+def cleanup_stale_pending_tasks() -> int:
+    if not os.path.exists(PENDING_DIR):
+        return 0
+    cutoff_time = time.time() - (PENDING_CACHE_TTL_HOURS * 3600)
+    deleted = 0
+    for fname in os.listdir(PENDING_DIR):
+        if not fname.endswith(".json"):
+            continue
+        fpath = os.path.join(PENDING_DIR, fname)
+        try:
+            mtime = os.path.getmtime(fpath)
+            if mtime < cutoff_time:
+                os.remove(fpath)
+                deleted += 1
+                logger.info("[episode_numbering] cleaned stale cache %s (age > %dh)", fname, PENDING_CACHE_TTL_HOURS)
+        except Exception as e:
+            logger.debug("[episode_numbering] cleanup error on %s: %s", fname, e)
+    return deleted
+
+
 def commit_if_pending(episode_id: str) -> bool:
     """Call at the exact moment production starts (run_pipeline entry).
 
@@ -221,6 +242,15 @@ def commit_if_pending(episode_id: str) -> bool:
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
+        cached_at = data.get("cached_at", 0)
+        age_hours = (time.time() - cached_at) / 3600 if cached_at else 0
+        if age_hours > PENDING_CACHE_TTL_HOURS:
+            logger.warning("[episode_numbering] stale pending task %s (age %.1fh > %dh TTL), removing", episode_id, age_hours, PENDING_CACHE_TTL_HOURS)
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+            return False
         market = data.get("market", "EN")
         resolved_eid = data.get("episode_id") or episode_id
         ok = _write_story_library_row(resolved_eid, market, data)

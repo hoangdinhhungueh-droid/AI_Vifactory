@@ -41,11 +41,12 @@ def main():
         i_lufs = float(integrated_lufs.group(1))
         tp_dbfs = float(true_peak.group(1))
         
-        print(f"LUFS: {i_lufs} (Target: -26 to -22)")
+        print(f"LUFS: {i_lufs} (Target: -14 +/- 2)")
         print(f"True Peak: {tp_dbfs} dBTP (Target: < -1.0 dBTP)")
         
-        if not (-26.0 <= i_lufs <= -22.0):
-            print(f"WARNING: LUFS {i_lufs} is outside acceptable range (-26 to -22).")
+        if not (-16.0 <= i_lufs <= -12.0):
+            print(f"FAILED: LUFS {i_lufs} is outside acceptable range (-14 +/- 2).")
+            sys.exit(1)
             
         if tp_dbfs >= -1.0:
             print(f"FAILED: True Peak {tp_dbfs} is too high (must be < -1.0).")

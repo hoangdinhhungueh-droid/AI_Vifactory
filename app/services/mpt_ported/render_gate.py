@@ -17,6 +17,8 @@ Env:
   QA_SILENCE_MAX   '12'    max dead-air seconds (first 60s of deliverable)
   QA_DUR_TOL_FRAC  '0.15'  allowed |out-audio| duration drift (fraction)
   QA_DUR_TOL_MIN   '3'     min absolute duration tolerance (seconds)
+  QA_LUFS_TARGET   '-14.0' integrated-loudness delivery target (LUFS)
+  QA_LUFS_TOL      '2.0'   allowed |LUFS - target| before loudness_off
   QA_GATE_HARD     '0'     '1' -> raise RenderGateError on primary-aspect fail
 """
 import asyncio
@@ -102,6 +104,42 @@ async def _silence_s(path: str, sample_s: int = 60) -> float:
         except Exception:
             pass
     return total
+
+
+async def _mean_volume_db(path: str, sample_s: int = 60) -> float:
+    """Mean volume (dB) of the first sample_s. Digital silence -> ~ -91 dB /
+    -inf; real narration is ~ -14..-24 dB. Returns -91.0 when ffmpeg emits no
+    mean_volume line (treat as silent)."""
+    out = await _run([
+        "ffmpeg", "-hide_banner", "-nostats", "-t", str(sample_s),
+        "-i", path, "-af", "volumedetect", "-f", "null", "-"], timeout=180)
+    m = re.search(r"mean_volume:\s*(-?[0-9.]+)\s*dB", out)
+    if m:
+        try:
+            return float(m.group(1))
+        except Exception:
+            return -91.0
+    return -91.0
+
+
+async def _integrated_lufs(path: str):
+    """Integrated program loudness (LUFS) via ebur128, over the whole file.
+    Returns the final Summary 'I:' value, or None when unparseable -- a
+    measurement failure must not, on its own, fail an otherwise-good render.
+    Real -14 LUFS delivery is the target; digital silence reads far lower."""
+    try:
+        out = await _run([
+            "ffmpeg", "-hide_banner", "-nostats",
+            "-i", path, "-af", "ebur128=peak=true", "-f", "null", "-"], timeout=300)
+    except Exception:
+        return None
+    vals = re.findall(r"I:\s*(-?[0-9.]+)\s*LUFS", out)
+    if not vals:
+        return None
+    try:
+        return float(vals[-1])
+    except Exception:
+        return None
 
 
 async def pre_render_check(clip_paths: list, audio_path: str) -> dict:
@@ -223,6 +261,28 @@ async def post_render_check(output_path: str, audio_path: str = "",
     if silence > silence_max:
         issues.append("dead_air:%.1fs" % silence)
 
+    # C-06: detect an audio track that is present but effectively silent
+    # (uniform dead-air across the sample), which the has_audio stream check
+    # above cannot catch.
+    mean_db = None
+    if pr.get("has_audio"):
+        mean_db = await _mean_volume_db(output_path, 60)
+        if mean_db <= _f("QA_SILENT_DB", -60.0):
+            issues.append("silent_audio:%.1fdB" % mean_db)
+
+    # C-02: integrated-loudness compliance. volumedetect/silencedetect above
+    # only catch silence, not whether the program hits the -14 LUFS delivery
+    # target. Only meaningful when real (non-silent) audio is present; a
+    # measurement failure (None) is not treated as a gate failure. Fails the
+    # gate at the QA_GATE_HARD tier, like black/bars/drift.
+    integrated_lufs = None
+    lufs_target = _f("QA_LUFS_TARGET", -14.0)
+    lufs_tol = _f("QA_LUFS_TOL", 2.0)
+    if pr.get("has_audio") and not any(i.startswith("silent_audio") for i in issues):
+        integrated_lufs = await _integrated_lufs(output_path)
+        if integrated_lufs is not None and abs(integrated_lufs - lufs_target) > lufs_tol:
+            issues.append("loudness_off:%.1fLUFS" % integrated_lufs)
+
     audio_dur = 0.0
     if audio_path and Path(str(audio_path)).exists():
         audio_dur = (await _probe(audio_path)).get("duration", 0.0)
@@ -239,10 +299,21 @@ async def post_render_check(output_path: str, audio_path: str = "",
         "silence_s_60s": round(silence, 2),
         "has_video": pr.get("has_video"),
         "has_audio": pr.get("has_audio"),
+        "mean_volume_db": mean_db,
+        "integrated_lufs": integrated_lufs,
     }
     ok = not issues
     logger.info("[render_gate] post-check %s ok=%s issues=%s %s",
                 Path(str(output_path)).name, ok, issues, metrics)
+    # C-06 (always-on, independent of QA_GATE_HARD): an empty or effectively
+    # silent audio track must NEVER ship on a primary deliverable. This is the
+    # "assert audio-khong-rong sau render" guarantee. False-positive-free:
+    # real narration is ~ -14..-24 dB, digital silence is <= -60 dB / -inf.
+    audio_empty = ("no_audio_stream" in issues
+                   or any(i.startswith("silent_audio") for i in issues))
+    if is_primary and audio_empty:
+        raise RenderGateError(
+            "render gate: empty/silent audio %s: %s" % (output_path, issues))
     if not ok and gate_hard() and is_primary:
         raise RenderGateError("render gate FAILED %s: %s" % (output_path, issues))
     return {"ok": ok, "issues": issues, "metrics": metrics}

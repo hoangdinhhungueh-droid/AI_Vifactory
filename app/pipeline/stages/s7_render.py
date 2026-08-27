@@ -142,7 +142,7 @@ async def run_s7(episode: dict) -> dict:
         episode["subtitle_mode"] = "karaoke_ass" if _use_kara else "srt_burn"
 
     qa["post"][master_key] = await post_render_check(
-        renders[master_key], norm_path, is_primary=False)
+        renders[master_key], norm_path, is_primary=True)
     for aspect in ["9:16", "1:1"]:
         key = "final_" + aspect.replace(":", "")
         qa["post"][key] = await post_render_check(
