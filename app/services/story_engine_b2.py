@@ -17,10 +17,23 @@ sys.path.insert(0, '/root/video_factory')
 from app.services.hhtech_reasoner import call_gpt56_sol, detect_safety_and_theme
 from app.services import story_gate as sgate
 from scripts.ag_notion_bridge import resolve_id, update_page_properties, create_page, query_db
+import json as json_lib
 
 NOTION_STORY_DB_ID = os.getenv("STORY_LIBRARY_DB_ID", "b0301989-2400-836b-bdb5-8131fea17736")
 EPISODES_BASE_DIR = os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")
 PENDING_TASKS_DIR = "/var/vf/pending_tasks"
+
+
+def load_competitor_intel(task_id: str) -> dict | None:
+    """Load B1.5 Competitor Intelligence Card if it exists."""
+    intel_path = os.path.join(EPISODES_BASE_DIR, task_id, "competitor_intel_card.json")
+    if os.path.exists(intel_path):
+        try:
+            with open(intel_path, "r", encoding="utf-8") as f:
+                return json_lib.load(f)
+        except Exception as e:
+            logger.debug(f"[story_engine] Error loading competitor intel for {task_id}: {e}")
+    return None
 
 
 def load_task_metadata(task_id: str) -> dict:
@@ -99,8 +112,10 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
     out_dir = os.path.join(EPISODES_BASE_DIR, task_id)
     os.makedirs(out_dir, exist_ok=True)
 
-    logger.info(f"[story_engine] Starting 5-Act story generation for {task_id} ({mkt}) | Theme: {theme} | Safety: {safety_label}...")
-
+    intel_card = load_competitor_intel(task_id)
+    intel_status = "loaded" if intel_card else "none"
+    logger.info(f"[story_engine] Starting 5-Act story generation for {task_id} ({mkt}) | Theme: {theme} | Safety: {safety_label}... [Intel Card: {intel_status}]")
+    
     lang_name = "English" if mkt == "EN" else ("Japanese" if mkt == "JP" else "Korean")
 
     system_prompt = (
@@ -125,7 +140,32 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         f"Output ONLY the complete script organized strictly by Acts using '=== ACT I ===', '=== ACT II ===', '=== ACT III ===', '=== ACT IV ===', '=== ACT V ===' markers. No markdown fences, no stage directions."
     )
 
-    user_prompt = f"Write the complete 5-Act voiceover narration script for '{topic}' in {lang_name} now."
+    competitor_context = ""
+    if intel_card:
+        gaps = intel_card.get("audience_comment_gaps", [])
+        benchmarks = intel_card.get("competitor_benchmarks", [])
+        golden_facts = intel_card.get("golden_facts_to_keep", [])
+        recommended_angle = intel_card.get("recommended_10x_angle", {})
+        
+        context_lines = ["### COMPETITOR INTELLIGENCE (From B1.5 Recon):"]
+        if benchmarks:
+            context_lines.append("Competitors & their flaws:")
+            for b in benchmarks[:3]:
+                context_lines.append(f"  - {b.get('channel', 'Unknown')}: {b.get('critical_flaw', 'N/A')}")
+        if gaps:
+            context_lines.append("Unanswered audience questions:")
+            for g in gaps[:3]:
+                context_lines.append(f"  - {g.get('unanswered_question', 'N/A')}")
+        if golden_facts:
+            context_lines.append("Golden facts to preserve:")
+            for f in golden_facts[:2]:
+                context_lines.append(f"  - {f}")
+        if recommended_angle:
+            context_lines.append(f"Recommended 10x angle: {recommended_angle.get('hook_proposal', 'N/A')}")
+        
+        competitor_context = "\n".join(context_lines) + "\n\n"
+
+    user_prompt = f"{competitor_context}Write the complete 5-Act voiceover narration script for '{topic}' in {lang_name} now."
     full_script_raw = call_gpt56_sol(user_prompt, system_prompt=system_prompt, max_tokens=3500, temperature=0.6, timeout=60.0)
 
     # Clean and parse acts
