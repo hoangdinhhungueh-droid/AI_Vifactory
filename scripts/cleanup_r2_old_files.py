@@ -7,6 +7,7 @@ Can be run as a cron job (e.g., daily at 2am).
 import os
 import sys
 import time
+import argparse
 import logging
 from datetime import datetime, timedelta
 
@@ -16,12 +17,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-TTL_DAYS = 7
-CUTOFF_TIMESTAMP = time.time() - (TTL_DAYS * 86400)
+DEFAULT_TTL_DAYS = 7
 
 
-def cleanup_r2():
-    """Remove R2 objects older than TTL_DAYS."""
+def cleanup_r2(ttl_days: int = DEFAULT_TTL_DAYS, dry_run: bool = False):
+    """Remove R2 objects older than ttl_days. dry_run reports without deleting."""
+    cutoff = time.time() - (ttl_days * 86400)
+    mode = "DRY-RUN" if dry_run else "LIVE"
     import boto3
     from botocore.exceptions import ClientError
 
@@ -44,7 +46,7 @@ def cleanup_r2():
         )
 
         # List all objects
-        logger.info("Scanning R2 bucket '%s' for objects older than %d days...", bucket, TTL_DAYS)
+        logger.info("[%s] Scanning R2 bucket '%s' for objects older than %d days...", mode, bucket, ttl_days)
         deleted_count = 0
         deleted_size = 0
 
@@ -56,25 +58,33 @@ def cleanup_r2():
                 last_modified = obj["LastModified"].timestamp()
                 size = obj.get("Size", 0)
 
-                if last_modified < CUTOFF_TIMESTAMP:
+                if last_modified < cutoff:
+                    age_days = (time.time() - last_modified) / 86400
+                    if dry_run:
+                        deleted_count += 1
+                        deleted_size += size
+                        logger.info(
+                            "WOULD DELETE (age %.1f days, %d KB): %s",
+                            age_days, size // 1024, key,
+                        )
+                        continue
                     try:
                         s3.delete_object(Bucket=bucket, Key=key)
                         deleted_count += 1
                         deleted_size += size
-                        age_days = (time.time() - last_modified) / 86400
                         logger.info(
                             "Deleted (age %.1f days, %d KB): %s",
-                            age_days,
-                            size // 1024,
-                            key,
+                            age_days, size // 1024, key,
                         )
                     except ClientError as e:
                         logger.error("Failed to delete %s: %s", key, e)
 
         logger.info(
-            "Cleanup complete: deleted %d objects (%d MB)",
+            "[%s] Cleanup complete: %s %d objects (%.2f MB)",
+            mode,
+            "would delete" if dry_run else "deleted",
             deleted_count,
-            deleted_size // (1024 * 1024),
+            deleted_size / (1024 * 1024),
         )
         return True
     except Exception as e:
@@ -83,6 +93,13 @@ def cleanup_r2():
 
 
 def main():
+    ap = argparse.ArgumentParser(description="Delete R2 objects past their TTL.")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="Report what would be deleted without deleting anything.")
+    ap.add_argument("--ttl-days", type=int, default=DEFAULT_TTL_DAYS,
+                    help="Delete objects older than this many days (default %d)." % DEFAULT_TTL_DAYS)
+    args = ap.parse_args()
+
     # Load env (same pattern as youtube_upload.py)
     p = "/root/secrets/.env"
     if os.path.exists(p):
@@ -93,8 +110,9 @@ def main():
                     k, v = line.split("=", 1)
                     os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
-    logger.info("R2 Cleanup (TTL=%d days) started at %s", TTL_DAYS, datetime.now().isoformat())
-    success = cleanup_r2()
+    logger.info("R2 Cleanup (TTL=%d days, dry_run=%s) started at %s",
+                args.ttl_days, args.dry_run, datetime.now().isoformat())
+    success = cleanup_r2(ttl_days=args.ttl_days, dry_run=args.dry_run)
     logger.info("R2 Cleanup finished: %s", "SUCCESS" if success else "FAILED")
     sys.exit(0 if success else 1)
 
