@@ -58,6 +58,14 @@ def cache_pending_task(episode_id: str, market: str, payload: dict) -> str:
     virality_score. Nothing is written to Notion by this call.
     """
     os.makedirs(PENDING_DIR, exist_ok=True)
+    # Sweep expired caches before adding a new one: stale pending files are what
+    # made get_next_episode_id() skip numbers (each stale file still claims an EP).
+    try:
+        swept = cleanup_stale_pending_tasks()
+        if swept:
+            logger.info("[episode_numbering] swept %d stale pending cache(s) before caching %s", swept, episode_id)
+    except Exception as _ce:
+        logger.debug("[episode_numbering] stale sweep failed: %s", _ce)
     path = _pending_path(episode_id)
     data = {"episode_id": episode_id, "market": (market or "EN").upper(), "cached_at": time.time()}
     data.update(payload or {})
