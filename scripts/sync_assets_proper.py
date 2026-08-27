@@ -1,4 +1,4 @@
-import os, sys, glob, json, math
+import os, sys, glob, json, math, argparse
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -10,7 +10,11 @@ from app.services.image_gen import _r2_upload
 from scripts.ag_notion_bridge import resolve_id, create_page
 from scripts.remove_bg_chromakey import remove_bg_chromakey
 
-ep_id = 'en-byzantine-empire-ep001'
+parser = argparse.ArgumentParser(description="Sync episode assets: chroma-key + R2 + Notion")
+parser.add_argument("--episode_id", type=str, default="en-byzantine-empire-ep001",
+                    help="Episode ID (e.g. en-enron-collapse-ep006)")
+args = parser.parse_args()
+ep_id = args.episode_id
 raw_dir = f'/var/vf/episodes/{ep_id}/assets/raw'
 cutout_dir = f'/var/vf/episodes/{ep_id}/assets/cutout'
 os.makedirs(cutout_dir, exist_ok=True)
