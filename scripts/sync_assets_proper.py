@@ -1,4 +1,4 @@
-import os, sys, glob, json, math, argparse
+import os, re, sys, glob, json, math, argparse
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -26,8 +26,8 @@ print('Notion Images DB ID:', images_db_id)
 fg_files = sorted(glob.glob(f'{raw_dir}/*_fg.jpg'))
 for fg_path in fg_files:
     fname = os.path.basename(fg_path)
-    idx_str = fname.split('_')[0]
-    out_png = f'{cutout_dir}/{idx_str}_fg_cutout.png'
+    stem = re.sub(r'_fg$', '', os.path.splitext(fname)[0])
+    out_png = f'{cutout_dir}/{stem}_fg_cutout.png'
     try:
         print(f'Chroma-keying {fname} ({os.path.getsize(fg_path)} bytes) -> {out_png}...')
         remove_bg_chromakey(fg_path, out_png, tol=65.0, soft=35.0)
@@ -42,7 +42,8 @@ print(f'Total assets to upload to R2 and sync to Notion: {len(all_assets)}')
 for ast_path in all_assets:
     ast_name = os.path.basename(ast_path)
     is_bg = '_bg.' in ast_name
-    idx = int(ast_name[2:5])
+    _m = re.search(r'\d+', ast_name)
+    idx = int(_m.group()) if _m else None
     layer_type = 'Background' if is_bg else 'Foreground/Overlay'
     aspect = '16:9' if is_bg else '1:1'
     
@@ -54,7 +55,6 @@ for ast_path in all_assets:
     props = {
         'Name': {'title': [{'type': 'text', 'text': {'content': f'[AG] {ast_name}'}}]},
         'Episode ID': {'rich_text': [{'type': 'text', 'text': {'content': ep_id}}]},
-        'Scene Index': {'number': idx},
         'Layer Type': {'select': {'name': layer_type}},
         'Aspect': {'select': {'name': aspect}},
         'Status': {'status': {'name': 'Approved'}},
@@ -65,6 +65,9 @@ for ast_path in all_assets:
     if r2_url:
         props['Image'] = {'files': [{'name': ast_name, 'type': 'external', 'external': {'url': r2_url}}]}
     
+    if idx is not None:
+        props['Scene Index'] = {'number': idx}
+
     res = create_page(images_db_id, props)
     page_id = res.get('id', '')
     print(f'Notion Image Asset Library synced: {ast_name} (Page ID: {page_id}) ✅')
