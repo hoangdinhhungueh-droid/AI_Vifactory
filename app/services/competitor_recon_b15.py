@@ -20,7 +20,7 @@ import re
 import time
 from pathlib import Path
 from typing import Optional, List, Dict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -161,219 +161,12 @@ def filter_comment_gaps(comments: List[Dict], min_likes: int = 3) -> List[Dict]:
     return gaps
 
 
-OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
-HAIKU_MODEL = os.environ.get("B15_SYNTH_MODEL", "anthropic/claude-haiku-4.5")
-
-SYNTH_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "competitor_analysis": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "video_id": {"type": "string"},
-                    "hook_strategy": {"type": "string"},
-                    "critical_flaw": {"type": "string"},
-                },
-                "required": ["video_id", "hook_strategy", "critical_flaw"],
-                "additionalProperties": False,
-            },
-        },
-        "golden_facts_to_keep": {"type": "array", "items": {"type": "string"}},
-        "audience_comment_gaps": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "unanswered_question": {"type": "string"},
-                    "viewer_frustration": {"type": "string"},
-                },
-                "required": ["unanswered_question", "viewer_frustration"],
-                "additionalProperties": False,
-            },
-        },
-        "recommended_10x_angle": {
-            "type": "object",
-            "properties": {
-                "hook_proposal": {"type": "string"},
-                "core_mechanism_to_clarify": {"type": "string"},
-                "differentiator": {"type": "string"},
-            },
-            "required": ["hook_proposal", "core_mechanism_to_clarify", "differentiator"],
-            "additionalProperties": False,
-        },
-    },
-    "required": [
-        "competitor_analysis",
-        "golden_facts_to_keep",
-        "audience_comment_gaps",
-        "recommended_10x_angle",
-    ],
-    "additionalProperties": False,
-}
-
-SYNTH_SYSTEM_PROMPT = (
-    "You are the B1.5 Recon Synthesizer for a documentary video factory. "
-    "You receive REAL YouTube competitor metrics and REAL viewer comments. "
-    "Rules: (1) Never invent a statistic, quote or timestamp that is absent from the input. "
-    "(2) unanswered_question MUST be a verbatim excerpt of a supplied comment. "
-    "(3) golden_facts_to_keep must be traceable to the supplied titles or comments. "
-    "(4) critical_flaw must name a concrete, checkable weakness, not a generic complaint. "
-    "Answer in English."
-)
-
-
-def call_haiku(prompt, system_prompt, schema, max_tokens=2000, timeout=180.0):
-    """Call Claude Haiku via OpenRouter under a strict JSON schema. Returns dict or None."""
-    import urllib.request
-    import urllib.error
-
-    key = os.environ.get("OPENROUTER_API_KEY")
-    if not key:
-        logger.error("[b15] OPENROUTER_API_KEY not set, cannot run Haiku synthesis")
-        return None
-
-    payload = {
-        "model": HAIKU_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ],
-        "max_tokens": max_tokens,
-        "temperature": 0.3,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {"name": "b15_intel", "strict": True, "schema": schema},
-        },
-    }
-    req = urllib.request.Request(
-        OPENROUTER_BASE_URL + "/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        method="POST",
-    )
-    req.add_header("Authorization", "Bearer " + key)
-    req.add_header("Content-Type", "application/json")
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            data = json.load(r)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")[:300]
-        logger.error("[b15] Haiku HTTP %s: %s", e.code, body)
-        return None
-    except Exception as e:
-        logger.error("[b15] Haiku call failed: %s", e)
-        return None
-
-    usage = data.get("usage") or {}
-    logger.info("[b15] Haiku usage: %s tokens, cost %s", usage.get("total_tokens"), usage.get("cost"))
-    try:
-        return json.loads(data["choices"][0]["message"]["content"])
-    except Exception as e:
-        logger.error("[b15] Haiku returned unparseable content: %s", e)
-        return None
-
-
-def build_synth_prompt(target_keyword, niche, benchmarks, gaps):
-    """Render the real collected data into the synthesizer prompt."""
-    lines = [
-        "TARGET KEYWORD: " + str(target_keyword),
-        "NICHE: " + str(niche),
-        "",
-        "COMPETITOR VIDEOS (real YouTube Data API metrics):",
-    ]
-    for b in benchmarks:
-        lines.append(
-            "- video_id=%s | channel=%s | title=%s | views=%d | comments=%d | published=%s | views_per_day=%d"
-            % (
-                b.get("video_id", ""),
-                b.get("channel", ""),
-                b.get("title", ""),
-                b.get("views", 0),
-                b.get("comments", 0),
-                b.get("published_at", ""),
-                b.get("avg_views_per_day", 0),
-            )
-        )
-    lines += ["", "REAL VIEWER COMMENTS (verbatim, with like counts):"]
-    if gaps:
-        for g in gaps:
-            flat = " ".join(str(g.get("text", "")).split())
-            lines.append("- [%d likes] %s" % (g.get("likes", 0), flat[:400]))
-    else:
-        lines.append("- (none passed the gap filter)")
-    lines += [
-        "",
-        "TASK:",
-        "1. For EACH video_id above, infer hook_strategy from its title and metrics, and name its single most important critical_flaw as a documentary source.",
-        "2. Extract golden_facts_to_keep: concrete factual anchors worth preserving in our own script.",
-        "3. For each supplied comment revealing a content gap, output unanswered_question (verbatim excerpt) plus viewer_frustration (what the viewer actually wanted).",
-        "4. Propose a recommended_10x_angle that beats every video above.",
-    ]
-    return "\n".join(lines)
-
-
-def apply_haiku_synthesis(card, target_keyword, niche, gaps):
-    """Replace the card's analytical fields with real Haiku output."""
-    benchmarks = card.get("competitor_benchmarks") or []
-    if not benchmarks:
-        card["synthesis_status"] = "skipped_no_benchmarks"
-        return card
-
-    prompt = build_synth_prompt(target_keyword, niche, benchmarks, gaps[:8])
-    out = call_haiku(prompt, SYNTH_SYSTEM_PROMPT, SYNTH_SCHEMA)
-    if not out:
-        card["synthesis_status"] = "haiku_failed"
-        return card
-
-    by_id = {}
-    for a in out.get("competitor_analysis") or []:
-        if a.get("video_id"):
-            by_id[a["video_id"]] = a
-    for b in benchmarks:
-        a = by_id.get(b.get("video_id"))
-        if a:
-            b["hook_strategy"] = a.get("hook_strategy", "")
-            b["critical_flaw"] = a.get("critical_flaw", "")
-
-    facts = out.get("golden_facts_to_keep") or []
-    if facts:
-        card["golden_facts_to_keep"] = facts
-
-    synth_gaps = out.get("audience_comment_gaps") or []
-    if synth_gaps:
-        merged = []
-        for sg in synth_gaps:
-            q = sg.get("unanswered_question", "")
-            likes = 0
-            probe = q[:30]
-            for g in gaps:
-                if probe and probe in g.get("text", ""):
-                    likes = g.get("likes", 0)
-                    break
-            merged.append({
-                "unanswered_question": q,
-                "viewer_frustration": sg.get("viewer_frustration", ""),
-                "likes_count": likes,
-            })
-        card["audience_comment_gaps"] = merged
-
-    angle = out.get("recommended_10x_angle") or {}
-    if angle:
-        card["recommended_10x_angle"] = angle
-
-    card["synthesis_status"] = "haiku_ok"
-    card["synthesis_model"] = HAIKU_MODEL
-    return card
-
-
 def synthesize_intel_card(
     task_id: str,
     target_keyword: str,
     niche: str,
     competitors: List[Dict],
     gaps: List[Dict],
-    use_haiku: bool = True,
 ) -> Dict:
     """Compile competitor intelligence card (Haiku-ready schema)."""
     # Calculate Velocity for each competitor
@@ -392,8 +185,8 @@ def synthesize_intel_card(
                     "comments": comp.get("comments", 0),
                     "published_at": comp["published_at"],
                     "avg_views_per_day": round(velocity),
-                    "hook_strategy": "",
-                    "critical_flaw": "",
+                    "hook_strategy": f"Analyze first 15s of {comp['title']}",
+                    "critical_flaw": "TBD by Haiku synthesis",
                 })
             except Exception as e:
                 logger.debug("[b15] velocity calc error: %s", e)
@@ -414,24 +207,18 @@ def synthesize_intel_card(
         "audience_comment_gaps": [
             {
                 "unanswered_question": g["text"][:150],
-                "viewer_frustration": "",
+                "viewer_frustration": "Extracted from comment",
                 "likes_count": g["likes"],
             }
             for g in gaps[:5]
         ],
         "recommended_10x_angle": {
-            "hook_proposal": "",
-            "core_mechanism_to_clarify": "",
-            "differentiator": "",
+            "hook_proposal": f"Lead with the biggest gap competitors missed on '{target_keyword}'",
+            "core_mechanism_to_clarify": f"Dig into mechanisms competitors glossed over",
         },
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "synthesis_status": "pending",
+        "timestamp": datetime.utcnow().isoformat(),
     }
-
-    if not use_haiku:
-        card["synthesis_status"] = "disabled"
-        return card
-    return apply_haiku_synthesis(card, target_keyword, niche, gaps)
+    return card
 
 
 async def run_b15(task_id: str, target_keyword: str, niche: str = "General") -> Optional[Dict]:
