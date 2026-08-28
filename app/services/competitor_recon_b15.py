@@ -282,10 +282,10 @@ def select_competitors(candidates: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
         v = velocity(c.get("views", 0), c.get("published_at", ""))
         if v is None:
             continue
-        c = dict(c, avg_views_per_day=round(v), age_days=age_days(c["published_at"]))
+        c = dict(c, avg_views_per_day=round(v), _velocity=v, age_days=age_days(c["published_at"]))
         scored.append(c)
 
-    group1 = sorted(scored, key=lambda c: c["avg_views_per_day"], reverse=True)[:GROUP1_ALLTIME_COUNT]
+    group1 = sorted(scored, key=lambda c: c["_velocity"], reverse=True)[:GROUP1_ALLTIME_COUNT]
     picked = {c["video_id"] for c in group1}
 
     recent = [
@@ -294,7 +294,7 @@ def select_competitors(candidates: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
         and RECENT_WINDOW_MIN_DAYS <= c["age_days"] <= RECENT_WINDOW_MAX_DAYS
         and c.get("comments", 0) >= RECENT_MIN_COMMENTS
     ]
-    group2 = sorted(recent, key=lambda c: c["avg_views_per_day"], reverse=True)[:GROUP2_RECENT_COUNT]
+    group2 = sorted(recent, key=lambda c: c["_velocity"], reverse=True)[:GROUP2_RECENT_COUNT]
 
     for c in group1:
         c["selection_group"] = "all_time_top_velocity"
