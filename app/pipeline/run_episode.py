@@ -327,7 +327,7 @@ async def run_pipeline(
         episode["chapters"] = _ch.get("chapters", [])
         episode["chapter_meta"] = {k: _ch[k] for k in ("n_chapters", "total_duration_s", "wpm", "split_mode") if k in _ch}
         try:
-            with open(os.path.join(out_dir, "story_gate.json"), "w") as _f:
+            with open(os.path.join(out_dir, "quality_gate.json"), "w") as _f:
                 json.dump({"quality": qa, "chapters": _ch}, _f, indent=2)
         except Exception as _swallowed:
             logger.warning("[swallowed] run_episode L%d: %s: %s", 263, type(_swallowed).__name__, _swallowed)
@@ -690,7 +690,7 @@ async def run_pipeline(
         from app.services.seo_metadata import write_seo_payloads
         if not episode.get("chapters"):
             try:
-                with open(os.path.join(out_dir, "story_gate.json")) as _gf:
+                with open(os.path.join(out_dir, "quality_gate.json")) as _gf:
                     _gate = json.load(_gf)
                 episode["chapters"] = (_gate.get("chapters") or {}).get("chapters", [])
             except Exception:
