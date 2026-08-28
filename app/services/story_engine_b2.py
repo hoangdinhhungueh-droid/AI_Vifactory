@@ -25,6 +25,25 @@ PENDING_TASKS_DIR = "/var/vf/pending_tasks"
 KNOWN_MARKETS = {"EN", "JP", "KR"}
 
 
+def _opening_hook(script: str, max_chars: int = 320) -> str:
+    """The first 1-2 sentences of the script, whole.
+
+    S3.5 scores this string on its own (app/services/story_quality.py:114):
+    a curiosity cue is worth 2.5 and an emotion cue 1.5, and the open question
+    that carries both is always the *second* sentence of a shock-then-question
+    opening. A fixed character slice cut it off mid-word, so the hook scored
+    6.3 against a 7.0 floor no matter how good the script was.
+    """
+    sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", (script or "").strip()) if s.strip()]
+    if not sents:
+        return ""
+    hook = sents[0]
+    for nxt in sents[1:2]:
+        if len(hook) + len(nxt) + 1 <= max_chars:
+            hook = hook + " " + nxt
+    return hook[:max_chars]
+
+
 def _reuse_slug(text: str, fallback: str) -> str:
     """Short hyphen slug (<=4 words) used as a background/foreground reuse key."""
     s = re.sub(r"[^a-z0-9]+", "-", str(text or "").lower()).strip("-")
@@ -282,7 +301,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         "story": full_script,
         "story_gate_score": story_score_str,
         "bgm_mood": "dramatic",
-        "hook_3s": full_script[:120],
+        "hook_3s": _opening_hook(full_script),
         "breakout_queries": breakout_queries,
         "content_theme": theme,
         "safety_label": safety_label,
