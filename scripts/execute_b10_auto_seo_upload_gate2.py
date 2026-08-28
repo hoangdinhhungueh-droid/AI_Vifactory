@@ -20,7 +20,7 @@ Flow:
      _find_thumbnail_asset).
   6. Update publish_ledger.json.
   7. Dispatch the UNCHANGED Human Gate 2 Telegram card (4 buttons) via
-     app.services.telegram_buttons.send_gate2_card.
+     app.services.telegram_buttons.send_gate3_card.
 """
 import os
 import sys
@@ -38,7 +38,7 @@ from app.services.hhtech_reasoner import call_gpt56_sol  # noqa: F401 (re-export
 from app.services.seo_autogen_b10 import generate_seo_packaging
 from app.services.youtube_upload import upload_from_payload
 from app.services.youtube_thumbnail import set_thumbnail
-from app.services.telegram_buttons import send_gate2_card
+from app.services.telegram_buttons import send_gate3_card
 from app.services import publish_ledger
 from ag_notion_bridge import update_page_properties, query_db, create_page
 from notion_schema_ext import (
@@ -317,7 +317,7 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
     LEDGER_PATH.write_text(json.dumps(ledger, indent=2, ensure_ascii=False), encoding="utf-8")
 
     print("=== [B10-AUTO] 8. Dispatching Human Gate 2 Telegram card (unchanged, 4 buttons) ===")
-    await send_gate2_card(
+    await send_gate3_card(
         video_id=video_id,
         episode_id=episode_id,
         title_a=packaging["title_a"],

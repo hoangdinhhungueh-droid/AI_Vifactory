@@ -11,7 +11,7 @@ sys.path.insert(0, "/root/video_factory/scripts")
 
 from app.services.youtube_upload import upload_from_payload, _load_env
 _load_env()
-from app.services.telegram_buttons import send_gate2_card
+from app.services.telegram_buttons import send_gate3_card
 
 # --episode arg (default: en-byzantine-empire-ep001 for backward compat)
 import argparse as _ap
@@ -104,7 +104,7 @@ def upload_and_gate2():
 
     print("=== 4. DISPATCHING HUMAN GATE 2 TELEGRAM CARD (4 BUTTONS) ===")
     async def dispatch():
-        msg_id = await send_gate2_card(
+        msg_id = await send_gate3_card(
             video_id=video_id,
             episode_id=ep_id,
             title_a=title_a,

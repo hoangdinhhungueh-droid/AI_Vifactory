@@ -153,6 +153,47 @@ def parse_callback_data(data):
     return s, ""
 
 
+VF_LOCK_DIR = "/var/vf/locks"
+VF_LOG_DIR = "/var/vf/logs"
+
+
+def _spawn_production(task_id):
+    """Fire-and-forget the B1.5->B2->B3->B3.5 chain for one approved market.
+
+    One process per market: approving EN must not start JP/KR, and an OOM in
+    one market cannot take the others down with it. Detached from vf-api
+    (start_new_session) so an API restart mid-chain does not kill the run.
+    Returns a short status string for the button reply.
+    """
+    import os
+    import subprocess
+    os.makedirs(VF_LOCK_DIR, exist_ok=True)
+    os.makedirs(VF_LOG_DIR, exist_ok=True)
+    lock = os.path.join(VF_LOCK_DIR, "%s.lock" % task_id)
+    try:
+        # O_EXCL makes the double-tap lose the race instead of spawning twice.
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return "already running"
+    log_path = os.path.join(VF_LOG_DIR, "%s.log" % task_id)
+    try:
+        logf = open(log_path, "ab")
+        proc = subprocess.Popen(
+            ["python3", "scripts/produce_episode_hg1.py", str(task_id)],
+            cwd="/root/video_factory",
+            stdout=logf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        os.write(fd, str(proc.pid).encode())
+        return "pid %d" % proc.pid
+    except Exception as e:
+        os.unlink(lock)
+        _log.error("[dispatch] gate1 spawn for %s failed: %s", task_id, e)
+        return "spawn failed: %s" % e
+    finally:
+        os.close(fd)
+
+
 def _gate1_approve_or_reject(task_id, approve):
     """Shared Gate 1 approve/reject logic for a single market task_id.
     Used by both the single apr/rej buttons and the ap_all/rj_all bulk
@@ -245,7 +286,8 @@ def _gate1_approve_or_reject(task_id, approve):
                 _log.warning('[dispatch] gate1 approve trend-brain update for %s: %s', task_id, e)
 
         ok = sl_ok and tb_ok
-        txt = (f'✅ Duyệt [{task_id}] => Đã cập nhật Notion (Gate Passed).') if ok else (f'⚠️ Duyệt OK nhưng lỗi cập nhật Notion cho [{task_id}].')
+        spawn = _spawn_production(task_id)
+        txt = (f'✅ Duyệt [{task_id}] => Notion OK, đang chạy B1.5→B3.5 ({spawn}).') if ok else (f'⚠️ Duyệt OK nhưng lỗi cập nhật Notion cho [{task_id}] ({spawn}).')
         return txt, not ok
     else:
         if page_id:
@@ -282,6 +324,17 @@ def dispatch(action, arg):
     """Route a button press. Returns (reply_text, show_alert). FAIL-SAFE."""
     a = (action or "").strip()
     arg = (arg or "").strip()
+    if a == "imgdone":
+        # HG2 acknowledged: images exist in Notion, release the HG1 lock so the
+        # B4->B10 leg can be launched (or the market re-run) without a manual rm.
+        import os
+        try:
+            os.unlink(os.path.join(VF_LOCK_DIR, "%s.lock" % arg))
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            _log.warning("[dispatch] imgdone unlock %s: %s", arg, e)
+        return f"✅ Đã ghi nhận ảnh xong cho [{arg}]. Chạy B4→B10 để render.", False
     if a == "up":
         return _yt_upload_episode(arg)
     if a == "pub":
