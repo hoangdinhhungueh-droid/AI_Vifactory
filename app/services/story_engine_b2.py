@@ -124,7 +124,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
     system_prompt = (
         f"You are a World-Class Master Non-Fiction Documentary Scriptwriter for Video Factory.\n"
         f"Target Narration Language: {lang_name}.\n"
-        f"Total Word Count Target: ~1,200 words across 5 structured Acts (approx. 240 words / 2 paragraphs per Act).\n\n"
+        f"Total Word Count Target: 1,500-1,700 words across 5 structured Acts (approx. 300-340 words / 2-3 paragraphs per Act). Scripts under 1,200 words are rejected by the story gate.\n\n"
         f"EDITORIAL & RETENTION PRINCIPLES (Rule 1, 2, 3, 4: Big Fish Small Pond):\n"
         f"• Subject / Case: {topic}\n"
         f"• Core Causal Mechanism: {niche_brief}\n"
@@ -135,11 +135,15 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         f"• {treatment_note}\n"
         f"• Zero graphic violence, zero gore, zero criminal glorification, zero method instructions.\n\n"
         f"ACT STRUCTURE REQUIREMENTS:\n"
-        f"1. Act I (The Catalyst Hook & The Apex Illusion): In first 60 words, open with a shocking empirical fact/paradox. Embed breakout queries.\n"
-        f"2. Act II (The Structural Setup & Latent Vulnerability): Dissect the institutional/societal framework and the hidden vulnerabilities.\n"
+        f"1. Act I (The Catalyst Hook & The Apex Illusion): The first 60 words must contain a hard number or dated fact that is itself startling (a valuation, a body count, a date) plus an unanswered question. Embed breakout queries.\n"
+        f"2. Act II (The Rise & Latent Vulnerability): Narrate the ascent in concrete dated milestones — when it was founded, how it grew and expanded, what it became, the market share it dominated, the year each threshold was crossed — then dissect the institutional framework that let the hidden vulnerability accumulate underneath that growth.\n"
         f"3. Act III (The Escalation & Hidden Conflict): Detail operational escalation, secondary financial flows, and manipulation.\n"
         f"4. Act IV (The Breaking Point & Terminal Collapse): Detail the decisive catalyst, investigation breakthrough, and rapid collapse.\n"
         f"5. Act V (The Institutional Aftermath & Timeless Lesson): Payoff, legislative reforms, and the systemic lesson.\n\n"
+        f"NARRATIVE LOOP DISCIPLINE:\n"
+        f"• Open a new loop roughly every 180 words: a direct question to the viewer, or a fact deliberately withheld ('that number would matter later', 'but almost no one noticed', 'for now'). A 1,600-word script needs at least nine such openings.\n"
+        f"• Every question or withheld fact you raise must be paid off later in explicit language: 'that is why', 'which is how', 'here is the answer', 'in the end'. Close at least three quarters of the loops you open.\n"
+        f"• Cite the evidentiary basis in the narration itself (filing, report, court testimony, balance sheet) at least twice.\n\n"
         f"Output ONLY the complete script organized strictly by Acts using '=== ACT I ===', '=== ACT II ===', '=== ACT III ===', '=== ACT IV ===', '=== ACT V ===' markers. No markdown fences, no stage directions."
     )
 
@@ -174,7 +178,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         competitor_context = "\n".join(context_lines) + "\n\n"
 
     user_prompt = f"{competitor_context}Write the complete 5-Act voiceover narration script for '{topic}' in {lang_name} now."
-    full_script_raw = call_gpt56_sol(user_prompt, system_prompt=system_prompt, max_tokens=3500, temperature=0.6, timeout=60.0)
+    full_script_raw = call_gpt56_sol(user_prompt, system_prompt=system_prompt, max_tokens=4500, temperature=0.6, timeout=90.0)
 
     # Clean and parse acts
     act_blocks = re.split(r'=== ACT [I|V|X]+ ===', full_script_raw, flags=re.IGNORECASE)
