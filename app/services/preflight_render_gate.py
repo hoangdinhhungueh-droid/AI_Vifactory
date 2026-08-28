@@ -207,7 +207,7 @@ def _check_scene_materials(brain: Optional[dict], by_key: dict, blocks: list, wa
         return
     scenes = brain.get("scenes") or []
     for s in scenes:
-        idx = s.get("scene_index")
+        idx = s.get("scene_index", s.get("scene_idx"))
         bg_key = s.get("background_reuse_key")
         fg_key = s.get("foreground_reuse_key")
         if not bg_key:

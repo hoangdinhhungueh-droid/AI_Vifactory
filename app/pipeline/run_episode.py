@@ -338,7 +338,7 @@ async def run_pipeline(
             _qmsg = (f"score={qa.get('quality_score')} blocking={qa.get('blocking')}\n"
                      f"\u26d4 Pipeline STOPPED (S3.5). Fix the script in Notion, then re-run this episode.")
             try:
-                await tg.notify_production("QUALITY_GATE_FAILED", episode_id, _qmsg)
+                await tg.notify_error("S3.5 QUALITY GATE FAILED", episode_id, _qmsg)
             except Exception as _swallowed:
                 logger.warning("[swallowed] run_episode L%d: %s: %s", 272, type(_swallowed).__name__, _swallowed)
             # FIX 27/07/2026: default flipped to hard-block. A failing script
@@ -439,7 +439,7 @@ async def run_pipeline(
             if _pf.get("verdict") == "BLOCKED":
                 _pfmsg = "; ".join(_pf.get("blocks", []))
                 try:
-                    await tg.notify_production("S3.7 preflight gate BLOCKED", episode_id, _pfmsg)
+                    await tg.notify_error("S3.7 PREFLIGHT GATE BLOCKED", episode_id, _pfmsg)
                 except Exception as _swallowed:
                     logger.warning("[swallowed] run_episode L%d: %s: %s", 3701, type(_swallowed).__name__, _swallowed)
                 if _pf_mode == "block":
