@@ -25,6 +25,12 @@ PENDING_TASKS_DIR = "/var/vf/pending_tasks"
 KNOWN_MARKETS = {"EN", "JP", "KR"}
 
 
+def _reuse_slug(text: str, fallback: str) -> str:
+    """Short hyphen slug (<=4 words) used as a background/foreground reuse key."""
+    s = re.sub(r"[^a-z0-9]+", "-", str(text or "").lower()).strip("-")
+    return "-".join([w for w in s.split("-") if w][:4]) or fallback
+
+
 def load_competitor_intel(task_id: str) -> dict | None:
     """Load B1.5 Competitor Intelligence Card if it exists."""
     intel_path = os.path.join(EPISODES_BASE_DIR, task_id, "competitor_intel_card.json")
@@ -212,19 +218,23 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         "Your task is to take the 5-Act script and generate dynamic scene breakdowns covering the entire narrative.\n\n"
         "STRICT VISUAL & COMPOSITION RULES:\n"
         "1. Scene 000 MUST be the Hero Frame establishing the central visual theme.\n"
-        "2. Background Prompts (bg_prompt): High-Key Warm Documentary, 16:9 aspect ratio, atmospheric cinematic lighting, under 35 words, NO text, NO characters.\n"
-        "3. Foreground Prompts (fg_prompt): EXACTLY 1 full-body character or central symbolic subject from head to toe, historical authentic attire, isolated on SOLID FLAT #FF00FF MAGENTA CHROMA-KEY BACKGROUND, clean chroma-key cutout, sharp silhouette, no border, no frame.\n"
-        "4. Foreground Position (fg_position): Alternate 'left' and 'right' dynamically across scenes.\n\n"
+        "2. Background Prompts (image_prompt): High-Key Warm Documentary, 16:9 aspect ratio, atmospheric cinematic lighting, under 35 words, NO text, NO characters.\n"
+        "3. Foreground Prompts (foreground_prompt): EXACTLY 1 full-body character or central symbolic subject from head to toe, historical authentic attire, isolated on SOLID FLAT #FF00FF MAGENTA CHROMA-KEY BACKGROUND, clean chroma-key cutout, sharp silhouette, no border, no frame.\n"
+        "4. Foreground Position (foreground_position): Alternate 'left' and 'right' dynamically across scenes.\n"
+        "5. Reuse keys (background_reuse_key / foreground_reuse_key): short lowercase hyphen slugs, max 4 words. Scenes sharing the SAME setting MUST share the SAME background_reuse_key; scenes showing the SAME subject MUST share the SAME foreground_reuse_key. Target 8-14 distinct background keys and 8-14 distinct foreground keys for the whole episode so images get reused instead of regenerated.\n"
+        "6. Every scene MUST have both reuse keys filled. Never null, never empty.\n\n"
         "Output ONLY a valid JSON array of scene objects matching this exact structure without markdown fences:\n"
         "[\n"
         "  {\n"
-        "    \"scene_idx\": 0,\n"
+        "    \"scene_index\": 0,\n"
         "    \"name\": \"sc000_hero_scene_name\",\n"
         "    \"arc\": \"Act I\",\n"
-        "    \"narration_text\": \"...\",\n"
-        "    \"bg_prompt\": \"Cinematic wide angle high-key documentary view of ..., photorealistic 8k documentary style.\",\n"
-        "    \"fg_prompt\": \"Full body standing figure in authentic attire, head to shoes visible, isolated on solid flat #FF00FF magenta background, clean chroma-key cutout, sharp silhouette, no border.\",\n"
-        "    \"fg_position\": \"left\"\n"
+        "    \"narration\": \"...\",\n"
+        "    \"image_prompt\": \"Cinematic wide angle high-key documentary view of ..., photorealistic 8k documentary style.\",\n"
+        "    \"foreground_prompt\": \"Full body standing figure in authentic attire, head to shoes visible, isolated on solid flat #FF00FF magenta background, clean chroma-key cutout, sharp silhouette, no border.\",\n"
+        "    \"foreground_position\": \"left\",\n"
+        "    \"background_reuse_key\": \"a1-trading-floor\",\n"
+        "    \"foreground_reuse_key\": \"ceo-dark-suit\"\n"
         "  }\n"
         "]"
     )
@@ -244,19 +254,25 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         logger.warning(f"[story_engine] Director Plan JSON parsing failed: {e}. Generating fallback scenes.")
         scenes = [
             {
-                "scene_idx": 0,
+                "scene_index": 0,
                 "name": f"sc000_hero_{task_id}",
                 "arc": "Act I",
-                "narration_text": full_script[:200],
-                "bg_prompt": f"Cinematic wide angle high-key documentary scene of {topic}, soft golden lighting, architectural detail, 8k documentary style.",
-                "fg_prompt": f"Full body standing representative historical figure for {topic}, authentic costume, head to shoes visible, isolated on solid flat #FF00FF magenta background, clean chroma-key cutout, sharp silhouette, no border.",
-                "fg_position": "left"
+                "narration": full_script[:200],
+                "image_prompt": f"Cinematic wide angle high-key documentary scene of {topic}, soft golden lighting, architectural detail, 8k documentary style.",
+                "foreground_prompt": f"Full body standing representative historical figure for {topic}, authentic costume, head to shoes visible, isolated on solid flat #FF00FF magenta background, clean chroma-key cutout, sharp silhouette, no border.",
+                "foreground_position": "left",
+                "background_reuse_key": "a1-hero-establishing",
+                "foreground_reuse_key": "hero-subject"
             }
         ]
 
     for i, sc in enumerate(scenes):
-        sc["scene_idx"] = i
-        sc["fg_position"] = "left" if i % 2 == 0 else "right"
+        sc["scene_index"] = i
+        sc["foreground_position"] = "left" if i % 2 == 0 else "right"
+        if not sc.get("background_reuse_key"):
+            sc["background_reuse_key"] = _reuse_slug(sc.get("name"), "bg-%03d" % i)
+        if not sc.get("foreground_reuse_key"):
+            sc["foreground_reuse_key"] = _reuse_slug(sc.get("name"), "fg-%03d" % i)
 
     # Build brain_input.json
     brain_input = {
@@ -296,17 +312,17 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
             update_page_properties(story_page_id, props)
 
         for sc in scenes[:12]:  # Seed primary scenes to Notion
-            idx = sc.get('scene_idx', 0)
+            idx = sc.get('scene_index', 0)
             sc_name = sc.get('name', f'sc{idx:03d}')
             sc_props = {
                 'Name': {'title': [{'type': 'text', 'text': {'content': f'[AG] {sc_name}'}}]},
                 'Episode ID': {'rich_text': [{'type': 'text', 'text': {'content': task_id}}]},
                 'Scene Index': {'number': idx},
                 'Arc': {'select': {'name': str(sc.get('arc', 'Act I'))[:50]}},
-                'Narration Text': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('narration_text', '')[:1000]}}]},
-                'Background Prompt': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('bg_prompt', '')[:1000]}}]},
-                'Foreground Prompt': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('fg_prompt', '')[:1000]}}]},
-                'Foreground Position': {'select': {'name': sc.get('fg_position', 'left')}},
+                'Narration Text': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('narration', '')[:1000]}}]},
+                'Background Prompt': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('image_prompt', '')[:1000]}}]},
+                'Foreground Prompt': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('foreground_prompt', '')[:1000]}}]},
+                'Foreground Position': {'select': {'name': sc.get('foreground_position', 'left')}},
                 'Status': {'status': {'name': 'Ready'}}
             }
             create_page(director_db_id, sc_props)
