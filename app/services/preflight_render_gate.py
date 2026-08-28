@@ -206,8 +206,8 @@ def _check_scene_materials(brain: Optional[dict], by_key: dict, blocks: list, wa
         warns.append("scenes: brain_input.json not found/unreadable, scene-completeness check skipped")
         return
     scenes = brain.get("scenes") or []
-    for s in scenes:
-        idx = s.get("scene_index", s.get("scene_idx"))
+    for i, s in enumerate(scenes):
+        idx = s.get("scene_index", s.get("scene_idx", i))
         bg_key = s.get("background_reuse_key")
         fg_key = s.get("foreground_reuse_key")
         if not bg_key:
