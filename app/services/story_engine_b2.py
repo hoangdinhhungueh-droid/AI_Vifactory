@@ -142,27 +142,32 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
 
     competitor_context = ""
     if intel_card:
-        gaps = intel_card.get("audience_comment_gaps", [])
         benchmarks = intel_card.get("competitor_benchmarks", [])
-        golden_facts = intel_card.get("golden_facts_to_keep", [])
-        recommended_angle = intel_card.get("recommended_10x_angle", {})
-        
-        context_lines = ["### COMPETITOR INTELLIGENCE (From B1.5 Recon):"]
-        if benchmarks:
-            context_lines.append("Competitors & their flaws:")
-            for b in benchmarks[:3]:
-                context_lines.append(f"  - {b.get('channel', 'Unknown')}: {b.get('critical_flaw', 'N/A')}")
+        gaps = intel_card.get("audience_comment_gaps", [])
+
+        context_lines = ["### COMPETITOR EVIDENCE (collected by B1.5, uninterpreted):"]
+        for b in benchmarks[:5]:
+            context_lines.append(
+                f"  - {b.get('channel', '?')} | \"{b.get('title', '?')}\" | "
+                f"{b.get('views', 0):,} views | {b.get('avg_views_per_day', 0):,}/day | "
+                f"{b.get('comments', 0):,} comments | {b.get('selection_group', '?')}"
+            )
+            head = b.get("transcript_head")
+            if head:
+                context_lines.append(f"    opening narration: {head[:400]}")
         if gaps:
-            context_lines.append("Unanswered audience questions:")
-            for g in gaps[:3]:
-                context_lines.append(f"  - {g.get('unanswered_question', 'N/A')}")
-        if golden_facts:
-            context_lines.append("Golden facts to preserve:")
-            for f in golden_facts[:2]:
-                context_lines.append(f"  - {f}")
-        if recommended_angle:
-            context_lines.append(f"Recommended 10x angle: {recommended_angle.get('hook_proposal', 'N/A')}")
-        
+            context_lines.append("Verbatim audience comments, highest-liked first:")
+            for g in gaps[:6]:
+                context_lines.append(
+                    f"  - [{g.get('likes_count', 0)} likes] {g.get('comment_verbatim', '')[:220]}"
+                )
+        context_lines.append(
+            "Derive from the evidence above: each competitor's critical explanatory gap, and "
+            "the single highest-value unanswered question. Build Acts III-IV to resolve that "
+            "question through mechanisms rather than speculation. Use only facts stated above "
+            "or in the theme brief; invent nothing."
+        )
+
         competitor_context = "\n".join(context_lines) + "\n\n"
 
     user_prompt = f"{competitor_context}Write the complete 5-Act voiceover narration script for '{topic}' in {lang_name} now."
