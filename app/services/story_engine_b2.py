@@ -22,6 +22,7 @@ import json as json_lib
 NOTION_STORY_DB_ID = os.getenv("STORY_LIBRARY_DB_ID", "b0301989-2400-836b-bdb5-8131fea17736")
 EPISODES_BASE_DIR = os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")
 PENDING_TASKS_DIR = "/var/vf/pending_tasks"
+KNOWN_MARKETS = {"EN", "JP", "KR"}
 
 
 def load_competitor_intel(task_id: str) -> dict | None:
@@ -73,9 +74,11 @@ def load_task_metadata(task_id: str) -> dict:
     except Exception as e:
         logger.warning(f"[story_engine] Error querying Notion Story Library for {task_id}: {e}")
 
-    parts = task_id.split("_")
-    mkt = parts[0] if len(parts) > 0 else "EN"
-    raw_name = "_".join(parts[2:]) if len(parts) > 2 else task_id
+    parts = [p for p in re.split(r"[_-]", task_id) if p]
+    head = parts[0].upper() if parts else ""
+    mkt = head if head in KNOWN_MARKETS else "EN"
+    body = [p for p in parts[1:] if not re.fullmatch(r"ep\d+", p, re.I)]
+    raw_name = "_".join(body) if body else task_id
     theme, safety_label, treatment_note = detect_safety_and_theme(raw_name, mkt)
     
     return {
