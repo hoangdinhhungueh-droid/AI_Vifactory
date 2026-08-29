@@ -237,7 +237,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
 
         if story_page_id:
             props = {
-                'Status': {'status': {'name': 'Approved'}},
+                'Status': {'status': {'name': 'Gate Passed'}},
                 'Story Gate Score': {'rich_text': [{'type': 'text', 'text': {'content': f'[AG] {story_score_str} PASS (GPT-5.6-SOL)'}}]},
                 'Rising Queries': {'rich_text': [{'type': 'text', 'text': {'content': ', '.join(breakout_queries)}}]}
             }
@@ -260,6 +260,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
             create_page(director_db_id, sc_props)
         logger.info(f"[story_engine] Notion Director Plan synced {len(scenes)} scenes! ✅")
     except Exception as e:
-        logger.warning(f"[story_engine] Notion sync exception (non-fatal): {e}")
+        logger.error(f"[story_engine] Notion sync FAILED for {task_id}: {e}")
+        raise RuntimeError(f"B2 Notion sync failed: {e}") from e
 
     return brain_input
