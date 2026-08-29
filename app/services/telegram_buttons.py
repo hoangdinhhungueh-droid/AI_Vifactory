@@ -271,6 +271,8 @@ async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,
         "📚 <b>Director Plan + Prompt Library:</b> đã sync Notion ✅\n\n"
         "📋 <b>Dán nguyên khối dưới đây vào Antigravity chat:</b>\n"
         f"<pre>{html.escape(paste_block)}</pre>\n"
-        "👉 <i>Sinh ảnh xong, pipeline tự chạy tiếp B5 → B10 và gửi card HG3.</i>"
+        "👉 <i>Pipeline tự kiểm tra mỗi ~10 phút — khi mọi ảnh BG/FG "
+        "đã Approved/Pulled by VPS trên Notion, tự chạy tiếp B5 → B10 "
+        "và gửi card HG3. Nút dưới đây chỉ để ghi nhận, không kích hoạt render.</i>"
     )
     return await send_with_buttons(text, [[("✅ Đã sinh ảnh xong", f"imgdone:{task_id}")]])
