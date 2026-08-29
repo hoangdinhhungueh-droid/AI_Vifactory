@@ -16,13 +16,16 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, '/root/video_factory')
 from app.services.hhtech_reasoner import call_gpt56_sol, detect_safety_and_theme
 from app.services import story_gate as sgate
-from scripts.ag_notion_bridge import resolve_id, update_page_properties, create_page, query_db
+from scripts.ag_notion_bridge import resolve_id, update_page_properties, create_page, query_db, append_children_blocks, get_blocks
 import json as json_lib
 
 NOTION_STORY_DB_ID = os.getenv("STORY_LIBRARY_DB_ID", "b0301989-2400-836b-bdb5-8131fea17736")
 EPISODES_BASE_DIR = os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")
 PENDING_TASKS_DIR = "/var/vf/pending_tasks"
 KNOWN_MARKETS = {"EN", "JP", "KR"}
+# Rule 75 subtitle chars-per-second hard cap; mirrors compile_episode_from_notion.py.
+# Used only as a physical floor for duration_sec, never to derive it.
+CPS_HARD_CAP = 20.0
 
 
 def _opening_hook(script: str, max_chars: int = 320) -> str:
@@ -203,7 +206,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         competitor_context = "\n".join(context_lines) + "\n\n"
 
     user_prompt = f"{competitor_context}Write the complete 5-Act voiceover narration script for '{topic}' in {lang_name} now."
-    full_script_raw = call_gpt56_sol(user_prompt, system_prompt=system_prompt, max_tokens=4500, temperature=0.6, timeout=90.0)
+    full_script_raw = call_gpt56_sol(user_prompt, system_prompt=system_prompt, max_tokens=4500, temperature=0.6, timeout=180.0)
 
     # Clean and parse acts
     act_blocks = re.split(r'=== ACT [I|V|X]+ ===', full_script_raw, flags=re.IGNORECASE)
@@ -221,6 +224,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
     # Audit Story Gate Score
     audit = sgate.score_story(full_script)
     story_score_str = f"{audit.get('score', 8)}/{audit.get('max_score', 10)}"
+    story_verdict = audit.get('verdict') or 'UNKNOWN'
     logger.info(f"[story_engine] Story Gate Score: {story_score_str} | Verdict: {audit.get('verdict')}")
 
     # Write story.txt
@@ -242,6 +246,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         "4. Foreground Position (foreground_position): Alternate 'left' and 'right' dynamically across scenes.\n"
         "5. Reuse keys (background_reuse_key / foreground_reuse_key): short lowercase hyphen slugs, max 4 words. Scenes sharing the SAME setting MUST share the SAME background_reuse_key; scenes showing the SAME subject MUST share the SAME foreground_reuse_key. Target 8-14 distinct background keys and 8-14 distinct foreground keys for the whole episode so images get reused instead of regenerated.\n"
         "6. Every scene MUST have both reuse keys filled. Never null, never empty.\n\n"
+        "7. duration_sec: estimated on-screen seconds for THIS scene, i.e. how long its narration takes when read aloud at a natural documentary pace (~150 words per minute). Positive number, one decimal. The sum over all scenes must approximate the read time of the whole script. Never omit it, never 0.\n\n"
         "Output ONLY a valid JSON array of scene objects matching this exact structure without markdown fences:\n"
         "[\n"
         "  {\n"
@@ -249,6 +254,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         "    \"name\": \"sc000_hero_scene_name\",\n"
         "    \"arc\": \"Act I\",\n"
         "    \"narration\": \"...\",\n"
+        "    \"duration_sec\": 12.5,\n"
         "    \"image_prompt\": \"Cinematic wide angle high-key documentary view of ..., photorealistic 8k documentary style.\",\n"
         "    \"foreground_prompt\": \"Full body standing figure in authentic attire, head to shoes visible, isolated on solid flat #FF00FF magenta background, clean chroma-key cutout, sharp silhouette, no border.\",\n"
         "    \"foreground_position\": \"left\",\n"
@@ -259,7 +265,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
     )
 
     dp_user = f"Topic: {topic}\nMarket: {mkt}\nFull Script:\n\n{full_script[:3500]}\n\nGenerate the complete Director Plan scenes JSON array now:"
-    dp_raw = call_gpt56_sol(dp_user, system_prompt=dp_system, max_tokens=3000, timeout=50.0)
+    dp_raw = call_gpt56_sol(dp_user, system_prompt=dp_system, max_tokens=3000, timeout=300.0)
 
     if dp_raw.startswith("```"):
         dp_raw = dp_raw.split("```")[1]
@@ -292,6 +298,18 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
             sc["background_reuse_key"] = _reuse_slug(sc.get("name"), "bg-%03d" % i)
         if not sc.get("foreground_reuse_key"):
             sc["foreground_reuse_key"] = _reuse_slug(sc.get("name"), "fg-%03d" % i)
+        try:
+            _dur = float(sc.get("duration_sec") or 0)
+        except (TypeError, ValueError):
+            _dur = 0.0
+        if _dur > 0:
+            # Physical floor only: a duration implying CPS > hard cap is unreadable.
+            _floor = len((sc.get("narration") or "").strip()) / CPS_HARD_CAP
+            sc["duration_sec"] = round(max(_dur, _floor), 1)
+        else:
+            sc.pop("duration_sec", None)
+            logger.warning("[story_engine] scene %d has no duration_sec from B3; leaving it unset "
+                           "so the compiler gate rejects it (Rule 118: do not fabricate)" % i)
 
     # Build brain_input.json
     brain_input = {
@@ -324,28 +342,76 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
 
         if story_page_id:
             props = {
-                'Status': {'status': {'name': 'Approved'}},
-                'Story Gate Score': {'rich_text': [{'type': 'text', 'text': {'content': f'[AG] {story_score_str} PASS (GPT-5.6-SOL)'}}]},
+                'Status': {'status': {'name': 'Gate Passed' if story_verdict == 'PASS' else 'Compiled'}},
+                'Story Gate Score': {'rich_text': [{'type': 'text', 'text': {'content': f'[AG] {story_score_str} {story_verdict} (GPT-5.6-SOL)'}}]},
                 'Rising Queries': {'rich_text': [{'type': 'text', 'text': {'content': ', '.join(breakout_queries)}}]}
             }
-            update_page_properties(story_page_id, props)
+            _res = update_page_properties(story_page_id, props)
+            if isinstance(_res, dict) and _res.get('error'):
+                logger.error('[story_engine] Story Library patch FAILED %s: %s' % (_res.get('status_code'), _res.get('message')))
 
+            # compile_episode_from_notion reads the full script from the page BODY,
+            # not from any property; without these blocks it aborts on "empty body".
+            _blk = get_blocks(story_page_id)
+            _has_body = False
+            if isinstance(_blk, dict):
+                for _b in (_blk.get('results') or []):
+                    _bt = _b.get('type')
+                    if _bt in ('paragraph', 'heading_1', 'heading_2', 'heading_3', 'quote', 'callout'):
+                        if ''.join(t.get('plain_text', '') for t in _b.get(_bt, {}).get('rich_text', [])).strip():
+                            _has_body = True
+                            break
+            if _has_body:
+                logger.info('[story_engine] Story Library body already present, skip append')
+            else:
+                _chunks = []
+                for _p in [x.strip() for x in full_script.split('\n\n') if x.strip()]:
+                    while len(_p) > 1900:
+                        _cut = _p.rfind(' ', 1000, 1900)
+                        if _cut < 0:
+                            _cut = 1900
+                        _chunks.append(_p[:_cut])
+                        _p = _p[_cut:].lstrip()
+                    if _p:
+                        _chunks.append(_p)
+                _children = [{'object': 'block', 'type': 'paragraph',
+                              'paragraph': {'rich_text': [{'type': 'text', 'text': {'content': c}}]}}
+                             for c in _chunks]
+                _appended = 0
+                for _i in range(0, len(_children), 90):
+                    _ares = append_children_blocks(story_page_id, _children[_i:_i + 90])
+                    if isinstance(_ares, dict) and _ares.get('error'):
+                        logger.error('[story_engine] Story body append FAILED %s: %s' % (_ares.get('status_code'), _ares.get('message')))
+                        break
+                    _appended += len(_children[_i:_i + 90])
+                logger.info('[story_engine] Story Library body written %d/%d blocks (%d chars)' % (_appended, len(_children), len(full_script)))
+
+        seeded = 0
         for sc in scenes[:12]:  # Seed primary scenes to Notion
             idx = sc.get('scene_index', 0)
             sc_name = sc.get('name', f'sc{idx:03d}')
             sc_props = {
                 'Name': {'title': [{'type': 'text', 'text': {'content': f'[AG] {sc_name}'}}]},
                 'Episode ID': {'rich_text': [{'type': 'text', 'text': {'content': task_id}}]},
+                'Task ID': {'rich_text': [{'type': 'text', 'text': {'content': task_id}}]},
                 'Scene Index': {'number': idx},
-                'Arc': {'select': {'name': str(sc.get('arc', 'Act I'))[:50]}},
-                'Narration Text': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('narration', '')[:1000]}}]},
+                'Beat': {'rich_text': [{'type': 'text', 'text': {'content': str(sc.get('arc', ''))[:200]}}]},
+                'Narration Segment': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('narration', '')[:1000]}}]},
                 'Background Prompt': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('image_prompt', '')[:1000]}}]},
                 'Foreground Prompt': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('foreground_prompt', '')[:1000]}}]},
-                'Foreground Position': {'select': {'name': sc.get('foreground_position', 'left')}},
-                'Status': {'status': {'name': 'Ready'}}
+                'BG Reuse Key': {'rich_text': [{'type': 'text', 'text': {'content': str(sc.get('background_reuse_key') or '')[:200]}}]},
+                'FG Reuse Key': {'rich_text': [{'type': 'text', 'text': {'content': str(sc.get('foreground_reuse_key') or '')[:200]}}]},
+                'FG Position': {'select': {'name': str(sc.get('foreground_position', 'left')).capitalize()}},
+                'Status': {'status': {'name': 'Compiled'}}
             }
-            create_page(director_db_id, sc_props)
-        logger.info(f"[story_engine] Notion Director Plan synced {len(scenes)} scenes! ✅")
+            if sc.get('duration_sec'):
+                sc_props['Duration Est (s)'] = {'number': float(sc['duration_sec'])}
+            _res = create_page(director_db_id, sc_props)
+            if isinstance(_res, dict) and _res.get('error'):
+                logger.error('[story_engine] Director Plan scene %s FAILED %s: %s' % (idx, _res.get('status_code'), _res.get('message')))
+            else:
+                seeded += 1
+        logger.info("[story_engine] Notion Director Plan seeded %d/%d scenes" % (seeded, min(len(scenes), 12)))
     except Exception as e:
         logger.warning(f"[story_engine] Notion sync exception (non-fatal): {e}")
 

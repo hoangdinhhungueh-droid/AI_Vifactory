@@ -7,7 +7,7 @@ Never reads a cached or pre-dumped local file (unlike ag_notion_bridge.read_skil
 which reads a static data/notion_audit/skill_ai.md snapshot that can go stale).
 
 Used by:
-  - scripts/produce_b1_b2_b3_gpt56_sol.py  (B2 story acts + B3 director plan)
+  - scripts/produce_episode_hg1.py  (B1.5→B3.5: recon + story + director plan + prompts)
   - app/services/prompt_forge.py           (B3.5 prompt forge)
   - scripts/sync_skill_enhancements.py     (reverse-sync GPT-5.6-Sol strict-audit gate)
 
