@@ -170,7 +170,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         f"5. Act V (The Institutional Aftermath & Timeless Lesson): Payoff, legislative reforms, and the systemic lesson.\n\n"
         f"NARRATIVE LOOP DISCIPLINE:\n"
         f"• Open a new loop roughly every 180 words: a direct question to the viewer, or a fact deliberately withheld ('that number would matter later', 'but almost no one noticed', 'for now'). A 1,600-word script needs at least nine such openings.\n"
-        f"• Every question or withheld fact you raise must be paid off later in explicit language: 'that is why', 'which is how', 'here is the answer', 'in the end'. Close at least three quarters of the loops you open.\n"
+        f"• CRITICAL: Every question or withheld fact you raise MUST be paid off later in explicit language: 'that is why', 'which is how', 'here is the answer', 'in the end'. Close at least 75-80% of the loops you open (for 1600 words = at least 8 closed loops). Use LOOP_CLOSE vocabulary in Acts IV-V. Missing loop closures are a gate failure.\n"
         f"• Cite the evidentiary basis in the narration itself (filing, report, court testimony, balance sheet) at least twice.\n\n"
         f"Output ONLY the complete script organized strictly by Acts using '=== ACT I ===', '=== ACT II ===', '=== ACT III ===', '=== ACT IV ===', '=== ACT V ===' markers. No markdown fences, no stage directions."
     )
