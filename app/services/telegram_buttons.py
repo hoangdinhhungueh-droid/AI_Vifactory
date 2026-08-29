@@ -256,7 +256,10 @@ async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,
     paste_block = (
         f"/run:image task:{task_id}\n\n"
         f"CONTEXT & CONSTRAINTS (Rule 435-437):\n"
-        f"Episode: {task_id} | Notion Prompt Library subpage | filter Episode={task_id}\n\n"
+        f"Episode: {task_id}\n"
+        f"Prompts: /var/vf/episodes/{task_id}/prompts_forge.json (30 reuse keys: BG+FG)\n"
+        f"  - layer_type: Background (16:9) or Foreground (1:1 chroma-key #FF00FF)\n"
+        f"  - Each reuse_key → one Antigravity /run:image request\n\n"
         f"QUALITY RULES (Rule 435 — 2K Resolution):\n"
         f"ALL images MUST be 2560x1440 (16:9 aspect, 2K DCI).\n"
         f"Append to every prompt: [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]\n\n"
