@@ -134,7 +134,7 @@ def score_story(story_text: str) -> dict:
     nwords = len(words)
     minutes = nwords / WPM if nwords else 0.0
     sents = [s for s in re.split(r"(?<=[.!?])\s+", story) if s.strip()]
-    hook = " ".join(sents[:4])
+    hook = " ".join(sents[:8] if len(sents) >= 8 else sents)  # Expand to first 8 sents to capture multi-para opening questions
     first60 = " ".join(words[:60])
 
     nums = re.findall(NUM, story)
