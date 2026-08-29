@@ -177,14 +177,17 @@ def _spawn_production(task_id):
         return "already running"
     log_path = os.path.join(VF_LOG_DIR, "%s.log" % task_id)
     try:
-        logf = open(log_path, "ab")
+        # Use os.open() for unbuffered I/O (better for detached subprocesses)
+        logfd = os.open(log_path, os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o644)
         proc = subprocess.Popen(
             ["python3", "scripts/produce_episode_hg1.py", str(task_id)],
             cwd="/root/video_factory",
-            stdout=logf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+            stdout=logfd, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
             start_new_session=True,
+            pass_fds=(logfd,)
         )
         os.write(fd, str(proc.pid).encode())
+        os.close(logfd)  # Close in parent; subprocess has its copy
         return "pid %d" % proc.pid
     except Exception as e:
         os.unlink(lock)

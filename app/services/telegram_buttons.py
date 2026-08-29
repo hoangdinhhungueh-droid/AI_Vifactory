@@ -273,8 +273,8 @@ async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,
         f"STORAGE & UPDATE:\n"
         f"1. Save images: /var/vf/episodes/{task_id}/assets/\n"
         f"2. Update Notion Image Asset Library: Episode ID, Reuse Key (match Prompt Library), Layer Type, Status=Approved\n\n"
-        f"QUOTA HANDLING (Rule 437):\n"
-        f"If 429 'quota exhausted': STOP immediately, VPS poller will auto-resume after reset (~4h50m)"
+        f"EXECUTION (Rule 120 — Native UI, No Quota):\n"
+        f"Use Antigravity's native chat + Image 3 directly. No IDE, no rate limits, no quota cap."
     )
     text = (
         "🎨 <b>[HUMAN GATE 2] PROMPTS SẴN SÀNG — CẦN SINH ẢNH</b>\n\n"

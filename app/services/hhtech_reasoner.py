@@ -173,8 +173,8 @@ def call_gpt56_sol(
                         delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
                         if delta:
                             full_content.append(delta)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"[hhtech] stream parse error: {e} on line: {data_str[:100]}")
                     
     return "".join(full_content).strip()
 

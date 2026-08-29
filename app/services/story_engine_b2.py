@@ -242,7 +242,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         "STRICT VISUAL & COMPOSITION RULES:\n"
         "1. Scene 000 MUST be the Hero Frame establishing the central visual theme.\n"
         "2. Background Prompts (image_prompt): High-Key Warm Documentary, 16:9 aspect ratio, atmospheric cinematic lighting, under 35 words, NO text, NO characters.\n"
-        "3. Foreground Prompts (foreground_prompt): EXACTLY 1 full-body character or central symbolic subject from head to toe, historical authentic attire, isolated on SOLID FLAT #FF00FF MAGENTA CHROMA-KEY BACKGROUND, clean chroma-key cutout, sharp silhouette, no border, no frame.\n"
+        "3. Foreground Prompts (foreground_prompt): EXACTLY 1 illustrated/drawn (NOT photorealistic) full-body character or central symbolic subject from head to toe, historical authentic attire, STYLIZED DIGITAL ARTWORK, isolated on SOLID FLAT #FF00FF MAGENTA CHROMA-KEY BACKGROUND, clean chroma-key cutout, sharp silhouette, no border, no frame.\n"
         "4. Foreground Position (foreground_position): Alternate 'left' and 'right' dynamically across scenes.\n"
         "5. Reuse keys (background_reuse_key / foreground_reuse_key): short lowercase hyphen slugs, max 4 words. Scenes sharing the SAME setting MUST share the SAME background_reuse_key; scenes showing the SAME subject MUST share the SAME foreground_reuse_key. Target 8-14 distinct background keys and 8-14 distinct foreground keys for the whole episode so images get reused instead of regenerated.\n"
         "6. Every scene MUST have both reuse keys filled. Never null, never empty.\n\n"
@@ -284,7 +284,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
                 "arc": "Act I",
                 "narration": full_script[:200],
                 "image_prompt": f"Cinematic wide angle high-key documentary scene of {topic}, soft golden lighting, architectural detail, 8k documentary style.",
-                "foreground_prompt": f"Full body standing representative historical figure for {topic}, authentic costume, head to shoes visible, isolated on solid flat #FF00FF magenta background, clean chroma-key cutout, sharp silhouette, no border.",
+                "foreground_prompt": f"Illustrated/drawn (NOT photorealistic) full-body {topic} character in authentic historical costume, head to shoes visible, digital artwork style, isolated on solid flat #FF00FF magenta background, clean chroma-key cutout, sharp silhouette, no border.",
                 "foreground_position": "left",
                 "background_reuse_key": "a1-hero-establishing",
                 "foreground_reuse_key": "hero-subject"

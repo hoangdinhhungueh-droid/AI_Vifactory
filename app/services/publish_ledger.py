@@ -98,10 +98,29 @@ def _save(records: List[Dict[str, Any]]) -> bool:
 
 def record_upload(video_id: str, title: str = "", episode_dir: str = "",
                    privacy_status: str = "private") -> bool:
-    """Upsert a just-uploaded video into the ledger. FAIL-SAFE."""
+    """Upsert a just-uploaded video into the ledger. FAIL-SAFE.
+    
+    Pre-check: if same episode_dir uploaded <5min ago, skip (dedup).
+    """
     if not video_id:
         return False
+    
     records = _load()
+    
+    # DEDUP: if episode_dir exists and was uploaded within last 5 min, skip
+    if episode_dir:
+        now_ts = datetime.now(timezone.utc).timestamp()
+        for r in records:
+            r_ep = r.get("episode_dir", "")
+            if r_ep == episode_dir and r.get("status") in ("private", "unlisted"):
+                try:
+                    r_ts = datetime.fromisoformat(r.get("uploaded_at", "")).timestamp()
+                    if now_ts - r_ts < 300:  # < 5 min
+                        # Already uploaded recently, skip
+                        return True  # FAIL-SAFE: pretend success
+                except:
+                    pass
+    
     status = "public" if privacy_status == "public" else "private"
     for r in records:
         if r.get("video_id") == video_id:

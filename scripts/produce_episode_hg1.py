@@ -57,8 +57,14 @@ def run_chain(task_id: str) -> int:
         from app.services.competitor_recon_b15 import run_b15
         _log(stage, "recon for keyword=%r" % keyword)
         card = run_b15(task_id, keyword, niche)
-        _log(stage, "intel card: %d competitors, %d transcripts" % (
-            len(card.get("competitors") or []), card.get("transcripts_captured", 0)))
+        if not card:
+            _log(stage, "no intel card (recon returned nothing) - B2 continues without it")
+        else:
+            _meta = card.get("collection_meta") or {}
+            _log(stage, "intel card: %d competitors, %d gaps, %d transcripts" % (
+                len(card.get("competitor_benchmarks") or []),
+                len(card.get("audience_comment_gaps") or []),
+                _meta.get("transcripts_captured", 0)))
     except Exception as e:
         # Recon is enrichment, not a hard dependency: B2 runs without it.
         _log(stage, "SKIPPED (%s: %s)" % (type(e).__name__, e))
