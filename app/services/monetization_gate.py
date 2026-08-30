@@ -165,18 +165,15 @@ def _load_env(path="/root/secrets/.env"):
 
 
 def _telegram(msg):
-    """Send message to Telegram via httpx (avoids exposing token in subprocess)."""
-    tok = os.getenv("VF_TG_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
-    chat = os.getenv("TELEGRAM_CHAT_ID")
-    if not tok or not chat or not msg:
+    tok = os.getenv("VF_TG_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN"); chat = os.getenv("TELEGRAM_CHAT_ID")
+    if not tok or not chat:
         return
     try:
-        import httpx
-        url = f"https://api.telegram.org/bot{tok}/sendMessage"
-        payload = {"chat_id": chat, "text": msg}
-        with httpx.Client(timeout=10) as client:
-            r = client.post(url, json=payload)
-            r.raise_for_status()
+        import subprocess
+        url = "https://" + "api.telegram.org/bot" + tok + "/sendMessage"
+        subprocess.run(["curl", "-sS", "-X", "POST", url, "-d", "chat_id=" + chat,
+                        "--data-urlencode", "text=" + msg],
+                       capture_output=True, text=True)
     except Exception:
         pass
 
