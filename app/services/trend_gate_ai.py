@@ -273,6 +273,9 @@ LANE_MIN = {
 GATE_DAILY_CAP = int(os.getenv("TREND_GATE_DAILY_CAP", "3"))
 GATE_DAILY_MIN = int(os.getenv("TREND_GATE_DAILY_MIN", "3"))
 
+# Rule D6 (Decisions Log): Minimum virality score gate for B1 Trend Gate
+MIN_VIRALITY_SCORE = 7.0
+
 
 def _commits_path(day):
     return os.path.join(RAW_POOL_DIR, "trend_gate_commits_%s.json" % day)
@@ -873,6 +876,13 @@ def trend_virality(req: TrendViralityRequest):
                 md = by_m.get(m, {})
                 top_sub = md.get("top_subject")
                 top_v = md.get("top_virality", 0)
+
+                # Rule D6: Enforce MIN_VIRALITY_SCORE >= 7.0
+                v_num = float(top_v) if str(top_v).replace(".", "").replace("-", "").isdigit() else 0.0
+                if v_num < MIN_VIRALITY_SCORE:
+                    logger.info(f"[B1 Gate] {m} subject '{top_sub}' rejected: virality {v_num:.2f} < {MIN_VIRALITY_SCORE}")
+                    continue
+
                 if top_sub and str(top_sub).strip().lower() not in ("none", "", "null"):
                     top_item = md.get("subjects", [{}])[0] if md.get("subjects") else {}
                     valid_markets.append((m, str(top_sub).strip(), top_v, top_item))
