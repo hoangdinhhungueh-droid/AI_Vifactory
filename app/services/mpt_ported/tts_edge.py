@@ -6,7 +6,7 @@ import aiofiles
 
 SSML_SUPPORTED_VOICES = {
     "en-US-AriaNeural":      ["cheerful","empathetic","fearful","sad","angry","excited","gentle","hopeful"],
-    "en-US-GuyNeural":       ["cheerful","newscast","angry","sad"],
+    "en-US-DavisNeural":       ["cheerful","newscast","angry","sad"],
     "en-GB-SoniaNeural":     ["cheerful","sad"],
     "vi-VN-HoaiMyNeural":    [],
     "vi-VN-NamMinhNeural":   [],
@@ -21,7 +21,7 @@ SSML_SUPPORTED_VOICES = {
 # and EP004 was already tuned for GuyNeural's pacing (see rate/pitch FIX
 # 29/07/2026 below, calibrated for the male voice's faster delivery). Aria
 # leaking back in as the default was a real regression -- fixed here.
-DEFAULT_VOICE = "en-US-GuyNeural"
+DEFAULT_VOICE = "en-US-DavisNeural"
 
 # ENHANCE 05/08/2026: auto-emphasis for narration. Wrap standout statistics
 # (numbers, percentages, money, magnitudes, years -- min 2 digits) in

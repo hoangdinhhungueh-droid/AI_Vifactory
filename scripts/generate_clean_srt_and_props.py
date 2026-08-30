@@ -20,7 +20,7 @@ print("Generating timestamped subtitles via Edge-TTS SubMaker...")
 submaker = edge_tts.SubMaker()
 
 async def gen_subs():
-    communicate = edge_tts.Communicate(speech_text, "en-US-GuyNeural", rate="-8%", pitch="-2Hz")
+    communicate = edge_tts.Communicate(speech_text, "en-US-DavisNeural", rate="-8%", pitch="-2Hz")
     async for chunk in communicate.stream():
         if chunk["type"] == "WordBoundary":
             submaker.feed(chunk)

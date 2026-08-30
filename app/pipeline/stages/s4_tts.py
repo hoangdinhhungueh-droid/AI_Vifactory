@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 # contradicting the locked decision (Decisions Log + "05 - Stage Details
 # S1-S9" spec row: "Voice giong dan ong trung nien") and the rate/pitch
 # tuning below (FIX 29/07/2026), which was calibrated specifically for the
-# MALE voice's pacing complaint on EP004. Switched to en-US-GuyNeural.
+# MALE voice's pacing complaint on EP004. Switched to en-US-DavisNeural.
 # LOCK 17/08/2026 (user decision): ALWAYS male voice, every market/lang.
 LANG_VOICE = {
-    "en": "en-US-GuyNeural",
+    "en": "en-US-DavisNeural",
     "vi": "vi-VN-NamMinhNeural",
     "zh": "zh-CN-YunxiNeural",
     "ja": "ja-JP-KeitaNeural",
@@ -39,7 +39,7 @@ async def run_s4(episode: dict) -> dict:
     episode_id = episode["episode_id"]
     text       = episode["text"]
     lang_code  = episode.get("lang_code", "en")
-    voice      = episode.get("voice") or LANG_VOICE.get(lang_code, "en-US-GuyNeural")
+    voice      = episode.get("voice") or LANG_VOICE.get(lang_code, "en-US-DavisNeural")
     backend    = episode.get("backend", "auto")
     out_dir    = os.path.join("/var/vf/episodes", episode_id)
     os.makedirs(out_dir, exist_ok=True)

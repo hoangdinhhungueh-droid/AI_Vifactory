@@ -75,7 +75,7 @@ REPO = Path("/root/video_factory")
 # for this channel) -- NOT to other languages' own native default voices.
 # Extend these sets if new edge-tts voices are ever adopted.
 KNOWN_MALE_VOICES = {
-    "en-US-GuyNeural", "en-US-ChristopherNeural", "en-US-EricNeural",
+    "en-US-DavisNeural", "en-US-ChristopherNeural", "en-US-EricNeural",
     "en-US-RogerNeural", "en-US-SteffanNeural", "en-US-BrianNeural",
     "en-GB-RyanNeural", "vi-VN-NamMinhNeural",
 }

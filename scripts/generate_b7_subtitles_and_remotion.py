@@ -23,7 +23,7 @@ print("Synthesizing sentence-level subtitles via Edge-TTS...")
 submaker_sentence = edge_tts.SubMaker()
 
 async def gen_sentences():
-    comm = edge_tts.Communicate(speech_text, "en-US-GuyNeural", rate="-8%", pitch="-2Hz", boundary="SentenceBoundary")
+    comm = edge_tts.Communicate(speech_text, "en-US-DavisNeural", rate="-8%", pitch="-2Hz", boundary="SentenceBoundary")
     async for chunk in comm.stream():
         if chunk["type"] == "SentenceBoundary":
             submaker_sentence.feed(chunk)
