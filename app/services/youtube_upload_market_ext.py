@@ -63,6 +63,12 @@ def _build_client_for_market(market="en"):
 
 
 def upload_from_payload_market(market, episode_dir,
+    # C-03: Check dedup before upload
+    task_id = payload.get("task_id", episode_dir.split("/")[-1])
+    if publish_ledger.check_already_uploaded(task_id):
+        logger.warning("[C-03] Task %s already uploaded, blocking duplicate", task_id)
+        return {"upload_blocked": True, "reason": "already_uploaded", "task_id": task_id}
+
                                payload_file="youtube_upload_payload.json",
                                privacy_status=None):
     """Market-aware upload: selects correct OAuth credentials for market (en/jp/kr).

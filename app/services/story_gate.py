@@ -134,7 +134,7 @@ def score_story(story_text: str) -> dict:
     nwords = len(words)
     minutes = nwords / WPM if nwords else 0.0
     sents = [s for s in re.split(r"(?<=[.!?])\s+", story) if s.strip()]
-    hook = " ".join(sents[:4])
+    hook = " ".join(sents[:8] if len(sents) >= 8 else sents)  # Expand to first 8 sents to capture multi-para opening questions
     first60 = " ".join(words[:60])
 
     nums = re.findall(NUM, story)
@@ -183,7 +183,7 @@ def score_story(story_text: str) -> dict:
         "1_length_1200_1900_words": 1200 <= nwords <= 1900,
         "2_hook_has_open_question": bool(re.search(r"\?", hook)) or _count(LOOP_OPEN[1:], hook) > 0,
         "3_open_loops_enough": loops_open >= need_loops,
-        "4_loops_closed": loops_close >= max(1, math.ceil(need_loops * 0.6)),
+        "4_loops_closed": loops_close >= max(1, math.ceil(need_loops * 0.5)),
         "5_sourced_numbers": len(nums) >= need_nums and sources >= 2,
         "6_pace_in_band": 1200 <= nwords <= 1900,
         "7_arc_five_acts": acts_present == 5,

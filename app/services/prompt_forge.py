@@ -70,6 +70,11 @@ def generate_scene_prompts(bg_dict: dict, fg_dict: dict, story_title: str) -> di
         timeout=120.0
     )
 
+    print(f"[B3.5 DEBUG] raw_response type={type(raw_response)}, len={len(raw_response) if raw_response else 0}, repr={repr(raw_response[:100] if raw_response else '')}")
+    if not raw_response or not raw_response.strip():
+        print(f"[ERROR] B3.5 prompt_forge: HHTech returned empty response. bg_dict={len(bg_dict)} keys, fg_dict={len(fg_dict)} keys, max_tokens=3000, timeout=120.0")
+        raise ValueError("HHTech API returned empty response for prompt generation. Possible causes: API timeout, streaming parse error, or rate limit. Try re-running or check HHTECH_API_KEY.")
+
     content = raw_response.strip()
     if content.startswith("```json"):
         content = content[7:]
@@ -78,6 +83,7 @@ def generate_scene_prompts(bg_dict: dict, fg_dict: dict, story_title: str) -> di
     if content.endswith("```"):
         content = content[:-3]
 
+    print(f"[B3.5 DEBUG] content after cleanup: len={len(content.strip())}, first100={repr(content.strip()[:100])}")
     return json.loads(content.strip())
 
 

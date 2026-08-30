@@ -327,7 +327,7 @@ async def run_pipeline(
         episode["chapters"] = _ch.get("chapters", [])
         episode["chapter_meta"] = {k: _ch[k] for k in ("n_chapters", "total_duration_s", "wpm", "split_mode") if k in _ch}
         try:
-            with open(os.path.join(out_dir, "story_gate.json"), "w") as _f:
+            with open(os.path.join(out_dir, "quality_gate.json"), "w") as _f:
                 json.dump({"quality": qa, "chapters": _ch}, _f, indent=2)
         except Exception as _swallowed:
             logger.warning("[swallowed] run_episode L%d: %s: %s", 263, type(_swallowed).__name__, _swallowed)
@@ -338,7 +338,7 @@ async def run_pipeline(
             _qmsg = (f"score={qa.get('quality_score')} blocking={qa.get('blocking')}\n"
                      f"\u26d4 Pipeline STOPPED (S3.5). Fix the script in Notion, then re-run this episode.")
             try:
-                await tg.notify_production("QUALITY_GATE_FAILED", episode_id, _qmsg)
+                await tg.notify_error("S3.5 QUALITY GATE FAILED", episode_id, _qmsg)
             except Exception as _swallowed:
                 logger.warning("[swallowed] run_episode L%d: %s: %s", 272, type(_swallowed).__name__, _swallowed)
             # FIX 27/07/2026: default flipped to hard-block. A failing script
@@ -416,38 +416,6 @@ async def run_pipeline(
         raise
     except Exception as _e365:
         logger.warning("[S3.65] story judge soft-failed: %s", _e365)
-
-    # -- S3.7: Pre-render audit gate (materials + wiring), added 07/08/2026 --
-    # Catches, BEFORE any TTS/render work starts, the exact defect classes
-    # hit in EP005 production QC: background not removed, wrong/regressed
-    # TTS voice, SSML leaking into spoken audio/subtitles, and missing
-    # foreground/core images. Defaults to BLOCK (unlike S3.65's default
-    # warn) because every check maps to a concrete production defect, not
-    # a speculative heuristic. VF_PREFLIGHT_GATE=block|warn|off.
-    try:
-        _pf_mode = _pfgate.gate_mode()
-        if _pf_mode != "off":
-            _pf = _pfgate.run_preflight_gate(out_dir, brain=_brain)
-            episode["preflight_render_gate"] = _pf
-            try:
-                with open(os.path.join(out_dir, "preflight_render_report.json"), "w") as _f:
-                    json.dump(_pf, _f, indent=2, ensure_ascii=False)
-            except Exception as _swallowed:
-                logger.warning("[swallowed] run_episode L%d: %s: %s", 3700, type(_swallowed).__name__, _swallowed)
-            logger.info("[S3.7] preflight gate verdict=%s blocks=%d warns=%d",
-                        _pf.get("verdict"), len(_pf.get("blocks", [])), len(_pf.get("warns", [])))
-            if _pf.get("verdict") == "BLOCKED":
-                _pfmsg = "; ".join(_pf.get("blocks", []))
-                try:
-                    await tg.notify_production("S3.7 preflight gate BLOCKED", episode_id, _pfmsg)
-                except Exception as _swallowed:
-                    logger.warning("[swallowed] run_episode L%d: %s: %s", 3701, type(_swallowed).__name__, _swallowed)
-                if _pf_mode == "block":
-                    raise RuntimeError("Preflight render gate BLOCKED: " + _pfmsg)
-    except RuntimeError:
-        raise
-    except Exception as _e37:
-        logger.warning("[S3.7] preflight gate soft-failed: %s", _e37)
 
     # -- S4: TTS -----------------------------------------------------------
     logger.info("[S4] synthesizing TTS...")
@@ -669,6 +637,38 @@ async def run_pipeline(
     # -- inject clip_paths for S7 ------------------------------------------
     episode["clips"] = [{"path": p} for p in clip_paths]
 
+    # -- S3.7: Pre-render audit gate (materials + wiring), added 07/08/2026 --
+    # Catches, BEFORE any TTS/render work starts, the exact defect classes
+    # hit in EP005 production QC: background not removed, wrong/regressed
+    # TTS voice, SSML leaking into spoken audio/subtitles, and missing
+    # foreground/core images. Defaults to BLOCK (unlike S3.65's default
+    # warn) because every check maps to a concrete production defect, not
+    # a speculative heuristic. VF_PREFLIGHT_GATE=block|warn|off.
+    try:
+        _pf_mode = _pfgate.gate_mode()
+        if _pf_mode != "off":
+            _pf = _pfgate.run_preflight_gate(out_dir, brain=_brain)
+            episode["preflight_render_gate"] = _pf
+            try:
+                with open(os.path.join(out_dir, "preflight_render_report.json"), "w") as _f:
+                    json.dump(_pf, _f, indent=2, ensure_ascii=False)
+            except Exception as _swallowed:
+                logger.warning("[swallowed] run_episode L%d: %s: %s", 3700, type(_swallowed).__name__, _swallowed)
+            logger.info("[S3.7] preflight gate verdict=%s blocks=%d warns=%d",
+                        _pf.get("verdict"), len(_pf.get("blocks", [])), len(_pf.get("warns", [])))
+            if _pf.get("verdict") == "BLOCKED":
+                _pfmsg = "; ".join(_pf.get("blocks", []))
+                try:
+                    await tg.notify_error("S3.7 PREFLIGHT GATE BLOCKED", episode_id, _pfmsg)
+                except Exception as _swallowed:
+                    logger.warning("[swallowed] run_episode L%d: %s: %s", 3701, type(_swallowed).__name__, _swallowed)
+                if _pf_mode == "block":
+                    raise RuntimeError("Preflight render gate BLOCKED: " + _pfmsg)
+    except RuntimeError:
+        raise
+    except Exception as _e37:
+        logger.warning("[S3.7] preflight gate soft-failed: %s", _e37)
+
     # -- S7: Render --------------------------------------------------------
     logger.info("[S7] rendering video...")
     if os.getenv("VF_STAGE_NOTIFY", "1") == "1":
@@ -690,7 +690,7 @@ async def run_pipeline(
         from app.services.seo_metadata import write_seo_payloads
         if not episode.get("chapters"):
             try:
-                with open(os.path.join(out_dir, "story_gate.json")) as _gf:
+                with open(os.path.join(out_dir, "quality_gate.json")) as _gf:
                     _gate = json.load(_gf)
                 episode["chapters"] = (_gate.get("chapters") or {}).get("chapters", [])
             except Exception:

@@ -98,10 +98,29 @@ def _save(records: List[Dict[str, Any]]) -> bool:
 
 def record_upload(video_id: str, title: str = "", episode_dir: str = "",
                    privacy_status: str = "private") -> bool:
-    """Upsert a just-uploaded video into the ledger. FAIL-SAFE."""
+    """Upsert a just-uploaded video into the ledger. FAIL-SAFE.
+    
+    Pre-check: if same episode_dir uploaded <5min ago, skip (dedup).
+    """
     if not video_id:
         return False
+    
     records = _load()
+    
+    # DEDUP: if episode_dir exists and was uploaded within last 5 min, skip
+    if episode_dir:
+        now_ts = datetime.now(timezone.utc).timestamp()
+        for r in records:
+            r_ep = r.get("episode_dir", "")
+            if r_ep == episode_dir and r.get("status") in ("private", "unlisted"):
+                try:
+                    r_ts = datetime.fromisoformat(r.get("uploaded_at", "")).timestamp()
+                    if now_ts - r_ts < 300:  # < 5 min
+                        # Already uploaded recently, skip
+                        return True  # FAIL-SAFE: pretend success
+                except:
+                    pass
+    
     status = "public" if privacy_status == "public" else "private"
     for r in records:
         if r.get("video_id") == video_id:
@@ -152,3 +171,15 @@ def list_recent(limit: int = 200) -> List[Dict[str, Any]]:
 
 def load_pending() -> List[Dict[str, Any]]:
     return [r for r in _load() if r.get("status") != "public"]
+
+def check_already_uploaded(task_id: str) -> bool:
+    """Check if task_id already has a recorded upload in ledger."""
+    try:
+        records = _load()
+        for r in records:
+            ep_dir = r.get("episode_dir", "")
+            if task_id == os.path.basename(ep_dir).strip() or r.get("task_id") == task_id:
+                return True
+        return False
+    except Exception:
+        return False

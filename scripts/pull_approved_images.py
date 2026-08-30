@@ -48,6 +48,10 @@ import json
 import os
 import re
 import sys
+
+from app.services.quota_manager import (
+    read_quota, is_quota_available, get_retry_wait_seconds, mark_resumed
+)
 import urllib.error
 import urllib.request
 
@@ -238,6 +242,21 @@ def main():
     database_id = find_database_id(token)
     rows = query_rows(token, database_id, args.episode_id, statuses)
     print("FOUND_ROWS=%d statuses=%s episode_id=%s" % (len(rows), statuses, args.episode_id))
+
+    # Check quota state (anti-429 pattern)
+    current_quota = read_quota()
+    if current_quota and not is_quota_available(current_quota):
+        wait_sec = get_retry_wait_seconds(current_quota)
+        wait_min = wait_sec / 60
+        print(f"QUOTA_EXHAUSTED: {current_quota.images_generated}/{current_quota.target_count} generated.")
+        print(f"Quota will reset in ~{wait_min:.0f} minutes. Try again at: {current_quota.quota_reset_at}")
+        print(f"(You can retry: python3 scripts/pull_approved_images.py --episode-id {args.episode_id})")
+        sys.exit(0)  # Not fatal; poller will retry
+    
+    if current_quota and current_quota.status == "QUOTA_EXHAUSTED":
+        # Quota has reset; mark resumed
+        mark_resumed(current_quota)
+        print(f"INFO: Quota has reset. Resuming from {current_quota.images_generated}/{current_quota.target_count}")
 
     manifest = []
     for row in rows:

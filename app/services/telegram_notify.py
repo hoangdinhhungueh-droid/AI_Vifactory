@@ -151,6 +151,16 @@ async def send_media_or_link(local_path: str, caption: str = "", key: Optional[s
 # ---- High-level production hooks -------------------------------------------
 
 async def notify_production(stage: str, episode_id: str, detail: str = "") -> bool:
+    """Stage progress -> log only.
+
+    The pipeline has exactly 3 human gates (HG1 topic approval, HG2 prompts
+    ready, HG3 release card). Per-stage pings drowned those out, so they are
+    logged instead of sent. Set VF_STAGE_NOTIFY_TELEGRAM=1 to get them back
+    while debugging.
+    """
+    logger.info(f"[stage] {stage} - {episode_id}" + (f" | {detail}" if detail else ""))
+    if os.getenv("VF_STAGE_NOTIFY_TELEGRAM", "0") != "1":
+        return True
     msg = f"\U0001F3AC <b>VF Production</b>\n<b>{stage}</b> \u2014 <code>{episode_id}</code>"
     if detail:
         msg += f"\n{detail}"

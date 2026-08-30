@@ -83,7 +83,7 @@ CHILDREN = [
         [
             rt("File \u0111\u00E3 s\u1EEDa/t\u1EA1o: "),
             rt(
-                "scripts/skill_ai_live.py (moi), scripts/produce_b1_b2_b3_gpt56_sol.py, app/services/prompt_forge.py, app/audit/db.py, app/audit/notifier.py, scripts/sync_skill_enhancements.py (moi), scripts/apply_rule121_skill_ai.py (moi, one-off seed)",
+                "scripts/skill_ai_live.py (moi), scripts/produce_episode_hg1.py, app/services/prompt_forge.py, app/audit/db.py, app/audit/notifier.py, scripts/sync_skill_enhancements.py (moi), scripts/apply_rule121_skill_ai.py (moi, one-off seed)",
                 code=True,
             ),
             rt(

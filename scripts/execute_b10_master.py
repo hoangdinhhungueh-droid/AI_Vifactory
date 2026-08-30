@@ -5,7 +5,7 @@ sys.path.insert(0, '/root/video_factory')
 sys.path.insert(0, '/root/video_factory/scripts')
 
 from app.services.youtube_upload import upload_from_payload
-from app.services.telegram_buttons import send_gate2_card
+from app.services.telegram_buttons import send_gate3_card
 
 # --episode arg (default: en-byzantine-empire-ep001 for backward compat)
 import argparse as _ap
@@ -120,7 +120,7 @@ print(f"Updated publish_ledger.json for {ep_id} ✅")
 # 6. Dispatch Telegram Human Gate 2 Card with 4 interactive buttons
 print("=== 6. DISPATCHING HUMAN GATE 2 TELEGRAM CARD ===")
 async def dispatch_gate2():
-    msg_id = await send_gate2_card(
+    msg_id = await send_gate3_card(
         video_id=video_id,
         episode_id=ep_id,
         title_a=title_a,

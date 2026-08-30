@@ -167,16 +167,17 @@ def render_episode(episode_id, market="en"):
     if bgm_path.exists():
         cmd_master.extend(["-stream_loop", "-1", "-i", str(bgm_path)])
         audio_filter = (
-            f"[1:a][2:a]amix=inputs=2:duration=first:dropout_transition=2[a]"
+            "[2:a]volume=0.06[bgm];"
+            "[1:a][bgm]amix=inputs=2:duration=first:dropout_transition=2,"
+            "aformat=sample_rates=48000:channel_layouts=stereo[a]"
         )
     else:
-        audio_filter = "[1:a]aformat=sample_rate=48000:channel_layout=stereo[a]"
-    
+        audio_filter = "[1:a]aformat=sample_rates=48000:channel_layouts=stereo[a]"
+
     cmd_master.extend([
         "-filter_complex",
         f"[0:v]subtitles={srt_escaped}:force_style='FontSize=22,FontName=Arial,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,MarginV=45'[v];"
-        f"[2:a]volume=0.06[bgm];"
-        f"[1:a][bgm]{audio_filter}",
+        f"{audio_filter}",
         "-map", "[v]", "-map", "[a]",
         "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "320k", "-ar", "48000",
