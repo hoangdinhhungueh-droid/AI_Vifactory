@@ -154,6 +154,7 @@ async def send_gate1_card(en_pack: dict, jp_pack: dict, kr_pack: dict) -> Option
         name_vi = html.escape(str(pack.get('topic_name_vi', subj)))
         keyword = html.escape(str(pack.get('search_specific_keyword', subj)))
         niche = html.escape(str(pack.get('niche_angle_brief', '')))
+        safety_label = html.escape(str(pack.get('safety_label', 'Standard')))
         arcs = html.escape(str(pack.get('story_direction_5_arcs', '')))
         task_id = html.escape(str(pack.get('task_id', f'{market.upper()}_EP0001_{market.lower()}')))
 
@@ -184,6 +185,7 @@ async def send_gate1_card(en_pack: dict, jp_pack: dict, kr_pack: dict) -> Option
             f"• <b>Search-Specific Key:</b> <code>{keyword}</code>\n"
             f"• <b>🔥 Cụm từ tìm kiếm tăng (+%):</b> <code>{bqs_display}</code>\n"
             f"• <b>Niche Brief:</b> {niche}\n"
+            f"⚠️ <b>Safety Tier:</b> {safety_label}\n"
             f"• <b>5-Act Direction:</b> {arcs_short}\n"
             f"👉 <b>Task ID:</b> <code>{task_id}</code>\n"
         )
