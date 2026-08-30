@@ -1,6 +1,7 @@
 from loguru import logger
 import os, sys, json
 from dotenv import load_dotenv
+from app.services import publish_ledger
 def _load_env():
     load_dotenv('/root/video_factory/.env')
 
@@ -63,12 +64,6 @@ def _build_client_for_market(market="en"):
 
 
 def upload_from_payload_market(market, episode_dir,
-    # C-03: Check dedup before upload
-    task_id = payload.get("task_id", episode_dir.split("/")[-1])
-    if publish_ledger.check_already_uploaded(task_id):
-        logger.warning("[C-03] Task %s already uploaded, blocking duplicate", task_id)
-        return {"upload_blocked": True, "reason": "already_uploaded", "task_id": task_id}
-
                                payload_file="youtube_upload_payload.json",
                                privacy_status=None):
     """Market-aware upload: selects correct OAuth credentials for market (en/jp/kr).
@@ -82,6 +77,12 @@ def upload_from_payload_market(market, episode_dir,
 
     with open(os.path.join(episode_dir, payload_file)) as f:
         payload = json.load(f)
+
+    # C-03: Check dedup before upload
+    task_id = payload.get("task_id", os.path.basename(episode_dir))
+    if publish_ledger.check_already_uploaded(task_id):
+        logger.warning("[C-03] Task %s already uploaded, blocking duplicate", task_id)
+        return {"upload_blocked": True, "reason": "already_uploaded", "task_id": task_id}
 
     platform = "youtube"
 
@@ -169,7 +170,6 @@ def upload_from_payload_market(market, episode_dir,
     try:
         vid = response.get("id") if isinstance(response, dict) else None
         if vid:
-            from app.services import publish_ledger
             publish_ledger.record_upload(
                 vid, payload.get("title", ""), episode_dir, resolved_privacy
             )
