@@ -19,6 +19,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from app.llm_router import llm_call
+from app.utils.logging_config import configure_logging
+
+# Suppress sensitive data in logs (httpx, urllib3, asyncpg, etc.)
+configure_logging()
 
 app = FastAPI(title="AI Video Factory API", version="v11.8")
 
