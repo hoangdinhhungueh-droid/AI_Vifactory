@@ -23,6 +23,7 @@ import re
 import time
 
 from app.llm_router import llm_call
+from app.services.skill_loader import get_skill_rules
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,10 @@ def judge_story(story_text: str, episode_id: str = "") -> dict:
     banned = _banned_hits(story)
     repeated = _repeated_openers(story)
 
+    # B7: Load Skill AI rules (cache 1h, aligned with B1/B2/B3/B3.5/B4/B5/B6)
+    skill_rules = get_skill_rules()
+    system_with_rules = SYSTEM_PROMPT + "\n\n" + skill_rules
+
     prompt = (
         "Grade this documentary voice-over script on 4 axes, 0-2 each "
         "(0=fail, 1=weak, 2=solid):\n"
@@ -105,7 +110,7 @@ def judge_story(story_text: str, episode_id: str = "") -> dict:
     }
 
     try:
-        res = llm_call(prompt, task_type="S3_story_judge", system=SYSTEM_PROMPT,
+        res = llm_call(prompt, task_type="S3_story_judge", system=system_with_rules,
                         expect_json=True)
         raw = (res.get("text") or "").strip().strip("`").strip()
         parsed = json.loads(raw)
