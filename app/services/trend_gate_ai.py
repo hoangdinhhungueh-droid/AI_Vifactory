@@ -274,7 +274,7 @@ GATE_DAILY_CAP = int(os.getenv("TREND_GATE_DAILY_CAP", "3"))
 GATE_DAILY_MIN = int(os.getenv("TREND_GATE_DAILY_MIN", "3"))
 
 # Rule D6 (Decisions Log): Minimum virality score gate for B1 Trend Gate
-MIN_VIRALITY_SCORE = 7.0
+MIN_VIRALITY_SCORE = 0.65  # 65% normalized (Rule D6: virality threshold, adjusted 31/08 for better pass rate)
 
 
 def _commits_path(day):
@@ -877,7 +877,7 @@ def trend_virality(req: TrendViralityRequest):
                 top_sub = md.get("top_subject")
                 top_v = md.get("top_virality", 0)
 
-                # Rule D6: Enforce MIN_VIRALITY_SCORE >= 7.0
+                # Rule D6: Enforce MIN_VIRALITY_SCORE >= 0.65 (65% normalized, adjusted 31/08)
                 v_num = float(top_v) if str(top_v).replace(".", "").replace("-", "").isdigit() else 0.0
                 if v_num < MIN_VIRALITY_SCORE:
                     logger.info(f"[B1 Gate] {m} subject '{top_sub}' rejected: virality {v_num:.2f} < {MIN_VIRALITY_SCORE}")

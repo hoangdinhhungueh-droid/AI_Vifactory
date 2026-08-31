@@ -45,8 +45,8 @@ class TestTrendGateB1:
         """Test that virality score ≥ 7.0 (Rule D6)."""
         # This would be part of the trend_virality endpoint
         # For now, verify the gate logic exists in code
-        min_score = 7.0
-        test_scores = [6.9, 7.0, 7.5, 8.0]
+        min_score = 0.70
+        test_scores = [0.69, 0.70, 0.75, 0.80]
         
         for score in test_scores:
             is_valid = score >= min_score
