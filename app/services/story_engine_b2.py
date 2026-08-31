@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 sys.path.insert(0, '/root/video_factory')
 from app.services.hhtech_reasoner import call_gpt56_sol, detect_safety_and_theme
+from app.services.skill_loader import get_skill_rules
 from app.services import story_gate as sgate
 from scripts.ag_notion_bridge import resolve_id, update_page_properties, create_page, query_db, append_children_blocks, get_blocks
 import json as json_lib
@@ -149,11 +150,15 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
     
     lang_name = "English" if mkt == "EN" else ("Japanese" if mkt == "JP" else "Korean")
 
+    # Load dynamic editorial rules from Notion Skill AI page
+    skill_rules = get_skill_rules()
+
     system_prompt = (
         f"You are a World-Class Master Non-Fiction Documentary Scriptwriter for Video Factory.\n"
         f"Target Narration Language: {lang_name}.\n"
         f"Total Word Count Target: 1,500-1,700 words across 5 structured Acts (approx. 300-340 words / 2-3 paragraphs per Act). Scripts under 1,200 words are rejected by the story gate.\n\n"
-        f"EDITORIAL & RETENTION PRINCIPLES (Rule 1, 2, 3, 4: Big Fish Small Pond):\n"
+        f"{skill_rules}\n\n"  # ← DYNAMIC RULES from Notion
+        f"SPECIFIC CONTEXT FOR THIS SCRIPT:\n"
         f"• Subject / Case: {topic}\n"
         f"• Core Causal Mechanism: {niche_brief}\n"
         f"• 5-Arc Direction: {story_arcs}\n"
