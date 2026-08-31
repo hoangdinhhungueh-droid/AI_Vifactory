@@ -33,6 +33,7 @@ from app.services import character_refs as _cref
 from app.services import image_gen as _img
 from app.services import telegram_notify as _tg
 from app.services.hhtech_reasoner import call_gpt56_sol
+from app.services.skill_loader import get_skill_rules
 
 sys.path.insert(0, "/root/video_factory/scripts")
 try:
@@ -487,6 +488,9 @@ def _generate_thumbnail_prompt(brain):
     art_style_val = brain.get("art_style"); style_tail = (art_style_val.get("style_prompt") if isinstance(art_style_val, dict) else art_style_val) or ""
     hook = brain.get("hook_3s") or ""
     story = (brain.get("story") or "")[:1200]
+    
+    # B4: Load Skill AI rules (cache 1h, aligned with B1/B2/B3/B3.5)
+    skill_rules = get_skill_rules()
     system = (
         "You are the Lead Thumbnail Art Director for Video Factory, applying "
         "the viral CTR-optimization framework (Skill AI SEO Playbook Hook "
@@ -500,6 +504,7 @@ def _generate_thumbnail_prompt(brain):
         + (style_tail or "flat editorial documentary illustration") +
         ". Output ONLY the raw image prompt text, nothing else."
     )
+    system = system + "\n\n" + skill_rules
     user = (
         "Episode hook (0-3s): %s\n\nStory excerpt:\n%s\n\nWrite the single "
         "best viral thumbnail prompt now." % (hook, story)
