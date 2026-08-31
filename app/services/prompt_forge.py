@@ -2,8 +2,7 @@
 Service: B3.5 Prompt Engineering Forge (/prompt:forge)
 Single Source of Truth: HHTech GPT-5.6-Sol + Prompt Library Notion DB
 Rule 120: Isolates prompt generation. FGs strictly generated on flat #FF00FF magenta background.
-Rule 121: MUST prepend a LIVE fresh fetch of the Skill AI Notion page to the system prompt on
-every call -- never rely on a cached/hardcoded rule snapshot (see scripts/skill_ai_live.py).
+Rule 121: Loads Skill AI rules via skill_loader.py (cache 1h, aligned with B1/B2/B3).
 23/08/2026: Prompt Library restructured to 1-episode-per-subpage + child "Prompts" DB
 (mirrors the Director Plan restructuring). push_prompts_to_notion now resolves/creates the
 episode's own child DB via ag_notion_bridge.resolve_episode_prompt_db instead of writing to a
@@ -20,7 +19,7 @@ def _load_env():
 _load_env()
 
 from app.services.hhtech_reasoner import call_gpt56_sol
-from scripts.skill_ai_live import load_skill_ai_live
+from app.services.skill_loader import get_skill_rules
 
 sys.path.insert(0, "/root/video_factory/scripts")
 import ag_notion_bridge as _bridge  # 23/08/2026: per-episode Prompt Library subpage+DB resolver
@@ -31,12 +30,12 @@ PROMPT_LIBRARY_DB_ID_FALLBACK = "8c801989-2400-831a-901d-014aebdc3b31"
 def generate_scene_prompts(bg_dict: dict, fg_dict: dict, story_title: str) -> dict:
     """
     Calls HHTech GPT-5.6-Sol via dedicated reasoner to generate high-fidelity image prompts for unique BGs and FGs.
-    Rule 121: always prepends a freshly-fetched (live, not cached) Skill AI digest.
+    Rule 121: loads Skill AI rules via skill_loader.py (cache 1h, same as B1/B2/B3).
     """
-    skill_ai_context = load_skill_ai_live()
+    skill_rules = get_skill_rules()
 
     system_prompt = (
-        skill_ai_context + "\n\n" +
+        skill_rules + "\n\n" +
         "You are an elite Hollywood Visual Director and Master Prompt Engineer specialized in 2-layer historical documentary video production.\n"
         "Generate high-fidelity, photorealistic image prompts for the given Backgrounds (16:9) and Foregrounds (1:1).\n\n"
         "RULES FOR LAYER 1 BACKGROUNDS (16:9):\n"
@@ -149,7 +148,7 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
         }
         res = requests.post("https://api.notion.com/v1/pages", headers=headers, json=bg_payload, timeout=10)
         if res.status_code in (200, 201):
-            print(f"Pushed BG prompt {bg_key} to Notion Prompt Library DB \u2705")
+            print(f"Pushed BG prompt {bg_key} to Notion Prompt Library DB ✅")
         else:
             print(f"[WARN] Failed to push BG prompt {bg_key}: {res.status_code} {res.text}")
 
@@ -167,6 +166,6 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
         }
         res = requests.post("https://api.notion.com/v1/pages", headers=headers, json=fg_payload, timeout=10)
         if res.status_code in (200, 201):
-            print(f"Pushed FG prompt {fg_key} to Notion Prompt Library DB \u2705")
+            print(f"Pushed FG prompt {fg_key} to Notion Prompt Library DB ✅")
         else:
             print(f"[WARN] Failed to push FG prompt {fg_key}: {res.status_code} {res.text}")
