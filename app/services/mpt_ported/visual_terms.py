@@ -3,6 +3,7 @@
 import asyncio, json, os, re
 from typing import Optional
 import httpx
+from app.services.skill_loader import get_skill_rules
 
 LLM_ENDPOINT = os.getenv("VF_API_URL", "http://localhost:8000") + "/api/v1/llm"
 LLM_API_KEY  = os.getenv("VF_API_KEY", "")
@@ -23,15 +24,20 @@ async def extract_visual_terms(
     Returns list of {sentence, visual_term, duration_s, media_type}.
     Uses VPS LLM router (/api/v1/llm).
     """
+    # B6: Load Skill AI rules (cache 1h, aligned with B1/B2/B3/B3.5/B4/B5)
+    skill_rules = get_skill_rules()
+    
     # Split into sentences (simple heuristic)
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     sentences = [s for s in sentences if len(s) > 5][:max_segments]
     batch = " | ".join(sentences)
 
+    system_with_rules = SYSTEM_PROMPT + "\n\n" + skill_rules
+    
     payload = {
         "prompt": batch,
         "task_type": "S3_visual_terms",
-        "system": SYSTEM_PROMPT,
+        "system": system_with_rules,
     }
     headers = {"Content-Type": "application/json"}
     if LLM_API_KEY:
