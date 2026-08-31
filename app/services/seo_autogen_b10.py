@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 
 from app.services.hhtech_reasoner import call_gpt56_sol
 from app.services import seo_metadata as seo
+from app.services.skill_loader import get_skill_rules
 
 logger = logging.getLogger("vf.seo_autogen_b10")
 
@@ -132,9 +133,13 @@ def generate_seo_packaging(episode: dict, series_meta: dict = None) -> dict:
         "chapters_source": chapters,
     }, ensure_ascii=False)
 
+ 
+    # B10: Load Skill AI rules (cache 1h, aligned with B1/B2/B3/B3.5/B4/B5/B6/B7)
+    skill_rules = get_skill_rules()
+    system_with_rules = SEO_SYSTEM_PROMPT + "\n\n" + skill_rules
     llm_result = None
     try:
-        raw = call_gpt56_sol(user_prompt, system_prompt=SEO_SYSTEM_PROMPT, max_tokens=2000, timeout=90.0)
+        raw = call_gpt56_sol(user_prompt, system_prompt=system_with_rules, max_tokens=2000, timeout=90.0)
         llm_result = _parse_llm_json(raw)
     except Exception as e:
         logger.error("[seo_autogen_b10] HHTech call/parse failed, using deterministic fallback: %s", e)
