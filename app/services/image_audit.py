@@ -37,6 +37,8 @@ import time
 import urllib.request
 import urllib.error
 
+from app.services.skill_loader import get_skill_rules
+
 NOTION_VERSION = "2022-06-28"
 # --- 16/08: vision audit provider switched to hhtech (OpenAI-compatible, paid credits) ---
 # Gemini free tier (250 RPD shared with text chains) exhausted after a few images -> unusable.
@@ -135,14 +137,17 @@ _AUDIT_CALIBRATION = (
 
 
 def _learned_rules() -> str:
-    """Inject human-approved learn-cycle rules into every audit prompt (16/08)."""
+    """B5: Load Skill AI rules via skill_loader (cache 1h, aligned with B1/B2/B3/B3.5).
+    
+    Replaces the old PG learn-loop hook (Rule 16 & 111 - 16/08) with unified
+    skill loading strategy. All stages now read from the same Skill AI snapshot.
+    """
     try:
-        from app.audit.db import get_approved_enhancements
-        rules = get_approved_enhancements(limit=10)
-        if not rules:
-            return ""
-        return "\n\nLEARNED RULES (approved from previous audit cycles):\n" + "\n".join("- " + str(r)[:150] for r in rules)
-    except Exception:
+        return get_skill_rules()
+    except Exception as e:
+        # Fallback: return empty string on error (audit can still proceed)
+        import logging
+        logging.getLogger(__name__).warning(f"[B5] skill_loader failed: {e}")
         return ""
 
 
