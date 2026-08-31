@@ -5,11 +5,13 @@ Dynamic loader for Video Factory editorial & structural rules from Notion Single
 Replaces hardcoded system_prompt strings in hhtech_reasoner.py + story_engine_b2.py.
 
 Created: 2026-08-31 (Fix for CRITICAL_HARDCODED_SKILLS_P0)
+Updated: 2026-08-31 (Added real TTL cache implementation)
 """
 import os
 import sys
 import logging
-from functools import lru_cache
+import time
+from functools import wraps
 
 # Add scripts dir to path for ag_notion_bridge
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../..", "scripts"))
@@ -20,9 +22,16 @@ logger = logging.getLogger(__name__)
 SKILL_AI_PAGE_ID = "ac901989-2400-827e-bda2-8175dabdcf13"
 CACHE_TTL_SECONDS = int(os.getenv("SKILL_CACHE_TTL_SECONDS", "3600"))  # 1 hour default
 
+# Cache state (module-level for simplicity)
+_cache = {
+    "data": None,
+    "expiration": 0,
+    "hits": 0,
+    "misses": 0
+}
 
-@lru_cache(maxsize=1)
-def _fetch_skill_rules() -> str:
+
+def _fetch_skill_rules_impl() -> str:
     """Fetch and parse Rules 113-121 từ Notion Skill AI page.
     
     Returns:
@@ -124,7 +133,7 @@ def _fetch_skill_rules() -> str:
 
 
 def get_skill_rules(force_refresh: bool = False) -> str:
-    """Get cached skill rules, optionally force refresh.
+    """Get cached skill rules with TTL expiration.
     
     Args:
         force_refresh: If True, clear cache and re-fetch from Notion
@@ -132,6 +141,12 @@ def get_skill_rules(force_refresh: bool = False) -> str:
     Returns:
         str: Skill rules text for system_prompt injection.
              Empty string if fetch fails (non-blocking fallback).
+    
+    Cache behavior:
+        - First call: Fetch from Notion, cache for TTL seconds
+        - Subsequent calls: Return cached value if not expired
+        - After TTL: Automatic refresh from Notion
+        - force_refresh: Bypass cache, always fetch fresh
     
     Usage:
         # In hhtech_reasoner.py or story_engine_b2.py:
@@ -143,73 +158,138 @@ def get_skill_rules(force_refresh: bool = False) -> str:
             "Output ONLY valid JSON...\n"
         )
     """
-    if force_refresh:
-        _fetch_skill_rules.cache_clear()
-        logger.info("[skill_loader] Cache cleared, forcing refresh from Notion")
+    global _cache
     
-    return _fetch_skill_rules()
+    current_time = time.time()
+    
+    # Check if cache is valid
+    if not force_refresh and _cache["data"] is not None and current_time < _cache["expiration"]:
+        # Cache hit
+        _cache["hits"] += 1
+        logger.debug(f"[skill_loader] Cache hit (expires in {int(_cache['expiration'] - current_time)}s)")
+        return _cache["data"]
+    
+    # Cache miss or expired - fetch fresh data
+    _cache["misses"] += 1
+    if force_refresh:
+        logger.info("[skill_loader] Force refresh requested")
+    elif _cache["data"] is None:
+        logger.info("[skill_loader] First fetch (cold cache)")
+    else:
+        logger.info(f"[skill_loader] Cache expired (age: {int(current_time - (_cache['expiration'] - CACHE_TTL_SECONDS))}s)")
+    
+    # Fetch from Notion
+    rules = _fetch_skill_rules_impl()
+    
+    # Update cache
+    _cache["data"] = rules
+    _cache["expiration"] = current_time + CACHE_TTL_SECONDS
+    
+    logger.info(f"[skill_loader] Cache updated (TTL: {CACHE_TTL_SECONDS}s, expires at: {time.strftime('%H:%M:%S', time.localtime(_cache['expiration']))})")
+    
+    return rules
 
 
 def get_cache_info() -> dict:
-    """Get LRU cache statistics for monitoring.
+    """Get cache statistics for monitoring.
     
     Returns:
-        dict: Cache info with hits, misses, size, maxsize
+        dict: Cache info with hits, misses, age, ttl, expiration time
     """
-    info = _fetch_skill_rules.cache_info()
+    global _cache
+    
+    current_time = time.time()
+    age_seconds = 0
+    remaining_seconds = 0
+    
+    if _cache["data"] is not None:
+        cache_created = _cache["expiration"] - CACHE_TTL_SECONDS
+        age_seconds = int(current_time - cache_created)
+        remaining_seconds = max(0, int(_cache["expiration"] - current_time))
+    
     return {
-        "hits": info.hits,
-        "misses": info.misses,
-        "size": info.currsize,
-        "maxsize": info.maxsize,
-        "ttl_seconds": CACHE_TTL_SECONDS
+        "hits": _cache["hits"],
+        "misses": _cache["misses"],
+        "cached": _cache["data"] is not None,
+        "age_seconds": age_seconds,
+        "remaining_seconds": remaining_seconds,
+        "ttl_seconds": CACHE_TTL_SECONDS,
+        "expiration_time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(_cache["expiration"])) if _cache["data"] else None
     }
+
+
+def clear_cache():
+    """Manually clear the cache. Next call to get_skill_rules() will fetch from Notion."""
+    global _cache
+    _cache["data"] = None
+    _cache["expiration"] = 0
+    logger.info("[skill_loader] Cache manually cleared")
 
 
 # CLI test interface
 if __name__ == "__main__":
     import json
     
-    print("Testing Skill Loader...")
+    print("Testing Skill Loader with TTL Cache...")
     print("=" * 60)
     
-    # Test 1: Fetch rules
-    print("\n[Test 1] Fetching rules from Notion...")
+    # Test 1: Fetch rules (cold cache)
+    print("\n[Test 1] Cold cache - fetching from Notion...")
+    start = time.time()
     rules = get_skill_rules()
+    t1 = time.time() - start
     if rules:
-        print(f"✅ SUCCESS: Loaded {len(rules)} characters")
+        print(f"✅ SUCCESS: Loaded {len(rules)} characters in {t1:.3f}s")
         print(f"\nFirst 500 chars:\n{rules[:500]}...")
     else:
         print("❌ FAILED: Empty result")
     
-    # Test 2: Cache hit
-    print("\n[Test 2] Testing cache...")
-    import time
-    start = time.time()
-    rules1 = get_skill_rules()
-    t1 = time.time() - start
-    
+    # Test 2: Cache hit (warm cache)
+    print("\n[Test 2] Warm cache - should be instant...")
     start = time.time()
     rules2 = get_skill_rules()
     t2 = time.time() - start
     
-    if rules1 == rules2 and t2 < t1 / 5:  # Cache should be 5x+ faster
-        print(f"✅ CACHE WORKING: {t1:.3f}s (cold) vs {t2:.3f}s (warm)")
+    if rules == rules2 and t2 < 0.001:  # Cache should be < 1ms
+        print(f"✅ CACHE HIT: {t1:.3f}s (cold) vs {t2:.6f}s (warm) - {int(t1/t2)}x faster")
     else:
-        print(f"⚠️  CACHE: {t1:.3f}s (cold) vs {t2:.3f}s (warm)")
+        print(f"⚠️  UNEXPECTED: {t1:.3f}s (cold) vs {t2:.3f}s (warm)")
     
     # Test 3: Cache info
     print("\n[Test 3] Cache statistics:")
     info = get_cache_info()
     print(json.dumps(info, indent=2))
     
-    # Test 4: Force refresh
-    print("\n[Test 4] Testing force refresh...")
+    # Test 4: Wait for partial TTL, verify cache still valid
+    print(f"\n[Test 4] Waiting 2 seconds (TTL={CACHE_TTL_SECONDS}s)...")
+    time.sleep(2)
+    info_after = get_cache_info()
+    remaining_before = info["remaining_seconds"]
+    remaining_after = info_after["remaining_seconds"]
+    
+    if remaining_after < remaining_before and remaining_after > 0:
+        print(f"✅ TTL WORKING: {remaining_before}s → {remaining_after}s remaining")
+    else:
+        print(f"⚠️  TTL: {remaining_before}s → {remaining_after}s")
+    
+    # Test 5: Force refresh
+    print("\n[Test 5] Testing force refresh...")
     rules_refreshed = get_skill_rules(force_refresh=True)
     if rules_refreshed:
-        print(f"✅ REFRESH SUCCESS: {len(rules_refreshed)} characters")
+        print(f"✅ FORCE REFRESH: {len(rules_refreshed)} characters")
+        info_refresh = get_cache_info()
+        print(f"   Cache reset: {info_refresh['age_seconds']}s old, {info_refresh['remaining_seconds']}s remaining")
     else:
         print("❌ REFRESH FAILED")
+    
+    # Test 6: Manual clear
+    print("\n[Test 6] Testing manual cache clear...")
+    clear_cache()
+    info_cleared = get_cache_info()
+    if not info_cleared["cached"]:
+        print(f"✅ CACHE CLEARED: cached={info_cleared['cached']}")
+    else:
+        print(f"❌ CLEAR FAILED: cached={info_cleared['cached']}")
     
     print("\n" + "=" * 60)
     print("Test complete")
