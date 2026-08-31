@@ -10,6 +10,7 @@ Standardized Architecture (24/08/2026 - Go-Live 2026):
 """
 
 import os, json, logging, re, urllib.request, urllib.parse
+from app.services.skill_loader import get_skill_rules
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
@@ -232,13 +233,12 @@ def reason_topic_niche(
             top_text = "\n[TOP SEARCH QUERIES]:\n" + "\n".join(lines) + "\n"
 
     # 3. Universal English-First Strategic System Prompt (Objective & Free of Stereotypes)
+    skill_rules = get_skill_rules()  # Dynamic load from Notion Skill AI
+
     system_prompt = (
         "You are the Lead Creative Director and Strategic Research Analyst for Video Factory (VF Pipeline).\n"
         "Your mission is to perform an objective, deep-dive causal analysis of the trending topic using the provided factual evidence (Native Ground Truth) and breakout search signals.\n\n"
-        "CORE EDITORIAL PRINCIPLES (Rule 1, 2, 3, 4, 78: Big Fish Small Pond):\n"
-        "1. OBJECTIVE & UNBIASED ANALYSIS: Do NOT force generic cliches or artificial stereotypes. Let the verified historical, financial, legal, or institutional facts dictate the causal mechanism.\n"
-        "2. CAUSAL MECHANISMS OVER GENERALITIES: Uncover the real underlying drivers (e.g., regulatory loopholes, structural incentives, accounting practices, market power, or social dynamics) directly from the evidence.\n"
-        "3. ACT 1 HOOK SHOCK: If Google Trends Breakout Queries or critical verified facts exist, use them as the primary catalyst/shock hook in the first 60 words of Act 1.\n"
+        f"{skill_rules}\n\n"  # ← DYNAMIC RULES from Notion
         "4. PLATFORM SAFETY MANDATE: Strictly respect the YouTube Safety Treatment Note below:\n"
         f"   [SAFETY RULE: {safety_label}]: {treatment_note}\n"
         "5. SEARCH-SPECIFIC TARGETING: Formulate 'search_specific_keyword' in the TARGET MARKET'S NATIVE LANGUAGE (Japanese for JP, Korean for KR, English for EN) incorporating high-intent core keywords and breakout terms for YouTube search optimization.\n"
