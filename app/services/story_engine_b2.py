@@ -1,6 +1,6 @@
 # app/services/story_engine_b2.py
 """
-Generic B2 Story Engine & Dynamic B3 Director Plan Generator via GPT-5.6-Sol.
+Generic B2 Story Engine & Dynamic B3 Director Plan Generator via GPT-6-Astra.
 Architecture & Rule Compliance:
   - Strict Rule 118: Zero-Mock Data.
   - Strict Rule 120: Safe-Treatment Mandates & Timestamp-Accurate 5-Act Structure.
@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 sys.path.insert(0, '/root/video_factory')
-from app.services.hhtech_reasoner import call_gpt56_sol, detect_safety_and_theme
+from app.services.hhtech_reasoner import call_gpt6_astra, detect_safety_and_theme
 from app.services.skill_loader import (
     get_skill_rules,
     get_central_skills,
@@ -146,7 +146,7 @@ def load_task_metadata(task_id: str) -> dict:
 
 
 def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
-    """Generate a complete 5-Act non-fiction script (~1,200 words) using GPT-5.6-Sol
+    """Generate a complete 5-Act non-fiction script (~1,200 words) using GPT-6-Astra
     enforcing YouTube Safety and Big Fish Small Pond mechanisms in a single optimized pass.
     Inherits authentic rules dynamically from Notion SoT (Central Skills + Content Engine Hub).
     """
@@ -309,8 +309,8 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
             f"Write the full ~1,800-2,200 word script now, adhering strictly to the 5-Act markers:"
         )
 
-        logger.info(f"[story_engine] Calling HHTech GPT-5.6-Sol for 5-Act Script generation (1,800-2,200 words)...")
-        full_script_raw = call_gpt56_sol(user_prompt, system_prompt=system_prompt, max_tokens=4200, timeout=240.0)
+        logger.info(f"[story_engine] Calling HHTech GPT-6-Astra for 5-Act Script generation (1,800-2,200 words)...")
+        full_script_raw = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=4200, timeout=240.0)
 
         cleaned_acts = []
         act_pattern = re.compile(r'(=== ACT [I|V|X]+ ===.*?)(?=(=== ACT [I|V|X]+ ===|\Z))', re.DOTALL)
@@ -340,7 +340,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
             logger.warning(
                 f"[story_engine] Story Gate FAILED ({audit.get('score')}/{audit.get('max_score')}). "
                 f"Fix hints: {audit.get('fix_hints')}. Banned hits: {audit.get('banned_phrases_found')}. "
-                f"Initiating Auto-Refine Attempt {refine_attempt}/2 via GPT-5.6-Sol..."
+                f"Initiating Auto-Refine Attempt {refine_attempt}/2 via GPT-6-Astra..."
             )
             refine_user = (
                 f"The generated script failed our quality gate (Score: {audit.get('score')}/{audit.get('max_score')}).\n"
@@ -352,7 +352,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
                 f"Output ONLY the corrected 5-Act script now:"
             )
             try:
-                refined_raw = call_gpt56_sol(refine_user, system_prompt=system_prompt, max_tokens=4200, timeout=240.0)
+                refined_raw = call_gpt6_astra(refine_user, system_prompt=system_prompt, max_tokens=4200, timeout=240.0)
                 if refined_raw and len(refined_raw.split()) >= 1000:
                     cleaned_acts_ref = []
                     matches_ref = act_pattern.findall(refined_raw)
@@ -382,105 +382,10 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
             logger.warning(f"[story_engine] Error writing story.txt to {d}: {_fe}")
 
     # ----------------------------------------------------
-    # B3. Dynamic Director Plan Generation
+    # B2 Output Finalization (Rule 125: B3 Scene breakdown delegated to director_planner_b3.py)
     # ----------------------------------------------------
-    logger.info(f"[story_engine] [B3] Generating Dynamic Director Plan via GPT-5.6-Sol...")
-    media_rules = get_media_production_rules()
-    dp_system = (
-        "You are the Lead Art Director for Video Factory (VF Pipeline v3 / Rule 116, Rule 120, Rule 435).\n"
-        "Your task is to take the 5-Act script and generate dynamic scene breakdowns covering the entire narrative.\n\n"
-        "=== NOTION SOT MEDIA PRODUCTION RULES ===\n"
-        f"{media_rules}\n\n"
-        "STRICT VISUAL & COMPOSITION RULES:\n"
-        "1. Scene 000 MUST be the Hero Frame establishing the central visual theme.\n"
-        "2. Background Prompts (image_prompt): High-Key Warm Documentary, 16:9 aspect ratio, atmospheric cinematic lighting, under 35 words, NO text, NO characters.\n"
-        "3. Foreground Prompts (foreground_prompt): EXACTLY 1 illustrated/drawn (NOT photorealistic) full-body character or central symbolic subject from head to toe, historical authentic attire, STYLIZED DIGITAL ARTWORK, isolated on SOLID FLAT #FF00FF MAGENTA CHROMA-KEY BACKGROUND, clean chroma-key cutout, sharp silhouette, no border, no frame.\n"
-        "4. Foreground Position (foreground_position): Alternate 'left' and 'right' dynamically across scenes.\n"
-        "5. Reuse keys (background_reuse_key / foreground_reuse_key): short lowercase hyphen slugs, max 4 words. Scenes sharing the SAME setting MUST share the SAME background_reuse_key; scenes showing the SAME subject MUST share the SAME foreground_reuse_key. Target 8-14 distinct background keys and 8-14 distinct foreground keys for the whole episode so images get reused instead of regenerated.\n"
-        "6. Every scene MUST have both reuse keys filled. Never null, never empty.\n\n"
-        "7. duration_sec: estimated on-screen seconds for THIS scene, i.e. how long its narration takes when read aloud at a natural documentary pace (~150 words per minute). Positive number, one decimal. The sum over all scenes must approximate the read time of the whole script. Never omit it, never 0.\n\n"
-        "Output ONLY a valid JSON array of scene objects matching this exact structure without markdown fences:\n"
-        "[\n"
-        "  {\n"
-        "    \"scene_index\": 0,\n"
-        "    \"name\": \"sc000_hero_scene_name\",\n"
-        "    \"arc\": \"Act I\",\n"
-        "    \"narration\": \"...\",\n"
-        "    \"duration_sec\": 12.5,\n"
-        "    \"image_prompt\": \"Cinematic wide angle high-key documentary view of ..., photorealistic 8k documentary style, 16:9 aspect ratio.\",\n"
-        "    \"foreground_prompt\": \"Stylized editorial graphic novel digital illustration of full body standing figure in authentic attire, head to shoes visible, isolated on solid flat #FF00FF magenta background, clean chroma-key cutout, sharp silhouette, no border.\",\n"
-        "    \"foreground_position\": \"left\",\n"
-        "    \"background_reuse_key\": \"a1-trading-floor\",\n"
-        "    \"foreground_reuse_key\": \"ceo-dark-suit\"\n"
-        "  }\n"
-        "]"
-    )
-
-    dp_user = f"Topic: {topic}\nMarket: {mkt}\nFull Script:\n\n{full_script[:3500]}\n\nGenerate the complete Director Plan scenes JSON array now:"
-    dp_raw = None
-    for b3_attempt in range(1, 4):
-        try:
-            logger.info(f"[story_engine] [B3] Calling GPT-5.6-Sol for Director Plan (attempt {b3_attempt}/3)...")
-            dp_raw = call_gpt56_sol(dp_user, system_prompt=dp_system, max_tokens=4000, timeout=300.0 + (b3_attempt - 1) * 60.0)
-            if dp_raw and len(dp_raw.strip()) > 50:
-                break
-        except Exception as e:
-            logger.warning(f"[story_engine] [B3] Director Plan attempt {b3_attempt} failed: {e}")
-            if b3_attempt < 3:
-                import time
-                time.sleep(5.0)
-
-    dp_clean = dp_raw.strip()
-    if "```" in dp_clean:
-        for chunk in dp_clean.split("```"):
-            c = chunk.strip()
-            if c.startswith("json"):
-                c = c[4:].strip()
-            if c.startswith("[") and "]" in c:
-                dp_clean = c
-                break
-    start = dp_clean.find("[")
-    end = dp_clean.rfind("]")
-    if start != -1 and end != -1:
-        dp_clean = dp_clean[start:end+1]
-
-    try:
-        scenes = json.loads(dp_clean, strict=False)
-    except Exception as e:
-        logger.warning(f"[story_engine] Director Plan JSON parsing failed: {e}. Generating fallback scenes.")
-        scenes = [
-            {
-                "scene_index": 0,
-                "name": f"sc000_hero_{task_id}",
-                "arc": "Act I",
-                "narration": full_script[:200],
-                "image_prompt": f"Cinematic wide angle high-key documentary scene of {topic}, soft golden lighting, architectural detail, 16:9 aspect ratio.",
-                "foreground_prompt": f"Stylized editorial graphic novel digital illustration of full-body {topic} character in authentic historical costume, head to shoes visible, digital artwork style, isolated on solid flat #FF00FF magenta background, clean chroma-key cutout, sharp silhouette, no border.",
-                "foreground_position": "left",
-                "background_reuse_key": "a1-hero-establishing",
-                "foreground_reuse_key": "hero-subject"
-            }
-        ]
-
-    for i, sc in enumerate(scenes):
-        sc["scene_index"] = i
-        sc["foreground_position"] = "left" if i % 2 == 0 else "right"
-        if not sc.get("background_reuse_key"):
-            sc["background_reuse_key"] = _reuse_slug(sc.get("name"), "bg-%03d" % i)
-        if not sc.get("foreground_reuse_key"):
-            sc["foreground_reuse_key"] = _reuse_slug(sc.get("name"), "fg-%03d" % i)
-        try:
-            _dur = float(sc.get("duration_sec") or 0)
-        except (TypeError, ValueError):
-            _dur = 0.0
-        if _dur > 0:
-            # Physical floor only: a duration implying CPS > hard cap is unreadable.
-            _floor = len((sc.get("narration") or "").strip()) / CPS_HARD_CAP
-            sc["duration_sec"] = round(max(_dur, _floor), 1)
-        else:
-            sc.pop("duration_sec", None)
-            logger.warning("[story_engine] scene %d has no duration_sec from B3; leaving it unset "
-                           "so the compiler gate rejects it (Rule 118: do not fabricate)" % i)
+    logger.info("[story_engine] B2 5-Act story generation complete. Scene breakdown delegated to B3 Art Director.")
+    scenes = []
 
     # Build brain_input.json
     brain_input = {
@@ -619,7 +524,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="B2 Story Engine (GPT-5.6-Sol)")
+    parser = argparse.ArgumentParser(description="B2 Story Engine (GPT-6-Astra)")
     parser.add_argument("task_id", help="Task ID or Episode ID (e.g. KR_EP0001_pesticide-trust-crisis)")
     parser.add_argument("--force", action="store_true", help="Force regeneration even if story.txt exists")
     args = parser.parse_args()

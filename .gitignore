@@ -69,4 +69,4 @@ remotion/build/
 *.bak*
 *.broken*
 scratch/
-tests/ci_neighbor_tester.log
+tests/ci_neighbor_tester.logworkspace/

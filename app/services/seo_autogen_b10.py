@@ -4,7 +4,7 @@ SEO Auto-Packaging Generator for B10 (Upload stage).
 
 Added 23/08/2026 per user request: removes the manual "paste command into
 Antigravity" step for YouTube packaging. Instead, B10 now calls the same
-HHTech GPT-5.6-Sol gateway used at B1/B2 (see hhtech_reasoner.call_gpt56_sol,
+HHTech GPT-6-Astra gateway used at B1/B2 (see hhtech_reasoner.call_gpt56_sol,
 Rule 117) to auto-generate the full SEO/packaging bundle for an episode,
 strictly following the Skill AI packaging rules (Rule 119): KVS-method
 title, front-loaded description, hidden tags, platform-capped hashtags,
@@ -29,7 +29,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from app.services.hhtech_reasoner import call_gpt56_sol
+from app.services.hhtech_reasoner import call_gpt6_astra
 from app.services import seo_metadata as seo
 from app.services.skill_loader import get_skill_rules
 
@@ -112,7 +112,7 @@ def _fallback_packaging(episode: dict, series_meta=None) -> dict:
 
 def generate_seo_packaging(episode: dict, series_meta: dict = None) -> dict:
     """Auto-generate the full YouTube SEO/packaging bundle for one episode via
-    HHTech GPT-5.6-Sol (same gateway as B1/B2, Rule 117), then enforce all
+    HHTech GPT-6-Astra (same gateway as B1/B2, Rule 117), then enforce all
     deterministic numeric/format constraints via seo_metadata helpers.
 
     `episode` should include at minimum: episode_id, trend_keywords or
@@ -144,8 +144,8 @@ def generate_seo_packaging(episode: dict, series_meta: dict = None) -> dict:
     max_retries = 3
     for attempt in range(1, max_retries + 1):
         try:
-            logger.info("[seo_autogen_b10] Attempt %d/%d calling HHTech GPT-5.6-Sol...", attempt, max_retries)
-            raw = call_gpt56_sol(user_prompt, system_prompt=system_with_rules, max_tokens=2000, timeout=90.0)
+            logger.info("[seo_autogen_b10] Attempt %d/%d calling HHTech GPT-6-Astra...", attempt, max_retries)
+            raw = call_gpt6_astra(user_prompt, system_prompt=system_with_rules, max_tokens=2000, timeout=90.0)
             parsed = _parse_llm_json(raw)
             if parsed and isinstance(parsed, dict) and parsed.get("title_kvs"):
                 llm_result = parsed
@@ -240,7 +240,7 @@ def generate_seo_packaging(episode: dict, series_meta: dict = None) -> dict:
     result = {
         "episode_id": episode.get("episode_id"),
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "generation_method": "hhtech_gpt56sol_auto" if not packaging.get("is_fallback") else "deterministic_fallback",
+        "generation_method": "hhtech_gpt6astra_auto" if not packaging.get("is_fallback") else "deterministic_fallback",
         "title_a": title,
         "title_b": title_b,
         "description": description,

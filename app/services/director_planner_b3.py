@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT_DIR / "scripts"))
 logger = logging.getLogger("director_planner_b3")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-from app.services.hhtech_reasoner import call_gpt56_sol
+from app.services.hhtech_reasoner import call_gpt6_astra, call_gpt56_sol
 from app.services.skill_loader import (
     get_skill_rules,
     get_central_skills,
@@ -290,7 +290,7 @@ def generate_director_plan(
     raw_res = ""
     for attempt in range(1, 3):
         try:
-            raw_res = call_gpt56_sol(
+            raw_res = call_gpt6_astra(
                 prompt=prompt_instruction,
                 system_prompt=system_prompt,
                 max_tokens=6500,

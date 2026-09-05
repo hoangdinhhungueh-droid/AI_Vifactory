@@ -28,18 +28,18 @@ def test_cost_cap_enforcement():
         
         # Test 1: Record within budget
         print("[TEST] Recording 500 VND (within budget)...")
-        tracker.record("gpt-5.6-sol", 10000, is_image=False)  # 10k tokens * 0.05 VND/token = 500 VND
+        tracker.record("gpt-6-astra", 10000, is_image=False)  # 10k tokens * 0.05 VND/token = 500 VND
         print(f"✅ Success. Total: {tracker.get_monthly_total():.2f} VND")
         
         # Test 2: Record another 300 VND (still within budget)
         print("[TEST] Recording another 300 VND (total 800/1000)...")
-        tracker.record("gpt-5.6-sol", 6000, is_image=False)  # 6k tokens * 0.05 VND/token = 300 VND
+        tracker.record("gpt-6-astra", 6000, is_image=False)  # 6k tokens * 0.05 VND/token = 300 VND
         print(f"✅ Success. Total: {tracker.get_monthly_total():.2f} VND")
         
         # Test 3: Try to exceed budget (should fail)
         print("[TEST] Attempting to record 500 VND (would exceed cap)...")
         try:
-            tracker.record("gpt-5.6-sol", 10000, is_image=False)  # Would total 1300 VND > 1000 cap
+            tracker.record("gpt-6-astra", 10000, is_image=False)  # Would total 1300 VND > 1000 cap
             print("❌ FAIL: Should have raised CostCapExceededError")
             return False
         except CostCapExceededError as e:
@@ -115,7 +115,7 @@ def test_mixed_model_tracking():
         tracker = CostTracker(cap_vnd=300_000, db_path=test_db_path)
         
         # Mix of models
-        tracker.record("gpt-5.6-sol", 100_000, is_image=False)  # 100k tokens * 0.05 = 5000 VND
+        tracker.record("gpt-6-astra", 100_000, is_image=False)  # 100k tokens * 0.05 = 5000 VND
         tracker.record("claude-3.5-sonnet", 20_000, is_image=False)  # 20k * 0.15 = 3000 VND
         tracker.record("imagen3", 5, is_image=True)  # 5 images * 5000 = 25000 VND
         

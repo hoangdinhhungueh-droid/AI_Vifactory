@@ -308,26 +308,26 @@ async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,
     safe_task = html.escape(str(task_id))
     paste_block = (
         f"/run:image task:{task_id}\n\n"
-        f"QUY CHUáº¨N Ká»¸ THUáº¬T áº¢NH (Rule 116 & 435):\n"
-        f"â€¢ File prompts: /var/vf/episodes/{task_id}/prompts_forge.json ({n_bg} BG + {n_fg} FG)\n"
-        f"â€¢ Layer 1 (Background): 16:9 (2560x1440 2K DCI), phong cÃ¡ch tÆ° liá»‡u Ä‘iá»‡n áº£nh, khÃ´ng ngÆ°á»i cáº­n cáº£nh, chá»«a safe-zone 20% Ä‘Ã¡y cho phá»¥ Ä‘á».\n"
-        f"â€¢ Layer 2 (Foreground): 1:1 (2048x2048), tranh váº½ minh há»a ká»¹ thuáº­t sá»‘ (stylized graphic novel illustration), toÃ n thÃ¢n trÃªn ná»n pháº³ng #FF00FF magenta chroma-key (tÃ¡ch sáº¡ch viá»n trong suá»‘t).\n"
-        f"â€¢ Thumbnails (A/B): 16:9 (2560x1440 2K DCI), Thumbnail A (Emotion-First) & Thumbnail B (Curiosity-Gap).\n"
-        f"â€¢ LÆ°u trá»¯: /var/vf/episodes/{task_id}/assets/ & Ä‘á»“ng bá»™ Notion Image Asset Library.\n\n"
+        f"QUY CHUẨN KỸ THUẬT ẢNH (Rule 116 & 435):\n"
+        f"• File prompts: /var/vf/episodes/{task_id}/prompts_forge.json ({n_bg} BG + {n_fg} FG)\n"
+        f"• Layer 1 (Background): 16:9 (2560x1440 2K DCI), phong cách tư liệu điện ảnh, không người cận cảnh, chừa safe-zone 20% đáy cho phụ đề.\n"
+        f"• Layer 2 (Foreground): 1:1 (2048x2048), tranh vẽ minh họa kỹ thuật số (stylized graphic novel illustration), toàn thân trên nền phẳng #FF00FF magenta chroma-key (tách sạch viền trong suốt).\n"
+        f"• Thumbnails (A/B): 16:9 (2560x1440 2K DCI), Thumbnail A (Emotion-First) & Thumbnail B (Curiosity-Gap).\n"
+        f"• Lưu trữ: /var/vf/episodes/{task_id}/assets/ & đồng bộ Notion Image Asset Library.\n\n"
         f"B5 IMAGE AUDIT (Rule 436):\n"
-        f"â€¢ Sau khi sinh Ä‘á»§ áº£nh, Antigravity cháº¡y kiá»ƒm Ä‘á»‹nh ká»¹ thuáº­t (Ä‘Ãºng kÃ­ch thÆ°á»›c, Ä‘á»‹nh dáº¡ng PNG, tá»· lá»‡ Ä‘en) & Vision Audit (Prompt Adherence, Object Accuracy, Visual Logic) Ä‘áº¡t Ä‘iá»ƒm â‰¥8.0/10.\n\n"
+        f"• Sau khi sinh đủ ảnh, Antigravity chạy kiểm định kỹ thuật (đúng kích thước, định dạng PNG, tỷ lệ đen) & Vision Audit (Prompt Adherence, Object Accuracy, Visual Logic) đạt điểm ≥8.0/10.\n\n"
         f"B6 TRIGGER (Rule 437):\n"
-        f"â€¢ Khi B5 PASS, kÃ­ch hoáº¡t B6 trÃªn VPS Ä‘á»ƒ tá»± Ä‘á»™ng Ä‘iá»u phá»‘i toÃ n bá»™ chuá»—i tiáº¿p theo (B6 tá»± gá»i B7â†’B10):\n"
+        f"• Khi B5 PASS, kích hoạt B6 trên VPS để tự động điều phối toàn bộ chuỗi tiếp theo (B6 tự gọi B7→B10):\n"
         f"  ssh root@claude.vifactory.com \"cd /root/video_factory && python3 scripts/continue_after_images.py --episode-id {task_id}\""
     )
     text = (
-        "ðŸŽ¨ <b>[HUMAN GATE 2] PROMPTS Sáº´N SÃ€NG â€” Cáº¦N SINH áº¢NH</b>\n\n"
-        f"ðŸŽ¬ <b>Episode:</b> <code>{safe_task}</code>\n"
-        f"ðŸŽžï¸ <b>Scenes:</b> {n_scenes} Â· <b>BG:</b> {n_bg} Â· <b>FG:</b> {n_fg} Â· <b>Thumbnails A/B:</b> 2\n"
-        f"ðŸ“Š <b>Story Gate:</b> {html.escape(str(story_score))} | <b>Notion Sync:</b> âœ…\n\n"
-        "ðŸ“‹ <b>DÃ¡n nguyÃªn khá»‘i dÆ°á»›i Ä‘Ã¢y vÃ o Antigravity chat:</b>\n"
+        "🎨 <b>[HUMAN GATE 2] PROMPTS SẴN SÀNG — CẦN SINH ẢNH</b>\n\n"
+        f"🎬 <b>Episode:</b> <code>{safe_task}</code>\n"
+        f"🎞️ <b>Scenes:</b> {n_scenes} · <b>BG:</b> {n_bg} · <b>FG:</b> {n_fg} · <b>Thumbnails A/B:</b> 2\n"
+        f"📊 <b>Story Gate:</b> {html.escape(str(story_score))} | <b>Notion Sync:</b> ✅\n\n"
+        "📋 <b>Dán nguyên khối dưới đây vào Antigravity chat:</b>\n"
         f"<pre>{html.escape(paste_block)}</pre>\n"
-        "ðŸ‘‰ <i>B5 audit cháº¡y tá»± Ä‘á»™ng sau B4, sau Ä‘Ã³ kÃ­ch hoáº¡t B6 trÃªn VPS Ä‘á»ƒ hoÃ n táº¥t chuá»—i render. NÃºt dÆ°á»›i chá»‰ dÃ¹ng ghi nháº­n thá»§ cÃ´ng.</i>"
+        "👉 <i>B5 audit chạy tự động sau B4, sau đó kích hoạt B6 trên VPS để hoàn tất chuỗi render. Nút dưới chỉ dùng ghi nhận thủ công.</i>"
     )
-    return await send_with_buttons(text, [[("âœ… ÄÃ£ sinh áº£nh xong", f"imgdone:{task_id}")]])
+    return await send_with_buttons(text, [[("✅ Đã sinh ảnh xong", f"imgdone:{task_id}")]])
 

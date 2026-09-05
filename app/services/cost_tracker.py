@@ -26,7 +26,7 @@ class CostTracker:
     Storage: /var/vf/cost_tracker.json
     Format: {
         "2026-09": {
-            "gpt-5.6-sol": 150000.50,
+            "gpt-6-astra": 300000.00,
             "imagen3": 80000.00,
             "claude-3.5-sonnet": 20000.00
         },
@@ -37,7 +37,7 @@ class CostTracker:
     # Pricing rates in VND (TODO: Update with actual HHTech/provider rates)
     RATES = {
         # LLM models (VND per 1k tokens)
-        "gpt-5.6-sol": 50.0,           # ~$0.002/1k tokens * 25000 VND/USD
+        "gpt-6-astra": 100.0,          # ~/bin/sh.004/1k tokens * 25000 VND/USD (2x Sol rate)
         "claude-3.5-sonnet": 150.0,    # ~$0.006/1k tokens * 25000 VND/USD
         "claude-3-opus": 750.0,        # ~$0.030/1k tokens * 25000 VND/USD
         
@@ -66,7 +66,7 @@ class CostTracker:
         Record token/image usage and check budget cap.
         
         Args:
-            model: Model identifier (e.g., "gpt-5.6-sol", "imagen3")
+            model: Model identifier (e.g., "gpt-6-astra", "imagen3")
             tokens: Token count (for LLMs) or image count (for image models)
             is_image: True if recording image generation, False for LLM tokens
         

@@ -148,7 +148,7 @@ def fetch_channel_deep_diagnostics(access_token):
 def call_hhtech_gpt56(api_key, prompt):
     url = "https://hhtechapi.com/v1/chat/completions"
     payload = {
-        "model": "gpt-5.6-sol",
+        "model": "gpt-6-astra",
         "messages": [
             {
                 "role": "system",
@@ -453,9 +453,9 @@ def run_b11_engine(mode="routine", dry_run=False):
         )
         
         full_prompt = "\n".join(prompt_lines)
-        print("Calling HHTech GPT-5.6-Sol...")
+        print("Calling HHTech GPT-6-Astra...")
         analysis_text, usage, elapsed = call_hhtech_gpt56(hhtech_key, full_prompt)
-        print(f"GPT-5.6-Sol finished in {elapsed:.2f}s (Tokens used: {usage.get('total_tokens', 0)})")
+        print(f"GPT-6-Astra finished in {elapsed:.2f}s (Tokens used: {usage.get('total_tokens', 0)})")
         print("\n--- SUPREME INSIGHT SUMMARY ---")
         print(analysis_text[:700] + "...\n")
         

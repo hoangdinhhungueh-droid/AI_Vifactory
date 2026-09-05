@@ -1,6 +1,6 @@
 """
 Service: B3.5 Prompt Engineering Forge (/prompt:forge)
-Single Source of Truth: HHTech GPT-5.6-Sol + Prompt Library Notion DB
+Single Source of Truth: HHTech GPT-6-Astra + Prompt Library Notion DB
 Rule 116 & 435: Layer 1 Background (16:9) + Layer 2 Foreground (1:1 stylized graphic novel on #FF00FF).
 Rule 120: Isolates prompt generation. FGs strictly generated on flat #FF00FF magenta background.
 Rule 121: Dynamically loads Media Production Hub and Central Skill AI rules via skill_loader.py.
@@ -19,7 +19,7 @@ def _load_env():
 
 _load_env()
 
-from app.services.hhtech_reasoner import call_gpt56_sol
+from app.services.hhtech_reasoner import call_gpt6_astra
 from app.services.skill_loader import (
     get_skill_rules,
     get_central_skills,
@@ -41,7 +41,7 @@ _RELIC_REGEX = re.compile(
 
 class ContentPolicyRefusalError(Exception):
     """
-    Raised when HHTech GPT-5.6-Sol refuses to generate prompts due to content policy.
+    Raised when HHTech GPT-6-Astra refuses to generate prompts due to content policy.
     Upstream should route to HG2.5 (human review gate) for manual prompt engineering.
     """
     pass
@@ -139,7 +139,7 @@ def generate_scene_prompts(
     **kwargs
 ) -> dict:
     """
-    Calls HHTech GPT-5.6-Sol via dedicated reasoner to generate high-fidelity image prompts
+    Calls HHTech GPT-6-Astra via dedicated reasoner to generate high-fidelity image prompts
     for paired Backgrounds (16:9) and Foregrounds (1:1).
     
     Preserves scene-level pairing (background_reuse_key, foreground_reuse_key) to ensure
@@ -213,8 +213,8 @@ def generate_scene_prompts(
     raw_response = None
     for pf_attempt in range(1, 3):
         try:
-            logger.info(f"[prompt_forge] Calling GPT-5.6-Sol for prompts (attempt {pf_attempt}/2)...")
-            raw_response = call_gpt56_sol(
+            logger.info(f"[prompt_forge] Calling GPT-6-Astra for prompts (attempt {pf_attempt}/2)...")
+            raw_response = call_gpt6_astra(
                 prompt=json.dumps(user_payload, ensure_ascii=False),
                 system_prompt=system_prompt,
                 max_tokens=3500,
@@ -255,9 +255,9 @@ def generate_scene_prompts(
                 "inappropriate content"
             ]
             if any(indicator in content_lower for indicator in refusal_indicators):
-                logger.error("[prompt_forge] GPT-5.6-Sol CONTENT POLICY REFUSAL detected")
+                logger.error("[prompt_forge] GPT-6-Astra CONTENT POLICY REFUSAL detected")
                 raise ContentPolicyRefusalError(
-                    f"HHTech GPT-5.6-Sol refused to generate prompts due to content policy for '{story_title}'. "
+                    f"HHTech GPT-6-Astra refused to generate prompts due to content policy for '{story_title}'. "
                     f"Refusal: {content[:250]}"
                 )
             else:

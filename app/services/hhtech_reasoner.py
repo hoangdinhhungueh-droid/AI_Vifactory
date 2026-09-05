@@ -1,6 +1,6 @@
 # app/services/hhtech_reasoner.py
 """
-HHTech Reasoning Service via GPT-5.6-Sol (Sole Gateway Model).
+HHTech Reasoning Service via GPT-6-Astra (Sole Gateway Model).
 Standardized Architecture (24/08/2026 - Go-Live 2026):
   - English-First System Prompt for maximum reasoning depth & zero stereotyping.
   - Native Evidence Grounding (Wikipedia Japanese / Korean / English summaries).
@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 HHTECH_BASE_URL = os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1")
-HHTECH_MODEL = os.getenv("HHTECH_MODEL", "gpt-5.6-sol")
+HHTECH_MODEL = os.getenv("HHTECH_MODEL", "gpt-6-astra")
 
 def get_hhtech_key() -> str:
     key = os.getenv("HHTECH_API_KEY")
@@ -131,7 +131,7 @@ def _fetch_native_wiki_extract(subject: str, market: str) -> str:
         pass
     return ""
 
-def call_gpt56_sol(
+def call_gpt6_astra(
     prompt: str,
     system_prompt: str | None = None,
     max_tokens: int = 4000,
@@ -139,24 +139,10 @@ def call_gpt56_sol(
     timeout: float = 60.0
 ) -> str:
     """
-    Synchronous caller for GPT-5.6-Sol via Model Gateway (Pattern 3).
+    Synchronous caller for GPT-6-Astra via Model Gateway (Pattern 3).
     
     Automatically tracks costs and enforces 300k VND monthly budget.
     Falls back to Anthropic Claude if HHTech fails (optional).
-    
-    Args:
-        prompt: User prompt text
-        system_prompt: Optional system prompt
-        max_tokens: Maximum tokens to generate
-        temperature: Sampling temperature
-        timeout: Request timeout in seconds
-    
-    Returns:
-        Generated text response
-    
-    Raises:
-        CostCapExceededError: If monthly budget would be exceeded
-        ModelGatewayError: If API call fails
     """
     from app.services.model_gateway import get_global_gateway
     
@@ -169,14 +155,15 @@ def call_gpt56_sol(
             max_tokens=max_tokens,
             temperature=temperature,
             timeout=timeout,
-            fallback=None  # No fallback by default; can enable with "claude-3.5-sonnet"
+            fallback=None
         )
         return result.strip()
-    
     except Exception as e:
-        # Log error and re-raise
         logger.error(f"[hhtech] Model gateway call failed: {e}")
         raise
+
+# Backward-compatibility alias during migration
+call_gpt56_sol = call_gpt6_astra
 
 def reason_topic_niche(
     subject: str,
@@ -186,7 +173,7 @@ def reason_topic_niche(
     top_queries: list | None = None,
     viral_videos: list | None = None
 ) -> dict:
-    """Call GPT-5.6-Sol via HHTech API with native signals and YouTube Safety Labeling
+    """Call GPT-6-Astra via HHTech API with native signals and YouTube Safety Labeling
     to analyze topic objectively, refine native search keywords, and output 5-Act outline for Human Gate 1.
     """
     key = get_hhtech_key()
@@ -318,10 +305,10 @@ def reason_topic_niche(
             clean_bqs = extract_clean_breakout_queries(rising_queries, max_count=5)
         parsed["breakout_queries"] = clean_bqs[:5]
 
-        logger.info(f"[hhtech] GPT-5.6-Sol reasoning success for {subject} ({m_up}) -> slug: {parsed.get('task_slug')}, safety: {parsed.get('safety_label')}")
+        logger.info(f"[hhtech] GPT-6-Astra reasoning success for {subject} ({m_up}) -> slug: {parsed.get('task_slug')}, safety: {parsed.get('safety_label')}")
         return parsed
     except Exception as e:
-        logger.error(f"[hhtech] Exception calling GPT-5.6-Sol for {subject} ({m_up}): {e}")
+        logger.error(f"[hhtech] Exception calling GPT-6-Astra for {subject} ({m_up}): {e}")
 
     return _fallback_topic(subject, market, virality_score, rising_queries)
 
@@ -359,7 +346,7 @@ def assess_keyword_video_viability(
     top_videos: list | None = None,
     **kwargs
 ) -> dict:
-    """Pre-Selection Video-Viability Skill for GPT-5.6-Sol (User Rule 05/09/2026).
+    """Pre-Selection Video-Viability Skill for GPT-6-Astra (User Rule 05/09/2026).
     Evaluates raw candidate keywords on whether they can viably sustain an 8-12 min
     high-retention 5-act non-fiction video with 2-layer Remotion illustration.
     """

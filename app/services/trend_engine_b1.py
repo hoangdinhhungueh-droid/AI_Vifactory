@@ -346,7 +346,7 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
 
         lines = [
             "🎯 <b>[HUMAN GATE 1] THÔNG BÁO TIẾN ĐỘ CHỦ ĐỀ SẢN XUẤT (GO-LIVE 2026)</b>",
-            "<i>(✨ B1 Trend Recon & B1.5 Competitor Gap bởi GPT-5.6-Sol qua HHTech API)</i>",
+            "<i>(✨ B1 Trend Recon & B1.5 Competitor Gap bởi GPT-6-Astra qua HHTech API)</i>",
             "",
             f"{flag} <b>Market {mkt}:</b> <code>{raw_term}</code> (Viability: {score}/10)",
             f"• <b>Đề tài:</b> {title_vi}",
@@ -399,7 +399,7 @@ def discover_and_produce_market_trend(
         # 2. Ground-truth Wikipedia extract
         factsheet = fetch_ground_truth_factsheet(term, m_up)
 
-        # 3. Viability assessment via HHTech GPT-5.6-Sol
+        # 3. Viability assessment via HHTech GPT-6-Astra
         viability = assess_keyword_video_viability(
             term=term,
             market=m_up,
