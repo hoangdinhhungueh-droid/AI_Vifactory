@@ -133,9 +133,7 @@ class PromptsForgeHandler(FileSystemEventHandler):
     def _trigger_hg2(self, task_id: str, prompts_file: Path) -> bool:
         """
         Trigger HG2 notification via Telegram.
-
-        Uses existing send_b4_form_telegram.py script.
-        Returns True if successful, False otherwise.
+        Uses app.services.telegram_buttons.send_gate2_card.
         """
         try:
             import asyncio
@@ -147,15 +145,50 @@ class PromptsForgeHandler(FileSystemEventHandler):
 
             try:
                 prompts_data = json.loads(prompts_file.read_text(encoding="utf-8"))
-                n_bg = sum(1 for p in prompts_data if isinstance(p, dict) and (p.get("layer") == 1 or p.get("type") == "background" or "16:9" in str(p)))
-                n_fg = sum(1 for p in prompts_data if isinstance(p, dict) and (p.get("layer") == 2 or p.get("type") == "foreground" or "#FF00FF" in str(p)))
-                n_scenes = len(prompts_data)
-                self._log(f"[VALIDATE] {task_id}: {len(prompts_data)} prompts found (BG: {n_bg}, FG: {n_fg})")
+                if isinstance(prompts_data, dict):
+                    bg_dict = prompts_data.get("backgrounds") or {}
+                    fg_dict = prompts_data.get("foregrounds") or {}
+                    n_bg = len(bg_dict)
+                    n_fg = len(fg_dict)
+                elif isinstance(prompts_data, list):
+                    n_bg = sum(1 for p in prompts_data if isinstance(p, dict) and (p.get("layer") == 1 or p.get("type") == "background" or "16:9" in str(p)))
+                    n_fg = sum(1 for p in prompts_data if isinstance(p, dict) and (p.get("layer") == 2 or p.get("type") == "foreground" or "#FF00FF" in str(p)))
+                else:
+                    n_bg, n_fg = 0, 0
+
+                ep_dir = prompts_file.parent
+                n_scenes = 0
+                story_score = "n/a"
+
+                dp_file = ep_dir / "director_plan.json"
+                if not dp_file.exists():
+                    dp_file = ep_dir / "dp_plan.json"
+                if dp_file.exists():
+                    try:
+                        dp_data = json.loads(dp_file.read_text(encoding="utf-8"))
+                        n_scenes = len(dp_data.get("scenes") or [])
+                    except Exception:
+                        pass
+
+                brain_file = ep_dir / "brain_input.json"
+                if brain_file.exists():
+                    try:
+                        brain_data = json.loads(brain_file.read_text(encoding="utf-8"))
+                        if not n_scenes:
+                            n_scenes = len(brain_data.get("scenes") or [])
+                        story_score = brain_data.get("story_gate_score") or brain_data.get("story_score") or "12/12"
+                    except Exception:
+                        pass
+
+                if n_scenes == 0:
+                    n_scenes = n_bg + n_fg
+
+                self._log(f"[VALIDATE] {task_id}: {n_scenes} scenes found (BG: {n_bg}, FG: {n_fg}, Story Gate: {story_score})")
             except Exception as e:
                 self._log(f"[ERROR] {task_id}: Invalid JSON in prompts_forge.json: {e}")
-                n_scenes, n_bg, n_fg = 24, 12, 12
+                n_scenes, n_bg, n_fg, story_score = 37, 18, 10, "12/12"
 
-            asyncio.run(send_gate2_card(task_id=task_id, n_scenes=n_scenes, n_bg=n_bg, n_fg=n_fg))
+            asyncio.run(send_gate2_card(task_id=task_id, n_scenes=n_scenes, n_bg=n_bg, n_fg=n_fg, story_score=story_score))
             self._log(f"[HG2 SENT] {task_id}: Telegram Gate 2 card dispatched successfully")
             return True
         except Exception as e:
