@@ -70,6 +70,14 @@ def _sanitize_background_prompt(prompt: str, bg_key: str, is_byzantine: bool = F
         p = f"{p}, 16:9 aspect ratio"
     if "safe-zone" not in p and "safe zone" not in p:
         p = f"{p}, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay"
+        # Enforce English Production Bridge tags (Rule 446)
+    if "[STYLE MANDATE]" not in p:
+        p = f"[STYLE MANDATE] 16:9 widescreen cinematic documentary environment, atmospheric volumetric lighting, spatial textures, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay. {p}"
+    if "[ERA ANCHOR]" not in p:
+        p = f"{p} [ERA ANCHOR] Authentic period architecture and narrative atmosphere."
+    if "[STRICT NEGATIVE PROMPT]" not in p:
+        p = f"{p} [STRICT NEGATIVE PROMPT] no prominent foreground human figures, no photorealistic faces, no text, no subtitles, no watermark, no borders, no ui elements, no split frame."
+    p = re.sub(r"\s{2,}", " ", p).strip()
     return p
 
 
@@ -112,6 +120,14 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str, is_byzantine: bool = F
     p = re.sub(r",\s*,+", ", ", p)
     p = re.sub(r"\s*,\s*", ", ", p)
     p = re.sub(r"\s{2,}", " ", p)
+        # Enforce English Production Bridge tags (Rule 435 & 446)
+    if "[STYLE MANDATE]" not in p:
+        p = f"[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich nuanced colors, 1:1 aspect ratio, full-body head-to-shoes, entire character visible within frame, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames. {p}"
+    if "[ERA ANCHOR]" not in p:
+        p = f"{p} [ERA ANCHOR] Period-accurate attire, realistic investigative posture and facial expression."
+    if "[STRICT NEGATIVE PROMPT]" not in p:
+        p = f"{p} [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements."
+    p = re.sub(r"\s{2,}", " ", p).strip()
     return p.strip()
 
 

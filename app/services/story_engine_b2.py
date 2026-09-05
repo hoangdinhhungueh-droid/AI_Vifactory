@@ -609,32 +609,8 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
                     _appended += len(_children[_i:_i + 90])
                 logger.info('[story_engine] Story Library body written %d/%d blocks (%d chars)' % (_appended, len(_children), len(full_script)))
 
-        seeded = 0
-        for sc in scenes[:12]:  # Seed primary scenes to Notion
-            idx = sc.get('scene_index', 0)
-            sc_name = sc.get('name', f'sc{idx:03d}')
-            sc_props = {
-                'Name': {'title': [{'type': 'text', 'text': {'content': f'[AG] {sc_name}'}}]},
-                'Episode ID': {'rich_text': [{'type': 'text', 'text': {'content': task_id}}]},
-                'Task ID': {'rich_text': [{'type': 'text', 'text': {'content': task_id}}]},
-                'Scene Index': {'number': idx},
-                'Beat': {'rich_text': [{'type': 'text', 'text': {'content': str(sc.get('arc', ''))[:200]}}]},
-                'Narration Segment': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('narration', '')[:1000]}}]},
-                'Background Prompt': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('image_prompt', '')[:1000]}}]},
-                'Foreground Prompt': {'rich_text': [{'type': 'text', 'text': {'content': sc.get('foreground_prompt', '')[:1000]}}]},
-                'BG Reuse Key': {'rich_text': [{'type': 'text', 'text': {'content': str(sc.get('background_reuse_key') or '')[:200]}}]},
-                'FG Reuse Key': {'rich_text': [{'type': 'text', 'text': {'content': str(sc.get('foreground_reuse_key') or '')[:200]}}]},
-                'FG Position': {'select': {'name': str(sc.get('foreground_position', 'left')).capitalize()}},
-                'Status': {'status': {'name': 'Compiled'}}
-            }
-            if sc.get('duration_sec'):
-                sc_props['Duration Est (s)'] = {'number': float(sc['duration_sec'])}
-            _res = create_page(director_db_id, sc_props)
-            if isinstance(_res, dict) and _res.get('error'):
-                logger.error('[story_engine] Director Plan scene %s FAILED %s: %s' % (idx, _res.get('status_code'), _res.get('message')))
-            else:
-                seeded += 1
-        logger.info("[story_engine] Notion Director Plan seeded %d/%d scenes" % (seeded, min(len(scenes), 12)))
+        # Director Plan seeding is handled exclusively by B3 director_planner_b3 (Rule 125 Single Truth)
+        logger.info('[story_engine] Story Library synced. B3 Director Plan handoff prepared.')
     except Exception as e:
         logger.warning(f"[story_engine] Notion sync exception (non-fatal): {e}")
 

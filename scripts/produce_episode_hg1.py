@@ -83,16 +83,29 @@ def run_chain(task_id: str) -> int:
         _log(stage, "FAILED (%s: %s)" % (type(e).__name__, e))
         raise RuntimeError("B1.5 competitor recon failed: %s" % e)
 
-    # ---- B2 story + B3 director plan ---------------------------------
-    stage = "B2/B3"
+    # ---- B2 5-Beat Investigative Docudrama (Rule 445) ----------------
+    stage = "B2"
     from app.services.story_engine_b2 import generate_5_arc_story
-    _log(stage, "generating 5-act story + director plan via GPT-5.6-Sol")
+    _log(stage, "generating 5-beat investigative docudrama via HHTech Reasoner")
     brain = generate_5_arc_story(task_id)
-    scenes = brain.get("scenes") or []
+    story_text = brain.get("story") or brain.get("full_script") or ""
     score = str(brain.get("story_gate_score") or "n/a")
-    _log(stage, "%d scenes, story_gate_score=%s" % (len(scenes), score))
+    _log(stage, "story generated (%d words), story_gate_score=%s" % (len(story_text.split()), score))
+
+    # ---- B3 Hollywood Art Director & Scene Breakdown Engine (Rule 125)
+    stage = "B3"
+    from app.services.director_planner_b3 import generate_director_plan
+    _log(stage, "executing Hollywood Art Director & 8-axis scene breakdown")
+    director_plan = generate_director_plan(
+        episode_id=task_id,
+        story_text=story_text,
+        intel_card=card if 'card' in locals() else None,
+        metadata={"niche": brain.get("niche") or "Finance", "topic": brain.get("topic") or task_id}
+    )
+    scenes = director_plan.get("scenes") or []
+    _log(stage, "director plan ready: %d scenes (Archetype: %s)" % (len(scenes), director_plan.get("director_archetype", "Standard")))
     if not scenes:
-        raise RuntimeError("B2 produced no scenes")
+        raise RuntimeError("B3 produced no scenes in director plan")
 
     # ---- B3.5 prompt forge with scene semantic coupling --------------
     stage = "B3.5"

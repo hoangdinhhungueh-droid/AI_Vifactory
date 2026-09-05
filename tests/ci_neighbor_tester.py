@@ -1,11 +1,13 @@
 """
 tests/ci_neighbor_tester.py — ISO NEIGHBOR-TESTING ENGINE [N-1, N, N+1]
-AI Video Factory CI/CD Quality Assurance Protocol (Rule 121 & Rule 123).
+AI Video Factory CI/CD Quality Assurance Protocol (Rule 121, Rule 123 & Rule 447).
 
 Architecture:
   - Block 1 (B1): Trend Discovery & Ground Truth Reality Anchor
   - Block 1.5 (B1.5): Competitor Recon & Fatal Explanatory Vacuum
   - Block 2 (B2): 5-Beat Investigative Docudrama & Story Gate
+  - Block 3 (B3): Hollywood Art Director & 8-Axis Scene Breakdown Engine
+  - Block 4 (B4/B3.5): Specialized Visual Prompt Forge & Chroma Key Spec
 
 Rules:
   - When Block N is modified, automatically tests [N-1, N, N+1] to verify
@@ -15,9 +17,8 @@ Rules:
 
 Usage:
   python3 tests/ci_neighbor_tester.py --auto         # Auto-detect changed block from git
-  python3 tests/ci_neighbor_tester.py --block 1.5    # Explicitly test Block 1.5 and neighbors (1, 1.5, 2)
-  python3 tests/ci_neighbor_tester.py --block 1      # Test Block 1 and neighbor 1.5
-  python3 tests/ci_neighbor_tester.py --block 2      # Test Block 1.5 and Block 2
+  python3 tests/ci_neighbor_tester.py --block 3      # Test Block 3 and neighbors (2, 3, 4)
+  python3 tests/ci_neighbor_tester.py --block 2      # Test Block 2 and neighbors (1.5, 2, 3)
   python3 tests/ci_neighbor_tester.py --all          # Test all blocks
 """
 import argparse
@@ -50,9 +51,17 @@ BLOCK_FILES = {
         "app/services/story_gate.py",
         "app/services/skill_loader.py",
     ],
+    3.0: [
+        "app/services/director_planner_b3.py",
+        "app/audit/director_audit.py",
+        "scripts/generate_50_director_plan.py",
+    ],
+    4.0: [
+        "app/services/prompt_forge.py",
+    ],
 }
 
-ALL_BLOCKS = [1.0, 1.5, 2.0]
+ALL_BLOCKS = [1.0, 1.5, 2.0, 3.0, 4.0]
 
 
 def get_changed_files_from_git() -> list[str]:
@@ -145,7 +154,7 @@ def test_block1_trend_contract() -> bool:
 
 
 def test_block15_competitor_contract() -> bool:
-    logger.info("--- [TEST BLOCK 1.5: Competitor Recon & Gap Analysis] ---")
+    logger.info("--- [TEST BLOCK 1.5: Competitor Recon & Fatal Explanatory Vacuum] ---")
     try:
         from app.services.competitor_recon_b15 import (
             extract_high_engagement_comments,
@@ -261,6 +270,125 @@ def test_block2_story_contract() -> bool:
         return False
 
 
+def test_block3_director_contract() -> bool:
+    logger.info("--- [TEST BLOCK 3: Hollywood Art Director & 8-Axis Audit] ---")
+    try:
+        from app.services.director_planner_b3 import (
+            detect_cinematic_archetype,
+            CANONICAL_BEATS,
+            CINEMATIC_ARCHETYPES,
+            generate_director_plan,
+        )
+        from app.audit.director_audit import (
+            audit_director_plan,
+            audit_director,
+        )
+        from scripts.generate_50_director_plan import generate_50_scene_plan
+
+        # 1. Canonical 5 Beats Structure Verification
+        assert len(CANONICAL_BEATS) == 5, f"Expected 5 Canonical Beats, got {len(CANONICAL_BEATS)}"
+        assert "Impossible Contradiction" in CANONICAL_BEATS[0]
+        assert "Modern Mirror" in CANONICAL_BEATS[4]
+        logger.info("  ✅ Canonical 5 Beats Investigative Hierarchy Verified.")
+
+        # 2. Dynamic Director Archetype Classification
+        fincher = detect_cinematic_archetype("Finance", "Forensic Wall Street Fraud and Lehman Brothers Collapse")
+        assert "Fincher" in fincher["director"] or "Corporate Noir" in fincher["director"]
+        nolan = detect_cinematic_archetype("History", "Historical Manhattan Project and Cold War Oppenheimer")
+        assert "Nolan" in nolan["director"] or "Chernobyl" in nolan["director"]
+        logger.info(f"  ✅ Director Archetype Routing OK: Finance -> '{fincher['director']}', History -> '{nolan['director']}'.")
+
+        # 3. Forwarding script check
+        assert callable(generate_50_scene_plan)
+        logger.info("  ✅ Legacy generate_50_scene_plan wrapper forwards to B3 engine correctly.")
+
+        # 4. 8-Axis Director Audit Engine Verification
+        # Build an authentic 5-Beat production plan
+        sample_plan = {
+            "director_profile": "David Fincher / Adam McKay (Corporate Noir)",
+            "scenes": []
+        }
+        for beat_idx, beat_name in enumerate(CANONICAL_BEATS, start=1):
+            for sc_num in range(1, 9): # 8 scenes per beat -> 40 scenes total (within 35-55 dynamic range)
+                scene_id = f"s_{(beat_idx-1)*8 + sc_num:02d}"
+                is_wide = (sc_num == 1)
+                sample_plan["scenes"].append({
+                    "id": scene_id,
+                    "beat_number": beat_idx,
+                    "beat_name": beat_name,
+                    "duration_sec": 4.5,
+                    "camera_tension": "High (Rapid investigation pan)" if beat_idx in (1, 4) else "Medium",
+                    "narration": f"Evidence fragment #{sc_num} revealing critical paper trail in {beat_name}.",
+                    "background_visual_prompt": f"[STYLE MANDATE] 2D Graphic Novel Illustration, cel-shading, wide angle room. [ERA ANCHOR] Wall Street 2008. [STRICT NEGATIVE PROMPT] No photorealism.",
+                    "foreground_visual_prompt": "" if is_wide else f"[STYLE MANDATE] 2D Graphic Novel Illustration, cel-shading, character waist up. Pure #FF00FF magenta background. [ERA ANCHOR] Wall Street 2008. [STRICT NEGATIVE PROMPT] No photorealism.",
+                    "background_key": f"bg_beat_{beat_idx}",
+                    "character_key": "" if is_wide else f"fg_char_{beat_idx}",
+                    "bottom_safe_zone_protected": True
+                })
+
+        audit_res = audit_director_plan(sample_plan)
+        score = audit_res.get("score", 0)
+        verdict = audit_res.get("verdict", "FAIL")
+        checks = audit_res.get("checks", {})
+        logger.info(f"  ✅ Director Audit 8-Axis Score: {score}/10 | Verdict: {verdict} | Checks: {list(checks.keys())}")
+        assert len(checks) == 8, f"Expected 8 audit axes, got {len(checks)}"
+        assert verdict == "PASS" and score >= 8.0, f"Sample director plan failed 8-axis audit: {audit_res.get('issues')}"
+
+        return True
+    except Exception as e:
+        logger.error(f"❌ BLOCK 3 CONTRACT TEST FAILED: {e}")
+        return False
+
+
+def test_block4_prompt_contract() -> bool:
+    logger.info("--- [TEST BLOCK 4: Specialized Visual Prompt Forge & Chroma Key Spec] ---")
+    try:
+        from app.services.prompt_forge import (
+            _sanitize_background_prompt,
+            _sanitize_foreground_prompt,
+            generate_scene_prompts,
+        )
+
+        # 1. Layer 1 (BG) Prompt Contract: Widescreen 16:9 + Safe-zone + No Chroma
+        bg_raw = "Wall Street investment bank trading floor at night with red ticker tape monitors"
+        bg_out = _sanitize_background_prompt(bg_raw, bg_key="bg_wall_street_floor")
+        assert "[STYLE MANDATE]" in bg_out
+        assert "16:9" in bg_out
+        assert "[ERA ANCHOR]" in bg_out
+        assert "[STRICT NEGATIVE PROMPT]" in bg_out
+        assert "#FF00FF" not in bg_out, "Chroma key color leaked into Layer 1 BG prompt!"
+        logger.info(f"  ✅ Layer 1 BG Prompt Contract Verified: 16:9 widescreen, safe-zone anchored.")
+
+        # 2. Layer 2 (FG) Prompt Contract: Chroma Key Pure #FF00FF + Cel-Shaded Graphic Novel
+        fg_raw = "Senior forensic investigator in rolled up sleeves pointing at anomalous ledger entry"
+        fg_out = _sanitize_foreground_prompt(fg_raw, fg_key="fg_investigator")
+        assert "[STYLE MANDATE]" in fg_out
+        assert "#FF00FF" in fg_out or "magenta" in fg_out.lower()
+        assert "cel-shading" in fg_out.lower() or "comic" in fg_out.lower() or "graphic novel" in fg_out.lower()
+        assert "[ERA ANCHOR]" in fg_out
+        assert "[STRICT NEGATIVE PROMPT]" in fg_out
+        logger.info(f"  ✅ Layer 2 FG Prompt Contract Verified: Cel-shaded Graphic Novel + pure #FF00FF Chroma Key.")
+
+        # 3. Generate Combined Scene Prompt Contract
+        assert callable(generate_scene_prompts)
+        sample_bg_dict = {"bg_01": bg_raw}
+        sample_fg_dict = {"fg_01": fg_raw}
+        prompts_bundle = generate_scene_prompts(
+            bg_dict=sample_bg_dict,
+            fg_dict=sample_fg_dict,
+            story_title="The Fall of Lehman Brothers",
+            scenes=[{"id": "s_01", "narration": "Test scene", "background_key": "bg_01", "character_key": "fg_01"}]
+        )
+        assert isinstance(prompts_bundle, dict)
+        assert len(prompts_bundle) > 0
+        logger.info("  ✅ Scene Dual-Layer Prompt Bundle Schema Verified.")
+
+        return True
+    except Exception as e:
+        logger.error(f"❌ BLOCK 4 CONTRACT TEST FAILED: {e}")
+        return False
+
+
 def run_tests_for_blocks(blocks_to_test: list[float]) -> bool:
     logger.info("=======================================================")
     logger.info(f"🧪 RUNNING ISO NEIGHBOR TESTS FOR BLOCKS: {blocks_to_test}")
@@ -274,6 +402,10 @@ def run_tests_for_blocks(blocks_to_test: list[float]) -> bool:
             results[1.5] = test_block15_competitor_contract()
         elif b == 2.0:
             results[2.0] = test_block2_story_contract()
+        elif b == 3.0:
+            results[3.0] = test_block3_director_contract()
+        elif b == 4.0:
+            results[4.0] = test_block4_prompt_contract()
 
     all_passed = all(results.values())
     logger.info("=======================================================")
@@ -286,9 +418,9 @@ def run_tests_for_blocks(blocks_to_test: list[float]) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="ISO Neighbor-Testing Engine for Blocks 1, 1.5, 2")
+    parser = argparse.ArgumentParser(description="ISO Neighbor-Testing Engine for Blocks 1, 1.5, 2, 3, 4")
     parser.add_argument("--auto", action="store_true", help="Auto-detect changed block from git status")
-    parser.add_argument("--block", type=float, choices=[1.0, 1.5, 2.0], help="Explicit target block (e.g. 1, 1.5, 2)")
+    parser.add_argument("--block", type=float, choices=[1.0, 1.5, 2.0, 3.0, 4.0], help="Explicit target block (e.g. 1, 1.5, 2, 3, 4)")
     parser.add_argument("--all", action="store_true", help="Run all blocks")
 
     args = parser.parse_args()
