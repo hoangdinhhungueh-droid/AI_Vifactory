@@ -1,0 +1,72 @@
+# Environment & Secrets
+*.env
+.env.local
+.env.*.local
+secrets.env.txt
+
+# Cache & Generated
+db/*.json
+*.bak_*
+.coverage
+*.pyc
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Test Archives (legacy, exclude from collection)
+tests/archive_legacy_20260822/
+
+# Temporary Files
+*.tmp
+.tmp_*
+
+# Pha 5 I-04: backup folders (giu local, khong commit)
+_backups_*/
+
+# Virtualenvs (all variants)
+venv*/
+
+# Node
+node_modules/
+remotion/node_modules/
+
+# Large media / render artifacts
+assets/
+remotion/public/
+checkpoints/
+
+# Runtime data & logs
+logs/
+n8n-data/
+data/
+db/*.log
+db/*.on
+db/*.pid
+
+# Archives & backups
+_archive/
+_bak_archive/
+_backups_*/
+archive_legacy_*/
+
+# Runtime & Build artifacts
+episodes/
+remotion/build/
+*.patch
+*.bak*
+*.broken*
+scratch/
+tests/ci_neighbor_tester.log

@@ -1,0 +1,12 @@
+{
+  "exact": [
+    "marvel", "disney", "naruto", "one piece", "dragon ball", "mickey mouse",
+    "pokemon", "harry potter", "star wars",
+    "terrorist", "suicide method", "self-harm", "how to make a bomb"
+  ],
+  "patterns": [
+    "(isis|al-qaeda)",
+    "how to (make|build) (a )?(bomb|weapon)",
+    "(kill|hurt) (yourself|myself)"
+  ]
+}

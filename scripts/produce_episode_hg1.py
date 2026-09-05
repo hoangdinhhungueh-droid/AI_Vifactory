@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""B1.5 -> B2 -> B3 -> B3.5 for one approved market, then Human Gate 2.
+
+Spawned by the HG1 approve button (app/services/telegram_actions.py) as a
+detached subprocess: one process per approved market, so approving EN does not
+touch JP/KR and a crash in one market cannot take the others down. Runs
+independently of vf-api, so restarting the API mid-chain does not lose work.
+
+Usage: python3 scripts/produce_episode_hg1.py <task_id>
+Log:   /var/vf/logs/<task_id>.log (the caller redirects stdout/stderr there)
+"""
+import asyncio
+import json
+import os
+import sys
+import time
+import traceback
+from pathlib import Path
+
+sys.path.insert(0, "/root/video_factory")
+
+EPISODES = Path("/var/vf/episodes")
+PENDING = Path("/var/vf/pending_tasks")
+
+
+def _log(stage: str, msg: str) -> None:
+    print("[%s] %s: %s" % (time.strftime("%H:%M:%S"), stage, msg), flush=True)
+
+
+def _load_pending(task_id: str) -> dict:
+    p = PENDING / ("%s.json" % task_id)
+    if p.exists():
+        return json.loads(p.read_text(encoding="utf-8"))
+    return {}
+
+
+async def _notify_gate2(task_id: str, n_scenes: int, n_bg: int, n_fg: int, score: str) -> None:
+    from app.services.telegram_buttons import send_gate2_card
+    await send_gate2_card(task_id, n_scenes, n_bg, n_fg, score)
+
+
+async def _notify_gate25_manual_review(task_id: str, reason: str) -> None:
+    """
+    Notify that episode requires HG2.5 manual prompt engineering review.
+    02/09/2026: Added for content policy refusal routing.
+    """
+    from app.services import telegram_notify as tg
+    await tg.notify_error(
+        "HG2.5 Manual Review Required",
+        task_id,
+        f"GPT content policy refusal. Manual prompt engineering needed.\n\nReason: {reason[:300]}"
+    )
+
+
+async def _notify_failure(task_id: str, stage: str, detail: str) -> None:
+    from app.services import telegram_notify as tg
+    await tg.notify_error("HG1 chain failed at %s" % stage, task_id, detail)
+
+
+def run_chain(task_id: str) -> int:
+    ep_dir = EPISODES / task_id
+    ep_dir.mkdir(parents=True, exist_ok=True)
+    meta = _load_pending(task_id)
+    keyword = meta.get("keyword") or meta.get("topic_name") or task_id
+    niche = meta.get("niche_brief") or "General"
+
+    # ---- B1.5 competitor recon (Two-Pass Recon & Competitor Anatomy) --
+    stage = "B1.5"
+    try:
+        from app.services.competitor_recon_b15 import run_b15
+        _log(stage, "Two-Pass competitor recon for keyword=%r (niche=%r)" % (keyword, niche))
+        card = run_b15(task_id, keyword, niche)
+        if not card:
+            raise RuntimeError("B1.5 recon returned no intel card for task %s" % task_id)
+        _meta = card.get("collection_meta") or {}
+        card_file = ep_dir / "competitor_intel_card.json"
+        _log(stage, "intel card: %d competitors, %d gaps, %d transcripts, persisted=%s" % (
+            len(card.get("competitor_benchmarks") or []),
+            len(card.get("audience_comment_gaps") or []),
+            _meta.get("transcripts_captured", 0),
+            card_file.exists()))
+    except Exception as e:
+        _log(stage, "FAILED (%s: %s)" % (type(e).__name__, e))
+        raise RuntimeError("B1.5 competitor recon failed: %s" % e)
+
+    # ---- B2 story + B3 director plan ---------------------------------
+    stage = "B2/B3"
+    from app.services.story_engine_b2 import generate_5_arc_story
+    _log(stage, "generating 5-act story + director plan via GPT-5.6-Sol")
+    brain = generate_5_arc_story(task_id)
+    scenes = brain.get("scenes") or []
+    score = str(brain.get("story_gate_score") or "n/a")
+    _log(stage, "%d scenes, story_gate_score=%s" % (len(scenes), score))
+    if not scenes:
+        raise RuntimeError("B2 produced no scenes")
+
+    # ---- B3.5 prompt forge with scene semantic coupling --------------
+    stage = "B3.5"
+    from app.services.prompt_forge import generate_scene_prompts, push_prompts_to_notion, ContentPolicyRefusalError
+    
+    # Build enriched BG and FG metadata preserving scene pairings
+    bg_dict, fg_dict = {}, {}
+    for s in scenes:
+        bg_k = s.get("background_reuse_key")
+        fg_k = s.get("foreground_reuse_key")
+        arc = s.get("arc", "")
+        narration = s.get("narration", "")
+        bg_hint = s.get("image_prompt", "")
+        fg_hint = s.get("foreground_prompt", "")
+
+        if bg_k:
+            if bg_k not in bg_dict:
+                bg_dict[bg_k] = {
+                    "beat": arc,
+                    "narration_context": narration[:400],
+                    "visual_hint": bg_hint,
+                    "paired_foregrounds": [fg_k] if fg_k else []
+                }
+            elif fg_k and fg_k not in bg_dict[bg_k].get("paired_foregrounds", []):
+                bg_dict[bg_k]["paired_foregrounds"].append(fg_k)
+
+        if fg_k:
+            if fg_k not in fg_dict:
+                fg_dict[fg_k] = {
+                    "beat": arc,
+                    "narration_context": narration[:400],
+                    "visual_hint": fg_hint,
+                    "paired_backgrounds": [bg_k] if bg_k else []
+                }
+            elif bg_k and bg_k not in fg_dict[fg_k].get("paired_backgrounds", []):
+                fg_dict[fg_k]["paired_backgrounds"].append(bg_k)
+
+    _log(stage, "forging prompts for %d BG keys, %d FG keys (scene semantic coupling preserved)" % (len(bg_dict), len(fg_dict)))
+    if not bg_dict:
+        raise RuntimeError("no background_reuse_key on any scene -- B2 schema regression")
+    
+    # Handle GPT content policy refusals gracefully (02/09/2026 P0 fix)
+    try:
+        prompts = generate_scene_prompts(
+            bg_dict=bg_dict,
+            fg_dict=fg_dict,
+            story_title=brain.get("topic") or task_id,
+            scenes=scenes
+        )
+        (ep_dir / "prompts_forge.json").write_text(
+            json.dumps(prompts, ensure_ascii=False, indent=2), encoding="utf-8")
+        n_bg = len(prompts.get("backgrounds") or {})
+        n_fg = len(prompts.get("foregrounds") or {})
+        _log(stage, "%d BG prompts, %d FG prompts -> Notion" % (n_bg, n_fg))
+        push_prompts_to_notion(prompts, task_id, task_id=task_id)
+        
+    except ContentPolicyRefusalError as e:
+        # GPT refused due to sensitive content - route to HG2.5 manual review
+        _log(stage, "CONTENT POLICY REFUSAL - routing to HG2.5 manual review")
+        _log(stage, "Refusal: %s" % str(e)[:200])
+        
+        # Create marker file for manual prompt engineering
+        refusal_marker = {
+            "status": "NEEDS_MANUAL_REVIEW",
+            "reason": "content_policy_refusal",
+            "refusal_detail": str(e)[:500],
+            "bg_keys_needed": list(bg_dict.keys()),
+            "fg_keys_needed": list(fg_dict.keys()),
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        (ep_dir / "prompts_forge.json").write_text(
+            json.dumps(refusal_marker, ensure_ascii=False, indent=2), encoding="utf-8")
+        
+        # Notify for manual intervention
+        asyncio.run(_notify_gate25_manual_review(task_id, str(e)))
+        
+        _log(stage, "Episode marked for HG2.5 manual prompt engineering")
+        _log("HG2.5", "Waiting for human to craft prompts for sensitive topic")
+        return 0  # Exit cleanly - not a failure, just needs human input
+
+    # ---- Human Gate 2 -------------------------------------------------
+    asyncio.run(_notify_gate2(task_id, len(scenes), n_bg, n_fg, score))
+    _log("HG2", "card sent, waiting for images from Antigravity")
+    return 0
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print("usage: produce_episode.py <task_id>", file=sys.stderr)
+        return 2
+    task_id = sys.argv[1].strip()
+    _log("START", "task_id=%s pid=%d" % (task_id, os.getpid()))
+    try:
+        return run_chain(task_id)
+    except Exception as e:
+        tb = traceback.format_exc()
+        _log("FAILED", "%s: %s\n%s" % (type(e).__name__, e, tb))
+        # Ensure lock file is cleaned up so future attempts are not blocked
+        lock_file = Path("/var/vf/locks") / ("%s.lock" % task_id)
+        if lock_file.exists():
+            try:
+                lock_file.unlink()
+                _log("CLEANUP", "Removed lockfile %s" % lock_file)
+            except Exception:
+                pass
+        try:
+            asyncio.run(_notify_failure(task_id, "chain", "%s: %s" % (type(e).__name__, e)))
+        except Exception as ne:
+            _log("FAILED", "could not notify: %s" % ne)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

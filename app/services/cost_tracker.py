@@ -1,0 +1,186 @@
+# app/services/cost_tracker.py
+"""
+Cost Tracker for VF Pipeline - Pattern 3 Implementation.
+Enforces 300k VND monthly cap across all model providers.
+Tracks usage per model and provides monthly reporting.
+"""
+
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class CostCapExceededError(Exception):
+    """Raised when monthly cost cap is exceeded."""
+    pass
+
+
+class CostTracker:
+    """
+    Tracks model usage costs and enforces monthly budget cap.
+    
+    Storage: /var/vf/cost_tracker.json
+    Format: {
+        "2026-09": {
+            "gpt-5.6-sol": 150000.50,
+            "imagen3": 80000.00,
+            "claude-3.5-sonnet": 20000.00
+        },
+        "2026-08": {...}
+    }
+    """
+    
+    # Pricing rates in VND (TODO: Update with actual HHTech/provider rates)
+    RATES = {
+        # LLM models (VND per 1k tokens)
+        "gpt-5.6-sol": 50.0,           # ~$0.002/1k tokens * 25000 VND/USD
+        "claude-3.5-sonnet": 150.0,    # ~$0.006/1k tokens * 25000 VND/USD
+        "claude-3-opus": 750.0,        # ~$0.030/1k tokens * 25000 VND/USD
+        
+        # Image models (VND per image)
+        "imagen3": 5000.0,             # ~$0.20/image * 25000 VND/USD
+        "dall-e-3": 10000.0,           # ~$0.40/image * 25000 VND/USD
+        
+        # Default fallback
+        "default": 50.0
+    }
+    
+    def __init__(self, cap_vnd: int = 300_000, db_path: Optional[str] = None):
+        """
+        Initialize cost tracker.
+        
+        Args:
+            cap_vnd: Monthly budget cap in VND (default: 300,000)
+            db_path: Path to cost database JSON file (default: /var/vf/cost_tracker.json)
+        """
+        self.cap_vnd = cap_vnd
+        self.db_path = Path(db_path) if db_path else Path("/var/vf/cost_tracker.json")
+        self.costs = self._load()
+    
+    def record(self, model: str, tokens: int, is_image: bool = False):
+        """
+        Record token/image usage and check budget cap.
+        
+        Args:
+            model: Model identifier (e.g., "gpt-5.6-sol", "imagen3")
+            tokens: Token count (for LLMs) or image count (for image models)
+            is_image: True if recording image generation, False for LLM tokens
+        
+        Raises:
+            CostCapExceededError: If recording would exceed monthly cap
+        """
+        cost_vnd = self._calculate_cost(model, tokens, is_image)
+        current_month = datetime.utcnow().strftime("%Y-%m")
+        
+        # Initialize month if needed
+        if current_month not in self.costs:
+            self.costs[current_month] = {}
+        
+        # Initialize model if needed
+        if model not in self.costs[current_month]:
+            self.costs[current_month][model] = 0.0
+        
+        # Calculate new total
+        new_model_cost = self.costs[current_month][model] + cost_vnd
+        monthly_total = sum(self.costs[current_month].values()) + cost_vnd
+        
+        # Check cap BEFORE recording
+        if monthly_total > self.cap_vnd:
+            remaining = self.cap_vnd - (monthly_total - cost_vnd)
+            raise CostCapExceededError(
+                f"Monthly cap {self.cap_vnd:,.0f} VND exceeded. "
+                f"Current: {monthly_total - cost_vnd:,.2f} VND, "
+                f"This call: {cost_vnd:,.2f} VND, "
+                f"Would total: {monthly_total:,.2f} VND, "
+                f"Remaining: {remaining:,.2f} VND"
+            )
+        
+        # Record cost
+        self.costs[current_month][model] = new_model_cost
+        self._save()
+        
+        logger.info(
+            f"[COST] Recorded {cost_vnd:,.2f} VND for {model} "
+            f"({tokens} {'images' if is_image else 'tokens'}). "
+            f"Monthly total: {monthly_total:,.2f}/{self.cap_vnd:,.0f} VND "
+            f"({(monthly_total/self.cap_vnd*100):.1f}%)"
+        )
+    
+    def _calculate_cost(self, model: str, tokens: int, is_image: bool) -> float:
+        """Calculate cost in VND."""
+        rate = self.RATES.get(model, self.RATES["default"])
+        
+        if is_image:
+            # Image models: rate is per image, tokens = image count
+            return rate * tokens
+        else:
+            # LLM models: rate is per 1k tokens
+            return (rate * tokens) / 1000.0
+    
+    def monthly_report(self, month: Optional[str] = None) -> Dict[str, float]:
+        """
+        Get cost breakdown for a specific month.
+        
+        Args:
+            month: Month in "YYYY-MM" format (default: current month)
+        
+        Returns:
+            Dictionary of {model: cost_vnd}
+        """
+        if month is None:
+            month = datetime.utcnow().strftime("%Y-%m")
+        return self.costs.get(month, {})
+    
+    def get_monthly_total(self, month: Optional[str] = None) -> float:
+        """Get total cost for a month."""
+        report = self.monthly_report(month)
+        return sum(report.values())
+    
+    def get_remaining_budget(self) -> float:
+        """Get remaining budget for current month."""
+        spent = self.get_monthly_total()
+        return max(0, self.cap_vnd - spent)
+    
+    def get_budget_usage_pct(self) -> float:
+        """Get budget usage percentage for current month."""
+        spent = self.get_monthly_total()
+        return (spent / self.cap_vnd) * 100.0 if self.cap_vnd > 0 else 0.0
+    
+    def _load(self) -> Dict:
+        """Load cost database from disk."""
+        if self.db_path.exists():
+            try:
+                with open(self.db_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"[COST] Error loading {self.db_path}: {e}")
+                return {}
+        return {}
+    
+    def _save(self):
+        """Save cost database to disk."""
+        try:
+            # Ensure directory exists
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Write with pretty formatting
+            with open(self.db_path, "w", encoding="utf-8") as f:
+                json.dump(self.costs, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[COST] Error saving {self.db_path}: {e}")
+
+
+# Singleton instance for global access
+_global_tracker: Optional[CostTracker] = None
+
+
+def get_global_tracker() -> CostTracker:
+    """Get or create the global cost tracker instance."""
+    global _global_tracker
+    if _global_tracker is None:
+        _global_tracker = CostTracker()
+    return _global_tracker

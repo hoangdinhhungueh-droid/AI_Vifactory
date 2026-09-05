@@ -1,0 +1,393 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Build Remotion props JSON for the generic "TwoLayerEpisode" composition
+(remotion/src/index.tsx) from brain_input.json (2-layer schema extension) +
+the local image manifest produced by scripts/pull_approved_images.py +
+whisper_segments.json (Single Source of Truth Subtitles).
+
+PIPELINE-WIDE & ARCHITECTURAL:
+1. Single Source of Truth Subtitles (Rule 120 & R3):
+   Extracts exact Faster-Whisper word timestamps (word, start_ms, end_ms)
+   and forwards them into scene `subtitles` (and `words`) in remotion_props.json.
+2. Dynamic Dialogue Speaker Tags (R4):
+   Dynamically formats dialogue speaker tags based on scene character metadata
+   (foreground_reuse_key, character_name, role) into professional uppercase dossier tags.
+3. 100% Foreground Coverage Guarantee (Rule 100):
+   Automatically fills empty foregrounds from approved manifest character cutouts
+   with left/right alternation.
+4. Intelligent Stat Card Extraction (Rule 102):
+   Scans narration for key metrics to pop-in animated Remotion Stat Cards.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import os
+import re
+import shutil
+import sys
+from pathlib import Path
+
+logger = logging.getLogger("vf.build_remotion_props")
+
+
+def load_manifest_index(manifest_path: str):
+    with open(manifest_path, encoding="utf-8") as f:
+        rows = json.load(f)
+    by_reuse_key = {}
+    fg_pool = []
+    for r in rows:
+        rk = (r.get("reuse_key") or "").strip()
+        lp = r.get("local_path")
+        if rk and lp:
+            by_reuse_key[rk] = lp
+            if "fg_" in rk.lower() or "character" in (r.get("asset_type") or "").lower():
+                fg_pool.append((rk, lp))
+    return by_reuse_key, fg_pool
+
+
+def stage_into_public(local_path: str, public_dir: str, episode_id: str) -> str | None:
+    """Copy local_path into <public_dir>/pulled/<episode_id>/<basename> and
+    return the path relative to public_dir (for staticFile())."""
+    if not local_path:
+        return None
+    if local_path.startswith("http://") or local_path.startswith("https://"):
+        return local_path
+    dest_dir = os.path.join(public_dir, "pulled", episode_id)
+    os.makedirs(dest_dir, exist_ok=True)
+    basename = os.path.basename(local_path)
+    dest_path = os.path.join(dest_dir, basename)
+    if not os.path.exists(local_path):
+        raise FileNotFoundError("missing local image: %s" % local_path)
+    shutil.copyfile(local_path, dest_path)
+    return "pulled/%s/%s" % (episode_id, basename)
+
+
+def extract_stat_card(text: str):
+    """Extract prominent financial metrics / keywords from narration text."""
+    if not text:
+        return None, None
+
+    patterns = [
+        (r'(\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|TRILLION|B|M|K)?(?:\s*→\s*<\$\d+)?(?:\s*/\s*SHARE)?)', "FINANCIAL METRIC // VALUATION"),
+        (r'(-\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|B|M)?)', "BALANCE SHEET // WRITE-DOWN"),
+        (r'(\b(?:<\$\d+(?:\.\d+)?|\$\d+(?:\.\d+)?)\b)', "MARKET VALUE // PRICE TARGET"),
+        (r'(\b\d+(?:\.\d+)?%)', "GROWTH RATE // PERCENTAGE"),
+        (r'(\b\d+\+?\s*(?:BOXES|DOCUMENTS|WITNESSES|EMPLOYEES|INVESTIGATORS)\b)', "EVIDENCE // SCALE"),
+        (r'(\b(?:GUILTY|CONVICTED|VERDICT|FRAUD|CONSPIRACY)\b)', "LEGAL RULING // VERDICT"),
+        (r'(\b(?:MARK-TO-MARKET|SPECIAL PURPOSE ENTITIES|SPE NETWORK|CIRCULAR HEDGE)\b)', "FINANCIAL MECHANISM"),
+    ]
+
+    for p, label in patterns:
+        m = re.search(p, text, re.IGNORECASE)
+        if m:
+            val = m.group(1).upper().strip()
+            if len(val) >= 2:
+                return val, label
+
+    return None, None
+
+
+def format_speaker_tag(scene: dict, act_title: str) -> str:
+    """Dynamically format dialogue speaker tags based on scene character metadata.
+    Converts keys like 'madoff-chairman' -> 'MADOFF // CHAIRMAN',
+    or preserves explicit scene speaker tags.
+    """
+    if scene.get("speaker_tag"):
+        return str(scene["speaker_tag"]).strip()
+
+    if scene.get("character_name"):
+        name = str(scene["character_name"]).strip()
+        role = str(scene.get("character_role") or "CASE DOSSIER").strip()
+        return f"{name} // {role}".upper()
+
+    fg_key = scene.get("foreground_reuse_key")
+    if fg_key:
+        k_clean = re.sub(r'^(fg_|bg_)', '', str(fg_key).strip(), flags=re.IGNORECASE)
+        parts = [p for p in re.split(r'[-_]', k_clean) if p]
+        if len(parts) >= 2:
+            tag = f"{parts[0].upper()} // {' '.join(parts[1:]).upper()}"
+        elif len(parts) == 1:
+            tag = f"{parts[0].upper()} // DOSSIER"
+        else:
+            tag = "ARCHIVE X // CASE INVESTIGATION DOSSIER"
+        return tag
+
+    if scene.get("beat"):
+        return f"{act_title} // {str(scene['beat']).upper()}"
+
+    return act_title or "ARCHIVE X // CASE INVESTIGATION DOSSIER"
+
+
+def match_segments_and_extract_words(scene_text: str, segments: list, start_idx: int, fps: int = 30):
+    """Match Whisper segments for a scene and extract exact word timestamps.
+    Returns: (matched_words, next_seg_idx, scene_duration_sec, scene_start_ms, scene_end_ms)
+    """
+    if not segments or start_idx >= len(segments):
+        return [], start_idx, None, 0, 0
+
+    scene_clean = re.sub(r'\W+', '', scene_text).lower()
+    if not scene_clean:
+        return [], start_idx, None, 0, 0
+
+    matched_segs = []
+    accumulated_text = ""
+    idx = start_idx
+    first_seg = segments[idx]
+    scene_start_ms = int(first_seg.get("start_ms", first_seg.get("start", 0) * 1000))
+
+    while idx < len(segments):
+        seg = segments[idx]
+        seg_clean = re.sub(r'\W+', '', seg.get("text", "")).lower()
+        accumulated_text += seg_clean
+        matched_segs.append(seg)
+        idx += 1
+        if len(accumulated_text) >= len(scene_clean) * 0.9:
+            break
+
+    last_seg = matched_segs[-1] if matched_segs else first_seg
+    scene_end_ms = int(last_seg.get("end_ms", last_seg.get("end", 0) * 1000))
+    dur_sec = max(0.1, (scene_end_ms - scene_start_ms) / 1000.0)
+    dur_frames = max(1, round(dur_sec * fps))
+
+    # Extract words from matched segments
+    subtitles = []
+    for seg in matched_segs:
+        words = seg.get("words")
+        if words and isinstance(words, list):
+            for w in words:
+                w_text = str(w.get("word") or "").strip()
+                if not w_text:
+                    continue
+                w_start = int(w.get("start_ms", w.get("start", 0) * 1000))
+                w_end = int(w.get("end_ms", w.get("end", 0) * 1000))
+                rel_start_ms = max(0, w_start - scene_start_ms)
+                rel_end_ms = max(rel_start_ms + 25, w_end - scene_start_ms)
+                subtitles.append({
+                    "word": w_text,
+                    "start_ms": rel_start_ms,
+                    "end_ms": rel_end_ms,
+                    "startFrame": max(0, round((rel_start_ms / 1000.0) * fps)),
+                    "endFrame": min(dur_frames, round((rel_end_ms / 1000.0) * fps)),
+                    "abs_start_ms": w_start,
+                    "abs_end_ms": w_end,
+                })
+        else:
+            # Fallback for segments without word-level granularity
+            seg_text = seg.get("text", "").strip()
+            s_words = seg_text.split()
+            seg_s = int(seg.get("start_ms", seg.get("start", 0) * 1000))
+            seg_e = int(seg.get("end_ms", seg.get("end", 0) * 1000))
+            seg_span = max(100, seg_e - seg_s)
+            w_len_total = sum(len(w) for w in s_words) or 1
+            cur_ms = seg_s
+            for sw in s_words:
+                w_dur = int(seg_span * (len(sw) / w_len_total))
+                rel_start_ms = max(0, cur_ms - scene_start_ms)
+                rel_end_ms = max(rel_start_ms + 25, cur_ms + w_dur - scene_start_ms)
+                subtitles.append({
+                    "word": sw,
+                    "start_ms": rel_start_ms,
+                    "end_ms": rel_end_ms,
+                    "startFrame": max(0, round((rel_start_ms / 1000.0) * fps)),
+                    "endFrame": min(dur_frames, round((rel_end_ms / 1000.0) * fps)),
+                    "abs_start_ms": cur_ms,
+                    "abs_end_ms": cur_ms + w_dur,
+                })
+                cur_ms += w_dur
+
+    return subtitles, idx, dur_sec, scene_start_ms, scene_end_ms
+
+
+def build_remotion_props_data(
+    episode_id: str,
+    brain_input_path: str,
+    segments_path: str = "",
+    manifest_path: str = "",
+    public_dir: str = "/root/video_factory/remotion/public",
+    fps: int = 30,
+    width: int = 1920,
+    height: int = 1080,
+    fg_fade_sec: float = 0.5,
+    skip_missing: bool = False,
+) -> dict:
+    """Generate props dictionary for Remotion TwoLayerEpisode."""
+    with open(brain_input_path, encoding="utf-8") as f:
+        brain = json.load(f)
+
+    by_reuse_key = {}
+    fg_pool = []
+    if manifest_path and os.path.exists(manifest_path):
+        by_reuse_key, fg_pool = load_manifest_index(manifest_path)
+
+    raw_scenes = brain.get("scenes", [])
+    total_scenes = len(raw_scenes)
+    scenes_out = []
+    missing = []
+    fg_idx = 0
+
+    segments = []
+    if segments_path and os.path.exists(segments_path):
+        try:
+            with open(segments_path, "r", encoding="utf-8") as sf:
+                segments = json.load(sf)
+        except Exception as e:
+            logger.warning("[build_remotion_props] Failed to read segments file %s: %s", segments_path, e)
+            segments = []
+
+    seg_cursor = 0
+
+    for i, s in enumerate(raw_scenes):
+        bg_key = s.get("background_reuse_key")
+        fg_key = s.get("foreground_reuse_key")
+        bg_local = by_reuse_key.get(bg_key) if bg_key else None
+        fg_local = by_reuse_key.get(fg_key) if fg_key else None
+
+        if bg_key and not bg_local:
+            missing.append(bg_key)
+            if skip_missing:
+                continue
+
+        # Auto FG Fallback: Guarantee 100% Foreground Coverage (Rule 100)
+        if not fg_local and fg_pool:
+            chosen_fg_key, chosen_fg_local = fg_pool[fg_idx % len(fg_pool)]
+            fg_local = chosen_fg_local
+            fg_idx += 1
+
+        bg_rel = stage_into_public(bg_local, public_dir, episode_id) if bg_local else None
+        fg_rel = stage_into_public(fg_local, public_dir, episode_id) if fg_local else None
+
+        caption_text = s.get("caption") or s.get("narration") or ""
+        narration_text = s.get("narration") or caption_text
+
+        dur_sec = float(s.get("duration_sec") or 4.0)
+        scene_subtitles = []
+
+        # Single Source of Truth Subtitles & Millisecond-Accurate Karaoke
+        if segments:
+            matched_subs, next_cursor, calc_dur, s_start, s_end = match_segments_and_extract_words(
+                narration_text, segments, seg_cursor, fps=fps
+            )
+            if matched_subs:
+                scene_subtitles = matched_subs
+                seg_cursor = next_cursor
+                if calc_dur is not None and calc_dur > 0.1:
+                    dur_sec = calc_dur
+
+        # Alternate Left / Right position
+        default_pos = "left" if (i % 2 == 0) else "right"
+        fg_pos = s.get("foreground_position") or default_pos
+
+        # Extract or read stat cards
+        stat_val = s.get("stat_value") or s.get("statValue")
+        stat_lbl = s.get("stat_label") or s.get("statLabel")
+        if not stat_val:
+            auto_val, auto_lbl = extract_stat_card(narration_text)
+            if auto_val:
+                stat_val = auto_val
+                stat_lbl = auto_lbl
+
+        # Generic 5-Act non-fiction story engine headings (no hardcoded Enron strings)
+        act_title = s.get("act_title") or (
+            "ACT I // THE HOOK & EXPOSURE" if i <= int(total_scenes * 0.15) else
+            "ACT II // THE ARCHITECTURE OF POWER" if i <= int(total_scenes * 0.40) else
+            "ACT III // THE HIDDEN MECHANISM" if i <= int(total_scenes * 0.65) else
+            "ACT IV // THE CRACK IN THE ILLUSION" if i <= int(total_scenes * 0.85) else
+            "ACT V // THE AFTERMATH & RECKONING"
+        )
+
+        speaker_tag = format_speaker_tag(s, act_title)
+
+        scenes_out.append({
+            "background": bg_rel or "",
+            "foreground": fg_rel,
+            "foregroundPosition": fg_pos,
+            "durationInFrames": max(1, round(dur_sec * fps)),
+            "foregroundFadeFrames": max(1, round(fg_fade_sec * fps)),
+            "caption": caption_text,
+            "narration": narration_text,
+            "safeZone": s.get("safe_zone") or "none",
+            "statValue": stat_val,
+            "statLabel": stat_lbl,
+            "speakerTag": speaker_tag,
+            "actTitle": act_title,
+            "subtitles": scene_subtitles,  # Forward Faster-Whisper words
+            "words": scene_subtitles,      # Alias for maximum compatibility
+        })
+
+    if missing:
+        print("WARNING: missing local images for reuse keys: %s" % sorted(set(missing)), file=sys.stderr)
+    if not scenes_out:
+        print("ERROR: no scenes produced (brain_input has no usable scenes, or all were skipped)", file=sys.stderr)
+        sys.exit(1)
+
+    # Proportional scaling to match narration audio if video duration is shorter than audio
+    audio_path = os.path.join(os.path.dirname(brain_input_path), "tts_out.mp3")
+    if os.path.exists(audio_path):
+        try:
+            import subprocess as _sub
+            probe = _sub.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path], stdout=_sub.PIPE, text=True)
+            adur = float(probe.stdout.strip())
+            total_frames = sum(sc["durationInFrames"] for sc in scenes_out)
+            total_vdur = total_frames / fps
+            if adur > 0 and total_vdur < adur * 0.97:
+                scale = (adur + 0.5) / total_vdur
+                for sc in scenes_out:
+                    sc["durationInFrames"] = max(1, round(sc["durationInFrames"] * scale))
+                print(f"DURATION_SCALED: scaled {total_vdur:.1f}s -> {adur:.1f}s to match audio ({scale:.2f}x)")
+        except Exception as _e_dur:
+            print(f"DEBUG: duration probe fallback: {_e_dur}")
+
+    props = {
+        "scenes": scenes_out,
+        "fps": fps,
+        "width": width,
+        "height": height,
+    }
+    return props
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--episode-id", required=True)
+    ap.add_argument("--brain-input", required=True)
+    ap.add_argument("--segments", default="")
+    ap.add_argument("--manifest", default="")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--public-dir", default="/root/video_factory/remotion/public")
+    ap.add_argument("--fps", type=int, default=30)
+    ap.add_argument("--width", type=int, default=1920)
+    ap.add_argument("--height", type=int, default=1080)
+    ap.add_argument("--fg-fade-sec", type=float, default=0.5)
+    ap.add_argument("--skip-missing", action="store_true",
+                    help="drop scenes whose background image is missing instead of failing")
+    args = ap.parse_args()
+
+    props = build_remotion_props_data(
+        episode_id=args.episode_id,
+        brain_input_path=args.brain_input,
+        segments_path=args.segments,
+        manifest_path=args.manifest,
+        public_dir=args.public_dir,
+        fps=args.fps,
+        width=args.width,
+        height=args.height,
+        fg_fade_sec=args.fg_fade_sec,
+        skip_missing=args.skip_missing,
+    )
+
+    os.makedirs(os.path.dirname(args.out), exist_ok=True)
+    with open(args.out, "w", encoding="utf-8") as f:
+        json.dump(props, f, ensure_ascii=False, indent=2)
+
+    total_words_forwarded = sum(len(sc.get("subtitles") or []) for sc in props["scenes"])
+    print("WROTE", args.out, "scenes=%d (subtitles=%d words, stats=%d)" % (
+        len(props["scenes"]),
+        total_words_forwarded,
+        sum(1 for sc in props["scenes"] if sc.get("statValue"))
+    ))
+
+
+if __name__ == "__main__":
+    main()
