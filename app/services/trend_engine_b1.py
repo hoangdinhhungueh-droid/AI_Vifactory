@@ -456,7 +456,8 @@ def discover_and_produce_market_trend(
         # 5. Inline B1.5 Competitor Recon (Deep Two-Pass Recon & Top Comments)
         print(f"  🎯 [B1.5] Executing Deep Competitor Recon for {task_id}...")
         try:
-            recon_card = run_b15(task_id, term, t_obj.get("niche_angle_brief", "General"))
+            recon_keyword = t_obj.get("search_specific_keyword") or term
+            recon_card = run_b15(task_id, recon_keyword, t_obj.get("niche_angle_brief", "General"))
             if recon_card:
                 t_obj["competitor_gap"] = recon_card.get("competitor_narrative_anatomy", {}).get("fatal_explanatory_vacuum", "")
                 print(f"  ✅ [B1.5] Competitor Intel Card saved successfully.")
