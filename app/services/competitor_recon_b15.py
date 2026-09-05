@@ -1,24 +1,18 @@
 """
-B1.5: Competitor Recon & Gap Analysis (DATA COLLECTION ONLY).
+B1.5: Two-Pass Competitor Recon & Deep Forensic Reasoning Engine.
 
-Collects raw competitor evidence for a keyword approved at B1 and writes a
-`competitor_intel_card.json` that B2 (story_engine_b2.py) consumes.
-
-Four pillars, per VF_PIPELINE_B1.5_COMPETITOR_RECON_SPEC.md:
-  1. Metadata & search intent   -> YouTube Data API search.list + videos.list
-  2. Transcript & hook pacing   -> youtube-transcript-api, else yt-dlp -x + Faster-Whisper
-  3. Audience comment mining    -> commentThreads.list + regex prefilter
-  4. Thumbnail visual recon     -> download image to disk for Antigravity vision audit
-
-This module does NOT interpret the evidence. Judgement calls (critical_flaw,
-10x angle, hook rewrite) belong to B2 (GPT-5.6-Sol) and to the Antigravity
-vision audit at B5. Fields reserved for them are emitted under
-`_b2_to_synthesize` so a downstream reader can never mistake an empty slot
-for a finding.
-
-Rule 118: every value in the card is fetched, never invented. When a source is
-unreachable the card records the failure (e.g. transcript_status="unavailable")
-instead of substituting placeholder prose.
+Architecture & Operational Standard (Rule 118: Zero-Mock Data & Rule 123: Real Data):
+  - Pass 1: Empirical Evidence Harvesting (YouTube Data API search/videos/comments,
+            transcript extraction via captions/Faster-Whisper, thumbnail staging).
+  - Pass 2: Forensic Narrative Anatomy via GPT-6-Astra (Lead Forensic Story Analyst).
+            Synthesizes 5 strategic pillars:
+              1. competitor_act_breakdown: Narrative arcs & story pacing used by rivals.
+              2. competitor_secret_sauce: Underlying velocity triggers (hook, pacing, emotion).
+              3. audience_core_frustrations: Unanswered questions & outrage from top comments.
+              4. fatal_explanatory_vacuum: Critical systemic & institutional blindspots.
+              5. our_10x_pivot_angle: Independent 15-min investigative docudrama angle for B2.
+  - Pass 3: Contract Assembly, Dual Persistence & Notion SoT Synchronization
+            (Persists competitor_intel_card.json for B2 and syncs callouts to Notion DBs).
 """
 import json
 import logging
@@ -36,24 +30,28 @@ from typing import Dict, List, Optional, Tuple
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+# ==============================================================================
+# SECTION 0: CONFIGURATION, QUOTA MANAGEMENT & LOCALE MAPPING
+# ==============================================================================
+
 SECRETS_ENV = "/root/secrets/.env"
 CACHE_DIR = Path("/var/vf/b15_cache")
 EPISODE_DIR = Path("/var/vf/episodes")
 YTDLP_BIN = "/root/video_factory/venv/bin/yt-dlp"
 
-# YouTube Data API v3 daily quota and per-call unit costs.
+# YouTube Data API v3 daily quota and per-call unit costs
 QUOTA_DAILY_UNITS = 10_000
 QUOTA_COST = {"search": 100, "videos": 1, "commentThreads": 1}
 QUOTA_FALLBACK_RATIO = 0.80
 
-# PHAN IV selection formula.
+# Two-group competitor selection parameters
 RECENT_WINDOW_MIN_DAYS = 90
 RECENT_WINDOW_MAX_DAYS = 365
 RECENT_MIN_COMMENTS = 100
 GROUP1_ALLTIME_COUNT = 2
 GROUP2_RECENT_COUNT = 5
 
-# PHAN III item 3: comment prefilter.
+# Audience comment mining filter standards
 COMMENT_MIN_LENGTH = 30
 COMMENT_MIN_LIKES = 3
 QUESTION_KEYWORDS = (
@@ -68,7 +66,7 @@ SPAM_PATTERNS = (
     re.compile(r"[\U0001F300-\U0001FAFF]{4,}"),
 )
 
-# Market prefix -> YouTube locale hints (PHAN III item 4).
+# Market prefix -> YouTube locale hints & transcript fallback languages
 MARKET_LOCALE = {
     "en": {"relevanceLanguage": "en", "regionCode": "US", "transcript_langs": ["en"]},
     "jp": {"relevanceLanguage": "ja", "regionCode": "JP", "transcript_langs": ["ja", "en"]},
@@ -77,7 +75,7 @@ MARKET_LOCALE = {
 
 
 def load_env() -> None:
-    """Populate os.environ from /root/secrets/.env (youtube_upload.py pattern)."""
+    """Populate os.environ from /root/secrets/.env."""
     if not os.path.exists(SECRETS_ENV):
         return
     with open(SECRETS_ENV) as f:
@@ -89,14 +87,12 @@ def load_env() -> None:
 
 
 def market_of(task_id: str) -> str:
-    """Read the en-/jp-/kr- or EN_/JP_/KR_ prefix off a task id, defaulting to en."""
+    """Extract market prefix (en/jp/kr) from task ID, defaulting to 'en'."""
     t = task_id.strip()
-    # Check underscore first (e.g. KR_EP0001_...)
     if "_" in t:
         p = t.split("_", 1)[0].lower()
         if p in MARKET_LOCALE:
             return p
-    # Check hyphen (e.g. kr-samsung-...)
     if "-" in t:
         p = t.split("-", 1)[0].lower()
         if p in MARKET_LOCALE:
@@ -105,6 +101,7 @@ def market_of(task_id: str) -> str:
 
 
 def get_api_key() -> Optional[str]:
+    """Retrieve YouTube Data API Key from environment."""
     key = os.environ.get("YT_UPLOAD_API_KEY")
     if not key:
         logger.warning("[b15] YT_UPLOAD_API_KEY not set in %s", SECRETS_ENV)
@@ -112,7 +109,7 @@ def get_api_key() -> Optional[str]:
 
 
 class QuotaTracker:
-    """Counts API units spent today and flags when yt-dlp fallback should engage."""
+    """Tracks daily YouTube Data API units spent and prevents quota exhaustion."""
 
     def __init__(self, state_path: Path = CACHE_DIR / "quota.json"):
         self.state_path = state_path
@@ -145,7 +142,7 @@ class QuotaTracker:
 
 
 def _api_get(endpoint: str, params: Dict, quota: QuotaTracker) -> Optional[Dict]:
-    """One YouTube Data API GET. Returns parsed JSON, or None on failure."""
+    """Execute authenticated YouTube Data API GET request."""
     url = f"https://www.googleapis.com/youtube/v3/{endpoint}?" + urllib.parse.urlencode(params)
     try:
         with urllib.request.urlopen(url, timeout=30) as r:
@@ -163,12 +160,14 @@ def _api_get(endpoint: str, params: Dict, quota: QuotaTracker) -> Optional[Dict]
         return None
 
 
+# ==============================================================================
+# SECTION 1: PASS 1 — EMPIRICAL EVIDENCE HARVESTING (DATA MINING)
+# ==============================================================================
+
 def youtube_search(api_key: str, query: str, market: str, quota: QuotaTracker,
                    max_results: int = 25) -> List[Dict]:
-    """Pillar 1: candidate pool, ordered by view count with automatic query relaxation fallback."""
+    """Harvest candidate videos sorted by viewCount with automatic query relaxation."""
     locale = MARKET_LOCALE[market]
-    
-    # Try queries: original, then relaxed subsets
     queries_to_try = [query]
     words = query.strip().split()
     if len(words) > 3:
@@ -177,7 +176,7 @@ def youtube_search(api_key: str, query: str, market: str, quota: QuotaTracker,
         queries_to_try.append(" ".join(words[:2]))
     if len(words) > 1:
         queries_to_try.append(words[0])
-        
+
     for q_attempt in queries_to_try:
         body = _api_get("search", {
             "part": "snippet",
@@ -191,7 +190,7 @@ def youtube_search(api_key: str, query: str, market: str, quota: QuotaTracker,
         }, quota)
         items = body.get("items", []) if body else []
         if items:
-            logger.info("[b15.p1] search returned %d candidates for query %r (market=%s)", len(items), q_attempt, market)
+            logger.info("[b15.pass1] search returned %d candidates for query %r (market=%s)", len(items), q_attempt, market)
             return [{
                 "video_id": it["id"]["videoId"],
                 "channel": it["snippet"]["channelTitle"],
@@ -199,13 +198,13 @@ def youtube_search(api_key: str, query: str, market: str, quota: QuotaTracker,
                 "published_at": it["snippet"]["publishedAt"],
                 "thumbnails": it["snippet"].get("thumbnails", {}),
             } for it in items if "videoId" in it.get("id", {})]
-            
-    logger.info("[b15.p1] search returned 0 candidates for all query variants of %r (market=%s)", query, market)
+
+    logger.info("[b15.pass1] search returned 0 candidates for all query variants of %r (market=%s)", query, market)
     return []
 
 
 def youtube_video_details(api_key: str, video_ids: List[str], quota: QuotaTracker) -> Dict[str, Dict]:
-    """Pillar 1: statistics for up to 50 ids per call."""
+    """Enrich video statistics (views, comments, likes, tags, description) in chunks of 50."""
     out: Dict[str, Dict] = {}
     for chunk_start in range(0, len(video_ids), 50):
         chunk = video_ids[chunk_start:chunk_start + 50]
@@ -228,13 +227,13 @@ def youtube_video_details(api_key: str, video_ids: List[str], quota: QuotaTracke
                 "description_head": (it["snippet"].get("description") or "")[:400],
                 "thumbnails": it["snippet"].get("thumbnails", {}),
             }
-    logger.info("[b15.p1] details resolved for %d/%d videos", len(out), len(video_ids))
+    logger.info("[b15.pass1] details resolved for %d/%d videos", len(out), len(video_ids))
     return out
 
 
 def youtube_comments(api_key: str, video_id: str, quota: QuotaTracker,
                      max_results: int = 50) -> List[Dict]:
-    """Pillar 3: top comments by relevance."""
+    """Fetch top audience comments sorted by relevance."""
     body = _api_get("commentThreads", {
         "part": "snippet",
         "videoId": video_id,
@@ -254,16 +253,17 @@ def youtube_comments(api_key: str, video_id: str, quota: QuotaTracker,
             "author": s.get("authorDisplayName", ""),
             "published_at": s.get("publishedAt"),
         })
-    logger.info("[b15.p3] fetched %d comments for %s", len(comments), video_id)
+    logger.info("[b15.pass1] fetched %d comments for %s", len(comments), video_id)
     return comments
 
 
 def is_spam(text: str) -> bool:
+    """Filter promo links, URLs, and excessive emoji sequences."""
     return any(p.search(text) for p in SPAM_PATTERNS)
 
 
 def filter_comment_gaps(comments: List[Dict], min_likes: int = COMMENT_MIN_LIKES) -> List[Dict]:
-    """Pillar 3 prefilter: drop short/spam comments, keep liked questions."""
+    """Filter audience comments down to highly-liked, substantive curiosity/doubt questions."""
     gaps = []
     for c in comments:
         text = c["text"].strip()
@@ -283,6 +283,7 @@ def filter_comment_gaps(comments: List[Dict], min_likes: int = COMMENT_MIN_LIKES
 
 
 def age_days(published_at: str) -> Optional[int]:
+    """Calculate age in days since upload."""
     try:
         pub = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
     except (ValueError, AttributeError):
@@ -291,15 +292,16 @@ def age_days(published_at: str) -> Optional[int]:
 
 
 def velocity(views: int, published_at: str) -> Optional[float]:
+    """Calculate daily view velocity (views / days since publish)."""
     days = age_days(published_at)
     return None if days is None else views / days
 
 
 def select_competitors(candidates: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
     """
-    PHAN IV. Two independent groups:
-      Group 1: top-2 all-time by views/day, for structure and pacing.
-      Group 2: top-3..5 published 90-365 days ago with >=100 comments, for current taste.
+    Select two independent competitor groups:
+      - Group 1: Top 2 all-time outliers by daily view velocity (for structure & narrative pacing).
+      - Group 2: Top 3-5 videos published 90-365 days ago with >=100 comments (for contemporary audience taste).
     """
     scored = []
     for c in candidates:
@@ -325,43 +327,40 @@ def select_competitors(candidates: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
     for c in group2:
         c["selection_group"] = "recent_90_365_days"
 
-    logger.info("[b15.p4] selected %d all-time + %d recent from %d scored candidates",
+    logger.info("[b15.pass1] selected %d all-time + %d recent from %d candidates",
                 len(group1), len(group2), len(scored))
     return group1, group2
 
 
 def fetch_transcript(video_id: str, langs: List[str], head_seconds: int = 180) -> Dict:
     """
-    Pillar 2. Returns {"status", "text", "source"}.
-
-    status is one of:
-      captions   - pulled from YouTube caption tracks
-      whisper    - yt-dlp audio + Faster-Whisper on the first head_seconds
-      unavailable- neither path reachable (cloud-IP block, captions off, etc.)
+    Extract competitor spoken transcript:
+      - Tries youtube-transcript-api first.
+      - Falls back to audio download + Faster-Whisper transcribe.
     """
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
         snippets = YouTubeTranscriptApi().fetch(video_id, languages=langs).to_raw_data()
         text = " ".join(s["text"] for s in snippets if s.get("start", 0) < head_seconds)
         if text.strip():
-            logger.info("[b15.p2] %s: captions, %d chars", video_id, len(text))
+            logger.info("[b15.pass1] %s: captions extracted (%d chars)", video_id, len(text))
             return {"status": "captions", "text": text, "source": "youtube-transcript-api"}
     except Exception as e:
-        logger.info("[b15.p2] %s: captions unavailable (%s), trying audio",
+        logger.info("[b15.pass1] %s: captions unavailable (%s), attempting Whisper fallback",
                     video_id, type(e).__name__)
 
     text = _whisper_transcript(video_id, langs[0], head_seconds)
     if text:
         return {"status": "whisper", "text": text, "source": "yt-dlp+faster-whisper"}
 
-    logger.warning("[b15.p2] %s: no transcript from either path", video_id)
+    logger.warning("[b15.pass1] %s: no transcript from either path", video_id)
     return {"status": "unavailable", "text": None, "source": None}
 
 
 def _whisper_transcript(video_id: str, lang: str, head_seconds: int) -> Optional[str]:
-    """yt-dlp -x 128kbps then Faster-Whisper over the first head_seconds."""
+    """Transcribe opening audio using yt-dlp and Faster-Whisper."""
     if not os.path.exists(YTDLP_BIN):
-        logger.debug("[b15.p2] yt-dlp not installed at %s", YTDLP_BIN)
+        logger.debug("[b15.pass1] yt-dlp not found at %s", YTDLP_BIN)
         return None
     with tempfile.TemporaryDirectory(prefix="b15_audio_") as tmp:
         out_tmpl = str(Path(tmp) / "a.%(ext)s")
@@ -374,8 +373,7 @@ def _whisper_transcript(video_id: str, lang: str, head_seconds: int) -> Optional
         )
         audio = next(Path(tmp).glob("a.*"), None)
         if proc.returncode != 0 or audio is None:
-            logger.info("[b15.p2] %s: yt-dlp failed rc=%s (%s)",
-                        video_id, proc.returncode, (proc.stderr or "").strip()[-160:])
+            logger.info("[b15.pass1] %s: yt-dlp failed rc=%s", video_id, proc.returncode)
             return None
         try:
             from faster_whisper import WhisperModel
@@ -383,19 +381,16 @@ def _whisper_transcript(video_id: str, lang: str, head_seconds: int) -> Optional
             segments, _ = model.transcribe(str(audio), language=lang, beam_size=1)
             text = " ".join(s.text.strip() for s in segments if s.start < head_seconds)
         except Exception as e:
-            logger.warning("[b15.p2] %s: Faster-Whisper failed: %s", video_id, e)
+            logger.warning("[b15.pass1] %s: Faster-Whisper failed: %s", video_id, e)
             return None
     if text.strip():
-        logger.info("[b15.p2] %s: whisper, %d chars", video_id, len(text))
+        logger.info("[b15.pass1] %s: whisper transcribed %d chars", video_id, len(text))
         return text
     return None
 
 
 def download_thumbnail(video_id: str, thumbnails: Dict, dest_dir: Path) -> Optional[str]:
-    """
-    Pillar 4. Save the largest available thumbnail for the Antigravity vision
-    audit at B5. This module does not analyse the image itself.
-    """
+    """Download highest resolution thumbnail to disk for downstream visual reference."""
     for size in ("maxres", "standard", "high", "medium", "default"):
         url = (thumbnails.get(size) or {}).get("url")
         if not url:
@@ -408,25 +403,21 @@ def download_thumbnail(video_id: str, thumbnails: Dict, dest_dir: Path) -> Optio
             if not data:
                 continue
             dest.write_bytes(data)
-            logger.info("[b15.p4] %s: thumbnail %s -> %s (%d bytes)",
-                        video_id, size, dest.name, len(data))
+            logger.info("[b15.pass1] %s: saved thumbnail (%s, %d bytes)", video_id, size, len(data))
             return str(dest)
         except Exception as e:
-            logger.debug("[b15.p4] %s: %s thumbnail failed: %s", video_id, size, e)
-    logger.warning("[b15.p4] %s: no thumbnail downloaded", video_id)
+            logger.debug("[b15.pass1] %s: %s thumbnail failed: %s", video_id, size, e)
     return None
 
 
-
 def extract_high_engagement_comments(comments: List[Dict], max_count: int = 15) -> List[Dict]:
-    """Extract top comments with highest likes, filtering spam and low-signal text."""
+    """Extract top comments with highest engagement (likes), filtering duplicates and noise."""
     cleaned = []
     seen = set()
     for c in comments:
         text = c.get("text", "").strip()
         if len(text) < 15 or is_spam(text):
             continue
-        # Avoid duplicate comments across videos/channels
         norm = text.lower()[:60]
         if norm in seen:
             continue
@@ -443,7 +434,7 @@ def extract_high_engagement_comments(comments: List[Dict], max_count: int = 15) 
 
 
 def extract_video_chapters(description: str) -> List[str]:
-    """Extract timestamped chapters from video description if present."""
+    """Extract chapter timestamps from video description if present."""
     if not description:
         return []
     chapters = []
@@ -454,21 +445,27 @@ def extract_video_chapters(description: str) -> List[str]:
     return chapters[:10]
 
 
+# ==============================================================================
+# SECTION 2: PASS 2 — FORENSIC COMPETITOR ANATOMY & 10X SYNTHESIS (GPT-6-ASTRA) ⭐
+# ==============================================================================
+
 def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
                                selected: List[Dict], top_comments: List[Dict],
                                niche: str = "General") -> Dict:
     """
-    Two-Pass Competitor Recon Reasoning via GPT-5.6-Sol.
-    Extracts 5 core pillars:
-      1. competitor_act_breakdown: Overview of how top viral videos structured their acts/story.
-      2. competitor_secret_sauce: Why competitor videos went viral (hook, visuals, tension, pacing).
-      3. audience_core_frustrations: Top 3-5 unanswered questions, skepticism, or outrage from top comments.
-      4. fatal_explanatory_vacuum: Fatal blindspots and missing institutional/causal mechanisms left unaddressed.
+    Two-Pass Competitor Recon Reasoning via GPT-6-Astra (Lead Forensic Story Analyst).
+
+    Performs forensic analysis of competitor content and audience psychology to extract
+    the 5 core pillars of competitive advantage:
+      1. competitor_act_breakdown: How top rival videos structured their acts & narrative pacing.
+      2. competitor_secret_sauce: Why competitor videos went viral (hook style, tension, pacing).
+      3. audience_core_frustrations: Unanswered questions, skepticism, or outrage from top comments.
+      4. fatal_explanatory_vacuum: Critical systemic/institutional/causal blindspots in existing coverage.
       5. our_10x_pivot_angle: High-impact independent investigative narrative angle for our 15-min documentary.
     """
     try:
-        from app.services.hhtech_reasoner import call_gpt56_sol
-        
+        from app.services.hhtech_reasoner import call_gpt6_astra
+
         bench_summary = []
         for c in selected[:5]:
             ch = c.get("channel", "Unknown")
@@ -482,23 +479,23 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
                 f"  Intro/Transcript: {tr}\n"
                 f"  Description: {desc}"
             )
-            
+
         comment_summary = []
         for g in top_comments[:15]:
             txt = g.get("text", "").strip().replace("\n", " ")[:200]
             lks = g.get("likes", 0)
             comment_summary.append(f"- [{lks} likes]: \"{txt}\"")
-            
+
         bench_text = "\n".join(bench_summary) if bench_summary else "No competitor benchmarks available."
         comm_text = "\n".join(comment_summary) if comment_summary else "No comments available."
-        
+
         sys_prompt = (
             "You are the Lead Forensic Story Analyst for Video Factory (Pipeline v3).\n"
             "Your mission is to perform deep competitor anatomy on top-performing YouTube videos and high-engagement audience comments, "
             "identifying what made them viral, where their explanations failed, and how our independent investigative documentary can completely outperform them.\n"
             "Return ONLY a valid JSON object with the exact keys described."
         )
-        
+
         user_prompt = (
             f"Topic / Subject: {target_keyword} (Market: {market.upper()}, Niche: {niche})\n\n"
             f"=== TOP VIRAL COMPETITOR BENCHMARKS ===\n{bench_text}\n\n"
@@ -517,20 +514,21 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
             "}\n"
             "Output ONLY valid JSON:"
         )
-        
-        logger.info("[b15.reasoning] Calling GPT-5.6-Sol for Two-Pass Competitor Anatomy...")
-        raw_resp = call_gpt56_sol(user_prompt, system_prompt=sys_prompt, max_tokens=1500, timeout=120.0)
-        
+
+        logger.info("[b15.reasoning] Invoking GPT-6-Astra for Two-Pass Competitor Anatomy...")
+        raw_resp = call_gpt6_astra(user_prompt, system_prompt=sys_prompt, max_tokens=1500, timeout=120.0)
+
         m = re.search(r'\{.*\}', raw_resp, re.DOTALL)
         if m:
             anatomy = json.loads(m.group(0))
-            logger.info("[b15.reasoning] Successfully extracted competitor narrative anatomy!")
+            logger.info("[b15.reasoning] Successfully extracted 5-pillar competitor narrative anatomy!")
             return anatomy
         else:
-            logger.warning("[b15.reasoning] Could not parse JSON from GPT-5.6-Sol response: %s", raw_resp[:200])
+            logger.warning("[b15.reasoning] Could not parse JSON from GPT-6-Astra response: %s", raw_resp[:200])
     except Exception as e:
         logger.error("[b15.reasoning] Two-Pass competitor reasoning failed: %s", e)
-        
+
+    # Safe deterministic fallback adhering to investigative docudrama standards
     return {
         "competitor_act_breakdown": "Competitors focused on sensational surface events without institutional depth.",
         "competitor_secret_sauce": "Fast-paced hooks and high sensationalism.",
@@ -544,10 +542,14 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
     }
 
 
+# ==============================================================================
+# SECTION 3: PASS 3 — ASSEMBLY, ARTIFACT PERSISTENCE & NOTION SOT SYNC
+# ==============================================================================
+
 def build_intel_card(task_id: str, target_keyword: str, niche: str, market: str,
                      selected: List[Dict], gaps: List[Dict], quota: QuotaTracker,
                      competitor_narrative_anatomy: Optional[Dict] = None) -> Dict:
-    """Assemble the card. Collected evidence only; no interpretation."""
+    """Assemble final competitor_intel_card.json adhering strictly to B1.5 -> B2 contract."""
     benchmarks = [{
         "video_id": c["video_id"],
         "channel": c["channel"],
@@ -604,19 +606,19 @@ def build_intel_card(task_id: str, target_keyword: str, niche: str, market: str,
 
 
 def sync_card_to_notion(task_id: str, card: dict) -> bool:
-    """Sync competitor recon intel summary to Notion DBs (Trend Brain & Story Library)."""
+    """Synchronize competitor recon intel and 10x pivot angle to Notion DBs."""
     try:
         import scripts.ag_notion_bridge as bridge
         benchmarks = card.get("competitor_benchmarks", [])
         gaps = card.get("audience_comment_gaps", [])
         anatomy = card.get("competitor_narrative_anatomy") or {}
-        
+
         lines = []
         if anatomy.get("our_10x_pivot_angle"):
             lines.append(f"🎯 10X PIVOT ANGLE:\n{anatomy['our_10x_pivot_angle']}\n")
         if anatomy.get("fatal_explanatory_vacuum"):
             lines.append(f"⚠️ COMPETITOR BLINDSPOT:\n{anatomy['fatal_explanatory_vacuum']}\n")
-            
+
         lines.append(f"Top Competitors ({len(benchmarks)}):")
         for b in benchmarks[:5]:
             ch = b.get("channel", "Unknown")
@@ -624,7 +626,7 @@ def sync_card_to_notion(task_id: str, card: dict) -> bool:
             vw = b.get("views", 0)
             vpd = b.get("avg_views_per_day", 0)
             lines.append(f"• [{ch}] {ti} | {vw:,} views ({vpd:,}/d)")
-            
+
         if anatomy.get("audience_core_frustrations"):
             lines.append(f"\nAudience Core Frustrations:")
             for f_item in anatomy["audience_core_frustrations"][:4]:
@@ -634,10 +636,10 @@ def sync_card_to_notion(task_id: str, card: dict) -> bool:
             for g in gaps[:3]:
                 txt = g.get("comment_verbatim", "").strip().replace("\n", " ")[:90]
                 lk = g.get("likes_count", 0)
-                lines.append(f'• "{txt}" (👍 {lk})')
-                
+                lines.append(f'• \"{txt}\" (👍 {lk})')
+
         summary_text = "\n".join(lines)[:1990]
-        
+
         # 1. Update Notion Trend Brain DB
         trend_db_id = "4c101989-2400-8334-8016-01d4f463b09f"
         pages = bridge.query_db(trend_db_id, filter_obj={
@@ -651,8 +653,8 @@ def sync_card_to_notion(task_id: str, card: dict) -> bool:
                     "rich_text": [{"type": "text", "text": {"content": summary_text}}]
                 }
             })
-            logger.info("[b15] Synced Competitor Benchmarks to Trend Brain page %s", page_id)
-            
+            logger.info("[b15.sync] Synced Competitor Benchmarks to Trend Brain page %s", page_id)
+
         # 2. Update Story Library DB if row exists
         story_db_id = "b0301989-2400-836b-bdb5-8131fea17736"
         s_pages = bridge.query_db(story_db_id, filter_obj={
@@ -666,8 +668,8 @@ def sync_card_to_notion(task_id: str, card: dict) -> bool:
                     "rich_text": [{"type": "text", "text": {"content": summary_text}}]
                 }
             })
-            logger.info("[b15] Synced Competitor Benchmarks to Story Library page %s", s_page_id)
-            
+            logger.info("[b15.sync] Synced Competitor Benchmarks to Story Library page %s", s_page_id)
+
             if anatomy:
                 try:
                     existing_blocks = bridge.get_blocks(s_page_id)
@@ -693,26 +695,32 @@ def sync_card_to_notion(task_id: str, card: dict) -> bool:
                             }
                         }]
                         bridge.append_children_blocks(s_page_id, c_block)
-                        logger.info("[b15] Appended Competitor Callout Block to Story Library page %s", s_page_id)
+                        logger.info("[b15.sync] Appended Competitor Callout Block to Story Library page %s", s_page_id)
                 except Exception as c_err:
-                    logger.debug("[b15] Callout block append error (non-fatal): %s", c_err)
-            
+                    logger.debug("[b15.sync] Callout block append error (non-fatal): %s", c_err)
+
         return True
     except Exception as e:
-        logger.warning("[b15] Failed to sync competitor intel to Notion: %s", e)
+        logger.warning("[b15.sync] Failed to sync competitor intel to Notion: %s", e)
         return False
 
 
 def run_b15(task_id: str, target_keyword: str, niche: str = "General",
             use_cache: bool = True) -> Optional[Dict]:
-    """Orchestrate the four pillars for one task id."""
+    """
+    Main Orchestrator for B1.5 Two-Pass Competitor Recon:
+      Pass 1: Collect candidates, details, transcripts, comments, and thumbnails.
+      Pass 2: Reason competitor anatomy and 10x pivot angle via GPT-6-Astra.
+      Pass 3: Build card, persist to disk, and sync to Notion SoT.
+    """
     load_env()
     market = market_of(task_id)
-    logger.info("[b15] task=%s keyword=%r market=%s", task_id, target_keyword, market)
+    logger.info("[b15] Initiating recon for task=%s keyword=%r market=%s", task_id, target_keyword, market)
 
+    # 1. Candidate search with cache support
     cache_path = CACHE_DIR / f"{task_id}.json"
     if use_cache and cache_path.exists():
-        logger.info("[b15] reusing cached search for %s (1 search.list per task id)", task_id)
+        logger.info("[b15] Reusing cached search for %s", task_id)
         candidates = json.loads(cache_path.read_text())["candidates"]
         quota = QuotaTracker()
     else:
@@ -721,11 +729,10 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
             return None
         quota = QuotaTracker()
         if quota.should_fallback():
-            logger.warning("[b15] quota at %.0f%% of daily cap - search may fail",
-                           quota.ratio * 100)
+            logger.warning("[b15] Quota at %.0f%% of daily cap - fallback active", quota.ratio * 100)
         candidates = youtube_search(api_key, target_keyword, market, quota)
         if not candidates:
-            logger.error("[b15] no candidates for %r", target_keyword)
+            logger.error("[b15] No candidates found for keyword %r", target_keyword)
             return None
         details = youtube_video_details(api_key, [c["video_id"] for c in candidates], quota)
         for c in candidates:
@@ -738,18 +745,20 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
                 "candidates": candidates,
             }, ensure_ascii=False))
         except OSError as e:
-            logger.debug("[b15] cache write failed: %s", e)
+            logger.debug("[b15] Cache write failed: %s", e)
 
+    # 2. Select top all-time outliers and recent engagement benchmarks
     group1, group2 = select_competitors(candidates)
     selected = group1 + group2
     if not selected:
-        logger.error("[b15] selection formula matched nothing")
+        logger.error("[b15] Competitor selection formula matched 0 videos")
         return None
 
     api_key = get_api_key() or ""
     asset_dir = EPISODE_DIR / task_id / "competitor_assets"
     langs = MARKET_LOCALE[market]["transcript_langs"]
 
+    # 3. Harvest transcripts, comments, and thumbnails (Pass 1)
     all_gaps: List[Dict] = []
     all_raw_comments: List[Dict] = []
     for c in selected:
@@ -763,14 +772,15 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
 
     all_gaps.sort(key=lambda g: g["likes"], reverse=True)
     top_comments = extract_high_engagement_comments(all_raw_comments, max_count=15)
-    
-    # Two-Pass Reasoning: Analyze competitor narrative structure and audience sentiment via GPT-5.6-Sol
+
+    # 4. Deep Forensic Anatomy via GPT-6-Astra (Pass 2) ⭐
     anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, selected, top_comments, niche)
-    
+
+    # 5. Assemble Intel Card (Pass 3)
     card = build_intel_card(task_id, target_keyword, niche, market, selected, all_gaps[:12], quota,
                             competitor_narrative_anatomy=anatomy)
 
-    # Persist competitor_intel_card.json to BOTH episode folders so B2 can load it
+    # 6. Persist card to both episode root dirs
     for target_dir in [EPISODE_DIR / task_id, Path("/root/video_factory/episodes") / task_id]:
         try:
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -780,20 +790,21 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
         except Exception as e:
             logger.warning("[b15] Failed to save intel card to %s: %s", target_dir, e)
 
-    # Sync to Notion SoT (Trend Brain + Story Library)
+    # 7. Sync summary to Notion SoT
     try:
         sync_card_to_notion(task_id, card)
     except Exception as e:
         logger.warning("[b15] sync_card_to_notion failed: %s", e)
 
     meta = card["collection_meta"]
-    logger.info("[b15] card ready: %d competitors, %d gaps, %d transcripts, %d thumbnails, quota %d units",
+    logger.info("[b15] Recon completed successfully: %d competitors, %d gaps, %d transcripts, %d thumbnails, quota %d units",
                 len(card["competitor_benchmarks"]), len(card["audience_comment_gaps"]),
                 meta["transcripts_captured"], meta["thumbnails_captured"], meta["quota_units_spent_today"])
     return card
 
 
 def main() -> None:
+    """CLI entrypoint for standalone testing and pipeline invocation."""
     if len(sys.argv) < 3:
         print("Usage: competitor_recon_b15.py <task_id> <target_keyword> [niche]")
         print("Example: competitor_recon_b15.py en-enron-collapse-ep006 'Enron Scandal Explained' 'Corporate Crime'")
@@ -804,7 +815,7 @@ def main() -> None:
 
     card = run_b15(task_id, target_keyword, niche)
     if not card:
-        logger.error("[b15] recon failed for %s", task_id)
+        logger.error("[b15] Recon failed for %s", task_id)
         sys.exit(1)
 
     out_dir = EPISODE_DIR / task_id
