@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 
 from app.services.hhtech_reasoner import call_gpt6_astra
 from app.services import seo_metadata as seo
-from app.services.skill_loader import get_skill_rules
+from app.services.skill_loader import get_b10_seo_rules
 
 logger = logging.getLogger("vf.seo_autogen_b10")
 
@@ -136,7 +136,7 @@ def generate_seo_packaging(episode: dict, series_meta: dict = None) -> dict:
 
  
     # B10: Load Skill AI rules (cache 1h, aligned with B1/B2/B3/B3.5/B4/B5/B6/B7)
-    skill_rules = get_skill_rules()
+    skill_rules = get_b10_seo_rules()
     system_with_rules = SEO_SYSTEM_PROMPT + "\n\n" + skill_rules
 
     # Resilient Packaging: 3-attempt retry logic with exponential backoff and intelligent failover

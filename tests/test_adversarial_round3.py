@@ -271,7 +271,24 @@ class TestR3AdversarialB10SEOAndTelegram:
                 {"title": "Secret Fire of the Sea", "start": "03:00"},
             ]
         }
-        pkg = generate_seo_packaging(episode)
+        mock_res = json.dumps({
+            "title_kvs": "Byzantine Empire: The Secret Weapon That Held 1,000 Years",
+            "description": (
+                "In 1453, a thousand-year empire fell in a single day.\n"
+                "Featuring Constantinople siege 1453 and Greek fire classified weapon.\n"
+                "00:00 The Last Roman Stronghold\n"
+                "03:00 Secret Fire of the Sea"
+            ),
+            "primary_keywords": ["Byzantine Empire"],
+            "secondary_keywords": ["Constantinople"],
+            "hashtags": ["#ByzantineEmpire", "#History"],
+            "chapters": [
+                {"title": "The Last Roman Stronghold", "start": "00:00"},
+                {"title": "Secret Fire of the Sea", "start": "03:00"}
+            ]
+        })
+        with patch("app.services.seo_autogen_b10.call_gpt6_astra", return_value=mock_res):
+            pkg = generate_seo_packaging(episode)
         desc = pkg["description"]
         assert "Byzantine Empire" in pkg["title_a"]
         assert "Constantinople siege 1453" in desc
