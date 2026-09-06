@@ -400,6 +400,55 @@ def get_b1_strategic_rules() -> str:
     )
 
 
+
+
+def get_b35_strategic_rules() -> str:
+    """Concise strategic visual production rules (~1,200 chars) for B3.5 Prompt Forge.
+    Distills Rule 116 (Two-Layer Composition), Rule 120 (Chroma Key Spec),
+    Rule 128 (Zero Semantic Bias & Era Authenticity), Rule 435 (Graphic Novel Style),
+    and Rule 446 (English Production Bridge) without prompt bloat.
+    """
+    return (
+        "=== NOTION SOT CONCISE VISUAL PRODUCTION RULES (RULES 116, 120, 128, 435, 446) ===\n"
+        "1. TWO-LAYER COMPOSITION (Rule 116):\n"
+        "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic documentary environment. Authentic period architecture, environment textures, dramatic volumetric lighting. No prominent foreground humans. Bottom 20% safe-zone for subtitles, center-right negative space for character overlay.\n"
+        "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration. Cel-shading, bold ink linework, rich nuanced colors. Exactly one full-body character visible from head to toe in authentic period attire.\n"
+        "2. STRICT CHROMA KEY SPEC (Rule 120):\n"
+        "   - Foreground MUST be isolated on pure flat solid #FF00FF magenta background for algorithmic chroma extraction.\n"
+        "   - No white borders, no halos, no gradients, no background scenery in Layer 2.\n"
+        "3. GRAPHIC NOVEL ART STYLE (Rule 435):\n"
+        "   - Non-photorealistic stylized 2D graphic novel digital illustration.\n"
+        "   - NO studio portrait lighting, NO photorealism, NO 3D CGI skin.\n"
+        "4. ZERO SEMANTIC BIAS & ERA AUTHENTICITY (Rule 128):\n"
+        "   - Derive architecture, clothing, tools, and props strictly from scene context and narrative era.\n"
+        "   - Zero domain bleed: never inject modern tech into historical scenes, nor rural relics into corporate scenes.\n"
+        "5. ENGLISH PRODUCTION BRIDGE (Rule 446): All visual prompt outputs must be in clear, descriptive English."
+    )
+
+
+def get_visual_strategic_rules() -> str:
+    """Alias for get_b35_strategic_rules."""
+    return get_b35_strategic_rules()
+
+
+def get_b3_strategic_rules() -> str:
+    """Concise strategic art direction rules (~1,200 chars) for B3 Director Planner.
+    Distills Rule 116 (Two-Layer Architecture), Rule 120 (Chroma Key Spec),
+    Rule 128 (Universal Dynamic Context & Character Ensemble), Rule 445 (5-Beat Structure),
+    and Rule 446 (Production Bridge).
+    """
+    return (
+        "=== NOTION SOT ART DIRECTION & CINEMATIC PLANNING RULES (RULES 116, 120, 128, 445, 446) ===\n"
+        "1. TWO-LAYER RENDER ARCHITECTURE (Rule 116):\n"
+        "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic period/topic environment. Safe-zone clear in bottom 20% for subtitles, center-right negative space for character overlay.\n"
+        "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration isolated on pure solid flat #FF00FF magenta chroma key. Full-body standing or seated visible head-to-toe. NO photorealistic humans.\n"
+        "2. UNIVERSAL DYNAMIC SEMANTIC CONTEXT (Rule 128):\n"
+        "   - Strictly analyze story.txt to derive Era Anchor, physical/geographical environment, lighting mood, color palette, and dynamic character ensemble. Zero domain bleed.\n"
+        "3. 5-BEAT INVESTIGATIVE DOCUDRAMA STRUCTURE (Rule 445):\n"
+        "   - Break down story into dynamic, high-tension storyboard units (typically 35 to 55 scenes) respecting the 5-beat emotional arc.\n"
+        "4. PRODUCTION BRIDGE (Rule 446): All visual prompt descriptions must be in clear, descriptive English."
+    )
+
 def get_skill_rules(force_refresh: bool = False) -> str:
     """Backward-compatible wrapper returning dynamic Central Skills rules."""
     return get_central_skills(force_refresh=force_refresh)

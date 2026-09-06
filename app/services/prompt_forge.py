@@ -3,12 +3,16 @@ Service: B3.5 Prompt Engineering Forge (/prompt:forge)
 Single Source of Truth: HHTech GPT-6-Astra + Prompt Library Notion DB
 Rule 116 & 435: Layer 1 Background (16:9) + Layer 2 Foreground (1:1 stylized graphic novel on #FF00FF).
 Rule 120: Isolates prompt generation. FGs strictly generated on flat #FF00FF magenta background.
-Rule 121: Dynamically loads Media Production Hub and Central Skill AI rules via skill_loader.py.
-Semantic Coupling: Inherits and preserves B3 Director Plan scene-level (background, foreground) pairings.
-Eradicates all archaic historical relics dynamically and dynamically matches scene era and lighting.
+Rule 128: Zero Semantic Bias. Dynamically matches scene era, architecture, and lighting without topic relics.
+Rule 446: English Production Bridge for all visual generation prompts.
 """
 
-import os, sys, json, re, requests, logging
+import os
+import sys
+import json
+import re
+import requests
+import logging
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -20,11 +24,7 @@ def _load_env():
 _load_env()
 
 from app.services.hhtech_reasoner import call_gpt6_astra
-from app.services.skill_loader import (
-    get_skill_rules,
-    get_central_skills,
-    get_media_production_rules
-)
+from app.services.skill_loader import get_b35_strategic_rules
 
 sys.path.insert(0, "/root/video_factory/scripts")
 import ag_notion_bridge as _bridge
@@ -32,11 +32,8 @@ import ag_notion_bridge as _bridge
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY") or os.environ.get("NOTION_TOKEN", "")
 PROMPT_LIBRARY_DB_ID_FALLBACK = "8c801989-2400-831a-901d-014aebdc3b31"
 
-# Relic regex covering singular/plural forms and historical artifacts
-_RELIC_REGEX = re.compile(
-    r"\b(armored\s+crusaders?|crusaders?|venetian\s+doges?|doges?|byzantine|byzantium|circa[\s\-_]*1204|imperial\s+relics?)\b",
-    re.IGNORECASE
-)
+# Rule 128: Concise targeted visual rules (~1.2k chars) replacing 336k chars dump
+TARGETED_VISUAL_RULES = get_b35_strategic_rules()
 
 
 class ContentPolicyRefusalError(Exception):
@@ -47,14 +44,71 @@ class ContentPolicyRefusalError(Exception):
     pass
 
 
-def _clean_relics(text: str, is_byzantine_topic: bool = False) -> str:
-    """Scrub archaic prompt relics unless the topic is legitimately medieval history."""
-    if is_byzantine_topic:
-        return text
-    cleaned = _RELIC_REGEX.sub("", text)
-    # Clean up dangling prepositions before commas left behind
-    cleaned = re.sub(r"\b(with|in|of|and|for|at)\s*,", ",", cleaned, flags=re.IGNORECASE)
-    # Clean up double commas, awkward commas and spaces left behind
+def deduplicate_phrase_stutter(text: str) -> str:
+    """
+    Universal Anti-Stuttering & Phrase Deduplication Engine (Rule 128 & Gate 6 Guarantee).
+    1. Eliminates consecutive identical words.
+    2. Eliminates consecutive repeated word sequences / n-grams (2-8 words repeated consecutively).
+    3. Normalizes single-instance structural phrases (such as [STYLE MANDATE], [ERA ANCHOR],
+       [STRICT NEGATIVE PROMPT], 16:9, 1:1, #FF00FF, Stylized Editorial) so each appears
+       AT MOST ONCE across the entire prompt.
+    4. Cleans up dangling prepositions, duplicate commas, and irregular spacing.
+    """
+    cleaned = text
+
+    # 1. Deduplicate consecutive identical words: e.g. "the the" -> "the"
+    cleaned = re.sub(r"\b(\w+)(?:[\s,]+\1\b)+", r"\1", cleaned, flags=re.IGNORECASE)
+
+    # 2. Deduplicate consecutive repeated phrases (2 to 8 words repeated consecutively)
+    for _ in range(3):
+        cleaned = re.sub(
+            r"(\b[a-zA-Z0-9#_-]+(?:[\s,]+[a-zA-Z0-9#_-]+){1,8}\b)[\s,]+(?:\1\b)+",
+            r"\1",
+            cleaned,
+            flags=re.IGNORECASE
+        )
+
+    # 3. Ensure critical architectural phrases appear at most ONCE across the entire prompt
+    single_instance_phrases = [
+        r"\[STYLE MANDATE\]",
+        r"\[ERA ANCHOR\]",
+        r"\[STRICT NEGATIVE PROMPT\]",
+        r"16:9 widescreen cinematic documentary environment",
+        r"16:9 aspect ratio",
+        r"1:1 aspect ratio",
+        r"bottom 20% safe-zone for subtitles",
+        r"bottom 20% safe-zone",
+        r"clear center-right negative space for foreground character overlay",
+        r"clear center-right negative space",
+        r"solid flat #FF00FF pure magenta background",
+        r"solid #FF00FF magenta background",
+        r"#FF00FF",
+        r"clean chroma-key cutout, sharp silhouette, no borders, no frames",
+        r"clean chroma-key cutout",
+        r"full-body head-to-shoes",
+        r"entire character visible within frame",
+        r"Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration",
+        r"Stylized Editorial Graphic Novel Digital Illustration",
+        r"Stylized Editorial Graphic Novel",
+        r"Stylized Editorial"
+    ]
+
+    for phrase_pat in single_instance_phrases:
+        matches = list(re.finditer(phrase_pat, cleaned, flags=re.IGNORECASE))
+        if len(matches) > 1:
+            parts = []
+            last_idx = 0
+            for i, m in enumerate(matches):
+                if i == 0:
+                    parts.append(cleaned[last_idx:m.end()])
+                else:
+                    parts.append(cleaned[last_idx:m.start()])
+                last_idx = m.end()
+            parts.append(cleaned[last_idx:])
+            cleaned = "".join(parts)
+
+    # 4. Clean up dangling prepositions, commas, and whitespace
+    cleaned = re.sub(r"\b(with|in|of|and|for|at)\s*([,.;])", r"\2", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r",\s*,+", ", ", cleaned)
     cleaned = re.sub(r"\s*,\s*", ", ", cleaned)
     cleaned = re.sub(r"\s{2,}", " ", cleaned)
@@ -62,38 +116,50 @@ def _clean_relics(text: str, is_byzantine_topic: bool = False) -> str:
     return cleaned.strip()
 
 
-def _sanitize_background_prompt(prompt: str, bg_key: str, is_byzantine: bool = False) -> str:
+def _clean_relics(text: str, is_byzantine_topic: bool = False) -> str:
+    """Universal prompt text sanitization: deduplication, spacing, and punctuation cleanup (Rule 128)."""
+    return deduplicate_phrase_stutter(text)
+
+
+def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: bool = False) -> str:
     """Sanitize and enforce Rule 116 standards for Layer 1 Background prompts."""
-    p = _clean_relics(prompt, is_byzantine)
-    # Enforce 16:9 aspect ratio and negative space safe-zone if missing
+    p = prompt.strip()
+    p = re.sub(r"\[STYLE MANDATE\]\s*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[ERA ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[STRICT NEGATIVE PROMPT\]\s*.*$", "", p, flags=re.IGNORECASE)
+
     if "16:9" not in p:
         p = f"{p}, 16:9 aspect ratio"
     if "safe-zone" not in p and "safe zone" not in p:
         p = f"{p}, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay"
-        # Enforce English Production Bridge tags (Rule 446)
-    if "[STYLE MANDATE]" not in p:
-        p = f"[STYLE MANDATE] 16:9 widescreen cinematic documentary environment, atmospheric volumetric lighting, spatial textures, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay. {p}"
-    if "[ERA ANCHOR]" not in p:
-        p = f"{p} [ERA ANCHOR] Authentic period architecture and narrative atmosphere."
-    if "[STRICT NEGATIVE PROMPT]" not in p:
-        p = f"{p} [STRICT NEGATIVE PROMPT] no prominent foreground human figures, no photorealistic faces, no text, no subtitles, no watermark, no borders, no ui elements, no split frame."
-    p = re.sub(r"\s{2,}", " ", p).strip()
-    return p
+
+    style_prefix = "[STYLE MANDATE] 16:9 widescreen cinematic documentary environment, atmospheric volumetric lighting, spatial textures, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay."
+
+    p = f"{style_prefix} {p} [ERA ANCHOR] Authentic period architecture and narrative atmosphere. [STRICT NEGATIVE PROMPT] no prominent foreground human figures, no photorealistic faces, no text, no subtitles, no watermark, no borders, no ui elements, no split frame."
+
+    return deduplicate_phrase_stutter(p)
 
 
-def _sanitize_foreground_prompt(prompt: str, fg_key: str, is_byzantine: bool = False) -> str:
+def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: bool = False) -> str:
     """Sanitize and enforce Rule 116 & Rule 435 standards for Layer 2 Foreground prompts."""
-    p = _clean_relics(prompt, is_byzantine)
-    
-    # Eliminate photorealistic studio lighting in favor of stylized editorial graphic novel illustration
+    p = prompt.strip()
+
     p = re.sub(r"studio portrait lighting,?\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"photorealistic studio portrait,?\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"photorealistic,?\s*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"3D render,?\s*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"CGI skin,?\s*", "", p, flags=re.IGNORECASE)
 
-    # Clean up and normalize non-photorealistic stylized phrasing (avoid redundant prefix when [STYLE MANDATE] is appended)
-    p = re.sub(r"^(?:Stylized editorial graphic novel digital illustration of\s*)+", "", p, flags=re.IGNORECASE).strip()
+    p = re.sub(r"\[STYLE MANDATE\]\s*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[ERA ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[STRICT NEGATIVE PROMPT\]\s*.*$", "", p, flags=re.IGNORECASE)
+    p = re.sub(
+        r"(?:Non-photorealistic\s+2D\s+)?Stylized\s+Editorial(?:\s+Graphic\s+Novel)?(?:\s+Digital)?(?:\s+Illustration)?(?:\s+of)?\s*,?\s*",
+        "",
+        p,
+        flags=re.IGNORECASE
+    ).strip()
 
-    # Check if prompt already specifies full-body standing framing (Rules 116 & 435)
     has_full_body = any(term in p.lower() for term in [
         "full-body", "full body", "head-to-shoes", "head to toe", "entire character visible"
     ])
@@ -104,28 +170,35 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str, is_byzantine: bool = F
     )
 
     if not has_full_body:
-        # Strip any existing partial chroma key / aspect ratio clauses to avoid redundant phrasing
         p = re.sub(r",?\s*(?:isolated\s+on\s+(?:a\s+solid\s+flat\s+)?)?#FF00FF[^,]*", "", p, flags=re.IGNORECASE)
         p = re.sub(r",?\s*1:1 aspect ratio", "", p, flags=re.IGNORECASE)
         p = f"{p.rstrip(', ')}, {mandatory_framing}"
     else:
-        # Full-body was already specified; guarantee technical #FF00FF magenta chroma-key and 1:1 aspect ratio
         if "#FF00FF" not in p:
             p = f"{p}, on solid #FF00FF magenta background"
         if "1:1 aspect ratio" not in p:
             p = f"{p}, 1:1 aspect ratio"
 
-    # Clean up double commas or awkward spacing left behind
-    p = re.sub(r",\s*,+", ", ", p)
-    p = re.sub(r"\s*,\s*", ", ", p)
-    p = re.sub(r"\s{2,}", " ", p)
-        # Enforce English Production Bridge tags (Rule 435 & 446)
-    if "[STYLE MANDATE]" not in p:
-        p = f"[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich nuanced colors, 1:1 aspect ratio, full-body head-to-shoes, entire character visible within frame, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames. {p}"
-    if "[ERA ANCHOR]" not in p:
-        p = f"{p} [ERA ANCHOR] Period-accurate attire, realistic investigative posture and facial expression."
-    if "[STRICT NEGATIVE PROMPT]" not in p:
-        p = f"{p} [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements."
+    style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich nuanced colors, 1:1 aspect ratio, full-body head-to-shoes, entire character visible within frame, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
+
+    p = f"{style_prefix} {p} [ERA ANCHOR] Period-accurate attire, realistic investigative posture and facial expression. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements."
+
+    p = deduplicate_phrase_stutter(p)
+
+    matches = list(re.finditer(r"Stylized\s+editorial", p, flags=re.IGNORECASE))
+    if len(matches) > 1:
+        parts = []
+        last_idx = 0
+        for i, m in enumerate(matches):
+            parts.append(p[last_idx:m.start()])
+            if i == 0:
+                parts.append(p[m.start():m.end()])
+            else:
+                parts.append("expressive illustrated")
+            last_idx = m.end()
+        parts.append(p[last_idx:])
+        p = "".join(parts)
+
     p = re.sub(r"\s{2,}", " ", p).strip()
     return p.strip()
 
@@ -145,38 +218,31 @@ def generate_scene_prompts(
     Background and Foreground are semantically unified in era, lighting, and narrative context.
     
     Enforces Rule 116 & Rule 435 (non-photorealistic stylized graphic novel FG on #FF00FF).
-    Eradicates all hardcoded relics and dynamically adapts to the scene era.
+    Eradicates all hardcoded relics and dynamically adapts to the scene era (Rule 128).
     """
-    media_rules = get_media_production_rules()
-    central_rules = get_central_skills()
-
-    is_byzantine = "byzantine" in story_title.lower() or "fourth crusade" in story_title.lower()
-
-    # Build scene pairing context
     scene_pairings = []
     if scenes:
         for s in scenes:
             scene_pairings.append({
                 "scene_index": s.get("scene_index"),
                 "arc": s.get("arc"),
-                "background_reuse_key": s.get("background_reuse_key"),
-                "foreground_reuse_key": s.get("foreground_reuse_key"),
+                "background_reuse_key": s.get("background_reuse_key") or s.get("bg_id"),
+                "foreground_reuse_key": s.get("foreground_reuse_key") or s.get("fg_id"),
                 "narration_excerpt": (s.get("narration") or "")[:250],
                 "bg_hint": s.get("image_prompt"),
                 "fg_hint": s.get("foreground_prompt")
             })
 
+    # Rule 128: Use concise strategic rules loader (~1.2k chars) to eliminate token explosion
+    visual_rules = get_b35_strategic_rules()
     system_prompt = (
-        "=== NOTION SOT MEDIA PRODUCTION & VISUAL DIRECTION RULES ===\n"
-        f"{media_rules}\n\n"
-        "=== NOTION SOT CENTRAL EDITORIAL RULES (RULES 116, 120, 435) ===\n"
-        f"{central_rules}\n\n"
+        f"{visual_rules}\n\n"
         "You are an Elite Visual Director and Master Prompt Engineer for the AI Video Factory (VF Pipeline).\n"
         "Your mission is to generate production-grade image generation prompts for 2-Layer video composition:\n"
         "  - Layer 1 Background (16:9 2K DCI 2560x1440): Cinematic documentary environment.\n"
         "  - Layer 2 Foreground (1:1 2048x2048): Stylized editorial graphic novel digital illustration isolated on pure #FF00FF magenta chroma key.\n\n"
-        "CRITICAL ARCHITECTURAL MANDATES (RULE 116 & RULE 435):\n"
-        "1. ERA & TOPIC AUTHENTICITY: Strictly derive the era, architectural style, atmosphere, color palette, and lighting dynamically from the episode topic and scene narration. NEVER hallucinate medieval or out-of-context architectural relics for modern or non-medieval topics.\n"
+        "CRITICAL ARCHITECTURAL MANDATES (RULE 116 & RULE 435 & RULE 128):\n"
+        "1. ERA & TOPIC AUTHENTICITY (Rule 128): Strictly derive era, architectural style, atmosphere, color palette, and lighting dynamically from the episode topic and scene narration. Zero domain bleed.\n"
         "2. SCENE SEMANTIC COUPLING: Maintain 100% semantic unity between each Background and its paired Foreground character. The setting, time period, indoor/outdoor lighting angle, and mood MUST match between paired assets in each scene.\n"
         "3. LAYER 1 BACKGROUND PROMPT RULES (16:9):\n"
         "   - Wide-angle cinematic environment establishing scene atmosphere and narrative depth.\n"
@@ -238,53 +304,51 @@ def generate_scene_prompts(
             content = content[3:]
         if content.endswith("```"):
             content = content[:-3]
+        content = content.strip()
 
-        clean_content = content.strip()
+        # Check for content policy refusal
+        content_lower = content.lower()
+        refusal_indicators = [
+            "i cannot generate",
+            "i am unable to",
+            "content policy",
+            "safety policy",
+            "against my programming",
+            "sensitive themes",
+            "violates",
+            "inappropriate content"
+        ]
+        if any(indicator in content_lower for indicator in refusal_indicators):
+            logger.error("[prompt_forge] GPT-6-Astra CONTENT POLICY REFUSAL detected")
+            raise ContentPolicyRefusalError(
+                f"HHTech GPT-6-Astra refused to generate prompts due to content policy for '{story_title}'. "
+                f"Refusal: {content[:250]}"
+            )
+
         try:
-            parsed = json.loads(clean_content)
-        except json.JSONDecodeError:
-            if clean_content.startswith("{") and not clean_content.endswith("}"):
-                for suffix in ['"}', '"}}', '"}', '}']:
-                    try:
-                        parsed = json.loads(clean_content + suffix)
-                        break
-                    except Exception:
-                        pass
-            if parsed is None:
-                content_lower = clean_content.lower()
-                refusal_indicators = [
-                    "cannot propagate",
-                    "material conflict",
-                    "content policy",
-                    "unable to generate",
-                    "cannot create",
-                    "policy violation",
-                    "inappropriate content"
-                ]
-                if any(indicator in content_lower for indicator in refusal_indicators):
-                    logger.error("[prompt_forge] GPT-6-Astra CONTENT POLICY REFUSAL detected")
-                    raise ContentPolicyRefusalError(
-                        f"HHTech GPT-6-Astra refused to generate prompts due to content policy for '{story_title}'. "
-                        f"Refusal: {clean_content[:250]}"
-                    )
-                else:
-                    logger.warning(f"[prompt_forge] Malformed JSON from LLM: {clean_content[:200]}, falling back to metadata synthesis.")
-                    parsed = None
+            parsed = json.loads(content)
+        except Exception as e:
+            logger.warning(f"[prompt_forge] JSON decode error: {e}. Attempting recovery...")
+            m = re.search(r"(\{.*\})", content, re.DOTALL)
+            if m:
+                try:
+                    parsed = json.loads(m.group(1))
+                except Exception:
+                    pass
 
     if not parsed or not isinstance(parsed, dict):
         parsed = {"backgrounds": {}, "foregrounds": {}}
 
-    # Sanitize and post-process all generated prompts
     cleaned_backgrounds = {}
     cleaned_foregrounds = {}
 
     for k, p in parsed.get("backgrounds", {}).items():
         prompt_str = p if isinstance(p, str) else p.get("prompt", str(p))
-        cleaned_backgrounds[k] = _sanitize_background_prompt(prompt_str, k, is_byzantine)
+        cleaned_backgrounds[k] = _sanitize_background_prompt(prompt_str, k)
 
     for k, p in parsed.get("foregrounds", {}).items():
         prompt_str = p if isinstance(p, str) else p.get("prompt", str(p))
-        cleaned_foregrounds[k] = _sanitize_foreground_prompt(prompt_str, k, is_byzantine)
+        cleaned_foregrounds[k] = _sanitize_foreground_prompt(prompt_str, k)
 
     # Ensure all requested keys are covered, synthesizing from scene metadata if needed
     for bg_k, bg_meta in bg_dict.items():
@@ -304,7 +368,7 @@ def generate_scene_prompts(
                 f"atmospheric volumetric natural lighting matching narrative tone, 16:9 aspect ratio, "
                 f"bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay"
             )
-            cleaned_backgrounds[bg_k] = _sanitize_background_prompt(fallback_bg, bg_k, is_byzantine)
+            cleaned_backgrounds[bg_k] = _sanitize_background_prompt(fallback_bg, bg_k)
 
     for fg_k, fg_meta in fg_dict.items():
         if fg_k not in cleaned_foregrounds:
@@ -319,11 +383,11 @@ def generate_scene_prompts(
                 paired_bgs = []
             paired_desc = f", harmonized with setting {', '.join(paired_bgs)}" if paired_bgs else ""
             fallback_fg = (
-                f"Stylized editorial graphic novel digital illustration of full-body {hint} figure in authentic period attire{paired_desc}, "
+                f"Full-body {hint} figure in authentic period attire{paired_desc}, "
                 f"head to toe visible, dramatic character rim light matching environment, "
                 f"isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames, 1:1 aspect ratio"
             )
-            cleaned_foregrounds[fg_k] = _sanitize_foreground_prompt(fallback_fg, fg_k, is_byzantine)
+            cleaned_foregrounds[fg_k] = _sanitize_foreground_prompt(fallback_fg, fg_k)
 
     result = {
         "backgrounds": cleaned_backgrounds,
