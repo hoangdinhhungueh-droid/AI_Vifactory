@@ -448,10 +448,43 @@ def get_b3_strategic_rules() -> str:
         "   - Break down story into dynamic, high-tension storyboard units (typically 35 to 55 scenes) respecting the 5-beat emotional arc.\n"
         "4. PRODUCTION BRIDGE (Rule 446): All visual prompt descriptions must be in clear, descriptive English."
     )
+def get_b10_seo_rules() -> str:
+    """Concise strategic rules (~1,200 chars) for B10 YouTube Packaging & SEO Metadata.
+    Distills Rule 118 (Zero-Mock), Rule 444 (An Ong Curiosity Hook in Titles),
+    Breakout Query Search Injections, A/B Testing Title Specs, YouTube 2026
+    Hashtags and Tags algorithms without prompt bloat.
+    """
+    return (
+        "=== NOTION SOT CONCISE B10 YOUTUBE PACKAGING & SEO RULES (RULES 118, 444, 446) ===\n"
+        "1. RULE 118 ZERO-MOCK & FACTUAL ANCHOR: All titles, descriptions, and tags must be strictly grounded in the real episode narrative and search breakout data. Never invent fictitious events, deceptive clickbait, or hallucinated characters.\n"
+        "2. TITLE DYNAMICS & A/B TESTING (Rule 444 An Ong Hook):\n"
+        "   - Title A (Curiosity / Mystery Hook): High CTR, paradox-driven, emotion-inducing under 70 characters.\n"
+        "   - Title B (Search Intent / High Virality): SEO-optimized, authoritative, incorporating primary keywords under 70 characters.\n"
+        "   - Title C (Casual / Provocative Question): Question-driven angle that triggers immediate curiosity.\n"
+        "3. BREAKOUT QUERY INJECTION (Native-First):\n"
+        "   - Naturally weave Google Trends breakout queries into the top 3 lines of the description and tags for maximum search volume discovery.\n"
+        "4. DESCRIPTION & CHAPTERS SPEC:\n"
+        "   - 3-second hook restated in opening lines followed by deep causal summary.\n"
+        "   - Timestamps/Chapters clearly formatted (e.g. 00:00 [Chapter Title]). Never omit 00:00.\n"
+        "5. TAGS & HASHTAGS BUDGETING:\n"
+        "   - Tags: Comma-separated, priority to breakout terms, capped at <= 500 chars and <= 7 core tags.\n"
+        "   - Hashtags: CamelCase slugs (e.g. #ByzantineEmpire), capped at strictly 3 to 5 hashtags."
+    )
+
 
 def get_skill_rules(force_refresh: bool = False) -> str:
-    """Backward-compatible wrapper returning dynamic Central Skills rules."""
-    return get_central_skills(force_refresh=force_refresh)
+    """Universal backward-compatible strategic rules (~1,500 chars).
+    Returns core foundational guardrails (Rules 118, 126, 128, 444, 446)
+    to prevent massive prompt pollution (100k tokens) across legacy callers.
+    """
+    return (
+        "=== NOTION SOT CORE STRATEGIC GUARDRAILS (RULES 118, 126, 128, 444, 446) ===\n"
+        "1. RULE 118 ZERO-MOCK DATA: Strictly use empirical, ground-truth factual data. Zero speculation, synthetic metrics, or hallucinated details.\n"
+        "2. RULE 128 UNIVERSAL DYNAMIC CONTEXT (Zero Semantic Bias): Strictly derive era, environment, and characters from the specific narrative. Zero domain bleed.\n"
+        "3. RULE 444 AN ONG CURIOSITY PROTOCOL: Frame narratives and hooks around causal paradoxes, hidden mechanisms, and systemic truths.\n"
+        "4. RULE 446 ENGLISH PRODUCTION BRIDGE: Internal prompts, art direction, and scene parameters must be in clear English; user-facing metadata in target market native language.\n"
+        "5. PLATFORM CONFORMANCE: Adhere strictly to YouTube editorial, algorithmic CTR/AVD retention, and visual quality requirements."
+    )
 
 
 def get_cache_info() -> dict:
