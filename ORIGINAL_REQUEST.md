@@ -293,20 +293,41 @@ Integrity mode: development
 
 > **CỔNG TÁC VỤ ĐANG THỰC THI (PHIÊN GO-LIVE CHÍNH THỨC)**:
 
-### 1. [ ] TASK-GOLIVE-1: Nâng Cấp Logic Ghi Nhận Từ Khóa & Đổi Trạng Thái Liên DB (B1 ➔ B3)
-- [ ] **B1 (`VF Trend Brain` DB `4c101989-...`)**:
-  - Chuẩn hóa thuộc tính: Tiêu đề `"Keyword"`, Status `""` (`"New (from VPS)"` ➔ `"Approved→Story"`).
-  - Ghi nhận đầy đủ: `"Trend Score"` (0.0-1.0), `"Market"`, `"Task ID"`, `"Rising Queries"`, `"Competitor Benchmarks"`, `"YouTube Safety Label"`, `"Upload Treatment Note"`, `"Trend Source"`.
-- [ ] **B2 (`Story Library` DB `b0301989-...`)**:
+### 1. [x] TASK-GOLIVE-1: Nâng Cấp Logic Ghi Nhận Từ Khóa & Đổi Trạng Thái Liên DB (B1 ➔ B3) — ✅ PASS
+- [x] **B1 (`VF Trend Brain` DB `4c101989-2400-8334-8016-01d4f463b09f`)**:
+  - Chuẩn hóa 13 thuộc tính canonical: Tiêu đề `"Keyword"`, Status `""` (`"New (from VPS)"` ➔ `"Approved→Story"`).
+  - Ghi nhận đầy đủ: `"Trend Score"` (0.0-1.0), `"Market"`, `"Task ID"`, `"Rising Queries"`, `"Competitor Benchmarks"`, `"YouTube Safety Label"`, `"Upload Treatment Note"`, `"Trend Source"`, `"Verdict Reason"`, `"QID"`. Loại bỏ triệt để 20 trường legacy.
+- [x] **B2 (`Story Library` DB `b0301989-2400-836b-bdb5-8131fea17736`)**:
   - Ghi nhận `"Status"` = `"Draft"` khi bắt đầu, đổi sang `"Gate Passed"` khi Story Gate 12/12 PASS.
   - Đồng bộ liên DB: Ngay khi B2 pass, gọi `trend_brain_mirror.mark_used()` chuyển trạng thái `VF Trend Brain` sang `"Used"`.
-- [ ] **B3 (`Director Plan` DB `5b201989-...`) & B3.5 (`Prompt Library`)**:
+- [x] **B3 (`Director Plan` DB `5b201989-2400-81df-85e6-ec8d5386227b`) & B3.5 (`Prompt Library`)**:
   - Triển khai đầy đủ `push_director_plan_to_notion()` qua `resolve_episode_director_db()`, gán `"Status"` = `"Compiled"`.
   - Khi `push_prompts_to_notion()` hoàn tất: đổi `"Status"` trong `Director Plan` thành `"Prompted"`, đồng thời cập nhật `"Status"` trong `Story Library` sang `"Produced"`.
-- [ ] **Kiểm thử State Machine**: Viết test độc lập `tests/test_notion_state_machine.py` chạy runtime exit code 0.
+- [x] **Kiểm thử State Machine**: Viết test độc lập `tests/test_notion_state_machine.py` chạy runtime 5/5 PASS, exit code 0.
 
-### 2. [ ] TASK-GOLIVE-2: Dọn Rác An Toàn 100% (Safe Housekeeping & Git Sync)
-- [ ] Quét sạch 111 file rác tạm tại `/tmp/` trên VPS (các file log cũ, audio test, thư mục temp `tmp*`), bảo tồn tuyệt đối các socket và process đang chạy.
-- [ ] Dọn dẹp các thư mục worker cũ trong `.agents/` ở Windows Workspace, bảo tồn `.agents/skills/vf-pipeline-teamwork/`.
-- [ ] Biên dịch toàn bộ file sửa đổi `python3 -m py_compile`, chạy master smoke gate `scripts/e2e_pipeline_smoketest.py`.
-- [ ] Git commit & push 3 chiều lên `origin/main`, xác nhận working tree clean và SHA256 parity.
+### 2. [x] TASK-GOLIVE-2: Dọn Rác An Toàn 100% (Safe Housekeeping & Git Sync) — ✅ PASS
+- [x] Quét sạch 111 file rác tạm tại `/tmp/` trên VPS (các file log cũ, audio test, thư mục temp `tmp*`), bảo tồn tuyệt đối các socket và process đang chạy.
+- [x] Dọn dẹp các thư mục worker cũ trong `.agents/` ở Windows Workspace, bảo tồn `.agents/skills/vf-pipeline-teamwork/`.
+- [x] Biên dịch toàn bộ file sửa đổi `python3 -m py_compile`, chạy master smoke gate `scripts/e2e_pipeline_smoketest.py` 8/8 gates PASS.
+- [x] Git commit & push 3 chiều lên `origin/main`, xác nhận working tree clean và SHA256 parity.
+
+### 3. [x] TASK-GOLIVE-3: Early SEO Package & 60s An Ong Hook Forge (Post-B1.5), Direct B2 Anchor Handoff, and Zero-LLM B10 Upload Gate 2 — ✅ PASS
+- [x] **B1.6 Early SEO Forge (`app/services/seo_package_forge.py`)**:
+  - Kích hoạt ngay sau B1.5 Competitor Recon với keyword, niche, competitor gap.
+  - Gọi GPT-6-Astra sinh trọn bộ: `Title A` (KVS leading keyword), `Title B` (curiosity/emotional backup), `Description` (front-loaded hook <=150 ký tự), đúng 3 `Hashtags`, `Tags` (<=400 ký tự budget), `hook_3s` (cold-open), `hook_60s` (An Ong narrative contract Rule 444 ~90-130 words), `specific_viral_angle` (10x pivot angle).
+  - Lưu cục bộ tại `/var/vf/episodes/<task_id>/seo_package.json`.
+  - Đồng bộ 2 chiều vào Notion SoT: `📺 YouTube Channel & Video Metadata Registry` (`3c301989-2400-81b9-a4bb-e5568ce942f8`) và `📖 Story Library` (`b0301989-2400-836b-bdb5-8131fea17736`).
+  - Wire trực tiếp vào `app/services/trend_engine_b1.py` (Step 5.5), `scripts/produce_episode_hg1.py` (Step B1.6), và cập nhật tin nhắn Telegram Gate 1 hiển thị Title A & 60s Hook.
+- [x] **B2 Story Engine Anchor (`app/services/story_engine_b2.py`)**:
+  - Load trực tiếp `hook_60s`, `hook_3s`, `title_a` từ `seo_package.json`.
+  - Tiêm thẳng triple-quoted `hook_anchor_prompt` vào system prompt B2, ép Act I mở màn trực diện vào title và hook đã hứa mà không cần Astra re-reason lại về ngách hay hook, triệt tiêu 100% narrative drift.
+- [x] **B10 Auto SEO Upload Optimization (`scripts/execute_b10_auto_seo_upload_gate2.py`)**:
+  - Loại bỏ hoàn toàn dynamic LLM call trong B10; tải trực tiếp pre-computed packaging từ `seo_package.json` (fallback Notion Registry DB).
+  - Thiết lập chuẩn xác tham số YouTube API: `privacyStatus: "unlisted"`, `containsSyntheticMedia: True`, `selfDeclaredMadeForKids: False`.
+  - Tự động gán Hero thumbnail (`thumbnail_a.png` ghép từ Scene 000 BG/FG).
+- [x] **Kiểm thử Runtime & Regression Tests**:
+  - Viết bộ test `tests/test_b15_seo_package_forge.py` (6/6 tests PASS).
+  - Toàn bộ test suites liên quan (`test_competitor_recon_b15.py`, `test_trend_gate_b1.py`, `test_notion_state_machine.py`) đạt 50/50 tests PASS.
+  - Neighbor tests (`ci_neighbor_tester.py --block 1.0`, `--block 3.0`) đạt ALL PASSED.
+  - Master Smoke Gate (`scripts/e2e_pipeline_smoketest.py`) đạt ALL 8 GATES PASSED.
+

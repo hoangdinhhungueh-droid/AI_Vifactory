@@ -326,7 +326,9 @@ def commit_trend_task(topic_data: dict) -> str:
             "Competitor Benchmarks": {"rich_text": [{"type": "text", "text": {"content": (f"Blue Ocean Gap: {topic_data.get('competitor_differentiation_gap', '')} | " + f"Top {len(topic_data.get('viral_competitor_videos', []))} videos reconciled")[:1990]}}]},
             "YouTube Safety Label": {"multi_select": [{"name": x} for x in labels]},
             "Upload Treatment Note": {"rich_text": [{"type": "text", "text": {"content": treatment_note[:1990]}}]},
-            "Trend Source": {"multi_select": [{"name": "gtrends_rss"}, {"name": "youtube_recon"}]}
+            "Trend Source": {"multi_select": [{"name": "gtrends_rss"}, {"name": "youtube_recon"}]},
+            "Verdict Reason": {"rich_text": [{"type": "text", "text": {"content": str(topic_data.get("verdict_reason") or topic_data.get("specific_viral_angle") or "Approved via GPT-6-Astra")[:1990]}}]},
+            "QID": {"rich_text": [{"type": "text", "text": {"content": str(topic_data.get("qid") or topic_data.get("task_slug") or "")[:1990]}}]}
         }
         if existing.get("results"):
             page_id = existing["results"][0]["id"]
@@ -366,15 +368,18 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
         gap = html.escape(str(topic_data.get("competitor_differentiation_gap", "")))
         task_id = html.escape(str(topic_data.get("task_id", "")))
         score = topic_data.get("viability_score", 9.0)
+        title_a = html.escape(str(topic_data.get("title_a", "")))
+        hook_60s = html.escape(str(topic_data.get("hook_60s", "")))
 
         lines = [
             "🎯 <b>[HUMAN GATE 1] THÔNG BÁO TIẾN ĐỘ CHỦ ĐỀ SẢN XUẤT (GO-LIVE 2026)</b>",
-            "<i>(✨ B1 Trend Recon & B1.5 Competitor Gap bởi GPT-6-Astra qua HHTech API)</i>",
+            "<i>(✨ B1 Trend Recon & B1.5 Competitor Gap & B1.6 SEO bởi GPT-6-Astra qua HHTech API)</i>",
             "",
             f"{flag} <b>Market {mkt}:</b> <code>{raw_term}</code> (Viability: {score}/10)",
             f"• <b>Đề tài:</b> {title_vi}",
             f"• <b>Search-Specific Key:</b> <code>{keyword}</code>",
-            f"• <b>🔥 Cụm từ tìm kiếm tăng:</b> <code>{rising}</code>",
+            (f"• <b>🎬 YouTube Title A:</b> <code>{title_a}</code>" if title_a else f"• <b>🔥 Cụm từ tìm kiếm tăng:</b> <code>{rising}</code>"),
+            (f"• <b>⚡ 60s An Ong Hook:</b> <i>{hook_60s[:160]}...</i>" if hook_60s else f"• <b>Niche Brief:</b> {niche}"),
             f"• <b>Niche Brief:</b> {niche}",
             f"• <b>Khác biệt đối thủ (Blue Ocean Gap):</b> <i>{gap}</i>",
             f"• <b>5-Beat Docudrama:</b> {arcs[:180]}...",
@@ -496,6 +501,32 @@ def discover_and_produce_market_trend(
                 print(f"  ✅ [B1.5] Competitor Intel Card saved successfully with real gap: {gap_val[:60]}...")
         except Exception as re_err:
             logger.warning(f"[{task_id}] Inline B1.5 recon warning: {re_err}")
+
+        # 5.5. Early B1.5 SEO & Narrative Hook Package Forge (Rule 119 & Rule 444)
+        print(f"  🚀 [B1.6] Forging Early SEO Package & 60s An Ong Hook for {task_id} via GPT-6-Astra...")
+        try:
+            from app.services.seo_package_forge import forge_seo_package
+            seo_pkg = forge_seo_package(
+                task_id=task_id,
+                target_keyword=t_obj.get("search_specific_keyword") or term,
+                market=m_up,
+                niche_brief=t_obj.get("niche_angle_brief", ""),
+                competitor_gap=t_obj.get("competitor_differentiation_gap", ""),
+                rising_queries=rising_queries[:8],
+                breakout_queries=t_obj.get("breakout_queries", []),
+                competitor_card=recon_card if 'recon_card' in locals() else None
+            )
+            if seo_pkg:
+                t_obj["seo_package"] = seo_pkg
+                t_obj["title_a"] = seo_pkg.get("title_a")
+                t_obj["title_b"] = seo_pkg.get("title_b")
+                t_obj["hook_3s"] = seo_pkg.get("hook_3s")
+                t_obj["hook_60s"] = seo_pkg.get("hook_60s")
+                t_obj["specific_viral_angle"] = seo_pkg.get("specific_viral_angle") or t_obj.get("specific_viral_angle")
+                print(f"  ✅ [B1.6] Early SEO Package forged: '{seo_pkg.get('title_a')}'")
+                print(f"     60s Hook Contract: {seo_pkg.get('hook_60s')[:70]}...")
+        except Exception as seo_err:
+            logger.warning(f"[{task_id}] Early SEO package forge warning: {seo_err}")
 
         # 6. Send Pure Telegram Gate 1 Notification
         send_pure_telegram_gate1_notification(t_obj)

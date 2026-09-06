@@ -93,6 +93,36 @@ def run_chain(task_id: str) -> int:
         _log(stage, "FAILED (%s: %s)" % (type(e).__name__, e))
         raise RuntimeError("B1.5 competitor recon failed: %s" % e)
 
+    # ---- B1.6 Early SEO Package & 60s Hook Forge (Rule 119 & Rule 444) ---
+    stage = "B1.6"
+    seo_pkg_file = ep_dir / "seo_package.json"
+    seo_pkg = None
+    if seo_pkg_file.exists() and seo_pkg_file.stat().st_size > 100:
+        try:
+            seo_pkg = json.loads(seo_pkg_file.read_text(encoding="utf-8"))
+            _log(stage, "Reusing existing valid SEO package from %s" % seo_pkg_file)
+        except Exception:
+            seo_pkg = None
+
+    if not seo_pkg:
+        _log(stage, "Forging early SEO package & 60s An Ong Hook for task %s via GPT-6-Astra" % task_id)
+        try:
+            from app.services.seo_package_forge import forge_seo_package
+            seo_pkg = forge_seo_package(
+                task_id=task_id,
+                target_keyword=keyword,
+                market=meta.get("market") or "EN",
+                niche_brief=niche,
+                competitor_card=card if 'card' in locals() else None,
+                rising_queries=meta.get("rising_queries") or [],
+                breakout_queries=meta.get("breakout_queries") or []
+            )
+            _log(stage, "SEO package forged: Title A=%r (60s Hook: %d words)" % (
+                seo_pkg.get("title_a"), len((seo_pkg.get("hook_60s") or "").split())
+            ))
+        except Exception as e:
+            _log(stage, "Warning: early SEO forge failed (%s: %s). Continuing to B2..." % (type(e).__name__, e))
+
     # ---- B2 5-Beat Investigative Docudrama (Rule 445) ----------------
     stage = "B2"
     from app.services.story_engine_b2 import generate_5_arc_story

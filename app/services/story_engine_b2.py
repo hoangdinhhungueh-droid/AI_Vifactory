@@ -168,6 +168,28 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
     frustrations = anatomy.get("audience_core_frustrations") or []
     comp_acts = anatomy.get("competitor_act_breakdown") or ""
     competitors = meta.get("viral_competitor_videos") or (intel_card.get("competitors") if intel_card else []) or (intel_card.get("competitor_benchmarks") if intel_card else [])
+
+    # Check for pre-computed SEO package & 60s hook (Rule 119 & Rule 444)
+    seo_pkg = {}
+    for cand_dir in [out_dir, root_ep_dir]:
+        sp_path = os.path.join(cand_dir, "seo_package.json")
+        if os.path.exists(sp_path):
+            try:
+                with open(sp_path, "r", encoding="utf-8") as sf:
+                    seo_pkg = json.load(sf)
+                    if seo_pkg:
+                        break
+            except Exception:
+                pass
+    if not seo_pkg and isinstance(meta.get("seo_package"), dict):
+        seo_pkg = meta["seo_package"]
+
+    seo_title_a = seo_pkg.get("title_a") or meta.get("title_a") or ""
+    seo_title_b = seo_pkg.get("title_b") or meta.get("title_b") or ""
+    hook_60s = seo_pkg.get("hook_60s") or meta.get("hook_60s") or ""
+    hook_3s = seo_pkg.get("hook_3s") or meta.get("hook_3s") or ""
+    if seo_pkg.get("specific_viral_angle"):
+        viral_angle = seo_pkg["specific_viral_angle"]
     
     logger.info(f"[story_engine] Starting 5-Act story generation for {task_id} ({mkt}) | Topic: {topic} | Angle: {viral_angle}... [Intel: {intel_status}, Gap: {bool(competitor_gap)}]")
     
@@ -197,6 +219,16 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
             "   - Treat the perpetrator as flawed, cornered, and undone by their own arrogance. Zero romanticization of criminal 'genius'.\n"
         )
 
+    hook_anchor_prompt = ""
+    if hook_60s:
+        hook_anchor_prompt = f"""• Approved YouTube Title A: {seo_title_a}
+• Pre-Approved 3s Cold-Open: {hook_3s}
+• Mandatory 60s Opening Monologue Contract (Act I MUST anchor directly to this):
+  "{hook_60s}"
+CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off this exact 60-second narrative contract and title premise. Do not reinvent or drift away from this premise.
+
+"""
+
     system_prompt = (
         f"You are a World-Class Master Non-Fiction Investigative Documentary Scriptwriter for Video Factory.\n"
         f"Genre: Independent Investigative Docudrama (Phóng sự Điều tra Bất Đối Xứng - Multi-Layer Puzzle).\n"
@@ -219,6 +251,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         f"• 5-Arc Direction: {story_arcs}\n"
         f"• Content Theme: {theme}\n"
         f"• Breakout Search Queries (Embed in Act 1): {', '.join(breakout_queries[:4])}\n\n"
+        f"{hook_anchor_prompt}"
         f"CRITICAL PLATFORM SAFETY MANDATE [{safety_label}]:\n"
         f"• {treatment_note}\n"
         f"• Zero graphic violence, zero gore, zero criminal glorification, zero method instructions.\n"
@@ -385,7 +418,11 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         "story": full_script,
         "story_gate_score": story_score_str,
         "bgm_mood": "dramatic",
-        "hook_3s": _opening_hook(full_script),
+        "hook_3s": hook_3s or _opening_hook(full_script),
+        "hook_60s": hook_60s,
+        "title_a": seo_title_a,
+        "title_b": seo_title_b,
+        "seo_package": seo_pkg,
         "breakout_queries": breakout_queries,
         "content_theme": theme,
         "safety_label": safety_label,
@@ -407,6 +444,13 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
     # ----------------------------------------------------
     try:
         story_page_id = meta.get("page_id")
+
+        if story_page_id and seo_pkg:
+            try:
+                from app.services.seo_package_forge import sync_seo_package_to_story_library
+                sync_seo_package_to_story_library(task_id, seo_pkg, story_page_id=story_page_id)
+            except Exception as _se:
+                logger.warning(f"[story_engine] Error syncing SEO package to Story Library: {_se}")
 
         if not story_page_id:
             try:

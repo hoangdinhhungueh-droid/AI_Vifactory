@@ -336,9 +336,53 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
     print(f"=== [B10-AUTO] 1. Loading episode context for {episode_id} ===")
     episode = _load_episode_context(episode_id, ep_dir)
 
-    print("=== [B10-AUTO] 2. Auto-generating SEO packaging via HHTech GPT-6-Astra (Rule 119) ===")
-    packaging = generate_seo_packaging(episode)
-    print(f"Generation method: {packaging['generation_method']}")
+    print("=== [B10-AUTO] 2. Loading Pre-Computed SEO Packaging (Zero-LLM Fast Upload) ===")
+    seo_file = ep_dir / "seo_package.json"
+    packaging = None
+    if seo_file.exists():
+        try:
+            packaging = json.loads(seo_file.read_text(encoding="utf-8"))
+            print(f"Loaded pre-computed SEO package from {seo_file} (Method: {packaging.get('generation_method')})")
+        except Exception as e:
+            print(f"Warning: failed reading {seo_file}: {e}")
+
+    if not packaging:
+        print("Checking Notion YouTube Registry for existing SEO package...")
+        try:
+            res = query_db(YOUTUBE_REGISTRY_DB_ID, filter_obj={"property": "Task ID", "rich_text": {"equals": episode_id}})
+            if res.get("results"):
+                p_row = res["results"][0].get("properties", {})
+                def _g(prop):
+                    return "".join(t.get("plain_text", "") for t in p_row.get(prop, {}).get("rich_text", []))
+                t_a = _g("Title A")
+                if t_a:
+                    packaging = {
+                        "task_id": episode_id,
+                        "title_a": t_a,
+                        "title_b": _g("Title B (Backup A/B)"),
+                        "description": _g("SEO Description"),
+                        "tags": [t.strip() for t in _g("Tags & Keywords").split(",") if t.strip()],
+                        "hashtags": [h.strip() for h in _g("Hashtags").split() if h.strip()],
+                        "hook_3s": _g("Hook Frame (0-3s)"),
+                        "hook_frame_note": _g("Hook Frame (0-3s)"),
+                        "thumbnail_variants": [],
+                        "generation_method": _g("SEO Generation Method") or "notion_registry_cached"
+                    }
+                    print(f"Loaded existing SEO package from Notion YouTube Registry: {t_a}")
+        except Exception as _qe:
+            print(f"Notion registry lookup error: {_qe}")
+
+    if not packaging:
+        print("No pre-computed package found; invoking deterministic fallback packaging (Rule 118)")
+        from app.services.seo_package_forge import _fallback_seo_package
+        kw = episode.get("trend_keywords", [episode.get("niche")])[0] if episode.get("trend_keywords") else (episode.get("niche") or episode_id)
+        packaging = _fallback_seo_package(
+            task_id=episode_id,
+            target_keyword=str(kw),
+            market=market,
+            niche_brief=episode.get("niche_angle_brief", "")
+        )
+    print(f"Generation method: {packaging.get('generation_method')}")
 
     with open(ep_dir / "seo_payload_b10.json", "w", encoding="utf-8") as f:
         json.dump(packaging, f, ensure_ascii=False, indent=2)
@@ -369,7 +413,9 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
         "hashtags": packaging["hashtags"],
         "breakout_queries": packaging.get("breakout_queries", []),
         "category_id": "22",
-        "privacy_status": privacy_status,
+        "privacy_status": "unlisted",
+        "contains_synthetic_media": True,
+        "self_declared_made_for_kids": False,
         "export": {"target_file": "final_169.mp4"},
         "market": market,
     }
