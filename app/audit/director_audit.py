@@ -15,13 +15,23 @@ def _check_scene_coverage(scenes: list, story_beats: list = None) -> tuple:
     if not scenes:
         return 0.0, [{"severity": "critical", "axis": "scene_coverage", "message": "No scenes provided", "fix": "Generate director plan with scenes"}]
     score = 10.0
-    # Check minimum scene count (30 - 60 scenes for a 12-15 min video)
-    if len(scenes) < 15:
+    # Check minimum scene count (30 - 60 scenes for a 12-15 min docudrama)
+    if len(scenes) < 20:
+        score = 0.0
+        issues.append({
+            "severity": "critical",
+            "axis": "scene_coverage",
+            "message": f"Critical scene deficit: only {len(scenes)} scenes provided (minimum 30-55 required for 5-Beat Docudrama)",
+            "fix": "Subdivide story into at least 30-55 dynamic storyboard scenes across all 5 beats"
+        })
+    elif len(scenes) < 30:
         score -= 4.0
-        issues.append({"severity": "high", "axis": "scene_coverage", "message": f"Only {len(scenes)} scenes — too few for a 12-15m docudrama", "fix": "Expand to at least 25-55 scenes"})
-    elif len(scenes) < 25:
-        score -= 1.5
-        issues.append({"severity": "medium", "axis": "scene_coverage", "message": f"Only {len(scenes)} scenes — slightly short", "fix": "Target 30-55 dynamic scenes"})
+        issues.append({
+            "severity": "high",
+            "axis": "scene_coverage",
+            "message": f"Only {len(scenes)} scenes — insufficient coverage for docudrama (target 35-55 dynamic scenes)",
+            "fix": "Target 35-55 dynamic scenes (7 to 10 scenes per beat)"
+        })
     # Check for null/empty scenes
     null_scenes = [i for i, s in enumerate(scenes) if not s.get("fg_prompt") and not s.get("bg_prompt") and not s.get("image_prompt")]
     if null_scenes:
@@ -256,8 +266,11 @@ def audit_director_plan(director_plan: dict) -> dict:
     if not axis_scores:
         return {"score": 0.0, "max_score": 10.0, "verdict": "FAIL", "issues": issues}
     
+    has_critical = any(i.get("severity") == "critical" for i in issues)
     avg_score = round(sum(axis_scores.values()) / len(axis_scores), 2)
-    verdict = "PASS" if avg_score >= 8.0 and not any(i.get("severity") == "critical" for i in issues) else "FAIL"
+    if has_critical:
+        avg_score = min(avg_score, 4.0)
+    verdict = "PASS" if avg_score >= 8.0 and not has_critical else "FAIL"
     return {
         "score": avg_score,
         "max_score": 10.0,

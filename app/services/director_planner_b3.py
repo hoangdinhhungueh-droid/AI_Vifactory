@@ -518,6 +518,9 @@ def generate_director_plan(
     }
 
     prompt_instruction = (
+        f"CRITICAL STORYBOARD DIRECTIVE (Rule 445):\n"
+        f"The full story contains {total_words} words across 5 beats. You MUST break down the complete narrative into 35 to 55 sequential scenes (typically 7 to 10 scenes per beat, ~30-50 words per scene).\n"
+        f"DO NOT summarize or produce only 1 scene per beat! Each beat must contain multiple sequential scenes covering every paragraph of narration.\n\n"
         "Output a JSON object with this EXACT structure:\n"
         "{\n"
         "  \"episode_id\": \"" + episode_id + "\",\n"
@@ -593,9 +596,14 @@ def generate_director_plan(
                 except Exception:
                     pass
 
-    # 4. Fallback synthesis if LLM failed (Uses Dynamic Context & Ensemble - Rule 128)
-    if not parsed or not parsed.get("scenes"):
-        logger.warning("  [B3] Activating robust deterministic scene synthesizer fallback...")
+    # 4. Fallback synthesis if LLM failed or generated insufficient scenes (< min_required_scenes) (Rule 445: 35-55 dynamic scenes)
+    min_required_scenes = max(25, min(35, total_words // 45)) if total_words > 300 else 5
+    llm_scenes = parsed.get("scenes", []) if parsed else []
+    if not parsed or len(llm_scenes) < min_required_scenes:
+        if parsed and llm_scenes:
+            logger.warning(f"  [B3] LLM returned insufficient scenes ({len(llm_scenes)} < {min_required_scenes}). Activating robust deterministic scene synthesizer fallback...")
+        else:
+            logger.warning("  [B3] Activating robust deterministic scene synthesizer fallback...")
         parsed = _synthesize_deterministic_director_plan(
             episode_id,
             story_beats,
