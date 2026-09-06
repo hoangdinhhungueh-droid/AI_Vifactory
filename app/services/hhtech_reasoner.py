@@ -375,7 +375,7 @@ def assess_keyword_video_viability(
         "1. VISUAL FEASIBILITY (Layer 1 BG 16:9 + Layer 2 FG Transparent PNG):\n"
         "   - Can the story be staged with tangible visual scenes (boardrooms, trading desks, courtrooms, labs, archives, historical streets)?\n"
         "   - REJECT if purely abstract math/financial formula with zero concrete physical scenes or identifiable decision-makers.\n"
-        "2. CAUSAL CONFLICT DEPTH (Rule 1-4, 78 Big Fish Small Pond):\n"
+        "2. CAUSAL CONFLICT DEPTH (PRINCIPLE: BIG FISH SMALL POND - CAUSAL MECHANISM):\n"
         "   - Is there a systemic mechanism, regulatory loophole, executive hubris, or institutional betrayal?\n"
         "   - REJECT if it is merely generic everyday gossip, simple celebrity news, or a routine press release.\n"
         "3. RULE 444 HOOK POTENTIAL (5-10s Quantitative Shock):\n"

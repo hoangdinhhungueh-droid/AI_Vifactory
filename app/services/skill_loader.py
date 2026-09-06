@@ -504,7 +504,7 @@ def get_b11_self_learning_rules(force_refresh: bool = False) -> str:
 def get_b2_editorial_skills(force_refresh: bool = False) -> str:
     """Return high-density, targeted editorial skill prompts for B2 Story Engine.
     Combines Notion Content Engine Hub narrative rules, Central Brain rules
-    (Rule 1-4, 78 Big Fish Small Pond, Rule 118 Truth Anchor, Rule 444 Hook Protocol),
+    (Principle: Big Fish Small Pond, Rule 118 Truth Anchor, Rule 444 Hook Protocol),
     and B11 Self-Learning post-mortem feedback dynamically.
     """
     ce_rules = get_content_engine_rules(force_refresh=force_refresh)
@@ -519,7 +519,7 @@ def get_b2_editorial_skills(force_refresh: bool = False) -> str:
 
     editorial_prompt = (
         "=== B2 EDITORIAL & CINEMATIC NARRATIVE MANDATES ===\n"
-        "1. RULE 1, 2, 3, 4, 78 (BIG FISH SMALL POND - CAUSAL MECHANISM):\n"
+        "1. PRINCIPLE: BIG FISH SMALL POND (CAUSAL MECHANISM):\n"
         "   - Never narrate surface events chronologically like a boring encyclopedia. Dissect the underlying structural mechanism:\n"
         "     the regulatory loophole, the financial incentive structure, or the psychological vulnerability.\n"
         "   - The story is NOT about the person; the story is about the SYSTEMIC MACHINE that made the crisis inevitable.\n"

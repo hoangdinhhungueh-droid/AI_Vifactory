@@ -1,12 +1,4 @@
----
-name: notion-sot-second-brain
-description: >-
-  Bản đồ kiến trúc vận hành Single Source of Truth (SoT) & Second Brain của dự án AI Video Factory (VF Pipeline) trên Notion.
-  Tối ưu hóa token theo cấu trúc phân cấp 3 tầng (Root -> Hubs -> Registries), định tuyến tức thì cho Skill AI, Quy Trình Chuẩn (B1-B11),
-  Decisions Log và 8 Specialized Hubs.
----
-
-# 🧠 Notion Single Source of Truth (Second Brain) Architecture
+# 🧠 Notion Single Source of Truth (Second Brain) Architecture Reference
 
 > **MỤC TIÊU**: Cung cấp bản đồ định tuyến dữ liệu Single Source of Truth (SoT) tốc độ cao, tiết kiệm 80% context tokens bằng cơ chế **Progressive Disclosure (Phân cấp 3 Tầng)**. Tuyệt đối không nạp flat dump toàn bộ trang nếu chỉ cần tra cứu cục bộ.
 
@@ -57,13 +49,18 @@ graph TD
 ### 1️⃣ PILLAR 1: Skill AI (Central Brain)
 - **Root URL**: [`Skill AI`](https://app.notion.com/p/Skill-AI-ac9019892400827ebda28175dabdcf13) (`ac901989-2400-827e-bda2-8175dabdcf13`)
 - **Vai trò**: Chứa **Hiến pháp AI** và các quy tắc kỷ luật thép:
+  - **Rule 116**: Two-Layer Render Architecture (16:9 Cinematic BG + 1:1 FG #FF00FF Chroma Key).
   - **Rule 118**: Zero-Mock Data & Cơ chế Ask-Before-Deviating (Dừng lại hỏi User khi lỗi/rate-limit).
-  - **Rule 119**: Strict Existing Codebase Execution (Chỉ dùng script chuẩn trên VPS).
-  - **Rule 120**: Google Image Native Only (Tắt 100% VPS visual engine) & Phụ đề Karaoke Sync Millisecond.
-  - **Rule 121**: Strict Test Protocol (In log 200 OK từ Terminal/REST API trước khi hoàn thành).
+  - **Rule 119**: Strict Existing Codebase Execution (Chỉ dùng script chuẩn trên VPS, file tạm lưu ở /tmp/).
+  - **Rule 120**: Karaoke Millisecond Subtitle & Audio Duration Sync (durationInFrames chuẩn timestamp Whisper).
+  - **Rule 121**: Strict Test Protocol (In log 200 OK hoặc exit code 0 trước khi hoàn thành).
+  - **Rule 122**: Pixel-Level Visual Audit Gate (UI artifact = 0%, alpha integrity = 100%, Comic style).
+  - **Rule 123**: Mandatory Real-Data Pipeline Testing (Live RSS, YouTube Data API, Notion live).
   - **Rule 124**: Atomic Code-ification on Agreement (Chốt là code ngay, cấm nói suông).
   - **Rule 125**: Single Pipeline Version & Zero-Ghost Remnant Mandate (Dọn sạch 100% tàn dư cũ).
-  - **Rule 126**: Three-Way Physical Sync & Zero-False-Success Mandate (Bảo chứng đồng bộ vật lý VPS ⇄ GitHub ⇄ Notion, cấm báo cáo khống khi đĩa VPS chưa ghi).
+  - **Rule 126**: Three-Way Physical Sync & Zero-False-Success Mandate (Bảo chứng đồng bộ vật lý VPS ⇄ GitHub ⇄ Notion/Local).
+  - **Rule 127**: Anti-Tunnel-Vision & Mandatory Programmatic Runtime Execution Gate (Thực thi sống hàm sửa đổi).
+  - **Rule 128**: Anti-Semantic-Bias & Generic Contract Architecture Mandate (0 domain bleed, generic patterns).
 - **8 Specialized Hubs con**:
   | Hub Chuyên Môn | Notion Page ID | Trọng Tâm Nhiệm Vụ |
   | :--- | :--- | :--- |

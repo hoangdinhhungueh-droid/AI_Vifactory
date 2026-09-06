@@ -2,7 +2,7 @@
 Service: B3 Dynamic Hollywood Art Director & Universal Scene Breakdown Engine (/director:plan)
 Single Source of Truth: HHTech GPT-6-Astra + Director Plan Notion DB (5b201989-2400-8295-be81-81c2c0e4e138)
 Rule 116 & 435: Dual-Layer Remotion Render Architecture (16:9 BG + 1:1 FG #FF00FF Chroma Key).
-Rule 120: Two-Layer separation. Backgrounds and Foregrounds isolated for Remotion composition.
+Rule 120: Audio & Subtitle Timing Sync (duration_est_sec strictly aligned with spoken narration timestamps).
 Rule 128: Zero Semantic Bias. Dynamically analyzes story.txt to derive Era Anchor, physical/geographical environment,
           atmospheric lighting mood, color palette, and Dynamic Character Ensemble (4-8 roles) without static topic relics.
 Rule 445: 5-Beat Investigative Docudrama storyboard structure (35 to 55 dynamic scenes).
