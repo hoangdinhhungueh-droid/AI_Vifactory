@@ -19,9 +19,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-ROOT_DIR = Path("/root/video_factory")
-if not ROOT_DIR.exists():
-    ROOT_DIR = Path(".")
+import os
+ROOT_DIR = Path(os.getenv("VF_ROOT_DIR", Path(__file__).resolve().parent.parent.parent))
 
 from app.services.hhtech_reasoner import call_gpt6_astra
 from app.services.skill_loader import (

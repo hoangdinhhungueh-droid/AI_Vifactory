@@ -1,5 +1,6 @@
 import sys, os
-sys.path.insert(0, "/root/video_factory")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # tests/test_adversarial_round2.py
 """
 Adversarial test suite for Review Round 2.

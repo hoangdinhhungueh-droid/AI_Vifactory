@@ -16,7 +16,7 @@ import json
 import pytest
 from pathlib import Path
 
-sys.path.insert(0, "/root/video_factory")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.services.seo_package_forge import (
     _fallback_seo_package,

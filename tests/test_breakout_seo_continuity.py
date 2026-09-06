@@ -3,7 +3,8 @@
 Tests all requirements R1, R2, R3 and edge cases.
 """
 import sys
-sys.path.insert(0, "/root/video_factory")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest
 import re

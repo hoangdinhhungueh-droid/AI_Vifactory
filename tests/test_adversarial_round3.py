@@ -5,7 +5,8 @@ Deep stress tests across R1, R2, R3, Notion payload sync, Telegram card generati
 and downstream pipeline script continuity.
 """
 import sys, os
-sys.path.insert(0, "/root/video_factory")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import json
 import pytest

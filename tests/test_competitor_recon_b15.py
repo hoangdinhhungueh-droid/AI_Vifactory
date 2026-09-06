@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-sys.path.insert(0, "/root/video_factory")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.services.competitor_recon_b15 import (  # noqa: E402
     COMMENT_MIN_LENGTH,

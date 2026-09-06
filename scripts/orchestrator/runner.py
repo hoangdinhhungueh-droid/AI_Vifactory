@@ -447,7 +447,47 @@ class OrchestratorRunner:
             "errors": compile_errors,
         }
 
-        all_ok = len(backup_files) == 0 and len(compile_errors) == 0
+        # 4. Check GitHub Actions CI status for HEAD commit (Rule 126 Mandatory Gate)
+        head_commit_res = subprocess.run(
+            ["git", "-C", str(self.root_dir), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+        )
+        head_sha = head_commit_res.stdout.strip()
+        ci_status_info: Dict[str, Any] = {"head_sha": head_sha, "verified": False}
+        if head_sha:
+            try:
+                import urllib.request
+                gh_token = os.getenv("GITHUB_TOKEN", "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")
+                url = f"https://api.github.com/repos/hoangdinhhungueh-droid/AI_Vifactory/actions/runs?head_sha={head_sha}&per_page=1"
+                req = urllib.request.Request(url, headers={
+                    "Authorization": f"Bearer {gh_token}",
+                    "Accept": "application/vnd.github.v3+json",
+                    "User-Agent": "VF-Orchestrator"
+                })
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode())
+                    runs = data.get("workflow_runs", [])
+                    if runs:
+                        latest_run = runs[0]
+                        ci_status_info.update({
+                            "run_id": latest_run.get("id"),
+                            "status": latest_run.get("status"),
+                            "conclusion": latest_run.get("conclusion"),
+                            "html_url": latest_run.get("html_url"),
+                            "verified": True,
+                        })
+                    else:
+                        ci_status_info["message"] = "No workflow runs found yet for this HEAD commit"
+            except Exception as e:
+                ci_status_info["error"] = str(e)
+        sync_report["github_actions_ci"] = ci_status_info
+
+        ci_passed = (
+            ci_status_info.get("verified", False)
+            and ci_status_info.get("conclusion") == "success"
+        )
+        all_ok = is_clean and len(backup_files) == 0 and len(compile_errors) == 0 and ci_passed
         payload = {
             "status": "success" if all_ok else "failure",
             "sync_report": sync_report,
@@ -461,6 +501,12 @@ class OrchestratorRunner:
             print(f"Git Clean: {'YES' if is_clean else 'NO'}")
             print(f"Zero Ghost Backup Files: {len(backup_files)} found")
             print(f"PyCompile: {'PASS' if len(compile_errors) == 0 else 'FAIL'}")
+            ci_verdict = (
+                f"{str(ci_status_info.get('conclusion')).upper()} (Run ID: {ci_status_info.get('run_id')})"
+                if ci_status_info.get("verified")
+                else f"NOT_PASSED ({ci_status_info.get('message', ci_status_info.get('error', 'No run'))})"
+            )
+            print(f"GitHub Actions CI: {ci_verdict}")
 
         return 0 if all_ok else 1
 

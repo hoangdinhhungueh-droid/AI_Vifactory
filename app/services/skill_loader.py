@@ -35,9 +35,9 @@ SELF_LEARNING_PAGE_ID = "83cbd0d0-03af-4a60-a765-682a3c5a0a5d"
 # Backward compatibility alias
 SKILL_AI_PAGE_ID = CENTRAL_SKILL_PAGE_ID
 
-CACHE_TTL_SECONDS = int(os.getenv("SKILL_CACHE_TTL_SECONDS", "3600"))  # 1 hour default
-SNAPSHOT_FILE = Path("/root/video_factory/data/notion_audit/skills_snapshot.json")
-LEGACY_SNAPSHOT_FILE = Path("/root/video_factory/data/notion_audit/skill_ai.md")
+ROOT_DIR = Path(os.getenv("VF_ROOT_DIR", Path(__file__).resolve().parent.parent.parent))
+SNAPSHOT_FILE = Path(os.getenv("VF_SKILLS_SNAPSHOT", ROOT_DIR / "data" / "notion_audit" / "skills_snapshot.json"))
+LEGACY_SNAPSHOT_FILE = Path(os.getenv("VF_LEGACY_SKILLS_SNAPSHOT", ROOT_DIR / "data" / "notion_audit" / "skill_ai.md"))
 
 # In-memory multi-hub cache state
 _cache = {
