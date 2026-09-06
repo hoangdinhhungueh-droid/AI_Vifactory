@@ -100,7 +100,7 @@ def send_learn_summary(scope: str, patterns: int, proposals: int, items: list) -
 
 def send_skill_ai_sync_result(skill_name: str, verdict: str, rule_title: str, detail: str):
     """23/08/2026 -- Rule 121 reverse-sync gate result. Notifies the human after
-    scripts/sync_skill_enhancements.py has run the GPT-5.6-Sol strict absolute audit
+    scripts/sync_skill_enhancements.py has run the GPT-6-Astra strict absolute audit
     on an already human-approved enhancement, and either wrote a new generalized rule
     into the live Skill AI page (verdict='APPLIED') or rejected it for being too
     narrow/episode-specific or conflicting with existing rules (verdict='REJECTED'),

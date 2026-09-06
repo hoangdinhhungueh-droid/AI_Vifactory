@@ -9,9 +9,9 @@ which reads a static data/notion_audit/skill_ai.md snapshot that can go stale).
 Used by:
   - scripts/produce_episode_hg1.py  (B1.5→B3.5: recon + story + director plan + prompts)
   - app/services/prompt_forge.py           (B3.5 prompt forge)
-  - scripts/sync_skill_enhancements.py     (reverse-sync GPT-5.6-Sol strict-audit gate)
+  - scripts/sync_skill_enhancements.py     (reverse-sync GPT-6-Astra strict-audit gate)
 
-Any script that calls GPT-5.6-Sol to generate story/director/prompt content MUST call
+Any script that calls GPT-6-Astra to generate story/director/prompt content MUST call
 load_skill_ai_live() once per run and prepend its output to the system prompt. Do NOT
 cache the result across runs/episodes -- fetch fresh every single execution.
 
@@ -34,7 +34,7 @@ SKILL_AI_KEY = "skill_ai"
 def load_skill_ai_live(max_chars: int = 20000) -> str:
     """Fetch the LIVE Skill AI page fresh from Notion (no local cache/file).
     Returns a compact plain-text digest (headings + rule bullets) ready to prepend
-    to any GPT-5.6-Sol system prompt.
+    to any GPT-6-Astra system prompt.
 
     If the digest is larger than max_chars, keep BOTH the head (foundational rules,
     e.g. Rule 1 Zero-Mock-Data) AND the tail (most recently appended rules, e.g. new
@@ -96,7 +96,7 @@ def load_skill_ai_live(max_chars: int = 20000) -> str:
 def append_skill_ai_rule(title: str, body_text: str):
     """Reverse-sync write: append ONE new generalized rule block to the LIVE Skill AI
     page. Intended to be called ONLY from scripts/sync_skill_enhancements.py (after a
-    GPT-5.6-Sol strict audit confirms the rule is generalized -- not tied to a single
+    GPT-6-Astra strict audit confirms the rule is generalized -- not tied to a single
     episode -- and does not conflict with existing rules), or from the one-off
     scripts/bootstrap_rule121.py governance bootstrap. Never call this directly from
     per-episode pipeline scripts.

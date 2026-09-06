@@ -56,7 +56,7 @@ CHILDREN = [
         [
             rt("1. N\u1EA1p m\u1EDBi (live) b\u1EAFt bu\u1ED9c t\u1EA1i B2/B3/B3.5/B4: ", bold=True),
             rt(
-                "Th\u00EAm scripts/skill_ai_live.py \u2014 m\u1ED7i l\u1EA7n ch\u1EA1y B2 (5-Arc Story), B3 (Director Plan), B3.5 (Prompt Forge) \u0111\u1EC1u live-fetch to\u00E0n b\u1ED9 trang Skill AI t\u1EEB Notion API v\u00E0 prepend v\u00E0o system prompt g\u1ECDi GPT-5.6-Sol; kh\u00F4ng c\u00F2n \u0111\u1ECDc file cache c\u1EE5c b\u1ED9 hay ch\u1EC9 d\u1EF1a rule vi\u1EBFt c\u1EE9ng trong code. N\u1EBFu fetch l\u1ED7i, script d\u1EEBng h\u1EB3n (RuntimeError) thay v\u00EC t\u1EF1 suy di\u1EC5n."
+                "Th\u00EAm scripts/skill_ai_live.py \u2014 m\u1ED7i l\u1EA7n ch\u1EA1y B2 (5-Arc Story), B3 (Director Plan), B3.5 (Prompt Forge) \u0111\u1EC1u live-fetch to\u00E0n b\u1ED9 trang Skill AI t\u1EEB Notion API v\u00E0 prepend v\u00E0o system prompt g\u1ECDi GPT-6-Astra; kh\u00F4ng c\u00F2n \u0111\u1ECDc file cache c\u1EE5c b\u1ED9 hay ch\u1EC9 d\u1EF1a rule vi\u1EBFt c\u1EE9ng trong code. N\u1EBFu fetch l\u1ED7i, script d\u1EEBng h\u1EB3n (RuntimeError) thay v\u00EC t\u1EF1 suy di\u1EC5n."
             ),
         ]
     ),
@@ -64,7 +64,7 @@ CHILDREN = [
         [
             rt("2. C\u1ED5ng Reverse-Sync 3 l\u1EDBp: ", bold=True),
             rt(
-                "Th\u00EAm scripts/sync_skill_enhancements.py. Ch\u1EC9 ghi ng\u01B0\u1EE3c v\u00E0o Skill AI khi: (a) \u0111\u1EC1 xu\u1EA5t \u0111\u1EBFn t\u1EEB chu k\u1EF3 h\u1ECDc t\u1ED5ng qu\u00E1t h\u00F3a app/audit/learn.py (l\u1ED7i l\u1EB7p l\u1EA1i qua nhi\u1EC1u episode, kh\u00F4ng ph\u1EE5c v\u1EE5 ri\u00EAng 1 EP), (b) con ng\u01B0\u1EDDi \u0111\u00E3 approve, (c) GPT-5.6-Sol th\u1EF1c hi\u1EC7n audit tuy\u1EC7t \u0111\u1ED1i nghi\u00EAm ng\u1EB7t x\u00E1c nh\u1EADn \u0111\u1EC1 xu\u1EA5t \u0111\u00E3 t\u1ED5ng qu\u00E1t h\u00F3a \u0111\u00FAng c\u00E1ch v\u00E0 kh\u00F4ng xung \u0111\u1ED9t rule hi\u1EC7n c\u00F3."
+                "Th\u00EAm scripts/sync_skill_enhancements.py. Ch\u1EC9 ghi ng\u01B0\u1EE3c v\u00E0o Skill AI khi: (a) \u0111\u1EC1 xu\u1EA5t \u0111\u1EBFn t\u1EEB chu k\u1EF3 h\u1ECDc t\u1ED5ng qu\u00E1t h\u00F3a app/audit/learn.py (l\u1ED7i l\u1EB7p l\u1EA1i qua nhi\u1EC1u episode, kh\u00F4ng ph\u1EE5c v\u1EE5 ri\u00EAng 1 EP), (b) con ng\u01B0\u1EDDi \u0111\u00E3 approve, (c) GPT-6-Astra th\u1EF1c hi\u1EC7n audit tuy\u1EC7t \u0111\u1ED1i nghi\u00EAm ng\u1EB7t x\u00E1c nh\u1EADn \u0111\u1EC1 xu\u1EA5t \u0111\u00E3 t\u1ED5ng qu\u00E1t h\u00F3a \u0111\u00FAng c\u00E1ch v\u00E0 kh\u00F4ng xung \u0111\u1ED9t rule hi\u1EC7n c\u00F3."
             ),
         ]
     ),

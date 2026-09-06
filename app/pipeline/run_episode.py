@@ -301,7 +301,7 @@ async def run_pipeline(
     # Fully automatic, no human approval step. VF_STORY_JUDGE=off|warn|block
     # (default warn - new gate, not yet calibrated against production data).
     try:
-        _sj_mode = "off"  # DECOMMISSIONED: Handled by GPT-5.6-Sol via HHTech SoT
+        _sj_mode = "off"  # DECOMMISSIONED: Handled by GPT-6-Astra via HHTech SoT
         if _sj_mode != "off" and not skip_story_gate:
             _sj = _sjudge.judge_story(text, episode_id=episode_id)
             episode["story_judge"] = _sj

@@ -16,7 +16,7 @@ RULE_TITLE = "Rule 121 - Mandatory Fresh Skill Load Before Execution (23/08/2026
 RULE_BODY = (
     "Truoc khi thuc hien B2 (5-Arc Story), B3 (Director Plan), B3.5 (Prompt Forge), "
     "hoac B4 (sinh anh trong Antigravity qua Google Image Native Forge), MOI agent/session "
-    "(bao gom Antigravity, GPT-5.6-Sol goi qua HHTech, va moi script VPS lien quan) BAT BUOC phai "
+    "(bao gom Antigravity, GPT-6-Astra goi qua HHTech, va moi script VPS lien quan) BAT BUOC phai "
     "nap MOI (live fetch truc tiep tu Notion API, KHONG dung file cache/dump/hardcode) toan bo "
     "noi dung trang Skill AI nay truoc khi sinh noi dung. Nghiem cam tu suy dien hoac suy doan "
     "khong co can cu tu trang Skill AI. Neu khong the fetch duoc Skill AI live thi phai DUNG lai "
@@ -25,7 +25,7 @@ RULE_BODY = (
     "qua scripts/sync_skill_enhancements.py, va chi khi: (1) mot de xuat enhancement da duoc "
     "chu ky hoc tap tong quat hoa app/audit/learn.py sinh ra tu cac loi LAP LAI qua nhieu episode "
     "(khong hardcode rieng cho 1 EP don le - phai dreaming/scale-up), (2) con nguoi da approve de "
-    "xuat do, va (3) GPT-5.6-Sol thuc hien mot audit tuyet doi nghiem ngat xac nhan rule de xuat "
+    "xuat do, va (3) GPT-6-Astra thuc hien mot audit tuyet doi nghiem ngat xac nhan rule de xuat "
     "da duoc tong quat hoa dung cach va khong xung dot voi cac rule hien co, truoc khi duoc ghi "
     "vao trang nay. Cac script dong bo mot chieu, rieng le cho tung EP (kieu sync_rule118_notion.py, "
     "sync_all_sot_notion.py) khong duoc dung de cap nhat Skill AI ke tu ngay ap dung rule nay."

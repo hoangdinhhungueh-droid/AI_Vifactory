@@ -13,13 +13,13 @@ Flow:
   2. A human approves the proposal (existing flow: scripts/run-learn.py --queue, then
      app.audit.db.approve_enhancement(id) marks it 'approved').
   3. THIS script picks up every 'approved' (not yet applied) proposal, and asks
-     GPT-5.6-Sol to run one more absolute strict audit pass:
+     GPT-6-Astra to run one more absolute strict audit pass:
        - Confirm the proposed rule is GENERALIZED (must not mention a specific
          episode_id/task_id/slug) so it scales to future episodes, not just one EP.
        - Confirm it does not conflict with or duplicate an existing Skill AI rule
          (uses a LIVE fetch of the current Skill AI page -- never a cached copy).
        - Produce final, clean rule text ready to append.
-  4. Only on GPT-5.6-Sol PASS does it append the rule to the live Skill AI page and
+  4. Only on GPT-6-Astra PASS does it append the rule to the live Skill AI page and
      mark the enhancement 'applied'. On FAIL it leaves status='approved' for a human
      to revise, and sends a Telegram explanation.
 
@@ -89,7 +89,7 @@ def run_sync():
             raw = call_gpt56_sol(user_prompt, system_prompt=STRICT_AUDITOR_SYSTEM, max_tokens=800)
             result = _extract_json(raw)
         except Exception as e:
-            print(f"[sync_skill_enhancements] GPT-5.6-Sol audit call failed for {enh_id}: {e}")
+            print(f"[sync_skill_enhancements] GPT-6-Astra audit call failed for {enh_id}: {e}")
             send_skill_ai_sync_result(skill_name, "AUDIT_ERROR", proposed_value[:60], str(e))
             continue
 

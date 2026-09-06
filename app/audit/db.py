@@ -253,7 +253,7 @@ def get_approved_awaiting_sync() -> list:
     """23/08/2026 -- Rule 121 reverse-sync gate: enhancements a human has approved
     (status='approved') but that have NOT yet been pushed into the live Skill AI
     Notion page. Consumed only by scripts/sync_skill_enhancements.py, which runs
-    one more GPT-5.6-Sol strict-audit pass (generalized-not-per-episode + no
+    one more GPT-6-Astra strict-audit pass (generalized-not-per-episode + no
     conflict with current Skill AI content) before writing to Notion and calling
     apply_enhancement() to mark the row 'applied'.
     """

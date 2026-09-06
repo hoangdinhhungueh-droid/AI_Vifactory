@@ -34,7 +34,7 @@ from pydantic import BaseModel
 from app.services import character_refs as _cref
 from app.services import image_gen as _img
 from app.services import telegram_notify as _tg
-from app.services.hhtech_reasoner import call_gpt56_sol
+from app.services.hhtech_reasoner import call_gpt6_astra
 from app.services.skill_loader import get_skill_rules
 
 sys.path.insert(0, "/root/video_factory/scripts")
@@ -542,7 +542,7 @@ async def generate_images(episode_id: str, req: GenImagesReq):
 
 # --------------------------------------------------------- Rule 123 helpers
 def _generate_thumbnail_prompt(brain):
-    """B3 (viral skill): ask GPT-5.6-Sol for ONE high-CTR YouTube thumbnail
+    """B3 (viral skill): ask GPT-6-Astra for ONE high-CTR YouTube thumbnail
     image-generation prompt, applying the SEO Playbook viral Hook A/B/C
     framework (Emotion-first / Keyword-first / Curiosity-gap) and matching
     this episode's existing BG/FG art style."""
@@ -571,11 +571,11 @@ def _generate_thumbnail_prompt(brain):
         "best viral thumbnail prompt now." % (hook, story)
     )
     try:
-        prompt = call_gpt56_sol(user, system_prompt=system, max_tokens=400)
+        prompt = call_gpt6_astra(user, system_prompt=system, max_tokens=400)
         return prompt.strip().strip(chr(34)).strip()
     except Exception as e:
         logger.warning(
-            "[genimg] thumbnail prompt gen (GPT-5.6-Sol) failed, falling "
+            "[genimg] thumbnail prompt gen (GPT-6-Astra) failed, falling "
             "back to hook-based prompt: %s", e)
         return (
             "Dramatic high-contrast documentary thumbnail, %s, extreme "

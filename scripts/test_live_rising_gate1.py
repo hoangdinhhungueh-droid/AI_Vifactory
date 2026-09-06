@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Test script for verifying B1 Trend Gate with Google Trends Rising (Breakout) & Top Queries
-injected into HHTech GPT-5.6-Sol reasoning, Notion Trend Brain DB sync, and Telegram Gate 1 dispatch.
+injected into HHTech GPT-6-Astra reasoning, Notion Trend Brain DB sync, and Telegram Gate 1 dispatch.
 """
 import os, sys, json, asyncio
 sys.path.insert(0, '/root/video_factory')
@@ -47,7 +47,7 @@ def run_verification():
                 rising_q = [{"query": f"{subject} 폰지사기 세뇌 수법 2026", "value": "Breakout"}, {"query": f"{subject} 피해자 심리 지배 구조", "value": "+500%"}]
                 top_q = [{"query": f"{subject} 사기 수법 해설", "value": "100"}]
         
-        print(f"\n2. VERIFYING HHTECH GPT-5.6-Sol REASONING WITH BREAKOUT QUERIES (R2)")
+        print(f"\n2. VERIFYING HHTECH GPT-6-Astra REASONING WITH BREAKOUT QUERIES (R2)")
         t_dict = reason_topic_niche(subject, market, vs.get('virality_score') or score_hint, rising_queries=rising_q, top_queries=top_q)
         print(f"Topic Name VI: {t_dict.get('topic_name_vi')}")
         print(f"Search-Specific Key: {t_dict.get('search_specific_keyword')}")
