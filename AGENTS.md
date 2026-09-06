@@ -1,11 +1,11 @@
 # 🛡️ ANTIGRAVITY OPERATIONAL CONSTITUTION (ALWAYS ON)
 
 > **QUY TẮC BẤT BIẾN CẤP CAO NHẤT CỦA WORKSPACE AI VIDEO FACTORY (VF PIPELINE).**
-> Mọi Agent/Subagent bắt buộc tuân thủ 6 Kỷ Luật Thép và cơ chế Định Tuyến Kỹ Năng (Progressive Disclosure) dưới đây:
+> Mọi Agent/Subagent bắt buộc tuân thủ 11 Kỷ Luật Thép và cơ chế Định Tuyến Kỹ Năng (Progressive Disclosure) dưới đây:
 
 ---
 
-## ⚖️ I. HIẾN PHÁP 10 ĐIỀU LUẬT BẤT BIẾN (IRON LAWS)
+## ⚖️ I. HIẾN PHÁP 11 ĐIỀU LUẬT BẤT BIẾN (IRON LAWS)
 
 1. **RULE 118 (Zero-Mock Data & Ask-Before-Deviating)**:
    - CẤM TUYỆT ĐỐI tự tạo mock data, số liệu giả định (Analytics, Views, CTR, RPM). Chưa có API/số liệu YouTube Studio thực tế thì bắt buộc để `null` và báo cáo rõ ràng.
@@ -71,6 +71,30 @@
       - Áp dụng bình đẳng, phổ quát cho mọi thị trường (`EN`, `VN`, `JA`, `KO`...) và mọi thể loại nội dung.
     - **Tách Biệt Minh Bạch Giữa Schema Contract và Example Instance**:
       - Nếu thực sự cần đưa ví dụ trực quan, Agent BẮT BUỘC phải đặt trong block ghi chú `[!NOTE]` riêng biệt với tiêu đề "Minh Họa Phi Trực Thuộc" và cảnh báo tường minh: *"Dữ liệu dưới đây chỉ là ví dụ minh họa format, cấm Agent copy/tái sử dụng các giá trị cụ thể này vào runtime của Episode khác"*.
+11. **RULE 129 (Autonomous Deep Reasoning & Proactive Clarification Gate - Chuẩn Suy Luận Đa Chiều & Tự Động Phản Vấn Gọn Gẽ Theo Phong Cách Claude)**:
+    - **Tự Động Kích Hoạt 100% Trong Mọi Phiên Chat (Zero-Prompt Auto-Inquiry)**:
+      - TỰ ĐỘNG BẬT MẶC ĐỊNH ở mọi phiên làm việc và mọi lượt hội thoại mà KHÔNG CẦN User phải gõ `/grill-me`, `/boost` hay đưa ra lời nhắc.
+      - Khi nhận bất kỳ yêu cầu nào liên quan đến kiến trúc, luồng logic pipeline, tích hợp mới, tái cấu trúc (refactor), giải pháp kỹ thuật có nhiều phương án, hoặc yêu cầu có điểm mơ hồ: Agent BẮT BUỘC kích hoạt tư duy First-Principles và suy luận đa chiều TRƯỚC KHI thực hiện bất kỳ lệnh can thiệp hay sửa code nào.
+    - **Quy Trình 3 Bước Suy Luận Sâu Đa Chiều (Autonomous Multi-Angle Decomposition)**:
+      1. *Bóc tách mục tiêu thực chất & Điểm mù (Intent & Blind-Spots)*: Phân tích mục tiêu cốt lõi của User đằng sau câu lệnh; nhận diện các giả định ngầm (hidden assumptions), edge cases, rủi ro đứt gãy luồng dữ liệu hoặc tác động lan truyền (blast radius).
+      2. *Đánh giá 3 Trục Độc Lập*:
+         - *Kiến trúc & Khế ước*: Có phá vỡ hoặc mâu thuẫn với các Rule hiện hữu (118–128) và `PIPELINE_CONTRACTS.md` không?
+         - *Hiệu năng & Tài nguyên*: Có gây nghẽn cổ chai, timeout, xung đột tiến trình hoặc quá tải CPU/RAM trên VPS không?
+         - *Vận hành & Đồng bộ*: Có đòi hỏi đảm bảo vòng đồng bộ vật lý 3 chiều (Local - VPS - Notion/GitHub) theo Rule 126 không?
+      3. *Phân tích Đánh đổi (Trade-offs)*: Định hình rõ ràng tối thiểu 2 phương án khả thi (Option A vs Option B) kèm ưu/nhược điểm từng phương án.
+    - **Cổng Phản Vấn Chủ Động & Gọn Gẽ (Claude-Style Crisp Inquiry Gate)**:
+      - Khi phát hiện tác vụ có chiều sâu kỹ thuật, nhiều phương án rẽ nhánh, hoặc còn điểm mơ hồ cần quyết định từ User:
+        - **DỪNG LẠI Ở CỔNG THAM VẤN**, phản hồi cho User theo cấu trúc 4 phần chuẩn mực, cực kỳ cô đọng và sắc bén:
+          1. *Tóm tắt Nhận định (Intent Digest - 1-2 câu)*: Khẳng định Agent đã nắm trúng bản chất vấn đề kỹ thuật và mục tiêu cốt lõi.
+          2. *Phương án & Đánh đổi (Trade-offs Matrix)*: Liệt kê Option A vs Option B (ngắn gọn, tập trung vào kết quả và hệ quả).
+          3. *Khuyến nghị Chuyên môn*: Nêu rõ lựa chọn đề xuất kèm lý do kỹ thuật (`(Khuyến nghị: Chọn Phương án A vì...)`).
+          4. *Câu hỏi Chốt Trực Diện*: Đặt câu hỏi ngắn gọn, rõ ràng (sử dụng công cụ `ask_question` nếu là trắc nghiệm nhiều lựa chọn trực quan) để User chỉ cần chọn hoặc trả lời 1 dòng là có thể tiến hành ngay.
+    - **Ranh Giới "Chống Phiền Toái" (Zero-Friction on Deterministic Tasks)**:
+      - Phân định rạch ròi:
+        + *BẮT BUỘC HỎI*: Tác vụ có tính chiến lược, thay đổi kiến trúc/hợp đồng, yêu cầu chưa rõ ràng, có nhiều hướng tiếp cận, hoặc thao tác có rủi ro phá hủy.
+        + *CẤM HỎI LẮT NHẮT (Thực thi dứt khoát)*: Yêu cầu đã rõ ràng 100%, sửa lỗi cú pháp cụ thể, chạy script test/kiểm tra hệ thống, in log, giải thích kiến thức đơn thuần.
+    - **Kỷ Luật "Chốt Là Code Ngay" (Rule 124 Enforced)**:
+      - Ngay khi User xác nhận hướng đi hoặc lựa chọn xong, Agent lập tức bắt tay vào code hóa (`replace_file_content`/`write_to_file`) và kiểm thử nghiệm thu nghiêm ngặt, tuyệt đối không hỏi lại những điều đã được chốt.
 
 ---
 
@@ -87,10 +111,11 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 | **B6, B7, B8** | TTS, Whisper Subtitles, Remotion Render CPU | `notion_sot_second_brain.md` (Media Production Hub) | Rule 120 (Karaoke millisecond sync, `durationInFrames` chuẩn timestamp) |
 | **B10** | SEO Metadata, Synthetic Media, Gate 2 | `PIPELINE_CONTRACTS.md` | `status.containsSyntheticMedia: true`, Hero Thumbnail |
 | **B11** (`/run:b11`) | Analytics 48h, Feedback Dreaming Loop | Skill `vf-b11-analytics` | Rule 113 (48h Law), Rule 440–442 |
-| **Teamwork Pipeline** (`/teamwork:pipeline`, `/run:teamwork`) | Điều phối đội ngũ 4 vai (Parallel Debuggers, Forensic Auditor, CI Gatekeeper, 3-Way Sync) cho B1..B11 | Skill `vf-pipeline-teamwork` & `scripts/orchestrator/` | Rule 118, 119, 121, 126, 127, 128 |
+| **Teamwork Pipeline** (`/teamwork:pipeline`, `/run:teamwork`) | Điều phối đội ngũ 4 vai (Parallel Debuggers, Forensic Auditor, CI Gatekeeper, 3-Way Sync) cho B1..B11 | Skill `vf-pipeline-teamwork` & `scripts/orchestrator/` | Rule 118, 119, 121, 126, 127, 128, 129 |
 
 ---
 
 ## 🎯 III. NGUYÊN TẮC QUẢN TRỊ TÁC VỤ (TASK DISCIPLINE)
 1. **Task-Level Contract**: Mọi nhiệm vụ lớn / Sprint bắt buộc neo theo file `ORIGINAL_REQUEST.md` (chứa User Request gốc, Requirements R1..Rn và Acceptance Criteria `[ ]`).
 2. **Interface Contracts**: Khế ước dữ liệu JSON IN/OUT giữa các block và danh mục file trên VPS tra cứu tại `PIPELINE_CONTRACTS.md`.
+3. **Autonomous Clarification Protocol**: Mọi tác vụ có tính đa chiều, rẽ nhánh kỹ thuật hoặc mơ hồ bắt buộc kích hoạt Cổng Phản Vấn Chủ Động (Rule 129), suy luận sâu và làm rõ với User trước khi triển khai sâu.
