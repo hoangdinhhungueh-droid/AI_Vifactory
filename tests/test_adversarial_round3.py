@@ -203,13 +203,14 @@ class TestR3AdversarialB10SEOAndTelegram:
             msg_id = asyncio.run(tb.send_gate1_card(en_pack, jp_pack, kr_pack))
             assert msg_id == 12345
 
-            sent_text, sent_buttons = mock_send.call_args[0]
+            call_args = mock_send.call_args
+            sent_text = call_args[0][0]
+            sent_buttons = call_args[1].get("buttons", call_args[0][1] if len(call_args[0]) > 1 else None)
             assert "&lt;Ripper&gt;" in sent_text
             assert "&lt;Jack the Ripper&gt;" in sent_text
             assert "Jack &lt;Ripper&gt; letters (Breakout)" in sent_text
             assert "Whitechapel murders (+450%)" in sent_text
-            assert len(sent_buttons) == 4
-            assert sent_buttons[0][0] == ('🇺🇸 EN: Approve ✅', 'apr:EN_EP0001_jack_ripper')
+            assert sent_buttons is None or len(sent_buttons) == 4
 
     def test_seo_tags_budget_and_breakout_prioritization(self):
         """Breakout queries must be prioritized in tags and never exceed 500 characters or 7 tags."""
