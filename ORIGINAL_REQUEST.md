@@ -46,6 +46,69 @@ Xây dựng Framework điều phối Multi-Agent (Tooling / Runner) có khả n�
 Thực hiện kiểm toán chéo độc lập và xác minh đúng sự thật (Adversarial Forensic Audit & Ground-Truth Verification) toàn bộ các hạng mục công việc mà Agent tiền nhiệm trong phiên "Resolving Agent Accountability Issues" (ID: `87517f5d-e6e7-4ba3-a422-68489d790286`) đã báo cáo hoàn tất trong file ORIGINAL_REQUEST.md. Xác minh đúng sự thật trên VPS (/root/video_factory), GitHub repo (hoangdinhhungueh-droid/AI_Vifactory.git), và Notion SoT theo các Kỷ luật thép (Rule 118, 121, 126, 127).
 </USER_REQUEST>
 
+### 7. Phiên 7 (2026-09-06T15:05:25Z): Kiểm Toán Đối Kháng Vòng 3 & Quality Gate Toàn Hệ Thống (Adversarial Forensic Audit Round 3)
+<USER_REQUEST>
+# Teamwork Project Prompt
+
+> Requested team: Independent Adversarial Audit & Quality Gate Team (Round 3)
+
+Thực hiện kiểm toán đối kháng vòng 3 (Adversarial Forensic Audit Round 3) độc lập và toàn diện trên toàn bộ hệ sinh thái AI Video Factory sau khi dọn sạch file trùng lặp và đồng bộ khế ước `ORIGINAL_REQUEST.md`. Xác minh đúng sự thật trên VPS (`/root/video_factory`), GitHub repo (`hoangdinhhungueh-droid/AI_Vifactory.git`), và Notion SoT theo Kỷ luật thép (Rule 118, 121, 125, 126, 127, 128, 129).
+
+Working directory: c:\Users\hunghd2\Documents\antigravity\AI Video Factory
+Integrity mode: development
+
+## USER MANDATORY AUDIT DIRECTIVE
+1. **Tuân thủ triệt để rule audit và framework đã xây dựng**: Sử dụng trực tiếp runner và các module kiểm soát trong `scripts/orchestrator/` (`runner.py`, `rule128_governor.py`, `resource_recycler.py`, `lifecycle_manager.py`), tuân thủ tuyệt đối các Kỷ luật thép (Rule 118, 121, 125, 126, 127, 128, 129).
+2. **Tập trung vào `ORIGINAL_REQUEST.md` — Có task nào thì task đó phải đảm bảo DONE, phải có chứng minh, CẤM BÁO CÁO MÙ**:
+   - Rà soát từng task một trong Mục IV của `ORIGINAL_REQUEST.md`:
+     - Gói 1: AUDIT-G1.1 đến AUDIT-G1.6 (Docstrings, Comments, Logs & Purge GPT-5.6-Sol).
+     - Gói 2: AUDIT-G2.1 đến AUDIT-G2.4 (Ghost Purge & Shadow Scripts Cleanup).
+     - Gói 3: AUDIT-G3.1 đến AUDIT-G3.5 (Khớp nối hợp đồng `PIPELINE_CONTRACTS.md`).
+     - Gói 4: AUDIT-G4.1 đến AUDIT-G4.2 (Sửa dứt điểm blocking CI/Tests).
+     - Verification: AUDIT-VERIFY-1 đến AUDIT-VERIFY-5 (Kiểm chứng runtime, exit code, git commit).
+     - Nhóm 2: AUDIT-PREV-1 đến AUDIT-PREV-5 (Dynamic Narrative Context, Character Ensemble, 35-55 dynamic scenes floor & coverage audit, Notion Dynamic DB Resolver `3d301989-2400-8162-9276-e380ff5efb35`, Trục kiểm toán 9).
+     - Nhóm 3: ORCH-1 đến ORCH-VERIFY (Multi-Agent Orchestrator Framework).
+   - Bất kỳ task nào tuyên bố PASS bắt buộc phải có bằng chứng pháp y tại chỗ: trích dẫn lệnh chạy runtime trên VPS, File Path, Line Numbers và Exit Code `0`. Tuyệt đối không chấp nhận báo cáo hình thức.
+
+## Requirements
+
+### R1. Comprehensive Codebase & Bug-Free Inspection (B1 ➔ B11)
+- Rà soát toàn bộ các module đã refactor từ B1 đến B3.5, B4/B5, B10, B11.
+- Kiểm tra độc lập xem còn tồn tại bug cú pháp, runtime exceptions, type mismatch, hoặc unhandled edge cases nào không.
+- Rà soát nghiêm ngặt Rule 128 (Zero Semantic Bias — cấm hardcode domain/episode bias) và Rule 125 (Zero Ghost Remnant & Ambiguity) trên toàn bộ codebase.
+
+### R2. Full-Spectrum Programmatic Runtime Execution Gate (Rule 121 & Rule 127)
+- Thực thi kiểm thử runtime sống trên môi trường VPS `/root/video_factory` qua 6 cổng kiểm thử:
+  1. `cd /root/video_factory && pytest tests/test_competitor_recon_b15.py tests/test_trend_gate_b1.py -v` (39/39 tests PASS).
+  2. `cd /root/video_factory && python3 tests/ci_neighbor_tester.py --block 1.0` (Blocks 1.0, 1.5 PASS, Exit code 0).
+  3. `cd /root/video_factory && python3 tests/ci_neighbor_tester.py --block 3.0` (Blocks 2.0, 3.0, 4.0 PASS, Exit code 0, Story Gate 12/12, Director Audit >= 8.0).
+  4. `cd /root/video_factory && python3 scripts/e2e_pipeline_smoketest.py` (7/7 Gates PASS, in dòng `ALL PIPELINE GATES PASSED`).
+  5. `cd /root/video_factory && pytest tests/test_orchestrator.py -v` (23/23 tests PASS).
+  6. `cd /root/video_factory && pytest tests/test_adversarial_round3.py -v` (13/13 tests PASS).
+- Kiểm tra tính chân thực của các bài test: cấm `assert True`, không mock số liệu, các điểm số (Story Gate, Director Plan) phải xuất phát từ thuật toán phân tích dữ liệu thực tế.
+
+### R3. Three-Way Physical Sync & Cleanliness Audit (Rule 125 & Rule 126)
+- Thẩm định tính toàn vẹn và đồng bộ 3 chiều (VPS `/root/video_factory` ⇄ GitHub repo `origin/main` ⇄ Local Windows Workspace `AI Video Factory`).
+- Xác nhận checksum SHA256 của file khế ước `ORIGINAL_REQUEST.md` và `PIPELINE_CONTRACTS.md` khớp tuyệt đối giữa Local và VPS.
+- Xác nhận file tàn dư trùng lặp `.agents/ORIGINAL_REQUEST.md` đã bị xóa bỏ hoàn toàn, chỉ còn duy nhất 1 bản Master Single Source of Truth tại thư mục gốc.
+- Quét sạch 100% file rác backup (`*.bak*`, `*.backup*`) trên VPS, bảo đảm `git status` trên VPS trả về `working tree clean` và `up to date with origin/main`.
+
+## Acceptance Criteria
+
+### Test & Runtime Gates
+- [ ] Toàn bộ 6 cổng kiểm thử runtime trên VPS trả về Exit Code `0` với bằng chứng in rõ ràng từ stdout/stderr.
+- [ ] Không có assertion giả mạo (`assert True`, tautological pass) hay hàm test rỗng (`pass`).
+
+### Zero-Ghost & Cleanliness
+- [ ] `find /root/video_factory -name '*.bak*' -o -name '*.backup*'` trả về đúng 0 file trên VPS.
+- [ ] Không còn file duplicate `.agents/ORIGINAL_REQUEST.md` trong workspace; duy nhất 1 file `ORIGINAL_REQUEST.md` tại root phản ánh 100% chính xác thực tế.
+- [ ] `git -C /root/video_factory status` trả về `working tree clean` và commit HEAD khớp hoàn toàn với `origin/main`.
+
+### Three-Way Sync Parity
+- [ ] Checksum SHA256 của `ORIGINAL_REQUEST.md` giữa Windows Workspace và VPS `/root/video_factory` khớp tuyệt đối từng byte.
+- [ ] Báo cáo kiểm toán Round 3 kết luận rõ ràng: hệ thống đã sẵn sàng 100%, không còn bug ngầm và tác động 3-way đã khép kín.
+</USER_REQUEST>
+
 ---
 
 ## 🔍 II. BẢN ĐỒ PHÁP Y NGUYÊN NHÂN GỐC RỄ (FULL ROOT-CAUSE POST-MORTEM)
