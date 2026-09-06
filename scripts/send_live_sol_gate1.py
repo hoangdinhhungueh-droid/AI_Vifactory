@@ -38,7 +38,7 @@ except Exception as e:
 
 gate1_text = (
     "🎯 <b>[HUMAN GATE 1] PHÊ DUYỆT CHỦ ĐỀ SẢN XUẤT (GO-LIVE 2026)</b>\n"
-    "<i>(✨ Suy luận chiến lược & Đúc kết ngách bởi GPT-5.6-Sol qua HHTech API)</i>\n\n"
+    "<i>(✨ Suy luận chiến lược & Đúc kết ngách bởi GPT-6-Astra qua HHTech API)</i>\n\n"
     f"🇺🇸 <b>Market EN:</b> <code>Byzantine Empire</code> (Virality: 0.973)\n"
     f"• <b>Đề tài:</b> {en_info.get('topic_name_vi')}\n"
     f"• <b>Search-Specific Key:</b> <code>{en_info.get('search_specific_keyword')}</code>\n"
@@ -69,4 +69,4 @@ gate1_rows = [
 ]
 
 asyncio.run(tb.send_with_buttons(gate1_text, gate1_rows))
-print('Delivered Live HHTech GPT-5.6-Sol Gate 1 notification to Telegram!')
+print('Delivered Live HHTech GPT-6-Astra Gate 1 notification to Telegram!')

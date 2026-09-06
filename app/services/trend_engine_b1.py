@@ -256,10 +256,12 @@ def commit_trend_task(topic_data: dict) -> str:
     generate competitor intel card, record to History Registry, and sync to Notion SoT.
     """
     try:
-        from app.services import episode_numbering as _epnum
-        task_id = _epnum.generate_episode_id(topic_data["market"], topic_data.get("task_slug") or topic_data["raw_term"])
-    except Exception:
-        task_id = f"{topic_data['market']}_EP0001_{topic_data.get('task_slug') or 'topic'}"
+        from app.services.trend_gate_ai import get_next_episode_id
+        task_id = get_next_episode_id(topic_data.get("market", "EN"), topic_data.get("task_slug") or topic_data.get("raw_term", "topic"))
+    except Exception as _ep_err:
+        logger.error(f"[trend_engine] Failed to generate episode ID via trend_gate_ai: {_ep_err}")
+        slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(topic_data.get("task_slug") or topic_data.get("raw_term", "topic"))).strip('-')[:25]
+        task_id = f"{topic_data.get('market', 'EN')}_EP9999_{slug}"
 
     topic_data["task_id"] = task_id
 
@@ -354,7 +356,7 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
             f"• <b>🔥 Cụm từ tìm kiếm tăng:</b> <code>{rising}</code>",
             f"• <b>Niche Brief:</b> {niche}",
             f"• <b>Khác biệt đối thủ (Blue Ocean Gap):</b> <i>{gap}</i>",
-            f"• <b>5-Act Direction:</b> {arcs[:180]}...",
+            f"• <b>5-Beat Docudrama:</b> {arcs[:180]}...",
             f"👉 <b>Task ID:</b> <code>{task_id}</code>",
             "--------------------------------------------------",
             "⚙️ <i>Hệ thống đang tự động chuyển tiếp sang <b>B2 Story Engine</b> (Kịch bản điều tra 12–15 phút) & <b>B3 Visual Plan</b>!</i>"
@@ -459,8 +461,18 @@ def discover_and_produce_market_trend(
             recon_keyword = t_obj.get("search_specific_keyword") or term
             recon_card = run_b15(task_id, recon_keyword, t_obj.get("niche_angle_brief", "General"))
             if recon_card:
-                t_obj["competitor_gap"] = recon_card.get("competitor_narrative_anatomy", {}).get("fatal_explanatory_vacuum", "")
-                print(f"  ✅ [B1.5] Competitor Intel Card saved successfully.")
+                gap_val = recon_card.get("competitor_narrative_anatomy", {}).get("fatal_explanatory_vacuum", "")
+                if gap_val:
+                    t_obj["competitor_differentiation_gap"] = gap_val
+                    t_obj["competitor_gap"] = gap_val
+                    task_file = os.path.join("/var/vf/pending_tasks", f"{task_id}.json")
+                    if os.path.exists(task_file):
+                        try:
+                            with open(task_file, "w", encoding="utf-8") as tf:
+                                json.dump(t_obj, tf, ensure_ascii=False, indent=2)
+                        except Exception as _we:
+                            logger.warning(f"Could not re-persist task file with competitor gap: {_we}")
+                print(f"  ✅ [B1.5] Competitor Intel Card saved successfully with real gap: {gap_val[:60]}...")
         except Exception as re_err:
             logger.warning(f"[{task_id}] Inline B1.5 recon warning: {re_err}")
 

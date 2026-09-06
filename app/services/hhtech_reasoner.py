@@ -232,7 +232,7 @@ def reason_topic_niche(
             viral_videos_text = "\n[YOUTUBE LIVE VIRAL BENCHMARKS & ALGORITHM RECOMMENDATIONS]:\n" + "\n".join(v_lines) + "\n"
 
     # 3. Universal English-First Strategic System Prompt (Objective & Free of Stereotypes)
-    skill_rules = get_skill_rules()  # Dynamic load from Notion Skill AI
+    skill_rules = get_b1_strategic_rules()  # Concise B1 strategic rules (prevents prompt contamination)
 
     system_prompt = (
         "You are the Lead Creative Director and Strategic Research Analyst for Video Factory (VF Pipeline).\n"
@@ -280,7 +280,7 @@ def reason_topic_niche(
 
     try:
         logger.info(f"[hhtech] Calling {HHTECH_MODEL} for topic: {subject} ({m_up}) with safety: {safety_label} & {len(rising_queries or [])} rising queries...")
-        content = call_gpt56_sol(user_prompt, system_prompt=system_prompt, max_tokens=2500, timeout=50.0)
+        content = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=2500, timeout=50.0)
         if content.startswith("```"):
             content = content.split("```")[1]
             if content.startswith("json"):
@@ -407,7 +407,7 @@ def assess_keyword_video_viability(
     )
 
     try:
-        raw_res = call_gpt56_sol(user_prompt, system_prompt=system_prompt, max_tokens=1000, timeout=75.0)
+        raw_res = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=1000, timeout=75.0)
         clean_json = raw_res.strip()
         if clean_json.startswith("```"):
             clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json)

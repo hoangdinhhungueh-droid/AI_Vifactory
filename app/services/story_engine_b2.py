@@ -1,13 +1,13 @@
 # app/services/story_engine_b2.py
 """
-Generic B2 Story Engine & Dynamic B3 Director Plan Generator via GPT-6-Astra.
+B2 Story Engine (5-Beat Docudrama 1,800–2,200 words) via GPT-6-Astra.
 Architecture & Rule Compliance:
-  - Strict Rule 118: Zero-Mock Data.
+  - Strict Rule 118: Zero-Mock Data & Ask-Before-Deviating.
   - Strict Rule 120: Safe-Treatment Mandates & Timestamp-Accurate 5-Act Structure.
-  - Fast Single-Call 5-Act Generation (~1,200 words total, 8-10 min runtime).
-  - Synchronizes seamlessly to Notion Story Library DB & Notion Director Plan DB.
+  - Strict Rule 445: 5-Beat Docudrama Story Generation (~1,800–2,200 words, 8-10 min runtime).
+  - Synchronizes seamlessly to Notion Story Library DB (Dual-Callout & Forensic Metrics).
   - Dynamic Rule Injection: Inherits Central Skills (Rules 113–121) and Content Engine Hub
-    (5-Act architecture, pacing, and loop discipline) directly from Notion SoT.
+    (5-Beat architecture, pacing, and loop discipline) directly from Notion SoT.
 """
 
 import os, sys, json, time, re, logging
@@ -32,19 +32,12 @@ NOTION_STORY_DB_ID = os.getenv("STORY_LIBRARY_DB_ID", "b0301989-2400-836b-bdb5-8
 EPISODES_BASE_DIR = os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")
 PENDING_TASKS_DIR = "/var/vf/pending_tasks"
 KNOWN_MARKETS = {"EN", "JP", "KR"}
-# Rule 75 subtitle chars-per-second hard cap; mirrors compile_episode_from_notion.py.
-# Used only as a physical floor for duration_sec, never to derive it.
-CPS_HARD_CAP = 20.0
+
 
 
 def _opening_hook(script: str, max_chars: int = 320) -> str:
     """The first 1-2 sentences of the script, whole.
-
-    S3.5 scores this string on its own (app/services/story_quality.py:114):
-    a curiosity cue is worth 2.5 and an emotion cue 1.5, and the open question
-    that carries both is always the *second* sentence of a shock-then-question
-    opening. A fixed character slice cut it off mid-word, so the hook scored
-    6.3 against a 7.0 floor no matter how good the script was.
+    Extracts the opening curiosity and emotional hook for quality scoring.
     """
     sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", (script or "").strip()) if s.strip()]
     if not sents:
@@ -56,10 +49,7 @@ def _opening_hook(script: str, max_chars: int = 320) -> str:
     return hook[:max_chars]
 
 
-def _reuse_slug(text: str, fallback: str) -> str:
-    """Short hyphen slug (<=4 words) used as a background/foreground reuse key."""
-    s = re.sub(r"[^a-z0-9]+", "-", str(text or "").lower()).strip("-")
-    return "-".join([w for w in s.split("-") if w][:4]) or fallback
+
 
 
 def load_competitor_intel(task_id: str) -> dict:
@@ -416,7 +406,6 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
     # Notion Sync: Story Library & Director Plan DBs
     # ----------------------------------------------------
     try:
-        director_db_id = resolve_id('director')
         story_page_id = meta.get("page_id")
 
         if not story_page_id:
@@ -436,7 +425,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
                         "Episode ID": {"rich_text": [{"type": "text", "text": {"content": str(task_id)}}]},
                         "Market": {"select": {"name": mkt}},
                         "Status": {"status": {"name": "Gate Passed" if story_verdict == "PASS" else "Compiled"}},
-                        "Story Gate Score": {"rich_text": [{"type": "text", "text": {"content": f"[AG] {story_score_str} {story_verdict} (GPT-5.6-SOL)"}}]},
+                        "Story Gate Score": {"rich_text": [{"type": "text", "text": {"content": f"[AG] {story_score_str} {story_verdict} (GPT-6-ASTRA)"}}]},
                         "Niche Angle Brief": {"rich_text": [{"type": "text", "text": {"content": str(niche_brief)[:1999]}}]},
                         "Story Direction (5 Arcs)": {"rich_text": [{"type": "text", "text": {"content": str(story_arcs)[:1999]}}]},
                     }
@@ -454,7 +443,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
         if story_page_id:
             props = {
                 'Status': {'status': {'name': 'Gate Passed' if story_verdict == 'PASS' else 'Compiled'}},
-                'Story Gate Score': {'rich_text': [{'type': 'text', 'text': {'content': f'[AG] {story_score_str} {story_verdict} (GPT-5.6-SOL)'}}]},
+                'Story Gate Score': {'rich_text': [{'type': 'text', 'text': {'content': f'[AG] {story_score_str} {story_verdict} (GPT-6-ASTRA)'}}]},
                 'Rising Queries': {'rich_text': [{'type': 'text', 'text': {'content': ', '.join(breakout_queries)}}]}
             }
             _res = update_page_properties(story_page_id, props)

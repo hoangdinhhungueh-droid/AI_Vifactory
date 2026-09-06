@@ -68,12 +68,22 @@ def run_chain(task_id: str) -> int:
     stage = "B1.5"
     try:
         from app.services.competitor_recon_b15 import run_b15
-        _log(stage, "Two-Pass competitor recon for keyword=%r (niche=%r)" % (keyword, niche))
-        card = run_b15(task_id, keyword, niche)
-        if not card:
-            raise RuntimeError("B1.5 recon returned no intel card for task %s" % task_id)
-        _meta = card.get("collection_meta") or {}
         card_file = ep_dir / "competitor_intel_card.json"
+        card = None
+        if card_file.exists() and card_file.stat().st_size > 100:
+            try:
+                card = json.loads(card_file.read_text(encoding="utf-8"))
+                _log(stage, "Reusing existing valid competitor intel card from %s" % card_file)
+            except Exception:
+                card = None
+
+        if not card:
+            _log(stage, "Two-Pass competitor recon for keyword=%r (niche=%r)" % (keyword, niche))
+            card = run_b15(task_id, keyword, niche)
+            if not card:
+                raise RuntimeError("B1.5 recon returned no intel card for task %s" % task_id)
+
+        _meta = card.get("collection_meta") or {}
         _log(stage, "intel card: %d competitors, %d gaps, %d transcripts, persisted=%s" % (
             len(card.get("competitor_benchmarks") or []),
             len(card.get("audience_comment_gaps") or []),
@@ -194,7 +204,7 @@ def run_chain(task_id: str) -> int:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("usage: produce_episode.py <task_id>", file=sys.stderr)
+        print("usage: produce_episode_hg1.py <task_id>", file=sys.stderr)
         return 2
     task_id = sys.argv[1].strip()
     _log("START", "task_id=%s pid=%d" % (task_id, os.getpid()))

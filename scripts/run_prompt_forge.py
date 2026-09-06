@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CLI Runner for B3.5 Prompt Engineering Forge (/prompt:forge)
-Generates detailed prompts via HHTech GPT-5.6-Sol and pushes directly to Notion Prompt Library DB.
+Generates detailed prompts via HHTech GPT-6-Astra and pushes directly to Notion Prompt Library DB.
 Rule 120: Prompts are synced to Notion SoT DB, avoiding raw prompt chat dumps.
 """
 
@@ -46,7 +46,7 @@ def main():
                 "narration_context": s.get("narration") or s.get("caption", "")
             }
             
-    print(f"=== B3.5 PROMPT FORGE: Generating prompts for {len(bg_dict)} BGs and {len(fg_dict)} FGs via HHTech GPT-5.6-Sol ===")
+    print(f"=== B3.5 PROMPT FORGE: Generating prompts for {len(bg_dict)} BGs and {len(fg_dict)} FGs via HHTech GPT-6-Astra ===")
     prompts_data = generate_scene_prompts(bg_dict, fg_dict, title)
     
     out_file = ep_dir / "prompts_forge.json"

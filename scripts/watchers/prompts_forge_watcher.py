@@ -186,7 +186,7 @@ class PromptsForgeHandler(FileSystemEventHandler):
                 self._log(f"[VALIDATE] {task_id}: {n_scenes} scenes found (BG: {n_bg}, FG: {n_fg}, Story Gate: {story_score})")
             except Exception as e:
                 self._log(f"[ERROR] {task_id}: Invalid JSON in prompts_forge.json: {e}")
-                n_scenes, n_bg, n_fg, story_score = 37, 18, 10, "12/12"
+                n_scenes, n_bg, n_fg, story_score = 0, 0, 0, "N/A"
 
             asyncio.run(send_gate2_card(task_id=task_id, n_scenes=n_scenes, n_bg=n_bg, n_fg=n_fg, story_score=story_score))
             self._log(f"[HG2 SENT] {task_id}: Telegram Gate 2 card dispatched successfully")

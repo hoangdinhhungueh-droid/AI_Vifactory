@@ -803,6 +803,12 @@ def trend_refine(req: TrendRefineRequest):
 
 
 
+class TrendViralityRequest(BaseModel):
+    markets: list[str] | None = ["EN", "JP", "KR"]
+    max_candidates: int = 1
+    auto_commit: bool = True
+
+
 @router.post("/api/v1/trend-virality")
 def trend_virality(req: TrendViralityRequest):
     """Step 3 / Unified Pipeline: Approach B Direct Recon & Algorithmic Anchor.

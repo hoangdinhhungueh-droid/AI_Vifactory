@@ -5,7 +5,7 @@ from app.services import telegram_buttons as tb
 from app.services.hhtech_reasoner import reason_topic_niche
 from app.services.trend_gate_ai import get_next_episode_id
 
-# 1. Reason with GPT-5.6-Sol
+# 1. Reason with GPT-6-Astra
 en_info = reason_topic_niche("Jack the Ripper", "EN", 0.97)
 jp_info = reason_topic_niche("ライブドア事件", "JP", 0.832)
 kr_info = reason_topic_niche("도박 중독", "KR", 0.723)
@@ -39,7 +39,7 @@ tb._save_gate1_pending({'en': en_task, 'jp': jp_task, 'kr': kr_task})
 
 gate1_text = (
     "🎯 <b>[HUMAN GATE 1] PHÊ DUYỆT CHỦ ĐỀ SẢN XUẤT (GO-LIVE 2026)</b>\n"
-    "<i>(✨ Suy luận chiến lược & Đúc kết ngách bởi GPT-5.6-Sol qua HHTech API)</i>\n\n"
+    "<i>(✨ Suy luận chiến lược & Đúc kết ngách bởi GPT-6-Astra qua HHTech API)</i>\n\n"
     f"🇺🇸 <b>Market EN:</b> <code>Jack the Ripper</code> (Virality: 0.97)\n"
     f"• <b>Đề tài:</b> {en_info.get('topic_name_vi')}\n"
     f"• <b>Search-Specific Key:</b> <code>{en_info.get('search_specific_keyword')}</code>\n"

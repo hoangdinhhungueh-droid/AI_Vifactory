@@ -380,6 +380,26 @@ def get_all_skills_bundle(force_refresh: bool = False) -> str:
     return bundle
 
 
+def get_b1_strategic_rules() -> str:
+    """Concise strategic rules (~1,200 chars) for B1 Topic & Niche Reasoning.
+    Distills Rule 1-4 Causal Mechanisms, Rule 444 An Ong Hook, Rule 118 Zero-Mock,
+    and Rule 445 5-Beat Docudrama Architecture without prompt bloat.
+    """
+    return (
+        "CORE STRATEGIC EDITORIAL PRINCIPLES (RULE 118, 444, 445):\n"
+        "1. RULE 118 ZERO-MOCK: Strictly ground the topic and angle in real search signals or YouTube benchmarks. Never invent speculative or synthetic themes.\n"
+        "2. CAUSAL MECHANISM MANDATE: Every approved angle must expose an institutional, financial, or systemic mechanism (how the system broke, who profited, why oversight failed).\n"
+        "3. RULE 444 AN ONG HOOK: Formulate a paradoxical, curiosity-inducing opening hook that subverts conventional wisdom.\n"
+        "4. RULE 445 5-BEAT DOCUDRAMA ARCHITECTURE:\n"
+        "   - Beat 1: Paradox & Shock Opening (0-60s)\n"
+        "   - Beat 2: The Red Herring / False Narrative & Early Warning Signs\n"
+        "   - Beat 3: The Fatal Explanatory Vacuum / Institutional Crack (Competitor Gap)\n"
+        "   - Beat 4: The Smoking Gun / Systemic Exposure & Climax\n"
+        "   - Beat 5: The Living Warning & Enduring Consequence\n"
+        "5. NATIVE GROUND TRUTH: All search keywords must be in the native language of the target market (JP/KR/EN)."
+    )
+
+
 def get_skill_rules(force_refresh: bool = False) -> str:
     """Backward-compatible wrapper returning dynamic Central Skills rules."""
     return get_central_skills(force_refresh=force_refresh)

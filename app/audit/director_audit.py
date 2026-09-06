@@ -213,6 +213,7 @@ def audit_director_plan(director_plan: dict) -> dict:
         "max_score": 10.0,
         "verdict": verdict,
         "axis_scores": axis_scores,
+        "checks": axis_scores,
         "issues": issues,
         "recommendations": recommendations
     }

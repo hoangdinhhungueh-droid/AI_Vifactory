@@ -54,7 +54,7 @@ def run_b3_5_prompt_forge(self, episode_id: str):
     try:
         # Execute B3.5 prompt forge
         result = subprocess.run(
-            ["python3", "/root/video_factory/app/services/prompt_forge_b3_5.py", episode_id],
+            ["python3", "/root/video_factory/scripts/run_prompt_forge.py", "--episode", episode_id],
             check=True,
             capture_output=True,
             text=True,

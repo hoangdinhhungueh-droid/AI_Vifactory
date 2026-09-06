@@ -217,7 +217,7 @@ def generate_scene_prompts(
             raw_response = call_gpt6_astra(
                 prompt=json.dumps(user_payload, ensure_ascii=False),
                 system_prompt=system_prompt,
-                max_tokens=3500,
+                max_tokens=4500,
                 timeout=120.0
             )
             if raw_response and raw_response.strip():
@@ -240,29 +240,37 @@ def generate_scene_prompts(
         if content.endswith("```"):
             content = content[:-3]
 
-        # Parse JSON with refusal detection
+        clean_content = content.strip()
         try:
-            parsed = json.loads(content.strip())
-        except json.JSONDecodeError as e:
-            content_lower = content.lower()
-            refusal_indicators = [
-                "cannot propagate",
-                "material conflict",
-                "content policy",
-                "unable to generate",
-                "cannot create",
-                "policy violation",
-                "inappropriate content"
-            ]
-            if any(indicator in content_lower for indicator in refusal_indicators):
-                logger.error("[prompt_forge] GPT-6-Astra CONTENT POLICY REFUSAL detected")
-                raise ContentPolicyRefusalError(
-                    f"HHTech GPT-6-Astra refused to generate prompts due to content policy for '{story_title}'. "
-                    f"Refusal: {content[:250]}"
-                )
-            else:
-                logger.warning(f"[prompt_forge] Malformed JSON from LLM: {content[:200]}, falling back to metadata synthesis.")
-                parsed = None
+            parsed = json.loads(clean_content)
+        except json.JSONDecodeError:
+            if clean_content.startswith("{") and not clean_content.endswith("}"):
+                for suffix in ['"}', '"}}', '"}', '}']:
+                    try:
+                        parsed = json.loads(clean_content + suffix)
+                        break
+                    except Exception:
+                        pass
+            if parsed is None:
+                content_lower = clean_content.lower()
+                refusal_indicators = [
+                    "cannot propagate",
+                    "material conflict",
+                    "content policy",
+                    "unable to generate",
+                    "cannot create",
+                    "policy violation",
+                    "inappropriate content"
+                ]
+                if any(indicator in content_lower for indicator in refusal_indicators):
+                    logger.error("[prompt_forge] GPT-6-Astra CONTENT POLICY REFUSAL detected")
+                    raise ContentPolicyRefusalError(
+                        f"HHTech GPT-6-Astra refused to generate prompts due to content policy for '{story_title}'. "
+                        f"Refusal: {clean_content[:250]}"
+                    )
+                else:
+                    logger.warning(f"[prompt_forge] Malformed JSON from LLM: {clean_content[:200]}, falling back to metadata synthesis.")
+                    parsed = None
 
     if not parsed or not isinstance(parsed, dict):
         parsed = {"backgrounds": {}, "foregrounds": {}}
@@ -282,8 +290,15 @@ def generate_scene_prompts(
     # Ensure all requested keys are covered, synthesizing from scene metadata if needed
     for bg_k, bg_meta in bg_dict.items():
         if bg_k not in cleaned_backgrounds:
-            hint = bg_meta.get("visual_hint") or bg_meta.get("narration_context") or bg_k.replace("-", " ")
-            paired_fgs = bg_meta.get("paired_foregrounds", [])
+            if isinstance(bg_meta, dict):
+                hint = bg_meta.get("visual_hint") or bg_meta.get("narration_context") or bg_k.replace("-", " ")
+                paired_fgs = bg_meta.get("paired_foregrounds", [])
+            elif isinstance(bg_meta, str):
+                hint = bg_meta
+                paired_fgs = []
+            else:
+                hint = str(bg_meta or bg_k).replace("-", " ")
+                paired_fgs = []
             paired_desc = f", paired with {', '.join(paired_fgs)}" if paired_fgs else ""
             fallback_bg = (
                 f"Cinematic wide-angle documentary environment of {hint}{paired_desc}, "
@@ -294,8 +309,15 @@ def generate_scene_prompts(
 
     for fg_k, fg_meta in fg_dict.items():
         if fg_k not in cleaned_foregrounds:
-            hint = fg_meta.get("visual_hint") or fg_meta.get("narration_context") or fg_k.replace("-", " ")
-            paired_bgs = fg_meta.get("paired_backgrounds", [])
+            if isinstance(fg_meta, dict):
+                hint = fg_meta.get("visual_hint") or fg_meta.get("narration_context") or fg_k.replace("-", " ")
+                paired_bgs = fg_meta.get("paired_backgrounds", [])
+            elif isinstance(fg_meta, str):
+                hint = fg_meta
+                paired_bgs = []
+            else:
+                hint = str(fg_meta or fg_k).replace("-", " ")
+                paired_bgs = []
             paired_desc = f", harmonized with setting {', '.join(paired_bgs)}" if paired_bgs else ""
             fallback_fg = (
                 f"Stylized editorial graphic novel digital illustration of full-body {hint} figure in authentic period attire{paired_desc}, "

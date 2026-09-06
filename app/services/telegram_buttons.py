@@ -258,7 +258,7 @@ async def send_gate1_card(en_pack: dict, jp_pack: dict, kr_pack: dict) -> Option
 
     text = (
         "🎯 <b>[HUMAN GATE 1] THÔNG BÁO TIẾN ĐỘ CHỦ ĐỀ SẢN XUẤT (GO-LIVE 2026)</b>\n"
-        "<i>(✨ Suy luận chiến lược & Đúc kết ngách bởi GPT-5.6-Sol qua HHTech API)</i>\n\n"
+        "<i>(✨ Suy luận chiến lược & Đúc kết ngách bởi GPT-6-Astra qua HHTech API)</i>\n\n"
         + _fmt(en_pack, '🇺🇸', 'EN') + "\n"
         + _fmt(jp_pack, '🇯🇵', 'JP') + "\n"
         + _fmt(kr_pack, '🇰🇷', 'KR') + "\n"

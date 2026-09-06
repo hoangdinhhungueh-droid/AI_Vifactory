@@ -8,7 +8,7 @@
 ## 🔄 I. KHẾ ƯỚC DỮ LIỆU LIÊN KHỐI (INTER-BLOCK DATA CONTRACTS)
 
 ### 1. Khối B1 (Trend Discovery) ➔ Khối B1.5 (Competitor Recon)
-* **File lưu trữ**: `/var/vf/episodes/<task_id>/trend_intel.json`
+* **File lưu trữ**: `/var/vf/pending_tasks/<task_id>.json (kèm đồng bộ Notion Trend Brain DB)`
 * **Data Schema**:
   ```json
   {
@@ -52,7 +52,7 @@
 ---
 
 ### 3. Khối B2 (Story Engine) ➔ Khối B3 (Director Plan)
-* **File lưu trữ**: `/var/vf/episodes/<task_id>/story_5_acts.json`
+* **File lưu trữ**: `/var/vf/episodes/<task_id>/story.txt (Kịch bản 5 Beat) & brain_input.json`
 * **Quy chuẩn**: 5 Beat Docudrama (1,800–2,200 từ, ~12–15 phút), Rule 444 Hook (0–60s), Micro-Cliffhangers (90–120s), Story Gate $\ge 8/10$.
 * **Data Schema**:
   ```json
@@ -74,7 +74,7 @@
 ---
 
 ### 4. Khối B3 (Director Plan) ➔ Khối B3.5 (Prompt Forge)
-* **File lưu trữ**: `director_plan.json` ➔ `prompts_forge.json`
+* **File lưu trữ**: `director_plan.json` ➔ `prompts_forge.json (và prompts.json tương thích ngược)`
 * **Quy chuẩn**: Toàn bộ visual prompts viết bằng tiếng Anh, gắn `[STYLE MANDATE]`, `[ERA ANCHOR]`, `[STRICT NEGATIVE PROMPT]`.
 * **Data Schema (`director_plan.json`)**:
   ```json

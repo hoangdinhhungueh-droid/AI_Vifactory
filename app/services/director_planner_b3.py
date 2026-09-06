@@ -9,7 +9,7 @@ Input:
   - Topic Metadata (Niche, Language/Market, Target Keyword, Mood)
 Output:
   - director_plan.json & dp_plan.json in workspace/{episode_id} and episodes/{episode_id}
-  - prompts.json via prompt_forge.py
+  - prompts_forge.json (and prompts.json) via prompt_forge.py
   - Notion SoT Sync: Director Plan DB (5b201989-2400-8295-be81-81c2c0e4e138)
 """
 
@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT_DIR / "scripts"))
 logger = logging.getLogger("director_planner_b3")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-from app.services.hhtech_reasoner import call_gpt6_astra, call_gpt56_sol
+from app.services.hhtech_reasoner import call_gpt6_astra
 from app.services.skill_loader import (
     get_skill_rules,
     get_central_skills,
@@ -286,7 +286,7 @@ def generate_director_plan(
         "Input Data:\n" + json.dumps(user_payload, ensure_ascii=False)
     )
 
-    logger.info("  [B3] Calling HHTech GPT-5.6-Sol for Hollywood Director Plan...")
+    logger.info("  [B3] Calling HHTech GPT-6-Astra for Hollywood Director Plan...")
     raw_res = ""
     for attempt in range(1, 3):
         try:
@@ -434,7 +434,19 @@ def generate_director_plan(
         ]
     }
 
+    existing_brain = {}
+    candidate_files = [ep_dir / "brain_input.json", ws_dir / "brain_input.json"]
+    for cf in candidate_files:
+        if cf.exists():
+            try:
+                with open(cf, "r", encoding="utf-8") as bf:
+                    existing_brain = json.load(bf)
+                break
+            except Exception:
+                pass
+
     brain_input = {
+        **existing_brain,
         "episode_id": episode_id,
         "content_type": "investigative_docudrama",
         "story": story_text,
@@ -468,9 +480,12 @@ def generate_director_plan(
             scenes=normalized_scenes
         )
         
-        with open(ep_dir / "prompts.json", "w", encoding="utf-8") as f:
+        with open(ep_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
             json.dump(prompts_res, f, indent=2, ensure_ascii=False)
-        with open(ws_dir / "prompts.json", "w", encoding="utf-8") as f:
+        with open(ws_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
+            json.dump(prompts_res, f, indent=2, ensure_ascii=False)
+        # Maintain prompts.json compatibility
+        with open(ep_dir / "prompts.json", "w", encoding="utf-8") as f:
             json.dump(prompts_res, f, indent=2, ensure_ascii=False)
             
         if not skip_notion:

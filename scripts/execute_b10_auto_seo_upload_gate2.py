@@ -8,7 +8,7 @@ step. Added 23/08/2026 per user request; implements Skill AI Rule 119.
 Flow:
   1. Load episode context (brain_input.json + Story Library row for the
      already-validated B1 keyword & breakout queries, Rule 117).
-  2. Auto-call HHTech GPT-5.6-Sol (app.services.seo_autogen_b10) to generate
+  2. Auto-call HHTech GPT-6-Astra (app.services.seo_autogen_b10) to generate
      Title/Description/Thumbnail A-B-C/Hook Frame/End Screen packaging --
      same gateway pattern as B2 (produce_b1_b2_b3_gpt56_sol.py).
   3. Sync the generated packaging and breakout queries into the Notion Story Library row.
@@ -336,7 +336,7 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
     print(f"=== [B10-AUTO] 1. Loading episode context for {episode_id} ===")
     episode = _load_episode_context(episode_id, ep_dir)
 
-    print("=== [B10-AUTO] 2. Auto-generating SEO packaging via HHTech GPT-5.6-Sol (Rule 119) ===")
+    print("=== [B10-AUTO] 2. Auto-generating SEO packaging via HHTech GPT-6-Astra (Rule 119) ===")
     packaging = generate_seo_packaging(episode)
     print(f"Generation method: {packaging['generation_method']}")
 
