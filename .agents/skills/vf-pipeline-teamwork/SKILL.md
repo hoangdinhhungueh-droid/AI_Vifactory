@@ -61,12 +61,13 @@ Khi nhận lệnh `/teamwork:pipeline` hoặc khi cần kiểm thử/debug bất
 
 ### 4. Three-Way Physical Sync Coordinator (Điều Phối Viên Đồng Bộ Vật Lý 3 Chiều)
 - **Nhiệm vụ**: Bảo chứng đồng bộ dữ liệu tuyệt đối giữa 3 thực thể: **VPS ⇄ GitHub ⇄ Local/Notion**.
-- **Quy trình 5 bước bắt buộc**:
+- **Quy trình 6 bước bắt buộc**:
   1. Biên dịch AST `python3 -m py_compile` toàn bộ file Python trên VPS.
   2. Thực thi kiểm thử runtime sống hàm sửa đổi (Rule 127: `python3 -c "from <module> import <func>; <func>(...)"`).
   3. Git Commit & Push trực tiếp từ VPS lên GitHub `hoangdinhhungueh-droid/AI_Vifactory.git`, kiểm tra `working tree clean`.
-  4. Đồng bộ ngược file về Local Windows Workspace, đối soát SHA256 đạt 100% bit-for-bit parity.
-  5. Quét sạch file tạm: `find /root/video_factory -name '*.bak*' -o -name '*.backup*'` trả về 0 file (Rule 125).
+  4. **Cổng Bảo Chứng GitHub Actions CI Bắt Buộc (Mandatory CI Gate)**: Chạy `python scripts/watch_github_ci.py --commit <HEAD_SHA>` theo dõi cho đến khi GitHub Actions trả về `conclusion: success`. CẤM TUYỆT ĐỐI báo cáo thành công khi CI chưa PASS.
+  5. Đồng bộ ngược file về Local Windows Workspace, đối soát SHA256 đạt 100% bit-for-bit parity.
+  6. Quét sạch file tạm: `find /root/video_factory -name '*.bak*' -o -name '*.backup*'` trả về 0 file (Rule 125).
 
 ---
 

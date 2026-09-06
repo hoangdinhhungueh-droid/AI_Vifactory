@@ -6,8 +6,11 @@ import scripts.ag_notion_bridge as bridge
 from app.services.trend_brain_mirror import _yt_labels_for_subject, _STATUS_TO_DB
 
 
+@pytest.mark.integration
 def test_trend_brain_schema_and_status_options():
     """Verify live Notion Trend Brain DB matches state machine contract."""
+    if not os.getenv("NOTION_TOKEN") and not os.path.exists("/root/video_factory/config/secrets.env"):
+        pytest.skip("NOTION_TOKEN not available in hermetic test environment")
     db_id = "4c101989-2400-8334-8016-01d4f463b09f"
     res = bridge._req("GET", f"databases/{db_id}")
     assert not res.get("error"), f"Failed to fetch Trend Brain DB: {res}"
@@ -31,8 +34,11 @@ def test_trend_brain_schema_and_status_options():
     assert "Upload Treatment Note" in props and props["Upload Treatment Note"]["type"] == "rich_text"
 
 
+@pytest.mark.integration
 def test_story_library_schema_and_status_options():
     """Verify live Notion Story Library DB matches state machine contract."""
+    if not os.getenv("NOTION_TOKEN") and not os.path.exists("/root/video_factory/config/secrets.env"):
+        pytest.skip("NOTION_TOKEN not available in hermetic test environment")
     db_id = "b0301989-2400-836b-bdb5-8131fea17736"
     res = bridge._req("GET", f"databases/{db_id}")
     assert not res.get("error"), f"Failed to fetch Story Library DB: {res}"
@@ -47,8 +53,11 @@ def test_story_library_schema_and_status_options():
     assert "Produced" in status_opts
 
 
+@pytest.mark.integration
 def test_director_plan_schema_and_status_options():
     """Verify live Notion Director Plan DB matches state machine contract."""
+    if not os.getenv("NOTION_TOKEN") and not os.path.exists("/root/video_factory/config/secrets.env"):
+        pytest.skip("NOTION_TOKEN not available in hermetic test environment")
     db_id = "5b201989-2400-8295-be81-81c2c0e4e138"
     res = bridge._req("GET", f"databases/{db_id}")
     assert not res.get("error"), f"Failed to fetch Director Plan DB: {res}"

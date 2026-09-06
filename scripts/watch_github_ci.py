@@ -14,6 +14,12 @@ import subprocess
 import urllib.request
 import urllib.error
 
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 DEFAULT_REPO = "hoangdinhhungueh-droid/AI_Vifactory"
 DEFAULT_TOKEN = "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"
 

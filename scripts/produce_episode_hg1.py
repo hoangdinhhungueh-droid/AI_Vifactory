@@ -34,9 +34,10 @@ def _load_pending(task_id: str) -> dict:
     return {}
 
 
-async def _notify_gate2(task_id: str, n_scenes: int, n_bg: int, n_fg: int, score: str) -> None:
+async def _notify_gate2(task_id: str, n_scenes: int, n_bg: int, n_fg: int, score: str, n_thumb: int = 2) -> None:
     from app.services.telegram_buttons import send_gate2_card
-    await send_gate2_card(task_id, n_scenes, n_bg, n_fg, score)
+    await send_gate2_card(task_id, n_scenes, n_bg, n_fg, score, n_thumb=n_thumb)
+
 
 
 async def _notify_gate25_manual_review(task_id: str, reason: str) -> None:
@@ -199,7 +200,8 @@ def run_chain(task_id: str) -> int:
             json.dumps(prompts, ensure_ascii=False, indent=2), encoding="utf-8")
         n_bg = len(prompts.get("backgrounds") or {})
         n_fg = len(prompts.get("foregrounds") or {})
-        _log(stage, "%d BG prompts, %d FG prompts -> Notion" % (n_bg, n_fg))
+        n_thumb = len(prompts.get("thumbnails") or {})
+        _log(stage, "%d BG prompts, %d FG prompts, %d Thumbnails -> Notion" % (n_bg, n_fg, n_thumb))
         push_prompts_to_notion(prompts, task_id, task_id=task_id)
         
     except ContentPolicyRefusalError as e:
@@ -227,9 +229,10 @@ def run_chain(task_id: str) -> int:
         return 0  # Exit cleanly - not a failure, just needs human input
 
     # ---- Human Gate 2 -------------------------------------------------
-    asyncio.run(_notify_gate2(task_id, len(scenes), n_bg, n_fg, score))
+    asyncio.run(_notify_gate2(task_id, len(scenes), n_bg, n_fg, score, n_thumb=n_thumb))
     _log("HG2", "card sent, waiting for images from Antigravity")
     return 0
+
 
 
 def main() -> int:

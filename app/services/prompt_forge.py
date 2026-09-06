@@ -203,6 +203,50 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     return p.strip()
 
 
+def _sanitize_thumbnail_prompt(prompt: str, thumb_key: str = "") -> str:
+    """Sanitize and format YouTube 16:9 2K DCI Hero Thumbnail prompt (Rule 114 & Rule 435)."""
+    p = prompt.strip()
+    if "16:9" not in p:
+        p = f"{p}, 16:9 aspect ratio"
+    if "2560x1440" not in p and "2K" not in p:
+        p = f"{p}, 2560x1440 resolution (2K DCI)"
+
+    style_prefix = "[STYLE MANDATE: THUMBNAIL] 16:9 widescreen high-CTR YouTube hero thumbnail, high visual tension, dramatic high-contrast lighting, bold cinematic color grading, clear focal point, clean negative space for typography."
+    p = f"{style_prefix} {p} [STRICT NEGATIVE PROMPT] no tiny unreadable text, no cluttered composition, no low quality, no blur, no split frame, no watermark, no ui elements."
+    return deduplicate_phrase_stutter(p)
+
+
+def _synthesize_thumbnail_prompts(story_title: str, seo_data: dict = None) -> dict:
+    """
+    Synthesize high-CTR YouTube Thumbnail prompts (A/B) from SEO Package & Story Anchor (Rule 114 & Rule 435).
+    Thumbnail A: Emotion-First & Specific Viral Angle.
+    Thumbnail B: Curiosity-Gap & Paradox Juxtaposition.
+    """
+    title_a = (seo_data.get("title_a") if seo_data else "") or story_title
+    title_b = (seo_data.get("title_b") if seo_data else "") or ""
+    hook_3s = (seo_data.get("hook_3s") if seo_data else "") or ""
+    viral_angle = (seo_data.get("specific_viral_angle") if seo_data else "") or ""
+
+    thumb_a = (
+        f"Cinematic wide-angle 16:9 YouTube hero thumbnail for '{title_a}'. "
+        f"High visual tension visual metaphor representing '{viral_angle or title_a}', "
+        f"dramatic high-contrast chiaroscuro lighting, bold atmospheric color grading, "
+        f"clear asymmetric focal point, unobstructed clean negative space for typography, "
+        f"photorealistic 8k cinematic documentary aesthetic, 2560x1440 resolution, 2K DCI."
+    )
+    thumb_b = (
+        f"Curiosity-gap 16:9 YouTube thumbnail for '{title_b or title_a}'. "
+        f"Shocking narrative juxtaposition illustrating the core paradox '{hook_3s or title_a}', "
+        f"intense volumetric cinematic lighting, high-stakes atmospheric depth, "
+        f"unobstructed safe-zone for title text, photorealistic 8k documentary aesthetic, 2560x1440 resolution."
+    )
+    return {
+        "thumbnail_a": _sanitize_thumbnail_prompt(thumb_a, "thumbnail_a"),
+        "thumbnail_b": _sanitize_thumbnail_prompt(thumb_b, "thumbnail_b")
+    }
+
+
+
 def generate_scene_prompts(
     bg_dict: dict,
     fg_dict: dict,
@@ -389,12 +433,32 @@ def generate_scene_prompts(
             )
             cleaned_foregrounds[fg_k] = _sanitize_foreground_prompt(fallback_fg, fg_k)
 
+    # Rule 114 & 435: Ensure thumbnails are forged from SEO package or story anchor
+    seo_pkg = kwargs.get("seo_package")
+    task_id = kwargs.get("task_id")
+    if not seo_pkg and task_id:
+        for candidate in [
+            Path(f"/var/vf/episodes/{task_id}/seo_package.json"),
+            Path(f"/root/video_factory/episodes/{task_id}/seo_package.json"),
+            Path(f"./episodes/{task_id}/seo_package.json")
+        ]:
+            if candidate.exists():
+                try:
+                    seo_pkg = json.loads(candidate.read_text(encoding="utf-8"))
+                    break
+                except Exception:
+                    pass
+
+    cleaned_thumbnails = _synthesize_thumbnail_prompts(story_title, seo_pkg)
+
     result = {
         "backgrounds": cleaned_backgrounds,
-        "foregrounds": cleaned_foregrounds
+        "foregrounds": cleaned_foregrounds,
+        "thumbnails": cleaned_thumbnails
     }
-    logger.info(f"[prompt_forge] Successfully forged {len(cleaned_backgrounds)} BG prompts and {len(cleaned_foregrounds)} FG prompts")
+    logger.info(f"[prompt_forge] Successfully forged {len(cleaned_backgrounds)} BG prompts, {len(cleaned_foregrounds)} FG prompts, and {len(cleaned_thumbnails)} Thumbnails")
     return result
+
 
 
 def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = None):
@@ -493,7 +557,30 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
         except Exception as e:
             logger.warning(f"[prompt_forge] Exception pushing FG prompt {fg_key}: {e}")
 
+    # 2b. Thumbnails (A/B)
+    for thumb_key, prompt in prompts_data.get("thumbnails", {}).items():
+        prompt_str = prompt if isinstance(prompt, str) else prompt.get("prompt", str(prompt))
+        thumb_payload = {
+            "parent": {"database_id": prompt_library_db_id},
+            "properties": {
+                "Title": {"title": [{"text": {"content": f"[{episode_id}] {thumb_key} (Thumbnail 16:9)"}}]},
+                "prompt_text": {"rich_text": [{"text": {"content": prompt_str[:2000]}}]},
+                "category": {"select": {"name": "image"}},
+                "variables": {"rich_text": [{"text": {"content": "Aspect Ratio: 16:9 2K DCI, High Contrast, YouTube CTR Hero"}}]},
+                "version": {"number": 1}
+            }
+        }
+        try:
+            res = requests.post("https://api.notion.com/v1/pages", headers=headers, json=thumb_payload, timeout=10)
+            if res.status_code in (200, 201):
+                logger.debug(f"[prompt_forge] Pushed Thumbnail prompt {thumb_key} to Notion Prompt Library DB")
+            else:
+                logger.warning(f"[prompt_forge] Failed to push Thumbnail prompt {thumb_key}: {res.status_code}")
+        except Exception as e:
+            logger.warning(f"[prompt_forge] Exception pushing Thumbnail prompt {thumb_key}: {e}")
+
     # 3. Cross-DB State Transitions:
+
     # Update Director Plan status -> 'Prompted' and Story Library status -> 'Produced'
     try:
         import scripts.ag_notion_bridge as bridge

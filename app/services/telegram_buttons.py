@@ -300,34 +300,31 @@ async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b:
 
 
 async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,
-                          story_score: str = "n/a") -> Optional[int]:
+                          story_score: str = "n/a", n_thumb: int = 2) -> Optional[int]:
     """Send Human Gate 2: B3.5 finished, prompts are in Notion, images are next.
-    Streamlined format: Single source of image quality specs, no redundant timing,
-    and single clean B6 trigger that naturally cascades B7->B10 on VPS.
+    Streamlined format: Single source of image quality specs, 1-click copy block for Antigravity,
+    and automatic B6 trigger via images_ready.json that cascades B6->B10 on VPS.
     """
     safe_task = html.escape(str(task_id))
     paste_block = (
         f"/run:image task:{task_id}\n\n"
-        f"QUY CHUẨN KỸ THUẬT ẢNH (Rule 116 & 435):\n"
-        f"• File prompts: /var/vf/episodes/{task_id}/prompts_forge.json ({n_bg} BG + {n_fg} FG)\n"
-        f"• Layer 1 (Background): 16:9 (2560x1440 2K DCI), phong cách tư liệu điện ảnh, không người cận cảnh, chừa safe-zone 20% đáy cho phụ đề.\n"
-        f"• Layer 2 (Foreground): 1:1 (2048x2048), tranh vẽ minh họa kỹ thuật số (stylized graphic novel illustration), toàn thân trên nền phẳng #FF00FF magenta chroma-key (tách sạch viền trong suốt).\n"
-        f"• Thumbnails (A/B): 16:9 (2560x1440 2K DCI), Thumbnail A (Emotion-First) & Thumbnail B (Curiosity-Gap).\n"
-        f"• Lưu trữ: /var/vf/episodes/{task_id}/assets/ & đồng bộ Notion Image Asset Library.\n\n"
-        f"B5 IMAGE AUDIT (Rule 436):\n"
-        f"• Sau khi sinh đủ ảnh, Antigravity chạy kiểm định kỹ thuật (đúng kích thước, định dạng PNG, tỷ lệ đen) & Vision Audit (Prompt Adherence, Object Accuracy, Visual Logic) đạt điểm ≥8.0/10.\n\n"
-        f"B6 TRIGGER (Rule 437):\n"
-        f"• Khi B5 PASS, kích hoạt B6 trên VPS để tự động điều phối toàn bộ chuỗi tiếp theo (B6 tự gọi B7→B10):\n"
-        f"  ssh root@claude.vifactory.com \"cd /root/video_factory && python3 scripts/continue_after_images.py --episode-id {task_id}\""
+        f"QUY CHUẨN KỸ THUẬT ẢNH B4/B5 (Rule 116 & 435):\n"
+        f"• File prompts: /var/vf/episodes/{task_id}/prompts_forge.json ({n_bg} BG + {n_fg} FG + {n_thumb} Thumbnails)\n"
+        f"• Layer 1 (Background): 16:9 (2560x1440 2K DCI PNG), tư liệu điện ảnh, safe-zone 20% đáy cho phụ đề.\n"
+        f"• Layer 2 (Foreground): 1:1 (2048x2048 RGBA PNG), đồ họa minh họa Stylized Graphic Novel trên nền phẳng #FF00FF (tách sạch viền trong suốt, bảo toàn áo trắng).\n"
+        f"• Thumbnails (A/B): 16:9 (2560x1440 2K DCI PNG), Thumbnail A (Emotion-First) & B (Curiosity-Gap) cho gói SEO B10.\n"
+        f"• B5 Forensic Audit: Tự động đo lường pixel thật (alpha %, vết lem magenta < 0.1%, kích thước 2K).\n"
+        f"• Auto-Trigger B6: Sau khi audit PASS, tự động ghi /var/vf/episodes/{task_id}/images_ready.json để VPS render Master."
     )
     text = (
         "🎨 <b>[HUMAN GATE 2] PROMPTS SẴN SÀNG — CẦN SINH ẢNH</b>\n\n"
         f"🎬 <b>Episode:</b> <code>{safe_task}</code>\n"
-        f"🎞️ <b>Scenes:</b> {n_scenes} · <b>BG:</b> {n_bg} · <b>FG:</b> {n_fg} · <b>Thumbnails A/B:</b> 2\n"
+        f"🎞️ <b>Scenes:</b> {n_scenes} · <b>BG:</b> {n_bg} · <b>FG:</b> {n_fg} · <b>Thumbnails:</b> {n_thumb}\n"
         f"📊 <b>Story Gate:</b> {html.escape(str(story_score))} | <b>Notion Sync:</b> ✅\n\n"
-        "📋 <b>Dán nguyên khối dưới đây vào Antigravity chat:</b>\n"
+        "📋 <b>Chạm khối lệnh bên dưới để Copy và Dán vào Antigravity:</b>\n"
         f"<pre>{html.escape(paste_block)}</pre>\n"
-        "👉 <i>B5 audit chạy tự động sau B4, sau đó kích hoạt B6 trên VPS để hoàn tất chuỗi render. Nút dưới chỉ dùng ghi nhận thủ công.</i>"
+        "👉 <i>Sau khi Antigravity hoàn tất sinh ảnh & audit, B6 sẽ tự động được kích hoạt trên VPS. Nút dưới dùng ghi nhận thủ công.</i>"
     )
     return await send_with_buttons(text, [[("✅ Đã sinh ảnh xong", f"imgdone:{task_id}")]])
+
 

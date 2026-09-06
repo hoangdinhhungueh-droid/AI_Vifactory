@@ -779,8 +779,10 @@ def generate_director_plan(
             bg_dict=bg_req,
             fg_dict=fg_req,
             story_title=topic,
-            scenes=normalized_scenes
+            scenes=normalized_scenes,
+            task_id=episode_id
         )
+
 
         with open(ep_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
             json.dump(prompts_res, f, indent=2, ensure_ascii=False)

@@ -48,6 +48,13 @@
        `git -C /root/video_factory add <files> && git -C /root/video_factory commit -m "<msg>" && git -C /root/video_factory push origin main`
        để đẩy ngay lên GitHub `hoangdinhhungueh-droid/AI_Vifactory.git`.
      - *Khóa trạng thái sạch*: Bắt buộc đối soát `git -C /root/video_factory status` trả về `working tree clean` và `up to date with origin/main`. Cấm tuyệt đối để working tree trên VPS ở trạng thái dirty / uncommitted sau phiên làm việc.
+     - *Cổng Bảo Chứng GitHub Actions CI Bắt Buộc (Mandatory GitHub Actions CI Verification Gate)*:
+       - **CẤM BÁO CÁO HOÀN TẤT KHI CI CHƯA PASS**: CẤM TUYỆT ĐỐI việc Agent sau khi `git push` chỉ nhìn thấy `working tree clean` rồi vội vã báo cáo User "Đồng bộ 3 chiều thành công / 3-Way Sync PASS" trong khi GitHub Actions CI trên GitHub đang chạy hoặc đã fail ngầm.
+       - **Bắt buộc kích hoạt CI Watcher theo dõi Commit SHA**: Ngay sau khi `git push origin main`, Agent BẮT BUỘC thực thi script giám sát:
+         `python scripts/watch_github_ci.py --commit <HEAD_SHA>`
+         hoặc `python scripts/orchestrator/runner.py --mode sync` để theo dõi GitHub Actions API cho đến khi Workflow Run của chính commit vừa push đạt `status: completed`.
+       - **Chỉ đóng dấu PASS khi conclusion = success**: Toàn bộ bộ test hermetic unit/contract và linting trên hạ tầng GitHub Actions bắt buộc phải trả về `conclusion: success` (exit code 0).
+       - **Xử lý khi CI Thất bại (CI Fail-Fast & Auto-Recover)**: Nếu GitHub Actions trả về `failure` hoặc `cancelled`, BẮT BUỘC coi như bước Đồng bộ 3 Chiều THẤT BẠI HOÀN TOÀN (FAIL). Agent phải tải log lỗi về, tự động debug và khắc phục, sau đó commit & push lại cho đến khi GitHub Actions Green 100%.
      - *Đồng bộ ngược Local & Notion*: Sao chép/cập nhật đồng bộ các file hợp đồng tương ứng vào workspace Antigravity local và các trang Notion SoT (`notion_sot_second_brain.md`), đảm bảo cả 3 thực thể (Local - VPS - GitHub/Notion) khớp nhau 100%.
 9. **RULE 127 (Anti-Tunnel-Vision & Mandatory Programmatic Runtime Execution Gate)**:
    - **Cấm Tuyệt Đối Nghiệm Thu Qua `py_compile` Hoặc `git log` Đơn Thuần (No Static-Only Verification)**:
