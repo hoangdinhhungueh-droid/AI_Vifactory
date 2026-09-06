@@ -35,6 +35,17 @@ Sau đó gọi team audit ra check:
 2. Đảm bảo VPS - Notion - Git đồng bộ bản cuối cập nhật nhất, không còn bất đồng bộ.
 </USER_REQUEST>
 
+### 5. Phiên 5 (2026-09-06T08:03:51Z & 08:07:34Z): Điều Phối Multi-Agent Squad 4 Vai & Chỉ Thị Rule 128
+<USER_REQUEST>
+Xây dựng Framework điều phối Multi-Agent (Tooling / Runner) có khả năng tái sử dụng định kỳ, kết hợp điều phối đội Agent 4 vai thực hiện debug song song toàn bộ vấn đề từ B1 đến B3.5 trong ORIGINAL_REQUEST.md, kiểm toán pháp y độc lập, thực thi CI/CD Quality Gates và bảo chứng đồng bộ vật lý 3-Way (VPS ⇄ GitHub ⇄ Notion/Local).
+[CHỈ THỊ KIẾN TRÚC CHIẾN LƯỢC — RULE 128]: Cấm tuyệt đối monkey-patching bias riêng cho từng Episode. Phải giải quyết ở gốc rễ cơ chế Universal Semantic Abstraction để dùng chung cho mọi Episode không phụ thuộc thể loại.
+</USER_REQUEST>
+
+### 6. Phiên 6 (2026-09-06T12:09:35Z): Kiểm Toán Chéo Đối Kháng & Xác Minh Đúng Sự Thật (Adversarial Forensic Audit Round 2)
+<USER_REQUEST>
+Thực hiện kiểm toán chéo độc lập và xác minh đúng sự thật (Adversarial Forensic Audit & Ground-Truth Verification) toàn bộ các hạng mục công việc mà Agent tiền nhiệm trong phiên "Resolving Agent Accountability Issues" (ID: `87517f5d-e6e7-4ba3-a422-68489d790286`) đã báo cáo hoàn tất trong file ORIGINAL_REQUEST.md. Xác minh đúng sự thật trên VPS (/root/video_factory), GitHub repo (hoangdinhhungueh-droid/AI_Vifactory.git), và Notion SoT theo các Kỷ luật thép (Rule 118, 121, 126, 127).
+</USER_REQUEST>
+
 ---
 
 ## 🔍 II. BẢN ĐỒ PHÁP Y NGUYÊN NHÂN GỐC RỄ (FULL ROOT-CAUSE POST-MORTEM)
@@ -176,7 +187,7 @@ Sau đó gọi team audit ra check:
 
 > **TRẠNG THÁI HIỆN TẠI (RULE 118, RULE 121, RULE 124, RULE 126, RULE 127 & RULE 128)**:
 > - **TRẠNG THÁI TỔNG THỂ**: ✅ **HOÀN TẤT NGHIỆM THU PHÁP Y RUNTIME 100% PASS & ĐỒNG BỘ 3 CHIỀU KHÉP KÍN (VPS ⇄ GITHUB ⇄ LOCAL)**
-> - **HEAD COMMIT TRÊN VPS & GITHUB**: Đã đồng bộ qua chuỗi commit hoàn thiện kiến trúc (`79d2631` ➔ `c759705` ➔ `4b1acfd` ➔ `c9406c2` ➔ `ff79132` ➔ `3c62689` ➔ `7f42a87` ➔ `1cb6a09` ➔ `5e39657` và commit rectification tài liệu).
+> - **HEAD COMMIT TRÊN VPS & GITHUB**: Đã đồng bộ qua chuỗi commit hoàn thiện kiến trúc (`79d2631` ➔ `c759705` ➔ `4b1acfd` ➔ `c9406c2` ➔ `ff79132` ➔ `3c62689` ➔ `7f42a87` ➔ `1cb6a09` ➔ `5e39657` ➔ `392ae06` ➔ `b9ec029` ➔ `8f9791f` ➔ `4cda5fd` ➔ `6ac3b53` ➔ `2c064bd` và commit đồng bộ khép kín).
 > - Toàn bộ các vấn đề phát hiện từ `implementation_plan.md`, các phiên tiền nhiệm và kiểm toán độc lập đã được đính chính, đối soát thực tế trên đĩa cứng VPS (`/root/video_factory`), chạy kiểm thử runtime sống đạt Exit Code `0`.
 > - Ký hiệu trạng thái: `[x] PASS` — Đi kèm bằng chứng thực thi runtime thực tế, exit code và hash commit.
 
@@ -219,7 +230,7 @@ Sau đó gọi team audit ra check:
 - [x] PASS **AUDIT-VERIFY-5 (Three-Way Physical Sync & Git Integrity)**:
   - Biên dịch `python3 -m py_compile` 100% file modified đạt exit code 0.
   - Master Smoke Gate: `python3 scripts/e2e_pipeline_smoketest.py` đạt `🎉 ALL PIPELINE GATES PASSED (100% INTEGRATION RUNTIME OK)!` (Exit code 0).
-  - Git commit & push trực tiếp từ VPS: Khởi điểm từ commit `79d2631`, sau đó các commit hoàn thiện kiến trúc gốc rễ (`c759705`, `4b1acfd`, `c9406c2`, `ff79132`, `3c62689`, `7f42a87`, `1cb6a09`, `5e39657`, `392ae06`, `8f9791f`, `4cda5fd`) đã được đẩy thành công lên `hoangdinhhungueh-droid/AI_Vifactory.git` (`main -> main`), bảo đảm HEAD đồng bộ 100% tại commit `4cda5fd`.
+  - Git commit & push trực tiếp từ VPS: Khởi điểm từ commit `79d2631`, sau đó các commit hoàn thiện kiến trúc gốc rễ (`c759705`, `4b1acfd`, `c9406c2`, `ff79132`, `3c62689`, `7f42a87`, `1cb6a09`, `5e39657`, `392ae06`, `b9ec029`, `8f9791f`, `4cda5fd`, `6ac3b53`, `2c064bd`) đã được đẩy thành công lên `hoangdinhhungueh-droid/AI_Vifactory.git` (`main -> main`), bảo đảm HEAD đồng bộ 100% tại commit `2c064bd`.
   - VPS working tree clean: `On branch main, nothing to commit, working tree clean`.
 
 ---
