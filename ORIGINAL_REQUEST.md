@@ -331,3 +331,22 @@ Integrity mode: development
   - Neighbor tests (`ci_neighbor_tester.py --block 1.0`, `--block 3.0`) đạt ALL PASSED.
   - Master Smoke Gate (`scripts/e2e_pipeline_smoketest.py`) đạt ALL 8 GATES PASSED.
 
+### 4. [x] TASK-GOLIVE-4: Cầu Nối B3.5 Prompt Forge ➔ Antigravity B4/B5 Browser Automation, YouTube SEO Thumbnail Generation (A/B), and Empirical Pixel Audit Gate — ✅ PASS
+- [x] **B3.5 Visual Prompt Forge (`app/services/prompt_forge.py`)**:
+  - Triển khai `_sanitize_thumbnail_prompt()` & `_synthesize_thumbnail_prompts()` tự động sinh Thumbnail A (Emotion-First Impact) & Thumbnail B (Curiosity-Gap Suspense) từ `seo_package.json` theo chuẩn 16:9, 2560x1440 2K DCI PNG, high visual tension, clear focal point, safe-zone for typography.
+  - Hàm `generate_scene_prompts()` tích hợp trường `"thumbnails"` song hành cùng `"scenes"`, đẩy đồng bộ vào Notion Prompt Library DB subpage.
+- [x] **Telegram Gate 2 Card (`app/services/telegram_buttons.py` & `scripts/produce_episode_hg1.py`)**:
+  - Gửi thẻ Gate 2 với khối 1-click copy: `<pre>/run:image task:{task_id}</pre>`, hiển thị đầy đủ ngữ cảnh kỹ thuật: số lượng BG, FG, Thumbnails (2K DCI 16:9), layer breakdown mà không rườm rà.
+- [x] **Antigravity B4/B5 Automation (`scripts/gemini_browser_gen.py`)**:
+  - **Clean Pass-Through**: Xóa bỏ hoàn toàn hardcoded Wall Street background anchor và medieval church negative prompts (Rule 128 - Zero Semantic Bias), pass 100% dynamic era prompts từ B3.5.
+  - **Empirical Pixel Audit Gate (`audit_single_image`)**: Xóa bỏ mock score 98 (Rule 118 & 122), tính toán trực tiếp từ dữ liệu pixel thật: kích thước chuẩn (2560x1440 BG/Thumb, 2048x2048 FG), tỷ lệ đen < 90%, kênh alpha 10-88% cho FG, rò rỉ magenta fringe < 0.2%. Sinh báo cáo `b5_audit_report.json` và `*_audit.json`.
+  - **Batch Archive Upload (`upload_batch_archive_to_vps`)**: Đóng gói toàn bộ PNG và Audit Reports thành `assets_<episode_id>.tar.gz`, truyền tải nguyên tử qua `/tmp/vf/` và giải nén tại chỗ vào `/var/vf/episodes/<id>/`, triệt tiêu hoàn toàn rủi ro rớt mạng / Cloudflare MCP timeout.
+  - **Marker B5 ➔ B6 (`create_images_ready_marker`)**: Ghi nhận `images_ready.json` trên VPS để watchdog `vf-image-ready-watcher.service` tự động kích hoạt `continue_after_images.py`.
+- [x] **Kiểm thử Pháp Y & Đồng Bộ 3 Chiều**:
+  - Bộ test `tests/test_b35_b4_bridge.py` đạt 5/5 PASS.
+  - Neighbor ISO Tester (`tests/ci_neighbor_tester.py --block 3.0`): Blocks 2.0, 3.0, 4.0 ALL PASSED.
+  - Master E2E Pipeline Smoketest (`scripts/e2e_pipeline_smoketest.py`): 8/8 Gates ALL PASSED.
+  - Đã xử lý triệt để hằng số `CACHE_TTL_SECONDS` trong `app/services/skill_loader.py`.
+  - GitHub Actions CI Commit `856c021` đạt `conclusion: success` (Workflow Run 34056181759, 115s).
+
+
