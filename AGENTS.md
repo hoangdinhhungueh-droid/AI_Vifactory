@@ -5,7 +5,7 @@
 
 ---
 
-## ⚖️ I. HIẾN PHÁP 7 ĐIỀU LUẬT BẤT BIẾN (IRON LAWS)
+## ⚖️ I. HIẾN PHÁP 8 ĐIỀU LUẬT BẤT BIẾN (IRON LAWS)
 
 1. **RULE 118 (Zero-Mock Data & Ask-Before-Deviating)**:
    - CẤM TUYỆT ĐỐI tự tạo mock data, số liệu giả định (Analytics, Views, CTR, RPM). Chưa có API/số liệu YouTube Studio thực tế thì bắt buộc để `null` và báo cáo rõ ràng.
@@ -33,6 +33,22 @@
      1. **Verification & ISO Testing**: BẮT BUỘC chạy test luồng mới (kiểm thử hợp đồng, neighbor-testing) đạt PASS trước khi kết luận hoàn thành.
      2. **Atomic Rewiring & Ghost Purge**: BẮT BUỘC đề xuất đè hoặc đổi trỏ toàn bộ caller trong pipeline sang luồng mới; dọn dẹp sạch sẽ toàn bộ tàn dư, logic cũ, shadow code.
      3. **Single Truth**: TUYỆT ĐỐI KHÔNG BAO GIỜ để tồn tại song song 2 version trong cùng một pipeline dẫn đến sai cấu trúc, trùng lặp (duplication) hoặc tàn dư bóng ma (ghost remnants/bypasses).
+     4. **Zero-Ambiguity & Explicit Code Mandate (Cấm Tuyệt Đối Sự Không Tường Minh)**: CẤM TUYỆT ĐỐI để tồn tại docstring, comment, inline note hoặc schema mô tả cũ mâu thuẫn với ruột code thực tế (như code đã dùng LLM/Two-Pass nhưng docstring vẫn ghi "DATA COLLECTION ONLY"). Sự không tường minh này là dấu hiệu vi phạm nghiêm trọng của việc làm version mới nửa vời mà không dọn dẹp version cũ, gây đánh lừa Agent và User. Mọi thay đổi logic bắt buộc phải đồng bộ hóa 100% tài liệu nội hàm và docstring ngay trong cùng commit.
+8. **RULE 126 (Three-Way Physical Sync & Zero-False-Success Mandate)**:
+   - **Bảo chứng đồng bộ vật lý (Anti-False Sync & Zero-Phantom Completion)**:
+     - CẤM TUYỆT ĐỐI việc Agent chỉ sửa code ở thư mục local Windows (`AI Video Factory`) rồi báo cáo User "Đã đồng bộ xong VPS" trong khi code thực tế trên đĩa cứng VPS chưa được cập nhật.
+     - Mọi thay đổi logic bắt buộc phải được ghi trực tiếp xuống đĩa cứng VPS (`/root/video_factory`), biên dịch `python3 -m py_compile` đạt exit code `0`, và in bằng chứng diff/log thực tế trước khi kết luận.
+   - **Xử lý sự cố đường truyền MCP & Runner cứu sinh (MCP Socket Stall Recovery)**:
+     - Khi gọi MCP tool `vf-factory` bị timeout, ngắt phiên hoặc lỗi transport `Internal Server Error`/`Unauthorized` (do PM2 `vf-vps-mcp` restart hoặc mạng quốc tế chập chờn):
+       - CẤM TUYỆT ĐỐI im lặng bỏ qua, báo cáo khống hoặc giả định lệnh đã chạy thành công.
+       - BẮT BUỘC fallback sang runner chuẩn `scripts/vps_runner.py` (cơ chế Fresh-Session Auto-Init + Cloudflare Access Token) để tái xác thực và thực thi lệnh trực tiếp xuống VPS. Nếu vẫn mất kết nối -> **DỪNG LẠI HỎI USER NGAY (Rule 118)**.
+   - **Khép kín vòng đồng bộ tam giác (VPS ⇄ GitHub ⇄ Notion)**:
+     - *VPS KHÔNG tự kéo code*: Trên VPS không có auto-git pull. Code push lên GitHub sẽ KHÔNG tự động xuống VPS trừ khi chạy `git -C /root/video_factory pull origin main`.
+     - *Bắt buộc Commit & Push từ VPS*: Ngay sau khi code trên VPS được test PASS, Agent BẮT BUỘC thực thi:
+       `git -C /root/video_factory add <files> && git -C /root/video_factory commit -m "<msg>" && git -C /root/video_factory push origin main`
+       để đẩy ngay lên GitHub `hoangdinhhungueh-droid/AI_Vifactory.git`.
+     - *Khóa trạng thái sạch*: Bắt buộc đối soát `git -C /root/video_factory status` trả về `working tree clean` và `up to date with origin/main`. Cấm tuyệt đối để working tree trên VPS ở trạng thái dirty / uncommitted sau phiên làm việc.
+     - *Đồng bộ ngược Local & Notion*: Sao chép/cập nhật đồng bộ các file hợp đồng tương ứng vào workspace Antigravity local và các trang Notion SoT (`notion_sot_second_brain.md`), đảm bảo cả 3 thực thể (Local - VPS - GitHub/Notion) khớp nhau 100%.
 
 ---
 
