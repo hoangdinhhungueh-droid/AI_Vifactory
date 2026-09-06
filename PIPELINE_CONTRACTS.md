@@ -2,6 +2,9 @@
 
 > **MỤC ĐÍCH**: Bản đặc tả kỹ thuật sống về Khế ước Dữ liệu (IN/OUT Data Contracts) giữa các block trong Pipeline và Danh mục cấu trúc mã nguồn trên VPS (`/root/video_factory`).
 > Mọi thay đổi về Schema dữ liệu bắt buộc phải được kiểm thử qua `tests/ci_neighbor_tester.py` (Rule 447).
+>
+> 🛡️ **QUY TẮC BẤT BIẾN (RULE 128 - ANTI-SEMANTIC-BIAS)**:
+> Toàn bộ Data Schema trong tài liệu này được định dạng theo **Generic Contract Pattern** (Khuôn mẫu Hợp đồng Tổng quát) với Placeholders và Type Annotations. CẤM TUYỆT ĐỐI Agent gán ép hoặc giả định các giá trị mẫu cho một chủ đề cụ thể (như Lehman Brothers, tài chính, chứng khoán...). Mọi Episode mới thuộc bất kỳ đề tài nào (công nghệ, lịch sử, tội phạm, kinh tế, địa chính trị) ở mọi ngôn ngữ (`EN`, `VN`, `JA`, `KO`...) đều áp dụng cấu trúc này với nội dung phát sinh độc lập.
 
 ---
 
@@ -9,43 +12,70 @@
 
 ### 1. Khối B1 (Trend Discovery) ➔ Khối B1.5 (Competitor Recon)
 * **File lưu trữ**: `/var/vf/pending_tasks/<task_id>.json (kèm đồng bộ Notion Trend Brain DB)`
-* **Data Schema**:
+* **Data Schema (Generic Specification)**:
   ```json
   {
-    "task_id": "EN_EP0102_lehman_collapse",
-    "market": "EN",
-    "raw_term": "Lehman Brothers Bankruptcy",
-    "viability_score": 88.5,
+    "task_id": "<MARKET>_EP<0000>_<topic_slug>",
+    "market": "<MARKET_CODE: EN | VN | JA | KO | ...>",
+    "raw_term": "<PRIMARY_SEARCH_TOPIC_OR_ENTITY_NAME>",
+    "viability_score": "<FLOAT: 0.0 - 100.0>",
     "factsheet": {
-      "verified_date": "2008-09-15",
-      "key_entities": ["Richard Fuld", "Federal Reserve", "Treasury"],
-      "core_mechanism": "Subprime mortgage CDO collateral collapse",
-      "wikipedia_ground_truth_url": "https://en.wikipedia.org/wiki/Bankruptcy_of_Lehman_Brothers"
+      "verified_date": "<YYYY-MM-DD | Historical Era Anchor>",
+      "key_entities": ["<Entity_1>", "<Entity_2>", "<Entity_3>"],
+      "core_mechanism": "<Core conflict, technical mechanism, or systemic event>",
+      "wikipedia_ground_truth_url": "https://<lang>.wikipedia.org/wiki/<Verified_Article_Slug>"
     },
-    "niche_angle_brief": "The hidden repo 105 loophole that masked insolvency",
-    "story_direction_5_arcs": ["The Facade", "The Secret Ledger", "The Fed Standoff", "The 72-Hour Panic", "The Living Echo"]
+    "niche_angle_brief": "<Specific unexplored narrative angle with zero competitor coverage>",
+    "story_direction_5_arcs": [
+      "<Arc 1: Hook/Contradiction>",
+      "<Arc 2: Buildup/False Narrative>",
+      "<Arc 3: Paper Trail/Investigation>",
+      "<Arc 4: Climax/Smoking Gun>",
+      "<Arc 5: Resolution/Modern Reflection>"
+    ]
   }
   ```
+* **Quy chuẩn Field Ràng buộc**:
+  - `task_id`: Bắt buộc tuân thủ regex `^[A-Z]{2}_EP\d{4}_[a-z0-9_]+$`. Cấp phát tự động tịnh tiến theo kho số thực tế trên VPS, cấm fallback cứng.
+  - `viability_score`: Tính toán từ dữ liệu Google Trends RSS live & Wikipedia Anchor, cấm hardcode giả định.
 
 ---
 
 ### 2. Khối B1.5 (Competitor Recon) ➔ Khối B2 (Story Engine)
 * **File lưu trữ**: `/var/vf/episodes/<task_id>/competitor_intel_card.json`
-* **Data Schema**:
+* **Data Schema (Cấu trúc 2 tầng chuẩn: Root Benchmarks & Deep Narrative Anatomy)**:
   ```json
   {
-    "task_id": "EN_EP0102_lehman_collapse",
-    "analyzed_videos_count": 8,
-    "competitor_act_breakdown": [
-      {"competitor": "Channel A", "structure": "Chronological history of 150 years", "weakness": "Surface-level, lacks drama"}
+    "task_id": "<MARKET>_EP<0000>_<topic_slug>",
+    "analyzed_videos_count": "<INTEGER: Number of competitor videos analyzed, e.g. 5-15>",
+    "competitor_benchmarks": [
+      {
+        "channel": "<COMPETITOR_CHANNEL_NAME>",
+        "views": "<INTEGER_VIEWS>",
+        "duration": "<INTEGER_SECONDS>",
+        "hook_pacing": "<fast | moderate | slow>"
+      }
     ],
-    "competitor_secret_sauce": "Fast paced B-roll montage with heavy cinematic bass drops",
-    "audience_core_frustrations": [
-      "No one explains what Repo 105 actually was in plain English",
-      "Rivals never showed who actually profited from the bailout"
-    ],
-    "fatal_explanatory_vacuum": "Complete silence on the accounting accounting gimmick Repo 105 and Fed internal division",
-    "our_10x_pivot_angle": "Forensic crime scene investigation: How accounting fraud was disguised as liquidity"
+    "gap_signals": {
+      "avg_views": "<INTEGER_AVG_VIEWS>",
+      "top_opportunity": "<Core underserved topic or content gap identified>"
+    },
+    "competitor_narrative_anatomy": {
+      "competitor_act_breakdown": [
+        {
+          "competitor": "<NAME>",
+          "structure": "<Chronological | Problem-Solution | Investigative>",
+          "weakness": "<Specific analytical flaw or surface-level coverage>"
+        }
+      ],
+      "competitor_secret_sauce": "<High-retention technique used by rivals>",
+      "audience_core_frustrations": [
+        "<Audience pain point 1 extracted from top comments>",
+        "<Audience pain point 2 extracted from top comments>"
+      ],
+      "fatal_explanatory_vacuum": "<Critical knowledge gap completely missed or glossed over by existing videos>",
+      "our_10x_pivot_angle": "<Our distinctive narrative breakthrough angle that definitively solves the vacuum>"
+    }
   }
   ```
 
@@ -57,16 +87,16 @@
 * **Data Schema**:
   ```json
   {
-    "task_id": "EN_EP0102_lehman_collapse",
-    "task_slug": "lehman-repo105-collapse",
-    "language": "en",
-    "word_count": 2045,
+    "task_id": "<MARKET>_EP<0000>_<topic_slug>",
+    "task_slug": "<lowercase-hyphenated-topic-slug>",
+    "language": "<en | vi | ja | ko>",
+    "word_count": "<INTEGER: 1800 - 2200>",
     "beats": [
-      {"beat": 1, "name": "The Impossible Contradiction", "text": "..."},
-      {"beat": 2, "name": "The False Narrative & Red Herring", "text": "..."},
-      {"beat": 3, "name": "The Systemic Blindspot & Paper Trail", "text": "..."},
-      {"beat": 4, "name": "The Real Culprit & Smoking Gun", "text": "..."},
-      {"beat": 5, "name": "The Uncomfortable Modern Mirror", "text": "..."}
+      {"beat": 1, "name": "The Impossible Contradiction", "text": "<BEAT_1_TEXT: Hook 0-60s & An Ong Paradox>"},
+      {"beat": 2, "name": "The False Narrative & Red Herring", "text": "<BEAT_2_TEXT: Buildup & Common Misconception>"},
+      {"beat": 3, "name": "The Systemic Blindspot & Paper Trail", "text": "<BEAT_3_TEXT: Forensic Investigation & Evidence>"},
+      {"beat": 4, "name": "The Real Culprit & Smoking Gun", "text": "<BEAT_4_TEXT: The Climax & Systemic Core Revelation>"},
+      {"beat": 5, "name": "The Uncomfortable Modern Mirror", "text": "<BEAT_5_TEXT: Modern Echo & Lingering Lesson>"}
     ]
   }
   ```
@@ -81,13 +111,13 @@
   {
     "scenes": [
       {
-        "scene_id": "scene_001",
-        "act_number": 1,
-        "background_reuse_key": "bg_wall_street_trading_floor",
-        "foreground_reuse_key": "fg_fuld_frantic_phone",
-        "setting_description": "Manhattan investment bank trading desk at midnight",
-        "character_description": "CEO Richard Fuld, mid-60s, sharp pin-striped suit, exhausted",
-        "visual_action": "Slamming landline telephone onto desk covered in red spreadsheets"
+        "scene_id": "scene_<001>",
+        "act_number": "<INTEGER: 1-5>",
+        "background_reuse_key": "bg_<location_slug>",
+        "foreground_reuse_key": "fg_<character_or_subject_slug>_<action_slug>",
+        "setting_description": "<ENVIRONMENT_DESCRIPTION_ENGLISH: Detailed setting and era background>",
+        "character_description": "<CHARACTER_DESCRIPTION_ENGLISH: Detailed subject appearance, clothing, mood>",
+        "visual_action": "<VISUAL_ACTION_ENGLISH: Subject pose and dynamic interaction>"
       }
     ]
   }
@@ -102,18 +132,17 @@
   ```json
   {
     "audio_path": "audio/narration_master.mp3",
-    "bgm_path": "audio/bgm_cinematic_tension.mp3",
+    "bgm_path": "audio/bgm_<mood_slug>.mp3",
     "scenes": [
       {
-        "scene_id": "scene_001",
-        "start_frame": 0,
-        "duration_in_frames": 180,
-        "bg_image": "images/scene_001_bg.png",
-        "fg_image": "images/scene_001_fg.png",
+        "scene_id": "scene_<001>",
+        "start_frame": "<INTEGER_START_FRAME>",
+        "duration_in_frames": "<INTEGER_DURATION_FRAMES>",
+        "bg_image": "images/scene_<001>_bg.png",
+        "fg_image": "images/scene_<001>_fg.png",
         "subtitles": [
-          {"word": "On", "start_ms": 120, "end_ms": 280},
-          {"word": "September", "start_ms": 290, "end_ms": 750},
-          {"word": "15th,", "start_ms": 760, "end_ms": 1150}
+          {"word": "<WORD_1>", "start_ms": "<INT_MS>", "end_ms": "<INT_MS>"},
+          {"word": "<WORD_2>", "start_ms": "<INT_MS>", "end_ms": "<INT_MS>"}
         ]
       }
     ]
@@ -128,9 +157,9 @@
   ```json
   {
     "snippet": {
-      "title": "The $600 Billion Lie That Broke Wall Street",
-      "description": "...",
-      "tags": ["wall street", "2008 financial crisis", "lehman brothers"]
+      "title": "<TITLE: High-CTR Curiosity Gap Title Without Clickbait Deception>",
+      "description": "<DESCRIPTION: 5-Beat chapter markers, forensic sources, disclaimer>",
+      "tags": ["<PRIMARY_KEYWORD>", "<NICHE_ENTITY>", "<ERA_OR_TOPIC_THEME>"]
     },
     "status": {
       "privacyStatus": "unlisted",
@@ -193,4 +222,3 @@ Mọi tác vụ can thiệp code trong pipeline BẮT BUỘC tuân thủ thứ t
 4. **Khóa 4 (Local Workspace & Notion SoT Alignment)**:
    - Đồng bộ tệp tài liệu/khế ước tương ứng vào thư mục cục bộ của Antigravity (`c:\Users\hunghd2\Documents\antigravity\AI Video Factory`).
    - Cập nhật trang Notion SoT tương ứng, đảm bảo mọi tài liệu nội hàm khớp 100% với code thực tế trên VPS (Zero-Ambiguity Mandate).
-

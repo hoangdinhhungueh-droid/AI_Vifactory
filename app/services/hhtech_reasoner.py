@@ -15,7 +15,7 @@ PATTERN 3 UPDATE (02/09/2026):
 """
 
 import os, json, logging, re, urllib.request, urllib.parse
-from app.services.skill_loader import get_skill_rules
+from app.services.skill_loader import get_skill_rules, get_b1_strategic_rules
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)

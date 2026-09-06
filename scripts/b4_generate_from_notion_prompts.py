@@ -43,6 +43,31 @@ def fetch_prompts_from_notion(episode_id: str):
         raise RuntimeError(f"Error querying Notion Prompt Library DB: {res}")
 
     results = res.get("results", [])
+
+    # Self-Healing: If Notion prompt DB is empty, auto-push from local prompts_forge.json
+    if not results:
+        print(f"[SELF-HEALING] Notion Prompt DB is empty for {episode_id}. Checking local prompts_forge.json...")
+        for pf_candidate in [
+            Path(f"/var/vf/episodes/{episode_id}/prompts_forge.json"),
+            Path(f"/root/video_factory/episodes/{episode_id}/prompts_forge.json"),
+            Path(f"/root/video_factory/workspace/{episode_id}/prompts_forge.json")
+        ]:
+            if pf_candidate.exists():
+                try:
+                    with open(pf_candidate, "r", encoding="utf-8") as f:
+                        prompts_data = json.load(f)
+                    from app.services.prompt_forge import push_prompts_to_notion
+                    print(f"[SELF-HEALING] Found {pf_candidate}. Auto-pushing prompts to Notion...")
+                    push_prompts_to_notion(prompts_data, episode_id)
+                    # Re-query
+                    re_res = _req("POST", f"databases/{prompt_db_id}/query", data={
+                        "filter": {"property": "Title", "title": {"contains": f"[{episode_id}]"}}
+                    })
+                    results = re_res.get("results", [])
+                    print(f"[SELF-HEALING] Successfully recovered {len(results)} prompts from Notion after auto-sync.")
+                    break
+                except Exception as _she:
+                    print(f"[SELF-HEALING] Failed auto-sync: {_she}")
     bgs = {}
     fgs = {}
     for r in results:

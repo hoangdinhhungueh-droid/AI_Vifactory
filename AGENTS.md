@@ -5,7 +5,7 @@
 
 ---
 
-## ⚖️ I. HIẾN PHÁP 8 ĐIỀU LUẬT BẤT BIẾN (IRON LAWS)
+## ⚖️ I. HIẾN PHÁP 10 ĐIỀU LUẬT BẤT BIẾN (IRON LAWS)
 
 1. **RULE 118 (Zero-Mock Data & Ask-Before-Deviating)**:
    - CẤM TUYỆT ĐỐI tự tạo mock data, số liệu giả định (Analytics, Views, CTR, RPM). Chưa có API/số liệu YouTube Studio thực tế thì bắt buộc để `null` và báo cáo rõ ràng.
@@ -49,6 +49,28 @@
        để đẩy ngay lên GitHub `hoangdinhhungueh-droid/AI_Vifactory.git`.
      - *Khóa trạng thái sạch*: Bắt buộc đối soát `git -C /root/video_factory status` trả về `working tree clean` và `up to date with origin/main`. Cấm tuyệt đối để working tree trên VPS ở trạng thái dirty / uncommitted sau phiên làm việc.
      - *Đồng bộ ngược Local & Notion*: Sao chép/cập nhật đồng bộ các file hợp đồng tương ứng vào workspace Antigravity local và các trang Notion SoT (`notion_sot_second_brain.md`), đảm bảo cả 3 thực thể (Local - VPS - GitHub/Notion) khớp nhau 100%.
+9. **RULE 127 (Anti-Tunnel-Vision & Mandatory Programmatic Runtime Execution Gate)**:
+   - **Cấm Tuyệt Đối Nghiệm Thu Qua `py_compile` Hoặc `git log` Đơn Thuần (No Static-Only Verification)**:
+     - `py_compile` CHỈ kiểm tra cú pháp bề mặt (`SyntaxError`), HOÀN TOÀN KHÔNG bắt được `NameError`, `ImportError`, `AttributeError` khi hàm được thực thi thực tế.
+     - CẤM TUYỆT ĐỐI việc Agent chỉ chạy `py_compile` hoặc in `git log` rồi kết luận code "đã sửa xong và hoạt động 100%".
+   - **Bắt Buộc Kiểm Thử Thực Thi Sống Hàm Sửa Đổi (Mandatory Function-Level Runtime Invocation)**:
+     - Bất kỳ file nào có sửa đổi logic/import, Agent BẮT BUỘC phải chạy lệnh Python runtime thực thi trực tiếp hàm đó (`python3 -c "from <module> import <func>; <func>(...)"`) trên VPS với input tối thiểu, in rõ output hoặc exit code `0` chứng minh không văng Exception.
+   - **Cấm Tuyên Bố Hoàn Tất Cục Bộ / Nói Khống Toàn Hệ Thống (Anti-Tunnel-Vision & Scope Integrity)**:
+     - CẤM TUYỆT ĐỐI việc một Agent chỉ sửa vài dòng trong phiên của mình rồi tuyên bố bao biện "Hệ thống đã sửa xong 100% / Không còn lỗi tồn đọng".
+     - Mọi báo cáo nghiệm thu BẮT BUỘC phải phân định rành mạch 2 phần: (1) Phạm vi đã sửa kèm bằng chứng thực thi runtime; (2) Danh sách các module/block liên đới còn tồn đọng chưa sửa.
+   - **Cổng Khóa Tích Hợp Toàn Luồng Bắt Buộc (Mandatory Master E2E Smoke Gate)**:
+     - Mọi phiên làm việc can thiệp vào pipeline B1–B3.5 BẮT BUỘC phải chạy script chuẩn trên VPS:
+       `python3 /root/video_factory/scripts/e2e_pipeline_smoketest.py`
+     - Cấm báo cáo hoàn tất chừng nào script này chưa đạt exit code `0` và in dòng `ALL PIPELINE GATES PASSED`.
+10. **RULE 128 (Anti-Semantic-Bias & Generic Contract Architecture Mandate)**:
+    - **Cấm Tuyệt Đối Hardcode / Fix Bias Dữ Liệu Cụ Thể Trong Tài Liệu & Khế Ước Hệ Thống (Zero-Semantic-Bias Mandate)**:
+      - CẤM TUYỆT ĐỐI việc Agent đưa dữ liệu nội dung của một Episode cụ thể (như tên tập, nhân vật, sự kiện tài chính, từ khóa cụ thể...) làm schema định danh hay quy chuẩn trong các file khế ước (`PIPELINE_CONTRACTS.md`), system rules, prompt templates.
+      - Hiện tượng "Semantic Anchoring" (neo ngữ nghĩa) này sẽ làm các Agent thế hệ sau bị ám thị vô thức (few-shot bias), ép góc nhìn và rò rỉ từ vựng (domain bleed) sang các tập phim khác thể loại.
+    - **Chuẩn Hóa Generic Contract Pattern & Type Annotations**:
+      - Mọi schema trong khế ước bắt buộc phải viết dưới dạng **Generic Pattern**: dùng Placeholders mang tính ngữ nghĩa kèm kiểu dữ liệu rõ ràng (ví dụ: `"<MARKET>_EP<0000>_<topic_slug>"` với regex `^[A-Z]{2}_EP\d{4}_[a-z0-9_]+$`, `"<FLOAT: 0.0 - 100.0>"`, `"<STRING: Core conflict>"`).
+      - Áp dụng bình đẳng, phổ quát cho mọi thị trường (`EN`, `VN`, `JA`, `KO`...) và mọi thể loại nội dung.
+    - **Tách Biệt Minh Bạch Giữa Schema Contract và Example Instance**:
+      - Nếu thực sự cần đưa ví dụ trực quan, Agent BẮT BUỘC phải đặt trong block ghi chú `[!NOTE]` riêng biệt với tiêu đề "Minh Họa Phi Trực Thuộc" và cảnh báo tường minh: *"Dữ liệu dưới đây chỉ là ví dụ minh họa format, cấm Agent copy/tái sử dụng các giá trị cụ thể này vào runtime của Episode khác"*.
 
 ---
 

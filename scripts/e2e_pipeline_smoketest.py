@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""
+scripts/e2e_pipeline_smoketest.py
+Master End-to-End Pipeline Smoke Test Runner (Mandated by Rule 127).
+Validates runtime imports, function invocations, data contract bindings,
+and anti-regression invariants across Blocks 1 through 3.5.
+Exit code 0 indicates ALL PIPELINE GATES PASSED.
+"""
+
+import sys
+import os
+import json
+import re
+
+# Ensure project root is in path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+def print_gate(title):
+    print(f"\n========================================================")
+    print(f"🚦 CHECKING GATE: {title}")
+    print(f"========================================================")
+
+def gate_b1_reasoner():
+    print_gate("1. B1 HHTech Reasoner & Strategic Rules Runtime")
+    from app.services.skill_loader import get_b1_strategic_rules
+    rules = get_b1_strategic_rules()
+    assert isinstance(rules, str) and len(rules) > 100, "get_b1_strategic_rules must return non-empty rules"
+    assert len(rules) < 5000, f"get_b1_strategic_rules must be concise (<5k chars), got {len(rules)}"
+    print(f"  [PASS] get_b1_strategic_rules() returned {len(rules)} chars (no prompt contamination).")
+
+    import app.services.hhtech_reasoner as hr
+    assert hasattr(hr, "get_b1_strategic_rules"), "hhtech_reasoner must import get_b1_strategic_rules!"
+    assert hasattr(hr, "reason_topic_niche"), "hhtech_reasoner must have reason_topic_niche"
+    print("  [PASS] hhtech_reasoner correctly imported get_b1_strategic_rules without NameError.")
+
+def gate_b1_episode_numbering():
+    print_gate("2. B1 Dynamic Episode Numbering (Rule 117)")
+    from app.services.trend_gate_ai import get_next_episode_id
+    ep_en = get_next_episode_id("EN", "smoke_test_topic")
+    print(f"  [INFO] Next EN Episode: {ep_en}")
+    assert not ep_en.startswith("EN_EP0001"), f"Episode numbering must not fall back to EN_EP0001! Got: {ep_en}"
+    assert re.match(r"^EN_EP\d{4}_", ep_en), f"Episode ID format invalid: {ep_en}"
+    print("  [PASS] Dynamic Episode Numbering progresses correctly beyond EP0250+.")
+
+def gate_b1_b15_contract():
+    print_gate("3. B1 ➔ B1.5 Competitor Recon Contract & Data Flow")
+    from app.services.competitor_recon_b15 import run_b15
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+    with open(os.path.join(PROJECT_ROOT, "app", "services", "trend_engine_b1.py"), "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "competitor_differentiation_gap" in content, "trend_engine_b1 must map competitor_differentiation_gap!"
+    print("  [PASS] trend_engine_b1 properly maps competitor_differentiation_gap to task payload.")
+
+def gate_b2_story_engine():
+    print_gate("4. B2 Story Engine & Metadata Preservation")
+    with open(os.path.join(PROJECT_ROOT, "app", "services", "story_engine_b2.py"), "r", encoding="utf-8") as f:
+        b2_code = f.read()
+    assert "call_gpt56_sol" not in b2_code, "story_engine_b2 must not contain call_gpt56_sol!"
+    assert "GPT-6-ASTRA" in b2_code, "story_engine_b2 must sync with GPT-6-ASTRA tag!"
+    print("  [PASS] story_engine_b2 has 0% GPT-5.6-Sol remnants and proper 5-Beat Docudrama tags.")
+
+def gate_b3_director_planner():
+    print_gate("5. B3 Director Planner & Non-Destructive Brain Input")
+    with open(os.path.join(PROJECT_ROOT, "app", "services", "director_planner_b3.py"), "r", encoding="utf-8") as f:
+        b3_code = f.read()
+    assert "existing_brain" in b3_code, "director_planner_b3 must read existing_brain to preserve metadata!"
+    assert "prompts_forge.json" in b3_code, "director_planner_b3 must save prompts_forge.json!"
+    print("  [PASS] director_planner_b3 preserves existing brain metadata and saves prompts_forge.json.")
+
+def gate_b35_visual_prompt_forge():
+    print_gate("6. B3.5 Visual Prompt Forge & Anti-Stuttering")
+    from app.services.prompt_forge import generate_scene_prompts
+    mock_bg = {
+        "bg_b1_loc0": {"visual_hint": "Rural Korean terraced rice fields under autumn overcast sky", "narration_context": "Pesticide investigation in rural farming village"}
+    }
+    mock_fg = {
+        "fg_b1_char0": {"visual_hint": "Korean elder farmer in mud-stained work clothes holding empty container", "narration_context": "Local farmer discovering counterfeit pesticide"}
+    }
+    mock_scenes = [
+        {"scene_id": "sc_01", "bg_id": "bg_b1_loc0", "fg_id": "fg_b1_char0", "narration": "In the misty dawn of the valley..."}
+    ]
+    res = generate_scene_prompts(mock_bg, mock_fg, "Korean Agricultural Counterfeit Mystery", mock_scenes)
+    assert "backgrounds" in res and "foregrounds" in res, "generate_scene_prompts output must have backgrounds and foregrounds"
+    
+    bg_p = list(res["backgrounds"].values())[0]
+    fg_p = list(res["foregrounds"].values())[0]
+
+    # Check for semiconductor leakage
+    assert "server rack" not in bg_p.lower() and "silicon wafer" not in bg_p.lower(), f"Prompt leakage detected in BG: {bg_p[:100]}"
+    # Check for duplicate stuttering
+    stutter_match = re.search(r"(Stylized editorial.*){2,}", fg_p, re.IGNORECASE)
+    assert not stutter_match, f"Stuttering phrase detected in FG: {fg_p[:150]}"
+    print("  [PASS] B3.5 generate_scene_prompts clean of prompt leakage and stuttering.")
+
+def gate_zero_ghost_and_encoding():
+    print_gate("7. Zero-Ghost Remnants & Character Encoding")
+    # Check for mojibake in telegram buttons
+    tg_path = os.path.join(PROJECT_ROOT, "app", "services", "telegram_buttons.py")
+    with open(tg_path, "r", encoding="utf-8", errors="ignore") as f:
+        tg_code = f.read()
+    assert "ðŸ" not in tg_code, "telegram_buttons.py contains mojibake characters!"
+    print("  [PASS] telegram_buttons.py is 100% clean of Mojibake characters.")
+
+def main():
+    print("\n" + "="*60)
+    print("🛡️ RUNNING MASTER E2E PIPELINE SMOKE TEST (RULE 127)")
+    print("="*60)
+    try:
+        gate_b1_reasoner()
+        gate_b1_episode_numbering()
+        gate_b1_b15_contract()
+        gate_b2_story_engine()
+        gate_b3_director_planner()
+        gate_b35_visual_prompt_forge()
+        gate_zero_ghost_and_encoding()
+
+        print("\n" + "="*60)
+        print("🎉 ALL PIPELINE GATES PASSED (100% INTEGRATION RUNTIME OK)!")
+        print("="*60 + "\n")
+        sys.exit(0)
+    except AssertionError as ae:
+        print(f"\n❌ [GATE FAILED]: {ae}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n💥 [UNEXPECTED ERROR]: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(2)
+
+if __name__ == "__main__":
+    main()

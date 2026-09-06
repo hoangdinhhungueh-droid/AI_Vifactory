@@ -48,6 +48,12 @@ CANONICAL_BEATS = [
 ]
 
 CINEMATIC_ARCHETYPES = {
+    "agriculture": {
+        "director": "Bong Joon-ho / David Fincher (Rural Noir)",
+        "visual_tone": "Expansive rural countryside, terraced agricultural fields under overcast skies, local cooperative warehouses, weathered agricultural machinery, chemical testing canisters, dimly lit provincial administrative offices",
+        "palette": "Earthy ochre, muted moss green, rusted iron, damp soil brown, overcast slate gray",
+        "camera_style": "Slow atmospheric tracking shots across agricultural landscapes, lingering wide tableaux, claustrophobic medium shots in provincial records rooms"
+    },
     "finance": {
         "director": "Adam McKay / David Fincher (Corporate Noir)",
         "visual_tone": "Glossy boardroom veneer contrasting cold trading floors, shredded paper trails, creeping push-ins on forensic ledger anomalies, claustrophobic glass partitions",
@@ -60,9 +66,15 @@ CINEMATIC_ARCHETYPES = {
         "palette": "Aged ochre, slate stone, imperial gold accents, oxidized bronze, deep shadow",
         "camera_style": "Slow deliberate tracking shots, high-angle surveillance-style observation, lingering static tableaux with heavy negative space"
     },
+    "medical_pharma": {
+        "director": "Steven Soderbergh / Denis Villeneuve (Clinical Realism)",
+        "visual_tone": "Provincial clinical examination rooms, sealed diagnostic vials, pharmaceutical packaging lines, regulatory inspection desks, sterile fluorescent forensic labs",
+        "palette": "Clinical pale blue, antiseptic mint green, iodine amber, brushed stainless steel",
+        "camera_style": "Forensic close-ups on batch numbers and chemical seals, creeping dolly shots through regulatory archives"
+    },
     "tech": {
         "director": "David Fincher / Steven Soderbergh (Clinical Thriller)",
-        "visual_tone": "High-key sterile laboratories, server racks, pristine minimalist glass offices, silicon wafers, isolation of key innovators in vast server rooms",
+        "visual_tone": "Cleanroom micro-fabrication facilities, server racks, pristine minimalist glass offices, silicon wafers, isolation of key innovators in vast server rooms",
         "palette": "Cool sterile white, cyan, brushed aluminum, obsidian black, warning red accents",
         "camera_style": "Smooth robotic tracking, tight macro focus on technical schematics and data monitors, symmetrical center framing"
     },
@@ -78,11 +90,15 @@ CINEMATIC_ARCHETYPES = {
 def detect_cinematic_archetype(niche: str = "", topic: str = "") -> dict:
     """Detect the most compelling Hollywood visual archetype based on niche and topic."""
     text = f"{niche} {topic}".lower()
-    if any(k in text for k in ["finance", "economy", "bank", "money", "fraud", "wall street", "debt", "enron", "market", "trader"]):
+    if any(k in text for k in ["pesticide", "farm", "crop", "fertilizer", "rural", "agriculture", "harvest", "seed", "container", "soil"]):
+        return CINEMATIC_ARCHETYPES["agriculture"]
+    elif any(k in text for k in ["finance", "economy", "bank", "money", "fraud", "wall street", "debt", "enron", "market", "trader", "madoff"]):
         return CINEMATIC_ARCHETYPES["finance"]
     elif any(k in text for k in ["history", "empire", "war", "monarchy", "byzantine", "medieval", "crusade", "revolution", "soviet", "cold war"]):
         return CINEMATIC_ARCHETYPES["history"]
-    elif any(k in text for k in ["tech", "ai", "semiconductor", "chip", "biotech", "silicon", "pharma", "software", "tsmc", "cyber"]):
+    elif any(k in text for k in ["vaccine", "doping", "valieva", "pharma", "clinical", "hospital", "drug", "medicine", "toxic", "poison"]):
+        return CINEMATIC_ARCHETYPES["medical_pharma"]
+    elif any(k in text for k in ["semiconductor", "chip", "silicon", "tsmc", "cyber", "software", "gpu", "ai model", "supercomputer", "data center"]):
         return CINEMATIC_ARCHETYPES["tech"]
     return CINEMATIC_ARCHETYPES["default"]
 
@@ -502,16 +518,68 @@ def generate_director_plan(
 
 
 def _synthesize_deterministic_director_plan(episode_id: str, story_beats: list[dict], archetype: dict) -> dict:
-    """Robust fallback scene breakdown if LLM is unavailable."""
+    """Robust fallback scene breakdown with dynamic character ensemble and authentic narrative context."""
     scenes = []
     sc_counter = 0
 
+    arch_name = "default"
+    for k, v in CINEMATIC_ARCHETYPES.items():
+        if v.get("director") == archetype.get("director"):
+            arch_name = k
+            break
+
+    role_pools = {
+        "agriculture": [
+            ("Elder Crop Cultivator", "weathered canvas work jacket and rubber boots holding agricultural sample", "grim, vigilant"),
+            ("Agricultural Chemical Inspector", "protective field jacket holding sealed container test dossier", "meticulous, observant"),
+            ("Provincial Supply Wholesaler", "utilitarian jacket standing beside shipping pallets with clipboard", "evasive, tense"),
+            ("Forensic Toxicologist", "protective apron and safety glasses reviewing test vial chromatography", "analytical, grim"),
+            ("Cooperative Village Representative", "heavy wool vest examining dispatch registry under rustic incandescent light", "determined, weary"),
+            ("Regional Environmental Official", "wrinkled municipal suit presenting official regulatory decree", "conflicted, defensive")
+        ],
+        "finance": [
+            ("Forensic Financial Auditor", "rolled-up shirt sleeves holding red-annotated ledger printouts", "exhausted, relentless"),
+            ("Senior Portfolio Manager", "tailored charcoal wool suit standing before darkened market monitor", "stoic, calculating"),
+            ("Federal Securities Investigator", "trench coat over unbuttoned suit holding subpoena binder", "uncompromising, sharp"),
+            ("Corporate General Counsel", "bespoke executive attire gesturing at confidential legal settlement", "protective, cautious"),
+            ("Internal Whistleblower", "civilian workwear holding encrypted thumb drive in dim elevator lobby", "anxious, resolute")
+        ],
+        "history": [
+            ("Imperial Palace Chronicler", "embroidered Byzantine tunic examining wax-sealed parchment", "somber, archival"),
+            ("Foreign Diplomatic Envoy", "ceremonial silk and velvet diplomat mantle presenting sealed credentials", "guarded, courtly"),
+            ("Senior Military Strategist", "iron-studded armor cuirass leaning over harbor fortification maps", "stern, commanding"),
+            ("Patriarchal Scribe", "clerical vestments holding illuminated codex near altar chiaroscuro", "reverent, ominous")
+        ],
+        "medical_pharma": [
+            ("Chief Toxicological Examiner", "sanitary lab coat holding sealed specimen vial", "clinical, piercing"),
+            ("Pharmaceutical Compliance Director", "tailored lab blazer beside automated blistering machine", "restrained, guarded"),
+            ("Hospital Chief of Staff", "physician scrubs holding clinical trial patient log", "strained, grave"),
+            ("Investigative Health Journalist", "weathered jacket with press credential notebook", "relentless, focused")
+        ],
+        "tech": [
+            ("Semiconductor Cleanroom Specialist", "antistatic cleanroom hood and suit holding silicon wafer carrier", "focused, sterile"),
+            ("Chief Hardware Architect", "dark mock-neck sweater examining circuit blueprint monitor", "visionary, isolated"),
+            ("Supply Chain Logistics Officer", "hi-vis industrial jacket inside automated fabrication facility", "urgent, precise"),
+            ("Cyber Forensics Specialist", "hoodie and badge examining decompiled firmware terminal", "concentrated, aloof")
+        ],
+        "default": [
+            ("Lead Investigative Specialist", "dark trench coat holding classified evidence binder", "focused, sharp"),
+            ("Senior Forensic Analyst", "utilitarian blazer reviewing timeline charts", "analytical, observant"),
+            ("Key Eyewitness / Informant", "civilian jacket in dimly lit public concourse", "tense, guarded"),
+            ("Administrative Record Keeper", "cardigan and spectacles pulling archival box from shelf", "weary, thorough")
+        ]
+    }
+
+    pool = role_pools.get(arch_name, role_pools["default"])
+
     for b_idx, beat in enumerate(story_beats):
         b_num = b_idx + 1
-        b_name = CANONICAL_BEATS[b_idx]
-        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", beat["content"]) if len(s.strip()) > 15]
-        
-        # Group sentences into narrative units of ~35-45 words
+        b_name = CANONICAL_BEATS[b_idx] if b_idx < len(CANONICAL_BEATS) else f"Beat {b_num}"
+        import re
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", beat.get("content", "")) if len(s.strip()) > 15]
+        if not sentences:
+            sentences = [f"Narrative progression for {b_name}."]
+
         curr_narr = []
         curr_words = 0
         for sent in sentences:
@@ -521,31 +589,45 @@ def _synthesize_deterministic_director_plan(episode_id: str, story_beats: list[d
                 sc_text = " ".join(curr_narr)
                 sc_id = f"sc{sc_counter:03d}"
                 bg_k = f"{episode_id.lower()}_bg_b{b_num}_loc{sc_counter % 3}"
-                fg_k = f"{episode_id.lower()}_fg_b{b_num}_char{sc_counter % 2}" if sc_counter % 4 != 0 else None
                 
+                char_idx = sc_counter % len(pool)
+                char_role, char_attire, char_state = pool[char_idx]
+                fg_k = f"{episode_id.lower()}_fg_b{b_num}_char{char_idx}" if sc_counter % 4 != 0 else None
+
+                beat_settings = {
+                    1: f"Forensic establishing wide shot of initial anomaly and rural landscape, {archetype['visual_tone']}",
+                    2: f"Institutional record depot and supply warehouse reflecting official narrative, {archetype['visual_tone']}",
+                    3: f"Inspection office and archival examination setting uncovering paper trail, {archetype['visual_tone']}",
+                    4: f"Critical supply chain crossroads and distribution nexus revealing the smoking gun, {archetype['visual_tone']}",
+                    5: f"Contemporary regulatory environment and lasting aftermath, {archetype['visual_tone']}"
+                }
+                bg_desc = beat_settings.get(b_num, f"Cinematic documentary environment for {b_name}, {archetype['visual_tone']}")
+
+                fg_desc = f"Full-body {char_role} in {char_attire}, standing head-to-toe, posture {char_state}, isolated on solid #FF00FF magenta background" if fg_k else None
+
                 scenes.append({
                     "scene_id": sc_id,
                     "beat_index": b_num,
                     "beat_name": b_name,
                     "narration": sc_text,
                     "duration_est_sec": max(8, min(16, curr_words // 3)),
-                    "visual_metaphor": f"Systemic visual metaphor representing {b_name}",
+                    "visual_metaphor": f"Visual metaphor representing {b_name}",
                     "camera": {
                         "movement": "slow_push_in" if sc_counter % 2 == 0 else "static_tension",
                         "tension_level": "high"
                     },
                     "background": {
                         "reuse_key": bg_k,
-                        "visual_description": f"Cinematic wide-angle documentary setting for {b_name}, {archetype['visual_tone']}",
+                        "visual_description": bg_desc,
                         "safe_zone": "bottom 20% clear for subtitles, center-right negative space"
                     },
                     "foreground": {
                         "reuse_key": fg_k,
-                        "character_role": "Investigative Figure",
-                        "psychological_state": "focused, tense",
-                        "body_language": "Standing full-body head-to-toe, holding evidence dossier",
+                        "character_role": char_role,
+                        "psychological_state": char_state,
+                        "body_language": f"Standing full-body head-to-toe, {char_attire}",
                         "position": "right" if sc_counter % 2 == 0 else "left",
-                        "visual_description": f"Stylized editorial graphic novel illustration of investigator, isolated on solid #FF00FF magenta background"
+                        "visual_description": fg_desc
                     } if fg_k else None,
                     "audio_sfx_cue": "low_sub_drone_and_paper_shuffle"
                 })

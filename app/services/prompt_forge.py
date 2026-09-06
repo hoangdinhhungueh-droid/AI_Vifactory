@@ -90,9 +90,9 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str, is_byzantine: bool = F
     p = re.sub(r"photorealistic studio portrait,?\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"photorealistic,?\s*", "", p, flags=re.IGNORECASE)
 
-    # Ensure non-photorealistic stylized digital illustration phrasing
-    if "stylized editorial graphic novel" not in p.lower() and "illustrated" not in p.lower():
-        p = f"Stylized editorial graphic novel digital illustration of {p}"
+    # Clean up and normalize non-photorealistic stylized phrasing
+    p = re.sub(r"^(?:Stylized editorial graphic novel digital illustration of\s*)+", "", p, flags=re.IGNORECASE)
+    p = f"Stylized editorial graphic novel digital illustration of {p.strip()}"
 
     # Check if prompt already specifies full-body standing framing (Rules 116 & 435)
     has_full_body = any(term in p.lower() for term in [

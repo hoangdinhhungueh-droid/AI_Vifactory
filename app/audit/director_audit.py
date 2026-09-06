@@ -162,6 +162,55 @@ def _check_narration(scenes: list) -> tuple:
     return max(score, 0), issues
 
 
+def _check_semantic_relevance(content: dict, scenes: list) -> tuple:
+    """9th Axis: Check semantic relevance and verify 0% semiconductor/server-room prompt leakage."""
+    issues = []
+    score = 10.0
+    topic = str(content.get("topic") or content.get("episode_id") or "").lower()
+    niche = str(content.get("niche") or "").lower()
+    
+    is_tech = any(k in f"{topic} {niche}" for k in ["semiconductor", "chip", "silicon", "tsmc", "cyber", "software", "gpu", "ai model", "supercomputer", "data center"])
+    
+    leak_count = 0
+    stutter_count = 0
+    forbidden_terms = ["server rack", "silicon wafer", "cleanroom micro-fabrication", "data center corridor"]
+    
+    for sc in scenes:
+        bg_desc = str(sc.get("background", {}).get("visual_description", "") or sc.get("bg_prompt", "")).lower()
+        fg_desc = str(sc.get("foreground", {}).get("visual_description", "") or sc.get("fg_prompt", "")).lower()
+        
+        if not is_tech:
+            for term in forbidden_terms:
+                if term in bg_desc or term in fg_desc:
+                    leak_count += 1
+                    issues.append({
+                        "severity": "critical",
+                        "axis": "semantic_relevance",
+                        "message": f"Scene {sc.get('scene_id')}: Prompt leakage of tech trope '{term}' in non-tech story '{topic}'",
+                        "fix": "Remove tech/semiconductor terms and use topic-authentic narrative context"
+                    })
+                    break
+        
+        # Check stuttering
+        if "stylized editorial graphic novel" in fg_desc:
+            matches = re.findall(r"stylized editorial graphic novel", fg_desc)
+            if len(matches) > 1:
+                stutter_count += 1
+                issues.append({
+                    "severity": "medium",
+                    "axis": "semantic_relevance",
+                    "message": f"Scene {sc.get('scene_id')}: Repeated prefix stuttering detected in FG prompt",
+                    "fix": "Use anti-stuttering regex to normalize prompt prefixes"
+                })
+
+    if leak_count > 0:
+        score -= min(leak_count * 2.0, 8.0)
+    if stutter_count > 0:
+        score -= min(stutter_count * 0.5, 2.0)
+        
+    return max(score, 0), issues
+
+
 def audit_director(content: dict, llm_call=None) -> tuple:
     """Run full 8-axis director plan audit. Returns (axis_scores, issues, recommendations, 'rule_only')."""
     scenes = content.get("scenes", [])
@@ -181,6 +230,7 @@ def audit_director(content: dict, llm_call=None) -> tuple:
         ("duration", lambda: _check_duration(scenes)),
         ("camera_tension", lambda: _check_camera_tension(scenes)),
         ("narration", lambda: _check_narration(scenes)),
+        ("semantic_relevance", lambda: _check_semantic_relevance(content, scenes)),
     ]
     
     for axis_name, check_fn in checks:

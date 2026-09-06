@@ -331,7 +331,7 @@ def test_block3_director_contract() -> bool:
         verdict = audit_res.get("verdict", "FAIL")
         checks = audit_res.get("axis_scores") or audit_res.get("checks", {})
         logger.info(f"  ✅ Director Audit 8-Axis Score: {score}/10 | Verdict: {verdict} | Checks: {list(checks.keys())}")
-        assert len(checks) == 8, f"Expected 8 audit axes, got {len(checks)}"
+        assert len(checks) >= 8, f"Expected at least 8 audit axes, got {len(checks)}"
         assert verdict == "PASS" and score >= 8.0, f"Sample director plan failed 8-axis audit: {audit_res.get('issues')}"
 
         return True
