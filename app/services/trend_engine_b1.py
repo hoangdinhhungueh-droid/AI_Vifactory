@@ -301,22 +301,43 @@ def commit_trend_task(topic_data: dict) -> str:
         specific_angle=topic_data.get("specific_viral_angle")
     )
 
-    # 4. Sync to Notion Trend Brain DB
+    # 4. Sync to Notion Trend Brain DB (Standardized Cross-DB State Machine)
     try:
         import scripts.ag_notion_bridge as bridge
+        from app.services.trend_brain_mirror import _yt_labels_for_subject
         trend_db_id = "4c101989-2400-8334-8016-01d4f463b09f"
+        raw_term = str(topic_data.get("raw_term", "")).strip()
+        mkt = topic_data.get("market", "EN").upper()
+        raw_score = float(topic_data.get("viability_score", 8.5) or 8.5)
+        score_val = (raw_score / 10.0) if raw_score > 1.0 else raw_score
+        labels, treatment_note = _yt_labels_for_subject(raw_term)
+        today = datetime.now(timezone.utc).date().isoformat()
+
+        find_filt = {"and": [
+            {"property": "Keyword", "title": {"equals": raw_term[:1900]}},
+            {"property": "Market", "select": {"equals": mkt}}
+        ]}
+        existing = bridge.query_db(trend_db_id, filter_obj=find_filt)
         props = {
-            "Name": {"title": [{"type": "text", "text": {"content": topic_data.get("topic_name_vi") or topic_data["raw_term"]}}]},
+            "Trend Score": {"number": round(score_val, 4)},
+            "": {"status": {"name": "Approved→Story"}},
             "Task ID": {"rich_text": [{"type": "text", "text": {"content": task_id}}]},
-            "Keyword": {"rich_text": [{"type": "text", "text": {"content": topic_data["raw_term"]}}]},
-            "Market": {"select": {"name": topic_data["market"]}},
-            "Virality Score": {"number": float(topic_data.get("viability_score", 8.5)) / 10.0},
             "Rising Queries": {"rich_text": [{"type": "text", "text": {"content": ", ".join(topic_data.get("rising_queries", []))[:1990]}}]},
             "Competitor Benchmarks": {"rich_text": [{"type": "text", "text": {"content": (f"Blue Ocean Gap: {topic_data.get('competitor_differentiation_gap', '')} | " + f"Top {len(topic_data.get('viral_competitor_videos', []))} videos reconciled")[:1990]}}]},
-            "Status": {"status": {"name": "Approved→Story"}}
+            "YouTube Safety Label": {"multi_select": [{"name": x} for x in labels]},
+            "Upload Treatment Note": {"rich_text": [{"type": "text", "text": {"content": treatment_note[:1990]}}]},
+            "Trend Source": {"multi_select": [{"name": "gtrends_rss"}, {"name": "youtube_recon"}]}
         }
-        bridge.create_page(trend_db_id, props)
-        logger.info(f"[trend_engine] Synced task {task_id} to Notion Trend Brain DB")
+        if existing.get("results"):
+            page_id = existing["results"][0]["id"]
+            bridge.update_page_properties(page_id, props)
+            logger.info(f"[trend_engine] Updated task {task_id} in Notion Trend Brain DB (page={page_id}, status='Approved→Story')")
+        else:
+            props["Keyword"] = {"title": [{"type": "text", "text": {"content": raw_term[:1900]}}]}
+            props["Market"] = {"select": {"name": mkt}}
+            props["Discovered"] = {"date": {"start": today}}
+            cr = bridge.create_page(trend_db_id, props)
+            logger.info(f"[trend_engine] Created task {task_id} in Notion Trend Brain DB (id={cr.get('id') if isinstance(cr, dict) else 'ok'}, status='Approved→Story')")
     except Exception as e:
         logger.warning(f"[trend_engine] Notion sync failed: {e}")
 

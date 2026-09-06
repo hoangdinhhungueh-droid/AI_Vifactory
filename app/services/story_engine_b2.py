@@ -505,6 +505,16 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
 
         # Director Plan seeding is handled exclusively by B3 director_planner_b3 (Rule 125 Single Truth)
         logger.info('[story_engine] Story Library synced. B3 Director Plan handoff prepared.')
+
+        # Cross-DB State Machine: Mark keyword as 'Used' in Trend Brain DB
+        try:
+            import app.services.trend_brain_mirror as tbm
+            raw_keyword = meta.get("raw_term") or meta.get("target_keyword") or meta.get("topic") or topic
+            if raw_keyword:
+                tbm.mark_used(str(raw_keyword).strip(), mkt)
+                logger.info(f"[story_engine] Transitioned Trend Brain keyword '{raw_keyword}' ({mkt}) status to 'Used'")
+        except Exception as _tbm_e:
+            logger.warning(f"[story_engine] Notice marking keyword as Used in Trend Brain: {_tbm_e}")
     except Exception as e:
         logger.warning(f"[story_engine] Notion sync exception (non-fatal): {e}")
 

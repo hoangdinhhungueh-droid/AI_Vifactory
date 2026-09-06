@@ -492,3 +492,29 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
                 logger.warning(f"[prompt_forge] Failed to push FG prompt {fg_key}: {res.status_code} {res.text}")
         except Exception as e:
             logger.warning(f"[prompt_forge] Exception pushing FG prompt {fg_key}: {e}")
+
+    # 3. Cross-DB State Transitions:
+    # Update Director Plan status -> 'Prompted' and Story Library status -> 'Produced'
+    try:
+        import scripts.ag_notion_bridge as bridge
+        # 3a. Update Director Plan status -> 'Prompted'
+        dir_res = bridge.resolve_episode_director_db(episode_id, task_id=task_id, create_if_missing=False)
+        if isinstance(dir_res, dict) and not dir_res.get("error"):
+            subpage_id = dir_res.get("subpage_id")
+            if subpage_id:
+                bridge.update_page_properties(subpage_id, {"Status": {"status": {"name": "Prompted"}}})
+                logger.info(f"[prompt_forge] Transitioned Director Plan [{episode_id}] status to 'Prompted'")
+
+        # 3b. Update Story Library status -> 'Produced'
+        story_db_id = bridge.resolve_id("story")
+        if story_db_id:
+            q_story = bridge.query_db(story_db_id, filter_obj={"or": [
+                {"property": "Task ID", "rich_text": {"equals": episode_id}},
+                {"property": "Episode ID", "rich_text": {"equals": episode_id}}
+            ]})
+            if q_story.get("results"):
+                story_page_id = q_story["results"][0]["id"]
+                bridge.update_page_properties(story_page_id, {"Status": {"status": {"name": "Produced"}}})
+                logger.info(f"[prompt_forge] Transitioned Story Library [{episode_id}] status to 'Produced'")
+    except Exception as _st_err:
+        logger.warning(f"[prompt_forge] Notice updating downstream Notion statuses: {_st_err}")

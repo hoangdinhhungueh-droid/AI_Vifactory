@@ -947,7 +947,7 @@ def _synthesize_deterministic_director_plan(
 def push_director_plan_to_notion(director_plan: dict, episode_id: str):
     """
     Sync director plan scenes to Notion Director Plan DB (5b201989-2400-8295-be81-81c2c0e4e138).
-    Uses 1 EP = 1 Subpage + Child Scene DB model.
+    Uses 1 EP = 1 Subpage + Child Scene DB model, setting Status to 'Compiled'.
     """
     notion_token = os.environ.get("NOTION_API_KEY") or os.environ.get("NOTION_TOKEN", "")
     if not notion_token:
@@ -955,10 +955,17 @@ def push_director_plan_to_notion(director_plan: dict, episode_id: str):
         return
 
     try:
-        import ag_notion_bridge as b
+        import scripts.ag_notion_bridge as bridge
         scenes = director_plan.get("scenes", [])
-        logger.info(f"[B3 Notion] Syncing {len(scenes)} scenes for {episode_id} to Director Plan DB...")
-        logger.info(f"[B3 Notion] Synced {len(scenes)} scenes successfully.")
+        logger.info(f"[B3 Notion] Resolving Director Plan subpage for {episode_id}...")
+        resolved = bridge.resolve_episode_director_db(episode_id, task_id=episode_id, create_if_missing=True)
+        if isinstance(resolved, dict) and not resolved.get("error"):
+            subpage_id = resolved.get("subpage_id")
+            if subpage_id:
+                bridge.update_page_properties(subpage_id, {"Status": {"status": {"name": "Compiled"}}})
+                logger.info(f"[B3 Notion] Set Director Plan [{episode_id}] status to 'Compiled' (subpage={subpage_id}, {len(scenes)} scenes)")
+        else:
+            logger.warning(f"[B3 Notion] Could not resolve Director Plan subpage for {episode_id}: {resolved}")
     except Exception as e:
         logger.warning(f"[B3 Notion] Notion sync encountered notice: {e}")
 
