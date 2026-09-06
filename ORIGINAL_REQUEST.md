@@ -219,7 +219,7 @@ Sau đó gọi team audit ra check:
 - [x] PASS **AUDIT-VERIFY-5 (Three-Way Physical Sync & Git Integrity)**:
   - Biên dịch `python3 -m py_compile` 100% file modified đạt exit code 0.
   - Master Smoke Gate: `python3 scripts/e2e_pipeline_smoketest.py` đạt `🎉 ALL PIPELINE GATES PASSED (100% INTEGRATION RUNTIME OK)!` (Exit code 0).
-  - Git commit & push trực tiếp từ VPS: Khởi điểm từ commit `79d2631`, sau đó các commit hoàn thiện kiến trúc gốc rễ (`c759705`, `4b1acfd`, `c9406c2`, `ff79132`, `3c62689`, `7f42a87`, `1cb6a09`, `5e39657`) đã được đẩy thành công lên `hoangdinhhungueh-droid/AI_Vifactory.git` (`main -> main`), bảo đảm HEAD đồng bộ 100%.
+  - Git commit & push trực tiếp từ VPS: Khởi điểm từ commit `79d2631`, sau đó các commit hoàn thiện kiến trúc gốc rễ (`c759705`, `4b1acfd`, `c9406c2`, `ff79132`, `3c62689`, `7f42a87`, `1cb6a09`, `5e39657`, `392ae06`, `8f9791f`, `4cda5fd`) đã được đẩy thành công lên `hoangdinhhungueh-droid/AI_Vifactory.git` (`main -> main`), bảo đảm HEAD đồng bộ 100% tại commit `4cda5fd`.
   - VPS working tree clean: `On branch main, nothing to commit, working tree clean`.
 
 ---
@@ -231,12 +231,20 @@ Sau đó gọi team audit ra check:
 - [x] PASS **AUDIT-PREV-2 (B3.5 Dynamic Character Ensemble & Anti-Stuttering)**:
   - Tái cấu trúc `_synthesize_deterministic_director_plan` với Dynamic Character Ensemble (phân bổ vai diễn linh hoạt theo ngữ cảnh kịch bản thực tế).
   - Nâng cấp `_sanitize_foreground_prompt` với regex chuẩn hóa và thuật toán khử lặp từ kép `deduplicate_phrase_stutter()`, loại bỏ hoàn toàn hiện tượng lặp từ kép.
-- [x] PASS **AUDIT-PREV-3 (Tái Tạo Prompts Cho Tập Live `KR_EP0001` — Rectified)**:
-  - **Đính chính số lượng Prompts thực tế trên đĩa VPS**: Con số "18 BG và 10 FG" trong báo cáo trước là sao chép nhầm từ số liệu lỗi ban đầu. Kiểm toán thực tế file `/var/vf/episodes/KR_EP0001_pesticide-container-trust/prompts_forge.json` xác nhận có chính xác **10 prompts** (gồm **5 BG + 5 FG**, tương ứng 1 cặp BG/FG cho mỗi beat trong cấu trúc 5-Beat Docudrama). Trong khi đó, subpage Notion lưu trữ lũy kế 41 prompts qua các vòng test.
-  - **Kiểm toán chất lượng Prompt (Rule 122)**: Bối cảnh hoàn toàn chuẩn xác đề tài nông nghiệp/thuốc BVTV Hàn Quốc (*Overcast slate-gray sky, terraced fields, plastic pesticide bottles in woven sacks*). Kết quả pháp y: `TECH LEAKS IN BGS: 0`, `STUTTER LEAKS IN FGS: 0`.
-- [x] PASS **AUDIT-PREV-4 (Notion SoT Sync & Operational Self-Healing — Rectified)**:
-  - **Đính chính ID Database Notion (Expose Phantom ID)**: Báo cáo trước ghi nhận ID `1607c390-1c31-41e7-8c34-eb16ee64db50` (thực tế API Notion trả về HTTP 404 `object_not_found` — là ID bóng ma/sai lệch). Database ID thực tế được resolve chuẩn xác bởi `ag_notion_bridge.resolve_episode_prompt_db("KR_EP0001_pesticide-container-trust")` là **`3d301989-2400-8162-9276-e380ff5efb35`** (`Prompt Library — KR_EP0001_pesticide-container-trust`), hiện lưu trữ chính xác **41 prompts** (các bản ghi prompt tích lũy qua các chu kỳ đồng bộ).
-  - **Xác nhận cơ chế Self-Healing hoạt động thực tế**: Kiểm tra mã nguồn tại `scripts/b4_generate_from_notion_prompts.py:54-66` xác nhận cơ chế Self-Healing hoàn toàn có thật và vận hành ổn định: nếu truy vấn Notion trả về rỗng, script tự động đọc file đĩa cục bộ `prompts_forge.json`, gọi `push_prompts_to_notion` để phục hồi dữ liệu lên Notion subpage database trước khi tiến hành sinh ảnh B4.
+- [x] PASS **AUDIT-PREV-3 (Fix Gốc Rễ Lỗi Thu Hẹp Cảnh "5 BG + 5 FG" / Scene Collapse Bug — Rectified & Hardened)**:
+  - **Bản chất hiện tượng & Phản hồi của User**: Báo cáo trước ghi nhận "5 BG + 5 FG" (tương ứng 5 cảnh cho kịch bản 1.519 từ ~ 12 phút, tức mỗi cảnh tĩnh kéo dài gần 150 giây!). User đã phê bình chuẩn xác: cấu trúc docudrama 5x10 không hề có giới hạn tĩnh 5 prompt mà phải có từ 35–55 dynamic scenes (7–10 scenes mỗi beat).
+  - **Nguyên nhân gốc rễ (Root Cause)**:
+    1. Trong `app/services/director_planner_b3.py`: LLM trả về lười 1 scene/beat (5 scenes), nhưng mã nguồn B3 không có chốt sàn tối thiểu (`min_scenes >= 30`), vẫn chấp nhận danh sách 5 scenes này.
+    2. Trong `app/audit/director_audit.py`: Bộ kiểm toán chỉ trừ nhẹ -4.0 điểm khi `< 15 scenes` với mức độ non-critical `high`, khiến một plan chỉ có 5 scenes cho video 12 phút vẫn được cấp verdict `PASS` với điểm số > 8.0!
+  - **Giải pháp gốc rễ đã thực thi & đóng đinh vào Codebase (Commit `4cda5fd`)**:
+    1. Trong `app/services/director_planner_b3.py`: Đưa chỉ thị `CRITICAL STORYBOARD DIRECTIVE (Rule 445)` vào prompt LLM bắt buộc phân rã 35–55 sequential scenes. Đồng thời thiết lập cổng khóa cứng: `min_required_scenes = max(25, min(35, total_words // 45)) if total_words > 300 else 5`. Nếu LLM trả về `< min_required_scenes`, hệ thống tự động kích hoạt `_synthesize_deterministic_director_plan` để tạo 35–55 dynamic scenes chuẩn chỉ.
+    2. Trong `app/audit/director_audit.py`: Nâng cấp `_check_scene_coverage`: nếu `< 20 scenes`, gán `severity = "critical"` và `score = 0.0`. Khi có lỗi `critical`, `audit_director_plan` lập tức khóa điểm trần `min(avg_score, 4.0)` và trả về `verdict = "FAIL"`.
+    3. Đã chạy test thực tế trên VPS (`test_audit_gate.py`): Kế hoạch 5 scenes bị từ chối thẳng thừng (`verdict: FAIL, score: 4.0`), trong khi kế hoạch chuẩn 40 scenes vượt qua với `verdict: PASS, score: 9.44`.
+    4. Chỉ thị đặc biệt từ User: Bỏ qua việc tái chạy sinh ảnh live cho tập `KR_EP0001` ("Tái thực thi thực tế trên VPS cho tập live KR_EP0001 -> bỏ qua. chạy đúng luồng 1, 2 để fix gốc rễ cái đã. Còn lại tất cả tôi đồng ý") để tập trung triệt để vào sửa gốc rễ logic kiến trúc và kiểm thử chất lượng hệ thống.
+- [x] PASS **AUDIT-PREV-4 (Notion SoT Sync & Dynamic Database Resolver — Rectified)**:
+  - **Bản chất ID bóng ma (Phantom ID)**: ID `1607c390-1c31-41e7-8c34-eb16ee64db50` từng xuất hiện trong ghi chép trước thực chất là một chuỗi copy-paste chưa qua kiểm chứng runtime (gọi API Notion trả về HTTP 404 `object_not_found`).
+  - **Cơ chế Resolve động chuẩn xác**: Module `scripts/ag_notion_bridge.py:resolve_episode_prompt_db()` truy vấn động từ `flat_db_id = resolve_id("prompt_library")`, tìm hàng tương ứng với `(episode_id)` và trích xuất child database thực tế: **`3d301989-2400-8162-9276-e380ff5efb35`** (`Prompt Library — KR_EP0001_pesticide-container-trust`), hiện lưu trữ chính xác **41 prompts** hợp lệ.
+  - **Cơ chế Self-Healing**: `scripts/b4_generate_from_notion_prompts.py:54-66` tự động fallback đọc đĩa `prompts_forge.json` và push lại lên Notion nếu subpage rỗng.
 - [x] PASS **AUDIT-PREV-5 (Trục Kiểm Toán Thứ 9 `semantic_relevance`)**:
   - Bổ sung Trục thứ 9 đo độ khớp ngữ nghĩa trong `app/audit/director_audit.py`, tự động trừ điểm nặng nếu phát hiện rò rỉ tech trope vào câu chuyện phi công nghệ. Đã test nghiệm thu đạt PASS 9/9 trục (Score: 8.44/10 trên synthetic test, 9.56/10 trên tập live `KR_EP0001`).
 
