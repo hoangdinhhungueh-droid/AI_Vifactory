@@ -14,12 +14,19 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    sync_playwright = None
+
 from PIL import Image, ImageFilter
 import numpy as np
 
-USER_DATA_DIR = r"C:\Users\hunghd2\.gemini\browser_profile"
-os.makedirs(USER_DATA_DIR, exist_ok=True)
+USER_DATA_DIR = os.environ.get("GEMINI_BROWSER_PROFILE", r"C:\Users\hunghd2\.gemini\browser_profile")
+try:
+    os.makedirs(USER_DATA_DIR, exist_ok=True)
+except Exception:
+    pass
 
 # Embedded Self-Contained MCP Client for VPS Communications
 VPS_URL = "https://ag.vifactory.com/mcp"

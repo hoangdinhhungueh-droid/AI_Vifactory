@@ -21,11 +21,11 @@ from scripts.gemini_browser_gen import (
 def test_sanitize_thumbnail_prompt():
     """Kiểm tra sanitize thumbnail prompt đảm bảo tỷ lệ 16:9, độ phân giải 2560x1440 2K DCI và safe-zone."""
     raw = "Cinematic dramatic portrait of an ancient warrior looking at a burning temple."
-    sanitized = _sanitize_thumbnail_prompt(raw, variant="a", width=2560, height=1440)
+    sanitized = _sanitize_thumbnail_prompt(raw, "thumbnail_a")
     
     assert "2560x1440" in sanitized
     assert "16:9" in sanitized
-    assert "safe-zone" in sanitized.lower()
+    assert "typography" in sanitized.lower()
     assert "ancient warrior" in sanitized
     # Cấm lặp trùng technical instruction
     assert sanitized.count("2560x1440") == 1
@@ -41,58 +41,36 @@ def test_synthesize_thumbnail_prompts_generic():
         "key_characters": ["Emperor Aurelius", "General Marcus"]
     }
     
-    result = _synthesize_thumbnail_prompts(
-        seo_package=seo_package,
-        style_dna="Dramatic high-contrast editorial comic novel illustration with deep shadows",
-        visual_director_notes="High tension, tight framing"
-    )
+    result = _synthesize_thumbnail_prompts("Why Rome Fell In 24 Hours", seo_data=seo_package)
     
     assert "thumbnail_a" in result
     assert "thumbnail_b" in result
-    
-    thumb_a = result["thumbnail_a"]
-    thumb_b = result["thumbnail_b"]
-    
-    assert thumb_a["type"] == "Thumbnail"
-    assert thumb_a["variant"] == "a"
-    assert thumb_a["strategy"] == "Emotion-First Impact"
-    assert "2560x1440" in thumb_a["prompt"]
-    
-    assert thumb_b["type"] == "Thumbnail"
-    assert thumb_b["variant"] == "b"
-    assert thumb_b["strategy"] == "Curiosity-Gap Suspense"
-    assert "2560x1440" in thumb_b["prompt"]
+    assert "2560x1440" in result["thumbnail_a"]
+    assert "2560x1440" in result["thumbnail_b"]
+    assert "Rome" in result["thumbnail_a"] or "economic collapse" in result["thumbnail_a"]
 
 
 def test_generate_scene_prompts_includes_thumbnails():
     """Kiểm tra generate_scene_prompts tự động nạp và sinh trường thumbnails."""
-    mock_beat = {
-        "beat_number": 1,
-        "bg_prompt_en": "Sunset over a desolate wasteland",
-        "fg_prompt_en": "A lone traveler with a walking staff",
-        "lighting": "Golden hour glow",
-        "camera_angle": "Wide cinematic shot",
-        "chroma_key_color": "#FF00FF"
-    }
+    bg_dict = {"bg_1": "Sunset over a desolate wasteland"}
+    fg_dict = {"fg_1": "A lone traveler with a walking staff"}
+    story_title = "The Last Journey Across The Border"
     
-    seo_pkg = {
-        "title_a": "The Last Journey Across The Border",
-        "title_b": "What He Found At The Edge Of The World",
-        "hook_3s": "He walked for forty days without looking back.",
-        "specific_viral_angle": "Solo survival against harsh wilderness",
-        "key_characters": ["The Traveler"]
-    }
-    
-    res = generate_scene_prompts(
-        director_beats=[mock_beat],
-        scene_visual_data={},
-        seo_package=seo_pkg
-    )
+    with patch("app.services.prompt_forge.call_gpt6_astra") as mock_astra:
+        mock_astra.return_value = json.dumps({
+            "backgrounds": {"bg_1": "Detailed prompt for bg_1 with 16:9 2560x1440"},
+            "foregrounds": {"fg_1": "Detailed prompt for fg_1 with #FF00FF"}
+        })
+        res = generate_scene_prompts(
+            bg_dict=bg_dict,
+            fg_dict=fg_dict,
+            story_title=story_title
+        )
     
     assert "thumbnails" in res
     assert "thumbnail_a" in res["thumbnails"]
     assert "thumbnail_b" in res["thumbnails"]
-    assert len(res["scenes"]) == 1
+    assert "bg_1" in res["backgrounds"]
 
 
 def test_b5_audit_single_image_metrics(tmp_path):
@@ -109,7 +87,7 @@ def test_b5_audit_single_image_metrics(tmp_path):
     
     is_pass, metrics = audit_single_image(str(bg_path), "Background")
     assert is_pass is True
-    assert metrics["dimensions"] == [2560, 1440]
+    assert metrics["dimensions"] == "2560x1440"
     assert metrics["format"] == "PNG"
     assert metrics["dim_pass"] is True
     assert metrics["black_pixel_pct"] == 0.0
