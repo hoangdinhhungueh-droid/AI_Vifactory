@@ -54,7 +54,10 @@ def get_opener():
 
 
 def fetch_run_for_commit(repo: str, token: str, commit_sha: str, opener):
-    url = f"https://api.github.com/repos/{repo}/actions/runs?head_sha={commit_sha}&per_page=1"
+    if len(commit_sha) < 40:
+        url = f"https://api.github.com/repos/{repo}/actions/runs?per_page=20"
+    else:
+        url = f"https://api.github.com/repos/{repo}/actions/runs?head_sha={commit_sha}&per_page=1"
     req = urllib.request.Request(url, headers={
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github.v3+json",
@@ -64,6 +67,11 @@ def fetch_run_for_commit(repo: str, token: str, commit_sha: str, opener):
         with opener.open(req, timeout=15) as resp:
             data = json.loads(resp.read().decode())
             runs = data.get("workflow_runs", [])
+            if len(commit_sha) < 40:
+                for r in runs:
+                    if r.get("head_sha", "").startswith(commit_sha):
+                        return r
+                return None
             return runs[0] if runs else None
     except Exception as e:
         print(f"[watch_github_ci] API request failed: {e}", file=sys.stderr)
