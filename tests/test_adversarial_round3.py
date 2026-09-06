@@ -110,7 +110,7 @@ class TestR2AdversarialHHTechReasoning:
     """Stress test R2: GPT-5.6-Sol prompt construction, breakout formatting, and niche reasoning."""
 
     @pytest.mark.integration
-    @patch("app.services.hhtech_reasoner.call_gpt56_sol")
+    @patch("app.services.hhtech_reasoner.call_gpt6_astra")
     def test_reason_topic_niche_prompt_formatting_and_breakout_capture(self, mock_call):
         mock_response = json.dumps({
             "topic_name_vi": "Sự sụp đổ của Đế chế La Mã",
@@ -150,7 +150,7 @@ class TestR2AdversarialHHTechReasoning:
         assert '"Roman Empire documentary" (Index: 100)' in user_prompt
 
         # Check system prompt includes the 5-act and Hook shock instructions
-        assert "ACT 1 HOOK SHOCK" in system_prompt
+        assert "RULE 444 AN ONG HOOK" in system_prompt
         assert "SEARCH-SPECIFIC TARGETING" in system_prompt
 
         # Check result structure

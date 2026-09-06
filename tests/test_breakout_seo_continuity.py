@@ -219,16 +219,16 @@ class TestR2B10SEOInjection:
 
         # Test generate_seo_packaging in fallback mode
         import app.services.seo_autogen_b10 as seo_b10
-        orig_call = seo_b10.call_gpt56_sol
+        orig_call = seo_b10.call_gpt6_astra
 
         def mock_llm_fail(*a, **kw):
             raise ConnectionError("Simulated LLM network failure")
 
-        seo_b10.call_gpt56_sol = mock_llm_fail
+        seo_b10.call_gpt6_astra = mock_llm_fail
         try:
             pkg = generate_seo_packaging(episode)
         finally:
-            seo_b10.call_gpt56_sol = orig_call
+            seo_b10.call_gpt6_astra = orig_call
 
         assert pkg["generation_method"] == "deterministic_fallback"
         assert pkg["title_a"].startswith("Byzantine Empire")
@@ -286,12 +286,12 @@ class TestR3PipelineContinuityAndPayloadAudit:
 
         # Mock or run deterministic fallback packaging
         import app.services.seo_autogen_b10 as seo_b10
-        orig_call = seo_b10.call_gpt56_sol
-        seo_b10.call_gpt56_sol = lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("Fallback"))
+        orig_call = seo_b10.call_gpt6_astra
+        seo_b10.call_gpt6_astra = lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("Fallback"))
         try:
             pkg = generate_seo_packaging(episode)
         finally:
-            seo_b10.call_gpt56_sol = orig_call
+            seo_b10.call_gpt6_astra = orig_call
 
         upload_payload = {
             "episode_id": episode["episode_id"],
@@ -401,7 +401,7 @@ class TestR3PipelineContinuityAndPayloadAudit:
         from app.services.hhtech_reasoner import reason_topic_niche
         import app.services.hhtech_reasoner as hht
 
-        # Capture prompt passed to call_gpt56_sol
+        # Capture prompt passed to call_gpt6_astra
         captured = {}
         def mock_call(prompt, system_prompt="", **kw):
             captured["prompt"] = prompt
@@ -415,8 +415,8 @@ class TestR3PipelineContinuityAndPayloadAudit:
                 "breakout_queries": ["Constantinople siege 1453", "Greek fire secret"]
             })
 
-        orig_call = hht.call_gpt56_sol
-        hht.call_gpt56_sol = mock_call
+        orig_call = hht.call_gpt6_astra
+        hht.call_gpt6_astra = mock_call
         try:
             res = reason_topic_niche(
                 subject="Byzantine Empire",
@@ -429,13 +429,13 @@ class TestR3PipelineContinuityAndPayloadAudit:
                 ]
             )
         finally:
-            hht.call_gpt56_sol = orig_call
+            hht.call_gpt6_astra = orig_call
 
         assert "[GOOGLE TRENDS RISING / BREAKOUT QUERIES (NATIVE LANGUAGE)]:" in captured["prompt"]
         assert "Constantinople siege 1453" in captured["prompt"]
         assert "(Breakout)" in captured["prompt"]
         assert "Greek fire secret" in captured["prompt"]
-        assert "ACT 1 HOOK SHOCK:" in captured["system_prompt"]
+        assert "RULE 444 AN ONG HOOK:" in captured["system_prompt"]
         assert "SEARCH-SPECIFIC TARGETING:" in captured["system_prompt"]
         assert res["task_slug"] == "byzantine-empire"
         assert len(res["breakout_queries"]) == 2
