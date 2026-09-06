@@ -40,6 +40,8 @@ SNAPSHOT_FILE = Path(os.getenv("VF_SKILLS_SNAPSHOT", ROOT_DIR / "data" / "notion
 LEGACY_SNAPSHOT_FILE = Path(os.getenv("VF_LEGACY_SKILLS_SNAPSHOT", ROOT_DIR / "data" / "notion_audit" / "skill_ai.md"))
 
 # In-memory multi-hub cache state
+CACHE_TTL_SECONDS = 3600
+
 _cache = {
     "central": {"data": None, "expiration": 0},
     "content_engine": {"data": None, "expiration": 0},
