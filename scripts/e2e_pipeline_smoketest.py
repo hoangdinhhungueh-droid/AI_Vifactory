@@ -103,6 +103,34 @@ def gate_zero_ghost_and_encoding():
     assert "ðŸ" not in tg_code, "telegram_buttons.py contains mojibake characters!"
     print("  [PASS] telegram_buttons.py is 100% clean of Mojibake characters.")
 
+def gate_market_scheduler():
+    print_gate("8. Market Stagger Scheduler & VN Timezone Compliance (Crash Protection)")
+    from app.services.market_scheduler import (
+        get_vn_now,
+        get_scheduled_market_for_date,
+        is_production_day,
+        get_market_schedule_info,
+    )
+    from datetime import datetime, timezone, timedelta
+
+    # 1. VN Timezone offset
+    vn_now = get_vn_now()
+    assert vn_now.utcoffset() == timedelta(hours=7), "Market scheduler must evaluate strictly in UTC+7 VN Time!"
+
+    # 2. Canonical 7-day schedule mapping
+    mon = datetime(2026, 9, 7, 6, 0, 0)
+    expected = {0: "EN", 1: "KR", 2: "JP", 3: "EN", 4: "KR", 5: "JP", 6: None}
+    for offset, exp_mkt in expected.items():
+        cur = mon + timedelta(days=offset)
+        res = get_scheduled_market_for_date(cur)
+        assert res == exp_mkt, f"Schedule mismatch on {cur.strftime('%A')}: expected {exp_mkt}, got {res}"
+
+    # 3. UTC boundary check (VPS cron trigger at 23:00 UTC)
+    sun_night_utc = datetime(2026, 9, 6, 23, 0, 0, tzinfo=timezone.utc)
+    assert get_scheduled_market_for_date(sun_night_utc) == "EN", "Sunday 23:00 UTC must map to Monday EN!"
+
+    print("  [PASS] Market scheduler enforces 1 video/day (EN 2,5 | KR 3,6 | JP 4,7 | Sun OFF) and UTC+7 anchor.")
+
 def main():
     print("\n" + "="*60)
     print("🛡️ RUNNING MASTER E2E PIPELINE SMOKE TEST (RULE 127)")
@@ -115,6 +143,7 @@ def main():
         gate_b3_director_planner()
         gate_b35_visual_prompt_forge()
         gate_zero_ghost_and_encoding()
+        gate_market_scheduler()
 
         print("\n" + "="*60)
         print("🎉 ALL PIPELINE GATES PASSED (100% INTEGRATION RUNTIME OK)!")

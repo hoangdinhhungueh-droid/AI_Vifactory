@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 """
-scripts/run_trend_pipeline.py — UNIFIED CANONICAL TREND PIPELINE (B1 ➔ B1.5 ➔ B2 ➔ B3)
-Standardized Architecture (05/09/2026):
-  1. Direct Google & YouTube Trends Ingestion (Zero-Mock Data, Multi-Geo Fan-Out)
-  2. B1.5 Competitor Recon & Blue Ocean Differentiation Gap Integrated
-  3. Automatic Multi-Candidate Scan & Permanent History Deduplication
-  4. Human Gate 1 Pure Informative Broadcast on Telegram (0 interactive buttons)
-  5. Automated B2 Story Engine (12-15 min docudrama) & B3 2-Layer Director Plan
-  6. Story Gate Self-Repair & Candidate Fallback Protection
+scripts/run_trend_pipeline.py — UNIFIED CANONICAL TREND & PRODUCTION PIPELINE (B1 ➔ B1.5 ➔ B2 ➔ B3)
+Standardized Architecture (06/09/2026):
+  1. Weekly Staggered Market Production Scheduler:
+     - Prevents VPS resource exhaustion and infrastructure crashes by ensuring
+       exactly 1 video is produced per day across target markets:
+         * Monday & Thursday   ➔ EN (English)
+         * Tuesday & Friday     ➔ KR (Korean)
+         * Wednesday & Saturday ➔ JP (Japanese)
+         * Sunday               ➔ System Rest & B11 Analytics Maintenance (0 new videos)
+     - Mandatory Timezone Anchor: Evaluated strictly in Vietnam Time (Asia/Ho_Chi_Minh / UTC+7).
+  2. Direct Google & YouTube Trends Ingestion (Zero-Mock Data, Multi-Geo Fan-Out)
+  3. B1.5 Competitor Recon & Blue Ocean Differentiation Gap Integrated
+  4. Automatic Multi-Candidate Scan & Permanent History Deduplication
+  5. Human Gate 1 Pure Informative Broadcast on Telegram (0 interactive buttons)
+  6. Automated B2 Story Engine (12-15 min docudrama) & B3 2-Layer Director Plan
+  7. Story Gate Self-Repair & Candidate Fallback Protection
 
 Usage:
-  python3 scripts/run_trend_pipeline.py                         # All 3 markets (EN, JP, KR) auto-produced
-  python3 scripts/run_trend_pipeline.py --markets EN            # Specific market auto-produced
+  python3 scripts/run_trend_pipeline.py                         # Auto-scheduled single market for today
+  python3 scripts/run_trend_pipeline.py --market EN             # CLI override: specific market
+  python3 scripts/run_trend_pipeline.py --markets EN KR         # CLI override: multiple markets
+  python3 scripts/run_trend_pipeline.py --force-all-markets     # Emergency override: all 3 markets
   python3 scripts/run_trend_pipeline.py --term "topic" --market EN # Custom seed term
   python3 scripts/run_trend_pipeline.py --no-produce            # Discovery only (skip B2/B3 production)
+  python3 scripts/run_trend_pipeline.py --dry-run               # Inspect scheduled market without running
 """
 import os
 import sys
@@ -27,6 +38,13 @@ sys.path.insert(0, "/root/video_factory")
 from app.services.trend_engine_b1 import (
     discover_and_produce_market_trend,
     run_daily_all_markets
+)
+from app.services.market_scheduler import (
+    get_market_schedule_info,
+    get_scheduled_market_for_date,
+    get_vn_now,
+    is_production_day,
+    run_sunday_maintenance,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -44,27 +62,73 @@ def _notify_telegram(msg: str):
 
 def main():
     args = sys.argv[1:]
-    markets = ["EN", "JP", "KR"]
     custom_term = None
     custom_market = "EN"
     auto_produce = "--no-produce" not in args
+    is_dry_run = "--dry-run" in args
+    force_all = "--force-all-markets" in args
 
+    cli_markets = None
     if "--markets" in args:
         idx = args.index("--markets")
-        markets = [m.upper() for m in args[idx + 1:] if not m.startswith("--")]
+        cli_markets = [m.upper() for m in args[idx + 1:] if not m.startswith("--")]
+
+    if "--market" in args:
+        idx = args.index("--market")
+        custom_market = args[idx + 1].upper() if idx + 1 < len(args) else "EN"
+        cli_markets = [custom_market]
 
     if "--term" in args:
         idx = args.index("--term")
         custom_term = args[idx + 1] if idx + 1 < len(args) else None
 
-    if "--market" in args:
-        idx = args.index("--market")
-        custom_market = args[idx + 1].upper() if idx + 1 < len(args) else "EN"
+    # 1. Evaluate schedule based on Vietnam Timezone (UTC+7)
+    schedule_info = get_market_schedule_info()
+
+    if custom_term:
+        markets = [custom_market]
+        print(f"🎯 [CLI OVERRIDE] Custom seed '{custom_term}' for market {custom_market}")
+    elif cli_markets:
+        markets = cli_markets
+        print(f"🎯 [CLI OVERRIDE] Explicit markets specified: {markets}")
+    elif force_all:
+        markets = ["EN", "JP", "KR"]
+        print("⚠️ [FORCE ALL] Bypassing daily schedule: running all 3 markets (EN, JP, KR)")
+    else:
+        # Canonical weekly stagger schedule
+        if not schedule_info["is_production_day"]:
+            print("=======================================================")
+            print(f"🛑 [MARKET SCHEDULER] TODAY IS {schedule_info['day_vi'].upper()} ({schedule_info['day_en'].upper()})")
+            print(f"Time (VN UTC+7): {schedule_info['timestamp_vn']}")
+            print("Weekly schedule designates Sunday as REST & MAINTENANCE DAY (0 new videos).")
+            print("=======================================================")
+            if is_dry_run:
+                print("DRY-RUN: Would execute Sunday maintenance & B11 weekly dreaming.")
+                return
+            maint_res = run_sunday_maintenance()
+            print(f"🧹 Sunday Maintenance Finished: {maint_res['cleanup']}")
+            print(f"📊 B11 Routine Status: {maint_res['b11_status']}")
+            return
+
+        scheduled_mkt = schedule_info["scheduled_market"]
+        markets = [scheduled_mkt]
+        print("=======================================================")
+        print(f"📅 [MARKET SCHEDULER] DAILY PRODUCTION CADENCE (1 VIDEO/DAY)")
+        print(f"Time (VN UTC+7): {schedule_info['timestamp_vn']} | Day: {schedule_info['day_vi']} ({schedule_info['day_en']})")
+        print(f"Assigned Market Today: 🚀 {scheduled_mkt} (Single Market Execution)")
+        print("Prevents VPS CPU/RAM crash by isolating production workloads.")
+        print("=======================================================")
+
+    if is_dry_run:
+        print(f"DRY-RUN COMPLETE: Target markets would be {markets}. Auto-produce: {auto_produce}")
+        return
 
     print("=======================================================")
     print("🚀 LAUNCHING UNIFIED TREND & PRODUCTION PIPELINE (B1 ➔ B1.5 ➔ B2)")
-    print(f"Time: {datetime.now(timezone.utc).isoformat()}")
-    print(f"Auto-Produce B2/B3: {auto_produce}")
+    print(f"Execution Time (UTC): {datetime.now(timezone.utc).isoformat()}")
+    print(f"Execution Time (VN):  {get_vn_now().isoformat()}")
+    print(f"Markets in scope:     {markets}")
+    print(f"Auto-Produce B2/B3:   {auto_produce}")
     print("=======================================================")
 
     results = {"success": True, "approved_topics": []}

@@ -10,6 +10,23 @@
 
 ## 🔄 I. KHẾ ƯỚC DỮ LIỆU LIÊN KHỐI (INTER-BLOCK DATA CONTRACTS)
 
+### 0. Khế Ước Điều Phối Lịch Tuần (Weekly Staggered Market Production Scheduler — Crash Protection Gate)
+* **File lưu trữ & Module**: `app/services/market_scheduler.py` & `scripts/run_trend_pipeline.py`
+* **Mục đích**: Triệt tiêu 100% rủi ro nghẽn cổ chai CPU/RAM/API và crash hạ tầng VPS khi Human Gate 1 chuyển sang chế độ Informative Broadcast tự động, bằng cách cố định mỗi ngày chỉ sản xuất duy nhất 1 video cho 1 thị trường.
+* **Ma Trận Lịch Tuần (Neo Cứng Múi Giờ Việt Nam UTC+7 / Asia/Ho_Chi_Minh)**:
+  | Thứ (VN Time UTC+7) | Python Weekday (`date.weekday()`) | Thị Trường Được Phép Sản Xuất | Nhiệm Vụ Thực Thi |
+  | :--- | :---: | :---: | :--- |
+  | **Thứ Hai (Monday)** | `0` | **EN** | Pipeline B1 ➔ B1.5 ➔ B2 ➔ B3 ➔ B10 (Kênh English) |
+  | **Thứ Ba (Tuesday)** | `1` | **KR** | Pipeline B1 ➔ B1.5 ➔ B2 ➔ B3 ➔ B10 (Kênh Korean) |
+  | **Thứ Tư (Wednesday)** | `2` | **JP** | Pipeline B1 ➔ B1.5 ➔ B2 ➔ B3 ➔ B10 (Kênh Japanese) |
+  | **Thứ Năm (Thursday)** | `3` | **EN** | Pipeline B1 ➔ B1.5 ➔ B2 ➔ B3 ➔ B10 (Kênh English) |
+  | **Thứ Sáu (Friday)** | `4` | **KR** | Pipeline B1 ➔ B1.5 ➔ B2 ➔ B3 ➔ B10 (Kênh Korean) |
+  | **Thứ Bảy (Saturday)** | `5` | **JP** | Pipeline B1 ➔ B1.5 ➔ B2 ➔ B3 ➔ B10 (Kênh Japanese) |
+  | **Chủ Nhật (Sunday)** | `6` | **NGHỈ** | Dọn rác cache `/tmp`, xóa stale locks, B11 Analytics Dreaming |
+* **Quy tắc Bất Biến (Scheduler Invariants)**:
+  1. **Strict Calendar Isolation**: Nếu một ngày gặp sự cố (API lỗi, không cào được đề tài), ngày hôm sau vẫn chạy đúng thị trường của ngày đó, không dồn ứ làm trễ lịch kênh khác. Cho phép chạy bù thủ công qua cờ CLI `--market <MKT>`.
+  2. **Boundary Precision**: Crontab chạy `0 23 * * *` (23:00 UTC) tự động quy đổi thành 06:00 AM VN của ngày tiếp theo. Cấm dùng UTC naive datetime.
+
 ### 1. Khối B1 (Trend Discovery) ➔ Khối B1.5 (Competitor Recon)
 * **File lưu trữ**: `/var/vf/pending_tasks/<task_id>.json (kèm đồng bộ Notion Trend Brain DB)`
 * **Data Schema (Generic Specification)**:

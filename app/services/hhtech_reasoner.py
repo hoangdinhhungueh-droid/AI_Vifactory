@@ -223,11 +223,18 @@ def reason_topic_niche(
     if viral_videos:
         v_lines = []
         for v in viral_videos[:6]:
-            t = str(v.get("title", "")).strip()
-            vc = v.get("views", 0)
-            pub = str(v.get("published_at", ""))[:10]
+            if isinstance(v, str):
+                t = v.strip()
+                vc = 0
+                pub = ""
+            elif isinstance(v, dict):
+                t = str(v.get("title", "")).strip()
+                vc = v.get("views", 0)
+                pub = str(v.get("published_at", ""))[:10]
+            else:
+                continue
             if t:
-                v_lines.append(f'  - "{t}" ({vc:,} views, published: {pub})' if isinstance(vc, int) else f'  - "{t}"')
+                v_lines.append(f'  - "{t}" ({vc:,} views, published: {pub})' if isinstance(vc, int) and vc > 0 else f'  - "{t}"')
         if v_lines:
             viral_videos_text = "\n[YOUTUBE LIVE VIRAL BENCHMARKS & ALGORITHM RECOMMENDATIONS]:\n" + "\n".join(v_lines) + "\n"
 
