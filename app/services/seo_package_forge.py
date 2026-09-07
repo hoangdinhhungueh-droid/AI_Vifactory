@@ -352,7 +352,7 @@ def forge_seo_package(
             logger.info(f"[seo_package_forge] Attempt {attempt}/{max_retries} calling GPT-6-Astra for {task_id}...")
             from app.services.hhtech_reasoner import call_gpt6_astra
             raw = call_gpt6_astra(
-                user_prompt=user_prompt,
+                prompt=user_prompt,
                 system_prompt=SEO_HOOK_SYSTEM_PROMPT,
                 max_tokens=2200,
                 timeout=75.0

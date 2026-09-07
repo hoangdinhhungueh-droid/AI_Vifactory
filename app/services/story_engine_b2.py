@@ -281,12 +281,17 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
         )
 
     hook_anchor_prompt = ""
-    if hook_60s:
+    if hook_60s and not seo_pkg.get("is_fallback"):
         hook_anchor_prompt = f"""• Approved YouTube Title A: {seo_title_a}
 • Pre-Approved 3s Cold-Open: {hook_3s}
 • Mandatory 60s Opening Monologue Contract (Act I MUST anchor directly to this):
   "{hook_60s}"
 CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off this exact 60-second narrative contract and title premise. Do not reinvent or drift away from this premise.
+
+"""
+    elif seo_title_a:
+        hook_anchor_prompt = f"""• Target YouTube Title: {seo_title_a}
+• Title Premise Instruction (Rule 130): Act I MUST directly address the central premise of this title, leading with the Level 1 Primary Catalyst and quantitative metrics from the Grounding Table.
 
 """
 
@@ -320,11 +325,17 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         f"   - Power your narration with precise, active investigative verbs ('inverted', 'hemorrhaged', 'siphoned', 'strangled', 'cloaked', 'recalibrated', 'evaporated', 'intercepted').\n"
         f"   - Staccato rhythm: Balance dense, analytical evidence with short, punchy forensic conclusions.\n\n"
         f"MANDATORY STORY GATE 12/12 REQUIREMENTS (ZERO-TOLERANCE QUALITY CRITERIA):\n"
-        f"• Check 9 (Hook Shock in First 60 Words): The very first sentence of Act I MUST feature a concrete numeric figure, percentage (%), monetary sum ($), or superlative scale (e.g. '105 receptions', '$0 spent', '3.65 million') creating a quantitative paradox.\n"
-        f"• Check 12 (Pattern Interrupt in Mechanism): In Act III (The Systemic Blindspot, 25%-70% mark), write at least one very short, punchy sentence of 2 to 6 words maximum (e.g. 'The paper trail vanished.', 'Then came the audit.', 'Nobody questioned the payout.') to disrupt rhythm.\n"
-        f"• Check 2 (Open Question in Hook): Act I must open a compelling Core Curiosity Loop with a direct unanswered question in the opening paragraph.\n"
-        f"• Check 5 (Grounded Truth Anchor & Sourced Numbers): Narration must strictly adhere to verified evidence. When a REAL-WORLD GROUNDED FACTS TABLE is supplied: claims marked [VERIFIED] may be asserted directly; claims marked [REPORTED] must use attributive sourcing ('According to reports from [Source]...', 'Records from [Source] indicate...'); claims marked [SPECULATIVE] must use cautious conditional language ('If projected scenarios hold...'). ZERO inventing of unverified numbers, rates, casualties, or institutional actions outside verified records.\n"
-        f"• Check 10 (Zero Banned Cliches): 100% elimination of banned AI cliches ('in a world where', 'little did they know', 'testament to', 'double-edged sword', 'beacon of hope').\n\n"
+        f"• Check 9 (Hook Shock in First 60 Words): The very first sentence of Act I MUST open with a concrete percentage (%), monetary sum ($), or numeric figure (e.g. '84.5%', '20.9 million', '$0 spent'). Do not delay the number to sentence 2.\n"
+        f"• Check 2, 3 & 4 (Curiosity Loops Open & Closed): Plant at least 8 to 10 explicit curiosity questions with '?' across the script (~2 per Act). Frequently close loops using phrases like 'that is why', 'which is how', 'the answer', 'in the end'.\n"
+        f"• Check 5 (Sourced Numbers): Include at least 10 grounded numbers across the script accompanied by explicit sourcing language ('according to reports from [Source]', 'records from [Source] indicate').\n"
+        f"• Check 7 (5-Act Architectural Cues): Each Act must explicitly weave in its architectural vocabulary:\n"
+        f"   - Act I (Hook/Shock): 'collapse', 'shock', 'disappear', 'first', 'only', and questions '?'.\n"
+        f"   - Act II (The False Narrative): 'official story', 'narrative', 'headline', 'myth', 'red herring'.\n"
+        f"   - Act III (Systemic Blindspot): 'paper trail', 'blindspot', 'loophole', 'leak', 'memo', 'forensic'.\n"
+        f"   - Act IV (The Smoking Gun): 'smoking gun', 'culprit', 'exposed', 'unmasked', 'profited'.\n"
+        f"   - Act V (The Modern Mirror): 'mirror', 'warning', 'modern', 'today', 'lesson', 'verdict'.\n"
+        f"• Check 12 (Pattern Interrupt in Act III): Write at least one punchy sentence of 2 to 6 words maximum in Act III (e.g. 'The paper trail vanished.', 'Then came the audit.').\n"
+        f"• Check 10 (Zero Banned Cliches): 100% elimination of banned AI cliches ('in a world where', 'little did they know', 'testament to', 'double-edged sword', 'beacon of hope', 'it's worth noting', 'at the end of the day').\n\n"
         f"{editorial_skills}\n\n"
         f"SPECIFIC CONTEXT FOR THIS SCRIPT:\n"
         f"• Subject / Case: {topic}\n"
@@ -364,19 +375,19 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
     if frustrations:
         context_lines.append(
             "🔥 AUDIENCE BURNING QUESTIONS & FRUSTRATIONS (MUST BE RESOLVED):\n"
-            + "\n".join(f"  - {fr}" for fr in frustrations[:5])
+            + "\n".join(f"  - {fr}" for fr in frustrations[:3])
             + "\nYour script must seamlessly and authoritatively answer every single one of these viewer doubts throughout the narrative."
         )
     if competitors:
         context_lines.append("TOP VIRAL COMPETITOR BENCHMARKS (High velocity references):")
-        for c in competitors[:5]:
+        for c in competitors[:3]:
             v_views = c.get("views", 0)
             v_title = c.get("title", "?")
             context_lines.append(f'  - \"{v_title}\" ({v_views:,} views)')
     if intel_card and intel_card.get("audience_comment_gaps"):
         context_lines.append("High-engagement audience comment quotes:")
-        for g in intel_card["audience_comment_gaps"][:10]:
-            context_lines.append(f"  - [{g.get('likes_count', 0)} likes] {g.get('comment_verbatim', '')[:220]}")
+        for g in intel_card["audience_comment_gaps"][:3]:
+            context_lines.append(f"  - [{g.get('likes_count', 0)} likes] {g.get('comment_verbatim', '')[:140]}")
 
     context_lines.append(
         "🚨 STRICT ZERO COMPETITOR NAME-DROP MANDATE:\n"
@@ -446,7 +457,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         )
 
         logger.info(f"[story_engine] Calling HHTech GPT-6-Astra for 5-Act Script generation (1,800-2,200 words)...")
-        full_script_raw = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=4200, timeout=240.0)
+        full_script_raw = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=3400, timeout=240.0)
 
         cleaned_acts = []
         act_pattern = re.compile(r'(=== ACT [I|V|X]+ ===.*?)(?=(=== ACT [I|V|X]+ ===|\Z))', re.DOTALL)
@@ -491,7 +502,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
                 f"Output ONLY the corrected 5-Act script now:"
             )
             try:
-                refined_raw = call_gpt6_astra(refine_user, system_prompt=system_prompt, max_tokens=4200, timeout=240.0)
+                refined_raw = call_gpt6_astra(refine_user, system_prompt=system_prompt, max_tokens=3400, timeout=240.0)
                 if refined_raw and len(refined_raw.split()) >= 1000:
                     cleaned_acts_ref = []
                     matches_ref = act_pattern.findall(refined_raw)
