@@ -69,11 +69,23 @@ CINEMATIC_ARCHETYPES = DynamicArchetypeDict({
         "palette": "Aged ochre, slate stone, imperial gold accents, oxidized bronze, deep chiaroscuro",
         "camera_style": "Slow deliberate tracking shots, high-angle surveillance-style observation, lingering static tableaux"
     },
-    "sports": {
-        "director": "GPT-6-Astra — Sports Documentary Realism (Moneyball Principle)",
-        "visual_tone": "Sunlit stadium tunnels, high-contrast training facilities, authentic press briefing rooms, analytical draft boards",
-        "palette": "Desaturated turf green, stadium amber, deep navy, clinical white accents",
-        "camera_style": "Steadicam tracking shots, telephoto stadium perspective, grounded eye-level procedural framing"
+    "true_crime": {
+        "director": "GPT-6-Astra — David Fincher (Forensic Procedural Noir) Principle",
+        "visual_tone": "Evidence locker dim lighting, sterile courtroom benches, micro-evidence examinations, tense interrogation room staging",
+        "palette": "Low-key obsidian black, desaturated neutral slate, cold fluorescent white, deep shadows",
+        "camera_style": "Precision analytical tracking, tight macro close-ups on physical evidence, static high-tension procedural compositions"
+    },
+    "psychology": {
+        "director": "GPT-6-Astra — Denis Villeneuve (Psychological Mystery & Behavioral Tension) Principle",
+        "visual_tone": "Claustrophobic interview rooms, symbolic geometric architectural framing, disorienting shadow play dissecting mental manipulation",
+        "palette": "Muted monochrome with solitary focal accents, deep graphite grey, psychological shadow contrasts",
+        "camera_style": "Creeping slow push-ins creating psychological intimacy, symmetrical wide tableaus, abrupt perspective shifts"
+    },
+    "tech_geopolitics": {
+        "director": "GPT-6-Astra — Cyber & Geopolitical Thriller (Sicario & Zero Dark Thirty Principle)",
+        "visual_tone": "Humming cleanroom photolithography labs, fiber-optic submarine cable maps, satellite telemetry command centers, dark boardroom summits",
+        "palette": "Silicon cyan, server rack emerald, cold titanium silver, deep surveillance indigo",
+        "camera_style": "Clinical surveillance pans, sharp graphic whip-cuts between maps and boardrooms, high-angle technological dominance framing"
     },
     "default": {
         "director": "GPT-6-Astra — Denis Villeneuve & David Fincher (Investigative Realism) Principle",
@@ -87,14 +99,18 @@ CINEMATIC_ARCHETYPES = DynamicArchetypeDict({
 def detect_cinematic_archetype(niche: str = "", topic: str = "", story_text: str = "") -> dict:
     """
     Universal dynamic cinematic archetype and visual grammar detection (Rule 128).
-    Maintains compatibility with tests while routing dynamically based on cinematic tone.
+    Routes dynamically based on the 5 Canonical High-RPM Content Pillars.
     """
     combined = f"{niche} {topic} {story_text[:500]}".lower()
-    if any(k in combined for k in ["sport", "athlete", "nfl", "nba", "football", "baseball", "olympic", "player", "coach", "stadium", "league"]):
-        return CINEMATIC_ARCHETYPES["sports"]
-    elif any(k in combined for k in ["finance", "economy", "bank", "money", "fraud", "wall street", "debt", "lehman", "madoff", "enron", "trading"]):
+    if any(k in combined for k in ["tech", "chip", "semiconductor", "asml", "tsmc", "silicon", "geopolitic", "supply chain", "cable", "satellite", "cyber", "hardware", "lithography", "quantum"]):
+        return CINEMATIC_ARCHETYPES["tech_geopolitics"]
+    elif any(k in combined for k in ["crime", "murder", "killer", "investigation", "forensic", "court", "trial", "verdict", "police", "detective", "fbi", "heist"]):
+        return CINEMATIC_ARCHETYPES["true_crime"]
+    elif any(k in combined for k in ["psycholog", "manipulat", "cult", "mind", "behavior", "brainwash", "cognitive", "hysteria", "bias", "propaganda", "societal"]):
+        return CINEMATIC_ARCHETYPES["psychology"]
+    elif any(k in combined for k in ["finance", "economy", "bank", "money", "fraud", "wall street", "debt", "lehman", "madoff", "enron", "trading", "business"]):
         return CINEMATIC_ARCHETYPES["finance"]
-    elif any(k in combined for k in ["history", "empire", "war", "monarchy", "oppenheimer", "manhattan project", "soviet", "cold war", "chernobyl", "medieval", "century"]):
+    elif any(k in combined for k in ["history", "empire", "war", "monarchy", "oppenheimer", "manhattan project", "soviet", "cold war", "chernobyl", "medieval", "century", "labor day", "strike"]):
         return CINEMATIC_ARCHETYPES["history"]
     elif any(k in combined for k in ["medical", "pharma", "clinical", "hospital", "drug", "medicine", "vaccine", "toxic", "poison", "epidemic", "cholera"]):
         return {

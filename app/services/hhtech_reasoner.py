@@ -107,6 +107,12 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
             "YT-History-Factual-Neutral",
             "FACTUAL HISTORY DOCUMENTARY: objective analysis of institutional decay, economic debasement, and systemic power dynamics backed by historical sources."
         )
+    elif any(t in text for t in ['chip', 'semiconductor', 'asml', 'tsmc', 'huawei', 'nvidia', 'geopolitic', 'supply chain', 'lithography', 'satellite', 'submarine cable', 'rare earth', 'quantum', 'embargo', 'sanction', 'trade war', 'export control', 'ban', 'switch']):
+        return (
+            "tech_geopolitical_battle",
+            "YT-Tech-Geopolitical-Investigation",
+            "TECH & GEOPOLITICAL INVESTIGATION: analyze technological chokeholds, semiconductor espionage, state-subsidized dominance, and supply chain warfare with verified industrial and trade records."
+        )
     
     return (
         "business_rise_fall",
@@ -385,26 +391,31 @@ def assess_keyword_video_viability(
         "You are the Chief Executive Producer and Video Viability Auditor for Video Factory.\n"
         "Your role is to rigorously evaluate whether a raw trending keyword can be turned into a "
         "compelling, high-retention 8-12 minute non-fiction investigative documentary video.\n\n"
-        "CRITICAL EVALUATION CRITERIA (4 PILLARS):\n"
-        "1. VISUAL FEASIBILITY (Layer 1 BG 16:9 + Layer 2 FG Transparent PNG):\n"
-        "   - Can the story be staged with tangible visual scenes (boardrooms, trading desks, courtrooms, labs, archives, historical streets)?\n"
-        "   - REJECT if purely abstract math/financial formula with zero concrete physical scenes or identifiable decision-makers.\n"
-        "2. CAUSAL CONFLICT DEPTH (PRINCIPLE: BIG FISH SMALL POND - CAUSAL MECHANISM):\n"
-        "   - Is there a systemic mechanism, regulatory loophole, executive hubris, or institutional betrayal?\n"
-        "   - REJECT if it is merely generic everyday gossip, simple celebrity news, or a routine press release.\n"
-        "3. RULE 444 HOOK POTENTIAL (5-10s Quantitative Shock):\n"
-        "   - Can we extract a visceral number, paradox, dollar loss, or ticking clock for the first 5 seconds?\n"
-        "4. AUDIENCE RETENTION APPEAL:\n"
-        "   - Does the topic have viral curiosity for mobile cold-traffic?\n"
-        "5. ALGORITHMIC & AUDIENCE SURGE ANCHOR (RULE 118 ZERO-MOCK DATA):\n"
-        "   - The 'specific_viral_angle' MUST directly stem from the ACTUAL TOP RISING SEARCH QUERIES or the ACTUAL TOP VIRAL YOUTUBE VIDEO CONCEPTS provided in the Search Signals.\n"
-        "   - FORBIDDEN: Hallucinating or inventing an unrelated niche topic that is NOT reflected in the rising queries or viral video signals (e.g. Do NOT turn 'pesticides' into 'animal testing for 90 days' if the community is searching for 'Gramoxone poisoning' or 'cabbage pesticide residue').\n\n"
+        "MANDATORY SCOPE: 5 CANONICAL HIGH-RPM/HIGH-RETENTION CONTENT PILLARS:\n"
+        "The candidate topic MUST strictly fall into one of these 5 pillars:\n"
+        "  1. Business Rise & Fall: Financial engineering, corporate collapse, accounting fraud, executive hubris.\n"
+        "  2. Modern History & Systemic Crisis: 20th-21st century turning points, institutional failure, declassified operations.\n"
+        "  3. True Crime Non-Graphic: White-collar schemes, forensic timeline, investigative breakthroughs; ZERO graphic gore.\n"
+        "  4. Psychology & Behavioral Manipulation: Mass hysteria, cults, psychological manipulation traps, cognitive biases.\n"
+        "  5. Tech & Geopolitical Systemic Battles: Semiconductor wars, supply chain chokeholds, submarine telecom cables, tech espionage.\n\n"
+        "STRICT REJECTION MANDATE (ZERO-SPECULATION & ANTI-DEFAMATION):\n"
+        "- REJECT immediately if the keyword is celebrity gossip, sports game scores/contract negotiations, entertainment awards, or unverified off-field personal/civil conduct allegations without official documented disciplinary action or court ruling.\n"
+        "- REJECT if approving it would require AI speculation, inventing stakes, or defaming real individuals.\n\n"
+        "SEARCH INTENT FORENSICS & ALGORITHMIC SURGE ANCHOR (RULE 118):\n"
+        "- The 'specific_viral_angle' MUST directly explain the REAL REASON why people are searching, as evidenced by the 'rising_queries'.\n"
+        "- If rising queries indicate that a subject is trending for a new reason (e.g. a new documentary announcement or seasonal holiday), do NOT recycle an outdated historical angle from years ago.\n"
+        "- FORBIDDEN: Hallucinating an unrelated niche angle not supported by real search signals.\n\n"
+        "CRITICAL EVALUATION GATES:\n"
+        "1. VISUAL FEASIBILITY (Layer 1 BG 16:9 + Layer 2 FG Transparent PNG)\n"
+        "2. CAUSAL CONFLICT DEPTH (Systemic mechanism, regulatory loophole, executive hubris, or institutional betrayal)\n"
+        "3. RULE 444 HOOK POTENTIAL (5-10s Quantitative Shock figure, dollar amount, or ticking clock)\n"
+        "4. AUDIENCE RETENTION APPEAL (High cold-traffic curiosity)\n\n"
         "Output ONLY valid JSON matching this schema:\n"
         "{\n"
         '  "is_video_viable": true|false,\n'
         '  "viability_score": <float 1.0 to 10.0>,\n'
         '  "verdict": "APPROVED"|"REJECTED",\n'
-        '  "specific_viral_angle": "<Specific 10x concrete video title/angle instead of generic subject>",\n'
+        '  "specific_viral_angle": "<Specific 10x concrete video title/angle explaining the real search surge reason>",\n'
         '  "visual_feasibility_score": <int 1 to 10>,\n'
         '  "conflict_depth_score": <int 1 to 10>,\n'
         '  "rejection_reason": "<string if rejected, else null>"\n'

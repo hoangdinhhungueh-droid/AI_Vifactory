@@ -98,6 +98,7 @@ def get_next_episode_id(market: str = "EN", slug: str = "", offset: int = 0) -> 
     if os.path.exists(pending_dir):
         try:
             for f in os.listdir(pending_dir):
+
                 if not f.endswith(".json"):
                     continue
                 p = os.path.join(pending_dir, f)
@@ -198,6 +199,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -223,39 +225,29 @@ EN_SUB_GEOS = ["US", "GB", "DE", "AU", "CA", "NZ"]
 # so a 6x geo fan-out doesn't trip rate limits (12/08/2026 decision).
 EN_GEO_SLEEP_SECONDS = float(os.getenv("TREND_GATE_EN_GEO_SLEEP", "1.5"))
 
-# One representative seed per theme for the free autocomplete lanes. Kept separate
-# from legacy_sources.SERPAPI_V5_SEEDS so the two can evolve independently.
 AUTOCOMPLETE_SEEDS = {
-    "business": "business scandal",
-    "history": "ancient history mystery",
-    "true_crime": "true crime case",
+    "business": "business rise and fall collapse",
+    "modern_history": "modern history systemic investigation",
+    "true_crime": "true crime case non graphic",
     "psychology": "psychology of manipulation",
-    "scam_fraud_gambling": "investment scam",
+    "tech_geopolitics": "tech geopolitical supply chain battle",
 }
 
-# UPDATE (06/08/2026 live-test fix): the seeds above are English-only. On JP/KR the
-# autocomplete lanes were sending an English seed with hl/gl=ja/JP or ko/KR - Google
-# and YouTube mostly echo back English suggestions for an English seed regardless of
-# hl/gl, so cross_confirmed_google_youtube showed the SAME English terms for JP/KR as
-# for US (confirmed live-test 06/08/2026: JP and KR trend-raw runs returned identical
-# EN-language candidates like "ancient history mystery", "business scandals 2026").
-# Native-language seeds per market so JP/KR actually surface JP/KR-language search
-# suggestions - this is required for the original ask (score real Google+YouTube
-# search interest) to mean anything for non-English markets.
+# 5 Canonical Content Pillars per Market (Native-First)
 AUTOCOMPLETE_SEEDS_BY_MARKET = {
     "JP": {
-        "business": "\u4f01\u696d \u30b9\u30ad\u30e3\u30f3\u30c0\u30eb",
-        "history": "\u53e4\u4ee3\u6b74\u3000\u8b0e",
-        "true_crime": "\u51f6\u60aa\u4e8b\u4ef6",
-        "psychology": "\u5fc3\u7406\u64cd\u4f5c",
-        "scam_fraud_gambling": "\u6295\u8cc7\u8a50\u6b3a",
+        "business": "企業 衰退 崩壊 スキャンダル",
+        "modern_history": "現代史 事件 調査",
+        "true_crime": "未解決事件 捜査 ドキュメンタリー",
+        "psychology": "心理操作 洗脳 行動経済学",
+        "tech_geopolitics": "半導体戦争 技術覇権 地政学",
     },
     "KR": {
-        "business": "\uae30\uc5c5 \uc2a4\uce90\ub4e4",
-        "history": "\uace0\ub300\uc0ac \ubbf8\uc2a4\ud130\ub9ac",
-        "true_crime": "\uc2e4\ud654 \ubc94\uc8c4 \uc0ac\uac74",
-        "psychology": "\uc2ec\ub9ac \uc870\uc791",
-        "scam_fraud_gambling": "\ud22c\uc790 \uc0ac\uae30",
+        "business": "기업 흥망성쇠 몰락 스캔들",
+        "modern_history": "현대사 사건 탐사",
+        "true_crime": "실화 범죄 수사 다큐",
+        "psychology": "심리 조작 가스라이팅 행동심리",
+        "tech_geopolitics": "반도체 전쟁 기술 패권 공급망",
     },
 }
 
@@ -298,6 +290,7 @@ def _committed_today(day):
     try:
         with open(_commits_path(day)) as f:
             for line in f:
+
                 line = line.strip()
                 if not line:
                     continue
@@ -400,6 +393,7 @@ def _lane_serpapi(market, pool):
     return []
 
 
+
 def _lane_gtrends_daily(market, limit=None):
     """FREE Google Trends 'Trending Now' RSS feed (06/08/2026 decision - see
     trend_free_signals.py). UPDATE (12/08/2026): EN fans out across 6 sub-geos
@@ -498,6 +492,7 @@ def _lane_google_autocomplete(market, limit=None):
     by_term = {}
     for gi, geo in enumerate(geos):
         hl, gl = AC_HL_GL.get(geo, ("en", "US"))
+
         for theme, seed in seeds.items():
             try:
                 suggestions = google_autocomplete(seed, hl=hl, gl=gl) or []
@@ -598,6 +593,7 @@ def collect_raw_pool(markets=None, pool=20, lanes=None):
     """Collect every lane's RAW candidates. No LLM, no scoring, no ranking, no cap,
     no DB write - all judgement is deliberately left to the Notion AI gate."""
     markets = [m.strip().upper() for m in (markets or DEFAULT_MARKETS) if m and m.strip()]
+
     lanes = lanes or ["serpapi", "gtrends_daily", "wiki_spike", "evergreen",
                        "youtube_autocomplete", "google_autocomplete", "gtrends_discover"]
     # Legacy raw pool free signals retired; canonical pool handled by B1
@@ -698,6 +694,7 @@ def trend_raw(req: TrendRawRequest):
 class GateItem(BaseModel):
     term: str
     market: str
+
     lane: str | None = None       # serpapi | gtrends_daily | wiki_spike | evergreen | youtube_autocomplete | google_autocomplete
     theme: str | None = None
     score: float | None = None    # the gate's own composite judgement, 0..1
@@ -799,6 +796,7 @@ def trend_commit(req: TrendCommitRequest):
             "committed_today": _day_counts, "pick_of_day": pick or None}
 
 
+
 # ===== Trend Refine endpoint (07/08/2026) — Nhom 2: deep scrape =====
 
 class TrendRefineRequest(BaseModel):
@@ -882,3 +880,4 @@ def trend_virality(req: TrendViralityRequest):
         "approved_topics": approved_topics,
         "by_market": by_market
     }
+

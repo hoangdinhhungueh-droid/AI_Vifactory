@@ -283,3 +283,57 @@ Integrity mode: development
 >    - Commit VPS: `6f6b6f245de4e397e801db9a60031f6f08848067`.
 >    - GitHub Actions CI Watcher: [Workflow Run 34086874750](https://github.com/hoangdinhhungueh-droid/AI_Vifactory/actions/runs/34086874750) đạt `conclusion: success` (exit code 0).
 
+---
+
+## 💎 VII. CẬP NHẬT TIẾN TRÌNH SẢN XUẤT & PHẪU THUẬT GỐC RỄ PIPELINE (2026-09-07 SESSION 8)
+
+> **Căn cứ yêu cầu người dùng ngày 2026-09-07 (/vf-pipeline-teamwork /grill-me)**:
+> 1. [x] **Nâng cấp toàn diện Skill `/vf-image-gen` & Playwright Automation**:
+>    - Runbook `SKILL.md` chuẩn hóa quy trình tự động 7 bước (Đọc Task ID, Nạp nguyên lý không nhiễm độc prompt, Quét asset Notion/VPS, Sinh ảnh 2K DCI + #FF00FF Magenta, Audit song song 4 trục, Download ảnh gốc, Auto-trigger B6).
+>    - `gemini_browser_gen.py`: Bổ sung bộ lọc task id thông minh, kiểm tra nhất quán B3.5 prompts vs B3 scenes, mặc định tự động handoff sang B6 `continue_after_images.py` khi B5 đạt PASS.
+> 2. [x] **Phẫu thuật gốc rễ B1 Trend Discovery & B1.5 Competitor Recon (Sửa sai trend Puka Nacua)**:
+>    - `hhtech_reasoner.py`: Xóa bỏ triệt để các ví dụ hardcode gây neo ngữ nghĩa (Rule 128) `Puka Nacua rookie contract`, `Livedoor stock fraud`, `Gramoxone`, thay thế bằng Generic Pattern Placeholders.
+>    - `trend_engine_b1.py`: Tích hợp Google Trends Real-Time Rising / Breakout Queries qua `pytrends` trước khi autocomplete; Đảo thứ tự B1.5 Pre-Recon chạy trước `reason_topic_niche` để nạp đúng khoảng trống đối thủ (Fatal Explanatory Vacuum), thất vọng khán giả và top bình luận vào LLM.
+> 3. [x] **Khắc phục Story Gate 12/12 cho mọi Episode**:
+>    - `story_engine_b2.py`: Nâng ngưỡng kích hoạt Auto-Refine lên `< 12` (thay vì `< 10`), ép buộc Tiêu chí 9 (Hook Shock số liệu trong 60 từ đầu) và Tiêu chí 12 (Pattern Interrupt câu $\le 6$ từ ngắt nhịp) trong System Prompt.
+>    - CI Neighbor Test Block 3.0 nghiệm thu thực tế: đạt tuyệt đối **12/12 (Words: 1519) | Verdict: PASS**.
+> 4. [x] **Triệt tiêu thông báo trùng lặp Human Gate 2**:
+>    - `prompts_forge_watcher.py`: Chuyển sang chế độ passive validation (chỉ log và sync trạng thái), vô hiệu hóa việc dispatch Telegram từ watcher.
+>    - Duy nhất 1 thông báo Human Gate 2 gửi từ pipeline script theo mẫu tinh gọn 1-chạm chuẩn mực khớp 100% hình ảnh điều hành.
+> 5. [x] **Chuẩn hóa Dynamic Director Principle (Loại bỏ mâu thuẫn Adam McKay / David Fincher)**:
+>    - `director_planner_b3.py`: Gỡ bỏ sự kết hợp trái ngược Adam McKay / David Fincher khỏi Corporate Noir; Bổ sung phong cách `Sports Documentary Realism (Moneyball Principle)` cho chủ đề thể thao/vận động viên; Khẳng định Astra 6 là Đạo diễn duy nhất.
+> 6. [x] **Kiểm thử chất lượng toàn hệ thống & Three-Way Physical Sync (Rule 121, 126, 127)**:
+>    - `py_compile`: Toàn bộ 6 file trên VPS đạt exit code `0`.
+>    - Pytest: 44/44 unit tests PASS (100%).
+>    - CI Neighbor Testing: Block 1.0 PASS; Block 3.0 PASS (Story Gate 12/12, Director Audit 8.44/10).
+>    - Master E2E Smoke Gate: 8/8 Gates PASS (in dòng `ALL PIPELINE GATES PASSED`).
+
+---
+
+## 🏛️ VIII. THIẾT LẬP 5 TRỤ CỘT NỘI DUNG SIÊU LỢI NHUẬN & CƠ CHẾ ĐIỀU TRA Ý ĐỒ TÌM KIẾM (2026-09-07 SESSION 9)
+
+> **Căn cứ chỉ đạo chiến lược người dùng ngày 2026-09-07**:
+> 1. [x] **Khóa Chặt 5 Trụ Cột Nội Dung Siêu Lợi Nhuận (High-RPM / High-Retention Pillars)**:
+>    - Trụ cột 1: **Business Rise & Fall** ($18–$45 CPM) — Corporate Noir (David Fincher / Margin Call).
+>    - Trụ cột 2: **Modern History & Systemic Crisis** ($10–$20 CPM) — Historical Realism (Christopher Nolan / Johan Renck).
+>    - Trụ cột 3: **True Crime Non-Graphic** ($8–$18 CPM, CTR 8–14%) — Forensic Procedural Noir (David Fincher).
+>    - Trụ cột 4: **Psychology & Behavioral Manipulation** ($10–$22 CPM) — Psychological Puzzle Drama (Denis Villeneuve).
+>    - Trụ cột 5: **Tech & Geopolitical Systemic Battles** ($25–$50 CPM) — Cyber & Geopolitical Thriller (Sicario / Zero Dark Thirty).
+>    - *Code hóa*: Cập nhật `AUTOCOMPLETE_SEEDS` và `AUTOCOMPLETE_SEEDS_BY_MARKET` trong `app/services/trend_gate_ai.py`; Cập nhật `detect_safety_and_theme` trong `app/services/hhtech_reasoner.py`.
+> 2. [x] **Hủy Bỏ Phong Cách Thể Thao Không Cần Thiết**:
+>    - Đã gỡ bỏ hoàn toàn `Sports Documentary Realism (Moneyball Principle)` khỏi `app/services/director_planner_b3.py` và điều hướng 100% về 5 phong cách tương ứng với 5 trụ cột.
+> 3. [x] **Giữ Vững & Code Hóa Rule Loại Bỏ Tin Đồn / Suy Đoán Vô Căn Cứ (Anti-Speculation & Fact-Anchored Gate)**:
+>    - Chuẩn hóa điều khoản cưỡng chế trong `assess_keyword_video_viability`: REJECT ngay lập tức các đề tài đời tư, tranh cãi dân sự chưa có phán quyết, hoặc tin đồn chưa có án phạt chính thức (nguyên nhân Astra tự động reject Puka Nacua).
+> 4. [x] **Search Intent Forensics (Pháp Y Ý Đồ Tìm Kiếm qua Rising Queries)**:
+>    - Bắt buộc nạp cụm từ tìm kiếm bùng nổ (`rising_queries` qua pytrends live) vào `assess_keyword_video_viability` và `reason_topic_niche`.
+>    - Khóa quy tắc: `specific_viral_angle` bắt buộc giải mã đúng động cơ bùng nổ thực tế của người xem thay vì tái chế góc nhìn cũ (như trường hợp Elizabeth Holmes bùng nổ vì phim tài liệu mới A24 thay vì vụ án Theranos 2023).
+> 5. [x] **Dọn Dẹp Tàn Dư & Sẵn Sàng Kho Số `EN_EP0001`**:
+>    - Lưu trữ tập `EN_EP0001_puka_contract_economics` cũ vào `_archive/` trên VPS.
+>    - Lưu trữ các trang Notion tương ứng trong VF Trend Brain, Story Library, Director Plan, Prompt Library.
+>    - Xác nhận `get_next_episode_id("EN")` quay về chuẩn xác `EN_EP0001`.
+> 6. [x] **Master E2E Smoke Test & Three-Way Sync**:
+>    - Pytest: 10/10 tests PASS.
+>    - E2E Smoketest: 8/8 Gates PASS (`ALL PIPELINE GATES PASSED`).
+
+
+
