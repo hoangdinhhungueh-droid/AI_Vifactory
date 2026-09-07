@@ -1,11 +1,11 @@
 # 🛡️ ANTIGRAVITY OPERATIONAL CONSTITUTION (ALWAYS ON)
 
 > **QUY TẮC BẤT BIẾN CẤP CAO NHẤT CỦA WORKSPACE AI VIDEO FACTORY (VF PIPELINE).**
-> Mọi Agent/Subagent bắt buộc tuân thủ 11 Kỷ Luật Thép và cơ chế Định Tuyến Kỹ Năng (Progressive Disclosure) dưới đây:
+> Mọi Agent/Subagent bắt buộc tuân thủ 12 Kỷ Luật Thép và cơ chế Định Tuyến Kỹ Năng (Progressive Disclosure) dưới đây:
 
 ---
 
-## ⚖️ I. HIẾN PHÁP 11 ĐIỀU LUẬT BẤT BIẾN (IRON LAWS)
+## ⚖️ I. HIẾN PHÁP 12 ĐIỀU LUẬT BẤT BIẾN (IRON LAWS)
 
 1. **RULE 118 (Zero-Mock Data & Ask-Before-Deviating)**:
    - CẤM TUYỆT ĐỐI tự tạo mock data, số liệu giả định (Analytics, Views, CTR, RPM). Chưa có API/số liệu YouTube Studio thực tế thì bắt buộc để `null` và báo cáo rõ ràng.
@@ -102,6 +102,27 @@
         + *CẤM HỎI LẮT NHẮT (Thực thi dứt khoát)*: Yêu cầu đã rõ ràng 100%, sửa lỗi cú pháp cụ thể, chạy script test/kiểm tra hệ thống, in log, giải thích kiến thức đơn thuần.
     - **Kỷ Luật "Chốt Là Code Ngay" (Rule 124 Enforced)**:
       - Ngay khi User xác nhận hướng đi hoặc lựa chọn xong, Agent lập tức bắt tay vào code hóa (`replace_file_content`/`write_to_file`) và kiểm thử nghiệm thu nghiêm ngặt, tuyệt đối không hỏi lại những điều đã được chốt.
+12. **RULE 130 (Factual Causal Integrity & Search-Intent Payoff Mandate - Kỷ Luật Thép Về Tính Toàn Vẹn Nhân Quả & Trả Lời Trúng Ý Định Tìm Kiếm Của Khán Giả)**:
+    - **Zero-Fabricated Causality & Anti-Convenient-Twist Mandate (Cấm Bịa Đặt Mối Quan Hệ Nhân Quả & Thuyết Âm Mưu Tiện Lợi)**:
+      - CẤM TUYỆT ĐỐI việc Agent hoặc Prompt sáng tác ra một "twist" nhân quả giả định chỉ để làm kịch bản nghe có vẻ bí hiểm hoặc giật gân (ví dụ: gán nguyên nhân cốt lõi cho một yếu tố phụ trợ, biến hệ quả tài chính thứ cấp thành "thủ phạm phát lệnh" thay thế nguyên nhân thực tế).
+      - Mối quan hệ nhân quả (Causal Chain) bắt buộc phải phân định minh bạch 2 cấp độ:
+        + **Level 1 (Primary Catalyst / Ngòi nổ Khách quan Trực tiếp)**: Sự kiện kích hoạt thực tế từ thế giới thực (hành động quân sự, tập kích, phán quyết tòa án, vụ bắt giữ, lệnh cấm vận chuyển, vụ bê bối gian lận sổ sách bị phát giác).
+        + **Level 2 (Transmission Mechanism / Cơ chế Lan truyền Thể chế)**: Phản ứng dây chuyền của hệ thống (phí bảo hiểm rủi ro tăng vọt, margin call, cạn kiệt thanh khoản, đứt gãy chuỗi cung ứng, từ chối cấp phép).
+        + *Nguyên tắc bất biến*: Level 2 là bộ lọc/hệ quả của Level 1, tuyệt đối không được đánh tráo Level 2 thành Level 1 để tạo cảm giác "điều tra giật gân" vô căn cứ.
+    - **Factual High-Stakes Hook Mandate (Hook Kịch Tính Nhưng Phải Đúng Sự Thật 100%)**:
+      - Sự kịch tính (suspense / hook) KHÔNG đến từ tính từ giật gân hay sự bịa đặt; nó đến từ **sự va chạm khốc liệt giữa một sự kiện ngòi nổ thực tế và quy mô ảnh hưởng khổng lồ của nó**.
+      - Hook 0-60s (Rule 444) bắt buộc phải cấu thành từ 3 thành tố:
+        1. Một sự kiện ngòi nổ thời sự / thực tế có mốc thời gian rõ ràng (Catalyst Event).
+        2. Một con số lượng hóa xác thực (Quantitative Metric) từ Grounding Table.
+        3. Một nghịch lý thể chế cốt lõi (Core Institutional Paradox) chạm đúng nỗi sợ hãi hoặc sự tò mò cao nhất của người xem.
+    - **Search-Intent Direct Payoff & Anti-Bait-and-Switch (Chống Treo Đầu Dê Bán Thịt Chó / Thoái Thác Thời Sự)**:
+      - Khi người xem gõ tìm kiếm một từ khóa đang trend (ví dụ: một vụ scandal, một cuộc khủng hoảng, một vụ sụp đổ tài chính), họ đang có một câu hỏi nhức nhối cần được trả lời ngay lập tức.
+      - Kịch bản (đặc biệt là Act I & Act II) BẮT BUỘC phải đối diện và giải mã trực tiếp câu hỏi thời sự đó.
+      - CẤM TUYỆT ĐỐI việc mượn từ khóa nóng làm mồi nhử (clickbait) rồi ngay sau đó thoái thác, bẻ lái sang một bài giảng lý thuyết luật/học thuật chung chung, trừu tượng hay lịch sử xa xưa mà không giải quyết mối bận tâm thời sự của khán giả.
+    - **Universal Generic Pattern Across All Topic Axes (Áp Dụng Bình Đẳng Cho Mọi Trục Đề Tài - Rule 128 Enforced)**:
+      - Áp dụng chuẩn Generic Placeholders:
+        `"<CATALYST_EVENT> (verified date & direct actor) -> <TRANSMISSION_MECHANISM> (financial/legal/logistical choke) -> <CORE_SYSTEMIC_PARADOX> -> <DIRECT_SEARCH_PAYOFF>"`
+      - Dù là Trục 1 (Vụ án kinh tế), Trục 2 (Tội phạm điều tra), Trục 3 (Công nghệ độc quyền), Trục 4 (Tài chính sụp đổ), hay Trục 5 (Địa chính trị/Thương mại toàn cầu): Mọi kịch bản đều phải tuân thủ nghiêm ngặt 4 nguyên tắc trên.
 
 ---
 

@@ -151,24 +151,87 @@ def test_passes_grounding_gate_strict_audit_criteria():
         "rejected": False,
         "has_live_search": True,
         "claims": [
-            {"claim": "Official notice by treasury", "source": "US MARAD", "confidence": "verified", "date": "2026-09-01", "mechanism": "regulatory"},
-            {"claim": "Transit fell 80%", "source": "Lloyd's List", "confidence": "verified", "date": "2026-09-02", "mechanism": "commercial"},
-            {"claim": "Spot freight rates elevated", "source": "Reuters", "confidence": "reported", "date": "2026-09-03", "mechanism": "financial"}
+            {"claim": "Armed forces interdicted commercial vessel in international corridor", "source": "Reuters", "confidence": "verified", "date": "2026-09-01", "causal_role": "primary_catalyst", "mechanism": "military"},
+            {"claim": "Transit fell 80%", "source": "Lloyd's List", "confidence": "verified", "date": "2026-09-02", "causal_role": "transmission_mechanism", "mechanism": "commercial"},
+            {"claim": "Spot freight rates elevated", "source": "US MARAD", "confidence": "reported", "date": "2026-09-03", "causal_role": "transmission_mechanism", "mechanism": "financial"}
         ]
     }
     ok, reason = passes_grounding_gate(valid_res, min_verified=2, require_whitelist=True)
     assert ok is True
     assert "PASSED" in reason
+    assert "causal_link: VALID" in reason
+
+
+def test_classify_causal_role():
+    from app.services.grounding_layer_b15 import classify_causal_role
+
+    # Explicit tagging
+    assert classify_causal_role({"causal_role": "primary_catalyst"}) == "primary_catalyst"
+    assert classify_causal_role({"causal_role": "transmission_mechanism"}) == "transmission_mechanism"
+    assert classify_causal_role({"causal_role": "background_context"}) == "background_context"
+
+    # Heuristic fallback: Catalyst signals
+    assert classify_causal_role({"claim": "Forces struck two oil tankers", "mechanism": "military"}) == "primary_catalyst"
+    assert classify_causal_role({"claim": "Court issued indictment against executive", "mechanism": "legal"}) == "primary_catalyst"
+
+    # Heuristic fallback: Transmission signals
+    assert classify_causal_role({"claim": "War risk insurance premiums surged to 3%", "mechanism": "financial"}) == "transmission_mechanism"
+    assert classify_causal_role({"claim": "Vessel traffic dropped by 85%", "mechanism": "commercial"}) == "transmission_mechanism"
+
+
+def test_passes_grounding_gate_causal_link_missing_catalyst():
+    # Only transmission claims, no primary catalyst
+    no_catalyst_res = {
+        "topic": "only transmission topic",
+        "rejected": False,
+        "has_live_search": True,
+        "claims": [
+            {"claim": "War risk insurance rose to 3%", "source": "Reuters", "confidence": "verified", "date": "2026-09-01", "causal_role": "transmission_mechanism"},
+            {"claim": "Vessel traffic fell 80%", "source": "Lloyd's List", "confidence": "verified", "date": "2026-09-02", "causal_role": "transmission_mechanism"},
+            {"claim": "Advisory notice issued", "source": "US MARAD", "confidence": "reported", "date": "2026-09-03", "causal_role": "transmission_mechanism"}
+        ]
+    }
+    ok, reason = passes_grounding_gate(no_catalyst_res, require_causal_link=True)
+    assert ok is False
+    assert "Causal Link Failure" in reason
+    assert "primary catalyst" in reason
+
+
+def test_passes_grounding_gate_causal_link_missing_transmission():
+    # Only catalyst claims, no transmission mechanism
+    no_trans_res = {
+        "topic": "only catalyst topic",
+        "rejected": False,
+        "has_live_search": True,
+        "claims": [
+            {"claim": "Missile attack struck port facility", "source": "Reuters", "confidence": "verified", "date": "2026-09-01", "causal_role": "primary_catalyst"},
+            {"claim": "Naval strike launched against depot", "source": "AP News", "confidence": "verified", "date": "2026-09-02", "causal_role": "primary_catalyst"},
+            {"claim": "Subpoena issued for executive records", "source": "Bloomberg", "confidence": "reported", "date": "2026-09-03", "causal_role": "primary_catalyst"}
+        ]
+    }
+    ok, reason = passes_grounding_gate(no_trans_res, require_causal_link=True)
+    assert ok is False
+    assert "Causal Link Failure" in reason
+    assert "transmission mechanism" in reason
 
 
 def test_format_grounded_facts_for_prompt():
     sample_result = {
         "claims": [
             {
+                "claim": "Forces ordered immediate corridor closure",
+                "source": "Reuters",
+                "date": "2026-08-14",
+                "confidence": "verified",
+                "causal_role": "primary_catalyst",
+                "mechanism": "military"
+            },
+            {
                 "claim": "Vessel transits fell by 18 percent",
                 "source": "Lloyd's List",
                 "date": "2026-08-15",
                 "confidence": "verified",
+                "causal_role": "transmission_mechanism",
                 "mechanism": "commercial"
             },
             {
@@ -176,14 +239,17 @@ def test_format_grounded_facts_for_prompt():
                 "source": "US MARAD",
                 "date": "2026-08-16",
                 "confidence": "reported",
+                "causal_role": "transmission_mechanism",
                 "mechanism": "regulatory"
             }
         ]
     }
     formatted = format_grounded_facts_for_prompt(sample_result)
     assert "REAL-WORLD GROUNDED FACTS TABLE" in formatted
-    assert "[VERIFIED] (2026-08-15) [Lloyd's List | Mechanism: commercial]: Vessel transits fell by 18 percent" in formatted
-    assert "[REPORTED] (2026-08-16) [US MARAD | Mechanism: regulatory]: Advisory notice issued to merchant fleet" in formatted
+    assert "RULE 130" in formatted
+    assert "[VERIFIED] [PRIMARY_CATALYST] (2026-08-14) [Reuters | Mechanism: military]" in formatted
+    assert "[VERIFIED] [TRANSMISSION_MECHANISM] (2026-08-15) [Lloyd's List | Mechanism: commercial]" in formatted
+    assert "[REPORTED] [TRANSMISSION_MECHANISM] (2026-08-16) [US MARAD | Mechanism: regulatory]" in formatted
 
 
 def test_story_engine_strict_grounding_contract(tmp_path):
@@ -200,19 +266,21 @@ def test_story_engine_strict_grounding_contract(tmp_path):
     with pytest.raises(RuntimeError, match="Strict Contract Violation: B1.5.5 Grounding Gate REJECTED"):
         load_grounding_intel("TASK_BAD", str(tmp_path))
 
-    # 3. Valid grounding card with >= 2 verified whitelisted claims -> passes and returns block
+    # 3. Valid grounding card with >= 2 verified whitelisted claims & valid causal link -> passes and returns block
     good_intel = {
         "topic": "verified",
         "rejected": False,
         "has_live_search": True,
         "claims": [
-            {"claim": "Real claim 1", "source": "Reuters", "confidence": "verified", "date": "2026-09-01"},
-            {"claim": "Real claim 2", "source": "Lloyd's List", "confidence": "verified", "date": "2026-09-02"},
-            {"claim": "Real claim 3", "source": "US MARAD", "confidence": "reported", "date": "2026-09-03"}
+            {"claim": "Hostile strike ordered against cargo corridor", "source": "Reuters", "confidence": "verified", "date": "2026-09-01", "causal_role": "primary_catalyst", "mechanism": "military"},
+            {"claim": "Vessel transits plunged 84 percent", "source": "Lloyd's List", "confidence": "verified", "date": "2026-09-02", "causal_role": "transmission_mechanism", "mechanism": "commercial"},
+            {"claim": "Official advisory notice issued to fleet", "source": "US MARAD", "confidence": "reported", "date": "2026-09-03", "causal_role": "transmission_mechanism", "mechanism": "regulatory"}
         ]
     }
     bad_intel.write_text(json.dumps(good_intel), encoding="utf-8")
     data, block = load_grounding_intel("TASK_GOOD", str(tmp_path))
     assert len(data["claims"]) == 3
     assert "REAL-WORLD GROUNDED FACTS TABLE" in block
+    assert "RULE 130" in block
+
 

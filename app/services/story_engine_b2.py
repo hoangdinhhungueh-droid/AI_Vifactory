@@ -305,9 +305,11 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         f"Structure per Act: Approximately 360-440 words across 3-4 vivid, investigative paragraphs per Act.\n"
         f"Strict Requirement: Scripts under 1,700 words will be rejected by the story gate.\n\n"
         f"INVESTIGATIVE DRAMATIC SUSPENSE & TICKING CLOCK PROTOCOL (JOHNNY HARRIS x CHERNOBYL x MARGIN CALL PACING):\n"
-        f"1. TENSION THROUGH CAUSALITY & MECHANISM (NOT SENSATIONALISM):\n"
+        f"1. TENSION THROUGH CAUSALITY & MECHANISM (RULE 130 ENFORCED):\n"
         f"   - Suspense must arise from the inexorable, ticking breakdown of complex human, financial, regulatory, or technical systems.\n"
         f"   - Avoid cheap adjectives or melodramatic filler. Build dread and urgency through forensic clarity: revealing the structural trap closing in, the math that no longer adds up, the margin calls that cannot be met, or the communication blackout in international waters.\n"
+        f"   - FACTUAL CAUSAL INTEGRITY (ZERO FABRICATED TWISTS): Strictly distinguish Level 1 Primary Catalyst (the direct trigger/event) from Level 2 Transmission Mechanism (institutional/insurance/financial response). NEVER invent a fake plot twist or claim an administrative memo caused a physical crisis without primary evidence.\n"
+        f"   - SEARCH-INTENT DIRECT PAYOFF (ANTI-BAIT-AND-SWITCH): Act I and Act II must directly address and resolve the burning question the viewer searched for. Zero clickbait or dodging into abstract historical textbook lectures. Ground the dramatic tension in verifiable reality before peeling back the systemic layers.\n"
         f"2. CONTRAST PACING & TENSION SPIKES (EVERY 90-120 SECONDS):\n"
         f"   - Act I (The Impossible Contradiction & Ticking Clock): Open with cold quantitative shock. Establish a ticking clock: a deadline, an asymmetric spread, or an invisible threshold already crossed.\n"
         f"   - Act II (The False Narrative & Deceptive Calm): Unmask the comforting official version. Contrast what the public was told against the silent anomalies recorded by secondary instruments or registries.\n"
@@ -439,7 +441,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
             f"{grounding_block}\n\n" if grounding_block else ""
             f"{competitor_context}"
             f"{feedback_block}"
-            f"ACT I OPENING MANDATE (Rule 444 An Ong Hook Protocol): The very first sentence of Act I MUST open with a shock quantitative stake, specific economic contradiction, or irreconcilable conflict. Zero generic preamble or slow historical setup; hook cold-traffic mobile viewers within 5-10 seconds.\n"
+            f"ACT I OPENING MANDATE (Rule 444 An Ong Hook & Rule 130 Search-Intent Payoff): The very first sentence of Act I MUST open with a shock quantitative stake, specific economic contradiction, or irreconcilable conflict anchored to the Primary Catalyst. Zero generic preamble or slow historical setup; directly address and pay off the viewer's core search query while launching the Core Curiosity Loop within 5-10 seconds.\n"
             f"Write the full ~1,800-2,200 word script now, adhering strictly to the 5-Act markers:"
         )
 

@@ -139,6 +139,37 @@ def is_trusted_domain(source: str, url: str = "") -> bool:
     return False
 
 
+def classify_causal_role(claim: Dict[str, Any]) -> str:
+    """
+    Classifies or extracts the causal role of a factual claim under Rule 130.
+    Generic across all 5 topic axes:
+      - 'primary_catalyst': Level 1 direct event/trigger (e.g. strike, arrest, indictment, crash, breach, ban).
+      - 'transmission_mechanism': Level 2 institutional/systemic response (e.g. insurance surge, margin call, traffic drop, liquidity freeze).
+      - 'background_context': Structural baseline, historical baseline, pre-existing statutes or geography.
+    """
+    role = str(claim.get("causal_role", "")).strip().lower()
+    if role in ("primary_catalyst", "transmission_mechanism", "background_context"):
+        return role
+
+    # Semantic keyword classification fallback for unannotated or legacy claims
+    txt = (str(claim.get("claim", "")) + " " + str(claim.get("mechanism", ""))).lower()
+    catalyst_signals = [
+        "strike", "struck", "attack", "explod", "invad", "declar", "arrest", "indict",
+        "breach", "raid", "order", "clos", "shut", "fired", "killed", "leak", "hack",
+        "seiz", "subpoena", "default", "scandal", "fraud", "bribe", "whistleblower"
+    ]
+    transmission_signals = [
+        "premium", "insurance", "advisory", "rate", "transit", "decreas", "plung",
+        "drop", "fell", "margin call", "liquidity", "sanction", "ban", "freeze", "divert",
+        "rerout", "spread", "yield", "curb", "halt", "loss", "surcharge", "downgrade"
+    ]
+    if any(s in txt for s in catalyst_signals) and not any(s in txt for s in ["insurance", "premium", "margin call"]):
+        return "primary_catalyst"
+    if any(s in txt for s in transmission_signals):
+        return "transmission_mechanism"
+    return "background_context"
+
+
 def run_grounding_research(
     topic: str,
     search_hint: str = "",
@@ -147,7 +178,7 @@ def run_grounding_research(
 ) -> Dict[str, Any]:
     """
     Executes live Google Search Grounding via Gemini 2.5 Flash REST API.
-    Extracts structured factual claims, dates, sources, confidence levels, and mechanisms.
+    Extracts structured factual claims, dates, sources, confidence levels, mechanisms, and causal roles (Rule 130).
     """
     api_key = get_gemini_api_key()
     if not api_key:
@@ -167,15 +198,20 @@ def run_grounding_research(
     sys_instruction = (
         "You are an Elite Forensic Research Fact-Finder for an investigative documentary channel.\n"
         "Your mission is to extract 3 to 6 concrete, verifiable factual claims from real-world news and official records.\n\n"
-        "MANDATORY FACT-CHECKING RULES:\n"
+        "MANDATORY FACT-CHECKING & CAUSAL RULES (RULE 118 & RULE 130):\n"
         "1. Extract ONLY facts that actually occurred or are currently reported. NEVER invent statistics, dollar amounts, casualties, or quotes.\n"
         "2. Categorize confidence strictly into:\n"
         "   - 'verified': Corroborated by major official agencies, regulatory filings, or multiple reputable international news outlets.\n"
         "   - 'reported': Stated by a single reputable news organization or industry analyst.\n"
         "   - 'speculative': Predictions, scenario forecasts, or unverified claims made by commentators.\n"
-        "3. Identify the mechanism of each claim (e.g. 'financial', 'legal', 'military', 'commercial', 'technical', 'regulatory').\n"
-        "4. Include exact publication dates (YYYY-MM-DD) and outlet/source names.\n"
-        "5. If there is insufficient credible evidence or the topic is pure rumor/satire, set 'rejected': true with a clear 'reject_reason'.\n\n"
+        "3. Categorize causal_role strictly into:\n"
+        "   - 'primary_catalyst': Level 1 direct event/trigger that physically, legally, or financially initiated the crisis (e.g., military strike, indictment, executive arrest, contract breach, earnings shock, system crash).\n"
+        "   - 'transmission_mechanism': Level 2 institutional/systemic response or choke point that transmitted or amplified the impact (e.g., insurance risk surcharge, liquidity freeze, margin call, export ban, supply chain default, traffic plunge).\n"
+        "   - 'background_context': Baseline structural data, historical baseline numbers, geographic or legal statutes existing prior to the catalyst.\n"
+        "   MANDATORY RULE 130: Distinguish Level 1 from Level 2. NEVER invert causality or present a transmission mechanism as the original primary trigger.\n"
+        "4. Identify the mechanism of each claim (e.g. 'financial', 'legal', 'military', 'commercial', 'technical', 'regulatory').\n"
+        "5. Include exact publication dates (YYYY-MM-DD) and outlet/source names.\n"
+        "6. If there is insufficient credible evidence or the topic is pure rumor/satire, set 'rejected': true with a clear 'reject_reason'.\n\n"
         "Output ONLY a valid JSON object matching this schema:\n"
         "{\n"
         "  \"topic\": \"...\",\n"
@@ -188,6 +224,7 @@ def run_grounding_research(
         "      \"source_url\": \"Optional URL or domain if available\",\n"
         "      \"date\": \"YYYY-MM-DD\",\n"
         "      \"confidence\": \"verified|reported|speculative\",\n"
+        "      \"causal_role\": \"primary_catalyst|transmission_mechanism|background_context\",\n"
         "      \"mechanism\": \"legal|military|commercial|financial|technical|regulatory\"\n"
         "    }\n"
         "  ]\n"
@@ -283,18 +320,22 @@ def passes_grounding_gate(
     require_whitelist: bool = True,
     max_speculative_ratio: float = 0.40,
     min_claims: int = 3,
-    min_dated_claims: int = 2
+    min_dated_claims: int = 2,
+    require_causal_link: bool = True
 ) -> Tuple[bool, str]:
     """
-    Code-Enforced Gate (Rule 121 & Rule 127).
-    Evaluates whether the research result meets factual criteria BEFORE moving to scriptwriting.
-    Strict Dual-Layer Quality Audit Gate:
+    Code-Enforced Gate (Rule 121, Rule 127 & Rule 130).
+    Evaluates whether the research result meets factual and causal criteria BEFORE moving to scriptwriting.
+    Strict Multi-Layer Quality & Causal Audit Gate:
       1. Not explicitly rejected by model
       2. Minimum total claims (default >= 3)
       3. Minimum verified claims (default >= 2)
       4. Whitelist enforcement: At least 1 verified claim MUST come from an authoritative whitelisted source
       5. Maximum speculative ratio (default <= 40%)
       6. Temporal anchoring: At least 2 claims must have valid date format
+      7. Causal Link Verification (Rule 130):
+         - At least 1 verified/reported claim must serve as Level 1 Primary Catalyst.
+         - At least 1 verified/reported claim must serve as Level 2 Transmission Mechanism.
     """
     if not grounding_result:
         return False, "Empty grounding result."
@@ -338,11 +379,29 @@ def passes_grounding_gate(
     if len(dated_claims) < min_dated_claims:
         return False, f"Insufficient temporally anchored claims with valid dates ({len(dated_claims)} found, required >= {min_dated_claims})."
 
-    return True, f"PASSED ({len(claims)} claims: {len(verified_claims)} verified, {len(dated_claims)} dated, spec_ratio {spec_ratio:.0%})"
+    if require_causal_link:
+        catalysts = [
+            c for c in claims
+            if classify_causal_role(c) == "primary_catalyst"
+            and str(c.get("confidence", "")).lower() in ("verified", "reported")
+        ]
+        if not catalysts:
+            return False, "Causal Link Failure (Rule 130): Missing verified or reported primary catalyst claim."
+
+        transmissions = [
+            c for c in claims
+            if classify_causal_role(c) == "transmission_mechanism"
+            and str(c.get("confidence", "")).lower() in ("verified", "reported")
+        ]
+        if not transmissions:
+            return False, "Causal Link Failure (Rule 130): Missing verified or reported transmission mechanism claim."
+
+    return True, f"PASSED ({len(claims)} claims: {len(verified_claims)} verified, {len(dated_claims)} dated, spec_ratio {spec_ratio:.0%}, causal_link: VALID)"
 
 
 def format_grounded_facts_for_prompt(grounding_result: Dict[str, Any]) -> str:
-    """Formats verified claims into a clean Markdown table for injection into B2 Story Engine prompt."""
+    """Formats verified claims into a clean Markdown table for injection into B2 Story Engine prompt
+    with strict Rule 130 Causal Hierarchy and Search-Intent directives."""
     claims = grounding_result.get("claims", [])
     if not claims:
         return ""
@@ -350,11 +409,16 @@ def format_grounded_facts_for_prompt(grounding_result: Dict[str, Any]) -> str:
     lines = [
         "### REAL-WORLD GROUNDED FACTS TABLE (MANDATORY TRUTH ANCHOR)",
         "The following factual claims have been independently verified via live web research.",
-        "MANDATORY SCRIPTWRITING CONSTRAINTS (RULE 118 & RULE 445):",
+        "MANDATORY SCRIPTWRITING CONSTRAINTS (RULE 118, RULE 130 & RULE 445):",
         "1. VERIFIED claims: You may assert directly as established facts.",
         "2. REPORTED claims: You MUST use attributive sourcing ('According to reports from [Source]...', 'Records from [Source] indicate...').",
         "3. SPECULATIVE claims: You MUST use cautious conditional framing ('If subsequent assessments hold...', 'Under projected scenarios...').",
-        "4. ZERO-HALLUCINATION: Do NOT invent dates, numerical fees, casualties, or institutional actors outside this table.\n"
+        "4. CAUSAL HIERARCHY & INTEGRITY (RULE 130):",
+        "   - [PRIMARY_CATALYST] (Level 1): The direct physical, military, legal, or commercial spark. Act I Hook MUST feature this catalyst to pay off the viewer's search query immediately.",
+        "   - [TRANSMISSION_MECHANISM] (Level 2): The systemic channel (insurance, liquidity, margin call, regulatory notice, supply bottleneck). Acts III & IV must dissect this mechanism.",
+        "   - ZERO INVERTED CAUSALITY: Strictly forbidden to present a transmission mechanism as the original primary trigger.",
+        "5. SEARCH-INTENT DIRECT PAYOFF: Do NOT clickbait or drift away into academic abstractions. Address the central headline question within the opening 60 seconds.",
+        "6. ZERO-HALLUCINATION: Do NOT invent dates, numerical fees, casualties, or institutional actors outside this table.\n"
     ]
 
     for idx, c in enumerate(claims, 1):
@@ -362,7 +426,8 @@ def format_grounded_facts_for_prompt(grounding_result: Dict[str, Any]) -> str:
         date = c.get("date", "Undated")
         src = c.get("source", "Industry Record")
         mech = c.get("mechanism", "General")
+        role = classify_causal_role(c).upper()
         claim_txt = c.get("claim", "")
-        lines.append(f"{idx}. [{conf}] ({date}) [{src} | Mechanism: {mech}]: {claim_txt}")
+        lines.append(f"{idx}. [{conf}] [{role}] ({date}) [{src} | Mechanism: {mech}]: {claim_txt}")
 
     return "\n".join(lines)
