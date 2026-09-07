@@ -127,6 +127,28 @@ def run_chain(task_id: str) -> int:
         except Exception as e:
             _log(stage, "Warning: early SEO forge failed (%s: %s). Continuing to B2..." % (type(e).__name__, e))
 
+    # ---- B1.5.5 Grounding Layer Fact-Verification (Rule 118 & Rule 121)
+    stage = "B1.5.5"
+    grounding_file = ep_dir / "grounding_intel.json"
+    if not grounding_file.exists():
+        _log(stage, "Running live Google Search Grounding for %s" % task_id)
+        try:
+            from app.services.grounding_layer_b15 import run_grounding_research, passes_grounding_gate
+            g_intel = run_grounding_research(
+                topic=keyword,
+                search_hint=niche,
+                market=meta.get("market") or "EN"
+            )
+            g_ok, g_msg = passes_grounding_gate(g_intel, min_verified=1)
+            if not g_ok:
+                _log(stage, "WARNING: Grounding Gate not fully satisfied (%s), continuing with caution" % g_msg)
+            grounding_file.write_text(json.dumps(g_intel, ensure_ascii=False, indent=2), encoding="utf-8")
+            _log(stage, "grounding intel saved: %d claims (%s)" % (len(g_intel.get("claims", [])), g_msg))
+        except Exception as ge:
+            _log(stage, "Notice running grounding: %s" % ge)
+    else:
+        _log(stage, "reusing existing grounding_intel.json")
+
     # ---- B2 5-Beat Investigative Docudrama (Rule 445) ----------------
     stage = "B2"
     from app.services.story_engine_b2 import generate_5_arc_story

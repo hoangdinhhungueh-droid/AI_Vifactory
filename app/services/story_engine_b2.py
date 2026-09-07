@@ -252,7 +252,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         f"• Check 9 (Hook Shock in First 60 Words): The very first sentence of Act I MUST feature a concrete numeric figure, percentage (%), monetary sum ($), or superlative scale (e.g. '105 receptions', '$0 spent', '3.65 million') creating a quantitative paradox.\n"
         f"• Check 12 (Pattern Interrupt in Mechanism): In Act III (The Systemic Blindspot, 25%-70% mark), write at least one very short, punchy sentence of 2 to 6 words maximum (e.g. 'The paper trail vanished.', 'Then came the audit.', 'Nobody questioned the payout.') to disrupt rhythm.\n"
         f"• Check 2 (Open Question in Hook): Act I must open a compelling Core Curiosity Loop with a direct unanswered question in the opening paragraph.\n"
-        f"• Check 5 (Sourced Numbers): Narration must cite at least 2 explicit forensic sources/reports and include regular concrete metrics.\n"
+        f"• Check 5 (Grounded Truth Anchor & Sourced Numbers): Narration must strictly adhere to verified evidence. When a REAL-WORLD GROUNDED FACTS TABLE is supplied: claims marked [VERIFIED] may be asserted directly; claims marked [REPORTED] must use attributive sourcing ('According to reports from [Source]...', 'Records from [Source] indicate...'); claims marked [SPECULATIVE] must use cautious conditional language ('If projected scenarios hold...'). ZERO inventing of unverified numbers, rates, casualties, or institutional actions outside verified records.\n"
         f"• Check 10 (Zero Banned Cliches): 100% elimination of banned AI cliches ('in a world where', 'little did they know', 'testament to', 'double-edged sword', 'beacon of hope').\n\n"
         f"{editorial_skills}\n\n"
         f"SPECIFIC CONTEXT FOR THIS SCRIPT:\n"
@@ -337,8 +337,19 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         )
         _b2_insight_cards = fetch_active_insights(_b2_notion_token, mkt)
         feedback_block = build_feedback_block(_b2_insight_cards)
-        if feedback_block:
-            logger.info(f'[story_engine] B11->B2 loop: injecting {len(_b2_insight_cards)} InsightCard(s) into prompt for {mkt}')
+        # Grounding Layer (B1.5.5 Fact-Anchor Injection - Rule 118 & Rule 128)
+        grounding_intel_file = os.path.join(out_dir, "grounding_intel.json")
+        grounding_block = ""
+        if os.path.exists(grounding_intel_file):
+            try:
+                with open(grounding_intel_file, "r", encoding="utf-8") as gf:
+                    g_data = json.load(gf)
+                from app.services.grounding_layer_b15 import format_grounded_facts_for_prompt
+                grounding_block = format_grounded_facts_for_prompt(g_data)
+                if grounding_block:
+                    logger.info(f"[story_engine] Injected Grounding Layer table ({len(g_data.get('claims', []))} claims) into B2 prompt for {task_id}.")
+            except Exception as _gfe:
+                logger.warning(f"[story_engine] Notice loading grounding_intel.json: {_gfe}")
 
         user_prompt = (
             f"Generate the comprehensive 12-15 minute (1,800-2,200 words) Non-Fiction Investigative Documentary Script for {topic} following the 5-Beat Investigative Docudrama structure.\n"
@@ -348,6 +359,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
             f"5-Arc Narrative: {story_arcs}\n"
             f"Content Theme: {theme}\n"
             f"Breakout Search Queries to prioritize in Act I: {', '.join(breakout_queries)}\n\n"
+            f"{grounding_block}\n\n" if grounding_block else ""
             f"{competitor_context}"
             f"{feedback_block}"
             f"ACT I OPENING MANDATE (Rule 444 An Ong Hook Protocol): The very first sentence of Act I MUST open with a shock quantitative stake, specific economic contradiction, or irreconcilable conflict. Zero generic preamble or slow historical setup; hook cold-traffic mobile viewers within 5-10 seconds.\n"

@@ -548,6 +548,34 @@ def discover_and_produce_market_trend(
         except Exception as re_err:
             logger.warning(f"[{task_id}] B1.5 recon finalizing warning: {re_err}")
 
+        # 5.2. Grounding Layer Fact-Verification & Gate (B1.5.5 - Rule 118 & Rule 121)
+        print(f"  🔍 [B1.5.5] Running Live Grounding Research & Verification Gate for {task_id}...")
+        try:
+            from app.services.grounding_layer_b15 import run_grounding_research, passes_grounding_gate
+            grounding_kw = t_obj.get("search_specific_keyword") or term
+            grounding_hint = t_obj.get("niche_angle_brief") or ""
+            grounding_intel = run_grounding_research(topic=grounding_kw, search_hint=grounding_hint, market=m_up)
+            
+            gate_ok, gate_msg = passes_grounding_gate(grounding_intel, min_verified=1)
+            if not gate_ok:
+                logger.warning(f"[{task_id}] Grounding Gate REJECTED: {gate_msg}")
+                print(f"  ❌ [B1.5.5 Grounding Gate] REJECTED: {gate_msg}. Rotating to next candidate...")
+                continue
+
+            t_obj["grounding_intel"] = grounding_intel
+            print(f"  ✅ [B1.5.5 Grounding Gate] {gate_msg}")
+
+            # Persist grounding_intel.json to episode folders
+            for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
+                g_dir = Path(ep_base) / task_id
+                if g_dir.parent.exists() or Path(ep_base).exists():
+                    g_dir.mkdir(parents=True, exist_ok=True)
+                    (g_dir / "grounding_intel.json").write_text(
+                        json.dumps(grounding_intel, ensure_ascii=False, indent=2), encoding="utf-8"
+                    )
+        except Exception as g_err:
+            logger.warning(f"[{task_id}] Grounding Layer notice: {g_err}")
+
         # 5.5. Early B1.5 SEO & Narrative Hook Package Forge (Rule 119 & Rule 444)
         print(f"  🚀 [B1.6] Forging Early SEO Package & 60s An Ong Hook for {task_id} via GPT-6-Astra...")
         try:
