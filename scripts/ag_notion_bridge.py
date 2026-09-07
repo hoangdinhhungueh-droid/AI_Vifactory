@@ -166,6 +166,11 @@ def append_children_blocks(block_id, children):
     return _req("PATCH", f"blocks/{resolved}/children", {"children": children})
 
 
+def delete_block(block_id):
+    resolved = resolve_id(block_id)
+    return _req("DELETE", f"blocks/{resolved}")
+
+
 def _strip_ids(obj):
     if isinstance(obj, dict):
         return {k: _strip_ids(v) for k, v in obj.items() if k != "id"}

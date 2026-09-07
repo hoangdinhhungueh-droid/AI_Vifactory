@@ -25,7 +25,7 @@ from app.services.skill_loader import (
     get_b2_editorial_skills
 )
 from app.services import story_gate as sgate
-from scripts.ag_notion_bridge import resolve_id, update_page_properties, create_page, query_db, append_children_blocks, get_blocks
+from scripts.ag_notion_bridge import resolve_id, update_page_properties, create_page, query_db, append_children_blocks, get_blocks, delete_block
 try:
     from scripts.vf_insight_cards import fetch_active_insights, build_feedback_block
 except ImportError:
@@ -623,56 +623,79 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
 
             # compile_episode_from_notion reads the full script from the page BODY,
             # not from any property; without these blocks it aborts on "empty body".
+            # Rule 125 & 126 Single Truth: Purge old blocks if present to eliminate ghost versions
             _blk = get_blocks(story_page_id)
-            _has_body = False
-            if isinstance(_blk, dict):
-                for _b in (_blk.get('results') or []):
-                    _bt = _b.get('type')
-                    if _bt in ('paragraph', 'heading_1', 'heading_2', 'heading_3', 'quote', 'callout'):
-                        if ''.join(t.get('plain_text', '') for t in _b.get(_bt, {}).get('rich_text', [])).strip():
-                            _has_body = True
-                            break
-            if _has_body:
-                logger.info('[story_engine] Story Library body already present, skip append')
-            else:
-                _children = []
-                if anatomy:
-                    c_text = (
-                        f"🎯 PHÂN TÍCH ĐỐI THỦ & ĐÒN BẨY ĐỘT PHÁ (B1.5 RECON)\n"
-                        f"• Đòn bẩy 10x: {pivot_angle or 'N/A'}\n"
-                        f"• Điểm mù đối thủ: {competitor_gap or 'N/A'}\n"
-                        f"• Cốt truyện đối thủ: {comp_acts or 'N/A'}\n"
-                        f"• Thắc mắc khán giả: {', '.join(frustrations[:3]) if frustrations else 'N/A'}"
-                    )[:1950]
+            if isinstance(_blk, dict) and _blk.get('results'):
+                old_blocks = _blk.get('results') or []
+                logger.info(f"[story_engine] Purging {len(old_blocks)} existing blocks from Story Library page {story_page_id} to enforce Single Truth...")
+                for _ob in old_blocks:
+                    try:
+                        delete_block(_ob['id'])
+                    except Exception as _de:
+                        logger.warning(f"[story_engine] Error deleting old block {_ob.get('id')}: {_de}")
+
+            _children = []
+            # Summary Callout with Rule 130 verification metrics
+            summary_text = (
+                f"🛡️ B2 5-BEAT DOCUDRAMA SCRIPT (RULE 130 ENFORCED)\n"
+                f"• Words: {total_words:,} | Story Gate: {story_score_str} {story_verdict}\n"
+                f"• Model: GPT-6-Astra | Causal Roles: Primary Catalyst -> Transmission Mechanism\n"
+                f"• Title A: {seo_title_a or topic}"
+            )[:1950]
+            _children.append({
+                "object": "block",
+                "type": "callout",
+                "callout": {
+                    "rich_text": [{"type": "text", "text": {"content": summary_text}}],
+                    "icon": {"type": "emoji", "emoji": "🛡️"}
+                }
+            })
+            if anatomy:
+                c_text = (
+                    f"🎯 PHÂN TÍCH ĐỐI THỦ & ĐÒN BẨY ĐỘT PHÁ (B1.5 RECON)\n"
+                    f"• Đòn bẩy 10x: {pivot_angle or 'N/A'}\n"
+                    f"• Điểm mù đối thủ: {competitor_gap or 'N/A'}\n"
+                    f"• Cốt truyện đối thủ: {comp_acts or 'N/A'}\n"
+                    f"• Thắc mắc khán giả: {', '.join(frustrations[:3]) if frustrations else 'N/A'}"
+                )[:1950]
+                _children.append({
+                    "object": "block",
+                    "type": "callout",
+                    "callout": {
+                        "rich_text": [{"type": "text", "text": {"content": c_text}}],
+                        "icon": {"type": "emoji", "emoji": "🎯"}
+                    }
+                })
+            _chunks = []
+            for _p in [x.strip() for x in full_script.split('\n\n') if x.strip()]:
+                if _p.startswith("=== ACT ") and _p.endswith(" ==="):
                     _children.append({
                         "object": "block",
-                        "type": "callout",
-                        "callout": {
-                            "rich_text": [{"type": "text", "text": {"content": c_text}}],
-                            "icon": {"type": "emoji", "emoji": "🎯"}
+                        "type": "heading_2",
+                        "heading_2": {
+                            "rich_text": [{"type": "text", "text": {"content": _p}}]
                         }
                     })
-                _chunks = []
-                for _p in [x.strip() for x in full_script.split('\n\n') if x.strip()]:
-                    while len(_p) > 1900:
-                        _cut = _p.rfind(' ', 1000, 1900)
-                        if _cut < 0:
-                            _cut = 1900
-                        _chunks.append(_p[:_cut])
-                        _p = _p[_cut:].lstrip()
-                    if _p:
-                        _chunks.append(_p)
-                for c in _chunks:
-                    _children.append({'object': 'block', 'type': 'paragraph',
-                                      'paragraph': {'rich_text': [{'type': 'text', 'text': {'content': c}}]}})
-                _appended = 0
-                for _i in range(0, len(_children), 90):
-                    _ares = append_children_blocks(story_page_id, _children[_i:_i + 90])
-                    if isinstance(_ares, dict) and _ares.get('error'):
-                        logger.error('[story_engine] Story body append FAILED %s: %s' % (_ares.get('status_code'), _ares.get('message')))
-                        break
-                    _appended += len(_children[_i:_i + 90])
-                logger.info('[story_engine] Story Library body written %d/%d blocks (%d chars)' % (_appended, len(_children), len(full_script)))
+                    continue
+                while len(_p) > 1900:
+                    _cut = _p.rfind(' ', 1000, 1900)
+                    if _cut < 0:
+                        _cut = 1900
+                    _chunks.append(_p[:_cut])
+                    _p = _p[_cut:].lstrip()
+                if _p:
+                    _chunks.append(_p)
+            for c in _chunks:
+                _children.append({'object': 'block', 'type': 'paragraph',
+                                  'paragraph': {'rich_text': [{'type': 'text', 'text': {'content': c}}]}})
+            _appended = 0
+            for _i in range(0, len(_children), 90):
+                _ares = append_children_blocks(story_page_id, _children[_i:_i + 90])
+                if isinstance(_ares, dict) and _ares.get('error'):
+                    logger.error('[story_engine] Story body append FAILED %s: %s' % (_ares.get('status_code'), _ares.get('message')))
+                    break
+                _appended += len(_children[_i:_i + 90])
+            logger.info('[story_engine] Story Library body written %d/%d blocks (%d chars)' % (_appended, len(_children), len(full_script)))
 
         # Director Plan seeding is handled exclusively by B3 director_planner_b3 (Rule 125 Single Truth)
         logger.info('[story_engine] Story Library synced. B3 Director Plan handoff prepared.')
