@@ -20,14 +20,24 @@ TRUSTED_DOMAINS = [
     # Wire services & global financial press
     "reuters.com", "apnews.com", "bloomberg.com", "afp.com", "bbc.com", "bbc.co.uk", "cnbc.com", "nytimes.com",
     "theguardian.com", "marketwatch.com", "forbes.com", "wsj.com", "ft.com", "economist.com",
+    # Think tanks, security & foreign affairs authorities
+    "foreignaffairs.com", "cfr.org", "csis.org", "chathamhouse.org", "carnegieendowment.org",
+    "defensenews.com", "janes.com", "understandingwar.org", "sipri.org", "crisisgroup.org",
+    # Financial, regulatory & central banking authorities
+    "bis.org", "imf.org", "worldbank.org", "federalreserve.gov", "sec.gov", "cftc.gov", "boj.or.jp", "bok.or.kr",
+    "bankofengland.co.uk", "ecb.europa.eu",
     # Japanese authoritative news & economic publications
     "nikkei.com", "nhk.or.jp", "asahi.com", "yomiuri.co.jp", "mainichi.jp", "kyodonews.net", "jiji.com",
+    "japantimes.co.jp", "toyokeizai.net", "diamond.jp",
     # Korean authoritative news & economic publications
     "yna.co.kr", "mk.co.kr", "hankyung.com", "chosun.com", "donga.com", "joongang.co.kr",
-    # Maritime, commodities & trade authorities
+    "koreatimes.co.kr", "koreaherald.com", "sedaily.com",
+    # Maritime, commodities, energy & trade authorities
     "lloydslist.com", "gcaptain.com", "maritime-executive.com", "tradewindsnews.com",
     "eia.gov", "imo.org", "marad.dot.gov", "spglobal.com", "freightwaves.com",
-    "windward.ai", "kpler.com", "vortexa.com",
+    "windward.ai", "kpler.com", "vortexa.com", "iea.org", "opec.org", "argusmedia.com", "woodmac.com", "rystadenergy.com",
+    # Tech & semiconductor intelligence
+    "trendforce.com", "digitimes.com", "counterpointresearch.com", "idc.com", "gartner.com", "semiconductors.org",
     # Official / Institutional TLDs (Global, US, JP, KR, UK, etc.)
     ".gov", ".mil", ".int", ".org", ".go.jp", ".go.kr", ".gov.uk", ".gov.au"
 ]
@@ -67,17 +77,41 @@ def is_trusted_domain(source: str, url: str = "") -> bool:
     """Check if the source name or URL contains any of the trusted domains with proper domain boundaries."""
     source_lower = source.lower()
     
-    # Check source name directly (e.g. 'Reuters', 'Bloomberg', 'Nikkei', 'Yonhap')
+    # Authoritative name keywords across geopolitics, economics, maritime, technology, and ministries
     name_keywords = [
+        # Wire & global financial press
         "reuters", "associated press", "ap news", "bloomberg", "financial times", "wall street journal",
         "wsj", "economist", "bbc", "cnbc", "new york times", "nytimes", "guardian", "forbes",
-        "nikkei", "nhk", "asahi", "yomiuri", "mainichi", "kyodo", "jiji",
+        # Think tanks & foreign affairs
+        "csis", "chatham house", "carnegie", "sipri", "crisis group", "defense news", "janes",
+        "understanding war", "foreign affairs", "foreign policy",
+        # Central banks & international bodies
+        "imf", "world bank", "federal reserve", "sec", "cftc", "bis", "ecb", "bank of england",
+        "bank of japan", "bank of korea",
+        # Japanese press
+        "nikkei", "nhk", "asahi", "yomiuri", "mainichi", "kyodo", "jiji", "japan times", "toyokeizai",
+        # Korean press
         "yonhap", "yna", "maeil", "korea economic daily", "hankyung", "chosun", "donga", "joongang",
+        "korea times", "korea herald", "sedaily",
+        # Maritime & energy & commodities
         "lloyd's list", "lloyds list", "gcaptain", "maritime executive", "tradewinds",
-        "eia", "imo", "marad", "s&p global", "sp global", "freightwaves", "windward", "kpler"
+        "eia", "imo", "marad", "s&p global", "sp global", "freightwaves", "windward", "kpler",
+        "vortexa", "iea", "opec", "argus", "wood mackenzie", "rystad",
+        # Tech & industry research
+        "trendforce", "digitimes", "counterpoint", "gartner", "idc", "semiconductor industry",
+        # Ministries & governmental agencies
+        "ministry of transport", "department of transportation", "department of defense",
+        "department of state", "department of energy", "treasury", "pentagon", "white house",
+        "coast guard", "maritime administration", "customs", "kantei", "meti", "mof"
     ]
     if any(k in source_lower for k in name_keywords):
         return True
+
+    # Split composite source names into sub-tokens to check each candidate name
+    sub_tokens = [tok.strip() for tok in re.split(r"[,;/|\-\(\)]+", source_lower) if tok.strip()]
+    for tok in sub_tokens:
+        if any(k in tok for k in name_keywords):
+            return True
 
     # Check hostname from URL
     host = ""
@@ -245,12 +279,22 @@ def run_grounding_research(
 
 def passes_grounding_gate(
     grounding_result: Dict[str, Any],
-    min_verified: int = 1,
-    require_whitelist: bool = False
+    min_verified: int = 2,
+    require_whitelist: bool = True,
+    max_speculative_ratio: float = 0.40,
+    min_claims: int = 3,
+    min_dated_claims: int = 2
 ) -> Tuple[bool, str]:
     """
     Code-Enforced Gate (Rule 121 & Rule 127).
     Evaluates whether the research result meets factual criteria BEFORE moving to scriptwriting.
+    Strict Dual-Layer Quality Audit Gate:
+      1. Not explicitly rejected by model
+      2. Minimum total claims (default >= 3)
+      3. Minimum verified claims (default >= 2)
+      4. Whitelist enforcement: At least 1 verified claim MUST come from an authoritative whitelisted source
+      5. Maximum speculative ratio (default <= 40%)
+      6. Temporal anchoring: At least 2 claims must have valid date format
     """
     if not grounding_result:
         return False, "Empty grounding result."
@@ -266,20 +310,35 @@ def passes_grounding_gate(
             return True, "Passed with fallback (Search API unavailable, relying on verified factsheet)."
         return False, "No factual claims could be extracted."
 
+    if len(claims) < min_claims:
+        return False, f"Insufficient total claims ({len(claims)} found, required >= {min_claims})."
+
     verified_claims = [c for c in claims if str(c.get("confidence", "")).lower() == "verified"]
     if len(verified_claims) < min_verified:
         return False, f"Insufficient verified claims ({len(verified_claims)} found, required >= {min_verified})."
 
     if require_whitelist:
-        has_whitelisted = False
-        for c in claims:
+        has_whitelisted_verified = False
+        for c in verified_claims:
             if is_trusted_domain(c.get("source", ""), c.get("source_url", "")):
-                has_whitelisted = True
+                has_whitelisted_verified = True
                 break
-        if not has_whitelisted:
-            return False, "None of the extracted claims originate from whitelisted authoritative domains."
+        if not has_whitelisted_verified:
+            has_whitelisted_any = any(is_trusted_domain(c.get("source", ""), c.get("source_url", "")) for c in claims)
+            if not has_whitelisted_any:
+                return False, "None of the extracted claims originate from whitelisted authoritative domains."
+            return False, "None of the verified claims originate from whitelisted authoritative domains."
 
-    return True, f"PASSED ({len(claims)} claims, {len(verified_claims)} verified)"
+    speculative_claims = [c for c in claims if str(c.get("confidence", "")).lower() == "speculative"]
+    spec_ratio = len(speculative_claims) / len(claims)
+    if spec_ratio > max_speculative_ratio:
+        return False, f"Speculative claims ratio too high ({spec_ratio:.1%} > {max_speculative_ratio:.0%})."
+
+    dated_claims = [c for c in claims if re.search(r"\b(19\d\d|20\d\d)(?:-\d{2}-\d{2})?\b", str(c.get("date", "")))]
+    if len(dated_claims) < min_dated_claims:
+        return False, f"Insufficient temporally anchored claims with valid dates ({len(dated_claims)} found, required >= {min_dated_claims})."
+
+    return True, f"PASSED ({len(claims)} claims: {len(verified_claims)} verified, {len(dated_claims)} dated, spec_ratio {spec_ratio:.0%})"
 
 
 def format_grounded_facts_for_prompt(grounding_result: Dict[str, Any]) -> str:

@@ -117,7 +117,7 @@ def run_chain(task_id: str) -> int:
                 search_hint=niche,
                 market=meta.get("market") or "EN"
             )
-            g_ok, g_msg = passes_grounding_gate(g_intel, min_verified=1)
+            g_ok, g_msg = passes_grounding_gate(g_intel, min_verified=2, require_whitelist=True)
             if not g_ok:
                 _log(stage, "FATAL: Grounding Gate REJECTED (%s). Aborting pipeline!" % g_msg)
                 raise RuntimeError(f"B1.5.5 Grounding Gate REJECTED: {g_msg}. Cannot proceed to B2!")
@@ -128,7 +128,7 @@ def run_chain(task_id: str) -> int:
             raise RuntimeError(f"B1.5.5 Grounding Layer failed: {ge}")
     else:
         from app.services.grounding_layer_b15 import passes_grounding_gate
-        g_ok, g_msg = passes_grounding_gate(g_intel, min_verified=1)
+        g_ok, g_msg = passes_grounding_gate(g_intel, min_verified=2, require_whitelist=True)
         if not g_ok:
             _log(stage, "FATAL: Existing grounding_intel.json fails verification (%s). Aborting pipeline!" % g_msg)
             raise RuntimeError(f"B1.5.5 Grounding Gate REJECTED on existing intel: {g_msg}")

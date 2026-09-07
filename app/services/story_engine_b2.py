@@ -128,7 +128,7 @@ def load_grounding_intel(task_id: str, out_dir: str, topic: str = "", niche_brie
             f"Run B1.5.5 Grounding Layer before B2 story generation!"
         )
 
-    ok, reason = passes_grounding_gate(g_data, min_verified=1)
+    ok, reason = passes_grounding_gate(g_data, min_verified=2, require_whitelist=True)
     if not ok:
         raise RuntimeError(
             f"Strict Contract Violation: B1.5.5 Grounding Gate REJECTED for task {task_id} ({reason}). "
@@ -196,7 +196,7 @@ def load_task_metadata(task_id: str) -> dict:
     }
 
 
-def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
+def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: bool = False) -> dict:
     """Generate a complete 5-Beat Docudrama script (1,800-2,200 words, ~12-15 min) using GPT-6-Astra
     enforcing YouTube Safety, Rule 444 An Ong Hook, and Rule 445 in a single optimized pass.
     Inherits authentic rules dynamically from Notion SoT (Central Skills + Content Engine Hub).
@@ -304,6 +304,19 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         f"Total Word Count Target: 1,800 - 2,200 words (~12 to 15 minutes narration at ~150 WPM) across 5 structured Acts.\n"
         f"Structure per Act: Approximately 360-440 words across 3-4 vivid, investigative paragraphs per Act.\n"
         f"Strict Requirement: Scripts under 1,700 words will be rejected by the story gate.\n\n"
+        f"INVESTIGATIVE DRAMATIC SUSPENSE & TICKING CLOCK PROTOCOL (JOHNNY HARRIS x CHERNOBYL x MARGIN CALL PACING):\n"
+        f"1. TENSION THROUGH CAUSALITY & MECHANISM (NOT SENSATIONALISM):\n"
+        f"   - Suspense must arise from the inexorable, ticking breakdown of complex human, financial, regulatory, or technical systems.\n"
+        f"   - Avoid cheap adjectives or melodramatic filler. Build dread and urgency through forensic clarity: revealing the structural trap closing in, the math that no longer adds up, the margin calls that cannot be met, or the communication blackout in international waters.\n"
+        f"2. CONTRAST PACING & TENSION SPIKES (EVERY 90-120 SECONDS):\n"
+        f"   - Act I (The Impossible Contradiction & Ticking Clock): Open with cold quantitative shock. Establish a ticking clock: a deadline, an asymmetric spread, or an invisible threshold already crossed.\n"
+        f"   - Act II (The False Narrative & Deceptive Calm): Unmask the comforting official version. Contrast what the public was told against the silent anomalies recorded by secondary instruments or registries.\n"
+        f"   - Act III (The Systemic Blindspot & Breathless Paper Trail): Rapid forensic escalation. The paper trail accelerates. Insert sharp pattern-interrupt sentences (2-6 words) to freeze the tempo before dropping the investigative breakthrough.\n"
+        f"   - Act IV (The Smoking Gun & Climax): The undeniable confrontation with reality. Lay bare the exact mechanism, contract, ledger, or order. The forensic net closes completely.\n"
+        f"   - Act V (The Modern Mirror & Chilling Warning): Loop closure (>=75%). Leave the viewer with a cold, spine-tingling realization: the vulnerability was not an isolated freak accident—it is an unpatched feature of the systems we rely on today.\n"
+        f"3. KINETIC & VISCERAL VERBS:\n"
+        f"   - Power your narration with precise, active investigative verbs ('inverted', 'hemorrhaged', 'siphoned', 'strangled', 'cloaked', 'recalibrated', 'evaporated', 'intercepted').\n"
+        f"   - Staccato rhythm: Balance dense, analytical evidence with short, punchy forensic conclusions.\n\n"
         f"MANDATORY STORY GATE 12/12 REQUIREMENTS (ZERO-TOLERANCE QUALITY CRITERIA):\n"
         f"• Check 9 (Hook Shock in First 60 Words): The very first sentence of Act I MUST feature a concrete numeric figure, percentage (%), monetary sum ($), or superlative scale (e.g. '105 receptions', '$0 spent', '3.65 million') creating a quantitative paradox.\n"
         f"• Check 12 (Pattern Interrupt in Mechanism): In Act III (The Systemic Blindspot, 25%-70% mark), write at least one very short, punchy sentence of 2 to 6 words maximum (e.g. 'The paper trail vanished.', 'Then came the audit.', 'Nobody questioned the payout.') to disrupt rhythm.\n"
@@ -374,7 +387,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
 
     story_file = os.path.join(out_dir, "story.txt")
     existing_script = ""
-    if os.path.exists(story_file):
+    if os.path.exists(story_file) and not force:
         try:
             with open(story_file, "r", encoding="utf-8") as sf:
                 existing_script = sf.read().strip()
@@ -388,6 +401,8 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
                 logger.info(f"[story_engine] Reusing existing valid grounded story.txt ({len(existing_script.split())} words) for {task_id}.")
         except Exception as e:
             logger.warning(f"[story_engine] Error reading existing story.txt: {e}")
+    elif force:
+        logger.info(f"[story_engine] Force regeneration requested for {task_id}. Generating fresh high-suspense grounded script...")
 
     if existing_script and len(existing_script.split()) >= 1500:
         full_script = existing_script
@@ -413,8 +428,9 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
             logger.info(f"[story_engine] Injected Grounding Layer table ({len(g_data.get('claims', []))} claims) into B2 prompt for {task_id}.")
 
         user_prompt = (
-            f"Generate the comprehensive 12-15 minute (1,800-2,200 words) Non-Fiction Investigative Documentary Script for {topic} following the 5-Beat Investigative Docudrama structure.\n"
-            f"Structure: Beat 1 (The Impossible Contradiction) -> Beat 2 (The False Narrative & Red Herring) -> Beat 3 (The Systemic Blindspot & Paper Trail) -> Beat 4 (The Real Culprit & Smoking Gun) -> Beat 5 (The Uncomfortable Modern Mirror & Living Warning).\n"
+            f"Generate the comprehensive 12-15 minute (1,800-2,200 words) Non-Fiction Investigative Documentary Script for {topic} following the 5-Beat Investigative Docudrama structure with HIGH DRAMATIC SUSPENSE and ticking-clock pacing.\n"
+            f"Structure: Beat 1 (The Impossible Contradiction & Ticking Clock) -> Beat 2 (The False Narrative & Red Herring) -> Beat 3 (The Systemic Blindspot & Paper Trail) -> Beat 4 (The Real Culprit & Smoking Gun) -> Beat 5 (The Uncomfortable Modern Mirror & Living Warning).\n"
+            f"Tone & Style: Johnny Harris investigative rigor meets Chernobyl / Margin Call procedural tension—clinical, fast-paced, high-stakes, forensically detailed, completely free of fluff.\n"
             f"Language: {lang_name}.\n"
             f"Core Mechanism: {niche_brief}\n"
             f"5-Arc Narrative: {story_arcs}\n"
@@ -678,7 +694,7 @@ if __name__ == "__main__":
                 print(f"Removed {sf} for regeneration.")
 
     print(f"Generating 5-Act Story for {args.task_id}...")
-    res = generate_5_arc_story(args.task_id)
+    res = generate_5_arc_story(args.task_id, force=args.force)
     story_text = res.get("story", "")
     print(f"=== STORY GENERATION COMPLETED ===")
     print(f"Total Words: {len(story_text.split())}")

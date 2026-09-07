@@ -44,6 +44,7 @@ BLOCK_FILES = {
     ],
     1.5: [
         "app/services/competitor_recon_b15.py",
+        "app/services/grounding_layer_b15.py",
     ],
     2.0: [
         "app/services/story_engine_b2.py",
