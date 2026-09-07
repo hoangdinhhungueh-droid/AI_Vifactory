@@ -83,6 +83,62 @@ def load_competitor_intel(task_id: str) -> dict:
     )
 
 
+def load_grounding_intel(task_id: str, out_dir: str, topic: str = "", niche_brief: str = "", market: str = "EN") -> tuple[dict, str]:
+    """Load B1.5.5 Grounding Intel Card.
+    Enforces strict contract: raises RuntimeError if missing or fails gate, unless bypassed.
+    """
+    candidates = [
+        os.path.join(out_dir, "grounding_intel.json"),
+        os.path.join(EPISODES_BASE_DIR, task_id, "grounding_intel.json"),
+        os.path.join("/root/video_factory/episodes", task_id, "grounding_intel.json"),
+    ]
+    g_data = None
+    for p in candidates:
+        if os.path.exists(p) and os.path.getsize(p) > 10:
+            try:
+                with open(p, "r", encoding="utf-8") as gf:
+                    g_data = json_lib.load(gf)
+                    if g_data:
+                        break
+            except Exception:
+                pass
+
+    if not g_data and topic:
+        # Attempt JIT Grounding Research
+        logger.info(f"[story_engine] Grounding intel missing for {task_id}. Attempting JIT Google Search Grounding...")
+        try:
+            from app.services.grounding_layer_b15 import run_grounding_research
+            g_data = run_grounding_research(topic=topic, search_hint=niche_brief, market=market)
+            if g_data:
+                os.makedirs(out_dir, exist_ok=True)
+                with open(os.path.join(out_dir, "grounding_intel.json"), "w", encoding="utf-8") as gf:
+                    json_lib.dump(g_data, gf, ensure_ascii=False, indent=2)
+        except Exception as _je:
+            logger.error(f"[story_engine] JIT Grounding Research failed for {task_id}: {_je}")
+
+    from app.services.grounding_layer_b15 import passes_grounding_gate, format_grounded_facts_for_prompt
+
+    if os.getenv("VF_BYPASS_GROUNDING_CHECK") == "1":
+        logger.warning(f"[story_engine] VF_BYPASS_GROUNDING_CHECK active: continuing without verified grounding for {task_id}")
+        return g_data or {}, format_grounded_facts_for_prompt(g_data) if g_data else ""
+
+    if not g_data:
+        raise RuntimeError(
+            f"Strict Contract Violation: B1.5.5 Grounding Intel Card missing for task {task_id}. "
+            f"Run B1.5.5 Grounding Layer before B2 story generation!"
+        )
+
+    ok, reason = passes_grounding_gate(g_data, min_verified=1)
+    if not ok:
+        raise RuntimeError(
+            f"Strict Contract Violation: B1.5.5 Grounding Gate REJECTED for task {task_id} ({reason}). "
+            f"Cannot proceed to B2 without verified facts!"
+        )
+
+    block = format_grounded_facts_for_prompt(g_data)
+    return g_data, block
+
+
 def load_task_metadata(task_id: str) -> dict:
     """Load metadata for a given task ID from local pending cache or Notion Story Library."""
     cache_path = os.path.join(PENDING_TASKS_DIR, f"{task_id}.json")
@@ -322,8 +378,14 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         try:
             with open(story_file, "r", encoding="utf-8") as sf:
                 existing_script = sf.read().strip()
-            if len(existing_script.split()) >= 1500:
-                logger.info(f"[story_engine] Reusing existing valid story.txt ({len(existing_script.split())} words) for {task_id}.")
+            # Anti-hallucination check: force regeneration if script was ungrounded
+            grounding_intel_file = os.path.join(out_dir, "grounding_intel.json")
+            is_ungrounded = ("hypothetical calculation" in existing_script.lower() or not os.path.exists(grounding_intel_file))
+            if is_ungrounded:
+                logger.info(f"[story_engine] Existing story.txt for {task_id} is ungrounded or missing grounding_intel.json. Forcing fresh regeneration!")
+                existing_script = ""
+            elif len(existing_script.split()) >= 1500:
+                logger.info(f"[story_engine] Reusing existing valid grounded story.txt ({len(existing_script.split())} words) for {task_id}.")
         except Exception as e:
             logger.warning(f"[story_engine] Error reading existing story.txt: {e}")
 
@@ -337,19 +399,18 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         )
         _b2_insight_cards = fetch_active_insights(_b2_notion_token, mkt)
         feedback_block = build_feedback_block(_b2_insight_cards)
+        
         # Grounding Layer (B1.5.5 Fact-Anchor Injection - Rule 118 & Rule 128)
-        grounding_intel_file = os.path.join(out_dir, "grounding_intel.json")
-        grounding_block = ""
-        if os.path.exists(grounding_intel_file):
-            try:
-                with open(grounding_intel_file, "r", encoding="utf-8") as gf:
-                    g_data = json.load(gf)
-                from app.services.grounding_layer_b15 import format_grounded_facts_for_prompt
-                grounding_block = format_grounded_facts_for_prompt(g_data)
-                if grounding_block:
-                    logger.info(f"[story_engine] Injected Grounding Layer table ({len(g_data.get('claims', []))} claims) into B2 prompt for {task_id}.")
-            except Exception as _gfe:
-                logger.warning(f"[story_engine] Notice loading grounding_intel.json: {_gfe}")
+        # Strict contract: load_grounding_intel raises RuntimeError if missing or rejected
+        g_data, grounding_block = load_grounding_intel(
+            task_id=task_id,
+            out_dir=out_dir,
+            topic=topic,
+            niche_brief=niche_brief,
+            market=mkt
+        )
+        if grounding_block:
+            logger.info(f"[story_engine] Injected Grounding Layer table ({len(g_data.get('claims', []))} claims) into B2 prompt for {task_id}.")
 
         user_prompt = (
             f"Generate the comprehensive 12-15 minute (1,800-2,200 words) Non-Fiction Investigative Documentary Script for {topic} following the 5-Beat Investigative Docudrama structure.\n"

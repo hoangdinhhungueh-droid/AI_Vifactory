@@ -574,7 +574,9 @@ def discover_and_produce_market_trend(
                         json.dumps(grounding_intel, ensure_ascii=False, indent=2), encoding="utf-8"
                     )
         except Exception as g_err:
-            logger.warning(f"[{task_id}] Grounding Layer notice: {g_err}")
+            logger.error(f"[{task_id}] Grounding Layer exception: {g_err}. Rotating to next candidate...")
+            print(f"  ❌ [B1.5.5 Grounding Gate] Exception: {g_err}. Rotating to next candidate...")
+            continue
 
         # 5.5. Early B1.5 SEO & Narrative Hook Package Forge (Rule 119 & Rule 444)
         print(f"  🚀 [B1.6] Forging Early SEO Package & 60s An Ong Hook for {task_id} via GPT-6-Astra...")

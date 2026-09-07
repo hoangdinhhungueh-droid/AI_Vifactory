@@ -19,13 +19,17 @@ logger = logging.getLogger(__name__)
 TRUSTED_DOMAINS = [
     # Wire services & global financial press
     "reuters.com", "apnews.com", "bloomberg.com", "afp.com", "bbc.com", "bbc.co.uk", "cnbc.com", "nytimes.com",
-    "theguardian.com", "marketwatch.com", "forbes.com",
+    "theguardian.com", "marketwatch.com", "forbes.com", "wsj.com", "ft.com", "economist.com",
+    # Japanese authoritative news & economic publications
+    "nikkei.com", "nhk.or.jp", "asahi.com", "yomiuri.co.jp", "mainichi.jp", "kyodonews.net", "jiji.com",
+    # Korean authoritative news & economic publications
+    "yna.co.kr", "mk.co.kr", "hankyung.com", "chosun.com", "donga.com", "joongang.co.kr",
     # Maritime, commodities & trade authorities
     "lloydslist.com", "gcaptain.com", "maritime-executive.com", "tradewindsnews.com",
     "eia.gov", "imo.org", "marad.dot.gov", "spglobal.com", "freightwaves.com",
     "windward.ai", "kpler.com", "vortexa.com",
-    # Official / Institutional TLDs
-    ".gov", ".mil", ".int", ".org"
+    # Official / Institutional TLDs (Global, US, JP, KR, UK, etc.)
+    ".gov", ".mil", ".int", ".org", ".go.jp", ".go.kr", ".gov.uk", ".gov.au"
 ]
 
 
@@ -63,12 +67,14 @@ def is_trusted_domain(source: str, url: str = "") -> bool:
     """Check if the source name or URL contains any of the trusted domains with proper domain boundaries."""
     source_lower = source.lower()
     
-    # Check source name directly (e.g. 'Reuters', 'Bloomberg', 'AP News')
+    # Check source name directly (e.g. 'Reuters', 'Bloomberg', 'Nikkei', 'Yonhap')
     name_keywords = [
         "reuters", "associated press", "ap news", "bloomberg", "financial times", "wall street journal",
-        "wsj", "economist", "bbc", "cnbc", "new york times", "nytimes", "guardian",
+        "wsj", "economist", "bbc", "cnbc", "new york times", "nytimes", "guardian", "forbes",
+        "nikkei", "nhk", "asahi", "yomiuri", "mainichi", "kyodo", "jiji",
+        "yonhap", "yna", "maeil", "korea economic daily", "hankyung", "chosun", "donga", "joongang",
         "lloyd's list", "lloyds list", "gcaptain", "maritime executive", "tradewinds",
-        "eia", "imo", "marad", "s&p global", "sp global", "freightwaves", "windward"
+        "eia", "imo", "marad", "s&p global", "sp global", "freightwaves", "windward", "kpler"
     ]
     if any(k in source_lower for k in name_keywords):
         return True
@@ -88,7 +94,7 @@ def is_trusted_domain(source: str, url: str = "") -> bool:
     for td in TRUSTED_DOMAINS:
         td_low = td.lower()
         if td_low.startswith("."):
-            # TLD check: e.g. .gov, .mil, .int, .org
+            # TLD check: e.g. .gov, .mil, .int, .org, .go.jp, .go.kr
             if host.endswith(td_low):
                 return True
         else:
@@ -157,7 +163,12 @@ def run_grounding_research(
     query_text = f"Topic: '{topic}'."
     if search_hint:
         query_text += f" Search focus: '{search_hint}'."
-    query_text += " Search live web news and official records, then return the JSON factual extraction."
+    if market.upper() == "JP":
+        query_text += " Search authoritative Japanese and international news and official records."
+    elif market.upper() == "KR":
+        query_text += " Search authoritative Korean and international news and official records."
+    else:
+        query_text += " Search live web news and official records, then return the JSON factual extraction."
 
     payload = {
         "systemInstruction": {

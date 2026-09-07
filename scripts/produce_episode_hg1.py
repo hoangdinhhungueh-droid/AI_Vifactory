@@ -97,6 +97,43 @@ def run_chain(task_id: str) -> int:
         _log(stage, "FAILED (%s: %s)" % (type(e).__name__, e))
         raise RuntimeError("B1.5 competitor recon failed: %s" % e)
 
+    # ---- B1.5.5 Grounding Layer Fact-Verification (Rule 118 & Rule 121)
+    stage = "B1.5.5"
+    grounding_file = ep_dir / "grounding_intel.json"
+    g_intel = None
+    if grounding_file.exists() and grounding_file.stat().st_size > 100:
+        try:
+            g_intel = json.loads(grounding_file.read_text(encoding="utf-8"))
+            _log(stage, "Reusing existing grounding_intel.json from %s" % grounding_file)
+        except Exception:
+            g_intel = None
+
+    if not g_intel:
+        _log(stage, "Running live Google Search Grounding for %s" % task_id)
+        try:
+            from app.services.grounding_layer_b15 import run_grounding_research, passes_grounding_gate
+            g_intel = run_grounding_research(
+                topic=keyword,
+                search_hint=niche,
+                market=meta.get("market") or "EN"
+            )
+            g_ok, g_msg = passes_grounding_gate(g_intel, min_verified=1)
+            if not g_ok:
+                _log(stage, "FATAL: Grounding Gate REJECTED (%s). Aborting pipeline!" % g_msg)
+                raise RuntimeError(f"B1.5.5 Grounding Gate REJECTED: {g_msg}. Cannot proceed to B2!")
+            grounding_file.write_text(json.dumps(g_intel, ensure_ascii=False, indent=2), encoding="utf-8")
+            _log(stage, "grounding intel saved: %d claims (%s)" % (len(g_intel.get("claims", [])), g_msg))
+        except Exception as ge:
+            _log(stage, "FATAL: Grounding Layer execution failed: %s" % ge)
+            raise RuntimeError(f"B1.5.5 Grounding Layer failed: {ge}")
+    else:
+        from app.services.grounding_layer_b15 import passes_grounding_gate
+        g_ok, g_msg = passes_grounding_gate(g_intel, min_verified=1)
+        if not g_ok:
+            _log(stage, "FATAL: Existing grounding_intel.json fails verification (%s). Aborting pipeline!" % g_msg)
+            raise RuntimeError(f"B1.5.5 Grounding Gate REJECTED on existing intel: {g_msg}")
+        _log(stage, "Existing grounding intel verified OK: %s" % g_msg)
+
     # ---- B1.6 Early SEO Package & 60s Hook Forge (Rule 119 & Rule 444) ---
     stage = "B1.6"
     seo_pkg_file = ep_dir / "seo_package.json"
@@ -126,28 +163,6 @@ def run_chain(task_id: str) -> int:
             ))
         except Exception as e:
             _log(stage, "Warning: early SEO forge failed (%s: %s). Continuing to B2..." % (type(e).__name__, e))
-
-    # ---- B1.5.5 Grounding Layer Fact-Verification (Rule 118 & Rule 121)
-    stage = "B1.5.5"
-    grounding_file = ep_dir / "grounding_intel.json"
-    if not grounding_file.exists():
-        _log(stage, "Running live Google Search Grounding for %s" % task_id)
-        try:
-            from app.services.grounding_layer_b15 import run_grounding_research, passes_grounding_gate
-            g_intel = run_grounding_research(
-                topic=keyword,
-                search_hint=niche,
-                market=meta.get("market") or "EN"
-            )
-            g_ok, g_msg = passes_grounding_gate(g_intel, min_verified=1)
-            if not g_ok:
-                _log(stage, "WARNING: Grounding Gate not fully satisfied (%s), continuing with caution" % g_msg)
-            grounding_file.write_text(json.dumps(g_intel, ensure_ascii=False, indent=2), encoding="utf-8")
-            _log(stage, "grounding intel saved: %d claims (%s)" % (len(g_intel.get("claims", [])), g_msg))
-        except Exception as ge:
-            _log(stage, "Notice running grounding: %s" % ge)
-    else:
-        _log(stage, "reusing existing grounding_intel.json")
 
     # ---- B2 5-Beat Investigative Docudrama (Rule 445) ----------------
     stage = "B2"

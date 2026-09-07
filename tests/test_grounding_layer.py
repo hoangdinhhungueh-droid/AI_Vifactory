@@ -20,6 +20,13 @@ def test_is_trusted_domain():
     assert is_trusted_domain("Lloyd's List", "https://lloydslist.com") is True
     assert is_trusted_domain("US MARAD", "https://marad.dot.gov") is True
 
+    # Japanese & Korean authoritative sources
+    assert is_trusted_domain("Nikkei", "https://www.nikkei.com/article/123") is True
+    assert is_trusted_domain("NHK News", "https://www3.nhk.or.jp/news") is True
+    assert is_trusted_domain("Japan Gov", "https://www.kantei.go.jp") is True
+    assert is_trusted_domain("Yonhap News", "https://en.yna.co.kr/view/123") is True
+    assert is_trusted_domain("Korea Gov", "https://www.mofa.go.kr") is True
+
     # Untrusted / social media / content farm
     assert is_trusted_domain("Random Blog", "https://clickbait-news.xyz") is False
     assert is_trusted_domain("Anonymous Forum", "https://forum.sample.org.fake") is False
@@ -143,3 +150,30 @@ def test_format_grounded_facts_for_prompt():
     assert "REAL-WORLD GROUNDED FACTS TABLE" in formatted
     assert "[VERIFIED] (2026-08-15) [Lloyd's List | Mechanism: commercial]: Vessel transits fell by 18 percent" in formatted
     assert "[REPORTED] (2026-08-16) [US MARAD | Mechanism: regulatory]: Advisory notice issued to merchant fleet" in formatted
+
+
+def test_story_engine_strict_grounding_contract(tmp_path):
+    from app.services.story_engine_b2 import load_grounding_intel
+    import os, json
+
+    # 1. Missing grounding intel card -> raises RuntimeError
+    with pytest.raises(RuntimeError, match="Strict Contract Violation: B1.5.5 Grounding Intel Card missing"):
+        load_grounding_intel("NON_EXISTENT_TASK_XYZ", str(tmp_path))
+
+    # 2. Existing but rejected grounding intel card -> raises RuntimeError
+    bad_intel = tmp_path / "grounding_intel.json"
+    bad_intel.write_text(json.dumps({"topic": "bad", "rejected": True, "claims": []}), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="Strict Contract Violation: B1.5.5 Grounding Gate REJECTED"):
+        load_grounding_intel("TASK_BAD", str(tmp_path))
+
+    # 3. Valid grounding card with 1 verified claim -> passes and returns block
+    good_intel = {
+        "topic": "verified",
+        "rejected": False,
+        "claims": [{"claim": "Real claim", "source": "Reuters", "confidence": "verified", "date": "2026-09-01"}]
+    }
+    bad_intel.write_text(json.dumps(good_intel), encoding="utf-8")
+    data, block = load_grounding_intel("TASK_GOOD", str(tmp_path))
+    assert len(data["claims"]) == 1
+    assert "REAL-WORLD GROUNDED FACTS TABLE" in block
+
