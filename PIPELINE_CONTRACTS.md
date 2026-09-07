@@ -98,6 +98,48 @@
 
 ---
 
+### 2.1. Khối B1.5.5 (Search Grounding & Fact Verification Gate) ➔ Khối B2 (Story Engine)
+* **File lưu trữ**: `/var/vf/episodes/<task_id>/grounding_intel.json`
+* **Mục đích**: Chặn đứng 100% rủi ro hallucination về số liệu tài chính, ngày tháng, thương vong hoặc sự kiện chính trị nhạy cảm trước khi viết kịch bản. Sử dụng Google Search Grounding (REST API `tools: [{"googleSearch": {}}]`) trích xuất sự kiện thực tế có nguồn dẫn chứng minh bạch.
+* **Data Schema (Generic Specification)**:
+  ```json
+  {
+    "topic": "<PRIMARY_SEARCH_TOPIC_OR_ENTITY_NAME>",
+    "rejected": "<BOOLEAN: false if credible, true if pure rumor/satire/unsubstantiated>",
+    "reject_reason": "<STRING: Explanation if rejected, empty string if passed>",
+    "claims": [
+      {
+        "claim": "<Concise, specific factual claim with concrete metric/action>",
+        "source": "<Name of reporting outlet or agency, e.g. Reuters, Bloomberg, Lloyd's List, EIA, MARAD>",
+        "source_url": "<Optional URL or domain if available>",
+        "date": "<YYYY-MM-DD>",
+        "confidence": "<verified | reported | speculative>",
+        "mechanism": "<legal | military | commercial | financial | technical | regulatory>"
+      }
+    ],
+    "grounding_chunks": [
+      {
+        "title": "<Source page title>",
+        "uri": "<Source web URL>"
+      }
+    ],
+    "search_queries": [
+      "<Web search query executed by Grounding model>"
+    ],
+    "has_live_search": "<BOOLEAN: true if live web search succeeded, false if degraded fallback>"
+  }
+  ```
+* **Quy chuẩn Verification Gate (Rule 121 & Rule 127)**:
+  1. `rejected == false`: Chủ đề không bị mô hình đánh cờ là tin đồn hoặc phỏng đoán vô căn cứ.
+  2. `claims`: Tối thiểu 1 factual claim đạt cấp độ `confidence: "verified"` (được xác thực bởi cơ quan chuyên môn/hồ sơ pháp lý hoặc nhiều hãng tin uy tín).
+  3. `Fast-Fail Rotation`: Nếu không thỏa mãn Gate, pipeline B1.5.5 lập tức loại bỏ chủ đề, xoay vòng sang ứng viên tiếp theo trong danh sách cào trend.
+  4. `Prompt Anchoring`: Khi đạt Gate, các claims được chuyển hóa thành bảng sự thật (`REAL-WORLD GROUNDED FACTS TABLE`) nhúng thẳng vào prompt B2 với quy tắc ràng buộc ngôn ngữ 3 cấp:
+     - `VERIFIED`: Được phép khẳng định trực diện như sự thật khách quan.
+     - `REPORTED`: Bắt buộc dẫn nguồn phân bổ ("Theo báo cáo từ...", "Ghi nhận của...").
+     - `SPECULATIVE`: Bắt buộc đóng khung giả định ("Trong kịch bản dự phóng...", "Nếu các ước tính tiếp tục...").
+
+---
+
 ### 3. Khối B2 (Story Engine) ➔ Khối B3 (Director Plan)
 * **File lưu trữ**: `/var/vf/episodes/<task_id>/story.txt (Kịch bản 5 Beat) & brain_input.json`
 * **Quy chuẩn**: 5 Beat Docudrama (1,800–2,200 từ, ~12–15 phút), Rule 444 Hook (0–60s), Micro-Cliffhangers (90–120s), Story Gate $\ge 8/10$.
@@ -195,6 +237,8 @@
 | :--- | :--- | :--- |
 | `app/services/trend_engine_b1.py` | Cào Google Trends RSS live, Wikipedia Anchor | Block 1.0 |
 | `app/services/competitor_recon_b15.py` | YouTube Data API, bóc tách comment & Explanatory Vacuum | Block 1.5 |
+| `app/services/grounding_layer_b15.py` | Google Search Grounding REST API & Confidence Gate | Block 1.5.5 |
+| `tests/test_grounding_layer.py` | Test suite kiểm thử Grounding Verification Gate | Block 1.5.5 Unit Test |
 | `app/services/story_engine_b2.py` | Sinh kịch bản 5 Beat Docudrama qua GPT-6-Astra | Block 2.0 |
 | `tests/ci_neighbor_tester.py` | Framework ISO Neighbor-Testing `[N-1, N, N+1]` | CI/CD Quality Gate |
 | `app/services/prompt_forge.py` | Prompt Forge cho Layer 1 BG & Layer 2 FG (#FF00FF) | Block 3.5 |
