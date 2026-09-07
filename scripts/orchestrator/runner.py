@@ -274,8 +274,11 @@ class OrchestratorRunner:
 
     def _run_audit_mode(self, sandbox: ResourceSandbox) -> int:
         """Executes Forensic Auditing on Story Gate, Director Plan, and Visual Prompts."""
-        start_ts = time.time()
-        task_id = self.args.task_id or "KR_EP0001_pesticide-container-trust"
+        task_id = self.args.task_id
+        if not task_id:
+            ep_root = Path("/var/vf/episodes")
+            active = [d.name for d in ep_root.iterdir() if d.is_dir() and not d.name.startswith(("_", "."))] if ep_root.exists() else []
+            task_id = active[0] if active else "EN_EP0001_sample_topic"
         ep_dir = Path("/var/vf/episodes") / task_id
 
         audit_report: Dict[str, Any] = {
@@ -329,9 +332,16 @@ class OrchestratorRunner:
                 audit_report["visual_prompt_audit"] = prompt_res
 
                 # Rule 128 cross-domain bleed & anti-stutter check
+                niche_domain = "general"
+                intel_f = ep_dir / "competitor_intel_card.json"
+                if intel_f.exists():
+                    try:
+                        niche_domain = json.loads(intel_f.read_text(encoding="utf-8")).get("niche", "general")
+                    except Exception:
+                        pass
                 passed, p_issues = self.governor.audit_prompts(
                     prompts_data,
-                    topic_domain="agriculture" if "pesticide" in task_id else "general",
+                    topic_domain=niche_domain,
                 )
                 if not passed:
                     audit_report["rule128_checks"].extend(p_issues)

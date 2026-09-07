@@ -1117,7 +1117,7 @@ def push_director_plan_to_notion(director_plan: dict, episode_id: str):
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="B3 Hollywood Art Director & Universal Scene Breakdown Engine")
-    parser.add_argument("episode_id", help="Episode ID (e.g. KR_EP0001_pesticide-container-trust or EN_EP0251)")
+    parser.add_argument("episode_id", help="Episode ID (e.g. <MARKET>_EP<0000>_<topic_slug>)")
     parser.add_argument("--skip-notion", action="store_true", help="Skip syncing to Notion")
     args = parser.parse_args()
 

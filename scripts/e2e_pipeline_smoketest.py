@@ -72,15 +72,15 @@ def gate_b35_visual_prompt_forge():
     print_gate("6. B3.5 Visual Prompt Forge & Anti-Stuttering")
     from app.services.prompt_forge import generate_scene_prompts
     mock_bg = {
-        "bg_b1_loc0": {"visual_hint": "Rural Korean terraced rice fields under autumn overcast sky", "narration_context": "Pesticide investigation in rural farming village"}
+        "bg_b1_loc0": {"visual_hint": "Atmospheric archival facility under dim low-key lighting", "narration_context": "Investigative documentary scene context"}
     }
     mock_fg = {
-        "fg_b1_char0": {"visual_hint": "Korean elder farmer in mud-stained work clothes holding empty container", "narration_context": "Local farmer discovering counterfeit pesticide"}
+        "fg_b1_char0": {"visual_hint": "Lead field investigator examining documentation", "narration_context": "Investigator analyzing primary forensic records"}
     }
     mock_scenes = [
-        {"scene_id": "sc_01", "bg_id": "bg_b1_loc0", "fg_id": "fg_b1_char0", "narration": "In the misty dawn of the valley..."}
+        {"scene_id": "sc_01", "bg_id": "bg_b1_loc0", "fg_id": "fg_b1_char0", "narration": "Forensic evidence examination scene."}
     ]
-    res = generate_scene_prompts(mock_bg, mock_fg, "Korean Agricultural Counterfeit Mystery", mock_scenes)
+    res = generate_scene_prompts(mock_bg, mock_fg, "Generic Documentary Investigation", mock_scenes)
     assert "backgrounds" in res and "foregrounds" in res, "generate_scene_prompts output must have backgrounds and foregrounds"
     
     bg_p = list(res["backgrounds"].values())[0]

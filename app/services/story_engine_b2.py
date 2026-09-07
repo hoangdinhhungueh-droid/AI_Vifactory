@@ -593,7 +593,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="B2 Story Engine (GPT-6-Astra)")
-    parser.add_argument("task_id", help="Task ID or Episode ID (e.g. KR_EP0001_pesticide-trust-crisis)")
+    parser.add_argument("task_id", help="Task ID or Episode ID (e.g. <MARKET>_EP<0000>_<topic_slug>)")
     parser.add_argument("--force", action="store_true", help="Force regeneration even if story.txt exists")
     args = parser.parse_args()
 
