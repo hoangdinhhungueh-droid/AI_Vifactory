@@ -1,27 +1,4 @@
 #!/usr/bin/env python3
-"""
-VF Pattern 1: Event-Driven Transitions - Prompts Forge Watcher
-================================================================
-
-Purpose: Replace 10-min cron poller with real-time file watcher for B3.5→B4 transition
-Trigger: Creation of /var/vf/episodes/{task_id}/prompts_forge.json
-Action: Send HG2 notification via Telegram
-Latency: <30 seconds (vs 10 minutes with cron)
-
-Architecture:
-- Uses watchdog library (inotify wrapper)
-- Monitors /var/vf/episodes recursively
-- Deduplication via processed set
-- Fallback: Cron poller runs every 30 min
-
-Deployment:
-- Systemd service: vf-prompts-forge-watcher.service
-- Log: /var/vf/logs/prompts_forge_watcher.log
-- Auto-restart on crash
-
-Ref: INTEGRATION_ROADMAP_DRAMACLAW_PATTERNS.md (Week 1-2)
-"""
-
 import sys
 import time
 import json
@@ -188,8 +165,9 @@ class PromptsForgeHandler(FileSystemEventHandler):
                 self._log(f"[ERROR] {task_id}: Invalid JSON in prompts_forge.json: {e}")
                 n_scenes, n_bg, n_fg, story_score = 0, 0, 0, "N/A"
 
-            asyncio.run(send_gate2_card(task_id=task_id, n_scenes=n_scenes, n_bg=n_bg, n_fg=n_fg, story_score=story_score))
-            self._log(f"[HG2 SENT] {task_id}: Telegram Gate 2 card dispatched successfully")
+            # Rule 125 & User Approved Option A2: Watcher is passive logger only;
+            # Telegram HG2 card is dispatched exclusively by produce_episode_hg1.py to prevent duplicate spam.
+            self._log(f"[HG2 VALIDATED] {task_id}: prompts_forge.json validated (scenes={n_scenes}, BG={n_bg}, FG={n_fg}, Story Gate={story_score}). Dispatch handled exclusively by pipeline script.")
             return True
         except Exception as e:
             self._log(f"[ERROR] {task_id}: Exception in HG2 trigger: {e}")

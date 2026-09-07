@@ -262,10 +262,24 @@ Integrity mode: development
 ## 🚀 VI. TIẾN TRÌNH CÔNG VIỆC HÔM NAY (2026-09-07 OPERATIONAL AUDIT & HARDENING)
 
 > **Căn cứ yêu cầu người dùng ngày 2026-09-07**:
-> 1. **Kiểm toán báo cáo B4 & B5 từ phiên trước (`658d00a0-a568-406e-b554-11798f9554a7`)**: Làm rõ ranh giới giữa hoàn thành code cầu nối / unit test vs thực thi sinh ảnh sống thực tế trên Antigravity.
-> 2. **Xử lý sự cố kho số Episode (`EN_EP0260`)**: Reset và đồng bộ kho số chuẩn xác theo Notion VF Trend Brain hoặc cấu hình lưu trữ, dọn dẹp các thư mục test cũ trên filesystem VPS.
-> 3. **Tinh gọn thông báo Telegram**: Loại bỏ thông báo trùng lặp `VF Daily Trend & Story Pipeline (B1 ➔ B3) — 1 Đề tài hoàn tất:` ở cuối script; chỉ giữ Human Gate 1 và Human Gate 2.
-> 4. **Kiểm toán chất lượng B1 ➔ B3.5**:
->    - Khắc phục lỗi keyword stuffing (nối chuỗi từ khóa 9 từ vào Title A và 60s Hook) và lỗi fallback trùng lặp Viral Angle = Blue Ocean Gap.
->    - Khắc phục lệch đường dẫn B3 Director Plan: Đồng bộ việc lưu `director_plan.json` và `brain_input.json` vào chuẩn `/var/vf/episodes/<id>/` theo đúng `PIPELINE_CONTRACTS.md`.
-> 5. **Làm rõ sự cố HHTech API Usage (Claude Opus 5)**: Xác minh pháp y các cuộc gọi `claude-opus-5` (không thuộc về pipeline VPS, do client ngoại vi gọi).
+> 1. [x] **Kiểm toán báo cáo B4 & B5 từ phiên trước (`658d00a0-a568-406e-b554-11798f9554a7`)**: Làm rõ ranh giới giữa hoàn thành code cầu nối / unit test vs thực thi sinh ảnh sống thực tế trên Antigravity. Đã kiểm tra trình duyệt Chrome profile và chuẩn hóa quy trình chạy headless `gemini_browser_gen.py`.
+> 2. [x] **Xử lý dứt điểm sự cố kho số Episode (`EN_EP0260`)**: Đã lưu trữ toàn bộ folder cũ sang `/var/vf/episodes/_archive/` và pending tasks cũ sang `_archive/`. Đã dọn sạch Notion Story Library, Director Plan và Prompt Library. Cập nhật dòng VF Trend Brain về `EN_EP0001_puka_contract_economics`. Kiểm thử `get_next_episode_id` trên VPS xác nhận kho số quay về chuẩn xác `EN_EP0001` (`max_num=1`).
+> 3. [x] **Tinh gọn thông báo Telegram**: Loại bỏ thông báo trùng lặp `VF Daily Trend & Story Pipeline (B1 ➔ B3) — 1 Đề tài hoàn tất:` ở cuối script; chỉ giữ Human Gate 1 và Human Gate 2.
+> 4. [x] **Tái cấu trúc Template Human Gate 2 & Skill `vf-image-gen`**: Tinh gọn thẻ HG2 thành bản tóm lược điều hành (Chủ đề, Đạo diễn Hollywood, Thống kê Scenes/BG/FG, Hook Thumbnail A/B) kèm khối lệnh 1-chạm:
+>    ```
+>    /vf-image-gen
+>    /run:image --episode EN_EP0001_puka_contract_economics --headless
+>    ```
+>    Ủy quyền toàn bộ quy chuẩn kỹ thuật (2K DCI, #FF00FF Chroma HSV, 4-Trục Visual Audit Rule 122, Auto-Trigger `images_ready.json`) cho Skill `vf-image-gen`.
+> 5. [x] **Tái tạo toàn diện Pipeline B1.5 ➔ B2 ➔ B3 ➔ B3.5 cho `EN_EP0001_puka_contract_economics`**:
+>    - **B1.5**: YouTube Recon thực tế + 5 Trụ cột Narrative Anatomy qua GPT-6-Astra (`competitor_intel_card.json`, 16.5KB).
+>    - **B1.6**: Gói SEO sớm & 60s An Ong Hook (`seo_package.json`, 2.9KB).
+>    - **B2**: Kịch bản 5-Beat Docudrama 12–15 phút đạt chuẩn Story Gate 12/12 (`story.txt`, 14.9KB).
+>    - **B3**: Kế hoạch đạo diễn 82 scenes chuẩn Sentence-Atomic Pacing (ngắt trọn vẹn câu, $\le 35$ từ/scene, Safe-Zone FG Left/Right), đồng bộ 82/82 scenes vào Child DB Scenes (`3d401989-2400-81a3-8618-d7078f65f98c`).
+>    - **B3.5**: Prompt Forge 20 BG, 15 FG và 2 Hero Thumbnails (`prompts_forge.json`, 52KB), đồng bộ 37/37 prompts vào Prompt Library DB (`3d401989-2400-811a-ab14-c0854469b921`).
+>    - **Human Gate 2**: Đã phát thẻ Telegram mới về Telegram (Message ID: `456`).
+> 6. [x] **Three-Way Physical Sync & CI Verification (Rule 126)**:
+>    - Pytest trên VPS: 10/10 tests PASS (`test_b35_b4_bridge.py`, `test_trend_gate_b1.py`).
+>    - Commit VPS: `6f6b6f245de4e397e801db9a60031f6f08848067`.
+>    - GitHub Actions CI Watcher: [Workflow Run 34086874750](https://github.com/hoangdinhhungueh-droid/AI_Vifactory/actions/runs/34086874750) đạt `conclusion: success` (exit code 0).
+

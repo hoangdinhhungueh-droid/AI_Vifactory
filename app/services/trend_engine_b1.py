@@ -100,6 +100,26 @@ def perform_direct_platform_recon(term: str, market: str) -> dict:
     gl = cfg["gl"]
     intent_mods = cfg["intent_modifiers"]
 
+    # 0. Real-time Google Trends Rising / Breakout Queries via pytrends (Rule 123)
+    pytrends_rising = []
+    seen = set()
+    try:
+        from pytrends.request import TrendReq
+        hl_code = "en-US" if m_up == "EN" else ("ja-JP" if m_up == "JP" else "ko-KR")
+        pt = TrendReq(hl=hl_code, tz=360, timeout=(6.0, 6.0))
+        pt.build_payload([term], timeframe='now 7-d', geo=gl)
+        rel = pt.related_queries()
+        if term in rel and rel[term].get("rising") is not None:
+            rdf = rel[term]["rising"]
+            if hasattr(rdf, "empty") and not rdf.empty and "query" in rdf:
+                for q_val in rdf["query"].tolist():
+                    q_clean = str(q_val).strip()
+                    if q_clean and q_clean.lower() not in seen:
+                        seen.add(q_clean.lower())
+                        pytrends_rising.append(q_clean)
+    except Exception as _pt_err:
+        logger.debug(f"[{m_up}] Pytrends rising queries fetch skipped/failed for {term}: {_pt_err}")
+
     # 1. Google Autocomplete (Viewer Web Searches)
     g_sugg = google_autocomplete(term, hl=hl, gl=gl, timeout=6.0)
 
@@ -114,8 +134,7 @@ def perform_direct_platform_recon(term: str, market: str) -> dict:
         if s:
             intent_queries.extend(s[:2])
 
-    all_rising = []
-    seen = set()
+    all_rising = list(pytrends_rising)
     for q in g_sugg + yt_sugg + intent_queries:
         q_str = str(q).strip()
         if q_str and q_str.lower() not in seen:
@@ -444,7 +463,23 @@ def discover_and_produce_market_trend(
         specific_angle = viability.get("specific_viral_angle") or term
         print(f"  ✅ APPROVED! Viability: {score}/10 | Angle: {specific_angle}")
 
-        # 4. Reason Niche Brief & 5-Act Direction
+        # 3.5 B1.5 Pre-Recon (Rule 123 & Rule 128: Data-Driven Competitor Recon Before Niche Decision)
+        print(f"  🎯 [B1.5 Pre-Recon] Harvesting Competitor Benchmarks & Audience Frustrations for '{term}'...")
+        temp_slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(term).lower()).strip('-')[:20]
+        temp_task_id = f"{m_up}_TEMP_{temp_slug}"
+        recon_card = None
+        comp_gap = ""
+        try:
+            recon_card = run_b15(temp_task_id, term, niche="Trending Investigative", use_cache=True)
+            if recon_card:
+                anatomy = recon_card.get("competitor_narrative_anatomy", {})
+                comp_gap = anatomy.get("fatal_explanatory_vacuum", "")
+                if comp_gap:
+                    print(f"  ✅ [B1.5 Pre-Recon] Discovered real competitor vacuum: {comp_gap[:60]}...")
+        except Exception as _b15_pre_err:
+            logger.warning(f"B1.5 pre-recon warning for {term}: {_b15_pre_err}")
+
+        # 4. Reason Niche Brief & 5-Beat Direction using Real Competitor Intel & Real Rising Queries
         niche_data = reason_topic_niche(
             subject=term,
             market=m_up,
@@ -452,6 +487,8 @@ def discover_and_produce_market_trend(
             rising_queries=rising_queries[:8],
             viral_videos=viral_videos[:5]
         )
+        if comp_gap:
+            niche_data["competitor_differentiation_gap"] = comp_gap
 
         t_obj = {
             "market": m_up,
@@ -466,7 +503,7 @@ def discover_and_produce_market_trend(
             "search_specific_keyword": niche_data.get("search_specific_keyword"),
             "task_slug": niche_data.get("task_slug"),
             "niche_angle_brief": niche_data.get("niche_angle_brief"),
-            "competitor_differentiation_gap": niche_data.get("competitor_differentiation_gap", ""),
+            "competitor_differentiation_gap": niche_data.get("competitor_differentiation_gap") or comp_gap,
             "story_direction_5_arcs": niche_data.get("story_direction_5_arcs"),
             "rising_queries": rising_queries[:8],
             "breakout_queries": niche_data.get("breakout_queries") or rising_queries[:3],
@@ -481,13 +518,22 @@ def discover_and_produce_market_trend(
         t_obj["task_id"] = task_id
         print(f"  💾 Committed Task ID: {task_id}")
 
-        # 5. Inline B1.5 Competitor Recon (Deep Two-Pass Recon & Top Comments)
-        print(f"  🎯 [B1.5] Executing Deep Competitor Recon for {task_id}...")
+        # 5. Re-link or Execute B1.5 Competitor Recon for final task_id
+        print(f"  🎯 [B1.5] Finalizing Competitor Intel Card for {task_id}...")
         try:
             recon_keyword = t_obj.get("search_specific_keyword") or term
-            recon_card = run_b15(task_id, recon_keyword, t_obj.get("niche_angle_brief", "General"))
+            if not recon_card:
+                recon_card = run_b15(task_id, recon_keyword, t_obj.get("niche_angle_brief", "General"))
+            else:
+                recon_card["task_id"] = task_id
+                for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes"]:
+                    t_dir = Path(ep_base) / task_id
+                    t_dir.mkdir(parents=True, exist_ok=True)
+                    (t_dir / "competitor_intel_card.json").write_text(
+                        json.dumps(recon_card, ensure_ascii=False, indent=2), encoding="utf-8")
+            
             if recon_card:
-                gap_val = recon_card.get("competitor_narrative_anatomy", {}).get("fatal_explanatory_vacuum", "")
+                gap_val = recon_card.get("competitor_narrative_anatomy", {}).get("fatal_explanatory_vacuum", "") or comp_gap
                 if gap_val:
                     t_obj["competitor_differentiation_gap"] = gap_val
                     t_obj["competitor_gap"] = gap_val
@@ -500,7 +546,7 @@ def discover_and_produce_market_trend(
                             logger.warning(f"Could not re-persist task file with competitor gap: {_we}")
                 print(f"  ✅ [B1.5] Competitor Intel Card saved successfully with real gap: {gap_val[:60]}...")
         except Exception as re_err:
-            logger.warning(f"[{task_id}] Inline B1.5 recon warning: {re_err}")
+            logger.warning(f"[{task_id}] B1.5 recon finalizing warning: {re_err}")
 
         # 5.5. Early B1.5 SEO & Narrative Hook Package Forge (Rule 119 & Rule 444)
         print(f"  🚀 [B1.6] Forging Early SEO Package & 60s An Ong Hook for {task_id} via GPT-6-Astra...")

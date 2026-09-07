@@ -58,19 +58,25 @@ class DynamicArchetypeDict(dict):
 # Compatibility container for legacy callers and tests
 CINEMATIC_ARCHETYPES = DynamicArchetypeDict({
     "finance": {
-        "director": "Adam McKay / David Fincher (Corporate Noir)",
+        "director": "GPT-6-Astra — David Fincher (Corporate Noir) Principle",
         "visual_tone": "Glossy boardroom veneer contrasting cold trading floors, shredded paper trails, creeping push-ins on forensic ledger anomalies",
         "palette": "Cold steel blue, dark charcoal, toxic amber highlights, fluorescent office hum",
         "camera_style": "Slow creeping push-ins on critical revelations, clinical wide establishing shots, sudden whip pans on micro-cliffhangers"
     },
     "history": {
-        "director": "Chernobyl / Christopher Nolan (Historical Realism)",
+        "director": "GPT-6-Astra — Christopher Nolan & Johan Renck (Historical Realism) Principle",
         "visual_tone": "Monumental scale, oppressive stone and concrete institutional corridors, dusty light beams through heavy drapes, atmospheric decay",
         "palette": "Aged ochre, slate stone, imperial gold accents, oxidized bronze, deep chiaroscuro",
         "camera_style": "Slow deliberate tracking shots, high-angle surveillance-style observation, lingering static tableaux"
     },
+    "sports": {
+        "director": "GPT-6-Astra — Sports Documentary Realism (Moneyball Principle)",
+        "visual_tone": "Sunlit stadium tunnels, high-contrast training facilities, authentic press briefing rooms, analytical draft boards",
+        "palette": "Desaturated turf green, stadium amber, deep navy, clinical white accents",
+        "camera_style": "Steadicam tracking shots, telephoto stadium perspective, grounded eye-level procedural framing"
+    },
     "default": {
-        "director": "Investigative Cinematic Docudrama (Denis Villeneuve / David Fincher Style)",
+        "director": "GPT-6-Astra — Denis Villeneuve & David Fincher (Investigative Realism) Principle",
         "visual_tone": "Moody atmospheric tension, dramatic low-key lighting, textured architectural backgrounds, forensic depth of field",
         "palette": "Muted earth tones, cinematic contrast, shadow-heavy rim lighting",
         "camera_style": "Creeping push-ins, dynamic eye-level forensic staging, dramatic low-angle power shots"
@@ -84,13 +90,15 @@ def detect_cinematic_archetype(niche: str = "", topic: str = "", story_text: str
     Maintains compatibility with tests while routing dynamically based on cinematic tone.
     """
     combined = f"{niche} {topic} {story_text[:500]}".lower()
-    if any(k in combined for k in ["finance", "economy", "bank", "money", "fraud", "wall street", "debt", "lehman", "madoff", "enron", "trading"]):
+    if any(k in combined for k in ["sport", "athlete", "nfl", "nba", "football", "baseball", "olympic", "player", "coach", "stadium", "league"]):
+        return CINEMATIC_ARCHETYPES["sports"]
+    elif any(k in combined for k in ["finance", "economy", "bank", "money", "fraud", "wall street", "debt", "lehman", "madoff", "enron", "trading"]):
         return CINEMATIC_ARCHETYPES["finance"]
     elif any(k in combined for k in ["history", "empire", "war", "monarchy", "oppenheimer", "manhattan project", "soviet", "cold war", "chernobyl", "medieval", "century"]):
         return CINEMATIC_ARCHETYPES["history"]
     elif any(k in combined for k in ["medical", "pharma", "clinical", "hospital", "drug", "medicine", "vaccine", "toxic", "poison", "epidemic", "cholera"]):
         return {
-            "director": "Steven Soderbergh / Denis Villeneuve (Clinical Realism)",
+            "director": "GPT-6-Astra — Steven Soderbergh (Clinical Realism) Principle",
             "visual_tone": "Provincial clinical examination rooms, sealed diagnostic vials, pharmaceutical packaging lines, regulatory inspection desks",
             "palette": "Clinical pale blue, antiseptic mint green, iodine amber, brushed stainless steel",
             "camera_style": "Forensic close-ups on batch numbers and chemical seals, creeping dolly shots through regulatory archives"

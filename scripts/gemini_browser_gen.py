@@ -149,16 +149,21 @@ def check_gemini_session(page):
     """Kiểm tra trạng thái đăng nhập Gemini Web."""
     print("🌐 Đang kết nối tới https://gemini.google.com/app...")
     page.goto("https://gemini.google.com/app", wait_until="domcontentloaded")
-    time.sleep(4)
     
-    input_box = page.query_selector('div[role="textbox"], div[contenteditable="true"], textarea')
+    input_box = None
+    for _ in range(15):
+        input_box = page.query_selector('div[role="textbox"], div[contenteditable="true"], textarea')
+        if input_box and input_box.is_visible():
+            break
+        time.sleep(1)
+    
     sign_in_btn = page.query_selector('a[href*="ServiceLogin"], a[href*="InteractiveLogin"], button:has-text("Sign in"), button:has-text("Đăng nhập")')
     user_avatar = page.query_selector('a[href*="SignOutOptions"], a[aria-label*="Google Account"], a[aria-label*="Tài khoản Google"], [data-test-id="user-avatar"]')
     
-    if sign_in_btn and not user_avatar:
+    if sign_in_btn and not user_avatar and not input_box:
         print("\n" + "!"*70)
         print("❌ CHƯA ĐĂNG NHẬP GOOGLE PRO TRÊN TRÌNH DUYỆT!")
-        print("👉 Vui lòng mở tiện ích trên Desktop: C:\\Users\\hunghd2\\Desktop\\Mo_Gemini_DangNhap.bat")
+        print(r"👉 Vui lòng mở tiện ích trên Desktop: C:\Users\hunghd2\Desktop\AI VF\Mo_Gemini_DangNhap.bat")
         print("👉 Bấm 'Sign in' để hoàn tất đăng nhập tài khoản Google Pro.")
         print("!"*70 + "\n")
         return None
@@ -170,132 +175,69 @@ def check_gemini_session(page):
     return None
 
 def fetch_prompts_from_vps(episode_id):
-    """Lấy danh sách prompts_forge.json từ VPS an toàn không bị giới hạn stdout buffer (hỗ trợ BG, FG, Thumbnails)."""
-    cmd_keys = f"""python3 -c '
-import json, os, glob
-candidates = [
-    f"/var/vf/episodes/{episode_id}/prompts_forge.json"
-] + glob.glob(f"/var/vf/episodes/{episode_id}*/prompts_forge.json")
-path = next((p for p in candidates if os.path.exists(p)), None)
-if not path:
-    print(json.dumps({{"error": "not found"}}))
-else:
-    with open(path) as f:
-        d = json.load(f)
-    print(json.dumps({{
-        "bg_keys": list(d.get("backgrounds", {{}}).keys()),
-        "fg_keys": list(d.get("foregrounds", {{}}).keys()),
-        "thumb_keys": list(d.get("thumbnails", {{}}).keys())
-    }}))
-'"""
-    res = client.run_command(cmd_keys)
-    keys_data = json.loads(res.get("stdout", "{}").strip() or "{}")
-    if "error" in keys_data:
-        raise RuntimeError(f"Không tìm thấy prompts_forge.json trên VPS cho episode {episode_id}")
-        
-    bg_keys = keys_data.get("bg_keys", [])
-    fg_keys = keys_data.get("fg_keys", [])
-    thumb_keys = keys_data.get("thumb_keys", [])
-    items = []
+    """Lấy danh sách prompts_forge.json từ VPS hoặc cache local an toàn không bị giới hạn stdout buffer (hỗ trợ BG, FG, Thumbnails)."""
+    local_episode_dir = os.path.join(r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets", episode_id)
+    os.makedirs(local_episode_dir, exist_ok=True)
+    local_prompts_file = os.path.join(local_episode_dir, "prompts_forge.json")
     
-    # Backgrounds in chunks of 5
-    for i in range(0, len(bg_keys), 5):
-        subset = bg_keys[i:i+5]
-        cmd = f"""python3 -c '
-import json, os, glob
-candidates = [f"/var/vf/episodes/{episode_id}/prompts_forge.json"] + glob.glob(f"/var/vf/episodes/{episode_id}*/prompts_forge.json")
-path = next((p for p in candidates if os.path.exists(p)), None)
-with open(path) as f:
-    d = json.load(f)
-bgs = d.get("backgrounds", {{}})
-out = {{k: bgs[k] for k in {json.dumps(subset)} if k in bgs}}
-print(json.dumps(out))
-'"""
-        chunk_res = client.run_command(cmd)
-        chunk_data = json.loads(chunk_res.get("stdout", "{}").strip())
-        for k, p in chunk_data.items():
-            prompt_text = p if isinstance(p, str) else p.get("prompt", "")
-            items.append({
-                "reuse_key": k,
-                "layer_type": "Background",
-                "prompt": f"{prompt_text} [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]"
-            })
+    d = None
+    if os.path.exists(local_prompts_file) and os.path.getsize(local_prompts_file) > 100:
+        try:
+            with open(local_prompts_file, "r", encoding="utf-8") as f:
+                d = json.load(f)
+        except Exception:
+            d = None
             
-    # Foregrounds in chunks of 5
-    for i in range(0, len(fg_keys), 5):
-        subset = fg_keys[i:i+5]
-        cmd = f"""python3 -c '
-import json, os, glob
-candidates = [f"/var/vf/episodes/{episode_id}/prompts_forge.json"] + glob.glob(f"/var/vf/episodes/{episode_id}*/prompts_forge.json")
-path = next((p for p in candidates if os.path.exists(p)), None)
-with open(path) as f:
-    d = json.load(f)
-fgs = d.get("foregrounds", {{}})
-out = {{k: fgs[k] for k in {json.dumps(subset)} if k in fgs}}
-print(json.dumps(out))
-'"""
-        chunk_res = client.run_command(cmd)
-        chunk_data = json.loads(chunk_res.get("stdout", "{}").strip())
-        for k, p in chunk_data.items():
-            prompt_text = p if isinstance(p, str) else p.get("prompt", "")
-            items.append({
-                "reuse_key": k,
-                "layer_type": "Foreground",
-                "prompt": f"{prompt_text} [TECHNICAL: Generate with pure #FF00FF magenta background, clean chroma key cutout, 1:1 aspect ratio, sharp silhouette, no borders.]"
-            })
-
-    # Thumbnails (A/B) from prompts_forge or fallback to seo_package.json
-    if thumb_keys:
-        cmd_thumbs = f"""python3 -c '
-import json, os, glob
-candidates = [f"/var/vf/episodes/{episode_id}/prompts_forge.json"] + glob.glob(f"/var/vf/episodes/{episode_id}*/prompts_forge.json")
-path = next((p for p in candidates if os.path.exists(p)), None)
-with open(path) as f:
-    d = json.load(f)
-thumbs = d.get("thumbnails", {{}})
-print(json.dumps(thumbs))
-'"""
-        t_res = client.run_command(cmd_thumbs)
-        t_data = json.loads(t_res.get("stdout", "{}").strip() or "{}")
-        for k, p in t_data.items():
+    if not d:
+        vps_path = f"/var/vf/episodes/{episode_id}/prompts_forge.json"
+        size_res = client.run_command(f"wc -c < '{vps_path}'")
+        size_str = size_res.get("stdout", "0").strip()
+        if not size_str.isdigit() or int(size_str) == 0:
+            raise RuntimeError(f"Không tìm thấy prompts_forge.json trên VPS cho episode {episode_id}")
+        size = int(size_str)
+        chunk_size = 6000
+        data_total = b""
+        offset = 0
+        while offset < size:
+            count = min(chunk_size, size - offset)
+            res = client.run_command(f"tail -c +{offset+1} '{vps_path}' | head -c {count} | base64 -w 0")
+            chunk = res.get("stdout", "").strip()
+            if not chunk:
+                break
+            decoded = base64.b64decode(chunk)
+            data_total += decoded
+            offset += len(decoded)
+        with open(local_prompts_file, "wb") as f:
+            f.write(data_total)
+        d = json.loads(data_total.decode("utf-8"))
+        
+    items = []
+    for k, p in d.get("backgrounds", {}).items():
+        prompt_text = p if isinstance(p, str) else p.get("prompt", "")
+        items.append({
+            "reuse_key": k,
+            "layer_type": "Background",
+            "prompt": f"{prompt_text} [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]"
+        })
+        
+    for k, p in d.get("foregrounds", {}).items():
+        prompt_text = p if isinstance(p, str) else p.get("prompt", "")
+        items.append({
+            "reuse_key": k,
+            "layer_type": "Foreground",
+            "prompt": f"{prompt_text} [TECHNICAL: Generate with pure #FF00FF magenta background, clean chroma key cutout, 1:1 aspect ratio, sharp silhouette, no borders.]"
+        })
+        
+    thumbs = d.get("thumbnails", {})
+    if thumbs:
+        for k, p in thumbs.items():
             prompt_text = p if isinstance(p, str) else p.get("prompt", "")
             items.append({
                 "reuse_key": k,
                 "layer_type": "Thumbnail",
                 "prompt": f"{prompt_text} [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]"
             })
-    else:
-        # Fallback: synthesize thumbnails from seo_package.json on VPS if not in prompts_forge
-        cmd_seo = f"""python3 -c '
-import json, os, glob
-candidates = [f"/var/vf/episodes/{episode_id}/seo_package.json"] + glob.glob(f"/var/vf/episodes/{episode_id}*/seo_package.json")
-path = next((p for p in candidates if os.path.exists(p)), None)
-if path:
-    with open(path) as f:
-        print(json.dumps(json.load(f)))
-else:
-    print(json.dumps({{}}))
-'"""
-        seo_res = client.run_command(cmd_seo)
-        seo_data = json.loads(seo_res.get("stdout", "{}").strip() or "{}")
-        if seo_data:
-            t_a = seo_data.get("title_a", episode_id)
-            t_b = seo_data.get("title_b", "")
-            viral = seo_data.get("specific_viral_angle", "")
-            items.append({
-                "reuse_key": "thumbnail_a",
-                "layer_type": "Thumbnail",
-                "prompt": f"Cinematic wide-angle 16:9 YouTube hero thumbnail for '{t_a}'. High visual tension representing '{viral or t_a}', dramatic high-contrast chiaroscuro lighting, bold atmospheric color grading, clean negative space for typography, photorealistic 8k documentary aesthetic, 2560x1440 resolution, 2K DCI."
-            })
-            if t_b:
-                items.append({
-                    "reuse_key": "thumbnail_b",
-                    "layer_type": "Thumbnail",
-                    "prompt": f"Curiosity-gap 16:9 YouTube thumbnail for '{t_b}'. Intense volumetric cinematic lighting, high-stakes atmospheric depth, safe-zone for title text, photorealistic 8k documentary aesthetic, 2560x1440 resolution, 2K DCI."
-                })
-            
     return items
-
 
 def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Background", timeout_sec=120, max_retries=2):
     """Gửi prompt lên Gemini Web và lưu kết quả dưới định dạng .PNG chuẩn 2K DCI với cơ chế retry tự động."""
@@ -886,26 +828,35 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=8,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gemini Browser Automation Image Generator")
-    parser.add_argument("--episode", type=str, default=None, help="Episode ID (ví dụ: EN_EP0260_...)")
+    parser.add_argument("--episode", type=str, default=None, help="Episode ID (ví dụ: EN_EP0001_...)")
     parser.add_argument("--test", action="store_true", help="Chạy thử 1 ảnh mẫu PNG")
     parser.add_argument("--headless", action="store_true", help="Chạy không hiện cửa sổ")
     parser.add_argument("--pacing", type=int, default=8, help="Thời gian giãn cách giữa các prompt (giây)")
     parser.add_argument("--force", action="store_true", help="Sinh lại toàn bộ ngay cả khi đã có file cục bộ")
-    parser.add_argument("--auto-handoff", action="store_true", help="Tự động trigger B6 render sau khi xong B4/B5 (mặc định False theo Rule 122)")
+    parser.add_argument("--no-auto-handoff", action="store_true", help="Tắt tự động trigger B6 render sau khi xong B4/B5 (mặc định B6 tự động kích hoạt)")
     args = parser.parse_args()
     
+    # Auto handoff mặc định bật theo Rule 437 trừ khi truyền --no-auto-handoff
+    auto_handoff = not args.no_auto_handoff
+
     if args.test:
         test_items = [{
             "reuse_key": "test-sample-scene",
             "prompt": "A cinematic dramatic wide shot of a 1960s Wall Street office with volumetric sunlight beams and glowing ticker displays, photorealistic 8k, 16:9 aspect ratio [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]",
             "layer_type": "Background"
         }]
-        run_browser_pipeline("test_run", test_items, headless=args.headless, pacing_sec=5, force=args.force, auto_handoff=args.auto_handoff)
+        run_browser_pipeline("test_run", test_items, headless=args.headless, pacing_sec=5, force=args.force, auto_handoff=auto_handoff)
     else:
         if not args.episode:
             print("❌ LỖI (Rule 128): Thiếu tham số --episode <EPISODE_ID>! Bắt buộc truyền ID tường minh, cấm fallback mặc định.")
             parser.print_help()
             sys.exit(1)
-        items = fetch_prompts_from_vps(args.episode)
-        print(f"📋 Đã nạp thành công {len(items)} prompts từ VPS cho episode {args.episode}")
-        run_browser_pipeline(args.episode, items, headless=args.headless, pacing_sec=args.pacing, force=args.force, auto_handoff=args.auto_handoff)
+        
+        # Làm sạch episode_id nếu user paste dạng task:ID hoặc dính dấu ngoặc/nháy
+        clean_ep = args.episode.strip().strip("'\"")
+        if clean_ep.lower().startswith("task:"):
+            clean_ep = clean_ep[5:].strip()
+        
+        items = fetch_prompts_from_vps(clean_ep)
+        print(f"📋 Đã nạp thành công {len(items)} prompts từ VPS cho episode {clean_ep}")
+        run_browser_pipeline(clean_ep, items, headless=args.headless, pacing_sec=args.pacing, force=args.force, auto_handoff=auto_handoff)

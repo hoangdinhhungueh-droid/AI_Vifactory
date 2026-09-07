@@ -131,7 +131,7 @@ def load_task_metadata(task_id: str) -> dict:
         "task_id": task_id,
         "market": mkt,
         "topic": raw_name.replace("_", " ").title(),
-        "story_arcs": "Hồi 1 (Hook) -> Hồi 2 (Trỗi dậy) -> Hồi 3 (Xung đột) -> Hồi 4 (Sụp đổ) -> Hồi 5 (Bài học)",
+        "story_arcs": "Beat 1 (Nghịch lý mở màn 0-60s) -> Beat 2 (Bẫy truyền thông & Red Herring) -> Beat 3 (Manh mối rò rỉ & Vết nứt thể chế) -> Beat 4 (Cỗ máy lợi ích & Smoking Gun) -> Beat 5 (Gương soi hiện tại & Lời cảnh báo)",
         "niche_brief": f"Cơ chế ngách và sự kiện lịch sử/kinh tế đằng sau {raw_name}.",
         "breakout_queries": [],
         "content_theme": theme,
@@ -141,8 +141,8 @@ def load_task_metadata(task_id: str) -> dict:
 
 
 def generate_5_arc_story(task_id: str, custom_meta: dict | None = None) -> dict:
-    """Generate a complete 5-Act non-fiction script (~1,200 words) using GPT-6-Astra
-    enforcing YouTube Safety and Big Fish Small Pond mechanisms in a single optimized pass.
+    """Generate a complete 5-Beat Docudrama script (1,800-2,200 words, ~12-15 min) using GPT-6-Astra
+    enforcing YouTube Safety, Rule 444 An Ong Hook, and Rule 445 in a single optimized pass.
     Inherits authentic rules dynamically from Notion SoT (Central Skills + Content Engine Hub).
     """
     meta = custom_meta or load_task_metadata(task_id)
@@ -248,6 +248,12 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         f"Total Word Count Target: 1,800 - 2,200 words (~12 to 15 minutes narration at ~150 WPM) across 5 structured Acts.\n"
         f"Structure per Act: Approximately 360-440 words across 3-4 vivid, investigative paragraphs per Act.\n"
         f"Strict Requirement: Scripts under 1,700 words will be rejected by the story gate.\n\n"
+        f"MANDATORY STORY GATE 12/12 REQUIREMENTS (ZERO-TOLERANCE QUALITY CRITERIA):\n"
+        f"• Check 9 (Hook Shock in First 60 Words): The very first sentence of Act I MUST feature a concrete numeric figure, percentage (%), monetary sum ($), or superlative scale (e.g. '105 receptions', '$0 spent', '3.65 million') creating a quantitative paradox.\n"
+        f"• Check 12 (Pattern Interrupt in Mechanism): In Act III (The Systemic Blindspot, 25%-70% mark), write at least one very short, punchy sentence of 2 to 6 words maximum (e.g. 'The paper trail vanished.', 'Then came the audit.', 'Nobody questioned the payout.') to disrupt rhythm.\n"
+        f"• Check 2 (Open Question in Hook): Act I must open a compelling Core Curiosity Loop with a direct unanswered question in the opening paragraph.\n"
+        f"• Check 5 (Sourced Numbers): Narration must cite at least 2 explicit forensic sources/reports and include regular concrete metrics.\n"
+        f"• Check 10 (Zero Banned Cliches): 100% elimination of banned AI cliches ('in a world where', 'little did they know', 'testament to', 'double-edged sword', 'beacon of hope').\n\n"
         f"{editorial_skills}\n\n"
         f"SPECIFIC CONTEXT FOR THIS SCRIPT:\n"
         f"• Subject / Case: {topic}\n"
@@ -369,21 +375,24 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
 
     # Audit Story Gate Score
     audit = sgate.score_story(full_script)
-    story_score_str = f"{audit.get('score', 8)}/{audit.get('max_score', 10)}"
+    story_score_str = f"{audit.get('score', 8)}/{audit.get('max_score', 12)}"
     story_verdict = audit.get('verdict') or 'UNKNOWN'
     logger.info(f"[story_engine] Initial Story Gate Score: {story_score_str} | Verdict: {audit.get('verdict')}")
 
-    # Auto-Refine Self-Correction Loop if Story Gate fails (<80% or banned cliches found)
-    if story_verdict != "PASS":
+    # Auto-Refine Self-Correction Loop: Mandate 12/12 Perfect Score for every Episode
+    if audit.get("score", 0) < 12 or story_verdict != "PASS":
         for refine_attempt in range(1, 3):
             logger.warning(
-                f"[story_engine] Story Gate FAILED ({audit.get('score')}/{audit.get('max_score')}). "
+                f"[story_engine] Story Gate under 12/12 ({audit.get('score')}/{audit.get('max_score')}). "
                 f"Fix hints: {audit.get('fix_hints')}. Banned hits: {audit.get('banned_phrases_found')}. "
-                f"Initiating Auto-Refine Attempt {refine_attempt}/2 via GPT-6-Astra..."
+                f"Initiating Auto-Refine Attempt {refine_attempt}/2 via GPT-6-Astra to achieve 12/12..."
             )
             refine_user = (
-                f"The generated script failed our quality gate (Score: {audit.get('score')}/{audit.get('max_score')}).\n"
+                f"The generated script scored {audit.get('score')}/{audit.get('max_score')} on Story Gate. Target is 12/12 PERFECT SCORE.\n"
                 f"REQUIRED CORRECTIONS:\n" + "\n".join(f"- {h}" for h in audit.get("fix_hints", [])) + "\n\n"
+                f"CRITICAL REMINDERS FOR 12/12:\n"
+                f"1. Hook Shock: Sentence 1 of Act I MUST feature a quantitative number, %, or $ figure within 60 words.\n"
+                f"2. Pattern Interrupt: Act III MUST have at least one short sentence of 2 to 6 words (e.g. 'The paper trail vanished.').\n"
                 f"BANNED PHRASES FOUND (MUST ELIMINATE): {', '.join(audit.get('banned_phrases_found', []))}\n\n"
                 f"Please rewrite and polish the entire 5-Act script, strictly maintaining 1,800-2,200 words, "
                 f"preserving all 5 Acts ('=== ACT I ===' to '=== ACT V ==='), ensuring the first sentence opens with a shock quantitative stake (Rule 444), and resolving all failed items.\n\n"
