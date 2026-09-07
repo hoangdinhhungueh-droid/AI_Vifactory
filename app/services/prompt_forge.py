@@ -222,21 +222,24 @@ def _synthesize_thumbnail_prompts(story_title: str, seo_data: dict = None) -> di
     Thumbnail A: Emotion-First & Specific Viral Angle.
     Thumbnail B: Curiosity-Gap & Paradox Juxtaposition.
     """
-    title_a = (seo_data.get("title_a") if seo_data else "") or story_title
-    title_b = (seo_data.get("title_b") if seo_data else "") or ""
-    hook_3s = (seo_data.get("hook_3s") if seo_data else "") or ""
-    viral_angle = (seo_data.get("specific_viral_angle") if seo_data else "") or ""
+    clean_title_a = re.sub(r"[\r\n]+", " ", (seo_data.get("title_a") if seo_data else "") or story_title or "").strip()[:80]
+    clean_title_b = re.sub(r"[\r\n]+", " ", (seo_data.get("title_b") if seo_data else "") or "").strip()[:80]
+    clean_hook = re.sub(r"[\r\n]+", " ", (seo_data.get("hook_3s") if seo_data else "") or "").strip()[:100]
+    
+    raw_angle = ((seo_data.get("specific_viral_angle") if seo_data else "") or "").strip()
+    first_sent = re.sub(r"[\r\n]+", " ", raw_angle).split(".")[0].strip() if raw_angle else ""
+    clean_angle = first_sent[:120] or clean_title_a
 
     thumb_a = (
-        f"Cinematic wide-angle 16:9 YouTube hero thumbnail for '{title_a}'. "
-        f"High visual tension visual metaphor representing '{viral_angle or title_a}', "
+        f"Cinematic wide-angle 16:9 YouTube hero thumbnail for '{clean_title_a}'. "
+        f"High visual tension visual metaphor representing '{clean_angle}', "
         f"dramatic high-contrast chiaroscuro lighting, bold atmospheric color grading, "
         f"clear asymmetric focal point, unobstructed clean negative space for typography, "
         f"photorealistic 8k cinematic documentary aesthetic, 2560x1440 resolution, 2K DCI."
     )
     thumb_b = (
-        f"Curiosity-gap 16:9 YouTube thumbnail for '{title_b or title_a}'. "
-        f"Shocking narrative juxtaposition illustrating the core paradox '{hook_3s or title_a}', "
+        f"Curiosity-gap 16:9 YouTube thumbnail for '{clean_title_b or clean_title_a}'. "
+        f"Shocking narrative juxtaposition illustrating the core paradox '{clean_hook or clean_title_a}', "
         f"intense volumetric cinematic lighting, high-stakes atmospheric depth, "
         f"unobstructed safe-zone for title text, photorealistic 8k documentary aesthetic, 2560x1440 resolution."
     )

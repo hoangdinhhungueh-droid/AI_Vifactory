@@ -26,6 +26,11 @@ from app.services.skill_loader import (
 )
 from app.services import story_gate as sgate
 from scripts.ag_notion_bridge import resolve_id, update_page_properties, create_page, query_db, append_children_blocks, get_blocks
+try:
+    from scripts.vf_insight_cards import fetch_active_insights, build_feedback_block
+except ImportError:
+    def fetch_active_insights(*a, **kw): return []
+    def build_feedback_block(*a, **kw): return ''
 import json as json_lib
 
 NOTION_STORY_DB_ID = os.getenv("STORY_LIBRARY_DB_ID", "b0301989-2400-836b-bdb5-8131fea17736")
@@ -319,6 +324,16 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
     if existing_script and len(existing_script.split()) >= 1500:
         full_script = existing_script
     else:
+        # B11->B2 Feedback Loop: fetch active InsightCards (Rule 126 compliant, non-fatal)
+        _b2_notion_token = (
+            os.getenv('NOTION_TOKEN', '') or
+            os.getenv('VF_NOTION_TOKEN', '')
+        )
+        _b2_insight_cards = fetch_active_insights(_b2_notion_token, mkt)
+        feedback_block = build_feedback_block(_b2_insight_cards)
+        if feedback_block:
+            logger.info(f'[story_engine] B11->B2 loop: injecting {len(_b2_insight_cards)} InsightCard(s) into prompt for {mkt}')
+
         user_prompt = (
             f"Generate the comprehensive 12-15 minute (1,800-2,200 words) Non-Fiction Investigative Documentary Script for {topic} following the 5-Beat Investigative Docudrama structure.\n"
             f"Structure: Beat 1 (The Impossible Contradiction) -> Beat 2 (The False Narrative & Red Herring) -> Beat 3 (The Systemic Blindspot & Paper Trail) -> Beat 4 (The Real Culprit & Smoking Gun) -> Beat 5 (The Uncomfortable Modern Mirror & Living Warning).\n"
@@ -328,6 +343,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
             f"Content Theme: {theme}\n"
             f"Breakout Search Queries to prioritize in Act I: {', '.join(breakout_queries)}\n\n"
             f"{competitor_context}"
+            f"{feedback_block}"
             f"ACT I OPENING MANDATE (Rule 444 An Ong Hook Protocol): The very first sentence of Act I MUST open with a shock quantitative stake, specific economic contradiction, or irreconcilable conflict. Zero generic preamble or slow historical setup; hook cold-traffic mobile viewers within 5-10 seconds.\n"
             f"Write the full ~1,800-2,200 word script now, adhering strictly to the 5-Act markers:"
         )

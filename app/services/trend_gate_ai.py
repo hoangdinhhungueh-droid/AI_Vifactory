@@ -11,21 +11,20 @@ def sanitize_episode_slug(slug: str) -> str:
 
 
 def get_next_episode_id(market: str = "EN", slug: str = "", offset: int = 0) -> str:
-    """Generate next market-isolated sequential episode task ID (e.g. EN_EP0002_byzantine_empire).
-    Strictly isolated per market (EN, JP, KR, etc.). Each market counts from EP0001 upwards
-    independently of other markets.
-    Scans:
-      1. Filesystem /var/vf/episodes for <market>_EP... or <market>-...-ep...
-      2. Local pending tasks cache /var/vf/pending_tasks for <market>_EP...
-      3. Notion Story Library DB (b0301989-2400-836b-bdb5-8131fea17736)
-      4. Notion Trend Brain DB (4c101989-2400-8334-8016-01d4f463b09f)
+    """Generate next market-isolated sequential episode task ID (e.g. EN_EP0001_topic).
+    Strictly isolated per market (EN, JP, KR, etc.).
+    Single Source of Truth is Notion:
+      1. Primary: Notion VF Trend Brain DB (4c101989-2400-8334-8016-01d4f463b09f) & Story Library DB (b0301989-2400-836b-bdb5-8131fea17736)
+         - If Notion has episodes for this market, counts upwards from max(notion_nums).
+         - If Notion is empty for this market (user reset/cleared DB), starts from EP0001.
+      2. Active unexpired tasks in /var/vf/pending_tasks (to avoid collision during concurrent runs).
+      3. Filesystem /var/vf/episodes (only non-archived, non-dead, active directories).
     Returns: <market>_<EPxxxx>_<name>
     """
     import os, re, json, logging
     _log = logging.getLogger("app.episode_id")
     target_market = str(market or "EN").strip().upper()
     clean_slug = sanitize_episode_slug(slug)
-    nums = [0]
 
     def _extract_market_ep_nums(text: str, mkt: str) -> list[int]:
         if not text:
@@ -50,52 +49,8 @@ def get_next_episode_id(market: str = "EN", slug: str = "", offset: int = 0) -> 
                     pass
         return found
 
-    # 1. Scan filesystem /var/vf/episodes
-    ep_dir = "/var/vf/episodes"
-    if os.path.exists(ep_dir):
-        try:
-            for f in os.listdir(ep_dir):
-                for num in _extract_market_ep_nums(f, target_market):
-                    nums.append(num)
-        except Exception as e:
-            _log.warning("[episode_id] fs scan error: %s", e)
-
-    # 2. Scan pending tasks cache /var/vf/pending_tasks
-    pending_dir = "/var/vf/pending_tasks"
-    if os.path.exists(pending_dir):
-        try:
-            for f in os.listdir(pending_dir):
-                if not f.endswith(".json"):
-                    continue
-                p = os.path.join(pending_dir, f)
-                try:
-                    with open(p, "r", encoding="utf-8") as jf:
-                        data = json.load(jf)
-                    row_m = str(data.get("market", "")).strip().upper()
-                    row_eid = str(data.get("episode_id", ""))
-                    if row_m == target_market:
-                        for num in _extract_market_ep_nums(row_eid + " " + f, target_market):
-                            nums.append(num)
-                except Exception:
-                    for num in _extract_market_ep_nums(f, target_market):
-                        nums.append(num)
-        except Exception as e:
-            _log.warning("[episode_id] pending_tasks scan error: %s", e)
-
-    # 3. Scan Publish Ledger
-    ledger_path = "/root/video_factory/db/publish_ledger.json"
-    if os.path.exists(ledger_path):
-        try:
-            with open(ledger_path, "r", encoding="utf-8") as lf:
-                ledger_data = json.load(lf)
-            for item in ledger_data:
-                ep_dir_name = item.get("episode_dir", "")
-                for num in _extract_market_ep_nums(ep_dir_name, target_market):
-                    nums.append(num)
-        except Exception as e:
-            _log.warning("[episode_id] ledger scan error: %s", e)
-
-    # 4. Scan Story Library DB (Produced / Approved Stories)
+    notion_nums = []
+    # 1. Primary Source of Truth: Notion VF Trend Brain DB & Story Library DB
     try:
         import scripts.ag_notion_bridge as bridge
 
@@ -112,6 +67,19 @@ def get_next_episode_id(market: str = "EN", slug: str = "", offset: int = 0) -> 
                 return sel.get("name", "") if sel else ""
             return ""
 
+        # Check Trend Brain DB
+        tb_res = bridge.query_db("4c101989-2400-8334-8016-01d4f463b09f")
+        for r in tb_res.get("results", []):
+            props = r.get("properties", {})
+            mkt_prop = _get_prop_txt(props.get("Market", {}))
+            tid_prop = _get_prop_txt(props.get("Task ID", {}))
+            eid_prop = _get_prop_txt(props.get("Episode ID", {}))
+            kw_prop = _get_prop_txt(props.get("Keyword", {}))
+            for txt in [tid_prop, eid_prop, kw_prop]:
+                for num in _extract_market_ep_nums(txt, target_market):
+                    notion_nums.append(num)
+
+        # Check Story Library DB
         sl_res = bridge.query_db("b0301989-2400-836b-bdb5-8131fea17736")
         for r in sl_res.get("results", []):
             props = r.get("properties", {})
@@ -120,15 +88,58 @@ def get_next_episode_id(market: str = "EN", slug: str = "", offset: int = 0) -> 
             eid_prop = _get_prop_txt(props.get("Episode ID", {}))
             for txt in [tid_prop, eid_prop, name_prop]:
                 for num in _extract_market_ep_nums(txt, target_market):
-                    nums.append(num)
+                    notion_nums.append(num)
     except Exception as e:
-        _log.warning("[episode_id] Notion scan error: %s", e)
+        _log.warning("[episode_id] Notion SoT scan notice: %s", e)
 
-    max_num = max(nums)
+    # Check active pending tasks in /var/vf/pending_tasks
+    pending_nums = []
+    pending_dir = "/var/vf/pending_tasks"
+    if os.path.exists(pending_dir):
+        try:
+            for f in os.listdir(pending_dir):
+                if not f.endswith(".json"):
+                    continue
+                p = os.path.join(pending_dir, f)
+                try:
+                    with open(p, "r", encoding="utf-8") as jf:
+                        data = json.load(jf)
+                    row_m = str(data.get("market", "")).strip().upper()
+                    row_eid = str(data.get("episode_id", "") or data.get("task_id", ""))
+                    if row_m == target_market or row_eid.startswith(f"{target_market}_EP"):
+                        for num in _extract_market_ep_nums(row_eid + " " + f, target_market):
+                            pending_nums.append(num)
+                except Exception:
+                    for num in _extract_market_ep_nums(f, target_market):
+                        pending_nums.append(num)
+        except Exception as e:
+            _log.warning("[episode_id] pending_tasks scan notice: %s", e)
+
+    # Determine next number:
+    all_valid_nums = [0]
+    if notion_nums:
+        all_valid_nums.extend(notion_nums)
+    if pending_nums:
+        all_valid_nums.extend(pending_nums)
+
+    # Fallback: if both Notion and pending are empty, only check active non-archived dirs
+    if len(all_valid_nums) == 1:
+        ep_dir = "/var/vf/episodes"
+        if os.path.exists(ep_dir):
+            try:
+                for f in os.listdir(ep_dir):
+                    if f.startswith("_") or "archive" in f.lower() or "dead" in f.lower() or "test" in f.lower():
+                        continue
+                    for num in _extract_market_ep_nums(f, target_market):
+                        all_valid_nums.append(num)
+            except Exception:
+                pass
+
+    max_num = max(all_valid_nums)
     next_num = max_num + 1 + offset
     task_id = f"{target_market}_EP{next_num:04d}_{clean_slug}"
-    _log.info("[episode_id] Generated Task ID %s (market=%s, max_num=%d, next_num=%d, offset=%d)",
-              task_id, target_market, max_num, next_num, offset)
+    _log.info("[episode_id] Generated Task ID %s (market=%s, max_num=%d, next_num=%d, offset=%d, notion_count=%d)",
+              task_id, target_market, max_num, next_num, offset, len(notion_nums))
     return task_id
 # app/services/trend_gate_ai.py - "Notion AI is the crawl brain" architecture (26/07/2026).
 #

@@ -153,29 +153,19 @@ def main():
             except Exception as e:
                 logger.error(f"Error during daily cycle for {mkt}: {e}")
 
-    # Build summary and send Telegram alert
+    # Print summary to console logs (Rule 125: Telegram already notified via Human Gate 1 & Human Gate 2)
     total = len(results["approved_topics"])
     print("\n=======================================================")
     print(f"🎯 PIPELINE COMPLETED: {total} TOPICS PRODUCED & COMMITTED")
     print("=======================================================")
 
-    tg_lines = [f"🚀 <b>VF Daily Trend & Story Pipeline (B1 ➔ B3)</b> — {total} Đề tài hoàn tất:"]
     for t in results["approved_topics"]:
         print(f"[{t['market']}] {t.get('topic_name_vi')} (Slug: {t.get('task_slug')})")
         print(f"   Angle: '{t.get('specific_viral_angle')}'")
         print(f"   Blue Ocean Gap: {t.get('competitor_differentiation_gap')}")
         print(f"   Task ID: {t.get('task_id')}")
+        print(f"   Status: Human Gate 1 & Human Gate 2 dispatched.")
 
-        tg_lines.append(
-            f"\n🌍 <b>Thị trường {t['market']}</b>: <b>{t.get('topic_name_vi')}</b>\n"
-            f"• <i>Viral Angle</i>: {t.get('specific_viral_angle')}\n"
-            f"• <i>Khác biệt đối thủ</i>: {t.get('competitor_differentiation_gap')}\n"
-            f"• <i>Task ID</i>: <code>{t.get('task_id')}</code>\n"
-            f"• <i>Status</i>: ✅ <b>Kịch bản 12-15 phút & Visual Plan sẵn sàng</b>"
-        )
-
-    if total > 0:
-        _notify_telegram("\n".join(tg_lines))
 
 
 if __name__ == "__main__":

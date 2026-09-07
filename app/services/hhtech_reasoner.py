@@ -264,7 +264,7 @@ def reason_topic_niche(
         "STRATEGIC INSTRUCTIONS (MANDATORY ALGORITHMIC SURGE ANCHOR & BLUE OCEAN DIFFERENTIATION):\n"
         "0.1. BLUE OCEAN DIFFERENTIATION: Analyze the competitor video titles above. Identify their superficial gaps (e.g. generic highlight, daily news, surface gossip) and formulate 'competitor_differentiation_gap' in Vietnamese detailing the structural mechanism, forensic truth, or institutional lesson that our video delivers which competitors completely missed.\n"
         "0. SURGE ANCHOR (RULE 118 ZERO-MOCK): The topic and 'niche_angle_brief' MUST be directly anchored to either one of the real rising search queries (e.g. 그라목손 / Gramoxone, 배추 농약) OR the proven viral mechanics from the million-view YouTube videos above. CẤM TUYỆT ĐỐI tự sáng tác một đề tài xa lạ không có trong dữ liệu tìm kiếm thật.\n"
-        "1. 'search_specific_keyword': Must be in the TARGET MARKET NATIVE LANGUAGE (Japanese for JP, Korean for KR, English for EN), combining core event names, key figures, and breakout search terms.\n"
+        "1. 'search_specific_keyword': High-intent search phrase in TARGET MARKET NATIVE LANGUAGE (Japanese for JP, Korean for KR, English for EN), strictly 3 to 5 words maximum (e.g. 'Puka Nacua rookie contract', 'Livedoor stock fraud'). CẤM TUYỆT ĐỐI nhồi nhét chuỗi từ khóa dài quá 5 từ.\n"
         "2. 'breakout_queries': Top 3-5 breakout/rising query strings in the native market language.\n"
         "3. 'task_slug': Concise lowercase-hyphenated English slug (max 25 characters, e.g. livedoor-scandal).\n"
         "4. 'topic_name_vi': Sharp, high-retention Vietnamese title for the episode.\n"
@@ -299,6 +299,13 @@ def reason_topic_niche(
         parsed["content_theme"] = parsed.get("content_theme") or theme
         parsed["safety_label"] = parsed.get("safety_label") or safety_label
         parsed["treatment_note"] = parsed.get("treatment_note") or treatment_note
+
+        # Post-process & sanitize search_specific_keyword (anti-keyword stuffing: max 4-5 words)
+        raw_kw = str(parsed.get("search_specific_keyword") or "").strip()
+        if raw_kw:
+            kw_words = raw_kw.split()
+            if len(kw_words) > 5:
+                parsed["search_specific_keyword"] = " ".join(kw_words[:4])
 
         # Post-process & sanitize breakout_queries
         bqs = parsed.get("breakout_queries")

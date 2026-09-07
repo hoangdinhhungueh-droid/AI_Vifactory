@@ -423,14 +423,17 @@ def generate_director_plan(
     # 1. Resolve inputs
     ep_dir = ROOT_DIR / "episodes" / episode_id
     ws_dir = ROOT_DIR / "workspace" / episode_id
+    var_vf_dir = Path(f"/var/vf/episodes/{episode_id}")
     ep_dir.mkdir(parents=True, exist_ok=True)
     ws_dir.mkdir(parents=True, exist_ok=True)
+    if var_vf_dir.parent.exists() or Path("/var/vf").exists():
+        var_vf_dir.mkdir(parents=True, exist_ok=True)
 
     if not story_text:
         story_candidates = [
+            var_vf_dir / "story.txt",
             ep_dir / "story.txt",
-            ws_dir / "story.txt",
-            Path(f"/var/vf/episodes/{episode_id}/story.txt")
+            ws_dir / "story.txt"
         ]
         for sc in story_candidates:
             if sc.exists():
@@ -442,6 +445,7 @@ def generate_director_plan(
 
     if not intel_card:
         intel_candidates = [
+            var_vf_dir / "competitor_intel_card.json",
             ep_dir / "competitor_intel_card.json",
             ws_dir / "competitor_intel_card.json"
         ]
@@ -720,7 +724,7 @@ def generate_director_plan(
 
     # Non-destructive deep-merge for brain_input.json preserving all B2 metadata
     existing_brain = {}
-    candidate_files = [ep_dir / "brain_input.json", ws_dir / "brain_input.json"]
+    candidate_files = [var_vf_dir / "brain_input.json", ep_dir / "brain_input.json", ws_dir / "brain_input.json"]
     for cf in candidate_files:
         if cf.exists():
             try:
@@ -757,8 +761,12 @@ def generate_director_plan(
         if k in existing_brain:
             brain_input[k] = existing_brain[k]
 
-    # 7. Persist to workspace & episodes
-    for target_dir in [ws_dir, ep_dir]:
+    # 7. Persist to canonical directories
+    canonical_dirs = [ws_dir, ep_dir]
+    if var_vf_dir.exists() and var_vf_dir not in canonical_dirs:
+        canonical_dirs.append(var_vf_dir)
+
+    for target_dir in canonical_dirs:
         with open(target_dir / "director_plan.json", "w", encoding="utf-8") as f:
             json.dump(director_plan, f, indent=2, ensure_ascii=False)
         with open(target_dir / "dp_plan.json", "w", encoding="utf-8") as f:
@@ -766,7 +774,7 @@ def generate_director_plan(
         with open(target_dir / "brain_input.json", "w", encoding="utf-8") as f:
             json.dump(brain_input, f, indent=2, ensure_ascii=False)
 
-    logger.info(f"  [B3] Saved director_plan.json & dp_plan.json to {ws_dir} and {ep_dir}")
+    logger.info(f"  [B3] Saved director_plan.json & dp_plan.json to {canonical_dirs}")
 
     # 8. Trigger B3.5 Prompt Forge to generate specialized visual prompts
     try:
@@ -783,14 +791,11 @@ def generate_director_plan(
             task_id=episode_id
         )
 
-
-        with open(ep_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
-            json.dump(prompts_res, f, indent=2, ensure_ascii=False)
-        with open(ws_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
-            json.dump(prompts_res, f, indent=2, ensure_ascii=False)
-        # Maintain prompts.json compatibility
-        with open(ep_dir / "prompts.json", "w", encoding="utf-8") as f:
-            json.dump(prompts_res, f, indent=2, ensure_ascii=False)
+        for target_dir in canonical_dirs:
+            with open(target_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
+                json.dump(prompts_res, f, indent=2, ensure_ascii=False)
+            with open(target_dir / "prompts.json", "w", encoding="utf-8") as f:
+                json.dump(prompts_res, f, indent=2, ensure_ascii=False)
 
         if not skip_notion:
             push_prompts_to_notion(prompts_res, episode_id)
@@ -948,7 +953,7 @@ def _synthesize_deterministic_director_plan(
 def push_director_plan_to_notion(director_plan: dict, episode_id: str):
     """
     Sync director plan scenes to Notion Director Plan DB (5b201989-2400-8295-be81-81c2c0e4e138).
-    Uses 1 EP = 1 Subpage + Child Scene DB model, setting Status to 'Compiled'.
+    Uses 1 EP = 1 Subpage + Child Scene DB model, setting Status to 'Compiled' and syncing all scenes.
     """
     notion_token = os.environ.get("NOTION_API_KEY") or os.environ.get("NOTION_TOKEN", "")
     if not notion_token:
@@ -960,13 +965,93 @@ def push_director_plan_to_notion(director_plan: dict, episode_id: str):
         scenes = director_plan.get("scenes", [])
         logger.info(f"[B3 Notion] Resolving Director Plan subpage for {episode_id}...")
         resolved = bridge.resolve_episode_director_db(episode_id, task_id=episode_id, create_if_missing=True)
-        if isinstance(resolved, dict) and not resolved.get("error"):
-            subpage_id = resolved.get("subpage_id")
-            if subpage_id:
-                bridge.update_page_properties(subpage_id, {"Status": {"status": {"name": "Compiled"}}})
-                logger.info(f"[B3 Notion] Set Director Plan [{episode_id}] status to 'Compiled' (subpage={subpage_id}, {len(scenes)} scenes)")
-        else:
+        if not isinstance(resolved, dict) or resolved.get("error"):
             logger.warning(f"[B3 Notion] Could not resolve Director Plan subpage for {episode_id}: {resolved}")
+            return
+
+        subpage_id = resolved.get("subpage_id")
+        scenes_db_id = resolved.get("db_id")
+
+        if subpage_id:
+            bridge.update_page_properties(subpage_id, {"Status": {"status": {"name": "Compiled"}}})
+            logger.info(f"[B3 Notion] Set Director Plan [{episode_id}] status to 'Compiled' (subpage={subpage_id})")
+
+        if not scenes_db_id:
+            logger.warning(f"[B3 Notion] No child Scenes DB found for {episode_id}")
+            return
+
+        # Query existing scenes to avoid duplicate rows
+        existing_scenes = {}
+        try:
+            q_res = bridge.query_db(scenes_db_id)
+            for r in q_res.get("results", []):
+                props = r.get("properties", {})
+                name_list = props.get("Name", {}).get("title", [])
+                t_name = "".join(t.get("plain_text", "") for t in name_list).strip()
+                if t_name:
+                    existing_scenes[t_name] = r.get("id")
+        except Exception as q_err:
+            logger.warning(f"[B3 Notion] Notice querying existing scenes in {scenes_db_id}: {q_err}")
+
+        logger.info(f"[B3 Notion] Syncing {len(scenes)} scenes to Child DB ({scenes_db_id}). Existing scenes in DB: {len(existing_scenes)}")
+
+        synced_count = 0
+        for idx, sc in enumerate(scenes):
+            sc_idx = sc.get("scene_index", idx)
+            scene_title = f"Scene {sc_idx:03d}"
+
+            # Construct properties conforming strictly to child Scenes DB schema
+            props = {
+                "Name": {"title": [{"text": {"content": scene_title}}]},
+                "Scene Index": {"number": sc_idx},
+                "Arc Index": {"number": sc.get("beat_index", 1)},
+                "Beat": {"rich_text": [{"text": {"content": str(sc.get("beat") or "")[:2000]}}]},
+                "Narration Segment": {"rich_text": [{"text": {"content": str(sc.get("narration_segment") or sc.get("narration") or "")[:2000]}}]},
+                "Duration Est (s)": {"number": float(sc.get("duration_est") or sc.get("duration_sec") or 0.0)},
+                "Background Prompt": {"rich_text": [{"text": {"content": str(sc.get("bg_prompt") or sc.get("image_prompt") or "")[:2000]}}]},
+                "BG Reuse Key": {"rich_text": [{"text": {"content": str(sc.get("bg_reuse_key") or sc.get("background_reuse_key") or "")[:2000]}}]},
+                "BG Layout Note": {"rich_text": [{"text": {"content": str(sc.get("visual_metaphor") or "")[:2000]}}]},
+                "Foreground Prompt": {"rich_text": [{"text": {"content": str(sc.get("fg_prompt") or sc.get("foreground_prompt") or "")[:2000]}}]},
+                "FG Reuse Key": {"rich_text": [{"text": {"content": str(sc.get("fg_reuse_key") or sc.get("foreground_reuse_key") or "")[:2000]}}]},
+                "Status": {"status": {"name": "Compiled"}},
+                "Episode ID": {"rich_text": [{"text": {"content": episode_id}}]},
+                "Task ID": {"rich_text": [{"text": {"content": episode_id}}]}
+            }
+
+            # Select mappings
+            pos = str(sc.get("foreground_position") or "").lower()
+            if "left" in pos:
+                props["FG Position"] = {"select": {"name": "Left"}}
+            elif "right" in pos:
+                props["FG Position"] = {"select": {"name": "Right"}}
+            elif "center" in pos:
+                props["FG Position"] = {"select": {"name": "Center"}}
+
+            sz = str(sc.get("safe_zone") or "").lower()
+            if "top" in sz:
+                props["Safe Zone"] = {"select": {"name": "Top third"}}
+            elif "right" in sz:
+                props["Safe Zone"] = {"select": {"name": "Right third"}}
+            else:
+                props["Safe Zone"] = {"select": {"name": "Lower third"}}
+
+            fg_sub = str(sc.get("fg_subject_type") or "").upper()
+            if "A" in fg_sub or "NAMED" in fg_sub:
+                props["FG Subject Type"] = {"select": {"name": "A — Named character"}}
+            elif "B" in fg_sub or "SYMBOLIC" in fg_sub:
+                props["FG Subject Type"] = {"select": {"name": "B — Symbolic figure"}}
+
+            if scene_title in existing_scenes:
+                page_id = existing_scenes[scene_title]
+                bridge.update_page_properties(page_id, props)
+            else:
+                res_create = bridge.create_page(parent_db_id=scenes_db_id, properties=props)
+                if isinstance(res_create, dict) and res_create.get("id"):
+                    existing_scenes[scene_title] = res_create["id"]
+
+            synced_count += 1
+
+        logger.info(f"[B3 Notion] ✅ Pushed {synced_count}/{len(scenes)} scenes into Child DB {scenes_db_id} for {episode_id}")
     except Exception as e:
         logger.warning(f"[B3 Notion] Notion sync encountered notice: {e}")
 

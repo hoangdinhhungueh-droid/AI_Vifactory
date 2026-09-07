@@ -81,11 +81,27 @@ Return ONLY valid JSON matching this schema:
 
 def _parse_llm_json(raw: str) -> dict:
     text = (raw or "").strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-    return json.loads(text.strip())
+    if not text:
+        return {}
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+
+    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except Exception:
+            pass
+
+    match = re.search(r"(\{.*\})", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except Exception:
+            pass
+    return {}
 
 
 def _clean_hashtag(tag: str) -> str:
@@ -104,12 +120,14 @@ def _fallback_seo_package(
     competitor_gap: str = "",
     rising_queries: list = None
 ) -> dict:
-    """Deterministic fallback if HHTech API or JSON parse fails. Guarantees zero pipeline stall."""
-    kw = (target_keyword or "Investigative Case").strip()
+    """Deterministic fallback if HHTech API or JSON parse fails. Guarantees zero pipeline stall without keyword stuffing."""
+    raw_kw = (target_keyword or "Investigative Case").strip()
+    kw_words = raw_kw.split()
+    kw = " ".join(kw_words[:4]) if len(kw_words) > 4 else raw_kw
     clean_tag = re.sub(r"[^\w]", "", kw.title()) or "Documentary"
     
-    title_a = f"{kw} | The Hidden Investigation"[:100]
-    title_b = f"{kw}: What Official Reports Left Out"[:100]
+    title_a = f"{kw}: The Hidden Investigation"[:100]
+    title_b = f"{kw}: What Official Reports Concealed"[:100]
     desc_hook = f"The untold investigative documentary behind {kw}. Exposing the systemic evidence and critical turning points."[:150]
     
     hashtags = [f"#{clean_tag}", "#Investigation", "#Docudrama"][:3]
@@ -123,7 +141,12 @@ def _fallback_seo_package(
         f"This 15-minute investigation uncovers the smoking gun evidence, the key beneficiaries, "
         f"and the enduring truth that public records left in the dark."
     )
-    angle = competitor_gap or f"Exposing the systemic institutional mechanisms behind {kw}"
+    if competitor_gap:
+        clean_gap = re.sub(r"[\r\n]+", " ", competitor_gap).strip()
+        first_sent = clean_gap.split(".")[0].strip()
+        angle = first_sent[:120] if first_sent else f"Exposing the systemic institutional mechanisms behind {kw}"
+    else:
+        angle = f"Exposing the systemic institutional mechanisms behind {kw}"
 
     thumbnail_variants = [
         {"variant": "A", "framework": "emotion_first", "headline_text": f"THEY HID THIS"[:32], "visual_concept": "High-contrast dramatic lighting focusing on confidential investigative records."},

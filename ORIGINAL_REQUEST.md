@@ -246,107 +246,26 @@ Integrity mode: development
 
 ---
 
-### 🎯 IV. KHO LƯU TRỮ CÁC MỐC ĐÃ NGHIỆM THU PHÁP Y (CERTIFIED MILESTONES ARCHIVE)
+#### 🎯 IV. KHO LƯU TRỮ CÁC MỐC ĐÃ NGHIỆM THU PHÁP Y (CERTIFIED MILESTONES ARCHIVE — SESSIONS 1 TO 7)
 
 > **CHỨNG THỰC PHÁP Y RUNTIME 100% PASS & ĐỒNG BỘ 3 CHIỀU (RULE 118, 121, 124, 126, 127, 128)**:
-> - **Trạng thái tổng thể**: ✅ **TOÀN BỘ 27 HẠNG MỤC ĐÃ ĐƯỢC AUDIT ĐỐI KHÁNG ROUND 3 XÁC MINH 100% PASS**.
-> - **Baseline Commit**: [`7adde26`](https://github.com/hoangdinhhungueh-droid/AI_Vifactory/commit/7adde26) (VPS `/root/video_factory` ⇄ GitHub `origin/main` ⇄ Local Windows Workspace).
-> - **Anti-Mock Score**: 0 `assert True`, 0 empty test functions, điểm Story Gate 12/12 & Director Plan 8.44/10 xuất phát từ thuật toán phân tích dữ liệu sống.
-> - **Filesystem Parity**: SHA256 `ORIGINAL_REQUEST.md` và `PIPELINE_CONTRACTS.md` khớp tuyệt đối từng byte giữa Local và VPS; 0 file `.bak` tồn đọng.
-
-### 📜 Bảng Tổng Hợp 27 Hạng Mục Đã Nghiệm Thu Pháp Y (Forensic Ledger)
-
-| Mã Hạng Mục | Thành Phần / File | Nội Dung Giải Quyết Triệt Để | Bằng Chứng Runtime & Hash Commit | Trạng Thái |
-| :--- | :--- | :--- | :--- | :---: |
-| **AUDIT-G1.1** | `director_planner_b3.py` | Xóa import `call_gpt56_sol`, sửa log sang GPT-6-Astra, thống nhất `prompts_forge.json`. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-G1.2** | `story_engine_b2.py` | Docstring 5-Beat Docudrama 1.800-2.200 words, nhãn Notion `[AG] {score} {verdict} (GPT-6-ASTRA)`. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-G1.3** | `hhtech_reasoner.py` | Chuyển `reason_topic_niche` sang GPT-6-Astra, import `get_b1_strategic_rules` chống NameError. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-G1.4** | `telegram_buttons.py` | Đồng bộ tin nhắn Gate 1 hiển thị GPT-6-Astra. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-G1.5** | `episode_images.py`, B10 | Sửa 100% docstrings/logs từ GPT-5.6-Sol sang GPT-6-Astra trong pipeline image & SEO. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-G1.6** | `produce_episode_hg1.py` | Sửa usage message in ra `python scripts/produce_episode_hg1.py <task_id>`. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-G2.1** | VPS Filesystem | Xóa sổ vĩnh viễn 10 file backup tàn dư (`*.bak_astra_migration`, `*.backup_*`). | `find ... *.bak*` trả về đúng 0 file | **✅ PASS** |
-| **AUDIT-G2.2** | `scripts/_deprecated/` | Cô lập 2 shadow scripts `generate_50_scenes_*` vào archive; xóa file trùng `build_remotion_props.py`. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-G2.3** | `story_engine_b2.py` | Dọn dead code: xóa `_reuse_slug`, `CPS_HARD_CAP`, biến thừa `director_db_id`. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-G2.4** | `produce_episode_hg1.py` | Tái sử dụng `competitor_intel_card.json` (>100 bytes) từ B1, chống tốn quota YouTube API. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-G3.1** | B1 ➔ B1.5 Contract | Chuẩn hóa file payload trung gian `/var/vf/pending_tasks/<task_id>.json` và Notion Trend Brain. | SHA256 Parity, exit code 0 | **✅ PASS** |
-| **AUDIT-G3.2** | B1.5 ➔ B2 Contract | Chuẩn hóa JSON schema `competitor_intel_card.json` 2 tầng (root benchmarks + narrative anatomy). | SHA256 Parity, exit code 0 | **✅ PASS** |
-| **AUDIT-G3.3** | B2 ➔ B3 Contract | Chuẩn hóa hợp đồng B2 output ra `/var/vf/episodes/<task_id>/story.txt` và `brain_input.json`. | SHA256 Parity, exit code 0 | **✅ PASS** |
-| **AUDIT-G3.4** | B3 ➔ B3.5 Contract | Thống nhất file visual prompt duy nhất là `prompts_forge.json` (kèm alias `prompts.json`). | SHA256 Parity, exit code 0 | **✅ PASS** |
-| **AUDIT-G3.5** | Local ⇄ VPS Sync | Đồng bộ 100% `PIPELINE_CONTRACTS.md` giữa Windows Workspace và VPS (SHA256 khớp tuyệt đối). | Checksum Parity `06fc2c...` | **✅ PASS** |
-| **AUDIT-G4.1** | `ci_neighbor_tester.py` | Sửa assert đọc cả `axis_scores` lẫn `checks` từ `director_audit.py`, hỗ trợ trục 9. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-G4.2** | `trend_gate_ai.py` | Bổ sung class Pydantic `TrendViralityRequest` triệt tiêu hoàn toàn lỗi `NameError`. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-VERIFY-1** | ISO Neighbor-Testing | Chạy `--block 1.0` (Blocks [1.0, 1.5] PASS) và `--block 3.0` (Blocks [2.0, 3.0, 4.0] PASS). | Exit code 0, runtime verified | **✅ PASS** |
-| **AUDIT-VERIFY-2** | Pytest B1.5 Recon | Chạy `pytest tests/test_competitor_recon_b15.py` đạt 34/34 tests PASS (100%). | 34 passed in 1.25s, exit code 0 | **✅ PASS** |
-| **AUDIT-VERIFY-3** | Pytest Trend Gate B1 | Chạy `pytest tests/test_trend_gate_b1.py` đạt 5/5 tests PASS (100%). | 5 passed in 0.78s, exit code 0 | **✅ PASS** |
-| **AUDIT-VERIFY-4** | Quét File Rác Backup | Lệnh `find /root/video_factory -name '*.bak*' -o -name '*.backup*'` trả về đúng 0 file. | Clean filesystem verified | **✅ PASS** |
-| **AUDIT-VERIFY-5** | Master Smoke Gate | Chạy `python3 scripts/e2e_pipeline_smoketest.py` đạt `ALL PIPELINE GATES PASSED`. | 7/7 gates PASS, exit code 0 | **✅ PASS** |
-| **AUDIT-PREV-1** | B3 Narrative Context | Trích xuất ngữ cảnh phổ quát (`world_environment`, `era_anchor`, `lighting_and_tone`) theo Rule 128. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-PREV-2** | B3.5 Dynamic Persona | Phân bổ vai diễn linh hoạt qua Character Ensemble, thuật toán `deduplicate_phrase_stutter`. | Commit `ff79132`, exit code 0 | **✅ PASS** |
-| **AUDIT-PREV-3** | Fix Scene Collapse Bug | Thiết lập sàn cứng `min_scenes >= 35-55`, bộ kiểm toán khóa trần `4.0/FAIL` nếu `< 20 scenes`. | Commit `4cda5fd`, score 9.44/10 | **✅ PASS** |
-| **AUDIT-PREV-4** | Dynamic DB Resolver | Dynamic Resolver xác định đúng subpage DB `3d301989-2400-8162-9276-e380ff5efb35` (41 prompts). | Runtime API 200 OK | **✅ PASS** |
-| **AUDIT-PREV-5** | Trục Kiểm Toán Thứ 9 | Bổ sung trục `semantic_relevance` trong `director_audit.py`, trừ điểm nặng nếu rò rỉ tech trope. | Score 8.44/10 synthetic, 9.56 live | **✅ PASS** |
-| **ORCH-1..VERIFY** | Multi-Agent Orchestrator | Framework điều phối đa luồng (`task_partitioner`, `lifecycle_manager`, `resource_recycler`, `rule128_governor`, `runner.py`). | `tests/test_orchestrator.py` 23/23 PASS | **✅ PASS** |
+> - **Trạng thái tổng thể**: ✅ **TOÀN BỘ 31 HẠNG MỤC (AUDIT-G1..G4, AUDIT-PREV, ORCH, VÀ TASK-GOLIVE-1..4) ĐÃ ĐƯỢC AUDIT ĐỐI KHÁNG VÀ CI CI/CD CHỨNG THỰC 100% PASS**.
+> - **Baseline Commits**: `7adde26` (Master Baseline) ➔ `ff79132` (Pillars 1-6) ➔ `4cda5fd` (Director Scene Floor) ➔ `856c021` (Golive Bridge, GitHub Actions CI Workflow 34056181759 Green).
+> - **Tóm tắt 4 Task Go-Live hôm qua (2026-09-06)**:
+>   - **TASK-GOLIVE-1 (Notion State Machine B1➔B3)**: ✅ Canonical 13 trường VF Trend Brain; State transitions tự động `Approved→Story` ➔ `Gate Passed` (Used) ➔ `Compiled` ➔ `Prompted` / `Produced`. Pytest `test_notion_state_machine.py` 5/5 PASS.
+>   - **TASK-GOLIVE-2 (Safe Housekeeping & Cleanliness)**: ✅ Dọn sạch 111 file rác `/tmp/` trên VPS; working tree clean; 0 file `.bak*`.
+>   - **TASK-GOLIVE-3 (Early SEO Forge B1.6 & 60s An Ong Hook)**: ✅ `seo_package_forge.py` sinh Title A/B, Description, 3 Hashtags, Tags, Hook 3s/60s; direct anchor vào B2 Act I; Zero-LLM B10; `test_b15_seo_package_forge.py` 6/6 PASS.
+>   - **TASK-GOLIVE-4 (Bridge B3.5 ➔ Antigravity B4/B5 & Thumbnails)**: ✅ `prompt_forge.py` sinh Thumbnail A/B; Thẻ HG2 1-click copy; `gemini_browser_gen.py` xóa hardcode bối cảnh (Rule 128), audit pixel thật (Rule 122), đóng gói tar.gz base64 upload nguyên tử, marker `images_ready.json` kích hoạt B6; `test_b35_b4_bridge.py` 5/5 PASS.
 
 ---
 
-## 🎯 V. ACTIVE GO-LIVE TASKS & CROSS-DATABASE ENHANCEMENTS
+## 🚀 VI. TIẾN TRÌNH CÔNG VIỆC HÔM NAY (2026-09-07 OPERATIONAL AUDIT & HARDENING)
 
-> **CỔNG TÁC VỤ ĐANG THỰC THI (PHIÊN GO-LIVE CHÍNH THỨC)**:
-
-### 1. [x] TASK-GOLIVE-1: Nâng Cấp Logic Ghi Nhận Từ Khóa & Đổi Trạng Thái Liên DB (B1 ➔ B3) — ✅ PASS
-- [x] **B1 (`VF Trend Brain` DB `4c101989-2400-8334-8016-01d4f463b09f`)**:
-  - Chuẩn hóa 13 thuộc tính canonical: Tiêu đề `"Keyword"`, Status `""` (`"New (from VPS)"` ➔ `"Approved→Story"`).
-  - Ghi nhận đầy đủ: `"Trend Score"` (0.0-1.0), `"Market"`, `"Task ID"`, `"Rising Queries"`, `"Competitor Benchmarks"`, `"YouTube Safety Label"`, `"Upload Treatment Note"`, `"Trend Source"`, `"Verdict Reason"`, `"QID"`. Loại bỏ triệt để 20 trường legacy.
-- [x] **B2 (`Story Library` DB `b0301989-2400-836b-bdb5-8131fea17736`)**:
-  - Ghi nhận `"Status"` = `"Draft"` khi bắt đầu, đổi sang `"Gate Passed"` khi Story Gate 12/12 PASS.
-  - Đồng bộ liên DB: Ngay khi B2 pass, gọi `trend_brain_mirror.mark_used()` chuyển trạng thái `VF Trend Brain` sang `"Used"`.
-- [x] **B3 (`Director Plan` DB `5b201989-2400-81df-85e6-ec8d5386227b`) & B3.5 (`Prompt Library`)**:
-  - Triển khai đầy đủ `push_director_plan_to_notion()` qua `resolve_episode_director_db()`, gán `"Status"` = `"Compiled"`.
-  - Khi `push_prompts_to_notion()` hoàn tất: đổi `"Status"` trong `Director Plan` thành `"Prompted"`, đồng thời cập nhật `"Status"` trong `Story Library` sang `"Produced"`.
-- [x] **Kiểm thử State Machine**: Viết test độc lập `tests/test_notion_state_machine.py` chạy runtime 5/5 PASS, exit code 0.
-
-### 2. [x] TASK-GOLIVE-2: Dọn Rác An Toàn 100% (Safe Housekeeping & Git Sync) — ✅ PASS
-- [x] Quét sạch 111 file rác tạm tại `/tmp/` trên VPS (các file log cũ, audio test, thư mục temp `tmp*`), bảo tồn tuyệt đối các socket và process đang chạy.
-- [x] Dọn dẹp các thư mục worker cũ trong `.agents/` ở Windows Workspace, bảo tồn `.agents/skills/vf-pipeline-teamwork/`.
-- [x] Biên dịch toàn bộ file sửa đổi `python3 -m py_compile`, chạy master smoke gate `scripts/e2e_pipeline_smoketest.py` 8/8 gates PASS.
-- [x] Git commit & push 3 chiều lên `origin/main`, xác nhận working tree clean và SHA256 parity.
-
-### 3. [x] TASK-GOLIVE-3: Early SEO Package & 60s An Ong Hook Forge (Post-B1.5), Direct B2 Anchor Handoff, and Zero-LLM B10 Upload Gate 2 — ✅ PASS
-- [x] **B1.6 Early SEO Forge (`app/services/seo_package_forge.py`)**:
-  - Kích hoạt ngay sau B1.5 Competitor Recon với keyword, niche, competitor gap.
-  - Gọi GPT-6-Astra sinh trọn bộ: `Title A` (KVS leading keyword), `Title B` (curiosity/emotional backup), `Description` (front-loaded hook <=150 ký tự), đúng 3 `Hashtags`, `Tags` (<=400 ký tự budget), `hook_3s` (cold-open), `hook_60s` (An Ong narrative contract Rule 444 ~90-130 words), `specific_viral_angle` (10x pivot angle).
-  - Lưu cục bộ tại `/var/vf/episodes/<task_id>/seo_package.json`.
-  - Đồng bộ 2 chiều vào Notion SoT: `📺 YouTube Channel & Video Metadata Registry` (`3c301989-2400-81b9-a4bb-e5568ce942f8`) và `📖 Story Library` (`b0301989-2400-836b-bdb5-8131fea17736`).
-  - Wire trực tiếp vào `app/services/trend_engine_b1.py` (Step 5.5), `scripts/produce_episode_hg1.py` (Step B1.6), và cập nhật tin nhắn Telegram Gate 1 hiển thị Title A & 60s Hook.
-- [x] **B2 Story Engine Anchor (`app/services/story_engine_b2.py`)**:
-  - Load trực tiếp `hook_60s`, `hook_3s`, `title_a` từ `seo_package.json`.
-  - Tiêm thẳng triple-quoted `hook_anchor_prompt` vào system prompt B2, ép Act I mở màn trực diện vào title và hook đã hứa mà không cần Astra re-reason lại về ngách hay hook, triệt tiêu 100% narrative drift.
-- [x] **B10 Auto SEO Upload Optimization (`scripts/execute_b10_auto_seo_upload_gate2.py`)**:
-  - Loại bỏ hoàn toàn dynamic LLM call trong B10; tải trực tiếp pre-computed packaging từ `seo_package.json` (fallback Notion Registry DB).
-  - Thiết lập chuẩn xác tham số YouTube API: `privacyStatus: "unlisted"`, `containsSyntheticMedia: True`, `selfDeclaredMadeForKids: False`.
-  - Tự động gán Hero thumbnail (`thumbnail_a.png` ghép từ Scene 000 BG/FG).
-- [x] **Kiểm thử Runtime & Regression Tests**:
-  - Viết bộ test `tests/test_b15_seo_package_forge.py` (6/6 tests PASS).
-  - Toàn bộ test suites liên quan (`test_competitor_recon_b15.py`, `test_trend_gate_b1.py`, `test_notion_state_machine.py`) đạt 50/50 tests PASS.
-  - Neighbor tests (`ci_neighbor_tester.py --block 1.0`, `--block 3.0`) đạt ALL PASSED.
-  - Master Smoke Gate (`scripts/e2e_pipeline_smoketest.py`) đạt ALL 8 GATES PASSED.
-
-### 4. [x] TASK-GOLIVE-4: Cầu Nối B3.5 Prompt Forge ➔ Antigravity B4/B5 Browser Automation, YouTube SEO Thumbnail Generation (A/B), and Empirical Pixel Audit Gate — ✅ PASS
-- [x] **B3.5 Visual Prompt Forge (`app/services/prompt_forge.py`)**:
-  - Triển khai `_sanitize_thumbnail_prompt()` & `_synthesize_thumbnail_prompts()` tự động sinh Thumbnail A (Emotion-First Impact) & Thumbnail B (Curiosity-Gap Suspense) từ `seo_package.json` theo chuẩn 16:9, 2560x1440 2K DCI PNG, high visual tension, clear focal point, safe-zone for typography.
-  - Hàm `generate_scene_prompts()` tích hợp trường `"thumbnails"` song hành cùng `"scenes"`, đẩy đồng bộ vào Notion Prompt Library DB subpage.
-- [x] **Telegram Gate 2 Card (`app/services/telegram_buttons.py` & `scripts/produce_episode_hg1.py`)**:
-  - Gửi thẻ Gate 2 với khối 1-click copy: `<pre>/run:image task:{task_id}</pre>`, hiển thị đầy đủ ngữ cảnh kỹ thuật: số lượng BG, FG, Thumbnails (2K DCI 16:9), layer breakdown mà không rườm rà.
-- [x] **Antigravity B4/B5 Automation (`scripts/gemini_browser_gen.py`)**:
-  - **Clean Pass-Through**: Xóa bỏ hoàn toàn hardcoded Wall Street background anchor và medieval church negative prompts (Rule 128 - Zero Semantic Bias), pass 100% dynamic era prompts từ B3.5.
-  - **Empirical Pixel Audit Gate (`audit_single_image`)**: Xóa bỏ mock score 98 (Rule 118 & 122), tính toán trực tiếp từ dữ liệu pixel thật: kích thước chuẩn (2560x1440 BG/Thumb, 2048x2048 FG), tỷ lệ đen < 90%, kênh alpha 10-88% cho FG, rò rỉ magenta fringe < 0.2%. Sinh báo cáo `b5_audit_report.json` và `*_audit.json`.
-  - **Batch Archive Upload (`upload_batch_archive_to_vps`)**: Đóng gói toàn bộ PNG và Audit Reports thành `assets_<episode_id>.tar.gz`, truyền tải nguyên tử qua `/tmp/vf/` và giải nén tại chỗ vào `/var/vf/episodes/<id>/`, triệt tiêu hoàn toàn rủi ro rớt mạng / Cloudflare MCP timeout.
-  - **Marker B5 ➔ B6 (`create_images_ready_marker`)**: Ghi nhận `images_ready.json` trên VPS để watchdog `vf-image-ready-watcher.service` tự động kích hoạt `continue_after_images.py`.
-- [x] **Kiểm thử Pháp Y & Đồng Bộ 3 Chiều**:
-  - Bộ test `tests/test_b35_b4_bridge.py` đạt 5/5 PASS.
-  - Neighbor ISO Tester (`tests/ci_neighbor_tester.py --block 3.0`): Blocks 2.0, 3.0, 4.0 ALL PASSED.
-  - Master E2E Pipeline Smoketest (`scripts/e2e_pipeline_smoketest.py`): 8/8 Gates ALL PASSED.
-  - Đã xử lý triệt để hằng số `CACHE_TTL_SECONDS` trong `app/services/skill_loader.py`.
-  - GitHub Actions CI Commit `856c021` đạt `conclusion: success` (Workflow Run 34056181759, 115s).
-
-
+> **Căn cứ yêu cầu người dùng ngày 2026-09-07**:
+> 1. **Kiểm toán báo cáo B4 & B5 từ phiên trước (`658d00a0-a568-406e-b554-11798f9554a7`)**: Làm rõ ranh giới giữa hoàn thành code cầu nối / unit test vs thực thi sinh ảnh sống thực tế trên Antigravity.
+> 2. **Xử lý sự cố kho số Episode (`EN_EP0260`)**: Reset và đồng bộ kho số chuẩn xác theo Notion VF Trend Brain hoặc cấu hình lưu trữ, dọn dẹp các thư mục test cũ trên filesystem VPS.
+> 3. **Tinh gọn thông báo Telegram**: Loại bỏ thông báo trùng lặp `VF Daily Trend & Story Pipeline (B1 ➔ B3) — 1 Đề tài hoàn tất:` ở cuối script; chỉ giữ Human Gate 1 và Human Gate 2.
+> 4. **Kiểm toán chất lượng B1 ➔ B3.5**:
+>    - Khắc phục lỗi keyword stuffing (nối chuỗi từ khóa 9 từ vào Title A và 60s Hook) và lỗi fallback trùng lặp Viral Angle = Blue Ocean Gap.
+>    - Khắc phục lệch đường dẫn B3 Director Plan: Đồng bộ việc lưu `director_plan.json` và `brain_input.json` vào chuẩn `/var/vf/episodes/<id>/` theo đúng `PIPELINE_CONTRACTS.md`.
+> 5. **Làm rõ sự cố HHTech API Usage (Claude Opus 5)**: Xác minh pháp y các cuộc gọi `claude-opus-5` (không thuộc về pipeline VPS, do client ngoại vi gọi).
