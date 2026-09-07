@@ -34,9 +34,12 @@ def _load_pending(task_id: str) -> dict:
     return {}
 
 
-async def _notify_gate2(task_id: str, n_scenes: int, n_bg: int, n_fg: int, score: str, n_thumb: int = 2) -> None:
+async def _notify_gate2(task_id: str, n_scenes: int, n_bg: int, n_fg: int, score: str, n_thumb: int = 2,
+                        topic: str = "", director_archetype: str = "", title_a: str = "", title_b: str = "") -> None:
     from app.services.telegram_buttons import send_gate2_card
-    await send_gate2_card(task_id, n_scenes, n_bg, n_fg, score, n_thumb=n_thumb)
+    await send_gate2_card(task_id, n_scenes, n_bg, n_fg, score, n_thumb=n_thumb,
+                          topic=topic, director_archetype=director_archetype, title_a=title_a, title_b=title_b)
+
 
 
 
@@ -229,9 +232,24 @@ def run_chain(task_id: str) -> int:
         return 0  # Exit cleanly - not a failure, just needs human input
 
     # ---- Human Gate 2 -------------------------------------------------
-    asyncio.run(_notify_gate2(task_id, len(scenes), n_bg, n_fg, score, n_thumb=n_thumb))
+    seo_pkg_file = ep_dir / "seo_package.json"
+    t_a, t_b = "", ""
+    if seo_pkg_file.exists():
+        try:
+            s_data = json.loads(seo_pkg_file.read_text(encoding="utf-8"))
+            t_a = s_data.get("title_a", "")
+            t_b = s_data.get("title_b", "")
+        except Exception:
+            pass
+    asyncio.run(_notify_gate2(
+        task_id, len(scenes), n_bg, n_fg, score, n_thumb=n_thumb,
+        topic=brain.get("topic") or task_id,
+        director_archetype=director_plan.get("director_archetype", "Hollywood Principle"),
+        title_a=t_a, title_b=t_b
+    ))
     _log("HG2", "card sent, waiting for images from Antigravity")
     return 0
+
 
 
 

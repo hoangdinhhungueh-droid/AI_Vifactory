@@ -37,11 +37,9 @@ SKILL_AI_PAGE_ID = CENTRAL_SKILL_PAGE_ID
 
 ROOT_DIR = Path(os.getenv("VF_ROOT_DIR", Path(__file__).resolve().parent.parent.parent))
 SNAPSHOT_FILE = Path(os.getenv("VF_SKILLS_SNAPSHOT", ROOT_DIR / "data" / "notion_audit" / "skills_snapshot.json"))
-LEGACY_SNAPSHOT_FILE = Path(os.getenv("VF_LEGACY_SKILLS_SNAPSHOT", ROOT_DIR / "data" / "notion_audit" / "skill_ai.md"))
+CACHE_TTL_SECONDS = 3600  # 1 hour cache TTL for Notion skills
 
 # In-memory multi-hub cache state
-CACHE_TTL_SECONDS = 3600
-
 _cache = {
     "central": {"data": None, "expiration": 0},
     "content_engine": {"data": None, "expiration": 0},
@@ -405,26 +403,28 @@ def get_b1_strategic_rules() -> str:
 
 
 def get_b35_strategic_rules() -> str:
-    """Concise strategic visual production rules (~1,200 chars) for B3.5 Prompt Forge.
+    """Concise strategic visual production rules (~1,400 chars) for B3.5 Prompt Forge.
     Distills Rule 116 (Two-Layer Composition), Rule 120 (Chroma Key Spec),
     Rule 128 (Zero Semantic Bias & Era Authenticity), Rule 435 (Graphic Novel Style),
-    and Rule 446 (English Production Bridge) without prompt bloat.
+    Rule 446 (English Production Bridge), and Rule 114 (High-CTR 16:9 Hero Thumbnails).
     """
     return (
-        "=== NOTION SOT CONCISE VISUAL PRODUCTION RULES (RULES 116, 120, 128, 435, 446) ===\n"
+        "=== NOTION SOT CONCISE VISUAL PRODUCTION RULES (RULES 114, 116, 120, 128, 435, 446) ===\n"
         "1. TWO-LAYER COMPOSITION (Rule 116):\n"
-        "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic documentary environment. Authentic period architecture, environment textures, dramatic volumetric lighting. No prominent foreground humans. Bottom 20% safe-zone for subtitles, center-right negative space for character overlay.\n"
-        "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration. Cel-shading, bold ink linework, rich nuanced colors. Exactly one full-body character visible from head to toe in authentic period attire.\n"
+        "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic documentary environment. Authentic period architecture, environment textures, dramatic volumetric lighting. No prominent foreground humans. Bottom 20% safe-zone clear for subtitles, center-right negative space for character overlay.\n"
+        "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration. Cel-shading, bold ink linework, rich nuanced colors. Exactly one full-body character visible head to toe in authentic period attire. Positioned strictly Right or Left.\n"
         "2. STRICT CHROMA KEY SPEC (Rule 120):\n"
         "   - Foreground MUST be isolated on pure flat solid #FF00FF magenta background for algorithmic chroma extraction.\n"
-        "   - No white borders, no halos, no gradients, no background scenery in Layer 2.\n"
+        "   - No white borders, no halos, no gradients, no scenery in Layer 2.\n"
         "3. GRAPHIC NOVEL ART STYLE (Rule 435):\n"
         "   - Non-photorealistic stylized 2D graphic novel digital illustration.\n"
         "   - NO studio portrait lighting, NO photorealism, NO 3D CGI skin.\n"
-        "4. ZERO SEMANTIC BIAS & ERA AUTHENTICITY (Rule 128):\n"
-        "   - Derive architecture, clothing, tools, and props strictly from scene context and narrative era.\n"
+        "4. CINEMATIC CONTINUITY & ERA AUTHENTICITY (Rule 128):\n"
+        "   - Harmonize lighting angle, color palette, and atmosphere between paired Layer 1 and Layer 2 assets.\n"
         "   - Zero domain bleed: never inject modern tech into historical scenes, nor rural relics into corporate scenes.\n"
-        "5. ENGLISH PRODUCTION BRIDGE (Rule 446): All visual prompt outputs must be in clear, descriptive English."
+        "5. 16:9 2K HERO THUMBNAILS (Rule 114):\n"
+        "   - Thumbnail A (Emotion-First & Viral Angle) and Thumbnail B (Curiosity-Gap & Paradox): 16:9, 2560x1440, bold contrast, clean negative space for typography.\n"
+        "6. ENGLISH PRODUCTION BRIDGE (Rule 446): All visual prompt outputs must be in clear, descriptive English."
     )
 
 
@@ -434,21 +434,30 @@ def get_visual_strategic_rules() -> str:
 
 
 def get_b3_strategic_rules() -> str:
-    """Concise strategic art direction rules (~1,200 chars) for B3 Director Planner.
-    Distills Rule 116 (Two-Layer Architecture), Rule 120 (Chroma Key Spec),
+    """Concise strategic art direction rules (~1,600 chars) for B3 Director Planner.
+    Distills Rule 116 (Two-Layer Architecture), Rule 120 (Chroma Key & Safe Zone),
     Rule 128 (Universal Dynamic Context & Character Ensemble), Rule 445 (5-Beat Structure),
-    and Rule 446 (Production Bridge).
+    Sentence-Atomic Pacing (Subtitle Overflow Prevention), and Archetype-Specific Grammar.
     """
     return (
-        "=== NOTION SOT ART DIRECTION & CINEMATIC PLANNING RULES (RULES 116, 120, 128, 445, 446) ===\n"
-        "1. TWO-LAYER RENDER ARCHITECTURE (Rule 116):\n"
-        "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic period/topic environment. Safe-zone clear in bottom 20% for subtitles, center-right negative space for character overlay.\n"
-        "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration isolated on pure solid flat #FF00FF magenta chroma key. Full-body standing or seated visible head-to-toe. NO photorealistic humans.\n"
-        "2. UNIVERSAL DYNAMIC SEMANTIC CONTEXT (Rule 128):\n"
-        "   - Strictly analyze story.txt to derive Era Anchor, physical/geographical environment, lighting mood, color palette, and dynamic character ensemble. Zero domain bleed.\n"
-        "3. 5-BEAT INVESTIGATIVE DOCUDRAMA STRUCTURE (Rule 445):\n"
-        "   - Break down story into dynamic, high-tension storyboard units (typically 35 to 55 scenes) respecting the 5-beat emotional arc.\n"
-        "4. PRODUCTION BRIDGE (Rule 446): All visual prompt descriptions must be in clear, descriptive English."
+        "=== NOTION SOT HOLLYWOOD ART DIRECTION & SCENE BREAKDOWN RULES (RULES 116, 120, 128, 445, 446) ===\n"
+        "1. ROLE: You are the Hollywood Master Visual Director & Lead Cinematographer. Your decisions dictate video pacing, frame boundaries, subtitle timing, and visual continuity.\n"
+        "2. SENTENCE-ATOMIC PACING & SUBTITLE OVERFLOW PREVENTION:\n"
+        "   - Each scene MUST contain 1-2 COMPLETE sentences (max 35 words, ~75-110 characters) ending with a definitive sentence boundary ('.', '!', '?'). NEVER cut mid-sentence.\n"
+        "   - Subtitle line budget: strictly fit within 2 lines on 1920x1080 display (~35-40 characters/line). Remotion and Karaoke TTS anchor strictly to these sentence cut marks.\n"
+        "   - Duration Estimation: calculate duration_est_sec strictly at standard narration pace: max(7, min(16, round(word_count / 2.4))).\n"
+        "3. ARCHETYPE-SPECIFIC CINEMATIC GRAMMAR & CAMERA PRINCIPLES:\n"
+        "   - Corporate Noir / Finance (Fincher / McKay): Clinical creeping push-ins, high-tension surveillance staging, analytical whip-pans on forensic anomalies.\n"
+        "   - Historical Realism / War (Nolan / Chernobyl): Monumental scale, lingering wide tableaux, atmospheric architectural tracking, deep documentary shadows.\n"
+        "   - Clinical Realism / Pharma (Soderbergh / Villeneuve): Low-key sterile observation, creeping macro push-ins on physical seals and evidence ledgers.\n"
+        "   - Economic Drama / Sports (Bennett Miller / McKay): Observational realism, contrasting institutional authority with high-stakes human contracts.\n"
+        "   - You dynamically choose camera angles, shot progression, and layers within each scene guided by these principles.\n"
+        "4. BALANCED VISUAL CONTINUITY WITHIN BEATS:\n"
+        "   - Maintain visual harmony within each 5-Beat act: balance location anchors so scenes do not jump randomly every frame, but avoid static repetition (2-3 evolving sub-angles per beat).\n"
+        "5. TWO-LAYER COMPOSITION & SUBTITLE SAFE-ZONE INTEGRITY (Rule 116):\n"
+        "   - Layer 1 Background (16:9 2560x1440): Bottom 20% MUST remain clear for 2-line Subtitles.\n"
+        "   - Layer 2 Foreground (1:1 2048x2048 #FF00FF): Position strictly 'Right' or 'Left' (Rule of Thirds). NEVER place full-body characters at 'Center' to prevent colliding with Karaoke Subtitles.\n"
+        "6. PRODUCTION BRIDGE (Rule 446): All prompt descriptions and visual hints must be in descriptive English."
     )
 def get_b10_seo_rules() -> str:
     """Concise strategic rules (~1,200 chars) for B10 YouTube Packaging & SEO Metadata.

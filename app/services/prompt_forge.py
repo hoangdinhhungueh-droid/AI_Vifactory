@@ -18,8 +18,21 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 def _load_env():
-    from app.services.youtube_upload import _load_env as le
-    le()
+    try:
+        from app.services.youtube_upload import _load_env as le
+        le()
+    except Exception:
+        pass
+    if not os.environ.get("NOTION_TOKEN") and os.path.exists("/root/secrets/.env"):
+        try:
+            with open("/root/secrets/.env", "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("NOTION_TOKEN="):
+                        os.environ["NOTION_TOKEN"] = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    elif line.startswith("NOTION_API_KEY="):
+                        os.environ["NOTION_API_KEY"] = line.split("=", 1)[1].strip().strip('"').strip("'")
+        except Exception:
+            pass
 
 _load_env()
 
@@ -470,12 +483,20 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
     (per-episode subpage+DB resolved dynamically via ag_notion_bridge.resolve_episode_prompt_db).
     Archives old prompts for the same episode first to keep idempotency.
     """
-    if not NOTION_API_KEY:
-        logger.warning("[prompt_forge] No NOTION_API_KEY found, skipping Notion sync.")
+    token = None
+    try:
+        token = _bridge._get_token()
+    except Exception:
+        pass
+    if not token:
+        token = os.environ.get("NOTION_API_KEY") or os.environ.get("NOTION_TOKEN", "")
+
+    if not token:
+        logger.warning("[prompt_forge] No Notion token found, skipping Notion sync.")
         return
 
     headers = {
-        "Authorization": f"Bearer {NOTION_API_KEY}",
+        "Authorization": f"Bearer {token}",
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json"
     }
@@ -491,94 +512,73 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
 
     # 0. Archive old prompts for this episode to maintain single-truth
     try:
-        q_res = requests.post(
-            f"https://api.notion.com/v1/databases/{prompt_library_db_id}/query",
-            headers=headers,
-            json={
-                "filter": {
-                    "property": "Title",
-                    "title": {"contains": f"[{episode_id}]"}
-                }
-            },
-            timeout=10
-        )
-        if q_res.status_code == 200:
-            existing = q_res.json().get("results", [])
-            for r in existing:
-                requests.patch(
-                    f"https://api.notion.com/v1/pages/{r['id']}",
-                    headers=headers,
-                    json={"archived": True},
-                    timeout=10
-                )
-            if existing:
-                logger.info(f"[prompt_forge] Archived {len(existing)} older prompts for [{episode_id}] in Prompt Library DB.")
+        filter_obj = {
+            "property": "Title",
+            "title": {"contains": f"[{episode_id}]"}
+        }
+        q_res = _bridge.query_db(prompt_library_db_id, filter_obj=filter_obj)
+        existing = q_res.get("results", []) if isinstance(q_res, dict) else []
+        for r in existing:
+            _bridge._req("PATCH", f"pages/{r['id']}", {"archived": True})
+        if existing:
+            logger.info(f"[prompt_forge] Archived {len(existing)} older prompts for [{episode_id}] in Prompt Library DB.")
     except Exception as e:
         logger.warning(f"[prompt_forge] Error cleaning old prompts: {e}")
 
     # 1. Backgrounds
     for bg_key, prompt in prompts_data.get("backgrounds", {}).items():
         prompt_str = prompt if isinstance(prompt, str) else prompt.get("prompt", str(prompt))
-        bg_payload = {
-            "parent": {"database_id": prompt_library_db_id},
-            "properties": {
-                "Title": {"title": [{"text": {"content": f"[{episode_id}] {bg_key} (BG 16:9)"}}]},
-                "prompt_text": {"rich_text": [{"text": {"content": prompt_str[:2000]}}]},
-                "category": {"select": {"name": "image"}},
-                "variables": {"rich_text": [{"text": {"content": "Aspect Ratio: 16:9, Safe Zone: Bottom 20%"}}]},
-                "version": {"number": 1}
-            }
+        bg_props = {
+            "Title": {"title": [{"text": {"content": f"[{episode_id}] {bg_key} (BG 16:9)"}}]},
+            "prompt_text": {"rich_text": [{"text": {"content": prompt_str[:2000]}}]},
+            "category": {"select": {"name": "image"}},
+            "variables": {"rich_text": [{"text": {"content": "Aspect Ratio: 16:9, Safe Zone: Bottom 20%"}}]},
+            "version": {"number": 1}
         }
         try:
-            res = requests.post("https://api.notion.com/v1/pages", headers=headers, json=bg_payload, timeout=10)
-            if res.status_code in (200, 201):
+            res = _bridge.create_page(prompt_library_db_id, bg_props)
+            if not res.get("error"):
                 logger.debug(f"[prompt_forge] Pushed BG prompt {bg_key} to Notion Prompt Library DB")
             else:
-                logger.warning(f"[prompt_forge] Failed to push BG prompt {bg_key}: {res.status_code} {res.text}")
+                logger.warning(f"[prompt_forge] Failed to push BG prompt {bg_key}: {res}")
         except Exception as e:
             logger.warning(f"[prompt_forge] Exception pushing BG prompt {bg_key}: {e}")
 
     # 2. Foregrounds
     for fg_key, prompt in prompts_data.get("foregrounds", {}).items():
         prompt_str = prompt if isinstance(prompt, str) else prompt.get("prompt", str(prompt))
-        fg_payload = {
-            "parent": {"database_id": prompt_library_db_id},
-            "properties": {
-                "Title": {"title": [{"text": {"content": f"[{episode_id}] {fg_key} (FG 1:1 #FF00FF)"}}]},
-                "prompt_text": {"rich_text": [{"text": {"content": prompt_str[:2000]}}]},
-                "category": {"select": {"name": "image"}},
-                "variables": {"rich_text": [{"text": {"content": "Aspect Ratio: 1:1, Chroma Key: Flat #FF00FF Magenta Background"}}]},
-                "version": {"number": 1}
-            }
+        fg_props = {
+            "Title": {"title": [{"text": {"content": f"[{episode_id}] {fg_key} (FG 1:1 #FF00FF)"}}]},
+            "prompt_text": {"rich_text": [{"text": {"content": prompt_str[:2000]}}]},
+            "category": {"select": {"name": "image"}},
+            "variables": {"rich_text": [{"text": {"content": "Aspect Ratio: 1:1, Chroma Key: Flat #FF00FF Magenta Background"}}]},
+            "version": {"number": 1}
         }
         try:
-            res = requests.post("https://api.notion.com/v1/pages", headers=headers, json=fg_payload, timeout=10)
-            if res.status_code in (200, 201):
+            res = _bridge.create_page(prompt_library_db_id, fg_props)
+            if not res.get("error"):
                 logger.debug(f"[prompt_forge] Pushed FG prompt {fg_key} to Notion Prompt Library DB")
             else:
-                logger.warning(f"[prompt_forge] Failed to push FG prompt {fg_key}: {res.status_code} {res.text}")
+                logger.warning(f"[prompt_forge] Failed to push FG prompt {fg_key}: {res}")
         except Exception as e:
             logger.warning(f"[prompt_forge] Exception pushing FG prompt {fg_key}: {e}")
 
     # 2b. Thumbnails (A/B)
     for thumb_key, prompt in prompts_data.get("thumbnails", {}).items():
         prompt_str = prompt if isinstance(prompt, str) else prompt.get("prompt", str(prompt))
-        thumb_payload = {
-            "parent": {"database_id": prompt_library_db_id},
-            "properties": {
-                "Title": {"title": [{"text": {"content": f"[{episode_id}] {thumb_key} (Thumbnail 16:9)"}}]},
-                "prompt_text": {"rich_text": [{"text": {"content": prompt_str[:2000]}}]},
-                "category": {"select": {"name": "image"}},
-                "variables": {"rich_text": [{"text": {"content": "Aspect Ratio: 16:9 2K DCI, High Contrast, YouTube CTR Hero"}}]},
-                "version": {"number": 1}
-            }
+        thumb_props = {
+            "Title": {"title": [{"text": {"content": f"[{episode_id}] {thumb_key} (Thumbnail 16:9)"}}]},
+            "prompt_text": {"rich_text": [{"text": {"content": prompt_str[:2000]}}]},
+            "category": {"select": {"name": "image"}},
+            "variables": {"rich_text": [{"text": {"content": "Aspect Ratio: 16:9 2K DCI, High Contrast, YouTube CTR Hero"}}]},
+            "version": {"number": 1}
         }
         try:
-            res = requests.post("https://api.notion.com/v1/pages", headers=headers, json=thumb_payload, timeout=10)
-            if res.status_code in (200, 201):
+            res = _bridge.create_page(prompt_library_db_id, thumb_props)
+            if not res.get("error"):
                 logger.debug(f"[prompt_forge] Pushed Thumbnail prompt {thumb_key} to Notion Prompt Library DB")
             else:
-                logger.warning(f"[prompt_forge] Failed to push Thumbnail prompt {thumb_key}: {res.status_code}")
+                logger.warning(f"[prompt_forge] Failed to push Thumbnail prompt {thumb_key}: {res}")
         except Exception as e:
             logger.warning(f"[prompt_forge] Exception pushing Thumbnail prompt {thumb_key}: {e}")
 

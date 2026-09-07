@@ -521,9 +521,19 @@ def generate_director_plan(
     }
 
     prompt_instruction = (
-        f"CRITICAL STORYBOARD DIRECTIVE (Rule 445):\n"
-        f"The full story contains {total_words} words across 5 beats. You MUST break down the complete narrative into 35 to 55 sequential scenes (typically 7 to 10 scenes per beat, ~30-50 words per scene).\n"
-        f"DO NOT summarize or produce only 1 scene per beat! Each beat must contain multiple sequential scenes covering every paragraph of narration.\n\n"
+        f"CRITICAL HOLLYWOOD STORYBOARD & PACING DIRECTIVE (Rules 116, 120, 128, 445):\n"
+        f"The full story contains {total_words} words across 5 beats. You MUST break down the complete narrative into 35 to 55 sequential scenes (typically 7 to 10 scenes per beat).\n"
+        f"1. SENTENCE-ATOMIC PACING & SUBTITLE OVERFLOW PREVENTION:\n"
+        f"   - Each scene's 'narration' MUST consist of 1 or 2 COMPLETE sentences (max 35 words, ~75-110 characters, strictly ending with '.', '!', or '?'). NEVER cut mid-sentence.\n"
+        f"   - Subtitle line budget: strictly fits within 2 lines on 1920x1080 display (~35-40 characters/line). Remotion and Karaoke TTS anchor strictly to these sentence cut marks.\n"
+        f"   - Calculate 'duration_est_sec' strictly at standard narration pace: max(7, min(16, round(word_count / 2.4))).\n"
+        f"2. ARCHETYPE-SPECIFIC CINEMATIC GRAMMAR & CAMERA PRINCIPLES:\n"
+        f"   - Adopt the visual pacing of {archetype['director']}. You choose specific camera angles (e.g. slow_push_in, clinical_macro, wide_tableaux) and tension dynamically.\n"
+        f"3. BALANCED VISUAL CONTINUITY WITHIN BEATS:\n"
+        f"   - Maintain visual harmony within each beat: share location anchors so scenes do not jump randomly every frame, but evolve angles naturally.\n"
+        f"4. TWO-LAYER COMPOSITION & SUBTITLE SAFE-ZONE INTEGRITY:\n"
+        f"   - Background (16:9 2560x1440): bottom 20% clear for subtitles.\n"
+        f"   - Foreground (1:1 2048x2048 #FF00FF): position strictly 'right' or 'left' (Rule of Thirds). NEVER place full-body characters at 'center'.\n\n"
         "Output a JSON object with this EXACT structure:\n"
         "{\n"
         "  \"episode_id\": \"" + episode_id + "\",\n"
@@ -535,7 +545,7 @@ def generate_director_plan(
         "      \"scene_id\": \"sc001\",\n"
         "      \"beat_index\": 1,\n"
         "      \"beat_name\": \"Beat 1: The Impossible Contradiction\",\n"
-        "      \"narration\": \"exact sentence/spoken text for this scene\",\n"
+        "      \"narration\": \"exact complete sentence/spoken text for this scene.\",\n"
         "      \"duration_est_sec\": 11,\n"
         "      \"visual_metaphor\": \"metaphorical meaning\",\n"
         "      \"camera\": {\n"
@@ -860,6 +870,18 @@ def _synthesize_deterministic_director_plan(
     scenes = []
     sc_counter = 0
 
+    d_lower = archetype.get("director", "").lower()
+    if "fincher" in d_lower or "mckay" in d_lower or "noir" in d_lower:
+        cam_moves = ["slow_creeping_push_in", "clinical_macro_tight", "surveillance_high_angle", "analytical_tracking"]
+    elif "nolan" in d_lower or "chernobyl" in d_lower:
+        cam_moves = ["monumental_wide_tableaux", "slow_atmospheric_pan", "lingering_depth_push", "dramatic_low_angle"]
+    elif "soderbergh" in d_lower or "clinical" in d_lower:
+        cam_moves = ["clinical_forensic_pan", "sealed_macro_push", "cold_tracking_shot", "sterile_wide_establishing"]
+    elif "miller" in d_lower or "contract" in d_lower or "moneyball" in d_lower:
+        cam_moves = ["observational_mid_push", "high_stakes_confrontation_angle", "forensic_ledger_close", "institutional_tracking"]
+    else:
+        cam_moves = ["slow_push_in", "atmospheric_tracking", "dramatic_tableaux", "static_tension"]
+
     for b_idx, beat in enumerate(story_beats):
         b_num = b_idx + 1
         b_name = CANONICAL_BEATS[b_idx] if b_idx < len(CANONICAL_BEATS) else f"Beat {b_num}"
@@ -870,10 +892,12 @@ def _synthesize_deterministic_director_plan(
         curr_narr = []
         curr_words = 0
         for sent in sentences:
-            curr_narr.append(sent)
-            curr_words += len(sent.split())
-            if curr_words >= 35:
-                sc_text = " ".join(curr_narr)
+            sent_words = len(sent.split())
+            # Sentence-Atomic Cut: flush when adding next sentence exceeds 35 words or already has 2 sentences
+            if curr_narr and (curr_words + sent_words > 35 or len(curr_narr) >= 2):
+                sc_text = " ".join(curr_narr).strip()
+                if not re.search(r"[.!?]$", sc_text):
+                    sc_text += "."
                 sc_id = f"sc{sc_counter:03d}"
                 bg_k = f"{episode_id.lower()}_bg_b{b_num}_loc{sc_counter % 3}"
 
@@ -884,32 +908,35 @@ def _synthesize_deterministic_director_plan(
                 char_state = char_obj["archetype"]
                 char_cues = char_obj.get("visual_cues", "standing head-to-toe")
                 fg_k = f"{episode_id.lower()}_fg_b{b_num}_char{char_idx}" if sc_counter % 4 != 0 else None
+                fg_pos = "right" if sc_counter % 2 == 0 else "left"
 
                 bg_desc = f"Cinematic documentary environment for {b_name}, {dynamic_context['physical_environment']}, {dynamic_context['lighting_mood']}"
                 fg_desc = f"Full-body {char_role} in {char_attire}, standing head-to-toe, {char_cues}, posture {char_state}, isolated on solid #FF00FF magenta background" if fg_k else None
+                cam_move = cam_moves[sc_counter % len(cam_moves)]
+                dur = max(7, min(16, round(curr_words / 2.4)))
 
                 scenes.append({
                     "scene_id": sc_id,
                     "beat_index": b_num,
                     "beat_name": b_name,
                     "narration": sc_text,
-                    "duration_est_sec": max(8, min(16, curr_words // 3)),
+                    "duration_est_sec": dur,
                     "visual_metaphor": f"Visual metaphor representing {b_name}",
                     "camera": {
-                        "movement": "slow_push_in" if sc_counter % 2 == 0 else "static_tension",
+                        "movement": cam_move,
                         "tension_level": "high"
                     },
                     "background": {
                         "reuse_key": bg_k,
                         "visual_description": bg_desc,
-                        "safe_zone": "bottom 20% clear for subtitles, center-right negative space"
+                        "safe_zone": f"bottom 20% clear for subtitles, center-{'left' if fg_pos == 'right' else 'right'} negative space"
                     },
                     "foreground": {
                         "reuse_key": fg_k,
                         "character_role": char_role,
                         "psychological_state": char_state,
                         "body_language": f"Standing full-body head-to-toe, {char_cues}",
-                        "position": "right" if sc_counter % 2 == 0 else "left",
+                        "position": fg_pos,
                         "visual_description": fg_desc
                     } if fg_k else None,
                     "audio_sfx_cue": "low_sub_drone_and_paper_shuffle"
@@ -918,21 +945,28 @@ def _synthesize_deterministic_director_plan(
                 curr_narr = []
                 curr_words = 0
 
+            curr_narr.append(sent)
+            curr_words += sent_words
+
         if curr_narr:
-            sc_text = " ".join(curr_narr)
+            sc_text = " ".join(curr_narr).strip()
+            if not re.search(r"[.!?]$", sc_text):
+                sc_text += "."
             sc_id = f"sc{sc_counter:03d}"
+            dur = max(7, min(16, round(curr_words / 2.4)))
+            cam_move = cam_moves[sc_counter % len(cam_moves)]
             scenes.append({
                 "scene_id": sc_id,
                 "beat_index": b_num,
                 "beat_name": b_name,
                 "narration": sc_text,
-                "duration_est_sec": 10,
+                "duration_est_sec": dur,
                 "visual_metaphor": f"Closing tension of {b_name}",
-                "camera": {"movement": "static_tension", "tension_level": "high"},
+                "camera": {"movement": cam_move, "tension_level": "high"},
                 "background": {
                     "reuse_key": f"{episode_id.lower()}_bg_b{b_num}_tail",
                     "visual_description": f"Wide cinematic environment of {b_name}, {dynamic_context['physical_environment']}",
-                    "safe_zone": "bottom 20% safe zone"
+                    "safe_zone": "bottom 20% clear for subtitles"
                 },
                 "foreground": None,
                 "audio_sfx_cue": "clock_ticking"

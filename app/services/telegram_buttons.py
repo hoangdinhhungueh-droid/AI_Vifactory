@@ -300,31 +300,42 @@ async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b:
 
 
 async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,
-                          story_score: str = "n/a", n_thumb: int = 2) -> Optional[int]:
+                          story_score: str = "n/a", n_thumb: int = 2,
+                          topic: str = "", director_archetype: str = "",
+                          era_anchor: str = "", title_a: str = "", title_b: str = "") -> Optional[int]:
     """Send Human Gate 2: B3.5 finished, prompts are in Notion, images are next.
-    Streamlined format: Single source of image quality specs, 1-click copy block for Antigravity,
-    and automatic B6 trigger via images_ready.json that cascades B6->B10 on VPS.
+    Lean Executive Briefing format + Antigravity 1-click execution block:
+    Delegates deep technical rules (2K DCI, #FF00FF Chroma, 4-Axis Visual Audit)
+    to Antigravity Skill `vf-image-gen`.
     """
     safe_task = html.escape(str(task_id))
-    paste_block = (
-        f"/run:image task:{task_id}\n\n"
-        f"QUY CHUẨN KỸ THUẬT ẢNH B4/B5 (Rule 116 & 435):\n"
-        f"• File prompts: /var/vf/episodes/{task_id}/prompts_forge.json ({n_bg} BG + {n_fg} FG + {n_thumb} Thumbnails)\n"
-        f"• Layer 1 (Background): 16:9 (2560x1440 2K DCI PNG), tư liệu điện ảnh, safe-zone 20% đáy cho phụ đề.\n"
-        f"• Layer 2 (Foreground): 1:1 (2048x2048 RGBA PNG), đồ họa minh họa Stylized Graphic Novel trên nền phẳng #FF00FF (tách sạch viền trong suốt, bảo toàn áo trắng).\n"
-        f"• Thumbnails (A/B): 16:9 (2560x1440 2K DCI PNG), Thumbnail A (Emotion-First) & B (Curiosity-Gap) cho gói SEO B10.\n"
-        f"• B5 Forensic Audit: Tự động đo lường pixel thật (alpha %, vết lem magenta < 0.1%, kích thước 2K).\n"
-        f"• Auto-Trigger B6: Sau khi audit PASS, tự động ghi /var/vf/episodes/{task_id}/images_ready.json để VPS render Master."
-    )
+    safe_score = html.escape(str(story_score))
+    safe_topic = html.escape(str(topic)) if topic else safe_task
+    safe_arch = html.escape(str(director_archetype)) if director_archetype else "Hollywood Master Principle"
+
+    paste_block = f"/vf-image-gen\n/run:image --episode {task_id} --headless"
+
+    thumb_details = ""
+    if title_a or title_b:
+        thumb_details = (
+            f"🖼️ <b>Thumbnails A/B Hooks:</b>\n"
+            f"• <b>Thumbnail A (Emotion-First):</b> <i>{html.escape(title_a)}</i>\n"
+            f"• <b>Thumbnail B (Curiosity-Gap):</b> <i>{html.escape(title_b)}</i>\n\n"
+        )
+
     text = (
-        "🎨 <b>[HUMAN GATE 2] PROMPTS SẴN SÀNG — CẦN SINH ẢNH</b>\n\n"
+        "🎨 <b>[HUMAN GATE 2] ĐẠO DIỄN B3/B3.5 HOÀN TẤT — SẴN SÀNG SINH ẢNH</b>\n\n"
         f"🎬 <b>Episode:</b> <code>{safe_task}</code>\n"
-        f"🎞️ <b>Scenes:</b> {n_scenes} · <b>BG:</b> {n_bg} · <b>FG:</b> {n_fg} · <b>Thumbnails:</b> {n_thumb}\n"
-        f"📊 <b>Story Gate:</b> {html.escape(str(story_score))} | <b>Notion Sync:</b> ✅\n\n"
-        "📋 <b>Chạm khối lệnh bên dưới để Copy và Dán vào Antigravity:</b>\n"
+        f"📌 <b>Chủ đề:</b> {safe_topic}\n"
+        f"🎥 <b>Phong cách Đạo diễn:</b> {safe_arch}\n"
+        f"🎞️ <b>Tài nguyên thị giác:</b> {n_scenes} Scenes · {n_bg} BG (16:9) · {n_fg} FG (1:1 Magenta) · {n_thumb} Thumbnails\n"
+        f"📊 <b>Story Gate:</b> {safe_score} | <b>Notion Prompt Sync:</b> ✅\n\n"
+        + thumb_details +
+        "📋 <b>Khối lệnh 1-Chạm thực thi trên Antigravity (Copy & Dán):</b>\n"
         f"<pre>{html.escape(paste_block)}</pre>\n"
-        "👉 <i>Sau khi Antigravity hoàn tất sinh ảnh & audit, B6 sẽ tự động được kích hoạt trên VPS. Nút dưới dùng ghi nhận thủ công.</i>"
+        "⚡ <i>Quy chuẩn kỹ thuật ảnh 2K DCI, tách nền Chroma HSV, 4-Trục Visual Audit (Rule 122) và Auto-Trigger B6 được ủy quyền trọn vẹn cho Skill <b>vf-image-gen</b>.</i>"
     )
-    return await send_with_buttons(text, [[("✅ Đã sinh ảnh xong", f"imgdone:{task_id}")]])
+    return await send_with_buttons(text, [[("✅ Đã sinh ảnh xong (B6 Render)", f"imgdone:{task_id}")]])
+
 
 
