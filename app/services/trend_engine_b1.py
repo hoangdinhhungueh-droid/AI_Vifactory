@@ -26,6 +26,7 @@ import logging
 import asyncio
 import urllib.request
 import urllib.parse
+from pathlib import Path
 from datetime import datetime, timezone
 
 from app.services.trend_free_signals import (

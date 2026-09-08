@@ -241,7 +241,7 @@ class ModelGateway:
                     break
                 else:
                     raise ModelGatewayError("Empty response from HHTech API stream")
-            except (httpx.TimeoutException, httpx.NetworkError, ModelGatewayError) as e:
+            except (httpx.HTTPError, ModelGatewayError) as e:
                 last_error = e
                 logger.warning(f"[GATEWAY] HHTech attempt {attempt}/{max_retries} failed: {e}")
                 if attempt < max_retries:
