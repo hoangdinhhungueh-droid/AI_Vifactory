@@ -227,7 +227,7 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
     if len(seen) < 10:
         for geo in geos[:2]:
             try:
-                disc_terms = gtrends_discover_trending_searches(geo=geo, count=15, timeout=10.0)
+                disc_terms = gtrends_discover_trending_searches(market=m_up, geo=geo, count=15, timeout=10.0)
                 for t in disc_terms:
                     t = t.strip()
                     if not t:

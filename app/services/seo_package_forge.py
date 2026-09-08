@@ -47,7 +47,7 @@ Strict Constraints (Skill AI Packaging & Rule 444 An Ong Hook):
 4. HASHTAGS: Exactly 3 high-intent hashtags (#Tag1 #Tag2 #Tag3). Cap strictly at 3.
 5. TAGS: High-value SEO tags within a 400-character budget (max 7-10 tags).
 6. 3-SECOND COLD OPEN (hook_3s): The single most startling visual or contradiction statement (0-3s).
-7. 60-SECOND NARRATIVE HOOK (hook_60s): An Ong narrative contract (Rule 444). A 90-130 word opening monologue for Act I setting up the quantitative shock, the systemic contradiction, and the core puzzle the documentary will solve.
+7. 60-SECOND NARRATIVE HOOK (hook_60s): An Ong narrative contract (Rule 444 & Rule 130). A 90-130 word opening monologue for Act I setting up the quantitative shock, leading directly with the Level 1 Primary Catalyst (verified dates, events, numbers), the systemic contradiction, and the core puzzle. STRICTLY FORBIDDEN: Starting with 'Now imagine...', 'Imagine a world...', or hypothetical hand-waving. Lead with real, verifiable stakes.
 8. SPECIFIC VIRAL ANGLE (specific_viral_angle): The 10x pivot angle directly exploiting the competitor's fatal explanatory vacuum.
 9. THUMBNAIL A/B/C: Exactly 3 distinct copywriting variants:
    - Variant A = emotion_first: Short emotional punch headline (<=32 chars, UPPERCASE).

@@ -149,29 +149,55 @@ def _save_snapshot(hub_key: str, content: str):
         logger.warning(f"[skill_loader] Failed saving snapshot: {e}")
 
 
-AUTHENTIC_5_ACT_PACING_RULES = """
+DOCUDRAMA_5BEAT_PACING_X10 = """
+## 10X 5-BEAT INVESTIGATIVE DOCUDRAMA ARCHITECTURE (QUY CHUẨN ĐẶC TẢ NHỊP KỊCH BẢN X10)
+Genre: High-Stakes Non-Fiction Investigative Docudrama (Johnny Harris x Margin Call x Chernobyl Pacing).
+Target: 1,800 - 2,200 words across 5 structured Acts (~360-440 words / Act). Total runtime: 12-15 minutes.
 
-## Cấu Trúc Dẫn Truyện "Investigative Docudrama" (Hồ Sơ Điều Tra Bất Đối Xứng - Multi-Layer Puzzle)
-• Beat 1 / Act I (The Impossible Contradiction - Nghịch Lý Mở Màn 0-60s):
-  - Mở đầu bằng một nghịch lý kinh tế/xã hội bất khả thi: một thực thể đứng trên đỉnh cao hoàng kim, số liệu tuyệt hảo, nhưng một vết nứt ngầm không ai ngờ kích hoạt sự sụp đổ.
-  - An Ong Hook Protocol (Rule 444): 60 từ đầu tiên kích nổ ngay con số chấn động hoặc câu hỏi điều tra nhức nhối, mở ngay Core Curiosity Loop cực lớn. CẤM mở đầu kiểu giáo khoa.
-• Beat 2 / Act II (The False Narrative & Red Herring - Bẫy Truyền Thông & Sai Lầm Đối Thủ):
-  - Phơi bày câu chuyện bề nổi mà truyền thông chính thống hoặc các video đối thủ đã kể.
-  - Lật tẩy "Red Herring" (manh mối hỏa mù / giả thuyết sai lầm) mà công chúng từng tin sái cổ, chỉ ra tại sao cách giải thích thông thường là nông cạn và né tránh trách nhiệm.
-• Beat 3 / Act III (The Systemic Blindspot & Paper Trail - Manh Mối Rò Rỉ & Vết Nứt Thể Chế):
-  - Khai quật hồ sơ điều tra thực tế, báo cáo kiểm toán nội bộ, email rò rỉ, cơ chế pháp lý hoặc kẽ hở tài chính mà đối thủ đã bỏ qua (Fatal Explanatory Vacuum).
-  - Phân tích động cơ lợi ích thực sự của các nhân vật cốt cán: Ai là kẻ kiếm lời? Ai biết trước thảm họa nhưng im lặng?
-• Beat 4 / Act IV (The Real Culprit & Smoking Gun - Cỗ Máy Lợi Ích & Bằng Chứng Vạch Trần):
-  - Vạch trần "Smoking Gun" (khẩu súng còn bốc khói): Bằng chứng không thể chối cãi, điểm gãy cấu trúc không thể cứu vãn.
-  - Giải phẫu đòn đánh chí mạng / sự kiện sụp đổ không thể đảo ngược, đưa kịch bản lên đỉnh điểm kịch tính (Climax).
-• Beat 5 / Act V (The Uncomfortable Modern Mirror & Living Warning - Bản Án & Lời Cảnh Báo Hiện Tại):
-  - Bản án lịch sử và bài học bất hủ. Đóng các curiosity loops mở ở Beat 1 (tỷ lệ đóng >= 75-80%).
-  - Chiếu chiếc gương soi vào hiện tại: Cơ chế thao túng tương tự đang âm thầm diễn ra ở đâu hôm nay? Lời cảnh tỉnh sâu sắc để lại dư âm mạnh mẽ cho người xem.
+### 🥊 BEAT 1 / ACT I (0:00 - 3:00): THE IMPOSSIBLE CONTRADICTION & COLD STRIKE
+• Primary Objective: Capture cold mobile traffic within 5-10s (Rule 444) and directly satisfy viewer search intent (Rule 130).
+• Micro-Pacing Breakdown:
+  1.1 Cold Strike (0:00 - 0:20): Sentence 1 MUST lead with a verified real-world event (Level 1 Primary Catalyst) and an exact quantitative figure (%, $, or metric) within 60 words. STRICTLY FORBIDDEN: Opening with 'Imagine...', 'In today's world...', or philosophical throat-clearing.
+  1.2 Sensory/Structural Paradox (0:20 - 1:00): Clash two irreconcilable realities: the visible official surface (e.g. radars show vessels moving, corporate headquarters announce record profits) vs. the invisible systemic failure (liquidity evaporating, insurance canceled, contracts freezing).
+  1.3 Ticking Clock & Human Stakes (1:00 - 2:00): Establish the ticking deadline and asymmetric exposure. Who is hemorrhaging capital or facing catastrophe right now?
+  1.4 The Core Curiosity Lock & Micro-Cliffhanger 1 (2:00 - 3:00): Formulate the central investigative enigma: 'How did this catastrophe unfold in broad daylight under the watch of elite regulators/institutions?' End Act I on an alarming initial anomaly.
+• Mandatory Keywords & Signals: 'collapse', 'shock', 'disappear', 'first', 'only', and at least 2 explicit curiosity questions ('?').
 
-## Narrative Loop & Micro-Cliffhanger Discipline
-• Mở curiosity loop trong 60 từ đầu tiên và cài cắm Micro-Cliffhanger mỗi 90-120 giây xuyên suốt kịch bản để níu chân người xem.
-• Độ dài chuẩn: 1,800 - 2,200 từ (~12-15 phút dẫn chuyện lôi cuốn, giọng văn phóng sự điều tra trung tính, sắc bén, không sáo rỗng).
-• Bắt buộc trích dẫn bằng chứng cụ thể: ngày tháng, số liệu định lượng, tên tài liệu/cơ quan điều tra ít nhất 2 lần mỗi Beat."""
+### 🎭 BEAT 2 / ACT II (3:00 - 6:00): THE FALSE NARRATIVE & MEDIA RED HERRING
+• Primary Objective: Dismantle the superficial official narrative and expose competitor blindspots.
+• Micro-Pacing Breakdown:
+  2.1 The Comforting Consensus (3:00 - 4:00): Reconstruct the mainstream media headlines and PR statements that lulled the public into a false sense of security.
+  2.2 The Peripheral Fracture (4:00 - 5:00): Examine peripheral data that competitors ignored: quiet revisions in fine print, anomalous maritime transits, off-balance-sheet notes, or unusual trading spikes.
+  2.3 The Red Herring Unmasked & Micro-Cliffhanger 2 (5:00 - 6:00): Prove forensically why the popular scapegoat is wrong or merely a symptom. If the official story is a myth, what hidden machine is actually pulling the strings?
+• Mandatory Keywords & Signals: 'official story', 'narrative', 'headline', 'myth', 'red herring', citing official reports/statements.
+
+### 📂 BEAT 3 / ACT III (6:00 - 9:30): THE SYSTEMIC BLINDSPOT & PAPER TRAIL
+• Primary Objective: Deep-dive into technical evidence, contract clauses, internal memos, and regulatory choke points.
+• Micro-Pacing Breakdown:
+  3.1 Entering the Choke Point (6:00 - 7:00): Walk the viewer into the operational cockpit: specific legal sub-clauses (e.g. BIMCO CONWARTIME, ISDA master terms, margin covenants), risk algorithms, or board decisions.
+  3.2 The Asymmetric Trap (7:00 - 8:00): Reveal how self-reinforcing mechanisms forced rational actors into collective disaster—not out of malice, but because automated rules left them no other choice.
+  3.3 Pattern Interrupt Breaker (8:00 - 8:30): Insert a punchy, staccato sentence of 2 to 6 words maximum (e.g. 'The paper trail vanished.', 'Then came the audit.', 'No one was looking.') to freeze the narrative tempo before dropping the fatal leak.
+  3.4 The Fatal Explanatory Vacuum & Micro-Cliffhanger 3 (8:30 - 9:30): Unearth the ignored early warning memo or confidential audit that predicted the exact failure months in advance.
+• Mandatory Keywords & Signals: 'paper trail', 'blindspot', 'loophole', 'leak', 'memo', 'forensic', plus exactly 1 pattern-interrupt short sentence (2-6 words).
+
+### ⚡ BEAT 4 / ACT IV (9:30 - 12:30): THE SMOKING GUN & ASYMMETRIC CLIMAX
+• Primary Objective: Deliver the irrefutable structural climax and unmask the true beneficiaries and systemic breaking point.
+• Micro-Pacing Breakdown:
+  4.1 The Dam Breaks (9:30 - 10:30): The inevitable transmission from Level 1 catalyst to Level 2 institutional catastrophe completes: freight rates surge 400%, liquidity evaporates, or default triggers fire simultaneously.
+  4.2 The Smoking Gun Unmasked (10:30 - 11:30): Present the definitive document or data proof. Who anticipated the collapse? Who extracted asymmetric profit while the public or ordinary participants absorbed the loss?
+  4.3 The Climax & Cascade (11:30 - 12:30): The dominoes finish falling. The regulatory or market verdict is rendered. The trap has irrevocably snapped shut.
+• Mandatory Keywords & Signals: 'smoking gun', 'culprit', 'exposed', 'unmasked', 'profited', closing loops with 'that is why', 'the answer', 'which is how'.
+
+### 🪞 BEAT 5 / ACT V (12:30 - 15:00): THE UNCOMFORTABLE MODERN MIRROR & LIVING WARNING
+• Primary Objective: Deliver closure (>=80% curiosity loops answered) and hold a chilling mirror up to the contemporary world.
+• Micro-Pacing Breakdown:
+  5.1 The Systemic Verdict (12:30 - 13:30): Synthesize the entire causal chain into one unforgettable insight. Resolve remaining curiosity loops from Acts I-IV.
+  5.2 The Living Contemporary Precedent (13:30 - 14:15): Reveal that this vulnerability did not end with this episode. Show the exact same mechanism operating today under a different corporate, financial, or geopolitical guise.
+  5.3 The Final Living Warning (14:15 - 15:00): End with an unsettling, thought-provoking investigative takeaway that respects viewer intelligence. STRICTLY ZERO preachy moralizing or generic cliches ('in conclusion', 'time will tell', 'beacon of hope').
+• Mandatory Keywords & Signals: 'mirror', 'warning', 'modern', 'today', 'lesson', 'verdict', loop closure >= 80%.
+"""
+
+AUTHENTIC_5_ACT_PACING_RULES = DOCUDRAMA_5BEAT_PACING_X10
 
 TWO_LAYER_VISUAL_RULES = """
 
@@ -547,48 +573,36 @@ def get_b11_self_learning_rules(force_refresh: bool = False) -> str:
 
 def get_b2_editorial_skills(force_refresh: bool = False) -> str:
     """Return high-density, targeted editorial skill prompts for B2 Story Engine.
-    Combines Notion Content Engine Hub narrative rules, Central Brain rules
-    (Principle: Big Fish Small Pond, Rule 118 Truth Anchor, Rule 444 Hook Protocol),
-    and B11 Self-Learning post-mortem feedback dynamically.
+    Combines 10X 5-Beat Docudrama Micro-Pacing Architecture, Rule 113/114/130 YouTube Viral Mandates,
+    and B11 Self-Learning post-mortem feedback dynamically without marketing context clutter.
     """
-    ce_rules = get_content_engine_rules(force_refresh=force_refresh)
     b11_lessons = get_b11_self_learning_rules(force_refresh=force_refresh)
     
     b11_section = ""
     if b11_lessons:
         b11_section = (
-            "\n\n=== 5. B11 CONTINUOUS SELF-LEARNING LESSONS (LIVE NOTION FEEDBACK) ===\n"
-            f"{b11_lessons[:1500]}\n"
+            "\n\n=== B11 CONTINUOUS SELF-LEARNING LESSONS (LIVE NOTION FEEDBACK) ===\n"
+            f"{b11_lessons[:1200]}\n"
         )
 
     editorial_prompt = (
-        "=== B2 EDITORIAL & CINEMATIC NARRATIVE MANDATES ===\n"
-        "1. PRINCIPLE: BIG FISH SMALL POND (CAUSAL MECHANISM):\n"
-        "   - Never narrate surface events chronologically like a boring encyclopedia. Dissect the underlying structural mechanism:\n"
-        "     the regulatory loophole, the financial incentive structure, or the psychological vulnerability.\n"
-        "   - The story is NOT about the person; the story is about the SYSTEMIC MACHINE that made the crisis inevitable.\n"
-        "   - Ground all statements in verified historical/economic facts; zero speculative gossip.\n\n"
-        "2. RULE 444 (AN ONG HOOK PROTOCOL - COLD TRAFFIC HOOK 5-10 SECONDS):\n"
-        "   - The very first sentence of Act I MUST open with a shock quantitative stake, specific economic contradiction, or irreconcilable conflict.\n"
-        "   - ZERO generic preamble ('In the quiet town of...', 'Throughout history...', 'In today\'s world...').\n"
-        "   - Hook mobile viewers immediately with an inescapable, high-stakes puzzle.\n\n"
-        "3. CINEMATIC TENSION & SCENE-LEVEL DRAMA (ANTI-BLAND DIRECTIVE):\n"
-        "   - Banish dry passive summary. Anchor every Act in specific human decisions, ticking clocks, and irreversible bets.\n"
-        "   - Micro-Cliffhangers: End Act I, Act II, and Act III with an unresolved revelation or friction point that forces the viewer to keep watching.\n"
-        "   - Visual Staging: Describe scenes with concrete physical reality (exact boardroom meetings, panicked trading desks, leaked memos, court transcripts) so Remotion visuals can pair seamlessly.\n\n"
-        "4. CẤU TRÚC DẪN TRUYỆN INVESTIGATIVE DOCUDRAMA (HỒ SƠ ĐIỀU TRA BẤT ĐỐI XỨNG - MULTI-LAYER PUZZLE):\n"
-        "   - Beat 1 / Act I (The Impossible Contradiction): Mở màn nghịch lý phi lý 0-60s, con số chấn động/xung đột bất khả thi, mở Core Curiosity Loop (Rule 444 An Ong Hook).\n"
-        "   - Beat 2 / Act II (The False Narrative & Red Herring): Lật tẩy bẫy truyền thông và sai lầm đối thủ, bóc trần manh mối hỏa mù.\n"
-        "   - Beat 3 / Act III (The Systemic Blindspot & Paper Trail): Khai quật kẽ hở thể chế, tài liệu/báo cáo rò rỉ (Fatal Explanatory Vacuum) đối thủ bỏ qua.\n"
-        "   - Beat 4 / Act IV (The Real Culprit & Smoking Gun): Vạch trần khẩu súng còn bốc khói, cỗ máy lợi ích thật sự, điểm gãy chí mạng (Climax).\n"
-        "   - Beat 5 / Act V (The Uncomfortable Modern Mirror & Living Warning): Chiếu chiếc gương soi vào hiện tại, đóng curiosity loops (>=75-80%), lời cảnh báo nhức nhối.\n"
-        "   - Micro-Cliffhangers: Cài cắm điểm thắt/tò mò mỗi 90-120 giây xuyên suốt kịch bản để giữ chân người xem.\n"
-        "   - Target Word Count: 1,800 - 2,200 từ (~12-15 phút narration) phân bổ đều cho 5 Acts.\n"
-        "   - Tone & Style: Phóng sự điều tra độc lập, sắc bén, khách quan, giàu bằng chứng tài liệu/số liệu cụ thể.\n"
-        "   - Anti-AI Mandate: ZERO banned cliches (delve, testament, tapestry, crucible, beacon, in conclusion).\n"
-        f"{b11_section}\n"
-        "=== DETAILED CONTENT ENGINE RULES FROM NOTION SOT ===\n"
-        f"{ce_rules[:3500]}"
+        "=== B2 10X EDITORIAL & INVESTIGATIVE CINEMATIC MANDATES ===\n"
+        "1. RULE 130: FACTUAL CAUSAL INTEGRITY & SEARCH-INTENT DIRECT PAYOFF:\n"
+        "   - Suspense arises from forensic clarity: the collision between a verified real catalyst event and its systemic transmission.\n"
+        "   - Strictly distinguish Level 1 Primary Catalyst (direct verified event, dates, actors) from Level 2 Transmission Mechanism (institutional/insurance/financial response).\n"
+        "   - Act I and Act II must directly address and resolve the viewer's burning search query. ZERO hypotheticals ('Imagine a scenario...'), ZERO clickbait bait-and-switch.\n"
+        "   - Ground all statements in verified facts from the Grounding Table; zero speculative gossip.\n\n"
+        "2. CINEMATIC HUMAN TENSION INSIDE SYSTEMIC TRAPS:\n"
+        "   - Banish dry, passive corporate encyclopedia summaries. Systemic forces are felt through the humans trapped inside them:\n"
+        "     the panic of a tanker captain on the bridge, the margin clerk watching red liquidation warnings, the regulator signing an emergency waiver.\n"
+        "   - Visual Staging: Anchor scenes with concrete physical reality (blinking radar consoles, frantic late-night phone logs, leaked internal memos, courtroom transcripts) so Remotion visuals pair seamlessly.\n\n"
+        "3. RULE 113 & 114: YOUTUBE RETENTION & CURIOSITY DISCIPLINE:\n"
+        "   - Rule 444 Cold Traffic Hook: Mobile viewers decide in 5-10 seconds. Sentence 1 of Act I MUST open with a shock quantitative stake (%, $, or metric).\n"
+        "   - Micro-Cliffhangers: Plant an unresolved tension spike every 90-120 seconds throughout the script.\n"
+        "   - Continuous Loop Pacing: Plant at least 8 to 10 explicit curiosity questions with '?' across the script (~2 per Act), and frequently close loops using resolving phrases ('that is why', 'which is how', 'the answer', 'in the end').\n"
+        "   - Anti-AI Mandate: ZERO banned cliches (delve, testament, tapestry, crucible, beacon, in conclusion, time will tell).\n\n"
+        f"{DOCUDRAMA_5BEAT_PACING_X10}\n"
+        f"{b11_section}"
     )
     return editorial_prompt
 

@@ -282,11 +282,18 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
 
     hook_anchor_prompt = ""
     if hook_60s and not seo_pkg.get("is_fallback"):
+        anti_imagine_directive = ""
+        if "imagine" in hook_60s.lower() or "hypothetical" in hook_60s.lower():
+            anti_imagine_directive = (
+                "\n🚨 RULE 130 MANDATE: The reference hook contains passive/hypothetical framing ('imagine'). "
+                "You MUST convert this into a DIRECT FACTUAL ASSERTION of verified events (Level 1 Primary Catalyst) "
+                "with exact dates, actors, and quantitative metrics from the Grounding Table. STRICTLY FORBIDDEN: Writing 'Imagine...' in your script!\n"
+            )
         hook_anchor_prompt = f"""• Approved YouTube Title A: {seo_title_a}
 • Pre-Approved 3s Cold-Open: {hook_3s}
-• Mandatory 60s Opening Monologue Contract (Act I MUST anchor directly to this):
-  "{hook_60s}"
-CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off this exact 60-second narrative contract and title premise. Do not reinvent or drift away from this premise.
+• Mandatory 60s Opening Premise Contract (Act I MUST anchor directly to this):
+  "{hook_60s}"{anti_imagine_directive}
+CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off this premise, leading with verified Level 1 Catalyst facts and quantitative numbers. Do not drift into abstract theory.
 
 """
     elif seo_title_a:
