@@ -123,6 +123,21 @@
       - Áp dụng chuẩn Generic Placeholders:
         `"<CATALYST_EVENT> (verified date & direct actor) -> <TRANSMISSION_MECHANISM> (financial/legal/logistical choke) -> <CORE_SYSTEMIC_PARADOX> -> <DIRECT_SEARCH_PAYOFF>"`
       - Dù là Trục 1 (Vụ án kinh tế), Trục 2 (Tội phạm điều tra), Trục 3 (Công nghệ độc quyền), Trục 4 (Tài chính sụp đổ), hay Trục 5 (Địa chính trị/Thương mại toàn cầu): Mọi kịch bản đều phải tuân thủ nghiêm ngặt 4 nguyên tắc trên.
+13. **RULE 131 (10X Beat Architecture & Editorial Signal Purity Mandate - Kỷ Luật Thép Về Cấu Trúc Nhịp Kịch Bản x10 & Khử Nhiễu Prompt Kể Chuyện)**:
+    - **Signal-to-Noise Ratio & Zero Marketing Contamination (Khử Nhiễu Tuyệt Đối)**:
+      - CẤM TUYỆT ĐỐI việc nạp các tài liệu content marketing, social copy, brand voice tiếp thị chung chung từ Content Engine Hub vào prompt kịch bản B2. B2 chỉ nhận đúng các nguyên lý kịch tính, điều tra, pacing docudrama và bài học tự học B11.
+    - **10X 5-Beat Investigative Docudrama Architecture (Đặc Tả Nhịp Vi Mô x10)**:
+      - Bắt buộc phân rã vi mô từng nhịp:
+        + Beat 1 (0-3m): Cold Strike 0-20s (Level 1 Catalyst + Grounding Number trong 60 từ đầu) -> Sensory/Structural Paradox 20-60s -> Ticking Clock & Human Stakes 1-2m -> Curiosity Lock & Micro-Cliffhanger 1. CẤM từ "Imagine" hay câu hỏi giả định.
+        + Beat 2 (3-6m): The False Narrative & Media Red Herring -> Vạch trần sự thật nửa mùa, phơi bày sai lầm của đối thủ và truyền thông chính thống.
+        + Beat 3 (6-9.5m): Forensic Paper Trail & The Asymmetric Trap -> Đi sâu vào phòng họp kín, điều khoản hợp đồng cụ thể (clause/sub-clause), dòng tiền ngầm, biên bản nội bộ. Chèn câu ngắt nhịp cực ngắn (Pattern Interrupt 2-6 từ).
+        + Beat 4 (9.5-12.5m): The Smoking Gun & Asymmetric Climax -> Bóc trần "khẩu súng còn bốc khói", thực thể hưởng lợi thật sự, điểm gãy cấu trúc không thể quay đầu.
+        + Beat 5 (12.5-15m): The Uncomfortable Modern Mirror & Living Warning -> Đóng >=80% các câu hỏi tò mò, chiếu chiếc gương soi đương đại và lời cảnh tỉnh nhức nhối.
+    - **Anti-Hypothetical Directive & Factual Anchor (Cấm Tuyệt Đối Lối Dẫn Thoái Thác "Imagine...")**:
+      - CẤM TUYỆT ĐỐI mọi prompt và output mở đầu bằng "Now imagine...", "Imagine a scenario...", hay câu hỏi tu từ triết học chung chung.
+      - Bắt buộc dẫn nhập thẳng bằng sự kiện ngòi nổ thực tế (Level 1 Primary Catalyst) kèm mốc thời gian và con số lượng hóa xác thực từ `grounding_intel.json`.
+    - **Cinematic Human Tension inside Systemic Traps (Căng Thẳng Con Người Trong Chiếc Bẫy Thể Chế)**:
+      - Loại bỏ hoàn toàn quan điểm vô cảm "không nói về con người". Lực lượng thể chế, tài chính, quân sự phải được cảm nhận sống động qua con người bị mắc kẹt bên trong chúng (nỗi sợ của cơ trưởng trên buồng lái, áp lực của nhân viên thanh toán khi tài khoản báo đỏ, sự bất lực của điều tra viên).
 
 ---
 
