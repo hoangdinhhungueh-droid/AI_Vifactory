@@ -289,6 +289,12 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
                 "You MUST convert this into a DIRECT FACTUAL ASSERTION of verified events (Level 1 Primary Catalyst) "
                 "with exact dates, actors, and quantitative metrics from the Grounding Table. STRICTLY FORBIDDEN: Writing 'Imagine...' in your script!\n"
             )
+        if "hypothesis" in hook_60s.lower() or "unauthenticated" in hook_60s.lower():
+            anti_imagine_directive += (
+                "\n🚨 RULE 130 ANTI-NIHILISM MANDATE: The reference hook contains hyper-skeptical framing ('hypothesis'). "
+                "You MUST treat verified real-world crisis events (e.g. traffic drops, strikes, advisories) as genuine facts (Level 1 Catalyst), "
+                "and focus on explaining the transmission mechanism (insurance/contracts), NOT denying the reality of the crisis!\n"
+            )
         hook_anchor_prompt = f"""• Approved YouTube Title A: {seo_title_a}
 • Pre-Approved 3s Cold-Open: {hook_3s}
 • Mandatory 60s Opening Premise Contract (Act I MUST anchor directly to this):
@@ -322,6 +328,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         f"   - Avoid cheap adjectives or melodramatic filler. Build dread and urgency through forensic clarity: revealing the structural trap closing in, the math that no longer adds up, the margin calls that cannot be met, or the communication blackout in international waters.\n"
         f"   - FACTUAL CAUSAL INTEGRITY (ZERO FABRICATED TWISTS): Strictly distinguish Level 1 Primary Catalyst (the direct trigger/event) from Level 2 Transmission Mechanism (institutional/insurance/financial response). NEVER invent a fake plot twist or claim an administrative memo caused a physical crisis without primary evidence.\n"
         f"   - SEARCH-INTENT DIRECT PAYOFF (ANTI-BAIT-AND-SWITCH): Act I and Act II must directly address and resolve the burning question the viewer searched for. Zero clickbait or dodging into abstract historical textbook lectures. Ground the dramatic tension in verifiable reality before peeling back the systemic layers.\n"
+        f"   - ANTI-EPISTEMIC-NIHILISM & HISTORICAL PRECEDENT MANDATE: Do NOT dismiss verified macroeconomic and geopolitical realities (such as traffic collapses and military declarations confirmed by global news agencies, Lloyd's List, and maritime monitors) by demanding impossible evidentiary hurdles (like vessel-level captain logs). The contemporary crisis is real; Level 1 Military danger is the primary catalyst; insurance and contracts are the transmission mechanism. Past events (such as 2019) serve strictly as historical precedents to illustrate the financial and legal mechanism, NEVER to displace or deny contemporary crisis facts.\n"
         f"2. CONTRAST PACING & TENSION SPIKES (EVERY 90-120 SECONDS):\n"
         f"   - Act I (The Impossible Contradiction & Ticking Clock): Open with cold quantitative shock. Establish a ticking clock: a deadline, an asymmetric spread, or an invisible threshold already crossed.\n"
         f"   - Act II (The False Narrative & Deceptive Calm): Unmask the comforting official version. Contrast what the public was told against the silent anomalies recorded by secondary instruments or registries.\n"

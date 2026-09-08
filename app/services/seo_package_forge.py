@@ -55,6 +55,10 @@ Strict Constraints (Skill AI Packaging & Rule 444 An Ong Hook):
    - Variant C = curiosity_gap: Counter-intuitive paradox or number (<=32 chars, UPPERCASE).
    Each with a 1-sentence visual_concept.
 10. END SCREEN: 3 timing markers (~3:00 branding, 70% playlist, last 20s CTA).
+11. ANTI-FACT-DENIAL & TEMPORAL INTEGRITY (RULE 130 MANDATE):
+    - NEVER dismiss verified contemporary events or crisis data (e.g. 2026 traffic drops, military declarations, insurance surges) as 'hypotheses' or 'unauthenticated propositions'.
+    - NEVER retreat into past decades (e.g. 2019 Front Altair) as the primary subject of a contemporary search query.
+    - Historical precedents may ONLY be referenced as comparative mechanisms to explain the legal/financial transmission chain, NEVER to displace or deny contemporary crisis events.
 
 Return ONLY valid JSON matching this schema:
 {
@@ -313,11 +317,12 @@ def forge_seo_package(
     rising_queries: list = None,
     breakout_queries: list = None,
     competitor_card: dict = None,
-    story_page_id: str = None
+    story_page_id: str = None,
+    grounding_intel: dict = None
 ) -> dict:
     """Forge complete SEO Package and 60s An Ong Hook right after Step 1.5.
 
-    1. Calls HHTech GPT-6-Astra with rich context (target_keyword, niche, competitor gap, rising queries).
+    1. Calls HHTech GPT-6-Astra with rich context (target_keyword, niche, competitor gap, rising queries, verified ground facts).
     2. Enforces deterministic length, hashtag cap (exactly 3), and tag budget (<=400 chars).
     3. Persists package to /var/vf/episodes/<task_id>/seo_package.json.
     4. Upserts to YouTube Registry DB and Story Library DB in Notion SoT.
@@ -333,6 +338,33 @@ def forge_seo_package(
         anatomy = competitor_card.get("competitor_narrative_anatomy") or {}
         comp_gap = anatomy.get("fatal_explanatory_vacuum") or competitor_card.get("competitor_gap", "")
 
+    # Load grounding intel if not explicitly passed
+    if not grounding_intel:
+        for cand in [
+            os.path.join(EPISODES_BASE, task_id, "grounding_intel.json"),
+            os.path.join("/root/video_factory/episodes", task_id, "grounding_intel.json"),
+        ]:
+            if os.path.exists(cand):
+                try:
+                    with open(cand, "r", encoding="utf-8") as gf:
+                        grounding_intel = json.load(gf)
+                        if grounding_intel:
+                            break
+                except Exception:
+                    pass
+
+    verified_facts = []
+    if grounding_intel and isinstance(grounding_intel, dict):
+        for c in grounding_intel.get("claims", []):
+            claim_text = c.get("claim", "").strip()
+            src = c.get("source", "").strip()
+            dt = c.get("date", "").strip()
+            role = c.get("causal_role", "")
+            if claim_text:
+                prefix = f"[{dt}] " if dt else ""
+                suffix = f" (Source: {src}, Role: {role})" if src else ""
+                verified_facts.append(f"{prefix}{claim_text}{suffix}")
+
     user_payload = {
         "task_id": task_id,
         "market": m_up,
@@ -342,6 +374,8 @@ def forge_seo_package(
         "rising_queries": rq[:6],
         "breakout_queries": bq[:4]
     }
+    if verified_facts:
+        user_payload["verified_ground_facts"] = verified_facts[:6]
 
     user_prompt = json.dumps(user_payload, ensure_ascii=False, indent=2)
 
