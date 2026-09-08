@@ -232,7 +232,7 @@ def youtube_video_details(api_key: str, video_ids: List[str], quota: QuotaTracke
 
 
 def youtube_comments(api_key: str, video_id: str, quota: QuotaTracker,
-                     max_results: int = 50) -> List[Dict]:
+                     max_results: int = 20) -> List[Dict]:
     """Fetch top audience comments sorted by relevance."""
     body = _api_get("commentThreads", {
         "part": "snippet",
@@ -346,15 +346,9 @@ def fetch_transcript(video_id: str, langs: List[str], head_seconds: int = 180) -
             logger.info("[b15.pass1] %s: captions extracted (%d chars)", video_id, len(text))
             return {"status": "captions", "text": text, "source": "youtube-transcript-api"}
     except Exception as e:
-        logger.info("[b15.pass1] %s: captions unavailable (%s), attempting Whisper fallback",
-                    video_id, type(e).__name__)
-
-    text = _whisper_transcript(video_id, langs[0], head_seconds)
-    if text:
-        return {"status": "whisper", "text": text, "source": "yt-dlp+faster-whisper"}
-
-    logger.warning("[b15.pass1] %s: no transcript from either path", video_id)
-    return {"status": "unavailable", "text": None, "source": None}
+        logger.warning("[b15.pass1] %s: captions unavailable (%s), skipping heavy audio download to conserve bandwidth and time",
+                       video_id, type(e).__name__)
+        return {"status": "unavailable", "text": None, "source": None}
 
 
 def _whisper_transcript(video_id: str, lang: str, head_seconds: int) -> Optional[str]:

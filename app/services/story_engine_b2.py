@@ -300,7 +300,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
 • Pre-Approved 3s Cold-Open: {hook_3s}
 • Mandatory 60s Opening Premise Contract (Act I MUST anchor directly to this):
   "{hook_60s}"{anti_imagine_directive}
-CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off this premise, leading with verified Level 1 Catalyst facts and quantitative numbers. Do not drift into abstract theory.
+CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting this 60s hook verbatim within the first 1-2 sentences. Ensure the very first sentence contains the concrete date, catalyst event, and numeric figure/percentage so that Check 9 (Hook Shock in First 60 Words) passes with 100% certainty. Do not write philosophical or vague introductions.
 
 """
     elif seo_title_a:

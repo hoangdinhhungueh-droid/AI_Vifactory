@@ -521,7 +521,7 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
             f"• <b>5-Beat Docudrama:</b> {arcs[:180]}...",
             f"👉 <b>Task ID:</b> <code>{task_id}</code>",
             "--------------------------------------------------",
-            "⚙️ <i>Hệ thống đang tự động chuyển tiếp sang <b>B2 Story Engine</b> (Kịch bản điều tra 12–15 phút) & <b>B3 Visual Plan</b>!</i>"
+            "⚙️ <i>Hệ thống đang tiến hành sinh <b>B2 Kịch bản điều tra</b> & kiểm toán độc lập <b>B2.1 Fact & Causal Gate</b> (Claude Opus 5)...</i>"
         ]
         msg = chr(10).join(lines)
         _send_telegram(msg)
@@ -650,6 +650,33 @@ def discover_and_produce_market_trend(
         specific_angle = viability.get("specific_viral_angle") or term
         print(f"  ✅ APPROVED! Viability: {score}/10 | Angle: {specific_angle}")
 
+        # 3.2 B1.1 Adversarial Critic Gate (Rule 130 & Anti-Bait-and-Switch Early VETO - Claude Opus 5)
+        # Filters out false trends, stale anchors, and bait-and-switch before wasting tokens/scrapes on B1.5!
+        print(f"  🛡️ [B1.1 Critic Gate] Interrogating candidate '{term}' and angle for live trend fidelity...")
+        try:
+            from app.services.adversarial_critic_b1 import audit_candidate_trend_alignment
+            critic_res = audit_candidate_trend_alignment(
+                candidate_term=term,
+                specific_angle=specific_angle,
+                niche_brief=f"Documentary on {term} and {specific_angle}",
+                market=m_up,
+                news_catalysts=recon_data.get("news_catalysts", []),
+                rising_queries=rising_queries[:8],
+                traffic=str(c.get("approx_traffic", "")),
+                model="claude-opus-5",
+                fallback_model="gpt-6-astra"
+            )
+            c_verdict = critic_res.get("verdict", "PASS").upper()
+            c_score = critic_res.get("audit_score", 0.0)
+            if c_verdict == "FAIL" or c_score < 7.5:
+                veto_msg = critic_res.get("veto_reason") or "Failed adversarial trend alignment audit"
+                print(f"  ❌ VETOED BY CRITIC GATE (Score: {c_score}/10): {veto_msg}")
+                logger.warning(f"[{m_up}] Critic Gate VETOED '{term}': {veto_msg}")
+                continue
+            print(f"  ✅ CRITIC GATE PASSED! Score: {c_score}/10 | Angle verified aligned with live trend.")
+        except Exception as _critic_err:
+            logger.warning(f"[{m_up}] Critic Gate execution warning for '{term}': {_critic_err}")
+
         # 3.5 B1.5 Pre-Recon (Rule 123 & Rule 128: Data-Driven Competitor Recon Before Niche Decision)
         print(f"  🎯 [B1.5 Pre-Recon] Harvesting Competitor Benchmarks & Audience Frustrations for '{term}'...")
         temp_slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(term).lower()).strip('-')[:20]
@@ -677,32 +704,6 @@ def discover_and_produce_market_trend(
         )
         if comp_gap:
             niche_data["competitor_differentiation_gap"] = comp_gap
-
-        # 4.5 B1.1 Adversarial Critic Gate (Rule 130 & Anti-Bait-and-Switch VETO)
-        print(f"  🛡️ [B1.1 Critic Gate] Interrogating candidate '{term}' and angle for live trend fidelity...")
-        try:
-            from app.services.adversarial_critic_b1 import audit_candidate_trend_alignment
-            critic_res = audit_candidate_trend_alignment(
-                candidate_term=term,
-                specific_angle=niche_data.get("specific_viral_angle") or specific_angle,
-                niche_brief=niche_data.get("niche_angle_brief", ""),
-                market=m_up,
-                news_catalysts=recon_data.get("news_catalysts", []),
-                rising_queries=rising_queries[:8],
-                traffic=str(c.get("approx_traffic", "")),
-                model="claude-opus-5",
-                fallback_model="gpt-6-astra"
-            )
-            c_verdict = critic_res.get("verdict", "PASS").upper()
-            c_score = critic_res.get("audit_score", 0.0)
-            if c_verdict == "FAIL" or c_score < 7.5:
-                veto_msg = critic_res.get("veto_reason") or "Failed adversarial trend alignment audit"
-                print(f"  ❌ VETOED BY CRITIC GATE (Score: {c_score}/10): {veto_msg}")
-                logger.warning(f"[{m_up}] Critic Gate VETOED '{term}': {veto_msg}")
-                continue
-            print(f"  ✅ CRITIC GATE PASSED! Score: {c_score}/10 | Angle verified aligned with live trend.")
-        except Exception as _critic_err:
-            logger.warning(f"[{m_up}] Critic Gate execution warning for '{term}': {_critic_err}")
 
         t_obj = {
             "market": m_up,
