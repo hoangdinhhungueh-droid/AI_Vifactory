@@ -801,14 +801,21 @@ def run_daily_all_markets(markets: list[str] = None, auto_produce: bool = True) 
 
 
 if __name__ == "__main__":
-    import sys
-    custom_term = None
-    target_mkt = "EN"
-    if len(sys.argv) > 1 and not sys.argv[1].startswith("--"):
-        custom_term = sys.argv[1]
-    if len(sys.argv) > 2 and not sys.argv[2].startswith("--"):
-        target_mkt = sys.argv[2]
+    import argparse
+    parser = argparse.ArgumentParser(description="Canonical Trend Engine B1 Discovery & Production")
+    parser.add_argument("term", nargs="?", default=None, help="Custom seed term")
+    parser.add_argument("pos_market", nargs="?", default=None, help="Target market (EN, JP, KR)")
+    parser.add_argument("--market", "-m", default=None, help="Target market (EN, JP, KR)")
+    parser.add_argument("--seed", "-s", default=None, help="Custom seed term")
+    parser.add_argument("--no-auto", action="store_true", help="Disable automated B1.5 -> B2 production")
+    args = parser.parse_args()
 
-    print(f"Executing Trend Engine B1 CLI (term={custom_term}, market={target_mkt})...")
-    res = discover_and_produce_market_trend(market=target_mkt, custom_seed=custom_term, auto_produce=True)
+    target_mkt = (args.market or args.pos_market or "EN").upper()
+    custom_term = args.seed or args.term
+    if custom_term == "":
+        custom_term = None
+    auto_prod = not args.no_auto
+
+    print(f"Executing Trend Engine B1 CLI (term={custom_term}, market={target_mkt}, auto_produce={auto_prod})...")
+    res = discover_and_produce_market_trend(market=target_mkt, custom_seed=custom_term, auto_produce=auto_prod)
     print(f"Finished. Produced {len(res)} topics.")
