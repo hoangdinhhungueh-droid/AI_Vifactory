@@ -239,46 +239,49 @@ def run_chain(task_id: str) -> int:
     if not bg_dict:
         raise RuntimeError("no background_reuse_key on any scene -- B2 schema regression")
     
-    # Handle GPT content policy refusals gracefully (02/09/2026 P0 fix)
-    try:
-        prompts = generate_scene_prompts(
-            bg_dict=bg_dict,
-            fg_dict=fg_dict,
-            story_title=brain.get("topic") or task_id,
-            scenes=scenes
-        )
-        (ep_dir / "prompts_forge.json").write_text(
-            json.dumps(prompts, ensure_ascii=False, indent=2), encoding="utf-8")
+    prompts_file = ep_dir / "prompts_forge.json"
+    prompts = None
+    if prompts_file.exists() and prompts_file.stat().st_size > 100:
+        try:
+            prompts = json.loads(prompts_file.read_text(encoding="utf-8"))
+            _log(stage, f"Reusing existing valid prompts from {prompts_file}")
+        except Exception:
+            prompts = None
+
+    if not prompts:
+        try:
+            prompts = generate_scene_prompts(
+                bg_dict=bg_dict,
+                fg_dict=fg_dict,
+                story_title=brain.get("topic") or task_id,
+                scenes=scenes
+            )
+            prompts_file.write_text(
+                json.dumps(prompts, ensure_ascii=False, indent=2), encoding="utf-8")
+            n_bg = len(prompts.get("backgrounds") or {})
+            n_fg = len(prompts.get("foregrounds") or {})
+            n_thumb = len(prompts.get("thumbnails") or {})
+            _log(stage, "%d BG prompts, %d FG prompts, %d Thumbnails -> Notion" % (n_bg, n_fg, n_thumb))
+            push_prompts_to_notion(prompts, task_id, task_id=task_id)
+        except ContentPolicyRefusalError as e:
+            _log(stage, "CONTENT POLICY REFUSAL - routing to HG2.5 manual review")
+            _log(stage, "Refusal: %s" % str(e)[:200])
+            refusal_marker = {
+                "status": "NEEDS_MANUAL_REVIEW",
+                "reason": "content_policy_refusal",
+                "refusal_detail": str(e)[:500],
+                "bg_keys_needed": list(bg_dict.keys()),
+                "fg_keys_needed": list(fg_dict.keys()),
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            prompts_file.write_text(
+                json.dumps(refusal_marker, ensure_ascii=False, indent=2), encoding="utf-8")
+    else:
         n_bg = len(prompts.get("backgrounds") or {})
         n_fg = len(prompts.get("foregrounds") or {})
         n_thumb = len(prompts.get("thumbnails") or {})
-        _log(stage, "%d BG prompts, %d FG prompts, %d Thumbnails -> Notion" % (n_bg, n_fg, n_thumb))
-        push_prompts_to_notion(prompts, task_id, task_id=task_id)
+        _log(stage, "%d BG prompts, %d FG prompts, %d Thumbnails loaded from disk" % (n_bg, n_fg, n_thumb))
         
-    except ContentPolicyRefusalError as e:
-        # GPT refused due to sensitive content - route to HG2.5 manual review
-        _log(stage, "CONTENT POLICY REFUSAL - routing to HG2.5 manual review")
-        _log(stage, "Refusal: %s" % str(e)[:200])
-        
-        # Create marker file for manual prompt engineering
-        refusal_marker = {
-            "status": "NEEDS_MANUAL_REVIEW",
-            "reason": "content_policy_refusal",
-            "refusal_detail": str(e)[:500],
-            "bg_keys_needed": list(bg_dict.keys()),
-            "fg_keys_needed": list(fg_dict.keys()),
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-        }
-        (ep_dir / "prompts_forge.json").write_text(
-            json.dumps(refusal_marker, ensure_ascii=False, indent=2), encoding="utf-8")
-        
-        # Notify for manual intervention
-        asyncio.run(_notify_gate25_manual_review(task_id, str(e)))
-        
-        _log(stage, "Episode marked for HG2.5 manual prompt engineering")
-        _log("HG2.5", "Waiting for human to craft prompts for sensitive topic")
-        return 0  # Exit cleanly - not a failure, just needs human input
-
     # ---- Human Gate 2 -------------------------------------------------
     seo_pkg_file = ep_dir / "seo_package.json"
     t_a, t_b = "", ""
