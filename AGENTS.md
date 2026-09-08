@@ -119,10 +119,14 @@
       - Khi người xem gõ tìm kiếm một từ khóa đang trend (ví dụ: một vụ scandal, một cuộc khủng hoảng, một vụ sụp đổ tài chính), họ đang có một câu hỏi nhức nhối cần được trả lời ngay lập tức.
       - Kịch bản (đặc biệt là Act I & Act II) BẮT BUỘC phải đối diện và giải mã trực tiếp câu hỏi thời sự đó.
       - CẤM TUYỆT ĐỐI việc mượn từ khóa nóng làm mồi nhử (clickbait) rồi ngay sau đó thoái thác, bẻ lái sang một bài giảng lý thuyết luật/học thuật chung chung, trừu tượng hay lịch sử xa xưa mà không giải quyết mối bận tâm thời sự của khán giả.
+    - **Contemporary Event Anchor & Trend-Intent Priority Mandate (Ưu Tiên Ý Định Xu Hướng & Neo Sự Kiện Thời Sự Đương Đại)**:
+      - Khi kịch bản bắt nguồn từ một xu hướng thời sự, khủng hoảng hay sự kiện nóng: Act I (cụ thể là đoạn 1 hoặc 2) BẮT BUỘC phải gọi tên trực diện sự kiện ngòi nổ đương đại (chủ thể phát lệnh/hành động, mốc thời gian, con số sụt giảm/thiệt hại định lượng từ bảng Grounding Intel).
+      - CẤM TUYỆT ĐỐI việc né tránh sự kiện bằng các mệnh đề trừu tượng hóa hay triết học chung chung (như "Khi một mối đe dọa quân sự xuất hiện...", "Trong một thị trường biến động...") khi bảng Grounding đã xác thực rõ sự kiện.
+      - Phân định rạch ròi với tiền lệ lịch sử: Dữ liệu quá khứ (như sự kiện 2019, 2008, 1980s) CHỈ ĐƯỢC DÙNG từ Act II/III với tư cách là tiền lệ đối chứng để giải thích cơ chế, TUYỆT ĐỐI KHÔNG ĐƯỢC dùng để che lấp hay thay thế sự kiện đương đại mà khán giả đang tìm kiếm.
     - **Universal Generic Pattern Across All Topic Axes (Áp Dụng Bình Đẳng Cho Mọi Trục Đề Tài - Rule 128 Enforced)**:
       - Áp dụng chuẩn Generic Placeholders:
         `"<CATALYST_EVENT> (verified date & direct actor) -> <TRANSMISSION_MECHANISM> (financial/legal/logistical choke) -> <CORE_SYSTEMIC_PARADOX> -> <DIRECT_SEARCH_PAYOFF>"`
-      - Dù là Trục 1 (Vụ án kinh tế), Trục 2 (Tội phạm điều tra), Trục 3 (Công nghệ độc quyền), Trục 4 (Tài chính sụp đổ), hay Trục 5 (Địa chính trị/Thương mại toàn cầu): Mọi kịch bản đều phải tuân thủ nghiêm ngặt 4 nguyên tắc trên.
+      - Dù là Trục 1 (Vụ án kinh tế), Trục 2 (Tội phạm điều tra), Trục 3 (Công nghệ độc quyền), Trục 4 (Tài chính sụp đổ), hay Trục 5 (Địa chính trị/Thương mại toàn cầu): Mọi kịch bản đều phải tuân thủ nghiêm ngặt các nguyên tắc trên.
 13. **RULE 131 (10X Beat Architecture & Editorial Signal Purity Mandate - Kỷ Luật Thép Về Cấu Trúc Nhịp Kịch Bản x10 & Khử Nhiễu Prompt Kể Chuyện)**:
     - **Signal-to-Noise Ratio & Zero Marketing Contamination (Khử Nhiễu Tuyệt Đối)**:
       - CẤM TUYỆT ĐỐI việc nạp các tài liệu content marketing, social copy, brand voice tiếp thị chung chung từ Content Engine Hub vào prompt kịch bản B2. B2 chỉ nhận đúng các nguyên lý kịch tính, điều tra, pacing docudrama và bài học tự học B11.

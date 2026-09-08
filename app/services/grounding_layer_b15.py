@@ -418,7 +418,11 @@ def format_grounded_facts_for_prompt(grounding_result: Dict[str, Any]) -> str:
         "   - [TRANSMISSION_MECHANISM] (Level 2): The systemic channel (insurance, liquidity, margin call, regulatory notice, supply bottleneck). Acts III & IV must dissect this mechanism.",
         "   - ZERO INVERTED CAUSALITY: Strictly forbidden to present a transmission mechanism as the original primary trigger.",
         "5. SEARCH-INTENT DIRECT PAYOFF: Do NOT clickbait or drift away into academic abstractions. Address the central headline question within the opening 60 seconds.",
-        "6. ZERO-HALLUCINATION: Do NOT invent dates, numerical fees, casualties, or institutional actors outside this table.\n"
+        "6. ZERO-HALLUCINATION: Do NOT invent dates, numerical fees, casualties, or institutional actors outside this table.",
+        "7. CONTEMPORARY EVENT ANCHOR & TREND-INTENT PRIORITY (MANDATORY IN ACT I):",
+        "   - When an episode is based on an active trend, breaking investigation, or contemporary crisis: Act I (specifically paragraph 1 or 2) MUST explicitly name the specific real-world Contemporary Catalyst Event (exact dates, acting entities/governments, and verified quantitative drops/metrics from this table).",
+        "   - STRICTLY FORBIDDEN: Hiding behind vague, abstract, or generic phrasing (such as 'When a military threat occurs' or 'When market volatility happens') when verified contemporary event details are present in the table!",
+        "   - HISTORICAL PRECEDENT DISCIPLINE: Historical comparisons (e.g. 2019, 2008, 1980s) may ONLY be used in later Acts (Act II/III) as comparative blueprints to explain the legal/financial mechanism, NEVER to replace or displace the contemporary catalyst that viewers are actively searching for.\n"
     ]
 
     for idx, c in enumerate(claims, 1):

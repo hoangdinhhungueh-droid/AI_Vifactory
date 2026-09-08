@@ -328,6 +328,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         f"   - Avoid cheap adjectives or melodramatic filler. Build dread and urgency through forensic clarity: revealing the structural trap closing in, the math that no longer adds up, the margin calls that cannot be met, or the communication blackout in international waters.\n"
         f"   - FACTUAL CAUSAL INTEGRITY (ZERO FABRICATED TWISTS): Strictly distinguish Level 1 Primary Catalyst (the direct trigger/event) from Level 2 Transmission Mechanism (institutional/insurance/financial response). NEVER invent a fake plot twist or claim an administrative memo caused a physical crisis without primary evidence.\n"
         f"   - SEARCH-INTENT DIRECT PAYOFF (ANTI-BAIT-AND-SWITCH): Act I and Act II must directly address and resolve the burning question the viewer searched for. Zero clickbait or dodging into abstract historical textbook lectures. Ground the dramatic tension in verifiable reality before peeling back the systemic layers.\n"
+        f"   - CONTEMPORARY EVENT ANCHOR & TREND-INTENT PRIORITY (RULE 130 MANDATE): When covering an active trend or contemporary crisis, Act I (specifically paragraphs 1-2) MUST explicitly name and anchor to the verified real-world Contemporary Catalyst Event (naming the acting entity, exact date, and verified metric from Grounding Intel). NEVER hide behind generic/abstract phrasing (like 'When a military threat occurs' or 'When market volatility happens') when verified real-world event details exist in Grounding Intel. Satisfy the viewer's viral search intent immediately.\n"
         f"   - ANTI-EPISTEMIC-NIHILISM & HISTORICAL PRECEDENT MANDATE: Do NOT dismiss verified macroeconomic and geopolitical realities (such as traffic collapses and military declarations confirmed by global news agencies, Lloyd's List, and maritime monitors) by demanding impossible evidentiary hurdles (like vessel-level captain logs). The contemporary crisis is real; Level 1 Military danger is the primary catalyst; insurance and contracts are the transmission mechanism. Past events (such as 2019) serve strictly as historical precedents to illustrate the financial and legal mechanism, NEVER to displace or deny contemporary crisis facts.\n"
         f"2. CONTRAST PACING & TENSION SPIKES (EVERY 90-120 SECONDS):\n"
         f"   - Act I (The Impossible Contradiction & Ticking Clock): Open with cold quantitative shock. Establish a ticking clock: a deadline, an asymmetric spread, or an invisible threshold already crossed.\n"
@@ -466,7 +467,12 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
             f"{grounding_block}\n\n" if grounding_block else ""
             f"{competitor_context}"
             f"{feedback_block}"
-            f"ACT I OPENING MANDATE (Rule 444 An Ong Hook & Rule 130 Search-Intent Payoff): The very first sentence of Act I MUST open with a shock quantitative stake, specific economic contradiction, or irreconcilable conflict anchored to the Primary Catalyst. Zero generic preamble or slow historical setup; directly address and pay off the viewer's core search query while launching the Core Curiosity Loop within 5-10 seconds.\n"
+            f"ACT I OPENING MANDATE (Rule 444 An Ong Hook, Rule 130 Search-Intent Payoff & Contemporary Event Anchor): "
+            f"Sentence 1 of Act I MUST open with a shock quantitative stake or economic contradiction. "
+            f"Paragraphs 1-2 of Act I MUST explicitly name and anchor to the verified Contemporary Catalyst Event "
+            f"(exact date, acting entity, and verified quantitative impact from the Grounding Table). "
+            f"Zero generic preamble, slow historical setup, or abstract theoretical hand-waving ('When a threat occurs'); "
+            f"directly satisfy and pay off the viewer's search query with verified contemporary facts before peeling back the systemic layers.\n"
             f"Write the full ~1,800-2,200 word script now, adhering strictly to the 5-Act markers:"
         )
 
