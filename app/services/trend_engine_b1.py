@@ -530,6 +530,52 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
         logger.warning(f"[trend_engine] Failed to send Telegram Gate 1 notification: {e}")
 
 
+FORENSIC_ANCHORS = {
+    "KR": [
+        "망한", "파산", "부도", "위기", "사태", "비리", "회생", "적자", "폭망", "몰락",
+        "배임", "횡령", "매각", "상폐", "손실", "디폴트", "구속", "압수수색", "체납",
+        "논란", "붕괴", "스캔들", "진실", "의혹", "사건", "갈등", "분쟁", "소송",
+        "검찰", "조사", "규제", "폭락", "폭등", "사기", "의문"
+    ],
+    "EN": [
+        "collapse", "bankrupt", "crisis", "scandal", "fraud", "failed", "downfall",
+        "investigation", "default", "liquidation", "loss", "debt", "deficit", "probe",
+        "arrest", "lawsuit", "court", "recession", "scam", "why it failed", "exposed",
+        "fall of", "controversy", "crash", "plunge", "turmoil", "indictment", "guilty"
+    ],
+    "JP": [
+        "倒産", "破産", "危機", "事件", "転落", "不正", "赤字", "崩壊", "粉飾",
+        "裁判", "逮捕", "巨額", "損失", "なぜ", "疑惑", "衰退", "暴落", "詐欺"
+    ]
+}
+
+
+def forensic_pre_filter(candidate: dict, market: str) -> tuple[bool, str]:
+    """Level-0 Forensic Pre-Filter Gate (Rule 118 & Rule 130).
+    Filters out non-investigative, sports, showbiz, or shallow queries before any LLM calls,
+    burning 0 tokens on non-viable candidates.
+    """
+    source = candidate.get("source", "")
+    if source == "custom_seed":
+        return True, "Bypassed: custom seed"
+
+    m_up = (market or "EN").upper()
+    anchors = FORENSIC_ANCHORS.get(m_up, FORENSIC_ANCHORS["EN"])
+
+    term = candidate.get("term", "").lower()
+    news = candidate.get("news_title", "").lower()
+    combined_text = f"{term} {news}"
+
+    for kw in anchors:
+        if kw.lower() in combined_text:
+            return True, f"Matched forensic crisis anchor: '{kw}'"
+
+    if source == "youtube_autocomplete":
+        return True, "Bypassed: youtube autocomplete investigative seed"
+
+    return False, f"No forensic crisis anchor in '{term}' (0 LLM tokens burned)"
+
+
 def discover_and_produce_market_trend(
     market: str = "EN",
     custom_seed: str = None,
@@ -540,7 +586,7 @@ def discover_and_produce_market_trend(
     for exactly 1 topic per market per day.
     """
     m_up = (market or "EN").upper()
-    print(f"\\n=======================================================")
+    print(f"\n=======================================================")
     print(f"🚀 [TREND ENGINE B1] Scanning Market {m_up} for Daily Production Topic")
     print(f"=======================================================")
 
@@ -553,7 +599,13 @@ def discover_and_produce_market_trend(
 
     for idx, c in enumerate(candidates[:max_scan_candidates], start=1):
         term = c["term"]
-        print(f"\\n[{m_up}] Candidate #{idx}/{min(len(candidates), max_scan_candidates)}: '{term}' (Traffic: {c.get('approx_traffic')}, Geos: {c.get('geos_present')})")
+        print(f"\n[{m_up}] Candidate #{idx}/{min(len(candidates), max_scan_candidates)}: '{term}' (Traffic: {c.get('approx_traffic')}, Geos: {c.get('geos_present')})")
+
+        # Level-0 Forensic Pre-Filter Gate (0 LLM Tokens Burned)
+        pass_pre, pre_reason = forensic_pre_filter(c, m_up)
+        if not pass_pre:
+            print(f"  ⏭️ [PRE-FILTER LEVEL-0 REJECT] {pre_reason}")
+            continue
 
         # 1. Direct Platform Recon (Google/YouTube Autocomplete & Viral Videos)
         recon_data = perform_direct_platform_recon(term, m_up)

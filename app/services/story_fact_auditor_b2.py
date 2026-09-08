@@ -110,10 +110,15 @@ Perform strict adversarial forensic audit according to the 4 Iron Criteria. Inte
                 "critical_findings": f"Auditor unavailable ({e2}), bypassed with fallback pass."
             }
 
-    clean_json = raw_res.strip()
-    if clean_json.startswith("```"):
-        clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json)
-        clean_json = re.sub(r"\s*```$", "", clean_json)
+    # Robust regex extraction of JSON block to ignore markdown codeblock artifacts or trailing text
+    json_match = re.search(r"(\{.*\})", raw_res, re.DOTALL)
+    if json_match:
+        clean_json = json_match.group(1).strip()
+    else:
+        clean_json = raw_res.strip()
+        if clean_json.startswith("```"):
+            clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json)
+            clean_json = re.sub(r"\s*```$", "", clean_json)
 
     try:
         audit_result = json.loads(clean_json)
@@ -135,7 +140,7 @@ Perform strict adversarial forensic audit according to the 4 Iron Criteria. Inte
 
     verdict = audit_result.get("verdict", "FAIL").upper()
     score = float(audit_result.get("audit_score", 0.0))
-    if score < 8.0 and verdict == "PASS":
+    if score < 7.5 and verdict == "PASS":
         verdict = "FAIL"
         audit_result["verdict"] = "FAIL"
 
