@@ -524,8 +524,8 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
                     story_score_str = f"{audit.get('score')}/{audit.get('max_score')}"
                     story_verdict = audit.get('verdict') or 'UNKNOWN'
                     logger.info(f"[story_engine] Post-Refine Attempt {refine_attempt} Score: {story_score_str} | Verdict: {story_verdict}")
-                    if story_verdict == "PASS":
-                        logger.info(f"[story_engine] Auto-Refine SUCCESS on attempt {refine_attempt}!")
+                    if audit.get("score", 0) >= 12:
+                        logger.info(f"[story_engine] Auto-Refine SUCCESS: Perfect 12/12 achieved on attempt {refine_attempt}!")
                         break
             except Exception as _re:
                 logger.warning(f"[story_engine] Auto-refine attempt {refine_attempt} error: {_re}")
