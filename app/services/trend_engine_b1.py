@@ -756,18 +756,31 @@ def discover_and_produce_market_trend(
             print(f"  ⚙️ [B2/B3] Auto-producing 12-15 min docudrama & 2-layer director plan for {task_id}...")
             try:
                 from scripts.produce_episode_hg1 import run_chain
-                run_chain(task_id)
-                print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B3 -> Gate 2 for {task_id}!")
-                produced_topics.append(t_obj)
-                break  # Exactly 1 completed topic per market per day!
+                res_code = run_chain(task_id)
+                if res_code == 0:
+                    print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B3 -> Gate 2 for {task_id}!")
+                    produced_topics.append(t_obj)
+                    break  # Exactly 1 completed topic per market per day!
+                else:
+                    logger.error(f"[{task_id}] Pipeline stopped at gate with exit code {res_code}. CIRCUIT BREAKER ACTIVATED: Freezing pipeline.")
+                    break
             except Exception as prod_err:
-                logger.error(f"[{task_id}] Auto-production failed: {prod_err}. Rotating to next candidate...")
+                logger.error(f"[{task_id}] CRITICAL RUNTIME ERROR: {prod_err}. CIRCUIT BREAKER ACTIVATED: Halting pipeline immediately.")
+                import traceback
+                tb_str = traceback.format_exc()
+                logger.error(tb_str)
                 try:
                     from app.llm_router import _send_telegram
-                    _send_telegram(f"⚠️ <b>[Story Gate Fallback]</b> Task <code>{task_id}</code> không đạt chuẩn hoặc lỗi. Đang tự động xoay sang candidate kế tiếp cho thị trường {m_up}...")
+                    _send_telegram(
+                        f"🛑 <b>[PIPELINE CIRCUIT BREAKER - RULE 118]</b>\n"
+                        f"Task <code>{task_id}</code> gặp sự cố kỹ thuật hoặc Cổng Audit B2.1 bị từ chối:\n"
+                        f"<code>{str(prod_err)[:300]}</code>\n"
+                        f"⚡ <b>Hành động:</b> Đã kích hoạt Phanh Dừng Khẩn Cấp. Tuyệt đối KHÔNG tự ý xoay đề tài để bảo vệ tài nguyên token."
+                    )
                 except Exception:
                     pass
-                continue
+                # CIRCUIT BREAKER: Freeze and break immediately. NEVER rotate candidate on runtime/audit error!
+                break
         else:
             produced_topics.append(t_obj)
             break

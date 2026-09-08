@@ -554,8 +554,74 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
                 fallback_model="gpt-6-astra"
             )
             f_verdict = fact_audit_result.get("verdict", "PASS").upper()
-            f_score = fact_audit_result.get("audit_score", 8.0)
+            f_score = float(fact_audit_result.get("audit_score", 8.0))
             logger.info(f"[story_engine] B2.1 Fact & Causal Audit: Verdict={f_verdict} (Score: {f_score}/10)")
+
+            # 1-Shot Self-Repair if audit fails (< 7.5 or FAIL)
+            if f_verdict == "FAIL" or f_score < 7.5:
+                audit_critique = fact_audit_result.get("audit_notes") or fact_audit_result.get("veto_reason") or "Factual or causal discrepancies found."
+                logger.warning(f"[story_engine] B2.1 Audit FAILED (Score: {f_score}/10). Triggering 1-Shot Fact & Causal Self-Repair via Astra...")
+
+                repair_prompt = f"""You are correcting an investigative documentary script that failed a rigorous factual and causal verification audit.
+
+=== AUDIT DISCREPANCIES & CRITIQUE (BY CLAUDE-OPUS-5) ===
+{audit_critique}
+
+=== ORIGINAL SCRIPT ===
+{full_script}
+
+=== MANDATORY GROUNDING TRUTH TABLE ===
+{grounding_block}
+
+INSTRUCTIONS FOR REPAIR:
+1. Correct every cited factual discrepancy, fabricated number, and inverted causal relationship identified by Claude-Opus-5.
+2. Ensure Level 1 Primary Catalyst is explicitly named in Act I.
+3. Preserve the 1,800 - 2,200 word count across the 5 structured Acts ('=== ACT I ===' to '=== ACT V ===').
+4. Do not invent any new numbers not found in the Grounding Table.
+Output ONLY the complete repaired 5-Act script:"""
+
+                try:
+                    repaired_script_raw = call_gpt6_astra(
+                        repair_prompt,
+                        system_prompt=system_prompt,
+                        max_tokens=3400,
+                        timeout=240.0
+                    )
+                    r_cleaned = []
+                    r_matches = act_pattern.findall(repaired_script_raw)
+                    if r_matches:
+                        for rm in r_matches:
+                            r_cleaned.append(rm[0].strip())
+                    repaired_script = "\n\n".join(r_cleaned) if len(r_cleaned) >= 5 else repaired_script_raw.strip()
+
+                    logger.info(f"[story_engine] Re-auditing repaired script via claude-opus-5 for {task_id}...")
+                    re_audit = audit_story_facts_and_causality(
+                        story_text=repaired_script,
+                        grounding_claims=grounding_claims,
+                        topic_meta={
+                            "task_id": task_id,
+                            "topic_name_vi": topic,
+                            "rising_queries": breakout_queries
+                        },
+                        market=mkt,
+                        model="claude-opus-5",
+                        fallback_model="gpt-6-astra"
+                    )
+                    re_verdict = re_audit.get("verdict", "PASS").upper()
+                    re_score = float(re_audit.get("audit_score", 8.0))
+                    logger.info(f"[story_engine] Post-Repair B2.1 Audit: Verdict={re_verdict} (Score: {re_score}/10)")
+
+                    if re_verdict == "PASS" and re_score >= 7.5:
+                        full_script = repaired_script
+                        fact_audit_result = re_audit
+                        f_verdict = re_verdict
+                        f_score = re_score
+                        logger.info(f"[story_engine] 1-Shot Self-Repair SUCCESS: Kịch bản đã được sửa chữa đạt chuẩn ({re_score}/10)!")
+                    else:
+                        fact_audit_result = re_audit
+                        logger.error(f"[story_engine] 1-Shot Self-Repair STILL FAILED (Score: {re_score}/10). Halting at B2.1 Gate.")
+                except Exception as _re_err:
+                    logger.error(f"[story_engine] 1-Shot Self-Repair execution failed: {_re_err}")
         except Exception as _fa_err:
             logger.warning(f"[story_engine] B2.1 Fact & Causal Audit warning: {_fa_err}")
 

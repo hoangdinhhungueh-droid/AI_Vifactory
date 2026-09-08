@@ -173,6 +173,17 @@ def run_chain(task_id: str) -> int:
     score = str(brain.get("story_gate_score") or "n/a")
     _log(stage, "story generated (%d words), story_gate_score=%s" % (len(story_text.split()), score))
 
+    # ---- B2.1 Fact & Causal Integrity Audit Gate (Rule 118 & Rule 130)
+    fact_audit = brain.get("fact_causal_audit") or {}
+    f_verdict = fact_audit.get("verdict", "PASS").upper()
+    f_score = float(fact_audit.get("audit_score", 10.0))
+    _log(stage, f"B2.1 Fact & Causal Audit (claude-opus-5): Verdict={f_verdict}, Score={f_score}/10")
+    if f_verdict == "FAIL" or f_score < 7.5:
+        veto_reason = fact_audit.get("veto_reason") or fact_audit.get("audit_notes") or "Script failed fact/causal integrity audit"
+        _log(stage, f"FATAL: B2.1 Fact & Causal Audit REJECTED ({f_score}/10). Reason: {veto_reason}. Halting pipeline before B3!")
+        raise RuntimeError(f"B2.1 Fact & Causal Audit REJECTED ({f_score}/10): {veto_reason}. Halting pipeline before B3!")
+    _log(stage, f"B2.1 Fact & Causal Audit PASSED ({f_score}/10). Proceeding directly to B3 Hollywood Director Plan!")
+
     # ---- B3 Hollywood Art Director & Scene Breakdown Engine (Rule 125)
     stage = "B3"
     from app.services.director_planner_b3 import generate_director_plan
