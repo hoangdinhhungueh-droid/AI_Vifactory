@@ -37,6 +37,7 @@ NOTION_STORY_DB_ID = os.getenv("STORY_LIBRARY_DB_ID", "b0301989-2400-836b-bdb5-8
 EPISODES_BASE_DIR = os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")
 PENDING_TASKS_DIR = "/var/vf/pending_tasks"
 KNOWN_MARKETS = {"EN", "JP", "KR"}
+ACT_PATTERN = re.compile(r'(=== ACT [I|V|X]+ ===.*?)(?=(=== ACT [I|V|X]+ ===|\Z))', re.DOTALL)
 
 
 
@@ -455,8 +456,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         full_script_raw = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=3400, timeout=240.0)
 
         cleaned_acts = []
-        act_pattern = re.compile(r'(=== ACT [I|V|X]+ ===.*?)(?=(=== ACT [I|V|X]+ ===|\Z))', re.DOTALL)
-        matches = act_pattern.findall(full_script_raw)
+        matches = ACT_PATTERN.findall(full_script_raw)
         if matches:
             for m in matches:
                 cleaned_acts.append(m[0].strip())
@@ -500,7 +500,7 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
                 refined_raw = call_gpt6_astra(refine_user, system_prompt=system_prompt, max_tokens=3400, timeout=240.0)
                 if refined_raw and len(refined_raw.split()) >= 1000:
                     cleaned_acts_ref = []
-                    matches_ref = act_pattern.findall(refined_raw)
+                    matches_ref = ACT_PATTERN.findall(refined_raw)
                     if matches_ref:
                         for mr in matches_ref:
                             cleaned_acts_ref.append(mr[0].strip())
@@ -588,7 +588,7 @@ Output ONLY the complete repaired 5-Act script:"""
                         timeout=240.0
                     )
                     r_cleaned = []
-                    r_matches = act_pattern.findall(repaired_script_raw)
+                    r_matches = ACT_PATTERN.findall(repaired_script_raw)
                     if r_matches:
                         for rm in r_matches:
                             r_cleaned.append(rm[0].strip())
