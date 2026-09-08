@@ -576,6 +576,24 @@ def forensic_pre_filter(candidate: dict, market: str) -> tuple[bool, str]:
     return False, f"No forensic crisis anchor in '{term}' (0 LLM tokens burned)"
 
 
+def get_next_prefiltered_candidate(market: str = "EN", custom_seed: str | None = None) -> dict | None:
+    """Retrieves the next highest-scoring candidate that passes Level-0 Forensic Pre-Filter,
+    without triggering full production. Used by Centralized Orchestrator Leader for Optimal Rotation.
+    """
+    candidates = fetch_market_trend_candidates(market=market, custom_seed=custom_seed)
+    for cand in candidates:
+        term = cand.get("term", "").strip()
+        if is_topic_already_handled(term, market=market):
+            continue
+        passed, reason = forensic_pre_filter(cand, market)
+        if passed:
+            logger.info(f"[trend_engine] Next prefiltered candidate for {market}: '{term}' ({reason})")
+            return cand
+        else:
+            logger.info(f"[trend_engine] Candidate '{term}' rejected by Level-0 pre-filter: {reason}")
+    return None
+
+
 def discover_and_produce_market_trend(
     market: str = "EN",
     custom_seed: str = None,

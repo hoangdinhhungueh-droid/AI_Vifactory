@@ -68,14 +68,54 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
             "run_b15('{task_id}', meta.get('raw_term') or meta.get('keyword'), meta.get('niche_angle_brief') or 'General')",
         ],
     ),
+    "1.5.5": StageContract(
+        stage_id="1.5.5",
+        name="B1.5.5 Grounding Layer",
+        description="Fact & Data Anchoring via Live Google Search Whitelist Verification (Rule 118 & 121)",
+        prerequisites=["1.5"],
+        input_files=["/var/vf/pending_tasks/{task_id}.json"],
+        output_files=["/var/vf/episodes/{task_id}/grounding_intel.json"],
+        command_template=[
+            "python3",
+            "-c",
+            "import sys, json; sys.path.insert(0, '.'); from app.services.grounding_layer_b15 import run_grounding_research, passes_grounding_gate; "
+            "meta = json.load(open('/var/vf/pending_tasks/{task_id}.json')); "
+            "intel = run_grounding_research(topic=meta.get('raw_term') or meta.get('keyword'), search_hint=meta.get('niche_angle_brief') or 'General', market=meta.get('market') or 'EN'); "
+            "ok, msg = passes_grounding_gate(intel, min_verified=2, require_whitelist=True); "
+            "assert ok, f'Grounding Gate Failed: {msg}'; "
+            "open('/var/vf/episodes/{task_id}/grounding_intel.json', 'w', encoding='utf-8').write(json.dumps(intel, ensure_ascii=False, indent=2))",
+        ],
+    ),
+    "1.6": StageContract(
+        stage_id="1.6",
+        name="B1.6 Early SEO Package",
+        description="Dual Title A/B, Description, Tags & 60s An Ong Hook Forge (Rule 444)",
+        prerequisites=["1.5.5"],
+        input_files=[
+            "/var/vf/pending_tasks/{task_id}.json",
+            "/var/vf/episodes/{task_id}/grounding_intel.json",
+        ],
+        output_files=["/var/vf/episodes/{task_id}/seo_package.json"],
+        command_template=[
+            "python3",
+            "-c",
+            "import sys, json; sys.path.insert(0, '.'); from app.services.seo_package_forge import forge_seo_package; "
+            "meta = json.load(open('/var/vf/pending_tasks/{task_id}.json')); "
+            "card_p = '/var/vf/episodes/{task_id}/competitor_intel_card.json'; "
+            "card = json.load(open(card_p)) if sys.platform != 'win32' and __import__('os').path.exists(card_p) else None; "
+            "pkg = forge_seo_package('{task_id}', meta.get('raw_term') or meta.get('keyword'), market=meta.get('market') or 'EN', niche_brief=meta.get('niche_angle_brief') or 'General', competitor_card=card); "
+            "open('/var/vf/episodes/{task_id}/seo_package.json', 'w', encoding='utf-8').write(json.dumps(pkg, ensure_ascii=False, indent=2))",
+        ],
+    ),
     "2.0": StageContract(
         stage_id="2.0",
         name="B2 Story Engine",
         description="5-Beat Docudrama 1,800-2,200 words via GPT-6-Astra (Rule 445)",
-        prerequisites=["1.5"],
+        prerequisites=["1.5.5"],
         input_files=[
             "/var/vf/pending_tasks/{task_id}.json",
             "/var/vf/episodes/{task_id}/competitor_intel_card.json",
+            "/var/vf/episodes/{task_id}/grounding_intel.json",
         ],
         output_files=[
             "/var/vf/episodes/{task_id}/story.txt",
@@ -86,6 +126,28 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
             "-c",
             "import sys; sys.path.insert(0, '.'); from app.services.story_engine_b2 import generate_5_arc_story; "
             "generate_5_arc_story('{task_id}')",
+        ],
+    ),
+    "2.1": StageContract(
+        stage_id="2.1",
+        name="B2.1 Fact & Causal Audit",
+        description="Claude-Opus-5 Forensic Fact & Causal Integrity Audit (Rule 118 & 130)",
+        prerequisites=["2.0"],
+        input_files=[
+            "/var/vf/episodes/{task_id}/story.txt",
+            "/var/vf/episodes/{task_id}/grounding_intel.json",
+        ],
+        output_files=["/var/vf/episodes/{task_id}/fact_audit.json"],
+        command_template=[
+            "python3",
+            "-c",
+            "import sys, json; sys.path.insert(0, '.'); from app.services.story_fact_auditor_b2 import audit_story_facts_and_causality; "
+            "story = open('/var/vf/episodes/{task_id}/story.txt', encoding='utf-8').read(); "
+            "claims = json.load(open('/var/vf/episodes/{task_id}/grounding_intel.json', encoding='utf-8')).get('claims', []); "
+            "meta = json.load(open('/var/vf/pending_tasks/{task_id}.json', encoding='utf-8')); "
+            "res = audit_story_facts_and_causality(story, claims, {'task_id': '{task_id}', 'topic': meta.get('raw_term')}, market=meta.get('market', 'EN'), model='claude-opus-5'); "
+            "open('/var/vf/episodes/{task_id}/fact_audit.json', 'w', encoding='utf-8').write(json.dumps(res, ensure_ascii=False, indent=2)); "
+            "assert res.get('verdict') == 'PASS' or float(res.get('audit_score', 0)) >= 7.5, f'B2.1 Audit Gate Failed: {res}'",
         ],
     ),
     "3.0": StageContract(
@@ -124,6 +186,37 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
             "{task_id}",
         ],
     ),
+    "4.0": StageContract(
+        stage_id="4.0",
+        name="B4 Image Generation",
+        description="Gemini Pro Web Chrome Automation 2K DCI + HSV Chroma Key (Rule 122)",
+        prerequisites=["3.5"],
+        input_files=["/var/vf/episodes/{task_id}/prompts_forge.json"],
+        output_files=["/var/vf/episodes/{task_id}/images/"],
+        command_template=[
+            "python3",
+            "scripts/gemini_browser_gen.py",
+            "--episode",
+            "{task_id}",
+            "--headless",
+        ],
+    ),
+    "5.0": StageContract(
+        stage_id="5.0",
+        name="B5 Visual Audit",
+        description="Pixel-Level Visual Audit Gate (UI, Alpha Edge, Graphic Novel Style, Era Context)",
+        prerequisites=["4.0"],
+        input_files=["/var/vf/episodes/{task_id}/images/"],
+        output_files=["/var/vf/episodes/{task_id}/visual_audit_report.json"],
+        command_template=[
+            "python3",
+            "scripts/orchestrator/runner.py",
+            "--task-id",
+            "{task_id}",
+            "--mode",
+            "audit",
+        ],
+    ),
 }
 
 STAGE_ALIASES = {
@@ -133,18 +226,36 @@ STAGE_ALIASES = {
     "1.5": "1.5",
     "b1.5": "1.5",
     "b15": "1.5",
+    "1.5.5": "1.5.5",
+    "b1.5.5": "1.5.5",
+    "b155": "1.5.5",
+    "grounding": "1.5.5",
+    "1.6": "1.6",
+    "b1.6": "1.6",
+    "b16": "1.6",
+    "seo": "1.6",
     "2": "2.0",
     "2.0": "2.0",
     "b2": "2.0",
+    "2.1": "2.1",
+    "b2.1": "2.1",
+    "b21": "2.1",
+    "audit_story": "2.1",
     "3": "3.0",
     "3.0": "3.0",
     "b3": "3.0",
     "3.5": "3.5",
     "b3.5": "3.5",
     "b35": "3.5",
+    "4": "4.0",
+    "4.0": "4.0",
+    "b4": "4.0",
+    "5": "5.0",
+    "5.0": "5.0",
+    "b5": "5.0",
 }
 
-STAGE_ORDER = ["1.0", "1.5", "2.0", "3.0", "3.5"]
+STAGE_ORDER = ["1.0", "1.5", "1.5.5", "1.6", "2.0", "2.1", "3.0", "3.5", "4.0", "5.0"]
 
 
 @dataclass

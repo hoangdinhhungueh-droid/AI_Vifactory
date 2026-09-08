@@ -162,6 +162,51 @@ class OrchestratorRunner:
                 print(f"Unknown mode: {mode}", file=sys.stderr)
                 return 1
 
+    def _update_pipeline_state(
+        self,
+        task_id: str,
+        stage_id: str,
+        status: str,
+        details: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Atomically updates /var/vf/episodes/{task_id}/pipeline_state.json (Rule 126 Single Source of Truth)."""
+        ep_dir = Path("/var/vf/episodes") / task_id
+        if not ep_dir.exists():
+            try:
+                ep_dir.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
+        state_file = ep_dir / "pipeline_state.json"
+        state_data: Dict[str, Any] = {
+            "task_id": task_id,
+            "market": self.args.market,
+            "current_stage": stage_id,
+            "status": status,
+            "stages": {},
+            "candidate_rotation_history": [],
+            "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+        }
+        if state_file.exists():
+            try:
+                state_data = json.loads(state_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        state_data["current_stage"] = stage_id
+        state_data["status"] = status
+        state_data["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        if "stages" not in state_data or not isinstance(state_data["stages"], dict):
+            state_data["stages"] = {}
+        stage_entry = state_data["stages"].get(stage_id, {})
+        stage_entry["status"] = status
+        if details:
+            stage_entry.update(details)
+        state_data["stages"][stage_id] = stage_entry
+        try:
+            state_file.write_text(json.dumps(state_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+        return state_data
+
     def _run_pipeline_mode(self, sandbox: ResourceSandbox) -> int:
         """Executes pipeline or single block mode."""
         start_ts = time.time()
@@ -215,10 +260,13 @@ class OrchestratorRunner:
             return 0
 
         # Live Execution mode
+        self._update_pipeline_state(task_id, "INIT", "RUNNING")
         stage_results: List[Dict[str, Any]] = []
         for stage in plan:
             out_log = sandbox.get_log_path(f"stage_{stage.stage_id}", stream="out")
             err_log = sandbox.get_log_path(f"stage_{stage.stage_id}", stream="err")
+
+            self._update_pipeline_state(task_id, stage.stage_id, "RUNNING")
 
             worker = SubprocessWorker(
                 stage_id=stage.stage_id,
@@ -242,6 +290,12 @@ class OrchestratorRunner:
             )
 
             if not res.success:
+                self._update_pipeline_state(
+                    task_id,
+                    stage.stage_id,
+                    "FAILED",
+                    {"exit_code": res.exit_code, "error": res.stderr_preview or res.stdout_preview}
+                )
                 payload = {
                     "status": "failure",
                     "mode": self.args.mode,
@@ -258,7 +312,15 @@ class OrchestratorRunner:
                     if res.stderr_preview:
                         print(f"STDERR:\n{res.stderr_preview}", file=sys.stderr)
                 return res.exit_code or 1
+            else:
+                self._update_pipeline_state(
+                    task_id,
+                    stage.stage_id,
+                    "COMPLETED",
+                    {"exit_code": 0, "duration": res.duration_seconds}
+                )
 
+        self._update_pipeline_state(task_id, "ALL", "COMPLETED")
         payload = {
             "status": "success",
             "mode": self.args.mode,
