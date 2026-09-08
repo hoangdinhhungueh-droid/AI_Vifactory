@@ -56,9 +56,9 @@ Strict Constraints (Skill AI Packaging & Rule 444 An Ong Hook):
    Each with a 1-sentence visual_concept.
 10. END SCREEN: 3 timing markers (~3:00 branding, 70% playlist, last 20s CTA).
 11. ANTI-FACT-DENIAL & TEMPORAL INTEGRITY (RULE 130 MANDATE):
-    - NEVER dismiss verified contemporary events or crisis data (e.g. 2026 traffic drops, military declarations, insurance surges) as 'hypotheses' or 'unauthenticated propositions'.
-    - NEVER retreat into past decades (e.g. 2019 Front Altair) as the primary subject of a contemporary search query.
-    - Historical precedents may ONLY be referenced as comparative mechanisms to explain the legal/financial transmission chain, NEVER to displace or deny contemporary crisis events.
+    - NEVER dismiss verified contemporary events or crisis data (e.g. verified market dislocations, regulatory actions, operational halts) as 'hypotheses' or 'unauthenticated propositions'.
+    - NEVER retreat into past historical precedents as the primary subject of a contemporary search query.
+    - Historical precedents may ONLY be referenced as comparative mechanisms to explain the legal, institutional, or financial transmission chain, NEVER to displace or deny contemporary crisis events.
 
 Return ONLY valid JSON matching this schema:
 {

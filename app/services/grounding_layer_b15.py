@@ -220,7 +220,7 @@ def run_grounding_research(
         "  \"claims\": [\n"
         "    {\n"
         "      \"claim\": \"Concise, specific factual claim with concrete metric/action\",\n"
-        "      \"source\": \"Name of reporting outlet or agency (e.g. Reuters, Bloomberg, Lloyd's List, EIA, MARAD)\",\n"
+        "      \"source\": \"Name of reporting outlet or agency (e.g. Reuters, Bloomberg, SEC, Nikkei, EIA)\",\n"
         "      \"source_url\": \"Optional URL or domain if available\",\n"
         "      \"date\": \"YYYY-MM-DD\",\n"
         "      \"confidence\": \"verified|reported|speculative\",\n"
@@ -421,8 +421,8 @@ def format_grounded_facts_for_prompt(grounding_result: Dict[str, Any]) -> str:
         "6. ZERO-HALLUCINATION: Do NOT invent dates, numerical fees, casualties, or institutional actors outside this table.",
         "7. CONTEMPORARY EVENT ANCHOR & TREND-INTENT PRIORITY (MANDATORY IN ACT I):",
         "   - When an episode is based on an active trend, breaking investigation, or contemporary crisis: Act I (specifically paragraph 1 or 2) MUST explicitly name the specific real-world Contemporary Catalyst Event (exact dates, acting entities/governments, and verified quantitative drops/metrics from this table).",
-        "   - STRICTLY FORBIDDEN: Hiding behind vague, abstract, or generic phrasing (such as 'When a military threat occurs' or 'When market volatility happens') when verified contemporary event details are present in the table!",
-        "   - HISTORICAL PRECEDENT DISCIPLINE: Historical comparisons (e.g. 2019, 2008, 1980s) may ONLY be used in later Acts (Act II/III) as comparative blueprints to explain the legal/financial mechanism, NEVER to replace or displace the contemporary catalyst that viewers are actively searching for.\n"
+        "   - STRICTLY FORBIDDEN: Hiding behind vague, abstract, or generic phrasing (such as 'When an emergency occurs' or 'When systemic volatility happens') when verified contemporary event details are present in the table!",
+        "   - HISTORICAL PRECEDENT DISCIPLINE: Historical comparisons from past eras may ONLY be used in later Acts (Act II/III) as comparative blueprints to explain the legal, institutional, or financial mechanism, NEVER to replace or displace the contemporary catalyst that viewers are actively searching for.\n"
     ]
 
     for idx, c in enumerate(claims, 1):

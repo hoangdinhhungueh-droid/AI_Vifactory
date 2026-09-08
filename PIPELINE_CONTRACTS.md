@@ -110,7 +110,7 @@
     "claims": [
       {
         "claim": "<Concise, specific factual claim with concrete metric/action>",
-        "source": "<Name of reporting outlet or agency, e.g. Reuters, Bloomberg, Lloyd's List, EIA, MARAD>",
+        "source": "<Name of reporting outlet or agency, e.g. Reuters, Bloomberg, SEC filings, Nikkei, official ministry>",
         "source_url": "<Optional URL or domain if available>",
         "date": "<YYYY-MM-DD>",
         "confidence": "<verified | reported | speculative>",
