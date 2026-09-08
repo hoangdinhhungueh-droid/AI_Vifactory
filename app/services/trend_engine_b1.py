@@ -20,6 +20,7 @@ Standardized Architecture:
      - Fallback loop: If B2 fails Story Gate 12/12 after self-repair, automatically rotates to next candidate.
 """
 import os
+import sys
 import re
 import json
 import logging
@@ -28,6 +29,13 @@ import urllib.request
 import urllib.parse
 from pathlib import Path
 from datetime import datetime, timezone
+
+# Ensure workspace root is in sys.path
+_PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+if "/root/video_factory" not in sys.path:
+    sys.path.insert(0, "/root/video_factory")
 
 from app.services.trend_free_signals import (
     gtrends_daily_rss,
@@ -303,7 +311,7 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
     # Lane 3: YouTube Search-Box Autocomplete (Direct Viewer Search Intent — Free, No Quota)
     PILLAR_SEEDS_BY_MARKET = {
         "KR": [
-            "사건의 진실", "폭망 이유", "사태 원인", "기업 흥망성쇠", "의혹 폭로", "부도 붕괴 위기", "논란 실체"
+            "망한 이유", "몰락 이유", "파산 이유", "위기 이유", "사태 원인", "사건의 진실", "폭망한 이유"
         ],
         "JP": [
             "事件の真相", "なぜ 失敗", "倒産 理由", "疑惑 暴露", "崩壊のメカニズム", "問題の闇"
@@ -526,7 +534,7 @@ def discover_and_produce_market_trend(
     market: str = "EN",
     custom_seed: str = None,
     auto_produce: bool = True,
-    max_scan_candidates: int = 6
+    max_scan_candidates: int = 15
 ) -> list[dict]:
     """Execute canonical B1 trend discovery and automated B1.5 -> B2 -> B3 pipeline
     for exactly 1 topic per market per day.
@@ -807,6 +815,7 @@ if __name__ == "__main__":
     parser.add_argument("pos_market", nargs="?", default=None, help="Target market (EN, JP, KR)")
     parser.add_argument("--market", "-m", default=None, help="Target market (EN, JP, KR)")
     parser.add_argument("--seed", "-s", default=None, help="Custom seed term")
+    parser.add_argument("--max-candidates", "-n", type=int, default=15, help="Max candidates to scan (default: 15)")
     parser.add_argument("--no-auto", action="store_true", help="Disable automated B1.5 -> B2 production")
     args = parser.parse_args()
 
@@ -815,7 +824,8 @@ if __name__ == "__main__":
     if custom_term == "":
         custom_term = None
     auto_prod = not args.no_auto
+    max_candidates = args.max_candidates
 
-    print(f"Executing Trend Engine B1 CLI (term={custom_term}, market={target_mkt}, auto_produce={auto_prod})...")
-    res = discover_and_produce_market_trend(market=target_mkt, custom_seed=custom_term, auto_produce=auto_prod)
+    print(f"Executing Trend Engine B1 CLI (term={custom_term}, market={target_mkt}, auto_produce={auto_prod}, max_candidates={max_candidates})...")
+    res = discover_and_produce_market_trend(market=target_mkt, custom_seed=custom_term, auto_produce=auto_prod, max_scan_candidates=max_candidates)
     print(f"Finished. Produced {len(res)} topics.")

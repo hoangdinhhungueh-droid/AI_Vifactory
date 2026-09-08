@@ -523,6 +523,20 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
     # Audits full verbatim script against Grounding Fact Table using claude-opus-5
     # ----------------------------------------------------
     fact_audit_result = {}
+    grounding_claims = []
+    try:
+        for _g_cand in [os.path.join(out_dir, "grounding_intel.json"), os.path.join(root_ep_dir, "grounding_intel.json")]:
+            if os.path.exists(_g_cand):
+                with open(_g_cand, "r", encoding="utf-8") as _gf:
+                    grounding_claims = json.load(_gf).get("claims", [])
+                if grounding_claims:
+                    break
+    except Exception as _ge:
+        logger.warning(f"[story_engine] Error loading grounding claims for B2.1: {_ge}")
+
+    if not grounding_claims and 'g_data' in locals() and isinstance(g_data, dict):
+        grounding_claims = g_data.get("claims", [])
+
     if grounding_claims:
         try:
             from app.services.story_fact_auditor_b2 import audit_story_facts_and_causality
