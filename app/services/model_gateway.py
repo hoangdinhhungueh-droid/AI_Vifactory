@@ -65,8 +65,9 @@ class ModelGateway:
         self.hhtech_base_url = os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1")
         self.hhtech_model = os.getenv("HHTECH_MODEL", "gpt-6-astra")
         
-        # Load from secrets file if env vars not set
-        if not self.hhtech_key:
+        # Load from secrets file if env vars not set or key is masked/invalid
+        is_invalid_key = not self.hhtech_key or any(ord(c) > 127 for c in self.hhtech_key) or "••" in self.hhtech_key
+        if is_invalid_key:
             self._try_load_secrets()
     
     def _try_load_secrets(self):

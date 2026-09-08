@@ -133,9 +133,9 @@ def gtrends_discover_trending_searches(market="EN", timeout=15.0, geo=None, coun
     Returns list of trending search term strings (typically ~20-40 per market after
     deduplication). Free, no API key, official pytrends method.
     """
-    if geo and (not market or market not in ["JP", "KR"]):
+    if geo and (not market or market not in ["JP", "KR", "EN"]):
         market = geo.upper()
-    if market not in ["JP", "KR"]:
+    if market not in ["JP", "KR", "EN"]:
         return []
     
     # Cache key
@@ -144,12 +144,14 @@ def gtrends_discover_trending_searches(market="EN", timeout=15.0, geo=None, coun
     if cached is not None:
         return cached
     
-    # Seed queries to discover trending searches
-    # JP: "trending", "popular", "news", "hot topic"
-    # KR: "trending", "popular", "news", "hot topic"
+    # Seed queries to discover trending searches across investigative & systemic axes
+    # KR: Trending, News, Issues, Scandals, Collapse, Crisis, Downfall, Mechanisms
+    # JP: Trending, News, Scandals, Collapse, Truth, Bankruptcy, Crisis
+    # EN: Trending, News, Scandals, Collapse, Crisis, Investigation, Fraud, Downfall
     seed_queries = {
-        "JP": ["トレンド", "人気", "ニュース", "話題"],
-        "KR": ["트렌드", "인기", "뉴스", "화제"]
+        "JP": ["トレンド", "ニュース", "話題", "事件", "崩壊", "疑惑", "真相", "なぜ", "問題", "倒産", "危機"],
+        "KR": ["트렌드", "뉴스", "화제", "사건", "사태", "논란", "폭망", "의혹", "원인", "실체", "붕괴", "위기", "급락"],
+        "EN": ["trending", "news", "scandal", "collapse", "crisis", "investigation", "fraud", "downfall", "exposed"]
     }
     
     seeds = seed_queries.get(market, [])
@@ -157,11 +159,11 @@ def gtrends_discover_trending_searches(market="EN", timeout=15.0, geo=None, coun
         return []
     
     # Map market to pytrends geo
-    geo_map = {"JP": "JP", "KR": "KR"}
+    geo_map = {"JP": "JP", "KR": "KR", "EN": "US"}
     geo = geo_map.get(market)
     
     # Map market to language
-    hl_map = {"JP": "ja", "KR": "ko"}
+    hl_map = {"JP": "ja", "KR": "ko", "EN": "en"}
     hl = hl_map.get(market, "en")
     
     try:

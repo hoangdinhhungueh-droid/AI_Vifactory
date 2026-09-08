@@ -93,6 +93,48 @@ def fetch_ground_truth_factsheet(term: str, market: str) -> dict:
     }
 
 
+def fetch_live_news_catalyst(term: str, market: str, count: int = 6) -> list:
+    """Fetch live news articles via Google News RSS for the term to identify the exact 24-48h news catalyst.
+    Zero-quota, zero rate limit, essential for Rule 130 search-intent payoff.
+    """
+    m_up = (market or "EN").upper()
+    cfg = MARKET_CONFIG.get(m_up, MARKET_CONFIG["EN"])
+    hl = cfg["hl"]
+    gl = cfg["gl"]
+
+    clean_term = str(term).strip()
+    if not clean_term:
+        return []
+
+    url = f"https://news.google.com/rss/search?q={urllib.parse.quote(clean_term)}&hl={hl}&gl={gl}&ceid={gl}:{hl}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Antigravity/2.0"})
+
+    news_items = []
+    try:
+        import xml.etree.ElementTree as ET
+        with urllib.request.urlopen(req, timeout=8.0) as resp:
+            xml_data = resp.read().decode("utf-8", errors="replace")
+            root = ET.fromstring(xml_data)
+            for it in root.findall(".//item")[:count]:
+                t_elem = it.find("title")
+                d_elem = it.find("description")
+                p_elem = it.find("pubDate")
+                title = t_elem.text.strip() if t_elem is not None and t_elem.text else ""
+                desc = d_elem.text.strip() if d_elem is not None and d_elem.text else ""
+                desc_clean = re.sub(r'<[^>]+>', ' ', desc).replace('&nbsp;', ' ').strip()
+                pub = p_elem.text.strip() if p_elem is not None and p_elem.text else ""
+                if title:
+                    news_items.append({
+                        "title": title,
+                        "description": desc_clean[:250],
+                        "published_at": pub
+                    })
+    except Exception as e:
+        logger.debug(f"[{m_up}] Live news catalyst fetch failed for '{clean_term}': {e}")
+
+    return news_items
+
+
 def perform_direct_platform_recon(term: str, market: str) -> dict:
     """Directly searches the keyword across Google Autocomplete, YouTube Autocomplete, and YouTube Search."""
     m_up = (market or "EN").upper()
@@ -142,6 +184,9 @@ def perform_direct_platform_recon(term: str, market: str) -> dict:
             seen.add(q_str.lower())
             all_rising.append(q_str)
 
+    # 4. Live News Catalyst Recon (Google News RSS Live — Rule 130)
+    news_catalysts = fetch_live_news_catalyst(term, m_up, count=6)
+
     viral_videos = []
     api_key = os.environ.get("YT_UPLOAD_API_KEY")
     if api_key:
@@ -172,7 +217,8 @@ def perform_direct_platform_recon(term: str, market: str) -> dict:
         "rising_queries": all_rising[:10],
         "google_suggestions": g_sugg[:5],
         "youtube_suggestions": yt_sugg[:5],
-        "viral_videos": viral_videos[:6]
+        "viral_videos": viral_videos[:6],
+        "news_catalysts": news_catalysts
     }
 
 
@@ -218,43 +264,105 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
                         "source": "gtrends_rss"
                     }
                     seen[k] = cand_obj
+                    seen[k]["sources_present"] = ["gtrends_rss"]
                 else:
                     if geo not in seen[k]["geos_present"]:
                         seen[k]["geos_present"].append(geo)
+                    if "gtrends_rss" not in seen[k].get("sources_present", []):
+                        seen[k].setdefault("sources_present", []).append("gtrends_rss")
         except Exception as e:
             logger.warning(f"[{m_up}/{geo}] Failed to fetch Daily RSS: {e}")
 
-    # Fallback to Discover Trending Searches if needed
-    if len(seen) < 10:
-        for geo in geos[:2]:
-            try:
-                disc_terms = gtrends_discover_trending_searches(market=m_up, geo=geo, count=15, timeout=10.0)
-                for t in disc_terms:
-                    t = t.strip()
-                    if not t:
-                        continue
-                    k = t.lower()
-                    if k not in seen:
-                        seen[k] = {
-                            "term": t,
-                            "primary_geo": geo,
-                            "geos_present": [geo],
-                            "approx_traffic": "discover_trending",
-                            "news_title": "",
-                            "source": "gtrends_discover"
-                        }
-            except Exception as e:
-                logger.warning(f"[{m_up}/{geo}] Discover Trending Searches error: {e}")
+    # Lane 2: Google Trends Discover Searches via pytrends (Rule 123 Live Search Discovery)
+    # Always executed (removed artificial < 10 threshold) across investigative & systemic seeds
+    for geo in geos[:2]:
+        try:
+            disc_terms = gtrends_discover_trending_searches(market=m_up, geo=geo, count=20, timeout=12.0)
+            logger.info(f"[{m_up}/{geo}] Discover Trending Searches returned {len(disc_terms)} queries.")
+            for t in disc_terms:
+                t = t.strip()
+                if not t:
+                    continue
+                k = t.lower()
+                if k not in seen:
+                    seen[k] = {
+                        "term": t,
+                        "primary_geo": geo,
+                        "geos_present": [geo],
+                        "approx_traffic": "discover_trending",
+                        "news_title": "",
+                        "source": "gtrends_discover",
+                        "sources_present": ["gtrends_discover"]
+                    }
+                else:
+                    if "gtrends_discover" not in seen[k].get("sources_present", []):
+                        seen[k].setdefault("sources_present", []).append("gtrends_discover")
+        except Exception as e:
+            logger.warning(f"[{m_up}/{geo}] Discover Trending Searches error: {e}")
+
+    # Lane 3: YouTube Search-Box Autocomplete (Direct Viewer Search Intent — Free, No Quota)
+    PILLAR_SEEDS_BY_MARKET = {
+        "KR": [
+            "사건의 진실", "폭망 이유", "사태 원인", "기업 흥망성쇠", "의혹 폭로", "부도 붕괴 위기", "논란 실체"
+        ],
+        "JP": [
+            "事件の真相", "なぜ 失敗", "倒産 理由", "疑惑 暴露", "崩壊のメカニズム", "問題の闇"
+        ],
+        "EN": [
+            "business collapse documentary", "scandal explained", "fraud investigation",
+            "what really happened to", "the downfall of", "crisis breakdown"
+        ]
+    }
+    yt_seeds = PILLAR_SEEDS_BY_MARKET.get(m_up, PILLAR_SEEDS_BY_MARKET["EN"])
+    hl = cfg.get("hl", "en")
+    gl = cfg.get("gl", "US")
+
+    for y_seed in yt_seeds:
+        try:
+            yt_terms = youtube_autocomplete(y_seed, hl=hl, gl=gl, timeout=8.0)
+            for t in yt_terms[:6]:
+                t = t.strip()
+                if not t or len(t) < 3:
+                    continue
+                k = t.lower()
+                if k not in seen:
+                    seen[k] = {
+                        "term": t,
+                        "primary_geo": gl,
+                        "geos_present": [gl],
+                        "approx_traffic": "yt_viewer_search",
+                        "news_title": "",
+                        "source": "youtube_autocomplete",
+                        "sources_present": ["youtube_autocomplete"]
+                    }
+                else:
+                    if "youtube_autocomplete" not in seen[k].get("sources_present", []):
+                        seen[k].setdefault("sources_present", []).append("youtube_autocomplete")
+        except Exception as _yt_err:
+            logger.debug(f"[{m_up}] YouTube autocomplete seed '{y_seed}' failed: {_yt_err}")
 
     candidates = list(seen.values())
 
-    # Multi-geo presence bonus
+    # Multi-signal ranking: Prioritizes cross-confirmed terms and viewer search intent
     def sort_score(cand):
+        sources = cand.get("sources_present", [cand.get("source", "")])
+        source_bonus = len(sources) * 1200  # High bonus for cross-confirmed topics
+        
+        # Signal type weighting
+        signal_weight = 0
+        if "youtube_autocomplete" in sources:
+            signal_weight += 800  # Direct viewer search demand
+        if "gtrends_discover" in sources:
+            signal_weight += 500  # Rising query demand
+        if "gtrends_rss" in sources:
+            signal_weight += 300  # News cycle presence
+
         geo_count = len(cand.get("geos_present", []))
         raw_traffic = str(cand.get("approx_traffic", ""))
         num_m = re.findall(r"(\d+)", raw_traffic.replace(",", ""))
         traffic_val = int(num_m[0]) if num_m else 0
-        return (geo_count * 1000) + traffic_val
+
+        return source_bonus + signal_weight + (geo_count * 400) + traffic_val
 
     candidates.sort(key=sort_score, reverse=True)
 
@@ -267,7 +375,7 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
             continue
         unhandled.append(c)
 
-    logger.info(f"[{m_up}] Total {len(candidates)} candidates fetched -> {len(unhandled)} unhandled fresh candidates.")
+    logger.info(f"[{m_up}] Total {len(candidates)} candidates fetched across all lanes -> {len(unhandled)} unhandled fresh candidates.")
     return unhandled
 
 
@@ -486,10 +594,37 @@ def discover_and_produce_market_trend(
             market=m_up,
             virality_score=0.92,
             rising_queries=rising_queries[:8],
-            viral_videos=viral_videos[:5]
+            viral_videos=viral_videos[:5],
+            news_catalysts=recon_data.get("news_catalysts", [])
         )
         if comp_gap:
             niche_data["competitor_differentiation_gap"] = comp_gap
+
+        # 4.5 B1.1 Adversarial Critic Gate (Rule 130 & Anti-Bait-and-Switch VETO)
+        print(f"  🛡️ [B1.1 Critic Gate] Interrogating candidate '{term}' and angle for live trend fidelity...")
+        try:
+            from app.services.adversarial_critic_b1 import audit_candidate_trend_alignment
+            critic_res = audit_candidate_trend_alignment(
+                candidate_term=term,
+                specific_angle=niche_data.get("specific_viral_angle") or specific_angle,
+                niche_brief=niche_data.get("niche_angle_brief", ""),
+                market=m_up,
+                news_catalysts=recon_data.get("news_catalysts", []),
+                rising_queries=rising_queries[:8],
+                traffic=str(c.get("approx_traffic", "")),
+                model="claude-opus-5",
+                fallback_model="gpt-6-astra"
+            )
+            c_verdict = critic_res.get("verdict", "PASS").upper()
+            c_score = critic_res.get("audit_score", 0.0)
+            if c_verdict == "FAIL" or c_score < 7.5:
+                veto_msg = critic_res.get("veto_reason") or "Failed adversarial trend alignment audit"
+                print(f"  ❌ VETOED BY CRITIC GATE (Score: {c_score}/10): {veto_msg}")
+                logger.warning(f"[{m_up}] Critic Gate VETOED '{term}': {veto_msg}")
+                continue
+            print(f"  ✅ CRITIC GATE PASSED! Score: {c_score}/10 | Angle verified aligned with live trend.")
+        except Exception as _critic_err:
+            logger.warning(f"[{m_up}] Critic Gate execution warning for '{term}': {_critic_err}")
 
         t_obj = {
             "market": m_up,
@@ -628,6 +763,20 @@ def discover_and_produce_market_trend(
         else:
             produced_topics.append(t_obj)
             break
+
+    if not produced_topics and not custom_seed:
+        alert_msg = (
+            f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
+            f"Đã quét qua {min(len(candidates), max_scan_candidates)}/{len(candidates)} ứng viên live từ đa kênh (RSS, Discover, YouTube) cho thị trường <b>{m_up}</b>, "
+            f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 7.0/10) để làm phóng sự điều tra.\n"
+            f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra hoặc cấp seed chỉ định."
+        )
+        logger.warning(f"[{m_up}] No candidates passed viability gate.")
+        try:
+            from app.llm_router import _send_telegram
+            _send_telegram(alert_msg)
+        except Exception as _tel_err:
+            logger.warning(f"Failed to send B1 alert to Telegram: {_tel_err}")
 
     return produced_topics
 

@@ -518,6 +518,33 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
             except Exception as _re:
                 logger.warning(f"[story_engine] Auto-refine attempt {refine_attempt} error: {_re}")
 
+    # ----------------------------------------------------
+    # B2.1 Fact & Causal Integrity Audit Gate (Rule 118 & Rule 130)
+    # Audits full verbatim script against Grounding Fact Table using claude-opus-5
+    # ----------------------------------------------------
+    fact_audit_result = {}
+    if grounding_claims:
+        try:
+            from app.services.story_fact_auditor_b2 import audit_story_facts_and_causality
+            logger.info(f"[story_engine] Running B2.1 Fact & Causal Audit via claude-opus-5 for {task_id}...")
+            fact_audit_result = audit_story_facts_and_causality(
+                story_text=full_script,
+                grounding_claims=grounding_claims,
+                topic_meta={
+                    "task_id": task_id,
+                    "topic_name_vi": topic,
+                    "rising_queries": breakout_queries
+                },
+                market=mkt,
+                model="claude-opus-5",
+                fallback_model="gpt-6-astra"
+            )
+            f_verdict = fact_audit_result.get("verdict", "PASS").upper()
+            f_score = fact_audit_result.get("audit_score", 8.0)
+            logger.info(f"[story_engine] B2.1 Fact & Causal Audit: Verdict={f_verdict} (Score: {f_score}/10)")
+        except Exception as _fa_err:
+            logger.warning(f"[story_engine] B2.1 Fact & Causal Audit warning: {_fa_err}")
+
     # Write story.txt to both directories
     for d in [out_dir, root_ep_dir]:
         try:
@@ -551,7 +578,8 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         "treatment_note": treatment_note,
         "scenes": scenes,
         "total_scenes": len(scenes),
-        "render_architecture": "two_layer_v1"
+        "render_architecture": "two_layer_v1",
+        "fact_causal_audit": fact_audit_result
     }
 
     for d in [out_dir, root_ep_dir]:

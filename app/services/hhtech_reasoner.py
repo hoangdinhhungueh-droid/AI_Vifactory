@@ -177,7 +177,8 @@ def reason_topic_niche(
     virality_score: float = 0.85,
     rising_queries: list | None = None,
     top_queries: list | None = None,
-    viral_videos: list | None = None
+    viral_videos: list | None = None,
+    news_catalysts: list | None = None
 ) -> dict:
     """Call GPT-6-Astra via HHTech API with native signals and YouTube Safety Labeling
     to analyze topic objectively, refine native search keywords, and output 5-Act outline for Human Gate 1.
@@ -244,6 +245,18 @@ def reason_topic_niche(
         if v_lines:
             viral_videos_text = "\n[YOUTUBE LIVE VIRAL BENCHMARKS & ALGORITHM RECOMMENDATIONS]:\n" + "\n".join(v_lines) + "\n"
 
+    news_catalysts_text = ""
+    if news_catalysts:
+        n_lines = []
+        for n in news_catalysts[:6]:
+            t = n.get("title", "").strip()
+            d = n.get("description", "").strip()
+            p = n.get("published_at", "").strip()
+            if t:
+                n_lines.append(f'  - [{p}] "{t}" ({d[:120]})')
+        if n_lines:
+            news_catalysts_text = "\n[LIVE BREAKING NEWS CATALYSTS (PAST 24-48H) — MANDATORY REAL-WORLD ANCHOR (RULE 130)]:\n" + "\n".join(n_lines) + "\n"
+
     # 3. Universal English-First Strategic System Prompt (Objective & Free of Stereotypes)
     skill_rules = get_b1_strategic_rules()  # Concise B1 strategic rules (prevents prompt contamination)
 
@@ -266,8 +279,10 @@ def reason_topic_niche(
         f"{extract_text}"
         f"{breakout_text}"
         f"{top_text}"
-        f"{viral_videos_text}\n"
+        f"{viral_videos_text}"
+        f"{news_catalysts_text}\n"
         "STRATEGIC INSTRUCTIONS (MANDATORY ALGORITHMIC SURGE ANCHOR & BLUE OCEAN DIFFERENTIATION):\n"
+        "0.0. CONTEMPORARY EVENT ANCHOR (RULE 130 ENFORCED): If live breaking news catalysts are provided above, your topic and 'niche_angle_brief' MUST directly explain the breaking real-world catalyst event (who, what, when) that caused viewers to search for this term today. CẤM TUYỆT ĐỐI bẻ lái sang bài toán doanh nghiệp/kế toán/lịch sử xa xưa mà bỏ rơi ngòi nổ thời sự 48h qua.\n"
         "0.1. BLUE OCEAN DIFFERENTIATION: Analyze the competitor video titles above. Identify their superficial gaps (e.g. generic highlight, daily news, surface gossip) and formulate 'competitor_differentiation_gap' in Vietnamese detailing the structural mechanism, forensic truth, or institutional lesson that our video delivers which competitors completely missed.\n"
         "0. SURGE ANCHOR (RULE 118 ZERO-MOCK): The topic and 'niche_angle_brief' MUST be directly anchored to either one of the real rising search queries from the data above OR the proven viral mechanics from the million-view YouTube videos above. CẤM TUYỆT ĐỐI tự sáng tác một đề tài xa lạ không có trong dữ liệu tìm kiếm thật.\n"
         "1. 'search_specific_keyword': High-intent search phrase in TARGET MARKET NATIVE LANGUAGE (Japanese for JP, Korean for KR, English for EN), strictly 3 to 5 words maximum (e.g. '<PRIMARY_ENTITY> <CORE_SURGE_QUERY>'). CẤM TUYỆT ĐỐI nhồi nhét chuỗi từ khóa dài quá 5 từ.\n"
