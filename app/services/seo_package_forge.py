@@ -37,50 +37,14 @@ AI_DISCLOSURE_TEXT = (
     "and stylized visual illustrations created under human editorial direction."
 )
 
-SEO_HOOK_SYSTEM_PROMPT = """You are the Packaging & Narrative Hook Director for Video Factory.
-Your mission: Given the target keyword, market, niche brief, and competitor narrative gap from B1.5 Recon, forge the complete YouTube SEO Package and opening Narrative Contract for the episode.
+from app.services.skill_loader import get_seo_editorial_skills
 
-Strict Constraints (Skill AI Packaging & Rule 444 An Ong Hook):
-1. TITLE A (KVS method): The primary keyword MUST lead or feature prominently at the front. Compelling curiosity gap or emotional contradiction. Maximum 100 characters (optimal 60-70).
-2. TITLE B (Backup A/B): Alternate emotional, mystery, or curiosity-gap angle for A/B testing. Maximum 100 characters.
-3. DESCRIPTION: Front-loaded 2-line hook (<=150 chars). NEVER start with "In this video" or "Welcome".
-4. HASHTAGS: Exactly 3 high-intent hashtags (#Tag1 #Tag2 #Tag3). Cap strictly at 3.
-5. TAGS: High-value SEO tags within a 400-character budget (max 7-10 tags).
-6. 3-SECOND COLD OPEN (hook_3s): The single most startling visual or contradiction statement (0-3s).
-7. 60-SECOND NARRATIVE HOOK (hook_60s): An Ong narrative contract (Rule 444 & Rule 130). A 90-130 word opening monologue for Act I setting up the quantitative shock, leading directly with the Level 1 Primary Catalyst (verified dates, events, numbers), the systemic contradiction, and the core puzzle. STRICTLY FORBIDDEN: Starting with 'Now imagine...', 'Imagine a world...', or hypothetical hand-waving. Lead with real, verifiable stakes.
-8. SPECIFIC VIRAL ANGLE (specific_viral_angle): The 10x pivot angle directly exploiting the competitor's fatal explanatory vacuum.
-9. THUMBNAIL A/B/C: Exactly 3 distinct copywriting variants:
-   - Variant A = emotion_first: Short emotional punch headline (<=32 chars, UPPERCASE).
-   - Variant B = keyword_first: Primary keyword-led headline (<=32 chars, UPPERCASE).
-   - Variant C = curiosity_gap: Counter-intuitive paradox or number (<=32 chars, UPPERCASE).
-   Each with a 1-sentence visual_concept.
-10. END SCREEN: 3 timing markers (~3:00 branding, 70% playlist, last 20s CTA).
-11. ANTI-FACT-DENIAL & TEMPORAL INTEGRITY (RULE 130 MANDATE):
-    - NEVER dismiss verified contemporary events or crisis data (e.g. verified market dislocations, regulatory actions, operational halts) as 'hypotheses' or 'unauthenticated propositions'.
-    - NEVER retreat into past historical precedents as the primary subject of a contemporary search query.
-    - Historical precedents may ONLY be referenced as comparative mechanisms to explain the legal, institutional, or financial transmission chain, NEVER to displace or deny contemporary crisis events.
+def get_seo_hook_system_prompt() -> str:
+    """Load dynamic SEO packaging system prompt from Notion SoT / external template (Rule 132)."""
+    return get_seo_editorial_skills()
 
-Return ONLY valid JSON matching this schema:
-{
-  "title_a": "<title with keyword, <=100 chars>",
-  "title_b": "<alternate title, <=100 chars>",
-  "description_hook": "<2 lines, <=150 chars, no In this video/Welcome>",
-  "hashtags": ["#Tag1", "#Tag2", "#Tag3"],
-  "tags": ["tag1", "tag2", "tag3"],
-  "hook_3s": "<0-3s cold open statement>",
-  "hook_60s": "<60s An Ong narrative contract 90-130 words>",
-  "specific_viral_angle": "<10x pivot angle>",
-  "thumbnail_variants": [
-    {"variant": "A", "framework": "emotion_first", "headline_text": "<<=32 chars UPPERCASE>", "visual_concept": "<1 sentence>"},
-    {"variant": "B", "framework": "keyword_first", "headline_text": "<<=32 chars UPPERCASE>", "visual_concept": "<1 sentence>"},
-    {"variant": "C", "framework": "curiosity_gap", "headline_text": "<<=32 chars UPPERCASE>", "visual_concept": "<1 sentence>"}
-  ],
-  "end_screen_notes": {
-    "point_1_intro": "~3:00 -- series/channel branding overlay",
-    "point_2_70pct": "70% duration -- playlist/related episode overlay",
-    "point_3_last_20s": "last 20s -- next-episode CTA + subscribe"
-  }
-}"""
+# Backward-compatible module attribute
+SEO_HOOK_SYSTEM_PROMPT = get_seo_hook_system_prompt()
 
 
 def _parse_llm_json(raw: str) -> dict:
@@ -387,7 +351,7 @@ def forge_seo_package(
             from app.services.hhtech_reasoner import call_gpt6_astra
             raw = call_gpt6_astra(
                 prompt=user_prompt,
-                system_prompt=SEO_HOOK_SYSTEM_PROMPT,
+                system_prompt=get_seo_hook_system_prompt(),
                 max_tokens=2200,
                 timeout=75.0
             )

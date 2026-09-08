@@ -141,7 +141,17 @@
       - CẤM TUYỆT ĐỐI mọi prompt và output mở đầu bằng "Now imagine...", "Imagine a scenario...", hay câu hỏi tu từ triết học chung chung.
       - Bắt buộc dẫn nhập thẳng bằng sự kiện ngòi nổ thực tế (Level 1 Primary Catalyst) kèm mốc thời gian và con số lượng hóa xác thực từ `grounding_intel.json`.
     - **Cinematic Human Tension inside Systemic Traps (Căng Thẳng Con Người Trong Chiếc Bẫy Thể Chế)**:
-      - Loại bỏ hoàn toàn quan điểm vô cảm "không nói về con người". Lực lượng thể chế, tài chính, quân sự phải được cảm nhận sống động qua con người bị mắc kẹt bên trong chúng (nỗi sợ của cơ trưởng trên buồng lái, áp lực của nhân viên thanh toán khi tài khoản báo đỏ, sự bất lực của điều tra viên).
+      - Loại bỏ hoàn toàn quan điểm vô cảm "không nói về con người". Lực lượng thể chế, tài chính, pháp lý phải được cảm nhận sống động qua con người bị mắc kẹt bên trong chúng (áp lực của người phụ trách vận hành đối diện lệnh đình chỉ đột ngột, áp lực của nhân viên thanh toán khi tài khoản báo đỏ, sự căng thẳng của cơ quan giám sát ký lệnh miễn trừ khẩn cấp).
+14. **RULE 132 (Strict Decoupled Engine & Pure Transmission Pipe Mandate - Kỷ Luật Thép Về Phân Tách Động Cơ Thực Thi & Nguồn Tri Thức Notion SoT)**:
+    - **Code Là Ống Dẫn Thuần Túy (Code as Pure Transmission Engine)**:
+      - Mã nguồn Python (`app/services/*`, `scripts/*`) CHỈ ĐƯỢC PHÉP chứa logic hạ tầng kỹ thuật: gọi API, trích xuất dữ liệu, định dạng JSON/Markdown, kiểm tra schema, xử lý audio/video render.
+      - CẤM TUYỆT ĐỐI việc nhúng text prompt nghiệp vụ, văn phong kể chuyện, triết lý docudrama, hay ví dụ case study cụ thể vào các biến chuỗi trong file code `.py`.
+    - **Notion Là Nguồn Tri Thức Duy Nhất (Notion as the Sole Source of Brain & Policy)**:
+      - Toàn bộ Prompt templates, nguyên lý kịch bản 5 Beat, cấu trúc Hook, quy tắc ngôn ngữ, và bài học cải tiến tự động B11 BẮT BUỘC phải lưu trữ và quản lý tập trung trên Notion SoT (hoặc nạp động thông qua `skill_loader.py`).
+      - Trường hợp fallback offline: BẮT BUỘC nạp từ các file markdown cấu hình độc lập (`config/prompts/*.md`), tuyệt đối không được hardcode vào mã nguồn.
+    - **Cổng CI Linter Khử Nhiễm Ngữ Nghĩa Bắt Buộc (Mandatory Semantic Bias CI Linter Gate)**:
+      - Mọi commit và pull request bắt buộc phải vượt qua bài kiểm tra `tests/test_zero_semantic_bias.py` trên GitHub Actions CI.
+      - Bất kỳ đoạn mã, prompt hoặc docstring nào chứa danh từ riêng, thực thể hoặc chi tiết của một Episode cụ thể (Rule 128) sẽ bị CI đánh rớt ngay lập tức.
 
 ---
 

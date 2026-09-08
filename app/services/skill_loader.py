@@ -585,6 +585,14 @@ def get_b2_editorial_skills(force_refresh: bool = False) -> str:
             f"{b11_lessons[:1200]}\n"
         )
 
+    b2_template_file = ROOT_DIR / "config" / "prompts" / "b2_editorial_prompt.md"
+    if b2_template_file.exists():
+        try:
+            base_editorial = b2_template_file.read_text(encoding="utf-8").strip()
+            return f"{base_editorial}\n{b11_section}"
+        except Exception as e:
+            logger.warning(f"[skill_loader] Failed reading {b2_template_file}: {e}")
+
     editorial_prompt = (
         "=== B2 10X EDITORIAL & INVESTIGATIVE CINEMATIC MANDATES ===\n"
         "1. RULE 130: FACTUAL CAUSAL INTEGRITY & SEARCH-INTENT DIRECT PAYOFF:\n"
@@ -605,6 +613,19 @@ def get_b2_editorial_skills(force_refresh: bool = False) -> str:
         f"{b11_section}"
     )
     return editorial_prompt
+
+
+def get_seo_editorial_skills(force_refresh: bool = False) -> str:
+    """Return targeted packaging & narrative hook prompt guidelines for B1.5 SEO Package Forge.
+    Decoupled from Python code: loads from config/prompts/seo_package_prompt.md or Notion SoT.
+    """
+    prompt_file = ROOT_DIR / "config" / "prompts" / "seo_package_prompt.md"
+    if prompt_file.exists():
+        try:
+            return prompt_file.read_text(encoding="utf-8").strip()
+        except Exception as e:
+            logger.warning(f"[skill_loader] Failed reading {prompt_file}: {e}")
+    return "You are the Packaging & Narrative Hook Director for Video Factory."
 
 
 def clear_cache():
