@@ -28,7 +28,8 @@ import asyncio
 import urllib.request
 import urllib.parse
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from email.utils import parsedate_to_datetime
 
 # Ensure workspace root is in sys.path
 _PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
@@ -41,7 +42,8 @@ from app.services.trend_free_signals import (
     gtrends_daily_rss,
     youtube_autocomplete,
     google_autocomplete,
-    gtrends_discover_trending_searches
+    gtrends_discover_trending_searches,
+    google_news_topic_rss
 )
 from app.services.competitor_recon_b15 import (
     youtube_search,
@@ -248,9 +250,11 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
             "source": "custom_seed"
         }]
 
-    candidates = []
+    gt_candidates = []
+    yt_candidates = []
     seen = {}
 
+    # Lane 1: Google Trends Daily RSS across market geos
     for geo in geos:
         try:
             items = gtrends_daily_rss(geo=geo, timeout=12.0)
@@ -269,10 +273,11 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
                         "geos_present": [geo],
                         "approx_traffic": traffic,
                         "news_title": news,
-                        "source": "gtrends_rss"
+                        "source": "gtrends_rss",
+                        "sources_present": ["gtrends_rss"]
                     }
                     seen[k] = cand_obj
-                    seen[k]["sources_present"] = ["gtrends_rss"]
+                    gt_candidates.append(cand_obj)
                 else:
                     if geo not in seen[k]["geos_present"]:
                         seen[k]["geos_present"].append(geo)
@@ -281,8 +286,36 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
         except Exception as e:
             logger.warning(f"[{m_up}/{geo}] Failed to fetch Daily RSS: {e}")
 
-    # Lane 2: Google Trends Discover Searches via pytrends (Rule 123 Live Search Discovery)
-    # Always executed (removed artificial < 10 threshold) across investigative & systemic seeds
+    # Lane 2: Google News Topic RSS (Business & Finance) - Zero rate limit, 100% live breaking stories
+    try:
+        hl = cfg.get("hl", "en")
+        gl = cfg.get("gl", "US")
+        news_items = google_news_topic_rss(topic="BUSINESS", hl=hl, gl=gl, timeout=12.0)
+        logger.info(f"[{m_up}] Google News Topic RSS returned {len(news_items)} live breaking business stories.")
+        for n_it in news_items:
+            t = n_it.get("term", "").strip()
+            if not t or len(t) < 4:
+                continue
+            k = t.lower()
+            if k not in seen:
+                cand_obj = {
+                    "term": t,
+                    "primary_geo": gl,
+                    "geos_present": [gl],
+                    "approx_traffic": "google_news_live",
+                    "news_title": t,
+                    "source": "google_news_live",
+                    "sources_present": ["google_news_live"]
+                }
+                seen[k] = cand_obj
+                gt_candidates.append(cand_obj)
+            else:
+                if "google_news_live" not in seen[k].get("sources_present", []):
+                    seen[k].setdefault("sources_present", []).append("google_news_live")
+    except Exception as e:
+        logger.warning(f"[{m_up}] Failed to fetch Google News Topic RSS: {e}")
+
+    # Lane 3: Google Trends Discover Searches via pytrends (with fallback to 0 if rate-limited)
     for geo in geos[:2]:
         try:
             disc_terms = gtrends_discover_trending_searches(market=m_up, geo=geo, count=20, timeout=12.0)
@@ -293,7 +326,7 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
                     continue
                 k = t.lower()
                 if k not in seen:
-                    seen[k] = {
+                    cand_obj = {
                         "term": t,
                         "primary_geo": geo,
                         "geos_present": [geo],
@@ -302,13 +335,15 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
                         "source": "gtrends_discover",
                         "sources_present": ["gtrends_discover"]
                     }
+                    seen[k] = cand_obj
+                    gt_candidates.append(cand_obj)
                 else:
                     if "gtrends_discover" not in seen[k].get("sources_present", []):
                         seen[k].setdefault("sources_present", []).append("gtrends_discover")
         except Exception as e:
             logger.warning(f"[{m_up}/{geo}] Discover Trending Searches error: {e}")
 
-    # Lane 3: YouTube Search-Box Autocomplete (Direct Viewer Search Intent — Free, No Quota)
+    # Lane 4: YouTube Search-Box Autocomplete (Direct Viewer Search Intent — Free, No Quota)
     PILLAR_SEEDS_BY_MARKET = {
         "KR": [
             "망한 이유", "몰락 이유", "파산 이유", "위기 이유", "사태 원인", "사건의 진실", "폭망한 이유"
@@ -328,13 +363,13 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
     for y_seed in yt_seeds:
         try:
             yt_terms = youtube_autocomplete(y_seed, hl=hl, gl=gl, timeout=8.0)
-            for t in yt_terms[:6]:
+            for t in yt_terms[:10]:
                 t = t.strip()
                 if not t or len(t) < 3:
                     continue
                 k = t.lower()
                 if k not in seen:
-                    seen[k] = {
+                    cand_obj = {
                         "term": t,
                         "primary_geo": gl,
                         "geos_present": [gl],
@@ -343,47 +378,38 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
                         "source": "youtube_autocomplete",
                         "sources_present": ["youtube_autocomplete"]
                     }
+                    seen[k] = cand_obj
+                    yt_candidates.append(cand_obj)
                 else:
                     if "youtube_autocomplete" not in seen[k].get("sources_present", []):
                         seen[k].setdefault("sources_present", []).append("youtube_autocomplete")
         except Exception as _yt_err:
             logger.debug(f"[{m_up}] YouTube autocomplete seed '{y_seed}' failed: {_yt_err}")
 
-    candidates = list(seen.values())
+    # Interleaved 40-candidate Assembly:
+    # Top 10 GTrends -> Top 10 YouTube -> GTrends 11-20 -> YouTube 11-20
+    gt_batch1 = gt_candidates[:10]
+    yt_batch1 = yt_candidates[:10]
+    gt_batch2 = gt_candidates[10:20]
+    yt_batch2 = yt_candidates[10:20]
 
-    # Multi-signal ranking: Prioritizes cross-confirmed terms and viewer search intent
-    def sort_score(cand):
-        sources = cand.get("sources_present", [cand.get("source", "")])
-        source_bonus = len(sources) * 1200  # High bonus for cross-confirmed topics
-        
-        # Signal type weighting
-        signal_weight = 0
-        if "youtube_autocomplete" in sources:
-            signal_weight += 800  # Direct viewer search demand
-        if "gtrends_discover" in sources:
-            signal_weight += 500  # Rising query demand
-        if "gtrends_rss" in sources:
-            signal_weight += 300  # News cycle presence
-
-        geo_count = len(cand.get("geos_present", []))
-        raw_traffic = str(cand.get("approx_traffic", ""))
-        num_m = re.findall(r"(\d+)", raw_traffic.replace(",", ""))
-        traffic_val = int(num_m[0]) if num_m else 0
-
-        return source_bonus + signal_weight + (geo_count * 400) + traffic_val
-
-    candidates.sort(key=sort_score, reverse=True)
+    ordered_candidates = gt_batch1 + yt_batch1 + gt_batch2 + yt_batch2
+    # Add any remaining tail candidates
+    remaining_gt = gt_candidates[20:]
+    remaining_yt = yt_candidates[20:]
+    ordered_candidates.extend(remaining_gt)
+    ordered_candidates.extend(remaining_yt)
 
     # Deduplicate against permanent topic history registry
     unhandled = []
-    for c in candidates:
+    for c in ordered_candidates:
         term = c["term"]
         if is_topic_already_handled(term, market=m_up):
             logger.info(f"[{m_up}] Skipping previously handled topic: {term}")
             continue
         unhandled.append(c)
 
-    logger.info(f"[{m_up}] Total {len(candidates)} candidates fetched across all lanes -> {len(unhandled)} unhandled fresh candidates.")
+    logger.info(f"[{m_up}] Total candidates: GT={len(gt_candidates)}, YT={len(yt_candidates)} -> Ordered Interleaved unhandled: {len(unhandled)}")
     return unhandled
 
 
@@ -535,25 +561,29 @@ FORENSIC_ANCHORS = {
         "망한", "파산", "부도", "위기", "사태", "비리", "회생", "적자", "폭망", "몰락",
         "배임", "횡령", "매각", "상폐", "손실", "디폴트", "구속", "압수수색", "체납",
         "논란", "붕괴", "스캔들", "진실", "의혹", "사건", "갈등", "분쟁", "소송",
-        "검찰", "조사", "규제", "폭락", "폭등", "사기", "의문"
+        "검찰", "조사", "규제", "폭락", "폭등", "사기", "의문", "제재", "인수",
+        "파업", "관세", "경고", "해고", "감원", "쇼크", "폭로", "탈세", "충격"
     ],
     "EN": [
         "collapse", "bankrupt", "crisis", "scandal", "fraud", "failed", "downfall",
         "investigation", "default", "liquidation", "loss", "debt", "deficit", "probe",
         "arrest", "lawsuit", "court", "recession", "scam", "why it failed", "exposed",
-        "fall of", "controversy", "crash", "plunge", "turmoil", "indictment", "guilty"
+        "fall of", "controversy", "crash", "plunge", "turmoil", "indictment", "guilty",
+        "sanction", "tariff", "strike", "layoff", "shock", "dispute", "takeover"
     ],
     "JP": [
         "倒産", "破産", "危機", "事件", "転落", "不正", "赤字", "崩壊", "粉飾",
-        "裁判", "逮捕", "巨額", "損失", "なぜ", "疑惑", "衰退", "暴落", "詐欺"
+        "裁判", "逮捕", "巨額", "損失", "なぜ", "疑惑", "衰退", "暴落", "詐欺",
+        "買収", "買収へ", "制裁", "ストライキ", "解雇", "ショック", "暴露", "脱税",
+        "問題", "紛争", "訴訟", "調査", "規制", "真相", "失敗", "リスク"
     ]
 }
 
 
 def forensic_pre_filter(candidate: dict, market: str) -> tuple[bool, str]:
-    """Level-0 Forensic Pre-Filter Gate (Rule 118 & Rule 130).
-    Filters out non-investigative, sports, showbiz, or shallow queries before any LLM calls,
-    burning 0 tokens on non-viable candidates.
+    """Level-0 Forensic Pre-Filter Gate (Rule 118, Rule 123, Rule 130).
+    Filters out non-investigative queries and verifies that YouTube Autocomplete queries
+    possess an active 24-48h news catalyst before burning any LLM tokens.
     """
     source = candidate.get("source", "")
     if source == "custom_seed":
@@ -562,16 +592,36 @@ def forensic_pre_filter(candidate: dict, market: str) -> tuple[bool, str]:
     m_up = (market or "EN").upper()
     anchors = FORENSIC_ANCHORS.get(m_up, FORENSIC_ANCHORS["EN"])
 
-    term = candidate.get("term", "").lower()
+    term = candidate.get("term", "").strip()
+    term_lower = term.lower()
     news = candidate.get("news_title", "").lower()
-    combined_text = f"{term} {news}"
+    combined_text = f"{term_lower} {news}"
 
+    # For YouTube Autocomplete candidates: verify live breaking news catalyst (Rule 130 & Rule 123)
+    if source == "youtube_autocomplete":
+        catalysts = fetch_live_news_catalyst(term, m_up, count=5)
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=48)
+        fresh_articles = []
+        for cat in catalysts:
+            pub_str = cat.get("published_at", "")
+            try:
+                pub_dt = parsedate_to_datetime(pub_str)
+                if pub_dt >= cutoff:
+                    fresh_articles.append(cat)
+            except Exception:
+                # If date parse fails, keep article if term is in title
+                if term_lower in cat.get("title", "").lower():
+                    fresh_articles.append(cat)
+
+        if not fresh_articles:
+            return False, f"Stale YouTube search without 24-48h live news catalyst: '{term}' (0 LLM tokens burned)"
+        return True, f"Verified YouTube search with {len(fresh_articles)} live news catalyst articles in 24-48h"
+
+    # For Google Trends / Google News: check forensic crisis anchors
     for kw in anchors:
         if kw.lower() in combined_text:
             return True, f"Matched forensic crisis anchor: '{kw}'"
-
-    if source == "youtube_autocomplete":
-        return True, "Bypassed: youtube autocomplete investigative seed"
 
     return False, f"No forensic crisis anchor in '{term}' (0 LLM tokens burned)"
 
@@ -580,7 +630,7 @@ def get_next_prefiltered_candidate(market: str = "EN", custom_seed: str | None =
     """Retrieves the next highest-scoring candidate that passes Level-0 Forensic Pre-Filter,
     without triggering full production. Used by Centralized Orchestrator Leader for Optimal Rotation.
     """
-    candidates = fetch_market_trend_candidates(market=market, custom_seed=custom_seed)
+    candidates = fetch_live_trending_terms(market=market, custom_seed=custom_seed)
     for cand in candidates:
         term = cand.get("term", "").strip()
         if is_topic_already_handled(term, market=market):
@@ -598,7 +648,7 @@ def discover_and_produce_market_trend(
     market: str = "EN",
     custom_seed: str = None,
     auto_produce: bool = True,
-    max_scan_candidates: int = 15
+    max_scan_candidates: int = 40
 ) -> list[dict]:
     """Execute canonical B1 trend discovery and automated B1.5 -> B2 -> B3 pipeline
     for exactly 1 topic per market per day.
