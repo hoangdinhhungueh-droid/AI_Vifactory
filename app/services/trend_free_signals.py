@@ -5,6 +5,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 _TRENDING_RSS_URL = "https://trends.google.com/trending/rss"
+_SUGGEST_URL = "https://suggestqueries.google.com/complete/search"
 
 _CACHE = {}
 _CACHE_TTL_SECONDS = 6 * 3600  # 6h - plenty for the ~1x/day gate cadence, cheap safety net
