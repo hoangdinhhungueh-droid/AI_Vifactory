@@ -388,6 +388,18 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
     if context_lines:
         competitor_context = "\n".join(context_lines) + "\n\n"
 
+    # Grounding Layer (B1.5.5 Fact-Anchor Injection - Rule 118 & Rule 128)
+    # Strict contract: load_grounding_intel raises RuntimeError if missing or rejected
+    g_data, grounding_block = load_grounding_intel(
+        task_id=task_id,
+        out_dir=out_dir,
+        topic=topic,
+        niche_brief=niche_brief,
+        market=mkt
+    )
+    if grounding_block:
+        logger.info(f"[story_engine] Loaded Grounding Layer table ({len(g_data.get('claims', []))} claims) for {task_id}.")
+
     story_file = os.path.join(out_dir, "story.txt")
     existing_script = ""
     if os.path.exists(story_file) and not force:
@@ -418,18 +430,6 @@ CRITICAL HOOK INSTRUCTION: You MUST begin and shape Act I directly paying off th
         _b2_insight_cards = fetch_active_insights(_b2_notion_token, mkt)
         feedback_block = build_feedback_block(_b2_insight_cards)
         
-        # Grounding Layer (B1.5.5 Fact-Anchor Injection - Rule 118 & Rule 128)
-        # Strict contract: load_grounding_intel raises RuntimeError if missing or rejected
-        g_data, grounding_block = load_grounding_intel(
-            task_id=task_id,
-            out_dir=out_dir,
-            topic=topic,
-            niche_brief=niche_brief,
-            market=mkt
-        )
-        if grounding_block:
-            logger.info(f"[story_engine] Injected Grounding Layer table ({len(g_data.get('claims', []))} claims) into B2 prompt for {task_id}.")
-
         user_prompt = (
             f"Generate the comprehensive 12-15 minute (1,800-2,200 words) Non-Fiction Investigative Documentary Script for {topic} following the 5-Beat Investigative Docudrama structure with HIGH DRAMATIC SUSPENSE and ticking-clock pacing.\n"
             f"Structure: Beat 1 (The Impossible Contradiction & Ticking Clock) -> Beat 2 (The False Narrative & Red Herring) -> Beat 3 (The Systemic Blindspot & Paper Trail) -> Beat 4 (The Real Culprit & Smoking Gun) -> Beat 5 (The Uncomfortable Modern Mirror & Living Warning).\n"
