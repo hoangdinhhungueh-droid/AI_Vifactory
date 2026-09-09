@@ -1,11 +1,11 @@
 # 🛡️ ANTIGRAVITY OPERATIONAL CONSTITUTION (ALWAYS ON)
 
 > **QUY TẮC BẤT BIẾN CẤP CAO NHẤT CỦA WORKSPACE AI VIDEO FACTORY (VF PIPELINE).**
-> Mọi Agent/Subagent bắt buộc tuân thủ 12 Kỷ Luật Thép và cơ chế Định Tuyến Kỹ Năng (Progressive Disclosure) dưới đây:
+> Mọi Agent/Subagent bắt buộc tuân thủ 15 Kỷ Luật Thép và cơ chế Định Tuyến Kỹ Năng (Progressive Disclosure) dưới đây:
 
 ---
 
-## ⚖️ I. HIẾN PHÁP 12 ĐIỀU LUẬT BẤT BIẾN (IRON LAWS)
+## ⚖️ I. HIẾN PHÁP ĐIỀU LUẬT BẤT BIẾN (IRON LAWS)
 
 1. **RULE 118 (Zero-Mock Data & Ask-Before-Deviating)**:
    - CẤM TUYỆT ĐỐI tự tạo mock data, số liệu giả định (Analytics, Views, CTR, RPM). Chưa có API/số liệu YouTube Studio thực tế thì bắt buộc để `null` và báo cáo rõ ràng.
@@ -151,7 +151,13 @@
       - Trường hợp fallback offline: BẮT BUỘC nạp từ các file markdown cấu hình độc lập (`config/prompts/*.md`), tuyệt đối không được hardcode vào mã nguồn.
     - **Cổng CI Linter Khử Nhiễm Ngữ Nghĩa Bắt Buộc (Mandatory Semantic Bias CI Linter Gate)**:
       - Mọi commit và pull request bắt buộc phải vượt qua bài kiểm tra `tests/test_zero_semantic_bias.py` trên GitHub Actions CI.
-      - Bất kỳ đoạn mã, prompt hoặc docstring nào chứa danh từ riêng, thực thể hoặc chi tiết của một Episode cụ thể (Rule 128) sẽ bị CI đánh rớt ngay lập tức.
+15. **RULE 133 (Notion AI Skill Delegation vs. Antigravity Operational Scope Mandate - Kỷ Luật Thép Về Phân Định Ranh Giới Giữa Skill AI Notion & Rule Antigravity)**:
+    - **Skill AI Notion Là Nơi Lưu Trữ Nghiệp Vụ Prompt & Tri Thức Kể Chuyện (Domain & Editorial Knowledge on Notion SoT)**:
+      - Mọi quy chuẩn nghiệp vụ liên quan đến Prompt Engineering, cấu trúc kịch bản (như Rule 130 Factual Causal Integrity, Rule 131 10X 5-Beat Architecture, Rule 444 Hook, phong cách hình ảnh B3/B3.5, bài học cải tiến B11) BẮT BUỘC phải được cập nhật và quản trị tập trung tại các trang Notion SoT (`Skill AI` page `ac901989-2400-827e-bda2-8175dabdcf13`, `Content Engine Hub`, `Media Production Hub`).
+      - Code thực thi trên VPS (`app/services/*`, `scripts/*`) nạp các quy chuẩn này thông qua phễu tinh gọn `skill_loader.py` (cơ chế Just-In-Time Injection, caching 3600s, offline fallback `config/prompts/*.md`) để truyền đúng tinh thần nghiệp vụ cho LLM xử lý từng bước mà KHÔNG làm phình to prompt hay tràn context.
+    - **AGENTS.md Chỉ Chứa Các Quy Tắc Vận Hành Trực Tiếp Của Antigravity (Antigravity Direct Execution Rules Only)**:
+      - `AGENTS.md` là Hiến pháp vận hành của Antigravity, CHỈ ĐƯỢC PHÉP ghi nhận các Kỷ luật thép chi phối hành vi trực tiếp của Agent (như Rule 118 Zero-Mock Data & Ask-Before-Deviating, Rule 119 Codebase Execution, Rule 121 Strict Verification Protocol, Rule 124 Atomic Commit, Rule 126 Three-Way Physical Sync, Rule 127 Runtime Execution Gate, Rule 129 Autonomous Inquiry Gate).
+      - CẤM TUYỆT ĐỐI việc đưa toàn văn nội dung prompt kể chuyện, hướng dẫn viết văn, hay chi tiết nghệ thuật tạo hình vào `AGENTS.md` gây lãng phí token nạp vào mỗi phiên chat và làm loãng khả năng tuân thủ kỷ luật thực thi của Antigravity.
 
 ---
 
@@ -176,3 +182,4 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 1. **Task-Level Contract**: Mọi nhiệm vụ lớn / Sprint bắt buộc neo theo file `ORIGINAL_REQUEST.md` (chứa User Request gốc, Requirements R1..Rn và Acceptance Criteria `[ ]`).
 2. **Interface Contracts**: Khế ước dữ liệu JSON IN/OUT giữa các block và danh mục file trên VPS tra cứu tại `PIPELINE_CONTRACTS.md`.
 3. **Autonomous Clarification Protocol**: Mọi tác vụ có tính đa chiều, rẽ nhánh kỹ thuật hoặc mơ hồ bắt buộc kích hoạt Cổng Phản Vấn Chủ Động (Rule 129), suy luận sâu và làm rõ với User trước khi triển khai sâu.
+

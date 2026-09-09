@@ -61,6 +61,11 @@ graph TD
   - **Rule 126**: Three-Way Physical Sync & Zero-False-Success Mandate (Bảo chứng đồng bộ vật lý VPS ⇄ GitHub ⇄ Notion/Local).
   - **Rule 127**: Anti-Tunnel-Vision & Mandatory Programmatic Runtime Execution Gate (Thực thi sống hàm sửa đổi).
   - **Rule 128**: Anti-Semantic-Bias & Generic Contract Architecture Mandate (0 domain bleed, generic patterns).
+  - **Rule 129**: Autonomous Deep Reasoning & Proactive Clarification Gate (Claude-style inquiry).
+  - **Rule 130**: Factual Causal Integrity & Search-Intent Payoff Mandate (Level 1 Catalyst vs Level 2 Transmission).
+  - **Rule 131**: 10X Beat Architecture & Editorial Signal Purity Mandate (5-Beat micro-pacing, 0 marketing clutter).
+  - **Rule 132**: Strict Decoupled Engine & Pure Transmission Pipe Mandate (Code as pure pipe, Notion as brain).
+  - **Rule 133**: Notion AI Skill Delegation vs. Antigravity Operational Scope Mandate (Editorial skills on Notion, Antigravity rules in AGENTS.md).
 - **8 Specialized Hubs con**:
   | Hub Chuyên Môn | Notion Page ID | Trọng Tâm Nhiệm Vụ |
   | :--- | :--- | :--- |
@@ -78,10 +83,21 @@ graph TD
 ### 2️⃣ PILLAR 2: VF Pipeline Quy Trình Chuẩn (Go-Live 2026)
 - **Root URL**: [`🏭 VF Pipeline — Quy Trình Chuẩn`](https://app.notion.com/p/VF-Pipeline-Quy-Tr-nh-Chu-n-Duy-Nh-t-Go-Live-2026-3c3019892400815cb22ff4ced65469bf) (`3c301989-2400-815c-b22f-f4ced65469bf`)
 - **Vai trò**: Dây chuyền sản xuất video chuẩn từ B1 đến B11 (Tuân thủ CI/CD ISO Neighbor-Testing [N-1, N, N+1]):
-  - **B1 (`/run:trend` | `trend_engine_b1.py` & `market_scheduler.py`)**: Cào Google Trends RSS live (EN, JP, KR - Native-First Discovery) theo **Lịch Điều Phối Tuần Đơn Nhiệm** (Thứ 2 & 5: EN | Thứ 3 & 6: KR | Thứ 4 & 7: JP | Chủ Nhật: Nghỉ & Bảo dưỡng định kỳ). Ngăn ngừa crash hạ tầng VPS. Wikipedia Ground Truth đối chiếu sự thật (Fact-Check Reference / Reality Anchor). Human Gate 1 Pure Informative Broadcast trên Telegram (0 nút bấm).
-  - **B1.5 (`competitor_recon_b15.py`)**: Competitor Recon & Gap Analysis. Truy vấn YouTube Data API bằng từ khóa bản địa, cào Top 10-15 comments có like cao nhất, bóc tách Fatal Explanatory Vacuum và 10x Pivot Angle vào `competitor_intel_card.json`.
-  - **B1.5.5 (`grounding_layer_b15.py`)**: Live Fact-Grounding & Verification Gate. Truy vấn Google Search Grounding (Gemini 2.5 Flash REST), bóc tách 3-6 verified claims thực tế (ngày tháng, nguồn tin uy tín Reuters/Bloomberg/SEC/Nikkei/cơ quan quản lý, cơ chế tài chính/pháp lý/thương mại) vào `grounding_intel.json`. Fast-fail loại bỏ chủ đề tin đồn/ảo giác; neo bảng dữ liệu sự thật vào prompt B2 với ràng buộc 3 cấp độ tự tin (VERIFIED, REPORTED, SPECULATIVE).
-  - **B2 (`/video:story` | `story_engine_b2.py`)**: Sinh kịch bản 5 Beat "Investigative Docudrama: Multi-Layer Puzzle" (1,800 - 2,200 từ, ~12-15 phút) qua `GPT-6-Astra`. Khóa Rule 444 An Ong Hook (0-60s), Micro-Cliffhangers (90-120s), Story Gate score >= 8/10. Chuyển giao sang Production Bridge (English slug & visual prompts). Sync **Story Library DB**.
+  - **B1 (`/run:trend` | `trend_engine_b1.py` & `market_scheduler.py`)**: Cào Google Trends RSS live & YouTube Signals theo Daily Ephemeral Cut-off (EN, JP, KR). Áp dụng 7 Trục Đề Tài Vàng:
+    1. **Business Rise & Fall**: Độc quyền, gian lận kế toán, phá sản, sụp đổ tài chính.
+    2. **Modern History & Systemic Crisis**: Khủng hoảng thể chế, chuỗi cung ứng, điểm gãy chính sách.
+    3. **True Crime Non-Graphic**: Đại án kinh tế, lừa đảo xuyên quốc gia, phá án điều tra pháp y/chứng từ (0% bạo lực, 0% máu me).
+    4. **Psychology & Behavioral Manipulation**: Thao túng tâm lý, bẫy hành vi, tà đạo, hiệu ứng đám đông, tẩy não.
+    5. **Tech & Geopolitical Battles**: Chiến tranh bán dẫn, cáp ngầm, gián điệp công nghệ, thế lưỡng nan độc quyền.
+    6. **Institutional & Regulatory Chokepoints**: Lỗ hổng pháp lý, khủng hoảng lương hưu, bê bối che đậy kiểm định/chất lượng.
+    7. **Hidden Asymmetric Fortunes & Underground Flows**: Dòng tiền ngầm, rửa tiền, chênh lệch thông tin bất đối xứng.
+    *Viability Gate yêu cầu score ≥ 8.0/10.*
+  - **B1.1 (`adversarial_critic_b1.py`)**: Adversarial Critic Gate qua Claude Opus 5 (Veto sớm các đề tài lệch trend / bait-and-switch).
+  - **B1.5 (`competitor_recon_b15.py`)**: Two-Pass Competitor Recon & Fatal Explanatory Vacuum.
+  - **B1.5.5 (`grounding_layer_b15.py`)**: Live Fact-Grounding & Verification Gate (Gemini 2.5 Flash REST), bóc tách 3-6 verified claims.
+  - **B1.6 (`seo_package_forge.py`)**: Forging Early Title A/B & 60s An Ong Hook (Rule 444 & Rule 130).
+  - **B2 (`story_engine_b2.py`)**: Sinh kịch bản 5 Beat "Investigative Docudrama" (1,800 - 2,200 từ, ~12-15 phút) qua `GPT-6-Astra`.
+  - **B2.1 (`fact_causal_audit` qua Claude Opus 5)**: Kiểm toán độc lập tính toàn vẹn nhân quả (Rule 130). Chỉ khi B2.1 đạt PASS (score ≥ 7.5/10) mới **Chốt Task ID chính thức + Sync Notion Trend Brain (Approved→Story) + Gửi Telegram Gate 1 hoàn chỉnh** trước khi chuyển giao B3.
   - **B3 (`/video:art-director`)**: Lập bảng đạo diễn Dynamic Scenes (Layer 1 BG + Layer 2 FG) bằng tiếng Anh. Sync **Director Plan DB**.
   - **B3.5 (`/prompt:forge`)**: Sinh Prompt Engineering chuẩn FG `#FF00FF` Chroma Key bằng tiếng Anh. Sync **Prompt Library DB**.
   - **B4 (`/image:native`)**: Sinh ảnh Google Image Native / Gemini Pro Web (`generate_image`). Upload R2 & Sync **Image Asset Library DB**.
@@ -132,3 +148,4 @@ Thay vì dump toàn bộ cây thư mục 500+ trang vào Context Window:
 3. **Bước 3 — Sync Back & Verification**:
    - Ghi dữ liệu trực tiếp vào đúng Database ID, in log phản hồi `200 OK` (Rule 121).
    - Nếu gặp lỗi kỹ thuật hoặc trần API -> **Kích hoạt Rule 118: Dừng lại và báo cáo User ngay lập tức**.
+
