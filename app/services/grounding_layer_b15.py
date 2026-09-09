@@ -305,7 +305,7 @@ def run_grounding_research(
         logger.error(f"[grounding] Grounding API call failed: {e}")
         return {
             "topic": topic,
-            "rejected": False,
+            "rejected": True,
             "reject_reason": f"API call error: {e}",
             "claims": [],
             "grounding_chunks": [],
@@ -346,10 +346,9 @@ def passes_grounding_gate(
 
     claims = grounding_result.get("claims", [])
     if not claims:
-        # If API is temporarily unreachable but candidate has verified wiki factsheet, we allow graceful degradation
-        if not grounding_result.get("has_live_search", False):
-            return True, "Passed with fallback (Search API unavailable, relying on verified factsheet)."
-        return False, "No factual claims could be extracted."
+        # Rule 118: Zero-Mock Data. Zero verified claims CANNOT pass the grounding gate.
+        reason = grounding_result.get("reject_reason") or "No factual claims could be extracted (API timeout or ungrounded)."
+        return False, f"Grounding Gate Blocked: {reason}"
 
     if len(claims) < min_claims:
         return False, f"Insufficient total claims ({len(claims)} found, required >= {min_claims})."

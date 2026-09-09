@@ -55,37 +55,49 @@ class DynamicArchetypeDict(dict):
         }
 
 
-# Compatibility container for legacy callers and tests
+# 7 Golden Content Axes (Notion SoT Second Brain & Hollywood Principles)
 CINEMATIC_ARCHETYPES = DynamicArchetypeDict({
-    "finance": {
-        "director": "GPT-6-Astra — David Fincher (Corporate Noir) Principle",
-        "visual_tone": "Glossy boardroom veneer contrasting cold trading floors, shredded paper trails, creeping push-ins on forensic ledger anomalies",
+    "business_rise_fall": {
+        "director": "GPT-6-Astra — David Fincher & Adam McKay (Corporate Noir & Forensic Exposition) Principle",
+        "visual_tone": "Glossy corporate boardroom veneer contrasting cold trading floors, shredded paper trails, creeping push-ins on forensic ledger anomalies",
         "palette": "Cold steel blue, dark charcoal, toxic amber highlights, fluorescent office hum",
-        "camera_style": "Slow creeping push-ins on critical revelations, clinical wide establishing shots, sudden whip pans on micro-cliffhangers"
+        "camera_style": "Slow creeping push-ins on financial ledgers, clinical wide corporate establishing shots, whip pans on margin calls"
     },
-    "history": {
-        "director": "GPT-6-Astra — Christopher Nolan & Johan Renck (Historical Realism) Principle",
-        "visual_tone": "Monumental scale, oppressive stone and concrete institutional corridors, dusty light beams through heavy drapes, atmospheric decay",
-        "palette": "Aged ochre, slate stone, imperial gold accents, oxidized bronze, deep chiaroscuro",
-        "camera_style": "Slow deliberate tracking shots, high-angle surveillance-style observation, lingering static tableaux"
+    "systemic_crisis": {
+        "director": "GPT-6-Astra — Johan Renck & Denis Villeneuve (Oppressive Institutional Realism & Brutal Scale) Principle",
+        "visual_tone": "Monumental institutional corridors, decaying supply chain depots, heavy dust beams through fractured blinds, systemic infrastructure collapse",
+        "palette": "Desaturated slate stone, oxidized bronze, aged ochre, industrial charcoal, deep chiaroscuro",
+        "camera_style": "Slow deliberate surveillance tracking, high-angle institutional scale observation, lingering frozen tableaux"
     },
     "true_crime": {
-        "director": "GPT-6-Astra — David Fincher (Forensic Procedural Noir) Principle",
-        "visual_tone": "Evidence locker dim lighting, sterile courtroom benches, micro-evidence examinations, tense interrogation room staging",
-        "palette": "Low-key obsidian black, desaturated neutral slate, cold fluorescent white, deep shadows",
+        "director": "GPT-6-Astra — David Fincher & Errol Morris (Forensic Procedural Noir — Non-Graphic) Principle",
+        "visual_tone": "Evidence locker dim lighting, sterile courtroom benches, macro document forgery examinations, high-contrast interrogation rooms",
+        "palette": "Low-key obsidian black, desaturated neutral slate, cold fluorescent white, deep chiaroscuro shadows",
         "camera_style": "Precision analytical tracking, tight macro close-ups on physical evidence, static high-tension procedural compositions"
     },
     "psychology": {
-        "director": "GPT-6-Astra — Denis Villeneuve (Psychological Mystery & Behavioral Tension) Principle",
-        "visual_tone": "Claustrophobic interview rooms, symbolic geometric architectural framing, disorienting shadow play dissecting mental manipulation",
-        "palette": "Muted monochrome with solitary focal accents, deep graphite grey, psychological shadow contrasts",
+        "director": "GPT-6-Astra — Denis Villeneuve & Darren Aronofsky (Psychological Mystery & Geometric Disorientation) Principle",
+        "visual_tone": "Claustrophobic interrogation spaces, symbolic geometric architectural framing, disorienting shadow play dissecting herd bias and manipulation",
+        "palette": "Deep graphite monochrome with solitary amber/crimson focal accents, psychological shadow contrasts",
         "camera_style": "Creeping slow push-ins creating psychological intimacy, symmetrical wide tableaus, abrupt perspective shifts"
     },
     "tech_geopolitics": {
-        "director": "GPT-6-Astra — Cyber & Geopolitical Thriller (Sicario & Zero Dark Thirty Principle)",
-        "visual_tone": "Humming cleanroom photolithography labs, fiber-optic submarine cable maps, satellite telemetry command centers, dark boardroom summits",
-        "palette": "Silicon cyan, server rack emerald, cold titanium silver, deep surveillance indigo",
-        "camera_style": "Clinical surveillance pans, sharp graphic whip-cuts between maps and boardrooms, high-angle technological dominance framing"
+        "director": "GPT-6-Astra — Christopher Nolan (Cold Analytical Precision & Global Asymmetric Stakes) Principle",
+        "visual_tone": "Humming photolithography cleanrooms, submarine fiber-optic cable routes, satellite command telemetry, dark geopolitical summit chambers",
+        "palette": "Silicon cyan, cleanroom amber, server rack emerald, cold titanium silver, deep surveillance indigo",
+        "camera_style": "Clinical surveillance pans, sharp graphic whip-cuts between maps and hardware, high-angle technological dominance framing"
+    },
+    "institutional_regulatory": {
+        "director": "GPT-6-Astra — Steven Soderbergh & Michael Mann (Clinical Whistleblower & Regulatory Chokepoint) Principle",
+        "visual_tone": "Municipal registry desks, confidential inspection archives with red rejected stamps, sealed sample containers, late-night whistleblowing meetings",
+        "palette": "Clinical pale cyan, antiseptic mint green, institutional beige, iodine amber, brushed stainless steel",
+        "camera_style": "Forensic macro close-ups on regulatory clause stamps and approval dates, handheld observational creeping push-ins, clinical wide archive corridors"
+    },
+    "asymmetric_flows": {
+        "director": "GPT-6-Astra — Martin Scorsese & J.C. Chandor (Asymmetric Financial Thriller & Underground Flows) Principle",
+        "visual_tone": "Discreet offshore private banking suites, encrypted dark-terminal trading desks, luxury maritime harbors concealing shell company assets",
+        "palette": "Deep velvet midnight blue, tarnished brass gold, dark burgundy, cigar-smoke chiaroscuro",
+        "camera_style": "Slow predator tracking shots, clinical over-the-shoulder document inspections, abrupt freezing snap-zooms on hidden beneficiary names"
     },
     "default": {
         "director": "GPT-6-Astra — Denis Villeneuve & David Fincher (Investigative Realism) Principle",
@@ -95,30 +107,46 @@ CINEMATIC_ARCHETYPES = DynamicArchetypeDict({
     }
 })
 
+# Backward compatibility aliases for legacy callers and tests
+CINEMATIC_ARCHETYPES["finance"] = CINEMATIC_ARCHETYPES["business_rise_fall"]
+CINEMATIC_ARCHETYPES["history"] = CINEMATIC_ARCHETYPES["systemic_crisis"]
+
 
 def detect_cinematic_archetype(niche: str = "", topic: str = "", story_text: str = "") -> dict:
     """
     Universal dynamic cinematic archetype and visual grammar detection (Rule 128).
-    Routes dynamically based on the 5 Canonical High-RPM Content Pillars.
+    Routes dynamically based on the 7 Golden Content Axes (Notion SoT Second Brain).
     """
-    combined = f"{niche} {topic} {story_text[:500]}".lower()
+    combined = f"{niche} {topic} {story_text[:600]}".lower()
+
+    # 1. Tech & Geopolitical Battles
     if any(k in combined for k in ["tech", "chip", "semiconductor", "asml", "tsmc", "silicon", "geopolitic", "supply chain", "cable", "satellite", "cyber", "hardware", "lithography", "quantum"]):
         return CINEMATIC_ARCHETYPES["tech_geopolitics"]
+
+    # 2. Institutional & Regulatory Chokepoints / Medical / Whistleblower
+    elif any(k in combined for k in ["regulatory", "chokepoint", "inspector", "compliance", "oversight", "pension", "license", "permit", "coverup", "recall", "medical", "pharma", "clinical", "hospital", "drug", "medicine", "vaccine", "toxic", "poison", "epidemic", "cholera", "pesticide"]):
+        return CINEMATIC_ARCHETYPES["institutional_regulatory"]
+
+    # 3. Hidden Asymmetric Fortunes & Underground Flows
+    elif any(k in combined for k in ["underground", "illicit", "laundering", "smuggl", "offshore", "shell company", "shadow banking", "dark pool", "cartel", "asymmetric", "hidden fortune", "bribe", "kickback"]):
+        return CINEMATIC_ARCHETYPES["asymmetric_flows"]
+
+    # 4. True Crime Non-Graphic
     elif any(k in combined for k in ["crime", "murder", "killer", "investigation", "forensic", "court", "trial", "verdict", "police", "detective", "fbi", "heist"]):
         return CINEMATIC_ARCHETYPES["true_crime"]
-    elif any(k in combined for k in ["psycholog", "manipulat", "cult", "mind", "behavior", "brainwash", "cognitive", "hysteria", "bias", "propaganda", "societal"]):
+
+    # 5. Psychology & Behavioral Manipulation
+    elif any(k in combined for k in ["psycholog", "manipulat", "cult", "mind", "behavior", "brainwash", "cognitive", "hysteria", "bias", "propaganda", "societal", "mass panic"]):
         return CINEMATIC_ARCHETYPES["psychology"]
-    elif any(k in combined for k in ["finance", "economy", "bank", "money", "fraud", "wall street", "debt", "lehman", "madoff", "enron", "trading", "business"]):
-        return CINEMATIC_ARCHETYPES["finance"]
-    elif any(k in combined for k in ["history", "empire", "war", "monarchy", "oppenheimer", "manhattan project", "soviet", "cold war", "chernobyl", "medieval", "century", "labor day", "strike"]):
-        return CINEMATIC_ARCHETYPES["history"]
-    elif any(k in combined for k in ["medical", "pharma", "clinical", "hospital", "drug", "medicine", "vaccine", "toxic", "poison", "epidemic", "cholera"]):
-        return {
-            "director": "GPT-6-Astra — Steven Soderbergh (Clinical Realism) Principle",
-            "visual_tone": "Provincial clinical examination rooms, sealed diagnostic vials, pharmaceutical packaging lines, regulatory inspection desks",
-            "palette": "Clinical pale blue, antiseptic mint green, iodine amber, brushed stainless steel",
-            "camera_style": "Forensic close-ups on batch numbers and chemical seals, creeping dolly shots through regulatory archives"
-        }
+
+    # 6. Business Rise & Fall / Corporate Debt
+    elif any(k in combined for k in ["finance", "economy", "bank", "money", "fraud", "wall street", "debt", "lehman", "madoff", "enron", "trading", "business", "rehabilitation", "bankruptcy", "collateral", "lien"]):
+        return CINEMATIC_ARCHETYPES["business_rise_fall"]
+
+    # 7. Modern History & Systemic Crisis
+    elif any(k in combined for k in ["history", "empire", "war", "monarchy", "oppenheimer", "manhattan project", "soviet", "cold war", "chernobyl", "medieval", "century", "labor day", "strike", "crisis"]):
+        return CINEMATIC_ARCHETYPES["systemic_crisis"]
+
     return CINEMATIC_ARCHETYPES["default"]
 
 
@@ -499,6 +527,16 @@ def generate_director_plan(
     logger.info(f"  [B3] Story length: {total_words} words across {len(story_beats)} beats. Archetype: {archetype['director']}")
     logger.info(f"  [B3] Extracted Era: {dynamic_context['era_anchor']}. Ensemble: {len(character_ensemble)} roles.")
 
+    m_up = (metadata.get("market") or episode_id.split("_")[0]).upper()
+    if m_up in ["JP", "JA"]:
+        market_lang_name = "Japanese (日本語)"
+    elif m_up in ["KR", "KO"]:
+        market_lang_name = "Korean (한국어)"
+    elif m_up in ["VN", "VI"]:
+        market_lang_name = "Vietnamese (Tiếng Việt)"
+    else:
+        market_lang_name = "English"
+
     # 2. Build Hollywood Art Director Prompt using concise targeted rules
     targeted_art_rules = get_b3_strategic_rules()
     system_prompt = (
@@ -523,12 +561,16 @@ def generate_director_plan(
         "3. FLEXIBLE ASSET ROSTER PER BEAT:\n"
         "   - Each Beat defines a pool of Backgrounds (2-4 key locations) and Foregrounds (1-3 key figures).\n"
         "   - Maintain background_reuse_key and foreground_reuse_key across continuous sequences.\n"
-        "4. ALL VISUAL PROMPTS MUST BE IN ENGLISH (Production Bridge Rule 446).\n\n"
+        "4. DUAL-LANGUAGE PROTOCOL (Production Bridge Rule 446 & Market Rule 120):\n"
+        "   - VISUAL PROMPTS (bg_prompt, fg_prompt, visual_metaphor): MUST BE IN ENGLISH for the image generation engine.\n"
+        f"   - SPOKEN NARRATION ('narration' field in each scene): MUST BE 100% WRITTEN IN {market_lang_name}! NEVER translate narration to English for non-English markets! Voiceover TTS & subtitles require authentic {market_lang_name}.\n\n"
         "OUTPUT FORMAT: Return ONLY a valid JSON object matching the exact schema below. No markdown fences."
     )
 
     user_payload = {
         "episode_id": episode_id,
+        "market": m_up,
+        "narration_language": market_lang_name,
         "niche": niche,
         "topic": topic,
         "director_archetype": archetype["director"],
@@ -548,8 +590,8 @@ def generate_director_plan(
     prompt_instruction = (
         f"CRITICAL HOLLYWOOD STORYBOARD & PACING DIRECTIVE (Rules 116, 120, 128, 445):\n"
         f"The full story contains {total_words} words across 5 beats. You MUST break down the complete narrative into 35 to 55 sequential scenes (typically 7 to 10 scenes per beat).\n"
-        f"1. SENTENCE-ATOMIC PACING & SUBTITLE OVERFLOW PREVENTION:\n"
-        f"   - Each scene's 'narration' MUST consist of 1 or 2 COMPLETE sentences (max 35 words, ~75-110 characters, strictly ending with '.', '!', or '?'). NEVER cut mid-sentence.\n"
+        f"1. SENTENCE-ATOMIC PACING & SPOKEN LANGUAGE PURITY:\n"
+        f"   - The 'narration' field MUST be in {market_lang_name} matching the verbatim storyline, strictly 1-2 complete sentences ending with terminal punctuation.\n"
         f"   - Subtitle line budget: strictly fits within 2 lines on 1920x1080 display (~35-40 characters/line). Remotion and Karaoke TTS anchor strictly to these sentence cut marks.\n"
         f"   - Calculate 'duration_est_sec' strictly at standard narration pace: max(7, min(16, round(word_count / 2.4))).\n"
         f"2. ARCHETYPE-SPECIFIC CINEMATIC GRAMMAR & CAMERA PRINCIPLES:\n"

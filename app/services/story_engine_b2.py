@@ -551,7 +551,17 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
     if not grounding_claims and 'g_data' in locals() and isinstance(g_data, dict):
         grounding_claims = g_data.get("claims", [])
 
-    if grounding_claims:
+    if not grounding_claims:
+        logger.error(f"[story_engine] CRITICAL: No verified grounding claims found for {task_id}! Violates Rule 118.")
+        fact_audit_result = {
+            "verdict": "FAIL",
+            "audit_score": 1.0,
+            "red_flags": ["RULE_118_ZERO_GROUNDING_CLAIMS"],
+            "critical_findings": "Pipeline blocked: Zero verified factual claims available for story audit."
+        }
+        f_verdict = "FAIL"
+        f_score = 1.0
+    else:
         try:
             from app.services.story_fact_auditor_b2 import audit_story_facts_and_causality
             logger.info(f"[story_engine] Running B2.1 Fact & Causal Audit via claude-opus-5 for {task_id}...")
@@ -609,6 +619,25 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                     logger.error(f"[story_engine] Dual-Model Convergence execution failed: {_conv_err}")
         except Exception as _fa_err:
             logger.warning(f"[story_engine] B2.1 Fact & Causal Audit warning: {_fa_err}")
+
+    # Rule 121 & Rule 127: Hard Story Integrity Gate (Anti-Truncation & 5-Act Assurance)
+    clean_acts = ACT_PATTERN.findall(full_script)
+    act_count = len(clean_acts)
+    word_count = len(full_script.split())
+    char_count = len(full_script)
+    is_cjk = any(mkt.upper() == c for c in ["JP", "KR", "JA", "KO"])
+    min_len = 1000 if not is_cjk else 1500  # words for EN, characters for CJK
+    actual_len = char_count if is_cjk else word_count
+    ends_valid = bool(re.search(r"[.!?。？！'\"”’]\s*$", full_script.strip()))
+
+    if act_count < 5 or actual_len < min_len or not ends_valid:
+        err_msg = (
+            f"[story_engine] CRITICAL STORY DEFECT for {task_id}: Script is truncated or malformed! "
+            f"Acts found: {act_count}/5, Length: {actual_len} (required >= {min_len}), "
+            f"Ends with sentence punctuation: {ends_valid}. Rejecting export to B3!"
+        )
+        logger.error(err_msg)
+        raise ValueError(err_msg)
 
     # Write story.txt to both directories
     for d in [out_dir, root_ep_dir]:

@@ -130,6 +130,18 @@ def gate_market_scheduler():
 
     print("  [PASS] Market scheduler enforces 1 video/day (EN 2,5 | KR 3,6 | JP 4,7 | Sun OFF) and UTC+7 anchor.")
 
+def gate_b36_visual_convergence():
+    print_gate("9. B3.6 Visual Convergence Gate (DACL & Rule 118/122)")
+    from app.services.b36_visual_convergence import (
+        run_b36_visual_convergence,
+        B36_AUDIT_SYSTEM_PROMPT,
+        ASTRA_CROSS_AUDIT_PROMPT
+    )
+    assert "MARKET LINGUISTIC PURITY" in B36_AUDIT_SYSTEM_PROMPT
+    assert "cross_audit_verdict" in ASTRA_CROSS_AUDIT_PROMPT
+    assert hasattr(run_b36_visual_convergence, "__call__"), "run_b36_visual_convergence must be callable"
+    print("  [PASS] B3.6 Visual Convergence Gate DACL definitions verified.")
+
 def main():
     print("\n" + "="*60)
     print("🛡️ RUNNING MASTER E2E PIPELINE SMOKE TEST (RULE 127)")
@@ -141,6 +153,7 @@ def main():
         gate_b2_story_engine()
         gate_b3_director_planner()
         gate_b35_visual_prompt_forge()
+        gate_b36_visual_convergence()
         gate_zero_ghost_and_encoding()
         gate_market_scheduler()
 

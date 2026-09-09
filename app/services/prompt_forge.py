@@ -146,9 +146,9 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     if "safe-zone" not in p and "safe zone" not in p:
         p = f"{p}, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay"
 
-    style_prefix = "[STYLE MANDATE] 16:9 widescreen cinematic documentary environment, atmospheric volumetric lighting, spatial textures, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay."
+    style_prefix = "[STYLE MANDATE] 16:9 widescreen cinematic editorial environment illustration, stylized graphic novel background, atmospheric volumetric lighting, spatial textures, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay."
 
-    p = f"{style_prefix} {p} [ERA ANCHOR] Authentic period architecture and narrative atmosphere. [STRICT NEGATIVE PROMPT] no prominent foreground human figures, no photorealistic faces, no text, no subtitles, no watermark, no borders, no ui elements, no split frame."
+    p = f"{style_prefix} {p} [ERA ANCHOR] Authentic period architecture and narrative atmosphere. [STRICT NEGATIVE PROMPT] no prominent foreground human figures, no photorealistic faces, no text, no subtitles, no watermark, no borders, no ui elements, no split frame, no photographic raw camera."
 
     return deduplicate_phrase_stutter(p)
 
@@ -173,28 +173,20 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
         flags=re.IGNORECASE
     ).strip()
 
-    has_full_body = any(term in p.lower() for term in [
-        "full-body", "full body", "head-to-shoes", "head to toe", "entire character visible"
-    ])
+    # Clean corrupted character role fragments (e.g. 'ficial' -> 'official')
+    p = re.sub(r"\bFull-body\s+ficial\b", "Full-body official", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bficial\b", "official", p)
 
-    mandatory_framing = (
-        "1:1 aspect ratio, full-body head-to-shoes standing portrait, "
-        "entire character visible with head and feet completely inside frame on solid #FF00FF magenta background"
-    )
-
-    if not has_full_body:
-        p = re.sub(r",?\s*(?:isolated\s+on\s+(?:a\s+solid\s+flat\s+)?)?#FF00FF[^,]*", "", p, flags=re.IGNORECASE)
-        p = re.sub(r",?\s*1:1 aspect ratio", "", p, flags=re.IGNORECASE)
-        p = f"{p.rstrip(', ')}, {mandatory_framing}"
-    else:
-        if "#FF00FF" not in p:
-            p = f"{p}, on solid #FF00FF magenta background"
-        if "1:1 aspect ratio" not in p:
-            p = f"{p}, 1:1 aspect ratio"
+    # Strip redundant chroma and isolation clauses from core description to prevent stutter
+    p = re.sub(r",?\s*(?:isolated\s+on(?:\s+a)?(?:\s+solid)?(?:\s+flat)?\s*(?:#FF00FF)?(?:\s+pure)?(?:\s+magenta)?(?:\s+background)?)", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*#FF00FF[^,]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*1:1\s+aspect\s+ratio", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*(?:isolated\s+on(?:\s+a)?|\bon\b|\bwith\b|\bat\b)\s*$", "", p.strip(), flags=re.IGNORECASE)
+    p = p.rstrip(",. ").strip()
 
     style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich nuanced colors, 1:1 aspect ratio, full-body head-to-shoes, entire character visible within frame, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
 
-    p = f"{style_prefix} {p} [ERA ANCHOR] Period-accurate attire, realistic investigative posture and facial expression. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements."
+    p = f"{style_prefix} {p}, full-body standing or seated head-to-shoes visible within frame. [ERA ANCHOR] Authentic professional attire, stylized expressive character acting. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements."
 
     p = deduplicate_phrase_stutter(p)
 
@@ -217,44 +209,49 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
 
 
 def _sanitize_thumbnail_prompt(prompt: str, thumb_key: str = "") -> str:
-    """Sanitize and format YouTube 16:9 2K DCI Hero Thumbnail prompt (Rule 114 & Rule 435)."""
+    """Sanitize and format YouTube 16:9 QHD Hero Thumbnail prompt (Rule 114, Rule 122 & Rule 435)."""
     p = prompt.strip()
+    p = p.replace("2K DCI", "").replace("(2K DCI)", "").strip()
     if "16:9" not in p:
         p = f"{p}, 16:9 aspect ratio"
-    if "2560x1440" not in p and "2K" not in p:
-        p = f"{p}, 2560x1440 resolution (2K DCI)"
+    if "2560x1440" not in p:
+        p = f"{p}, 2560x1440 resolution (16:9 QHD)"
 
-    style_prefix = "[STYLE MANDATE: THUMBNAIL] 16:9 widescreen high-CTR YouTube hero thumbnail, high visual tension, dramatic high-contrast lighting, bold cinematic color grading, clear focal point, clean negative space for typography."
-    p = f"{style_prefix} {p} [STRICT NEGATIVE PROMPT] no tiny unreadable text, no cluttered composition, no low quality, no blur, no split frame, no watermark, no ui elements."
+    style_prefix = "[STYLE MANDATE: THUMBNAIL] 16:9 widescreen high-CTR YouTube hero thumbnail, non-photorealistic 2D stylized editorial graphic novel digital illustration, bold ink linework, cel-shading, high visual tension, dramatic high-contrast lighting, bold cinematic color grading, clear focal point, clean negative space for typography."
+    strict_negatives = "[STRICT NEGATIVE PROMPT] no tiny unreadable text, no cluttered composition, no low quality, no blur, no split frame, no watermark, no ui elements, no text, no letters, no words, no Japanese glyphs, no typography, no logos, no photorealistic human, no 3D CGI."
+    p = f"{style_prefix} {p} {strict_negatives}"
     return deduplicate_phrase_stutter(p)
 
 
 def _synthesize_thumbnail_prompts(story_title: str, seo_data: dict = None) -> dict:
     """
-    Synthesize high-CTR YouTube Thumbnail prompts (A/B) from SEO Package & Story Anchor (Rule 114 & Rule 435).
-    Thumbnail A: Emotion-First & Specific Viral Angle.
-    Thumbnail B: Curiosity-Gap & Paradox Juxtaposition.
+    Synthesize high-CTR YouTube Thumbnail prompts (A/B) from SEO Package & Story Anchor (Rule 114, 122 & Rule 435).
+    Thumbnail A: Emotion-First & Specific Viral Angle (Graphic Novel Hero Art).
+    Thumbnail B: Curiosity-Gap & Paradox Juxtaposition (Graphic Novel Concept Art).
     """
-    clean_title_a = re.sub(r"[\r\n]+", " ", (seo_data.get("title_a") if seo_data else "") or story_title or "").strip()[:80]
-    clean_title_b = re.sub(r"[\r\n]+", " ", (seo_data.get("title_b") if seo_data else "") or "").strip()[:80]
-    clean_hook = re.sub(r"[\r\n]+", " ", (seo_data.get("hook_3s") if seo_data else "") or "").strip()[:100]
+    raw_title_a = (seo_data.get("title_a") if seo_data else "") or story_title or ""
+    clean_title_a = re.sub(r"[\r\n]+", " ", raw_title_a).split("|")[0].strip()[:80]
+    
+    raw_title_b = (seo_data.get("title_b") if seo_data else "") or ""
+    clean_title_b = re.sub(r"[\r\n]+", " ", raw_title_b).split("|")[0].strip()[:80]
+    
+    clean_hook = re.sub(r"[\r\n]+", " ", (seo_data.get("hook_3s") if seo_data else "") or "").split("|")[0].strip()[:100]
     
     raw_angle = ((seo_data.get("specific_viral_angle") if seo_data else "") or "").strip()
-    first_sent = re.sub(r"[\r\n]+", " ", raw_angle).split(".")[0].strip() if raw_angle else ""
+    first_sent = re.sub(r"[\r\n]+", " ", raw_angle).split(".")[0].split("|")[0].strip() if raw_angle else ""
     clean_angle = first_sent[:120] or clean_title_a
 
     thumb_a = (
-        f"Cinematic wide-angle 16:9 YouTube hero thumbnail for '{clean_title_a}'. "
-        f"High visual tension visual metaphor representing '{clean_angle}', "
-        f"dramatic high-contrast chiaroscuro lighting, bold atmospheric color grading, "
-        f"clear asymmetric focal point, unobstructed clean negative space for typography, "
-        f"photorealistic 8k cinematic documentary aesthetic, 2560x1440 resolution, 2K DCI."
+        f"Stylized editorial graphic novel 16:9 YouTube hero thumbnail for '{clean_title_a}'. "
+        f"High visual tension dramatic metaphor illustrating '{clean_angle}', "
+        f"dramatic high-contrast chiaroscuro lighting, bold ink outlines, rich nuanced cel-shading, "
+        f"clear asymmetric focal point, unobstructed clean negative space for typography, 2560x1440 resolution (16:9 QHD)."
     )
     thumb_b = (
-        f"Curiosity-gap 16:9 YouTube thumbnail for '{clean_title_b or clean_title_a}'. "
+        f"Curiosity-gap stylized graphic novel 16:9 YouTube thumbnail for '{clean_title_b or clean_title_a}'. "
         f"Shocking narrative juxtaposition illustrating the core paradox '{clean_hook or clean_title_a}', "
-        f"intense volumetric cinematic lighting, high-stakes atmospheric depth, "
-        f"unobstructed safe-zone for title text, photorealistic 8k documentary aesthetic, 2560x1440 resolution."
+        f"intense volumetric dramatic chiaroscuro, graphic novel cel-shading with clean ink lines, "
+        f"unobstructed safe-zone for title typography, 2560x1440 resolution (16:9 QHD)."
     )
     return {
         "thumbnail_a": _sanitize_thumbnail_prompt(thumb_a, "thumbnail_a"),

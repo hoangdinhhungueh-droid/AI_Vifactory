@@ -50,7 +50,10 @@ def test_cinematic_archetype_routing():
     assert "Fincher" in fin["director"] or "Corporate Noir" in fin["director"]
 
     hist = detect_cinematic_archetype("History", "Cold War Manhattan Project")
-    assert "Nolan" in hist["director"] or "Chernobyl" in hist["director"]
+    assert "Renck" in hist["director"] or "Villeneuve" in hist["director"] or "Chernobyl" in hist["director"]
+
+    tech = detect_cinematic_archetype("Technology", "Semiconductor Supply Chain War")
+    assert "Nolan" in tech["director"]
 
     med = detect_cinematic_archetype("Medical", "Cholera Outbreak")
     assert "Soderbergh" in med["director"] or "Villeneuve" in med["director"] or "Clinical" in med["director"]

@@ -186,11 +186,44 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
             "{task_id}",
         ],
     ),
+    "3.6": StageContract(
+        stage_id="3.6",
+        name="B3.6 Visual Convergence Gate (DACL)",
+        description="Decremental Adversarial Convergence Loop (Opus 5 + Astra) for B3 Director Plan & B3.5 Prompts (Rule 118, 122, 130)",
+        prerequisites=["3.5"],
+        input_files=[
+            "/var/vf/episodes/{task_id}/director_plan.json",
+            "/var/vf/episodes/{task_id}/dp_plan.json",
+            "/var/vf/episodes/{task_id}/prompts_forge.json",
+            "/var/vf/episodes/{task_id}/story.txt",
+            "/var/vf/episodes/{task_id}/grounding_intel.json",
+        ],
+        output_files=[
+            "/var/vf/episodes/{task_id}/visual_convergence_audit.json",
+            "/var/vf/episodes/{task_id}/director_plan.json",
+            "/var/vf/episodes/{task_id}/prompts_forge.json",
+        ],
+        command_template=[
+            "python3",
+            "-c",
+            "import sys, json; sys.path.insert(0, '.'); from app.services.b36_visual_convergence import run_b36_visual_convergence; "
+            "dplan = json.load(open('/var/vf/episodes/{task_id}/director_plan.json', encoding='utf-8')); "
+            "dp = json.load(open('/var/vf/episodes/{task_id}/dp_plan.json', encoding='utf-8')) if __import__('os').path.exists('/var/vf/episodes/{task_id}/dp_plan.json') else {}; "
+            "prompts = json.load(open('/var/vf/episodes/{task_id}/prompts_forge.json', encoding='utf-8')); "
+            "story = open('/var/vf/episodes/{task_id}/story.txt', encoding='utf-8').read(); "
+            "intel = json.load(open('/var/vf/episodes/{task_id}/grounding_intel.json', encoding='utf-8')) if __import__('os').path.exists('/var/vf/episodes/{task_id}/grounding_intel.json') else {}; "
+            "res = run_b36_visual_convergence('{task_id}', dplan, dp, prompts, story, intel); "
+            "open('/var/vf/episodes/{task_id}/visual_convergence_audit.json', 'w', encoding='utf-8').write(json.dumps(res, ensure_ascii=False, indent=2)); "
+            "open('/var/vf/episodes/{task_id}/director_plan.json', 'w', encoding='utf-8').write(json.dumps(res['director_plan'], ensure_ascii=False, indent=2)); "
+            "open('/var/vf/episodes/{task_id}/prompts_forge.json', 'w', encoding='utf-8').write(json.dumps(res['prompts_data'], ensure_ascii=False, indent=2)); "
+            "assert res.get('converged', False), f'B3.6 Convergence Gate Failed: {res.get(\"final_score\")}'",
+        ],
+    ),
     "4.0": StageContract(
         stage_id="4.0",
         name="B4 Image Generation",
         description="Gemini Pro Web Chrome Automation 2K DCI + HSV Chroma Key (Rule 122)",
-        prerequisites=["3.5"],
+        prerequisites=["3.6"],
         input_files=["/var/vf/episodes/{task_id}/prompts_forge.json"],
         output_files=["/var/vf/episodes/{task_id}/images/"],
         command_template=[
@@ -247,6 +280,11 @@ STAGE_ALIASES = {
     "3.5": "3.5",
     "b3.5": "3.5",
     "b35": "3.5",
+    "3.6": "3.6",
+    "b3.6": "3.6",
+    "b36": "3.6",
+    "visual_convergence": "3.6",
+    "dacl": "3.6",
     "4": "4.0",
     "4.0": "4.0",
     "b4": "4.0",
@@ -255,7 +293,7 @@ STAGE_ALIASES = {
     "b5": "5.0",
 }
 
-STAGE_ORDER = ["1.0", "1.5", "1.5.5", "1.6", "2.0", "2.1", "3.0", "3.5", "4.0", "5.0"]
+STAGE_ORDER = ["1.0", "1.5", "1.5.5", "1.6", "2.0", "2.1", "3.0", "3.5", "3.6", "4.0", "5.0"]
 
 
 @dataclass
