@@ -1053,7 +1053,7 @@ def discover_and_produce_market_trend(
         alert_msg = (
             f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
             f"Đã quét qua {min(len(candidates), max_scan_candidates)}/{len(candidates)} ứng viên live từ đa kênh (RSS, Discover, YouTube) cho thị trường <b>{m_up}</b>, "
-            f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 7.0/10) để làm phóng sự điều tra.\n"
+            f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 8.0/10) để làm phóng sự điều tra.\n"
             f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra hoặc cấp seed chỉ định."
         )
         logger.warning(f"[{m_up}] No candidates passed viability gate.")
