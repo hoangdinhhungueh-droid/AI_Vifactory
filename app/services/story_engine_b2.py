@@ -415,6 +415,9 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
     if grounding_block:
         logger.info(f"[story_engine] Loaded Grounding Layer table ({len(g_data.get('claims', []))} claims) for {task_id}.")
 
+    is_cjk_market = mkt.upper() in ("JP", "KR", "ZH")
+    min_existing = 1500 if is_cjk_market else 1000
+
     story_file = os.path.join(out_dir, "story.txt")
     existing_script = ""
     if os.path.exists(story_file) and not force:
@@ -424,17 +427,20 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             # Anti-hallucination check: force regeneration if script was ungrounded
             grounding_intel_file = os.path.join(out_dir, "grounding_intel.json")
             is_ungrounded = ("hypothetical calculation" in existing_script.lower() or not os.path.exists(grounding_intel_file))
+            existing_len = len(existing_script) if is_cjk_market else len(existing_script.split())
             if is_ungrounded:
                 logger.info(f"[story_engine] Existing story.txt for {task_id} is ungrounded or missing grounding_intel.json. Forcing fresh regeneration!")
                 existing_script = ""
-            elif len(existing_script.split()) >= 1500:
-                logger.info(f"[story_engine] Reusing existing valid grounded story.txt ({len(existing_script.split())} words) for {task_id}.")
+            elif existing_len >= min_existing:
+                metric_lbl = "chars" if is_cjk_market else "words"
+                logger.info(f"[story_engine] Reusing existing valid grounded story.txt ({existing_len} {metric_lbl}) for {task_id}.")
         except Exception as e:
             logger.warning(f"[story_engine] Error reading existing story.txt: {e}")
     elif force:
         logger.info(f"[story_engine] Force regeneration requested for {task_id}. Generating fresh high-suspense grounded script...")
 
-    if existing_script and len(existing_script.split()) >= 1500:
+    existing_len = len(existing_script) if is_cjk_market else len(existing_script.split())
+    if existing_script and existing_len >= min_existing:
         full_script = existing_script
     else:
         # B11->B2 Feedback Loop: fetch active InsightCards (Rule 126 compliant, non-fatal)
@@ -481,8 +487,10 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
         else:
             full_script = "\n\n".join(cleaned_acts)
 
-    total_words = len(full_script.split())
-    logger.info(f"[story_engine] Generated 5-Act Script: {total_words} words for {task_id}.")
+    is_cjk_market = mkt.upper() in ("JP", "KR", "ZH")
+    total_len = len(full_script) if is_cjk_market else len(full_script.split())
+    metric_lbl = "chars" if is_cjk_market else "words"
+    logger.info(f"[story_engine] Generated 5-Act Script: {total_len} {metric_lbl} for {task_id}.")
 
     # Audit Story Gate Score
     audit = sgate.score_story(full_script)
@@ -498,6 +506,10 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                 f"Fix hints: {audit.get('fix_hints')}. Banned hits: {audit.get('banned_phrases_found')}. "
                 f"Initiating Auto-Refine Attempt {refine_attempt}/2 via GPT-6-Astra to achieve 12/12..."
             )
+            length_instruction = "strictly maintaining 2,500-3,500 Japanese characters" if mkt.upper() == "JP" else (
+                "strictly maintaining 2,500-3,500 Korean characters" if mkt.upper() == "KR" else
+                "strictly maintaining 1,800-2,200 words"
+            )
             refine_user = (
                 f"The generated script scored {audit.get('score')}/{audit.get('max_score')} on Story Gate. Target is 12/12 PERFECT SCORE.\n"
                 f"REQUIRED CORRECTIONS:\n" + "\n".join(f"- {h}" for h in audit.get("fix_hints", [])) + "\n\n"
@@ -505,14 +517,16 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                 f"1. Hook Shock: Sentence 1 of Act I MUST feature a quantitative number, %, or $ figure within 60 words.\n"
                 f"2. Pattern Interrupt: Act III MUST have at least one short sentence of 2 to 6 words (e.g. 'The paper trail vanished.').\n"
                 f"BANNED PHRASES FOUND (MUST ELIMINATE): {', '.join(audit.get('banned_phrases_found', []))}\n\n"
-                f"Please rewrite and polish the entire 5-Act script, strictly maintaining 1,800-2,200 words, "
+                f"Please rewrite and polish the entire 5-Act script, {length_instruction}, "
                 f"preserving all 5 Acts ('=== ACT I ===' to '=== ACT V ==='), ensuring the first sentence opens with a shock quantitative stake (Rule 444), and resolving all failed items.\n\n"
                 f"Current Draft:\n{full_script}\n\n"
                 f"Output ONLY the corrected 5-Act script now:"
             )
             try:
                 refined_raw = call_gpt6_astra(refine_user, system_prompt=system_prompt, max_tokens=3400, timeout=240.0)
-                if refined_raw and len(refined_raw.split()) >= 1000:
+                refined_len = len(refined_raw) if is_cjk_market else len(refined_raw.split())
+                min_threshold = 1500 if is_cjk_market else 1000
+                if refined_raw and refined_len >= min_threshold:
                     cleaned_acts_ref = []
                     matches_ref = ACT_PATTERN.findall(refined_raw)
                     if matches_ref:

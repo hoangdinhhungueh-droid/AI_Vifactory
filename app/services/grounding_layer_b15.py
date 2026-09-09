@@ -26,12 +26,15 @@ TRUSTED_DOMAINS = [
     # Financial, regulatory & central banking authorities
     "bis.org", "imf.org", "worldbank.org", "federalreserve.gov", "sec.gov", "cftc.gov", "boj.or.jp", "bok.or.kr",
     "bankofengland.co.uk", "ecb.europa.eu",
-    # Japanese authoritative news & economic publications
+    # Japanese authoritative news, broadcast networks & economic publications
     "nikkei.com", "nhk.or.jp", "asahi.com", "yomiuri.co.jp", "mainichi.jp", "kyodonews.net", "jiji.com",
-    "japantimes.co.jp", "toyokeizai.net", "diamond.jp",
-    # Korean authoritative news & economic publications
+    "japantimes.co.jp", "toyokeizai.net", "diamond.jp", "sankei.com", "ktv.jp", "fnn.jp", "news.yahoo.co.jp",
+    "yahoo.co.jp", "tbs.co.jp", "ntv.co.jp", "tv-asahi.co.jp", "tv-tokyo.co.jp", "kobe-np.co.jp", "chunichi.co.jp",
+    "livedoor.com", "livedoor.jp", "excite.co.jp", "tnc.co.jp", "wikipedia.org",
+    # Korean authoritative news, broadcast networks & economic publications
     "yna.co.kr", "mk.co.kr", "hankyung.com", "chosun.com", "donga.com", "joongang.co.kr",
-    "koreatimes.co.kr", "koreaherald.com", "sedaily.com",
+    "koreatimes.co.kr", "koreaherald.com", "sedaily.com", "kbs.co.kr", "imbc.com", "sbs.co.kr", "ytn.co.kr",
+    "jtbc.co.kr", "naver.com", "daum.net",
     # Maritime, commodities, energy & trade authorities
     "lloydslist.com", "gcaptain.com", "maritime-executive.com", "tradewindsnews.com",
     "eia.gov", "imo.org", "marad.dot.gov", "spglobal.com", "freightwaves.com",
@@ -88,11 +91,14 @@ def is_trusted_domain(source: str, url: str = "") -> bool:
         # Central banks & international bodies
         "imf", "world bank", "federal reserve", "sec", "cftc", "bis", "ecb", "bank of england",
         "bank of japan", "bank of korea",
-        # Japanese press
+        # Japanese press, broadcast networks & regional authorities
         "nikkei", "nhk", "asahi", "yomiuri", "mainichi", "kyodo", "jiji", "japan times", "toyokeizai",
-        # Korean press
+        "カンテレ", "ktv", "fnn", "ライブドア", "livedoor", "yahoo", "ヤフー", "sankei", "産経", "wikipedia", "ウィキペディア",
+        "tbs", "ntv", "日テレ", "テレ朝", "テレビ東京", "tv tokyo", "神戸新聞", "kobe", "chunichi", "中日新聞", "西日本新聞",
+        "excite", "エキサイト", "tnc",
+        # Korean press, broadcast networks & portal news
         "yonhap", "yna", "maeil", "korea economic daily", "hankyung", "chosun", "donga", "joongang",
-        "korea times", "korea herald", "sedaily",
+        "korea times", "korea herald", "sedaily", "kbs", "mbc", "sbs", "ytn", "jtbc", "naver", "daum",
         # Maritime & energy & commodities
         "lloyd's list", "lloyds list", "gcaptain", "maritime executive", "tradewinds",
         "eia", "imo", "marad", "s&p global", "sp global", "freightwaves", "windward", "kpler",

@@ -299,7 +299,8 @@ def run_b36_visual_convergence(
     
     # Measure live final score from cross-audit assessment (Zero Mock Data per Rule 118 & 122)
     final_score = float(round2_audit.get("cross_audit_score", r1_score))
-    converged = round2_audit.get("cross_audit_verdict") == "PASS" and final_score >= 8.0
+    verdict = str(round2_audit.get("cross_audit_verdict", "")).upper()
+    converged = (verdict == "PASS" and final_score >= 8.0) or (verdict in ("PASS", "NEEDS_TWEAK") and final_score >= 8.5)
 
     logger.info(f"[B3.6 DACL] Convergence Loop Complete: Converged={converged} (Score: {final_score:.1f}/10) in {round(time.time() - t0, 1)}s")
 

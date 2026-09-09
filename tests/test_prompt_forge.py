@@ -70,6 +70,9 @@ def test_sanitize_foreground_prompt_contract():
     assert re.search(r"(Stylized editorial.*){2,}", fg, re.IGNORECASE) is None
 
 
+from unittest.mock import patch
+
+
 def test_generate_scene_prompts_fallback_dual_layer():
     mock_bg = {
         "bg_loc0": {"visual_hint": "Rural vineyard hillside under overcast gray sky"}
@@ -81,7 +84,8 @@ def test_generate_scene_prompts_fallback_dual_layer():
         {"scene_id": "sc01", "bg_id": "bg_loc0", "fg_id": "fg_char0", "narration": "In the valley..."}
     ]
 
-    res = generate_scene_prompts(mock_bg, mock_fg, "Harvest Dispute", mock_scenes)
+    with patch("app.services.prompt_forge.call_gpt6_astra", return_value=None):
+        res = generate_scene_prompts(mock_bg, mock_fg, "Harvest Dispute", mock_scenes)
     assert "backgrounds" in res
     assert "foregrounds" in res
     assert "bg_loc0" in res["backgrounds"]
@@ -94,3 +98,15 @@ def test_generate_scene_prompts_fallback_dual_layer():
     assert "#FF00FF" in fg_p
     assert "1:1 aspect ratio" in fg_p
     assert re.search(r"(Stylized editorial.*){2,}", fg_p, re.IGNORECASE) is None
+
+
+def test_generate_scene_prompts_astra_success():
+    mock_bg = {"bg_loc0": {"visual_hint": "Rural vineyard hillside"}}
+    mock_fg = {"fg_char0": {"visual_hint": "Vineyard caretaker"}}
+    mock_scenes = [{"scene_id": "sc01", "bg_id": "bg_loc0", "fg_id": "fg_char0", "narration": "In the valley..."}]
+    fake_json = '{"backgrounds": {"bg_loc0": "Ancient vineyard, 16:9 aspect ratio, bottom 20% safe-zone clear [STYLE MANDATE]"}, "foregrounds": {"fg_char0": "Stylized Editorial Graphic Novel Digital Illustration of Caretaker, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames, 1:1 aspect ratio, full-body head-to-shoes [STYLE MANDATE]"}}'
+    with patch("app.services.prompt_forge.call_gpt6_astra", return_value=fake_json):
+        res = generate_scene_prompts(mock_bg, mock_fg, "Harvest Dispute", mock_scenes)
+    assert "bg_loc0" in res["backgrounds"]
+    assert "fg_char0" in res["foregrounds"]
+    assert "#FF00FF" in res["foregrounds"]["fg_char0"]

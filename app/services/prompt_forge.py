@@ -141,6 +141,11 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     p = re.sub(r"\[ERA ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[STRICT NEGATIVE PROMPT\]\s*.*$", "", p, flags=re.IGNORECASE)
 
+    # Eradicate forbidden photorealistic tokens
+    p = re.sub(r"photorealistic\s*(?:8k)?\s*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\b8k\b", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"photographic\s*(?:raw\s*camera)?", "", p, flags=re.IGNORECASE)
+
     if "16:9" not in p:
         p = f"{p}, 16:9 aspect ratio"
     if "safe-zone" not in p and "safe zone" not in p:
@@ -162,6 +167,10 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     p = re.sub(r"photorealistic,?\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"3D render,?\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"CGI skin,?\s*", "", p, flags=re.IGNORECASE)
+
+    # Eradicate positional bias from 1:1 cutout (compositor handles left/right placement)
+    p = re.sub(r"positioned strictly on the (?:left|right),?\s*", "centered in frame, ", p, flags=re.IGNORECASE)
+    p = re.sub(r"on the (?:far\s+)?(?:left|right)(?:-hand)? side of the frame,?\s*", "centered in frame, ", p, flags=re.IGNORECASE)
 
     p = re.sub(r"\[STYLE MANDATE\]\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[ERA ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
@@ -235,11 +244,16 @@ def _synthesize_thumbnail_prompts(story_title: str, seo_data: dict = None) -> di
     raw_title_b = (seo_data.get("title_b") if seo_data else "") or ""
     clean_title_b = re.sub(r"[\r\n]+", " ", raw_title_b).split("|")[0].strip()[:80]
     
-    clean_hook = re.sub(r"[\r\n]+", " ", (seo_data.get("hook_3s") if seo_data else "") or "").split("|")[0].strip()[:100]
-    
     raw_angle = ((seo_data.get("specific_viral_angle") if seo_data else "") or "").strip()
-    first_sent = re.sub(r"[\r\n]+", " ", raw_angle).split(".")[0].split("|")[0].strip() if raw_angle else ""
-    clean_angle = first_sent[:120] or clean_title_a
+    angle_sents = [s.strip() for s in re.split(r"[.\n\r。|！？!?]+", raw_angle) if s.strip()]
+    first_sent = angle_sents[0] if angle_sents else ""
+    if any(kw in first_sent for kw in ["報道の表面", "ではなく", "ではなく、", "突き合わせ", "可視化する", "中心に"]):
+        first_sent = clean_title_a
+    clean_angle = re.sub(r"[、,;:\s]+$", "", first_sent[:100]) or clean_title_a
+
+    raw_hook = (seo_data.get("hook_3s") if seo_data else "") or ""
+    hook_sents = [s.strip() for s in re.split(r"[.\n\r。|！？!?]+", raw_hook) if s.strip()]
+    clean_hook = re.sub(r"[、,;:\s]+$", "", hook_sents[0][:100]) if hook_sents else clean_title_a
 
     thumb_a = (
         f"Stylized editorial graphic novel 16:9 YouTube hero thumbnail for '{clean_title_a}'. "
@@ -279,24 +293,25 @@ def generate_scene_prompts(
     """
     scene_pairings = []
     if scenes:
-        for s in scenes:
+        for idx, sc in enumerate(scenes):
+            bg_k = sc.get("background_reuse_key") or sc.get("bg_id") or f"bg_{idx}"
+            fg_k = sc.get("foreground_reuse_key") or sc.get("fg_id") or f"fg_{idx}"
+            narr = sc.get("narration") or sc.get("narrative") or ""
+            dur = sc.get("duration_sec") or sc.get("duration_est_sec") or 5
             scene_pairings.append({
-                "scene_index": s.get("scene_index"),
-                "arc": s.get("arc"),
-                "background_reuse_key": s.get("background_reuse_key") or s.get("bg_id"),
-                "foreground_reuse_key": s.get("foreground_reuse_key") or s.get("fg_id"),
-                "narration_excerpt": (s.get("narration") or "")[:250],
-                "bg_hint": s.get("image_prompt"),
-                "fg_hint": s.get("foreground_prompt")
+                "scene_index": idx,
+                "background_key": bg_k,
+                "foreground_key": fg_k,
+                "narration_context": narr,
+                "duration_sec": dur
             })
 
-    # Rule 128: Use concise strategic rules loader (~1.2k chars) to eliminate token explosion
-    visual_rules = get_b35_strategic_rules()
+    # Prepare strategic prompt for GPT-6-Astra
+    b35_rules = get_b35_strategic_rules()
     system_prompt = (
-        f"{visual_rules}\n\n"
-        "You are an Elite Visual Director and Master Prompt Engineer for the AI Video Factory (VF Pipeline).\n"
-        "Your mission is to generate production-grade image generation prompts for 2-Layer video composition:\n"
-        "  - Layer 1 Background (16:9 2K DCI 2560x1440): Cinematic documentary environment.\n"
+        "You are the Lead Cinematographer and Visual Concept Artist (GPT-6-Astra) for AI Video Factory.\n"
+        "Your mission is to forge production-ready image prompts for two distinct visual layers per scene:\n"
+        "  - Layer 1 Background (16:9 2560x1440): Wide environmental setting, cinematic lighting, subtitle safe-zone.\n"
         "  - Layer 2 Foreground (1:1 2048x2048): Stylized editorial graphic novel digital illustration isolated on pure #FF00FF magenta chroma key.\n\n"
         "CRITICAL ARCHITECTURAL MANDATES (RULE 116 & RULE 435 & RULE 128):\n"
         "1. ERA & TOPIC AUTHENTICITY (Rule 128): Strictly derive era, architectural style, atmosphere, color palette, and lighting dynamically from the episode topic and scene narration. Zero domain bleed.\n"
@@ -306,7 +321,7 @@ def generate_scene_prompts(
         "   - Authentic period architecture, environment textures, dramatic volumetric lighting.\n"
         "   - NO prominent human figures in the foreground. Leave center/right negative space clear for the Layer 2 character overlay.\n"
         "   - Leave the bottom 20% safe zone clear of critical visual elements for on-screen subtitles.\n"
-        "   - Style: Photorealistic 8k cinematic documentary environment, rich spatial textures, moody color grading, 16:9 aspect ratio.\n"
+        "   - Style: Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, rich spatial textures, moody chiaroscuro lighting, 16:9 aspect ratio.\n"
         "4. LAYER 2 FOREGROUND PROMPT RULES (1:1):\n"
         "   - NON-PHOTOREALISTIC, STYLIZED EDITORIAL GRAPHIC NOVEL DIGITAL ILLUSTRATION (clean digital artwork, illustrated character drawing, NOT a studio photograph).\n"
         "   - Exactly ONE full-body standing or seated figure/subject visible from head to toe in authentic attire appropriate to the era and role.\n"
@@ -321,7 +336,8 @@ def generate_scene_prompts(
         "  \"foregrounds\": {\n"
         "    \"<fg_key>\": \"<detailed prompt string>\", ...\n"
         "  }\n"
-        "}\n"
+        "}\n\n"
+        f"STRATEGIC VISUAL RULES:\n{b35_rules}"
     )
 
     user_payload = {

@@ -712,26 +712,32 @@ def generate_director_plan(
         bg = sc.get("background") or {}
         bg_key = bg.get("reuse_key") or f"{episode_id.lower()}_bg_b{beat_idx}_loc{idx:02d}"
         bg_desc = bg.get("visual_description") or sc.get("image_prompt") or f"Cinematic documentary environment for {beat_name}"
-        bg_roster[bg_key] = {
-            "key": bg_key,
-            "beat": beat_name,
-            "description": bg_desc,
-            "safe_zone": "bottom 20% safe zone for subtitles, center-right negative space for foreground"
-        }
+        if bg_key in bg_roster:
+            bg_desc = bg_roster[bg_key]["description"]
+        else:
+            bg_roster[bg_key] = {
+                "key": bg_key,
+                "beat": beat_name,
+                "description": bg_desc,
+                "safe_zone": "bottom 20% safe zone for subtitles, center-right negative space for foreground"
+            }
 
         fg = sc.get("foreground")
         fg_key = None
         if fg and isinstance(fg, dict):
             fg_key = fg.get("reuse_key") or f"{episode_id.lower()}_fg_b{beat_idx}_char{idx:02d}"
             fg_desc = fg.get("visual_description") or sc.get("foreground_prompt") or f"Stylized editorial graphic novel character for {beat_name}"
-            fg_roster[fg_key] = {
-                "key": fg_key,
-                "beat": beat_name,
-                "role": fg.get("character_role", "Key Narrative Figure"),
-                "body_language": fg.get("body_language", "Standing full body, expressive investigative posture"),
-                "description": fg_desc,
-                "position": fg.get("position", "right" if idx % 2 == 0 else "left")
-            }
+            if fg_key in fg_roster:
+                fg_desc = fg_roster[fg_key]["description"]
+            else:
+                fg_roster[fg_key] = {
+                    "key": fg_key,
+                    "beat": beat_name,
+                    "role": fg.get("character_role", "Key Narrative Figure"),
+                    "body_language": fg.get("body_language", "Standing full body, expressive investigative posture"),
+                    "description": fg_desc,
+                    "position": fg.get("position", "right" if idx % 2 == 0 else "left")
+                }
 
         cam = sc.get("camera") or {}
         cam_mov = cam.get("movement") if isinstance(cam, dict) else str(cam)
