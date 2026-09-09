@@ -212,6 +212,7 @@ class TestIntelCard:
             "task_id", "target_keyword", "niche", "market",
             "competitor_benchmarks", "audience_comment_gaps",
             "_b2_to_synthesize", "collection_meta",
+            "transposition_opportunities", "ai_slop_redlines", "audience_wishlist_topics",
         }
 
     def test_no_placeholder_verdicts_emitted(self, tmp_path):
