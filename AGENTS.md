@@ -1,7 +1,7 @@
 # 🛡️ ANTIGRAVITY OPERATIONAL CONSTITUTION (ALWAYS ON)
 
 > **QUY TẮC BẤT BIẾN CẤP CAO NHẤT CỦA WORKSPACE AI VIDEO FACTORY (VF PIPELINE).**
-> Mọi Agent/Subagent bắt buộc tuân thủ 15 Kỷ Luật Thép và cơ chế Định Tuyến Kỹ Năng (Progressive Disclosure) dưới đây:
+> Mọi Agent/Subagent bắt buộc tuân thủ 16 Kỷ Luật Thép và cơ chế Định Tuyến Kỹ Năng (Progressive Disclosure) dưới đây:
 
 ---
 
@@ -150,14 +150,26 @@
       - Toàn bộ Prompt templates, nguyên lý kịch bản 5 Beat, cấu trúc Hook, quy tắc ngôn ngữ, và bài học cải tiến tự động B11 BẮT BUỘC phải lưu trữ và quản lý tập trung trên Notion SoT (hoặc nạp động thông qua `skill_loader.py`).
       - Trường hợp fallback offline: BẮT BUỘC nạp từ các file markdown cấu hình độc lập (`config/prompts/*.md`), tuyệt đối không được hardcode vào mã nguồn.
     - **Cổng CI Linter Khử Nhiễm Ngữ Nghĩa Bắt Buộc (Mandatory Semantic Bias CI Linter Gate)**:
-      - Mọi commit và pull request bắt buộc phải vượt qua bài kiểm tra `tests/test_zero_semantic_bias.py` trên GitHub Actions CI.
 15. **RULE 133 (Notion AI Skill Delegation vs. Antigravity Operational Scope Mandate - Kỷ Luật Thép Về Phân Định Ranh Giới Giữa Skill AI Notion & Rule Antigravity)**:
-    - **Skill AI Notion Là Nơi Lưu Trữ Nghiệp Vụ Prompt & Tri Thức Kể Chuyện (Domain & Editorial Knowledge on Notion SoT)**:
-      - Mọi quy chuẩn nghiệp vụ liên quan đến Prompt Engineering, cấu trúc kịch bản (như Rule 130 Factual Causal Integrity, Rule 131 10X 5-Beat Architecture, Rule 444 Hook, phong cách hình ảnh B3/B3.5, bài học cải tiến B11) BẮT BUỘC phải được cập nhật và quản trị tập trung tại các trang Notion SoT (`Skill AI` page `ac901989-2400-827e-bda2-8175dabdcf13`, `Content Engine Hub`, `Media Production Hub`).
-      - Code thực thi trên VPS (`app/services/*`, `scripts/*`) nạp các quy chuẩn này thông qua phễu tinh gọn `skill_loader.py` (cơ chế Just-In-Time Injection, caching 3600s, offline fallback `config/prompts/*.md`) để truyền đúng tinh thần nghiệp vụ cho LLM xử lý từng bước mà KHÔNG làm phình to prompt hay tràn context.
+    - **Skill AI Notion Là Nơi Lưu Trữ Nghiệp Vụ Prompt & Tri Thức Kể Chuyện & Đạo Diễn (Domain, Editorial & Director Knowledge on Notion SoT)**:
+      - Mọi quy chuẩn nghiệp vụ liên quan đến Prompt Engineering, cấu trúc kịch bản và đạo diễn hình ảnh (Rule 130 Factual Causal Integrity & Visual Anchoring, Rule 131 10X 5-Beat Architecture & Storyboard Pacing, Rule 444 Hook, phong cách hình ảnh B3/B3.5, bài học cải tiến B11) BẮT BUỘC phải được cập nhật và quản trị tập trung tại các trang Notion SoT (`Skill AI` page `ac901989-2400-827e-bda2-8175dabdcf13`, `Content Engine Hub`, `Media Production Hub`).
+      - Code thực thi trên VPS (`app/services/*`, `scripts/*`) nạp các quy chuẩn này thông qua phễu tinh gọn `skill_loader.py` (cơ chế Just-In-Time Injection, caching 3600s, offline fallback `config/prompts/*.md`) để truyền đủ context và đúng tinh thần nghiệp vụ cho LLM (GPT-6-Astra) xử lý từng bước mà KHÔNG làm phình to prompt hay tràn context.
     - **AGENTS.md Chỉ Chứa Các Quy Tắc Vận Hành Trực Tiếp Của Antigravity (Antigravity Direct Execution Rules Only)**:
       - `AGENTS.md` là Hiến pháp vận hành của Antigravity, CHỈ ĐƯỢC PHÉP ghi nhận các Kỷ luật thép chi phối hành vi trực tiếp của Agent (như Rule 118 Zero-Mock Data & Ask-Before-Deviating, Rule 119 Codebase Execution, Rule 121 Strict Verification Protocol, Rule 124 Atomic Commit, Rule 126 Three-Way Physical Sync, Rule 127 Runtime Execution Gate, Rule 129 Autonomous Inquiry Gate).
       - CẤM TUYỆT ĐỐI việc đưa toàn văn nội dung prompt kể chuyện, hướng dẫn viết văn, hay chi tiết nghệ thuật tạo hình vào `AGENTS.md` gây lãng phí token nạp vào mỗi phiên chat và làm loãng khả năng tuân thủ kỷ luật thực thi của Antigravity.
+16. **RULE 134 (Exact Parity, Full-Text Consistency & Adversarial Boundary Verification Gate - Kỷ Luật Thép Về Đối Soát Nhất Quán Toàn Diện & Kiểm Thử Đối Kháng)**:
+    - **Cấm Tuyệt Đối Nghiệm Thu Cục Bộ Bằng Smoke Test Đơn Thuần (Anti-Shallow-Smoke Mandate)**:
+      - Smoke test (`e2e_pipeline_smoketest.py`, `ci_neighbor_tester.py`) chỉ chứng minh luồng chính không sập (happy path / syntax / schema), HOÀN TOÀN KHÔNG chứng minh các thông số nghiệp vụ, hằng số cấu hình, và thông điệp cảnh báo đã khớp nhau 100%.
+      - CẤM TUYỆT ĐỐI việc Agent thấy Smoke test in `PASS` rồi kết luận hoàn tất khi chưa chạy kiểm tra tính nhất quán giá trị (Value & Boundary Parity).
+    - **Bắt Buộc Quét Nhất Quán Văn Bản Toàn Diện (Mandatory Full-Text Consistency Sweep)**:
+      - Khi thay đổi bất kỳ hằng số cấu hình, ngưỡng điểm (như `viability_score >= 8.0`), danh mục trục đề tài (như `7 Canonical Pillars`), hoặc định danh schema:
+        Agent BẮT BUỘC phải thực thi lệnh tìm kiếm toàn diện (`grep_search` hoặc `grep -rn`) trên toàn bộ codebase VPS và Workspace để rà soát tất cả file liên quan (service logic, reasoner, templates, tests, alerts, docstrings).
+      - CẤM TUYỆT ĐỐI để tồn tại tình trạng file này ghi `8.0` nhưng file kia hoặc chuỗi cảnh báo vẫn ghi `7.0`, hay module này có 7 trục nhưng module khác chỉ có 5 trục.
+    - **Kiểm Thử Đối Kháng Nghiệp Vụ Biên (Adversarial Boundary & Parity Assertions in CI)**:
+      - Mọi bài kiểm thử CI (`tests/ci_neighbor_tester.py`) BẮT BUỘC phải có các câu lệnh `assert` cụ thể kiểm tra sự đồng nhất giữa hằng số cấu hình và nội dung nghiệp vụ thực tế (ví dụ: `assert VIABILITY_THRESHOLD == 8.0`, kiểm tra chuỗi alert chứa đúng ngưỡng, kiểm tra danh mục Pillars đủ 7 mục canonical).
+      - BẮT BUỘC bổ sung test case kiểm thử ngoại cảnh / boundary context (như chạy script từ working directory khác để kiểm tra đường dẫn tuyệt đối, kiểm tra fallback khi thiếu file fixture).
+    - **Chốt Chặn Kiểm Toán Pháp Y Độc Lập Trước Khi Đồng Bộ (Pre-Sync Adversarial Forensic Gate)**:
+      - Trước khi thực hiện `git push` và nghiệm thu hoàn tất theo Rule 126, vai **Forensic Auditor** trong `/vf-pipeline-teamwork` BẮT BUỘC phải thực hiện checklist quét đối kháng vi sai (Differential Audit Checklist) tìm kiếm các điểm rò rỉ, sai lệch hằng số, và tàn dư logic cũ. Chỉ khi checklist đạt 100% CLEAR mới được bàn giao cho Three-Way Sync Coordinator.
 
 ---
 
@@ -182,4 +194,3 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 1. **Task-Level Contract**: Mọi nhiệm vụ lớn / Sprint bắt buộc neo theo file `ORIGINAL_REQUEST.md` (chứa User Request gốc, Requirements R1..Rn và Acceptance Criteria `[ ]`).
 2. **Interface Contracts**: Khế ước dữ liệu JSON IN/OUT giữa các block và danh mục file trên VPS tra cứu tại `PIPELINE_CONTRACTS.md`.
 3. **Autonomous Clarification Protocol**: Mọi tác vụ có tính đa chiều, rẽ nhánh kỹ thuật hoặc mơ hồ bắt buộc kích hoạt Cổng Phản Vấn Chủ Động (Rule 129), suy luận sâu và làm rõ với User trước khi triển khai sâu.
-
