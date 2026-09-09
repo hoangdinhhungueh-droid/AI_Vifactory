@@ -1,10 +1,25 @@
 #!/usr/bin/env python3
 """
-scripts/b11_engine.py
+scripts/b11_antigravity_engine.py
 =============================================================================
 B11 Analytics Dreaming & Continuous Feedback-Loop Engine (v2.1 An Ong Edition)
 =============================================================================
-Deployed on VPS for 24/7 autonomous monitoring & Antigravity orchestration.
+Features:
+- Stateful Delta Tracking (data/b11_state.json): Avoids redundant re-analysis.
+- Multi-Dimensional Analytics:
+  * Device Breakdown (Mobile vs Desktop vs TV vs Tablet)
+  * Traffic Source Breakdown (Browse vs Related vs Search)
+- An Ong Framework Integration (Rules 443, 444, 445):
+  * Mobile-First Thumbnail Legibility Trigger (Text >= 40% Canvas)
+  * 5-Variant Hook Protocol for Cold Traffic Retention
+  * Pure Niche Consistency Enforcement
+- 3-Tier Multi-Role Architecture:
+  * Tier 1 (Fast Sync - 0 Token): Routine delta check & Notion stats update.
+  * Tier 2 (Antigravity Sentinel): Session-level QA & interactive reporting.
+  * Tier 3 (Supreme Brain): HHTech GPT-6-Astra ONLY on 48h milestone transition,
+    significant traffic anomalies, or manual --deep trigger.
+- Cross-platform: Runs seamlessly on Local Windows and Remote Linux VPS.
+- Compliance: Rule 113 (48h Law), Rule 118 (Zero-Mock Data), Rule 121 (200 OK).
 """
 
 import urllib.request
@@ -14,6 +29,9 @@ import os
 import sys
 import time
 from datetime import datetime, timezone, timedelta
+
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8')
 
 # Notion IDs
 B11_EXPERIMENT_LAB_DB_ID = "76601989-2400-838f-ad45-816777c57ffd"
@@ -26,6 +44,7 @@ STATE_FILE = os.path.join(DATA_DIR, "b11_state.json")
 
 # Candidate secret paths (Windows & Linux)
 SECRETS_PATHS = [
+    r"c:\Users\hunghd2\Desktop\AI VF\secrets.env.txt",
     "/".join(["", "root", "sec" + "rets", ".env"]),
     os.path.join(BASE_DIR, "secrets.env.txt"),
     os.path.join(BASE_DIR, ".env"),
@@ -346,6 +365,70 @@ def append_skill_enhancement(token, target_page_id, action_summary):
     res = notion_api(token, url, method="PATCH", payload=payload)
     return len(res.get("results", [])) > 0
 
+def diagnose_channel_lifecycle(videos: list) -> dict:
+    """
+    Newborn Channel Incubation Matrix (The 0-20 Video Law - Thanh Hai 2026 Playbook).
+    Categorizes channel lifecycle maturity and provides algorithmic health diagnosis:
+      - Phase 1 (Seed Sampling: 1-10 videos): Algorithmic indexing & cold traffic exploration.
+      - Phase 2 (Viability Gate: 11-20 videos): Threshold testing (Stall vs Packaging vs Hook).
+      - Phase 3 (Mature Scale: >20 videos): Standard routine & deep post-mortem optimization.
+    """
+    total_videos = len(videos)
+    total_views = sum(v.get("views", 0) for v in videos)
+    total_likes = sum(v.get("likes", 0) for v in videos)
+    total_comments = sum(v.get("comments", 0) for v in videos)
+    avg_views = total_views / max(total_videos, 1)
+
+    if total_videos <= 10:
+        phase = "PHASE_1_SEED_SAMPLING"
+        status = "NORMAL_INCUBATION"
+        guidance = (
+            f"Kênh đang ở Giai đoạn Ươm tạo Hạt giống ({total_videos}/10 video). "
+            "KỶ LUẬT THÉP: CẤM đổi ngách, cấm sửa Title/Thumbnail lung tung khi view thấp. "
+            "Thuật toán YouTube đang thử nghiệm phân phối cho nhiều tệp khán giả khác nhau (Cold Sampling). "
+            "Duy trì nghiêm ngặt nhịp độ xuất bản theo lịch tuần."
+        )
+    elif 11 <= total_videos <= 20:
+        phase = "PHASE_2_VIABILITY_GATE"
+        if total_views < 100:
+            status = "ALGORITHMIC_STALL_RISK"
+            guidance = (
+                f"CẢNH BÁO SỨC SỐNG ({total_videos} video, tổng {total_views} view): "
+                "Lưu lượng phân phối quá thấp hoặc từ khóa bị kén tệp. "
+                "Rà soát lại SEO Tags và cân nhắc áp dụng Format Win Transposition sang ngách rộng hơn."
+            )
+        elif total_views >= 500 and total_likes < 5:
+            status = "AUDIENCE_ENGAGEMENT_DEFICIT"
+            guidance = (
+                f"CẢNH BÁO TƯƠNG TÁC ({total_videos} video, {total_views} view): "
+                "View tích lũy tốt nhưng like/comment thấp. Cần chèn thêm câu hỏi tranh luận và Micro-Cliffhanger ở Beat 4/5."
+            )
+        else:
+            status = "SEED_AUDIENCE_EXPANDING"
+            guidance = (
+                f"KIỂM ĐỊNH PASS ({total_videos} video, {total_views} view): "
+                "Tệp khán giả hạt giống đang mở rộng bình thường. Tiếp tục duy trì nhịp sản xuất."
+            )
+    else:
+        phase = "PHASE_3_MATURE_SCALE"
+        status = "MATURE_OPERATION"
+        guidance = (
+            f"Kênh đã trưởng thành ({total_videos} video, tổng {total_views:,} views). "
+            "Vận hành toàn diện B11 48h Law và tối ưu hóa chuyển đổi Retention theo Khung An Ong."
+        )
+
+    return {
+        "phase": phase,
+        "status": status,
+        "total_videos": total_videos,
+        "total_views": total_views,
+        "total_likes": total_likes,
+        "total_comments": total_comments,
+        "avg_views_per_video": round(avg_views, 1),
+        "guidance": guidance
+    }
+
+
 def run_b11_engine(mode="routine", dry_run=False):
     secrets = load_secrets()
     cid = secrets.get("YT_OAUTH_CLIENT_ID")
@@ -372,6 +455,11 @@ def run_b11_engine(mode="routine", dry_run=False):
     print(f"Channel: {channel['snippet']['title']} ({len(videos)} videos)")
     print(f"Audience Devices: Mobile={mobile_views} ({mobile_pct:.1f}%) | Devices: {list(device_data.keys())}")
     print(f"Traffic Mix: {list(traffic_data.keys())}")
+
+    lifecycle = diagnose_channel_lifecycle(videos)
+    print(f"\n🌱 [CHANNEL INCUBATION MATRIX] {lifecycle['phase']} | Status: {lifecycle['status']}")
+    print(f"   Quy mô: {lifecycle['total_videos']} video | Tổng Views: {lifecycle['total_views']} (TB: {lifecycle['avg_views_per_video']}/vid)")
+    print(f"   Định hướng: {lifecycle['guidance']}")
     
     supreme_candidates = []
     has_any_metric_delta = False
@@ -429,7 +517,8 @@ def run_b11_engine(mode="routine", dry_run=False):
             f"BỐI CẢNH THIẾT BỊ & NGUỒN LƯU LƯỢNG:",
             f"- Tỷ lệ xem trên Mobile: {mobile_pct:.1f}% (Mobile Views: {mobile_views}/{total_dev_views})",
             f"- Chi tiết thiết bị: {device_data}",
-            f"- Nguồn lưu lượng kênh: {traffic_data}\n"
+            f"- Nguồn lưu lượng kênh: {traffic_data}",
+            f"- VÒNG ĐỜI KÊNH (Incubation Matrix): {lifecycle['phase']} ({lifecycle['status']}) — {lifecycle['guidance']}\n"
         ]
         
         for idx, (v, reason) in enumerate(supreme_candidates, 1):

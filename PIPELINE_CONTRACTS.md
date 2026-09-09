@@ -91,8 +91,24 @@
         "<Audience pain point 2 extracted from top comments>"
       ],
       "fatal_explanatory_vacuum": "<Critical knowledge gap completely missed or glossed over by existing videos>",
-      "our_10x_pivot_angle": "<Our distinctive narrative breakthrough angle that definitively solves the vacuum>"
-    }
+      "our_10x_pivot_angle": "<Our distinctive narrative breakthrough angle that definitively solves the vacuum>",
+      "transposition_opportunities": {
+        "proven_structural_vehicle": "<Underlying psychological format/hook structure, e.g. Unit Economics of Operating an Elite Facility>",
+        "recommended_target_niches": ["<Cross-niche opportunity 1>", "<Cross-niche opportunity 2>"]
+      },
+      "ai_slop_redlines": [
+        "<Specific generic phrases or bot cliches flagged by audience in this niche>"
+      ],
+      "audience_wishlist_topics": [
+        "<Specific future video topic or investigation explicitly requested by viewers>"
+      ]
+    },
+    "transposition_opportunities": {
+      "proven_structural_vehicle": "<Underlying psychological format/hook structure>",
+      "recommended_target_niches": ["<Cross-niche opportunity 1>", "<Cross-niche opportunity 2>"]
+    },
+    "ai_slop_redlines": ["<Audience-mined banned cliches>"],
+    "audience_wishlist_topics": ["<Viewer-requested upcoming topics>"]
   }
   ```
 
@@ -187,6 +203,9 @@
 ### 5. Khối B6 (Speech & Whisper) ➔ Khối B8 (Remotion Props)
 * **File lưu trữ**: `remotion_props.json`
 * **Quy chuẩn Rule 120**: `durationInFrames` khớp chính xác timestamp câu thoại trong Whisper, cấm chia đều toán học.
+* **Lộ Trình Chuẩn Hóa Timeframe Whisper Đồng Nhất Toàn Luồng (Architectural Roadmap Note)**:
+  > [!NOTE]
+  > Quy hoạch tương lai sẽ tích hợp cơ chế đồng nhất Timeframe khép kín giữa Đạo diễn nghệ thuật (B3 Director Plan) ➔ Visual Assets (B4/B5) ➔ Phân cảnh & Karaoke Subtitles (B7/B8) ➔ Speech TTS Audio (B6) dựa trên Whisper Word Timestamps thực tế, loại bỏ hoàn toàn độ trễ lệch pha giữa nhịp thoại và nhịp cảnh.
 * **Data Schema**:
   ```json
   {

@@ -73,6 +73,21 @@ MARKET_LOCALE = {
     "kr": {"relevanceLanguage": "ko", "regionCode": "KR", "transcript_langs": ["ko", "en"]},
 }
 
+# Strategic comment mining patterns (Thanh Hai YouTube AI 2026 Playbook)
+SLOP_PATTERNS = (
+    re.compile(r"\b(ai slop|chatgpt script|bot script|sounds like ai|ai generated|lazy writing|generic voiceover|ai hallucination|cliche|fake story)\b", re.I),
+    re.compile(r"\b(chán vì ai|nội dung ai|giọng đọc ai|kịch bản ai|viết bằng ai|sáo rỗng)\b", re.I),
+    re.compile(r"\b(aiスクリプト|aiっぽい|機械音声|薄っぺらい)\b", re.I),
+    re.compile(r"\b(ai 대본|기계음|챗gpt|양산형)\b", re.I),
+)
+
+WISHLIST_PATTERNS = (
+    re.compile(r"\b(please (?:make|do|cover)|next (?:video|topic) (?:should be|on)|can you (?:make|do|cover)|waiting for|wish you (?:would|could) (?:cover|make)|make one about|would love to see)\b", re.I),
+    re.compile(r"\b(làm về|hóng video về|mong ad làm|chờ video về|review về|làm tiếp về)\b", re.I),
+    re.compile(r"\b(次(は|の動画は|のテーマは)|取り上げてほしい|解説してほしい|作ってほしい)\b", re.I),
+    re.compile(r"\b(다음(은| 영상은)|다뤄주세요|만들어주세요|해줬으면 좋겠어요)\b", re.I),
+)
+
 
 def load_env() -> None:
     """Populate os.environ from /root/secrets/.env."""
@@ -427,6 +442,44 @@ def extract_high_engagement_comments(comments: List[Dict], max_count: int = 15) 
     return cleaned[:max_count]
 
 
+def extract_comment_mined_signals(comments: List[Dict]) -> Tuple[List[str], List[str]]:
+    """
+    Mine comments for two critical strategic signals (Thanh Hai YouTube AI 2026 Playbook):
+      1. ai_slop_redlines: Community complaints/eye-rolls about AI slop, fake facts, or generic writing.
+      2. audience_wishlist_topics: Explicit viewer requests for future content topics.
+    """
+    ai_slop = []
+    wishlist = []
+    seen_slop = set()
+    seen_wish = set()
+
+    for c in comments:
+        text = c.get("text", "").strip() if isinstance(c, dict) else str(c).strip()
+        if not text or is_spam(text):
+            continue
+        text_norm = " ".join(text.split())
+
+        # Check AI slop / skepticism
+        for pat in SLOP_PATTERNS:
+            if pat.search(text_norm):
+                sample = text_norm[:120]
+                if sample.lower() not in seen_slop:
+                    seen_slop.add(sample.lower())
+                    ai_slop.append(sample)
+                break
+
+        # Check Audience content wishlist
+        for pat in WISHLIST_PATTERNS:
+            if pat.search(text_norm):
+                sample = text_norm[:120]
+                if sample.lower() not in seen_wish:
+                    seen_wish.add(sample.lower())
+                    wishlist.append(sample)
+                break
+
+    return ai_slop[:5], wishlist[:5]
+
+
 def extract_video_chapters(description: str) -> List[str]:
     """Extract chapter timestamps from video description if present."""
     if not description:
@@ -504,7 +557,20 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
             '    "Frustration / Unanswered question 3"\n'
             '  ],\n'
             '  "fatal_explanatory_vacuum": "The critical systemic, institutional, financial, or forensic blindspot that competitors completely ignored or glossed over",\n'
-            '  "our_10x_pivot_angle": "Our master investigative angle for a 12-15 minute deep-dive that answers audience frustrations and exposes the root causes without mentioning competitor channels"\n'
+            '  "our_10x_pivot_angle": "Our master investigative angle for a 12-15 minute deep-dive that answers audience frustrations and exposes the root causes without mentioning competitor channels",\n'
+            '  "transposition_opportunities": {\n'
+            '    "proven_structural_vehicle": "The underlying psychological format/hook structure that made rivals succeed (e.g. Unit Economics of Operating an Elite Facility, True Cost of Luxury Illusion)",\n'
+            '    "recommended_target_niches": [\n'
+            '      "Target sub-niche or historical setting 1 where this exact format can be transplanted",\n'
+            '      "Target sub-niche 2"\n'
+            '    ]\n'
+            '  },\n'
+            '  "ai_slop_redlines": [\n'
+            '    "Specific generic phrases, bot-like cliches, or superficial errors called out by audience or despised in this niche"\n'
+            '  ],\n'
+            '  "audience_wishlist_topics": [\n'
+            '    "Specific future video topic or investigation explicitly requested by viewers in comments"\n'
+            '  ]\n'
             "}\n"
             "Output ONLY valid JSON:"
         )
@@ -532,7 +598,19 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
             "What systemic changes were made after the scandal?"
         ],
         "fatal_explanatory_vacuum": "Lack of forensic paper trail and regulatory failure mechanisms.",
-        "our_10x_pivot_angle": f"Independent investigative documentary uncovering the hidden systemic mechanisms behind {target_keyword}."
+        "our_10x_pivot_angle": f"Independent investigative documentary uncovering the hidden systemic mechanisms behind {target_keyword}.",
+        "transposition_opportunities": {
+            "proven_structural_vehicle": "Forensic systemic breakdown of institutional vulnerabilities",
+            "recommended_target_niches": [
+                f"Historical parallels to {target_keyword} in industrial history",
+                f"Modern digital equivalent of {target_keyword}"
+            ]
+        },
+        "ai_slop_redlines": [
+            "Avoid generic AI opening phrases like 'in today's video' or 'have you ever wondered'",
+            "Avoid vague moralizing conclusions without specific policy or legal outcomes"
+        ],
+        "audience_wishlist_topics": []
     }
 
 
@@ -542,7 +620,8 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
 
 def build_intel_card(task_id: str, target_keyword: str, niche: str, market: str,
                      selected: List[Dict], gaps: List[Dict], quota: QuotaTracker,
-                     competitor_narrative_anatomy: Optional[Dict] = None) -> Dict:
+                     competitor_narrative_anatomy: Optional[Dict] = None,
+                     raw_comments: Optional[List[Dict]] = None) -> Dict:
     """Assemble final competitor_intel_card.json adhering strictly to B1.5 -> B2 contract."""
     benchmarks = [{
         "video_id": c["video_id"],
@@ -564,6 +643,13 @@ def build_intel_card(task_id: str, target_keyword: str, niche: str, market: str,
         "thumbnail_path": c.get("thumbnail_path"),
     } for c in selected]
 
+    mined_slop, mined_wishlist = extract_comment_mined_signals(raw_comments or gaps)
+    anatomy = competitor_narrative_anatomy or {}
+
+    combined_slop = list(dict.fromkeys((anatomy.get("ai_slop_redlines") or []) + mined_slop))
+    combined_wishlist = list(dict.fromkeys((anatomy.get("audience_wishlist_topics") or []) + mined_wishlist))
+    transposition = anatomy.get("transposition_opportunities", {})
+
     card = {
         "task_id": task_id,
         "target_keyword": target_keyword,
@@ -577,12 +663,17 @@ def build_intel_card(task_id: str, target_keyword: str, niche: str, market: str,
             "author": g["author"],
             "published_at": g.get("published_at"),
         } for g in gaps],
+        "transposition_opportunities": transposition,
+        "ai_slop_redlines": combined_slop,
+        "audience_wishlist_topics": combined_wishlist,
         "_b2_to_synthesize": [
             "golden_facts_to_keep",
             "competitor_benchmarks[].critical_flaw",
             "competitor_benchmarks[].hook_strategy",
             "audience_comment_gaps[].viewer_frustration",
             "recommended_10x_angle",
+            "transposition_opportunities",
+            "ai_slop_redlines",
         ],
         "collection_meta": {
             "collected_at": datetime.now(timezone.utc).isoformat(),
@@ -592,6 +683,8 @@ def build_intel_card(task_id: str, target_keyword: str, niche: str, market: str,
             "transcripts_captured": sum(
                 1 for b in benchmarks if b["transcript_status"] != "unavailable"),
             "thumbnails_captured": sum(1 for b in benchmarks if b["thumbnail_path"]),
+            "mined_slop_count": len(combined_slop),
+            "mined_wishlist_count": len(combined_wishlist),
         },
     }
     if competitor_narrative_anatomy:
@@ -610,8 +703,16 @@ def sync_card_to_notion(task_id: str, card: dict) -> bool:
         lines = []
         if anatomy.get("our_10x_pivot_angle"):
             lines.append(f"🎯 10X PIVOT ANGLE:\n{anatomy['our_10x_pivot_angle']}\n")
+        if card.get("transposition_opportunities", {}).get("proven_structural_vehicle"):
+            v_name = card["transposition_opportunities"]["proven_structural_vehicle"]
+            lines.append(f"⚡ FORMAT WIN VEHICLE:\n{v_name}\n")
         if anatomy.get("fatal_explanatory_vacuum"):
             lines.append(f"⚠️ COMPETITOR BLINDSPOT:\n{anatomy['fatal_explanatory_vacuum']}\n")
+        if card.get("ai_slop_redlines"):
+            lines.append(f"🚫 AI-SLOP REDLINES:")
+            for slop in card["ai_slop_redlines"][:2]:
+                lines.append(f"• {slop}")
+            lines.append("")
 
         lines.append(f"Top Competitors ({len(benchmarks)}):")
         for b in benchmarks[:5]:
@@ -772,7 +873,7 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
 
     # 5. Assemble Intel Card (Pass 3)
     card = build_intel_card(task_id, target_keyword, niche, market, selected, all_gaps[:12], quota,
-                            competitor_narrative_anatomy=anatomy)
+                            competitor_narrative_anatomy=anatomy, raw_comments=all_raw_comments)
 
     # 6. Persist card to both episode root dirs
     for target_dir in [EPISODE_DIR / task_id, Path("/root/video_factory/episodes") / task_id]:

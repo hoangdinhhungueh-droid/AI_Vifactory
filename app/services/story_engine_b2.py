@@ -230,6 +230,8 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
     frustrations = anatomy.get("audience_core_frustrations") or []
     comp_acts = anatomy.get("competitor_act_breakdown") or ""
     competitors = meta.get("viral_competitor_videos") or (intel_card.get("competitors") if intel_card else []) or (intel_card.get("competitor_benchmarks") if intel_card else [])
+    ai_slop_redlines = (intel_card.get("ai_slop_redlines") or anatomy.get("ai_slop_redlines") or []) if intel_card else []
+    transposition = (intel_card.get("transposition_opportunities") or anatomy.get("transposition_opportunities") or {}) if intel_card else {}
 
     # Check for pre-computed SEO package & 60s hook (Rule 119 & Rule 444)
     seo_pkg = {}
@@ -309,6 +311,11 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
 
 """
 
+    slop_redlines_mandate = ""
+    if ai_slop_redlines:
+        redline_bullets = "\n".join(f"   * BANNED AUDIENCE CLICHE: \"{slop}\"" for slop in ai_slop_redlines[:4])
+        slop_redlines_mandate = f"\n• Check 10B (Niche-Specific AI-Slop Redlines Mined From Audience):\n{redline_bullets}"
+
     system_prompt = (
         f"You are a World-Class Master Non-Fiction Investigative Documentary Scriptwriter for Video Factory.\n"
         f"Target Narration Language: {lang_name}.\n"
@@ -326,7 +333,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
         f"   - Act IV (The Smoking Gun): 'smoking gun', 'culprit', 'exposed', 'unmasked', 'profited'.\n"
         f"   - Act V (The Modern Mirror): 'mirror', 'warning', 'modern', 'today', 'lesson', 'verdict'.\n"
         f"• Check 12 (Pattern Interrupt in Act III): Write at least one punchy sentence of 2 to 6 words maximum in Act III (e.g. 'The paper trail vanished.', 'Then came the audit.').\n"
-        f"• Check 10 (Zero Banned Cliches): 100% elimination of banned AI cliches ('in a world where', 'little did they know', 'testament to', 'double-edged sword', 'beacon of hope', 'it's worth noting', 'at the end of the day').\n\n"
+        f"• Check 10 (Zero Banned Cliches): 100% elimination of banned AI cliches ('in a world where', 'little did they know', 'testament to', 'double-edged sword', 'beacon of hope', 'it's worth noting', 'at the end of the day').{slop_redlines_mandate}\n\n"
         f"{editorial_skills}\n\n"
         f"SPECIFIC CONTEXT FOR THIS SCRIPT:\n"
         f"• Subject / Case: {topic}\n"
@@ -345,6 +352,13 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
 
     competitor_context = ""
     context_lines = []
+    if transposition and transposition.get("proven_structural_vehicle"):
+        v_name = transposition["proven_structural_vehicle"]
+        context_lines.append(
+            "⚡ PROVEN STRUCTURAL VEHICLE (Format Win Transposition):\n"
+            f"Transmute this proven narrative vehicle to our case: \"{v_name}\".\n"
+            "Adopt its core tension, pacing rhythm, and psychological hook while investigating our unique case."
+        )
     if pivot_angle:
         context_lines.append(
             "🎯 10X INDEPENDENT INVESTIGATIVE PIVOT (OUR STRATEGIC LEVERAGE):\n"
