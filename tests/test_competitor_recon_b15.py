@@ -58,9 +58,7 @@ class TestMarketDetection:
 
 class TestVelocity:
     def test_views_per_day(self):
-        assert velocity(1000, iso_days_ago(10)) == pytest.approx(100, rel=0.2)
-
-    def test_same_day_upload_does_not_divide_by_zero(self):
+        assert velocity(1000, iso_days_ago(2)) == 500
         assert velocity(500, iso_days_ago(0)) == 500
 
     def test_malformed_date_returns_none(self):
