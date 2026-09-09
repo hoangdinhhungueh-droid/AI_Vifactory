@@ -500,8 +500,9 @@ def generate_director_plan(
     logger.info(f"  [B3] Extracted Era: {dynamic_context['era_anchor']}. Ensemble: {len(character_ensemble)} roles.")
 
     # 2. Build Hollywood Art Director Prompt using concise targeted rules
+    targeted_art_rules = get_b3_strategic_rules()
     system_prompt = (
-        f"{TARGETED_ART_RULES}\n\n"
+        f"{targeted_art_rules}\n\n"
         "You are an Elite Hollywood Art Director, Director of Photography (DP), and Master Visual Storyboard Editor.\n"
         f"You direct in the visual style of {archetype['director']}.\n"
         f"Visual Tone: {dynamic_context['physical_environment']}.\n"

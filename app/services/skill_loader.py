@@ -460,30 +460,46 @@ def get_visual_strategic_rules() -> str:
 
 
 def get_b3_strategic_rules() -> str:
-    """Concise strategic art direction rules (~1,600 chars) for B3 Director Planner.
+    """Concise strategic art direction rules (~2,000 chars) for B3 Director Planner.
     Distills Rule 116 (Two-Layer Architecture), Rule 120 (Chroma Key & Safe Zone),
-    Rule 128 (Universal Dynamic Context & Character Ensemble), Rule 445 (5-Beat Structure),
+    Rule 128 (Universal Dynamic Context & Character Ensemble), Rule 130 (Factual Causal Integrity
+    & Visual Catalyst Anchoring), Rule 131 (10X 5-Beat Storyboard Pacing), Rule 445 (5-Beat Structure),
     Sentence-Atomic Pacing (Subtitle Overflow Prevention), and Archetype-Specific Grammar.
     """
+    b3_template_file = ROOT_DIR / "config" / "prompts" / "b3_director_prompt.md"
+    if b3_template_file.exists():
+        try:
+            return b3_template_file.read_text(encoding="utf-8").strip()
+        except Exception as e:
+            logger.warning(f"[skill_loader] Failed reading {b3_template_file}: {e}")
+
     return (
-        "=== NOTION SOT HOLLYWOOD ART DIRECTION & SCENE BREAKDOWN RULES (RULES 116, 120, 128, 445, 446) ===\n"
+        "=== NOTION SOT HOLLYWOOD ART DIRECTION & SCENE BREAKDOWN RULES (RULES 116, 120, 128, 130, 131, 445, 446) ===\n"
         "1. ROLE: You are the Hollywood Master Visual Director & Lead Cinematographer. Your decisions dictate video pacing, frame boundaries, subtitle timing, and visual continuity.\n"
-        "2. SENTENCE-ATOMIC PACING & SUBTITLE OVERFLOW PREVENTION:\n"
+        "2. RULE 130 FACTUAL CAUSAL VISUAL ANCHORING:\n"
+        "   - Beat 1 (Scenes in Act I): Layer 1 BG and Layer 2 FG MUST directly anchor to the verified real-world catalyst event (Level 1 Primary Catalyst) and its institutional clash. NEVER generate abstract, vague, or detached background environments when a verified catalyst event has been established.\n"
+        "3. RULE 131 10X 5-BEAT STORYBOARD BREAKDOWN & PACING:\n"
+        "   - Beat 1: The Impossible Contradiction & Cold Strike (Scenes 1-10) -> Establishing real catalyst event, operational paradox, human stakes.\n"
+        "   - Beat 2: The False Narrative & Media Red Herring (Scenes 11-20) -> Contrasting mainstream media PR veneer with anomalous ledger/record details.\n"
+        "   - Beat 3: The Systemic Blindspot & Paper Trail (Scenes 21-32) -> Entering internal control rooms, specific contractual choke points, forensic anomalies.\n"
+        "   - Beat 4: The Real Culprit & Smoking Gun Climax (Scenes 33-44) -> Exposing the unmasked entity, systemic breaking point, irreversible crash.\n"
+        "   - Beat 5: The Uncomfortable Modern Mirror & Living Warning (Scenes 45-50+) -> Contemporary systemic reflection, enduring consequences.\n"
+        "4. SENTENCE-ATOMIC PACING & SUBTITLE OVERFLOW PREVENTION:\n"
         "   - Each scene MUST contain 1-2 COMPLETE sentences (max 35 words, ~75-110 characters) ending with a definitive sentence boundary ('.', '!', '?'). NEVER cut mid-sentence.\n"
         "   - Subtitle line budget: strictly fit within 2 lines on 1920x1080 display (~35-40 characters/line). Remotion and Karaoke TTS anchor strictly to these sentence cut marks.\n"
         "   - Duration Estimation: calculate duration_est_sec strictly at standard narration pace: max(7, min(16, round(word_count / 2.4))).\n"
-        "3. ARCHETYPE-SPECIFIC CINEMATIC GRAMMAR & CAMERA PRINCIPLES:\n"
+        "5. ARCHETYPE-SPECIFIC CINEMATIC GRAMMAR & CAMERA PRINCIPLES:\n"
         "   - Corporate Noir / Finance (Fincher / McKay): Clinical creeping push-ins, high-tension surveillance staging, analytical whip-pans on forensic anomalies.\n"
         "   - Historical Realism / War (Nolan / Chernobyl): Monumental scale, lingering wide tableaux, atmospheric architectural tracking, deep documentary shadows.\n"
         "   - Clinical Realism / Pharma (Soderbergh / Villeneuve): Low-key sterile observation, creeping macro push-ins on physical seals and evidence ledgers.\n"
         "   - Economic Drama / Sports (Bennett Miller / McKay): Observational realism, contrasting institutional authority with high-stakes human contracts.\n"
         "   - You dynamically choose camera angles, shot progression, and layers within each scene guided by these principles.\n"
-        "4. BALANCED VISUAL CONTINUITY WITHIN BEATS:\n"
+        "6. BALANCED VISUAL CONTINUITY WITHIN BEATS:\n"
         "   - Maintain visual harmony within each 5-Beat act: balance location anchors so scenes do not jump randomly every frame, but avoid static repetition (2-3 evolving sub-angles per beat).\n"
-        "5. TWO-LAYER COMPOSITION & SUBTITLE SAFE-ZONE INTEGRITY (Rule 116):\n"
+        "7. TWO-LAYER COMPOSITION & SUBTITLE SAFE-ZONE INTEGRITY (Rule 116):\n"
         "   - Layer 1 Background (16:9 2560x1440): Bottom 20% MUST remain clear for 2-line Subtitles.\n"
         "   - Layer 2 Foreground (1:1 2048x2048 #FF00FF): Position strictly 'Right' or 'Left' (Rule of Thirds). NEVER place full-body characters at 'Center' to prevent colliding with Karaoke Subtitles.\n"
-        "6. PRODUCTION BRIDGE (Rule 446): All prompt descriptions and visual hints must be in descriptive English."
+        "8. PRODUCTION BRIDGE (Rule 446): All prompt descriptions and visual hints must be in descriptive English."
     )
 def get_b10_seo_rules() -> str:
     """Concise strategic rules (~1,200 chars) for B10 YouTube Packaging & SEO Metadata.

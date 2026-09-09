@@ -66,6 +66,7 @@ graph TD
   - **Rule 131**: 10X Beat Architecture & Editorial Signal Purity Mandate (5-Beat micro-pacing, 0 marketing clutter).
   - **Rule 132**: Strict Decoupled Engine & Pure Transmission Pipe Mandate (Code as pure pipe, Notion as brain).
   - **Rule 133**: Notion AI Skill Delegation vs. Antigravity Operational Scope Mandate (Editorial skills on Notion, Antigravity rules in AGENTS.md).
+  - **Rule 134**: Exact Parity, Full-Text Consistency & Adversarial Boundary Verification Gate (Đối soát nhất quán toàn diện).
 - **8 Specialized Hubs con**:
   | Hub Chuyên Môn | Notion Page ID | Trọng Tâm Nhiệm Vụ |
   | :--- | :--- | :--- |
@@ -98,7 +99,7 @@ graph TD
   - **B1.6 (`seo_package_forge.py`)**: Forging Early Title A/B & 60s An Ong Hook (Rule 444 & Rule 130).
   - **B2 (`story_engine_b2.py`)**: Sinh kịch bản 5 Beat "Investigative Docudrama" (1,800 - 2,200 từ, ~12-15 phút) qua `GPT-6-Astra`.
   - **B2.1 (`fact_causal_audit` qua Claude Opus 5)**: Kiểm toán độc lập tính toàn vẹn nhân quả (Rule 130). Chỉ khi B2.1 đạt PASS (score ≥ 7.5/10) mới **Chốt Task ID chính thức + Sync Notion Trend Brain (Approved→Story) + Gửi Telegram Gate 1 hoàn chỉnh** trước khi chuyển giao B3.
-  - **B3 (`/video:art-director`)**: Lập bảng đạo diễn Dynamic Scenes (Layer 1 BG + Layer 2 FG) bằng tiếng Anh. Sync **Director Plan DB**.
+  - **B3 (`/video:art-director`)**: Lập bảng đạo diễn Dynamic Scenes (Layer 1 BG + Layer 2 FG) bằng tiếng Anh khớp 10X 5-Beat & Visual Anchoring ngòi nổ thực tế (Rule 116, 120, 128, 130, 131). Sync **Director Plan DB**.
   - **B3.5 (`/prompt:forge`)**: Sinh Prompt Engineering chuẩn FG `#FF00FF` Chroma Key bằng tiếng Anh. Sync **Prompt Library DB**.
   - **B4 (`/image:native`)**: Sinh ảnh Google Image Native / Gemini Pro Web (`generate_image`). Upload R2 & Sync **Image Asset Library DB**.
   - **B5 (`/audit:vision`)**: Vision Audit 4 trục (Rule 122) & Tách phông `#FF00FF` HSV Chroma Key. Update `Status = Approved`.
@@ -148,4 +149,3 @@ Thay vì dump toàn bộ cây thư mục 500+ trang vào Context Window:
 3. **Bước 3 — Sync Back & Verification**:
    - Ghi dữ liệu trực tiếp vào đúng Database ID, in log phản hồi `200 OK` (Rule 121).
    - Nếu gặp lỗi kỹ thuật hoặc trần API -> **Kích hoạt Rule 118: Dừng lại và báo cáo User ngay lập tức**.
-
