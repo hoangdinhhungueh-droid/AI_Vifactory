@@ -107,7 +107,15 @@ Niche Brief: "{niche_brief}"
 
 Interrogate whether this proposed angle truly satisfies the breaking search intent, or if it constitutes a Bait-and-Switch diversion. Return strict JSON only."""
 
-    chosen_model = model
+    # Enforce Claude lineage: only claude-opus-5 or claude-sonnet-5 allowed
+    if not (model.startswith("claude-opus-5") or model.startswith("claude-sonnet-5")):
+        chosen_model = "claude-opus-5"
+    else:
+        chosen_model = model
+
+    # Fallback to kimi-k3 if not specified
+    fallback_model = fallback_model if fallback_model and fallback_model != "gpt-6-astra" else "kimi-k3"
+
     try:
         raw_res = gateway.call_llm(
             prompt=user_prompt,
@@ -115,10 +123,11 @@ Interrogate whether this proposed angle truly satisfies the breaking search inte
             system_prompt=SYSTEM_CRITIC_PROMPT,
             max_tokens=800,
             temperature=0.1,
-            timeout=60.0
+            timeout=60.0,
+            fallback="claude-sonnet-5" if chosen_model == "claude-opus-5" else "kimi-k3"
         )
     except Exception as e:
-        logger.warning(f"[critic_gate] Primary critic model {chosen_model} failed ({e}), falling back to {fallback_model}...")
+        logger.warning(f"[critic_gate] Claude primary ({chosen_model}) failed ({e}), invoking fallback {fallback_model} (kimi-k3)...")
         try:
             chosen_model = fallback_model
             raw_res = gateway.call_llm(
@@ -127,7 +136,8 @@ Interrogate whether this proposed angle truly satisfies the breaking search inte
                 system_prompt=SYSTEM_CRITIC_PROMPT,
                 max_tokens=800,
                 temperature=0.1,
-                timeout=60.0
+                timeout=60.0,
+                fallback="gpt-6-astra"
             )
         except Exception as e2:
             logger.error(f"[critic_gate] Fallback critic model {fallback_model} also failed: {e2}")

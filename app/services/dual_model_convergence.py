@@ -60,7 +60,7 @@ def run_dual_model_convergence(
     logger.info(f"[dual_convergence] Starting Dual-Model Convergence for {task_id} ({market})...")
 
     # ----------------------------------------------------
-    # Pass 1: Claude-Opus-5 Direct Scribe
+    # Pass 1: Claude Line (Opus 5 / Sonnet 5) Direct Scribe
     # ----------------------------------------------------
     scribe_prompt = f"""You are an elite investigative documentary chief editor and senior scribe.
 You previously audited an investigative documentary script and found factual, attribution, or causal discrepancies.
@@ -85,24 +85,37 @@ Your task now is to DIRECTLY REWRITE and EDIT the entire 5-Act script to resolve
 Output ONLY the complete, edited 5-Act script now:"""
 
     gateway = get_global_gateway()
-    logger.info(f"[dual_convergence] Pass 1: Calling Claude-Opus-5 as Direct Scribe for {task_id}...")
+    logger.info(f"[dual_convergence] Pass 1: Calling Claude (Opus 5 / Sonnet 5) as Direct Scribe for {task_id}...")
 
     try:
-        scribe_raw = gateway.call_llm(
-            prompt=scribe_prompt,
-            model="claude-opus-5",
-            system_prompt=system_prompt,
-            max_tokens=3500,
-            temperature=0.4,
-            timeout=240.0,
-            fallback="gpt-6-astra"
-        )
+        # Try Claude Opus 5 first, fallback to Claude Sonnet 5, then kimi-k3
+        try:
+            scribe_raw = gateway.call_llm(
+                prompt=scribe_prompt,
+                model="claude-opus-5",
+                system_prompt=system_prompt,
+                max_tokens=3500,
+                temperature=0.4,
+                timeout=180.0,
+                fallback="claude-sonnet-5"
+            )
+        except Exception as e_claude:
+            logger.warning(f"[dual_convergence] Both Claude models failed ({e_claude}), trying kimi-k3 as Scribe...")
+            scribe_raw = gateway.call_llm(
+                prompt=scribe_prompt,
+                model="kimi-k3",
+                system_prompt=system_prompt,
+                max_tokens=3500,
+                temperature=0.4,
+                timeout=180.0,
+                fallback="gpt-6-astra"
+            )
     except Exception as se:
-        logger.error(f"[dual_convergence] Pass 1 (Opus 5 Scribe) failed: {se}")
+        logger.error(f"[dual_convergence] Pass 1 (Scribe) failed: {se}")
         return {
             "converged": False,
             "status": "NON_CONVERGENCE",
-            "reason": f"Opus 5 Scribe error: {se}",
+            "reason": f"Scribe error: {se}",
             "script": story_text,
             "score": 0.0
         }
@@ -119,9 +132,9 @@ Output ONLY the complete, edited 5-Act script now:"""
     logger.info(f"[dual_convergence] Pass 1 Scribe complete: {word_count} words ({len(cleaned_acts)}/5 acts).")
 
     # ----------------------------------------------------
-    # Pass 2: GPT-6-Astra Cross-Audit (Dramaturgy, Pacing & Fact Consistency)
+    # Pass 2: GPT-6-Astra & Kimi-K3 Cross-Audit
     # ----------------------------------------------------
-    logger.info(f"[dual_convergence] Pass 2: Running GPT-6-Astra Cross-Audit for {task_id}...")
+    logger.info(f"[dual_convergence] Pass 2: Running Cross-Audit for {task_id}...")
     
     # Story Gate Score
     story_audit = sgate.score_story(repaired_script)
@@ -129,14 +142,14 @@ Output ONLY the complete, edited 5-Act script now:"""
     sg_verdict = story_audit.get("verdict", "FAIL")
     logger.info(f"[dual_convergence] Pass 2 Story Gate Score: {sg_score}/12 (Verdict: {sg_verdict})")
 
-    # Re-verify Fact & Causal Integrity with Claude-Opus-5 / Astra
+    # Re-verify Fact & Causal Integrity with Claude Line (Opus 5 / Sonnet 5) and Kimi-K3 fallback
     re_audit = audit_story_facts_and_causality(
         story_text=repaired_script,
         grounding_claims=grounding_claims,
         topic_meta=topic_meta,
         market=market,
         model="claude-opus-5",
-        fallback_model="gpt-6-astra"
+        fallback_model="kimi-k3"
     )
 
     re_verdict = re_audit.get("verdict", "FAIL").upper()

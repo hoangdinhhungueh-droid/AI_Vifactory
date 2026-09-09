@@ -7,7 +7,7 @@ Tracks usage per model and provides monthly reporting.
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -37,9 +37,12 @@ class CostTracker:
     # Pricing rates in VND (TODO: Update with actual HHTech/provider rates)
     RATES = {
         # LLM models (VND per 1k tokens)
-        "gpt-6-astra": 100.0,          # ~/bin/sh.004/1k tokens * 25000 VND/USD (2x Sol rate)
+        "gpt-6-astra": 100.0,          # ~$0.004/1k tokens * 25000 VND/USD (2x Sol rate)
         "claude-3.5-sonnet": 150.0,    # ~$0.006/1k tokens * 25000 VND/USD
         "claude-3-opus": 750.0,        # ~$0.030/1k tokens * 25000 VND/USD
+        "claude-opus-5": 50.0,         # HHTech flat rate
+        "claude-sonnet-5": 50.0,       # HHTech flat rate
+        "kimi-k3": 50.0,               # HHTech flat rate
         
         # Image models (VND per image)
         "imagen3": 5000.0,             # ~$0.20/image * 25000 VND/USD
@@ -74,7 +77,7 @@ class CostTracker:
             CostCapExceededError: If recording would exceed monthly cap
         """
         cost_vnd = self._calculate_cost(model, tokens, is_image)
-        current_month = datetime.utcnow().strftime("%Y-%m")
+        current_month = datetime.now(timezone.utc).strftime("%Y-%m")
         
         # Initialize month if needed
         if current_month not in self.costs:
@@ -132,7 +135,7 @@ class CostTracker:
             Dictionary of {model: cost_vnd}
         """
         if month is None:
-            month = datetime.utcnow().strftime("%Y-%m")
+            month = datetime.now(timezone.utc).strftime("%Y-%m")
         return self.costs.get(month, {})
     
     def get_monthly_total(self, month: Optional[str] = None) -> float:

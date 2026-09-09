@@ -79,7 +79,15 @@ Rising Search Queries: {', '.join([str(q) for q in rising_queries[:6]])}
 
 Perform strict adversarial forensic audit according to the 4 Iron Criteria. Interrogate every metric, source attribution, and causal link. Return strict JSON only."""
 
-    chosen_model = model
+    # Enforce Claude lineage: only claude-opus-5 or claude-sonnet-5 allowed
+    if not (model.startswith("claude-opus-5") or model.startswith("claude-sonnet-5")):
+        chosen_model = "claude-opus-5"
+    else:
+        chosen_model = model
+
+    # Fallback to kimi-k3 if not specified
+    fallback_model = fallback_model if fallback_model and fallback_model != "gpt-6-astra" else "kimi-k3"
+
     try:
         raw_res = gateway.call_llm(
             prompt=user_prompt,
@@ -87,10 +95,11 @@ Perform strict adversarial forensic audit according to the 4 Iron Criteria. Inte
             system_prompt=SYSTEM_STORY_AUDITOR_PROMPT,
             max_tokens=1000,
             temperature=0.1,
-            timeout=90.0
+            timeout=90.0,
+            fallback="claude-sonnet-5" if chosen_model == "claude-opus-5" else "kimi-k3"
         )
     except Exception as e:
-        logger.warning(f"[story_auditor] Primary auditor {chosen_model} failed ({e}), falling back to {fallback_model}...")
+        logger.warning(f"[story_auditor] Claude auditor {chosen_model} failed ({e}), invoking fallback {fallback_model} (kimi-k3)...")
         try:
             chosen_model = fallback_model
             raw_res = gateway.call_llm(
@@ -99,7 +108,8 @@ Perform strict adversarial forensic audit according to the 4 Iron Criteria. Inte
                 system_prompt=SYSTEM_STORY_AUDITOR_PROMPT,
                 max_tokens=1000,
                 temperature=0.1,
-                timeout=75.0
+                timeout=75.0,
+                fallback="gpt-6-astra"
             )
         except Exception as e2:
             logger.error(f"[story_auditor] Fallback auditor {fallback_model} also failed: {e2}")
