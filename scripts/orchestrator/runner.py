@@ -115,7 +115,13 @@ class OrchestratorRunner:
 
     def __init__(self, args: argparse.Namespace):
         self.args = args
-        self.root_dir = Path.cwd()
+        script_root = Path(__file__).resolve().parent.parent.parent
+        if (Path.cwd() / "app").exists():
+            self.root_dir = Path.cwd()
+        elif (Path("/root/video_factory") / "app").exists():
+            self.root_dir = Path("/root/video_factory")
+        else:
+            self.root_dir = script_root
         self.partitioner = TaskPartitioner(root_dir=self.root_dir)
         self.governor = Rule128Governor(strict=args.strict_rule128)
         self.lifecycle = LifecycleManager(max_parallel=args.parallel, default_timeout=args.timeout)
