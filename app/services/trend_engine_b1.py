@@ -375,18 +375,52 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
     # Lane 4: YouTube Search-Box Autocomplete (Direct Viewer Search Intent across 7 Pillars — Free, No Quota)
     PILLAR_SEEDS_BY_MARKET = {
         "KR": [
-            "망한 이유", "몰락 이유", "파산 이유", "위기 이유", "사태 원인", "사건의 진실", "폭망한 이유",
-            "가스라이팅 사건", "사이비 실체", "다단계 사기", "횡령 수법", "반도체 전쟁", "리콜 은폐", "경영권 분쟁"
+            # Pillar 1: Business Rise & Fall
+            "망한 이유", "몰락 이유", "파산 이유", "위기 이유", "폭망한 이유", "경영권 분쟁",
+            # Pillar 2: Modern History & Systemic Crisis
+            "사태 원인", "비하인드 스토리", "제도적 실패", "외환위기 원인",
+            # Pillar 3: True Crime Non-Graphic
+            "사건의 진실", "화이트칼라 범죄", "횡령 수법", "자금세탁 실체", "위조 사건",
+            # Pillar 4: Psychology & Behavioral Manipulation
+            "가스라이팅 사건", "사이비 실체", "다단계 사기", "심리 조작 수법", "집단 광기",
+            # Pillar 5: Tech & Geopolitical Battles
+            "반도체 전쟁", "기술 유출", "공급망 위기", "패권 다툼", "통신케이블",
+            # Pillar 6: Institutional & Regulatory Chokepoints
+            "리콜 은폐", "품질 조작", "연금 고갈 이유", "시험성적서 위조", "독점 규제",
+            # Pillar 7: Hidden Fortunes & Underground Flows
+            "지하경제 실체", "비자금 추적", "탈세 수법", "차명계좌"
         ],
         "JP": [
-            "事件の真相", "なぜ 失敗", "倒産 理由", "疑惑 暴露", "崩壊のメカニズム", "問題の闇",
-            "洗脳 事件", "マインドコントロール 手口", "巨額詐欺 手口", "横領 手口", "半導体 覇権", "不正認証 理由", "敵対的買収"
+            # Pillar 1: Business Rise & Fall
+            "なぜ 失敗", "倒産 理由", "崩壊のメカニズム", "経営破綻", "敵対的買収",
+            # Pillar 2: Modern History & Systemic Crisis
+            "事件の真相", "疑惑 暴露", "問題の闇", "歴史的転換点", "制度崩壊",
+            # Pillar 3: True Crime Non-Graphic
+            "巨額横領 手口", "知能犯 手口", "金融詐欺", "公金横領", "粉飾決算 手口",
+            # Pillar 4: Psychology & Behavioral Manipulation
+            "洗脳 事件", "マインドコントロール 手口", "カルト 実態", "集団心理の罠", "心理誘導",
+            # Pillar 5: Tech & Geopolitical Battles
+            "半導体 覇権", "サプライチェーン 危機", "技術流出 事件", "地政学 リスク",
+            # Pillar 6: Institutional & Regulatory Chokepoints
+            "不正認証 理由", "データ改ざん 闇", "リコール隠し", "年金破綻 理由", "規制緩和の罠",
+            # Pillar 7: Hidden Fortunes & Underground Flows
+            "巨額詐欺 手口", "マネーロンダリング 手口", "裏金 闇", "地下資金 流れ"
         ],
         "EN": [
-            "business collapse documentary", "scandal explained", "fraud investigation",
-            "what really happened to", "the downfall of", "crisis breakdown",
-            "cult manipulation documentary", "mass hysteria psychology", "white collar crime documentary",
-            "semiconductor war explained", "corporate cover up documentary"
+            # Pillar 1: Business Rise & Fall
+            "business collapse documentary", "the downfall of", "corporate bankruptcy explained", "how it went bankrupt",
+            # Pillar 2: Modern History & Systemic Crisis
+            "crisis breakdown", "what really happened to", "scandal explained", "systemic crisis documentary",
+            # Pillar 3: True Crime Non-Graphic
+            "fraud investigation", "white collar crime documentary", "embezzlement scheme exposed", "accounting fraud breakdown",
+            # Pillar 4: Psychology & Behavioral Manipulation
+            "cult manipulation documentary", "mass hysteria psychology", "social engineering scam", "cognitive bias trap",
+            # Pillar 5: Tech & Geopolitical Battles
+            "semiconductor war explained", "supply chain chokepoint", "tech cold war documentary", "subsea cable geopolitics",
+            # Pillar 6: Institutional & Regulatory Chokepoints
+            "corporate cover up documentary", "safety test falsification scandal", "regulatory loophole explained", "pension crisis collapse",
+            # Pillar 7: Hidden Fortunes & Underground Flows
+            "money laundering network exposed", "shadow banking scheme", "offshore tax evasion documentary"
         ]
     }
     yt_seeds = PILLAR_SEEDS_BY_MARKET.get(m_up, PILLAR_SEEDS_BY_MARKET["EN"])
@@ -639,34 +673,47 @@ def sanitize_candidate_term(term: str) -> str:
 
 FORENSIC_ANCHORS = {
     "KR": [
+        # Business & Financial
         "망한", "파산", "부도", "위기", "사태", "비리", "회생", "적자", "폭망", "몰락",
         "배임", "횡령", "매각", "상폐", "상장폐지", "손실", "디폴트", "구속", "압수수색", "체납",
         "논란", "붕괴", "스캔들", "진실", "의혹", "사건", "갈등", "분쟁", "소송",
         "검찰", "조사", "규제", "폭락", "폭등", "사기", "의문", "제재", "인수",
         "파업", "관세", "경고", "해고", "감원", "쇼크", "폭로", "탈세", "충격",
         "법정관리", "워크아웃", "분식회계", "불법대출", "불공정거래", "미정산", "먹튀",
-        "가스라이팅", "심리 조작", "다단계", "세뇌", "사이비", "폰지", "자금세탁",
-        "품질 조작", "기술 유출", "공급망", "경영권 분쟁", "독점", "고독사"
+        # Psychology & Behavioral Manipulation
+        "가스라이팅", "심리 조작", "다단계", "세뇌", "사이비", "폰지", "자금세탁", "집단 광기", "마인드컨트롤",
+        # Tech, Institutional, Regulatory Chokepoints & Non-Graphic Crime
+        "품질 조작", "기술 유출", "공급망", "경영권 분쟁", "독점", "고독사", "리콜 은폐", "시험성적서 위조", "비자금"
     ],
     "EN": [
+        # Business & Financial
         "collapse", "bankrupt", "crisis", "scandal", "fraud", "failed", "downfall",
         "investigation", "default", "liquidation", "loss", "debt", "deficit", "probe",
         "arrest", "lawsuit", "court", "recession", "scam", "why it failed", "exposed",
         "fall of", "controversy", "crash", "plunge", "turmoil", "indictment", "guilty",
         "sanction", "tariff", "strike", "layoff", "shock", "dispute", "takeover",
         "whistleblower", "antitrust", "subpoena", "foreclosure", "ponzi", "accounting fraud",
-        "gaslighting", "mass hysteria", "cult psychology", "manipulation", "money laundering",
-        "embezzlement", "insider trading", "recall cover-up", "monopoly chokehold", "pension crisis"
+        # Psychology & Behavioral Manipulation
+        "gaslighting", "mass hysteria", "cult psychology", "manipulation", "mind control",
+        "social engineering", "brainwashing", "pyramid scheme",
+        # Tech, Institutional, Regulatory Chokepoints & Non-Graphic Crime
+        "money laundering", "embezzlement", "insider trading", "recall cover-up", "monopoly chokehold",
+        "pension crisis", "safety test falsification", "subsea cable", "supply chain chokepoint"
     ],
     "JP": [
+        # Business & Financial
         "倒産", "破産", "危機", "事件", "転落", "不正", "赤字", "崩壊", "粉飾",
         "裁判", "逮捕", "巨額", "損失", "なぜ", "疑惑", "衰退", "暴落", "詐欺",
         "買収", "買収へ", "制裁", "ストライキ", "解雇", "ショック", "暴露", "脱税",
         "問題", "紛争", "訴訟", "調査", "規制", "真相", "失敗", "リスク",
         "民事再生", "特別清算", "不正会計", "粉飾決算", "横領", "背任", "不祥事",
         "リコール", "営業停止", "独占禁止法", "偽装", "内部告発", "債務超過",
+        # Psychology & Behavioral Manipulation
         "洗脳", "マインドコントロール", "心理操作", "カルト", "集団心理", "巨額詐欺",
-        "資金洗浄", "技術流出", "品質不正", "過労死", "年金崩壊", "敵対的買収"
+        "情報弱者", "マルチ商法", "集団パニック", "心理誘導",
+        # Tech, Institutional, Regulatory Chokepoints & Non-Graphic Crime
+        "資金洗浄", "技術流出", "品質不正", "過労死", "年金崩壊", "敵対的買収",
+        "データ改ざん", "裏金", "知能犯", "公金横領", "サプライチェーン"
     ]
 }
 

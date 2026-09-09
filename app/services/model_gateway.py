@@ -279,8 +279,26 @@ class ModelGateway:
         temperature: float,
         timeout: float
     ) -> str:
-        """Call fallback LLM provider (Anthropic Claude)."""
-        if model.startswith("claude-"):
+        """Call fallback LLM provider. Routes to Anthropic direct if claude & key present, otherwise HHTech API."""
+        if model.startswith("claude-") and self.anthropic_key:
+            return self._call_anthropic(
+                prompt=prompt,
+                model=model,
+                system_prompt=system_prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=timeout
+            )
+        elif self.hhtech_key:
+            return self._call_hhtech(
+                prompt=prompt,
+                model=model,
+                system_prompt=system_prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=timeout
+            )
+        elif model.startswith("claude-"):
             return self._call_anthropic(
                 prompt=prompt,
                 model=model,
@@ -290,7 +308,7 @@ class ModelGateway:
                 timeout=timeout
             )
         else:
-            raise ModelGatewayError(f"Unknown fallback model: {model}")
+            raise ModelGatewayError(f"No configured provider available for fallback model: {model}")
     
     def _call_anthropic(
         self,
