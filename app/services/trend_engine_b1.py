@@ -372,17 +372,21 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
         except Exception as e:
             logger.warning(f"[{m_up}/{geo}] Discover Trending Searches error: {e}")
 
-    # Lane 4: YouTube Search-Box Autocomplete (Direct Viewer Search Intent — Free, No Quota)
+    # Lane 4: YouTube Search-Box Autocomplete (Direct Viewer Search Intent across 7 Pillars — Free, No Quota)
     PILLAR_SEEDS_BY_MARKET = {
         "KR": [
-            "망한 이유", "몰락 이유", "파산 이유", "위기 이유", "사태 원인", "사건의 진실", "폭망한 이유"
+            "망한 이유", "몰락 이유", "파산 이유", "위기 이유", "사태 원인", "사건의 진실", "폭망한 이유",
+            "가스라이팅 사건", "사이비 실체", "다단계 사기", "횡령 수법", "반도체 전쟁", "리콜 은폐", "경영권 분쟁"
         ],
         "JP": [
-            "事件の真相", "なぜ 失敗", "倒産 理由", "疑惑 暴露", "崩壊のメカニズム", "問題の闇"
+            "事件の真相", "なぜ 失敗", "倒産 理由", "疑惑 暴露", "崩壊のメカニズム", "問題の闇",
+            "洗脳 事件", "マインドコントロール 手口", "巨額詐欺 手口", "横領 手口", "半導体 覇権", "不正認証 理由", "敵対的買収"
         ],
         "EN": [
             "business collapse documentary", "scandal explained", "fraud investigation",
-            "what really happened to", "the downfall of", "crisis breakdown"
+            "what really happened to", "the downfall of", "crisis breakdown",
+            "cult manipulation documentary", "mass hysteria psychology", "white collar crime documentary",
+            "semiconductor war explained", "corporate cover up documentary"
         ]
     }
     yt_seeds = PILLAR_SEEDS_BY_MARKET.get(m_up, PILLAR_SEEDS_BY_MARKET["EN"])
@@ -640,7 +644,9 @@ FORENSIC_ANCHORS = {
         "논란", "붕괴", "스캔들", "진실", "의혹", "사건", "갈등", "분쟁", "소송",
         "검찰", "조사", "규제", "폭락", "폭등", "사기", "의문", "제재", "인수",
         "파업", "관세", "경고", "해고", "감원", "쇼크", "폭로", "탈세", "충격",
-        "법정관리", "워크아웃", "분식회계", "불법대출", "불공정거래", "미정산", "먹튀"
+        "법정관리", "워크아웃", "분식회계", "불법대출", "불공정거래", "미정산", "먹튀",
+        "가스라이팅", "심리 조작", "다단계", "세뇌", "사이비", "폰지", "자금세탁",
+        "품질 조작", "기술 유출", "공급망", "경영권 분쟁", "독점", "고독사"
     ],
     "EN": [
         "collapse", "bankrupt", "crisis", "scandal", "fraud", "failed", "downfall",
@@ -648,7 +654,9 @@ FORENSIC_ANCHORS = {
         "arrest", "lawsuit", "court", "recession", "scam", "why it failed", "exposed",
         "fall of", "controversy", "crash", "plunge", "turmoil", "indictment", "guilty",
         "sanction", "tariff", "strike", "layoff", "shock", "dispute", "takeover",
-        "whistleblower", "antitrust", "subpoena", "foreclosure", "ponzi", "accounting fraud"
+        "whistleblower", "antitrust", "subpoena", "foreclosure", "ponzi", "accounting fraud",
+        "gaslighting", "mass hysteria", "cult psychology", "manipulation", "money laundering",
+        "embezzlement", "insider trading", "recall cover-up", "monopoly chokehold", "pension crisis"
     ],
     "JP": [
         "倒産", "破産", "危機", "事件", "転落", "不正", "赤字", "崩壊", "粉飾",
@@ -656,7 +664,9 @@ FORENSIC_ANCHORS = {
         "買収", "買収へ", "制裁", "ストライキ", "解雇", "ショック", "暴露", "脱税",
         "問題", "紛争", "訴訟", "調査", "規制", "真相", "失敗", "リスク",
         "民事再生", "特別清算", "不正会計", "粉飾決算", "横領", "背任", "不祥事",
-        "リコール", "営業停止", "独占禁止法", "偽装", "内部告発", "債務超過"
+        "リコール", "営業停止", "独占禁止法", "偽装", "内部告発", "債務超過",
+        "洗脳", "マインドコントロール", "心理操作", "カルト", "集団心理", "巨額詐欺",
+        "資金洗浄", "技術流出", "品質不正", "過労死", "年金崩壊", "敵対的買収"
     ]
 }
 
@@ -778,12 +788,16 @@ def discover_and_produce_market_trend(
         )
         score = viability.get("viability_score", 0)
 
-        if not viability.get("is_video_viable") or score < 7.0:
-            print(f"  ❌ REJECTED: {viability.get('rejection_reason', 'Low viability score (< 7.0)')}")
+        if not viability.get("is_video_viable") or score < 8.0:
+            print(f"  ❌ REJECTED: {viability.get('rejection_reason', 'Low viability score (< 8.0)')}")
             continue
 
         specific_angle = viability.get("specific_viral_angle") or term
         print(f"  ✅ APPROVED! Viability: {score}/10 | Angle: {specific_angle}")
+
+        # Temporary pipeline task ID for pre-audit stages (B1 -> B1.1 -> B1.5 -> B1.5.5 -> B1.6 -> B2 -> B2.1)
+        temp_slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(term).lower()).strip('-')[:20]
+        temp_task_id = f"{m_up}_TEMP_{temp_slug}"
 
         # 3.2 B1.1 Adversarial Critic Gate (Rule 130 & Anti-Bait-and-Switch Early VETO - Claude Opus 5)
         # Filters out false trends, stale anchors, and bait-and-switch before wasting tokens/scrapes on B1.5!
@@ -814,8 +828,6 @@ def discover_and_produce_market_trend(
 
         # 3.5 B1.5 Pre-Recon (Rule 123 & Rule 128: Data-Driven Competitor Recon Before Niche Decision)
         print(f"  🎯 [B1.5 Pre-Recon] Harvesting Competitor Benchmarks & Audience Frustrations for '{term}'...")
-        temp_slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(term).lower()).strip('-')[:20]
-        temp_task_id = f"{m_up}_TEMP_{temp_slug}"
         recon_card = None
         comp_gap = ""
         try:
@@ -860,46 +872,34 @@ def discover_and_produce_market_trend(
             "safety_label": niche_data.get("safety_label"),
             "treatment_note": niche_data.get("treatment_note"),
             "factsheet": factsheet,
-            "viral_competitor_videos": viral_videos[:5]
+            "viral_competitor_videos": viral_videos[:5],
+            "temp_task_id": temp_task_id
         }
 
-        # Commit task to pending tasks, history registry, and Notion Trend Brain
-        task_id = commit_trend_task(t_obj)
-        t_obj["task_id"] = task_id
-        print(f"  💾 Committed Task ID: {task_id}")
-
-        # 5. Re-link or Execute B1.5 Competitor Recon for final task_id
-        print(f"  🎯 [B1.5] Finalizing Competitor Intel Card for {task_id}...")
+        # 5. Save Competitor Intel Card to temp workspace
+        print(f"  🎯 [B1.5] Persisting Competitor Intel Card for {temp_task_id}...")
         try:
             recon_keyword = t_obj.get("search_specific_keyword") or term
             if not recon_card:
-                recon_card = run_b15(task_id, recon_keyword, t_obj.get("niche_angle_brief", "General"))
+                recon_card = run_b15(temp_task_id, recon_keyword, t_obj.get("niche_angle_brief", "General"))
             else:
-                recon_card["task_id"] = task_id
-                for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes"]:
-                    t_dir = Path(ep_base) / task_id
+                recon_card["task_id"] = temp_task_id
+            for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
+                t_dir = Path(ep_base) / temp_task_id
+                if t_dir.parent.exists() or Path(ep_base).exists():
                     t_dir.mkdir(parents=True, exist_ok=True)
                     (t_dir / "competitor_intel_card.json").write_text(
                         json.dumps(recon_card, ensure_ascii=False, indent=2), encoding="utf-8")
-            
             if recon_card:
                 gap_val = recon_card.get("competitor_narrative_anatomy", {}).get("fatal_explanatory_vacuum", "") or comp_gap
                 if gap_val:
                     t_obj["competitor_differentiation_gap"] = gap_val
                     t_obj["competitor_gap"] = gap_val
-                    task_file = os.path.join("/var/vf/pending_tasks", f"{task_id}.json")
-                    if os.path.exists(task_file):
-                        try:
-                            with open(task_file, "w", encoding="utf-8") as tf:
-                                json.dump(t_obj, tf, ensure_ascii=False, indent=2)
-                        except Exception as _we:
-                            logger.warning(f"Could not re-persist task file with competitor gap: {_we}")
-                print(f"  ✅ [B1.5] Competitor Intel Card saved successfully with real gap: {gap_val[:60]}...")
         except Exception as re_err:
-            logger.warning(f"[{task_id}] B1.5 recon finalizing warning: {re_err}")
+            logger.warning(f"[{temp_task_id}] B1.5 recon finalizing warning: {re_err}")
 
         # 5.2. Grounding Layer Fact-Verification & Gate (B1.5.5 - Rule 118 & Rule 121)
-        print(f"  🔍 [B1.5.5] Running Live Grounding Research & Verification Gate for {task_id}...")
+        print(f"  🔍 [B1.5.5] Running Live Grounding Research & Verification Gate for {temp_task_id}...")
         try:
             from app.services.grounding_layer_b15 import run_grounding_research, passes_grounding_gate
             grounding_kw = t_obj.get("search_specific_keyword") or term
@@ -908,32 +908,32 @@ def discover_and_produce_market_trend(
             
             gate_ok, gate_msg = passes_grounding_gate(grounding_intel, min_verified=2, require_whitelist=True)
             if not gate_ok:
-                logger.warning(f"[{task_id}] Grounding Gate REJECTED: {gate_msg}")
+                logger.warning(f"[{temp_task_id}] Grounding Gate REJECTED: {gate_msg}")
                 print(f"  ❌ [B1.5.5 Grounding Gate] REJECTED: {gate_msg}. Rotating to next candidate...")
                 continue
 
             t_obj["grounding_intel"] = grounding_intel
             print(f"  ✅ [B1.5.5 Grounding Gate] {gate_msg}")
 
-            # Persist grounding_intel.json to episode folders
+            # Persist grounding_intel.json to episode folders under temp_task_id
             for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-                g_dir = Path(ep_base) / task_id
+                g_dir = Path(ep_base) / temp_task_id
                 if g_dir.parent.exists() or Path(ep_base).exists():
                     g_dir.mkdir(parents=True, exist_ok=True)
                     (g_dir / "grounding_intel.json").write_text(
                         json.dumps(grounding_intel, ensure_ascii=False, indent=2), encoding="utf-8"
                     )
         except Exception as g_err:
-            logger.error(f"[{task_id}] Grounding Layer exception: {g_err}. Rotating to next candidate...")
+            logger.error(f"[{temp_task_id}] Grounding Layer exception: {g_err}. Rotating to next candidate...")
             print(f"  ❌ [B1.5.5 Grounding Gate] Exception: {g_err}. Rotating to next candidate...")
             continue
 
-        # 5.5. Early B1.5 SEO & Narrative Hook Package Forge (Rule 119 & Rule 444)
-        print(f"  🚀 [B1.6] Forging Early SEO Package & 60s An Ong Hook for {task_id} via GPT-6-Astra...")
+        # 5.5. Early B1.6 SEO & Narrative Hook Package Forge (Rule 119 & Rule 444)
+        print(f"  🚀 [B1.6] Forging Early SEO Package & 60s An Ong Hook for {temp_task_id} via GPT-6-Astra...")
         try:
             from app.services.seo_package_forge import forge_seo_package
             seo_pkg = forge_seo_package(
-                task_id=task_id,
+                task_id=temp_task_id,
                 target_keyword=t_obj.get("search_specific_keyword") or term,
                 market=m_up,
                 niche_brief=t_obj.get("niche_angle_brief", ""),
@@ -952,40 +952,98 @@ def discover_and_produce_market_trend(
                 print(f"  ✅ [B1.6] Early SEO Package forged: '{seo_pkg.get('title_a')}'")
                 print(f"     60s Hook Contract: {seo_pkg.get('hook_60s')[:70]}...")
         except Exception as seo_err:
-            logger.warning(f"[{task_id}] Early SEO package forge warning: {seo_err}")
+            logger.warning(f"[{temp_task_id}] Early SEO package forge warning: {seo_err}")
 
-        # 6. Send Pure Telegram Gate 1 Notification
+        # Temporarily save pending task under temp_task_id so B2 can read metadata
+        pending_dir = "/var/vf/pending_tasks"
+        os.makedirs(pending_dir, exist_ok=True)
+        temp_task_file = os.path.join(pending_dir, f"{temp_task_id}.json")
+        with open(temp_task_file, "w", encoding="utf-8") as tf:
+            json.dump(t_obj, tf, ensure_ascii=False, indent=2)
+
+        # 6. Generate B2 5-Beat Investigative Docudrama Script
+        print(f"  ⚙️ [B2] Generating 12-15 min docudrama script for {temp_task_id} via HHTech Reasoner...")
+        try:
+            from app.services.story_engine_b2 import generate_5_arc_story
+            brain = generate_5_arc_story(temp_task_id)
+            story_text = brain.get("story") or brain.get("full_script") or ""
+            t_obj["story_text"] = story_text
+            t_obj["story_gate_score"] = brain.get("story_gate_score")
+            print(f"  ✅ [B2] Script generated ({len(story_text.split())} words, Gate Score: {t_obj['story_gate_score']})")
+        except Exception as b2_err:
+            logger.error(f"[{temp_task_id}] B2 Story generation failed: {b2_err}. Freezing candidate.")
+            break
+
+        # 7. B2.1 Independent Fact & Causal Integrity Audit Gate (Rule 118, 122 & 130 - Claude Opus 5)
+        print(f"  🛡️ [B2.1 Fact & Causal Audit] Auditing script with Claude Opus 5...")
+        fact_audit = brain.get("fact_causal_audit") or {}
+        f_verdict = fact_audit.get("verdict", "PASS").upper()
+        f_score = float(fact_audit.get("audit_score", 10.0))
+        print(f"  ⚖️ [B2.1 Fact & Causal Audit Result] Verdict={f_verdict}, Score={f_score}/10")
+
+        if f_verdict == "FAIL" or f_score < 7.5:
+            veto_reason = fact_audit.get("veto_reason") or fact_audit.get("audit_notes") or "Script failed fact/causal integrity audit"
+            logger.error(f"[{temp_task_id}] B2.1 Audit REJECTED ({f_score}/10): {veto_reason}. CIRCUIT BREAKER ACTIVATED.")
+            print(f"  ❌ [B2.1 REJECTED] {veto_reason}. Halting pipeline immediately.")
+            try:
+                from app.llm_router import _send_telegram
+                _send_telegram(
+                    f"🛑 <b>[B2.1 FACT & CAUSAL AUDIT VETO - RULE 130]</b>\n"
+                    f"Candidate <code>{term}</code> ({m_up}) bị Cổng B2.1 từ chối (Score: {f_score}/10):\n"
+                    f"<code>{veto_reason[:300]}</code>\n"
+                    f"⚡ <b>Hành động:</b> Phanh khẩn cấp kích hoạt. Tuyệt đối không chốt Task ID và không gửi duyệt HG1."
+                )
+            except Exception:
+                pass
+            break
+
+        print(f"  🎉 [B2.1 AUDIT PASSED!] Score: {f_score}/10. Moving to OFFICIAL TASK ID COMMIT & NOTION SYNC & HG1 NOTIFICATION!")
+
+        # 8. NOW OFFICIALLY COMMIT TASK ID, SYNC NOTION, RENAME TEMP FOLDERS, & SEND HG1 NOTIFICATION!
+        task_id = commit_trend_task(t_obj)
+        t_obj["task_id"] = task_id
+        print(f"  💾 Officially Committed Task ID: {task_id}")
+
+        # Migrate episode and pending task artifacts from temp_task_id to canonical task_id
+        for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
+            temp_p = Path(ep_base) / temp_task_id
+            canon_p = Path(ep_base) / task_id
+            if temp_p.exists() and not canon_p.exists():
+                try:
+                    temp_p.rename(canon_p)
+                except Exception as _m_err:
+                    logger.warning(f"Could not rename {temp_p} to {canon_p}: {_m_err}")
+
+        # Update canonical pending task file with full object
+        canon_task_file = os.path.join(pending_dir, f"{task_id}.json")
+        with open(canon_task_file, "w", encoding="utf-8") as tf:
+            json.dump(t_obj, tf, ensure_ascii=False, indent=2)
+
+        # Cleanup temp pending task
+        if os.path.exists(temp_task_file):
+            try:
+                os.remove(temp_task_file)
+            except Exception:
+                pass
+
+        # 9. Send Pure Telegram Gate 1 Notification (Now fully enriched with Title A/B & 60s An Ong Hook!)
         send_pure_telegram_gate1_notification(t_obj)
 
-        # 7. Automated Transition to B2 Story Engine & B3 Director Plan
+        # 10. Proceed directly to B3 Hollywood Director Plan & B3.5 Prompt Forge
         if auto_produce:
-            print(f"  ⚙️ [B2/B3] Auto-producing 12-15 min docudrama & 2-layer director plan for {task_id}...")
+            print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {task_id}...")
             try:
                 from scripts.produce_episode_hg1 import run_chain
                 res_code = run_chain(task_id)
                 if res_code == 0:
-                    print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B3 -> Gate 2 for {task_id}!")
+                    print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B2.1 -> B3 -> Gate 2 for {task_id}!")
                     produced_topics.append(t_obj)
                     break  # Exactly 1 completed topic per market per day!
                 else:
-                    logger.error(f"[{task_id}] Pipeline stopped at gate with exit code {res_code}. CIRCUIT BREAKER ACTIVATED: Freezing pipeline.")
+                    logger.error(f"[{task_id}] Pipeline stopped at gate with exit code {res_code}. Freezing pipeline.")
                     break
             except Exception as prod_err:
-                logger.error(f"[{task_id}] CRITICAL RUNTIME ERROR: {prod_err}. CIRCUIT BREAKER ACTIVATED: Halting pipeline immediately.")
-                import traceback
-                tb_str = traceback.format_exc()
-                logger.error(tb_str)
-                try:
-                    from app.llm_router import _send_telegram
-                    _send_telegram(
-                        f"🛑 <b>[PIPELINE CIRCUIT BREAKER - RULE 118]</b>\n"
-                        f"Task <code>{task_id}</code> gặp sự cố kỹ thuật hoặc Cổng Audit B2.1 bị từ chối:\n"
-                        f"<code>{str(prod_err)[:300]}</code>\n"
-                        f"⚡ <b>Hành động:</b> Đã kích hoạt Phanh Dừng Khẩn Cấp. Tuyệt đối KHÔNG tự ý xoay đề tài để bảo vệ tài nguyên token."
-                    )
-                except Exception:
-                    pass
-                # CIRCUIT BREAKER: Freeze and break immediately. NEVER rotate candidate on runtime/audit error!
+                logger.error(f"[{task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}. Freezing pipeline.")
                 break
         else:
             produced_topics.append(t_obj)
@@ -1048,4 +1106,3 @@ if __name__ == "__main__":
     print(f"Executing Trend Engine B1 CLI (term={custom_term}, market={target_mkt}, auto_produce={auto_prod}, max_candidates={max_candidates})...")
     res = discover_and_produce_market_trend(market=target_mkt, custom_seed=custom_term, auto_produce=auto_prod, max_scan_candidates=max_candidates)
     print(f"Finished. Produced {len(res)} topics.")
-

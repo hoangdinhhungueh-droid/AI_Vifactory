@@ -166,12 +166,23 @@ def run_chain(task_id: str) -> int:
 
     # ---- B2 5-Beat Investigative Docudrama (Rule 445) ----------------
     stage = "B2"
-    from app.services.story_engine_b2 import generate_5_arc_story
-    _log(stage, "generating 5-beat investigative docudrama via HHTech Reasoner")
-    brain = generate_5_arc_story(task_id)
+    brain_file = ep_dir / "brain_input.json"
+    brain = None
+    if brain_file.exists() and brain_file.stat().st_size > 100:
+        try:
+            brain = json.loads(brain_file.read_text(encoding="utf-8"))
+            _log(stage, "Reusing existing valid brain_input.json from %s" % brain_file)
+        except Exception:
+            brain = None
+
+    if not brain or not brain.get("story"):
+        from app.services.story_engine_b2 import generate_5_arc_story
+        _log(stage, "generating 5-beat investigative docudrama via HHTech Reasoner")
+        brain = generate_5_arc_story(task_id)
+
     story_text = brain.get("story") or brain.get("full_script") or ""
     score = str(brain.get("story_gate_score") or "n/a")
-    _log(stage, "story generated (%d words), story_gate_score=%s" % (len(story_text.split()), score))
+    _log(stage, "story ready (%d words), story_gate_score=%s" % (len(story_text.split()), score))
 
     # ---- B2.1 Fact & Causal Integrity Audit Gate (Rule 118 & Rule 130)
     fact_audit = brain.get("fact_causal_audit") or {}
@@ -249,6 +260,7 @@ def run_chain(task_id: str) -> int:
             prompts = None
 
     if not prompts:
+        # Handle GPT content policy refusals gracefully (02/09/2026 P0 fix)
         try:
             prompts = generate_scene_prompts(
                 bg_dict=bg_dict,
@@ -264,6 +276,7 @@ def run_chain(task_id: str) -> int:
             _log(stage, "%d BG prompts, %d FG prompts, %d Thumbnails -> Notion" % (n_bg, n_fg, n_thumb))
             push_prompts_to_notion(prompts, task_id, task_id=task_id)
         except ContentPolicyRefusalError as e:
+            # GPT refused due to sensitive content - route to HG2.5 manual review
             _log(stage, "CONTENT POLICY REFUSAL - routing to HG2.5 manual review")
             _log(stage, "Refusal: %s" % str(e)[:200])
             refusal_marker = {
@@ -281,7 +294,7 @@ def run_chain(task_id: str) -> int:
         n_fg = len(prompts.get("foregrounds") or {})
         n_thumb = len(prompts.get("thumbnails") or {})
         _log(stage, "%d BG prompts, %d FG prompts, %d Thumbnails loaded from disk" % (n_bg, n_fg, n_thumb))
-        
+
     # ---- Human Gate 2 -------------------------------------------------
     seo_pkg_file = ep_dir / "seo_package.json"
     t_a, t_b = "", ""
