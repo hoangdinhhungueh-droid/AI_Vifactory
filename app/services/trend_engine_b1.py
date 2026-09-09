@@ -43,7 +43,8 @@ from app.services.trend_free_signals import (
     youtube_autocomplete,
     google_autocomplete,
     gtrends_discover_trending_searches,
-    google_news_topic_rss
+    google_news_topic_rss,
+    fetch_specialized_market_rss
 )
 from app.services.competitor_recon_b15 import (
     youtube_search,
@@ -315,6 +316,34 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
     except Exception as e:
         logger.warning(f"[{m_up}] Failed to fetch Google News Topic RSS: {e}")
 
+    # Lane 2.5: High-Forensic Specialized Market RSS (TDB/Yahoo for JP, Crisis for KR, Corporate for EN)
+    try:
+        spec_items = fetch_specialized_market_rss(market=m_up, timeout=12.0)
+        logger.info(f"[{m_up}] Specialized Market RSS returned {len(spec_items)} high-forensic items.")
+        for s_it in spec_items:
+            t = s_it.get("term", "").strip()
+            if not t or len(t) < 4:
+                continue
+            k = t.lower()
+            if k not in seen:
+                cand_obj = {
+                    "term": t,
+                    "primary_geo": cfg.get("gl", "US"),
+                    "geos_present": [cfg.get("gl", "US")],
+                    "approx_traffic": "specialized_rss_live",
+                    "news_title": t,
+                    "source": s_it.get("source", "specialized_rss"),
+                    "sources_present": [s_it.get("source", "specialized_rss")]
+                }
+                seen[k] = cand_obj
+                gt_candidates.append(cand_obj)
+            else:
+                src_name = s_it.get("source", "specialized_rss")
+                if src_name not in seen[k].get("sources_present", []):
+                    seen[k].setdefault("sources_present", []).append(src_name)
+    except Exception as e:
+        logger.warning(f"[{m_up}] Failed to fetch Specialized Market RSS: {e}")
+
     # Lane 3: Google Trends Discover Searches via pytrends (with fallback to 0 if rate-limited)
     for geo in geos[:2]:
         try:
@@ -386,19 +415,23 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
         except Exception as _yt_err:
             logger.debug(f"[{m_up}] YouTube autocomplete seed '{y_seed}' failed: {_yt_err}")
 
-    # Interleaved 40-candidate Assembly:
-    # Top 10 GTrends -> Top 10 YouTube -> GTrends 11-20 -> YouTube 11-20
-    gt_batch1 = gt_candidates[:10]
-    yt_batch1 = yt_candidates[:10]
-    gt_batch2 = gt_candidates[10:20]
-    yt_batch2 = yt_candidates[10:20]
+    # Forensic Priority Interleaving Assembly:
+    # 1. Prioritize candidates that already contain forensic crisis anchors
+    all_raw = gt_candidates + yt_candidates
+    anchors = FORENSIC_ANCHORS.get(m_up, FORENSIC_ANCHORS["EN"])
 
-    ordered_candidates = gt_batch1 + yt_batch1 + gt_batch2 + yt_batch2
-    # Add any remaining tail candidates
-    remaining_gt = gt_candidates[20:]
-    remaining_yt = yt_candidates[20:]
-    ordered_candidates.extend(remaining_gt)
-    ordered_candidates.extend(remaining_yt)
+    forensic_priority = []
+    regular_cands = []
+
+    for c in all_raw:
+        comb = f"{c.get('term', '')} {c.get('news_title', '')}".lower()
+        if any(kw.lower() in comb for kw in anchors):
+            forensic_priority.append(c)
+        else:
+            regular_cands.append(c)
+
+    # Put forensic priority first, followed by regular candidates
+    ordered_candidates = forensic_priority + regular_cands
 
     # Deduplicate against permanent topic history registry
     unhandled = []
@@ -409,7 +442,7 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
             continue
         unhandled.append(c)
 
-    logger.info(f"[{m_up}] Total candidates: GT={len(gt_candidates)}, YT={len(yt_candidates)} -> Ordered Interleaved unhandled: {len(unhandled)}")
+    logger.info(f"[{m_up}] Total candidates: GT={len(gt_candidates)}, YT={len(yt_candidates)} -> Forensic Priority: {len(forensic_priority)}, Regular: {len(regular_cands)} -> Unhandled: {len(unhandled)}")
     return unhandled
 
 
@@ -556,26 +589,74 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
         logger.warning(f"[trend_engine] Failed to send Telegram Gate 1 notification: {e}")
 
 
+def sanitize_candidate_term(term: str) -> str:
+    """Sanitize noisy news headlines into crisp entity & event keywords.
+    Removes news source suffixes, brackets, and journalistic boilerplate.
+    Example:
+      '【近畿初の神社倒産】清和源氏発祥の『多田神社』が民事再生法の適用申請...（MBSニュース）'
+      -> '多田神社 民事再生'
+    """
+    if not term:
+        return ""
+    s = str(term).strip()
+    # Remove publisher prefixes/suffixes like 【...】, （...）, (...), - Publisher
+    s = re.sub(r'^[【\[][^】\]]+[】\]]\s*', '', s)
+    s = re.sub(r'\s*[（\(][^）\)]+[）\)]\s*$', '', s)
+    s = re.sub(r'\s*-\s*[^-]+$', '', s)
+
+    # Extract quoted entity if present: 『多田神社』 -> 多田神社
+    quotes = re.findall(r'[『「"]([^』」"]+)[』」"]', s)
+    entity = quotes[0] if quotes else ""
+
+    # Look for key event anchors
+    events = ["民事再生", "倒産", "破産", "不正会計", "粉飾", "巨額損失", "不祥事", "買収", "逮捕", "疑惑",
+              "법정관리", "워크아웃", "부도", "횡령", "배임", "분식회계", "상장폐지",
+              "bankruptcy", "fraud", "investigation", "collapse", "lawsuit", "indictment"]
+    found_event = ""
+    for ev in events:
+        if ev in s:
+            found_event = ev
+            break
+
+    if entity and found_event:
+        return f"{entity} {found_event}"
+    elif entity and len(s) > 35:
+        return entity
+    elif len(s) > 40 and found_event:
+        # If headline is very long, extract text around event
+        idx = s.find(found_event)
+        start = max(0, idx - 15)
+        end = min(len(s), idx + len(found_event) + 15)
+        chunk = s[start:end].strip()
+        return chunk if len(chunk) < 30 else s[:30]
+
+    return s[:45].strip()
+
+
 FORENSIC_ANCHORS = {
     "KR": [
         "망한", "파산", "부도", "위기", "사태", "비리", "회생", "적자", "폭망", "몰락",
-        "배임", "횡령", "매각", "상폐", "손실", "디폴트", "구속", "압수수색", "체납",
+        "배임", "횡령", "매각", "상폐", "상장폐지", "손실", "디폴트", "구속", "압수수색", "체납",
         "논란", "붕괴", "스캔들", "진실", "의혹", "사건", "갈등", "분쟁", "소송",
         "검찰", "조사", "규제", "폭락", "폭등", "사기", "의문", "제재", "인수",
-        "파업", "관세", "경고", "해고", "감원", "쇼크", "폭로", "탈세", "충격"
+        "파업", "관세", "경고", "해고", "감원", "쇼크", "폭로", "탈세", "충격",
+        "법정관리", "워크아웃", "분식회계", "불법대출", "불공정거래", "미정산", "먹튀"
     ],
     "EN": [
         "collapse", "bankrupt", "crisis", "scandal", "fraud", "failed", "downfall",
         "investigation", "default", "liquidation", "loss", "debt", "deficit", "probe",
         "arrest", "lawsuit", "court", "recession", "scam", "why it failed", "exposed",
         "fall of", "controversy", "crash", "plunge", "turmoil", "indictment", "guilty",
-        "sanction", "tariff", "strike", "layoff", "shock", "dispute", "takeover"
+        "sanction", "tariff", "strike", "layoff", "shock", "dispute", "takeover",
+        "whistleblower", "antitrust", "subpoena", "foreclosure", "ponzi", "accounting fraud"
     ],
     "JP": [
         "倒産", "破産", "危機", "事件", "転落", "不正", "赤字", "崩壊", "粉飾",
         "裁判", "逮捕", "巨額", "損失", "なぜ", "疑惑", "衰退", "暴落", "詐欺",
         "買収", "買収へ", "制裁", "ストライキ", "解雇", "ショック", "暴露", "脱税",
-        "問題", "紛争", "訴訟", "調査", "規制", "真相", "失敗", "リスク"
+        "問題", "紛争", "訴訟", "調査", "規制", "真相", "失敗", "リスク",
+        "民事再生", "特別清算", "不正会計", "粉飾決算", "横領", "背任", "不祥事",
+        "リコール", "営業停止", "独占禁止法", "偽装", "内部告発", "債務超過"
     ]
 }
 
@@ -648,7 +729,7 @@ def discover_and_produce_market_trend(
     market: str = "EN",
     custom_seed: str = None,
     auto_produce: bool = True,
-    max_scan_candidates: int = 40
+    max_scan_candidates: int = 60
 ) -> list[dict]:
     """Execute canonical B1 trend discovery and automated B1.5 -> B2 -> B3 pipeline
     for exactly 1 topic per market per day.
@@ -666,8 +747,12 @@ def discover_and_produce_market_trend(
     produced_topics = []
 
     for idx, c in enumerate(candidates[:max_scan_candidates], start=1):
-        term = c["term"]
-        print(f"\n[{m_up}] Candidate #{idx}/{min(len(candidates), max_scan_candidates)}: '{term}' (Traffic: {c.get('approx_traffic')}, Geos: {c.get('geos_present')})")
+        raw_term = c["term"]
+        # Sanitize long noisy headlines into crisp entity & event keyword
+        clean_recon_term = sanitize_candidate_term(raw_term)
+        term = clean_recon_term if len(raw_term) > 40 else raw_term
+
+        print(f"\n[{m_up}] Candidate #{idx}/{min(len(candidates), max_scan_candidates)}: '{raw_term}' (Recon Term: '{term}', Traffic: {c.get('approx_traffic')}, Geos: {c.get('geos_present')})")
 
         # Level-0 Forensic Pre-Filter Gate (0 LLM Tokens Burned)
         pass_pre, pre_reason = forensic_pre_filter(c, m_up)
@@ -963,3 +1048,4 @@ if __name__ == "__main__":
     print(f"Executing Trend Engine B1 CLI (term={custom_term}, market={target_mkt}, auto_produce={auto_prod}, max_candidates={max_candidates})...")
     res = discover_and_produce_market_trend(market=target_mkt, custom_seed=custom_term, auto_produce=auto_prod, max_scan_candidates=max_candidates)
     print(f"Finished. Produced {len(res)} topics.")
+

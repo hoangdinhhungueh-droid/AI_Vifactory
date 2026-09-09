@@ -149,6 +149,74 @@ def google_news_topic_rss(topic="BUSINESS", hl="en", gl="US", timeout=12.0):
         logger.warning("[free-signals] google_news_topic_rss failed for topic=%r geo=%r: %s", topic, gl, e)
         return []
 
+def fetch_specialized_market_rss(market="JP", timeout=12.0):
+    """Fetch high-RPM investigative & business crisis feeds specialized for each market.
+    - JP: Yahoo Japan Business RSS + High-forensic business bankruptcy & fraud queries
+    - KR: High-forensic business workout, bankruptcy, and embezzlement queries
+    - EN: SEC / DOJ corporate crisis & financial scandal queries
+    100% live, zero-quota, zero rate limit.
+    """
+    m_up = (market or "EN").upper()
+    key = ("specialized_market_rss", m_up)
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+
+    import urllib.parse
+    import xml.etree.ElementTree as ET
+
+    feeds = []
+    if m_up == "JP":
+        q_forensic = urllib.parse.quote("when:48h (倒産 OR 民事再生 OR 破産 OR 不祥事 OR 巨額損失 OR 不正会計)")
+        feeds.append({
+            "url": f"https://news.google.com/rss/search?q={q_forensic}&hl=ja&gl=JP&ceid=JP:ja",
+            "source": "jp_forensic_news"
+        })
+        feeds.append({
+            "url": "https://news.yahoo.co.jp/rss/topics/business.xml",
+            "source": "yahoo_jp_business"
+        })
+    elif m_up == "KR":
+        q_forensic = urllib.parse.quote("when:48h (워크아웃 OR 법정관리 OR 부도 OR 횡령 OR 분식회계 OR 배임)")
+        feeds.append({
+            "url": f"https://news.google.com/rss/search?q={q_forensic}&hl=ko&gl=KR&ceid=KR:ko",
+            "source": "kr_forensic_news"
+        })
+    else:  # EN
+        q_forensic = urllib.parse.quote("when:48h (bankrupt OR bankruptcy OR fraud OR \"investigation\" OR \"indictment\" OR lawsuit OR collapse)")
+        feeds.append({
+            "url": f"https://news.google.com/rss/search?q={q_forensic}&hl=en-US&gl=US&ceid=US:en",
+            "source": "en_forensic_news"
+        })
+
+    out = []
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Antigravity/2.0"}
+
+    for feed_info in feeds:
+        try:
+            r = requests.get(feed_info["url"], headers=headers, timeout=timeout)
+            if r.status_code != 200:
+                continue
+            root = ET.fromstring(r.content)
+            for item in root.iter("item"):
+                raw_title = (item.findtext("title") or "").strip()
+                if not raw_title:
+                    continue
+                clean_title = raw_title.rsplit(" - ", 1)[0].strip() if " - " in raw_title else raw_title
+                pub_date = (item.findtext("pubDate") or "").strip()
+                out.append({
+                    "term": clean_title,
+                    "approx_traffic": "specialized_rss_live",
+                    "news_title": clean_title,
+                    "published_at": pub_date,
+                    "source": feed_info["source"]
+                })
+        except Exception as e:
+            logger.warning("[free-signals] Specialized feed %s failed for %s: %s", feed_info.get("source"), m_up, e)
+
+    _cache_set(key, out)
+    return out
+
 
 def gtrends_discover_trending_searches(market="EN", timeout=15.0, geo=None, count=15, **kwargs):
     """
@@ -256,3 +324,4 @@ def gtrends_discover_trending_searches(market="EN", timeout=15.0, geo=None, coun
     except Exception as e:
         logger.warning("[free-signals] gtrends_discover failed for %s: %s", market, e)
         return []
+
