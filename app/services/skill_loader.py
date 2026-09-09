@@ -422,7 +422,15 @@ def get_b1_strategic_rules() -> str:
         "   - Beat 3: The Fatal Explanatory Vacuum / Institutional Crack (Competitor Gap)\n"
         "   - Beat 4: The Smoking Gun / Systemic Exposure & Climax\n"
         "   - Beat 5: The Living Warning & Enduring Consequence\n"
-        "5. NATIVE GROUND TRUTH: All search keywords must be in the native language of the target market (JP/KR/EN)."
+        "5. 7 CANONICAL INVESTIGATIVE PILLARS:\n"
+        "   - Pillar 1: Rise and Fall of Corporate Giants\n"
+        "   - Pillar 2: Systemic Financial & Market Crashes\n"
+        "   - Pillar 3: True Crime Non-Graphic & Forensic Fraud\n"
+        "   - Pillar 4: Psychology & Behavioral Manipulation\n"
+        "   - Pillar 5: Technological & Geopolitical Battles\n"
+        "   - Pillar 6: Institutional & Regulatory Chokepoints\n"
+        "   - Pillar 7: Hidden Asymmetric Fortunes & Wealth Transfers\n"
+        "6. NATIVE GROUND TRUTH: All search keywords must be in the native language of the target market (JP/KR/EN)."
     )
 
 

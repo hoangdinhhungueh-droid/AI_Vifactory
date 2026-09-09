@@ -467,3 +467,20 @@ def assess_keyword_video_viability(
             "conflict_depth_score": 7,
             "rejection_reason": None
         }
+
+
+class HHTechReasoner:
+    """Class wrapper around HHTech reasoning functions for test parity & OO callers."""
+    def __init__(self):
+        self.model = HHTECH_MODEL
+        self.base_url = HHTECH_BASE_URL
+
+    def _get_system_rules(self) -> str:
+        return get_b1_strategic_rules()
+
+    def assess_viability(self, *args, **kwargs):
+        return assess_keyword_video_viability(*args, **kwargs)
+
+    def reason_niche(self, *args, **kwargs):
+        return reason_topic_niche(*args, **kwargs)
+

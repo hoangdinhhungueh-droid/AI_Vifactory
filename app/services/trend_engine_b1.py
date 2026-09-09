@@ -66,6 +66,7 @@ from app.services.topic_history_registry import (
 logger = logging.getLogger("trend_engine_b1")
 
 EN_SUB_GEOS = ["US", "GB", "CA", "AU", "NZ"]
+VIABILITY_THRESHOLD = 8.0
 
 MARKET_CONFIG = {
     "EN": {
@@ -603,10 +604,12 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
         score = topic_data.get("viability_score", 9.0)
         title_a = html.escape(str(topic_data.get("title_a", "")))
         hook_60s = html.escape(str(topic_data.get("hook_60s", "")))
+        fact_score = topic_data.get("fact_audit_score", 10.0)
+        fact_model = html.escape(str(topic_data.get("fact_audit_model", "Claude Opus 5")))
 
         lines = [
             "🎯 <b>[HUMAN GATE 1] THÔNG BÁO TIẾN ĐỘ CHỦ ĐỀ SẢN XUẤT (GO-LIVE 2026)</b>",
-            "<i>(✨ B1 Trend Recon & B1.5 Competitor Gap & B1.6 SEO bởi GPT-6-Astra qua HHTech API)</i>",
+            "<i>(✨ B1 Trend Recon & B1.5 Competitor Gap & B1.6 SEO & B2 Story qua GPT-6-Astra & Claude Opus 5)</i>",
             "",
             f"{flag} <b>Market {mkt}:</b> <code>{raw_term}</code> (Viability: {score}/10)",
             f"• <b>Đề tài:</b> {title_vi}",
@@ -616,10 +619,14 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
             f"• <b>Niche Brief:</b> {niche}",
             f"• <b>Khác biệt đối thủ (Blue Ocean Gap):</b> <i>{gap}</i>",
             f"• <b>5-Beat Docudrama:</b> {arcs[:180]}...",
+            f"• <b>🛡️ B2.1 Fact & Causal Audit:</b> <b>PASS ({fact_score}/10)</b> qua {fact_model}",
             f"👉 <b>Task ID:</b> <code>{task_id}</code>",
             "--------------------------------------------------",
-            "⚙️ <i>Hệ thống đang tiến hành sinh <b>B2 Kịch bản điều tra</b> & kiểm toán độc lập <b>B2.1 Fact & Causal Gate</b> (Claude Opus 5)...</i>"
+            "⚙️ <i>B2.1 Fact Audit đã PASS! Hệ thống đang tự động chuyển tiếp sang <b>B3 Visual Director Plan & B3.5 Prompt Forge</b>...</i>"
         ]
+        # Remove duplicate niche brief if hook_60s was empty
+        if not hook_60s:
+            lines = [l for i, l in enumerate(lines) if not (l.startswith("• <b>Niche Brief:</b>") and i == 9)]
         msg = chr(10).join(lines)
         _send_telegram(msg)
         logger.info(f"[trend_engine] Sent pure Telegram Gate 1 notification for {task_id}")
@@ -1046,6 +1053,8 @@ def discover_and_produce_market_trend(
             continue
 
         print(f"  🎉 [B2.1 AUDIT PASSED!] Score: {f_score}/10. Moving to OFFICIAL TASK ID COMMIT & NOTION SYNC & HG1 NOTIFICATION!")
+        t_obj["fact_audit_score"] = f_score
+        t_obj["fact_audit_model"] = fact_audit.get("auditor_model", "Claude Opus 5")
 
         # 8. NOW OFFICIALLY COMMIT TASK ID, SYNC NOTION, RENAME TEMP FOLDERS, & SEND HG1 NOTIFICATION!
         task_id = commit_trend_task(t_obj)
@@ -1053,14 +1062,25 @@ def discover_and_produce_market_trend(
         print(f"  💾 Officially Committed Task ID: {task_id}")
 
         # Migrate episode and pending task artifacts from temp_task_id to canonical task_id
+        import shutil
         for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
             temp_p = Path(ep_base) / temp_task_id
             canon_p = Path(ep_base) / task_id
-            if temp_p.exists() and not canon_p.exists():
+            if temp_p.exists():
+                canon_p.mkdir(parents=True, exist_ok=True)
+                for f_item in temp_p.iterdir():
+                    dest_file = canon_p / f_item.name
+                    try:
+                        if f_item.is_file():
+                            shutil.copy2(f_item, dest_file)
+                        elif f_item.is_dir():
+                            shutil.copytree(f_item, dest_file, dirs_exist_ok=True)
+                    except Exception as _cp_err:
+                        logger.warning(f"Could not copy {f_item} to {dest_file}: {_cp_err}")
                 try:
-                    temp_p.rename(canon_p)
-                except Exception as _m_err:
-                    logger.warning(f"Could not rename {temp_p} to {canon_p}: {_m_err}")
+                    shutil.rmtree(temp_p)
+                except Exception as _rm_err:
+                    logger.warning(f"Could not remove temp folder {temp_p}: {_rm_err}")
 
         # Update canonical pending task file with full object
         canon_task_file = os.path.join(pending_dir, f"{task_id}.json")
@@ -1074,7 +1094,7 @@ def discover_and_produce_market_trend(
             except Exception:
                 pass
 
-        # 9. Send Pure Telegram Gate 1 Notification (Now fully enriched with Title A/B & 60s An Ong Hook!)
+        # 9. Send Pure Telegram Gate 1 Notification (Now fully enriched with Title A/B, 60s Hook & B2.1 PASS!)
         send_pure_telegram_gate1_notification(t_obj)
 
         # 10. Proceed directly to B3 Hollywood Director Plan & B3.5 Prompt Forge
