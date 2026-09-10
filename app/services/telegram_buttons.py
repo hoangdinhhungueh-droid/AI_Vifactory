@@ -358,9 +358,12 @@ def trigger_human_gate_2(episode_id: str) -> Optional[int]:
     ]
     ep_dir = None
     for c in candidates:
-        if c.exists():
-            ep_dir = c
-            break
+        try:
+            if c.exists():
+                ep_dir = c
+                break
+        except (PermissionError, OSError):
+            continue
 
     if not ep_dir:
         logger.warning(f"[HG2] Episode directory not found for {episode_id}")
