@@ -2,7 +2,7 @@
 """
 Model Gateway for VF Pipeline - Pattern 3 Implementation.
 Centralizes all model API calls with:
-  - Automatic cost tracking (300k VND cap enforcement)
+  - Automatic cost tracking and telemetry
   - Provider fallback support (HHTech → Anthropic)
   - A/B testing capability
   - Unified error handling
@@ -42,7 +42,7 @@ class ModelGateway:
     Centralized gateway for all model API calls.
     
     Features:
-    - Cost tracking with budget enforcement
+    - Cost tracking and telemetry
     - Automatic fallback to secondary providers
     - Standardized error handling
     - Request/response logging
@@ -116,7 +116,6 @@ class ModelGateway:
             Generated text response
         
         Raises:
-            CostCapExceededError: If request would exceed monthly budget
             AllProvidersFailed: If primary and all fallbacks fail
         """
         model = model or self.hhtech_model
@@ -376,7 +375,6 @@ class ModelGateway:
             Image bytes (or first image if count > 1)
         
         Raises:
-            CostCapExceededError: If request would exceed monthly budget
             AllProvidersFailed: If primary and all fallbacks fail
         """
         # TODO: Implement image generation when needed

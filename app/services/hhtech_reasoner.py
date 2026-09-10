@@ -9,8 +9,7 @@ Standardized Architecture (24/08/2026 - Go-Live 2026):
   - Vietnamese Output for Human Gate 1 (topic_name_vi, niche_angle_brief, story_direction_5_arcs).
 
 PATTERN 3 UPDATE (02/09/2026):
-  - Routed through Model Gateway for automatic cost tracking and budget enforcement
-  - 300k VND monthly cap enforced at gateway layer
+  - Routed through Model Gateway for automatic cost tracking and telemetry
   - Fallback support to Anthropic Claude if HHTech fails
 """
 
@@ -147,7 +146,7 @@ def call_gpt6_astra(
     """
     Synchronous caller for GPT-6-Astra via Model Gateway (Pattern 3).
     
-    Automatically tracks costs and enforces 300k VND monthly budget.
+    Automatically tracks model usage telemetry.
     Falls back to Anthropic Claude if HHTech fails (optional).
     """
     from app.services.model_gateway import get_global_gateway

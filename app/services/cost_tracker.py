@@ -1,8 +1,7 @@
 # app/services/cost_tracker.py
 """
 Cost Tracker for VF Pipeline - Pattern 3 Implementation.
-Enforces 300k VND monthly cap across all model providers.
-Tracks usage per model and provides monthly reporting.
+Tracks model usage costs for passive telemetry and monthly reporting.
 """
 
 import json
@@ -15,20 +14,20 @@ logger = logging.getLogger(__name__)
 
 
 class CostCapExceededError(Exception):
-    """Raised when monthly cost cap is exceeded."""
+    """Retained for backward compatibility. No budget cap is enforced."""
     pass
 
 
 class CostTracker:
     """
-    Tracks model usage costs and enforces monthly budget cap.
+    Tracks model usage costs for passive telemetry.
     
     Storage: /var/vf/cost_tracker.json
     Format: {
         "2026-09": {
-            "gpt-6-astra": 300000.00,
-            "imagen3": 80000.00,
-            "claude-3.5-sonnet": 20000.00
+            "gpt-6-astra": 15000.00,
+            "imagen3": 8000.00,
+            "claude-3.5-sonnet": 2000.00
         },
         "2026-08": {...}
     }
@@ -52,12 +51,12 @@ class CostTracker:
         "default": 50.0
     }
     
-    def __init__(self, cap_vnd: int = 300_000, db_path: Optional[str] = None):
+    def __init__(self, cap_vnd: Optional[int] = None, db_path: Optional[str] = None):
         """
-        Initialize cost tracker.
+        Initialize cost tracker for passive telemetry.
         
         Args:
-            cap_vnd: Monthly budget cap in VND (default: 300,000)
+            cap_vnd: Optional legacy parameter retained for signature compatibility.
             db_path: Path to cost database JSON file (default: /var/vf/cost_tracker.json)
         """
         self.cap_vnd = cap_vnd
