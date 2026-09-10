@@ -100,14 +100,14 @@ graph TD
   - **B2 (`story_engine_b2.py`)**: Sinh kịch bản 5 Beat "Investigative Docudrama" (1,800 - 2,200 từ, ~12-15 phút) qua `GPT-6-Astra`.
   - **B2.1 (`fact_causal_audit` qua Claude Opus 5)**: Kiểm toán độc lập tính toàn vẹn nhân quả (Rule 130). Chỉ khi B2.1 đạt PASS (score ≥ 7.5/10) mới **Chốt Task ID chính thức + Sync Notion Trend Brain (Approved→Story) + Gửi Telegram Gate 1 hoàn chỉnh** trước khi chuyển giao B3.
   - **B3 (`/video:art-director`)**: Lập bảng đạo diễn Dynamic Scenes (Layer 1 BG + Layer 2 FG) bằng tiếng Anh khớp 10X 5-Beat & Visual Anchoring ngòi nổ thực tế (Rule 116, 120, 128, 130, 131). Sync **Director Plan DB**.
-  - **B3.5 (`/prompt:forge`)**: Sinh Prompt Engineering chuẩn FG `#FF00FF` Chroma Key bằng tiếng Anh. Sync **Prompt Library DB**.
+  - **B3.5 (`/prompt:forge`) / B3.6 (`b36_visual_convergence.py`)**: Sinh Prompt Engineering chuẩn FG `#FF00FF` Chroma Key & DACL Visual Convergence Audit. Tự động phát **Telegram Human Gate 2** (Thẻ tóm lược điều hành + lệnh 1-chạm kích hoạt `vf-image-gen` B4/B5).
   - **B4 (`/image:native`)**: Sinh ảnh Google Image Native / Gemini Pro Web (`generate_image`). Upload R2 & Sync **Image Asset Library DB**.
   - **B5 (`/audit:vision`)**: Vision Audit 4 trục (Rule 122) & Tách phông `#FF00FF` HSV Chroma Key. Update `Status = Approved`.
   - **B6 (`/audio:narration`)**: TTS thuyết minh giọng nam chuẩn theo ngôn ngữ thị trường (`en-US-GuyNeural` cho EN, `ja-JP` cho JP, `ko-KR` cho KR) chuẩn -14 LUFS.
   - **B7 (`/audio:subtitle`)**: Whisper SRT -> trích xuất Timestamp Karaoke chính xác từng miligiây.
   - **B8 (`/video:render`)**: Remotion React Master Render CPU (TwoLayerEpisode + Subtitles + Top Act Bar + BGM -24dB).
   - **B9 (`/probe:quality`)**: Quality Probe EBU R128 (-26 đến -22 LUFS) & Stream Integrity 1080p 30fps.
-  - **B10 (`/video:upload`)**: YouTube Upload Unlisted + Telegram Human Gate 2.
+  - **B10 (`/video:upload`)**: YouTube Upload Unlisted + Telegram Human Gate 3 (Nghiệm thu Episode Master Pro & phát hành).
   - **B11 (`/run:b11` | `b11_engine.py`)**: YouTube Analytics 48h sync (Routine Lean Sync & Deep Post-Mortem Feedback Loop).
 
 ---
