@@ -333,6 +333,13 @@ def run_b36_visual_convergence(
 
     logger.info(f"[B3.6 DACL] Convergence Loop Complete: Converged={converged} (Score: {final_score:.1f}/10) in {round(time.time() - t0, 1)}s")
 
+    # Trigger Human Gate 2 Telegram Notification with Converged Assets (Rule 125)
+    try:
+        from app.services.telegram_buttons import trigger_human_gate_2
+        trigger_human_gate_2(episode_id)
+    except Exception as e:
+        logger.warning(f"[B3.6 DACL] HG2 dispatch note: {e}")
+
     return {
         "converged": converged,
         "final_score": final_score,

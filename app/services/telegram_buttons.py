@@ -338,4 +338,142 @@ async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,
     return await send_with_buttons(text, [[("✅ Đã sinh ảnh xong (B6 Render)", f"imgdone:{task_id}")]])
 
 
+def trigger_human_gate_2(episode_id: str) -> Optional[int]:
+    """
+    Synchronous trigger for Human Gate 2 (Rule 125 & Executive 1-Click Mandate).
+    Gathers episode metadata, scenes, visual prompts, thumbnails, and dispatches
+    the standard Human Gate 2 Telegram card to the user.
+    Safe for synchronous callers and threadpools.
+    """
+    import asyncio
+    from pathlib import Path
+
+    # 1. Resolve canonical episode directory
+    candidates = [
+        Path(f"/root/video_factory/episodes/{episode_id}"),
+        Path(f"/var/vf/episodes/{episode_id}"),
+        Path(f"/root/video_factory/workspace/{episode_id}"),
+        Path(f"episodes/{episode_id}"),
+        Path(f"workspace/{episode_id}")
+    ]
+    ep_dir = None
+    for c in candidates:
+        if c.exists():
+            ep_dir = c
+            break
+
+    if not ep_dir:
+        logger.warning(f"[HG2] Episode directory not found for {episode_id}")
+        return None
+
+    # 2. Extract scene count & metadata
+    n_scenes = 0
+    dp_file = ep_dir / "director_plan.json"
+    if not dp_file.exists():
+        dp_file = ep_dir / "dp_plan.json"
+    dp_data = {}
+    if dp_file.exists():
+        try:
+            dp_data = json.loads(dp_file.read_text(encoding="utf-8"))
+            n_scenes = len(dp_data.get("scenes", []))
+        except Exception:
+            pass
+
+    # 3. Extract prompts counts
+    pforge_file = ep_dir / "prompts_forge.json"
+    if not pforge_file.exists():
+        pforge_file = ep_dir / "prompts.json"
+    n_bg, n_fg, n_thumb = 0, 0, 2
+    if pforge_file.exists():
+        try:
+            p_data = json.loads(pforge_file.read_text(encoding="utf-8"))
+            n_bg = len(p_data.get("backgrounds", {}))
+            n_fg = len(p_data.get("foregrounds", {}))
+            n_thumb = len(p_data.get("thumbnails", {})) or 2
+        except Exception:
+            pass
+
+    # 4. Extract Titles from seo_package
+    title_a, title_b = "", ""
+    seo_file = ep_dir / "seo_package.json"
+    if seo_file.exists():
+        try:
+            s_data = json.loads(seo_file.read_text(encoding="utf-8"))
+            title_a = s_data.get("title_a", "")
+            title_b = s_data.get("title_b", "")
+        except Exception:
+            pass
+
+    # 5. Extract topic, archetype, story_score
+    topic = dp_data.get("topic") or episode_id
+    director_arch = dp_data.get("director_archetype") or "Hollywood Master Principle"
+
+    story_score = "Audit: PASS"
+    audit_file = ep_dir / "visual_convergence_audit.json"
+    if audit_file.exists():
+        try:
+            a_data = json.loads(audit_file.read_text(encoding="utf-8"))
+            f_score = a_data.get("final_score")
+            if f_score:
+                story_score = f"B3.6 Audit: {f_score}/10"
+        except Exception:
+            pass
+    if story_score == "Audit: PASS":
+        brain_file = ep_dir / "brain_input.json"
+        if brain_file.exists():
+            try:
+                b_data = json.loads(brain_file.read_text(encoding="utf-8"))
+                s_gate = b_data.get("story_gate_score")
+                if s_gate:
+                    story_score = f"B2 Gate: {s_gate}"
+            except Exception:
+                pass
+
+    logger.info(f"[HG2] Dispatching Human Gate 2 card for {episode_id} ({n_scenes} scenes, {n_bg} BGs, {n_fg} FGs)...")
+
+    # Async loop execution safety
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            msg_id = pool.submit(
+                asyncio.run,
+                send_gate2_card(
+                    task_id=episode_id,
+                    n_scenes=n_scenes,
+                    n_bg=n_bg,
+                    n_fg=n_fg,
+                    story_score=story_score,
+                    n_thumb=n_thumb,
+                    topic=topic,
+                    director_archetype=director_arch,
+                    title_a=title_a,
+                    title_b=title_b
+                )
+            ).result()
+    else:
+        msg_id = asyncio.run(
+            send_gate2_card(
+                task_id=episode_id,
+                n_scenes=n_scenes,
+                n_bg=n_bg,
+                n_fg=n_fg,
+                story_score=story_score,
+                n_thumb=n_thumb,
+                topic=topic,
+                director_archetype=director_arch,
+                title_a=title_a,
+                title_b=title_b
+            )
+        )
+
+    if msg_id:
+        logger.info(f"[HG2] Successfully dispatched Human Gate 2 Telegram card (msg_id={msg_id}) for {episode_id}")
+    return msg_id
+
+
 

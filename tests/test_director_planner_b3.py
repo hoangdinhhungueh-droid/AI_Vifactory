@@ -170,3 +170,10 @@ def test_cjk_beat_extraction_and_scene_breakdown():
         assert not s["narration"].startswith("===")
         assert not s["narration"].startswith("ACT")
 
+
+def test_trigger_human_gate_2_contract():
+    """Test that trigger_human_gate_2 handles non-existent task safely and returns None."""
+    from app.services.telegram_buttons import trigger_human_gate_2
+    res = trigger_human_gate_2("NON_EXISTENT_TASK_99999")
+    assert res is None
+

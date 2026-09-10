@@ -908,6 +908,13 @@ def generate_director_plan(
     if not skip_notion:
         push_director_plan_to_notion(director_plan, episode_id)
 
+    # 10. Trigger Human Gate 2 Telegram Notification (Rule 125 & Executive 1-Click Mandate)
+    try:
+        from app.services.telegram_buttons import trigger_human_gate_2
+        trigger_human_gate_2(episode_id)
+    except Exception as e:
+        logger.warning(f"  [B3.5 HG2] Failed to dispatch Human Gate 2 notification: {e}")
+
     return director_plan
 
 
