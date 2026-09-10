@@ -251,7 +251,9 @@ def extract_universal_semantic_context(story_text: str, metadata: dict = None, i
         physical_environment = f"Authentic narrative environment: {'; '.join(env_cues)}, reflecting primary setting locations and institutional archives"
     else:
         topic_hint = metadata.get("topic") or intel_card.get("target_keyword", "Investigative Setting")
-        physical_environment = f"Authentic narrative environment reflecting {topic_hint}, with dedicated field operational sites and archival document repositories"
+        topic_clean = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]", "", str(topic_hint)).strip()
+        clean_env_label = topic_clean if len(topic_clean) >= 3 else "authentic documentary setting"
+        physical_environment = f"Authentic narrative environment reflecting {clean_env_label}, with dedicated field operational sites and archival document repositories"
 
     # 3. Dynamic Atmospheric Lighting Mood
     lighting_cues = []
@@ -404,7 +406,7 @@ def extract_story_beats(story_text: str) -> list[dict]:
     current_lines = []
 
     beat_patterns = [
-        re.compile(r"^(?:##\s*)?(?:ACT|BEAT)\s*([1-5])[:\-\s]*(.*)", re.IGNORECASE),
+        re.compile(r"^(?:={2,}\s*)?(?:#+\s*)?(?:ACT|BEAT)\s*([1-5]|IV|I{1,3}|V)[:\-\s=]*(.*)", re.IGNORECASE),
         re.compile(r"^(?:##\s*)?(The Impossible Contradiction|The False Narrative|The Systemic Blindspot|The Real Culprit|The Uncomfortable Modern Mirror)", re.IGNORECASE)
     ]
 
@@ -419,7 +421,7 @@ def extract_story_beats(story_text: str) -> list[dict]:
                         "content": "\n".join(current_lines).strip()
                     })
                     current_lines = []
-                current_beat_title = line.strip().lstrip("#").strip()
+                current_beat_title = line.strip().strip("=").strip("#").strip()
                 matched = True
                 break
         if not matched:
@@ -523,8 +525,9 @@ def generate_director_plan(
     archetype = detect_cinematic_archetype(niche, topic, story_text)
 
     story_beats = extract_story_beats(story_text)
-    total_words = len(story_text.split())
-    logger.info(f"  [B3] Story length: {total_words} words across {len(story_beats)} beats. Archetype: {archetype['director']}")
+    is_cjk = any("\u4e00" <= char <= "\u9fff" or "\u3040" <= char <= "\u30ff" or "\uac00" <= char <= "\ud7af" for char in story_text[:500])
+    total_words = int(len(story_text) / 2.5) if is_cjk else len(story_text.split())
+    logger.info(f"  [B3] Story length: {total_words} words ({len(story_text)} chars) across {len(story_beats)} beats. Archetype: {archetype['director']}")
     logger.info(f"  [B3] Extracted Era: {dynamic_context['era_anchor']}. Ensemble: {len(character_ensemble)} roles.")
 
     m_up = (metadata.get("market") or episode_id.split("_")[0]).upper()
@@ -677,7 +680,7 @@ def generate_director_plan(
                     pass
 
     # 4. Fallback synthesis if LLM failed or generated insufficient scenes (< min_required_scenes) (Rule 445: 35-55 dynamic scenes)
-    min_required_scenes = max(25, min(35, total_words // 45)) if total_words > 300 else 5
+    min_required_scenes = max(35, min(55, total_words // 30)) if total_words > 300 else 5
     llm_scenes = parsed.get("scenes", []) if parsed else []
     if not parsed or len(llm_scenes) < min_required_scenes:
         if parsed and llm_scenes:
@@ -874,11 +877,26 @@ def generate_director_plan(
             task_id=episode_id
         )
 
+        # Map forged prompts back to each scene in director_plan
+        for sc in director_plan.get("scenes", []):
+            bg_k = sc.get("bg_reuse_key")
+            if bg_k and bg_k in prompts_res.get("backgrounds", {}):
+                sc["bg_prompt"] = prompts_res["backgrounds"][bg_k]
+                sc["image_prompt"] = prompts_res["backgrounds"][bg_k]
+            fg_k = sc.get("fg_reuse_key")
+            if fg_k and fg_k in prompts_res.get("foregrounds", {}):
+                sc["fg_prompt"] = prompts_res["foregrounds"][fg_k]
+                sc["foreground_prompt"] = prompts_res["foregrounds"][fg_k]
+
         for target_dir in canonical_dirs:
             with open(target_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
                 json.dump(prompts_res, f, indent=2, ensure_ascii=False)
             with open(target_dir / "prompts.json", "w", encoding="utf-8") as f:
                 json.dump(prompts_res, f, indent=2, ensure_ascii=False)
+            with open(target_dir / "director_plan.json", "w", encoding="utf-8") as f:
+                json.dump(director_plan, f, indent=2, ensure_ascii=False)
+            with open(target_dir / "dp_plan.json", "w", encoding="utf-8") as f:
+                json.dump({"scenes": director_plan.get("scenes", [])}, f, indent=2, ensure_ascii=False)
 
         if not skip_notion:
             push_prompts_to_notion(prompts_res, episode_id)
@@ -958,19 +976,41 @@ def _synthesize_deterministic_director_plan(
     for b_idx, beat in enumerate(story_beats):
         b_num = b_idx + 1
         b_name = CANONICAL_BEATS[b_idx] if b_idx < len(CANONICAL_BEATS) else f"Beat {b_num}"
-        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", beat.get("content", "")) if len(s.strip()) > 15]
+        beat_raw = beat.get("content", "").strip()
+
+        # Multi-lingual CJK detection
+        is_cjk = any("\u4e00" <= char <= "\u9fff" or "\u3040" <= char <= "\u30ff" or "\uac00" <= char <= "\ud7af" for char in beat_raw[:200])
+        if is_cjk:
+            raw_sents = re.split(r"(?<=[。！？\n])\s*", beat_raw)
+            sentences = [s.strip() for s in raw_sents if len(s.strip()) > 8]
+        else:
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", beat_raw) if len(s.strip()) > 15]
+
         if not sentences:
             sentences = [f"Narrative progression for {b_name}."]
 
         curr_narr = []
-        curr_words = 0
+        curr_units = 0
         for sent in sentences:
-            sent_words = len(sent.split())
-            # Sentence-Atomic Cut: flush when adding next sentence exceeds 35 words or already has 2 sentences
-            if curr_narr and (curr_words + sent_words > 35 or len(curr_narr) >= 2):
-                sc_text = " ".join(curr_narr).strip()
-                if not re.search(r"[.!?]$", sc_text):
-                    sc_text += "."
+            # Clean any lingering header tokens
+            sent = re.sub(r'^(?:={2,}\s*)?(?:#+\s*)?(?:ACT|BEAT)\s*(?:[1-5]|IV|I{1,3}|V)[^\n]*?(?:={2,})?\s*', '', sent, flags=re.IGNORECASE).strip()
+            if not sent:
+                continue
+
+            if is_cjk:
+                sent_units = len(sent)
+                cut_threshold = 85
+                unit_divisor = 5.5
+            else:
+                sent_units = len(sent.split())
+                cut_threshold = 35
+                unit_divisor = 2.4
+
+            # Sentence-Atomic Cut: flush when adding next sentence exceeds threshold or already has 2 sentences
+            if curr_narr and (curr_units + sent_units > cut_threshold or len(curr_narr) >= 2):
+                sc_text = "".join(curr_narr).strip() if is_cjk else " ".join(curr_narr).strip()
+                if not re.search(r"[.!?。！？]$", sc_text):
+                    sc_text += ("。" if is_cjk else ".")
                 sc_id = f"sc{sc_counter:03d}"
                 bg_k = f"{episode_id.lower()}_bg_b{b_num}_loc{sc_counter % 3}"
 
@@ -983,10 +1023,10 @@ def _synthesize_deterministic_director_plan(
                 fg_k = f"{episode_id.lower()}_fg_b{b_num}_char{char_idx}" if sc_counter % 4 != 0 else None
                 fg_pos = "right" if sc_counter % 2 == 0 else "left"
 
-                bg_desc = f"Cinematic documentary environment for {b_name}, {dynamic_context['physical_environment']}, {dynamic_context['lighting_mood']}"
-                fg_desc = f"Full-body {char_role} in {char_attire}, standing head-to-toe, {char_cues}, posture {char_state}, isolated on solid #FF00FF magenta background" if fg_k else None
+                bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 cinematic setting of {b_name}, {dynamic_context['physical_environment']}, {dynamic_context['lighting_mood']}"
+                fg_desc = f"Stylized editorial graphic novel digital illustration of full-body {char_role} in {char_attire}, standing head-to-toe, {char_cues}, posture {char_state}, 1:1 aspect ratio, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames" if fg_k else None
                 cam_move = cam_moves[sc_counter % len(cam_moves)]
-                dur = max(7, min(16, round(curr_words / 2.4)))
+                dur = max(7, min(18, round(curr_units / unit_divisor)))
 
                 scenes.append({
                     "scene_id": sc_id,
@@ -997,7 +1037,7 @@ def _synthesize_deterministic_director_plan(
                     "visual_metaphor": f"Visual metaphor representing {b_name}",
                     "camera": {
                         "movement": cam_move,
-                        "tension_level": "high"
+                        "tension_level": "high" if sc_counter % 3 != 0 else "medium"
                     },
                     "background": {
                         "reuse_key": bg_k,
@@ -1016,18 +1056,20 @@ def _synthesize_deterministic_director_plan(
                 })
                 sc_counter += 1
                 curr_narr = []
-                curr_words = 0
+                curr_units = 0
 
             curr_narr.append(sent)
-            curr_words += sent_words
+            curr_units += sent_units
 
         if curr_narr:
-            sc_text = " ".join(curr_narr).strip()
-            if not re.search(r"[.!?]$", sc_text):
-                sc_text += "."
+            sc_text = "".join(curr_narr).strip() if is_cjk else " ".join(curr_narr).strip()
+            if not re.search(r"[.!?。！？]$", sc_text):
+                sc_text += ("。" if is_cjk else ".")
             sc_id = f"sc{sc_counter:03d}"
-            dur = max(7, min(16, round(curr_words / 2.4)))
+            dur = max(7, min(18, round(curr_units / unit_divisor)))
             cam_move = cam_moves[sc_counter % len(cam_moves)]
+            bg_k = f"{episode_id.lower()}_bg_b{b_num}_tail"
+            bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 setting of {b_name}, {dynamic_context['physical_environment']}"
             scenes.append({
                 "scene_id": sc_id,
                 "beat_index": b_num,
@@ -1035,10 +1077,10 @@ def _synthesize_deterministic_director_plan(
                 "narration": sc_text,
                 "duration_est_sec": dur,
                 "visual_metaphor": f"Closing tension of {b_name}",
-                "camera": {"movement": cam_move, "tension_level": "high"},
+                "camera": {"movement": cam_move, "tension_level": "medium"},
                 "background": {
-                    "reuse_key": f"{episode_id.lower()}_bg_b{b_num}_tail",
-                    "visual_description": f"Wide cinematic environment of {b_name}, {dynamic_context['physical_environment']}",
+                    "reuse_key": bg_k,
+                    "visual_description": bg_desc,
                     "safe_zone": "bottom 20% clear for subtitles"
                 },
                 "foreground": None,

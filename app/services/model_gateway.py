@@ -234,13 +234,17 @@ class ModelGateway:
                                     logger.debug(f"[GATEWAY] Stream parse error: {e}")
                 
                 result = "".join(full_content)
-                if result.strip():
-                    break
-                else:
+                if not result.strip():
                     raise ModelGatewayError("Empty response from HHTech API stream")
+                stripped = result.strip()
+                if stripped.startswith("[Error]") or stripped.startswith("Error:") or "error occurred while processing your request" in stripped.lower():
+                    raise ModelGatewayError(f"HHTech stream returned backend error: {stripped[:200]}")
+                break
             except (httpx.HTTPError, ModelGatewayError) as e:
                 last_error = e
                 logger.warning(f"[GATEWAY] HHTech attempt {attempt}/{max_retries} failed: {e}")
+                if isinstance(e, ModelGatewayError) and any(s in str(e) for s in ["503", "hết nguồn khả dụng", "backend error"]):
+                    raise e
                 if attempt < max_retries:
                     import time
                     time.sleep(attempt * 3.0)

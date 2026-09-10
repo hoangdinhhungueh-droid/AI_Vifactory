@@ -125,3 +125,48 @@ def test_non_destructive_brain_deep_merge():
     assert merged["hook_3s"] == "In 2008, the world financial system was on the brink."
     assert merged["breakout_queries"] == ["subprime collapse", "leverage fraud"]
     assert len(merged["scenes"]) == 1
+
+
+def test_cjk_beat_extraction_and_scene_breakdown():
+    from app.services.director_planner_b3 import extract_story_beats, _synthesize_deterministic_director_plan, detect_cinematic_archetype
+
+    cjk_story = """=== ACT I ===
+2億1000万円――2026年9月9日、多田神社が民事再生を申し立て、名刀・鬼切丸と不動産が担保に挙がったと報じられました。
+名刀が、信仰の象徴ではなく「担保」として扱われる可能性があります。
+信仰の記憶を守るはずの制度が、いつ債権者の回収手続きへ接続するのか。その衝撃を、数字と文書から追跡します。
+
+=== ACT II ===
+報道の見出しは、「元宮司が借金を残した」という単純な筋書きに流れやすいものです。
+しかし、神社の破綻は一個人のモラル崩壊だけで起きるものではありません。
+背後には、宗教法人規則、責任役員会の議決、総代会の承認という制度的な防壁がありました。
+
+=== ACT III ===
+調査の記録の痕跡は、登記簿から始まります。次に、宗教法人の規則、責任役員の決議録、公告の記録、融資契約、担保契約、送金記録です。
+問題は、誰がその契約書に押印したのかという点です。
+神社の財産を処分するには、包括宗教法人の承認や規則に基づく手続きが必要です。
+
+=== ACT IV ===
+決定的な証拠は、「鬼切丸が担保になった」という見出しではありません。所有権、担保の種類、対象物の特定、承認手続き、貸し手の素性です。
+誰が担保権を実行できる立場にあるのか。
+その登記上の権利者が誰であるかを特定しなければ、真の危機は見えてきません。
+
+=== ACT V ===
+民事再生を申し立てれば、担保財産は自動的に守られるのでしょうか？ 答えは、そうではありません。
+神社の破綻が残した教訓は、信仰と金融の境界線が曖昧になったとき、文化財すら市場の流動性に呑み込まれるという冷酷な現実です。
+後悔しないための備えとは何か。そこに、次の危機を防げるかどうかの答えがあります。
+"""
+    beats = extract_story_beats(cjk_story)
+    assert len(beats) == 5
+    for b in beats:
+        assert not b["content"].startswith("===")
+        assert not b["content"].startswith("ACT")
+
+    archetype = detect_cinematic_archetype("Investigative Documentary", "多田神社", cjk_story)
+    plan = _synthesize_deterministic_director_plan("JP_EP0001_test", beats, archetype)
+    scenes = plan.get("scenes", [])
+    assert len(scenes) >= 10
+    # Zero header leak in narration
+    for s in scenes:
+        assert not s["narration"].startswith("===")
+        assert not s["narration"].startswith("ACT")
+

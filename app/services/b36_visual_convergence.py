@@ -139,6 +139,25 @@ def run_b36_visual_convergence(
     fg_prompts = prompts_data.get("foregrounds", {})
     thumbnails = prompts_data.get("thumbnails", {})
 
+    # Build slim sample scenes to avoid prompt duplication and upstream payload overflow
+    sample_scenes_raw = scenes[:5] + scenes[len(scenes)//2:len(scenes)//2 + 2] + scenes[-2:] if len(scenes) >= 9 else scenes
+    slim_sample_scenes = []
+    for s in sample_scenes_raw:
+        slim_sample_scenes.append({
+            "scene_id": s.get("scene_id"),
+            "beat": s.get("beat") or s.get("beat_name"),
+            "narration": s.get("narration"),
+            "camera": s.get("camera"),
+            "bg_reuse_key": s.get("bg_reuse_key") or s.get("background_reuse_key"),
+            "fg_reuse_key": s.get("fg_reuse_key") or s.get("foreground_reuse_key"),
+            "safe_zone": s.get("safe_zone")
+        })
+
+    bg_keys = list(bg_prompts.keys())
+    sample_bgs = {k: bg_prompts[k] for k in bg_keys[:4]}
+    fg_keys = list(fg_prompts.keys())
+    sample_fgs = {k: fg_prompts[k] for k in fg_keys[:4]}
+
     # 1. Prepare Round 1 Compact Audit Payload
     audit_payload = {
         "episode_id": episode_id,
@@ -149,9 +168,9 @@ def run_b36_visual_convergence(
         "total_scenes": len(scenes),
         "total_bgs": len(bg_prompts),
         "total_fgs": len(fg_prompts),
-        "sample_scenes": scenes[:8] + scenes[24:27] + scenes[-3:] if len(scenes) >= 30 else scenes,
-        "sample_bgs": {k: bg_prompts[k] for k in list(bg_prompts.keys())[:3]},
-        "sample_fgs": {k: fg_prompts[k] for k in list(fg_prompts.keys())[:3]},
+        "sample_scenes": slim_sample_scenes,
+        "sample_bgs": sample_bgs,
+        "sample_fgs": sample_fgs,
         "thumbnails": thumbnails,
         "story_excerpt": story_text[:800],
         "grounding_claims_count": len(grounding_intel.get("claims", []))
@@ -161,27 +180,29 @@ def run_b36_visual_convergence(
     current_prompts = dict(prompts_data)
     audit_history = []
 
-    # Round 1: Claude Opus 5 Initial Forensic Audit
-    logger.info(f"[B3.6 DACL] Round 1: Invoking Claude Opus 5 Forensic Auditor for {episode_id}...")
+    # Round 1: Claude Forensic Audit
+    primary_model = os.getenv("B36_AUDIT_MODEL", "claude-sonnet-4.5")
+    fallback_model = "claude-opus-5" if primary_model == "claude-sonnet-4.5" else "claude-sonnet-4.5"
+    logger.info(f"[B3.6 DACL] Round 1: Invoking {primary_model} Forensic Auditor for {episode_id}...")
     try:
         raw_res = gateway.call_llm(
             prompt=f"[EPISODE ASSETS UNDER AUDIT]\n{json.dumps(audit_payload, ensure_ascii=False, indent=2)}\n\nConduct full adversarial forensic audit now. Return strict JSON only.",
             system_prompt=B36_AUDIT_SYSTEM_PROMPT,
-            model="claude-opus-5",
+            model=primary_model,
             max_tokens=2500,
             temperature=0.1,
-            timeout=90.0,
-            fallback="claude-sonnet-5"
+            timeout=70.0,
+            fallback=fallback_model
         )
     except Exception as e:
-        logger.warning(f"[B3.6 DACL] Primary Opus 5 call failed: {e}. Falling back to Sonnet 5...")
+        logger.warning(f"[B3.6 DACL] Primary {primary_model} call failed: {e}. Falling back to {fallback_model}...")
         raw_res = gateway.call_llm(
             prompt=f"[EPISODE ASSETS UNDER AUDIT]\n{json.dumps(audit_payload, ensure_ascii=False, indent=2)}\n\nConduct full adversarial forensic audit now. Return strict JSON only.",
             system_prompt=B36_AUDIT_SYSTEM_PROMPT,
-            model="claude-sonnet-5",
+            model=fallback_model,
             max_tokens=2500,
             temperature=0.1,
-            timeout=80.0,
+            timeout=70.0,
             fallback="gpt-6-astra"
         )
 
@@ -241,6 +262,10 @@ def run_b36_visual_convergence(
             for k in ["narration", "bg_prompt", "fg_prompt", "camera_movement", "duration_est_sec"]:
                 if k in ps:
                     scene_map[sid][k] = ps[k]
+                    if k == "bg_prompt":
+                        scene_map[sid]["image_prompt"] = ps[k]
+                    elif k == "fg_prompt":
+                        scene_map[sid]["foreground_prompt"] = ps[k]
 
     if patched_thumbs:
         for tk, tv in patched_thumbs.items():
@@ -266,7 +291,7 @@ def run_b36_visual_convergence(
             max_tokens=1500,
             temperature=0.2,
             timeout=70.0,
-            fallback="kimi-k3"
+            fallback="claude-sonnet-4.5"
         )
         j_match2 = re.search(r"(\{.*\})", astra_res, re.DOTALL)
         clean_json2 = j_match2.group(1).strip() if j_match2 else astra_res.strip()
@@ -290,6 +315,10 @@ def run_b36_visual_convergence(
             for k in ["narration", "bg_prompt", "fg_prompt", "camera_movement", "duration_est_sec"]:
                 if k in rs:
                     scene_map[sid][k] = rs[k]
+                    if k == "bg_prompt":
+                        scene_map[sid]["image_prompt"] = rs[k]
+                    elif k == "fg_prompt":
+                        scene_map[sid]["foreground_prompt"] = rs[k]
 
     for tk, tv in refined_delta.get("patched_thumbnails", {}).items():
         if tv:

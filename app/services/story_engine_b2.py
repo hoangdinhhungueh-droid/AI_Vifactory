@@ -316,6 +316,36 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
         redline_bullets = "\n".join(f"   * BANNED AUDIENCE CLICHE: \"{slop}\"" for slop in ai_slop_redlines[:4])
         slop_redlines_mandate = f"\n• Check 10B (Niche-Specific AI-Slop Redlines Mined From Audience):\n{redline_bullets}"
 
+    if mkt == "JP":
+        check7_mandate = (
+            "• Check 7 (5-Act Architectural Cues - Japanese Native Vocabulary):\n"
+            "   - Act I (Hook/Shock): 衝撃, 崩壊, 消失, 最初, 危機, and questions '?' or '？'.\n"
+            "   - Act II (The False Narrative): 報道, 公式見解, 神話, 誤解, 背景, 歴史, オフィシャル.\n"
+            "   - Act III (Systemic Blindspot): 死角, 疑惑, 欠陥, 内部, 記録, しかし, だが, 亀裂.\n"
+            "   - Act IV (The Smoking Gun): 決定打, 証拠, 判決, 責任, 破綻, 暴露, 調査, 処分.\n"
+            "   - Act V (The Modern Mirror): 警告, 教訓, 現代, 今日, 遺産, 課題, 結論.\n"
+            "   CRITICAL LINGUISTIC PURITY (RULE 120 & RULE 128): 100% Japanese prose. STRICTLY FORBIDDEN: Do NOT write raw English words ('collapse', 'shock', 'disappear', 'official story', 'red herring', 'paper trail', 'only') in Japanese prose; translate them into native Japanese!"
+        )
+    elif mkt == "KR":
+        check7_mandate = (
+            "• Check 7 (5-Act Architectural Cues - Korean Native Vocabulary):\n"
+            "   - Act I (Hook/Shock): 충격, 붕괴, 위험, 의문, and questions '?'.\n"
+            "   - Act II (The False Narrative): 보도, 언론, 오해, 통념, 배경, 역사.\n"
+            "   - Act III (Systemic Blindspot): 사각지대, 맹점, 의혹, 내부, 계약, 그러나.\n"
+            "   - Act IV (The Smoking Gun): 스모킹건, 결정적, 증거, 판결, 책임, 폭로, 단속.\n"
+            "   - Act V (The Modern Mirror): 경고, 교훈, 현대, 오늘날, 과제, 결론, 유산.\n"
+            "   CRITICAL LINGUISTIC PURITY (RULE 120 & RULE 128): 100% Korean prose. STRICTLY FORBIDDEN: Do NOT write raw English words in Korean prose!"
+        )
+    else:
+        check7_mandate = (
+            "• Check 7 (5-Act Architectural Cues): Each Act must explicitly weave in its architectural vocabulary:\n"
+            "   - Act I (Hook/Shock): 'collapse', 'shock', 'disappear', 'first', 'only', and questions '?'.\n"
+            "   - Act II (The False Narrative): 'official story', 'narrative', 'headline', 'myth', 'red herring'.\n"
+            "   - Act III (Systemic Blindspot): 'paper trail', 'blindspot', 'loophole', 'leak', 'memo', 'forensic'.\n"
+            "   - Act IV (The Smoking Gun): 'smoking gun', 'culprit', 'exposed', 'unmasked', 'profited'.\n"
+            "   - Act V (The Modern Mirror): 'mirror', 'warning', 'modern', 'today', 'lesson', 'verdict'."
+        )
+
     system_prompt = (
         f"You are a World-Class Master Non-Fiction Investigative Documentary Scriptwriter for Video Factory.\n"
         f"Target Narration Language: {lang_name}.\n"
@@ -326,12 +356,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
         f"• Check 9 (Hook Shock in First 60 Words): The very first sentence of Act I MUST open with a concrete percentage (%), monetary sum ($), or numeric figure. Do not delay the number to sentence 2.\n"
         f"• Check 2, 3 & 4 (Curiosity Loops Open & Closed): Plant at least 8 to 10 explicit curiosity questions with '?' across the script (~2 per Act). Frequently close loops using phrases like 'that is why', 'which is how', 'the answer', 'in the end'.\n"
         f"• Check 5 (Sourced Numbers): Include at least 10 grounded numbers across the script accompanied by explicit sourcing language ('according to reports from [Source]', 'records from [Source] indicate').\n"
-        f"• Check 7 (5-Act Architectural Cues): Each Act must explicitly weave in its architectural vocabulary:\n"
-        f"   - Act I (Hook/Shock): 'collapse', 'shock', 'disappear', 'first', 'only', and questions '?'.\n"
-        f"   - Act II (The False Narrative): 'official story', 'narrative', 'headline', 'myth', 'red herring'.\n"
-        f"   - Act III (Systemic Blindspot): 'paper trail', 'blindspot', 'loophole', 'leak', 'memo', 'forensic'.\n"
-        f"   - Act IV (The Smoking Gun): 'smoking gun', 'culprit', 'exposed', 'unmasked', 'profited'.\n"
-        f"   - Act V (The Modern Mirror): 'mirror', 'warning', 'modern', 'today', 'lesson', 'verdict'.\n"
+        f"{check7_mandate}\n"
         f"• Check 12 (Pattern Interrupt in Act III): Write at least one punchy sentence of 2 to 6 words maximum in Act III (e.g. 'The paper trail vanished.', 'Then came the audit.').\n"
         f"• Check 10 (Zero Banned Cliches): 100% elimination of banned AI cliches ('in a world where', 'little did they know', 'testament to', 'double-edged sword', 'beacon of hope', 'it's worth noting', 'at the end of the day').{slop_redlines_mandate}\n\n"
         f"{editorial_skills}\n\n"

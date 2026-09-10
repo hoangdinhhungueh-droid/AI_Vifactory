@@ -141,10 +141,17 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     p = re.sub(r"\[ERA ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[STRICT NEGATIVE PROMPT\]\s*.*$", "", p, flags=re.IGNORECASE)
 
-    # Eradicate forbidden photorealistic tokens
+    # Eradicate forbidden photorealistic tokens while protecting 'non-photorealistic'
+    p = re.sub(r"\bnon-photorealistic\b", "__NON_PHOTO__", p, flags=re.IGNORECASE)
     p = re.sub(r"photorealistic\s*(?:8k)?\s*", "", p, flags=re.IGNORECASE)
+    p = p.replace("__NON_PHOTO__", "non-photorealistic")
+    p = re.sub(r"\bnon-\s*2d\b", "non-photorealistic 2D", p, flags=re.IGNORECASE)
     p = re.sub(r"\b8k\b", "", p, flags=re.IGNORECASE)
     p = re.sub(r"photographic\s*(?:raw\s*camera)?", "", p, flags=re.IGNORECASE)
+
+    # Strip non-ASCII / CJK glyphs from English visual prompts (Rule 446)
+    p = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]+", "", p)
+    p = re.sub(r"\s{2,}", " ", p).strip()
 
     if "16:9" not in p:
         p = f"{p}, 16:9 aspect ratio"
@@ -162,11 +169,19 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     """Sanitize and enforce Rule 116 & Rule 435 standards for Layer 2 Foreground prompts."""
     p = prompt.strip()
 
+    p = re.sub(r"\bnon-photorealistic\b", "__NON_PHOTO__", p, flags=re.IGNORECASE)
     p = re.sub(r"studio portrait lighting,?\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"photorealistic studio portrait,?\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"photorealistic,?\s*", "", p, flags=re.IGNORECASE)
+    p = p.replace("__NON_PHOTO__", "non-photorealistic")
+    p = re.sub(r"\bnon-\s*2d\b", "non-photorealistic 2D", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bnon-\s*exactly\b", "exactly", p, flags=re.IGNORECASE)
     p = re.sub(r"3D render,?\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"CGI skin,?\s*", "", p, flags=re.IGNORECASE)
+
+    # Strip non-ASCII / CJK glyphs from English visual prompts (Rule 446)
+    p = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]+", "", p)
+    p = re.sub(r"\s{2,}", " ", p).strip()
 
     # Eradicate positional bias from 1:1 cutout (compositor handles left/right placement)
     p = re.sub(r"positioned strictly on the (?:left|right),?\s*", "centered in frame, ", p, flags=re.IGNORECASE)
@@ -214,13 +229,25 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
         p = "".join(parts)
 
     p = re.sub(r"\s{2,}", " ", p).strip()
-    return p.strip()
+    return p
 
 
 def _sanitize_thumbnail_prompt(prompt: str, thumb_key: str = "") -> str:
     """Sanitize and format YouTube 16:9 QHD Hero Thumbnail prompt (Rule 114, Rule 122 & Rule 435)."""
     p = prompt.strip()
     p = p.replace("2K DCI", "").replace("(2K DCI)", "").strip()
+
+    # Protect non-photorealistic tokens
+    p = re.sub(r"\bnon-photorealistic\b", "__NON_PHOTO__", p, flags=re.IGNORECASE)
+    p = re.sub(r"photorealistic\s*(?:8k)?\s*", "", p, flags=re.IGNORECASE)
+    p = p.replace("__NON_PHOTO__", "non-photorealistic")
+    p = re.sub(r"\bnon-\s*2d\b", "non-photorealistic 2D", p, flags=re.IGNORECASE)
+
+    # Strip non-ASCII / CJK glyphs from English visual prompts (Rule 446)
+    p = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]+", "", p)
+    p = re.sub(r"['\"](?:\s*['\"])?", "", p)
+    p = re.sub(r"\s{2,}", " ", p).strip()
+
     if "16:9" not in p:
         p = f"{p}, 16:9 aspect ratio"
     if "2560x1440" not in p:
