@@ -134,10 +134,6 @@ class ModelGateway:
             )
             return response
         
-        except CostCapExceededError:
-            # Don't retry if budget exceeded - raise immediately
-            raise
-        
         except Exception as e:
             logger.warning(f"[GATEWAY] Primary model {model} failed: {e}")
             
@@ -255,18 +251,11 @@ class ModelGateway:
         if total_tokens == 0:
             total_tokens = (len(prompt) + len(result)) // 4
         
-        # Record cost AFTER successful call
+        # Record cost AFTER successful call (passive telemetry)
         try:
             self.cost_tracker.record(model, total_tokens, is_image=False)
-        except CostCapExceededError:
-            # Call succeeded but recording shows we exceeded budget
-            # Log warning but return the result (already paid for)
-            logger.warning(
-                f"[GATEWAY] Budget cap exceeded after successful call. "
-                f"Consider this the last call for this month."
-            )
-            # Re-raise to prevent further calls
-            raise
+        except Exception as e:
+            logger.debug(f"[GATEWAY] Cost tracking record info: {e}")
         
         return result
     

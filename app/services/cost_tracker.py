@@ -66,15 +66,12 @@ class CostTracker:
     
     def record(self, model: str, tokens: int, is_image: bool = False):
         """
-        Record token/image usage and check budget cap.
+        Record token/image usage for passive telemetry without any budget cap blocking.
         
         Args:
             model: Model identifier (e.g., "gpt-6-astra", "imagen3")
             tokens: Token count (for LLMs) or image count (for image models)
             is_image: True if recording image generation, False for LLM tokens
-        
-        Raises:
-            CostCapExceededError: If recording would exceed monthly cap
         """
         cost_vnd = self._calculate_cost(model, tokens, is_image)
         current_month = datetime.now(timezone.utc).strftime("%Y-%m")
@@ -91,26 +88,14 @@ class CostTracker:
         new_model_cost = self.costs[current_month][model] + cost_vnd
         monthly_total = sum(self.costs[current_month].values()) + cost_vnd
         
-        # Check cap BEFORE recording
-        if monthly_total > self.cap_vnd:
-            remaining = self.cap_vnd - (monthly_total - cost_vnd)
-            raise CostCapExceededError(
-                f"Monthly cap {self.cap_vnd:,.0f} VND exceeded. "
-                f"Current: {monthly_total - cost_vnd:,.2f} VND, "
-                f"This call: {cost_vnd:,.2f} VND, "
-                f"Would total: {monthly_total:,.2f} VND, "
-                f"Remaining: {remaining:,.2f} VND"
-            )
-        
-        # Record cost
+        # Record cost (unlimited / passive telemetry)
         self.costs[current_month][model] = new_model_cost
         self._save()
         
         logger.info(
             f"[COST] Recorded {cost_vnd:,.2f} VND for {model} "
             f"({tokens} {'images' if is_image else 'tokens'}). "
-            f"Monthly total: {monthly_total:,.2f}/{self.cap_vnd:,.0f} VND "
-            f"({(monthly_total/self.cap_vnd*100):.1f}%)"
+            f"Monthly total: {monthly_total:,.2f} VND"
         )
     
     def _calculate_cost(self, model: str, tokens: int, is_image: bool) -> float:
@@ -144,14 +129,12 @@ class CostTracker:
         return sum(report.values())
     
     def get_remaining_budget(self) -> float:
-        """Get remaining budget for current month."""
-        spent = self.get_monthly_total()
-        return max(0, self.cap_vnd - spent)
+        """Get remaining budget for current month (unlimited)."""
+        return float('inf')
     
     def get_budget_usage_pct(self) -> float:
-        """Get budget usage percentage for current month."""
-        spent = self.get_monthly_total()
-        return (spent / self.cap_vnd) * 100.0 if self.cap_vnd > 0 else 0.0
+        """Get budget usage percentage for current month (unconstrained)."""
+        return 0.0
     
     def _load(self) -> Dict:
         """Load cost database from disk."""
