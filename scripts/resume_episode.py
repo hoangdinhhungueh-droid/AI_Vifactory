@@ -54,7 +54,11 @@ def _visual_terms(b):
 
 async def _render(episode_id: str, brain: dict, story_text: str):
     from app.pipeline.run_episode import run_pipeline
-    lang = brain.get("lang_code") or "en"
+    lang = brain.get("lang_code") or brain.get("language")
+    market = str(brain.get("market") or episode_id.split("_")[0]).lower()
+    market_to_lang = {"jp": "ja", "ja": "ja", "ko": "ko", "kr": "ko", "vn": "vi", "vi": "vi", "zh": "zh", "cn": "zh", "en": "en"}
+    if not lang or (lang == "en" and market in market_to_lang and market_to_lang[market] != "en"):
+        lang = market_to_lang.get(market, "en")
     if isinstance(lang, list):
         lang = lang[0] if lang else "en"
     return await run_pipeline(

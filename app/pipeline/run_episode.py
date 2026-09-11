@@ -362,7 +362,7 @@ async def run_pipeline(
     _render_arch = str((brain or {}).get("render_architecture") or "").strip()
     if not _render_arch:
         _render_arch = str(episode.get("render_architecture") or "").strip()
-    if _render_arch == "two_layer_v1":
+    if _render_arch in ("two_layer_v1", "remotion_twolayer_karaoke_v4") or "twolayer" in _render_arch or _render_arch.startswith("two_layer"):
         logger.info("[S4.5] two_layer_v1 detected; ensuring S6 Whisper transcription is ready for Remotion props")
         # Ensure speech narration (S4 completed) and Faster-Whisper transcription (S6)
         # run before Remotion prop generation & render (S4.5/S7) so exact word timestamps are available.

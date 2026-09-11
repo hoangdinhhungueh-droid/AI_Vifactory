@@ -37,7 +37,14 @@ async def run_s4(episode: dict) -> dict:
     Output: episode + {audio_path, size_bytes, backend, visual_terms}"""
     episode_id = episode["episode_id"]
     text       = episode["text"]
-    lang_code  = episode.get("lang_code", "en")
+    lang_code  = episode.get("lang_code")
+    if not lang_code or lang_code == "en":
+        market = str(episode.get("market") or episode_id.split("_")[0]).lower()
+        market_to_lang = {"jp": "ja", "ja": "ja", "ko": "ko", "kr": "ko", "vn": "vi", "vi": "vi", "zh": "zh", "cn": "zh", "en": "en"}
+        if market in market_to_lang and market_to_lang[market] != "en":
+            lang_code = market_to_lang[market]
+        else:
+            lang_code = lang_code or "en"
     voice      = episode.get("voice") or LANG_VOICE.get(lang_code, "en-US-ChristopherNeural")
     backend    = episode.get("backend", "auto")
     out_dir    = os.path.join("/var/vf/episodes", episode_id)

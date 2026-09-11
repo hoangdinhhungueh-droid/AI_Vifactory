@@ -96,8 +96,8 @@ async def build_cards(episode, aspect, out_dir, clip_paths):
                 render_arch = str(_json.load(_bf).get("render_architecture") or "").strip()
         except Exception:
             pass
-    if render_arch == "two_layer_v1":
-        logger.info("[motion_cards] skipping intro/outro cards for two_layer_v1 architecture")
+    if render_arch in ("two_layer_v1", "remotion_twolayer_karaoke_v4") or "twolayer" in render_arch or render_arch.startswith("two_layer"):
+        logger.info("[motion_cards] skipping intro/outro cards for two-layer architecture (%s)", render_arch)
         return clip_paths
     try:
         from app.services.mpt_ported.video_render import ASPECT_SIZES
