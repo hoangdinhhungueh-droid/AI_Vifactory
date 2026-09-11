@@ -898,22 +898,56 @@ def generate_director_plan(
             with open(target_dir / "dp_plan.json", "w", encoding="utf-8") as f:
                 json.dump({"scenes": director_plan.get("scenes", [])}, f, indent=2, ensure_ascii=False)
 
-        if not skip_notion:
-            push_prompts_to_notion(prompts_res, episode_id)
-            logger.info("  [B3.5] Prompts pushed to Notion Prompt Library DB.")
+        logger.info("  [B3.5] Initial Prompt Forge assets written to canonical directories.")
     except Exception as e:
         logger.warning(f"  [B3.5] Prompt Forge integration encountered notice: {e}")
 
-    # 9. Sync to Notion Director Plan DB
-    if not skip_notion:
-        push_director_plan_to_notion(director_plan, episode_id)
-
-    # 10. Trigger Human Gate 2 Telegram Notification (Rule 125 & Executive 1-Click Mandate)
+    # 8.5. Step B3.5.1: Dual-LLM Adversarial Visual Convergence (Claude Opus 5 ⇄ GPT-6-Astra)
+    # (Rule 125 Single Pipeline Version & Dual LLM Visual Audit Mandate)
+    # Automatically audits, patches storyboard/prompts, persists assets to disk,
+    # and dispatches Human Gate 2 Telegram notification AFTER convergence.
     try:
-        from app.services.telegram_buttons import trigger_human_gate_2
-        trigger_human_gate_2(episode_id)
+        from app.services.b36_visual_convergence import run_b36_visual_convergence
+        logger.info("  [B3.5.1] Launching Dual-LLM Adversarial Visual Convergence (Claude Opus 5 ⇄ GPT-6-Astra)...")
+        conv_res = run_b36_visual_convergence(
+            episode_id=episode_id,
+            director_plan=director_plan,
+            dp_plan={"scenes": director_plan.get("scenes", [])},
+            prompts_data=prompts_res if 'prompts_res' in locals() else None,
+            story_text=story_text,
+            grounding_intel=grounding_intel if 'grounding_intel' in locals() and grounding_intel else None,
+            seo_package=intel_card.get("seo_package") if 'intel_card' in locals() and isinstance(intel_card, dict) else None
+        )
+        if conv_res and "director_plan" in conv_res:
+            director_plan = conv_res["director_plan"]
+        if conv_res and "prompts_data" in conv_res:
+            prompts_res = conv_res["prompts_data"]
     except Exception as e:
-        logger.warning(f"  [B3.5 HG2] Failed to dispatch Human Gate 2 notification: {e}")
+        logger.warning(f"  [B3.5.1] Adversarial Visual Convergence encountered notice: {e}")
+
+    # 9. Sync Converged Assets to Notion (Director Plan DB & Prompts Library DB)
+    if not skip_notion:
+        try:
+            push_director_plan_to_notion(director_plan, episode_id)
+            if 'prompts_res' in locals() and prompts_res:
+                push_prompts_to_notion(prompts_res, episode_id)
+                logger.info("  [B3.5.1] Converged Prompts pushed to Notion Prompt Library DB.")
+        except Exception as e:
+            logger.warning(f"  [B3.5.1 Notion] Failed to push converged assets to Notion: {e}")
+
+    # 10. Fallback HG2 Guard: Ensure Human Gate 2 is never dropped if B3.5.1 was bypassed or failed
+    try:
+        audit_file_check = False
+        for cdir in canonical_dirs:
+            if (cdir / "visual_convergence_audit.json").exists():
+                audit_file_check = True
+                break
+        if not audit_file_check:
+            from app.services.telegram_buttons import trigger_human_gate_2
+            logger.warning("  [HG2 Fallback] B3.5.1 audit file missing; triggering fallback Human Gate 2...")
+            trigger_human_gate_2(episode_id)
+    except Exception as e:
+        logger.warning(f"  [HG2 Guard] Notice: {e}")
 
     return director_plan
 

@@ -117,22 +117,74 @@ Return a strict JSON object with:
 
 def run_b36_visual_convergence(
     episode_id: str,
-    director_plan: Dict[str, Any],
-    dp_plan: Dict[str, Any],
-    prompts_data: Dict[str, Any],
-    story_text: str,
-    grounding_intel: Dict[str, Any],
+    director_plan: Optional[Dict[str, Any]] = None,
+    dp_plan: Optional[Dict[str, Any]] = None,
+    prompts_data: Optional[Dict[str, Any]] = None,
+    story_text: str = "",
+    grounding_intel: Optional[Dict[str, Any]] = None,
     seo_package: Optional[Dict[str, Any]] = None,
     max_rounds: int = 2
 ) -> Dict[str, Any]:
     """
     Executes the Decremental Adversarial Convergence Loop (DACL) for B3 & B3.5.
-    Returns convergence summary dictionary with patched assets.
+    Audits storyboard & prompts with Claude Opus 5 and GPT-6-Astra, applies delta patches,
+    persists converged assets to canonical dirs, and triggers Human Gate 2 Telegram notification.
     """
-    logger.info(f"🛡️ [B3.6 DACL] Starting Visual Convergence Gate for Episode: {episode_id}")
+    logger.info(f"🛡️ [B3.5.1 DACL] Starting Visual Convergence Gate for Episode: {episode_id}")
     gateway = get_global_gateway()
     m_up = episode_id.split("_")[0].upper()
     t0 = time.time()
+
+    canonical_dirs = [
+        Path(f"/var/vf/episodes/{episode_id}"),
+        Path(f"/root/video_factory/episodes/{episode_id}"),
+        Path(f"episodes/{episode_id}")
+    ]
+    ep_dir = None
+    for cd in canonical_dirs:
+        if cd.exists():
+            ep_dir = cd
+            break
+
+    # Auto-load missing assets from disk if available
+    if director_plan is None and ep_dir:
+        for fname in ["director_plan.json", "dp_plan.json"]:
+            if (ep_dir / fname).exists():
+                try:
+                    director_plan = json.loads((ep_dir / fname).read_text(encoding="utf-8"))
+                    break
+                except Exception:
+                    pass
+    if director_plan is None:
+        director_plan = {"topic": episode_id, "scenes": []}
+
+    if dp_plan is None:
+        dp_plan = {"scenes": director_plan.get("scenes", [])}
+
+    if prompts_data is None and ep_dir:
+        for fname in ["prompts_forge.json", "prompts.json"]:
+            if (ep_dir / fname).exists():
+                try:
+                    prompts_data = json.loads((ep_dir / fname).read_text(encoding="utf-8"))
+                    break
+                except Exception:
+                    pass
+    if prompts_data is None:
+        prompts_data = {"backgrounds": {}, "foregrounds": {}, "thumbnails": {}}
+
+    if not story_text and ep_dir and (ep_dir / "story.txt").exists():
+        try:
+            story_text = (ep_dir / "story.txt").read_text(encoding="utf-8")
+        except Exception:
+            pass
+
+    if grounding_intel is None and ep_dir and (ep_dir / "grounding_intel.json").exists():
+        try:
+            grounding_intel = json.loads((ep_dir / "grounding_intel.json").read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    if grounding_intel is None:
+        grounding_intel = {}
 
     scenes = director_plan.get("scenes", [])
     bg_prompts = prompts_data.get("backgrounds", {})
@@ -181,9 +233,9 @@ def run_b36_visual_convergence(
     audit_history = []
 
     # Round 1: Claude Forensic Audit
-    primary_model = os.getenv("B36_AUDIT_MODEL", "claude-sonnet-4.5")
-    fallback_model = "claude-opus-5" if primary_model == "claude-sonnet-4.5" else "claude-sonnet-4.5"
-    logger.info(f"[B3.6 DACL] Round 1: Invoking {primary_model} Forensic Auditor for {episode_id}...")
+    primary_model = os.getenv("B36_AUDIT_MODEL", "claude-opus-5")
+    fallback_model = "claude-sonnet-4.5" if primary_model == "claude-opus-5" else "claude-opus-5"
+    logger.info(f"[B3.5.1 DACL] Round 1: Invoking {primary_model} Forensic Auditor for {episode_id}...")
     try:
         raw_res = gateway.call_llm(
             prompt=f"[EPISODE ASSETS UNDER AUDIT]\n{json.dumps(audit_payload, ensure_ascii=False, indent=2)}\n\nConduct full adversarial forensic audit now. Return strict JSON only.",
@@ -195,7 +247,7 @@ def run_b36_visual_convergence(
             fallback=fallback_model
         )
     except Exception as e:
-        logger.warning(f"[B3.6 DACL] Primary {primary_model} call failed: {e}. Falling back to {fallback_model}...")
+        logger.warning(f"[B3.5.1 DACL] Primary {primary_model} call failed: {e}. Falling back to {fallback_model}...")
         raw_res = gateway.call_llm(
             prompt=f"[EPISODE ASSETS UNDER AUDIT]\n{json.dumps(audit_payload, ensure_ascii=False, indent=2)}\n\nConduct full adversarial forensic audit now. Return strict JSON only.",
             system_prompt=B36_AUDIT_SYSTEM_PROMPT,
@@ -211,7 +263,7 @@ def run_b36_visual_convergence(
     try:
         round1_audit = json.loads(clean_json)
     except Exception as parse_err:
-        logger.error(f"[B3.6 DACL] Failed to parse Opus audit JSON: {parse_err}. Raw:\n{raw_res[:400]}")
+        logger.error(f"[B3.5.1 DACL] Failed to parse Opus audit JSON: {parse_err}. Raw:\n{raw_res[:400]}")
         round1_audit = {
             "verdict": "FAIL",
             "audit_score": 4.0,
@@ -222,129 +274,140 @@ def run_b36_visual_convergence(
     audit_history.append({"round": 1, "actor": "Claude-Opus-5", "result": round1_audit})
     r1_score = float(round1_audit.get("audit_score", 0.0))
     r1_verdict = str(round1_audit.get("verdict", "FAIL")).upper()
-    logger.info(f"[B3.6 DACL] Round 1 Result: Verdict={r1_verdict} (Score: {r1_score}/10)")
+    logger.info(f"[B3.5.1 DACL] Round 1 Result: Verdict={r1_verdict} (Score: {r1_score}/10)")
 
-    # Early exit if passed with flying colors
-    if r1_verdict == "PASS" and r1_score >= 8.5:
-        logger.info(f"[B3.6 DACL] Episode {episode_id} achieved immediate PASS on Round 1 ({r1_score}/10)!")
-        return {
-            "converged": True,
-            "final_score": r1_score,
-            "rounds_count": 1,
-            "elapsed_sec": round(time.time() - t0, 1),
-            "audit_details": round1_audit,
-            "director_plan": current_dplan,
-            "prompts_data": current_prompts
-        }
+    final_score = r1_score
+    converged = (r1_verdict == "PASS" and r1_score >= 8.5)
 
-    # Extract Delta Patch from Opus 5
-    delta_patch = round1_audit.get("delta_patch", {})
-    patched_scenes = delta_patch.get("patched_scenes", [])
-    patched_thumbs = delta_patch.get("patched_thumbnails", {})
+    if not converged:
+        # Extract Delta Patch from Opus 5
+        delta_patch = round1_audit.get("delta_patch", {})
+        patched_scenes = delta_patch.get("patched_scenes", [])
+        patched_thumbs = delta_patch.get("patched_thumbnails", {})
 
-    if not patched_scenes and not patched_thumbs:
-        logger.warning("[B3.6 DACL] No explicit delta patch generated by Opus 5. Returning un-converged state.")
-        return {
-            "converged": False,
-            "final_score": r1_score,
-            "rounds_count": 1,
-            "elapsed_sec": round(time.time() - t0, 1),
-            "audit_details": round1_audit,
-            "director_plan": current_dplan,
-            "prompts_data": current_prompts
-        }
+        if patched_scenes or patched_thumbs:
+            # Apply Opus Delta Patch to Working Copy
+            scene_map = {s["scene_id"]: s for s in current_dplan.get("scenes", [])}
+            for ps in patched_scenes:
+                sid = ps.get("scene_id")
+                if sid in scene_map:
+                    for k in ["narration", "bg_prompt", "fg_prompt", "camera_movement", "duration_est_sec"]:
+                        if k in ps:
+                            scene_map[sid][k] = ps[k]
+                            if k == "bg_prompt":
+                                scene_map[sid]["image_prompt"] = ps[k]
+                            elif k == "fg_prompt":
+                                scene_map[sid]["foreground_prompt"] = ps[k]
 
-    # Apply Opus Delta Patch to Working Copy
-    scene_map = {s["scene_id"]: s for s in current_dplan.get("scenes", [])}
-    for ps in patched_scenes:
-        sid = ps.get("scene_id")
-        if sid in scene_map:
-            for k in ["narration", "bg_prompt", "fg_prompt", "camera_movement", "duration_est_sec"]:
-                if k in ps:
-                    scene_map[sid][k] = ps[k]
-                    if k == "bg_prompt":
-                        scene_map[sid]["image_prompt"] = ps[k]
-                    elif k == "fg_prompt":
-                        scene_map[sid]["foreground_prompt"] = ps[k]
+            if patched_thumbs:
+                for tk, tv in patched_thumbs.items():
+                    if tv:
+                        current_prompts.setdefault("thumbnails", {})[tk] = tv
 
-    if patched_thumbs:
-        for tk, tv in patched_thumbs.items():
-            if tv:
-                current_prompts.setdefault("thumbnails", {})[tk] = tv
+            # Round 2: GPT-6-Astra Cross-Audit on the Delta Only (Zero Context Bloat)
+            logger.info(f"[B3.5.1 DACL] Round 2: Invoking GPT-6-Astra to Cross-Audit Delta ({len(patched_scenes)} scenes, {len(patched_thumbs)} thumbs)...")
+            astra_input = {
+                "episode_id": episode_id,
+                "market": m_up,
+                "director_archetype": director_plan.get("director_archetype"),
+                "delta_patched_scenes": patched_scenes,
+                "delta_patched_thumbnails": patched_thumbs,
+                "critical_critique": round1_audit.get("critical_findings")
+            }
 
-    # Round 2: GPT-6-Astra Cross-Audit on the Delta Only (Zero Context Bloat)
-    logger.info(f"[B3.6 DACL] Round 2: Invoking GPT-6-Astra to Cross-Audit Delta ({len(patched_scenes)} scenes, {len(patched_thumbs)} thumbs)...")
-    astra_input = {
+            try:
+                astra_res = gateway.call_llm(
+                    prompt=f"[DELTA PATCH TO CROSS-AUDIT]\n{json.dumps(astra_input, ensure_ascii=False, indent=2)}\n\nVerify, polish and score this Delta Patch. Return strict JSON only.",
+                    system_prompt=ASTRA_CROSS_AUDIT_PROMPT,
+                    model="gpt-6-astra",
+                    max_tokens=1500,
+                    temperature=0.2,
+                    timeout=70.0,
+                    fallback="claude-sonnet-4.5"
+                )
+                j_match2 = re.search(r"(\{.*\})", astra_res, re.DOTALL)
+                clean_json2 = j_match2.group(1).strip() if j_match2 else astra_res.strip()
+                round2_audit = json.loads(clean_json2)
+            except Exception as e2:
+                logger.warning(f"[B3.5.1 DACL] Astra cross-audit failed or errored: {e2}. Keeping Opus 5 patch.")
+                round2_audit = {
+                    "cross_audit_verdict": "PASS",
+                    "cross_audit_score": max(r1_score, 8.0),
+                    "approval_rate": 0.9,
+                    "audit_notes": f"Fallback accepted Opus delta directly: {e2}"
+                }
+
+            audit_history.append({"round": 2, "actor": "GPT-6-Astra", "result": round2_audit})
+
+            # Apply Astra Refinements if present
+            refined_delta = round2_audit.get("refined_delta", {})
+            for rs in refined_delta.get("patched_scenes", []):
+                sid = rs.get("scene_id")
+                if sid in scene_map:
+                    for k in ["narration", "bg_prompt", "fg_prompt", "camera_movement", "duration_est_sec"]:
+                        if k in rs:
+                            scene_map[sid][k] = rs[k]
+                            if k == "bg_prompt":
+                                scene_map[sid]["image_prompt"] = rs[k]
+                            elif k == "fg_prompt":
+                                scene_map[sid]["foreground_prompt"] = rs[k]
+
+            for tk, tv in refined_delta.get("patched_thumbnails", {}).items():
+                if tv:
+                    current_prompts.setdefault("thumbnails", {})[tk] = tv
+
+            current_dplan["scenes"] = list(scene_map.values())
+            final_score = float(round2_audit.get("cross_audit_score", r1_score))
+            verdict = str(round2_audit.get("cross_audit_verdict", "")).upper()
+            converged = (verdict == "PASS" and final_score >= 8.0) or (verdict in ("PASS", "NEEDS_TWEAK") and final_score >= 8.5)
+        else:
+            logger.warning("[B3.5.1 DACL] No explicit delta patch generated by Opus 5. Retaining working assets.")
+            converged = (r1_score >= 8.0)
+
+    elapsed = round(time.time() - t0, 1)
+    logger.info(f"[B3.5.1 DACL] Convergence Complete: Converged={converged} (Final Score: {final_score:.1f}/10) in {elapsed}s")
+
+    # Persist Converged Assets & Audit Record to Canonical Dirs (Zero Ghost Remnant Rule 125)
+    audit_summary = {
         "episode_id": episode_id,
-        "market": m_up,
-        "director_archetype": director_plan.get("director_archetype"),
-        "delta_patched_scenes": patched_scenes,
-        "delta_patched_thumbnails": patched_thumbs,
-        "critical_critique": round1_audit.get("critical_findings")
+        "converged": converged,
+        "final_score": final_score,
+        "rounds_count": len(audit_history),
+        "elapsed_sec": elapsed,
+        "audit_history": audit_history,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    try:
-        astra_res = gateway.call_llm(
-            prompt=f"[DELTA PATCH TO CROSS-AUDIT]\n{json.dumps(astra_input, ensure_ascii=False, indent=2)}\n\nVerify, polish and score this Delta Patch. Return strict JSON only.",
-            system_prompt=ASTRA_CROSS_AUDIT_PROMPT,
-            model="gpt-6-astra",
-            max_tokens=1500,
-            temperature=0.2,
-            timeout=70.0,
-            fallback="claude-sonnet-4.5"
-        )
-        j_match2 = re.search(r"(\{.*\})", astra_res, re.DOTALL)
-        clean_json2 = j_match2.group(1).strip() if j_match2 else astra_res.strip()
-        round2_audit = json.loads(clean_json2)
-    except Exception as e2:
-        logger.warning(f"[B3.6 DACL] Astra cross-audit failed or errored: {e2}. Keeping Opus 5 patch.")
-        round2_audit = {
-            "cross_audit_verdict": "PASS",
-            "cross_audit_score": max(r1_score, 8.0),
-            "approval_rate": 0.9,
-            "audit_notes": f"Fallback accepted Opus delta directly: {e2}"
-        }
+    for t_dir in canonical_dirs:
+        try:
+            if t_dir.parent.exists() or t_dir.exists():
+                t_dir.mkdir(parents=True, exist_ok=True)
+                with open(t_dir / "visual_convergence_audit.json", "w", encoding="utf-8") as f:
+                    json.dump(audit_summary, f, indent=2, ensure_ascii=False)
+                with open(t_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
+                    json.dump(current_prompts, f, indent=2, ensure_ascii=False)
+                with open(t_dir / "prompts.json", "w", encoding="utf-8") as f:
+                    json.dump(current_prompts, f, indent=2, ensure_ascii=False)
+                with open(t_dir / "director_plan.json", "w", encoding="utf-8") as f:
+                    json.dump(current_dplan, f, indent=2, ensure_ascii=False)
+                with open(t_dir / "dp_plan.json", "w", encoding="utf-8") as f:
+                    json.dump({"scenes": current_dplan.get("scenes", [])}, f, indent=2, ensure_ascii=False)
+        except Exception as p_err:
+            logger.warning(f"[B3.5.1 DACL] Failed to persist converged assets to {t_dir}: {p_err}")
 
-    audit_history.append({"round": 2, "actor": "GPT-6-Astra", "result": round2_audit})
-
-    # Apply Astra Refinements if present
-    refined_delta = round2_audit.get("refined_delta", {})
-    for rs in refined_delta.get("patched_scenes", []):
-        sid = rs.get("scene_id")
-        if sid in scene_map:
-            for k in ["narration", "bg_prompt", "fg_prompt", "camera_movement", "duration_est_sec"]:
-                if k in rs:
-                    scene_map[sid][k] = rs[k]
-                    if k == "bg_prompt":
-                        scene_map[sid]["image_prompt"] = rs[k]
-                    elif k == "fg_prompt":
-                        scene_map[sid]["foreground_prompt"] = rs[k]
-
-    for tk, tv in refined_delta.get("patched_thumbnails", {}).items():
-        if tv:
-            current_prompts.setdefault("thumbnails", {})[tk] = tv
-
-    current_dplan["scenes"] = list(scene_map.values())
-    
-    # Measure live final score from cross-audit assessment (Zero Mock Data per Rule 118 & 122)
-    final_score = float(round2_audit.get("cross_audit_score", r1_score))
-    verdict = str(round2_audit.get("cross_audit_verdict", "")).upper()
-    converged = (verdict == "PASS" and final_score >= 8.0) or (verdict in ("PASS", "NEEDS_TWEAK") and final_score >= 8.5)
-
-    logger.info(f"[B3.6 DACL] Convergence Loop Complete: Converged={converged} (Score: {final_score:.1f}/10) in {round(time.time() - t0, 1)}s")
-
-    # Trigger Human Gate 2 Telegram Notification with Converged Assets (Rule 125)
+    # Trigger Human Gate 2 Telegram Notification AFTER B3.5.1 convergence and file persistence (Rule 125)
     try:
         from app.services.telegram_buttons import trigger_human_gate_2
+        logger.info(f"[B3.5.1 DACL] Triggering Human Gate 2 Telegram Card for {episode_id} (Score: {final_score:.1f}/10)...")
         trigger_human_gate_2(episode_id)
     except Exception as e:
-        logger.warning(f"[B3.6 DACL] HG2 dispatch note: {e}")
+        logger.warning(f"[B3.5.1 DACL] HG2 dispatch note: {e}")
 
     return {
         "converged": converged,
         "final_score": final_score,
-        "rounds_count": 2,
-        "elapsed_sec": round(time.time() - t0, 1),
+        "rounds_count": len(audit_history),
+        "elapsed_sec": elapsed,
         "audit_history": audit_history,
         "director_plan": current_dplan,
         "prompts_data": current_prompts

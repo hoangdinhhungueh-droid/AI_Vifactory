@@ -959,6 +959,7 @@ def discover_and_produce_market_trend(
             "treatment_note": niche_data.get("treatment_note"),
             "factsheet": factsheet,
             "viral_competitor_videos": viral_videos[:5],
+            "critic_score": c_score,
             "temp_task_id": temp_task_id
         }
 

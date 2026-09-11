@@ -445,26 +445,36 @@ def trigger_human_gate_2(episode_id: str) -> Optional[int]:
     topic = dp_data.get("topic") or episode_id
     director_arch = dp_data.get("director_archetype") or "Hollywood Master Principle"
 
-    story_score = "Audit: PASS"
+    b2_score = None
+    brain_file = ep_dir / "brain_input.json"
+    if brain_file.exists():
+        try:
+            b_data = json.loads(brain_file.read_text(encoding="utf-8"))
+            b2_val = b_data.get("story_gate_score")
+            if b2_val:
+                b2_score = str(b2_val)
+        except Exception:
+            pass
+
+    b35_score = None
     audit_file = ep_dir / "visual_convergence_audit.json"
     if audit_file.exists():
         try:
             a_data = json.loads(audit_file.read_text(encoding="utf-8"))
             f_score = a_data.get("final_score")
-            if f_score:
-                story_score = f"B3.6 Audit: {f_score}/10"
+            if f_score is not None:
+                b35_score = f"{float(f_score):.1f}/10"
         except Exception:
             pass
-    if story_score == "Audit: PASS":
-        brain_file = ep_dir / "brain_input.json"
-        if brain_file.exists():
-            try:
-                b_data = json.loads(brain_file.read_text(encoding="utf-8"))
-                s_gate = b_data.get("story_gate_score")
-                if s_gate:
-                    story_score = f"B2 Gate: {s_gate}"
-            except Exception:
-                pass
+
+    if b35_score and b2_score:
+        story_score = f"B2: {b2_score} · B3.5.1: {b35_score}"
+    elif b35_score:
+        story_score = f"B3.5.1 Audit: {b35_score}"
+    elif b2_score:
+        story_score = f"B2 Gate: {b2_score}"
+    else:
+        story_score = "Audit: PASS"
 
     logger.info(f"[HG2] Dispatching Human Gate 2 card for {episode_id} ({n_scenes} scenes, {n_bg} BGs, {n_fg} FGs)...")
 
