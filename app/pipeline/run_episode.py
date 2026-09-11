@@ -362,7 +362,8 @@ async def run_pipeline(
     _render_arch = str((brain or {}).get("render_architecture") or "").strip()
     if not _render_arch:
         _render_arch = str(episode.get("render_architecture") or "").strip()
-    if _render_arch in ("two_layer_v1", "remotion_twolayer_karaoke_v4") or "twolayer" in _render_arch or _render_arch.startswith("two_layer"):
+    is_two_layer = _render_arch in ("two_layer_v1", "remotion_twolayer_karaoke_v4") or "twolayer" in _render_arch or _render_arch.startswith("two_layer")
+    if is_two_layer:
         logger.info("[S4.5] two_layer_v1 detected; ensuring S6 Whisper transcription is ready for Remotion props")
         # Ensure speech narration (S4 completed) and Faster-Whisper transcription (S6)
         # run before Remotion prop generation & render (S4.5/S7) so exact word timestamps are available.
@@ -463,17 +464,17 @@ async def run_pipeline(
             logger.warning("[S4.5-coverage] pre-check skipped (%s)", _e_probe_err)
 
     # -- S5: Stock visuals (driven by Notion visual_terms) -----------------
-    # GAP-4 FIX (31/08/2026): Skip S5 entirely for two_layer_v1 architecture.
+    # GAP-4 FIX (31/08/2026): Skip S5 entirely for two_layer_v1 / remotion_twolayer_karaoke_v4 architecture.
     # S4.5 already validated images during Notion pull; S5 validation is
     # redundant and may fail if S4.5 wrote to a different path than S5 expects.
-    if _render_arch == "two_layer_v1":
-        logger.info("[S5] skipped (two_layer_v1 architecture - images validated during S4.5 Notion pull)")
+    if is_two_layer:
+        logger.info("[S5] skipped (two-layer visual %s - images validated during S4.5 Notion pull)", _render_arch)
         # S4.5 already pulled and validated images from Notion; set clips to
         # the twolayer output so S7 uses it as the master visual.
         if twolayer_clip_path:
             episode["clips"] = [{"path": twolayer_clip_path, "source": "twolayer_remotion"}]
         else:
-            # S4.5 failed but we're in two_layer_v1 mode - should have already
+            # S4.5 failed but we're in two-layer mode - should have already
             # raised above. If we reach here, set empty clips (S7 will fail).
             episode["clips"] = []
     else:
@@ -509,7 +510,7 @@ async def run_pipeline(
     _cgate = (os.getenv("VF_CLIP_GATE", "block") or "block").strip().lower()
     if _cgate not in ("off", "warn", "block"):
         _cgate = "block"
-    if _n_scenes > 0 and _cgate != "off" and _render_arch != "two_layer_v1":
+    if _n_scenes > 0 and _cgate != "off" and not is_two_layer:
         try:
             _ratio = float(os.getenv("VF_CLIP_GATE_RATIO", "0.85"))
         except Exception:

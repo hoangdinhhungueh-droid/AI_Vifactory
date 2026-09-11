@@ -113,7 +113,7 @@ async def run_s7(episode: dict) -> dict:
         except Exception as e:
             logger.warning("[S7] %s blurpad derive failed for %s (%s); "
                            "falling back to full render", episode_id, aspect, e)
-            if render_arch == "two_layer_v1":
+            if is_two_layer:
                 render_clips = clip_paths
             else:
                 render_clips = await build_cards(episode, aspect, out_dir, clip_paths)
@@ -140,7 +140,7 @@ async def run_s7(episode: dict) -> dict:
         except Exception:
             pass
 
-    if render_arch in ("two_layer_v1", "remotion_twolayer_karaoke_v4") or "twolayer" in render_arch or render_arch.startswith("two_layer"):
+    if is_two_layer:
         logger.info(
             "[S7] %s render_architecture == '%s': skipping redundant FFmpeg subtitle burning "
             "(Remotion Safe-Zone Dialogue Container is sole on-screen subtitle mechanism)",
