@@ -588,7 +588,7 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
         return
 
     try:
-        from app.llm_router import _send_telegram
+        from app.services.telegram_buttons import send_telegram_broadcast
         import html
         mkt = topic_data.get("market", "EN")
         flag = "🇺🇸" if mkt == "EN" else ("🇯🇵" if mkt == "JP" else "🇰🇷")
@@ -616,7 +616,6 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
             f"• <b>Search-Specific Key:</b> <code>{keyword}</code>",
             (f"• <b>🎬 YouTube Title A:</b> <code>{title_a}</code>" if title_a else f"• <b>🔥 Cụm từ tìm kiếm tăng:</b> <code>{rising}</code>"),
             (f"• <b>⚡ 60s An Ong Hook:</b> <i>{hook_60s[:160]}...</i>" if hook_60s else f"• <b>Niche Brief:</b> {niche}"),
-            f"• <b>Niche Brief:</b> {niche}",
             f"• <b>Khác biệt đối thủ (Blue Ocean Gap):</b> <i>{gap}</i>",
             f"• <b>5-Beat Docudrama:</b> {arcs[:180]}...",
             f"• <b>🛡️ B2.1 Fact & Causal Audit:</b> <b>PASS ({fact_score}/10)</b> qua {fact_model}",
@@ -624,12 +623,16 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
             "--------------------------------------------------",
             "⚙️ <i>B2.1 Fact Audit đã PASS! Hệ thống đang tự động chuyển tiếp sang <b>B3 Visual Director Plan & B3.5 Prompt Forge</b>...</i>"
         ]
-        # Remove duplicate niche brief if hook_60s was empty
-        if not hook_60s:
-            lines = [l for i, l in enumerate(lines) if not (l.startswith("• <b>Niche Brief:</b>") and i == 9)]
+        # Append extra niche brief only if hook_60s was displayed
+        if hook_60s and niche:
+            lines.insert(8, f"• <b>Niche Brief:</b> {niche}")
+
         msg = chr(10).join(lines)
-        _send_telegram(msg)
-        logger.info(f"[trend_engine] Sent pure Telegram Gate 1 notification for {task_id}")
+        msg_id = send_telegram_broadcast(msg)
+        if msg_id:
+            logger.info(f"[trend_engine] Sent pure Telegram Gate 1 notification (msg_id={msg_id}) for {task_id}")
+        else:
+            logger.error(f"[trend_engine] FAILED to send pure Telegram Gate 1 notification for {task_id} (msg_id is None)")
     except Exception as e:
         logger.warning(f"[trend_engine] Failed to send Telegram Gate 1 notification: {e}")
 
@@ -860,8 +863,8 @@ def discover_and_produce_market_trend(
                 print(f"\n{circuit_alert}\n")
                 logger.critical(f"[{m_up}] Rule 118 Circuit Breaker triggered after {consecutive_api_errors} consecutive LLM failures.")
                 try:
-                    from app.llm_router import _send_telegram
-                    _send_telegram(circuit_alert)
+                    from app.services.telegram_buttons import send_telegram_broadcast
+                    send_telegram_broadcast(circuit_alert)
                 except Exception:
                     pass
                 break
@@ -1069,8 +1072,8 @@ def discover_and_produce_market_trend(
             logger.error(f"[{temp_task_id}] B2.1 Audit REJECTED ({f_score}/10): {veto_reason}. Candidate rejected, rotating to next candidate...")
             print(f"  ❌ [B2.1 REJECTED] {veto_reason}. Rotating to next candidate in queue...")
             try:
-                from app.llm_router import _send_telegram
-                _send_telegram(
+                from app.services.telegram_buttons import send_telegram_broadcast
+                send_telegram_broadcast(
                     f"⚠️ <b>[B2.1 FACT & CAUSAL AUDIT REJECT - RULE 130]</b>\n"
                     f"Candidate <code>{term}</code> ({m_up}) chưa đạt chuẩn (Score: {f_score}/10):\n"
                     f"<code>{veto_reason[:300]}</code>\n"
@@ -1155,8 +1158,8 @@ def discover_and_produce_market_trend(
         )
         logger.warning(f"[{m_up}] No candidates passed viability gate.")
         try:
-            from app.llm_router import _send_telegram
-            _send_telegram(alert_msg)
+            from app.services.telegram_buttons import send_telegram_broadcast
+            send_telegram_broadcast(alert_msg)
         except Exception as _tel_err:
             logger.warning(f"Failed to send B1 alert to Telegram: {_tel_err}")
 

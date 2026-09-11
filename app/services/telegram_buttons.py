@@ -18,6 +18,7 @@ import time
 from typing import List, Tuple, Optional
 from datetime import datetime, timezone
 import httpx
+import asyncio
 
 from app.utils.security import mask_exception_text
 
@@ -29,22 +30,20 @@ GATE2_SENT_FILE = os.path.join(DB_DIR, "gate2_sent.json")
 
 def _load_env_secrets():
     try:
-        envp = os.path.join("/root", "secrets", ".env")
-        if os.path.exists(envp):
-            with open(envp, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if "=" in line and not line.startswith("#"):
-                        k, v = line.split("=", 1)
-                        k, v = k.strip(), v.strip().strip('"').strip("'")
-                        if k == "VF_TG_BOT_TOKEN" and v:
-                            os.environ["VF_TG_BOT_TOKEN"] = v
-                        elif k == "TELEGRAM_BOT_TOKEN" and v:
-                            if not os.environ.get("VF_TG_BOT_TOKEN"):
-                                os.environ["TELEGRAM_BOT_TOKEN"] = v
-                        elif k in ("TELEGRAM_CHAT_ID", "TELEGRAM_ENABLED") and v:
-                            if k not in os.environ or not os.environ[k]:
-                                os.environ[k] = v
+        for envp in ["/root/secrets/.env", "/root/video_factory/.env", ".env"]:
+            if os.path.exists(envp):
+                with open(envp, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if "=" in line and not line.startswith("#"):
+                            k, v = line.split("=", 1)
+                            k, v = k.strip(), v.strip().strip('"').strip("'")
+                            if k in ("VF_TG_BOT_TOKEN", "TELEGRAM_BOT_TOKEN") and v:
+                                if k not in os.environ or not os.environ[k]:
+                                    os.environ[k] = v
+                            elif k in ("VF_TG_CHAT_ID", "TELEGRAM_CHAT_ID", "TELEGRAM_ENABLED") and v:
+                                if k not in os.environ or not os.environ[k]:
+                                    os.environ[k] = v
     except Exception:
         pass
 
@@ -54,7 +53,7 @@ def _token() -> str:
 
 def _chat_id() -> str:
     _load_env_secrets()
-    return os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    return os.environ.get("VF_TG_CHAT_ID", "").strip() or os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 
 def is_enabled() -> bool:
     if os.environ.get("TELEGRAM_ENABLED", "").strip() == "0":
@@ -122,9 +121,10 @@ async def send_with_buttons(text: str, buttons: Optional[list] = None, parse_mod
         logger.warning("[tg-btn] Telegram notifier is disabled or missing credentials.")
         return None
     url = f"https://api.telegram.org/bot{_token()}/sendMessage"
+    clean_text = str(text).replace(chr(92) + 'n', chr(10))
     payload = {
         "chat_id": _chat_id(),
-        "text": text,
+        "text": clean_text,
         "parse_mode": parse_mode,
         "disable_web_page_preview": True,
     }
@@ -138,6 +138,18 @@ async def send_with_buttons(text: str, buttons: Optional[list] = None, parse_mod
                 msg_id = data.get("result", {}).get("message_id")
                 logger.info(f"[tg-btn] Sent button message (id={msg_id}) to {_chat_id()}")
                 return msg_id
+            elif parse_mode == "HTML" and res.status_code != 200:
+                logger.warning(f"[tg-btn] HTML parse failed ({res.status_code}): {mask_exception_text(res.text)}. Retrying as plain text...")
+                payload.pop("parse_mode", None)
+                res_plain = await client.post(url, json=payload)
+                if res_plain.status_code == 200:
+                    data = res_plain.json()
+                    msg_id = data.get("result", {}).get("message_id")
+                    logger.info(f"[tg-btn] Sent fallback plain text message (id={msg_id}) to {_chat_id()}")
+                    return msg_id
+                else:
+                    logger.error(f"[tg-btn] Plain text fallback also failed: {res_plain.status_code} {mask_exception_text(res_plain.text)}")
+                    return None
             else:
                 logger.error(
                     f"[tg-btn] Failed to send button message: {res.status_code} "
@@ -147,6 +159,28 @@ async def send_with_buttons(text: str, buttons: Optional[list] = None, parse_mod
     except Exception as e:
         logger.error(f"[tg-btn] Exception sending button message: {mask_exception_text(str(e))}")
         return None
+
+def send_telegram_broadcast(text: str, parse_mode: str = "HTML") -> Optional[int]:
+    """Synchronous, thread-safe Telegram message dispatcher with auto-secrets loading.
+    Can be called safely from any synchronous or asynchronous context.
+    Returns message_id if successful, None otherwise.
+    """
+    _load_env_secrets()
+    if not is_enabled():
+        logger.warning("[tg-btn] Telegram notifier is disabled or missing credentials.")
+        return None
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, send_with_buttons(text, buttons=None, parse_mode=parse_mode)).result()
+    else:
+        return asyncio.run(send_with_buttons(text, buttons=None, parse_mode=parse_mode))
 
 async def answer_callback(callback_query_id: str, text: str = "", show_alert: bool = False) -> bool:
     """Answer a callback query to remove loading spinner.

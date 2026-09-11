@@ -35,6 +35,24 @@ from datetime import datetime, timezone
 # Ensure project root in sys.path
 sys.path.insert(0, "/root/video_factory")
 
+def _load_system_secrets():
+    """Ensure all secrets from /root/secrets/.env are loaded into os.environ for cron execution."""
+    for env_path in ["/root/secrets/.env", "/root/video_factory/.env", ".env"]:
+        try:
+            if os.path.exists(env_path):
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if "=" in line and not line.startswith("#"):
+                            k, v = line.split("=", 1)
+                            k, v = k.strip(), v.strip().strip('"').strip("'")
+                            if k and v and k not in os.environ:
+                                os.environ[k] = v
+        except Exception:
+            pass
+
+_load_system_secrets()
+
 from app.services.trend_engine_b1 import (
     discover_and_produce_market_trend,
     run_daily_all_markets
@@ -54,8 +72,8 @@ logger = logging.getLogger("run_trend_pipeline")
 def _notify_telegram(msg: str):
     """Send summary notification to Telegram."""
     try:
-        from app.llm_router import _send_telegram
-        _send_telegram(msg)
+        from app.services.telegram_buttons import send_telegram_broadcast
+        send_telegram_broadcast(msg)
     except Exception as e:
         logger.warning(f"Telegram notification failed: {e}")
 

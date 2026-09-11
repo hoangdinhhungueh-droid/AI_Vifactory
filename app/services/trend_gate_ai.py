@@ -306,7 +306,7 @@ def _committed_today(day):
 def _notify_raw_ready(data):
     """Telegram ping after the automated VPS crawl: raw pool ready for the gate."""
     try:
-        from app.llm_router import _send_telegram
+        from app.services.telegram_buttons import send_telegram_broadcast as _send_telegram
     except Exception:
         return
     lines = ["\U0001f4e5 RAW POOL %s da san sang (VPS cao tu dong, CHUA ghi thu vien)."
@@ -775,7 +775,7 @@ def trend_commit(req: TrendCommitRequest):
         # actually exists in Story Library. pick_of_day file above is only a daily marker.
     if req.notify and (saved or pick):
         try:
-            from app.llm_router import _send_telegram
+            from app.services.telegram_buttons import send_telegram_broadcast as _send_telegram
             msg = ["\u2705 GATE (Notion AI): %d tu khoa qua kiem duyet -> thu vien." % saved]
             if by_source:
                 msg.append("Nguon: " + ", ".join("%s=%d" % (k, v)

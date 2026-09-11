@@ -198,7 +198,7 @@ def run_sunday_maintenance() -> Dict[str, Any]:
 
     # Send Telegram notification
     try:
-        from app.llm_router import _send_telegram
+        from app.services.telegram_buttons import send_telegram_broadcast
         msg = (
             "🧹 <b>[VF SYSTEM MAINTENANCE - CHỦ NHẬT]</b>\n"
             "• <i>Trạng thái</i>: Nghỉ sản xuất video định kỳ để bảo vệ hạ tầng VPS.\n"
@@ -206,8 +206,8 @@ def run_sunday_maintenance() -> Dict[str, Any]:
             f"• <i>B11 Analytics Routine</i>: {results['b11_status'].upper()}\n"
             "• <i>Lịch tuần mới</i>: Sáng mai (Thứ Hai 06:00 VN) sẽ sản xuất kênh <b>EN</b>."
         )
-        _send_telegram(msg)
-        results["telegram_sent"] = True
+        msg_id = send_telegram_broadcast(msg)
+        results["telegram_sent"] = bool(msg_id)
     except Exception as te:
         logger.warning(f"Telegram notification for maintenance failed: {te}")
         results["telegram_sent"] = False

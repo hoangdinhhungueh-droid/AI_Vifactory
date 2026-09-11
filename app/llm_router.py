@@ -50,28 +50,12 @@ def _inc_usage(service: str, tokens: int = 0):
             conn.commit()
 
 def _send_telegram(msg: str):
-    # Fix 30/06: doc token call-time, VF bot ONLY (khong fallback OC bot).
-    tok = os.environ.get("VF_TG_BOT_TOKEN", "").strip()
-    chat = (os.environ.get("VF_TG_CHAT_ID", "").strip()
-            or os.environ.get("TELEGRAM_CHAT_ID", "").strip())
-    if not tok or not chat:
-        return
     try:
-        clean_text = str(msg).replace(chr(92) + 'n', chr(10))
-        resp = requests.post(
-            f"https://api.telegram.org/bot{tok}/sendMessage",
-            json={"chat_id": chat, "text": clean_text, "parse_mode": "HTML", "disable_web_page_preview": True},
-            timeout=10
-        )
-        if resp.status_code != 200:
-            logger.warning(f"Telegram HTML parse error {resp.status_code}: {resp.text}. Retrying plain text.")
-            requests.post(
-                f"https://api.telegram.org/bot{tok}/sendMessage",
-                json={"chat_id": chat, "text": clean_text, "disable_web_page_preview": True},
-                timeout=10
-            )
+        from app.services.telegram_buttons import send_telegram_broadcast
+        return send_telegram_broadcast(str(msg))
     except Exception as e:
-        logger.warning(f"Telegram alert failed: {e}")
+        logger.warning(f'send_telegram_broadcast delegation failed: {e}')
+
 def _call_gemini(prompt: str, system: str = "") -> str:
     # RUN#8 RE-ACTIVATED: chi gemini-2.5-flash-lite. Auth qua HEADER x-goog-api-key (KHONG ?key= tren URL).
     model = os.getenv("GEMINI_MODEL_25FL", "gemini-2.5-flash-lite")
