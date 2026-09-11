@@ -456,15 +456,17 @@ def assess_keyword_video_viability(
         data = json.loads(clean_json)
         return data
     except Exception as e:
-        logger.warning(f"[hhtech] assess_keyword_video_viability failed: {e}")
+        logger.error(f"[hhtech] assess_keyword_video_viability failed: {type(e).__name__}: {e}")
         return {
-            "is_video_viable": True,
-            "viability_score": 7.0,
-            "verdict": "APPROVED_BY_FALLBACK",
+            "is_video_viable": False,
+            "viability_score": 0.0,
+            "verdict": "REJECTED_API_ERROR",
             "specific_viral_angle": keyword,
-            "visual_feasibility_score": 7,
-            "conflict_depth_score": 7,
-            "rejection_reason": None
+            "visual_feasibility_score": 0,
+            "conflict_depth_score": 0,
+            "rejection_reason": f"LLM assessment error: {type(e).__name__} ({e})",
+            "api_error": True,
+            "error_details": str(e)
         }
 
 

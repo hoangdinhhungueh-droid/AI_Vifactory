@@ -130,6 +130,7 @@ class QuotaTracker:
         self.state_path = state_path
         self.date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         self.spent = 0
+        self.exhausted = False
         self._load()
 
     def _load(self) -> None:
@@ -137,14 +138,24 @@ class QuotaTracker:
             data = json.loads(self.state_path.read_text())
             if data.get("date") == self.date:
                 self.spent = int(data.get("spent", 0))
+                self.exhausted = bool(data.get("exhausted", False))
         except (OSError, ValueError, TypeError):
             pass
+
+    def mark_exhausted(self) -> None:
+        self.exhausted = True
+        try:
+            self.state_path.parent.mkdir(parents=True, exist_ok=True)
+            self.state_path.write_text(json.dumps({"date": self.date, "spent": self.spent, "exhausted": True}))
+            logger.warning("[b15] YouTube Data API daily quota marked EXHAUSTED for date %s", self.date)
+        except OSError as e:
+            logger.debug("[b15] could not persist quota state: %s", e)
 
     def charge(self, endpoint: str) -> None:
         self.spent += QUOTA_COST.get(endpoint, 1)
         try:
             self.state_path.parent.mkdir(parents=True, exist_ok=True)
-            self.state_path.write_text(json.dumps({"date": self.date, "spent": self.spent}))
+            self.state_path.write_text(json.dumps({"date": self.date, "spent": self.spent, "exhausted": self.exhausted}))
         except OSError as e:
             logger.debug("[b15] could not persist quota state: %s", e)
 
@@ -153,7 +164,7 @@ class QuotaTracker:
         return self.spent / QUOTA_DAILY_UNITS
 
     def should_fallback(self) -> bool:
-        return self.ratio >= QUOTA_FALLBACK_RATIO
+        return self.exhausted or (self.ratio >= QUOTA_FALLBACK_RATIO)
 
 
 def _api_get(endpoint: str, params: Dict, quota: QuotaTracker) -> Optional[Dict]:
@@ -172,6 +183,8 @@ def _api_get(endpoint: str, params: Dict, quota: QuotaTracker) -> Optional[Dict]
             except Exception:
                 pass
         logger.error("[b15] %s failed: %s %s", endpoint, e, detail)
+        if "429" in str(e) or "quotaExceeded" in detail or "RESOURCE_EXHAUSTED" in detail:
+            quota.mark_exhausted()
         return None
 
 
@@ -825,10 +838,26 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
         quota = QuotaTracker()
         if quota.should_fallback():
             logger.warning("[b15] Quota at %.0f%% of daily cap - fallback active", quota.ratio * 100)
-        candidates = youtube_search(api_key, target_keyword, market, quota)
+        candidates = youtube_search(api_key, target_keyword, market, quota) if not quota.exhausted else []
         if not candidates:
-            logger.error("[b15] No candidates found for keyword %r", target_keyword)
-            return None
+            logger.warning("[b15] No candidates found for keyword %r (quota exhausted or zero matches). Activating resilient fallback recon card.", target_keyword)
+            anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, [], [], niche)
+            card = build_intel_card(task_id, target_keyword, niche, market, [], [], quota,
+                                    competitor_narrative_anatomy=anatomy, raw_comments=[])
+            for target_dir in [EPISODE_DIR / task_id, Path("/root/video_factory/episodes") / task_id]:
+                try:
+                    target_dir.mkdir(parents=True, exist_ok=True)
+                    out_p = target_dir / "competitor_intel_card.json"
+                    out_p.write_text(json.dumps(card, ensure_ascii=False, indent=2), encoding="utf-8")
+                    logger.info("[b15] Resilient fallback intel card saved to %s", out_p)
+                except Exception as e:
+                    logger.warning("[b15] Failed to save resilient intel card to %s: %s", target_dir, e)
+            try:
+                sync_card_to_notion(task_id, card)
+            except Exception as e:
+                logger.warning("[b15] sync_card_to_notion failed: %s", e)
+            return card
+
         details = youtube_video_details(api_key, [c["video_id"] for c in candidates], quota)
         for c in candidates:
             c.update(details.get(c["video_id"], {}))
@@ -845,9 +874,21 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
     # 2. Select top all-time outliers and recent engagement benchmarks
     group1, group2 = select_competitors(candidates)
     selected = group1 + group2
+    if not selected and candidates:
+        logger.warning("[b15] Competitor selection formula matched 0 videos, falling back to top candidates directly.")
+        selected = candidates[:3]
     if not selected:
-        logger.error("[b15] Competitor selection formula matched 0 videos")
-        return None
+        anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, [], [], niche)
+        card = build_intel_card(task_id, target_keyword, niche, market, [], [], quota,
+                                competitor_narrative_anatomy=anatomy, raw_comments=[])
+        for target_dir in [EPISODE_DIR / task_id, Path("/root/video_factory/episodes") / task_id]:
+            try:
+                target_dir.mkdir(parents=True, exist_ok=True)
+                out_p = target_dir / "competitor_intel_card.json"
+                out_p.write_text(json.dumps(card, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception as e:
+                logger.warning("[b15] Failed to save intel card to %s: %s", target_dir, e)
+        return card
 
     api_key = get_api_key() or ""
     asset_dir = EPISODE_DIR / task_id / "competitor_assets"

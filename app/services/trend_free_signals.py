@@ -7,32 +7,47 @@ logger = logging.getLogger(__name__)
 _TRENDING_RSS_URL = "https://trends.google.com/trending/rss"
 _SUGGEST_URL = "https://suggestqueries.google.com/complete/search"
 
+from datetime import datetime, timezone
+
 _CACHE = {}
-_CACHE_TTL_SECONDS = 6 * 3600  # 6h - plenty for the ~1x/day gate cadence, cheap safety net
+
+
+def _current_utc_day():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def _cache_get(key):
-    hit = _CACHE.get(key)
+    day_str = _current_utc_day()
+    # Cache key format: (day_str, *original_key)
+    full_key = (day_str, key) if isinstance(key, tuple) else (day_str, str(key))
+    hit = _CACHE.get(full_key)
     if not hit:
         return None
-    ts, val = hit
-    if time.time() - ts > _CACHE_TTL_SECONDS:
-        _CACHE.pop(key, None)
-        return None
-    return val
+    return hit
 
 
 def _cache_set(key, val):
-    _CACHE[key] = (time.time(), val)
+    day_str = _current_utc_day()
+    # Clean out any old days from cache memory to maintain strict daily freshness
+    stale_keys = [k for k in _CACHE.keys() if k[0] != day_str]
+    for sk in stale_keys:
+        _CACHE.pop(sk, None)
+    full_key = (day_str, key) if isinstance(key, tuple) else (day_str, str(key))
+    _CACHE[full_key] = val
 
 
 def _get_with_retry(url, params, timeout, retries=1):
     """GET with one retry + short backoff. Raises the last error if every attempt fails
     so callers keep their existing try/except -> [] fallback behaviour."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
     last_exc = None
     for attempt in range(retries + 1):
         try:
-            r = requests.get(url, params=params, timeout=timeout)
+            r = requests.get(url, params=params, headers=headers, timeout=timeout)
             if r.status_code == 200:
                 return r
             last_exc = Exception("HTTP %s" % r.status_code)
@@ -248,14 +263,30 @@ def gtrends_discover_trending_searches(market="EN", timeout=15.0, geo=None, coun
     if cached is not None:
         return cached
     
-    # Seed queries to discover trending searches across investigative & systemic axes
-    # KR: Trending, News, Issues, Scandals, Collapse, Crisis, Downfall, Mechanisms
-    # JP: Trending, News, Scandals, Collapse, Truth, Bankruptcy, Crisis
-    # EN: Trending, News, Scandals, Collapse, Crisis, Investigation, Fraud, Downfall
+    # Seed queries to discover trending searches across 7 Canonical Pillars:
+    # 1. Corporate & Financial Fraud (Sụp đổ/Gian lận)
+    # 2. True Crime Non-Graphic & Forensic Case Solving (Án kinh tế/Phá án trắng)
+    # 3. Psychology, Cults & Manipulation Traps (Tâm lý thao túng/Bẫy hành vi)
+    # 4. Tech Monopolies & Supply Chain Warfare (Bán dẫn/Độc quyền)
+    # 5. Testing Scandals & Recalls (Bê bối kiểm định/Thu hồi)
+    # 6. Socio-Economic Structural Crisis (Nghịch lý xã hội/Dân số)
+    # 7. Hostile Takeovers & Regulatory Loopholes (Thâu tóm/Hố đen pháp lý)
     seed_queries = {
-        "JP": ["トレンド", "ニュース", "話題", "事件", "崩壊", "疑惑", "真相", "なぜ", "問題", "倒産", "危機"],
-        "KR": ["트렌드", "뉴스", "화제", "사건", "사태", "논란", "폭망", "의혹", "원인", "실체", "붕괴", "위기", "급락"],
-        "EN": ["trending", "news", "scandal", "collapse", "crisis", "investigation", "fraud", "downfall", "exposed"]
+        "JP": [
+            "トレンド", "ニュース", "話題", "事件", "崩壊", "疑惑", "真相", "なぜ", "問題", "倒産", "危機",
+            "洗脳", "マインドコントロール", "心理操作", "巨額詐欺", "横領", "捜査", "背任",
+            "半導体", "不正認証", "リコール", "過労死", "年金崩壊", "敵対的買収"
+        ],
+        "KR": [
+            "트렌드", "뉴스", "화제", "사건", "사태", "논란", "폭망", "의혹", "원인", "실체", "붕괴", "위기", "급락",
+            "가스라이팅", "심리 조작", "다단계", "횡령", "배임", "구속", "검찰 조사",
+            "반도체 전쟁", "기술 유출", "품질 조작", "리콜", "고독사", "경영권 분쟁"
+        ],
+        "EN": [
+            "trending", "news", "scandal", "collapse", "crisis", "investigation", "fraud", "downfall", "exposed",
+            "gaslighting", "mass hysteria", "cult psychology", "manipulation", "money laundering", "indictment", "embezzlement",
+            "semiconductor embargo", "tech monopoly", "recall cover-up", "pension collapse", "hostile takeover"
+        ]
     }
     
     seeds = seed_queries.get(market, [])
@@ -324,4 +355,3 @@ def gtrends_discover_trending_searches(market="EN", timeout=15.0, geo=None, coun
     except Exception as e:
         logger.warning("[free-signals] gtrends_discover failed for %s: %s", market, e)
         return []
-

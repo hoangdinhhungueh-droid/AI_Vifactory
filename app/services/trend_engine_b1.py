@@ -809,6 +809,8 @@ def discover_and_produce_market_trend(
         return []
 
     produced_topics = []
+    consecutive_api_errors = 0
+    max_consecutive_api_errors = 3
 
     for idx, c in enumerate(candidates[:max_scan_candidates], start=1):
         raw_term = c["term"]
@@ -840,6 +842,33 @@ def discover_and_produce_market_trend(
             rising_queries=rising_queries[:6],
             top_videos=viral_videos[:4]
         )
+
+        # Circuit Breaker check for repeated LLM API infrastructure outages (Rule 118)
+        if viability.get("api_error"):
+            consecutive_api_errors += 1
+            err_detail = viability.get("rejection_reason", "Unknown LLM error")
+            print(f"  ⚠️ [LLM API FAILURE {consecutive_api_errors}/{max_consecutive_api_errors}] {err_detail}")
+            logger.error(f"[{m_up}] Viability LLM API error on candidate '{term}': {err_detail}")
+            if consecutive_api_errors >= max_consecutive_api_errors:
+                circuit_alert = (
+                    f"🚨 <b>[RULE 118 CIRCUIT BREAKER ACTIVATED]</b>\n"
+                    f"Market: <code>{m_up}</code> | Candidate: <code>{term}</code>\n"
+                    f"LLM API thất bại liên tiếp {consecutive_api_errors} lần tại Viability Gate:\n"
+                    f"<code>{err_detail[:250]}</code>\n"
+                    f"🛑 <b>Hành động:</b> Tạm dừng quét candidate pool để bảo vệ hệ thống và chờ kiểm tra hạ tầng."
+                )
+                print(f"\n{circuit_alert}\n")
+                logger.critical(f"[{m_up}] Rule 118 Circuit Breaker triggered after {consecutive_api_errors} consecutive LLM failures.")
+                try:
+                    from app.llm_router import _send_telegram
+                    _send_telegram(circuit_alert)
+                except Exception:
+                    pass
+                break
+            continue
+        else:
+            consecutive_api_errors = 0
+
         score = viability.get("viability_score", 0)
 
         if not viability.get("is_video_viable") or score < 8.0:
