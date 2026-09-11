@@ -68,7 +68,8 @@ def _build_client(market=None):
 
 def upload_video(video_path, title, description, tags=None,
                  category_id="22", privacy_status=None,
-                 made_for_kids=False, market=None, thumbnail_path=None):
+                 made_for_kids=False, market=None, thumbnail_path=None,
+                 subtitles_path=None):
     if not os.path.exists(video_path):
         raise FileNotFoundError(video_path)
     _load_env()
@@ -119,6 +120,29 @@ def upload_video(video_path, title, description, tags=None,
             print("THUMBNAIL_SET_OK", thumbnail_path, flush=True)
         except Exception as e:
             print(f"[WARN] thumbnail set failed for {thumbnail_path}: {e}", flush=True)
+
+    # 11/09/2026 (Beat TTS & YouTube AI Dubbing): Upload .srt captions
+    if subtitles_path and os.path.exists(subtitles_path):
+        try:
+            lang_sub = (market or "en").lower()
+            if lang_sub == "jp": lang_sub = "ja"
+            if lang_sub == "kr": lang_sub = "ko"
+            youtube.captions().insert(
+                part="snippet",
+                body={
+                    "snippet": {
+                        "videoId": response["id"],
+                        "language": lang_sub,
+                        "name": f"{lang_sub.upper()} Captions",
+                        "isDraft": False
+                    }
+                },
+                media_body=MediaFileUpload(subtitles_path, mimetype="application/x-subrip")
+            ).execute()
+            print("CAPTIONS_SET_OK", subtitles_path, flush=True)
+        except Exception as e:
+            print(f"[WARN] captions upload failed for {subtitles_path}: {e}", flush=True)
+
     return response
 
 def upload_from_payload(episode_dir, payload_file="youtube_upload_payload.json",
@@ -164,6 +188,17 @@ def upload_from_payload(episode_dir, payload_file="youtube_upload_payload.json",
                 thumbnail_path = cand
                 break
 
+    subtitles_path = None
+    sub_cands = [
+        os.path.join(episode_dir, f"subtitles_{market}.srt"),
+        os.path.join(episode_dir, "subtitles_ja.srt" if market == "jp" else f"subtitles_{market}.srt"),
+        os.path.join(episode_dir, "subtitles.srt"),
+    ]
+    for cand in sub_cands:
+        if os.path.exists(cand) and os.path.getsize(cand) > 50:
+            subtitles_path = cand
+            break
+
     resp = upload_video(
         video_path=video_path,
         title=payload["title"],
@@ -173,5 +208,6 @@ def upload_from_payload(episode_dir, payload_file="youtube_upload_payload.json",
         made_for_kids=False,
         market=market,
         thumbnail_path=thumbnail_path,
+        subtitles_path=subtitles_path,
     )
     return resp

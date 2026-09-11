@@ -65,6 +65,28 @@ async def run_s4(episode: dict) -> dict:
     if tts_emphasize_raw is None:
         tts_emphasize_raw = os.getenv("VF_TTS_EMPHASIS", "1")
     tts_emphasize = str(tts_emphasize_raw) not in ("0", "false", "False", "off")
+
+    # BEAT-LEVEL TTS ARCHITECTURE (Zero-Drift Beat Engine)
+    brain_path = os.path.join(out_dir, "brain_input.json")
+    has_scenes = bool(episode.get("scenes")) or (os.path.exists(brain_path) and os.path.getsize(brain_path) > 100)
+    if has_scenes:
+        try:
+            from app.services.beat_tts_engine import synthesize_beat_tts_pipeline
+            force_tts = os.getenv("VF_FORCE_TTS", "0") == "1"
+            beat_res = await synthesize_beat_tts_pipeline(episode_id, out_dir=out_dir, force=force_tts)
+            logger.info("[S4] %s beat tts complete (%dB, backend=%s)", episode_id, beat_res["size_bytes"], beat_res.get("backend"))
+            return {
+                **episode,
+                "audio_path": beat_res["audio_path"],
+                "size_bytes": beat_res["size_bytes"],
+                "backend": beat_res.get("backend", "edge_tts_beat"),
+                "segments": beat_res.get("segments", []),
+                "srt_path": beat_res.get("srt_path", ""),
+                "visual_terms": []
+            }
+        except Exception as _e_beat:
+            logger.warning("[S4] %s beat tts fallback: %s", episode_id, _e_beat)
+
     if os.path.exists(audio_path) and os.path.getsize(audio_path) > 1000000 and os.getenv("VF_FORCE_TTS", "0") != "1":
         logger.info("[S4] %s using existing valid audio: %s (%dB)", episode_id, audio_path, os.path.getsize(audio_path))
         return {**episode, "audio_path": audio_path, "size_bytes": os.path.getsize(audio_path), "backend": "existing", "visual_terms": []}

@@ -45,6 +45,10 @@ async def run_s6(episode: dict) -> dict:
     assert_not_simulated([audio_path])
 
     logger.info("[S6] %s aligning lang=%s", episode_id, lang_code)
+    segments = episode.get("segments")
+    if segments:
+        logger.info("[S6] %s reusing pre-computed segments from episode (%d segments)", episode_id, len(segments))
+
     _cache_on = (os.getenv("VF_ALIGN_CACHE", "1") or "1").strip() == "1"
     _ck = None
     if _cache_on:
@@ -109,8 +113,12 @@ async def run_s6(episode: dict) -> dict:
     except Exception as _e:
         logging.getLogger(__name__).warning('[S6] scene_len_ms calc failed: %s', _e)
         scene_len_ms = None
-    segments = resplit_for_cps(segments, scene_len_ms=scene_len_ms)
-    logger.info("[S6] %s %d segments after CPS auto-split", episode_id, len(segments))
+    is_beat_aligned = bool(segments and any(sg.get("scene_id") for sg in segments))
+    if not is_beat_aligned:
+        segments = resplit_for_cps(segments, scene_len_ms=scene_len_ms)
+        logger.info("[S6] %s %d segments after CPS auto-split", episode_id, len(segments))
+    else:
+        logger.info("[S6] %s preserving %d 1:1 beat-aligned scene segments", episode_id, len(segments))
     speed_warnings = check_reading_speed(segments)
     if speed_warnings:
         logger.warning("[S6] %s %d segment(s) over CPS cap: %s", episode_id, len(speed_warnings), speed_warnings[:3])

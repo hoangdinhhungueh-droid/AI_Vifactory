@@ -120,31 +120,36 @@ def format_speaker_tag(scene: dict, act_title: str) -> str:
     return act_title or "ARCHIVE X // CASE INVESTIGATION DOSSIER"
 
 
-def match_segments_and_extract_words(scene_text: str, segments: list, start_idx: int, fps: int = 30):
+def match_segments_and_extract_words(scene_text: str, segments: list, start_idx: int, fps: int = 30, scene_id: str = ""):
     """Match Whisper segments for a scene and extract exact word timestamps.
     Returns: (matched_words, next_seg_idx, scene_duration_sec, scene_start_ms, scene_end_ms)
     """
     if not segments or start_idx >= len(segments):
         return [], start_idx, None, 0, 0
 
-    scene_clean = re.sub(r'\W+', '', scene_text).lower()
-    if not scene_clean:
-        return [], start_idx, None, 0, 0
-
     matched_segs = []
-    accumulated_text = ""
     idx = start_idx
     first_seg = segments[idx]
     scene_start_ms = int(first_seg.get("start_ms", first_seg.get("start", 0) * 1000))
 
-    while idx < len(segments):
-        seg = segments[idx]
-        seg_clean = re.sub(r'\W+', '', seg.get("text", "")).lower()
-        accumulated_text += seg_clean
-        matched_segs.append(seg)
-        idx += 1
-        if len(accumulated_text) >= len(scene_clean) * 0.9:
-            break
+    # Fast-path: 1:1 match by scene_id (Beat TTS architecture)
+    if scene_id and first_seg.get("scene_id") == scene_id:
+        matched_segs = [first_seg]
+        idx = start_idx + 1
+    else:
+        scene_clean = re.sub(r'\W+', '', scene_text).lower()
+        if not scene_clean:
+            return [], start_idx, None, 0, 0
+
+        accumulated_text = ""
+        while idx < len(segments):
+            seg = segments[idx]
+            seg_clean = re.sub(r'\W+', '', seg.get("text", "")).lower()
+            accumulated_text += seg_clean
+            matched_segs.append(seg)
+            idx += 1
+            if len(accumulated_text) >= len(scene_clean) * 0.9:
+                break
 
     last_seg = matched_segs[-1] if matched_segs else first_seg
     scene_end_ms = int(last_seg.get("end_ms", last_seg.get("end", 0) * 1000))
@@ -267,7 +272,7 @@ def build_remotion_props_data(
         # Single Source of Truth Subtitles & Millisecond-Accurate Karaoke
         if segments:
             matched_subs, next_cursor, calc_dur, s_start, s_end = match_segments_and_extract_words(
-                narration_text, segments, seg_cursor, fps=fps
+                narration_text, segments, seg_cursor, fps=fps, scene_id=s.get("scene_id", "")
             )
             if matched_subs:
                 scene_subtitles = matched_subs
