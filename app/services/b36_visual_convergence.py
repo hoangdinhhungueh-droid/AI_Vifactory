@@ -142,19 +142,22 @@ def run_b36_visual_convergence(
     ]
     ep_dir = None
     for cd in canonical_dirs:
-        if cd.exists():
-            ep_dir = cd
-            break
+        try:
+            if cd.exists():
+                ep_dir = cd
+                break
+        except (PermissionError, OSError):
+            continue
 
     # Auto-load missing assets from disk if available
     if director_plan is None and ep_dir:
         for fname in ["director_plan.json", "dp_plan.json"]:
-            if (ep_dir / fname).exists():
-                try:
+            try:
+                if (ep_dir / fname).exists():
                     director_plan = json.loads((ep_dir / fname).read_text(encoding="utf-8"))
                     break
-                except Exception:
-                    pass
+            except Exception:
+                pass
     if director_plan is None:
         director_plan = {"topic": episode_id, "scenes": []}
 
@@ -163,24 +166,26 @@ def run_b36_visual_convergence(
 
     if prompts_data is None and ep_dir:
         for fname in ["prompts_forge.json", "prompts.json"]:
-            if (ep_dir / fname).exists():
-                try:
+            try:
+                if (ep_dir / fname).exists():
                     prompts_data = json.loads((ep_dir / fname).read_text(encoding="utf-8"))
                     break
-                except Exception:
-                    pass
+            except Exception:
+                pass
     if prompts_data is None:
         prompts_data = {"backgrounds": {}, "foregrounds": {}, "thumbnails": {}}
 
-    if not story_text and ep_dir and (ep_dir / "story.txt").exists():
+    if not story_text and ep_dir:
         try:
-            story_text = (ep_dir / "story.txt").read_text(encoding="utf-8")
+            if (ep_dir / "story.txt").exists():
+                story_text = (ep_dir / "story.txt").read_text(encoding="utf-8")
         except Exception:
             pass
 
-    if grounding_intel is None and ep_dir and (ep_dir / "grounding_intel.json").exists():
+    if grounding_intel is None and ep_dir:
         try:
-            grounding_intel = json.loads((ep_dir / "grounding_intel.json").read_text(encoding="utf-8"))
+            if (ep_dir / "grounding_intel.json").exists():
+                grounding_intel = json.loads((ep_dir / "grounding_intel.json").read_text(encoding="utf-8"))
         except Exception:
             pass
     if grounding_intel is None:
@@ -380,7 +385,13 @@ def run_b36_visual_convergence(
 
     for t_dir in canonical_dirs:
         try:
-            if t_dir.parent.exists() or t_dir.exists():
+            can_persist = False
+            try:
+                if t_dir.exists() or t_dir.parent.exists():
+                    can_persist = True
+            except (PermissionError, OSError):
+                can_persist = False
+            if can_persist:
                 t_dir.mkdir(parents=True, exist_ok=True)
                 with open(t_dir / "visual_convergence_audit.json", "w", encoding="utf-8") as f:
                     json.dump(audit_summary, f, indent=2, ensure_ascii=False)
@@ -392,7 +403,7 @@ def run_b36_visual_convergence(
                     json.dump(current_dplan, f, indent=2, ensure_ascii=False)
                 with open(t_dir / "dp_plan.json", "w", encoding="utf-8") as f:
                     json.dump({"scenes": current_dplan.get("scenes", [])}, f, indent=2, ensure_ascii=False)
-        except Exception as p_err:
+        except (PermissionError, OSError, Exception) as p_err:
             logger.warning(f"[B3.5.1 DACL] Failed to persist converged assets to {t_dir}: {p_err}")
 
     # Trigger Human Gate 2 Telegram Notification AFTER B3.5.1 convergence and file persistence (Rule 125)

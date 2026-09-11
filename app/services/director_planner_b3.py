@@ -939,9 +939,12 @@ def generate_director_plan(
     try:
         audit_file_check = False
         for cdir in canonical_dirs:
-            if (cdir / "visual_convergence_audit.json").exists():
-                audit_file_check = True
-                break
+            try:
+                if (cdir / "visual_convergence_audit.json").exists():
+                    audit_file_check = True
+                    break
+            except (PermissionError, OSError):
+                continue
         if not audit_file_check:
             from app.services.telegram_buttons import trigger_human_gate_2
             logger.warning("  [HG2 Fallback] B3.5.1 audit file missing; triggering fallback Human Gate 2...")
