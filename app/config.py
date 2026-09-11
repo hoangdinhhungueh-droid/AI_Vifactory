@@ -1,5 +1,5 @@
 # app/config.py — LLM_ROUTING v8 (Phase 1: Best-of-FREE pinned priority + Cerebras + Gemini 2.5 FL)
-# Source of Truth: 08 Tool & Platform Routing. (Spec mirror — runtime dung inline trong llm_router.py.)
+# Source of Truth: 08 Tool & Platform Routing. (Legacy free router spec mirror - archived reference.)
 
 OR_PRIORITY = [
     "nvidia/nemotron-3-nano-30b-a3b:free", "openai/gpt-oss-20b:free",

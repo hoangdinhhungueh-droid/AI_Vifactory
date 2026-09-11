@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 import psycopg2
-from app.llm_router import llm_call, _send_telegram
+from app.services.telegram_buttons import send_telegram_broadcast
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -66,13 +66,15 @@ def _estimate_gap_llm(niches, market):
         "Niches: " + ", ".join(niches) + "\n"
         'Respond ONLY with JSON: {"<niche>": {"gap": 0.0}, ...}'
     )
-    res = llm_call(prompt, task_type="S1_gap_estimate",
-                   system="You are a precise market analyst. Respond with valid JSON only.")
-    txt = res["text"]
+    from app.services.model_gateway import get_global_gateway
+    txt = get_global_gateway().call_llm(
+        prompt=prompt,
+        system_prompt="You are a precise market analyst. Respond with valid JSON only."
+    )
     data = json.loads(txt[txt.find("{"): txt.rfind("}") + 1])
     if not isinstance(data, dict):
         raise ValueError("S1 LLM gap estimate is not a JSON object")
-    return data, res.get("provider", "unknown")
+    return data, "hhtech_gateway"
 
 
 def _trend_meta(niche, market):

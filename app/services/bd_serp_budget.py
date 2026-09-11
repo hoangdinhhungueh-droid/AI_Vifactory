@@ -31,8 +31,8 @@ def _month():
 
 def _tg(msg):
     try:
-        from app.llm_router import _send_telegram
-        _send_telegram(msg)
+        from app.services.telegram_buttons import send_telegram_broadcast
+        send_telegram_broadcast(msg)
     except Exception as e:
         logger.warning("[bd-serp] telegram fail: %s", e)
 

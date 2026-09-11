@@ -22,7 +22,7 @@ import os
 import re
 import time
 
-from app.llm_router import llm_call
+from app.services.model_gateway import get_global_gateway
 from app.services.skill_loader import get_skill_rules
 
 logger = logging.getLogger(__name__)
@@ -110,9 +110,11 @@ def judge_story(story_text: str, episode_id: str = "") -> dict:
     }
 
     try:
-        res = llm_call(prompt, task_type="S3_story_judge", system=system_with_rules,
-                        expect_json=True, fail_silent=True)
-        raw = (res.get("text") or "").strip().strip("`").strip()
+        gateway = get_global_gateway()
+        raw_text = gateway.call_llm(prompt=prompt, system_prompt=system_with_rules)
+        raw = (raw_text or "").strip().strip("`").strip()
+        if raw.lower().startswith("json"):
+            raw = raw[4:].strip()
         parsed = json.loads(raw)
         a = int(parsed.get("anti_ai_tone", 0))
         t = int(parsed.get("technique", 0))
@@ -120,7 +122,7 @@ def judge_story(story_text: str, episode_id: str = "") -> dict:
         e = int(parsed.get("editorial_perspective", 0))
         result.update({
             "llm_ok": True,
-            "model": res.get("model"),
+            "model": gateway.hhtech_model,
             "anti_ai_tone": a,
             "technique": t,
             "freshness": f,

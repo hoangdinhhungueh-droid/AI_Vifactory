@@ -65,8 +65,8 @@ def _save(state):
 
 def _telegram(msg):
     try:
-        from app.llm_router import _send_telegram
-        _send_telegram(msg)
+        from app.services.telegram_buttons import send_telegram_broadcast
+        send_telegram_broadcast(msg)
     except Exception as e:
         logger.warning("[serp-budget] telegram failed: %s", e)
 

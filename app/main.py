@@ -18,7 +18,6 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
-from app.llm_router import llm_call
 
 app = FastAPI(title="AI Video Factory API", version="v11.8")
 
@@ -39,14 +38,20 @@ def health():
 
 @app.get("/api/v1/diag")
 def diag():
-    """Enhance D: provider audit — usage, health, scores, chains."""
+    """Provider audit & health diagnostics via ModelGateway."""
     try:
-        from app.llm_router import router_diag
-        return router_diag()
+        from app.services.model_gateway import get_global_gateway
+        gw = get_global_gateway()
+        return {
+            "status": "ok",
+            "provider": "hhtech_gateway",
+            "model": gw.hhtech_model,
+            "cost_summary": gw.cost_tracker.monthly_report() if gw.cost_tracker else {},
+        }
     except Exception as e:
         return {"status": "error", "reason": str(e)}
 
-# ── §1.3 Pipeline LLM endpoint (n8n → quota-tracked via llm_router) ─────────
+# ── §1.3 Pipeline LLM endpoint (ModelGateway + Cost Tracking) ────────────────
 class LLMRequest(BaseModel):
     prompt: str
     task_type: str = "SETUP_ORCHESTRATE"
@@ -54,7 +59,10 @@ class LLMRequest(BaseModel):
 
 @app.post("/api/v1/llm")
 def call_llm(req: LLMRequest):
-    return llm_call(req.prompt, req.task_type, req.system)
+    from app.services.model_gateway import get_global_gateway
+    gw = get_global_gateway()
+    text = gw.call_llm(prompt=req.prompt, system_prompt=req.system)
+    return {"text": text, "model": gw.hhtech_model, "provider": "hhtech"}
 
 # ── §7.1 OC-V agent brain: OpenAI-compatible chat (v11.8) ────────────────────
 _BROWSER_UA = os.getenv(
