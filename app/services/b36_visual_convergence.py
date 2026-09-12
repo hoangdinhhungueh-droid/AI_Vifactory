@@ -239,7 +239,7 @@ def run_b36_visual_convergence(
 
     # Round 1: Claude Forensic Audit
     primary_model = os.getenv("B36_AUDIT_MODEL", "claude-opus-5")
-    fallback_model = "claude-sonnet-4.5" if primary_model == "claude-opus-5" else "claude-opus-5"
+    fallback_model = os.getenv("B36_FALLBACK_MODEL", "kimi-k3")
     logger.info(f"[B3.5.1 DACL] Round 1: Invoking {primary_model} Forensic Auditor for {episode_id}...")
     try:
         raw_res = gateway.call_llm(
@@ -260,7 +260,7 @@ def run_b36_visual_convergence(
             max_tokens=2500,
             temperature=0.1,
             timeout=70.0,
-            fallback="gpt-6-astra"
+            fallback="claude-sonnet-5"
         )
 
     json_match = re.search(r"(\{.*\})", raw_res, re.DOTALL)
@@ -328,7 +328,7 @@ def run_b36_visual_convergence(
                     max_tokens=1500,
                     temperature=0.2,
                     timeout=70.0,
-                    fallback="claude-sonnet-4.5"
+                    fallback="kimi-k3"
                 )
                 j_match2 = re.search(r"(\{.*\})", astra_res, re.DOTALL)
                 clean_json2 = j_match2.group(1).strip() if j_match2 else astra_res.strip()

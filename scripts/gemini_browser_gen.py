@@ -653,12 +653,62 @@ def sync_to_notion(episode_id):
         print("Notion Sync Stderr:", res.get("stderr"))
 
 
+def verify_director_plan_binding(episode_id, items, local_dir):
+    """Verifies that generated images map 1:1 to assets declared in director_plan.json (Rule 122 & Rule 128)."""
+    dplan_file = os.path.join(local_dir, "director_plan.json")
+    dplan = None
+    if os.path.exists(dplan_file):
+        try:
+            with open(dplan_file, "r", encoding="utf-8") as f:
+                dplan = json.load(f)
+        except Exception:
+            pass
+    if not dplan:
+        try:
+            res = client.run_command(f"cat /var/vf/episodes/{episode_id}/director_plan.json")
+            if res.get("stdout"):
+                dplan = json.loads(res["stdout"])
+        except Exception:
+            pass
+
+    if not dplan:
+        return {"status": "SKIPPED", "reason": "director_plan.json not available for validation", "unregistered_keys": []}
+
+    registered_bgs = set()
+    registered_fgs = set()
+    for s in dplan.get("scenes", []):
+        if s.get("bg_reuse_key"):
+            registered_bgs.add(s["bg_reuse_key"])
+        if s.get("fg_reuse_key"):
+            registered_fgs.add(s["fg_reuse_key"])
+
+    unregistered = []
+    for it in items:
+        k = it["reuse_key"]
+        layer = it.get("layer_type", "Background")
+        if layer == "Background" and k not in registered_bgs and not k.startswith("thumb"):
+            unregistered.append(k)
+        elif layer == "Foreground" and k not in registered_fgs and not k.startswith("thumb"):
+            unregistered.append(k)
+
+    return {
+        "status": "PASSED" if not unregistered else "WARN",
+        "registered_bg_count": len(registered_bgs),
+        "registered_fg_count": len(registered_fgs),
+        "unregistered_keys": unregistered
+    }
+
+
 def run_b5_audit(episode_id, items, local_dir):
     """Thực hiện B5 Forensic Pixel Audit theo Rule 118, 122 & 436 (Zero-Mock Score)."""
     print(f"\n🔍 [B5 Forensic Visual Audit] Đang thẩm định chất lượng toàn bộ {len(items)} ảnh...")
     audit_results = []
     pass_count = 0
     
+    # Verify Director Plan Binding
+    dp_binding = verify_director_plan_binding(episode_id, items, local_dir)
+    print(f"🎬 [B5 Director Binding] Status: {dp_binding.get('status')} (Unregistered: {len(dp_binding.get('unregistered_keys', []))})")
+
     for item in items:
         key = item["reuse_key"]
         layer = item.get("layer_type", "Background")
@@ -720,6 +770,7 @@ def run_b5_audit(episode_id, items, local_dir):
         "total_images": len(items),
         "approved_count": pass_count,
         "overall_verdict": overall_verdict,
+        "director_plan_binding": dp_binding,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "items": audit_results
     }
@@ -730,6 +781,7 @@ def run_b5_audit(episode_id, items, local_dir):
         
     print(f"📊 [B5 Audit] Báo cáo lưu tại: b5_audit_report.json | Verdict: {overall_verdict} ({pass_count}/{len(items)} Approved)")
     return report
+
 
 
 def trigger_b6_handoff(episode_id):

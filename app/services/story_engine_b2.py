@@ -498,7 +498,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
         )
 
         logger.info(f"[story_engine] Calling HHTech GPT-6-Astra for 5-Act Script generation (1,800-2,200 words)...")
-        full_script_raw = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=3400, timeout=240.0)
+        full_script_raw = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=6000, timeout=300.0)
 
         cleaned_acts = []
         matches = ACT_PATTERN.findall(full_script_raw)
@@ -548,7 +548,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                 f"Output ONLY the corrected 5-Act script now:"
             )
             try:
-                refined_raw = call_gpt6_astra(refine_user, system_prompt=system_prompt, max_tokens=3400, timeout=240.0)
+                refined_raw = call_gpt6_astra(refine_user, system_prompt=system_prompt, max_tokens=6000, timeout=300.0)
                 refined_len = len(refined_raw) if is_cjk_market else len(refined_raw.split())
                 min_threshold = 1500 if is_cjk_market else 1000
                 if refined_raw and refined_len >= min_threshold:

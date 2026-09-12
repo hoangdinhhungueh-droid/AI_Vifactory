@@ -5,7 +5,7 @@ Rule 116 & 435: Dual-Layer Remotion Render Architecture (16:9 BG + 1:1 FG #FF00F
 Rule 120: Audio & Subtitle Timing Sync (duration_est_sec strictly aligned with spoken narration timestamps).
 Rule 128: Zero Semantic Bias. Dynamically analyzes story.txt to derive Era Anchor, physical/geographical environment,
           atmospheric lighting mood, color palette, and Dynamic Character Ensemble (4-8 roles) without static topic relics.
-Rule 445: 5-Beat Investigative Docudrama storyboard structure (35 to 55 dynamic scenes).
+Rule 445: 5-Beat Investigative Docudrama storyboard structure (organic dynamic scene breakdown governed by story pacing).
 Rule 446: English Production Bridge for all visual prompt descriptions.
 """
 
@@ -552,15 +552,16 @@ def generate_director_plan(
         f"Lighting Grammar: {dynamic_context['lighting_mood']}.\n"
         f"Camera Grammar: {archetype.get('camera_style', 'Atmospheric slow push-ins and tracking shots')}.\n\n"
         "YOUR CORE MISSION:\n"
-        "Break down this complete 5-Beat Investigative Docudrama story into a DYNAMIC, HIGH-TENSION storyboard (typically 35 to 55 scenes).\n"
-        "DO NOT force an arbitrary mathematical count. Let the scenes flow naturally from the narrative units (30-50 words per scene, ~8-18 seconds duration).\n"
+        "Break down this complete 5-Beat Investigative Docudrama story into a DYNAMIC, HIGH-TENSION storyboard.\n"
+        "DO NOT force an arbitrary mathematical count. Let the scene count and pacing flow naturally and organically from the narrative units (typically 30-50 words per scene, ~8-18 seconds duration).\n"
         "EVERY SCENE MUST SERVE A PSYCHOLOGICAL AND INVESTIGATIVE PURPOSE.\n\n"
         "CRITICAL ARCHITECTURAL MANDATES:\n"
         "1. TWO-LAYER RENDER SYSTEM (Rule 116):\n"
         "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic period/topic environment. Safe-zone clear in bottom 20% for subtitles, center-right negative space for foreground overlay.\n"
         "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration isolated on pure solid flat #FF00FF magenta chroma key. Full-body standing or seated visible head-to-toe. NO photorealistic humans.\n"
-        "2. DYNAMIC CHARACTER ENSEMBLE (Rule 128):\n"
-        f"   - Authentically draw characters from this narrative ensemble: {[c['role_name'] for c in character_ensemble]}.\n"
+        "2. DYNAMIC CHARACTER ENSEMBLE (Rule 128 - Zero Fixed Roles):\n"
+        "   - As the Hollywood Art Director, YOU HAVE FULL AUTONOMY to dynamically cast the character roster directly from the story narrative (protagonists, executives, investigators, witnesses, regulators, analysts).\n"
+        f"   - Detected narrative suggestions: {[c['role_name'] for c in character_ensemble]}. You may adapt, refine, or expand this ensemble to best serve the visual docudrama.\n"
         "3. FLEXIBLE ASSET ROSTER PER BEAT:\n"
         "   - Each Beat defines a pool of Backgrounds (2-4 key locations) and Foregrounds (1-3 key figures).\n"
         "   - Maintain background_reuse_key and foreground_reuse_key across continuous sequences.\n"

@@ -106,8 +106,8 @@
     - **Zero-Fabricated Causality & Anti-Convenient-Twist Mandate (Cấm Bịa Đặt Mối Quan Hệ Nhân Quả & Thuyết Âm Mưu Tiện Lợi)**:
       - CẤM TUYỆT ĐỐI việc Agent hoặc Prompt sáng tác ra một "twist" nhân quả giả định chỉ để làm kịch bản nghe có vẻ bí hiểm hoặc giật gân (ví dụ: gán nguyên nhân cốt lõi cho một yếu tố phụ trợ, biến hệ quả tài chính thứ cấp thành "thủ phạm phát lệnh" thay thế nguyên nhân thực tế).
       - Mối quan hệ nhân quả (Causal Chain) bắt buộc phải phân định minh bạch 2 cấp độ:
-        + **Level 1 (Primary Catalyst / Ngòi nổ Khách quan Trực tiếp)**: Sự kiện kích hoạt thực tế từ thế giới thực (hành động quân sự, tập kích, phán quyết tòa án, vụ bắt giữ, lệnh cấm vận chuyển, vụ bê bối gian lận sổ sách bị phát giác).
-        + **Level 2 (Transmission Mechanism / Cơ chế Lan truyền Thể chế)**: Phản ứng dây chuyền của hệ thống (phí bảo hiểm rủi ro tăng vọt, margin call, cạn kiệt thanh khoản, đứt gãy chuỗi cung ứng, từ chối cấp phép).
+        + **Level 1 (Primary Catalyst / Ngòi nổ Khách quan Trực tiếp)**: Hành động hoặc sự kiện kích hoạt khởi đầu từ thế giới thực, tùy biến linh hoạt theo từng trục đề tài (Trục 1: Quyết định sa thải, từ chối ký báo cáo kiểm toán; Trục 2: Điểm gãy chính sách; Trục 3: Vụ gian lận/lỗ hổng bị khai thác; Trục 4: Thuật toán/phát biểu kích hoạt tâm lý đám đông; Trục 5: Đột phá công nghệ, lệnh kiểm soát xuất khẩu; Trục 6: Gian lận kiểm định bị phanh phui, lệnh triệu hồi; Trục 7: Lỗ hổng chuyển giá, phong tỏa dòng tiền).
+        + **Level 2 (Transmission Mechanism / Cơ chế Lan truyền Thể chế)**: Phản ứng dây chuyền của cấu trúc hệ thống, thể chế hoặc thị trường (sụt giảm thanh khoản, margin call, đứt gãy chuỗi cung ứng, phản ứng tẩy chay của người tiêu dùng, siết chặt quy chế).
         + *Nguyên tắc bất biến*: Level 2 là bộ lọc/hệ quả của Level 1, tuyệt đối không được đánh tráo Level 2 thành Level 1 để tạo cảm giác "điều tra giật gân" vô căn cứ.
     - **Factual High-Stakes Hook Mandate (Hook Kịch Tính Nhưng Phải Đúng Sự Thật 100%)**:
       - Sự kịch tính (suspense / hook) KHÔNG đến từ tính từ giật gân hay sự bịa đặt; nó đến từ **sự va chạm khốc liệt giữa một sự kiện ngòi nổ thực tế và quy mô ảnh hưởng khổng lồ của nó**.
@@ -123,10 +123,11 @@
       - Khi kịch bản bắt nguồn từ một xu hướng thời sự, khủng hoảng hay sự kiện nóng: Act I (cụ thể là đoạn 1 hoặc 2) BẮT BUỘC phải gọi tên trực diện sự kiện ngòi nổ đương đại (chủ thể phát lệnh/hành động, mốc thời gian, con số sụt giảm/thiệt hại định lượng từ bảng Grounding Intel).
       - CẤM TUYỆT ĐỐI việc né tránh sự kiện bằng các mệnh đề trừu tượng hóa hay triết học chung chung (như "Khi một mối đe dọa quân sự xuất hiện...", "Trong một thị trường biến động...") khi bảng Grounding đã xác thực rõ sự kiện.
       - Phân định rạch ròi với tiền lệ lịch sử: Dữ liệu quá khứ (như sự kiện 2019, 2008, 1980s) CHỈ ĐƯỢC DÙNG từ Act II/III với tư cách là tiền lệ đối chứng để giải thích cơ chế, TUYỆT ĐỐI KHÔNG ĐƯỢC dùng để che lấp hay thay thế sự kiện đương đại mà khán giả đang tìm kiếm.
-    - **Universal Generic Pattern Across All Topic Axes (Áp Dụng Bình Đẳng Cho Mọi Trục Đề Tài - Rule 128 Enforced)**:
+    - **Universal Generic Pattern Across All 7 Topic Pillars (Áp Dụng Bình Đẳng Cho 7 Trục Đề Tài Vàng - Rule 128 Enforced)**:
       - Áp dụng chuẩn Generic Placeholders:
         `"<CATALYST_EVENT> (verified date & direct actor) -> <TRANSMISSION_MECHANISM> (financial/legal/logistical choke) -> <CORE_SYSTEMIC_PARADOX> -> <DIRECT_SEARCH_PAYOFF>"`
-      - Dù là Trục 1 (Vụ án kinh tế), Trục 2 (Tội phạm điều tra), Trục 3 (Công nghệ độc quyền), Trục 4 (Tài chính sụp đổ), hay Trục 5 (Địa chính trị/Thương mại toàn cầu): Mọi kịch bản đều phải tuân thủ nghiêm ngặt các nguyên tắc trên.
+      - Trải dài trên toàn bộ 7 Trục: Trục 1 (Business Rise & Fall), Trục 2 (Modern History & Systemic Crisis), Trục 3 (True Crime Non-Graphic), Trục 4 (Psychology & Behavioral Manipulation), Trục 5 (Tech & Geopolitical Battles), Trục 6 (Institutional & Regulatory Chokepoints), Trục 7 (Hidden Asymmetric Fortunes & Underground Flows).
+
 13. **RULE 131 (10X Beat Architecture & Editorial Signal Purity Mandate - Kỷ Luật Thép Về Cấu Trúc Nhịp Kịch Bản x10 & Khử Nhiễu Prompt Kể Chuyện)**:
     - **Signal-to-Noise Ratio & Zero Marketing Contamination (Khử Nhiễu Tuyệt Đối)**:
       - CẤM TUYỆT ĐỐI việc nạp các tài liệu content marketing, social copy, brand voice tiếp thị chung chung từ Content Engine Hub vào prompt kịch bản B2. B2 chỉ nhận đúng các nguyên lý kịch tính, điều tra, pacing docudrama và bài học tự học B11.

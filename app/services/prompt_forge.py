@@ -382,8 +382,8 @@ def generate_scene_prompts(
             raw_response = call_gpt6_astra(
                 prompt=json.dumps(user_payload, ensure_ascii=False),
                 system_prompt=system_prompt,
-                max_tokens=4500,
-                timeout=120.0
+                max_tokens=7000,
+                timeout=180.0
             )
             if raw_response and raw_response.strip():
                 break

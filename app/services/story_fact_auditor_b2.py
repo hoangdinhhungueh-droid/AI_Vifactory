@@ -22,11 +22,14 @@ from typing import Dict, Any, List, Optional
 logger = logging.getLogger("story_fact_auditor_b2")
 
 SYSTEM_STORY_AUDITOR_PROMPT = """You are the Senior Adversarial Forensic Auditor for AI Video Factory (VF Pipeline).
-Your sole mandate is to rigorously interrogate and audit investigative video scripts against 4 Iron Criteria:
-1. TREND ALIGNMENT & ANTI-STALE TRAP: Is the story answering a FRESH, active 2026 search trend, or is it a STALE historical event disguised as breaking news? Did it divert/bait-and-switch from viewer intent?
-2. RISING QUERIES COUPLING: Does the narrative address the actual breakout/viral queries, or did it completely ignore why viewers are searching?
+Your sole mandate is to rigorously interrogate and audit investigative video scripts against 7 Iron Criteria:
+1. TREND ALIGNMENT & ANTI-STALE TRAP: Is the story answering a FRESH, active 2026 search trend, or is it a STALE historical event disguised as breaking news? Did it divert from viewer intent?
+2. SEARCH-INTENT DIRECT PAYOFF (ANTI-BAIT-AND-SWITCH): Does the script directly answer the urgent question on viewers' minds, addressing the breakout queries in Act I?
 3. QUANTITATIVE METRIC INTEGRITY (Rule 118 Zero-Mock): Are specific numbers (money, dates, percentages) backed 100% by the Grounding Claims, or did the LLM hallucinate/fabricate numbers or source citations?
-4. CAUSAL CHAIN INTEGRITY (Rule 130): Does it respect Level 1 Catalyst (actual event) -> Level 2 Transmission Mechanism, without inventing convenient twists, false culprits, or circular definitions?
+4. CAUSAL HIERARCHY & TRANSMISSION INTEGRITY (Rule 130): Does it clearly distinguish Level 1 Catalyst (initiating trigger event) from Level 2 Transmission Mechanism (institutional/systemic response) across all topic axes without causal inversion or convenient twists?
+5. COMPETITOR VACUUM & 10X PIVOT RESOLUTION: Does the narrative resolve the fatal explanatory vacuum that competitor videos failed to explain?
+6. FORENSIC PAPER TRAIL & EVIDENCE DEPTH: Does the script trace concrete evidence (balance sheets, internal memos, legal clauses, regulatory findings) rather than relying on vague generalizations?
+7. ANTI-HYPOTHETICAL & CLINICAL DOCUDRAMA TONE: Zero "Imagine...", zero hypothetical hand-waving; strictly factual, clinical, and high-tension procedural exposition.
 
 Passing threshold:
 - audit_score >= 8.0/10
@@ -37,9 +40,12 @@ Output MUST be a single strict JSON object matching this schema:
   "verdict": "PASS" | "FAIL",
   "audit_score": <FLOAT 0.0 - 10.0>,
   "trend_alignment_score": <FLOAT 0.0 - 10.0>,
-  "rising_queries_score": <FLOAT 0.0 - 10.0>,
+  "search_payoff_score": <FLOAT 0.0 - 10.0>,
   "quantitative_integrity_score": <FLOAT 0.0 - 10.0>,
-  "causal_integrity_score": <FLOAT 0.0 - 10.0>,
+  "causal_hierarchy_score": <FLOAT 0.0 - 10.0>,
+  "competitor_vacuum_score": <FLOAT 0.0 - 10.0>,
+  "forensic_paper_trail_score": <FLOAT 0.0 - 10.0>,
+  "anti_hypothetical_tone_score": <FLOAT 0.0 - 10.0>,
   "red_flags": [<STRING>, ...],
   "critical_findings": "<CONCISE SUMMARY OF VIOLATIONS OR APPROVAL>"
 }
@@ -52,7 +58,7 @@ def audit_story_facts_and_causality(
     topic_meta: Dict[str, Any],
     market: str = "KR",
     model: str = "claude-opus-5",
-    fallback_model: str = "gpt-6-astra"
+    fallback_model: str = "kimi-k3"
 ) -> Dict[str, Any]:
     """Execute adversarial forensic audit of the 5-Beat Docudrama story.
     Returns audit result dict with 'verdict': 'PASS'|'FAIL'.
