@@ -28,12 +28,15 @@ _API = "https://api.telegram.org"
 _TG_FILE_LIMIT = 50 * 1024 * 1024  # Telegram bot upload limit ~50MB
 
 
+def _chat_id() -> str:
+    tb._load_env_secrets()
+    return os.environ.get("VF_TG_CHAT_ID", "").strip() or os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+
+
 def _token() -> str:
+    tb._load_env_secrets()
     return os.environ.get("VF_TG_BOT_TOKEN", "").strip() or os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 
-
-def _chat_id() -> str:
-    return os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 
 
 def is_enabled() -> bool:
@@ -191,25 +194,55 @@ async def notify_error(stage: str, episode_id: str, error: str) -> bool:
 async def notify_episode_done(episode_id: str, final_path: str = None,
                               credit_usd: Optional[float] = None,
                               breakdown: Optional[dict] = None) -> bool:
-    """Human Gate 2 Notification (Rule 114 / Unified Protocol V4).
-    Automatically triggers execute_human_gate_2 to upload Unlisted to YouTube and send the 4-button Gate 2 card.
+    """Human Gate 3 Automated Pipeline Completion Hook (Rule 114 / Protocol V4).
+    Automatically triggers execute_b10_auto_seo_upload_gate2 to upload Unlisted
+    to YouTube and dispatch the 4-button Human Gate 3 Telegram card.
     """
     try:
+        import sys
+        import json
         import subprocess
-        print(f"[Gate 2] Triggering execute_human_gate_2 for {episode_id}...")
+        from pathlib import Path
+        ep_dir = Path(f"/var/vf/episodes/{episode_id}")
+        market = "en"
+        brain_path = ep_dir / "brain_input.json"
+        if brain_path.exists():
+            try:
+                bdata = json.loads(brain_path.read_text(encoding="utf-8"))
+                market = bdata.get("market") or bdata.get("lang_code") or market
+            except Exception:
+                pass
+        if market == "en":
+            ep_lower = str(episode_id).lower()
+            if ep_lower.startswith("jp_") or ep_lower.startswith("jp-"):
+                market = "jp"
+            elif ep_lower.startswith("kr_") or ep_lower.startswith("kr-"):
+                market = "kr"
+            elif ep_lower.startswith("vn_") or ep_lower.startswith("vn-"):
+                market = "vn"
+
+        logger.info(f"[Gate 3] Auto-triggering B10 for {episode_id} (market: {market})...")
+        cmd = [
+            sys.executable,
+            "/root/video_factory/scripts/execute_b10_auto_seo_upload_gate2.py",
+            "--episode", episode_id,
+            "--market", market,
+            "--privacy", "unlisted"
+        ]
         proc = subprocess.run(
-            [sys.executable, "/root/video_factory/scripts/execute_human_gate_2.py", episode_id],
-            capture_output=True, text=True, timeout=300
+            cmd,
+            capture_output=True, text=True, timeout=600
         )
         if proc.returncode == 0:
-            logger.info("[Gate 2] execute_human_gate_2 succeeded for %s", episode_id)
+            logger.info(f"[Gate 3] B10 & Human Gate 3 succeeded for {episode_id}")
             return True
         else:
-            logger.error("[Gate 2] execute_human_gate_2 failed (%d): %s", proc.returncode, proc.stderr)
+            logger.error(f"[Gate 3] B10 failed ({proc.returncode}): {proc.stdout[-500:]}\n{proc.stderr[-500:]}")
             return False
     except Exception as e:
-        logger.error("[Gate 2] notify_episode_done error: %s", e)
+        logger.error(f"[Gate 3] notify_episode_done error: {e}")
         return False
+
 
 
 if __name__ == "__main__":

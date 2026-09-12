@@ -302,8 +302,65 @@ async def send_gate1_card(en_pack: dict, jp_pack: dict, kr_pack: dict) -> Option
 
     return await send_with_buttons(text, buttons=None)
 
-async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b: str, duration_str: str = "08:53.99") -> Optional[int]:
-    """Send Human Gate 3 Telegram card with 4 mandatory interactive buttons."""
+async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b: str, duration_str: Optional[str] = None, market: Optional[str] = None) -> Optional[int]:
+    """Send Human Gate 3 Telegram card with 4 mandatory interactive buttons.
+    Dynamically probes duration and resolves market voice/metadata (Rule 114/119).
+    """
+    _load_env_secrets()
+    from pathlib import Path
+    ep_dir = Path(f"/var/vf/episodes/{episode_id}")
+
+    # 1. Resolve market
+    if not market:
+        ep_lower = str(episode_id).lower()
+        if ep_lower.startswith("jp_") or ep_lower.startswith("jp-"):
+            market = "jp"
+        elif ep_lower.startswith("kr_") or ep_lower.startswith("kr-"):
+            market = "kr"
+        elif ep_lower.startswith("vn_") or ep_lower.startswith("vn-"):
+            market = "vn"
+        else:
+            market = "en"
+
+    # 2. Dynamic duration probe
+    if not duration_str or duration_str == "08:53.99":
+        duration_str = "12:00.00"
+        vid_candidates = [
+            ep_dir / "final_169.mp4",
+            ep_dir / "master_video_pro.mp4",
+            ep_dir / "twolayer_silent.mp4",
+        ]
+        for vpath in vid_candidates:
+            if vpath.exists():
+                try:
+                    import subprocess
+                    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                           "-of", "default=noprint_wrappers=1:nokey=1", str(vpath)]
+                    dur_sec = float(subprocess.check_output(cmd).decode().strip())
+                    mins = int(dur_sec // 60)
+                    secs = dur_sec % 60
+                    duration_str = f"{mins:02d}:{secs:05.2f}"
+                    break
+                except Exception as _pe:
+                    logger.debug("[tg-btn] probe duration error: %s", _pe)
+
+    # 3. Dynamic voice / audio string
+    voice_map = {
+        "jp": "Edge-TTS ja-JP-KeitaNeural (Japanese Male Voice)",
+        "kr": "Edge-TTS ko-KR-InJoonNeural (Korean Male Voice)",
+        "vn": "Edge-TTS vi-VN-NamMinhNeural (Vietnamese Male Voice)",
+        "en": "Edge-TTS en-US-GuyNeural (English Male Voice)",
+    }
+    voice_str = voice_map.get(market.lower(), "Edge-TTS Studio Voice")
+
+    # 4. Check captions
+    captions_ok = False
+    for srt_name in (f"subtitles_{market}.srt", "subtitles.srt"):
+        if (ep_dir / srt_name).exists():
+            captions_ok = True
+            break
+    captions_str = f"✅ Đã nạp track chuẩn {market.upper()}" if captions_ok else "⏳ Phụ đề tự động"
+
     watch_url = f"https://youtu.be/{video_id}" if video_id else "https://youtube.com"
     safe_ep = html.escape(str(episode_id))
     safe_t_a = html.escape(str(title_a))
@@ -315,7 +372,8 @@ async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b:
         f"🎬 <b>Episode ID:</b> <code>{safe_ep}</code>\n"
         f"⏱️ <b>Thời lượng:</b> {safe_dur} (Full HD 1080p / 30fps)\n"
         "🎨 <b>Visual:</b> Layer 1 (16:9) + Layer 2 (1:1 Chroma Key Cutout)\n"
-        "🎙️ <b>Audio:</b> Edge-TTS en-US-GuyNeural (target -14 LUFS) + BGM (-24dB)\n"
+        f"🎙️ <b>Audio:</b> {voice_str} (target -14 LUFS) + BGM (-24dB)\n"
+        f"📝 <b>Captions (CC):</b> {captions_str}\n"
         "🏷️ <b>Nhãn AI:</b> Altered or Synthetic Content: <b>BẬT (Yes)</b>\n"
         "🛡️ <b>Trạng thái hiện tại:</b> <b>Không công khai (Unlisted)</b>\n\n"
         "📌 <b>GÓI PACKAGING YOUTUBE 2026 (Rule 113/119):</b>\n"
@@ -331,6 +389,7 @@ async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b:
         [("🔒 Giữ Không Công Khai (Unlisted)", f"kp:{video_id}")]
     ]
     return await send_with_buttons(text, rows)
+
 
 
 async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,

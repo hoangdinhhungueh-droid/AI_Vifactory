@@ -523,6 +523,7 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
         episode_id=episode_id,
         title_a=packaging["title_a"],
         title_b=packaging["title_b"],
+        market=market,
     )
     print("B10-AUTO complete. No manual Antigravity paste step was required.")
     return {"video_id": video_id, "packaging": packaging}
