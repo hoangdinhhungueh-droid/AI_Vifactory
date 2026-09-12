@@ -292,6 +292,7 @@ class TestR3AdversarialB10SEOAndTelegram:
             pkg = generate_seo_packaging(episode)
         desc = pkg["description"]
         assert "Byzantine Empire" in pkg["title_a"]
+        assert "Key topics & search queries:" not in desc
         assert "Constantinople siege 1453" in desc
         assert "Greek fire classified weapon" in desc
         assert len(desc) <= 5000

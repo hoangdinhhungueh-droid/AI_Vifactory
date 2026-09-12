@@ -192,6 +192,16 @@ def generate_seo_packaging(episode: dict, series_meta: dict = None) -> dict:
     title = title[:100]
 
     hook2 = (packaging.get("description_hook_2_lines") or "").strip()
+    if not hook2 and packaging.get("description"):
+        desc_lines = []
+        for line in str(packaging["description"]).splitlines():
+            line_s = line.strip()
+            if not line_s or line_s.startswith("#") or "00:" in line_s or "01:" in line_s or line_s.lower().startswith("chapter"):
+                continue
+            desc_lines.append(line_s)
+            if len(desc_lines) >= 2:
+                break
+        hook2 = " ".join(desc_lines)
     for banned in ("in this video", "welcome"):
         if hook2.lower().startswith(banned):
             hook2 = hook2.split(" ", 2)[-1]
