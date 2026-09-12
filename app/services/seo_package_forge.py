@@ -80,6 +80,56 @@ def _clean_hashtag(tag: str) -> str:
     return "#" + re.sub(r"[^\w]", "", tag[1:])
 
 
+def _build_dynamic_chapters(
+    title: str,
+    market: str,
+    target_keyword: str,
+    total_duration_s: float = 720.0,
+) -> list[str]:
+    """Generate dynamic, localized 5-act chapters per episode without formulaic English placeholders."""
+    m = (market or "EN").upper()
+    dur = max(float(total_duration_s or 720.0), 180.0)
+
+    # Proportional act timestamp offsets
+    t_act1 = 0
+    t_act2 = int(dur * 0.16)
+    t_act3 = int(dur * 0.40)
+    t_act4 = int(dur * 0.64)
+    t_act5 = int(dur * 0.85)
+
+    def _fmt(sec: int) -> str:
+        mm = sec // 60
+        ss = sec % 60
+        return f"{mm:02d}:{ss:02d}"
+
+    kw = (target_keyword or "").strip() or (title[:30] if title else "Investigation")
+
+    if m == "JP":
+        return [
+            f"{_fmt(t_act1)} - {kw[:30]}の発端と疑惑",
+            f"{_fmt(t_act2)} - 組織構造と権限の謎",
+            f"{_fmt(t_act3)} - 記録と資金の空白",
+            f"{_fmt(t_act4)} - 制度の亀裂と法的対立",
+            f"{_fmt(t_act5)} - 現代組織への警鐘と教訓",
+        ]
+    elif m == "VN":
+        return [
+            f"{_fmt(t_act1)} - Dấu hiệu bất thường: {kw[:30]}",
+            f"{_fmt(t_act2)} - Cấu trúc quyền lực và góc khuất điều hành",
+            f"{_fmt(t_act3)} - Hồ sơ kiểm toán và dòng tiền bí ẩn",
+            f"{_fmt(t_act4)} - Vết nứt thể chế bộc lộ",
+            f"{_fmt(t_act5)} - Đòn giáng trừng phạt và bài học đắt giá",
+        ]
+    else:  # Default EN and others
+        return [
+            f"{_fmt(t_act1)} - {kw[:35]}: The Catalyst",
+            f"{_fmt(t_act2)} - The Architecture of Concealment",
+            f"{_fmt(t_act3)} - Forensic Paper Trail & Missing Capital",
+            f"{_fmt(t_act4)} - The Systemic Fracture",
+            f"{_fmt(t_act5)} - The Reckoning & Final Precedent",
+        ]
+
+
 def _fallback_seo_package(
     task_id: str,
     target_keyword: str,
@@ -122,18 +172,13 @@ def _fallback_seo_package(
         {"variant": "C", "framework": "curiosity_gap", "headline_text": "THE FATAL LIE"[:32], "visual_concept": "Split composition contrasting official reports with unredacted leaked memos."}
     ]
 
+    chapters_lines = _build_dynamic_chapters(title_a, market, kw)
+
     desc_parts = [
         desc_hook,
         "",
-        f"Key topics & search queries: {', '.join(rising_queries[:5]) if rising_queries else kw}",
-        "",
         "Chapters:",
-        f"00:00 - {title_a[:35]}",
-        "01:00 - The Impossible Contradiction",
-        "04:30 - The False Narrative & Red Herring",
-        "08:00 - The Systemic Blindspot",
-        "11:30 - The Smoking Gun",
-        "14:00 - The Living Warning",
+        *chapters_lines,
         "",
         " ".join(hashtags),
         "",
@@ -447,20 +492,24 @@ def forge_seo_package(
                 {"variant": "C", "framework": "curiosity_gap", "headline_text": "FATAL EVIDENCE"[:32], "visual_concept": "Split screen contrasting official claim with evidence."}
             ]
 
-        # Assemble full description (5 acts chapter outline + keywords + hashtags + disclosure)
-        clean_bqs = [str(q).strip() for q in (bq or rq) if str(q).strip()]
+        # Assemble full description (dynamic 5 acts chapter outline + hashtags + disclosure)
+        chapters = parsed_llm.get("chapters")
+        chapter_lines = []
+        if chapters and isinstance(chapters, list):
+            for ch in chapters:
+                if isinstance(ch, dict) and ch.get("title"):
+                    ts = ch.get("timestamp") or ch.get("time") or ch.get("start") or "00:00"
+                    chapter_lines.append(f"{ts} - {ch['title']}")
+                elif isinstance(ch, str) and ch.strip():
+                    chapter_lines.append(ch.strip())
+        if not chapter_lines:
+            chapter_lines = _build_dynamic_chapters(title_a, m_up, kw)
+
         desc_parts = [
             desc_hook,
             "",
-            f"Key topics & search queries: {', '.join(clean_bqs[:5]) if clean_bqs else kw}",
-            "",
             "Chapters:",
-            f"00:00 - {title_a[:35]}",
-            "01:00 - The Impossible Contradiction",
-            "04:30 - The False Narrative & Red Herring",
-            "08:00 - The Systemic Blindspot",
-            "11:30 - The Smoking Gun",
-            "14:00 - The Living Warning",
+            *chapter_lines,
             "",
             " ".join(hashtags),
             "",

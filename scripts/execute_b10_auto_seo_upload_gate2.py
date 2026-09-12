@@ -328,6 +328,70 @@ def _find_thumbnail_asset(ep_dir: Path) -> str:
     return ""
 
 
+def _clean_and_localize_seo_description(desc: str, ep_dir: Path, market: str, title: str = "") -> str:
+    """Ensure SEO description has NO 'Key topics & search queries' line, and chapters are dynamic/synchronized."""
+    if not desc:
+        return ""
+    lines = desc.split("\n")
+    cleaned_lines = []
+    for line in lines:
+        l_lower = line.strip().lower()
+        if l_lower.startswith("key topics & search queries:") or l_lower.startswith("topics covered:"):
+            continue
+        cleaned_lines.append(line)
+
+    desc_cleaned = "\n".join(cleaned_lines)
+
+    # Check if chapters need re-syncing from remotion_props.json
+    remotion_path = ep_dir / "remotion_props.json"
+    if remotion_path.exists():
+        try:
+            with open(remotion_path, "r", encoding="utf-8") as rf:
+                rdata = json.load(rf)
+            scenes = rdata.get("scenes", [])
+            if scenes:
+                fps = 30
+                current_frame = 0
+                act_map = []
+                last_act = None
+                for idx, s in enumerate(scenes):
+                    act = s.get("actTitle")
+                    dur = s.get("durationInFrames", 0)
+                    if act and act != last_act:
+                        sec = int(current_frame / fps)
+                        mm, ss = sec // 60, sec % 60
+                        act_map.append((f"{mm:02d}:{ss:02d}", act))
+                        last_act = act
+                    current_frame += dur
+
+                total_duration_s = current_frame / fps
+
+                # If description contains static English formula or timestamps > total duration
+                if "The Impossible Contradiction" in desc_cleaned or "14:00" in desc_cleaned:
+                    from app.services.seo_package_forge import _build_dynamic_chapters
+                    new_ch = _build_dynamic_chapters(title or "Investigation", market, title, total_duration_s=total_duration_s)
+                    if len(act_map) == len(new_ch):
+                        synced_ch = [f"{act_map[i][0]} - {new_ch[i].split(' - ', 1)[1] if ' - ' in new_ch[i] else new_ch[i]}" for i in range(len(new_ch))]
+                    else:
+                        synced_ch = new_ch
+
+                    ch_idx = desc_cleaned.find("Chapters:")
+                    if ch_idx != -1:
+                        head = desc_cleaned[:ch_idx].rstrip()
+                        tail = ""
+                        for sep in ["\n#", "\nThis video incorporates", "\nThis story and its"]:
+                            s_idx = desc_cleaned.find(sep, ch_idx)
+                            if s_idx != -1:
+                                tail = desc_cleaned[s_idx:].lstrip()
+                                break
+                        ch_block = "Chapters:\n" + "\n".join(synced_ch)
+                        desc_cleaned = f"{head}\n\n{ch_block}\n\n{tail}".strip()
+        except Exception as e:
+            print(f"[b10_seo] Chapter sync error: {e}")
+
+    return desc_cleaned
+
+
 async def run(episode_id: str, market: str = "en", privacy_status: str = "unlisted"):
     ep_dir = Path(f"/var/vf/episodes/{episode_id}")
     if not ep_dir.exists():
@@ -383,6 +447,13 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
             niche_brief=episode.get("niche_angle_brief", "")
         )
     print(f"Generation method: {packaging.get('generation_method')}")
+
+    packaging["description"] = _clean_and_localize_seo_description(
+        packaging.get("description", ""),
+        ep_dir,
+        market,
+        title=packaging.get("title_a", "")
+    )
 
     with open(ep_dir / "seo_payload_b10.json", "w", encoding="utf-8") as f:
         json.dump(packaging, f, ensure_ascii=False, indent=2)

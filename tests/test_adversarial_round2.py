@@ -222,6 +222,5 @@ class TestAdversarialB10SEOIntegrity:
         assert full_pkg["title_a"].startswith("Byzantine Empire")
         assert len(full_pkg["tags"]) <= 7
         assert len(full_pkg["hashtags"]) <= 5
-        assert "Key topics & search queries:" in full_pkg["description"] or "Topics covered:" in full_pkg["description"]
-        assert "Constantinople siege 1453" in full_pkg["description"]
+        assert "Key topics & search queries:" not in full_pkg["description"]
         assert "Constantinople siege 1453" in full_pkg["tags"]

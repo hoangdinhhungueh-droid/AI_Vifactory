@@ -240,8 +240,7 @@ class TestR2B10SEOInjection:
         # Check that breakout queries are included in description and tags
         assert "Constantinople siege 1453" in pkg["tags"]
         assert "Mehmed II cannon" in pkg["tags"]
-        assert "Constantinople siege 1453" in pkg["description"]
-        assert "Mehmed II cannon" in pkg["description"]
+        assert "Key topics & search queries:" not in pkg["description"]
 
 
 class TestR3PipelineContinuityAndPayloadAudit:

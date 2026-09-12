@@ -213,18 +213,7 @@ def generate_seo_packaging(episode: dict, series_meta: dict = None) -> dict:
     desc_parts = [hook2, ""]
     if chapters_block:
         desc_parts += ["Chapters:", chapters_block, ""]
-    if breakout_queries:
-        clean_bqs = []
-        for q in breakout_queries:
-            if not q or isinstance(q, bool):
-                continue
-            if isinstance(q, dict):
-                q = q.get("query") or q.get("term") or q.get("article") or ""
-            q_str = str(q).strip()
-            if q_str and q_str.lower() not in (primary_kw or "").lower() and q_str.lower() not in [x.lower() for x in clean_bqs]:
-                clean_bqs.append(q_str)
-        if clean_bqs:
-            desc_parts += [f"Key topics & search queries: {', '.join(clean_bqs[:5])}", ""]
+    # Key topics line removed per user instruction (clean SEO description)
     if hashtags:
         desc_parts += [" ".join(hashtags), ""]
     desc_parts.append(seo.AI_DISCLOSURE)
