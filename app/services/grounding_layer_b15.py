@@ -437,7 +437,7 @@ def format_grounded_facts_for_prompt(grounding_result: Dict[str, Any]) -> str:
         "The following factual claims have been independently verified via live web research.",
         "MANDATORY SCRIPTWRITING CONSTRAINTS (RULE 118, RULE 130 & RULE 445):",
         "1. VERIFIED claims: You may assert directly as established facts.",
-        "2. REPORTED claims: You MUST use attributive sourcing ('According to reports from [Source]...', 'Records from [Source] indicate...').",
+        "2. REPORTED claims: Naturally attribute to reporting outlets or agencies (e.g. 'Reuters reported...', 'Bloomberg documented...'). STRICTLY FORBIDDEN: Robotic boilerplate openers like 'according to provided summaries' or 'as stated in the data'.",
         "3. SPECULATIVE claims: You MUST use cautious conditional framing ('If subsequent assessments hold...', 'Under projected scenarios...').",
         "4. CAUSAL HIERARCHY & INTEGRITY (RULE 130):",
         "   - [PRIMARY_CATALYST] (Level 1): The direct physical, military, legal, or commercial spark. Act I Hook MUST feature this catalyst to pay off the viewer's search query immediately.",

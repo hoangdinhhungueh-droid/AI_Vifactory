@@ -503,6 +503,11 @@ def forge_seo_package(
         "rising_queries": rq[:6],
         "breakout_queries": bq[:4]
     }
+    if grounding_intel and isinstance(grounding_intel, dict):
+        if grounding_intel.get("temporal_cadence"):
+            user_payload["temporal_cadence"] = grounding_intel["temporal_cadence"]
+        if grounding_intel.get("causal_epochs"):
+            user_payload["causal_epochs"] = grounding_intel["causal_epochs"]
     if verified_facts:
         user_payload["verified_ground_facts"] = verified_facts[:6]
 
