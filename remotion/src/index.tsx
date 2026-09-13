@@ -575,7 +575,7 @@ export const TwoLayerScene = (props) => {
             }}
           >
             <span>📜</span>
-            <span>{props.speakerTag ? (String(props.speakerTag).toUpperCase().startsWith("ARCHIVE X") ? String(props.speakerTag).toUpperCase() : ("ARCHIVE X // " + String(props.speakerTag).toUpperCase())) : "ARCHIVE X // CASE INVESTIGATION DOSSIER"}</span>
+            <span>{props.speakerTag ? String(props.speakerTag).toUpperCase() : (props.actTitle ? String(props.actTitle).toUpperCase() : "CASE INVESTIGATION")}</span>
           </div>
 
           {/* Karaoke Word-Highlight Subtitle Line */}

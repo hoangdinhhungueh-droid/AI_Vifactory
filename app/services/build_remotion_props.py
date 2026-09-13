@@ -90,34 +90,36 @@ def extract_stat_card(text: str):
 
 
 def format_speaker_tag(scene: dict, act_title: str) -> str:
-    """Dynamically format dialogue speaker tags based on scene character metadata.
-    Converts keys like 'madoff-chairman' -> 'MADOFF // CHAIRMAN',
-    or preserves explicit scene speaker tags.
+    """Dynamically format dialogue speaker tags or beat identification.
+    Rule 125 & Zero-Leak Mandate: Never leak internal asset keys, layer names, or hashes.
+    Displays:
+      - Explicit dialogue speaker: 'NAME // ROLE'
+      - Beat identification: 'BEAT <X>: <TITLE>' (or clean scene beat string)
     """
     if scene.get("speaker_tag"):
         return str(scene["speaker_tag"]).strip()
 
     if scene.get("character_name"):
         name = str(scene["character_name"]).strip()
-        role = str(scene.get("character_role") or "CASE DOSSIER").strip()
-        return f"{name} // {role}".upper()
+        role = str(scene.get("character_role") or "").strip()
+        if role:
+            return f"{name} // {role}".upper()
+        return name.upper()
 
-    fg_key = scene.get("foreground_reuse_key")
-    if fg_key:
-        k_clean = re.sub(r'^(fg_|bg_)', '', str(fg_key).strip(), flags=re.IGNORECASE)
-        parts = [p for p in re.split(r'[-_]', k_clean) if p]
-        if len(parts) >= 2:
-            tag = f"{parts[0].upper()} // {' '.join(parts[1:]).upper()}"
-        elif len(parts) == 1:
-            tag = f"{parts[0].upper()} // DOSSIER"
-        else:
-            tag = "ARCHIVE X // CASE INVESTIGATION DOSSIER"
-        return tag
+    # Prioritize clean beat identification (e.g. "BEAT 1: THE IMPOSSIBLE CONTRADICTION")
+    beat_val = scene.get("beat") or scene.get("beat_title")
+    if beat_val:
+        return str(beat_val).strip().upper()
 
-    if scene.get("beat"):
-        return f"{act_title} // {str(scene['beat']).upper()}"
+    beat_idx = scene.get("beat_index")
+    if beat_idx:
+        clean_act = re.sub(r'^ACT\s+[IVXLCDM]+\s*//\s*', '', str(act_title or '').strip(), flags=re.IGNORECASE)
+        return f"BEAT {beat_idx}: {clean_act}".strip().upper()
 
-    return act_title or "ARCHIVE X // CASE INVESTIGATION DOSSIER"
+    if act_title:
+        return str(act_title).strip().upper()
+
+    return "CASE INVESTIGATION"
 
 
 def match_segments_and_extract_words(scene_text: str, segments: list, start_idx: int, fps: int = 30, scene_id: str = ""):
