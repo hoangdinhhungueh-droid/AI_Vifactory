@@ -578,12 +578,12 @@ def generate_scene_prompts(
             Path(f"/root/video_factory/episodes/{task_id}/seo_package.json"),
             Path(f"./episodes/{task_id}/seo_package.json")
         ]:
-            if candidate.exists():
-                try:
+            try:
+                if candidate.exists() and candidate.is_file():
                     seo_pkg = json.loads(candidate.read_text(encoding="utf-8"))
                     break
-                except Exception:
-                    pass
+            except (PermissionError, OSError):
+                continue
 
     cleaned_thumbnails = _synthesize_thumbnail_prompts(story_title, seo_pkg, market=market)
 
