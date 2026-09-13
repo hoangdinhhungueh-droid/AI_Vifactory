@@ -346,12 +346,29 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             "   - Act V (The Modern Mirror): 'mirror', 'warning', 'modern', 'today', 'lesson', 'verdict'."
         )
 
+    if mkt == "KR":
+        length_mandate = (
+            "Total Word/Syllable Count Target: 3,200 - 3,600 Korean Hangul syllables (~1,050 - 1,250 eojeol words) across 5 structured Acts for ~12-14 minutes narration at natural docudrama pace (~250 syllables/min).\n"
+            "Structure per Act: Approximately 210-250 Korean words (640-720 syllables) across 3-4 vivid, investigative paragraphs per Act.\n"
+            "Strict Requirement: Scripts under 2,800 Korean syllables or under 950 words will be rejected by the story gate.\n\n"
+        )
+    elif mkt == "JP":
+        length_mandate = (
+            "Total Character Count Target: 3,400 - 3,800 Japanese characters (~1,150 - 1,300 word units) across 5 structured Acts for ~12-14 minutes narration at natural cadence (~270 chars/min).\n"
+            "Structure per Act: Approximately 680-760 Japanese characters across 3-4 vivid, investigative paragraphs per Act.\n"
+            "Strict Requirement: Scripts under 3,000 characters or under 1,000 word units will be rejected by the story gate.\n\n"
+        )
+    else:
+        length_mandate = (
+            "Total Word Count Target: 1,800 - 2,200 words (~12 to 15 minutes narration at ~150 WPM) across 5 structured Acts.\n"
+            "Structure per Act: Approximately 360-440 words across 3-4 vivid, investigative paragraphs per Act.\n"
+            "Strict Requirement: Scripts under 1,700 words will be rejected by the story gate.\n\n"
+        )
+
     system_prompt = (
         f"You are a World-Class Master Non-Fiction Investigative Documentary Scriptwriter for Video Factory.\n"
         f"Target Narration Language: {lang_name}.\n"
-        f"Total Word Count Target: 1,800 - 2,200 words (~12 to 15 minutes narration at ~150 WPM) across 5 structured Acts.\n"
-        f"Structure per Act: Approximately 360-440 words across 3-4 vivid, investigative paragraphs per Act.\n"
-        f"Strict Requirement: Scripts under 1,700 words will be rejected by the story gate.\n\n"
+        f"{length_mandate}"
         f"MANDATORY STORY GATE 12/12 REQUIREMENTS:\n"
         f"• Check 9 (Hook Shock in First 60 Words): The very first sentence of Act I MUST open with a concrete percentage (%), monetary sum ($), or numeric figure. Do not delay the number to sentence 2.\n"
         f"• Check 2, 3 & 4 (Curiosity Loops Open & Closed): Plant at least 8 to 10 explicit curiosity questions with '?' across the script (~2 per Act). Frequently close loops using phrases like 'that is why', 'which is how', 'the answer', 'in the end'.\n"

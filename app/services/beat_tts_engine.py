@@ -145,8 +145,15 @@ async def synthesize_beat_tts_pipeline(
     }
     lang_code = brain.get("lang_code") or market_to_lang.get(market, "en")
     voice = brain.get("voice") or LANG_VOICE.get(lang_code, "en-US-ChristopherNeural")
-    tts_rate = brain.get("tts_rate") or os.getenv("VF_TTS_RATE", "-8%")
-    tts_pitch = brain.get("tts_pitch") or os.getenv("VF_TTS_PITCH", "-2Hz")
+    
+    # Calibrated pacing per language/market (Rule 128)
+    # English uses -8% for deliberate documentary delivery (EP004 QC feedback)
+    # CJK / Vietnamese uses +0% to maintain natural, authoritative cadence
+    default_rate = "-8%" if lang_code == "en" else "+0%"
+    default_pitch = "-2Hz" if lang_code == "en" else "-1Hz"
+    
+    tts_rate = brain.get("tts_rate") or os.getenv("VF_TTS_RATE") or default_rate
+    tts_pitch = brain.get("tts_pitch") or os.getenv("VF_TTS_PITCH") or default_pitch
 
     logger.info("[BeatTTS] Starting Beat-Level TTS Pipeline for %s", episode_id)
     logger.info("  Market: %s | Lang: %s | Voice: %s | Rate: %s | Pitch: %s", market, lang_code, voice, tts_rate, tts_pitch)

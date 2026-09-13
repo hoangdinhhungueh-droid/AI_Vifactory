@@ -392,7 +392,7 @@ def _clean_and_localize_seo_description(desc: str, ep_dir: Path, market: str, ti
     return desc_cleaned
 
 
-async def run(episode_id: str, market: str = "en", privacy_status: str = "unlisted"):
+async def run(episode_id: str, market: str = "en", privacy_status: str = "unlisted", force_reupload: bool = False):
     ep_dir = Path(f"/var/vf/episodes/{episode_id}")
     if not ep_dir.exists():
         raise FileNotFoundError(f"Episode directory not found: {ep_dir}")
@@ -528,7 +528,18 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
         except Exception:
             pass
 
-    if video_id:
+    if video_id and not force_reupload:
+        try:
+            from app.services.youtube_upload import _build_client
+            yt_client = _build_client(market=market)
+            v_check = yt_client.videos().list(part="status", id=video_id).execute()
+            if not v_check.get("items"):
+                print(f"Warning: video_id={video_id} no longer exists on YouTube (deleted/removed). Invalidate and re-uploading...")
+                video_id = None
+        except Exception as _e_chk:
+            print(f"Warning: failed checking YouTube video status: {_e_chk}")
+
+    if video_id and not force_reupload:
         print(f"YOUTUBE UPLOAD REUSED: video_id={video_id}")
     else:
         print("=== [B10-AUTO] 5. Uploading to YouTube (unlisted) ===")
@@ -605,8 +616,9 @@ def main():
     parser.add_argument("--episode", required=True, help="Episode ID, e.g. en-byzantine-empire-ep001")
     parser.add_argument("--market", default="en")
     parser.add_argument("--privacy", default="unlisted")
+    parser.add_argument("--force-reupload", action="store_true", help="Force fresh upload to YouTube even if video_id exists")
     args = parser.parse_args()
-    asyncio.run(run(args.episode, market=args.market, privacy_status=args.privacy))
+    asyncio.run(run(args.episode, market=args.market, privacy_status=args.privacy, force_reupload=args.force_reupload))
 
 
 if __name__ == "__main__":

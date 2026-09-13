@@ -54,8 +54,13 @@ async def run_s4(episode: dict) -> dict:
     # FIX 29/07/2026: narration pacing. User feedback on EP004: the male
     # voice reads too fast with no emphasis. Slow it down slightly and
     # drop the pitch a touch for a documentary delivery.
-    tts_rate = episode.get("tts_rate") or os.getenv("VF_TTS_RATE", "-8%")
-    tts_pitch = episode.get("tts_pitch") or os.getenv("VF_TTS_PITCH", "-2Hz")
+    # Calibrated pacing per language/market (Rule 128):
+    # English uses -8% for deliberate documentary delivery.
+    # CJK / Vietnamese uses +0% to prevent video over-expansion.
+    default_rate = "-8%" if lang_code == "en" else "+0%"
+    default_pitch = "-2Hz" if lang_code == "en" else "-1Hz"
+    tts_rate = episode.get("tts_rate") or os.getenv("VF_TTS_RATE") or default_rate
+    tts_pitch = episode.get("tts_pitch") or os.getenv("VF_TTS_PITCH") or default_pitch
     # ENHANCE 05/08/2026: SSML auto-emphasis for standout numbers/statistics.
     # Env kill-switch VF_TTS_EMPHASIS=0 disables instantly without a redeploy
     # of pipeline code (same on/off pattern as VF_STORY_GATE/VF_STORY_JUDGE).

@@ -200,7 +200,29 @@ def score_story(story_text: str) -> dict:
     story = story_text or ""
     words = _words(story)
     nwords = len(words)
-    minutes = nwords / WPM if nwords else 0.0
+
+    # Multi-lingual pacing & duration calibration (Rule 128 & Rule 120)
+    cjk_chars = re.findall(r'[\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]', story)
+    latin_words = re.findall(r'[a-zA-Z0-9_\-]+', story)
+    is_cjk = len(cjk_chars) > len(latin_words)
+    korean_chars = re.findall(r'[\uac00-\ud7af]', story)
+    is_korean = len(korean_chars) > len(cjk_chars) * 0.5 if is_cjk else False
+
+    if is_korean:
+        # Korean narration speed: ~245 syllables/min in investigative docudrama
+        minutes = len(korean_chars) / 245.0 if korean_chars else (nwords / WPM)
+        min_len = 950
+        max_len = 1650
+    elif is_cjk:
+        # Japanese/Chinese narration speed: ~275 characters/min
+        minutes = len(cjk_chars) / 275.0 if cjk_chars else (nwords / WPM)
+        min_len = 1000
+        max_len = 1800
+    else:
+        minutes = nwords / WPM if nwords else 0.0
+        min_len = 1700
+        max_len = 2500
+
     sents = [s for s in re.split(r"(?<=[.!?])\s+", story) if s.strip()]
     hook = " ".join(sents[:8] if len(sents) >= 8 else sents)  # Expand to first 8 sents to capture multi-para opening questions
     first60 = " ".join(words[:60])
@@ -247,16 +269,13 @@ def score_story(story_text: str) -> dict:
     mech_sents = [s for s in re.split(r"(?<=[.!?])\s+", mechanism_text) if s.strip()]
     short_sents = [s for s in mech_sents if 2 <= len(_words(s)) <= PATTERN_INTERRUPT_MAX_WORDS]
 
-    is_cjk = len(re.findall(r'[\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]', story)) > len(re.findall(r'[a-zA-Z0-9_\-]+', story))
-    min_len = 1500 if is_cjk else 1700
-
     checks = {
-        "1_length_1700_2500_words": min_len <= nwords <= 2500,
+        "1_length_1700_2500_words": min_len <= nwords <= max_len,
         "2_hook_has_open_question": bool(re.search(r"\?", hook)) or _count(LOOP_OPEN[1:], hook) > 0,
         "3_open_loops_enough": loops_open >= need_loops,
         "4_loops_closed": loops_close >= max(1, math.ceil(need_loops * 0.5)),
         "5_sourced_numbers": len(nums) >= need_nums and sources >= 2,
-        "6_pace_in_band": min_len <= nwords <= 2500,
+        "6_pace_in_band": min_len <= nwords <= max_len,
         "7_arc_five_acts": acts_present == 5,
         "8_segmentation": len(paras) >= MIN_PARAS and not oversized,
         "9_hook_shock_in_first_60w": bool(re.search(SHOCK, first60)),

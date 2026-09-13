@@ -2,7 +2,7 @@
 
 ## 10X 5-BEAT INVESTIGATIVE DOCUDRAMA ARCHITECTURE (QUY CHUẨN ĐẶC TẢ NHỊP KỊCH BẢN X10)
 Genre: High-Stakes Non-Fiction Investigative Docudrama (Johnny Harris x Margin Call x Chernobyl Pacing).
-Target: 1,800 - 2,200 words across 5 structured Acts (~360-440 words / Act). Total runtime: 12-15 minutes.
+Target: 1,800 - 2,200 words across 5 structured Acts (~360-440 words / Act for EN; 3,200 - 3,600 Hangul syllables / ~1,050 - 1,250 eojeol for KR; 3,400 - 3,800 characters for JP). Total runtime: 12-15 minutes.
 
 ### 🥊 BEAT 1 / ACT I (0:00 - 3:00): THE IMPOSSIBLE CONTRADICTION & COLD STRIKE
 • Primary Objective: Capture cold mobile traffic within 5-10s (Rule 444) and directly satisfy viewer search intent (Rule 130).
