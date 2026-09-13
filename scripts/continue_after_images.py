@@ -125,7 +125,7 @@ def main():
     ap.add_argument("--privacy", default="unlisted")
     ap.add_argument("--skip-upload", action="store_true",
                     help="render only; stop before B10/HG3 (dry run)")
-    ap.add_argument("--render-timeout", type=int, default=7200)
+    ap.add_argument("--render-timeout", type=int, default=14400)
     ap.add_argument("--upload-timeout", type=int, default=3600)
     args = ap.parse_args()
 
