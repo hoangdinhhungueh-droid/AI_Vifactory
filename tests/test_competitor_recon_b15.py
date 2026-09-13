@@ -20,10 +20,18 @@ from app.services.competitor_recon_b15 import (  # noqa: E402
     age_days,
     build_intel_card,
     filter_comment_gaps,
+    filter_comment_tri_buckets,
     is_spam,
     market_of,
     select_competitors,
     velocity,
+    calculate_vph,
+    calculate_vs_ratio,
+    calculate_outlier_score,
+    prune_forensic_context,
+    youtube_channel_subscribers,
+    SMALL_CHANNEL_SUB_CEILING,
+    OUTLIER_VS_RATIO_MIN,
 )
 
 
@@ -31,16 +39,20 @@ def iso_days_ago(days: int) -> str:
     return (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def candidate(vid, views, days_old, comments=500):
-    return {
+def candidate(vid, views, days_old, comments=500, channel_subscribers=None, channel_id=None):
+    c = {
         "video_id": vid,
         "channel": f"ch-{vid}",
+        "channel_id": channel_id or f"cid-{vid}",
         "title": f"title-{vid}",
         "published_at": iso_days_ago(days_old),
         "views": views,
         "comments": comments,
         "thumbnails": {},
     }
+    if channel_subscribers is not None:
+        c["channel_subscribers"] = channel_subscribers
+    return c
 
 
 class TestMarketDetection:
@@ -245,3 +257,141 @@ class TestIntelCard:
     def test_timestamp_is_timezone_aware(self, tmp_path):
         ts = self._card(tmp_path)["collection_meta"]["collected_at"]
         assert datetime.fromisoformat(ts).tzinfo is not None
+
+
+class TestTubeRadarOutlierMetrics:
+    def test_calculate_vph(self):
+        # 10,000 views on a video published 10 hours ago -> ~1000 VPH
+        vph = calculate_vph(10_000, iso_days_ago(1))  # 24 hours ago
+        assert vph is not None
+        assert 400 <= vph <= 430
+
+    def test_calculate_vs_ratio(self):
+        # 100,000 views on a 2,000 sub channel -> 50.0x ratio
+        ratio = calculate_vs_ratio(100_000, 2_000)
+        assert ratio == 50.0
+
+        # Floor protection: 0 subs uses floor of 100
+        ratio_zero = calculate_vs_ratio(10_000, 0)
+        assert ratio_zero == 100.0
+
+    def test_calculate_outlier_score_prefers_small_channels(self):
+        # Small channel (2k subs, 100k views, published 5 days ago)
+        score_small = calculate_outlier_score(100_000, 2_000, iso_days_ago(5))
+
+        # Huge channel (2M subs, 200k views, published 5 days ago)
+        score_huge = calculate_outlier_score(200_000, 2_000_000, iso_days_ago(5))
+
+        assert score_small > score_huge
+        assert score_small > 100.0  # High outlier signal
+        assert score_huge < 1.0     # Mediocre/underperforming signal
+
+
+class TestOutlierCompetitorSelection:
+    def test_prefers_small_channel_with_high_vs_ratio(self):
+        # Candidate 1: Micro channel breakout (1,500 subs, 120k views, 5 days old -> R_vs = 80x)
+        c_micro = candidate("micro_viral", 120_000, 5, channel_subscribers=1_500)
+
+        # Candidate 2: Small channel breakout (20,000 subs, 180k views, 10 days old -> R_vs = 9x)
+        c_small = candidate("small_viral", 180_000, 10, channel_subscribers=20_000)
+
+        # Candidate 3: Mega channel (5,000,000 subs, 500k views, 10 days old -> R_vs = 0.1x)
+        c_mega = candidate("mega_normal", 500_000, 10, channel_subscribers=5_000_000)
+
+        # Candidate 4: Old historical giant (3,000,000 subs, 10M views, 500 days old)
+        c_old_giant = candidate("old_giant", 10_000_000, 500, channel_subscribers=3_000_000)
+
+        cands = [c_micro, c_small, c_mega, c_old_giant]
+        g1, g2 = select_competitors(cands)
+
+        # Group 1 must contain the small channel outliers
+        g1_ids = [c["video_id"] for c in g1]
+        assert "micro_viral" in g1_ids
+        assert "small_viral" in g1_ids
+        assert all(c["selection_group"] == "small_channel_outlier_surge" for c in g1)
+
+        # Group 2 must contain all-time macro benchmarks without overlap
+        g2_ids = [c["video_id"] for c in g2]
+        assert "old_giant" in g2_ids
+        assert all(c["selection_group"] == "all_time_top_velocity" for c in g2)
+        assert set(g1_ids).isdisjoint(set(g2_ids))
+
+    def test_enriched_fields_in_selected_candidates(self):
+        c_micro = candidate("micro", 50_000, 3, channel_subscribers=2_000)
+        cands = [c_micro]
+        g1, _ = select_competitors(cands)
+        c = g1[0]
+        assert "vph" in c
+        assert "v_s_ratio" in c
+        assert "outlier_score" in c
+        assert c["v_s_ratio"] == 25.0
+        assert c["channel_subscribers"] == 2000
+
+
+class TestCommentTriBuckets:
+    def test_categorizes_into_three_buckets(self):
+        raw_comments = [
+            {"text": "Why did nobody explain what happened to the missing fund balance?", "likes": 50},
+            {"text": "This video is totally biased and wrong about the legal timeline!", "likes": 30},
+            {"text": "Best video on this topic, amazing analysis and masterpiece explanation!", "likes": 40},
+            {"text": "Tại sao kiểm toán không phát hiện ra lỗ hổng này sớm hơn?", "likes": 25},
+            {"text": "Sai rồi nhé, số liệu đoạn 5:30 bị chém gió hoàn toàn", "likes": 15},
+            {"text": "Quá hay và quá cuốn, phân tích cực kỳ chất lượng!", "likes": 60},
+        ]
+        buckets = filter_comment_tri_buckets(raw_comments, min_likes=5)
+        assert len(buckets["unanswered_questions"]) == 2
+        assert len(buckets["skepticism_critique"]) == 2
+        assert len(buckets["praise_resonance"]) == 2
+
+    def test_filter_comment_gaps_returns_unanswered(self):
+        raw_comments = [
+            {"text": "How did the executive bypass compliance without detection?", "likes": 100},
+            {"text": "I loved this video so much!", "likes": 10},
+        ]
+        gaps = filter_comment_gaps(raw_comments, min_likes=5)
+        assert len(gaps) == 1
+        assert "How did" in gaps[0]["text"]
+
+
+class TestContextPruningAndTokenGuard:
+    def test_prune_context_respects_token_caps(self):
+        # Create candidate with excessively long transcript (>5000 chars)
+        huge_tr = "Sentence about financial crime and forensic evidence. " * 200
+        cand = candidate("c1", 100_000, 10, channel_subscribers=2000)
+        cand["transcript"] = {"text": huge_tr, "status": "captions", "source": "test"}
+        cand["vph"] = 400.0
+        cand["v_s_ratio"] = 50.0
+        cand["outlier_score"] = 120.0
+
+        # 30 long comments
+        comments = [{"text": f"Why did event {i} happen? " * 10, "likes": i} for i in range(30)]
+
+        bench_text, comm_text = prune_forensic_context("Enron Collapse", "EN", "Business", [cand], comments)
+
+        # Transcripts must be truncated per video
+        assert len(bench_text) < 3000
+        # Comments must be capped to MAX_COMMENTS_IN_PROMPT (15)
+        assert comm_text.count("- [") <= 15
+
+
+class TestChannelSubscribersBatchEndpoint:
+    def test_parses_subscriber_counts(self, monkeypatch):
+        # Mock _api_get to return YouTube channels API structure
+        def mock_api_get(endpoint, params, quota):
+            assert endpoint == "channels"
+            assert params["part"] == "statistics"
+            return {
+                "items": [
+                    {"id": "cid-1", "statistics": {"subscriberCount": "15200", "hiddenSubscriberCount": False}},
+                    {"id": "cid-2", "statistics": {"subscriberCount": "0", "hiddenSubscriberCount": True}},
+                ]
+            }
+
+        import app.services.competitor_recon_b15 as b15_mod
+        monkeypatch.setattr(b15_mod, "_api_get", mock_api_get)
+
+        quota = QuotaTracker()
+        subs = youtube_channel_subscribers("fake-key", ["cid-1", "cid-2"], quota)
+        assert subs["cid-1"] == 15200
+        assert subs["cid-2"] == 0
+

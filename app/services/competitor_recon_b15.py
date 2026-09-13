@@ -41,15 +41,27 @@ YTDLP_BIN = "/root/video_factory/venv/bin/yt-dlp"
 
 # YouTube Data API v3 daily quota and per-call unit costs
 QUOTA_DAILY_UNITS = 10_000
-QUOTA_COST = {"search": 100, "videos": 1, "commentThreads": 1}
+QUOTA_COST = {"search": 100, "videos": 1, "commentThreads": 1, "channels": 1}
 QUOTA_FALLBACK_RATIO = 0.80
 
-# Two-group competitor selection parameters
+# Two-group competitor selection parameters (TubeRadar Outlier & Narrative Architecture)
 RECENT_WINDOW_MIN_DAYS = 90
 RECENT_WINDOW_MAX_DAYS = 365
 RECENT_MIN_COMMENTS = 100
 GROUP1_ALLTIME_COUNT = 2
 GROUP2_RECENT_COUNT = 5
+
+# TubeRadar 48H Outlier & Small-Channel Constants
+OUTLIER_VS_RATIO_MIN = 3.0
+SMALL_CHANNEL_SUB_CEILING = 50_000
+GROUP1_OUTLIER_COUNT = 3
+GROUP2_ALLTIME_BENCHMARK_COUNT = 2
+
+# Token Overflow & Budget Protection Caps
+MAX_PROMPT_CHARS = 10_000  # ~2,500 input tokens ceiling
+MAX_TRANSCRIPT_CHARS_PER_VIDEO = 1_200  # Focus on first 180s hook/conflict
+MAX_COMMENT_CHARS = 180
+MAX_COMMENTS_IN_PROMPT = 15
 
 # Audience comment mining filter standards
 COMMENT_MIN_LENGTH = 30
@@ -57,7 +69,21 @@ COMMENT_MIN_LIKES = 3
 QUESTION_KEYWORDS = (
     "why", "how", "missed", "didn't explain", "didnt explain", "did not explain",
     "confused", "confusing", "unclear", "what about", "never explained",
-    "still don't understand", "makes no sense",
+    "still don't understand", "makes no sense", "tại sao", "chưa giải thích",
+    "vô lý", "thế còn", "tiền đi đâu", "lừa đảo", "sao lại", "không hiểu",
+    "なぜ", "どうして", "説明がない", "矛盾", "왜", "어떻게", "설명안함",
+)
+PRAISE_KEYWORDS = (
+    "best video", "masterpiece", "eye opening", "eye-opening", "amazing analysis",
+    "great explanation", "underrated", "deserves more views", "chất lượng",
+    "quá hay", "quá cuốn", "đỉnh cao", "xuất sắc", "cảm ơn tác giả",
+    "最高", "わかりやすい", "神動画", "최고", "소름", "명작",
+)
+CRITIQUE_KEYWORDS = (
+    "wrong", "inaccurate", "biased", "propaganda", "fake", "clickbait",
+    "lazy", "missed the point", "misleading", "sai rồi", "bịa đặt",
+    "chém gió", "hời hợt", "thiếu sót", "sai lệch", "dắt mũi",
+    "間違い", "嘘", "偏向", "틀림", "선동", "왜곡",
 )
 SPAM_PATTERNS = (
     re.compile(r"https?://", re.I),
@@ -222,6 +248,7 @@ def youtube_search(api_key: str, query: str, market: str, quota: QuotaTracker,
             return [{
                 "video_id": it["id"]["videoId"],
                 "channel": it["snippet"]["channelTitle"],
+                "channel_id": it["snippet"].get("channelId", ""),
                 "title": it["snippet"]["title"],
                 "published_at": it["snippet"]["publishedAt"],
                 "thumbnails": it["snippet"].get("thumbnails", {}),
@@ -232,7 +259,7 @@ def youtube_search(api_key: str, query: str, market: str, quota: QuotaTracker,
 
 
 def youtube_video_details(api_key: str, video_ids: List[str], quota: QuotaTracker) -> Dict[str, Dict]:
-    """Enrich video statistics (views, comments, likes, tags, description) in chunks of 50."""
+    """Enrich video statistics (views, comments, likes, channel_id, tags, description) in chunks of 50."""
     out: Dict[str, Dict] = {}
     for chunk_start in range(0, len(video_ids), 50):
         chunk = video_ids[chunk_start:chunk_start + 50]
@@ -249,6 +276,7 @@ def youtube_video_details(api_key: str, video_ids: List[str], quota: QuotaTracke
                 "views": int(stats.get("viewCount", 0)),
                 "comments": int(stats.get("commentCount", 0)),
                 "likes": int(stats.get("likeCount", 0)),
+                "channel_id": it["snippet"].get("channelId", ""),
                 "published_at": it["snippet"]["publishedAt"],
                 "duration": it["contentDetails"]["duration"],
                 "tags": it["snippet"].get("tags", [])[:20],
@@ -256,6 +284,31 @@ def youtube_video_details(api_key: str, video_ids: List[str], quota: QuotaTracke
                 "thumbnails": it["snippet"].get("thumbnails", {}),
             }
     logger.info("[b15.pass1] details resolved for %d/%d videos", len(out), len(video_ids))
+    return out
+
+
+def youtube_channel_subscribers(api_key: str, channel_ids: List[str], quota: QuotaTracker) -> Dict[str, int]:
+    """
+    Query YouTube Data API channels endpoint in chunks of 50 to extract subscriber counts.
+    Cost: 1 quota unit per 50 channels (Data-Layer Only Protocol - zero bot risk).
+    """
+    out: Dict[str, int] = {}
+    clean_ids = [cid for cid in channel_ids if cid]
+    for chunk_start in range(0, len(clean_ids), 50):
+        chunk = clean_ids[chunk_start:chunk_start + 50]
+        body = _api_get("channels", {
+            "part": "statistics",
+            "id": ",".join(chunk),
+            "key": api_key,
+        }, quota)
+        if not body:
+            continue
+        for it in body.get("items", []):
+            stats = it.get("statistics", {})
+            hidden = stats.get("hiddenSubscriberCount", False)
+            subs = int(stats.get("subscriberCount", 0)) if not hidden else 0
+            out[it["id"]] = subs
+    logger.info("[b15.pass1] subscriber counts resolved for %d/%d channels", len(out), len(clean_ids))
     return out
 
 
@@ -290,23 +343,66 @@ def is_spam(text: str) -> bool:
     return any(p.search(text) for p in SPAM_PATTERNS)
 
 
-def filter_comment_gaps(comments: List[Dict], min_likes: int = COMMENT_MIN_LIKES) -> List[Dict]:
-    """Filter audience comments down to highly-liked, substantive curiosity/doubt questions."""
-    gaps = []
+def filter_comment_tri_buckets(comments: List[Dict], min_likes: int = COMMENT_MIN_LIKES) -> Dict[str, List[Dict]]:
+    """
+    Categorize audience comments into 3 strategic intelligence buckets (TubeRadar Model):
+      1. unanswered_questions: High-curiosity gap questions missed or unanswered by competitor.
+      2. skepticism_critique: Viewer doubts, counterarguments, and factual/editorial critiques.
+      3. praise_resonance: High-resonance emotional triggers and aspects viewers praised.
+    """
+    buckets: Dict[str, List[Dict]] = {
+        "unanswered_questions": [],
+        "skepticism_critique": [],
+        "praise_resonance": []
+    }
     for c in comments:
-        text = c["text"].strip()
-        if len(text) < COMMENT_MIN_LENGTH or c["likes"] < min_likes or is_spam(text):
+        text = c["text"].strip() if isinstance(c, dict) else str(c).strip()
+        likes = c.get("likes", 0) if isinstance(c, dict) else 0
+        if len(text) < COMMENT_MIN_LENGTH or likes < min_likes or is_spam(text):
             continue
         lowered = text.lower()
-        if not any(kw in lowered for kw in QUESTION_KEYWORDS):
-            continue
-        gaps.append({
+        item = {
             "text": text,
-            "likes": c["likes"],
-            "author": c["author"],
-            "published_at": c.get("published_at"),
-        })
-    gaps.sort(key=lambda g: g["likes"], reverse=True)
+            "likes": likes,
+            "author": c.get("author", "") if isinstance(c, dict) else "",
+            "published_at": c.get("published_at") if isinstance(c, dict) else None,
+            "video_id": c.get("video_id", "") if isinstance(c, dict) else "",
+        }
+
+        # Check Unanswered Question / Gap first
+        if any(kw in lowered for kw in QUESTION_KEYWORDS):
+            buckets["unanswered_questions"].append(item)
+        elif any(kw in lowered for kw in CRITIQUE_KEYWORDS):
+            buckets["skepticism_critique"].append(item)
+        elif any(kw in lowered for kw in PRAISE_KEYWORDS):
+            buckets["praise_resonance"].append(item)
+
+    for k in buckets:
+        buckets[k].sort(key=lambda x: x["likes"], reverse=True)
+    return buckets
+
+
+def filter_comment_gaps(comments: List[Dict], min_likes: int = COMMENT_MIN_LIKES) -> List[Dict]:
+    """Filter audience comments down to highly-liked, substantive curiosity/doubt questions."""
+    tri = filter_comment_tri_buckets(comments, min_likes)
+    gaps = tri["unanswered_questions"]
+    if not gaps:
+        # Fallback: check any comments with question keywords
+        for c in comments:
+            text = c["text"].strip() if isinstance(c, dict) else str(c).strip()
+            likes = c.get("likes", 0) if isinstance(c, dict) else 0
+            if len(text) < COMMENT_MIN_LENGTH or likes < min_likes or is_spam(text):
+                continue
+            lowered = text.lower()
+            if any(kw in lowered for kw in QUESTION_KEYWORDS):
+                gaps.append({
+                    "text": text,
+                    "likes": likes,
+                    "author": c.get("author", "") if isinstance(c, dict) else "",
+                    "published_at": c.get("published_at") if isinstance(c, dict) else None,
+                    "video_id": c.get("video_id", "") if isinstance(c, dict) else "",
+                })
+        gaps.sort(key=lambda g: g["likes"], reverse=True)
     return gaps
 
 
@@ -325,35 +421,116 @@ def velocity(views: int, published_at: str) -> Optional[float]:
     return None if days is None else views / days
 
 
+def calculate_vph(views: int, published_at: str) -> Optional[float]:
+    """Calculate Views Per Hour (VPH) since publish for 48H surge detection."""
+    try:
+        pub = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+        hours = max((datetime.now(timezone.utc) - pub.astimezone(timezone.utc)).total_seconds() / 3600.0, 1.0)
+        return round(views / hours, 2)
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def calculate_vs_ratio(views: int, subscribers: int) -> float:
+    """Calculate View-to-Subscriber Ratio (R_vs) with floor to avoid division by zero."""
+    eff_subs = max(int(subscribers or 0), 100)
+    return round(float(views) / float(eff_subs), 2)
+
+
+def calculate_outlier_score(views: int, subscribers: int, published_at: str) -> float:
+    """
+    Calculate TubeRadar Outlier Surge Score:
+      S_outlier = R_vs * W_tier * log10(VPH + 1.0)
+    Gives highest priority to small channels (<50k subs) with extreme View/Sub ratio.
+    """
+    import math
+    subs = int(subscribers or 0)
+    if subs <= 10_000:
+        w_tier = 2.5
+    elif subs <= 50_000:
+        w_tier = 1.8
+    elif subs <= 200_000:
+        w_tier = 1.0
+    else:
+        w_tier = 0.2
+
+    vs = calculate_vs_ratio(views, subs)
+    vph = calculate_vph(views, published_at) or 1.0
+    score = vs * w_tier * math.log10(vph + 1.0)
+    return round(score, 2)
+
+
 def select_competitors(candidates: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
     """
-    Select two independent competitor groups:
-      - Group 1: Top 2 all-time outliers by daily view velocity (for structure & narrative pacing).
-      - Group 2: Top 3-5 videos published 90-365 days ago with >=100 comments (for contemporary audience taste).
+    Select two independent competitor groups (TubeRadar Outlier + Master Narrative Architecture):
+      - Group 1 (Outlier Surge): Top 3 videos from small channels (<=50k subs) with R_vs >= 3.0
+                                 published within 48h to 180 days (or highest outlier score).
+                                 Gracefully falls back to top velocity all-time if no small outliers exist.
+      - Group 2 (Macro Benchmark): Top 2 all-time videos with highest velocity / views across any channel size,
+                                   or recent window (90-365 days) with >=100 comments.
     """
     scored = []
     for c in candidates:
         v = velocity(c.get("views", 0), c.get("published_at", ""))
         if v is None:
             continue
-        c = dict(c, avg_views_per_day=round(v), _velocity=v, age_days=age_days(c["published_at"]))
+        vph = calculate_vph(c.get("views", 0), c.get("published_at", "")) or 0.0
+        subs = int(c.get("channel_subscribers", 0) or 0)
+        vs = calculate_vs_ratio(c.get("views", 0), subs)
+        outlier_s = calculate_outlier_score(c.get("views", 0), subs, c.get("published_at", ""))
+        c = dict(
+            c,
+            avg_views_per_day=round(v),
+            _velocity=v,
+            age_days=age_days(c["published_at"]),
+            vph=vph,
+            channel_subscribers=subs,
+            v_s_ratio=vs,
+            outlier_score=outlier_s
+        )
         scored.append(c)
 
-    group1 = sorted(scored, key=lambda c: c["_velocity"], reverse=True)[:GROUP1_ALLTIME_COUNT]
-    picked = {c["video_id"] for c in group1}
-
-    recent = [
+    # 1. Check for True Small Channel Outliers (0 < subs <= 50k subs, R_vs >= 3.0, age <= 180 days)
+    small_outliers = [
         c for c in scored
-        if c["video_id"] not in picked
-        and RECENT_WINDOW_MIN_DAYS <= c["age_days"] <= RECENT_WINDOW_MAX_DAYS
-        and c.get("comments", 0) >= RECENT_MIN_COMMENTS
+        if 0 < c.get("channel_subscribers", 0) <= SMALL_CHANNEL_SUB_CEILING
+        and c["v_s_ratio"] >= OUTLIER_VS_RATIO_MIN
+        and (c["age_days"] is None or c["age_days"] <= 180)
     ]
-    group2 = sorted(recent, key=lambda c: c["_velocity"], reverse=True)[:GROUP2_RECENT_COUNT]
 
-    for c in group1:
-        c["selection_group"] = "all_time_top_velocity"
-    for c in group2:
-        c["selection_group"] = "recent_90_365_days"
+    if len(small_outliers) >= 1:
+        small_outliers.sort(key=lambda c: (c["outlier_score"], c["vph"]), reverse=True)
+        group1 = small_outliers[:GROUP1_OUTLIER_COUNT]
+        for c in group1:
+            c["selection_group"] = "small_channel_outlier_surge"
+        picked = {c["video_id"] for c in group1}
+
+        remaining = [c for c in scored if c["video_id"] not in picked]
+        group2 = sorted(remaining, key=lambda c: c["_velocity"], reverse=True)[:GROUP2_ALLTIME_BENCHMARK_COUNT]
+        for c in group2:
+            c["selection_group"] = "all_time_top_velocity"
+    else:
+        # Fallback to standard velocity model (preserves 100% backward compatibility)
+        group1 = sorted(scored, key=lambda c: c["_velocity"], reverse=True)[:GROUP1_ALLTIME_COUNT]
+        for c in group1:
+            c["selection_group"] = "all_time_top_velocity"
+        picked = {c["video_id"] for c in group1}
+
+        recent = [
+            c for c in scored
+            if c["video_id"] not in picked
+            and RECENT_WINDOW_MIN_DAYS <= c["age_days"] <= RECENT_WINDOW_MAX_DAYS
+            and c.get("comments", 0) >= RECENT_MIN_COMMENTS
+        ]
+        group2 = sorted(recent, key=lambda c: c["_velocity"], reverse=True)[:GROUP2_RECENT_COUNT]
+        for c in group2:
+            c["selection_group"] = "recent_90_365_days"
+
+    logger.info("[b15.pass1] selected %d in Group 1 (%s) + %d in Group 2 (%s) from %d candidates",
+                len(group1), group1[0]["selection_group"] if group1 else "none",
+                len(group2), group2[0]["selection_group"] if group2 else "none",
+                len(scored))
+    return group1, group2
 
     logger.info("[b15.pass1] selected %d all-time + %d recent from %d candidates",
                 len(group1), len(group2), len(scored))
@@ -506,48 +683,136 @@ def extract_video_chapters(description: str) -> List[str]:
 
 
 # ==============================================================================
-# SECTION 2: PASS 2 — FORENSIC COMPETITOR ANATOMY & 10X SYNTHESIS (GPT-6-ASTRA) ⭐
+# SECTION 2: PASS 2 — FORENSIC COMPETITOR ANATOMY & 10X SYNTHESIS (MULTI-TIER LLM) ⭐
 # ==============================================================================
 
-def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
-                               selected: List[Dict], top_comments: List[Dict],
-                               niche: str = "General") -> Dict:
+def call_recon_forensic_llm(
+    prompt: str,
+    system_prompt: Optional[str] = None,
+    max_tokens: int = 2000,
+    temperature: float = 0.4,
+    timeout: float = 120.0
+) -> str:
     """
-    Two-Pass Competitor Recon Reasoning via GPT-6-Astra (Lead Forensic Story Analyst).
+    Multi-Tier Resilient LLM Caller for Forensic Competitor Analysis (B1.5):
+      - Tier 1: Primary (gpt-6-astra -> fallback claude-opus-5)
+      - Tier 2: Resilient Fallback (kimi-k3 -> fallback claude-sonnet-5)
+      - Budget & Token Guard: CostTracker integration and error containment
+    """
+    from app.services.model_gateway import get_global_gateway
+    gateway = get_global_gateway()
 
-    Performs forensic analysis of competitor content and audience psychology to extract
-    the 5 core pillars of competitive advantage:
-      1. competitor_act_breakdown: How top rival videos structured their acts & narrative pacing.
-      2. competitor_secret_sauce: Why competitor videos went viral (hook style, tension, pacing).
-      3. audience_core_frustrations: Unanswered questions, skepticism, or outrage from top comments.
-      4. fatal_explanatory_vacuum: Critical systemic/institutional/causal blindspots in existing coverage.
-      5. our_10x_pivot_angle: High-impact independent investigative narrative angle for our 15-min documentary.
-    """
+    # Tier 1: Astra 6 (with Opus 5 fallback)
     try:
+        logger.info("[b15.llm] Invoking Tier 1: gpt-6-astra (fallback claude-opus-5)...")
+        return gateway.call_llm(
+            prompt=prompt,
+            model="gpt-6-astra",
+            system_prompt=system_prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout=timeout,
+            fallback="claude-opus-5"
+        ).strip()
+    except Exception as e_tier1:
+        logger.warning(f"[b15.llm] Tier 1 failed ({e_tier1}), falling back to Tier 2: kimi-k3 (fallback claude-sonnet-5)...")
+
+    # Tier 2: Kimi K3 (with Sonnet 5 fallback)
+    try:
+        return gateway.call_llm(
+            prompt=prompt,
+            model="kimi-k3",
+            system_prompt=system_prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout=timeout,
+            fallback="claude-sonnet-5"
+        ).strip()
+    except Exception as e_tier2:
+        logger.error(f"[b15.llm] Tier 2 also failed ({e_tier2}). Attempting last-resort direct hhtech reasoner...")
         from app.services.hhtech_reasoner import call_gpt6_astra
+        return call_gpt6_astra(prompt, system_prompt=system_prompt, max_tokens=max_tokens, timeout=timeout)
 
-        bench_summary = []
-        for c in selected[:5]:
-            ch = c.get("channel", "Unknown")
-            ti = c.get("title", "")
-            vw = c.get("views", 0)
-            vpd = c.get("avg_views_per_day", 0)
-            desc = c.get("description_head", "")[:250]
-            tr = (c.get("transcript", {}).get("text") or "")[:350]
-            bench_summary.append(
-                f"- Channel: [{ch}] | Title: \"{ti}\" | Views: {vw:,} ({vpd:,}/day)\n"
-                f"  Intro/Transcript: {tr}\n"
-                f"  Description: {desc}"
-            )
 
-        comment_summary = []
-        for g in top_comments[:15]:
-            txt = g.get("text", "").strip().replace("\n", " ")[:200]
+def prune_forensic_context(
+    target_keyword: str,
+    market: str,
+    niche: str,
+    selected: List[Dict],
+    top_comments: List[Dict],
+    tri_buckets: Optional[Dict[str, List[Dict]]] = None
+) -> Tuple[str, str]:
+    """
+    Budget & Token Overflow Protection:
+      - Limits transcript to MAX_TRANSCRIPT_CHARS_PER_VIDEO (1,200 chars focus on hook/conflict).
+      - Limits comments to MAX_COMMENTS_IN_PROMPT (15 comments, max 180 chars).
+      - Enriches comment context with 3-bucket signals (Praise, Critique, Unanswered).
+      - Prunes descriptions if total prompt approaches MAX_PROMPT_CHARS (10,000 chars).
+    """
+    bench_summary = []
+    for c in selected[:5]:
+        ch = c.get("channel", "Unknown")
+        ti = c.get("title", "")
+        vw = c.get("views", 0)
+        subs = c.get("channel_subscribers", 0)
+        vs = c.get("v_s_ratio", 0.0)
+        vph = c.get("vph", 0.0)
+        vpd = c.get("avg_views_per_day", 0)
+        grp = c.get("selection_group", "competitor")
+        desc = (c.get("description_head", "") or "")[:200]
+        raw_tr = (c.get("transcript", {}).get("text") or "")
+        tr = raw_tr[:MAX_TRANSCRIPT_CHARS_PER_VIDEO]
+        bench_summary.append(
+            f"- Channel: [{ch}] (Subs: {subs:,} | Group: {grp})\n"
+            f"  Title: \"{ti}\" | Views: {vw:,} | VPH: {vph} | V/S Ratio: {vs}x | Views/day: {vpd:,}\n"
+            f"  Opening Hook Transcript (0-180s): {tr}\n"
+            f"  Description: {desc}"
+        )
+
+    comment_summary = []
+    if tri_buckets:
+        unanswered = tri_buckets.get("unanswered_questions", [])[:7]
+        critique = tri_buckets.get("skepticism_critique", [])[:4]
+        praise = tri_buckets.get("praise_resonance", [])[:4]
+        for u in unanswered:
+            txt = u.get("text", "").strip().replace("\n", " ")[:MAX_COMMENT_CHARS]
+            comment_summary.append(f"- [UNANSWERED QUESTION | {u.get('likes', 0)} likes]: \"{txt}\"")
+        for cr in critique:
+            txt = cr.get("text", "").strip().replace("\n", " ")[:MAX_COMMENT_CHARS]
+            comment_summary.append(f"- [AUDIENCE CRITIQUE | {cr.get('likes', 0)} likes]: \"{txt}\"")
+        for pr in praise:
+            txt = pr.get("text", "").strip().replace("\n", " ")[:MAX_COMMENT_CHARS]
+            comment_summary.append(f"- [PRAISE/RESONANCE | {pr.get('likes', 0)} likes]: \"{txt}\"")
+    else:
+        for g in top_comments[:MAX_COMMENTS_IN_PROMPT]:
+            txt = g.get("text", "").strip().replace("\n", " ")[:MAX_COMMENT_CHARS]
             lks = g.get("likes", 0)
             comment_summary.append(f"- [{lks} likes]: \"{txt}\"")
 
-        bench_text = "\n".join(bench_summary) if bench_summary else "No competitor benchmarks available."
-        comm_text = "\n".join(comment_summary) if comment_summary else "No comments available."
+    bench_text = "\n".join(bench_summary) if bench_summary else "No competitor benchmarks available."
+    comm_text = "\n".join(comment_summary) if comment_summary else "No comments available."
+
+    total_len = len(bench_text) + len(comm_text)
+    if total_len > MAX_PROMPT_CHARS:
+        excess = total_len - MAX_PROMPT_CHARS
+        bench_text = bench_text[:max(len(bench_text) - excess, 2000)]
+        logger.info(f"[b15.token_guard] Pruned prompt context to maintain safety ceiling ({len(bench_text) + len(comm_text)} chars)")
+
+    return bench_text, comm_text
+
+
+def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
+                               selected: List[Dict], top_comments: List[Dict],
+                               niche: str = "General",
+                               tri_buckets: Optional[Dict[str, List[Dict]]] = None) -> Dict:
+    """
+    Two-Pass Competitor Recon Reasoning via Multi-Tier LLM (Lead Forensic Story Analyst).
+    Uses Astra 6 / Opus 5 (fallback Kimi K3 / Sonnet 5) with token overflow protection.
+    """
+    try:
+        bench_text, comm_text = prune_forensic_context(
+            target_keyword, market, niche, selected, top_comments, tri_buckets
+        )
 
         sys_prompt = (
             "You are the Lead Forensic Story Analyst for Video Factory (Pipeline v3).\n"
@@ -558,9 +823,10 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
 
         user_prompt = (
             f"Topic / Subject: {target_keyword} (Market: {market.upper()}, Niche: {niche})\n\n"
-            f"=== TOP VIRAL COMPETITOR BENCHMARKS ===\n{bench_text}\n\n"
-            f"=== TOP HIGH-ENGAGEMENT AUDIENCE COMMENTS (Highest Likes) ===\n{comm_text}\n\n"
-            "Perform deep structural and audience sentiment analysis. Provide a JSON response with:\n"
+            f"=== TOP VIRAL COMPETITOR BENCHMARKS (OUTLIERS & ALL-TIME) ===\n{bench_text}\n\n"
+            f"=== TOP HIGH-ENGAGEMENT AUDIENCE COMMENTS (TRI-BUCKET INTELLIGENCE) ===\n{comm_text}\n\n"
+            "Perform deep structural and audience sentiment analysis. Pay special attention to UNANSWERED QUESTIONS to pinpoint the fatal explanatory vacuum.\n"
+            "Provide a JSON response with:\n"
             "{\n"
             '  "competitor_act_breakdown": "Summary of narrative arcs and storyline beats used by competitors (e.g. Act 1 Hook, Act 2 Conflict, Act 3 Climax)",\n'
             '  "competitor_secret_sauce": "What made these videos gain high velocity and views (hook style, pacing, emotional trigger)",\n'
@@ -588,8 +854,8 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
             "Output ONLY valid JSON:"
         )
 
-        logger.info("[b15.reasoning] Invoking GPT-6-Astra for Two-Pass Competitor Anatomy...")
-        raw_resp = call_gpt6_astra(user_prompt, system_prompt=sys_prompt, max_tokens=1500, timeout=120.0)
+        logger.info("[b15.reasoning] Invoking Multi-Tier Forensic LLM for Two-Pass Competitor Anatomy...")
+        raw_resp = call_recon_forensic_llm(user_prompt, system_prompt=sys_prompt, max_tokens=2000, timeout=120.0)
 
         m = re.search(r'\{.*\}', raw_resp, re.DOTALL)
         if m:
@@ -597,7 +863,7 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
             logger.info("[b15.reasoning] Successfully extracted 5-pillar competitor narrative anatomy!")
             return anatomy
         else:
-            logger.warning("[b15.reasoning] Could not parse JSON from GPT-6-Astra response: %s", raw_resp[:200])
+            logger.warning("[b15.reasoning] Could not parse JSON from LLM response: %s", raw_resp[:200])
     except Exception as e:
         logger.error("[b15.reasoning] Two-Pass competitor reasoning failed: %s", e)
 
@@ -639,6 +905,8 @@ def build_intel_card(task_id: str, target_keyword: str, niche: str, market: str,
     benchmarks = [{
         "video_id": c["video_id"],
         "channel": c["channel"],
+        "channel_id": c.get("channel_id", ""),
+        "subscriber_count": c.get("channel_subscribers", 0),
         "title": c["title"],
         "published_at": c["published_at"],
         "age_days": c["age_days"],
@@ -647,6 +915,9 @@ def build_intel_card(task_id: str, target_keyword: str, niche: str, market: str,
         "comments": c.get("comments", 0),
         "duration": c.get("duration"),
         "avg_views_per_day": c["avg_views_per_day"],
+        "vph": c.get("vph", 0.0),
+        "v_s_ratio": c.get("v_s_ratio", 0.0),
+        "outlier_score": c.get("outlier_score", 0.0),
         "selection_group": c["selection_group"],
         "tags": c.get("tags", []),
         "description_head": c.get("description_head", ""),
@@ -861,6 +1132,13 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
         details = youtube_video_details(api_key, [c["video_id"] for c in candidates], quota)
         for c in candidates:
             c.update(details.get(c["video_id"], {}))
+
+        # Batch channel subscriber lookup (1 API unit per 50 channels - Data-Layer Only Protocol)
+        c_ids = list({c.get("channel_id") for c in candidates if c.get("channel_id")})
+        sub_map = youtube_channel_subscribers(api_key, c_ids, quota) if c_ids and not quota.exhausted else {}
+        for c in candidates:
+            c["channel_subscribers"] = sub_map.get(c.get("channel_id", ""), 0)
+
         try:
             CACHE_DIR.mkdir(parents=True, exist_ok=True)
             cache_path.write_text(json.dumps({
@@ -909,8 +1187,9 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
     all_gaps.sort(key=lambda g: g["likes"], reverse=True)
     top_comments = extract_high_engagement_comments(all_raw_comments, max_count=15)
 
-    # 4. Deep Forensic Anatomy via GPT-6-Astra (Pass 2) ⭐
-    anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, selected, top_comments, niche)
+    # 4. Deep Forensic Anatomy via Multi-Tier LLM (Pass 2) ⭐
+    tri_buckets = filter_comment_tri_buckets(all_raw_comments)
+    anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, selected, top_comments, niche, tri_buckets=tri_buckets)
 
     # 5. Assemble Intel Card (Pass 3)
     card = build_intel_card(task_id, target_keyword, niche, market, selected, all_gaps[:12], quota,

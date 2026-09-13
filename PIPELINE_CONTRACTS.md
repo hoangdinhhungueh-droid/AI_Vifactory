@@ -68,7 +68,13 @@
     "competitor_benchmarks": [
       {
         "channel": "<COMPETITOR_CHANNEL_NAME>",
+        "channel_id": "<YOUTUBE_CHANNEL_ID>",
+        "subscriber_count": "<INTEGER: e.g. 2500>",
         "views": "<INTEGER_VIEWS>",
+        "vph": "<FLOAT: views per hour, e.g. 450.25>",
+        "v_s_ratio": "<FLOAT: views / subscribers, e.g. 42.5>",
+        "outlier_score": "<FLOAT: virality outlier score>",
+        "selection_group": "<small_channel_outlier_surge | all_time_top_velocity | recent_90_365_days>",
         "duration": "<INTEGER_SECONDS>",
         "hook_pacing": "<fast | moderate | slow>"
       }

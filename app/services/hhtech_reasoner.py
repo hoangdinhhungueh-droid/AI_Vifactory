@@ -144,15 +144,21 @@ def call_gpt6_astra(
     timeout: float = 60.0
 ) -> str:
     """
-    Synchronous caller for GPT-6-Astra via Model Gateway (Pattern 3).
-    
-    Automatically tracks model usage telemetry.
-    Falls back to Anthropic Claude if HHTech fails (optional).
+    Synchronous caller for GPT-6-Astra via Model Gateway with Multi-Tier Fallback:
+      - Tier 1: Primary (gpt-6-astra -> fallback claude-opus-5)
+      - Tier 2: Resilient Fallback (kimi-k3 -> fallback claude-sonnet-5)
+    Automatically tracks model usage telemetry and guards against token overflow.
     """
     from app.services.model_gateway import get_global_gateway
-    
+    gateway = get_global_gateway()
+
+    # Budget / token guard: Cap prompt if excessively long
+    if len(prompt) > 24_000:
+        logger.warning(f"[hhtech] Prompt length {len(prompt)} exceeds 24k chars, pruning to 20k to avoid token overflow.")
+        prompt = prompt[:20_000]
+
+    # Tier 1: Primary Astra 6 with Opus 5 fallback
     try:
-        gateway = get_global_gateway()
         result = gateway.call_llm(
             prompt=prompt,
             model=HHTECH_MODEL,
@@ -160,11 +166,26 @@ def call_gpt6_astra(
             max_tokens=max_tokens,
             temperature=temperature,
             timeout=timeout,
-            fallback=None
+            fallback="claude-opus-5"
         )
         return result.strip()
-    except Exception as e:
-        logger.error(f"[hhtech] Model gateway call failed: {e}")
+    except Exception as e_t1:
+        logger.warning(f"[hhtech] Primary Tier 1 failed ({e_t1}), falling back to Tier 2 (kimi-k3 -> claude-sonnet-5)...")
+
+    # Tier 2: Kimi K3 with Sonnet 5 fallback
+    try:
+        result = gateway.call_llm(
+            prompt=prompt,
+            model="kimi-k3",
+            system_prompt=system_prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout=timeout,
+            fallback="claude-sonnet-5"
+        )
+        return result.strip()
+    except Exception as e_t2:
+        logger.error(f"[hhtech] All gateway tiers failed ({e_t2})")
         raise
 
 # Backward-compatibility alias during migration
