@@ -222,6 +222,21 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
     root_ep_dir = os.path.join("/root/video_factory/episodes", task_id)
     os.makedirs(root_ep_dir, exist_ok=True)
 
+    # Grounding Layer (B1.5.5 Fact-Anchor Injection - Rule 118 & Rule 128)
+    # Strict contract: load_grounding_intel raises RuntimeError if missing or rejected
+    g_data, grounding_block = load_grounding_intel(
+        task_id=task_id,
+        out_dir=out_dir,
+        topic=topic,
+        niche_brief=niche_brief,
+        market=mkt
+    )
+    if grounding_block:
+        logger.info(f"[story_engine] Loaded Grounding Layer table ({len(g_data.get('claims', []))} claims) for {task_id}.")
+
+    temporal_cadence = (g_data.get("temporal_cadence") or "ADAPTIVE").upper()
+    causal_epochs = g_data.get("causal_epochs") or []
+
     intel_card = load_competitor_intel(task_id)
     intel_status = "loaded" if intel_card else "none"
     anatomy = (intel_card.get("competitor_narrative_anatomy") or {}) if intel_card else {}
@@ -365,6 +380,48 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             "Strict Requirement: Scripts under 1,700 words will be rejected by the story gate.\n\n"
         )
 
+    chrono_cadence_instructions = {
+        "MACRO_SAGA": (
+            "TEMPORAL CADENCE: MACRO_SAGA (Multi-Year / Decadal Epic):\n"
+            "This investigation spans multiple years or decades. You MUST construct a sweeping chronological causal arc across the 5 Acts:\n"
+            "• Act I (Contemporary Shock & Rupture): Open with the contemporary breaking point, final verdict, or recent market shock. Anchor strictly to verified dates and metrics.\n"
+            "• Act II (The Genesis Rewind - Origin Deal/Baseline): Rewind years back to the foundational origin point (the founding loan, initial contract, deregulatory move, or early premise). Establish the baseline before the crisis began.\n"
+            "• Act III (The Hidden Mutation & Systemic Rot): Trace the years of brewing trouble—unheeded audits, hidden debt/leverage, quiet contractual loopholes, or regulatory blind spots that metastasized beneath the surface.\n"
+            "• Act IV (The Fatal Rupture & Reckoning): Document the catastrophic collapse, criminal indictment, default, or international legal ruling that tore the illusion apart.\n"
+            "• Act V (The Modern Mirror & Asset Hunt): Return to the contemporary horizon—the forensic pursuit of hidden assets, remaining liabilities, and the enduring institutional warning for viewers today."
+        ),
+        "MID_TACTICAL": (
+            "TEMPORAL CADENCE: MID_TACTICAL (Months to 1-2 Years Operational/Policy Conflict):\n"
+            "This investigation spans months or a short multi-season cycle. Construct an escalating procedural arc:\n"
+            "• Act I: The acute trigger event and public outbreak.\n"
+            "• Act II: Pre-crisis baseline and early tactical decisions months earlier.\n"
+            "• Act III: The escalation phase, internal disputes, and warning signals ignored by leadership.\n"
+            "• Act IV: The climax—public confrontation, regulatory intervention, or operational failure.\n"
+            "• Act V: The fallout, policy changes, and forward-looking systemic impact."
+        ),
+        "FLASH_CRISIS": (
+            "TEMPORAL CADENCE: FLASH_CRISIS (Days to Weeks Rapid Shock / Flash Collapse):\n"
+            "This investigation spans hours, days, or weeks (e.g. bank run, liquidity freeze, sudden catastrophe). Maintain breathless, high-velocity ticking-clock pacing:\n"
+            "• Act I: The breaking collapse and catastrophic 24-hour run.\n"
+            "• Act II: The vulnerable baseline conditions immediately preceding the spark.\n"
+            "• Act III: The transmission contagion—hour-by-hour panic, margin calls, or operational dominoes.\n"
+            "• Act IV: The emergency rupture point—failed bailouts, sudden halts, or regulatory seizure.\n"
+            "• Act V: Forensic autopsy—the immediate lessons and structural exposure."
+        )
+    }
+    cadence_guide = chrono_cadence_instructions.get(
+        temporal_cadence,
+        "TEMPORAL CADENCE: ADAPTIVE CHRONO-PACING:\n"
+        "Trace the timeline progression from initial origin through mutation to the critical rupture and modern aftermath."
+    )
+    chrono_mandate = (
+        f"\n🚨 MANDATORY ADAPTIVE CHRONO-PACING & TEMPORAL PROGRESSION (RULE 130):\n"
+        f"{cadence_guide}\n"
+        f"CRITICAL SINGLE-TIMESTAMP ACCOUNTING LOOP PROHIBITION:\n"
+        f"STRICTLY FORBIDDEN: Looping and repeating the exact same financial figures or news snippet from today's headline across all 5 Acts!\n"
+        f"Each Act MUST advance along the chronological causal chain defined in the Chrono-Causal Epochs Table. Give viewers the full investigative journey—from genesis to reckoning."
+    )
+
     system_prompt = (
         f"You are a World-Class Master Non-Fiction Investigative Documentary Scriptwriter for Video Factory.\n"
         f"Target Narration Language: {lang_name}.\n"
@@ -389,6 +446,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
         f"• {treatment_note}\n"
         f"• Zero graphic violence, zero gore, zero criminal glorification, zero method instructions.\n"
         f"{crime_forensic_mandate}\n"
+        f"{chrono_mandate}\n"
         f"Output ONLY the complete script organized strictly by Acts using '=== ACT I ===', '=== ACT II ===', '=== ACT III ===', '=== ACT IV ===', '=== ACT V ===' markers. No markdown fences, no stage directions."
     )
 
@@ -445,18 +503,6 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
     if context_lines:
         competitor_context = "\n".join(context_lines) + "\n\n"
 
-    # Grounding Layer (B1.5.5 Fact-Anchor Injection - Rule 118 & Rule 128)
-    # Strict contract: load_grounding_intel raises RuntimeError if missing or rejected
-    g_data, grounding_block = load_grounding_intel(
-        task_id=task_id,
-        out_dir=out_dir,
-        topic=topic,
-        niche_brief=niche_brief,
-        market=mkt
-    )
-    if grounding_block:
-        logger.info(f"[story_engine] Loaded Grounding Layer table ({len(g_data.get('claims', []))} claims) for {task_id}.")
-
     is_cjk_market = mkt.upper() in ("JP", "KR", "ZH")
     min_existing = 1500 if is_cjk_market else 1000
 
@@ -511,6 +557,9 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             f"(exact date, acting entity, and verified quantitative impact from the Grounding Table). "
             f"Zero generic preamble, slow historical setup, or abstract theoretical hand-waving ('When a threat occurs'); "
             f"directly satisfy and pay off the viewer's search query with verified contemporary facts before peeling back the systemic layers.\n"
+            f"CHRONO-CAUSAL PROGRESSION (TEMPORAL CADENCE: {temporal_cadence}): "
+            f"Advance the narrative chronologically across the 5 Acts using the Chrono-Causal Epochs Table (Genesis Seed -> Mutation & Warning -> Critical Rupture -> Modern Aftermath). "
+            f"STRICTLY FORBIDDEN: Looping and repeating the exact same single-timestamp figures across every Act. Each Act must uncover a distinct temporal phase of the case.\n"
             f"Write the full ~1,800-2,200 word script now, adhering strictly to the 5-Act markers:"
         )
 
@@ -627,7 +676,9 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                 topic_meta={
                     "task_id": task_id,
                     "topic_name_vi": topic,
-                    "rising_queries": breakout_queries
+                    "rising_queries": breakout_queries,
+                    "temporal_cadence": temporal_cadence,
+                    "causal_epochs": causal_epochs
                 },
                 market=mkt,
                 model="claude-opus-5",
@@ -651,7 +702,9 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                         topic_meta={
                             "task_id": task_id,
                             "topic_name_vi": topic,
-                            "rising_queries": breakout_queries
+                            "rising_queries": breakout_queries,
+                            "temporal_cadence": temporal_cadence,
+                            "causal_epochs": causal_epochs
                         },
                         market=mkt,
                         system_prompt=system_prompt

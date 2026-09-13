@@ -284,3 +284,52 @@ def test_story_engine_strict_grounding_contract(tmp_path):
     assert "RULE 130" in block
 
 
+def test_format_grounded_facts_with_chrono_epochs():
+    sample_result = {
+        "temporal_cadence": "MACRO_SAGA",
+        "claims": [
+            {
+                "claim": "Direct breach event",
+                "source": "Reuters",
+                "date": "2026-08-14",
+                "confidence": "verified",
+                "causal_role": "primary_catalyst",
+                "mechanism": "legal"
+            },
+            {
+                "claim": "Regulatory sanction notice",
+                "source": "SEC",
+                "date": "2026-08-15",
+                "confidence": "verified",
+                "causal_role": "transmission_mechanism",
+                "mechanism": "regulatory"
+            }
+        ],
+        "causal_epochs": [
+            {
+                "epoch_stage": "genesis_seed",
+                "time_marker": "2007",
+                "event_summary": "Initial loan guaranteed by commercial bank",
+                "verified_claim": "380 billion won loan contracted"
+            },
+            {
+                "epoch_stage": "incubation_mutation",
+                "time_marker": "2015",
+                "event_summary": "Collateral sold at auction after debt default",
+                "verified_claim": "Auction completed"
+            },
+            {
+                "epoch_stage": "critical_rupture",
+                "time_marker": "2026",
+                "event_summary": "Arbitration tribunal dismisses all claims with costs",
+                "verified_claim": "Zero payout award"
+            }
+        ]
+    }
+    formatted = format_grounded_facts_for_prompt(sample_result)
+    assert "CHRONO-CAUSAL EPOCHS TABLE (TEMPORAL CADENCE: MACRO_SAGA)" in formatted
+    assert "[GENESIS_SEED] (2007): Initial loan guaranteed by commercial bank" in formatted
+    assert "[INCUBATION_MUTATION] (2015): Collateral sold at auction" in formatted
+    assert "[CRITICAL_RUPTURE] (2026): Arbitration tribunal dismisses all claims" in formatted
+
+

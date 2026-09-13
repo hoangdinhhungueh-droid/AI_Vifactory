@@ -217,12 +217,28 @@ def run_grounding_research(
         "   MANDATORY RULE 130: Distinguish Level 1 from Level 2. NEVER invert causality or present a transmission mechanism as the original primary trigger.\n"
         "4. Identify the mechanism of each claim (e.g. 'financial', 'legal', 'military', 'commercial', 'technical', 'regulatory').\n"
         "5. Include exact publication dates (YYYY-MM-DD) and outlet/source names.\n"
-        "6. If there is insufficient credible evidence or the topic is pure rumor/satire, set 'rejected': true with a clear 'reject_reason'.\n\n"
+        "6. If there is insufficient credible evidence or the topic is pure rumor/satire, set 'rejected': true with a clear 'reject_reason'.\n"
+        "7. ADAPTIVE TEMPORAL PROGRESSION & CHRONO-EPOCHS (SCALE-UP ARCHITECTURE):\n"
+        "   - Identify the natural temporal cadence of the topic: 'MACRO_SAGA' (multi-year/decadal, corporate rise/fall, major lawsuit), 'MID_TACTICAL' (months to 1-2 years, policy/product battle), or 'FLASH_CRISIS' (days to weeks, bank-run, flash crash, sudden breach).\n"
+        "   - Extract 2 to 4 pivotal 'causal_epochs' representing the timeline progression:\n"
+        "     * 'genesis_seed': The foundational origin (initial contract, loan, founding premise, baseline deal, or pre-crisis baseline).\n"
+        "     * 'incubation_mutation': The hidden distortion or systemic rot (unheeded warnings, hidden leverage, initial disputes, or brewing crisis).\n"
+        "     * 'critical_rupture': The fatal breaking point (criminal conviction, regulatory seizure, whistleblower leak, or default).\n"
+        "     * 'contemporary_aftermath': The current state (unresolved asset recovery, final award, enforcement, or precedent).\n\n"
         "Output ONLY a valid JSON object matching this schema:\n"
         "{\n"
         "  \"topic\": \"...\",\n"
+        "  \"temporal_cadence\": \"MACRO_SAGA|MID_TACTICAL|FLASH_CRISIS\",\n"
         "  \"rejected\": false,\n"
         "  \"reject_reason\": \"\",\n"
+        "  \"causal_epochs\": [\n"
+        "    {\n"
+        "      \"epoch_stage\": \"genesis_seed|incubation_mutation|critical_rupture|contemporary_aftermath\",\n"
+        "      \"time_marker\": \"Year, date, or relative time (e.g. 2007, 6 months earlier, Hour 0)\",\n"
+        "      \"event_summary\": \"What physically, legally, or financially occurred\",\n"
+        "      \"verified_claim\": \"Anchor factual statement with concrete metric/actor\"\n"
+        "    }\n"
+        "  ],\n"
         "  \"claims\": [\n"
         "    {\n"
         "      \"claim\": \"Concise, specific factual claim with concrete metric/action\",\n"
@@ -237,7 +253,12 @@ def run_grounding_research(
         "}\n"
     )
 
-    query_text = f"Topic: '{topic}'."
+    query_text = (
+        f"Topic: '{topic}'.\n"
+        f"1. Contemporary Horizon: Identify the immediate breaking event, latest verdict, recent metric, and primary catalyst.\n"
+        f"2. Chronological Backtrace: Investigate the chronological pre-history: when did this entity, conflict, contract, deal, or vulnerability begin? "
+        f"Identify the origin point, any prior criminal/civil disputes, ignored audits, or pre-crisis baseline.\n"
+    )
     if search_hint:
         query_text += f" Search focus: '{search_hint}'."
     if market.upper() == "JP":
@@ -438,5 +459,19 @@ def format_grounded_facts_for_prompt(grounding_result: Dict[str, Any]) -> str:
         role = classify_causal_role(c).upper()
         claim_txt = c.get("claim", "")
         lines.append(f"{idx}. [{conf}] [{role}] ({date}) [{src} | Mechanism: {mech}]: {claim_txt}")
+
+    epochs = grounding_result.get("causal_epochs", [])
+    cadence = grounding_result.get("temporal_cadence", "ADAPTIVE")
+    if epochs:
+        lines.append("")
+        lines.append(f"### CHRONO-CAUSAL EPOCHS TABLE (TEMPORAL CADENCE: {cadence})")
+        lines.append("Use these chronological waypoints to drive narrative progression across the 5 Acts (avoid single-timestamp repetition):")
+        for ep in epochs:
+            stg = str(ep.get("epoch_stage", "stage")).upper()
+            tm = ep.get("time_marker", "Historical Anchor")
+            ev = ep.get("event_summary", "")
+            cl = ep.get("verified_claim", "")
+            anchor_note = f" — Verified Anchor: {cl}" if cl else ""
+            lines.append(f"- [{stg}] ({tm}): {ev}{anchor_note}")
 
     return "\n".join(lines)

@@ -28,12 +28,12 @@ Your sole mandate is to rigorously interrogate and audit investigative video scr
 3. QUANTITATIVE METRIC INTEGRITY (Rule 118 Zero-Mock): Are specific numbers (money, dates, percentages) backed 100% by the Grounding Claims, or did the LLM hallucinate/fabricate numbers or source citations?
 4. CAUSAL HIERARCHY & TRANSMISSION INTEGRITY (Rule 130): Does it clearly distinguish Level 1 Catalyst (initiating trigger event) from Level 2 Transmission Mechanism (institutional/systemic response) across all topic axes without causal inversion or convenient twists?
 5. COMPETITOR VACUUM & 10X PIVOT RESOLUTION: Does the narrative resolve the fatal explanatory vacuum that competitor videos failed to explain?
-6. FORENSIC PAPER TRAIL & EVIDENCE DEPTH: Does the script trace concrete evidence (balance sheets, internal memos, legal clauses, regulatory findings) rather than relying on vague generalizations?
+6. FORENSIC PAPER TRAIL & CHRONOLOGICAL CAUSAL DEPTH (SCALE-UP CHRONO-ENGINE): Does the script uncover the chronological root cause (Genesis Seed & Incubation Mutation) across the natural temporal cadence of the topic (Macro Saga, Mid Tactical, or Flash Crisis), or does it fall into the single-timestamp accounting loop trap by merely repeating today's breaking numbers across all Acts?
 7. ANTI-HYPOTHETICAL & CLINICAL DOCUDRAMA TONE: Zero "Imagine...", zero hypothetical hand-waving; strictly factual, clinical, and high-tension procedural exposition.
 
 Passing threshold:
 - audit_score >= 8.0/10
-- To pass, verdict MUST be "PASS". If critical violations exist (fabrications, severe staleness, causal inversion), mark "verdict": "FAIL".
+- To pass, verdict MUST be "PASS". If critical violations exist (fabrications, severe staleness, causal inversion, single-timestamp accounting loop), mark "verdict": "FAIL".
 
 Output MUST be a single strict JSON object matching this schema:
 {
@@ -45,6 +45,7 @@ Output MUST be a single strict JSON object matching this schema:
   "causal_hierarchy_score": <FLOAT 0.0 - 10.0>,
   "competitor_vacuum_score": <FLOAT 0.0 - 10.0>,
   "forensic_paper_trail_score": <FLOAT 0.0 - 10.0>,
+  "chrono_causal_depth_score": <FLOAT 0.0 - 10.0>,
   "anti_hypothetical_tone_score": <FLOAT 0.0 - 10.0>,
   "red_flags": [<STRING>, ...],
   "critical_findings": "<CONCISE SUMMARY OF VIOLATIONS OR APPROVAL>"
@@ -70,20 +71,27 @@ def audit_story_facts_and_causality(
     topic = topic_meta.get("topic_name_vi") or topic_meta.get("raw_term") or "Unknown Topic"
     task_id = topic_meta.get("task_id", "")
     rising_queries = topic_meta.get("rising_queries", [])
+    temporal_cadence = topic_meta.get("temporal_cadence") or "ADAPTIVE"
+    causal_epochs = topic_meta.get("causal_epochs") or []
+
+    epochs_section = ""
+    if causal_epochs:
+        epochs_section = f"\n[CHRONO-CAUSAL EPOCHS & TEMPORAL CADENCE: {temporal_cadence}]\n" + json.dumps(causal_epochs, ensure_ascii=False, indent=2) + "\n"
 
     user_prompt = f"""[TOPIC AUDIT TARGET]
 Task ID: {task_id}
 Topic: {topic} | Market: {m_up}
 Audit Context: September 2026 Live Production Pipeline
+Temporal Cadence: {temporal_cadence}
 Rising Search Queries: {', '.join([str(q) for q in rising_queries[:6]])}
 
 [GROUNDING FACT CLAIMS (VERIFIED BASELINE TRUTH)]
 {json.dumps(grounding_claims, ensure_ascii=False, indent=2)}
-
+{epochs_section}
 [DELIVERED VIDEO SCRIPT FOR AUDIT]
 {story_text}
 
-Perform strict adversarial forensic audit according to the 4 Iron Criteria. Interrogate every metric, source attribution, and causal link. Return strict JSON only."""
+Perform strict adversarial forensic audit according to the 7 Iron Criteria. Interrogate every metric, source attribution, chronological progression, and causal link. Return strict JSON only."""
 
     # Enforce Claude lineage: only claude-opus-5 or claude-sonnet-5 allowed
     if not (model.startswith("claude-opus-5") or model.startswith("claude-sonnet-5")):

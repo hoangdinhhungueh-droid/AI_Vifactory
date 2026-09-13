@@ -130,6 +130,10 @@
       - Áp dụng chuẩn Generic Placeholders:
         `"<CATALYST_EVENT> (verified date & direct actor) -> <TRANSMISSION_MECHANISM> (financial/legal/logistical choke) -> <CORE_SYSTEMIC_PARADOX> -> <DIRECT_SEARCH_PAYOFF>"`
       - Trải dài trên toàn bộ 7 Trục: Trục 1 (Business Rise & Fall), Trục 2 (Modern History & Systemic Crisis), Trục 3 (True Crime Non-Graphic), Trục 4 (Psychology & Behavioral Manipulation), Trục 5 (Tech & Geopolitical Battles), Trục 6 (Institutional & Regulatory Chokepoints), Trục 7 (Hidden Asymmetric Fortunes & Underground Flows).
+    - **Adaptive Temporal Cadence & Chrono-Causal Epochs (Thoát Khỏi Bẫy Đơn Điểm Thời Gian & Co Giãn Nhân Quả)**:
+      - Phân loại tự động 3 nhịp thời gian tự nhiên: `MACRO_SAGA` (đại án/tranh chấp nhiều năm hoặc thập kỷ), `MID_TACTICAL` (chu kỳ chính sách/sản phẩm vài tháng đến 1-2 năm), `FLASH_CRISIS` (khủng hoảng thanh khoản/sụp đổ đột ngột vài ngày hoặc 72 giờ).
+      - Trích xuất bảng `causal_epochs` (`genesis_seed` -> `incubation_mutation` -> `critical_rupture` -> `contemporary_aftermath`) làm hoa tiêu nhân quả xuyên suốt kịch bản và đạo diễn phân cảnh.
+      - CẤM TUYỆT ĐỐI căn bệnh "vòng lặp kế toán 1 thời điểm" (Single-Timestamp Accounting Loop Trap) lặp đi lặp lại cùng các con số thời sự trên cả 5 Hồi; kịch bản (B2) và thị giác (B3) bắt buộc phải tiến triển qua các mốc son nhân quả của từng epoch.
 
 13. **RULE 131 (10X Beat Architecture & Editorial Signal Purity Mandate - Kỷ Luật Thép Về Cấu Trúc Nhịp Kịch Bản x10 & Khử Nhiễu Prompt Kể Chuyện)**:
     - **Signal-to-Noise Ratio & Zero Marketing Contamination (Khử Nhiễu Tuyệt Đối)**:

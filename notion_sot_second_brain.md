@@ -62,7 +62,7 @@ graph TD
   - **Rule 127**: Anti-Tunnel-Vision & Mandatory Programmatic Runtime Execution Gate (Thực thi sống hàm sửa đổi).
   - **Rule 128**: Anti-Semantic-Bias & Generic Contract Architecture Mandate (0 domain bleed, generic patterns).
   - **Rule 129**: Autonomous Deep Reasoning & Proactive Clarification Gate (Claude-style inquiry).
-  - **Rule 130**: Factual Causal Integrity & Search-Intent Payoff Mandate (Level 1 Catalyst vs Level 2 Transmission).
+  - **Rule 130**: Factual Causal Integrity & Search-Intent Payoff Mandate (Level 1 Catalyst vs Level 2 Transmission; Adaptive Temporal Cadence & Chrono-Causal Epochs).
   - **Rule 131**: 10X Beat Architecture & Editorial Signal Purity Mandate (5-Beat micro-pacing, 0 marketing clutter).
   - **Rule 132**: Strict Decoupled Engine & Pure Transmission Pipe Mandate (Code as pure pipe, Notion as brain).
   - **Rule 133**: Notion AI Skill Delegation vs. Antigravity Operational Scope Mandate (Editorial skills on Notion, Antigravity rules in AGENTS.md).
@@ -95,9 +95,11 @@ graph TD
     *Viability Gate yêu cầu score ≥ 8.0/10.*
   - **B1.1 (`adversarial_critic_b1.py`)**: Adversarial Critic Gate qua Claude Opus 5 (Veto sớm các đề tài lệch trend / bait-and-switch).
   - **B1.5 (`competitor_recon_b15.py`)**: Two-Pass Competitor Recon & Fatal Explanatory Vacuum.
-  - **B1.5.5 (`grounding_layer_b15.py`)**: Live Fact-Grounding & Verification Gate (Gemini 2.5 Flash REST), bóc tách 3-6 verified claims.
+  - **B1.5.5 (`grounding_layer_b15.py`)**: Live Fact-Grounding & Verification Gate (Gemini 2.5 Flash REST), bóc tách 3-6 verified claims, xác định Temporal Cadence (`MACRO_SAGA`, `MID_TACTICAL`, `FLASH_CRISIS`) và bảng Chrono-Causal Epochs.
   - **B1.6 (`seo_package_forge.py`)**: Forging Early Title A/B & 60s An Ong Hook (Rule 444 & Rule 130).
-  - **B2 (`story_engine_b2.py`)**: Sinh kịch bản 5 Beat "Investigative Docudrama" (1,800 - 2,200 từ, ~12-15 phút) qua `GPT-6-Astra`.
+  - **B2 (`story_engine_b2.py`)**: Sinh kịch bản 5 Beat "Investigative Docudrama" (1,800 - 2,200 từ, ~12-15 phút) qua `GPT-6-Astra`, điều phối dòng thời gian nhân quả linh hoạt, triệt tiêu bẫy lặp số kế toán đơn điểm thời gian.
+  - **B2.1 (`story_fact_auditor_b2.py`)**: Claude Opus 5 Fact & Causal Depth Audit Gate (yêu cầu score >= 8.0/10, thẩm định chiều sâu mốc thời gian nhân quả).
+  - **B3 (`director_planner_b3.py`)**: Hollywood Art Director Plan (35-55 scenes), nạp `epoch_stage` và `temporal_cadence` để đồng bộ ánh sáng và bối cảnh thị giác theo từng thời kỳ.
   - **B2.1 (`fact_causal_audit` qua Claude Opus 5)**: Kiểm toán độc lập tính toàn vẹn nhân quả (Rule 130). Chỉ khi B2.1 đạt PASS (score ≥ 7.5/10) mới **Chốt Task ID chính thức + Sync Notion Trend Brain (Approved→Story) + Gửi Telegram Gate 1 hoàn chỉnh** trước khi chuyển giao B3.
   - **B3 (`/video:art-director`)**: Lập bảng đạo diễn Dynamic Scenes (Layer 1 BG + Layer 2 FG) bằng tiếng Anh khớp 10X 5-Beat & Visual Anchoring ngòi nổ thực tế (Rule 116, 120, 128, 130, 131). Sync **Director Plan DB**.
   - **B3.5 (`/prompt:forge`) / B3.6 (`b36_visual_convergence.py`)**: Sinh Prompt Engineering chuẩn FG `#FF00FF` Chroma Key & DACL Visual Convergence Audit. Tự động phát **Telegram Human Gate 2** (Thẻ tóm lược điều hành + lệnh 1-chạm kích hoạt `vf-image-gen` B4/B5).
