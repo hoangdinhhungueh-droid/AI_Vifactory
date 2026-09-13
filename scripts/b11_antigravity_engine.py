@@ -594,19 +594,22 @@ def run_b11_engine(mode="routine", dry_run=False, target_market=None):
             )
             
         prompt_lines.append(
-            "\nYÊU CẦU PHÂN TÍCH CHUYÊN SÂU TỐI CAO (Chief YouTube Algorithm Scientist):\n"
-            "1. ĐÁNH GIÁ SỨC KHỎE KÊNH & PHỄU PHÂN PHỐI (Dựa trên 4 Tab Analytics):\n"
-            "   - Nhận định trạng thái thuật toán kênh (Lạnh/Warm/Mature) và hiệu quả nguồn lưu lượng.\n"
-            "   - Đánh giá tỷ lệ Mobile và nguy cơ rớt view nếu Thumbnail thiếu tương phản hoặc Hook vòng vo.\n"
-            "2. CHỈ THỊ KỸ THUẬT BẮT BUỘC CHO VIDEO TIẾP THEO (Áp dụng Khung An Ong 2026):\n"
-            "   - B2 Story: Áp dụng Rule 444 (5-Variant Hook Protocol): Soạn sẵn 1 câu Hook mẫu mở đầu trực diện bằng con số hoặc nghịch lý gay gắt.\n"
-            "   - B10 SEO & Thumbnail: Áp dụng Rule 443: Đề xuất Headline Text trên thumbnail (Font Ultra-Bold, chiếm >= 40% canvas).\n"
-            "   - B1 Định Hướng Đề Tài Mới (Dựa trên Tab 4 Xu Hướng): Gợi ý 2 đề tài cụ thể bắt nhịp với chủ đề đang thịnh hành tại thị trường mục tiêu nhưng vẫn giữ vững bản sắc ngách (Rule 445: Pure Niche).\n"
-            "3. ĐÚNG 1 CÂU QUY TẮC HÀNH ĐỘNG CỐT TỬ ĐỂ BỔ SUNG VÀO NOTION SKILL (Self-Learning Enhancement Loop)."
+            "\nYÊU CẦU PHÂN TÍCH CHUYÊN SÂU & TỰ HỌC CẢI TIẾN PIPELINE (Chief YouTube Algorithm Scientist):\n"
+            "Dựa trên kiến thức thực chứng toàn diện từ 4 Tab Analytics, hãy thực hiện ĐÁNH GIÁ 3 TẦNG & TỔNG HỢP BÀI HỌC TỰ HỌC ĐỂ NÂNG CẤP CÁC BƯỚC TRONG PIPELINE:\n"
+            "1. TẦNG CHẨN ĐOÁN THUẬT TOÁN (Tầng 1 & 2 - Forensic Health & Distribution Bottlenecks):\n"
+            "   - Nhận định chính xác giai đoạn ươm tạo kênh (Incubation Matrix 0-20 Video), trạng thái phân phối lạnh (Cold Sampling) và cảnh báo nghẽn (Stall / Engagement Deficit).\n"
+            "   - Phân tích rủi ro thiết bị Mobile và phễu chuyển đổi từ 4 Tab.\n"
+            "2. TẦNG TỰ HỌC & CHỈ THỊ CẢI TIẾN TRỰC TIẾP CHO TỪNG BƯỚC PIPELINE (Tier 3 Self-Learning Enhancement):\n"
+            "   - [NÂNG CẤP B1 - ĐỊNH HƯỚNG ĐỀ TÀI & NGÁCH]: Dựa vào Tab 4 (Xu hướng thị trường) & Tab 2 (Từ khóa tìm kiếm), gợi ý 2 đề tài mới có nhu cầu tìm kiếm cao, giải quyết Content Gaps nhưng TUÂN THỦ TRIỆT ĐỂ Rule 445 (Pure Niche Consistency).\n"
+            "   - [NÂNG CẤP B2 - KỊCH BẢN & 5-BEAT HOOK]: Dựa vào Tab 2 (AVD & Retention drop-off), áp dụng Rule 444 (5-Variant Hook Protocol) để soạn 1 câu Hook mẫu mở đầu trực diện bằng số liệu/nghịch lý gai góc và gia cố Micro-Cliffhangers tại Beat 4/5.\n"
+            "   - [NÂNG CẤP B3/B4/B5 - HÌNH ẢNH & THUMBNAIL]: Dựa vào Tab 2 (Tỷ lệ Mobile %) & Tab 3 (Nhân khẩu học), áp dụng Rule 443 để ra chỉ thị kỹ thuật cho Thumbnail (Headline text cực lớn >= 40% canvas, độ tương phản cao, phong cách minh họa Stylized Graphic Novel cho đúng thị trường).\n"
+            "   - [NÂNG CẤP B10 - ĐÓNG GÓI & SEO FORGE]: Dựa vào Tab 2 (Search queries) & Tab 3 (Địa lý khán giả), chỉ đạo quy cách Title giật gân nhưng trung thực (Rule 130), bộ Tags và Description chuẩn ngôn ngữ bản địa.\n"
+            "3. QUY TẮC CỐT TỬ ĐỒNG BỘ VÀO NOTION SKILL (Self-Learning Enhancement Loop):\n"
+            "   - Đúc kết ĐÚNG 1 ĐOẠN QUY TẮC HÀNH ĐỘNG CỐT LÕI (2-3 câu ngắn gọn) để tự động lưu vào Notion Skill `Self-Learning Enhancement Loop`, làm tri thức sống cho các Agent của B1, B2, B10 tự động nạp ở chu kỳ tiếp theo."
         )
         
         full_prompt = "\n".join(prompt_lines)
-        print("Calling HHTech GPT-6-Astra with Complete 4-Tab Analytics...")
+        print("Calling HHTech GPT-6-Astra with Complete 4-Tab Analytics (3-Tier Pipeline Self-Learning)...")
         analysis_text, usage, elapsed = call_hhtech_gpt56(hhtech_key, full_prompt)
         token_cost = usage.get("total_tokens", 0)
         print(f"GPT-6-Astra finished in {elapsed:.2f}s (Tokens used: {token_cost})")
