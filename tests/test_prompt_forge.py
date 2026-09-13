@@ -110,3 +110,61 @@ def test_generate_scene_prompts_astra_success():
     assert "bg_loc0" in res["backgrounds"]
     assert "fg_char0" in res["foregrounds"]
     assert "#FF00FF" in res["foregrounds"]["fg_char0"]
+
+
+from app.services.prompt_forge import resolve_market_profile
+
+
+def test_resolve_market_profile():
+    jp = resolve_market_profile("JP")
+    assert jp["market_code"] == "JP"
+    assert "Japanese" in jp["fg_anchor"]
+    assert "no Caucasian traits" in jp["fg_negatives"]
+
+    kr = resolve_market_profile("KR")
+    assert kr["market_code"] == "KR"
+    assert "Korean" in kr["fg_anchor"]
+    assert "no Caucasian traits" in kr["fg_negatives"]
+
+    vn = resolve_market_profile("VN")
+    assert vn["market_code"] == "VN"
+    assert "Vietnamese" in vn["fg_anchor"]
+    assert "no Caucasian traits" in vn["fg_negatives"]
+
+    gl = resolve_market_profile("GLOBAL")
+    assert gl["market_code"] == "GLOBAL"
+
+
+def test_market_adaptive_sanitization_anti_western_bias():
+    raw_fg = "Senior financial investigator examining document"
+    jp_fg = _sanitize_foreground_prompt(raw_fg, market="JP")
+    assert "[MARKET & ETHNIC ANCHOR]" in jp_fg
+    assert "Authentic Japanese individual" in jp_fg
+    assert "no Caucasian traits" in jp_fg
+    assert "#FF00FF" in jp_fg
+
+    raw_bg = "Modern executive boardroom with glass windows"
+    kr_bg = _sanitize_background_prompt(raw_bg, market="KR")
+    assert "[MARKET & ENVIRONMENT ANCHOR]" in kr_bg
+    assert "Seoul or Yeouido" in kr_bg
+    assert "no generic Western American cityscapes" in kr_bg
+    assert "16:9" in kr_bg
+
+
+def test_generate_scene_prompts_market_propagation():
+    mock_bg = {"bg_1": {"visual_hint": "Ministry office"}}
+    mock_fg = {"fg_1": {"visual_hint": "Chief prosecutor"}}
+    mock_scenes = [{"scene_id": "sc01", "bg_id": "bg_1", "fg_id": "fg_1", "narration": "The scandal broke..."}]
+
+    with patch("app.services.prompt_forge.call_gpt6_astra", return_value=None):
+        res = generate_scene_prompts(
+            mock_bg, mock_fg, "Tokyo Financial Scandal", mock_scenes, task_id="JP_EP0042_tokyo_scandal"
+        )
+    assert "backgrounds" in res and "foregrounds" in res
+    fg_p = res["foregrounds"]["fg_1"]
+    bg_p = res["backgrounds"]["bg_1"]
+    assert "Authentic Japanese individual" in fg_p
+    assert "no Caucasian traits" in fg_p
+    assert "Authentic Japanese corporate or urban setting" in bg_p
+    assert "thumbnails" in res
+    assert "Japanese" in res["thumbnails"]["thumbnail_a"]

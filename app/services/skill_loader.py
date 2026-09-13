@@ -437,13 +437,13 @@ def get_b1_strategic_rules() -> str:
 
 
 def get_b35_strategic_rules() -> str:
-    """Concise strategic visual production rules (~1,400 chars) for B3.5 Prompt Forge.
+    """Concise strategic visual production rules (~1,800 chars) for B3.5 Prompt Forge.
     Distills Rule 116 (Two-Layer Composition), Rule 120 (Chroma Key Spec),
-    Rule 128 (Zero Semantic Bias & Era Authenticity), Rule 435 (Graphic Novel Style),
-    Rule 446 (English Production Bridge), and Rule 114 (High-CTR 16:9 Hero Thumbnails).
+    Rule 122 (Visual Audit & Market Ethnicity Conformance), Rule 128 (Zero Semantic Bias & Era Authenticity),
+    Rule 435 (Graphic Novel Style), Rule 446 (English Production Bridge), and Rule 114 (Hero Thumbnails).
     """
     return (
-        "=== NOTION SOT CONCISE VISUAL PRODUCTION RULES (RULES 114, 116, 120, 128, 435, 446) ===\n"
+        "=== NOTION SOT CONCISE VISUAL PRODUCTION RULES (RULES 114, 116, 120, 122, 128, 435, 446) ===\n"
         "1. TWO-LAYER COMPOSITION (Rule 116):\n"
         "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic documentary environment. Authentic period architecture, environment textures, dramatic volumetric lighting. No prominent foreground humans. Bottom 20% safe-zone clear for subtitles, center-right negative space for character overlay.\n"
         "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration. Cel-shading, bold ink linework, rich nuanced colors. Exactly one full-body character visible head to toe in authentic period attire. Positioned strictly Right or Left.\n"
@@ -458,7 +458,10 @@ def get_b35_strategic_rules() -> str:
         "   - Zero domain bleed: never inject modern tech into historical scenes, nor rural relics into corporate scenes.\n"
         "5. 16:9 2K HERO THUMBNAILS (Rule 114):\n"
         "   - Thumbnail A (Emotion-First & Viral Angle) and Thumbnail B (Curiosity-Gap & Paradox): 16:9, 2560x1440, bold contrast, clean negative space for typography.\n"
-        "6. ENGLISH PRODUCTION BRIDGE (Rule 446): All visual prompt outputs must be in clear, descriptive English."
+        "6. ENGLISH PRODUCTION BRIDGE (Rule 446): All visual prompt outputs must be in clear, descriptive English.\n"
+        "7. MARKET ETHNICITY & REGIONAL ARCHITECTURE CONFORMANCE (Rule 122 & Rule 128):\n"
+        "   - Foreground characters MUST feature authentic ethnic phenotype (facial bone structure, eye shape, hair styling, skin tones, local professional attire) strictly conforming to target market (JP -> Japanese, KR -> Korean, VN -> Vietnamese). ZERO Caucasian/Western bias on Asian subjects.\n"
+        "   - Backgrounds MUST feature authentic local corporate/urban architecture, streetscapes, and interior design matching the target market. ZERO generic American high-rise mismatch."
     )
 
 

@@ -513,6 +513,22 @@ def generate_director_plan(
         if not intel_card:
             intel_card = {}
 
+    grounding_data = {}
+    g_candidates = [
+        var_vf_dir / "grounding_intel.json",
+        ep_dir / "grounding_intel.json",
+        ws_dir / "grounding_intel.json"
+    ]
+    for gc in g_candidates:
+        if gc.exists():
+            try:
+                grounding_data = json.loads(gc.read_text(encoding="utf-8"))
+                break
+            except Exception:
+                pass
+    temporal_cadence = (grounding_data.get("temporal_cadence") or "ADAPTIVE").upper()
+    causal_epochs = grounding_data.get("causal_epochs") or []
+
     if not metadata:
         metadata = {}
 
@@ -567,7 +583,10 @@ def generate_director_plan(
         "   - Maintain background_reuse_key and foreground_reuse_key across continuous sequences.\n"
         "4. DUAL-LANGUAGE PROTOCOL (Production Bridge Rule 446 & Market Rule 120):\n"
         "   - VISUAL PROMPTS (bg_prompt, fg_prompt, visual_metaphor): MUST BE IN ENGLISH for the image generation engine.\n"
-        f"   - SPOKEN NARRATION ('narration' field in each scene): MUST BE 100% WRITTEN IN {market_lang_name}! NEVER translate narration to English for non-English markets! Voiceover TTS & subtitles require authentic {market_lang_name}.\n\n"
+        f"   - SPOKEN NARRATION ('narration' field in each scene): MUST BE 100% WRITTEN IN {market_lang_name}! NEVER translate narration to English for non-English markets! Voiceover TTS & subtitles require authentic {market_lang_name}.\n"
+        "5. ADAPTIVE CHRONO-PACING & VISUAL STAGING (Rule 130):\n"
+        f"   - Temporal Cadence: {temporal_cadence}.\n"
+        "   - Evolve visual lighting, tone, and environment across the 5 beats to match the story's chronological epochs (e.g. foundational deals/ambition in earlier acts vs escalating shadow and clinical courtroom/investigative staging in climax).\n\n"
         "OUTPUT FORMAT: Return ONLY a valid JSON object matching the exact schema below. No markdown fences."
     )
 
@@ -580,6 +599,8 @@ def generate_director_plan(
         "director_archetype": archetype["director"],
         "dynamic_context": dynamic_context,
         "character_ensemble": character_ensemble,
+        "temporal_cadence": temporal_cadence,
+        "causal_epochs": causal_epochs,
         "fatal_explanatory_vacuum": intel_card.get("competitor_narrative_anatomy", {}).get("fatal_explanatory_vacuum", ""),
         "story_beats": [
             {
@@ -875,7 +896,8 @@ def generate_director_plan(
             fg_dict=fg_req,
             story_title=topic,
             scenes=normalized_scenes,
-            task_id=episode_id
+            task_id=episode_id,
+            market=m_up
         )
 
         # Map forged prompts back to each scene in director_plan

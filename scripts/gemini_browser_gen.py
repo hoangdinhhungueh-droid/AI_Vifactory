@@ -665,9 +665,38 @@ def verify_director_plan_binding(episode_id, items, local_dir):
             pass
     if not dplan:
         try:
-            res = client.run_command(f"cat /var/vf/episodes/{episode_id}/director_plan.json")
-            if res.get("stdout"):
-                dplan = json.loads(res["stdout"])
+            vps_eval_code = f"""python3 -c '
+import json
+try:
+    with open("/var/vf/episodes/{episode_id}/director_plan.json") as f:
+        d = json.load(f)
+    bgs = [s.get("bg_reuse_key") for s in d.get("scenes", []) if s.get("bg_reuse_key")]
+    fgs = [s.get("fg_reuse_key") for s in d.get("scenes", []) if s.get("fg_reuse_key")]
+    print(json.dumps({{"bgs": list(set(bgs)), "fgs": list(set(fgs))}}))
+except Exception as e:
+    print(json.dumps({{"error": str(e)}}))
+'"""
+            res = client.run_command(vps_eval_code)
+            stdout_txt = res.get("stdout", "").strip()
+            if stdout_txt and "{" in stdout_txt:
+                data = json.loads(stdout_txt)
+                if "bgs" in data and "fgs" in data:
+                    registered_bgs = set(data["bgs"])
+                    registered_fgs = set(data["fgs"])
+                    unregistered = []
+                    for it in items:
+                        k = it["reuse_key"]
+                        layer = it.get("layer_type", "Background")
+                        if layer == "Background" and k not in registered_bgs and not k.startswith("thumb"):
+                            unregistered.append(k)
+                        elif layer == "Foreground" and k not in registered_fgs and not k.startswith("thumb"):
+                            unregistered.append(k)
+                    return {
+                        "status": "PASSED" if not unregistered else "WARN",
+                        "registered_bg_count": len(registered_bgs),
+                        "registered_fg_count": len(registered_fgs),
+                        "unregistered_keys": unregistered
+                    }
         except Exception:
             pass
 
@@ -747,7 +776,7 @@ def run_b5_audit(episode_id, items, local_dir):
                 },
                 "vision_audit": {
                     "status": "Rule 122 Multimodal Agent Review",
-                    "inspection_mandate": "Must inspect actual pixels with view_file tool before final rendering sign-off"
+                    "inspection_mandate": "Must inspect actual pixels with view_file tool before final rendering sign-off against Rule 122 4-Trục: 1. UI Artifact (0%), 2. Alpha/Chroma, 3. Stylized Graphic Novel, 4. Era, Market & Ethnic Context (Anti-Western bias)."
                 },
                 "verdict": verdict,
                 "status": status
@@ -788,7 +817,8 @@ def trigger_b6_handoff(episode_id):
     """Kích hoạt B6 Render Pipeline qua continue_after_images.py trên VPS."""
     print(f"\n🚀 [Rule 437 Handoff] Kích hoạt VPS Render Pipeline B6-B10 cho {episode_id}...")
     log_file = f"/var/vf/logs/{episode_id}_b4b10.log"
-    cmd = f"nohup python3 /root/video_factory/scripts/continue_after_images.py --episode-id {episode_id} > {log_file} 2>&1 &"
+    market = episode_id.split("_")[0].lower() if "_" in episode_id else "en"
+    cmd = f"nohup python3 /root/video_factory/scripts/continue_after_images.py --episode-id {episode_id} --market {market} > {log_file} 2>&1 &"
     res = client.run_command(cmd)
     print(f"✅ B6-B10 background task spawned! Exit={res.get('exit_code')}")
     print(f"📄 Log file: {log_file}")

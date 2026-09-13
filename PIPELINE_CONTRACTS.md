@@ -186,7 +186,11 @@
 
 ### 4. Khối B3 (Director Plan) ➔ Khối B3.5 (Prompt Forge)
 * **File lưu trữ**: `director_plan.json` ➔ `prompts_forge.json (và prompts.json tương thích ngược)`
-* **Quy chuẩn**: Toàn bộ visual prompts viết bằng tiếng Anh, gắn `[STYLE MANDATE]`, `[ERA ANCHOR]`, `[STRICT NEGATIVE PROMPT]`.
+* **Quy chuẩn**: Toàn bộ visual prompts viết bằng tiếng Anh, gắn `[STYLE MANDATE]`, `[MARKET & ETHNIC ANCHOR]`, `[MARKET & ENVIRONMENT ANCHOR]`, `[ERA ANCHOR]`, `[STRICT NEGATIVE PROMPT]`.
+* **Khế ước Bản Sắc Thị Trường (Rule 122 & 128 Generic Pattern)**:
+  - Thị trường mục tiêu `<MARKET>` (`JP`, `KR`, `VN`, `EN`...) quyết định bắt buộc đặc điểm nhân chủng học của nhân vật FG (khuôn mặt, mắt, tóc, trang phục) và kiến trúc của BG (phòng họp, cao ốc, đường phố địa phương).
+  - FG: CẤM TUYỆT ĐỐI thiên kiến da trắng/Âu Mỹ (Caucasian/Western bias) khi tạo nhân vật Á Châu.
+  - BG: CẤM TUYỆT ĐỐI kiến trúc đô thị phương Tây khi bối cảnh diễn ra tại thị trường Á Đông.
 * **Data Schema (`director_plan.json`)**:
   ```json
   {

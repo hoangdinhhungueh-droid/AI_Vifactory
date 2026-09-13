@@ -67,16 +67,16 @@ CONF_MIN = 0.7
 CB_FAILS = 3
 
 _AUDIT_PROMPT = """You are an image QA auditor for a video factory pipeline.
-Audit this generated image against its generation prompt.
+Audit this generated image against its generation prompt and Rule 122 standards.
 
 PROMPT:
 {prompt}
 
 Score 0-10 on three dimensions and reply ONLY with compact JSON:
 {{
-  "d1_prompt_adherence": <0-10>,   // does the image match the prompt content?
-  "d2_object_accuracy": <0-10>,    // are objects/anatomy/count correct?
-  "d3_visual_logic": <0-10>,       // lighting/perspective/composition coherent?
+  "d1_prompt_adherence": <0-10>,   // does the image match prompt content, subject, era & market setting?
+  "d2_object_accuracy": <0-10>,    // are character ethnicity, anatomy, objects, clothing & architecture correct?
+  "d3_visual_logic": <0-10>,       // lighting/perspective/composition coherent, no Western bias on Asian subjects?
   "confidence": <0.0-1.0>,
   "issues": [<short strings, empty if none>],
   "notes": "<one short sentence>"
@@ -103,6 +103,9 @@ _ISSUE_MAP = {
     "lighting": "Lighting issue",
     "composition": "Composition issue",
     "color": "Color mismatch",
+    "western_bias": "Western/Caucasian bias",
+    "ethnic_mismatch": "Ethnic mismatch",
+    "market_mismatch": "Market/regional mismatch",
 }
 
 
@@ -126,13 +129,16 @@ class _CircuitBreaker:
             raise CircuitOpen(f"Gemini audit failed {self.fails}x in a row")
 
 
-# 16/08: skill-loaded scoring. Calibration block measured to recover Haiku scores
-# (complexity-camouflage 4.35 raw -> 8.25 with this block, test 16/08 ~19:0x).
+# 16/08: skill-loaded scoring. Calibration block measured to recover Haiku scores.
+# Rule 122 Axis 4 update: enforces Market Ethnicity & Architectural Conformance.
 _AUDIT_CALIBRATION = (
-    "\n\nGRADING CALIBRATION (skill rules of this pipeline):"
-    "\n- Intended style is flat vector illustration with bold outlines and muted palette - never penalize for lacking photorealism."
-    "\n- Score anchors: 9-10 = near-perfect execution; 8 = usable as-is, only minor omissions; 6-7 = usable with minor fixes; 5 = borderline, needs review; 3-4 = major element missing or wrong; 0-2 = unusable."
-    "\n- Judge severity by production impact: missing small accent detail = -1 at most; missing core subject = -4 or more."
+    "\n\nGRADING CALIBRATION (Rule 122 skill rules of this pipeline):"
+    "\n- Intended style is 2D stylized graphic novel editorial illustration with bold ink lines and cel-shading - never penalize for lacking photorealism."
+    "\n- RULE 122 AXIS 4 (ERA, MARKET & ETHNIC CONFORMANCE):"
+    "\n  * Foreground characters MUST match the market's authentic ethnic phenotype (e.g. East Asian for JP/KR/VN). Severe penalty (-3 to -5 points on d1 and d2) if an Asian character exhibits Western/Caucasian facial features, blonde hair, or blue eyes (issue: 'western_bias')."
+    "\n  * Background environments MUST match authentic local architecture and interior aesthetics of the story setting (issue: 'market_mismatch')."
+    "\n- Score anchors: 9-10 = near-perfect execution; 8 = usable as-is, only minor omissions; 6-7 = usable with minor fixes; 5 = borderline, needs review; 3-4 = major element missing or wrong ethnicity/setting; 0-2 = unusable."
+    "\n- Judge severity by production impact: missing small accent detail = -1 at most; Western bias on Asian character or wrong setting = -4 or more."
 )
 
 

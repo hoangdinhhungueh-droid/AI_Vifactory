@@ -45,6 +45,9 @@ Audit against 6 Core Criteria:
    - 0% corrupted tokens (e.g. 'ficial' instead of 'official').
 6. LEVEL 2 CAUSAL DRAMATIZATION (Rule 130):
    - Scenes must visualize institutional/regulatory/financial mechanisms, not merely surface claims.
+7. MARKET ETHNICITY & REGIONAL ARCHITECTURE CONFORMANCE (Rule 122 & Rule 128):
+   - Foreground character prompts MUST enforce authentic ethnic facial bone structure, eyes, hair, and attire conforming to the target market (JP/KR/VN). CẤM tuyệt đối hiện tượng Tây hóa (Western/Caucasian bias) trên nhân vật Á Châu.
+   - Background prompts MUST enforce authentic local corporate and urban architecture, streetscapes, and interior aesthetics of the target market. CẤM kiến trúc ngoại lai.
 
 Output MUST be a single strict JSON object matching this schema:
 {
@@ -56,7 +59,8 @@ Output MUST be a single strict JSON object matching this schema:
     "fg_chroma_rule122": <FLOAT 0.0 - 10.0>,
     "thumbnail_and_bg_style": <FLOAT 0.0 - 10.0>,
     "prompt_hygiene": <FLOAT 0.0 - 10.0>,
-    "causal_dramatization": <FLOAT 0.0 - 10.0>
+    "causal_dramatization": <FLOAT 0.0 - 10.0>,
+    "market_ethnicity_fidelity": <FLOAT 0.0 - 10.0>
   },
   "flawed_scene_ids": ["<SCENE_ID>", ...],
   "flawed_prompt_keys": ["<PROMPT_KEY>", ...],
