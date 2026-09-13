@@ -342,9 +342,33 @@ def _clean_and_localize_seo_description(desc: str, ep_dir: Path, market: str, ti
 
     desc_cleaned = "\n".join(cleaned_lines)
 
-    # Check if chapters need re-syncing from remotion_props.json
+    # Check if chapters need re-syncing from audio_beats or remotion_props.json
+    beats_dir = ep_dir / "audio_beats"
     remotion_path = ep_dir / "remotion_props.json"
-    if remotion_path.exists():
+    act_map = []
+    total_duration_s = 0.0
+
+    if beats_dir.exists():
+        beats = sorted(beats_dir.glob("beat_*.mp3"))
+        if len(beats) >= 3:
+            import subprocess
+            curr_t = 0.0
+            for b in beats:
+                sec = int(curr_t)
+                mm, ss = sec // 60, sec % 60
+                act_map.append((f"{mm:02d}:{ss:02d}", b.stem))
+                try:
+                    res = subprocess.run(
+                        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(b)],
+                        capture_output=True, text=True
+                    )
+                    dur = float(res.stdout.strip() or 0)
+                    curr_t += dur
+                except Exception:
+                    curr_t += 180.0
+            total_duration_s = curr_t
+
+    if not act_map and remotion_path.exists():
         try:
             with open(remotion_path, "r", encoding="utf-8") as rf:
                 rdata = json.load(rf)
@@ -352,7 +376,6 @@ def _clean_and_localize_seo_description(desc: str, ep_dir: Path, market: str, ti
             if scenes:
                 fps = 30
                 current_frame = 0
-                act_map = []
                 last_act = None
                 for idx, s in enumerate(scenes):
                     act = s.get("actTitle")
@@ -363,29 +386,38 @@ def _clean_and_localize_seo_description(desc: str, ep_dir: Path, market: str, ti
                         act_map.append((f"{mm:02d}:{ss:02d}", act))
                         last_act = act
                     current_frame += dur
-
                 total_duration_s = current_frame / fps
+        except Exception as e:
+            print(f"[b10_seo] Remotion prop read error: {e}")
 
-                # If description contains static English formula or timestamps > total duration
-                if "The Impossible Contradiction" in desc_cleaned or "14:00" in desc_cleaned:
-                    from app.services.seo_package_forge import _build_dynamic_chapters
-                    new_ch = _build_dynamic_chapters(title or "Investigation", market, title, total_duration_s=total_duration_s)
-                    if len(act_map) == len(new_ch):
-                        synced_ch = [f"{act_map[i][0]} - {new_ch[i].split(' - ', 1)[1] if ' - ' in new_ch[i] else new_ch[i]}" for i in range(len(new_ch))]
-                    else:
-                        synced_ch = new_ch
+    if act_map and total_duration_s > 0:
+        try:
+            m_up = (market or "EN").upper()
+            needs_resync = (
+                "The Impossible Contradiction" in desc_cleaned or
+                "14:00" in desc_cleaned or
+                ("The Catalyst" in desc_cleaned and m_up != "EN") or
+                ("The Architecture of Concealment" in desc_cleaned and m_up != "EN")
+            )
+            if needs_resync:
+                from app.services.seo_package_forge import _build_dynamic_chapters
+                new_ch = _build_dynamic_chapters(title or "Investigation", market, title, total_duration_s=total_duration_s)
+                if len(act_map) == len(new_ch):
+                    synced_ch = [f"{act_map[i][0]} - {new_ch[i].split(' - ', 1)[1] if ' - ' in new_ch[i] else new_ch[i]}" for i in range(len(new_ch))]
+                else:
+                    synced_ch = new_ch
 
-                    ch_idx = desc_cleaned.find("Chapters:")
-                    if ch_idx != -1:
-                        head = desc_cleaned[:ch_idx].rstrip()
-                        tail = ""
-                        for sep in ["\n#", "\nThis video incorporates", "\nThis story and its"]:
-                            s_idx = desc_cleaned.find(sep, ch_idx)
-                            if s_idx != -1:
-                                tail = desc_cleaned[s_idx:].lstrip()
-                                break
-                        ch_block = "Chapters:\n" + "\n".join(synced_ch)
-                        desc_cleaned = f"{head}\n\n{ch_block}\n\n{tail}".strip()
+                ch_idx = desc_cleaned.find("Chapters:")
+                if ch_idx != -1:
+                    head = desc_cleaned[:ch_idx].rstrip()
+                    tail = ""
+                    for sep in ["\n#", "\nThis video incorporates", "\nThis story and its"]:
+                        s_idx = desc_cleaned.find(sep, ch_idx)
+                        if s_idx != -1:
+                            tail = desc_cleaned[s_idx:].lstrip()
+                            break
+                    ch_block = "Chapters:\n" + "\n".join(synced_ch)
+                    desc_cleaned = f"{head}\n\n{ch_block}\n\n{tail}".strip()
         except Exception as e:
             print(f"[b10_seo] Chapter sync error: {e}")
 

@@ -112,6 +112,14 @@ def _build_dynamic_chapters(
             f"{_fmt(t_act4)} - 制度の亀裂と法的対立",
             f"{_fmt(t_act5)} - 現代組織への警鐘と教訓",
         ]
+    elif m == "KR":
+        return [
+            f"{_fmt(t_act1)} - {kw[:30]}: 사건의 발단과 의혹",
+            f"{_fmt(t_act2)} - 은폐된 구조와 권한의 사각지대",
+            f"{_fmt(t_act3)} - 내부 기록과 자금 흐름의 추적",
+            f"{_fmt(t_act4)} - 제도의 균열과 법적 공방의 결말",
+            f"{_fmt(t_act5)} - 최종 판결과 현대적 경고",
+        ]
     elif m == "VN":
         return [
             f"{_fmt(t_act1)} - Dấu hiệu bất thường: {kw[:30]}",
