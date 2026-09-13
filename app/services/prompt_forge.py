@@ -570,29 +570,14 @@ def generate_scene_prompts(
             )
             cleaned_foregrounds[fg_k] = _sanitize_foreground_prompt(fallback_fg, fg_k, market=market)
 
-    # Rule 114 & 435: Ensure thumbnails are forged from SEO package or story anchor
-    seo_pkg = kwargs.get("seo_package")
-    if not seo_pkg and task_id:
-        for candidate in [
-            Path(f"/var/vf/episodes/{task_id}/seo_package.json"),
-            Path(f"/root/video_factory/episodes/{task_id}/seo_package.json"),
-            Path(f"./episodes/{task_id}/seo_package.json")
-        ]:
-            try:
-                if candidate.exists() and candidate.is_file():
-                    seo_pkg = json.loads(candidate.read_text(encoding="utf-8"))
-                    break
-            except (PermissionError, OSError):
-                continue
-
-    cleaned_thumbnails = _synthesize_thumbnail_prompts(story_title, seo_pkg, market=market)
-
+    # Architectural Decision: Decoupled to YouTube Studio Native Gemini Designer at HG3.
+    # Pipeline B3.5 focuses strictly on Dual-Layer Assets: Backgrounds (16:9) & Foregrounds (1:1 Chroma Key Cutout).
     result = {
         "backgrounds": cleaned_backgrounds,
         "foregrounds": cleaned_foregrounds,
-        "thumbnails": cleaned_thumbnails
+        "thumbnails": {}
     }
-    logger.info(f"[prompt_forge] Successfully forged {len(cleaned_backgrounds)} BG prompts, {len(cleaned_foregrounds)} FG prompts, and {len(cleaned_thumbnails)} Thumbnails for market {market}")
+    logger.info(f"[prompt_forge] Successfully forged {len(cleaned_backgrounds)} BG prompts, {len(cleaned_foregrounds)} FG prompts for market {market} (Thumbnails decoupled to YouTube Studio HG3)")
     return result
 
 

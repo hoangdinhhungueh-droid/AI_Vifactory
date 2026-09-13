@@ -548,16 +548,12 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
     with open(ep_dir / "youtube_upload_payload.json", "w", encoding="utf-8") as f:
         json.dump(upload_payload, f, ensure_ascii=False, indent=2)
 
-    print("=== [B10-AUTO] 6. Best-effort auto thumbnail set (automated Hero composition) ===")
-    try:
-        compose_hero_thumbnail(ep_dir)
-    except Exception as _th_err:
-        print(f"[thumbnail] compose_hero_thumbnail failed: {_th_err}")
+    print("=== [B10-AUTO] 6. Thumbnail Step (Decoupled to HG3 / YouTube Studio Native Gemini) ===")
     thumb_path = _find_thumbnail_asset(ep_dir)
     if thumb_path:
         set_thumbnail(video_id, thumb_path, market=market)
     else:
-        print("No dedicated thumbnail asset found yet -- skipping thumbnail upload (dedicated generation step pending, per user decision 23/08/2026).")
+        print("[B10] No dedicated thumbnail file found. Thumbnail creation is delegated to YouTube Studio Native Gemini AI at Human Gate 3.")
 
     print("=== [B10-AUTO] 7. Updating publish_ledger.json ===")
     publish_ledger.record_upload(

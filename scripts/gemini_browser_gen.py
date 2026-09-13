@@ -237,6 +237,8 @@ def fetch_prompts_from_vps(episode_id):
                 "layer_type": "Thumbnail",
                 "prompt": f"{prompt_text} [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]"
             })
+    else:
+        print("ℹ️ [B4 Image Gen] Thumbnails decoupled to YouTube Studio Native Gemini Designer at HG3 (0 thumbnails in pipeline).")
     return items
 
 def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Background", timeout_sec=120, max_retries=2):

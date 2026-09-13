@@ -50,8 +50,8 @@ def test_synthesize_thumbnail_prompts_generic():
     assert "Rome" in result["thumbnail_a"] or "economic collapse" in result["thumbnail_a"]
 
 
-def test_generate_scene_prompts_includes_thumbnails():
-    """Kiểm tra generate_scene_prompts tự động nạp và sinh trường thumbnails."""
+def test_generate_scene_prompts_decoupled_thumbnails():
+    """Kiểm tra generate_scene_prompts tách rời thumbnails sang HG3 (thumbnails rỗng nhưng tương thích ngược)."""
     bg_dict = {"bg_1": "Sunset over a desolate wasteland"}
     fg_dict = {"fg_1": "A lone traveler with a walking staff"}
     story_title = "The Last Journey Across The Border"
@@ -68,8 +68,7 @@ def test_generate_scene_prompts_includes_thumbnails():
         )
     
     assert "thumbnails" in res
-    assert "thumbnail_a" in res["thumbnails"]
-    assert "thumbnail_b" in res["thumbnails"]
+    assert res["thumbnails"] == {}
     assert "bg_1" in res["backgrounds"]
 
 

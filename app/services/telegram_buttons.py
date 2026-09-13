@@ -362,6 +362,7 @@ async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b:
     captions_str = f"✅ Đã nạp track chuẩn {market.upper()}" if captions_ok else "⏳ Phụ đề tự động"
 
     watch_url = f"https://youtu.be/{video_id}" if video_id else "https://youtube.com"
+    studio_url = f"https://studio.youtube.com/video/{video_id}/edit" if video_id else "https://studio.youtube.com"
     safe_ep = html.escape(str(episode_id))
     safe_t_a = html.escape(str(title_a))
     safe_t_b = html.escape(str(title_b))
@@ -379,10 +380,16 @@ async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b:
         "📌 <b>GÓI PACKAGING YOUTUBE 2026 (Rule 113/119):</b>\n"
         f"• <b>Title A (Primary):</b> <i>{safe_t_a}</i>\n"
         f"• <b>Title B (Backup A/B):</b> <i>{safe_t_b}</i>\n\n"
-        f'🔗 <b>Link xem trước (Unlisted):</b> <a href="{watch_url}">{watch_url}</a>\n\n'
+        f'🔗 <b>Link xem trước (Unlisted):</b> <a href="{watch_url}">{watch_url}</a>\n'
+        f'🛠️ <b>YouTube Studio Edit:</b> <a href="{studio_url}">{studio_url}</a>\n\n'
+        "🎨 <b>QUY TRÌNH THIẾT KẾ THUMBNAIL (GEMINI AI TRÊN YOUTUBE STUDIO):</b>\n"
+        "1. Bấm nút <b>'🎨 Mở Studio (Tạo Thumbnail Gemini)'</b> bên dưới.\n"
+        "2. Sử dụng tính năng <i>Thiết kế ảnh thu nhỏ (Gemini AI)</i> native của YouTube Studio để chọn concept & tạo thumbnail chuẩn xác nhất.\n"
+        "3. Lưu ảnh thu nhỏ trên YouTube Studio rồi bấm <b>'🚀 Chuyển sang Công Khai (Public)'</b>.\n\n"
         "👉 <i>Bấm nút bên dưới để chuyển trạng thái phát hành:</i>"
     )
     rows = [
+        [("🎨 Mở Studio (Tạo Thumbnail Gemini)", None, studio_url)],
         [("📺 Xem trước Video (Unlisted)", None, watch_url)],
         [("🚀 Chuyển sang Công Khai (Public)", f"pub:{video_id}")],
         [("🌐 Công Khai Tất cả Video (Public All)", "puball")],
@@ -393,7 +400,7 @@ async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b:
 
 
 async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,
-                          story_score: str = "n/a", n_thumb: int = 2,
+                          story_score: str = "n/a", n_thumb: int = 0,
                           topic: str = "", director_archetype: str = "",
                           era_anchor: str = "", title_a: str = "", title_b: str = "") -> Optional[int]:
     """Send Human Gate 2: B3.5 finished, prompts are in Notion, images are next.
@@ -408,22 +415,14 @@ async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,
 
     paste_block = f"/vf-image-gen\n/run:image --episode {task_id} --headless"
 
-    thumb_details = ""
-    if title_a or title_b:
-        thumb_details = (
-            f"🖼️ <b>Thumbnails A/B Hooks:</b>\n"
-            f"• <b>Thumbnail A (Emotion-First):</b> <i>{html.escape(title_a)}</i>\n"
-            f"• <b>Thumbnail B (Curiosity-Gap):</b> <i>{html.escape(title_b)}</i>\n\n"
-        )
-
     text = (
         "🎨 <b>[HUMAN GATE 2] ĐẠO DIỄN B3/B3.5 HOÀN TẤT — SẴN SÀNG SINH ẢNH</b>\n\n"
         f"🎬 <b>Episode:</b> <code>{safe_task}</code>\n"
         f"📌 <b>Chủ đề:</b> {safe_topic}\n"
         f"🎥 <b>Phong cách Đạo diễn:</b> {safe_arch}\n"
-        f"🎞️ <b>Tài nguyên thị giác:</b> {n_scenes} Scenes · {n_bg} BG (16:9) · {n_fg} FG (1:1 Magenta) · {n_thumb} Thumbnails\n"
-        f"📊 <b>Story Gate:</b> {safe_score} | <b>Notion Prompt Sync:</b> ✅\n\n"
-        + thumb_details +
+        f"🎞️ <b>Tài nguyên thị giác:</b> {n_scenes} Scenes · {n_bg} BG (16:9) · {n_fg} FG (1:1 Magenta Cutout)\n"
+        f"📊 <b>Story Gate:</b> {safe_score} | <b>Notion Prompt Sync:</b> ✅\n"
+        "🖼️ <b>Thumbnail:</b> <i>Ủy quyền thiết kế trực tiếp qua Gemini AI trên YouTube Studio tại Human Gate 3 (sau B10 upload).</i>\n\n"
         "📋 <b>Khối lệnh 1-Chạm thực thi trên Antigravity (Copy & Dán):</b>\n"
         f"<pre>{html.escape(paste_block)}</pre>\n"
         "⚡ <i>Quy chuẩn kỹ thuật ảnh 2K DCI, tách nền Chroma HSV, 4-Trục Visual Audit (Rule 122) và Auto-Trigger B6 được ủy quyền trọn vẹn cho Skill <b>vf-image-gen</b>.</i>"
@@ -479,13 +478,13 @@ def trigger_human_gate_2(episode_id: str) -> Optional[int]:
     pforge_file = ep_dir / "prompts_forge.json"
     if not pforge_file.exists():
         pforge_file = ep_dir / "prompts.json"
-    n_bg, n_fg, n_thumb = 0, 0, 2
+    n_bg, n_fg, n_thumb = 0, 0, 0
     if pforge_file.exists():
         try:
             p_data = json.loads(pforge_file.read_text(encoding="utf-8"))
             n_bg = len(p_data.get("backgrounds", {}))
             n_fg = len(p_data.get("foregrounds", {}))
-            n_thumb = len(p_data.get("thumbnails", {})) or 2
+            n_thumb = len(p_data.get("thumbnails", {}))
         except Exception:
             pass
 

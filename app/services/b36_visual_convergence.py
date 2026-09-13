@@ -37,9 +37,10 @@ Audit against 6 Core Criteria:
 3. RULE 122 & 435 CEL-SHADED FG:
    - Pure flat #FF00FF magenta chroma key isolation, 1:1 aspect ratio, full-body head-to-shoes visible within frame.
    - Zero photorealistic human faces/skin; zero white/gray halos; zero cutoffs.
-4. THUMBNAILS & BG STYLE CONFORMANCE:
-   - Thumbnails MUST be 2D stylized graphic novel hero illustrations (2560x1440 QHD).
+4. BACKGROUND (BG) STYLE CONFORMANCE:
+   - Backgrounds MUST be 2D stylized graphic novel editorial illustrations (2560x1440 QHD, 16:9).
    - STRICTLY FORBIDDEN: 'photorealistic', '8k photographic', raw briefing notes, pipe characters, or missing text negatives.
+   - (Thumbnails are decoupled to YouTube Studio Native Gemini Designer at Human Gate 3).
 5. PROMPT HYGIENE:
    - 0% dangling fragments (e.g. 'isolated on a,').
    - 0% corrupted tokens (e.g. 'ficial' instead of 'official').
@@ -57,7 +58,7 @@ Output MUST be a single strict JSON object matching this schema:
     "market_linguistic": <FLOAT 0.0 - 10.0>,
     "hollywood_pacing": <FLOAT 0.0 - 10.0>,
     "fg_chroma_rule122": <FLOAT 0.0 - 10.0>,
-    "thumbnail_and_bg_style": <FLOAT 0.0 - 10.0>,
+    "bg_style_conformance": <FLOAT 0.0 - 10.0>,
     "prompt_hygiene": <FLOAT 0.0 - 10.0>,
     "causal_dramatization": <FLOAT 0.0 - 10.0>,
     "market_ethnicity_fidelity": <FLOAT 0.0 - 10.0>
@@ -77,10 +78,7 @@ Output MUST be a single strict JSON object matching this schema:
         "duration_est_sec": <INT>
       }
     ],
-    "patched_thumbnails": {
-      "thumbnail_a": "<CORRECTED_THUMBNAIL_A_PROMPT>",
-      "thumbnail_b": "<CORRECTED_THUMBNAIL_B_PROMPT>"
-    }
+    "patched_thumbnails": {}
   }
 }
 """
@@ -109,10 +107,7 @@ Return a strict JSON object with:
         "duration_est_sec": <INT>
       }
     ],
-    "patched_thumbnails": {
-      "thumbnail_a": "<POLISHED_THUMBNAIL_A>",
-      "thumbnail_b": "<POLISHED_THUMBNAIL_B>"
-    }
+    "patched_thumbnails": {}
   },
   "audit_notes": "<CONCISE POLISH SUMMARY>"
 }

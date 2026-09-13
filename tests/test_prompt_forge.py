@@ -167,4 +167,4 @@ def test_generate_scene_prompts_market_propagation():
     assert "no Caucasian traits" in fg_p
     assert "Authentic Japanese corporate or urban setting" in bg_p
     assert "thumbnails" in res
-    assert "Japanese" in res["thumbnails"]["thumbnail_a"]
+    assert res["thumbnails"] == {}  # Decoupled to YouTube Studio Native Gemini Designer at HG3
