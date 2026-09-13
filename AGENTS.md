@@ -20,7 +20,10 @@
      1. *UI & Artifact*: 0% dính thanh công cụ trình duyệt, nút bấm, watermark.
      2. *Alpha & Edge Integrity*: 0% thủng lỗ trên nhân vật/áo sơ mi/tóc; viền mịn, không lem magenta.
      3. *Style Conformance*: 100% đồ họa minh họa Stylized Graphic Novel Editorial Illustration có nét vẽ comic mực và cel-shading (Rule 116 & 435). CẤM ảnh chụp thật photorealistic.
-     4. *Era Context*: Bối cảnh BG và trang phục FG khớp thời đại câu chuyện. CẤM lạc thời đại.
+     4. *Era, Market & Ethnic Context (Bản Sắc Thời Đại, Dân Tộc & Thị Trường)*:
+        - **Foreground (FG)**: Khuôn mặt, nhân chủng học (facial bone structure, eye shape, hair styling, skin undertone) và trang phục BẮT BUỘC phản ánh đúng thị trường mục tiêu và bối cảnh câu chuyện (Ví dụ: Thị trường JP -> 100% nét nhân vật Nhật Bản; KR -> 100% nét nhân vật Hàn Quốc; VN -> nét nhân vật Việt Nam; US -> nét Âu/Mỹ). CẤM TUYỆT ĐỐI hiện tượng "Tây hóa" (Western/Caucasian bias) mặc định trên nhân vật Á Châu.
+        - **Background (BG)**: Bối cảnh kiến trúc, hạ tầng, nội thất công sở, không gian đô thị, phong cách thiết kế BẮT BUỘC phản ánh đúng thực tế địa lý và văn hóa thị trường mục tiêu (Ví dụ: phòng họp/trụ sở tại Tokyo/Seoul khác hoàn toàn phong cách văn phòng New York/London). CẤM bối cảnh ngoại lai lạc thị trường.
+        - **Tính Nhất Quán Giữa BG và FG**: Phong cách văn hóa, ánh sáng, góc chiếu và trang phục của nhân vật FG phải hòa hợp tuyệt đối với không gian địa phương của BG trong cùng một Scene.
    - CẤM TUYỆT ĐỐI giả mạo điểm số (như hardcode 9.8). Điểm số phải từ phân tích thị giác thật.
 5. **RULE 123 (Mandatory Real-Data Pipeline Testing)**:
    - 100% kiểm thử pipeline (B1–B11) bắt buộc dùng dữ liệu live thời gian thực (Google Trends RSS live, YouTube Data API live, Notion live). CẤM TUYỆT ĐỐI dummy/synthetic seeds.
@@ -171,6 +174,23 @@
       - BẮT BUỘC bổ sung test case kiểm thử ngoại cảnh / boundary context (như chạy script từ working directory khác để kiểm tra đường dẫn tuyệt đối, kiểm tra fallback khi thiếu file fixture).
     - **Chốt Chặn Kiểm Toán Pháp Y Độc Lập Trước Khi Đồng Bộ (Pre-Sync Adversarial Forensic Gate)**:
       - Trước khi thực hiện `git push` và nghiệm thu hoàn tất theo Rule 126, vai **Forensic Auditor** trong `/vf-pipeline-teamwork` BẮT BUỘC phải thực hiện checklist quét đối kháng vi sai (Differential Audit Checklist) tìm kiếm các điểm rò rỉ, sai lệch hằng số, và tàn dư logic cũ. Chỉ khi checklist đạt 100% CLEAR mới được bàn giao cho Three-Way Sync Coordinator.
+17. **RULE 135 (Ground-Truth Video Timeline Chapter Synchronization Mandate - Kỷ Luật Thép Về Đồng Bộ Mốc Chương Hồi Khớp Tuyệt Đối Với Tiến Trình Video Remotion)**:
+    - **Remotion Rendered Timeline Là Chân Lý Duy Nhất Của YouTube Chapters (Single Source of Truth Timeline)**:
+      - Mốc thời gian chương hồi (`00:00`, `MM:SS`) hiển thị trên YouTube Description BẮT BUỘC phải được trích xuất trực tiếp từ `remotion_props.json` (tích lũy `durationInFrames / fps` của các phân cảnh thực tế đã được đồng bộ Whisper word-level timestamps).
+      - CẤM TUYỆT ĐỐI việc tính mốc chapter từ độ dài lý thuyết, tỷ lệ % ước lượng thô (`total_duration_s * 0.16...`), hoặc tính từ tổng thời lượng các file audio beat thô rời rạc (`audio_beats/beat_*.mp3`) khi video đã render.
+    - **Tự Động Hóa Đồng Bộ Tại Cổng B10 Upload (Automated Chapter Synchronization)**:
+      - Khi đóng gói SEO / Upload YouTube tại B10, pipeline BẮT BUỘC gọi hàm chuẩn hóa `sync_exact_chapters_from_remotion()`.
+      - Tiêu chuẩn YouTube Chapter: Mốc bắt đầu luôn là `00:00`, tối thiểu 3 chapter, mỗi chapter cách nhau ít nhất 10 giây, tăng dần theo thời gian.
+      - Tiêu đề chapter giữ nguyên tính sáng tạo/SEO/bản địa hóa của LLM hoặc template thị trường, chỉ chuẩn hóa lại mốc thời gian `MM:SS` cho khớp chính xác 100% với video rendered.
+18. **RULE 136 (Zero-Asset-Leak & Pure Beat Header Mandate - Kỷ Luật Thép Về Triệt Tiêu Rò Rỉ Mã Asset Lên Phụ Đề & Chuẩn Hóa Tiêu Đề Nhịp Beat)**:
+    - **Cấm Tuyệt Đối Rò Rỉ Mã Asset / Layer / Hash Lên Video (Zero-Asset-Leak)**:
+      - Thẻ speaker tag / lower-third banner phụ đề trên video Remotion CẤM TUYỆT ĐỐI việc đọc hoặc fallback sang `foreground_reuse_key`, `background_reuse_key`, layer names, file extensions (`.png`), hay bất kỳ mã hash nội bộ nào.
+      - CẤM TUYỆT ĐỐI hardcode các tiền tố nội bộ mang tính shadow code (như `"ARCHIVE X // "`) trong renderer component `index.tsx`.
+    - **Chuẩn Hóa Thẻ Định Danh Phân Cảnh Phổ Quát (Pure Beat & Dialogue Formatting Across All Markets)**:
+      - Thẻ phụ đề chỉ được phép hiển thị 2 trường hợp:
+        1) Nhân vật đối thoại/phát biểu thực tế: `TÊN // VAI TRÒ` (ví dụ: `JOHN DOE // LEAD AUDITOR`).
+        2) Thẻ nhịp Beat định danh: `BEAT <X>: <TIÊU ĐỀ BEAT>` (ví dụ: `BEAT 1: THE IMPOSSIBLE CONTRADICTION`, `BEAT 2: THE FALSE NARRATIVE & RED HERRING`).
+      - Áp dụng generic phổ quát cho mọi thị trường (EN, JP, KR, VN...), không hardcode tên tập hay bối cảnh cụ thể (tuân thủ nghiêm ngặt Rule 128).
 
 ---
 

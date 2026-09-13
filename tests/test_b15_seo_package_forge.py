@@ -202,3 +202,73 @@ class TestSeoPackageForge:
             ep_dir.rmdir()
         except Exception:
             pass
+
+    def test_sync_exact_chapters_from_remotion_rule135(self, tmp_path):
+        from app.services.seo_package_forge import sync_exact_chapters_from_remotion
+
+        # Create mock remotion_props.json
+        props = {
+            "fps": 30,
+            "scenes": [
+                {"durationInFrames": 900, "speakerTag": "BEAT 1: THE IMPOSSIBLE CONTRADICTION"},   # 0s - 30s
+                {"durationInFrames": 900, "speakerTag": "BEAT 1: THE IMPOSSIBLE CONTRADICTION"},   # 30s - 60s
+                {"durationInFrames": 1800, "speakerTag": "BEAT 2: THE FALSE NARRATIVE"},           # 60s - 120s
+                {"durationInFrames": 1800, "speakerTag": "BEAT 3: THE HIDDEN MECHANISM"},          # 120s - 180s
+                {"durationInFrames": 1800, "speakerTag": "BEAT 4: THE SMOKING GUN"},               # 180s - 240s
+                {"durationInFrames": 1800, "speakerTag": "BEAT 5: THE RECKONING"}                  # 240s - 300s
+            ]
+        }
+        props_file = tmp_path / "remotion_props.json"
+        props_file.write_text(json.dumps(props), encoding="utf-8")
+
+        existing_chapters = [
+            "00:00 - Custom Title Act 1",
+            "00:15 - Custom Title Act 2",
+            "00:30 - Custom Title Act 3",
+            "00:45 - Custom Title Act 4",
+            "01:00 - Custom Title Act 5"
+        ]
+
+        synced = sync_exact_chapters_from_remotion(
+            task_id="TEST_EP0001",
+            market="EN",
+            existing_chapters=existing_chapters,
+            ep_dir_path=str(tmp_path)
+        )
+
+        assert len(synced) == 5
+        assert synced[0] == "00:00 - Custom Title Act 1"
+        assert synced[1] == "01:00 - Custom Title Act 2"  # 60s = 01:00
+        assert synced[2] == "02:00 - Custom Title Act 3"  # 120s = 02:00
+        assert synced[3] == "03:00 - Custom Title Act 4"  # 180s = 03:00
+        assert synced[4] == "04:00 - Custom Title Act 5"  # 240s = 04:00
+
+    def test_zero_asset_leak_speaker_tag_rule136(self):
+        from app.services.build_remotion_props import format_speaker_tag
+
+        # Scene with internal foreground reuse key and beat string
+        scene_with_asset = {
+            "foreground_reuse_key": "KR_EP0001_korea_isds_win_costs_fg_b5_char2",
+            "beat": "Beat 2: The False Narrative & Red Herring",
+            "beat_index": 2
+        }
+        tag = format_speaker_tag(scene_with_asset, act_title="ACT II // POWER")
+
+        # Must NOT contain internal codes or ARCHIVE X
+        assert "ARCHIVE X" not in tag
+        assert "KR_EP0001" not in tag
+        assert "CHAR2" not in tag
+        assert "FG_" not in tag
+        # Must contain pure Beat identification
+        assert tag == "BEAT 2: THE FALSE NARRATIVE & RED HERRING"
+
+        # Scene with character dialogue
+        char_scene = {
+            "character_name": "John Doe",
+            "character_role": "Lead Forensic Auditor",
+            "foreground_reuse_key": "fg_char_auditor_99"
+        }
+        char_tag = format_speaker_tag(char_scene, act_title="ACT III")
+        assert char_tag == "JOHN DOE // LEAD FORENSIC AUDITOR"
+        assert "fg_char" not in char_tag
+

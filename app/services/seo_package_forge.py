@@ -138,6 +138,117 @@ def _build_dynamic_chapters(
         ]
 
 
+def sync_exact_chapters_from_remotion(
+    task_id: str,
+    market: str = "EN",
+    existing_chapters: list = None,
+    ep_dir_path: str = None,
+    title: str = "",
+    target_keyword: str = "",
+    total_duration_s: float = 720.0,
+) -> list[str]:
+    """Rule 135: Synchronize YouTube chapters with exact frame-accurate timestamps from remotion_props.json.
+    Ground-Truth Video Timeline:
+      1. First chapter is always 00:00.
+      2. Timestamps match the actual rendered video timeline (current_frame / fps).
+      3. Preserves localized/creative chapter titles from LLM or existing package.
+      4. Falls back gracefully to proportional durations if remotion_props.json is not yet available.
+    """
+    m = (market or "EN").upper()
+    
+    # 1. Locate remotion_props.json
+    candidates = []
+    if ep_dir_path:
+        candidates.append(os.path.join(ep_dir_path, "remotion_props.json"))
+    candidates.extend([
+        f"/var/vf/episodes/{task_id}/remotion_props.json",
+        f"/root/video_factory/var/vf/episodes/{task_id}/remotion_props.json",
+    ])
+    
+    remotion_path = None
+    for cand in candidates:
+        if os.path.exists(cand):
+            remotion_path = cand
+            break
+
+    exact_timestamps = []
+    total_dur_s = float(total_duration_s or 720.0)
+
+    if remotion_path:
+        try:
+            with open(remotion_path, "r", encoding="utf-8") as rf:
+                rdata = json.load(rf)
+            scenes = rdata.get("scenes", [])
+            fps = float(rdata.get("fps") or 30.0)
+            if scenes:
+                current_frame = 0
+                last_beat_key = None
+                
+                for idx, s in enumerate(scenes):
+                    speaker_tag = str(s.get("speakerTag") or "")
+                    beat_val = str(s.get("beat") or "")
+                    act_title = str(s.get("actTitle") or "")
+                    beat_idx = s.get("beat_index")
+                    
+                    # Extract canonical beat key (e.g., "BEAT 1", "BEAT 2", "ACT I", etc.)
+                    beat_match = re.search(r'\b(BEAT\s*\d+|ACT\s*[IVXLCDM]+)\b', f"{speaker_tag} {beat_val} {act_title}", re.IGNORECASE)
+                    if beat_match:
+                        current_beat_key = beat_match.group(1).upper()
+                    elif beat_idx:
+                        current_beat_key = f"BEAT {beat_idx}"
+                    else:
+                        current_beat_key = act_title or f"SCENE_{idx}"
+
+                    dur = int(s.get("durationInFrames") or 0)
+                    
+                    if current_beat_key != last_beat_key or idx == 0:
+                        sec = int(current_frame / fps)
+                        # Ensure YouTube constraint: each chapter at least 10s apart, and first is 0
+                        if not exact_timestamps:
+                            exact_timestamps.append(0)
+                        elif sec >= exact_timestamps[-1] + 10:
+                            exact_timestamps.append(sec)
+                        last_beat_key = current_beat_key
+
+                    current_frame += dur
+                
+                if current_frame > 0:
+                    total_dur_s = current_frame / fps
+        except Exception as e:
+            logger.warning("[seo_package_forge] Error reading remotion_props: %s", e)
+
+    def _fmt(sec: int) -> str:
+        mm = sec // 60
+        ss = sec % 60
+        return f"{mm:02d}:{ss:02d}"
+
+    # 2. If we got exact timestamps (at least 3 chapters for valid YouTube chapters)
+    if len(exact_timestamps) >= 3:
+        if existing_chapters and isinstance(existing_chapters, list):
+            clean_titles = []
+            for ch in existing_chapters:
+                ch_str = str(ch).strip()
+                title_clean = re.sub(r'^\d{1,2}:\d{2}(?::\d{2})?\s*[-:]?\s*', '', ch_str).strip()
+                if title_clean:
+                    clean_titles.append(title_clean)
+            
+            if len(clean_titles) >= len(exact_timestamps):
+                return [f"{_fmt(exact_timestamps[i])} - {clean_titles[i]}" for i in range(len(exact_timestamps))]
+            elif len(clean_titles) >= 3:
+                n = min(len(clean_titles), len(exact_timestamps))
+                return [f"{_fmt(exact_timestamps[i])} - {clean_titles[i]}" for i in range(n)]
+
+        fallback_chapters = _build_dynamic_chapters(title or "Investigation", m, target_keyword or title, total_duration_s=total_dur_s)
+        clean_fallback_titles = [re.sub(r'^\d{1,2}:\d{2}\s*[-:]?\s*', '', c).strip() for c in fallback_chapters]
+        n = min(len(clean_fallback_titles), len(exact_timestamps))
+        return [f"{_fmt(exact_timestamps[i])} - {clean_fallback_titles[i]}" for i in range(n)]
+
+    # 3. Fallback: remotion_props.json not found or fewer than 3 scenes -> use proportional dynamic chapters
+    if existing_chapters and len(existing_chapters) >= 3:
+        return [str(c).strip() for c in existing_chapters if str(c).strip()]
+    return _build_dynamic_chapters(title or "Investigation", m, target_keyword or title, total_duration_s=total_dur_s)
+
+
 def _fallback_seo_package(
     task_id: str,
     target_keyword: str,
@@ -180,7 +291,7 @@ def _fallback_seo_package(
         {"variant": "C", "framework": "curiosity_gap", "headline_text": "THE FATAL LIE"[:32], "visual_concept": "Split composition contrasting official reports with unredacted leaked memos."}
     ]
 
-    chapters_lines = _build_dynamic_chapters(title_a, market, kw)
+    chapters_lines = sync_exact_chapters_from_remotion(task_id, market, title=title_a, target_keyword=kw)
 
     desc_parts = [
         desc_hook,
@@ -335,7 +446,8 @@ def forge_seo_package(
     breakout_queries: list = None,
     competitor_card: dict = None,
     story_page_id: str = None,
-    grounding_intel: dict = None
+    grounding_intel: dict = None,
+    total_duration_s: float = 720.0,
 ) -> dict:
     """Forge complete SEO Package and 60s An Ong Hook right after Step 1.5.
 
@@ -510,8 +622,14 @@ def forge_seo_package(
                     chapter_lines.append(f"{ts} - {ch['title']}")
                 elif isinstance(ch, str) and ch.strip():
                     chapter_lines.append(ch.strip())
-        if not chapter_lines:
-            chapter_lines = _build_dynamic_chapters(title_a, m_up, kw)
+        chapter_lines = sync_exact_chapters_from_remotion(
+            task_id=task_id,
+            market=m_up,
+            existing_chapters=chapter_lines,
+            title=title_a,
+            target_keyword=kw,
+            total_duration_s=total_duration_s
+        )
 
         desc_parts = [
             desc_hook,
