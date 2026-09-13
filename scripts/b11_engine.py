@@ -110,6 +110,22 @@ def get_yt_access_token(cid, csec, refresh_token):
         res = json.loads(resp.read().decode("utf-8"))
         return res.get("access_token")
 
+def get_market_oauth(secrets, market="en"):
+    m = (market or "en").lower().strip()
+    if m == "jp":
+        refresh = secrets.get("JP_YT_OAUTH_REFRESH_TOKEN") or secrets.get("YT_OAUTH_REFRESH_TOKEN_JP")
+        cid = secrets.get("JP_YT_OAUTH_CLIENT_ID") or secrets.get("YT_OAUTH_CLIENT_ID_JP") or secrets.get("YT_OAUTH_CLIENT_ID")
+        csec = secrets.get("JP_YT_OAUTH_CLIENT_SECRET") or secrets.get("YT_OAUTH_CLIENT_SECRET_JP") or secrets.get("YT_OAUTH_CLIENT_SECRET")
+    elif m == "kr":
+        refresh = secrets.get("KR_YT_OAUTH_REFRESH_TOKEN") or secrets.get("YT_OAUTH_REFRESH_TOKEN_KR")
+        cid = secrets.get("KR_YT_OAUTH_CLIENT_ID") or secrets.get("YT_OAUTH_CLIENT_ID_KR") or secrets.get("YT_OAUTH_CLIENT_ID")
+        csec = secrets.get("KR_YT_OAUTH_CLIENT_SECRET") or secrets.get("YT_OAUTH_CLIENT_SECRET_KR") or secrets.get("YT_OAUTH_CLIENT_SECRET")
+    else:
+        refresh = secrets.get("YT_OAUTH_REFRESH_TOKEN") or secrets.get("EN_YT_OAUTH_REFRESH_TOKEN")
+        cid = secrets.get("YT_OAUTH_CLIENT_ID") or secrets.get("EN_YT_OAUTH_CLIENT_ID")
+        csec = secrets.get("YT_OAUTH_CLIENT_SECRET") or secrets.get("EN_YT_OAUTH_CLIENT_SECRET")
+    return cid, csec, refresh
+
 def query_youtube(access_token, endpoint, params=None):
     url = f"https://www.googleapis.com/youtube/v3/{endpoint}"
     if params:
@@ -206,7 +222,7 @@ def notion_api(token, endpoint, method="GET", payload=None):
     with urllib.request.urlopen(req, timeout=25) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
-def fetch_all_channel_videos(access_token):
+def fetch_all_channel_videos(access_token, market="EN"):
     ch_info = query_youtube(access_token, "channels", {"part": "snippet,contentDetails,statistics", "mine": "true"})
     items = ch_info.get("items", [])
     if not items:
@@ -274,6 +290,7 @@ def fetch_all_channel_videos(access_token):
         video_data.append({
             "id": v_id,
             "title": title,
+            "market": market.upper(),
             "published_at": pub_at,
             "hours_since": hours_since,
             "views": views,
@@ -305,7 +322,7 @@ def sync_to_experiment_lab(token, v_item, insight=None, action_verdict=None, les
         "Name": {"title": [{"type": "text", "text": {"content": f"{title[:80]} · B11 Diagnosis"}}]},
         "Episode ID": {"rich_text": [{"type": "text", "text": {"content": title[:30]}}]},
         "Video ID": {"rich_text": [{"type": "text", "text": {"content": vid_id}}]},
-        "Market": {"select": {"name": "EN"}},
+        "Market": {"select": {"name": v_item.get("market", "EN")}},
         "Platform": {"select": {"name": "YouTube"}},
         "State Stage": {"select": {"name": state_stage}},
         "Views": {"number": v_item["views"]},
@@ -429,104 +446,131 @@ def diagnose_channel_lifecycle(videos: list) -> dict:
     }
 
 
-def run_b11_engine(mode="routine", dry_run=False):
+def run_b11_engine(mode="routine", dry_run=False, target_market=None):
     secrets = load_secrets()
-    cid = secrets.get("YT_OAUTH_CLIENT_ID")
-    csec = secrets.get("YT_OAUTH_CLIENT_SECRET")
-    refresh = secrets.get("YT_OAUTH_REFRESH_TOKEN")
     hhtech_key = secrets.get("HHTECH_API_KEY")
     notion_token = secrets.get("NOTION_TOKEN")
     
-    if not (cid and csec and refresh):
-        raise ValueError("Missing YouTube OAuth credentials")
-        
-    print(f"=== [B11 LEAN ENGINE v2.1 AN ONG EDITION] MODE: {mode.upper()} ===")
+    print(f"=== [B11 LEAN ENGINE v2.2 MULTI-MARKET AN ONG EDITION] MODE: {mode.upper()} ===")
     state = load_state()
     prev_videos = state.get("videos", {})
     
-    access_token = get_yt_access_token(cid, csec, refresh)
-    channel, videos = fetch_all_channel_videos(access_token)
-    device_data, traffic_data = fetch_channel_deep_diagnostics(access_token)
-    
-    total_dev_views = sum(d["views"] for d in device_data.values()) or 1
-    mobile_views = device_data.get("MOBILE", {}).get("views", 0)
-    mobile_pct = (mobile_views / total_dev_views) * 100.0
-    
-    print(f"Channel: {channel['snippet']['title']} ({len(videos)} videos)")
-    print(f"Audience Devices: Mobile={mobile_views} ({mobile_pct:.1f}%) | Devices: {list(device_data.keys())}")
-    print(f"Traffic Mix: {list(traffic_data.keys())}")
-
-    lifecycle = diagnose_channel_lifecycle(videos)
-    print(f"\n🌱 [CHANNEL INCUBATION MATRIX] {lifecycle['phase']} | Status: {lifecycle['status']}")
-    print(f"   Quy mô: {lifecycle['total_videos']} video | Tổng Views: {lifecycle['total_views']} (TB: {lifecycle['avg_views_per_video']}/vid)")
-    print(f"   Định hướng: {lifecycle['guidance']}")
-    
+    target_markets = [target_market.lower()] if target_market else ["en", "jp", "kr"]
+    all_videos = []
     supreme_candidates = []
     has_any_metric_delta = False
+    new_video_state = dict(prev_videos)
     
-    print("\n--- DELTA SCANNING ---")
-    for v in videos:
-        v_id = v["id"]
-        prev = prev_videos.get(v_id)
-        
-        delta_views = v["views"] - (prev.get("views", 0) if prev else 0)
-        delta_likes = v["likes"] - (prev.get("likes", 0) if prev else 0)
-        delta_comments = v["comments"] - (prev.get("comments", 0) if prev else 0)
-        
-        was_sampling = prev.get("is_sampling", True) if prev else True
-        is_sampling = v["is_sampling"]
-        crossed_48h = was_sampling and not is_sampling
-        
-        is_breakout = delta_views >= 20 or delta_likes >= 5
-        
-        needs_supreme = False
-        trigger_reason = ""
-        
-        if mode == "deep":
-            needs_supreme = not is_sampling or crossed_48h
-            trigger_reason = "Manual --deep trigger"
-        elif crossed_48h:
-            needs_supreme = True
-            trigger_reason = "Milestone: First 48h Mature Transition"
-        elif is_breakout:
-            needs_supreme = True
-            trigger_reason = f"Anomaly Breakout: +{delta_views} views, +{delta_likes} likes"
+    for m in target_markets:
+        cid, csec, refresh = get_market_oauth(secrets, m)
+        if not (cid and csec and refresh):
+            print(f"\n⚠️  [MARKET: {m.upper()}] Thiếu OAuth credentials, bỏ qua.")
+            continue
             
-        if delta_views != 0 or delta_likes != 0 or delta_comments != 0 or not prev:
-            has_any_metric_delta = True
+        try:
+            access_token = get_yt_access_token(cid, csec, refresh)
+            channel, videos = fetch_all_channel_videos(access_token, market=m.upper())
+            device_data, traffic_data = fetch_channel_deep_diagnostics(access_token)
             
-        print(f"  * [{v_id}] {v['title'][:35]} | Views: {v['views']} (Δ {delta_views:+d}) | Sampling: {is_sampling} | Supreme: {needs_supreme} ({trigger_reason or 'None'})")
-        
-        if needs_supreme:
-            supreme_candidates.append((v, trigger_reason))
+            total_dev_views = sum(d["views"] for d in device_data.values()) or 1
+            mobile_views = device_data.get("MOBILE", {}).get("views", 0)
+            mobile_pct = (mobile_views / total_dev_views) * 100.0
+            
+            print(f"\n==================== MARKET: {m.upper()} ====================")
+            print(f"Channel: {channel['snippet']['title']} ({len(videos)} videos)")
+            print(f"Audience Devices: Mobile={mobile_views} ({mobile_pct:.1f}%) | Devices: {list(device_data.keys())}")
+            print(f"Traffic Mix: {list(traffic_data.keys())}")
+
+            lifecycle = diagnose_channel_lifecycle(videos)
+            print(f"🌱 [CHANNEL INCUBATION MATRIX] {lifecycle['phase']} | Status: {lifecycle['status']}")
+            print(f"   Quy mô: {lifecycle['total_videos']} video | Tổng Views: {lifecycle['total_views']} (TB: {lifecycle['avg_views_per_video']}/vid)")
+            print(f"   Định hướng: {lifecycle['guidance']}")
+            
+            print("\n--- DELTA SCANNING ---")
+            for v in videos:
+                v_id = v["id"]
+                prev = prev_videos.get(v_id)
+                
+                delta_views = v["views"] - (prev.get("views", 0) if prev else 0)
+                delta_likes = v["likes"] - (prev.get("likes", 0) if prev else 0)
+                delta_comments = v["comments"] - (prev.get("comments", 0) if prev else 0)
+                
+                was_sampling = prev.get("is_sampling", True) if prev else True
+                is_sampling = v["is_sampling"]
+                crossed_48h = was_sampling and not is_sampling
+                
+                is_breakout = delta_views >= 20 or delta_likes >= 5
+                
+                needs_supreme = False
+                trigger_reason = ""
+                
+                if mode == "deep":
+                    needs_supreme = not is_sampling or crossed_48h
+                    trigger_reason = "Manual --deep trigger"
+                elif crossed_48h:
+                    needs_supreme = True
+                    trigger_reason = "Milestone: First 48h Mature Transition"
+                elif is_breakout:
+                    needs_supreme = True
+                    trigger_reason = f"Anomaly Breakout: +{delta_views} views, +{delta_likes} likes"
+                    
+                if delta_views != 0 or delta_likes != 0 or delta_comments != 0 or not prev:
+                    has_any_metric_delta = True
+                    
+                print(f"  * [{v_id}] [{m.upper()}] {v['title'][:35]} | Views: {v['views']} (Δ {delta_views:+d}) | Sampling: {is_sampling} | Supreme: {needs_supreme} ({trigger_reason or 'None'})")
+                
+                if needs_supreme:
+                    supreme_candidates.append({
+                        "video": v,
+                        "reason": trigger_reason,
+                        "market": m.upper(),
+                        "mobile_pct": mobile_pct,
+                        "device_data": device_data,
+                        "traffic_data": traffic_data,
+                        "lifecycle": lifecycle
+                    })
+                    
+                new_video_state[v_id] = {
+                    "id": v_id,
+                    "market": m.upper(),
+                    "title": v["title"],
+                    "views": v["views"],
+                    "likes": v["likes"],
+                    "comments": v["comments"],
+                    "hours_since": v["hours_since"],
+                    "is_sampling": v["is_sampling"],
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+                all_videos.append(v)
+        except Exception as e:
+            print(f"❌ [MARKET: {m.upper()}] Error processing channel: {e}")
             
     if not dry_run and has_any_metric_delta:
         print("\n--- TIER 1: FAST METRICS SYNC TO NOTION (0 TOKEN) ---")
-        for v in videos:
+        for v in all_videos:
             res_log = sync_to_experiment_lab(notion_token, v)
-            print(f"  * {v['id']}: {res_log}")
+            print(f"  * [{v.get('market', 'EN')}] {v['id']}: {res_log}")
     elif dry_run:
         print("\n[DRY-RUN] Bỏ qua cập nhật Notion Tier 1.")
     else:
         print("\n--- TIER 1: NO METRIC DELTA DETECTED. Notion DB up to date. (0 TOKEN) ---")
         
+    token_cost = 0
     if supreme_candidates:
         print(f"\n🚨 [TIER 3: SUPREME BRAIN ENGAGED] Found {len(supreme_candidates)} qualified candidate(s).")
         prompt_lines = [
-            "Dưới đây là các video có biến động cột mốc quan trọng cần phân tích tối cao theo Khung An Ong 2026:",
-            f"BỐI CẢNH THIẾT BỊ & NGUỒN LƯU LƯỢNG:",
-            f"- Tỷ lệ xem trên Mobile: {mobile_pct:.1f}% (Mobile Views: {mobile_views}/{total_dev_views})",
-            f"- Chi tiết thiết bị: {device_data}",
-            f"- Nguồn lưu lượng kênh: {traffic_data}",
-            f"- VÒNG ĐỜI KÊNH (Incubation Matrix): {lifecycle['phase']} ({lifecycle['status']}) — {lifecycle['guidance']}\n"
+            "Dưới đây là các video có biến động cột mốc quan trọng cần phân tích tối cao theo Khung An Ong 2026:"
         ]
         
-        for idx, (v, reason) in enumerate(supreme_candidates, 1):
+        for idx, c in enumerate(supreme_candidates, 1):
+            v = c["video"]
             prompt_lines.append(
-                f"{idx}. Video ID: {v['id']} | Title: {v['title']}\n"
-                f"   Lý do kích hoạt: {reason}\n"
+                f"\n{idx}. [{c['market']}] Video ID: {v['id']} | Title: {v['title']}\n"
+                f"   Lý do kích hoạt: {c['reason']}\n"
                 f"   Tuổi: {v['hours_since']:.1f}h | Views: {v['views']} | Likes: {v['likes']} | Comments: {v['comments']}\n"
                 f"   AVD: {v['avd_sec']}s | WatchMin: {v['watch_min']}m\n"
+                f"   Mobile Views: {c['mobile_pct']:.1f}% | Traffic: {list(c['traffic_data'].keys())}\n"
+                f"   Incubation: {c['lifecycle']['phase']} - {c['lifecycle']['guidance']}"
             )
             
         prompt_lines.append(
@@ -544,18 +588,20 @@ def run_b11_engine(mode="routine", dry_run=False):
         full_prompt = "\n".join(prompt_lines)
         print("Calling HHTech GPT-6-Astra...")
         analysis_text, usage, elapsed = call_hhtech_gpt56(hhtech_key, full_prompt)
-        print(f"GPT-6-Astra finished in {elapsed:.2f}s (Tokens used: {usage.get('total_tokens', 0)})")
+        token_cost = usage.get("total_tokens", 0)
+        print(f"GPT-6-Astra finished in {elapsed:.2f}s (Tokens used: {token_cost})")
         print("\n--- SUPREME INSIGHT SUMMARY ---")
         print(analysis_text[:700] + "...\n")
         
         if not dry_run:
             print("Syncing Supreme Insights to Notion DB & Skills...")
-            for v, reason in supreme_candidates:
+            for c in supreme_candidates:
+                v = c["video"]
                 action_verdict = "Enhance Action Required"
                 sync_to_experiment_lab(
                     notion_token,
                     v,
-                    insight=f"Trigger: {reason} | Mobile: {mobile_pct:.1f}%\n{analysis_text[:350]}",
+                    insight=f"[{c['market']}] Trigger: {c['reason']} | Mobile: {c['mobile_pct']:.1f}%\n{analysis_text[:350]}",
                     action_verdict=action_verdict,
                     lesson=analysis_text[-400:]
                 )
@@ -567,16 +613,6 @@ def run_b11_engine(mode="routine", dry_run=False):
     else:
         print("\n✅ [TIER 3 STANDBY] Không có biến động chạm ngưỡng tối cao. Token chi phí: 0.")
         
-    new_video_state = {}
-    for v in videos:
-        new_video_state[v["id"]] = {
-            "views": v["views"],
-            "likes": v["likes"],
-            "comments": v["comments"],
-            "hours_since": v["hours_since"],
-            "is_sampling": v["is_sampling"],
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }
     state["videos"] = new_video_state
     state["last_run"] = datetime.now(timezone.utc).isoformat()
     save_state(state)
@@ -584,13 +620,19 @@ def run_b11_engine(mode="routine", dry_run=False):
     print("\n=== [B11 LEAN ENGINE] RUN FINISHED SUCCESSFULLY ===")
     return {
         "status": "ok",
-        "videos_scanned": len(videos),
+        "videos_scanned": len(all_videos),
         "supreme_triggered": len(supreme_candidates) > 0,
-        "token_cost": 0 if not supreme_candidates else usage.get("total_tokens", 1500)
+        "token_cost": token_cost
     }
 
 if __name__ == "__main__":
     is_dry = "--dry-run" in sys.argv
     is_deep = "--deep" in sys.argv
+    target_market = None
+    for arg in sys.argv:
+        if arg.startswith("--market="):
+            target_market = arg.split("=", 1)[1].strip()
+        elif arg.startswith("-m="):
+            target_market = arg.split("=", 1)[1].strip()
     mode = "deep" if is_deep else "routine"
-    run_b11_engine(mode=mode, dry_run=is_dry)
+    run_b11_engine(mode=mode, dry_run=is_dry, target_market=target_market)
