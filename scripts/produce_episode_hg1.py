@@ -250,24 +250,18 @@ def run_chain(task_id: str) -> int:
         n_thumb = len(prompts.get("thumbnails") or {})
         _log(stage, "%d BG prompts, %d FG prompts, %d Thumbnails loaded from disk" % (n_bg, n_fg, n_thumb))
 
-    # ---- Human Gate 2 -------------------------------------------------
+    # ---- Human Gate 2 Check & Dispatch Guard (Rule 125 Single Truth) ----
     stage = "HG2"
-    seo_pkg_file = ep_dir / "seo_package.json"
-    t_a, t_b = "", ""
-    if seo_pkg_file.exists():
-        try:
-            s_data = json.loads(seo_pkg_file.read_text(encoding="utf-8"))
-            t_a = s_data.get("title_a", "")
-            t_b = s_data.get("title_b", "")
-        except Exception:
-            pass
-    asyncio.run(_notify_gate2(
-        task_id, len(scenes), n_bg, n_fg, score, n_thumb=n_thumb,
-        topic=brain.get("topic") or task_id,
-        director_archetype=director_plan.get("director_archetype", "Hollywood Principle"),
-        title_a=t_a, title_b=t_b
-    ))
-    _log("HG2", "card sent, waiting for images from Antigravity")
+    audit_file = ep_dir / "visual_convergence_audit.json"
+    if audit_file.exists():
+        _log("HG2", "Human Gate 2 card already dispatched after B3.5.1 DACL convergence (Rule 125 Single Truth). Skipping duplicate.")
+        return 0
+
+    # Fallback only if B3.5.1 did not run and audit file is absent
+    _log("HG2", "B3.5.1 audit file not found; triggering unified Human Gate 2 fallback...")
+    from app.services.telegram_buttons import trigger_human_gate_2
+    trigger_human_gate_2(task_id)
+    _log("HG2", "Fallback Human Gate 2 card sent, waiting for images from Antigravity")
     return 0
 
 
