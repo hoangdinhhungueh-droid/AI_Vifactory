@@ -958,22 +958,13 @@ def generate_director_plan(
         except Exception as e:
             logger.warning(f"  [B3.5.1 Notion] Failed to push converged assets to Notion: {e}")
 
-    # 10. Fallback HG2 Guard: Ensure Human Gate 2 is never dropped if B3.5.1 was bypassed or failed
+    # 10. Verification of B3.5.1 Convergence: HG2 is canonically triggered inside b36_visual_convergence upon successful convergence.
     try:
-        audit_file_check = False
-        for cdir in canonical_dirs:
-            try:
-                if (cdir / "visual_convergence_audit.json").exists():
-                    audit_file_check = True
-                    break
-            except (PermissionError, OSError):
-                continue
-        if not audit_file_check:
-            from app.services.telegram_buttons import trigger_human_gate_2
-            logger.warning("  [HG2 Fallback] B3.5.1 audit file missing; triggering fallback Human Gate 2...")
-            trigger_human_gate_2(episode_id)
+        has_audit = any((cdir / "visual_convergence_audit.json").exists() for cdir in canonical_dirs if cdir.exists())
+        if not has_audit:
+            logger.warning(f"  [B3/B3.5] Visual convergence audit not found for {episode_id}. HG2 withheld until convergence.")
     except Exception as e:
-        logger.warning(f"  [HG2 Guard] Notice: {e}")
+        logger.warning(f"  [B3/B3.5 Guard] Notice: {e}")
 
     return director_plan
 

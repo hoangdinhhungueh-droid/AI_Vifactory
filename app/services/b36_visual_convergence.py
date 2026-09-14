@@ -49,6 +49,9 @@ Audit against 6 Core Criteria:
 7. MARKET ETHNICITY & REGIONAL ARCHITECTURE CONFORMANCE (Rule 122 & Rule 128):
    - Foreground character prompts MUST enforce authentic ethnic facial bone structure, eyes, hair, and attire conforming to the target market (JP/KR/VN). CẤM tuyệt đối hiện tượng Tây hóa (Western/Caucasian bias) trên nhân vật Á Châu.
    - Background prompts MUST enforce authentic local corporate and urban architecture, streetscapes, and interior aesthetics of the target market. CẤM kiến trúc ngoại lai.
+8. SEPARATION OF CONCERNS & LOCKED FACT INTEGRITY (Rule 125 & Rule 130):
+   - All real-world factual events, corporate names, flight identities, dates, and regulatory filings have ALREADY been fact-checked and verified by Gemini 2.5 with Google Search Grounding at B1.5 and approved at Story Gate B2.
+   - B3.5.1 is EXCLUSIVELY a Visual & Cinematographic Convergence Gate. DO NOT audit, question, challenge, or dock points for factual evidence or missing journalistic sources.
 
 Output MUST be a single strict JSON object matching this schema:
 {
@@ -90,7 +93,10 @@ Your task is to review and cross-validate this Delta Patch:
 2. Verify that camera movements and tension maintain dramatic Hollywood suspense.
 3. Polish any awkward phrasing or visual prompt syntax.
 4. Score the quality and visual integrity of the patched package (0.0 to 10.0).
-5. CRITICAL: All underlying factual events in the narration have ALREADY been verified by the Grounding Intel layer. Do NOT dock points or withhold approval for factual proof; focus your evaluation exclusively on visual composition, cinematic direction, and narrative pacing.
+5. CRITICAL SEPARATION OF CONCERNS (Rule 125 & Rule 130):
+   - All underlying factual events, flight identities, corporate actions, and casualty figures in the narration have ALREADY been verified by the Gemini 2.5 Grounding Intel layer and approved at Story Gate B2.
+   - Under NO circumstances should you act as an investigative journalist questioning the reality of the incident, nor withhold approval or dock points for factual verification or missing documentation sources.
+   - Focus your evaluation and scoring EXCLUSIVELY on visual composition, cinematic direction, prompt syntax, and narrative pacing.
 
 Return a strict JSON object with:
 {
@@ -191,6 +197,21 @@ def run_b36_visual_convergence(
     if grounding_intel is None:
         grounding_intel = {}
 
+    # Format verified claims from grounding_intel (locked truth from Gemini 2.5)
+    verified_claims = []
+    if isinstance(grounding_intel, dict):
+        raw_claims = grounding_intel.get("claims") or grounding_intel.get("verified_claims")
+        if isinstance(raw_claims, list):
+            for c in raw_claims:
+                if isinstance(c, dict):
+                    txt = c.get("claim") or c.get("verified_claim") or c.get("fact_summary") or ""
+                    src = c.get("source") or ""
+                    dt = c.get("date") or ""
+                    if txt:
+                        verified_claims.append(f"({dt}) {txt}" + (f" [Source: {src}]" if src else ""))
+                elif isinstance(c, str) and c.strip():
+                    verified_claims.append(c.strip())
+
     scenes = director_plan.get("scenes", [])
     bg_prompts = prompts_data.get("backgrounds", {})
     fg_prompts = prompts_data.get("foregrounds", {})
@@ -230,7 +251,8 @@ def run_b36_visual_convergence(
         "sample_fgs": sample_fgs,
         "thumbnails": thumbnails,
         "story_excerpt": story_text[:800],
-        "grounding_claims_count": len(grounding_intel.get("claims", []))
+        "verified_grounding_facts_locked": verified_claims[:6],
+        "grounding_claims_count": len(verified_claims)
     }
 
     current_dplan = dict(director_plan)
@@ -318,7 +340,7 @@ def run_b36_visual_convergence(
                 "delta_patched_scenes": patched_scenes,
                 "delta_patched_thumbnails": patched_thumbs,
                 "critical_critique": round1_audit.get("critical_findings"),
-                "verified_grounding_claims": [(c.get("fact_summary") or str(c)) if isinstance(c, dict) else str(c) for c in grounding_intel.get("claims", [])][:10]
+                "verified_grounding_claims": verified_claims[:10]
             }
 
             try:

@@ -514,16 +514,25 @@ def trigger_human_gate_2(episode_id: str) -> Optional[int]:
         except Exception:
             pass
 
+    # 5. Extract B3.5.1 score and verify convergence (Rule 121 & Rule 125)
     b35_score = None
     audit_file = ep_dir / "visual_convergence_audit.json"
-    if audit_file.exists():
-        try:
-            a_data = json.loads(audit_file.read_text(encoding="utf-8"))
-            f_score = a_data.get("final_score")
-            if f_score is not None:
-                b35_score = f"{float(f_score):.1f}/10"
-        except Exception:
-            pass
+    if not audit_file.exists():
+        logger.warning(f"[HG2 Guard] Episode {episode_id} is missing visual_convergence_audit.json. B3.5.1 has not completed. Blocking HG2 card.")
+        return None
+
+    try:
+        a_data = json.loads(audit_file.read_text(encoding="utf-8"))
+        converged = a_data.get("converged", False)
+        f_score = a_data.get("final_score")
+        if f_score is not None:
+            b35_score = f"{float(f_score):.1f}/10"
+        if not converged or (f_score is not None and float(f_score) < 8.0):
+            logger.warning(f"[HG2 Guard] Episode {episode_id} B3.5.1 has NOT converged (Score: {b35_score}, Converged: {converged}). Blocking Human Gate 2 completion notification.")
+            return None
+    except Exception as e:
+        logger.warning(f"[HG2 Guard] Failed to evaluate visual convergence audit: {e}")
+        return None
 
     if b35_score and b2_score:
         story_score = f"B2: {b2_score} · B3.5.1: {b35_score}"
