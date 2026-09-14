@@ -43,6 +43,32 @@ CANONICAL_BEATS = [
 # Rule 128: Concise targeted art direction rules (~1.2k chars) replacing 336k chars dump
 TARGETED_ART_RULES = get_b3_strategic_rules()
 
+# 6 Canonical Cinematic Camera Movements
+CANONICAL_CAMERA_MOVES = [
+    "slow_push_in",
+    "snap_zoom",
+    "cinematic_pan",
+    "macro_tilt",
+    "slow_pull_out",
+    "handheld_shake"
+]
+
+
+def detect_forensic_overlay(narration_text: str) -> dict | None:
+    """Rule 128: Detect forensic evidentiary graphics trigger based on factual keywords."""
+    if not narration_text:
+        return None
+    t = narration_text.lower()
+    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "hợp đồng", "điều khoản", "tài liệu mật", "hanko", "biên bản"]):
+        return {"type": "redacted_doc", "label": "CLASSIFIED // REDACTED RECORD"}
+    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada"]):
+        return {"type": "radar_map", "label": "RADAR TELEMETRY // VECTOR TRACK"}
+    if any(k in t for k in ["stock", "dollar", "capital", "billion", "market", "revenue", "loss", "margin", "liquidity", "cổ phiếu", "sụt giảm", "thất thoát", "tỷ đô", "thị trường"]):
+        return {"type": "financial_chart", "label": "MARKET DISRUPTION // CAPITAL TRAJECTORY"}
+    if any(k in t for k in ["surveillance", "cctv", "facility", "camera", "security", "warehouse", "monitor", "an ninh", "giám sát"]):
+        return {"type": "surveillance_crt", "label": "FACILITY_SURVEILLANCE // CH_04"}
+    return None
+
 
 class DynamicArchetypeDict(dict):
     """Rule 128: Zero-Semantic-Bias Dynamic Archetype Registry with backward compatibility."""
@@ -568,8 +594,9 @@ def generate_director_plan(
         f"Lighting Grammar: {dynamic_context['lighting_mood']}.\n"
         f"Camera Grammar: {archetype.get('camera_style', 'Atmospheric slow push-ins and tracking shots')}.\n\n"
         "YOUR CORE MISSION:\n"
-        "Break down this complete 5-Beat Investigative Docudrama story into a DYNAMIC, HIGH-TENSION storyboard.\n"
-        "DO NOT force an arbitrary mathematical count. Let the scene count and pacing flow naturally and organically from the narrative units (typically 30-50 words per scene, ~8-18 seconds duration).\n"
+        "Break down this complete 5-Beat Investigative Docudrama story into a DYNAMIC, HIGH-TENSION storyboard of 130 to 160 sequential scenes (~6-7s duration per scene) for an 18-20 minute docudrama.\n"
+        "Act I MUST open with a 12 to 15 scene Fincher-style rapid-fire hook (15-25 words each, ~3.5s - 5.0s per scene) structured in 3 phases: (1) Asymmetric Paradox (0-15s), (2) Hard Metric Shock (15-35s), and (3) The Investigative Contract (35-60s).\n"
+        "Acts II through V MUST sustain a tight sentence-atomic pacing of 25-35 words per scene (~6.0s - 7.5s duration).\n"
         "EVERY SCENE MUST SERVE A PSYCHOLOGICAL AND INVESTIGATIVE PURPOSE.\n\n"
         "CRITICAL ARCHITECTURAL MANDATES:\n"
         "1. TWO-LAYER RENDER SYSTEM (Rule 116):\n"
@@ -578,15 +605,14 @@ def generate_director_plan(
         "2. DYNAMIC CHARACTER ENSEMBLE (Rule 128 - Zero Fixed Roles):\n"
         "   - As the Hollywood Art Director, YOU HAVE FULL AUTONOMY to dynamically cast the character roster directly from the story narrative (protagonists, executives, investigators, witnesses, regulators, analysts).\n"
         f"   - Detected narrative suggestions: {[c['role_name'] for c in character_ensemble]}. You may adapt, refine, or expand this ensemble to best serve the visual docudrama.\n"
-        "3. FLEXIBLE ASSET ROSTER PER BEAT:\n"
-        "   - Each Beat defines a pool of Backgrounds (2-4 key locations) and Foregrounds (1-3 key figures).\n"
-        "   - Maintain background_reuse_key and foreground_reuse_key across continuous sequences.\n"
+        "3. LOCATION CONTINUITY CLUSTERED BG (Rule 131):\n"
+        "   - Plan 3-4 location anchors per Beat (~15-20 total background clusters for the entire 5-Beat episode). Assign 'bg_cluster_id' (1..20) per scene.\n"
+        "   - Consecutive scenes within the same physical environment share 'bg_cluster_id' and 'background.reuse_key', allowing camera angles to evolve without disorienting the viewer.\n"
         "4. DUAL-LANGUAGE PROTOCOL (Production Bridge Rule 446 & Market Rule 120):\n"
         "   - VISUAL PROMPTS (bg_prompt, fg_prompt, visual_metaphor): MUST BE IN ENGLISH for the image generation engine.\n"
         f"   - SPOKEN NARRATION ('narration' field in each scene): MUST BE 100% WRITTEN IN {market_lang_name}! NEVER translate narration to English for non-English markets! Voiceover TTS & subtitles require authentic {market_lang_name}.\n"
-        "5. ADAPTIVE CHRONO-PACING & VISUAL STAGING (Rule 130):\n"
-        f"   - Temporal Cadence: {temporal_cadence}.\n"
-        "   - Evolve visual lighting, tone, and environment across the 5 beats to match the story's chronological epochs (e.g. foundational deals/ambition in earlier acts vs escalating shadow and clinical courtroom/investigative staging in climax).\n\n"
+        "5. 6 CANONICAL CINEMATIC CAMERA MOVEMENTS:\n"
+        "   - Must declare 'movement' from: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n\n"
         "OUTPUT FORMAT: Return ONLY a valid JSON object matching the exact schema below. No markdown fences."
     )
 
@@ -614,18 +640,16 @@ def generate_director_plan(
 
     prompt_instruction = (
         f"CRITICAL HOLLYWOOD STORYBOARD & PACING DIRECTIVE (Rules 116, 120, 128, 445):\n"
-        f"The full story contains {total_words} words across 5 beats. You MUST break down the complete narrative into 35 to 55 sequential scenes (typically 7 to 10 scenes per beat).\n"
+        f"The full story contains {total_words} words across 5 beats. You MUST break down the complete narrative into 130 to 160 sequential scenes (~25 to 35 scenes per beat).\n"
+        f"Act I MUST start with a 12-15 scene rapid-fire Fincher hook (Scenes 1-15, 15-25 words/scene, ~3.5s-5s duration).\n"
+        f"Acts II-V MUST sustain 25-35 words per scene (~6.0s - 7.5s duration).\n"
         f"1. SENTENCE-ATOMIC PACING & SPOKEN LANGUAGE PURITY:\n"
         f"   - The 'narration' field MUST be in {market_lang_name} matching the verbatim storyline, strictly 1-2 complete sentences ending with terminal punctuation.\n"
-        f"   - Subtitle line budget: strictly fits within 2 lines on 1920x1080 display (~35-40 characters/line). Remotion and Karaoke TTS anchor strictly to these sentence cut marks.\n"
-        f"   - Calculate 'duration_est_sec' strictly at standard narration pace: max(7, min(16, round(word_count / 2.4))).\n"
-        f"2. ARCHETYPE-SPECIFIC CINEMATIC GRAMMAR & CAMERA PRINCIPLES:\n"
-        f"   - Adopt the visual pacing of {archetype['director']}. You choose specific camera angles (e.g. slow_push_in, clinical_macro, wide_tableaux) and tension dynamically.\n"
-        f"3. BALANCED VISUAL CONTINUITY WITHIN BEATS:\n"
-        f"   - Maintain visual harmony within each beat: share location anchors so scenes do not jump randomly every frame, but evolve angles naturally.\n"
-        f"4. TWO-LAYER COMPOSITION & SUBTITLE SAFE-ZONE INTEGRITY:\n"
-        f"   - Background (16:9 2560x1440): bottom 20% clear for subtitles.\n"
-        f"   - Foreground (1:1 2048x2048 #FF00FF): position strictly 'right' or 'left' (Rule of Thirds). NEVER place full-body characters at 'center'.\n\n"
+        f"   - Subtitle line budget: strictly fits within 2 lines on 1920x1080 display (~35-40 characters/line).\n"
+        f"   - Calculate 'duration_est_sec': Hook (Scenes 1-15): max(3, min(6, round(word_count / 3.0))); Core (Scenes 16+): max(5, min(9, round(word_count / 2.5))).\n"
+        f"2. 6 CAMERA MOVEMENTS: declare strictly one of: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n"
+        f"3. LOCATION CONTINUITY CLUSTERED BG: Assign 'bg_cluster_id' (1..20). Group 3-4 location anchors per Beat.\n"
+        f"4. FORENSIC OVERLAYS: Tag evidentiary scenes with 'forensic_overlay': 'redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt', or null.\n\n"
         "Output a JSON object with this EXACT structure:\n"
         "{\n"
         "  \"episode_id\": \"" + episode_id + "\",\n"
@@ -638,10 +662,12 @@ def generate_director_plan(
         "      \"beat_index\": 1,\n"
         "      \"beat_name\": \"Beat 1: The Impossible Contradiction\",\n"
         "      \"narration\": \"exact complete sentence/spoken text for this scene.\",\n"
-        "      \"duration_est_sec\": 11,\n"
+        "      \"duration_est_sec\": 4,\n"
         "      \"visual_metaphor\": \"metaphorical meaning\",\n"
+        "      \"bg_cluster_id\": 1,\n"
+        "      \"forensic_overlay\": \"redacted_doc\",\n"
         "      \"camera\": {\n"
-        "        \"movement\": \"slow_push_in\",\n"
+        "        \"movement\": \"snap_zoom\",\n"
         "        \"tension_level\": \"high\"\n"
         "      },\n"
         "      \"background\": {\n"
@@ -701,8 +727,8 @@ def generate_director_plan(
                 except Exception:
                     pass
 
-    # 4. Fallback synthesis if LLM failed or generated insufficient scenes (< min_required_scenes) (Rule 445: 35-55 dynamic scenes)
-    min_required_scenes = max(35, min(55, total_words // 30)) if total_words > 300 else 5
+    # 4. Fallback synthesis if LLM failed or generated insufficient scenes (< min_required_scenes) (Rule 445: 130-160 dynamic scenes)
+    min_required_scenes = max(80, min(160, total_words // 25)) if total_words > 500 else 10
     llm_scenes = parsed.get("scenes", []) if parsed else []
     if not parsed or len(llm_scenes) < min_required_scenes:
         if parsed and llm_scenes:
@@ -732,7 +758,11 @@ def generate_director_plan(
         beat_name = sc.get("beat_name") or CANONICAL_BEATS[beat_idx - 1]
 
         narration = sc.get("narration") or ""
-        dur = sc.get("duration_est_sec") or sc.get("duration_sec") or max(8, min(18, len(narration.split()) // 3))
+        words_cnt = len(narration.split()) if narration else 10
+        if idx < 15:
+            dur = sc.get("duration_est_sec") or sc.get("duration_sec") or max(3, min(6, round(words_cnt / 3.0)))
+        else:
+            dur = sc.get("duration_est_sec") or sc.get("duration_sec") or max(5, min(9, round(words_cnt / 2.5)))
 
         bg = sc.get("background") or {}
         bg_key = bg.get("reuse_key") or f"{episode_id.lower()}_bg_b{beat_idx}_loc{idx:02d}"
@@ -766,7 +796,19 @@ def generate_director_plan(
 
         cam = sc.get("camera") or {}
         cam_mov = cam.get("movement") if isinstance(cam, dict) else str(cam)
-        cam_mov = cam_mov or ("slow_push_in" if idx % 3 == 0 else ("static_tension" if idx % 3 == 1 else "tracking_left"))
+        if cam_mov not in CANONICAL_CAMERA_MOVES:
+            if idx < 15:
+                hook_moves = ["snap_zoom", "handheld_shake", "macro_tilt", "slow_push_in"]
+                cam_mov = hook_moves[idx % len(hook_moves)]
+            else:
+                cam_mov = CANONICAL_CAMERA_MOVES[idx % len(CANONICAL_CAMERA_MOVES)]
+
+        bg_cluster_id = sc.get("bg_cluster_id") or sc.get("bgClusterId") or ((beat_idx - 1) * 4 + (idx % 3) + 1)
+        forensic_overlay = sc.get("forensic_overlay") or sc.get("forensicOverlay")
+        if not forensic_overlay or isinstance(forensic_overlay, str):
+            auto_overlay = detect_forensic_overlay(narration)
+            if auto_overlay:
+                forensic_overlay = auto_overlay
 
         norm_sc = {
             "scene_index": idx,
@@ -778,6 +820,8 @@ def generate_director_plan(
             "duration_est": float(dur),
             "duration_sec": int(dur),
             "visual_metaphor": sc.get("visual_metaphor", "Systemic tension and institutional conflict"),
+            "bg_cluster_id": int(bg_cluster_id),
+            "forensic_overlay": forensic_overlay,
             "camera": {
                 "movement": cam_mov,
                 "tension_level": cam.get("tension_level", "high") if isinstance(cam, dict) else "high"
@@ -1021,15 +1065,15 @@ def _synthesize_deterministic_director_plan(
 
     d_lower = archetype.get("director", "").lower()
     if "fincher" in d_lower or "mckay" in d_lower or "noir" in d_lower:
-        cam_moves = ["slow_creeping_push_in", "clinical_macro_tight", "surveillance_high_angle", "analytical_tracking"]
+        cam_moves = ["snap_zoom", "slow_push_in", "cinematic_pan", "macro_tilt", "handheld_shake", "slow_pull_out"]
     elif "nolan" in d_lower or "chernobyl" in d_lower:
-        cam_moves = ["monumental_wide_tableaux", "slow_atmospheric_pan", "lingering_depth_push", "dramatic_low_angle"]
+        cam_moves = ["slow_pull_out", "cinematic_pan", "slow_push_in", "handheld_shake", "macro_tilt", "snap_zoom"]
     elif "soderbergh" in d_lower or "clinical" in d_lower:
-        cam_moves = ["clinical_forensic_pan", "sealed_macro_push", "cold_tracking_shot", "sterile_wide_establishing"]
+        cam_moves = ["macro_tilt", "slow_push_in", "cinematic_pan", "snap_zoom", "slow_pull_out", "handheld_shake"]
     elif "miller" in d_lower or "contract" in d_lower or "moneyball" in d_lower:
-        cam_moves = ["observational_mid_push", "high_stakes_confrontation_angle", "forensic_ledger_close", "institutional_tracking"]
+        cam_moves = ["cinematic_pan", "slow_push_in", "snap_zoom", "macro_tilt", "handheld_shake", "slow_pull_out"]
     else:
-        cam_moves = ["slow_push_in", "atmospheric_tracking", "dramatic_tableaux", "static_tension"]
+        cam_moves = CANONICAL_CAMERA_MOVES
 
     for b_idx, beat in enumerate(story_beats):
         b_num = b_idx + 1
@@ -1055,21 +1099,24 @@ def _synthesize_deterministic_director_plan(
             if not sent:
                 continue
 
+            is_hook = (b_num == 1 and sc_counter < 15)
             if is_cjk:
                 sent_units = len(sent)
-                cut_threshold = 85
-                unit_divisor = 5.5
+                cut_threshold = 45 if is_hook else 70
+                unit_divisor = 4.0 if is_hook else 5.5
             else:
                 sent_units = len(sent.split())
-                cut_threshold = 35
-                unit_divisor = 2.4
+                cut_threshold = 20 if is_hook else 30
+                unit_divisor = 3.0 if is_hook else 2.5
 
-            # Sentence-Atomic Cut: flush when adding next sentence exceeds threshold or already has 2 sentences
-            if curr_narr and (curr_units + sent_units > cut_threshold or len(curr_narr) >= 2):
+            max_sentences = 1 if is_hook else 2
+            # Sentence-Atomic Cut: flush when adding next sentence exceeds threshold or already has max_sentences
+            if curr_narr and (curr_units + sent_units > cut_threshold or len(curr_narr) >= max_sentences):
                 sc_text = "".join(curr_narr).strip() if is_cjk else " ".join(curr_narr).strip()
                 if not re.search(r"[.!?。！？]$", sc_text):
                     sc_text += ("。" if is_cjk else ".")
                 sc_id = f"sc{sc_counter:03d}"
+                bg_cluster_id = ((b_num - 1) * 4) + (sc_counter % 3) + 1
                 bg_k = f"{episode_id.lower()}_bg_b{b_num}_loc{sc_counter % 3}"
 
                 char_idx = sc_counter % len(character_ensemble)
@@ -1084,7 +1131,12 @@ def _synthesize_deterministic_director_plan(
                 bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 cinematic setting of {b_name}, {dynamic_context['physical_environment']}, {dynamic_context['lighting_mood']}"
                 fg_desc = f"Stylized editorial graphic novel digital illustration of full-body {char_role} in {char_attire}, standing head-to-toe, {char_cues}, posture {char_state}, 1:1 aspect ratio, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames" if fg_k else None
                 cam_move = cam_moves[sc_counter % len(cam_moves)]
-                dur = max(7, min(18, round(curr_units / unit_divisor)))
+                if is_hook:
+                    dur = max(3, min(5, round(curr_units / unit_divisor)))
+                else:
+                    dur = max(5, min(9, round(curr_units / unit_divisor)))
+
+                forensic_overlay = detect_forensic_overlay(sc_text)
 
                 scenes.append({
                     "scene_id": sc_id,
@@ -1093,9 +1145,11 @@ def _synthesize_deterministic_director_plan(
                     "narration": sc_text,
                     "duration_est_sec": dur,
                     "visual_metaphor": f"Visual metaphor representing {b_name}",
+                    "bg_cluster_id": bg_cluster_id,
+                    "forensic_overlay": forensic_overlay,
                     "camera": {
                         "movement": cam_move,
-                        "tension_level": "high" if sc_counter % 3 != 0 else "medium"
+                        "tension_level": "high" if (is_hook or sc_counter % 3 != 0) else "medium"
                     },
                     "background": {
                         "reuse_key": bg_k,
@@ -1110,7 +1164,7 @@ def _synthesize_deterministic_director_plan(
                         "position": fg_pos,
                         "visual_description": fg_desc
                     } if fg_k else None,
-                    "audio_sfx_cue": "low_sub_drone_and_paper_shuffle"
+                    "audio_sfx_cue": "heartbeat_pulse" if is_hook else "low_sub_drone_and_paper_shuffle"
                 })
                 sc_counter += 1
                 curr_narr = []
@@ -1124,10 +1178,12 @@ def _synthesize_deterministic_director_plan(
             if not re.search(r"[.!?。！？]$", sc_text):
                 sc_text += ("。" if is_cjk else ".")
             sc_id = f"sc{sc_counter:03d}"
-            dur = max(7, min(18, round(curr_units / unit_divisor)))
+            dur = max(5, min(9, round(curr_units / unit_divisor)))
             cam_move = cam_moves[sc_counter % len(cam_moves)]
+            bg_cluster_id = ((b_num - 1) * 4) + (sc_counter % 3) + 1
             bg_k = f"{episode_id.lower()}_bg_b{b_num}_tail"
             bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 setting of {b_name}, {dynamic_context['physical_environment']}"
+            forensic_overlay = detect_forensic_overlay(sc_text)
             scenes.append({
                 "scene_id": sc_id,
                 "beat_index": b_num,
@@ -1135,6 +1191,8 @@ def _synthesize_deterministic_director_plan(
                 "narration": sc_text,
                 "duration_est_sec": dur,
                 "visual_metaphor": f"Closing tension of {b_name}",
+                "bg_cluster_id": bg_cluster_id,
+                "forensic_overlay": forensic_overlay,
                 "camera": {"movement": cam_move, "tension_level": "medium"},
                 "background": {
                     "reuse_key": bg_k,

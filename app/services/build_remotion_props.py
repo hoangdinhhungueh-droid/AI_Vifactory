@@ -32,6 +32,22 @@ from pathlib import Path
 logger = logging.getLogger("vf.build_remotion_props")
 
 
+def detect_forensic_overlay(narration_text: str) -> dict | None:
+    """Rule 128: Detect forensic evidentiary graphics trigger based on factual keywords."""
+    if not narration_text:
+        return None
+    t = narration_text.lower()
+    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "hợp đồng", "điều khoản", "tài liệu mật", "hanko", "biên bản"]):
+        return {"type": "redacted_doc", "label": "CLASSIFIED // REDACTED RECORD"}
+    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada"]):
+        return {"type": "radar_map", "label": "RADAR TELEMETRY // VECTOR TRACK"}
+    if any(k in t for k in ["stock", "dollar", "capital", "billion", "market", "revenue", "loss", "margin", "liquidity", "cổ phiếu", "sụt giảm", "thất thoát", "tỷ đô", "thị trường"]):
+        return {"type": "financial_chart", "label": "MARKET DISRUPTION // CAPITAL TRAJECTORY"}
+    if any(k in t for k in ["surveillance", "cctv", "facility", "camera", "security", "warehouse", "monitor", "an ninh", "giám sát"]):
+        return {"type": "surveillance_crt", "label": "FACILITY_SURVEILLANCE // CH_04"}
+    return None
+
+
 def load_manifest_index(manifest_path: str):
     with open(manifest_path, encoding="utf-8") as f:
         rows = json.load(f)
@@ -408,6 +424,15 @@ def build_remotion_props_data(
 
         speaker_tag = format_speaker_tag(s, act_title, custom_beat_titles)
 
+        # Extract Camera Grammar & Evidentiary Forensic Overlays (Rule 122 & Rule 128)
+        cam = s.get("camera") or {}
+        cam_mov = s.get("camera_movement") or (cam.get("movement") if isinstance(cam, dict) else str(cam))
+        tension_lvl = s.get("tension_level") or (cam.get("tension_level") if isinstance(cam, dict) else "high")
+        bg_cluster = s.get("bg_cluster_id") or s.get("bgClusterId")
+        forensic_ov = s.get("forensic_overlay") or s.get("forensicOverlay")
+        if not forensic_ov:
+            forensic_ov = detect_forensic_overlay(narration_text)
+
         scenes_out.append({
             "background": bg_rel or "",
             "foreground": fg_rel,
@@ -421,6 +446,10 @@ def build_remotion_props_data(
             "statLabel": stat_lbl,
             "speakerTag": speaker_tag,
             "actTitle": act_title,
+            "cameraMovement": cam_mov or "slow_push_in",
+            "tensionLevel": tension_lvl or "high",
+            "bgClusterId": bg_cluster,
+            "forensicOverlay": forensic_ov,
             "subtitles": scene_subtitles,  # Forward Faster-Whisper words
             "words": scene_subtitles,      # Alias for maximum compatibility
         })
