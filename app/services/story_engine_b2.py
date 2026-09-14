@@ -885,7 +885,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             # Summary Callout with Rule 130 verification metrics
             summary_text = (
                 f"🛡️ B2 5-BEAT DOCUDRAMA SCRIPT (RULE 130 ENFORCED)\n"
-                f"• Words: {total_words:,} | Story Gate: {story_score_str} {story_verdict}\n"
+                f"• {'Words' if not is_cjk else 'Chars'}: {actual_len:,} | Story Gate: {story_score_str} {story_verdict}\n"
                 f"• Model: GPT-6-Astra | Causal Roles: Primary Catalyst -> Transmission Mechanism\n"
                 f"• Title A: {seo_title_a or topic}"
             )[:1950]
