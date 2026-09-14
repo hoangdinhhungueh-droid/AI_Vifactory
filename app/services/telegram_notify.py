@@ -221,6 +221,12 @@ async def notify_episode_done(episode_id: str, final_path: str = None,
             elif ep_lower.startswith("vn_") or ep_lower.startswith("vn-"):
                 market = "vn"
 
+        # Rule 125 Anti-Double-Dispatch: If continue_after_images.py orchestrator is active, skip internal subprocess
+        b4b10_state = ep_dir / "b4b10_state.json"
+        if b4b10_state.exists():
+            logger.info(f"[Gate 3] Episode {episode_id} orchestrated by continue_after_images (b4b10_state.json detected). Skipping redundant internal B10 trigger.")
+            return True
+
         logger.info(f"[Gate 3] Auto-triggering B10 for {episode_id} (market: {market})...")
         cmd = [
             sys.executable,

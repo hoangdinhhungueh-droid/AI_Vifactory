@@ -89,15 +89,102 @@ def extract_stat_card(text: str):
     return None, None
 
 
-def format_speaker_tag(scene: dict, act_title: str) -> str:
-    """Dynamically format dialogue speaker tags or beat identification.
-    Rule 125 & Zero-Leak Mandate: Never leak internal asset keys, layer names, or hashes.
+def extract_custom_beat_titles(brain: dict, brain_input_path: str = "") -> dict[int, str]:
+    """Extract episode-specific 5-beat custom titles matching Chapters and Story (Rule 128 & Rule 136).
+    Returns dict: {1: 'TITLE 1', 2: 'TITLE 2', 3: 'TITLE 3', 4: 'TITLE 4', 5: 'TITLE 5'}
+    """
+    beat_titles: dict[int, str] = {}
+    ep_dir = os.path.dirname(brain_input_path) if brain_input_path else ""
+
+    # 1. Try to read from seo_package.json in episode directory or brain_input
+    seo_data = None
+    if ep_dir:
+        seo_path = os.path.join(ep_dir, "seo_package.json")
+        if os.path.exists(seo_path):
+            try:
+                with open(seo_path, "r", encoding="utf-8") as sf:
+                    seo_data = json.load(sf)
+            except Exception:
+                pass
+
+    if not seo_data and isinstance(brain.get("seo_package"), dict):
+        seo_data = brain["seo_package"]
+
+    raw_chapters = []
+    if seo_data:
+        if isinstance(seo_data.get("chapters"), list):
+            raw_chapters = [str(c) for c in seo_data["chapters"] if str(c).strip()]
+        elif isinstance(seo_data.get("description"), str):
+            desc = seo_data["description"]
+            ch_start = desc.find("Chapters:")
+            if ch_start != -1:
+                ch_block = desc[ch_start:]
+                for line in ch_block.splitlines()[1:]:
+                    line_s = line.strip()
+                    if not line_s or line_s.startswith("#") or "This video" in line_s:
+                        break
+                    if re.match(r'^\d{1,2}:\d{2}', line_s):
+                        raw_chapters.append(line_s)
+
+    # 2. Extract clean titles from chapters (format: "00:00 - Title")
+    for idx, ch_line in enumerate(raw_chapters[:5], 1):
+        clean_title = re.sub(r'^\d{1,2}:\d{2}(?::\d{2})?\s*[-:]?\s*', '', ch_line).strip()
+        clean_title = re.sub(r'^(?:Beat|Act)\s*[1-5IVXLCDM]+[:\-]?\s*', '', clean_title, flags=re.IGNORECASE).strip()
+        if clean_title:
+            beat_titles[idx] = clean_title
+
+    # 3. Fallback: parse from story text (=== ACT I: TITLE === or similar)
+    if len(beat_titles) < 5:
+        story_text = brain.get("story") or ""
+        if not story_text and ep_dir:
+            st_path = os.path.join(ep_dir, "story.txt")
+            if os.path.exists(st_path):
+                try:
+                    with open(st_path, "r", encoding="utf-8") as st_f:
+                        story_text = st_f.read()
+                except Exception:
+                    pass
+        if story_text:
+            act_matches = re.findall(r'(?:={2,}\s*)?(?:ACT|BEAT)\s*([1-5]|IV|I{1,3}|V)\s*[:\-–—]\s*([^=\r\n]+)', story_text, re.IGNORECASE)
+            roman_map = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5}
+            for act_num, act_name in act_matches:
+                b_num = roman_map.get(act_num.upper()) or (int(act_num) if act_num.isdigit() else 1)
+                clean_name = act_name.strip().strip("=").strip()
+                if clean_name and b_num not in beat_titles:
+                    beat_titles[b_num] = clean_name
+
+    # 4. Fallback: dynamic chapter generation based on topic/keyword and market
+    if len(beat_titles) < 5:
+        try:
+            from app.services.seo_package_forge import _build_dynamic_chapters
+            kw = str(brain.get("topic") or brain.get("title_a") or brain.get("episode_id") or "Investigation").strip()
+            m = (brain.get("market") or "EN").upper()
+            dyn_chapters = _build_dynamic_chapters(title=kw, market=m, target_keyword=kw)
+            for idx, ch_line in enumerate(dyn_chapters[:5], 1):
+                if idx not in beat_titles:
+                    clean_title = re.sub(r'^\d{1,2}:\d{2}(?::\d{2})?\s*[-:]?\s*', '', ch_line).strip()
+                    clean_title = re.sub(r'^(?:Beat|Act)\s*[1-5IVXLCDM]+[:\-]?\s*', '', clean_title, flags=re.IGNORECASE).strip()
+                    beat_titles[idx] = clean_title
+        except Exception as e:
+            logger.warning("[extract_custom_beat_titles] Fallback dynamic chapters failed: %s", e)
+
+    return beat_titles
+
+
+def format_speaker_tag(scene: dict, act_title: str = "", custom_beat_titles: dict = None) -> str:
+    """Dynamically format dialogue speaker tags or episode-specific beat identification.
+    Rule 125, Rule 128 & Rule 136: Never leak internal asset keys, layer names, or hashes.
     Displays:
       - Explicit dialogue speaker: 'NAME // ROLE'
-      - Beat identification: 'BEAT <X>: <TITLE>' (or clean scene beat string)
+      - Custom Episode Beat identification: 'BEAT <X>: <EPISODE_SPECIFIC_TITLE>'
     """
     if scene.get("speaker_tag"):
-        return str(scene["speaker_tag"]).strip()
+        st = str(scene["speaker_tag"]).strip()
+        if not any(arch.lower() in st.lower() for arch in [
+            "the impossible contradiction", "the false narrative",
+            "the systemic blindspot", "the real culprit", "the uncomfortable modern mirror"
+        ]):
+            return st
 
     if scene.get("character_name"):
         name = str(scene["character_name"]).strip()
@@ -106,20 +193,41 @@ def format_speaker_tag(scene: dict, act_title: str) -> str:
             return f"{name} // {role}".upper()
         return name.upper()
 
-    # Prioritize clean beat identification (e.g. "BEAT 1: THE IMPOSSIBLE CONTRADICTION")
-    beat_val = scene.get("beat") or scene.get("beat_title")
-    if beat_val:
-        return str(beat_val).strip().upper()
-
+    # Determine beat_idx (1-5)
     beat_idx = scene.get("beat_index")
-    if beat_idx:
-        clean_act = re.sub(r'^ACT\s+[IVXLCDM]+\s*//\s*', '', str(act_title or '').strip(), flags=re.IGNORECASE)
+    if not beat_idx:
+        b_match = re.search(r'(?:BEAT|ACT)\s*([1-5]|IV|I{1,3}|V)', str(scene.get("beat") or scene.get("beat_name") or act_title or ""), re.IGNORECASE)
+        if b_match:
+            val = b_match.group(1).upper()
+            roman_map = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5}
+            beat_idx = roman_map.get(val) or (int(val) if val.isdigit() else 1)
+        else:
+            beat_idx = 1
+    beat_idx = min(max(int(beat_idx), 1), 5)
+
+    # 1. Prioritize episode-specific custom beat title
+    if custom_beat_titles and beat_idx in custom_beat_titles:
+        c_title = custom_beat_titles[beat_idx]
+        if c_title:
+            return f"BEAT {beat_idx}: {c_title}".strip().upper()
+
+    # 2. Check if scene had an explicit non-generic beat title
+    beat_val = scene.get("beat_title") or scene.get("beat") or scene.get("beat_name")
+    if beat_val:
+        b_str = str(beat_val).strip()
+        clean_b = re.sub(r'^(?:Beat|Act)\s*\d+[:\-]?\s*', '', b_str, flags=re.IGNORECASE).strip()
+        if clean_b and not any(arch.lower() in clean_b.lower() for arch in [
+            "the impossible contradiction", "the false narrative",
+            "the systemic blindspot", "the real culprit", "the uncomfortable modern mirror"
+        ]):
+            return f"BEAT {beat_idx}: {clean_b}".strip().upper()
+
+    # 3. Clean act title fallback
+    clean_act = re.sub(r'^ACT\s+[IVXLCDM]+\s*//\s*', '', str(act_title or '').strip(), flags=re.IGNORECASE)
+    if clean_act and not any(gen in clean_act.upper() for gen in ["HOOK & EXPOSURE", "THE CATALYST", "ARCHITECTURE OF POWER"]):
         return f"BEAT {beat_idx}: {clean_act}".strip().upper()
 
-    if act_title:
-        return str(act_title).strip().upper()
-
-    return "CASE INVESTIGATION"
+    return f"BEAT {beat_idx}: INVESTIGATION".upper()
 
 
 def match_segments_and_extract_words(scene_text: str, segments: list, start_idx: int, fps: int = 30, scene_id: str = ""):
@@ -245,6 +353,9 @@ def build_remotion_props_data(
 
     seg_cursor = 0
 
+    custom_beat_titles = extract_custom_beat_titles(brain, brain_input_path)
+    logger.info("[build_remotion_props] Episode-specific Beat Titles: %s", custom_beat_titles)
+
     for i, s in enumerate(raw_scenes):
         bg_key = s.get("background_reuse_key")
         fg_key = s.get("foreground_reuse_key")
@@ -304,7 +415,7 @@ def build_remotion_props_data(
             "ACT V // THE AFTERMATH & RECKONING"
         )
 
-        speaker_tag = format_speaker_tag(s, act_title)
+        speaker_tag = format_speaker_tag(s, act_title, custom_beat_titles)
 
         scenes_out.append({
             "background": bg_rel or "",

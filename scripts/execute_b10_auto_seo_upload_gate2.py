@@ -590,14 +590,37 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
     LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
     LEDGER_PATH.write_text(json.dumps(ledger, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    print("=== [B10-AUTO] 8. Dispatching Human Gate 2 Telegram card (unchanged, 4 buttons) ===")
-    await send_gate3_card(
-        video_id=video_id,
-        episode_id=episode_id,
-        title_a=packaging["title_a"],
-        title_b=packaging["title_b"],
-        market=market,
-    )
+    # Rule 125 Idempotency Gate: Prevent duplicate HG3 telegram card within 10 minutes
+    hg3_marker = ep_dir / "hg3_dispatched.json"
+    recent_dispatch = False
+    if hg3_marker.exists():
+        try:
+            m_data = json.loads(hg3_marker.read_text(encoding="utf-8"))
+            last_ts = m_data.get("timestamp_epoch", 0)
+            if time.time() - last_ts < 600 and m_data.get("video_id") == video_id:
+                recent_dispatch = True
+                print(f"⚠️ [B10-AUTO] HG3 card already dispatched {int(time.time() - last_ts)}s ago for video {video_id}. Skipping duplicate Telegram message.")
+        except Exception:
+            pass
+
+    if not recent_dispatch:
+        print("=== [B10-AUTO] 8. Dispatching Human Gate 3 Telegram card (4 buttons) ===")
+        await send_gate3_card(
+            video_id=video_id,
+            episode_id=episode_id,
+            title_a=packaging["title_a"],
+            title_b=packaging["title_b"],
+            market=market,
+        )
+        try:
+            hg3_marker.write_text(json.dumps({
+                "episode_id": episode_id,
+                "video_id": video_id,
+                "timestamp_epoch": time.time(),
+                "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            }, indent=2), encoding="utf-8")
+        except Exception:
+            pass
     print("B10-AUTO complete. No manual Antigravity paste step was required.")
     return {"video_id": video_id, "packaging": packaging}
 
