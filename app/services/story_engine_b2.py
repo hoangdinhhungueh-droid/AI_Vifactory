@@ -12,6 +12,7 @@ Architecture & Rule Compliance:
 
 import os, sys, json, time, re, logging
 from datetime import datetime, timezone
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -58,16 +59,18 @@ def _opening_hook(script: str, max_chars: int = 320) -> str:
 
 
 
-def load_competitor_intel(task_id: str) -> dict:
-    """Load B1.5 Competitor Intelligence Card if it exists in either episodes dir.
-    Enforces strict contract: raises RuntimeError if missing or incomplete, unless bypassed.
+def load_competitor_intel(task_id: str, topic: str = "", niche_brief: str = "", market: str = "EN") -> dict:
+    """Load B1.5 Competitor Intel Card.
+    Enforces strict contract: raises RuntimeError if missing, unless bypassed or recovered via JIT.
     """
     candidates = [
         os.path.join(EPISODES_BASE_DIR, task_id, "competitor_intel_card.json"),
+        os.path.join("/var/vf/episodes", task_id, "competitor_intel_card.json"),
         os.path.join("/root/video_factory/episodes", task_id, "competitor_intel_card.json"),
+        os.path.join("./episodes", task_id, "competitor_intel_card.json"),
     ]
     for intel_path in candidates:
-        if os.path.exists(intel_path):
+        if os.path.exists(intel_path) and os.path.getsize(intel_path) > 10:
             try:
                 with open(intel_path, "r", encoding="utf-8") as f:
                     data = json_lib.load(f)
@@ -75,6 +78,23 @@ def load_competitor_intel(task_id: str) -> dict:
                         return data
             except Exception as e:
                 logger.debug(f"[story_engine] Error loading competitor intel from {intel_path}: {e}")
+
+    # JIT fallback: if missing from disk but topic is present, attempt dynamic B1.5 recon
+    if topic:
+        logger.info(f"[story_engine] Competitor intel missing on disk for {task_id}. Attempting JIT B1.5 recon for '{topic[:50]}'...")
+        try:
+            from app.services.competitor_recon_b15 import run_b15
+            recon_card = run_b15(task_id, topic, niche_brief or "General", market=market)
+            if recon_card and isinstance(recon_card, dict):
+                for ep_base in [EPISODES_BASE_DIR, "/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
+                    t_dir = Path(ep_base) / task_id
+                    t_dir.mkdir(parents=True, exist_ok=True)
+                    (t_dir / "competitor_intel_card.json").write_text(
+                        json_lib.dumps(recon_card, ensure_ascii=False, indent=2), encoding="utf-8")
+                return recon_card
+        except Exception as jit_err:
+            logger.warning(f"[story_engine] JIT competitor recon failed for {task_id}: {jit_err}")
+
     if os.getenv("VF_BYPASS_INTEL_CHECK") == "1":
         logger.warning(f"[story_engine] VF_BYPASS_INTEL_CHECK active: continuing without intel card for {task_id}")
         return {}
@@ -237,7 +257,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
     temporal_cadence = (g_data.get("temporal_cadence") or "ADAPTIVE").upper()
     causal_epochs = g_data.get("causal_epochs") or []
 
-    intel_card = load_competitor_intel(task_id)
+    intel_card = load_competitor_intel(task_id, topic=topic, niche_brief=niche_brief, market=mkt)
     intel_status = "loaded" if intel_card else "none"
     anatomy = (intel_card.get("competitor_narrative_anatomy") or {}) if intel_card else {}
     competitor_gap = meta.get("competitor_differentiation_gap") or anatomy.get("fatal_explanatory_vacuum") or (intel_card.get("competitor_gap") if intel_card else "")

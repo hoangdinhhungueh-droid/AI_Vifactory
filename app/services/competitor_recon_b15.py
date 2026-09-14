@@ -217,6 +217,36 @@ def _api_get(endpoint: str, params: Dict, quota: QuotaTracker) -> Optional[Dict]
         return None
 
 
+def parse_relative_time_to_dt(rel_str: str) -> Optional[datetime]:
+    """Parse relative time strings like '8 hours ago', '2 days ago', '1 week ago' into UTC datetime."""
+    if not rel_str or not isinstance(rel_str, str):
+        return None
+    s = rel_str.strip().lower()
+    now = datetime.now(timezone.utc)
+    if "yesterday" in s:
+        return now - timedelta(days=1)
+    m = re.search(r'(\d+)\s*(second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr)', s)
+    if not m:
+        return None
+    val = int(m.group(1))
+    unit = m.group(2)
+    if unit.startswith("sec"):
+        return now - timedelta(seconds=val)
+    elif unit.startswith("min"):
+        return now - timedelta(minutes=val)
+    elif unit.startswith("hour") or unit.startswith("hr"):
+        return now - timedelta(hours=val)
+    elif unit.startswith("day"):
+        return now - timedelta(days=val)
+    elif unit.startswith("week") or unit.startswith("wk"):
+        return now - timedelta(days=val * 7)
+    elif unit.startswith("month") or unit.startswith("mo"):
+        return now - timedelta(days=val * 30)
+    elif unit.startswith("year") or unit.startswith("yr"):
+        return now - timedelta(days=val * 365)
+    return None
+
+
 def scrape_youtube_search_zero_quota(query: str, market: str = "en", max_results: int = 15) -> List[Dict]:
     """Zero-quota public YouTube search harvester using ytInitialData.
     Provides complete resilience against YouTube Data API 429 quota exhaustion (Rule 118 & 123).
@@ -271,13 +301,17 @@ def scrape_youtube_search_zero_quota(query: str, market: str = "en", max_results
                             elif "m" in view_text.lower():
                                 views_int *= 1000000
 
+                    dt_pub = parse_relative_time_to_dt(pub_text)
+                    iso_pub = dt_pub.isoformat() if dt_pub else (pub_text or "")
+
                     if vid and title:
                         videos.append({
                             "video_id": vid,
                             "channel": channel,
                             "channel_id": "",
                             "title": title,
-                            "published_at": pub_text,
+                            "published_at": iso_pub,
+                            "published_at_relative": pub_text,
                             "views": views_int,
                             "thumbnails": vr.get("thumbnail", {}),
                             "url": f"https://www.youtube.com/watch?v={vid}"
@@ -501,10 +535,14 @@ def filter_comment_gaps(comments: List[Dict], min_likes: int = COMMENT_MIN_LIKES
 
 def age_days(published_at: str) -> Optional[int]:
     """Calculate age in days since upload."""
+    if not published_at or not isinstance(published_at, str):
+        return None
     try:
         pub = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
     except (ValueError, AttributeError):
-        return None
+        pub = parse_relative_time_to_dt(published_at)
+        if pub is None:
+            return None
     return max((datetime.now(timezone.utc) - pub.astimezone(timezone.utc)).days, 1)
 
 
@@ -516,12 +554,16 @@ def velocity(views: int, published_at: str) -> Optional[float]:
 
 def calculate_vph(views: int, published_at: str) -> Optional[float]:
     """Calculate Views Per Hour (VPH) since publish for 48H surge detection."""
+    if not published_at or not isinstance(published_at, str):
+        return None
     try:
         pub = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
-        hours = max((datetime.now(timezone.utc) - pub.astimezone(timezone.utc)).total_seconds() / 3600.0, 1.0)
-        return round(views / hours, 2)
     except (ValueError, AttributeError, TypeError):
-        return None
+        pub = parse_relative_time_to_dt(published_at)
+        if pub is None:
+            return None
+    hours = max((datetime.now(timezone.utc) - pub.astimezone(timezone.utc)).total_seconds() / 3600.0, 1.0)
+    return round(views / hours, 2)
 
 
 def calculate_vs_ratio(views: int, subscribers: int) -> float:
@@ -996,27 +1038,27 @@ def build_intel_card(task_id: str, target_keyword: str, niche: str, market: str,
                      raw_comments: Optional[List[Dict]] = None) -> Dict:
     """Assemble final competitor_intel_card.json adhering strictly to B1.5 -> B2 contract."""
     benchmarks = [{
-        "video_id": c["video_id"],
-        "channel": c["channel"],
+        "video_id": c.get("video_id", ""),
+        "channel": c.get("channel", ""),
         "channel_id": c.get("channel_id", ""),
         "subscriber_count": c.get("channel_subscribers", 0),
-        "title": c["title"],
-        "published_at": c["published_at"],
-        "age_days": c["age_days"],
+        "title": c.get("title", ""),
+        "published_at": c.get("published_at", ""),
+        "age_days": c.get("age_days", 1),
         "views": c.get("views", 0),
         "likes": c.get("likes", 0),
         "comments": c.get("comments", 0),
         "duration": c.get("duration"),
-        "avg_views_per_day": c["avg_views_per_day"],
+        "avg_views_per_day": c.get("avg_views_per_day", c.get("views", 0)),
         "vph": c.get("vph", 0.0),
         "v_s_ratio": c.get("v_s_ratio", 0.0),
         "outlier_score": c.get("outlier_score", 0.0),
-        "selection_group": c["selection_group"],
+        "selection_group": c.get("selection_group", "competitor_benchmark"),
         "tags": c.get("tags", []),
         "description_head": c.get("description_head", ""),
-        "transcript_status": c["transcript"]["status"],
-        "transcript_source": c["transcript"]["source"],
-        "transcript_head": c["transcript"]["text"],
+        "transcript_status": (c.get("transcript") or {}).get("status", "unavailable"),
+        "transcript_source": (c.get("transcript") or {}).get("source"),
+        "transcript_head": (c.get("transcript") or {}).get("text"),
         "thumbnail_path": c.get("thumbnail_path"),
     } for c in selected]
 
@@ -1034,10 +1076,10 @@ def build_intel_card(task_id: str, target_keyword: str, niche: str, market: str,
         "market": market,
         "competitor_benchmarks": benchmarks,
         "audience_comment_gaps": [{
-            "video_id": g["video_id"],
-            "comment_verbatim": g["text"],
-            "likes_count": g["likes"],
-            "author": g["author"],
+            "video_id": g.get("video_id", ""),
+            "comment_verbatim": g.get("text", ""),
+            "likes_count": g.get("likes", 0),
+            "author": g.get("author", "Anonymous"),
             "published_at": g.get("published_at"),
         } for g in gaps],
         "transposition_opportunities": transposition,
@@ -1178,7 +1220,7 @@ def sync_card_to_notion(task_id: str, card: dict) -> bool:
 
 
 def run_b15(task_id: str, target_keyword: str, niche: str = "General",
-            use_cache: bool = True) -> Optional[Dict]:
+            use_cache: bool = True, market: Optional[str] = None) -> Optional[Dict]:
     """
     Main Orchestrator for B1.5 Two-Pass Competitor Recon:
       Pass 1: Collect candidates, details, transcripts, comments, and thumbnails.
@@ -1186,7 +1228,7 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
       Pass 3: Build card, persist to disk, and sync to Notion SoT.
     """
     load_env()
-    market = market_of(task_id)
+    market = (market or market_of(task_id)).lower()
     logger.info("[b15] Initiating recon for task=%s keyword=%r market=%s", task_id, target_keyword, market)
 
     # 1. Candidate search with cache support
@@ -1247,6 +1289,16 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
     if not selected and candidates:
         logger.warning("[b15] Competitor selection formula matched 0 videos, falling back to top candidates directly.")
         selected = candidates[:3]
+        for c in selected:
+            c.setdefault("selection_group", "top_search_fallback")
+            c.setdefault("age_days", age_days(c.get("published_at", "")) or 1)
+            c.setdefault("avg_views_per_day", c.get("views", 0) / max(c.get("age_days", 1), 1))
+            c.setdefault("vph", calculate_vph(c.get("views", 0), c.get("published_at", "")) or 0.0)
+            c.setdefault("channel_subscribers", c.get("channel_subscribers", 0))
+            c.setdefault("v_s_ratio", 0.0)
+            c.setdefault("outlier_score", 0.0)
+            c.setdefault("transcript", {"status": "unavailable", "text": None, "source": None})
+            c.setdefault("thumbnail_path", None)
     if not selected:
         anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, [], [], niche)
         card = build_intel_card(task_id, target_keyword, niche, market, [], [], quota,

@@ -1021,16 +1021,15 @@ def discover_and_produce_market_trend(
         try:
             recon_keyword = t_obj.get("search_specific_keyword") or term
             if not recon_card:
-                recon_card = run_b15(temp_task_id, recon_keyword, t_obj.get("niche_angle_brief", "General"))
+                recon_card = run_b15(temp_task_id, recon_keyword, t_obj.get("niche_angle_brief", "General"), market=m_up)
             else:
                 recon_card["task_id"] = temp_task_id
-            for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-                t_dir = Path(ep_base) / temp_task_id
-                if t_dir.parent.exists() or Path(ep_base).exists():
+            if recon_card and isinstance(recon_card, dict):
+                for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
+                    t_dir = Path(ep_base) / temp_task_id
                     t_dir.mkdir(parents=True, exist_ok=True)
                     (t_dir / "competitor_intel_card.json").write_text(
                         json.dumps(recon_card, ensure_ascii=False, indent=2), encoding="utf-8")
-            if recon_card:
                 gap_val = recon_card.get("competitor_narrative_anatomy", {}).get("fatal_explanatory_vacuum", "") or comp_gap
                 if gap_val:
                     t_obj["competitor_differentiation_gap"] = gap_val

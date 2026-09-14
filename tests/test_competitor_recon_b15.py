@@ -32,6 +32,7 @@ from app.services.competitor_recon_b15 import (  # noqa: E402
     youtube_channel_subscribers,
     SMALL_CHANNEL_SUB_CEILING,
     OUTLIER_VS_RATIO_MIN,
+    parse_relative_time_to_dt,
 )
 
 
@@ -394,4 +395,58 @@ class TestChannelSubscribersBatchEndpoint:
         subs = youtube_channel_subscribers("fake-key", ["cid-1", "cid-2"], quota)
         assert subs["cid-1"] == 15200
         assert subs["cid-2"] == 0
+
+
+class TestRelativeTimeAndZeroQuotaResilience:
+    def test_parse_relative_time_units(self):
+        assert parse_relative_time_to_dt("") is None
+        assert parse_relative_time_to_dt("not a date") is None
+
+        now = datetime.now(timezone.utc)
+        dt_hr = parse_relative_time_to_dt("8 hours ago")
+        assert dt_hr is not None
+        assert abs((now - dt_hr).total_seconds() - 8 * 3600) < 5
+
+        dt_day = parse_relative_time_to_dt("2 days ago")
+        assert dt_day is not None
+        assert abs((now - dt_day).total_seconds() - 2 * 86400) < 5
+
+        dt_wk = parse_relative_time_to_dt("3 weeks ago")
+        assert dt_wk is not None
+        assert abs((now - dt_wk).total_seconds() - 21 * 86400) < 5
+
+        dt_mo = parse_relative_time_to_dt("1 month ago")
+        assert dt_mo is not None
+        assert abs((now - dt_mo).total_seconds() - 30 * 86400) < 5
+
+        dt_yr = parse_relative_time_to_dt("2 years ago")
+        assert dt_yr is not None
+        assert abs((now - dt_yr).total_seconds() - 730 * 86400) < 5
+
+        dt_yest = parse_relative_time_to_dt("yesterday")
+        assert dt_yest is not None
+        assert abs((now - dt_yest).total_seconds() - 86400) < 5
+
+    def test_age_days_and_vph_with_relative_strings(self):
+        assert age_days("8 hours ago") == 1
+        assert age_days("3 days ago") == 3
+        vph = calculate_vph(1000, "8 hours ago")
+        assert vph is not None
+        assert 100 <= vph <= 150
+
+    def test_build_intel_card_safe_missing_fields(self):
+        quota = QuotaTracker()
+        raw_cand = {
+            "video_id": "test_123",
+            "title": "Raw Candidate Title",
+            "views": 5000,
+        }
+        card = build_intel_card("task_001", "keyword", "niche", "EN", [raw_cand], [], quota)
+        assert len(card["competitor_benchmarks"]) == 1
+        b = card["competitor_benchmarks"][0]
+        assert b["video_id"] == "test_123"
+        assert b["age_days"] == 1
+        assert b["selection_group"] == "competitor_benchmark"
+        assert b["transcript_status"] == "unavailable"
+
 
