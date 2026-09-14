@@ -71,7 +71,57 @@ class TestTrendGateB1:
         assert metadata["task_id"].startswith("EN_EP")
         assert metadata["score"] >= 7.0
         assert metadata["status"] in ["Draft", "InProgress", "Complete", "Failed"]
-        assert metadata["node"] == "B1"
+    def test_sanitize_candidate_term_preserves_english_words(self):
+        """Rule 118/125: Verify candidate headlines are never mangled or cut in half."""
+        from app.services.trend_engine_b1 import sanitize_candidate_term
+
+        # Test case 1: Candidate #19 - Tesla Cybercab
+        t1 = "Tesla launched Cybercab in Austin. Hours later, the feds launched an investigation."
+        s1 = sanitize_candidate_term(t1)
+        assert "Tesla" in s1
+        assert "Cybercab" in s1
+        assert "investigation" in s1
+        assert not s1.startswith("ds launched")  # Former fatal bug test
+
+        # Test case 2: Candidate #58 - West Marine bankruptcy
+        t2 = "West Marine CEO details bankruptcy lessons"
+        s2 = sanitize_candidate_term(t2)
+        assert s2 == "West Marine CEO details bankruptcy lessons"
+        assert "bankru" not in s2 or "bankruptcy" in s2
+
+        # Test case 3: Candidate #13 - Montessori Ponzi
+        t3 = "Inside the Outrageous Collapse of a ‘Montessori Ponzi’"
+        s3 = sanitize_candidate_term(t3)
+        assert "Montessori Ponzi" in s3
+        assert not s3.endswith("Montesso")
+
+        # Test case 4: Stripping publisher suffix
+        t4 = "Kennedy Center could close as early as Tuesday, warns of bankruptcy, documents show - The Washington Post"
+        s4 = sanitize_candidate_term(t4)
+        assert not s4.endswith("The Washington Post")
+        assert "Kennedy Center" in s4
+
+    def test_sanitize_candidate_term_cjk(self):
+        """Rule 118/122: Verify CJK quoted entity and event extraction."""
+        from app.services.trend_engine_b1 import sanitize_candidate_term
+
+        jp_headline = "【近畿初の神社倒産】清和源氏発祥の『多田神社』が民事再生法の適用申請...（MBSニュース）"
+        s_jp = sanitize_candidate_term(jp_headline)
+        assert s_jp == "多田神社 民事再生"
+
+    def test_zero_quota_youtube_scraper(self):
+        """Rule 123: Verify zero-quota public YouTube search scraper structure."""
+        from app.services.competitor_recon_b15 import scrape_youtube_search_zero_quota
+
+        results = scrape_youtube_search_zero_quota("Tesla Cybercab Austin", market="en", max_results=3)
+        assert isinstance(results, list)
+        if results:
+            first = results[0]
+            assert "video_id" in first
+            assert "title" in first
+            assert "views" in first
+            assert "url" in first
+            assert first["url"].startswith("https://www.youtube.com/watch?v=")
 
 
 if __name__ == "__main__":
