@@ -384,28 +384,29 @@ def run_b36_visual_convergence(
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    for t_dir in canonical_dirs:
-        try:
-            can_persist = False
+    if not episode_id.upper().startswith("TEST_"):
+        for t_dir in canonical_dirs:
             try:
-                if t_dir.exists() or t_dir.parent.exists():
-                    can_persist = True
-            except (PermissionError, OSError):
                 can_persist = False
-            if can_persist:
-                t_dir.mkdir(parents=True, exist_ok=True)
-                with open(t_dir / "visual_convergence_audit.json", "w", encoding="utf-8") as f:
-                    json.dump(audit_summary, f, indent=2, ensure_ascii=False)
-                with open(t_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
-                    json.dump(current_prompts, f, indent=2, ensure_ascii=False)
-                with open(t_dir / "prompts.json", "w", encoding="utf-8") as f:
-                    json.dump(current_prompts, f, indent=2, ensure_ascii=False)
-                with open(t_dir / "director_plan.json", "w", encoding="utf-8") as f:
-                    json.dump(current_dplan, f, indent=2, ensure_ascii=False)
-                with open(t_dir / "dp_plan.json", "w", encoding="utf-8") as f:
-                    json.dump({"scenes": current_dplan.get("scenes", [])}, f, indent=2, ensure_ascii=False)
-        except (PermissionError, OSError, Exception) as p_err:
-            logger.warning(f"[B3.5.1 DACL] Failed to persist converged assets to {t_dir}: {p_err}")
+                try:
+                    if t_dir.exists() or t_dir.parent.exists():
+                        can_persist = True
+                except (PermissionError, OSError):
+                    can_persist = False
+                if can_persist:
+                    t_dir.mkdir(parents=True, exist_ok=True)
+                    with open(t_dir / "visual_convergence_audit.json", "w", encoding="utf-8") as f:
+                        json.dump(audit_summary, f, indent=2, ensure_ascii=False)
+                    with open(t_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
+                        json.dump(current_prompts, f, indent=2, ensure_ascii=False)
+                    with open(t_dir / "prompts.json", "w", encoding="utf-8") as f:
+                        json.dump(current_prompts, f, indent=2, ensure_ascii=False)
+                    with open(t_dir / "director_plan.json", "w", encoding="utf-8") as f:
+                        json.dump(current_dplan, f, indent=2, ensure_ascii=False)
+                    with open(t_dir / "dp_plan.json", "w", encoding="utf-8") as f:
+                        json.dump({"scenes": current_dplan.get("scenes", [])}, f, indent=2, ensure_ascii=False)
+            except (PermissionError, OSError, Exception) as p_err:
+                logger.warning(f"[B3.5.1 DACL] Failed to persist converged assets to {t_dir}: {p_err}")
 
     # Trigger Human Gate 2 Telegram Notification AFTER B3.5.1 convergence and file persistence (Rule 125)
     if episode_id.upper().startswith("TEST_"):
