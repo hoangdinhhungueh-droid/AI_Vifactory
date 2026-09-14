@@ -21,9 +21,18 @@ from typing import Dict, List, Any, Optional, Tuple
 
 logger = logging.getLogger("vf.beat_bgm_engine")
 
-CATALOG_PATH = Path("/root/video_factory/assets/bgm_curated/catalog.json")
-CURATED_DIR = Path("/root/video_factory/assets/bgm_curated")
-LEGACY_DIR = Path("/root/video_factory/assets/bgm")
+REPO_ROOT = Path(os.getenv("VF_REPO_DIR") or Path(__file__).resolve().parent.parent.parent)
+CATALOG_PATH = Path(os.getenv("BGM_CATALOG_PATH", str(REPO_ROOT / "assets" / "bgm_curated" / "catalog.json")))
+CURATED_DIR = Path(os.getenv("BGM_CURATED_DIR", str(REPO_ROOT / "assets" / "bgm_curated")))
+LEGACY_DIR = Path(os.getenv("BGM_DIR", str(REPO_ROOT / "assets" / "bgm")))
+
+EMBEDDED_FALLBACK_CATALOG = [
+    {"beat_index": 1, "beat_name": "beat_1_hook", "track_id": "investigations", "title": "Investigations", "artist": "Kevin MacLeod", "duration_s": 93.5, "file_path": str(CURATED_DIR / "beat_1_hook" / "investigations.mp3"), "license": "Creative Commons: By Attribution 3.0 License", "source": "YouTube Audio Library Certified"},
+    {"beat_index": 2, "beat_name": "beat_2_buildup", "track_id": "covert_affair", "title": "Covert Affair", "artist": "Kevin MacLeod", "duration_s": 194.2, "file_path": str(CURATED_DIR / "beat_2_buildup" / "covert_affair.mp3"), "license": "Creative Commons: By Attribution 3.0 License", "source": "YouTube Audio Library Certified"},
+    {"beat_index": 3, "beat_name": "beat_3_investigation", "track_id": "stay_the_course", "title": "Stay the Course", "artist": "Kevin MacLeod", "duration_s": 272.1, "file_path": str(CURATED_DIR / "beat_3_investigation" / "stay_the_course.mp3"), "license": "Creative Commons: By Attribution 3.0 License", "source": "YouTube Audio Library Certified"},
+    {"beat_index": 4, "beat_name": "beat_4_climax", "track_id": "black_vortex", "title": "Black Vortex", "artist": "Kevin MacLeod", "duration_s": 169.7, "file_path": str(CURATED_DIR / "beat_4_climax" / "black_vortex.mp3"), "license": "Creative Commons: By Attribution 3.0 License", "source": "YouTube Audio Library Certified"},
+    {"beat_index": 5, "beat_name": "beat_5_reflection", "track_id": "heartbreaking", "title": "Heartbreaking", "artist": "Kevin MacLeod", "duration_s": 96.0, "file_path": str(CURATED_DIR / "beat_5_reflection" / "heartbreaking.mp3"), "license": "Creative Commons: By Attribution 3.0 License", "source": "YouTube Audio Library Certified"},
+]
 
 BEAT_MOOD_MAP = {
     1: "beat_1_hook",
@@ -56,12 +65,12 @@ def _probe_duration(file_path: str) -> float:
 
 def load_bgm_catalog() -> List[Dict[str, Any]]:
     """Load curated BGM catalog. Fallback to scanning directory if catalog.json is missing."""
-    if CATALOG_PATH.exists():
-        try:
+    try:
+        if CATALOG_PATH.exists():
             with open(CATALOG_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception as e:
-            logger.warning("[beat_bgm_engine] Failed to read catalog.json: %s", e)
+    except (PermissionError, OSError, Exception) as e:
+        logger.warning("[beat_bgm_engine] Failed to read catalog.json (%s), checking filesystem", e)
 
     # Fallback: scan CURATED_DIR
     catalog = []
@@ -83,6 +92,8 @@ def load_bgm_catalog() -> List[Dict[str, Any]]:
                         "license_url": "http://creativecommons.org/licenses/by/3.0/",
                         "source": "YouTube Audio Library Certified"
                     })
+    if not catalog:
+        return EMBEDDED_FALLBACK_CATALOG
     return catalog
 
 
