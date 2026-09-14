@@ -176,15 +176,11 @@ def format_speaker_tag(scene: dict, act_title: str = "", custom_beat_titles: dic
     Rule 125, Rule 128 & Rule 136: Never leak internal asset keys, layer names, or hashes.
     Displays:
       - Explicit dialogue speaker: 'NAME // ROLE'
-      - Custom Episode Beat identification: 'BEAT <X>: <EPISODE_SPECIFIC_TITLE>'
+      - Custom Episode Beat identification (when custom_beat_titles provided): 'BEAT <X>: <EPISODE_SPECIFIC_TITLE>'
+      - Standard Beat identification: 'BEAT <X>: <TITLE>' (or clean scene beat string)
     """
     if scene.get("speaker_tag"):
-        st = str(scene["speaker_tag"]).strip()
-        if not any(arch.lower() in st.lower() for arch in [
-            "the impossible contradiction", "the false narrative",
-            "the systemic blindspot", "the real culprit", "the uncomfortable modern mirror"
-        ]):
-            return st
+        return str(scene["speaker_tag"]).strip()
 
     if scene.get("character_name"):
         name = str(scene["character_name"]).strip()
@@ -205,26 +201,21 @@ def format_speaker_tag(scene: dict, act_title: str = "", custom_beat_titles: dic
             beat_idx = 1
     beat_idx = min(max(int(beat_idx), 1), 5)
 
-    # 1. Prioritize episode-specific custom beat title
-    if custom_beat_titles and beat_idx in custom_beat_titles:
-        c_title = custom_beat_titles[beat_idx]
-        if c_title:
-            return f"BEAT {beat_idx}: {c_title}".strip().upper()
+    # 1. Custom episode-specific beat title (highest priority when explicitly provided)
+    if custom_beat_titles and beat_idx in custom_beat_titles and custom_beat_titles[beat_idx]:
+        return f"BEAT {beat_idx}: {custom_beat_titles[beat_idx]}".strip().upper()
 
-    # 2. Check if scene had an explicit non-generic beat title
-    beat_val = scene.get("beat_title") or scene.get("beat") or scene.get("beat_name")
+    # 2. Prioritize explicit beat from scene
+    beat_val = scene.get("beat") or scene.get("beat_title") or scene.get("beat_name")
     if beat_val:
         b_str = str(beat_val).strip()
-        clean_b = re.sub(r'^(?:Beat|Act)\s*\d+[:\-]?\s*', '', b_str, flags=re.IGNORECASE).strip()
-        if clean_b and not any(arch.lower() in clean_b.lower() for arch in [
-            "the impossible contradiction", "the false narrative",
-            "the systemic blindspot", "the real culprit", "the uncomfortable modern mirror"
-        ]):
-            return f"BEAT {beat_idx}: {clean_b}".strip().upper()
+        if not b_str.upper().startswith("BEAT ") and not b_str.upper().startswith("ACT "):
+            return f"BEAT {beat_idx}: {b_str}".strip().upper()
+        return b_str.upper()
 
     # 3. Clean act title fallback
-    clean_act = re.sub(r'^ACT\s+[IVXLCDM]+\s*//\s*', '', str(act_title or '').strip(), flags=re.IGNORECASE)
-    if clean_act and not any(gen in clean_act.upper() for gen in ["HOOK & EXPOSURE", "THE CATALYST", "ARCHITECTURE OF POWER"]):
+    if act_title:
+        clean_act = re.sub(r'^ACT\s+[IVXLCDM]+\s*//\s*', '', str(act_title or '').strip(), flags=re.IGNORECASE)
         return f"BEAT {beat_idx}: {clean_act}".strip().upper()
 
     return f"BEAT {beat_idx}: INVESTIGATION".upper()
