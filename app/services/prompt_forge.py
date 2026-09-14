@@ -67,28 +67,28 @@ def resolve_market_profile(market: str = "EN") -> dict:
         return {
             "market_code": "JP",
             "market_name": "Japanese (Japan)",
-            "fg_anchor": "Authentic Japanese individual, distinct Japanese facial features and bone structure, natural East Asian eye shape, realistic Japanese corporate hairstyle and grooming, professional Japanese salaryman dark suit or authentic contemporary Japanese attire",
-            "bg_anchor": "Authentic Japanese corporate or urban setting, contemporary Tokyo or regional Japanese architecture, authentic Japanese interior aesthetics, Japanese signage atmosphere and clean structural lines",
-            "fg_negatives": "no Caucasian traits, no Western facial structure, no blue eyes, no blond hair, no American corporate look",
-            "bg_negatives": "no generic Western American cityscapes, no foreign architecture, no New York office aesthetic"
+            "fg_anchor": "Authentic Japanese individual, distinct Japanese facial bone structure, natural East Asian eye shape, neat Japanese corporate salaryman or professional OL styling, dark navy or charcoal tailored business suit, corporate lapel pin badge (sha-sho), corporate ID neck strap, holding Japanese documents or official folders stamped with red vermilion circular hanko seal (inkan), expressive focused professional acting",
+            "bg_anchor": "Authentic Japanese corporate or government headquarters setting, Tokyo Kasumigaseki or Marunouchi district architecture, Japanese minimalist wood panels and frosted glass partitions, King File document binders with square spine tabs on shelves, discreet Japanese Kanji signage (財務省, 取締役会, 裁判所), authentic Tokyo financial skyline with soft cinematic lighting",
+            "fg_negatives": "no Caucasian traits, no Western facial structure, no blue eyes, no blond hair, no American corporate look, no passive blank stare, no English text, no Latin letters",
+            "bg_negatives": "no generic Western American cityscapes, no foreign architecture, no New York office aesthetic, no English text, no Latin alphabet on boards or walls, no American flags, no generic gray cubicles"
         }
     elif m in ("KR", "KO"):
         return {
             "market_code": "KR",
             "market_name": "Korean (South Korea)",
-            "fg_anchor": "Authentic Korean individual, distinct Korean facial features and bone structure, refined East Asian eye shape, modern Korean professional hairstyle and grooming, tailored Korean chaebol executive suit or authentic Korean business attire",
-            "bg_anchor": "Authentic Korean corporate or urban setting, modern Seoul or Yeouido financial center architecture, sleek Korean high-rise glass interiors and authentic Korean urban atmosphere",
-            "fg_negatives": "no Caucasian traits, no Western facial structure, no blue eyes, no blond hair, no American corporate look",
-            "bg_negatives": "no generic Western American cityscapes, no foreign architecture, no New York office aesthetic"
+            "fg_anchor": "Authentic Korean individual, distinct Korean facial bone structure, defined cheekbones, refined East Asian eye shape, modern Korean professional hairstyle, tailored Korean chaebol executive suit, Korean corporate employee ID card lanyard (sawonjeung), holding official Korean legal or financial document with prominent circular red or green seal stamp (ingam dojang or seungso seal), dramatic decisive character acting",
+            "bg_anchor": "Authentic South Korean corporate or institutional headquarters setting, Seoul or Yeouido financial district architecture, sleek modern Korean high-rise interior, subtle Korean court crest or Taegeuk Mugunghwa emblem, document shelves with Korean vertical binder spines, panoramic window view of Seoul skyline and Han River bridges, high-contrast chiaroscuro lighting",
+            "fg_negatives": "no Caucasian traits, no Western facial structure, no blue eyes, no blond hair, no American corporate look, no passive blank stare, no English text, no Latin letters",
+            "bg_negatives": "no generic Western American cityscapes, no foreign architecture, no New York office aesthetic, no English text, no Latin words on whiteboards, no English signage, no American flags, no generic gray cubicles"
         }
     elif m in ("VN", "VI"):
         return {
             "market_code": "VN",
             "market_name": "Vietnamese (Vietnam)",
-            "fg_anchor": "Authentic Vietnamese individual, distinct Vietnamese facial features and bone structure, Southeast Asian eye shape and hair styling, authentic contemporary Vietnamese professional or official attire",
-            "bg_anchor": "Authentic Vietnamese corporate or urban setting, contemporary Hanoi or Ho Chi Minh City commercial architecture, authentic regional architectural textures and atmospheric lighting",
-            "fg_negatives": "no Caucasian traits, no Western facial structure, no blue eyes, no blond hair, no American corporate look",
-            "bg_negatives": "no generic Western American cityscapes, no foreign architecture, no New York office aesthetic"
+            "fg_anchor": "Authentic Vietnamese individual, distinct Vietnamese facial features and bone structure, Southeast Asian eye shape and hair styling, authentic contemporary Vietnamese professional or civil servant attire, official identification card with red neck lanyard, holding official Vietnamese dossier with prominent circular red rubber stamp (dau moc do), authoritative decisive character acting",
+            "bg_anchor": "Authentic Vietnamese corporate or administrative headquarters setting, contemporary Hanoi or Ho Chi Minh City commercial architecture, Hanoi Ba Dinh administrative office or Saigon District 1 financial center, Vietnamese mahogany wood furniture with gold lacquer accents, subtle National Emblem of Vietnam (Quoc huy Viet Nam) on conference wall, document cabinets with official Vietnamese administrative folders, Saigon river or Hanoi cityscape view",
+            "fg_negatives": "no Caucasian traits, no Western facial structure, no blue eyes, no blond hair, no American corporate look, no passive blank stare, no English text, no Latin typography",
+            "bg_negatives": "no generic Western American cityscapes, no foreign architecture, no New York office aesthetic, no English text, no Latin words on whiteboards, no foreign flags, no generic gray cubicles"
         }
     else:  # EN, US, GLOBAL, etc.
         return {

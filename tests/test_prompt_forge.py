@@ -165,6 +165,6 @@ def test_generate_scene_prompts_market_propagation():
     bg_p = res["backgrounds"]["bg_1"]
     assert "Authentic Japanese individual" in fg_p
     assert "no Caucasian traits" in fg_p
-    assert "Authentic Japanese corporate or urban setting" in bg_p
+    assert "Authentic Japanese corporate or government headquarters setting" in bg_p
     assert "thumbnails" in res
     assert res["thumbnails"] == {}  # Decoupled to YouTube Studio Native Gemini Designer at HG3

@@ -149,9 +149,16 @@ Interrogate whether this proposed angle truly satisfies the breaking search inte
             }
 
     clean_json = raw_res.strip()
-    if clean_json.startswith("```"):
-        clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json)
-        clean_json = re.sub(r"\s*```$", "", clean_json)
+    match_codeblock = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', raw_res)
+    if match_codeblock:
+        clean_json = match_codeblock.group(1).strip()
+    else:
+        match_obj = re.search(r'(\{[\s\S]*\})', raw_res)
+        if match_obj:
+            clean_json = match_obj.group(1).strip()
+        elif clean_json.startswith("```"):
+            clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json)
+            clean_json = re.sub(r"\s*```$", "", clean_json)
 
     try:
         audit_result = json.loads(clean_json)

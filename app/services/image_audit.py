@@ -74,9 +74,9 @@ PROMPT:
 
 Score 0-10 on three dimensions and reply ONLY with compact JSON:
 {{
-  "d1_prompt_adherence": <0-10>,   // does the image match prompt content, subject, era & market setting?
-  "d2_object_accuracy": <0-10>,    // are character ethnicity, anatomy, objects, clothing & architecture correct?
-  "d3_visual_logic": <0-10>,       // lighting/perspective/composition coherent, no Western bias on Asian subjects?
+  "d1_prompt_adherence": <0-10>,   // does the image match prompt content, subject, era & indigenous market setting?
+  "d2_object_accuracy": <0-10>,    // are character ethnicity, anatomy, clothing, and cultural props (seals, stamps, lanyards) authentic?
+  "d3_visual_logic": <0-10>,       // lighting/perspective coherent, 0% English text on non-EN signs/whiteboards, 0% Western bias on Asian subjects?
   "confidence": <0.0-1.0>,
   "issues": [<short strings, empty if none>],
   "notes": "<one short sentence>"
@@ -106,6 +106,8 @@ _ISSUE_MAP = {
     "western_bias": "Western/Caucasian bias",
     "ethnic_mismatch": "Ethnic mismatch",
     "market_mismatch": "Market/regional mismatch",
+    "english_text_leak": "English text leak in non-EN market",
+    "lacking_cultural_props": "Lacking indigenous cultural props",
 }
 
 

@@ -200,30 +200,51 @@ def perform_direct_platform_recon(term: str, market: str) -> dict:
     news_catalysts = fetch_live_news_catalyst(term, m_up, count=6)
 
     viral_videos = []
-    api_key = os.environ.get("YT_UPLOAD_API_KEY")
-    if api_key:
-        try:
-            quota = QuotaTracker()
-            raw_vids = youtube_search(api_key, term, m_up.lower(), quota)
-            if raw_vids:
-                vids_to_fetch = [v["video_id"] for v in raw_vids[:8]]
-                details = youtube_video_details(api_key, vids_to_fetch, quota)
-                for v in raw_vids[:8]:
-                    vid = v["video_id"]
-                    d = details.get(vid, {})
-                    title = v.get("title") or (d.get("tags", [term])[0] if d.get("tags") else term)
-                    views = d.get("views", 0)
-                    pub = d.get("published_at", "")
-                    viral_videos.append({
-                        "video_id": vid,
-                        "title": title,
-                        "views": views,
-                        "published_at": pub,
-                        "url": f"https://www.youtube.com/watch?v={vid}"
-                    })
-                viral_videos.sort(key=lambda x: x.get("views", 0), reverse=True)
-        except Exception as e:
-            logger.warning(f"[{m_up}] YouTube search error: {e}")
+    # Primary: Resilient zero-quota YouTube search for B1 candidate screening
+    # Conserves 100% of YouTube Data API quota for B1.5 and B10 video upload!
+    try:
+        from app.services.competitor_recon_b15 import scrape_youtube_search_zero_quota
+        scraped = scrape_youtube_search_zero_quota(term, m_up.lower(), max_results=6)
+        if scraped:
+            for v in scraped:
+                viral_videos.append({
+                    "video_id": v.get("video_id"),
+                    "title": v.get("title", term),
+                    "views": v.get("views", 0),
+                    "published_at": v.get("published_at", ""),
+                    "url": v.get("url", f"https://www.youtube.com/watch?v={v.get('video_id')}")
+                })
+    except Exception as _scrape_err:
+        logger.debug(f"[{m_up}] Zero-quota YouTube scrape during B1 recon notice: {_scrape_err}")
+
+    # Fallback to official API only if zero-quota returned nothing and quota is healthy
+    if not viral_videos:
+        api_key = os.environ.get("YT_UPLOAD_API_KEY")
+        if api_key:
+            try:
+                quota = QuotaTracker()
+                if not quota.should_fallback():
+                    raw_vids = youtube_search(api_key, term, m_up.lower(), quota, max_results=8)
+                    if raw_vids:
+                        vids_to_fetch = [v["video_id"] for v in raw_vids[:8]]
+                        details = youtube_video_details(api_key, vids_to_fetch, quota)
+                        for v in raw_vids[:8]:
+                            vid = v["video_id"]
+                            d = details.get(vid, {})
+                            title = v.get("title") or (d.get("tags", [term])[0] if d.get("tags") else term)
+                            views = d.get("views", 0)
+                            pub = d.get("published_at", "")
+                            viral_videos.append({
+                                "video_id": vid,
+                                "title": title,
+                                "views": views,
+                                "published_at": pub,
+                                "url": f"https://www.youtube.com/watch?v={vid}"
+                            })
+            except Exception as e:
+                logger.warning(f"[{m_up}] YouTube API search error: {e}")
+
+    viral_videos.sort(key=lambda x: x.get("views", 0), reverse=True)
 
     return {
         "rising_queries": all_rising[:10],
@@ -640,45 +661,76 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
 def sanitize_candidate_term(term: str) -> str:
     """Sanitize noisy news headlines into crisp entity & event keywords.
     Removes news source suffixes, brackets, and journalistic boilerplate.
-    Example:
-      '【近畿初の神社倒産】清和源氏発祥の『多田神社』が民事再生法の適用申請...（MBSニュース）'
-      -> '多田神社 民事再生'
+    Guarantees word-boundary integrity: NEVER truncates in the middle of words (Rule 118 & Rule 125).
     """
     if not term:
         return ""
     s = str(term).strip()
-    # Remove publisher prefixes/suffixes like 【...】, （...）, (...), - Publisher
+
+    # 1. Remove publisher brackets and source tags
     s = re.sub(r'^[【\[][^】\]]+[】\]]\s*', '', s)
     s = re.sub(r'\s*[（\(][^）\)]+[）\)]\s*$', '', s)
-    s = re.sub(r'\s*-\s*[^-]+$', '', s)
+    s = re.sub(r'\s*[-–—|]\s*[^-–—|]+$', '', s)
 
-    # Extract quoted entity if present: 『多田神社』 -> 多田神社
-    quotes = re.findall(r'[『「"]([^』」"]+)[』」"]', s)
-    entity = quotes[0] if quotes else ""
+    # 2. Remove common journalistic / clickbait prefixes
+    s = re.sub(
+        r'^(?:Report|Update|Watch|Opinion|Breaking|Exclusive|Analysis|Look|Sunday Reader|Briggs):\s*',
+        '', s, flags=re.IGNORECASE
+    )
 
-    # Look for key event anchors
-    events = ["民事再生", "倒産", "破産", "不正会計", "粉飾", "巨額損失", "不祥事", "買収", "逮捕", "疑惑",
-              "법정관리", "워크아웃", "부도", "횡령", "배임", "분식회계", "상장폐지",
-              "bankruptcy", "fraud", "investigation", "collapse", "lawsuit", "indictment"]
-    found_event = ""
-    for ev in events:
-        if ev in s:
-            found_event = ev
-            break
+    # 3. Clean quotes and whitespace
+    s = re.sub(r"[‘'’]", "'", s)
+    s = re.sub(r'[“”]', '"', s)
+    s = re.sub(r'\s+', ' ', s).strip()
 
-    if entity and found_event:
-        return f"{entity} {found_event}"
-    elif entity and len(s) > 35:
-        return entity
-    elif len(s) > 40 and found_event:
-        # If headline is very long, extract text around event
-        idx = s.find(found_event)
-        start = max(0, idx - 15)
-        end = min(len(s), idx + len(found_event) + 15)
-        chunk = s[start:end].strip()
-        return chunk if len(chunk) < 30 else s[:30]
+    # 4. Check for East Asian (CJK) vs Latin/English
+    is_cjk = bool(re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]', s))
+    if is_cjk:
+        # Extract quoted entity if present: 『多田神社』 -> 多田神社
+        quotes = re.findall(r'[『「]([^』」]+)[』」]', s)
+        entity = quotes[0].strip() if quotes else ""
 
-    return s[:45].strip()
+        events = [
+            "民事再生", "倒産", "破産", "不正会計", "粉飾", "巨額損失", "不祥事", "買収", "逮捕", "疑惑",
+            "법정관리", "워크아웃", "부도", "횡령", "배임", "분식회계", "상장폐지"
+        ]
+        found_event = next((ev for ev in events if ev in s), "")
+
+        if entity and found_event:
+            return f"{entity} {found_event}"
+        elif entity and len(s) > 35:
+            return entity
+        elif len(s) > 50:
+            m_split = re.split(r'[。、…\s]+', s)
+            chunk = ""
+            for seg in m_split:
+                if len(chunk) + len(seg) <= 45:
+                    chunk = f"{chunk} {seg}".strip() if chunk else seg
+                else:
+                    break
+            return chunk if len(chunk) >= 10 else s[:45].strip()
+        return s.strip(" .。、…-")
+
+    # 5. Latin / English / Western Headlines
+    s = s.strip(" .,:;!?-")
+
+    # If headline is within rich search length (<= 95 chars), keep 100% intact!
+    if len(s) <= 95:
+        return s
+
+    # If headline is excessively long (> 95 characters):
+    # Truncate strictly at a sentence boundary (. ) or word boundary, NEVER in the middle of a word!
+    if ". " in s:
+        first_sentence = s.split(". ")[0].strip()
+        if len(first_sentence) >= 25 and len(first_sentence) <= 95:
+            return first_sentence
+
+    truncated = s[:90]
+    if " " in truncated:
+        clean_word_boundary = truncated.rsplit(" ", 1)[0].strip()
+        return clean_word_boundary.strip(" .,:;!?-")
+
+    return truncated.strip(" .,:;!?-")
 
 
 FORENSIC_ANCHORS = {
@@ -817,9 +869,10 @@ def discover_and_produce_market_trend(
 
     for idx, c in enumerate(candidates[:max_scan_candidates], start=1):
         raw_term = c["term"]
+        c["raw_term"] = raw_term
         # Sanitize long noisy headlines into crisp entity & event keyword
         clean_recon_term = sanitize_candidate_term(raw_term)
-        term = clean_recon_term if len(raw_term) > 40 else raw_term
+        term = clean_recon_term if clean_recon_term else raw_term
 
         print(f"\n[{m_up}] Candidate #{idx}/{min(len(candidates), max_scan_candidates)}: '{raw_term}' (Recon Term: '{term}', Traffic: {c.get('approx_traffic')}, Geos: {c.get('geos_present')})")
 

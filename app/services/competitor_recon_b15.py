@@ -195,6 +195,9 @@ class QuotaTracker:
 
 def _api_get(endpoint: str, params: Dict, quota: QuotaTracker) -> Optional[Dict]:
     """Execute authenticated YouTube Data API GET request."""
+    if quota.should_fallback():
+        logger.debug("[b15] Quota should_fallback active (exhausted=%s, ratio=%.2f). Skipping %s", quota.exhausted, quota.ratio, endpoint)
+        return None
     url = f"https://www.googleapis.com/youtube/v3/{endpoint}?" + urllib.parse.urlencode(params)
     try:
         with urllib.request.urlopen(url, timeout=30) as r:
@@ -214,14 +217,92 @@ def _api_get(endpoint: str, params: Dict, quota: QuotaTracker) -> Optional[Dict]
         return None
 
 
+def scrape_youtube_search_zero_quota(query: str, market: str = "en", max_results: int = 15) -> List[Dict]:
+    """Zero-quota public YouTube search harvester using ytInitialData.
+    Provides complete resilience against YouTube Data API 429 quota exhaustion (Rule 118 & 123).
+    """
+    if not query or not str(query).strip():
+        return []
+
+    locale = MARKET_LOCALE.get(market.lower(), MARKET_LOCALE.get("en", {}))
+    hl = locale.get("relevanceLanguage", "en")
+    gl = locale.get("regionCode", "US")
+
+    clean_query = str(query).strip()
+    url = "https://www.youtube.com/results?search_query=" + urllib.parse.quote(clean_query)
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": f"{hl}-{gl},{hl};q=0.9,en;q=0.8"
+    })
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            html = resp.read().decode("utf-8", errors="ignore")
+
+        m = re.search(r'var ytInitialData\s*=\s*({.*?});</script>', html)
+        if not m:
+            m = re.search(r'window\["ytInitialData"\]\s*=\s*({.*?});</script>', html)
+        if not m:
+            return []
+
+        data = json.loads(m.group(1))
+        videos = []
+        contents = data.get("contents", {}).get("twoColumnSearchResultsRenderer", {}).get("primaryContents", {}).get("sectionListRenderer", {}).get("contents", [])
+        for c in contents:
+            item_section = c.get("itemSectionRenderer", {}).get("contents", [])
+            for item in item_section:
+                vr = item.get("videoRenderer")
+                if vr:
+                    vid = vr.get("videoId")
+                    title_runs = vr.get("title", {}).get("runs", [])
+                    title = "".join(r.get("text", "") for r in title_runs)
+                    view_text = vr.get("viewCountText", {}).get("simpleText", "") or vr.get("shortViewCountText", {}).get("simpleText", "")
+                    channel = "".join(r.get("text", "") for r in vr.get("ownerText", {}).get("runs", []))
+                    pub_text = vr.get("publishedTimeText", {}).get("simpleText", "")
+
+                    views_int = 0
+                    nums = re.findall(r'[\d,\.]+', view_text)
+                    if nums:
+                        clean_num = nums[0].replace(",", "").replace(".", "")
+                        if clean_num.isdigit():
+                            views_int = int(clean_num)
+                            if "k" in view_text.lower():
+                                views_int *= 1000
+                            elif "m" in view_text.lower():
+                                views_int *= 1000000
+
+                    if vid and title:
+                        videos.append({
+                            "video_id": vid,
+                            "channel": channel,
+                            "channel_id": "",
+                            "title": title,
+                            "published_at": pub_text,
+                            "views": views_int,
+                            "thumbnails": vr.get("thumbnail", {}),
+                            "url": f"https://www.youtube.com/watch?v={vid}"
+                        })
+                        if len(videos) >= max_results:
+                            break
+            if len(videos) >= max_results:
+                break
+
+        if videos:
+            logger.info("[b15.zero_quota] Scraped %d videos for query %r (market=%s)", len(videos), clean_query, market)
+        return videos
+    except Exception as e:
+        logger.warning("[b15.zero_quota] Scraper failed for %r: %s", clean_query, e)
+        return []
+
+
 # ==============================================================================
 # SECTION 1: PASS 1 — EMPIRICAL EVIDENCE HARVESTING (DATA MINING)
 # ==============================================================================
 
 def youtube_search(api_key: str, query: str, market: str, quota: QuotaTracker,
                    max_results: int = 25) -> List[Dict]:
-    """Harvest candidate videos sorted by viewCount with automatic query relaxation."""
-    locale = MARKET_LOCALE[market]
+    """Harvest candidate videos sorted by viewCount with automatic query relaxation and zero-quota scraper fallback."""
+    locale = MARKET_LOCALE.get(market.lower(), MARKET_LOCALE.get("en", {}))
     queries_to_try = [query]
     words = query.strip().split()
     if len(words) > 3:
@@ -231,28 +312,40 @@ def youtube_search(api_key: str, query: str, market: str, quota: QuotaTracker,
     if len(words) > 1:
         queries_to_try.append(words[0])
 
-    for q_attempt in queries_to_try:
-        body = _api_get("search", {
-            "part": "snippet",
-            "q": q_attempt,
-            "type": "video",
-            "maxResults": max_results,
-            "order": "viewCount",
-            "relevanceLanguage": locale["relevanceLanguage"],
-            "regionCode": locale["regionCode"],
-            "key": api_key,
-        }, quota)
-        items = body.get("items", []) if body else []
-        if items:
-            logger.info("[b15.pass1] search returned %d candidates for query %r (market=%s)", len(items), q_attempt, market)
-            return [{
-                "video_id": it["id"]["videoId"],
-                "channel": it["snippet"]["channelTitle"],
-                "channel_id": it["snippet"].get("channelId", ""),
-                "title": it["snippet"]["title"],
-                "published_at": it["snippet"]["publishedAt"],
-                "thumbnails": it["snippet"].get("thumbnails", {}),
-            } for it in items if "videoId" in it.get("id", {})]
+    if not quota.should_fallback() and api_key:
+        for q_attempt in queries_to_try:
+            body = _api_get("search", {
+                "part": "snippet",
+                "q": q_attempt,
+                "type": "video",
+                "maxResults": max_results,
+                "order": "viewCount",
+                "relevanceLanguage": locale.get("relevanceLanguage", "en"),
+                "regionCode": locale.get("regionCode", "US"),
+                "key": api_key,
+            }, quota)
+            items = body.get("items", []) if body else []
+            if items:
+                logger.info("[b15.pass1] search returned %d candidates for query %r (market=%s)", len(items), q_attempt, market)
+                return [{
+                    "video_id": it["id"]["videoId"],
+                    "channel": it["snippet"]["channelTitle"],
+                    "channel_id": it["snippet"].get("channelId", ""),
+                    "title": it["snippet"]["title"],
+                    "published_at": it["snippet"]["publishedAt"],
+                    "thumbnails": it["snippet"].get("thumbnails", {}),
+                } for it in items if "videoId" in it.get("id", {})]
+
+    # Resilient zero-quota fallback when API quota is exhausted, missing, or returns 0
+    scraped = scrape_youtube_search_zero_quota(query, market, max_results=max_results)
+    if scraped:
+        logger.info("[b15.pass1] Resilient zero-quota scraper recovered %d candidates for %r", len(scraped), query)
+        return scraped
+    if len(queries_to_try) > 1:
+        scraped_relaxed = scrape_youtube_search_zero_quota(queries_to_try[1], market, max_results=max_results)
+        if scraped_relaxed:
+            logger.info("[b15.pass1] Resilient zero-quota scraper recovered %d candidates for relaxed query %r", len(scraped_relaxed), queries_to_try[1])
+            return scraped_relaxed
 
     logger.info("[b15.pass1] search returned 0 candidates for all query variants of %r (market=%s)", query, market)
     return []
@@ -1103,13 +1196,11 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
         candidates = json.loads(cache_path.read_text())["candidates"]
         quota = QuotaTracker()
     else:
-        api_key = get_api_key()
-        if not api_key:
-            return None
+        api_key = get_api_key() or ""
         quota = QuotaTracker()
         if quota.should_fallback():
-            logger.warning("[b15] Quota at %.0f%% of daily cap - fallback active", quota.ratio * 100)
-        candidates = youtube_search(api_key, target_keyword, market, quota) if not quota.exhausted else []
+            logger.warning("[b15] Quota at %.0f%% of daily cap - zero-quota scraper fallback active", quota.ratio * 100)
+        candidates = youtube_search(api_key, target_keyword, market, quota)
         if not candidates:
             logger.warning("[b15] No candidates found for keyword %r (quota exhausted or zero matches). Activating resilient fallback recon card.", target_keyword)
             anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, [], [], niche)
@@ -1129,9 +1220,10 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
                 logger.warning("[b15] sync_card_to_notion failed: %s", e)
             return card
 
-        details = youtube_video_details(api_key, [c["video_id"] for c in candidates], quota)
-        for c in candidates:
-            c.update(details.get(c["video_id"], {}))
+        if not quota.should_fallback() and api_key:
+            details = youtube_video_details(api_key, [c["video_id"] for c in candidates], quota)
+            for c in candidates:
+                c.update(details.get(c["video_id"], {}))
 
         # Batch channel subscriber lookup (1 API unit per 50 channels - Data-Layer Only Protocol)
         c_ids = list({c.get("channel_id") for c in candidates if c.get("channel_id")})

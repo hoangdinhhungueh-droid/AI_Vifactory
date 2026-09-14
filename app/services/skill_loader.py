@@ -445,23 +445,23 @@ def get_b35_strategic_rules() -> str:
     return (
         "=== NOTION SOT CONCISE VISUAL PRODUCTION RULES (RULES 114, 116, 120, 122, 128, 435, 446) ===\n"
         "1. TWO-LAYER COMPOSITION (Rule 116):\n"
-        "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic documentary environment. Authentic period architecture, environment textures, dramatic volumetric lighting. No prominent foreground humans. Bottom 20% safe-zone clear for subtitles, center-right negative space for character overlay.\n"
-        "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration. Cel-shading, bold ink linework, rich nuanced colors. Exactly one full-body character visible head to toe in authentic period attire. Positioned strictly Right or Left.\n"
+        "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic documentary environment. Period architecture, dramatic lighting. No foreground humans. Bottom 20% safe-zone clear for subtitles, center-right negative space for character overlay.\n"
+        "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration. Cel-shading, bold ink linework. Exactly one full-body character head-to-toe in authentic attire. Positioned Right or Left.\n"
         "2. STRICT CHROMA KEY SPEC (Rule 120):\n"
-        "   - Foreground MUST be isolated on pure flat solid #FF00FF magenta background for algorithmic chroma extraction.\n"
+        "   - Foreground MUST be isolated on pure flat solid #FF00FF magenta background for chroma extraction.\n"
         "   - No white borders, no halos, no gradients, no scenery in Layer 2.\n"
         "3. GRAPHIC NOVEL ART STYLE (Rule 435):\n"
-        "   - Non-photorealistic stylized 2D graphic novel digital illustration.\n"
-        "   - NO studio portrait lighting, NO photorealism, NO 3D CGI skin.\n"
+        "   - Non-photorealistic stylized 2D graphic novel illustration. Cel-shading ink. NO photorealism, NO 3D CGI skin.\n"
         "4. CINEMATIC CONTINUITY & ERA AUTHENTICITY (Rule 128):\n"
-        "   - Harmonize lighting angle, color palette, and atmosphere between paired Layer 1 and Layer 2 assets.\n"
-        "   - Zero domain bleed: never inject modern tech into historical scenes, nor rural relics into corporate scenes.\n"
-        "5. 16:9 2K HERO THUMBNAILS (Rule 114):\n"
-        "   - Thumbnail A (Emotion-First & Viral Angle) and Thumbnail B (Curiosity-Gap & Paradox): 16:9, 2560x1440, bold contrast, clean negative space for typography.\n"
-        "6. ENGLISH PRODUCTION BRIDGE (Rule 446): All visual prompt outputs must be in clear, descriptive English.\n"
+        "   - Harmonize lighting angle, color palette, atmosphere between paired Layer 1 & 2 assets.\n"
+        "   - Zero domain bleed: never inject modern tech into historical scenes or rural relics into corporate scenes.\n"
+        "5. INDIGENOUS CULTURAL PROPS & ANTI-ENGLISH BLEED (Rule 122 & Rule 128):\n"
+        "   - Every scene MUST include tangible local cultural artifacts (JP: hanko cinnabar red seals, King File spine tabs, sha-sho lapel pins; KR: official round seals/stamps, sawonjeung ID lanyards, Taegeuk/court crests; VN: red circular stamps, Quoc huy crests, mahogany lacquer).\n"
+        "   - STRICTLY FORBIDDEN: English/Latin text or English words on whiteboards, walls, signs, or folders for Asian markets (JP/KR/VN).\n"
+        "6. ENGLISH PRODUCTION BRIDGE (Rule 446): All visual prompt outputs must be in clear descriptive English.\n"
         "7. MARKET ETHNICITY & REGIONAL ARCHITECTURE CONFORMANCE (Rule 122 & Rule 128):\n"
-        "   - Foreground characters MUST feature authentic ethnic phenotype (facial bone structure, eye shape, hair styling, skin tones, local professional attire) strictly conforming to target market (JP -> Japanese, KR -> Korean, VN -> Vietnamese). ZERO Caucasian/Western bias on Asian subjects.\n"
-        "   - Backgrounds MUST feature authentic local corporate/urban architecture, streetscapes, and interior design matching the target market. ZERO generic American high-rise mismatch."
+        "   - Foreground characters MUST feature authentic ethnic phenotype (bone structure, eye shape, styling, attire, dynamic acting) strictly matching target market (JP -> Japanese, KR -> Korean, VN -> Vietnamese). ZERO Caucasian/Western bias.\n"
+        "   - Backgrounds MUST feature authentic local corporate/urban architecture matching target market. ZERO generic American cubicles or Western skyline mismatch."
     )
 
 
@@ -644,15 +644,21 @@ def get_b2_editorial_skills(force_refresh: bool = False) -> str:
 
 def get_seo_editorial_skills(force_refresh: bool = False) -> str:
     """Return targeted packaging & narrative hook prompt guidelines for B1.5 SEO Package Forge.
-    Decoupled from Python code: loads from config/prompts/seo_package_prompt.md or Notion SoT.
+    Decoupled from Python code: loads from config/prompts/seo_package_prompt.md or Notion SoT,
+    and dynamically integrates B11 Continuous Self-Learning feedback.
     """
+    base_prompt = "You are the Packaging & Narrative Hook Director for Video Factory."
     prompt_file = ROOT_DIR / "config" / "prompts" / "seo_package_prompt.md"
     if prompt_file.exists():
         try:
-            return prompt_file.read_text(encoding="utf-8").strip()
+            base_prompt = prompt_file.read_text(encoding="utf-8").strip()
         except Exception as e:
             logger.warning(f"[skill_loader] Failed reading {prompt_file}: {e}")
-    return "You are the Packaging & Narrative Hook Director for Video Factory."
+            
+    b11_lessons = get_b11_self_learning_rules(force_refresh=force_refresh)
+    if b11_lessons:
+        return f"{base_prompt}\n\n=== B11 CONTINUOUS SELF-LEARNING LESSONS (LIVE NOTION FEEDBACK) ===\n{b11_lessons[:1200]}"
+    return base_prompt
 
 
 def clear_cache():
