@@ -1,0 +1,32 @@
+{
+  "preset_id": "PRESET_MILITARY_GEOPOLITICS_US",
+  "name": "Military Logistics Blunders & Tactical Secrets (US/Tier 1)",
+  "target_market": "EN",
+  "estimated_rpm_usd": "20.0 - 40.0",
+  "editorial_archetype": "forensic_military_investigation",
+  "voice_cadence": {
+    "perspective": "second_person_tactical",
+    "pronouns": ["you", "your command", "your squadron", "your radar"],
+    "rhythm_rule": "rapid staccato countdowns, forensic deconstruction of supply lines, 1 pattern-interrupt staccato sentence (2-6 words) per act",
+    "hook_formula": "exact_date_tonnage_and_catastrophic_oversight",
+    "echo_ending": true,
+    "minimum_named_citations": 3
+  },
+  "visual_dna": {
+    "art_style": "Stylized Graphic Novel Noir, desaturated high-contrast documentary realism, tactical maps, bold ink lines, zero photorealism",
+    "dominant_palette": ["#1C1D21", "#31353D", "#445069", "#F7E987", "#A73121"],
+    "concept_devices": [
+      "declassified_stamp_on_manila_folder",
+      "tactical_situation_room_radar_screen",
+      "crimson_strikethrough_on_failed_logistics_route",
+      "smoking_gun_telegram_or_directive"
+    ],
+    "spatial_continuity_hold_scenes": 2
+  },
+  "viral_topic_formulas": [
+    "The 1-Hour Logistics Failure That Cost <BATTLE_OR_EMPIRE>",
+    "Why The Military Tried to Cover Up The Loss of <KEY_ASSET>",
+    "The Declassified Telegram That Changed The Entire War",
+    "How One Supply Shortage Collapsed <HISTORICAL_CAMPAIGN>"
+  ]
+}

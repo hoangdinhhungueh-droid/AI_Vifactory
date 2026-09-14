@@ -44,3 +44,11 @@
    - Posing & Body Language: Mandate high-stakes dynamic body postures (leaning forward into conflict, decisive pointing, clenched fist, slamming palm on evidence).
    - Facial Micro-Expressions: Mandate intense emotive facial acting (furrowed brow, sharp intense glare, clenched jaw, resolute stare, zero dead eyes).
    - Active Props Interaction: Characters MUST physically interact with indigenous props (holding stamped dossier with red hanko/ingam/mộc đỏ seal, presenting official verdict, wearing corporate ID lanyard).
+
+10. CONCRETE METAPHORS & VISUAL CONCEPT DEVICES (RULE 122 RETENTION DYNAMICS):
+   - 10.1 Label-on-Object Physicalization:
+     - Translate abstract systemic pressures, financial debt, legal traps, or regulatory quotas into tangible physical objects with explicit bold ALL-CAPS text labels (e.g. bold lettering stamped across a massive evidence crate, a ledger labeled 'DEFAULT', or an audit dossier marked 'CONFIDENTIAL').
+   - 10.2 Negation & Refutation Devices (Red X Stamp):
+     - When unmasking false narratives or disproving an official PR myth (Beat 2), visually emphasize the refutation using dramatic forensic devices: a bold crimson red X stamp across the debunked chart, or an official red audit rejection banner.
+   - 10.3 Spatial Continuity & Micro-Evolution:
+     - For 2 to 3 consecutive scenes detailing the same sequential argument, DO NOT frantically cut to completely unrelated environments. Hold the spatial staging constant while evolving camera intimacy (wide establishing to macro push-in), lighting tension, or character micro-expressions to maintain viewer focus without visual disorientation.

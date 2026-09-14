@@ -1,0 +1,35 @@
+{
+  "preset_id": "PRESET_STOIC_ZEN_JP_KR",
+  "name": "Indigenous Philosophy, Stoicism & Cultural Mindset (JP/KR)",
+  "target_market": "JP_KR",
+  "estimated_rpm_usd": "5.0 - 12.0",
+  "editorial_archetype": "philosophical_contemplative_docudrama",
+  "voice_cadence": {
+    "perspective": "second_person_reflective",
+    "pronouns": {
+      "JP": ["あなた", "あなたの心", "あなたの人生"],
+      "KR": ["당신", "당신의 마음", "당신의 삶"]
+    },
+    "rhythm_rule": "calm staccato observations, deep institutional/existential reflection, pacing calibrated at 245-275 chars per minute",
+    "hook_formula": "contemporary_burnout_vs_ancient_verdict",
+    "echo_ending": true,
+    "minimum_named_citations": 2
+  },
+  "visual_dna": {
+    "art_style": "Stylized Graphic Novel x Japanese/Korean Woodblock/Ink Aesthetics, subtle cel-shading, 100% indigenous facial bone structure and props",
+    "dominant_palette": ["#1A1A1D", "#4E4E50", "#950740", "#C3073F", "#6F2232", "#E8D8C8"],
+    "concept_devices": [
+      "indigenous_verdict_dossier_with_red_hanko_dojang_seal",
+      "calligraphy_scroll_decree",
+      "tea_room_shadow_contrast",
+      "red_x_refutation_on_shallow_consensus"
+    ],
+    "spatial_continuity_hold_scenes": 3
+  },
+  "viral_topic_formulas": [
+    "Why Ancient Monks Feared <MODERN_HABIT>",
+    "The 400-Year-Old Lesson About <BURNOUT_OR_DEBT>",
+    "The Silent Rule That Kept Japanese Society From Collapsing",
+    "What Really Happens When You Stop Caring About <SOCIAL_PRESSURE>"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "preset_id": "PRESET_ANCIENT_PREHISTORY_US",
+  "name": "Ancient Humans & Prehistoric Anthropology (US/Tier 1)",
+  "target_market": "EN",
+  "estimated_rpm_usd": "15.0 - 35.0",
+  "editorial_archetype": "anthropology_educational_explainer",
+  "voice_cadence": {
+    "perspective": "second_person_immersive",
+    "pronouns": ["you", "your ancestors", "your body", "your brain"],
+    "rhythm_rule": "two short punchy statements (3-7 words), one deep explanatory sentence (15-22 words), one rhetorical inquiry ('?') every 4-6 sentences",
+    "hook_formula": "sensory_contrast_and_statistic",
+    "echo_ending": true,
+    "minimum_named_citations": 3
+  },
+  "visual_dna": {
+    "art_style": "Stylized Graphic Novel Editorial Illustration, comic ink linework, flat cel-shading, zero photographic textures",
+    "dominant_palette": ["#F58220", "#7FB5D5", "#D2B488", "#4E9A45", "#283A6E"],
+    "concept_devices": [
+      "label_on_boulder_or_prop",
+      "red_x_negation_stamp",
+      "campfire_tribe_gathering",
+      "archaeological_expedition_lantern"
+    ],
+    "spatial_continuity_hold_scenes": 2
+  },
+  "viral_topic_formulas": [
+    "How Did Ancient Humans Survive <THREAT>?",
+    "What <DAILY_ROUTINE> Was Like 100,000 Years Ago",
+    "Why You Wouldn't Last a Day in <ANCIENT_ERA>",
+    "The Dark Truth Behind How Our Ancestors Truly Lived"
+  ]
+}

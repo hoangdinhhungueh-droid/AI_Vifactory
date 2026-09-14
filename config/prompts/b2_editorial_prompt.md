@@ -63,3 +63,13 @@ Target: 1,800 - 2,200 words across 5 structured Acts (~360-440 words / Act for E
    - Micro-Cliffhangers: Plant an unresolved tension spike every 90-120 seconds throughout the script.
    - Continuous Loop Pacing: Plant at least 8 to 10 explicit curiosity questions with '?' across the script (~2 per Act), and frequently close loops using resolving phrases ('that is why', 'which is how', 'the answer', 'in the end').
    - Anti-AI Mandate: ZERO banned cliches (delve, testament, tapestry, crucible, beacon, in conclusion, time will tell).
+
+4. SENTENCE CADENCE & IMMERSIVE 2ND-PERSON PACING (VIRAL RETENTION DYNAMICS):
+   - 4.1 Immersive 2nd-Person POV ("You / Your" / "Bạn / Của bạn" / "あなた / あなたの" / "당신 / 당신의"):
+     - Narrate in a calm, intelligent 2nd-person perspective. Place the viewer directly inside the operational crisis, control room, or historical pressure point rather than detached 3rd-person encyclopedia lecturing.
+   - 4.2 Dynamic Sentence Cadence (Anti-Monotony Flow):
+     - Strictly vary sentence lengths across all Acts: alternate two short punchy statements (3-7 words), followed by one deep explanatory sentence (15-22 words), punctuated by an active curiosity question ('?') every 4-6 sentences.
+   - 4.3 Circular Narrative Loop (Echo Ending):
+     - The final closing sentence of Beat 5 (Act V) MUST directly echo and re-invoke the core opening catalyst phrase, stake, or paradox introduced in the opening hook of Beat 1 (Act I), completely reframed by the systemic verdict.
+   - 4.4 E-E-A-T Factual Citation Anchor (Anti-Inauthentic Content Armor):
+     - Act II and Act III MUST weave at least 2-3 named real-world researchers, official audits, regulatory filings, or historical archive sources verified in the Grounding Table into the natural narration. STRICTLY ZERO anonymous synthetic claims.
