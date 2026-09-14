@@ -273,6 +273,8 @@
 | `app/services/prompt_forge.py` | Prompt Forge cho Layer 1 BG & Layer 2 FG (#FF00FF) | Block 3.5 |
 | `scripts/gemini_browser_gen.py` | Chrome Automation sinh ảnh Gemini Pro Web | Block 4.0 |
 | `app/pipeline/stages/s6_speech.py` | TTS Edge-TTS & Faster-Whisper trích xuất word timestamp | Block 6.0 & 7.0 |
+| `app/services/beat_bgm_engine.py` | 5-Beat Docudrama Adaptive BGM & YouTube Audio Library Vault | Block 7.5 (BGM Engine) |
+| `tests/test_beat_bgm_engine.py` | Test suite kiểm thử 5-Beat BGM Engine & Crossfading | Block 7.5 Unit Test |
 | `app/services/build_remotion_props.py` | Ghép timestamp Whisper vào props Remotion | Block 7.0 |
 | `remotion/src/index.tsx` | TwoLayerEpisode 1080p React Remotion Engine | Block 8.0 |
 | `app/pipeline/stages/s7_render.py` | Remotion CPU Render & bypass redundant burning | Block 8.0 |
