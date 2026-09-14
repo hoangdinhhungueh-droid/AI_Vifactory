@@ -107,7 +107,7 @@ graph TD
   - **B5 (`/audit:vision`)**: Vision Audit 4 trục (Rule 122): UI artifact = 0%, alpha integrity = 100%, Comic cel-shading, Era/Market & Indigenous Props Conformance (0% English text leak, 0% passive blank stare) & Tách phông `#FF00FF` HSV Chroma Key. Update `Status = Approved`.
   - **B6 (`/audio:narration`)**: TTS thuyết minh giọng nam chuẩn theo ngôn ngữ thị trường (`en-US-GuyNeural` cho EN, `ja-JP` cho JP, `ko-KR` cho KR) chuẩn -14 LUFS.
   - **B7 (`/audio:subtitle`)**: Whisper SRT -> trích xuất Timestamp Karaoke chính xác từng miligiây.
-  - **B8 (`/video:render`)**: Remotion React Master Render CPU (TwoLayerEpisode + Subtitles + Top Act Bar + BGM -24dB).
+  - **B7.5 & B8 (`beat_bgm_engine.py` & `/video:render`)**: Phối nhạc 5-Beat Docudrama Adaptive BGM (YouTube Audio Library sạch 100% bản quyền) + Remotion React Master Render CPU + FFmpeg Sidechain Ducking & Vocal EQ Dip (triệt tiêu hoàn toàn tiếng ù rè tần số thấp).
   - **B9 (`/probe:quality`)**: Quality Probe EBU R128 (-26 đến -22 LUFS) & Stream Integrity 1080p 30fps.
   - **B10 (`/video:upload`)**: YouTube Upload Unlisted + Telegram Human Gate 3 (Nghiệm thu Episode Master Pro & phát hành).
   - **B11 (`/run:b11` | `b11_engine.py`)**: YouTube Analytics 48h sync (Routine Lean Sync & Deep Post-Mortem Feedback Loop).
