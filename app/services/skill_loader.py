@@ -460,7 +460,7 @@ def get_b35_strategic_rules() -> str:
         "   - STRICTLY FORBIDDEN: English/Latin text or English words on whiteboards, walls, signs, or folders for Asian markets (JP/KR/VN).\n"
         "6. ENGLISH PRODUCTION BRIDGE (Rule 446): All visual prompt outputs must be in clear descriptive English.\n"
         "7. MARKET ETHNICITY & REGIONAL ARCHITECTURE CONFORMANCE (Rule 122 & Rule 128):\n"
-        "   - Foreground characters MUST feature authentic ethnic phenotype (bone structure, eye shape, styling, attire, dynamic acting) strictly matching target market (JP -> Japanese, KR -> Korean, VN -> Vietnamese). ZERO Caucasian/Western bias.\n"
+        "   - Foreground characters MUST feature authentic ethnic phenotype (bone structure, eye shape, styling, attire), dynamic high-stakes body posture (leaning forward, decisive pointing, clenched fist), intense facial micro-expressions (furrowed brow, sharp intense glare, zero dead eyes/blank stare), and active interaction with tangible indigenous props. ZERO Caucasian/Western bias.\n"
         "   - Backgrounds MUST feature authentic local corporate/urban architecture matching target market. ZERO generic American cubicles or Western skyline mismatch."
     )
 

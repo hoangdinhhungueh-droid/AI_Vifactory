@@ -75,22 +75,16 @@ PROMPT:
 Score 0-10 on three dimensions and reply ONLY with compact JSON:
 {{
   "d1_prompt_adherence": <0-10>,   // does the image match prompt content, subject, era & indigenous market setting?
-  "d2_object_accuracy": <0-10>,    // are character ethnicity, anatomy, clothing, and cultural props (seals, stamps, lanyards) authentic?
-  "d3_visual_logic": <0-10>,       // lighting/perspective coherent, 0% English text on non-EN signs/whiteboards, 0% Western bias on Asian subjects?
+  "d2_object_accuracy": <0-10>,    // are character ethnicity, anatomy, clothing, dramatic acting/posing, and cultural props (seals, stamps, lanyards) authentic?
+  "d3_visual_logic": <0-10>,       // lighting/perspective coherent, 0% English text on non-EN signs/whiteboards, 0% Western bias, 0% passive blank stare?
   "confidence": <0.0-1.0>,
   "issues": [<short strings, empty if none>],
   "notes": "<one short sentence>"
 }}"""
 
 # 16/08: FG assets are stored AFTER chroma-key (magenta background removed).
-# Auditing them against the pre-key "magenta background" expectation = false penalty
-# (root cause of Haiku rejecting FG rows for "background completely wrong").
-_FG_BG_NOTE = (
-    "\n\nNOTE: this is a FOREGROUND/OVERLAY asset whose magenta chroma-key background "
-    "has already been removed (the background may appear transparent or white). "
-    "That is EXPECTED and correct - do NOT penalize background color/transparency; "
-    "judge only the subject objects, their outlines, palette, and internal layout."
-)
+# Transparent edges may compress as black or gray in JPEG previews.
+# Do NOT fail FG on missing magenta if transparent cutout is clean.
 
 _ISSUE_MAP = {
     "prompt_mismatch": "Prompt mismatch",
@@ -108,6 +102,8 @@ _ISSUE_MAP = {
     "market_mismatch": "Market/regional mismatch",
     "english_text_leak": "English text leak in non-EN market",
     "lacking_cultural_props": "Lacking indigenous cultural props",
+    "passive_blank_stare": "Lifeless pose or passive blank stare",
+    "lacking_dramatic_acting": "Lacking dynamic dramatic acting",
 }
 
 

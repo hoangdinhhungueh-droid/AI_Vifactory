@@ -168,3 +168,27 @@ def test_generate_scene_prompts_market_propagation():
     assert "Authentic Japanese corporate or government headquarters setting" in bg_p
     assert "thumbnails" in res
     assert res["thumbnails"] == {}  # Decoupled to YouTube Studio Native Gemini Designer at HG3
+
+
+def test_dynamic_acting_and_active_props_mandate():
+    """Rule 122: Verify dynamic high-stakes body posture, facial micro-expressions, and active props."""
+    raw_fg = "Chief prosecutor presenting indictment"
+    kr_fg = _sanitize_foreground_prompt(raw_fg, market="KR")
+    assert "dynamic high-stakes body posture" in kr_fg
+    assert "intense facial micro-expressions" in kr_fg
+    assert "active physical interaction with props" in kr_fg
+    assert "ingam dojang" in kr_fg
+    assert "no passive blank stare" in kr_fg
+    assert "no lifeless neutral pose" in kr_fg
+    assert "no passport photo posture" in kr_fg
+    assert "no dead eyes" in kr_fg
+
+    jp_prof = resolve_market_profile("JP")
+    assert "hanko seal (inkan)" in jp_prof["fg_anchor"]
+    assert "sha-sho" in jp_prof["fg_anchor"]
+    assert "no dead eyes" in jp_prof["fg_negatives"]
+
+    vn_prof = resolve_market_profile("VN")
+    assert "dau moc do" in vn_prof["fg_anchor"]
+    assert "red neck lanyard" in vn_prof["fg_anchor"]
+    assert "no dead eyes" in vn_prof["fg_negatives"]

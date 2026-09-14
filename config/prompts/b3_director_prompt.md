@@ -38,3 +38,9 @@
 
 8. PRODUCTION BRIDGE (Rule 446):
    - All prompt descriptions and visual hints must be in descriptive English.
+
+9. DRAMATIC CHARACTER ACTING & INDIGENOUS PROPS (Rule 122 & Rule 128):
+   - Layer 2 Foreground characters MUST NOT be static passport-photo mannequins or have passive blank stares.
+   - Posing & Body Language: Mandate high-stakes dynamic body postures (leaning forward into conflict, decisive pointing, clenched fist, slamming palm on evidence).
+   - Facial Micro-Expressions: Mandate intense emotive facial acting (furrowed brow, sharp intense glare, clenched jaw, resolute stare, zero dead eyes).
+   - Active Props Interaction: Characters MUST physically interact with indigenous props (holding stamped dossier with red hanko/ingam/mộc đỏ seal, presenting official verdict, wearing corporate ID lanyard).

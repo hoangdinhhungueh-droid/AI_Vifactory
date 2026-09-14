@@ -54,7 +54,7 @@ graph TD
   - **Rule 119**: Strict Existing Codebase Execution (Chỉ dùng script chuẩn trên VPS, file tạm lưu ở /tmp/).
   - **Rule 120**: Karaoke Millisecond Subtitle & Audio Duration Sync (durationInFrames chuẩn timestamp Whisper).
   - **Rule 121**: Strict Test Protocol (In log 200 OK hoặc exit code 0 trước khi hoàn thành).
-  - **Rule 122**: Pixel-Level Visual Audit Gate (UI artifact = 0%, alpha integrity = 100%, Comic style).
+  - **Rule 122**: Pixel-Level Visual Audit Gate & Indigenous Dynamic Posing (UI artifact = 0%, alpha integrity = 100%, Comic cel-shading, Era/Market ethnicity, Dynamic High-Stakes Posing & Facial Micro-Expressions, Active Indigenous Props Interaction, Zero-Mock Score).
   - **Rule 123**: Mandatory Real-Data Pipeline Testing (Live RSS, YouTube Data API, Notion live).
   - **Rule 124**: Atomic Code-ification on Agreement (Chốt là code ngay, cấm nói suông).
   - **Rule 125**: Single Pipeline Version & Zero-Ghost Remnant Mandate (Dọn sạch 100% tàn dư cũ).
@@ -102,9 +102,9 @@ graph TD
   - **B3 (`director_planner_b3.py`)**: Hollywood Art Director Plan (35-55 scenes), nạp `epoch_stage` và `temporal_cadence` để đồng bộ ánh sáng và bối cảnh thị giác theo từng thời kỳ.
   - **B2.1 (`fact_causal_audit` qua Claude Opus 5)**: Kiểm toán độc lập tính toàn vẹn nhân quả (Rule 130). Chỉ khi B2.1 đạt PASS (score ≥ 7.5/10) mới **Chốt Task ID chính thức + Sync Notion Trend Brain (Approved→Story) + Gửi Telegram Gate 1 hoàn chỉnh** trước khi chuyển giao B3.
   - **B3 (`/video:art-director`)**: Lập bảng đạo diễn Dynamic Scenes (Layer 1 BG + Layer 2 FG) bằng tiếng Anh khớp 10X 5-Beat & Visual Anchoring ngòi nổ thực tế (Rule 116, 120, 128, 130, 131). Sync **Director Plan DB**.
-  - **B3.5 (`/prompt:forge`) / B3.6 (`b36_visual_convergence.py`)**: Sinh Prompt Engineering chuẩn FG `#FF00FF` Chroma Key & DACL Visual Convergence Audit. Tự động phát **Telegram Human Gate 2** (Thẻ tóm lược điều hành + lệnh 1-chạm kích hoạt `vf-image-gen` B4/B5).
+  - **B3.5 (`/prompt:forge`) / B3.6 (`b36_visual_convergence.py`)**: Sinh Prompt Engineering chuẩn FG `#FF00FF` Chroma Key & DACL Visual Convergence Audit. Tích hợp Dynamic High-Stakes Posing, Facial Micro-Expressions, Active Indigenous Props (hanko/ingam/mộc đỏ), và Anti-English Bleed (JP, KR, VN). Tự động phát **Telegram Human Gate 2** (Thẻ tóm lược điều hành + lệnh 1-chạm kích hoạt `vf-image-gen` B4/B5).
   - **B4 (`/image:native`)**: Sinh ảnh Google Image Native / Gemini Pro Web (`generate_image`). Upload R2 & Sync **Image Asset Library DB**.
-  - **B5 (`/audit:vision`)**: Vision Audit 4 trục (Rule 122) & Tách phông `#FF00FF` HSV Chroma Key. Update `Status = Approved`.
+  - **B5 (`/audit:vision`)**: Vision Audit 4 trục (Rule 122): UI artifact = 0%, alpha integrity = 100%, Comic cel-shading, Era/Market & Indigenous Props Conformance (0% English text leak, 0% passive blank stare) & Tách phông `#FF00FF` HSV Chroma Key. Update `Status = Approved`.
   - **B6 (`/audio:narration`)**: TTS thuyết minh giọng nam chuẩn theo ngôn ngữ thị trường (`en-US-GuyNeural` cho EN, `ja-JP` cho JP, `ko-KR` cho KR) chuẩn -14 LUFS.
   - **B7 (`/audio:subtitle`)**: Whisper SRT -> trích xuất Timestamp Karaoke chính xác từng miligiây.
   - **B8 (`/video:render`)**: Remotion React Master Render CPU (TwoLayerEpisode + Subtitles + Top Act Bar + BGM -24dB).
