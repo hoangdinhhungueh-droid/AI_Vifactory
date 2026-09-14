@@ -1108,10 +1108,18 @@ def discover_and_produce_market_trend(
             story_text = brain.get("story") or brain.get("full_script") or ""
             t_obj["story_text"] = story_text
             t_obj["story_gate_score"] = brain.get("story_gate_score")
-            print(f"  ✅ [B2] Script generated ({len(story_text.split())} words, Gate Score: {t_obj['story_gate_score']})")
+            t_obj["story_verdict"] = brain.get("story_verdict", "PASS")
+            print(f"  ✅ [B2] Script generated ({len(story_text.split())} words, Gate Score: {t_obj['story_gate_score']}, Verdict: {t_obj['story_verdict']})")
         except Exception as b2_err:
             logger.error(f"[{temp_task_id}] B2 Story generation failed: {b2_err}. Freezing candidate.")
             break
+
+        # Check Story Gate verdict (Rule 121 & Rule 127)
+        if t_obj.get("story_verdict") == "FAIL":
+            logger.error(f"[{temp_task_id}] B2 Story Gate REJECTED ({t_obj.get('story_gate_score')}). Candidate rejected, rotating to next candidate...")
+            print(f"  ❌ [B2 STORY GATE REJECTED] Score: {t_obj.get('story_gate_score')}. Rotating to next candidate in queue...")
+            record_handled_topic(term, market=m_up)
+            continue
 
         # 7. B2.1 Independent Fact & Causal Integrity Audit Gate (Rule 118, 122 & 130 - Claude Opus 5)
         print(f"  🛡️ [B2.1 Fact & Causal Audit] Auditing script with Claude Opus 5...")
@@ -1178,6 +1186,25 @@ def discover_and_produce_market_trend(
                 os.remove(temp_task_file)
             except Exception:
                 pass
+
+        # Update Notion Story Library row from temp_task_id to canonical task_id (Rule 125 & 126 Single Truth)
+        try:
+            from scripts.ag_notion_bridge import query_db, update_page_properties
+            s_db_id = os.getenv("STORY_LIBRARY_DB_ID", "b0301989-2400-836b-bdb5-8131fea17736")
+            q_res = query_db(s_db_id, filter_obj={"or": [
+                {"property": "Task ID", "rich_text": {"equals": temp_task_id}},
+                {"property": "Episode ID", "rich_text": {"equals": temp_task_id}}
+            ]})
+            if q_res and q_res.get("results"):
+                for r in q_res["results"]:
+                    update_page_properties(r["id"], {
+                        "Task ID": {"rich_text": [{"type": "text", "text": {"content": task_id}}]},
+                        "Episode ID": {"rich_text": [{"type": "text", "text": {"content": task_id}}]},
+                        "Status": {"status": {"name": "Gate Passed"}}
+                    })
+                logger.info(f"[trend_engine] Migrated Notion Story Library rows from {temp_task_id} to canonical {task_id} (Status: Gate Passed)")
+        except Exception as _m_err:
+            logger.warning(f"[trend_engine] Notice migrating Story Library Task ID: {_m_err}")
 
         # 9. Send Pure Telegram Gate 1 Notification (Now fully enriched with Title A/B, 60s Hook & B2.1 PASS!)
         send_pure_telegram_gate1_notification(t_obj)

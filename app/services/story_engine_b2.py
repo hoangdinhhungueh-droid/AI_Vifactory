@@ -610,12 +610,18 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
     story_verdict = audit.get('verdict') or 'UNKNOWN'
     logger.info(f"[story_engine] Initial Story Gate Score: {story_score_str} | Verdict: {audit.get('verdict')}")
 
+    best_script = full_script
+    best_score = audit.get("score", 0)
+    best_audit = audit
+    best_score_str = story_score_str
+    best_verdict = story_verdict
+
     # Auto-Refine Self-Correction Loop: Mandate 12/12 Perfect Score for every Episode
-    if audit.get("score", 0) < 12 or story_verdict != "PASS":
+    if best_score < 12 or best_verdict != "PASS":
         for refine_attempt in range(1, 3):
             logger.warning(
-                f"[story_engine] Story Gate under 12/12 ({audit.get('score')}/{audit.get('max_score')}). "
-                f"Fix hints: {audit.get('fix_hints')}. Banned hits: {audit.get('banned_phrases_found')}. "
+                f"[story_engine] Story Gate under 12/12 ({best_score}/{best_audit.get('max_score', 12)}). "
+                f"Fix hints: {best_audit.get('fix_hints')}. Banned hits: {best_audit.get('banned_phrases_found')}. "
                 f"Initiating Auto-Refine Attempt {refine_attempt}/2 via GPT-6-Astra to achieve 12/12..."
             )
             length_instruction = "strictly maintaining 2,500-3,500 Japanese characters" if mkt.upper() == "JP" else (
@@ -623,15 +629,15 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                 "strictly maintaining 1,800-2,200 words"
             )
             refine_user = (
-                f"The generated script scored {audit.get('score')}/{audit.get('max_score')} on Story Gate. Target is 12/12 PERFECT SCORE.\n"
-                f"REQUIRED CORRECTIONS:\n" + "\n".join(f"- {h}" for h in audit.get("fix_hints", [])) + "\n\n"
+                f"The generated script scored {best_score}/{best_audit.get('max_score', 12)} on Story Gate. Target is 12/12 PERFECT SCORE.\n"
+                f"REQUIRED CORRECTIONS:\n" + "\n".join(f"- {h}" for h in best_audit.get("fix_hints", [])) + "\n\n"
                 f"CRITICAL REMINDERS FOR 12/12:\n"
                 f"1. Hook Shock: Sentence 1 of Act I MUST feature a quantitative number, %, or $ figure within 60 words.\n"
                 f"2. Pattern Interrupt: Act III MUST have at least one short sentence of 2 to 6 words (e.g. 'The paper trail vanished.').\n"
-                f"BANNED PHRASES FOUND (MUST ELIMINATE): {', '.join(audit.get('banned_phrases_found', []))}\n\n"
+                f"BANNED PHRASES FOUND (MUST ELIMINATE): {', '.join(best_audit.get('banned_phrases_found', []))}\n\n"
                 f"Please rewrite and polish the entire 5-Act script, {length_instruction}, "
                 f"preserving all 5 Acts ('=== ACT I ===' to '=== ACT V ==='), ensuring the first sentence opens with a shock quantitative stake (Rule 444), and resolving all failed items.\n\n"
-                f"Current Draft:\n{full_script}\n\n"
+                f"Current Draft:\n{best_script}\n\n"
                 f"Output ONLY the corrected 5-Act script now:"
             )
             try:
@@ -644,19 +650,29 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                     if matches_ref:
                         for mr in matches_ref:
                             cleaned_acts_ref.append(mr[0].strip())
-                    if len(cleaned_acts_ref) == 5:
-                        full_script = "\n\n".join(cleaned_acts_ref)
-                    else:
-                        full_script = refined_raw.strip()
-                    audit = sgate.score_story(full_script)
-                    story_score_str = f"{audit.get('score')}/{audit.get('max_score')}"
-                    story_verdict = audit.get('verdict') or 'UNKNOWN'
-                    logger.info(f"[story_engine] Post-Refine Attempt {refine_attempt} Score: {story_score_str} | Verdict: {story_verdict}")
-                    if audit.get("score", 0) >= 12:
+                    candidate_script = "\n\n".join(cleaned_acts_ref) if len(cleaned_acts_ref) == 5 else refined_raw.strip()
+                    ref_audit = sgate.score_story(candidate_script)
+                    ref_score = ref_audit.get("score", 0)
+                    ref_score_str = f"{ref_score}/{ref_audit.get('max_score', 12)}"
+                    ref_verdict = ref_audit.get('verdict') or 'UNKNOWN'
+                    logger.info(f"[story_engine] Post-Refine Attempt {refine_attempt} Score: {ref_score_str} | Verdict: {ref_verdict}")
+                    if ref_score > best_score:
+                        best_script = candidate_script
+                        best_score = ref_score
+                        best_audit = ref_audit
+                        best_score_str = ref_score_str
+                        best_verdict = ref_verdict
+                        logger.info(f"[story_engine] Auto-Refine Improved Score to {best_score_str} ({best_verdict})")
+                    if best_score >= 12:
                         logger.info(f"[story_engine] Auto-Refine SUCCESS: Perfect 12/12 achieved on attempt {refine_attempt}!")
                         break
             except Exception as _re:
                 logger.warning(f"[story_engine] Auto-refine attempt {refine_attempt} error: {_re}")
+
+    full_script = best_script
+    audit = best_audit
+    story_score_str = best_score_str
+    story_verdict = best_verdict
 
     # ----------------------------------------------------
     # B2.1 Fact & Causal Integrity Audit Gate (Rule 118 & Rule 130)
@@ -737,7 +753,14 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                         fact_audit_result["convergence_status"] = "CONVERGED"
                         f_verdict = "PASS"
                         f_score = float(conv_res.get("fact_score", 8.0))
-                        logger.info(f"[story_engine] Dual-Model Convergence SUCCESS: Script converged with Fact Score {f_score}/10!")
+
+                        # Re-score converged script against Story Gate (Rule 125 & 127)
+                        conv_audit = sgate.score_story(full_script)
+                        story_score_str = f"{conv_audit.get('score', 10)}/{conv_audit.get('max_score', 12)}"
+                        story_verdict = conv_audit.get('verdict') or 'PASS'
+                        fact_audit_result["story_gate_score"] = story_score_str
+                        fact_audit_result["story_verdict"] = story_verdict
+                        logger.info(f"[story_engine] Dual-Model Convergence SUCCESS: Script converged with Fact Score {f_score}/10 | Story Gate: {story_score_str} ({story_verdict})!")
                     else:
                         fact_audit_result = conv_res.get("audit_details", fact_audit_result)
                         fact_audit_result["convergence_status"] = "NON_CONVERGENCE"
@@ -790,6 +813,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
         "topic": topic,
         "story": full_script,
         "story_gate_score": story_score_str,
+        "story_verdict": story_verdict,
         "bgm_mood": "dramatic",
         "hook_3s": hook_3s or _opening_hook(full_script),
         "hook_60s": hook_60s,

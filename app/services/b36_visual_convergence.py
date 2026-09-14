@@ -90,6 +90,7 @@ Your task is to review and cross-validate this Delta Patch:
 2. Verify that camera movements and tension maintain dramatic Hollywood suspense.
 3. Polish any awkward phrasing or visual prompt syntax.
 4. Score the quality and visual integrity of the patched package (0.0 to 10.0).
+5. CRITICAL: All underlying factual events in the narration have ALREADY been verified by the Grounding Intel layer. Do NOT dock points or withhold approval for factual proof; focus your evaluation exclusively on visual composition, cinematic direction, and narrative pacing.
 
 Return a strict JSON object with:
 {
@@ -316,7 +317,8 @@ def run_b36_visual_convergence(
                 "director_archetype": director_plan.get("director_archetype"),
                 "delta_patched_scenes": patched_scenes,
                 "delta_patched_thumbnails": patched_thumbs,
-                "critical_critique": round1_audit.get("critical_findings")
+                "critical_critique": round1_audit.get("critical_findings"),
+                "verified_grounding_claims": [(c.get("fact_summary") or str(c)) if isinstance(c, dict) else str(c) for c in grounding_intel.get("claims", [])][:10]
             }
 
             try:
@@ -327,7 +329,7 @@ def run_b36_visual_convergence(
                     max_tokens=1500,
                     temperature=0.2,
                     timeout=70.0,
-                    fallback="kimi-k3"
+                    fallback="claude-sonnet-5"
                 )
                 j_match2 = re.search(r"(\{.*\})", astra_res, re.DOTALL)
                 clean_json2 = j_match2.group(1).strip() if j_match2 else astra_res.strip()
@@ -406,12 +408,15 @@ def run_b36_visual_convergence(
             logger.warning(f"[B3.5.1 DACL] Failed to persist converged assets to {t_dir}: {p_err}")
 
     # Trigger Human Gate 2 Telegram Notification AFTER B3.5.1 convergence and file persistence (Rule 125)
-    try:
-        from app.services.telegram_buttons import trigger_human_gate_2
-        logger.info(f"[B3.5.1 DACL] Triggering Human Gate 2 Telegram Card for {episode_id} (Score: {final_score:.1f}/10)...")
-        trigger_human_gate_2(episode_id)
-    except Exception as e:
-        logger.warning(f"[B3.5.1 DACL] HG2 dispatch note: {e}")
+    if converged:
+        try:
+            from app.services.telegram_buttons import trigger_human_gate_2
+            logger.info(f"[B3.5.1 DACL] Triggering Human Gate 2 Telegram Card for {episode_id} (Score: {final_score:.1f}/10)...")
+            trigger_human_gate_2(episode_id)
+        except Exception as e:
+            logger.warning(f"[B3.5.1 DACL] HG2 dispatch note: {e}")
+    else:
+        logger.warning(f"[B3.5.1 DACL] Convergence gate NOT met ({final_score:.1f}/10). Withholding HG2 Telegram notification.")
 
     return {
         "converged": converged,
