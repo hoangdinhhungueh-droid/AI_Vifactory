@@ -408,7 +408,9 @@ def run_b36_visual_convergence(
             logger.warning(f"[B3.5.1 DACL] Failed to persist converged assets to {t_dir}: {p_err}")
 
     # Trigger Human Gate 2 Telegram Notification AFTER B3.5.1 convergence and file persistence (Rule 125)
-    if converged:
+    if episode_id.upper().startswith("TEST_"):
+        logger.info(f"[B3.5.1 DACL] Skipping HG2 Telegram card for test episode: {episode_id}")
+    elif converged:
         try:
             from app.services.telegram_buttons import trigger_human_gate_2
             logger.info(f"[B3.5.1 DACL] Triggering Human Gate 2 Telegram Card for {episode_id} (Score: {final_score:.1f}/10)...")

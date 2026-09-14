@@ -107,9 +107,11 @@ def test_b36_round2_convergence_with_delta_patch():
 
     fake_gateway.call_llm.side_effect = [r1_opus, r2_astra]
 
-    with patch("app.services.b36_visual_convergence.get_global_gateway", return_value=fake_gateway):
+    with patch("app.services.b36_visual_convergence.get_global_gateway", return_value=fake_gateway), \
+         patch("app.services.b36_visual_convergence.trigger_human_gate_2", create=True) as mock_hg2, \
+         patch("app.services.telegram_buttons.trigger_human_gate_2") as mock_tb_hg2:
         res = run_b36_visual_convergence(
-            episode_id="JP_EP0001_tada_shrine_debt",
+            episode_id="TEST_EP0001_tada_mock",
             director_plan={"topic": "Tada Shrine", "scenes": [{"scene_id": "SC_001", "narration": "English narration"}]},
             dp_plan={},
             prompts_data={"backgrounds": {}, "foregrounds": {}, "thumbnails": {"thumbnail_a": "old photorealistic"}},
