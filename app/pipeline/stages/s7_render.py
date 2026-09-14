@@ -56,11 +56,27 @@ async def run_s7(episode: dict) -> dict:
     # Pre-render quality gate: fail fast on unusable inputs (EP001 class).
     qa = {"pre": await pre_render_check(clip_paths, norm_path), "post": {}}
 
-    # 2. Select BGM
+    # 2. Select BGM (5-Beat Adaptive BGM Engine - Rule 125 & R3)
     duration_s = lufs_report.get("duration_s", 60.0)
-    logger.info("[S7] %s selecting BGM mood=%s dur=%.1fs", episode_id, mood, duration_s)
-    bgm_info = await select_bgm(mood=mood, duration_s=duration_s)
-    bgm_path = bgm_info.get("path")
+    logger.info("[S7] %s assembling 5-Beat adaptive BGM dur=%.1fs", episode_id, duration_s)
+    bgm_path = None
+    bgm_info = {}
+    try:
+        from app.services.beat_bgm_engine import generate_beat_adaptive_bgm
+        bgm_info = generate_beat_adaptive_bgm(
+            episode_id=episode_id,
+            out_dir=out_dir,
+            audio_path=norm_path
+        )
+        bgm_path = bgm_info.get("bgm_path")
+        logger.info("[S7] %s 5-Beat BGM generated: %s (%d tracks)", episode_id, bgm_path, len(bgm_info.get("tracks", [])))
+    except Exception as e:
+        logger.warning("[S7] %s 5-Beat BGM failed (%s), falling back to select_bgm", episode_id, e)
+        try:
+            bgm_info = await select_bgm(mood=mood, duration_s=duration_s)
+            bgm_path = bgm_info.get("path")
+        except Exception as _e_bgm:
+            logger.warning("[S7] %s select_bgm fallback failed: %s", episode_id, _e_bgm)
 
     # Resolve render_architecture early (Rule 116 / Single Source of Truth)
     render_arch = str(episode.get("render_architecture") or "").strip()
@@ -207,7 +223,9 @@ async def run_s7(episode: dict) -> dict:
 
     return {**episode,
             **renders,
-            "bgm_path":    bgm_path,
-            "audio_norm":  norm_path,
-            "qa_gate":     qa,
-            "lufs_report": lufs_report}
+            "bgm_path":        bgm_path,
+            "bgm_tracks":      bgm_info.get("tracks", []),
+            "bgm_attribution": bgm_info.get("attribution_text", ""),
+            "audio_norm":      norm_path,
+            "qa_gate":         qa,
+            "lufs_report":     lufs_report}

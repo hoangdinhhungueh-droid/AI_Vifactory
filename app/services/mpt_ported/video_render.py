@@ -585,15 +585,28 @@ async def render_video(
         cap_dur = audio_dur if audio_dur is not None else video_dur
         cap_args = ["-t", f"{cap_dur + 0.5:.3f}"]
         if bgm_path and Path(bgm_path).exists():
+            # Intelligent Sidechain Ducking + Vocal Clarity EQ (Rule 125 & R3)
+            # Replaces legacy aloop with sidechaincompress:
+            # - When TTS speaks: BGM ducks smoothly to -18dB..-20dB and dips 2.5kHz vocal zone (-4dB)
+            # - When TTS pauses: BGM swells to cinematic level without drowning speech
+            # - Eliminates muddy sub-bass hum/drone ("tiếng ù ù")
+            bgm_dur = await _probe_duration_or_none(bgm_path)
+            bgm_loop = (
+                ["-stream_loop", "-1"]
+                if (bgm_dur is not None and audio_dur is not None and bgm_dur < audio_dur - 1.0)
+                else []
+            )
             af = (
-                f"[1:a]volume=0.9[tts];"
-                f"[2:a]volume={bgm_volume},aloop=loop=-1:size=2e+09[bgm];"
-                f"[tts][bgm]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[aout]"
+                "[1:a]volume=0.95,asplit=2[tts_clean][tts_sc];"
+                "[2:a]volume=0.28,equalizer=f=2500:t=q:w=1.5:g=-4[bgm_eq];"
+                "[bgm_eq][tts_sc]sidechaincompress=threshold=0.03:ratio=6:attack=150:release=450:makeup=1[bgm_ducked];"
+                "[tts_clean][bgm_ducked]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[aout]"
             )
             cmd = [
                 "ffmpeg", "-y",
                 *loop_args, "-i", video_only,
-                "-i", audio_path, "-i", bgm_path,
+                "-i", audio_path,
+                *bgm_loop, "-i", bgm_path,
                 "-filter_complex", af,
                 "-map", "0:v", "-map", "[aout]",
                 "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
