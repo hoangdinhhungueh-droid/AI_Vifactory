@@ -15,22 +15,22 @@ def _check_scene_coverage(scenes: list, story_beats: list = None) -> tuple:
     if not scenes:
         return 0.0, [{"severity": "critical", "axis": "scene_coverage", "message": "No scenes provided", "fix": "Generate director plan with scenes"}]
     score = 10.0
-    # Check minimum scene count (30 - 60 scenes for a 12-15 min docudrama)
+    # Check minimum scene count (minimum 30 scenes, target 130-160 scenes for docudrama)
     if len(scenes) < 20:
         score = 0.0
         issues.append({
             "severity": "critical",
             "axis": "scene_coverage",
-            "message": f"Critical scene deficit: only {len(scenes)} scenes provided (minimum 30-55 required for 5-Beat Docudrama)",
-            "fix": "Subdivide story into at least 30-55 dynamic storyboard scenes across all 5 beats"
+            "message": f"Critical scene deficit: only {len(scenes)} scenes provided (minimum 30 required, target 130-160 for 5-Beat Docudrama)",
+            "fix": "Subdivide story into dynamic storyboard scenes across all 5 beats (target 130-160 scenes)"
         })
     elif len(scenes) < 30:
         score -= 4.0
         issues.append({
             "severity": "high",
             "axis": "scene_coverage",
-            "message": f"Only {len(scenes)} scenes — insufficient coverage for docudrama (target 35-55 dynamic scenes)",
-            "fix": "Target 35-55 dynamic scenes (7 to 10 scenes per beat)"
+            "message": f"Only {len(scenes)} scenes — insufficient coverage for docudrama (target 130-160 dynamic scenes)",
+            "fix": "Target 130-160 dynamic scenes across 5 beats (~25 to 35 scenes per beat)"
         })
     # Check for null/empty scenes
     null_scenes = [i for i, s in enumerate(scenes) if not s.get("fg_prompt") and not s.get("bg_prompt") and not s.get("image_prompt")]

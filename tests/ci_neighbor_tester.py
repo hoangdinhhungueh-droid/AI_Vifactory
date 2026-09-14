@@ -372,7 +372,7 @@ def test_block3_director_contract() -> bool:
             "scenes": []
         }
         for beat_idx, beat_name in enumerate(CANONICAL_BEATS, start=1):
-            for sc_num in range(1, 9): # 8 scenes per beat -> 40 scenes total (within 35-55 dynamic range)
+            for sc_num in range(1, 9):  # 8 scenes per beat -> 40 scenes sample (tests >=30 coverage floor; production target 130-160)
                 scene_id = f"s_{(beat_idx-1)*8 + sc_num:02d}"
                 is_wide = (sc_num == 1)
                 sample_plan["scenes"].append({

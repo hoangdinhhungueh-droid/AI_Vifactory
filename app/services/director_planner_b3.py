@@ -494,8 +494,8 @@ def generate_director_plan(
 ) -> dict:
     """
     Core B3 Art Director & Universal Scene Breakdown Engine (Rule 128).
-    Breaks down 5-Beat story into 35-55 dynamic cinematic scenes.
-    Generates flexible asset roster (BG pool and FG pool) per Beat.
+    Breaks down 5-Beat story into 130-160 dynamic cinematic scenes.
+    Preserves existing metadata in brain_input.json without destructive overwrite.
     Produces director_plan.json, dp_plan.json, and brain_input.json (non-destructive deep-merge).
     """
     logger.info(f"🎬 [B3 Director] Starting Art Direction for Episode: {episode_id}")

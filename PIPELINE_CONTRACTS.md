@@ -187,6 +187,11 @@
 ### 4. Khối B3 (Director Plan) ➔ Khối B3.5 (Prompt Forge)
 * **File lưu trữ**: `director_plan.json` ➔ `prompts_forge.json (và prompts.json tương thích ngược)`
 * **Quy chuẩn**: Toàn bộ visual prompts viết bằng tiếng Anh, gắn `[STYLE MANDATE]`, `[MARKET & ETHNIC ANCHOR]`, `[MARKET & ENVIRONMENT ANCHOR]`, `[ERA ANCHOR]`, `[STRICT NEGATIVE PROMPT]`.
+* **Pacing & Asset Optimization (130-160 Scenes & 15-20 Clustered BGs)**:
+  - **Pacing**: Chuẩn hóa nhịp 130–160 scenes động (~4–6s/scene) dàn đều 5 Beats, đẩy nhịp dựng Fincher kịch tính.
+  - **Clustered BG Reuse**: B4 sinh tối ưu hóa 15–20 Backgrounds độc bản (`bg_cluster_id`) được tái sử dụng linh hoạt xuyên suốt các scenes trong cùng một bối cảnh, triệt tiêu nguy cơ nghẽn API sinh ảnh hoặc kéo dài render.
+  - **6 Cinematic Camera Moves**: `"slow_zoom_in"`, `"slow_zoom_out"`, `"pan_left"`, `"pan_right"`, `"tracking_shot"`, `"dutch_angle_push"`.
+  - **4 Forensic Evidentiary Overlays**: `"none"`, `"document_highlight"`, `"timeline_tick"`, `"stat_counter"`, `"redacted_stamp"`.
 * **Khế ước Bản Sắc Thị Trường (Rule 122 & 128 Generic Pattern)**:
   - Thị trường mục tiêu `<MARKET>` (`JP`, `KR`, `VN`, `EN`...) quyết định bắt buộc đặc điểm nhân chủng học của nhân vật FG (khuôn mặt, mắt, tóc, trang phục) và kiến trúc của BG (phòng họp, cao ốc, đường phố địa phương).
   - FG: CẤM TUYỆT ĐỐI thiên kiến da trắng/Âu Mỹ (Caucasian/Western bias) khi tạo nhân vật Á Châu.
@@ -194,12 +199,20 @@
 * **Data Schema (`director_plan.json`)**:
   ```json
   {
+    "director_profile": "<DIRECTOR_ARCHETYPE_NAME>",
+    "target_scene_count": "<INTEGER: 130-160>",
+    "bg_clusters_count": "<INTEGER: 15-20>",
     "scenes": [
       {
         "scene_id": "scene_<001>",
         "act_number": "<INTEGER: 1-5>",
+        "beat_number": "<INTEGER: 1-5>",
+        "beat_name": "<BEAT_NAME>",
+        "bg_cluster_id": "bg_cluster_<01-20>",
         "background_reuse_key": "bg_<location_slug>",
         "foreground_reuse_key": "fg_<character_or_subject_slug>_<action_slug>",
+        "camera_movement": "<slow_zoom_in | slow_zoom_out | pan_left | pan_right | tracking_shot | dutch_angle_push>",
+        "forensic_overlay": "<none | document_highlight | timeline_tick | stat_counter | redacted_stamp>",
         "setting_description": "<ENVIRONMENT_DESCRIPTION_ENGLISH: Detailed setting and era background>",
         "character_description": "<CHARACTER_DESCRIPTION_ENGLISH: Detailed subject appearance, clothing, mood>",
         "visual_action": "<VISUAL_ACTION_ENGLISH: Subject pose and dynamic interaction>"
@@ -213,6 +226,9 @@
 ### 5. Khối B6 (Speech & Whisper) ➔ Khối B8 (Remotion Props)
 * **File lưu trữ**: `remotion_props.json`
 * **Quy chuẩn Rule 120**: `durationInFrames` khớp chính xác timestamp câu thoại trong Whisper, cấm chia đều toán học.
+* **Dynamic Beat Title & Sidechain Ducking**:
+  - `speakerTag`: Hiển thị `BEAT <N>: <EPISODE_SPECIFIC_BEAT_TITLE>` tùy biến theo từng tập và từng beat (không dùng tiêu đề mặc định cố định).
+  - Sidechain Ducking: FFmpeg `-20dB` tự động hạ BGM khi có giọng đọc thoại và phục hồi sau 300ms.
 * **Lộ Trình Chuẩn Hóa Timeframe Whisper Đồng Nhất Toàn Luồng (Architectural Roadmap Note)**:
   > [!NOTE]
   > Quy hoạch tương lai sẽ tích hợp cơ chế đồng nhất Timeframe khép kín giữa Đạo diễn nghệ thuật (B3 Director Plan) ➔ Visual Assets (B4/B5) ➔ Phân cảnh & Karaoke Subtitles (B7/B8) ➔ Speech TTS Audio (B6) dựa trên Whisper Word Timestamps thực tế, loại bỏ hoàn toàn độ trễ lệch pha giữa nhịp thoại và nhịp cảnh.
@@ -228,6 +244,9 @@
         "duration_in_frames": "<INTEGER_DURATION_FRAMES>",
         "bg_image": "images/scene_<001>_bg.png",
         "fg_image": "images/scene_<001>_fg.png",
+        "camera_movement": "<slow_zoom_in | slow_zoom_out | pan_left | pan_right | tracking_shot | dutch_angle_push>",
+        "forensic_overlay": "<none | document_highlight | timeline_tick | stat_counter | redacted_stamp>",
+        "speakerTag": "<DYNAMIC_BEAT_TITLE: e.g. BEAT 1: The Impossible Contradiction>",
         "subtitles": [
           {"word": "<WORD_1>", "start_ms": "<INT_MS>", "end_ms": "<INT_MS>"},
           {"word": "<WORD_2>", "start_ms": "<INT_MS>", "end_ms": "<INT_MS>"}
