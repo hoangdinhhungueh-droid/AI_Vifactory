@@ -1111,14 +1111,25 @@ def discover_and_produce_market_trend(
             t_obj["story_verdict"] = brain.get("story_verdict", "PASS")
             print(f"  ✅ [B2] Script generated ({len(story_text.split())} words, Gate Score: {t_obj['story_gate_score']}, Verdict: {t_obj['story_verdict']})")
         except Exception as b2_err:
-            logger.error(f"[{temp_task_id}] B2 Story generation failed: {b2_err}. Freezing candidate.")
-            break
+            logger.error(f"[{temp_task_id}] B2 Story generation failed: {b2_err}. Rotating to next candidate...")
+            record_handled_topic(term=term, task_id=temp_task_id, market=m_up)
+            if os.path.exists(temp_task_file):
+                try:
+                    os.remove(temp_task_file)
+                except Exception:
+                    pass
+            continue
 
         # Check Story Gate verdict (Rule 121 & Rule 127)
         if t_obj.get("story_verdict") == "FAIL":
             logger.error(f"[{temp_task_id}] B2 Story Gate REJECTED ({t_obj.get('story_gate_score')}). Candidate rejected, rotating to next candidate...")
             print(f"  ❌ [B2 STORY GATE REJECTED] Score: {t_obj.get('story_gate_score')}. Rotating to next candidate in queue...")
-            record_handled_topic(term, market=m_up)
+            record_handled_topic(term=term, task_id=temp_task_id, market=m_up)
+            if os.path.exists(temp_task_file):
+                try:
+                    os.remove(temp_task_file)
+                except Exception:
+                    pass
             continue
 
         # 7. B2.1 Independent Fact & Causal Integrity Audit Gate (Rule 118, 122 & 130 - Claude Opus 5)
@@ -1142,7 +1153,12 @@ def discover_and_produce_market_trend(
                 )
             except Exception:
                 pass
-            record_handled_topic(term, market=m_up)
+            record_handled_topic(term=term, task_id=temp_task_id, market=m_up)
+            if os.path.exists(temp_task_file):
+                try:
+                    os.remove(temp_task_file)
+                except Exception:
+                    pass
             continue
 
         print(f"  🎉 [B2.1 AUDIT PASSED!] Score: {f_score}/10. Moving to OFFICIAL TASK ID COMMIT & NOTION SYNC & HG1 NOTIFICATION!")

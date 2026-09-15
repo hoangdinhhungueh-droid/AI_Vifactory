@@ -113,7 +113,7 @@ def is_topic_already_handled(term: str, market: str = None) -> bool:
     return False
 
 
-def record_handled_topic(term: str, task_id: str, market: str, slug: str = None, specific_angle: str = None) -> None:
+def record_handled_topic(term: str, task_id: str = "", market: str = "EN", slug: str = None, specific_angle: str = None) -> None:
     """Record newly approved or produced topic into the permanent registry."""
     norm = _normalize_key(term)
     if not norm:
@@ -121,7 +121,7 @@ def record_handled_topic(term: str, task_id: str, market: str, slug: str = None,
 
     history = load_history()
     history[norm] = {
-        "task_id": task_id,
+        "task_id": task_id or "REJECTED_OR_HANDLED",
         "raw_term": term,
         "slug": slug or "",
         "specific_angle": specific_angle or "",
@@ -130,7 +130,7 @@ def record_handled_topic(term: str, task_id: str, market: str, slug: str = None,
         "source": "live_pipeline"
     }
     save_history(history)
-    logger.info(f"[history] Recorded '{term}' ({task_id}) into permanent topic registry.")
+    logger.info(f"[history] Recorded '{term}' ({task_id or 'HANDLED'}) into permanent topic registry.")
 
 
 if __name__ == "__main__":
