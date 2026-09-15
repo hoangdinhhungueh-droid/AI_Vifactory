@@ -582,169 +582,165 @@ def generate_director_plan(
     else:
         market_lang_name = "English"
 
-    # 2. Build Hollywood Art Director Prompt using concise targeted rules
+    # 2. Beat-by-Beat Hollywood Art Director Generation (Dynamic Chunking)
+    # Allows full 40k input context across chunks while keeping each chunk output <= 2,800 tokens,
+    # completely eliminating physical output token truncation (finish_reason: length).
     targeted_art_rules = get_b3_strategic_rules()
-    system_prompt = (
-        f"{targeted_art_rules}\n\n"
-        "You are an Elite Hollywood Art Director, Director of Photography (DP), and Master Visual Storyboard Editor.\n"
-        f"You direct in the visual style of {archetype['director']}.\n"
-        f"Visual Tone: {dynamic_context['physical_environment']}.\n"
-        f"Era Anchor: {dynamic_context['era_anchor']}.\n"
-        f"Color Palette: {dynamic_context['color_palette']}.\n"
-        f"Lighting Grammar: {dynamic_context['lighting_mood']}.\n"
-        f"Camera Grammar: {archetype.get('camera_style', 'Atmospheric slow push-ins and tracking shots')}.\n\n"
-        "YOUR CORE MISSION:\n"
-        "Break down this complete 5-Beat Investigative Docudrama story into a DYNAMIC, HIGH-TENSION storyboard of 130 to 160 sequential scenes (~6-7s duration per scene) for an 18-20 minute docudrama.\n"
-        "Act I MUST open with a 12 to 15 scene Fincher-style rapid-fire hook (15-25 words each, ~3.5s - 5.0s per scene) structured in 3 phases: (1) Asymmetric Paradox (0-15s), (2) Hard Metric Shock (15-35s), and (3) The Investigative Contract (35-60s).\n"
-        "Acts II through V MUST sustain a tight sentence-atomic pacing of 25-35 words per scene (~6.0s - 7.5s duration).\n"
-        "EVERY SCENE MUST SERVE A PSYCHOLOGICAL AND INVESTIGATIVE PURPOSE.\n\n"
-        "CRITICAL ARCHITECTURAL MANDATES:\n"
-        "1. TWO-LAYER RENDER SYSTEM (Rule 116):\n"
-        "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic period/topic environment. Safe-zone clear in bottom 20% for subtitles, center-right negative space for foreground overlay.\n"
-        "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration isolated on pure solid flat #FF00FF magenta chroma key. Full-body standing or seated visible head-to-toe. NO photorealistic humans.\n"
-        "2. DYNAMIC CHARACTER ENSEMBLE (Rule 128 - Zero Fixed Roles):\n"
-        "   - As the Hollywood Art Director, YOU HAVE FULL AUTONOMY to dynamically cast the character roster directly from the story narrative (protagonists, executives, investigators, witnesses, regulators, analysts).\n"
-        f"   - Detected narrative suggestions: {[c['role_name'] for c in character_ensemble]}. You may adapt, refine, or expand this ensemble to best serve the visual docudrama.\n"
-        "3. LOCATION CONTINUITY CLUSTERED BG (Rule 131):\n"
-        "   - Plan 3-4 location anchors per Beat (~15-20 total background clusters for the entire 5-Beat episode). Assign 'bg_cluster_id' (1..20) per scene.\n"
-        "   - Consecutive scenes within the same physical environment share 'bg_cluster_id' and 'background.reuse_key', allowing camera angles to evolve without disorienting the viewer.\n"
-        "4. DUAL-LANGUAGE PROTOCOL (Production Bridge Rule 446 & Market Rule 120):\n"
-        "   - VISUAL PROMPTS (bg_prompt, fg_prompt, visual_metaphor): MUST BE IN ENGLISH for the image generation engine.\n"
-        f"   - SPOKEN NARRATION ('narration' field in each scene): MUST BE 100% WRITTEN IN {market_lang_name}! NEVER translate narration to English for non-English markets! Voiceover TTS & subtitles require authentic {market_lang_name}.\n"
-        "5. 6 CANONICAL CINEMATIC CAMERA MOVEMENTS:\n"
-        "   - Must declare 'movement' from: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n\n"
-        "OUTPUT FORMAT: Return ONLY a valid JSON object matching the exact schema below. No markdown fences."
-    )
 
-    user_payload = {
-        "episode_id": episode_id,
-        "market": m_up,
-        "narration_language": market_lang_name,
-        "niche": niche,
-        "topic": topic,
-        "director_archetype": archetype["director"],
-        "dynamic_context": dynamic_context,
-        "character_ensemble": character_ensemble,
-        "temporal_cadence": temporal_cadence,
-        "causal_epochs": causal_epochs,
-        "fatal_explanatory_vacuum": intel_card.get("competitor_narrative_anatomy", {}).get("fatal_explanatory_vacuum", ""),
-        "story_beats": [
-            {
-                "beat_index": i + 1,
-                "beat_name": CANONICAL_BEATS[i],
-                "content": story_beats[i]["content"][:1500]
-            }
-            for i in range(len(story_beats))
-        ]
-    }
+    cam_moves = CANONICAL_CAMERA_MOVES
+    d_lower = archetype.get("director", "").lower()
+    if "fincher" in d_lower or "mckay" in d_lower or "noir" in d_lower:
+        cam_moves = ["snap_zoom", "slow_push_in", "cinematic_pan", "macro_tilt", "handheld_shake", "slow_pull_out"]
+    elif "nolan" in d_lower or "chernobyl" in d_lower:
+        cam_moves = ["slow_pull_out", "cinematic_pan", "slow_push_in", "handheld_shake", "macro_tilt", "snap_zoom"]
+    elif "soderbergh" in d_lower or "clinical" in d_lower:
+        cam_moves = ["macro_tilt", "slow_push_in", "cinematic_pan", "snap_zoom", "slow_pull_out", "handheld_shake"]
+    elif "miller" in d_lower or "contract" in d_lower or "moneyball" in d_lower:
+        cam_moves = ["cinematic_pan", "slow_push_in", "snap_zoom", "macro_tilt", "handheld_shake", "slow_pull_out"]
 
-    prompt_instruction = (
-        f"CRITICAL HOLLYWOOD STORYBOARD & PACING DIRECTIVE (Rules 116, 120, 128, 445):\n"
-        f"The full story contains {total_words} words across 5 beats. You MUST break down the complete narrative into 130 to 160 sequential scenes (~25 to 35 scenes per beat).\n"
-        f"Act I MUST start with a 12-15 scene rapid-fire Fincher hook (Scenes 1-15, 15-25 words/scene, ~3.5s-5s duration).\n"
-        f"Acts II-V MUST sustain 25-35 words per scene (~6.0s - 7.5s duration).\n"
-        f"1. SENTENCE-ATOMIC PACING & SPOKEN LANGUAGE PURITY:\n"
-        f"   - The 'narration' field MUST be in {market_lang_name} matching the verbatim storyline, strictly 1-2 complete sentences ending with terminal punctuation.\n"
-        f"   - Subtitle line budget: strictly fits within 2 lines on 1920x1080 display (~35-40 characters/line).\n"
-        f"   - Calculate 'duration_est_sec': Hook (Scenes 1-15): max(3, min(6, round(word_count / 3.0))); Core (Scenes 16+): max(5, min(9, round(word_count / 2.5))).\n"
-        f"2. 6 CAMERA MOVEMENTS: declare strictly one of: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n"
-        f"3. LOCATION CONTINUITY CLUSTERED BG: Assign 'bg_cluster_id' (1..20). Group 3-4 location anchors per Beat.\n"
-        f"4. FORENSIC OVERLAYS: Tag evidentiary scenes with 'forensic_overlay': 'redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt', or null.\n\n"
-        "Output a JSON object with this EXACT structure:\n"
-        "{\n"
-        "  \"episode_id\": \"" + episode_id + "\",\n"
-        "  \"visual_tone\": \"" + dynamic_context['physical_environment'] + "\",\n"
-        "  \"color_palette\": \"" + dynamic_context['color_palette'] + "\",\n"
-        "  \"director_archetype\": \"" + archetype['director'] + "\",\n"
-        "  \"scenes\": [\n"
-        "    {\n"
-        "      \"scene_id\": \"sc001\",\n"
-        "      \"beat_index\": 1,\n"
-        "      \"beat_name\": \"Beat 1: The Impossible Contradiction\",\n"
-        "      \"narration\": \"exact complete sentence/spoken text for this scene.\",\n"
-        "      \"duration_est_sec\": 4,\n"
-        "      \"visual_metaphor\": \"metaphorical meaning\",\n"
-        "      \"bg_cluster_id\": 1,\n"
-        "      \"forensic_overlay\": \"redacted_doc\",\n"
-        "      \"camera\": {\n"
-        "        \"movement\": \"snap_zoom\",\n"
-        "        \"tension_level\": \"high\"\n"
-        "      },\n"
-        "      \"background\": {\n"
-        "        \"reuse_key\": \"" + episode_id.lower() + "_bg_b1_loc0\",\n"
-        "        \"visual_description\": \"Detailed 16:9 cinematic environment...\",\n"
-        "        \"safe_zone\": \"bottom 20% clear for subtitles, center-right negative space for foreground\"\n"
-        "      },\n"
-        "      \"foreground\": {\n"
-        "        \"reuse_key\": \"" + episode_id.lower() + "_fg_b1_char0\",\n"
-        "        \"character_role\": \"" + character_ensemble[0]['role_name'] + "\",\n"
-        "        \"psychological_state\": \"" + character_ensemble[0]['archetype'] + "\",\n"
-        "        \"body_language\": \"" + character_ensemble[0]['visual_cues'] + "\",\n"
-        "        \"position\": \"right\",\n"
-        "        \"visual_description\": \"Stylized editorial graphic novel digital illustration on #FF00FF magenta background...\"\n"
-        "      },\n"
-        "      \"audio_sfx_cue\": \"distant_siren_and_flickering_light\"\n"
-        "    }\n"
-        "  ]\n"
-        "}\n\n"
-        "Input Data:\n" + json.dumps(user_payload, ensure_ascii=False)
-    )
+    all_scenes = []
+    sc_counter = 0
 
-    logger.info("  [B3] Calling HHTech GPT-6-Astra for Hollywood Director Plan...")
-    raw_res = ""
-    for attempt in range(1, 3):
-        try:
-            raw_res = call_gpt6_astra(
-                prompt=prompt_instruction,
-                system_prompt=system_prompt,
-                max_tokens=6500,
-                timeout=180.0
-            )
-            if raw_res and raw_res.strip():
-                break
-        except Exception as e:
-            logger.warning(f"  [B3] LLM attempt {attempt} failed: {e}")
-            time.sleep(3)
+    for b_idx, beat in enumerate(story_beats):
+        b_num = b_idx + 1
+        b_name = CANONICAL_BEATS[b_idx] if b_idx < len(CANONICAL_BEATS) else f"Beat {b_num}"
+        beat_content = beat.get("content", "").strip()
+        logger.info(f"  [B3 Dynamic Chunk {b_num}/5] Directing {b_name} (start scene: sc{sc_counter:03d})...")
 
-    # 3. Parse JSON
-    parsed = None
-    if raw_res and raw_res.strip():
-        cleaned = raw_res.strip()
-        if cleaned.startswith("```json"):
-            cleaned = cleaned[7:]
-        if cleaned.startswith("```"):
-            cleaned = cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        try:
-            parsed = json.loads(cleaned.strip())
-        except Exception as e:
-            logger.warning(f"  [B3] Failed to parse LLM JSON: {e}. Attempting recovery...")
-            m = re.search(r"(\{.*\})", cleaned, re.DOTALL)
-            if m:
-                try:
-                    parsed = json.loads(m.group(1))
-                except Exception:
-                    pass
+        system_prompt = (
+            f"{targeted_art_rules}\n\n"
+            "You are an Elite Hollywood Art Director, Director of Photography (DP), and Master Visual Storyboard Editor.\n"
+            f"You direct in the visual style of {archetype['director']}.\n"
+            f"Visual Tone: {dynamic_context['physical_environment']}.\n"
+            f"Era Anchor: {dynamic_context['era_anchor']}.\n"
+            f"Color Palette: {dynamic_context['color_palette']}.\n"
+            f"Lighting Grammar: {dynamic_context['lighting_mood']}.\n"
+            f"Camera Grammar: {archetype.get('camera_style', 'Atmospheric slow push-ins and tracking shots')}.\n\n"
+            "YOUR MISSION FOR THIS BEAT:\n"
+            f"Break down this narrative Beat ({b_name}) into 26 to 32 sequential cinematic scenes (~6-7s duration each).\n"
+            + ("Act I MUST open with a 12 to 15 scene Fincher-style rapid-fire hook (Scenes sc000-sc014, 15-25 words each, ~3.5s - 5.0s per scene) structured in 3 phases: (1) Asymmetric Paradox (0-15s), (2) Hard Metric Shock (15-35s), and (3) The Investigative Contract (35-60s).\n" if b_num == 1 else "Sustain a tight sentence-atomic pacing of 25-35 words per scene (~6.0s - 7.5s duration).\n")
+            + "\nCRITICAL ARCHITECTURAL MANDATES:\n"
+            "1. TWO-LAYER RENDER SYSTEM (Rule 116):\n"
+            "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic environment. Safe-zone clear in bottom 20% for subtitles, center-right negative space for foreground overlay.\n"
+            "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration isolated on pure solid flat #FF00FF magenta chroma key. Full-body head-to-toe. NO photorealistic humans.\n"
+            "2. DYNAMIC CHARACTER ENSEMBLE (Rule 128):\n"
+            f"   - Available character roles: {[c['role_name'] for c in character_ensemble]}.\n"
+            "3. DUAL-LANGUAGE PROTOCOL (Rule 446 & Rule 120):\n"
+            "   - VISUAL PROMPTS (bg_prompt, fg_prompt, visual_metaphor): MUST BE IN ENGLISH.\n"
+            f"   - SPOKEN NARRATION ('narration'): MUST BE 100% VERBATIM IN {market_lang_name}! NEVER translate narration to English!\n"
+            "4. 6 CANONICAL CAMERA MOVEMENTS: declare strictly one of: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n"
+            f"5. LOCATION CONTINUITY: assign 'bg_cluster_id' (range {((b_num - 1) * 4) + 1}..{b_num * 4}).\n"
+            "6. FORENSIC OVERLAYS: Tag evidentiary scenes with 'forensic_overlay': 'redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt', or null.\n\n"
+            "OUTPUT FORMAT: Return ONLY a valid JSON object matching: {\"scenes\": [ ... ]}. No markdown fences."
+        )
 
-    # 4. Fallback synthesis if LLM failed or generated insufficient scenes (< min_required_scenes) (Rule 445: 130-160 dynamic scenes)
-    min_required_scenes = max(80, min(160, total_words // 25)) if total_words > 500 else 10
-    llm_scenes = parsed.get("scenes", []) if parsed else []
-    if not parsed or len(llm_scenes) < min_required_scenes:
-        if parsed and llm_scenes:
-            logger.warning(f"  [B3] LLM returned insufficient scenes ({len(llm_scenes)} < {min_required_scenes}). Activating robust deterministic scene synthesizer fallback...")
+        beat_payload = {
+            "episode_id": episode_id,
+            "market": m_up,
+            "narration_language": market_lang_name,
+            "beat_index": b_num,
+            "beat_name": b_name,
+            "start_scene_index": sc_counter,
+            "target_scene_count": "26 to 32 scenes",
+            "dynamic_context": dynamic_context,
+            "character_ensemble": character_ensemble,
+            "beat_verbatim_storyline": beat_content
+        }
+
+        prompt_instruction = (
+            f"Break down Beat {b_num} ({b_name}) into 26 to 32 sequential scenes starting from scene_id 'sc{sc_counter:03d}'.\n"
+            "Return a JSON object: {\"scenes\": [...]}\n\n"
+            "Input Data:\n" + json.dumps(beat_payload, ensure_ascii=False)
+        )
+
+        raw_res = ""
+        for attempt in range(1, 3):
+            try:
+                raw_res = call_gpt6_astra(
+                    prompt=prompt_instruction,
+                    system_prompt=system_prompt,
+                    max_tokens=3500,
+                    timeout=90.0
+                )
+                if raw_res and raw_res.strip():
+                    break
+            except Exception as e:
+                logger.warning(f"  [B3 Beat {b_num}] LLM attempt {attempt} failed: {e}")
+                time.sleep(2)
+
+        # Parse JSON
+        parsed_beat = None
+        if raw_res and raw_res.strip():
+            cleaned = raw_res.strip()
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:]
+            if cleaned.startswith("```"):
+                cleaned = cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            try:
+                parsed_beat = json.loads(cleaned.strip())
+            except Exception:
+                m = re.search(r"(\{.*\})", cleaned, re.DOTALL)
+                if m:
+                    try:
+                        parsed_beat = json.loads(m.group(1))
+                    except Exception:
+                        pass
+                elif cleaned.strip().startswith("[") and cleaned.strip().endswith("]"):
+                    try:
+                        parsed_beat = {"scenes": json.loads(cleaned.strip())}
+                    except Exception:
+                        pass
+
+        candidate_scenes = []
+        if isinstance(parsed_beat, dict):
+            candidate_scenes = parsed_beat.get("scenes") or []
+        elif isinstance(parsed_beat, list):
+            candidate_scenes = parsed_beat
+
+        if len(candidate_scenes) >= 15:
+            logger.info(f"  [B3 Beat {b_num}] LLM generated {len(candidate_scenes)} scenes successfully.")
+            for s in candidate_scenes:
+                s["scene_id"] = f"sc{sc_counter:03d}"
+                s["beat_index"] = b_num
+                s["beat_name"] = b_name
+                if not s.get("bg_cluster_id"):
+                    s["bg_cluster_id"] = ((b_num - 1) * 4) + (sc_counter % 3) + 1
+                if not s.get("forensic_overlay"):
+                    s["forensic_overlay"] = detect_forensic_overlay(s.get("narration", ""))
+                all_scenes.append(s)
+                sc_counter += 1
         else:
-            logger.warning("  [B3] Activating robust deterministic scene synthesizer fallback...")
-        parsed = _synthesize_deterministic_director_plan(
+            logger.warning(f"  [B3 Beat {b_num}] LLM generated insufficient scenes ({len(candidate_scenes)}). Activating deterministic synthesizer for Beat {b_num}...")
+            synth_scenes, sc_counter = _synthesize_beat_scenes(
+                b_idx=b_idx,
+                beat=beat,
+                episode_id=episode_id,
+                archetype=archetype,
+                dynamic_context=dynamic_context,
+                character_ensemble=character_ensemble,
+                cam_moves=cam_moves,
+                start_sc_counter=sc_counter
+            )
+            all_scenes.extend(synth_scenes)
+
+    # 3. Validation and safety fallback
+    min_required_scenes = max(80, min(160, total_words // 25)) if total_words > 500 else 10
+    if len(all_scenes) < min_required_scenes:
+        logger.warning(f"  [B3] Total scenes {len(all_scenes)} < minimum {min_required_scenes}. Regenerating full deterministic fallback...")
+        fallback_plan = _synthesize_deterministic_director_plan(
             episode_id,
             story_beats,
             archetype,
             dynamic_context=dynamic_context,
             character_ensemble=character_ensemble
         )
+        scenes = fallback_plan.get("scenes", [])
+    else:
+        scenes = all_scenes
 
-    scenes = parsed.get("scenes", [])
-    logger.info(f"  [B3] Successfully created {len(scenes)} cinematic scenes across 5 beats.")
+    logger.info(f"  [B3] Successfully created total {len(scenes)} cinematic scenes across 5 beats.")
 
     # 5. Normalize scene structure and build dp_plan
     normalized_scenes = []
@@ -1060,9 +1056,7 @@ def _synthesize_deterministic_director_plan(
             }
         ]
 
-    scenes = []
-    sc_counter = 0
-
+    cam_moves = CANONICAL_CAMERA_MOVES
     d_lower = archetype.get("director", "").lower()
     if "fincher" in d_lower or "mckay" in d_lower or "noir" in d_lower:
         cam_moves = ["snap_zoom", "slow_push_in", "cinematic_pan", "macro_tilt", "handheld_shake", "slow_pull_out"]
@@ -1072,137 +1066,22 @@ def _synthesize_deterministic_director_plan(
         cam_moves = ["macro_tilt", "slow_push_in", "cinematic_pan", "snap_zoom", "slow_pull_out", "handheld_shake"]
     elif "miller" in d_lower or "contract" in d_lower or "moneyball" in d_lower:
         cam_moves = ["cinematic_pan", "slow_push_in", "snap_zoom", "macro_tilt", "handheld_shake", "slow_pull_out"]
-    else:
-        cam_moves = CANONICAL_CAMERA_MOVES
+
+    scenes = []
+    sc_counter = 0
 
     for b_idx, beat in enumerate(story_beats):
-        b_num = b_idx + 1
-        b_name = CANONICAL_BEATS[b_idx] if b_idx < len(CANONICAL_BEATS) else f"Beat {b_num}"
-        beat_raw = beat.get("content", "").strip()
-
-        # Multi-lingual CJK detection
-        is_cjk = any("\u4e00" <= char <= "\u9fff" or "\u3040" <= char <= "\u30ff" or "\uac00" <= char <= "\ud7af" for char in beat_raw[:200])
-        if is_cjk:
-            raw_sents = re.split(r"(?<=[。！？\n])\s*", beat_raw)
-            sentences = [s.strip() for s in raw_sents if len(s.strip()) > 8]
-        else:
-            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", beat_raw) if len(s.strip()) > 15]
-
-        if not sentences:
-            sentences = [f"Narrative progression for {b_name}."]
-
-        curr_narr = []
-        curr_units = 0
-        for sent in sentences:
-            # Clean any lingering header tokens
-            sent = re.sub(r'^(?:={2,}\s*)?(?:#+\s*)?(?:ACT|BEAT)\s*(?:[1-5]|IV|I{1,3}|V)[^\n]*?(?:={2,})?\s*', '', sent, flags=re.IGNORECASE).strip()
-            if not sent:
-                continue
-
-            is_hook = (b_num == 1 and sc_counter < 15)
-            if is_cjk:
-                sent_units = len(sent)
-                cut_threshold = 45 if is_hook else 70
-                unit_divisor = 4.0 if is_hook else 5.5
-            else:
-                sent_units = len(sent.split())
-                cut_threshold = 20 if is_hook else 30
-                unit_divisor = 3.0 if is_hook else 2.5
-
-            max_sentences = 1 if is_hook else 2
-            # Sentence-Atomic Cut: flush when adding next sentence exceeds threshold or already has max_sentences
-            if curr_narr and (curr_units + sent_units > cut_threshold or len(curr_narr) >= max_sentences):
-                sc_text = "".join(curr_narr).strip() if is_cjk else " ".join(curr_narr).strip()
-                if not re.search(r"[.!?。！？]$", sc_text):
-                    sc_text += ("。" if is_cjk else ".")
-                sc_id = f"sc{sc_counter:03d}"
-                bg_cluster_id = ((b_num - 1) * 4) + (sc_counter % 3) + 1
-                bg_k = f"{episode_id.lower()}_bg_b{b_num}_loc{sc_counter % 3}"
-
-                char_idx = sc_counter % len(character_ensemble)
-                char_obj = character_ensemble[char_idx]
-                char_role = char_obj["role_name"]
-                char_attire = char_obj["attire"]
-                char_state = char_obj["archetype"]
-                char_cues = char_obj.get("visual_cues", "standing head-to-toe")
-                fg_k = f"{episode_id.lower()}_fg_b{b_num}_char{char_idx}" if sc_counter % 4 != 0 else None
-                fg_pos = "right" if sc_counter % 2 == 0 else "left"
-
-                bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 cinematic setting of {b_name}, {dynamic_context['physical_environment']}, {dynamic_context['lighting_mood']}"
-                fg_desc = f"Stylized editorial graphic novel digital illustration of full-body {char_role} in {char_attire}, standing head-to-toe, {char_cues}, posture {char_state}, 1:1 aspect ratio, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames" if fg_k else None
-                cam_move = cam_moves[sc_counter % len(cam_moves)]
-                if is_hook:
-                    dur = max(3, min(5, round(curr_units / unit_divisor)))
-                else:
-                    dur = max(5, min(9, round(curr_units / unit_divisor)))
-
-                forensic_overlay = detect_forensic_overlay(sc_text)
-
-                scenes.append({
-                    "scene_id": sc_id,
-                    "beat_index": b_num,
-                    "beat_name": b_name,
-                    "narration": sc_text,
-                    "duration_est_sec": dur,
-                    "visual_metaphor": f"Visual metaphor representing {b_name}",
-                    "bg_cluster_id": bg_cluster_id,
-                    "forensic_overlay": forensic_overlay,
-                    "camera": {
-                        "movement": cam_move,
-                        "tension_level": "high" if (is_hook or sc_counter % 3 != 0) else "medium"
-                    },
-                    "background": {
-                        "reuse_key": bg_k,
-                        "visual_description": bg_desc,
-                        "safe_zone": f"bottom 20% clear for subtitles, center-{'left' if fg_pos == 'right' else 'right'} negative space"
-                    },
-                    "foreground": {
-                        "reuse_key": fg_k,
-                        "character_role": char_role,
-                        "psychological_state": char_state,
-                        "body_language": f"Standing full-body head-to-toe, {char_cues}",
-                        "position": fg_pos,
-                        "visual_description": fg_desc
-                    } if fg_k else None,
-                    "audio_sfx_cue": "heartbeat_pulse" if is_hook else "low_sub_drone_and_paper_shuffle"
-                })
-                sc_counter += 1
-                curr_narr = []
-                curr_units = 0
-
-            curr_narr.append(sent)
-            curr_units += sent_units
-
-        if curr_narr:
-            sc_text = "".join(curr_narr).strip() if is_cjk else " ".join(curr_narr).strip()
-            if not re.search(r"[.!?。！？]$", sc_text):
-                sc_text += ("。" if is_cjk else ".")
-            sc_id = f"sc{sc_counter:03d}"
-            dur = max(5, min(9, round(curr_units / unit_divisor)))
-            cam_move = cam_moves[sc_counter % len(cam_moves)]
-            bg_cluster_id = ((b_num - 1) * 4) + (sc_counter % 3) + 1
-            bg_k = f"{episode_id.lower()}_bg_b{b_num}_tail"
-            bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 setting of {b_name}, {dynamic_context['physical_environment']}"
-            forensic_overlay = detect_forensic_overlay(sc_text)
-            scenes.append({
-                "scene_id": sc_id,
-                "beat_index": b_num,
-                "beat_name": b_name,
-                "narration": sc_text,
-                "duration_est_sec": dur,
-                "visual_metaphor": f"Closing tension of {b_name}",
-                "bg_cluster_id": bg_cluster_id,
-                "forensic_overlay": forensic_overlay,
-                "camera": {"movement": cam_move, "tension_level": "medium"},
-                "background": {
-                    "reuse_key": bg_k,
-                    "visual_description": bg_desc,
-                    "safe_zone": "bottom 20% clear for subtitles"
-                },
-                "foreground": None,
-                "audio_sfx_cue": "clock_ticking"
-            })
-            sc_counter += 1
+        b_scenes, sc_counter = _synthesize_beat_scenes(
+            b_idx=b_idx,
+            beat=beat,
+            episode_id=episode_id,
+            archetype=archetype,
+            dynamic_context=dynamic_context,
+            character_ensemble=character_ensemble,
+            cam_moves=cam_moves,
+            start_sc_counter=sc_counter
+        )
+        scenes.extend(b_scenes)
 
     return {
         "episode_id": episode_id,
@@ -1213,6 +1092,157 @@ def _synthesize_deterministic_director_plan(
         "character_ensemble": character_ensemble,
         "scenes": scenes
     }
+
+
+def _synthesize_beat_scenes(
+    b_idx: int,
+    beat: dict,
+    episode_id: str,
+    archetype: dict,
+    dynamic_context: dict,
+    character_ensemble: list[dict],
+    cam_moves: list[str],
+    start_sc_counter: int
+) -> tuple[list[dict], int]:
+    """
+    Synthesize 25-35 deterministic scenes for a single beat.
+    Correctly splits Korean and CJK text using [.!?。！？\n] to prevent scene underflow.
+    """
+    b_num = b_idx + 1
+    b_name = CANONICAL_BEATS[b_idx] if b_idx < len(CANONICAL_BEATS) else f"Beat {b_num}"
+    beat_raw = beat.get("content", "").strip()
+
+    # Multi-lingual CJK detection (Chinese, Japanese, Korean)
+    is_cjk = any("\u4e00" <= char <= "\u9fff" or "\u3040" <= char <= "\u30ff" or "\uac00" <= char <= "\ud7af" for char in beat_raw[:200])
+    if is_cjk:
+        # Korean uses Latin period/punctuation [.!?] along with CJK characters; Japanese/Chinese use [。！？]
+        raw_sents = re.split(r"(?<=[.!?。！？\n])\s*", beat_raw)
+        sentences = [s.strip() for s in raw_sents if len(s.strip()) > 8]
+    else:
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", beat_raw) if len(s.strip()) > 15]
+
+    if not sentences:
+        sentences = [f"Narrative progression for {b_name}."]
+
+    beat_scenes = []
+    sc_counter = start_sc_counter
+    curr_narr = []
+    curr_units = 0
+
+    for sent in sentences:
+        # Clean any lingering header tokens
+        sent = re.sub(r'^(?:={2,}\s*)?(?:#+\s*)?(?:ACT|BEAT)\s*(?:[1-5]|IV|I{1,3}|V)[^\n]*?(?:={2,})?\s*', '', sent, flags=re.IGNORECASE).strip()
+        if not sent:
+            continue
+
+        is_hook = (b_num == 1 and sc_counter < 15)
+        if is_cjk:
+            sent_units = len(sent)
+            cut_threshold = 45 if is_hook else 70
+            unit_divisor = 4.0 if is_hook else 5.5
+        else:
+            sent_units = len(sent.split())
+            cut_threshold = 20 if is_hook else 30
+            unit_divisor = 3.0 if is_hook else 2.5
+
+        max_sentences = 1 if is_hook else 2
+        # Sentence-Atomic Cut: flush when adding next sentence exceeds threshold or already has max_sentences
+        if curr_narr and (curr_units + sent_units > cut_threshold or len(curr_narr) >= max_sentences):
+            sc_text = "".join(curr_narr).strip() if is_cjk else " ".join(curr_narr).strip()
+            if not re.search(r"[.!?。！？]$", sc_text):
+                is_ja_zh = any("\u4e00" <= c <= "\u9fff" or "\u3040" <= c <= "\u30ff" for c in sc_text)
+                sc_text += ("。" if is_ja_zh else ".")
+            sc_id = f"sc{sc_counter:03d}"
+            bg_cluster_id = ((b_num - 1) * 4) + (sc_counter % 3) + 1
+            bg_k = f"{episode_id.lower()}_bg_b{b_num}_loc{sc_counter % 3}"
+
+            char_idx = sc_counter % len(character_ensemble)
+            char_obj = character_ensemble[char_idx]
+            char_role = char_obj["role_name"]
+            char_attire = char_obj["attire"]
+            char_state = char_obj["archetype"]
+            char_cues = char_obj.get("visual_cues", "standing head-to-toe")
+            fg_k = f"{episode_id.lower()}_fg_b{b_num}_char{char_idx}" if sc_counter % 4 != 0 else None
+            fg_pos = "right" if sc_counter % 2 == 0 else "left"
+
+            bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 cinematic setting of {b_name}, {dynamic_context['physical_environment']}, {dynamic_context['lighting_mood']}"
+            fg_desc = f"Stylized editorial graphic novel digital illustration of full-body {char_role} in {char_attire}, standing head-to-toe, {char_cues}, posture {char_state}, 1:1 aspect ratio, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames" if fg_k else None
+            cam_move = cam_moves[sc_counter % len(cam_moves)]
+            if is_hook:
+                dur = max(3, min(5, round(curr_units / unit_divisor)))
+            else:
+                dur = max(5, min(9, round(curr_units / unit_divisor)))
+
+            forensic_overlay = detect_forensic_overlay(sc_text)
+
+            beat_scenes.append({
+                "scene_id": sc_id,
+                "beat_index": b_num,
+                "beat_name": b_name,
+                "narration": sc_text,
+                "duration_est_sec": dur,
+                "visual_metaphor": f"Visual metaphor representing {b_name}",
+                "bg_cluster_id": bg_cluster_id,
+                "forensic_overlay": forensic_overlay,
+                "camera": {
+                    "movement": cam_move,
+                    "tension_level": "high" if is_hook or sc_counter % 3 == 0 else "medium"
+                },
+                "background": {
+                    "reuse_key": bg_k,
+                    "visual_description": bg_desc,
+                    "safe_zone": "bottom 20% clear for subtitles, center-right negative space for foreground"
+                },
+                "foreground": {
+                    "reuse_key": fg_k,
+                    "character_role": char_role,
+                    "psychological_state": char_state,
+                    "body_language": char_cues,
+                    "position": fg_pos,
+                    "visual_description": fg_desc
+                } if fg_k else None,
+                "audio_sfx_cue": "tense_ambient_drone" if sc_counter % 2 == 0 else "paper_shuffling"
+            })
+            sc_counter += 1
+            curr_narr = []
+            curr_units = 0
+
+        curr_narr.append(sent)
+        curr_units += sent_units
+
+    if curr_narr:
+        sc_text = "".join(curr_narr).strip() if is_cjk else " ".join(curr_narr).strip()
+        if not re.search(r"[.!?。！？]$", sc_text):
+            is_ja_zh = any("\u4e00" <= c <= "\u9fff" or "\u3040" <= c <= "\u30ff" for c in sc_text)
+            sc_text += ("。" if is_ja_zh else ".")
+        sc_id = f"sc{sc_counter:03d}"
+        dur = max(5, min(9, round(curr_units / unit_divisor)))
+        cam_move = cam_moves[sc_counter % len(cam_moves)]
+        bg_cluster_id = ((b_num - 1) * 4) + (sc_counter % 3) + 1
+        bg_k = f"{episode_id.lower()}_bg_b{b_num}_tail"
+        bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 setting of {b_name}, {dynamic_context['physical_environment']}"
+        forensic_overlay = detect_forensic_overlay(sc_text)
+        beat_scenes.append({
+            "scene_id": sc_id,
+            "beat_index": b_num,
+            "beat_name": b_name,
+            "narration": sc_text,
+            "duration_est_sec": dur,
+            "visual_metaphor": f"Closing tension of {b_name}",
+            "bg_cluster_id": bg_cluster_id,
+            "forensic_overlay": forensic_overlay,
+            "camera": {"movement": cam_move, "tension_level": "medium"},
+            "background": {
+                "reuse_key": bg_k,
+                "visual_description": bg_desc,
+                "safe_zone": "bottom 20% clear for subtitles"
+            },
+            "foreground": None,
+            "audio_sfx_cue": "clock_ticking"
+        })
+        sc_counter += 1
+
+    return beat_scenes, sc_counter
 
 
 def push_director_plan_to_notion(director_plan: dict, episode_id: str):

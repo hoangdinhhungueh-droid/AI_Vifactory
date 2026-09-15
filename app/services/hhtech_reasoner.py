@@ -112,6 +112,24 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
             "YT-Tech-Geopolitical-Investigation",
             "TECH & GEOPOLITICAL INVESTIGATION: analyze technological chokeholds, semiconductor espionage, state-subsidized dominance, and supply chain warfare with verified industrial and trade records."
         )
+    elif any(t in text for t in ['ancient', 'gobekli', 'göbekli', 'younger dryas', 'denisovan', 'megalith', 'clovis', 'prehistoric', 'lost civilization', 'civilization', 'ice age', 'stonehenge', 'sundaland', 'neanderthal', 'australopithecus', 'archaeolog', 'fossil', 'hominid', '잃어버린 문명', '선사시대', '고대 인류', '고대 문명', '縄文', '古代文明', 'ancient humans']):
+        return (
+            "ancient_prehistory_anthropology",
+            "YT-Educational-Anthropology",
+            "PREHISTORIC ANTHROPOLOGY & ANCIENT HUMAN SURVIVAL: forensic deep-dive into fossil evidence, archaeological stratigraphy, and evolutionary mechanics; strictly educational and evidence-grounded."
+        )
+    elif any(t in text for t in ['stoic', 'stoicism', 'marcus aurelius', 'seneca', 'epictetus', 'musashi', 'dokkodo', '독행도', '스토아', '아우렐리우스', 'burnout', 'mental resilience', 'zen detachment', '번아웃', '孤独の力', '宮本武蔵', '折れない心', '人間関係の疲れ', '내면의 평화', '감정 조절']):
+        return (
+            "indigenous_philosophy_stoicism",
+            "YT-Philosophy-Mindset",
+            "INDIGENOUS PHILOSOPHY & CONTEMPLATIVE RESILIENCE: dissect ancient mindset protocols applied to modern institutional burnout; calm, reflective, grounded in primary historical texts."
+        )
+    elif any(t in text for t in ['military logistics', 'geopolitical choke', 'malacca', 'undersea cable', 'starfish prime', 'supply line', 'airlift', 'defense doctrine', 'strategic blunder', '군사 물류', '지정학', '해저 케이블', '兵站', 'チョークポイント', 'chokepoint', 'blockade']):
+        return (
+            "military_logistics_geopolitics",
+            "YT-Military-Tactical-Investigation",
+            "MILITARY LOGISTICS & GEOPOLITICAL CHOKEPOINTS: forensic deconstruction of supply line failures, tactical blunders, and strategic infrastructure chokepoints based on declassified records; ZERO glorification of violence."
+        )
     
     return (
         "business_rise_fall",
@@ -152,10 +170,10 @@ def call_gpt6_astra(
     from app.services.model_gateway import get_global_gateway
     gateway = get_global_gateway()
 
-    # Budget / token guard: Cap prompt if excessively long
-    if len(prompt) > 24_000:
-        logger.warning(f"[hhtech] Prompt length {len(prompt)} exceeds 24k chars, pruning to 20k to avoid token overflow.")
-        prompt = prompt[:20_000]
+    # Budget / token guard: Cap prompt if excessively long (User approved 40k token ceiling ~150k chars)
+    if len(prompt) > 150_000:
+        logger.warning(f"[hhtech] Prompt length {len(prompt)} exceeds 150k chars (40k tokens), pruning to 120k to avoid token overflow.")
+        prompt = prompt[:120_000]
 
     # Tier 1: Primary Astra 6 with Opus 5 fallback
     try:
@@ -426,15 +444,18 @@ def assess_keyword_video_viability(
         "You are the Chief Executive Producer and Video Viability Auditor for Video Factory.\n"
         "Your role is to rigorously evaluate whether a raw trending keyword can be turned into a "
         "compelling, high-retention 8-12 minute non-fiction investigative documentary video.\n\n"
-        "MANDATORY SCOPE: 7 CANONICAL HIGH-RPM/HIGH-RETENTION CONTENT PILLARS:\n"
-        "The candidate topic MUST strictly fall into one of these 7 pillars:\n"
+        "MANDATORY SCOPE: 10 HIGH-RPM/HIGH-RETENTION NON-FICTION CONTENT PILLARS:\n"
+        "The candidate topic MUST strictly fall into one of these pillars:\n"
         "  1. Business Rise & Fall: Financial engineering, corporate collapse, accounting fraud, executive hubris.\n"
         "  2. Modern History & Systemic Crisis: 20th-21st century turning points, institutional failure, declassified operations.\n"
         "  3. True Crime Non-Graphic: White-collar schemes, forensic timeline, investigative breakthroughs; ZERO graphic gore.\n"
         "  4. Psychology & Behavioral Manipulation: Mass hysteria, cults, psychological manipulation traps, cognitive biases.\n"
         "  5. Tech & Geopolitical Systemic Battles: Semiconductor wars, supply chain chokeholds, submarine telecom cables, tech espionage.\n"
         "  6. Institutional & Regulatory Chokepoints: Policy loopholes, pension/insurance failures, testing/quality falsification cover-ups.\n"
-        "  7. Hidden Asymmetric Fortunes & Underground Flows: Underground flows, money laundering, information asymmetry schemes.\n\n"
+        "  7. Hidden Asymmetric Fortunes & Underground Flows: Underground flows, money laundering, information asymmetry schemes.\n"
+        "  8. Ancient Prehistory & Lost Civilizations: Forensic archaeological evidence, evolutionary survival mechanisms, prehistoric anomalies.\n"
+        "  9. Indigenous Philosophy & Stoic Mindset: Ancient mindset protocols (Dokkodo, Stoicism) applied to modern institutional burnout and social fatigue.\n"
+        "  10. Declassified Military Logistics & Geopolitical Chokepoints: Supply line collapses, strategic maritime straits, undersea infrastructure vulnerabilities.\n\n"
         "STRICT REJECTION MANDATE (ZERO-SPECULATION & ANTI-DEFAMATION):\n"
         "- REJECT immediately if the keyword is celebrity gossip, sports game scores/contract negotiations, entertainment awards, or unverified off-field personal/civil conduct allegations without official documented disciplinary action or court ruling.\n"
         "- REJECT if approving it would require AI speculation, inventing stakes, or defaming real individuals.\n\n"
@@ -459,11 +480,20 @@ def assess_keyword_video_viability(
         "}"
     )
 
+    preset_hint = ""
+    if theme == "ancient_prehistory_anthropology":
+        preset_hint = "Assigned Strategic Preset: PRESET_ANCIENT_PREHISTORY_US (Archetype: anthropology_educational_explainer, Target RPM: $15-$35).\n"
+    elif theme == "indigenous_philosophy_stoicism":
+        preset_hint = "Assigned Strategic Preset: PRESET_STOIC_ZEN_JP_KR (Archetype: philosophical_contemplative_docudrama, Target RPM: $5-$12).\n"
+    elif theme == "military_logistics_geopolitics":
+        preset_hint = "Assigned Strategic Preset: PRESET_MILITARY_GEOPOLITICS_US (Archetype: forensic_military_investigation, Target RPM: $20-$40).\n"
+
     user_prompt = (
         f"Candidate Keyword: {keyword}\n"
         f"Target Market: {m_up}\n"
         f"Detected Content Theme: {theme}\n"
         f"Platform Safety Label: {safety_label}\n"
+        f"{preset_hint}"
         f"{signals_str}\n"
         "Evaluate this keyword now. If approved, formulate a razor-sharp 'specific_viral_angle' (e.g. from 'Enron' -> 'How Enron Staged Fake Trading Floors to Scam $30B')."
     )

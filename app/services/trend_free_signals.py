@@ -271,21 +271,32 @@ def gtrends_discover_trending_searches(market="EN", timeout=15.0, geo=None, coun
     # 5. Testing Scandals & Recalls (Bê bối kiểm định/Thu hồi)
     # 6. Socio-Economic Structural Crisis (Nghịch lý xã hội/Dân số)
     # 7. Hostile Takeovers & Regulatory Loopholes (Thâu tóm/Hố đen pháp lý)
+    # 8. Ancient Prehistory & Lost Civilizations (Khảo cổ tiền sử / Văn minh đã mất)
+    # 9. Stoic Wisdom & Modern Psychological Survival (Triết học Khắc kỷ / Bản lĩnh tinh thần)
+    # 10. Declassified Military Logistics & Geopolitical Chokepoints (Hậu cần quân sự / Điểm nghẽn địa chính trị)
     seed_queries = {
         "JP": [
             "トレンド", "ニュース", "話題", "事件", "崩壊", "疑惑", "真相", "なぜ", "問題", "倒産", "危機",
             "洗脳", "マインドコントロール", "心理操作", "巨額詐欺", "横領", "捜査", "背任",
-            "半導体", "不正認証", "リコール", "過労死", "年金崩壊", "敵対的買収"
+            "半導体", "不正認証", "リコール", "過労死", "年金崩壊", "敵対的買収",
+            # Niche 2: Stoic Wisdom & Contemplative Mindset (JP)
+            "ストイック", "禅の教え", "宮本武蔵 独行道", "精神的自立", "人間関係の疲れ", "孤独の力", "メンタル回復", "折れない心"
         ],
         "KR": [
             "트렌드", "뉴스", "화제", "사건", "사태", "논란", "폭망", "의혹", "원인", "실체", "붕괴", "위기", "급락",
             "가스라이팅", "심리 조작", "다단계", "횡령", "배임", "구속", "검찰 조사",
-            "반도체 전쟁", "기술 유출", "품질 조작", "리콜", "고독사", "경영권 분쟁"
+            "반도체 전쟁", "기술 유출", "품질 조작", "리콜", "고독사", "경영권 분쟁",
+            # Niche 2: Stoic Wisdom & Psychological Resilience (KR)
+            "스토아 철학", "마르쿠스 아우렐리우스", "독행도", "인간관계 번아웃", "멘탈 관리", "고독의 힘", "내면의 평화", "감정 조절"
         ],
         "EN": [
             "trending", "news", "scandal", "collapse", "crisis", "investigation", "fraud", "downfall", "exposed",
             "gaslighting", "mass hysteria", "cult psychology", "manipulation", "money laundering", "indictment", "embezzlement",
-            "semiconductor embargo", "tech monopoly", "recall cover-up", "pension collapse", "hostile takeover"
+            "semiconductor embargo", "tech monopoly", "recall cover-up", "pension collapse", "hostile takeover",
+            # Niche 1: Ancient Prehistory & Lost Civilizations (US/EN)
+            "ancient mystery", "lost civilization", "archaeological discovery", "prehistoric anomaly", "younger dryas", "megalithic structure", "ancient humans survive",
+            # Niche 3: Declassified Military Logistics & Geopolitical Chokepoints (US/EN)
+            "military logistics", "declassified strategy", "geopolitical choke point", "straits of malacca", "undersea cables", "supply line collapse", "defense doctrine"
         ]
     }
     

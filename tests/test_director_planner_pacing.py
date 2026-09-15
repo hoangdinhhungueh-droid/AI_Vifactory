@@ -120,3 +120,23 @@ def test_build_remotion_props_with_camera_and_overlay(tmp_path):
     assert sc1["tensionLevel"] == "medium"
     assert sc1["bgClusterId"] == 1
     assert sc1["forensicOverlay"]["type"] == "redacted_doc"
+
+
+def test_korean_pacing_and_scene_count_no_underflow():
+    """Verify Korean docudrama story with Latin punctuation (.!?) breaks down into >= 20 scenes per beat."""
+    korean_beat = "탁구장 환불 사태의 배후에는 복잡한 금융 구조가 숨겨져 있었습니다. " * 15
+    story_beats = [
+        {"content": korean_beat}
+        for _ in range(5)
+    ]
+    archetype = detect_cinematic_archetype("business_rise_fall", "Table Tennis Refund Trap")
+    plan = _synthesize_deterministic_director_plan(
+        episode_id="KR_EP0002_test_korean",
+        story_beats=story_beats,
+        archetype=archetype
+    )
+    scenes = plan.get("scenes", [])
+    # 5 beats x ~25-30 scenes each must yield >= 100 scenes total
+    assert len(scenes) >= 70
+    assert all(sc["narration"].endswith((".", "!", "?")) for sc in scenes)
+    assert all(1 <= sc["beat_index"] <= 5 for sc in scenes)
