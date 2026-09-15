@@ -10,6 +10,7 @@ import {
   delayRender,
   interpolate,
   registerRoot,
+  spring,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
@@ -1516,7 +1517,7 @@ const RemotionRoot = () => {
           safeZone: "top_left",
           accentOverride: null,
         }}
-        calculateMetadata={({ props }) => {
+        calculateMetadata={({ props }: { props: any }) => {
           return {
             durationInFrames: props.durationInFrames ? props.durationInFrames : 150,
             width: props.width ? props.width : 1536,
@@ -1555,7 +1556,7 @@ const RemotionRoot = () => {
         width={1920}
         height={1080}
         defaultProps={{ scenes: [] }}
-        calculateMetadata={({ props }) => {
+        calculateMetadata={({ props }: { props: any }) => {
           const fps = props.fps ? props.fps : 30;
           const width = props.width ? props.width : 1920;
           const height = props.height ? props.height : 1080;
