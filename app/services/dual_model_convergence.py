@@ -173,8 +173,10 @@ Output ONLY the complete, edited 5-Act script now:"""
         last_word_count = word_count
         current_script = repaired_script
 
-        # Convergence Condition: Fact Score >= 7.5 AND Story Gate >= 10/12 AND Word Count >= 1500
-        converged = (re_verdict == "PASS" or re_score >= 7.5) and (sg_score >= 10) and (word_count >= 1500)
+        # Convergence Condition: Fact Score >= 7.5 AND Story Gate >= 10/12 AND Word Count >= 1500 (1000 for CJK)
+        is_cjk = market.upper() in ("JP", "KR", "ZH")
+        min_words = 1000 if is_cjk else 1500
+        converged = (re_verdict == "PASS" or re_score >= 7.5) and (sg_score >= 10) and (word_count >= min_words)
 
         if converged:
             logger.info(
