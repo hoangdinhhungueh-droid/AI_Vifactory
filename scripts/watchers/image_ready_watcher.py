@@ -135,61 +135,48 @@ class ImageReadyHandler(FileSystemEventHandler):
     def _trigger_b6(self, task_id: str, images_file: Path) -> bool:
         """
         Trigger B6 (Audio/TTS generation).
-
-        Uses existing continue_after_images.py script.
-        Returns True if successful, False otherwise.
+        Uses continue_after_images.py with proper parameters and non-blocking spawn.
         """
         try:
-            # Verify images_ready.json is valid
             if not images_file.exists():
                 self._log(f"[ERROR] {task_id}: images_ready.json disappeared")
                 return False
 
-            # Read and validate JSON
+            # Wait up to 3s for file flush (prevent inotify race condition)
+            for _ in range(6):
+                if images_file.exists() and images_file.stat().st_size > 5:
+                    break
+                time.sleep(0.5)
+
             try:
                 images_data = json.loads(images_file.read_text())
                 approved_count = images_data.get('approved_count', 0)
-                self._log(f"[VALIDATE] {task_id}: {approved_count}/26 images approved")
+                total_images = images_data.get('total_images', 0)
+                status = images_data.get('status', '')
+                self._log(f"[VALIDATE] {task_id}: {approved_count}/{total_images} images approved (status={status})")
 
-                if approved_count != 26:
-                    self._log(f"[ERROR] {task_id}: Expected 26 approved images, got {approved_count}")
+                if approved_count <= 0 or status not in ('ready_for_render', 'ready', 'approved'):
+                    self._log(f"[ERROR] {task_id}: Invalid approved count ({approved_count}) or status ({status})")
                     return False
 
             except json.JSONDecodeError as e:
                 self._log(f"[ERROR] {task_id}: Invalid JSON in images_ready.json: {e}")
                 return False
 
-            # Import and call B6 trigger
-            # Note: This uses the existing Antigravity B5→B6 integration
-            # Ref: B5_IMPLEMENTATION_COMPLETE.md
-            from scripts.telegram_buttons import trigger_b6_after_approval
-
-            # Trigger B6
-            trigger_b6_after_approval(task_id)
-
-            self._log(f"[B6 TRIGGER] {task_id}: Audio/TTS generation started")
-
+            market = task_id.split('_')[0].lower() if '_' in task_id else 'en'
+            log_file = f"/var/vf/logs/{task_id}_b4b10.log"
+            cmd = [
+                sys.executable,
+                "/root/video_factory/scripts/continue_after_images.py",
+                "--episode-id", task_id,
+                "--market", market
+            ]
+            self._log(f"[B6 TRIGGER] Spawning continue_after_images.py for {task_id} (market={market})...")
+            import subprocess
+            with open(log_file, "a") as out_f:
+                subprocess.Popen(cmd, stdout=out_f, stderr=subprocess.STDOUT, cwd="/root/video_factory")
+            self._log(f"[B6 TRIGGER SUCCESS] {task_id}: Spawned in background. Log at {log_file}")
             return True
-
-        except ImportError as e:
-            self._log(f"[ERROR] Failed to import B6 trigger function: {e}")
-            self._log(f"[FALLBACK] Attempting direct script call...")
-
-            # Fallback: Call continue_after_images.py directly
-            try:
-                import subprocess
-                result = subprocess.run(
-                    ["python3", "/root/video_factory/scripts/continue_after_images.py", task_id],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=60
-                )
-                self._log(f"[B6 DIRECT] {task_id}: {result.stdout}")
-                return True
-            except Exception as e2:
-                self._log(f"[ERROR] {task_id}: Direct script call failed: {e2}")
-                return False
 
         except Exception as e:
             self._log(f"[ERROR] {task_id}: Exception in B6 trigger: {e}")
