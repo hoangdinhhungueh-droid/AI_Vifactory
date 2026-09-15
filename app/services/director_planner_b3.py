@@ -704,8 +704,8 @@ def generate_director_plan(
                 raw_res = call_gpt6_astra(
                     prompt=prompt_instruction,
                     system_prompt=system_prompt,
-                    max_tokens=3500,
-                    timeout=90.0
+                    max_tokens=4500,
+                    timeout=100.0
                 )
                 if raw_res and raw_res.strip():
                     break

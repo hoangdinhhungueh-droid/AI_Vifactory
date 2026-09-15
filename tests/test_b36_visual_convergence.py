@@ -18,7 +18,9 @@ def test_b36_prompts_integrity():
     assert "#FF00FF" in B36_AUDIT_SYSTEM_PROMPT
     assert "2560x1440" in B36_AUDIT_SYSTEM_PROMPT
     assert "delta_patch" in B36_AUDIT_SYSTEM_PROMPT
+    assert "REMOTION FORENSIC GRAPHICS" in B36_AUDIT_SYSTEM_PROMPT
     assert "cross_audit_verdict" in ASTRA_CROSS_AUDIT_PROMPT
+
 
 
 def test_b36_round1_immediate_pass():
@@ -40,7 +42,9 @@ def test_b36_round1_immediate_pass():
         "critical_findings": "Storyboard demonstrates flawless execution."
     }"""
 
-    with patch("app.services.b36_visual_convergence.get_global_gateway", return_value=fake_gateway),          patch("app.services.b36_visual_convergence.trigger_human_gate_2", create=True) as mock_hg2,          patch("app.services.telegram_buttons.trigger_human_gate_2") as mock_tb_hg2:
+    with patch("app.services.b36_visual_convergence.get_global_gateway", return_value=fake_gateway), \
+         patch("app.services.b36_visual_convergence.trigger_human_gate_2", create=True) as mock_hg2, \
+         patch("app.services.telegram_buttons.trigger_human_gate_2") as mock_tb_hg2:
         res = run_b36_visual_convergence(
             episode_id="TEST_EP0001_tada_mock",
             director_plan={"topic": "Tada Shrine", "scenes": [{"scene_id": "SC_001", "narration": "こんにちは"}]},

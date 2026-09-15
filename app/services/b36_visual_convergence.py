@@ -52,6 +52,11 @@ Audit against 6 Core Criteria:
 8. SEPARATION OF CONCERNS & LOCKED FACT INTEGRITY (Rule 125 & Rule 130):
    - All real-world factual events, corporate names, flight identities, dates, and regulatory filings have ALREADY been fact-checked and verified by Gemini 2.5 with Google Search Grounding at B1.5 and approved at Story Gate B2.
    - B3.5.1 is EXCLUSIVELY a Visual & Cinematographic Convergence Gate. DO NOT audit, question, challenge, or dock points for factual evidence or missing journalistic sources.
+9. REMOTION FORENSIC GRAPHICS, STAT CARDS & MOTION SUITE (Rule 122):
+   - Evidentiary scenes MUST have appropriate 'forensic_overlay' ('redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt').
+   - High-impact metric scenes (currency, percentages, casualties, scale) MUST have 'stat_card' with structured value and label.
+   - Climax/violation scenes MUST have 'stamp_badge' ('PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID').
+   - Camera & Parallax motion MUST be assigned ('dramatic_push', 'subtle_drift', 'split_whip', 'forensic_lock') with valid duration and tension curves.
 
 Output MUST be a single strict JSON object matching this schema:
 {
@@ -64,8 +69,10 @@ Output MUST be a single strict JSON object matching this schema:
     "bg_style_conformance": <FLOAT 0.0 - 10.0>,
     "prompt_hygiene": <FLOAT 0.0 - 10.0>,
     "causal_dramatization": <FLOAT 0.0 - 10.0>,
-    "market_ethnicity_fidelity": <FLOAT 0.0 - 10.0>
+    "market_ethnicity_fidelity": <FLOAT 0.0 - 10.0>,
+    "remotion_motion_suite": <FLOAT 0.0 - 10.0>
   },
+
   "flawed_scene_ids": ["<SCENE_ID>", ...],
   "flawed_prompt_keys": ["<PROMPT_KEY>", ...],
   "red_flags": ["<DESCRIPTION_OF_ISSUE>", ...],
@@ -97,6 +104,8 @@ Your task is to review and cross-validate this Delta Patch:
    - All underlying factual events, flight identities, corporate actions, and casualty figures in the narration have ALREADY been verified by the Gemini 2.5 Grounding Intel layer and approved at Story Gate B2.
    - Under NO circumstances should you act as an investigative journalist questioning the reality of the incident, nor withhold approval or dock points for factual verification or missing documentation sources.
    - Focus your evaluation and scoring EXCLUSIVELY on visual composition, cinematic direction, prompt syntax, and narrative pacing.
+6. REMOTION SUITE VERIFICATION:
+   - Ensure that patched scenes preserve or refine Remotion forensic overlays, stat cards, stamp badges, and camera motion directives.
 
 Return a strict JSON object with:
 {
@@ -268,7 +277,7 @@ def run_b36_visual_convergence(
             prompt=f"[EPISODE ASSETS UNDER AUDIT]\n{json.dumps(audit_payload, ensure_ascii=False, indent=2)}\n\nConduct full adversarial forensic audit now. Return strict JSON only.",
             system_prompt=B36_AUDIT_SYSTEM_PROMPT,
             model=primary_model,
-            max_tokens=2500,
+            max_tokens=3500,
             temperature=0.1,
             timeout=70.0,
             fallback=fallback_model
@@ -279,7 +288,7 @@ def run_b36_visual_convergence(
             prompt=f"[EPISODE ASSETS UNDER AUDIT]\n{json.dumps(audit_payload, ensure_ascii=False, indent=2)}\n\nConduct full adversarial forensic audit now. Return strict JSON only.",
             system_prompt=B36_AUDIT_SYSTEM_PROMPT,
             model=fallback_model,
-            max_tokens=2500,
+            max_tokens=3500,
             temperature=0.1,
             timeout=70.0,
             fallback="gpt-4o"
@@ -348,7 +357,7 @@ def run_b36_visual_convergence(
                     prompt=f"[DELTA PATCH TO CROSS-AUDIT]\n{json.dumps(astra_input, ensure_ascii=False, indent=2)}\n\nVerify, polish and score this Delta Patch. Return strict JSON only.",
                     system_prompt=ASTRA_CROSS_AUDIT_PROMPT,
                     model="gpt-6-astra",
-                    max_tokens=1500,
+                    max_tokens=2500,
                     temperature=0.2,
                     timeout=70.0,
                     fallback="claude-sonnet-5"

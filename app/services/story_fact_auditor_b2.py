@@ -22,7 +22,7 @@ from typing import Dict, Any, List, Optional
 logger = logging.getLogger("story_fact_auditor_b2")
 
 SYSTEM_STORY_AUDITOR_PROMPT = """You are the Senior Adversarial Forensic Auditor for AI Video Factory (VF Pipeline).
-Your sole mandate is to rigorously interrogate and audit investigative video scripts against 7 Iron Criteria:
+Your sole mandate is to rigorously interrogate and audit investigative video scripts against 8 Iron Criteria:
 1. TREND ALIGNMENT & ANTI-STALE TRAP: Is the story answering a FRESH, active 2026 search trend, or is it a STALE historical event disguised as breaking news? Did it divert from viewer intent?
 2. SEARCH-INTENT DIRECT PAYOFF (ANTI-BAIT-AND-SWITCH): Does the script directly answer the urgent question on viewers' minds, addressing the breakout queries in Act I?
 3. QUANTITATIVE METRIC INTEGRITY (Rule 118 Zero-Mock): Are specific numbers (money, dates, percentages) backed 100% by the Grounding Claims, or did the LLM hallucinate/fabricate numbers or source citations?
@@ -30,6 +30,7 @@ Your sole mandate is to rigorously interrogate and audit investigative video scr
 5. COMPETITOR VACUUM & 10X PIVOT RESOLUTION: Does the narrative resolve the fatal explanatory vacuum that competitor videos failed to explain?
 6. FORENSIC PAPER TRAIL & CHRONOLOGICAL CAUSAL DEPTH (SCALE-UP CHRONO-ENGINE): Does the script uncover the chronological root cause (Genesis Seed & Incubation Mutation) across the natural temporal cadence of the topic (Macro Saga, Mid Tactical, or Flash Crisis), or does it fall into the single-timestamp accounting loop trap by merely repeating today's breaking numbers across all Acts?
 7. ANTI-HYPOTHETICAL & CLINICAL DOCUDRAMA TONE: Zero "Imagine...", zero hypothetical hand-waving; strictly factual, clinical, and high-tension procedural exposition.
+8. 7 GOLDEN CONTENT AXES FIDELITY (Rule 128 & Rule 130): Does the narrative faithfully embody the unique causal mechanism of its primary axis (1. Business Rise & Fall: margin calls/accounting holes; 2. Systemic Crisis: institutional breakdown/structural collapse; 3. True Crime: forensic paper trail/court records; 4. Psychology: crowd panic/herd bias; 5. Tech & Geopolitics: export controls/semiconductor bottlenecks; 6. Institutional/Regulatory: inspection reports/product recalls; 7. Asymmetric Financial Flows: shell companies/cross-border transfer pricing) without generic melodrama or out-of-genre confusion?
 
 Passing threshold:
 - audit_score >= 8.0/10
@@ -47,6 +48,7 @@ Output MUST be a single strict JSON object matching this schema:
   "forensic_paper_trail_score": <FLOAT 0.0 - 10.0>,
   "chrono_causal_depth_score": <FLOAT 0.0 - 10.0>,
   "anti_hypothetical_tone_score": <FLOAT 0.0 - 10.0>,
+  "axis_fidelity_score": <FLOAT 0.0 - 10.0>,
   "red_flags": [<STRING>, ...],
   "critical_findings": "<CONCISE SUMMARY OF VIOLATIONS OR APPROVAL>"
 }
@@ -83,6 +85,7 @@ Task ID: {task_id}
 Topic: {topic} | Market: {m_up}
 Audit Context: September 2026 Live Production Pipeline
 Temporal Cadence: {temporal_cadence}
+Content Axis / Theme: {topic_meta.get("content_theme") or topic_meta.get("niche_brief") or "Investigative Non-Fiction"}
 Rising Search Queries: {', '.join([str(q) for q in rising_queries[:6]])}
 
 [GROUNDING FACT CLAIMS (VERIFIED BASELINE TRUTH)]
@@ -91,7 +94,7 @@ Rising Search Queries: {', '.join([str(q) for q in rising_queries[:6]])}
 [DELIVERED VIDEO SCRIPT FOR AUDIT]
 {story_text}
 
-Perform strict adversarial forensic audit according to the 7 Iron Criteria. Interrogate every metric, source attribution, chronological progression, and causal link. Return strict JSON only."""
+Perform strict adversarial forensic audit according to the 8 Iron Criteria. Interrogate every metric, source attribution, chronological progression, axis fidelity, and causal link. Return strict JSON only."""
 
     # Enforce Claude lineage: only claude-opus-5 or claude-sonnet-5 allowed
     if not (model.startswith("claude-opus-5") or model.startswith("claude-sonnet-5")):
