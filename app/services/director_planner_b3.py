@@ -70,6 +70,47 @@ def detect_forensic_overlay(narration_text: str) -> dict | None:
     return None
 
 
+def detect_stat_card(narration_text: str) -> dict | None:
+    """Rule 122 & Rule 128: Extract prominent financial metrics or evidentiary scales for Remotion Stat Card."""
+    if not narration_text:
+        return None
+    patterns = [
+        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:만|억|조)?\s*원)', "PRICE ANCHOR // TRANSACTION"),
+        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆)?\s*円)', "FINANCIAL VALUE // VALUATION"),
+        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:tỷ|triệu|nghìn)\s*đ(?:ồng)?)', "MARKET METRIC // COST"),
+        (r'(\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|TRILLION|B|M|K)?(?:\s*→\s*<\$\d+)?(?:\s*/\s*SHARE)?)', "FINANCIAL METRIC // VALUATION"),
+        (r'(-\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|B|M)?)', "BALANCE SHEET // WRITE-DOWN"),
+        (r'((?:<\$\d+(?:\.\d+)?|\$\d+(?:\.\d+)?))', "MARKET VALUE // PRICE TARGET"),
+        (r'([+-]?\d+(?:\.\d+)?%)', "GROWTH RATE // PERCENTAGE"),
+        (r'(\d+\+?\s*(?:BOXES|DOCUMENTS|WITNESSES|EMPLOYEES|INVESTIGATORS|개|명|건|곳))', "EVIDENCE // SCALE"),
+        (r'(\b(?:GUILTY|CONVICTED|VERDICT|FRAUD|CONSPIRACY)\b)', "LEGAL RULING // VERDICT"),
+        (r'(\b(?:MARK-TO-MARKET|SPECIAL PURPOSE ENTITIES|SPE NETWORK|CIRCULAR HEDGE)\b)', "FINANCIAL MECHANISM"),
+    ]
+    for p, label in patterns:
+        m = re.search(p, narration_text, re.IGNORECASE)
+        if m:
+            val = m.group(1).upper().strip()
+            if len(val) >= 2:
+                return {"value": val, "label": label}
+    return None
+
+
+def detect_stamp_badge(narration_text: str) -> str | None:
+    """Rule 122: Detect high-stakes evidence stamp slam trigger for Remotion ForensicStampBadge."""
+    if not narration_text:
+        return None
+    t = narration_text.lower()
+    if any(k in t for k in ["gian lận", "lừa đảo", "vi phạm", "사기", "위반", "부당", "환불 거부", "fraud", "violation", "illegal"]):
+        return "PRICE_FRAUD"
+    if any(k in t for k in ["tài liệu mật", "hợp đồng mật", "비밀", "기밀", "confidential", "classified", "nda"]):
+        return "CONFIDENTIAL"
+    if any(k in t for k in ["bằng chứng", "chứng cứ", "vết nứt", "증거", "단서", "evidence", "proof"]):
+        return "EVIDENCE"
+    if any(k in t for k in ["hủy bỏ", "vô hiệu", "취소", "무효", "void", "breach"]):
+        return "VOID"
+    return None
+
+
 class DynamicArchetypeDict(dict):
     """Rule 128: Zero-Semantic-Bias Dynamic Archetype Registry with backward compatibility."""
     def __missing__(self, key):
@@ -630,7 +671,11 @@ def generate_director_plan(
             f"   - SPOKEN NARRATION ('narration'): MUST BE 100% VERBATIM IN {market_lang_name}! NEVER translate narration to English!\n"
             "4. 6 CANONICAL CAMERA MOVEMENTS: declare strictly one of: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n"
             f"5. LOCATION CONTINUITY: assign 'bg_cluster_id' (range {((b_num - 1) * 4) + 1}..{b_num * 4}).\n"
-            "6. FORENSIC OVERLAYS: Tag evidentiary scenes with 'forensic_overlay': 'redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt', or null.\n\n"
+            "6. FORENSIC OVERLAYS: Tag evidentiary scenes with 'forensic_overlay': 'redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt', or null.\n"
+            "7. MOTION GRAPHICS & STAT CARDS (Rule 122 Remotion Suite):\n"
+            "   - 'stat_card': Tag high-impact metric scenes with {\"value\": \"$41.8M\" / \"14,000명\" / \"52%\", \"label\": \"PRICE ANCHOR\" / \"VALUATION COLLAPSE\"} or null.\n"
+            "   - 'stamp_badge': Climax evidentiary stamp slam: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.\n"
+            "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'.\n\n"
             "OUTPUT FORMAT: Return ONLY a valid JSON object matching: {\"scenes\": [ ... ]}. No markdown fences."
         )
 
@@ -709,6 +754,12 @@ def generate_director_plan(
                     s["bg_cluster_id"] = ((b_num - 1) * 4) + (sc_counter % 3) + 1
                 if not s.get("forensic_overlay"):
                     s["forensic_overlay"] = detect_forensic_overlay(s.get("narration", ""))
+                if not s.get("stat_card"):
+                    s["stat_card"] = detect_stat_card(s.get("narration", ""))
+                if not s.get("stamp_badge"):
+                    s["stamp_badge"] = detect_stamp_badge(s.get("narration", ""))
+                if not s.get("motion_directive"):
+                    s["motion_directive"] = "dramatic_push" if sc_counter < 15 else ("split_whip" if sc_counter % 3 == 0 else "subtle_drift")
                 all_scenes.append(s)
                 sc_counter += 1
         else:
@@ -806,6 +857,18 @@ def generate_director_plan(
             if auto_overlay:
                 forensic_overlay = auto_overlay
 
+        stat_card = sc.get("stat_card") or sc.get("statCard")
+        if not stat_card:
+            stat_card = detect_stat_card(narration)
+
+        stamp_badge = sc.get("stamp_badge") or sc.get("stampBadge")
+        if not stamp_badge:
+            stamp_badge = detect_stamp_badge(narration)
+
+        motion_directive = sc.get("motion_directive") or sc.get("motionDirective")
+        if not motion_directive:
+            motion_directive = "dramatic_push" if idx < 15 else ("split_whip" if idx % 3 == 0 else "subtle_drift")
+
         norm_sc = {
             "scene_index": idx,
             "scene_id": sc_id,
@@ -818,6 +881,9 @@ def generate_director_plan(
             "visual_metaphor": sc.get("visual_metaphor", "Systemic tension and institutional conflict"),
             "bg_cluster_id": int(bg_cluster_id),
             "forensic_overlay": forensic_overlay,
+            "stat_card": stat_card,
+            "stamp_badge": stamp_badge,
+            "motion_directive": motion_directive,
             "camera": {
                 "movement": cam_mov,
                 "tension_level": cam.get("tension_level", "high") if isinstance(cam, dict) else "high"
@@ -1174,6 +1240,9 @@ def _synthesize_beat_scenes(
                 dur = max(5, min(9, round(curr_units / unit_divisor)))
 
             forensic_overlay = detect_forensic_overlay(sc_text)
+            stat_card = detect_stat_card(sc_text)
+            stamp_badge = detect_stamp_badge(sc_text)
+            motion_directive = "dramatic_push" if is_hook else ("split_whip" if sc_counter % 3 == 0 else "subtle_drift")
 
             beat_scenes.append({
                 "scene_id": sc_id,
@@ -1184,6 +1253,9 @@ def _synthesize_beat_scenes(
                 "visual_metaphor": f"Visual metaphor representing {b_name}",
                 "bg_cluster_id": bg_cluster_id,
                 "forensic_overlay": forensic_overlay,
+                "stat_card": stat_card,
+                "stamp_badge": stamp_badge,
+                "motion_directive": motion_directive,
                 "camera": {
                     "movement": cam_move,
                     "tension_level": "high" if is_hook or sc_counter % 3 == 0 else "medium"
@@ -1222,6 +1294,9 @@ def _synthesize_beat_scenes(
         bg_k = f"{episode_id.lower()}_bg_b{b_num}_tail"
         bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 setting of {b_name}, {dynamic_context['physical_environment']}"
         forensic_overlay = detect_forensic_overlay(sc_text)
+        stat_card = detect_stat_card(sc_text)
+        stamp_badge = detect_stamp_badge(sc_text)
+        motion_directive = "subtle_drift"
         beat_scenes.append({
             "scene_id": sc_id,
             "beat_index": b_num,
@@ -1231,6 +1306,9 @@ def _synthesize_beat_scenes(
             "visual_metaphor": f"Closing tension of {b_name}",
             "bg_cluster_id": bg_cluster_id,
             "forensic_overlay": forensic_overlay,
+            "stat_card": stat_card,
+            "stamp_badge": stamp_badge,
+            "motion_directive": motion_directive,
             "camera": {"movement": cam_move, "tension_level": "medium"},
             "background": {
                 "reuse_key": bg_k,

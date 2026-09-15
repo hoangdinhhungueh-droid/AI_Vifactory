@@ -588,6 +588,56 @@ const SurveillanceGridOverlay = ({ label }: { label?: string }) => {
   );
 };
 
+const ForensicStampBadge = ({ badge, isLeft }: { badge: string; isLeft?: boolean }) => {
+  const frame = useCurrentFrame();
+  const cfg = useVideoConfig();
+  // Dynamic Stamp Slam physics: rapid scale drop from 2.4 down to 1.0 with damping spring
+  const scale = spring({
+    frame: Math.max(0, frame - 4),
+    fps: cfg.fps || 30,
+    config: { damping: 9, mass: 0.35, stiffness: 150 },
+    from: 2.4,
+    to: 1.0,
+  });
+  const opacity = interpolate(frame, [3, 7], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const bUp = (badge || "").toUpperCase();
+  const isAlert = ["VIOLATION", "FRAUD", "PRICE_FRAUD", "VOID", "CRITICAL", "ILLEGAL"].some((k) => bUp.includes(k));
+  const isAuth = ["CONFIDENTIAL", "CLASSIFIED", "SEALED", "EVIDENCE", "RESTRICTED"].some((k) => bUp.includes(k));
+
+  const mainColor = isAlert ? "#ef4444" : isAuth ? "#f59e0b" : "#10b981";
+  const borderColor = isAlert ? "rgba(239, 68, 68, 0.85)" : isAuth ? "rgba(245, 158, 11, 0.85)" : "rgba(16, 185, 129, 0.85)";
+  const bg = isAlert ? "rgba(45, 10, 15, 0.92)" : isAuth ? "rgba(40, 25, 10, 0.92)" : "rgba(10, 35, 20, 0.92)";
+  const icon = isAlert ? "🚨" : isAuth ? "📁" : "⚖️";
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 55,
+        left: isLeft ? "auto" : 70,
+        right: isLeft ? 70 : "auto",
+        transform: `scale(${scale}) rotate(-8deg)`,
+        opacity,
+        zIndex: 32,
+        border: `3px double ${borderColor}`,
+        borderRadius: 8,
+        padding: "8px 20px",
+        backgroundColor: bg,
+        boxShadow: `0 10px 30px rgba(0,0,0,0.85), 0 0 20px ${mainColor}40`,
+        fontFamily: "'Courier New', Courier, monospace",
+        textTransform: "uppercase",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        pointerEvents: "none",
+      }}
+    >
+      <span style={{ fontSize: 20 }}>{icon}</span>
+      <span style={{ color: mainColor, fontSize: 18, fontWeight: 900, letterSpacing: 2 }}>{badge}</span>
+    </div>
+  );
+};
+
 export const TwoLayerScene = (props) => {
   const background = props.background;
   const showBackground = props.showBackground === false ? false : true;
@@ -600,6 +650,7 @@ export const TwoLayerScene = (props) => {
   const statValue = props.statValue;
   const statLabel = props.statLabel;
   const forensicOverlay = props.forensicOverlay;
+  const stampBadge = props.stampBadge;
 
   const cfg = useVideoConfig();
   const durationInFrames = cfg.durationInFrames || 180;
@@ -750,18 +801,32 @@ export const TwoLayerScene = (props) => {
         </div>
       ) : null}
 
-      {/* Forensic Motion Graphics Evidentiary Overlays (Rule 122) */}
-      {forensicOverlay && forensicOverlay.type === "redacted_doc" ? (
-        <RedactedDocumentOverlay label={forensicOverlay.label} isLeft={isLeft} />
-      ) : null}
-      {forensicOverlay && forensicOverlay.type === "radar_map" ? (
-        <DynamicRadarMapOverlay label={forensicOverlay.label} isLeft={isLeft} />
-      ) : null}
-      {forensicOverlay && forensicOverlay.type === "financial_chart" ? (
-        <KineticChartOverlay label={forensicOverlay.label} isLeft={isLeft} />
-      ) : null}
-      {forensicOverlay && forensicOverlay.type === "surveillance_crt" ? (
-        <SurveillanceGridOverlay label={forensicOverlay.label} />
+      {/* Forensic Motion Graphics Evidentiary Overlays (Rule 122 & Rule 128) */}
+      {(() => {
+        const rawOv = forensicOverlay;
+        const ovType = typeof rawOv === "string" ? rawOv : rawOv?.type;
+        const ovLabel = typeof rawOv === "object" ? rawOv?.label : undefined;
+        return (
+          <>
+            {ovType === "redacted_doc" ? (
+              <RedactedDocumentOverlay label={ovLabel} isLeft={isLeft} />
+            ) : null}
+            {ovType === "radar_map" ? (
+              <DynamicRadarMapOverlay label={ovLabel} isLeft={isLeft} />
+            ) : null}
+            {ovType === "financial_chart" ? (
+              <KineticChartOverlay label={ovLabel} isLeft={isLeft} />
+            ) : null}
+            {ovType === "surveillance_crt" ? (
+              <SurveillanceGridOverlay label={ovLabel} />
+            ) : null}
+          </>
+        );
+      })()}
+
+      {/* Forensic Stamp Slam Badge (Rule 122 Acting & Evidence Props) */}
+      {stampBadge ? (
+        <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} />
       ) : null}
 
       {/* Modern High-Retention Subtitle Dialogue Container (Exact Layout of User Reference Image 1) */}
@@ -1358,6 +1423,7 @@ export const TwoLayerEpisode = (props) => {
           tensionLevel={s.tensionLevel || (s.camera ? s.camera.tension_level : undefined)}
           bgClusterId={s.bgClusterId || s.bg_cluster_id}
           forensicOverlay={s.forensicOverlay || s.forensic_overlay}
+          stampBadge={s.stampBadge || s.stamp_badge}
         />
       </Sequence>
     );

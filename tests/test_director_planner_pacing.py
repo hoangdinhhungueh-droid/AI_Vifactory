@@ -4,6 +4,8 @@ import pytest
 from app.services.director_planner_b3 import (
     CANONICAL_CAMERA_MOVES,
     detect_forensic_overlay,
+    detect_stat_card,
+    detect_stamp_badge,
     _synthesize_deterministic_director_plan,
     detect_cinematic_archetype
 )
@@ -45,6 +47,33 @@ def test_detect_forensic_overlay_categories():
     assert r5 is None
 
 
+def test_detect_stat_card_and_stamp_badge():
+    # Multi-currency & metrics
+    s1 = detect_stat_card("피해액은 350만 원에 달했습니다.")
+    assert s1 is not None
+    assert "350만 원" in s1["value"]
+    assert "PRICE ANCHOR" in s1["label"]
+
+    s2 = detect_stat_card("The hedge fund lost $41.8M in under twenty minutes.")
+    assert s2 is not None
+    assert "$41.8M" in s2["value"]
+
+    s3 = detect_stat_card("Khoản thất thoát lên tới 500 tỷ đồng.")
+    assert s3 is not None
+    assert "500 TỶ ĐỒNG" in s3["value"]
+
+    # Stamp badges
+    b1 = detect_stamp_badge("탁구장 환불 거부 사기 혐의가 입증되었습니다.")
+    assert b1 == "PRICE_FRAUD"
+
+    b2 = detect_stamp_badge("All classified contract records were stamped secret.")
+    assert b2 == "CONFIDENTIAL"
+
+    b3 = detect_stamp_badge("The regulatory agreement was declared void immediately.")
+    assert b3 == "VOID"
+
+
+
 def test_synthesize_deterministic_director_plan_pacing():
     story_beats = [
         {"content": "On an ordinary morning, Flight 21 vanished into thin air. " * 8},
@@ -77,6 +106,7 @@ def test_synthesize_deterministic_director_plan_pacing():
         assert sc["duration_est_sec"] <= 10
         assert sc["camera"]["movement"] in CANONICAL_CAMERA_MOVES
         assert 1 <= sc["bg_cluster_id"] <= 20
+        assert sc["motion_directive"] in {"dramatic_push", "subtle_drift", "split_whip", "forensic_lock"}
 
 
 def test_build_remotion_props_with_camera_and_overlay(tmp_path):

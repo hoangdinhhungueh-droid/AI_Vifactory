@@ -502,8 +502,13 @@ def get_b3_strategic_rules() -> str:
         "7. TWO-LAYER COMPOSITION & SUBTITLE SAFE-ZONE INTEGRITY (Rule 116):\n"
         "   - Layer 1 Background (16:9 2560x1440): Bottom 20% clear for subtitles.\n"
         "   - Layer 2 Foreground (1:1 2048x2048 #FF00FF): Position strictly 'Right' or 'Left' (Rule of Thirds). NEVER place full-body characters at 'Center'.\n"
-        "8. PRODUCTION BRIDGE (Rule 446): All prompt descriptions and visual hints must be in descriptive English."
+        "8. PRODUCTION BRIDGE (Rule 446): All prompt descriptions and visual hints must be in descriptive English.\n"
+        "9. REMOTION MOTION GRAPHICS & FORENSIC ARTIFACTS (Rule 122):\n"
+        "   - 'stat_card': Tag metric scenes with {'value': '$41.8M' / '14,000명' / '52%', 'label': 'PRICE ANCHOR' / 'VALUATION COLLAPSE'} or null.\n"
+        "   - 'stamp_badge': Climax evidentiary stamp slam: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.\n"
+        "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'."
     )
+
 def get_b10_seo_rules() -> str:
     """Concise strategic rules (~1,200 chars) for B10 YouTube Packaging & SEO Metadata.
     Distills Rule 118 (Zero-Mock), Rule 444 (An Ong Curiosity Hook in Titles),

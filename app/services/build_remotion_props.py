@@ -81,16 +81,19 @@ def stage_into_public(local_path: str, public_dir: str, episode_id: str) -> str 
 
 
 def extract_stat_card(text: str):
-    """Extract prominent financial metrics / keywords from narration text."""
+    """Extract prominent financial metrics / keywords from narration text (KRW, JPY, USD, VND, percentages)."""
     if not text:
         return None, None
 
     patterns = [
+        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:만|억|조)?\s*원)', "PRICE ANCHOR // TRANSACTION"),
+        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆)?\s*円)', "FINANCIAL VALUE // VALUATION"),
+        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:tỷ|triệu|nghìn)\s*đ(?:ồng)?)', "MARKET METRIC // COST"),
         (r'(\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|TRILLION|B|M|K)?(?:\s*→\s*<\$\d+)?(?:\s*/\s*SHARE)?)', "FINANCIAL METRIC // VALUATION"),
         (r'(-\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|B|M)?)', "BALANCE SHEET // WRITE-DOWN"),
-        (r'(\b(?:<\$\d+(?:\.\d+)?|\$\d+(?:\.\d+)?)\b)', "MARKET VALUE // PRICE TARGET"),
-        (r'(\b\d+(?:\.\d+)?%)', "GROWTH RATE // PERCENTAGE"),
-        (r'(\b\d+\+?\s*(?:BOXES|DOCUMENTS|WITNESSES|EMPLOYEES|INVESTIGATORS)\b)', "EVIDENCE // SCALE"),
+        (r'((?:<\$\d+(?:\.\d+)?|\$\d+(?:\.\d+)?))', "MARKET VALUE // PRICE TARGET"),
+        (r'([+-]?\d+(?:\.\d+)?%)', "GROWTH RATE // PERCENTAGE"),
+        (r'(\d+\+?\s*(?:BOXES|DOCUMENTS|WITNESSES|EMPLOYEES|INVESTIGATORS|개|명|건|곳))', "EVIDENCE // SCALE"),
         (r'(\b(?:GUILTY|CONVICTED|VERDICT|FRAUD|CONSPIRACY)\b)', "LEGAL RULING // VERDICT"),
         (r'(\b(?:MARK-TO-MARKET|SPECIAL PURPOSE ENTITIES|SPE NETWORK|CIRCULAR HEDGE)\b)', "FINANCIAL MECHANISM"),
     ]
@@ -433,6 +436,34 @@ def build_remotion_props_data(
         if not forensic_ov:
             forensic_ov = detect_forensic_overlay(narration_text)
 
+        # Rule 122 & Rule 128: Guarantee forensic_overlay is a structured dict with 'type' and 'label'
+        DEFAULT_OVERLAY_LABELS = {
+            "redacted_doc": "CLASSIFIED // REDACTED RECORD",
+            "radar_map": "RADAR TELEMETRY // VECTOR TRACK",
+            "financial_chart": "MARKET DISRUPTION // CAPITAL TRAJECTORY",
+            "surveillance_crt": "FACILITY_SURVEILLANCE // CH_04",
+        }
+        if isinstance(forensic_ov, str):
+            forensic_ov = {
+                "type": forensic_ov,
+                "label": DEFAULT_OVERLAY_LABELS.get(forensic_ov, "FORENSIC // EVIDENCE RECORD")
+            }
+
+        # Extract Stamp Slam Badge (Rule 122 Acting & Evidence Props)
+        stamp_badge = s.get("stamp_badge") or s.get("stampBadge")
+        if not stamp_badge:
+            t_lower = narration_text.lower()
+            if any(k in t_lower for k in ["gian lận", "lừa đảo", "vi phạm", "사기", "위반", "부당", "환불 거부", "fraud", "violation", "illegal"]):
+                stamp_badge = "PRICE_FRAUD"
+            elif any(k in t_lower for k in ["tài liệu mật", "hợp đồng mật", "비밀", "기밀", "confidential", "classified", "nda"]):
+                stamp_badge = "CONFIDENTIAL"
+            elif any(k in t_lower for k in ["bằng chứng", "chứng cứ", "vết nứt", "증거", "단서", "evidence", "proof"]):
+                stamp_badge = "EVIDENCE"
+            elif any(k in t_lower for k in ["hủy bỏ", "vô hiệu", "취소", "무효", "void", "breach"]):
+                stamp_badge = "VOID"
+
+        motion_directive = s.get("motion_directive") or s.get("motionDirective") or "subtle_drift"
+
         scenes_out.append({
             "background": bg_rel or "",
             "foreground": fg_rel,
@@ -444,6 +475,8 @@ def build_remotion_props_data(
             "safeZone": s.get("safe_zone") or "none",
             "statValue": stat_val,
             "statLabel": stat_lbl,
+            "stampBadge": stamp_badge,
+            "motionDirective": motion_directive,
             "speakerTag": speaker_tag,
             "actTitle": act_title,
             "cameraMovement": cam_mov or "slow_push_in",

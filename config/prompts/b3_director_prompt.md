@@ -61,3 +61,8 @@
      - When unmasking false narratives or disproving an official PR myth (Beat 2), visually emphasize the refutation using dramatic forensic devices: a bold crimson red X stamp across the debunked chart, or an official red audit rejection banner.
    - 10.3 Spatial Continuity & Micro-Evolution:
      - For 2 to 3 consecutive scenes detailing the same sequential argument, DO NOT frantically cut to completely unrelated environments. Hold the spatial staging constant while evolving camera intimacy (wide establishing to macro push-in), lighting tension, or character micro-expressions to maintain viewer focus without visual disorientation.
+
+11. REMOTION MOTION GRAPHICS & FORENSIC ARTIFACTS (Rule 122 Remotion Suite):
+   - 'stat_card': Tag high-impact metric scenes with {"value": "$41.8M" / "14,000명" / "52%", "label": "PRICE ANCHOR" / "VALUATION COLLAPSE" / "EVIDENCE SCALE"} or null.
+   - 'stamp_badge': Climax evidentiary stamp slam animation: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.
+   - 'motion_directive': Dynamic Parallax 2.5D visual motion: 'dramatic_push' (intense push with depth), 'subtle_drift' (slow floating tension), 'split_whip' (kinetic transition), or 'forensic_lock' (rock-solid hold on document evidence).
