@@ -11,16 +11,16 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@remotion/captions": "^4.0.524",
-    "@remotion/cli": "^4.0.484",
-    "@remotion/google-fonts": "^4.0.524",
-    "@remotion/layout-utils": "^4.0.524",
-    "@remotion/noise": "^4.0.524",
-    "@remotion/paths": "^4.0.524",
-    "@remotion/shapes": "^4.0.524",
-    "@remotion/transitions": "^4.0.524",
+    "@remotion/captions": "4.0.524",
+    "@remotion/cli": "4.0.524",
+    "@remotion/google-fonts": "4.0.524",
+    "@remotion/layout-utils": "4.0.524",
+    "@remotion/noise": "4.0.524",
+    "@remotion/paths": "4.0.524",
+    "@remotion/shapes": "4.0.524",
+    "@remotion/transitions": "4.0.524",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "remotion": "^4.0.484"
+    "remotion": "4.0.524"
   }
 }

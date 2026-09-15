@@ -48,6 +48,29 @@ def detect_forensic_overlay(narration_text: str) -> dict | None:
     return None
 
 
+def normalize_camera_movement(raw_mov: str | None) -> str:
+    """Normalize raw camera movement string into one of 6 Remotion canonical movements."""
+    if not raw_mov:
+        return "slow_push_in"
+    m = str(raw_mov).strip().lower()
+    canonical = ["snap_zoom", "slow_push_in", "slow_pull_out", "cinematic_pan", "macro_tilt", "handheld_shake"]
+    if m in canonical:
+        return m
+    if "snap" in m or "punch" in m or ("zoom" in m and "slow" not in m):
+        return "snap_zoom"
+    if "pull" in m or "retreat" in m:
+        return "slow_pull_out"
+    if "push" in m or "forward" in m:
+        return "slow_push_in"
+    if "pan" in m or "lateral" in m or "drift" in m or "whip" in m:
+        return "cinematic_pan"
+    if "tilt" in m or "pedestal" in m:
+        return "macro_tilt"
+    if "shake" in m or "handheld" in m or "jitter" in m:
+        return "handheld_shake"
+    return "slow_push_in"
+
+
 def load_manifest_index(manifest_path: str):
     with open(manifest_path, encoding="utf-8") as f:
         rows = json.load(f)
@@ -429,7 +452,8 @@ def build_remotion_props_data(
 
         # Extract Camera Grammar & Evidentiary Forensic Overlays (Rule 122 & Rule 128)
         cam = s.get("camera") or {}
-        cam_mov = s.get("camera_movement") or (cam.get("movement") if isinstance(cam, dict) else str(cam))
+        raw_cam_mov = s.get("camera_movement") or (cam.get("movement") if isinstance(cam, dict) else str(cam))
+        cam_mov = normalize_camera_movement(raw_cam_mov)
         tension_lvl = s.get("tension_level") or (cam.get("tension_level") if isinstance(cam, dict) else "high")
         bg_cluster = s.get("bg_cluster_id") or s.get("bgClusterId")
         forensic_ov = s.get("forensic_overlay") or s.get("forensicOverlay")

@@ -1,5 +1,5 @@
 import pytest
-from app.services.build_remotion_props import extract_custom_beat_titles, format_speaker_tag
+from app.services.build_remotion_props import extract_custom_beat_titles, format_speaker_tag, normalize_camera_movement
 
 def test_extract_custom_beat_titles_from_seo():
     desc = """Some description
@@ -37,3 +37,15 @@ def test_format_speaker_tag_custom_beats():
     scene_char = {"beat_index": 2, "character_name": "Karl Seuring", "character_role": "Whistleblower Pilot"}
     tag_char = format_speaker_tag(scene_char, custom_beat_titles=custom_beats)
     assert tag_char == "KARL SEURING // WHISTLEBLOWER PILOT"
+
+def test_normalize_camera_movement():
+    assert normalize_camera_movement("slow_push_in") == "slow_push_in"
+    assert normalize_camera_movement("snap_zoom") == "snap_zoom"
+    assert normalize_camera_movement("Slow, almost imperceptible push-in toward the student's lowered gaze") == "slow_push_in"
+    assert normalize_camera_movement("Slow pull-out down the aisle") == "slow_pull_out"
+    assert normalize_camera_movement("Brief controlled snap-zoom onto the evidence") == "snap_zoom"
+    assert normalize_camera_movement("Slow lateral cinematic pan along the counseling desks") == "cinematic_pan"
+    assert normalize_camera_movement("Measured macro tilt from the paired paddles to the empty rail") == "macro_tilt"
+    assert normalize_camera_movement("Handheld jitter and sudden shake") == "handheld_shake"
+    assert normalize_camera_movement("") == "slow_push_in"
+    assert normalize_camera_movement(None) == "slow_push_in"
