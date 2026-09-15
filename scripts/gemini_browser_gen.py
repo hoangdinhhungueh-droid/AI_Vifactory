@@ -195,18 +195,25 @@ def fetch_prompts_from_vps(episode_id):
         if not size_str.isdigit() or int(size_str) == 0:
             raise RuntimeError(f"Không tìm thấy prompts_forge.json trên VPS cho episode {episode_id}")
         size = int(size_str)
-        chunk_size = 6000
+        CHUNK_SIZE = 1024 * 1024  # 1MB chunk size
         data_total = b""
         offset = 0
         while offset < size:
-            count = min(chunk_size, size - offset)
-            res = client.run_command(f"tail -c +{offset+1} '{vps_path}' | head -c {count} | base64 -w 0")
-            chunk = res.get("stdout", "").strip()
+            count = min(CHUNK_SIZE, size - offset)
+            chunk = ""
+            for attempt in range(3):
+                res = client.run_command(f"tail -c +{offset+1} '{vps_path}' | head -c {count} | base64 -w 0")
+                chunk = res.get("stdout", "").strip()
+                if chunk:
+                    break
+                time.sleep(1)
             if not chunk:
-                break
+                raise RuntimeError(f"Không thể đọc chunk từ offset {offset} của {vps_path} sau 3 lần thử")
             decoded = base64.b64decode(chunk)
             data_total += decoded
             offset += len(decoded)
+        if len(data_total) != size:
+            raise RuntimeError(f"Toàn vẹn dữ liệu thất bại khi đọc {vps_path}: nhận {len(data_total)}/{size} bytes")
         with open(local_prompts_file, "wb") as f:
             f.write(data_total)
         d = json.loads(data_total.decode("utf-8"))
@@ -479,12 +486,20 @@ def upload_png_to_vps(key, local_path, episode_id, layer_type="Background"):
         data = f.read()
         
     b64 = base64.b64encode(data).decode("ascii")
-    CHUNK_SIZE = 500 * 1024
+    CHUNK_SIZE = 1024 * 1024  # 1MB
     chunks = [b64[i:i+CHUNK_SIZE] for i in range(0, len(b64), CHUNK_SIZE)]
     
     for idx, chunk in enumerate(chunks):
-        tmp_path = f"/tmp/vf/{key}_{idx:03d}.b64"
-        client.call_tool("write_file", {"path": tmp_path, "content": chunk, "confirm": True})
+        tmp_path = f"/tmp/vf/{key}_{idx:04d}.b64"
+        write_ok = False
+        for attempt in range(3):
+            res = client.call_tool("write_file", {"path": tmp_path, "content": chunk, "confirm": True})
+            if res and (res.get("status") == "ok" or "OK" in str(res) or res.get("bytes") == len(chunk)):
+                write_ok = True
+                break
+            time.sleep(1)
+        if not write_ok:
+            raise RuntimeError(f"Lỗi ghi chunk {idx+1}/{len(chunks)} vào {tmp_path} sau 3 lần thử")
         
     target_raw_png = f"/var/vf/episodes/{episode_id}/assets/{key}.png"
     target_img_png = f"/var/vf/episodes/{episode_id}/images/{key}.png"
@@ -574,22 +589,37 @@ def upload_batch_archive_to_vps(episode_id, prompt_items, local_dir, audit_repor
         tar_bytes = f.read()
     b64_str = base64.b64encode(tar_bytes).decode("ascii")
     
-    chunk_size = 60000
-    chunks = [b64_str[i:i+chunk_size] for i in range(0, len(b64_str), chunk_size)]
+    CHUNK_SIZE = 1024 * 1024  # 1MB (1,048,576 characters)
+    chunks = [b64_str[i:i+CHUNK_SIZE] for i in range(0, len(b64_str), CHUNK_SIZE)]
     client.run_command(f"mkdir -p /tmp/vf && rm -f /tmp/vf/vf_arch_{episode_id}_*.b64")
     
+    print(f"📦 Bắt đầu truyền tải {len(chunks)} chunks (1MB/chunk) lên VPS...")
     for idx, chunk in enumerate(chunks):
-        tmp_path = f"/tmp/vf/vf_arch_{episode_id}_{idx:04d}.b64"
-        client.call_tool("write_file", {"path": tmp_path, "content": chunk, "confirm": True})
-        if (idx + 1) % 15 == 0 or (idx + 1) == len(chunks):
+        tmp_path = f"/tmp/vf/vf_arch_{episode_id}_{idx:05d}.b64"
+        write_ok = False
+        for attempt in range(3):
+            res = client.call_tool("write_file", {"path": tmp_path, "content": chunk, "confirm": True})
+            if res and (res.get("status") == "ok" or "OK" in str(res) or res.get("bytes") == len(chunk)):
+                write_ok = True
+                break
+            print(f"  ⚠️ Thử lại chunk {idx+1}/{len(chunks)} (lần {attempt+2}/3)...")
+            time.sleep(1)
+        if not write_ok:
+            raise RuntimeError(f"❌ Upload chunk {idx+1}/{len(chunks)} thất bại sau 3 lần thử: {tmp_path}")
+
+        if (idx + 1) % 10 == 0 or (idx + 1) == len(chunks):
             print(f"  ⬆️ Uploaded chunk {idx+1}/{len(chunks)} ({int((idx+1)/len(chunks)*100)}%)")
             
     unpack_cmd = f"""python3 -c '
-import os, tarfile, shutil, glob
+import os, tarfile, shutil, sys
 
 tar_path = "/tmp/vf/assets_{episode_id}.tar.gz"
 os.system("cat /tmp/vf/vf_arch_{episode_id}_*.b64 | base64 -d > " + tar_path)
 os.system("rm -f /tmp/vf/vf_arch_{episode_id}_*.b64")
+
+if not os.path.exists(tar_path) or os.path.getsize(tar_path) == 0:
+    print("ERROR: tar archive not created or empty")
+    sys.exit(1)
 
 base_dir = "/var/vf/episodes/{episode_id}"
 assets_dir = f"{{base_dir}}/assets"
@@ -603,8 +633,12 @@ for d in [assets_dir, images_dir, thumbs_dir, audits_dir]:
 unpacked = f"/tmp/unpacked_{episode_id}"
 os.makedirs(unpacked, exist_ok=True)
 
-with tarfile.open(tar_path, "r:gz") as tar:
-    tar.extractall(unpacked)
+try:
+    with tarfile.open(tar_path, "r:gz") as tar:
+        tar.extractall(unpacked)
+except Exception as e:
+    print(f"ERROR: Corrupted archive extraction: {{e}}")
+    sys.exit(2)
 
 for f in os.listdir(unpacked):
     src = os.path.join(unpacked, f)
@@ -625,7 +659,10 @@ if os.path.exists(tar_path):
 print("EXTRACT_OK")
 '"""
     res = client.run_command(unpack_cmd)
-    print(f"🎉 Atomic extraction on VPS: {res.get('stdout', '').strip()} (Exit={res.get('exit_code')})")
+    stdout_str = res.get("stdout", "").strip()
+    if res.get("exit_code") != 0 or "EXTRACT_OK" not in stdout_str:
+        raise RuntimeError(f"❌ Giải nén assets trên VPS thất bại: {stdout_str} (Exit={res.get('exit_code')})")
+    print(f"🎉 Atomic extraction on VPS: {stdout_str} (Exit=0) ✅")
 
 
 def create_images_ready_marker(episode_id, total_count, pass_count):
