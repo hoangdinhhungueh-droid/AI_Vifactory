@@ -621,6 +621,14 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
             }, indent=2), encoding="utf-8")
         except Exception:
             pass
+    # [POST-SYNC CLEANUP] Rule 125 & Post-Publish Disk Hygiene
+    try:
+        from scripts.post_sync_cleanup import cleanup_episode_intermediates
+        clean_res = cleanup_episode_intermediates(episode_id)
+        print(f"[B10-AUTO] Post-publish intermediate cleanup: {clean_res}")
+    except Exception as _clean_err:
+        print(f"[B10-AUTO] Post-publish cleanup non-fatal warning: {_clean_err}")
+
     print("B10-AUTO complete. No manual Antigravity paste step was required.")
     return {"video_id": video_id, "packaging": packaging}
 
