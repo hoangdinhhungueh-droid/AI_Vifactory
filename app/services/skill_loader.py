@@ -430,7 +430,9 @@ def get_b1_strategic_rules() -> str:
         "   - Pillar 5: Technological & Geopolitical Battles\n"
         "   - Pillar 6: Institutional & Regulatory Chokepoints\n"
         "   - Pillar 7: Hidden Asymmetric Fortunes & Wealth Transfers\n"
-        "6. NATIVE GROUND TRUTH: All search keywords must be in the native language of the target market (JP/KR/EN)."
+        "   - Pillar 11: Everyday Consumer Injustice & Institutional Traps\n"
+        "6. NATIVE GROUND TRUTH: All search keywords must be in the native language of the target market (JP/KR/EN).\n"
+        "7. ANTI-TUTORIAL PACKAGING (RULE 130): Strictly forbidden to use tutorial/how-to phrasing ('How to', 'Steps to', 'Cách', 'Mẹo', '5 bước', '환불하는법'). Must use dramatic clash formula: [Everyday Item/Transaction + Shock Figure] vs [Unilateral Fine Print / Institutional Trap]."
     )
 
 

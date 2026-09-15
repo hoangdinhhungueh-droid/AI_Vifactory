@@ -37,10 +37,13 @@ You must audit against 4 Iron Criteria:
    - REJECT (FAIL) if the model borrows a viral breaking keyword as clickbait, but immediately steers (be lai) into an unrelated tangent (e.g. shipbuilder balance sheet instead of missile strikes on ships).
 4. POLICY SAFETY & FACTUAL GROUNDING:
    - Safe under YouTube Guidelines (geopolitical/economic analysis is welcome, but zero graphic gore, zero defamation of private citizens, zero glorification of terror).
+5. CONSUMER DOCUDRAMA & ANTI-TUTORIAL PACKAGING (RULE 130):
+   - For consumer disputes / retail traps (Pillar 11): Enforce the 3-tier gate (Outlier score >= 3.0x or breaking traffic, asymmetric institutional/contract loophole, and verified by media/regulator).
+   - REJECT (FAIL) if the proposed angle or title sounds like a dry tutorial / customer service FAQ / how-to guide ('How to', 'Mẹo vặt', '5 bước', '환불하는법'). The angle MUST formulate a high-stakes dramatic clash: [Everyday Item/Transaction + Shock Figure] vs [Unilateral Fine Print / Institutional Trap].
 
 Passing threshold:
 - audit_score >= 7.5/10
-- All 4 criteria must be satisfied.
+- All criteria must be satisfied.
 - If failed, you MUST specify "verdict": "FAIL" and provide a crisp "veto_reason" in English and Vietnamese.
 
 Output MUST be a single valid JSON object matching this schema:

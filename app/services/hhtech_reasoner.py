@@ -130,6 +130,12 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
             "YT-Military-Tactical-Investigation",
             "MILITARY LOGISTICS & GEOPOLITICAL CHOKEPOINTS: forensic deconstruction of supply line failures, tactical blunders, and strategic infrastructure chokepoints based on declassified records; ZERO glorification of violence."
         )
+    elif any(t in text for t in ["refund", "환불", "교환", "반품", "영수증", "바가지", "동탄문구점", "bẫy giá", "giấu giá", "hóa đơn", "không hoàn tiền", "no refund", "cancellation fee", "hidden fee", "hidden cost", "fine print", "consumer trap", "소비자 분쟁", "위약금", "단순 변심", "가격표시제", "bất cân xứng tiêu dùng", "chèn ép người mua", "quy chế hoàn tiền", "overcharge", "unilateral clause", "consumer dispute", "subscription trap"]):
+        return (
+            "consumer_injustice_institutional_trap",
+            "YT-Consumer-Awareness",
+            "SOCIAL REALITY & CONSUMER INJUSTICE DOCUDRAMA: dissect everyday retail traps, asymmetric contract fine print, and regulatory loopholes; empathetic focus on victim struggle and institutional confrontation; ZERO defamation, strictly verified public records."
+        )
     
     return (
         "business_rise_fall",
@@ -444,7 +450,7 @@ def assess_keyword_video_viability(
         "You are the Chief Executive Producer and Video Viability Auditor for Video Factory.\n"
         "Your role is to rigorously evaluate whether a raw trending keyword can be turned into a "
         "compelling, high-retention 8-12 minute non-fiction investigative documentary video.\n\n"
-        "MANDATORY SCOPE: 10 HIGH-RPM/HIGH-RETENTION NON-FICTION CONTENT PILLARS:\n"
+        "MANDATORY SCOPE: 11 HIGH-RPM/HIGH-RETENTION NON-FICTION CONTENT PILLARS:\n"
         "The candidate topic MUST strictly fall into one of these pillars:\n"
         "  1. Business Rise & Fall: Financial engineering, corporate collapse, accounting fraud, executive hubris.\n"
         "  2. Modern History & Systemic Crisis: 20th-21st century turning points, institutional failure, declassified operations.\n"
@@ -455,10 +461,12 @@ def assess_keyword_video_viability(
         "  7. Hidden Asymmetric Fortunes & Underground Flows: Underground flows, money laundering, information asymmetry schemes.\n"
         "  8. Ancient Prehistory & Lost Civilizations: Forensic archaeological evidence, evolutionary survival mechanisms, prehistoric anomalies.\n"
         "  9. Indigenous Philosophy & Stoic Mindset: Ancient mindset protocols (Dokkodo, Stoicism) applied to modern institutional burnout and social fatigue.\n"
-        "  10. Declassified Military Logistics & Geopolitical Chokepoints: Supply line collapses, strategic maritime straits, undersea infrastructure vulnerabilities.\n\n"
-        "STRICT REJECTION MANDATE (ZERO-SPECULATION & ANTI-DEFAMATION):\n"
+        "  10. Declassified Military Logistics & Geopolitical Chokepoints: Supply line collapses, strategic maritime straits, undersea infrastructure vulnerabilities.\n"
+        "  11. Everyday Consumer Injustice & Institutional Traps: Asymmetric retail traps, unwritten receipt clauses, hidden fees, toothless regulatory guidance, and minor contract exploitation.\n\n"
+        "STRICT REJECTION MANDATE (ZERO-SPECULATION & ANTI-DEFAMATION & ANTI-TUTORIAL):\n"
         "- REJECT immediately if the keyword is celebrity gossip, sports game scores/contract negotiations, entertainment awards, or unverified off-field personal/civil conduct allegations without official documented disciplinary action or court ruling.\n"
-        "- REJECT if approving it would require AI speculation, inventing stakes, or defaming real individuals.\n\n"
+        "- REJECT if approving it would require AI speculation, inventing stakes, or defaming real individuals.\n"
+        "- REJECT if the proposed angle is a dry customer service FAQ, tutorial, or how-to guide ('How to', 'Mẹo', '5 bước', '환불하는법'). The angle MUST formulate a high-stakes dramatic clash: [Everyday Item/Transaction + Shock Figure] vs [Unilateral Fine Print / Institutional Trap].\n\n"
         "SEARCH INTENT FORENSICS & ALGORITHMIC SURGE ANCHOR (RULE 118):\n"
         "- The 'specific_viral_angle' MUST directly explain the REAL REASON why people are searching, as evidenced by the 'rising_queries'.\n"
         "- If rising queries indicate that a subject is trending for a new reason (e.g. a new documentary announcement or seasonal holiday), do NOT recycle an outdated historical angle from years ago.\n"
@@ -487,6 +495,8 @@ def assess_keyword_video_viability(
         preset_hint = "Assigned Strategic Preset: PRESET_STOIC_ZEN_JP_KR (Archetype: philosophical_contemplative_docudrama, Target RPM: $5-$12).\n"
     elif theme == "military_logistics_geopolitics":
         preset_hint = "Assigned Strategic Preset: PRESET_MILITARY_GEOPOLITICS_US (Archetype: forensic_military_investigation, Target RPM: $20-$40).\n"
+    elif theme == "consumer_injustice_institutional_trap":
+        preset_hint = "Assigned Strategic Preset: PRESET_CONSUMER_DOCUDRAMA (Archetype: social_reality_docudrama, Target RPM: $12-$25).\n"
 
     user_prompt = (
         f"Candidate Keyword: {keyword}\n"

@@ -55,6 +55,8 @@
 * **Quy chuẩn Field Ràng buộc**:
   - `task_id`: Bắt buộc tuân thủ regex `^[A-Z]{2}_EP\d{4}_[a-z0-9_]+$`. Cấp phát tự động tịnh tiến theo kho số thực tế trên VPS, cấm fallback cứng.
   - `viability_score`: Tính toán từ dữ liệu Google Trends RSS live & Wikipedia Anchor, cấm hardcode giả định.
+  - `content_theme`: Gán nhãn 1 trong 11 Content Pillars chính thống, bao gồm Pillar 11 (Everyday Consumer Injustice & Institutional Traps: `consumer_injustice_institutional_trap`).
+  - `editorial_archetype`: Hỗ trợ `social_reality_docudrama` cho các đề tài bẫy tiêu dùng đời thường, tuân thủ nghiêm ngặt Anti-Tutorial SEO Packaging Mandate (Rule 130: cấm mọi tiền tố 'How to / Cách / Mẹo / 5 bước / 환불하는법'; bắt buộc áp dụng công thức va chạm điện ảnh).
 
 ---
 

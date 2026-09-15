@@ -164,7 +164,9 @@ def test_block1_trend_contract() -> bool:
         assert "Hidden Asymmetric Fortunes" in rule_text, "Missing Pillar 7 in HHTech Reasoner"
         assert "True Crime Non-Graphic" in rule_text, "Missing Pillar 3 in HHTech Reasoner"
         assert "Psychology & Behavioral Manipulation" in rule_text, "Missing Pillar 4 in HHTech Reasoner"
-        logger.info("  ✅ Rule 134 Parity Check: All 7 Canonical Pillars verified in HHTech Reasoner.")
+        assert "Everyday Consumer Injustice & Institutional Traps" in rule_text, "Missing Pillar 11 in HHTech Reasoner"
+        assert "ANTI-TUTORIAL PACKAGING" in rule_text, "Missing Anti-Tutorial Packaging rule in HHTech Reasoner"
+        logger.info("  ✅ Rule 134 Parity Check: Canonical Pillars including Pillar 11 verified in HHTech Reasoner.")
 
         return True
     except Exception as e:

@@ -1,0 +1,32 @@
+{
+  "preset_id": "PRESET_CONSUMER_DOCUDRAMA",
+  "name": "Everyday Consumer Injustice & Institutional Traps",
+  "target_market": "GLOBAL_KR_JP_EN_VN",
+  "estimated_rpm_usd": "12.0 - 25.0",
+  "editorial_archetype": "social_reality_docudrama",
+  "voice_cadence": {
+    "perspective": "social_investigative_third_person_with_victim_dialogue",
+    "rhythm_rule": "relatable everyday pacing, investigative social TV documentary rhythm (PD Notebook / 60 Minutes), tension escalation across 5 beats: cold transaction shock -> regulatory wall -> fine print exposure",
+    "hook_formula": "everyday_item_and_shock_figure_vs_asymmetric_trap",
+    "anti_tutorial_mandate": "strictly forbidden to use 'How to', 'Steps to', 'Cách', 'Mẹo', '5 bước', '환불하는법'. Must use clash formula: [Item/Transaction + Shock Figure] vs [Fine Print/Stamp/Institutional Trap]",
+    "minimum_named_citations": 2
+  },
+  "visual_dna": {
+    "art_style": "Stylized Graphic Novel Editorial Illustration, cel-shading ink, dramatic cinematic realism, authentic local props",
+    "dominant_palette": ["#0F141C", "#1E2633", "#D32F2F", "#E0A96D", "#F5F5F5", "#2A3950"],
+    "concept_devices": [
+      "everyday_retail_cash_register_counter",
+      "cctv_high_angle_timestamp_footage",
+      "fine_print_unilateral_stamp_on_receipt",
+      "victim_confrontation_with_store_manager",
+      "official_consumer_agency_guideline_dossier"
+    ],
+    "spatial_continuity_hold_scenes": 3
+  },
+  "viral_topic_formulas": [
+    "[ITEM + SHOCK_FIGURE] vs [UNILATERAL_STAMP / ARBITRARY_FINE_PRINT]",
+    "Why Stores Can Legally Trap You With A Single Receipt Stamp",
+    "The Hidden Asymmetric Clause Behind <EVERYDAY_TRANSACTION>",
+    "When A Local Store Weaponizes Fine Print Against An Innocent Consumer"
+  ]
+}
