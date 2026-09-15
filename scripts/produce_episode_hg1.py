@@ -148,15 +148,39 @@ def run_chain(task_id: str) -> int:
         veto_reason = fact_audit.get("veto_reason") or "Factual discrepancies in pre-approved story"
         _log(stage, f"FATAL: B2.1 Fact Audit REJECTED ({f_score}/10): {veto_reason}. Halting before B3!")
         raise RuntimeError(f"B2.1 Fact Audit REJECTED ({f_score}/10): {veto_reason}. Halting before B3!")
-    _log(stage, f"B2.1 Fact Audit verified OK ({f_score}/10). Proceeding directly to B3 Hollywood Director Plan!")
+    _log(stage, f"B2.1 Fact Audit verified OK ({f_score}/10). Proceeding directly to B3 Audio Spine & Visual Director!")
 
-    # ---- B3 Hollywood Art Director & Scene Breakdown Engine (Rule 125)
-    stage = "B3"
+    # ---- B2 Spoken Script Verification (Hollywood Audio-Anchored Standard)
+    if not brain.get("spoken_sentences"):
+        _log("B2_SPOKEN", "Adapting Master Spoken VO script from 5-Act story...")
+        from app.services.story_engine_b2 import adapt_master_spoken_script, adversarial_audit_spoken_script
+        mkt = str(brain.get("market") or meta.get("market") or task_id.split("_")[0]).upper()
+        spoken_data = adapt_master_spoken_script(story_text, market=mkt, topic=keyword)
+        spoken_audit = adversarial_audit_spoken_script(spoken_data, market=mkt, topic=keyword)
+        brain["spoken_script"] = spoken_data.get("spoken_script_text", story_text)
+        brain["spoken_sentences"] = spoken_data.get("sentences", [])
+        brain["spoken_script_audit"] = spoken_audit
+        (ep_dir / "spoken_script.txt").write_text(brain["spoken_script"], encoding="utf-8")
+        (ep_dir / "spoken_sentences.json").write_text(json.dumps(brain["spoken_sentences"], ensure_ascii=False, indent=2), encoding="utf-8")
+        brain_file.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
+        _log("B2_SPOKEN", f"Master Spoken VO ready: {len(brain['spoken_sentences'])} breath-paced sentences (Audit: {spoken_audit.get('audit_score')}/10 {spoken_audit.get('verdict')})")
+
+    # ---- B3 Audio Spine & Timecode Map (Rule 120 & Hollywood Architecture)
+    stage = "B3_AUDIO"
+    from app.services.beat_tts_engine import synthesize_beat_tts_pipeline
+    _log(stage, "Synthesizing Master Voiceover Audio Spine from B2 Spoken Script...")
+    force_tts = os.getenv("VF_FORCE_TTS", "0") == "1"
+    tts_res = asyncio.run(synthesize_beat_tts_pipeline(task_id, out_dir=str(ep_dir), force=force_tts))
+    _log(stage, f"Audio Spine ready: {tts_res['total_duration_sec']:.1f}s ({len(tts_res['segments'])} sentences mapped)")
+
+    # ---- B3.5 Hollywood Art Director & Shot Breakdown (Rule 125 & 128)
+    stage = "B3_VISUAL"
     from app.services.director_planner_b3 import generate_director_plan
-    _log(stage, "executing Hollywood Art Director & 8-axis scene breakdown")
+    _log(stage, "Executing Hollywood Art Director & shot breakdown from audio timecodes...")
     director_plan = generate_director_plan(
         episode_id=task_id,
         story_text=story_text,
+        spoken_sentences=tts_res.get("segments"),
         intel_card=card if 'card' in locals() else None,
         metadata={"niche": brain.get("niche") or "Finance", "topic": brain.get("topic") or task_id}
     )

@@ -112,17 +112,33 @@ async def synthesize_beat_tts_pipeline(
     with open(brain_path, "r", encoding="utf-8") as f:
         brain = json.load(f)
 
+    # Hollywood Audio-Anchored Pipeline: prioritize spoken_sentences from B2 over scenes
+    spoken_sentences = brain.get("spoken_sentences", [])
     scenes = brain.get("scenes", [])
-    if not scenes:
-        raise ValueError(f"No scenes found in {brain_path}")
+    
+    if not spoken_sentences and not scenes:
+        # Check disk fallback for spoken_sentences.json
+        disk_sp = f"{out_dir}/spoken_sentences.json"
+        if os.path.exists(disk_sp):
+            try:
+                with open(disk_sp, "r", encoding="utf-8") as sf:
+                    spoken_sentences = json.load(sf)
+            except Exception:
+                pass
+
+    use_spoken_sentences = bool(spoken_sentences)
+    units_to_synthesize = spoken_sentences if use_spoken_sentences else scenes
+    if not units_to_synthesize:
+        raise ValueError(f"No spoken_sentences or scenes found in {brain_path}")
 
     final_audio_path = f"{out_dir}/tts_out.mp3"
     seg_file = f"{out_dir}/whisper_segments.json"
+    spoken_out_file = f"{out_dir}/spoken_sentences.json"
     srt_file = f"{out_dir}/subtitles.srt"
 
     # Idempotency check
     if not force and os.path.exists(final_audio_path) and os.path.exists(seg_file):
-        if os.path.getsize(final_audio_path) > 1000000 and os.path.getsize(seg_file) > 1000:
+        if os.path.getsize(final_audio_path) > 100000 and os.path.getsize(seg_file) > 1000:
             logger.info("[BeatTTS] Reusing existing valid audio & segments for %s", episode_id)
             with open(seg_file, "r", encoding="utf-8") as sf:
                 existing_segs = json.load(sf)
@@ -155,14 +171,14 @@ async def synthesize_beat_tts_pipeline(
     tts_rate = brain.get("tts_rate") or os.getenv("VF_TTS_RATE") or default_rate
     tts_pitch = brain.get("tts_pitch") or os.getenv("VF_TTS_PITCH") or default_pitch
 
-    logger.info("[BeatTTS] Starting Beat-Level TTS Pipeline for %s", episode_id)
+    logger.info("[BeatTTS] Starting Beat-Level TTS Pipeline for %s (%s)", episode_id, "spoken_sentences" if use_spoken_sentences else "scenes")
     logger.info("  Market: %s | Lang: %s | Voice: %s | Rate: %s | Pitch: %s", market, lang_code, voice, tts_rate, tts_pitch)
 
-    # Group scenes by beat_index
+    # Group units by beat_index
     beats: Dict[int, List[Dict[str, Any]]] = {}
-    for sc in scenes:
-        b_idx = int(sc.get("beat_index") or 1)
-        beats.setdefault(b_idx, []).append(sc)
+    for u in units_to_synthesize:
+        b_idx = int(u.get("beat_index") or 1)
+        beats.setdefault(b_idx, []).append(u)
 
     all_segments: List[Dict[str, Any]] = []
     beat_mp3_paths: List[str] = []
@@ -172,10 +188,15 @@ async def synthesize_beat_tts_pipeline(
     global_time_offset_ms = 0
 
     for b_idx in sorted(beats.keys()):
-        b_scenes = beats[b_idx]
-        beat_text = "\n\n".join(sc.get("narration", "").strip() for sc in b_scenes)
+        b_units = beats[b_idx]
+        beat_texts = []
+        for u in b_units:
+            t = (u.get("text") or u.get("narration") or "").strip()
+            if t:
+                beat_texts.append(t)
+        beat_text = "\n\n".join(beat_texts)
         beat_file = f"{beats_dir}/beat_{b_idx}.mp3"
-        logger.info("  Synthesizing Beat %d (%d scenes, %d chars)...", b_idx, len(b_scenes), len(beat_text))
+        logger.info("  Synthesizing Beat %d (%d units, %d chars)...", b_idx, len(b_units), len(beat_text))
 
         comm = edge_tts.Communicate(beat_text, voice, rate=tts_rate, pitch=tts_pitch)
         boundaries = []
@@ -202,28 +223,30 @@ async def synthesize_beat_tts_pipeline(
         beat_actual_dur_sec = float(dur_res.stdout.strip() or 0.0)
         beat_actual_dur_ms = int(beat_actual_dur_sec * 1000)
 
-        # Map scenes to boundaries
+        # Map units to boundaries
         seg_idx = 0
         beat_segments = []
-        for sc in b_scenes:
-            sc_text = re.sub(r'\s+', '', sc.get("narration", ""))
+        for u in b_units:
+            raw_u_text = u.get("text") or u.get("narration") or ""
+            u_clean_text = re.sub(r'\s+', '', raw_u_text)
             matched = []
             accum = ""
-            local_sc_start = boundaries[seg_idx]["start_ms"] if seg_idx < len(boundaries) else 0
+            local_u_start = boundaries[seg_idx]["start_ms"] if seg_idx < len(boundaries) else 0
             while seg_idx < len(boundaries):
                 b_item = boundaries[seg_idx]
                 b_clean = re.sub(r'\s+', '', b_item["text"])
                 accum += b_clean
                 matched.append(b_item)
                 seg_idx += 1
-                if len(accum) >= len(sc_text) * 0.95 or accum == sc_text:
+                if len(accum) >= len(u_clean_text) * 0.95 or accum == u_clean_text:
                     break
             
-            local_sc_end = matched[-1]["end_ms"] if matched else local_sc_start + 4000
+            local_u_end = matched[-1]["end_ms"] if matched else local_u_start + 4000
             
             # Convert to global timeline
-            abs_start_ms = global_time_offset_ms + local_sc_start
-            abs_end_ms = global_time_offset_ms + local_sc_end
+            abs_start_ms = global_time_offset_ms + local_u_start
+            abs_end_ms = global_time_offset_ms + local_u_end
+            dur_frames = max(1, int(round((abs_end_ms - abs_start_ms) / 1000.0 * 30)))
             
             # Words for karaoke
             words = []
@@ -234,14 +257,17 @@ async def synthesize_beat_tts_pipeline(
                 words.extend(sub_words)
 
             segment_entry = {
-                "scene_id": sc.get("scene_id"),
+                "sentence_id": u.get("sentence_id") or u.get("scene_id") or f"sent_{len(all_segments) + len(beat_segments) + 1:03d}",
+                "scene_id": u.get("scene_id") or u.get("sentence_id"),
                 "beat_index": b_idx,
-                "text": sc.get("narration", ""),
+                "text": raw_u_text,
                 "start_ms": abs_start_ms,
                 "end_ms": abs_end_ms,
                 "start": round(abs_start_ms / 1000.0, 3),
                 "end": round(abs_end_ms / 1000.0, 3),
-                "words": words
+                "duration_frames": dur_frames,
+                "words": words,
+                "karaoke_highlights": u.get("karaoke_highlights", [])
             }
             beat_segments.append(segment_entry)
 
@@ -293,9 +319,21 @@ async def synthesize_beat_tts_pipeline(
             all_segments[-1]["words"][-1]["end_ms"] = final_actual_dur_ms
             all_segments[-1]["words"][-1]["end"] = round(final_actual_dur_ms / 1000.0, 3)
 
-    # Write whisper_segments.json
+    # Write whisper_segments.json and spoken_sentences.json (Hollywood Audio Spine)
     with open(seg_file, "w", encoding="utf-8") as sf:
         json.dump(all_segments, sf, ensure_ascii=False, indent=2)
+    with open(spoken_out_file, "w", encoding="utf-8") as sof:
+        json.dump(all_segments, sof, ensure_ascii=False, indent=2)
+
+    # Sync back to brain_input.json so downstream stages (B3.5 Director & Remotion) have exact timecodes
+    try:
+        brain["spoken_sentences"] = all_segments
+        brain["audio_duration_sec"] = final_actual_dur_sec
+        brain["audio_duration_frames"] = int(round(final_actual_dur_sec * 30))
+        with open(brain_path, "w", encoding="utf-8") as bf:
+            json.dump(brain, bf, ensure_ascii=False, indent=2)
+    except Exception as _b_err:
+        logger.warning(f"[BeatTTS] Could not update brain_input.json: {_b_err}")
 
     # Build SRT content
     srt_entries = []

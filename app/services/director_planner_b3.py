@@ -529,13 +529,14 @@ def _deep_merge(base: dict, update: dict) -> dict:
 def generate_director_plan(
     episode_id: str,
     story_text: str = None,
+    spoken_sentences: list = None,
     intel_card: dict = None,
     metadata: dict = None,
     skip_notion: bool = False
 ) -> dict:
     """
-    Core B3 Art Director & Universal Scene Breakdown Engine (Rule 128).
-    Breaks down 5-Beat story into 130-160 dynamic cinematic scenes.
+    Core B3 Art Director & Universal Scene Breakdown Engine (Hollywood Audio-Anchored - Rule 128).
+    Breaks down 5-Beat story into 45-65 dynamic cinematic shots anchored 1:1 to master audio timecodes.
     Preserves existing metadata in brain_input.json without destructive overwrite.
     Produces director_plan.json, dp_plan.json, and brain_input.json (non-destructive deep-merge).
     """
@@ -549,6 +550,31 @@ def generate_director_plan(
     ws_dir.mkdir(parents=True, exist_ok=True)
     if var_vf_dir.parent.exists() or Path("/var/vf").exists():
         var_vf_dir.mkdir(parents=True, exist_ok=True)
+
+    if not spoken_sentences:
+        spoken_candidates = [
+            var_vf_dir / "spoken_sentences.json",
+            ep_dir / "spoken_sentences.json",
+            ws_dir / "spoken_sentences.json"
+        ]
+        for sc in spoken_candidates:
+            if sc.exists():
+                try:
+                    spoken_sentences = json.loads(sc.read_text(encoding="utf-8"))
+                    if spoken_sentences:
+                        break
+                except Exception:
+                    pass
+    if not spoken_sentences:
+        for bc in [var_vf_dir / "brain_input.json", ep_dir / "brain_input.json"]:
+            if bc.exists():
+                try:
+                    b_data = json.loads(bc.read_text(encoding="utf-8"))
+                    spoken_sentences = b_data.get("spoken_sentences", [])
+                    if spoken_sentences:
+                        break
+                except Exception:
+                    pass
 
     if not story_text:
         story_candidates = [
@@ -646,57 +672,110 @@ def generate_director_plan(
         b_num = b_idx + 1
         b_name = CANONICAL_BEATS[b_idx] if b_idx < len(CANONICAL_BEATS) else f"Beat {b_num}"
         beat_content = beat.get("content", "").strip()
-        logger.info(f"  [B3 Dynamic Chunk {b_num}/5] Directing {b_name} (start scene: sc{sc_counter:03d})...")
+        beat_spoken = [s for s in spoken_sentences if int(s.get("beat_index") or 1) == b_num] if spoken_sentences else None
+        logger.info(f"  [B3 Dynamic Chunk {b_num}/5] Directing {b_name} (start scene: sc{sc_counter:03d}, spoken sentences: {len(beat_spoken) if beat_spoken else 'N/A'})...")
 
-        system_prompt = (
-            f"{targeted_art_rules}\n\n"
-            "You are an Elite Hollywood Art Director, Director of Photography (DP), and Master Visual Storyboard Editor.\n"
-            f"You direct in the visual style of {archetype['director']}.\n"
-            f"Visual Tone: {dynamic_context['physical_environment']}.\n"
-            f"Era Anchor: {dynamic_context['era_anchor']}.\n"
-            f"Color Palette: {dynamic_context['color_palette']}.\n"
-            f"Lighting Grammar: {dynamic_context['lighting_mood']}.\n"
-            f"Camera Grammar: {archetype.get('camera_style', 'Atmospheric slow push-ins and tracking shots')}.\n\n"
-            "YOUR MISSION FOR THIS BEAT:\n"
-            f"Break down this narrative Beat ({b_name}) into 26 to 32 sequential cinematic scenes (~6-7s duration each).\n"
-            + ("Act I MUST open with a 12 to 15 scene Fincher-style rapid-fire hook (Scenes sc000-sc014, 15-25 words each, ~3.5s - 5.0s per scene) structured in 3 phases: (1) Asymmetric Paradox (0-15s), (2) Hard Metric Shock (15-35s), and (3) The Investigative Contract (35-60s).\n" if b_num == 1 else "Sustain a tight sentence-atomic pacing of 25-35 words per scene (~6.0s - 7.5s duration).\n")
-            + "\nCRITICAL ARCHITECTURAL MANDATES:\n"
-            "1. TWO-LAYER RENDER SYSTEM (Rule 116):\n"
-            "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic environment. Safe-zone clear in bottom 20% for subtitles, center-right negative space for foreground overlay.\n"
-            "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration isolated on pure solid flat #FF00FF magenta chroma key. Full-body head-to-toe. NO photorealistic humans.\n"
-            "2. DYNAMIC CHARACTER ENSEMBLE (Rule 128):\n"
-            f"   - Available character roles: {[c['role_name'] for c in character_ensemble]}.\n"
-            "3. DUAL-LANGUAGE PROTOCOL (Rule 446 & Rule 120):\n"
-            "   - VISUAL PROMPTS (bg_prompt, fg_prompt, visual_metaphor): MUST BE IN ENGLISH.\n"
-            f"   - SPOKEN NARRATION ('narration'): MUST BE 100% VERBATIM IN {market_lang_name}! NEVER translate narration to English!\n"
-            "4. 6 CANONICAL CAMERA MOVEMENTS: declare strictly one of: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n"
-            f"5. LOCATION CONTINUITY: assign 'bg_cluster_id' (range {((b_num - 1) * 4) + 1}..{b_num * 4}).\n"
-            "6. FORENSIC OVERLAYS: Tag evidentiary scenes with 'forensic_overlay': 'redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt', or null.\n"
-            "7. MOTION GRAPHICS & STAT CARDS (Rule 122 Remotion Suite):\n"
-            "   - 'stat_card': Tag high-impact metric scenes with {\"value\": \"$41.8M\" / \"14,000명\" / \"52%\", \"label\": \"PRICE ANCHOR\" / \"VALUATION COLLAPSE\"} or null.\n"
-            "   - 'stamp_badge': Climax evidentiary stamp slam: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.\n"
-            "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'.\n\n"
-            "OUTPUT FORMAT: Return ONLY a valid JSON object matching: {\"scenes\": [ ... ]}. No markdown fences."
-        )
+        if beat_spoken:
+            system_prompt = (
+                f"{targeted_art_rules}\n\n"
+                "You are an Elite Hollywood Art Director, Director of Photography (DP), and Master Visual Storyboard Editor.\n"
+                f"You direct in the visual style of {archetype['director']}.\n"
+                f"Visual Tone: {dynamic_context['physical_environment']}.\n"
+                f"Era Anchor: {dynamic_context['era_anchor']}.\n"
+                f"Color Palette: {dynamic_context['color_palette']}.\n"
+                f"Lighting Grammar: {dynamic_context['lighting_mood']}.\n"
+                f"Camera Grammar: {archetype.get('camera_style', 'Atmospheric slow push-ins and tracking shots')}.\n\n"
+                "YOUR MISSION FOR THIS BEAT (HOLLYWOOD AUDIO-ANCHORED SHOT BREAKDOWN):\n"
+                f"Direct cinematic visual shots for the {len(beat_spoken)} spoken voiceover sentences of {b_name}.\n"
+                "For each spoken sentence, assign 1 cinematic scene (or up to 2 shots for high-stakes climax moments).\n\n"
+                "CRITICAL ARCHITECTURAL MANDATES:\n"
+                "1. 0% INVENTED SPOKEN TEXT: The 'narration' field MUST BE THE VERBATIM TEXT of the spoken sentence. DO NOT INVENT ANY NEW WORDS OR DIALOGUE!\n"
+                "2. TIMECODE ALIGNMENT: The scene duration MUST match the sentence audio duration ('duration_frames' and 'duration_sec').\n"
+                "3. TWO-LAYER RENDER SYSTEM (Rule 116 & Rule 122):\n"
+                "   - Layer 1 Background (16:9 widescreen 2560x1440): 'bg_prompt' IN ENGLISH. Cinematic environment, safe-zone clear in bottom 20% for subtitles.\n"
+                "   - Layer 2 Foreground (1:1 2048x2048): 'fg_prompt' IN ENGLISH. Stylized Graphic Novel Editorial Illustration on solid flat #FF00FF magenta chroma key.\n"
+                "4. DYNAMIC CHARACTER ENSEMBLE (Rule 128):\n"
+                f"   - Available character roles: {[c['role_name'] for c in character_ensemble]}.\n"
+                "5. 6 CANONICAL CAMERA MOVEMENTS: declare strictly one of: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n"
+                "6. FORENSIC GRAPHICS & STAT CARDS:\n"
+                "   - 'forensic_overlay': 'redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt', or null.\n"
+                "   - 'stat_card': Tag high-impact metric scenes with {\"value\": \"$41.8M\" / \"14,000명\" / \"52%\", \"label\": \"PRICE ANCHOR\" / \"VALUATION COLLAPSE\"} or null.\n"
+                "   - 'stamp_badge': Climax evidentiary stamp slam: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.\n"
+                "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'.\n\n"
+                "OUTPUT FORMAT: Return ONLY a valid JSON object matching: {\"scenes\": [ ... ]}. No markdown fences."
+            )
 
-        beat_payload = {
-            "episode_id": episode_id,
-            "market": m_up,
-            "narration_language": market_lang_name,
-            "beat_index": b_num,
-            "beat_name": b_name,
-            "start_scene_index": sc_counter,
-            "target_scene_count": "26 to 32 scenes",
-            "dynamic_context": dynamic_context,
-            "character_ensemble": character_ensemble,
-            "beat_verbatim_storyline": beat_content
-        }
+            beat_payload = {
+                "episode_id": episode_id,
+                "market": m_up,
+                "narration_language": market_lang_name,
+                "beat_index": b_num,
+                "beat_name": b_name,
+                "start_scene_index": sc_counter,
+                "target_scene_count": f"{len(beat_spoken)} shots matching spoken sentences",
+                "dynamic_context": dynamic_context,
+                "character_ensemble": character_ensemble,
+                "spoken_sentences": beat_spoken
+            }
 
-        prompt_instruction = (
-            f"Break down Beat {b_num} ({b_name}) into 26 to 32 sequential scenes starting from scene_id 'sc{sc_counter:03d}'.\n"
-            "Return a JSON object: {\"scenes\": [...]}\n\n"
-            "Input Data:\n" + json.dumps(beat_payload, ensure_ascii=False)
-        )
+            prompt_instruction = (
+                f"Direct cinematic shots for the {len(beat_spoken)} spoken sentences of Beat {b_num} ({b_name}) starting from scene_id 'sc{sc_counter:03d}'.\n"
+                "Each scene's narration MUST match the spoken sentence text verbatim (0% invented text).\n"
+                "Return a JSON object: {\"scenes\": [...]}\n\n"
+                "Input Data:\n" + json.dumps(beat_payload, ensure_ascii=False)
+            )
+            min_candidate_count = max(3, int(len(beat_spoken) * 0.7))
+        else:
+            system_prompt = (
+                f"{targeted_art_rules}\n\n"
+                "You are an Elite Hollywood Art Director, Director of Photography (DP), and Master Visual Storyboard Editor.\n"
+                f"You direct in the visual style of {archetype['director']}.\n"
+                f"Visual Tone: {dynamic_context['physical_environment']}.\n"
+                f"Era Anchor: {dynamic_context['era_anchor']}.\n"
+                f"Color Palette: {dynamic_context['color_palette']}.\n"
+                f"Lighting Grammar: {dynamic_context['lighting_mood']}.\n"
+                f"Camera Grammar: {archetype.get('camera_style', 'Atmospheric slow push-ins and tracking shots')}.\n\n"
+                "YOUR MISSION FOR THIS BEAT:\n"
+                f"Break down this narrative Beat ({b_name}) into 26 to 32 sequential cinematic scenes (~6-7s duration each).\n"
+                + ("Act I MUST open with a 12 to 15 scene Fincher-style rapid-fire hook (Scenes sc000-sc014, 15-25 words each, ~3.5s - 5.0s per scene) structured in 3 phases: (1) Asymmetric Paradox (0-15s), (2) Hard Metric Shock (15-35s), and (3) The Investigative Contract (35-60s).\n" if b_num == 1 else "Sustain a tight sentence-atomic pacing of 25-35 words per scene (~6.0s - 7.5s duration).\n")
+                + "\nCRITICAL ARCHITECTURAL MANDATES:\n"
+                "1. TWO-LAYER RENDER SYSTEM (Rule 116):\n"
+                "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic environment. Safe-zone clear in bottom 20% for subtitles, center-right negative space for foreground overlay.\n"
+                "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration isolated on pure solid flat #FF00FF magenta chroma key. Full-body head-to-toe. NO photorealistic humans.\n"
+                "2. DYNAMIC CHARACTER ENSEMBLE (Rule 128):\n"
+                f"   - Available character roles: {[c['role_name'] for c in character_ensemble]}.\n"
+                "3. DUAL-LANGUAGE PROTOCOL (Rule 446 & Rule 120):\n"
+                "   - VISUAL PROMPTS (bg_prompt, fg_prompt, visual_metaphor): MUST BE IN ENGLISH.\n"
+                f"   - SPOKEN NARRATION ('narration'): MUST BE 100% VERBATIM IN {market_lang_name}! NEVER translate narration to English!\n"
+                "4. 6 CANONICAL CAMERA MOVEMENTS: declare strictly one of: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n"
+                "5. LOCATION CONTINUITY: assign 'bg_cluster_id' (range {((b_num - 1) * 4) + 1}..{b_num * 4}).\n"
+                "6. FORENSIC OVERLAYS: Tag evidentiary scenes with 'forensic_overlay': 'redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt', or null.\n"
+                "7. MOTION GRAPHICS & STAT CARDS (Rule 122 Remotion Suite):\n"
+                "   - 'stat_card': Tag high-impact metric scenes with {\"value\": \"$41.8M\" / \"14,000명\" / \"52%\", \"label\": \"PRICE ANCHOR\" / \"VALUATION COLLAPSE\"} or null.\n"
+                "   - 'stamp_badge': Climax evidentiary stamp slam: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.\n"
+                "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'.\n\n"
+                "OUTPUT FORMAT: Return ONLY a valid JSON object matching: {\"scenes\": [ ... ]}. No markdown fences."
+            )
+
+            beat_payload = {
+                "episode_id": episode_id,
+                "market": m_up,
+                "narration_language": market_lang_name,
+                "beat_index": b_num,
+                "beat_name": b_name,
+                "start_scene_index": sc_counter,
+                "target_scene_count": "26 to 32 scenes",
+                "dynamic_context": dynamic_context,
+                "character_ensemble": character_ensemble,
+                "beat_verbatim_storyline": beat_content
+            }
+
+            prompt_instruction = (
+                f"Break down Beat {b_num} ({b_name}) into 26 to 32 sequential scenes starting from scene_id 'sc{sc_counter:03d}'.\n"
+                "Return a JSON object: {\"scenes\": [...]}\n\n"
+                "Input Data:\n" + json.dumps(beat_payload, ensure_ascii=False)
+            )
+            min_candidate_count = 15
 
         raw_res = ""
         for attempt in range(1, 3):
@@ -744,12 +823,20 @@ def generate_director_plan(
         elif isinstance(parsed_beat, list):
             candidate_scenes = parsed_beat
 
-        if len(candidate_scenes) >= 15:
+        if len(candidate_scenes) >= min_candidate_count:
             logger.info(f"  [B3 Beat {b_num}] LLM generated {len(candidate_scenes)} scenes successfully.")
-            for s in candidate_scenes:
+            for s_idx, s in enumerate(candidate_scenes):
                 s["scene_id"] = f"sc{sc_counter:03d}"
                 s["beat_index"] = b_num
                 s["beat_name"] = b_name
+                if beat_spoken and s_idx < len(beat_spoken):
+                    sent = beat_spoken[s_idx]
+                    s["sentence_id"] = sent.get("sentence_id")
+                    s["duration_frames"] = sent.get("duration_frames") or s.get("duration_frames") or int(round(sent.get("duration_sec", 6.0) * 30))
+                    s["duration_sec"] = sent.get("duration_sec") or s.get("duration_sec") or round(s["duration_frames"] / 30.0, 2)
+                    s["duration_est_sec"] = s["duration_sec"]
+                    s["narration"] = sent.get("text") or s.get("narration", "")
+
                 if not s.get("bg_cluster_id"):
                     s["bg_cluster_id"] = ((b_num - 1) * 4) + (sc_counter % 3) + 1
                 if not s.get("forensic_overlay"):
@@ -763,7 +850,7 @@ def generate_director_plan(
                 all_scenes.append(s)
                 sc_counter += 1
         else:
-            logger.warning(f"  [B3 Beat {b_num}] LLM generated insufficient scenes ({len(candidate_scenes)}). Activating deterministic synthesizer for Beat {b_num}...")
+            logger.warning(f"  [B3 Beat {b_num}] LLM generated insufficient scenes ({len(candidate_scenes)} < {min_candidate_count}). Activating deterministic synthesizer for Beat {b_num}...")
             synth_scenes, sc_counter = _synthesize_beat_scenes(
                 b_idx=b_idx,
                 beat=beat,
@@ -772,12 +859,13 @@ def generate_director_plan(
                 dynamic_context=dynamic_context,
                 character_ensemble=character_ensemble,
                 cam_moves=cam_moves,
-                start_sc_counter=sc_counter
+                start_sc_counter=sc_counter,
+                beat_spoken_sents=beat_spoken
             )
             all_scenes.extend(synth_scenes)
 
     # 3. Validation and safety fallback
-    min_required_scenes = max(80, min(160, total_words // 25)) if total_words > 500 else 10
+    min_required_scenes = max(25, int(len(spoken_sentences) * 0.7)) if spoken_sentences else (max(80, min(160, total_words // 25)) if total_words > 500 else 10)
     if len(all_scenes) < min_required_scenes:
         logger.warning(f"  [B3] Total scenes {len(all_scenes)} < minimum {min_required_scenes}. Regenerating full deterministic fallback...")
         fallback_plan = _synthesize_deterministic_director_plan(
@@ -785,7 +873,8 @@ def generate_director_plan(
             story_beats,
             archetype,
             dynamic_context=dynamic_context,
-            character_ensemble=character_ensemble
+            character_ensemble=character_ensemble,
+            spoken_sentences=spoken_sentences
         )
         scenes = fallback_plan.get("scenes", [])
     else:
@@ -1080,7 +1169,8 @@ def _synthesize_deterministic_director_plan(
     story_beats: list[dict],
     archetype: dict,
     dynamic_context: dict = None,
-    character_ensemble: list[dict] = None
+    character_ensemble: list[dict] = None,
+    spoken_sentences: list = None
 ) -> dict:
     """
     Robust fallback scene breakdown with dynamic character ensemble and authentic narrative context.
@@ -1137,6 +1227,8 @@ def _synthesize_deterministic_director_plan(
     sc_counter = 0
 
     for b_idx, beat in enumerate(story_beats):
+        b_num = b_idx + 1
+        beat_spoken = [s for s in spoken_sentences if int(s.get("beat_index") or 1) == b_num] if spoken_sentences else None
         b_scenes, sc_counter = _synthesize_beat_scenes(
             b_idx=b_idx,
             beat=beat,
@@ -1145,7 +1237,8 @@ def _synthesize_deterministic_director_plan(
             dynamic_context=dynamic_context,
             character_ensemble=character_ensemble,
             cam_moves=cam_moves,
-            start_sc_counter=sc_counter
+            start_sc_counter=sc_counter,
+            beat_spoken_sents=beat_spoken
         )
         scenes.extend(b_scenes)
 
@@ -1168,14 +1261,84 @@ def _synthesize_beat_scenes(
     dynamic_context: dict,
     character_ensemble: list[dict],
     cam_moves: list[str],
-    start_sc_counter: int
+    start_sc_counter: int,
+    beat_spoken_sents: list[dict] = None
 ) -> tuple[list[dict], int]:
     """
-    Synthesize 25-35 deterministic scenes for a single beat.
-    Correctly splits Korean and CJK text using [.!?。！？\n] to prevent scene underflow.
+    Synthesize deterministic scenes for a single beat.
+    If beat_spoken_sents is provided (Hollywood Audio-Anchored architecture):
+    Synthesizes 1:1 scenes anchored to the spoken sentence timecodes with 0% invented dialogue.
+    Otherwise, splits raw text into breath chunks.
     """
     b_num = b_idx + 1
     b_name = CANONICAL_BEATS[b_idx] if b_idx < len(CANONICAL_BEATS) else f"Beat {b_num}"
+
+    # Hollywood Audio-Anchored path: 1:1 mapping from spoken sentences
+    if beat_spoken_sents:
+        beat_scenes = []
+        sc_counter = start_sc_counter
+        for sent in beat_spoken_sents:
+            sc_text = sent.get("text", "").strip()
+            if not sc_text:
+                continue
+            sc_id = f"sc{sc_counter:03d}"
+            bg_cluster_id = ((b_num - 1) * 4) + (sc_counter % 3) + 1
+            bg_k = f"{episode_id.lower()}_bg_b{b_num}_loc{sc_counter % 3}"
+
+            char_idx = sc_counter % len(character_ensemble)
+            char_obj = character_ensemble[char_idx]
+            char_role = char_obj["role_name"]
+            char_attire = char_obj["attire"]
+            char_state = char_obj["archetype"]
+            char_cues = char_obj.get("visual_cues", "standing head-to-toe")
+            fg_k = f"{episode_id.lower()}_fg_b{b_num}_char{char_idx}" if sc_counter % 3 != 0 else None
+            fg_pos = "right" if sc_counter % 2 == 0 else "left"
+
+            bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 cinematic setting of {b_name}, {dynamic_context['physical_environment']}, {dynamic_context['lighting_mood']}"
+            fg_desc = f"Stylized editorial graphic novel digital illustration of full-body {char_role} in {char_attire}, standing head-to-toe, {char_cues}, posture {char_state}, 1:1 aspect ratio, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames" if fg_k else None
+            cam_move = cam_moves[sc_counter % len(cam_moves)]
+
+            dur_frames = sent.get("duration_frames") or int(round(sent.get("duration_sec", 6.0) * 30))
+            dur_sec = sent.get("duration_sec") or round(dur_frames / 30.0, 2)
+
+            forensic_overlay = detect_forensic_overlay(sc_text)
+            stat_card = detect_stat_card(sc_text)
+            stamp_badge = detect_stamp_badge(sc_text)
+            motion_directive = "dramatic_push" if sc_counter < 10 else ("split_whip" if sc_counter % 3 == 0 else "subtle_drift")
+
+            beat_scenes.append({
+                "scene_id": sc_id,
+                "sentence_id": sent.get("sentence_id"),
+                "beat_index": b_num,
+                "beat_name": b_name,
+                "narration": sc_text,
+                "duration_est_sec": dur_sec,
+                "duration_sec": dur_sec,
+                "duration_frames": dur_frames,
+                "visual_metaphor": f"Visual metaphor representing {b_name}",
+                "bg_cluster_id": bg_cluster_id,
+                "forensic_overlay": forensic_overlay,
+                "stat_card": stat_card,
+                "stamp_badge": stamp_badge,
+                "motion_directive": motion_directive,
+                "camera": {
+                    "movement": cam_move,
+                    "target_focal": "medium_shot" if fg_k else "wide_shot",
+                    "transition": "cut"
+                },
+                "camera_movement": cam_move,
+                "bg_prompt": bg_desc,
+                "image_prompt": bg_desc,
+                "fg_prompt": fg_desc,
+                "foreground_prompt": fg_desc,
+                "background_reuse_key": bg_k,
+                "foreground_reuse_key": fg_k,
+                "fg_position": fg_pos if fg_k else None,
+                "safe_zone": "bottom 20% clear for subtitles"
+            })
+            sc_counter += 1
+        return beat_scenes, sc_counter
+
     beat_raw = beat.get("content", "").strip()
 
     # Multi-lingual CJK detection (Chinese, Japanese, Korean)

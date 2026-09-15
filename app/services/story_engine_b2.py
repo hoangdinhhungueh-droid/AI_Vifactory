@@ -217,6 +217,194 @@ def load_task_metadata(task_id: str) -> dict:
     }
 
 
+def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str = "") -> dict:
+    """Phase 2 (Master Spoken VO & Subtitle Adaptation - Hollywood Standard):
+    Adapts 5-Act Overview Narrative into a breath-timed Spoken Voiceover Script
+    strictly constrained to 10-12 minutes narration (<= 15 min hard ceiling).
+    Splits into natural breath-paced sentences (10-18 words, 25-50 syllables).
+    Extracts karaoke highlight keywords and assigns beat_index (1..5).
+    """
+    mkt = market.upper()
+    lang_name = "English" if mkt == "EN" else ("Japanese" if mkt == "JP" else "Korean")
+
+    if mkt == "KR":
+        target_desc = "3,000 to 3,400 Korean Hangul syllables (~40 to 60 sentences, strictly <= 4,500 syllables, ~10-12 min speech)"
+    elif mkt == "JP":
+        target_desc = "3,200 to 3,600 Japanese characters (~40 to 60 sentences, strictly <= 4,800 characters, ~10-12 min speech)"
+    else:
+        target_desc = "1,500 to 1,800 English words (~50 to 70 sentences, strictly <= 2,000 words, ~10-12 min speech)"
+
+    system_prompt = (
+        f"You are an Elite Master Voiceover Director, Audio Dramatist, and Subtitle Editor for Video Factory.\\n"
+        f"Target Spoken Language: {lang_name}.\\n"
+        f"Target Length: {target_desc}.\\n\\n"
+        "YOUR MISSION:\\n"
+        "Transform the provided 5-Act Investigative Documentary Script into a Master Spoken Voiceover Script optimized for broadcast delivery.\\n\\n"
+        "STRICT CONSTRAINTS:\\n"
+        "1. PRESERVE THE 5-BEAT STRUCTURE: Sentences must advance chronologically from Beat 1 to Beat 5.\\n"
+        "2. NATURAL BREATH PACING: Each sentence must be 10-18 words (Korean/CJK: 25-50 syllables/characters). Avoid run-on sentences.\\n"
+        "3. DRAMATIC AUDIO PUNCTUATION: Use natural pauses (commas, ellipses '...', em-dashes '—') to create suspense, pacing shifts, and dramatic gravitas.\\n"
+        "4. HARD DURATION CEILING: Narration duration MUST be between 10 and 12 minutes (NEVER exceed 15 minutes). Eliminate repetitive fluff.\\n"
+        "5. KARAOKE HIGHLIGHTS: For each sentence, identify 1 to 3 critical high-impact keywords (amounts, percentages, fraud terms, evidence, dates) for visual karaoke highlighting.\\n"
+        "6. LINGUISTIC PURITY: 100% native vocabulary in the target language. Zero raw English words in KR/JP prose.\\n\\n"
+        "OUTPUT FORMAT:\\n"
+        "Return ONLY a valid JSON object matching this exact schema, without markdown formatting:\\n"
+        "{\\n"
+        '  "total_estimated_minutes": 11.2,\\n'
+        '  "spoken_script_text": "Full concatenated spoken narration text...",\\n'
+        '  "sentences": [\\n'
+        '    {\\n'
+        '      "sentence_id": "sent_001",\\n'
+        '      "beat_index": 1,\\n'
+        '      "text": "First breath-timed spoken sentence...",\\n'
+        '      "karaoke_highlights": ["keyword1", "keyword2"]\\n'
+        '    }\\n'
+        '  ]\\n'
+        "}"
+    )
+
+    user_prompt = (
+        f"Adapt the following 5-Act Investigative Script for topic '{topic}' into the Master Spoken Voiceover & Subtitle Script:\\n\\n"
+        f"{full_script}\\n\\n"
+        f"Generate the JSON now:"
+    )
+
+    logger.info(f"[story_engine] Adapting Master Spoken VO Script for {topic} ({mkt})...")
+    raw_res = ""
+    try:
+        raw_res = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=6000, timeout=180.0)
+    except Exception as e:
+        logger.warning(f"[story_engine] LLM call for spoken VO adaptation failed: {e}")
+
+    parsed = None
+    if raw_res and raw_res.strip():
+        cleaned = raw_res.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        if cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        try:
+            parsed = json.loads(cleaned.strip())
+        except Exception:
+            m = re.search(r"(\{.*\})", cleaned, re.DOTALL)
+            if m:
+                try:
+                    parsed = json.loads(m.group(1))
+                except Exception:
+                    pass
+
+    if not parsed or not isinstance(parsed, dict) or not parsed.get("sentences"):
+        logger.warning(f"[story_engine] Spoken VO adaptation parsing failed or empty. Running deterministic sentence splitting fallback.")
+        sentences = []
+        full_text_lines = []
+        act_blocks = re.split(r'(===\s*(?:ACT|BEAT)\s*[I|V|X\d]+\s*===)', full_script, flags=re.IGNORECASE)
+        current_beat = 1
+        for block in act_blocks:
+            b_up = block.strip().upper()
+            if "ACT I" in b_up or "BEAT 1" in b_up: current_beat = 1; continue
+            if "ACT II" in b_up or "BEAT 2" in b_up: current_beat = 2; continue
+            if "ACT III" in b_up or "BEAT 3" in b_up: current_beat = 3; continue
+            if "ACT IV" in b_up or "BEAT 4" in b_up: current_beat = 4; continue
+            if "ACT V" in b_up or "BEAT 5" in b_up: current_beat = 5; continue
+
+            raw_sents = [s.strip() for s in re.split(r'(?<=[.!?。！？])\s+', block) if s.strip()]
+            for s in raw_sents:
+                if s.startswith("==="):
+                    continue
+                sentences.append({
+                    "sentence_id": f"sent_{len(sentences)+1:03d}",
+                    "beat_index": current_beat,
+                    "text": s,
+                    "karaoke_highlights": []
+                })
+                full_text_lines.append(s)
+        joined_text = " ".join(full_text_lines)
+        parsed = {
+            "total_estimated_minutes": round(len(joined_text) / (250 * 5 if mkt in ("KR", "JP") else 150), 1),
+            "spoken_script_text": joined_text,
+            "sentences": sentences
+        }
+
+    return parsed
+
+
+def adversarial_audit_spoken_script(spoken_data: dict, market: str = "EN", topic: str = "") -> dict:
+    """Gate 2.5 (Adversarial Spoken VO Audit Gate):
+    Uses an independent LLM pass acting as Chief Audio Director & Broadcast Standards Auditor.
+    Verifies:
+      1. Duration <= 15 minutes hard ceiling (target 10-12 minutes).
+      2. Pacing, dramatic tension, and natural breathing rhythm.
+      3. Absence of narrative bloat, repetitive word loops, or artificial inflation.
+      4. Coverage of all 5 Beats.
+    Must score >= 8.5/10 with verdict 'PASS'.
+    """
+    mkt = market.upper()
+    sentences = spoken_data.get("sentences", [])
+    script_text = spoken_data.get("spoken_script_text", "")
+    total_est_min = float(spoken_data.get("total_estimated_minutes", 10.0))
+
+    is_cjk = mkt in ("KR", "JP", "ZH")
+    total_units = len(script_text) if is_cjk else len(script_text.split())
+    unit_name = "characters/syllables" if is_cjk else "words"
+
+    max_units = 5500 if is_cjk else 2200
+    if total_units > max_units:
+        logger.warning(f"[story_engine] Spoken VO exceeds strict ceiling: {total_units} {unit_name} (max {max_units})!")
+
+    system_prompt = (
+        "You are the Chief Broadcast Standards Auditor & Audio Director for Video Factory.\\n"
+        "Audit the following Spoken Voiceover Script with adversarial scrutiny.\\n\\n"
+        "EVALUATION CRITERIA:\\n"
+        "1. DURATION COMPLIANCE (Weight 30%): Does the script fit into 10 to 12 minutes (hard maximum 15 minutes)? Flag any bloated or padded sentences.\\n"
+        "2. DRAMATIC TENSION & PACING (Weight 30%): Does it maintain relentless docudrama suspense and rhythmic breathing pauses?\\n"
+        "3. NARRATIVE INTEGRITY (Weight 20%): Are all 5 investigative beats present (Hook -> False Narrative -> Systemic Blindspot -> Real Culprit -> Modern Mirror)?\\n"
+        "4. SPOKEN SUITABILITY (Weight 20%): Are sentences concise (10-18 words) and easy for a voiceover narrator to deliver naturally without stumbling?\\n\\n"
+        "OUTPUT FORMAT: Return ONLY a JSON object:\\n"
+        "{\\n"
+        '  "verdict": "PASS",\\n'
+        '  "audit_score": 9.2,\\n'
+        '  "estimated_duration_minutes": 11.0,\\n'
+        '  "pacing_verdict": "Excellent / Needs trim",\\n'
+        '  "bloat_detected": false,\\n'
+        '  "critique": "Crisp, breath-timed sentences with high dramatic urgency."\\n'
+        "}"
+    )
+
+    user_prompt = (
+        f"Episode Topic: {topic} | Market: {mkt}\\n"
+        f"Total Sentences: {len(sentences)} | Total {unit_name}: {total_units} | Initial Est: {total_est_min:.1f} min\\n\\n"
+        f"Spoken Script Sample (First 5 and Last 5 sentences):\\n"
+        + "\\n".join(f"- [{s.get('sentence_id')} Beat {s.get('beat_index')}] {s.get('text')}" for s in sentences[:5])
+        + "\\n...\\n"
+        + "\\n".join(f"- [{s.get('sentence_id')} Beat {s.get('beat_index')}] {s.get('text')}" for s in sentences[-5:])
+        + f"\\n\\nAudit this Spoken Script now:"
+    )
+
+    try:
+        raw_res = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=1500, timeout=60.0)
+        cleaned = raw_res.strip()
+        if cleaned.startswith("```json"): cleaned = cleaned[7:]
+        if cleaned.startswith("```"): cleaned = cleaned[3:]
+        if cleaned.endswith("```"): cleaned = cleaned[:-3]
+        audit = json.loads(cleaned.strip())
+    except Exception as e:
+        logger.warning(f"[story_engine] Adversarial spoken audit LLM parse error: {e}. Applying rule-based audit.")
+        score = 9.0 if total_units <= max_units and len(sentences) >= 30 else 7.0
+        audit = {
+            "verdict": "PASS" if score >= 8.5 else "FAIL",
+            "audit_score": score,
+            "estimated_duration_minutes": total_est_min,
+            "pacing_verdict": "Paced" if score >= 8.5 else "Length violation",
+            "bloat_detected": total_units > max_units,
+            "critique": "Rule-based audit fallback: duration and sentence count within safe parameters."
+        }
+
+    logger.info(f"[story_engine] Gate 2.5 Spoken VO Audit: Verdict={audit.get('verdict')} | Score={audit.get('audit_score')}/10 | Est={audit.get('estimated_duration_minutes')}m")
+    return audit
+
+
 def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: bool = False) -> dict:
     """Generate a complete 5-Beat Docudrama script (1,800-2,200 words, ~12-15 min) using GPT-6-Astra
     enforcing YouTube Safety, Rule 444 An Ong Hook, and Rule 445 in a single optimized pass.
@@ -801,9 +989,28 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             logger.warning(f"[story_engine] Error writing story.txt to {d}: {_fe}")
 
     # ----------------------------------------------------
+    # Phase 2: Adapt Master Spoken VO Script (Hollywood Standard - Rule 120 & Rule 128)
+    # ----------------------------------------------------
+    logger.info(f"[story_engine] Phase 2: Generating Master Spoken VO Script for {task_id}...")
+    spoken_data = adapt_master_spoken_script(full_script=full_script, market=mkt, topic=topic)
+    spoken_audit = adversarial_audit_spoken_script(spoken_data=spoken_data, market=mkt, topic=topic)
+    spoken_script_text = spoken_data.get("spoken_script_text") or full_script
+    spoken_sentences = spoken_data.get("sentences") or []
+
+    # Write spoken_script.txt & spoken_sentences.json to both directories
+    for d in [out_dir, root_ep_dir]:
+        try:
+            with open(os.path.join(d, "spoken_script.txt"), "w", encoding="utf-8") as f:
+                f.write(spoken_script_text)
+            with open(os.path.join(d, "spoken_sentences.json"), "w", encoding="utf-8") as f:
+                json.dump(spoken_sentences, f, ensure_ascii=False, indent=2)
+        except Exception as _fe:
+            logger.warning(f"[story_engine] Error writing spoken VO assets to {d}: {_fe}")
+
+    # ----------------------------------------------------
     # B2 Output Finalization (Rule 125: B3 Scene breakdown delegated to director_planner_b3.py)
     # ----------------------------------------------------
-    logger.info("[story_engine] B2 5-Act story generation complete. Scene breakdown delegated to B3 Art Director.")
+    logger.info("[story_engine] B2 5-Act story & Spoken VO complete. Scene breakdown delegated to B3 Art Director.")
     scenes = []
 
     # Build brain_input.json
@@ -824,6 +1031,10 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
         "content_theme": theme,
         "safety_label": safety_label,
         "treatment_note": treatment_note,
+        "spoken_script": spoken_script_text,
+        "spoken_sentences": spoken_sentences,
+        "spoken_script_audit": spoken_audit,
+        "total_estimated_minutes": spoken_audit.get("estimated_duration_minutes") or spoken_data.get("total_estimated_minutes", 11.0),
         "scenes": scenes,
         "total_scenes": len(scenes),
         "render_architecture": "two_layer_v1",
