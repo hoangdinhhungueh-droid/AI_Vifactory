@@ -598,13 +598,29 @@ def forge_seo_package(
         # Narrative hooks
         hook_3s = str(parsed_llm.get("hook_3s") or f"Everything you knew about {kw} is built on a contradiction.").strip()
         hook_60s = str(parsed_llm.get("hook_60s") or "").strip()
-        if len(hook_60s.split()) < 30:
-            hook_60s = (
-                f"When the initial reports regarding {kw} surfaced, few questioned the public narrative. "
-                f"Yet deep inside institutional records, an evidentiary anomaly emerged that contradicted official findings. "
-                f"This investigation explores the forensic paper trail, the concealed motives, and the systemic revelation "
-                f"that forces a re-examination of everything on record."
-            )
+        is_cjk_pkg = m_up in ("JP", "JA", "KR", "KO", "ZH")
+        is_hook_too_short = (len(hook_60s) < 60) if is_cjk_pkg else (len(hook_60s.split()) < 30)
+
+        if is_hook_too_short:
+            if m_up in ("JP", "JA"):
+                hook_60s = (
+                    f"{kw}に関する第一報が報じられた当初、その公式発表を疑う者はほとんどいませんでした。"
+                    f"しかし組織の内部記録を精査すると、公式見解と真っ向から矛盾する重大な証拠の異常値が浮上しました。"
+                    f"本調査ドキュメンタリーは、隠蔽された動機、追跡された記録、そして全てを覆す構造的真実を徹底解明します。"
+                )
+            elif m_up in ("KR", "KO"):
+                hook_60s = (
+                    f"{kw}에 관한 최초 보도가 나왔을 때, 공식 발표에 의문을 제기한 사람은 거의 없었습니다. "
+                    f"그러나 내부 기록을 추적한 결과, 공식 결론과 정면으로 배치되는 결정적인 증거 이상징후가 드러났습니다. "
+                    f"본 탐사 다큐멘터리는 은폐된 동기와 추적된 기록, 그리고 모든 것을 재평가하게 만드는 구조적 진실을 파헤칩니다."
+                )
+            else:
+                hook_60s = (
+                    f"When the initial reports regarding {kw} surfaced, few questioned the public narrative. "
+                    f"Yet deep inside institutional records, an evidentiary anomaly emerged that contradicted official findings. "
+                    f"This investigation explores the forensic paper trail, the concealed motives, and the systemic revelation "
+                    f"that forces a re-examination of everything on record."
+                )
 
         angle = str(parsed_llm.get("specific_viral_angle") or comp_gap or f"Exposing the systemic truth of {kw}").strip()
 

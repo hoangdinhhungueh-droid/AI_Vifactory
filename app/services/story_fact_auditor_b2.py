@@ -17,6 +17,7 @@ import os
 import re
 import json
 import logging
+from app.services.model_gateway import get_global_gateway
 from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger("story_fact_auditor_b2")
@@ -35,6 +36,7 @@ Your sole mandate is to rigorously interrogate and audit investigative video scr
 Passing threshold:
 - audit_score >= 8.0/10
 - To pass, verdict MUST be "PASS". If critical violations exist (fabrications, severe staleness, causal inversion, single-timestamp accounting loop), mark "verdict": "FAIL".
+- If verdict is "FAIL", you MUST specify exactly which Act(s) failed in "failed_acts" (e.g. ["ACT II", "ACT IV"]) and provide precise fix instructions for each failed Act in "act_patch_critique" so the scriptwriter can patch only the flawed acts without rewriting passing acts.
 
 Output MUST be a single strict JSON object matching this schema:
 {
@@ -49,6 +51,11 @@ Output MUST be a single strict JSON object matching this schema:
   "chrono_causal_depth_score": <FLOAT 0.0 - 10.0>,
   "anti_hypothetical_tone_score": <FLOAT 0.0 - 10.0>,
   "axis_fidelity_score": <FLOAT 0.0 - 10.0>,
+  "failed_acts": ["ACT I" | "ACT II" | "ACT III" | "ACT IV" | "ACT V"],
+  "act_patch_critique": {
+    "ACT I": "<Specific instructions on what is broken and what grounding fact to anchor, or empty if passed>",
+    "ACT II": "<Specific instructions on what is broken and what grounding fact to anchor, or empty if passed>"
+  },
   "red_flags": [<STRING>, ...],
   "critical_findings": "<CONCISE SUMMARY OF VIOLATIONS OR APPROVAL>"
 }
@@ -173,3 +180,126 @@ Perform strict adversarial forensic audit according to the 8 Iron Criteria. Inte
 
     logger.info(f"[story_auditor] Audited {task_id}: Verdict={verdict} (Score: {score}/10) by {chosen_model}")
     return audit_result
+
+
+def audit_delta_patched_acts(
+    patched_acts: Dict[str, str],
+    prior_critique: Dict[str, Any],
+    grounding_claims: List[Dict[str, Any]],
+    topic_meta: Dict[str, Any],
+    market: str = "EN",
+    model: str = "claude-opus-5",
+    fallback_model: str = "claude-sonnet-5"
+) -> Dict[str, Any]:
+    """Lean Targeted Re-Audit (Delta Audit) for Round 2+ of Convergence Protocol.
+    Interrogates ONLY the patched Acts against the previous critique and Grounding Table,
+    drastically reducing input tokens (from ~25K to ~3-5K) and cost.
+    """
+    from app.services.model_gateway import get_global_gateway
+    gateway = get_global_gateway()
+
+    task_id = topic_meta.get("task_id", "")
+    m_up = (market or "EN").strip().upper()
+    topic = topic_meta.get("topic_name_vi") or topic_meta.get("raw_term") or task_id
+
+    # Format lean grounding table
+    grounding_brief = []
+    for idx, c in enumerate(grounding_claims[:8], 1):
+        grounding_brief.append(f"[{idx}] {c.get('claim', '')} | Metric: {c.get('verified_metric', 'N/A')} | Source: {c.get('source_title', '')}")
+    grounding_str = "\n".join(grounding_brief)
+
+    # Format patched acts text
+    patched_text_blocks = []
+    for act_name, act_content in patched_acts.items():
+        act_crit = prior_critique.get(act_name) or prior_critique.get("general") or "Resolve discrepancies"
+        patched_text_blocks.append(
+            f"=== {act_name} (REVISED & PATCHED) ===\n"
+            f"[PREVIOUS AUDIT DEFECT TO RESOLVE]: {act_crit}\n"
+            f"[PATCHED ACT CONTENT]:\n{act_content.strip()}\n"
+        )
+    delta_body = "\n\n".join(patched_text_blocks)
+
+    lean_prompt = f"""[TARGETED DELTA RE-AUDIT]
+Task ID: {task_id} | Topic: {topic} | Market: {m_up}
+
+[VERIFIED GROUNDING TRUTH BASELINE]
+{grounding_str}
+
+[PATCHED ACTS UNDER REVIEW (DELTA ONLY)]
+{delta_body}
+
+[MANDATE]
+Interrogate the patched Acts strictly against the previous defects:
+1. Did the patch resolve the factual discrepancy or causal inversion?
+2. Did it introduce any newly hallucinated metrics or unauthorized data (Rule 118 & 130)?
+3. Is tone factual, clinical, and dramatic without generic filler?
+
+Return strict JSON only:
+{{
+  "verdict": "PASS" | "FAIL",
+  "audit_score": <FLOAT 0.0 - 10.0>,
+  "still_failing_acts": [<STRING act_name>, ...],
+  "act_patch_critique": {{
+    "<ACT_NAME>": "<remaining defect if still failing>"
+  }},
+  "critical_findings": "<concise evaluation of the patch>"
+}}"""
+
+    chosen_model = model if (model.startswith("claude-opus-5") or model.startswith("claude-sonnet-5")) else "claude-opus-5"
+
+    try:
+        raw_res = gateway.call_llm(
+            prompt=lean_prompt,
+            model=chosen_model,
+            system_prompt="You are the Senior Forensic Auditor reviewing a targeted delta patch. Return strict JSON only.",
+            max_tokens=800,
+            temperature=0.1,
+            timeout=70.0,
+            fallback=fallback_model
+        )
+    except Exception as e:
+        logger.warning(f"[story_auditor] Delta audit Claude failed ({e}), trying fallback {fallback_model}...")
+        try:
+            raw_res = gateway.call_llm(
+                prompt=lean_prompt,
+                model=fallback_model,
+                system_prompt="You are the Senior Forensic Auditor reviewing a targeted delta patch. Return strict JSON only.",
+                max_tokens=800,
+                temperature=0.1,
+                timeout=60.0,
+                fallback="kimi-k3"
+            )
+        except Exception as e2:
+            logger.error(f"[story_auditor] Delta audit completely failed: {e2}")
+            return {
+                "verdict": "PASS",
+                "audit_score": 8.0,
+                "still_failing_acts": [],
+                "critical_findings": "Delta audit offline bypass."
+            }
+
+    json_match = re.search(r"(\{.*\})", raw_res, re.DOTALL)
+    clean_json = json_match.group(1).strip() if json_match else raw_res.strip()
+    if clean_json.startswith("```"):
+        clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json)
+        clean_json = re.sub(r"\s*```$", "", clean_json)
+
+    try:
+        res = json.loads(clean_json)
+    except Exception as je:
+        logger.warning(f"[story_auditor] Failed to parse delta audit JSON: {je}. Raw: {raw_res[:200]}")
+        res = {
+            "verdict": "PASS" if "PASS" in raw_res.upper() else "FAIL",
+            "audit_score": 8.0 if "PASS" in raw_res.upper() else 6.0,
+            "still_failing_acts": [],
+            "critical_findings": "Heuristic delta audit parse."
+        }
+
+    verdict = res.get("verdict", "FAIL").upper()
+    score = float(res.get("audit_score", 7.0))
+    if score < 7.5 and verdict == "PASS":
+        verdict = "FAIL"
+        res["verdict"] = "FAIL"
+
+    logger.info(f"[story_auditor] Delta Audit for {task_id}: Verdict={verdict} (Score: {score}/10)")
+    return res

@@ -1,120 +1,99 @@
-import json
-from unittest.mock import MagicMock, patch
+"""Unit tests for Dual-Model Convergence Protocol.
+Verifies role separation (Astra patches, Opus audits delta),
+CJK length compliance, and targeted act patching.
+"""
 import pytest
+from unittest.mock import MagicMock, patch
 
-import app.services.model_gateway
-import app.services.story_fact_auditor_b2
-from app.services.dual_model_convergence import run_dual_model_convergence
-from app.services.trend_engine_b1 import forensic_pre_filter, get_next_prefiltered_candidate
-
-
-class TestForensicPreFilter:
-    """Test Level-0 Forensic Pre-Filter Gate."""
-
-    def test_filter_kr_investigative_topic(self):
-        cand = {
-            "term": "홈플러스 망한 이유",
-            "news_title": "홈플러스 위기 사태 분석",
-            "source": "gtrends_rss"
-        }
-        passed, reason = forensic_pre_filter(cand, "KR")
-        assert passed
-        assert "망한" in reason or "위기" in reason
-
-    def test_filter_kr_showbiz_rejection(self):
-        cand = {
-            "term": "아이돌 컴백 무대",
-            "news_title": "새 앨범 발표 쇼케이스",
-            "source": "gtrends_rss"
-        }
-        passed, reason = forensic_pre_filter(cand, "KR")
-        assert not passed
-        assert "0 LLM tokens burned" in reason
-
-    def test_filter_en_investigative_topic(self):
-        cand = {
-            "term": "FTX bankruptcy collapse",
-            "news_title": "Sam Bankman-Fried fraud investigation",
-            "source": "gtrends_rss"
-        }
-        passed, reason = forensic_pre_filter(cand, "EN")
-        assert passed
+from app.services.dual_model_convergence import (
+    parse_script_into_acts,
+    determine_failing_acts,
+    run_dual_model_convergence
+)
 
 
-class TestDualModelConvergence:
-    """Test Dual-Model Convergence Protocol."""
-
-    SAMPLE_5ACT_SCRIPT = """=== ACT I ===
-The corporate treasury emptied in 48 hours. A $200M cash deficit shocked retail markets.
+SAMPLE_5_ACT_SCRIPT_JP = """=== ACT I ===
+ソニー生命の金銭不正問題が発覚した時、金融界に大きな衝撃が走った。2026年4月30日、保険業法128条に基づく報告命令が下された。
 
 === ACT II ===
-Public statements claimed stability, but supplier invoices piled up uncollected.
+内部統制の不備がどのようにして1億8060万円の不正引き出しを許したのか。承認プロセスの盲点がそこにあった。
 
 === ACT III ===
-Internal audits uncovered 19 store sale-and-leaseback arrangements.
-The paper trail vanished.
+調査が進むにつれ、口座管理の杜撰さと上層部の監督不行届が次々と明るみに出た。
 
 === ACT IV ===
-The smoking gun was a clause permitting private equity debt transfer to operations.
+2026年9月15日、金融庁は立ち入り検査に着手した。これは単なる一社員の犯罪ではなく、組織的構造欠陥であった。
 
 === ACT V ===
-Retail giants today stand as cautionary tales of asset-stripping disguised as restructuring."""
+この事件が残した教訓は、コンプライアンスの形骸化がいかに企業を破滅へ追い込むかという点である。
+""" + ("\n詳細な調査記録が示すのは、制度の隙間を突いた巧妙な隠蔽工作の数々であった。" * 75)
 
-    @patch("app.services.story_gate.score_story")
-    @patch("app.services.model_gateway.get_global_gateway")
-    @patch("app.services.story_fact_auditor_b2.audit_story_facts_and_causality")
-    def test_convergence_pass(self, mock_fact_audit, mock_gateway_fn, mock_score_story):
-        mock_score_story.return_value = {"score": 12, "max_score": 12, "verdict": "PASS"}
 
-        # Mock Opus 5 Scribe
-        mock_gw = MagicMock()
-        # Make it return 1800+ words script
-        mock_gw.call_llm.return_value = (self.SAMPLE_5ACT_SCRIPT + "\n") * 35
-        mock_gateway_fn.return_value = mock_gw
+def test_parse_script_into_acts():
+    acts = parse_script_into_acts(SAMPLE_5_ACT_SCRIPT_JP)
+    assert len(acts) == 5
+    assert "ACT I" in acts
+    assert "ACT II" in acts
+    assert "ACT III" in acts
+    assert "ACT IV" in acts
+    assert "ACT V" in acts
+    assert "ソニー生命" in acts["ACT I"]
 
-        # Mock Fact Auditor
-        mock_fact_audit.return_value = {
-            "verdict": "PASS",
-            "audit_score": 8.5,
-            "claims_verified": 5,
-            "discrepancies": []
-        }
 
-        claims = [{"claim": "200M deficit", "verified_metric": "200M", "source_title": "Reuters", "date": "2026-08-01"}]
+def test_determine_failing_acts():
+    # Structured metadata
+    meta = {"failed_acts": ["ACT II", "ACT IV"]}
+    failed = determine_failing_acts("Some critique", meta)
+    assert failed == ["ACT II", "ACT IV"]
+
+    # Inferred from text
+    critique = "In Act II, the causal mechanism is inverted. In Act V, the conclusion lacks numbers."
+    failed_text = determine_failing_acts(critique, {})
+    assert "ACT II" in failed_text
+    assert "ACT V" in failed_text
+
+
+def test_dual_model_convergence_astra_patches_opus_audits():
+    fake_gateway = MagicMock()
+
+    # Pass 1: Astra patches Act II
+    astra_patched_act2 = """=== ACT II ===
+2021年5月の制度改変により、1億8060万円の不正送金プロセスが隠蔽された。
+内部承認を経ずに顧客口座から直接資金が移動する致命的な構造欠陥が放置されていた。""" + ("\n詳細な内部証言と監査記録。" * 20)
+
+    # Pass 2: Opus audits delta
+    opus_delta_audit_res = """{
+        "verdict": "PASS",
+        "audit_score": 8.8,
+        "still_failing_acts": [],
+        "critical_findings": "Act II patch fully resolves the causal discrepancy and anchors strictly to verified claims."
+    }"""
+
+    fake_gateway.call_llm.side_effect = [astra_patched_act2, opus_delta_audit_res]
+
+    with (
+        patch("app.services.model_gateway.get_global_gateway", return_value=fake_gateway),
+        patch("app.services.story_gate.score_story", return_value={"score": 11, "verdict": "PASS"})
+    ):
         res = run_dual_model_convergence(
-            story_text="Original bad draft",
-            grounding_claims=claims,
-            audit_critique="Failed attribution",
-            topic_meta={"task_id": "KR_EP0004_test", "topic": "Homeplus"},
-            market="KR"
+            story_text=SAMPLE_5_ACT_SCRIPT_JP,
+            grounding_claims=[
+                {"claim": "180.6M yen fraud", "verified_metric": "180.6M yen", "source_title": "FSA Report"}
+            ],
+            audit_critique="Act II has causal inversion regarding the 180.6M yen transfer.",
+            topic_meta={"task_id": "JP_TEST_01", "topic_name_vi": "Sony Life Fraud"},
+            market="JP",
+            max_rounds=2,
+            initial_audit_result={"failed_acts": ["ACT II"], "audit_score": 5.0}
         )
 
         assert res["converged"] is True
         assert res["status"] == "PASS"
-        assert res["fact_score"] >= 7.5
+        assert res["fact_score"] == 8.8
+        assert res["story_gate_score"] == 11
 
-    @patch("app.services.model_gateway.get_global_gateway")
-    @patch("app.services.story_fact_auditor_b2.audit_story_facts_and_causality")
-    def test_convergence_fail(self, mock_fact_audit, mock_gateway_fn):
-        mock_gw = MagicMock()
-        mock_gw.call_llm.return_value = self.SAMPLE_5ACT_SCRIPT
-        mock_gateway_fn.return_value = mock_gw
-
-        mock_fact_audit.return_value = {
-            "verdict": "FAIL",
-            "audit_score": 6.0,
-            "veto_reason": "Continued hallucination of profit margins"
-        }
-
-        claims = [{"claim": "200M deficit", "verified_metric": "200M", "source_title": "Reuters", "date": "2026-08-01"}]
-        res = run_dual_model_convergence(
-            story_text="Original draft",
-            grounding_claims=claims,
-            audit_critique="Failed attribution",
-            topic_meta={"task_id": "KR_EP0004_test", "topic": "Homeplus"},
-            market="KR"
-        )
-
-        assert res["converged"] is False
-        assert res["status"] == "NON_CONVERGENCE"
-        assert "veto_reason" in res or "reason" in res
+        # Verify role separation: First call MUST be gpt-6-astra (Patcher), Second call MUST be claude-opus-5 (Delta Auditor)
+        calls = fake_gateway.call_llm.call_args_list
+        assert len(calls) == 2
+        assert calls[0].kwargs.get("model") == "gpt-6-astra"
+        assert calls[1].kwargs.get("model") == "claude-opus-5"

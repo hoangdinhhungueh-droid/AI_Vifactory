@@ -1008,7 +1008,13 @@ def generate_director_plan(
         beat_name = sc.get("beat_name") or CANONICAL_BEATS[beat_idx - 1]
 
         narration = sc.get("narration") or ""
-        words_cnt = len(narration.split()) if narration else 10
+        is_cjk_narr = any("一" <= c <= "鿿" or "぀" <= c <= "ヿ" or "가" <= c <= "힯" for c in narration)
+        if is_cjk_narr:
+            # For CJK, ~2.5 characters equals 1 spoken word equivalent
+            clean_cjk_len = len(re.sub(r'\s+', '', narration))
+            words_cnt = max(3, round(clean_cjk_len / 2.5)) if clean_cjk_len else 10
+        else:
+            words_cnt = len(narration.split()) if narration else 10
         if idx < 15:
             dur = sc.get("duration_est_sec") or sc.get("duration_sec") or max(3, min(6, round(words_cnt / 3.0)))
         else:

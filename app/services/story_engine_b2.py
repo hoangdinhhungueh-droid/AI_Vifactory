@@ -920,7 +920,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             # Dual-Model Convergence Protocol if audit fails (< 7.5 or FAIL)
             if f_verdict == "FAIL" or f_score < 7.5:
                 audit_critique = fact_audit_result.get("audit_notes") or fact_audit_result.get("veto_reason") or "Factual or causal discrepancies found."
-                logger.warning(f"[story_engine] B2.1 Audit FAILED (Score: {f_score}/10). Activating Dual-Model Convergence Protocol (Opus 5 Direct Scribe + Astra Cross-Audit)...")
+                logger.warning(f"[story_engine] B2.1 Audit FAILED (Score: {f_score}/10). Activating Dual-Model Convergence Protocol (Opus 5 Delta Audit + Astra Targeted Patcher)...")
 
                 try:
                     from app.services.dual_model_convergence import run_dual_model_convergence
@@ -936,7 +936,8 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                             "causal_epochs": causal_epochs
                         },
                         market=mkt,
-                        system_prompt=system_prompt
+                        system_prompt=system_prompt,
+                        initial_audit_result=fact_audit_result
                     )
                     
                     if conv_res.get("converged"):

@@ -682,9 +682,8 @@ class OrchestratorRunner:
 
         # 2. Check for backup files (*.bak*, *.backup_*)
         backup_files: List[str] = []
-        for root, _, files in os.walk(self.root_dir):
-            if ".git" in root or "__pycache__" in root:
-                continue
+        for root, dirs, files in os.walk(self.root_dir):
+            dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "node_modules", "venv", ".venv", "assets", "logs", "pulled", ".pytest_cache")]
             for f in files:
                 if ".bak" in f or ".backup" in f:
                     backup_files.append(os.path.join(root, f))
