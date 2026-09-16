@@ -16,8 +16,8 @@ Hardened with Anti-OOM guards:
 - Strict exit code verification
 
 Usage:
-  python3 scripts/render_twolayer_visual.py \\
-      --props /var/vf/episodes/<episode_id>/remotion_props.json \\
+  python3 scripts/render_twolayer_visual.py \
+      --props /var/vf/episodes/<episode_id>/remotion_props.json \
       --out /var/vf/episodes/<episode_id>/twolayer_silent.mp4
 """
 import argparse
@@ -49,11 +49,61 @@ def preflight_memory_check():
         print(f"[MEMORY CHECK] psutil check skipped: {e}")
 
 
+def optimize_props_assets(props_path: str, proj_dir: str):
+    """Pre-scales any referenced image in remotion/public down to 1080p if larger (Pillar 2)."""
+    try:
+        from PIL import Image
+        import json
+        with open(props_path, "r", encoding="utf-8") as pf:
+            data = json.load(pf)
+        scenes = data.get("scenes", [])
+        count = 0
+        for sc in scenes:
+            for key in ["background", "foreground"]:
+                img_rel = sc.get(key)
+                if not img_rel or str(img_rel).startswith("http"):
+                    continue
+                full_path = os.path.join(proj_dir, "public", str(img_rel))
+                if os.path.exists(full_path):
+                    try:
+                        with Image.open(full_path) as im:
+                            if im.width > 1920 or im.height > 1080:
+                                ratio = min(1920.0 / im.width, 1080.0 / im.height)
+                                nw = max(1, int(round(im.width * ratio)))
+                                nh = max(1, int(round(im.height * ratio)))
+                                r_im = im.resize((nw, nh), Image.Resampling.LANCZOS)
+                                r_im.save(full_path, optimize=True)
+                                count += 1
+                    except Exception:
+                        pass
+        if count > 0:
+            print(f"[ASSET PRE-SCALE] Successfully pre-scaled {count} assets down to 1080p.")
+    except Exception as e:
+        print(f"[ASSET CHECK] Pre-scale check skipped: {e}")
+
+
+def calculate_dynamic_timeout(props_path: str, base_timeout: float) -> tuple[float, int]:
+    """Calculate adaptive timeout based on total frames (Pillar 3)."""
+    total_frames = 18000
+    try:
+        import json
+        with open(props_path, "r", encoding="utf-8") as pf:
+            data = json.load(pf)
+            total_frames = data.get("durationInFrames", 18000)
+    except Exception:
+        pass
+    # Allow 1.5s per frame minimum, or at least base_timeout / 10800s (3 hours)
+    timeout = max(base_timeout, float(total_frames) * 1.5, 10800.0)
+    return timeout, total_frames
+
+
 def main():
+    import json
+    import time
     ap = argparse.ArgumentParser()
     ap.add_argument("--props", required=True, help="Path to remotion_props.json")
     ap.add_argument("--out", required=True, help="Output .mp4 path")
-    ap.add_argument("--timeout", type=float, default=float(os.environ.get("VF_REMOTION_TIMEOUT", "7200")))
+    ap.add_argument("--timeout", type=float, default=float(os.environ.get("VF_REMOTION_TIMEOUT", "10800")))
     args = ap.parse_args()
 
     if not os.path.exists(os.path.join(PROJ_DIR, ENTRY)):
@@ -67,9 +117,17 @@ def main():
     
     # Pre-flight RAM verification
     preflight_memory_check()
-    
-    # Conservative concurrency: 1 (safe default) or user-overridden
-    concurrency = os.environ.get("VF_REMOTION_CONCURRENCY", "1")
+
+    # Pillar 2: Pre-scale image assets to 1080p to eliminate Chromium downscale bottleneck
+    optimize_props_assets(args.props, PROJ_DIR)
+
+    # Pillar 1: Dynamic CPU concurrency (auto-detects cores, cap at 3 for RAM safety)
+    default_concurrency = min(3, max(1, (os.cpu_count() or 4) - 2))
+    concurrency = os.environ.get("VF_REMOTION_CONCURRENCY", str(default_concurrency))
+
+    # Pillar 3: Dynamic adaptive timeout based on total frames
+    dynamic_timeout, total_frames = calculate_dynamic_timeout(args.props, args.timeout)
+    print(f"[RENDER CONFIG] Total frames: {total_frames} | Concurrency: {concurrency} | Dynamic Timeout: {dynamic_timeout:.0f}s")
     
     cmd = [
         "npx", "remotion", "render", ENTRY, COMP_ID, args.out,
@@ -84,19 +142,42 @@ def main():
         env["NODE_OPTIONS"] = "--max-old-space-size=2048"
     
     print("RUNNING", " ".join(cmd), "cwd=", PROJ_DIR, "concurrency=", concurrency, "NODE_OPTIONS=", env.get("NODE_OPTIONS"))
+    start_t = time.time()
+    last_progress = ""
+
+    # Pillar 3: Real-time progress streaming with Popen
     try:
-        proc = subprocess.run(cmd, cwd=PROJ_DIR, capture_output=True, text=True, timeout=args.timeout, env=env)
+        proc = subprocess.Popen(
+            cmd,
+            cwd=PROJ_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            env=env
+        )
+        if proc.stdout:
+            for line in proc.stdout:
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                if "Rendered frame" in line or "%" in line:
+                    last_progress = line.strip()
+
+        proc.wait(timeout=dynamic_timeout)
+        rc = proc.returncode
     except subprocess.TimeoutExpired:
-        print("RENDER_FAILED timeout=%.0fs" % args.timeout)
+        if proc:
+            proc.kill()
+        print(f"RENDER_FAILED timeout={dynamic_timeout:.0f}s (Last known progress: {last_progress})")
         sys.exit(1)
 
-    if proc.returncode != 0 or not os.path.exists(args.out):
-        print("RENDER_FAILED rc=%s" % proc.returncode)
-        print((proc.stderr or "")[-2000:])
+    elapsed = time.time() - start_t
+    if rc != 0 or not os.path.exists(args.out):
+        print(f"RENDER_FAILED rc={rc} elapsed={elapsed:.1f}s")
         sys.exit(1)
 
     size = os.path.getsize(args.out)
-    print("RENDERED", args.out, size, "bytes")
+    print(f"RENDERED {args.out} {size} bytes in {elapsed:.1f}s (avg {(elapsed/max(1, total_frames)):.2f}s/frame)")
 
 
 if __name__ == "__main__":

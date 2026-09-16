@@ -191,7 +191,8 @@ def load_manifest_index(manifest_path: str):
 
 def stage_into_public(local_path: str, public_dir: str, episode_id: str) -> str | None:
     """Copy local_path into <public_dir>/pulled/<episode_id>/<basename> and
-    return the path relative to public_dir (for staticFile())."""
+    return the path relative to public_dir (for staticFile()).
+    Pre-scales images larger than 1920x1080 down to 1080p to eliminate Chromium downscale overhead (Rule 122 & Render Optimization)."""
     if not local_path:
         return None
     if local_path.startswith("http://") or local_path.startswith("https://"):
@@ -202,7 +203,24 @@ def stage_into_public(local_path: str, public_dir: str, episode_id: str) -> str 
     dest_path = os.path.join(dest_dir, basename)
     if not os.path.exists(local_path):
         raise FileNotFoundError("missing local image: %s" % local_path)
-    shutil.copyfile(local_path, dest_path)
+
+    # Pre-scale down to max 1920x1080 if image is larger
+    scaled = False
+    try:
+        from PIL import Image
+        with Image.open(local_path) as im:
+            if im.width > 1920 or im.height > 1080:
+                ratio = min(1920.0 / im.width, 1080.0 / im.height)
+                new_w = max(1, int(round(im.width * ratio)))
+                new_h = max(1, int(round(im.height * ratio)))
+                resized = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                resized.save(dest_path, optimize=True)
+                scaled = True
+    except Exception as e:
+        logger.debug("[stage_into_public] PIL pre-scale skipped or failed for %s: %s", local_path, e)
+
+    if not scaled:
+        shutil.copyfile(local_path, dest_path)
     return "pulled/%s/%s" % (episode_id, basename)
 
 

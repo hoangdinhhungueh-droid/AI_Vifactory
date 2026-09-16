@@ -412,12 +412,12 @@ async def run_pipeline(
                      "--segments", _segments_path,
                      "--manifest", _manifest_path, "--out", _props_path, "--skip-missing"],
                     check=True, timeout=120)
-            _rem_timeout = int(os.environ.get("VF_REMOTION_TIMEOUT", "7200"))
+            _rem_timeout = int(os.environ.get("VF_REMOTION_TIMEOUT", "10800"))
             if not os.path.exists(_silent_path) or os.path.getsize(_silent_path) < 1000000:
                 _sp.run([sys.executable, "/root/video_factory/scripts/render_twolayer_visual.py",
                      "--props", _props_path, "--out", _silent_path,
                      "--timeout", str(_rem_timeout)],
-                    check=True, timeout=_rem_timeout + 60)
+                    check=True, timeout=_rem_timeout + 600)
             if os.path.exists(_silent_path) and os.path.getsize(_silent_path) > 0:
                 twolayer_clip_path = _silent_path
                 logger.info("[S4.5] two-layer silent visual ready: %s", _silent_path)
