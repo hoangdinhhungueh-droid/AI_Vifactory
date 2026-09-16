@@ -1,0 +1,19 @@
+{
+  "rules": [
+    {
+      "path": "**/*.py",
+      "merge_system_rule": true,
+      "rule": "AI Video Factory Operational Constitution (Python Enforcement):\n1. RULE 118 (Zero-Mock Data): NEVER allow synthetic/mock data, hardcoded fake analytics (views, CTR, AVD, retention). Missing metrics MUST be None.\n2. RULE 119 (Temp Isolation): Temporary sandboxes and test artifacts MUST reside strictly in /tmp/ and be cleaned up on exit. Never pollute project root.\n3. RULE 120 (Audio-Subtitle Millisecond Precision): Whisper timestamps and TTS sync MUST preserve millisecond precision without coarse rounding.\n4. RULE 125 (Single Truth & Zero-Ghost): FORBID shadow bypass scripts, duplicate versions, and .bak files. Docstrings must match actual implementation.\n5. RULE 126/127 (Runtime Integrity): All file operations MUST explicitly specify encoding='utf-8'. Catch specific exceptions; NEVER use bare 'except:' or silent 'pass'. Always use 'with' context managers for files, sockets, locks.\n6. RULE 128 (Zero Semantic Bias): FORBID hardcoding episode-specific content (topic names, local characters, era details) into core contracts, schemas, or prompt templates. Use generic patterns ^[A-Z]{2}_EP\\d{4}_[a-z0-9_]+$.\n7. RULE 134 (Pre-Sync Consistency): Configuration constants, timeout thresholds, and error codes must remain strictly consistent across contracts, tests, and CLI runners.\n8. Concurrency & Subprocesses: Every subprocess invocation MUST have an explicit timeout, watchdog, and exit cleanup to prevent zombie processes."
+    },
+    {
+      "path": "**/*.{ts,tsx,js,jsx}",
+      "merge_system_rule": true,
+      "rule": "AI Video Factory Remotion & Web Visual Rules:\n1. Anti-OOM & Memory Leak: Release heavy image/video buffers promptly. Do not accumulate large binary buffers or canvases in React state.\n2. Remotion Lifecycle: Every 'delayRender' MUST be paired with a guaranteed 'continueRender' in a try/finally block to prevent renderer deadlocks.\n3. Safe Zone Compliance: Overlay elements, subtitles, and badges must remain within 1080x1920 (Vertical) or 1920x1080 (Horizontal) platform safe zones.\n4. Strict Types: Avoid 'any' types; strictly validate subtitle timestamps and scene duration props."
+    },
+    {
+      "path": "**/*.sh",
+      "merge_system_rule": true,
+      "rule": "AI Video Factory Shell Scripting Rules:\n1. Robustness: Always start with 'set -euo pipefail'.\n2. Cleanup: Register 'trap' handlers on EXIT/ERR to clean up /tmp artifacts.\n3. Quoting: Double quote all variables to prevent word splitting and glob injection."
+    }
+  ]
+}

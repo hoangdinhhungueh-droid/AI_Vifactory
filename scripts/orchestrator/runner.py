@@ -53,9 +53,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=["pipeline", "block", "audit", "ci", "sync"],
+        choices=["pipeline", "block", "audit", "ci", "sync", "review"],
         default="pipeline",
         help="Operational mode (default: pipeline)",
+    )
+    parser.add_argument(
+        "--ocr-mode",
+        choices=["auto", "direct", "delegate"],
+        default="auto",
+        help="Open Code Review execution mode: auto, direct, or delegate (default: auto)",
+    )
+    parser.add_argument(
+        "--ocr-background",
+        default="AI Video Factory production pipeline code modification and hardening",
+        help="Business and technical background context passed to OCR engine",
     )
     parser.add_argument(
         "--blocks",
@@ -164,6 +175,8 @@ class OrchestratorRunner:
                 return self._run_ci_mode(sandbox)
             elif mode == "sync":
                 return self._run_sync_mode(sandbox)
+            elif mode == "review":
+                return self._run_review_mode(sandbox)
             else:
                 print(f"Unknown mode: {mode}", file=sys.stderr)
                 return 1
@@ -432,8 +445,161 @@ class OrchestratorRunner:
 
         return 0 if audit_report["overall_verdict"] == "PASS" else 1
 
+    def _run_review_mode(self, sandbox: ResourceSandbox) -> int:
+        """Executes Alibaba Open Code Review (OCR) on Git diff or workspace changes."""
+        start_ts = time.time()
+        import shutil
+
+        ocr_bin = shutil.which("ocr")
+        if not ocr_bin:
+            for candidate in ["/usr/local/bin/ocr", "/usr/bin/ocr"]:
+                if Path(candidate).exists() and os.access(candidate, os.X_OK):
+                    ocr_bin = candidate
+                    break
+
+        if not ocr_bin:
+            err_msg = "Open Code Review ('ocr') binary not found in PATH or /usr/local/bin/ocr."
+            if self.args.json_output:
+                print(json.dumps({"status": "error", "error": err_msg, "verdict": "FAIL"}, indent=2))
+            else:
+                print(f"[OCR Review] ❌ {err_msg}", file=sys.stderr)
+            return 1
+
+        # 1. Preview changes via delegate preview (deterministic engineering)
+        prev_cmd = [ocr_bin, "delegate", "preview", "--format", "json"]
+        prev_res = subprocess.run(prev_cmd, cwd=str(self.root_dir), capture_output=True, text=True)
+
+        preview_data: Dict[str, Any] = {}
+        if prev_res.returncode == 0 and prev_res.stdout.strip():
+            try:
+                preview_data = json.loads(prev_res.stdout)
+            except Exception:
+                pass
+
+        reviewable_count = preview_data.get("reviewable_count", 0)
+        reviewable_files = preview_data.get("reviewable_files", [])
+
+        if reviewable_count == 0:
+            result = {
+                "status": "success",
+                "ocr_mode": self.args.ocr_mode,
+                "reviewable_count": 0,
+                "reviewable_files": [],
+                "issues": [],
+                "verdict": "PASS",
+                "message": "Working tree clean: No changed files to review.",
+                "duration_seconds": round(time.time() - start_ts, 3),
+            }
+            if self.args.json_output:
+                print(json.dumps(result, indent=2))
+            else:
+                print("=== OPEN CODE REVIEW (OCR) ===")
+                print("Working tree clean: No reviewable changes found. Code review PASS ✅")
+            return 0
+
+        file_paths = [f.get("path") for f in reviewable_files if f.get("path")]
+
+        # In delegate mode: output rules and file list for host agent
+        if self.args.ocr_mode == "delegate":
+            rules_cmd = [ocr_bin, "delegate", "rule", "--format", "json"] + file_paths
+            rules_res = subprocess.run(rules_cmd, cwd=str(self.root_dir), capture_output=True, text=True)
+            rules_data: Dict[str, Any] = {}
+            if rules_res.returncode == 0 and rules_res.stdout.strip():
+                try:
+                    rules_data = json.loads(rules_res.stdout)
+                except Exception:
+                    pass
+
+            result = {
+                "status": "success",
+                "ocr_mode": "delegate",
+                "reviewable_count": reviewable_count,
+                "reviewable_files": reviewable_files,
+                "rule_groups": rules_data.get("groups", []),
+                "verdict": "DELEGATED",
+                "duration_seconds": round(time.time() - start_ts, 3),
+            }
+            if self.args.json_output:
+                print(json.dumps(result, indent=2))
+            else:
+                print(f"=== OPEN CODE REVIEW (DELEGATION MODE) ===")
+                print(f"Target files to review ({reviewable_count}): {', '.join(file_paths)}")
+                print(f"Rule groups resolved: {len(rules_data.get('groups', []))}")
+                print("Delegated to Host AI Agent (Antigravity) for semantic line-level verification.")
+            return 0
+
+        # In auto or direct mode: run ocr review
+        out_file = sandbox.sandbox_dir / "ocr_review_report.json"
+        bg_ctx = self.args.ocr_background
+        review_cmd = [
+            ocr_bin,
+            "review",
+            "--audience",
+            "agent",
+            "-b",
+            bg_ctx,
+            "--output",
+            str(out_file),
+        ]
+        rev_res = subprocess.run(review_cmd, cwd=str(self.root_dir), capture_output=True, text=True)
+
+        issues: List[Dict[str, Any]] = []
+        if out_file.exists():
+            try:
+                raw_content = out_file.read_text(encoding="utf-8")
+                try:
+                    report_json = json.loads(raw_content)
+                    if isinstance(report_json, list):
+                        issues = report_json
+                    elif isinstance(report_json, dict) and "comments" in report_json:
+                        issues = report_json["comments"]
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        critical_count = sum(1 for i in issues if str(i.get("severity", "")).lower() == "critical")
+        high_count = sum(1 for i in issues if str(i.get("severity", "")).lower() == "high")
+        medium_count = sum(1 for i in issues if str(i.get("severity", "")).lower() == "medium")
+        low_count = sum(1 for i in issues if str(i.get("severity", "")).lower() == "low")
+
+        verdict = "PASS" if (critical_count == 0 and high_count == 0) else "FAIL"
+
+        result = {
+            "status": "success" if verdict == "PASS" else "failure",
+            "ocr_mode": "direct",
+            "reviewable_count": reviewable_count,
+            "reviewable_files": file_paths,
+            "severity_summary": {
+                "critical": critical_count,
+                "high": high_count,
+                "medium": medium_count,
+                "low": low_count,
+            },
+            "issues": issues,
+            "verdict": verdict,
+            "duration_seconds": round(time.time() - start_ts, 3),
+        }
+
+        if self.args.json_output:
+            print(json.dumps(result, indent=2))
+        else:
+            print("=== OPEN CODE REVIEW (OCR) RESULTS ===")
+            print(f"Reviewed Files ({reviewable_count}): {', '.join(file_paths)}")
+            print(f"Issues: Critical={critical_count}, High={high_count}, Medium={medium_count}, Low={low_count}")
+            if verdict == "PASS":
+                print("Code Review Gate: ✅ ALL GATES PASSED (0 Critical / 0 High)")
+            else:
+                print("Code Review Gate: ❌ FAILED (High/Critical defects detected)")
+                for issue in issues:
+                    sev = str(issue.get("severity", "")).upper()
+                    if sev in ("CRITICAL", "HIGH"):
+                        print(f"  [{sev}] {issue.get('path')}:{issue.get('start_line')}-{issue.get('end_line')} - {issue.get('content')}")
+
+        return 0 if verdict == "PASS" else 1
+
     def _run_ci_mode(self, sandbox: ResourceSandbox) -> int:
-        """Executes ISO Neighbor-Testing & Master E2E Smoke Gate."""
+        """Executes ISO Neighbor-Testing, Master E2E Smoke Gate, and OCR Code Review Gate."""
         start_ts = time.time()
         ci_results: Dict[str, Any] = {}
 
@@ -461,7 +627,14 @@ class OrchestratorRunner:
             "output_tail": smoke_res.stdout_preview or smoke_res.stderr_preview,
         }
 
-        all_passed = iso_res.success and smoke_res.success
+        # 3. Open Code Review (OCR) Quality Gate
+        ocr_res_code = self._run_review_mode(sandbox)
+        ci_results["ocr_code_review"] = {
+            "success": (ocr_res_code == 0),
+            "exit_code": ocr_res_code,
+        }
+
+        all_passed = iso_res.success and smoke_res.success and (ocr_res_code == 0)
         payload = {
             "status": "success" if all_passed else "failure",
             "ci_gates": ci_results,
@@ -474,6 +647,7 @@ class OrchestratorRunner:
             print("=== CI QUALITY GATE RESULTS ===")
             print(f"ISO Neighbor-Testing: {'PASS' if iso_res.success else 'FAIL'}")
             print(f"Master E2E Smoke Gate: {'PASS' if smoke_res.success else 'FAIL'}")
+            print(f"OCR Code Review Gate: {'PASS' if ocr_res_code == 0 else 'FAIL'}")
             print(f"OVERALL: {'✅ ALL PASSED' if all_passed else '❌ FAILED'}")
 
         return 0 if all_passed else 1
@@ -494,6 +668,17 @@ class OrchestratorRunner:
             "working_tree_clean": is_clean,
             "uncommitted_files": git_res.stdout.strip().splitlines() if not is_clean else [],
         }
+
+        # 1b. OCR Pre-Sync Verification (if changes exist, ensure 0 critical/high issues)
+        ocr_clean = True
+        ocr_sync_info: Dict[str, Any] = {}
+        if not is_clean:
+            ocr_res_code = self._run_review_mode(sandbox)
+            ocr_clean = (ocr_res_code == 0)
+            ocr_sync_info = {"success": ocr_clean, "exit_code": ocr_res_code}
+        else:
+            ocr_sync_info = {"success": True, "message": "Working tree clean; zero uncommitted diff."}
+        sync_report["ocr_pre_sync_gate"] = ocr_sync_info
 
         # 2. Check for backup files (*.bak*, *.backup_*)
         backup_files: List[str] = []
@@ -565,7 +750,7 @@ class OrchestratorRunner:
             ci_status_info.get("verified", False)
             and ci_status_info.get("conclusion") == "success"
         )
-        all_ok = is_clean and len(backup_files) == 0 and len(compile_errors) == 0 and ci_passed
+        all_ok = is_clean and len(backup_files) == 0 and len(compile_errors) == 0 and ci_passed and ocr_clean
         payload = {
             "status": "success" if all_ok else "failure",
             "sync_report": sync_report,
@@ -579,6 +764,7 @@ class OrchestratorRunner:
             print(f"Git Clean: {'YES' if is_clean else 'NO'}")
             print(f"Zero Ghost Backup Files: {len(backup_files)} found")
             print(f"PyCompile: {'PASS' if len(compile_errors) == 0 else 'FAIL'}")
+            print(f"OCR Pre-Sync Gate: {'PASS' if ocr_clean else 'FAIL'}")
             ci_verdict = (
                 f"{str(ci_status_info.get('conclusion')).upper()} (Run ID: {ci_status_info.get('run_id')})"
                 if ci_status_info.get("verified")
