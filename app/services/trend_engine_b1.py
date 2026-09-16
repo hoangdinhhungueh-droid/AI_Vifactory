@@ -1048,6 +1048,9 @@ def discover_and_produce_market_trend(
         # 5.2. Grounding Layer Fact-Verification & Gate (B1.5.5 - Rule 118 & Rule 121)
         print(f"  🔍 [B1.5.5] Running Live Grounding Research & Verification Gate for {temp_task_id}...")
         try:
+            import importlib
+            import app.services.grounding_layer_b15 as gl_b15
+            importlib.reload(gl_b15)
             from app.services.grounding_layer_b15 import run_grounding_research, passes_grounding_gate
             grounding_kw = t_obj.get("search_specific_keyword") or term
             grounding_hint = t_obj.get("niche_angle_brief") or ""

@@ -194,7 +194,7 @@ def run_grounding_research(
     topic: str,
     search_hint: str = "",
     market: str = "EN",
-    timeout: float = 35.0
+    timeout: float = 60.0
 ) -> Dict[str, Any]:
     """
     Executes live Google Search Grounding via Gemini 2.5 Flash REST API.
@@ -297,7 +297,7 @@ def run_grounding_research(
     }
 
     headers = {"Content-Type": "application/json"}
-    candidate_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    candidate_models = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
     last_err = None
 
     for model_name in candidate_models:
