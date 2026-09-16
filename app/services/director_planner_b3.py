@@ -742,6 +742,42 @@ def generate_director_plan(
     niche = metadata.get("niche") or intel_card.get("niche", "Investigative Documentary")
     topic = metadata.get("topic") or intel_card.get("target_keyword", episode_id)
 
+    # Hollywood Movie Standard: Ensure Audio Spine exists before Director Breakdown
+    if not spoken_sentences and story_text:
+        logger.info(f"  [B3 Hollywood] spoken_sentences missing for {episode_id}. Auto-synthesizing Hollywood Audio Spine from story...")
+        try:
+            from app.services.story_engine_b2 import adapt_master_spoken_script, adversarial_audit_spoken_script
+            from app.services.beat_tts_engine import synthesize_beat_tts_pipeline
+            import asyncio
+            
+            mkt = (metadata.get("market") or episode_id.split("_")[0]).upper()
+            topic_val = topic or episode_id
+            spoken_data = adapt_master_spoken_script(story_text, market=mkt, topic=topic_val)
+            spoken_audit = adversarial_audit_spoken_script(spoken_data, market=mkt, topic=topic_val)
+            raw_sents = spoken_data.get("sentences", [])
+            
+            for td in [ep_dir, var_vf_dir]:
+                if td.exists():
+                    (td / "spoken_script.txt").write_text(spoken_data.get("spoken_script_text", story_text), encoding="utf-8")
+                    (td / "spoken_sentences.json").write_text(json.dumps(raw_sents, ensure_ascii=False, indent=2), encoding="utf-8")
+                    bp = td / "brain_input.json"
+                    if bp.exists():
+                        try:
+                            b_in = json.loads(bp.read_text(encoding="utf-8"))
+                            b_in["spoken_script"] = spoken_data.get("spoken_script_text", story_text)
+                            b_in["spoken_sentences"] = raw_sents
+                            b_in["spoken_script_audit"] = spoken_audit
+                            bp.write_text(json.dumps(b_in, ensure_ascii=False, indent=2), encoding="utf-8")
+                        except Exception:
+                            pass
+            
+            tts_dir = str(ep_dir if ep_dir.exists() else var_vf_dir)
+            tts_res = asyncio.run(synthesize_beat_tts_pipeline(episode_id, out_dir=tts_dir, force=False))
+            spoken_sentences = tts_res.get("segments") or raw_sents
+            logger.info(f"  [B3 Hollywood] Audio Spine synthesized: {len(spoken_sentences)} sentences timecode-locked.")
+        except Exception as e:
+            logger.warning(f"  [B3 Hollywood] Auto Audio Spine synthesis error: {e}. Proceeding with best-effort.")
+
     # Rule 128: Universal Dynamic Context & Character Ensemble Extraction
     dynamic_context = extract_universal_semantic_context(story_text, metadata, intel_card)
     character_ensemble = extract_dynamic_character_ensemble(story_text, dynamic_context, topic)

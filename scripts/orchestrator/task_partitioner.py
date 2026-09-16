@@ -150,13 +150,72 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
             "assert res.get('verdict') == 'PASS' or float(res.get('audit_score', 0)) >= 7.5, f'B2.1 Audit Gate Failed: {res}'",
         ],
     ),
+    "2.5": StageContract(
+        stage_id="2.5",
+        name="B2.5 Spoken VO Adaptation",
+        description="Hollywood Breath-Timed Spoken Script Adaptation & Adversarial Duration Audit",
+        prerequisites=["2.1"],
+        input_files=[
+            "/var/vf/episodes/{task_id}/story.txt",
+        ],
+        output_files=[
+            "/var/vf/episodes/{task_id}/spoken_script.txt",
+            "/var/vf/episodes/{task_id}/spoken_sentences.json",
+        ],
+        command_template=[
+            "python3",
+            "-c",
+            "import sys, json, os; sys.path.insert(0, '.'); from app.services.story_engine_b2 import adapt_master_spoken_script, adversarial_audit_spoken_script; "
+            "ep_dir = '/var/vf/episodes/{task_id}'; "
+            "story = open(f'{ep_dir}/story.txt', encoding='utf-8').read(); "
+            "meta_path = '/var/vf/pending_tasks/{task_id}.json'; "
+            "meta = json.load(open(meta_path, encoding='utf-8')) if os.path.exists(meta_path) else {}; "
+            "mkt = meta.get('market') or '{task_id}'.split('_')[0].upper(); "
+            "topic = meta.get('raw_term') or '{task_id}'; "
+            "res = adapt_master_spoken_script(story, market=mkt, topic=topic); "
+            "audit = adversarial_audit_spoken_script(res, market=mkt, topic=topic); "
+            "assert audit.get('verdict') == 'PASS' or float(audit.get('audit_score', 0)) >= 7.5, f'B2.5 Audit Failed: {audit}'; "
+            "open(f'{ep_dir}/spoken_script.txt', 'w', encoding='utf-8').write(res.get('spoken_script_text', story)); "
+            "open(f'{ep_dir}/spoken_sentences.json', 'w', encoding='utf-8').write(json.dumps(res.get('sentences', []), ensure_ascii=False, indent=2)); "
+            "brain_p = f'{ep_dir}/brain_input.json'; "
+            "brain = json.load(open(brain_p, encoding='utf-8')) if os.path.exists(brain_p) else {}; "
+            "brain['spoken_script'] = res.get('spoken_script_text', story); "
+            "brain['spoken_sentences'] = res.get('sentences', []); "
+            "brain['spoken_script_audit'] = audit; "
+            "open(brain_p, 'w', encoding='utf-8').write(json.dumps(brain, ensure_ascii=False, indent=2)); "
+            "print(f'✅ B2.5 Spoken VO Adaptation PASS: {len(res.get(\"sentences\", []))} sentences')",
+        ],
+    ),
+    "2.6": StageContract(
+        stage_id="2.6",
+        name="B2.6 Audio Spine (Edge-TTS)",
+        description="Hollywood Master Voiceover Audio Spine & Subtitle Timecode Mapping (Rule 120)",
+        prerequisites=["2.5"],
+        input_files=[
+            "/var/vf/episodes/{task_id}/spoken_sentences.json",
+        ],
+        output_files=[
+            "/var/vf/episodes/{task_id}/tts_out.mp3",
+            "/var/vf/episodes/{task_id}/subtitles.srt",
+        ],
+        command_template=[
+            "python3",
+            "-c",
+            "import sys, asyncio, json; sys.path.insert(0, '.'); from app.services.beat_tts_engine import synthesize_beat_tts_pipeline; "
+            "ep_dir = '/var/vf/episodes/{task_id}'; "
+            "res = asyncio.run(synthesize_beat_tts_pipeline('{task_id}', out_dir=ep_dir, force=False)); "
+            "assert res.get('total_duration_sec', 0) > 0, 'TTS output duration is zero'; "
+            "print(f'✅ B2.6 Audio Spine PASS: {res.get(\"total_duration_sec\"):.1f}s ({len(res.get(\"segments\", []))} segments)')",
+        ],
+    ),
     "3.0": StageContract(
         stage_id="3.0",
         name="B3 Director Plan",
-        description="Hollywood Director Plan via Universal Dynamic Context & Persona Extractor",
-        prerequisites=["2.0"],
+        description="Hollywood Visual Director Plan locked to Audio Spine timecodes (Rule 125, 128)",
+        prerequisites=["2.6"],
         input_files=[
             "/var/vf/episodes/{task_id}/story.txt",
+            "/var/vf/episodes/{task_id}/spoken_sentences.json",
             "/var/vf/episodes/{task_id}/brain_input.json",
         ],
         output_files=[
@@ -167,9 +226,12 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
             "python3",
             "-c",
             "import sys, json; sys.path.insert(0, '.'); from app.services.director_planner_b3 import generate_director_plan; "
-            "story = open('/var/vf/episodes/{task_id}/story.txt', encoding='utf-8').read(); "
-            "brain = json.load(open('/var/vf/episodes/{task_id}/brain_input.json', encoding='utf-8')); "
-            "generate_director_plan('{task_id}', story, metadata={'topic': brain.get('topic') or '{task_id}'})",
+            "ep_dir = '/var/vf/episodes/{task_id}'; "
+            "story = open(f'{ep_dir}/story.txt', encoding='utf-8').read(); "
+            "brain = json.load(open(f'{ep_dir}/brain_input.json', encoding='utf-8')); "
+            "sp_sents = json.load(open(f'{ep_dir}/spoken_sentences.json', encoding='utf-8')) if __import__('os').path.exists(f'{ep_dir}/spoken_sentences.json') else None; "
+            "plan = generate_director_plan('{task_id}', story, spoken_sentences=sp_sents, metadata={'topic': brain.get('topic') or '{task_id}'}); "
+            "print(f'✅ B3 Hollywood Director Plan PASS: {len(plan.get(\"scenes\", []))} scenes')",
         ],
     ),
     "3.5": StageContract(
@@ -274,9 +336,22 @@ STAGE_ALIASES = {
     "b2.1": "2.1",
     "b21": "2.1",
     "audit_story": "2.1",
+    "2.5": "2.5",
+    "b2.5": "2.5",
+    "b25": "2.5",
+    "spoken": "2.5",
+    "sub": "2.5",
+    "2.6": "2.6",
+    "b2.6": "2.6",
+    "b26": "2.6",
+    "tts": "2.6",
+    "audio": "2.6",
+    "audio_spine": "2.6",
     "3": "3.0",
     "3.0": "3.0",
     "b3": "3.0",
+    "b30": "3.0",
+    "director": "3.0",
     "3.5": "3.5",
     "b3.5": "3.5",
     "b35": "3.5",
@@ -293,7 +368,7 @@ STAGE_ALIASES = {
     "b5": "5.0",
 }
 
-STAGE_ORDER = ["1.0", "1.5", "1.5.5", "1.6", "2.0", "2.1", "3.0", "3.5", "3.6", "4.0", "5.0"]
+STAGE_ORDER = ["1.0", "1.5", "1.5.5", "1.6", "2.0", "2.1", "2.5", "2.6", "3.0", "3.5", "3.6", "4.0", "5.0"]
 
 
 @dataclass
@@ -405,6 +480,13 @@ class TaskPartitioner:
             # Brain input schema
             if "story_gate_score" not in data and "story" not in data and "beats" not in data:
                 issues.append("Block 2.0 brain_input missing story or story_gate_score.")
+
+        elif stage_id == "2.5":
+            # Spoken sentences schema
+            if isinstance(data, list) and len(data) == 0:
+                issues.append("Block 2.5 spoken_sentences array is empty.")
+            elif isinstance(data, dict) and "sentences" not in data and "spoken_script_text" not in data:
+                issues.append("Block 2.5 spoken data missing 'sentences'.")
 
         elif stage_id == "3.0":
             # Director plan schema

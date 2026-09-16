@@ -164,24 +164,31 @@
 
 ---
 
-### 3. Khối B2 (Story Engine) ➔ Khối B3 (Director Plan)
-* **File lưu trữ**: `/var/vf/episodes/<task_id>/story.txt (Kịch bản 5 Beat) & brain_input.json`
-* **Quy chuẩn**: 5 Beat Docudrama (1,800–2,200 từ, ~12–15 phút), Rule 444 Hook (0–60s), Micro-Cliffhangers (90–120s), Story Gate $\ge 8/10$.
-* **Data Schema**:
+### 3. Khối B2 (Story Engine) ➔ Khối B2.5 (Spoken VO) ➔ Khối B2.6 (Audio Spine) ➔ Khối B3 (Director Plan)
+* **Quy chuẩn Hollywood Movie Standard**:
+  1. **B2.5 Spoken VO Adaptation**: Chuyển thể 5-Beat Story thành các câu thoại ngắt hơi nhịp thở (`spoken_script.txt` & `spoken_sentences.json`). Mỗi câu tối đa ~15 từ (~3-5s), trần thời lượng tổng $\le 15$ phút, qua kiểm toán phản biện `adversarial_audit_spoken_script` đạt điểm $\ge 7.5/10$.
+  2. **B2.6 Master Audio Spine (Edge-TTS)**: Sinh file âm thanh `tts_out.mp3` và bóc tách timecode mili-giây chính xác (`start_ms`, `end_ms`, `duration_frames` tại 30fps) cho từng câu thoại trong `spoken_sentences.json`, xuất phụ đề `subtitles.srt`.
+  3. **B3.0 Hollywood Visual Director Plan**: Đạo diễn hình ảnh nhận danh sách câu thoại đã có timecode thật. Toàn bộ các cảnh hình ảnh được khóa 1:1 theo câu thoại (`narration == sent["text"]`, `duration_frames == sent["duration_frames"]`). Tuyệt đối 0% bịa thoại hay phân cảnh text mù.
+* **File lưu trữ**:
+  - `/var/vf/episodes/<task_id>/story.txt` (Kịch bản 5 Beat)
+  - `/var/vf/episodes/<task_id>/spoken_script.txt` (Kịch bản đọc thoại)
+  - `/var/vf/episodes/<task_id>/spoken_sentences.json` (Danh sách câu thoại kèm timecode ms và frames)
+  - `/var/vf/episodes/<task_id>/tts_out.mp3` (Audio spine chuẩn)
+  - `/var/vf/episodes/<task_id>/subtitles.srt` (Phụ đề đồng bộ mili-giây)
+  - `/var/vf/episodes/<task_id>/director_plan.json` (Phân cảnh hình ảnh khóa audio)
+* **Data Schema (`spoken_sentences.json`)**:
   ```json
-  {
-    "task_id": "<MARKET>_EP<0000>_<topic_slug>",
-    "task_slug": "<lowercase-hyphenated-topic-slug>",
-    "language": "<en | vi | ja | ko>",
-    "word_count": "<INTEGER: 1800 - 2200>",
-    "beats": [
-      {"beat": 1, "name": "The Impossible Contradiction", "text": "<BEAT_1_TEXT: Hook 0-60s & An Ong Paradox>"},
-      {"beat": 2, "name": "The False Narrative & Red Herring", "text": "<BEAT_2_TEXT: Buildup & Common Misconception>"},
-      {"beat": 3, "name": "The Systemic Blindspot & Paper Trail", "text": "<BEAT_3_TEXT: Forensic Investigation & Evidence>"},
-      {"beat": 4, "name": "The Real Culprit & Smoking Gun", "text": "<BEAT_4_TEXT: The Climax & Systemic Core Revelation>"},
-      {"beat": 5, "name": "The Uncomfortable Modern Mirror", "text": "<BEAT_5_TEXT: Modern Echo & Lingering Lesson>"}
-    ]
-  }
+  [
+    {
+      "sentence_id": "sent_<001>",
+      "beat_index": "<INTEGER: 1-5>",
+      "text": "<SPOKEN_VERBATIM_TEXT>",
+      "start_ms": "<INTEGER: Millisecond start time>",
+      "end_ms": "<INTEGER: Millisecond end time>",
+      "duration_sec": "<FLOAT: Duration in seconds>",
+      "duration_frames": "<INTEGER: Duration in frames at 30fps>"
+    }
+  ]
   ```
 
 ---

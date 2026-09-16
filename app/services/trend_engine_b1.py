@@ -608,6 +608,37 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
         logger.info(f"[trend_engine] Skipping Telegram notification for test seed: {topic_data.get('raw_term')}")
         return
 
+    task_id = str(topic_data.get("task_id", "")).strip()
+
+    # 1. Gate Order Integrity Guard (Rule 125 & Anti-Ghost Out-of-Order Gate Violation)
+    # Human Gate 1 can ONLY be dispatched BEFORE B3/Gate 2. If B3 is already done or HG2 dispatched, BLOCK!
+    if task_id:
+        for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
+            plan_file = os.path.join(ep_base, task_id, "director_plan.json")
+            audit_file = os.path.join(ep_base, task_id, "visual_convergence_audit.json")
+            if os.path.exists(plan_file) or os.path.exists(audit_file):
+                logger.warning(
+                    f"[trend_engine] GATE ORDER VIOLATION BLOCKED: Refusing to dispatch Human Gate 1 for {task_id} "
+                    f"because B3 Director Plan / HG2 visual convergence already exists ({plan_file})! "
+                    f"Human Gate 1 MUST NEVER be dispatched after Human Gate 2."
+                )
+                return
+
+    # 2. Fact & Causal Audit Strict Pass Enforcement (Rule 118 & Rule 130)
+    try:
+        fact_score = float(topic_data.get("fact_audit_score", 0.0) or 0.0)
+    except (ValueError, TypeError):
+        fact_score = 0.0
+    fact_passed = topic_data.get("fact_audit_passed", None)
+
+    # Explicit PASS check: Must either have fact_passed=True or fact_score >= 7.5
+    if fact_passed is False or (fact_passed is None and fact_score < 7.5):
+        logger.warning(
+            f"[trend_engine] GATE 1 DISPATCH BLOCKED: Candidate {task_id} B2.1 Fact Audit did NOT pass "
+            f"(score={fact_score}/10, passed={fact_passed}). CẤM broadcast Human Gate 1 PASS khi chưa đạt chuẩn!"
+        )
+        return
+
     try:
         from app.services.telegram_buttons import send_telegram_broadcast
         import html
@@ -621,11 +652,9 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
         niche = html.escape(str(topic_data.get("niche_angle_brief", "")))
         arcs = html.escape(str(topic_data.get("story_direction_5_arcs", "")))
         gap = html.escape(str(topic_data.get("competitor_differentiation_gap", "")))
-        task_id = html.escape(str(topic_data.get("task_id", "")))
         score = topic_data.get("viability_score", 9.0)
         title_a = html.escape(str(topic_data.get("title_a", "")))
         hook_60s = html.escape(str(topic_data.get("hook_60s", "")))
-        fact_score = topic_data.get("fact_audit_score", 10.0)
         fact_model = html.escape(str(topic_data.get("fact_audit_model", "Claude Opus 5")))
 
         lines = [
@@ -934,8 +963,8 @@ def discover_and_produce_market_trend(
 
         specific_angle = viability.get("specific_viral_angle") or term
         print(f"  ✅ APPROVED! Viability: {score}/10 | Angle: {specific_angle}")
-
         viability_passed_candidates.append({"term": term, "score": score, "angle": specific_angle})
+
         # Temporary pipeline task ID for pre-audit stages (B1 -> B1.1 -> B1.5 -> B1.5.5 -> B1.6 -> B2 -> B2.1)
         import hashlib
         clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(term).lower()).strip('-')[:20]
@@ -1198,6 +1227,7 @@ def discover_and_produce_market_trend(
         print(f"  🎉 [B2.1 AUDIT PASSED!] Score: {f_score}/10. Moving to OFFICIAL TASK ID COMMIT & NOTION SYNC & HG1 NOTIFICATION!")
         t_obj["fact_audit_score"] = f_score
         t_obj["fact_audit_model"] = fact_audit.get("auditor_model", "Claude Opus 5")
+        t_obj["fact_audit_passed"] = True
 
         # 8. NOW OFFICIALLY COMMIT TASK ID, SYNC NOTION, RENAME TEMP FOLDERS, & SEND HG1 NOTIFICATION!
         task_id = commit_trend_task(t_obj)
@@ -1282,6 +1312,7 @@ def discover_and_produce_market_trend(
     if not produced_topics and not custom_seed:
         scanned_count = min(len(candidates), max_scan_candidates)
         if viability_passed_candidates:
+            # Candidates passed B1 Viability Gate, but were stopped downstream (Critic, Grounding, or B2 Story/Fact Audit)
             alert_msg = (
                 f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
                 f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live cho thị trường <b>{m_up}</b>.\n"
