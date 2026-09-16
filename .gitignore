@@ -45,7 +45,8 @@ remotion/node_modules/
 
 # Large media / render artifacts
 assets/
-remotion/public/
+remotion/public/*
+!remotion/public/sfx/
 checkpoints/
 
 # Runtime data & logs

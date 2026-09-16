@@ -32,19 +32,122 @@ from pathlib import Path
 logger = logging.getLogger("vf.build_remotion_props")
 
 
-def detect_forensic_overlay(narration_text: str) -> dict | None:
-    """Rule 128: Detect forensic evidentiary graphics trigger based on factual keywords."""
+def detect_forensic_overlay(narration_text: str, theme: str = "noir_dossier") -> dict | None:
+    """Rule 128 & Vox Explanatory Engine: Detect evidentiary graphics trigger based on factual keywords."""
     if not narration_text:
         return None
     t = narration_text.lower()
-    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "hợp đồng", "điều khoản", "tài liệu mật", "hanko", "biên bản"]):
-        return {"type": "redacted_doc", "label": "CLASSIFIED // REDACTED RECORD"}
-    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada"]):
-        return {"type": "radar_map", "label": "RADAR TELEMETRY // VECTOR TRACK"}
-    if any(k in t for k in ["stock", "dollar", "capital", "billion", "market", "revenue", "loss", "margin", "liquidity", "cổ phiếu", "sụt giảm", "thất thoát", "tỷ đô", "thị trường"]):
-        return {"type": "financial_chart", "label": "MARKET DISRUPTION // CAPITAL TRAJECTORY"}
-    if any(k in t for k in ["surveillance", "cctv", "facility", "camera", "security", "warehouse", "monitor", "an ninh", "giám sát"]):
-        return {"type": "surveillance_crt", "label": "FACILITY_SURVEILLANCE // CH_04"}
+
+    # 1. Document Highlight (Contracts, clauses, terms, NDA, redactions)
+    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "hợp đồng", "điều khoản", "tài liệu mật", "hanko", "biên bản", "fine print", "refund policy", "환불", "약관", "조항"]):
+        return {
+            "type": "document_highlight",
+            "legacy_type": "redacted_doc",
+            "theme": theme or "noir_dossier",
+            "layout": "split_right",
+            "title": "LEGAL CLAUSE // EXCLUSION AUDIT",
+            "badge": "SUBPOENAED",
+            "sfx_cue": "marker_stroke",
+            "label": "CLASSIFIED // REDACTED RECORD",
+            "payload": {
+                "document_title": "MEMORANDUM OF AGREEMENT // EXCLUSION PROVISION",
+                "clauses": [
+                    "SECTION 4 // NON-REFUNDABLE CONTINGENCY",
+                    "ARTICLE 17 // EXCLUSION OF LIABILITY",
+                    "ARBITRATION PROTOCOL // FINAL BINDING VERDICT"
+                ],
+                "highlight_line_index": 1,
+                "redacted_terms": ["ARBITRATION PROTOCOL", "NON-REFUNDABLE"]
+            }
+        }
+
+    # 2. Kinetic Counter (Numerical surge/collapse, capital metrics)
+    if any(k in t for k in ["stock", "dollar", "capital", "billion", "market", "revenue", "loss", "margin", "liquidity", "cổ phiếu", "sụt giảm", "thất thoát", "tỷ đô", "thị trường", "tổn thất", "bốc hơi", "원", "円", "man-won", "trillion"]):
+        num_m = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?)', narration_text)
+        val = float(num_m.group(1).replace(",", "")) if num_m else 41.8
+        trend = "down" if any(k in t for k in ["loss", "giảm", "sụt", "drop", "collapse", "bốc hơi", "하락", "폭락"]) else "up"
+        return {
+            "type": "kinetic_counter",
+            "legacy_type": "financial_chart",
+            "theme": theme or "tech_infographic",
+            "layout": "split_right",
+            "title": "DISRUPTION INDEX // ASYMMETRIC SPREAD",
+            "badge": "VIOLATION",
+            "sfx_cue": "counter_tick",
+            "label": "MARKET DISRUPTION // CAPITAL TRAJECTORY",
+            "payload": {
+                "start_value": 0.0,
+                "end_value": val,
+                "unit": "M",
+                "prefix": "$",
+                "suffix": "",
+                "trend": trend,
+                "chart_type": "line"
+            }
+        }
+
+    # 3. Causal Flowchart (Systemic trap, network, money laundering, shell game, pipeline)
+    if any(k in t for k in ["mechanism", "network", "shell", "laundering", "channel", "transmission", "intermediary", "trap", "bẫy", "chuỗi", "dòng tiền", "trung gian", "cơ chế", "dây chuyền", "구조", "우회", "경로"]):
+        return {
+            "type": "causal_flowchart",
+            "legacy_type": "redacted_doc",
+            "theme": theme or "noir_dossier",
+            "layout": "fullscreen_dossier",
+            "title": "CAUSAL TRANSMISSION // ASYMMETRIC CHOKE",
+            "badge": "RESTRICTED",
+            "sfx_cue": "node_pop",
+            "label": "INSTITUTIONAL TRANSMISSION // SYSTEMIC CHOKE",
+            "payload": {
+                "nodes": [
+                    {"id": "origin", "label": "Consumer Capital", "status": "normal"},
+                    {"id": "intermediary", "label": "Platform Escrow", "status": "breach"},
+                    {"id": "offshore", "label": "Non-Refund Vault", "status": "fatal"}
+                ],
+                "edges": [
+                    {"from": "origin", "to": "intermediary", "label": "Deposit Stream"},
+                    {"from": "intermediary", "to": "offshore", "label": "Trapped Liquidity"}
+                ]
+            }
+        }
+
+    # 4. Tactical Map (Radar, flight path, maritime choke, coordinates)
+    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình"]):
+        return {
+            "type": "tactical_map",
+            "legacy_type": "radar_map",
+            "theme": "surveillance_cctv",
+            "layout": "split_right",
+            "title": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
+            "badge": "CONFIDENTIAL",
+            "sfx_cue": "sonar_ping",
+            "label": "RADAR TELEMETRY // VECTOR TRACK",
+            "payload": {
+                "target_name": "TACTICAL INTERCEPT // VECTOR ALPHA",
+                "coordinates": "37.5665°N, 126.9780°E",
+                "grid_type": "radar",
+                "points_of_interest": ["PRIMARY CATALYST", "LOGISTICAL CHOKE"]
+            }
+        }
+
+    # 5. Surveillance CRT
+    if any(k in t for k in ["surveillance", "cctv", "facility", "camera", "security", "warehouse", "monitor", "an ninh", "giám sát", "감시"]):
+        return {
+            "type": "tactical_map",
+            "legacy_type": "surveillance_crt",
+            "theme": "surveillance_cctv",
+            "layout": "floating_card",
+            "title": "FACILITY SURVEILLANCE // CAM 04",
+            "badge": "RESTRICTED",
+            "sfx_cue": "sonar_ping",
+            "label": "FACILITY_SURVEILLANCE // CH_04",
+            "payload": {
+                "target_name": "PERIMETER FEED // SECTOR 7",
+                "coordinates": "CAM_04_FEED // 1080P",
+                "grid_type": "chokepoint",
+                "points_of_interest": ["ACCESS BREACH"]
+            }
+        }
+
     return None
 
 
@@ -460,18 +563,40 @@ def build_remotion_props_data(
         if not forensic_ov:
             forensic_ov = detect_forensic_overlay(narration_text)
 
-        # Rule 122 & Rule 128: Guarantee forensic_overlay is a structured dict with 'type' and 'label'
+        # Rule 122 & Rule 128: Guarantee forensic_overlay is a structured dict with full Vox Explanatory schema
         DEFAULT_OVERLAY_LABELS = {
             "redacted_doc": "CLASSIFIED // REDACTED RECORD",
             "radar_map": "RADAR TELEMETRY // VECTOR TRACK",
             "financial_chart": "MARKET DISRUPTION // CAPITAL TRAJECTORY",
             "surveillance_crt": "FACILITY_SURVEILLANCE // CH_04",
+            "document_highlight": "CLASSIFIED // REDACTED RECORD",
+            "kinetic_counter": "MARKET DISRUPTION // CAPITAL TRAJECTORY",
+            "causal_flowchart": "INSTITUTIONAL TRANSMISSION // SYSTEMIC CHOKE",
+            "tactical_map": "RADAR TELEMETRY // VECTOR TRACK",
         }
         if isinstance(forensic_ov, str):
             forensic_ov = {
                 "type": forensic_ov,
                 "label": DEFAULT_OVERLAY_LABELS.get(forensic_ov, "FORENSIC // EVIDENCE RECORD")
             }
+
+        # Spatial Layout Collision Prevention:
+        # Prevent character foreground and evidentiary graphics from colliding on the same side.
+        if forensic_ov and isinstance(forensic_ov, dict):
+            if "label" not in forensic_ov:
+                forensic_ov["label"] = DEFAULT_OVERLAY_LABELS.get(forensic_ov.get("type"), "FORENSIC // EVIDENCE RECORD")
+            if "layout" not in forensic_ov:
+                forensic_ov["layout"] = "split_right"
+            if "theme" not in forensic_ov:
+                forensic_ov["theme"] = "noir_dossier"
+
+            ov_layout = forensic_ov.get("layout")
+            if ov_layout == "split_right":
+                fg_pos = "left"
+            elif ov_layout == "split_left":
+                fg_pos = "right"
+            elif ov_layout == "fullscreen_dossier":
+                fg_rel = None
 
         # Extract Stamp Slam Badge (Rule 122 Acting & Evidence Props)
         stamp_badge = s.get("stamp_badge") or s.get("stampBadge")

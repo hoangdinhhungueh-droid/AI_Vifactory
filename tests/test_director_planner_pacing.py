@@ -22,25 +22,25 @@ def test_canonical_camera_moves_completeness():
 
 
 def test_detect_forensic_overlay_categories():
-    # Contract / Redacted Doc
+    # Contract / Redacted Doc -> Vox Document Highlight
     r1 = detect_forensic_overlay("The company signed a classified NDA clause preventing disclosure.")
     assert r1 is not None
-    assert r1["type"] == "redacted_doc"
+    assert r1["type"] == "document_highlight"
 
-    # Flight / Radar
+    # Flight / Radar -> Vox Tactical Map
     r2 = detect_forensic_overlay("The cargo flight vanished from air traffic control radar screens.")
     assert r2 is not None
-    assert r2["type"] == "radar_map"
+    assert r2["type"] == "tactical_map"
 
-    # Financial / Capital Loss
+    # Financial / Capital Loss -> Vox Kinetic Counter
     r3 = detect_forensic_overlay("A catastrophic 40 billion dollar stock market liquidity collapse.")
     assert r3 is not None
-    assert r3["type"] == "financial_chart"
+    assert r3["type"] == "kinetic_counter"
 
-    # Surveillance
+    # Surveillance -> Vox Tactical Map
     r4 = detect_forensic_overlay("Security warehouse CCTV surveillance footage was quietly erased.")
     assert r4 is not None
-    assert r4["type"] == "surveillance_crt"
+    assert r4["type"] == "tactical_map"
 
     # None
     r5 = detect_forensic_overlay("An ordinary conversation in an office.")
@@ -143,13 +143,13 @@ def test_build_remotion_props_with_camera_and_overlay(tmp_path):
     assert sc0["cameraMovement"] == "snap_zoom"
     assert sc0["tensionLevel"] == "high"
     assert sc0["bgClusterId"] == 1
-    assert sc0["forensicOverlay"]["type"] == "radar_map"
+    assert sc0["forensicOverlay"]["type"] == "tactical_map"
 
     sc1 = props["scenes"][1]
     assert sc1["cameraMovement"] == "macro_tilt"
     assert sc1["tensionLevel"] == "medium"
     assert sc1["bgClusterId"] == 1
-    assert sc1["forensicOverlay"]["type"] == "redacted_doc"
+    assert sc1["forensicOverlay"]["type"] == "document_highlight"
 
 
 def test_korean_pacing_and_scene_count_no_underflow():

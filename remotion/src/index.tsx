@@ -17,6 +17,7 @@ import {
 } from "remotion";
 import { DataStoryTest } from "./DataStoryTest";
 import { FullStory } from "./FullStory";
+import { VoxOverlayLayer } from "./components/vox/VoxOverlayLayer";
 
 const INK = "#05090d";
 const LIGHT = "#ffffff";
@@ -379,215 +380,8 @@ const SubtitleZoneOverlay = ({ height, position }) => {
   );
 };
 
-// === FORENSIC MOTION GRAPHICS TOOLKIT (Rule 122 & Rule 128) ===
-
-const RedactedDocumentOverlay = ({ label, isLeft }: { label?: string; isLeft?: boolean }) => {
-  const frame = useCurrentFrame();
-  const red1 = interpolate(frame, [5, 25], [0, 100], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const red2 = interpolate(frame, [15, 38], [0, 100], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const red3 = interpolate(frame, [25, 50], [0, 100], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-
-  return (
-    <div
-      style={{
-        position: "absolute",
-        top: 60,
-        left: isLeft ? "auto" : 80,
-        right: isLeft ? 80 : "auto",
-        width: 440,
-        backgroundColor: "rgba(10, 15, 25, 0.90)",
-        border: "1.5px solid rgba(242, 166, 59, 0.45)",
-        borderRadius: 12,
-        padding: "16px 20px",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.85), inset 0 0 15px rgba(242,166,59,0.1)",
-        backdropFilter: "blur(10px)",
-        zIndex: 28,
-        fontFamily: "'Courier New', Courier, monospace",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(242, 166, 59, 0.3)", paddingBottom: 6, marginBottom: 10 }}>
-        <span style={{ color: "#ffd166", fontSize: 12, fontWeight: 900, letterSpacing: 1.5 }}>
-          📁 {label || "CLASSIFIED // EVIDENCE DOSSIER"}
-        </span>
-        <span style={{ color: "#ef4444", fontSize: 11, fontWeight: 800, border: "1px solid #ef4444", padding: "1px 6px", borderRadius: 4 }}>
-          CONFIDENTIAL
-        </span>
-      </div>
-      <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.8, position: "relative" }}>
-        <div style={{ position: "relative", marginBottom: 6 }}>
-          <span>SUBJECT: OPERATION ATLAS LOGISTICS COMPLIANCE</span>
-          <div style={{ position: "absolute", inset: 0, width: `${red1}%`, backgroundColor: "#05090d", borderRadius: 3 }} />
-        </div>
-        <div style={{ position: "relative", marginBottom: 6 }}>
-          <span>SECTION 14.2: LIABILITY CONCEALMENT & CLAUSE 9A</span>
-          <div style={{ position: "absolute", inset: 0, width: `${red2}%`, backgroundColor: "#05090d", borderRadius: 3 }} />
-        </div>
-        <div style={{ position: "relative" }}>
-          <span>AUTHORIZATION: NON-DISCLOSURE ENFORCED</span>
-          <div style={{ position: "absolute", inset: 0, width: `${red3}%`, backgroundColor: "#05090d", borderRadius: 3 }} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const DynamicRadarMapOverlay = ({ label, isLeft }: { label?: string; isLeft?: boolean }) => {
-  const frame = useCurrentFrame();
-  const sweepAngle = (frame * 4) % 360;
-  const pingOpacity = Math.sin(frame * 0.25) > 0 ? 1 : 0.25;
-
-  return (
-    <div
-      style={{
-        position: "absolute",
-        top: 60,
-        left: isLeft ? "auto" : 80,
-        right: isLeft ? 80 : "auto",
-        width: 320,
-        height: 200,
-        backgroundColor: "rgba(5, 12, 18, 0.88)",
-        border: "1.5px solid rgba(16, 185, 129, 0.5)",
-        borderRadius: 12,
-        padding: 14,
-        boxShadow: "0 10px 30px rgba(0,0,0,0.85), 0 0 15px rgba(16,185,129,0.2)",
-        backdropFilter: "blur(10px)",
-        zIndex: 28,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        fontFamily: "'Courier New', Courier, monospace",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(16, 185, 129, 0.3)", paddingBottom: 6 }}>
-        <span style={{ color: "#10b981", fontSize: 12, fontWeight: 900, letterSpacing: 1.5 }}>
-          📡 {label || "ATC RADAR // VECTOR TRACK"}
-        </span>
-        <span style={{ color: "#10b981", fontSize: 11, fontWeight: 700 }}>LIVE 30Hz</span>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ position: "relative", width: 110, height: 110, borderRadius: "50%", border: "1px solid rgba(16, 185, 129, 0.4)", overflow: "hidden" }}>
-          <div style={{ position: "absolute", inset: 18, borderRadius: "50%", border: "1px dashed rgba(16, 185, 129, 0.3)" }} />
-          <div style={{ position: "absolute", inset: 36, borderRadius: "50%", border: "1px solid rgba(16, 185, 129, 0.2)" }} />
-          <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1, backgroundColor: "rgba(16, 185, 129, 0.3)" }} />
-          <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, backgroundColor: "rgba(16, 185, 129, 0.3)" }} />
-          <div
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              width: 55,
-              height: 2,
-              backgroundColor: "#10b981",
-              transformOrigin: "left center",
-              transform: `rotate(${sweepAngle}deg)`,
-              boxShadow: "0 0 8px #10b981",
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              top: 35,
-              left: 65,
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              backgroundColor: "#ef4444",
-              opacity: pingOpacity,
-              boxShadow: "0 0 10px #ef4444",
-            }}
-          />
-        </div>
-
-        <div style={{ color: "#cbd5e1", fontSize: 11, lineHeight: 1.6 }}>
-          <div>CALLSIGN: <span style={{ color: "#38bdf8" }}>AMZ-21</span></div>
-          <div>ALTITUDE: <span style={{ color: "#f87171" }}>3,200 -&gt; 0 FT</span></div>
-          <div>V/S: <span style={{ color: "#f87171" }}>-4,800 FPM</span></div>
-          <div>SECTOR: 25.79°N, 80.28°W</div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const KineticChartOverlay = ({ label, isLeft }: { label?: string; isLeft?: boolean }) => {
-  const frame = useCurrentFrame();
-  const drawProgress = interpolate(frame, [0, 45], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const val = interpolate(frame, [5, 40], [0, -42.8], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-
-  return (
-    <div
-      style={{
-        position: "absolute",
-        top: 60,
-        left: isLeft ? "auto" : 80,
-        right: isLeft ? 80 : "auto",
-        width: 360,
-        backgroundColor: "rgba(15, 23, 42, 0.92)",
-        border: "1.5px solid rgba(239, 68, 68, 0.5)",
-        borderRadius: 12,
-        padding: "14px 18px",
-        boxShadow: "0 12px 35px rgba(0,0,0,0.85), 0 0 15px rgba(239,68,68,0.25)",
-        backdropFilter: "blur(10px)",
-        zIndex: 28,
-        fontFamily: "'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(239, 68, 68, 0.3)", paddingBottom: 6, marginBottom: 8 }}>
-        <span style={{ color: "#f87171", fontSize: 12, fontWeight: 900, letterSpacing: 1.5, textTransform: "uppercase" }}>
-          📉 {label || "MARKET TRAJECTORY // LOSS"}
-        </span>
-        <span style={{ color: "#f87171", fontSize: 13, fontWeight: 900 }}>
-          {val.toFixed(1)}B USD
-        </span>
-      </div>
-      <svg width="320" height="70" viewBox="0 0 320 70">
-        <defs>
-          <linearGradient id="gradLoss" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(239, 68, 68, 0.3)" />
-            <stop offset="100%" stopColor="rgba(239, 68, 68, 0)" />
-          </linearGradient>
-        </defs>
-        <path
-          d="M 0,15 Q 80,10 160,35 T 320,60"
-          fill="none"
-          stroke="#ef4444"
-          strokeWidth="3"
-          strokeDasharray="350"
-          strokeDashoffset={350 * (1 - drawProgress)}
-        />
-        <circle cx={drawProgress * 320} cy={15 + drawProgress * 45} r="4" fill="#ffd166" />
-      </svg>
-    </div>
-  );
-};
-
-const SurveillanceGridOverlay = ({ label }: { label?: string }) => {
-  const frame = useCurrentFrame();
-  const isRecBlink = frame % 30 < 15;
-  const timeSec = Math.floor(frame / 30);
-
-  return (
-    <AbsoluteFill style={{ pointerEvents: "none", zIndex: 26 }}>
-      <div style={{ position: "absolute", top: 40, left: 40, width: 30, height: 30, borderTop: "2px solid rgba(255,255,255,0.4)", borderLeft: "2px solid rgba(255,255,255,0.4)" }} />
-      <div style={{ position: "absolute", top: 40, right: 40, width: 30, height: 30, borderTop: "2px solid rgba(255,255,255,0.4)", borderRight: "2px solid rgba(255,255,255,0.4)" }} />
-      <div style={{ position: "absolute", bottom: 40, left: 40, width: 30, height: 30, borderBottom: "2px solid rgba(255,255,255,0.4)", borderLeft: "2px solid rgba(255,255,255,0.4)" }} />
-      <div style={{ position: "absolute", bottom: 40, right: 40, width: 30, height: 30, borderBottom: "2px solid rgba(255,255,255,0.4)", borderRight: "2px solid rgba(255,255,255,0.4)" }} />
-
-      <div style={{ position: "absolute", top: 46, left: 80, display: "flex", alignItems: "center", gap: 8, fontFamily: "'Courier New', monospace" }}>
-        <div style={{ width: 12, height: 12, borderRadius: "50%", backgroundColor: "#ef4444", opacity: isRecBlink ? 1 : 0.2, boxShadow: isRecBlink ? "0 0 10px #ef4444" : "none" }} />
-        <span style={{ color: "#ef4444", fontSize: 14, fontWeight: 900, letterSpacing: 2 }}>REC</span>
-        <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, marginLeft: 12 }}>
-          {label || "CAM-04 // SEC_ZONE"}
-        </span>
-      </div>
-
-      <div style={{ position: "absolute", top: 46, right: 80, color: "rgba(255,255,255,0.7)", fontFamily: "'Courier New', monospace", fontSize: 13 }}>
-        00:00:{timeSec < 10 ? `0${timeSec}` : timeSec}:{(frame % 30) < 10 ? `0${frame % 30}` : frame % 30}
-      </div>
-    </AbsoluteFill>
-  );
-};
+// === VOX-STYLE EXPLANATORY MOTION ENGINE (Rule 122 & Rule 128) ===
+// Components modularized into src/components/vox/ (VoxOverlayLayer, VoxDocumentHighlight, VoxKineticCounter, VoxCausalFlowchart, VoxTacticalMap)
 
 const ForensicStampBadge = ({ badge, isLeft }: { badge: string; isLeft?: boolean }) => {
   const frame = useCurrentFrame();
@@ -802,28 +596,8 @@ export const TwoLayerScene = (props) => {
         </div>
       ) : null}
 
-      {/* Forensic Motion Graphics Evidentiary Overlays (Rule 122 & Rule 128) */}
-      {(() => {
-        const rawOv = forensicOverlay;
-        const ovType = typeof rawOv === "string" ? rawOv : rawOv?.type;
-        const ovLabel = typeof rawOv === "object" ? rawOv?.label : undefined;
-        return (
-          <>
-            {ovType === "redacted_doc" ? (
-              <RedactedDocumentOverlay label={ovLabel} isLeft={isLeft} />
-            ) : null}
-            {ovType === "radar_map" ? (
-              <DynamicRadarMapOverlay label={ovLabel} isLeft={isLeft} />
-            ) : null}
-            {ovType === "financial_chart" ? (
-              <KineticChartOverlay label={ovLabel} isLeft={isLeft} />
-            ) : null}
-            {ovType === "surveillance_crt" ? (
-              <SurveillanceGridOverlay label={ovLabel} />
-            ) : null}
-          </>
-        );
-      })()}
+      {/* Vox-Style Explanatory Motion Engine (Rule 122 & Rule 128) */}
+      <VoxOverlayLayer forensicOverlay={forensicOverlay} isLeft={isLeft} />
 
       {/* Forensic Stamp Slam Badge (Rule 122 Acting & Evidence Props) */}
       {stampBadge ? (

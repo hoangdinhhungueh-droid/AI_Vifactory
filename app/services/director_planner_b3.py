@@ -54,19 +54,122 @@ CANONICAL_CAMERA_MOVES = [
 ]
 
 
-def detect_forensic_overlay(narration_text: str) -> dict | None:
-    """Rule 128: Detect forensic evidentiary graphics trigger based on factual keywords."""
+def detect_forensic_overlay(narration_text: str, theme: str = "noir_dossier") -> dict | None:
+    """Rule 128 & Vox Explanatory Engine: Detect evidentiary graphics trigger based on factual keywords."""
     if not narration_text:
         return None
     t = narration_text.lower()
-    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "hợp đồng", "điều khoản", "tài liệu mật", "hanko", "biên bản"]):
-        return {"type": "redacted_doc", "label": "CLASSIFIED // REDACTED RECORD"}
-    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada"]):
-        return {"type": "radar_map", "label": "RADAR TELEMETRY // VECTOR TRACK"}
-    if any(k in t for k in ["stock", "dollar", "capital", "billion", "market", "revenue", "loss", "margin", "liquidity", "cổ phiếu", "sụt giảm", "thất thoát", "tỷ đô", "thị trường"]):
-        return {"type": "financial_chart", "label": "MARKET DISRUPTION // CAPITAL TRAJECTORY"}
-    if any(k in t for k in ["surveillance", "cctv", "facility", "camera", "security", "warehouse", "monitor", "an ninh", "giám sát"]):
-        return {"type": "surveillance_crt", "label": "FACILITY_SURVEILLANCE // CH_04"}
+
+    # 1. Document Highlight (Contracts, clauses, terms, NDA, redactions)
+    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "hợp đồng", "điều khoản", "tài liệu mật", "hanko", "biên bản", "fine print", "refund policy", "환불", "약관", "조항"]):
+        return {
+            "type": "document_highlight",
+            "legacy_type": "redacted_doc",
+            "theme": theme or "noir_dossier",
+            "layout": "split_right",
+            "title": "LEGAL CLAUSE // EXCLUSION AUDIT",
+            "badge": "SUBPOENAED",
+            "sfx_cue": "marker_stroke",
+            "label": "CLASSIFIED // REDACTED RECORD",
+            "payload": {
+                "document_title": "MEMORANDUM OF AGREEMENT // EXCLUSION PROVISION",
+                "clauses": [
+                    "SECTION 4 // NON-REFUNDABLE CONTINGENCY",
+                    "ARTICLE 17 // EXCLUSION OF LIABILITY",
+                    "ARBITRATION PROTOCOL // FINAL BINDING VERDICT"
+                ],
+                "highlight_line_index": 1,
+                "redacted_terms": ["ARBITRATION PROTOCOL", "NON-REFUNDABLE"]
+            }
+        }
+
+    # 2. Kinetic Counter (Numerical surge/collapse, capital metrics)
+    if any(k in t for k in ["stock", "dollar", "capital", "billion", "market", "revenue", "loss", "margin", "liquidity", "cổ phiếu", "sụt giảm", "thất thoát", "tỷ đô", "thị trường", "tổn thất", "bốc hơi", "원", "円", "man-won", "trillion"]):
+        num_m = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?)', narration_text)
+        val = float(num_m.group(1).replace(",", "")) if num_m else 41.8
+        trend = "down" if any(k in t for k in ["loss", "giảm", "sụt", "drop", "collapse", "bốc hơi", "하락", "폭락"]) else "up"
+        return {
+            "type": "kinetic_counter",
+            "legacy_type": "financial_chart",
+            "theme": theme or "tech_infographic",
+            "layout": "split_right",
+            "title": "DISRUPTION INDEX // ASYMMETRIC SPREAD",
+            "badge": "VIOLATION",
+            "sfx_cue": "counter_tick",
+            "label": "MARKET DISRUPTION // CAPITAL TRAJECTORY",
+            "payload": {
+                "start_value": 0.0,
+                "end_value": val,
+                "unit": "M",
+                "prefix": "$",
+                "suffix": "",
+                "trend": trend,
+                "chart_type": "line"
+            }
+        }
+
+    # 3. Causal Flowchart (Systemic trap, network, money laundering, shell game, pipeline)
+    if any(k in t for k in ["mechanism", "network", "shell", "laundering", "channel", "transmission", "intermediary", "trap", "bẫy", "chuỗi", "dòng tiền", "trung gian", "cơ chế", "dây chuyền", "구조", "우회", "경로"]):
+        return {
+            "type": "causal_flowchart",
+            "legacy_type": "redacted_doc",
+            "theme": theme or "noir_dossier",
+            "layout": "fullscreen_dossier",
+            "title": "CAUSAL TRANSMISSION // ASYMMETRIC CHOKE",
+            "badge": "RESTRICTED",
+            "sfx_cue": "node_pop",
+            "label": "INSTITUTIONAL TRANSMISSION // SYSTEMIC CHOKE",
+            "payload": {
+                "nodes": [
+                    {"id": "origin", "label": "Consumer Capital", "status": "normal"},
+                    {"id": "intermediary", "label": "Platform Escrow", "status": "breach"},
+                    {"id": "offshore", "label": "Non-Refund Vault", "status": "fatal"}
+                ],
+                "edges": [
+                    {"from": "origin", "to": "intermediary", "label": "Deposit Stream"},
+                    {"from": "intermediary", "to": "offshore", "label": "Trapped Liquidity"}
+                ]
+            }
+        }
+
+    # 4. Tactical Map (Radar, flight path, maritime choke, coordinates)
+    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình"]):
+        return {
+            "type": "tactical_map",
+            "legacy_type": "radar_map",
+            "theme": "surveillance_cctv",
+            "layout": "split_right",
+            "title": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
+            "badge": "CONFIDENTIAL",
+            "sfx_cue": "sonar_ping",
+            "label": "RADAR TELEMETRY // VECTOR TRACK",
+            "payload": {
+                "target_name": "TACTICAL INTERCEPT // VECTOR ALPHA",
+                "coordinates": "37.5665°N, 126.9780°E",
+                "grid_type": "radar",
+                "points_of_interest": ["PRIMARY CATALYST", "LOGISTICAL CHOKE"]
+            }
+        }
+
+    # 5. Surveillance CRT
+    if any(k in t for k in ["surveillance", "cctv", "facility", "camera", "security", "warehouse", "monitor", "an ninh", "giám sát", "감시"]):
+        return {
+            "type": "tactical_map",
+            "legacy_type": "surveillance_crt",
+            "theme": "surveillance_cctv",
+            "layout": "floating_card",
+            "title": "FACILITY SURVEILLANCE // CAM 04",
+            "badge": "RESTRICTED",
+            "sfx_cue": "sonar_ping",
+            "label": "FACILITY_SURVEILLANCE // CH_04",
+            "payload": {
+                "target_name": "PERIMETER FEED // SECTOR 7",
+                "coordinates": "CAM_04_FEED // 1080P",
+                "grid_type": "chokepoint",
+                "points_of_interest": ["ACCESS BREACH"]
+            }
+        }
+
     return None
 
 
@@ -166,6 +269,12 @@ CINEMATIC_ARCHETYPES = DynamicArchetypeDict({
         "palette": "Deep velvet midnight blue, tarnished brass gold, dark burgundy, cigar-smoke chiaroscuro",
         "camera_style": "Slow predator tracking shots, clinical over-the-shoulder document inspections, abrupt freezing snap-zooms on hidden beneficiary names"
     },
+    "consumer_injustice_institutional_trap": {
+        "director": "GPT-6-Astra — Adam McKay & Laurent Cantet (Social Reality & Everyday Institutional Entrapment) Principle",
+        "visual_tone": "Fluorescent consumer dispute consultation rooms, corporate storefront refund denial counters with bold exclusion notices, dense fine-print contract binders, everyday citizens confronting institutional stonewalling",
+        "palette": "Institutional beige, muted slate olive, fluorescent pale blue, warning amber stamp highlights",
+        "camera_style": "Macro tilts over hidden exclusion clauses, static confrontation two-shots, sudden snap zooms on predatory fine print"
+    },
     "default": {
         "director": "GPT-6-Astra — Denis Villeneuve & David Fincher (Investigative Realism) Principle",
         "visual_tone": "Moody atmospheric tension, dramatic low-key lighting, textured architectural backgrounds, forensic depth of field",
@@ -177,6 +286,7 @@ CINEMATIC_ARCHETYPES = DynamicArchetypeDict({
 # Backward compatibility aliases for legacy callers and tests
 CINEMATIC_ARCHETYPES["finance"] = CINEMATIC_ARCHETYPES["business_rise_fall"]
 CINEMATIC_ARCHETYPES["history"] = CINEMATIC_ARCHETYPES["systemic_crisis"]
+CINEMATIC_ARCHETYPES["consumer_injustice"] = CINEMATIC_ARCHETYPES["consumer_injustice_institutional_trap"]
 
 
 def detect_cinematic_archetype(niche: str = "", topic: str = "", story_text: str = "") -> dict:
@@ -186,8 +296,12 @@ def detect_cinematic_archetype(niche: str = "", topic: str = "", story_text: str
     """
     combined = f"{niche} {topic} {story_text[:600]}".lower()
 
-    # 1. Tech & Geopolitical Battles
-    if any(k in combined for k in ["tech", "chip", "semiconductor", "asml", "tsmc", "silicon", "geopolitic", "supply chain", "cable", "satellite", "cyber", "hardware", "lithography", "quantum"]):
+    # 1. Consumer Injustice & Everyday Institutional Traps (Pillar 11)
+    if any(k in combined for k in ["consumer", "refund", "trap", "fine print", "arbitration", "dispute", "tiêu dùng", "hoàn tiền", "bẫy", "hợp đồng tiêu dùng", "환불", "약관", "소비자", "분쟁", "조정", "구글스토어", "전자제품"]):
+        return CINEMATIC_ARCHETYPES["consumer_injustice_institutional_trap"]
+
+    # 2. Tech & Geopolitical Battles
+    elif any(k in combined for k in ["tech", "chip", "semiconductor", "asml", "tsmc", "silicon", "geopolitic", "supply chain", "cable", "satellite", "cyber", "hardware", "lithography", "quantum"]):
         return CINEMATIC_ARCHETYPES["tech_geopolitics"]
 
     # 2. Institutional & Regulatory Chokepoints / Medical / Whistleblower
