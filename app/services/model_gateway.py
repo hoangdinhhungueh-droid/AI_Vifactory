@@ -187,9 +187,10 @@ class ModelGateway:
             "model": model,
             "messages": messages,
             "max_tokens": max_tokens,
-            "temperature": temperature,
             "stream": True
         }
+        if not model.startswith("kimi"):
+            payload["temperature"] = temperature
         
         max_retries = 3
         last_error = None

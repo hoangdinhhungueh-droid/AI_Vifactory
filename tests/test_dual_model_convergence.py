@@ -2,6 +2,7 @@
 Verifies role separation (Astra patches, Opus audits delta),
 CJK length compliance, and targeted act patching.
 """
+import json
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -91,9 +92,36 @@ def test_dual_model_convergence_astra_patches_opus_audits():
         assert res["status"] == "PASS"
         assert res["fact_score"] == 8.8
         assert res["story_gate_score"] == 11
+        assert res["audit_details"]["verdict"] == "PASS"
 
         # Verify role separation: First call MUST be gpt-6-astra (Patcher), Second call MUST be claude-opus-5 (Delta Auditor)
         calls = fake_gateway.call_llm.call_args_list
         assert len(calls) == 2
         assert calls[0].kwargs.get("model") == "gpt-6-astra"
         assert calls[1].kwargs.get("model") == "claude-opus-5"
+
+
+def test_score_verdict_normalization_fail_with_passing_score():
+    """Tests that when Claude Opus returns verdict 'FAIL' but audit_score >= 7.5,
+    the normalization contract converts it to 'PASS'."""
+    from app.services.story_fact_auditor_b2 import audit_delta_patched_acts
+
+    fake_gw = MagicMock()
+    fake_gw.call_llm.return_value = json.dumps({
+        "verdict": "FAIL",
+        "audit_score": 7.6,
+        "still_failing_acts": [],
+        "critical_findings": "Minor nuances remain but factual claims verified."
+    })
+
+    with patch("app.services.model_gateway.get_global_gateway", return_value=fake_gw):
+        res = audit_delta_patched_acts(
+            patched_acts={"ACT I": "Patched text for Act I"},
+            prior_critique={"critical_findings": "Initial discrepancy in Act I"},
+            grounding_claims=[{"claim": "test claim"}],
+            topic_meta={"task_id": "JP_TEST_NORM", "topic_name_vi": "Test Normalization"},
+            market="JP"
+        )
+
+        assert res["audit_score"] == 7.6
+        assert res["verdict"] == "PASS", "Verdict must be normalized to PASS when score >= 7.5!"

@@ -944,6 +944,8 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                         full_script = conv_res.get("script", full_script)
                         fact_audit_result = conv_res.get("audit_details", fact_audit_result)
                         fact_audit_result["convergence_status"] = "CONVERGED"
+                        fact_audit_result["verdict"] = "PASS"
+                        fact_audit_result["audit_score"] = float(conv_res.get("fact_score", 8.0))
                         f_verdict = "PASS"
                         f_score = float(conv_res.get("fact_score", 8.0))
 

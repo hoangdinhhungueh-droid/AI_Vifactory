@@ -291,6 +291,8 @@ Output ONLY the patched Act(s), formatted with standard headers (e.g. '=== ACT I
         converged = (re_verdict == "PASS" or re_score >= 7.5) and (sg_score >= 10) and is_length_valid
 
         if converged:
+            re_audit["verdict"] = "PASS"
+            re_audit["audit_score"] = re_score
             logger.info(
                 f"[dual_convergence] SUCCESS: Targeted Delta-Convergence ACHIEVED on Round {round_idx}/{max_rounds} for {task_id}! "
                 f"(Fact Score: {re_score}/10, Story Gate: {sg_score}/12, Length: {last_units} {unit_name})"

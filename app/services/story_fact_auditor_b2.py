@@ -177,6 +177,9 @@ Perform strict adversarial forensic audit according to the 8 Iron Criteria. Inte
     if score < 7.5 and verdict == "PASS":
         verdict = "FAIL"
         audit_result["verdict"] = "FAIL"
+    elif score >= 7.5 and verdict == "FAIL":
+        verdict = "PASS"
+        audit_result["verdict"] = "PASS"
 
     logger.info(f"[story_auditor] Audited {task_id}: Verdict={verdict} (Score: {score}/10) by {chosen_model}")
     return audit_result
@@ -300,6 +303,9 @@ Return strict JSON only:
     if score < 7.5 and verdict == "PASS":
         verdict = "FAIL"
         res["verdict"] = "FAIL"
+    elif score >= 7.5 and verdict == "FAIL":
+        verdict = "PASS"
+        res["verdict"] = "PASS"
 
     logger.info(f"[story_auditor] Delta Audit for {task_id}: Verdict={verdict} (Score: {score}/10)")
     return res
