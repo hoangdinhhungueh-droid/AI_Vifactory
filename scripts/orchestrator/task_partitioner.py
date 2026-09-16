@@ -230,7 +230,7 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
             "story = open(f'{ep_dir}/story.txt', encoding='utf-8').read(); "
             "brain = json.load(open(f'{ep_dir}/brain_input.json', encoding='utf-8')); "
             "sp_sents = json.load(open(f'{ep_dir}/spoken_sentences.json', encoding='utf-8')) if __import__('os').path.exists(f'{ep_dir}/spoken_sentences.json') else None; "
-            "plan = generate_director_plan('{task_id}', story, spoken_sentences=sp_sents, metadata={'topic': brain.get('topic') or '{task_id}'}); "
+            "plan = generate_director_plan('{task_id}', story, spoken_sentences=sp_sents, metadata={'topic': brain.get('topic') or '{task_id}'}, run_downstream=False); "
             "print(f'✅ B3 Hollywood Director Plan PASS: {len(plan.get(\"scenes\", []))} scenes')",
         ],
     ),

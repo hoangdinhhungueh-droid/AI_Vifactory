@@ -646,7 +646,8 @@ def generate_director_plan(
     spoken_sentences: list = None,
     intel_card: dict = None,
     metadata: dict = None,
-    skip_notion: bool = False
+    skip_notion: bool = False,
+    run_downstream: bool = True
 ) -> dict:
     """
     Core B3 Art Director & Universal Scene Breakdown Engine (Hollywood Audio-Anchored - Rule 128).
@@ -1235,87 +1236,77 @@ def generate_director_plan(
 
     logger.info(f"  [B3] Saved director_plan.json & dp_plan.json to {canonical_dirs}")
 
-    # 8. Trigger B3.5 Prompt Forge to generate specialized visual prompts
-    try:
-        from app.services.prompt_forge import generate_scene_prompts, push_prompts_to_notion
-        logger.info("  [B3.5] Forging visual prompts via Prompt Forge Engine...")
-        bg_req = {k: {"visual_hint": v["description"], "narration_context": v["beat"]} for k, v in bg_roster.items()}
-        fg_req = {k: {"visual_hint": v["description"], "narration_context": v["beat"]} for k, v in fg_roster.items()}
+    # 8. Trigger B3.5 Prompt Forge & B3.6 Visual Convergence (if run_downstream)
+    if run_downstream:
+        try:
+            from app.services.prompt_forge import generate_scene_prompts, push_prompts_to_notion
+            logger.info("  [B3.5] Forging visual prompts via Prompt Forge Engine...")
+            bg_req = {k: {"visual_hint": v["description"], "narration_context": v["beat"]} for k, v in bg_roster.items()}
+            fg_req = {k: {"visual_hint": v["description"], "narration_context": v["beat"]} for k, v in fg_roster.items()}
 
-        prompts_res = generate_scene_prompts(
-            bg_dict=bg_req,
-            fg_dict=fg_req,
-            story_title=topic,
-            scenes=normalized_scenes,
-            task_id=episode_id,
-            market=m_up
-        )
+            prompts_res = generate_scene_prompts(
+                bg_dict=bg_req,
+                fg_dict=fg_req,
+                story_title=topic,
+                scenes=normalized_scenes,
+                task_id=episode_id,
+                market=m_up
+            )
 
-        # Map forged prompts back to each scene in director_plan
-        for sc in director_plan.get("scenes", []):
-            bg_k = sc.get("bg_reuse_key")
-            if bg_k and bg_k in prompts_res.get("backgrounds", {}):
-                sc["bg_prompt"] = prompts_res["backgrounds"][bg_k]
-                sc["image_prompt"] = prompts_res["backgrounds"][bg_k]
-            fg_k = sc.get("fg_reuse_key")
-            if fg_k and fg_k in prompts_res.get("foregrounds", {}):
-                sc["fg_prompt"] = prompts_res["foregrounds"][fg_k]
-                sc["foreground_prompt"] = prompts_res["foregrounds"][fg_k]
+            # Map forged prompts back to each scene in director_plan
+            for sc in director_plan.get("scenes", []):
+                bg_k = sc.get("bg_reuse_key")
+                if bg_k and bg_k in prompts_res.get("backgrounds", {}):
+                    sc["bg_prompt"] = prompts_res["backgrounds"][bg_k]
+                    sc["image_prompt"] = prompts_res["backgrounds"][bg_k]
+                fg_k = sc.get("fg_reuse_key")
+                if fg_k and fg_k in prompts_res.get("foregrounds", {}):
+                    sc["fg_prompt"] = prompts_res["foregrounds"][fg_k]
+                    sc["foreground_prompt"] = prompts_res["foregrounds"][fg_k]
 
-        for target_dir in canonical_dirs:
-            with open(target_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
-                json.dump(prompts_res, f, indent=2, ensure_ascii=False)
-            with open(target_dir / "prompts.json", "w", encoding="utf-8") as f:
-                json.dump(prompts_res, f, indent=2, ensure_ascii=False)
-            with open(target_dir / "director_plan.json", "w", encoding="utf-8") as f:
-                json.dump(director_plan, f, indent=2, ensure_ascii=False)
-            with open(target_dir / "dp_plan.json", "w", encoding="utf-8") as f:
-                json.dump({"scenes": director_plan.get("scenes", [])}, f, indent=2, ensure_ascii=False)
+            for target_dir in canonical_dirs:
+                with open(target_dir / "prompts_forge.json", "w", encoding="utf-8") as f:
+                    json.dump(prompts_res, f, indent=2, ensure_ascii=False)
+                with open(target_dir / "prompts.json", "w", encoding="utf-8") as f:
+                    json.dump(prompts_res, f, indent=2, ensure_ascii=False)
+                with open(target_dir / "director_plan.json", "w", encoding="utf-8") as f:
+                    json.dump(director_plan, f, indent=2, ensure_ascii=False)
+                with open(target_dir / "dp_plan.json", "w", encoding="utf-8") as f:
+                    json.dump({"scenes": director_plan.get("scenes", [])}, f, indent=2, ensure_ascii=False)
 
-        logger.info("  [B3.5] Initial Prompt Forge assets written to canonical directories.")
-    except Exception as e:
-        logger.warning(f"  [B3.5] Prompt Forge integration encountered notice: {e}")
+            logger.info("  [B3.5] Initial Prompt Forge assets written to canonical directories.")
+        except Exception as e:
+            logger.warning(f"  [B3.5] Prompt Forge integration encountered notice: {e}")
 
-    # 8.5. Step B3.5.1: Dual-LLM Adversarial Visual Convergence (Claude Opus 5 ⇄ GPT-6-Astra)
-    # (Rule 125 Single Pipeline Version & Dual LLM Visual Audit Mandate)
-    # Automatically audits, patches storyboard/prompts, persists assets to disk,
-    # and dispatches Human Gate 2 Telegram notification AFTER convergence.
-    try:
-        from app.services.b36_visual_convergence import run_b36_visual_convergence
-        logger.info("  [B3.5.1] Launching Dual-LLM Adversarial Visual Convergence (Claude Opus 5 ⇄ GPT-6-Astra)...")
-        conv_res = run_b36_visual_convergence(
-            episode_id=episode_id,
-            director_plan=director_plan,
-            dp_plan={"scenes": director_plan.get("scenes", [])},
-            prompts_data=prompts_res if 'prompts_res' in locals() else None,
-            story_text=story_text,
-            grounding_intel=grounding_intel if 'grounding_intel' in locals() and grounding_intel else None,
-            seo_package=intel_card.get("seo_package") if 'intel_card' in locals() and isinstance(intel_card, dict) else None
-        )
-        if conv_res and "director_plan" in conv_res:
-            director_plan = conv_res["director_plan"]
-        if conv_res and "prompts_data" in conv_res:
-            prompts_res = conv_res["prompts_data"]
-    except Exception as e:
-        logger.warning(f"  [B3.5.1] Adversarial Visual Convergence encountered notice: {e}")
+        # 8.5. Step B3.5.1: Dual-LLM Adversarial Visual Convergence (Claude Opus 5 ⇄ GPT-6-Astra)
+        try:
+            from app.services.b36_visual_convergence import run_b36_visual_convergence
+            logger.info("  [B3.5.1] Launching Dual-LLM Adversarial Visual Convergence (Claude Opus 5 ⇄ GPT-6-Astra)...")
+            conv_res = run_b36_visual_convergence(
+                episode_id=episode_id,
+                director_plan=director_plan,
+                dp_plan={"scenes": director_plan.get("scenes", [])},
+                prompts_data=prompts_res if 'prompts_res' in locals() else None,
+                story_text=story_text,
+                grounding_intel=grounding_intel if 'grounding_intel' in locals() and grounding_intel else None,
+                seo_package=intel_card.get("seo_package") if 'intel_card' in locals() and isinstance(intel_card, dict) else None
+            )
+            if conv_res and "director_plan" in conv_res:
+                director_plan = conv_res["director_plan"]
+            if conv_res and "prompts_data" in conv_res:
+                prompts_res = conv_res["prompts_data"]
+        except Exception as e:
+            logger.warning(f"  [B3.5.1] Adversarial Visual Convergence encountered notice: {e}")
 
-    # 9. Sync Converged Assets to Notion (Director Plan DB & Prompts Library DB)
+    # 9. Sync Director Plan to Notion
     if not skip_notion:
         try:
             push_director_plan_to_notion(director_plan, episode_id)
-            if 'prompts_res' in locals() and prompts_res:
+            if run_downstream and 'prompts_res' in locals() and prompts_res:
                 push_prompts_to_notion(prompts_res, episode_id)
                 logger.info("  [B3.5.1] Converged Prompts pushed to Notion Prompt Library DB.")
         except Exception as e:
-            logger.warning(f"  [B3.5.1 Notion] Failed to push converged assets to Notion: {e}")
-
-    # 10. Verification of B3.5.1 Convergence: HG2 is canonically triggered inside b36_visual_convergence upon successful convergence.
-    try:
-        has_audit = any((cdir / "visual_convergence_audit.json").exists() for cdir in canonical_dirs if cdir.exists())
-        if not has_audit:
-            logger.warning(f"  [B3/B3.5] Visual convergence audit not found for {episode_id}. HG2 withheld until convergence.")
-    except Exception as e:
-        logger.warning(f"  [B3/B3.5 Guard] Notice: {e}")
+            logger.warning(f"  [B3 Notion] Failed to push assets to Notion: {e}")
 
     return director_plan
 

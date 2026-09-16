@@ -272,7 +272,7 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
     logger.info(f"[story_engine] Adapting Master Spoken VO Script for {topic} ({mkt})...")
     raw_res = ""
     try:
-        raw_res = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=6000, timeout=180.0)
+        raw_res = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=3500, timeout=45.0)
     except Exception as e:
         logger.warning(f"[story_engine] LLM call for spoken VO adaptation failed: {e}")
 
