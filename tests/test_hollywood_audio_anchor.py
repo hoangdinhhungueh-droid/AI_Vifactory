@@ -46,14 +46,16 @@ def test_spoken_script_adaptation_deterministic():
         "The lesson of Hwaseong remains a living warning for the modern retail regulatory framework.\n"
     )
     
-    res = adapt_master_spoken_script(sample_5act_story, market="EN", topic="Table Tennis Refund Trap")
-    assert isinstance(res, dict)
-    sentences = res.get("sentences", [])
-    assert len(sentences) >= 5, f"Expected at least 5 sentences, got {len(sentences)}"
-    assert res.get("total_estimated_minutes", 0) <= 15.0, "Estimated duration must be <= 15 minutes"
+    from unittest.mock import patch
+    with patch("app.services.story_engine_b2.call_gpt6_astra", side_effect=Exception("Simulated API failure for fallback test")):
+        res = adapt_master_spoken_script(sample_5act_story, market="EN", topic="Table Tennis Refund Trap")
+        assert isinstance(res, dict)
+        sentences = res.get("sentences", [])
+        assert len(sentences) >= 5, f"Expected at least 5 sentences, got {len(sentences)}"
+        assert res.get("total_estimated_minutes", 0) <= 15.0, "Estimated duration must be <= 15 minutes"
 
-    beats_present = set(s.get("beat_index") for s in sentences)
-    assert 1 in beats_present and 5 in beats_present, f"Beats must cover full arc: {beats_present}"
+        beats_present = set(s.get("beat_index") for s in sentences)
+        assert 1 in beats_present and 5 in beats_present, f"Beats must cover full arc: {beats_present}"
 
 
 def test_adversarial_audit_duration_ceiling():
