@@ -10,7 +10,9 @@ import sys
 import json
 import re
 import logging
+import time
 import urllib.request
+import urllib.error
 from typing import List, Dict, Any, Tuple, Optional
 
 logger = logging.getLogger(__name__)
@@ -95,10 +97,22 @@ def is_trusted_domain(source: str, url: str = "") -> bool:
         "nikkei", "nhk", "asahi", "yomiuri", "mainichi", "kyodo", "jiji", "japan times", "toyokeizai",
         "カンテレ", "ktv", "fnn", "ライブドア", "livedoor", "yahoo", "ヤフー", "sankei", "産経", "wikipedia", "ウィキペディア",
         "tbs", "ntv", "日テレ", "テレ朝", "テレビ東京", "tv tokyo", "神戸新聞", "kobe", "chunichi", "中日新聞", "西日本新聞",
-        "excite", "エキサイト", "tnc",
+        "excite", "エキサイト", "tnc", "共同通信", "時事通信", "時事", "読売新聞", "読売", "朝日新聞", "朝日",
+        "日本経済新聞", "日経", "毎日新聞", "毎日", "産経新聞", "東京新聞", "日経ビジネス", "週刊東洋経済", "東洋経済",
+        "ダイヤモンド", "プレジデント", "ロイター", "ブルームバーグ", "東京商工リサーチ", "帝国データバンク",
+        "財務省", "金融庁", "日本銀行", "日銀", "経済産業省", "経産省", "国土交通省", "国交省",
+        "公正取引委員会", "公取委", "東京地裁", "大阪地裁", "最高裁判所", "警察庁", "警視庁", "内閣府",
+        "首相官邸", "外務省", "法務省", "厚生労働省", "厚労省", "税務署", "国税庁", "貿易統計",
         # Korean press, broadcast networks & portal news
         "yonhap", "yna", "maeil", "korea economic daily", "hankyung", "chosun", "donga", "joongang",
         "korea times", "korea herald", "sedaily", "kbs", "mbc", "sbs", "ytn", "jtbc", "naver", "daum",
+        "연합뉴스", "연합", "조선일보", "조선", "중앙일보", "동아일보", "한겨레", "경향신문", "한국일보",
+        "매일경제", "매경", "한국경제", "한경", "서울경제", "머니투데이", "이데일리", "뉴시스",
+        "기획재정부", "기재부", "금융위원회", "금융위", "금융감독원", "금감원", "한국은행", "한은",
+        "공정거래위원회", "공정위", "산업통상자원부", "산자부", "대법원", "서울중앙지법", "검찰청", "대통령실", "국세청",
+        # Vietnamese press and ministries
+        "vnexpress", "tuoitre", "tuổi trẻ", "thanhnien", "thanh niên", "vietnamnet", "dantri", "dân trí",
+        "vtv", "vov", "baochinhphu", "báo chính phủ", "bộ tài chính", "ngân hàng nhà nước",
         # Maritime & energy & commodities
         "lloyd's list", "lloyds list", "gcaptain", "maritime executive", "tradewinds",
         "eia", "imo", "marad", "s&p global", "sp global", "freightwaves", "windward", "kpler",
@@ -283,62 +297,79 @@ def run_grounding_research(
     }
 
     headers = {"Content-Type": "application/json"}
-    req = urllib.request.Request(api_url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+    candidate_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    last_err = None
 
-    try:
-        logger.info(f"[grounding] Executing Google Search Grounding for topic: '{topic[:60]}'")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw_data = json.loads(resp.read().decode("utf-8"))
+    for model_name in candidate_models:
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"[grounding] Executing Google Search Grounding with {model_name} (attempt {attempt+1}/{max_retries}) for topic: '{topic[:60]}'")
+                req = urllib.request.Request(api_url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    raw_data = json.loads(resp.read().decode("utf-8"))
 
-        candidate = raw_data.get("candidates", [{}])[0]
-        parts = candidate.get("content", {}).get("parts", [])
-        text_resp = "".join([p.get("text", "") for p in parts]).strip()
+                candidate = raw_data.get("candidates", [{}])[0]
+                parts = candidate.get("content", {}).get("parts", [])
+                text_resp = "".join([p.get("text", "") for p in parts]).strip()
 
-        # Extract grounding metadata (queries and source chunks)
-        grounding_meta = candidate.get("groundingMetadata", {})
-        web_queries = grounding_meta.get("webSearchQueries", [])
-        raw_chunks = grounding_meta.get("groundingChunks", [])
-        grounding_chunks = []
-        for c in raw_chunks:
-            web = c.get("web", {})
-            if web:
-                grounding_chunks.append({
-                    "title": web.get("title", ""),
-                    "uri": web.get("uri", "")
-                })
+                # Extract grounding metadata (queries and source chunks)
+                grounding_meta = candidate.get("groundingMetadata", {})
+                web_queries = grounding_meta.get("webSearchQueries", [])
+                raw_chunks = grounding_meta.get("groundingChunks", [])
+                grounding_chunks = []
+                for c in raw_chunks:
+                    web = c.get("web", {})
+                    if web:
+                        grounding_chunks.append({
+                            "title": web.get("title", ""),
+                            "uri": web.get("uri", "")
+                        })
 
-        # Clean markdown fence if LLM wrapped with ```json
-        clean_json = re.sub(r"^```json\s*|\s*```$", "", text_resp, flags=re.MULTILINE).strip()
-        parsed = json.loads(clean_json)
+                # Clean markdown fence if LLM wrapped with ```json
+                clean_json = re.sub(r"^```json\s*|\s*```$", "", text_resp, flags=re.MULTILINE).strip()
+                parsed = json.loads(clean_json)
 
-        parsed["grounding_chunks"] = grounding_chunks
-        parsed["search_queries"] = web_queries
-        parsed["has_live_search"] = True
-        logger.info(f"[grounding] Successfully extracted {len(parsed.get('claims', []))} claims with {len(grounding_chunks)} search sources.")
-        return parsed
+                parsed["grounding_chunks"] = grounding_chunks
+                parsed["search_queries"] = web_queries
+                parsed["has_live_search"] = True
+                parsed["grounding_model"] = model_name
+                logger.info(f"[grounding] Successfully extracted {len(parsed.get('claims', []))} claims with {len(grounding_chunks)} search sources via {model_name}.")
+                return parsed
 
-    except json.JSONDecodeError as je:
-        logger.warning(f"[grounding] Failed to parse JSON from grounding response: {je}")
-        return {
-            "topic": topic,
-            "rejected": True,
-            "reject_reason": f"JSON parse error from grounding model: {je}",
-            "claims": [],
-            "grounding_chunks": [],
-            "search_queries": [],
-            "has_live_search": False
-        }
-    except Exception as e:
-        logger.error(f"[grounding] Grounding API call failed: {e}")
-        return {
-            "topic": topic,
-            "rejected": True,
-            "reject_reason": f"API call error: {e}",
-            "claims": [],
-            "grounding_chunks": [],
-            "search_queries": [],
-            "has_live_search": False
-        }
+            except json.JSONDecodeError as je:
+                logger.warning(f"[grounding] Failed to parse JSON from {model_name} response: {je}")
+                last_err = je
+                break
+            except urllib.error.HTTPError as he:
+                last_err = he
+                if he.code in (500, 502, 503, 504, 429) and attempt < max_retries - 1:
+                    wait_sec = 2 * (attempt + 1)
+                    logger.warning(f"[grounding] HTTP {he.code} on {model_name}. Retrying in {wait_sec}s...")
+                    time.sleep(wait_sec)
+                    continue
+                else:
+                    logger.warning(f"[grounding] HTTP {he.code} on {model_name}. Falling back to next model...")
+                    break
+            except Exception as e:
+                last_err = e
+                logger.warning(f"[grounding] Unexpected error on {model_name}: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                    continue
+                break
+
+    logger.error(f"[grounding] All grounding models failed: {last_err}")
+    return {
+        "topic": topic,
+        "rejected": True,
+        "reject_reason": f"All grounding models failed: {last_err}",
+        "claims": [],
+        "grounding_chunks": [],
+        "search_queries": [],
+        "has_live_search": False
+    }
 
 
 def passes_grounding_gate(
@@ -386,12 +417,21 @@ def passes_grounding_gate(
 
     if require_whitelist:
         has_whitelisted_verified = False
+        chunk_uris = [chunk.get("uri", "") for chunk in grounding_result.get("grounding_chunks", []) if chunk.get("uri")]
+        has_trusted_chunk = any(is_trusted_domain("", uri) for uri in chunk_uris)
+
         for c in verified_claims:
             if is_trusted_domain(c.get("source", ""), c.get("source_url", "")):
                 has_whitelisted_verified = True
                 break
+            elif has_trusted_chunk and str(c.get("confidence", "")).lower() == "verified":
+                has_whitelisted_verified = True
+                break
+
         if not has_whitelisted_verified:
-            has_whitelisted_any = any(is_trusted_domain(c.get("source", ""), c.get("source_url", "")) for c in claims)
+            has_whitelisted_any = any(
+                is_trusted_domain(c.get("source", ""), c.get("source_url", "")) for c in claims
+            ) or has_trusted_chunk
             if not has_whitelisted_any:
                 return False, "None of the extracted claims originate from whitelisted authoritative domains."
             return False, "None of the verified claims originate from whitelisted authoritative domains."

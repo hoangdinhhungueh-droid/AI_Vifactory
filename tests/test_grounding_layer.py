@@ -25,12 +25,23 @@ def test_is_trusted_domain():
     assert is_trusted_domain("Bank for International Settlements (BIS)", "https://www.bis.org") is True
     assert is_trusted_domain("Federal Reserve", "https://www.federalreserve.gov") is True
 
-    # Japanese & Korean authoritative sources
+    # Japanese & Korean authoritative sources (English, Kanji, and Hangul)
     assert is_trusted_domain("Nikkei", "https://www.nikkei.com/article/123") is True
+    assert is_trusted_domain("日本経済新聞") is True
     assert is_trusted_domain("NHK News", "https://www3.nhk.or.jp/news") is True
+    assert is_trusted_domain("財務省") is True
+    assert is_trusted_domain("共同通信") is True
+    assert is_trusted_domain("時事通信") is True
+    assert is_trusted_domain("金融庁") is True
     assert is_trusted_domain("Japan Gov", "https://www.kantei.go.jp") is True
     assert is_trusted_domain("Yonhap News", "https://en.yna.co.kr/view/123") is True
+    assert is_trusted_domain("연합뉴스") is True
+    assert is_trusted_domain("조선일보") is True
+    assert is_trusted_domain("금융감독원") is True
+    assert is_trusted_domain("기획재정부") is True
     assert is_trusted_domain("Korea Gov", "https://www.mofa.go.kr") is True
+    assert is_trusted_domain("VnExpress") is True
+    assert is_trusted_domain("Tuổi Trẻ") is True
 
     # Multi-source composite string check
     assert is_trusted_domain("Vertex AI Search, The National, Nautilus Shipping, Ministry of Transport") is True
@@ -160,6 +171,21 @@ def test_passes_grounding_gate_strict_audit_criteria():
     assert ok is True
     assert "PASSED" in reason
     assert "causal_link: VALID" in reason
+
+    # 7. Valid Japanese Grounding Gate PASS with Kanji sources
+    valid_jp_res = {
+        "topic": "日本の貿易収支赤字",
+        "rejected": False,
+        "has_live_search": True,
+        "claims": [
+            {"claim": "2026年8月の貿易収支が1兆1056億円の赤字を記録", "source": "財務省", "confidence": "verified", "date": "2026-09-16", "causal_role": "primary_catalyst", "mechanism": "financial"},
+            {"claim": "輸出額が前年同月比で3.2%減少", "source": "日本経済新聞", "confidence": "verified", "date": "2026-09-16", "causal_role": "transmission_mechanism", "mechanism": "commercial"},
+            {"claim": "原油輸入価格の上昇が貿易収支を圧迫", "source": "NHKニュース", "confidence": "reported", "date": "2026-09-16", "causal_role": "transmission_mechanism", "mechanism": "financial"}
+        ]
+    }
+    ok, reason = passes_grounding_gate(valid_jp_res, min_verified=2, require_whitelist=True)
+    assert ok is True
+    assert "PASSED" in reason
 
 
 def test_classify_causal_role():
