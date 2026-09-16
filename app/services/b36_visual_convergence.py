@@ -28,8 +28,9 @@ B36_AUDIT_SYSTEM_PROMPT = """You are the Senior Visual Director & Adversarial Fo
 Your job is to conduct a strict, uncompromising audit of the B3 Director Plan and B3.5 Visual Prompts Manifest.
 
 Audit against 6 Core Criteria:
-1. MARKET LINGUISTIC PURITY (Rule 120 & 128):
-   - Narration text in each scene MUST be in the episode target market language (e.g. Japanese for JP, Korean for KR, English for EN, Vietnamese for VN).
+1. MARKET LINGUISTIC PURITY & MASTER AUDIO LOCK (Rule 120 & 125 & 128):
+   - Narration text and durations are PERMANENTLY LOCKED 1:1 to the Edge-TTS master audio spine (spoken_sentences.json).
+   - DO NOT rewrite, edit, or alter narration text or scene durations under any circumstances. 0% invented text.
    - Visual prompts (bg_prompt, fg_prompt) MUST be in English.
 2. HOLLYWOOD 7-AXIS & CINEMATIC PACING:
    - Adheres to the assigned Hollywood director archetype principle (e.g. David Fincher Noir, Nolan Precision).
@@ -327,8 +328,8 @@ def run_b36_visual_convergence(
             for ps in patched_scenes:
                 sid = ps.get("scene_id")
                 if sid in scene_map:
-                    for k in ["narration", "bg_prompt", "fg_prompt", "camera_movement", "duration_est_sec"]:
-                        if k in ps:
+                    for k in ["bg_prompt", "fg_prompt", "camera_movement", "motion_directive", "forensic_overlay", "stat_card", "stamp_badge"]:
+                        if k in ps and ps[k] is not None:
                             scene_map[sid][k] = ps[k]
                             if k == "bg_prompt":
                                 scene_map[sid]["image_prompt"] = ps[k]
@@ -381,8 +382,8 @@ def run_b36_visual_convergence(
             for rs in refined_delta.get("patched_scenes", []):
                 sid = rs.get("scene_id")
                 if sid in scene_map:
-                    for k in ["narration", "bg_prompt", "fg_prompt", "camera_movement", "duration_est_sec"]:
-                        if k in rs:
+                    for k in ["bg_prompt", "fg_prompt", "camera_movement", "motion_directive", "forensic_overlay", "stat_card", "stamp_badge"]:
+                        if k in rs and rs[k] is not None:
                             scene_map[sid][k] = rs[k]
                             if k == "bg_prompt":
                                 scene_map[sid]["image_prompt"] = rs[k]

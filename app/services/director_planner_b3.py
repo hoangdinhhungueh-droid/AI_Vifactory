@@ -1052,10 +1052,15 @@ def generate_director_plan(
             words_cnt = max(3, round(clean_cjk_len / 2.5)) if clean_cjk_len else 10
         else:
             words_cnt = len(narration.split()) if narration else 10
-        if idx < 15:
-            dur = sc.get("duration_est_sec") or sc.get("duration_sec") or max(3, min(6, round(words_cnt / 3.0)))
+        # Hollywood Audio-Anchored duration: prioritize exact frame duration from Edge-TTS audio spine
+        if sc.get("duration_frames"):
+            dur = round(float(sc["duration_frames"]) / 30.0, 3)
+        elif sc.get("duration_est_sec") or sc.get("duration_sec"):
+            dur = float(sc.get("duration_est_sec") or sc.get("duration_sec"))
+        elif idx < 15:
+            dur = max(3, min(6, round(words_cnt / 3.0)))
         else:
-            dur = sc.get("duration_est_sec") or sc.get("duration_sec") or max(5, min(9, round(words_cnt / 2.5)))
+            dur = max(5, min(9, round(words_cnt / 2.5)))
 
         bg = sc.get("background") or {}
         bg_key = bg.get("reuse_key") or f"{episode_id.lower()}_bg_b{beat_idx}_loc{idx:02d}"
@@ -1122,8 +1127,9 @@ def generate_director_plan(
             "beat": beat_name,
             "narration": narration,
             "narration_segment": narration,
-            "duration_est": float(dur),
-            "duration_sec": int(dur),
+            "duration_est": round(float(dur), 3),
+            "duration_sec": max(1, int(round(dur))),
+            "duration_frames": int(sc.get("duration_frames") or round(dur * 30)),
             "visual_metaphor": sc.get("visual_metaphor", "Systemic tension and institutional conflict"),
             "bg_cluster_id": int(bg_cluster_id),
             "forensic_overlay": forensic_overlay,

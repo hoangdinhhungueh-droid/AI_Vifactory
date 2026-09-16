@@ -127,8 +127,10 @@ def test_b36_round2_convergence_with_delta_patch():
         assert res["final_score"] == 8.7
         assert res["rounds_count"] == 2
         assert fake_gateway.call_llm.call_count == 2
-        # Verify that patched scenes merged into director_plan
+        # Verify that visual prompts merged into director_plan while narration remains locked to audio spine
         patched_s1 = res["director_plan"]["scenes"][0]
-        assert "多田神社" in patched_s1["narration"]
+        assert patched_s1["narration"] == "English narration"
+        assert "Stylized graphic novel" in patched_s1["bg_prompt"]
+        assert "Slow push-in" in patched_s1["camera_movement"]
         # Verify patched thumbnail merged into prompts_data
         assert "2560x1440" in res["prompts_data"]["thumbnails"]["thumbnail_a"]
