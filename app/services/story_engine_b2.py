@@ -716,6 +716,10 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
 
     story_file = os.path.join(out_dir, "story.txt")
     existing_script = ""
+    # Rule 118 & Rule 125: Temporary evaluation tasks during B1 scanning must NEVER reuse stale scripts from other candidates
+    if "_TEMP_" in task_id:
+        force = True
+
     if os.path.exists(story_file) and not force:
         try:
             with open(story_file, "r", encoding="utf-8") as sf:

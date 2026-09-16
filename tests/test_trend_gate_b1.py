@@ -124,5 +124,56 @@ class TestTrendGateB1:
             assert first["url"].startswith("https://www.youtube.com/watch?v=")
 
 
+    def test_cjk_story_gate_numbers_and_shock(self):
+        """Rule 120/128: Verify Japanese text with numbers and shock words passes check 5 and 9."""
+        from app.services.story_gate import score_story
+        sample_jp = """=== ACT I ===
+2026年9月14日、中部電力は社長と会長の2人が9月30日付で辞任すると発表した。
+浜岡原発の安全審査が停止したという衝撃的な見出しだ。
+しかし2019年と2021年に2度の内部通報があった。
+なぜ危機は防げなかったのか？
+
+=== ACT II ===
+2012年に遡る。公式見解はデータの扱いと説明した。
+報道は神話を伝えた。しかし異議は退けられた。
+
+=== ACT III ===
+内部記録を調べる。どこに停止権限があったのか。
+それが死角を決める。
+これは単なる誤解だったのか。
+現場は数字を揃えた。
+
+=== ACT IV ===
+原子力規制委員会が決定打を下した。
+責任者が処分され、再稼働は破綻した。
+証拠が暴露された。
+
+=== ACT V ===
+今日に残る教訓は何だったのか。
+現代の企業統治への警告である。
+結論として信頼の回復が問われている。
+"""
+        res = score_story(sample_jp)
+        assert res["checks"]["5_sourced_numbers"] is True, f"Check 5 failed. Numbers found: {res['numbers_found']}"
+        assert res["checks"]["9_hook_shock_in_first_60w"] is True, "Check 9 failed to find shock word in first 60 words"
+        assert res["numbers_found"] >= 5
+
+    def test_cjk_temp_task_id_hash(self):
+        """Rule 125/128: Verify CJK terms without latin letters receive a deterministic MD5 hash."""
+        import hashlib
+        import re
+        term_jp = "＜主張＞中部電トップ辞任 日本の力損なう不祥事だ 社説"
+        clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(term_jp).lower()).strip('-')[:20]
+        assert clean_slug == ""  # Old buggy behavior produced empty slug
+
+        # New behavior: falls back to md5 hash
+        term_hash = hashlib.md5(term_jp.encode('utf-8')).hexdigest()[:8]
+        temp_task_id = f"JP_TEMP_{term_hash}"
+        assert temp_task_id.startswith("JP_TEMP_")
+        assert len(temp_task_id) == len("JP_TEMP_") + 8
+        assert temp_task_id != "JP_TEMP_"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+

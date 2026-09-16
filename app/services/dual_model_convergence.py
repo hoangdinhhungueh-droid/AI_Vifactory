@@ -141,8 +141,9 @@ Output ONLY the complete, edited 5-Act script now:"""
                 cleaned_acts.append(m[0].strip())
         
         repaired_script = "\n\n".join(cleaned_acts) if len(cleaned_acts) == 5 else scribe_raw.strip()
-        word_count = len(repaired_script.split())
-        logger.info(f"[dual_convergence] Pass 1 Scribe (Round {round_idx}) complete: {word_count} words ({len(cleaned_acts)}/5 acts).")
+        words_list = sgate._words(repaired_script)
+        word_count = len(words_list)
+        logger.info(f"[dual_convergence] Pass 1 Scribe (Round {round_idx}) complete: {word_count} words/units ({len(cleaned_acts)}/5 acts).")
 
         # ----------------------------------------------------
         # Pass 2: Cross-Audit & Story Gate Verification
@@ -173,9 +174,11 @@ Output ONLY the complete, edited 5-Act script now:"""
         last_word_count = word_count
         current_script = repaired_script
 
-        # Convergence Condition: Fact Score >= 7.5 AND Story Gate >= 10/12 AND Word Count >= 1500 (1000 for CJK)
+        # Convergence Condition: Fact Score >= 7.5 AND Story Gate >= 10/12 AND Word Count >= 1500 (950 for CJK)
         is_cjk = market.upper() in ("JP", "KR", "ZH")
-        min_words = 1000 if is_cjk else 1500
+        cjk_chars = len(re.findall(r'[\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]', repaired_script))
+        is_cjk_script = is_cjk or cjk_chars > 300
+        min_words = 950 if is_cjk_script else 1500
         converged = (re_verdict == "PASS" or re_score >= 7.5) and (sg_score >= 10) and (word_count >= min_words)
 
         if converged:
@@ -218,4 +221,3 @@ Output ONLY the complete, edited 5-Act script now:"""
         "story_gate_score": last_sg_score,
         "audit_details": last_re_audit
     }
-

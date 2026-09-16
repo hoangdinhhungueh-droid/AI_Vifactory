@@ -864,6 +864,7 @@ def discover_and_produce_market_trend(
         return []
 
     produced_topics = []
+    viability_passed_candidates = []
     consecutive_api_errors = 0
     max_consecutive_api_errors = 3
 
@@ -934,9 +935,16 @@ def discover_and_produce_market_trend(
         specific_angle = viability.get("specific_viral_angle") or term
         print(f"  ✅ APPROVED! Viability: {score}/10 | Angle: {specific_angle}")
 
+        viability_passed_candidates.append({"term": term, "score": score, "angle": specific_angle})
         # Temporary pipeline task ID for pre-audit stages (B1 -> B1.1 -> B1.5 -> B1.5.5 -> B1.6 -> B2 -> B2.1)
-        temp_slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(term).lower()).strip('-')[:20]
-        temp_task_id = f"{m_up}_TEMP_{temp_slug}"
+        import hashlib
+        clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(term).lower()).strip('-')[:20]
+        if not clean_slug:
+            # CJK term without latin letters: anchor with deterministic MD5 hash
+            term_hash = hashlib.md5(str(term).encode('utf-8')).hexdigest()[:8]
+            temp_task_id = f"{m_up}_TEMP_{term_hash}"
+        else:
+            temp_task_id = f"{m_up}_TEMP_{clean_slug}"
 
         # 3.2 B1.1 Adversarial Critic Gate (Rule 130 & Anti-Bait-and-Switch Early VETO - Claude Opus 5)
         # Filters out false trends, stale anchors, and bait-and-switch before wasting tokens/scrapes on B1.5!
@@ -1130,6 +1138,15 @@ def discover_and_produce_market_trend(
                     os.remove(temp_task_file)
                 except Exception:
                     pass
+            # Clean up temp episode directory to prevent stale cache contamination (Rule 118 & 125)
+            import shutil
+            for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
+                t_dir = Path(ep_base) / temp_task_id
+                if t_dir.exists():
+                    try:
+                        shutil.rmtree(t_dir)
+                    except Exception:
+                        pass
             continue
 
         # 7. B2.1 Independent Fact & Causal Integrity Audit Gate (Rule 118, 122 & 130 - Claude Opus 5)
@@ -1159,6 +1176,15 @@ def discover_and_produce_market_trend(
                     os.remove(temp_task_file)
                 except Exception:
                     pass
+            # Clean up temp episode directory to prevent stale cache contamination (Rule 118 & 125)
+            import shutil
+            for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
+                t_dir = Path(ep_base) / temp_task_id
+                if t_dir.exists():
+                    try:
+                        shutil.rmtree(t_dir)
+                    except Exception:
+                        pass
             continue
 
         print(f"  🎉 [B2.1 AUDIT PASSED!] Score: {f_score}/10. Moving to OFFICIAL TASK ID COMMIT & NOTION SYNC & HG1 NOTIFICATION!")
@@ -1246,13 +1272,24 @@ def discover_and_produce_market_trend(
             break
 
     if not produced_topics and not custom_seed:
-        alert_msg = (
-            f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
-            f"Đã quét qua {min(len(candidates), max_scan_candidates)}/{len(candidates)} ứng viên live từ đa kênh (RSS, Discover, YouTube) cho thị trường <b>{m_up}</b>, "
-            f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 8.0/10) để làm phóng sự điều tra.\n"
-            f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra hoặc cấp seed chỉ định."
-        )
-        logger.warning(f"[{m_up}] No candidates passed viability gate.")
+        scanned_count = min(len(candidates), max_scan_candidates)
+        if viability_passed_candidates:
+            alert_msg = (
+                f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
+                f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live cho thị trường <b>{m_up}</b>.\n"
+                f"📊 <b>Kết quả B1:</b> Có <b>{len(viability_passed_candidates)}</b> ứng viên đạt Viability Gate (≥ 8.0/10).\n"
+                f"❌ <b>Điểm nghẽn:</b> Toàn bộ ứng viên đã bị chặn tại các chốt kiểm định hạ nguồn (Adversarial Critic Gate hoặc B2 Story/Fact Audit Gate).\n"
+                f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra log chi tiết."
+            )
+            logger.warning(f"[{m_up}] {len(viability_passed_candidates)} candidates passed viability gate but none passed downstream B2/B3 gates.")
+        else:
+            alert_msg = (
+                f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
+                f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live từ đa kênh (RSS, Discover, YouTube) cho thị trường <b>{m_up}</b>, "
+                f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 8.0/10) để làm phóng sự điều tra.\n"
+                f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra hoặc cấp seed chỉ định."
+            )
+            logger.warning(f"[{m_up}] No candidates passed viability gate.")
         try:
             from app.services.telegram_buttons import send_telegram_broadcast
             send_telegram_broadcast(alert_msg)

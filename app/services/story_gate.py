@@ -37,12 +37,12 @@ WPM = 152.0
 LOOP_OPEN = [
     r"\?",
     r"？",
-    r"(?i)but (?:nobody|no one|almost no one|what)",
-    r"(?i)what (?:nobody|no one|almost nobody) (?:knew|saw|noticed)",
-    r"(?i)that number would",
-    r"(?i)not yet",
-    r"(?i)keep that (?:number|figure|date) in mind",
-    r"(?i)we will come back to",
+    r"(?i) but (?:nobody|no one|almost no one|what) ",
+    r"(?i) what (?:nobody|no one|almost nobody) (?:knew|saw|noticed) ",
+    r"(?i) that number would ",
+    r"(?i) not yet ",
+    r"(?i) keep that (?:number|figure|date) in mind ",
+    r"(?i) we will come back to ",
     r"(?i) but (?:nobody|no one|almost no one|what) ",
     r"(?i) what (?:nobody|no one|almost nobody) (?:knew|saw|noticed) ",
     r"(?i) that number would ",
@@ -68,22 +68,22 @@ LOOP_CLOSE = [
 ]
 SOURCE = [
     r"(?i)according to",
-    r"(?i)filing",
-    r"(?i)report(?:ed|s)?",
-    r"(?i)balance sheet",
-    r"(?i)examiner",
-    r"(?i)court",
-    r"(?i)testimony",
+    r"(?i) filing ",
+    r"(?i) report(?:ed|s)? ",
+    r"(?i) balance sheet ",
+    r"(?i) examiner ",
+    r"(?i) court ",
+    r"(?i) testimony ",
     r"보고서", r"통계", r"조사", r"발표", r"기록", r"정부", r"기관", r"WHO", r"유엔", r"시스템", r"자료", r"세계보건기구", r"환경개선", r"농촌진흥청", r"국립농업과학원",
     r"報告", r"統計", r"調査", r"発表", r"記録", r"政府", r"機関", r"資料",
 ]
-NUM = r"(?:\$\s?\d[\d,\.]*\s?(?:billion|million|trillion|B|M|T)?|[₩¥￥]\s?\d[\d,\.]*|\b\d[\d,\.]*\s?(?:%|percent|billion|million|trillion|years|employees|days|만|억|조|회|건|명|년|일|월|개|배|원|엔)\b|\b(?:1[89]|20)\d{2}\b)"
+NUM = r"(?:\$\s?\d[\d,\.]*\s?(?:billion|million|trillion|B|M|T)?|[₩¥￥]\s?\d[\d,\.]*|\b\d[\d,\.]*\s?(?:%|percent|billion|million|trillion|years|employees|days)\b|\d[\d,\.]*\s?(?:%|percent|万|億|兆|回|件|名|年|日|月|個|倍|円|人|度|건|명|회|조|억|만|원)|\b\d[\d,\.]+\b|\b(?:1[89]|20)\d{2}\b)"
 
 # --- act cue vocabularies (v3: each act must speak its own language) --------
 ACT_CUES = {
     "act1_hook_shock": [
-        r"(?i)(?:vanish|disappear|collapse[sd]?|gone|wiped out|shock|nobody|no one)",
-        r"(?i)(?:largest|biggest|worst|first|only|never)",
+        r"(?i) (?:vanish|disappear|collapse[sd]?|gone|wiped out|shock|nobody|no one) ",
+        r"(?i) (?:largest|biggest|worst|first|only|never) ",
         r"\?",
         r"？",
         r"충격", r"의문", r"붕괴", r"위험", r"shock", r"hook", r"조회수", r"질문", r"오염", r"추측",
@@ -117,7 +117,7 @@ ACT_CUES = {
     ],
     "act5_denouement": [
         r"(?i)mirror", r"(?i)warning", r"(?i)modern", r"(?i)today", r"(?i)echo", r"(?i)repeat", r"(?i)lesson", r"(?i)verdict", r"soi chiếu", r"cảnh tỉnh", r"cảnh báo", r"bản án", r"gương soi", r"경고", r"거울", r"현대", r"되풀이", r"판결", r"現代", r"警告", r"教訓", r"判決",
-        r"(?i)(?:today|years later|since then|legacy|remains?|lesson|aftermath|what happened to|left behind|still)",
+        r"(?i) (?:today|years later|since then|legacy|remains?|lesson|aftermath|what happened to|left behind|still) ",
         r"오늘날", r"현재", r"교훈", r"유산", r"결론", r"미래", r"과제", r"신뢰", r"남겨진", r"결국", r"식탁", r"제도", r"안전", r"회복",
         r"今日", r"現在", r"教訓", r"遺産", r"未来", r"信頼", r"課題", r"結論",
     ],
@@ -125,7 +125,9 @@ ACT_CUES = {
 ACT_ORDER = ["act1_hook_shock", "act2_build", "act3_knot",
              "act4_resolution", "act5_denouement"]
 
-SHOCK = r"(?:\$\s?\d[\d,\.]*\s?(?:billion|million|trillion|hundred|thousand)?|[₩¥￥]\s?\d[\d,\.]*|\b\d[\d,\.]*\s?(?:%|percent|만|억|조|회|건|명)|\b(?:largest|biggest|worst|deadliest|first|never|nobody|no one|collapse|bankrupt|stole|fraud|scandal|crash|tragedy|executed|shock|최대|최악|사망|붕괴|사기|스캔들|파산|충격|처음|비극|위험|검출|오염|독성|경고|最大|最悪|死亡|崩壊|詐欺|事件|破綻|衝撃)\b)"
+SHOCK_WESTERN = r"\b(?:largest|biggest|worst|deadliest|first|never|nobody|no one|collapse|bankrupt|stole|fraud|scandal|crash|tragedy|executed|shock)\b"
+SHOCK_CJK = r"(?:최대|최악|사망|붕괴|사기|스캔들|파산|충격|처음|비극|위험|검출|오염|독성|경고|最大|最悪|死亡|崩壊|詐欺|事件|破綻|衝撃|危機|不正|辞任)"
+SHOCK = rf"(?:\$\s?\d[\d,\.]*\s?(?:billion|million|trillion|hundred|thousand)?|[₩¥￥]\s?\d[\d,\.]*|\d[\d,\.]*\s?(?:%|percent|만|억|조|회|건|명|億|万|件)|{SHOCK_WESTERN}|{SHOCK_CJK})"
 
 MAX_PARA_WORDS = 160
 MIN_PARAS = 15
@@ -229,7 +231,7 @@ def score_story(story_text: str) -> dict:
         min_len = 1700
         max_len = 2500
 
-    sents = [s for s in re.split(r"(?<=[.!?])\s+", story) if s.strip()]
+    sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+|[。！？\n]+", story) if s.strip()]
     hook = " ".join(sents[:8] if len(sents) >= 8 else sents)  # Expand to first 8 sents to capture multi-para opening questions
     first60 = " ".join(words[:60])
 
@@ -266,14 +268,22 @@ def score_story(story_text: str) -> dict:
 
     # --- Checklist B: pattern interrupt (v4) ----------------------------------
     # Mechanism = 25%-70% of the script (Hoi 2)
-    mech_start = int(nwords * 0.25)
-    mech_end = int(nwords * 0.70)
-    if mech_end > mech_start:
-        mechanism_text = " ".join(words[mech_start:mech_end])
+    if is_cjk:
+        nchars = len(story)
+        mech_start_c = int(nchars * 0.25)
+        mech_end_c = int(nchars * 0.70)
+        mech_raw = story[mech_start_c:mech_end_c]
+        mech_sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+|[。！？\n]+", mech_raw) if s.strip()]
+        short_sents = [s for s in mech_sents if 2 <= len(_words(s)) <= PATTERN_INTERRUPT_MAX_WORDS]
     else:
-        mechanism_text = story
-    mech_sents = [s for s in re.split(r"(?<=[.!?])\s+", mechanism_text) if s.strip()]
-    short_sents = [s for s in mech_sents if 2 <= len(_words(s)) <= PATTERN_INTERRUPT_MAX_WORDS]
+        mech_start = int(nwords * 0.25)
+        mech_end = int(nwords * 0.70)
+        if mech_end > mech_start:
+            mechanism_text = " ".join(words[mech_start:mech_end])
+        else:
+            mechanism_text = story
+        mech_sents = [s for s in re.split(r"(?<=[.!?])\s+", mechanism_text) if s.strip()]
+        short_sents = [s for s in mech_sents if 2 <= len(_words(s)) <= PATTERN_INTERRUPT_MAX_WORDS]
 
     checks = {
         "1_length_1700_2500_words": min_len <= nwords <= max_len,
