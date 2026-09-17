@@ -425,9 +425,9 @@ async def run_pipeline(
             except Exception:
                 pass
             _dynamic_rem_timeout = max(
-                int(os.environ.get("VF_REMOTION_TIMEOUT", "18000")),
-                int(_calc_frames * 2.5),
-                18000
+                int(os.environ.get("VF_REMOTION_TIMEOUT", "10800")),
+                int(_calc_frames * 1.5),
+                10800
             )
             if not os.path.exists(_silent_path) or os.path.getsize(_silent_path) < 1000000:
                 logger.info("[S4.5] launching render_twolayer_visual with dynamic timeout=%ds (frames=%d)",

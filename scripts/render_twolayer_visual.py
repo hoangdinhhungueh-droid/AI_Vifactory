@@ -96,8 +96,8 @@ def calculate_dynamic_timeout(props_path: str, base_timeout: float) -> tuple[flo
                 total_frames = int(data.get("durationInFrames", 18000))
     except Exception:
         pass
-    # Allow 2.0s per frame minimum on CPU, or at least base_timeout / 18000s
-    timeout = max(base_timeout, float(total_frames) * 2.0, 18000.0)
+    # Allow 1.5s per frame minimum, or at least base_timeout / 10800s (3 hours)
+    timeout = max(base_timeout, float(total_frames) * 1.5, 10800.0)
     return timeout, total_frames
 
 
