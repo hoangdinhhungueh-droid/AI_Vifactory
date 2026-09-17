@@ -285,7 +285,15 @@ class LeadDetective:
                 if ep_item.is_dir():
                     if is_protected_episode(ep_item.name):
                         continue
-                    if ep_item.name.startswith("_dead_") or ep_item.name in ("test_run", "en-enron-ep000"):
+                    is_test_or_dead = (
+                        ep_item.name.startswith("_dead_")
+                        or ep_item.name.startswith("TEST_")
+                        or ep_item.name.startswith("test_")
+                        or "_TEMP_" in ep_item.name
+                        or ep_item.name.endswith("-none")
+                        or ep_item.name in ("test_run", "en-enron-ep000")
+                    )
+                    if is_test_or_dead:
                         try:
                             stat = ep_item.stat()
                             age_h = (now - stat.st_mtime) / 3600.0
