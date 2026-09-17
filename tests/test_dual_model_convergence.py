@@ -54,23 +54,23 @@ def test_determine_failing_acts():
     assert "ACT V" in failed_text
 
 
-def test_dual_model_convergence_astra_patches_opus_audits():
+def test_dual_model_convergence_opus_patches_astra_audits():
     fake_gateway = MagicMock()
 
-    # Pass 1: Astra patches Act II
-    astra_patched_act2 = """=== ACT II ===
+    # Pass 1: Claude Opus 5 patches Act II
+    opus_patched_act2 = """=== ACT II ===
 2021年5月の制度改変により、1億8060万円の不正送金プロセスが隠蔽された。
 内部承認を経ずに顧客口座から直接資金が移動する致命的な構造欠陥が放置されていた。""" + ("\n詳細な内部証言と監査記録。" * 20)
 
-    # Pass 2: Opus audits delta
-    opus_delta_audit_res = """{
+    # Pass 2: GPT-6-Astra audits delta
+    astra_delta_audit_res = """{
         "verdict": "PASS",
         "audit_score": 8.8,
         "still_failing_acts": [],
         "critical_findings": "Act II patch fully resolves the causal discrepancy and anchors strictly to verified claims."
     }"""
 
-    fake_gateway.call_llm.side_effect = [astra_patched_act2, opus_delta_audit_res]
+    fake_gateway.call_llm.side_effect = [opus_patched_act2, astra_delta_audit_res]
 
     with (
         patch("app.services.model_gateway.get_global_gateway", return_value=fake_gateway),
@@ -94,15 +94,15 @@ def test_dual_model_convergence_astra_patches_opus_audits():
         assert res["story_gate_score"] == 11
         assert res["audit_details"]["verdict"] == "PASS"
 
-        # Verify role separation: First call MUST be gpt-6-astra (Patcher), Second call MUST be claude-opus-5 (Delta Auditor)
+        # Verify role separation: First call MUST be claude-opus-5 (Patcher), Second call MUST be gpt-6-astra (Delta Auditor)
         calls = fake_gateway.call_llm.call_args_list
         assert len(calls) == 2
-        assert calls[0].kwargs.get("model") == "gpt-6-astra"
-        assert calls[1].kwargs.get("model") == "claude-opus-5"
+        assert calls[0].kwargs.get("model") == "claude-opus-5"
+        assert calls[1].kwargs.get("model") == "gpt-6-astra"
 
 
 def test_score_verdict_normalization_fail_with_passing_score():
-    """Tests that when Claude Opus returns verdict 'FAIL' but audit_score >= 7.5,
+    """Tests that when GPT-6-Astra returns verdict 'FAIL' but audit_score >= 7.5,
     the normalization contract converts it to 'PASS'."""
     from app.services.story_fact_auditor_b2 import audit_delta_patched_acts
 

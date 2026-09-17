@@ -22,21 +22,21 @@ from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger("story_fact_auditor_b2")
 
-SYSTEM_STORY_AUDITOR_PROMPT = """You are the Senior Adversarial Forensic Auditor for AI Video Factory (VF Pipeline).
-Your sole mandate is to rigorously interrogate and audit investigative video scripts against 8 Iron Criteria:
-1. TREND ALIGNMENT & ANTI-STALE TRAP: Is the story answering a FRESH, active 2026 search trend, or is it a STALE historical event disguised as breaking news? Did it divert from viewer intent?
-2. SEARCH-INTENT DIRECT PAYOFF (ANTI-BAIT-AND-SWITCH): Does the script directly answer the urgent question on viewers' minds, addressing the breakout queries in Act I?
-3. QUANTITATIVE METRIC INTEGRITY (Rule 118 Zero-Mock): Are specific numbers (money, dates, percentages) backed 100% by the Grounding Claims, or did the LLM hallucinate/fabricate numbers or source citations?
-4. CAUSAL HIERARCHY & TRANSMISSION INTEGRITY (Rule 130): Does it clearly distinguish Level 1 Catalyst (initiating trigger event) from Level 2 Transmission Mechanism (institutional/systemic response) across all topic axes without causal inversion or convenient twists?
-5. COMPETITOR VACUUM & 10X PIVOT RESOLUTION: Does the narrative resolve the fatal explanatory vacuum that competitor videos failed to explain?
-6. FORENSIC PAPER TRAIL & CHRONOLOGICAL CAUSAL DEPTH (SCALE-UP CHRONO-ENGINE): Does the script uncover the chronological root cause (Genesis Seed & Incubation Mutation) across the natural temporal cadence of the topic (Macro Saga, Mid Tactical, or Flash Crisis), or does it fall into the single-timestamp accounting loop trap by merely repeating today's breaking numbers across all Acts?
-7. ANTI-HYPOTHETICAL & CLINICAL DOCUDRAMA TONE: Zero "Imagine...", zero hypothetical hand-waving; strictly factual, clinical, and high-tension procedural exposition.
-8. 7 GOLDEN CONTENT AXES FIDELITY (Rule 128 & Rule 130): Does the narrative faithfully embody the unique causal mechanism of its primary axis (1. Business Rise & Fall: margin calls/accounting holes; 2. Systemic Crisis: institutional breakdown/structural collapse; 3. True Crime: forensic paper trail/court records; 4. Psychology: crowd panic/herd bias; 5. Tech & Geopolitics: export controls/semiconductor bottlenecks; 6. Institutional/Regulatory: inspection reports/product recalls; 7. Asymmetric Financial Flows: shell companies/cross-border transfer pricing) without generic melodrama or out-of-genre confusion?
+SYSTEM_STORY_AUDITOR_PROMPT = """You are the Senior Fact-Check & Safety Gatekeeper (GPT-6-Astra) for AI Video Factory (VF Pipeline).
+Your mandate is to rigorously verify HARD FACTS, ACCURATE QUANTITATIVE METRICS, and YOUTUBE PLATFORM SAFETY against the Grounding Table:
+1. QUANTITATIVE METRIC INTEGRITY (Rule 118 Zero-Mock): Are specific numbers (money, dates, percentages, legal entities) backed 100% by the Grounding Claims, or did the script fabricate data?
+2. CAUSAL HIERARCHY & TRANSMISSION INTEGRITY (Rule 130): Does it distinguish Level 1 Catalyst (initiating trigger event) from Level 2 Transmission Mechanism (institutional/systemic response)?
+3. SEARCH-INTENT DIRECT PAYOFF: Does Act I directly satisfy the viewer's core search intent?
+4. RESTRAINED EDITORIAL POLICY (CRITICAL MANDATE):
+   - You MUST NOT penalize cinematic metaphors, high dramatic suspense, emotional human stakes, or rhetorical questions.
+   - Do NOT force the script into a boring news wire or dry legal brief! The writer (Claude Opus 5) is an artistic director; your sole job is to ensure legal/factual truth and YouTube safety compliance.
+   - If verified numbers, dates, and actors match the Grounding Table without dangerous safety violations, award "verdict": "PASS".
+5. YOUTUBE SAFETY: Zero glorification of violence, zero self-harm, zero defamatory ungrounded personal attacks.
 
 Passing threshold:
-- audit_score >= 8.0/10
-- To pass, verdict MUST be "PASS". If critical violations exist (fabrications, severe staleness, causal inversion, single-timestamp accounting loop), mark "verdict": "FAIL".
-- If verdict is "FAIL", you MUST specify exactly which Act(s) failed in "failed_acts" (e.g. ["ACT II", "ACT IV"]) and provide precise fix instructions for each failed Act in "act_patch_critique" so the scriptwriter can patch only the flawed acts without rewriting passing acts.
+- audit_score >= 8.0/10 (scores >= 7.5 are normalized to PASS)
+- If critical violations exist (blatant data fabrication, safety violations, causal inversion), mark "verdict": "FAIL".
+- If verdict is "FAIL", specify exactly which Act(s) failed in "failed_acts" and provide actionable fact corrections in "act_patch_critique".
 
 Output MUST be a single strict JSON object matching this schema:
 {
@@ -53,11 +53,11 @@ Output MUST be a single strict JSON object matching this schema:
   "axis_fidelity_score": <FLOAT 0.0 - 10.0>,
   "failed_acts": ["ACT I" | "ACT II" | "ACT III" | "ACT IV" | "ACT V"],
   "act_patch_critique": {
-    "ACT I": "<Specific instructions on what is broken and what grounding fact to anchor, or empty if passed>",
-    "ACT II": "<Specific instructions on what is broken and what grounding fact to anchor, or empty if passed>"
+    "ACT I": "<Specific instructions on factual numbers/dates to correct, or empty if passed>",
+    "ACT II": "<Specific instructions on factual numbers/dates to correct, or empty if passed>"
   },
   "red_flags": [<STRING>, ...],
-  "critical_findings": "<CONCISE SUMMARY OF VIOLATIONS OR APPROVAL>"
+  "critical_findings": "<CONCISE SUMMARY OF FACTUAL VERDICT>"
 }
 """
 
@@ -67,21 +67,21 @@ def audit_story_facts_and_causality(
     grounding_claims: List[Dict[str, Any]],
     topic_meta: Dict[str, Any],
     market: str = "KR",
-    model: str = "claude-opus-5",
+    model: str = "gpt-6-astra",
     fallback_model: str = "kimi-k3"
 ) -> Dict[str, Any]:
     """Execute adversarial forensic audit of the 5-Beat Docudrama story.
-    Returns audit result dict with 'verdict': 'PASS'|'FAIL'.
+    Audits verbatim text against Grounding Fact Table and Rule 130 Causal Architecture via GPT-6-Astra.
     """
     from app.services.model_gateway import get_global_gateway
     gateway = get_global_gateway()
 
-    m_up = (market or "EN").strip().upper()
-    topic = topic_meta.get("topic_name_vi") or topic_meta.get("raw_term") or "Unknown Topic"
     task_id = topic_meta.get("task_id", "")
-    rising_queries = topic_meta.get("rising_queries", [])
-    temporal_cadence = topic_meta.get("temporal_cadence") or "ADAPTIVE"
+    m_up = (market or "KR").strip().upper()
+    topic = topic_meta.get("topic_name_vi") or topic_meta.get("raw_term") or task_id
+    temporal_cadence = (topic_meta.get("temporal_cadence") or "MID_TACTICAL").upper()
     causal_epochs = topic_meta.get("causal_epochs") or []
+    rising_queries = topic_meta.get("rising_queries") or []
 
     epochs_section = ""
     if causal_epochs:
@@ -103,14 +103,8 @@ Rising Search Queries: {', '.join([str(q) for q in rising_queries[:6]])}
 
 Perform strict adversarial forensic audit according to the 8 Iron Criteria. Interrogate every metric, source attribution, chronological progression, axis fidelity, and causal link. Return strict JSON only."""
 
-    # Enforce Claude lineage: only claude-opus-5 or claude-sonnet-5 allowed
-    if not (model.startswith("claude-opus-5") or model.startswith("claude-sonnet-5")):
-        chosen_model = "claude-opus-5"
-    else:
-        chosen_model = model
-
-    # Fallback to kimi-k3 if not specified
-    fallback_model = fallback_model if fallback_model and fallback_model != "gpt-6-astra" else "kimi-k3"
+    chosen_model = model or "gpt-6-astra"
+    fallback_model = fallback_model if fallback_model and fallback_model != chosen_model else "kimi-k3"
 
     try:
         raw_res = gateway.call_llm(
@@ -120,10 +114,10 @@ Perform strict adversarial forensic audit according to the 8 Iron Criteria. Inte
             max_tokens=1000,
             temperature=0.1,
             timeout=90.0,
-            fallback="claude-sonnet-5" if chosen_model == "claude-opus-5" else "kimi-k3"
+            fallback=fallback_model
         )
     except Exception as e:
-        logger.warning(f"[story_auditor] Claude auditor {chosen_model} failed ({e}), invoking fallback {fallback_model} (kimi-k3)...")
+        logger.warning(f"[story_auditor] Auditor {chosen_model} failed ({e}), invoking fallback {fallback_model}...")
         try:
             chosen_model = fallback_model
             raw_res = gateway.call_llm(
@@ -133,7 +127,7 @@ Perform strict adversarial forensic audit according to the 8 Iron Criteria. Inte
                 max_tokens=1000,
                 temperature=0.1,
                 timeout=75.0,
-                fallback="gpt-6-astra"
+                fallback="claude-sonnet-5"
             )
         except Exception as e2:
             logger.error(f"[story_auditor] Fallback auditor {fallback_model} also failed: {e2}")
@@ -191,11 +185,11 @@ def audit_delta_patched_acts(
     grounding_claims: List[Dict[str, Any]],
     topic_meta: Dict[str, Any],
     market: str = "EN",
-    model: str = "claude-opus-5",
-    fallback_model: str = "claude-sonnet-5"
+    model: str = "gpt-6-astra",
+    fallback_model: str = "kimi-k3"
 ) -> Dict[str, Any]:
     """Lean Targeted Re-Audit (Delta Audit) for Round 2+ of Convergence Protocol.
-    Interrogates ONLY the patched Acts against the previous critique and Grounding Table,
+    Interrogates ONLY the patched Acts against the previous critique and Grounding Table via GPT-6-Astra,
     drastically reducing input tokens (from ~25K to ~3-5K) and cost.
     """
     from app.services.model_gateway import get_global_gateway
@@ -235,7 +229,7 @@ Task ID: {task_id} | Topic: {topic} | Market: {m_up}
 Interrogate the patched Acts strictly against the previous defects:
 1. Did the patch resolve the factual discrepancy or causal inversion?
 2. Did it introduce any newly hallucinated metrics or unauthorized data (Rule 118 & 130)?
-3. Is tone factual, clinical, and dramatic without generic filler?
+3. RESTRAINED EDITORIAL POLICY: Do NOT penalize high dramatic tension, cinematic pacing, or emotional engagement. Solely verify facts and YouTube safety.
 
 Return strict JSON only:
 {{
@@ -248,20 +242,21 @@ Return strict JSON only:
   "critical_findings": "<concise evaluation of the patch>"
 }}"""
 
-    chosen_model = model if (model.startswith("claude-opus-5") or model.startswith("claude-sonnet-5")) else "claude-opus-5"
+    chosen_model = model or "gpt-6-astra"
+    fallback_model = fallback_model if fallback_model and fallback_model != chosen_model else "kimi-k3"
 
     try:
         raw_res = gateway.call_llm(
             prompt=lean_prompt,
             model=chosen_model,
-            system_prompt="You are the Senior Forensic Auditor reviewing a targeted delta patch. Return strict JSON only.",
+            system_prompt="You are the Senior Fact-Check Auditor (GPT-6-Astra) reviewing a targeted delta patch. Verify facts and safety without penalizing dramatic flair. Return strict JSON only.",
             max_tokens=800,
             temperature=0.1,
             timeout=70.0,
             fallback=fallback_model
         )
     except Exception as e:
-        logger.warning(f"[story_auditor] Delta audit Claude failed ({e}), trying fallback {fallback_model}...")
+        logger.warning(f"[story_auditor] Delta audit {chosen_model} failed ({e}), trying fallback {fallback_model}...")
         try:
             raw_res = gateway.call_llm(
                 prompt=lean_prompt,

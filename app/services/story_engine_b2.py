@@ -776,8 +776,18 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             f"Write the full ~1,800-2,200 word script now, adhering strictly to the 5-Act markers:"
         )
 
-        logger.info(f"[story_engine] Calling HHTech GPT-6-Astra for 5-Act Script generation (1,800-2,200 words)...")
-        full_script_raw = call_gpt6_astra(user_prompt, system_prompt=system_prompt, max_tokens=6000, timeout=300.0)
+        logger.info(f"[story_engine] Calling Claude Opus 5 (Master Scriptwriter) for 5-Act Script generation (1,800-2,200 words)...")
+        from app.services.model_gateway import get_global_gateway
+        gateway = get_global_gateway()
+        full_script_raw = gateway.call_llm(
+            prompt=user_prompt,
+            model="claude-opus-5",
+            system_prompt=system_prompt,
+            max_tokens=6000,
+            temperature=0.35,
+            timeout=300.0,
+            fallback="claude-sonnet-5"
+        )
 
         cleaned_acts = []
         matches = ACT_PATTERN.findall(full_script_raw)
@@ -833,7 +843,15 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                 f"Output ONLY the corrected 5-Act script now:"
             )
             try:
-                refined_raw = call_gpt6_astra(refine_user, system_prompt=system_prompt, max_tokens=6000, timeout=300.0)
+                refined_raw = gateway.call_llm(
+                    prompt=refine_user,
+                    model="claude-opus-5",
+                    system_prompt=system_prompt,
+                    max_tokens=6000,
+                    temperature=0.3,
+                    timeout=300.0,
+                    fallback="claude-sonnet-5"
+                )
                 refined_len = len(refined_raw) if is_cjk_market else len(refined_raw.split())
                 min_threshold = 1500 if is_cjk_market else 1000
                 if refined_raw and refined_len >= min_threshold:
@@ -898,7 +916,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
     else:
         try:
             from app.services.story_fact_auditor_b2 import audit_story_facts_and_causality
-            logger.info(f"[story_engine] Running B2.1 Fact & Causal Audit via claude-opus-5 for {task_id}...")
+            logger.info(f"[story_engine] Running B2.1 Fact & Causal Audit via gpt-6-astra for {task_id}...")
             fact_audit_result = audit_story_facts_and_causality(
                 story_text=full_script,
                 grounding_claims=grounding_claims,
@@ -910,8 +928,8 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                     "causal_epochs": causal_epochs
                 },
                 market=mkt,
-                model="claude-opus-5",
-                fallback_model="gpt-6-astra"
+                model="gpt-6-astra",
+                fallback_model="kimi-k3"
             )
             f_verdict = fact_audit_result.get("verdict", "PASS").upper()
             f_score = float(fact_audit_result.get("audit_score", 8.0))
@@ -920,7 +938,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             # Dual-Model Convergence Protocol if audit fails (< 7.5 or FAIL)
             if f_verdict == "FAIL" or f_score < 7.5:
                 audit_critique = fact_audit_result.get("audit_notes") or fact_audit_result.get("veto_reason") or "Factual or causal discrepancies found."
-                logger.warning(f"[story_engine] B2.1 Audit FAILED (Score: {f_score}/10). Activating Dual-Model Convergence Protocol (Opus 5 Delta Audit + Astra Targeted Patcher)...")
+                logger.warning(f"[story_engine] B2.1 Audit FAILED (Score: {f_score}/10). Activating Dual-Model Convergence Protocol (Opus 5 Targeted Patcher + Astra Delta Audit)...")
 
                 try:
                     from app.services.dual_model_convergence import run_dual_model_convergence

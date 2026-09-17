@@ -2,14 +2,14 @@
 
 Implements the Adversarial Targeted Delta-Convergence Protocol (Rule 125 & Rule 130):
 1. Roles:
-   - Claude-Opus-5: Pure Forensic Auditor (Only audits and pinpoints specific defective Acts).
-   - GPT-6-Astra: Producer & Targeted Patcher (Rewrites ONLY defective Acts; retains passed Acts).
+   - Claude-Opus-5: Master Scriptwriter & Targeted Patcher (Rewrites ONLY defective Acts; preserves high dramatic tension and emotional power).
+   - GPT-6-Astra: Senior Fact-Check Gatekeeper (Audits patched Acts against Grounding Table; enforces Restrained Editorial Policy).
 2. Convergence Cycle (Max 3 rounds):
-   - Pass 1 (Targeted Patcher - Astra): Receives defective Act(s) + Opus 5 critique + Grounding Table.
+   - Pass 1 (Targeted Patcher - Opus 5): Receives defective Act(s) + Astra 6 fact critique + Grounding Table.
      Outputs ONLY the revised Act(s). Reassembles script with intact passing Acts.
-   - Pass 2 (Delta Re-Audit - Opus 5): Evaluates ONLY the patched Act(s) with minimal token context (~3-5K tokens).
+   - Pass 2 (Delta Re-Audit - Astra 6): Evaluates ONLY the patched Act(s) with minimal token context (~3-5K tokens).
 3. Consensus Verification:
-   - Fact & Causal Score >= 7.5/10 (Opus 5)
+   - Fact & Causal Score >= 7.5/10 (Astra 6)
    - Story Gate Score >= 10/12 (Rule 121 / 127)
    - Multi-Lingual Length Validity (Rule 120 / text_metrics.py: JP >= 2500 chars, KR >= 2200 chars / 750 words, EN >= 1200 words).
 """
@@ -154,7 +154,7 @@ def run_dual_model_convergence(
         )
 
         # ----------------------------------------------------
-        # Pass 1: GPT-6-Astra Targeted Patcher (NEVER Opus 5)
+        # Pass 1: Claude Opus 5 Targeted Patcher (Master Scriptwriter)
         # ----------------------------------------------------
         # Extract defective text blocks
         flawed_content_parts = []
@@ -163,14 +163,14 @@ def run_dual_model_convergence(
             flawed_content_parts.append(f"=== {fa} (CURRENT DEFECTIVE DRAFT) ===\n{content}\n")
         flawed_content_str = "\n\n".join(flawed_content_parts) if flawed_content_parts else current_script
 
-        patcher_prompt = f"""You are the Master Scriptwriter & Investigative Docudrama Producer (GPT-6-Astra).
-Claude Opus 5 (Senior Forensic Auditor) audited your 5-Act documentary script and flagged factual/causal discrepancies in specific Acts.
+        patcher_prompt = f"""You are Claude Opus 5, Master Non-Fiction Investigative Documentary Scriptwriter for Video Factory.
+GPT-6-Astra (Senior Fact-Check Gatekeeper) audited your 5-Act documentary script and flagged factual discrepancies in specific Acts.
 Your mandate is to REWRITE AND PATCH ONLY THE DEFECTIVE ACTS listed below.
 
 === TARGET ACTS REQUIRING REPAIR ===
 {', '.join(failed_acts)}
 
-=== SENIOR AUDITOR CRITIQUE & REQUIRED CORRECTIONS (ROUND {round_idx}) ===
+=== FACT-CHECK AUDITOR CRITIQUE & REQUIRED CORRECTIONS (ROUND {round_idx}) ===
 {current_critique}
 
 === CURRENT DEFECTIVE ACT CONTENT ===
@@ -180,39 +180,39 @@ Your mandate is to REWRITE AND PATCH ONLY THE DEFECTIVE ACTS listed below.
 {grounding_table_str}
 
 === EDITORIAL RULES ===
-1. Level 1 Catalyst: Explicitly cite verified event, actor, date, and quantitative impact. Never swap Level 2 symptom for Level 1 trigger.
-2. Zero Fabrication: Absolutely NO made-up numbers, quotes, or unauthorized statistics.
+1. Level 1 Catalyst: Explicitly cite verified event, actor, date, and quantitative impact from Grounding Table.
+2. Emotional & Cinematic Power: Maintain high dramatic suspense, human stakes, and pattern interrupts. Do NOT let factual corrections make the script dry or clinical.
 3. Narrative Continuity: Ensure the patched Acts seamlessly flow with the untouched Acts.
-4. Language & Tone: Match the target market ({m_up}). Clinical, dramatic, procedural docudrama exposition.
+4. Native Diction: Natural high-register native phrasing ({m_up}). Zero raw English jargon in JP/KR.
 
 Output ONLY the patched Act(s), formatted with standard headers (e.g. '=== ACT I ===', '=== ACT II ==='):"""
 
         logger.info(
             f"[dual_convergence] Pass 1 (Round {round_idx}): "
-            f"Invoking GPT-6-Astra to patch {len(failed_acts)} Act(s)..."
+            f"Invoking Claude Opus 5 to patch {len(failed_acts)} Act(s)..."
         )
 
         try:
             patched_raw = gateway.call_llm(
                 prompt=patcher_prompt,
-                model="gpt-6-astra",
+                model="claude-opus-5",
                 system_prompt=system_prompt,
                 max_tokens=3500,
-                temperature=0.25,
-                timeout=120.0,
-                fallback="kimi-k3"
+                temperature=0.3,
+                timeout=180.0,
+                fallback="claude-sonnet-5"
             )
-        except Exception as e_astra:
-            logger.warning(f"[dual_convergence] GPT-6-Astra patcher failed ({e_astra}), trying claude-sonnet-5 fallback...")
+        except Exception as e_opus:
+            logger.warning(f"[dual_convergence] Claude Opus 5 patcher failed ({e_opus}), trying claude-sonnet-5 fallback...")
             try:
                 patched_raw = gateway.call_llm(
                     prompt=patcher_prompt,
                     model="claude-sonnet-5",
                     system_prompt=system_prompt,
                     max_tokens=3500,
-                    temperature=0.25,
+                    temperature=0.3,
                     timeout=120.0,
-                    fallback="kimi-k3"
+                    fallback="gpt-6-astra"
                 )
             except Exception as se:
                 logger.error(f"[dual_convergence] Patcher failed completely on round {round_idx}: {se}")
@@ -251,9 +251,9 @@ Output ONLY the patched Act(s), formatted with standard headers (e.g. '=== ACT I
         )
 
         # ----------------------------------------------------
-        # Pass 2: Targeted Delta Re-Audit via Claude Opus 5
+        # Pass 2: Targeted Delta Re-Audit via GPT-6-Astra
         # ----------------------------------------------------
-        logger.info(f"[dual_convergence] Pass 2 (Round {round_idx}): Running Delta Re-Audit via Claude Opus 5...")
+        logger.info(f"[dual_convergence] Pass 2 (Round {round_idx}): Running Delta Re-Audit via GPT-6-Astra...")
 
         # Story Gate Verification (Rule 121 & Rule 127)
         story_audit = sgate.score_story(repaired_script)
@@ -271,8 +271,8 @@ Output ONLY the patched Act(s), formatted with standard headers (e.g. '=== ACT I
             grounding_claims=grounding_claims,
             topic_meta=topic_meta,
             market=m_up,
-            model="claude-opus-5",
-            fallback_model="claude-sonnet-5"
+            model="gpt-6-astra",
+            fallback_model="kimi-k3"
         )
 
         re_verdict = re_audit.get("verdict", "FAIL").upper()
