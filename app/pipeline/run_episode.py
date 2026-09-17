@@ -231,7 +231,7 @@ async def run_pipeline(
         qa = _sq.score_story(story_text=text, hook_3s=hook_3s, trend_keywords=trend_keywords, character_pack=character_pack)
         episode["quality"] = qa
         _ch = {}
-        if qa.get("passed"):
+        if qa.get("passed") or skip_story_gate:
             _ch = _cs.split_chapters(text, episode_id=episode_id)
             episode["chapters"] = _ch.get("chapters", [])
         try:
@@ -239,10 +239,10 @@ async def run_pipeline(
                 json.dump({"quality": qa, "chapters": _ch}, _f, indent=2)
         except Exception as _swallowed:
             logger.warning("[swallowed] run_episode L%d: %s: %s", 263, type(_swallowed).__name__, _swallowed)
-        logger.info("[S3.5] quality=%.2f passed=%s n_chapters=%d total_s=%.1f",
-                    qa.get("quality_score", 0), qa.get("passed"),
+        logger.info("[S3.5] quality=%.2f passed=%s (skip_story_gate=%s) n_chapters=%d total_s=%.1f",
+                    qa.get("quality_score", 0), qa.get("passed"), skip_story_gate,
                     _ch.get("n_chapters", 0), _ch.get("total_duration_s", 0))
-        if not qa.get("passed"):
+        if not qa.get("passed") and not skip_story_gate:
             _qmsg = (f"score={qa.get('quality_score')} blocking={qa.get('blocking')}\n"
                      f"⛔ Pipeline STOPPED (S3.5). Fix the script in Notion, then re-run this episode.")
             try:
@@ -254,6 +254,8 @@ async def run_pipeline(
             # Notion first. Set VF_QUAL_GATE=0 only for an explicit override.
             if os.getenv("VF_QUAL_GATE", "1") != "0":
                 raise RuntimeError(f"Story quality gate FAILED: {qa.get('blocking')}")
+        elif not qa.get("passed") and skip_story_gate:
+            logger.info("[S3.5] Story quality gate bypassed via skip_story_gate=True (previously approved at B3.5)")
     except RuntimeError:
         raise
     except Exception as _e:

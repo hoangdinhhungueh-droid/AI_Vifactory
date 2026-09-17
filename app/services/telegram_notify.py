@@ -61,6 +61,12 @@ async def send_message(text: str, *, disable_preview: bool = False, silent: bool
         async with httpx.AsyncClient(timeout=30) as client:
             r = await client.post(url, json=payload)
         if r.status_code != 200:
+            if "can't parse entities" in r.text or "parse" in r.text:
+                payload.pop("parse_mode", None)
+                async with httpx.AsyncClient(timeout=30) as client:
+                    r2 = await client.post(url, json=payload)
+                if r2.status_code == 200:
+                    return True
             logger.warning(f"[tg] sendMessage {r.status_code}: {r.text[:200]}")
             return False
         return True
