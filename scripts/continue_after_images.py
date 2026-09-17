@@ -101,13 +101,54 @@ def _notify_error(stage, episode_id, detail):
 
 
 def _run_stage(stage, argv, episode_id, timeout):
+    import signal
     _log("=== %s: %s" % (stage, " ".join(argv)))
     _write_state(episode_id, stage=stage, status="running")
     started = time.time()
-    proc = subprocess.run(argv, cwd=REPO, timeout=timeout)
+    proc = None
+    try:
+        proc = subprocess.Popen(
+            argv,
+            cwd=REPO,
+            start_new_session=True,
+        )
+        proc.wait(timeout=timeout)
+        rc = proc.returncode
+    except subprocess.TimeoutExpired:
+        if proc:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                time.sleep(2)
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except Exception:
+                pass
+        msg = "%s TIMEOUT after %ss" % (stage, timeout)
+        _log("FAILED " + msg)
+        _write_state(episode_id, stage=stage, status="failed", error=msg,
+                     elapsed_sec=timeout)
+        _notify_error(stage, episode_id, msg)
+        return False
+    except Exception as exc:
+        if proc:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except Exception:
+                pass
+        msg = "%s crashed (%s: %s)" % (stage, type(exc).__name__, exc)
+        _log("FAILED " + msg)
+        _write_state(episode_id, stage=stage, status="failed", error=msg)
+        _notify_error(stage, episode_id, msg)
+        return False
+    finally:
+        if proc and proc.poll() is None:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except Exception:
+                pass
+
     elapsed = round(time.time() - started, 1)
-    if proc.returncode != 0:
-        msg = "%s exited %d after %ss" % (stage, proc.returncode, elapsed)
+    if rc != 0:
+        msg = "%s exited %d after %ss" % (stage, rc, elapsed)
         _log("FAILED " + msg)
         _write_state(episode_id, stage=stage, status="failed", error=msg,
                      elapsed_sec=elapsed)
@@ -116,6 +157,7 @@ def _run_stage(stage, argv, episode_id, timeout):
     _log("OK %s in %ss" % (stage, elapsed))
     _write_state(episode_id, stage=stage, status="ok", elapsed_sec=elapsed)
     return True
+
 
 
 def main():
