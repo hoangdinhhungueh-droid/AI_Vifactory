@@ -204,6 +204,10 @@ def stage_into_public(local_path: str, public_dir: str, episode_id: str) -> str 
     if not os.path.exists(local_path):
         raise FileNotFoundError("missing local image: %s" % local_path)
 
+    # Fast skip if already staged and non-empty (eliminates redundant resizing for reused keys)
+    if os.path.exists(dest_path) and os.path.getsize(dest_path) > 1024:
+        return "pulled/%s/%s" % (episode_id, basename)
+
     # Pre-scale down to max 1920x1080 if image is larger
     scaled = False
     try:
@@ -214,7 +218,7 @@ def stage_into_public(local_path: str, public_dir: str, episode_id: str) -> str 
                 new_w = max(1, int(round(im.width * ratio)))
                 new_h = max(1, int(round(im.height * ratio)))
                 resized = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
-                resized.save(dest_path, optimize=True)
+                resized.save(dest_path, compress_level=1)
                 scaled = True
     except Exception as e:
         logger.debug("[stage_into_public] PIL pre-scale skipped or failed for %s: %s", local_path, e)

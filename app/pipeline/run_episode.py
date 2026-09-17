@@ -411,7 +411,7 @@ async def run_pipeline(
                      "--episode-id", episode_id, "--brain-input", _brain_input_path,
                      "--segments", _segments_path,
                      "--manifest", _manifest_path, "--out", _props_path, "--skip-missing"],
-                    check=True, timeout=120)
+                    check=True, timeout=600)
             _rem_timeout = int(os.environ.get("VF_REMOTION_TIMEOUT", "10800"))
             if not os.path.exists(_silent_path) or os.path.getsize(_silent_path) < 1000000:
                 _sp.run([sys.executable, "/root/video_factory/scripts/render_twolayer_visual.py",
