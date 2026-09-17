@@ -228,7 +228,7 @@ async def run_pipeline(
     # FLOW ENHANCE 27/07/2026 - runs BEFORE TTS so a weak script is caught
     # while it is still cheap to rewrite. VF_QUAL_GATE=0 to disable hard block.
     try:
-        qa = _sq.score_story(text)
+        qa = _sq.score_story(story_text=text, hook_3s=hook_3s, trend_keywords=trend_keywords, character_pack=character_pack)
         episode["quality"] = qa
         _ch = {}
         if qa.get("passed"):

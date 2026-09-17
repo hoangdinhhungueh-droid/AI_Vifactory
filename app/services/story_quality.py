@@ -221,7 +221,7 @@ def _score_structure(text: str):
 WEIGHTS = {"hook": 0.30, "trend_fit": 0.20, "character": 0.20, "twist": 0.15, "structure": 0.15}
 
 
-def score_story(*, story_text: str, hook_3s=None, trend_keywords=None, character_pack=None) -> dict:
+def score_story(story_text: str = "", *, hook_3s=None, trend_keywords=None, character_pack=None, **kwargs) -> dict:
     text = (story_text or "").strip()
     sents = _sentences(text)
     first = sents[0] if sents else ""
