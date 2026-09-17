@@ -53,7 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=["pipeline", "block", "audit", "ci", "sync", "review"],
+        choices=["pipeline", "block", "audit", "ci", "sync", "review", "sweep"],
         default="pipeline",
         help="Operational mode (default: pipeline)",
     )
@@ -114,6 +114,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Enforce strict Rule 128 validation against hardcoded domain keywords / domain bleed",
     )
     parser.add_argument(
+        "--touchpoints",
+        default="all",
+        help="Touchpoints to sweep (all, vps, notion, cloudflare_r2, antigravity_skills, gdrive_youtube)",
+    )
+    parser.add_argument(
+        "--force-purge",
+        action="store_true",
+        help="Force purge dead directories instead of archiving (Sweep mode)",
+    )
+    parser.add_argument(
+        "--skip-ci-probe",
+        action="store_true",
+        help="Skip live CI gate probe in sweep verifier",
+    )
+    parser.add_argument(
+        "--bypass-lock",
+        action="store_true",
+        help="Bypass global process lock acquisition (used by internal sub-runners / probes)",
+    )
+    parser.add_argument(
         "--json-output",
         action="store_true",
         help="Output structured machine-readable JSON to stdout",
@@ -163,7 +183,7 @@ class OrchestratorRunner:
         # 2. Enter isolated ResourceSandbox per Rule 119
         with ResourceSandbox(
             cleanup_on_exit=True,
-            acquire_lock=(not self.args.dry_run),
+            acquire_lock=(not self.args.dry_run and not getattr(self.args, "bypass_lock", False)),
             lock_timeout_sec=5.0,
         ) as sandbox:
             mode = self.args.mode
@@ -177,6 +197,8 @@ class OrchestratorRunner:
                 return self._run_sync_mode(sandbox)
             elif mode == "review":
                 return self._run_review_mode(sandbox)
+            elif mode == "sweep":
+                return self._run_sweep_mode(sandbox)
             else:
                 print(f"Unknown mode: {mode}", file=sys.stderr)
                 return 1
@@ -772,6 +794,60 @@ class OrchestratorRunner:
             print(f"GitHub Actions CI: {ci_verdict}")
 
         return 0 if all_ok else 1
+
+    def _run_sweep_mode(self, sandbox: ResourceSandbox) -> int:
+        """Executes Post-Upgrade Multi-Touchpoint Remnant & Ghost Sweep (Lead-Doer Pair)."""
+        start_ts = time.time()
+        try:
+            if __package__ is None or __package__ == "":
+                from scripts.orchestrator.sweep_governor import run_sweep, TOUCHPOINTS
+            else:
+                from .sweep_governor import run_sweep, TOUCHPOINTS
+        except ImportError:
+            import sys
+            sys.path.insert(0, str(self.root_dir))
+            from scripts.orchestrator.sweep_governor import run_sweep, TOUCHPOINTS
+
+        touchpoints_arg = getattr(self.args, "touchpoints", "all")
+        if touchpoints_arg.lower() == "all":
+            selected_tp = TOUCHPOINTS
+        else:
+            selected_tp = [t.strip() for t in touchpoints_arg.split(",") if t.strip() in TOUCHPOINTS]
+
+        force_purge = getattr(self.args, "force_purge", False)
+        skip_ci_probe = getattr(self.args, "skip_ci_probe", False)
+
+        sweep_log_dir = Path("/var/vf/logs/sweep") if Path("/var/vf/logs").exists() else Path("logs/sweep")
+        res = run_sweep(
+            touchpoints=selected_tp,
+            dry_run=self.args.dry_run,
+            force_purge=force_purge,
+            run_ci_probe=not skip_ci_probe,
+            output_dir=sweep_log_dir,
+        )
+
+        cert = res.get("certificate", {})
+        rep = res.get("execution_report", {})
+        is_clean = cert.get("zero_remnants_verified", False)
+        ci_ok = "PASS" in cert.get("live_pipeline_ci_status", "")
+
+        if self.args.json_output:
+            print(json.dumps(res, indent=2))
+        else:
+            print("\n=======================================================")
+            print("🛡️ VF PIPELINE POST-UPGRADE REMNANT & GHOST SWEEP COMPLETE")
+            print("=======================================================")
+            print(f"Cert ID:         {cert.get('cert_id')}")
+            print(f"Mode:            {'DRY-RUN' if rep.get('dry_run') else 'LIVE PURGE'}")
+            print(f"Items Purged:    {rep.get('items_purged')}")
+            print(f"Items Archived:  {rep.get('items_archived')}")
+            print(f"Storage Freed:   {rep.get('freed_mb')} MB")
+            print(f"Zero Remnants:   {'✅ VERIFIED' if is_clean else '❌ UNRESOLVED'}")
+            print(f"Live CI Status:  {cert.get('live_pipeline_ci_status')}")
+            print(f"Certificate:     {res.get('certificate_md_path')}")
+            print("=======================================================\n")
+
+        return 0 if (is_clean and ci_ok) else 1
 
 
 def main() -> None:
