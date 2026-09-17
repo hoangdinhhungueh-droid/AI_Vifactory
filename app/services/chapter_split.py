@@ -190,7 +190,7 @@ def _build_chapter(index, title_hint, text, wpm):
     }
 
 
-def split_chapters(story_text: str, target_chapters=None, wpm=None) -> dict:
+def split_chapters(story_text: str, target_chapters=None, wpm=None, **kwargs) -> dict:
     text = (story_text or "").strip()
     wpm = float(wpm or NARRATION_WPM)
     if not text:
