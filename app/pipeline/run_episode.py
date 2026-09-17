@@ -412,12 +412,30 @@ async def run_pipeline(
                      "--segments", _segments_path,
                      "--manifest", _manifest_path, "--out", _props_path, "--skip-missing"],
                     check=True, timeout=600)
-            _rem_timeout = int(os.environ.get("VF_REMOTION_TIMEOUT", "10800"))
+            _calc_frames = 18000
+            try:
+                if os.path.exists(_props_path):
+                    with open(_props_path, "r", encoding="utf-8") as _pf:
+                        _pdata = json.load(_pf)
+                        _scenes = _pdata.get("scenes") or []
+                        if _scenes:
+                            _calc_frames = sum(max(1, int(s.get("durationInFrames", 1))) for s in _scenes)
+                        else:
+                            _calc_frames = int(_pdata.get("durationInFrames", 18000))
+            except Exception:
+                pass
+            _dynamic_rem_timeout = max(
+                int(os.environ.get("VF_REMOTION_TIMEOUT", "18000")),
+                int(_calc_frames * 2.5),
+                18000
+            )
             if not os.path.exists(_silent_path) or os.path.getsize(_silent_path) < 1000000:
+                logger.info("[S4.5] launching render_twolayer_visual with dynamic timeout=%ds (frames=%d)",
+                            _dynamic_rem_timeout, _calc_frames)
                 _sp.run([sys.executable, "/root/video_factory/scripts/render_twolayer_visual.py",
                      "--props", _props_path, "--out", _silent_path,
-                     "--timeout", str(_rem_timeout)],
-                    check=True, timeout=_rem_timeout + 600)
+                     "--timeout", str(_dynamic_rem_timeout)],
+                    check=True, timeout=_dynamic_rem_timeout + 1200)
             if os.path.exists(_silent_path) and os.path.getsize(_silent_path) > 0:
                 twolayer_clip_path = _silent_path
                 logger.info("[S4.5] two-layer silent visual ready: %s", _silent_path)

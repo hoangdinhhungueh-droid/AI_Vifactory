@@ -89,11 +89,15 @@ def calculate_dynamic_timeout(props_path: str, base_timeout: float) -> tuple[flo
         import json
         with open(props_path, "r", encoding="utf-8") as pf:
             data = json.load(pf)
-            total_frames = data.get("durationInFrames", 18000)
+            scenes = data.get("scenes") or []
+            if scenes:
+                total_frames = sum(max(1, int(s.get("durationInFrames", 1))) for s in scenes)
+            else:
+                total_frames = int(data.get("durationInFrames", 18000))
     except Exception:
         pass
-    # Allow 1.5s per frame minimum, or at least base_timeout / 10800s (3 hours)
-    timeout = max(base_timeout, float(total_frames) * 1.5, 10800.0)
+    # Allow 2.0s per frame minimum on CPU, or at least base_timeout / 18000s
+    timeout = max(base_timeout, float(total_frames) * 2.0, 18000.0)
     return timeout, total_frames
 
 
@@ -142,10 +146,12 @@ def main():
         env["NODE_OPTIONS"] = "--max-old-space-size=2048"
     
     print("RUNNING", " ".join(cmd), "cwd=", PROJ_DIR, "concurrency=", concurrency, "NODE_OPTIONS=", env.get("NODE_OPTIONS"))
+    import signal
     start_t = time.time()
     last_progress = ""
 
-    # Pillar 3: Real-time progress streaming with Popen
+    # Pillar 3: Real-time progress streaming with Popen and process group isolation
+    proc = None
     try:
         proc = subprocess.Popen(
             cmd,
@@ -154,7 +160,8 @@ def main():
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            env=env
+            env=env,
+            start_new_session=True,
         )
         if proc.stdout:
             for line in proc.stdout:
@@ -167,9 +174,20 @@ def main():
         rc = proc.returncode
     except subprocess.TimeoutExpired:
         if proc:
-            proc.kill()
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                time.sleep(2)
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except Exception:
+                pass
         print(f"RENDER_FAILED timeout={dynamic_timeout:.0f}s (Last known progress: {last_progress})")
         sys.exit(1)
+    finally:
+        if proc and proc.poll() is None:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except Exception:
+                pass
 
     elapsed = time.time() - start_t
     if rc != 0 or not os.path.exists(args.out):
