@@ -177,6 +177,8 @@ class ModelGateway:
             "Authorization": f"Bearer {self.hhtech_key}",
             "Content-Type": "application/json"
         }
+        if "claude" in model.lower():
+            headers["anthropic-beta"] = "prompt-caching-2024-07-31"
         
         messages: List[Dict[str, str]] = []
         if system_prompt:
@@ -230,6 +232,10 @@ class ModelGateway:
                                     usage = data.get("usage", {})
                                     if usage:
                                         total_tokens = usage.get("total_tokens", 0)
+                                        details = usage.get("prompt_tokens_details") or {}
+                                        cached_tokens = details.get("cached_tokens", 0)
+                                        if cached_tokens > 0:
+                                            logger.info(f"[GATEWAY] Prompt cache hit! {cached_tokens}/{usage.get('prompt_tokens', 0)} tokens served from cache.")
                                 except Exception as e:
                                     logger.debug(f"[GATEWAY] Stream parse error: {e}")
                 
@@ -319,6 +325,7 @@ class ModelGateway:
         headers = {
             "x-api-key": self.anthropic_key,
             "anthropic-version": "2023-06-01",
+            "anthropic-beta": "prompt-caching-2024-07-31",
             "Content-Type": "application/json"
         }
         

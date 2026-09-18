@@ -57,6 +57,33 @@ CANONICAL_CAMERA_MOVES = [
     "handheld_shake"
 ]
 
+def _sanitize_beat_spoken_for_llm(spoken_list: list) -> list:
+    """
+    Prune heavy Whisper audio metadata (word-level timestamps, score arrays,
+    and karaoke highlight tokens) from LLM director payload.
+    Preserves exact sentence text, sentence ID, and duration budget.
+    Downstream Remotion props generator retains full verbatim spoken_sentences.json.
+    """
+    if not spoken_list:
+        return []
+    lean = []
+    for s in spoken_list:
+        if not isinstance(s, dict):
+            continue
+        duration_s = s.get("duration_sec")
+        if duration_s is None:
+            start = s.get("start", 0)
+            end = s.get("end", 0)
+            duration_s = round(end - start, 2) if end > start else 5.0
+        lean.append({
+            "sentence_id": s.get("sentence_id") or s.get("id") or f"sent_{len(lean)+1:03d}",
+            "text": s.get("text") or s.get("sentence") or "",
+            "duration_sec": duration_s,
+            "beat_index": s.get("beat_index", 1)
+        })
+    return lean
+
+
 
 def detect_forensic_overlay(narration_text: str, theme: str = "noir_dossier") -> dict | None:
     """Rule 128 & Vox Explanatory Engine: Detect evidentiary graphics trigger based on factual keywords."""
@@ -885,7 +912,7 @@ def generate_director_plan(
                 "target_scene_count": f"{len(beat_spoken)} shots matching spoken sentences",
                 "dynamic_context": dynamic_context,
                 "character_ensemble": character_ensemble,
-                "spoken_sentences": beat_spoken
+                "spoken_sentences": _sanitize_beat_spoken_for_llm(beat_spoken)
             }
 
             prompt_instruction = (

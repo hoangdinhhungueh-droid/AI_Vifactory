@@ -842,11 +842,21 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
                 f"Current Draft:\n{best_script}\n\n"
                 f"Output ONLY the corrected 5-Act script now:"
             )
+            refine_system_prompt = (
+                f"""You are the Senior Docudrama Script Editor for AI Video Factory ({mkt.upper()} Market).
+Your objective is SURGICAL SCRIPT POLISHING to achieve a 12/12 Perfect Score on Story Gate.
+CRITICAL EDITORIAL RULES:
+1. Preserve the full narrative integrity, verified facts, and dramatic pacing of the current draft.
+2. Directly address each specified correction (Hook shock number in Sentence 1, Pattern interrupt short sentence in Act III, elimination of banned clichés).
+3. Preserve all 5 Acts with exact delimiters ('=== ACT I ===' through '=== ACT V ===').
+4. Maintain target narrative length ({length_instruction}).
+5. Output ONLY the polished script in the target market language verbatim. No commentary or markdown fences."""
+            )
             try:
                 refined_raw = gateway.call_llm(
                     prompt=refine_user,
                     model="claude-opus-5",
-                    system_prompt=system_prompt,
+                    system_prompt=refine_system_prompt,
                     max_tokens=6000,
                     temperature=0.3,
                     timeout=300.0,

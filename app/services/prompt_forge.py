@@ -393,18 +393,28 @@ def generate_scene_prompts(
 
     scene_pairings = []
     if scenes:
+        seen_pairs = {}
         for idx, sc in enumerate(scenes):
-            bg_k = sc.get("background_reuse_key") or sc.get("bg_id") or f"bg_{idx}"
-            fg_k = sc.get("foreground_reuse_key") or sc.get("fg_id") or f"fg_{idx}"
-            narr = sc.get("narration") or sc.get("narrative") or ""
-            dur = sc.get("duration_sec") or sc.get("duration_est_sec") or 5
-            scene_pairings.append({
-                "scene_index": idx,
-                "background_key": bg_k,
-                "foreground_key": fg_k,
-                "narration_context": narr,
-                "duration_sec": dur
-            })
+            bg_k = sc.get("background_reuse_key") or sc.get("bg_id") or "bg_00"
+            raw_fg = sc.get("foreground_reuse_key") or sc.get("fg_id") or None
+            # Fix: Never invent phantom foreground keys when scene has no foreground (Rule 118 & 128)
+            fg_k = str(raw_fg).strip() if raw_fg and str(raw_fg).strip() else None
+
+            pair_key = (bg_k, fg_k)
+            narr = (sc.get("narration") or sc.get("narrative") or "").strip()
+
+            if pair_key not in seen_pairs:
+                clean_context = narr[:120] if narr else ""
+                seen_pairs[pair_key] = {
+                    "background_key": bg_k,
+                    "foreground_key": fg_k,
+                    "scene_span": f"sc{idx:03d}",
+                    "representative_context": clean_context
+                }
+            else:
+                seen_pairs[pair_key]["scene_span"] += f", sc{idx:03d}"
+
+        scene_pairings = list(seen_pairs.values())
 
     # Prepare strategic prompt for GPT-6-Astra
     b35_rules = get_b35_strategic_rules()
@@ -455,7 +465,7 @@ def generate_scene_prompts(
         "foregrounds_to_generate": fg_dict
     }
     if scene_pairings:
-        user_payload["scene_level_pairings"] = scene_pairings
+        user_payload["unique_asset_pairings"] = scene_pairings
 
     raw_response = None
     gateway = get_global_gateway()
