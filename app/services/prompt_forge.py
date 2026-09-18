@@ -37,6 +37,7 @@ def _load_env():
 _load_env()
 
 from app.services.hhtech_reasoner import call_gpt6_astra
+from app.services.model_gateway import get_global_gateway
 from app.services.skill_loader import get_b35_strategic_rules
 
 sys.path.insert(0, "/root/video_factory/scripts")
@@ -457,19 +458,22 @@ def generate_scene_prompts(
         user_payload["scene_level_pairings"] = scene_pairings
 
     raw_response = None
+    gateway = get_global_gateway()
     for pf_attempt in range(1, 3):
         try:
-            logger.info(f"[prompt_forge] Calling GPT-6-Astra for prompts (attempt {pf_attempt}/2, market={market})...")
-            raw_response = call_gpt6_astra(
+            logger.info(f"[prompt_forge] Calling Claude Opus 5 for prompts (attempt {pf_attempt}/2, market={market}, fallback=gpt-6-astra)...")
+            raw_response = gateway.call_llm(
                 prompt=json.dumps(user_payload, ensure_ascii=False),
                 system_prompt=system_prompt,
+                model="claude-opus-5",
                 max_tokens=8500,
-                timeout=200.0
+                timeout=200.0,
+                fallback="gpt-6-astra"
             )
             if raw_response and raw_response.strip():
                 break
         except Exception as e:
-            logger.warning(f"[prompt_forge] HHTech API attempt {pf_attempt} encountered issue: {e}")
+            logger.warning(f"[prompt_forge] LLM attempt {pf_attempt} encountered issue: {e}")
             if pf_attempt < 2:
                 import time
                 time.sleep(3.0)

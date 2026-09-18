@@ -269,9 +269,9 @@ def run_b36_visual_convergence(
     current_prompts = dict(prompts_data)
     audit_history = []
 
-    # Round 1: Claude Forensic Audit
-    primary_model = os.getenv("B36_AUDIT_MODEL", "claude-opus-5")
-    fallback_model = os.getenv("B36_FALLBACK_MODEL", "claude-sonnet-5")
+    # Round 1: GPT-6-Astra Forensic Visual Linter & Auditor
+    primary_model = os.getenv("B36_AUDIT_MODEL", "gpt-6-astra")
+    fallback_model = os.getenv("B36_FALLBACK_MODEL", "kimi-k3")
     logger.info(f"[B3.5.1 DACL] Round 1: Invoking {primary_model} Forensic Auditor for {episode_id}...")
     try:
         raw_res = gateway.call_llm(
@@ -292,7 +292,7 @@ def run_b36_visual_convergence(
             max_tokens=3500,
             temperature=0.1,
             timeout=70.0,
-            fallback="gpt-4o"
+            fallback="claude-sonnet-5"
         )
 
     json_match = re.search(r"(\{.*\})", raw_res, re.DOTALL)
@@ -300,15 +300,15 @@ def run_b36_visual_convergence(
     try:
         round1_audit = json.loads(clean_json)
     except Exception as parse_err:
-        logger.error(f"[B3.5.1 DACL] Failed to parse Opus audit JSON: {parse_err}. Raw:\n{raw_res[:400]}")
+        logger.error(f"[B3.5.1 DACL] Failed to parse Astra audit JSON: {parse_err}. Raw:\n{raw_res[:400]}")
         round1_audit = {
             "verdict": "FAIL",
             "audit_score": 4.0,
             "red_flags": [f"JSON_PARSE_ERROR: {parse_err}"],
-            "critical_findings": "Opus output could not be parsed into JSON."
+            "critical_findings": "Astra output could not be parsed into JSON."
         }
 
-    audit_history.append({"round": 1, "actor": "Claude-Opus-5", "result": round1_audit})
+    audit_history.append({"round": 1, "actor": "GPT-6-Astra", "result": round1_audit})
     r1_score = float(round1_audit.get("audit_score", 0.0))
     r1_verdict = str(round1_audit.get("verdict", "FAIL")).upper()
     logger.info(f"[B3.5.1 DACL] Round 1 Result: Verdict={r1_verdict} (Score: {r1_score}/10)")
@@ -317,13 +317,13 @@ def run_b36_visual_convergence(
     converged = (r1_verdict == "PASS" and r1_score >= 8.5)
 
     if not converged:
-        # Extract Delta Patch from Opus 5
+        # Extract Delta Patch from Auditor
         delta_patch = round1_audit.get("delta_patch", {})
         patched_scenes = delta_patch.get("patched_scenes", [])
         patched_thumbs = delta_patch.get("patched_thumbnails", {})
 
         if patched_scenes or patched_thumbs:
-            # Apply Opus Delta Patch to Working Copy
+            # Apply Initial Delta Patch to Working Copy
             scene_map = {s["scene_id"]: s for s in current_dplan.get("scenes", [])}
             for ps in patched_scenes:
                 sid = ps.get("scene_id")
@@ -341,9 +341,9 @@ def run_b36_visual_convergence(
                     if tv:
                         current_prompts.setdefault("thumbnails", {})[tk] = tv
 
-            # Round 2: GPT-6-Astra Cross-Audit on the Delta Only (Zero Context Bloat)
-            logger.info(f"[B3.5.1 DACL] Round 2: Invoking GPT-6-Astra to Cross-Audit Delta ({len(patched_scenes)} scenes, {len(patched_thumbs)} thumbs)...")
-            astra_input = {
+            # Round 2: Claude Opus 5 Cross-Audit / Polish on the Delta Only (Zero Context Bloat)
+            logger.info(f"[B3.5.1 DACL] Round 2: Invoking Claude Opus 5 to Refine & Polish Delta ({len(patched_scenes)} scenes, {len(patched_thumbs)} thumbs)...")
+            patcher_input = {
                 "episode_id": episode_id,
                 "market": m_up,
                 "director_archetype": director_plan.get("director_archetype"),
@@ -354,28 +354,28 @@ def run_b36_visual_convergence(
             }
 
             try:
-                astra_res = gateway.call_llm(
-                    prompt=f"[DELTA PATCH TO CROSS-AUDIT]\n{json.dumps(astra_input, ensure_ascii=False, indent=2)}\n\nVerify, polish and score this Delta Patch. Return strict JSON only.",
+                patcher_res = gateway.call_llm(
+                    prompt=f"[DELTA PATCH TO REFINE & POLISH]\n{json.dumps(patcher_input, ensure_ascii=False, indent=2)}\n\nVerify, polish and score this Delta Patch. Return strict JSON only.",
                     system_prompt=ASTRA_CROSS_AUDIT_PROMPT,
-                    model="gpt-6-astra",
+                    model="claude-opus-5",
                     max_tokens=2500,
                     temperature=0.2,
                     timeout=70.0,
                     fallback="claude-sonnet-5"
                 )
-                j_match2 = re.search(r"(\{.*\})", astra_res, re.DOTALL)
-                clean_json2 = j_match2.group(1).strip() if j_match2 else astra_res.strip()
+                j_match2 = re.search(r"(\{.*\})", patcher_res, re.DOTALL)
+                clean_json2 = j_match2.group(1).strip() if j_match2 else patcher_res.strip()
                 round2_audit = json.loads(clean_json2)
             except Exception as e2:
-                logger.warning(f"[B3.5.1 DACL] Astra cross-audit failed or errored: {e2}. Keeping Opus 5 patch.")
+                logger.warning(f"[B3.5.1 DACL] Claude Opus 5 refinement failed or errored: {e2}. Keeping initial delta.")
                 round2_audit = {
                     "cross_audit_verdict": "PASS",
                     "cross_audit_score": max(r1_score, 8.0),
                     "approval_rate": 0.9,
-                    "audit_notes": f"Fallback accepted Opus delta directly: {e2}"
+                    "audit_notes": f"Fallback accepted initial delta directly: {e2}"
                 }
 
-            audit_history.append({"round": 2, "actor": "GPT-6-Astra", "result": round2_audit})
+            audit_history.append({"round": 2, "actor": "Claude-Opus-5", "result": round2_audit})
 
             # Apply Astra Refinements if present
             refined_delta = round2_audit.get("refined_delta", {})

@@ -23,6 +23,7 @@ import os
 ROOT_DIR = Path(os.getenv("VF_ROOT_DIR", Path(__file__).resolve().parent.parent.parent))
 
 from app.services.hhtech_reasoner import call_gpt6_astra
+from app.services.model_gateway import get_global_gateway
 from app.services.skill_loader import (
     get_b3_strategic_rules,
     get_b35_strategic_rules
@@ -929,13 +930,17 @@ def generate_director_plan(
             min_candidate_count = 15
 
         raw_res = ""
+        gateway = get_global_gateway()
         for attempt in range(1, 3):
             try:
-                raw_res = call_gpt6_astra(
+                logger.info(f"  [B3 Beat {b_num}] Calling Claude Opus 5 (Visual Director) attempt {attempt}/2 (fallback=gpt-6-astra)...")
+                raw_res = gateway.call_llm(
                     prompt=prompt_instruction,
                     system_prompt=system_prompt,
+                    model="claude-opus-5",
                     max_tokens=4500,
-                    timeout=100.0
+                    timeout=120.0,
+                    fallback="gpt-6-astra"
                 )
                 if raw_res and raw_res.strip():
                     break
