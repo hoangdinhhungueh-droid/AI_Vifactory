@@ -113,6 +113,7 @@ def main():
     ap.add_argument("--frames", default=None, help="Frame range to render (e.g. 0-4341)")
     ap.add_argument("--x264-preset", default="veryfast", help="x264 preset (default: veryfast)")
     ap.add_argument("--crf", type=int, default=18, help="x264 CRF (default: 18)")
+    ap.add_argument("--log", default="info", help="Remotion log level (default: info)")
     args = ap.parse_args()
 
     if not os.path.exists(os.path.join(PROJ_DIR, ENTRY)):
@@ -141,7 +142,7 @@ def main():
     cmd = [
         "npx", "remotion", "render", ENTRY, COMP_ID, args.out,
         "--props=" + os.path.abspath(args.props),
-        "--log=error",
+        f"--log={args.log}",
         "--concurrency=" + concurrency,
         "--x264-preset=" + args.x264_preset,
         "--crf=" + str(args.crf),
@@ -177,7 +178,7 @@ def main():
             for line in proc.stdout:
                 sys.stdout.write(line)
                 sys.stdout.flush()
-                if "Rendered frame" in line or "%" in line:
+                if "Rendered" in line or "%" in line:
                     last_progress = line.strip()
 
         proc.wait(timeout=dynamic_timeout)
