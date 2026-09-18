@@ -167,7 +167,7 @@ def main():
     ap.add_argument("--privacy", default="unlisted")
     ap.add_argument("--skip-upload", action="store_true",
                     help="render only; stop before B10/HG3 (dry run)")
-    ap.add_argument("--render-timeout", type=int, default=36000)
+    ap.add_argument("--render-timeout", type=int, default=54000)
     ap.add_argument("--upload-timeout", type=int, default=3600)
     args = ap.parse_args()
 
@@ -194,14 +194,23 @@ def main():
         _log("WARNING render_architecture=%r (not two_layer_v1 / remotion_twolayer_karaoke_v4): S4.5 two-layer "
              "path will be SKIPPED and legacy S5 will run instead" % arch)
 
-    _write_state(episode_id, stage="start", status="running",
-                 market=args.market, privacy=args.privacy,
-                 skip_upload=bool(args.skip_upload))
+    # Calculate adaptive dynamic render timeout matching run_episode (Pillar 3)
+    props_path = ep_dir / "remotion_props.json"
+    effective_render_timeout = args.render_timeout
+    if props_path.exists():
+        try:
+            pdata = json.loads(props_path.read_text(encoding="utf-8"))
+            scenes = pdata.get("scenes") or []
+            calc_frames = sum(max(1, int(s.get("durationInFrames", 1))) for s in scenes) if scenes else int(pdata.get("durationInFrames", 18000))
+            effective_render_timeout = max(args.render_timeout, int(calc_frames * 2.0) + 7200, 54000)
+            _log("adaptive render timeout set to %ds for %d frames" % (effective_render_timeout, calc_frames))
+        except Exception as _terr:
+            _log("failed reading props for timeout: %s" % _terr)
 
     if not _run_stage("B4-B7 render (resume_episode)",
                       [sys.executable, "scripts/resume_episode.py",
                        "--episode-id", episode_id],
-                      episode_id, args.render_timeout):
+                      episode_id, effective_render_timeout):
         return 2
 
     master = ep_dir / "final_169.mp4"
