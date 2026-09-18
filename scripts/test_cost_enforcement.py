@@ -7,6 +7,17 @@ Verifies that CostCapExceededError is raised when budget limit is exceeded.
 
 import sys
 import os
+from pathlib import Path
+
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
+REPO_ROOT = str(Path(__file__).resolve().parents[1])
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 sys.path.insert(0, '/root/video_factory')
 
 from app.services.cost_tracker import CostTracker, CostCapExceededError
