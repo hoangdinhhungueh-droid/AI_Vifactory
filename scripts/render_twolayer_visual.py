@@ -24,6 +24,11 @@ import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 PROJ_DIR = os.environ.get("VF_REMOTION_DIR", "/root/video_factory/remotion")
 ENTRY = "src/index.tsx"

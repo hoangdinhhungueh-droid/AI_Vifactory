@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 import os
 ROOT_DIR = Path(os.getenv("VF_ROOT_DIR", Path(__file__).resolve().parent.parent.parent))
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from app.services.hhtech_reasoner import call_gpt6_astra
 from app.services.model_gateway import get_global_gateway
