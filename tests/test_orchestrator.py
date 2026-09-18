@@ -454,3 +454,48 @@ class TestRunnerCLI:
         payload = json.loads(captured.out)
         assert payload["status"] == "error"
         assert "Rule 128" in payload["error"]
+
+    def test_cli_council_mode(self, capsys):
+        parser = build_parser()
+        args = parser.parse_args([
+            "--mode", "council",
+            "--task-id", "EN_EP0260_macro_liquidity",
+            "--dry-run",
+            "--json-output",
+        ])
+        runner = OrchestratorRunner(args)
+        ret = runner.run()
+
+        assert ret == 0
+        captured = capsys.readouterr()
+        payload = json.loads(captured.out)
+        assert payload["status"] == "success"
+        matrix = payload["council_matrix"]
+        assert matrix["verdict"] == "APPROVED_FOR_SYNC"
+        assert matrix["council_quorum"] == "UNANIMOUS_4_OF_4"
+        assert matrix["votes"]["agent_1_architect"]["vote"] == "AGREE"
+        assert matrix["votes"]["agent_2_builder"]["vote"] == "COMMITTED"
+        assert matrix["votes"]["agent_3_qa_harness"]["vote"] == "PASS"
+        assert matrix["votes"]["agent_4_adversarial_auditor"]["vote"] == "CLEAR"
+
+    def test_cli_council_mode_veto(self, capsys):
+        parser = build_parser()
+        args = parser.parse_args([
+            "--mode", "council",
+            "--task-id", "invalid_bad_id",
+            "--dry-run",
+            "--json-output",
+        ])
+        runner = OrchestratorRunner(args)
+        ret = runner.run()
+
+        assert ret == 1
+        captured = capsys.readouterr()
+        payload = json.loads(captured.out)
+        assert payload["status"] == "failure"
+        matrix = payload["council_matrix"]
+        assert matrix["verdict"] == "REVISE_REQUIRED"
+        assert matrix["votes"]["agent_1_architect"]["vote"] == "DISAGREE"
+        assert matrix["votes"]["agent_4_adversarial_auditor"]["vote"] == "VETO"
+
+

@@ -11,8 +11,8 @@ def test_calculate_dynamic_timeout_underflow(tmp_path):
     props_file.write_text(json.dumps({"durationInFrames": 1500}), encoding="utf-8")
     timeout, frames = calculate_dynamic_timeout(str(props_file), base_timeout=7200.0)
     assert frames == 1500
-    # Minimum timeout is 10800s (3 hours)
-    assert timeout == 10800.0
+    # Minimum timeout floor is 36000.0s (10 hours, Rule 134)
+    assert timeout == 36000.0
 
 
 def test_calculate_dynamic_timeout_long_episode(tmp_path):
@@ -20,8 +20,8 @@ def test_calculate_dynamic_timeout_long_episode(tmp_path):
     props_file.write_text(json.dumps({"durationInFrames": 18000}), encoding="utf-8")
     timeout, frames = calculate_dynamic_timeout(str(props_file), base_timeout=7200.0)
     assert frames == 18000
-    # 18000 * 1.5 = 27000s
-    assert timeout == 27000.0
+    # 18000 * 2.0 + 7200.0 = 43200.0s (12 hours, Rule 134)
+    assert timeout == 43200.0
 
 
 def test_stage_into_public_prescales_large_image(tmp_path):

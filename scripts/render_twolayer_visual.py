@@ -83,22 +83,19 @@ def optimize_props_assets(props_path: str, proj_dir: str):
 
 
 def calculate_dynamic_timeout(props_path: str, base_timeout: float) -> tuple[float, int]:
-    """Calculate adaptive timeout based on total frames (Pillar 3)."""
-    total_frames = 18000
+    """Calculate adaptive timeout based on canonical policy (Rule 134)."""
     try:
-        import json
-        with open(props_path, "r", encoding="utf-8") as pf:
-            data = json.load(pf)
-            scenes = data.get("scenes") or []
-            if scenes:
-                total_frames = sum(max(1, int(s.get("durationInFrames", 1))) for s in scenes)
-            else:
-                total_frames = int(data.get("durationInFrames", 18000))
+        from app.services.render_timeout_policy import (
+            compute_render_timeout_hierarchy,
+            extract_frames_from_props,
+        )
+        total_frames = extract_frames_from_props(props_path, default_frames=18000)
+        h = compute_render_timeout_hierarchy(total_frames, base_timeout)
+        return h["remotion_timeout"], h["total_frames"]
     except Exception:
-        pass
-    # Allow 1.5s per frame minimum, or at least base_timeout / 10800s (3 hours)
-    timeout = max(base_timeout, float(total_frames) * 1.5, 10800.0)
-    return timeout, total_frames
+        total_frames = 18000
+        timeout = max(base_timeout, float(total_frames) * 2.0 + 7200.0, 36000.0)
+        return timeout, total_frames
 
 
 def main():

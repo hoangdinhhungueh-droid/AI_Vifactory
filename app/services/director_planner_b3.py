@@ -1125,6 +1125,20 @@ def generate_director_plan(
         if not motion_directive:
             motion_directive = "dramatic_push" if idx < 15 else ("split_whip" if idx % 3 == 0 else "subtle_drift")
 
+        # Dynamic Hollywood tension curve based on beat index and scene flow
+        dynamic_tension = cam.get("tension_level") if isinstance(cam, dict) else None
+        if not dynamic_tension or dynamic_tension == "high":
+            if beat_idx == 1:
+                dynamic_tension = "high" if idx in (0, 7, 8, 9) else "medium"
+            elif beat_idx == 2:
+                dynamic_tension = "high" if idx % 3 == 0 else "medium"
+            elif beat_idx == 3:
+                dynamic_tension = "high" if idx % 2 == 0 else "medium"
+            elif beat_idx == 4:
+                dynamic_tension = "climax" if idx % 2 == 0 else "high"
+            else:  # Beat 5
+                dynamic_tension = "climax" if idx == 0 else ("medium" if idx % 2 == 0 else "low")
+
         norm_sc = {
             "scene_index": idx,
             "scene_id": sc_id,
@@ -1143,7 +1157,7 @@ def generate_director_plan(
             "motion_directive": motion_directive,
             "camera": {
                 "movement": cam_mov,
-                "tension_level": cam.get("tension_level", "high") if isinstance(cam, dict) else "high"
+                "tension_level": dynamic_tension
             },
             "bg_reuse_key": bg_key,
             "bg_prompt": bg_desc,

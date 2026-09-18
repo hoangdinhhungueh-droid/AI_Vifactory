@@ -120,7 +120,7 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 | **B6, B7, B8** | TTS, Whisper Subtitles, Remotion Render CPU | `notion_sot_second_brain.md` (Media Production Hub) | Rule 120 (Karaoke millisecond sync, `durationInFrames` chuẩn timestamp) |
 | **B10** | SEO Metadata, Synthetic Media, Gate 2 | `PIPELINE_CONTRACTS.md` | `status.containsSyntheticMedia: true`, Hero Thumbnail, Rule 135 Chapters |
 | **B11** (`/run:b11`) | Analytics 48h, Feedback Dreaming Loop | Skill `vf-b11-analytics` | Rule 113 (48h Law), Rule 440–442 |
-| **Teamwork Pipeline** (`/vf-pipeline-teamwork`) | Điều phối đội ngũ 4 vai (Parallel Debuggers, Forensic Auditor, CI Gatekeeper, 3-Way Sync) | Skill `vf-pipeline-teamwork` & `scripts/orchestrator/` | Rule 118, 119, 121, 126, 127, 128, 129, 134 |
+| **Teamwork Pipeline** (`/vf-pipeline-teamwork`) | Hội Đồng Multi-Agent Harness 4 vai (Architect, Builder, QA Test Harness, Adversarial Auditor - strictly review) & 3 Cặp Docs | Skill `vf-pipeline-teamwork` & `scripts/orchestrator/` | Rule 118, 119, 121, 124, 125, 126, 127, 128, 129, 134 |
 
 ---
 
