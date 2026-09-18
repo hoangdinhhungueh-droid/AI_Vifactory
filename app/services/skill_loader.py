@@ -506,7 +506,7 @@ def get_b3_strategic_rules() -> str:
         "   - Layer 2 Foreground (1:1 2048x2048 #FF00FF): Position strictly 'Right' or 'Left' (Rule of Thirds). NEVER place full-body characters at 'Center'.\n"
         "8. PRODUCTION BRIDGE (Rule 446): All prompt descriptions and visual hints must be in descriptive English.\n"
         "9. REMOTION MOTION GRAPHICS & FORENSIC ARTIFACTS (Rule 122):\n"
-        "   - 'stat_card': Tag metric scenes with {'value': '$41.8M' / '14,000명' / '52%', 'label': 'PRICE ANCHOR' / 'VALUATION COLLAPSE'} or null.\n"
+        "   - 'stat_card': Tag metric scenes with exact numbers from narration: {'value': '<EXACT_METRIC_FROM_NARRATION>', 'label': 'PRICE ANCHOR' / 'VALUATION COLLAPSE'} or null.\n"
         "   - 'stamp_badge': Climax evidentiary stamp slam: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.\n"
         "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'."
     )

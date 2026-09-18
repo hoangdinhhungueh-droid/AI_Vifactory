@@ -29,6 +29,8 @@ import shutil
 import sys
 from pathlib import Path
 
+from app.services.text_to_number_parser import parse_spoken_number
+
 logger = logging.getLogger("vf.build_remotion_props")
 
 
@@ -61,27 +63,27 @@ def detect_forensic_overlay(narration_text: str, theme: str = "noir_dossier") ->
             }
         }
 
-    # 2. Kinetic Counter (Numerical surge/collapse, capital metrics)
-    if any(k in t for k in ["stock", "dollar", "capital", "billion", "market", "revenue", "loss", "margin", "liquidity", "cổ phiếu", "sụt giảm", "thất thoát", "tỷ đô", "thị trường", "tổn thất", "bốc hơi", "원", "円", "man-won", "trillion"]):
-        num_m = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?)', narration_text)
-        val = float(num_m.group(1).replace(",", "")) if num_m else 41.8
-        trend = "down" if any(k in t for k in ["loss", "giảm", "sụt", "drop", "collapse", "bốc hơi", "하락", "폭락"]) else "up"
+    # 2. Kinetic Counter (Numerical surge/collapse, capital metrics, spoken & written amounts)
+    parsed_metric = parse_spoken_number(narration_text)
+    if parsed_metric is not None:
+        title = f"{parsed_metric.metric_type.upper()} METRIC // CAPITAL TRAJECTORY"
+        badge = "SURGE" if parsed_metric.trend == "up" else "COLLAPSE"
         return {
             "type": "kinetic_counter",
             "legacy_type": "financial_chart",
             "theme": theme or "tech_infographic",
             "layout": "split_right",
-            "title": "DISRUPTION INDEX // ASYMMETRIC SPREAD",
-            "badge": "VIOLATION",
+            "title": title,
+            "badge": badge,
             "sfx_cue": "counter_tick",
-            "label": "MARKET DISRUPTION // CAPITAL TRAJECTORY",
+            "label": f"EVIDENTIARY VALUE // {parsed_metric.formatted}",
             "payload": {
                 "start_value": 0.0,
-                "end_value": val,
-                "unit": "M",
-                "prefix": "$",
-                "suffix": "",
-                "trend": trend,
+                "end_value": parsed_metric.display_value,
+                "unit": parsed_metric.unit,
+                "prefix": parsed_metric.prefix,
+                "suffix": parsed_metric.suffix,
+                "trend": parsed_metric.trend,
                 "chart_type": "line"
             }
         }
@@ -229,9 +231,23 @@ def stage_into_public(local_path: str, public_dir: str, episode_id: str) -> str 
 
 
 def extract_stat_card(text: str):
-    """Extract prominent financial metrics / keywords from narration text (KRW, JPY, USD, VND, percentages)."""
+    """Extract prominent financial metrics / keywords from narration text (KRW, JPY, USD, VND, percentages, spoken words)."""
     if not text:
         return None, None
+
+    parsed = parse_spoken_number(text)
+    if parsed:
+        if parsed.suffix and "원" in parsed.suffix:
+            label = "PRICE ANCHOR // TRANSACTION"
+        elif parsed.suffix and "đồng" in parsed.suffix:
+            label = "MARKET METRIC // COST"
+        elif parsed.metric_type == "currency":
+            label = "FINANCIAL METRIC // VALUATION"
+        elif parsed.metric_type == "percentage":
+            label = "GROWTH RATE // PERCENTAGE"
+        else:
+            label = "EVIDENCE // SCALE"
+        return parsed.formatted, label
 
     patterns = [
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:만|억|조)?\s*원)', "PRICE ANCHOR // TRANSACTION"),
@@ -525,8 +541,9 @@ def build_remotion_props_data(
             if skip_missing:
                 continue
 
-        # Auto FG Fallback: Guarantee 100% Foreground Coverage (Rule 100)
-        if not fg_local and fg_pool:
+        # Auto FG Fallback: In Vox Documentary Style, full-frame evidence scenes
+        # (documents, maps, charts) remain foreground-free unless fg_key is requested
+        if not fg_local and fg_key and fg_pool:
             chosen_fg_key, chosen_fg_local = fg_pool[fg_idx % len(fg_pool)]
             fg_local = chosen_fg_local
             fg_idx += 1
@@ -635,6 +652,13 @@ def build_remotion_props_data(
 
         motion_directive = s.get("motion_directive") or s.get("motionDirective") or "subtle_drift"
 
+        # Anti-Flicker Card Segment Key (Rule 122 & Zero-Flicker Architecture)
+        card_segment_key = None
+        if forensic_ov or stat_val or stamp_badge:
+            ov_type = forensic_ov.get("type", "") if isinstance(forensic_ov, dict) else str(forensic_ov or "")
+            ov_title = forensic_ov.get("title", "") if isinstance(forensic_ov, dict) else ""
+            card_segment_key = f"{ov_type}_{stat_val or ''}_{stamp_badge or ''}_{ov_title}"
+
         scenes_out.append({
             "background": bg_rel or "",
             "foreground": fg_rel,
@@ -647,6 +671,7 @@ def build_remotion_props_data(
             "statValue": stat_val,
             "statLabel": stat_lbl,
             "stampBadge": stamp_badge,
+            "card_segment_key": card_segment_key,
             "motionDirective": motion_directive,
             "speakerTag": speaker_tag,
             "actTitle": act_title,

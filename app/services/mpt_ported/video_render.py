@@ -596,11 +596,16 @@ async def render_video(
                 if (bgm_dur is not None and audio_dur is not None and bgm_dur < audio_dur - 1.0)
                 else []
             )
+            # Intelligent Sidechain Ducking + Broadcast Vocal Pocket EQ (Rule 125 & R3)
+            # - BGM baseline at volume=0.09 (-22dB..-24dB documentary standard)
+            # - High-pass filter at 85Hz eliminates muddy sub-bass hum/drone
+            # - Vocal pocket EQ dips 2.5kHz presence zone (-5dB) to clear room for speech
+            # - Sidechain compressor ducks BGM cleanly without makeup gain boost
             af = (
-                "[1:a]volume=0.95,asplit=2[tts_clean][tts_sc];"
-                "[2:a]volume=0.28,equalizer=f=2500:t=q:w=1.5:g=-4[bgm_eq];"
-                "[bgm_eq][tts_sc]sidechaincompress=threshold=0.03:ratio=6:attack=150:release=450:makeup=1[bgm_ducked];"
-                "[tts_clean][bgm_ducked]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[aout]"
+                "[1:a]volume=1.0,asplit=2[tts_clean][tts_sc];"
+                "[2:a]volume=0.09,highpass=f=85,equalizer=f=2500:t=q:w=1.5:g=-5[bgm_eq];"
+                "[bgm_eq][tts_sc]sidechaincompress=threshold=0.02:ratio=10:attack=80:release=350[bgm_ducked];"
+                "[tts_clean][bgm_ducked]amix=inputs=2:duration=first:dropout_transition=2:normalize=0,alimiter=limit=0.95:attack=5:release=50[aout]"
             )
             cmd = [
                 "ffmpeg", "-y",

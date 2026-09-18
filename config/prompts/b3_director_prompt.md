@@ -63,6 +63,12 @@
      - For 2 to 3 consecutive scenes detailing the same sequential argument, DO NOT frantically cut to completely unrelated environments. Hold the spatial staging constant while evolving camera intimacy (wide establishing to macro push-in), lighting tension, or character micro-expressions to maintain viewer focus without visual disorientation.
 
 11. REMOTION MOTION GRAPHICS & FORENSIC ARTIFACTS (Rule 122 Remotion Suite):
-   - 'stat_card': Tag high-impact metric scenes with {"value": "$41.8M" / "14,000명" / "52%", "label": "PRICE ANCHOR" / "VALUATION COLLAPSE" / "EVIDENCE SCALE"} or null.
+   - 'stat_card': Tag high-impact metric scenes with exact numbers parsed from narration: {"value": "<EXACT_METRIC_FROM_NARRATION>", "label": "PRICE ANCHOR" / "VALUATION COLLAPSE" / "EVIDENCE SCALE"} or null. ZERO MOCK DATA (Rule 118): DO NOT invent or hardcode metrics not mentioned in narration.
    - 'stamp_badge': Climax evidentiary stamp slam animation: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.
    - 'motion_directive': Dynamic Parallax 2.5D visual motion: 'dramatic_push' (intense push with depth), 'subtle_drift' (slow floating tension), 'split_whip' (kinetic transition), or 'forensic_lock' (rock-solid hold on document evidence).
+
+12. VOX INVESTIGATIVE DOCUMENTARY AESTHETICS & FG SPARSITY (Rule 122 & Rule 128):
+   - Evidence-First Priority: The document, satellite map, money-flow network, and court docket ARE the primary visual anchors.
+   - Foreground Sparsity: Foreground characters (FG) must be used SPARINGLY (< 15% of scenes), reserved exclusively for introducing key named personas (e.g. suspect profile, whistleblower, chief prosecutor).
+   - Full-Frame Evidence: When explaining shell mechanisms, wire transactions, state subsidies, or legal clauses, set foreground to null to display full-frame cinematic evidence without mascot obstruction.
+   - Card Pacing Sparsity: Limit visual cards/badges to ~25-30% of scenes at key narrative pivots to avoid eye fatigue and visual overcrowding.

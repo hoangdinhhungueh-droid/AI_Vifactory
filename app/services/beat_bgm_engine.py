@@ -124,6 +124,27 @@ def get_beat_durations(episode_id: str, out_dir: Optional[str] = None, total_dur
             logger.info("[beat_bgm_engine] Resolved 5 Beat durations from audio_beats: %s", [round(x, 1) for x in durations])
             return durations
 
+    # Strategy 1.5: Check remotion_props.json or director_plan.json for exact scene-rendered beat timing
+    props_path = Path(out_dir) / "remotion_props.json"
+    if props_path.exists():
+        try:
+            with open(props_path, "r", encoding="utf-8") as pf:
+                pdata = json.load(pf)
+            scenes = pdata.get("scenes", [])
+            beat_scene_durs: Dict[int, float] = {1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
+            fps = float(pdata.get("fps") or 30.0)
+            for sc in scenes:
+                b_idx = int(sc.get("beat_index") or 1)
+                if b_idx in beat_scene_durs:
+                    frames = float(sc.get("durationInFrames") or (float(sc.get("duration_sec") or 4.0) * fps))
+                    beat_scene_durs[b_idx] += frames / fps
+            if all(beat_scene_durs[b] > 0 for b in range(1, 6)):
+                exact_durs = [beat_scene_durs[b] for b in range(1, 6)]
+                logger.info("[beat_bgm_engine] Resolved exact 5 Beat durations from remotion_props.json: %s", [round(x, 1) for x in exact_durs])
+                return exact_durs
+        except Exception as e:
+            logger.warning("[beat_bgm_engine] Failed to parse remotion_props.json: %s", e)
+
     # Strategy 2: Check whisper_segments.json
     seg_path = Path(out_dir) / "whisper_segments.json"
     if seg_path.exists():

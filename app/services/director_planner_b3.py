@@ -28,6 +28,7 @@ from app.services.skill_loader import (
     get_b3_strategic_rules,
     get_b35_strategic_rules
 )
+from app.services.text_to_number_parser import parse_spoken_number
 
 DIRECTOR_PLAN_FLAT_DB_ID = "5b201989-2400-8295-be81-81c2c0e4e138"
 DIRECTOR_PLAN_PARENT_PAGE_ID = "73801989-2400-82a7-ae5f-0110bfb666c8"
@@ -84,27 +85,27 @@ def detect_forensic_overlay(narration_text: str, theme: str = "noir_dossier") ->
             }
         }
 
-    # 2. Kinetic Counter (Numerical surge/collapse, capital metrics)
-    if any(k in t for k in ["stock", "dollar", "capital", "billion", "market", "revenue", "loss", "margin", "liquidity", "cổ phiếu", "sụt giảm", "thất thoát", "tỷ đô", "thị trường", "tổn thất", "bốc hơi", "원", "円", "man-won", "trillion"]):
-        num_m = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?)', narration_text)
-        val = float(num_m.group(1).replace(",", "")) if num_m else 41.8
-        trend = "down" if any(k in t for k in ["loss", "giảm", "sụt", "drop", "collapse", "bốc hơi", "하락", "폭락"]) else "up"
+    # 2. Kinetic Counter (Numerical surge/collapse, capital metrics, spoken & written amounts)
+    parsed_metric = parse_spoken_number(narration_text)
+    if parsed_metric is not None:
+        title = f"{parsed_metric.metric_type.upper()} METRIC // CAPITAL TRAJECTORY"
+        badge = "SURGE" if parsed_metric.trend == "up" else "COLLAPSE"
         return {
             "type": "kinetic_counter",
             "legacy_type": "financial_chart",
             "theme": theme or "tech_infographic",
             "layout": "split_right",
-            "title": "DISRUPTION INDEX // ASYMMETRIC SPREAD",
-            "badge": "VIOLATION",
+            "title": title,
+            "badge": badge,
             "sfx_cue": "counter_tick",
-            "label": "MARKET DISRUPTION // CAPITAL TRAJECTORY",
+            "label": f"EVIDENTIARY VALUE // {parsed_metric.formatted}",
             "payload": {
                 "start_value": 0.0,
-                "end_value": val,
-                "unit": "M",
-                "prefix": "$",
-                "suffix": "",
-                "trend": trend,
+                "end_value": parsed_metric.display_value,
+                "unit": parsed_metric.unit,
+                "prefix": parsed_metric.prefix,
+                "suffix": parsed_metric.suffix,
+                "trend": parsed_metric.trend,
                 "chart_type": "line"
             }
         }
@@ -178,6 +179,21 @@ def detect_stat_card(narration_text: str) -> dict | None:
     """Rule 122 & Rule 128: Extract prominent financial metrics or evidentiary scales for Remotion Stat Card."""
     if not narration_text:
         return None
+
+    parsed = parse_spoken_number(narration_text)
+    if parsed:
+        if parsed.suffix and "원" in parsed.suffix:
+            label = "PRICE ANCHOR // TRANSACTION"
+        elif parsed.suffix and "đồng" in parsed.suffix:
+            label = "MARKET METRIC // COST"
+        elif parsed.metric_type == "currency":
+            label = "FINANCIAL METRIC // VALUATION"
+        elif parsed.metric_type == "percentage":
+            label = "GROWTH RATE // PERCENTAGE"
+        else:
+            label = "EVIDENCE // SCALE"
+        return {"value": parsed.formatted, "label": label}
+
     patterns = [
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:만|억|조)?\s*원)', "PRICE ANCHOR // TRANSACTION"),
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆)?\s*円)', "FINANCIAL VALUE // VALUATION"),
@@ -851,7 +867,7 @@ def generate_director_plan(
                 "5. 6 CANONICAL CAMERA MOVEMENTS: declare strictly one of: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n"
                 "6. FORENSIC GRAPHICS & STAT CARDS:\n"
                 "   - 'forensic_overlay': 'redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt', or null.\n"
-                "   - 'stat_card': Tag high-impact metric scenes with {\"value\": \"$41.8M\" / \"14,000명\" / \"52%\", \"label\": \"PRICE ANCHOR\" / \"VALUATION COLLAPSE\"} or null.\n"
+                "   - 'stat_card': Tag high-impact metric scenes with exact numbers from narration: {\"value\": \"<EXACT_METRIC_FROM_NARRATION>\", \"label\": \"PRICE ANCHOR\" / \"VALUATION COLLAPSE\"} or null.\n"
                 "   - 'stamp_badge': Climax evidentiary stamp slam: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.\n"
                 "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'.\n\n"
                 "OUTPUT FORMAT: Return ONLY a valid JSON object matching: {\"scenes\": [ ... ]}. No markdown fences."
@@ -903,7 +919,7 @@ def generate_director_plan(
                 "5. LOCATION CONTINUITY: assign 'bg_cluster_id' (range {((b_num - 1) * 4) + 1}..{b_num * 4}).\n"
                 "6. FORENSIC OVERLAYS: Tag evidentiary scenes with 'forensic_overlay': 'redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt', or null.\n"
                 "7. MOTION GRAPHICS & STAT CARDS (Rule 122 Remotion Suite):\n"
-                "   - 'stat_card': Tag high-impact metric scenes with {\"value\": \"$41.8M\" / \"14,000명\" / \"52%\", \"label\": \"PRICE ANCHOR\" / \"VALUATION COLLAPSE\"} or null.\n"
+                "   - 'stat_card': Tag high-impact metric scenes with exact numbers from narration: {\"value\": \"<EXACT_METRIC_FROM_NARRATION>\", \"label\": \"PRICE ANCHOR\" / \"VALUATION COLLAPSE\"} or null.\n"
                 "   - 'stamp_badge': Climax evidentiary stamp slam: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.\n"
                 "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'.\n\n"
                 "OUTPUT FORMAT: Return ONLY a valid JSON object matching: {\"scenes\": [ ... ]}. No markdown fences."

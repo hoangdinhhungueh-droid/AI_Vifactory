@@ -78,12 +78,13 @@ export const VoxKineticCounter: React.FC<VoxKineticCounterProps> = ({
   });
 
   const startVal = typeof payload?.start_value === "number" ? payload.start_value : 0;
-  const endVal = typeof payload?.end_value === "number" ? payload.end_value : 41.8;
+  const rawEnd = payload?.end_value;
+  const endVal = typeof rawEnd === "number" ? rawEnd : (typeof rawEnd === "string" ? parseFloat(rawEnd) || 0 : 0);
   const prefix = payload?.prefix ?? "$";
   const suffix = payload?.suffix ?? "";
   const unit = payload?.unit ?? "M";
   const trend = payload?.trend ?? "down";
-  const displayTitle = title || label || "DISRUPTION INDEX // ASYMMETRIC SPREAD";
+  const displayTitle = title || label || "EVIDENTIARY VALUE // METRIC";
   const displayBadge = badge || (trend === "down" ? "COLLAPSE" : "SURGE");
 
   // Numeric count-up interpolation

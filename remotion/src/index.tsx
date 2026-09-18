@@ -437,6 +437,7 @@ export const TwoLayerScene = (props) => {
   const background = props.background;
   const showBackground = props.showBackground === false ? false : true;
   const showForeground = props.showForeground === false ? false : true;
+  const showOverlay = props.showOverlay === false ? false : true;
   const foreground = props.foreground;
   const foregroundPosition = props.foregroundPosition;
   const caption = props.caption || "";
@@ -544,7 +545,7 @@ export const TwoLayerScene = (props) => {
       ) : null}
 
       {/* Top Safe-Zone Animated Stat / Financial Alert Card */}
-      {statValue ? (
+      {showOverlay && statValue ? (
         <div
           style={{
             position: "absolute",
@@ -597,10 +598,12 @@ export const TwoLayerScene = (props) => {
       ) : null}
 
       {/* Vox-Style Explanatory Motion Engine (Rule 122 & Rule 128) */}
-      <VoxOverlayLayer forensicOverlay={forensicOverlay} isLeft={isLeft} />
+      {showOverlay ? (
+        <VoxOverlayLayer forensicOverlay={forensicOverlay} isLeft={isLeft} />
+      ) : null}
 
       {/* Forensic Stamp Slam Badge (Rule 122 Acting & Evidence Props) */}
-      {stampBadge ? (
+      {showOverlay && stampBadge ? (
         <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} />
       ) : null}
 
@@ -858,9 +861,7 @@ const auditForegroundCoverage = (scenes, foregroundSegments) => {
   for (let bgId = 0; bgId <= maxBgId; bgId += 1) {
     const count = foregroundSegments.filter((seg) => seg.bgId === bgId).length;
     if (count === 0) {
-      console.warn(
-        "[Rule 52.3 audit] background segment " + bgId + " has NO foreground/core -- every background should show a core (Rule 74)."
-      );
+      // In Vox Documentary Style, full-frame evidence (documents, maps, charts) without foreground is valid
     } else if (count > 2) {
       console.warn(
         "[Rule 52.3 audit] background segment " + bgId + " has " + count + " distinct foregrounds -- rule caps this at 2 cores per background."
@@ -868,6 +869,149 @@ const auditForegroundCoverage = (scenes, foregroundSegments) => {
     }
   }
 };
+
+// Anti-Flicker Card & Overlay Segmentation (Rule 122 & Zero-Flicker Architecture)
+// Groups consecutive scenes that share identical forensic overlays, stat cards,
+// or explicit card_segment_key into a single persistent sequence.
+// Prevents React unmount/remount on scene cuts and eliminates spring slam flickering.
+const computeOverlayKey = (s: any) => {
+  const explicitKey = s.card_segment_key || s.cardSegmentKey;
+  if (explicitKey) return explicitKey;
+
+  const ov = s.forensicOverlay || s.forensic_overlay;
+  const statVal = s.statValue;
+  const statLbl = s.statLabel;
+  const badge = s.stampBadge || s.stamp_badge;
+  if (!ov && !statVal && !badge) return null;
+
+  const pos = s.foregroundPosition || "left";
+  return JSON.stringify({
+    ovType: ov?.type,
+    ovTitle: ov?.title,
+    ovPayload: ov?.payload,
+    statVal,
+    statLbl,
+    badge,
+    pos,
+  });
+};
+
+const buildOverlaySegments = (scenes: any[]) => {
+  const raw: any[] = [];
+  let cursor = 0;
+  scenes.forEach((s) => {
+    const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
+    const key = computeOverlayKey(s);
+    const last = raw[raw.length - 1];
+    if (key && last && last.key === key) {
+      last.end += dur;
+    } else if (key) {
+      raw.push({
+        key,
+        start: cursor,
+        end: cursor + dur,
+        forensicOverlay: s.forensicOverlay || s.forensic_overlay,
+        statValue: s.statValue,
+        statLabel: s.statLabel,
+        stampBadge: s.stampBadge || s.stamp_badge,
+        isLeft: s.foregroundPosition === "left",
+      });
+    }
+    cursor += dur;
+  });
+  return raw.map((seg) => ({
+    from: seg.start,
+    durationInFrames: seg.end - seg.start,
+    forensicOverlay: seg.forensicOverlay,
+    statValue: seg.statValue,
+    statLabel: seg.statLabel,
+    stampBadge: seg.stampBadge,
+    isLeft: seg.isLeft,
+  }));
+};
+
+const OverlaySegmentView = ({
+  forensicOverlay,
+  statValue,
+  statLabel,
+  stampBadge,
+  isLeft,
+}: {
+  forensicOverlay?: any;
+  statValue?: string;
+  statLabel?: string;
+  stampBadge?: string;
+  isLeft: boolean;
+}) => {
+  const frame = useCurrentFrame();
+  const statSpring = interpolate(frame, [0, 15], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <AbsoluteFill style={{ pointerEvents: "none" }}>
+      {statValue ? (
+        <div
+          style={{
+            position: "absolute",
+            top: 50,
+            left: isLeft ? "auto" : 70,
+            right: isLeft ? 70 : "auto",
+            zIndex: 30,
+            backgroundColor: "rgba(12, 18, 28, 0.92)",
+            border: "2px solid #f2a63b",
+            borderRadius: 16,
+            padding: "16px 28px",
+            boxShadow: "0 12px 35px rgba(0,0,0,0.75), 0 0 20px rgba(242, 166, 59, 0.25)",
+            transform: `scale(${statSpring})`,
+            opacity: statSpring,
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 24 }}>⚠️</span>
+            <div
+              style={{
+                color: "#ffd166",
+                fontSize: 38,
+                fontWeight: 900,
+                fontFamily: "'Segoe UI', Roboto, Arial, sans-serif",
+                letterSpacing: 1,
+                textShadow: "0 2px 8px rgba(0,0,0,0.9)",
+              }}
+            >
+              {statValue}
+            </div>
+          </div>
+          {statLabel ? (
+            <div
+              style={{
+                color: "#94a3b8",
+                fontSize: 16,
+                fontWeight: 700,
+                letterSpacing: 1.5,
+                textTransform: "uppercase",
+                fontFamily: "'Segoe UI', Roboto, Arial, sans-serif",
+              }}
+            >
+              {statLabel}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <VoxOverlayLayer forensicOverlay={forensicOverlay} isLeft={isLeft} />
+
+      {stampBadge ? (
+        <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} />
+      ) : null}
+    </AbsoluteFill>
+  );
+};
+
 
 
 const ACT_DEFAULT_TITLES = [
@@ -1155,6 +1299,7 @@ export const TwoLayerEpisode = (props) => {
     : BACKGROUND_TRANSITION_FRAMES;
   const backgroundSegments = buildBackgroundSegments(scenes, backgroundFadeFrames);
   const foregroundSegments = buildForegroundSegments(scenes, 15);
+  const overlaySegments = buildOverlaySegments(scenes);
   if (typeof console !== "undefined" && console.warn) {
     auditForegroundCoverage(scenes, foregroundSegments);
   }
@@ -1184,6 +1329,7 @@ export const TwoLayerEpisode = (props) => {
           background={s.background}
           showBackground={false}
           showForeground={false}
+          showOverlay={false}
           foreground={s.foreground}
           foregroundPosition={s.foregroundPosition}
           foregroundFadeFrames={s.foregroundFadeFrames}
@@ -1260,7 +1406,25 @@ export const TwoLayerEpisode = (props) => {
         ))}
       </div>
 
-      {/* Subtitles, Stat Cards, and Fixed UI Overlays */}
+      {/* Anti-Flicker Continuous Overlay Segments (Rule 122 & Zero-Flicker Architecture) */}
+      {overlaySegments.map((seg, i) => (
+        <Sequence
+          key={`overlayseg-${i}`}
+          from={seg.from}
+          durationInFrames={seg.durationInFrames}
+          name={`overlay-segment-${i + 1}`}
+        >
+          <OverlaySegmentView
+            forensicOverlay={seg.forensicOverlay}
+            statValue={seg.statValue}
+            statLabel={seg.statLabel}
+            stampBadge={seg.stampBadge}
+            isLeft={seg.isLeft}
+          />
+        </Sequence>
+      ))}
+
+      {/* Subtitles, Speaker Tags, and Fixed UI Overlays */}
       {items}
       <CinematicVignette />
       <CinematicOverlay />
