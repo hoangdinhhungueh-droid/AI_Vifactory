@@ -427,7 +427,7 @@ async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,
         f"<pre>{html.escape(paste_block)}</pre>\n"
         "⚡ <i>Quy chuẩn kỹ thuật ảnh 2K DCI, tách nền Chroma HSV, 4-Trục Visual Audit (Rule 122) và Auto-Trigger B6 được ủy quyền trọn vẹn cho Skill <b>vf-image-gen</b>.</i>"
     )
-    return await send_with_buttons(text, [[("✅ Đã sinh ảnh xong (B6 Render)", f"imgdone:{task_id}")]])
+    return await send_with_buttons(text, buttons=None)
 
 
 def trigger_human_gate_2(episode_id: str) -> Optional[int]:

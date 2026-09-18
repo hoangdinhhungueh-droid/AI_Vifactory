@@ -177,3 +177,39 @@ def test_trigger_human_gate_2_contract():
     res = trigger_human_gate_2("NON_EXISTENT_TASK_99999")
     assert res is None
 
+
+def test_send_gate2_card_no_redundant_buttons():
+    """Verify Human Gate 2 card has buttons=None and contains 1-click command without imgdone button (Rule 125)."""
+    import asyncio
+    from unittest.mock import patch, AsyncMock
+    from app.services.telegram_buttons import send_gate2_card
+
+    async def _run():
+        with patch("app.services.telegram_buttons.send_with_buttons", new_callable=AsyncMock) as mock_send:
+            mock_send.return_value = 9999
+            msg_id = await send_gate2_card(
+                task_id="TEST_EP0001_clean_hg2",
+                n_scenes=50,
+                n_bg=25,
+                n_fg=50,
+                story_score="B2: 12/12 · B3.5.1: 8.6/10",
+                topic="Test Topic Clean Gate",
+                director_archetype="Fincher Noir"
+            )
+            assert msg_id == 9999
+            mock_send.assert_called_once()
+            args, kwargs = mock_send.call_args
+            # Verify text content
+            sent_text = args[0]
+            assert "[HUMAN GATE 2]" in sent_text
+            assert "/vf-image-gen" in sent_text
+            assert "/run:image --episode TEST_EP0001_clean_hg2 --headless" in sent_text
+            assert "imgdone" not in sent_text
+
+            # Verify buttons argument is None (Rule 125 - Zero Ghost Code)
+            sent_buttons = kwargs.get("buttons") if "buttons" in kwargs else (args[1] if len(args) > 1 else None)
+            assert sent_buttons is None
+
+    asyncio.run(_run())
+
+
