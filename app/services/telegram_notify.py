@@ -176,13 +176,31 @@ async def notify_production(stage: str, episode_id: str, detail: str = "") -> bo
     return await send_message(msg)
 
 
-async def notify_budget_alert(provider: str, day_used: float, day_cap: float,
-                              month_used: float, month_cap: float) -> bool:
+async def notify_cost_summary(month_used_vnd: float, episode_id: str = "",
+                              breakdown: Optional[dict] = None) -> bool:
+    """Notify actual LLM & pipeline cost (passive telemetry, no budget cap / no alarm)."""
+    lines = [
+        "💰 <b>[VF COST TELEMETRY]</b>",
+        f"🎬 <b>Episode:</b> <code>{episode_id}</code>" if episode_id else "",
+        f"📈 <b>Tổng chi phí tháng:</b> {month_used_vnd:,.0f} VND (~${month_used_vnd / 25000.0:.2f})",
+    ]
+    if breakdown:
+        lines.append("📊 <b>Chi tiết models:</b>")
+        for m, cost in sorted(breakdown.items(), key=lambda x: x[1] if isinstance(x[1], (int, float)) else 0, reverse=True):
+            if isinstance(cost, (int, float)) and cost > 0:
+                lines.append(f"• <code>{m}</code>: {cost:,.0f} VND")
+    msg = "\n".join(filter(None, lines))
+    return await send_message(msg)
+
+
+async def notify_budget_alert(provider: str, day_used: float, day_cap: float = 0.0,
+                              month_used: float = 0.0, month_cap: float = 0.0) -> bool:
+    """Backwards-compatible cost reporting hook without budget cap alarms (Standardized 18/09/2026)."""
     msg = (
-        "\U0001F7E1 <b>BUDGET ALERT</b>\n"
+        "💰 <b>[VF COST REPORT]</b>\n"
         f"provider: <code>{provider}</code>\n"
-        f"day: ${day_used:.2f} / ${day_cap:.2f}\n"
-        f"month: ${month_used:.2f} / ${month_cap:.2f}"
+        f"day: ${day_used:.4f}\n"
+        f"month: ${month_used:.4f}"
     )
     return await send_message(msg)
 

@@ -33,22 +33,38 @@ class CostTracker:
     }
     """
     
-    # Pricing rates in VND (TODO: Update with actual HHTech/provider rates)
+    # Pricing rates in VND per 1,000,000 (1M) tokens via HHTech API
+    # Standardized 18/09/2026 per User Mandate:
+    # - astra 6 (gpt-6-astra) = opus 5 (claude-opus-5) = 2.000 VND / 1M tokens (2.0 VND / 1k tokens)
+    # - Các fallback khác (gpt-5-sol, claude-sonnet-5, claude-3.5-sonnet, kimi-k3, default) = 1.600 VND / 1M tokens (1.6 VND / 1k tokens)
+    RATES_PER_1M = {
+        "gpt-6-astra": 2000.0,
+        "claude-opus-5": 2000.0,
+        "gpt-5-sol": 1600.0,
+        "claude-sonnet-5": 1600.0,
+        "claude-3.5-sonnet": 1600.0,
+        "claude-3-opus": 2000.0,
+        "kimi-k3": 1600.0,
+        "default": 1600.0,
+    }
+
+    # Rates in VND per 1k tokens (used by _calculate_cost: rate * tokens / 1000)
     RATES = {
         # LLM models (VND per 1k tokens)
-        "gpt-6-astra": 100.0,          # ~$0.004/1k tokens * 25000 VND/USD (2x Sol rate)
-        "claude-3.5-sonnet": 150.0,    # ~$0.006/1k tokens * 25000 VND/USD
-        "claude-3-opus": 750.0,        # ~$0.030/1k tokens * 25000 VND/USD
-        "claude-opus-5": 50.0,         # HHTech flat rate
-        "claude-sonnet-5": 50.0,       # HHTech flat rate
-        "kimi-k3": 50.0,               # HHTech flat rate
+        "gpt-6-astra": 2.0,            # 2.000 VND / 1M tokens
+        "claude-opus-5": 2.0,          # 2.000 VND / 1M tokens
+        "gpt-5-sol": 1.6,              # 1.600 VND / 1M tokens
+        "claude-sonnet-5": 1.6,        # 1.600 VND / 1M tokens
+        "claude-3.5-sonnet": 1.6,      # 1.600 VND / 1M tokens
+        "claude-3-opus": 2.0,          # 2.000 VND / 1M tokens
+        "kimi-k3": 1.6,                # 1.600 VND / 1M tokens
         
         # Image models (VND per image)
         "imagen3": 5000.0,             # ~$0.20/image * 25000 VND/USD
         "dall-e-3": 10000.0,           # ~$0.40/image * 25000 VND/USD
         
         # Default fallback
-        "default": 50.0
+        "default": 1.6
     }
     
     def __init__(self, cap_vnd: Optional[int] = None, db_path: Optional[str] = None):
@@ -134,6 +150,18 @@ class CostTracker:
     def get_budget_usage_pct(self) -> float:
         """Get budget usage percentage for current month (unconstrained)."""
         return 0.0
+    
+    def get_cost_summary_text(self, month: Optional[str] = None) -> str:
+        """Format human-readable cost telemetry string for Telegram and logs (Rule 118: Zero-Mock)."""
+        if month is None:
+            month = datetime.now(timezone.utc).strftime("%Y-%m")
+        report = self.monthly_report(month)
+        total = sum(report.values())
+        lines = [f"Tháng {month}: {total:,.0f} VND (~${total / 25000.0:.2f})"]
+        for m, cost in sorted(report.items(), key=lambda x: x[1], reverse=True):
+            if cost > 0:
+                lines.append(f"• <code>{m}</code>: {cost:,.0f} VND")
+        return "\n".join(lines)
     
     def _load(self) -> Dict:
         """Load cost database from disk."""

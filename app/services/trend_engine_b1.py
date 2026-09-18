@@ -1197,16 +1197,8 @@ def discover_and_produce_market_trend(
             veto_reason = fact_audit.get("veto_reason") or fact_audit.get("audit_notes") or "Script failed fact/causal integrity audit"
             logger.error(f"[{temp_task_id}] B2.1 Audit REJECTED ({f_score}/10): {veto_reason}. Candidate rejected, rotating to next candidate...")
             print(f"  ❌ [B2.1 REJECTED] {veto_reason}. Rotating to next candidate in queue...")
-            try:
-                from app.services.telegram_buttons import send_telegram_broadcast
-                send_telegram_broadcast(
-                    f"⚠️ <b>[B2.1 FACT & CAUSAL AUDIT REJECT - RULE 130]</b>\n"
-                    f"Candidate <code>{term}</code> ({m_up}) chưa đạt chuẩn (Score: {f_score}/10):\n"
-                    f"<code>{veto_reason[:300]}</code>\n"
-                    f"🔄 <b>Hành động:</b> Chuyển sang candidate tiếp theo trong hàng đợi live."
-                )
-            except Exception:
-                pass
+            # User approved: no telegram notification for B2.1 candidate rotation.
+            # If all fail, B1 VIABILITY ALERT or BOTTLENECK ALERT will cover; if passes, HG1 will cover.
             record_handled_topic(term=term, task_id=temp_task_id, market=m_up)
             if os.path.exists(temp_task_file):
                 try:

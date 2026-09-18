@@ -675,37 +675,41 @@ async def run_pipeline(
         "tts_backend": episode.get("backend", tts_backend),
         "seo_platforms": len(episode.get("seo_payloads") or {}),
     }
-    # -- Telegram: episode done + cost + free draft link -------------------
-    try:
-        _u1 = _usage_summary() if _usage_summary else {}
-        _spend1 = float((_u1 or {}).get("today_usd") or 0)
-        _ep_cost = round(_spend1 - _spend0, 4)
-    except Exception:
-        _u1, _ep_cost = {}, None
-    # FIX 27/07/2026: credit_gate does not exist on this host, so the block
-    # above always yielded 0.0 and the READY card advertised "$0.00" after 73
-    # paid Antigravity Google Image generations. Fall back to the local usage ledger.
+    # -- Telegram: episode done + cost reporting (passive telemetry, no budget cap) ----
     _cost_breakdown = {}
+    _ep_cost = None
+    _monthly_vnd = 0.0
+    _model_report = {}
+    try:
+        from app.services.cost_tracker import get_global_tracker
+        _tracker = get_global_tracker()
+        _monthly_vnd = _tracker.get_monthly_total()
+        _model_report = _tracker.monthly_report()
+    except Exception as _tr_err:
+        logger.warning("[COST] CostTracker unavailable: %s", _tr_err)
+
     try:
         from app.services import cost_ledger as _cl
         _cost_breakdown = _cl.breakdown_between(t0)
-        _led_cost = _cl.cost_between(t0, episode_id=episode_id)
-        if _led_cost is not None and (not _ep_cost or _led_cost > _ep_cost):
-            _ep_cost = _led_cost
-        logger.info("[COST] episode=%s usd=%s breakdown=%s",
-                    episode_id, _ep_cost, _cost_breakdown)
+        _ep_cost = _cl.cost_between(t0, episode_id=episode_id)
     except Exception as _ec:
         logger.warning("[COST] ledger unavailable: %s", _ec)
+
+    logger.info("[COST] episode=%s usd=%s monthly_vnd=%s breakdown=%s",
+                episode_id, _ep_cost, _monthly_vnd, _cost_breakdown)
+
     _final = result.get("final_169") or result.get("final_916") or result.get("final_11")
     try:
         await tg.notify_episode_done(episode_id, _final, _ep_cost,
                                      breakdown=_cost_breakdown)
     except Exception as _swallowed:
         logger.warning("[swallowed] run_episode L%d: %s: %s", 527, type(_swallowed).__name__, _swallowed)
+
+    # Cost telemetry notification (Rule 118: Pure telemetry, no budget cap / no alarm)
     try:
-        if (_u1 or {}).get("monthly_pct", 0) >= 80:
-            await tg.notify_budget_alert("ALL", _u1.get("today_usd", 0), _u1.get("daily_cap_usd", 0), _u1.get("month_usd", 0), _u1.get("monthly_cap_usd", 0))
+        if _monthly_vnd > 0:
+            await tg.notify_cost_summary(_monthly_vnd, episode_id=episode_id, breakdown=_model_report)
     except Exception as _swallowed:
-        logger.warning("[swallowed] run_episode L%d: %s: %s", 532, type(_swallowed).__name__, _swallowed)
+        logger.warning("[swallowed] run_episode cost telemetry L%d: %s: %s", 532, type(_swallowed).__name__, _swallowed)
     logger.info("[PIPELINE] DONE in %.1fs %s", elapsed, result)
     return result

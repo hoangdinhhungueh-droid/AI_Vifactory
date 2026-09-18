@@ -22,7 +22,7 @@ UNIT_USD = {
     "whisper_minutes": 0.0,
     "remotion_render": 0.0,
     "serpapi_search": float(os.environ.get("VF_COST_SERPAPI", "0.005")),
-    "llm_tokens_1k": float(os.environ.get("VF_COST_LLM_1K", "0.0")),
+    "llm_tokens_1k": float(os.environ.get("VF_COST_LLM_1K", "0.00008")),  # 2.000 VND / 1M tokens at 25k VND/USD
 }
 
 
