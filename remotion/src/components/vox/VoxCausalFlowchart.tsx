@@ -126,7 +126,6 @@ export const VoxCausalFlowchart: React.FC<VoxCausalFlowchartProps> = ({
         borderRadius: 14,
         padding: "20px 28px",
         boxShadow: st.shadow,
-        backdropFilter: "blur(14px)",
         zIndex: 28,
         fontFamily: "'Courier New', Courier, monospace",
         opacity,
@@ -267,4 +266,4 @@ export const VoxCausalFlowchart: React.FC<VoxCausalFlowchartProps> = ({
       </div>
     </div>
   );
-};
+};

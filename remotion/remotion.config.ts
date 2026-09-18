@@ -16,3 +16,6 @@ Config.setOffthreadVideoCacheSizeInBytes(512 * 1024 * 1024);
 Config.setChromiumOpenGlRenderer("swangle");
 Config.setChromiumDisableWebSecurity(true);
 Config.setConcurrency(1);
+Config.setX264Preset("veryfast");
+Config.setCrf(18);
+Config.setPixelFormat("yuv420p");

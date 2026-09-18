@@ -617,12 +617,11 @@ export const TwoLayerScene = (props) => {
             right: isRight ? 520 : 60,
             minHeight: 145,
             zIndex: 25,
-            background: "linear-gradient(180deg, rgba(15, 23, 42, 0.82) 0%, rgba(5, 9, 14, 0.88) 100%)",
+            background: "linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(5, 9, 14, 0.96) 100%)",
             border: "2px solid rgba(242, 166, 59, 0.40)",
             borderRadius: 18,
             padding: "16px 28px",
             boxShadow: "0 15px 40px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.15)",
-            backdropFilter: "blur(12px)",
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
@@ -849,13 +848,12 @@ const buildForegroundSegments = (scenes, defaultFadeFrames) => {
 // end up with zero or more-than-two foreground segments so the gap/overload
 // is visible during render instead of silently under- or over-populating
 // core frames.
-const _auditedForegroundCoverageKeys = new Set();
+const _auditedForegroundCoverageKeys = new WeakSet();
 const auditForegroundCoverage = (scenes, foregroundSegments) => {
   // Render runs this component body once per output frame -- dedupe by
-  // scene shape so this only actually logs once per distinct episode.
-  const dedupeKey = JSON.stringify(scenes.map((s) => [s.background, s.foreground, s.durationInFrames]));
-  if (_auditedForegroundCoverageKeys.has(dedupeKey)) return;
-  _auditedForegroundCoverageKeys.add(dedupeKey);
+  // scenes object reference so this only actually runs once per distinct episode props.
+  if (_auditedForegroundCoverageKeys.has(scenes)) return;
+  _auditedForegroundCoverageKeys.add(scenes);
   const bgIds = computeBackgroundSegmentIds(scenes);
   const maxBgId = bgIds.length ? bgIds[bgIds.length - 1] : -1;
   for (let bgId = 0; bgId <= maxBgId; bgId += 1) {
@@ -1116,10 +1114,9 @@ const TopProgressBar = ({ scenes, currentFrame, totalFrames }) => {
           alignItems: "center",
           gap: 10,
           padding: "7px 18px",
-          backgroundColor: "rgba(10, 15, 24, 0.88)",
+          backgroundColor: "rgba(10, 15, 24, 0.96)",
           border: "1.5px solid rgba(242, 166, 59, 0.45)",
           borderRadius: 8,
-          backdropFilter: "blur(10px)",
           boxShadow: "0 6px 20px rgba(0,0,0,0.6)",
         }}
       >
@@ -1157,7 +1154,7 @@ const CinematicVignette = () => (
       left: 0,
       width: "100%",
       height: "100%",
-      boxShadow: "inset 0 0 130px rgba(0, 0, 0, 0.70)",
+      background: "radial-gradient(ellipse at center, transparent 65%, rgba(0, 0, 0, 0.65) 100%)",
       zIndex: 10,
       pointerEvents: "none",
     }}
@@ -1166,22 +1163,12 @@ const CinematicVignette = () => (
 
 const CinematicOverlay = () => (
   <AbsoluteFill style={{ zIndex: 20, pointerEvents: "none" }}>
-    {/* Subtle film grain via SVG fractal noise */}
-    <svg style={{ position: "absolute", width: "100%", height: "100%", opacity: 0.045, mixBlendMode: "overlay" }}>
-      <filter id="cinematicGrain">
-        <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves={3} stitchTiles="stitch" />
-        <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0" />
-      </filter>
-      <rect width="100%" height="100%" filter="url(#cinematicGrain)" />
-    </svg>
-    {/* Cinematic soft-light tone grading */}
+    {/* Cinematic high-contrast editorial tone wash without CPU blend-mode */}
     <div
       style={{
         position: "absolute",
-        width: "100%",
-        height: "100%",
-        background: "linear-gradient(135deg, rgba(20, 28, 45, 0.08) 0%, rgba(45, 25, 15, 0.06) 100%)",
-        mixBlendMode: "soft-light",
+        inset: 0,
+        background: "linear-gradient(135deg, rgba(20, 28, 45, 0.05) 0%, rgba(45, 25, 15, 0.04) 100%)",
       }}
     />
   </AbsoluteFill>
@@ -1297,9 +1284,18 @@ export const TwoLayerEpisode = (props) => {
   const backgroundFadeFrames = props.backgroundFadeFrames
     ? props.backgroundFadeFrames
     : BACKGROUND_TRANSITION_FRAMES;
-  const backgroundSegments = buildBackgroundSegments(scenes, backgroundFadeFrames);
-  const foregroundSegments = buildForegroundSegments(scenes, 15);
-  const overlaySegments = buildOverlaySegments(scenes);
+  const backgroundSegments = React.useMemo(
+    () => buildBackgroundSegments(scenes, backgroundFadeFrames),
+    [scenes, backgroundFadeFrames]
+  );
+  const foregroundSegments = React.useMemo(
+    () => buildForegroundSegments(scenes, 15),
+    [scenes]
+  );
+  const overlaySegments = React.useMemo(
+    () => buildOverlaySegments(scenes),
+    [scenes]
+  );
   if (typeof console !== "undefined" && console.warn) {
     auditForegroundCoverage(scenes, foregroundSegments);
   }
@@ -1318,37 +1314,39 @@ export const TwoLayerEpisode = (props) => {
       )
     : "scale(1.0)";
 
-  let cursor = 0;
-  const items = scenes.map((s, i) => {
-    const from = cursor;
-    const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
-    cursor += dur;
-    return (
-      <Sequence key={i} from={from} durationInFrames={dur} name={`scene-${i + 1}`}>
-        <TwoLayerScene
-          background={s.background}
-          showBackground={false}
-          showForeground={false}
-          showOverlay={false}
-          foreground={s.foreground}
-          foregroundPosition={s.foregroundPosition}
-          foregroundFadeFrames={s.foregroundFadeFrames}
-          caption={s.caption}
-          narration={s.narration}
-          safeZone={s.safeZone}
-          statValue={s.statValue}
-          statLabel={s.statLabel}
-          speakerTag={s.speakerTag}
-          subtitles={s.subtitles || s.words}
-          cameraMovement={s.cameraMovement || (s.camera ? s.camera.movement : undefined)}
-          tensionLevel={s.tensionLevel || (s.camera ? s.camera.tension_level : undefined)}
-          bgClusterId={s.bgClusterId || s.bg_cluster_id}
-          forensicOverlay={s.forensicOverlay || s.forensic_overlay}
-          stampBadge={s.stampBadge || s.stamp_badge}
-        />
-      </Sequence>
-    );
-  });
+  const items = React.useMemo(() => {
+    let cursor = 0;
+    return scenes.map((s, i) => {
+      const from = cursor;
+      const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
+      cursor += dur;
+      return (
+        <Sequence key={i} from={from} durationInFrames={dur} name={`scene-${i + 1}`}>
+          <TwoLayerScene
+            background={s.background}
+            showBackground={false}
+            showForeground={false}
+            showOverlay={false}
+            foreground={s.foreground}
+            foregroundPosition={s.foregroundPosition}
+            foregroundFadeFrames={s.foregroundFadeFrames}
+            caption={s.caption}
+            narration={s.narration}
+            safeZone={s.safeZone}
+            statValue={s.statValue}
+            statLabel={s.statLabel}
+            speakerTag={s.speakerTag}
+            subtitles={s.subtitles || s.words}
+            cameraMovement={s.cameraMovement || (s.camera ? s.camera.movement : undefined)}
+            tensionLevel={s.tensionLevel || (s.camera ? s.camera.tension_level : undefined)}
+            bgClusterId={s.bgClusterId || s.bg_cluster_id}
+            forensicOverlay={s.forensicOverlay || s.forensic_overlay}
+            stampBadge={s.stampBadge || s.stamp_badge}
+          />
+        </Sequence>
+      );
+    });
+  }, [scenes]);
 
   const audioMaster = props.audioMaster ? props.audioMaster : null;
   const bgmFile = props.bgmFile ? props.bgmFile : null;

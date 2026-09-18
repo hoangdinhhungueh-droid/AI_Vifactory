@@ -92,7 +92,6 @@ export const VoxTacticalMap: React.FC<VoxTacticalMapProps> = ({
         borderRadius: 14,
         padding: "20px 24px",
         boxShadow: st.shadow,
-        backdropFilter: "blur(14px)",
         zIndex: 28,
         fontFamily: "'Courier New', Courier, monospace",
         opacity,
@@ -231,4 +230,4 @@ export const VoxTacticalMap: React.FC<VoxTacticalMapProps> = ({
       </div>
     </div>
   );
-};
+};

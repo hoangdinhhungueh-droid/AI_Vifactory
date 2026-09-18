@@ -120,7 +120,6 @@ export const VoxKineticCounter: React.FC<VoxKineticCounterProps> = ({
         borderRadius: 14,
         padding: "20px 24px",
         boxShadow: st.shadow,
-        backdropFilter: "blur(14px)",
         zIndex: 28,
         fontFamily: "'Courier New', Courier, monospace",
         opacity,
@@ -223,4 +222,4 @@ export const VoxKineticCounter: React.FC<VoxKineticCounterProps> = ({
       </div>
     </div>
   );
-};
+};

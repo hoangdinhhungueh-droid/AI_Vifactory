@@ -425,13 +425,11 @@ async def run_pipeline(
             )
             _dynamic_rem_timeout = int(_hierarchy["remotion_timeout"])
             _subproc_timeout = int(_hierarchy["run_episode_timeout"])
-            if not os.path.exists(_silent_path) or os.path.getsize(_silent_path) < 1000000:
-                logger.info("[S4.5] launching render_twolayer_visual with dynamic timeout=%ds (frames=%d, subproc_timeout=%ds)",
-                            _dynamic_rem_timeout, _calc_frames, _subproc_timeout)
-                _sp.run([sys.executable, "/root/video_factory/scripts/render_twolayer_visual.py",
-                     "--props", _props_path, "--out", _silent_path,
-                     "--timeout", str(_dynamic_rem_timeout)],
-                    check=True, timeout=_subproc_timeout)
+            logger.info("[S4.5] launching render_twolayer_chunks with dynamic timeout=%ds (frames=%d, subproc_timeout=%ds)",
+                        _dynamic_rem_timeout, _calc_frames, _subproc_timeout)
+            _sp.run([sys.executable, "/root/video_factory/scripts/render_twolayer_chunks.py",
+                 "--props", _props_path, "--out", _silent_path],
+                check=True, timeout=_subproc_timeout)
             if os.path.exists(_silent_path) and os.path.getsize(_silent_path) > 0:
                 twolayer_clip_path = _silent_path
                 logger.info("[S4.5] two-layer silent visual ready: %s", _silent_path)

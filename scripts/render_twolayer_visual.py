@@ -110,6 +110,9 @@ def main():
     ap.add_argument("--props", required=True, help="Path to remotion_props.json")
     ap.add_argument("--out", required=True, help="Output .mp4 path")
     ap.add_argument("--timeout", type=float, default=float(os.environ.get("VF_REMOTION_TIMEOUT", "10800")))
+    ap.add_argument("--frames", default=None, help="Frame range to render (e.g. 0-4341)")
+    ap.add_argument("--x264-preset", default="veryfast", help="x264 preset (default: veryfast)")
+    ap.add_argument("--crf", type=int, default=18, help="x264 CRF (default: 18)")
     args = ap.parse_args()
 
     if not os.path.exists(os.path.join(PROJ_DIR, ENTRY)):
@@ -140,7 +143,12 @@ def main():
         "--props=" + os.path.abspath(args.props),
         "--log=error",
         "--concurrency=" + concurrency,
+        "--x264-preset=" + args.x264_preset,
+        "--crf=" + str(args.crf),
+        "--bundle-cache",
     ]
+    if args.frames:
+        cmd.append(f"--frames={args.frames}")
     
     # Bound Node.js heap memory to 2GB to prevent runaway memory leaks
     env = os.environ.copy()

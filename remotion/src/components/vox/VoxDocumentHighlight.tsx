@@ -121,7 +121,6 @@ export const VoxDocumentHighlight: React.FC<VoxDocumentHighlightProps> = ({
         borderRadius: 14,
         padding: "20px 24px",
         boxShadow: st.shadow,
-        backdropFilter: "blur(14px)",
         zIndex: 28,
         fontFamily: "'Courier New', Courier, monospace",
         opacity,
@@ -249,4 +248,3 @@ export const VoxDocumentHighlight: React.FC<VoxDocumentHighlightProps> = ({
     </div>
   );
 };
-
