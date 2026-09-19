@@ -3,7 +3,7 @@ from pathlib import Path
 import edge_tts
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--episode", default="en-byzantine-empire-ep001", help="Episode ID")
+parser.add_argument("--episode", required=True, help="Episode ID (e.g. EN_EP0001_sample_topic)")
 args = parser.parse_args()
 ep_id = args.episode
 ep_dir = Path(f"/var/vf/episodes/{ep_id}")

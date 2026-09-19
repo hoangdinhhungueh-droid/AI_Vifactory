@@ -17,9 +17,9 @@ description: >-
 | Vai Trò Hội Đồng | Tôn Chỉ & Ranh Giới | Nhiệm Vụ Kỹ Thuật Trọng Tâm | Cặp Tài Liệu Neo Giữ |
 | :--- | :--- | :--- | :--- |
 | **1. Architect / Planner** | *Defines What/Why; Sets Rigid Boundaries* | Thiết kế khế ước In/Out (`PIPELINE_CONTRACTS.md`); xác lập In-Scope & Non-Goals; phân tích đánh đổi kiến trúc (Rule 129 Trade-offs). | **Doc 1A**: `TASK_SPEC.md` |
-| **2. Builder / Implementer** | *Implements to Spec; Zero Ghost Code* | Viết/sửa code bám sát spec; Atomic Commit (Rule 124); dọn sạch `/tmp/` (Rule 119); cấm `.bak*`/shadow code (Rule 125); AST `py_compile` exit 0. | **Doc 1B**: `CHANGE_MANIFEST.md` |
-| **3. QA & Test Harness** | *Trust Nothing; Verify Dynamically* | Soạn test matrix; chạy kiểm thử động trên sandbox/live data (Rule 123); ISO Neighbor-Testing, Master Smoke Gate, Runtime Live Function Gate (Rule 127); trích xuất log Exit Code 0. | **Doc 2A**: `TEST_HARNESS_PLAN.md`<br>⇄ **Doc 2B**: `TEST_VERIFICATION_REPORT.md` |
-| **4. Adversarial Auditor** | *Red Team Mindset; Strictly Review-Only* | **CẤM SỬA CODE**. Rà soát AST & Alibaba OCR; kiểm toán 18 Kỷ luật (Rule 118 Zero-Mock, Rule 128 Anti-Bias, Rule 134 Parity, Rule 136 Zero-Asset-Leak); **Quyền Phủ Quyết Tuyệt Đối (Absolute VETO)**. | **Doc 3A**: `ADVERSARIAL_AUDIT_CHECKLIST.md`<br>⇄ **Doc 3B**: `FORENSIC_VERDICT.md` |
+| **2. Builder / Implementer** | *Implements to Spec; Zero Ghost Code* | Viết/sửa code bám sát spec; Atomic Commit (Rule 124); dọn sạch `/tmp/` (Rule 119); cấm `.bak*`/shadow code (Rule 125); quét sạch 4 tầng qua `ghost_code_detector.py`; AST `py_compile` exit 0. | **Doc 1B**: `CHANGE_MANIFEST.md` |
+| **3. QA & Test Harness** | *Trust Nothing; Verify Dynamically* | Soạn test matrix; chạy kiểm thử động trên sandbox/live data (Rule 123); ISO Neighbor-Testing [N-1, N, N+1], Master Smoke Gate, Runtime Live Function Gate (Rule 127); kiểm tra Audio Spine Hard Gate B2.6/B3; trích xuất log Exit Code 0. | **Doc 2A**: `TEST_HARNESS_PLAN.md`<br>⇄ **Doc 2B**: `TEST_VERIFICATION_REPORT.md` |
+| **4. Adversarial Auditor** | *Red Team Mindset; Strictly Review-Only* | **CẤM SỬA CODE**. Rà soát AST & Alibaba OCR; kiểm toán 18 Kỷ luật (Rule 118 Zero-Mock, Rule 120 Audio Spine, Rule 125 Zero-Ghost, Rule 128 Anti-Bias, Rule 134 Parity, Rule 136 Zero-Asset-Leak); **Quyền Phủ Quyết Tuyệt Đối (Absolute VETO)**. | **Doc 3A**: `ADVERSARIAL_AUDIT_CHECKLIST.md`<br>⇄ **Doc 3B**: `FORENSIC_VERDICT.md` |
 
 > [!IMPORTANT]
 > **Three-Way Physical Sync Gate (Rule 126)**: Hậu kiểm kỹ thuật CHỈ mở khi Hội đồng đạt **Quorum 4/4 Unanimous Pass (0 VETO)** để commit Git từ VPS, push GitHub, CI Watcher green, và đối soát SHA256 bit-for-bit.
@@ -87,12 +87,13 @@ Nạp chi tiết từng tài liệu Just-in-Time khi thực thi tác vụ cụ t
 ## ⚖️ VI. KỶ LUẬT THÉP BẤT BIẾN (RULE 118 – RULE 136)
 1. **Rule 118**: Zero-Mock Data; dừng lại hỏi User khi lệch luồng.
 2. **Rule 119**: Chỉ dùng codebase chuẩn VPS; dọn sạch `/tmp/`.
-3. **Rule 121**: Nghiệm thu bằng Exit Code 0, HTTP 200, file:line rõ ràng.
-4. **Rule 124**: Atomic commit; chốt giải pháp là code ngay.
-5. **Rule 125**: Single Truth; zero ghost code; cấm file `.bak*`.
-6. **Rule 126**: Three-Way Physical Sync (VPS ⇄ GitHub CI ⇄ Local bit-for-bit).
-7. **Rule 127**: Bắt buộc kiểm thử runtime hàm sống, cấm chỉ dựa vào `py_compile`.
-8. **Rule 128**: Generic contract pattern; cấm hardcode đề tài/tropes vào schema & prompt.
-9. **Rule 129**: Phân tích đánh đổi 3 trục trước khi can thiệp kiến trúc.
-10. **Rule 134**: Exact Parity sweep toàn diện codebase khi đổi hằng số/schema.
-11. **Rule 136**: Zero-Asset-Leak; cấm rò rỉ mã hash, key, đuôi `.png` lên video render.
+3. **Rule 120**: Audio-Anchored Pipeline (Hollywood Audio Spine B2.6/B3; timecode-locked Edge-TTS; Hard Gate cấm 5.0s heuristic).
+4. **Rule 121**: Nghiệm thu bằng Exit Code 0, HTTP 200, file:line rõ ràng.
+5. **Rule 124**: Atomic commit; chốt giải pháp là code ngay.
+6. **Rule 125**: Single Truth; zero ghost code; cấm file `.bak*`; 4-Layer Ghost Hunter (`ghost_code_detector.py`) với quyền VETO tuyệt đối.
+7. **Rule 126**: Three-Way Physical Sync (VPS ⇄ GitHub CI ⇄ Local bit-for-bit).
+8. **Rule 127**: Bắt buộc kiểm thử runtime hàm sống, cấm chỉ dựa vào `py_compile`.
+9. **Rule 128**: Generic contract pattern; cấm hardcode đề tài/tropes vào schema & prompt.
+10. **Rule 129**: Phân tích đánh đổi 3 trục trước khi can thiệp kiến trúc.
+11. **Rule 134**: Exact Parity sweep toàn diện codebase khi đổi hằng số/schema.
+12. **Rule 136**: Zero-Asset-Leak; cấm rò rỉ mã hash, key, đuôi `.png` lên video render.

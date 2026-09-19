@@ -115,6 +115,7 @@ async def run_s7(episode: dict) -> dict:
         subtitle_segments=None,  # v8: subs burned per-aspect below, not here
         lang_code=lang_code,
         episode_id=episode_id,
+        is_two_layer=is_two_layer,
     )
     renders[master_key] = master_path
     logger.info("[S7] %s master %s rendered (no subs yet) -> %s", episode_id, master_aspect, master_path)
@@ -137,7 +138,8 @@ async def run_s7(episode: dict) -> dict:
                 clips=render_clips, audio_path=norm_path, output_path=out_path,
                 aspect=aspect, bgm_path=bgm_path,
                 subtitle_segments=None,  # v8: subs burned per-aspect below
-                lang_code=lang_code, episode_id=episode_id)
+                lang_code=lang_code, episode_id=episode_id,
+                is_two_layer=is_two_layer)
         renders[key] = out_path
         logger.info("[S7] %s %s derived (no subs yet) -> %s", episode_id, aspect, out_path)
 

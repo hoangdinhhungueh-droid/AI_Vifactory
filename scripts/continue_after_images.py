@@ -26,8 +26,8 @@ scripts/render_remotion_two_layer_master.py / scripts/execute_b10_master.py
 (both hardcoded to one specific past episode). Those are dead/legacy.
 
 Usage:
-  python3 scripts/continue_after_images.py --episode-id en_test_hg1_v2 \
-      [--market en] [--privacy unlisted] [--skip-upload]
+  python3 scripts/continue_after_images.py --episode-id <EPISODE_ID> \
+      [--market <market>] [--privacy unlisted] [--skip-upload]
 
 Writes /var/vf/episodes/<id>/b4b10_state.json after every stage transition so
 the poller (and a human) can see exactly where the leg is.
@@ -221,6 +221,19 @@ def main():
 
     master = ep_dir / "final_169.mp4"
     if not master.exists() or master.stat().st_size == 0:
+        # Self-Healing Mux Bridge: If twolayer_silent.mp4 exists, mux it immediately
+        silent_video = ep_dir / "twolayer_silent.mp4"
+        if silent_video.exists() and silent_video.stat().st_size > 10000000:
+            _log("Self-Healing Mux Bridge: twolayer_silent.mp4 found (%.1f MB). Running mux_master_episode.py..."
+                 % (silent_video.stat().st_size / 1048576.0))
+            mux_ok = _run_stage("S7 Muxing (mux_master_episode)",
+                                [sys.executable, "scripts/mux_master_episode.py",
+                                 "--episode-id", episode_id],
+                                episode_id, 300)
+            if mux_ok and master.exists() and master.stat().st_size > 0:
+                _log("Self-Healing Mux Bridge succeeded -> master video ready: %s" % master)
+
+    if not master.exists() or master.stat().st_size == 0:
         msg = "render reported success but %s is missing/empty" % master
         _log("FAILED " + msg)
         _write_state(episode_id, stage="render-verify", status="failed", error=msg)
@@ -237,7 +250,8 @@ def main():
                       [sys.executable, "scripts/execute_b10_auto_seo_upload_gate2.py",
                        "--episode", episode_id,
                        "--market", args.market,
-                       "--privacy", args.privacy],
+                       "--privacy", args.privacy,
+                       "--force-reupload"],
                       episode_id, args.upload_timeout):
         return 4
 

@@ -161,7 +161,7 @@ def query_approved_keys(token, db_id, episode_id):
 def expected_keys(episode_dir):
     """-> set of every Reuse Key the episode needs, from prompts_forge.json.
 
-    Confirmed live shape (en_test_hg1_v2, 29/08/2026): top-level "backgrounds"
+    Confirmed live shape: top-level "backgrounds"
     and "foregrounds", each a dict of {reuse_key: prompt_text} -- not a list.
     """
     forge_path = episode_dir / "prompts_forge.json"

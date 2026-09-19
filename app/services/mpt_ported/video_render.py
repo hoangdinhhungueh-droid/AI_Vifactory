@@ -390,7 +390,11 @@ async def _concat_clips(clips: list, output_path: str, aspect: str,
             if use_ckpt and os.path.exists(sp) and await _validate_clip(sp):
                 pass  # already scaled in a previous attempt - reuse, skip re-encode
             else:
-                await _scale_clip(clip, sp, w, h)
+                sw, sh = await _probe_wh(clip)
+                if sw == w and sh == h:
+                    shutil.copy(clip, sp)
+                else:
+                    await _scale_clip(clip, sp, w, h)
             scaled.append(sp)
 
         if len(scaled) == 1:
@@ -484,6 +488,7 @@ async def render_video(
     subtitle_segments: Optional[list] = None,
     lang_code: str = "en",
     episode_id=None,
+    is_two_layer: bool = False,
 ) -> str:
     """Full render: concat clips -> grade -> mux TTS (stream_loop fills audio) -> BGM.
 
@@ -505,7 +510,7 @@ async def render_video(
 
         # -- Editorial documentary grade (VF_GRADE=1 by default) ---------------
         graded_ckpt_path = f"{ckpt_dir}/graded_done.mp4" if use_ckpt else None
-        if _grade_enabled():
+        if not is_two_layer and _grade_enabled():
             if (use_ckpt and os.path.exists(graded_ckpt_path)
                     and await _validate_clip(graded_ckpt_path)):
                 video_only = graded_ckpt_path  # reuse cached grade, skip re-grading
@@ -796,7 +801,11 @@ async def _concat_clips_batched(clips, output_path, aspect, episode_id=None):
             if use_ckpt and os.path.exists(sp) and await _validate_clip(sp):
                 pass
             else:
-                await _scale_clip(clip, sp, w, h)
+                sw, sh = await _probe_wh(clip)
+                if sw == w and sh == h:
+                    shutil.copy(clip, sp)
+                else:
+                    await _scale_clip(clip, sp, w, h)
             scaled.append(sp)
 
         if len(scaled) == 1:
@@ -930,4 +939,3 @@ async def burn_subtitles_for_aspect(src_path, output_path, subtitle_segments, as
         return output_path
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-

@@ -40,9 +40,10 @@
 7. **RULE 125 (Single Pipeline Version & Zero-Ghost Remnant Mandate)**:
    - Khi thực hiện cập nhật luồng mới:
      1. **Verification & ISO Testing**: BẮT BUỘC chạy test luồng mới (kiểm thử hợp đồng, neighbor-testing) đạt PASS trước khi kết luận hoàn thành.
-     2. **Atomic Rewiring & Ghost Purge**: BẮT BUỘC đổi trỏ toàn bộ caller sang luồng mới; dọn dẹp sạch sẽ toàn bộ tàn dư, logic cũ, shadow code. Cấm để lại file `.bak*`, `.backup*`.
+     2. **Atomic Rewiring & Ghost Purge**: BẮT BUỘC đổi trỏ toàn bộ caller sang luồng mới; dọn dẹp sạch sẽ toàn bộ tàn dư, logic cũ, shadow code. Cấm để lại file `.bak*`, `.backup*`, file dead scripts.
      3. **Single Truth**: CẤM tồn tại song song 2 version trong cùng một pipeline gây sai cấu trúc, trùng lặp hoặc bypass ngầm.
      4. **Zero-Ambiguity & Explicit Code Mandate**: CẤM để tồn tại docstring, comment, inline note cũ mâu thuẫn với code thực tế. Đồng bộ hóa 100% tài liệu nội hàm ngay trong cùng commit.
+     5. **Automated 4-Layer Ghost Hunter Gate (VETO Authority)**: BẮT BUỘC chạy `scripts/orchestrator/ghost_code_detector.py` quét toàn bộ đĩa cứng vật lý (cả VPS và Local, bỏ qua blindness của .gitignore). Bất kỳ phát hiện nào về `.bak*`, orphan scripts, dead imports, hoặc bypass shadow code sẽ lập tức kích hoạt quyền VETO, trả exit code 1 và dừng toàn bộ CI/CD, runner, smoketest.
 
 8. **RULE 126 (Three-Way Physical Sync & Zero-False-Success Mandate)**:
    - **Bảo chứng đồng bộ vật lý (VPS ⇄ GitHub ⇄ Local/Notion bit-for-bit)**:
@@ -115,9 +116,10 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 | :--- | :--- | :--- | :--- |
 | **SoT & Registry** | Tra cứu Database ID, Page ID, Schema DB | Skill `notion-sot-second-brain` | Progressive Querying 3 Tầng |
 | **B1, B1.5, B2** | Trend RSS live, YouTube Recon, Kịch bản 5 Beat | `notion_sot_second_brain.md` & `tests/ci_neighbor_tester.py` | Rule 444 (An Ong Hook), 445 (5 Beat Docudrama), 446 (Native-First), 447 (Neighbor-Testing) |
-| **B3, B3.5** | Dynamic Director Plan & Prompt Forge | `PIPELINE_CONTRACTS.md` | Layer 1 BG (16:9) + Layer 2 FG (1:1) Prompt English |
+| **B2.6 / B3_AUDIO** | Hollywood Audio Spine, Beat-Level Edge-TTS, Word Karaoke, Subtitles SRT (`app/services/beat_tts_engine.py`) | `notion_sot_second_brain.md` (Media Production Hub) & `PIPELINE_CONTRACTS.md` | Rule 120 (Karaoke millisecond sync, `durationInFrames` chuẩn timestamp, Hard Gate) |
+| **B3, B3.5** | Dynamic Director Plan (Timecode-Locked) & Prompt Forge | `PIPELINE_CONTRACTS.md` | Layer 1 BG (16:9) + Layer 2 FG (1:1) Prompt English, Rule 120 Hard Gate |
 | **B4, B5** (`/run:image`) | Sinh ảnh Gemini Web & Tách nền Chroma HSV | Skill `vf-image-gen` | Rule 116, 122 (Visual Audit 4 trục), Rule 435–439 |
-| **B6, B7, B8** | TTS, Whisper Subtitles, Remotion Render CPU | `notion_sot_second_brain.md` (Media Production Hub) | Rule 120 (Karaoke millisecond sync, `durationInFrames` chuẩn timestamp) |
+| **B6, B7, B8** | Remotion Master Video Render CPU, BGM Cinematic Ducking, Video QA Audit | `notion_sot_second_brain.md` (Media Production Hub) | Rule 120, Rule 135 (Remotion chapters), Rule 136 (Clean speaker tags) |
 | **B10** | SEO Metadata, Synthetic Media, Gate 2 | `PIPELINE_CONTRACTS.md` | `status.containsSyntheticMedia: true`, Hero Thumbnail, Rule 135 Chapters |
 | **B11** (`/run:b11`) | Analytics 48h, Feedback Dreaming Loop | Skill `vf-b11-analytics` | Rule 113 (48h Law), Rule 440–442 |
 | **Teamwork Pipeline** (`/vf-pipeline-teamwork`) | Hội Đồng Multi-Agent Harness 4 vai (Architect, Builder, QA Test Harness, Adversarial Auditor - strictly review) & 3 Cặp Docs | Skill `vf-pipeline-teamwork` & `scripts/orchestrator/` | Rule 118, 119, 121, 124, 125, 126, 127, 128, 129, 134 |

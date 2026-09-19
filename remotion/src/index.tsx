@@ -18,6 +18,7 @@ import {
 import { DataStoryTest } from "./DataStoryTest";
 import { FullStory } from "./FullStory";
 import { VoxOverlayLayer } from "./components/vox/VoxOverlayLayer";
+import { EvidenceProp3D } from "./components/EvidenceProp3D";
 
 const INK = "#05090d";
 const LIGHT = "#ffffff";
@@ -1503,6 +1504,19 @@ const RemotionRoot = () => {
             width,
             height,
           };
+        }}
+      />
+      {/* 3D Procedural Evidence Prop PoC (img2threejs technique) */}
+      <Composition
+        id="EvidenceProp3DTest"
+        component={EvidenceProp3D}
+        durationInFrames={90}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{
+          title: "CONFIDENTIAL EVIDENCE // EXHIBIT A",
+          subtitle: "IMPERIAL SEAL / AUTHENTICATION STAMP",
         }}
       />
     </>

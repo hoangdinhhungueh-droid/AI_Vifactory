@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Parameterized render script for B8 (Remotion 2-Layer) + B9 (Quality Probe).
 
-Replaces render_byzantine_master.py with CLI args:
-  --episode_id EN-EPISODE-SLUG (required, e.g. en-byzantine-empire-ep001)
+Replaces legacy hardcoded render scripts with CLI args:
+  --episode_id EPISODE_ID (required, e.g. EN_EP0001_sample_topic)
   --market {en,jp,kr} (optional, default en; chooses BGM + localized paths)
 
 Reads audio_duration from brain_input.json["audio_duration"] or
@@ -212,12 +212,12 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python3 render_episode_parameterized.py --episode_id en-byzantine-empire-ep001
-  python3 render_episode_parameterized.py --episode_id jp-samurai-ep042 --market jp
-  python3 render_episode_parameterized.py --episode_id kr-korean-war-ep015 --market kr
+  python3 render_episode_parameterized.py --episode_id EN_EP0001_sample_topic
+  python3 render_episode_parameterized.py --episode_id JP_EP0001_sample_topic --market jp
+  python3 render_episode_parameterized.py --episode_id KR_EP0001_sample_topic --market kr
         """
     )
-    parser.add_argument("--episode_id", required=True, help="Episode ID (e.g. en-byzantine-empire-ep001)")
+    parser.add_argument("--episode_id", required=True, help="Episode ID (e.g. EN_EP0001_sample_topic)")
     parser.add_argument("--market", default="en", choices=["en", "jp", "kr"], help="Market code (default: en)")
     
     args = parser.parse_args()

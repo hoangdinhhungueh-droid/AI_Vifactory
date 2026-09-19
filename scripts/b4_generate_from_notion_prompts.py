@@ -112,7 +112,7 @@ def remove_magenta_chromakey(input_path: Path, output_path: Path):
 
 async def main():
     parser = argparse.ArgumentParser(description="B4 Visual Asset Generation from Notion Prompts")
-    parser.add_argument("--episode", default="en-byzantine-empire-ep001", help="Episode ID (default: en-byzantine-empire-ep001)")
+    parser.add_argument("--episode", required=True, help="Episode ID (e.g. EN_EP0001_sample_topic)")
     args = parser.parse_args()
 
     ep_id = args.episode

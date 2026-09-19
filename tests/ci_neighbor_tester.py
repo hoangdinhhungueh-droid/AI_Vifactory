@@ -52,6 +52,9 @@ BLOCK_FILES = {
         "app/services/story_gate.py",
         "app/services/skill_loader.py",
     ],
+    2.6: [
+        "app/services/beat_tts_engine.py",
+    ],
     3.0: [
         "app/services/director_planner_b3.py",
         "app/audit/director_audit.py",
@@ -62,7 +65,7 @@ BLOCK_FILES = {
     ],
 }
 
-ALL_BLOCKS = [1.0, 1.5, 2.0, 3.0, 4.0]
+ALL_BLOCKS = [1.0, 1.5, 2.0, 2.6, 3.0, 4.0]
 
 
 def get_changed_files_from_git() -> list[str]:
@@ -361,7 +364,9 @@ def test_block3_director_contract() -> bool:
         assert "Fincher" in fincher["director"] or "Corporate Noir" in fincher["director"]
         nolan = detect_cinematic_archetype("History", "Historical Manhattan Project and Cold War Oppenheimer")
         assert any(k in nolan["director"] for k in ["Nolan", "Chernobyl", "Johan Renck", "Villeneuve"])
-        logger.info(f"  ✅ Director Archetype Routing OK: Finance -> '{fincher['director']}', History -> '{nolan['director']}'.")
+        kr_noir = detect_cinematic_archetype("Finance", "김포FC 횡령 사태와 부실 감사")
+        assert "Fincher" in kr_noir["director"] or "Corporate Noir" in kr_noir["director"], f"Failed to detect Corporate Noir for Korean financial embezzlement: {kr_noir['director']}"
+        logger.info(f"  ✅ Director Archetype Routing OK: Finance -> '{fincher['director']}', History -> '{nolan['director']}', KR Embezzlement -> '{kr_noir['director']}'.")
 
         # 3. Forwarding script check
         assert callable(generate_50_scene_plan)
@@ -456,6 +461,61 @@ def test_block4_prompt_contract() -> bool:
         return False
 
 
+def test_block26_audio_spine_contract() -> bool:
+    logger.info("--- [TEST BLOCK 2.6: Hollywood Audio Spine & Beat-TTS Contract] ---")
+    try:
+        from app.services.beat_tts_engine import LANG_VOICE, tokenize_for_karaoke, format_srt_time
+        from app.services.director_planner_b3 import _is_valid_audio_spine
+
+        # 1. Voice configuration check
+        for mkt in ["en", "vi", "zh", "ja", "ko"]:
+            assert mkt in LANG_VOICE, f"Missing voice configuration for market: {mkt}"
+        assert LANG_VOICE["ko"] == "ko-KR-InJoonNeural"
+        logger.info("  ✅ Market Edge-TTS voices validated (EN, VI, ZH, JA, KO).")
+
+        # 2. SRT time format
+        assert format_srt_time(1250) == "00:00:01,250"
+        assert format_srt_time(3661050) == "01:01:01,050"
+        logger.info("  ✅ SRT time format precision verified.")
+
+        # 3. Karaoke Tokenizer monotonicity
+        tokens = tokenize_for_karaoke("김포FC 횡령 사태의 전말", 1000, 3000, "ko")
+        assert len(tokens) > 0
+        assert tokens[0]["start_ms"] == 1000
+        assert tokens[-1]["end_ms"] == 3000
+        for i in range(len(tokens) - 1):
+            assert tokens[i]["end_ms"] <= tokens[i+1]["start_ms"]
+        logger.info(f"  ✅ Karaoke Tokenizer validated ({len(tokens)} tokens, strictly monotonic).")
+
+        # 4. _is_valid_audio_spine hard gate contract
+        assert not _is_valid_audio_spine([], [ROOT_DIR])
+        assert not _is_valid_audio_spine([{"text": "Hello"}], [ROOT_DIR])
+        logger.info("  ✅ Audio Spine Hard Gate rejected invalid payloads.")
+
+        return True
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        logger.error(f"❌ BLOCK 2.6 CONTRACT TEST FAILED: {e}")
+        return False
+
+
+def test_zero_ghost_and_pipeline_integrity() -> bool:
+    logger.info("--- [TEST SYSTEM GATE: 4-Layer Zero-Ghost Code & Pipeline Integrity (Rule 125)] ---")
+    try:
+        from scripts.orchestrator.ghost_code_detector import scan_workspace
+        defects = scan_workspace(ROOT_DIR)
+        if defects:
+            for d in defects:
+                logger.error(f"  ❌ GHOST DEFECT [{d['rule']} - {d['layer']}]: {d['detail']} in {d['file']}")
+            assert len(defects) == 0, f"Detected {len(defects)} ghost code defects! Run scripts/orchestrator/ghost_code_detector.py to review."
+        logger.info("  ✅ 4-Layer Zero-Ghost Code Scan: 100% clean, 0 defects.")
+        return True
+    except Exception as e:
+        logger.error(f"❌ ZERO-GHOST INTEGRITY GATE FAILED: {e}")
+        return False
+
+
 def run_tests_for_blocks(blocks_to_test: list[float]) -> bool:
     logger.info("=======================================================")
     logger.info(f"🧪 RUNNING ISO NEIGHBOR TESTS FOR BLOCKS: {blocks_to_test}")
@@ -469,10 +529,15 @@ def run_tests_for_blocks(blocks_to_test: list[float]) -> bool:
             results[1.5] = test_block15_competitor_contract()
         elif b == 2.0:
             results[2.0] = test_block2_story_contract()
+        elif b == 2.6:
+            results[2.6] = test_block26_audio_spine_contract()
         elif b == 3.0:
             results[3.0] = test_block3_director_contract()
         elif b == 4.0:
             results[4.0] = test_block4_prompt_contract()
+
+    # Rule 125: Always enforce zero ghost code gate on every run
+    results["ghost_hunter"] = test_zero_ghost_and_pipeline_integrity()
 
     all_passed = all(results.values())
     logger.info("=======================================================")
@@ -485,9 +550,9 @@ def run_tests_for_blocks(blocks_to_test: list[float]) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="ISO Neighbor-Testing Engine for Blocks 1, 1.5, 2, 3, 4")
+    parser = argparse.ArgumentParser(description="ISO Neighbor-Testing Engine for Blocks 1, 1.5, 2, 2.6, 3, 4")
     parser.add_argument("--auto", action="store_true", help="Auto-detect changed block from git status")
-    parser.add_argument("--block", type=float, choices=[1.0, 1.5, 2.0, 3.0, 4.0], help="Explicit target block (e.g. 1, 1.5, 2, 3, 4)")
+    parser.add_argument("--block", type=float, choices=[1.0, 1.5, 2.0, 2.6, 3.0, 4.0], help="Explicit target block (e.g. 1, 1.5, 2, 2.6, 3, 4)")
     parser.add_argument("--all", action="store_true", help="Run all blocks")
 
     args = parser.parse_args()

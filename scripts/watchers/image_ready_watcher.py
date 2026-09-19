@@ -92,10 +92,28 @@ class ImageReadyHandler(FileSystemEventHandler):
         except Exception as e:
             self._log(f"[CHECKPOINT ERROR] Failed to save: {e}")
 
+    def _is_completed(self, task_id: str) -> bool:
+        """Check if episode has completed HG3 dispatch."""
+        ep_dir = Path("/var/vf/episodes") / task_id
+        hg3_marker = ep_dir / "hg3_dispatched.json"
+        return hg3_marker.exists()
+
+    def _is_process_running(self, task_id: str) -> bool:
+        """Check if a pipeline process is actively running for this task_id."""
+        try:
+            import subprocess, os
+            res = subprocess.run(["pgrep", "-f", task_id], capture_output=True, text=True)
+            pids = [p.strip() for p in res.stdout.strip().split("\n") if p.strip() and p.strip() != str(os.getpid())]
+            return len(pids) > 0
+        except Exception:
+            return False
+
+    def on_modified(self, event):
+        self.on_created(event)
+
     def on_created(self, event):
         """
-        Called when a file is created.
-
+        Called when a file is created or modified.
         Filters for images_ready.json files and triggers B6.
         """
         if event.is_directory:
@@ -114,21 +132,31 @@ class ImageReadyHandler(FileSystemEventHandler):
             self._log(f"[ERROR] Failed to extract task_id from {path}: {e}")
             return
 
-        # Check if already processed
-        if task_id in self.processed:
-            self._log(f"[SKIP] {task_id} already processed")
+        # Check if already genuinely completed (HG3 card dispatched)
+        if self._is_completed(task_id):
+            if task_id not in self.processed:
+                self.processed.add(task_id)
+                self._save_checkpoint()
+            self._log(f"[SKIP] {task_id} already completed HG3 dispatch")
             return
 
-        self._log(f"[DETECTED] images_ready.json created for {task_id}")
+        # Check if pipeline process is currently running
+        if self._is_process_running(task_id):
+            self._log(f"[SKIP] {task_id} pipeline process is currently active in background")
+            return
 
-        # Trigger B6 (Audio/TTS)
+        # If it was in processed checkpoint but HG3 is incomplete and process died -> auto-recovery!
+        if task_id in self.processed:
+            self._log(f"[RECOVERY] {task_id} marked in checkpoint but HG3 incomplete and process died. Re-triggering...")
+            self.processed.discard(task_id)
+
+        self._log(f"[DETECTED] images_ready.json ready for {task_id}")
+
+        # Trigger B6 (Audio/TTS -> Master Render -> B10 HG3)
         success = self._trigger_b6(task_id, path)
 
         if success:
-            # Mark as processed
-            self.processed.add(task_id)
-            self._save_checkpoint()
-            self._log(f"[SUCCESS] B6 triggered for {task_id}")
+            self._log(f"[SUCCESS] B6 pipeline spawned for {task_id}. Awaiting HG3 completion marker.")
         else:
             self._log(f"[FAILED] B6 trigger failed for {task_id}. Cron fallback will retry.")
 

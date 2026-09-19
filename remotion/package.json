@@ -19,9 +19,11 @@
     "@remotion/paths": "4.0.524",
     "@remotion/shapes": "4.0.524",
     "@remotion/transitions": "4.0.524",
+    "@types/three": "^0.160.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "remotion": "4.0.524"
+    "remotion": "4.0.524",
+    "three": "^0.160.1"
   },
   "devDependencies": {
     "typescript": "^5.4.5"

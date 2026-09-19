@@ -49,11 +49,13 @@ if __package__ is None or __package__ == "":
     from scripts.orchestrator.resource_recycler import ResourceRecycler, ResourceSandbox, get_system_temp_dir
     from scripts.orchestrator.rule128_governor import Rule128Governor, Rule128ViolationError, validate_generic_task_id
     from scripts.orchestrator.task_partitioner import PIPELINE_STAGES, STAGE_ORDER, PipelineStage, TaskPartitioner
+    from scripts.orchestrator.ghost_code_detector import scan_workspace
 else:
     from .lifecycle_manager import LifecycleManager, SubprocessWorker, WorkerResult
     from .resource_recycler import ResourceRecycler, ResourceSandbox, get_system_temp_dir
     from .rule128_governor import Rule128Governor, Rule128ViolationError, validate_generic_task_id
     from .task_partitioner import PIPELINE_STAGES, STAGE_ORDER, PipelineStage, TaskPartitioner
+    from .ghost_code_detector import scan_workspace
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -715,16 +717,13 @@ class OrchestratorRunner:
             ocr_sync_info = {"success": True, "message": "Working tree clean; zero uncommitted diff."}
         sync_report["ocr_pre_sync_gate"] = ocr_sync_info
 
-        # 2. Check for backup files (*.bak*, *.backup_*)
-        backup_files: List[str] = []
-        for root, dirs, files in os.walk(self.root_dir):
-            dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "node_modules", "venv", ".venv", "assets", "logs", "pulled", ".pytest_cache")]
-            for f in files:
-                if ".bak" in f or ".backup" in f:
-                    backup_files.append(os.path.join(root, f))
+        # 2. Automated 4-Layer Ghost Hunter Engine (Rule 125)
+        ghost_defects = scan_workspace(self.root_dir)
+        ghost_clean = len(ghost_defects) == 0
         sync_report["zero_ghost_cleanliness"] = {
-            "backup_files_count": len(backup_files),
-            "files": backup_files,
+            "defects_count": len(ghost_defects),
+            "defects": ghost_defects,
+            "success": ghost_clean,
         }
 
         # 3. py_compile check across scripts/orchestrator/
@@ -784,7 +783,7 @@ class OrchestratorRunner:
             ci_status_info.get("verified", False)
             and ci_status_info.get("conclusion") == "success"
         )
-        all_ok = is_clean and len(backup_files) == 0 and len(compile_errors) == 0 and ci_passed and ocr_clean
+        all_ok = is_clean and ghost_clean and len(compile_errors) == 0 and ci_passed and ocr_clean
         payload = {
             "status": "success" if all_ok else "failure",
             "sync_report": sync_report,
@@ -796,7 +795,7 @@ class OrchestratorRunner:
         else:
             print("=== THREE-WAY SYNC & CLEANLINESS REPORT ===")
             print(f"Git Clean: {'YES' if is_clean else 'NO'}")
-            print(f"Zero Ghost Backup Files: {len(backup_files)} found")
+            print(f"4-Layer Ghost Code Scan: {'PASS (0 defects)' if ghost_clean else f'FAIL ({len(ghost_defects)} defects)'}")
             print(f"PyCompile: {'PASS' if len(compile_errors) == 0 else 'FAIL'}")
             print(f"OCR Pre-Sync Gate: {'PASS' if ocr_clean else 'FAIL'}")
             ci_verdict = (
@@ -885,20 +884,14 @@ class OrchestratorRunner:
             else f"Invalid Task ID pattern: {task_id}"
         )
 
-        # 2. Agent 2 (Builder / Implementer): AST Compilation & Ghost File Check (Rule 119 & 125)
-        ghost_files = []
-        try:
-            for p in self.root_dir.glob("**/*.bak*"):
-                if not any(part.startswith(".") for part in p.parts):
-                    ghost_files.append(str(p.relative_to(self.root_dir)))
-        except Exception:
-            pass
-        builder_valid = len(ghost_files) == 0
+        # 2. Agent 2 (Builder / Implementer): 4-Layer AST Compilation & Ghost Hunter (Rule 119 & 125)
+        ghost_defects = scan_workspace(self.root_dir)
+        builder_valid = len(ghost_defects) == 0
         builder_vote = "COMMITTED" if builder_valid else "DEFECT"
         builder_notes = (
-            "Clean codebase, zero ghost files detected."
+            "Clean codebase, zero ghost files or dead remnants detected across 4 layers."
             if builder_valid
-            else f"Ghost remnants found: {ghost_files}"
+            else f"Ghost code defects detected ({len(ghost_defects)}): {[d['detail'] for d in ghost_defects[:3]]}"
         )
 
         # 3. Agent 3 (QA & Test Harness): Dynamic Validation Gate
@@ -926,9 +919,9 @@ class OrchestratorRunner:
             auditor_veto = True
             auditor_defects.append(f"Rule 128 violation: Task ID '{task_id}' does not match generic regex.")
 
-        if ghost_files:
+        if ghost_defects:
             auditor_veto = True
-            auditor_defects.append(f"Rule 125 violation: Ghost artifacts detected ({len(ghost_files)} files).")
+            auditor_defects.append(f"Rule 125 violation: 4-Layer Ghost Hunter found {len(ghost_defects)} defects.")
 
         auditor_vote = "CLEAR" if not auditor_veto else "VETO"
         auditor_notes = (

@@ -297,10 +297,10 @@
 | `app/services/grounding_layer_b15.py` | Google Search Grounding REST API & Confidence Gate | Block 1.5.5 |
 | `tests/test_grounding_layer.py` | Test suite kiểm thử Grounding Verification Gate | Block 1.5.5 Unit Test |
 | `app/services/story_engine_b2.py` | Sinh kịch bản 5 Beat Docudrama qua GPT-6-Astra | Block 2.0 |
-| `tests/ci_neighbor_tester.py` | Framework ISO Neighbor-Testing `[N-1, N, N+1]` | CI/CD Quality Gate |
+| `app/services/beat_tts_engine.py` | Hollywood Audio Spine, Beat-Level Edge-TTS, Word Karaoke & Subtitles SRT | Block 2.6 (Audio Spine) |
+| `app/services/director_planner_b3.py` | Dynamic Director Plan, Universal Scene Breakdown & Hard Gate | Block 3.0 |
 | `app/services/prompt_forge.py` | Prompt Forge cho Layer 1 BG & Layer 2 FG (#FF00FF) | Block 3.5 |
 | `scripts/gemini_browser_gen.py` | Chrome Automation sinh ảnh Gemini Pro Web | Block 4.0 |
-| `app/pipeline/stages/s6_speech.py` | TTS Edge-TTS & Faster-Whisper trích xuất word timestamp | Block 6.0 & 7.0 |
 | `app/services/beat_bgm_engine.py` | 5-Beat Docudrama Adaptive BGM & YouTube Audio Library Vault | Block 7.5 (BGM Engine) |
 | `tests/test_beat_bgm_engine.py` | Test suite kiểm thử 5-Beat BGM Engine & Crossfading | Block 7.5 Unit Test |
 | `app/services/build_remotion_props.py` | Ghép timestamp Whisper vào props Remotion | Block 7.0 |
@@ -308,6 +308,7 @@
 | `app/pipeline/stages/s7_render.py` | Remotion CPU Render & bypass redundant burning | Block 8.0 |
 | `app/services/seo_autogen_b10.py` | B10 SEO Packaging & Gate 2 Upload Payload | Block 10.0 |
 | `scripts/b11_engine.py` | Analytics 48h Routine Lean Sync & Deep Post-Mortem | Block 11.0 |
+| `scripts/orchestrator/ghost_code_detector.py` | 4-Layer Automated Ghost Code Hunter Engine (VETO Authority) | Core Orchestrator Gate |
 
 ---
 

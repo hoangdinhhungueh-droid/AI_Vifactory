@@ -635,7 +635,7 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
 
 def main():
     parser = argparse.ArgumentParser(description="Auto SEO + Upload + Gate2 (B10)")
-    parser.add_argument("--episode", required=True, help="Episode ID, e.g. en-byzantine-empire-ep001")
+    parser.add_argument("--episode", required=True, help="Episode ID, e.g. <MARKET>_EP<0000>_<topic_slug>")
     parser.add_argument("--market", default="en")
     parser.add_argument("--privacy", default="unlisted")
     parser.add_argument("--force-reupload", action="store_true", help="Force fresh upload to YouTube even if video_id exists")

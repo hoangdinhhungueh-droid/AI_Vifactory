@@ -16,6 +16,7 @@ import re
 import time
 import logging
 from pathlib import Path
+from typing import Optional, List, Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -351,7 +352,17 @@ def detect_cinematic_archetype(niche: str = "", topic: str = "", story_text: str
         return CINEMATIC_ARCHETYPES["tech_geopolitics"]
 
     # 2. Institutional & Regulatory Chokepoints / Medical / Whistleblower
-    elif any(k in combined for k in ["regulatory", "chokepoint", "inspector", "compliance", "oversight", "pension", "license", "permit", "coverup", "recall", "medical", "pharma", "clinical", "hospital", "drug", "medicine", "vaccine", "toxic", "poison", "epidemic", "cholera", "pesticide"]):
+    elif any(k in combined for k in [
+        "regulatory", "chokepoint", "inspector", "compliance", "oversight", "pension", "license", "permit", "coverup",
+        "recall", "medical", "pharma", "clinical", "hospital", "drug", "medicine", "vaccine", "toxic", "poison", "epidemic",
+        "cholera", "pesticide", "whistleblower",
+        # Korean
+        "내부고발", "규제", "감독", "식약처", "보건", "인허가", "은폐", "부실감사",
+        # Vietnamese
+        "thanh tra", "giám sát", "nội bộ", "y tế", "thu hồi", "che giấu", "giấy phép",
+        # Japanese
+        "内部告発", "規制", "監督", "隠蔽", "認可", "不祥事"
+    ]):
         return CINEMATIC_ARCHETYPES["institutional_regulatory"]
 
     # 3. Hidden Asymmetric Fortunes & Underground Flows
@@ -366,8 +377,17 @@ def detect_cinematic_archetype(niche: str = "", topic: str = "", story_text: str
     elif any(k in combined for k in ["psycholog", "manipulat", "cult", "mind", "behavior", "brainwash", "cognitive", "hysteria", "bias", "propaganda", "societal", "mass panic"]):
         return CINEMATIC_ARCHETYPES["psychology"]
 
-    # 6. Business Rise & Fall / Corporate Debt
-    elif any(k in combined for k in ["finance", "economy", "bank", "money", "fraud", "wall street", "debt", "lehman", "madoff", "enron", "trading", "business", "rehabilitation", "bankruptcy", "collateral", "lien"]):
+    # 6. Business Rise & Fall / Corporate Debt / Financial Fraud / Embezzlement
+    elif any(k in combined for k in [
+        "finance", "economy", "bank", "money", "fraud", "wall street", "debt", "lehman", "madoff", "enron",
+        "trading", "business", "rehabilitation", "bankruptcy", "collateral", "lien", "embezzle", "audit failure",
+        # Korean
+        "횡령", "공금", "회계", "감사", "장부", "자금", "분식회계", "배임", "부실", "적정", "재정", "파산", "금융", "부채", "증권", "은행", "비자금",
+        # Vietnamese
+        "tham ô", "kiểm toán", "gian lận", "ngân hàng", "kế toán", "tài chính", "báo cáo tài chính", "rửa tiền", "nợ xấu", "phá sản",
+        # Japanese
+        "横領", "粉飾決算", "監査", "裏金", "公金", "破産", "債務", "銀行", "金融", "不正会計"
+    ]):
         return CINEMATIC_ARCHETYPES["business_rise_fall"]
 
     # 7. Modern History & Systemic Crisis
@@ -686,6 +706,45 @@ def _deep_merge(base: dict, update: dict) -> dict:
     return result
 
 
+def _is_valid_audio_spine(spoken_sentences: Optional[List[Dict[str, Any]]], dirs: List[Path]) -> bool:
+    """Validate that Hollywood Audio Spine exists and is timecode-locked (Rule 120/127).
+    Must satisfy:
+    1. spoken_sentences is a non-empty list of dicts.
+    2. At least 80% of items in spoken_sentences have valid duration_frames > 0 or duration_sec > 0.
+    3. At least one directory in dirs contains valid tts_out.mp3 (> 10KB).
+    4. At least one directory in dirs contains whisper_segments.json or subtitles.srt (> 100 bytes).
+    """
+    if not spoken_sentences or not isinstance(spoken_sentences, list):
+        return False
+    
+    valid_durations = 0
+    for s in spoken_sentences:
+        if not isinstance(s, dict):
+            continue
+        if (s.get("duration_frames") and int(s.get("duration_frames") or 0) > 0) or \
+           (s.get("duration_sec") and float(s.get("duration_sec") or 0.0) > 0.0) or \
+           (s.get("end_ms", 0) > s.get("start_ms", 0)):
+            valid_durations += 1
+            
+    if valid_durations == 0 or (valid_durations / len(spoken_sentences)) < 0.8:
+        return False
+
+    has_audio = False
+    has_subtitles = False
+    for d in dirs:
+        if not d or not d.exists():
+            continue
+        audio_file = d / "tts_out.mp3"
+        if audio_file.exists() and audio_file.stat().st_size > 10240:
+            has_audio = True
+        sub_file = d / "whisper_segments.json"
+        srt_file = d / "subtitles.srt"
+        if (sub_file.exists() and sub_file.stat().st_size > 100) or (srt_file.exists() and srt_file.stat().st_size > 100):
+            has_subtitles = True
+
+    return has_audio and has_subtitles
+
+
 def generate_director_plan(
     episode_id: str,
     story_text: str = None,
@@ -789,9 +848,10 @@ def generate_director_plan(
     niche = metadata.get("niche") or intel_card.get("niche", "Investigative Documentary")
     topic = metadata.get("topic") or intel_card.get("target_keyword", episode_id)
 
-    # Hollywood Movie Standard: Ensure Audio Spine exists before Director Breakdown
-    if not spoken_sentences and story_text:
-        logger.info(f"  [B3 Hollywood] spoken_sentences missing for {episode_id}. Auto-synthesizing Hollywood Audio Spine from story...")
+    # Hollywood Movie Standard: Ensure Audio Spine exists and is timecode-locked before Director Breakdown (Rule 120/127)
+    audio_dirs = [ep_dir, var_vf_dir, ws_dir]
+    if not _is_valid_audio_spine(spoken_sentences, audio_dirs):
+        logger.info(f"  [B3 Hollywood] Audio Spine missing or invalid for {episode_id}. Auto-synthesizing Hollywood Audio Spine from story...")
         try:
             from app.services.story_engine_b2 import adapt_master_spoken_script, adversarial_audit_spoken_script
             from app.services.beat_tts_engine import synthesize_beat_tts_pipeline
@@ -799,31 +859,56 @@ def generate_director_plan(
             
             mkt = (metadata.get("market") or episode_id.split("_")[0]).upper()
             topic_val = topic or episode_id
-            spoken_data = adapt_master_spoken_script(story_text, market=mkt, topic=topic_val)
-            spoken_audit = adversarial_audit_spoken_script(spoken_data, market=mkt, topic=topic_val)
-            raw_sents = spoken_data.get("sentences", [])
             
-            for td in [ep_dir, var_vf_dir]:
-                if td.exists():
-                    (td / "spoken_script.txt").write_text(spoken_data.get("spoken_script_text", story_text), encoding="utf-8")
-                    (td / "spoken_sentences.json").write_text(json.dumps(raw_sents, ensure_ascii=False, indent=2), encoding="utf-8")
-                    bp = td / "brain_input.json"
-                    if bp.exists():
-                        try:
-                            b_in = json.loads(bp.read_text(encoding="utf-8"))
-                            b_in["spoken_script"] = spoken_data.get("spoken_script_text", story_text)
-                            b_in["spoken_sentences"] = raw_sents
-                            b_in["spoken_script_audit"] = spoken_audit
-                            bp.write_text(json.dumps(b_in, ensure_ascii=False, indent=2), encoding="utf-8")
-                        except Exception:
-                            pass
+            if not spoken_sentences:
+                spoken_data = adapt_master_spoken_script(story_text, market=mkt, topic=topic_val)
+                spoken_audit = adversarial_audit_spoken_script(spoken_data, market=mkt, topic=topic_val)
+                raw_sents = spoken_data.get("sentences", [])
+                spoken_script_txt = spoken_data.get("spoken_script_text", story_text)
+            else:
+                raw_sents = spoken_sentences
+                spoken_script_txt = story_text
+                spoken_audit = {}
             
-            tts_dir = str(ep_dir if ep_dir.exists() else var_vf_dir)
-            tts_res = asyncio.run(synthesize_beat_tts_pipeline(episode_id, out_dir=tts_dir, force=False))
-            spoken_sentences = tts_res.get("segments") or raw_sents
+            target_dir = ep_dir if ep_dir.exists() else var_vf_dir
+            target_dir.mkdir(parents=True, exist_ok=True)
+            
+            (target_dir / "spoken_script.txt").write_text(spoken_script_txt, encoding="utf-8")
+            (target_dir / "spoken_sentences.json").write_text(json.dumps(raw_sents, ensure_ascii=False, indent=2), encoding="utf-8")
+            
+            bp = target_dir / "brain_input.json"
+            b_in = {}
+            if bp.exists():
+                try:
+                    b_in = json.loads(bp.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+            b_in["episode_id"] = episode_id
+            b_in["market"] = mkt
+            b_in["story"] = story_text
+            b_in["spoken_script"] = spoken_script_txt
+            b_in["spoken_sentences"] = raw_sents
+            if spoken_audit:
+                b_in["spoken_script_audit"] = spoken_audit
+            bp.write_text(json.dumps(b_in, ensure_ascii=False, indent=2), encoding="utf-8")
+            
+            if var_vf_dir.exists() and var_vf_dir != target_dir:
+                try:
+                    (var_vf_dir / "spoken_script.txt").write_text(spoken_script_txt, encoding="utf-8")
+                    (var_vf_dir / "spoken_sentences.json").write_text(json.dumps(raw_sents, ensure_ascii=False, indent=2), encoding="utf-8")
+                    (var_vf_dir / "brain_input.json").write_text(json.dumps(b_in, ensure_ascii=False, indent=2), encoding="utf-8")
+                except Exception:
+                    pass
+            
+            tts_res = asyncio.run(synthesize_beat_tts_pipeline(episode_id, out_dir=str(target_dir), force=True))
+            spoken_sentences = tts_res.get("segments") or []
             logger.info(f"  [B3 Hollywood] Audio Spine synthesized: {len(spoken_sentences)} sentences timecode-locked.")
         except Exception as e:
-            logger.warning(f"  [B3 Hollywood] Auto Audio Spine synthesis error: {e}. Proceeding with best-effort.")
+            logger.error(f"  [B3 Hollywood] Auto Audio Spine synthesis failed: {e}")
+            raise RuntimeError(f"HARD GATE VIOLATION (Rule 120/127): Failed to construct valid Audio Spine for {episode_id}: {e}. Zero fallback allowed.") from e
+
+        if not _is_valid_audio_spine(spoken_sentences, audio_dirs):
+            raise RuntimeError(f"HARD GATE VIOLATION (Rule 120/127): Audio Spine for {episode_id} is still invalid after synthesis. Zero fallback allowed.")
 
     # Rule 128: Universal Dynamic Context & Character Ensemble Extraction
     dynamic_context = extract_universal_semantic_context(story_text, metadata, intel_card)

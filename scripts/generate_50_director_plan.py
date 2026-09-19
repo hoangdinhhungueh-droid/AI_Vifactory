@@ -11,6 +11,9 @@ from app.services.director_planner_b3 import generate_director_plan
 generate_50_scene_plan = generate_director_plan
 
 if __name__ == "__main__":
-    ep_id = sys.argv[1] if len(sys.argv) > 1 else "en-byzantine-empire-ep001"
+    if len(sys.argv) < 2:
+        print("Usage: python scripts/generate_50_director_plan.py <episode_id>")
+        sys.exit(1)
+    ep_id = sys.argv[1]
     plan = generate_director_plan(ep_id)
     print(f"✅ Successfully generated Director Plan for {ep_id}: {plan['total_scenes']} scenes.")

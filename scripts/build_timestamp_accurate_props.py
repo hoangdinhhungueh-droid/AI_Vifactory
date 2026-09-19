@@ -18,7 +18,7 @@ def main(ep_id=None):
     import argparse
     if ep_id is None:
         parser = argparse.ArgumentParser()
-        parser.add_argument("--episode", default="en-byzantine-empire-ep001")
+        parser.add_argument("--episode", required=True, help="Episode ID (e.g. EN_EP0001_sample_topic)")
         ep_id = parser.parse_known_args()[0].episode
     ep_dir = Path(f"/var/vf/episodes/{ep_id}")
     brain_file = ep_dir / "brain_input.json"

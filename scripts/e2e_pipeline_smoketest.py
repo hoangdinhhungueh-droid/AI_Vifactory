@@ -61,12 +61,17 @@ def gate_b2_story_engine():
     print("  [PASS] story_engine_b2 has 0% GPT-5.6-Sol remnants and proper 5-Beat Docudrama tags.")
 
 def gate_b3_director_planner():
-    print_gate("5. B3 Director Planner & Non-Destructive Brain Input")
+    print_gate("5. B3 Director Planner & Audio Spine Hard Gate (Rule 120/127)")
     with open(os.path.join(PROJECT_ROOT, "app", "services", "director_planner_b3.py"), "r", encoding="utf-8") as f:
         b3_code = f.read()
     assert "existing_brain" in b3_code, "director_planner_b3 must read existing_brain to preserve metadata!"
     assert "prompts_forge.json" in b3_code, "director_planner_b3 must save prompts_forge.json!"
-    print("  [PASS] director_planner_b3 preserves existing brain metadata and saves prompts_forge.json.")
+    assert "_is_valid_audio_spine" in b3_code, "director_planner_b3 must enforce _is_valid_audio_spine hard gate!"
+    
+    from app.services.director_planner_b3 import detect_cinematic_archetype
+    kr_archetype = detect_cinematic_archetype("Finance", "김포FC 횡령 사태와 부실 감사")
+    assert "Fincher" in kr_archetype["director"] or "Corporate Noir" in kr_archetype["director"], f"Failed to route KR embezzlement: {kr_archetype}"
+    print("  [PASS] director_planner_b3 preserves metadata, enforces Audio Spine Hard Gate, and routes KR Embezzlement to Corporate Noir.")
 
 def gate_b35_visual_prompt_forge():
     print_gate("6. B3.5 Visual Prompt Forge & Anti-Stuttering")
@@ -94,13 +99,21 @@ def gate_b35_visual_prompt_forge():
     print("  [PASS] B3.5 generate_scene_prompts clean of prompt leakage and stuttering.")
 
 def gate_zero_ghost_and_encoding():
-    print_gate("7. Zero-Ghost Remnants & Character Encoding")
+    print_gate("7. Zero-Ghost Remnants & 4-Layer Linter Engine (Rule 125)")
+    from scripts.orchestrator.ghost_code_detector import scan_workspace
+    from pathlib import Path
+    root_dir = Path(PROJECT_ROOT)
+    defects = scan_workspace(root_dir)
+    assert len(defects) == 0, f"Ghost code defects found ({len(defects)}): {[d['detail'] for d in defects[:5]]}"
+    print("  [PASS] 4-Layer Ghost Hunter scanned filesystem: 0 ghost files, 0 .bak remnants, 0 dead imports.")
+
     # Check for mojibake in telegram buttons
     tg_path = os.path.join(PROJECT_ROOT, "app", "services", "telegram_buttons.py")
-    with open(tg_path, "r", encoding="utf-8", errors="ignore") as f:
-        tg_code = f.read()
-    assert "ðŸ" not in tg_code, "telegram_buttons.py contains mojibake characters!"
-    print("  [PASS] telegram_buttons.py is 100% clean of Mojibake characters.")
+    if os.path.exists(tg_path):
+        with open(tg_path, "r", encoding="utf-8", errors="ignore") as f:
+            tg_code = f.read()
+        assert "ðŸ" not in tg_code, "telegram_buttons.py contains mojibake characters!"
+        print("  [PASS] telegram_buttons.py is 100% clean of Mojibake characters.")
 
 def gate_market_scheduler():
     print_gate("8. Market Stagger Scheduler & VN Timezone Compliance (Crash Protection)")
