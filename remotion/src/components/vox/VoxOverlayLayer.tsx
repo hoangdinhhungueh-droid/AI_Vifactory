@@ -1,14 +1,17 @@
 import React from "react";
 import { Audio, staticFile } from "remotion";
-import { VoxDocumentHighlight } from "./VoxDocumentHighlight";
+import { VoxPaperDossier } from "./VoxPaperDossier";
+import { VoxEvidenceBoard } from "./VoxEvidenceBoard";
+import { VoxBankCheck } from "./VoxBankCheck";
+import { VoxTacticalMap } from "./VoxTacticalMap";
 import { VoxKineticCounter } from "./VoxKineticCounter";
 import { VoxCausalFlowchart } from "./VoxCausalFlowchart";
-import { VoxTacticalMap } from "./VoxTacticalMap";
+import { EvidenceProp3D } from "../EvidenceProp3D";
 
 export interface VoxForensicOverlayData {
   type?: string;
   theme?: string;
-  layout?: "split_right" | "split_left" | "fullscreen_dossier" | "floating_card" | string;
+  layout?: "full_bleed_focus" | "split_right" | "split_left" | "fullscreen_dossier" | "floating_card" | string;
   title?: string;
   badge?: string;
   sfx_cue?: string;
@@ -36,7 +39,14 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
 
   const rawType = ov.type || "";
   const layout = ov.layout || (isLeft ? "split_right" : "split_left");
-  const sfxCue = ov.sfx_cue;
+  const sfxCue = ov.sfx_cue || (
+    rawType.includes("doc") || rawType.includes("dossier") ? "marker_stroke" :
+    rawType.includes("check") || rawType.includes("counter") ? "stamp_slam" :
+    rawType.includes("board") ? "paper_slide" :
+    rawType.includes("map") ? "sonar_ping" : undefined
+  );
+
+  const isFullBleed = layout === "full_bleed_focus" || layout === "fullscreen_dossier";
 
   // Determine component positioning based on layout
   let positionStyles: React.CSSProperties = {
@@ -44,32 +54,32 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
     zIndex: 28,
   };
 
-  if (layout === "fullscreen_dossier") {
+  if (isFullBleed) {
     positionStyles = {
       ...positionStyles,
-      top: 70,
+      top: "46%",
       left: "50%",
-      transform: "translateX(-50%)",
+      transform: "translate(-50%, -50%)",
     };
   } else if (layout === "split_left") {
     positionStyles = {
       ...positionStyles,
       top: 60,
-      left: 70,
+      left: 60,
     };
   } else if (layout === "split_right") {
     positionStyles = {
       ...positionStyles,
       top: 60,
-      right: 70,
+      right: 60,
     };
   } else {
     // floating_card / default
     positionStyles = {
       ...positionStyles,
       top: 60,
-      right: isLeft ? 70 : "auto",
-      left: isLeft ? "auto" : 70,
+      right: isLeft ? 60 : "auto",
+      left: isLeft ? "auto" : 60,
     };
   }
 
@@ -85,60 +95,121 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
 
   return (
     <>
+      {/* Background Dimmer / Focus Blur Backdrop when Full-Bleed Document is active */}
+      {isFullBleed ? (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.55)",
+            backdropFilter: "blur(4px)",
+            zIndex: 27,
+            pointerEvents: "none",
+          }}
+        />
+      ) : null}
+
       {/* Audio Micro-SFX cue */}
       {sfxCue && validSfx.includes(sfxCue) ? (
         <Audio
           src={staticFile(`sfx/${sfxCue}.mp3`)}
-          volume={0.25}
+          volume={0.3}
         />
       ) : null}
 
-      {/* Visual Component */}
+      {/* Visual Component Render */}
       <div style={positionStyles}>
-        {rawType === "document_highlight" || rawType === "redacted_doc" ? (
-          <VoxDocumentHighlight
+        {/* Paper Dossier / Official Document Highlight */}
+        {rawType === "document_highlight" || rawType === "redacted_doc" || rawType === "paper_dossier" ? (
+          <VoxPaperDossier
             title={ov.title}
             badge={ov.badge}
-            theme={ov.theme}
-            layout={ov.layout}
+            theme={ov.theme || "vox_paper"}
+            layout={layout}
             payload={ov.payload}
             label={ov.label}
           />
         ) : null}
 
+        {/* Evidence Corkboard / Suspect Network */}
+        {rawType === "evidence_board" || rawType === "suspect_network" ? (
+          <VoxEvidenceBoard
+            title={ov.title}
+            badge={ov.badge}
+            theme={ov.theme || "vox_paper"}
+            layout={layout}
+            payload={ov.payload}
+            label={ov.label}
+          />
+        ) : null}
+
+        {/* Bank Check / Subsidy Disbursement Ledger */}
+        {rawType === "bank_check" || rawType === "financial_ledger" ? (
+          <VoxBankCheck
+            title={ov.title}
+            badge={ov.badge}
+            theme={ov.theme || "vox_paper"}
+            layout={layout}
+            payload={ov.payload}
+            label={ov.label}
+          />
+        ) : null}
+
+        {/* Kinetic Counter Metric */}
         {rawType === "kinetic_counter" || rawType === "financial_chart" ? (
-          <VoxKineticCounter
+          <VoxBankCheck
             title={ov.title}
             badge={ov.badge}
-            theme={ov.theme}
-            layout={ov.layout}
+            theme={ov.theme || "vox_paper"}
+            layout={layout}
             payload={ov.payload}
             label={ov.label}
           />
         ) : null}
 
-        {rawType === "causal_flowchart" ? (
-          <VoxCausalFlowchart
-            title={ov.title}
-            badge={ov.badge}
-            theme={ov.theme}
-            layout={ov.layout}
-            payload={ov.payload}
-            label={ov.label}
-          />
-        ) : null}
-
+        {/* Tactical Paper Map */}
         {rawType === "tactical_map" || rawType === "radar_map" || rawType === "surveillance_crt" ? (
           <VoxTacticalMap
             title={ov.title}
             badge={ov.badge}
-            theme={ov.theme}
-            layout={ov.layout}
+            theme={ov.theme || "vox_paper"}
+            layout={layout}
             payload={ov.payload}
             label={ov.label}
           />
         ) : null}
+
+        {/* Causal Flowchart */}
+        {rawType === "causal_flowchart" ? (
+          <VoxCausalFlowchart
+            title={ov.title}
+            badge={ov.badge}
+            theme={ov.theme || "vox_paper"}
+            layout={layout}
+            payload={ov.payload}
+            label={ov.label}
+          />
+        ) : null}
+
+        {/* 3D Procedural Evidence Prop (img2threejs procedural technique) */}
+        {rawType === "evidence_3d_prop" || rawType === "3d_hanko_seal" || rawType === "3d_evidence_prop" ? (
+          <div
+            style={{
+              width: isFullBleed ? 1200 : 700,
+              height: isFullBleed ? 750 : 480,
+              borderRadius: 8,
+              overflow: "hidden",
+              border: "1px solid rgba(0, 229, 255, 0.4)",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.85)",
+            }}
+          >
+            <EvidenceProp3D
+              title={ov.title || "CONFIDENTIAL EVIDENCE // EXHIBIT A"}
+              subtitle={ov.label || ov.badge || "PROCEDURAL THREE.JS ARTIFACT"}
+            />
+          </div>
+        ) : null}
       </div>
     </>
   );
-};
+};

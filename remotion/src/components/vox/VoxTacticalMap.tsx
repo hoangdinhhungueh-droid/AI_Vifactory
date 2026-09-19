@@ -6,13 +6,14 @@ export interface VoxTacticalMapPayload {
   coordinates?: string;
   grid_type?: "radar" | "chokepoint" | "flight_path" | string;
   points_of_interest?: string[];
+  map_region?: string;
 }
 
 export interface VoxTacticalMapProps {
   title?: string;
   badge?: string;
-  theme?: "noir_dossier" | "tech_infographic" | "surveillance_cctv" | string;
-  layout?: "split_right" | "split_left" | "fullscreen_dossier" | "floating_card" | string;
+  theme?: "vox_paper" | "noir_dossier" | "tech_infographic" | "surveillance_cctv" | string;
+  layout?: "full_bleed_focus" | "split_right" | "split_left" | "fullscreen_dossier" | string;
   payload?: VoxTacticalMapPayload;
   label?: string;
 }
@@ -20,102 +21,106 @@ export interface VoxTacticalMapProps {
 export const VoxTacticalMap: React.FC<VoxTacticalMapProps> = ({
   title,
   badge,
-  theme = "surveillance_cctv",
-  layout = "split_right",
+  theme = "vox_paper",
+  layout = "full_bleed_focus",
   payload,
   label,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const themeStyles = {
-    noir_dossier: {
-      bg: "rgba(12, 16, 26, 0.94)",
-      border: "1.5px solid rgba(242, 166, 59, 0.55)",
-      headerColor: "#ffd166",
-      radarColor: "#f2a63b",
-      targetColor: "#ef4444",
-      textColor: "#cbd5e1",
-      shadow: "0 15px 40px rgba(0,0,0,0.85), inset 0 0 20px rgba(242,166,59,0.12)",
-    },
-    tech_infographic: {
-      bg: "rgba(7, 20, 34, 0.94)",
-      border: "1.5px solid rgba(56, 189, 248, 0.55)",
-      headerColor: "#38bdf8",
-      radarColor: "#38bdf8",
-      targetColor: "#ef4444",
-      textColor: "#94a3b8",
-      shadow: "0 15px 40px rgba(0,0,0,0.85), 0 0 25px rgba(56,189,248,0.2)",
-    },
-    surveillance_cctv: {
-      bg: "rgba(4, 18, 12, 0.95)",
-      border: "1.5px solid rgba(34, 197, 94, 0.55)",
-      headerColor: "#22c55e",
-      radarColor: "#22c55e",
-      targetColor: "#ef4444",
-      textColor: "#86efac",
-      shadow: "0 15px 40px rgba(0,0,0,0.85), 0 0 25px rgba(34,197,94,0.2)",
-    },
-  };
+  // Stop motion 12fps stepping
+  const steppedFrame = Math.floor(frame / 2.5) * 2.5;
 
-  const st = themeStyles[theme as keyof typeof themeStyles] || themeStyles.surveillance_cctv;
-
-  const scale = spring({
-    frame,
+  const mapDrop = spring({
+    frame: steppedFrame,
     fps,
-    config: { damping: 14, mass: 0.7, stiffness: 120 },
+    config: { damping: 12, mass: 0.8, stiffness: 140 },
   });
 
-  const opacity = interpolate(frame, [0, 8], [0, 1], {
+  const pinDrop = spring({
+    frame: Math.max(0, steppedFrame - 10),
+    fps,
+    config: { damping: 8, mass: 0.4, stiffness: 220 },
+  });
+
+  const routeDraw = interpolate(frame, [8, 36], [0, 100], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  const sweepAngle = (frame * 4) % 360;
-  const pingOpacity = Math.sin(frame * 0.25) > 0 ? 1 : 0.3;
-
   const displayTitle = title || label || "GEO-TACTICAL TELEMETRY // SECTOR GRID";
-  const displayBadge = badge || "ACTIVE TELEMETRY";
-  const targetName = payload?.target_name || "TACTICAL VECTOR // TARGET INTERCEPT";
-  const coordinates = payload?.coordinates || "37.5665°N, 126.9780°E";
-  const pois = payload?.points_of_interest || ["PRIMARY CATALYST", "LOGISTICAL CHOKE"];
+  const displayBadge = badge || "LOCATIONAL EVIDENCE";
+  const targetName = payload?.target_name || "ALLEGED GHOST DAYCARE FACILITY";
+  const coordinates = payload?.coordinates || "32.7157° N, 117.1611° W (SAN DIEGO)";
+  const mapRegion = payload?.map_region || "SAN DIEGO METROPOLITAN SECTOR";
+  const pois = payload?.points_of_interest || ["OPERATOR RESIDENCE", "CLAIM PROCESSING CENTER", "NOMINEE SHELL BANK"];
 
-  const isFullscreen = layout === "fullscreen_dossier";
-  const width = isFullscreen ? 880 : 500;
+  const isFullBleed = layout === "full_bleed_focus" || layout === "fullscreen_dossier";
+  const width = isFullBleed ? 1040 : 600;
+  const isPaper = theme === "vox_paper";
 
   return (
     <div
       style={{
         width,
-        backgroundColor: st.bg,
-        border: st.border,
-        borderRadius: 14,
-        padding: "20px 24px",
-        boxShadow: st.shadow,
-        zIndex: 28,
-        fontFamily: "'Courier New', Courier, monospace",
-        opacity,
-        transform: `scale(${scale})`,
-        transformOrigin: "top center",
+        backgroundColor: isPaper ? "#fdfbf7" : "rgba(12, 16, 26, 0.94)",
+        borderRadius: 6,
+        border: isPaper ? "2px solid #d97706" : "1.5px solid rgba(242, 166, 59, 0.55)",
+        padding: isFullBleed ? "28px 36px" : "20px 24px",
+        boxShadow: "0 25px 60px rgba(0,0,0,0.75), 0 4px 12px rgba(0,0,0,0.3)",
+        fontFamily: "'Courier Prime', 'Special Elite', 'Courier New', Courier, monospace",
+        position: "relative",
+        overflow: "hidden",
+        transform: `scale(${mapDrop}) rotate(-0.5deg)`,
+        transformOrigin: "center center",
       }}
     >
+      {/* Scotch tape on top corners */}
+      <div
+        style={{
+          position: "absolute",
+          top: -8,
+          left: 40,
+          width: 80,
+          height: 24,
+          backgroundColor: "rgba(255, 255, 255, 0.5)",
+          backdropFilter: "blur(1px)",
+          transform: "rotate(-15deg)",
+          zIndex: 20,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: -8,
+          right: 40,
+          width: 80,
+          height: 24,
+          backgroundColor: "rgba(255, 255, 255, 0.5)",
+          backdropFilter: "blur(1px)",
+          transform: "rotate(15deg)",
+          zIndex: 20,
+        }}
+      />
+
       {/* Header */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.15)",
+          borderBottom: `2px solid ${isPaper ? "#d97706" : "#f59e0b"}`,
           paddingBottom: 8,
           marginBottom: 16,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 16 }}>📡</span>
+          <span style={{ fontSize: 18 }}>🗺️</span>
           <span
             style={{
-              color: st.headerColor,
-              fontSize: 13,
+              color: isPaper ? "#92400e" : "#ffd166",
+              fontSize: isFullBleed ? 15 : 12,
               fontWeight: 900,
               letterSpacing: 1.5,
               textTransform: "uppercase",
@@ -127,105 +132,183 @@ export const VoxTacticalMap: React.FC<VoxTacticalMapProps> = ({
 
         <div
           style={{
-            border: `1.5px solid ${st.radarColor}`,
-            color: st.radarColor,
+            backgroundColor: "#b45309",
+            color: "#ffffff",
             fontSize: 11,
             fontWeight: 900,
             letterSpacing: 1.5,
-            padding: "2px 8px",
+            padding: "3px 10px",
             borderRadius: 4,
-            backgroundColor: "rgba(0,0,0,0.4)",
           }}
         >
           {displayBadge}
         </div>
       </div>
 
-      {/* Radar Container and Info Panel */}
-      <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-        {/* Animated Radar Sweep Vector Circle */}
+      {/* Map Layout: Left side Stylized Grid Map, Right side Facility Details */}
+      <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+        {/* Paper Map Canvas Simulation */}
         <div
           style={{
+            width: isFullBleed ? 440 : 260,
+            height: isFullBleed ? 240 : 180,
+            backgroundColor: isPaper ? "#f5efe1" : "#0f172a",
+            border: "1.5px solid #cbd5e1",
+            borderRadius: 4,
             position: "relative",
-            width: 140,
-            height: 140,
-            borderRadius: "50%",
-            border: `1.5px solid ${st.radarColor}`,
             overflow: "hidden",
-            backgroundColor: "rgba(0,0,0,0.4)",
             flexShrink: 0,
+            boxShadow: "inset 0 2px 8px rgba(0,0,0,0.15)",
           }}
         >
-          <div style={{ position: "absolute", inset: 22, borderRadius: "50%", border: `1px dashed rgba(255,255,255,0.2)` }} />
-          <div style={{ position: "absolute", inset: 44, borderRadius: "50%", border: `1px solid rgba(255,255,255,0.15)` }} />
-          <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1, backgroundColor: "rgba(255,255,255,0.2)" }} />
-          <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, backgroundColor: "rgba(255,255,255,0.2)" }} />
-
-          {/* Sweep Needle */}
+          {/* Topographical grid lines */}
           <div
             style={{
               position: "absolute",
-              top: "50%",
-              left: "50%",
-              width: 70,
-              height: 2,
-              backgroundColor: st.radarColor,
-              transformOrigin: "left center",
-              transform: `rotate(${sweepAngle}deg)`,
-              boxShadow: `0 0 10px ${st.radarColor}`,
+              inset: 0,
+              backgroundImage: "linear-gradient(#e2d9c2 1px, transparent 1px), linear-gradient(90deg, #e2d9c2 1px, transparent 1px)",
+              backgroundSize: "30px 30px",
+              opacity: 0.6,
             }}
           />
 
-          {/* Threat Target Point */}
+          {/* Animated Route Line connecting points */}
+          <svg
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+            }}
+          >
+            <path
+              d="M 40 180 Q 120 80 240 120 T 380 60"
+              fill="none"
+              stroke="#dc2626"
+              strokeWidth="3.5"
+              strokeDasharray="6 4"
+              strokeDashoffset={100 - routeDraw}
+            />
+            {/* POI dots */}
+            <circle cx="40" cy="180" r="5" fill="#1e293b" />
+            <circle cx="240" cy="120" r="5" fill="#1e293b" />
+          </svg>
+
+          {/* Target Red Pin with Bounce */}
           <div
             style={{
               position: "absolute",
-              top: 45,
-              left: 80,
-              width: 10,
-              height: 10,
+              top: isFullBleed ? 38 : 28,
+              left: isFullBleed ? 360 : 200,
+              transform: `scale(${pinDrop})`,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              zIndex: 10,
+            }}
+          >
+            <div
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                backgroundColor: "#dc2626",
+                boxShadow: "0 0 10px #dc2626",
+                border: "2px solid #ffffff",
+              }}
+            />
+            <div style={{ width: 3, height: 16, backgroundColor: "#dc2626" }} />
+          </div>
+
+          {/* Target Highlight Circle (Yellow Highlighter Pen ring) */}
+          <div
+            style={{
+              position: "absolute",
+              top: isFullBleed ? 40 : 30,
+              left: isFullBleed ? 345 : 185,
+              width: 50,
+              height: 50,
               borderRadius: "50%",
-              backgroundColor: st.targetColor,
-              opacity: pingOpacity,
-              boxShadow: `0 0 12px ${st.targetColor}`,
+              border: "4px solid #facc15",
+              backgroundColor: "rgba(250, 204, 21, 0.25)",
+              mixBlendMode: "multiply",
+              pointerEvents: "none",
             }}
           />
+
+          {/* Region Label Watermark */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 8,
+              left: 10,
+              fontSize: 10,
+              fontWeight: 800,
+              color: "#64748b",
+              letterSpacing: 1,
+            }}
+          >
+            SECTOR: {mapRegion}
+          </div>
         </div>
 
-        {/* Telemetry Information */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: st.textColor }}>
+        {/* Right side Location Breakdown */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
           <div>
-            <span style={{ color: "rgba(255,255,255,0.4)" }}>TARGET: </span>
-            <span style={{ fontWeight: 700, color: "#ffffff" }}>{targetName}</span>
-          </div>
-          <div>
-            <span style={{ color: "rgba(255,255,255,0.4)" }}>COORDINATES: </span>
-            <span style={{ color: st.radarColor, fontWeight: 700 }}>{coordinates}</span>
-          </div>
-          <div>
-            <span style={{ color: "rgba(255,255,255,0.4)" }}>GRID TYPE: </span>
-            <span>POLAR SECTOR SCAN</span>
-          </div>
-          {pois.length > 0 ? (
-            <div style={{ marginTop: 4 }}>
-              <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>POINTS OF INTEREST:</span>
-              <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                {pois.map((poi, idx) => (
-                  <span
-                    key={idx}
-                    style={{
-                      fontSize: 10,
-                      backgroundColor: "rgba(255,255,255,0.08)",
-                      padding: "2px 6px",
-                      borderRadius: 3,
-                    }}
-                  >
-                    • {poi}
-                  </span>
-                ))}
-              </div>
+            <div style={{ color: "#b45309", fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>
+              LOCATIONAL TARGET:
             </div>
-          ) : null}
+            <div
+              style={{
+                color: isPaper ? "#0f172a" : "#ffffff",
+                fontSize: isFullBleed ? 17 : 14,
+                fontWeight: 900,
+                marginTop: 2,
+              }}
+            >
+              📍 {targetName}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ color: "#64748b", fontSize: 10, fontWeight: 700 }}>
+              COORDINATES / JURISDICTION:
+            </div>
+            <div
+              style={{
+                color: isPaper ? "#334155" : "#93c5fd",
+                fontSize: 12,
+                fontWeight: 700,
+                marginTop: 2,
+              }}
+            >
+              {coordinates}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ color: "#64748b", fontSize: 10, fontWeight: 800, marginTop: 4 }}>
+              CONNECTED SURVEILLANCE POINTS:
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+              {pois.map((poi, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    fontSize: 11,
+                    color: isPaper ? "#1e293b" : "#e2e8f0",
+                    fontWeight: 700,
+                    backgroundColor: isPaper ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.06)",
+                    padding: "3px 8px",
+                    borderRadius: 3,
+                    borderLeft: "3px solid #dc2626",
+                  }}
+                >
+                  • {poi}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

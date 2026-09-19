@@ -303,8 +303,10 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
     );
   }
 
+  // 12fps stop-motion stepping for tactile paper cutout feel (Rule 122 & Vox Architecture)
+  const steppedFrame = Math.floor(frame / 2.5) * 2.5;
   const cell = computeForegroundCell(width, height, position, aspect);
-  const slideIn = interpolate(frame, [0, fadeFrames], [0, 1], {
+  const slideIn = interpolate(steppedFrame, [0, fadeFrames], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -321,7 +323,8 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
         height: cell.height,
         opacity,
         transform: `translateX(${translateX}px)`,
-        filter: "drop-shadow(0 20px 35px rgba(0,0,0,0.65)) drop-shadow(0 4px 10px rgba(0,0,0,0.4))",
+        // Signature Vox White Sticker Cutout Outline + Deep Realistic Ground Drop Shadow
+        filter: "drop-shadow(3px 0 0 #ffffff) drop-shadow(-3px 0 0 #ffffff) drop-shadow(0 3px 0 #ffffff) drop-shadow(0 -3px 0 #ffffff) drop-shadow(2px 2px 0 #ffffff) drop-shadow(-2px -2px 0 #ffffff) drop-shadow(0 25px 40px rgba(0,0,0,0.75))",
         zIndex: 15,
         pointerEvents: "none",
       }}
@@ -950,36 +953,35 @@ const OverlaySegmentView = ({
 
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
-      {statValue ? (
+      {statValue && !forensicOverlay ? (
         <div
           style={{
             position: "absolute",
-            top: 50,
+            top: 60,
             left: isLeft ? "auto" : 70,
             right: isLeft ? 70 : "auto",
             zIndex: 30,
-            backgroundColor: "rgba(12, 18, 28, 0.92)",
-            border: "2px solid #f2a63b",
-            borderRadius: 16,
-            padding: "16px 28px",
-            boxShadow: "0 12px 35px rgba(0,0,0,0.75), 0 0 20px rgba(242, 166, 59, 0.25)",
-            transform: `scale(${statSpring})`,
+            backgroundColor: "#faf7ee",
+            border: "2px solid #b45309",
+            borderRadius: 6,
+            padding: "14px 24px",
+            boxShadow: "0 18px 40px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3)",
+            transform: `scale(${statSpring}) rotate(-1.5deg)`,
             opacity: statSpring,
             display: "flex",
             flexDirection: "column",
-            gap: 4,
+            gap: 2,
+            fontFamily: "'Courier Prime', 'Special Elite', 'Courier New', Courier, monospace",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 24 }}>⚠️</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 20 }}>📊</span>
             <div
               style={{
-                color: "#ffd166",
-                fontSize: 38,
+                color: "#b45309",
+                fontSize: 34,
                 fontWeight: 900,
-                fontFamily: "'Segoe UI', Roboto, Arial, sans-serif",
                 letterSpacing: 1,
-                textShadow: "0 2px 8px rgba(0,0,0,0.9)",
               }}
             >
               {statValue}
@@ -988,12 +990,11 @@ const OverlaySegmentView = ({
           {statLabel ? (
             <div
               style={{
-                color: "#94a3b8",
-                fontSize: 16,
+                color: "#475569",
+                fontSize: 12,
                 fontWeight: 700,
                 letterSpacing: 1.5,
                 textTransform: "uppercase",
-                fontFamily: "'Segoe UI', Roboto, Arial, sans-serif",
               }}
             >
               {statLabel}
