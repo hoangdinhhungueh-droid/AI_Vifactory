@@ -1,43 +1,50 @@
-# 📐 [TASK_SPEC] INFRA_V7_AUTONOMOUS_FEEDBACK_LOOP — Closed-Loop Algorithmic Discovery Engine
+# 📐 [TASK_SPEC] INFRA_3D_PROCEDURAL_VOX_INTEGRATION_AND_COT_HARNESS
 
 ## 📌 1. Bối Cảnh & Ranh Giới (Context & Boundaries)
-- **Feature Title**: V7 Autonomous Closed-Loop Feedback Engine (An Ong YouTube Studio Suggested Videos Formula)
-- **Primary Block Impacted**: `B11.0` (Analytics Feedback), `B1.0` (Trend Engine), `B1.5` (Competitor Recon)
+- **Feature Title**: 3D Procedural Evidence Prop Engine & DeepSeek-R1 CoT Forensic Auditor
+- **Primary Blocks Impacted**:
+  - `B3.0` (`app/services/director_planner_b3.py`): Nhận diện và gán lớp đồ họa pháp y `evidence_3d_prop`.
+  - `B6.0` (`app/services/build_remotion_props.py`): Đóng gói trường `forensicOverlay` cho Remotion.
+  - `B7.0` (`remotion/src/components/vox/VoxOverlayLayer.tsx`): Kết xuất `<EvidenceProp3D />` theo tọa độ layout.
+  - `Audit / Council Engine` (`app/audit/deepseek_reasoner.py` & `.agents/skills/vf-pipeline-teamwork/`): Tích hợp DeepSeek-R1 CoT.
 - **In-Scope**:
-  - `scripts/b11_channel_analytics.py`: Thêm `calculate_v7_benchmarks()` và `harvest_v7_suggested_candidates()`.
-  - `scripts/b11_antigravity_engine.py`: Thêm `load_v7_pool()`, `save_v7_pool()`, `update_v7_pool()` và kết nối gặt tự động vào B11 loop.
-  - `app/services/trend_engine_b1.py`: Thêm `fetch_pending_v7_candidates()`, nạp vào Competitive Scoring, truyền `anchor_video_id` sang B1.5, và `mark_v7_candidate_consumed()`.
-  - `app/services/competitor_recon_b15.py`: Bổ sung `anchor_video_id` vào `run_b15()`.
-  - `PIPELINE_CONTRACTS.md`: Cập nhật khế ước lưu trữ và chuyển trạng thái `data/v7_winning_pool.json`.
-  - `tests/test_v7_feedback_loop.py`: 6 unit/integration test cases.
+  - Tích hợp `EvidenceProp3D` vào `VoxOverlayLayer.tsx` (chế độ `split_right`, `split_left`, `full_bleed_focus`).
+  - Mở rộng `detect_forensic_overlay()` trong `director_planner_b3.py` để tự động nhận diện từ khóa ấn phẩm/vật chứng bản địa (`hanko`, `seal`, `stamp`, `con dấu`, `triện`, `mộc đỏ`, `vật chứng`, `chứng thực`).
+  - Viết test suite `tests/test_evidence_3d_prop_pipeline.py` thẩm định trọn vẹn B3 ➔ B6 ➔ B7.
+  - Xác lập bộ 3 Cặp Docs Pháp Lý Hội Đồng theo `/vf-pipeline-teamwork`.
 - **Non-Goals**:
-  - Không sửa đổi cấu trúc kịch bản B2 (giữ nguyên 5 Beat Docudrama).
-  - Không thay đổi logic render Remotion B6–B8.
-  - Không tạo mock views/CTR hay giả lập video ảo khi chưa có data thật (Rule 118).
+  - Không phá vỡ kiến trúc Two-Layer (`Layer 1 BG 16:9 + Layer 2 FG 1:1 + Subtitle HUD`).
+  - Không đụng chạm Audio Spine Hard Gate B2.6/B3 (Rule 120).
+  - Không nạp file mesh nhị phân 3D cồng kềnh (`.glb`/`.obj`); 100% procedural Three.js.
 
 ---
 
 ## 🎯 2. Yêu Cầu Kỹ Thuật (Requirements R1 - R5)
-- **R1 (Closed-Loop Autonomous Engine)**: B11 định kỳ trích xuất video đề xuất đạt chuẩn thắng cuộc ➔ lưu trữ tại `data/v7_winning_pool.json` ➔ B1.0 tự động đọc và đưa vào vòng tuyển chọn đề tài.
-- **R2 (3-Layer Clean Learning Gate)**:
-  - Lớp 1: Lọc nhiễu thống kê (`views >= min_views`).
-  - Lớp 2: Tiêu chuẩn kép V7 (`ctr_percent > benchmark_avg_ctr` VÀ `avd_seconds > benchmark_avg_avd`).
-  - Lớp 3: Lọc ngách ngữ nghĩa (khớp Canonical Pillars, chặn `OFF_NICHE_KEYWORDS` regex).
-- **R3 (Competitive Scoring Gate B1.0)**: Ứng viên V7 và ứng viên Google Trends RSS cạnh tranh công bằng qua `assess_keyword_video_viability()`; chỉ đề tài đạt điểm >= 8.0 mới được chọn.
-- **R4 (B1.5 Targeted Recon)**: Khi đề tài V7 thắng, truyền `referring_video_id` làm `anchor_video_id` cho `run_b15()` để mổ xẻ trực tiếp video gốc và tìm Fatal Explanatory Vacuum.
-- **R5 (Zero-Mock Fallback)**: Nếu pool rỗng hoặc chưa có số liệu thực tế, pipeline tự động fallback 100% về Google Trends RSS live mà không làm gián đoạn hệ thống.
+- **R1 (3D Procedural Wiring)**: `EvidenceProp3D` được gắn trực tiếp vào `VoxOverlayLayer.tsx` dưới `rawType === "evidence_3d_prop" | "3d_hanko_seal" | "3d_evidence_prop"`.
+- **R2 (Responsive Layout Frame)**: Khi kích hoạt, component 3D co giãn theo layout (`isFullBleed ? 1200x750 : 700x500`), giữ vững viền noir và shadow card.
+- **R3 (B3 Director Detection)**: `director_planner_b3.py` tự động kích hoạt `evidence_3d_prop` khi kịch bản nhắc tới tang vật con dấu/triện đỏ/vật chứng chứng thực.
+- **R4 (DeepSeek-R1 CoT Auditor)**: `app/audit/deepseek_reasoner.py` trích xuất `reasoning_content` để thẩm định Rule 130, Rule 125, Rule 136.
+- **R5 (VPS & CI/CD Parity)**: Biên dịch bundle và render test trên VPS Hetzner đạt Exit Code 0, CPU SWangle 6.0 fps, 0 VRAM.
 
 ---
 
 ## 🔒 3. Khế Ước Dữ Liệu (Interface Contracts)
-- **Pool File**: `data/v7_winning_pool.json`
-- **Candidate Schema**:
-  - `candidate_id`: `V7_<MARKET>_<HEX>`
-  - `referring_video_id`: YouTube Video ID của đối thủ đề xuất
-  - `referring_title`: Tiêu đề video đối thủ
-  - `ctr_percent`: Tỷ lệ chuyển đổi / CTR
-  - `avd_seconds`: Thời lượng xem trung bình (Average View Duration)
-  - `views_from_source`: Lượt xem từ nguồn đề xuất
-  - `status`: `PENDING` ➔ `CONSUMED`
-  - `consumed_by_episode`: Mã tập sản xuất (e.g. `<MARKET>_EP<XXXX>`)
-  - `created_at` / `consumed_at`: Mốc thời gian chuẩn ISO-8601 UTC.
+- **Overlay Type**: `evidence_3d_prop`
+- **Schema `forensicOverlay`**:
+  ```json
+  {
+    "type": "evidence_3d_prop",
+    "legacy_type": "evidence_board",
+    "theme": "vox_paper",
+    "layout": "split_right",
+    "title": "CONFIDENTIAL EVIDENCE // FORENSIC ARTIFACT",
+    "badge": "PHYSICAL EXHIBIT",
+    "sfx_cue": "stamp_slam",
+    "label": "AUTHENTICATED IMPERIAL SEAL // 3D PROCEDURAL ARTIFACT",
+    "payload": {
+      "prop_type": "hanko_seal",
+      "evidence_id": "EXHIBIT-3D-01",
+      "authentication": "VERIFIED PHYSICAL TAMPER-PROOF"
+    }
+  }
+  ```

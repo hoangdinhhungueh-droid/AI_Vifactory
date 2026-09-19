@@ -1,59 +1,49 @@
-# 🛠️ [CHANGE_MANIFEST] INFRA_V7_AUTONOMOUS_FEEDBACK_LOOP — Closed-Loop Algorithmic Discovery Engine
+# 📝 [CHANGE_MANIFEST] INFRA_3D_PROCEDURAL_VOX_INTEGRATION_AND_COT_HARNESS
 
-## 📌 1. Trạng Thái Thực Thi (Execution Metadata)
-- **Builder Agent**: Antigravity Multi-Agent Harness (Builder Role)
-- **Thời điểm hoàn tất**: 2026-09-19T14:28:00+07:00
-- **AST Py-Compile**: `EXIT CODE 0` (Tất cả 4 module đều đạt)
-- **Ghost Hunter Gate (Rule 125)**: `EXIT CODE 0` (100% clean, 0 defects)
-
----
-
-## 📝 2. Chi Tiết File Sửa Đổi (Line-Level Changes)
-
-### 1. `scripts/b11_channel_analytics.py`
-- **Mục đích sửa**: Bổ sung hàm tính mốc Benchmark dòng Tổng (`calculate_v7_benchmarks`) và hàm trích xuất, sàng lọc 3 lớp video đề xuất (`harvest_v7_suggested_candidates`).
-- **Nội dung bổ sung**:
-  - `calculate_v7_benchmarks(rows)`: Tính `avg_ctr` và `avg_avd` làm thước đo chuẩn từ dữ liệu dòng Tổng.
-  - `harvest_v7_suggested_candidates(access_token, winning_video_ids, market, min_views, days)`: Query `RELATED_VIDEO` từ YouTube Analytics API v2, áp dụng bộ lọc 3 lớp (Views >= 10, Kép V7 CTR/AVD > Average, Lọc ngách ngữ nghĩa + chặn `OFF_NICHE_KEYWORDS`).
-  - Thêm `import re` ở đầu file.
-- **AST Py-Compile**: `EXIT CODE 0`
-
-### 2. `scripts/b11_antigravity_engine.py`
-- **Mục đích sửa**: Tích hợp V7 Harvester vào vòng lặp phân tích định kỳ và quản lý state pool `data/v7_winning_pool.json`.
-- **Nội dung bổ sung**:
-  - Định nghĩa `V7_POOL_FILE = os.path.join(DATA_DIR, "v7_winning_pool.json")`.
-  - Các hàm tiện ích: `load_v7_pool`, `save_v7_pool`, `update_v7_pool` (hỗ trợ deduplication chống lặp video đối thủ).
-  - Tích hợp gọi `harvest_v7_suggested_candidates` và cập nhật pool trong market processing loop.
-- **AST Py-Compile**: `EXIT CODE 0`
-
-### 3. `app/services/trend_engine_b1.py`
-- **Mục đích sửa**: Tích hợp ứng viên từ V7 Pool vào vòng tuyển chọn đề tài chính với cơ chế Đấu thầu Điểm Khả Thi (Competitive Scoring).
-- **Nội dung bổ sung**:
-  - Hàm `fetch_pending_v7_candidates(market)` và `mark_v7_candidate_consumed(candidate_id, episode_id)`.
-  - Nạp V7 candidates vào `fetch_live_trending_terms()` và ưu tiên đưa vào vòng thẩm định viability qua `assess_keyword_video_viability()`.
-  - Truyền `anchor_video_id` sang B1.5 (`run_b15`) khi đề tài có nguồn gốc từ V7.
-  - Đánh dấu `status: "CONSUMED"` trong `commit_trend_task()`.
-- **AST Py-Compile**: `EXIT CODE 0`
-
-### 4. `app/services/competitor_recon_b15.py`
-- **Mục đích sửa**: Hỗ trợ tham số `anchor_video_id` trong hàm `run_b15()`.
-- **Nội dung bổ sung & hiệu chỉnh**:
-  - Bổ sung `anchor_video_id: Optional[str] = None` vào `run_b15`.
-  - Tự động chèn video đối thủ V7 làm ứng viên hàng đầu trong danh sách phân tích của B1.5 ngay trước `select_competitors()`.
-  - **Forensic Fix**: Tách khối `if anchor_video_id:` độc lập sau khối search/cache, khắc phục triệt để lỗi thụt lề tiềm ẩn vốn có thể gây bỏ qua logic trích xuất chi tiết video khi `anchor_video_id` là `None`.
-- **AST Py-Compile**: `EXIT CODE 0`
-
-### 5. `PIPELINE_CONTRACTS.md`
-- **Mục đích sửa**: Cập nhật hợp đồng giao diện Mục 7 (`Khối B11 ➔ Khối B1.0/B1.5: V7 Autonomous Closed-Loop Feedback Engine`).
-- **Nội dung bổ sung**: Generic JSON Schema cho `data/v7_winning_pool.json` và quy chuẩn chuyển trạng thái `PENDING` ➔ `CONSUMED`.
-
-### 6. `tests/test_v7_feedback_loop.py` [NEW]
-- **Mục đích**: Bộ unit & integration test toàn diện 6 test cases kiểm thử trọn vẹn logic tính benchmark, lọc 3 lớp, chống data poisoning, quản lý state pool, và fallback zero-mock.
+## 📌 1. Thông Tin Bản Thay Đổi (Change Metadata)
+- **Author Role**: Builder / Implementer
+- **Target Task**: `INFRA_3D_PROCEDURAL_VOX_INTEGRATION_AND_COT_HARNESS`
+- **Scope**: Nối 3D Procedural Three.js vào `VoxOverlayLayer.tsx`, mở rộng `director_planner_b3.py`, tích hợp `deepseek_reasoner.py`, và dọn dẹp Option A.
 
 ---
 
-## 🧹 3. Cam Kết Dọn Rác & Zero-Ghost (Rule 119 & 125)
-- [x] Không để lại file tạm rác trong `/tmp/`.
-- [x] Không tạo file `.bak*`, `.backup*`, file shadow code.
-- [x] Đã đồng bộ comment/docstring nội hàm (Rule 125 Single Truth).
-- [x] Đã vượt qua cổng kiểm toán vật lý `ghost_code_detector.py` với 0 defects.
+## 📂 2. Danh Mục File Đã Thay Đổi (Touched Files)
+
+### A. Core Pipeline & Remotion Video Engine
+1. **[NEW] `remotion/src/components/EvidenceProp3D.tsx`**:
+   - Dựng hình procedural con dấu triện đỏ Hanko / Asian Imperial Seal bằng code Three.js thuần túy (`CylinderGeometry`, `SphereGeometry`, `TorusGeometry`).
+   - Phối màu Stylized Comic Noir cel-shading với viền mực đen inverted hull, 0% photorealistic (Rule 122).
+   - Diễn hoạt camera orbit 360° đồng bộ từng frame bằng `useCurrentFrame()`.
+2. **[MODIFY] `remotion/src/components/vox/VoxOverlayLayer.tsx`**:
+   - Nhập khẩu `EvidenceProp3D`.
+   - Bổ sung nhánh render cho `rawType === "evidence_3d_prop" | "3d_hanko_seal" | "3d_evidence_prop"`.
+   - Thiết lập khung hiển thị card noir bo góc có viền phát sáng cyan (`width: isFullBleed ? 1200 : 700`, `height: isFullBleed ? 750 : 480`).
+3. **[MODIFY] `remotion/src/index.tsx`**:
+   - Đăng ký composition độc lập `EvidenceProp3DTest` phục vụ kiểm định trực quan nhanh.
+4. **[MODIFY] `app/services/director_planner_b3.py`**:
+   - Bổ sung quy tắc nhận diện số 5 trong `detect_forensic_overlay()` cho các từ khóa tang vật bản địa (`hanko`, `seal`, `stamp`, `con dấu`, `triện`, `mộc đỏ`, `vật chứng`, `tang vật`, `도장`, `인감`, `증거물`).
+   - Trả về payload chuẩn: `type: "evidence_3d_prop"`, `layout: "split_right"`, `badge: "PHYSICAL EXHIBIT"`, `sfx_cue: "stamp_slam"`.
+
+### B. Audit & Multi-Agent Council Engine
+5. **[NEW] `app/audit/deepseek_reasoner.py`**:
+   - Module chuyên trách cho vai *Adversarial Auditor* trong hội đồng multi-agent.
+   - Hỗ trợ gọi API DeepSeek Reasoner (`deepseek-reasoner`), bóc tách tường minh cả 2 trường `reasoning_content` (CoT chain) và `content` (phán quyết `CLEAR` / `VETO`).
+   - Tích hợp bộ prompt kiểm toán đối kháng 3 trục thép: Rule 130 (Causal Integrity), Rule 125 & 128 (Ghost Code & Bias), Rule 136 (Zero Asset Leak).
+6. **[MODIFY] `.agents/skills/vf-pipeline-teamwork/SKILL.md`**:
+   - Chuẩn hóa vai trò số 4: *Adversarial Auditor powered by DeepSeek-R1 CoT*.
+7. **[MODIFY] `C:\Users\hunghd2\.gemini\config\skills\remotion\SKILL.md`**:
+   - Hợp nhất cẩm nang Remotion duy nhất: bổ sung chunking 5-Beat, still frame preview runbook, background render VPS.
+8. **[DELETE] `.agents/skills/remotion-*` (13 folders)**:
+   - Dọn sạch 13 thư mục generic boilerplate không dùng theo Option A.
+
+### C. Test Harness
+9. **[NEW] `tests/test_evidence_3d_prop_pipeline.py`**:
+   - 5 bài kiểm thử unit & integration cho 3D prop detection trên các ngôn ngữ (EN, VN, KR) và bảo toàn tính tương thích ngược cho các overlay 2D cũ.
+
+---
+
+## 🛡️ 3. Kiểm Tra Ghost Code & Biên Dịch (Rule 125 & Rule 127)
+- `python3 -m py_compile app/services/director_planner_b3.py` ➔ **Exit code 0**
+- `python3 -m py_compile app/audit/deepseek_reasoner.py` ➔ **Exit code 0**
+- `pytest tests/test_evidence_3d_prop_pipeline.py` ➔ **5/5 PASSED trên cả Local và VPS**
+- `npx remotion bundle` ➔ **Exit code 0**

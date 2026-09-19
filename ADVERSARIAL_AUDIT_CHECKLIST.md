@@ -1,21 +1,26 @@
-# 🛡️ [ADVERSARIAL_AUDIT_CHECKLIST] INFRA_V7_AUTONOMOUS_FEEDBACK_LOOP
+# 🕵️ [ADVERSARIAL_AUDIT_CHECKLIST] INFRA_3D_PROCEDURAL_VOX_INTEGRATION_AND_COT_HARNESS
 
-> **Kiểm Toán Viên Đối Kháng (Adversarial Auditor - Strictly Review-Only)**.
-> Rà soát độc lập trên 18 Kỷ Luật Thép và quyền VETO tuyệt đối.
+## 📌 1. Bối Cảnh Kiểm Toán Pháp Y (Forensic Audit Scope)
+- **Auditor Role**: Adversarial Auditor (Red Team Mindset, Strictly Review-Only, Powered by DeepSeek-R1 CoT Harness)
+- **Nguyên Tắc**: Quyền phủ quyết tuyệt đối (Absolute VETO). Không sửa code, chỉ soi xét lỗi và cấp phán quyết.
+- **Đối Tượng Rà Soát**: Toàn bộ diffs mã nguồn trong `remotion/`, `app/services/director_planner_b3.py`, `app/audit/deepseek_reasoner.py`, và `.agents/skills/`.
 
 ---
 
-## ⚖️ BẢNG ĐỐI SOÁT 18 KỶ LUẬT THÉP & INVARIANTS
+## ⚖️ 2. Bảng Đối Soát 18 Kỷ Luật Thép (Iron Laws Audit Matrix)
 
-| STT | Kỷ Luật Thép | Nội Dung Thẩm Định Pháp Y | Đánh Giá Thực Tế | Phán Quyết |
-| :---: | :--- | :--- | :--- | :---: |
-| 1 | **Rule 118** | Zero-Mock Data Mandate: Tuyệt đối không tạo số liệu view/CTR giả định khi kênh chưa có data. | Khi pool trống hoặc không có data, hàm trả về `[]` sạch sẽ, tự động fallback 100% về Google Trends RSS. | **PASS** |
-| 2 | **Rule 119** | Strict Existing Codebase: Không viết script shadow ngoài lề, dọn sạch `/tmp/`. | Chỉ sửa trực tiếp các module chuẩn: `b11_channel_analytics.py`, `b11_antigravity_engine.py`, `trend_engine_b1.py`, `competitor_recon_b15.py`. | **PASS** |
-| 3 | **Rule 120** | Audio Spine Invariant: Không xâm phạm cấu trúc audio spine hoặc duration. | Phạm vi can thiệp giới hạn ở B11 và B1/B1.5, hoàn toàn không chạm vào B2.6/B3 Audio Spine. | **PASS** |
-| 4 | **Rule 121** | Strict Verification Protocol: Mọi kết luận phải có bằng chứng Exit Code 0 và log thật. | Pytest 6/6 PASS, ISO Neighbor PASS, Ghost Detector PASS, Exit code 0. | **PASS** |
-| 5 | **Rule 124** | Atomic Code-ification: Chốt phương án là code ngay xuống đĩa, không hứa hẹn suông. | Toàn bộ 4 module và 1 test suite đã được cập nhật trực tiếp xuống workspace. | **PASS** |
-| 6 | **Rule 125** | Single Truth & Zero Ghost Remnant: 0 file `.bak*`, 0 dead imports, 0 bypass shadow code. | `ghost_code_detector.py` quét toàn bộ đĩa cứng vật lý: 0 defects, 100% clean. | **PASS** |
-| 7 | **Rule 127** | Runtime Live Execution Gate: Cấm nghiệm thu chỉ bằng py_compile. | Đã chạy runtime kiểm thử hàm sống `calculate_v7_benchmarks`, `harvest_v7_suggested_candidates`, `fetch_pending_v7_candidates` (Exit Code 0). | **PASS** |
-| 8 | **Rule 128** | Anti-Semantic-Bias & Generic Contract: Schema độc lập thị trường, cấm hardcode tên tập/đối thủ. | Schema dùng generic placeholder `V7_<MARKET>_<REFERRING_VIDEO_ID>`, pattern regex `^V7_[A-Z]{2}_[a-zA-Z0-9_-]+$`. | **PASS** |
-| 9 | **Rule 129** | Autonomous Clarification Gate: Đã hỏi User về các nhánh thiết kế cốt lõi. | Đã hỏi và chốt với User: Option A + Competitive Scoring + Bộ lọc 3 lớp chặt chẽ. | **PASS** |
-| 10 | **Rule 134** | Exact Parity Sweep: Đảm bảo hằng số cấu hình không bị lệch pha. | `VIABILITY_THRESHOLD = 8.0` đồng nhất 100% giữa B1 và test neighbor. | **PASS** |
+| Kỷ Luật Thép | Tiêu Chuẩn Rà Soát | Bằng Chứng Pháp Y | Đánh Giá |
+| :--- | :--- | :--- | :--- |
+| **Rule 118** (Zero-Mock Data) | Không tạo mock data hay giả lập số liệu | Không tạo mock CTR hay số liệu ảo; toàn bộ test dựa trên input text thực tế | ✅ PASS |
+| **Rule 119** (Strict VPS Codebase & Cleanup) | File tạm `/tmp/` phải được dọn sạch sẽ | Toàn bộ bundle test và render test `/tmp/poc_3d*` đã được dọn sạch | ✅ PASS |
+| **Rule 120** (Hollywood Audio Spine) | Cấm phá vỡ timing `durationInFrames` | 3D Evidence Prop gắn vào `VoxOverlayLayer`, tuân thủ 100% frame duration của scene do Whisper cấp | ✅ PASS |
+| **Rule 121** (Strict Verification Protocol) | Bằng chứng Exit Code 0 thực tế | Pytest 5/5 PASSED, bundle exit 0, render exit 0 | ✅ PASS |
+| **Rule 122** (Pixel-Level Visual Audit) | 100% Stylized Comic Noir, 0% photorealistic | `EvidenceProp3D` dùng `MeshToonMaterial` + ink outline black, không dùng photorealistic mesh | ✅ PASS |
+| **Rule 124** (Atomic Code-ification) | Chốt giải pháp là code ngay xuống đĩa | Đã code và đồng bộ bit-for-bit xuống cả Local và VPS | ✅ PASS |
+| **Rule 125** (Zero Ghost Code) | Cấm `.bak*`, orphan scripts, shadow code | Không sinh file backup rác, 13 folder generic đã được xóa sạch | ✅ PASS |
+| **Rule 126** (Three-Way Physical Sync) | VPS ⇄ GitHub ⇄ Local parity | SHA256 đối soát khớp 100% qua `sync_file_to_vps.py` | ✅ PASS |
+| **Rule 127** (Runtime Function Execution) | Cấm chỉ dựa vào `py_compile` đơn thuần | Đã chạy sống pytest và render headless video 90 frames trên VPS | ✅ PASS |
+| **Rule 128** (Anti-Semantic Bias) | Schema generic, cấm hardcode tropes | `evidence_3d_prop` hỗ trợ đa ngôn ngữ EN, VN, KR qua regex tổng quát | ✅ PASS |
+| **Rule 130** (Factual Causal Integrity) | Catalyst vs Transmission; cấm bịa twist | Module `deepseek_reasoner.py` bổ sung chốt chặn CoT kiểm toán nhân quả | ✅ PASS |
+| **Rule 134** (Exact Parity & Sweep) | Không để lệch pha cấu hình giữa các file | Cả Local và VPS đều đồng bộ Three.js 0.160.1 và TSX components | ✅ PASS |
+| **Rule 136** (Zero-Asset-Leak) | Cấm rò rỉ mã hash, filename lên video | Thẻ tiêu đề 3D Prop chỉ hiển thị `title` và `subtitle` chuẩn, 0% file name `.png` | ✅ PASS |
