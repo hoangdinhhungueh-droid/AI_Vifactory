@@ -1220,7 +1220,8 @@ def sync_card_to_notion(task_id: str, card: dict) -> bool:
 
 
 def run_b15(task_id: str, target_keyword: str, niche: str = "General",
-            use_cache: bool = True, market: Optional[str] = None) -> Optional[Dict]:
+            use_cache: bool = True, market: Optional[str] = None,
+            anchor_video_id: Optional[str] = None) -> Optional[Dict]:
     """
     Main Orchestrator for B1.5 Two-Pass Competitor Recon:
       Pass 1: Collect candidates, details, transcripts, comments, and thumbnails.
@@ -1229,7 +1230,7 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
     """
     load_env()
     market = (market or market_of(task_id)).lower()
-    logger.info("[b15] Initiating recon for task=%s keyword=%r market=%s", task_id, target_keyword, market)
+    logger.info("[b15] Initiating recon for task=%s keyword=%r market=%s anchor=%s", task_id, target_keyword, market, anchor_video_id)
 
     # 1. Candidate search with cache support
     cache_path = CACHE_DIR / f"{task_id}.json"
@@ -1243,6 +1244,7 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
         if quota.should_fallback():
             logger.warning("[b15] Quota at %.0f%% of daily cap - zero-quota scraper fallback active", quota.ratio * 100)
         candidates = youtube_search(api_key, target_keyword, market, quota)
+
         if not candidates:
             logger.warning("[b15] No candidates found for keyword %r (quota exhausted or zero matches). Activating resilient fallback recon card.", target_keyword)
             anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, [], [], niche)
@@ -1282,6 +1284,12 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
             }, ensure_ascii=False))
         except OSError as e:
             logger.debug("[b15] Cache write failed: %s", e)
+
+    # 1.5 Inject V7 anchor competitor video if provided
+    if anchor_video_id:
+        if not any(c.get("video_id") == anchor_video_id for c in candidates):
+            candidates.insert(0, {"video_id": anchor_video_id, "title": target_keyword, "source": "v7_anchor"})
+            logger.info("[b15] Prepended V7 anchor competitor video: %s", anchor_video_id)
 
     # 2. Select top all-time outliers and recent engagement benchmarks
     group1, group2 = select_competitors(candidates)

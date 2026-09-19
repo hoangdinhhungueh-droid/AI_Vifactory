@@ -19,6 +19,7 @@ and live Google Trends RSS. Unset or unavailable fields are recorded as null.
 
 import sys
 import os
+import re
 import json
 import urllib.request
 import urllib.parse
@@ -501,6 +502,215 @@ def fetch_complete_channel_analytics(access_token, market="KR", days=28):
         "tab_4_research_trends": tab_4
     }
     return payload
+
+
+def calculate_v7_benchmarks(rows: list) -> tuple:
+    """
+    Tính mốc Benchmark dòng Tổng (Total Benchmark) cho danh sách video đề xuất:
+      - avg_ctr: Mốc trung bình CTR (hoặc conversion share %)
+      - avg_avd: Mốc trung bình thời lượng xem (giây)
+    """
+    if not rows:
+        return 0.0, 0.0
+    total_views = sum(r.get("views", 0) for r in rows)
+    total_watch_seconds = sum(r.get("watch_seconds", 0) or (r.get("watch_minutes", 0) * 60.0) for r in rows)
+    avg_avd = (total_watch_seconds / total_views) if total_views > 0 else 0.0
+
+    ctrs = [r.get("ctr_percent") for r in rows if r.get("ctr_percent") is not None]
+    if ctrs:
+        avg_ctr = sum(ctrs) / len(ctrs)
+    else:
+        avg_ctr = (100.0 / len(rows)) if rows else 0.0
+    return round(float(avg_ctr), 2), round(float(avg_avd), 2)
+
+
+def harvest_v7_suggested_candidates(
+    access_token: str,
+    winning_video_ids: list = None,
+    market: str = "EN",
+    min_views: int = 10,
+    days: int = 28
+) -> list:
+    """
+    Khai thác dữ liệu Video Đề Xuất (Suggested Videos) học từ 'Công thức V7' của An Ong.
+    Áp dụng bộ lọc 3 lớp chặt chẽ:
+      1. Khử nhiễu thống kê: views >= min_views (mặc định 10).
+      2. Lọc kép V7: CTR > benchmark_avg_ctr VÀ AVD > benchmark_avg_avd.
+      3. Lọc ngách ngữ nghĩa: detect_safety_and_theme() bắt buộc khớp với Canonical Pillars.
+    """
+    try:
+        from app.services.hhtech_reasoner import detect_safety_and_theme
+    except ImportError:
+        def detect_safety_and_theme(title, m):
+            return "business_rise_fall", "YT-Safe-Standard", "Treatment"
+
+    CANONICAL_PILLARS = {
+        "true_crime_investigative",
+        "psychology_manipulation_fraud",
+        "business_rise_fall",
+        "societal_crisis",
+        "modern_history_untold",
+        "tech_geopolitical_battle",
+        "ancient_prehistory_anthropology",
+        "indigenous_philosophy_stoicism",
+        "military_logistics_geopolitics",
+        "consumer_injustice_institutional_trap"
+    }
+
+    now = datetime.now(timezone.utc)
+    end_date = now.strftime("%Y-%m-%d")
+    start_date = (now - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    m_up = (market or "EN").upper()
+
+    # 1. Xác định danh sách Winning Videos nếu chưa truyền vào
+    if not winning_video_ids:
+        try:
+            top_res = query_youtube_analytics_api(access_token, {
+                "ids": "channel==MINE",
+                "startDate": start_date,
+                "endDate": end_date,
+                "dimensions": "video",
+                "metrics": "views,estimatedMinutesWatched",
+                "sort": "-views",
+                "maxResults": 5
+            })
+            winning_video_ids = [row[0] for row in top_res.get("rows", []) if row[1] >= 100]
+        except Exception:
+            winning_video_ids = []
+
+    if not winning_video_ids:
+        return []
+
+    discovered_candidates = []
+    seen_referring_ids = set()
+
+    for vid in winning_video_ids:
+        try:
+            rel_res = query_youtube_analytics_api(access_token, {
+                "ids": "channel==MINE",
+                "startDate": start_date,
+                "endDate": end_date,
+                "dimensions": "insightTrafficSourceDetail",
+                "filters": f"video=={vid};insightTrafficSourceType==RELATED_VIDEO",
+                "metrics": "views,estimatedMinutesWatched,averageViewDuration",
+                "sort": "-views",
+                "maxResults": 50
+            })
+        except Exception:
+            continue
+
+        raw_rows = []
+        for r in rel_res.get("rows", []):
+            ref_id = r[0]
+            v_count = int(r[1])
+            w_min = float(r[2])
+            avd_sec = float(r[3]) if len(r) > 3 else (w_min * 60.0 / max(v_count, 1))
+            raw_rows.append({
+                "referring_video_id": ref_id,
+                "views": v_count,
+                "watch_minutes": w_min,
+                "watch_seconds": w_min * 60.0,
+                "avd_seconds": round(avd_sec, 2),
+                "ctr_percent": None
+            })
+
+        if not raw_rows:
+            continue
+
+        # Tính tổng views đề xuất để làm mẫu số tính CTR conversion proxy
+        total_sug_views = sum(r["views"] for r in raw_rows)
+        for r in raw_rows:
+            r["ctr_percent"] = round((r["views"] / max(total_sug_views, 1)) * 100.0, 2)
+
+        # Tính mốc Benchmark dòng Tổng
+        benchmark_avg_ctr, benchmark_avg_avd = calculate_v7_benchmarks(raw_rows)
+
+        # Sàng lọc Lớp 1 & Lớp 2
+        qualifying_rows = []
+        for r in raw_rows:
+            # Lớp 1: Khử nhiễu thống kê
+            if r["views"] < min_views:
+                continue
+            # Lớp 2: Lọc kép V7 (vượt cả 2 mốc trung bình)
+            if r["ctr_percent"] > benchmark_avg_ctr and r["avd_seconds"] > benchmark_avg_avd:
+                qualifying_rows.append(r)
+
+        if not qualifying_rows:
+            continue
+
+        # Lấy thông tin chi tiết các video đối thủ đạt chuẩn từ YouTube Data API
+        ref_ids = [q["referring_video_id"] for q in qualifying_rows if q["referring_video_id"] not in seen_referring_ids]
+        if not ref_ids:
+            continue
+
+        # Batch lookup 50 videos
+        video_snippets = {}
+        for i in range(0, len(ref_ids), 50):
+            chunk = ref_ids[i:i+50]
+            try:
+                data_res = query_youtube_data_api(access_token, "videos", {
+                    "part": "snippet",
+                    "id": ",".join(chunk)
+                })
+                for item in data_res.get("items", []):
+                    video_snippets[item["id"]] = item.get("snippet", {})
+            except Exception:
+                pass
+
+        # Lớp 3: Lọc ngách ngữ nghĩa & Đóng gói Candidate
+        for q in qualifying_rows:
+            ref_id = q["referring_video_id"]
+            if ref_id in seen_referring_ids:
+                continue
+
+            snippet = video_snippets.get(ref_id, {})
+            title = snippet.get("title", "")
+            channel_title = snippet.get("channelTitle", "")
+
+            if not title:
+                continue
+
+            title_low = title.lower()
+            OFF_NICHE_KEYWORDS = [
+                "music", "mv", "official video", "dance", "song", "lyrics", "cover", "album", "remix",
+                "gameplay", "walkthrough", "gaming", "fortnite", "minecraft", "roblox",
+                "vlog", "prank", "mukbang", "asmr", "shorts", "comedy", "funny", "reaction"
+            ]
+            if any(re.search(rf"\b{re.escape(kw)}\b", title_low) for kw in OFF_NICHE_KEYWORDS):
+                continue
+
+            # Kiểm tra ngách qua detect_safety_and_theme
+            theme, safety_label, treatment = detect_safety_and_theme(title, m_up)
+
+            # Lọc sạch: Bắt buộc thuộc Canonical Pillars và an toàn
+            if theme not in CANONICAL_PILLARS or "Sensitive" in safety_label:
+                continue
+
+            seen_referring_ids.add(ref_id)
+            cand_id = f"V7_{m_up}_{ref_id}"
+
+            candidate_obj = {
+                "candidate_id": cand_id,
+                "source_winning_video_id": vid,
+                "referring_video_id": ref_id,
+                "referring_title": title,
+                "referring_channel_title": channel_title,
+                "ctr_percent": q["ctr_percent"],
+                "benchmark_avg_ctr": benchmark_avg_ctr,
+                "avd_seconds": q["avd_seconds"],
+                "benchmark_avg_avd": benchmark_avg_avd,
+                "views_from_source": q["views"],
+                "canonical_pillar": theme,
+                "viability_score": None,
+                "status": "PENDING",
+                "consumed_by_episode": None,
+                "discovered_at": now.isoformat()
+            }
+            discovered_candidates.append(candidate_obj)
+
+    return discovered_candidates
+
 
 if __name__ == "__main__":
     from scripts.b11_engine import load_secrets, get_market_oauth, get_yt_access_token

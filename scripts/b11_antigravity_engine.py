@@ -42,7 +42,10 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from scripts.b11_channel_analytics import fetch_complete_channel_analytics
+from scripts.b11_channel_analytics import (
+    fetch_complete_channel_analytics,
+    harvest_v7_suggested_candidates
+)
 
 # Notion IDs
 B11_EXPERIMENT_LAB_DB_ID = "76601989-2400-838f-ad45-816777c57ffd"
@@ -51,6 +54,7 @@ SKILL_SELF_LEARNING_PAGE_ID = "83cbd0d0-03af-4a60-a765-682a3c5a0a5d"
 # Paths
 DATA_DIR = os.path.join(BASE_DIR, "data")
 STATE_FILE = os.path.join(DATA_DIR, "b11_state.json")
+V7_POOL_FILE = os.path.join(DATA_DIR, "v7_winning_pool.json")
 
 # Candidate secret paths (Windows & Linux)
 SECRETS_PATHS = [
@@ -105,6 +109,43 @@ def save_state(state):
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
+
+def load_v7_pool(market="ALL"):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    if os.path.isfile(V7_POOL_FILE):
+        try:
+            with open(V7_POOL_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if market != "ALL":
+                    m_up = market.upper()
+                    data["candidates"] = [c for c in data.get("candidates", []) if c.get("candidate_id", "").startswith(f"V7_{m_up}_")]
+                return data
+        except Exception:
+            pass
+    return {"market": market.upper(), "last_harvest_at": None, "candidates": []}
+
+def save_v7_pool(pool_data):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(V7_POOL_FILE, "w", encoding="utf-8") as f:
+        json.dump(pool_data, f, ensure_ascii=False, indent=2)
+
+def update_v7_pool(market: str, new_candidates: list) -> int:
+    """Cập nhật các ứng viên V7 mới vào v7_winning_pool.json, chống trùng lặp."""
+    pool = load_v7_pool("ALL")
+    existing_cands = pool.get("candidates", [])
+    existing_ref_ids = {c["referring_video_id"] for c in existing_cands}
+
+    added_count = 0
+    for cand in new_candidates:
+        if cand.get("referring_video_id") not in existing_ref_ids:
+            existing_cands.append(cand)
+            existing_ref_ids.add(cand["referring_video_id"])
+            added_count += 1
+
+    pool["candidates"] = existing_cands
+    pool["last_harvest_at"] = datetime.now(timezone.utc).isoformat()
+    save_v7_pool(pool)
+    return added_count
 
 def get_yt_access_token(cid, csec, refresh_token):
     url = "https://oauth2.googleapis.com/token"
@@ -531,6 +572,22 @@ def run_b11_engine(mode="routine", dry_run=False, target_market=None):
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }
                 all_videos.append(v)
+
+            # V7 SUGGESTED TOPICS HARVESTER (Học từ Công thức V7 An Ong)
+            try:
+                winning_ids = [v["id"] for v in all_videos if v.get("views", 0) >= 100]
+                if winning_ids and token:
+                    v7_cands = harvest_v7_suggested_candidates(
+                        access_token=token,
+                        winning_video_ids=winning_ids,
+                        market=m,
+                        min_views=10
+                    )
+                    if v7_cands:
+                        added = update_v7_pool(m, v7_cands)
+                        print(f"  🔥 [V7 HARVESTER] Market {m.upper()}: Đã lọc được {len(v7_cands)} ứng viên V7 đạt chuẩn (Thêm mới: {added}).")
+            except Exception as _v7_err:
+                pass
         except Exception as e:
             print(f"❌ [MARKET: {m.upper()}] Error processing channel: {e}")
             

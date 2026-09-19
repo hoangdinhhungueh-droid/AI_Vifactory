@@ -288,6 +288,47 @@
 
 ---
 
+### 7. Khối B11 (Analytics Dreaming) ➔ Khối B1.0/B1.5 (V7 Autonomous Closed-Loop Feedback Engine)
+* **File lưu trữ**: `data/v7_winning_pool.json`
+* **Mục đích**: Vòng lặp phản hồi thuật toán tự học (học từ "Công thức V7" của An Ong). B11 tự động trích xuất các video đối thủ đang đề xuất (`RELATED_VIDEO`) sang video thắng của kênh, lọc sạch qua 3 lớp (Khử nhiễu Views >= 10, Bộ lọc kép CTR/AVD > Average dòng Tổng, Lọc ngách ngữ nghĩa khớp Canonical Pillars), sau đó nạp vào vòng đấu thầu Điểm Khả Thi (Competitive Scoring) tại B1.0 và làm Anchor Video cho B1.5.
+* **Data Schema (Generic Specification)**:
+  ```json
+  {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "V7WinningTopicPool",
+    "type": "object",
+    "properties": {
+      "market": "<MARKET_CODE: EN | JP | KR | VN | ALL>",
+      "last_harvest_at": "<ISO_8601_TIMESTAMP>",
+      "candidates": [
+        {
+          "candidate_id": "V7_<MARKET>_<REFERRING_VIDEO_ID>",
+          "source_winning_video_id": "<SOURCE_WINNING_VIDEO_ID>",
+          "referring_video_id": "<REFERRING_VIDEO_ID>",
+          "referring_title": "<REFERRING_VIDEO_TITLE>",
+          "referring_channel_title": "<REFERRING_CHANNEL_TITLE>",
+          "ctr_percent": "<FLOAT: Calculated or proxy CTR %>",
+          "benchmark_avg_ctr": "<FLOAT: Total row benchmark CTR %>",
+          "avd_seconds": "<FLOAT: Average view duration in seconds>",
+          "benchmark_avg_avd": "<FLOAT: Total row benchmark AVD in seconds>",
+          "views_from_source": "<INTEGER_VIEWS>",
+          "canonical_pillar": "<CANONICAL_PILLAR_NAME>",
+          "viability_score": "<FLOAT: 0.0 - 10.0 | null>",
+          "status": "<PENDING | CONSUMED | EXPIRED | REJECTED>",
+          "consumed_by_episode": "<MARKET>_EP<0000>_<topic_slug> | null",
+          "discovered_at": "<ISO_8601_TIMESTAMP>"
+        }
+      ]
+    }
+  }
+  ```
+* **Quy chuẩn Field Ràng buộc**:
+  - `candidate_id`: Bắt buộc tuân thủ regex `^V7_[A-Z]{2}_[a-zA-Z0-9_-]+$`.
+  - `status`: Chuyển từ `PENDING` sang `CONSUMED` ngay khi đề tài được cam kết sản xuất tại B1.0 (`commit_trend_task`).
+  - `canonical_pillar`: Bắt buộc thuộc danh sách 10 Canonical Pillars chính thống, cấm rò rỉ video rác giải trí/nhạc/game.
+
+---
+
 ## 🗂️ II. DANH MỤC MÃ NGUỒN CHUẨN TRÊN VPS (`/root/video_factory`)
 
 | Đường Dẫn Tệp | Vai Trò Kỹ Thuật | Block Phụ Trách |

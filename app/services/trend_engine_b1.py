@@ -68,6 +68,49 @@ logger = logging.getLogger("trend_engine_b1")
 EN_SUB_GEOS = ["US", "GB", "CA", "AU", "NZ"]
 VIABILITY_THRESHOLD = 8.0
 
+V7_POOL_FILE = os.path.join(_PROJECT_ROOT, "data", "v7_winning_pool.json")
+
+def fetch_pending_v7_candidates(market: str = "EN") -> list:
+    """Đọc các ứng viên V7 có trạng thái PENDING từ data/v7_winning_pool.json."""
+    if not os.path.isfile(V7_POOL_FILE):
+        return []
+    try:
+        with open(V7_POOL_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            m_up = (market or "EN").upper()
+            cands = []
+            for c in data.get("candidates", []):
+                if c.get("status") == "PENDING" and c.get("candidate_id", "").startswith(f"V7_{m_up}_"):
+                    cands.append(c)
+            return cands
+    except Exception as e:
+        logger.debug(f"[trend_engine] Failed to read V7 pool: {e}")
+        return []
+
+def mark_v7_candidate_consumed(candidate_id: str, episode_id: str) -> bool:
+    """Đánh dấu ứng viên V7 đã được sản xuất (CONSUMED)."""
+    if not os.path.isfile(V7_POOL_FILE):
+        return False
+    try:
+        with open(V7_POOL_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        modified = False
+        for c in data.get("candidates", []):
+            if c.get("candidate_id") == candidate_id:
+                c["status"] = "CONSUMED"
+                c["consumed_by_episode"] = episode_id
+                c["consumed_at"] = datetime.now(timezone.utc).isoformat()
+                modified = True
+                break
+        if modified:
+            with open(V7_POOL_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            logger.info(f"[trend_engine] Marked V7 candidate {candidate_id} as CONSUMED by {episode_id}")
+            return True
+    except Exception as e:
+        logger.error(f"[trend_engine] Failed to mark V7 candidate {candidate_id} consumed: {e}")
+    return False
+
 MARKET_CONFIG = {
     "EN": {
         "geos": EN_SUB_GEOS,
@@ -475,22 +518,43 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
         except Exception as _yt_err:
             logger.debug(f"[{m_up}] YouTube autocomplete seed '{y_seed}' failed: {_yt_err}")
 
-    # Forensic Priority Interleaving Assembly:
-    # 1. Prioritize candidates that already contain forensic crisis anchors
-    all_raw = gt_candidates + yt_candidates
+    # Fetch V7 Algorithmic Suggested Candidates from Pool
+    v7_raw = fetch_pending_v7_candidates(m_up)
+    v7_candidates = []
+    for vc in v7_raw:
+        v_title = vc.get("referring_title", "").strip()
+        if not v_title:
+            continue
+        v_cand_obj = {
+            "term": v_title,
+            "raw_term": v_title,
+            "source": "v7_suggested_win",
+            "sources_present": ["v7_suggested_win"],
+            "approx_traffic": f"V7 CTR={vc.get('ctr_percent')}% AVD={vc.get('avd_seconds')}s (Views={vc.get('views_from_source')})",
+            "v7_data": vc,
+            "geos_present": [m_up]
+        }
+        v7_candidates.append(v_cand_obj)
+
+    # Forensic Priority & Competitive Scoring Assembly:
+    # V7 candidates and forensic crisis anchors are prioritized
+    all_raw = v7_candidates + gt_candidates + yt_candidates
     anchors = FORENSIC_ANCHORS.get(m_up, FORENSIC_ANCHORS["EN"])
 
     forensic_priority = []
     regular_cands = []
 
     for c in all_raw:
+        if c.get("source") == "v7_suggested_win":
+            forensic_priority.append(c)
+            continue
         comb = f"{c.get('term', '')} {c.get('news_title', '')}".lower()
         if any(kw.lower() in comb for kw in anchors):
             forensic_priority.append(c)
         else:
             regular_cands.append(c)
 
-    # Put forensic priority first, followed by regular candidates
+    # Put forensic/V7 priority first, followed by regular candidates
     ordered_candidates = forensic_priority + regular_cands
 
     # Deduplicate against permanent topic history registry
@@ -555,6 +619,12 @@ def commit_trend_task(topic_data: dict) -> str:
         slug=topic_data.get("task_slug"),
         specific_angle=topic_data.get("specific_viral_angle")
     )
+
+    # 3.5 Mark V7 Pool candidate as CONSUMED if topic originated from V7
+    if topic_data.get("v7_data"):
+        cand_id = topic_data["v7_data"].get("candidate_id")
+        if cand_id:
+            mark_v7_candidate_consumed(cand_id, task_id)
 
     # 4. Sync to Notion Trend Brain DB (Standardized Cross-DB State Machine)
     try:
@@ -1006,8 +1076,9 @@ def discover_and_produce_market_trend(
         print(f"  🎯 [B1.5 Pre-Recon] Harvesting Competitor Benchmarks & Audience Frustrations for '{term}'...")
         recon_card = None
         comp_gap = ""
+        anchor_vid = c.get("v7_data", {}).get("referring_video_id") if c.get("v7_data") else None
         try:
-            recon_card = run_b15(temp_task_id, term, niche="Trending Investigative", use_cache=True)
+            recon_card = run_b15(temp_task_id, term, niche="Trending Investigative", use_cache=True, anchor_video_id=anchor_vid)
             if recon_card:
                 anatomy = recon_card.get("competitor_narrative_anatomy", {})
                 comp_gap = anatomy.get("fatal_explanatory_vacuum", "")
@@ -1050,7 +1121,8 @@ def discover_and_produce_market_trend(
             "factsheet": factsheet,
             "viral_competitor_videos": viral_videos[:5],
             "critic_score": c_score,
-            "temp_task_id": temp_task_id
+            "temp_task_id": temp_task_id,
+            "v7_data": c.get("v7_data")
         }
 
         # 5. Save Competitor Intel Card to temp workspace
@@ -1058,7 +1130,7 @@ def discover_and_produce_market_trend(
         try:
             recon_keyword = t_obj.get("search_specific_keyword") or term
             if not recon_card:
-                recon_card = run_b15(temp_task_id, recon_keyword, t_obj.get("niche_angle_brief", "General"), market=m_up)
+                recon_card = run_b15(temp_task_id, recon_keyword, t_obj.get("niche_angle_brief", "General"), market=m_up, anchor_video_id=anchor_vid)
             else:
                 recon_card["task_id"] = temp_task_id
             if recon_card and isinstance(recon_card, dict):
