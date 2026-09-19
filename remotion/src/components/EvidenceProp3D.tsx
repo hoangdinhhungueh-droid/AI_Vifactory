@@ -67,15 +67,12 @@ export const EvidenceProp3D: React.FC<{
 
     const blackLacquer = new THREE.MeshToonMaterial({
       color: 0x181920,
-      roughness: 0.2,
     });
     const goldAccent = new THREE.MeshToonMaterial({
       color: 0xd4af37,
-      roughness: 0.3,
     });
     const vermilionRed = new THREE.MeshToonMaterial({
       color: 0xd32f2f,
-      roughness: 0.4,
     });
     const inkOutlineMat = new THREE.MeshBasicMaterial({
       color: 0x050608,
@@ -124,7 +121,6 @@ export const EvidenceProp3D: React.FC<{
     const groundGeo = new THREE.PlaneGeometry(12, 12);
     const groundMat = new THREE.MeshToonMaterial({
       color: 0x0a0c12,
-      roughness: 0.9,
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
