@@ -22,17 +22,120 @@ import asyncio
 import logging
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 logger = logging.getLogger("vf.beat_tts_engine")
 
-LANG_VOICE = {
-    "en": "en-US-ChristopherNeural",
-    "vi": "vi-VN-NamMinhNeural",
-    "zh": "zh-CN-YunxiNeural",
-    "ja": "ja-JP-KeitaNeural",
-    "ko": "ko-KR-InJoonNeural",
+# Resilient Multi-Tier Voice Rotation Roster per Market (Rule 120/128)
+VOICE_ROTATION_ROSTER: Dict[str, List[str]] = {
+    "en": ["en-US-ChristopherNeural", "en-US-GuyNeural", "en-US-EricNeural", "en-US-BrianNeural"],
+    "vi": ["vi-VN-NamMinhNeural", "vi-VN-HoaiMyNeural"],
+    "zh": ["zh-CN-YunxiNeural", "zh-CN-YunjianNeural", "zh-CN-YunyangNeural"],
+    "ja": ["ja-JP-KeitaNeural", "ja-JP-DaichiNeural", "ja-JP-NanamiNeural"],
+    "ko": ["ko-KR-InJoonNeural", "ko-KR-BongJinNeural", "ko-KR-SunHiNeural"]
 }
+
+LANG_VOICE = {k: v[0] for k, v in VOICE_ROTATION_ROSTER.items()}
+
+
+async def _synthesize_single_beat_resilient(
+    beat_text: str,
+    voices: List[str],
+    rate: str,
+    pitch: str,
+    beat_file: Path,
+    boundary_file: Path,
+    force: bool = False,
+    max_attempts: int = 4
+) -> Tuple[bytearray, List[Dict[str, Any]], str]:
+    """
+    Synthesizes a single beat using Edge-TTS with 3-layer resilience (Option A):
+    1. Layer 1: Exponential backoff with jitter on network/websocket/rate-limit failures.
+    2. Layer 2: Voice rotation across candidate voices for the target market.
+    3. Layer 3: Beat-level disk caching to resume instantly on partial failures (idempotent).
+    """
+    import edge_tts
+    import random
+
+    # Layer 3: Check disk cache for valid pre-existing beat audio & boundaries
+    if not force and beat_file.exists() and beat_file.stat().st_size > 5120 and boundary_file.exists():
+        try:
+            boundaries = json.loads(boundary_file.read_text(encoding="utf-8"))
+            beat_audio = beat_file.read_bytes()
+            if len(beat_audio) > 5120 and boundaries:
+                logger.info(
+                    "    [BeatTTS Cache Hit] Reusing valid cached beat audio (%dB, %d boundaries): %s",
+                    len(beat_audio), len(boundaries), beat_file.name
+                )
+                return beat_audio, boundaries, "cached"
+        except Exception as cache_err:
+            logger.warning("    [BeatTTS Cache Miss] Corrupt cache on %s: %s. Re-synthesizing...", beat_file.name, cache_err)
+
+    last_exc = None
+    for attempt in range(max_attempts):
+        curr_voice = voices[attempt % len(voices)]
+        if attempt > 0:
+            backoff_sec = min(16.0, (1.5 ** attempt) + random.uniform(0.3, 0.9))
+            logger.warning(
+                "    [BeatTTS Resilient Retry %d/%d] Voice: %s (Backoff: %.2fs)...",
+                attempt + 1, max_attempts, curr_voice, backoff_sec
+            )
+            await asyncio.sleep(backoff_sec)
+
+        boundaries = []
+        beat_audio = bytearray()
+        try:
+            comm = edge_tts.Communicate(beat_text, curr_voice, rate=rate, pitch=pitch)
+
+            async def _stream_beat():
+                async for chunk in comm.stream():
+                    if chunk["type"] == "audio":
+                        beat_audio.extend(chunk["data"])
+                    elif chunk["type"] == "SentenceBoundary":
+                        boundaries.append({
+                            "text": chunk["text"],
+                            "start_ms": int(chunk["offset"] / 10000),
+                            "duration_ms": int(chunk["duration"] / 10000),
+                            "end_ms": int((chunk["offset"] + chunk["duration"]) / 10000)
+                        })
+
+            await asyncio.wait_for(_stream_beat(), timeout=60.0)
+
+            if len(beat_audio) > 1024:
+                # Save beat audio and boundaries to disk immediately for caching
+                beat_file.parent.mkdir(parents=True, exist_ok=True)
+                beat_file.write_bytes(beat_audio)
+
+                # Fallback if boundaries array is empty (e.g. non-standard punctuation)
+                if not boundaries and len(beat_audio) > 1024:
+                    logger.warning("    [BeatTTS] No SentenceBoundary emitted for %s, probing duration...", beat_file.name)
+                    probe_cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 '{beat_file}'"
+                    dur_res = subprocess.run(probe_cmd, shell=True, capture_output=True, text=True)
+                    total_ms = int(float(dur_res.stdout.strip() or 1.0) * 1000)
+                    boundaries.append({
+                        "text": beat_text,
+                        "start_ms": 0,
+                        "duration_ms": total_ms,
+                        "end_ms": total_ms
+                    })
+
+                boundary_file.write_text(json.dumps(boundaries, ensure_ascii=False, indent=2), encoding="utf-8")
+                return beat_audio, boundaries, curr_voice
+            else:
+                raise ValueError(f"Synthesized audio payload too small ({len(beat_audio)} bytes)")
+
+        except Exception as exc:
+            last_exc = exc
+            logger.warning(
+                "    [BeatTTS] Attempt %d/%d failed with voice %s: %s - %s",
+                attempt + 1, max_attempts, curr_voice, type(exc).__name__, exc
+            )
+
+    raise RuntimeError(
+        f"HARD GATE VIOLATION (Rule 120/127): Beat TTS failed after {max_attempts} resilient attempts "
+        f"across candidate voices: {voices}. Last exception: {last_exc}"
+    )
+
 
 def format_srt_time(ms: int) -> str:
     hours = ms // 3600000
@@ -161,6 +264,8 @@ async def synthesize_beat_tts_pipeline(
     }
     lang_code = brain.get("lang_code") or market_to_lang.get(market, "en")
     voice = brain.get("voice") or LANG_VOICE.get(lang_code, "en-US-ChristopherNeural")
+    roster_candidates = VOICE_ROTATION_ROSTER.get(lang_code, ["en-US-ChristopherNeural"])
+    candidate_voices = [voice] + [v for v in roster_candidates if v != voice]
     
     # Calibrated pacing per language/market (Rule 128)
     # English uses -8% for deliberate documentary delivery (EP004 QC feedback)
@@ -172,7 +277,7 @@ async def synthesize_beat_tts_pipeline(
     tts_pitch = brain.get("tts_pitch") or os.getenv("VF_TTS_PITCH") or default_pitch
 
     logger.info("[BeatTTS] Starting Beat-Level TTS Pipeline for %s (%s)", episode_id, "spoken_sentences" if use_spoken_sentences else "scenes")
-    logger.info("  Market: %s | Lang: %s | Voice: %s | Rate: %s | Pitch: %s", market, lang_code, voice, tts_rate, tts_pitch)
+    logger.info("  Market: %s | Lang: %s | Primary Voice: %s | Rotation: %s | Rate: %s | Pitch: %s", market, lang_code, voice, candidate_voices, tts_rate, tts_pitch)
 
     # Group units by beat_index
     beats: Dict[int, List[Dict[str, Any]]] = {}
@@ -182,8 +287,8 @@ async def synthesize_beat_tts_pipeline(
 
     all_segments: List[Dict[str, Any]] = []
     beat_mp3_paths: List[str] = []
-    beats_dir = f"{out_dir}/audio_beats"
-    os.makedirs(beats_dir, exist_ok=True)
+    beats_dir = Path(f"{out_dir}/audio_beats")
+    beats_dir.mkdir(parents=True, exist_ok=True)
 
     global_time_offset_ms = 0
 
@@ -195,27 +300,21 @@ async def synthesize_beat_tts_pipeline(
             if t:
                 beat_texts.append(t)
         beat_text = "\n\n".join(beat_texts)
-        beat_file = f"{beats_dir}/beat_{b_idx}.mp3"
+        beat_file = beats_dir / f"beat_{b_idx}.mp3"
+        boundary_file = beats_dir / f"beat_{b_idx}_boundaries.json"
         logger.info("  Synthesizing Beat %d (%d units, %d chars)...", b_idx, len(b_units), len(beat_text))
 
-        comm = edge_tts.Communicate(beat_text, voice, rate=tts_rate, pitch=tts_pitch)
-        boundaries = []
-        beat_audio = bytearray()
-
-        async for chunk in comm.stream():
-            if chunk["type"] == "audio":
-                beat_audio.extend(chunk["data"])
-            elif chunk["type"] == "SentenceBoundary":
-                boundaries.append({
-                    "text": chunk["text"],
-                    "start_ms": int(chunk["offset"] / 10000),
-                    "duration_ms": int(chunk["duration"] / 10000),
-                    "end_ms": int((chunk["offset"] + chunk["duration"]) / 10000)
-                })
-
-        with open(beat_file, "wb") as bf:
-            bf.write(beat_audio)
-        beat_mp3_paths.append(beat_file)
+        beat_audio, boundaries, used_voice = await _synthesize_single_beat_resilient(
+            beat_text=beat_text,
+            voices=candidate_voices,
+            rate=tts_rate,
+            pitch=tts_pitch,
+            beat_file=beat_file,
+            boundary_file=boundary_file,
+            force=force,
+            max_attempts=4
+        )
+        beat_mp3_paths.append(str(beat_file))
 
         # Exact ffprobe duration of this beat audio
         probe_cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 '{beat_file}'"

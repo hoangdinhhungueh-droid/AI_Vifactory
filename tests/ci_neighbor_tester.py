@@ -464,14 +464,26 @@ def test_block4_prompt_contract() -> bool:
 def test_block26_audio_spine_contract() -> bool:
     logger.info("--- [TEST BLOCK 2.6: Hollywood Audio Spine & Beat-TTS Contract] ---")
     try:
-        from app.services.beat_tts_engine import LANG_VOICE, tokenize_for_karaoke, format_srt_time
+        import asyncio
+        import shutil
+        from pathlib import Path
+        from app.services.beat_tts_engine import (
+            LANG_VOICE,
+            VOICE_ROTATION_ROSTER,
+            _synthesize_single_beat_resilient,
+            tokenize_for_karaoke,
+            format_srt_time
+        )
         from app.services.director_planner_b3 import _is_valid_audio_spine
 
-        # 1. Voice configuration check
+        # 1. Voice configuration and multi-tier rotation roster check
         for mkt in ["en", "vi", "zh", "ja", "ko"]:
             assert mkt in LANG_VOICE, f"Missing voice configuration for market: {mkt}"
+            assert mkt in VOICE_ROTATION_ROSTER, f"Missing rotation roster for market: {mkt}"
+            assert len(VOICE_ROTATION_ROSTER[mkt]) >= 2, f"Roster must have >= 2 candidate voices for {mkt}"
+            assert VOICE_ROTATION_ROSTER[mkt][0] == LANG_VOICE[mkt], f"Primary voice mismatch for {mkt}"
         assert LANG_VOICE["ko"] == "ko-KR-InJoonNeural"
-        logger.info("  ✅ Market Edge-TTS voices validated (EN, VI, ZH, JA, KO).")
+        logger.info("  ✅ Market Edge-TTS voices and 5-market multi-tier rotation rosters validated.")
 
         # 2. SRT time format
         assert format_srt_time(1250) == "00:00:01,250"
@@ -491,6 +503,46 @@ def test_block26_audio_spine_contract() -> bool:
         assert not _is_valid_audio_spine([], [ROOT_DIR])
         assert not _is_valid_audio_spine([{"text": "Hello"}], [ROOT_DIR])
         logger.info("  ✅ Audio Spine Hard Gate rejected invalid payloads.")
+
+        # 5. Live Runtime Resilient Synthesis & Caching Verification (Rule 127)
+        test_cache_dir = Path("/tmp/test_ci_beat_cache")
+        test_cache_dir.mkdir(parents=True, exist_ok=True)
+        test_beat_mp3 = test_cache_dir / "beat_test.mp3"
+        test_beat_bnd = test_cache_dir / "beat_test_bnd.json"
+
+        try:
+            audio_bytes, boundaries, used_voice = asyncio.run(_synthesize_single_beat_resilient(
+                beat_text="Forensic audit verifies institutional integrity.",
+                voices=VOICE_ROTATION_ROSTER["en"],
+                rate="-8%",
+                pitch="-2Hz",
+                beat_file=test_beat_mp3,
+                boundary_file=test_beat_bnd,
+                force=True,
+                max_attempts=3
+            ))
+            assert len(audio_bytes) > 2048, f"Expected audio > 2KB, got {len(audio_bytes)}"
+            assert len(boundaries) > 0, "Expected non-empty SentenceBoundary array"
+            assert test_beat_mp3.exists() and test_beat_bnd.exists(), "Cache files not written"
+            logger.info(f"  ✅ Live Resilient Synthesis OK: {len(audio_bytes)}B, {len(boundaries)} boundaries via {used_voice}")
+
+            # Test Cache Hit (Resumption without network call)
+            cached_audio, cached_bnd, cache_status = asyncio.run(_synthesize_single_beat_resilient(
+                beat_text="Forensic audit verifies institutional integrity.",
+                voices=VOICE_ROTATION_ROSTER["en"],
+                rate="-8%",
+                pitch="-2Hz",
+                beat_file=test_beat_mp3,
+                boundary_file=test_beat_bnd,
+                force=False,
+                max_attempts=3
+            ))
+            assert cache_status == "cached", f"Expected cache_status == 'cached', got {cache_status}"
+            assert len(cached_audio) == len(audio_bytes)
+            logger.info("  ✅ Beat-Level Disk Caching verified (Instant idempotent resumption).")
+        finally:
+            if test_cache_dir.exists():
+                shutil.rmtree(test_cache_dir, ignore_errors=True)
 
         return True
     except Exception as e:
