@@ -191,21 +191,20 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
           />
         ) : null}
 
-        {/* 3D Procedural Evidence Prop (img2threejs procedural technique) */}
+        {/* 3D Procedural Evidence Prop (Vox Stop-Motion 12fps Evidence Specimen) */}
         {rawType === "evidence_3d_prop" || rawType === "3d_hanko_seal" || rawType === "3d_evidence_prop" ? (
           <div
             style={{
-              width: isFullBleed ? 1200 : 700,
-              height: isFullBleed ? 750 : 480,
-              borderRadius: 8,
-              overflow: "hidden",
-              border: "1px solid rgba(0, 229, 255, 0.4)",
-              boxShadow: "0 16px 40px rgba(0,0,0,0.85)",
+              width: isFullBleed ? 1160 : 700,
+              height: isFullBleed ? 720 : 480,
+              position: "relative",
             }}
           >
             <EvidenceProp3D
               title={ov.title || "CONFIDENTIAL EVIDENCE // EXHIBIT A"}
               subtitle={ov.label || ov.badge || "PROCEDURAL THREE.JS ARTIFACT"}
+              theme={ov.theme || "noir_dossier"}
+              layout={layout}
             />
           </div>
         ) : null}
