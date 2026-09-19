@@ -35,8 +35,9 @@ You must audit against 4 Iron Criteria:
 3. ANTI-BAIT-AND-SWITCH (RULE 130 SEARCH-INTENT PAYOFF):
    - When viewers search this keyword, what is the urgent question on their mind?
    - REJECT (FAIL) if the model borrows a viral breaking keyword as clickbait, but immediately steers (be lai) into an unrelated tangent (e.g. shipbuilder balance sheet instead of missile strikes on ships).
-4. POLICY SAFETY & FACTUAL GROUNDING:
-   - Safe under YouTube Guidelines (geopolitical/economic analysis is welcome, but zero graphic gore, zero defamation of private citizens, zero glorification of terror).
+4. POLICY SAFETY & FACTUAL GROUNDING (HARD SAFETY VETO):
+   - Safe under YouTube Community Guidelines & Monetization Policies.
+   - STRICT REJECTION (FAIL): REJECT immediately if the candidate or proposed angle centers on electoral politics, partisan campaigning, one-sided political rhetoric, religious doctrine/defamation, or unverified personal attacks on private individuals.
 5. CONSUMER DOCUDRAMA & ANTI-TUTORIAL PACKAGING (RULE 130):
    - For consumer disputes / retail traps (Pillar 11): Enforce the 3-tier gate (Outlier score >= 3.0x or breaking traffic, asymmetric institutional/contract loophole, and verified by media/regulator).
    - REJECT (FAIL) if the proposed angle or title sounds like a dry tutorial / customer service FAQ / how-to guide ('How to', 'Mẹo vặt', '5 bước', '환불하는법'). The angle MUST formulate a high-stakes dramatic clash: [Everyday Item/Transaction + Shock Figure] vs [Unilateral Fine Print / Institutional Trap].
@@ -116,8 +117,8 @@ Interrogate whether this proposed angle truly satisfies the breaking search inte
     else:
         chosen_model = model
 
-    # Fallback to kimi-k3 if not specified
-    fallback_model = fallback_model if fallback_model and fallback_model != "gpt-6-astra" else "kimi-k3"
+    # Fallback to gpt-6-astra
+    fallback_model = fallback_model or "gpt-6-astra"
 
     try:
         raw_res = gateway.call_llm(
@@ -127,10 +128,10 @@ Interrogate whether this proposed angle truly satisfies the breaking search inte
             max_tokens=800,
             temperature=0.1,
             timeout=60.0,
-            fallback="claude-sonnet-5" if chosen_model == "claude-opus-5" else "kimi-k3"
+            fallback="claude-sonnet-5" if chosen_model == "claude-opus-5" else "gpt-6-astra"
         )
     except Exception as e:
-        logger.warning(f"[critic_gate] Claude primary ({chosen_model}) failed ({e}), invoking fallback {fallback_model} (kimi-k3)...")
+        logger.warning(f"[critic_gate] Claude primary ({chosen_model}) failed ({e}), invoking fallback {fallback_model}...")
         try:
             chosen_model = fallback_model
             raw_res = gateway.call_llm(

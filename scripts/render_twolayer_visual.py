@@ -36,9 +36,19 @@ COMP_ID = "TwoLayerEpisode"
 
 
 def preflight_memory_check():
-    """Verify system RAM headroom before spawning Chromium render workers."""
+    """Verify system RAM headroom and reap zombie Chromium processes before render."""
     try:
         import psutil
+        # Clean up orphaned or zombie Chromium render processes
+        for p in psutil.process_iter(['pid', 'name', 'cmdline', 'status']):
+            try:
+                p_name = (p.info.get('name') or '').lower()
+                cmd = " ".join(p.info.get('cmdline') or []).lower()
+                if ('chrome-headless-shell' in cmd or 'chromium' in cmd) and p.info.get('status') == psutil.STATUS_ZOMBIE:
+                    p.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+
         mem = psutil.virtual_memory()
         avail_mb = mem.available / (1024 * 1024)
         total_mb = mem.total / (1024 * 1024)

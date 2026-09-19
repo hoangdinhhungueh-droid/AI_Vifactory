@@ -142,6 +142,54 @@ async def _integrated_lufs(path: str):
         return None
 
 
+async def _freeze_detect(path: str, sample_s: int = 60) -> float:
+    """Detect visual freeze frames (>3.0s visual freeze) using ffmpeg freezedetect."""
+    out = await _run([
+        "ffmpeg", "-hide_banner", "-nostats", "-t", str(sample_s),
+        "-i", path, "-vf", "freezedetect=n=-50dB:d=3.0",
+        "-an", "-f", "null", "-"], timeout=180)
+    max_freeze = 0.0
+    for m in re.finditer(r"freeze_duration:\s*([0-9.]+)", out):
+        try:
+            max_freeze = max(max_freeze, float(m.group(1)))
+        except Exception:
+            pass
+    return max_freeze
+
+
+async def _fps_check(path: str) -> float:
+    """Extract frame rate of primary video stream."""
+    out = await _run([
+        "ffprobe", "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", path], timeout=60)
+    try:
+        raw = out.strip().splitlines()[0]
+        if "/" in raw:
+            num, den = raw.split("/", 1)
+            return float(num) / float(den) if float(den) > 0 else 0.0
+        return float(raw or 0.0)
+    except Exception:
+        return 0.0
+
+
+def check_rule136_props(props_path: str) -> list:
+    """Rule 136: Verify zero asset leaks / filenames in speaker tags or lower thirds."""
+    if not props_path or not os.path.exists(props_path):
+        return []
+    leaks = []
+    try:
+        with open(props_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for sc in data.get("scenes", []):
+            sc_id = sc.get("id") or sc.get("scene_id") or "unknown"
+            tag = sc.get("speakerTag", "")
+            if any(ext in str(tag).lower() for ext in [".png", ".jpg", ".jpeg", ".webp", "hash_", "layer_", "archive x //"]):
+                leaks.append(f"rule136_leak:{sc_id}:{tag}")
+    except Exception:
+        pass
+    return leaks
+
+
 async def pre_render_check(clip_paths: list, audio_path: str) -> dict:
     """Validate inputs before render. Returns {ok, issues, metrics}."""
     issues = []
@@ -291,12 +339,24 @@ async def post_render_check(output_path: str, audio_path: str = "",
             if abs(out_dur - audio_dur) > tol:
                 issues.append("duration_drift:%.1fvs%.1f" % (out_dur, audio_dur))
 
+    # Freeze-frame detection (>3s visual freeze)
+    freeze_s = await _freeze_detect(output_path, 60)
+    if freeze_s >= _f("QA_FREEZE_MAX", 3.0):
+        issues.append("freeze_frame:%.1fs" % freeze_s)
+
+    # FPS drop detection (<24fps on video stream)
+    fps = await _fps_check(output_path)
+    if pr.get("has_video") and fps > 0 and fps < 24.0:
+        issues.append("fps_drop:%.1f" % fps)
+
     metrics = {
         "duration": round(out_dur, 2),
         "audio_dur": round(audio_dur, 2),
         "black_ratio_20s": round(black, 3),
         "bar_frac": round(bar_frac, 3),
         "silence_s_60s": round(silence, 2),
+        "freeze_s": round(freeze_s, 2),
+        "fps": round(fps, 2),
         "has_video": pr.get("has_video"),
         "has_audio": pr.get("has_audio"),
         "mean_volume_db": mean_db,

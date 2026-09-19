@@ -92,6 +92,102 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
         return None
     t = narration_text.lower()
 
+    # 0. 3D Procedural Evidence Props (12fps Stop-Motion Quantized Physical Artifacts - Priority 0)
+    # 0a. Financial Ledger 3D (Ledger, balance sheets, audit discrepancies, wire fraud records)
+    if any(k in t for k in ["ledger", "balance sheet", "accounting record", "wire fraud", "sổ sách", "bảng cân đối", "kế toán gian lận", "dòng tiền ảo", "회계 장부", "원장"]):
+        return {
+            "type": "evidence_3d_prop",
+            "legacy_type": "evidence_board",
+            "theme": theme or "vox_paper",
+            "layout": "split_right",
+            "title": "CONFIDENTIAL EVIDENCE // FINANCIAL LEDGER",
+            "badge": "FINANCIAL SPECIMEN",
+            "sfx_cue": "stamp_slam",
+            "label": "EXHIBIT B // PROCEDURAL 3D ACCOUNTING LEDGER",
+            "payload": {
+                "prop_type": "financial_ledger_3d",
+                "evidence_id": "EXHIBIT-3D-LEDGER",
+                "authentication": "VERIFIED FORENSIC DISCREPANCY",
+                "stop_motion_fps": 12
+            }
+        }
+
+    # 0b. Court Indictment 3D (Criminal docket, grand jury, indictment papers, prosecutor filings)
+    if any(k in t for k in ["indictment", "docket", "grand jury", "prosecutor filing", "bản cáo trạng", "hồ sơ truy tố", "khởi tố vụ án", "công tố viện", "기소장", "공소장"]):
+        return {
+            "type": "evidence_3d_prop",
+            "legacy_type": "evidence_board",
+            "theme": theme or "vox_paper",
+            "layout": "split_right",
+            "title": "CRIMINAL INDICTMENT // US DISTRICT COURT",
+            "badge": "GRAND JURY CHARGE",
+            "sfx_cue": "stamp_slam",
+            "label": "EXHIBIT C // PROCEDURAL 3D COURT INDICTMENT",
+            "payload": {
+                "prop_type": "court_indictment_3d",
+                "evidence_id": "EXHIBIT-3D-INDICTMENT",
+                "authentication": "UNSEALED CRIMINAL DOCKET",
+                "stop_motion_fps": 12
+            }
+        }
+
+    # 0c. Passport Specimen 3D (Identity theft, forged passport, ghost identities, fake credentials)
+    if any(k in t for k in ["passport", "fake id", "stolen identity", "forged credential", "hộ chiếu giả", "danh tính ma", "giả mạo giấy tờ", "위조 여권", "신분증"]):
+        return {
+            "type": "evidence_3d_prop",
+            "legacy_type": "evidence_board",
+            "theme": theme or "vox_paper",
+            "layout": "split_right",
+            "title": "PASSPORT SPECIMEN // FRAUDULENT ID",
+            "badge": "FORGED CREDENTIAL",
+            "sfx_cue": "stamp_slam",
+            "label": "EXHIBIT D // PROCEDURAL 3D IDENTITY EVIDENCE",
+            "payload": {
+                "prop_type": "passport_specimen_3d",
+                "evidence_id": "EXHIBIT-3D-PASSPORT",
+                "authentication": "FRAUDULENT SPECIMEN DETECTED",
+                "stop_motion_fps": 12
+            }
+        }
+
+    # 0d. Legal Contract 3D (Shell contracts, bogus agreements, backdated clauses, fake service terms)
+    if any(k in t for k in ["bogus contract", "shell contract", "backdated", "sham agreement", "hợp đồng khống", "thỏa thuận ma", "điều khoản giả", "위장 계약서"]):
+        return {
+            "type": "evidence_3d_prop",
+            "legacy_type": "evidence_board",
+            "theme": theme or "vox_paper",
+            "layout": "split_right",
+            "title": "LEGAL CONTRACT // SHELL AGREEMENT",
+            "badge": "SHAM CONTRACT",
+            "sfx_cue": "stamp_slam",
+            "label": "EXHIBIT E // PROCEDURAL 3D CONTRACT SPECIMEN",
+            "payload": {
+                "prop_type": "legal_contract_3d",
+                "evidence_id": "EXHIBIT-3D-CONTRACT",
+                "authentication": "NON-ARM'S-LENGTH INSTRUMENT",
+                "stop_motion_fps": 12
+            }
+        }
+
+    # 0e. Hanko / Imperial Seal 3D (Physical wax seals, stamps, warrants, authentications)
+    if any(k in t for k in ["hanko", "seal", "stamp", "con dấu", "triện", "mộc đỏ", "chứng thực", "vật chứng", "tang vật", "도장", "인감", "증거물", "authenticat", "exhibit item", "vault", "evidence item"]):
+        return {
+            "type": "evidence_3d_prop",
+            "legacy_type": "evidence_board",
+            "theme": theme or "vox_paper",
+            "layout": "split_right",
+            "title": "CONFIDENTIAL EVIDENCE // FORENSIC ARTIFACT",
+            "badge": "PHYSICAL EXHIBIT",
+            "sfx_cue": "stamp_slam",
+            "label": "AUTHENTICATED IMPERIAL SEAL // 3D PROCEDURAL ARTIFACT",
+            "payload": {
+                "prop_type": "hanko_seal",
+                "evidence_id": "EXHIBIT-3D-01",
+                "authentication": "VERIFIED PHYSICAL TAMPER-PROOF",
+                "stop_motion_fps": 12
+            }
+        }
+
     # 1. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
     if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류"]):
         return {
@@ -205,24 +301,6 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                     {"from": "origin", "to": "intermediary", "label": "Deposit Stream"},
                     {"from": "intermediary", "to": "offshore", "label": "Trapped Liquidity"}
                 ]
-            }
-        }
-
-    # 6. 3D Procedural Evidence Prop (Physical seals, stamps, warrants, vaults, authentications, physical evidence items)
-    if any(k in t for k in ["hanko", "seal", "stamp", "con dấu", "triện", "mộc đỏ", "chứng thực", "vật chứng", "tang vật", "도장", "인감", "증거물", "authenticat", "exhibit item", "vault", "evidence item"]):
-        return {
-            "type": "evidence_3d_prop",
-            "legacy_type": "evidence_board",
-            "theme": theme or "vox_paper",
-            "layout": "split_right",
-            "title": "CONFIDENTIAL EVIDENCE // FORENSIC ARTIFACT",
-            "badge": "PHYSICAL EXHIBIT",
-            "sfx_cue": "stamp_slam",
-            "label": "AUTHENTICATED IMPERIAL SEAL // 3D PROCEDURAL ARTIFACT",
-            "payload": {
-                "prop_type": "hanko_seal",
-                "evidence_id": "EXHIBIT-3D-01",
-                "authentication": "VERIFIED PHYSICAL TAMPER-PROOF"
             }
         }
 
@@ -1002,7 +1080,13 @@ def generate_director_plan(
                 "   - Layer 2 Foreground (1:1 2048x2048): 'fg_prompt' IN ENGLISH. Stylized Graphic Novel Editorial Illustration on solid flat #FF00FF magenta chroma key.\n"
                 "4. DYNAMIC CHARACTER ENSEMBLE (Rule 128):\n"
                 f"   - Available character roles: {[c['role_name'] for c in character_ensemble]}.\n"
-                "5. 6 CANONICAL CAMERA MOVEMENTS: declare strictly one of: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n"
+                "5. 6 CANONICAL CAMERA MOVEMENTS (DIRECTOR MOTION GRAMMAR):\n"
+                "   - 'slow_push_in': Fincher clinical slow push-in, cubic Bezier ease-in-out, tight tension build.\n"
+                "   - 'snap_zoom': Adam McKay investigative whip snap zoom, rapid reframing on sudden conflict.\n"
+                "   - 'cinematic_pan': Analytical scanning lateral pan across spatial evidence.\n"
+                "   - 'macro_tilt': Errol Morris forensic macro tilt, vertical inspection of documents/props.\n"
+                "   - 'slow_pull_out': Scale reveal, pulling back to expose systemic entrapment.\n"
+                "   - 'handheld_shake': Tense vérité micro-jitter, subjective documentary realism.\n"
                 "6. FORENSIC GRAPHICS & STAT CARDS:\n"
                 "   - 'forensic_overlay': 'evidence_3d_prop' (procedural 3D physical evidence / wax seal / imperial hanko / lockbox / exhibit item with 12fps stop-motion), 'document_highlight', 'tactical_map', 'kinetic_counter', 'evidence_board', 'causal_flowchart', or null.\n"
                 "   - 'stat_card': Tag high-impact metric scenes with exact numbers from narration: {\"value\": \"<EXACT_METRIC_FROM_NARRATION>\", \"label\": \"PRICE ANCHOR\" / \"VALUATION COLLAPSE\"} or null.\n"
@@ -1053,7 +1137,13 @@ def generate_director_plan(
                 "3. DUAL-LANGUAGE PROTOCOL (Rule 446 & Rule 120):\n"
                 "   - VISUAL PROMPTS (bg_prompt, fg_prompt, visual_metaphor): MUST BE IN ENGLISH.\n"
                 f"   - SPOKEN NARRATION ('narration'): MUST BE 100% VERBATIM IN {market_lang_name}! NEVER translate narration to English!\n"
-                "4. 6 CANONICAL CAMERA MOVEMENTS: declare strictly one of: 'slow_push_in', 'snap_zoom', 'cinematic_pan', 'macro_tilt', 'slow_pull_out', 'handheld_shake'.\n"
+                "4. 6 CANONICAL CAMERA MOVEMENTS (DIRECTOR MOTION GRAMMAR):\n"
+                "   - 'slow_push_in': Fincher clinical slow push-in, cubic Bezier ease-in-out, tight tension build.\n"
+                "   - 'snap_zoom': Adam McKay investigative whip snap zoom, rapid reframing on sudden conflict.\n"
+                "   - 'cinematic_pan': Analytical scanning lateral pan across spatial evidence.\n"
+                "   - 'macro_tilt': Errol Morris forensic macro tilt, vertical inspection of documents/props.\n"
+                "   - 'slow_pull_out': Scale reveal, pulling back to expose systemic entrapment.\n"
+                "   - 'handheld_shake': Tense vérité micro-jitter, subjective documentary realism.\n"
                 "5. LOCATION CONTINUITY: assign 'bg_cluster_id' (range {((b_num - 1) * 4) + 1}..{b_num * 4}).\n"
                 "6. FORENSIC OVERLAYS: Tag evidentiary scenes with 'forensic_overlay': 'evidence_3d_prop' (procedural 3D physical evidence / wax seal / imperial hanko / lockbox / exhibit item with 12fps stop-motion), 'document_highlight', 'tactical_map', 'kinetic_counter', 'evidence_board', 'causal_flowchart', or null.\n"
                 "7. MOTION GRAPHICS & STAT CARDS (Rule 122 Remotion Suite):\n"
@@ -1087,14 +1177,14 @@ def generate_director_plan(
         gateway = get_global_gateway()
         for attempt in range(1, 3):
             try:
-                logger.info(f"  [B3 Beat {b_num}] Calling Claude Opus 5 (Visual Director) attempt {attempt}/2 (fallback=gpt-6-astra)...")
+                logger.info(f"  [B3 Beat {b_num}] Calling GPT-6-Astra (Visual Director) attempt {attempt}/2 (fallback=claude-opus-5)...")
                 raw_res = gateway.call_llm(
                     prompt=prompt_instruction,
                     system_prompt=system_prompt,
-                    model="claude-opus-5",
+                    model="gpt-6-astra",
                     max_tokens=4500,
                     timeout=120.0,
-                    fallback="gpt-6-astra"
+                    fallback="claude-opus-5"
                 )
                 if raw_res and raw_res.strip():
                     break

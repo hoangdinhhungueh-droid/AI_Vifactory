@@ -891,10 +891,21 @@ def forensic_pre_filter(candidate: dict, market: str) -> tuple[bool, str]:
     m_up = (market or "EN").upper()
     anchors = FORENSIC_ANCHORS.get(m_up, FORENSIC_ANCHORS["EN"])
 
-    term = candidate.get("term", "").strip()
+    term = candidate.get("term", "").strip() or candidate.get("title", "").strip()
     term_lower = term.lower()
-    news = candidate.get("news_title", "").lower()
-    combined_text = f"{term_lower} {news}"
+    combined_text = f"{term_lower} {candidate.get('niche_brief', '').lower()} {candidate.get('angle', '').lower()} {candidate.get('title', '').lower()}"
+    # Hard Safety Gate (Anti-Politics, Anti-Religion, Anti-Defamation - Rule 118 & Policy Safety)
+    safety_forbidden_terms = [
+        'election 2026', 'election', 'presidential race', 'vote for', 'vote against',
+        'democrat vs republican', 'left-wing agenda', 'right-wing agenda', 'party propaganda',
+        'biden', 'trump', 'kamala', 'yoon suk yeol', 'lee jae myung', 'kishida', 'ishiba', 'putin', 'zelensky',
+        'democrat', 'republican', 'senate election', 'congressional hearing', 'parliament election',
+        'christianity', 'buddhism', 'islam', 'hinduism', 'judaism', 'catholic church',
+        'buddhist doctrine', 'muslim doctrine', 'quran', 'bible verse', 'defamation', 'hate speech'
+    ]
+    for st in safety_forbidden_terms:
+        if st in combined_text:
+            return False, f"Safety Gate VETO: Political/Religious/Defamation trigger '{st}' in candidate (0 LLM tokens burned)"
 
     # For YouTube Autocomplete candidates: verify live breaking news catalyst (Rule 130 & Rule 123)
     if source == "youtube_autocomplete":
