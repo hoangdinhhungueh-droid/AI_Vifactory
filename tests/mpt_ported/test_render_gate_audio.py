@@ -10,7 +10,7 @@ from app.services.mpt_ported.render_gate import post_render_check, RenderGateErr
 
 
 def _mk(monkeypatch, *, has_audio, has_video=True, duration=30.0,
-        black=0.0, bars=0.0, silence=0.0, mean_db=-18.0, lufs=-14.0):
+        black=0.0, bars=0.0, silence=0.0, mean_db=-18.0, lufs=-14.0, freeze=0.0, fps=30.0):
     """Stub every ffprobe/ffmpeg helper so post_render_check runs hermetically
     (no external binary, no file content needed)."""
     async def _probe(path):
@@ -26,12 +26,18 @@ def _mk(monkeypatch, *, has_audio, has_video=True, duration=30.0,
         return mean_db
     async def _integrated_lufs(path):
         return lufs
+    async def _freeze_detect(path, s=60):
+        return freeze
+    async def _fps_check(path):
+        return fps
     monkeypatch.setattr(rg, "_probe", _probe)
     monkeypatch.setattr(rg, "_black_ratio", _black_ratio)
     monkeypatch.setattr(rg, "_bar_frac", _bar_frac)
     monkeypatch.setattr(rg, "_silence_s", _silence_s)
     monkeypatch.setattr(rg, "_mean_volume_db", _mean_volume_db)
     monkeypatch.setattr(rg, "_integrated_lufs", _integrated_lufs)
+    monkeypatch.setattr(rg, "_freeze_detect", _freeze_detect)
+    monkeypatch.setattr(rg, "_fps_check", _fps_check)
 
 
 @pytest.fixture
