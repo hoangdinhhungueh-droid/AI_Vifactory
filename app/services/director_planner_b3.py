@@ -92,13 +92,59 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
         return None
     t = narration_text.lower()
 
-    # 1. Bank Check / Financial Ledger (Numerical claims, government funds, subsidies, theft, fraud amounts)
+    # 1. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
+    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류"]):
+        return {
+            "type": "document_highlight",
+            "legacy_type": "redacted_doc",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": "OFFICIAL INSPECTION & AUDIT RECORD",
+            "badge": "SUBPOENAED EVIDENCE",
+            "sfx_cue": "marker_stroke",
+            "label": "CLASSIFIED // REDACTED RECORD",
+            "payload": {
+                "document_title": "OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
+                "agency": "FEDERAL BUREAU OF INVESTIGATION // US DISTRICT COURT",
+                "case_number": "CASE NO. 26-CR-01844-SD",
+                "clauses": [
+                    "1. FIELD AGENTS CONDUCTED UNANNOUNCED INSPECTIONS OF REGISTERED FACILITIES.",
+                    "2. PHYSICAL ADDRESSES REVEALED RESIDENTIAL HOUSES WITH ZERO DAYCARE OPERATION.",
+                    "3. INVOICES SUBMITTED CLAIMED OVER 100 MINORS UNDER CONTINUOUS SUPERVISION.",
+                    "4. ENROLLMENT LOGS WERE FABRICATED USING STOLEN IDENTIFICATION DATA."
+                ],
+                "highlight_line_index": 1,
+                "redacted_terms": ["STOLEN IDENTIFICATION", "ZERO DAYCARE"],
+                "date": "OFFICIAL FILING // OCTOBER 2026"
+            }
+        }
+
+    # 2. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
+    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "surveillance", "cctv", "camera", "facility", "address", "location", "locations", "street", "city", "county", "district", "cơ sở", "địa điểm", "địa chỉ", "nhà trẻ", "khu vực", "시설", "주소", "위치", "warehouse", "giám sát"]):
+        return {
+            "type": "tactical_map",
+            "legacy_type": "radar_map",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
+            "badge": "LOCATIONAL EVIDENCE",
+            "sfx_cue": "sonar_ping",
+            "label": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
+            "payload": {
+                "target_name": "UNLICENSED GHOST DAYCARE FACILITY",
+                "coordinates": "SAN DIEGO COUNTY JURISDICTION",
+                "map_region": "SOUTHERN DISTRICT OF CALIFORNIA",
+                "points_of_interest": ["OPERATOR RESIDENCE", "CLAIM PROCESSING OFFICE", "DEPOSIT CHOKEPOINT"]
+            }
+        }
+
+    # 3. Kinetic Counter / Financial Ledger (Numerical claims, government funds, subsidies, theft, fraud amounts)
     parsed_metric = parse_spoken_number(narration_text)
-    if parsed_metric is not None or any(k in t for k in ["dollar", "subsidy", "subsidies", "$", "check", "claim", "claims", "billing", "payment", "reimbursement", "fund", "funds", "tiền", "ngân sách", "trợ cấp", "chi trả", "지원금", "환불", "청구"]):
+    if parsed_metric is not None or any(k in t for k in ["dollar", "subsidy", "subsidies", "$", "check", "claim", "claims", "billing", "payment", "reimbursement", "fund", "funds", "tiền", "ngân sách", "trợ cấp", "chi trả", "지원금", "환불", "청구", "billion", "million"]):
         display_val = parsed_metric.formatted if parsed_metric else "$10,482,910"
         return {
-            "type": "bank_check",
-            "legacy_type": "kinetic_counter",
+            "type": "kinetic_counter",
+            "legacy_type": "financial_chart",
             "theme": theme or "vox_paper",
             "layout": "full_bleed_focus",
             "title": f"GOVERNMENT DISBURSEMENT // {display_val}",
@@ -114,7 +160,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             }
         }
 
-    # 2. Evidence Board / Suspect Network (Indicted individuals, operators, ring, conspiracy, arrest)
+    # 4. Evidence Board / Suspect Network (Indicted individuals, operators, ring, conspiracy, arrest)
     if any(k in t for k in ["charged", "indicted", "indictment", "defendants", "suspects", "operator", "operators", "ring", "conspiracy", "conspirators", "arrest", "fbi", "prosecutor", "prosecutors", "khởi tố", "bị can", "đối tượng", "đường dây", "bắt giữ", "기소", "피의자", "체포"]):
         return {
             "type": "evidence_board",
@@ -138,53 +184,31 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             }
         }
 
-    # 3. Paper Dossier / Official Record (Contracts, clauses, regulations, audits, subpoenas, inspections, licenses)
-    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류"]):
+    # 5. Causal Flowchart (Systemic trap, network, money laundering, shell game, pipeline)
+    if any(k in t for k in ["mechanism", "network", "shell", "laundering", "channel", "transmission", "intermediary", "trap", "bẫy", "chuỗi", "dòng tiền", "trung gian", "cơ chế", "dây chuyền", "구조", "우회", "경로"]):
         return {
-            "type": "paper_dossier",
-            "legacy_type": "document_highlight",
+            "type": "causal_flowchart",
+            "legacy_type": "redacted_doc",
             "theme": theme or "vox_paper",
             "layout": "full_bleed_focus",
-            "title": "OFFICIAL INSPECTION & AUDIT RECORD",
-            "badge": "SUBPOENAED EVIDENCE",
-            "sfx_cue": "marker_stroke",
-            "label": "CLASSIFIED // REDACTED RECORD",
+            "title": "CAUSAL TRANSMISSION // ASYMMETRIC CHOKE",
+            "badge": "RESTRICTED",
+            "sfx_cue": "node_pop",
+            "label": "INSTITUTIONAL TRANSMISSION // SYSTEMIC CHOKE",
             "payload": {
-                "document_title": "OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
-                "agency": "FEDERAL BUREAU OF INVESTIGATION // US DISTRICT COURT",
-                "case_number": "CASE NO. 26-CR-01844-SD",
-                "clauses": [
-                    "1. FIELD AGENTS CONDUCTED UNANNOUNCED INSPECTIONS OF REGISTERED FACILITIES.",
-                    "2. PHYSICAL ADDRESSES REVEALED RESIDENTIAL HOUSES WITH ZERO DAYCARE OPERATION.",
-                    "3. INVOICES SUBMITTED CLAIMED OVER 100 MINORS UNDER CONTINUOUS SUPERVISION.",
-                    "4. ENROLLMENT LOGS WERE FABRICATED USING STOLEN IDENTIFICATION DATA."
+                "nodes": [
+                    {"id": "origin", "label": "Consumer Capital", "status": "normal"},
+                    {"id": "intermediary", "label": "Platform Escrow", "status": "breach"},
+                    {"id": "offshore", "label": "Non-Refund Vault", "status": "fatal"}
                 ],
-                "highlight_line_index": 1,
-                "redacted_terms": ["STOLEN IDENTIFICATION", "ZERO DAYCARE"],
-                "date": "OFFICIAL FILING // OCTOBER 2026"
+                "edges": [
+                    {"from": "origin", "to": "intermediary", "label": "Deposit Stream"},
+                    {"from": "intermediary", "to": "offshore", "label": "Trapped Liquidity"}
+                ]
             }
         }
 
-    # 4. Tactical Paper Map (Locations, daycare homes, facility, street, jurisdiction, address)
-    if any(k in t for k in ["facility", "home", "homes", "center", "centers", "address", "location", "locations", "street", "city", "county", "district", "cơ sở", "địa điểm", "địa chỉ", "nhà trẻ", "khu vực", "시설", "주소", "위치"]):
-        return {
-            "type": "tactical_map",
-            "legacy_type": "radar_map",
-            "theme": theme or "vox_paper",
-            "layout": "full_bleed_focus",
-            "title": "SECTOR SURVEILLANCE // TARGET FACILITY",
-            "badge": "LOCATIONAL EVIDENCE",
-            "sfx_cue": "sonar_ping",
-            "label": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
-            "payload": {
-                "target_name": "UNLICENSED GHOST DAYCARE FACILITY",
-                "coordinates": "SAN DIEGO COUNTY JURISDICTION",
-                "map_region": "SOUTHERN DISTRICT OF CALIFORNIA",
-                "points_of_interest": ["OPERATOR RESIDENCE", "CLAIM PROCESSING OFFICE", "DEPOSIT CHOKEPOINT"]
-            }
-        }
-
-    # 5. 3D Procedural Evidence Prop (Physical seals, stamps, warrants, vaults, authentications, physical evidence items)
+    # 6. 3D Procedural Evidence Prop (Physical seals, stamps, warrants, vaults, authentications, physical evidence items)
     if any(k in t for k in ["hanko", "seal", "stamp", "con dấu", "triện", "mộc đỏ", "chứng thực", "vật chứng", "tang vật", "도장", "인감", "증거물", "authenticat", "exhibit item", "vault", "evidence item"]):
         return {
             "type": "evidence_3d_prop",
@@ -202,30 +226,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             }
         }
 
-    # 6. Default Fallback for Zero-Gap Guarantee: Paper Dossier summarizing the scene
-    return {
-        "type": "paper_dossier",
-        "legacy_type": "document_highlight",
-        "theme": theme or "vox_paper",
-        "layout": "full_bleed_focus",
-        "title": "CASE INVESTIGATION // EVIDENTIARY RECORD",
-        "badge": "OFFICIAL EXHIBIT",
-        "sfx_cue": "marker_stroke",
-        "label": "EVIDENTIARY RECORD // EXHIBIT",
-        "payload": {
-            "document_title": "MEMORANDUM OF INVESTIGATION",
-            "agency": "TASK FORCE FORENSIC AUDIT DIVISION",
-            "case_number": "CASE EXHIBIT // INVESTIGATION",
-            "clauses": [
-                narration_text[:90].upper() + "...",
-                "TRANSACTIONAL AUDITS CONFIRMED IRREGULARITIES.",
-                "EVIDENTIARY ADMISSIBILITY CERTIFIED BY PROSECUTION."
-            ],
-            "highlight_line_index": 0,
-            "redacted_terms": ["IRREGULARITIES"],
-            "date": "CASE RECORD"
-        }
-    }
+    return None
 
 
 def detect_stat_card(narration_text: str) -> dict | None:
