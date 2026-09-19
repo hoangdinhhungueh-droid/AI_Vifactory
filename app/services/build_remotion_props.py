@@ -643,6 +643,9 @@ def build_remotion_props_data(
             "bank_check": "GOVERNMENT DISBURSEMENT // SUBSIDY WARRANT",
             "paper_dossier": "OFFICIAL INSPECTION & AUDIT RECORD",
             "evidence_board": "CONSPIRACY NETWORK // TARGET OPERATORS",
+            "evidence_3d_prop": "PHYSICAL EVIDENCE // FORENSIC SPECIMEN",
+            "3d_evidence_prop": "PHYSICAL EVIDENCE // FORENSIC SPECIMEN",
+            "3d_hanko_seal": "AUTHENTICATED IMPERIAL SEAL // FORENSIC SPECIMEN",
         }
         if isinstance(forensic_ov, str):
             forensic_ov = {
