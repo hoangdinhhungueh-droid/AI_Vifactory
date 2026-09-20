@@ -398,6 +398,7 @@ class OrchestratorRunner:
             active = [d.name for d in ep_root.iterdir() if d.is_dir() and not d.name.startswith(("_", "."))] if ep_root.exists() else []
             task_id = active[0] if active else "EN_EP0001_sample_topic"
         ep_dir = Path("/var/vf/episodes") / task_id
+        start_ts = time.time()
 
         audit_report: Dict[str, Any] = {
             "task_id": task_id,
