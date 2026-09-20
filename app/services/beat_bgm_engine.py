@@ -16,6 +16,7 @@ import json
 import logging
 import hashlib
 import subprocess
+import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 
@@ -183,12 +184,212 @@ def get_beat_durations(episode_id: str, out_dir: Optional[str] = None, total_dur
     return fallback_durations
 
 
-def select_5_beat_tracks(episode_id: str, catalog: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
-    """Deterministically select 5 cohesive tracks for beats 1..5 from catalog."""
+def _extract_story_context(episode_id: str, out_dir: Optional[str] = None) -> Dict[str, Any]:
+    """Extract topic, market, and 5-beat story narrative from episode directory if available."""
+    out_dir = out_dir or f"/var/vf/episodes/{episode_id}"
+    ep_path = Path(out_dir)
+    context: Dict[str, Any] = {"topic": episode_id, "market": "EN", "pillar": "", "beats": {}}
+
+    # 1. Try brain_input.json
+    brain_path = ep_path / "brain_input.json"
+    if brain_path.exists():
+        try:
+            with open(brain_path, "r", encoding="utf-8") as f:
+                bdata = json.load(f)
+            context["topic"] = bdata.get("topic_name_vi") or bdata.get("topic") or episode_id
+            context["market"] = bdata.get("market", "EN")
+            context["pillar"] = bdata.get("niche_angle_brief") or bdata.get("pillar", "")
+        except Exception as e:
+            logger.debug("[beat_bgm_engine] Error reading brain_input.json: %s", e)
+
+    # 2. Try story.txt
+    story_path = ep_path / "story.txt"
+    if story_path.exists():
+        try:
+            with open(story_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            act_patterns = [
+                r"===\s*ACT\s*I\s*===(.*?)(?====\s*ACT\s*II\s*===|\Z)",
+                r"===\s*ACT\s*II\s*===(.*?)(?====\s*ACT\s*III\s*===|\Z)",
+                r"===\s*ACT\s*III\s*===(.*?)(?====\s*ACT\s*IV\s*===|\Z)",
+                r"===\s*ACT\s*IV\s*===(.*?)(?====\s*ACT\s*V\s*===|\Z)",
+                r"===\s*ACT\s*V\s*===(.*?)(?=\Z)"
+            ]
+            for idx, pat in enumerate(act_patterns, start=1):
+                m = re.search(pat, content, re.DOTALL | re.IGNORECASE)
+                if m:
+                    text_snippet = m.group(1).strip()[:500]
+                    context["beats"][idx] = text_snippet
+        except Exception as e:
+            logger.debug("[beat_bgm_engine] Error reading story.txt: %s", e)
+
+    return context
+
+
+def _llm_select_tracks(
+    episode_id: str,
+    catalog: List[Dict[str, Any]],
+    story_context: Dict[str, Any],
+    out_dir: Optional[str] = None,
+    model_override: Optional[str] = None
+) -> Optional[List[Dict[str, Any]]]:
+    """Use HHTech LLM (gpt-6-astra / claude-opus-5) to curate BGM tracks based on story tone."""
+    try:
+        from app.services.model_gateway import get_global_gateway
+        gateway = get_global_gateway()
+    except Exception as e:
+        logger.warning("[beat_bgm_engine] ModelGateway unavailable: %s", e)
+        return None
+
+    model = model_override or os.getenv("BGM_SELECTOR_MODEL", "gpt-6-astra")
+    out_dir = out_dir or f"/var/vf/episodes/{episode_id}"
+
+    # Group candidate tracks by beat index
+    candidates_by_beat: Dict[int, List[Dict[str, Any]]] = {}
+    for t in catalog:
+        b_idx = int(t.get("beat_index", 1))
+        candidates_by_beat.setdefault(b_idx, []).append(t)
+
+    # Build candidate descriptions
+    candidates_prompt_text = ""
+    for b_idx in range(1, 6):
+        candidates = candidates_by_beat.get(b_idx, [])
+        candidates_prompt_text += f"\n--- BEAT {b_idx} CANDIDATE TRACKS ---\n"
+        for c in candidates:
+            mood_tags = ", ".join(c.get("mood_tags", [])) or "cinematic"
+            candidates_prompt_text += (
+                f"  • track_id: \"{c['track_id']}\" | Title: \"{c['title']}\" | "
+                f"BPM: {c.get('bpm', 100)} | Vibe: {c.get('vibe', '')} | Tags: [{mood_tags}]\n"
+            )
+
+    system_prompt = (
+        "You are an award-winning Hollywood Documentary Music Supervisor and Sound Director. "
+        "Your task is to select the perfect background score (BGM) track for each of the 5 Beats "
+        "of an investigative docudrama episode.\n\n"
+        "Editorial Principles:\n"
+        "- Beat 1 (Hook / Cold Strike): Tension, curiosity, immediate hook pacing.\n"
+        "- Beat 2 (False Narrative / Buildup): Creeping doubt, subtle suspense, or ticking clock.\n"
+        "- Beat 3 (Forensic Paper Trail): Steady, analytical investigative rhythm, focus, minimal distraction.\n"
+        "- Beat 4 (Climax / Smoking Gun): High stakes, peak dramatic tension, decisive reveal.\n"
+        "- Beat 5 (Living Warning / Reflection): Somber resolution, lingering tragedy, philosophical aftermath.\n\n"
+        "You must select EXACTLY ONE valid track_id from the candidate tracks for each beat (1 to 5).\n"
+        "Return STRICT JSON only without markdown code blocks:\n"
+        "{\n"
+        '  "narrative_mood_analysis": "<Brief analysis of the episode tone>",\n'
+        '  "selections": [\n'
+        '    {"beat_index": 1, "track_id": "<ID>", "rationale": "<Why this track matches Beat 1>"},\n'
+        '    {"beat_index": 2, "track_id": "<ID>", "rationale": "<Why this track matches Beat 2>"},\n'
+        '    {"beat_index": 3, "track_id": "<ID>", "rationale": "<Why this track matches Beat 3>"},\n'
+        '    {"beat_index": 4, "track_id": "<ID>", "rationale": "<Why this track matches Beat 4>"},\n'
+        '    {"beat_index": 5, "track_id": "<ID>", "rationale": "<Why this track matches Beat 5>"}\n'
+        '  ]\n'
+        "}"
+    )
+
+    prompt = (
+        f"Episode: {story_context.get('topic')}\n"
+        f"Market: {story_context.get('market')}\n"
+        f"Pillar / Angle: {story_context.get('pillar')}\n\n"
+        "=== 5-BEAT STORY SUMMARY ===\n"
+    )
+    for b_idx in range(1, 6):
+        b_summary = story_context.get("beats", {}).get(b_idx, f"Beat {b_idx} narrative")
+        prompt += f"[Beat {b_idx}]: {b_summary}\n"
+
+    prompt += f"\n=== AVAILABLE BGM CANDIDATE TRACKS ===\n{candidates_prompt_text}\n"
+    prompt += "Select the optimal soundtrack tracks now (strict JSON):"
+
+    try:
+        raw_res = gateway.call_llm(
+            prompt=prompt,
+            model=model,
+            system_prompt=system_prompt,
+            max_tokens=1000,
+            temperature=0.2,
+            timeout=30.0
+        )
+        if not raw_res:
+            return None
+
+        clean_json = raw_res.strip()
+        if clean_json.startswith("```"):
+            clean_json = re.sub(r"^```[a-zA-Z]*\n?", "", clean_json)
+            clean_json = re.sub(r"\n?```$", "", clean_json)
+
+        data = json.loads(clean_json)
+        selections = data.get("selections", [])
+        if len(selections) != 5:
+            logger.warning("[beat_bgm_engine] LLM returned %d selections instead of 5", len(selections))
+            return None
+
+        catalog_by_id = {t["track_id"]: t for t in catalog}
+        chosen_tracks = []
+        for s in selections:
+            tid = s.get("track_id")
+            if tid in catalog_by_id:
+                track = dict(catalog_by_id[tid])
+                track["director_rationale"] = s.get("rationale", "")
+                chosen_tracks.append(track)
+            else:
+                logger.warning("[beat_bgm_engine] Unknown track_id '%s' returned by LLM", tid)
+                return None
+
+        if len(chosen_tracks) == 5:
+            try:
+                dec_path = Path(out_dir) / "bgm_director_decision.json"
+                dec_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(dec_path, "w", encoding="utf-8") as df:
+                    json.dump({
+                        "episode_id": episode_id,
+                        "model": model,
+                        "narrative_mood_analysis": data.get("narrative_mood_analysis"),
+                        "selections": selections
+                    }, df, indent=2, ensure_ascii=False)
+                logger.info("[beat_bgm_engine] Saved AI Music Supervisor decision to %s", dec_path)
+            except Exception as pe:
+                logger.warning("[beat_bgm_engine] Failed to save bgm_director_decision.json: %s", pe)
+
+            return chosen_tracks
+
+    except Exception as e:
+        logger.warning("[beat_bgm_engine] LLM track curation failed (%s), will fallback", e)
+
+    return None
+
+
+def select_5_beat_tracks(
+    episode_id: str,
+    catalog: Optional[List[Dict[str, Any]]] = None,
+    out_dir: Optional[str] = None,
+    story_context: Optional[Dict[str, Any]] = None,
+    use_llm: Optional[bool] = None
+) -> List[Dict[str, Any]]:
+    """Select 5 cohesive tracks for beats 1..5.
+    
+    Priority:
+      1. LLM AI Music Supervisor (via HHTech gpt-6-astra / claude-opus-5) if story exists & use_llm is True
+      2. Deterministic hash-modulo fallback (Rule 125 single truth, zero downtime)
+    """
     catalog = catalog or load_bgm_catalog()
     if not catalog:
         raise RuntimeError("No BGM tracks found in curated catalog or assets/bgm_curated!")
 
+    out_dir = out_dir or f"/var/vf/episodes/{episode_id}"
+
+    if use_llm is None:
+        use_llm = os.getenv("BGM_USE_LLM", "true").lower() in ("true", "1", "yes")
+
+    if use_llm:
+        context = story_context or _extract_story_context(episode_id, out_dir=out_dir)
+        # Only invoke LLM if we have actual story beats
+        if context.get("beats") and len(context["beats"]) >= 3:
+            llm_tracks = _llm_select_tracks(episode_id, catalog, context, out_dir=out_dir)
+            if llm_tracks and len(llm_tracks) == 5:
+                logger.info("[beat_bgm_engine] AI Music Supervisor successfully selected 5 Beat tracks for %s", episode_id)
+                return llm_tracks
+
+    # Deterministic fallback (hash-based)
+    logger.info("[beat_bgm_engine] Using deterministic fallback track selection for %s", episode_id)
     selected_tracks = []
     # Seed by episode_id to ensure deterministic consistency across re-runs
     seed_int = int(hashlib.md5(episode_id.encode("utf-8")).hexdigest()[:8], 16)
@@ -239,7 +440,7 @@ def generate_beat_adaptive_bgm(
         existing_dur = _probe_duration(target_bgm_path)
         if abs(existing_dur - total_audio_dur) <= 2.0:
             logger.info("[beat_bgm_engine] Reusing existing valid bgm_master.mp3 (%.1fs) for %s", existing_dur, episode_id)
-            tracks = select_5_beat_tracks(episode_id)
+            tracks = select_5_beat_tracks(episode_id, out_dir=out_dir)
             attr_lines = [f"• {t['title']} by {t.get('artist', 'Kevin MacLeod')} ({t.get('license', 'CC-BY')})" for t in tracks]
             return {
                 "bgm_path": target_bgm_path,
@@ -249,7 +450,7 @@ def generate_beat_adaptive_bgm(
             }
 
     beat_durations = get_beat_durations(episode_id, out_dir=out_dir, total_dur=total_audio_dur)
-    selected_tracks = select_5_beat_tracks(episode_id)
+    selected_tracks = select_5_beat_tracks(episode_id, out_dir=out_dir)
 
     num_beats = len(beat_durations)
     logger.info("[beat_bgm_engine] Assembling 5-Beat BGM for %s (target total=%.1fs, %d beats)...", episode_id, total_audio_dur, num_beats)

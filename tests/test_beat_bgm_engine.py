@@ -51,6 +51,52 @@ def test_select_5_beat_tracks():
     assert len(tracks_c) == 5
 
 
+def test_extract_story_context(tmp_path):
+    """Verify extraction of 5-beat story context from episode files."""
+    from app.services.beat_bgm_engine import _extract_story_context
+    
+    ep_dir = tmp_path / "TEST_EP9999_sample"
+    ep_dir.mkdir()
+    
+    story_content = """=== ACT I ===
+Cold open mystery in the bank.
+=== ACT II ===
+The false narrative begins.
+=== ACT III ===
+The paper trail uncovers $50M.
+=== ACT IV ===
+The federal raid occurs.
+=== ACT V ===
+The living warning for taxpayers.
+"""
+    (ep_dir / "story.txt").write_text(story_content, encoding="utf-8")
+    (ep_dir / "brain_input.json").write_text(json.dumps({
+        "topic": "Bank Fraud Scandal",
+        "market": "EN",
+        "niche_angle_brief": "Shadow banking exposure"
+    }), encoding="utf-8")
+    
+    ctx = _extract_story_context("TEST_EP9999_sample", out_dir=str(ep_dir))
+    assert ctx["topic"] == "Bank Fraud Scandal"
+    assert ctx["market"] == "EN"
+    assert len(ctx["beats"]) == 5
+    assert "Cold open mystery" in ctx["beats"][1]
+    assert "living warning" in ctx["beats"][5]
+
+
+def test_select_5_beat_tracks_fallback_resilience(tmp_path):
+    """Verify selection gracefully falls back if LLM is disabled or fails."""
+    ep_dir = tmp_path / "TEST_EP9999_sample"
+    ep_dir.mkdir()
+    (ep_dir / "story.txt").write_text("=== ACT I ===\nTest\n=== ACT II ===\nTest\n=== ACT III ===\nTest\n=== ACT IV ===\nTest\n=== ACT V ===\nTest", encoding="utf-8")
+    
+    # Test with use_llm=False
+    tracks = select_5_beat_tracks("TEST_EP9999_sample", out_dir=str(ep_dir), use_llm=False)
+    assert len(tracks) == 5
+    for idx, t in enumerate(tracks, start=1):
+        assert t["beat_index"] == idx
+
+
 def test_get_beat_durations_fallback():
     """Verify fallback duration partitioning for standard 5-Act ratios."""
     durs = get_beat_durations("NON_EXISTENT_EP", out_dir="/tmp/non_existent_dir", total_dur=500.0)
