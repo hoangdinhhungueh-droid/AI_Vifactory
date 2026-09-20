@@ -19,6 +19,8 @@ import { DataStoryTest } from "./DataStoryTest";
 import { FullStory } from "./FullStory";
 import { VoxOverlayLayer } from "./components/vox/VoxOverlayLayer";
 import { EvidenceProp3D } from "./components/EvidenceProp3D";
+import { VoxAtmosphericLighting } from "./components/vox/VoxAtmosphericLighting";
+import { VoxParallaxLayer } from "./components/vox/VoxParallaxLayer";
 
 const INK = "#05090d";
 const LIGHT = "#ffffff";
@@ -1345,6 +1347,10 @@ export const TwoLayerEpisode = (props) => {
   const currentFrame = useCurrentFrame();
 
   const currentSceneInfo = getCurrentSceneInfo(scenes, currentFrame);
+  const currentCameraMov = currentSceneInfo
+    ? currentSceneInfo.scene.cameraMovement || (currentSceneInfo.scene.camera ? currentSceneInfo.scene.camera.movement : undefined)
+    : undefined;
+  const currentDur = currentSceneInfo ? currentSceneInfo.durationInFrames : 300;
   const cameraTransform = currentSceneInfo
     ? computeCameraTransform(
         currentSceneInfo.scene.cameraMovement || (currentSceneInfo.scene.camera ? currentSceneInfo.scene.camera.movement : undefined),
@@ -1411,59 +1417,66 @@ export const TwoLayerEpisode = (props) => {
           willChange: "transform",
         }}
       >
-        {backgroundSegments.map((seg, i) => (
-          <Sequence
-            key={`bgseg-${i}`}
-            from={seg.from}
-            durationInFrames={seg.durationInFrames}
-            name={`bg-segment-${i + 1}`}
-          >
-            <BackgroundSegment
-              src={seg.src}
-              fadeInFrames={seg.fadeInFrames}
+        <VoxParallaxLayer depth="background" cameraMovement={currentCameraMov} durationInFrames={currentDur}>
+          {backgroundSegments.map((seg, i) => (
+            <Sequence
+              key={`bgseg-${i}`}
+              from={seg.from}
               durationInFrames={seg.durationInFrames}
-            />
-          </Sequence>
-        ))}
-        {foregroundSegments.map((seg, i) => (
-          <Sequence
-            key={`fgseg-${i}`}
-            from={seg.start}
-            durationInFrames={seg.end - seg.start}
-            name={`fg-segment-${i + 1}`}
-          >
-            <ForegroundLayer
-              src={seg.src}
-              position={seg.position}
-              fadeFrames={seg.fadeFrames}
+              name={`bg-segment-${i + 1}`}
+            >
+              <BackgroundSegment
+                src={seg.src}
+                fadeInFrames={seg.fadeInFrames}
+                durationInFrames={seg.durationInFrames}
+              />
+            </Sequence>
+          ))}
+        </VoxParallaxLayer>
+        <VoxParallaxLayer depth="foreground" cameraMovement={currentCameraMov} durationInFrames={currentDur}>
+          {foregroundSegments.map((seg, i) => (
+            <Sequence
+              key={`fgseg-${i}`}
+              from={seg.start}
               durationInFrames={seg.end - seg.start}
-              width={width}
-              height={height}
-            />
-          </Sequence>
-        ))}
+              name={`fg-segment-${i + 1}`}
+            >
+              <ForegroundLayer
+                src={seg.src}
+                position={seg.position}
+                fadeFrames={seg.fadeFrames}
+                durationInFrames={seg.end - seg.start}
+                width={width}
+                height={height}
+              />
+            </Sequence>
+          ))}
+        </VoxParallaxLayer>
       </div>
 
       {/* Anti-Flicker Continuous Overlay Segments (Rule 122 & Zero-Flicker Architecture) */}
-      {overlaySegments.map((seg, i) => (
-        <Sequence
-          key={`overlayseg-${i}`}
-          from={seg.from}
-          durationInFrames={seg.durationInFrames}
-          name={`overlay-segment-${i + 1}`}
-        >
-          <OverlaySegmentView
-            forensicOverlay={seg.forensicOverlay}
-            statValue={seg.statValue}
-            statLabel={seg.statLabel}
-            stampBadge={seg.stampBadge}
-            isLeft={seg.isLeft}
-          />
-        </Sequence>
-      ))}
+      <VoxParallaxLayer depth="midground" cameraMovement={currentCameraMov} durationInFrames={currentDur}>
+        {overlaySegments.map((seg, i) => (
+          <Sequence
+            key={`overlayseg-${i}`}
+            from={seg.from}
+            durationInFrames={seg.durationInFrames}
+            name={`overlay-segment-${i + 1}`}
+          >
+            <OverlaySegmentView
+              forensicOverlay={seg.forensicOverlay}
+              statValue={seg.statValue}
+              statLabel={seg.statLabel}
+              stampBadge={seg.stampBadge}
+              isLeft={seg.isLeft}
+            />
+          </Sequence>
+        ))}
+      </VoxParallaxLayer>
 
       {/* Subtitles, Speaker Tags, and Fixed UI Overlays */}
       {items}
+      <VoxAtmosphericLighting intensity={0.9} />
       <CinematicVignette />
       <CinematicOverlay />
       <TopProgressBar scenes={scenes} currentFrame={currentFrame} totalFrames={totalSceneFrames(scenes)} />

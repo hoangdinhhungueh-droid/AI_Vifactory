@@ -1,49 +1,52 @@
-# 📝 [CHANGE_MANIFEST] INFRA_3D_PROCEDURAL_VOX_INTEGRATION_AND_COT_HARNESS
+# 📝 [CHANGE_MANIFEST] VOX_PARALLAX_ATMOSPHERE_AND_AI_TIMELINE_EDITOR_COUNCIL
 
 ## 📌 1. Thông Tin Bản Thay Đổi (Change Metadata)
 - **Author Role**: Builder / Implementer
-- **Target Task**: `INFRA_3D_PROCEDURAL_VOX_INTEGRATION_AND_COT_HARNESS`
-- **Scope**: Nối 3D Procedural Three.js vào `VoxOverlayLayer.tsx`, mở rộng `director_planner_b3.py`, tích hợp `deepseek_reasoner.py`, và dọn dẹp Option A.
+- **Target Task**: `VOX_PARALLAX_ATMOSPHERE_AND_AI_TIMELINE_EDITOR_COUNCIL`
+- **Scope**: Nâng cấp khâu dựng Remotion với AI Senior Post-Production Editor Gate (`app/services/timeline_editor_agent.py`) và Canvas thị giác điện ảnh 2.5D Multi-Plane Parallax & Atmospheric Lighting (`VoxParallaxLayer.tsx`, `VoxAtmosphericLighting.tsx`).
 
 ---
 
 ## 📂 2. Danh Mục File Đã Thay Đổi (Touched Files)
 
-### A. Core Pipeline & Remotion Video Engine
-1. **[NEW] `remotion/src/components/EvidenceProp3D.tsx`**:
-   - Dựng hình procedural con dấu triện đỏ Hanko / Asian Imperial Seal bằng code Three.js thuần túy (`CylinderGeometry`, `SphereGeometry`, `TorusGeometry`).
-   - Phối màu Stylized Comic Noir cel-shading với viền mực đen inverted hull, 0% photorealistic (Rule 122).
-   - Diễn hoạt camera orbit 360° đồng bộ từng frame bằng `useCurrentFrame()`.
-2. **[MODIFY] `remotion/src/components/vox/VoxOverlayLayer.tsx`**:
-   - Nhập khẩu `EvidenceProp3D`.
-   - Bổ sung nhánh render cho `rawType === "evidence_3d_prop" | "3d_hanko_seal" | "3d_evidence_prop"`.
-   - Thiết lập khung hiển thị card noir bo góc có viền phát sáng cyan (`width: isFullBleed ? 1200 : 700`, `height: isFullBleed ? 750 : 480`).
-3. **[MODIFY] `remotion/src/index.tsx`**:
-   - Đăng ký composition độc lập `EvidenceProp3DTest` phục vụ kiểm định trực quan nhanh.
-4. **[MODIFY] `app/services/director_planner_b3.py`**:
-   - Bổ sung quy tắc nhận diện số 5 trong `detect_forensic_overlay()` cho các từ khóa tang vật bản địa (`hanko`, `seal`, `stamp`, `con dấu`, `triện`, `mộc đỏ`, `vật chứng`, `tang vật`, `도장`, `인감`, `증거물`).
-   - Trả về payload chuẩn: `type: "evidence_3d_prop"`, `layout: "split_right"`, `badge: "PHYSICAL EXHIBIT"`, `sfx_cue: "stamp_slam"`.
+### A. Core Pipeline & AI Editorial Intelligence
+1. **[NEW] `app/services/timeline_editor_agent.py`**:
+   - Agent Đạo diễn Hậu kỳ thẩm định và tối ưu hóa timeline trước khi render:
+     * **Pacing Audit**: Phát hiện dead-air thị giác (>4.0s) để tự động chêm micro-motion hoặc đổi góc máy.
+     * **Word-Locked Camera Punch**: Khóa góc máy (snap_zoom, slow_push_in) và micro-SFX cue chính xác theo từng mili-giây Whisper word timestamp (`whisper_segments.json`).
+     * **Visual Monotony Breaker**: Tự động chuyển layout/hướng khi có > 2 cảnh cùng dùng 1 loại overlay liên tiếp.
+     * **Clean Speaker Tags (Rule 136)**: Khử toàn bộ rò rỉ mã asset, reuse_key, hash, chỉ cho phép hiển thị `TÊN // VAI TRÒ` hoặc `BEAT <X>: <TIÊU ĐỀ>`.
+     * **Graceful Fallback (Rule 118)**: Tự động fallback an toàn về deterministic props nếu LLM timeout hoặc gặp lỗi.
+2. **[MODIFY] `app/services/build_remotion_props.py`**:
+   - Tích hợp hàm `audit_and_optimize_timeline()` vào khâu lắp ráp `build_remotion_props()`.
+   - Bổ sung cờ `--enable-ai-editor` (mặc định True trong pipeline sản xuất).
 
-### B. Audit & Multi-Agent Council Engine
-5. **[NEW] `app/audit/deepseek_reasoner.py`**:
-   - Module chuyên trách cho vai *Adversarial Auditor* trong hội đồng multi-agent.
-   - Hỗ trợ gọi API DeepSeek Reasoner (`deepseek-reasoner`), bóc tách tường minh cả 2 trường `reasoning_content` (CoT chain) và `content` (phán quyết `CLEAR` / `VETO`).
-   - Tích hợp bộ prompt kiểm toán đối kháng 3 trục thép: Rule 130 (Causal Integrity), Rule 125 & 128 (Ghost Code & Bias), Rule 136 (Zero Asset Leak).
-6. **[MODIFY] `.agents/skills/vf-pipeline-teamwork/SKILL.md`**:
-   - Chuẩn hóa vai trò số 4: *Adversarial Auditor powered by DeepSeek-R1 CoT*.
-7. **[MODIFY] `C:\Users\hunghd2\.gemini\config\skills\remotion\SKILL.md`**:
-   - Hợp nhất cẩm nang Remotion duy nhất: bổ sung chunking 5-Beat, still frame preview runbook, background render VPS.
-8. **[DELETE] `.agents/skills/remotion-*` (13 folders)**:
-   - Dọn sạch 13 thư mục generic boilerplate không dùng theo Option A.
+### B. Remotion Visual Engine & 2.5D Cinematic Canvas
+3. **[NEW] `remotion/src/components/vox/VoxAtmosphericLighting.tsx`**:
+   - Hạt bụi điện ảnh (Cinema Dust Motes) di chuyển với nhịp lượng tử 12fps bằng pure Remotion math (`steppedFrame = Math.floor(frame / 2.5) * 2.5`).
+   - Quét sáng thể tích mềm (Volumetric Light Sweep) tạo không gian ánh sáng phim tài liệu điện ảnh đẳng cấp như Veo 2 / Seedance.
+   - Không sử dụng CSS transition, không gây sụt giảm FPS trên headless Linux CPU.
+4. **[NEW] `remotion/src/components/vox/VoxParallaxLayer.tsx`**:
+   - Thùng chứa độ sâu 2.5D Multi-Plane Parallax phân tách 3 lớp chuyển động vi sai:
+     * `background`: Hệ số 0.8x (tạo cảm giác không gian sâu thẳm).
+     * `midground`: Hệ số 1.0x (evidence props, documents, maps).
+     * `foreground`: Hệ số 1.25x (nhân vật cutout nổi bật về phía trước).
+5. **[MODIFY] `remotion/src/index.tsx`**:
+   - Bao bọc `BackgroundSegment` và `ForegroundLayer` trong `<VoxParallaxLayer depth="background">` và `<VoxParallaxLayer depth="foreground">`.
+   - Bao bọc `OverlaySegmentView` trong `<VoxParallaxLayer depth="midground">`.
+   - Bổ sung `<VoxAtmosphericLighting intensity={0.9} />` phủ trên video layer.
 
-### C. Test Harness
-9. **[NEW] `tests/test_evidence_3d_prop_pipeline.py`**:
-   - 5 bài kiểm thử unit & integration cho 3D prop detection trên các ngôn ngữ (EN, VN, KR) và bảo toàn tính tương thích ngược cho các overlay 2D cũ.
+### C. Test Harness & Production Utilities
+6. **[NEW] `tests/test_timeline_editor_agent.py`**:
+   - 4 bài kiểm thử chuyên sâu: `test_clean_speaker_tags_rule_136`, `test_visual_monotony_breaker`, `test_dead_air_elimination`, `test_word_locked_camera_punch`.
+7. **[NEW] `scripts/render_preview_2min.py`**:
+   - Kịch bản render preview 2 phút đầu (3,600 frames) tích hợp FFmpeg Sidechain Ducking, trích xuất 5 frame pháp y và gửi trực tiếp Telegram.
 
 ---
 
 ## 🛡️ 3. Kiểm Tra Ghost Code & Biên Dịch (Rule 125 & Rule 127)
-- `python3 -m py_compile app/services/director_planner_b3.py` ➔ **Exit code 0**
-- `python3 -m py_compile app/audit/deepseek_reasoner.py` ➔ **Exit code 0**
-- `pytest tests/test_evidence_3d_prop_pipeline.py` ➔ **5/5 PASSED trên cả Local và VPS**
-- `npx remotion bundle` ➔ **Exit code 0**
+- `python3 -m py_compile app/services/timeline_editor_agent.py app/services/build_remotion_props.py scripts/render_preview_2min.py tests/test_timeline_editor_agent.py` ➔ **Exit code 0**
+- `pytest tests/test_timeline_editor_agent.py` ➔ **4/4 PASSED (Exit code 0)**
+- `npx remotion bundle src/index.tsx` ➔ **Exit code 0**
+- `python3 scripts/render_twolayer_visual.py ... --frames 0-9` ➔ **10/10 frames rendered in 10.1s (Exit code 0)**
+- `python3 scripts/orchestrator/ghost_code_detector.py` ➔ **0 ghost artifacts, 0 defect**

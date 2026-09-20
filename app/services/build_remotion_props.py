@@ -34,6 +34,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from app.services.text_to_number_parser import parse_spoken_number
+from app.services.timeline_editor_agent import audit_and_optimize_timeline
 
 logger = logging.getLogger("vf.build_remotion_props")
 
@@ -767,6 +768,20 @@ def build_remotion_props_data(
                 print(f"DURATION_SCALED: scaled {total_vdur:.1f}s -> {adur:.1f}s to match audio ({scale:.2f}x)")
         except Exception as _e_dur:
             print(f"DEBUG: duration probe fallback: {_e_dur}")
+
+    # AI Senior Post-Production Editor Gate (Pacing, Word-locked punches, Monotony breaker)
+    try:
+        all_words = []
+        for sc in scenes_out:
+            for sub in (sc.get("subtitles") or []):
+                all_words.append({
+                    "word": sub.get("word"),
+                    "start_ms": sub.get("abs_start_ms", sub.get("start_ms", 0)),
+                    "end_ms": sub.get("abs_end_ms", sub.get("end_ms", 0)),
+                })
+        scenes_out = audit_and_optimize_timeline(scenes_out, whisper_words=all_words)
+    except Exception as _e_editor:
+        logger.warning("[build_remotion_props] AI Editor optimization fallback: %s", _e_editor)
 
     props = {
         "scenes": scenes_out,
