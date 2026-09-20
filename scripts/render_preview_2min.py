@@ -161,7 +161,17 @@ def main():
         f"5. <b>Procedural 3D Evidence Prop:</b> Vật chứng 3D Three.js nguyên khối (Ex. A), vật lý stop-motion 12fps (Scene 16 @ 1:52)\n"
         f"6. <b>Audio Spine:</b> TTS chuẩn studio + BGM Sidechain Ducking tự động dìm nhạc khi có giọng nói."
     )
-    send_telegram_video(MASTER_OUT, caption)
+    target_video = MASTER_OUT
+    if MASTER_OUT.stat().st_size > 48 * 1024 * 1024:
+        tg_out = EP_DIR / "preview_2min_tg.mp4"
+        if not tg_out.exists() or tg_out.stat().st_size == 0:
+            log("Master video exceeds 48MB, compressing for Telegram delivery...")
+            cmp_cmd = ["ffmpeg", "-y", "-i", str(MASTER_OUT), "-c:v", "libx264", "-crf", "28", "-preset", "faster", "-c:a", "aac", "-b:a", "128k", str(tg_out)]
+            subprocess.run(cmp_cmd, capture_output=True)
+        if tg_out.exists() and tg_out.stat().st_size > 0:
+            target_video = tg_out
+            log(f"Using compressed video for Telegram: {target_video} ({target_video.stat().st_size / (1024*1024):.1f} MB)")
+    send_telegram_video(target_video, caption)
     log("=== PREVIEW PIPELINE COMPLETED SUCCESSFULLY ===")
 
 if __name__ == "__main__":

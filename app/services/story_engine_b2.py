@@ -547,6 +547,9 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             "   - Act III (Systemic Blindspot): 死角, 疑惑, 欠陥, 内部, 記録, しかし, だが, 亀裂.\n"
             "   - Act IV (The Smoking Gun): 決定打, 証拠, 判決, 責任, 破綻, 暴露, 調査, 処分.\n"
             "   - Act V (The Modern Mirror): 警告, 教訓, 現代, 今日, 遺産, 課題, 結論.\n"
+            "• Check 8 & 9 (Open & Close Curiosity Loops - Japanese Vocabulary):\n"
+            "   - Open loops in each Act using: 果たして, 疑問, なぜ, 本当の理由は, だろうか (~2 per Act).\n"
+            "   - Close loops in each Act using: その理由は, 答えは, 結局, こうして, 明らかになったのは, まさに (~2 per Act).\n"
             "   CRITICAL LINGUISTIC PURITY (RULE 120 & RULE 128): 100% Japanese prose. STRICTLY FORBIDDEN: Do NOT write raw English words ('collapse', 'shock', 'disappear', 'official story', 'red herring', 'paper trail', 'only') in Japanese prose; translate them into native Japanese!"
         )
     elif mkt == "KR":
@@ -661,13 +664,20 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
 
     competitor_context = ""
     context_lines = []
-    if transposition and transposition.get("proven_structural_vehicle"):
+    if transposition and isinstance(transposition, dict) and transposition.get("proven_structural_vehicle"):
         v_name = transposition["proven_structural_vehicle"]
         context_lines.append(
             "⚡ PROVEN STRUCTURAL VEHICLE (Format Win Transposition):\n"
             f"Transmute this proven narrative vehicle to our case: \"{v_name}\".\n"
             "Adopt its core tension, pacing rhythm, and psychological hook while investigating our unique case."
         )
+    elif transposition and isinstance(transposition, list):
+        items = [f"  - {item}" for item in transposition if isinstance(item, str)]
+        if items:
+            context_lines.append(
+                "⚡ PROVEN STRUCTURAL VEHICLE (Format Win Transposition):\n"
+                + "\n".join(items)
+            )
     if pivot_angle:
         context_lines.append(
             "🎯 10X INDEPENDENT INVESTIGATIVE PIVOT (OUR STRATEGIC LEVERAGE):\n"
@@ -701,7 +711,10 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
     if intel_card and intel_card.get("audience_comment_gaps"):
         context_lines.append("High-engagement audience comment quotes:")
         for g in intel_card["audience_comment_gaps"][:3]:
-            context_lines.append(f"  - [{g.get('likes_count', 0)} likes] {g.get('comment_verbatim', '')[:140]}")
+            if isinstance(g, dict):
+                context_lines.append(f"  - [{g.get('likes_count', 0)} likes] {g.get('comment_verbatim', '')[:140]}")
+            elif isinstance(g, str):
+                context_lines.append(f"  - {g[:140]}")
 
     context_lines.append(
         "🚨 STRICT ZERO COMPETITOR NAME-DROP MANDATE:\n"
