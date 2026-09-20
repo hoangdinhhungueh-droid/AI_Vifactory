@@ -47,16 +47,35 @@ export const EvidenceProp3D: React.FC<{
   const borderColor = isNoir ? "#374151" : "#e2d9c2";
   const stampBorderColor = isNoir ? "#ef4444" : "#b91c1c";
 
+  const sceneRef = useRef<{
+    renderer: THREE.WebGLRenderer;
+    scene: THREE.Scene;
+    camera: THREE.PerspectiveCamera;
+    modelGroup: THREE.Group;
+    lights: { keyLight: THREE.DirectionalLight; rimLight: THREE.DirectionalLight };
+    geometries: THREE.BufferGeometry[];
+    materials: THREE.Material[];
+  } | null>(null);
+
+  // Initialize WebGL context and 3D scene ONCE on mount
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: true,
-      preserveDrawingBuffer: true,
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: true,
+        powerPreference: "high-performance",
+      });
+    } catch (e) {
+      console.warn("[EvidenceProp3D] Failed to create WebGLRenderer:", e);
+      return;
+    }
+
     renderer.setSize(width, height);
     renderer.setPixelRatio(1);
     renderer.shadowMap.enabled = true;
@@ -65,22 +84,6 @@ export const EvidenceProp3D: React.FC<{
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
 
-    // Quantized 12fps orbit motion for authentic documentary stop-motion cadence
-    const orbitAngle = interpolate(
-      steppedFrame,
-      [0, 90],
-      [-Math.PI * 0.25, Math.PI * 0.45]
-    );
-    const cameraDist = 8.5;
-    const cameraY = interpolate(steppedFrame, [0, 45, 90], [2.2, 3.2, 2.4]);
-    camera.position.set(
-      Math.sin(orbitAngle) * cameraDist,
-      cameraY,
-      Math.cos(orbitAngle) * cameraDist
-    );
-    camera.lookAt(0, 0.8, 0);
-
-    // Warmer documentary lighting (archival inspection lamp)
     const ambientLight = new THREE.AmbientLight(0x222733, 1.4);
     scene.add(ambientLight);
 
@@ -97,89 +100,130 @@ export const EvidenceProp3D: React.FC<{
     redGlow.position.set(0, 0.2, 0);
     scene.add(redGlow);
 
-    const hankoGroup = new THREE.Group();
+    const modelGroup = new THREE.Group();
+    const geometries: THREE.BufferGeometry[] = [];
+    const materials: THREE.Material[] = [];
 
-    const blackLacquer = new THREE.MeshToonMaterial({
-      color: 0x181920,
-    });
-    const goldAccent = new THREE.MeshToonMaterial({
-      color: 0xd4af37,
-    });
-    const vermilionRed = new THREE.MeshToonMaterial({
-      color: 0xd32f2f,
-    });
-    const inkOutlineMat = new THREE.MeshBasicMaterial({
-      color: 0x050608,
-      side: THREE.BackSide,
-    });
+    // Materials
+    const blackLacquer = new THREE.MeshToonMaterial({ color: 0x181920 });
+    const goldAccent = new THREE.MeshToonMaterial({ color: 0xd4af37 });
+    const vermilionRed = new THREE.MeshToonMaterial({ color: 0xd32f2f });
+    const inkOutlineMat = new THREE.MeshBasicMaterial({ color: 0x050608, side: THREE.BackSide });
+    materials.push(blackLacquer, goldAccent, vermilionRed, inkOutlineMat);
 
+    // 1. Hanko Handle
     const handleGeo = new THREE.CylinderGeometry(0.55, 0.65, 2.8, 32);
+    geometries.push(handleGeo);
     const handleMesh = new THREE.Mesh(handleGeo, blackLacquer);
     handleMesh.position.y = 1.6;
     handleMesh.castShadow = true;
-    hankoGroup.add(handleMesh);
+    modelGroup.add(handleMesh);
 
     const handleOutlineGeo = new THREE.CylinderGeometry(0.59, 0.69, 2.84, 32);
+    geometries.push(handleOutlineGeo);
     const handleOutline = new THREE.Mesh(handleOutlineGeo, inkOutlineMat);
     handleOutline.position.y = 1.6;
-    hankoGroup.add(handleOutline);
+    modelGroup.add(handleOutline);
 
+    // 2. Cap
     const capGeo = new THREE.SphereGeometry(0.55, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    geometries.push(capGeo);
     const capMesh = new THREE.Mesh(capGeo, blackLacquer);
     capMesh.position.y = 3.0;
-    hankoGroup.add(capMesh);
+    modelGroup.add(capMesh);
 
-    const ring1 = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.04, 16, 32), goldAccent);
+    // 3. Gold Rings
+    const ring1Geo = new THREE.TorusGeometry(0.58, 0.04, 16, 32);
+    const ring2Geo = new THREE.TorusGeometry(0.66, 0.05, 16, 32);
+    geometries.push(ring1Geo, ring2Geo);
+    const ring1 = new THREE.Mesh(ring1Geo, goldAccent);
     ring1.rotation.x = Math.PI / 2;
     ring1.position.y = 2.8;
-    hankoGroup.add(ring1);
+    modelGroup.add(ring1);
 
-    const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.05, 16, 32), goldAccent);
+    const ring2 = new THREE.Mesh(ring2Geo, goldAccent);
     ring2.rotation.x = Math.PI / 2;
     ring2.position.y = 0.5;
-    hankoGroup.add(ring2);
+    modelGroup.add(ring2);
 
+    // 4. Base Stamp
     const baseGeo = new THREE.CylinderGeometry(0.75, 0.75, 0.4, 32);
+    const baseOutlineGeo = new THREE.CylinderGeometry(0.79, 0.79, 0.44, 32);
+    geometries.push(baseGeo, baseOutlineGeo);
     const baseMesh = new THREE.Mesh(baseGeo, vermilionRed);
     baseMesh.position.y = 0.2;
     baseMesh.castShadow = true;
-    hankoGroup.add(baseMesh);
+    modelGroup.add(baseMesh);
 
-    const baseOutline = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.79, 0.79, 0.44, 32),
-      inkOutlineMat
-    );
+    const baseOutline = new THREE.Mesh(baseOutlineGeo, inkOutlineMat);
     baseOutline.position.y = 0.2;
-    hankoGroup.add(baseOutline);
+    modelGroup.add(baseOutline);
 
+    // 5. Stage Ground
     const groundGeo = new THREE.PlaneGeometry(12, 12);
-    const groundMat = new THREE.MeshToonMaterial({
-      color: 0x0c0f17,
-    });
+    const groundMat = new THREE.MeshToonMaterial({ color: 0x0c0f17 });
+    geometries.push(groundGeo);
+    materials.push(groundMat);
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    scene.add(hankoGroup);
+    scene.add(modelGroup);
 
-    // Stop-motion quantized wobble
-    const wobble = Math.sin(steppedFrame * 0.1) * 0.04;
-    hankoGroup.rotation.z = wobble;
-    hankoGroup.rotation.x = Math.cos(steppedFrame * 0.08) * 0.03;
-
-    renderer.render(scene, camera);
+    sceneRef.current = {
+      renderer,
+      scene,
+      camera,
+      modelGroup,
+      lights: { keyLight, rimLight },
+      geometries,
+      materials,
+    };
 
     return () => {
-      renderer.dispose();
-      handleGeo.dispose();
-      handleOutlineGeo.dispose();
-      capGeo.dispose();
-      baseGeo.dispose();
-      groundGeo.dispose();
+      try {
+        geometries.forEach((g) => g.dispose());
+        materials.forEach((m) => m.dispose());
+        renderer.dispose();
+      } catch (err) {
+        // cleanup safe
+      }
+      sceneRef.current = null;
     };
-  }, [steppedFrame, width, height, fps]);
+  }, [width, height]);
+
+  // Frame-by-frame animation update (NO WebGL context recreation)
+  useEffect(() => {
+    const s = sceneRef.current;
+    if (!s) return;
+
+    const orbitAngle = interpolate(
+      steppedFrame,
+      [0, 90],
+      [-Math.PI * 0.25, Math.PI * 0.45],
+      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+    );
+    const cameraDist = 8.5;
+    const cameraY = interpolate(steppedFrame, [0, 45, 90], [2.2, 3.2, 2.4], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    s.camera.position.set(
+      Math.sin(orbitAngle) * cameraDist,
+      cameraY,
+      Math.cos(orbitAngle) * cameraDist
+    );
+    s.camera.lookAt(0, 0.8, 0);
+
+    // Quantized 12fps stop-motion wobble
+    const wobble = Math.sin(steppedFrame * 0.1) * 0.04;
+    s.modelGroup.rotation.z = wobble;
+    s.modelGroup.rotation.x = Math.cos(steppedFrame * 0.08) * 0.03;
+
+    s.renderer.render(s.scene, s.camera);
+  }, [steppedFrame]);
 
   return (
     <div
@@ -207,9 +251,8 @@ export const EvidenceProp3D: React.FC<{
           transform: "translateX(-50%) rotate(1.5deg)",
           width: 140,
           height: 28,
-          backgroundColor: "rgba(255, 255, 255, 0.45)",
-          backdropFilter: "blur(1px)",
-          border: "1px solid rgba(255, 255, 255, 0.6)",
+          backgroundColor: "rgba(255, 255, 255, 0.65)",
+          border: "1px solid rgba(255, 255, 255, 0.75)",
           boxShadow: "0 2px 4px rgba(0,0,0,0.12)",
           zIndex: 40,
         }}

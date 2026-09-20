@@ -188,6 +188,7 @@ def main():
     parser.add_argument("--concurrency", default="3", help="Remotion concurrency (default: 3)")
     parser.add_argument("--x264-preset", default="veryfast", help="x264 preset (default: veryfast)")
     parser.add_argument("--crf", type=int, default=18, help="CRF rate control (default: 18)")
+    parser.add_argument("--skip-auto-mux", action="store_true", help="Skip automatic downstream mux and Gate 3 dispatch")
     args = parser.parse_args()
 
     ep_dir = Path(f"/var/vf/episodes/{args.episode_id}")
@@ -248,6 +249,13 @@ def main():
     print(f"🎉 MASTER VIDEO READY: {final_out}")
     print(f"Total frames: {total_frames} | Total time: {overall_elapsed / 60:.1f} mins | Avg Speed: {overall_fps:.2f} fps")
     print("=" * 60)
+
+    # Automatic Downstream Hook: Mux + Audit + B10 + Telegram Gate 3
+    if not args.skip_auto_mux:
+        mux_script = _REPO_ROOT / "scripts" / "mux_master_episode.py"
+        if mux_script.exists():
+            print("\n>>> [AUTO-PIPELINE] Automatically invoking mux, audit, and Gate 3 dispatch...")
+            subprocess.run([sys.executable, str(mux_script), "--episode-id", args.episode_id], check=True)
 
 
 if __name__ == "__main__":

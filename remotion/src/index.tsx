@@ -764,24 +764,56 @@ const BackgroundSegment = ({ src, fadeInFrames, durationInFrames }) => {
           extrapolateRight: "clamp",
         })
       : 1;
-  // Subtle Ken Burns slow zoom (1.0 -> 1.06) (Rule 95 & YouTube 2026 motion specs)
-  const scale = interpolate(frame, [0, dur], [1.0, 1.06], {
+  // Subtle, smooth editorial zoom (1.0 -> 1.03) without fighting outer camera
+  const scale = interpolate(frame, [0, dur], [1.0, 1.03], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
   return (
-    <AbsoluteFill style={{ opacity, overflow: "hidden" }}>
+    <AbsoluteFill style={{ overflow: "hidden", backgroundColor: "#0b0f17" }}>
+      {/* Vox Tactical Investigation Canvas: Blueprint Grid & Subtle Halftone Matrix */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage:
+            "linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px)",
+          backgroundSize: "60px 60px",
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px)",
+          backgroundSize: "30px 30px",
+          pointerEvents: "none",
+        }}
+      />
+
       {src ? (
-        <Img
-          src={resolveSrc(src)}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            transform: `scale(${scale})`,
-            filter: "brightness(1.08) contrast(1.02)",
-          }}
-        />
+        <AbsoluteFill style={{ opacity }}>
+          <Img
+            src={resolveSrc(src)}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              transform: `scale(${scale})`,
+              filter: "brightness(0.92) contrast(1.05)",
+            }}
+          />
+          {/* Subtle dark tint overlay to ensure foreground evidence objects pop with maximum clarity */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundColor: "rgba(11, 15, 23, 0.35)",
+              pointerEvents: "none",
+            }}
+          />
+        </AbsoluteFill>
       ) : null}
     </AbsoluteFill>
   );
@@ -1189,8 +1221,8 @@ export const computeCameraTransform = (
   const mov = cameraMovement || "slow_push_in";
 
   if (mov === "snap_zoom") {
-    // Sharp punch-in within first 8 frames (0.27s), then subtle hold creep
-    const scale = interpolate(f, [0, 8, dur], [1.0, 1.20, 1.23], {
+    // Sharp punch-in within first 8 frames, then subtle creep
+    const scale = interpolate(f, [0, 8, dur], [1.0, 1.10, 1.12], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
       easing: Easing.bezier(0.16, 1, 0.3, 1),
@@ -1199,46 +1231,51 @@ export const computeCameraTransform = (
   }
 
   if (mov === "slow_push_in") {
-    const maxScale = tensionLevel === "high" ? 1.14 : 1.08;
+    const maxScale = tensionLevel === "high" ? 1.06 : 1.035;
     const scale = interpolate(f, [0, dur], [1.0, maxScale], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
     });
     return `scale(${scale})`;
   }
 
   if (mov === "slow_pull_out") {
-    const scale = interpolate(f, [0, dur], [1.12, 1.0], {
+    const startScale = tensionLevel === "high" ? 1.06 : 1.035;
+    const scale = interpolate(f, [0, dur], [startScale, 1.0], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
     });
     return `scale(${scale})`;
   }
 
   if (mov === "cinematic_pan") {
-    // Subtle horizontal pan (-35px to +35px) with 1.06 base scale to prevent edge bleed
-    const panX = interpolate(f, [0, dur], [-35, 35], {
+    // Subtle horizontal tracking (-18px to +18px) with 1.03 base scale
+    const panX = interpolate(f, [0, dur], [-18, 18], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
     });
-    return `scale(1.06) translateX(${panX}px)`;
+    return `scale(1.03) translateX(${panX}px)`;
   }
 
   if (mov === "macro_tilt") {
-    // Vertical tilt (-22px to +22px) with 1.06 base scale
-    const tiltY = interpolate(f, [0, dur], [-22, 22], {
+    // Vertical tilt (-12px to +12px)
+    const tiltY = interpolate(f, [0, dur], [-12, 12], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
     });
-    return `scale(1.06) translateY(${tiltY}px)`;
+    return `scale(1.03) translateY(${tiltY}px)`;
   }
 
   if (mov === "handheld_shake") {
-    // High-tension procedural camera jitter with base scale 1.05
-    const intensity = tensionLevel === "high" ? 5.5 : 3.0;
-    const shakeX = Math.sin(f * 0.45) * intensity + Math.cos(f * 0.8) * (intensity * 0.5);
-    const shakeY = Math.cos(f * 0.35) * (intensity * 0.8) + Math.sin(f * 0.7) * (intensity * 0.4);
-    const scale = interpolate(f, [0, dur], [1.04, 1.07], {
+    // Controlled documentary tension jitter
+    const intensity = tensionLevel === "high" ? 2.5 : 1.2;
+    const shakeX = Math.sin(f * 0.45) * intensity + Math.cos(f * 0.8) * (intensity * 0.4);
+    const shakeY = Math.cos(f * 0.35) * (intensity * 0.6) + Math.sin(f * 0.7) * (intensity * 0.3);
+    const scale = interpolate(f, [0, dur], [1.02, 1.04], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
     });
@@ -1246,10 +1283,10 @@ export const computeCameraTransform = (
   }
 
   // Fallback subtle Ken Burns slow zoom
-  const scale = interpolate(f, [0, dur], [1.0, 1.06], {
+  const scale = interpolate(f, [0, dur], [1.0, 1.03], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-  });
+    easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
   return `scale(${scale})`;
 };
 

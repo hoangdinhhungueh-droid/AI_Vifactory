@@ -39,13 +39,39 @@ logger = logging.getLogger("vf.build_remotion_props")
 
 
 def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> dict | None:
-    """Rule 128 & Vox Explanatory Engine: Detect tactile paper-collage evidentiary graphics."""
+    """Rule 128 & Vox Explanatory Engine: Detect tactile paper-collage evidentiary graphics and 3D props."""
     if not narration_text:
         return None
     t = narration_text.lower()
 
-    # 1. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
-    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류"]):
+    # 1. 3D Procedural Evidence Specimen (Physical evidence, smoking gun, artifact, seal, vault, hanko)
+    if any(k in t for k in ["evidence", "smoking gun", "artifact", "seal", "stamp", "hanko", "vault", "exhibit", "chứng cứ", "tang vật", "niêm phong", "con dấu", "triện", "증거", "인장"]):
+        return {
+            "type": "evidence_3d_prop",
+            "legacy_type": "redacted_doc",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": "PHYSICAL EVIDENCE // EXHIBIT A",
+            "badge": "SEALED EXHIBIT",
+            "sfx_cue": "stamp_slam",
+            "label": "FORENSIC SPECIMEN // AUTHENTICATED",
+            "payload": {
+                "specimen_type": "procedural_3d_artifact",
+                "classification": "EVIDENTIARY_PROOF",
+                "notes": "12FPS STOP-MOTION VOLUMETRIC SPECIMEN"
+            }
+        }
+
+    # 2. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
+    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "조항", "감사", "서류"]):
+        # Dynamically split sentences to create relevant clause lines
+        sentences = [s.strip().upper() for s in re.split(r'[.!?]+', narration_text) if len(s.strip()) > 10][:4]
+        clauses = [f"{idx+1}. {sent}" for idx, sent in enumerate(sentences)] if sentences else [
+            "1. OFFICIAL FIELD AUDIT CONFIRMED SYSTEMIC IRREGULARITIES.",
+            "2. RECORDED CLAIMS EXCEEDED VERIFIABLE INSTITUTIONAL CAPACITY.",
+            "3. SUBMITTED INVOICES IDENTIFIED UNVERIFIED ANOMALOUS ENTITIES.",
+            "4. FORENSIC PAPER TRAIL ENTERED INTO OFFICIAL ADJUDICATION."
+        ]
         return {
             "type": "document_highlight",
             "legacy_type": "redacted_doc",
@@ -57,21 +83,16 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             "label": "CLASSIFIED // REDACTED RECORD",
             "payload": {
                 "document_title": "OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
-                "agency": "FEDERAL BUREAU OF INVESTIGATION // US DISTRICT COURT",
-                "case_number": "CASE NO. 26-CR-01844-SD",
-                "clauses": [
-                    "1. FIELD AGENTS CONDUCTED UNANNOUNCED INSPECTIONS OF REGISTERED FACILITIES.",
-                    "2. PHYSICAL ADDRESSES REVEALED RESIDENTIAL HOUSES WITH ZERO DAYCARE OPERATION.",
-                    "3. INVOICES SUBMITTED CLAIMED OVER 100 MINORS UNDER CONTINUOUS SUPERVISION.",
-                    "4. ENROLLMENT LOGS WERE FABRICATED USING STOLEN IDENTIFICATION DATA."
-                ],
-                "highlight_line_index": 1,
-                "redacted_terms": ["STOLEN IDENTIFICATION", "ZERO DAYCARE"],
-                "date": "OFFICIAL FILING // OCTOBER 2026"
+                "agency": "REGULATORY OVERSIGHT // INVESTIGATIVE DIVISION",
+                "case_number": "CASE DOCKET // ADJUDICATED FILING",
+                "clauses": clauses,
+                "highlight_line_index": 1 if len(clauses) > 1 else 0,
+                "redacted_terms": ["CONFIDENTIAL", "UNVERIFIED"],
+                "date": "OFFICIAL RECORD // VERIFIED"
             }
         }
 
-    # 2. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
+    # 3. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
     if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "surveillance", "cctv", "camera", "facility", "address", "location", "locations", "street", "city", "county", "district", "cơ sở", "địa điểm", "địa chỉ", "nhà trẻ", "khu vực", "시설", "주소", "위치", "warehouse", "giám sát"]):
         return {
             "type": "tactical_map",
@@ -83,36 +104,36 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             "sfx_cue": "sonar_ping",
             "label": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
             "payload": {
-                "target_name": "UNLICENSED GHOST DAYCARE FACILITY",
-                "coordinates": "SAN DIEGO COUNTY JURISDICTION",
-                "map_region": "SOUTHERN DISTRICT OF CALIFORNIA",
-                "points_of_interest": ["OPERATOR RESIDENCE", "CLAIM PROCESSING OFFICE", "DEPOSIT CHOKEPOINT"]
+                "target_name": "OPERATIONAL SITE // VERIFIED SECTOR",
+                "coordinates": "TARGET REGION JURISDICTION",
+                "map_region": "INVESTIGATIVE DISTRICT",
+                "points_of_interest": ["PRIMARY HUB", "INTERMEDIARY CHOKEPOINT", "ESCROW DISBURSEMENT"]
             }
         }
 
-    # 3. Kinetic Counter / Financial Ledger (Numerical claims, government funds, subsidies, theft, fraud amounts)
+    # 4. Kinetic Counter / Financial Ledger (Numerical claims, government funds, subsidies, theft, fraud amounts)
     parsed_metric = parse_spoken_number(narration_text)
     if parsed_metric is not None or any(k in t for k in ["dollar", "subsidy", "subsidies", "$", "check", "claim", "claims", "billing", "payment", "reimbursement", "fund", "funds", "tiền", "ngân sách", "trợ cấp", "chi trả", "지원금", "환불", "청구", "billion", "million"]):
-        display_val = parsed_metric.formatted if parsed_metric else "$10,482,910"
+        display_val = parsed_metric.formatted if parsed_metric else "$1,000,000"
         return {
             "type": "kinetic_counter",
             "legacy_type": "financial_chart",
             "theme": theme or "vox_paper",
             "layout": "full_bleed_focus",
-            "title": f"GOVERNMENT DISBURSEMENT // {display_val}",
-            "badge": "FRAUDULENT CLAIM",
+            "title": f"CAPITAL FLOW // {display_val}",
+            "badge": "DISBURSEMENT AUDIT",
             "sfx_cue": "stamp_slam",
             "label": f"EVIDENTIARY VALUE // {display_val}",
             "payload": {
-                "amount": parsed_metric.display_value if parsed_metric else 10482910,
-                "payee": "NOMINEE DAYCARE HOLDINGS // TARGET OPERATOR",
-                "payer": "DEPARTMENT OF SOCIAL SERVICES // CHILD DEVELOPMENT FUND",
-                "memo": "CHILDCARE SUBSIDY FRAUD // UNVERIFIED ATTENDANCE",
-                "date": "AUDIT BATCH // 2024-2026"
+                "amount": parsed_metric.display_value if parsed_metric else 1000000,
+                "payee": "NOMINEE ENTITY // TARGET RECIPIENT",
+                "payer": "OVERSIGHT AUTHORITY // DISBURSEMENT FUND",
+                "memo": "ALLOCATION DISBURSEMENT // FORENSIC AUDIT",
+                "date": "AUDIT CYCLE // VERIFIED RECORD"
             }
         }
 
-    # 4. Evidence Board / Suspect Network (Indicted individuals, operators, ring, conspiracy, arrest)
+    # 5. Evidence Board / Suspect Network (Indicted individuals, operators, ring, conspiracy, arrest)
     if any(k in t for k in ["charged", "indicted", "indictment", "defendants", "suspects", "operator", "operators", "ring", "conspiracy", "conspirators", "arrest", "fbi", "prosecutor", "prosecutors", "khởi tố", "bị can", "đối tượng", "đường dây", "bắt giữ", "기소", "피의자", "체포"]):
         return {
             "type": "evidence_board",
@@ -124,19 +145,19 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             "sfx_cue": "paper_slide",
             "label": "INVESTIGATION DOSSIER // SUBJECT NETWORK",
             "payload": {
-                "suspect_name": "PRIMARY TARGET // NOMINEE ADMINISTRATOR",
-                "role": "UNLICENSED SHELL OPERATOR / FALSE ENROLLMENT",
+                "suspect_name": "PRIMARY TARGET // NOMINEE OPERATOR",
+                "role": "UNLICENSED SHELL OPERATOR / FALSE DISBURSEMENT",
                 "charges": [
-                    "18 U.S.C. § 1343 // WIRE FRAUD CONSPIRACY",
-                    "18 U.S.C. § 1956 // MONEY LAUNDERING",
-                    "THEFT OF GOVERNMENT ASSISTANCE FUNDS"
+                    "WIRE FRAUD CONSPIRACY",
+                    "MONEY LAUNDERING",
+                    "THEFT OF ASSISTANCE FUNDS"
                 ],
-                "connected_entities": ["SHELL DAYCARE ENTITY", "CHECK CASHING SCHEME", "STATE ASSISTANCE LEDGER"],
-                "evidence_tag": "CRIMINAL DIVISION CASE #26-CR"
+                "connected_entities": ["SHELL ENTITY", "CHECK CASHING SCHEME", "LEDGER ACCOUNT"],
+                "evidence_tag": "CRIMINAL DIVISION CASE // VERIFIED"
             }
         }
 
-    # 5. Causal Flowchart (Systemic trap, network, money laundering, shell game, pipeline)
+    # 6. Causal Flowchart (Systemic trap, network, money laundering, shell game, pipeline)
     if any(k in t for k in ["mechanism", "network", "shell", "laundering", "channel", "transmission", "intermediary", "trap", "bẫy", "chuỗi", "dòng tiền", "trung gian", "cơ chế", "dây chuyền", "구조", "우회", "경로"]):
         return {
             "type": "causal_flowchart",
@@ -153,28 +174,11 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                     {"id": "intermediary", "label": "Platform Escrow", "status": "breach"},
                     {"id": "offshore", "label": "Non-Refund Vault", "status": "fatal"}
                 ],
+                "active_edge": "origin->intermediary",
                 "edges": [
                     {"from": "origin", "to": "intermediary", "label": "Deposit Stream"},
                     {"from": "intermediary", "to": "offshore", "label": "Trapped Liquidity"}
                 ]
-            }
-        }
-
-    # 6. 3D Procedural Evidence Prop (Physical seals, stamps, warrants, vaults, authentications, physical evidence items)
-    if any(k in t for k in ["hanko", "seal", "stamp", "con dấu", "triện", "mộc đỏ", "chứng thực", "vật chứng", "tang vật", "도장", "인감", "증거물", "authenticat", "exhibit item", "vault", "evidence item"]):
-        return {
-            "type": "evidence_3d_prop",
-            "legacy_type": "evidence_board",
-            "theme": theme or "vox_paper",
-            "layout": "split_right",
-            "title": "CONFIDENTIAL EVIDENCE // FORENSIC ARTIFACT",
-            "badge": "PHYSICAL EXHIBIT",
-            "sfx_cue": "stamp_slam",
-            "label": "AUTHENTICATED IMPERIAL SEAL // 3D PROCEDURAL ARTIFACT",
-            "payload": {
-                "prop_type": "hanko_seal",
-                "evidence_id": "EXHIBIT-3D-01",
-                "authentication": "VERIFIED PHYSICAL TAMPER-PROOF"
             }
         }
 

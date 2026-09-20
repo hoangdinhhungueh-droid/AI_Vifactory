@@ -95,14 +95,13 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
 
   return (
     <>
-      {/* Background Dimmer / Focus Blur Backdrop when Full-Bleed Document is active */}
+      {/* Background Dimmer Backdrop when Full-Bleed Document is active (Zero blur per anti-dropframe standard) */}
       {isFullBleed ? (
         <div
           style={{
             position: "absolute",
             inset: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.55)",
-            backdropFilter: "blur(4px)",
+            backgroundColor: "rgba(5, 9, 13, 0.78)",
             zIndex: 27,
             pointerEvents: "none",
           }}
@@ -155,12 +154,12 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
           />
         ) : null}
 
-        {/* Kinetic Counter Metric */}
+        {/* Kinetic Counter Metric (Correctly wired to VoxKineticCounter) */}
         {rawType === "kinetic_counter" || rawType === "financial_chart" ? (
-          <VoxBankCheck
+          <VoxKineticCounter
             title={ov.title}
             badge={ov.badge}
-            theme={ov.theme || "vox_paper"}
+            theme={ov.theme || "tech_infographic"}
             layout={layout}
             payload={ov.payload}
             label={ov.label}
@@ -192,7 +191,7 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
         ) : null}
 
         {/* 3D Procedural Evidence Prop (Vox Stop-Motion 12fps Evidence Specimen) */}
-        {rawType === "evidence_3d_prop" || rawType === "3d_hanko_seal" || rawType === "3d_evidence_prop" ? (
+        {rawType.includes("3d") || rawType === "evidence_3d_prop" || rawType === "evidence_prop" ? (
           <div
             style={{
               width: isFullBleed ? 1160 : 700,
