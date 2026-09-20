@@ -1,64 +1,78 @@
 # 📐 [TASK_SPEC] VOX_PARALLAX_ATMOSPHERE_AND_AI_TIMELINE_EDITOR_COUNCIL
 
 ## 📌 1. Bối Cảnh & Ranh Giới (Context & Boundaries)
-- **Feature Title**: AI Senior Post-Production Editor (Timeline Assembly LLM Gate) & Vox 2.5D Parallax Cinematic Canvas
+- **Feature Title**: Frontier LLM Post-Production Director Gate (`timeline_editor_agent.py`) & Vox Object-Driven Continuous Storyboard Canvas (`Remotion`)
+- **Target Task ID**: `GENERIC_EP_RENDER_TIMELINE_DIRECTOR` (Pattern: `^[A-Z]{2}_EP\d{4}_[a-z0-9_]+$`)
 - **Primary Blocks Impacted**:
-  - `B6.0` (`app/services/timeline_editor_agent.py` [MỚI]): Agent Đạo diễn Hậu kỳ LLM nhận định song song trong khâu dựng.
-  - `B6.5` (`app/services/build_remotion_props.py` & `scripts/build_remotion_props.py`): Tích hợp Timeline Editor Gate với cơ chế Graceful Fallback.
-  - `B7.0` (`remotion/src/components/vox/VoxAtmosphericLighting.tsx` [MỚI]): Ánh sáng điện ảnh & hạt bụi không gian (Dust Motes & Light Sweeps 12fps).
-  - `B7.1` (`remotion/src/components/vox/VoxParallaxLayer.tsx` [MỚI]): Chiều sâu lập thể 2.5D Multi-Plane Parallax (BG 0.8x, Midground 1.0x, FG 1.25x).
-  - `B7.2` (`remotion/src/index.tsx`): Tích hợp Atmospheric Lighting & 2.5D Parallax vào `TwoLayerEpisode`.
+  - `B6.0` (`app/services/timeline_editor_agent.py`): Tích hợp Frontier LLM (`gpt-6-astra` / `claude-opus-5` via `ModelGateway`) thẩm định song song 5-Beat script đối chiếu với timeline scenes để chỉ đạo nhịp dựng (pacing, cuts, camera movement, transitions, evidence staging) kèm cơ chế resilient fallback (<=35s timeout).
+  - `B6.5` (`app/services/build_remotion_props.py`): Truyền đầy đủ episode context (`episode_id`, `story.txt`, `segments_path`) vào `audit_and_optimize_timeline()`.
+  - `B7.0` (`remotion/src/index.tsx` & `src/components/vox/VoxParallaxLayer.tsx`): Nâng cấp Continuous Storyboard Canvas (Seedance 2.5 / Veo style continuous transitions, continuous drift, macro orbit, seamless whip pan, object-driven evidence tracking).
 - **In-Scope**:
-  - Tự động hóa đánh giá nhịp dựng (Pacing Audit): phát hiện dead air > 4.0s không có biến đổi thị giác để tự động chêm micro-motion hoặc đổi góc máy.
-  - Khóa góc máy theo từ khóa giọng nói thực tế (Word-Locked Camera Punch) dựa trên Whisper word-level timestamps (`whisper_segments.json`).
-  - Khử triệt để sự đơn điệu thị giác (Visual Monotony Breaker): tự động chuyển hướng khi có > 2 cảnh cùng dùng 1 loại overlay liên tiếp.
-  - Bổ sung hiệu ứng 2.5D Parallax và Atmospheric Lighting đạt chuẩn điện ảnh (như Seedance/Veo) mà vẫn giữ 100% độ sắc nét pháp y và tính nhẹ nhàng trên CPU VPS (Rule 119, Rule 120, Rule 122).
-  - Lập đủ bộ 3 Cặp Docs Pháp Lý Hội Đồng theo `/vf-pipeline-teamwork` và nghiệm thu Three-Way Sync (Rule 126).
+  - Frontier LLM Director invocation (`gpt-6-astra` primary, `claude-opus-5` fallback) phân tích kịch bản 5 Beat và các cảnh đã gán để ra quyết định đạo diễn vi mô (camera, pacing, tension, transitions, lower-thirds).
+  - Xuất audit log `/var/vf/episodes/{episode_id}/llm_director_review.json` ghi nhận toàn bộ lý do nghệ thuật và các điều chỉnh cảnh.
+  - Heuristic fallback bảo vệ 100% thời gian hoạt động: nếu API timeout (>35s) hoặc lỗi mạng, tự động kích hoạt bộ quy tắc heuristic xác định (pacing, monotony breaker, word-locked camera punches, Rule 136 clean tags).
+  - Continuous Storyboard Canvas: hỗ trợ các chuyển động máy liên tục (`continuous_drift`, `seamless_whip_pan`, `macro_orbit`, `cinematic_orbit`) không bị giật khựng giữa các scene cùng bối cảnh.
+  - Multi-Plane Parallax (0.8x BG, 1.0x Midground, 1.25x FG) tương thích hoàn toàn với các chuyển động máy mới.
 - **Non-Goals**:
-  - Không thay thế Remotion bằng mô hình video diffusion (Veo/Seedance) để tránh ảo giác chữ số (Rule 130).
-  - Không gọi LLM frame-by-frame trong lúc render Chromium (chỉ can thiệp ở tầng Timeline Metadata Assembly trước render).
-  - Không phá vỡ cấu trúc Audio Spine B2.6 / B3 (Rule 120 Hard Gate).
-  - Không sử dụng CSS `transition`, `@keyframes` hay `backdropFilter: blur()` gây sụt giảm FPS.
+  - Không can thiệp hoặc làm gián đoạn tiến trình render đang chạy trên VPS (`JP_EP0003_hamaoka_data_fraud`).
+  - Không gọi LLM frame-by-frame trong Chromium (chỉ can thiệp ở tầng Timeline Metadata Assembly trước render).
+  - Không phá vỡ cấu trúc Hollywood Audio Spine B2.6 / B3 (Rule 120 Hard Gate).
+  - Không sử dụng CSS transition hoặc backdropFilter gây sụt giảm FPS trên CPU VPS.
 
 ---
 
 ## 🎯 2. Yêu Cầu Kỹ Thuật (Requirements R1 - R6)
-- **R1 (AI Timeline Editor Module)**: Xây dựng `app/services/timeline_editor_agent.py` nhận `director_plan.json`, `whisper_segments.json`, `images/manifest.json`. Tự động phân tích pacing, đề xuất tinh chỉnh nhịp cắt, chèn micro-SFX cues và word-locked camera punches.
-- **R2 (Assembly Integration & Graceful Fallback)**: Tích hợp vào `build_remotion_props.py`. Nếu cờ `--enable-ai-editor` được bật (mặc định cho sản xuất), gọi Editor Agent; nếu LLM gặp timeout hoặc rate-limit, tự động fallback về deterministic mapping без lỗi (Rule 118).
-- **R3 (Vox Atmospheric Lighting Component)**: Xây dựng `remotion/src/components/vox/VoxAtmosphericLighting.tsx` render hạt bụi ánh sáng điện ảnh (Cinema Dust Motes 12fps) và tia sáng mềm (Volumetric Light Sweep) bằng pure Remotion math (`useCurrentFrame` + `interpolate`).
-- **R4 (Vox 2.5D Multi-Plane Parallax Layer)**: Xây dựng `remotion/src/components/vox/VoxParallaxLayer.tsx` hỗ trợ 3 tầng độ sâu dịch chuyển vi sai theo camera Remotion: Background Canvas (0.8x), Evidence Prop (1.0x), Foreground Cutout (1.25x).
-- **R5 (Integration & Anti-OOM Guard)**: Tích hợp an toàn vào `TwoLayerEpisode` trong `remotion/src/index.tsx`, duy trì kiểm thử `npx remotion bundle` đạt Exit Code 0, tiêu thụ RAM Chromium $\le$ 1GB.
-- **R6 (Council Quorum & Three-Way Physical Sync)**: Hoàn thiện hồ sơ Hội đồng 4 vai, chạy `ghost_code_detector.py` đạt 0 defects, test suites pass 100%, đồng bộ VPS ⇄ GitHub ⇄ Local (Rule 126).
+- **R1 (Frontier LLM Director Gate)**: Xây dựng hàm `llm_timeline_director_review()` trong `timeline_editor_agent.py` gọi `ModelGateway` (`gpt-6-astra` / `claude-opus-5`) phân tích 5 Beat story (`story.txt`) và scene list, trả về cấu trúc JSON chỉ đạo đạo diễn vi mô.
+- **R2 (Resilient Hybrid Fallback & Merging)**: Tự động merge các chỉ đạo của LLM với các chốt chặn an toàn heuristic (Word-locked punches, Monotony breaker, Rule 136 regex cleanup). Timeout 35s bảo vệ tuyệt đối không nghẽn pipeline.
+- **R3 (Continuous Storyboard Canvas in Remotion)**: Mở rộng `computeCameraTransform` trong `remotion/src/index.tsx` và `VoxParallaxLayer.tsx` hỗ trợ `continuous_drift`, `seamless_whip_pan`, `macro_orbit`, `cinematic_orbit` tạo nhịp chuyển cảnh mượt mà chuẩn Seedance 2.5 / Veo.
+- **R4 (Assembly Pipeline Wiring)**: Cập nhật `build_remotion_props_data()` truyền đầy đủ `episode_id` và context vào `audit_and_optimize_timeline()`.
+- **R5 (Automated Test Suites & Zero-Ghost)**: Bổ sung unit tests cho LLM Director & Heuristic Fallback trong `tests/test_timeline_editor_agent.py`, bảo đảm `pytest` pass 100%, `ghost_code_detector.py` 0 defects.
+- **R6 (Council Quorum & Three-Way Physical Sync)**: Hoàn tất 3 Cặp Docs Pháp Lý, Quorum 4/4 Unanimous Pass, commit & push VPS ⇄ GitHub Actions CI (success) ⇄ Local Windows parity (Rule 126).
 
 ---
 
-## 🔒 3. Khế Ước Dữ Liệu (Interface Contracts)
+## 🔒 3. Khế Ước Giao Diện (Interface Contracts)
 - **Timeline Editor Input Contract**:
-  ```json
-  {
-    "director_plan": { "scenes": [...] },
-    "whisper_segments": [ { "start_ms": 0, "end_ms": 2500, "word": "The", "confidence": 0.98 }, ... ],
-    "image_manifest": [ { "reuse_key": "...", "local_path": "..." } ]
-  }
-  ```
-- **Timeline Editor Output Contract (Enhanced `remotion_props.json`)**:
   ```json
   {
     "scenes": [
       {
-        "durationInFrames": 242,
-        "cameraMovement": "slow_push_in",
+        "scene_id": "sc_01",
+        "durationInFrames": 180,
+        "narration": "...",
+        "background": "...",
+        "foreground": "...",
+        "cameraMovement": "slow_push_in"
+      }
+    ],
+    "whisper_words": [ { "word": "...", "start_ms": 0, "end_ms": 300 } ],
+    "options": {
+      "episode_id": "JP_EP0003_hamaoka_data_fraud",
+      "enable_llm_director": true,
+      "model": "gpt-6-astra"
+    }
+  }
+  ```
+- **Timeline Editor Output Contract (`remotion_props.json`)**:
+  ```json
+  {
+    "scenes": [
+      {
+        "scene_id": "sc_01",
+        "durationInFrames": 180,
+        "cameraMovement": "continuous_drift",
         "tensionLevel": "high",
-        "wordLockedPunches": [
-          { "word": "FRAUD", "frame_offset": 84, "camera": "snap_zoom", "sfx_cue": "stamp_slam" }
-        ],
-        "forensicOverlay": {
-          "type": "kinetic_counter",
-          "layout": "full_bleed_focus",
-          "parallaxDepth": "midground",
-          "atmosphericDust": true
-        }
+        "transition": "continuous_whip",
+        "wordLockedPunches": [...],
+        "forensicOverlay": {...},
+        "speakerTag": "TÊN // VAI TRÒ"
       }
     ]
   }
   ```
+
+---
+
+## ⚖️ 4. Đánh Đổi Kiến Trúc & Rủi Ro (Rule 129 Trade-Offs)
+- **Option A (Chỉ dùng Heuristic Rules)**: Nhanh (0.1s), không tốn token, nhưng thiếu tư duy cảm xúc và nhịp thở đạo diễn điện ảnh theo từng mạch truyện.
+- **Option B (Frontier LLM Director + Heuristic Safety Gate - LỰA CHỌN TỐI ƯU)**: Gọi `gpt-6-astra` (hoặc `claude-opus-5`) thẩm định kịch bản và timeline trước khi render. Nếu API timeout (>35s) hoặc lỗi, tự động fallback ngay về Option A. Độ trễ assembly chấp nhận được (3-10s), đạt chất lượng đạo diễn đẳng cấp mà vẫn đảm bảo 100% độ tin cậy vận hành.

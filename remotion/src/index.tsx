@@ -1284,6 +1284,65 @@ export const computeCameraTransform = (
     return `scale(${scale}) translate(${shakeX.toFixed(2)}px, ${shakeY.toFixed(2)}px)`;
   }
 
+  if (mov === "continuous_drift") {
+    // Vox/Veo continuous momentum: smooth directional glide without abrupt stops
+    const panX = interpolate(f, [0, dur], [-14, 14], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.33, 1, 0.68, 1),
+    });
+    const panY = interpolate(f, [0, dur], [-6, 6], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.33, 1, 0.68, 1),
+    });
+    const scale = interpolate(f, [0, dur], [1.01, 1.045], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+    });
+    return `scale(${scale}) translate(${panX.toFixed(2)}px, ${panY.toFixed(2)}px)`;
+  }
+
+  if (mov === "seamless_whip_pan") {
+    // High-velocity lateral transition in first 6 frames settling into slow glide
+    const whipX = interpolate(f, [0, 6, dur], [35, 0, -8], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+    const scale = interpolate(f, [0, 6, dur], [1.06, 1.02, 1.03], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return `scale(${scale}) translateX(${whipX.toFixed(2)}px)`;
+  }
+
+  if (mov === "macro_orbit") {
+    // Elliptical 2.5D orbit around focal evidence
+    const angle = (f / dur) * Math.PI * 0.75;
+    const orbitX = Math.sin(angle) * 16;
+    const orbitY = (1 - Math.cos(angle)) * 8;
+    const scale = interpolate(f, [0, dur], [1.02, 1.05], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return `scale(${scale}) translate(${orbitX.toFixed(2)}px, ${orbitY.toFixed(2)}px)`;
+  }
+
+  if (mov === "cinematic_orbit") {
+    // Subtle orbital tilt + push
+    const rot = interpolate(f, [0, dur], [-0.6, 0.6], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    const scale = interpolate(f, [0, dur], [1.02, 1.045], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return `scale(${scale}) rotate(${rot.toFixed(2)}deg)`;
+  }
+
   // Fallback subtle Ken Burns slow zoom
   const scale = interpolate(f, [0, dur], [1.0, 1.03], {
     extrapolateLeft: "clamp",

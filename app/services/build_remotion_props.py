@@ -779,7 +779,15 @@ def build_remotion_props_data(
                     "start_ms": sub.get("abs_start_ms", sub.get("start_ms", 0)),
                     "end_ms": sub.get("abs_end_ms", sub.get("end_ms", 0)),
                 })
-        scenes_out = audit_and_optimize_timeline(scenes_out, whisper_words=all_words)
+        scenes_out = audit_and_optimize_timeline(
+            scenes_out,
+            whisper_words=all_words,
+            options={
+                "episode_id": episode_id,
+                "brain_input_path": brain_input_path,
+                "segments_path": segments_path,
+            }
+        )
     except Exception as _e_editor:
         logger.warning("[build_remotion_props] AI Editor optimization fallback: %s", _e_editor)
 

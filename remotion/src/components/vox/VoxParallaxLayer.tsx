@@ -49,6 +49,32 @@ export const VoxParallaxLayer: React.FC<{
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
     });
+  } else if (cameraMovement === "continuous_drift") {
+    offsetX = interpolate(frame, [0, dur], [-14 * depthFactor, 14 * depthFactor], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    offsetY = interpolate(frame, [0, dur], [-6 * depthFactor, 6 * depthFactor], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    scaleAdjust = interpolate(frame, [0, dur], [1.0, 1.0 + 0.03 * depthFactor], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+  } else if (cameraMovement === "seamless_whip_pan") {
+    offsetX = interpolate(frame, [0, 6, dur], [35 * depthFactor, 0, -8 * depthFactor], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+  } else if (cameraMovement === "macro_orbit" || cameraMovement === "cinematic_orbit") {
+    const angle = (frame / dur) * Math.PI * 0.75;
+    offsetX = Math.sin(angle) * 16 * depthFactor;
+    offsetY = (1 - Math.cos(angle)) * 8 * depthFactor;
+    scaleAdjust = interpolate(frame, [0, dur], [1.0, 1.0 + 0.035 * depthFactor], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
   }
 
   return (
