@@ -1287,6 +1287,7 @@ export const computeCameraTransform = (
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+  });
   return `scale(${scale})`;
 };
 
