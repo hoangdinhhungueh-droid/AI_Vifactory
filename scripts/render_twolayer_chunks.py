@@ -207,7 +207,7 @@ def main():
     parser.add_argument("--episode-id", default=None, help="Episode ID")
     parser.add_argument("--props", default=None, help="Explicit path to remotion_props.json")
     parser.add_argument("--out", default=None, help="Explicit path to final twolayer_silent.mp4")
-    parser.add_argument("--concurrency", default=os.environ.get("VF_REMOTION_CONCURRENCY", "2"), help="Remotion concurrency (default: 2)")
+    parser.add_argument("--concurrency", default=os.environ.get("VF_REMOTION_CONCURRENCY", "4"), help="Remotion concurrency (default: 4)")
     parser.add_argument("--x264-preset", default="veryfast", help="x264 preset (default: veryfast)")
     parser.add_argument("--crf", type=int, default=18, help="CRF rate control (default: 18)")
     parser.add_argument("--skip-auto-mux", action="store_true", help="Skip automatic downstream mux and Gate 3 dispatch")

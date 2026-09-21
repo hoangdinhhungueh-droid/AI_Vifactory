@@ -141,8 +141,8 @@ def main():
     # Pillar 2: Pre-scale image assets to 1080p to eliminate Chromium downscale bottleneck
     optimize_props_assets(args.props, PROJ_DIR)
 
-    # Pillar 1: Dynamic CPU concurrency (auto-detects cores, cap at 3 for RAM safety)
-    default_concurrency = min(3, max(1, (os.cpu_count() or 4) - 2))
+    # Pillar 1: Dynamic CPU concurrency (auto-detects cores, cap at 4 for RAM safety)
+    default_concurrency = min(4, max(1, (os.cpu_count() or 4) - 2))
     concurrency = os.environ.get("VF_REMOTION_CONCURRENCY", str(default_concurrency))
 
     # Pillar 3: Dynamic adaptive timeout based on total frames
