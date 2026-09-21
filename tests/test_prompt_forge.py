@@ -192,3 +192,16 @@ def test_dynamic_acting_and_active_props_mandate():
     assert "dau moc do" in vn_prof["fg_anchor"]
     assert "red neck lanyard" in vn_prof["fg_anchor"]
     assert "no dead eyes" in vn_prof["fg_negatives"]
+
+
+def test_object_and_evidence_prompt_sanitization():
+    """Verify VOX document & evidence object prompts omit human full-body constraints."""
+    raw_obj = "FTC court docket filing with yellow marker highlight"
+    obj_fg = _sanitize_foreground_prompt(raw_obj, fg_key="fg_doc_ftc_docket", market="EN")
+    assert "#FF00FF" in obj_fg
+    assert "1:1 aspect ratio" in obj_fg
+    assert "[OBJECT FOCUS]" in obj_fg
+    assert "centered investigative artifact" in obj_fg
+    assert "no human body" in obj_fg
+    assert "full-body head-to-shoes" not in obj_fg
+    assert "dynamic high-stakes body posture" not in obj_fg

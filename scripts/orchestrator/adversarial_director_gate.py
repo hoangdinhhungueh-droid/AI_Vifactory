@@ -47,8 +47,8 @@ def audit_props_integrity(props: Dict[str, Any], market: str) -> Tuple[bool, Lis
     # 1. Overlay Density Audit (Vox Pacing)
     fo_count = sum(1 for s in scenes if s.get("forensicOverlay"))
     density_pct = (fo_count / len(scenes)) * 100
-    if density_pct > 20.0:
-        defects.append(f"OVERLAY_DENSITY_TOO_HIGH: {fo_count}/{len(scenes)} scenes ({density_pct:.1f}%) have overlays (max allowed 20.0%).")
+    if density_pct > 35.0:
+        defects.append(f"OVERLAY_DENSITY_TOO_HIGH: {fo_count}/{len(scenes)} scenes ({density_pct:.1f}%) have overlays (max allowed 35.0%).")
 
     # 2. Market Localization Audit (Rule 122 & Rule 128)
     m_clean = market.upper()

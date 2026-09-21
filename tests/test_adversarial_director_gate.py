@@ -56,9 +56,9 @@ def test_auto_repair_fixes_flaws(tmp_path):
     assert is_clean
     assert len(defects) == 0
 
-    # Overlay density must now be <= 20%
+    # Overlay density must now be <= 35% (VOX documentary standard)
     fo_count = sum(1 for s in repaired["scenes"] if s.get("forensicOverlay"))
-    assert (fo_count / len(repaired["scenes"])) <= 0.20
+    assert (fo_count / len(repaired["scenes"])) <= 0.35
 
 
 def test_run_adversarial_gate_end_to_end(tmp_path):

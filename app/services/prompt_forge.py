@@ -265,9 +265,33 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     fg_anchor = prof["fg_anchor"]
     fg_negs = f", {prof['fg_negatives']}" if prof["fg_negatives"] else ""
 
-    style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich nuanced colors, 1:1 aspect ratio, full-body head-to-shoes, entire character visible within frame, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
+    # Detect if foreground is an investigative object/document/evidence rather than a human character
+    character_indicators = [
+        "investigator", "prosecutor", "senator", "caretaker", "official", "executive",
+        "judge", "lawyer", "person", "man", "woman", "pilot", "whistleblower", "ceo",
+        "director", "agent", "founder", "figure", "character", "analyst", "auditor",
+        "individual", "politician", "plaintiff", "defendant"
+    ]
+    has_character = any(ci in p.lower() for ci in character_indicators)
 
-    p = f"{style_prefix} {p}, dynamic high-stakes body posture, dramatic physical posing, intense facial micro-expressions with sharp focused gaze, full-body head-to-shoes visible within frame. [MARKET & ETHNIC ANCHOR] {fg_anchor}. [ERA ANCHOR] Authentic professional attire, stylized expressive character acting, active props interaction. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements{fg_negs}."
+    evidence_keywords = [
+        "document", "docket", "complaint", "lawsuit", "court filing", "subpoena",
+        "contract", "invoice", "receipt", "ledger", "bank check", "wire transfer",
+        "algorithm", "meter", "gauge", "dial", "search box", "sponsored", "search card",
+        "evidence", "folder", "binder", "stamp", "hanko", "seal", "prop", "artifact",
+        "server rack", "microchip", "circuit", "hard drive", "tape recorder",
+        "dossier", "newspaper clipping", "blueprint", "flowchart", "infographic"
+    ]
+    is_object_key = any(k in fg_key.lower() for k in ["doc", "evidence", "object", "prop", "item", "meter", "invoice", "check", "paper"])
+    has_evidence_kw = any(kw in p.lower() for kw in evidence_keywords)
+    is_object = (is_object_key or has_evidence_kw) and not has_character
+
+    if is_object:
+        style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich tactile paper and material textures, 1:1 aspect ratio, centered investigative artifact, crisp paper-cutout sticker aesthetic, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
+        p = f"{style_prefix} {p}. [OBJECT FOCUS] Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with clear legible markers. [ERA ANCHOR] Authentic period materials, forensic case evidence. [STRICT NEGATIVE PROMPT] no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no borders, no extraneous ui elements{fg_negs}."
+    else:
+        style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich nuanced colors, 1:1 aspect ratio, full-body head-to-shoes, entire character visible within frame, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
+        p = f"{style_prefix} {p}, dynamic high-stakes body posture, dramatic physical posing, intense facial micro-expressions with sharp focused gaze, full-body head-to-shoes visible within frame. [MARKET & ETHNIC ANCHOR] {fg_anchor}. [ERA ANCHOR] Authentic professional attire, stylized expressive character acting, active props interaction. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements{fg_negs}."
 
     p = deduplicate_phrase_stutter(p)
 

@@ -108,15 +108,13 @@ def extract_market_from_episode_id(episode_id: str) -> str:
     return "EN"
 
 
-def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: int = 7) -> List[int]:
-    """Select 6-8 climax scene indices across 5 Beats for forensic overlays.
+def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[int] = None) -> List[int]:
+    """Select climax scene indices across 5 Beats for forensic overlays.
     
-    Ensures Vox visual breathing room:
-    - Beat 1 (Cold Strike): 1 or 2 key scenes with quantitative catalyst.
-    - Beat 2 (False Narrative / Network): 1 scene with evidence network.
-    - Beat 3 (Forensic Paper Trail): 2 scenes with document / forensic proof.
-    - Beat 4 (Smoking Gun): 2 scenes with critical discrepancy or 3D prop.
-    - Beat 5 (Modern Warning): 1 scene with closing systemic takeaway.
+    VOX Editorial Motion Pacing:
+    - Automatically scales overlay count to ~30-35% of episode scenes (35-45 overlays for ~130 scenes).
+    - If target_count is explicitly provided (e.g. in test fixtures), strictly respects the provided quota.
+    - Accurately maps scenes across all 5 beats via beat_index / beat_number / act_number.
     """
     if not scenes:
         return []
@@ -128,11 +126,12 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: int = 7) ->
     # Map scenes by beat (1-5)
     beats_map: Dict[int, List[Tuple[int, Dict[str, Any]]]] = {b: [] for b in range(1, 6)}
     for idx, s in enumerate(scenes):
-        b_num = s.get("beat_number") or s.get("act_number") or 1
+        b_raw = s.get("beat_index") or s.get("beat_number") or s.get("act_number") or s.get("beat") or 1
         try:
-            b_int = int(b_num)
+            b_int = int(b_raw)
         except Exception:
-            b_int = 1
+            m = re.search(r'\d+', str(b_raw))
+            b_int = int(m.group(0)) if m else 1
         b_int = max(1, min(5, b_int))
         beats_map[b_int].append((idx, s))
 
@@ -156,11 +155,25 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: int = 7) ->
             score += 2.0
         return score
 
-    # Quota allocation: Beat 1: 1-2, Beat 2: 1, Beat 3: 2, Beat 4: 2, Beat 5: 1
-    beat_quotas = {1: 1, 2: 1, 3: 2, 4: 2, 5: 1}
-    # If Beat 1 has a very strong Scene 0 + Scene 2, allow 2
-    if len(scenes) > 60:
-        beat_quotas[1] = 2
+    # Quota allocation:
+    if target_count is None:
+        if len(scenes) >= 50:
+            target_count = min(45, max(12, int(len(scenes) * 0.32)))
+        else:
+            target_count = 7
+
+    if target_count <= 8:
+        beat_quotas = {1: 1, 2: 1, 3: 2, 4: 2, 5: 1}
+        if len(scenes) > 60:
+            beat_quotas[1] = 2
+    else:
+        # VOX high-density motion graphics allocation across 5 beats
+        q1 = max(2, int(target_count * 0.18))
+        q2 = max(2, int(target_count * 0.18))
+        q3 = max(3, int(target_count * 0.32))
+        q4 = max(3, int(target_count * 0.22))
+        q5 = max(1, target_count - (q1 + q2 + q3 + q4))
+        beat_quotas = {1: q1, 2: q2, 3: q3, 4: q4, 5: q5}
 
     for b_int in range(1, 6):
         candidates = beats_map[b_int]
@@ -174,8 +187,8 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: int = 7) ->
 
     # Sort final indices chronologically
     selected_indices = sorted(list(set(selected_indices)))
-    # Cap strictly to ensure overlay density never exceeds 18% (Vox Minimalist Pacing)
-    max_cap = max(1, int(len(scenes) * 0.18))
+    # Cap strictly to ensure overlay density matches target_count
+    max_cap = max(1, int(len(scenes) * 0.38))
     effective_cap = min(target_count, max_cap)
     if len(selected_indices) > effective_cap:
         selected_indices = selected_indices[:effective_cap]
@@ -324,7 +337,7 @@ def generate_editorial_briefing(
         "climax_scenes_count": len(climax_indices),
         "climax_scene_indices": climax_indices,
         "overlay_density_pct": density_pct,
-        "pacing_verdict": "APPROVED_VOX_MINIMALIST" if density_pct <= 20.0 else "TOO_DENSE",
+        "pacing_verdict": "APPROVED_VOX_MINIMALIST" if density_pct <= 35.0 else "TOO_DENSE",
         "market_theme": LOCALIZED_OVERLAY_THEMES.get(market, LOCALIZED_OVERLAY_THEMES["EN"]),
         "climax_scene_manifest": [
             {

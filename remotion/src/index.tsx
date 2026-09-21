@@ -325,8 +325,9 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
         height: cell.height,
         opacity,
         transform: `translateX(${translateX}px)`,
-        // Signature High-Performance Vox Cutout Drop Shadow (1-pass CPU compositing)
-        filter: "drop-shadow(0 16px 24px rgba(0,0,0,0.65))",
+        // Signature VOX Tactile Paper Cutout Sticker Edge + High-Performance 3D Drop Shadow
+        filter:
+          "drop-shadow(0 0 2px rgba(255, 255, 255, 0.92)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 20px 32px rgba(0, 0, 0, 0.85))",
         zIndex: 15,
         pointerEvents: "none",
       }}
@@ -353,6 +354,7 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
           height: "100%",
           objectFit: "contain",
           objectPosition: "bottom",
+          filter: "brightness(1.08) contrast(1.15)",
         }}
       />
     </div>
@@ -802,15 +804,15 @@ const BackgroundSegment = ({ src, fadeInFrames, durationInFrames }) => {
               height: "100%",
               objectFit: "cover",
               transform: `scale(${scale})`,
-              filter: "brightness(0.92) contrast(1.05)",
+              filter: "brightness(0.78) saturate(0.68) contrast(1.02) blur(1.2px)",
             }}
           />
-          {/* Subtle dark tint overlay to ensure foreground evidence objects pop with maximum clarity */}
+          {/* Deep Slate dark tint overlay to ensure foreground evidence objects pop with maximum clarity */}
           <div
             style={{
               position: "absolute",
               inset: 0,
-              backgroundColor: "rgba(11, 15, 23, 0.35)",
+              backgroundColor: "rgba(11, 15, 23, 0.45)",
               pointerEvents: "none",
             }}
           />
