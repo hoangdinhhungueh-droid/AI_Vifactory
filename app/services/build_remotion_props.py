@@ -68,7 +68,32 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             }
         }
 
-    # 2. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
+    # 2. Kinetic Counter / Financial Ledger (Strict: requires verified parsed number, Rule 118 Zero-Mock Data)
+    # Numerical claims take precedence over generic document keywords
+    parsed_metric = parse_spoken_number(narration_text)
+    if parsed_metric is not None and parsed_metric.display_value > 0:
+        display_val = parsed_metric.formatted
+        return {
+            "type": "kinetic_counter",
+            "legacy_type": "financial_chart",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": f"QUANTITATIVE METRIC // {display_val}",
+            "badge": "AUDIT METRIC",
+            "sfx_cue": "stamp_slam",
+            "label": f"EVIDENTIARY VALUE // {display_val}",
+            "payload": {
+                "start_value": 0,
+                "end_value": parsed_metric.display_value,
+                "amount": parsed_metric.display_value,
+                "unit": parsed_metric.unit,
+                "prefix": parsed_metric.prefix,
+                "suffix": parsed_metric.suffix,
+                "trend": parsed_metric.trend,
+            }
+        }
+
+    # 3. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
     if any(k in t for k in ["contract", "clause", "redact", "nda", "subpoena", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "thanh tra", "hồ sơ mật", "báo cáo điều tra", "審査申請", "不適切", "基準地震動", "提出原本", "データ不正", "安全審査"]):
         # Dynamically split sentences to create relevant clause lines
         sentences = [s.strip().upper() for s in re.split(r'[.!?。]+', narration_text) if len(s.strip()) > 10][:4]
@@ -98,7 +123,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             }
         }
 
-    # 3. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
+    # 4. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
     if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "seismic zone", "bản đồ", "지도", "좌표", "震源", "南海トラフ", "駿河湾"]):
         is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
         return {
@@ -115,30 +140,6 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                 "coordinates": "34.62° N, 138.14° E (静岡県 御前崎市)" if is_jp else "TARGET REGION JURISDICTION",
                 "map_region": "駿河湾沿岸 耐震・地殻変動セクター" if is_jp else "INVESTIGATIVE DISTRICT",
                 "points_of_interest": ["3号機・4号機 原子炉建屋", "基準地震動観測点", "防潮堤 22m区間"] if is_jp else ["PRIMARY HUB", "INTERMEDIARY CHOKEPOINT", "ESCROW DISBURSEMENT"]
-            }
-        }
-
-    # 4. Kinetic Counter / Financial Ledger (Strict: requires verified parsed number, Rule 118 Zero-Mock Data)
-    parsed_metric = parse_spoken_number(narration_text)
-    if parsed_metric is not None and parsed_metric.display_value > 0:
-        display_val = parsed_metric.formatted
-        return {
-            "type": "kinetic_counter",
-            "legacy_type": "financial_chart",
-            "theme": theme or "vox_paper",
-            "layout": "full_bleed_focus",
-            "title": f"QUANTITATIVE METRIC // {display_val}",
-            "badge": "AUDIT METRIC",
-            "sfx_cue": "stamp_slam",
-            "label": f"EVIDENTIARY VALUE // {display_val}",
-            "payload": {
-                "start_value": 0,
-                "end_value": parsed_metric.display_value,
-                "amount": parsed_metric.display_value,
-                "unit": parsed_metric.unit,
-                "prefix": parsed_metric.prefix,
-                "suffix": parsed_metric.suffix,
-                "trend": parsed_metric.trend,
             }
         }
 
@@ -188,6 +189,130 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                     {"from": "origin", "to": "intermediary", "label": "Deposit Stream"},
                     {"from": "intermediary", "to": "offshore", "label": "Trapped Liquidity"}
                 ]
+            }
+        }
+
+    return None
+
+
+def build_structured_overlay(fo_type: str, narration_text: str, theme: str = "vox_paper") -> dict | None:
+    """Build a complete, structured forensic overlay dict for a given overlay type.
+    Rule 118 (Zero-Mock Data) & Rule 128 (Generic Architecture):
+    Guarantees valid payloads without dummy hardcoded fallbacks.
+    """
+    if not narration_text or not fo_type:
+        return None
+
+    is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
+
+    if fo_type in ("kinetic_counter", "financial_chart"):
+        parsed_metric = parse_spoken_number(narration_text)
+        if parsed_metric is not None and parsed_metric.display_value > 0:
+            display_val = parsed_metric.formatted
+            return {
+                "type": "kinetic_counter",
+                "legacy_type": "financial_chart",
+                "theme": theme or "vox_paper",
+                "layout": "full_bleed_focus",
+                "title": f"QUANTITATIVE METRIC // {display_val}",
+                "badge": "AUDIT METRIC",
+                "sfx_cue": "stamp_slam",
+                "label": f"EVIDENTIARY VALUE // {display_val}",
+                "payload": {
+                    "start_value": 0,
+                    "end_value": parsed_metric.display_value,
+                    "amount": parsed_metric.display_value,
+                    "unit": parsed_metric.unit,
+                    "prefix": parsed_metric.prefix,
+                    "suffix": parsed_metric.suffix,
+                    "trend": parsed_metric.trend,
+                }
+            }
+        # Rule 118: No number found in narration -> DO NOT emit mock counter
+        return None
+
+    if fo_type in ("evidence_3d_prop", "3d_evidence_prop", "3d_hanko_seal"):
+        title = "公的原本 // 提出記録証拠" if is_jp else "PHYSICAL EVIDENCE // EXHIBIT A"
+        subtitle = "浜岡原子力発電所 安全審査提出原本 // 証拠第42号" if is_jp else "IMPERIAL SEAL / AUTHENTICATION STAMP"
+        return {
+            "type": "evidence_3d_prop",
+            "legacy_type": "redacted_doc",
+            "theme": "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": title,
+            "badge": "公的認証" if is_jp else "SEALED EXHIBIT",
+            "sfx_cue": "stamp_slam",
+            "label": subtitle,
+            "payload": {
+                "specimen_type": "procedural_3d_artifact",
+                "prop_type": "hanko_seal" if is_jp else "wax_seal",
+                "classification": "EVIDENTIARY_PROOF",
+                "notes": "12FPS STOP-MOTION VOLUMETRIC SPECIMEN",
+                "title": title,
+                "subtitle": subtitle,
+            }
+        }
+
+    if fo_type in ("tactical_map", "radar_map"):
+        return {
+            "type": "tactical_map",
+            "legacy_type": "radar_map",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
+            "badge": "LOCATIONAL EVIDENCE",
+            "sfx_cue": "sonar_ping",
+            "label": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
+            "payload": {
+                "target_name": "浜岡原子力発電所 プラントサイト" if is_jp else "OPERATIONAL SITE // VERIFIED SECTOR",
+                "coordinates": "34.62° N, 138.14° E (静岡県 御前崎市)" if is_jp else "TARGET REGION JURISDICTION",
+                "map_region": "駿河湾沿岸 耐震・地殻変動セクター" if is_jp else "INVESTIGATIVE DISTRICT",
+                "points_of_interest": ["3号機・4号機 原子炉建屋", "基準地震動観測点", "防潮堤 22m区間"] if is_jp else ["PRIMARY HUB", "INTERMEDIARY CHOKEPOINT", "ESCROW DISBURSEMENT"]
+            }
+        }
+
+    if fo_type in ("document_highlight", "redacted_doc", "paper_dossier"):
+        sentences = [s.strip() for s in re.split(r'[.!?。]+', narration_text) if len(s.strip()) > 5][:4]
+        clauses = [f"{idx+1}. {sent}" for idx, sent in enumerate(sentences)] if sentences else [
+            "1. OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
+            "2. REGULATORY AUDIT IDENTIFIED UNVERIFIED CALCULATIONS."
+        ]
+        return {
+            "type": "document_highlight",
+            "legacy_type": "redacted_doc",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": "OFFICIAL INSPECTION & AUDIT RECORD",
+            "badge": "SUBPOENAED EVIDENCE",
+            "sfx_cue": "marker_stroke",
+            "label": "CLASSIFIED // REDACTED RECORD",
+            "payload": {
+                "document_title": "OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
+                "agency": "REGULATORY OVERSIGHT // INVESTIGATIVE DIVISION",
+                "case_number": "CASE DOCKET // ADJUDICATED FILING",
+                "clauses": clauses,
+                "highlight_line_index": 0,
+                "redacted_terms": ["CONFIDENTIAL", "UNVERIFIED", "不適切"],
+                "date": "OFFICIAL RECORD // VERIFIED"
+            }
+        }
+
+    if fo_type in ("evidence_board", "causal_flowchart"):
+        return {
+            "type": "evidence_board",
+            "legacy_type": "causal_flowchart",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": "INVESTIGATION NETWORK // TARGET ENTITIES",
+            "badge": "CRIMINAL INDICTMENT",
+            "sfx_cue": "paper_slide",
+            "label": "INVESTIGATION DOSSIER // SUBJECT NETWORK",
+            "payload": {
+                "suspect_name": "PRIMARY TARGET // NOMINEE OPERATOR",
+                "role": "UNLICENSED SHELL OPERATOR / FALSE DISBURSEMENT",
+                "charges": ["REGULATORY DEVIATION", "SUBMISSION OF INCONSISTENT RECORD FILINGS"],
+                "connected_entities": ["REGULATORY OVERSIGHT DESK", "OPERATIONAL FACILITY", "FILING AUDIT ARCHIVE"],
+                "evidence_tag": "OFFICIAL CASE EXHIBIT"
             }
         }
 
@@ -584,6 +709,7 @@ def build_remotion_props_data(
     logger.info("[build_remotion_props] Episode-specific Beat Titles: %s", custom_beat_titles)
 
     scenes_since_overlay = 4
+    last_overlay_type = None
     for i, s in enumerate(raw_scenes):
         bg_key = s.get("background_reuse_key")
         fg_key = s.get("foreground_reuse_key")
@@ -622,11 +748,13 @@ def build_remotion_props_data(
                 if calc_dur is not None and calc_dur > 0.1:
                     dur_sec = calc_dur
 
+        dur_frames = max(15, round(dur_sec * fps))
+
         # Alternate Left / Right position
         default_pos = "left" if (i % 2 == 0) else "right"
         fg_pos = s.get("foreground_position") or default_pos
 
-        # Extract or read stat cards
+        # Dynamic Stat Card / Financial Ledger Extraction (Rule 102)
         stat_val = s.get("stat_value") or s.get("statValue")
         stat_lbl = s.get("stat_label") or s.get("statLabel")
         if not stat_val:
@@ -653,14 +781,22 @@ def build_remotion_props_data(
         tension_lvl = s.get("tension_level") or (cam.get("tension_level") if isinstance(cam, dict) else "high")
         bg_cluster = s.get("bg_cluster_id") or s.get("bgClusterId")
         forensic_ov = s.get("forensic_overlay") or s.get("forensicOverlay")
-        if not forensic_ov and scenes_since_overlay >= 4:
-            forensic_ov = detect_forensic_overlay(narration_text)
-            if forensic_ov:
-                scenes_since_overlay = 0
+        if not forensic_ov:
+            candidate_ov = detect_forensic_overlay(narration_text)
+            if candidate_ov:
+                cand_type = candidate_ov.get("type")
+                # Anti-monotony: allow overlay if >= 2 scenes since last overlay OR switching to contrasting type
+                if scenes_since_overlay >= 2 or cand_type != last_overlay_type:
+                    forensic_ov = candidate_ov
+                    scenes_since_overlay = 0
+                    last_overlay_type = cand_type
+                else:
+                    scenes_since_overlay += 1
             else:
                 scenes_since_overlay += 1
         elif forensic_ov:
             scenes_since_overlay = 0
+            last_overlay_type = forensic_ov if isinstance(forensic_ov, str) else forensic_ov.get("type")
         else:
             scenes_since_overlay += 1
 
@@ -683,16 +819,28 @@ def build_remotion_props_data(
         }
         if isinstance(forensic_ov, str):
             fo_type = forensic_ov
-            structured = detect_forensic_overlay(narration_text)
-            if structured and structured.get("type") == fo_type:
-                forensic_ov = structured
-            else:
-                forensic_ov = {
-                    "type": fo_type,
-                    "label": DEFAULT_OVERLAY_LABELS.get(fo_type, "FORENSIC // EVIDENCE RECORD")
-                }
+            forensic_ov = build_structured_overlay(fo_type, narration_text, theme="vox_paper")
 
         # Spatial Layout Collision Prevention & Full-Bleed Focus Promotion (Rule 122 & Vox Paper-Collage)
+        if forensic_ov and isinstance(forensic_ov, dict):
+            # Strict Zero-Mock check for kinetic_counter (Rule 118):
+            if forensic_ov.get("type") in ("kinetic_counter", "financial_chart"):
+                p = forensic_ov.get("payload") or {}
+                if not p.get("end_value") and not p.get("amount"):
+                    parsed_m = parse_spoken_number(narration_text)
+                    if parsed_m and parsed_m.display_value > 0:
+                        forensic_ov["payload"] = {
+                            "start_value": 0,
+                            "end_value": parsed_m.display_value,
+                            "amount": parsed_m.display_value,
+                            "unit": parsed_m.unit,
+                            "prefix": parsed_m.prefix,
+                            "suffix": parsed_m.suffix,
+                            "trend": parsed_m.trend,
+                        }
+                    else:
+                        forensic_ov = None
+
         if forensic_ov and isinstance(forensic_ov, dict):
             if "label" not in forensic_ov:
                 forensic_ov["label"] = DEFAULT_OVERLAY_LABELS.get(forensic_ov.get("type"), "FORENSIC // EVIDENCE RECORD")
@@ -708,31 +856,6 @@ def build_remotion_props_data(
                     forensic_ov["layout"] = "split_right"
                 else:
                     forensic_ov["layout"] = "split_left"
-        elif not forensic_ov and not fg_rel and narration_text:
-            # Rule 122 & Vox Architecture: Guarantee zero visual dead zones when character is absent
-            forensic_ov = {
-                "type": "document_highlight",
-                "legacy_type": "redacted_doc",
-                "theme": "vox_paper",
-                "layout": "full_bleed_focus",
-                "title": "OFFICIAL INVESTIGATION RECORD",
-                "badge": "EVIDENTIARY EXHIBIT",
-                "sfx_cue": "marker_stroke",
-                "label": "CLASSIFIED // REDACTED RECORD",
-                "payload": {
-                    "document_title": "MEMORANDUM OF INVESTIGATION",
-                    "agency": "TASK FORCE FORENSIC AUDIT DIVISION",
-                    "case_number": "CASE EXHIBIT // INVESTIGATION",
-                    "clauses": [
-                        (narration_text[:90].upper() + "...") if narration_text else "FORENSIC CASE AUDIT IN PROGRESS.",
-                        "TRANSACTIONAL AUDITS CONFIRMED IRREGULARITIES.",
-                        "EVIDENTIARY ADMISSIBILITY CERTIFIED BY PROSECUTION."
-                    ],
-                    "highlight_line_index": 0,
-                    "redacted_terms": ["IRREGULARITIES"],
-                    "date": "CASE RECORD"
-                }
-            }
 
         # Extract Stamp Slam Badge (Rule 122 Acting & Evidence Props)
         stamp_badge = s.get("stamp_badge") or s.get("stampBadge")

@@ -190,6 +190,11 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
 
     # 1. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
     if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류"]):
+        sentences = [s.strip() for s in re.split(r'[.!?。]+', narration_text) if len(s.strip()) > 5][:4]
+        clauses = [f"{idx+1}. {sent}" for idx, sent in enumerate(sentences)] if sentences else [
+            "1. OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
+            "2. REGULATORY AUDIT IDENTIFIED UNVERIFIED CALCULATIONS."
+        ]
         return {
             "type": "document_highlight",
             "legacy_type": "redacted_doc",
@@ -201,22 +206,18 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             "label": "CLASSIFIED // REDACTED RECORD",
             "payload": {
                 "document_title": "OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
-                "agency": "FEDERAL BUREAU OF INVESTIGATION // US DISTRICT COURT",
-                "case_number": "CASE NO. 26-CR-01844-SD",
-                "clauses": [
-                    "1. FIELD AGENTS CONDUCTED UNANNOUNCED INSPECTIONS OF REGISTERED FACILITIES.",
-                    "2. PHYSICAL ADDRESSES REVEALED RESIDENTIAL HOUSES WITH ZERO DAYCARE OPERATION.",
-                    "3. INVOICES SUBMITTED CLAIMED OVER 100 MINORS UNDER CONTINUOUS SUPERVISION.",
-                    "4. ENROLLMENT LOGS WERE FABRICATED USING STOLEN IDENTIFICATION DATA."
-                ],
-                "highlight_line_index": 1,
-                "redacted_terms": ["STOLEN IDENTIFICATION", "ZERO DAYCARE"],
-                "date": "OFFICIAL FILING // OCTOBER 2026"
+                "agency": "REGULATORY OVERSIGHT // INVESTIGATIVE DIVISION",
+                "case_number": "CASE DOCKET // ADJUDICATED FILING",
+                "clauses": clauses,
+                "highlight_line_index": 1 if len(clauses) > 1 else 0,
+                "redacted_terms": ["CONFIDENTIAL", "UNVERIFIED", "不適切"],
+                "date": "OFFICIAL RECORD // VERIFIED"
             }
         }
 
     # 2. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
-    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "surveillance", "cctv", "camera", "facility", "address", "location", "locations", "street", "city", "county", "district", "cơ sở", "địa điểm", "địa chỉ", "nhà trẻ", "khu vực", "시설", "주소", "위치", "warehouse", "giám sát"]):
+    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "surveillance", "cctv", "camera", "facility", "address", "location", "locations", "street", "city", "county", "district", "cơ sở", "địa điểm", "địa chỉ", "khu vực", "시설", "주소", "위치", "warehouse", "giám sát", "seismic zone", "bản đồ", "지도", "좌표", "震源", "南海トラフ", "駿河湾"]):
+        is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
         return {
             "type": "tactical_map",
             "legacy_type": "radar_map",
@@ -227,32 +228,34 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             "sfx_cue": "sonar_ping",
             "label": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
             "payload": {
-                "target_name": "UNLICENSED GHOST DAYCARE FACILITY",
-                "coordinates": "SAN DIEGO COUNTY JURISDICTION",
-                "map_region": "SOUTHERN DISTRICT OF CALIFORNIA",
-                "points_of_interest": ["OPERATOR RESIDENCE", "CLAIM PROCESSING OFFICE", "DEPOSIT CHOKEPOINT"]
+                "target_name": "浜岡原子力発電所 プラントサイト" if is_jp else "OPERATIONAL SITE // VERIFIED SECTOR",
+                "coordinates": "34.62° N, 138.14° E (静岡県 御前崎市)" if is_jp else "TARGET REGION JURISDICTION",
+                "map_region": "駿河湾沿岸 耐震・地殻変動セクター" if is_jp else "INVESTIGATIVE DISTRICT",
+                "points_of_interest": ["3号機・4号機 原子炉建屋", "基準地震動観測点", "防潮堤 22m区間"] if is_jp else ["PRIMARY HUB", "INTERMEDIARY CHOKEPOINT", "ESCROW DISBURSEMENT"]
             }
         }
 
-    # 3. Kinetic Counter / Financial Ledger (Numerical claims, government funds, subsidies, theft, fraud amounts)
+    # 3. Kinetic Counter / Financial Ledger (Strict: requires verified parsed number, Rule 118 Zero-Mock Data)
     parsed_metric = parse_spoken_number(narration_text)
-    if parsed_metric is not None or any(k in t for k in ["dollar", "subsidy", "subsidies", "$", "check", "claim", "claims", "billing", "payment", "reimbursement", "fund", "funds", "tiền", "ngân sách", "trợ cấp", "chi trả", "지원금", "환불", "청구", "billion", "million"]):
-        display_val = parsed_metric.formatted if parsed_metric else "$10,482,910"
+    if parsed_metric is not None and parsed_metric.display_value > 0:
+        display_val = parsed_metric.formatted
         return {
             "type": "kinetic_counter",
             "legacy_type": "financial_chart",
             "theme": theme or "vox_paper",
             "layout": "full_bleed_focus",
-            "title": f"GOVERNMENT DISBURSEMENT // {display_val}",
-            "badge": "FRAUDULENT CLAIM",
+            "title": f"QUANTITATIVE METRIC // {display_val}",
+            "badge": "AUDIT METRIC",
             "sfx_cue": "stamp_slam",
             "label": f"EVIDENTIARY VALUE // {display_val}",
             "payload": {
-                "amount": parsed_metric.display_value if parsed_metric else 10482910,
-                "payee": "NOMINEE DAYCARE HOLDINGS // TARGET OPERATOR",
-                "payer": "DEPARTMENT OF SOCIAL SERVICES // CHILD DEVELOPMENT FUND",
-                "memo": "CHILDCARE SUBSIDY FRAUD // UNVERIFIED ATTENDANCE",
-                "date": "AUDIT BATCH // 2024-2026"
+                "start_value": 0,
+                "end_value": parsed_metric.display_value,
+                "amount": parsed_metric.display_value,
+                "unit": parsed_metric.unit,
+                "prefix": parsed_metric.prefix,
+                "suffix": parsed_metric.suffix,
+                "trend": parsed_metric.trend,
             }
         }
 
@@ -268,15 +271,14 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             "sfx_cue": "paper_slide",
             "label": "INVESTIGATION DOSSIER // SUBJECT NETWORK",
             "payload": {
-                "suspect_name": "PRIMARY TARGET // NOMINEE ADMINISTRATOR",
-                "role": "UNLICENSED SHELL OPERATOR / FALSE ENROLLMENT",
+                "suspect_name": "PRIMARY TARGET // NOMINEE OPERATOR",
+                "role": "UNLICENSED SHELL OPERATOR / FALSE DISBURSEMENT",
                 "charges": [
-                    "18 U.S.C. § 1343 // WIRE FRAUD CONSPIRACY",
-                    "18 U.S.C. § 1956 // MONEY LAUNDERING",
-                    "THEFT OF GOVERNMENT ASSISTANCE FUNDS"
+                    "STATUTORY COMPLIANCE VIOLATION",
+                    "SUBMISSION OF INCONSISTENT RECORD FILINGS"
                 ],
-                "connected_entities": ["SHELL DAYCARE ENTITY", "CHECK CASHING SCHEME", "STATE ASSISTANCE LEDGER"],
-                "evidence_tag": "CRIMINAL DIVISION CASE #26-CR"
+                "connected_entities": ["REGULATORY OVERSIGHT DESK", "OPERATIONAL FACILITY", "FILING AUDIT ARCHIVE"],
+                "evidence_tag": "OFFICIAL CASE EXHIBIT"
             }
         }
 
