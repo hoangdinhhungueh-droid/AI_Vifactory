@@ -414,6 +414,16 @@ async def run_pipeline(
                      "--segments", _segments_path,
                      "--manifest", _manifest_path, "--out", _props_path, "--skip-missing"],
                     check=True, timeout=600)
+
+            # Stage B6.2: Autonomous Adversarial Director Gate (VOX minimalism, Rule 122 & 136)
+            _gate_script = "/root/video_factory/scripts/orchestrator/adversarial_director_gate.py"
+            if os.path.exists(_gate_script):
+                logger.info("[S4.5] running adversarial_director_gate on props")
+                _sp.run([sys.executable, _gate_script,
+                         "--episode-id", episode_id,
+                         "--props", _props_path,
+                         "--no-stills"], check=False, timeout=120)
+
             from app.services.render_timeout_policy import (
                 compute_render_timeout_hierarchy,
                 extract_frames_from_props,

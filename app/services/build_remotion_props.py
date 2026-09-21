@@ -1006,6 +1006,16 @@ def main():
         skip_missing=args.skip_missing,
     )
 
+    # Autonomous Editorial Director Gate (Rule 122, 128 & 136):
+    # Enforce VOX character sparsity (<= 12 FG), breakdown layout monotony, and clean tags
+    try:
+        from scripts.orchestrator.adversarial_director_gate import auto_repair_props
+        market = str(args.episode_id.split("_")[0]).upper() if args.episode_id else "EN"
+        props = auto_repair_props(props, market)
+        logger.info("Auto-repaired props applied at build_remotion_props (VOX minimalism & FG <= 12)")
+    except Exception as _re:
+        logger.warning("auto_repair_props skipped in build_remotion_props: %s", _re)
+
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(props, f, ensure_ascii=False, indent=2)
