@@ -15,6 +15,7 @@ Key Features:
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -28,54 +29,75 @@ PROJ_DIR = os.environ.get("VF_REMOTION_DIR", "/root/video_factory/remotion")
 
 
 def get_beat_chunks_from_props(props_path: str) -> list[dict]:
-    """Extract exact frame ranges for each Beat from remotion_props.json."""
+    """Extract exact frame ranges for each Act / Beat from remotion_props.json.
+    
+    Prefers canonical 5-Act structure (`actTitle`), falling back to `speakerTag`
+    beat detection (`BEAT <N>`), and finally 5 equal chunks.
+    """
     with open(props_path, "r", encoding="utf-8") as f:
         props = json.load(f)
     scenes = props.get("scenes", [])
     if not scenes:
         raise ValueError(f"No scenes found in {props_path}")
 
+    has_acts = any(bool(s.get("actTitle")) for s in scenes)
     beats = []
-    current_beat_tag = None
+    current_label = None
     start_frame = 0
     current_frame = 0
-    beat_idx = 1
+    chunk_idx = 1
 
     for i, s in enumerate(scenes):
         dur = max(1, round(s.get("durationInFrames", 1)))
-        tag = s.get("speakerTag", "")
-        # Detect Beat header e.g. "BEAT 1", "BEAT 2"
-        beat_prefix = None
-        if "BEAT " in tag.upper():
-            parts = tag.upper().split(":")
-            beat_prefix = parts[0].strip()
-
-        if beat_prefix and beat_prefix != current_beat_tag:
-            if current_beat_tag is not None:
+        
+        if has_acts:
+            raw_act = s.get("actTitle") or current_label or f"ACT {chunk_idx}"
+            # Extract high-level Act identifier e.g. "ACT I", "ACT II"
+            m = re.search(r"(ACT\s+[IVXLCDM\d]+)", raw_act, re.IGNORECASE)
+            act_label = m.group(1).upper() if m else raw_act.strip()
+            
+            if current_label is not None and act_label != current_label:
                 beats.append({
-                    "name": current_beat_tag,
-                    "index": beat_idx,
+                    "name": current_label,
+                    "index": chunk_idx,
                     "start_frame": start_frame,
                     "end_frame": current_frame - 1,
                     "duration": current_frame - start_frame,
                 })
-                beat_idx += 1
+                chunk_idx += 1
                 start_frame = current_frame
-            current_beat_tag = beat_prefix
+            current_label = act_label
+        else:
+            tag = s.get("speakerTag", "")
+            m = re.search(r"BEAT\s*(\d+)", tag, re.IGNORECASE)
+            beat_label = f"BEAT {m.group(1)}" if m else None
+            
+            if beat_label and beat_label != current_label:
+                if current_label is not None:
+                    beats.append({
+                        "name": current_label,
+                        "index": chunk_idx,
+                        "start_frame": start_frame,
+                        "end_frame": current_frame - 1,
+                        "duration": current_frame - start_frame,
+                    })
+                    chunk_idx += 1
+                    start_frame = current_frame
+                current_label = beat_label
 
         current_frame += dur
 
-    # Append the last beat
+    # Append the final chunk
     if current_frame > start_frame:
         beats.append({
-            "name": current_beat_tag or f"BEAT {beat_idx}",
-            "index": beat_idx,
+            "name": current_label or f"CHUNK_{chunk_idx}",
+            "index": chunk_idx,
             "start_frame": start_frame,
             "end_frame": current_frame - 1,
             "duration": current_frame - start_frame,
         })
 
-    # Fallback if no explicit beats found: split into 5 equal chunks
+    # Fallback if no explicit acts/beats found: split into 5 equal chunks
     if len(beats) < 2:
         beats = []
         total = current_frame
@@ -84,7 +106,7 @@ def get_beat_chunks_from_props(props_path: str) -> list[dict]:
         for b in range(1, 6):
             end = total - 1 if b == 5 else (cur + chunk_size - 1)
             beats.append({
-                "name": f"CHUNK {b}",
+                "name": f"CHUNK_{b}",
                 "index": b,
                 "start_frame": cur,
                 "end_frame": end,
@@ -185,7 +207,7 @@ def main():
     parser.add_argument("--episode-id", default=None, help="Episode ID")
     parser.add_argument("--props", default=None, help="Explicit path to remotion_props.json")
     parser.add_argument("--out", default=None, help="Explicit path to final twolayer_silent.mp4")
-    parser.add_argument("--concurrency", default="3", help="Remotion concurrency (default: 3)")
+    parser.add_argument("--concurrency", default=os.environ.get("VF_REMOTION_CONCURRENCY", "2"), help="Remotion concurrency (default: 2)")
     parser.add_argument("--x264-preset", default="veryfast", help="x264 preset (default: veryfast)")
     parser.add_argument("--crf", type=int, default=18, help="CRF rate control (default: 18)")
     parser.add_argument("--skip-auto-mux", action="store_true", help="Skip automatic downstream mux and Gate 3 dispatch")
@@ -198,6 +220,24 @@ def main():
         if m:
             args.episode_id = m.group(1)
             print(f"INFO: Auto-resolved episode_id from path: {args.episode_id}")
+
+    # Single-instance lock to prevent duplicate overlapping renders (Rule 125 & 127)
+    lock_file = Path(f"/tmp/vf_render_{args.episode_id or 'unknown'}.lock")
+    if lock_file.exists():
+        try:
+            prev_pid = int(lock_file.read_text().strip())
+            # Check if process is still alive
+            os.kill(prev_pid, 0)
+            print(f"FATAL: Render already in progress for {args.episode_id} (PID {prev_pid}). Aborting duplicate run.")
+            sys.exit(1)
+        except (OSError, ValueError):
+            # Stale lock file
+            lock_file.unlink(missing_ok=True)
+    
+    try:
+        lock_file.write_text(str(os.getpid()))
+    except Exception:
+        pass
 
     ep_dir = Path(f"/var/vf/episodes/{args.episode_id}") if args.episode_id else None
     props_path = args.props or (str(ep_dir / "remotion_props.json") if ep_dir else None)
@@ -223,7 +263,8 @@ def main():
 
     for b in beat_chunks:
         idx = b["index"]
-        c_out = os.path.join(chunks_dir, f"chunk_{idx:02d}_{b['name'].replace(' ', '_').lower()}.mp4")
+        clean_name = re.sub(r'[^a-zA-Z0-9_-]+', '_', b['name']).strip('_').lower()
+        c_out = os.path.join(chunks_dir, f"chunk_{idx:02d}_{clean_name}.mp4")
         expected_sec = b["duration"] / 30.0
 
         if verify_chunk_mp4(c_out, expected_sec):
@@ -258,15 +299,18 @@ def main():
     print(f"Total frames: {total_frames} | Total time: {overall_elapsed / 60:.1f} mins | Avg Speed: {overall_fps:.2f} fps")
     print("=" * 60)
 
-    # Automatic Downstream Hook: Mux + Audit + B10 + Telegram Gate 3
-    if not args.skip_auto_mux:
-        if not args.episode_id:
-            print("\n>>> [AUTO-PIPELINE] Skipping auto-mux because episode_id could not be resolved.")
-        else:
-            mux_script = _REPO_ROOT / "scripts" / "mux_master_episode.py"
-            if mux_script.exists():
-                print(f"\n>>> [AUTO-PIPELINE] Automatically invoking mux, audit, and Gate 3 dispatch for {args.episode_id}...")
-                subprocess.run([sys.executable, str(mux_script), "--episode-id", args.episode_id], check=True)
+    try:
+        # Automatic Downstream Hook: Mux + Audit + B10 + Telegram Gate 3
+        if not args.skip_auto_mux:
+            if not args.episode_id:
+                print("\n>>> [AUTO-PIPELINE] Skipping auto-mux because episode_id could not be resolved.")
+            else:
+                mux_script = _REPO_ROOT / "scripts" / "mux_master_episode.py"
+                if mux_script.exists():
+                    print(f"\n>>> [AUTO-PIPELINE] Automatically invoking mux, audit, and Gate 3 dispatch for {args.episode_id}...")
+                    subprocess.run([sys.executable, str(mux_script), "--episode-id", args.episode_id], check=True)
+    finally:
+        lock_file.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

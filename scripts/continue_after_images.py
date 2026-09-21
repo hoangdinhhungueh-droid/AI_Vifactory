@@ -214,9 +214,21 @@ def main():
             _log("failed reading props for timeout: %s" % _terr)
 
     # Stage B6.1: Props Staging & Editorial Briefing (Vox Minimalist Pacing)
+    brain_path = ep_dir / "brain_input.json"
+    props_path = ep_dir / "remotion_props.json"
+    segments_path = ep_dir / "whisper_segments.json"
+    manifest_path = ep_dir / "images" / "manifest.json"
+    if not manifest_path.exists():
+        manifest_path = ep_dir / "assets" / "manifest.json"
+
     _run_stage("B6.1 Props Staging",
                [sys.executable, "scripts/build_remotion_props.py",
-                "--episode-id", episode_id],
+                "--episode-id", episode_id,
+                "--brain-input", str(brain_path),
+                "--segments", str(segments_path),
+                "--manifest", str(manifest_path),
+                "--out", str(props_path),
+                "--skip-missing"],
                episode_id, 300)
 
     # Stage B6.2: Autonomous Adversarial Director Gate (Rule 122/128/136)

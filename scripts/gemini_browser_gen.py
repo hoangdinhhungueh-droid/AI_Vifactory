@@ -264,16 +264,38 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
             input_box = page.wait_for_selector('div[role="textbox"], div[contenteditable="true"], textarea', timeout=30000)
             input_box.click()
             time.sleep(0.3)
+
+            # Khóa cứng chế độ Imagen 3 qua menu "+" (Tạo hình ảnh) để 1 phát ăn ngay, triệt tiêu text2text refusal
+            try:
+                plus_btn = page.query_selector('button[aria-label*="Thêm"], button[aria-label*="Add"], button[aria-label*="Công cụ"], button[aria-label*="Tools"], button[aria-label*="Tải lên"], button[aria-label*="Upload"]')
+                if not plus_btn:
+                    # Tìm button đầu tiên bên trái trong khung nhập
+                    container = input_box.evaluate_handle("el => el.closest('form') || el.closest('div[class*=\"input\"]') || el.parentElement.parentElement")
+                    if container:
+                        plus_btn = container.query_selector('button')
+                if plus_btn:
+                    plus_btn.click()
+                    time.sleep(0.4)
+                    img_tool = page.query_selector('[role="menuitem"]:has-text("Tạo hình ảnh"), [role="menuitem"]:has-text("Create image"), button:has-text("Tạo hình ảnh"), button:has-text("Create image"), div:has-text("Tạo hình ảnh"), [aria-label*="Tạo hình ảnh"]')
+                    if img_tool:
+                        img_tool.click()
+                        time.sleep(0.4)
+                        print("🎨 [1-Shot Mode] Đã kích hoạt chế độ 'Tạo hình ảnh' trực tiếp qua menu công cụ!")
+            except Exception as _e_tool:
+                pass
             
             # Xóa nội dung cũ nếu có
             page.keyboard.press("Control+A")
             page.keyboard.press("Backspace")
             time.sleep(0.2)
             
-            # Rule 128: Clean Pass-Through of Astra-forged prompts (Zero hardcoded domain bias)
+            # Khử nhiễu các thẻ meta lập trình [STYLE MANDATE], [ERA ANCHOR] để Imagen 3 không bị hiểu nhầm là prompt crafting
+            import re
             clean_p = prompt_text.strip()
-            if not clean_p.lower().startswith("generate an image"):
-                full_prompt = f"Generate an image: {clean_p}"
+            clean_p = re.sub(r'\[(STYLE MANDATE|MARKET & ETHNIC ANCHOR|MARKET & ENVIRONMENT ANCHOR|ERA ANCHOR|STRICT NEGATIVE PROMPT|TECHNICAL:[^\]]*)\]', '', clean_p, flags=re.IGNORECASE).strip()
+            clean_p = re.sub(r'\s+', ' ', clean_p)
+            if not clean_p.lower().startswith("generate an image") and not clean_p.lower().startswith("draw"):
+                full_prompt = f"Draw: {clean_p}"
             else:
                 full_prompt = clean_p
             input_box.fill(full_prompt)
@@ -294,7 +316,22 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
             saved = False
             
             while time.time() - start_time < timeout_sec:
-                time.sleep(3)
+                time.sleep(2)
+
+                # Early Refusal Fast-Fail: Bắt text từ chối ngay trong 5s thay vì chờ mù 120s
+                refusal = page.query_selector(
+                    'div.markdown:has-text("cannot directly generate"), '
+                    'div.markdown:has-text("không thể trực tiếp tạo"), '
+                    'div.markdown:has-text("cannot generate images"), '
+                    'div.markdown:has-text("can\'t generate images"), '
+                    'div.markdown:has-text("unable to generate"), '
+                    'div.markdown:has-text("I cannot create images"), '
+                    'message-content:has-text("cannot directly generate")'
+                )
+                if refusal:
+                    print("⚠️ Phát hiện Gemini trả về text từ chối thay vì sinh ảnh. Fast-fail aborting ngay để retry!")
+                    break
+
                 images = page.query_selector_all('img[src*="googleusercontent.com"], img[src*="blob:"], img.generated-image, img')
                 
                 for img in reversed(images):
@@ -877,7 +914,7 @@ def trigger_b6_handoff(episode_id):
     print(check_res.get("stdout"))
 
 
-def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=8, force=False, auto_handoff=False):
+def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3, force=False, auto_handoff=False):
     """Chạy toàn bộ quy trình sinh ảnh bằng Chrome Web Automation (PNG 100%)."""
     print(f"\n🎬 BẮT ĐẦU GENERATE ẢNH CHO EPISODE: {episode_id} ({len(prompt_items)} items) [CHUẨN 100% PNG]")
     
@@ -986,8 +1023,8 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=8,
             except Exception as e:
                 print(f"⚠️ Warning: Batch archive upload gặp sự cố ({e}). Assets đơn lẻ đã được đẩy trong vòng lặp.")
             
-            # Đồng bộ Notion
-            sync_to_notion(episode_id)
+            # Rule 120/132: Asset storage decoupled - Binary chunks bypass Notion, directly on VPS -> R2 -> GDrive
+            print(f"\n📊 [Storage Decoupled] Bypassing Notion Image Library sync. Assets directly preserved on VPS/Drive.")
             
             # B6 Trigger & Marker nếu Technical Audit đạt yêu cầu
             if audit_report.get("overall_verdict") in ("TECH_PASS", "CONDITIONAL_PASS"):
@@ -1010,7 +1047,7 @@ if __name__ == "__main__":
     parser.add_argument("--episode", type=str, default=None, help="Episode ID (ví dụ: EN_EP0001_...)")
     parser.add_argument("--test", action="store_true", help="Chạy thử 1 ảnh mẫu PNG")
     parser.add_argument("--headless", action="store_true", help="Chạy không hiện cửa sổ")
-    parser.add_argument("--pacing", type=int, default=8, help="Thời gian giãn cách giữa các prompt (giây)")
+    parser.add_argument("--pacing", type=int, default=3, help="Thời gian giãn cách giữa các prompt (giây)")
     parser.add_argument("--force", action="store_true", help="Sinh lại toàn bộ ngay cả khi đã có file cục bộ")
     parser.add_argument("--no-auto-handoff", action="store_true", help="Tắt tự động trigger B6 render sau khi xong B4/B5 (mặc định B6 tự động kích hoạt)")
     args = parser.parse_args()
