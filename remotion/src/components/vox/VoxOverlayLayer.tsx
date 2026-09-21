@@ -118,8 +118,8 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
 
       {/* Visual Component Render */}
       <div style={positionStyles}>
-        {/* Paper Dossier / Official Document Highlight */}
-        {rawType === "document_highlight" || rawType === "redacted_doc" || rawType === "paper_dossier" ? (
+        {/* Paper Dossier / Official Document Highlight / Court Docket / Redacted Memo */}
+        {rawType === "document_highlight" || rawType === "redacted_doc" || rawType === "paper_dossier" || rawType === "court_docket" || rawType === "redacted_memo" ? (
           <VoxPaperDossier
             title={ov.title}
             badge={ov.badge}
@@ -130,8 +130,8 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
           />
         ) : null}
 
-        {/* Evidence Corkboard / Suspect Network */}
-        {rawType === "evidence_board" || rawType === "suspect_network" ? (
+        {/* Evidence Corkboard / Suspect Network / Corporate Org Chart */}
+        {rawType === "evidence_board" || rawType === "suspect_network" || rawType === "corporate_org_chart" ? (
           <VoxEvidenceBoard
             title={ov.title}
             badge={ov.badge}
@@ -178,8 +178,8 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
           />
         ) : null}
 
-        {/* Causal Flowchart */}
-        {rawType === "causal_flowchart" ? (
+        {/* Causal Flowchart / Money Trail Network */}
+        {rawType === "causal_flowchart" || rawType === "money_trail_network" ? (
           <VoxCausalFlowchart
             title={ov.title}
             badge={ov.badge}

@@ -309,6 +309,162 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
     return None
 
 
+def detect_object_focus(narration_text: str, topic: str = "") -> dict | None:
+    """Detect or synthesize an object_focus dictionary from narration text (Rule 118/128/VOX)."""
+    if not narration_text:
+        return None
+    t = narration_text.lower()
+    
+    # 1. Court Docket / Legal Complaint / Indictment / Lawsuit
+    if any(k in t for k in ["lawsuit", "complaint", "sue", "court", "judge", "docket", "indictment", "violation", "legal", "prosecutor", "antitrust", "ftc", "đơn kiện", "tòa án", "truy tố", "pháp lý", "chống độc quyền", "소송", "고소", "기소", "법원", "반독점"]):
+        return {
+            "type": "court_docket",
+            "title": "DISTRICT COURT // OFFICIAL FILING",
+            "agency": "REGULATORY ENFORCEMENT COMMISSION",
+            "source_ref": "DOCKET CASE RECORD // UNSEALED",
+            "key_snippet": narration_text[:70].strip(),
+            "stat_metric": None
+        }
+    # 2. Redacted Memo / Secret Agreement / Internal Memo
+    if any(k in t for k in ["memo", "internal", "confidential", "nda", "secret", "email", "slack", "unredacted", "tài liệu mật", "nội bộ", "thỏa thuận", "thư mật", "비밀", "내부", "기밀"]):
+        return {
+            "type": "redacted_memo",
+            "title": "EXECUTIVE MEMORANDUM // RESTRICTED",
+            "agency": "INTERNAL COMPLIANCE AUDIT",
+            "source_ref": "EXHIBIT MEMO-FORENSIC",
+            "key_snippet": narration_text[:70].strip(),
+            "stat_metric": None
+        }
+    # 3. Financial Ledger / Accounting Discrepancy
+    if any(k in t for k in ["ledger", "balance", "accounting", "audit", "revenue", "margin", "loss", "profit", "sổ sách", "kế toán", "doanh thu", "lợi nhuận", "thua lỗ", "장부", "매출", "손실"]):
+        return {
+            "type": "financial_ledger",
+            "title": "AUDIT LEDGER // FINANCIAL STATEMENT",
+            "agency": "OFFICIAL AUDIT EXAMINER",
+            "source_ref": "LEDGER DISCREPANCY RECORD",
+            "key_snippet": narration_text[:70].strip(),
+            "stat_metric": None
+        }
+    # 4. Money Trail Network / Wire Transactions
+    if any(k in t for k in ["wire", "transfer", "offshore", "shell", "escrow", "flow", "launder", "fees", "cut", "chuyển khoản", "dòng tiền", "rửa tiền", "phí hoa hồng", "cắt phế", "송금", "우회", "자금 흐름", "수수료"]):
+        return {
+            "type": "money_trail_network",
+            "title": "TRANSACTION NETWORK // CAPITAL FLOW",
+            "agency": "FINANCIAL CRIMES ENFORCEMENT",
+            "source_ref": "TRANSMISSION CHOKEPOINT",
+            "key_snippet": narration_text[:70].strip(),
+            "stat_metric": None
+        }
+    # 5. Corporate Org Chart / Hierarchy
+    if any(k in t for k in ["subsidiary", "parent company", "board", "executive", "hierarchy", "holding", "monopoly", "sellers", "merchants", "tập đoàn", "công ty con", "hội đồng", "độc quyền", "người bán", "지주회사", "계열사", "독점"]):
+        return {
+            "type": "corporate_org_chart",
+            "title": "CORPORATE STRUCTURE // MARKET DOMINANCE",
+            "agency": "REGISTRATION BUREAU",
+            "source_ref": "ENTITY FILING ARCHIVE",
+            "key_snippet": narration_text[:70].strip(),
+            "stat_metric": None
+        }
+    return None
+
+
+def detect_layout_zone(has_fg: bool, fg_position: str = "right", scene_idx: int = 0) -> dict:
+    """Detect layout_zone based on FG presence and spatial alternation (Rule 122)."""
+    if not has_fg:
+        placements = ["center_hero_document", "macro_detail_focus"]
+        placement = placements[scene_idx % len(placements)]
+        cam_axis = ["horizontal", "push_punch", "vertical"][scene_idx % 3]
+        return {
+            "placement": placement,
+            "safe_zone": "bottom_left",
+            "camera_pan_axis": cam_axis
+        }
+    else:
+        if fg_position == "left":
+            return {
+                "placement": "split_evidence_right",
+                "safe_zone": "bottom_right",
+                "camera_pan_axis": "horizontal"
+            }
+        else:
+            return {
+                "placement": "split_evidence_left",
+                "safe_zone": "bottom_left",
+                "camera_pan_axis": "horizontal"
+            }
+
+
+def detect_animation_cue(narration_text: str, object_focus: dict = None) -> dict:
+    """Detect or synthesize an animation_cue dictionary from narration text (Rule 120/122)."""
+    if not narration_text:
+        return {
+            "effect": "yellow_marker_highlight",
+            "trigger_word": "",
+            "duration_frames": 24
+        }
+    
+    words = re.findall(r"\w+", narration_text)
+    first_word = words[0] if words else ""
+    t = narration_text.lower()
+
+    # Counter Rollup
+    if any(k in t for k in ["$", "%", "billion", "million", "triệu", "tỷ", "percent", "đô la", "won", "yen", "usd", "억", "조"]):
+        trigger = first_word
+        for w in words:
+            if any(c.isdigit() for c in w) or w.lower() in ["billion", "million", "percent", "tỷ", "triệu"]:
+                trigger = w
+                break
+        return {
+            "effect": "counter_rollup",
+            "trigger_word": trigger,
+            "duration_frames": 30
+        }
+
+    # Red Stamp Slam
+    if any(k in t for k in ["fraud", "illegal", "guilty", "busted", "seized", "void", "breach", "vi phạm", "gian lận", "bị bắt", "vô hiệu", "bất hợp pháp", "위반", "사기", "무효"]):
+        trigger = first_word
+        for w in words:
+            if w.lower() in ["fraud", "illegal", "violation", "breach", "gian lận", "vi phạm", "사기", "위반"]:
+                trigger = w
+                break
+        return {
+            "effect": "red_stamp_slam",
+            "trigger_word": trigger,
+            "duration_frames": 18
+        }
+
+    # Flowchart Arrow Grow
+    if any(k in t for k in ["route", "channel", "path", "flow", "through", "via", "chuyển qua", "dẫn đến", "kết nối", "경로", "통해"]):
+        return {
+            "effect": "flowchart_arrow_grow",
+            "trigger_word": words[min(2, len(words) - 1)] if words else "",
+            "duration_frames": 24
+        }
+
+    # Default: Yellow Marker Highlight on central phrase
+    trigger = words[min(3, len(words) - 1)] if len(words) > 3 else (words[0] if words else "")
+    return {
+        "effect": "yellow_marker_highlight",
+        "trigger_word": trigger,
+        "duration_frames": 24
+    }
+
+
+def detect_frame_transition(camera_movement: str, tension_level: str, scene_idx: int = 0) -> dict:
+    """Detect frame_transition and SFX punctuation."""
+    if camera_movement in ("snap_zoom", "handheld_shake"):
+        return {"type": "macro_zoom_through", "sfx_cue": "stamp_thud"}
+    elif camera_movement in ("cinematic_pan",):
+        trans_type = "whip_pan_left" if scene_idx % 2 == 0 else "whip_pan_right"
+        return {"type": trans_type, "sfx_cue": "camera_whoosh"}
+    elif tension_level in ("climax", "extreme"):
+        return {"type": "match_cut", "sfx_cue": "paper_rustle"}
+    elif scene_idx % 4 == 0:
+        return {"type": "film_dissolve", "sfx_cue": "paper_rustle"}
+    else:
+        return {"type": "hard_cut", "sfx_cue": "digital_beep"}
+
+
 def detect_stat_card(narration_text: str) -> dict | None:
     """Rule 122 & Rule 128: Extract prominent financial metrics or evidentiary scales for Remotion Stat Card."""
     if not narration_text:
@@ -1093,7 +1249,13 @@ def generate_director_plan(
                 "   - 'forensic_overlay': 'evidence_3d_prop' (procedural 3D physical evidence / wax seal / imperial hanko / lockbox / exhibit item with 12fps stop-motion), 'document_highlight', 'tactical_map', 'kinetic_counter', 'evidence_board', 'causal_flowchart', or null.\n"
                 "   - 'stat_card': Tag high-impact metric scenes with exact numbers from narration: {\"value\": \"<EXACT_METRIC_FROM_NARRATION>\", \"label\": \"PRICE ANCHOR\" / \"VALUATION COLLAPSE\"} or null.\n"
                 "   - 'stamp_badge': Climax evidentiary stamp slam: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.\n"
-                "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'.\n\n"
+                "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'.\n"
+                "7. VOX EDITORIAL STORYBOARD (OBJECT-FOCUS & ANIMATION CUES - RULE 122 & RULE 128):\n"
+                "   - 'object_focus': Defines central evidentiary document/network: {\"type\": \"court_docket\" | \"redacted_memo\" | \"financial_ledger\" | \"money_trail_network\" | \"corporate_org_chart\" | \"archival_photo\" | \"persona_portrait\" | \"none\", \"title\": \"<DOC_TITLE>\", \"agency\": \"<AGENCY>\", \"source_ref\": \"<CASE_NO>\", \"key_snippet\": \"<HIGHLIGHT_SNIPPET>\", \"stat_metric\": \"<METRIC_OR_NULL>\"}\n"
+                "   - 'layout_zone': Directs spatial placement: {\"placement\": \"center_hero_document\" | \"split_evidence_left\" | \"split_evidence_right\" | \"macro_detail_focus\" | \"lower_third_ticker\", \"safe_zone\": \"bottom_left\", \"camera_pan_axis\": \"horizontal\" | \"vertical\" | \"push_punch\"}\n"
+                "   - 'animation_cue': Synchronizes procedural animation with speech: {\"effect\": \"yellow_marker_highlight\" | \"red_stamp_slam\" | \"counter_rollup\" | \"flowchart_arrow_grow\", \"trigger_word\": \"<WORD_FROM_NARRATION>\", \"duration_frames\": 24}\n"
+                "   - 'frame_transition': Directs editorial cut & SFX: {\"type\": \"match_cut\" | \"whip_pan_left\" | \"whip_pan_right\" | \"macro_zoom_through\" | \"film_dissolve\" | \"hard_cut\", \"sfx_cue\": \"paper_rustle\" | \"stamp_thud\" | \"camera_whoosh\"}\n"
+                "   - 'foreground': Sparsely used (<= 10-12 scenes per episode). When explaining mechanisms/contracts/filings, foreground MUST BE NULL.\n\n"
                 "OUTPUT FORMAT: Return ONLY a valid JSON object matching: {\"scenes\": [ ... ]}. No markdown fences."
             )
 
@@ -1151,7 +1313,13 @@ def generate_director_plan(
                 "7. MOTION GRAPHICS & STAT CARDS (Rule 122 Remotion Suite):\n"
                 "   - 'stat_card': Tag high-impact metric scenes with exact numbers from narration: {\"value\": \"<EXACT_METRIC_FROM_NARRATION>\", \"label\": \"PRICE ANCHOR\" / \"VALUATION COLLAPSE\"} or null.\n"
                 "   - 'stamp_badge': Climax evidentiary stamp slam: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.\n"
-                "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'.\n\n"
+                "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'.\n"
+                "8. VOX EDITORIAL STORYBOARD (OBJECT-FOCUS & ANIMATION CUES - RULE 122 & RULE 128):\n"
+                "   - 'object_focus': Defines central evidentiary document/network: {\"type\": \"court_docket\" | \"redacted_memo\" | \"financial_ledger\" | \"money_trail_network\" | \"corporate_org_chart\" | \"archival_photo\" | \"persona_portrait\" | \"none\", \"title\": \"<DOC_TITLE>\", \"agency\": \"<AGENCY>\", \"source_ref\": \"<CASE_NO>\", \"key_snippet\": \"<HIGHLIGHT_SNIPPET>\", \"stat_metric\": \"<METRIC_OR_NULL>\"}\n"
+                "   - 'layout_zone': Directs spatial placement: {\"placement\": \"center_hero_document\" | \"split_evidence_left\" | \"split_evidence_right\" | \"macro_detail_focus\" | \"lower_third_ticker\", \"safe_zone\": \"bottom_left\", \"camera_pan_axis\": \"horizontal\" | \"vertical\" | \"push_punch\"}\n"
+                "   - 'animation_cue': Synchronizes procedural animation with speech: {\"effect\": \"yellow_marker_highlight\" | \"red_stamp_slam\" | \"counter_rollup\" | \"flowchart_arrow_grow\", \"trigger_word\": \"<WORD_FROM_NARRATION>\", \"duration_frames\": 24}\n"
+                "   - 'frame_transition': Directs editorial cut & SFX: {\"type\": \"match_cut\" | \"whip_pan_left\" | \"whip_pan_right\" | \"macro_zoom_through\" | \"film_dissolve\" | \"hard_cut\", \"sfx_cue\": \"paper_rustle\" | \"stamp_thud\" | \"camera_whoosh\"}\n"
+                "   - 'foreground': Sparsely used (<= 10-12 scenes per episode). When explaining mechanisms/contracts/filings, foreground MUST BE NULL.\n\n"
                 "OUTPUT FORMAT: Return ONLY a valid JSON object matching: {\"scenes\": [ ... ]}. No markdown fences."
             )
 
@@ -1385,6 +1553,24 @@ def generate_director_plan(
             else:  # Beat 5
                 dynamic_tension = "climax" if idx == 0 else ("medium" if idx % 2 == 0 else "low")
 
+        # VOX Editorial Storyboard Fields (Rule 122 & Rule 128)
+        object_focus = sc.get("object_focus")
+        if not object_focus or not isinstance(object_focus, dict):
+            object_focus = detect_object_focus(narration, topic)
+
+        layout_zone = sc.get("layout_zone")
+        if not layout_zone or not isinstance(layout_zone, dict):
+            fg_pos = fg.get("position", "right") if fg else "right"
+            layout_zone = detect_layout_zone(has_fg=bool(fg_key), fg_position=fg_pos, scene_idx=idx)
+
+        animation_cue = sc.get("animation_cue")
+        if not animation_cue or not isinstance(animation_cue, dict):
+            animation_cue = detect_animation_cue(narration, object_focus)
+
+        frame_transition = sc.get("frame_transition")
+        if not frame_transition or not isinstance(frame_transition, dict):
+            frame_transition = detect_frame_transition(cam_mov, dynamic_tension or "medium", scene_idx=idx)
+
         norm_sc = {
             "scene_index": idx,
             "scene_id": sc_id,
@@ -1401,6 +1587,10 @@ def generate_director_plan(
             "stat_card": stat_card,
             "stamp_badge": stamp_badge,
             "motion_directive": motion_directive,
+            "object_focus": object_focus,
+            "layout_zone": layout_zone,
+            "animation_cue": animation_cue,
+            "frame_transition": frame_transition,
             "camera": {
                 "movement": cam_mov,
                 "tension_level": dynamic_tension
@@ -1418,6 +1608,24 @@ def generate_director_plan(
             "audio_sfx_cue": sc.get("audio_sfx_cue", "distant_room_tone")
         }
         normalized_scenes.append(norm_sc)
+
+    # VOX Hard Cap on Foreground characters (Rule 122 & Rule 128):
+    # Strictly <= 10-12 scenes per episode with foreground characters.
+    # Focus on documents, metrics, and systemic mechanisms; prevent CPU render bottlenecks.
+    fg_indices = [i for i, sc in enumerate(normalized_scenes) if sc.get("fg_reuse_key") or sc.get("foreground_reuse_key")]
+    if len(fg_indices) > 12:
+        logger.info(f"  [B3 VOX Gate] Pruning foreground characters from {len(fg_indices)} to <= 12 to enforce VOX object-focus minimalism...")
+        step = max(1, len(fg_indices) // 12)
+        kept_set = set(fg_indices[::step][:12])
+        for i, sc in enumerate(normalized_scenes):
+            if (sc.get("fg_reuse_key") or sc.get("foreground_reuse_key")) and i not in kept_set:
+                sc["fg_reuse_key"] = ""
+                sc["fg_prompt"] = ""
+                sc["foreground_reuse_key"] = ""
+                sc["foreground_prompt"] = ""
+                if sc.get("layout_zone"):
+                    sc["layout_zone"]["placement"] = "center_hero_document"
+                    sc["layout_zone"]["camera_pan_axis"] = "push_punch"
 
     # 6. Assemble complete output payloads
     director_plan = {

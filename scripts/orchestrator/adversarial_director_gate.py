@@ -83,15 +83,60 @@ def audit_props_integrity(props: Dict[str, Any], market: str) -> Tuple[bool, Lis
             if not stat_v and not end_val:
                 defects.append(f"EMPTY_KINETIC_COUNTER in Scene {i:02d}: counter overlay present but no quantitative value parsed.")
 
+    # 4. Foreground Character Sparsity Audit (VOX Pacing & Anti-OOM)
+    fg_count = sum(1 for s in scenes if s.get("foreground"))
+    fg_pct = (fg_count / len(scenes)) * 100
+    if fg_pct > 20.0:
+        defects.append(f"FG_DENSITY_TOO_HIGH: {fg_count}/{len(scenes)} scenes ({fg_pct:.1f}%) have foreground characters (max allowed 20.0% for VOX minimalism).")
+
+    # 5. Layout Zone Variety Audit (Anti-Monotony)
+    current_placement = None
+    streak = 0
+    for i, s in enumerate(scenes):
+        lz = s.get("layout_zone")
+        placement = lz.get("placement") if isinstance(lz, dict) else s.get("safeZone")
+        if placement and placement == current_placement:
+            streak += 1
+            if streak >= 6:
+                defects.append(f"LAYOUT_ZONE_MONOTONY: Scene {i:02d} is part of a {streak}+ scene streak with identical placement '{placement}'.")
+                break
+        else:
+            current_placement = placement
+            streak = 1
+
+    # 6. Animation Cue Trigger Word Integrity Audit
+    for i, s in enumerate(scenes):
+        ac = s.get("animation_cue")
+        if ac and isinstance(ac, dict):
+            tw = str(ac.get("trigger_word") or "").strip()
+            narr = str(s.get("narration") or s.get("caption") or "")
+            if tw and narr and tw.lower() not in narr.lower():
+                defects.append(f"ANIMATION_TRIGGER_MISMATCH in Scene {i:02d}: Trigger word '{tw}' not found in scene narration.")
+
     is_clean = len(defects) == 0
     return is_clean, defects
 
 
 def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
-    """Auto-repair props by pruning excess overlays and localizing text."""
+    """Auto-repair props by pruning excess overlays, localizing text, and enforcing FG sparsity."""
     logger.info("Auto-repairing remotion_props.json for market %s...", market)
     scenes = props.get("scenes", [])
     sanitized = prune_and_localize_scenes(scenes, market)
+
+    # Auto-prune FG characters if density > 15%
+    fg_count = sum(1 for s in sanitized if s.get("foreground"))
+    if fg_count > 12:
+        logger.info("Auto-repair: pruning FG characters from %d to <= 12...", fg_count)
+        step = max(1, fg_count // 12)
+        fg_seen = 0
+        for s in sanitized:
+            if s.get("foreground"):
+                if fg_seen % step != 0 or fg_seen >= 12 * step:
+                    s["foreground"] = ""
+                    if isinstance(s.get("layout_zone"), dict):
+                        s["layout_zone"]["placement"] = "center_hero_document"
+                fg_seen += 1
+
     props["scenes"] = sanitized
     return props
 

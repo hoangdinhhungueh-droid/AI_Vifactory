@@ -899,6 +899,10 @@ def build_remotion_props_data(
             "tensionLevel": tension_lvl or "high",
             "bgClusterId": bg_cluster,
             "forensicOverlay": forensic_ov,
+            "object_focus": s.get("object_focus"),
+            "layout_zone": s.get("layout_zone"),
+            "animation_cue": s.get("animation_cue"),
+            "frame_transition": s.get("frame_transition"),
             "subtitles": scene_subtitles,  # Forward Faster-Whisper words
             "words": scene_subtitles,      # Alias for maximum compatibility
         })

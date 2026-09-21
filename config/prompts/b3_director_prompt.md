@@ -69,6 +69,17 @@
 
 12. VOX INVESTIGATIVE DOCUMENTARY AESTHETICS & FG SPARSITY (Rule 122 & Rule 128):
    - Evidence-First Priority: The document, satellite map, money-flow network, and court docket ARE the primary visual anchors.
-   - Foreground Sparsity: Foreground characters (FG) must be used SPARINGLY (< 15% of scenes), reserved exclusively for introducing key named personas (e.g. suspect profile, whistleblower, chief prosecutor).
-   - Full-Frame Evidence: When explaining shell mechanisms, wire transactions, state subsidies, or legal clauses, set foreground to null to display full-frame cinematic evidence without mascot obstruction.
+   - Foreground Sparsity: Foreground characters (FG) must be used SPARINGLY (strictly <= 10-12 scenes per episode, < 15% of scenes), reserved exclusively for introducing key named personas (e.g. suspect profile, whistleblower, chief prosecutor).
+   - Full-Frame Evidence: When explaining shell mechanisms, wire transactions, algorithms, state subsidies, or legal clauses, set foreground to null to display full-frame cinematic evidence without mascot obstruction.
    - Card Pacing Sparsity: Limit visual cards/badges to ~25-30% of scenes at key narrative pivots to avoid eye fatigue and visual overcrowding.
+
+13. VOX EDITORIAL STORYBOARD SCHEMA (OBJECT-FOCUS & ANIMATION CUES):
+   - Every scene MUST declare the following 4 editorial storyboard fields:
+     * 'object_focus': Defines the central evidentiary physical/digital object on screen:
+       {"type": "court_docket" | "redacted_memo" | "financial_ledger" | "money_trail_network" | "corporate_org_chart" | "archival_photo" | "persona_portrait" | "none", "title": "<OFFICIAL_DOCUMENT_OR_NETWORK_TITLE>", "agency": "<REGULATORY_OR_GOV_BODY>", "source_ref": "<CASE_OR_DOCKET_NUMBER>", "key_snippet": "<EXACT_PHRASE_TO_HIGHLIGHT>", "stat_metric": "<QUANTITATIVE_VALUE_OR_NULL>"}
+     * 'layout_zone': Directs the spatial composition and camera panning axis:
+       {"placement": "center_hero_document" | "split_evidence_left" | "split_evidence_right" | "macro_detail_focus" | "lower_third_ticker", "safe_zone": "top_left" | "top_right" | "bottom_left" | "bottom_right", "camera_pan_axis": "horizontal" | "vertical" | "push_punch" | "static_lock"}
+     * 'animation_cue': Synchronizes procedural motion graphics with spoken narration:
+       {"effect": "yellow_marker_highlight" | "red_stamp_slam" | "counter_rollup" | "flowchart_arrow_grow" | "magnify_glass_circle" | "radar_sweep", "trigger_word": "<EXACT_WORD_FROM_NARRATION>", "duration_frames": 24}
+     * 'frame_transition': Dictates the editorial cut and acoustic punctuation:
+       {"type": "match_cut" | "whip_pan_left" | "whip_pan_right" | "macro_zoom_through" | "film_dissolve" | "hard_cut", "sfx_cue": "paper_rustle" | "stamp_thud" | "camera_whoosh" | "digital_beep"}
