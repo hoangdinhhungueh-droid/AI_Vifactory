@@ -118,12 +118,12 @@ def audit_props_integrity(props: Dict[str, Any], market: str) -> Tuple[bool, Lis
 
 
 def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
-    """Auto-repair props by pruning excess overlays, localizing text, and enforcing FG sparsity."""
+    """Auto-repair props by pruning excess overlays, localizing text, breaking layout monotony, and enforcing FG sparsity."""
     logger.info("Auto-repairing remotion_props.json for market %s...", market)
     scenes = props.get("scenes", [])
     sanitized = prune_and_localize_scenes(scenes, market)
 
-    # Auto-prune FG characters if density > 15%
+    # 1. Auto-prune FG characters if count > 12 (enforcing <= 12 high-impact VOX character cutouts)
     fg_count = sum(1 for s in sanitized if s.get("foreground"))
     if fg_count > 12:
         logger.info("Auto-repair: pruning FG characters from %d to <= 12...", fg_count)
@@ -136,6 +136,46 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
                     if isinstance(s.get("layout_zone"), dict):
                         s["layout_zone"]["placement"] = "center_hero_document"
                 fg_seen += 1
+
+    # 2. Auto-repair layout monotony: break streaks >= 5 across canonical VOX layout zones
+    vox_zones = ["split_evidence_left", "center_hero_document", "split_evidence_right", "bottom_third_dossier"]
+    prev_place = None
+    streak = 0
+    for idx, s in enumerate(sanitized):
+        lz = s.get("layout_zone")
+        if isinstance(lz, dict):
+            place = lz.get("placement") or "center_hero_document"
+            if place == prev_place:
+                streak += 1
+                if streak >= 5:
+                    new_place = vox_zones[idx % len(vox_zones)]
+                    lz["placement"] = new_place
+                    prev_place = new_place
+                    streak = 1
+            else:
+                prev_place = place
+                streak = 1
+        else:
+            # If layout_zone is missing or string, synthesize clean VOX layout_zone
+            new_place = vox_zones[idx % len(vox_zones)]
+            s["layout_zone"] = {
+                "placement": new_place,
+                "safe_zone": "bottom_left" if "left" in new_place else "bottom_right",
+                "camera_pan_axis": "horizontal" if idx % 2 == 0 else "static"
+            }
+            prev_place = new_place
+            streak = 1
+
+    # 3. Auto-repair animation trigger word mismatch against scene narration
+    for s in sanitized:
+        ac = s.get("animation_cue")
+        if ac and isinstance(ac, dict):
+            tw = str(ac.get("trigger_word") or "").strip()
+            narr = str(s.get("narration") or s.get("caption") or "")
+            if tw and narr and tw.lower() not in narr.lower():
+                # Pick first 4+ letter word from narration as trigger or clear
+                words = [w.strip(".,!?:;\"'") for w in narr.split() if len(w.strip(".,!?:;\"'")) >= 4]
+                ac["trigger_word"] = words[0] if words else ""
 
     props["scenes"] = sanitized
     return props

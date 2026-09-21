@@ -65,36 +65,59 @@ def preflight_memory_check():
 
 
 def optimize_props_assets(props_path: str, proj_dir: str):
-    """Pre-scales any referenced image in remotion/public down to 1080p if larger (Pillar 2)."""
+    """Pre-scales images down to 1080p and bakes crisp VOX sticker borders into FG (Pillar 2)."""
     try:
-        from PIL import Image
+        from PIL import Image, ImageFilter
         import json
         with open(props_path, "r", encoding="utf-8") as pf:
             data = json.load(pf)
         scenes = data.get("scenes", [])
         count = 0
+        processed_paths = set()
         for sc in scenes:
             for key in ["background", "foreground"]:
                 img_rel = sc.get(key)
                 if not img_rel or str(img_rel).startswith("http"):
                     continue
                 full_path = os.path.join(proj_dir, "public", str(img_rel))
-                if os.path.exists(full_path):
-                    try:
-                        with Image.open(full_path) as im:
-                            if im.width > 1920 or im.height > 1080:
-                                ratio = min(1920.0 / im.width, 1080.0 / im.height)
-                                nw = max(1, int(round(im.width * ratio)))
-                                nh = max(1, int(round(im.height * ratio)))
-                                r_im = im.resize((nw, nh), Image.Resampling.LANCZOS)
-                                r_im.save(full_path, optimize=True)
-                                count += 1
-                    except Exception:
-                        pass
+                if full_path in processed_paths or not os.path.exists(full_path):
+                    continue
+                processed_paths.add(full_path)
+                try:
+                    with Image.open(full_path) as im:
+                        im = im.convert("RGBA") if key == "foreground" else im.convert("RGB")
+                        modified = False
+                        # 1. Scale down to 1080p target
+                        max_w = 1080 if key == "foreground" else 1920
+                        max_h = 1080
+                        if im.width > max_w or im.height > max_h:
+                            ratio = min(max_w / float(im.width), max_h / float(im.height))
+                            nw = max(1, int(round(im.width * ratio)))
+                            nh = max(1, int(round(im.height * ratio)))
+                            im = im.resize((nw, nh), Image.Resampling.LANCZOS)
+                            modified = True
+
+                        # 2. Bake VOX white sticker border directly into FG alpha
+                        if key == "foreground" and "A" in im.getbands():
+                            alpha = im.split()[-1]
+                            min_a, max_a = alpha.getextrema()
+                            if min_a < 250:
+                                dilated = alpha.filter(ImageFilter.MaxFilter(7))
+                                bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
+                                bg.putalpha(dilated)
+                                im = Image.alpha_composite(bg, im)
+                                modified = True
+
+                        if modified:
+                            im.save(full_path, optimize=True)
+                            count += 1
+                except Exception:
+                    pass
         if count > 0:
-            print(f"[ASSET PRE-SCALE] Successfully pre-scaled {count} assets down to 1080p.")
+            print(f"[ASSET OPTIMIZE] Successfully optimized and pre-scaled {count} assets for fast CPU render.")
     except Exception as e:
-        print(f"[ASSET CHECK] Pre-scale check skipped: {e}")
+        print(f"[ASSET CHECK] Asset optimization skipped: {e}")
+
 
 
 def calculate_dynamic_timeout(props_path: str, base_timeout: float) -> tuple[float, int]:

@@ -325,8 +325,8 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
         height: cell.height,
         opacity,
         transform: `translateX(${translateX}px)`,
-        // Signature Vox White Sticker Cutout Outline + Deep Realistic Ground Drop Shadow
-        filter: "drop-shadow(3px 0 0 #ffffff) drop-shadow(-3px 0 0 #ffffff) drop-shadow(0 3px 0 #ffffff) drop-shadow(0 -3px 0 #ffffff) drop-shadow(2px 2px 0 #ffffff) drop-shadow(-2px -2px 0 #ffffff) drop-shadow(0 25px 40px rgba(0,0,0,0.75))",
+        // Signature High-Performance Vox Cutout Drop Shadow (1-pass CPU compositing)
+        filter: "drop-shadow(0 16px 24px rgba(0,0,0,0.65))",
         zIndex: 15,
         pointerEvents: "none",
       }}
@@ -341,7 +341,6 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
           height: 24,
           borderRadius: "50%",
           background: "radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.35) 45%, rgba(0, 0, 0, 0) 70%)",
-          filter: "blur(6px)",
           transform: "scaleY(0.4)",
           pointerEvents: "none",
           zIndex: -1,
