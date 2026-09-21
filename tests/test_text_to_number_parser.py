@@ -77,6 +77,23 @@ def test_parse_spoken_number_alphanumeric_and_symbols():
     assert "원" in p_kr.suffix
 
 
+def test_parse_spoken_number_korean():
+    # Spoken percentage: "부적절한 데이터는 구십이 퍼센트에 달했다."
+    p_kr_pct = parse_spoken_number("부적절한 데이터는 구십이 퍼센트에 달했다.")
+    assert p_kr_pct is not None
+    assert p_kr_pct.display_value == 92.0
+    assert p_kr_pct.unit == "%"
+    assert p_kr_pct.formatted == "92%"
+    assert p_kr_pct.trend == "down"
+
+    # Spoken case count: "조작된 서류는 이백이십오 건으로 확인되었습니다."
+    p_kr_count = parse_spoken_number("조작된 서류는 이백이십오 건으로 확인되었습니다.")
+    assert p_kr_count is not None
+    assert p_kr_count.display_value == 225.0
+    assert p_kr_count.unit == "건"
+    assert p_kr_count.formatted == "225건"
+
+
 def test_parse_spoken_number_japanese():
     # Hamaoka Scene 2: Ratio with Kanji numerals and percentage
     p_hamaoka = parse_spoken_number("審査関連データ二百二十五件のうち、二百八件、実に九十二パーセントが不適切でした。")

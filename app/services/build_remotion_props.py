@@ -948,6 +948,22 @@ def build_remotion_props_data(
     except Exception as _e_editor:
         logger.warning("[build_remotion_props] AI Editor optimization fallback: %s", _e_editor)
 
+    # Vox Minimalist Pacing & Rule 122/128/136 Localization Gate
+    try:
+        from app.services.editorial_briefing_generator import (
+            extract_market_from_episode_id,
+            prune_and_localize_scenes,
+            generate_editorial_briefing
+        )
+        m_code = extract_market_from_episode_id(episode_id)
+        out_dir = os.path.dirname(os.path.abspath(brain_input_path))
+        generate_editorial_briefing(episode_id, scenes_out, output_dir=out_dir)
+        scenes_out = prune_and_localize_scenes(scenes_out, m_code)
+        logger.info("[build_remotion_props] Vox Minimalist Gate applied: market=%s, overlays=%d/%d",
+                    m_code, sum(1 for s in scenes_out if s.get("forensicOverlay")), len(scenes_out))
+    except Exception as _e_brief:
+        logger.warning("[build_remotion_props] Vox Minimalist Gate fallback: %s", _e_brief)
+
     props = {
         "scenes": scenes_out,
         "fps": fps,

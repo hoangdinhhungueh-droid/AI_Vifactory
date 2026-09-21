@@ -298,17 +298,22 @@ def audit_and_optimize_timeline(
             consecutive_overlay_count = 1
             prev_overlay_type = current_type
 
+        # Extract market theme for localized labels
+        from app.services.editorial_briefing_generator import extract_market_from_episode_id, LOCALIZED_OVERLAY_THEMES
+        m_code = extract_market_from_episode_id(episode_id or (options or {}).get("episode_id", ""))
+        m_theme = LOCALIZED_OVERLAY_THEMES.get(m_code, LOCALIZED_OVERLAY_THEMES["EN"])
+
         if consecutive_overlay_count > 2 and isinstance(overlay, dict):
             # Break monotony: Switch third identical scene to contrasting kinetic type
             if current_type == "document_highlight":
                 overlay["type"] = "kinetic_counter"
-                overlay["title"] = "AUDIT DISCREPANCY // SYSTEMIC VARIANCE"
-                overlay["badge"] = "CRITICAL FINDING"
+                overlay["title"] = m_theme["counter_title"]
+                overlay["badge"] = m_theme["counter_badge"]
                 overlay["sfx_cue"] = "stamp_slam"
             elif current_type == "kinetic_counter":
                 overlay["type"] = "tactical_map"
-                overlay["title"] = "GEOGRAPHIC TRACE // LOCATION RECON"
-                overlay["badge"] = "SURVEILLANCE"
+                overlay["title"] = m_theme["map_title"]
+                overlay["badge"] = m_theme["map_badge"]
                 overlay["sfx_cue"] = "radar_ping"
             scene["forensicOverlay"] = overlay
             prev_overlay_type = overlay.get("type")
@@ -320,7 +325,7 @@ def audit_and_optimize_timeline(
             scene["cameraMovement"] = "snap_zoom"
             scene["tensionLevel"] = "high"
             if not scene.get("speakerTag") and not scene.get("actTitle"):
-                scene["speakerTag"] = "CRITICAL EVIDENCE // FORENSIC TIMELINE"
+                scene["speakerTag"] = m_theme["default_speaker"]
 
         # Step 6: Word-Locked Camera Punch Alignment
         scene_start_ms = word_cursor_ms

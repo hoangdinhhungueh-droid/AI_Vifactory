@@ -138,6 +138,28 @@ def _parse_kanji_or_arabic(val_str: str) -> Optional[int]:
     return _kanji_to_int(cleaned)
 
 
+def _hangul_to_int(h_str: str) -> Optional[int]:
+    """Convert Sino-Korean numeral string to integer (e.g. '이백이십오' -> 225, '구십이' -> 92)."""
+    h_map = {'영': 0, '공': 0, '일': 1, '이': 2, '삼': 3, '사': 4, '오': 5, '육': 6, '칠': 7, '팔': 8, '구': 9}
+    unit_map = {'십': 10, '백': 100, '천': 1000}
+    total = 0
+    current = 0
+    matched = False
+    for char in h_str:
+        if char in h_map:
+            current = h_map[char]
+            matched = True
+        elif char in unit_map:
+            unit = unit_map[char]
+            total += (current if current > 0 else 1) * unit
+            current = 0
+            matched = True
+        else:
+            return None
+    total += current
+    return total if matched else None
+
+
 def parse_spoken_number(text: str) -> Optional[ParsedMetric]:
     """Parse numerical metrics from narration text (spoken words or alphanumeric).
     Returns ParsedMetric or None if no numerical metric found.
@@ -151,6 +173,7 @@ def parse_spoken_number(text: str) -> Optional[ParsedMetric]:
     down_words = [
         "loss", "lost", "fell", "dropped", "collapse", "decline", "diverted", "vanished", "deficit",
         "sụt giảm", "thất thoát", "bốc hơi", "하락", "폭락", "손실",
+        "부적절", "부정", "조작", "위반", "은폐", "허위", "위조",
         "不適切", "不正", "改ざん", "改竄", "捏造", "虚偽", "隠蔽", "違反", "偽装", "損失"
     ]
     trend = "down" if any(k in text for k in down_words) or any(k in t_lower for k in down_words) else "up"
@@ -179,6 +202,40 @@ def parse_spoken_number(text: str) -> Optional[ParsedMetric]:
             metric_type="currency" if "원" in suffix else "scale",
             trend=trend
         )
+
+    # 1.1 Check Korean Spoken Percentages: 구십이 퍼센트, 92퍼센트, 15프로
+    kr_pct_hangul = re.search(r'([일이삼사오육칠팔구십백]+)\s*(?:퍼센트|프로|%)', text)
+    if kr_pct_hangul:
+        h_val = _hangul_to_int(kr_pct_hangul.group(1))
+        if h_val is not None:
+            return ParsedMetric(
+                raw_value=float(h_val),
+                display_value=float(h_val),
+                unit="%",
+                prefix="",
+                suffix="",
+                formatted=f"{h_val}%",
+                metric_type="percentage",
+                trend=trend
+            )
+
+    # 1.2 Check Korean Spoken Units & Scales: 이백이십오 건, 225건
+    kr_hangul_unit = re.search(r'([일이삼사오육칠팔구십백천]+)\s*(건|명|원|곳|개|만|억)', text)
+    if kr_hangul_unit:
+        h_val = _hangul_to_int(kr_hangul_unit.group(1))
+        u = kr_hangul_unit.group(2)
+        if h_val is not None:
+            mult = 100_000_000.0 if u == "억" else (10_000.0 if u == "만" else 1.0)
+            return ParsedMetric(
+                raw_value=float(h_val) * mult,
+                display_value=float(h_val),
+                unit=u,
+                prefix="",
+                suffix="",
+                formatted=f"{h_val}{u}",
+                metric_type="currency" if u in ("억", "만", "원") else "scale",
+                trend=trend
+            )
 
     # 2. Check Vietnamese Currencies: 500 tỷ đồng, 10 triệu đồng, 300 tỷ
     vn_match = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?)\s*(tỷ|triệu|nghìn)\s*(đ(?:ồng)?)?', text, re.IGNORECASE)

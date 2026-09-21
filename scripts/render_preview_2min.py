@@ -25,7 +25,13 @@ if str(_REPO_ROOT) not in sys.path:
 
 load_dotenv(_REPO_ROOT / ".env")
 
-EPISODE_ID = "EN_EP0003_san_diego_daycare_fraud"
+import argparse
+
+parser = argparse.ArgumentParser(description="Render 2-minute preview video")
+parser.add_argument("--episode-id", default=os.getenv("VF_EPISODE_ID", "JP_EP0003_hamaoka_data_fraud"), help="Episode ID")
+args, _ = parser.parse_known_args()
+
+EPISODE_ID = args.episode_id
 EP_DIR = Path(f"/var/vf/episodes/{EPISODE_ID}")
 PROPS_FILE = EP_DIR / "remotion_props.json"
 SILENT_OUT = EP_DIR / "preview_2min_silent.mp4"
@@ -148,7 +154,7 @@ def main():
     # Step 4: Dispatch Master Preview to User Telegram
     total_elapsed = time.time() - t0
     caption = (
-        f"🎬 <b>[EP EN0003] PREVIEW 2 PHÚT ĐẦU - VOX ARCHITECTURE</b>\n"
+        f"🎬 <b>[{EPISODE_ID}] PREVIEW 2 PHÚT ĐẦU - VOX ARCHITECTURE</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⏱ <b>Thời lượng:</b> 02:00 (3,600 frames @ 30fps)\n"
         f"⚡ <b>Thời gian render:</b> {total_elapsed/60:.1f} phút ({TOTAL_FRAMES/t_render:.2f} fps)\n"
