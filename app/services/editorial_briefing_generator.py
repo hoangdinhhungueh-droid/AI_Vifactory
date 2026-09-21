@@ -237,6 +237,10 @@ def prune_and_localize_scenes(
                 else:
                     fo_type = "evidence_board"
 
+            # Rule 118: Zero-Mock Data - If kinetic_counter has no parsed metric, fallback to document_highlight
+            if fo_type == "kinetic_counter" and not metric:
+                fo_type = "document_highlight"
+
             # Construct localized overlay
             if fo_type == "kinetic_counter":
                 overlay_obj = {

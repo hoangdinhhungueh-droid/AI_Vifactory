@@ -177,6 +177,19 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
                 words = [w.strip(".,!?:;\"'") for w in narr.split() if len(w.strip(".,!?:;\"'")) >= 4]
                 ac["trigger_word"] = words[0] if words else ""
 
+    # 4. Auto-repair empty kinetic counters: convert to document_highlight (Rule 118)
+    for s in sanitized:
+        fo = s.get("forensicOverlay")
+        if fo and isinstance(fo, dict) and fo.get("type") in ("kinetic_counter", "financial_chart"):
+            stat_v = s.get("statValue")
+            p = fo.get("payload") or {}
+            end_val = p.get("end_value") or p.get("amount")
+            if not stat_v and not end_val:
+                fo["type"] = "document_highlight"
+                fo["title"] = "OFFICIAL RECORD // SUBPOENAED EVIDENCE"
+                fo["badge"] = "EVIDENCE"
+                s["forensic_overlay"] = fo
+
     props["scenes"] = sanitized
     return props
 
