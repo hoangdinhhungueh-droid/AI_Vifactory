@@ -1,0 +1,116 @@
+{
+  "version": "2.0",
+  "source": "SrsBlack/ict-knowledge-library & CedInvest/awesome-smart-money-concepts (Distilled Institutional Wiki)",
+  "market_scope": "Crypto 24/7 Scale-Invariant Order Flow",
+  "max_input_ceiling_tokens": 1000,
+  "micro_cards": {
+    "BREAKER_BLOCK_CONFLUENCE": {
+      "model_name": "ICT Breaker Block + FVG Institutional Confluence (Unicorn Model)",
+      "abbreviation": "BREAKER_BLOCK",
+      "summary_vi": "Khối lệnh Order Block bị bẻ gãy sau cú quét thanh khoản (Turtle Soup), đảo vai trò hỗ trợ/kháng cự cực mạnh khi giá retest vùng hợp lưu cùng FVG.",
+      "formal_criteria": [
+        "Originating Structure: Clear Swing High/Low established before manipulation raid (fractal k=16).",
+        "Liquidity Raid (Turtle Soup): Price sweeps beyond swing extreme by >= 0.25 ATR, absorbing retail stop orders.",
+        "Violent Displacement: Opposite surge candle with body >= 0.85 ATR and body-to-range ratio >= 0.50.",
+        "Structural Rupture (Breaker): Displacement Close decisively penetrates the prior swing extreme preceding the sweep.",
+        "Imbalance Creation: Concurrently prints Fair Value Gap (FVG) >= 0.15 ATR.",
+        "Mitigation Retest: Trigger candle taps into the Breaker Block and FVG Consequent Encroachment (50% CE level) and holds favorably.",
+        "Clearance Runway: Unobstructed runway >= 1.20R to the opposing external liquidity pool (Mandate: Zero False VETO)."
+      ],
+      "invalidation_rules": [
+        "Candle body closes completely beyond the opposite extreme of the Breaker Block body.",
+        "Displacement breaking structure is sluggish (< 0.70 ATR), indicating retail drift rather than institutional sponsorship.",
+        "Retest occurs after > 16 bars from formation (momentum decay and structural staleness).",
+        "Clearance Runway to opposing major liquidity pool is < 1.20R (clearance obstruction).",
+        "Counter-trend relative to Bitcoin 15M macro momentum."
+      ],
+      "token_prompt_injection": "=== INSTITUTIONAL DOSSIER: ICT BREAKER BLOCK + FVG CONFLUENCE (UNICORN MODEL) ===\n1. ARCHETYPE & INSTITUTIONAL ORDER FLOW FOOTPRINT:\n   • The Unicorn Model represents the highest-probability institutional reversal and continuation signature in Smart Money Concepts.\n   • A distinct fractal swing extreme (k=16) establishes Buy-Side or Sell-Side Liquidity (BSL/SSL).\n   • Smart money initiates a liquidity raid (Turtle Soup) penetrating beyond the swing extreme to trigger retail stop-loss and breakout orders into institutional liquidity.\n   • Following the sweep, large institutional capital violently reverses direction with an energetic displacement candle, slicing through the swing point that originated the raid.\n   • The originating opposing order block is violated, forcing trapped market participants to mitigate at breakeven. This polarity flip transforms the violated block into an institutional mitigation Breaker Block.\n   • Overlapping confluence with a newly generated Fair Value Gap (FVG) creates a high-conviction support/resistance defense.\n\n2. DETERMINISTIC MATHEMATICAL CRITERIA (SCALE-INVARIANT ATR MULTIPLES):\n   • Sweep Depth: Raid_Depth = |Extreme_Wick - Swing_Level| >= 0.28 * ATR14 (filters micro-sweep noise).\n   • Displacement Surge: MSS_Body = |Close - Open| >= 0.88 * ATR14 with Body_to_Range_Ratio >= 0.50 and Close > EMA21 (Long) or < EMA21 (Short).\n   • Imbalance Creation: FVG_Gap = |Low[t] - High[t-2]| >= 0.16 * ATR14 (confirms genuine institutional liquidity void).\n   • Structural Penetration: Trigger candle Close breaks cleanly through the prior swing extreme preceding the sweep.\n   • Confluence Retest: Confirmation candle low/high penetrates into the Breaker level and FVG Consequent Encroachment (50% CE midpoint) and closes favorably.\n\n3. ASYMMETRICAL EXECUTION & RISK MANDATE:\n   • Entry: Confirmation on candle close respecting the Breaker + FVG zone (Zero blind limit orders).\n   • Protective Anchor SL: Placed behind the manipulation sweep extreme + 0.24 * ATR14 buffer (mitigates sharp secondary re-wicking).\n   • Target 1 (+1.0R): Mandatory scale-out of 50% position; immediately advance Stop Loss to Breakeven (Zero Risk State).\n   • Target 2 (+3.5R): Institutional runner targeting opposing external liquidity pool (BSL/SSL).\n   • Clearance Runway: Minimum clearance ratio to opposing structural pool must satisfy Runway >= 1.30R.\n\n4. FORENSIC INVALIDATION TRIGGERS (MANDATORY VETO CRITERIA):\n   • VETO 1 (Sluggish Displacement): Displacement body < 0.75 ATR, indicating retail chasing rather than institutional sponsorship.\n   • VETO 2 (Structural Rupture): Candle body closes beyond the extreme boundary of the Breaker Block body.\n   • VETO 3 (Momentum Decay / Staleness): Retest of the Breaker Block occurs after > 16 bars from formation.\n   • VETO 4 (Obstruction Wall): Immediate major support/resistance barrier located closer than 1.20R from entry.\n   • VETO 5 (Macro Counter-Trend): Shorting altcoins during bullish BTC 15M expansion or longing altcoins during bearish BTC dump.\n\n5. GATEKEEPER AUDITOR FOCUS:\n   • Cross-examine: Did the displacement break structure with authority? Is the FVG unmitigated? Is the runway to Target 1 (+1.0R) completely clear?"
+    },
+    "INVERSION_FVG": {
+      "model_name": "ICT Inversion Fair Value Gap (IFVG) Polarity Flip Model",
+      "abbreviation": "INVERSION_FVG",
+      "summary_vi": "Vùng mất cân bằng FVG bị dòng tiền thể chế đâm xuyên thủng hoàn toàn, đảo chiều vai trò từ cản thành đệm đỡ giá khi retest.",
+      "formal_criteria": [
+        "Prior Imbalance: Clean FVG gap >= 0.15 ATR formed in opposing direction during prior swing.",
+        "Institutional Disrespect: Powerful displacement candle closes COMPLETELY through the opposing FVG boundaries.",
+        "Polarity Inversion: The failed FVG instantly flips polarity into institutional support (for Long) or resistance (for Short).",
+        "Retest Absorption: Current candle wicks into the inverted zone, absorbs remaining orders, and closes favorably.",
+        "Clearance Runway >= 1.20R to next opposing external liquidity pool (Mandate: Zero False VETO)."
+      ],
+      "invalidation_rules": [
+        "Retest candle closes deeply inside or pierces back through the opposite boundary of the IFVG.",
+        "Breach candle lacked displacement volume/body (< 0.70 ATR), creating a fakeout pierce.",
+        "Retest occurs after > 16 bars (momentum decay).",
+        "Clearance Runway < 1.20R.",
+        "Counter-trend relative to Bitcoin 15M macro momentum."
+      ],
+      "token_prompt_injection": "=== INSTITUTIONAL DOSSIER: ICT INVERSION FVG (IFVG) POLARITY FLIP MODEL ===\n1. ARCHETYPE & INSTITUTIONAL ORDER FLOW FOOTPRINT:\n   • An Inversion Fair Value Gap (IFVG) occurs when a previously established imbalance is decisively disrespected and reclaimed by opposing institutional order flow.\n   • Under normal market conditions, an FVG acts as support or resistance. However, when smart money enters with overwhelming aggressive volume, price slices cleanly through the gap without halting.\n   • Once price closes beyond the opposing boundary of the FVG, the unfilled liquidity void inverts its polarity:\n     - A failed Bearish FVG inverts into high-conviction Bullish Support.\n     - A failed Bullish FVG inverts into high-conviction Bearish Resistance.\n   • When price subsequently retests the inverted zone, trapped traders and institutional limit orders absorb liquidity and launch an expansion move in the new direction.\n\n2. DETERMINISTIC MATHEMATICAL CRITERIA (SCALE-INVARIANT ATR MULTIPLES):\n   • Originating Imbalance: Prior opposing FVG height >= 0.16 * ATR14 formed within the last 25 bars.\n   • Decisive Breach: Counter-displacement candle body >= 0.88 * ATR14 closing completely beyond the outer boundary of the opposing FVG (Close > Top for Long, Close < Bot for Short).\n   • Liquidity Sweep Anchor: Preceded by a verified liquidity sweep of opposing swing extreme >= 0.28 * ATR14.\n   • Retest Absorption: Current confirmation candle wicks into the IFVG boundaries, respects the midpoint, and closes favorably outside the invalidation threshold.\n   • Inter-market Confluence: Aligned with BTC 15M trend and EMA21.\n\n3. ASYMMETRICAL EXECUTION & RISK MANDATE:\n   • Entry: Confirmation candle close respecting the inverted FVG zone.\n   • Protective Anchor SL: Placed behind the manipulation sweep extreme + 0.24 * ATR14 buffer.\n   • Target 1 (+1.0R): Mandatory scale-out of 50% position; immediately advance Stop Loss to Breakeven.\n   • Target 2 (+3.5R): Institutional runner targeting opposing external liquidity pool.\n   • Clearance Runway: Minimum clearance ratio to opposing structural pool >= 1.30R.\n\n4. FORENSIC INVALIDATION TRIGGERS (MANDATORY VETO CRITERIA):\n   • VETO 1 (Fakeout Pierce): The breach candle lacked displacement body (< 0.75 ATR) or failed to close completely through the opposing boundary.\n   • VETO 2 (Re-Penetration): Retest candle body closes back inside or pierces deeply through the opposite boundary of the IFVG.\n   • VETO 3 (Staleness Decay): Retest occurs after > 16 bars from the inversion breach.\n   • VETO 4 (Runway Obstruction): Distance to next major resistance/support wall < 1.20R.\n   • VETO 5 (Macro Conflict): Opposing strong Bitcoin 15M macro momentum.\n\n5. GATEKEEPER AUDITOR FOCUS:\n   • Cross-examine: Did price close decisively across the entire FVG? Is the retest clean with clear price rejection? Does the runway to T1 have zero structural obstacles?"
+    },
+    "BASELINE_CONFIRMATION": {
+      "model_name": "ICT Dynamic Liquidity Sweep + MSS Confirmation Model",
+      "abbreviation": "CONFIRMATION",
+      "summary_vi": "Quét thanh khoản đỉnh/đáy, xuất hiện nến đảo chiều MSS Displacement tạo FVG và nến xác nhận chạm 50% FVG.",
+      "formal_criteria": [
+        "Liquidity Sweep Depth >= 0.25 ATR beyond dynamic fractal swing pool (k=16).",
+        "Displacement Candle Body >= 0.85 ATR confirming Market Structure Shift (MSS).",
+        "Fair Value Gap (FVG) height >= 0.15 ATR created by displacement.",
+        "Confirmation Bar closes respecting FVG Consequent Encroachment (50% level).",
+        "Clearance Runway >= 1.20R to opposing pool (Mandate: Zero False VETO)."
+      ],
+      "invalidation_rules": [
+        "Displacement candle fails to close beyond the previous candle's extreme.",
+        "Confirmation candle closes completely through the opposite side of the FVG.",
+        "Runway to next major opposing liquidity pool < 1.20R.",
+        "Counter-trend relative to Bitcoin 15M macro momentum."
+      ],
+      "token_prompt_injection": "=== INSTITUTIONAL DOSSIER: ICT DYNAMIC LIQUIDITY SWEEP + MSS CONFIRMATION ===\n1. ARCHETYPE & INSTITUTIONAL ORDER FLOW FOOTPRINT:\n   • The canonical ICT 2022 mentorship core setup represents the foundational mechanics of institutional order flow repricing.\n   • Price seeks external range liquidity (BSL/SSL) accumulated above swing highs or below swing lows (fractal k=16).\n   • Upon reaching the liquidity pool, a rapid sweep wick triggers retail stop-loss and breakout orders, filling institutional resting orders.\n   • Smart money then initiates a rapid repricing displacement, shifting market structure (MSS) and leaving an imbalance (FVG) due to one-sided order delivery.\n   • As price retraces into the FVG, institutional algorithms rebalance the discount/premium pricing before resuming expansion toward opposing external liquidity.\n\n2. DETERMINISTIC MATHEMATICAL CRITERIA (SCALE-INVARIANT ATR MULTIPLES):\n   • Sweep Depth: Sweep_Depth = |Extreme_Wick - Swing_Level| >= 0.28 * ATR14 (ensures real stop-run, not micro-noise).\n   • Displacement MSS: Body = |Close - Open| >= 0.88 * ATR14, Close > EMA21 (for Long) or < EMA21 (for Short), and Close exceeds previous candle's extreme.\n   • FVG Height: |Low[t] - High[t-2]| (for Long) or |Low[t-2] - High[t]| (for Short) >= 0.16 * ATR14.\n   • Retest Confirmation: Confirmation candle penetrates into the FVG Consequent Encroachment (50% CE level) and closes favorably.\n   • Trend Alignment: Must align with macro Bitcoin 15M trend.\n\n3. ASYMMETRICAL EXECUTION & RISK MANDATE:\n   • Entry: Market confirmation on candle close respecting the FVG.\n   • Protective Anchor SL: Placed behind the manipulation sweep extreme + 0.24 * ATR14 buffer.\n   • Target 1 (+1.0R): Mandatory scale-out of 50% position; immediately advance Stop Loss to Breakeven.\n   • Target 2 (+3.5R): Runner to opposing structural liquidity pool.\n   • Clearance Runway: Minimum clearance ratio to opposing pool >= 1.30R.\n\n4. FORENSIC INVALIDATION TRIGGERS (MANDATORY VETO CRITERIA):\n   • VETO 1 (Thin Sweep): Sweep depth < 0.28 ATR, indicating premature entry into chop rather than a genuine liquidity raid.\n   • VETO 2 (Displacement Failure): Body < 0.75 ATR or excessive wicks (Body Ratio < 0.50), reflecting lack of institutional follow-through.\n   • VETO 3 (Imbalance Collapse): Confirmation candle closes completely through the opposite side of the FVG.\n   • VETO 4 (Clearance Obstruction): Clearance runway to nearest opposing structural barrier < 1.20R.\n   • VETO 5 (Macro Headwind): Trading against strong Bitcoin 15M trend.\n\n5. GATEKEEPER AUDITOR FOCUS:\n   • Cross-examine: Did the sweep clean the liquidity pool? Is displacement authoritative? Can price reach Target 1 (+1.0R) without encountering immediate major resistance?"
+    }
+  },
+  "macro_knowledge_synthesis": {
+    "macro_synthesis_title": "Tổng Luận Thể Chế: SMC Bất Biến Quy Mô, Tri-State và Bảo Toàn Base Rate",
+    "synthesis_summary_vi": "Bằng chứng đa chu kỳ trên tám cặp xác nhận rằng hệ thống phải bảo toàn các giao dịch có xác suất thắng cao thay vì áp dụng bộ lọc toàn cục quá chặt. Ngưỡng runway 1.20R được duy trì như chuẩn tối ưu, trong khi quyết định thực thi được chuyển sang kiến trúc ba trạng thái với mức phân bổ bất đối xứng. Phân cụm 126 archetype vi cấu trúc và bộ nhớ đệm giúp giảm chi phí suy luận, còn circuit breaker sau chuỗi thua liên tiếp giúp nén drawdown mà không làm suy giảm tần suất cơ hội. Mọi tiêu chí định lượng phải được chuẩn hóa theo ATR, R-multiple và hình thái cấu trúc để duy trì tính tổng quát qua các chế độ thị trường.",
+    "tier1_arithmetic_upgrades": {
+      "min_sweep_atr": 0.25,
+      "min_displacement_atr": 0.85,
+      "min_fvg_atr": 0.15,
+      "sl_buffer_atr": 0.2,
+      "min_runway_r": 1.2,
+      "circuit_breaker_loss_trigger": 2,
+      "circuit_breaker_margin_scale": 0.65,
+      "rationale_vi": "Giữ runway tối thiểu 1.20R vì dữ liệu cho thấy việc nâng ngưỡng lên 1.30R đã loại bỏ nhiều giao dịch thắng thuộc vùng base rate cao, tạo Type I error và làm suy yếu lợi thế thống kê. Các ngưỡng sweep, displacement, FVG và SL buffer được khóa theo ATR để bất biến trước thay đổi giá tuyệt đối và biến động từng cặp. Khi xuất hiện từ 2 lệnh thua liên tiếp, margin được nhân với 0.65, tương đương giảm 35% quy mô rủi ro, nhằm nén drawdown mà không kích hoạt bộ lọc loại bỏ cơ hội."
+    },
+    "tier2_llm_gatekeeper_upgrades": {
+      "tri_state_architecture": {
+        "APPROVED_A_PLUS": {
+          "leverage_min": 15.0,
+          "leverage_max": 20.0,
+          "margin_pct": 1.0,
+          "criteria": "Cấu trúc thuộc archetype đã xác thực với xác suất tiếp diễn cao; sweep và displacement đạt chuẩn ATR; FVG hợp lệ; runway tối thiểu 1.20R; không có dấu hiệu thất bại độc tính theo hình thái vi cấu trúc."
+        },
+        "APPROVED_SCALED": {
+          "leverage_min": 5.0,
+          "leverage_max": 8.0,
+          "margin_pct": 0.6,
+          "criteria": "Thiết lập vẫn phù hợp hướng và cấu trúc chính nhưng có một hoặc nhiều yếu tố chưa đạt độ xác tín A+, chẳng hạn displacement yếu hơn, xác nhận FVG kém hoàn chỉnh hoặc archetype chưa đủ dữ liệu; runway vẫn phải đạt tối thiểu 1.20R."
+        },
+        "REJECTED": {
+          "leverage": 0.0,
+          "criteria": "Chỉ hard veto khi xác nhận được archetype thất bại độc tính: phá cấu trúc ngược hướng kèm displacement đối nghịch, sweep thất bại có follow-through rõ ràng, FVG bị vô hiệu hóa theo quy tắc hình thái, hoặc runway dưới 1.20R; không được từ chối chỉ vì tín hiệu yếu hoặc chưa hoàn hảo."
+        }
+      },
+      "archetype_clustering": {
+        "total_clusters": 126,
+        "token_reduction_pct": 99.7,
+        "caching_policy": "Instant local cache lookup with on-demand zero-shot prototype extension"
+      },
+      "mandate": "ZERO FALSE VETO - PROTECT WINNING TRADES"
+    },
+    "institutional_laws": [
+      "Luật 1: Chống Base Rate Fallacy — Không nâng bộ lọc toàn cục khi bằng chứng cho thấy vùng tín hiệu vẫn có base rate thắng cao; bảo toàn runway tối thiểu 1.20R.",
+      "Luật 2: Tri-State Co Giãn Bất Đối Xứng — Phân biệt A+, Scaled và Rejected; giảm quy mô khi độ tin cậy suy giảm thay vì loại bỏ cơ hội hợp lệ.",
+      "Luật 3: Phân Cụm Vi Cấu Trúc — Chuẩn hóa và lưu đệm các archetype hình học, ưu tiên tra cứu tức thời và chỉ mở rộng zero-shot khi xuất hiện prototype mới.",
+      "Luật 4: Circuit Breaker Nén Drawdown — Sau tối thiểu 2 lệnh thua liên tiếp, nhân margin với 0.65 để giảm tốc độ suy giảm vốn mà không làm gián đoạn tần suất chiến lược.",
+      "Luật 5: Chuẩn Hóa Bất Biến Quy Mô ATR — Mọi tiêu chí sweep, displacement, FVG, SL buffer và đánh giá cấu trúc phải được biểu diễn bằng ATR, R-multiple hoặc hình thái tương đối; tuyệt đối không dùng ngưỡng giá tuyệt đối."
+    ]
+  }
+}
