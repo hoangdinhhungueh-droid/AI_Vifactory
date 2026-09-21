@@ -213,6 +213,20 @@ def main():
         except Exception as _terr:
             _log("failed reading props for timeout: %s" % _terr)
 
+    # Stage B6.1: Props Staging & Editorial Briefing (Vox Minimalist Pacing)
+    _run_stage("B6.1 Props Staging",
+               [sys.executable, "scripts/build_remotion_props.py",
+                "--episode-id", episode_id],
+               episode_id, 300)
+
+    # Stage B6.2: Autonomous Adversarial Director Gate (Rule 122/128/136)
+    if props_path.exists():
+        _run_stage("B6.2 Adversarial Director Gate",
+                   [sys.executable, "scripts/orchestrator/adversarial_director_gate.py",
+                    "--episode-id", episode_id,
+                    "--props", str(props_path)],
+                   episode_id, 300)
+
     if not _run_stage("B4-B7 render (resume_episode)",
                       [sys.executable, "scripts/resume_episode.py",
                        "--episode-id", episode_id],
@@ -240,6 +254,13 @@ def main():
         _notify_error("render-verify", episode_id, msg)
         return 3
     _log("master present: %s (%.1f MB)" % (master, master.stat().st_size / 1048576.0))
+
+    # Stage B9: Post-Render Autonomous Technical Sweep (LUFS & Rule 135 exact chapters)
+    _run_stage("B9 Post-Render Technical Sweep",
+               [sys.executable, "-m", "app.services.post_render_technical_sweep",
+                "--episode-id", episode_id,
+                "--episode-dir", str(ep_dir)],
+               episode_id, 300)
 
     if args.skip_upload:
         _log("--skip-upload set; stopping before B10/HG3")

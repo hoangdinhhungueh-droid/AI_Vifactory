@@ -190,33 +190,26 @@ def fetch_prompts_from_vps(episode_id):
             
     if not d:
         vps_path = f"/var/vf/episodes/{episode_id}/prompts_forge.json"
-        size_res = client.run_command(f"wc -c < '{vps_path}'")
-        size_str = size_res.get("stdout", "0").strip()
+        # High-performance chunked gzip transfer (Rule 126 Parity)
+        res = client.run_command(f"gzip -c '{vps_path}' | base64 -w 0 > /tmp/vf_pf.b64 && wc -c < /tmp/vf_pf.b64")
+        size_str = res.get("stdout", "0").strip()
         if not size_str.isdigit() or int(size_str) == 0:
-            raise RuntimeError(f"Không tìm thấy prompts_forge.json trên VPS cho episode {episode_id}")
+            raise RuntimeError(f"Không thể đọc {vps_path} từ VPS: {res.get('stderr')}")
         size = int(size_str)
-        CHUNK_SIZE = 4000  # 4KB chunk size fits safely within 8000-char MCP stdout buffer
-        data_total = b""
+        CHUNK_SIZE = 6000
+        b64_total = ""
         offset = 0
         while offset < size:
             count = min(CHUNK_SIZE, size - offset)
-            chunk = ""
-            for attempt in range(3):
-                res = client.run_command(f"tail -c +{offset+1} '{vps_path}' | head -c {count} | base64 -w 0")
-                chunk = res.get("stdout", "").strip()
-                if chunk:
-                    break
-                time.sleep(1)
-            if not chunk:
-                raise RuntimeError(f"Không thể đọc chunk từ offset {offset} của {vps_path} sau 3 lần thử")
-            decoded = base64.b64decode(chunk)
-            data_total += decoded
-            offset += len(decoded)
-        if len(data_total) != size:
-            raise RuntimeError(f"Toàn vẹn dữ liệu thất bại khi đọc {vps_path}: nhận {len(data_total)}/{size} bytes")
+            c_res = client.run_command(f"tail -c +{offset+1} /tmp/vf_pf.b64 | head -c {count}")
+            b64_total += c_res.get("stdout", "").strip()
+            offset += count
+        client.run_command("rm -f /tmp/vf_pf.b64")
+        import gzip
+        raw_bytes = gzip.decompress(base64.b64decode(b64_total))
         with open(local_prompts_file, "wb") as f:
-            f.write(data_total)
-        d = json.loads(data_total.decode("utf-8"))
+            f.write(raw_bytes)
+        d = json.loads(raw_bytes.decode("utf-8"))
         
     items = []
     for k, p in d.get("backgrounds", {}).items():
