@@ -77,6 +77,40 @@ def test_parse_spoken_number_alphanumeric_and_symbols():
     assert "원" in p_kr.suffix
 
 
+def test_parse_spoken_number_japanese():
+    # Hamaoka Scene 2: Ratio with Kanji numerals and percentage
+    p_hamaoka = parse_spoken_number("審査関連データ二百二十五件のうち、二百八件、実に九十二パーセントが不適切でした。")
+    assert p_hamaoka is not None
+    assert p_hamaoka.display_value == 208.0
+    assert p_hamaoka.unit == "件"
+    assert "225件" in p_hamaoka.suffix
+    assert "92%" in p_hamaoka.suffix
+    assert p_hamaoka.trend == "down"
+
+    # Kanji count
+    p_kanji = parse_spoken_number("不正なデータは二百八件に上る。")
+    assert p_kanji is not None
+    assert p_kanji.display_value == 208.0
+    assert p_kanji.unit == "件"
+    assert p_kanji.formatted == "208件"
+    assert p_kanji.trend == "down"
+
+    # Japanese percentage
+    p_jp_pct = parse_spoken_number("不適切な割合は実に九十二パーセントに達した。")
+    assert p_jp_pct is not None
+    assert p_jp_pct.display_value == 92.0
+    assert p_jp_pct.unit == "%"
+    assert p_jp_pct.formatted == "92%"
+    assert p_jp_pct.trend == "down"
+
+    # Japanese yen with scale
+    p_yen = parse_spoken_number("特別損失として百億円を計上した。")
+    assert p_yen is not None
+    assert p_yen.display_value == 100.0
+    assert p_yen.unit == "億"
+    assert p_yen.trend == "down"
+
+
 def test_parse_spoken_number_zero_mock_fallback():
     # Sentence with no numbers must return None (Rule 118: Zero-Mock)
     p_none = parse_spoken_number("This was not a market collapse flashing across financial screens or stock exchanges.")
@@ -84,3 +118,4 @@ def test_parse_spoken_number_zero_mock_fallback():
 
     p_ordinary = parse_spoken_number("The detectives arrived at the daycare center early in the morning.")
     assert p_ordinary is None
+

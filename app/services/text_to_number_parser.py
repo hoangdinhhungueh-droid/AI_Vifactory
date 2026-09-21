@@ -106,6 +106,38 @@ def _words_to_number(words_str: str) -> Optional[float]:
     return total if matched and total > 0 else None
 
 
+def _kanji_to_int(k_str: str) -> Optional[int]:
+    """Convert Japanese kanji numeral string to integer."""
+    k_map = {'〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
+    unit_map = {'十': 10, '百': 100, '千': 1000}
+    total = 0
+    current = 0
+    matched = False
+    for char in k_str:
+        if char in k_map:
+            current = k_map[char]
+            matched = True
+        elif char in unit_map:
+            unit = unit_map[char]
+            total += (current if current > 0 else 1) * unit
+            current = 0
+            matched = True
+        else:
+            return None
+    total += current
+    return total if matched else None
+
+
+def _parse_kanji_or_arabic(val_str: str) -> Optional[int]:
+    """Parse integer from either Arabic digits or Japanese Kanji numerals."""
+    if not val_str:
+        return None
+    cleaned = val_str.strip().replace(",", "")
+    if cleaned.isdigit():
+        return int(cleaned)
+    return _kanji_to_int(cleaned)
+
+
 def parse_spoken_number(text: str) -> Optional[ParsedMetric]:
     """Parse numerical metrics from narration text (spoken words or alphanumeric).
     Returns ParsedMetric or None if no numerical metric found.
@@ -115,9 +147,13 @@ def parse_spoken_number(text: str) -> Optional[ParsedMetric]:
 
     t_lower = text.lower()
 
-    # Determine trend heuristic
-    down_words = ["loss", "lost", "fell", "dropped", "collapse", "decline", "diverted", "vanished", "deficit", "sụt giảm", "thất thoát", "bốc hơi", "하락", "폭락", "손실"]
-    trend = "down" if any(k in t_lower for k in down_words) else "up"
+    # Determine trend heuristic (multi-lingual forensic keywords)
+    down_words = [
+        "loss", "lost", "fell", "dropped", "collapse", "decline", "diverted", "vanished", "deficit",
+        "sụt giảm", "thất thoát", "bốc hơi", "하락", "폭락", "손실",
+        "不適切", "不正", "改ざん", "改竄", "捏造", "虚偽", "隠蔽", "違反", "偽装", "損失"
+    ]
+    trend = "down" if any(k in text for k in down_words) or any(k in t_lower for k in down_words) else "up"
 
     # 1. Check Korean Currencies & Scales: 350만 원, 5000억 원, 10조 원, 14,000명
     kr_match = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?)\s*(만|억|조)?\s*(원|명|건|곳)', text)
@@ -169,8 +205,91 @@ def parse_spoken_number(text: str) -> Optional[ParsedMetric]:
             trend=trend
         )
 
-    # 3. Check Percentages: 52%, -38%, +15.4%
-    pct_match = re.search(r'([+-]?\d+(?:\.\d+)?)\s*%', text)
+    # 2.3. Check Japanese Ratio / Comparative Audit Metrics:
+    # e.g., "二百二十五件のうち、二百八件、実に九十二パーセントが不適切" or "225件中208件"
+    jp_ratio = re.search(
+        r'([一二三四五六七八九十百千\d]+)\s*(?:件|点|基|箇所|人)?\s*(?:のうち|中)[、\s]*([一二三四五六七八九十百千\d]+)\s*(件|点|基|箇所|人)',
+        text
+    )
+    if jp_ratio:
+        total_val = _parse_kanji_or_arabic(jp_ratio.group(1))
+        target_val = _parse_kanji_or_arabic(jp_ratio.group(2))
+        u = jp_ratio.group(3)
+        if total_val and target_val:
+            pct_m = re.search(r'([一二三四五六七八九十百千\d]+)\s*(?:パーセント|％)', text)
+            pct_str = ""
+            if pct_m:
+                p_val = _parse_kanji_or_arabic(pct_m.group(1))
+                if p_val:
+                    pct_str = f" ({p_val}%)"
+            elif total_val > 0:
+                calc_pct = round((target_val / total_val) * 100, 1)
+                pct_str = f" ({calc_pct:g}%)"
+
+            suffix_str = f" / {total_val}{u}{pct_str}"
+            return ParsedMetric(
+                raw_value=float(target_val),
+                display_value=float(target_val),
+                unit=u,
+                prefix="",
+                suffix=suffix_str,
+                formatted=f"{target_val}{u}{suffix_str}",
+                metric_type="scale",
+                trend=trend
+            )
+
+    # 2.5. Check Japanese Currencies, Units & Kanji Numbers: 二百八件, 208件, 92%, 100億円
+    jp_pct_kanji = re.search(r'([一二三四五六七八九十百]+)\s*(?:パーセント|％)', text)
+    if jp_pct_kanji:
+        k_val = _kanji_to_int(jp_pct_kanji.group(1))
+        if k_val is not None:
+            return ParsedMetric(
+                raw_value=float(k_val),
+                display_value=float(k_val),
+                unit="%",
+                prefix="",
+                suffix="",
+                formatted=f"{k_val}%",
+                metric_type="percentage",
+                trend=trend
+            )
+
+    jp_kanji_unit = re.search(r'([一二三四五六七八九十百千]+)\s*(件|人|ヶ所|基|箇所|億|万)', text)
+    if jp_kanji_unit:
+        k_val = _kanji_to_int(jp_kanji_unit.group(1))
+        u = jp_kanji_unit.group(2)
+        if k_val is not None:
+            mult = 100_000_000.0 if u == "億" else (10_000.0 if u == "万" else 1.0)
+            return ParsedMetric(
+                raw_value=float(k_val) * mult,
+                display_value=float(k_val),
+                unit=u,
+                prefix="",
+                suffix="",
+                formatted=f"{k_val}{u}",
+                metric_type="currency" if u in ("億", "万") else "scale",
+                trend=trend
+            )
+
+    jp_digit_match = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?)\s*(万|億|兆)?\s*(円|件|人|ヶ所|基|箇所)', text)
+    if jp_digit_match:
+        base = float(jp_digit_match.group(1).replace(",", ""))
+        unit = jp_digit_match.group(2) or ""
+        suffix = jp_digit_match.group(3)
+        mult = 100_000_000.0 if unit == "億" else (10_000.0 if unit == "万" else (1_000_000_000_000.0 if unit == "兆" else 1.0))
+        return ParsedMetric(
+            raw_value=base * mult,
+            display_value=base,
+            unit=f"{unit}{suffix}",
+            prefix="",
+            suffix="",
+            formatted=f"{base:g}{unit}{suffix}",
+            metric_type="currency" if "円" in suffix else "scale",
+            trend=trend
+        )
+
+    # 3. Check Percentages: 52%, -38%, +15.4%, 92パーセント
+    pct_match = re.search(r'([+-]?\d+(?:\.\d+)?)\s*(?:%|パーセント|％)', text)
     if pct_match:
         val = float(pct_match.group(1))
         return ParsedMetric(
@@ -178,7 +297,7 @@ def parse_spoken_number(text: str) -> Optional[ParsedMetric]:
             display_value=abs(val),
             unit="%",
             prefix="+" if val > 0 and "+" in pct_match.group(0) else ("-" if val < 0 else ""),
-            suffix="%",
+            suffix="",
             formatted=f"{val:g}%",
             metric_type="percentage",
             trend="down" if val < 0 or trend == "down" else "up"

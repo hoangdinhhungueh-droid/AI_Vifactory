@@ -47,7 +47,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
 
     # 1. 3D Procedural Evidence Specimen (Physical evidence, smoking gun, artifact, seal, vault, hanko)
     if any(k in t for k in ["evidence", "smoking gun", "artifact", "seal", "stamp", "hanko", "vault", "exhibit", "chứng cứ", "tang vật", "niêm phong", "con dấu", "triện", "증거", "인장", "原本", "印鑑", "決裁", "捺印"]):
-        is_jp = any("぀" <= c <= "ヿ" or "一" <= c <= "鿿" for c in narration_text)
+        is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
         title = "公的原本 // 提出記録証拠" if is_jp else "PHYSICAL EVIDENCE // EXHIBIT A"
         subtitle = "浜岡原子力発電所 安全審査提出原本 // 証拠第42号" if is_jp else "IMPERIAL SEAL / AUTHENTICATION STAMP"
         return {
@@ -100,7 +100,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
 
     # 3. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
     if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "seismic zone", "bản đồ", "지도", "좌표", "震源", "南海トラフ", "駿河湾"]):
-        is_jp = any("぀" <= c <= "ヿ" or "一" <= c <= "鿿" for c in narration_text)
+        is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
         return {
             "type": "tactical_map",
             "legacy_type": "radar_map",
@@ -219,15 +219,27 @@ def normalize_camera_movement(raw_mov: str | None) -> str:
 
 def load_manifest_index(manifest_path: str):
     with open(manifest_path, encoding="utf-8") as f:
-        rows = json.load(f)
+        data = json.load(f)
+    if isinstance(data, dict):
+        rows = data.get("items") or data.get("images") or data.get("manifest") or []
+    else:
+        rows = data
     by_reuse_key = {}
     fg_pool = []
     for r in rows:
+        if not isinstance(r, dict):
+            continue
         rk = (r.get("reuse_key") or "").strip()
         lp = r.get("local_path")
+        if not lp and rk:
+            candidate = os.path.join(os.path.dirname(manifest_path), f"{rk}.png")
+            if not os.path.exists(candidate):
+                candidate = os.path.join(os.path.dirname(manifest_path), "images", f"{rk}.png")
+            if os.path.exists(candidate):
+                lp = candidate
         if rk and lp:
             by_reuse_key[rk] = lp
-            if "fg_" in rk.lower() or "character" in (r.get("asset_type") or "").lower():
+            if "fg_" in rk.lower() or "character" in (r.get("layer_type") or r.get("asset_type") or "").lower():
                 fg_pool.append((rk, lp))
     return by_reuse_key, fg_pool
 
