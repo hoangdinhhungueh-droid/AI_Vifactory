@@ -38,7 +38,10 @@ _load_env()
 
 from app.services.hhtech_reasoner import call_gpt6_astra
 from app.services.model_gateway import get_global_gateway
-from app.services.skill_loader import get_b35_strategic_rules
+from app.services.skill_loader import (
+    get_b35_strategic_rules,
+    get_cinematic_tokens_dictionary
+)
 
 sys.path.insert(0, "/root/video_factory/scripts")
 import ag_notion_bridge as _bridge
@@ -48,6 +51,53 @@ PROMPT_LIBRARY_DB_ID_FALLBACK = "8c801989-2400-831a-901d-014aebdc3b31"
 
 # Rule 128: Concise targeted visual rules (~1.2k chars) replacing 336k chars dump
 TARGETED_VISUAL_RULES = get_b35_strategic_rules()
+
+
+def resolve_cinematic_tokens(tokens: list | None) -> dict:
+    """Translate cinematic tokens into English prompt directives for Gemini 2K DCI.
+    Returns categorized visual phrases:
+      {
+        "camera_directives": list[str],
+        "lighting_directives": list[str],
+        "vfx_directives": list[str],
+        "remotion_fx": list[str]
+      }
+    """
+    dict_data = get_cinematic_tokens_dictionary()
+    token_map = {t["token"]: t for t in dict_data.get("tokens", [])}
+    
+    res = {
+        "camera_directives": [],
+        "lighting_directives": [],
+        "vfx_directives": [],
+        "remotion_fx": []
+    }
+    if not tokens or not isinstance(tokens, list):
+        return res
+        
+    for tok in tokens:
+        if not isinstance(tok, str):
+            continue
+        t_clean = tok.strip()
+        if not t_clean.startswith("/"):
+            t_clean = f"/{t_clean}"
+        info = token_map.get(t_clean)
+        if not info:
+            continue
+        cat = info.get("category")
+        directive = info.get("gemini_directive_en", "")
+        if cat in ("angle", "framing") and directive and directive not in res["camera_directives"]:
+            res["camera_directives"].append(directive)
+        elif cat == "lighting" and directive and directive not in res["lighting_directives"]:
+            res["lighting_directives"].append(directive)
+        elif cat == "style_vfx" and directive and directive not in res["vfx_directives"]:
+            res["vfx_directives"].append(directive)
+            
+        r_fx = info.get("remotion_fx")
+        if r_fx and r_fx not in res["remotion_fx"]:
+            res["remotion_fx"].append(r_fx)
+            
+    return res
 
 
 class ContentPolicyRefusalError(Exception):
@@ -181,7 +231,7 @@ def _clean_relics(text: str, is_byzantine_topic: bool = False) -> str:
     return deduplicate_phrase_stutter(text)
 
 
-def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: bool = False, market: str = "EN") -> str:
+def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: bool = False, market: str = "EN", tokens: list | None = None) -> str:
     """Sanitize and enforce Rule 116 standards for Layer 1 Background prompts with Market Architecture Conformance."""
     p = prompt.strip()
     p = re.sub(r"\[STYLE MANDATE\]\s*", "", p, flags=re.IGNORECASE)
@@ -210,14 +260,25 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     bg_anchor = prof["bg_anchor"]
     bg_negs = f", {prof['bg_negatives']}" if prof["bg_negatives"] else ""
 
+    tokens_clauses = []
+    if tokens:
+        resolved = resolve_cinematic_tokens(tokens)
+        if resolved["camera_directives"]:
+            tokens_clauses.append(f"[CAMERA & PERSPECTIVE] {', '.join(resolved['camera_directives'])}.")
+        if resolved["lighting_directives"]:
+            tokens_clauses.append(f"[LIGHTING & OPTICS] {', '.join(resolved['lighting_directives'])}.")
+        if resolved["vfx_directives"]:
+            tokens_clauses.append(f"[OPTICAL STYLE] {', '.join(resolved['vfx_directives'])}.")
+    flow_str = f" {' '.join(tokens_clauses)}" if tokens_clauses else ""
+
     style_prefix = "[STYLE MANDATE] 16:9 widescreen cinematic editorial environment illustration, stylized graphic novel background, atmospheric volumetric lighting, spatial textures, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay."
 
-    p = f"{style_prefix} {p} [MARKET & ENVIRONMENT ANCHOR] {bg_anchor}. [ERA ANCHOR] Authentic period architecture and narrative atmosphere. [STRICT NEGATIVE PROMPT] no prominent foreground human figures, no photorealistic faces, no text, no subtitles, no watermark, no borders, no ui elements, no split frame, no photographic raw camera{bg_negs}."
+    p = f"{style_prefix} {p}{flow_str} [MARKET & ENVIRONMENT ANCHOR] {bg_anchor}. [ERA ANCHOR] Authentic period architecture and narrative atmosphere. [STRICT NEGATIVE PROMPT] no prominent foreground human figures, no photorealistic faces, no text, no subtitles, no watermark, no borders, no ui elements, no split frame, no photographic raw camera{bg_negs}."
 
     return deduplicate_phrase_stutter(p)
 
 
-def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: bool = False, market: str = "EN") -> str:
+def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: bool = False, market: str = "EN", tokens: list | None = None) -> str:
     """Sanitize and enforce Rule 116 & Rule 435 standards for Layer 2 Foreground prompts with Market Ethnicity Conformance."""
     p = prompt.strip()
 
@@ -265,6 +326,15 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     fg_anchor = prof["fg_anchor"]
     fg_negs = f", {prof['fg_negatives']}" if prof["fg_negatives"] else ""
 
+    tokens_clauses = []
+    if tokens:
+        resolved = resolve_cinematic_tokens(tokens)
+        if resolved["lighting_directives"]:
+            tokens_clauses.append(f"[LIGHTING & OPTICS] {', '.join(resolved['lighting_directives'])}.")
+        if resolved["vfx_directives"]:
+            tokens_clauses.append(f"[OPTICAL STYLE] {', '.join(resolved['vfx_directives'])}.")
+    fg_flow_str = f" {' '.join(tokens_clauses)}" if tokens_clauses else ""
+
     # Detect if foreground is an investigative object/document/evidence rather than a human character
     character_indicators = [
         "investigator", "prosecutor", "senator", "caretaker", "official", "executive",
@@ -294,10 +364,10 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
 
     if is_object:
         style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich tactile paper and material textures, 1:1 aspect ratio, centered investigative artifact, crisp paper-cutout sticker aesthetic, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
-        p = f"{style_prefix} {p}. [OBJECT FOCUS] Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with clear legible markers. [ERA ANCHOR] Authentic period materials, forensic case evidence. [STRICT NEGATIVE PROMPT] no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no borders, no extraneous ui elements{fg_negs}."
+        p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with clear legible markers. [ERA ANCHOR] Authentic period materials, forensic case evidence. [STRICT NEGATIVE PROMPT] no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no borders, no extraneous ui elements{fg_negs}."
     else:
         style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich nuanced colors, 1:1 aspect ratio, full-body head-to-shoes, entire character visible within frame, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
-        p = f"{style_prefix} {p}, dynamic high-stakes body posture, dramatic physical posing, intense facial micro-expressions with sharp focused gaze, full-body head-to-shoes visible within frame. [MARKET & ETHNIC ANCHOR] {fg_anchor}. [ERA ANCHOR] Authentic professional attire, stylized expressive character acting, active props interaction. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements{fg_negs}."
+        p = f"{style_prefix} {p}{fg_flow_str}, dynamic high-stakes body posture, dramatic physical posing, intense facial micro-expressions with sharp focused gaze, full-body head-to-shoes visible within frame. [MARKET & ETHNIC ANCHOR] {fg_anchor}. [ERA ANCHOR] Authentic professional attire, stylized expressive character acting, active props interaction. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements{fg_negs}."
 
     p = deduplicate_phrase_stutter(p)
 
@@ -446,10 +516,10 @@ def generate_scene_prompts(
 
         scene_pairings = list(seen_pairs.values())
 
-    # Prepare strategic prompt for GPT-6-Astra
+    # Prepare strategic prompt for Claude Opus 5
     b35_rules = get_b35_strategic_rules()
     system_prompt = (
-        "You are the Lead Cinematographer and Visual Concept Artist (GPT-6-Astra) for AI Video Factory.\n"
+        "You are the Lead Cinematographer and Visual Concept Artist (Claude Opus 5) for AI Video Factory.\n"
         "Your mission is to forge production-ready image prompts for two distinct visual layers per scene:\n"
         "  - Layer 1 Background (16:9 2560x1440): Wide environmental setting, cinematic lighting, subtitle safe-zone.\n"
         "  - Layer 2 Foreground (1:1 2048x2048): Stylized editorial graphic novel digital illustration isolated on pure #FF00FF magenta chroma key.\n\n"
@@ -564,16 +634,29 @@ def generate_scene_prompts(
     if not parsed or not isinstance(parsed, dict):
         parsed = {"backgrounds": {}, "foregrounds": {}}
 
+    bg_tokens_map = {}
+    fg_tokens_map = {}
+    if scenes:
+        for sc in scenes:
+            bg_k = sc.get("background_reuse_key") or sc.get("bg_id") or "bg_00"
+            raw_fg = sc.get("foreground_reuse_key") or sc.get("fg_id") or None
+            fg_k = str(raw_fg).strip() if raw_fg and str(raw_fg).strip() else None
+            toks = sc.get("cinematic_tokens") or []
+            if toks:
+                bg_tokens_map.setdefault(bg_k, []).extend(toks)
+                if fg_k:
+                    fg_tokens_map.setdefault(fg_k, []).extend(toks)
+
     cleaned_backgrounds = {}
     cleaned_foregrounds = {}
 
     for k, p in parsed.get("backgrounds", {}).items():
         prompt_str = p if isinstance(p, str) else p.get("prompt", str(p))
-        cleaned_backgrounds[k] = _sanitize_background_prompt(prompt_str, k, market=market)
+        cleaned_backgrounds[k] = _sanitize_background_prompt(prompt_str, k, market=market, tokens=bg_tokens_map.get(k))
 
     for k, p in parsed.get("foregrounds", {}).items():
         prompt_str = p if isinstance(p, str) else p.get("prompt", str(p))
-        cleaned_foregrounds[k] = _sanitize_foreground_prompt(prompt_str, k, market=market)
+        cleaned_foregrounds[k] = _sanitize_foreground_prompt(prompt_str, k, market=market, tokens=fg_tokens_map.get(k))
 
     # Ensure all requested keys are covered, synthesizing from scene metadata if needed
     for bg_k, bg_meta in bg_dict.items():
@@ -593,7 +676,7 @@ def generate_scene_prompts(
                 f"atmospheric volumetric natural lighting matching narrative tone, 16:9 aspect ratio, "
                 f"bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay"
             )
-            cleaned_backgrounds[bg_k] = _sanitize_background_prompt(fallback_bg, bg_k, market=market)
+            cleaned_backgrounds[bg_k] = _sanitize_background_prompt(fallback_bg, bg_k, market=market, tokens=bg_tokens_map.get(bg_k))
 
     for fg_k, fg_meta in fg_dict.items():
         if fg_k not in cleaned_foregrounds:
@@ -612,7 +695,7 @@ def generate_scene_prompts(
                 f"head to toe visible, dramatic character rim light matching environment, "
                 f"isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames, 1:1 aspect ratio"
             )
-            cleaned_foregrounds[fg_k] = _sanitize_foreground_prompt(fallback_fg, fg_k, market=market)
+            cleaned_foregrounds[fg_k] = _sanitize_foreground_prompt(fallback_fg, fg_k, market=market, tokens=fg_tokens_map.get(fg_k))
 
     # Architectural Decision: Decoupled to YouTube Studio Native Gemini Designer at HG3.
     # Pipeline B3.5 focuses strictly on Dual-Layer Assets: Backgrounds (16:9) & Foregrounds (1:1 Chroma Key Cutout).

@@ -1264,9 +1264,10 @@ def discover_and_produce_market_trend(
                         pass
             continue
 
-        # 7. B2.1 Independent Fact & Causal Integrity Audit Gate (Rule 118, 122 & 130 - Claude Opus 5)
-        print(f"  🛡️ [B2.1 Fact & Causal Audit] Auditing script with Claude Opus 5...")
+        # 7. B2.1 Independent Fact & Causal Integrity Audit Gate (Rule 118, 122 & 130 - GPT-6-Astra / Claude Opus 5)
         fact_audit = brain.get("fact_causal_audit") or {}
+        auditor_disp_name = fact_audit.get("auditor_model") or "GPT-6-Astra"
+        print(f"  🛡️ [B2.1 Fact & Causal Audit] Script audited by {auditor_disp_name}...")
         is_converged = fact_audit.get("convergence_status") == "CONVERGED"
         f_score = float(fact_audit.get("audit_score", 10.0))
         if (is_converged or f_score >= 7.5) and fact_audit.get("verdict") != "PASS":
@@ -1301,7 +1302,7 @@ def discover_and_produce_market_trend(
 
         print(f"  🎉 [B2.1 AUDIT PASSED!] Score: {f_score}/10. Moving to OFFICIAL TASK ID COMMIT & NOTION SYNC & HG1 NOTIFICATION!")
         t_obj["fact_audit_score"] = f_score
-        t_obj["fact_audit_model"] = fact_audit.get("auditor_model", "Claude Opus 5")
+        t_obj["fact_audit_model"] = fact_audit.get("auditor_model", "GPT-6-Astra")
         t_obj["fact_audit_passed"] = True
 
         # 8. NOW OFFICIALLY COMMIT TASK ID, SYNC NOTION, RENAME TEMP FOLDERS, & SEND HG1 NOTIFICATION!

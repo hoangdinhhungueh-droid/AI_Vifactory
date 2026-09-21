@@ -83,3 +83,10 @@
        {"effect": "yellow_marker_highlight" | "red_stamp_slam" | "counter_rollup" | "flowchart_arrow_grow" | "magnify_glass_circle" | "radar_sweep", "trigger_word": "<EXACT_WORD_FROM_NARRATION>", "duration_frames": 24}
      * 'frame_transition': Dictates the editorial cut and acoustic punctuation:
        {"type": "match_cut" | "whip_pan_left" | "whip_pan_right" | "macro_zoom_through" | "film_dissolve" | "hard_cut", "sfx_cue": "paper_rustle" | "stamp_thud" | "camera_whoosh" | "digital_beep"}
+
+14. 20 CANONICAL CINEMATIC FLOW TOKENS (INTERMEDIATE CINEMATIC DSL):
+   - Each scene MUST assign 2 to 3 tokens to the field 'cinematic_tokens': ["<TOKEN_1>", "<TOKEN_2>"] chosen strictly from this 20-token vocabulary:
+     * Angle (5): '/straightdown' (perpendicular 90° flat lay), '/groundlevel' (sát đất áp đảo), '/birdseye' (từ trên cao bao quát đơn độc), '/firstperson' (POV người trong cuộc), '/secondview' (đối thoại hai người).
+     * Framing (5): '/closecrop' (cận cảnh chủ thể), '/tightframe' (cận cảnh chi tiết cảm xúc), '/extremeclose' (đặc tả siêu vi con dấu/văn bản), '/thirdgrid' (bố cục 1/3 điện ảnh), '/innerframe' (khung lồng khung).
+     * Lighting (6): '/darkmood' (chiaroscuro low-key bí ẩn), '/edgelight' (viền sáng ven nổi khối), '/spotbeam' (rọi sáng vật chứng), '/lightrays' (tia sáng không gian god rays), '/sunsetglow' (giờ vàng ấm áp), '/duskhour' (giờ xanh chạng vạng lạnh lẽo).
+     * Style & VFX (4): '/filmlook' (chất nhựa phim 35mm), '/highcontrast' (tương phản gay gắt), '/edgefade' (tối 4 góc vignette), '/digitalglitch' (nhiễu tín hiệu giám sát).

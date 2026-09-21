@@ -879,6 +879,14 @@ def build_remotion_props_data(
             ov_title = forensic_ov.get("title", "") if isinstance(forensic_ov, dict) else ""
             card_segment_key = f"{ov_type}_{stat_val or ''}_{stamp_badge or ''}_{ov_title}"
 
+        cinematic_tokens = s.get("cinematic_tokens") or s.get("cinematicTokens") or []
+        optical_fx = {
+            "vignette": "/edgefade" in cinematic_tokens,
+            "film_grain": "/filmlook" in cinematic_tokens,
+            "digital_glitch": "/digitalglitch" in cinematic_tokens,
+            "high_contrast": "/highcontrast" in cinematic_tokens,
+        }
+
         scenes_out.append({
             "background": bg_rel or "",
             "foreground": fg_rel,
@@ -903,6 +911,8 @@ def build_remotion_props_data(
             "layout_zone": s.get("layout_zone"),
             "animation_cue": s.get("animation_cue"),
             "frame_transition": s.get("frame_transition"),
+            "cinematicTokens": cinematic_tokens,
+            "opticalFx": optical_fx,
             "subtitles": scene_subtitles,  # Forward Faster-Whisper words
             "words": scene_subtitles,      # Alias for maximum compatibility
         })

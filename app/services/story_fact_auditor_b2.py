@@ -178,6 +178,7 @@ Perform strict adversarial forensic audit according to the 8 Iron Criteria. Inte
         verdict = "PASS"
         audit_result["verdict"] = "PASS"
 
+    audit_result["auditor_model"] = chosen_model
     logger.info(f"[story_auditor] Audited {task_id}: Verdict={verdict} (Score: {score}/10) by {chosen_model}")
     return audit_result
 

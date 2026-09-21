@@ -29,7 +29,8 @@ from app.services.hhtech_reasoner import call_gpt6_astra
 from app.services.model_gateway import get_global_gateway
 from app.services.skill_loader import (
     get_b3_strategic_rules,
-    get_b35_strategic_rules
+    get_b35_strategic_rules,
+    get_cinematic_tokens_dictionary
 )
 from app.services.text_to_number_parser import parse_spoken_number
 
@@ -57,6 +58,43 @@ CANONICAL_CAMERA_MOVES = [
     "slow_pull_out",
     "handheld_shake"
 ]
+
+
+def validate_cinematic_tokens(tokens: list | None, narration: str = "") -> list:
+    """Rule 128 & Rule 132: Validate and sanitize cinematic flow tokens against the 20 canonical tokens.
+    Provides deterministic fallback if LLM omitted tokens.
+    """
+    dict_data = get_cinematic_tokens_dictionary()
+    valid_set = {t["token"] for t in dict_data.get("tokens", [])}
+    if not valid_set:
+        valid_set = {
+            "/straightdown", "/groundlevel", "/birdseye", "/firstperson", "/secondview",
+            "/closecrop", "/tightframe", "/extremeclose", "/thirdgrid", "/innerframe",
+            "/darkmood", "/edgelight", "/spotbeam", "/lightrays", "/sunsetglow", "/duskhour",
+            "/filmlook", "/highcontrast", "/edgefade", "/digitalglitch"
+        }
+    cleaned = []
+    if isinstance(tokens, list):
+        for tok in tokens:
+            if isinstance(tok, str):
+                t_str = tok.strip()
+                if not t_str.startswith("/"):
+                    t_str = f"/{t_str}"
+                if t_str in valid_set and t_str not in cleaned:
+                    cleaned.append(t_str)
+
+    if not cleaned and narration:
+        t_low = narration.lower()
+        if any(k in t_low for k in ["hồ sơ", "con dấu", "hợp đồng", "bản án", "bàn làm việc", "dossier", "contract", "verdict", "document", "ledger", "seal", "stamp"]):
+            cleaned = ["/straightdown", "/darkmood", "/edgelight"]
+        elif any(k in t_low for k in ["biến mất", "toàn cảnh", "thành phố", "tòa nhà", "quốc gia", "hệ thống", "skyline", "scale"]):
+            cleaned = ["/birdseye", "/duskhour", "/filmlook"]
+        elif any(k in t_low for k in ["khuôn mặt", "nói", "thì thầm", "khai nhận", "nhìn thẳng", "eyes", "whisper", "confession"]):
+            cleaned = ["/tightframe", "/darkmood", "/highcontrast"]
+        else:
+            cleaned = ["/thirdgrid", "/darkmood"]
+
+    return cleaned[:3]
 
 def _sanitize_beat_spoken_for_llm(spoken_list: list) -> list:
     """
@@ -1347,14 +1385,14 @@ def generate_director_plan(
         gateway = get_global_gateway()
         for attempt in range(1, 3):
             try:
-                logger.info(f"  [B3 Beat {b_num}] Calling GPT-6-Astra (Visual Director) attempt {attempt}/2 (fallback=claude-opus-5)...")
+                logger.info(f"  [B3 Beat {b_num}] Calling Claude Opus 5 (Visual Director) attempt {attempt}/2 (fallback=gpt-6-astra)...")
                 raw_res = gateway.call_llm(
                     prompt=prompt_instruction,
                     system_prompt=system_prompt,
-                    model="gpt-6-astra",
+                    model="claude-opus-5",
                     max_tokens=4500,
-                    timeout=120.0,
-                    fallback="claude-opus-5"
+                    timeout=150.0,
+                    fallback="gpt-6-astra"
                 )
                 if raw_res and raw_res.strip():
                     break
@@ -1605,6 +1643,7 @@ def generate_director_plan(
             "foreground_prompt": fg_roster.get(fg_key, {}).get("description", "") if fg_key else "",
             "foreground_position": fg.get("position", "right") if fg else "right",
             "safe_zone": "bottom",
+            "cinematic_tokens": validate_cinematic_tokens(sc.get("cinematic_tokens") or sc.get("cinematicTokens"), narration),
             "audio_sfx_cue": sc.get("audio_sfx_cue", "distant_room_tone")
         }
         normalized_scenes.append(norm_sc)
@@ -1960,7 +1999,8 @@ def _synthesize_beat_scenes(
                 "background_reuse_key": bg_k,
                 "foreground_reuse_key": fg_k,
                 "fg_position": fg_pos if fg_k else None,
-                "safe_zone": "bottom 20% clear for subtitles"
+                "safe_zone": "bottom 20% clear for subtitles",
+                "cinematic_tokens": validate_cinematic_tokens(None, sc_text)
             })
             sc_counter += 1
         return beat_scenes, sc_counter
@@ -2062,6 +2102,7 @@ def _synthesize_beat_scenes(
                     "position": fg_pos,
                     "visual_description": fg_desc
                 } if fg_k else None,
+                "cinematic_tokens": validate_cinematic_tokens(None, sc_text),
                 "audio_sfx_cue": "tense_ambient_drone" if sc_counter % 2 == 0 else "paper_shuffling"
             })
             sc_counter += 1

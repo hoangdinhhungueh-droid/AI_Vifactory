@@ -660,12 +660,40 @@ def get_seo_editorial_skills(force_refresh: bool = False) -> str:
     return base_prompt
 
 
+def get_cinematic_tokens_dictionary(force_refresh: bool = False) -> dict:
+    """Return the curated 20 Cinematic Flow Tokens dictionary.
+    Decoupled per Rule 132: loads dynamically from config/prompts/cinematic_tokens_dictionary.json
+    with in-memory caching.
+    """
+    global _cache
+    now = time.time()
+    if not force_refresh and _cache.get("cinematic_tokens", {}).get("data") and now < _cache["cinematic_tokens"]["expiration"]:
+        _cache["hits"] += 1
+        return _cache["cinematic_tokens"]["data"]
+
+    _cache["misses"] += 1
+    dict_file = ROOT_DIR / "config" / "prompts" / "cinematic_tokens_dictionary.json"
+    data = {"tokens": []}
+    if dict_file.exists():
+        try:
+            data = json.loads(dict_file.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.warning(f"[skill_loader] Failed reading {dict_file}: {e}")
+
+    _cache["cinematic_tokens"] = {
+        "data": data,
+        "expiration": now + CACHE_TTL_SECONDS
+    }
+    return data
+
+
 def clear_cache():
     """Manually clear all cached rules."""
     global _cache
-    for key in ("central", "content_engine", "media_production", "bundle"):
-        _cache[key]["data"] = None
-        _cache[key]["expiration"] = 0
+    for key in ("central", "content_engine", "media_production", "bundle", "cinematic_tokens"):
+        if key in _cache:
+            _cache[key]["data"] = None
+            _cache[key]["expiration"] = 0
     logger.info("[skill_loader] All multi-hub caches cleared")
 
 

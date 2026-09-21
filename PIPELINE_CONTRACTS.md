@@ -199,8 +199,13 @@
 * **Pacing & Asset Optimization (130-160 Scenes & 15-20 Clustered BGs)**:
   - **Pacing**: Chuẩn hóa nhịp 130–160 scenes động (~4–6s/scene) dàn đều 5 Beats, đẩy nhịp dựng Fincher kịch tính.
   - **Clustered BG Reuse**: B4 sinh tối ưu hóa 15–20 Backgrounds độc bản (`bg_cluster_id`) được tái sử dụng linh hoạt xuyên suốt các scenes trong cùng một bối cảnh, triệt tiêu nguy cơ nghẽn API sinh ảnh hoặc kéo dài render.
-  - **6 Cinematic Camera Moves**: `"slow_zoom_in"`, `"slow_zoom_out"`, `"pan_left"`, `"pan_right"`, `"tracking_shot"`, `"dutch_angle_push"`.
-  - **4 Forensic Evidentiary Overlays**: `"none"`, `"document_highlight"`, `"timeline_tick"`, `"stat_counter"`, `"redacted_stamp"`.
+  - **6 Canonical Camera Moves (Rule 128)**: `"slow_push_in"`, `"snap_zoom"`, `"cinematic_pan"`, `"macro_tilt"`, `"slow_pull_out"`, `"handheld_shake"`.
+  - **Forensic Evidentiary Overlays (VOX Overhaul)**: `"evidence_3d_prop"` (Three.js procedural 3D hanko/dossier/ledger 12fps stop-motion), `"document_highlight"`, `"tactical_map"`, `"kinetic_counter"`, `"evidence_board"`, `"causal_flowchart"`, hoặc `null`.
+  - **20 Google Flow Cinematic Tokens**: 
+    + Camera Axis: `/straightdown`, `/groundlevel`, `/birdseye`, `/firstperson`, `/secondview`.
+    + Framing/Scale: `/closecrop`, `/tightframe`, `/extremeclose`, `/thirdgrid`, `/innerframe`.
+    + Lighting: `/darkmood`, `/edgelight`, `/spotbeam`, `/lightrays`, `/sunsetglow`, `/duskhour`.
+    + Optical FX: `/filmlook`, `/highcontrast`, `/edgefade`, `/digitalglitch`.
 * **Khế ước Bản Sắc Thị Trường (Rule 122 & 128 Generic Pattern)**:
   - Thị trường mục tiêu `<MARKET>` (`JP`, `KR`, `VN`, `EN`...) quyết định bắt buộc đặc điểm nhân chủng học của nhân vật FG (khuôn mặt, mắt, tóc, trang phục) và kiến trúc của BG (phòng họp, cao ốc, đường phố địa phương).
   - FG: CẤM TUYỆT ĐỐI thiên kiến da trắng/Âu Mỹ (Caucasian/Western bias) khi tạo nhân vật Á Châu.
@@ -220,8 +225,9 @@
         "bg_cluster_id": "bg_cluster_<01-20>",
         "background_reuse_key": "bg_<location_slug>",
         "foreground_reuse_key": "fg_<character_or_subject_slug>_<action_slug>",
-        "camera_movement": "<slow_zoom_in | slow_zoom_out | pan_left | pan_right | tracking_shot | dutch_angle_push>",
-        "forensic_overlay": "<none | document_highlight | timeline_tick | stat_counter | redacted_stamp>",
+        "camera_movement": "<slow_push_in | snap_zoom | cinematic_pan | macro_tilt | slow_pull_out | handheld_shake>",
+        "cinematic_tokens": ["<TOKEN_1>", "<TOKEN_2>", "<TOKEN_3>"],
+        "forensic_overlay": "<evidence_3d_prop | document_highlight | tactical_map | kinetic_counter | evidence_board | causal_flowchart | null>",
         "setting_description": "<ENVIRONMENT_DESCRIPTION_ENGLISH: Detailed setting and era background>",
         "character_description": "<CHARACTER_DESCRIPTION_ENGLISH: Detailed subject appearance, clothing, mood>",
         "visual_action": "<VISUAL_ACTION_ENGLISH: Subject pose and dynamic interaction>"
@@ -252,9 +258,10 @@
         "start_frame": "<INTEGER_START_FRAME>",
         "duration_in_frames": "<INTEGER_DURATION_FRAMES>",
         "bg_image": "images/scene_<001>_bg.png",
-        "fg_image": "images/scene_<001>_fg.png",
-        "camera_movement": "<slow_zoom_in | slow_zoom_out | pan_left | pan_right | tracking_shot | dutch_angle_push>",
-        "forensic_overlay": "<none | document_highlight | timeline_tick | stat_counter | redacted_stamp>",
+        "camera_movement": "<slow_push_in | snap_zoom | cinematic_pan | macro_tilt | slow_pull_out | handheld_shake>",
+        "cinematic_tokens": ["<TOKEN_1>", "<TOKEN_2>"],
+        "forensic_overlay": "<evidence_3d_prop | document_highlight | tactical_map | kinetic_counter | evidence_board | causal_flowchart | null>",
+        "optical_fx": ["<vignette | film_grain | chromatic_aberration | glitch>"],
         "speakerTag": "<DYNAMIC_BEAT_TITLE: e.g. BEAT 1: The Impossible Contradiction>",
         "subtitles": [
           {"word": "<WORD_1>", "start_ms": "<INT_MS>", "end_ms": "<INT_MS>"},

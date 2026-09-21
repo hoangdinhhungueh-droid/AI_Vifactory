@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AI Video Factory Cinematic Flow Tokens Dictionary",
+  "version": "1.0.0",
+  "description": "Curated 20 Cinematic Flow Tokens acting as intermediate DSL between High-Level LLM, B3 Director, B3.5 Prompt Forge, and Remotion Engine.",
+  "tokens": [
+    {
+      "token": "/straightdown",
+      "category": "angle",
+      "description_vi": "Nhìn vuông góc từ trên xuống, rõ ràng và gọn mắt (Top-down 90° flat lay)",
+      "gemini_directive_en": "perpendicular 90-degree straight-down overhead perspective, top-down flat lay composition looking directly down",
+      "remotion_fx": null,
+      "remotion_camera_hint": "macro_tilt"
+    },
+    {
+      "token": "/groundlevel",
+      "category": "angle",
+      "description_vi": "Đặt máy sát đất, khiến nhân vật hoặc vật thể trông quyền lực và bề thế",
+      "gemini_directive_en": "extreme low-angle ground-level perspective looking up with imposing heroic scale",
+      "remotion_fx": null,
+      "remotion_camera_hint": "slow_push_in"
+    },
+    {
+      "token": "/birdseye",
+      "category": "angle",
+      "description_vi": "Nhìn từ trên cao, thể hiện sự đơn độc, lẻ loi hoặc trật tự không gian",
+      "gemini_directive_en": "high-altitude bird's eye view looking down, expansive spatial perspective emphasizing isolation",
+      "remotion_fx": null,
+      "remotion_camera_hint": "slow_pull_out"
+    },
+    {
+      "token": "/firstperson",
+      "category": "angle",
+      "description_vi": "Đưa khán giả vào vị trí người trong cuộc (Góc nhìn thứ nhất POV)",
+      "gemini_directive_en": "first-person subjective point-of-view (POV) perspective directly from character eye level",
+      "remotion_fx": null,
+      "remotion_camera_hint": "handheld_shake"
+    },
+    {
+      "token": "/secondview",
+      "category": "angle",
+      "description_vi": "Khung hình đối thoại tự nhiên cho cảnh hai người tương tác (Over-the-shoulder)",
+      "gemini_directive_en": "over-the-shoulder conversational two-shot angle capturing character confrontation",
+      "remotion_fx": null,
+      "remotion_camera_hint": "cinematic_pan"
+    },
+    {
+      "token": "/closecrop",
+      "category": "framing",
+      "description_vi": "Cận cảnh, tập trung trọn vẹn vào chủ thể chính",
+      "gemini_directive_en": "intense close-up framing isolating the primary subject with emotional intimacy",
+      "remotion_fx": null,
+      "remotion_camera_hint": "slow_push_in"
+    },
+    {
+      "token": "/tightframe",
+      "category": "framing",
+      "description_vi": "Cận cảnh chi tiết, làm nổi bật chủ thể và xung đột cảm xúc",
+      "gemini_directive_en": "tightly cropped dramatic framing emphasizing sharp facial tension and psychological pressure",
+      "remotion_fx": null,
+      "remotion_camera_hint": "snap_zoom"
+    },
+    {
+      "token": "/extremeclose",
+      "category": "framing",
+      "description_vi": "Đặc tả cực cận, làm lộ những chi tiết và bề mặt ẩn, con dấu, vi mạch",
+      "gemini_directive_en": "extreme macro close-up revealing microscopic texture, official seal imprint, and minute evidentiary details",
+      "remotion_fx": null,
+      "remotion_camera_hint": "macro_tilt"
+    },
+    {
+      "token": "/thirdgrid",
+      "category": "framing",
+      "description_vi": "Tỉ lệ một phần ba, cân đối và hài hòa chuẩn điện ảnh",
+      "gemini_directive_en": "cinematic rule-of-thirds composition, asymmetric aesthetic balance with clean negative space",
+      "remotion_fx": null,
+      "remotion_camera_hint": "cinematic_pan"
+    },
+    {
+      "token": "/innerframe",
+      "category": "framing",
+      "description_vi": "Khung lồng khung, dùng cảnh vật xung quanh để tôn chủ thể",
+      "gemini_directive_en": "frame-within-a-frame architectural composition through a doorway, window, or blurred foreground props",
+      "remotion_fx": null,
+      "remotion_camera_hint": "slow_push_in"
+    },
+    {
+      "token": "/darkmood",
+      "category": "lighting",
+      "description_vi": "Ánh sáng tối, tương phản kịch tính (Chiaroscuro low-key)",
+      "gemini_directive_en": "dramatic low-key chiaroscuro lighting, deep mysterious shadows, high tonal contrast",
+      "remotion_fx": null,
+      "remotion_camera_hint": null
+    },
+    {
+      "token": "/edgelight",
+      "category": "lighting",
+      "description_vi": "Viền sáng nổi bật quanh chủ thể (Rim / Edge light)",
+      "gemini_directive_en": "sharp volumetric rim edge lighting sculpting the subject contours against deep shadows",
+      "remotion_fx": null,
+      "remotion_camera_hint": null
+    },
+    {
+      "token": "/spotbeam",
+      "category": "lighting",
+      "description_vi": "Luồng sáng tập trung rọi thẳng vào tâm điểm vật chứng",
+      "gemini_directive_en": "harsh directional overhead spotlight beam illuminating a single critical evidence document",
+      "remotion_fx": null,
+      "remotion_camera_hint": null
+    },
+    {
+      "token": "/lightrays",
+      "category": "lighting",
+      "description_vi": "Tia sáng tạo chiều sâu không khí (Volumetric God Rays)",
+      "gemini_directive_en": "atmospheric volumetric god rays cutting through atmospheric haze with cinematic depth",
+      "remotion_fx": null,
+      "remotion_camera_hint": null
+    },
+    {
+      "token": "/sunsetglow",
+      "category": "lighting",
+      "description_vi": "Ánh sáng giờ vàng ấm áp (Golden Hour)",
+      "gemini_directive_en": "warm golden hour amber sunlight, long soft shadows, nostalgic evocative glow",
+      "remotion_fx": null,
+      "remotion_camera_hint": null
+    },
+    {
+      "token": "/duskhour",
+      "category": "lighting",
+      "description_vi": "Không khí chạng vạng mát lành, giờ xanh bí ẩn (Blue Hour)",
+      "gemini_directive_en": "moody blue hour twilight illumination, deep cool tones, melancholic evening atmosphere",
+      "remotion_fx": null,
+      "remotion_camera_hint": null
+    },
+    {
+      "token": "/filmlook",
+      "category": "style_vfx",
+      "description_vi": "Tạo chất phim điện ảnh, màu sắc và tương phản như phim chiếu rạp",
+      "gemini_directive_en": "vintage 35mm celluloid film aesthetic, authentic optical texture, cinematic color grade",
+      "remotion_fx": "film_grain",
+      "remotion_camera_hint": null
+    },
+    {
+      "token": "/highcontrast",
+      "category": "style_vfx",
+      "description_vi": "Hình ảnh điện ảnh tương phản mạnh, ranh giới sáng tối gay gắt",
+      "gemini_directive_en": "hard-hitting graphic contrast, crisp ink delineation, bold saturated tones",
+      "remotion_fx": null,
+      "remotion_camera_hint": null
+    },
+    {
+      "token": "/edgefade",
+      "category": "style_vfx",
+      "description_vi": "Làm tối viền khung hình (Vignette), tập trung thị giác vào trung tâm",
+      "gemini_directive_en": "subtle dark corner vignette focusing visual attention toward the center of frame",
+      "remotion_fx": "vignette",
+      "remotion_camera_hint": null
+    },
+    {
+      "token": "/digitalglitch",
+      "category": "style_vfx",
+      "description_vi": "Nhiễu kỹ thuật số, gián đoạn tín hiệu camera giám sát",
+      "gemini_directive_en": "cybernetic signal distortion, surveillance monitor scanlines, subtle digital glitch artifacts",
+      "remotion_fx": "digital_glitch",
+      "remotion_camera_hint": null
+    }
+  ]
+}
