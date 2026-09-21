@@ -182,7 +182,7 @@ def concat_chunks(chunks: list[str], out_path: str, chunks_dir: str) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(description="Render Remotion episode in Beat chunks & stitch losslessly.")
-    parser.add_argument("--episode-id", default="EN_EP0003_san_diego_daycare_fraud", help="Episode ID")
+    parser.add_argument("--episode-id", default=None, help="Episode ID")
     parser.add_argument("--props", default=None, help="Explicit path to remotion_props.json")
     parser.add_argument("--out", default=None, help="Explicit path to final twolayer_silent.mp4")
     parser.add_argument("--concurrency", default="3", help="Remotion concurrency (default: 3)")
@@ -191,11 +191,19 @@ def main():
     parser.add_argument("--skip-auto-mux", action="store_true", help="Skip automatic downstream mux and Gate 3 dispatch")
     args = parser.parse_args()
 
-    ep_dir = Path(f"/var/vf/episodes/{args.episode_id}")
-    props_path = args.props or str(ep_dir / "remotion_props.json")
-    final_out = args.out or str(ep_dir / "twolayer_silent.mp4")
+    # Auto-resolve episode-id if omitted (Rule 128 Generic Contract)
+    if not args.episode_id:
+        target_str = str(args.out or args.props or "")
+        m = re.search(r"episodes/([A-Z]{2}_EP\d{4}_[a-z0-9_]+)", target_str)
+        if m:
+            args.episode_id = m.group(1)
+            print(f"INFO: Auto-resolved episode_id from path: {args.episode_id}")
 
-    if not os.path.exists(props_path):
+    ep_dir = Path(f"/var/vf/episodes/{args.episode_id}") if args.episode_id else None
+    props_path = args.props or (str(ep_dir / "remotion_props.json") if ep_dir else None)
+    final_out = args.out or (str(ep_dir / "twolayer_silent.mp4") if ep_dir else None)
+
+    if not props_path or not os.path.exists(props_path):
         print(f"FATAL: props not found: {props_path}")
         sys.exit(1)
 
@@ -252,10 +260,13 @@ def main():
 
     # Automatic Downstream Hook: Mux + Audit + B10 + Telegram Gate 3
     if not args.skip_auto_mux:
-        mux_script = _REPO_ROOT / "scripts" / "mux_master_episode.py"
-        if mux_script.exists():
-            print("\n>>> [AUTO-PIPELINE] Automatically invoking mux, audit, and Gate 3 dispatch...")
-            subprocess.run([sys.executable, str(mux_script), "--episode-id", args.episode_id], check=True)
+        if not args.episode_id:
+            print("\n>>> [AUTO-PIPELINE] Skipping auto-mux because episode_id could not be resolved.")
+        else:
+            mux_script = _REPO_ROOT / "scripts" / "mux_master_episode.py"
+            if mux_script.exists():
+                print(f"\n>>> [AUTO-PIPELINE] Automatically invoking mux, audit, and Gate 3 dispatch for {args.episode_id}...")
+                subprocess.run([sys.executable, str(mux_script), "--episode-id", args.episode_id], check=True)
 
 
 if __name__ == "__main__":

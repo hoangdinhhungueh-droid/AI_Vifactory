@@ -428,7 +428,9 @@ async def run_pipeline(
             logger.info("[S4.5] launching render_twolayer_chunks with dynamic timeout=%ds (frames=%d, subproc_timeout=%ds)",
                         _dynamic_rem_timeout, _calc_frames, _subproc_timeout)
             _sp.run([sys.executable, "/root/video_factory/scripts/render_twolayer_chunks.py",
-                 "--props", _props_path, "--out", _silent_path],
+                 "--episode-id", episode_id,
+                 "--props", _props_path, "--out", _silent_path,
+                 "--skip-auto-mux"],
                 check=True, timeout=_subproc_timeout)
             if os.path.exists(_silent_path) and os.path.getsize(_silent_path) > 0:
                 twolayer_clip_path = _silent_path
