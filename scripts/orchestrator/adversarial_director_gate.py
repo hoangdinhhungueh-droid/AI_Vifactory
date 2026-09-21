@@ -83,11 +83,24 @@ def audit_props_integrity(props: Dict[str, Any], market: str) -> Tuple[bool, Lis
             if not stat_v and not end_val:
                 defects.append(f"EMPTY_KINETIC_COUNTER in Scene {i:02d}: counter overlay present but no quantitative value parsed.")
 
-    # 4. Foreground Character Sparsity Audit (VOX Pacing & Anti-OOM)
-    fg_count = sum(1 for s in scenes if s.get("foreground"))
-    fg_pct = (fg_count / len(scenes)) * 100
-    if fg_pct > 20.0:
-        defects.append(f"FG_DENSITY_TOO_HIGH: {fg_count}/{len(scenes)} scenes ({fg_pct:.1f}%) have foreground characters (max allowed 20.0% for VOX minimalism).")
+    # 4. Foreground Character Sparsity vs Evidence Exhibits Audit (VOX Pacing & Anti-OOM)
+    def is_evidence_object(s: Dict[str, Any]) -> bool:
+        fg = str(s.get("foreground") or "").lower()
+        tag = str(s.get("speakerTag") or "").lower()
+        role = str(s.get("foreground_role") or "").lower()
+        lz = s.get("layout_zone") or {}
+        place = str(lz.get("placement") if isinstance(lz, dict) else "").lower()
+        return any(k in fg for k in ["evidence", "doc_", "docket", "invoice", "ledger", "memo", "gauge", "statute", "rack", "contract", "binder", "stamp", "scale", "gavel", "box", "log", "prop", "artifact", "bill", "check", "receipt", "filing", "exhibit"]) or "document" in place or "evidence" in place or "artifact" in role
+
+    human_fg_count = sum(1 for s in scenes if s.get("foreground") and not is_evidence_object(s))
+    human_fg_pct = (human_fg_count / len(scenes)) * 100 if scenes else 0
+    if human_fg_pct > 20.0:
+        defects.append(f"FG_DENSITY_TOO_HIGH: {human_fg_count}/{len(scenes)} scenes ({human_fg_pct:.1f}%) have human foreground characters (max allowed 20.0% for VOX minimalism).")
+
+    evidence_fg_count = sum(1 for s in scenes if s.get("foreground") and is_evidence_object(s))
+    evidence_fg_pct = (evidence_fg_count / len(scenes)) * 100 if scenes else 0
+    if evidence_fg_pct > 55.0:
+        defects.append(f"FG_DENSITY_TOO_HIGH: {evidence_fg_count}/{len(scenes)} scenes ({evidence_fg_pct:.1f}%) have evidence exhibits (max allowed 55.0% for VOX pacing & anti-OOM).")
 
     # 5. Layout Zone Variety Audit (Anti-Monotony)
     current_placement = None
@@ -123,19 +136,43 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
     scenes = props.get("scenes", [])
     sanitized = prune_and_localize_scenes(scenes, market)
 
-    # 1. Auto-prune FG characters if count > 12 (enforcing <= 12 high-impact VOX character cutouts)
-    fg_count = sum(1 for s in sanitized if s.get("foreground"))
-    if fg_count > 12:
-        logger.info("Auto-repair: pruning FG characters from %d to <= 12...", fg_count)
-        step = max(1, fg_count // 12)
-        fg_seen = 0
+    # 1. Auto-prune FG: separate human characters (<= 12) vs forensic evidence objects (<= 60 / ~50%)
+    def is_evidence_object(s: Dict[str, Any]) -> bool:
+        fg = str(s.get("foreground") or "").lower()
+        tag = str(s.get("speakerTag") or "").lower()
+        role = str(s.get("foreground_role") or "").lower()
+        lz = s.get("layout_zone") or {}
+        place = str(lz.get("placement") if isinstance(lz, dict) else "").lower()
+        return any(k in fg for k in ["evidence", "doc_", "docket", "invoice", "ledger", "memo", "gauge", "statute", "rack", "contract", "binder", "stamp", "scale", "gavel", "box", "log", "prop", "artifact", "bill", "check", "receipt", "filing", "exhibit"]) or "document" in place or "evidence" in place or "artifact" in role
+
+    # Auto-prune human character cutouts if count > 12 (enforcing <= 12 high-impact VOX character cutouts)
+    human_scenes = [s for s in sanitized if s.get("foreground") and not is_evidence_object(s)]
+    if len(human_scenes) > 12:
+        logger.info("Auto-repair: pruning human FG characters from %d to <= 12...", len(human_scenes))
+        step = max(1, len(human_scenes) // 12)
+        h_seen = 0
         for s in sanitized:
-            if s.get("foreground"):
-                if fg_seen % step != 0 or fg_seen >= 12 * step:
+            if s.get("foreground") and not is_evidence_object(s):
+                if h_seen % step != 0 or h_seen >= 12 * step:
                     s["foreground"] = ""
                     if isinstance(s.get("layout_zone"), dict):
                         s["layout_zone"]["placement"] = "center_hero_document"
-                fg_seen += 1
+                h_seen += 1
+
+    # Auto-prune evidence objects if count exceeds 50% density (target max 60 exhibits)
+    evidence_scenes = [s for s in sanitized if s.get("foreground") and is_evidence_object(s)]
+    target_max_evidence = min(60, max(12, int(len(sanitized) * 0.50)))
+    if len(evidence_scenes) > target_max_evidence:
+        logger.info("Auto-repair: pruning evidence FG objects from %d to <= %d...", len(evidence_scenes), target_max_evidence)
+        step = max(1, len(evidence_scenes) // target_max_evidence)
+        e_seen = 0
+        for s in sanitized:
+            if s.get("foreground") and is_evidence_object(s):
+                if e_seen % step != 0 or e_seen >= target_max_evidence * step:
+                    s["foreground"] = ""
+                    if isinstance(s.get("layout_zone"), dict):
+                        s["layout_zone"]["placement"] = "center_hero_document"
+                e_seen += 1
 
     # 2. Auto-repair layout monotony: break streaks >= 5 across canonical VOX layout zones
     vox_zones = ["split_evidence_left", "center_hero_document", "split_evidence_right", "bottom_third_dossier"]

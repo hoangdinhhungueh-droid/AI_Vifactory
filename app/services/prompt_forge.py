@@ -282,9 +282,15 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
         "server rack", "microchip", "circuit", "hard drive", "tape recorder",
         "dossier", "newspaper clipping", "blueprint", "flowchart", "infographic"
     ]
-    is_object_key = any(k in fg_key.lower() for k in ["doc", "evidence", "object", "prop", "item", "meter", "invoice", "check", "paper"])
+    is_object_key = any(k in fg_key.lower() for k in ["doc", "evidence", "object", "prop", "item", "meter", "invoice", "check", "paper", "artifact", "ledger", "gauge", "statute", "envelope", "stamp"])
     has_evidence_kw = any(kw in p.lower() for kw in evidence_keywords)
-    is_object = (is_object_key or has_evidence_kw) and not has_character
+    if is_object_key:
+        is_object = True
+    else:
+        has_character = any(re.search(rf"\b{re.escape(ci)}\b", p, re.IGNORECASE) for ci in character_indicators)
+        if has_character and ("official legal" in p.lower() or "official filing" in p.lower() or "official ftc" in p.lower() or "bold figure" in p.lower()):
+            has_character = False
+        is_object = has_evidence_kw and not has_character
 
     if is_object:
         style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich tactile paper and material textures, 1:1 aspect ratio, centered investigative artifact, crisp paper-cutout sticker aesthetic, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
