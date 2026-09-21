@@ -165,6 +165,15 @@ async def run_mux(
         if not b9_ok:
             print("[MUX] Warning: B9 probe failed, continuing to audit/upload.")
 
+    # Step 3.5: Auto-purge intermediate silent video to relieve VPS disk space
+    if silent_video.exists() and final_video.exists() and final_video.stat().st_size > 0:
+        try:
+            silent_size_mb = silent_video.stat().st_size / (1024 * 1024)
+            silent_video.unlink()
+            print(f"[MUX-CLEANUP] Purged intermediate visual video {silent_video.name} ({silent_size_mb:.2f} MB) to relieve VPS disk ✅")
+        except Exception as e:
+            print(f"[MUX-CLEANUP] Warning: Could not purge {silent_video.name}: {e}")
+
     # Step 4: Run Automated LLM Visual & Content Audit on VPS
     audit_verdict = None
     if run_audit:

@@ -20,7 +20,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DEFAULT_TTL_DAYS = 7
+DEFAULT_TTL_DAYS = 2
+
+# STRICT PROTECTED EPISODES (Rule 118: ZERO-TOUCH on active production)
+PROTECTED_PATTERNS = ["KR_EP0002", "tabletennis_refund_trap"]
+
+
+def is_protected(key: str) -> bool:
+    """Check if key belongs to a protected active episode."""
+    for pattern in PROTECTED_PATTERNS:
+        if pattern.lower() in key.lower():
+            return True
+    return False
 
 
 def cleanup_r2(ttl_days=DEFAULT_TTL_DAYS, prefixes=(), dry_run=False):
@@ -78,6 +89,9 @@ def cleanup_r2(ttl_days=DEFAULT_TTL_DAYS, prefixes=(), dry_run=False):
 
                 if not any(key.startswith(p) for p in prefixes):
                     kept_expired += 1
+                    continue
+
+                if is_protected(key):
                     continue
 
                 age_days = (time.time() - last_modified) / 86400

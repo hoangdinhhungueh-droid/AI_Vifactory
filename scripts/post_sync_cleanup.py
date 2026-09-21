@@ -38,6 +38,12 @@ PROTECTED_PATTERNS = ["KR_EP0002", "tabletennis_refund_trap"]
 # INTERMEDIATE FILES TO PURGE POST-PUBLISH (Always keep finals and assets)
 INTERMEDIATE_FILENAMES = [
     "twolayer_silent.mp4",
+    "final_169_norm.mp4",
+    "preview_2min_master.mp4",
+    "preview_2min_silent.mp4",
+    "preview_2min_tg.mp4",
+    "final_11.mp4",
+    "final_916.mp4",
     "audio_norm.mp3",
     "test_ducked_audio.mp3",
     "test_bgm_mix.mp3",
@@ -103,6 +109,25 @@ def cleanup_episode_intermediates(episode_id: str, dry_run: bool = False) -> Dic
                 freed_bytes += size
                 removed_files.append(wav_file.name)
                 logger.info(f"[DRY-RUN] Would purge temp wav: {wav_file}")
+
+    # Clean intermediate render chunks directory
+    chunks_dir = ep_path / "chunks"
+    if chunks_dir.exists() and chunks_dir.is_dir():
+        for chunk_file in chunks_dir.glob("*.mp4"):
+            if chunk_file.is_file():
+                size = chunk_file.stat().st_size
+                if not dry_run:
+                    try:
+                        chunk_file.unlink()
+                        freed_bytes += size
+                        removed_files.append(f"chunks/{chunk_file.name}")
+                        logger.info(f"Purged chunk: {chunk_file.name} ({size / (1024*1024):.2f} MB)")
+                    except Exception as e:
+                        logger.error(f"Failed to delete chunk {chunk_file}: {e}")
+                else:
+                    freed_bytes += size
+                    removed_files.append(f"chunks/{chunk_file.name}")
+                    logger.info(f"[DRY-RUN] Would purge chunk: {chunk_file.name} ({size / (1024*1024):.2f} MB)")
 
     return {
         "status": "success",
@@ -208,7 +233,7 @@ def cleanup_orphaned_tmp_renders(dry_run: bool = False) -> int:
     return total_freed
 
 
-def cleanup_expired_r2(ttl_days: int = 7, dry_run: bool = False) -> bool:
+def cleanup_expired_r2(ttl_days: int = 2, dry_run: bool = False) -> bool:
     """Sweep Cloudflare R2 staging assets older than ttl_days."""
     try:
         sys.path.insert(0, "/root/video_factory")
@@ -221,7 +246,7 @@ def cleanup_expired_r2(ttl_days: int = 7, dry_run: bool = False) -> bool:
         return False
 
 
-def run_full_maintenance(dry_run: bool = False, r2_ttl_days: int = 7) -> Dict[str, Any]:
+def run_full_maintenance(dry_run: bool = False, r2_ttl_days: int = 2) -> Dict[str, Any]:
     """Execute full routine cleanup across VPS disk, tmp folders, and Cloudflare R2."""
     logger.info("=== STARTING FULL POST-SYNC & SYSTEM MAINTENANCE CLEANUP ===")
     
@@ -258,7 +283,7 @@ def main():
     parser.add_argument("--episode", type=str, help="Specific episode ID to clean intermediates after publish")
     parser.add_argument("--routine", action="store_true", help="Run full routine maintenance (intermediates + archives + tmp + R2)")
     parser.add_argument("--dry-run", action="store_true", help="Preview deletions without actually deleting files")
-    parser.add_argument("--r2-ttl", type=int, default=7, help="TTL in days for R2 assets (default: 7)")
+    parser.add_argument("--r2-ttl", type=int, default=2, help="TTL in days for R2 assets (default: 2)")
     args = parser.parse_args()
 
     if args.episode:

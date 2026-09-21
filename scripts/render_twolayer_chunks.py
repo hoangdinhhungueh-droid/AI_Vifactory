@@ -211,6 +211,7 @@ def main():
     parser.add_argument("--x264-preset", default="veryfast", help="x264 preset (default: veryfast)")
     parser.add_argument("--crf", type=int, default=18, help="CRF rate control (default: 18)")
     parser.add_argument("--skip-auto-mux", action="store_true", help="Skip automatic downstream mux and Gate 3 dispatch")
+    parser.add_argument("--keep-chunks", action="store_true", help="Keep individual chunk MP4s after stitching (default: False, auto-purge to save disk space)")
     args = parser.parse_args()
 
     # Auto-resolve episode-id if omitted (Rule 128 Generic Contract)
@@ -291,6 +292,26 @@ def main():
     if not ok_concat:
         print("FATAL: Stitching failed.")
         sys.exit(1)
+
+    # Auto-cleanup intermediate chunk files to relieve VPS disk pressure
+    if not args.keep_chunks and os.path.exists(final_out) and os.path.getsize(final_out) > 0:
+        print(f"\n>>> [AUTO-CLEANUP] Releasing VPS disk: Purging {len(rendered_files)} intermediate chunk files...")
+        freed_bytes = 0
+        for cf in rendered_files:
+            try:
+                if os.path.exists(cf):
+                    sz = os.path.getsize(cf)
+                    os.remove(cf)
+                    freed_bytes += sz
+            except Exception as e:
+                print(f"Warning: Failed to delete chunk {cf}: {e}")
+        concat_txt = os.path.join(chunks_dir, "chunks_concat_list.txt")
+        if os.path.exists(concat_txt):
+            try:
+                os.remove(concat_txt)
+            except Exception:
+                pass
+        print(f">>> [AUTO-CLEANUP] Freed {freed_bytes / (1024 * 1024):.1f} MB disk space on VPS ✅")
 
     overall_elapsed = time.time() - overall_start
     overall_fps = total_frames / max(0.1, overall_elapsed)
