@@ -67,16 +67,16 @@ export const VoxPaperDossier: React.FC<VoxPaperDossierProps> = ({
 
   const displayTitle = title || label || "OFFICIAL INVESTIGATION RECORD";
   const docTitle = payload?.document_title || "EXHIBIT A // EVIDENCE SUBMISSION";
-  const agency = payload?.agency || "UNITED STATES DISTRICT COURT";
-  const caseNumber = payload?.case_number || "CASE NO. 26-CR-01844-SD";
-  const docDate = payload?.date || "OCTOBER 14, 2026";
+  const agency = payload?.agency || "INDEPENDENT INVESTIGATION TASK FORCE";
+  const caseNumber = payload?.case_number || "FORENSIC CASE FILE // EXHIBIT RECORD";
+  const docDate = payload?.date || "OFFICIAL INQUIRY RECORD";
   const clauses = payload?.clauses && payload.clauses.length > 0
     ? payload.clauses
     : [
-        "1. THE DEFENDANTS WILLFULLY OPERATED SHELL DAYCARE ENTITIES WITHOUT LICENSED CAPACITY.",
+        "1. TRANSACTIONAL AUDIT CONFIRMED SYSTEMIC ANOMALIES IN STATUTORY FILINGS.",
         "2. CLAIMS TOTALING $10,482,910 WERE FRAUDULENTLY SUBMITTED TO ASSISTANCE PROGRAMS.",
-        "3. AUDIT INSPECTIONS CONFIRMED ZERO QUALIFYING MINORS PRESENT AT RECORDED ADDRESSES.",
-        "4. TRANSACTIONAL PAPER TRAILS REVEAL SYSTEMIC CONCEALMENT ACROSS NOMINEE ACCOUNTS."
+        "3. REGULATORY COMPLIANCE OVERSIGHT REVEALED INCONSISTENT RECORD SEQUENCES.",
+        "4. FORENSIC PAPER TRAIL DEMONSTRATES PERSISTENT PROTOCOL DEVIATIONS."
       ];
   const highlightIdx = typeof payload?.highlight_line_index === "number" ? payload.highlight_line_index : 1;
   const redactedTerms = payload?.redacted_terms || ["NOMINEE ACCOUNTS", "ZERO QUALIFYING"];

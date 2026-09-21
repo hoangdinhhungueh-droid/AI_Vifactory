@@ -57,17 +57,17 @@ export const VoxEvidenceBoard: React.FC<VoxEvidenceBoardProps> = ({
   });
 
   const displayTitle = title || label || "INVESTIGATION DOSSIER // SUBJECT NETWORK";
-  const suspectName = payload?.suspect_name || "PRIMARY NOMINEE // CHILDCARE OPERATOR";
-  const role = payload?.role || "TARGET ENTITY / FACILITY ADMINISTRATOR";
+  const suspectName = payload?.suspect_name || "PRIMARY SUBJECT // PERSON OF INTEREST";
+  const role = payload?.role || "OPERATIONAL EXECUTIVE / TARGET ENTITY";
   const charges = payload?.charges || [
-    "18 U.S.C. § 1343 // WIRE FRAUD CONSPIRACY",
-    "18 U.S.C. § 1956 // MONEY LAUNDERING",
-    "THEFT OF GOVERNMENT ASSISTANCE FUNDS"
+    "REGULATORY NON-COMPLIANCE AUDIT",
+    "INTERNAL CONTROL VIOLATION",
+    "FALSIFICATION OF STATUTORY RECORDS"
   ];
   const connected = payload?.connected_entities || [
-    "STATE SUBSIDY PROGRAM",
-    "NOMINEE CHECK CASHING",
-    "GHOST ENROLLMENT LEDGER"
+    "REGULATORY OVERSIGHT COMMISSION",
+    "CORPORATE EXECUTIVE COMMITTEE",
+    "TECHNICAL AUDIT LOGS"
   ];
   const displayBadge = badge || "CRIMINAL INDICTMENT";
   const evidenceTag = payload?.evidence_tag || "EVIDENCE ITEM #42";

@@ -298,21 +298,11 @@ def audit_and_optimize_timeline(
             consecutive_overlay_count = 1
             prev_overlay_type = current_type
 
-        if consecutive_overlay_count > 2 and isinstance(overlay, dict):
-            # Break monotony: Switch third identical scene to contrasting kinetic type
-            if current_type == "document_highlight":
-                overlay["type"] = "kinetic_counter"
-                overlay["title"] = "AUDIT DISCREPANCY // SYSTEMIC VARIANCE"
-                overlay["badge"] = "CRITICAL FINDING"
-                overlay["sfx_cue"] = "stamp_slam"
-            elif current_type == "kinetic_counter":
-                overlay["type"] = "tactical_map"
-                overlay["title"] = "GEOGRAPHIC TRACE // LOCATION RECON"
-                overlay["badge"] = "SURVEILLANCE"
-                overlay["sfx_cue"] = "radar_ping"
-            scene["forensicOverlay"] = overlay
-            prev_overlay_type = overlay.get("type")
-            consecutive_overlay_count = 1
+        if consecutive_overlay_count > 3 and isinstance(overlay, dict):
+            # Break monotony: Conclude overlay after 3 scenes to let visual art and character breathe (Rule 118 Zero-Mock)
+            scene["forensicOverlay"] = None
+            prev_overlay_type = None
+            consecutive_overlay_count = 0
 
         # Step 5: Pacing & Dead-Air Elimination
         if dur > max_dead_air_frames and not overlay and not scene.get("statValue") and not scene.get("cameraMovement"):

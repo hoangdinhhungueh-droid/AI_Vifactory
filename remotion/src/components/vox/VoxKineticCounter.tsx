@@ -77,12 +77,19 @@ export const VoxKineticCounter: React.FC<VoxKineticCounterProps> = ({
     extrapolateRight: "clamp",
   });
 
+  const rawEnd = payload?.end_value !== undefined && payload?.end_value !== null
+    ? payload.end_value
+    : (payload?.amount !== undefined && payload?.amount !== null ? payload.amount : undefined);
+
+  if (rawEnd === undefined || rawEnd === null) {
+    return null;
+  }
+
   const startVal = typeof payload?.start_value === "number" ? payload.start_value : 0;
-  const rawEnd = payload?.end_value;
-  const endVal = typeof rawEnd === "number" ? rawEnd : (typeof rawEnd === "string" ? parseFloat(rawEnd) || 0 : 0);
-  const prefix = payload?.prefix ?? "$";
+  const endVal = typeof rawEnd === "number" ? rawEnd : (parseFloat(String(rawEnd).replace(/[^0-9.-]/g, "")) || 0);
+  const prefix = payload?.prefix ?? "";
   const suffix = payload?.suffix ?? "";
-  const unit = payload?.unit ?? "M";
+  const unit = payload?.unit ?? "";
   const trend = payload?.trend ?? "down";
   const displayTitle = title || label || "EVIDENTIARY VALUE // METRIC";
   const displayBadge = badge || (trend === "down" ? "COLLAPSE" : "SURGE");

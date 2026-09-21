@@ -46,27 +46,32 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
     t = narration_text.lower()
 
     # 1. 3D Procedural Evidence Specimen (Physical evidence, smoking gun, artifact, seal, vault, hanko)
-    if any(k in t for k in ["evidence", "smoking gun", "artifact", "seal", "stamp", "hanko", "vault", "exhibit", "chứng cứ", "tang vật", "niêm phong", "con dấu", "triện", "증거", "인장"]):
+    if any(k in t for k in ["evidence", "smoking gun", "artifact", "seal", "stamp", "hanko", "vault", "exhibit", "chứng cứ", "tang vật", "niêm phong", "con dấu", "triện", "증거", "인장", "原本", "印鑑", "決裁", "捺印"]):
+        is_jp = any("぀" <= c <= "ヿ" or "一" <= c <= "鿿" for c in narration_text)
+        title = "公的原本 // 提出記録証拠" if is_jp else "PHYSICAL EVIDENCE // EXHIBIT A"
+        subtitle = "浜岡原子力発電所 安全審査提出原本 // 証拠第42号" if is_jp else "IMPERIAL SEAL / AUTHENTICATION STAMP"
         return {
             "type": "evidence_3d_prop",
             "legacy_type": "redacted_doc",
-            "theme": theme or "vox_paper",
+            "theme": "vox_paper" if is_jp else (theme or "noir_dossier"),
             "layout": "full_bleed_focus",
-            "title": "PHYSICAL EVIDENCE // EXHIBIT A",
-            "badge": "SEALED EXHIBIT",
+            "title": title,
+            "badge": "公的認証" if is_jp else "SEALED EXHIBIT",
             "sfx_cue": "stamp_slam",
-            "label": "FORENSIC SPECIMEN // AUTHENTICATED",
+            "label": subtitle,
             "payload": {
                 "specimen_type": "procedural_3d_artifact",
                 "classification": "EVIDENTIARY_PROOF",
-                "notes": "12FPS STOP-MOTION VOLUMETRIC SPECIMEN"
+                "notes": "12FPS STOP-MOTION VOLUMETRIC SPECIMEN",
+                "title": title,
+                "subtitle": subtitle,
             }
         }
 
     # 2. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
-    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "조항", "감사", "서류"]):
+    if any(k in t for k in ["contract", "clause", "redact", "nda", "subpoena", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "thanh tra", "hồ sơ mật", "báo cáo điều tra", "審査申請", "不適切", "基準地震動", "提出原本", "データ不正", "安全審査"]):
         # Dynamically split sentences to create relevant clause lines
-        sentences = [s.strip().upper() for s in re.split(r'[.!?]+', narration_text) if len(s.strip()) > 10][:4]
+        sentences = [s.strip().upper() for s in re.split(r'[.!?。]+', narration_text) if len(s.strip()) > 10][:4]
         clauses = [f"{idx+1}. {sent}" for idx, sent in enumerate(sentences)] if sentences else [
             "1. OFFICIAL FIELD AUDIT CONFIRMED SYSTEMIC IRREGULARITIES.",
             "2. RECORDED CLAIMS EXCEEDED VERIFIABLE INSTITUTIONAL CAPACITY.",
@@ -88,13 +93,14 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                 "case_number": "CASE DOCKET // ADJUDICATED FILING",
                 "clauses": clauses,
                 "highlight_line_index": 1 if len(clauses) > 1 else 0,
-                "redacted_terms": ["CONFIDENTIAL", "UNVERIFIED"],
+                "redacted_terms": ["CONFIDENTIAL", "UNVERIFIED", "不適切"],
                 "date": "OFFICIAL RECORD // VERIFIED"
             }
         }
 
     # 3. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
-    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "surveillance", "cctv", "camera", "facility", "address", "location", "locations", "street", "city", "county", "district", "cơ sở", "địa điểm", "địa chỉ", "nhà trẻ", "khu vực", "시설", "주소", "위치", "warehouse", "giám sát"]):
+    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "seismic zone", "bản đồ", "지도", "좌표", "震源", "南海トラフ", "駿河湾"]):
+        is_jp = any("぀" <= c <= "ヿ" or "一" <= c <= "鿿" for c in narration_text)
         return {
             "type": "tactical_map",
             "legacy_type": "radar_map",
@@ -105,32 +111,34 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             "sfx_cue": "sonar_ping",
             "label": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
             "payload": {
-                "target_name": "OPERATIONAL SITE // VERIFIED SECTOR",
-                "coordinates": "TARGET REGION JURISDICTION",
-                "map_region": "INVESTIGATIVE DISTRICT",
-                "points_of_interest": ["PRIMARY HUB", "INTERMEDIARY CHOKEPOINT", "ESCROW DISBURSEMENT"]
+                "target_name": "浜岡原子力発電所 プラントサイト" if is_jp else "OPERATIONAL SITE // VERIFIED SECTOR",
+                "coordinates": "34.62° N, 138.14° E (静岡県 御前崎市)" if is_jp else "TARGET REGION JURISDICTION",
+                "map_region": "駿河湾沿岸 耐震・地殻変動セクター" if is_jp else "INVESTIGATIVE DISTRICT",
+                "points_of_interest": ["3号機・4号機 原子炉建屋", "基準地震動観測点", "防潮堤 22m区間"] if is_jp else ["PRIMARY HUB", "INTERMEDIARY CHOKEPOINT", "ESCROW DISBURSEMENT"]
             }
         }
 
-    # 4. Kinetic Counter / Financial Ledger (Numerical claims, government funds, subsidies, theft, fraud amounts)
+    # 4. Kinetic Counter / Financial Ledger (Strict: requires verified parsed number, Rule 118 Zero-Mock Data)
     parsed_metric = parse_spoken_number(narration_text)
-    if parsed_metric is not None or any(k in t for k in ["dollar", "subsidy", "subsidies", "$", "check", "claim", "claims", "billing", "payment", "reimbursement", "fund", "funds", "tiền", "ngân sách", "trợ cấp", "chi trả", "지원금", "환불", "청구", "billion", "million"]):
-        display_val = parsed_metric.formatted if parsed_metric else "$1,000,000"
+    if parsed_metric is not None and parsed_metric.display_value > 0:
+        display_val = parsed_metric.formatted
         return {
             "type": "kinetic_counter",
             "legacy_type": "financial_chart",
             "theme": theme or "vox_paper",
             "layout": "full_bleed_focus",
-            "title": f"CAPITAL FLOW // {display_val}",
-            "badge": "DISBURSEMENT AUDIT",
+            "title": f"QUANTITATIVE METRIC // {display_val}",
+            "badge": "AUDIT METRIC",
             "sfx_cue": "stamp_slam",
             "label": f"EVIDENTIARY VALUE // {display_val}",
             "payload": {
-                "amount": parsed_metric.display_value if parsed_metric else 1000000,
-                "payee": "NOMINEE ENTITY // TARGET RECIPIENT",
-                "payer": "OVERSIGHT AUTHORITY // DISBURSEMENT FUND",
-                "memo": "ALLOCATION DISBURSEMENT // FORENSIC AUDIT",
-                "date": "AUDIT CYCLE // VERIFIED RECORD"
+                "start_value": 0,
+                "end_value": parsed_metric.display_value,
+                "amount": parsed_metric.display_value,
+                "unit": parsed_metric.unit,
+                "prefix": parsed_metric.prefix,
+                "suffix": parsed_metric.suffix,
+                "trend": parsed_metric.trend,
             }
         }
 
@@ -563,6 +571,7 @@ def build_remotion_props_data(
     custom_beat_titles = extract_custom_beat_titles(brain, brain_input_path)
     logger.info("[build_remotion_props] Episode-specific Beat Titles: %s", custom_beat_titles)
 
+    scenes_since_overlay = 4
     for i, s in enumerate(raw_scenes):
         bg_key = s.get("background_reuse_key")
         fg_key = s.get("foreground_reuse_key")
@@ -632,8 +641,16 @@ def build_remotion_props_data(
         tension_lvl = s.get("tension_level") or (cam.get("tension_level") if isinstance(cam, dict) else "high")
         bg_cluster = s.get("bg_cluster_id") or s.get("bgClusterId")
         forensic_ov = s.get("forensic_overlay") or s.get("forensicOverlay")
-        if not forensic_ov:
+        if not forensic_ov and scenes_since_overlay >= 4:
             forensic_ov = detect_forensic_overlay(narration_text)
+            if forensic_ov:
+                scenes_since_overlay = 0
+            else:
+                scenes_since_overlay += 1
+        elif forensic_ov:
+            scenes_since_overlay = 0
+        else:
+            scenes_since_overlay += 1
 
         # Rule 122 & Rule 128: Guarantee forensic_overlay is a structured dict with full Vox Explanatory schema
         DEFAULT_OVERLAY_LABELS = {
@@ -653,10 +670,15 @@ def build_remotion_props_data(
             "3d_hanko_seal": "AUTHENTICATED IMPERIAL SEAL // FORENSIC SPECIMEN",
         }
         if isinstance(forensic_ov, str):
-            forensic_ov = {
-                "type": forensic_ov,
-                "label": DEFAULT_OVERLAY_LABELS.get(forensic_ov, "FORENSIC // EVIDENCE RECORD")
-            }
+            fo_type = forensic_ov
+            structured = detect_forensic_overlay(narration_text)
+            if structured and structured.get("type") == fo_type:
+                forensic_ov = structured
+            else:
+                forensic_ov = {
+                    "type": fo_type,
+                    "label": DEFAULT_OVERLAY_LABELS.get(fo_type, "FORENSIC // EVIDENCE RECORD")
+                }
 
         # Spatial Layout Collision Prevention & Full-Bleed Focus Promotion (Rule 122 & Vox Paper-Collage)
         if forensic_ov and isinstance(forensic_ov, dict):

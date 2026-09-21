@@ -51,10 +51,10 @@ export const VoxTacticalMap: React.FC<VoxTacticalMapProps> = ({
 
   const displayTitle = title || label || "GEO-TACTICAL TELEMETRY // SECTOR GRID";
   const displayBadge = badge || "LOCATIONAL EVIDENCE";
-  const targetName = payload?.target_name || "ALLEGED GHOST DAYCARE FACILITY";
-  const coordinates = payload?.coordinates || "32.7157° N, 117.1611° W (SAN DIEGO)";
-  const mapRegion = payload?.map_region || "SAN DIEGO METROPOLITAN SECTOR";
-  const pois = payload?.points_of_interest || ["OPERATOR RESIDENCE", "CLAIM PROCESSING CENTER", "NOMINEE SHELL BANK"];
+  const targetName = payload?.target_name || "TARGET OPERATION SECTOR";
+  const coordinates = payload?.coordinates || "COORDINATES // INCIDENT GRID";
+  const mapRegion = payload?.map_region || "REGIONAL INVESTIGATION SECTOR";
+  const pois = payload?.points_of_interest || ["PRIMARY LOCATION", "INTERMEDIARY FACILITY", "REGULATORY CHOKEPOINT"];
 
   const isFullBleed = layout === "full_bleed_focus" || layout === "fullscreen_dossier";
   const width = isFullBleed ? 1040 : 600;

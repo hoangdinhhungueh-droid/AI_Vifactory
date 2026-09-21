@@ -52,16 +52,21 @@ export const VoxBankCheck: React.FC<VoxBankCheckProps> = ({
     extrapolateRight: "clamp",
   });
 
-  const rawAmount = payload?.amount ?? 10482910;
-  const numAmount = typeof rawAmount === "number" ? rawAmount : (parseFloat(String(rawAmount).replace(/[^0-9.]/g, "")) || 10482910);
-  const currentCount = Math.round(numAmount * countProgress);
-  const formattedCount = "$" + currentCount.toLocaleString();
+  if (!payload || payload.amount === undefined || payload.amount === null) {
+    return null;
+  }
 
-  const payee = payload?.payee || "SAN DIEGO DAYCARE HOLDINGS // NOMINEE RECIPIENT";
-  const payer = payload?.payer || "DEPARTMENT OF SOCIAL SERVICES // CHILD DEVELOPMENT FUND";
-  const memo = payload?.memo || "SUBSIDY REIMBURSEMENT // CLAIM BATCH #892";
-  const checkDate = payload?.date || "FISCAL YEAR AUDIT 2024-2026";
-  const checkNum = payload?.check_number || "NO. 004829";
+  const rawAmount = payload.amount;
+  const numAmount = typeof rawAmount === "number" ? rawAmount : (parseFloat(String(rawAmount).replace(/[^0-9.]/g, "")) || 0);
+  const currentCount = Math.round(numAmount * countProgress);
+  const currencySymbol = (payload as any)?.currency || "$";
+  const formattedCount = currencySymbol + currentCount.toLocaleString();
+
+  const payee = payload?.payee || "DESIGNATED RECIPIENT ENTITY // NOMINEE";
+  const payer = payload?.payer || "DISBURSEMENT AUTHORITY // TREASURY DIVISION";
+  const memo = payload?.memo || "ALLOCATION DISBURSEMENT // TRANSACTION BATCH";
+  const checkDate = payload?.date || "OFFICIAL AUDIT CYCLE";
+  const checkNum = payload?.check_number || "NO. 008920";
   const displayBadge = badge || "FRAUDULENT DISBURSEMENT";
 
   const isFullBleed = layout === "full_bleed_focus" || layout === "fullscreen_dossier";
