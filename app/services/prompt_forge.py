@@ -389,6 +389,118 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     return p
 
 
+UNIVERSAL_VOX_ANIMATION_PROMPT = (
+    "Tactile documentary stop-motion animation, visual paper collage elements slide smoothly into the frame, "
+    "translucent textured masking tape firmly adheres to the corners, golden brass pushpins press into the board, "
+    "taut red investigation yarn stretches and connects between evidentiary nodes, subtle organic paper curl and tactile drop shadow movement, "
+    "slow controlled cinematic document reveal, editorial investigative motion graphics, 6-second clip, 1080p crisp."
+)
+
+
+def _sanitize_vox_collage_prompt(
+    prompt: str,
+    key: str = "",
+    market: str = "EN",
+    tokens: list | None = None
+) -> str:
+    """Sanitize and format 16:9 VOX Tactile Documentary Collage prompt (Rule 116, 122 & 128)."""
+    p = prompt.strip()
+    p = re.sub(r"\[STYLE MANDATE[^\]]*\]\s*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[STRICT NEGATIVE PROMPT\]\s*.*$", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[MARKET & ENVIRONMENT ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
+
+    # Protect non-photorealistic
+    p = re.sub(r"\bnon-photorealistic\b", "__NON_PHOTO__", p, flags=re.IGNORECASE)
+    p = re.sub(r"photorealistic\s*(?:8k)?\s*", "", p, flags=re.IGNORECASE)
+    p = p.replace("__NON_PHOTO__", "non-photorealistic")
+    p = re.sub(r"\bnon-\s*2d\b", "non-photorealistic 2D", p, flags=re.IGNORECASE)
+    p = re.sub(r"\b8k\b", "", p, flags=re.IGNORECASE)
+
+    # Strip non-ASCII / CJK glyphs from English visual prompts (Rule 446)
+    p = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]+", "", p)
+    p = re.sub(r"\s{2,}", " ", p).strip()
+
+    prof = resolve_market_profile(market)
+    market_negs = f", {prof['fg_negatives']}" if prof.get("fg_negatives") else ""
+
+    tokens_clauses = []
+    if tokens:
+        resolved = resolve_cinematic_tokens(tokens)
+        if resolved["camera_directives"]:
+            tokens_clauses.append(f"[PERSPECTIVE] {', '.join(resolved['camera_directives'])}.")
+        if resolved["lighting_directives"]:
+            tokens_clauses.append(f"[LIGHTING] {', '.join(resolved['lighting_directives'])}.")
+    flow_str = f" {' '.join(tokens_clauses)}" if tokens_clauses else ""
+
+    style_prefix = (
+        "[STYLE MANDATE: VOX TACTILE DOCUMENTARY COLLAGE] 16:9 widescreen physical paper-and-cardboard collage assembly, "
+        "tactile editorial journalistic investigation aesthetic, macro physical depth of field, micro drop shadows between layered physical elements, "
+        "aged vintage archival newspaper and docket paper background, centered dark charcoal cardboard photo mat secured at 4 corners with "
+        "translucent textured masking tape (scotch tape) with subtle adhesive wrinkles and visible newsprint underneath, "
+        "crisp 2mm off-white die-cut paper borders on cutout exhibits, brass pushpins, taut red investigation yarn connecting nodes, "
+        "weathered typewriter serif label strip, bottom 20% safe-zone clear for subtitles."
+    )
+    strict_negatives = (
+        f"[STRICT NEGATIVE PROMPT] no 3D CGI render, no smooth digital vector illustration, no clean studio portrait, "
+        f"no green screen, no purple chroma, no purple halo, no watermark, no digital overlays, no floating text in bottom subtitle zone{market_negs}."
+    )
+
+    if "16:9" not in p:
+        p = f"{p}, 16:9 aspect ratio"
+
+    p = f"{style_prefix} {p}{flow_str} {strict_negatives}"
+    return deduplicate_phrase_stutter(p)
+
+
+def _synthesize_vox_collage_prompt(
+    bg_desc: str,
+    fg_desc: str = "",
+    object_focus: dict = None,
+    market: str = "EN",
+    scene_idx: int = 1,
+    tokens: list = None
+) -> str:
+    """
+    Synthesizes a complete 16:9 VOX Tactile Documentary Collage prompt from scene metadata
+    combining Base Texture + Tape-Affixed Dark Card Mat + Halftone Die-Cut Cutouts + Brass Pushpins + Red Yarn + Typewriter Label.
+    """
+    clean_bg = bg_desc.strip()
+    clean_fg = fg_desc.strip() if fg_desc else ""
+    clean_fg = re.sub(r"#FF00FF|magenta|isolated on|clean chroma-key", "", clean_fg, flags=re.IGNORECASE).strip()
+
+    obj_title = ""
+    obj_type = "investigative evidence"
+    snippet = ""
+    if object_focus and isinstance(object_focus, dict):
+        obj_type = object_focus.get("type") or "investigative document"
+        obj_title = object_focus.get("title") or ""
+        snippet = object_focus.get("key_snippet") or object_focus.get("stat_metric") or ""
+
+    label_text = snippet or obj_title or f"EXHIBIT {scene_idx:02d}"
+    label_text = re.sub(r"[\"'\n\r]+", "", label_text)[:30].upper().strip()
+    if not label_text:
+        label_text = f"EXHIBIT {scene_idx:02d}"
+
+    if obj_title:
+        exhibit_desc = f"a high-contrast vintage halftone black-and-white print cutout of {obj_type} '{obj_title}' with a distinct 2mm off-white die-cut paper border"
+    elif clean_fg:
+        exhibit_desc = f"a high-contrast vintage halftone print cutout illustration of {clean_fg[:90]} with a distinct 2mm off-white die-cut paper border"
+    else:
+        exhibit_desc = f"vintage archival documents and investigative evidence clippings of {clean_bg[:80]} with 2mm off-white die-cut paper borders"
+
+    body = (
+        f"A multi-layered physical documentary assemblage centered on {exhibit_desc}. "
+        f"The exhibit is mounted upon a thick dark charcoal cardboard mat, firmly pinned with golden brass thumbtacks. "
+        f"Taut crimson red investigation yarn connects the brass pins to secondary evidentiary nodes and document clippings across the board. "
+        f"At the bottom of the card mat, a weathered off-white paper strip typed with vintage serif text '{label_text}' is affixed with translucent scotch tape. "
+        f"The entire dark card mat is fastened onto an aged vintage newspaper archive surface with faint weathered gothic typography and an antique cartographic map chart, "
+        f"held down at each corner with textured translucent masking tape showing the newsprint beneath. "
+        f"Cinematic documentary lighting, realistic macro tactile texture, natural soft drop shadows cast by each physical paper layer."
+    )
+
+    return _sanitize_vox_collage_prompt(body, key=f"vox_sc_{scene_idx:03d}", market=market, tokens=tokens)
+
+
 def _sanitize_thumbnail_prompt(prompt: str, thumb_key: str = "", market: str = "EN") -> str:
     """Sanitize and format YouTube 16:9 QHD Hero Thumbnail prompt (Rule 114, Rule 122 & Rule 435)."""
     p = prompt.strip()
@@ -697,14 +809,63 @@ def generate_scene_prompts(
             )
             cleaned_foregrounds[fg_k] = _sanitize_foreground_prompt(fallback_fg, fg_k, market=market, tokens=fg_tokens_map.get(fg_k))
 
-    # Architectural Decision: Decoupled to YouTube Studio Native Gemini Designer at HG3.
-    # Pipeline B3.5 focuses strictly on Dual-Layer Assets: Backgrounds (16:9) & Foregrounds (1:1 Chroma Key Cutout).
+    # Synthesize VOX Tactile Documentary Collage prompts (16:9) & Universal Video prompts
+    cleaned_vox_collages = {}
+    animation_tiers = {}
+
+    if scenes:
+        for idx, sc in enumerate(scenes):
+            bg_k = sc.get("background_reuse_key") or sc.get("bg_id") or "bg_00"
+            raw_fg = sc.get("foreground_reuse_key") or sc.get("fg_id") or None
+            fg_k = str(raw_fg).strip() if raw_fg and str(raw_fg).strip() else None
+
+            bg_desc = cleaned_backgrounds.get(bg_k, "")
+            fg_desc = cleaned_foregrounds.get(fg_k, "") if fg_k else ""
+            obj_focus = sc.get("object_focus")
+            toks = sc.get("cinematic_tokens") or []
+
+            # Animation Tier: Cold Hook (0-15s) and pivotal clenching moments are Hero AI Video
+            anim_tier = sc.get("animation_tier")
+            if not anim_tier:
+                anim_tier = "HERO_AI_VIDEO_6S" if (idx < 15 or idx % 7 == 0) else "TACTILE_STOPMOTION_STILL"
+
+            vox_key = f"vox_sc_{idx+1:03d}_{bg_k}"
+            cleaned_vox_collages[vox_key] = _synthesize_vox_collage_prompt(
+                bg_desc=bg_desc,
+                fg_desc=fg_desc,
+                object_focus=obj_focus,
+                market=market,
+                scene_idx=idx+1,
+                tokens=toks
+            )
+            animation_tiers[vox_key] = anim_tier
+    else:
+        # Fallback when only bg_dict and fg_dict are provided (e.g. basic unit tests)
+        for idx, (bg_k, bg_meta) in enumerate(bg_dict.items()):
+            bg_desc = cleaned_backgrounds.get(bg_k, "")
+            paired_fg = list(fg_dict.keys())[0] if fg_dict else None
+            fg_desc = cleaned_foregrounds.get(paired_fg, "") if paired_fg else ""
+            vox_key = f"vox_{bg_k}"
+            cleaned_vox_collages[vox_key] = _synthesize_vox_collage_prompt(
+                bg_desc=bg_desc,
+                fg_desc=fg_desc,
+                market=market,
+                scene_idx=idx+1
+            )
+            animation_tiers[vox_key] = "HERO_AI_VIDEO_6S" if idx == 0 else "TACTILE_STOPMOTION_STILL"
+
     result = {
+        "vox_collages": cleaned_vox_collages,
+        "universal_video_prompt": UNIVERSAL_VOX_ANIMATION_PROMPT,
+        "animation_tiers": animation_tiers,
         "backgrounds": cleaned_backgrounds,
         "foregrounds": cleaned_foregrounds,
         "thumbnails": {}
     }
-    logger.info(f"[prompt_forge] Successfully forged {len(cleaned_backgrounds)} BG prompts, {len(cleaned_foregrounds)} FG prompts for market {market} (Thumbnails decoupled to YouTube Studio HG3)")
+    logger.info(
+        f"[prompt_forge] Successfully forged {len(cleaned_vox_collages)} VOX Collage prompts, "
+        f"{len(cleaned_backgrounds)} BG prompts, {len(cleaned_foregrounds)} FG prompts for market {market} (Thumbnails decoupled to YouTube Studio HG3)"
+    )
     return result
 
 
@@ -775,6 +936,26 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
                 logger.warning(f"[prompt_forge] Failed to push BG prompt {bg_key}: {res}")
         except Exception as e:
             logger.warning(f"[prompt_forge] Exception pushing BG prompt {bg_key}: {e}")
+
+    # 1b. VOX Collages (16:9 Tactile Documentary)
+    for vox_key, prompt in prompts_data.get("vox_collages", {}).items():
+        prompt_str = prompt if isinstance(prompt, str) else prompt.get("prompt", str(prompt))
+        tier = prompts_data.get("animation_tiers", {}).get(vox_key, "TACTILE_STOPMOTION_STILL")
+        vox_props = {
+            "Title": {"title": [{"text": {"content": f"[{episode_id}] {vox_key} (VOX Collage 16:9)"}}]},
+            "prompt_text": {"rich_text": [{"text": {"content": prompt_str[:2000]}}]},
+            "category": {"select": {"name": "image"}},
+            "variables": {"rich_text": [{"text": {"content": f"Aspect Ratio: 16:9, Style: VOX Tactile Documentary Collage, Tier: {tier}"}}]},
+            "version": {"number": 1}
+        }
+        try:
+            res = _bridge.create_page(prompt_library_db_id, vox_props)
+            if not res.get("error"):
+                logger.debug(f"[prompt_forge] Pushed VOX Collage prompt {vox_key} to Notion Prompt Library DB")
+            else:
+                logger.warning(f"[prompt_forge] Failed to push VOX Collage prompt {vox_key}: {res}")
+        except Exception as e:
+            logger.warning(f"[prompt_forge] Exception pushing VOX Collage prompt {vox_key}: {e}")
 
     # 2. Foregrounds
     for fg_key, prompt in prompts_data.get("foregrounds", {}).items():
