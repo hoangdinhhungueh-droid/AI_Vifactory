@@ -1,0 +1,37 @@
+{
+  "$comment": "FILE MẪU SCENE MAP CHO COMPOSITION VoxelStopMotion TRONG REMOTION",
+  "project_id": "voxel_demo_01",
+  "background_music_path": "assets/audio/background_theme.mp3",
+  "scenes": [
+    {
+      "scene_id": "scene_01",
+      "video_path": "assets/rendered/scene_01.mp4",
+      "duration_seconds": 5,
+      "audio_path": "assets/audio/scene_01_foley.mp3",
+      "audio_cue": "soft ambient forest birds, gentle wind chime",
+      "text_overlay": null,
+      "transition_out": "hard_cut",
+      "camera": "static"
+    },
+    {
+      "scene_id": "scene_02",
+      "video_path": "assets/rendered/scene_02.mp4",
+      "duration_seconds": 6,
+      "audio_path": "assets/audio/scene_02_foley.mp3",
+      "audio_cue": "soft wooden footstep foley, water trickling",
+      "text_overlay": null,
+      "transition_out": "stop_motion_flicker_cut",
+      "camera": "slow_pan_right"
+    },
+    {
+      "scene_id": "scene_03",
+      "video_path": "assets/rendered/scene_03.mp4",
+      "duration_seconds": 7,
+      "audio_path": "assets/audio/scene_03_foley.mp3",
+      "audio_cue": "gentle orchestral swell, distant village ambience",
+      "text_overlay": "Chapter One",
+      "transition_out": "hard_cut",
+      "camera": "slow_push_in"
+    }
+  ]
+}
