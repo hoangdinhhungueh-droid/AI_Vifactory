@@ -1472,91 +1472,60 @@ def generate_director_plan(
             )
             all_scenes.extend(synth_scenes)
 
-    # 3. Validation and safety fallback
-    min_required_scenes = max(25, int(len(spoken_sentences) * 0.7)) if spoken_sentences else (max(80, min(160, total_words // 25)) if total_words > 500 else 10)
-    if len(all_scenes) < min_required_scenes:
-        logger.warning(f"  [B3] Total scenes {len(all_scenes)} < minimum {min_required_scenes}. Regenerating full deterministic fallback...")
-        fallback_plan = _synthesize_deterministic_director_plan(
-            episode_id,
-            story_beats,
-            archetype,
-            dynamic_context=dynamic_context,
-            character_ensemble=character_ensemble,
-            spoken_sentences=spoken_sentences
-        )
-        scenes = fallback_plan.get("scenes", [])
-    else:
-        scenes = all_scenes
+    # 2. Rule 125 Single Truth: Delegate scene breakdown & tactile physics to unified_vox_director
+    from app.services.unified_vox_director import (
+        build_unified_director_plan,
+        OBJECT_ROSTER,
+        BACKGROUND_ROSTER,
+        _sanitize_foreground_prompt,
+        _sanitize_background_prompt
+    )
+    
+    target_dir = ep_dir if ep_dir.exists() else var_vf_dir
+    logger.info(f"  [B3 Bridge] Delegating Director Plan breakdown to Unified VOX Director (Rule 125 Single Truth)...")
+    unified_res = build_unified_director_plan(spoken_sentences, target_dir)
+    unified_scenes = unified_res.get("scenes", [])
+    hero_clips = unified_res.get("hero_clips", [])
 
-    logger.info(f"  [B3] Successfully created total {len(scenes)} cinematic scenes across 5 beats.")
-
-    # 5. Normalize scene structure and build dp_plan
     normalized_scenes = []
-    bg_roster = {}
-    fg_roster = {}
+    bg_roster = {
+        k: {
+            "key": k,
+            "beat": "Evidence Setting",
+            "description": v["description"],
+            "safe_zone": "bottom 20% safe zone"
+        }
+        for k, v in BACKGROUND_ROSTER.items()
+    }
+    fg_roster = {
+        k: {
+            "key": k,
+            "beat": "Evidence Exhibit",
+            "role": v.get("role", "Key Evidence"),
+            "description": v["description"],
+            "position": "center"
+        }
+        for k, v in OBJECT_ROSTER.items()
+    }
 
-    for idx, sc in enumerate(scenes):
+    for idx, sc in enumerate(unified_scenes):
         sc_id = sc.get("scene_id") or f"sc{idx:03d}"
-        beat_idx = sc.get("beat_index") or ((idx // max(1, len(scenes) // 5)) + 1)
-        beat_idx = min(max(int(beat_idx), 1), 5)
-        beat_name = sc.get("beat_name") or CANONICAL_BEATS[beat_idx - 1]
-
+        beat_idx = sc.get("beat_index", 1)
+        beat_name = CANONICAL_BEATS[min(max(beat_idx - 1, 0), 4)]
         narration = sc.get("narration") or ""
-        is_cjk_narr = any("一" <= c <= "鿿" or "぀" <= c <= "ヿ" or "가" <= c <= "힯" for c in narration)
-        if is_cjk_narr:
-            # For CJK, ~2.5 characters equals 1 spoken word equivalent
-            clean_cjk_len = len(re.sub(r'\s+', '', narration))
-            words_cnt = max(3, round(clean_cjk_len / 2.5)) if clean_cjk_len else 10
-        else:
-            words_cnt = len(narration.split()) if narration else 10
-        # Hollywood Audio-Anchored duration: prioritize exact frame duration from Edge-TTS audio spine
-        if sc.get("duration_frames"):
-            dur = round(float(sc["duration_frames"]) / 30.0, 3)
-        elif sc.get("duration_est_sec") or sc.get("duration_sec"):
-            dur = float(sc.get("duration_est_sec") or sc.get("duration_sec"))
-        elif idx < 15:
-            dur = max(3, min(6, round(words_cnt / 3.0)))
-        else:
-            dur = max(5, min(9, round(words_cnt / 2.5)))
+        dur = sc.get("duration_seconds", 5.0)
 
         bg = sc.get("background") or {}
-        bg_key = bg.get("reuse_key") or f"{episode_id.lower()}_bg_b{beat_idx}_loc{idx:02d}"
-        bg_desc = bg.get("visual_description") or sc.get("image_prompt") or f"Cinematic documentary environment for {beat_name}"
-        if bg_key in bg_roster:
-            bg_desc = bg_roster[bg_key]["description"]
-        else:
-            bg_roster[bg_key] = {
-                "key": bg_key,
-                "beat": beat_name,
-                "description": bg_desc,
-                "safe_zone": "bottom 20% safe zone for subtitles, center-right negative space for foreground"
-            }
+        fg = sc.get("foreground") or {}
+        bg_key = bg.get("reuse_key") or ""
+        bg_desc = bg.get("description") or ""
+        fg_key = fg.get("reuse_key") or ""
+        fg_desc = fg.get("description") or ""
 
-        fg = sc.get("foreground")
-        fg_key = None
-        if fg and isinstance(fg, dict):
-            fg_key = fg.get("reuse_key") or f"{episode_id.lower()}_fg_b{beat_idx}_char{idx:02d}"
-            fg_desc = fg.get("visual_description") or sc.get("foreground_prompt") or f"Stylized editorial graphic novel character for {beat_name}"
-            if fg_key in fg_roster:
-                fg_desc = fg_roster[fg_key]["description"]
-            else:
-                fg_roster[fg_key] = {
-                    "key": fg_key,
-                    "beat": beat_name,
-                    "role": fg.get("character_role", "Key Narrative Figure"),
-                    "body_language": fg.get("body_language", "Standing full body, expressive investigative posture"),
-                    "description": fg_desc,
-                    "position": fg.get("position", "right" if idx % 2 == 0 else "left")
-                }
-
-        cam = sc.get("camera") or {}
-        cam_mov = cam.get("movement") if isinstance(cam, dict) else str(cam)
+        cam = sc.get("camera")
+        cam_mov = cam if isinstance(cam, str) else (cam.get("movement", "static") if isinstance(cam, dict) else "static")
         if cam_mov not in CANONICAL_CAMERA_MOVES:
-            if idx < 15:
-                hook_moves = ["snap_zoom", "handheld_shake", "macro_tilt", "slow_push_in"]
-                cam_mov = hook_moves[idx % len(hook_moves)]
-            else:
-                cam_mov = CANONICAL_CAMERA_MOVES[idx % len(CANONICAL_CAMERA_MOVES)]
+            cam_mov = CANONICAL_CAMERA_MOVES[idx % len(CANONICAL_CAMERA_MOVES)]
 
         bg_cluster_id = sc.get("bg_cluster_id") or sc.get("bgClusterId") or ((beat_idx - 1) * 4 + (idx % 3) + 1)
         forensic_overlay = sc.get("forensic_overlay") or sc.get("forensicOverlay")

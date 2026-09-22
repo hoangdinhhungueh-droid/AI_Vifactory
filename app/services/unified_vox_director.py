@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """app/services/unified_vox_director.py
 Unified VOX Spatial Physics Director Engine (B3 & B3.5 Combined)
-Merges Scene Breakdown, Veo 3.1 3D Tactile Origami Physics (20 clips across 6 Google accounts),
+Merges Scene Breakdown, Veo 3.1 3D Tactile Origami Physics (Dynamic Hero clips distributed across Google accounts),
 and Tactile Stop-Motion Collage Remotion Directives (12fps stepped jitter, paper drop shadow).
 Compliant with:
 - Rule 120 (Word-level Audio Sync with Whisper)
@@ -18,7 +18,7 @@ import json
 import argparse
 import yaml
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -159,31 +159,98 @@ BACKGROUND_ROSTER = {
     }
 }
 
-# 20 Canonical Hero Video Anchor Scenes (evenly distributed across 6 Google accounts)
-HERO_SCENE_INDICES = [
-    0,   # Beat 1: Hook opening gavel strike
-    4,   # Beat 1: $20 billion paradox invoice
-    10,  # Beat 1: Sponsored product listing takeover
-    16,  # Beat 1: Lina Khan FTC complaint filing
-    22,  # Beat 1: Climax transition into second-price auction
-    28,  # Beat 2: Cloud server rack blinking in dark
-    34,  # Beat 2: Small business merchant ledger
-    40,  # Beat 2: Secret pricing algorithm trigger
-    48,  # Beat 2 Climax: Paper trail discovery in vault
-    54,  # Beat 3: Soft reserve floor rising to 80%
-    60,  # Beat 3: Millisecond bidding log printout
-    66,  # Beat 3: Corporate boardroom dusk meeting
-    74,  # Beat 3 Climax: The 68 billion revenue explosion
-    80,  # Beat 4: Redacted merchant contracts
-    86,  # Beat 4: Internal Project Nessie memo
-    92,  # Beat 4: Andy Jassy executive leadership dossier
-    98,  # Beat 4 Climax: Ohio small business fallout
-    104, # Beat 5: Federal courtroom hearing chamber
-    116, # Beat 5: Algorithmic pricing spread & Sherman Act
-    126  # Beat 5: Final judge gavel striking wooden block
-]
-
 FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06"]
+
+def select_dynamic_hero_indices(spoken_sentences: List[Dict[str, Any]]) -> List[int]:
+    """Rule 128 & User Mandate: Tuyển chọn các cảnh Hero AI Video (VEO) hoàn toàn động dựa trên nhịp điệu kể chuyện (cadence).
+    - Tần suất trung bình - cao: Khoảng 12% - 18% tổng số cảnh (trung bình 5-7 cảnh có 1 cảnh Hero).
+    - Cảnh mở màn (Scene 0) luôn là Hero (Cold Strike / Paradox Hook).
+    - Điểm chuyển giao Beat (Beat transitions: cảnh đầu mỗi Beat).
+    - Cảnh chốt hạ / Đỉnh điểm pháp lý (Climax / Resolution).
+    - Các khoảnh khắc bằng chứng / dữ liệu pháp y trọng yếu (high-stakes catalyst metrics & evidence).
+    - Khoảng cách tối thiểu giữa 2 Hero clips là >= 3 cảnh để tránh dồn ứ, và không vượt quá 8 cảnh để giữ nhịp kịch tính.
+    - CẤM hardcode danh sách chỉ số hay số lượng chết (như 20 clips).
+    """
+    total = len(spoken_sentences)
+    if total == 0:
+        return []
+    if total <= 3:
+        return [0]
+
+    # Nhận diện điểm khởi đầu các Beat
+    beat_first_indices = {}
+    for idx, s in enumerate(spoken_sentences):
+        b = int(s.get("beat_index") or ((idx // max(1, total // 5)) + 1))
+        b = min(max(b, 1), 5)
+        if b not in beat_first_indices:
+            beat_first_indices[b] = idx
+
+    # Từ khóa bằng chứng / xúc tác căng thẳng cao độ
+    catalyst_keywords = [
+        "billion", "tỷ", "million", "triệu", "docket", "complaint", "vụ kiện", "bản án",
+        "gavel", "búa gỗ", "statute", "sherman", "đạo luật", "algorithm", "thuật toán",
+        "nessie", "secret", "bí mật", "whistleblower", "soft reserve", "damages", "thiệt hại",
+        "invoice", "hóa đơn", "memo", "redacted", "black marker", "ledger", "sổ sách",
+        "court", "tòa án", "judge", "thẩm phán", "boardroom", "server rack", "sponsored"
+    ]
+
+    selected = [0]  # Scene 0 luôn là Hero
+    last_hero = 0
+
+    for idx in range(1, total):
+        sent = spoken_sentences[idx]
+        text = (sent.get("text") or "").lower()
+        dist = idx - last_hero
+
+        if dist < 3:
+            continue
+
+        is_beat_start = any(idx == b_idx for b_idx in beat_first_indices.values())
+        is_climax_or_end = (idx == total - 1) or (idx >= total - 3 and any(w in text for w in ["gavel", "verdict", "judge", "court", "warning", "lesson", "búa", "kết luận"]))
+        has_catalyst = any(kw in text for kw in catalyst_keywords)
+
+        if dist >= 8:
+            selected.append(idx)
+            last_hero = idx
+        elif is_beat_start and dist >= 4:
+            selected.append(idx)
+            last_hero = idx
+        elif is_climax_or_end and dist >= 3:
+            selected.append(idx)
+            last_hero = idx
+        elif has_catalyst and dist >= 5:
+            selected.append(idx)
+            last_hero = idx
+
+    return selected
+
+def determine_spatial_physics(narr: str, fg_key: Optional[str], hero_index: int) -> Tuple[str, str, str, str]:
+    """Xác định hành vi xúc giác (Tactile Spatial Physics) dựa trên bản chất vật thể và ngữ cảnh kể chuyện (Rule 128).
+    Trả về: (physics_type, action_type, seed_mode, foleys)
+    """
+    n_low = narr.lower()
+    fg_low = (fg_key or "").lower()
+
+    if any(k in n_low or k in fg_low for k in ["gavel", "judge", "búa", "scales", "justice"]):
+        return "MACRO_HIGHLIGHT_WIPE", "MACRO_HIGHLIGHT_WIPE", "CUTOUT_ONLY", "gavel_thud"
+    elif any(k in n_low or k in fg_low for k in ["gauge", "soft reserve", "needle", "meter"]):
+        return "MACRO_HIGHLIGHT_WIPE", "MACRO_HIGHLIGHT_WIPE", "CUTOUT_ONLY", "gauge_needle_hiss"
+    elif any(k in n_low or k in fg_low for k in ["server", "rack", "drive", "hardware", "led"]):
+        return "MACRO_HIGHLIGHT_WIPE", "MACRO_HIGHLIGHT_WIPE", "CUTOUT_ONLY", "paper_rustle"
+    elif any(k in n_low or k in fg_low for k in ["docket", "memo", "confidential", "secret", "whistleblower", "dog-ear", "peel"]):
+        return "CORNER_DOGEAR_PEEL", "CORNER_DOGEAR_PEEL", "COMPOSITE_16_9", "paper_page_turn"
+    elif any(k in n_low or k in fg_low for k in ["invoice", "damage", "bill", "check", "listing", "sponsored", "search card"]):
+        return "DOCUMENT_TABLE_DROP", "DOCUMENT_TABLE_DROP", "COMPOSITE_16_9", "document_table_thud"
+    elif any(k in n_low or k in fg_low for k in ["dossier", "contract", "agreement", "binder", "ledger", "book"]):
+        return "BIFOLD_DOSSIER_OPEN", "BIFOLD_DOSSIER_OPEN", "COMPOSITE_16_9", "paper_crease_snap"
+    else:
+        cycle = hero_index % 3
+        if cycle == 0:
+            return "CORNER_DOGEAR_PEEL", "CORNER_DOGEAR_PEEL", "COMPOSITE_16_9", "paper_page_turn"
+        elif cycle == 1:
+            return "DOCUMENT_TABLE_DROP", "DOCUMENT_TABLE_DROP", "COMPOSITE_16_9", "document_table_thud"
+        else:
+            return "BIFOLD_DOSSIER_OPEN", "BIFOLD_DOSSIER_OPEN", "COMPOSITE_16_9", "paper_crease_snap"
 
 def load_style_config(preset_name: Optional[str] = None) -> Dict[str, Any]:
     """Nạp cấu hình phong cách từ config/prompts/style-config.yaml (Rule 128 & Rule 132)."""
@@ -297,6 +364,8 @@ def build_unified_director_plan(
     hero_clips = []
     hero_count = 0
 
+    dynamic_hero_indices = set(select_dynamic_hero_indices(spoken_sentences))
+
     for idx, sent in enumerate(spoken_sentences):
         narr = sent.get("text", "")
         dur_frames = sent.get("duration_frames", 150)
@@ -349,36 +418,12 @@ def build_unified_director_plan(
         seed_title = OBJECT_ROSTER[fg_key]["title"] if fg_key else BACKGROUND_ROSTER[bg_key]["title"]
         setting_desc = BACKGROUND_ROSTER[bg_key]["title"]
 
-        is_hero_video = idx in HERO_SCENE_INDICES
-        if is_hero_video and hero_count < 20:
+        is_hero_video = idx in dynamic_hero_indices
+        if is_hero_video:
             flow_slot = FLOW_ACCOUNTS[hero_count % len(FLOW_ACCOUNTS)]
             
-            # Phân loại Spatial Physics Action theo 4 Chuẩn Hồ Sơ Pháp Y
-            if idx in [0, 126]:
-                physics_type = "MACRO_HIGHLIGHT_WIPE"
-                action_type = "MACRO_HIGHLIGHT_WIPE"
-                seed_mode = "CUTOUT_ONLY"
-                foleys = "gavel_thud"
-            elif idx in [28, 40]:
-                physics_type = "MACRO_HIGHLIGHT_WIPE"
-                action_type = "MACRO_HIGHLIGHT_WIPE"
-                seed_mode = "CUTOUT_ONLY"
-                foleys = "paper_rustle"
-            elif idx % 3 == 0:
-                physics_type = "CORNER_DOGEAR_PEEL"
-                action_type = "CORNER_DOGEAR_PEEL"
-                seed_mode = "COMPOSITE_16_9"
-                foleys = "paper_page_turn"
-            elif idx % 3 == 1:
-                physics_type = "DOCUMENT_TABLE_DROP"
-                action_type = "DOCUMENT_TABLE_DROP"
-                seed_mode = "COMPOSITE_16_9"
-                foleys = "document_table_thud"
-            else:
-                physics_type = "BIFOLD_DOSSIER_OPEN"
-                action_type = "BIFOLD_DOSSIER_OPEN"
-                seed_mode = "COMPOSITE_16_9"
-                foleys = "paper_crease_snap"
+            # Phân loại Spatial Physics Action động theo ngữ cảnh kể chuyện
+            physics_type, action_type, seed_mode, foleys = determine_spatial_physics(narr, fg_key, hero_count)
 
             action_desc = get_action_description(action_type, seed_title, narr)
             veo_prompt = format_final_veo_prompt(
@@ -563,7 +608,7 @@ def main():
         json.dump(prompts_data, f, indent=2, ensure_ascii=False)
     print(f"✅ Đã tạo prompts_forge.json ({len(bg_prompts)} BGs, {len(fg_prompts)} FGs) -> {pf_path}")
 
-    # 3. Lưu flow_video_manifest.json (20 Hero clips cho 6 tài khoản)
+    # 3. Lưu flow_video_manifest.json (Hero clips phân bổ qua các tài khoản Google Flow)
     manifest_data = {
         "episode_id": ep_id,
         "total_clips": len(hero_clips),
@@ -572,10 +617,10 @@ def main():
     man_path = ep_dir / "flow_video_manifest.json"
     with open(man_path, "w", encoding="utf-8") as f:
         json.dump(manifest_data, f, indent=2, ensure_ascii=False)
-    print(f"✅ Đã tạo flow_video_manifest.json ({len(hero_clips)} clips phân bổ 6 tài khoản) -> {man_path}")
+    print(f"✅ Đã tạo flow_video_manifest.json ({len(hero_clips)} clips phân bổ {len(FLOW_ACCOUNTS)} tài khoản) -> {man_path}")
 
     print("\n" + "=" * 70)
-    print("📊 BẢO CHỨNG PHÂN BỔ 20 CLIPS VEO CHO 6 TÀI KHOẢN GOOGLE FLOW:")
+    print(f"📊 BẢO CHỨNG PHÂN BỔ {len(hero_clips)} CLIPS VEO CHO {len(FLOW_ACCOUNTS)} TÀI KHOẢN GOOGLE FLOW:")
     print("=" * 70)
     acc_distribution = {}
     for c in hero_clips:

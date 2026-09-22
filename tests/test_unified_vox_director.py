@@ -79,3 +79,39 @@ def test_scene_schema_compliance(tmp_path):
         assert "final_veo_prompt" in c
         assert "prompt" in c
         assert c["transition_out"] in allowed_transitions
+
+def test_select_dynamic_hero_indices():
+    """Verify dynamic cadence selection without hardcoded dead numbers (Rule 128)."""
+    from app.services.unified_vox_director import select_dynamic_hero_indices, determine_spatial_physics
+    
+    # 1. 100 sentences test episode
+    sents = [
+        {"text": f"Sentence {i} describing financial evidence and system anomalies.", "beat_index": (i // 20) + 1}
+        for i in range(100)
+    ]
+    # Inject catalyst words
+    sents[15]["text"] = "The FTC Seattle court docket was filed."
+    sents[45]["text"] = "A twenty billion dollars fine was issued."
+    sents[85]["text"] = "Andy Jassy signed the internal project Nessie memo."
+    sents[99]["text"] = "The judge delivered the final gavel verdict."
+
+    hero_indices = select_dynamic_hero_indices(sents)
+    assert 0 in hero_indices, "Scene 0 must always be a hero clip (Hook/Paradox)"
+    assert len(hero_indices) >= 12 and len(hero_indices) <= 22, f"Cadence should yield ~14-20 clips for 100 scenes, got {len(hero_indices)}"
+    
+    # Check minimum distance
+    for i in range(len(hero_indices) - 1):
+        gap = hero_indices[i+1] - hero_indices[i]
+        assert gap >= 3, f"Gap between hero clips must be >= 3, found {gap} between {hero_indices[i]} and {hero_indices[i+1]}"
+
+    # 2. Physics classification
+    phys, act, mode, fol = determine_spatial_physics("The judge struck the gavel with authority", "fg_evidence_gavel", 0)
+    assert phys == "MACRO_HIGHLIGHT_WIPE"
+    assert mode == "CUTOUT_ONLY"
+    assert fol == "gavel_thud"
+
+    phys, act, mode, fol = determine_spatial_physics("Confidential memo revealing secret pricing", "fg_evidence_memo", 1)
+    assert phys == "CORNER_DOGEAR_PEEL"
+    assert mode == "COMPOSITE_16_9"
+    assert fol == "paper_page_turn"
+
