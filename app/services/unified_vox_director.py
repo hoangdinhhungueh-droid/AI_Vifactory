@@ -249,25 +249,25 @@ def format_final_veo_prompt(
     return " ".join(prompt.split())
 
 def get_action_description(action_type: str, seed_title: str, narration: str) -> str:
-    """Tạo mô tả hành động xúc giác ngắn gọn cho VEO physics prompt."""
+    """Tạo mô tả hành động xúc giác ngắn gọn cho VEO physics prompt (không lặp lại subject)."""
     if action_type == "CORNER_DOGEAR_PEEL":
-        return f"top sheet dog-ear corner curls back organically in crisp 12fps mechanical steps, lifting upward to reveal confidential audit docket beneath"
+        return "top sheet dog-ear corner curling and peeling backward in crisp 12fps mechanical steps, lifting upward to reveal confidential audit docket beneath"
     elif action_type == "DOCUMENT_TABLE_DROP":
-        return f"confidential forensic evidence folder ({seed_title}) slides rapidly into frame and slams onto executive table with a sharp stop-motion bounce, settling flat with paper flutter"
+        return "sliding rapidly into frame and slamming onto executive table with a sharp stop-motion bounce, settling flat with paper flutter"
     elif action_type == "BIFOLD_DOSSIER_OPEN":
-        return f"official confidential docket folder ({seed_title}) with sharp center crease opens outward flat onto table in clean mechanical 12fps steps, revealing internal financial charts"
+        return "with sharp center crease opening outward flat onto table in clean mechanical 12fps steps, revealing internal financial charts"
     elif action_type == "MACRO_HIGHLIGHT_WIPE":
         n_low = narration.lower()
         if "gavel" in n_low or "judge" in n_low:
-            return f"dark wooden judge gavel resting beside brass scales of justice on mahogany table under dramatic directional spotlight with subtle dust motes and micro-vibrations"
+            return "resting beside brass scales of justice on mahogany table under dramatic directional spotlight with subtle dust motes and micro-vibrations"
         elif "gauge" in n_low:
-            return f"industrial circular analog gauge needle rising smoothly toward red danger zone with amber reflection"
+            return "industrial circular analog gauge needle rising smoothly toward red danger zone with amber reflection"
         elif "server" in n_low:
-            return f"high-tech enterprise server rack drive module with rhythmic blue data activity LEDs flashing in cool mist"
+            return "high-tech enterprise server rack drive module with rhythmic blue data activity LEDs flashing in cool mist"
         else:
-            return f"{seed_title} resting on dark mahogany desk under dramatic directional studio keylight with 12fps documentary tracking motion"
+            return "resting on dark mahogany desk under dramatic directional studio keylight with 12fps documentary tracking motion"
     else:
-        return f"{seed_title} resting on table with subtle 12fps micro-jitter in steady documentary tracking"
+        return "resting on table with subtle 12fps micro-jitter in steady documentary tracking"
 
 def generate_tactile_physics_prompt(scene_idx: int, narration: str, action_type: str, seed_title: str) -> str:
     """Backward-compatible wrapper for tactile physics prompt."""
