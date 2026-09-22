@@ -984,6 +984,7 @@ def build_remotion_props_data(
             "opticalFx": optical_fx,
             "foleysAudio": foley_file,
             "foleys_audio": foley_file,
+            "transition_out": s.get("transition_out") or s.get("transitionOut") or "hard_cut",
             "subtitles": scene_subtitles,  # Forward Faster-Whisper words
             "words": scene_subtitles,      # Alias for maximum compatibility
         })

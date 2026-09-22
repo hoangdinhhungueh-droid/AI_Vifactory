@@ -16,6 +16,7 @@ import os
 import sys
 import json
 import argparse
+import yaml
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
@@ -184,68 +185,113 @@ HERO_SCENE_INDICES = [
 
 FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06"]
 
-def generate_tactile_physics_prompt(scene_idx: int, narration: str, action_type: str, seed_title: str) -> str:
-    """Tạo prompt xúc giác 5 thành phần cho Veo 3.1 - Fast.
-    Khóa 100% Graphic Novel, 0% người thật, chuẩn hóa 4 Forensic Paper Stop-Motion Patterns.
+def load_style_config(preset_name: Optional[str] = None) -> Dict[str, Any]:
+    """Nạp cấu hình phong cách từ config/prompts/style-config.yaml (Rule 128 & Rule 132)."""
+    config_path = ROOT_DIR / "config" / "prompts" / "style-config.yaml"
+    if not config_path.exists():
+        return {
+            "name": "vox_forensic_paper",
+            "positive": "tangible forensic investigative paper docudrama, heavy 300gsm fibrous cardstock, sharp cardstock creases, official audit stamps, classified exhibit labels, clean 2D stylized graphic novel comic ink outlines, bold linework, crosshatching, flat cel-shading, tabletop flat-lay evidence setting",
+            "motion_behavior": "12fps tactile stop-motion documentary motion, mechanical paper folding and dog-ear corner peel, crisp document table drop with subtle paper flutter, steady tripod camera drift, zero warping or morphing of text, staggered discrete frame steps",
+            "negative": "no photorealism, no live-action video, no real people, no 3D wax characters, no smooth 60fps interpolation, no gooey liquid warping, no anime, no watercolor",
+            "camera_defaults": {"allowed": ["static", "slow_push_in", "slow_pull_out", "cinematic_pan", "macro_tilt"]},
+            "lighting_defaults": "45-degree directional evening boardroom keylight, deep contact shadows onto dark mahogany surface",
+            "clip_duration_seconds": {"min": 4, "max": 8, "default": 5},
+            "prompt_template": "{style_anchor.positive}, {style_anchor.motion_behavior}. Scene: {scene.subject} {scene.action} in {scene.setting}. Camera: {scene.camera}. Lighting: {scene.lighting}. {style_anchor.negative}"
+        }
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+
+    presets = data.get("presets", {})
+    chosen_name = preset_name or data.get("active_preset", "vox_forensic_paper")
+    preset_data = presets.get(chosen_name)
+    if not preset_data:
+        chosen_name = next(iter(presets.keys()), "vox_forensic_paper")
+        preset_data = presets.get(chosen_name, {})
+
+    return {
+        "name": chosen_name,
+        "positive": " ".join(str(preset_data.get("positive", "")).split()),
+        "motion_behavior": " ".join(str(preset_data.get("motion_behavior", "")).split()),
+        "negative": " ".join(str(preset_data.get("negative", "")).split()),
+        "camera_defaults": preset_data.get("camera_defaults", {"allowed": ["static", "slow_push_in", "slow_pull_out", "cinematic_pan", "macro_tilt"]}),
+        "lighting_defaults": " ".join(str(preset_data.get("lighting_defaults", "warm diorama studio light, soft shadows, subtle rim light")).split()),
+        "clip_duration_seconds": preset_data.get("clip_duration_seconds", {"min": 4, "max": 8, "default": 5}),
+        "prompt_template": data.get("prompt_template", "")
+    }
+
+def format_final_veo_prompt(
+    preset: Dict[str, Any],
+    subject: str,
+    action: str,
+    setting: str,
+    camera: str,
+    lighting: Optional[str] = None
+) -> str:
+    """Ghép final_veo_prompt theo template chuẩn:
+    {style_anchor.positive}, {style_anchor.motion_behavior}.
+    Scene: {scene.subject} {scene.action} in {scene.setting}.
+    Camera: {scene.camera}. Lighting: {scene.lighting}.
+    {style_anchor.negative}
     """
+    pos = preset.get("positive", "")
+    mot = preset.get("motion_behavior", "")
+    neg = preset.get("negative", "")
+    lt = lighting or preset.get("lighting_defaults", "")
+    
+    prompt = (
+        f"{pos}, {mot}. "
+        f"Scene: {subject} {action} in {setting}. "
+        f"Camera: {camera}. Lighting: {lt}. "
+        f"{neg}"
+    )
+    return " ".join(prompt.split())
+
+def get_action_description(action_type: str, seed_title: str, narration: str) -> str:
+    """Tạo mô tả hành động xúc giác ngắn gọn cho VEO physics prompt."""
     if action_type == "CORNER_DOGEAR_PEEL":
-        action = (
-            f"Tactile forensic document stop-motion animation: The dog-eared corner of {seed_title} "
-            f"curls and peels backward in crisp 12fps stop-motion mechanical steps, lifting upward to reveal "
-            f"the underlying confidential evidence docket beneath it. Subtle 12fps organic paper flutter "
-            f"and micro-jitter animate the document resting on the dark executive boardroom table."
-        )
+        return f"top sheet dog-ear corner curls back organically in crisp 12fps mechanical steps, lifting upward to reveal confidential audit docket beneath"
     elif action_type == "DOCUMENT_TABLE_DROP":
-        action = (
-            f"Tactile forensic document stop-motion animation: This confidential forensic evidence folder ({seed_title}) "
-            f"slides rapidly into frame and slams onto the dark executive boardroom table with a sharp stop-motion bounce, "
-            f"settling flat with micro-vibrations and paper flutter at 12fps cadence."
-        )
+        return f"confidential forensic evidence folder ({seed_title}) slides rapidly into frame and slams onto executive table with a sharp stop-motion bounce, settling flat with paper flutter"
     elif action_type == "BIFOLD_DOSSIER_OPEN":
-        action = (
-            f"Tactile forensic document stop-motion animation: An official confidential docket folder ({seed_title}) "
-            f"with sharp center crease smoothly opens outward flat onto the executive table in clean mechanical "
-            f"12fps stop-motion steps, revealing the internal financial charts and forensic ledgers."
-        )
+        return f"official confidential docket folder ({seed_title}) with sharp center crease opens outward flat onto table in clean mechanical 12fps steps, revealing internal financial charts"
     elif action_type == "MACRO_HIGHLIGHT_WIPE":
-        if "gavel" in narration.lower() or "judge" in narration.lower():
-            action = (
-                "Slow cinematic camera push-in on a dark wooden judge gavel resting beside brass scales of justice "
-                "on mahogany table, dramatic warm directional spotlight, subtle floating dust motes, 12fps tactile motion."
-            )
-        elif "gauge" in narration.lower():
-            action = (
-                "Tactile macro push-in on an industrial circular analog gauge labeled SOFT RESERVE FLOOR, "
-                "with a brass needle rising smoothly toward red danger zone, amber backlight reflection, 12fps cadence."
-            )
-        elif "server" in narration.lower():
-            action = (
-                "Slow cinematic macro drift past high-tech server rack drive module with rhythmic blue data "
-                "activity LEDs flashing in cool industrial mist, steady documentary tracking."
-            )
+        n_low = narration.lower()
+        if "gavel" in n_low or "judge" in n_low:
+            return f"dark wooden judge gavel resting beside brass scales of justice on mahogany table under dramatic directional spotlight with subtle dust motes and micro-vibrations"
+        elif "gauge" in n_low:
+            return f"industrial circular analog gauge needle rising smoothly toward red danger zone with amber reflection"
+        elif "server" in n_low:
+            return f"high-tech enterprise server rack drive module with rhythmic blue data activity LEDs flashing in cool mist"
         else:
-            action = (
-                f"Tactile macro camera push-in on {seed_title} resting on dark mahogany desk, "
-                f"dramatic directional studio keylight, 12fps documentary tracking motion."
-            )
+            return f"{seed_title} resting on dark mahogany desk under dramatic directional studio keylight with 12fps documentary tracking motion"
     else:
-        action = (
-            f"Tactile forensic document stop-motion camera drift past {seed_title} resting on dark oak table, "
-            f"subtle 12fps micro-jitter, steady documentary movement."
-        )
+        return f"{seed_title} resting on table with subtle 12fps micro-jitter in steady documentary tracking"
 
-    material = "Heavy 300gsm fibrous textured cardstock paper, crisp paper creasing, tactile contact drop shadows shifting realistically across polished wood."
-    lighting = "Soft 45-degree directional evening boardroom keylight, deep contact shadows onto dark mahogany surface, subtle depth of field f/2.8."
-    style = "Strictly preserve the exact 2D stylized graphic novel comic ink outlines, bold linework, crosshatching, and flat cel-shading. NO photorealism, NO live-action video, NO real people."
-    dynamics = "12fps tactile stop-motion documentary motion, zero warping of text, stable mechanical transition."
+def generate_tactile_physics_prompt(scene_idx: int, narration: str, action_type: str, seed_title: str) -> str:
+    """Backward-compatible wrapper for tactile physics prompt."""
+    preset = load_style_config("vox_forensic_paper")
+    action_desc = get_action_description(action_type, seed_title, narration)
+    return format_final_veo_prompt(
+        preset=preset,
+        subject=seed_title,
+        action=action_desc,
+        setting="dark mahogany executive boardroom table at dusk",
+        camera="slow_push_in" if scene_idx % 2 == 0 else "cinematic_pan"
+    )
 
-    return f"{action} {material} {lighting} {style} {dynamics}"
-
-def build_unified_director_plan(spoken_sentences: List[Dict[str, Any]], ep_dir: Path) -> Dict[str, Any]:
+def build_unified_director_plan(
+    spoken_sentences: List[Dict[str, Any]],
+    ep_dir: Path,
+    style_preset: Optional[str] = None
+) -> Dict[str, Any]:
     """Hợp nhất B3 + B3.5: Tạo cấu trúc phân cảnh, gán 20 Veo clips Tactile Physics và Remotion Stop-Motion."""
-    total_scenes = len(spoken_sentences)
+    preset = load_style_config(style_preset)
+    allowed_cameras = preset.get("camera_defaults", {}).get("allowed", [
+        "static", "slow_push_in", "slow_pull_out", "cinematic_pan", "macro_tilt"
+    ])
     layout_zones = ["split_evidence_left", "center_hero_document", "split_evidence_right", "macro_detail_focus"]
-    camera_moves = ["slow_push_in", "snap_zoom", "macro_tilt", "cinematic_pan", "slow_pull_out"]
 
     scenes = []
     hero_clips = []
@@ -296,6 +342,13 @@ def build_unified_director_plan(spoken_sentences: List[Dict[str, Any]], ep_dir: 
             fg_candidates = [k for k, v in OBJECT_ROSTER.items() if beat_idx in v["beats"]]
             fg_key = fg_candidates[idx % len(fg_candidates)]
 
+        cam_move = allowed_cameras[idx % len(allowed_cameras)]
+        layout_choice = layout_zones[idx % len(layout_zones)]
+        transition_choice = "stop_motion_flicker_cut" if idx % 2 == 1 else "hard_cut"
+
+        seed_title = OBJECT_ROSTER[fg_key]["title"] if fg_key else BACKGROUND_ROSTER[bg_key]["title"]
+        setting_desc = BACKGROUND_ROSTER[bg_key]["title"]
+
         is_hero_video = idx in HERO_SCENE_INDICES
         if is_hero_video and hero_count < 20:
             flow_slot = FLOW_ACCOUNTS[hero_count % len(FLOW_ACCOUNTS)]
@@ -327,9 +380,17 @@ def build_unified_director_plan(spoken_sentences: List[Dict[str, Any]], ep_dir: 
                 seed_mode = "COMPOSITE_16_9"
                 foleys = "paper_crease_snap"
 
-            seed_title = OBJECT_ROSTER[fg_key]["title"] if fg_key else BACKGROUND_ROSTER[bg_key]["title"]
-            veo_prompt = generate_tactile_physics_prompt(idx, narr, action_type, seed_title)
-            
+            action_desc = get_action_description(action_type, seed_title, narr)
+            veo_prompt = format_final_veo_prompt(
+                preset,
+                subject=seed_title,
+                action=action_desc,
+                setting=setting_desc,
+                camera=cam_move,
+                lighting=preset["lighting_defaults"]
+            )
+            source_img = f"assets/keyframes/hero_sc{idx:03d}_seed.png" if seed_mode == "CUTOUT_ONLY" else f"assets/composite/sc{idx:03d}_composite.png"
+
             shot_type = "HERO_AI_VIDEO"
             clip_entry = {
                 "scene_id": f"sc{idx:03d}",
@@ -338,10 +399,21 @@ def build_unified_director_plan(spoken_sentences: List[Dict[str, Any]], ep_dir: 
                 "spatial_physics_type": physics_type,
                 "action_type": action_type,
                 "seed_asset_mode": seed_mode,
+                "source_image": source_img,
+                "subject": seed_title,
+                "action": action_desc,
+                "setting": setting_desc,
+                "camera": cam_move,
+                "lighting": preset["lighting_defaults"],
+                "duration_seconds": dur_sec,
+                "duration_sec": dur_sec,
+                "transition_out": transition_choice,
+                "audio_cue": foleys,
+                "text_overlay": None,
+                "final_veo_prompt": veo_prompt,
                 "bg_key": bg_key,
                 "fg_key": fg_key,
                 "prompt": veo_prompt,
-                "duration_sec": dur_sec,
                 "foleys_audio": foleys,
                 "output_filename": f"hero_video_sc{idx:03d}.mp4"
             }
@@ -351,14 +423,13 @@ def build_unified_director_plan(spoken_sentences: List[Dict[str, Any]], ep_dir: 
             shot_type = "TACTILE_STOP_MOTION_COLLAGE"
             physics_type = "REMOTION_FORENSIC"
             flow_slot = None
-            veo_prompt = None
             foleys = "stamp_impact" if ("invoice" in (fg_key or "") or "docket" in (fg_key or "")) else "paper_rustle"
+            action_desc = f"{seed_title} evidentiary display in tactile stop-motion"
+            veo_prompt = None
+            source_img = f"assets/composite/sc{idx:03d}_composite.png"
 
         has_foreground = (shot_type == "TACTILE_STOP_MOTION_COLLAGE" and idx % 3 != 2)
         assigned_fg = fg_key if has_foreground else None
-
-        layout_choice = layout_zones[idx % len(layout_zones)]
-        cam_move = camera_moves[idx % len(camera_moves)]
 
         # Remotion Stop-Motion Animation Directives
         remotion_instructions = {
@@ -383,10 +454,21 @@ def build_unified_director_plan(spoken_sentences: List[Dict[str, Any]], ep_dir: 
 
         scene_obj = {
             "scene_id": f"sc{idx:03d}",
-            "beat_index": beat_idx,
-            "narration": narr,
+            "source_image": source_img,
+            "subject": seed_title,
+            "action": action_desc,
+            "setting": setting_desc,
+            "camera": cam_move,
+            "lighting": preset["lighting_defaults"],
+            "duration_seconds": dur_sec,
             "duration_frames": dur_frames,
             "duration_sec": dur_sec,
+            "audio_cue": foleys,
+            "text_overlay": None,
+            "transition_out": transition_choice,
+            "final_veo_prompt": veo_prompt,
+            "beat_index": beat_idx,
+            "narration": narr,
             "shot_type": shot_type,
             "spatial_physics_type": physics_type,
             "flow_slot": flow_slot,
@@ -417,6 +499,7 @@ def main():
     parser = argparse.ArgumentParser(description="Unified VOX Director Engine (B3 + B3.5)")
     parser.add_argument("--episode", default="EN_EP0004_amazon_ad_lawsuit", help="Episode ID")
     parser.add_argument("--ep-dir", default=None, help="Explicit path to episode folder")
+    parser.add_argument("--style-preset", default="vox_forensic_paper", help="Style preset from style-config.yaml")
     args = parser.parse_args()
 
     ep_id = args.episode
@@ -451,7 +534,7 @@ def main():
         print(f"❌ Không tìm thấy dữ liệu kịch bản tại {ep_dir}")
         sys.exit(1)
 
-    result = build_unified_director_plan(spoken_sentences, ep_dir)
+    result = build_unified_director_plan(spoken_sentences, ep_dir, style_preset=args.style_preset)
     scenes = result["scenes"]
     hero_clips = result["hero_clips"]
 

@@ -1,0 +1,62 @@
+# ============================================================
+# STYLE CONFIG — Modular Art & Motion Directives
+# Antigravity reads this file and injects style_anchor + motion_behavior
+# into every prompt sent to VEO (Image-to-Video).
+# ============================================================
+
+active_preset: "vox_forensic_paper"
+
+presets:
+  voxel_stopmotion:
+    positive: >
+      voxel art style, 3D cube/pixel-based models, isometric or slight
+      low-angle camera, stop-motion animation aesthetic, diorama-scale
+      miniature world, soft studio ambient occlusion, warm directional
+      key light with soft shadow, tabletop/handmade craft look,
+      similar to Laika stop-motion shorts mixed with voxel game art
+    motion_behavior: >
+      movement staggered and slightly choppy like frame-by-frame
+      animation (~12fps feel), NOT smooth interpolation, objects
+      shift in small discrete steps, minor frame-hold jitter,
+      camera movement steady/tripod-like if any, minimal to no
+      motion blur
+    negative: >
+      no motion blur, no smooth 60fps interpolation, no photorealistic
+      rendering, no painterly or watercolor style, no 2D hand-drawn
+      animation, no anime style, no realistic human skin texture
+    camera_defaults:
+      allowed: ["static", "slow_pan_left", "slow_pan_right", "slight_isometric_rotate", "slow_push_in"]
+      disallowed: ["fast_whip_pan", "handheld_shake", "drone_flyover"]
+    lighting_defaults: "warm diorama studio light, soft shadows, subtle rim light"
+    clip_duration_seconds:
+      min: 4
+      max: 8
+      default: 6
+
+  vox_forensic_paper:
+    positive: >
+      tangible forensic investigative paper docudrama, heavy 300gsm fibrous cardstock,
+      sharp cardstock creases, official audit stamps, classified exhibit labels,
+      clean 2D stylized graphic novel comic ink outlines, bold linework, crosshatching,
+      flat cel-shading, tabletop flat-lay evidence setting
+    motion_behavior: >
+      12fps tactile stop-motion documentary motion, mechanical paper folding and dog-ear corner peel,
+      crisp document table drop with subtle paper flutter, steady tripod camera drift,
+      zero warping or morphing of text, staggered discrete frame steps
+    negative: >
+      no photorealism, no live-action video, no real people, no 3D wax characters,
+      no smooth 60fps interpolation, no gooey liquid warping, no anime, no watercolor
+    camera_defaults:
+      allowed: ["static", "slow_push_in", "slow_pull_out", "cinematic_pan", "macro_tilt"]
+      disallowed: ["fast_whip_pan", "drone_flyover"]
+    lighting_defaults: "45-degree directional evening boardroom keylight, deep contact shadows onto dark mahogany surface"
+    clip_duration_seconds:
+      min: 4
+      max: 8
+      default: 5
+
+prompt_template: |
+  {style_anchor.positive}, {style_anchor.motion_behavior}.
+  Scene: {scene.subject} {scene.action} in {scene.setting}.
+  Camera: {scene.camera}. Lighting: {scene.lighting}.
+  {style_anchor.negative}

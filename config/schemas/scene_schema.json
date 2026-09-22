@@ -1,0 +1,68 @@
+{
+  "$comment": "Schema cho 1 scene. Antigravity sinh N object theo schema này từ kịch bản gốc, mỗi object = 1 lệnh gọi VEO image-to-video. Field 'source_image' là ảnh keyframe (voxel render/mockup/composite) dùng làm input cho VEO.",
+  "type": "object",
+  "required": [
+    "scene_id",
+    "source_image",
+    "subject",
+    "action",
+    "setting",
+    "camera",
+    "duration_seconds"
+  ],
+  "properties": {
+    "scene_id": {
+      "type": "string",
+      "description": "ID duy nhất, dùng để Remotion map đúng thứ tự. VD: scene_01"
+    },
+    "source_image": {
+      "type": "string",
+      "description": "Path/URL ảnh keyframe (input cho VEO image-to-video). Render trước bằng voxel tool hoặc B4.5 composite seed để đảm bảo tính nhất quán giữa các scene."
+    },
+    "subject": {
+      "type": "string",
+      "description": "Chủ thể chính. VD: 'a small voxel fox character' hoặc '$20 Billion Damages Calculation Sheet'"
+    },
+    "action": {
+      "type": "string",
+      "description": "Hành động cụ thể, ngắn gọn. VD: 'top sheet dog-ear corner curls back organically' hoặc 'walking across a wooden bridge'"
+    },
+    "setting": {
+      "type": "string",
+      "description": "Bối cảnh. VD: 'a miniature pixel forest diorama at dusk' hoặc 'dark mahogany executive boardroom desk at dusk'"
+    },
+    "camera": {
+      "type": "string",
+      "enum": ["static", "slow_pan_left", "slow_pan_right", "slight_isometric_rotate", "slow_push_in", "slow_pull_out", "cinematic_pan", "macro_tilt"],
+      "description": "Lấy từ style-config.camera_defaults.allowed"
+    },
+    "lighting": {
+      "type": "string",
+      "default": "warm diorama studio light, soft shadows, subtle rim light"
+    },
+    "duration_seconds": {
+      "type": "number",
+      "minimum": 4,
+      "maximum": 8,
+      "default": 5
+    },
+    "audio_cue": {
+      "type": "string",
+      "description": "Optional. Mô tả âm thanh/nhạc nền cho scene này, Remotion sẽ overlay. VD: 'paper_crease_snap' hoặc 'soft wooden footstep foley'"
+    },
+    "text_overlay": {
+      "type": "string",
+      "description": "Optional. Text/caption hiện trên scene, nếu có."
+    },
+    "transition_out": {
+      "type": "string",
+      "enum": ["hard_cut", "stop_motion_flicker_cut", "crossfade_short"],
+      "default": "hard_cut",
+      "description": "hard_cut hợp phong cách stop-motion nhất. stop_motion_flicker_cut nhấp nháy 2-3 frame giả lập đổi khung hình thủ công."
+    },
+    "final_veo_prompt": {
+      "type": "string",
+      "description": "Prompt hoàn chỉnh ghép từ style_anchor + scene properties"
+    }
+  }
+}

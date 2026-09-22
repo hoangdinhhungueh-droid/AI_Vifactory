@@ -22,6 +22,7 @@ import { VoxOverlayLayer } from "./components/vox/VoxOverlayLayer";
 import { EvidenceProp3D } from "./components/EvidenceProp3D";
 import { VoxAtmosphericLighting } from "./components/vox/VoxAtmosphericLighting";
 import { VoxParallaxLayer } from "./components/vox/VoxParallaxLayer";
+import { VoxelStopMotionVideo, calculateTotalFrames } from "./components/VoxelStopMotionVideo";
 
 const INK = "#05090d";
 const LIGHT = "#ffffff";
@@ -555,8 +556,25 @@ export const TwoLayerScene = (props) => {
     extrapolateRight: "clamp",
   });
 
+  // Transition out / Entrance flicker (Tactile Stop-Motion Cut)
+  const transitionOut = props.transition_out || props.transitionOut;
+  let entranceOpacity = 1;
+  if (transitionOut === "stop_motion_flicker_cut") {
+    entranceOpacity = interpolate(
+      frame,
+      [0, 1, 2, 3, 4],
+      [0, 1, 0.3, 1, 1],
+      { extrapolateRight: "clamp", extrapolateLeft: "clamp" }
+    );
+  } else if (transitionOut === "crossfade_short") {
+    entranceOpacity = interpolate(frame, [0, 6], [0, 1], {
+      extrapolateRight: "clamp",
+      extrapolateLeft: "clamp",
+    });
+  }
+
   return (
-    <AbsoluteFill style={{ backgroundColor: showBackground ? INK : "transparent" }}>
+    <AbsoluteFill style={{ backgroundColor: showBackground ? INK : "transparent", opacity: entranceOpacity }}>
       {showBackground && background ? (
         <AbsoluteFill>
           <Img
@@ -640,20 +658,21 @@ export const TwoLayerScene = (props) => {
         <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} />
       ) : null}
 
-      {/* Modern High-Retention Subtitle Dialogue Container (Exact Layout of User Reference Image 1) */}
+      {/* Modern High-Retention Subtitle Dialogue Container (Decision A4: Adaptive Opposing HUD) */}
       {words.length > 0 ? (
         <div
           style={{
             position: "absolute",
             bottom: 30,
-            left: isLeft ? 520 : 60,
-            right: isRight ? 520 : 60,
-            minHeight: 145,
+            left: isLeft ? "52%" : (isRight ? 60 : "18%"),
+            right: isRight ? "52%" : (isLeft ? 60 : "18%"),
+            maxWidth: (isLeft || isRight) ? "45%" : "64%",
+            minHeight: (isLeft || isRight) ? 120 : 95,
             zIndex: 25,
             background: "linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(5, 9, 14, 0.96) 100%)",
             border: "2px solid rgba(242, 166, 59, 0.40)",
             borderRadius: 18,
-            padding: "16px 28px",
+            padding: (isLeft || isRight) ? "14px 22px" : "14px 28px",
             boxShadow: "0 15px 40px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.15)",
             display: "flex",
             flexDirection: "column",
@@ -664,11 +683,11 @@ export const TwoLayerScene = (props) => {
           <div
             style={{
               color: "#f2a63b",
-              fontSize: 18,
+              fontSize: (isLeft || isRight) ? 16 : 18,
               fontWeight: 800,
-              letterSpacing: 1.5,
+              letterSpacing: 1.2,
               textTransform: "uppercase",
-              marginBottom: 8,
+              marginBottom: 6,
               display: "flex",
               alignItems: "center",
               gap: 8,
@@ -683,10 +702,10 @@ export const TwoLayerScene = (props) => {
           <div
             style={{
               fontFamily: "'Segoe UI', Roboto, -apple-system, sans-serif",
-              fontSize: 30,
-              lineHeight: 1.45,
+              fontSize: (isLeft || isRight) ? 26 : 28,
+              lineHeight: 1.35,
               color: "#FFFFFF",
-              textAlign: "left",
+              textAlign: (isLeft || isRight) ? "left" : "center",
             }}
           >
             {visibleWords.map((w, wIdx) => {
@@ -1487,6 +1506,7 @@ export const TwoLayerEpisode = (props) => {
             bgClusterId={s.bgClusterId || s.bg_cluster_id}
             forensicOverlay={s.forensicOverlay || s.forensic_overlay}
             stampBadge={s.stampBadge || s.stamp_badge}
+            transition_out={s.transition_out || s.transitionOut}
           />
         </Sequence>
       );
@@ -1712,6 +1732,31 @@ const RemotionRoot = () => {
         defaultProps={{
           title: "CONFIDENTIAL EVIDENCE // EXHIBIT A",
           subtitle: "IMPERIAL SEAL / AUTHENTICATION STAMP",
+        }}
+      />
+      {/* Voxel & Stop-Motion Composition (Image-to-Video Engine) */}
+      <Composition
+        id="VoxelStopMotion"
+        component={VoxelStopMotionVideo}
+        durationInFrames={300}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{
+          sceneMap: { project_id: "voxel_default", scenes: [] },
+        }}
+        calculateMetadata={({ props }: { props: any }) => {
+          const fps = props.fps ? props.fps : 30;
+          const width = props.width ? props.width : 1920;
+          const height = props.height ? props.height : 1080;
+          const sceneMap = props.sceneMap || { project_id: "voxel_default", scenes: [] };
+          const total = calculateTotalFrames(sceneMap, fps);
+          return {
+            durationInFrames: total > 0 ? total : 300,
+            fps,
+            width,
+            height,
+          };
         }}
       />
     </>

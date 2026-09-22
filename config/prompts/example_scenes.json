@@ -1,0 +1,48 @@
+{
+  "$comment": "VÍ DỤ MẪU — 3 scene minh họa cách Antigravity điền schema và build prompt cuối cho VEO. Dùng làm few-shot reference khi viết agent instruction.",
+  "project_id": "voxel_demo_01",
+  "scenes": [
+    {
+      "scene_id": "scene_01",
+      "source_image": "assets/keyframes/fox_intro.png",
+      "subject": "a small voxel fox character with orange cube fur",
+      "action": "sitting still then slowly turning its head toward camera",
+      "setting": "a miniature pixel forest diorama clearing at dawn",
+      "camera": "static",
+      "lighting": "warm diorama studio light, soft shadows, subtle rim light",
+      "duration_seconds": 5,
+      "audio_cue": "soft ambient forest birds, gentle wind chime",
+      "text_overlay": null,
+      "transition_out": "hard_cut",
+      "final_veo_prompt": "voxel art style, 3D cube/pixel-based models, isometric or slight low-angle camera, stop-motion animation aesthetic, diorama-scale miniature world, soft studio ambient occlusion, warm directional key light with soft shadow, tabletop/handmade craft look. movement staggered and slightly choppy like frame-by-frame animation (~12fps feel), NOT smooth interpolation, objects shift in small discrete steps, minor frame-hold jitter, camera movement steady/tripod-like if any, minimal to no motion blur. Scene: a small voxel fox character with orange cube fur sitting still then slowly turning its head toward camera in a miniature pixel forest diorama clearing at dawn. Camera: static. Lighting: warm diorama studio light, soft shadows, subtle rim light. no motion blur, no smooth 60fps interpolation, no photorealistic rendering, no painterly or watercolor style, no 2D hand-drawn animation, no anime style, no realistic human skin texture"
+    },
+    {
+      "scene_id": "scene_02",
+      "source_image": "assets/keyframes/fox_walk_bridge.png",
+      "subject": "the same voxel fox character",
+      "action": "walking across a small wooden cube bridge",
+      "setting": "over a pixel stream in the same forest diorama",
+      "camera": "slow_pan_right",
+      "lighting": "warm diorama studio light, soft shadows, subtle rim light",
+      "duration_seconds": 6,
+      "audio_cue": "soft wooden footstep foley, water trickling",
+      "text_overlay": null,
+      "transition_out": "stop_motion_flicker_cut",
+      "final_veo_prompt": "voxel art style, 3D cube/pixel-based models, isometric or slight low-angle camera, stop-motion animation aesthetic, diorama-scale miniature world, soft studio ambient occlusion, warm directional key light with soft shadow, tabletop/handmade craft look. movement staggered and slightly choppy like frame-by-frame animation (~12fps feel), NOT smooth interpolation, objects shift in small discrete steps, minor frame-hold jitter, camera movement steady/tripod-like if any, minimal to no motion blur. Scene: the same voxel fox character walking across a small wooden cube bridge over a pixel stream in the same forest diorama. Camera: slow_pan_right. Lighting: warm diorama studio light, soft shadows, subtle rim light. no motion blur, no smooth 60fps interpolation, no photorealistic rendering, no painterly or watercolor style, no 2D hand-drawn animation, no anime style, no realistic human skin texture"
+    },
+    {
+      "scene_id": "scene_03",
+      "source_image": "assets/keyframes/fox_reveal_village.png",
+      "subject": "the voxel fox character in the foreground",
+      "action": "standing and looking out over a valley",
+      "setting": "a voxel village diorama revealed below at golden hour",
+      "camera": "slow_push_in",
+      "lighting": "warm golden hour rim light, long soft shadows",
+      "duration_seconds": 7,
+      "audio_cue": "gentle orchestral swell, distant village ambience",
+      "text_overlay": "Chapter One",
+      "transition_out": "hard_cut",
+      "final_veo_prompt": "voxel art style, 3D cube/pixel-based models, isometric or slight low-angle camera, stop-motion animation aesthetic, diorama-scale miniature world, soft studio ambient occlusion, warm directional key light with soft shadow, tabletop/handmade craft look. movement staggered and slightly choppy like frame-by-frame animation (~12fps feel), NOT smooth interpolation, objects shift in small discrete steps, minor frame-hold jitter, camera movement steady/tripod-like if any, minimal to no motion blur. Scene: the voxel fox character in the foreground standing and looking out over a valley in a voxel village diorama revealed below at golden hour. Camera: slow_push_in. Lighting: warm golden hour rim light, long soft shadows. no motion blur, no smooth 60fps interpolation, no photorealistic rendering, no painterly or watercolor style, no 2D hand-drawn animation, no anime style, no realistic human skin texture"
+    }
+  ]
+}
