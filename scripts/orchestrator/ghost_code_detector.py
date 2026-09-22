@@ -26,6 +26,11 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Tuple, Any
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 # Ignore common non-code / cache directories
 IGNORED_DIRS = {
     ".git",

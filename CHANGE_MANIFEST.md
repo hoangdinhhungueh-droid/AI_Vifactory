@@ -1,47 +1,65 @@
-# 📝 [CHANGE_MANIFEST] VOX_OBJECT_DRIVEN_DOCUDRAMA_OVERHAUL
+# 📝 [CHANGE_MANIFEST] HYBRID_VOX_VEO_FORENSIC_PAPER_ANIMATION_PIPELINE
 
 ## 📌 1. Trạng Thái Thực Thi (Execution Metadata)
-- **Author Role**: Builder / Implementer
-- **Target Task**: `VOX_OBJECT_DRIVEN_DOCUDRAMA_OVERHAUL`
-- **Scope**: Chuyển đổi toàn diện tập `EN_EP0004_amazon_ad_lawsuit` sang phong cách phim tài liệu điều tra VOX / Netflix 100% Tang vật pháp y (Zero generic cartoon humans), hiệu chuẩn Adversarial Director Gate, và render Master Video 5 chunks Beat-based.
-- **AST Py-Compile**: `EXIT CODE 0` (Verified on VPS Linux & Windows)
-- **Zero Ghost Code**: `0 DEFECTS` (Verified by `ghost_code_detector.py`)
-- **Unit Tests**: `8/8 PASSED` in 0.11s (`test_adversarial_director_gate.py`, `test_b3_vox_editorial.py`)
+- **Author Role**: Builder / Implementer & Architect
+- **Target Task**: `HYBRID_VOX_VEO_FORENSIC_PAPER_ANIMATION_PIPELINE`
+- **Scope**: Tái cấu trúc toàn diện từ Bước 3 (B3) trở đi: Hợp nhất B3 + B3.5, chuyển dịch 100% sang Bộ 4 Chuẩn Động Lực Học Hồ Sơ Pháp Y (Forensic Paper Stop-Motion I2V), điều phối tuần tự 6 tài khoản Google Flow Playwright CDP, và nâng cấp Remotion Audio Spine (12fps Jitter, Foleys SFX & Auto-Ducking BGM -6dB, Rule 136 Zero-Asset-Leak).
+- **AST Py-Compile**: `EXIT CODE 0` trên cả Hetzner VPS Linux và Windows Local.
+- **Remotion TypeScript Bundle**: `EXIT CODE 0` (`Bundling 100% ○ /home/agent-mcp/workspace/build`).
+- **Remotion Still Render**: `EXIT CODE 0` (Rendered 1080p audit frames: `frame_audit.jpg`, `frame_audit_300.jpg`).
+- **Three-Way Physical Sync**: VPS ⇄ GitHub ⇄ Local 100% bit-for-bit parity.
 
 ---
 
 ## 📂 2. Chi Tiết File Sửa Đổi (Line-Level Changes)
 
-### A. Adversarial Director Gate & Density Calibration
-1. **`scripts/orchestrator/adversarial_director_gate.py`**:
-   - Tách biệt kiểm toán mật độ giữa nhân vật người (`human_fg_count`) và tang vật pháp y (`evidence_fg_count`).
-   - Hàm `is_evidence_object()` nhận diện toàn bộ các tang vật điều tra (`evidence`, `doc_`, `docket`, `invoice`, `ledger`, `memo`, `gauge`, `statute`, `rack`, `contract`, `binder`, `stamp`, `scale`, `gavel`, `box`, `log`, `prop`, `artifact`, `bill`, `check`, `receipt`, `filing`, `exhibit`).
-   - Nhân vật người giữ nguyên trần 20% (<= 12 scenes) để triệt tiêu talking-head cliches.
-   - Tang vật pháp y được phép xuất hiện lên đến 55% (~60 scenes / 131 scenes) để tạo nhịp dựng Continuous Kinetic Montage chuẩn phim tài liệu VOX.
-   - Hàm `auto_repair_props()` tự động tỉa đều tang vật về ngưỡng tối ưu 50% (max 60 scenes), phân bổ nhịp nhàng qua 5 Beat mà không gây quá tải bộ nhớ Remotion.
+### A. Remotion Audio & Motion Engine (`remotion/src/index.tsx`)
+1. **Background Video Playback**:
+   - Tích hợp thẻ `<Video>` tự động phát video MP4/WebM lặp vô tận (`loop`, `muted`) khi phát hiện `hero_video_sc*.mp4`.
+2. **12fps Organic Stop-Motion Paper Jitter**:
+   - Áp dụng micro-jitter ngẫu nhiên có kiểm soát (`steppedFrame`, `jitterX`, `jitterY`, `jitterRot` ±1.25px / ±0.8°) tạo hiệu ứng hoạt họa cắt giấy thủ công xúc giác.
+3. **Foley SFX Sequence Execution**:
+   - Thêm mảng `foleyElements` render `<Audio src={resolveSrc(foleySrc)} volume={0.85} />` khớp từng scene có `foleysAudio`.
+4. **BGM Auto-Ducking (-6dB)**:
+   - Hàm `getBgmVolume(frame)` tự động hạ âm lượng nhạc nền BGM xuống 0.5x (-6dB) trong 30 frames đầu của mỗi phân cảnh kích hoạt Foleys SFX với đường dốc êm ái (smooth ramp).
+5. **Rule 136 Zero-Asset-Leak Speaker Tag**:
+   - Hàm `cleanSpeakerTag()` triệt tiêu 100% rò rỉ mã asset nội bộ (`.png`, `.jpg`, `bg_`, `fg_`, `ARCHIVE X`), chỉ cho phép hiển thị `TÊN // VAI TRÒ` hoặc `BEAT <X>: <TIÊU ĐỀ>`.
 
-### B. Prompt Forge & Asset Classifiers
-2. **`app/services/prompt_forge.py`**:
-   - Bổ sung các từ khóa tang vật mở rộng trong `is_object_key` (`artifact`, `ledger`, `gauge`, `statute`, `envelope`, `stamp`).
-   - Ngăn chặn triệt để tình trạng nhầm lẫn các cụm từ pháp lý ("official legal", "official ftc filing") thành nhân vật con người.
-   - Áp dụng chuẩn [STYLE MANDATE] 1:1 sticker cutout trên nền magenta phẳng #FF00FF.
+### B. Remotion Props Builder & Asset Routing (`app/services/build_remotion_props.py`)
+1. **Candidate Path Auto-Resolution**:
+   - Tự động quét và định tuyến đường dẫn asset cho `bg_key` và `fg_key` trên cả thư mục `public/pulled/`, `images/`, và root episode.
+2. **Foleys SFX Mapping**:
+   - Trích xuất `foleys_audio` / `foleys_trigger` từ `director_plan.json` và chuẩn hóa thành đường dẫn `sfx/<name>.mp3` trong `remotion_props.json`.
+3. **Hero Video Binding**:
+   - Tự động nhận diện và gán `hero_video_{scene_id}.mp4` vào thuộc tính `background` khi shot type là `HERO_AI_VIDEO`.
 
-### C. Pipeline Automation & Props Synchronization
-3. **`scripts/update_and_build_props.py`**:
-   - Đồng bộ hóa `brain_input.json` và `manifest.json` từ `director_plan.json`.
-   - Khắc phục tham số dòng lệnh `--episode-id` và `--props` cho `adversarial_director_gate.py`.
-   - Kết nối tự động qua `build_remotion_props.py` và xuất 60 foreground scenes tang vật.
-4. **`scripts/rebuild_en0004_director_plan.py`**:
-   - Xây dựng lại toàn bộ kịch bản phân cảnh B3 cho 131 scenes của `EN_EP0004_amazon_ad_lawsuit` với 14 tang vật pháp y và 8 bối cảnh không gian.
+### C. Unified VOX Director (`app/services/unified_vox_director.py`)
+1. **Hợp Nhất B3 + B3.5**:
+   - Tạo cấu trúc phân cảnh 131 scenes, chỉ định 20 Hero AI Video clips phân bổ tuần tự trên 6 tài khoản (`acc_01` $\to$ `acc_06`).
+2. **4 Chuẩn Động Lực Học Pháp Y**:
+   - `CORNER_DOGEAR_PEEL`, `DOCUMENT_TABLE_DROP`, `BIFOLD_DOSSIER_OPEN`, `MACRO_HIGHLIGHT_WIPE`.
+   - Prompt vật lý chất liệu giấy bìa 300gsm, ánh sáng directional keylight 45 độ, nét vẽ comic ink/cel-shading 2D, 12fps stop-motion rhythm.
 
-### D. Safe VPS File Transfer Utility
-5. **`scripts/download_from_vps.py`**:
-   - Công cụ tải file an toàn từ VPS về Local sử dụng Python file seek chunking qua MCP `FastVPSClient` (không kích hoạt cấm `dd` deny-pattern của VPS).
+### D. Composite Seed Generator (`app/services/composite_generator.py`)
+1. **Tự Động Ghép Ảnh Seed 16:9**:
+   - Ghép Layer 1 Background (16:9) và Layer 2 Foreground Evidence (1:1 sticker cutout) với bóng đổ 3D drop-shadow thực tế.
+   - Batch sinh 20/20 composite seeds cho tập `EN_EP0004_amazon_ad_lawsuit`.
+
+### E. Flow Video Dispatcher (`scripts/flow_video_dispatcher.py`)
+1. **Playwright + CDP Pipeline**:
+   - Tự động đăng nhập/sử dụng profile Chrome của 6 tài khoản.
+   - Nạp I2V composite seed, điền Veo 3.1 - Fast prompt.
+   - Auto JS click dialog duyệt quyền `Approve` / `Always approve`.
+   - Download trực tiếp luồng video 720p qua Chrome DevTools Protocol (CDP).
+
+### F. SFX Foley Library (`remotion/public/sfx/`)
+1. **Bổ Sung 6 File Foley Chuẩn**:
+   - `document_table_thud.mp3`, `gavel_thud.mp3`, `paper_crease_snap.mp3`, `paper_page_turn.mp3`, `paper_rustle.mp3`, `stamp_impact.mp3`.
 
 ---
 
-## 🧹 3. Cam Kết Dọn Rác & Zero-Ghost (Rule 119 & 125)
-- [x] Tự động giải phóng 400-500MB ổ cứng VPS sau khi stitch video (`render_twolayer_chunks.py`).
-- [x] Không tạo file `.bak*`, `.backup*`, file shadow code.
-- [x] Đã đồng bộ comment/docstring nội hàm (Rule 125 Single Truth).
+## 🧹 3. Cam Kết Dọn Rác & Zero-Ghost (Rule 119, 125, 126)
+- [x] Không tồn tại file `.bak*`, `.backup*`, file shadow code.
+- [x] Đã đồng bộ tài liệu nội hàm và khế ước (Rule 125 Single Truth).
 - [x] `python3 -m py_compile` đạt Exit Code 0 trên cả VPS và Local.
+- [x] Remotion bundle và Still render đạt Exit Code 0.

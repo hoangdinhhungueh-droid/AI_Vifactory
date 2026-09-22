@@ -12,6 +12,9 @@ db/*.json
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+.cache/
+.remotion/
+quantflow/
 
 # Virtual Environment
 venv/

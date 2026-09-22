@@ -543,6 +543,9 @@ def format_speaker_tag(scene: dict, act_title: str = "", custom_beat_titles: dic
     if scene.get("speaker_tag"):
         return str(scene["speaker_tag"]).strip()
 
+    if not act_title:
+        act_title = scene.get("act_title") or scene.get("actTitle") or ""
+
     if scene.get("character_name"):
         name = str(scene["character_name"]).strip()
         role = str(scene.get("character_role") or "").strip()
@@ -711,12 +714,67 @@ def build_remotion_props_data(
     scenes_since_overlay = 4
     last_overlay_type = None
     for i, s in enumerate(raw_scenes):
-        bg_key = s.get("background_reuse_key")
-        fg_key = s.get("foreground_reuse_key")
-        bg_local = by_reuse_key.get(bg_key) if bg_key else None
-        fg_local = by_reuse_key.get(fg_key) if fg_key else None
+        scene_id = s.get("scene_id", f"sc{i:03d}")
+        shot_type = s.get("shot_type", "")
 
-        if bg_key and not bg_local:
+        # Hỗ trợ cả schema phẳng (legacy) và schema lồng nhau (Unified VOX Director)
+        bg_key = s.get("background_reuse_key")
+        if not bg_key and isinstance(s.get("background"), dict):
+            bg_key = s.get("background", {}).get("reuse_key")
+
+        fg_key = s.get("foreground_reuse_key")
+        if not fg_key and isinstance(s.get("foreground"), dict):
+            fg_key = s.get("foreground", {}).get("reuse_key")
+
+        # Kiểm tra nếu cảnh này là Hero AI Video và đã có clip MP4 hoàn thiện
+        video_clip_found = None
+        if shot_type == "HERO_AI_VIDEO" or s.get("veo_action_prompt"):
+            hero_clip_name = f"hero_video_{scene_id}.mp4"
+            local_ep_dir = os.path.dirname(os.path.abspath(brain_input_path))
+            candidate_vids = [
+                os.path.join(local_ep_dir, "video_clips", hero_clip_name),
+                os.path.join("/var/vf/episodes", episode_id, "video_clips", hero_clip_name),
+                os.path.join(public_dir, episode_id, "video_clips", hero_clip_name),
+            ]
+            for cv in candidate_vids:
+                if os.path.exists(cv) and os.path.getsize(cv) > 100000:
+                    video_clip_found = cv
+                    break
+
+        if video_clip_found:
+            bg_local = video_clip_found
+        else:
+            bg_local = by_reuse_key.get(bg_key) if bg_key else None
+            if not bg_local and bg_key:
+                candidates_bg = [
+                    os.path.join(public_dir, "pulled", episode_id, f"{bg_key}.png"),
+                    os.path.join(public_dir, "pulled", episode_id, f"{bg_key}.jpg"),
+                    os.path.join(os.path.dirname(os.path.abspath(brain_input_path)), "images", f"{bg_key}.png"),
+                    os.path.join(os.path.dirname(os.path.abspath(brain_input_path)), f"{bg_key}.png"),
+                    os.path.join("/var/vf/episodes", episode_id, "images", f"{bg_key}.png"),
+                    os.path.join("/var/vf/episodes", episode_id, f"{bg_key}.png"),
+                ]
+                for cand in candidates_bg:
+                    if os.path.exists(cand):
+                        bg_local = cand
+                        break
+
+        fg_local = by_reuse_key.get(fg_key) if fg_key else None
+        if not fg_local and fg_key:
+            candidates_fg = [
+                os.path.join(public_dir, "pulled", episode_id, f"{fg_key}.png"),
+                os.path.join(public_dir, "pulled", episode_id, f"{fg_key}.jpg"),
+                os.path.join(os.path.dirname(os.path.abspath(brain_input_path)), "images", f"{fg_key}.png"),
+                os.path.join(os.path.dirname(os.path.abspath(brain_input_path)), f"{fg_key}.png"),
+                os.path.join("/var/vf/episodes", episode_id, "images", f"{fg_key}.png"),
+                os.path.join("/var/vf/episodes", episode_id, f"{fg_key}.png"),
+            ]
+            for cand in candidates_fg:
+                if os.path.exists(cand):
+                    fg_local = cand
+                    break
+
+        if bg_key and not bg_local and not video_clip_found:
             missing.append(bg_key)
             if skip_missing:
                 continue
@@ -887,6 +945,17 @@ def build_remotion_props_data(
             "high_contrast": "/highcontrast" in cinematic_tokens,
         }
 
+        # Foley SFX assignment (Rule 120 & Tactile Audio Spine)
+        foley_raw = s.get("foleys_audio") or s.get("foleysAudio")
+        if not foley_raw and isinstance(s.get("remotion_instructions"), dict):
+            foley_raw = s.get("remotion_instructions", {}).get("foleys_trigger")
+        foley_file = None
+        if foley_raw:
+            f_clean = str(foley_raw).strip()
+            if not f_clean.endswith(".mp3") and not f_clean.endswith(".wav"):
+                f_clean = f"{f_clean}.mp3"
+            foley_file = f"sfx/{f_clean}" if not f_clean.startswith("sfx/") else f_clean
+
         scenes_out.append({
             "background": bg_rel or "",
             "foreground": fg_rel,
@@ -913,6 +982,8 @@ def build_remotion_props_data(
             "frame_transition": s.get("frame_transition"),
             "cinematicTokens": cinematic_tokens,
             "opticalFx": optical_fx,
+            "foleysAudio": foley_file,
+            "foleys_audio": foley_file,
             "subtitles": scene_subtitles,  # Forward Faster-Whisper words
             "words": scene_subtitles,      # Alias for maximum compatibility
         })

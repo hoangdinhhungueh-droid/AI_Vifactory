@@ -6,6 +6,7 @@ import {
   Easing,
   Img,
   Sequence,
+  Video,
   continueRender,
   delayRender,
   interpolate,
@@ -315,6 +316,12 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
   const offscreenX = position === "left" ? -(cell.left + cell.width) : width - cell.left;
   const translateX = offscreenX * (1 - slideIn);
 
+  // VOX Stop-Motion micro-jitter & organic paper rotation
+  const jitterSeed = Math.floor(steppedFrame);
+  const jitterX = ((Math.sin(jitterSeed * 3.7) * 1000) % 2.5) - 1.25;
+  const jitterY = ((Math.cos(jitterSeed * 2.9) * 1000) % 2.5) - 1.25;
+  const jitterRot = ((Math.sin(jitterSeed * 1.3) * 1000) % 1.6) - 0.8;
+
   return (
     <div
       style={{
@@ -324,7 +331,7 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
         width: cell.width,
         height: cell.height,
         opacity,
-        transform: `translateX(${translateX}px)`,
+        transform: `translateX(${translateX}px) translate(${jitterX.toFixed(1)}px, ${jitterY.toFixed(1)}px) rotate(${jitterRot.toFixed(1)}deg)`,
         // Signature VOX Tactile Paper Cutout Sticker Edge + High-Performance 3D Drop Shadow
         filter:
           "drop-shadow(0 0 2px rgba(255, 255, 255, 0.92)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 20px 32px rgba(0, 0, 0, 0.85))",
@@ -438,6 +445,25 @@ const ForensicStampBadge = ({ badge, isLeft }: { badge: string; isLeft?: boolean
       <span style={{ color: mainColor, fontSize: 18, fontWeight: 900, letterSpacing: 2 }}>{badge}</span>
     </div>
   );
+};
+
+// Rule 136 (Zero-Asset-Leak & Pure Beat Header Mandate)
+const cleanSpeakerTag = (rawTag: any, actTitle: any): string => {
+  const str = rawTag ? String(rawTag).trim() : "";
+  if (
+    !str ||
+    str.includes(".png") ||
+    str.includes(".jpg") ||
+    str.startsWith("fg_") ||
+    str.startsWith("bg_") ||
+    str.startsWith("ARCHIVE")
+  ) {
+    if (actTitle && !String(actTitle).includes(".png")) {
+      return String(actTitle).toUpperCase();
+    }
+    return "BEAT 1: CASE INVESTIGATION";
+  }
+  return str.toUpperCase();
 };
 
 export const TwoLayerScene = (props) => {
@@ -650,7 +676,7 @@ export const TwoLayerScene = (props) => {
             }}
           >
             <span>📜</span>
-            <span>{props.speakerTag ? String(props.speakerTag).toUpperCase() : (props.actTitle ? String(props.actTitle).toUpperCase() : "CASE INVESTIGATION")}</span>
+            <span>{cleanSpeakerTag(props.speakerTag, props.actTitle)}</span>
           </div>
 
           {/* Karaoke Word-Highlight Subtitle Line */}
@@ -797,16 +823,29 @@ const BackgroundSegment = ({ src, fadeInFrames, durationInFrames }) => {
 
       {src ? (
         <AbsoluteFill style={{ opacity }}>
-          <Img
-            src={resolveSrc(src)}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              transform: `scale(${scale})`,
-              filter: "brightness(0.78) saturate(0.68) contrast(1.02) blur(1.2px)",
-            }}
-          />
+          {src.endsWith(".mp4") || src.endsWith(".webm") || src.includes(".mp4") ? (
+            <Video
+              src={resolveSrc(src)}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+              muted
+              loop
+            />
+          ) : (
+            <Img
+              src={resolveSrc(src)}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                transform: `scale(${scale})`,
+                filter: "brightness(0.78) saturate(0.68) contrast(1.02) blur(1.2px)",
+              }}
+            />
+          )}
           {/* Deep Slate dark tint overlay to ensure foreground evidence objects pop with maximum clarity */}
           <div
             style={{
@@ -1454,9 +1493,52 @@ export const TwoLayerEpisode = (props) => {
     });
   }, [scenes]);
 
+  // Foley SFX Audio Layers (Tactile Paper, Thuds, Stamps)
+  const foleyElements = React.useMemo(() => {
+    let cursor = 0;
+    return scenes.map((s, i) => {
+      const from = cursor;
+      const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
+      cursor += dur;
+      const foleySrc = s.foleysAudio || s.foleys_audio;
+      if (!foleySrc) return null;
+      return (
+        <Sequence key={`foley-${i}`} from={from} durationInFrames={Math.min(dur, 60)} name={`foley-${i + 1}`}>
+          <Audio src={resolveSrc(foleySrc)} volume={0.85} />
+        </Sequence>
+      );
+    });
+  }, [scenes]);
+
   const audioMaster = props.audioMaster ? props.audioMaster : null;
   const bgmFile = props.bgmFile ? props.bgmFile : null;
   const bgmVolume = props.bgmVolume !== undefined ? props.bgmVolume : 0.15;
+
+  // Auto-ducking BGM (-6dB = 0.5x volume) when Foley SFX triggers
+  const getBgmVolume = React.useCallback(
+    (frame: number) => {
+      let multiplier = 1.0;
+      let cursor = 0;
+      for (let i = 0; i < scenes.length; i++) {
+        const dur = Math.max(1, Math.round(scenes[i].durationInFrames ? scenes[i].durationInFrames : 1));
+        if (scenes[i].foleysAudio || scenes[i].foleys_audio) {
+          if (frame >= cursor && frame < cursor + 30) {
+            const rel = frame - cursor;
+            if (rel < 5) {
+              multiplier = Math.min(multiplier, 1.0 - (rel / 5) * 0.5);
+            } else if (rel < 20) {
+              multiplier = Math.min(multiplier, 0.5);
+            } else {
+              multiplier = Math.min(multiplier, 0.5 + ((rel - 20) / 10) * 0.5);
+            }
+          }
+        }
+        cursor += dur;
+      }
+      return bgmVolume * multiplier;
+    },
+    [scenes, bgmVolume]
+  );
 
   return (
     <AbsoluteFill style={{ backgroundColor: INK }}>
@@ -1464,8 +1546,9 @@ export const TwoLayerEpisode = (props) => {
         <Audio src={resolveSrc(audioMaster)} volume={1.0} />
       ) : null}
       {bgmFile ? (
-        <Audio src={resolveSrc(bgmFile)} volume={bgmVolume} />
+        <Audio src={resolveSrc(bgmFile)} volume={getBgmVolume} />
       ) : null}
+      {foleyElements}
 
       {/* Dynamic Cinematic Camera Container (Rule 122 & Rule 128) */}
       <div

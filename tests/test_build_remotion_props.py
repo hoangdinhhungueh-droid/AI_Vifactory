@@ -49,3 +49,20 @@ def test_normalize_camera_movement():
     assert normalize_camera_movement("Handheld jitter and sudden shake") == "handheld_shake"
     assert normalize_camera_movement("") == "slow_push_in"
     assert normalize_camera_movement(None) == "slow_push_in"
+
+
+def test_speaker_tag_zero_asset_leak():
+    """Rule 136: Zero-Asset-Leak Mandate."""
+    # When speaker_tag is empty and character is not present, returns pure BEAT header
+    scene_pure = {"beat_index": 3, "act_title": "ACT III // THE HIDDEN MECHANISM"}
+    tag = format_speaker_tag(scene_pure)
+    assert tag == "BEAT 3: THE HIDDEN MECHANISM"
+    assert ".png" not in tag
+    assert "fg_" not in tag
+    assert "bg_" not in tag
+
+    # Dialogue speaker returns NAME // ROLE
+    scene_dialogue = {"character_name": "Andy Jassy", "character_role": "Amazon CEO"}
+    tag_dialogue = format_speaker_tag(scene_dialogue)
+    assert tag_dialogue == "ANDY JASSY // AMAZON CEO"
+
