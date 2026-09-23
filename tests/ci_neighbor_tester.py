@@ -451,10 +451,34 @@ def test_block3_director_contract() -> bool:
                 assert "seattle" not in combined_txt, f"Seattle leak in JP scene: {combined_txt[:100]}"
                 assert "project nessie" not in combined_txt, f"Project Nessie leak in JP scene: {combined_txt[:100]}"
 
+            # 6. Rule 120, 128, 134: Canonical Foley SFX Static & Dynamic Adversarial Audit
+            logger.info("  🧪 [6/6] Running Canonical Foley SFX Physical Parity & Zero-Hallucination Audit...")
+            from app.services.sfx_registry import (
+                CANONICAL_SFX_REGISTRY,
+                verify_physical_sfx_assets,
+                is_valid_sfx,
+                get_canonical_sfx_list,
+            )
+            # A. Physical disk audit (100% 1:1 parity with public/sfx)
+            ok_sfx, missing_sfx = verify_physical_sfx_assets()
+            assert ok_sfx, f"SFX physical disk audit failed: {missing_sfx}"
+            logger.info(f"  ✅ Physical SFX Disk Parity OK: {len(CANONICAL_SFX_REGISTRY)}/13 assets verified on disk.")
+
+            # B. Zero-Hallucination in generated scenes
+            for sc in jp_scenes + en_scenes:
+                cue = sc.get("foleys_audio") or sc.get("audio_cue")
+                assert is_valid_sfx(cue), f"Generated scene {sc.get('scene_id')} has invalid/unregistered cue: {cue}"
+
+            # C. Anti-Silent-Fallback Code Audit on build_remotion_props.py
+            props_file = ROOT_DIR / "app" / "services" / "build_remotion_props.py"
+            props_content = props_file.read_text(encoding="utf-8")
+            assert 'f_base = "marker_stroke.mp3"' not in props_content, "Detected forbidden silent fallback to marker_stroke in build_remotion_props.py!"
+            assert 'f_base = "paper_rustle.mp3"' not in props_content, "Detected forbidden silent fallback to paper_rustle in build_remotion_props.py!"
+            logger.info("  ✅ Anti-Silent-Fallback Code Audit PASSED: 0% blind fallbacks in build_remotion_props.py.")
+
             jp_bgs = set(s.get("bg_reuse_key") for s in jp_scenes if s.get("bg_reuse_key"))
             en_bgs = set(s.get("bg_reuse_key") for s in en_scenes if s.get("bg_reuse_key"))
             assert len(jp_bgs.intersection(en_bgs)) == 0, f"Background rosters overlapped: {jp_bgs.intersection(en_bgs)}"
-
             logger.info(f"  ✅ Live Cross-Market Integrity Passed: JP ({len(jp_bgs)} BGs) vs EN ({len(en_bgs)} BGs) 100% disjoint, 0% leakage.")
         finally:
             shutil.rmtree(test_dir, ignore_errors=True)

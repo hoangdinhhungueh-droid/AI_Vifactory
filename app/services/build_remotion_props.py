@@ -35,6 +35,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from app.services.text_to_number_parser import parse_spoken_number
 from app.services.timeline_editor_agent import audit_and_optimize_timeline
+from app.services.sfx_registry import CANONICAL_SFX_REGISTRY, is_valid_sfx, get_sfx_filename
 
 logger = logging.getLogger("vf.build_remotion_props")
 
@@ -963,27 +964,32 @@ def build_remotion_props_data(
             "high_contrast": "/highcontrast" in cinematic_tokens,
         }
 
-        # Foley SFX assignment (Rule 120 & Tactile Audio Spine)
+        # Foley SFX assignment (Rule 120, Rule 128 & Tactile Audio Spine)
+        # ZERO-SILENT-FALLBACK MANDATE: Every foley cue must be registered in CANONICAL_SFX_REGISTRY
+        # and physically present on disk in remotion/public/sfx/
         foley_raw = s.get("foleys_audio") or s.get("foleysAudio")
         if not foley_raw and isinstance(s.get("remotion_instructions"), dict):
             foley_raw = s.get("remotion_instructions", {}).get("foleys_trigger")
         foley_file = None
         if foley_raw:
             f_clean = str(foley_raw).strip()
-            if not f_clean.endswith(".mp3") and not f_clean.endswith(".wav"):
-                f_clean = f"{f_clean}.mp3"
-            f_base = f_clean.replace("sfx/", "")
-            # Anti-404 Validation Gate: Verify against known valid Remotion public/sfx assets
-            valid_sfx_names = {
-                "counter_tick.mp3", "document_table_thud.mp3", "gavel_thud.mp3",
-                "marker_stroke.mp3", "node_pop.mp3", "paper_crease_snap.mp3",
-                "paper_page_turn.mp3", "paper_rustle.mp3", "paper_slide.mp3",
-                "sonar_ping.mp3", "stamp_impact.mp3", "stamp_slam.mp3",
-                "gauge_needle_hiss.mp3"
-            }
-            if f_base not in valid_sfx_names:
-                f_base = "marker_stroke.mp3" if "gauge" in f_base or "wipe" in f_base else "paper_rustle.mp3"
-            foley_file = f"sfx/{f_base}"
+            if not is_valid_sfx(f_clean):
+                sc_id = s.get("id") or s.get("scene_id") or f"scene_{idx}"
+                raise ValueError(
+                    f"❌ B6 REMOTION PROPS SFX AUDIT FAILED at {sc_id}: "
+                    f"Unknown foley cue '{foley_raw}'. Not registered in CANONICAL_SFX_REGISTRY! "
+                    f"Zero silent fallback permitted."
+                )
+            f_filename = get_sfx_filename(f_clean)
+            # Physical Asset Verification Gate
+            physical_sfx_path = _REPO_ROOT / "remotion" / "public" / "sfx" / f_filename
+            if not physical_sfx_path.exists():
+                sc_id = s.get("id") or s.get("scene_id") or f"scene_{idx}"
+                raise FileNotFoundError(
+                    f"❌ B6 REMOTION PROPS SFX AUDIT FAILED at {sc_id}: "
+                    f"Physical asset {physical_sfx_path} does not exist on disk!"
+                )
+            foley_file = f"sfx/{f_filename}"
 
         scenes_out.append({
             "background": bg_rel or "",

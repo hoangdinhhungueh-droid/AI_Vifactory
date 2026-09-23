@@ -169,3 +169,50 @@ def test_build_unified_director_plan_generates_manifest(tmp_path):
         assert s in FLOW_ACCOUNTS
 
 
+def test_canonical_sfx_registry_integrity():
+    """Verify Canonical SFX Registry physical integrity, closed vocabulary, and multi-market resolution."""
+    from app.services.sfx_registry import (
+        CANONICAL_SFX_REGISTRY,
+        get_canonical_sfx_list,
+        is_valid_sfx,
+        resolve_semantic_foley,
+        verify_physical_sfx_assets,
+    )
+
+    # 1. Closed set of 13 Canonical SFX
+    canonical_list = get_canonical_sfx_list()
+    assert len(canonical_list) == 13
+    assert "gauge_needle_hiss" in canonical_list
+    assert "gavel_thud" in canonical_list
+    assert "sonar_ping" in canonical_list
+
+    # 2. Validation function
+    assert is_valid_sfx("gauge_needle_hiss")
+    assert is_valid_sfx("sfx/gauge_needle_hiss.mp3")
+    assert not is_valid_sfx("laser_zap")
+    assert not is_valid_sfx("steam_burst")
+    assert not is_valid_sfx(None)
+
+    # 3. Physical assets check
+    ok, missing = verify_physical_sfx_assets()
+    assert ok, f"Missing or corrupted physical SFX files: {missing}"
+
+    # 4. Multi-market semantic resolution
+    # Japanese chemical residue
+    cue_jp = resolve_semantic_foley("中国産タケノコから二酸化硫黄の残余検査", "fg_evidence_chemical")
+    assert cue_jp == "gauge_needle_hiss"
+
+    # Korean court ruling
+    cue_kr = resolve_semantic_foley("서울중앙지방법원 판사의 최종 유죄 판결", "fg_court_gavel")
+    assert cue_kr == "gavel_thud"
+
+    # Vietnamese official seal
+    cue_vn = resolve_semantic_foley("Đóng dấu mộc đỏ quyết định xử phạt hành chính", "fg_official_seal")
+    assert cue_vn in ["stamp_slam", "stamp_impact"]
+
+    # English recon sonar
+    cue_en = resolve_semantic_foley("Satellite radar recon tracked illicit maritime vessels", "fg_radar_screen")
+    assert cue_en == "sonar_ping"
+
+
+

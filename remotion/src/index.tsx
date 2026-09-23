@@ -1721,7 +1721,8 @@ export const TwoLayerEpisode = (props) => {
       let foleySrc = s.foleysAudio || s.foleys_audio;
       if (!foleySrc) return null;
       if (!validSfx.includes(foleySrc) && !foleySrc.startsWith("http")) {
-        foleySrc = "sfx/marker_stroke.mp3";
+        console.warn(`[REMOTION SFX AUDIT] Scene ${i + 1} requested unverified SFX '${foleySrc}'. Skipped to prevent sound corruption.`);
+        return null;
       }
       return (
         <Sequence key={`foley-${i}`} from={from} durationInFrames={Math.min(dur, 60)} name={`foley-${i + 1}`}>

@@ -31,6 +31,12 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.services.prompt_forge import _sanitize_foreground_prompt, _sanitize_background_prompt
+from app.services.sfx_registry import (
+    CANONICAL_SFX_REGISTRY,
+    get_canonical_sfx_list,
+    is_valid_sfx,
+    resolve_semantic_foley
+)
 
 FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06"]
 
@@ -528,31 +534,30 @@ def select_dynamic_hero_indices(spoken_sentences: List[Dict[str, Any]]) -> List[
 def determine_spatial_physics(narr: str, fg_key: Optional[str], hero_index: int) -> Tuple[str, str, str, str]:
     """Xác định hành vi xúc giác (Tactile Spatial Physics) dựa trên bản chất vật thể và ngữ cảnh kể chuyện (Rule 128).
     Hỗ trợ đối chiếu đa ngôn ngữ: EN, JP, KR, VN.
+    Sử dụng CANONICAL_SFX_REGISTRY tuyệt đối, cấm sinh cue tùy tiện.
     Trả về: (physics_type, action_type, seed_mode, foleys)
     """
-    n_low = narr.lower()
+    foleys = resolve_semantic_foley(narr, fg_key, hero_index)
+    n_low = (narr or "").lower()
     fg_low = (fg_key or "").lower()
+    combined = f"{n_low} {fg_low}"
 
-    if any(k in n_low or k in fg_low for k in ["gavel", "judge", "búa", "scales", "justice", "thẩm phán", "裁判", "判決", "판사", "법원"]):
-        return "MACRO_HIGHLIGHT_WIPE", "MACRO_HIGHLIGHT_WIPE", "CUTOUT_ONLY", "gavel_thud"
-    elif any(k in n_low or k in fg_low for k in ["gauge", "meter", "vial", "chemical", "hóa chất", "lưu huỳnh", "sulfur", "residue", "spectrometry", "측정", "분석", "検査", "残余"]):
-        return "MACRO_HIGHLIGHT_WIPE", "MACRO_HIGHLIGHT_WIPE", "CUTOUT_ONLY", "gauge_needle_hiss"
-    elif any(k in n_low or k in fg_low for k in ["server", "rack", "drive", "hardware", "led", "máy chủ", "phần cứng", "서버", "하드웨어"]):
-        return "MACRO_HIGHLIGHT_WIPE", "MACRO_HIGHLIGHT_WIPE", "CUTOUT_ONLY", "paper_rustle"
-    elif any(k in n_low or k in fg_low for k in ["docket", "memo", "confidential", "secret", "whistleblower", "dog-ear", "peel", "cáo trạng", "khởi tố", "mật", "bóc tách", "기소", "고발", "비밀", "内部告発"]):
-        return "CORNER_DOGEAR_PEEL", "CORNER_DOGEAR_PEEL", "COMPOSITE_16_9", "paper_page_turn"
-    elif any(k in n_low or k in fg_low for k in ["invoice", "damage", "bill", "check", "listing", "card", "hóa đơn", "bồi thường", "chi phí", "영수증", "손해", "請求書", "損害"]):
-        return "DOCUMENT_TABLE_DROP", "DOCUMENT_TABLE_DROP", "COMPOSITE_16_9", "document_table_thud"
-    elif any(k in n_low or k in fg_low for k in ["dossier", "contract", "agreement", "binder", "ledger", "book", "hợp đồng", "sổ sách", "hồ sơ", "계약", "장부", "契約", "帳簿"]):
-        return "BIFOLD_DOSSIER_OPEN", "BIFOLD_DOSSIER_OPEN", "COMPOSITE_16_9", "paper_crease_snap"
+    if foleys in ["gavel_thud", "gauge_needle_hiss"]:
+        return "MACRO_HIGHLIGHT_WIPE", "MACRO_HIGHLIGHT_WIPE", "CUTOUT_ONLY", foleys
+    elif any(k in combined for k in ["docket", "memo", "confidential", "secret", "whistleblower", "dog-ear", "peel", "cáo trạng", "khởi tố", "mật", "bóc tách", "기소", "고발", "비밀", "内部告発"]):
+        return "CORNER_DOGEAR_PEEL", "CORNER_DOGEAR_PEEL", "COMPOSITE_16_9", foleys
+    elif any(k in combined for k in ["invoice", "damage", "bill", "check", "listing", "card", "hóa đơn", "bồi thường", "chi phí", "영수증", "손해", "請求書", "損害"]):
+        return "DOCUMENT_TABLE_DROP", "DOCUMENT_TABLE_DROP", "COMPOSITE_16_9", foleys
+    elif any(k in combined for k in ["dossier", "contract", "agreement", "binder", "ledger", "book", "hợp đồng", "sổ sách", "hồ sơ", "계약", "장부", "契約", "帳簿"]):
+        return "BIFOLD_DOSSIER_OPEN", "BIFOLD_DOSSIER_OPEN", "COMPOSITE_16_9", foleys
     else:
         cycle = hero_index % 3
         if cycle == 0:
-            return "CORNER_DOGEAR_PEEL", "CORNER_DOGEAR_PEEL", "COMPOSITE_16_9", "paper_page_turn"
+            return "CORNER_DOGEAR_PEEL", "CORNER_DOGEAR_PEEL", "COMPOSITE_16_9", foleys
         elif cycle == 1:
-            return "DOCUMENT_TABLE_DROP", "DOCUMENT_TABLE_DROP", "COMPOSITE_16_9", "document_table_thud"
+            return "DOCUMENT_TABLE_DROP", "DOCUMENT_TABLE_DROP", "COMPOSITE_16_9", foleys
         else:
-            return "BIFOLD_DOSSIER_OPEN", "BIFOLD_DOSSIER_OPEN", "COMPOSITE_16_9", "paper_crease_snap"
+            return "BIFOLD_DOSSIER_OPEN", "BIFOLD_DOSSIER_OPEN", "COMPOSITE_16_9", foleys
 
 
 def load_style_config(preset_name: Optional[str] = None) -> Dict[str, Any]:
@@ -653,6 +658,29 @@ def generate_tactile_physics_prompt(scene_idx: int, narration: str, action_type:
         setting="dark mahogany executive boardroom table at dusk",
         camera="slow_push_in" if scene_idx % 2 == 0 else "cinematic_pan"
     )
+
+
+def validate_director_sfx_compliance(scenes: List[Dict[str, Any]], hero_clips: List[Dict[str, Any]]) -> None:
+    """Chốt chặn kiểm toán pháp y SFX B3 (Rule 120, Rule 128 & Rule 134).
+    Bắt buộc 100% scenes và hero_clips phải dùng foley cue nằm trong CANONICAL_SFX_REGISTRY.
+    CẤM TUYỆT ĐỐI lọt cue lạ hoặc unconstrained string sang B4-B6.
+    """
+    invalid_cues = []
+    for sc in scenes:
+        cue = sc.get("foleys_audio") or sc.get("audio_cue")
+        if cue and not is_valid_sfx(cue):
+            invalid_cues.append(f"Scene {sc.get('scene_id')}: invalid foley cue '{cue}'")
+    for hc in hero_clips:
+        cue = hc.get("foleys_audio") or hc.get("audio_cue")
+        if cue and not is_valid_sfx(cue):
+            invalid_cues.append(f"Hero Clip {hc.get('scene_id')}: invalid foley cue '{cue}'")
+
+    if invalid_cues:
+        raise ValueError(
+            f"❌ B3 DIRECTOR SFX COMPLIANCE FAILED ({len(invalid_cues)} violations):\n" +
+            "\n".join(invalid_cues) +
+            f"\nAllowed Canonical SFX: {get_canonical_sfx_list()}"
+        )
 
 
 # ============================================================================
@@ -820,7 +848,7 @@ def build_unified_director_plan(
             shot_type = "TACTILE_STOP_MOTION_COLLAGE"
             physics_type = "REMOTION_FORENSIC"
             flow_slot = None
-            foleys = "stamp_impact" if ("invoice" in (fg_key or "") or "docket" in (fg_key or "") or "seal" in (fg_key or "")) else "paper_rustle"
+            foleys = resolve_semantic_foley(narr, fg_key, idx)
             action_desc = f"{seed_title} evidentiary display in tactile stop-motion"
             veo_prompt = None
             source_img = f"assets/composite/sc{idx:03d}_composite.png"
@@ -907,6 +935,9 @@ def build_unified_director_plan(
                 json.dump(manifest_data, mf, indent=2, ensure_ascii=False)
         except Exception:
             pass
+
+    # Validate director SFX compliance prior to return (Fail-Fast Gate)
+    validate_director_sfx_compliance(scenes, hero_clips)
 
     return {
         "scenes": scenes,

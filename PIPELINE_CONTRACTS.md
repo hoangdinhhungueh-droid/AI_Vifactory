@@ -238,6 +238,32 @@
 
 ---
 
+### 4.5. Khế Ước Foley SFX & Tactile Audio Spine (Rule 120, Rule 128, Rule 134 & CANONICAL_SFX_REGISTRY)
+* **Module Single Source of Truth (SoT)**: `app/services/sfx_registry.py`
+* **Mục đích**: Triệt tiêu hoàn toàn cơ chế tạo asset âm thanh ad-hoc và xóa bỏ 100% các logic fallback mù quáng (`marker_stroke.mp3` / `paper_rustle.mp3`) gây biến dạng sound design và che giấu lỗi hệ thống.
+* **Danh mục Đóng Kín 13 Cues Chuẩn Hóa (`CANONICAL_SFX_REGISTRY`)**:
+  | Canonical Slug | File Vật Lý (`remotion/public/sfx/`) | Nhóm Âm Thanh | Ngữ Cảnh Kịch Bản Chuẩn |
+  | :--- | :--- | :--- | :--- |
+  | `counter_tick` | `counter_tick.mp3` | `INSTRUMENT_METER` | Đồng hồ đếm ngược, rollup số liệu forensic |
+  | `document_table_thud` | `document_table_thud.mp3` | `PERCUSSION_IMPACT` | Đập tập tài liệu/hồ sơ dày xuống bàn gỗ |
+  | `gauge_needle_hiss` | `gauge_needle_hiss.mp3` | `INSTRUMENT_METER` | Kim đồng hồ đo áp lực nhảy, thử nghiệm hóa chất/quang phổ |
+  | `gavel_thud` | `gavel_thud.mp3` | `PERCUSSION_IMPACT` | Búa quan tòa giáng xuống bàn tuyên án |
+  | `marker_stroke` | `marker_stroke.mp3` | `MARKER_GRAPHIC` | Bút dạ quang gạch dòng chữ chứng cứ |
+  | `node_pop` | `node_pop.mp3` | `DIGITAL_NETWORK` | Mắt xích mạng lưới quan hệ/đồ thị xuất hiện |
+  | `paper_crease_snap` | `paper_crease_snap.mp3` | `PAPER_TACTILE` | Mở gập bìa hồ sơ mật bifold dossier |
+  | `paper_page_turn` | `paper_page_turn.mp3` | `PAPER_TACTILE` | Lật góc trang giấy tài liệu dog-ear peel |
+  | `paper_rustle` | `paper_rustle.mp3` | `PAPER_TACTILE` | Sột soạt giấy tờ tài liệu điều tra chung |
+  | `paper_slide` | `paper_slide.mp3` | `PAPER_TACTILE` | Trượt tài liệu nhanh trên mặt bàn gỗ phẳng |
+  | `sonar_ping` | `sonar_ping.mp3` | `INSTRUMENT_METER` | Quét sóng âm rada/vệ tinh trinh sát |
+  | `stamp_impact` | `stamp_impact.mp3` | `PERCUSSION_IMPACT` | Đóng mộc kiểm định (tiếng cộp vừa) |
+  | `stamp_slam` | `stamp_slam.mp3` | `PERCUSSION_IMPACT` | Dập dấu triện đỏ/hanko/sawonjeung chính thức (tiếng nện mạnh) |
+* **Kỷ Luật Thép Bất Biến (SFX Invariants)**:
+  1. **Zero-Hallucination Gate (B3 Fail-Fast)**: Hàm `determine_spatial_physics()` và `build_unified_director_plan()` BẮT BUỘC chỉ được phát ra 13 slugs trên thông qua `resolve_semantic_foley()`. Mọi cue lạ sẽ kích hoạt `validate_director_sfx_compliance()` dừng pipeline ngay tại B3.
+  2. **Zero-Silent-Fallback Mandate**: `build_remotion_props.py` và `remotion/src/index.tsx` CẤM TUYỆT ĐỐI tự ý gán fallback ngầm về `marker_stroke` hay `paper_rustle`. Thiếu file hoặc sai key phải kích hoạt lỗi pháp y hoặc bỏ qua âm thanh kèm cảnh báo console, không được phát sai âm thanh.
+  3. **1:1 Physical Parity Gate**: 100% file mp3 phải tồn tại trên đĩa cứng vật lý (cả VPS, Local, Repo GitHub) với dung lượng > 1000 bytes, được kiểm chứng liên tục trong `tests/ci_neighbor_tester.py`.
+
+---
+
 ### 5. Khối B6 (Speech & Whisper) ➔ Khối B8 (Remotion Props)
 * **File lưu trữ**: `remotion_props.json`
 * **Quy chuẩn Rule 120**: `durationInFrames` khớp chính xác timestamp câu thoại trong Whisper, cấm chia đều toán học.
