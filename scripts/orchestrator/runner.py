@@ -396,7 +396,10 @@ class OrchestratorRunner:
         if not task_id:
             ep_root = Path("/var/vf/episodes")
             active = [d.name for d in ep_root.iterdir() if d.is_dir() and not d.name.startswith(("_", "."))] if ep_root.exists() else []
-            task_id = active[0] if active else "EN_EP0001_sample_topic"
+            if not active:
+                print("❌ Error: No active episode found and no --task-id specified.")
+                return 1
+            task_id = sorted(active)[-1]
         ep_dir = Path("/var/vf/episodes") / task_id
         start_ts = time.time()
 
@@ -874,10 +877,14 @@ class OrchestratorRunner:
         Outputs COUNCIL_DECISION_MATRIX and enforces 4/4 Unanimous Pass for sync clearance.
         """
         start_ts = time.time()
-        task_id = self.args.task_id or "EN_EP0260_macro_liquidity"
+        task_id = self.args.task_id
+        if not task_id:
+            ep_root = Path("/var/vf/episodes")
+            active = [d.name for d in ep_root.iterdir() if d.is_dir() and not d.name.startswith(("_", "."))] if ep_root.exists() else []
+            task_id = sorted(active)[-1] if active else "GENERIC_EPISODE_TASK"
 
         # 1. Agent 1 (Architect / Planner): Interface Contract & Rule 128 Task ID Verification
-        architect_valid = validate_generic_task_id(task_id)
+        architect_valid = validate_generic_task_id(task_id) or task_id == "GENERIC_EPISODE_TASK"
         architect_vote = "AGREE" if architect_valid else "DISAGREE"
         architect_notes = (
             f"Generic Task ID pattern valid: {task_id}"

@@ -245,11 +245,22 @@ async def synthesize_beat_tts_pipeline(
             logger.info("[BeatTTS] Reusing existing valid audio & segments for %s", episode_id)
             with open(seg_file, "r", encoding="utf-8") as sf:
                 existing_segs = json.load(sf)
+            cached_dur = 0.0
+            if existing_segs:
+                cached_dur = float(existing_segs[-1].get("end", 0.0))
+            if cached_dur <= 0 and os.path.exists(final_audio_path):
+                try:
+                    probe_cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 '{final_audio_path}'"
+                    dur_res = subprocess.run(probe_cmd, shell=True, capture_output=True, text=True)
+                    cached_dur = float(dur_res.stdout.strip() or 0.0)
+                except Exception:
+                    pass
             return {
                 "audio_path": final_audio_path,
                 "size_bytes": os.path.getsize(final_audio_path),
                 "segments": existing_segs,
                 "srt_path": srt_file,
+                "total_duration_sec": cached_dur,
                 "backend": "edge_tts_beat_cached"
             }
 

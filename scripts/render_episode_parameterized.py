@@ -212,13 +212,13 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python3 render_episode_parameterized.py --episode_id EN_EP0001_sample_topic
-  python3 render_episode_parameterized.py --episode_id JP_EP0001_sample_topic --market jp
-  python3 render_episode_parameterized.py --episode_id KR_EP0001_sample_topic --market kr
+  python3 render_episode_parameterized.py --episode_id EN_EPXXXX_topic_slug
+  python3 render_episode_parameterized.py --episode_id JP_EPXXXX_topic_slug --market jp
+  python3 render_episode_parameterized.py --episode_id KR_EPXXXX_topic_slug --market kr
         """
     )
-    parser.add_argument("--episode_id", required=True, help="Episode ID (e.g. EN_EP0001_sample_topic)")
-    parser.add_argument("--market", default="en", choices=["en", "jp", "kr"], help="Market code (default: en)")
+    parser.add_argument("--episode_id", required=True, help="Episode ID (e.g. <MARKET>_EP<XXXX>_<slug>)")
+    parser.add_argument("--market", default="en", choices=["en", "jp", "kr", "vn"], help="Market code (default: en)")
     
     args = parser.parse_args()
     

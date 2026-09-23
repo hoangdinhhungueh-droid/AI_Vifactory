@@ -115,3 +115,57 @@ def test_select_dynamic_hero_indices():
     assert mode == "COMPOSITE_16_9"
     assert fol == "paper_page_turn"
 
+
+def test_dynamic_visual_roster_multi_market():
+    """Verify dynamic visual roster extraction across JP, KR, VN, EN (Rule 128 - Zero Semantic Bias)."""
+    from app.services.unified_vox_director import extract_dynamic_visual_roster
+
+    # 1. JP Market
+    jp_bg, jp_fg = extract_dynamic_visual_roster(market="JP", topic="Bamboo shoot food safety")
+    assert any("tokyo" in v["title"].lower() or "courthouse" in v["title"].lower() for v in jp_bg.values())
+    assert any("hanko" in k or "inspection" in k for k in jp_fg.keys())
+    assert not any("amazon" in v["title"].lower() for v in jp_fg.values())
+    assert not any("lina khan" in v["description"].lower() for v in jp_fg.values())
+
+    # 2. KR Market
+    kr_bg, kr_fg = extract_dynamic_visual_roster(market="KR", topic="Corporate accounting anomaly")
+    assert any("seoul" in v["title"].lower() or "courthouse" in v["title"].lower() for v in kr_bg.values())
+    assert any("ingam" in k or "sawonjeung" in k for k in kr_fg.keys())
+
+    # 3. VN Market
+    vn_bg, vn_fg = extract_dynamic_visual_roster(market="VN", topic="Thanh tra bất động sản")
+    assert any("mộc đỏ" in v["title"].lower() or "thanh tra" in v["title"].lower() for v in vn_fg.values())
+
+    # 4. EN Market
+    en_bg, en_fg = extract_dynamic_visual_roster(market="EN", topic="Securities antitrust filing")
+    assert any("docket" in k or "invoice" in k for k in en_fg.keys())
+
+
+def test_build_unified_director_plan_generates_manifest(tmp_path):
+    """Verify build_unified_director_plan outputs flow_video_manifest.json and accounts distribution."""
+    from app.services.unified_vox_director import build_unified_director_plan, FLOW_ACCOUNTS
+
+    sample_sentences = [
+        {"text": f"Investigative scene {i} discussing food quarantine protocols and chemical residue levels.", "beat_index": (i // 5) + 1, "duration_sec": 5.0, "duration_frames": 150}
+        for i in range(25)
+    ]
+    res = build_unified_director_plan(
+        spoken_sentences=sample_sentences,
+        ep_dir=tmp_path,
+        market="JP",
+        metadata={"episode_id": "JP_EP0004_test"}
+    )
+    manifest_path = tmp_path / "flow_video_manifest.json"
+    assert manifest_path.exists(), "flow_video_manifest.json must be generated"
+    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest_data["episode_id"] == "JP_EP0004_test"
+    assert manifest_data["total_clips"] == len(res["hero_clips"])
+    assert len(manifest_data["clips"]) > 0
+
+    # Ensure hero clips are assigned across FLOW_ACCOUNTS
+    assigned_slots = {c["flow_slot"] for c in manifest_data["clips"]}
+    assert len(assigned_slots) > 1
+    for s in assigned_slots:
+        assert s in FLOW_ACCOUNTS
+
+

@@ -176,13 +176,30 @@ class GhostCodeDetector:
 
         return layer_defects
 
+    def check_layer5_anti_bias_ast(self) -> List[str]:
+        """Layer 5: AST & Regex Anti-Semantic Bias scan (Rule 128 & Rule 132)."""
+        layer_defects = []
+        try:
+            import sys
+            if str(self.root_dir) not in sys.path:
+                sys.path.insert(0, str(self.root_dir))
+            from scripts.orchestrator.anti_bias_linter import AntiBiasLinter
+            linter = AntiBiasLinter(root_dir=self.root_dir)
+            violations = linter.scan_all()
+            for v in violations:
+                layer_defects.append(f"[Layer 5] Rule 128/132 AST Violation: {v}")
+        except Exception as e:
+            layer_defects.append(f"[Layer 5] Error executing AntiBiasLinter: {e}")
+        return layer_defects
+
     def run_all_checks(self) -> Tuple[bool, List[str]]:
-        """Runs all 4 forensic layers and compiles the final verdict."""
+        """Runs all 5 forensic layers and compiles the final verdict."""
         self.defects = []
         self.defects.extend(self.check_layer1_physical_hygiene())
         self.defects.extend(self.check_layer2_hardcoded_slugs())
         self.defects.extend(self.check_layer3_silent_heuristic_bypasses())
         self.defects.extend(self.check_layer4_documentation_parity())
+        self.defects.extend(self.check_layer5_anti_bias_ast())
         is_clean = (len(self.defects) == 0)
         return is_clean, self.defects
 
@@ -206,6 +223,9 @@ def scan_workspace(root_dir: str | Path = None) -> List[Dict[str, Any]]:
         elif "[Layer 4" in d:
             layer = "Layer 4"
             rule = "Rule 134"
+        elif "[Layer 5" in d:
+            layer = "Layer 5"
+            rule = "Rule 128"
 
         parsed_defects.append({
             "rule": rule,

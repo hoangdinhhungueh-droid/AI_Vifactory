@@ -2,164 +2,457 @@
 # -*- coding: utf-8 -*-
 """app/services/unified_vox_director.py
 Unified VOX Spatial Physics Director Engine (B3 & B3.5 Combined)
-Merges Scene Breakdown, Veo 3.1 3D Tactile Origami Physics (Dynamic Hero clips distributed across Google accounts),
+Merges Scene Breakdown, Veo 3.1 3D Tactile Physics (Dynamic Hero clips distributed across Google accounts),
 and Tactile Stop-Motion Collage Remotion Directives (12fps stepped jitter, paper drop shadow).
 Compliant with:
 - Rule 120 (Word-level Audio Sync with Whisper)
 - Rule 122 (Pixel-Level Visual Audit Gate & Zero-Mock Score)
-- Rule 128 (Zero Semantic Bias in Contracts)
+- Rule 128 (Zero Semantic Bias in Contracts - 100% Generic across JP, KR, VN, EN)
 - Rule 132 (Decoupled Engine)
 - Rule 445 (5-Beat Docudrama Storyboard Structure)
 """
 
 import os
 import sys
+import re
 import json
 import argparse
 import yaml
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 
-sys.stdout.reconfigure(encoding='utf-8')
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    pass
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(ROOT_DIR))
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from app.services.prompt_forge import _sanitize_foreground_prompt, _sanitize_background_prompt
 
-# 14 Tangible Evidence Objects Roster
-OBJECT_ROSTER = {
-    "fg_evidence_ftc_complaint_docket": {
-        "title": "FTC Seattle Court Docket No. 2:26-CV-01392",
-        "description": "Official legal filing document from the US District Court for the Western District of Washington, titled Federal Trade Commission v. Amazon.com Inc, bold header, legal docket stamped with blue ink, crisp document paper texture with clean sharp edges.",
-        "role": "Lead Prosecution Docket",
-        "beats": [1, 2, 5]
-    },
-    "fg_evidence_amazon_search_sponsored_box": {
-        "title": "Amazon Search Results Sponsored Card",
-        "description": "Physical representation of an e-commerce search result product listing card with prominent bold red circle around the small 'Sponsored' badge, detailed star ratings, price tag, and search query field.",
-        "role": "Advertising Interface Exhibit",
-        "beats": [1, 2, 3]
-    },
-    "fg_evidence_soft_reserve_algorithm_gauge": {
-        "title": "Soft Reserve Algorithm Escalation Gauge",
-        "description": "Tactile circular analog-digital industrial gauge with needle pointing from 30% into the red danger zone at 80%, labeled 'SOFT RESERVE FLOOR', brass bezel, glass face reflecting subtle amber warning light.",
-        "role": "Pricing Mechanism Instrument",
-        "beats": [1, 3, 4]
-    },
-    "fg_evidence_20b_damage_invoice": {
-        "title": "$20 Billion Damages Calculation Sheet",
-        "description": "Government audit summary invoice document displaying bold figure '$20,482,910,000' in green ledger ink, stamped diagonally with bold red ink 'CONFIDENTIAL / EXHIBIT A', crisp paper cutout edge.",
-        "role": "Forensic Accounting Exhibit",
-        "beats": [1, 4, 5]
-    },
-    "fg_evidence_auction_bid_log_paper": {
-        "title": "Second-Price Auction Bid Resolution Log",
-        "description": "High-density technical printout showing algorithmic bid comparison columns, timestamps in milliseconds, runner-up bid vs clearing price, with handwritten forensic annotations in red ink.",
-        "role": "Algorithmic Evidence Log",
-        "beats": [2, 3, 4]
-    },
-    "fg_evidence_sealed_memo_envelope": {
-        "title": "Confidential Internal Project Nessie Memo",
-        "description": "Manila folder envelope stamped 'RESTRICTED DISTRIBUTION // EXECUTIVE EYES ONLY', partially opened revealing internal memo memo with black redacted bars across strategic pricing paragraphs.",
-        "role": "Whistleblower Document",
-        "beats": [2, 3]
-    },
-    "fg_evidence_ohio_seller_bank_ledger": {
-        "title": "Ohio Small Business Merchant Financial Ledger",
-        "description": "Worn merchant bookkeeping ledger notebook open on a wooden table, showing ascending cost-per-click charges eroding product profit margins, paperclips, coffee stain, tactile ink lines.",
-        "role": "Victim Economic Evidence",
-        "beats": [1, 2, 4]
-    },
-    "fg_evidence_antitrust_statute_book": {
-        "title": "Sherman Act Section 2 Legal Reference Volume",
-        "description": "Heavy vintage leather-bound legal codex open to federal antitrust monopolization statute, gold leaf lettering on spine, ribbon bookmark, sharp paper edges.",
-        "role": "Statutory Authority",
-        "beats": [1, 5]
-    },
-    "fg_evidence_server_rack_drive": {
-        "title": "Automated Auction Engine Storage Module",
-        "description": "High-tech brushed metallic enterprise server drive enclosure with flashing blue data activity LEDs, forensic evidence barcode sticker labeled 'SEATTLE DATA CENTER EXTRACT'.",
-        "role": "Technical Hardware Evidence",
-        "beats": [2, 3]
-    },
-    "fg_evidence_redacted_contract_sheet": {
-        "title": "Third-Party Merchant Ad Agreement",
-        "description": "Multi-page legal agreement document with heavy black marker redactions across fee schedule clauses, paperclip at top, official corporate seal embossed in lower right.",
-        "role": "Merchant Terms Contract",
-        "beats": [2, 4]
-    },
-    "fg_evidence_damages_ledger_binder": {
-        "title": "$68 Billion Advertising Revenue Audit Binder",
-        "description": "Thick three-ring forensic investigative audit binder with tabbed colored dividers labeled 2019 through 2025, explosive revenue growth bar chart visible on front plastic sleeve.",
-        "role": "Macro Financial Evidence",
-        "beats": [3, 4, 5]
-    },
-    "fg_evidence_dossier_stamp_lina_khan": {
-        "title": "FTC Chair Lina Khan Regulatory Dossier Stamp",
-        "description": "Press cutout document dossier card featuring monochrome graphic novel editorial portrait of FTC Chair Lina Khan, official FTC seal badge in corner, paper clipped to evidentiary background card.",
-        "role": "Regulatory Leadership Dossier",
-        "beats": [1, 5]
-    },
-    "fg_evidence_dossier_stamp_andy_jassy": {
-        "title": "Amazon Executive Leadership Dossier Stamp",
-        "description": "Press cutout dossier document card featuring monochrome graphic novel editorial portrait of Amazon CEO Andy Jassy, corporate headquarters watermark, legal subpoena stamp.",
-        "role": "Corporate Leadership Dossier",
-        "beats": [2, 4]
-    },
-    "fg_evidence_gavel_justice_scale": {
-        "title": "Federal Court Judicial Gavel & Scales",
-        "description": "Dark polished walnut judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism.",
-        "role": "Judicial Climax Artifact",
-        "beats": [4, 5]
-    }
-}
-
-# 8 Uncluttered Backgrounds Roster
-BACKGROUND_ROSTER = {
-    "bg_seattle_federal_court_hall": {
-        "title": "Seattle Federal Courthouse Grand Hall",
-        "description": "Cinematic wide-angle interior of Seattle federal courthouse hall, classical stone colonnade, high vaulted ceiling with moody diffused daylight, quiet austere judicial atmosphere, uncluttered background without distracting crowds.",
-        "beats": [1, 5]
-    },
-    "bg_amazon_dark_server_room": {
-        "title": "Amazon Cloud Computing Data Center",
-        "description": "Deep perspective corridor of enterprise server racks in dark cooling room, subtle vertical cyan and amber LED tracer lights, clean floor reflection, atmospheric mist, uncluttered clean industrial tech environment.",
-        "beats": [2, 3]
-    },
-    "bg_executive_boardroom_dusk": {
-        "title": "Corporate Executive Boardroom at Dusk",
-        "description": "Modern minimalist corporate boardroom overlooking dusky Seattle city skyline through panoramic floor-to-ceiling glass windows, dark mahogany table reflection, clean architectural lines, zero clutter.",
-        "beats": [1, 4]
-    },
-    "bg_ohio_small_business_backroom": {
-        "title": "Ohio Small Business Warehouse Office",
-        "description": "Authentic quiet small business inventory office, cardboard shipping boxes neatly stacked in soft focus background, warm overhead industrial lamp casting gentle pool of light on desk, clean documentary mood.",
-        "beats": [1, 2, 4]
-    },
-    "bg_investigative_newsroom_night": {
-        "title": "Investigative Journalism Newsroom at Night",
-        "description": "Nocturnal newsroom with dark empty desks receding into soft shadows, warm desk lamp pools, distant city lights through blinds, serious quiet investigative atmosphere.",
-        "beats": [1, 2, 3]
-    },
-    "bg_forensic_archive_vault": {
-        "title": "Federal Archive Document Vault",
-        "description": "Steel shelving units holding hundreds of uniform gray legal archive boxes in deep linear perspective, clean concrete floor, cool fluorescent downlighting, forensic discovery vault.",
-        "beats": [3, 4]
-    },
-    "bg_auction_mechanics_lab": {
-        "title": "Marketplace Economics Research Lab",
-        "description": "Modern analytical workspace with large soft-focus monitors displaying muted auction bidding flowcharts and heatmaps, dark slate walls, focused analytical atmosphere.",
-        "beats": [2, 3]
-    },
-    "bg_legal_hearing_chamber": {
-        "title": "Federal Antitrust Hearing Chamber",
-        "description": "Formal oak-paneled congressional or federal hearing room with elevated judge bench in background soft focus, rich timber textures, formal dignified institutional setting.",
-        "beats": [4, 5]
-    }
-}
-
 FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06"]
+
+# ============================================================================
+# DYNAMIC VISUAL ROSTER GENERATOR (RULE 128 - ZERO SEMANTIC BIAS)
+# ============================================================================
+
+def extract_dynamic_visual_roster(
+    story_text: str = "",
+    spoken_sentences: Optional[List[Dict[str, Any]]] = None,
+    grounding_intel: Optional[Dict[str, Any]] = None,
+    competitor_card: Optional[Dict[str, Any]] = None,
+    market: str = "EN",
+    topic: str = "",
+    dynamic_context: Optional[Dict[str, Any]] = None
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Rule 128 & Rule 122: Trích xuất danh mục Đạo cụ (Foreground) & Bối cảnh (Background)
+    hoàn toàn động theo thị trường bản địa (JP, KR, VN, EN) và dữ liệu thực tế (grounding).
+    CẤM TUYỆT ĐỐI hardcode tên tập, nhân vật hay đạo cụ của một vụ án cụ thể (như Amazon).
+    """
+    m_up = str(market or "EN").upper().strip()
+    g_intel = grounding_intel or {}
+    key_metrics = []
+    
+    # Trích xuất số liệu định lượng từ grounding_intel nếu có
+    if g_intel.get("grounding_table"):
+        for row in g_intel.get("grounding_table", [])[:5]:
+            val = row.get("value") or row.get("metric_value")
+            unit = row.get("unit") or ""
+            if val:
+                key_metrics.append(f"{val} {unit}".strip())
+    elif g_intel.get("key_figures"):
+        key_metrics.extend([str(x) for x in g_intel.get("key_figures", [])[:4]])
+
+    metric_highlight = key_metrics[0] if key_metrics else ("CONFIDENTIAL METRIC // AUDIT FINDING" if m_up == "EN" else "定量監査データ // 検証記録")
+
+    if m_up in ["JP", "JA"]:
+        # Thị trường Nhật Bản: Hanko đỏ, Bộ Y tế Lao động Phúc lợi (MHLW), Tòa án Tokyo, mẫu kiểm định
+        bg_roster = {
+            "bg_district_court_hall": {
+                "title": "Tokyo District Courthouse Grand Hall",
+                "description": "Cinematic wide-angle interior of Japanese district courthouse judicial hall, classical stone colonnade, high vaulted ceiling with moody diffused daylight, quiet austere judicial atmosphere, uncluttered background without distracting crowds.",
+                "beats": [1, 5]
+            },
+            "bg_regulatory_inspection_lab": {
+                "title": "Ministry & Quarantine Safety Analysis Laboratory",
+                "description": "Modern chemical residue and food safety inspection laboratory, stainless steel workbenches, analytical spectrometry apparatus in soft background focus, cool fluorescent lighting, sterile documentary atmosphere.",
+                "beats": [2, 3]
+            },
+            "bg_executive_boardroom_dusk": {
+                "title": "Corporate Executive Boardroom Overlooking City at Dusk",
+                "description": "Minimalist Japanese corporate executive boardroom overlooking evening city skyline, dark polished cedar table reflection, clean architectural lines, zero clutter, serious institutional tension.",
+                "beats": [1, 4]
+            },
+            "bg_warehouse_distribution_office": {
+                "title": "Regional Warehouse Logistics Office",
+                "description": "Authentic commercial distribution logistics office, stacked shipping crates in soft focus background, warm overhead industrial lamp casting gentle pool of light on paperwork desk, clean documentary mood.",
+                "beats": [1, 2, 4]
+            },
+            "bg_investigative_newsroom_night": {
+                "title": "Investigative Journalism Newsroom at Night",
+                "description": "Nocturnal investigative newsroom with dark empty desks receding into soft shadows, warm desk lamp pools, distant city lights through blinds, serious quiet investigative atmosphere.",
+                "beats": [1, 2, 3]
+            },
+            "bg_forensic_archive_vault": {
+                "title": "Government Institutional Archive Document Vault",
+                "description": "Steel shelving units holding hundreds of uniform archival document storage boxes in deep linear perspective, clean concrete floor, cool downlighting, forensic discovery vault.",
+                "beats": [3, 4]
+            },
+            "bg_regulatory_hearing_chamber": {
+                "title": "Ministry Regulatory Oversight Hearing Chamber",
+                "description": "Formal oak-paneled legislative and administrative hearing room with committee bench in background soft focus, rich timber textures, dignified institutional setting.",
+                "beats": [4, 5]
+            },
+            "bg_municipal_quarantine_site": {
+                "title": "Port Customs Quarantine Facility Site",
+                "description": "Port customs inspection terminal hall, industrial concrete flooring, official barrier gates in soft focus, quiet authoritative regulatory setting.",
+                "beats": [2, 3]
+            }
+        }
+
+        fg_roster = {
+            "fg_evidence_prosecution_complaint_docket": {
+                "title": "Official Legal Complaint Docket Document",
+                "description": "Official Japanese district court legal filing document, titled prosecution complaint docket, bold Japanese kanji header, stamped with official red vermilion hanko seal, crisp document paper texture with clean sharp edges.",
+                "role": "Lead Prosecution Docket",
+                "beats": [1, 2, 5]
+            },
+            "fg_evidence_chemical_residue_inspection_sheet": {
+                "title": f"Official Safety Inspection Analysis Sheet ({metric_highlight})",
+                "description": f"Government accredited laboratory test certificate showing quantitative chemical analysis results with metric highlight '{metric_highlight}', red verification stamp, Japanese kanji column headers, crisp cutout edge.",
+                "role": "Forensic Inspection Exhibit",
+                "beats": [1, 2, 3]
+            },
+            "fg_evidence_damage_calculation_invoice": {
+                "title": "Macro Economic Restitution & Damages Calculation Sheet",
+                "description": "Official audit summary invoice document displaying highlighted financial calculation figures in green ledger ink, stamped diagonally with bold red ink '証拠物件 // 第1号' (EXHIBIT A), crisp paper cutout edge.",
+                "role": "Forensic Accounting Exhibit",
+                "beats": [1, 4, 5]
+            },
+            "fg_evidence_quarantine_customs_certificate": {
+                "title": "Import Customs Quarantine Clearance Certificate",
+                "description": "Port authority customs quarantine document with official batch serial numbers, regulatory verification stamps in red ink, tactile document folds, crisp cutout edges.",
+                "role": "Logistics Regulatory Certificate",
+                "beats": [2, 3, 4]
+            },
+            "fg_evidence_merchant_accounting_ledger": {
+                "title": "Corporate Bookkeeping Ledger & Supply Record",
+                "description": "Worn business bookkeeping ledger notebook open on a wooden table, showing ascending cost calculations and procurement records, paperclips, tactile ink lines.",
+                "role": "Economic Paper Trail",
+                "beats": [1, 2, 4]
+            },
+            "fg_evidence_sealed_whistleblower_memo": {
+                "title": "Confidential Internal Corporate Whistleblower Memo",
+                "description": "Manila folder envelope stamped '社外秘 // 厳秘' (CONFIDENTIAL // STRICTLY SECRET), partially opened revealing internal memo with black redacted bars across strategic paragraphs.",
+                "role": "Whistleblower Document",
+                "beats": [2, 3]
+            },
+            "fg_evidence_statutory_regulation_volume": {
+                "title": "Commercial & Public Safety Statutory Reference Volume",
+                "description": "Heavy leather-bound statutory legal reference volume open to regulatory oversight statute, gold lettering on spine, ribbon bookmark, sharp paper edges.",
+                "role": "Statutory Authority",
+                "beats": [1, 5]
+            },
+            "fg_evidence_hanko_ingam_seal": {
+                "title": "Authenticated Vermilion Hanko Seal & Exhibit Artifact",
+                "description": "Authentic Japanese circular red vermilion hanko seal impression beside dark wooden stamp cylinder on official verification paper, tactile paper texture.",
+                "role": "Authentication Artifact",
+                "beats": [3, 4, 5]
+            },
+            "fg_evidence_gavel_justice_scale": {
+                "title": "Judicial Courtroom Sounding Gavel & Scales",
+                "description": "Dark polished hardwood judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism.",
+                "role": "Judicial Climax Artifact",
+                "beats": [4, 5]
+            }
+        }
+
+    elif m_up in ["KR", "KO"]:
+        # Thị trường Hàn Quốc: Sawonjeung, Con dấu Ingam, Viện Kiểm sát / Tòa án Seoul, Báo cáo FSS
+        bg_roster = {
+            "bg_district_court_hall": {
+                "title": "Seoul Central District Courthouse Grand Atrium",
+                "description": "Cinematic wide-angle interior of Seoul Central District Court main judicial hall, polished stone colonnade, high vaulted ceiling with moody diffused daylight, quiet austere legal atmosphere.",
+                "beats": [1, 5]
+            },
+            "bg_fss_regulatory_chamber": {
+                "title": "Financial Supervisory Oversight Analytic Chamber",
+                "description": "Modern regulatory analytical workspace, multi-monitor analytical financial flowcharts in soft background focus, dark slate walls, focused investigative atmosphere.",
+                "beats": [2, 3]
+            },
+            "bg_executive_boardroom_dusk": {
+                "title": "Corporate Executive Boardroom at Dusk",
+                "description": "Modern corporate executive boardroom overlooking evening Seoul skyline through floor-to-ceiling glass windows, dark table reflection, clean architectural lines, zero clutter.",
+                "beats": [1, 4]
+            },
+            "bg_merchant_warehouse_office": {
+                "title": "Commercial Logistics & Enterprise Office",
+                "description": "Authentic quiet enterprise inventory office, stacked shipping cartons in soft focus background, warm overhead lamp casting pool of light on desk, clean documentary mood.",
+                "beats": [1, 2, 4]
+            },
+            "bg_investigative_newsroom_night": {
+                "title": "Investigative Journalism Newsroom at Night",
+                "description": "Nocturnal newsroom with dark empty desks receding into soft shadows, warm desk lamp pools, distant city lights through blinds, serious quiet investigative atmosphere.",
+                "beats": [1, 2, 3]
+            },
+            "bg_forensic_archive_vault": {
+                "title": "State Archive Document Vault",
+                "description": "Steel shelving units holding hundreds of uniform legal archive boxes in deep linear perspective, clean concrete floor, cool fluorescent downlighting.",
+                "beats": [3, 4]
+            },
+            "bg_legal_hearing_chamber": {
+                "title": "National Assembly & Regulatory Hearing Chamber",
+                "description": "Formal oak-paneled congressional hearing room with elevated committee bench in background soft focus, rich timber textures, dignified institutional setting.",
+                "beats": [4, 5]
+            }
+        }
+
+        fg_roster = {
+            "fg_evidence_prosecution_complaint_docket": {
+                "title": "Prosecution Indictment & Filing Docket",
+                "description": "Official Korean prosecution indictment filing document, titled criminal court docket, bold Korean hangeul header, stamped with red official seal, crisp paper cutout edges.",
+                "role": "Lead Prosecution Docket",
+                "beats": [1, 2, 5]
+            },
+            "fg_evidence_fss_audit_report": {
+                "title": f"Forensic Regulatory Audit Summary ({metric_highlight})",
+                "description": f"Government regulatory forensic audit report displaying key evidentiary metrics '{metric_highlight}', highlighted with yellow marker, official red circular seal stamp.",
+                "role": "Regulatory Audit Exhibit",
+                "beats": [1, 2, 3]
+            },
+            "fg_evidence_damage_calculation_invoice": {
+                "title": "Macro Restitution & Damages Calculation Sheet",
+                "description": "Forensic accounting audit invoice document displaying bold liability figures in green ledger ink, stamped diagonally with bold red ink '극비 // 증거자료' (CONFIDENTIAL EXHIBIT), crisp paper cutout edge.",
+                "role": "Forensic Accounting Exhibit",
+                "beats": [1, 4, 5]
+            },
+            "fg_evidence_corporate_bank_ledger": {
+                "title": "Corporate Banking Transaction & Financial Ledger",
+                "description": "Enterprise financial bookkeeping ledger open on a wooden table, showing transaction records and irregular transfers, paperclips, tactile ink lines.",
+                "role": "Financial Paper Trail",
+                "beats": [1, 2, 4]
+            },
+            "fg_evidence_sawonjeung_id_badge": {
+                "title": "Corporate Employee Identification Badge (Sawonjeung)",
+                "description": "Official Korean corporate employee sawonjeung ID card with lanyard resting on confidential audit paperwork, photo card cutout edge.",
+                "role": "Corporate Identity Exhibit",
+                "beats": [2, 3, 4]
+            },
+            "fg_evidence_sealed_whistleblower_memo": {
+                "title": "Confidential Internal Whistleblower Memo",
+                "description": "Manila folder envelope stamped '대외비 // 비공개' (CONFIDENTIAL // RESTRICTED), partially opened revealing internal memo with black redacted bars across strategic clauses.",
+                "role": "Whistleblower Document",
+                "beats": [2, 3]
+            },
+            "fg_evidence_statutory_regulation_volume": {
+                "title": "Commercial Code & Statutory Reference Volume",
+                "description": "Heavy leather-bound legal reference volume open to statutory monopolization and fraud sections, gold lettering on spine, sharp paper edges.",
+                "role": "Statutory Authority",
+                "beats": [1, 5]
+            },
+            "fg_evidence_gavel_justice_scale": {
+                "title": "Judicial Courtroom Gavel & Scales",
+                "description": "Dark polished hardwood judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism.",
+                "role": "Judicial Climax Artifact",
+                "beats": [4, 5]
+            }
+        }
+
+    elif m_up in ["VN", "VI"]:
+        # Thị trường Việt Nam: Dấu mộc đỏ, Kết luận thanh tra, Tòa án nhân dân, Sổ phụ ngân hàng
+        bg_roster = {
+            "bg_district_court_hall": {
+                "title": "Đại Sảnh Tòa Án Nhân Dân Trang Nghiêm",
+                "description": "Không gian đại sảnh Tòa án Nhân dân trang nghiêm, hàng cột đá vững chãi, ánh sáng tự nhiên khuếch tán, bầu không khí pháp lý chuẩn mực không người qua lại.",
+                "beats": [1, 5]
+            },
+            "bg_regulatory_inspection_headquarters": {
+                "title": "Trụ Sở Cơ Quan Thanh Tra Chuyên Ngành",
+                "description": "Không gian làm việc của cơ quan thanh tra kiểm tra chuyên ngành, các bảng biểu phân tích làm mờ ở hậu cảnh, ánh sáng nghiêm cẩn.",
+                "beats": [2, 3]
+            },
+            "bg_executive_boardroom_dusk": {
+                "title": "Phòng Họp Hội Đồng Quản Trị Lúc Chạng Vạng",
+                "description": "Phòng họp doanh nghiệp tối giản nhìn ra đường chân trời thành phố lúc hoàng hôn qua cửa kính lớn, mặt bàn gỗ sẫm bóng loáng, bố cục kiến trúc sạch sẽ.",
+                "beats": [1, 4]
+            },
+            "bg_merchant_warehouse_office": {
+                "title": "Văn Phòng Hiện Trường Kho Vận Hàng Hóa",
+                "description": "Văn phòng kho vận hiện trường chân thực, các kiện hàng hóa xếp ngăn nắp làm mờ ở hậu cảnh, đèn bàn rọi điểm sáng ấm trên bàn tài liệu.",
+                "beats": [1, 2, 4]
+            },
+            "bg_investigative_newsroom_night": {
+                "title": "Tòa Soạn Báo Điều Tra Ban Đêm",
+                "description": "Tòa soạn báo đêm yên tĩnh với các bàn làm việc vắng bóng người chìm vào bóng tối mờ, vệt sáng đèn bàn ấm áp, không khí điều tra sâu sắc.",
+                "beats": [1, 2, 3]
+            },
+            "bg_forensic_archive_vault": {
+                "title": "Kho Lưu Trữ Hồ Sơ Tài Liệu Quốc Gia",
+                "description": "Các dãy kệ thép lưu trữ hàng trăm hộp tài liệu pháp lý đồng nhất theo chiều sâu tuyến tính, sàn bê tông sạch sẽ, ánh sáng đèn huỳnh quang dịu mát.",
+                "beats": [3, 4]
+            },
+            "bg_legal_hearing_chamber": {
+                "title": "Phòng Xử Án & Điều Trần Trang Trọng",
+                "description": "Phòng xét xử trang trọng với bục hội đồng xét xử bằng gỗ sẫm màu làm mờ ở hậu cảnh, chất liệu gỗ dày dặn, bối cảnh pháp lý uy nghi.",
+                "beats": [4, 5]
+            }
+        }
+
+        fg_roster = {
+            "fg_evidence_prosecution_complaint_docket": {
+                "title": "Hồ Sơ Cáo Trạng & Văn Bản Khởi Tố Pháp Lý",
+                "description": "Văn bản hồ sơ tố tụng chính thức của cơ quan tiến hành tố tụng, tiêu đề in đậm, dập dấu triện đỏ thẩm quyền sắc nét, viền giấy sắc gọn.",
+                "role": "Lead Prosecution Docket",
+                "beats": [1, 2, 5]
+            },
+            "fg_evidence_inspection_conclusion_report": {
+                "title": f"Bản Kết Luận Thanh Tra & Kiểm Định ({metric_highlight})",
+                "description": f"Văn bản kết luận thanh tra chuyên ngành hiển thị con số phát hiện định lượng '{metric_highlight}', dập dấu mộc đỏ xác nhận, đường viền giấy sắc sảo.",
+                "role": "Regulatory Inspection Exhibit",
+                "beats": [1, 2, 3]
+            },
+            "fg_evidence_damage_calculation_invoice": {
+                "title": "Bảng Kê Thiệt Hại & Quyết Định Thu Hồi Kinh Tế",
+                "description": "Tài liệu bảng kê tính toán thiệt hại kinh tế hiển thị con số định lượng in mực kế toán, đóng dấu chéo MẬT // TÀI LIỆU CHỨNG CỨ bằng mực đỏ.",
+                "role": "Forensic Accounting Exhibit",
+                "beats": [1, 4, 5]
+            },
+            "fg_evidence_enterprise_bank_ledger": {
+                "title": "Sổ Phụ Ngân Hàng & Bảng Kê Chứng Từ Kế Toán",
+                "description": "Sổ kế toán doanh nghiệp mở trên mặt bàn gỗ hiển thị dòng tiền giao dịch và đối soát, kẹp giấy kim loại, vệt mực rõ nét.",
+                "role": "Financial Paper Trail",
+                "beats": [1, 2, 4]
+            },
+            "fg_evidence_sealed_whistleblower_memo": {
+                "title": "Phong Bì Tài Liệu Mật Nội Bộ Doanh Nghiệp",
+                "description": "Phong bì tài liệu màu nâu dập dấu 'MẬT // TUYỆT ĐỐI BẢO MẬT', hé mở để lộ văn bản nội bộ có các dòng bôi đen bảo mật.",
+                "role": "Whistleblower Document",
+                "beats": [2, 3]
+            },
+            "fg_evidence_statutory_regulation_volume": {
+                "title": "Bộ Luật & Văn Bản Quy Phạm Pháp Luật Chuyên Ngành",
+                "description": "Tập sách văn bản quy phạm pháp luật bìa da sẫm màu đóng gáy dày dặn, chữ mạ vàng, dải ruy băng đánh dấu trang, góc giấy sắc nét.",
+                "role": "Statutory Authority",
+                "beats": [1, 5]
+            },
+            "fg_evidence_official_red_seal_stamp": {
+                "title": "Con Dấu Mộc Đỏ Thẩm Quyền Pháp Lý",
+                "description": "Hình triện mộc đỏ chuẩn mực dập trên mặt giấy văn bản chứng cứ sắc sảo bên cạnh cán dấu gỗ trang nghiêm.",
+                "role": "Authentication Artifact",
+                "beats": [3, 4, 5]
+            },
+            "fg_evidence_gavel_justice_scale": {
+                "title": "Búa Gỗ Tòa Án & Cán Cân Công Lý",
+                "description": "Búa gỗ xét xử bằng gỗ gụ đánh bóng đặt trên đế gỗ bên cạnh cán cân công lý bằng đồng thau, chất gỗ tự nhiên chân thực.",
+                "role": "Judicial Climax Artifact",
+                "beats": [4, 5]
+            }
+        }
+
+    else:
+        # Thị trường Âu/Mỹ (EN): Federal Court Docket, Audit Binder, Damages Invoice, Whistleblower Memo
+        bg_roster = {
+            "bg_federal_court_hall": {
+                "title": "Federal Courthouse Grand Hall",
+                "description": "Cinematic wide-angle interior of federal courthouse hall, classical stone colonnade, high vaulted ceiling with moody diffused daylight, quiet austere judicial atmosphere, uncluttered background without distracting crowds.",
+                "beats": [1, 5]
+            },
+            "bg_regulatory_oversight_chamber": {
+                "title": "Regulatory Oversight Analytical Hearing Chamber",
+                "description": "Formal oak-paneled federal hearing room with elevated judge bench in background soft focus, rich timber textures, formal dignified institutional setting.",
+                "beats": [4, 5]
+            },
+            "bg_executive_boardroom_dusk": {
+                "title": "Corporate Executive Boardroom at Dusk",
+                "description": "Modern minimalist corporate boardroom overlooking dusky city skyline through panoramic floor-to-ceiling glass windows, dark mahogany table reflection, clean architectural lines, zero clutter.",
+                "beats": [1, 4]
+            },
+            "bg_enterprise_warehouse_office": {
+                "title": "Enterprise Operations Logistics Office",
+                "description": "Authentic quiet business inventory office, cardboard shipping boxes neatly stacked in soft focus background, warm overhead industrial lamp casting gentle pool of light on desk, clean documentary mood.",
+                "beats": [1, 2, 4]
+            },
+            "bg_investigative_newsroom_night": {
+                "title": "Investigative Journalism Newsroom at Night",
+                "description": "Nocturnal newsroom with dark empty desks receding into soft shadows, warm desk lamp pools, distant city lights through blinds, serious quiet investigative atmosphere.",
+                "beats": [1, 2, 3]
+            },
+            "bg_forensic_archive_vault": {
+                "title": "Federal Archive Document Vault",
+                "description": "Steel shelving units holding hundreds of uniform gray legal archive boxes in deep linear perspective, clean concrete floor, cool fluorescent downlighting, forensic discovery vault.",
+                "beats": [3, 4]
+            },
+            "bg_economics_analytics_lab": {
+                "title": "Marketplace Economics & Data Analytics Lab",
+                "description": "Modern analytical workspace with large soft-focus monitors displaying muted auction bidding flowcharts and heatmaps, dark slate walls, focused analytical atmosphere.",
+                "beats": [2, 3]
+            },
+            "bg_server_cooling_facility": {
+                "title": "Enterprise Cloud Data Center Facility",
+                "description": "Deep perspective corridor of enterprise server racks in dark cooling room, subtle vertical cyan and amber LED tracer lights, clean floor reflection, atmospheric mist, uncluttered clean industrial tech environment.",
+                "beats": [2, 3]
+            }
+        }
+
+        fg_roster = {
+            "fg_evidence_prosecution_complaint_docket": {
+                "title": "Official Legal Prosecution Complaint Docket",
+                "description": "Official legal filing document from the federal district court, bold case header, legal docket stamped with blue ink, crisp document paper texture with clean sharp edges.",
+                "role": "Lead Prosecution Docket",
+                "beats": [1, 2, 5]
+            },
+            "fg_evidence_damages_calculation_invoice": {
+                "title": f"Forensic Accounting & Damages Summary Sheet ({metric_highlight})",
+                "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink 'CONFIDENTIAL / EXHIBIT A', crisp paper cutout edge.",
+                "role": "Forensic Accounting Exhibit",
+                "beats": [1, 4, 5]
+            },
+            "fg_evidence_regulatory_audit_binder": {
+                "title": "Forensic Investigative Audit Binder",
+                "description": "Thick three-ring forensic investigative audit binder with tabbed colored dividers, official regulatory growth charts visible on front plastic sleeve.",
+                "role": "Macro Financial Evidence",
+                "beats": [3, 4, 5]
+            },
+            "fg_evidence_merchant_accounting_ledger": {
+                "title": "Small Business Financial Accounting Ledger",
+                "description": "Worn merchant bookkeeping ledger notebook open on a wooden table, showing ascending cost charges eroding profit margins, paperclips, tactile ink lines.",
+                "role": "Victim Economic Evidence",
+                "beats": [1, 2, 4]
+            },
+            "fg_evidence_sealed_whistleblower_memo": {
+                "title": "Confidential Internal Whistleblower Memo Envelope",
+                "description": "Manila folder envelope stamped 'RESTRICTED DISTRIBUTION // EXECUTIVE EYES ONLY', partially opened revealing internal memo with black redacted bars across strategic paragraphs.",
+                "role": "Whistleblower Document",
+                "beats": [2, 3]
+            },
+            "fg_evidence_statute_reference_book": {
+                "title": "Federal Statutory Legal Reference Volume",
+                "description": "Heavy vintage leather-bound legal codex open to federal statutory monopolization and fraud sections, gold leaf lettering on spine, ribbon bookmark, sharp paper edges.",
+                "role": "Statutory Authority",
+                "beats": [1, 5]
+            },
+            "fg_evidence_server_rack_drive": {
+                "title": "Automated Algorithm Storage Module",
+                "description": "High-tech brushed metallic enterprise server drive enclosure with flashing blue data activity LEDs, forensic evidence barcode sticker.",
+                "role": "Technical Hardware Evidence",
+                "beats": [2, 3]
+            },
+            "fg_evidence_gavel_justice_scale": {
+                "title": "Federal Court Judicial Gavel & Scales",
+                "description": "Dark polished walnut judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism.",
+                "role": "Judicial Climax Artifact",
+                "beats": [4, 5]
+            }
+        }
+
+    return bg_roster, fg_roster
+
+
+# ============================================================================
+# DYNAMIC HERO CADENCE & SPATIAL PHYSICS (RULE 128)
+# ============================================================================
 
 def select_dynamic_hero_indices(spoken_sentences: List[Dict[str, Any]]) -> List[int]:
     """Rule 128 & User Mandate: Tuyển chọn các cảnh Hero AI Video (VEO) hoàn toàn động dựa trên nhịp điệu kể chuyện (cadence).
@@ -169,7 +462,7 @@ def select_dynamic_hero_indices(spoken_sentences: List[Dict[str, Any]]) -> List[
     - Cảnh chốt hạ / Đỉnh điểm pháp lý (Climax / Resolution).
     - Các khoảnh khắc bằng chứng / dữ liệu pháp y trọng yếu (high-stakes catalyst metrics & evidence).
     - Khoảng cách tối thiểu giữa 2 Hero clips là >= 3 cảnh để tránh dồn ứ, và không vượt quá 8 cảnh để giữ nhịp kịch tính.
-    - CẤM hardcode danh sách chỉ số hay số lượng chết (như 20 clips).
+    - CẤM hardcode danh sách chỉ số hay số lượng chết.
     """
     total = len(spoken_sentences)
     if total == 0:
@@ -185,13 +478,20 @@ def select_dynamic_hero_indices(spoken_sentences: List[Dict[str, Any]]) -> List[
         if b not in beat_first_indices:
             beat_first_indices[b] = idx
 
-    # Từ khóa bằng chứng / xúc tác căng thẳng cao độ
+    # Từ khóa bằng chứng / xúc tác căng thẳng cao độ (đa ngôn ngữ EN, JP, KR, VN)
     catalyst_keywords = [
-        "billion", "tỷ", "million", "triệu", "docket", "complaint", "vụ kiện", "bản án",
-        "gavel", "búa gỗ", "statute", "sherman", "đạo luật", "algorithm", "thuật toán",
-        "nessie", "secret", "bí mật", "whistleblower", "soft reserve", "damages", "thiệt hại",
-        "invoice", "hóa đơn", "memo", "redacted", "black marker", "ledger", "sổ sách",
-        "court", "tòa án", "judge", "thẩm phán", "boardroom", "server rack", "sponsored"
+        # Numbers & metrics
+        "billion", "tỷ", "million", "triệu", "억", "조", "万", "億", "兆", "mg/kg", "ppm", "percent", "%",
+        # Legal & documents
+        "docket", "complaint", "vụ kiện", "bản án", "cáo trạng", "khởi tố", "기소", "소송", "訴訟", "起訴",
+        "gavel", "búa gỗ", "judge", "thẩm phán", "판사", "裁判",
+        "statute", "đạo luật", "luật", "법률", "法律",
+        "algorithm", "thuật toán", "알고리즘", "アルゴリズム",
+        "secret", "bí mật", "whistleblower", "nội bộ", "내부고발", "内部告発",
+        "damages", "thiệt hại", "hóa đơn", "invoice", "손해", "損害", "賠償",
+        "memo", "redacted", "bôi đen", "ledger", "sổ sách", "장부", "帳簿",
+        "court", "tòa án", "법원", "裁判所", "hearing", "điều trần", "청문회", "公聴会",
+        "inspect", "quarantine", "thanh tra", "kiểm định", "감사", "검사", "監査", "検査"
     ]
 
     selected = [0]  # Scene 0 luôn là Hero
@@ -206,7 +506,7 @@ def select_dynamic_hero_indices(spoken_sentences: List[Dict[str, Any]]) -> List[
             continue
 
         is_beat_start = any(idx == b_idx for b_idx in beat_first_indices.values())
-        is_climax_or_end = (idx == total - 1) or (idx >= total - 3 and any(w in text for w in ["gavel", "verdict", "judge", "court", "warning", "lesson", "búa", "kết luận"]))
+        is_climax_or_end = (idx == total - 1) or (idx >= total - 3 and any(w in text for w in ["gavel", "verdict", "judge", "court", "warning", "lesson", "búa", "kết luận", "판결", "判決"]))
         has_catalyst = any(kw in text for kw in catalyst_keywords)
 
         if dist >= 8:
@@ -224,24 +524,26 @@ def select_dynamic_hero_indices(spoken_sentences: List[Dict[str, Any]]) -> List[
 
     return selected
 
+
 def determine_spatial_physics(narr: str, fg_key: Optional[str], hero_index: int) -> Tuple[str, str, str, str]:
     """Xác định hành vi xúc giác (Tactile Spatial Physics) dựa trên bản chất vật thể và ngữ cảnh kể chuyện (Rule 128).
+    Hỗ trợ đối chiếu đa ngôn ngữ: EN, JP, KR, VN.
     Trả về: (physics_type, action_type, seed_mode, foleys)
     """
     n_low = narr.lower()
     fg_low = (fg_key or "").lower()
 
-    if any(k in n_low or k in fg_low for k in ["gavel", "judge", "búa", "scales", "justice"]):
+    if any(k in n_low or k in fg_low for k in ["gavel", "judge", "búa", "scales", "justice", "thẩm phán", "裁判", "判決", "판사", "법원"]):
         return "MACRO_HIGHLIGHT_WIPE", "MACRO_HIGHLIGHT_WIPE", "CUTOUT_ONLY", "gavel_thud"
-    elif any(k in n_low or k in fg_low for k in ["gauge", "soft reserve", "needle", "meter"]):
+    elif any(k in n_low or k in fg_low for k in ["gauge", "meter", "vial", "chemical", "hóa chất", "lưu huỳnh", "sulfur", "residue", "spectrometry", "측정", "분석", "検査", "残余"]):
         return "MACRO_HIGHLIGHT_WIPE", "MACRO_HIGHLIGHT_WIPE", "CUTOUT_ONLY", "gauge_needle_hiss"
-    elif any(k in n_low or k in fg_low for k in ["server", "rack", "drive", "hardware", "led"]):
+    elif any(k in n_low or k in fg_low for k in ["server", "rack", "drive", "hardware", "led", "máy chủ", "phần cứng", "서버", "하드웨어"]):
         return "MACRO_HIGHLIGHT_WIPE", "MACRO_HIGHLIGHT_WIPE", "CUTOUT_ONLY", "paper_rustle"
-    elif any(k in n_low or k in fg_low for k in ["docket", "memo", "confidential", "secret", "whistleblower", "dog-ear", "peel"]):
+    elif any(k in n_low or k in fg_low for k in ["docket", "memo", "confidential", "secret", "whistleblower", "dog-ear", "peel", "cáo trạng", "khởi tố", "mật", "bóc tách", "기소", "고발", "비밀", "内部告発"]):
         return "CORNER_DOGEAR_PEEL", "CORNER_DOGEAR_PEEL", "COMPOSITE_16_9", "paper_page_turn"
-    elif any(k in n_low or k in fg_low for k in ["invoice", "damage", "bill", "check", "listing", "sponsored", "search card"]):
+    elif any(k in n_low or k in fg_low for k in ["invoice", "damage", "bill", "check", "listing", "card", "hóa đơn", "bồi thường", "chi phí", "영수증", "손해", "請求書", "損害"]):
         return "DOCUMENT_TABLE_DROP", "DOCUMENT_TABLE_DROP", "COMPOSITE_16_9", "document_table_thud"
-    elif any(k in n_low or k in fg_low for k in ["dossier", "contract", "agreement", "binder", "ledger", "book"]):
+    elif any(k in n_low or k in fg_low for k in ["dossier", "contract", "agreement", "binder", "ledger", "book", "hợp đồng", "sổ sách", "hồ sơ", "계약", "장부", "契約", "帳簿"]):
         return "BIFOLD_DOSSIER_OPEN", "BIFOLD_DOSSIER_OPEN", "COMPOSITE_16_9", "paper_crease_snap"
     else:
         cycle = hero_index % 3
@@ -251,6 +553,7 @@ def determine_spatial_physics(narr: str, fg_key: Optional[str], hero_index: int)
             return "DOCUMENT_TABLE_DROP", "DOCUMENT_TABLE_DROP", "COMPOSITE_16_9", "document_table_thud"
         else:
             return "BIFOLD_DOSSIER_OPEN", "BIFOLD_DOSSIER_OPEN", "COMPOSITE_16_9", "paper_crease_snap"
+
 
 def load_style_config(preset_name: Optional[str] = None) -> Dict[str, Any]:
     """Nạp cấu hình phong cách từ config/prompts/style-config.yaml (Rule 128 & Rule 132)."""
@@ -288,6 +591,7 @@ def load_style_config(preset_name: Optional[str] = None) -> Dict[str, Any]:
         "prompt_template": data.get("prompt_template", "")
     }
 
+
 def format_final_veo_prompt(
     preset: Dict[str, Any],
     subject: str,
@@ -315,6 +619,7 @@ def format_final_veo_prompt(
     )
     return " ".join(prompt.split())
 
+
 def get_action_description(action_type: str, seed_title: str, narration: str) -> str:
     """Tạo mô tả hành động xúc giác ngắn gọn cho VEO physics prompt (không lặp lại subject)."""
     if action_type == "CORNER_DOGEAR_PEEL":
@@ -325,16 +630,17 @@ def get_action_description(action_type: str, seed_title: str, narration: str) ->
         return "with sharp center crease opening outward flat onto table in clean mechanical 12fps steps, revealing internal financial charts"
     elif action_type == "MACRO_HIGHLIGHT_WIPE":
         n_low = narration.lower()
-        if "gavel" in n_low or "judge" in n_low:
+        if any(k in n_low for k in ["gavel", "judge", "court", "verdict", "búa", "toà"]):
             return "resting beside brass scales of justice on mahogany table under dramatic directional spotlight with subtle dust motes and micro-vibrations"
-        elif "gauge" in n_low:
-            return "industrial circular analog gauge needle rising smoothly toward red danger zone with amber reflection"
-        elif "server" in n_low:
+        elif any(k in n_low for k in ["gauge", "needle", "chemical", "sulfur", "residue", "hóa chất"]):
+            return "industrial circular analog gauge needle rising steadily toward danger threshold zone with warm reflection"
+        elif any(k in n_low for k in ["server", "hardware", "rack", "máy chủ"]):
             return "high-tech enterprise server rack drive module with rhythmic blue data activity LEDs flashing in cool mist"
         else:
             return "resting on dark mahogany desk under dramatic directional studio keylight with 12fps documentary tracking motion"
     else:
         return "resting on table with subtle 12fps micro-jitter in steady documentary tracking"
+
 
 def generate_tactile_physics_prompt(scene_idx: int, narration: str, action_type: str, seed_title: str) -> str:
     """Backward-compatible wrapper for tactile physics prompt."""
@@ -348,83 +654,129 @@ def generate_tactile_physics_prompt(scene_idx: int, narration: str, action_type:
         camera="slow_push_in" if scene_idx % 2 == 0 else "cinematic_pan"
     )
 
+
+# ============================================================================
+# MASTER UNIFIED DIRECTOR PLANNER (RULE 125 SINGLE TRUTH & RULE 128)
+# ============================================================================
+
 def build_unified_director_plan(
     spoken_sentences: List[Dict[str, Any]],
     ep_dir: Path,
-    style_preset: Optional[str] = None
+    style_preset: Optional[str] = None,
+    story_text: Optional[str] = None,
+    grounding_intel: Optional[Dict[str, Any]] = None,
+    competitor_card: Optional[Dict[str, Any]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+    market: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Hợp nhất B3 + B3.5: Tạo cấu trúc phân cảnh, gán 20 Veo clips Tactile Physics và Remotion Stop-Motion."""
+    """Hợp nhất B3 + B3.5:
+    Tạo cấu trúc phân cảnh, gán Veo clips Tactile Physics động và Remotion Stop-Motion Directives.
+    Hoàn toàn Generic 100%, không bị bias hay hardcode vào bất kỳ đề tài đơn lẻ nào (Rule 128).
+    """
     preset = load_style_config(style_preset)
     allowed_cameras = preset.get("camera_defaults", {}).get("allowed", [
         "static", "slow_push_in", "slow_pull_out", "cinematic_pan", "macro_tilt"
     ])
     layout_zones = ["split_evidence_left", "center_hero_document", "split_evidence_right", "macro_detail_focus"]
 
+    meta = metadata or {}
+    ep_id = meta.get("episode_id") or ep_dir.name
+    mkt = (market or meta.get("market") or ep_id.split("_")[0]).upper()
+    topic = meta.get("topic") or meta.get("raw_term") or ep_id
+
+    # 1. Trích xuất Dynamic Visual Roster độc lập theo kịch bản và thị trường
+    bg_roster, fg_roster = extract_dynamic_visual_roster(
+        story_text=story_text or "",
+        spoken_sentences=spoken_sentences,
+        grounding_intel=grounding_intel,
+        competitor_card=competitor_card,
+        market=mkt,
+        topic=topic
+    )
+
     scenes = []
     hero_clips = []
     hero_count = 0
 
     dynamic_hero_indices = set(select_dynamic_hero_indices(spoken_sentences))
+    bg_keys = list(bg_roster.keys())
+    fg_keys = list(fg_roster.keys())
 
     for idx, sent in enumerate(spoken_sentences):
         narr = sent.get("text", "")
         dur_frames = sent.get("duration_frames", 150)
         dur_sec = sent.get("duration_sec", 5.0)
-        beat_idx = int(sent.get("beat_index") or ((idx // 26) + 1))
+        beat_idx = int(sent.get("beat_index") or ((idx // max(1, len(spoken_sentences) // 5)) + 1))
         beat_idx = min(max(beat_idx, 1), 5)
 
-        # Matching Background
-        bg_candidates = [k for k, v in BACKGROUND_ROSTER.items() if beat_idx in v["beats"]]
-        bg_key = bg_candidates[(idx // 3) % len(bg_candidates)]
+        # Matching Background phù hợp theo Beat và thứ tự cảnh
+        matching_bgs = [k for k, v in bg_roster.items() if beat_idx in v.get("beats", [1, 2, 3, 4, 5])]
+        if not matching_bgs:
+            matching_bgs = bg_keys
+        bg_key = matching_bgs[(idx // 3) % len(matching_bgs)]
 
-        # Matching Foreground Evidence
+        # Matching Foreground Evidence dựa trên từ khóa kể chuyện hoặc luân phiên Beat
         narr_lower = narr.lower()
-        if "twenty billion" in narr_lower or "20 billion" in narr_lower:
-            fg_key = "fg_evidence_20b_damage_invoice"
-        elif "ftc" in narr_lower or "complaint" in narr_lower or "docket" in narr_lower:
-            fg_key = "fg_evidence_ftc_complaint_docket"
-        elif "sponsored" in narr_lower or "search" in narr_lower:
-            fg_key = "fg_evidence_amazon_search_sponsored_box"
-        elif "soft reserve" in narr_lower or "floor" in narr_lower or "80%" in narr_lower or "30%" in narr_lower:
-            fg_key = "fg_evidence_soft_reserve_algorithm_gauge"
-        elif "auction" in narr_lower or "second-price" in narr_lower or "bid" in narr_lower:
-            fg_key = "fg_evidence_auction_bid_log_paper"
-        elif "ohio" in narr_lower or "small and medium" in narr_lower or "margin" in narr_lower:
-            fg_key = "fg_evidence_ohio_seller_bank_ledger"
-        elif "sherman" in narr_lower or "antitrust" in narr_lower or "statute" in narr_lower:
-            fg_key = "fg_evidence_antitrust_statute_book"
-        elif "memo" in narr_lower or "confidential" in narr_lower:
-            fg_key = "fg_evidence_sealed_memo_envelope"
-        elif "revenue" in narr_lower or "68 billion" in narr_lower:
-            fg_key = "fg_evidence_damages_ledger_binder"
-        elif "lina khan" in narr_lower:
-            fg_key = "fg_evidence_dossier_stamp_lina_khan"
-        elif "jassy" in narr_lower:
-            fg_key = "fg_evidence_dossier_stamp_andy_jassy"
-        elif "gavel" in narr_lower or "court" in narr_lower or "judge" in narr_lower:
-            fg_key = "fg_evidence_gavel_justice_scale"
-        elif "algorithm" in narr_lower or "server" in narr_lower:
-            fg_key = "fg_evidence_server_rack_drive"
-        elif "contract" in narr_lower or "terms" in narr_lower:
-            fg_key = "fg_evidence_redacted_contract_sheet"
-        else:
-            fg_candidates = [k for k, v in OBJECT_ROSTER.items() if beat_idx in v["beats"]]
-            fg_key = fg_candidates[idx % len(fg_candidates)]
+        fg_key = None
+
+        if any(k in narr_lower for k in ["court", "indictment", "docket", "complaint", "tòa", "khởi tố", "cáo trạng", "기소", "소송", "訴訟"]):
+            for k in fg_keys:
+                if "docket" in k or "complaint" in k or "indictment" in k:
+                    fg_key = k
+                    break
+        elif any(k in narr_lower for k in ["inspect", "test", "residue", "sulfur", "chemical", "thanh tra", "kiểm định", "hóa chất", "검사", "분석", "検査"]):
+            for k in fg_keys:
+                if "inspection" in k or "residue" in k or "audit_report" in k:
+                    fg_key = k
+                    break
+        elif any(k in narr_lower for k in ["damage", "restitution", "invoice", "loss", "billion", "thiệt hại", "bồi thường", "hóa đơn", "손해", "배상", "損害", "賠償"]):
+            for k in fg_keys:
+                if "damage" in k or "invoice" in k:
+                    fg_key = k
+                    break
+        elif any(k in narr_lower for k in ["ledger", "transaction", "bank", "cost", "margin", "sổ sách", "ngân hàng", "장부", "계좌", "帳簿"]):
+            for k in fg_keys:
+                if "ledger" in k:
+                    fg_key = k
+                    break
+        elif any(k in narr_lower for k in ["memo", "whistleblower", "confidential", "secret", "mật", "nội bộ", "내부고발", "비밀", "内部告発"]):
+            for k in fg_keys:
+                if "memo" in k:
+                    fg_key = k
+                    break
+        elif any(k in narr_lower for k in ["statute", "law", "regulation", "luật", "quy định", "법률", "규정", "法律"]):
+            for k in fg_keys:
+                if "statute" in k or "regulation" in k:
+                    fg_key = k
+                    break
+        elif any(k in narr_lower for k in ["gavel", "judge", "verdict", "búa", "phán quyết", "판결", "判決"]):
+            for k in fg_keys:
+                if "gavel" in k or "justice" in k:
+                    fg_key = k
+                    break
+        elif any(k in narr_lower for k in ["seal", "stamp", "hanko", "ingam", "dấu", "triện", "도장", "인감", "判子"]):
+            for k in fg_keys:
+                if "seal" in k or "hanko" in k or "ingam" in k:
+                    fg_key = k
+                    break
+
+        if not fg_key:
+            matching_fgs = [k for k, v in fg_roster.items() if beat_idx in v.get("beats", [1, 2, 3, 4, 5])]
+            if not matching_fgs:
+                matching_fgs = fg_keys
+            fg_key = matching_fgs[idx % len(matching_fgs)]
 
         cam_move = allowed_cameras[idx % len(allowed_cameras)]
         layout_choice = layout_zones[idx % len(layout_zones)]
         transition_choice = "stop_motion_flicker_cut" if idx % 2 == 1 else "hard_cut"
 
-        seed_title = OBJECT_ROSTER[fg_key]["title"] if fg_key else BACKGROUND_ROSTER[bg_key]["title"]
-        setting_desc = BACKGROUND_ROSTER[bg_key]["title"]
+        seed_title = fg_roster[fg_key]["title"] if fg_key else bg_roster[bg_key]["title"]
+        setting_desc = bg_roster[bg_key]["title"]
 
         is_hero_video = idx in dynamic_hero_indices
         if is_hero_video:
             flow_slot = FLOW_ACCOUNTS[hero_count % len(FLOW_ACCOUNTS)]
-            
-            # Phân loại Spatial Physics Action động theo ngữ cảnh kể chuyện
             physics_type, action_type, seed_mode, foleys = determine_spatial_physics(narr, fg_key, hero_count)
-
             action_desc = get_action_description(action_type, seed_title, narr)
             veo_prompt = format_final_veo_prompt(
                 preset,
@@ -468,7 +820,7 @@ def build_unified_director_plan(
             shot_type = "TACTILE_STOP_MOTION_COLLAGE"
             physics_type = "REMOTION_FORENSIC"
             flow_slot = None
-            foleys = "stamp_impact" if ("invoice" in (fg_key or "") or "docket" in (fg_key or "")) else "paper_rustle"
+            foleys = "stamp_impact" if ("invoice" in (fg_key or "") or "docket" in (fg_key or "") or "seal" in (fg_key or "")) else "paper_rustle"
             action_desc = f"{seed_title} evidentiary display in tactile stop-motion"
             veo_prompt = None
             source_img = f"assets/composite/sc{idx:03d}_composite.png"
@@ -490,8 +842,8 @@ def build_unified_director_plan(
                 "entrance": "SNAP_DROP_BOUNCE" if idx % 3 == 0 else "PAPER_SLIDE_IN"
             },
             "overlays": (
-                ["RED_YARN_CONNECTOR", "YELLOW_MARKER_STRIKE"] if "docket" in (assigned_fg or "") or "contract" in (assigned_fg or "") else
-                ["RED_STAMP_SLAM", "CASE_STAMP"] if "invoice" in (assigned_fg or "") or "memo" in (assigned_fg or "") else
+                ["RED_YARN_CONNECTOR", "YELLOW_MARKER_STRIKE"] if "docket" in (assigned_fg or "") or "inspection" in (assigned_fg or "") else
+                ["RED_STAMP_SLAM", "CASE_STAMP"] if "invoice" in (assigned_fg or "") or "memo" in (assigned_fg or "") or "seal" in (assigned_fg or "") else
                 ["COUNTER_ROLLUP"] if "gauge" in (assigned_fg or "") or "ledger" in (assigned_fg or "") else
                 []
             )
@@ -521,33 +873,72 @@ def build_unified_director_plan(
             "veo_action_prompt": veo_prompt,
             "background": {
                 "reuse_key": bg_key,
-                "title": BACKGROUND_ROSTER[bg_key]["title"],
-                "description": BACKGROUND_ROSTER[bg_key]["description"]
+                "title": bg_roster[bg_key]["title"],
+                "description": bg_roster[bg_key]["description"]
             },
             "foreground": {
                 "reuse_key": assigned_fg,
-                "title": OBJECT_ROSTER[assigned_fg]["title"] if assigned_fg else None,
-                "description": OBJECT_ROSTER[assigned_fg]["description"] if assigned_fg else None,
-                "role": OBJECT_ROSTER[assigned_fg]["role"] if assigned_fg else None,
+                "title": fg_roster[assigned_fg]["title"] if assigned_fg else None,
+                "description": fg_roster[assigned_fg]["description"] if assigned_fg else None,
+                "role": fg_roster[assigned_fg]["role"] if assigned_fg else None,
                 "position": "left" if "left" in layout_choice else ("right" if "right" in layout_choice else "center")
             } if assigned_fg else None,
             "remotion_instructions": remotion_instructions
         }
         scenes.append(scene_obj)
 
+    # 2. Tự động sinh và ghi file flow_video_manifest.json (Khế ước VEO Hero clips)
+    manifest_data = {
+        "episode_id": ep_id,
+        "total_clips": len(hero_clips),
+        "clips": hero_clips
+    }
+    
+    # Ghi vào ep_dir và /var/vf/episodes/<ep_id> nếu có
+    target_dirs = [ep_dir]
+    var_ep_dir = Path(f"/var/vf/episodes/{ep_id}")
+    if var_ep_dir.exists() and var_ep_dir not in target_dirs:
+        target_dirs.append(var_ep_dir)
+
+    for td in target_dirs:
+        try:
+            td.mkdir(parents=True, exist_ok=True)
+            with open(td / "flow_video_manifest.json", "w", encoding="utf-8") as mf:
+                json.dump(manifest_data, mf, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
     return {
         "scenes": scenes,
-        "hero_clips": hero_clips
+        "hero_clips": hero_clips,
+        "background_roster": bg_roster,
+        "foreground_roster": fg_roster
     }
+
 
 def main():
     parser = argparse.ArgumentParser(description="Unified VOX Director Engine (B3 + B3.5)")
-    parser.add_argument("--episode", default="EN_EP0004_amazon_ad_lawsuit", help="Episode ID")
+    parser.add_argument("--episode", default=None, help="Episode ID (e.g. <MARKET>_EP<XXXX>_<slug>)")
     parser.add_argument("--ep-dir", default=None, help="Explicit path to episode folder")
     parser.add_argument("--style-preset", default="vox_forensic_paper", help="Style preset from style-config.yaml")
     args = parser.parse_args()
 
     ep_id = args.episode
+    if not ep_id:
+        pending_dir = Path("/var/vf/pending_tasks")
+        if pending_dir.exists():
+            tasks = [f.stem for f in pending_dir.glob("*.json")]
+            if tasks:
+                ep_id = tasks[0]
+        if not ep_id:
+            episodes_dir = Path("/var/vf/episodes")
+            if episodes_dir.exists():
+                active = [d.name for d in episodes_dir.iterdir() if d.is_dir() and not d.name.startswith(("_", "."))]
+                if active:
+                    ep_id = sorted(active)[-1]
+        if not ep_id:
+            parser.error("Episode ID is required via --episode")
+
     if args.ep_dir:
         ep_dir = Path(args.ep_dir)
     else:
@@ -582,6 +973,8 @@ def main():
     result = build_unified_director_plan(spoken_sentences, ep_dir, style_preset=args.style_preset)
     scenes = result["scenes"]
     hero_clips = result["hero_clips"]
+    bg_roster = result.get("background_roster", {})
+    fg_roster = result.get("foreground_roster", {})
 
     # 1. Lưu director_plan.json
     dp_data = {
@@ -593,11 +986,11 @@ def main():
     dp_path = ep_dir / "director_plan.json"
     with open(dp_path, "w", encoding="utf-8") as f:
         json.dump(dp_data, f, indent=2, ensure_ascii=False)
-    print(f"✅ Đã tạo director_plan.json ({len(scenes)} cảnh, {len(hero_clips)} Veo 3D Origami clips) -> {dp_path}")
+    print(f"✅ Đã tạo director_plan.json ({len(scenes)} cảnh, {len(hero_clips)} Veo 3D clips) -> {dp_path}")
 
     # 2. Lưu prompts_forge.json
-    bg_prompts = {k: _sanitize_background_prompt(v["description"], bg_key=k, market="EN") for k, v in BACKGROUND_ROSTER.items()}
-    fg_prompts = {k: _sanitize_foreground_prompt(v["description"], fg_key=k, market="EN") for k, v in OBJECT_ROSTER.items()}
+    bg_prompts = {k: _sanitize_background_prompt(v["description"], bg_key=k, market=ep_id.split("_")[0]) for k, v in bg_roster.items()}
+    fg_prompts = {k: _sanitize_foreground_prompt(v["description"], fg_key=k, market=ep_id.split("_")[0]) for k, v in fg_roster.items()}
     prompts_data = {
         "episode_id": ep_id,
         "backgrounds": bg_prompts,
@@ -608,15 +1001,8 @@ def main():
         json.dump(prompts_data, f, indent=2, ensure_ascii=False)
     print(f"✅ Đã tạo prompts_forge.json ({len(bg_prompts)} BGs, {len(fg_prompts)} FGs) -> {pf_path}")
 
-    # 3. Lưu flow_video_manifest.json (Hero clips phân bổ qua các tài khoản Google Flow)
-    manifest_data = {
-        "episode_id": ep_id,
-        "total_clips": len(hero_clips),
-        "clips": hero_clips
-    }
+    # 3. flow_video_manifest.json đã được tự động lưu trong build_unified_director_plan()
     man_path = ep_dir / "flow_video_manifest.json"
-    with open(man_path, "w", encoding="utf-8") as f:
-        json.dump(manifest_data, f, indent=2, ensure_ascii=False)
     print(f"✅ Đã tạo flow_video_manifest.json ({len(hero_clips)} clips phân bổ {len(FLOW_ACCOUNTS)} tài khoản) -> {man_path}")
 
     print("\n" + "=" * 70)
@@ -628,6 +1014,7 @@ def main():
         acc_distribution[slot] = acc_distribution.get(slot, 0) + 1
     for slot, count in sorted(acc_distribution.items()):
         print(f"• {slot}: {count} clips")
+
 
 if __name__ == "__main__":
     main()

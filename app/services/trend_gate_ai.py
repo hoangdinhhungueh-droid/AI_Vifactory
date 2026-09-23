@@ -196,12 +196,18 @@ import json
 import time
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter
-from pydantic import BaseModel
-
-
-logger = logging.getLogger(__name__)
-router = APIRouter()
+try:
+    from fastapi import APIRouter
+    from pydantic import BaseModel
+    router = APIRouter()
+except ImportError:
+    class _DummyRouter:
+        def post(self, *args, **kwargs):
+            return lambda f: f
+        def get(self, *args, **kwargs):
+            return lambda f: f
+    router = _DummyRouter()
+    BaseModel = object
 
 RAW_POOL_DIR = "/root/video_factory/db"
 DEFAULT_MARKETS = [m.strip().upper() for m in

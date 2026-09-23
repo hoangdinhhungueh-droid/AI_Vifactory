@@ -22,14 +22,20 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TTL_DAYS = 2
 
-# STRICT PROTECTED EPISODES (Rule 118: ZERO-TOUCH on active production)
-PROTECTED_PATTERNS = ["KR_EP0002", "tabletennis_refund_trap"]
+# STRICT PROTECTED EPISODES (Rule 118 & Rule 128: Generic Active Production Protection)
+PROTECTED_PATTERNS = [
+    p.strip() for p in os.getenv("VF_PROTECTED_PATTERNS", "").split(",") if p.strip()
+]
 
 
 def is_protected(key: str) -> bool:
     """Check if key belongs to a protected active episode."""
+    import re
+    if re.search(r"\b[A-Z]{2}_EP\d{4}_[a-z0-9_]+\b", key):
+        if not any(k in key for k in ["_dead_", "TEST_", "test_", "_TEMP_"]):
+            return True
     for pattern in PROTECTED_PATTERNS:
-        if pattern.lower() in key.lower():
+        if pattern and pattern.lower() in key.lower():
             return True
     return False
 

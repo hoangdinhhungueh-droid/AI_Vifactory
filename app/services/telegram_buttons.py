@@ -284,9 +284,9 @@ async def send_gate1_card(en_pack: dict, jp_pack: dict, kr_pack: dict) -> Option
             f"👉 <b>Task ID:</b> <code>{task_id}</code>\n"
         )
 
-    en_task = en_pack.get('task_id', 'EN_EP0001_topic')
-    jp_task = jp_pack.get('task_id', 'JP_EP0001_topic')
-    kr_task = kr_pack.get('task_id', 'KR_EP0001_topic')
+    en_task = str(en_pack.get('task_id', '') or '')
+    jp_task = str(jp_pack.get('task_id', '') or '')
+    kr_task = str(kr_pack.get('task_id', '') or '')
 
     _save_gate1_pending({'en': en_task, 'jp': jp_task, 'kr': kr_task})
 

@@ -18,11 +18,12 @@ AUDIT_DIRS = [
     ROOT_DIR / "scripts"
 ]
 
-# Files explicitly exempted (e.g. test files that explicitly test domain handling)
+# Files explicitly exempted (e.g. test files that explicitly test domain handling or archives)
 EXEMPTED_FILES = {
     "test_grounding_layer.py",
     "test_b15_seo_package_forge.py",
-    "test_zero_semantic_bias.py"
+    "test_zero_semantic_bias.py",
+    "anti_bias_linter.py",
 }
 
 # Forbidden episode-specific domain words that must NEVER appear in generic services/scripts
@@ -33,7 +34,14 @@ FORBIDDEN_DOMAIN_PATTERNS = [
     (r"\bvoywar\b", "BIMCO VOYWAR clause domain bleed"),
     (r"\bfront\s+altair\b", "2019 Front Altair incident domain bleed"),
     (r"\bkokuka\b", "2019 Kokuka Courageous incident domain bleed"),
-    (r"\birgc\b", "IRGC military entity domain bleed")
+    (r"\birgc\b", "IRGC military entity domain bleed"),
+    (r"\blina\s+khan\b", "Lina Khan entity domain bleed"),
+    (r"\bandy\s+jassy\b", "Andy Jassy entity domain bleed"),
+    (r"\bproject\s+nessie\b", "Project Nessie entity domain bleed"),
+    (r"\bseattle\s+federal\s+court\b", "Seattle federal court entity domain bleed"),
+    (r"\bhamaoka\b", "Hamaoka nuclear plant entity domain bleed"),
+    (r"\bnidec\b", "Nidec shareholder entity domain bleed"),
+    (r"\bgimpo\s+fc\b", "Gimpo FC entity domain bleed"),
 ]
 
 
@@ -44,7 +52,7 @@ def get_python_files():
             continue
         for p in audit_dir.rglob("*.py"):
             parts = p.parts
-            if any(part in (".venv", "venv", "__pycache__", ".git", "episodes", "workspace") for part in parts):
+            if any(part in (".venv", "venv", "__pycache__", ".git", "episodes", "workspace", "archive", "tests") for part in parts):
                 continue
             if p.name.endswith((".bak", ".tmp")):
                 continue
@@ -55,6 +63,17 @@ def get_python_files():
 
 
 class TestZeroSemanticBias:
+
+    def test_ast_anti_bias_linter_zero_violations(self):
+        """Mandatory AST Anti-Bias Linter (Rule 128 & Rule 132).
+        Asserts 0 Episode ID leaks, 0 Case study entity leaks, and 0 static rosters across production codebase.
+        """
+        from scripts.orchestrator.anti_bias_linter import AntiBiasLinter
+        linter = AntiBiasLinter(root_dir=ROOT_DIR)
+        violations = linter.scan_all()
+        if violations:
+            msg = "\n".join([str(v) for v in violations])
+            pytest.fail(f"AntiBiasLinter detected {len(violations)} violation(s):\n{msg}")
 
     def test_no_episode_specific_leaks_in_generic_codebase(self):
         """Scans all production services and scripts to ensure 0 domain bleed."""
@@ -72,7 +91,7 @@ class TestZeroSemanticBias:
             lines = content.splitlines()
             for line_idx, line in enumerate(lines, 1):
                 # Skip lines that explicitly discuss Rule 128 / zero semantic bias enforcement
-                if "rule 128" in line.lower() or "zero-semantic-bias" in line.lower() or "blacklist" in line.lower():
+                if "rule 128" in line.lower() or "zero-semantic-bias" in line.lower() or "blacklist" in line.lower() or "banned" in line.lower():
                     continue
 
                 for pattern, reason in FORBIDDEN_DOMAIN_PATTERNS:

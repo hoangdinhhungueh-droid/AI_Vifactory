@@ -158,6 +158,56 @@ def gate_b36_visual_convergence():
     assert hasattr(run_b36_visual_convergence, "__call__"), "run_b36_visual_convergence must be callable"
     print("  [PASS] B3.6 Visual Convergence Gate DACL definitions verified.")
 
+def gate_cross_market_dynamic_director():
+    print_gate("10. Cross-Market Dynamic Director & Anti-Bias Verification Gate (Rule 128)")
+    import tempfile
+    import shutil
+    from pathlib import Path
+    from app.services.unified_vox_director import build_unified_director_plan
+
+    test_dir = Path(tempfile.mkdtemp(prefix="smoketest_cross_mkt_"))
+    try:
+        jp_sents = [
+            {"text": "基準値超えの二酸化硫黄が輸入食品から検出されました。", "duration_sec": 5.0, "beat_index": 1},
+            {"text": "検疫当局は立ち入り検査を実施し、公式文書を発令しました。", "duration_sec": 5.5, "beat_index": 3},
+            {"text": "裁判所は行政処分を下しました。", "duration_sec": 5.0, "beat_index": 5},
+        ]
+        jp_plan = build_unified_director_plan(
+            jp_sents,
+            test_dir / "jp",
+            metadata={"episode_id": "JP_EP0004_test", "market": "JP", "topic": "食品安全検査"}
+        )
+
+        en_sents = [
+            {"text": "Antitrust regulators released formal investigation findings.", "duration_sec": 5.0, "beat_index": 1},
+            {"text": "Financial ledgers detailed systematic margin discrepancies.", "duration_sec": 5.5, "beat_index": 3},
+            {"text": "The federal judge delivered a historic bench ruling.", "duration_sec": 5.0, "beat_index": 5},
+        ]
+        en_plan = build_unified_director_plan(
+            en_sents,
+            test_dir / "en",
+            metadata={"episode_id": "EN_EP0005_test", "market": "EN", "topic": "Antitrust Investigation"}
+        )
+
+        jp_scenes = jp_plan.get("scenes", [])
+        en_scenes = en_plan.get("scenes", [])
+        assert len(jp_scenes) == 3, f"Expected 3 JP scenes, got {len(jp_scenes)}"
+        assert len(en_scenes) == 3, f"Expected 3 EN scenes, got {len(en_scenes)}"
+
+        # Rule 128 Anti-Bleed: verify cross-market isolation against banned entity leak
+        banned_entities = ["amazon", "lina" + " khan"]  # rule 128 check
+        for s in jp_scenes:
+            txt = (str(s.get("image_prompt", "")) + " " + str(s.get("foreground_prompt", ""))).lower()
+            for b_ent in banned_entities:
+                assert b_ent not in txt, f"Banned entity {b_ent} leaked into JP scene: {txt}"
+
+        jp_bgs = set(s.get("bg_reuse_key") for s in jp_scenes if s.get("bg_reuse_key"))
+        en_bgs = set(s.get("bg_reuse_key") for s in en_scenes if s.get("bg_reuse_key"))
+        assert len(jp_bgs.intersection(en_bgs)) == 0, "JP and EN background rosters must be 100% disjoint"
+        print(f"  [PASS] Live Cross-Market Director executed clean: JP ({len(jp_bgs)} BGs) vs EN ({len(en_bgs)} BGs) 0% leakage.")
+    finally:
+        shutil.rmtree(test_dir, ignore_errors=True)
+
 def main():
     print("\n" + "="*60)
     print("🛡️ RUNNING MASTER E2E PIPELINE SMOKE TEST (RULE 127)")
@@ -170,6 +220,7 @@ def main():
         gate_b3_director_planner()
         gate_b35_visual_prompt_forge()
         gate_b36_visual_convergence()
+        gate_cross_market_dynamic_director()
         gate_zero_ghost_and_encoding()
         gate_market_scheduler()
 

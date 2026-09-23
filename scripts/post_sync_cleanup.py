@@ -33,7 +33,9 @@ logging.basicConfig(
 logger = logging.getLogger("post_sync_cleanup")
 
 # STRICT PROTECTED EPISODES (Rule 118: ZERO-TOUCH on active production)
-PROTECTED_PATTERNS = ["KR_EP0002", "tabletennis_refund_trap"]
+PROTECTED_PATTERNS = [
+    p.strip() for p in os.getenv("VF_PROTECTED_PATTERNS", "").split(",") if p.strip()
+]
 
 # INTERMEDIATE FILES TO PURGE POST-PUBLISH (Always keep finals and assets)
 INTERMEDIATE_FILENAMES = [
@@ -55,8 +57,12 @@ ARCHIVE_DIR = EPISODES_DIR / "_archive"
 
 def is_protected(ep_name: str) -> bool:
     """Check if an episode name matches protected active patterns."""
+    import re
+    if re.match(r"^[A-Z]{2}_EP\d{4}_[a-z0-9_]+$", ep_name):
+        if not (ep_name.startswith(("_dead_", "TEST_", "test_")) or "_TEMP_" in ep_name):
+            return True
     for pattern in PROTECTED_PATTERNS:
-        if pattern.lower() in ep_name.lower():
+        if pattern and pattern.lower() in ep_name.lower():
             return True
     return False
 

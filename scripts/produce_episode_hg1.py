@@ -171,7 +171,8 @@ def run_chain(task_id: str) -> int:
     _log(stage, "Synthesizing Master Voiceover Audio Spine from B2 Spoken Script...")
     force_tts = os.getenv("VF_FORCE_TTS", "0") == "1"
     tts_res = asyncio.run(synthesize_beat_tts_pipeline(task_id, out_dir=str(ep_dir), force=force_tts))
-    _log(stage, f"Audio Spine ready: {tts_res['total_duration_sec']:.1f}s ({len(tts_res['segments'])} sentences mapped)")
+    dur_sec = float(tts_res.get("total_duration_sec") or 0.0)
+    _log(stage, f"Audio Spine ready: {dur_sec:.1f}s ({len(tts_res.get('segments', []))} sentences mapped)")
 
     # ---- B3.5 Hollywood Art Director & Shot Breakdown (Rule 125 & 128)
     stage = "B3_VISUAL"

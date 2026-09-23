@@ -42,8 +42,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("sweep_governor")
 
-# Rule 118: STRICT PROTECTED EPISODES
-PROTECTED_PATTERNS = ["KR_EP0002", "tabletennis_refund_trap"]
+# Rule 118 & Rule 128: Generic Active Production Protection
+# Never hardcode specific episode IDs. Dynamic protection list + Canonical Pattern Protection.
+PROTECTED_PATTERNS = [
+    p.strip() for p in os.getenv("VF_PROTECTED_PATTERNS", "").split(",") if p.strip()
+]
 
 # Critical daemons and services to NEVER terminate
 PROTECTED_PROCESS_PATTERNS = [
@@ -90,9 +93,13 @@ def is_ghost_file(fname: str, parent_path: str) -> bool:
 
 
 def is_protected_episode(name: str) -> bool:
-    """Checks if an episode name matches protected active production episodes."""
+    """Checks if an episode matches canonical active production episodes (never archive active ones)."""
+    # Any canonical active episode format [A-Z]{2}_EP\d{4}_[a-z0-9_]+ is protected unless explicitly marked _dead_ or test_
+    if re.match(r"^[A-Z]{2}_EP\d{4}_[a-z0-9_]+$", name):
+        if not (name.startswith(("_dead_", "TEST_", "test_")) or "_TEMP_" in name):
+            return True
     for pattern in PROTECTED_PATTERNS:
-        if pattern.lower() in name.lower():
+        if pattern and pattern.lower() in name.lower():
             return True
     return False
 

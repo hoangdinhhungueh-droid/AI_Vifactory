@@ -149,8 +149,8 @@ if __name__ == "__main__":
     from typing import Optional
 
     parser = argparse.ArgumentParser(description="Batch Composite Seed Generator for Veo 3.1 I2V")
-    parser.add_argument("--episode", type=str, default="EN_EP0004_amazon_ad_lawsuit", help="Episode ID")
-    parser.add_argument("--brain-dir", type=str, default=r"C:\Users\hunghd2\.gemini\antigravity\brain\4a063bf3-98ec-418c-8ad5-fdc8863e5879", help="Brain artifacts dir")
+    parser.add_argument("--episode", type=str, required=True, help="Episode ID (e.g. <MARKET>_EP<XXXX>_<slug>)")
+    parser.add_argument("--brain-dir", type=str, default=None, help="Brain artifacts dir")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent.parent

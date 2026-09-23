@@ -409,7 +409,7 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
 
 def main():
     parser = argparse.ArgumentParser(description="Google Flow Video Dispatcher for 6 Accounts")
-    parser.add_argument("--episode", default="EN_EP0004_amazon_ad_lawsuit", help="Episode ID")
+    parser.add_argument("--episode", required=True, help="Episode ID (e.g. <MARKET>_EP<XXXX>_<slug>)")
     parser.add_argument("--acc", default="all", help="acc_01 to acc_06 or all")
     parser.add_argument("--limit", type=int, default=0, help="Limit number of clips to generate (0 for unlimited)")
     args = parser.parse_args()
