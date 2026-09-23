@@ -1707,12 +1707,22 @@ export const TwoLayerEpisode = (props) => {
   // Foley SFX Audio Layers (Tactile Paper, Thuds, Stamps)
   const foleyElements = React.useMemo(() => {
     let cursor = 0;
+    const validSfx = [
+      "sfx/counter_tick.mp3", "sfx/document_table_thud.mp3", "sfx/gavel_thud.mp3",
+      "sfx/marker_stroke.mp3", "sfx/node_pop.mp3", "sfx/paper_crease_snap.mp3",
+      "sfx/paper_page_turn.mp3", "sfx/paper_rustle.mp3", "sfx/paper_slide.mp3",
+      "sfx/sonar_ping.mp3", "sfx/stamp_impact.mp3", "sfx/stamp_slam.mp3",
+      "sfx/gauge_needle_hiss.mp3"
+    ];
     return scenes.map((s, i) => {
       const from = cursor;
       const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
       cursor += dur;
-      const foleySrc = s.foleysAudio || s.foleys_audio;
+      let foleySrc = s.foleysAudio || s.foleys_audio;
       if (!foleySrc) return null;
+      if (!validSfx.includes(foleySrc) && !foleySrc.startsWith("http")) {
+        foleySrc = "sfx/marker_stroke.mp3";
+      }
       return (
         <Sequence key={`foley-${i}`} from={from} durationInFrames={Math.min(dur, 60)} name={`foley-${i + 1}`}>
           <Audio src={resolveSrc(foleySrc)} volume={0.85} />

@@ -1001,12 +1001,9 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                         if attempt < MAX_INPLACE_RETRIES:
                             time.sleep(3)
                 
-                # Incremental single upload fallback (chỉ đẩy khi đã pass audit)
+                # Local storage only during generation (Atomic Batch Archive at end per Rule 119/125)
                 if image_passed and os.path.exists(local_png):
-                    try:
-                        upload_png_to_vps(key, local_png, episode_id, layer_type=layer)
-                    except Exception as e:
-                        print(f"⚠️ Upload warning for {key}: {e}")
+                    print(f"💾 [Local Cache] Ảnh {key}.png sẵn sàng ({layer}). Sẽ đóng gói nguyên tử gửi VPS sau khi hoàn tất.")
                 
                 if idx < len(prompt_items):
                     print(f"⏳ Giãn cách {pacing_sec}s giữa các prompt theo Rule 436 (Rate Pacing)...")

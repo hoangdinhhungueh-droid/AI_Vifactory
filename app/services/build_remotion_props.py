@@ -972,7 +972,18 @@ def build_remotion_props_data(
             f_clean = str(foley_raw).strip()
             if not f_clean.endswith(".mp3") and not f_clean.endswith(".wav"):
                 f_clean = f"{f_clean}.mp3"
-            foley_file = f"sfx/{f_clean}" if not f_clean.startswith("sfx/") else f_clean
+            f_base = f_clean.replace("sfx/", "")
+            # Anti-404 Validation Gate: Verify against known valid Remotion public/sfx assets
+            valid_sfx_names = {
+                "counter_tick.mp3", "document_table_thud.mp3", "gavel_thud.mp3",
+                "marker_stroke.mp3", "node_pop.mp3", "paper_crease_snap.mp3",
+                "paper_page_turn.mp3", "paper_rustle.mp3", "paper_slide.mp3",
+                "sonar_ping.mp3", "stamp_impact.mp3", "stamp_slam.mp3",
+                "gauge_needle_hiss.mp3"
+            }
+            if f_base not in valid_sfx_names:
+                f_base = "marker_stroke.mp3" if "gauge" in f_base or "wipe" in f_base else "paper_rustle.mp3"
+            foley_file = f"sfx/{f_base}"
 
         scenes_out.append({
             "background": bg_rel or "",
