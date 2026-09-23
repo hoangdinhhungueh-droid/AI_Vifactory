@@ -386,11 +386,16 @@ async def synthesize_beat_tts_pipeline(
 
     # Inter-scene and inter-beat gap bridging (Zero-Drift Guarantee)
     # Ensure every scene i seamlessly touches scene i+1: scenes[i].end_ms == scenes[i+1].start_ms
+    prev_cum_frames = 0
     for i in range(len(all_segments) - 1):
         curr_seg = all_segments[i]
         next_seg = all_segments[i + 1]
         curr_seg["end_ms"] = next_seg["start_ms"]
         curr_seg["end"] = round(curr_seg["end_ms"] / 1000.0, 3)
+        cum_target = int(round(curr_seg["end_ms"] / 1000.0 * 30))
+        curr_seg["duration_frames"] = max(1, cum_target - prev_cum_frames)
+        prev_cum_frames += curr_seg["duration_frames"]
+        curr_seg["duration_sec"] = round(curr_seg["duration_frames"] / 30.0, 3)
         # Clamp last word end_ms if needed
         if curr_seg.get("words"):
             curr_seg["words"][-1]["end_ms"] = min(curr_seg["end_ms"], max(curr_seg["words"][-1]["end_ms"], curr_seg["words"][-1]["start_ms"] + 100))
@@ -425,6 +430,9 @@ async def synthesize_beat_tts_pipeline(
     if all_segments:
         all_segments[-1]["end_ms"] = final_actual_dur_ms
         all_segments[-1]["end"] = round(final_actual_dur_ms / 1000.0, 3)
+        cum_target = int(round(final_actual_dur_ms / 1000.0 * 30))
+        all_segments[-1]["duration_frames"] = max(1, cum_target - prev_cum_frames)
+        all_segments[-1]["duration_sec"] = round(all_segments[-1]["duration_frames"] / 30.0, 3)
         if all_segments[-1].get("words"):
             all_segments[-1]["words"][-1]["end_ms"] = final_actual_dur_ms
             all_segments[-1]["words"][-1]["end"] = round(final_actual_dur_ms / 1000.0, 3)

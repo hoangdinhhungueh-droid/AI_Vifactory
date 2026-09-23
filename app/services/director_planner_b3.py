@@ -1378,7 +1378,7 @@ def generate_director_plan(
             "narration": narration,
             "narration_segment": narration,
             "duration_est": round(float(dur), 3),
-            "duration_sec": max(1, int(round(dur))),
+            "duration_sec": round(float(dur), 3),
             "duration_frames": int(sc.get("duration_frames") or round(dur * 30)),
             "visual_metaphor": sc.get("visual_metaphor", "Systemic tension and institutional conflict"),
             "bg_cluster_id": int(bg_cluster_id),

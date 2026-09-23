@@ -704,8 +704,8 @@ def build_unified_director_plan(
 
     for idx, sent in enumerate(spoken_sentences):
         narr = sent.get("text", "")
-        dur_frames = sent.get("duration_frames", 150)
-        dur_sec = sent.get("duration_sec", 5.0)
+        dur_frames = int(sent.get("duration_frames") or 150)
+        dur_sec = float(sent.get("duration_sec") or ((sent.get("end_ms", 0) - sent.get("start_ms", 0)) / 1000.0 if sent.get("end_ms") else 0.0) or round(dur_frames / 30.0, 3))
         beat_idx = int(sent.get("beat_index") or ((idx // max(1, len(spoken_sentences) // 5)) + 1))
         beat_idx = min(max(beat_idx, 1), 5)
 
