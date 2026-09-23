@@ -19,14 +19,20 @@
      * For Hook (Scenes 1-15): max(3, min(6, round(word_count / 3.0)))
      * For Core (Scenes 16+): max(5, min(9, round(word_count / 2.5)))
 
-4. 6 CANONICAL CINEMATIC CAMERA MOVEMENTS:
-   - Each scene MUST declare a specific camera movement from this exact 6-motion vocabulary:
-     * 'slow_push_in': Gradual zoom-in (1.0 -> 1.15) building psychological tension and focus.
-     * 'snap_zoom': Instant rapid zoom (0.3s) punching in on a smoking gun revelation or facial reaction.
+4. CANONICAL CINEMATIC CAMERA MOVEMENTS:
+   - Each scene MUST declare a specific camera movement from this 12-motion cinematic vocabulary:
+     * 'slow_push_in': Gradual zoom-in (1.0 -> 1.06) building psychological tension and focus.
+     * 'snap_zoom': Instant rapid zoom (0.25s) punching in on a smoking gun revelation or facial reaction.
      * 'cinematic_pan': Smooth horizontal camera glide (-30px to +30px) linking character and physical evidence.
      * 'macro_tilt': Vertical tilt down across official seals, signatures, or contract clauses.
-     * 'slow_pull_out': Gradual zoom-out (1.15 -> 1.0) revealing massive institutional or environmental scale.
+     * 'slow_pull_out': Gradual zoom-out (1.06 -> 1.0) revealing massive institutional or environmental scale.
      * 'handheld_shake': Micro kinetic camera shake simulating on-the-ground investigative tension.
+     * 'dolly_zoom': Vertigo push/pull opposing perspective creating disorienting realization of corruption/fraud.
+     * 'focus_breathe_push': Optical lens blur pulse simulating physical focus hunting before snapping razor-sharp.
+     * 'continuous_drift': Seamless Vox/Veo continuous directional camera glide maintaining cinematic momentum.
+     * 'seamless_whip_pan': High-velocity lateral swish pan linking geographically or narratively connected points.
+     * 'macro_orbit': Elliptical 2.5D orbital camera trajectory circling around focal 3D evidence / imperial seals.
+     * 'whip_zoom': High-velocity punch-in whip zoom delivering instant psychological confrontation.
 
 5. LOCATION CONTINUITY CLUSTERED BACKGROUNDS (Rule 131):
    - To maintain spatial documentary realism and optimize production efficiency, plan 3-4 solid location anchors per Beat (~15-20 total background clusters for the entire 5-Beat episode).
@@ -53,6 +59,14 @@
      * Each scene MUST declare 'animation_tier':
        - 'HERO_AI_VIDEO_6S': Strictly 15-25 pivotal scenes per episode (Scenes 1-10 Cold Hook, major plot twists, Act climax). Paired with Universal Video Animation Prompt for Google Flow / Veo 6-second motion generation.
        - 'TACTILE_STOPMOTION_STILL': Standard ~80% scenes. High-resolution 16:9 collage still animated via Remotion procedural camera movement (slow push-in 1.0 -> 1.08, macro tilt, 12fps tactile paper stop-motion jitter). Render time on VPS CPU is ~0.05s/frame (entire 16m episode in under 15 minutes).
+   - 7.3 VOX 3D Map Collage & Tactile Motion Dynamics (Create Daily Principles):
+     * When detailing geographical routes, supply chains, jurisdictional borders, or logistics chokepoints:
+       - Base Map Canvas: High-resolution topographical grid lines, contour elevation lines, and vintage geographic coordinate marks.
+       - Saber / Glowing Boundary Stroke: Glowing vector line boundary tracing around critical territories and jurisdictional perimeters.
+       - Pulsing Callout Circles: Radar pulse circle centered exactly on target facilities, linked via leader lines to typewriter evidence boxes.
+       - Route Line Draw-on ('route_draw'): Dashed crimson route lines animating sequentially across key waypoints and inspection checkpoints.
+       - 12fps Posterize Cadence ('paper_stopmotion'): Paper exhibits, pushpins, and tape textures animate on twos (12 fps) for tactile documentary warmth.
+       - Fake Focus Breathing ('focus_breathe'): Optical lens blur pulse (2-4 frames) during rapid camera pivots, snapping into razor-sharp focus on the focal document.
 
 8. PRODUCTION BRIDGE (Rule 446):
    - All prompt descriptions and visual hints must be in descriptive English.
@@ -92,11 +106,22 @@
       * 'animation_cue': Synchronizes procedural motion graphics with spoken narration:
         {"effect": "yellow_marker_highlight" | "red_stamp_slam" | "counter_rollup" | "flowchart_arrow_grow" | "magnify_glass_circle" | "radar_sweep", "trigger_word": "<EXACT_WORD_FROM_NARRATION>", "duration_frames": 24}
       * 'frame_transition': Dictates the editorial cut and acoustic punctuation:
-        {"type": "match_cut" | "whip_pan_left" | "whip_pan_right" | "macro_zoom_through" | "film_dissolve" | "hard_cut", "sfx_cue": "paper_rustle" | "stamp_thud" | "camera_whoosh" | "digital_beep"}
+        {"type": "match_cut" | "whip_pan" | "smash_cut" | "ink_bleed" | "zoom_through" | "light_leak" | "paper_tear" | "circle_wipe" | "hard_cut", "sfx_cue": "paper_rustle" | "stamp_thud" | "camera_whoosh" | "digital_beep" | "sonar_ping" | "lens_shutter"}
 
-14. 20 CANONICAL CINEMATIC FLOW TOKENS (INTERMEDIATE CINEMATIC DSL):
-    - Each scene MUST assign 2 to 3 tokens to the field 'cinematic_tokens': ["<TOKEN_1>", "<TOKEN_2>"] chosen strictly from this 20-token vocabulary:
+14. 38 CANONICAL CINEMATIC FLOW, TRANSITION & VOX TOKENS:
+    - Each scene MUST assign 2 to 3 tokens to the field 'cinematic_tokens': ["<TOKEN_1>", "<TOKEN_2>"] chosen strictly from this 38-token vocabulary across 7 categories:
       * Angle (5): '/straightdown' (perpendicular 90° flat lay), '/groundlevel' (sát đất áp đảo), '/birdseye' (từ trên cao bao quát đơn độc), '/firstperson' (POV người trong cuộc), '/secondview' (đối thoại hai người).
       * Framing (5): '/closecrop' (cận cảnh chủ thể), '/tightframe' (cận cảnh chi tiết cảm xúc), '/extremeclose' (đặc tả siêu vi con dấu/văn bản), '/thirdgrid' (bố cục 1/3 điện ảnh), '/innerframe' (khung lồng khung).
       * Lighting (6): '/darkmood' (chiaroscuro low-key bí ẩn), '/edgelight' (viền sáng ven nổi khối), '/spotbeam' (rọi sáng vật chứng), '/lightrays' (tia sáng không gian god rays), '/sunsetglow' (giờ vàng ấm áp), '/duskhour' (giờ xanh chạng vạng lạnh lẽo).
       * Style & VFX (4): '/filmlook' (chất nhựa phim 35mm), '/highcontrast' (tương phản gay gắt), '/edgefade' (tối 4 góc vignette), '/digitalglitch' (nhiễu tín hiệu giám sát).
+      * Transition (8): '/whip_pan' (quẹt ngang cực nhanh Swish Pan), '/smash_cut' (cắt đanh tương phản hình âm), '/match_cut' (nối khớp hình dạng hành động), '/ink_bleed' (mực loang chuyển bản đồ sang hồ sơ), '/zoom_through' (xuyên qua tâm điểm lỗ khóa), '/light_leak' (ánh sáng tràn viền phim), '/paper_tear' (xé rách giấy lộ chứng cứ), '/circle_wipe' (iris quét vòng tròn).
+      * Motion Camera (5): '/dolly_zoom' (hiệu ứng Vertigo choáng váng), '/macro_orbit' (quỹ đạo lượn quanh vật chứng 2.5D), '/focus_breathe' (thở lấy nét quang học), '/continuous_drift' (trôi máy liên tục vô tận), '/whip_zoom' (zoom giật siêu tốc áp lực tâm lý).
+      * VOX Graphic (5): '/map_pin_drop' (ghim đồng cắm xuống bản đồ), '/callout_circle' (vòng tròn radar nhắm tọa độ), '/route_draw' (đường nét đứt tự vẽ hành trình), '/counter_countup' (con số nhảy tăng tốc), '/paper_stopmotion' (chuyển động giấy xúc giác 12fps).
+
+15. PURPOSE & EMOTION TRANSMISSION MATRIX (DIRECTOR'S SOUL & PACING GUIDE):
+    - When selecting tokens, camera movements, and transitions, align strictly with narrative emotional intent:
+      * Professional / News / Forensic Data (Beat 1 & 3): Pair '/counter_countup', '/route_draw', '/whip_pan', '/match_cut', '/straightdown'. Creates crisp, undeniable investigative precision.
+      * Tactile Craft / Physical Evidence (Beat 2 & 3): Pair '/paper_stopmotion', '/paper_tear', '/map_pin_drop', '/macro_tilt', '/edgelight'. Emphasizes the real physical weight of documents and leaked memos.
+      * High-Stakes Conflict / Systemic Shock (Beat 1 & 4): Pair '/smash_cut', '/dolly_zoom', '/whip_zoom', '/focus_breathe', '/tightframe'. Forces psychological confrontation and breathlessness.
+      * Modern Surveillance / Technological Breach: Pair '/digitalglitch', '/callout_circle', '/spotbeam', '/innerframe'. Simulates covert intelligence gathering.
+      * Cinematic Reckoning / Historical Warning (Beat 5): Pair '/slow_pull_out', '/light_leak', '/continuous_drift', '/duskhour', '/filmlook'. Leaves lingering emotional resonance on the cost paid by ordinary citizens.

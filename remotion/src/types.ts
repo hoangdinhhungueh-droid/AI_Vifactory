@@ -6,9 +6,27 @@ export type CameraMove =
   | "slow_push_in"
   | "slow_pull_out"
   | "cinematic_pan"
-  | "macro_tilt";
+  | "macro_tilt"
+  | "snap_zoom"
+  | "macro_orbit"
+  | "cinematic_orbit"
+  | "dolly_zoom"
+  | "whip_zoom"
+  | "focus_breathe_push"
+  | "continuous_drift"
+  | "seamless_whip_pan";
 
-export type TransitionOut = "hard_cut" | "stop_motion_flicker_cut" | "crossfade_short";
+export type TransitionOut =
+  | "hard_cut"
+  | "smash_cut"
+  | "stop_motion_flicker_cut"
+  | "crossfade_short"
+  | "whip_pan"
+  | "macro_zoom_through"
+  | "ink_bleed"
+  | "paper_tear"
+  | "light_leak"
+  | "circle_wipe";
 
 export interface Scene {
   scene_id: string;

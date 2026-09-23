@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "AI Video Factory Cinematic Flow Tokens Dictionary",
-  "version": "1.0.0",
-  "description": "Curated 20 Cinematic Flow Tokens acting as intermediate DSL between High-Level LLM, B3 Director, B3.5 Prompt Forge, and Remotion Engine.",
+  "title": "AI Video Factory Cinematic Flow & Transition Tokens Dictionary",
+  "version": "2.0.0",
+  "description": "Curated 38 Canonical Cinematic Flow, Transition & VOX Motion Tokens acting as intermediate DSL between High-Level LLM, B3 Visual Director, B3.5 Prompt Forge, and Remotion Engine.",
   "tokens": [
     {
       "token": "/straightdown",
@@ -163,6 +163,150 @@
       "gemini_directive_en": "cybernetic signal distortion, surveillance monitor scanlines, subtle digital glitch artifacts",
       "remotion_fx": "digital_glitch",
       "remotion_camera_hint": null
+    },
+    {
+      "token": "/whip_pan",
+      "category": "transition",
+      "description_vi": "Chuyển cảnh quẹt ngang cực nhanh nối liền hai không gian hoặc tài liệu (Swish Pan)",
+      "gemini_directive_en": "dynamic horizontal swish pan motion blur wiping across the visual axis into evidence",
+      "remotion_fx": "whip_pan",
+      "remotion_camera_hint": "seamless_whip_pan"
+    },
+    {
+      "token": "/smash_cut",
+      "category": "transition",
+      "description_vi": "Cắt đanh tức thì, tương phản mạnh mẽ hình ảnh và nhịp độ",
+      "gemini_directive_en": "hard-hitting instant visual cut with abrupt spatial contrast and impactful composition",
+      "remotion_fx": "smash_cut",
+      "remotion_camera_hint": "snap_zoom"
+    },
+    {
+      "token": "/match_cut",
+      "category": "transition",
+      "description_vi": "Chuyển cảnh nối khớp hình dạng hoặc hướng chuyển động giữa 2 vật thể",
+      "gemini_directive_en": "precise graphic match cut aligning silhouette geometry and focal point continuity across scenes",
+      "remotion_fx": "match_cut",
+      "remotion_camera_hint": "slow_push_in"
+    },
+    {
+      "token": "/ink_bleed",
+      "category": "transition",
+      "description_vi": "Vệt mực loang hữu cơ chuyển từ bản đồ tổng quan sang chi tiết hồ sơ",
+      "gemini_directive_en": "organic fluid ink bleed matte transition spreading across textured archival parchment",
+      "remotion_fx": "ink_bleed",
+      "remotion_camera_hint": "slow_push_in"
+    },
+    {
+      "token": "/zoom_through",
+      "category": "transition",
+      "description_vi": "Zoom xuyên qua tâm điểm tài liệu hoặc lỗ khóa bừng mở cảnh mới",
+      "gemini_directive_en": "dynamic zoom-through plunge piercing through the center aperture into the next scene",
+      "remotion_fx": "zoom_through",
+      "remotion_camera_hint": "snap_zoom"
+    },
+    {
+      "token": "/light_leak",
+      "category": "transition",
+      "description_vi": "Ánh sáng quang học tràn viền qua khung hình tạo nét hoài niệm điện ảnh",
+      "gemini_directive_en": "warm optical film light leak sweep diffusing across the lens aperture",
+      "remotion_fx": "light_leak",
+      "remotion_camera_hint": "continuous_drift"
+    },
+    {
+      "token": "/paper_tear",
+      "category": "transition",
+      "description_vi": "Hiệu ứng xé rách giấy vật chứng để lộ lớp bằng chứng bên dưới",
+      "gemini_directive_en": "physical jagged paper tear transition revealing underlying evidentiary layer",
+      "remotion_fx": "paper_tear",
+      "remotion_camera_hint": "macro_tilt"
+    },
+    {
+      "token": "/circle_wipe",
+      "category": "transition",
+      "description_vi": "Chuyển cảnh vòng tròn iris mở rộng hoặc thu hẹp từ tâm điểm",
+      "gemini_directive_en": "classic circular iris wipe transition focusing attention on a pinpoint forensic detail",
+      "remotion_fx": "circle_wipe",
+      "remotion_camera_hint": "slow_pull_out"
+    },
+    {
+      "token": "/dolly_zoom",
+      "category": "motion_camera",
+      "description_vi": "Hiệu ứng Vertigo tiến lùi ngược chiều tạo cảm giác choáng váng chấn động",
+      "gemini_directive_en": "vertigo dolly zoom effect compressing background perspective while locking foreground scale",
+      "remotion_fx": "dolly_zoom",
+      "remotion_camera_hint": "dolly_zoom"
+    },
+    {
+      "token": "/macro_orbit",
+      "category": "motion_camera",
+      "description_vi": "Quỹ đạo 2.5D lượn vòng cung quanh con dấu hoặc vật chứng lập thể",
+      "gemini_directive_en": "elliptical 2.5D orbital camera trajectory circling around focal 3D evidence",
+      "remotion_fx": null,
+      "remotion_camera_hint": "macro_orbit"
+    },
+    {
+      "token": "/focus_breathe",
+      "category": "motion_camera",
+      "description_vi": "Độ sâu trường ảnh nhấp nhô tìm nét quang học trước khi khóa nét sắc lẹm",
+      "gemini_directive_en": "cinematic optical focus breathing pulse simulating lens breathing during high tension",
+      "remotion_fx": "focus_breathing",
+      "remotion_camera_hint": "focus_breathe_push"
+    },
+    {
+      "token": "/continuous_drift",
+      "category": "motion_camera",
+      "description_vi": "Trôi máy liên tục mượt mà không dừng giật kiểu phim tài liệu Vox/Veo",
+      "gemini_directive_en": "seamless continuous directional camera glide maintaining cinematic momentum",
+      "remotion_fx": null,
+      "remotion_camera_hint": "continuous_drift"
+    },
+    {
+      "token": "/whip_zoom",
+      "category": "motion_camera",
+      "description_vi": "Zoom giật siêu tốc đẩy nhanh gia tốc tạo sức ép tâm lý tức thì",
+      "gemini_directive_en": "high-velocity punch-in whip zoom delivering instant psychological confrontation",
+      "remotion_fx": "whip_zoom",
+      "remotion_camera_hint": "whip_zoom"
+    },
+    {
+      "token": "/map_pin_drop",
+      "category": "vox_graphic",
+      "description_vi": "Ghim đồng rơi cắm xuống bản đồ kèm vòng sóng xung nhịp",
+      "gemini_directive_en": "tactile brass pushpin dropping onto vintage cartographic survey map with location shockwave",
+      "remotion_fx": "map_pin_drop",
+      "remotion_camera_hint": "macro_tilt"
+    },
+    {
+      "token": "/callout_circle",
+      "category": "vox_graphic",
+      "description_vi": "Vòng tròn radar chỉ điểm nhấp nháy nhắm vào tọa độ mục tiêu trên bản đồ",
+      "gemini_directive_en": "pulsing glowing radar callout circle targeting geographic coordinate sector on topo grid",
+      "remotion_fx": "callout_circle",
+      "remotion_camera_hint": "slow_push_in"
+    },
+    {
+      "token": "/route_draw",
+      "category": "vox_graphic",
+      "description_vi": "Đường nét đứt tự vẽ hành trình di chuyển giữa các trạm trung chuyển",
+      "gemini_directive_en": "animated dashed red vector trajectory line drawing across tactical route chokepoints",
+      "remotion_fx": "route_draw",
+      "remotion_camera_hint": "cinematic_pan"
+    },
+    {
+      "token": "/counter_countup",
+      "category": "vox_graphic",
+      "description_vi": "Con số định lượng nhảy tăng tốc đến giá trị thiệt hại thực tế",
+      "gemini_directive_en": "high-speed mechanical metric counter spinning up to forensic audited value",
+      "remotion_fx": "counter_rollup",
+      "remotion_camera_hint": "snap_zoom"
+    },
+    {
+      "token": "/paper_stopmotion",
+      "category": "vox_graphic",
+      "description_vi": "Chuyển động giấy xúc giác nhịp 12fps (on twos) phong cách thủ công",
+      "gemini_directive_en": "tactile paper-collage stop-motion animation at 12fps with authentic physical craft texture",
+      "remotion_fx": "stop_motion_12fps",
+      "remotion_camera_hint": "handheld_shake"
     }
   ]
 }

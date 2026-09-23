@@ -49,19 +49,25 @@ CANONICAL_BEATS = [
 # Rule 128: Concise targeted art direction rules (~1.2k chars) replacing 336k chars dump
 TARGETED_ART_RULES = get_b3_strategic_rules()
 
-# 6 Canonical Cinematic Camera Movements
+# 12 Canonical Cinematic Camera Movements (Expanded with VOX 3D & Focus Dynamics)
 CANONICAL_CAMERA_MOVES = [
     "slow_push_in",
     "snap_zoom",
     "cinematic_pan",
     "macro_tilt",
     "slow_pull_out",
-    "handheld_shake"
+    "handheld_shake",
+    "dolly_zoom",
+    "focus_breathe_push",
+    "continuous_drift",
+    "seamless_whip_pan",
+    "macro_orbit",
+    "whip_zoom"
 ]
 
 
 def validate_cinematic_tokens(tokens: list | None, narration: str = "") -> list:
-    """Rule 128 & Rule 132: Validate and sanitize cinematic flow tokens against the 20 canonical tokens.
+    """Rule 128 & Rule 132: Validate and sanitize cinematic flow & transition tokens against the 38 canonical tokens.
     Provides deterministic fallback if LLM omitted tokens.
     """
     dict_data = get_cinematic_tokens_dictionary()
@@ -71,7 +77,11 @@ def validate_cinematic_tokens(tokens: list | None, narration: str = "") -> list:
             "/straightdown", "/groundlevel", "/birdseye", "/firstperson", "/secondview",
             "/closecrop", "/tightframe", "/extremeclose", "/thirdgrid", "/innerframe",
             "/darkmood", "/edgelight", "/spotbeam", "/lightrays", "/sunsetglow", "/duskhour",
-            "/filmlook", "/highcontrast", "/edgefade", "/digitalglitch"
+            "/filmlook", "/highcontrast", "/edgefade", "/digitalglitch",
+            "/whip_pan", "/smash_cut", "/match_cut", "/ink_bleed", "/zoom_through",
+            "/light_leak", "/paper_tear", "/circle_wipe",
+            "/dolly_zoom", "/macro_orbit", "/focus_breathe", "/continuous_drift", "/whip_zoom",
+            "/map_pin_drop", "/callout_circle", "/route_draw", "/counter_countup", "/paper_stopmotion"
         }
     cleaned = []
     if isinstance(tokens, list):
@@ -85,12 +95,18 @@ def validate_cinematic_tokens(tokens: list | None, narration: str = "") -> list:
 
     if not cleaned and narration:
         t_low = narration.lower()
-        if any(k in t_low for k in ["hồ sơ", "con dấu", "hợp đồng", "bản án", "bàn làm việc", "dossier", "contract", "verdict", "document", "ledger", "seal", "stamp"]):
-            cleaned = ["/straightdown", "/darkmood", "/edgelight"]
+        if any(k in t_low for k in ["bản đồ", "tọa độ", "vị trí", "biên giới", "hành trình", "tuyến đường", "map", "coordinate", "border", "route", "chokepoint"]):
+            cleaned = ["/route_draw", "/callout_circle", "/map_pin_drop"]
+        elif any(k in t_low for k in ["con số", "tỷ", "triệu", "đô la", "usd", "khoản tiền", "thiệt hại", "counter", "metric", "loss", "billion"]):
+            cleaned = ["/counter_countup", "/snap_zoom", "/spotbeam"]
+        elif any(k in t_low for k in ["hồ sơ", "con dấu", "hợp đồng", "bản án", "bàn làm việc", "dossier", "contract", "verdict", "document", "ledger", "seal", "stamp"]):
+            cleaned = ["/straightdown", "/paper_stopmotion", "/edgelight"]
         elif any(k in t_low for k in ["biến mất", "toàn cảnh", "thành phố", "tòa nhà", "quốc gia", "hệ thống", "skyline", "scale"]):
             cleaned = ["/birdseye", "/duskhour", "/filmlook"]
         elif any(k in t_low for k in ["khuôn mặt", "nói", "thì thầm", "khai nhận", "nhìn thẳng", "eyes", "whisper", "confession"]):
-            cleaned = ["/tightframe", "/darkmood", "/highcontrast"]
+            cleaned = ["/tightframe", "/focus_breathe", "/highcontrast"]
+        elif any(k in t_low for k in ["chấn động", "bất ngờ", "sụp đổ", "shock", "collapse", "crisis", "fraud"]):
+            cleaned = ["/smash_cut", "/dolly_zoom", "/darkmood"]
         else:
             cleaned = ["/thirdgrid", "/darkmood"]
 
@@ -489,16 +505,27 @@ def detect_animation_cue(narration_text: str, object_focus: dict = None) -> dict
 
 
 def detect_frame_transition(camera_movement: str, tension_level: str, scene_idx: int = 0) -> dict:
-    """Detect frame_transition and SFX punctuation."""
-    if camera_movement in ("snap_zoom", "handheld_shake"):
-        return {"type": "macro_zoom_through", "sfx_cue": "stamp_thud"}
-    elif camera_movement in ("cinematic_pan",):
+    """Detect frame_transition and SFX punctuation based on Bo-tu-dien-Transition-Animation."""
+    cam = (camera_movement or "").lower()
+    ten = (tension_level or "").lower()
+
+    if cam in ("whip_zoom",) or ten in ("climax", "extreme", "shock"):
+        return {"type": "smash_cut", "sfx_cue": "stamp_thud"}
+    elif cam in ("seamless_whip_pan", "cinematic_pan"):
         trans_type = "whip_pan_left" if scene_idx % 2 == 0 else "whip_pan_right"
         return {"type": trans_type, "sfx_cue": "camera_whoosh"}
-    elif tension_level in ("climax", "extreme"):
-        return {"type": "match_cut", "sfx_cue": "paper_rustle"}
+    elif cam in ("dolly_zoom", "focus_breathe_push"):
+        return {"type": "macro_zoom_through", "sfx_cue": "lens_shutter"}
+    elif cam in ("snap_zoom", "handheld_shake"):
+        return {"type": "macro_zoom_through", "sfx_cue": "stamp_thud"}
+    elif scene_idx % 7 == 0:
+        return {"type": "ink_bleed", "sfx_cue": "paper_rustle"}
+    elif scene_idx % 5 == 0:
+        return {"type": "paper_tear", "sfx_cue": "paper_rustle"}
     elif scene_idx % 4 == 0:
-        return {"type": "film_dissolve", "sfx_cue": "paper_rustle"}
+        return {"type": "light_leak", "sfx_cue": "lens_shutter"}
+    elif scene_idx % 3 == 0:
+        return {"type": "match_cut", "sfx_cue": "paper_rustle"}
     else:
         return {"type": "hard_cut", "sfx_cue": "digital_beep"}
 

@@ -254,6 +254,9 @@ def build_structured_overlay(fo_type: str, narration_text: str, theme: str = "vo
         }
 
     if fo_type in ("tactical_map", "radar_map"):
+        # Rule 128: Generic Contract with dynamic extraction from narration
+        loc_words = [w.strip() for w in re.split(r'[,.\s]+', narration_text) if len(w.strip()) > 3][:3]
+        target_loc = loc_words[0] if loc_words else ("TARGET OPERATION SECTOR" if not is_jp else "重要監視区域 // 調査対象地点")
         return {
             "type": "tactical_map",
             "legacy_type": "radar_map",
@@ -264,10 +267,10 @@ def build_structured_overlay(fo_type: str, narration_text: str, theme: str = "vo
             "sfx_cue": "sonar_ping",
             "label": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
             "payload": {
-                "target_name": "浜岡原子力発電所 プラントサイト" if is_jp else "OPERATIONAL SITE // VERIFIED SECTOR",
-                "coordinates": "34.62° N, 138.14° E (静岡県 御前崎市)" if is_jp else "TARGET REGION JURISDICTION",
-                "map_region": "駿河湾沿岸 耐震・地殻変動セクター" if is_jp else "INVESTIGATIVE DISTRICT",
-                "points_of_interest": ["3号機・4号機 原子炉建屋", "基準地震動観測点", "防潮堤 22m区間"] if is_jp else ["PRIMARY HUB", "INTERMEDIARY CHOKEPOINT", "ESCROW DISBURSEMENT"]
+                "target_name": f"TARGET SECTOR // {target_loc.upper()}" if not is_jp else f"対象区域 // {target_loc}",
+                "coordinates": "INCIDENT GRID // VERIFIED SECTOR",
+                "map_region": "REGIONAL JURISDICTION CORRIDOR",
+                "points_of_interest": [f"POI-01: {target_loc}", "LOGISTICS CHOKEPOINT", "REGULATORY AUDIT CHECKPOINT"]
             }
         }
 
@@ -320,20 +323,35 @@ def build_structured_overlay(fo_type: str, narration_text: str, theme: str = "vo
 
 
 def normalize_camera_movement(raw_mov: str | None) -> str:
-    """Normalize raw camera movement string into one of 6 Remotion canonical movements."""
+    """Normalize raw camera movement string into one of 12 Remotion canonical movements."""
     if not raw_mov:
         return "slow_push_in"
     m = str(raw_mov).strip().lower()
-    canonical = ["snap_zoom", "slow_push_in", "slow_pull_out", "cinematic_pan", "macro_tilt", "handheld_shake"]
+    canonical = [
+        "snap_zoom", "slow_push_in", "slow_pull_out", "cinematic_pan", "macro_tilt", "handheld_shake",
+        "dolly_zoom", "focus_breathe_push", "continuous_drift", "seamless_whip_pan", "macro_orbit", "whip_zoom"
+    ]
     if m in canonical:
         return m
-    if "snap" in m or "punch" in m or ("zoom" in m and "slow" not in m):
+    if "dolly" in m or "vertigo" in m:
+        return "dolly_zoom"
+    if "orbit" in m or "circle" in m:
+        return "macro_orbit"
+    if "breathe" in m or "focus" in m:
+        return "focus_breathe_push"
+    if "drift" in m or "glide" in m:
+        return "continuous_drift"
+    if "whip" in m and "pan" in m:
+        return "seamless_whip_pan"
+    if "whip" in m and "zoom" in m:
+        return "whip_zoom"
+    if "snap" in m or "punch" in m:
         return "snap_zoom"
     if "pull" in m or "retreat" in m:
         return "slow_pull_out"
     if "push" in m or "forward" in m:
         return "slow_push_in"
-    if "pan" in m or "lateral" in m or "drift" in m or "whip" in m:
+    if "pan" in m or "lateral" in m or "tracking" in m:
         return "cinematic_pan"
     if "tilt" in m or "pedestal" in m:
         return "macro_tilt"

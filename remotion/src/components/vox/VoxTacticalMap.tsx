@@ -49,6 +49,14 @@ export const VoxTacticalMap: React.FC<VoxTacticalMapProps> = ({
     extrapolateRight: "clamp",
   });
 
+  // Pulsing radar callout circle wave (VOX tactile animation per Create Daily tutorial)
+  const pingCycle = ((steppedFrame + 5) % 25) / 25;
+  const pingScale = interpolate(pingCycle, [0, 1], [0.6, 2.4]);
+  const pingOpacity = interpolate(pingCycle, [0, 0.25, 1], [0.85, 0.5, 0]);
+
+  // Dash marching flow after route is drawn
+  const dashOffset = (100 - routeDraw) + (steppedFrame > 36 ? ((steppedFrame - 36) * 0.75) % 20 : 0);
+
   const displayTitle = title || label || "GEO-TACTICAL TELEMETRY // SECTOR GRID";
   const displayBadge = badge || "LOCATIONAL EVIDENCE";
   const targetName = payload?.target_name || "TARGET OPERATION SECTOR";
@@ -172,7 +180,7 @@ export const VoxTacticalMap: React.FC<VoxTacticalMapProps> = ({
             }}
           />
 
-          {/* Animated Route Line connecting points */}
+          {/* Animated Route Line connecting points with Underlay Glow and Marching Dashes */}
           <svg
             style={{
               position: "absolute",
@@ -181,20 +189,50 @@ export const VoxTacticalMap: React.FC<VoxTacticalMapProps> = ({
               height: "100%",
             }}
           >
+            {/* Soft tactical path glow underlay */}
+            <path
+              d="M 40 180 Q 120 80 240 120 T 380 60"
+              fill="none"
+              stroke="#dc2626"
+              strokeWidth="7"
+              strokeOpacity="0.22"
+              strokeLinecap="round"
+              strokeDasharray="6 4"
+              strokeDashoffset={dashOffset}
+            />
+            {/* Primary animated dashed route line */}
             <path
               d="M 40 180 Q 120 80 240 120 T 380 60"
               fill="none"
               stroke="#dc2626"
               strokeWidth="3.5"
+              strokeLinecap="round"
               strokeDasharray="6 4"
-              strokeDashoffset={100 - routeDraw}
+              strokeDashoffset={dashOffset}
             />
-            {/* POI dots */}
-            <circle cx="40" cy="180" r="5" fill="#1e293b" />
-            <circle cx="240" cy="120" r="5" fill="#1e293b" />
+            {/* POI dots with tactile paper border */}
+            <circle cx="40" cy="180" r="6" fill="#1e293b" stroke="#ffffff" strokeWidth="2" />
+            <circle cx="240" cy="120" r="6" fill="#1e293b" stroke="#ffffff" strokeWidth="2" />
           </svg>
 
-          {/* Target Red Pin with Bounce */}
+          {/* Radar Callout Ping Wave (VOX dynamic focal lock) */}
+          <div
+            style={{
+              position: "absolute",
+              top: isFullBleed ? 26 : 16,
+              left: isFullBleed ? 348 : 188,
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
+              border: "2px solid #dc2626",
+              transform: `scale(${pingScale})`,
+              opacity: pingOpacity,
+              pointerEvents: "none",
+              zIndex: 9,
+            }}
+          />
+
+          {/* Target Red Pin with Bounce & Die-cut 3D drop shadow */}
           <div
             style={{
               position: "absolute",
@@ -205,6 +243,7 @@ export const VoxTacticalMap: React.FC<VoxTacticalMapProps> = ({
               flexDirection: "column",
               alignItems: "center",
               zIndex: 10,
+              filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))",
             }}
           >
             <div

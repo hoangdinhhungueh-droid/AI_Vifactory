@@ -86,11 +86,11 @@ def resolve_cinematic_tokens(tokens: list | None) -> dict:
             continue
         cat = info.get("category")
         directive = info.get("gemini_directive_en", "")
-        if cat in ("angle", "framing") and directive and directive not in res["camera_directives"]:
+        if cat in ("angle", "framing", "motion_camera") and directive and directive not in res["camera_directives"]:
             res["camera_directives"].append(directive)
         elif cat == "lighting" and directive and directive not in res["lighting_directives"]:
             res["lighting_directives"].append(directive)
-        elif cat == "style_vfx" and directive and directive not in res["vfx_directives"]:
+        elif cat in ("style_vfx", "transition", "vox_graphic") and directive and directive not in res["vfx_directives"]:
             res["vfx_directives"].append(directive)
             
         r_fx = info.get("remotion_fx")

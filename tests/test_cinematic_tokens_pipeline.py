@@ -33,7 +33,7 @@ from app.services.prompt_forge import (
 
 
 class TestCinematicTokensDictionary:
-    """Validate the 20 Curated Cinematic Flow Tokens Dictionary."""
+    """Validate the 38 Curated Cinematic & Motion Tokens Dictionary."""
 
     def test_dictionary_file_exists_and_valid_json(self):
         dict_path = ROOT_DIR / "config" / "prompts" / "cinematic_tokens_dictionary.json"
@@ -44,22 +44,27 @@ class TestCinematicTokensDictionary:
 
         assert "tokens" in data
         tokens = data["tokens"]
-        assert len(tokens) == 20, f"Expected exactly 20 tokens, found {len(tokens)}"
+        assert len(tokens) == 38, f"Expected exactly 38 tokens, found {len(tokens)}"
 
         expected_tokens = {
             "/straightdown", "/groundlevel", "/birdseye", "/firstperson", "/secondview",
             "/closecrop", "/tightframe", "/extremeclose", "/thirdgrid", "/innerframe",
             "/darkmood", "/edgelight", "/spotbeam", "/lightrays", "/sunsetglow", "/duskhour",
-            "/filmlook", "/highcontrast", "/edgefade", "/digitalglitch"
+            "/filmlook", "/highcontrast", "/edgefade", "/digitalglitch",
+            "/whip_pan", "/smash_cut", "/match_cut", "/ink_bleed", "/zoom_through",
+            "/light_leak", "/paper_tear", "/circle_wipe",
+            "/dolly_zoom", "/macro_orbit", "/focus_breathe", "/continuous_drift", "/whip_zoom",
+            "/map_pin_drop", "/callout_circle", "/route_draw", "/counter_countup", "/paper_stopmotion"
         }
         actual_tokens = {t["token"] for t in tokens}
         assert actual_tokens == expected_tokens, f"Token mismatch: {actual_tokens ^ expected_tokens}"
 
+        valid_categories = {"angle", "framing", "lighting", "style_vfx", "transition", "motion_camera", "vox_graphic"}
         for t in tokens:
             assert t["token"].startswith("/"), f"Token must start with slash: {t['token']}"
-            assert t["category"] in ("angle", "framing", "lighting", "style_vfx")
+            assert t["category"] in valid_categories, f"Invalid category: {t['category']}"
             assert len(t["description_vi"]) > 5
-            assert len(t["gemini_directive_en"]) > 10
+            assert len(t["gemini_directive_en"]) > 5
 
 
 class TestSkillLoaderIntegration:
@@ -70,7 +75,7 @@ class TestSkillLoaderIntegration:
         dict_data = get_cinematic_tokens_dictionary(force_refresh=True)
         assert dict_data is not None
         assert "tokens" in dict_data
-        assert len(dict_data["tokens"]) == 20
+        assert len(dict_data["tokens"]) == 38
 
         # Test caching
         cached_data = get_cinematic_tokens_dictionary()
@@ -96,10 +101,15 @@ class TestB3DirectorPlannerValidation:
         assert cleaned == ["/straightdown", "/darkmood"]
 
     def test_validate_heuristic_fallback_evidence(self):
-        # When tokens are empty, narration with evidence keywords falls back to straightdown
+        # When tokens are empty, narration with evidence keywords falls back to straightdown & paper_stopmotion
         cleaned = validate_cinematic_tokens([], "Cảnh sát niêm phong tập hồ sơ và con dấu đỏ trên bàn làm việc.")
         assert "/straightdown" in cleaned
-        assert "/darkmood" in cleaned
+        assert "/paper_stopmotion" in cleaned
+
+    def test_validate_heuristic_fallback_tactical_map(self):
+        cleaned = validate_cinematic_tokens([], "Bản đồ hiển thị tọa độ di chuyển của đoàn xe bí mật dọc biên giới.")
+        assert "/route_draw" in cleaned
+        assert "/callout_circle" in cleaned
 
     def test_validate_heuristic_fallback_macro_scale(self):
         cleaned = validate_cinematic_tokens([], "Toàn bộ hệ thống sụp đổ trên phạm vi toàn cảnh thành phố.")

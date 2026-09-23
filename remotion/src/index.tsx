@@ -1269,6 +1269,125 @@ const CinematicOverlay = () => (
   </AbsoluteFill>
 );
 
+// === CINEMATIC TRANSITIONS SYSTEM (Rule 122, Rule 128 & Bo-tu-dien-Transition-Animation) ===
+export const CinematicTransitionOverlay: React.FC<{
+  transitionOut: string | undefined;
+  relFrame: number;
+  durationInFrames: number;
+}> = ({ transitionOut, relFrame, durationInFrames }) => {
+  if (!transitionOut || transitionOut === "hard_cut") return null;
+
+  // 1. Paper Tear: diagonal jagged ripped paper edge sliding across screen (frames 0-8)
+  if (transitionOut === "paper_tear") {
+    if (relFrame > 8) return null;
+    const tearProgress = interpolate(relFrame, [0, 8], [-100, 100], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return (
+      <AbsoluteFill style={{ zIndex: 40, pointerEvents: "none", overflow: "hidden" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: `${tearProgress}%`,
+            width: 90,
+            height: "100%",
+            background: "linear-gradient(90deg, transparent 0%, rgba(248, 245, 235, 0.95) 40%, rgba(220, 215, 200, 0.9) 60%, transparent 100%)",
+            boxShadow: "0 0 25px rgba(0,0,0,0.55)",
+            transform: "skewX(-14deg)",
+          }}
+        />
+      </AbsoluteFill>
+    );
+  }
+
+  // 2. Ink Bleed: dark organic radial blotch spreading and dissolving (frames 0-9)
+  if (transitionOut === "ink_bleed") {
+    if (relFrame > 9) return null;
+    const inkOpacity = interpolate(relFrame, [0, 2, 9], [0.95, 0.75, 0], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    const inkScale = interpolate(relFrame, [0, 9], [0.9, 1.4], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return (
+      <AbsoluteFill
+        style={{
+          zIndex: 40,
+          pointerEvents: "none",
+          opacity: inkOpacity,
+          background: "radial-gradient(circle at 50% 50%, rgba(10, 14, 22, 0.96) 0%, rgba(18, 24, 38, 0.7) 45%, transparent 75%)",
+          transform: `scale(${inkScale})`,
+        }}
+      />
+    );
+  }
+
+  // 3. Light Leak: warm vintage anamorphic flare burst across corner (frames 0-8)
+  if (transitionOut === "light_leak") {
+    if (relFrame > 8) return null;
+    const leakOpacity = interpolate(relFrame, [0, 2, 8], [0, 0.82, 0], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return (
+      <AbsoluteFill
+        style={{
+          zIndex: 40,
+          pointerEvents: "none",
+          opacity: leakOpacity,
+          background: "radial-gradient(ellipse at 88% 12%, rgba(255, 195, 95, 0.88) 0%, rgba(255, 115, 30, 0.52) 40%, rgba(255, 60, 10, 0.18) 65%, transparent 85%)",
+        }}
+      />
+    );
+  }
+
+  // 4. Circle Wipe / Iris: circular aperture expanding from center (frames 0-7)
+  if (transitionOut === "circle_wipe") {
+    if (relFrame > 8) return null;
+    const irisRadius = interpolate(relFrame, [0, 7], [0, 120], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return (
+      <AbsoluteFill
+        style={{
+          zIndex: 40,
+          pointerEvents: "none",
+          background: INK,
+          maskImage: `radial-gradient(circle at 50% 50%, transparent ${irisRadius}%, black ${irisRadius + 1}%)`,
+          WebkitMaskImage: `radial-gradient(circle at 50% 50%, transparent ${irisRadius}%, black ${irisRadius + 1}%)`,
+        }}
+      />
+    );
+  }
+
+  // 5. Smash Cut: single-frame abrupt black punch (frame 0)
+  if (transitionOut === "smash_cut") {
+    if (relFrame === 0) {
+      return (
+        <AbsoluteFill style={{ zIndex: 45, backgroundColor: "#000000", pointerEvents: "none" }} />
+      );
+    }
+    return null;
+  }
+
+  // 6. Stop Motion Flicker Cut: 3-frame rapid shutter strobe
+  if (transitionOut === "stop_motion_flicker_cut") {
+    if (relFrame > 4) return null;
+    const strobe = interpolate(relFrame, [0, 1, 2, 3, 4], [0.35, 0, 0.2, 0, 0]);
+    if (strobe <= 0.01) return null;
+    return (
+      <AbsoluteFill style={{ zIndex: 40, backgroundColor: "#000000", opacity: strobe, pointerEvents: "none" }} />
+    );
+  }
+
+  return null;
+};
+
 // === CINEMATIC CAMERA SYSTEM (Rule 122 & Rule 128) ===
 
 export const computeCameraTransform = (
@@ -1402,6 +1521,40 @@ export const computeCameraTransform = (
     return `scale(${scale}) rotate(${rot.toFixed(2)}deg)`;
   }
 
+  if (mov === "dolly_zoom") {
+    // Vertigo opposing zoom/fov effect: scale down background while shifting perspective
+    const scale = interpolate(f, [0, dur], [1.12, 1.01], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+    const panY = interpolate(f, [0, dur], [8, -4], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return `scale(${scale}) translateY(${panY.toFixed(2)}px)`;
+  }
+
+  if (mov === "whip_zoom") {
+    // Ultra high-velocity punch-in in first 4 frames with micro overshoot
+    const scale = interpolate(f, [0, 4, 10, dur], [1.0, 1.15, 1.11, 1.13], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+    return `scale(${scale})`;
+  }
+
+  if (mov === "focus_breathe_push") {
+    // Push-in with subtle optical lens breathing pulse in first 12 frames
+    const breathe = interpolate(f, [0, 4, 8, 14, dur], [1.0, 1.04, 0.99, 1.02, 1.06], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+    });
+    return `scale(${breathe})`;
+  }
+
   // Fallback subtle Ken Burns slow zoom
   const scale = interpolate(f, [0, dur], [1.0, 1.03], {
     extrapolateLeft: "clamp",
@@ -1477,6 +1630,44 @@ export const TwoLayerEpisode = (props) => {
         currentSceneInfo.durationInFrames
       )
     : "scale(1.0)";
+
+  // Fake Focus Breathing & Motion Defocus Pulse (Rule 122 & "The Sauce" VOX optical aesthetic)
+  const focusBlurPx = React.useMemo(() => {
+    if (!currentSceneInfo) return 0;
+    const { relFrame } = currentSceneInfo;
+    const mov = currentCameraMov;
+    if (mov === "focus_breathe_push") {
+      return interpolate(relFrame, [0, 3, 6, 12, 15, 18], [0, 2.5, 0, 0, 1.8, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+    }
+    if (mov === "whip_zoom") {
+      return interpolate(relFrame, [0, 2, 5], [0, 3.2, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+    }
+    if (mov === "snap_zoom" || mov === "seamless_whip_pan") {
+      return interpolate(relFrame, [0, 2, 5], [0, 2.4, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+    }
+    if (mov === "dolly_zoom") {
+      return interpolate(relFrame, [0, 4, 9], [0, 1.6, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+    }
+    if (relFrame <= 3) {
+      return interpolate(relFrame, [0, 1, 3], [0, 0.8, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+    }
+    return 0;
+  }, [currentSceneInfo, currentCameraMov]);
 
   const items = React.useMemo(() => {
     let cursor = 0;
@@ -1576,8 +1767,9 @@ export const TwoLayerEpisode = (props) => {
           position: "absolute",
           inset: 0,
           transform: cameraTransform,
+          filter: focusBlurPx > 0.05 ? `blur(${focusBlurPx.toFixed(1)}px)` : undefined,
           transformOrigin: "center center",
-          willChange: "transform",
+          willChange: "transform, filter",
         }}
       >
         <VoxParallaxLayer depth="background" cameraMovement={currentCameraMov} durationInFrames={currentDur}>
@@ -1642,6 +1834,13 @@ export const TwoLayerEpisode = (props) => {
       <VoxAtmosphericLighting intensity={0.9} />
       <CinematicVignette />
       <CinematicOverlay />
+      {currentSceneInfo && (
+        <CinematicTransitionOverlay
+          transitionOut={currentSceneInfo.scene.transition_out || currentSceneInfo.scene.transitionOut}
+          relFrame={currentSceneInfo.relFrame}
+          durationInFrames={currentSceneInfo.durationInFrames}
+        />
+      )}
       <TopProgressBar scenes={scenes} currentFrame={currentFrame} totalFrames={totalSceneFrames(scenes)} />
     </AbsoluteFill>
   );
