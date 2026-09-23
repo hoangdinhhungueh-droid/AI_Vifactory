@@ -77,8 +77,15 @@ FORBIDDEN_HARDCODED_SLUGS = [
 
 
 class GhostCodeDetector:
-    def __init__(self, root_dir: str | Path):
-        self.root_dir = Path(root_dir).resolve()
+    def __init__(self, root_dir: str | Path | None = None):
+        if root_dir is None or str(root_dir) == ".":
+            cwd = Path(".").resolve()
+            if (cwd / "app").exists() and (cwd / "scripts").exists():
+                self.root_dir = cwd
+            else:
+                self.root_dir = Path(__file__).resolve().parent.parent.parent
+        else:
+            self.root_dir = Path(root_dir).resolve()
         self.defects: List[str] = []
 
     def check_layer1_physical_hygiene(self) -> List[str]:
