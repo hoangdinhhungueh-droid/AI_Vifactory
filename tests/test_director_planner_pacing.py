@@ -16,8 +16,11 @@ from app.services.build_remotion_props import (
 
 
 def test_canonical_camera_moves_completeness():
-    assert len(CANONICAL_CAMERA_MOVES) == 6
-    expected = {"slow_push_in", "snap_zoom", "cinematic_pan", "macro_tilt", "slow_pull_out", "handheld_shake"}
+    assert len(CANONICAL_CAMERA_MOVES) == 12
+    expected = {
+        "slow_push_in", "snap_zoom", "cinematic_pan", "macro_tilt", "slow_pull_out", "handheld_shake",
+        "dolly_zoom", "focus_breathe_push", "continuous_drift", "seamless_whip_pan", "macro_orbit", "whip_zoom"
+    }
     assert set(CANONICAL_CAMERA_MOVES) == expected
 
 
