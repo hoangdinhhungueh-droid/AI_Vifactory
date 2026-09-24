@@ -328,11 +328,11 @@ def parse_spoken_number(text: str) -> Optional[ParsedMetric]:
                 trend=trend
             )
 
-    jp_digit_match = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?)\s*(万|億|兆)?\s*(円|件|人|ヶ所|基|箇所)', text)
-    if jp_digit_match:
+    jp_digit_match = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?)\s*(万|億|兆)?\s*(円|件|人|名|ヶ所|箇所|基|倍|トン|m|km|点|本|台|棟)?', text)
+    if jp_digit_match and (jp_digit_match.group(2) or jp_digit_match.group(3)):
         base = float(jp_digit_match.group(1).replace(",", ""))
         unit = jp_digit_match.group(2) or ""
-        suffix = jp_digit_match.group(3)
+        suffix = jp_digit_match.group(3) or ""
         mult = 100_000_000.0 if unit == "億" else (10_000.0 if unit == "万" else (1_000_000_000_000.0 if unit == "兆" else 1.0))
         return ParsedMetric(
             raw_value=base * mult,

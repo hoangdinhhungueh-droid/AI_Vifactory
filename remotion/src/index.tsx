@@ -1046,7 +1046,7 @@ const OverlaySegmentView = ({
 
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
-      {statValue && !forensicOverlay ? (
+      {statValue && (!forensicOverlay || (typeof forensicOverlay === "object" && forensicOverlay?.type !== "kinetic_counter")) ? (
         <div
           style={{
             position: "absolute",
@@ -1096,7 +1096,12 @@ const OverlaySegmentView = ({
         </div>
       ) : null}
 
-      <VoxOverlayLayer forensicOverlay={forensicOverlay} isLeft={isLeft} />
+      <VoxOverlayLayer
+        forensicOverlay={forensicOverlay}
+        isLeft={isLeft}
+        statValue={statValue}
+        statLabel={statLabel}
+      />
 
       {stampBadge ? (
         <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} />

@@ -22,11 +22,15 @@ export interface VoxForensicOverlayData {
 export interface VoxOverlayLayerProps {
   forensicOverlay?: VoxForensicOverlayData | string | null;
   isLeft?: boolean;
+  statValue?: string;
+  statLabel?: string;
 }
 
 export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
   forensicOverlay,
   isLeft,
+  statValue,
+  statLabel,
 }) => {
   if (!forensicOverlay) {
     return null;
@@ -157,12 +161,15 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
         {/* Kinetic Counter Metric (Correctly wired to VoxKineticCounter) */}
         {rawType === "kinetic_counter" || rawType === "financial_chart" ? (
           <VoxKineticCounter
-            title={ov.title}
-            badge={ov.badge}
-            theme={ov.theme || "tech_infographic"}
+            title={ov.title || statLabel}
+            badge={ov.badge || "EVIDENTIARY METRIC"}
+            theme={ov.theme || "noir_dossier"}
             layout={layout}
-            payload={ov.payload}
-            label={ov.label}
+            payload={{
+              ...ov.payload,
+              ...(ov.payload?.end_value === undefined && statValue ? { amount: statValue } : {}),
+            }}
+            label={ov.label || statValue}
           />
         ) : null}
 

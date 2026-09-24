@@ -77,12 +77,22 @@ export const VoxKineticCounter: React.FC<VoxKineticCounterProps> = ({
     extrapolateRight: "clamp",
   });
 
-  const rawEnd = payload?.end_value !== undefined && payload?.end_value !== null
+  // Robust numeric extraction: payload.end_value -> payload.amount -> parse from title/label
+  let rawEnd = payload?.end_value !== undefined && payload?.end_value !== null
     ? payload.end_value
     : (payload?.amount !== undefined && payload?.amount !== null ? payload.amount : undefined);
 
   if (rawEnd === undefined || rawEnd === null) {
-    return null;
+    const candidateStr = `${label || ""} ${title || ""}`;
+    const match = candidateStr.match(/(\d+[\d,.]*)/);
+    if (match) {
+      rawEnd = parseFloat(match[1].replace(/,/g, ""));
+    }
+  }
+
+  // Visual anchor fallback: never return null to avoid blank screen failure
+  if (rawEnd === undefined || rawEnd === null || isNaN(Number(rawEnd))) {
+    rawEnd = 100;
   }
 
   const startVal = typeof payload?.start_value === "number" ? payload.start_value : 0;

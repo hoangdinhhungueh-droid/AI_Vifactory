@@ -33,167 +33,12 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from app.services.director_planner_b3 import detect_forensic_overlay
 from app.services.text_to_number_parser import parse_spoken_number
 from app.services.timeline_editor_agent import audit_and_optimize_timeline
 from app.services.sfx_registry import CANONICAL_SFX_REGISTRY, is_valid_sfx, get_sfx_filename
 
 logger = logging.getLogger("vf.build_remotion_props")
-
-
-def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> dict | None:
-    """Rule 128 & Vox Explanatory Engine: Detect tactile paper-collage evidentiary graphics and 3D props."""
-    if not narration_text:
-        return None
-    t = narration_text.lower()
-
-    # 1. 3D Procedural Evidence Specimen (Physical evidence, smoking gun, artifact, seal, vault, hanko)
-    if any(k in t for k in ["evidence", "smoking gun", "artifact", "seal", "stamp", "hanko", "vault", "exhibit", "chứng cứ", "tang vật", "niêm phong", "con dấu", "triện", "증거", "인장", "原本", "印鑑", "決裁", "捺印"]):
-        is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
-        title = "公的原本 // 提出記録証拠" if is_jp else "PHYSICAL EVIDENCE // EXHIBIT A"
-        subtitle = "浜岡原子力発電所 安全審査提出原本 // 証拠第42号" if is_jp else "IMPERIAL SEAL / AUTHENTICATION STAMP"
-        return {
-            "type": "evidence_3d_prop",
-            "legacy_type": "redacted_doc",
-            "theme": "vox_paper" if is_jp else (theme or "noir_dossier"),
-            "layout": "full_bleed_focus",
-            "title": title,
-            "badge": "公的認証" if is_jp else "SEALED EXHIBIT",
-            "sfx_cue": "stamp_slam",
-            "label": subtitle,
-            "payload": {
-                "specimen_type": "procedural_3d_artifact",
-                "classification": "EVIDENTIARY_PROOF",
-                "notes": "12FPS STOP-MOTION VOLUMETRIC SPECIMEN",
-                "title": title,
-                "subtitle": subtitle,
-            }
-        }
-
-    # 2. Kinetic Counter / Financial Ledger (Strict: requires verified parsed number, Rule 118 Zero-Mock Data)
-    # Numerical claims take precedence over generic document keywords
-    parsed_metric = parse_spoken_number(narration_text)
-    if parsed_metric is not None and parsed_metric.display_value > 0:
-        display_val = parsed_metric.formatted
-        return {
-            "type": "kinetic_counter",
-            "legacy_type": "financial_chart",
-            "theme": theme or "vox_paper",
-            "layout": "full_bleed_focus",
-            "title": f"QUANTITATIVE METRIC // {display_val}",
-            "badge": "AUDIT METRIC",
-            "sfx_cue": "stamp_slam",
-            "label": f"EVIDENTIARY VALUE // {display_val}",
-            "payload": {
-                "start_value": 0,
-                "end_value": parsed_metric.display_value,
-                "amount": parsed_metric.display_value,
-                "unit": parsed_metric.unit,
-                "prefix": parsed_metric.prefix,
-                "suffix": parsed_metric.suffix,
-                "trend": parsed_metric.trend,
-            }
-        }
-
-    # 3. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
-    if any(k in t for k in ["contract", "clause", "redact", "nda", "subpoena", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "thanh tra", "hồ sơ mật", "báo cáo điều tra", "審査申請", "不適切", "基準地震動", "提出原本", "データ不正", "安全審査"]):
-        # Dynamically split sentences to create relevant clause lines
-        sentences = [s.strip().upper() for s in re.split(r'[.!?。]+', narration_text) if len(s.strip()) > 10][:4]
-        clauses = [f"{idx+1}. {sent}" for idx, sent in enumerate(sentences)] if sentences else [
-            "1. OFFICIAL FIELD AUDIT CONFIRMED SYSTEMIC IRREGULARITIES.",
-            "2. RECORDED CLAIMS EXCEEDED VERIFIABLE INSTITUTIONAL CAPACITY.",
-            "3. SUBMITTED INVOICES IDENTIFIED UNVERIFIED ANOMALOUS ENTITIES.",
-            "4. FORENSIC PAPER TRAIL ENTERED INTO OFFICIAL ADJUDICATION."
-        ]
-        return {
-            "type": "document_highlight",
-            "legacy_type": "redacted_doc",
-            "theme": theme or "vox_paper",
-            "layout": "full_bleed_focus",
-            "title": "OFFICIAL INSPECTION & AUDIT RECORD",
-            "badge": "SUBPOENAED EVIDENCE",
-            "sfx_cue": "marker_stroke",
-            "label": "CLASSIFIED // REDACTED RECORD",
-            "payload": {
-                "document_title": "OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
-                "agency": "REGULATORY OVERSIGHT // INVESTIGATIVE DIVISION",
-                "case_number": "CASE DOCKET // ADJUDICATED FILING",
-                "clauses": clauses,
-                "highlight_line_index": 1 if len(clauses) > 1 else 0,
-                "redacted_terms": ["CONFIDENTIAL", "UNVERIFIED", "不適切"],
-                "date": "OFFICIAL RECORD // VERIFIED"
-            }
-        }
-
-    # 4. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
-    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "seismic zone", "bản đồ", "지도", "좌표", "震源", "南海トラフ", "駿河湾"]):
-        is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
-        return {
-            "type": "tactical_map",
-            "legacy_type": "radar_map",
-            "theme": theme or "vox_paper",
-            "layout": "full_bleed_focus",
-            "title": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
-            "badge": "LOCATIONAL EVIDENCE",
-            "sfx_cue": "sonar_ping",
-            "label": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
-            "payload": {
-                "target_name": "浜岡原子力発電所 プラントサイト" if is_jp else "OPERATIONAL SITE // VERIFIED SECTOR",
-                "coordinates": "34.62° N, 138.14° E (静岡県 御前崎市)" if is_jp else "TARGET REGION JURISDICTION",
-                "map_region": "駿河湾沿岸 耐震・地殻変動セクター" if is_jp else "INVESTIGATIVE DISTRICT",
-                "points_of_interest": ["3号機・4号機 原子炉建屋", "基準地震動観測点", "防潮堤 22m区間"] if is_jp else ["PRIMARY HUB", "INTERMEDIARY CHOKEPOINT", "ESCROW DISBURSEMENT"]
-            }
-        }
-
-    # 5. Evidence Board / Suspect Network (Indicted individuals, operators, ring, conspiracy, arrest)
-    if any(k in t for k in ["charged", "indicted", "indictment", "defendants", "suspects", "operator", "operators", "ring", "conspiracy", "conspirators", "arrest", "fbi", "prosecutor", "prosecutors", "khởi tố", "bị can", "đối tượng", "đường dây", "bắt giữ", "기소", "피의자", "체포"]):
-        return {
-            "type": "evidence_board",
-            "legacy_type": "causal_flowchart",
-            "theme": theme or "vox_paper",
-            "layout": "full_bleed_focus",
-            "title": "CONSPIRACY NETWORK // TARGET OPERATORS",
-            "badge": "CRIMINAL INDICTMENT",
-            "sfx_cue": "paper_slide",
-            "label": "INVESTIGATION DOSSIER // SUBJECT NETWORK",
-            "payload": {
-                "suspect_name": "PRIMARY TARGET // NOMINEE OPERATOR",
-                "role": "UNLICENSED SHELL OPERATOR / FALSE DISBURSEMENT",
-                "charges": [
-                    "WIRE FRAUD CONSPIRACY",
-                    "MONEY LAUNDERING",
-                    "THEFT OF ASSISTANCE FUNDS"
-                ],
-                "connected_entities": ["SHELL ENTITY", "CHECK CASHING SCHEME", "LEDGER ACCOUNT"],
-                "evidence_tag": "CRIMINAL DIVISION CASE // VERIFIED"
-            }
-        }
-
-    # 6. Causal Flowchart (Systemic trap, network, money laundering, shell game, pipeline)
-    if any(k in t for k in ["mechanism", "network", "shell", "laundering", "channel", "transmission", "intermediary", "trap", "bẫy", "chuỗi", "dòng tiền", "trung gian", "cơ chế", "dây chuyền", "구조", "우회", "경로"]):
-        return {
-            "type": "causal_flowchart",
-            "legacy_type": "redacted_doc",
-            "theme": theme or "vox_paper",
-            "layout": "full_bleed_focus",
-            "title": "CAUSAL TRANSMISSION // ASYMMETRIC CHOKE",
-            "badge": "RESTRICTED",
-            "sfx_cue": "node_pop",
-            "label": "INSTITUTIONAL TRANSMISSION // SYSTEMIC CHOKE",
-            "payload": {
-                "nodes": [
-                    {"id": "origin", "label": "Consumer Capital", "status": "normal"},
-                    {"id": "intermediary", "label": "Platform Escrow", "status": "breach"},
-                    {"id": "offshore", "label": "Non-Refund Vault", "status": "fatal"}
-                ],
-                "active_edge": "origin->intermediary",
-                "edges": [
-                    {"from": "origin", "to": "intermediary", "label": "Deposit Stream"},
-                    {"from": "intermediary", "to": "offshore", "label": "Trapped Liquidity"}
-                ]
-            }
-        }
-
-    return None
 
 
 def build_structured_overlay(fo_type: str, narration_text: str, theme: str = "vox_paper") -> dict | None:
@@ -234,7 +79,7 @@ def build_structured_overlay(fo_type: str, narration_text: str, theme: str = "vo
 
     if fo_type in ("evidence_3d_prop", "3d_evidence_prop", "3d_hanko_seal"):
         title = "公的原本 // 提出記録証拠" if is_jp else "PHYSICAL EVIDENCE // EXHIBIT A"
-        subtitle = "浜岡原子力発電所 安全審査提出原本 // 証拠第42号" if is_jp else "IMPERIAL SEAL / AUTHENTICATION STAMP"
+        subtitle = "公的認証原本 // 証拠第42号" if is_jp else "IMPERIAL SEAL / AUTHENTICATION STAMP"
         return {
             "type": "evidence_3d_prop",
             "legacy_type": "redacted_doc",
@@ -938,13 +783,13 @@ def build_remotion_props_data(
         stamp_badge = s.get("stamp_badge") or s.get("stampBadge")
         if not stamp_badge:
             t_lower = narration_text.lower()
-            if any(k in t_lower for k in ["gian lận", "lừa đảo", "vi phạm", "사기", "위반", "부당", "환불 거부", "fraud", "violation", "illegal"]):
+            if any(k in t_lower for k in ["gian lận", "lừa đảo", "vi phạm", "사기", "위반", "부당", "환불 거부", "fraud", "violation", "illegal", "詐欺", "不正", "違反", "不適切", "改ざん", "改竄", "捏造", "隠蔽", "違法"]):
                 stamp_badge = "PRICE_FRAUD"
-            elif any(k in t_lower for k in ["tài liệu mật", "hợp đồng mật", "비밀", "기밀", "confidential", "classified", "nda"]):
+            elif any(k in t_lower for k in ["tài liệu mật", "hợp đồng mật", "비밀", "기밀", "confidential", "classified", "nda", "機密", "極秘", "非公開", "内部告発", "秘密"]):
                 stamp_badge = "CONFIDENTIAL"
-            elif any(k in t_lower for k in ["bằng chứng", "chứng cứ", "vết nứt", "증거", "단서", "evidence", "proof"]):
+            elif any(k in t_lower for k in ["bằng chứng", "chứng cứ", "vết nứt", "증거", "단서", "evidence", "proof", "証拠", "物証", "確証", "痕跡", "実態"]):
                 stamp_badge = "EVIDENCE"
-            elif any(k in t_lower for k in ["hủy bỏ", "vô hiệu", "취소", "무효", "void", "breach"]):
+            elif any(k in t_lower for k in ["hủy bỏ", "vô hiệu", "취소", "무효", "void", "breach", "無効", "破棄", "契約解除", "差し止め", "取消"]):
                 stamp_badge = "VOID"
 
         motion_directive = s.get("motion_directive") or s.get("motionDirective") or "subtle_drift"

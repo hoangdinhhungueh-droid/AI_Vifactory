@@ -228,11 +228,13 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
     lang_name = "English" if mkt == "EN" else ("Japanese" if mkt == "JP" else "Korean")
 
     if mkt == "KR":
-        target_desc = "3,000 to 3,400 Korean Hangul syllables (~40 to 60 sentences, strictly <= 4,500 syllables, ~10-12 min speech)"
+        target_desc = "3,200 to 3,600 Korean Hangul syllables across 120 to 150 breath-timed sentences (each 20-30 syllables), for ~12-14 min narration at natural docudrama pace (~250-270 syllables/min). Do NOT compress or drop story content."
     elif mkt == "JP":
-        target_desc = "3,200 to 3,600 Japanese characters (~40 to 60 sentences, strictly <= 4,800 characters, ~10-12 min speech)"
+        target_desc = "3,400 to 3,800 Japanese characters across 120 to 150 breath-timed sentences (each 22-35 characters), for ~12-14 min narration at natural docudrama pace (~270-300 chars/min). Do NOT compress or drop story content."
+    elif mkt == "VN":
+        target_desc = "2,000 to 2,400 Vietnamese words across 130 to 160 breath-timed sentences (each 10-16 words), for ~12-14 min narration (~160-180 WPM). Do NOT compress or drop story content."
     else:
-        target_desc = "1,500 to 1,800 English words (~50 to 70 sentences, strictly <= 2,000 words, ~10-12 min speech)"
+        target_desc = "1,800 to 2,200 English words across 130 to 160 breath-timed sentences (each 10-16 words), for ~12-14 min narration (~140-160 WPM). Do NOT compress or drop story content."
 
     system_prompt = (
         f"You are an Elite Master Voiceover Director, Audio Dramatist, and Subtitle Editor for Video Factory.\\n"
@@ -241,10 +243,10 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
         "YOUR MISSION:\\n"
         "Transform the provided 5-Act Investigative Documentary Script into a Master Spoken Voiceover Script optimized for broadcast delivery.\\n\\n"
         "STRICT CONSTRAINTS:\\n"
-        "1. PRESERVE THE 5-BEAT STRUCTURE: Sentences must advance chronologically from Beat 1 to Beat 5.\\n"
-        "2. NATURAL BREATH PACING: Each sentence must be 10-18 words (Korean/CJK: 25-50 syllables/characters). Avoid run-on sentences.\\n"
+        "1. PRESERVE THE FULL 5-BEAT NARRATIVE: Adapt 100% of the storyline. Do NOT truncate, summarize, or discard any paragraph.\\n"
+        "2. NATURAL BREATH PACING: Each sentence must be 10-18 words (Korean/CJK: 22-35 syllables/characters). Avoid run-on sentences.\\n"
         "3. DRAMATIC AUDIO PUNCTUATION: Use natural pauses (commas, ellipses '...', em-dashes '—') to create suspense, pacing shifts, and dramatic gravitas.\\n"
-        "4. HARD DURATION CEILING: Narration duration MUST be between 10 and 12 minutes (NEVER exceed 15 minutes). Eliminate repetitive fluff.\\n"
+        "4. HARD DURATION TARGET: Total spoken duration MUST be 11 to 14 minutes across 120 to 160 breath-timed sentences (<= 15 min hard ceiling).\\n"
         "5. KARAOKE HIGHLIGHTS: For each sentence, identify 1 to 3 critical high-impact keywords (amounts, percentages, fraud terms, evidence, dates) for visual karaoke highlighting.\\n"
         "6. LINGUISTIC PURITY: 100% native vocabulary in the target language. Zero raw English words in KR/JP prose.\\n\\n"
         "OUTPUT FORMAT:\\n"
@@ -295,8 +297,9 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
                 except Exception:
                     pass
 
-    if not parsed or not isinstance(parsed, dict) or not parsed.get("sentences"):
-        logger.warning(f"[story_engine] Spoken VO adaptation parsing failed or empty. Running deterministic sentence splitting fallback.")
+    is_cjk = mkt in ("KR", "JP", "ZH")
+    if not parsed or not isinstance(parsed, dict) or not parsed.get("sentences") or len(parsed.get("sentences", [])) < 80:
+        logger.warning(f"[story_engine] Spoken VO adaptation parsing failed or too short ({len(parsed.get('sentences', [])) if parsed else 0} sents). Running deterministic sentence splitting fallback.")
         sentences = []
         full_text_lines = []
         act_blocks = re.split(r'(===\s*(?:ACT|BEAT)\s*[I|V|X\d]+\s*===)', full_script, flags=re.IGNORECASE)
@@ -309,9 +312,24 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
             if "ACT IV" in b_up or "BEAT 4" in b_up: current_beat = 4; continue
             if "ACT V" in b_up or "BEAT 5" in b_up: current_beat = 5; continue
 
-            raw_sents = [s.strip() for s in re.split(r'(?<=[.!?。！？])\s+', block) if s.strip()]
+            # Robust multilingual sentence split (handles CJK without whitespace after punctuation)
+            candidate_sents = [s.strip() for s in re.split(r'(?<=[。！？])|(?<=[.!?])(?:\s+|$|\n+)', block) if s.strip()]
+            raw_sents = []
+            for cs in candidate_sents:
+                if cs.startswith("==="):
+                    continue
+                # Sub-split long sentences to preserve breath-timed rhythm
+                if is_cjk and len(cs) > 42:
+                    parts = [p.strip() for p in re.split(r'(?<=[、，,;；——])', cs) if p.strip()]
+                    raw_sents.extend(parts if parts else [cs])
+                elif not is_cjk and len(cs.split()) > 20:
+                    parts = [p.strip() for p in re.split(r'(?<=[,;—])\s+', cs) if p.strip()]
+                    raw_sents.extend(parts if parts else [cs])
+                else:
+                    raw_sents.append(cs)
+
             for s in raw_sents:
-                if s.startswith("==="):
+                if not s or s.startswith("==="):
                     continue
                 sentences.append({
                     "sentence_id": f"sent_{len(sentences)+1:03d}",
@@ -320,9 +338,10 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
                     "karaoke_highlights": []
                 })
                 full_text_lines.append(s)
-        joined_text = " ".join(full_text_lines)
+        joined_text = "".join(full_text_lines) if is_cjk else " ".join(full_text_lines)
+        est_mins = round(len(joined_text) / 280.0, 1) if is_cjk else round(len(joined_text.split()) / 150.0, 1)
         parsed = {
-            "total_estimated_minutes": round(len(joined_text) / (250 * 5 if mkt in ("KR", "JP") else 150), 1),
+            "total_estimated_minutes": est_mins,
             "spoken_script_text": joined_text,
             "sentences": sentences
         }
@@ -357,7 +376,7 @@ def adversarial_audit_spoken_script(spoken_data: dict, market: str = "EN", topic
         "You are the Chief Broadcast Standards Auditor & Audio Director for Video Factory.\\n"
         "Audit the following Spoken Voiceover Script with adversarial scrutiny.\\n\\n"
         "EVALUATION CRITERIA:\\n"
-        "1. DURATION COMPLIANCE (Weight 30%): Does the script fit into 10 to 12 minutes (hard maximum 15 minutes)? Flag any bloated or padded sentences.\\n"
+        "1. DURATION COMPLIANCE (Weight 30%): Does the script fit into 11 to 14 minutes across 120-160 sentences (hard maximum 15 minutes)? Flag any bloated or truncated sentences.\\n"
         "2. DRAMATIC TENSION & PACING (Weight 30%): Does it maintain relentless docudrama suspense and rhythmic breathing pauses?\\n"
         "3. NARRATIVE INTEGRITY (Weight 20%): Are all 5 investigative beats present (Hook -> False Narrative -> Systemic Blindspot -> Real Culprit -> Modern Mirror)?\\n"
         "4. SPOKEN SUITABILITY (Weight 20%): Are sentences concise (10-18 words) and easy for a voiceover narrator to deliver naturally without stumbling?\\n\\n"
@@ -391,7 +410,7 @@ def adversarial_audit_spoken_script(spoken_data: dict, market: str = "EN", topic
         audit = json.loads(cleaned.strip())
     except Exception as e:
         logger.warning(f"[story_engine] Adversarial spoken audit LLM parse error: {e}. Applying rule-based audit.")
-        score = 9.0 if total_units <= max_units and len(sentences) >= 30 else 7.0
+        score = 9.0 if total_units <= max_units and len(sentences) >= 100 else 7.0
         audit = {
             "verdict": "PASS" if score >= 8.5 else "FAIL",
             "audit_score": score,

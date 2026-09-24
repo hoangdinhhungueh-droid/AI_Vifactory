@@ -148,7 +148,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
 
     # 0. 3D Procedural Evidence Props (12fps Stop-Motion Quantized Physical Artifacts - Priority 0)
     # 0a. Financial Ledger 3D (Ledger, balance sheets, audit discrepancies, wire fraud records)
-    if any(k in t for k in ["ledger", "balance sheet", "accounting record", "wire fraud", "sổ sách", "bảng cân đối", "kế toán gian lận", "dòng tiền ảo", "회계 장부", "원장"]):
+    if any(k in t for k in ["ledger", "balance sheet", "accounting record", "wire fraud", "sổ sách", "bảng cân đối", "kế toán gian lận", "dòng tiền ảo", "회계 장부", "원장", "台帳", "帳簿", "決算書", "不正送金", "財務諸表", "会計", "裏金", "資金流", "簿外", "架空計上"]):
         return {
             "type": "evidence_3d_prop",
             "legacy_type": "evidence_board",
@@ -167,7 +167,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
         }
 
     # 0b. Court Indictment 3D (Criminal docket, grand jury, indictment papers, prosecutor filings)
-    if any(k in t for k in ["indictment", "docket", "grand jury", "prosecutor filing", "bản cáo trạng", "hồ sơ truy tố", "khởi tố vụ án", "công tố viện", "기소장", "공소장"]):
+    if any(k in t for k in ["indictment", "docket", "grand jury", "prosecutor filing", "bản cáo trạng", "hồ sơ truy tố", "khởi tố vụ án", "công tố viện", "기소장", "공소장", "起訴状", "裁判", "告訴", "告発", "東京地検", "地検特捜部", "検察", "令状", "判決", "有罪"]):
         return {
             "type": "evidence_3d_prop",
             "legacy_type": "evidence_board",
@@ -186,7 +186,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
         }
 
     # 0c. Passport Specimen 3D (Identity theft, forged passport, ghost identities, fake credentials)
-    if any(k in t for k in ["passport", "fake id", "stolen identity", "forged credential", "hộ chiếu giả", "danh tính ma", "giả mạo giấy tờ", "위조 여권", "신분증"]):
+    if any(k in t for k in ["passport", "fake id", "stolen identity", "forged credential", "hộ chiếu giả", "danh tính ma", "giả mạo giấy tờ", "위조 여권", "신분증", "偽造パスポート", "旅券", "身分証", "偽造身分証", "偽造", "架空名義"]):
         return {
             "type": "evidence_3d_prop",
             "legacy_type": "evidence_board",
@@ -205,7 +205,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
         }
 
     # 0d. Legal Contract 3D (Shell contracts, bogus agreements, backdated clauses, fake service terms)
-    if any(k in t for k in ["bogus contract", "shell contract", "backdated", "sham agreement", "hợp đồng khống", "thỏa thuận ma", "điều khoản giả", "위장 계약서"]):
+    if any(k in t for k in ["bogus contract", "shell contract", "backdated", "sham agreement", "hợp đồng khống", "thỏa thuận ma", "điều khoản giả", "위장 계약서", "偽装契約", "架空契約", "裏契約", "密約", "覚書", "偽造契約書", "無効契約"]):
         return {
             "type": "evidence_3d_prop",
             "legacy_type": "evidence_board",
@@ -224,7 +224,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
         }
 
     # 0e. Hanko / Imperial Seal 3D (Physical wax seals, stamps, warrants, authentications)
-    if any(k in t for k in ["hanko", "seal", "stamp", "con dấu", "triện", "mộc đỏ", "chứng thực", "vật chứng", "tang vật", "도장", "인감", "증거물", "authenticat", "exhibit item", "vault", "evidence item"]):
+    if any(k in t for k in ["hanko", "seal", "stamp", "con dấu", "triện", "mộc đỏ", "chứng thực", "vật chứng", "tang vật", "도장", "인감", "증거물", "authenticat", "exhibit item", "vault", "evidence item", "印鑑", "判子", "ハンコ", "実印", "角印", "公印", "押印", "捺印", "証拠品", "押収", "原本"]):
         return {
             "type": "evidence_3d_prop",
             "legacy_type": "evidence_board",
@@ -243,7 +243,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
         }
 
     # 1. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
-    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류"]):
+    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류", "契約", "条項", "黒塗り", "機密", "内部文書", "調査報告", "監査", "公文書", "記録", "報告書", "規約", "認可", "査察", "捜査", "申請", "不正", "虚偽", "隠蔽"]):
         sentences = [s.strip() for s in re.split(r'[.!?。]+', narration_text) if len(s.strip()) > 5][:4]
         clauses = [f"{idx+1}. {sent}" for idx, sent in enumerate(sentences)] if sentences else [
             "1. OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
@@ -264,14 +264,16 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                 "case_number": "CASE DOCKET // ADJUDICATED FILING",
                 "clauses": clauses,
                 "highlight_line_index": 1 if len(clauses) > 1 else 0,
-                "redacted_terms": ["CONFIDENTIAL", "UNVERIFIED", "不適切"],
+                "redacted_terms": ["CONFIDENTIAL", "UNVERIFIED", "不適切", "不正"],
                 "date": "OFFICIAL RECORD // VERIFIED"
             }
         }
 
     # 2. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
-    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "surveillance", "cctv", "camera", "facility", "address", "location", "locations", "street", "city", "county", "district", "cơ sở", "địa điểm", "địa chỉ", "khu vực", "시설", "주소", "위치", "warehouse", "giám sát", "seismic zone", "bản đồ", "지도", "좌표", "震源", "南海トラフ", "駿河湾"]):
+    if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "surveillance", "cctv", "camera", "facility", "address", "location", "locations", "street", "city", "county", "district", "cơ sở", "địa điểm", "địa chỉ", "khu vực", "시설", "주소", "위치", "warehouse", "giám sát", "seismic zone", "bản đồ", "지도", "좌표", "地図", "マップ", "現場", "ルート", "航路", "監視カメラ", "防犯カメラ", "拠点", "所在地", "工場", "港", "倉庫", "海域", "空域", "位置", "区域", "セクター", "プラント", "現場検証"]):
         is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
+        loc_words = [w.strip() for w in re.split(r'[,.\s、。]+', narration_text) if len(w.strip()) > 3][:3]
+        target_loc = loc_words[0] if loc_words else ("TARGET OPERATION SECTOR" if not is_jp else "重要監視区域")
         return {
             "type": "tactical_map",
             "legacy_type": "radar_map",
@@ -282,10 +284,10 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             "sfx_cue": "sonar_ping",
             "label": "GEO-TACTICAL TELEMETRY // SECTOR GRID",
             "payload": {
-                "target_name": "浜岡原子力発電所 プラントサイト" if is_jp else "OPERATIONAL SITE // VERIFIED SECTOR",
-                "coordinates": "34.62° N, 138.14° E (静岡県 御前崎市)" if is_jp else "TARGET REGION JURISDICTION",
-                "map_region": "駿河湾沿岸 耐震・地殻変動セクター" if is_jp else "INVESTIGATIVE DISTRICT",
-                "points_of_interest": ["3号機・4号機 原子炉建屋", "基準地震動観測点", "防潮堤 22m区間"] if is_jp else ["PRIMARY HUB", "INTERMEDIARY CHOKEPOINT", "ESCROW DISBURSEMENT"]
+                "target_name": f"TARGET SECTOR // {target_loc.upper()}" if not is_jp else f"対象区域 // {target_loc}",
+                "coordinates": "INCIDENT GRID // VERIFIED SECTOR",
+                "map_region": "REGIONAL JURISDICTION CORRIDOR",
+                "points_of_interest": [f"POI-01: {target_loc}", "LOGISTICS CHOKEPOINT", "REGULATORY AUDIT CHECKPOINT"]
             }
         }
 
@@ -314,7 +316,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
         }
 
     # 4. Evidence Board / Suspect Network (Indicted individuals, operators, ring, conspiracy, arrest)
-    if any(k in t for k in ["charged", "indicted", "indictment", "defendants", "suspects", "operator", "operators", "ring", "conspiracy", "conspirators", "arrest", "fbi", "prosecutor", "prosecutors", "khởi tố", "bị can", "đối tượng", "đường dây", "bắt giữ", "기소", "피의자", "체포"]):
+    if any(k in t for k in ["charged", "indicted", "indictment", "defendants", "suspects", "operator", "operators", "ring", "conspiracy", "conspirators", "arrest", "fbi", "prosecutor", "prosecutors", "khởi tố", "bị can", "đối tượng", "đường dây", "bắt giữ", "기소", "피의자", "체포", "逮捕", "容疑者", "共謀", "被告", "主犯", "関係者", "首謀者", "摘発", "検挙", "送検", "捜査線", "組織犯罪", "関係図", "相関図"]):
         return {
             "type": "evidence_board",
             "legacy_type": "causal_flowchart",
@@ -337,7 +339,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
         }
 
     # 5. Causal Flowchart (Systemic trap, network, money laundering, shell game, pipeline)
-    if any(k in t for k in ["mechanism", "network", "shell", "laundering", "channel", "transmission", "intermediary", "trap", "bẫy", "chuỗi", "dòng tiền", "trung gian", "cơ chế", "dây chuyền", "구조", "우회", "경로"]):
+    if any(k in t for k in ["mechanism", "network", "shell", "laundering", "channel", "transmission", "intermediary", "trap", "bẫy", "chuỗi", "dòng tiền", "trung gian", "cơ chế", "dây chuyền", "구조", "우회", "경路", "仕組み", "構造", "メカニズム", "資金ルート", "マネーロンダリング", "迂回", "中間業者", "罠", "連鎖", "パイプライン", "スキーム", "利権", "資金環流"]):
         return {
             "type": "causal_flowchart",
             "legacy_type": "redacted_doc",
@@ -370,7 +372,7 @@ def detect_object_focus(narration_text: str, topic: str = "") -> dict | None:
     t = narration_text.lower()
     
     # 1. Court Docket / Legal Complaint / Indictment / Lawsuit
-    if any(k in t for k in ["lawsuit", "complaint", "sue", "court", "judge", "docket", "indictment", "violation", "legal", "prosecutor", "antitrust", "ftc", "đơn kiện", "tòa án", "truy tố", "pháp lý", "chống độc quyền", "소송", "고소", "기소", "법원", "반독점"]):
+    if any(k in t for k in ["lawsuit", "complaint", "sue", "court", "judge", "docket", "indictment", "violation", "legal", "prosecutor", "antitrust", "ftc", "đơn kiện", "tòa án", "truy tố", "pháp lý", "chống độc quyền", "소송", "고소", "기소", "법원", "반독점", "訴訟", "告訴", "起訴", "裁判", "裁判所", "検察", "違法", "告発", "地裁", "地検"]):
         return {
             "type": "court_docket",
             "title": "DISTRICT COURT // OFFICIAL FILING",
@@ -380,7 +382,7 @@ def detect_object_focus(narration_text: str, topic: str = "") -> dict | None:
             "stat_metric": None
         }
     # 2. Redacted Memo / Secret Agreement / Internal Memo
-    if any(k in t for k in ["memo", "internal", "confidential", "nda", "secret", "email", "slack", "unredacted", "tài liệu mật", "nội bộ", "thỏa thuận", "thư mật", "비밀", "내부", "기밀"]):
+    if any(k in t for k in ["memo", "internal", "confidential", "nda", "secret", "email", "slack", "unredacted", "tài liệu mật", "nội bộ", "thỏa thuận", "thư mật", "비밀", "내부", "기밀", "内部文書", "機密", "極秘", "社外秘", "内部告発", "メール", "非公開"]):
         return {
             "type": "redacted_memo",
             "title": "EXECUTIVE MEMORANDUM // RESTRICTED",
@@ -390,7 +392,7 @@ def detect_object_focus(narration_text: str, topic: str = "") -> dict | None:
             "stat_metric": None
         }
     # 3. Financial Ledger / Accounting Discrepancy
-    if any(k in t for k in ["ledger", "balance", "accounting", "audit", "revenue", "margin", "loss", "profit", "sổ sách", "kế toán", "doanh thu", "lợi nhuận", "thua lỗ", "장부", "매출", "손실"]):
+    if any(k in t for k in ["ledger", "balance", "accounting", "audit", "revenue", "margin", "loss", "profit", "sổ sách", "kế toán", "doanh thu", "lợi nhuận", "thua lỗ", "장부", "매출", "손실", "帳簿", "台帳", "決算", "不正会計", "売上", "損失", "赤字", "利益", "裏金"]):
         return {
             "type": "financial_ledger",
             "title": "AUDIT LEDGER // FINANCIAL STATEMENT",
@@ -400,7 +402,7 @@ def detect_object_focus(narration_text: str, topic: str = "") -> dict | None:
             "stat_metric": None
         }
     # 4. Money Trail Network / Wire Transactions
-    if any(k in t for k in ["wire", "transfer", "offshore", "shell", "escrow", "flow", "launder", "fees", "cut", "chuyển khoản", "dòng tiền", "rửa tiền", "phí hoa hồng", "cắt phế", "송금", "우회", "자금 흐름", "수수료"]):
+    if any(k in t for k in ["wire", "transfer", "offshore", "shell", "escrow", "flow", "launder", "fees", "cut", "chuyển khoản", "dòng tiền", "rửa tiền", "phí hoa hồng", "cắt phế", "송금", "우회", "자금 흐름", "수수료", "送金", "資金移動", "マネーロンダリング", "迂回", "キックバック", "手数料", "資金流"]):
         return {
             "type": "money_trail_network",
             "title": "TRANSACTION NETWORK // CAPITAL FLOW",
@@ -410,7 +412,7 @@ def detect_object_focus(narration_text: str, topic: str = "") -> dict | None:
             "stat_metric": None
         }
     # 5. Corporate Org Chart / Hierarchy
-    if any(k in t for k in ["subsidiary", "parent company", "board", "executive", "hierarchy", "holding", "monopoly", "sellers", "merchants", "tập đoàn", "công ty con", "hội đồng", "độc quyền", "người bán", "지주회사", "계열사", "독점"]):
+    if any(k in t for k in ["subsidiary", "parent company", "board", "executive", "hierarchy", "holding", "monopoly", "sellers", "merchants", "tập đoàn", "công ty con", "hội đồng", "độc quyền", "người bán", "지주회사", "계열사", "독점", "親会社", "子会社", "系列", "取締役会", "役員", "独占", "持株会社", "組織図"]):
         return {
             "type": "corporate_org_chart",
             "title": "CORPORATE STRUCTURE // MARKET DOMINANCE",
@@ -551,13 +553,13 @@ def detect_stat_card(narration_text: str) -> dict | None:
 
     patterns = [
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:만|억|조)?\s*원)', "PRICE ANCHOR // TRANSACTION"),
-        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆)?\s*円)', "FINANCIAL VALUE // VALUATION"),
+        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆)?\s*(?:円|ドル)?)', "FINANCIAL VALUE // VALUATION"),
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:tỷ|triệu|nghìn)\s*đ(?:ồng)?)', "MARKET METRIC // COST"),
         (r'(\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|TRILLION|B|M|K)?(?:\s*→\s*<\$\d+)?(?:\s*/\s*SHARE)?)', "FINANCIAL METRIC // VALUATION"),
         (r'(-\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|B|M)?)', "BALANCE SHEET // WRITE-DOWN"),
         (r'((?:<\$\d+(?:\.\d+)?|\$\d+(?:\.\d+)?))', "MARKET VALUE // PRICE TARGET"),
         (r'([+-]?\d+(?:\.\d+)?%)', "GROWTH RATE // PERCENTAGE"),
-        (r'(\d+\+?\s*(?:BOXES|DOCUMENTS|WITNESSES|EMPLOYEES|INVESTIGATORS|개|명|건|곳))', "EVIDENCE // SCALE"),
+        (r'(\d+\+?\s*(?:BOXES|DOCUMENTS|WITNESSES|EMPLOYEES|INVESTIGATORS|개|명|건|곳|人|名|件|ヶ所|箇所|基|倍|トン|m|km|点|本|台|棟|người|vụ|điểm|tấn|hồ sơ))', "EVIDENCE // SCALE"),
         (r'(\b(?:GUILTY|CONVICTED|VERDICT|FRAUD|CONSPIRACY)\b)', "LEGAL RULING // VERDICT"),
         (r'(\b(?:MARK-TO-MARKET|SPECIAL PURPOSE ENTITIES|SPE NETWORK|CIRCULAR HEDGE)\b)', "FINANCIAL MECHANISM"),
     ]
@@ -575,13 +577,13 @@ def detect_stamp_badge(narration_text: str) -> str | None:
     if not narration_text:
         return None
     t = narration_text.lower()
-    if any(k in t for k in ["gian lận", "lừa đảo", "vi phạm", "사기", "위반", "부당", "환불 거부", "fraud", "violation", "illegal"]):
+    if any(k in t for k in ["gian lận", "lừa đảo", "vi phạm", "사기", "위반", "부당", "환불 거부", "fraud", "violation", "illegal", "詐欺", "不正", "違反", "不適切", "改ざん", "改竄", "捏造", "隠蔽", "違法"]):
         return "PRICE_FRAUD"
-    if any(k in t for k in ["tài liệu mật", "hợp đồng mật", "비밀", "기밀", "confidential", "classified", "nda"]):
+    if any(k in t for k in ["tài liệu mật", "hợp đồng mật", "비밀", "기밀", "confidential", "classified", "nda", "機密", "極秘", "非公開", "内部告発", "秘密"]):
         return "CONFIDENTIAL"
-    if any(k in t for k in ["bằng chứng", "chứng cứ", "vết nứt", "증거", "단서", "evidence", "proof"]):
+    if any(k in t for k in ["bằng chứng", "chứng cứ", "vết nứt", "증거", "단서", "evidence", "proof", "証拠", "物証", "確証", "痕跡", "実態"]):
         return "EVIDENCE"
-    if any(k in t for k in ["hủy bỏ", "vô hiệu", "취소", "무효", "void", "breach"]):
+    if any(k in t for k in ["hủy bỏ", "vô hiệu", "취소", "무효", "void", "breach", "無効", "破棄", "契約解除", "差し止め", "取消"]):
         return "VOID"
     return None
 
