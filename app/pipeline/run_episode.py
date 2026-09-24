@@ -715,11 +715,5 @@ async def run_pipeline(
     except Exception as _swallowed:
         logger.warning("[swallowed] run_episode L%d: %s: %s", 527, type(_swallowed).__name__, _swallowed)
 
-    # Cost telemetry notification (Rule 118: Pure telemetry, no budget cap / no alarm)
-    try:
-        if _monthly_vnd > 0:
-            await tg.notify_cost_summary(_monthly_vnd, episode_id=episode_id, breakdown=_model_report)
-    except Exception as _swallowed:
-        logger.warning("[swallowed] run_episode cost telemetry L%d: %s: %s", 532, type(_swallowed).__name__, _swallowed)
     logger.info("[PIPELINE] DONE in %.1fs %s", elapsed, result)
     return result

@@ -178,19 +178,8 @@ async def notify_production(stage: str, episode_id: str, detail: str = "") -> bo
 
 async def notify_cost_summary(month_used_vnd: float, episode_id: str = "",
                               breakdown: Optional[dict] = None) -> bool:
-    """Notify actual LLM & pipeline cost (passive telemetry, no budget cap / no alarm)."""
-    lines = [
-        "💰 <b>[VF COST TELEMETRY]</b>",
-        f"🎬 <b>Episode:</b> <code>{episode_id}</code>" if episode_id else "",
-        f"📈 <b>Tổng chi phí tháng:</b> {month_used_vnd:,.0f} VND (~${month_used_vnd / 25000.0:.2f})",
-    ]
-    if breakdown:
-        lines.append("📊 <b>Chi tiết models:</b>")
-        for m, cost in sorted(breakdown.items(), key=lambda x: x[1] if isinstance(x[1], (int, float)) else 0, reverse=True):
-            if isinstance(cost, (int, float)) and cost > 0:
-                lines.append(f"• <code>{m}</code>: {cost:,.0f} VND")
-    msg = "\n".join(filter(None, lines))
-    return await send_message(msg)
+    """Disabled: cost telemetry removed per user mandate to eliminate Telegram clutter."""
+    return True
 
 
 async def notify_budget_alert(provider: str, day_used: float, day_cap: float = 0.0,
