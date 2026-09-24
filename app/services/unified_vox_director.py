@@ -528,6 +528,22 @@ def select_dynamic_hero_indices(spoken_sentences: List[Dict[str, Any]]) -> List[
             selected.append(idx)
             last_hero = idx
 
+    # Rule 128 & User Mandate: Cap to maximum 18 hero clips for long-form episodes (12-14 mins)
+    # to enforce mathematical budget of 6 accounts x 3 clips = 18 clips.
+    if len(selected) > 18:
+        mandatory = {0, selected[-1]}
+        for b_idx in beat_first_indices.values():
+            if b_idx in selected:
+                mandatory.add(b_idx)
+        remaining = [x for x in selected if x not in mandatory]
+        needed = 18 - len(mandatory)
+        if needed > 0 and remaining:
+            step = len(remaining) / needed
+            picked = [remaining[int(i * step)] for i in range(needed)]
+            selected = sorted(list(mandatory.union(picked)))
+        else:
+            selected = sorted(list(mandatory))[:18]
+
     return selected
 
 

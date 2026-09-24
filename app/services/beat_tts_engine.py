@@ -336,20 +336,27 @@ async def synthesize_beat_tts_pipeline(
         # Map units to boundaries
         seg_idx = 0
         beat_segments = []
-        for u in b_units:
+        is_exact_1to1 = (len(b_units) == len(boundaries))
+        for u_idx, u in enumerate(b_units):
             raw_u_text = u.get("text") or u.get("narration") or ""
             u_clean_text = re.sub(r'\s+', '', raw_u_text)
             matched = []
-            accum = ""
-            local_u_start = boundaries[seg_idx]["start_ms"] if seg_idx < len(boundaries) else 0
-            while seg_idx < len(boundaries):
-                b_item = boundaries[seg_idx]
-                b_clean = re.sub(r'\s+', '', b_item["text"])
-                accum += b_clean
-                matched.append(b_item)
-                seg_idx += 1
-                if len(accum) >= len(u_clean_text) * 0.95 or accum == u_clean_text:
-                    break
+            if is_exact_1to1:
+                matched = [boundaries[u_idx]]
+                local_u_start = matched[0]["start_ms"]
+            else:
+                accum = ""
+                local_u_start = boundaries[seg_idx]["start_ms"] if seg_idx < len(boundaries) else 0
+                while seg_idx < len(boundaries):
+                    b_item = boundaries[seg_idx]
+                    b_clean = re.sub(r'\s+', '', b_item["text"])
+                    accum += b_clean
+                    matched.append(b_item)
+                    seg_idx += 1
+                    u_punc = re.sub(r'[\W_]+', '', u_clean_text)
+                    accum_punc = re.sub(r'[\W_]+', '', accum)
+                    if len(accum_punc) >= len(u_punc) * 0.90 or accum == u_clean_text or len(accum) >= len(u_clean_text) - 1:
+                        break
             
             local_u_end = matched[-1]["end_ms"] if matched else local_u_start + 4000
             
