@@ -333,9 +333,9 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
         height: cell.height,
         opacity,
         transform: `translateX(${translateX}px) translate(${jitterX.toFixed(1)}px, ${jitterY.toFixed(1)}px) rotate(${jitterRot.toFixed(1)}deg)`,
-        // Signature VOX Tactile Paper Cutout Sticker Edge + High-Performance 3D Drop Shadow
+        // Signature VOX Tactile Paper Cutout Sticker Edge + High-Performance 3D Double Drop Shadow
         filter:
-          "drop-shadow(0 0 2px rgba(255, 255, 255, 0.92)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 20px 32px rgba(0, 0, 0, 0.85))",
+          "drop-shadow(0 25px 35px rgba(0, 0, 0, 0.85)) drop-shadow(0 5px 15px rgba(0, 0, 0, 0.60)) drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.70))",
         zIndex: 15,
         pointerEvents: "none",
       }}
@@ -362,7 +362,7 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
           height: "100%",
           objectFit: "contain",
           objectPosition: "bottom",
-          filter: "brightness(1.08) contrast(1.15)",
+          filter: "brightness(1.08) contrast(1.20) saturate(1.10)",
         }}
       />
     </div>
@@ -579,7 +579,22 @@ export const TwoLayerScene = (props) => {
         <AbsoluteFill>
           <Img
             src={resolveSrc(background)}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              transform: "scale(1.06)",
+              filter: "brightness(0.32) saturate(0.40) contrast(1.08) blur(14px)",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background:
+                "radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.65) 55%, rgba(5, 9, 13, 0.95) 100%)",
+              pointerEvents: "none",
+            }}
           />
         </AbsoluteFill>
       ) : null}
@@ -860,17 +875,18 @@ const BackgroundSegment = ({ src, fadeInFrames, durationInFrames }) => {
                 width: "100%",
                 height: "100%",
                 objectFit: "cover",
-                transform: `scale(${scale})`,
-                filter: "brightness(0.78) saturate(0.68) contrast(1.02) blur(1.2px)",
+                transform: `scale(${scale * 1.06})`,
+                filter: "brightness(0.32) saturate(0.40) contrast(1.08) blur(14px)",
               }}
             />
           )}
-          {/* Deep Slate dark tint overlay to ensure foreground evidence objects pop with maximum clarity */}
+          {/* Vox Investigation Spotlight & Dark Vignette overlay (Triệt tiêu background rườm rà, tôn vinh Foreground & Overlays) */}
           <div
             style={{
               position: "absolute",
               inset: 0,
-              backgroundColor: "rgba(11, 15, 23, 0.45)",
+              background:
+                "radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.65) 55%, rgba(5, 9, 13, 0.95) 100%)",
               pointerEvents: "none",
             }}
           />

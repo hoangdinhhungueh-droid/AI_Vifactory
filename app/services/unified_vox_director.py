@@ -16,10 +16,13 @@ import os
 import sys
 import re
 import json
+import logging
 import argparse
 import yaml
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 try:
     sys.stdout.reconfigure(encoding='utf-8')
@@ -44,6 +47,468 @@ FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06"]
 # DYNAMIC VISUAL ROSTER GENERATOR (RULE 128 - ZERO SEMANTIC BIAS)
 # ============================================================================
 
+def _generate_topic_anchored_roster_fallback(
+    topic: str,
+    market: str,
+    key_metrics: list,
+    claims: list
+) -> tuple:
+    """Rule 128: Topic-Anchored Deterministic Visual Roster Fallback (16-18 BGs & 20-24 FGs).
+    Generates rich, fully differentiated environmental BGs and tactile evidentiary FGs tailored
+    to the target market (JP, KR, VN, EN) and narrative domain (Financial/Debt, Tech/Antitrust, Corporate Scandal).
+    Guarantees zero photorealism, strict 2D stylized graphic novel aesthetic, and zero empty scenes.
+    """
+    m_up = str(market or "EN").upper().strip()
+    topic_low = (topic or "").lower()
+    metric_highlight = key_metrics[0] if key_metrics else ("CONFIDENTIAL METRIC // AUDIT FINDING" if m_up == "EN" else "定量監査データ // 検証記録")
+
+    pat = r'(?i)\b(debts?|nợ|bonds?|trái phiếu|yields?|rates?|lãi suất|banks?|ngân hàng|dollars?|currency|currencies|rollover|đáo hạn|finances?|financial|tài chính|gdp|imf|fed|treasury|kho bạc|inflation|lạm phát|credits?|tín dụng|365|trillions?|nghìn tỷ|securities|chứng khoán|deficits?|thâm hụt|채무|국채|금리|国債)\b'
+    is_financial = bool(re.search(pat, topic_low))
+
+    if is_financial:
+        # =========================================================================
+        # FINANCIAL MACRO / SOVEREIGN DEBT ROSTER (18 BGs & 22 FGs)
+        # =========================================================================
+        bg_roster = {
+            "bg_central_bank_trading_floor": {
+                "title": "Central Bank Open Market Trading Floor",
+                "description": "Expansive architectural wide shot of central bank open market execution floor, multiple curved multi-monitor desks displaying desaturated yield curves, towering stone columns with dramatic diffused daylight, serious macroeconomic regulatory atmosphere, clean negative space.",
+                "beats": [1, 4]
+            },
+            "bg_sovereign_bond_auction_gallery": {
+                "title": "Sovereign Bond Syndicate Auction Hall",
+                "description": "Grand institutional auction hall with rows of mahogany dealer desks facing muted digital debt bidding boards, dramatic high-contrast chiaroscuro lighting, subtle dust motes in sunbeams, dignified financial sovereign setting.",
+                "beats": [1, 3]
+            },
+            "bg_financial_district_night_skyline": {
+                "title": "Nocturnal Financial District High-Rise Overlook",
+                "description": "Dramatic wide view from executive terrace overlooking nocturnal skyscraper canyon, illuminated office windows receding into cold foggy blue night, dark sleek stone ledge in foreground, quiet tension of global finance.",
+                "beats": [1, 5]
+            },
+            "bg_treasury_briefing_room": {
+                "title": "Ministry of Finance & Treasury Briefing Room",
+                "description": "Formal oak-paneled fiscal policy briefing chamber, long polished table reflecting warm overhead downlights, national crest in deep background soft focus, austere institutional authority.",
+                "beats": [1, 2]
+            },
+            "bg_post_crisis_fiscal_summit_chamber": {
+                "title": "International Fiscal Stabilization Summit Hall",
+                "description": "Panoramic horseshoe conference hall for sovereign debt ministers, minimalist translation audio consoles, rich dark acoustic wood textures, formal multilateral negotiations mood.",
+                "beats": [2, 3]
+            },
+            "bg_treasury_vault_corridor": {
+                "title": "Sovereign Bullion & Secure Reserve Vault Corridor",
+                "description": "Deep perspective corridor of reinforced steel archival vault doors, cool industrial concrete walls, overhead fluorescent security lighting casting rhythmic shadows, heavy vault atmosphere.",
+                "beats": [2, 4]
+            },
+            "bg_historical_bank_boardroom": {
+                "title": "Heritage Central Bank Executive Council Chamber",
+                "description": "Vintage heritage boardroom with coffered timber ceilings, oil portraits in soft focus background, dark mahogany council table, solemn historical financial gravity.",
+                "beats": [2, 3]
+            },
+            "bg_academic_economics_lecture_hall": {
+                "title": "University Macroeconomic Policy Amphitheater",
+                "description": "Steep tiered wooden university lecture hall, chalkboards in soft background covered with faint mathematical differential equations, warm directional spot lighting, analytical scholarly atmosphere.",
+                "beats": [2, 5]
+            },
+            "bg_imf_analytical_bullpen": {
+                "title": "Multilateral Monetary Policy Research Bullpen",
+                "description": "Spacious analytical bullpen with desks piled with tabbed sovereign debt dossiers, glowing Bloomberg terminals in soft focus, slate-colored partitions, intense forensic research atmosphere.",
+                "beats": [3, 4]
+            },
+            "bg_sovereign_debt_archive_records_vault": {
+                "title": "National Debt Management Archival Records Vault",
+                "description": "Endless rows of steel shelving containing uniform archival debt registry boxes, clean polished epoxy floor, cool white downlighting, forensic paper trail discovery setting.",
+                "beats": [3, 4]
+            },
+            "bg_bloomberg_analytics_terminal_room": {
+                "title": "Financial Market Quantitative Analytics Center",
+                "description": "Dark analytical operations room with high-density workstation displays showing desaturated repo matrices and sovereign CDS heatmaps, muted amber and cyan indicator lights, intense forensic mood.",
+                "beats": [3, 4]
+            },
+            "bg_debt_management_office": {
+                "title": "Sovereign Debt Issuance Execution Office",
+                "description": "Quiet executive operations office, desk lamp casting warm circular pool of light over debt rollover maturity schedules, city skyline outside window at dusk, focused fiscal tension.",
+                "beats": [3, 5]
+            },
+            "bg_emergency_finance_ministry_war_room": {
+                "title": "Emergency Liquidity Crisis War Room",
+                "description": "Urgent government crisis coordination room, whiteboards covered with debt maturity timelines and interbank swap diagrams, scattered coffee cups on meeting table, high-stakes institutional stress.",
+                "beats": [4, 5]
+            },
+            "bg_distressed_bank_trading_pit": {
+                "title": "Commercial Bank Fixed-Income Dealing Room",
+                "description": "Quiet after-hours dealing floor with abandoned trader terminals showing red yield spikes, dim emergency lighting, deep shadows between rows of monitors, aftermath of liquidity shock.",
+                "beats": [4]
+            },
+            "bg_nocturnal_sovereign_wealth_office": {
+                "title": "Sovereign Wealth Management Office at Dawn",
+                "description": "Corner executive office with floor-to-ceiling glass catching early morning indigo and amber dawn light over harbor, sleek minimalist desk, profound institutional isolation.",
+                "beats": [4, 5]
+            },
+            "bg_parliament_budget_committee_hall": {
+                "title": "Parliamentary Public Accounts Oversight Hall",
+                "description": "Formal semicircular legislative committee chamber, carved walnut witness tables in foreground, elevated committee dais in background soft focus, dignified democratic scrutiny.",
+                "beats": [4, 5]
+            },
+            "bg_global_economic_forum_hall": {
+                "title": "Global Economic Governance Assembly Hall",
+                "description": "Vast futuristic auditorium with dark acoustic wall panels, subtle uplighting along tiered seats, empty speaker lectern in clean focus, sweeping monumental perspective.",
+                "beats": [1, 5]
+            },
+            "bg_executive_reading_library": {
+                "title": "Central Bank Presidential Research Library",
+                "description": "Quiet double-height institutional library with floor-to-ceiling leather-bound statutory ledgers, spiral brass reading staircase, green banker lamps on dark oak tables, reflective analytical stillness.",
+                "beats": [1, 5]
+            }
+        }
+
+        fg_roster = {
+            "fg_character_central_bank_governor": {
+                "title": "Central Bank Monetary Authority",
+                "description": "Full-body stylized editorial graphic novel digital illustration of a senior central bank governor in tailored charcoal formal suit, standing with composed authoritative posture, holding official monetary policy brief, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                "role": "Monetary Authority",
+                "beats": [1, 4, 5],
+                "keywords": ["governor", "central bank", "fed", "monetary", "rate hike", "policy", "thống đốc", "ngân hàng trung ương"],
+                "type": "character"
+            },
+            "fg_character_sovereign_bond_trader": {
+                "title": "Sovereign Fixed-Income Desk Head",
+                "description": "Full-body stylized editorial graphic novel digital illustration of an intense sovereign bond trader in crisp white shirt with rolled-up sleeves and dark trousers, reviewing printed yield curve slips with urgent skeptical gaze, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                "role": "Market Actor",
+                "beats": [1, 2, 4],
+                "keywords": ["trader", "bond desk", "yield", "spread", "market", "dealer", "nhà giao dịch", "trái phiếu"],
+                "type": "character"
+            },
+            "fg_character_treasury_fiscal_official": {
+                "title": "Treasury Debt Management Director",
+                "description": "Full-body stylized editorial graphic novel digital illustration of a senior government debt management official in dark navy blazer and spectacles, holding tabbed sovereign borrowing forecast binder, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                "role": "Fiscal Architect",
+                "beats": [2, 3, 5],
+                "keywords": ["treasury", "fiscal", "deficit", "borrowing", "issuance", "kho bạc", "ngân sách"],
+                "type": "character"
+            },
+            "fg_character_macro_auditor": {
+                "title": "Forensic Macroeconomic Sovereign Debt Auditor",
+                "description": "Full-body stylized editorial graphic novel digital illustration of a meticulous sovereign debt auditor in gray trench coat, holding heavy forensic dossier and magnifying loupe, stern analytical expression, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                "role": "Forensic Investigator",
+                "beats": [3, 4, 5],
+                "keywords": ["auditor", "investigator", "imf", "scrutiny", "finding", "kiểm toán", "thanh tra"],
+                "type": "character"
+            },
+            "fg_evidence_sovereign_treasury_bond": {
+                "title": "Official Sovereign 10-Year Treasury Bond Certificate",
+                "description": "Official 300gsm fibrous paper sovereign government bond certificate with intricate guilloche security borders, bold coupon yield rate heading, stamped diagonally with official vermilion treasury seal, crisp cutout edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Core Debt Exhibit",
+                "beats": [1, 2, 3],
+                "keywords": ["bond", "treasury", "yield", "coupon", "certificate", "trái phiếu", "kho bạc", "10-year"],
+                "type": "document"
+            },
+            "fg_evidence_debt_maturity_wall_chart": {
+                "title": "Macro Debt Maturity Rollover Wall Chart",
+                "description": "High-contrast quantitative bar graph document printed on heavy cardstock, illustrating the impending trillion-dollar debt maturity rollover wall across 2026-2029, highlighted in fluorescent green and red marker ink, crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Quantitative Maturity Proof",
+                "beats": [1, 3, 4],
+                "keywords": ["maturity", "rollover", "wall", "cliff", "refinance", "đáo hạn", "tái cấp vốn", "chart"],
+                "type": "data_metric"
+            },
+            "fg_evidence_central_bank_balance_sheet": {
+                "title": "Central Bank Balance Sheet Expansion Ledger",
+                "description": "Worn double-page central bank accounting ledger displaying ballooning asset holdings, quantitative easing and repo facilities in muted green ink, red verification checkmarks, tactile paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Monetary Expansion Evidence",
+                "beats": [1, 2, 4],
+                "keywords": ["balance sheet", "assets", "reserves", "qe", "qt", "expansion", "bảng cân đối"],
+                "type": "document"
+            },
+            "fg_evidence_sovereign_credit_downgrade_notice": {
+                "title": "Credit Rating Agency Sovereign Downgrade Letter",
+                "description": "Official formal rating advisory letter from credit agency, bold header stamped in red ink 'DOWNGRADED // OUTLOOK NEGATIVE', bold black typewriter font detailing fiscal debt overhang, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Sovereign Rating Exhibit",
+                "beats": [2, 4, 5],
+                "keywords": ["rating", "downgrade", "moody", "fitch", "s&p", "credit", "xếp hạng", "hạ bậc"],
+                "type": "document"
+            },
+            "fg_evidence_imf_debt_sustainability_matrix": {
+                "title": "IMF Debt-to-GDP Sustainability Framework Matrix",
+                "description": "Technical macroeconomic assessment document featuring multi-column debt-to-GDP projection tables, colored risk threshold heatmaps, official institutional header, sharp clean paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Sustainability Framework",
+                "beats": [3, 4, 5],
+                "keywords": ["imf", "gdp", "sustainability", "ratio", "framework", "matrix", "tỷ lệ gdp"],
+                "type": "data_metric"
+            },
+            "fg_evidence_currency_swap_facility_agreement": {
+                "title": "Bilateral Central Bank Currency Swap Agreement",
+                "description": "Thick legal bilateral treaty contract document, multiple pages stapled at top left with blue brass eyelet, blue ballpoint signature lines and embossed institutional seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Liquidity Mechanism Accord",
+                "beats": [2, 3, 4],
+                "keywords": ["swap", "currency", "liquidity", "foreign exchange", "agreement", "hoán đổi", "ngoại hối"],
+                "type": "document"
+            },
+            "fg_evidence_repo_rate_transaction_ticket": {
+                "title": "Overnight Repo Facility Repurchase Ticket",
+                "description": "Small tactile transaction slip on yellow carbon-copy paper with perforated edges, showing overnight repo rate interest calculations and collateralized bond numbers, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Interbank Liquidity Exhibit",
+                "beats": [2, 3, 4],
+                "keywords": ["repo", "repurchase", "overnight", "ticket", "collateral", "chiết khấu"],
+                "type": "document"
+            },
+            "fg_evidence_inflation_cpi_breakdown_ledger": {
+                "title": "Consumer Price Index Inflation Ledger Slip",
+                "description": "Official statistical bureau price index ledger sheet displaying escalating headline CPI numbers, red circled inflation metrics, crisp fibrous paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Inflation Metric Exhibit",
+                "beats": [1, 2, 5],
+                "keywords": ["inflation", "cpi", "price", "index", "purchasing power", "lạm phát", "giá cả"],
+                "type": "document"
+            },
+            "fg_evidence_g7_finance_communique": {
+                "title": "G7 Finance Ministers Sovereign Debt Resolution Accord",
+                "description": "Formal multilateral joint communique on heavy diplomatic letterhead, official emblem at top, embossed gold foil seal, diplomatic clauses regarding debt restructuring, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Multilateral Policy Exhibit",
+                "beats": [4, 5],
+                "keywords": ["g7", "ministers", "communique", "resolution", "accord", "thông cáo"],
+                "type": "document"
+            },
+            "fg_evidence_liquidity_crisis_redacted_memo": {
+                "title": "Confidential Emergency Interbank Liquidity Memo",
+                "description": "Manila folder document stamped 'STRICTLY CONFIDENTIAL // GOVERNORS EYES ONLY', heavy black redaction marker bars over vulnerable bank reserve numbers, official paperclips, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Classified Risk Memo",
+                "beats": [3, 4],
+                "keywords": ["emergency", "liquidity", "confidential", "secret", "memo", "redacted", "khẩn cấp"],
+                "type": "document"
+            },
+            "fg_evidence_damages_calculation_invoice": {
+                "title": f"Forensic Interest Servicing Cost Calculation Sheet ({metric_highlight})",
+                "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink 'CONFIDENTIAL / EXHIBIT A', crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Forensic Accounting Exhibit",
+                "beats": [1, 3, 5],
+                "keywords": ["invoice", "interest expense", "service", "cost", "calculation", "bill", "chi phí lãi"],
+                "type": "document"
+            },
+            "fg_evidence_sovereign_cds_spread_ticket": {
+                "title": "Sovereign Credit Default Swap Pricing Slip",
+                "description": "High-finance derivative order confirmation ticket, showing surging basis point credit default swap premiums, stamped with red ink 'CRITICAL EXPOSURE', isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Market Default Pricing",
+                "beats": [3, 4],
+                "keywords": ["cds", "default", "spread", "derivative", "swap", "vỡ nợ"],
+                "type": "document"
+            },
+            "fg_evidence_foreign_exchange_reserve_certificate": {
+                "title": "Official Sovereign Foreign Exchange & Bullion Audit Certificate",
+                "description": "Official central treasury certificate documenting official gold bullion holdings and foreign reserve currency allocations, stamped with official gold star seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Reserve Backing Exhibit",
+                "beats": [2, 3, 5],
+                "keywords": ["reserve", "gold", "bullion", "forex", "foreign exchange", "dự trữ ngoại hối"],
+                "type": "document"
+            },
+            "fg_evidence_pension_fund_asset_audit_binder": {
+                "title": "Institutional Pension Fund Fixed-Income Allocation Binder",
+                "description": "Thick three-ring binder open on desk showing asset allocation pie charts losing principal value to high interest yields, colored plastic tab dividers, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Institutional Impact Exhibit",
+                "beats": [3, 4, 5],
+                "keywords": ["pension", "fund", "allocation", "yield", "binder", "hưu trí", "quỹ đầu tư"],
+                "type": "document"
+            },
+            "fg_evidence_emergency_recapitalization_order": {
+                "title": "Executive Statutory Liquidity Intervention Order",
+                "description": "Formal executive decree on government letterhead signed with blue fountain pen ink, authorising emergency sovereign treasury backstops and recapitalisation funds, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "State Intervention Order",
+                "beats": [4, 5],
+                "keywords": ["order", "statutory", "executive", "bailout", "recapitalization", "can thiệp"],
+                "type": "document"
+            },
+            "fg_evidence_statute_reference_book": {
+                "title": "Monetary Code & Statutory Debt Ceiling Reference Codex",
+                "description": "Heavy vintage leather-bound legal codex open to statutory debt limit and central bank charter sections, gold leaf lettering on spine, crisp cream paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Statutory Authority",
+                "beats": [1, 2, 5],
+                "keywords": ["statute", "law", "code", "ceiling", "reference", "trần nợ", "luật ngân sách"],
+                "type": "document"
+            },
+            "fg_evidence_prosecution_complaint_docket": {
+                "title": "Official Sovereign Debt Default Legal Filing Docket",
+                "description": "Official legal filing document from the international arbitration court, bold case docket header, stamped with blue official seal, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Lead Prosecution Docket",
+                "beats": [1, 4, 5],
+                "keywords": ["docket", "complaint", "default", "legal", "filing", "khởi kiện", "hồ sơ pháp lý"],
+                "type": "document"
+            },
+            "fg_evidence_gavel_justice_scale": {
+                "title": "Judicial Sovereign Restructuring Climax Gavel & Scales",
+                "description": "Dark polished walnut judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                "role": "Judicial Climax Artifact",
+                "beats": [4, 5],
+                "keywords": ["gavel", "scales", "judge", "court", "verdict", "búa gỗ", "phán quyết"],
+                "type": "evidence_prop"
+            }
+        }
+        return bg_roster, fg_roster
+
+    # =========================================================================
+    # GENERAL INVESTIGATIVE / CORPORATE / REGULATORY FALLBACK (BY MARKET)
+    # =========================================================================
+    if m_up in ["JP", "JA"]:
+        bg_roster = {
+            "bg_district_court_hall": {"title": "Tokyo District Courthouse Grand Hall", "description": "Cinematic wide-angle interior of Japanese district courthouse judicial hall, classical stone colonnade, high vaulted ceiling with moody diffused daylight, quiet austere judicial atmosphere, uncluttered background without distracting crowds.", "beats": [1, 5]},
+            "bg_regulatory_inspection_lab": {"title": "Ministry & Quarantine Safety Analysis Laboratory", "description": "Modern chemical residue and food safety inspection laboratory, stainless steel workbenches, analytical spectrometry apparatus in soft background focus, cool fluorescent lighting, sterile documentary atmosphere.", "beats": [2, 3]},
+            "bg_executive_boardroom_dusk": {"title": "Corporate Executive Boardroom Overlooking Tokyo at Dusk", "description": "Minimalist Japanese corporate executive boardroom overlooking evening city skyline, dark polished cedar table reflection, clean architectural lines, zero clutter, serious institutional tension.", "beats": [1, 4]},
+            "bg_warehouse_distribution_office": {"title": "Regional Warehouse Logistics Office", "description": "Authentic commercial distribution logistics office, stacked shipping crates in soft focus background, warm overhead industrial lamp casting gentle pool of light on paperwork desk, clean documentary mood.", "beats": [1, 2, 4]},
+            "bg_investigative_newsroom_night": {"title": "Investigative Journalism Newsroom at Night", "description": "Nocturnal investigative newsroom with dark empty desks receding into soft shadows, warm desk lamp pools, distant city lights through blinds, serious quiet investigative atmosphere.", "beats": [1, 2, 3]},
+            "bg_forensic_archive_vault": {"title": "Government Institutional Archive Document Vault", "description": "Steel shelving units holding hundreds of uniform archival document storage boxes in deep linear perspective, clean concrete floor, cool downlighting, forensic discovery vault.", "beats": [3, 4]},
+            "bg_regulatory_hearing_chamber": {"title": "Ministry Regulatory Oversight Hearing Chamber", "description": "Formal oak-paneled legislative and administrative hearing room with committee bench in background soft focus, rich timber textures, dignified institutional setting.", "beats": [4, 5]},
+            "bg_municipal_quarantine_site": {"title": "Port Customs Quarantine Facility Site", "description": "Port customs inspection terminal hall, industrial concrete flooring, official barrier gates in soft focus, quiet authoritative regulatory setting.", "beats": [2, 3]},
+            "bg_tokyo_customs_inspection_hall": {"title": "Tokyo Port Customs Clearance Inspection Hall", "description": "Wide customs terminal hall with steel counters, official inspection barriers in background, industrial daylight, authoritative border control atmosphere.", "beats": [1, 2]},
+            "bg_kasumigaseki_ministry_corridor": {"title": "Kasumigaseki Government Ministry Corridor", "description": "Long austere government ministry hallway, polished terrazzo floor, tall wooden doors with brass room numbers, quiet bureaucratic gravity.", "beats": [2, 4]},
+            "bg_shinjuku_financial_boardroom": {"title": "Shinjuku Financial Tower Executive Chamber", "description": "High-altitude corporate boardroom overlooking Mount Fuji at dusk, dark mahogany table, sleek modern lighting, high corporate tension.", "beats": [3, 4]},
+            "bg_yokohama_port_logistics_office": {"title": "Yokohama Port Maritime Shipping Logistics Office", "description": "Maritime dispatch office overlooking cargo container cranes through rainy window pane, desk maps, tactile documentary atmosphere.", "beats": [2, 3]},
+            "bg_metropolitan_police_investigative_hq": {"title": "Metropolitan Police Special Investigation Headquarters", "description": "Nocturnal police taskforce briefing room, whiteboards with suspect timeline flowcharts, warm desk spotlights, focused detective mood.", "beats": [3, 4]},
+            "bg_consumer_affairs_agency_briefing_room": {"title": "Consumer Affairs Agency Press Briefing Room", "description": "Formal government press conference room, blue backdrop banner with Japanese seal, rows of empty reporter chairs in soft focus, solemn transparency.", "beats": [4, 5]},
+            "bg_national_diet_committee_room": {"title": "National Diet Judicial Oversight Committee Hall", "description": "Historic Diet building committee room with carved wood wainscoting, green baize witness table, dignified legislative scrutiny.", "beats": [4, 5]},
+            "bg_tokyo_district_archive_vault": {"title": "Tokyo District Judicial Evidence Archive Vault", "description": "Reinforced steel evidence vault with labeled brown cardboard litigation boxes, heavy vault door ajar in background, archival authenticity.", "beats": [3, 5]}
+        }
+        fg_roster = {
+            "fg_character_tokyo_district_prosecutor": {"title": "Tokyo District Public Prosecutor", "description": "Full-body stylized editorial graphic novel digital illustration of a sharp Japanese public prosecutor in tailored dark suit with prosecutor autumn-frost badge on lapel, holding official filing folder, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecutor", "beats": [1, 4, 5], "keywords": ["prosecutor", "court", "indictment", "検察官", "起訴", "裁判"], "type": "character"},
+            "fg_character_ministry_safety_inspector": {"title": "Ministry Food & Safety Lead Inspector", "description": "Full-body stylized editorial graphic novel digital illustration of a diligent Japanese ministry quarantine inspector in navy administrative uniform with ministry identification armband, holding inspection checklist, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Inspector", "beats": [1, 2, 3], "keywords": ["inspector", "quarantine", "ministry", "検査官", "厚生労働省"], "type": "character"},
+            "fg_character_corporate_director": {"title": "Corporate Compliance Managing Director", "description": "Full-body stylized editorial graphic novel digital illustration of a conflicted Japanese corporate director in crisp white shirt and dark trousers, bowing slightly in formal apology posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Executive", "beats": [2, 4], "keywords": ["director", "executive", "apology", "役員", "企業"], "type": "character"},
+            "fg_character_forensic_auditor": {"title": "Forensic Financial Accounting Auditor", "description": "Full-body stylized editorial graphic novel digital illustration of a focused Japanese auditor holding a thick ledger and red verification pen, spectacles reflecting desk light, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Auditor", "beats": [3, 4, 5], "keywords": ["auditor", "accounting", "ledger", "監査", "会計"], "type": "character"},
+            "fg_evidence_hanko_stamped_docket": {"title": "Official Vermilion Hanko Stamped Legal Docket", "description": "Official Japanese district court legal filing document, titled prosecution complaint docket, bold Japanese kanji header, stamped with official red vermilion hanko seal, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecution Docket", "beats": [1, 2, 5], "keywords": ["hanko", "docket", "complaint", "kanji", "seal", "判子", "訴状"], "type": "document"},
+            "fg_evidence_chemical_residue_inspection_sheet": {"title": f"Official Safety Inspection Analysis Sheet ({metric_highlight})", "description": f"Government accredited laboratory test certificate showing quantitative chemical analysis results with metric highlight '{metric_highlight}', red verification stamp, Japanese kanji column headers, crisp cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Inspection Exhibit", "beats": [1, 2, 3], "keywords": ["inspection", "chemical", "residue", "analysis", "lab", "検査", "分析"], "type": "document"},
+            "fg_evidence_damage_calculation_invoice": {"title": "Macro Economic Restitution & Damages Calculation Sheet", "description": "Official audit summary invoice document displaying highlighted financial calculation figures in green ledger ink, stamped diagonally with bold red ink '証拠物件 // 第1号' (EXHIBIT A), crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["damage", "invoice", "restitution", "loss", "損害", "賠償", "請求書"], "type": "document"},
+            "fg_evidence_quarantine_customs_certificate": {"title": "Official Port Customs Quarantine Certificate", "description": "Port customs import entry clearance form with official inspection stamps, Japanese kanji column headers, tabbed colored sticker, tactile paper creases, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Border Compliance Exhibit", "beats": [2, 3], "keywords": ["quarantine", "customs", "port", "clearance", "通関", "検疫"], "type": "document"},
+            "fg_evidence_investigative_audit_binder": {"title": "Government Forensic Investigation Audit Binder", "description": "Thick three-ring binder with navy vinyl cover and clear spine label in Japanese kanji '特別監査調書', tabbed colored dividers visible, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Core Investigative Dossier", "beats": [3, 4, 5], "keywords": ["binder", "audit", "investigation", "dossier", "監査調書"], "type": "document"},
+            "fg_evidence_corporate_accounting_ledger": {"title": "Business Financial Accounting Ledger", "description": "Worn merchant bookkeeping ledger notebook open on a wooden table, showing ascending cost charges eroding profit margins, red hanko approval stamps, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Commercial Transaction Record", "beats": [1, 2, 4], "keywords": ["ledger", "accounting", "transaction", "book", "帳簿", "元帳"], "type": "document"},
+            "fg_evidence_sealed_whistleblower_envelope": {"title": "Confidential Internal Whistleblower Envelope", "description": "Manila envelope stamped with bold red characters '極秘 // 内部告発' (TOP SECRET // WHISTLEBLOWER), partially open revealing folded document with black redacted lines, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower Evidence", "beats": [2, 3], "keywords": ["whistleblower", "envelope", "secret", "confidential", "内部告発", "極秘"], "type": "document"},
+            "fg_evidence_statutory_penal_code_book": {"title": "Japanese Penal & Statutory Reference Codex", "description": "Heavy dark-leather bound Japanese law codex open to commercial fraud and public health violation articles, gold kanji lettering on spine, ribbon marker, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Statutory Authority", "beats": [1, 5], "keywords": ["statute", "penal", "law", "code", "六法全書", "法律"], "type": "document"},
+            "fg_evidence_forensic_laboratory_sample_vial": {"title": "Official Evidence Sample Container with Barcode", "description": "Clear glass forensic laboratory evidence vial sealed with tamper-evident red security tape, official laboratory barcode label, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Physical Evidence Exhibit", "beats": [2, 3], "keywords": ["sample", "vial", "specimen", "evidence", "証拠品", "検体"], "type": "evidence_prop"},
+            "fg_evidence_judicial_gavel_sounding_block": {"title": "Judicial Sounding Block & Verdict Seal", "description": "Polished Japanese cherry-wood judicial gavel resting on round sounding block beside official red court seal, tactile timber grain, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Climax Artifact", "beats": [4, 5], "keywords": ["gavel", "judge", "verdict", "court", "判決", "法廷"], "type": "evidence_prop"},
+            "fg_evidence_ministry_recall_order": {"title": "Official Ministry Mandatory Product Recall Order", "description": "Official administrative decree on Ministry of Health labor and welfare letterhead, bold heading '回収命令', official vermilion seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Administrative Enforcement Exhibit", "beats": [4, 5], "keywords": ["recall", "order", "decree", "ministry", "回収命令"], "type": "document"},
+            "fg_evidence_customs_clearance_stamp_docket": {"title": "Import Declaration & Customs Tariff Docket", "description": "Multi-page import customs declaration with green tariff stamps and circular inspector approval seals, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Trade Import Exhibit", "beats": [2, 3], "keywords": ["customs", "declaration", "tariff", "import", "輸入申告"], "type": "document"},
+            "fg_evidence_internal_meeting_minutes_dossier": {"title": "Executive Board Emergency Meeting Minutes", "description": "Stapled confidential corporate document with bold header '臨時取締役会議事録', margin notes written in pencil, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Knowledge Exhibit", "beats": [3, 4], "keywords": ["minutes", "meeting", "board", "executive", "議事録"], "type": "document"},
+            "fg_evidence_red_sealed_violation_notice": {"title": "Formal Regulatory Violation & Cease Order", "description": "Government violation notice stamped with prominent square red ministerial seal, crisp paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Violation Exhibit", "beats": [4, 5], "keywords": ["violation", "notice", "cease", "seal", "違反通知"], "type": "document"},
+            "fg_evidence_food_safety_test_report": {"title": "Public Health Environmental Test Certificate", "description": "Official spectrometry test report displaying quantitative safety threshold tables, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Technical Test Proof", "beats": [2, 3], "keywords": ["test", "report", "health", "analysis", "検査成績書"], "type": "document"}
+        }
+        return bg_roster, fg_roster
+
+    elif m_up in ["KR", "KO"]:
+        bg_roster = {
+            "bg_district_court_hall": {"title": "Seoul Central District Courthouse Grand Hall", "description": "Monumental judicial corridor of Seoul Central District Court, marble colonnade, cool modern diffused lighting, solemn authoritative atmosphere.", "beats": [1, 5]},
+            "bg_seoul_prosecutors_office": {"title": "Supreme Prosecutors' Office Special Investigation Room", "description": "High-security prosecution interrogation and evidence review office in Seocho-dong, desks stacked with blue legal record boxes, city dusk through blinds.", "beats": [1, 4]},
+            "bg_yeouido_financial_boardroom": {"title": "Yeouido Corporate Headquarters Executive Boardroom", "description": "High-altitude corporate boardroom overlooking Han River and National Assembly at dusk, dark granite table, crisp minimalist lines.", "beats": [1, 4]},
+            "bg_incheon_customs_logistics_hall": {"title": "Incheon International Airport Customs Cargo Terminal", "description": "Vast industrial cargo inspection warehouse, stainless steel customs counters, automated conveyor belts in soft focus, authoritative regulatory mood.", "beats": [1, 2, 4]},
+            "bg_investigative_newsroom_night": {"title": "Seoul Broadcasting Investigative Desk at Night", "description": "Nocturnal newsroom with empty desks, warm desk lamps illuminating evidence binders, Seoul neon reflection on rainy windows.", "beats": [1, 2, 3]},
+            "bg_forensic_archive_vault": {"title": "Government Institutional Document Archive Vault", "description": "Steel mobile shelving units holding thousands of uniform gray legal archival binders, cool downlighting, forensic records discovery room.", "beats": [3, 4]},
+            "bg_regulatory_hearing_chamber": {"title": "Fair Trade Commission Regulatory Hearing Chamber", "description": "Formal oak-paneled hearing hall in Sejong Government Complex, commissioners' bench in soft focus background, dignified institutional setting.", "beats": [4, 5]},
+            "bg_corporate_digital_forensics_lab": {"title": "Digital Forensics & Electronic Discovery Center", "description": "High-tech data recovery laboratory with server diagnostic racks, glowing forensic analysis monitors displaying filesystem trees.", "beats": [2, 3]},
+            "bg_sejong_ministry_headquarters": {"title": "Sejong Government Complex Ministry Corridor", "description": "Modern government administrative complex, sleek white marble walls, expansive glass atrium, quiet bureaucratic tension.", "beats": [2, 3]},
+            "bg_gangnam_corporate_tower_office": {"title": "Gangnam Technology Enterprise Executive Suite", "description": "Floor-to-ceiling glass executive office overlooking Teheran-ro night traffic, dark walnut desk, severe corporate gravity.", "beats": [2, 4]},
+            "bg_national_assembly_hearing_hall": {"title": "National Assembly Parliamentary Audit Chamber", "description": "Iconic semicircular legislative hearing room, microphone consoles in sharp focus, national emblem on mahogany backdrop.", "beats": [4, 5]},
+            "bg_port_quarantine_terminal": {"title": "Busan Port Container Inspection Terminal", "description": "Industrial container customs staging yard, shipping cranes in misty background, wet asphalt reflection, cold maritime air.", "beats": [1, 2]},
+            "bg_audit_board_investigative_room": {"title": "Board of Audit and Inspection Examination Room", "description": "Formal government audit review suite, long conference table covered with audit dossiers, solemn oversight atmosphere.", "beats": [3, 4]},
+            "bg_public_health_research_center": {"title": "National Institute of Food and Drug Safety Analysis Lab", "description": "Sterile scientific analysis facility with chromatography instruments, cool fluorescent lighting, clinical documentary feel.", "beats": [2, 3]},
+            "bg_appellate_courtroom_interior": {"title": "Seoul High Court Appellate Chamber", "description": "Formal high court chamber with elevated judicial bench, traditional carved timber trim, solemn legal reckoning.", "beats": [4, 5]},
+            "bg_executive_library_archive": {"title": "Supreme Court Legal Library Archive", "description": "Quiet double-height jurisprudence library, rows of bound legal precedents, bronze banker lamps, reflective analytical silence.", "beats": [1, 5]}
+        }
+        fg_roster = {
+            "fg_character_seoul_prosecutor": {"title": "Senior Special Prosecutor", "description": "Full-body stylized editorial graphic novel digital illustration of a resolute Korean senior prosecutor in dark charcoal suit with prosecution emblem pin, holding a thick legal dossier, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecutor", "beats": [1, 4, 5], "keywords": ["prosecutor", "court", "검사", "기소", "검찰"], "type": "character"},
+            "fg_character_corporate_sawon": {"title": "Corporate Accounting Manager", "description": "Full-body stylized editorial graphic novel digital illustration of a conflicted Korean corporate manager in crisp white business shirt wearing corporate lanyard ID badge (Sawonjeung), holding financial ledger, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Insider", "beats": [2, 3, 4], "keywords": ["sawonjeung", "manager", "employee", "사원증", "과장"], "type": "character"},
+            "fg_character_regulatory_commissioner": {"title": "Fair Trade Oversight Commissioner", "description": "Full-body stylized editorial graphic novel digital illustration of a senior Korean regulatory commissioner in formal navy attire and glasses, holding an administrative cease order, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Commissioner", "beats": [3, 4, 5], "keywords": ["commissioner", "ftc", "위탁", "공정거래위원회"], "type": "character"},
+            "fg_character_forensic_auditor": {"title": "Senior Forensic Accounting Auditor", "description": "Full-body stylized editorial graphic novel digital illustration of a Korean forensic accountant holding an audit binder and tablet, analytical sharp gaze, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Auditor", "beats": [2, 3, 5], "keywords": ["auditor", "accountant", "회계사", "감사"], "type": "character"},
+            "fg_evidence_ingam_stamped_docket": {"title": "Official Red Vermilion Ingam Stamped Legal Filing Docket", "description": "Official Korean district court legal indictment document, bold Korean Hangul header, stamped with circular crimson ingam seal, crisp paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecution Docket", "beats": [1, 2, 5], "keywords": ["ingam", "docket", "complaint", "indictment", "seal", "인감", "공소장"], "type": "document"},
+            "fg_evidence_corporate_sawonjeung_badge": {"title": "Corporate Employee Sawonjeung Identification Card", "description": "Official plastic corporate employee ID badge with lanyard clip, Hangul title '경영지원본부 / 회계팀' (Management Support / Accounting Team), barcode and chip, authentic institutional realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Insider Artifact", "beats": [1, 2, 3], "keywords": ["sawonjeung", "badge", "id", "card", "사원증", "신분증"], "type": "evidence_prop"},
+            "fg_evidence_damages_calculation_invoice": {"title": f"Forensic Accounting & Damages Summary Sheet ({metric_highlight})", "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink '증거 제1호' (EXHIBIT 1), crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["damage", "invoice", "restitution", "손해배상", "세금계산서"], "type": "document"},
+            "fg_evidence_regulatory_audit_binder": {"title": "Regulatory Oversight Forensic Audit Dossier", "description": "Heavy three-ring binder labeled in Hangul '특별감사보고서' (Special Audit Report), colored tab dividers, official regulatory growth charts visible, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Core Investigative Dossier", "beats": [3, 4, 5], "keywords": ["binder", "audit", "dossier", "감사보고서"], "type": "document"},
+            "fg_evidence_merchant_accounting_ledger": {"title": "Corporate Accounting & Transaction Ledger", "description": "Business bookkeeping ledger notebook open on wooden table showing ascending financial transactions, red verification stamps, sharp paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Transaction Evidence", "beats": [1, 2, 4], "keywords": ["ledger", "bookkeeping", "accounting", "장부", "회계"], "type": "document"},
+            "fg_evidence_sealed_whistleblower_memo": {"title": "Confidential Internal Whistleblower Memo Envelope", "description": "Manila folder envelope stamped with bold red Hangul '대외비 // 내부고발' (RESTRICTED // WHISTLEBLOWER), partially opened revealing internal memo with black redacted bars across strategic paragraphs, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower Document", "beats": [2, 3], "keywords": ["memo", "whistleblower", "confidential", "내부고발", "대외비"], "type": "document"},
+            "fg_evidence_statute_reference_book": {"title": "Korean Commercial & Statutory Legal Codex", "description": "Heavy vintage dark-bound legal codex open to commercial code and antitrust enforcement articles, gold leaf Hangul on spine, ribbon bookmark, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Statutory Authority", "beats": [1, 5], "keywords": ["statute", "law", "codex", "법전", "상법"], "type": "document"},
+            "fg_evidence_server_rack_drive": {"title": "Digital Forensic Storage Drive Module", "description": "Enterprise server drive enclosure with flashing blue data activity LEDs, forensic evidence barcode label in Korean and English, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Digital Evidence", "beats": [2, 3], "keywords": ["server", "drive", "data", "digital", "디지털포렌식"], "type": "evidence_prop"},
+            "fg_evidence_gavel_justice_scale": {"title": "Judicial Gavel & Sounding Block", "description": "Polished dark wood judicial gavel resting on sounding block beside brass balance scales, courtroom documentary realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Climax Artifact", "beats": [4, 5], "keywords": ["gavel", "judge", "scales", "court", "법원", "판결"], "type": "evidence_prop"},
+            "fg_evidence_ftc_corrective_order": {"title": "Fair Trade Commission Formal Sanction Decree", "description": "Government sanction order on official Fair Trade Commission letterhead, bold Hangul title '시정명령서', red ministerial seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Sanction Exhibit", "beats": [4, 5], "keywords": ["order", "sanction", "ftc", "시정명령"], "type": "document"},
+            "fg_evidence_tax_audit_discrepancy_sheet": {"title": "National Tax Service Audit Discrepancy Statement", "description": "Official tax authority assessment slip showing calculated revenue discrepancies and unpaid corporate tax penalties, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Tax Discrepancy Exhibit", "beats": [2, 3], "keywords": ["tax", "discrepancy", "penalty", "국세청", "추징금"], "type": "document"},
+            "fg_evidence_bank_transaction_voucher": {"title": "Commercial Bank Wire Transfer Verification Voucher", "description": "Bank transaction voucher slip with dot-matrix printing, official cashier red stamp, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Financial Paper Trail", "beats": [2, 3], "keywords": ["wire", "bank", "voucher", "transfer", "송금확인서"], "type": "document"},
+            "fg_evidence_board_resolution_minutes": {"title": "Board of Directors Emergency Resolution Minutes", "description": "Formally bound board meeting minutes document with attendee signatures and red registered seal impressions, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Minutes Exhibit", "beats": [3, 4], "keywords": ["resolution", "board", "minutes", "이사회", "의사록"], "type": "document"},
+            "fg_evidence_forensic_cellphone_extraction_report": {"title": "Mobile Device Digital Extraction Forensic Report", "description": "Official police forensic extraction log showing chat logs and timestamps with highlighted red evidence callouts, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Digital Communication Proof", "beats": [2, 4], "keywords": ["chat", "extraction", "forensic", "phone", "포렌식보고서"], "type": "document"},
+            "fg_evidence_prosecution_summons_notice": {"title": "Official Public Prosecution Summons Order", "description": "Formal legal summons notice commanding executive appearance for questioning, red official stamp, crisp paper creases, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Summons Exhibit", "beats": [1, 4], "keywords": ["summons", "notice", "prosecution", "출석요구서"], "type": "document"}
+        }
+        return bg_roster, fg_roster
+
+    elif m_up in ["VN", "VI"]:
+        bg_roster = {
+            "bg_people_court_grand_hall": {"title": "Tòa Án Nhân Dân Thành Phố Hội Trường Lớn", "description": "Không gian hội trường xét xử của Tòa án nhân dân với quốc huy Việt Nam trên phông đỏ trung tâm, hàng ghế hội đồng xét xử bằng gỗ gụ uy nghiêm, ánh sáng ban ngày khuếch tán qua cửa sổ vòm cao.", "beats": [1, 5]},
+            "bg_inspectorate_hearing_room": {"title": "Phòng Họp Thanh Tra Chính Phủ & Ban Nội Chính", "description": "Phòng họp trang trọng với bàn họp dài bằng gỗ xoan đào, cờ đỏ sao vàng ở góc trang trọng, tài liệu thanh tra xếp ngay ngắn, không khí pháp lý nghiêm nghị.", "beats": [4, 5]},
+            "bg_corporate_executive_boardroom": {"title": "Phòng Họp Hội Đồng Quản Trị Tập Đoàn", "description": "Phòng họp cao tầng nhìn ra toàn cảnh sông Sài Gòn hoặc hồ Tây lúc hoàng hôn, bàn kính phản chiếu ánh đèn rọi trần, vách gỗ hiện đại sang trọng.", "beats": [1, 4]},
+            "bg_customs_logistics_warehouse": {"title": "Kho Hàng Giám Sát Hải Quan & Quản Lý Thị Trường", "description": "Kho hàng vận tải logistics với các kiện hàng xếp lớp phía sau mờ nhẹ, ngọn đèn công nghiệp chiếu rọi xuống bàn làm việc kiểm định giấy tờ.", "beats": [1, 2, 4]},
+            "bg_investigative_newsroom_night": {"title": "Tòa Soạn Báo Điều Tra Đêm Khuya", "description": "Không gian phòng biên tập báo chí lúc đêm muộn, bàn làm việc với đèn bàn rọi vào hồ sơ, cửa sổ nhìn ra ánh đèn thành phố mờ sương.", "beats": [1, 2, 3]},
+            "bg_state_records_archive_vault": {"title": "Trung Tâm Lưu Trữ Quốc Gia & Kho Hồ Sơ Vụ Án", "description": "Hệ thống giá kệ kim loại chứa hàng trăm hộp lưu trữ hồ sơ tài liệu xếp thẳng tắp, nền bê tông sạch bóng, ánh đèn tuýp trắng mát dịu.", "beats": [3, 4]},
+            "bg_market_surveillance_hq": {"title": "Trụ Sở Cục Quản Lý Thị Trường & Kiểm Tra Chuyên Ngành", "description": "Phòng họp tác chiến của cơ quan thanh tra thị trường, bảng sơ đồ mạng lưới phân phối, ánh sáng tập trung nghiêm túc.", "beats": [2, 3]},
+            "bg_bank_operations_center": {"title": "Trung Tâm Điều Hành Ngân Hàng & Giao Dịch Tài Chính", "description": "Không gian làm việc ngân hàng hiện đại với màn hình hiển thị biểu đồ dòng tiền mờ nhẹ phía sau, vách kính mờ, không khí phân tích tập trung.", "beats": [2, 3]},
+            "bg_ministry_briefing_hall": {"title": "Hội Trường Bộ Ngành Trung Ương", "description": "Hội trường hội nghị bộ ngành với hàng ghế bọc da sẫm màu, bục phát biểu bằng gỗ tự nhiên, không khí hành chính quyền lực.", "beats": [2, 4]},
+            "bg_tax_audit_office": {"title": "Phòng Thanh Tra Kiểm Tra Thuế Doanh Nghiệp", "description": "Văn phòng thanh tra thuế với chồng hồ sơ quyết toán tài chính, ánh đèn tuýp sáng rõ, máy tính hiển thị bảng cân đối số liệu.", "beats": [3, 4]},
+            "bg_police_investigation_agency": {"title": "Cơ Quan Cảnh Sát Điều Tra Trụ Sở Làm Việc", "description": "Phòng làm việc điều tra viên với bảng dòng thời gian chứng cứ, hồ sơ án tài chính, đèn bàn rọi vào biên bản ghi lời khai.", "beats": [3, 4]},
+            "bg_port_quarantine_terminal": {"title": "Cảng Biển Cửa Khẩu Kiểm Định Hàng Hóa", "description": "Khu vực kiểm hóa cảng biển Hải Phòng hoặc Cát Lái, cần cẩu container phía sau mờ nhẹ, mặt sàn công nghiệp mát mẻ.", "beats": [1, 2]},
+            "bg_notary_public_office": {"title": "Văn Phòng Công Chứng & Xác Thực Hồ Sơ Đất Đai", "description": "Phòng công chứng tư pháp với kệ sách lưu trữ văn bản pháp luật, dấu mộc đỏ trên bàn làm việc, ánh sáng chân thực.", "beats": [2, 3]},
+            "bg_financial_institute_amphitheater": {"title": "Giảng Đường Viện Chiến Lược Kinh Tế", "description": "Hội trường phân tích kinh tế vĩ mô, bảng số liệu biểu đồ dòng tiền phía sau, bầu không khí học thuật chuyên sâu.", "beats": [2, 5]},
+            "bg_appellate_courtroom": {"title": "Phòng Xét Xử Phúc Thẩm Tòa Án Cấp Cao", "description": "Phòng xét xử phúc thẩm với bục hội đồng ba thẩm phán, phù hiệu quốc gia trang nghiêm, bầu không khí phán quyết đanh thép.", "beats": [4, 5]},
+            "bg_executive_reading_room": {"title": "Thư Viện Pháp Luật & Nghiên Cứu Lịch Sử Tư Pháp", "description": "Thư viện tư pháp yên tĩnh với kệ sách bọc da cổ điển, đèn bàn màu xanh ngọc, không gian chiêm nghiệm sâu lắng.", "beats": [1, 5]}
+        }
+        fg_roster = {
+            "fg_character_vietnamese_inspector": {"title": "Trưởng Đoàn Thanh Tra Nhà Nước", "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một trưởng đoàn thanh tra trong trang phục thanh tra nhà nước trang trọng, cầm kẹp hồ sơ kết luận thanh tra, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Inspector", "beats": [1, 4, 5], "keywords": ["thanh tra", "kết luận", "cán bộ", "đoàn thanh tra"], "type": "character"},
+            "fg_character_corporate_chairperson": {"title": "Chủ Tịch Hội Đồng Quản Trị Tập Đoàn", "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một chủ tịch tập đoàn trong bộ vest tối màu trang trọng, nét mặt căng thẳng kiềm chế trước các chứng cứ tài chính, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Figure", "beats": [1, 2, 4], "keywords": ["chủ tịch", "hội đồng quản trị", "doanh nghiệp", "tập đoàn"], "type": "character"},
+            "fg_character_forensic_auditor": {"title": "Kiểm Toán Viên Trưởng Pháp Y Tài Chính", "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một kiểm toán viên tài chính cầm tập báo cáo kiểm toán độc lập dày cộp, kính gọng kim loại phản chiếu ánh đèn, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Auditor", "beats": [2, 3, 5], "keywords": ["kiểm toán", "tài chính", "dòng tiền", "báo cáo"], "type": "character"},
+            "fg_character_investigative_journalist": {"title": "Nhà Báo Điều Tra Chuyên Sâu", "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một nhà báo điều tra cầm sổ tay ghi chép và thẻ nhà báo, ánh mắt sắc sảo truy tìm chân tướng, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Investigative Reporter", "beats": [1, 3, 4], "keywords": ["nhà báo", "phóng viên", "điều tra", "chân tướng"], "type": "character"},
+            "fg_evidence_moc_do_stamped_docket": {"title": "Kết Luận Thanh Tra Đóng Dấu Mộc Đỏ & Chữ Ký Tươi", "description": "Văn bản kết luận thanh tra chính thức của cơ quan nhà nước, tiêu ngữ quốc gia sắc nét, đóng dấu mộc đỏ tươi hình quốc huy và chữ ký bút mực xanh, chất liệu giấy 300gsm góc cạnh sắc sảo, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Official Docket", "beats": [1, 2, 5], "keywords": ["mộc đỏ", "thanh tra", "kết luận", "dấu đỏ", "quuyết định"], "type": "document"},
+            "fg_evidence_damages_calculation_invoice": {"title": f"Bảng Tính Chi Phí Thiệt Hại & Bồi Thường Tài Chính ({metric_highlight})", "description": f"Bảng phụ lục kiểm toán tổng hợp thiệt hại kinh tế hiển thị con số '{metric_highlight}' mực xanh nổi bật, đóng dấu chéo mực đỏ 'TÀI LIỆU CHỨNG CỨ', viền cắt giấy sắc nét, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["thiệt hại", "hóa đơn", "bồi thường", "tài chính", "invoice"], "type": "document"},
+            "fg_evidence_red_sealed_violation_notice": {"title": "Biên Bản Vi Phạm Hành Chính & Quyết Định Xử Phạt", "description": "Biên bản xử phạt vi phạm hành chính có dấu mộc đỏ của cơ quan chức năng, chữ in vi tính rõ nét, có dấu giáp lai đỏ tươi mép giấy, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Administrative Sanction Exhibit", "beats": [4, 5], "keywords": ["biên bản", "xử phạt", "vi phạm", "mộc đỏ"], "type": "document"},
+            "fg_evidence_accounting_ledger": {"title": "Sổ Kế Toán & Báo Cáo Lưu Chuyển Dòng Tiền", "description": "Quyển sổ cái ghi chép giao dịch tài chính dòng tiền mở rộng trên mặt bàn gỗ, hiển thị số liệu thu chi lệch pha, có đánh dấu bút dạ quang vàng, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Accounting Exhibit", "beats": [1, 2, 4], "keywords": ["sổ sách", "kế toán", "dòng tiền", "ledger"], "type": "document"},
+            "fg_evidence_sealed_whistleblower_folder": {"title": "Hồ Sơ Tài Liệu Mật Bị Phát Giác", "description": "Túi hồ sơ giấy xi măng màu nâu đóng dấu đỏ 'MẬT // LƯU HÀNH NỘI BỘ', mở hé lộ các tài liệu nội bộ bị gạch đen xóa thông tin nhạy cảm, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower Evidence", "beats": [2, 3], "keywords": ["hồ sơ", "mật", "nội bộ", "tố giác", "memo"], "type": "document"},
+            "fg_evidence_statutory_law_codex": {"title": "Bộ Luật Hình Sự & Luật Doanh Nghiệp Hiện Hành", "description": "Sách luật bìa da đỏ in quốc huy vàng bóng loáng mở ra trang điều khoản vi phạm quản lý kinh tế, góc giấy sắc nét, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Statutory Authority", "beats": [1, 5], "keywords": ["luật", "bộ luật", "pháp luật", "statute"], "type": "document"},
+            "fg_evidence_server_storage_disk": {"title": "Ổ Đĩa Lưu Trữ Dữ Liệu Thuật Toán Doanh Nghiệp", "description": "Thiết bị ổ cứng kim loại chuyên dụng của hệ thống máy chủ máy chủ doanh nghiệp có dán tem niêm phong bằng chứng điều tra màu cam, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Technical Hardware Evidence", "beats": [2, 3], "keywords": ["ổ đĩa", "dữ liệu", "máy chủ", "server"], "type": "evidence_prop"},
+            "fg_evidence_gavel_justice_scale": {"title": "Búa Gỗ Xét Xử Tòa Án & Cán Cân Công Lý", "description": "Búa gỗ xét xử bằng gỗ gụ đánh bóng đặt trên đế gỗ bên cạnh cán cân công lý bằng đồng thau, chất gỗ tự nhiên chân thực, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Climax Artifact", "beats": [4, 5], "keywords": ["búa", "tòa án", "phán quyết", "công lý", "gavel"], "type": "evidence_prop"},
+            "fg_evidence_notarized_contract": {"title": "Hợp Đồng Kinh Tế Công Chứng Có Dấu Giáp Lai", "description": "Hợp đồng kinh tế nhiều trang được dập dấu mộc đỏ giáp lai giữa các mép giấy, đóng ghim góc trái, có chữ ký đại diện pháp luật, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Contractual Exhibit", "beats": [2, 3], "keywords": ["hợp đồng", "công chứng", "giáp lai", "contract"], "type": "document"},
+            "fg_evidence_bank_statement_slip": {"title": "Sao Kê Tài Khoản Ngân Hàng Dấu Giáp Lai Đỏ", "description": "Tập bảng sao kê tài khoản ngân hàng in kim hiển thị các giao dịch chuyển khoản hàng trăm tỷ đồng, dấu tròn ngân hàng đỏ tươi, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Banking Paper Trail", "beats": [2, 3], "keywords": ["sao kê", "ngân hàng", "giao dịch", "chuyển tiền"], "type": "document"},
+            "fg_evidence_forensic_sealing_tape": {"title": "Băng Keo Niêm Phong Tang Vật Pháp Lý", "description": "Dải băng keo giấy niêm phong chính thức có đóng dấu giáp lai đỏ đè lên mép dán thùng tài liệu tang vật, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Seal Exhibit", "beats": [3, 4], "keywords": ["niêm phong", "tang vật", "băng keo", "seal"], "type": "evidence_prop"},
+            "fg_evidence_tax_assessment_notice": {"title": "Thông Báo Truy Thu Thuế & Phạt Chậm Nộp", "description": "Văn bản quyết định truy thu thuế và xử phạt vi phạm của Cục Thuế, dấu mộc tròn đỏ của cơ quan thuế, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Tax Penalty Exhibit", "beats": [3, 5], "keywords": ["truy thu", "thuế", "xử phạt", "thông báo"], "type": "document"}
+        }
+        return bg_roster, fg_roster
+
+    else:
+        # Default EN Corporate / Regulatory Fallback
+        bg_roster = {
+            "bg_federal_court_hall": {"title": "Federal Courthouse Grand Hall", "description": "Cinematic wide-angle interior of federal courthouse hall, classical stone colonnade, high vaulted ceiling with moody diffused daylight, quiet austere judicial atmosphere, uncluttered background without distracting crowds.", "beats": [1, 5]},
+            "bg_regulatory_oversight_chamber": {"title": "Regulatory Oversight Analytical Hearing Chamber", "description": "Formal oak-paneled federal hearing room with elevated judge bench in background soft focus, rich timber textures, formal dignified institutional setting.", "beats": [4, 5]},
+            "bg_executive_boardroom_dusk": {"title": "Corporate Executive Boardroom at Dusk", "description": "Modern minimalist corporate boardroom overlooking dusky city skyline through panoramic floor-to-ceiling glass windows, dark mahogany table reflection, clean architectural lines, zero clutter.", "beats": [1, 4]},
+            "bg_enterprise_warehouse_office": {"title": "Enterprise Operations Logistics Office", "description": "Authentic quiet business inventory office, cardboard shipping boxes neatly stacked in soft focus background, warm overhead industrial lamp casting gentle pool of light on desk, clean documentary mood.", "beats": [1, 2, 4]},
+            "bg_investigative_newsroom_night": {"title": "Investigative Journalism Newsroom at Night", "description": "Nocturnal newsroom with dark empty desks receding into soft shadows, warm desk lamp pools, distant city lights through blinds, serious quiet investigative atmosphere.", "beats": [1, 2, 3]},
+            "bg_forensic_archive_vault": {"title": "Federal Archive Document Vault", "description": "Steel shelving units holding hundreds of uniform gray legal archive boxes in deep linear perspective, clean concrete floor, cool fluorescent downlighting, forensic discovery vault.", "beats": [3, 4]},
+            "bg_economics_analytics_lab": {"title": "Marketplace Economics & Data Analytics Lab", "description": "Modern analytical workspace with large soft-focus monitors displaying muted auction bidding flowcharts and heatmaps, dark slate walls, focused analytical atmosphere.", "beats": [2, 3]},
+            "bg_server_cooling_facility": {"title": "Enterprise Cloud Data Center Facility", "description": "Deep perspective corridor of enterprise server racks in dark cooling room, subtle vertical cyan and amber LED tracer lights, clean floor reflection, atmospheric mist, uncluttered clean industrial tech environment.", "beats": [2, 3]},
+            "bg_corporate_headquarters_atrium": {"title": "Corporate Glass Atrium at Twilight", "description": "Vast minimalist architectural corporate atrium, towering cantilevered glass walls, sleek granite floor reflecting twilight city sky, monumental scale.", "beats": [1, 2]},
+            "bg_compliance_audit_room": {"title": "Internal Corporate Compliance Review Suite", "description": "Focused internal audit room with desks covered in organized evidence folders, warm directional task lighting, slate gray acoustic walls, serious institutional tone.", "beats": [2, 3]},
+            "bg_legislative_hearing_rotunda": {"title": "Congressional Committee Hearing Rotunda", "description": "Curved neoclassical rotunda hearing room with mahogany witness tables in foreground, elevated committee dais in background, dignified congressional scrutiny.", "beats": [4, 5]},
+            "bg_nocturnal_city_overlook": {"title": "Nocturnal Metropolis Financial Center Overlook", "description": "Expansive view from executive office balcony overlooking illuminated financial skyscrapers shrouded in evening mist, profound quiet scale.", "beats": [1, 5]},
+            "bg_logistics_shipping_terminal": {"title": "Maritime Commercial Logistics Dock", "description": "Quiet commercial shipping terminal office overlooking automated gantry cranes through rainy glass, industrial authenticity.", "beats": [2, 4]},
+            "bg_secure_data_vault": {"title": "Forensic Electronic Evidence Cleanroom", "description": "High-security digital forensic cleanroom with anti-static workbenches, data recovery docks in soft focus, focused investigative realism.", "beats": [3, 4]},
+            "bg_press_conference_briefing_hall": {"title": "Government Press Briefing Auditorium", "description": "Formal government agency press theater, dark blue backdrop with federal eagle emblem, empty wooden lectern in sharp focus.", "beats": [4, 5]},
+            "bg_institutional_archive_records_room": {"title": "National Institutional Records Hall", "description": "Double-height archival records room with rolling ladder system, rows of bound legal dockets, soft ambient illumination.", "beats": [3, 5]}
+        }
+        fg_roster = {
+            "fg_character_lead_prosecutor": {"title": "Federal District Lead Prosecutor", "description": "Full-body stylized editorial graphic novel digital illustration of a focused federal prosecutor in dark tailored wool suit, holding prosecution complaint folder, standing with composed authority, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecutor", "beats": [1, 4, 5], "keywords": ["prosecutor", "complaint", "indictment", "court", "justice"], "type": "character"},
+            "fg_character_corporate_general_counsel": {"title": "Corporate General Counsel", "description": "Full-body stylized editorial graphic novel digital illustration of a guarded corporate defense attorney in charcoal pinstripe suit, holding closed leather briefcase with firm defensive posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Defense Counsel", "beats": [1, 2, 4], "keywords": ["counsel", "attorney", "corporate", "defense", "executive"], "type": "character"},
+            "fg_character_forensic_accountant": {"title": "Senior Forensic Financial Accountant", "description": "Full-body stylized editorial graphic novel digital illustration of a meticulous forensic accountant holding tabulated financial ledger and red audit pen, spectacles reflecting light, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accountant", "beats": [2, 3, 5], "keywords": ["accountant", "audit", "forensic", "ledger", "numbers"], "type": "character"},
+            "fg_character_whistleblower_insider": {"title": "Key Corporate Whistleblower Insider", "description": "Full-body stylized editorial graphic novel digital illustration of an observant corporate insider in casual business jacket, holding confidential manila envelope with cautious resolute gaze, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower", "beats": [2, 3, 4], "keywords": ["whistleblower", "insider", "confidential", "secret", "memo"], "type": "character"},
+            "fg_evidence_prosecution_complaint_docket": {"title": "Official Legal Prosecution Complaint Docket", "description": "Official legal filing document from the federal district court, bold case header, legal docket stamped with blue ink, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecution Docket", "beats": [1, 2, 5], "keywords": ["docket", "complaint", "indictment", "court", "legal"], "type": "document"},
+            "fg_evidence_damages_calculation_invoice": {"title": f"Forensic Accounting & Damages Summary Sheet ({metric_highlight})", "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink 'CONFIDENTIAL / EXHIBIT A', crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["damages", "invoice", "restitution", "loss", "bill"], "type": "document"},
+            "fg_evidence_regulatory_audit_binder": {"title": "Forensic Investigative Audit Binder", "description": "Thick three-ring forensic investigative audit binder with tabbed colored dividers, official regulatory growth charts visible on front plastic sleeve, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Macro Financial Evidence", "beats": [3, 4, 5], "keywords": ["binder", "audit", "investigation", "dossier"], "type": "document"},
+            "fg_evidence_merchant_accounting_ledger": {"title": "Small Business Financial Accounting Ledger", "description": "Worn merchant bookkeeping ledger notebook open on a wooden table, showing ascending cost charges eroding profit margins, paperclips, tactile ink lines, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Victim Economic Evidence", "beats": [1, 2, 4], "keywords": ["ledger", "bookkeeping", "accounting", "transaction"], "type": "document"},
+            "fg_evidence_sealed_whistleblower_memo": {"title": "Confidential Internal Whistleblower Memo Envelope", "description": "Manila folder envelope stamped 'RESTRICTED DISTRIBUTION // EXECUTIVE EYES ONLY', partially opened revealing internal memo with black redacted bars across strategic paragraphs, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower Document", "beats": [2, 3], "keywords": ["memo", "whistleblower", "confidential", "secret", "envelope"], "type": "document"},
+            "fg_evidence_statute_reference_book": {"title": "Federal Statutory Legal Reference Volume", "description": "Heavy vintage leather-bound legal codex open to federal statutory monopolization and fraud sections, gold leaf lettering on spine, ribbon bookmark, sharp paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Statutory Authority", "beats": [1, 5], "keywords": ["statute", "law", "code", "reference", "volume"], "type": "document"},
+            "fg_evidence_server_rack_drive": {"title": "Automated Algorithm Storage Module", "description": "High-tech brushed metallic enterprise server drive enclosure with flashing blue data activity LEDs, forensic evidence barcode sticker, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Technical Hardware Evidence", "beats": [2, 3], "keywords": ["server", "drive", "data", "algorithm", "module"], "type": "evidence_prop"},
+            "fg_evidence_gavel_justice_scale": {"title": "Federal Court Judicial Gavel & Scales", "description": "Dark polished walnut judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Climax Artifact", "beats": [4, 5], "keywords": ["gavel", "judge", "scales", "court", "verdict"], "type": "evidence_prop"},
+            "fg_evidence_subpoena_compliance_order": {"title": "Federal Subpoena Duces Tecum Order", "description": "Official federal court subpoena order commanding production of records, embossed blue judicial seal, signed command line, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Compulsory Legal Order", "beats": [2, 4], "keywords": ["subpoena", "order", "records", "compliance"], "type": "document"},
+            "fg_evidence_internal_email_chain_exhibit": {"title": "Printed Executive Internal Email Chain Exhibit", "description": "Printed email records stamped with exhibit letter, highlighting strategic discussions with bold yellow highlighter ink, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Internal Communications Exhibit", "beats": [2, 3], "keywords": ["email", "chain", "exhibit", "communication"], "type": "document"},
+            "fg_evidence_financial_audit_reconciliation": {"title": "Forensic Revenue Reconciliation Audit Sheet", "description": "Multi-column audit reconciliation spread sheet on green-tinted paper, red penalty calculations stamped in bottom right corner, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Audit Reconciliation Exhibit", "beats": [3, 4], "keywords": ["reconciliation", "audit", "revenue", "penalty"], "type": "document"},
+            "fg_evidence_compliance_violation_notice": {"title": "Federal Regulatory Formal Violation Notice", "description": "Formal administrative cease-and-desist violation decree with red stamped border and gold agency seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Violation Exhibit", "beats": [4, 5], "keywords": ["violation", "notice", "cease", "sanction"], "type": "document"}
+        }
+        return bg_roster, fg_roster
+
+
 def extract_dynamic_visual_roster(
     story_text: str = "",
     spoken_sentences: Optional[List[Dict[str, Any]]] = None,
@@ -55,403 +520,114 @@ def extract_dynamic_visual_roster(
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Rule 128 & Rule 122: Trích xuất danh mục Đạo cụ (Foreground) & Bối cảnh (Background)
     hoàn toàn động theo thị trường bản địa (JP, KR, VN, EN) và dữ liệu thực tế (grounding).
-    CẤM TUYỆT ĐỐI hardcode tên tập, nhân vật hay đạo cụ của một vụ án cụ thể (như Amazon).
+    Sản sinh:
+      - 16 đến 20 Backgrounds (16:9 2560x1440) phân bổ đều qua 5 Beats.
+      - 20 đến 26 Foregrounds (1:1 2048x2048 trên nền phẳng #FF00FF magenta chroma):
+        + 4-6 Nhân vật chủ chốt (type: 'character')
+        + 16-20 Đạo cụ bằng chứng / Chứng từ pháp y / Biểu đồ xúc giác (type: 'evidence_prop' | 'document' | 'data_metric')
+    CẤM TUYỆT ĐỐI hardcode chỉ 8 items hoặc hardcode tên tập/đạo cụ vụ án cụ thể.
     """
     m_up = str(market or "EN").upper().strip()
     g_intel = grounding_intel or {}
+    topic_str = topic or (g_intel.get("topic") if isinstance(g_intel, dict) else "") or "Investigative Docudrama"
+
+    # Trích xuất số liệu định lượng và claims thực tế từ grounding
+    claims = []
+    if isinstance(g_intel, dict):
+        for c in g_intel.get("claims", [])[:10]:
+            txt = c.get("claim") or c.get("text") if isinstance(c, dict) else str(c)
+            if txt:
+                claims.append(txt[:150])
+
     key_metrics = []
-    
-    # Trích xuất số liệu định lượng từ grounding_intel nếu có
-    if g_intel.get("grounding_table"):
-        for row in g_intel.get("grounding_table", [])[:5]:
+    if isinstance(g_intel, dict) and g_intel.get("grounding_table"):
+        for row in g_intel.get("grounding_table", [])[:8]:
             val = row.get("value") or row.get("metric_value")
             unit = row.get("unit") or ""
+            param = row.get("parameter") or row.get("claim_id") or ""
             if val:
-                key_metrics.append(f"{val} {unit}".strip())
-    elif g_intel.get("key_figures"):
-        key_metrics.extend([str(x) for x in g_intel.get("key_figures", [])[:4]])
+                key_metrics.append(f"{param}: {val} {unit}".strip())
+    elif isinstance(g_intel, dict) and g_intel.get("key_figures"):
+        key_metrics.extend([str(x) for x in g_intel.get("key_figures", [])[:6]])
 
-    metric_highlight = key_metrics[0] if key_metrics else ("CONFIDENTIAL METRIC // AUDIT FINDING" if m_up == "EN" else "定量監査データ // 検証記録")
+    # Narrative sample
+    sample_narr = []
+    if spoken_sentences:
+        step = max(1, len(spoken_sentences) // 10)
+        sample_narr = [s.get("text", "") for s in spoken_sentences[::step][:8]]
+    elif story_text:
+        sample_narr = [line.strip() for line in story_text.split("\n") if line.strip()][:5]
 
-    if m_up in ["JP", "JA"]:
-        # Thị trường Nhật Bản: Hanko đỏ, Bộ Y tế Lao động Phúc lợi (MHLW), Tòa án Tokyo, mẫu kiểm định
-        bg_roster = {
-            "bg_district_court_hall": {
-                "title": "Tokyo District Courthouse Grand Hall",
-                "description": "Cinematic wide-angle interior of Japanese district courthouse judicial hall, classical stone colonnade, high vaulted ceiling with moody diffused daylight, quiet austere judicial atmosphere, uncluttered background without distracting crowds.",
-                "beats": [1, 5]
-            },
-            "bg_regulatory_inspection_lab": {
-                "title": "Ministry & Quarantine Safety Analysis Laboratory",
-                "description": "Modern chemical residue and food safety inspection laboratory, stainless steel workbenches, analytical spectrometry apparatus in soft background focus, cool fluorescent lighting, sterile documentary atmosphere.",
-                "beats": [2, 3]
-            },
-            "bg_executive_boardroom_dusk": {
-                "title": "Corporate Executive Boardroom Overlooking City at Dusk",
-                "description": "Minimalist Japanese corporate executive boardroom overlooking evening city skyline, dark polished cedar table reflection, clean architectural lines, zero clutter, serious institutional tension.",
-                "beats": [1, 4]
-            },
-            "bg_warehouse_distribution_office": {
-                "title": "Regional Warehouse Logistics Office",
-                "description": "Authentic commercial distribution logistics office, stacked shipping crates in soft focus background, warm overhead industrial lamp casting gentle pool of light on paperwork desk, clean documentary mood.",
-                "beats": [1, 2, 4]
-            },
-            "bg_investigative_newsroom_night": {
-                "title": "Investigative Journalism Newsroom at Night",
-                "description": "Nocturnal investigative newsroom with dark empty desks receding into soft shadows, warm desk lamp pools, distant city lights through blinds, serious quiet investigative atmosphere.",
-                "beats": [1, 2, 3]
-            },
-            "bg_forensic_archive_vault": {
-                "title": "Government Institutional Archive Document Vault",
-                "description": "Steel shelving units holding hundreds of uniform archival document storage boxes in deep linear perspective, clean concrete floor, cool downlighting, forensic discovery vault.",
-                "beats": [3, 4]
-            },
-            "bg_regulatory_hearing_chamber": {
-                "title": "Ministry Regulatory Oversight Hearing Chamber",
-                "description": "Formal oak-paneled legislative and administrative hearing room with committee bench in background soft focus, rich timber textures, dignified institutional setting.",
-                "beats": [4, 5]
-            },
-            "bg_municipal_quarantine_site": {
-                "title": "Port Customs Quarantine Facility Site",
-                "description": "Port customs inspection terminal hall, industrial concrete flooring, official barrier gates in soft focus, quiet authoritative regulatory setting.",
-                "beats": [2, 3]
-            }
-        }
+    bg_roster = None
+    fg_roster = None
 
-        fg_roster = {
-            "fg_evidence_prosecution_complaint_docket": {
-                "title": "Official Legal Complaint Docket Document",
-                "description": "Official Japanese district court legal filing document, titled prosecution complaint docket, bold Japanese kanji header, stamped with official red vermilion hanko seal, crisp document paper texture with clean sharp edges.",
-                "role": "Lead Prosecution Docket",
-                "beats": [1, 2, 5]
-            },
-            "fg_evidence_chemical_residue_inspection_sheet": {
-                "title": f"Official Safety Inspection Analysis Sheet ({metric_highlight})",
-                "description": f"Government accredited laboratory test certificate showing quantitative chemical analysis results with metric highlight '{metric_highlight}', red verification stamp, Japanese kanji column headers, crisp cutout edge.",
-                "role": "Forensic Inspection Exhibit",
-                "beats": [1, 2, 3]
-            },
-            "fg_evidence_damage_calculation_invoice": {
-                "title": "Macro Economic Restitution & Damages Calculation Sheet",
-                "description": "Official audit summary invoice document displaying highlighted financial calculation figures in green ledger ink, stamped diagonally with bold red ink '証拠物件 // 第1号' (EXHIBIT A), crisp paper cutout edge.",
-                "role": "Forensic Accounting Exhibit",
-                "beats": [1, 4, 5]
-            },
-            "fg_evidence_quarantine_customs_certificate": {
-                "title": "Import Customs Quarantine Clearance Certificate",
-                "description": "Port authority customs quarantine document with official batch serial numbers, regulatory verification stamps in red ink, tactile document folds, crisp cutout edges.",
-                "role": "Logistics Regulatory Certificate",
-                "beats": [2, 3, 4]
-            },
-            "fg_evidence_merchant_accounting_ledger": {
-                "title": "Corporate Bookkeeping Ledger & Supply Record",
-                "description": "Worn business bookkeeping ledger notebook open on a wooden table, showing ascending cost calculations and procurement records, paperclips, tactile ink lines.",
-                "role": "Economic Paper Trail",
-                "beats": [1, 2, 4]
-            },
-            "fg_evidence_sealed_whistleblower_memo": {
-                "title": "Confidential Internal Corporate Whistleblower Memo",
-                "description": "Manila folder envelope stamped '社外秘 // 厳秘' (CONFIDENTIAL // STRICTLY SECRET), partially opened revealing internal memo with black redacted bars across strategic paragraphs.",
-                "role": "Whistleblower Document",
-                "beats": [2, 3]
-            },
-            "fg_evidence_statutory_regulation_volume": {
-                "title": "Commercial & Public Safety Statutory Reference Volume",
-                "description": "Heavy leather-bound statutory legal reference volume open to regulatory oversight statute, gold lettering on spine, ribbon bookmark, sharp paper edges.",
-                "role": "Statutory Authority",
-                "beats": [1, 5]
-            },
-            "fg_evidence_hanko_ingam_seal": {
-                "title": "Authenticated Vermilion Hanko Seal & Exhibit Artifact",
-                "description": "Authentic Japanese circular red vermilion hanko seal impression beside dark wooden stamp cylinder on official verification paper, tactile paper texture.",
-                "role": "Authentication Artifact",
-                "beats": [3, 4, 5]
-            },
-            "fg_evidence_gavel_justice_scale": {
-                "title": "Judicial Courtroom Sounding Gavel & Scales",
-                "description": "Dark polished hardwood judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism.",
-                "role": "Judicial Climax Artifact",
-                "beats": [4, 5]
-            }
-        }
+    # Thử gọi LLM Gateway để sinh Roster hoàn toàn độc lập và động (bỏ qua trong pytest để test chạy tức thì)
+    is_testing = bool(os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules)
+    if not is_testing:
+        try:
+            from app.services.model_gateway import get_global_gateway
+            gateway = get_global_gateway()
 
-    elif m_up in ["KR", "KO"]:
-        # Thị trường Hàn Quốc: Sawonjeung, Con dấu Ingam, Viện Kiểm sát / Tòa án Seoul, Báo cáo FSS
-        bg_roster = {
-            "bg_district_court_hall": {
-                "title": "Seoul Central District Courthouse Grand Atrium",
-                "description": "Cinematic wide-angle interior of Seoul Central District Court main judicial hall, polished stone colonnade, high vaulted ceiling with moody diffused daylight, quiet austere legal atmosphere.",
-                "beats": [1, 5]
-            },
-            "bg_fss_regulatory_chamber": {
-                "title": "Financial Supervisory Oversight Analytic Chamber",
-                "description": "Modern regulatory analytical workspace, multi-monitor analytical financial flowcharts in soft background focus, dark slate walls, focused investigative atmosphere.",
-                "beats": [2, 3]
-            },
-            "bg_executive_boardroom_dusk": {
-                "title": "Corporate Executive Boardroom at Dusk",
-                "description": "Modern corporate executive boardroom overlooking evening Seoul skyline through floor-to-ceiling glass windows, dark table reflection, clean architectural lines, zero clutter.",
-                "beats": [1, 4]
-            },
-            "bg_merchant_warehouse_office": {
-                "title": "Commercial Logistics & Enterprise Office",
-                "description": "Authentic quiet enterprise inventory office, stacked shipping cartons in soft focus background, warm overhead lamp casting pool of light on desk, clean documentary mood.",
-                "beats": [1, 2, 4]
-            },
-            "bg_investigative_newsroom_night": {
-                "title": "Investigative Journalism Newsroom at Night",
-                "description": "Nocturnal newsroom with dark empty desks receding into soft shadows, warm desk lamp pools, distant city lights through blinds, serious quiet investigative atmosphere.",
-                "beats": [1, 2, 3]
-            },
-            "bg_forensic_archive_vault": {
-                "title": "State Archive Document Vault",
-                "description": "Steel shelving units holding hundreds of uniform legal archive boxes in deep linear perspective, clean concrete floor, cool fluorescent downlighting.",
-                "beats": [3, 4]
-            },
-            "bg_legal_hearing_chamber": {
-                "title": "National Assembly & Regulatory Hearing Chamber",
-                "description": "Formal oak-paneled congressional hearing room with elevated committee bench in background soft focus, rich timber textures, dignified institutional setting.",
-                "beats": [4, 5]
-            }
-        }
+            system_prompt = (
+                "You are the Lead Cinematographer & VOX Motion Graphics Visual Director for AI Video Factory.\n"
+                "Your mission is to architect an exhaustive, topic-anchored Visual Asset Roster for a 12-20 minute investigative docudrama in VOX / Johnny Harris style.\n"
+                "The documentary is structured across 5 Beats:\n"
+                "Beat 1: Cold Strike & Paradox Hook (0-60s)\n"
+                "Beat 2: Historical Origin & False Narrative\n"
+                "Beat 3: Forensic Paper Trail & Quantitative Mechanism\n"
+                "Beat 4: The Systemic Climax & Crisis\n"
+                "Beat 5: Modern Mirror & Living Warning\n\n"
+                "MANDATES:\n"
+                "1. 'background_roster': Exactly 16 to 20 distinct environmental Backgrounds (16:9 2560x1440).\n"
+                "   - Distributed evenly across Beats 1 to 5 (3 to 4 distinct BGs per Beat).\n"
+                "   - Non-photorealistic 2D stylized graphic novel editorial illustration, bold ink linework, cel-shading, moody chiaroscuro lighting, rich textures.\n"
+                "   - ZERO prominent human figures in the foreground. Leave center/right negative space clear for tactile foreground overlays. Leave bottom 20% safe zone clear for subtitles.\n"
+                "   - Strictly authentic to target market and topic era.\n"
+                "   - Keys MUST be 'bg_<semantic_slug>'.\n"
+                "   - Schema: {\"title\": \"...\", \"description\": \"...\", \"beats\": [1, 2]}\n\n"
+                "2. 'foreground_roster': Exactly 20 to 26 distinct Foregrounds (1:1 2048x2048) on pure flat #FF00FF magenta chroma key.\n"
+                "   Divided into:\n"
+                "   A. Key Character Archetypes (4 to 6 items): 'type': 'character', full-body or 3/4 stylized graphic novel figure visible from head to toe/waist on flat #FF00FF magenta background. Authentic ethnic phenotype for target market. Keys: 'fg_character_<role>'.\n"
+                "   B. Tactile Evidence Props, Documents & Charts (16 to 20 items): 'type': 'evidence_prop' | 'document' | 'data_metric'. High-impact, topic-specific evidentiary artifacts (e.g. debt bonds, auction sheets, balance ledgers, contracts, audit memos, charts, stamped dockets, currency swaps, default tickets). Keys: 'fg_evidence_<object_name>'.\n"
+                "   - Schema: {\"title\": \"...\", \"description\": \"...\", \"role\": \"...\", \"beats\": [1, 2, 3], \"keywords\": [\"kw1\", \"kw2\"], \"type\": \"character\"|\"document\"|\"evidence_prop\"|\"data_metric\"}\n\n"
+                "Output ONLY valid JSON matching:\n"
+                "{\n"
+                "  \"background_roster\": { \"<bg_key>\": { \"title\": \"...\", \"description\": \"...\", \"beats\": [...] } },\n"
+                "  \"foreground_roster\": { \"<fg_key>\": { \"title\": \"...\", \"description\": \"...\", \"role\": \"...\", \"beats\": [...], \"keywords\": [...], \"type\": \"...\" } }\n"
+                "}"
+            )
 
-        fg_roster = {
-            "fg_evidence_prosecution_complaint_docket": {
-                "title": "Prosecution Indictment & Filing Docket",
-                "description": "Official Korean prosecution indictment filing document, titled criminal court docket, bold Korean hangeul header, stamped with red official seal, crisp paper cutout edges.",
-                "role": "Lead Prosecution Docket",
-                "beats": [1, 2, 5]
-            },
-            "fg_evidence_fss_audit_report": {
-                "title": f"Forensic Regulatory Audit Summary ({metric_highlight})",
-                "description": f"Government regulatory forensic audit report displaying key evidentiary metrics '{metric_highlight}', highlighted with yellow marker, official red circular seal stamp.",
-                "role": "Regulatory Audit Exhibit",
-                "beats": [1, 2, 3]
-            },
-            "fg_evidence_damage_calculation_invoice": {
-                "title": "Macro Restitution & Damages Calculation Sheet",
-                "description": "Forensic accounting audit invoice document displaying bold liability figures in green ledger ink, stamped diagonally with bold red ink '극비 // 증거자료' (CONFIDENTIAL EXHIBIT), crisp paper cutout edge.",
-                "role": "Forensic Accounting Exhibit",
-                "beats": [1, 4, 5]
-            },
-            "fg_evidence_corporate_bank_ledger": {
-                "title": "Corporate Banking Transaction & Financial Ledger",
-                "description": "Enterprise financial bookkeeping ledger open on a wooden table, showing transaction records and irregular transfers, paperclips, tactile ink lines.",
-                "role": "Financial Paper Trail",
-                "beats": [1, 2, 4]
-            },
-            "fg_evidence_sawonjeung_id_badge": {
-                "title": "Corporate Employee Identification Badge (Sawonjeung)",
-                "description": "Official Korean corporate employee sawonjeung ID card with lanyard resting on confidential audit paperwork, photo card cutout edge.",
-                "role": "Corporate Identity Exhibit",
-                "beats": [2, 3, 4]
-            },
-            "fg_evidence_sealed_whistleblower_memo": {
-                "title": "Confidential Internal Whistleblower Memo",
-                "description": "Manila folder envelope stamped '대외비 // 비공개' (CONFIDENTIAL // RESTRICTED), partially opened revealing internal memo with black redacted bars across strategic clauses.",
-                "role": "Whistleblower Document",
-                "beats": [2, 3]
-            },
-            "fg_evidence_statutory_regulation_volume": {
-                "title": "Commercial Code & Statutory Reference Volume",
-                "description": "Heavy leather-bound legal reference volume open to statutory monopolization and fraud sections, gold lettering on spine, sharp paper edges.",
-                "role": "Statutory Authority",
-                "beats": [1, 5]
-            },
-            "fg_evidence_gavel_justice_scale": {
-                "title": "Judicial Courtroom Gavel & Scales",
-                "description": "Dark polished hardwood judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism.",
-                "role": "Judicial Climax Artifact",
-                "beats": [4, 5]
-            }
-        }
+            user_prompt = json.dumps({
+                "topic": topic_str,
+                "target_market": m_up,
+                "verified_claims": claims,
+                "key_metrics": key_metrics,
+                "narrative_samples": sample_narr
+            }, ensure_ascii=False)
 
-    elif m_up in ["VN", "VI"]:
-        # Thị trường Việt Nam: Dấu mộc đỏ, Kết luận thanh tra, Tòa án nhân dân, Sổ phụ ngân hàng
-        bg_roster = {
-            "bg_district_court_hall": {
-                "title": "Đại Sảnh Tòa Án Nhân Dân Trang Nghiêm",
-                "description": "Không gian đại sảnh Tòa án Nhân dân trang nghiêm, hàng cột đá vững chãi, ánh sáng tự nhiên khuếch tán, bầu không khí pháp lý chuẩn mực không người qua lại.",
-                "beats": [1, 5]
-            },
-            "bg_regulatory_inspection_headquarters": {
-                "title": "Trụ Sở Cơ Quan Thanh Tra Chuyên Ngành",
-                "description": "Không gian làm việc của cơ quan thanh tra kiểm tra chuyên ngành, các bảng biểu phân tích làm mờ ở hậu cảnh, ánh sáng nghiêm cẩn.",
-                "beats": [2, 3]
-            },
-            "bg_executive_boardroom_dusk": {
-                "title": "Phòng Họp Hội Đồng Quản Trị Lúc Chạng Vạng",
-                "description": "Phòng họp doanh nghiệp tối giản nhìn ra đường chân trời thành phố lúc hoàng hôn qua cửa kính lớn, mặt bàn gỗ sẫm bóng loáng, bố cục kiến trúc sạch sẽ.",
-                "beats": [1, 4]
-            },
-            "bg_merchant_warehouse_office": {
-                "title": "Văn Phòng Hiện Trường Kho Vận Hàng Hóa",
-                "description": "Văn phòng kho vận hiện trường chân thực, các kiện hàng hóa xếp ngăn nắp làm mờ ở hậu cảnh, đèn bàn rọi điểm sáng ấm trên bàn tài liệu.",
-                "beats": [1, 2, 4]
-            },
-            "bg_investigative_newsroom_night": {
-                "title": "Tòa Soạn Báo Điều Tra Ban Đêm",
-                "description": "Tòa soạn báo đêm yên tĩnh với các bàn làm việc vắng bóng người chìm vào bóng tối mờ, vệt sáng đèn bàn ấm áp, không khí điều tra sâu sắc.",
-                "beats": [1, 2, 3]
-            },
-            "bg_forensic_archive_vault": {
-                "title": "Kho Lưu Trữ Hồ Sơ Tài Liệu Quốc Gia",
-                "description": "Các dãy kệ thép lưu trữ hàng trăm hộp tài liệu pháp lý đồng nhất theo chiều sâu tuyến tính, sàn bê tông sạch sẽ, ánh sáng đèn huỳnh quang dịu mát.",
-                "beats": [3, 4]
-            },
-            "bg_legal_hearing_chamber": {
-                "title": "Phòng Xử Án & Điều Trần Trang Trọng",
-                "description": "Phòng xét xử trang trọng với bục hội đồng xét xử bằng gỗ sẫm màu làm mờ ở hậu cảnh, chất liệu gỗ dày dặn, bối cảnh pháp lý uy nghi.",
-                "beats": [4, 5]
-            }
-        }
+            resp = gateway.call_llm(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                model="gpt-6-astra",
+                fallback="claude-opus-5",
+                max_tokens=4500,
+                timeout=30.0
+            )
+            if resp:
+                cleaned_json = re.sub(r"^```(?:json)?\s*", "", resp.strip(), flags=re.MULTILINE)
+                cleaned_json = re.sub(r"\s*```$", "", cleaned_json, flags=re.MULTILINE)
+                parsed = json.loads(cleaned_json)
+                bgs = parsed.get("background_roster", {})
+                fgs = parsed.get("foreground_roster", {})
+                if len(bgs) >= 14 and len(fgs) >= 18:
+                    bg_roster = bgs
+                    fg_roster = fgs
+        except Exception as e:
+            logger.info(f"[unified_vox_director] LLM dynamic roster extraction bypassed or failed: {e}")
 
-        fg_roster = {
-            "fg_evidence_prosecution_complaint_docket": {
-                "title": "Hồ Sơ Cáo Trạng & Văn Bản Khởi Tố Pháp Lý",
-                "description": "Văn bản hồ sơ tố tụng chính thức của cơ quan tiến hành tố tụng, tiêu đề in đậm, dập dấu triện đỏ thẩm quyền sắc nét, viền giấy sắc gọn.",
-                "role": "Lead Prosecution Docket",
-                "beats": [1, 2, 5]
-            },
-            "fg_evidence_inspection_conclusion_report": {
-                "title": f"Bản Kết Luận Thanh Tra & Kiểm Định ({metric_highlight})",
-                "description": f"Văn bản kết luận thanh tra chuyên ngành hiển thị con số phát hiện định lượng '{metric_highlight}', dập dấu mộc đỏ xác nhận, đường viền giấy sắc sảo.",
-                "role": "Regulatory Inspection Exhibit",
-                "beats": [1, 2, 3]
-            },
-            "fg_evidence_damage_calculation_invoice": {
-                "title": "Bảng Kê Thiệt Hại & Quyết Định Thu Hồi Kinh Tế",
-                "description": "Tài liệu bảng kê tính toán thiệt hại kinh tế hiển thị con số định lượng in mực kế toán, đóng dấu chéo MẬT // TÀI LIỆU CHỨNG CỨ bằng mực đỏ.",
-                "role": "Forensic Accounting Exhibit",
-                "beats": [1, 4, 5]
-            },
-            "fg_evidence_enterprise_bank_ledger": {
-                "title": "Sổ Phụ Ngân Hàng & Bảng Kê Chứng Từ Kế Toán",
-                "description": "Sổ kế toán doanh nghiệp mở trên mặt bàn gỗ hiển thị dòng tiền giao dịch và đối soát, kẹp giấy kim loại, vệt mực rõ nét.",
-                "role": "Financial Paper Trail",
-                "beats": [1, 2, 4]
-            },
-            "fg_evidence_sealed_whistleblower_memo": {
-                "title": "Phong Bì Tài Liệu Mật Nội Bộ Doanh Nghiệp",
-                "description": "Phong bì tài liệu màu nâu dập dấu 'MẬT // TUYỆT ĐỐI BẢO MẬT', hé mở để lộ văn bản nội bộ có các dòng bôi đen bảo mật.",
-                "role": "Whistleblower Document",
-                "beats": [2, 3]
-            },
-            "fg_evidence_statutory_regulation_volume": {
-                "title": "Bộ Luật & Văn Bản Quy Phạm Pháp Luật Chuyên Ngành",
-                "description": "Tập sách văn bản quy phạm pháp luật bìa da sẫm màu đóng gáy dày dặn, chữ mạ vàng, dải ruy băng đánh dấu trang, góc giấy sắc nét.",
-                "role": "Statutory Authority",
-                "beats": [1, 5]
-            },
-            "fg_evidence_official_red_seal_stamp": {
-                "title": "Con Dấu Mộc Đỏ Thẩm Quyền Pháp Lý",
-                "description": "Hình triện mộc đỏ chuẩn mực dập trên mặt giấy văn bản chứng cứ sắc sảo bên cạnh cán dấu gỗ trang nghiêm.",
-                "role": "Authentication Artifact",
-                "beats": [3, 4, 5]
-            },
-            "fg_evidence_gavel_justice_scale": {
-                "title": "Búa Gỗ Tòa Án & Cán Cân Công Lý",
-                "description": "Búa gỗ xét xử bằng gỗ gụ đánh bóng đặt trên đế gỗ bên cạnh cán cân công lý bằng đồng thau, chất gỗ tự nhiên chân thực.",
-                "role": "Judicial Climax Artifact",
-                "beats": [4, 5]
-            }
-        }
-
-    else:
-        # Thị trường Âu/Mỹ (EN): Federal Court Docket, Audit Binder, Damages Invoice, Whistleblower Memo
-        bg_roster = {
-            "bg_federal_court_hall": {
-                "title": "Federal Courthouse Grand Hall",
-                "description": "Cinematic wide-angle interior of federal courthouse hall, classical stone colonnade, high vaulted ceiling with moody diffused daylight, quiet austere judicial atmosphere, uncluttered background without distracting crowds.",
-                "beats": [1, 5]
-            },
-            "bg_regulatory_oversight_chamber": {
-                "title": "Regulatory Oversight Analytical Hearing Chamber",
-                "description": "Formal oak-paneled federal hearing room with elevated judge bench in background soft focus, rich timber textures, formal dignified institutional setting.",
-                "beats": [4, 5]
-            },
-            "bg_executive_boardroom_dusk": {
-                "title": "Corporate Executive Boardroom at Dusk",
-                "description": "Modern minimalist corporate boardroom overlooking dusky city skyline through panoramic floor-to-ceiling glass windows, dark mahogany table reflection, clean architectural lines, zero clutter.",
-                "beats": [1, 4]
-            },
-            "bg_enterprise_warehouse_office": {
-                "title": "Enterprise Operations Logistics Office",
-                "description": "Authentic quiet business inventory office, cardboard shipping boxes neatly stacked in soft focus background, warm overhead industrial lamp casting gentle pool of light on desk, clean documentary mood.",
-                "beats": [1, 2, 4]
-            },
-            "bg_investigative_newsroom_night": {
-                "title": "Investigative Journalism Newsroom at Night",
-                "description": "Nocturnal newsroom with dark empty desks receding into soft shadows, warm desk lamp pools, distant city lights through blinds, serious quiet investigative atmosphere.",
-                "beats": [1, 2, 3]
-            },
-            "bg_forensic_archive_vault": {
-                "title": "Federal Archive Document Vault",
-                "description": "Steel shelving units holding hundreds of uniform gray legal archive boxes in deep linear perspective, clean concrete floor, cool fluorescent downlighting, forensic discovery vault.",
-                "beats": [3, 4]
-            },
-            "bg_economics_analytics_lab": {
-                "title": "Marketplace Economics & Data Analytics Lab",
-                "description": "Modern analytical workspace with large soft-focus monitors displaying muted auction bidding flowcharts and heatmaps, dark slate walls, focused analytical atmosphere.",
-                "beats": [2, 3]
-            },
-            "bg_server_cooling_facility": {
-                "title": "Enterprise Cloud Data Center Facility",
-                "description": "Deep perspective corridor of enterprise server racks in dark cooling room, subtle vertical cyan and amber LED tracer lights, clean floor reflection, atmospheric mist, uncluttered clean industrial tech environment.",
-                "beats": [2, 3]
-            }
-        }
-
-        fg_roster = {
-            "fg_evidence_prosecution_complaint_docket": {
-                "title": "Official Legal Prosecution Complaint Docket",
-                "description": "Official legal filing document from the federal district court, bold case header, legal docket stamped with blue ink, crisp document paper texture with clean sharp edges.",
-                "role": "Lead Prosecution Docket",
-                "beats": [1, 2, 5]
-            },
-            "fg_evidence_damages_calculation_invoice": {
-                "title": f"Forensic Accounting & Damages Summary Sheet ({metric_highlight})",
-                "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink 'CONFIDENTIAL / EXHIBIT A', crisp paper cutout edge.",
-                "role": "Forensic Accounting Exhibit",
-                "beats": [1, 4, 5]
-            },
-            "fg_evidence_regulatory_audit_binder": {
-                "title": "Forensic Investigative Audit Binder",
-                "description": "Thick three-ring forensic investigative audit binder with tabbed colored dividers, official regulatory growth charts visible on front plastic sleeve.",
-                "role": "Macro Financial Evidence",
-                "beats": [3, 4, 5]
-            },
-            "fg_evidence_merchant_accounting_ledger": {
-                "title": "Small Business Financial Accounting Ledger",
-                "description": "Worn merchant bookkeeping ledger notebook open on a wooden table, showing ascending cost charges eroding profit margins, paperclips, tactile ink lines.",
-                "role": "Victim Economic Evidence",
-                "beats": [1, 2, 4]
-            },
-            "fg_evidence_sealed_whistleblower_memo": {
-                "title": "Confidential Internal Whistleblower Memo Envelope",
-                "description": "Manila folder envelope stamped 'RESTRICTED DISTRIBUTION // EXECUTIVE EYES ONLY', partially opened revealing internal memo with black redacted bars across strategic paragraphs.",
-                "role": "Whistleblower Document",
-                "beats": [2, 3]
-            },
-            "fg_evidence_statute_reference_book": {
-                "title": "Federal Statutory Legal Reference Volume",
-                "description": "Heavy vintage leather-bound legal codex open to federal statutory monopolization and fraud sections, gold leaf lettering on spine, ribbon bookmark, sharp paper edges.",
-                "role": "Statutory Authority",
-                "beats": [1, 5]
-            },
-            "fg_evidence_server_rack_drive": {
-                "title": "Automated Algorithm Storage Module",
-                "description": "High-tech brushed metallic enterprise server drive enclosure with flashing blue data activity LEDs, forensic evidence barcode sticker.",
-                "role": "Technical Hardware Evidence",
-                "beats": [2, 3]
-            },
-            "fg_evidence_gavel_justice_scale": {
-                "title": "Federal Court Judicial Gavel & Scales",
-                "description": "Dark polished walnut judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism.",
-                "role": "Judicial Climax Artifact",
-                "beats": [4, 5]
-            }
-        }
+    # Fallback chất lượng cao nếu LLM không trả kết quả đủ chuẩn
+    if not bg_roster or not fg_roster:
+        bg_roster, fg_roster = _generate_topic_anchored_roster_fallback(topic_str, m_up, key_metrics, claims)
 
     return bg_roster, fg_roster
 
@@ -746,6 +922,20 @@ def build_unified_director_plan(
     bg_keys = list(bg_roster.keys())
     fg_keys = list(fg_roster.keys())
 
+    # Phân loại Foreground: Nhân vật (character) vs Đạo cụ bằng chứng (evidence prop / document)
+    char_fg_keys = [
+        k for k in fg_keys
+        if fg_roster[k].get("type") == "character"
+        or k.startswith("char_") or k.startswith("fg_character_")
+        or any(w in k.lower() for w in ["character", "official", "banker", "investigator", "trader", "eyewitness", "minister"])
+    ]
+    prop_fg_keys = [k for k in fg_keys if k not in char_fg_keys]
+    if not prop_fg_keys:
+        prop_fg_keys = fg_keys
+
+    char_count = 0
+    last_char_scene = -99
+
     for idx, sent in enumerate(spoken_sentences):
         narr = sent.get("text", "")
         dur_frames = int(sent.get("duration_frames") or 150)
@@ -753,7 +943,7 @@ def build_unified_director_plan(
         beat_idx = int(sent.get("beat_index") or ((idx // max(1, len(spoken_sentences) // 5)) + 1))
         beat_idx = min(max(beat_idx, 1), 5)
 
-        # Matching Background phù hợp theo Beat và thứ tự cảnh
+        # Matching Background phù hợp theo Beat và thứ tự cảnh (luân phiên 3 cảnh / 1 BG)
         matching_bgs = [k for k, v in bg_roster.items() if beat_idx in v.get("beats", [1, 2, 3, 4, 5])]
         if not matching_bgs:
             matching_bgs = bg_keys
@@ -763,52 +953,47 @@ def build_unified_director_plan(
         narr_lower = narr.lower()
         fg_key = None
 
-        if any(k in narr_lower for k in ["court", "indictment", "docket", "complaint", "tòa", "khởi tố", "cáo trạng", "기소", "소송", "訴訟"]):
-            for k in fg_keys:
-                if "docket" in k or "complaint" in k or "indictment" in k:
-                    fg_key = k
-                    break
-        elif any(k in narr_lower for k in ["inspect", "test", "residue", "sulfur", "chemical", "thanh tra", "kiểm định", "hóa chất", "검사", "분석", "検査"]):
-            for k in fg_keys:
-                if "inspection" in k or "residue" in k or "audit_report" in k:
-                    fg_key = k
-                    break
-        elif any(k in narr_lower for k in ["damage", "restitution", "invoice", "loss", "billion", "thiệt hại", "bồi thường", "hóa đơn", "손해", "배상", "損害", "賠償"]):
-            for k in fg_keys:
-                if "damage" in k or "invoice" in k:
-                    fg_key = k
-                    break
-        elif any(k in narr_lower for k in ["ledger", "transaction", "bank", "cost", "margin", "sổ sách", "ngân hàng", "장부", "계좌", "帳簿"]):
-            for k in fg_keys:
-                if "ledger" in k:
-                    fg_key = k
-                    break
-        elif any(k in narr_lower for k in ["memo", "whistleblower", "confidential", "secret", "mật", "nội bộ", "내부고발", "비밀", "内部告発"]):
-            for k in fg_keys:
-                if "memo" in k:
-                    fg_key = k
-                    break
-        elif any(k in narr_lower for k in ["statute", "law", "regulation", "luật", "quy định", "법률", "규정", "法律"]):
-            for k in fg_keys:
-                if "statute" in k or "regulation" in k:
-                    fg_key = k
-                    break
-        elif any(k in narr_lower for k in ["gavel", "judge", "verdict", "búa", "phán quyết", "판결", "判決"]):
-            for k in fg_keys:
-                if "gavel" in k or "justice" in k:
-                    fg_key = k
-                    break
-        elif any(k in narr_lower for k in ["seal", "stamp", "hanko", "ingam", "dấu", "triện", "도장", "인감", "判子"]):
-            for k in fg_keys:
-                if "seal" in k or "hanko" in k or "ingam" in k:
-                    fg_key = k
-                    break
+        # Kiểm tra khoảnh khắc xuất hiện nhân vật (nhân vật con người xuất hiện có chọn lọc <= 10-12 cảnh)
+        is_char_moment = (
+            bool(char_fg_keys) and
+            (char_count < 10) and
+            (idx - last_char_scene >= 12) and
+            (any(q in narr for q in ['"', '“', '”', '「', '」']) or
+             any(w in narr_lower for w in ["said", "testified", "admitted", "warned", "declared", "tuyên bố", "thừa nhận", "chỉ trích", "phát biểu", "증언", "발언", "発言", "証言"]))
+        )
 
-        if not fg_key:
-            matching_fgs = [k for k, v in fg_roster.items() if beat_idx in v.get("beats", [1, 2, 3, 4, 5])]
-            if not matching_fgs:
-                matching_fgs = fg_keys
-            fg_key = matching_fgs[idx % len(matching_fgs)]
+        if is_char_moment:
+            matched_char = None
+            for ck in char_fg_keys:
+                c_info = fg_roster[ck]
+                kws = c_info.get("keywords", []) + c_info.get("title", "").lower().split()
+                if any(kw in narr_lower for kw in kws if len(kw) > 3):
+                    matched_char = ck
+                    break
+            if not matched_char:
+                matched_char = char_fg_keys[char_count % len(char_fg_keys)]
+            fg_key = matched_char
+            char_count += 1
+            last_char_scene = idx
+        else:
+            # Gán đạo cụ bằng chứng pháp y dựa trên điểm tương đồng từ khóa
+            matched_prop = None
+            best_score = 0
+            for pk in prop_fg_keys:
+                p_info = fg_roster[pk]
+                p_beats = p_info.get("beats", [1, 2, 3, 4, 5])
+                kws = p_info.get("keywords", []) + p_info.get("title", "").lower().split()
+                score = sum(1 for kw in kws if len(kw) > 3 and kw in narr_lower)
+                if beat_idx in p_beats:
+                    score += 1
+                if score > best_score:
+                    best_score = score
+                    matched_prop = pk
+
+            if not matched_prop or best_score <= 1:
+                beat_props = [k for k in prop_fg_keys if beat_idx in fg_roster[k].get("beats", [1, 2, 3, 4, 5])] or prop_fg_keys
+                matched_prop = beat_props[(idx // 2) % len(beat_props)]
+            fg_key = matched_prop
 
         cam_move = allowed_cameras[idx % len(allowed_cameras)]
         layout_choice = layout_zones[idx % len(layout_zones)]

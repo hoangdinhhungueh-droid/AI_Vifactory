@@ -1297,7 +1297,8 @@ def generate_director_plan(
             "beat": "Evidence Exhibit",
             "role": v.get("role", "Key Evidence"),
             "description": v["description"],
-            "position": "center"
+            "position": "center",
+            "type": v.get("type", "evidence_prop")
         }
         for k, v in dynamic_fg_roster.items()
     }
@@ -1418,23 +1419,36 @@ def generate_director_plan(
         }
         normalized_scenes.append(norm_sc)
 
-    # VOX Hard Cap on Foreground characters (Rule 122 & Rule 128):
-    # Strictly <= 10-12 scenes per episode with foreground characters.
-    # Focus on documents, metrics, and systemic mechanisms; prevent CPU render bottlenecks.
-    fg_indices = [i for i, sc in enumerate(normalized_scenes) if sc.get("fg_reuse_key") or sc.get("foreground_reuse_key")]
-    if len(fg_indices) > 12:
-        logger.info(f"  [B3 VOX Gate] Pruning foreground characters from {len(fg_indices)} to <= 12 to enforce VOX object-focus minimalism...")
-        step = max(1, len(fg_indices) // 12)
-        kept_set = set(fg_indices[::step][:12])
-        for i, sc in enumerate(normalized_scenes):
-            if (sc.get("fg_reuse_key") or sc.get("foreground_reuse_key")) and i not in kept_set:
+    # VOX Hard Cap on Foreground Human Characters ONLY (Rule 122 & Rule 128):
+    # Strictly <= 10-12 scenes per episode with human character avatars (to prevent uncanny valley and CPU render bottlenecks).
+    # Tactile evidence props, charts, and documents MUST NOT be pruned — they form the core VOX motion graphic visual trail!
+    char_indices = []
+    for i, sc in enumerate(normalized_scenes):
+        fg_k = sc.get("fg_reuse_key") or sc.get("foreground_reuse_key") or ""
+        fg_info = fg_roster.get(fg_k, {})
+        is_char = (
+            fg_info.get("type") == "character" or
+            fg_k.startswith("char_") or
+            fg_k.startswith("fg_character_") or
+            any(w in fg_k.lower() for w in ["character", "official", "banker", "investigator", "trader", "eyewitness", "minister"])
+        )
+        if fg_k and is_char:
+            char_indices.append(i)
+
+    if len(char_indices) > 12:
+        logger.info(f"  [B3 VOX Gate] Pruning foreground human characters from {len(char_indices)} to <= 12 (tactile evidence props preserved)...")
+        step = max(1, len(char_indices) // 12)
+        kept_char_set = set(char_indices[::step][:12])
+        for i in char_indices:
+            if i not in kept_char_set:
+                sc = normalized_scenes[i]
                 sc["fg_reuse_key"] = ""
                 sc["fg_prompt"] = ""
                 sc["foreground_reuse_key"] = ""
                 sc["foreground_prompt"] = ""
                 if sc.get("layout_zone"):
                     sc["layout_zone"]["placement"] = "center_hero_document"
-                    sc["layout_zone"]["camera_pan_axis"] = "push_punch"
+                    sc["layout_zone"]["camera_pan_axis"] = "push_punch" 
 
     # 6. Assemble complete output payloads
     director_plan = {

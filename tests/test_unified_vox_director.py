@@ -215,4 +215,50 @@ def test_canonical_sfx_registry_integrity():
     assert cue_en == "sonar_ping"
 
 
+def test_vox_roster_depth_and_coverage(tmp_path):
+    """Rule 122 & Rule 128: Verify expanded roster depth (>=16 BGs, >=20 FGs) and healthy VOX FG coverage."""
+    from app.services.unified_vox_director import extract_dynamic_visual_roster, build_unified_director_plan
+
+    # 1. Roster depth for financial topic
+    bg_roster, fg_roster = extract_dynamic_visual_roster(
+        market="EN",
+        topic="365 Nghìn Tỷ USD Nợ Toàn Cầu: Cái Bẫy Đáo Hạn Khiến Thế Giới Vay Để Trả Nợ"
+    )
+    assert len(bg_roster) >= 16, f"Expected >= 16 BGs for VOX docudrama, got {len(bg_roster)}"
+    assert len(fg_roster) >= 20, f"Expected >= 20 FGs for VOX docudrama, got {len(fg_roster)}"
+
+    # Check distribution: characters vs props
+    chars = [k for k, v in fg_roster.items() if v.get("type") == "character" or "character" in k]
+    props = [k for k, v in fg_roster.items() if k not in chars]
+    assert 3 <= len(chars) <= 8, f"Expected 3-8 character archetypes, got {len(chars)}"
+    assert len(props) >= 15, f"Expected >= 15 tactile evidence props, got {len(props)}"
+
+    # 2. Test long-form scene coverage (60 scenes)
+    sample_scenes = [
+        {"text": f"Scene {i} analyzing sovereign debt rollover risks and bond yield curve spikes.", "beat_index": (i // 12) + 1, "duration_sec": 5.0}
+        for i in range(60)
+    ]
+    plan = build_unified_director_plan(
+        spoken_sentences=sample_scenes,
+        ep_dir=tmp_path,
+        market="EN",
+        metadata={"episode_id": "EN_EP0005_test_roster", "topic": "365T Debt"}
+    )
+    scenes = plan["scenes"]
+    assert len(scenes) == 60
+
+    scenes_with_fg = [s for s in scenes if (s.get("foreground") and s["foreground"].get("reuse_key"))]
+    fg_ratio = len(scenes_with_fg) / len(scenes)
+    # Healthy VOX coverage: between 55% and 75%
+    assert 0.55 <= fg_ratio <= 0.75, f"Expected VOX FG ratio between 55% and 75%, got {fg_ratio:.1%}"
+
+    # Verify character appearance cap <= 12
+    char_appearances = [
+        s for s in scenes_with_fg
+        if s["foreground"]["reuse_key"] in chars
+    ]
+    assert len(char_appearances) <= 12, f"Human character appearances ({len(char_appearances)}) must be <= 12"
+
+
+
 
