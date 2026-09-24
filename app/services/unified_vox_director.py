@@ -60,287 +60,1116 @@ def _generate_topic_anchored_roster_fallback(
     """
     m_up = str(market or "EN").upper().strip()
     topic_low = (topic or "").lower()
-    metric_highlight = key_metrics[0] if key_metrics else ("CONFIDENTIAL METRIC // AUDIT FINDING" if m_up == "EN" else "定量監査データ // 検証記録")
+    if key_metrics:
+        metric_highlight = key_metrics[0]
+    elif m_up in ["JP", "JA"]:
+        metric_highlight = "定量監査データ // 検証記録"
+    elif m_up in ["KR", "KO"]:
+        metric_highlight = "정량감사데이터 // 검증기록"
+    elif m_up in ["VN", "VI"]:
+        metric_highlight = "SỐ LIỆU ĐỊNH LƯỢNG // HỒ SƠ PHÁP Y"
+    else:
+        metric_highlight = "CONFIDENTIAL METRIC // AUDIT FINDING"
 
     pat = r'(?i)\b(debts?|nợ|bonds?|trái phiếu|yields?|rates?|lãi suất|banks?|ngân hàng|dollars?|currency|currencies|rollover|đáo hạn|finances?|financial|tài chính|gdp|imf|fed|treasury|kho bạc|inflation|lạm phát|credits?|tín dụng|365|trillions?|nghìn tỷ|securities|chứng khoán|deficits?|thâm hụt|채무|국채|금리|国債)\b'
     is_financial = bool(re.search(pat, topic_low))
 
     if is_financial:
         # =========================================================================
-        # FINANCIAL MACRO / SOVEREIGN DEBT ROSTER (18 BGs & 22 FGs)
+        # FINANCIAL MACRO / SOVEREIGN DEBT ROSTER (BY MARKET)
         # =========================================================================
-        bg_roster = {
-            "bg_central_bank_trading_floor": {
-                "title": "Central Bank Open Market Trading Floor",
-                "description": "Expansive architectural wide shot of central bank open market execution floor, multiple curved multi-monitor desks displaying desaturated yield curves, towering stone columns with dramatic diffused daylight, serious macroeconomic regulatory atmosphere, clean negative space.",
-                "beats": [1, 4]
-            },
-            "bg_sovereign_bond_auction_gallery": {
-                "title": "Sovereign Bond Syndicate Auction Hall",
-                "description": "Grand institutional auction hall with rows of mahogany dealer desks facing muted digital debt bidding boards, dramatic high-contrast chiaroscuro lighting, subtle dust motes in sunbeams, dignified financial sovereign setting.",
-                "beats": [1, 3]
-            },
-            "bg_financial_district_night_skyline": {
-                "title": "Nocturnal Financial District High-Rise Overlook",
-                "description": "Dramatic wide view from executive terrace overlooking nocturnal skyscraper canyon, illuminated office windows receding into cold foggy blue night, dark sleek stone ledge in foreground, quiet tension of global finance.",
-                "beats": [1, 5]
-            },
-            "bg_treasury_briefing_room": {
-                "title": "Ministry of Finance & Treasury Briefing Room",
-                "description": "Formal oak-paneled fiscal policy briefing chamber, long polished table reflecting warm overhead downlights, national crest in deep background soft focus, austere institutional authority.",
-                "beats": [1, 2]
-            },
-            "bg_post_crisis_fiscal_summit_chamber": {
-                "title": "International Fiscal Stabilization Summit Hall",
-                "description": "Panoramic horseshoe conference hall for sovereign debt ministers, minimalist translation audio consoles, rich dark acoustic wood textures, formal multilateral negotiations mood.",
-                "beats": [2, 3]
-            },
-            "bg_treasury_vault_corridor": {
-                "title": "Sovereign Bullion & Secure Reserve Vault Corridor",
-                "description": "Deep perspective corridor of reinforced steel archival vault doors, cool industrial concrete walls, overhead fluorescent security lighting casting rhythmic shadows, heavy vault atmosphere.",
-                "beats": [2, 4]
-            },
-            "bg_historical_bank_boardroom": {
-                "title": "Heritage Central Bank Executive Council Chamber",
-                "description": "Vintage heritage boardroom with coffered timber ceilings, oil portraits in soft focus background, dark mahogany council table, solemn historical financial gravity.",
-                "beats": [2, 3]
-            },
-            "bg_academic_economics_lecture_hall": {
-                "title": "University Macroeconomic Policy Amphitheater",
-                "description": "Steep tiered wooden university lecture hall, chalkboards in soft background covered with faint mathematical differential equations, warm directional spot lighting, analytical scholarly atmosphere.",
-                "beats": [2, 5]
-            },
-            "bg_imf_analytical_bullpen": {
-                "title": "Multilateral Monetary Policy Research Bullpen",
-                "description": "Spacious analytical bullpen with desks piled with tabbed sovereign debt dossiers, glowing Bloomberg terminals in soft focus, slate-colored partitions, intense forensic research atmosphere.",
-                "beats": [3, 4]
-            },
-            "bg_sovereign_debt_archive_records_vault": {
-                "title": "National Debt Management Archival Records Vault",
-                "description": "Endless rows of steel shelving containing uniform archival debt registry boxes, clean polished epoxy floor, cool white downlighting, forensic paper trail discovery setting.",
-                "beats": [3, 4]
-            },
-            "bg_bloomberg_analytics_terminal_room": {
-                "title": "Financial Market Quantitative Analytics Center",
-                "description": "Dark analytical operations room with high-density workstation displays showing desaturated repo matrices and sovereign CDS heatmaps, muted amber and cyan indicator lights, intense forensic mood.",
-                "beats": [3, 4]
-            },
-            "bg_debt_management_office": {
-                "title": "Sovereign Debt Issuance Execution Office",
-                "description": "Quiet executive operations office, desk lamp casting warm circular pool of light over debt rollover maturity schedules, city skyline outside window at dusk, focused fiscal tension.",
-                "beats": [3, 5]
-            },
-            "bg_emergency_finance_ministry_war_room": {
-                "title": "Emergency Liquidity Crisis War Room",
-                "description": "Urgent government crisis coordination room, whiteboards covered with debt maturity timelines and interbank swap diagrams, scattered coffee cups on meeting table, high-stakes institutional stress.",
-                "beats": [4, 5]
-            },
-            "bg_distressed_bank_trading_pit": {
-                "title": "Commercial Bank Fixed-Income Dealing Room",
-                "description": "Quiet after-hours dealing floor with abandoned trader terminals showing red yield spikes, dim emergency lighting, deep shadows between rows of monitors, aftermath of liquidity shock.",
-                "beats": [4]
-            },
-            "bg_nocturnal_sovereign_wealth_office": {
-                "title": "Sovereign Wealth Management Office at Dawn",
-                "description": "Corner executive office with floor-to-ceiling glass catching early morning indigo and amber dawn light over harbor, sleek minimalist desk, profound institutional isolation.",
-                "beats": [4, 5]
-            },
-            "bg_parliament_budget_committee_hall": {
-                "title": "Parliamentary Public Accounts Oversight Hall",
-                "description": "Formal semicircular legislative committee chamber, carved walnut witness tables in foreground, elevated committee dais in background soft focus, dignified democratic scrutiny.",
-                "beats": [4, 5]
-            },
-            "bg_global_economic_forum_hall": {
-                "title": "Global Economic Governance Assembly Hall",
-                "description": "Vast futuristic auditorium with dark acoustic wall panels, subtle uplighting along tiered seats, empty speaker lectern in clean focus, sweeping monumental perspective.",
-                "beats": [1, 5]
-            },
-            "bg_executive_reading_library": {
-                "title": "Central Bank Presidential Research Library",
-                "description": "Quiet double-height institutional library with floor-to-ceiling leather-bound statutory ledgers, spiral brass reading staircase, green banker lamps on dark oak tables, reflective analytical stillness.",
-                "beats": [1, 5]
+        if m_up in ["JP", "JA"]:
+            bg_roster = {
+                "bg_boj_market_operations_floor": {
+                    "title": "日本銀行金融市場局オープン・マーケット・オペレーションフロア",
+                    "description": "Expansive architectural wide shot of Bank of Japan market operations execution floor, multiple curved multi-monitor desks displaying desaturated Japanese government bond yield curves, stone pillars with diffused daylight, serious central bank macroeconomic regulatory atmosphere, clean negative space.",
+                    "beats": [1, 4]
+                },
+                "bg_jgb_syndicate_auction_hall": {
+                    "title": "日本国債引受シンジケート入札場",
+                    "description": "Grand Tokyo institutional auction hall with rows of dark cedar dealer desks facing muted digital JGB debt bidding boards, dramatic chiaroscuro lighting, dignified Japanese sovereign financial setting.",
+                    "beats": [1, 3]
+                },
+                "bg_marunouchi_financial_skyline_dusk": {
+                    "title": "丸の内・大手町金融街夕景",
+                    "description": "Dramatic wide view from executive terrace overlooking Marunouchi Tokyo nocturnal skyscraper canyon, illuminated office windows receding into cold foggy blue night, dark stone ledge in foreground.",
+                    "beats": [1, 5]
+                },
+                "bg_mof_kasumigaseki_press_briefing": {
+                    "title": "財務省主計局・国債企画課会見室",
+                    "description": "Formal Kasumigaseki Ministry of Finance briefing chamber, long polished table reflecting warm overhead downlights, Japanese crest in soft focus background, austere bureaucratic authority.",
+                    "beats": [1, 2]
+                },
+                "bg_multilateral_financial_summit": {
+                    "title": "アジア太平洋金融安定化サミット議場",
+                    "description": "Panoramic horseshoe conference hall for sovereign debt ministers, minimalist translation audio consoles, rich dark acoustic wood textures, formal multilateral negotiations mood.",
+                    "beats": [2, 3]
+                },
+                "bg_boj_heritage_vault_corridor": {
+                    "title": "日本銀行旧地下金庫通路",
+                    "description": "Deep perspective corridor of reinforced steel archival vault doors inside Bank of Japan underground vaults, cool industrial concrete walls, overhead security lighting casting rhythmic shadows.",
+                    "beats": [2, 4]
+                },
+                "bg_boj_policy_board_chamber": {
+                    "title": "日本銀行政策委員会正庁",
+                    "description": "Vintage heritage boardroom with coffered timber ceilings, oil portraits in soft focus background, dark cedar council table, solemn historical financial gravity.",
+                    "beats": [2, 3]
+                },
+                "bg_todai_macroeconomics_amphitheater": {
+                    "title": "東京大学経済学部大講義室",
+                    "description": "Steep tiered wooden university lecture hall, chalkboards in soft background covered with faint mathematical differential equations, warm directional spot lighting, analytical scholarly atmosphere.",
+                    "beats": [2, 5]
+                },
+                "bg_fsa_regulatory_inspection_bullpen": {
+                    "title": "金融庁市場監視局特別査察室",
+                    "description": "Spacious regulatory analytical bullpen with desks piled with tabbed sovereign debt dossiers, glowing financial terminals in soft focus, slate-colored partitions, intense forensic research atmosphere.",
+                    "beats": [3, 4]
+                },
+                "bg_mof_debt_archive_records_vault": {
+                    "title": "財務省国債登録原簿記録書庫",
+                    "description": "Endless rows of steel shelving containing uniform archival debt registry boxes, clean polished epoxy floor, cool white downlighting, forensic paper trail discovery setting.",
+                    "beats": [3, 4]
+                },
+                "bg_tokyo_terminal_analytics_room": {
+                    "title": "日本橋証券クオンツ・アナリティクスルーム",
+                    "description": "Dark analytical operations room with high-density workstation displays showing desaturated repo matrices and sovereign CDS heatmaps, muted amber and cyan indicator lights, intense forensic mood.",
+                    "beats": [3, 4]
+                },
+                "bg_mof_debt_management_office": {
+                    "title": "財務省理財局国債課執務室",
+                    "description": "Quiet executive operations office, desk lamp casting warm circular pool of light over debt rollover maturity schedules, Tokyo city skyline outside window at dusk, focused fiscal tension.",
+                    "beats": [3, 5]
+                },
+                "bg_emergency_liquidity_crisis_hq": {
+                    "title": "金融危機対策タスクフォース対策本部",
+                    "description": "Urgent government crisis coordination room, whiteboards covered with debt maturity timelines and interbank swap diagrams, scattered coffee cups on meeting table, high-stakes institutional stress.",
+                    "beats": [4, 5]
+                },
+                "bg_mega_bank_fixed_income_floor": {
+                    "title": "メガバンク市場営業部債券デスク",
+                    "description": "Quiet after-hours dealing floor with abandoned trader terminals showing red yield spikes, dim emergency lighting, deep shadows between rows of monitors, aftermath of liquidity shock.",
+                    "beats": [4]
+                },
+                "bg_roppongi_investment_office_dawn": {
+                    "title": "六本木投資会社エグゼクティブオフィス黎明",
+                    "description": "Corner executive office with floor-to-ceiling glass catching early morning indigo and amber dawn light over Tokyo Tower, sleek minimalist desk, profound institutional isolation.",
+                    "beats": [4, 5]
+                },
+                "bg_national_diet_financial_audit_room": {
+                    "title": "衆議院予算委員会第一特別室",
+                    "description": "Formal semicircular legislative committee chamber, carved walnut witness tables in foreground, elevated committee dais in background soft focus, dignified democratic scrutiny.",
+                    "beats": [4, 5]
+                },
+                "bg_global_financial_forum_hall": {
+                    "title": "国際金融フォーラム国際会議場",
+                    "description": "Vast futuristic auditorium with dark acoustic wall panels, subtle uplighting along tiered seats, empty speaker lectern in clean focus, sweeping monumental perspective.",
+                    "beats": [1, 5]
+                },
+                "bg_boj_financial_research_library": {
+                    "title": "日本銀行金融研究所特別図書室",
+                    "description": "Quiet double-height institutional library with floor-to-ceiling leather-bound statutory ledgers, spiral brass reading staircase, green banker lamps on dark oak tables, reflective analytical stillness.",
+                    "beats": [1, 5]
+                }
             }
-        }
+            fg_roster = {
+                "fg_character_boj_governor": {
+                    "title": "日本銀行総裁",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior Bank of Japan governor in tailored dark charcoal suit, holding official monetary policy brief with quiet resolute authority, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Monetary Authority",
+                    "beats": [1, 4, 5],
+                    "keywords": ["governor", "boj", "monetary", "日本銀行", "総裁", "日銀", "金利"],
+                    "type": "character"
+                },
+                "fg_character_jgb_bond_trader": {
+                    "title": "メガバンク国債チーフトレーダー",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of an intense Japanese bond trader in crisp white shirt with rolled-up sleeves, reviewing printed yield curve slips with urgent skeptical gaze, corporate lapel badge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Market Actor",
+                    "beats": [1, 2, 4],
+                    "keywords": ["trader", "jgb", "yield", "bond", "国債", "トレーダー", "利回り"],
+                    "type": "character"
+                },
+                "fg_character_mof_bureaucrat": {
+                    "title": "財務省理財局次長",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior Ministry of Finance bureaucrat in dark navy suit and spectacles, holding tabbed sovereign debt issuance forecast binder, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Fiscal Architect",
+                    "beats": [2, 3, 5],
+                    "keywords": ["mof", "treasury", "fiscal", "財務省", "理財局", "主計局", "予算"],
+                    "type": "character"
+                },
+                "fg_character_macro_financial_auditor": {
+                    "title": "国際金融特別査察官",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of a meticulous Japanese financial auditor in trench coat, holding heavy forensic dossier and magnifying loupe, stern analytical expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Forensic Investigator",
+                    "beats": [3, 4, 5],
+                    "keywords": ["auditor", "fsa", "investigation", "金融庁", "査察官", "監査"],
+                    "type": "character"
+                },
+                "fg_evidence_jgb_10year_bond_certificate": {
+                    "title": "第10年利付日本国債証券朱肉判子押印",
+                    "description": "Official 300gsm Japanese government 10-year bond certificate with intricate security border engraving, bold coupon yield rate heading in Japanese kanji, stamped with official vermilion Ministry of Finance hanko seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Core Debt Exhibit",
+                    "beats": [1, 2, 3],
+                    "keywords": ["bond", "jgb", "certificate", "hanko", "国債", "利付国債", "判子"],
+                    "type": "document"
+                },
+                "fg_evidence_debt_maturity_rollover_chart": {
+                    "title": "国債償還借換スケジュール集中図表",
+                    "description": "High-contrast quantitative bar graph document printed on heavy cardstock, illustrating the impending multi-trillion yen debt maturity rollover wall, highlighted in fluorescent green and red marker ink, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Quantitative Maturity Proof",
+                    "beats": [1, 3, 4],
+                    "keywords": ["maturity", "rollover", "wall", "chart", "借換", "償還", "図表"],
+                    "type": "data_metric"
+                },
+                "fg_evidence_boj_balance_sheet_ledger": {
+                    "title": "日本銀行資産買入勘定元帳",
+                    "description": "Worn double-page central bank accounting ledger displaying ballooning asset holdings, Japanese kanji column headers, red verification hanko checkmarks, tactile paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Monetary Expansion Evidence",
+                    "beats": [1, 2, 4],
+                    "keywords": ["balance sheet", "boj", "assets", "日銀", "資産買入", "勘定元帳"],
+                    "type": "document"
+                },
+                "fg_evidence_credit_rating_downgrade_letter": {
+                    "title": "格付機関による日本国債格下げ勧告書",
+                    "description": "Official formal rating advisory letter from credit agency, bold header stamped in red ink 'DOWNGRADED // OUTLOOK NEGATIVE', bold kanji text detailing fiscal debt overhang, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Sovereign Rating Exhibit",
+                    "beats": [2, 4, 5],
+                    "keywords": ["rating", "downgrade", "credit", "格下げ", "格付", "信用"],
+                    "type": "document"
+                },
+                "fg_evidence_imf_japan_surveillance_matrix": {
+                    "title": "IMF第4条対日審査債務持続性マトリクス",
+                    "description": "Technical macroeconomic assessment document featuring multi-column debt-to-GDP projection tables for Japan, colored risk threshold heatmaps, official institutional header, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Sustainability Framework",
+                    "beats": [3, 4, 5],
+                    "keywords": ["imf", "gdp", "sustainability", "matrix", "持続可能性", "債務残高"],
+                    "type": "data_metric"
+                },
+                "fg_evidence_bilateral_currency_swap_accord": {
+                    "title": "日米中央銀行二国間通貨スワップ協定書",
+                    "description": "Thick legal bilateral treaty contract document, multiple pages stapled at top left with official vermilion hanko seal, Japanese and English text, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Liquidity Mechanism Accord",
+                    "beats": [2, 3, 4],
+                    "keywords": ["swap", "currency", "bilateral", "スワップ", "為替", "協定"],
+                    "type": "document"
+                },
+                "fg_evidence_gensaki_repo_ticket": {
+                    "title": "現先取引約定確認票",
+                    "description": "Tactile transaction slip on carbon-copy paper with perforated edges, showing overnight gensaki repo rate interest calculations and collateralized JGB numbers, circular red hanko stamp, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Interbank Liquidity Exhibit",
+                    "beats": [2, 3, 4],
+                    "keywords": ["repo", "gensaki", "ticket", "現先", "レポ", "約定確認"],
+                    "type": "document"
+                },
+                "fg_evidence_core_cpi_inflation_sheet": {
+                    "title": "全国消費者物価指数公表速報資料",
+                    "description": "Official Ministry of Internal Affairs price index ledger sheet displaying escalating headline CPI numbers, red circled inflation metrics, crisp fibrous paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Inflation Metric Exhibit",
+                    "beats": [1, 2, 5],
+                    "keywords": ["inflation", "cpi", "price", "物価", "消費者物価指数", "インフレ"],
+                    "type": "document"
+                },
+                "fg_evidence_g7_tokyo_communique": {
+                    "title": "G7財務相・中央銀行総裁会議共同声明書",
+                    "description": "Formal multilateral joint communique on heavy diplomatic letterhead, embossed gold seal, diplomatic Japanese kanji text regarding sovereign debt stabilization, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Multilateral Policy Exhibit",
+                    "beats": [4, 5],
+                    "keywords": ["g7", "communique", "finance", "共同声明", "財務相"],
+                    "type": "document"
+                },
+                "fg_evidence_interbank_liquidity_crisis_memo": {
+                    "title": "極秘金融危機介入通告書",
+                    "description": "Manila folder document stamped '極秘 // 金融市場局長限り', heavy black redaction marker bars over vulnerable bank reserve numbers, official paperclips, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Classified Risk Memo",
+                    "beats": [3, 4],
+                    "keywords": ["emergency", "liquidity", "secret", "memo", "極秘", "流動性危機"],
+                    "type": "document"
+                },
+                "fg_evidence_damages_calculation_invoice": {
+                    "title": f"国債利払い費財政試算書 ({metric_highlight})",
+                    "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red vermilion hanko '重要証拠 // 第1号', crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Forensic Accounting Exhibit",
+                    "beats": [1, 3, 5],
+                    "keywords": ["invoice", "servicing", "cost", "利払い費", "試算書", "財政"],
+                    "type": "document"
+                },
+                "fg_evidence_japan_sovereign_cds_slip": {
+                    "title": "日本国債クレジット・デフォルト・スワップスプレッド伝票",
+                    "description": "Derivative order confirmation ticket, showing surging basis point credit default swap premiums on Japanese sovereign debt, stamped with red ink 'CRITICAL SPREAD', isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Market Default Pricing",
+                    "beats": [3, 4],
+                    "keywords": ["cds", "spread", "derivative", "スプレッド", "デフォルト"],
+                    "type": "document"
+                },
+                "fg_evidence_foreign_exchange_reserve_record": {
+                    "title": "財務省特別会計外国為替準備金保有証明書",
+                    "description": "Official central treasury certificate documenting official gold bullion holdings and foreign reserve currency allocations, stamped with official gold star seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Reserve Backing Exhibit",
+                    "beats": [2, 3, 5],
+                    "keywords": ["reserve", "forex", "gold", "外貨準備", "為替特会"],
+                    "type": "document"
+                },
+                "fg_evidence_gpif_pension_portfolio_binder": {
+                    "title": "年金積立金管理運用独立行政法人ポートフォリオ報告書",
+                    "description": "Thick three-ring binder open on desk showing domestic bond allocation charts losing value to yield shifts, colored tab dividers, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Institutional Impact Exhibit",
+                    "beats": [3, 4, 5],
+                    "keywords": ["pension", "gpif", "fund", "allocation", "年金積立金", "ポートフォリオ"],
+                    "type": "document"
+                },
+                "fg_evidence_emergency_fiscal_injection_decree": {
+                    "title": "政府緊急財政投融資発動令",
+                    "description": "Formal executive decree on government letterhead signed with blue fountain pen ink, authorising emergency sovereign treasury liquidity backstops, vermilion cabinet seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "State Intervention Order",
+                    "beats": [4, 5],
+                    "keywords": ["decree", "bailout", "injection", "財政投融資", "緊急支援"],
+                    "type": "document"
+                },
+                "fg_evidence_statutory_finance_law_codex": {
+                    "title": "財政法・日本銀行法大系法規集",
+                    "description": "Heavy vintage leather-bound legal codex open to statutory debt limit and central bank charter sections, gold kanji lettering on spine, crisp cream paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Statutory Authority",
+                    "beats": [1, 2, 5],
+                    "keywords": ["statute", "law", "code", "codex", "財政法", "日本銀行法", "六法"],
+                    "type": "document"
+                },
+                "fg_evidence_tokyo_district_court_insolvency_docket": {
+                    "title": "東京地方裁判所会社更生手続申立書",
+                    "description": "Official legal filing document from Tokyo District Court, bold case docket header in Japanese kanji, stamped with vermilion court hanko seal, crisp document paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Lead Prosecution Docket",
+                    "beats": [1, 4, 5],
+                    "keywords": ["docket", "insolvency", "court", "更生手続", "裁判所", "倒産"],
+                    "type": "document"
+                },
+                "fg_evidence_judicial_gavel_sounding_block": {
+                    "title": "司法審判用小槌及び量刑台",
+                    "description": "Dark polished Japanese cherry-wood judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Judicial Climax Artifact",
+                    "beats": [4, 5],
+                    "keywords": ["gavel", "scales", "judge", "court", "小槌", "判決", "法廷"],
+                    "type": "evidence_prop"
+                }
+            }
+            return bg_roster, fg_roster
 
-        fg_roster = {
-            "fg_character_central_bank_governor": {
-                "title": "Central Bank Monetary Authority",
-                "description": "Full-body stylized editorial graphic novel digital illustration of a senior central bank governor in tailored charcoal formal suit, standing with composed authoritative posture, holding official monetary policy brief, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
-                "role": "Monetary Authority",
-                "beats": [1, 4, 5],
-                "keywords": ["governor", "central bank", "fed", "monetary", "rate hike", "policy", "thống đốc", "ngân hàng trung ương"],
-                "type": "character"
-            },
-            "fg_character_sovereign_bond_trader": {
-                "title": "Sovereign Fixed-Income Desk Head",
-                "description": "Full-body stylized editorial graphic novel digital illustration of an intense sovereign bond trader in crisp white shirt with rolled-up sleeves and dark trousers, reviewing printed yield curve slips with urgent skeptical gaze, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
-                "role": "Market Actor",
-                "beats": [1, 2, 4],
-                "keywords": ["trader", "bond desk", "yield", "spread", "market", "dealer", "nhà giao dịch", "trái phiếu"],
-                "type": "character"
-            },
-            "fg_character_treasury_fiscal_official": {
-                "title": "Treasury Debt Management Director",
-                "description": "Full-body stylized editorial graphic novel digital illustration of a senior government debt management official in dark navy blazer and spectacles, holding tabbed sovereign borrowing forecast binder, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
-                "role": "Fiscal Architect",
-                "beats": [2, 3, 5],
-                "keywords": ["treasury", "fiscal", "deficit", "borrowing", "issuance", "kho bạc", "ngân sách"],
-                "type": "character"
-            },
-            "fg_character_macro_auditor": {
-                "title": "Forensic Macroeconomic Sovereign Debt Auditor",
-                "description": "Full-body stylized editorial graphic novel digital illustration of a meticulous sovereign debt auditor in gray trench coat, holding heavy forensic dossier and magnifying loupe, stern analytical expression, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
-                "role": "Forensic Investigator",
-                "beats": [3, 4, 5],
-                "keywords": ["auditor", "investigator", "imf", "scrutiny", "finding", "kiểm toán", "thanh tra"],
-                "type": "character"
-            },
-            "fg_evidence_sovereign_treasury_bond": {
-                "title": "Official Sovereign 10-Year Treasury Bond Certificate",
-                "description": "Official 300gsm fibrous paper sovereign government bond certificate with intricate guilloche security borders, bold coupon yield rate heading, stamped diagonally with official vermilion treasury seal, crisp cutout edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Core Debt Exhibit",
-                "beats": [1, 2, 3],
-                "keywords": ["bond", "treasury", "yield", "coupon", "certificate", "trái phiếu", "kho bạc", "10-year"],
-                "type": "document"
-            },
-            "fg_evidence_debt_maturity_wall_chart": {
-                "title": "Macro Debt Maturity Rollover Wall Chart",
-                "description": "High-contrast quantitative bar graph document printed on heavy cardstock, illustrating the impending trillion-dollar debt maturity rollover wall across 2026-2029, highlighted in fluorescent green and red marker ink, crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Quantitative Maturity Proof",
-                "beats": [1, 3, 4],
-                "keywords": ["maturity", "rollover", "wall", "cliff", "refinance", "đáo hạn", "tái cấp vốn", "chart"],
-                "type": "data_metric"
-            },
-            "fg_evidence_central_bank_balance_sheet": {
-                "title": "Central Bank Balance Sheet Expansion Ledger",
-                "description": "Worn double-page central bank accounting ledger displaying ballooning asset holdings, quantitative easing and repo facilities in muted green ink, red verification checkmarks, tactile paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Monetary Expansion Evidence",
-                "beats": [1, 2, 4],
-                "keywords": ["balance sheet", "assets", "reserves", "qe", "qt", "expansion", "bảng cân đối"],
-                "type": "document"
-            },
-            "fg_evidence_sovereign_credit_downgrade_notice": {
-                "title": "Credit Rating Agency Sovereign Downgrade Letter",
-                "description": "Official formal rating advisory letter from credit agency, bold header stamped in red ink 'DOWNGRADED // OUTLOOK NEGATIVE', bold black typewriter font detailing fiscal debt overhang, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Sovereign Rating Exhibit",
-                "beats": [2, 4, 5],
-                "keywords": ["rating", "downgrade", "moody", "fitch", "s&p", "credit", "xếp hạng", "hạ bậc"],
-                "type": "document"
-            },
-            "fg_evidence_imf_debt_sustainability_matrix": {
-                "title": "IMF Debt-to-GDP Sustainability Framework Matrix",
-                "description": "Technical macroeconomic assessment document featuring multi-column debt-to-GDP projection tables, colored risk threshold heatmaps, official institutional header, sharp clean paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Sustainability Framework",
-                "beats": [3, 4, 5],
-                "keywords": ["imf", "gdp", "sustainability", "ratio", "framework", "matrix", "tỷ lệ gdp"],
-                "type": "data_metric"
-            },
-            "fg_evidence_currency_swap_facility_agreement": {
-                "title": "Bilateral Central Bank Currency Swap Agreement",
-                "description": "Thick legal bilateral treaty contract document, multiple pages stapled at top left with blue brass eyelet, blue ballpoint signature lines and embossed institutional seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Liquidity Mechanism Accord",
-                "beats": [2, 3, 4],
-                "keywords": ["swap", "currency", "liquidity", "foreign exchange", "agreement", "hoán đổi", "ngoại hối"],
-                "type": "document"
-            },
-            "fg_evidence_repo_rate_transaction_ticket": {
-                "title": "Overnight Repo Facility Repurchase Ticket",
-                "description": "Small tactile transaction slip on yellow carbon-copy paper with perforated edges, showing overnight repo rate interest calculations and collateralized bond numbers, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Interbank Liquidity Exhibit",
-                "beats": [2, 3, 4],
-                "keywords": ["repo", "repurchase", "overnight", "ticket", "collateral", "chiết khấu"],
-                "type": "document"
-            },
-            "fg_evidence_inflation_cpi_breakdown_ledger": {
-                "title": "Consumer Price Index Inflation Ledger Slip",
-                "description": "Official statistical bureau price index ledger sheet displaying escalating headline CPI numbers, red circled inflation metrics, crisp fibrous paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Inflation Metric Exhibit",
-                "beats": [1, 2, 5],
-                "keywords": ["inflation", "cpi", "price", "index", "purchasing power", "lạm phát", "giá cả"],
-                "type": "document"
-            },
-            "fg_evidence_g7_finance_communique": {
-                "title": "G7 Finance Ministers Sovereign Debt Resolution Accord",
-                "description": "Formal multilateral joint communique on heavy diplomatic letterhead, official emblem at top, embossed gold foil seal, diplomatic clauses regarding debt restructuring, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Multilateral Policy Exhibit",
-                "beats": [4, 5],
-                "keywords": ["g7", "ministers", "communique", "resolution", "accord", "thông cáo"],
-                "type": "document"
-            },
-            "fg_evidence_liquidity_crisis_redacted_memo": {
-                "title": "Confidential Emergency Interbank Liquidity Memo",
-                "description": "Manila folder document stamped 'STRICTLY CONFIDENTIAL // GOVERNORS EYES ONLY', heavy black redaction marker bars over vulnerable bank reserve numbers, official paperclips, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Classified Risk Memo",
-                "beats": [3, 4],
-                "keywords": ["emergency", "liquidity", "confidential", "secret", "memo", "redacted", "khẩn cấp"],
-                "type": "document"
-            },
-            "fg_evidence_damages_calculation_invoice": {
-                "title": f"Forensic Interest Servicing Cost Calculation Sheet ({metric_highlight})",
-                "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink 'CONFIDENTIAL / EXHIBIT A', crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Forensic Accounting Exhibit",
-                "beats": [1, 3, 5],
-                "keywords": ["invoice", "interest expense", "service", "cost", "calculation", "bill", "chi phí lãi"],
-                "type": "document"
-            },
-            "fg_evidence_sovereign_cds_spread_ticket": {
-                "title": "Sovereign Credit Default Swap Pricing Slip",
-                "description": "High-finance derivative order confirmation ticket, showing surging basis point credit default swap premiums, stamped with red ink 'CRITICAL EXPOSURE', isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Market Default Pricing",
-                "beats": [3, 4],
-                "keywords": ["cds", "default", "spread", "derivative", "swap", "vỡ nợ"],
-                "type": "document"
-            },
-            "fg_evidence_foreign_exchange_reserve_certificate": {
-                "title": "Official Sovereign Foreign Exchange & Bullion Audit Certificate",
-                "description": "Official central treasury certificate documenting official gold bullion holdings and foreign reserve currency allocations, stamped with official gold star seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Reserve Backing Exhibit",
-                "beats": [2, 3, 5],
-                "keywords": ["reserve", "gold", "bullion", "forex", "foreign exchange", "dự trữ ngoại hối"],
-                "type": "document"
-            },
-            "fg_evidence_pension_fund_asset_audit_binder": {
-                "title": "Institutional Pension Fund Fixed-Income Allocation Binder",
-                "description": "Thick three-ring binder open on desk showing asset allocation pie charts losing principal value to high interest yields, colored plastic tab dividers, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Institutional Impact Exhibit",
-                "beats": [3, 4, 5],
-                "keywords": ["pension", "fund", "allocation", "yield", "binder", "hưu trí", "quỹ đầu tư"],
-                "type": "document"
-            },
-            "fg_evidence_emergency_recapitalization_order": {
-                "title": "Executive Statutory Liquidity Intervention Order",
-                "description": "Formal executive decree on government letterhead signed with blue fountain pen ink, authorising emergency sovereign treasury backstops and recapitalisation funds, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "State Intervention Order",
-                "beats": [4, 5],
-                "keywords": ["order", "statutory", "executive", "bailout", "recapitalization", "can thiệp"],
-                "type": "document"
-            },
-            "fg_evidence_statute_reference_book": {
-                "title": "Monetary Code & Statutory Debt Ceiling Reference Codex",
-                "description": "Heavy vintage leather-bound legal codex open to statutory debt limit and central bank charter sections, gold leaf lettering on spine, crisp cream paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Statutory Authority",
-                "beats": [1, 2, 5],
-                "keywords": ["statute", "law", "code", "ceiling", "reference", "trần nợ", "luật ngân sách"],
-                "type": "document"
-            },
-            "fg_evidence_prosecution_complaint_docket": {
-                "title": "Official Sovereign Debt Default Legal Filing Docket",
-                "description": "Official legal filing document from the international arbitration court, bold case docket header, stamped with blue official seal, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Lead Prosecution Docket",
-                "beats": [1, 4, 5],
-                "keywords": ["docket", "complaint", "default", "legal", "filing", "khởi kiện", "hồ sơ pháp lý"],
-                "type": "document"
-            },
-            "fg_evidence_gavel_justice_scale": {
-                "title": "Judicial Sovereign Restructuring Climax Gavel & Scales",
-                "description": "Dark polished walnut judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                "role": "Judicial Climax Artifact",
-                "beats": [4, 5],
-                "keywords": ["gavel", "scales", "judge", "court", "verdict", "búa gỗ", "phán quyết"],
-                "type": "evidence_prop"
+        elif m_up in ["KR", "KO"]:
+            bg_roster = {
+                "bg_bok_monetary_policy_floor": {
+                    "title": "한국은행 공개시장운영 종합상황실",
+                    "description": "Expansive architectural wide shot of Bank of Korea open market execution room, curved multi-monitor desks displaying desaturated Korean Treasury Bond yield curves, granite colonnade with diffused daylight, serious central bank macroeconomic regulatory atmosphere, clean negative space.",
+                    "beats": [1, 4]
+                },
+                "bg_ktb_primary_dealer_auction_hall": {
+                    "title": "국고채 전문딜러 입찰실",
+                    "description": "Grand Yeouido institutional auction hall with rows of dark walnut dealer desks facing muted digital KTB debt bidding boards, dramatic high-contrast chiaroscuro lighting, dignified Korean sovereign financial setting.",
+                    "beats": [1, 3]
+                },
+                "bg_yeouido_financial_district_night": {
+                    "title": "여의도 증권가 야경",
+                    "description": "Dramatic wide view from executive terrace overlooking Yeouido nocturnal skyscraper canyon, illuminated office windows receding into cold foggy blue night, dark sleek granite ledge in foreground.",
+                    "beats": [1, 5]
+                },
+                "bg_moef_sejong_briefing_room": {
+                    "title": "기획재정부 국채발행 브리핑룸",
+                    "description": "Formal Sejong government complex fiscal policy briefing chamber, long polished table reflecting warm overhead downlights, national emblem in soft focus background, austere bureaucratic authority.",
+                    "beats": [1, 2]
+                },
+                "bg_multilateral_east_asia_summit": {
+                    "title": "한중일 거시경제금융안정 회의장",
+                    "description": "Panoramic horseshoe conference hall for sovereign debt ministers, minimalist translation audio consoles, rich dark acoustic wood textures, formal multilateral negotiations mood.",
+                    "beats": [2, 3]
+                },
+                "bg_bok_secure_vault_corridor": {
+                    "title": "한국은행 금고 지하 통로",
+                    "description": "Deep perspective corridor of reinforced steel archival vault doors inside Bank of Korea underground vaults, cool industrial concrete walls, overhead fluorescent security lighting casting rhythmic shadows.",
+                    "beats": [2, 4]
+                },
+                "bg_bok_financial_monetary_committee_chamber": {
+                    "title": "한국은행 금융통화위원회 본회의장",
+                    "description": "Vintage heritage council chamber with coffered timber ceilings, national emblem on mahogany backdrop, dark oak council table, solemn historical financial gravity.",
+                    "beats": [2, 3]
+                },
+                "bg_seoul_national_econ_amphitheater": {
+                    "title": "서울대학교 경제학부 대강의실",
+                    "description": "Steep tiered wooden university lecture hall, chalkboards in soft background covered with faint mathematical differential equations, warm directional spot lighting, analytical scholarly atmosphere.",
+                    "beats": [2, 5]
+                },
+                "bg_fsc_fss_inspection_bullpen": {
+                    "title": "금융위원회 금융감독원 자본시장 특별조사국",
+                    "description": "Spacious regulatory analytical bullpen with desks piled with tabbed sovereign debt dossiers, glowing financial terminals in soft focus, slate-colored partitions, intense forensic research atmosphere.",
+                    "beats": [3, 4]
+                },
+                "bg_moef_debt_archive_records_vault": {
+                    "title": "국가채무관리기록보존서고",
+                    "description": "Endless rows of steel shelving containing uniform archival debt registry boxes, clean polished epoxy floor, cool white downlighting, forensic paper trail discovery setting.",
+                    "beats": [3, 4]
+                },
+                "bg_krx_derivatives_analytics_room": {
+                    "title": "한국거래소 파생상품 퀀트분석센터",
+                    "description": "Dark analytical operations room with high-density workstation displays showing desaturated repo matrices and sovereign CDS heatmaps, muted amber and cyan indicator lights, intense forensic mood.",
+                    "beats": [3, 4]
+                },
+                "bg_moef_fiscal_management_office": {
+                    "title": "기획재정부 재정관리국 국채과",
+                    "description": "Quiet executive operations office, desk lamp casting warm circular pool of light over debt rollover maturity schedules, city skyline outside window at dusk, focused fiscal tension.",
+                    "beats": [3, 5]
+                },
+                "bg_emergency_financial_war_room": {
+                    "title": "금융위기 비상대응상황실",
+                    "description": "Urgent government crisis coordination room, whiteboards covered with debt maturity timelines and interbank swap diagrams, scattered coffee cups on meeting table, high-stakes institutional stress.",
+                    "beats": [4, 5]
+                },
+                "bg_commercial_bank_treasury_desk": {
+                    "title": "시중은행 자금운용부 채권트레이딩룸",
+                    "description": "Quiet after-hours dealing floor with abandoned trader terminals showing red yield spikes, dim emergency lighting, deep shadows between rows of monitors, aftermath of liquidity shock.",
+                    "beats": [4]
+                },
+                "bg_teheranro_asset_management_dawn": {
+                    "title": "테헤란로 자산운용사 총괄집무실 여명",
+                    "description": "Corner executive office with floor-to-ceiling glass catching early morning indigo and amber dawn light over Seoul skyline, sleek minimalist desk, profound institutional isolation.",
+                    "beats": [4, 5]
+                },
+                "bg_national_assembly_strategy_finance_hall": {
+                    "title": "국회 기획재정위원회 대회의실",
+                    "description": "Formal semicircular legislative committee chamber, carved walnut witness tables in foreground, elevated committee dais in background soft focus, dignified democratic scrutiny.",
+                    "beats": [4, 5]
+                },
+                "bg_global_financial_governance_hall": {
+                    "title": "국제금융기구 연례협의 총회장",
+                    "description": "Vast futuristic auditorium with dark acoustic wall panels, subtle uplighting along tiered seats, empty speaker lectern in clean focus, sweeping monumental perspective.",
+                    "beats": [1, 5]
+                },
+                "bg_bok_economic_research_library": {
+                    "title": "한국은행 경제연구원 전문학술도서관",
+                    "description": "Quiet double-height institutional library with floor-to-ceiling leather-bound statutory ledgers, spiral brass reading staircase, green banker lamps on dark oak tables, reflective analytical stillness.",
+                    "beats": [1, 5]
+                }
             }
-        }
-        return bg_roster, fg_roster
+            fg_roster = {
+                "fg_character_bok_governor": {
+                    "title": "한국은행 총재",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior Bank of Korea governor in tailored dark charcoal suit, holding official monetary policy brief with composed authoritative posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Monetary Authority",
+                    "beats": [1, 4, 5],
+                    "keywords": ["governor", "bok", "monetary", "한국은행", "총재", "금리", "금융통화위원회"],
+                    "type": "character"
+                },
+                "fg_character_ktb_bond_trader": {
+                    "title": "여의도 국고채 수석 딜러",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of an intense Korean sovereign bond trader in crisp white shirt with rolled-up sleeves, reviewing printed yield curve slips with urgent skeptical gaze, wearing Sawonjeung corporate ID lanyard, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Market Actor",
+                    "beats": [1, 2, 4],
+                    "keywords": ["trader", "ktb", "yield", "bond", "국고채", "딜러", "채권"],
+                    "type": "character"
+                },
+                "fg_character_moef_fiscal_director": {
+                    "title": "기획재정부 국채과장",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior MOEF fiscal official in dark navy blazer and glasses, holding tabbed sovereign borrowing forecast binder, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Fiscal Architect",
+                    "beats": [2, 3, 5],
+                    "keywords": ["moef", "treasury", "fiscal", "기획재정부", "국채", "재정"],
+                    "type": "character"
+                },
+                "fg_character_macro_financial_auditor": {
+                    "title": "감사원 금융기금 감사관",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of a meticulous sovereign debt auditor in gray trench coat, holding heavy forensic dossier and magnifying loupe, stern analytical expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Forensic Investigator",
+                    "beats": [3, 4, 5],
+                    "keywords": ["auditor", "fss", "investigation", "감사원", "금융감독원", "검사"],
+                    "type": "character"
+                },
+                "fg_evidence_ktb_10year_bond_certificate": {
+                    "title": "대한민국 국고채권 10년물 증서 인감 날인",
+                    "description": "Official 300gsm fibrous paper Republic of Korea 10-year Treasury Bond certificate with intricate guilloche security borders, bold coupon yield rate heading in Hangul, stamped diagonally with official crimson Ingam seal, crisp cutout edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Core Debt Exhibit",
+                    "beats": [1, 2, 3],
+                    "keywords": ["bond", "ktb", "certificate", "ingam", "국고채권", "인감", "채권"],
+                    "type": "document"
+                },
+                "fg_evidence_debt_maturity_rollover_chart": {
+                    "title": "국채 만기도래 상환 집중구간 차트",
+                    "description": "High-contrast quantitative bar graph document printed on heavy cardstock, illustrating the impending multi-trillion won debt maturity rollover wall across upcoming fiscal years, highlighted in fluorescent green and red marker ink, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Quantitative Maturity Proof",
+                    "beats": [1, 3, 4],
+                    "keywords": ["maturity", "rollover", "wall", "chart", "만기도래", "차환", "상환"],
+                    "type": "data_metric"
+                },
+                "fg_evidence_bok_balance_sheet_ledger": {
+                    "title": "한국은행 대차대조표 및 유동성 자산대장",
+                    "description": "Worn double-page central bank accounting ledger displaying ballooning asset holdings, Hangul column headers, red verification checkmarks, tactile paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Monetary Expansion Evidence",
+                    "beats": [1, 2, 4],
+                    "keywords": ["balance sheet", "bok", "assets", "한국은행", "대차대조표", "자산"],
+                    "type": "document"
+                },
+                "fg_evidence_credit_rating_downgrade_letter": {
+                    "title": "국제신용평가사 국가신용등급 강등 통보서",
+                    "description": "Official formal rating advisory letter from credit agency, bold header stamped in red ink 'DOWNGRADED // OUTLOOK NEGATIVE', bold Hangul text detailing fiscal debt overhang, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Sovereign Rating Exhibit",
+                    "beats": [2, 4, 5],
+                    "keywords": ["rating", "downgrade", "credit", "신용등급", "강등", "신용평가"],
+                    "type": "document"
+                },
+                "fg_evidence_imf_korea_surveillance_matrix": {
+                    "title": "IMF 연례협의 대외채무 지속가능성 평가표",
+                    "description": "Technical macroeconomic assessment document featuring multi-column debt-to-GDP projection tables for South Korea, colored risk threshold heatmaps, official institutional header, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Sustainability Framework",
+                    "beats": [3, 4, 5],
+                    "keywords": ["imf", "gdp", "sustainability", "matrix", "지속가능성", "국가채무"],
+                    "type": "data_metric"
+                },
+                "fg_evidence_bilateral_currency_swap_accord": {
+                    "title": "한미 중앙은행 통화스와프 계약서",
+                    "description": "Thick legal bilateral treaty contract document, multiple pages stapled at top left with circular crimson Ingam seal, Korean and English text, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Liquidity Mechanism Accord",
+                    "beats": [2, 3, 4],
+                    "keywords": ["swap", "currency", "bilateral", "통화스와프", "외환", "계약서"],
+                    "type": "document"
+                },
+                "fg_evidence_rp_repo_transaction_ticket": {
+                    "title": "환매조건부채권(RP) 매매 체결확인서",
+                    "description": "Small tactile transaction slip on yellow carbon-copy paper with perforated edges, showing overnight RP repo rate interest calculations and collateralized bond numbers, circular red teller stamp, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Interbank Liquidity Exhibit",
+                    "beats": [2, 3, 4],
+                    "keywords": ["repo", "rp", "ticket", "환매조건부채권", "콜시장", "체결확인서"],
+                    "type": "document"
+                },
+                "fg_evidence_cpi_inflation_ledger_slip": {
+                    "title": "소비자물가지수(CPI) 동향 분석표",
+                    "description": "Official Statistics Korea price index ledger sheet displaying escalating headline CPI numbers, red circled inflation metrics, crisp fibrous paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Inflation Metric Exhibit",
+                    "beats": [1, 2, 5],
+                    "keywords": ["inflation", "cpi", "price", "소비자물가", "인플레이션", "통계청"],
+                    "type": "document"
+                },
+                "fg_evidence_g20_seoul_finance_communique": {
+                    "title": "G20 재무장관 회의 공동선언문",
+                    "description": "Formal multilateral joint communique on heavy diplomatic letterhead, official emblem at top, embossed gold foil seal, diplomatic clauses regarding debt restructuring in Hangul, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Multilateral Policy Exhibit",
+                    "beats": [4, 5],
+                    "keywords": ["g20", "ministers", "communique", "공동선언문", "재무장관"],
+                    "type": "document"
+                },
+                "fg_evidence_interbank_liquidity_crisis_memo": {
+                    "title": "대외비 은행간 유동성 위기 경보 전문",
+                    "description": "Manila folder document stamped '대외비 // 금융통화위원 한정', heavy black redaction marker bars over vulnerable bank reserve numbers, official paperclips, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Classified Risk Memo",
+                    "beats": [3, 4],
+                    "keywords": ["emergency", "liquidity", "secret", "memo", "대외비", "유동성위기"],
+                    "type": "document"
+                },
+                "fg_evidence_damages_calculation_invoice": {
+                    "title": f"국채 이자비용 재정소요 산출명세서 ({metric_highlight})",
+                    "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink '증거 제1호', crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Forensic Accounting Exhibit",
+                    "beats": [1, 3, 5],
+                    "keywords": ["invoice", "interest", "servicing", "이자비용", "재정소요", "산출명세서"],
+                    "type": "document"
+                },
+                "fg_evidence_korea_sovereign_cds_slip": {
+                    "title": "대한민국 외평채 CDS 프리미엄 체결전표",
+                    "description": "High-finance derivative order confirmation ticket, showing surging basis point credit default swap premiums on Korean Foreign Exchange Stabilization Bonds, stamped with red ink 'CRITICAL EXPOSURE', isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Market Default Pricing",
+                    "beats": [3, 4],
+                    "keywords": ["cds", "spread", "derivative", "외평채", "프리미엄", "부도스왑"],
+                    "type": "document"
+                },
+                "fg_evidence_foreign_exchange_reserve_record": {
+                    "title": "한국은행 외환보유액 감사증명서",
+                    "description": "Official central treasury certificate documenting official gold bullion holdings and foreign reserve currency allocations, stamped with official gold seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Reserve Backing Exhibit",
+                    "beats": [2, 3, 5],
+                    "keywords": ["reserve", "forex", "gold", "외환보유액", "준비자산"],
+                    "type": "document"
+                },
+                "fg_evidence_nps_national_pension_binder": {
+                    "title": "국민연금공단(NPS) 채권포트폴리오 분석철",
+                    "description": "Thick three-ring binder open on desk showing domestic fixed-income allocation pie charts losing principal value to high yields, colored tab dividers, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Institutional Impact Exhibit",
+                    "beats": [3, 4, 5],
+                    "keywords": ["pension", "nps", "fund", "allocation", "국민연금", "채권포트폴리오"],
+                    "type": "document"
+                },
+                "fg_evidence_emergency_recapitalization_order": {
+                    "title": "공적자금관리위원회 긴급출자명령서",
+                    "description": "Formal executive decree on government letterhead signed with blue fountain pen ink, authorising emergency sovereign treasury backstops and public funds recapitalisation, circular crimson Ingam seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "State Intervention Order",
+                    "beats": [4, 5],
+                    "keywords": ["decree", "bailout", "recapitalization", "공적자금", "출자명령"],
+                    "type": "document"
+                },
+                "fg_evidence_statutory_finance_law_codex": {
+                    "title": "국가재정법 및 한국은행법 주해집",
+                    "description": "Heavy vintage leather-bound legal codex open to statutory debt limit and central bank charter sections, gold leaf Hangul lettering on spine, crisp cream paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Statutory Authority",
+                    "beats": [1, 2, 5],
+                    "keywords": ["statute", "law", "code", "국가재정법", "한국은행법", "법전"],
+                    "type": "document"
+                },
+                "fg_evidence_seoul_court_insolvency_docket": {
+                    "title": "서울회생법원 회생절차개시신청서",
+                    "description": "Official legal filing document from Seoul Bankruptcy Court, bold case docket header in Hangul, stamped with circular red court seal, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Lead Prosecution Docket",
+                    "beats": [1, 4, 5],
+                    "keywords": ["docket", "insolvency", "court", "회생신청", "회생법원", "부도"],
+                    "type": "document"
+                },
+                "fg_evidence_judicial_gavel_sounding_block": {
+                    "title": "법원 사법 심판봉 및 정의의 저울",
+                    "description": "Dark polished walnut judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Judicial Climax Artifact",
+                    "beats": [4, 5],
+                    "keywords": ["gavel", "scales", "judge", "court", "심판봉", "판결", "법원"],
+                    "type": "evidence_prop"
+                }
+            }
+            return bg_roster, fg_roster
+
+        elif m_up in ["VN", "VI"]:
+            bg_roster = {
+                "bg_sbv_open_market_floor": {
+                    "title": "Sàn Giao Dịch Thị Trường Mở Ngân Hàng Nhà Nước Việt Nam",
+                    "description": "Không gian sàn điều hành nghiệp vụ thị trường mở OMO của Ngân hàng Nhà nước, các dãy bàn chuyên viên với hệ thống màn hình hiển thị đường cong lợi suất trái phiếu chính phủ VND, cột trụ đá cổ điển với ánh sáng ban ngày khuếch tán, bầu không khí pháp lý tiền tệ uy nghiêm.",
+                    "beats": [1, 4]
+                },
+                "bg_treasury_bond_auction_hall": {
+                    "title": "Hội Trường Đấu Thầu Trái Phiếu Chính Phủ Sở Giao Dịch HNX",
+                    "description": "Hội trường đấu thầu trái phiếu chính phủ trang trọng với các dãy bàn thành viên đấu thầu nhìn về bảng điện tử định giá trái phiếu trung ương, ánh sáng tương phản chiaroscuro sắc nét, không gian tài chính công trang nghiêm.",
+                    "beats": [1, 3]
+                },
+                "bg_saigon_financial_district_night": {
+                    "title": "Đại Lộ Tài Chính Bến Bạch Đằng & Sông Sài Gòn Về Đêm",
+                    "description": "Góc nhìn toàn cảnh từ ban công tầng cao nhìn xuống đại lộ tài chính lung linh ánh đèn phản chiếu trên mặt sông về đêm, lan can đá granit tối màu ở tiền cảnh, sự tĩnh lặng sâu sắc của trung tâm vốn.",
+                    "beats": [1, 5]
+                },
+                "bg_mof_vietnam_briefing_room": {
+                    "title": "Phòng Họp Báo Cục Quản Lý Nợ & Tài Chính Đối Ngoại Bộ Tài Chính",
+                    "description": "Phòng họp báo nghiệp vụ của Bộ Tài chính với bàn gỗ bóng phản chiếu ánh đèn rọi trần, quốc huy Việt Nam trên phông nền phía sau mờ nhẹ, không khí hành chính quyền lực.",
+                    "beats": [1, 2]
+                },
+                "bg_asean_financial_stability_summit": {
+                    "title": "Hội Trường Hội Nghị Bộ Trưởng Tài Chính ASEAN",
+                    "description": "Hội trường bàn tròn hình móng ngựa dành cho các bộ trưởng tài chính khu vực, cabin dịch thuật hội nghị mờ nhẹ phía sau, vách gỗ tiêu âm hiện đại sang trọng.",
+                    "beats": [2, 3]
+                },
+                "bg_sbv_vault_corridor": {
+                    "title": "Hành Lang Kho Tiền Trung Ương Ngân Hàng Nhà Nước",
+                    "description": "Hành lang sâu hun hút với các cửa vòm thép kiên cố của kho dự trữ tiền tệ quốc gia, tường bê tông công nghiệp sạch bóng, ánh đèn tuýp trắng rọi theo nhịp bước.",
+                    "beats": [2, 4]
+                },
+                "bg_sbv_monetary_council_chamber": {
+                    "title": "Phòng Họp Hội Đồng Tư Vấn Chính Sách Tiền Tệ Quốc Gia",
+                    "description": "Phòng họp trang trọng với bàn họp dài bằng gỗ xoan đào, cờ đỏ sao vàng ở góc trang trọng, tài liệu điều hành vĩ mô xếp ngay ngắn, không khí tư pháp tiền tệ trang nghiêm.",
+                    "beats": [2, 3]
+                },
+                "bg_national_economics_amphitheater": {
+                    "title": "Giảng Đường Lớn Đại Học Kinh Tế Quốc Dân",
+                    "description": "Giảng đường bậc thang dốc bằng gỗ tự nhiên, bảng đen phía sau viết các phương trình vi phân kinh tế vĩ mô mờ nhẹ, ánh đèn rọi tập trung học thuật chuyên sâu.",
+                    "beats": [2, 5]
+                },
+                "bg_ssc_market_surveillance_bullpen": {
+                    "title": "Cục Thanh Tra Giám Sát Thị Trường Ủy Ban Chứng Khoán Nhà Nước",
+                    "description": "Khu làm việc thanh tra chứng khoán với các dãy bàn chất đầy hồ sơ phát hành trái phiếu doanh nghiệp, màn hình giám sát dòng tiền, vách ngăn văn phòng tối giản.",
+                    "beats": [3, 4]
+                },
+                "bg_state_treasury_archive_vault": {
+                    "title": "Kho Lưu Trữ Hồ Sơ Nợ Công & Ngân Sách Kho Bạc Nhà Nước",
+                    "description": "Hệ thống giá kệ kim loại sâu hun hút chứa hàng trăm hộp tài liệu đăng ký trái phiếu chính phủ, nền epoxy sạch bóng, ánh sáng đèn trắng chuẩn mực pháp y.",
+                    "beats": [3, 4]
+                },
+                "bg_financial_analytics_terminal_room": {
+                    "title": "Phòng Phân Tích Dòng Tiền & Định Lượng Trái Phiếu",
+                    "description": "Trung tâm phân tích tài chính hiện đại với các trạm máy tính hiển thị ma trận thanh khoản liên ngân hàng và biểu đồ hoán đổi rủi ro nợ, ánh sáng dịu tập trung.",
+                    "beats": [3, 4]
+                },
+                "bg_debt_management_director_office": {
+                    "title": "Văn Phòng Cục Quản Lý Nợ Công Bộ Tài Chính",
+                    "description": "Văn phòng lãnh đạo cục quản lý nợ công lúc hoàng hôn, đèn bàn rọi vào tập lịch trình đáo hạn trái phiếu chính phủ, cửa sổ nhìn ra phố xá trung tâm.",
+                    "beats": [3, 5]
+                },
+                "bg_emergency_liquidity_crisis_hq": {
+                    "title": "Phòng Tác Chiến Xử Lý Khủng Hoảng Thanh Khoản Ngân Hàng",
+                    "description": "Phòng tác chiến khẩn cấp của ban điều hành, bảng trắng vẽ sơ đồ dòng tiền cứu trợ liên ngân hàng và tái cấp vốn, tách cà phê trên bàn họp dã chiến, áp lực điều hành cao độ.",
+                    "beats": [4, 5]
+                },
+                "bg_commercial_bank_treasury_pit": {
+                    "title": "Sàn Giao Dịch Nguồn Vốn & Trái Phiếu Ngân Hàng Thương Mại",
+                    "description": "Sàn giao dịch nguồn vốn sau giờ làm việc với các dãy màn hình hiển thị cảnh báo lãi suất qua đêm tăng vọt, ánh đèn khẩn cấp mờ tối, dư âm cú sốc thanh khoản.",
+                    "beats": [4]
+                },
+                "bg_financial_executive_office_dawn": {
+                    "title": "Văn Phòng Chủ Tịch Hội Đồng Quản Trị Nhìn Xuống Thành Phố Lúc Bình Minh",
+                    "description": "Văn phòng góc tầng cao với vách kính phản chiếu ánh bình minh vàng lam trên các cao ốc tài chính, bàn làm việc gỗ mun hiện đại, cảm giác cô độc thể chế.",
+                    "beats": [4, 5]
+                },
+                "bg_national_assembly_budget_committee_hall": {
+                    "title": "Hội Trường Ủy Ban Tài Chính Ngân Sách Quốc Hội",
+                    "description": "Hội trường giám sát ngân sách nhà nước hình bán nguyệt của Quốc hội, bàn đại biểu bằng gỗ gụ phía trước, bục chủ tọa phía sau mờ nhẹ, sự thẩm tra dân chủ nghiêm minh.",
+                    "beats": [4, 5]
+                },
+                "bg_macro_economic_forum_hall": {
+                    "title": "Hội Trường Diễn Đàn Kinh Tế Vĩ Mô & Thị Trường Vốn",
+                    "description": "Hội trường lớn với vách tiêu âm tối màu, ánh đèn rọi tinh tế dọc các hàng ghế đại biểu, bục diễn giả sắc nét, góc nhìn kiến trúc hoành tráng.",
+                    "beats": [1, 5]
+                },
+                "bg_sbv_banking_academy_library": {
+                    "title": "Thư Viện Nghiên Cứu Lịch Sử Tiền Tệ & Ngân Hàng",
+                    "description": "Thư viện tư liệu ngân hàng trung ương với các kệ sách luật ngân sách bọc da cổ điển, cầu thang sắt uốn, đèn bàn xanh ngọc trên bàn gỗ, không gian chiêm nghiệm sâu lắng.",
+                    "beats": [1, 5]
+                }
+            }
+            fg_roster = {
+                "fg_character_sbv_governor": {
+                    "title": "Thống Đốc Ngân Hàng Nhà Nước Việt Nam",
+                    "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một vị Thống đốc Ngân hàng Nhà nước trong trang phục vest tối màu trang trọng, dáng đứng uy quyền điềm tĩnh, cầm tập hồ sơ chỉ đạo điều hành chính sách tiền tệ, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Monetary Authority",
+                    "beats": [1, 4, 5],
+                    "keywords": ["thống đốc", "ngân hàng nhà nước", "nhnn", "tiền tệ", "lãi suất", "chính sách"],
+                    "type": "character"
+                },
+                "fg_character_sovereign_bond_trader": {
+                    "title": "Trưởng Bộ Phận Kinh Doanh Nguồn Vốn & Trái Phiếu",
+                    "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một trưởng phòng kinh doanh nguồn vốn ngân hàng thương mại trong áo sơ mi trắng thắt cà vạt xắn tay áo, nét mặt căng thẳng xem xét bảng số liệu đường cong lợi suất, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Market Actor",
+                    "beats": [1, 2, 4],
+                    "keywords": ["trader", "trái phiếu", "lợi suất", "nguồn vốn", "kinh doanh", "dealer"],
+                    "type": "character"
+                },
+                "fg_character_debt_management_director": {
+                    "title": "Cục Trưởng Cục Quản Lý Nợ Công Bộ Tài Chính",
+                    "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một cục trưởng quản lý nợ công trong bộ vest xanh navy chỉn chu đeo kính gọng kim loại, cầm tập kẹp dự báo hạn mức vay nợ quốc gia, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Fiscal Architect",
+                    "beats": [2, 3, 5],
+                    "keywords": ["nợ công", "bộ tài chính", "ngân sách", "cục trưởng", "kho bạc"],
+                    "type": "character"
+                },
+                "fg_character_macro_debt_auditor": {
+                    "title": "Trưởng Đoàn Thanh Tra Pháp Y Thị Trường Trái Phiếu",
+                    "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một thanh tra viên kiểm toán tài chính trong trang phục thanh tra nghiêm nghị, tay cầm kính lúp và tập hồ sơ chứng cứ dòng tiền, ánh mắt sắc sảo truy tìm sai phạm, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Forensic Investigator",
+                    "beats": [3, 4, 5],
+                    "keywords": ["thanh tra", "kiểm toán", "pháp y", "sai phạm", "điều tra"],
+                    "type": "character"
+                },
+                "fg_evidence_vn_government_bond_certificate": {
+                    "title": "Trái Phiếu Chính Phủ Việt Nam Mệnh Giá VND Đóng Mộc Đỏ Quốc Huy",
+                    "description": "Văn bản chứng chỉ Trái phiếu Chính phủ Việt Nam in bảo an chống giả trên giấy 300gsm, hoa văn chìm tinh xảo, ghi rõ lãi suất danh nghĩa và kỳ hạn 10 năm bằng tiền đồng VND, đóng dấu mộc đỏ tươi hình quốc huy của Bộ Tài chính, mép giấy sắc nét, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Core Debt Exhibit",
+                    "beats": [1, 2, 3],
+                    "keywords": ["trái phiếu chính phủ", "tpcp", "mộc đỏ", "quốc huy", "vnd", "kho bạc"],
+                    "type": "document"
+                },
+                "fg_evidence_debt_maturity_rollover_chart": {
+                    "title": "Biểu Đồ Cột Đáo Hạn Trái Phiếu Doanh Nghiệp & Nợ Công (Maturity Wall)",
+                    "description": "Biểu đồ cột định lượng độ tương phản cao in trên bìa cứng dày, thể hiện áp lực đáo hạn hàng trăm nghìn tỷ đồng dồn toa giai đoạn tới, đánh dấu bút dạ quang xanh và đỏ nổi bật, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Quantitative Maturity Proof",
+                    "beats": [1, 3, 4],
+                    "keywords": ["đáo hạn", "rollover", "dồn toa", "áp lực trả nợ", "biểu đồ"],
+                    "type": "data_metric"
+                },
+                "fg_evidence_sbv_balance_sheet_ledger": {
+                    "title": "Sổ Cái Cân Đối Thanh Khoản & Mua Bán Ngoại Tệ NHNN",
+                    "description": "Quyển sổ cái kế toán điều hành tiền tệ mở rộng hiển thị các khoản can thiệp thanh khoản tiền đồng và dự trữ ngoại hối, tiêu đề cột bằng tiếng Việt, dấu tích kiểm tra bút mực đỏ, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Monetary Expansion Evidence",
+                    "beats": [1, 2, 4],
+                    "keywords": ["bảng cân đối", "nhnn", "ngoại tệ", "dòng tiền", "sổ cái"],
+                    "type": "document"
+                },
+                "fg_evidence_credit_rating_downgrade_letter": {
+                    "title": "Thông Báo Đánh Giá Xếp Hạng Tín Nhiệm Quốc Gia & Doanh Nghiệp",
+                    "description": "Văn bản thông báo chính thức của tổ chức xếp hạng tín nhiệm, đóng dấu chéo mực đỏ 'HẠ TRIỂN VỌNG // TIÊU CỰC', chữ in rõ nét phân tích gánh nặng nợ và hệ số đòn bẩy, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Sovereign Rating Exhibit",
+                    "beats": [2, 4, 5],
+                    "keywords": ["xếp hạng", "tín nhiệm", "hạ bậc", "rủi ro", "đánh giá"],
+                    "type": "document"
+                },
+                "fg_evidence_imf_vietnam_surveillance_matrix": {
+                    "title": "Bảng Phân Tích Tính Bền Vững Nợ Công Khung Đánh Giá IMF",
+                    "description": "Tài liệu đánh giá kinh tế vĩ mô nhiều cột với các bảng dự báo tỷ lệ nợ trên GDP của Việt Nam, bản đồ nhiệt phân tầng rủi ro, tiêu đề cơ quan chính thức, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Sustainability Framework",
+                    "beats": [3, 4, 5],
+                    "keywords": ["imf", "gdp", "nợ công", "bền vững", "chỉ số"],
+                    "type": "data_metric"
+                },
+                "fg_evidence_bilateral_currency_swap_accord": {
+                    "title": "Hợp Đồng Hạn Mức Tín Dụng & Hoán Đổi Ngoại Tệ Song Phương",
+                    "description": "Tập hợp đồng tín dụng song phương dày nhiều trang đóng ghim đồng góc trái, đóng dấu mộc đỏ giáp lai giữa các mép giấy, chữ ký đại diện ngân hàng bằng mực xanh, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Liquidity Mechanism Accord",
+                    "beats": [2, 3, 4],
+                    "keywords": ["hoán đổi", "ngoại hối", "tín dụng", "hợp đồng", "giáp lai"],
+                    "type": "document"
+                },
+                "fg_evidence_interbank_repo_ticket": {
+                    "title": "Lệnh Giao Dịch Repo Thị Trường Liên Ngân Hàng Có Mộc Tròn Ngân Hàng",
+                    "description": "Phiếu lệnh xác nhận giao dịch mua bán có kỳ hạn (Repo) in trên giấy carbon vàng có răng cưa, ghi rõ lãi suất qua đêm và mã trái phiếu thế chấp, dấu tròn đỏ ngân hàng, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Interbank Liquidity Exhibit",
+                    "beats": [2, 3, 4],
+                    "keywords": ["repo", "liên ngân hàng", "phiếu lệnh", "chiết khấu", "thanh khoản"],
+                    "type": "document"
+                },
+                "fg_evidence_cpi_inflation_ledger_slip": {
+                    "title": "Bảng Số Liệu Chỉ Số Giá Tiêu Dùng CPI Tổng Cục Thống Kê",
+                    "description": "Bản tin thống kê chính thức của Tổng cục Thống kê hiển thị đà leo thang của chỉ số CPI qua các quý, khoanh tròn đỏ số liệu lạm phát cốt lõi, chất liệu giấy in văn phòng sắc nét, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Inflation Metric Exhibit",
+                    "beats": [1, 2, 5],
+                    "keywords": ["cpi", "lạm phát", "giá tiêu dùng", "thống kê", "chỉ số"],
+                    "type": "document"
+                },
+                "fg_evidence_asean_finance_communique": {
+                    "title": "Tuyên Bố Chung Hội Nghị Bộ Trưởng Tài Chính & Thống Đốc ASEAN",
+                    "description": "Văn bản tuyên bố chung ngoại giao trên giấy tiêu đề trang trọng, biểu trưng ASEAN phía trên, dấu dập nổi mạ vàng, nội dung thỏa thuận ổn định thị trường tài chính khu vực, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Multilateral Policy Exhibit",
+                    "beats": [4, 5],
+                    "keywords": ["tuyên bố", "asean", "hội nghị", "bộ trưởng", "tài chính"],
+                    "type": "document"
+                },
+                "fg_evidence_classified_liquidity_memo": {
+                    "title": "Báo Cáo Khẩn Về Nguy Cơ Mất Thanh Khoản Dấu Đỏ Tuyệt Mật",
+                    "description": "Túi hồ sơ giấy xi măng màu nâu đóng dấu đỏ 'TUYỆT MẬT // CHỈ LƯU HÀNH LÃNH ĐẠO', tài liệu bên trong bị gạch đen xóa thông tin số dư thanh khoản các ngân hàng yếu kém, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Classified Risk Memo",
+                    "beats": [3, 4],
+                    "keywords": ["tuyệt mật", "khẩn cấp", "thanh khoản", "báo cáo", "rủi ro"],
+                    "type": "document"
+                },
+                "fg_evidence_damages_calculation_invoice": {
+                    "title": f"Bảng Tính Chi Phí Nghĩa Vụ Trả Nợ & Lãi Vay Quá Hạn ({metric_highlight})",
+                    "description": f"Bảng phụ lục kiểm toán tài chính hiển thị con số nghĩa vụ trả nợ '{metric_highlight}' mực xanh nổi bật, đóng dấu chéo mực đỏ 'TÀI LIỆU CHỨNG CỨ PHÁP LÝ', viền cắt sắc sảo, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Forensic Accounting Exhibit",
+                    "beats": [1, 3, 5],
+                    "keywords": ["chi phí", "nghĩa vụ trả nợ", "lãi vay", "thiệt hại", "bảng tính"],
+                    "type": "document"
+                },
+                "fg_evidence_cds_spread_ticket": {
+                    "title": "Bảng Định Giá Phí Phòng Ngừa Rủi Ro Vỡ Nợ Trái Phiếu",
+                    "description": "Phiếu xác nhận giao dịch phòng ngừa rủi ro tài chính hiển thị mức phí CDS tăng vọt hàng trăm điểm cơ bản, đóng dấu mực đỏ 'RỦI RO BÁO ĐỘNG ĐỎ', isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Market Default Pricing",
+                    "beats": [3, 4],
+                    "keywords": ["cds", "vỡ nợ", "phí rủi ro", "trái phiếu", "spread"],
+                    "type": "document"
+                },
+                "fg_evidence_foreign_exchange_reserve_record": {
+                    "title": "Giấy Chứng Nhận Dự Trữ Ngoại Hối & Kim Loại Quý Nhà Nước",
+                    "description": "Văn bản xác nhận chính thức của Kho bạc và NHNN ghi nhận quy mô dự trữ ngoại tệ và vàng miếng quốc gia, đóng dấu sao vàng nổi, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Reserve Backing Exhibit",
+                    "beats": [2, 3, 5],
+                    "keywords": ["dự trữ", "ngoại hối", "vàng", "bảo chứng", "ngân khố"],
+                    "type": "document"
+                },
+                "fg_evidence_social_security_fund_binder": {
+                    "title": "Hồ Sơ Đầu Tư Trái Phiếu Quỹ Bảo Hiểm Xã Hội Việt Nam",
+                    "description": "Tập cặp file ba còng mở rộng hiển thị cơ cấu danh mục đầu tư trái phiếu dài hạn bị hao hụt giá trị trước biến động lãi suất thị trường, các nhãn ngăn phân màu, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Institutional Impact Exhibit",
+                    "beats": [3, 4, 5],
+                    "keywords": ["bảo hiểm xã hội", "quỹ hưu trí", "danh mục", "đầu tư", "trái phiếu"],
+                    "type": "document"
+                },
+                "fg_evidence_special_refinancing_order": {
+                    "title": "Quyết Định Cho Vay Tái Cấp Vốn Đặc Biệt của Ngân Hàng Nhà Nước Mộc Đỏ",
+                    "description": "Quyết định hành chính chính thức của Thống đốc về việc can thiệp cho vay tái cấp vốn đặc biệt ổn định thanh khoản, tiêu ngữ quốc gia sắc nét, dấu mộc đỏ tươi giáp lai mép giấy, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "State Intervention Order",
+                    "beats": [4, 5],
+                    "keywords": ["tái cấp vốn", "quyết định", "can thiệp", "mộc đỏ", "nhnn"],
+                    "type": "document"
+                },
+                "fg_evidence_statutory_budget_law_codex": {
+                    "title": "Bộ Luật Quản Lý Nợ Công & Luật Ngân Sách Nhà Nước Bìa Da Đỏ",
+                    "description": "Bộ luật bìa da đỏ in quốc huy vàng bóng loáng mở ra trang điều khoản quy định trần nợ công và giới hạn thâm hụt ngân sách quốc gia, góc giấy sắc nét, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Statutory Authority",
+                    "beats": [1, 2, 5],
+                    "keywords": ["luật", "ngân sách", "nợ công", "trần nợ", "pháp luật"],
+                    "type": "document"
+                },
+                "fg_evidence_insolvency_restructuring_docket": {
+                    "title": "Đơn Yêu Cầu Mở Thủ Tục Phá Sản & Tái Cơ Cấu Nợ Tòa Án Nhân Dân",
+                    "description": "Hồ sơ thụ lý vụ việc phục hồi kinh doanh và tái cấu trúc tài chính nợ của Tòa án nhân dân, tiêu ngữ quốc gia và dấu mộc đỏ của Tòa án, chất liệu giấy hồ sơ dày dặn, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Lead Prosecution Docket",
+                    "beats": [1, 4, 5],
+                    "keywords": ["tòa án", "phá sản", "tái cơ cấu", "hồ sơ", "mộc đỏ"],
+                    "type": "document"
+                },
+                "fg_evidence_judicial_gavel_sounding_block": {
+                    "title": "Búa Gỗ Xét Xử Tòa Án & Cán Cân Công Lý Bằng Đồng",
+                    "description": "Búa gỗ xét xử bằng gỗ gụ đánh bóng đặt trên đế gỗ bên cạnh cán cân công lý bằng đồng thau, chất gỗ tự nhiên chân thực, không khí pháp đình uy nghiêm, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Judicial Climax Artifact",
+                    "beats": [4, 5],
+                    "keywords": ["búa gỗ", "tòa án", "cán cân", "công lý", "phán quyết"],
+                    "type": "evidence_prop"
+                }
+            }
+            return bg_roster, fg_roster
+
+        else:
+            # Default Global / EN Financial Macro Sovereign Debt
+            bg_roster = {
+                "bg_central_bank_trading_floor": {
+                    "title": "Central Bank Open Market Trading Floor",
+                    "description": "Expansive architectural wide shot of central bank open market execution floor, multiple curved multi-monitor desks displaying desaturated yield curves, towering stone columns with dramatic diffused daylight, serious macroeconomic regulatory atmosphere, clean negative space.",
+                    "beats": [1, 4]
+                },
+                "bg_sovereign_bond_auction_gallery": {
+                    "title": "Sovereign Bond Syndicate Auction Hall",
+                    "description": "Grand institutional auction hall with rows of mahogany dealer desks facing muted digital debt bidding boards, dramatic high-contrast chiaroscuro lighting, subtle dust motes in sunbeams, dignified financial sovereign setting.",
+                    "beats": [1, 3]
+                },
+                "bg_financial_district_night_skyline": {
+                    "title": "Nocturnal Financial District High-Rise Overlook",
+                    "description": "Dramatic wide view from executive terrace overlooking nocturnal skyscraper canyon, illuminated office windows receding into cold foggy blue night, dark sleek stone ledge in foreground, quiet tension of global finance.",
+                    "beats": [1, 5]
+                },
+                "bg_treasury_briefing_room": {
+                    "title": "Ministry of Finance & Treasury Briefing Room",
+                    "description": "Formal oak-paneled fiscal policy briefing chamber, long polished table reflecting warm overhead downlights, national crest in deep background soft focus, austere institutional authority.",
+                    "beats": [1, 2]
+                },
+                "bg_post_crisis_fiscal_summit_chamber": {
+                    "title": "International Fiscal Stabilization Summit Hall",
+                    "description": "Panoramic horseshoe conference hall for sovereign debt ministers, minimalist translation audio consoles, rich dark acoustic wood textures, formal multilateral negotiations mood.",
+                    "beats": [2, 3]
+                },
+                "bg_treasury_vault_corridor": {
+                    "title": "Sovereign Bullion & Secure Reserve Vault Corridor",
+                    "description": "Deep perspective corridor of reinforced steel archival vault doors, cool industrial concrete walls, overhead fluorescent security lighting casting rhythmic shadows, heavy vault atmosphere.",
+                    "beats": [2, 4]
+                },
+                "bg_historical_bank_boardroom": {
+                    "title": "Heritage Central Bank Executive Council Chamber",
+                    "description": "Vintage heritage boardroom with coffered timber ceilings, oil portraits in soft focus background, dark mahogany council table, solemn historical financial gravity.",
+                    "beats": [2, 3]
+                },
+                "bg_academic_economics_lecture_hall": {
+                    "title": "University Macroeconomic Policy Amphitheater",
+                    "description": "Steep tiered wooden university lecture hall, chalkboards in soft background covered with faint mathematical differential equations, warm directional spot lighting, analytical scholarly atmosphere.",
+                    "beats": [2, 5]
+                },
+                "bg_imf_analytical_bullpen": {
+                    "title": "Multilateral Monetary Policy Research Bullpen",
+                    "description": "Spacious analytical bullpen with desks piled with tabbed sovereign debt dossiers, glowing Bloomberg terminals in soft focus, slate-colored partitions, intense forensic research atmosphere.",
+                    "beats": [3, 4]
+                },
+                "bg_sovereign_debt_archive_records_vault": {
+                    "title": "National Debt Management Archival Records Vault",
+                    "description": "Endless rows of steel shelving containing uniform archival debt registry boxes, clean polished epoxy floor, cool white downlighting, forensic paper trail discovery setting.",
+                    "beats": [3, 4]
+                },
+                "bg_bloomberg_analytics_terminal_room": {
+                    "title": "Financial Market Quantitative Analytics Center",
+                    "description": "Dark analytical operations room with high-density workstation displays showing desaturated repo matrices and sovereign CDS heatmaps, muted amber and cyan indicator lights, intense forensic mood.",
+                    "beats": [3, 4]
+                },
+                "bg_debt_management_office": {
+                    "title": "Sovereign Debt Issuance Execution Office",
+                    "description": "Quiet executive operations office, desk lamp casting warm circular pool of light over debt rollover maturity schedules, city skyline outside window at dusk, focused fiscal tension.",
+                    "beats": [3, 5]
+                },
+                "bg_emergency_finance_ministry_war_room": {
+                    "title": "Emergency Liquidity Crisis War Room",
+                    "description": "Urgent government crisis coordination room, whiteboards covered with debt maturity timelines and interbank swap diagrams, scattered coffee cups on meeting table, high-stakes institutional stress.",
+                    "beats": [4, 5]
+                },
+                "bg_distressed_bank_trading_pit": {
+                    "title": "Commercial Bank Fixed-Income Dealing Room",
+                    "description": "Quiet after-hours dealing floor with abandoned trader terminals showing red yield spikes, dim emergency lighting, deep shadows between rows of monitors, aftermath of liquidity shock.",
+                    "beats": [4]
+                },
+                "bg_nocturnal_sovereign_wealth_office": {
+                    "title": "Sovereign Wealth Management Office at Dawn",
+                    "description": "Corner executive office with floor-to-ceiling glass catching early morning indigo and amber dawn light over harbor, sleek minimalist desk, profound institutional isolation.",
+                    "beats": [4, 5]
+                },
+                "bg_parliament_budget_committee_hall": {
+                    "title": "Parliamentary Public Accounts Oversight Hall",
+                    "description": "Formal semicircular legislative committee chamber, carved walnut witness tables in foreground, elevated committee dais in background soft focus, dignified democratic scrutiny.",
+                    "beats": [4, 5]
+                },
+                "bg_global_economic_forum_hall": {
+                    "title": "Global Economic Governance Assembly Hall",
+                    "description": "Vast futuristic auditorium with dark acoustic wall panels, subtle uplighting along tiered seats, empty speaker lectern in clean focus, sweeping monumental perspective.",
+                    "beats": [1, 5]
+                },
+                "bg_executive_reading_library": {
+                    "title": "Central Bank Presidential Research Library",
+                    "description": "Quiet double-height institutional library with floor-to-ceiling leather-bound statutory ledgers, spiral brass reading staircase, green banker lamps on dark oak tables, reflective analytical stillness.",
+                    "beats": [1, 5]
+                }
+            }
+            fg_roster = {
+                "fg_character_central_bank_governor": {
+                    "title": "Central Bank Monetary Authority",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior central bank governor in tailored charcoal formal suit, standing with composed authoritative posture, holding official monetary policy brief, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                    "role": "Monetary Authority",
+                    "beats": [1, 4, 5],
+                    "keywords": ["governor", "central bank", "fed", "monetary", "rate hike", "policy", "thống đốc", "ngân hàng trung ương"],
+                    "type": "character"
+                },
+                "fg_character_sovereign_bond_trader": {
+                    "title": "Sovereign Fixed-Income Desk Head",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of an intense sovereign bond trader in crisp white shirt with rolled-up sleeves and dark trousers, reviewing printed yield curve slips with urgent skeptical gaze, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                    "role": "Market Actor",
+                    "beats": [1, 2, 4],
+                    "keywords": ["trader", "bond desk", "yield", "spread", "market", "dealer", "nhà giao dịch", "trái phiếu"],
+                    "type": "character"
+                },
+                "fg_character_treasury_fiscal_official": {
+                    "title": "Treasury Debt Management Director",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior government debt management official in dark navy blazer and spectacles, holding tabbed sovereign borrowing forecast binder, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                    "role": "Fiscal Architect",
+                    "beats": [2, 3, 5],
+                    "keywords": ["treasury", "fiscal", "deficit", "borrowing", "issuance", "kho bạc", "ngân sách"],
+                    "type": "character"
+                },
+                "fg_character_macro_auditor": {
+                    "title": "Forensic Macroeconomic Sovereign Debt Auditor",
+                    "description": "Full-body stylized editorial graphic novel digital illustration of a meticulous sovereign debt auditor in gray trench coat, holding heavy forensic dossier and magnifying loupe, stern analytical expression, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                    "role": "Forensic Investigator",
+                    "beats": [3, 4, 5],
+                    "keywords": ["auditor", "investigator", "imf", "scrutiny", "finding", "kiểm toán", "thanh tra"],
+                    "type": "character"
+                },
+                "fg_evidence_sovereign_treasury_bond": {
+                    "title": "Official Sovereign 10-Year Treasury Bond Certificate",
+                    "description": "Official 300gsm fibrous paper sovereign government bond certificate with intricate guilloche security borders, bold coupon yield rate heading, stamped diagonally with official vermilion treasury seal, crisp cutout edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Core Debt Exhibit",
+                    "beats": [1, 2, 3],
+                    "keywords": ["bond", "treasury", "yield", "coupon", "certificate", "trái phiếu", "kho bạc", "10-year"],
+                    "type": "document"
+                },
+                "fg_evidence_debt_maturity_wall_chart": {
+                    "title": "Macro Debt Maturity Rollover Wall Chart",
+                    "description": "High-contrast quantitative bar graph document printed on heavy cardstock, illustrating the impending trillion-dollar debt maturity rollover wall across 2026-2029, highlighted in fluorescent green and red marker ink, crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Quantitative Maturity Proof",
+                    "beats": [1, 3, 4],
+                    "keywords": ["maturity", "rollover", "wall", "cliff", "refinance", "đáo hạn", "tái cấp vốn", "chart"],
+                    "type": "data_metric"
+                },
+                "fg_evidence_central_bank_balance_sheet": {
+                    "title": "Central Bank Balance Sheet Expansion Ledger",
+                    "description": "Worn double-page central bank accounting ledger displaying ballooning asset holdings, quantitative easing and repo facilities in muted green ink, red verification checkmarks, tactile paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Monetary Expansion Evidence",
+                    "beats": [1, 2, 4],
+                    "keywords": ["balance sheet", "assets", "reserves", "qe", "qt", "expansion", "bảng cân đối"],
+                    "type": "document"
+                },
+                "fg_evidence_sovereign_credit_downgrade_notice": {
+                    "title": "Credit Rating Agency Sovereign Downgrade Letter",
+                    "description": "Official formal rating advisory letter from credit agency, bold header stamped in red ink 'DOWNGRADED // OUTLOOK NEGATIVE', bold black typewriter font detailing fiscal debt overhang, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Sovereign Rating Exhibit",
+                    "beats": [2, 4, 5],
+                    "keywords": ["rating", "downgrade", "moody", "fitch", "s&p", "credit", "xếp hạng", "hạ bậc"],
+                    "type": "document"
+                },
+                "fg_evidence_imf_debt_sustainability_matrix": {
+                    "title": "IMF Debt-to-GDP Sustainability Framework Matrix",
+                    "description": "Technical macroeconomic assessment document featuring multi-column debt-to-GDP projection tables, colored risk threshold heatmaps, official institutional header, sharp clean paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Sustainability Framework",
+                    "beats": [3, 4, 5],
+                    "keywords": ["imf", "gdp", "sustainability", "ratio", "framework", "matrix", "tỷ lệ gdp"],
+                    "type": "data_metric"
+                },
+                "fg_evidence_currency_swap_facility_agreement": {
+                    "title": "Bilateral Central Bank Currency Swap Agreement",
+                    "description": "Thick legal bilateral treaty contract document, multiple pages stapled at top left with blue brass eyelet, blue ballpoint signature lines and embossed institutional seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Liquidity Mechanism Accord",
+                    "beats": [2, 3, 4],
+                    "keywords": ["swap", "currency", "liquidity", "foreign exchange", "agreement", "hoán đổi", "ngoại hối"],
+                    "type": "document"
+                },
+                "fg_evidence_repo_rate_transaction_ticket": {
+                    "title": "Overnight Repo Facility Repurchase Ticket",
+                    "description": "Small tactile transaction slip on yellow carbon-copy paper with perforated edges, showing overnight repo rate interest calculations and collateralized bond numbers, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Interbank Liquidity Exhibit",
+                    "beats": [2, 3, 4],
+                    "keywords": ["repo", "repurchase", "overnight", "ticket", "collateral", "chiết khấu"],
+                    "type": "document"
+                },
+                "fg_evidence_inflation_cpi_breakdown_ledger": {
+                    "title": "Consumer Price Index Inflation Ledger Slip",
+                    "description": "Official statistical bureau price index ledger sheet displaying escalating headline CPI numbers, red circled inflation metrics, crisp fibrous paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Inflation Metric Exhibit",
+                    "beats": [1, 2, 5],
+                    "keywords": ["inflation", "cpi", "price", "index", "purchasing power", "lạm phát", "giá cả"],
+                    "type": "document"
+                },
+                "fg_evidence_g7_finance_communique": {
+                    "title": "G7 Finance Ministers Sovereign Debt Resolution Accord",
+                    "description": "Formal multilateral joint communique on heavy diplomatic letterhead, official emblem at top, embossed gold foil seal, diplomatic clauses regarding debt restructuring, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Multilateral Policy Exhibit",
+                    "beats": [4, 5],
+                    "keywords": ["g7", "ministers", "communique", "resolution", "accord", "thông cáo"],
+                    "type": "document"
+                },
+                "fg_evidence_liquidity_crisis_redacted_memo": {
+                    "title": "Confidential Emergency Interbank Liquidity Memo",
+                    "description": "Manila folder document stamped 'STRICTLY CONFIDENTIAL // GOVERNORS EYES ONLY', heavy black redaction marker bars over vulnerable bank reserve numbers, official paperclips, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Classified Risk Memo",
+                    "beats": [3, 4],
+                    "keywords": ["emergency", "liquidity", "confidential", "secret", "memo", "redacted", "khẩn cấp"],
+                    "type": "document"
+                },
+                "fg_evidence_damages_calculation_invoice": {
+                    "title": f"Forensic Interest Servicing Cost Calculation Sheet ({metric_highlight})",
+                    "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink 'CONFIDENTIAL / EXHIBIT A', crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Forensic Accounting Exhibit",
+                    "beats": [1, 3, 5],
+                    "keywords": ["invoice", "interest expense", "service", "cost", "calculation", "bill", "chi phí lãi"],
+                    "type": "document"
+                },
+                "fg_evidence_sovereign_cds_spread_ticket": {
+                    "title": "Sovereign Credit Default Swap Pricing Slip",
+                    "description": "High-finance derivative order confirmation ticket, showing surging basis point credit default swap premiums, stamped with red ink 'CRITICAL EXPOSURE', isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Market Default Pricing",
+                    "beats": [3, 4],
+                    "keywords": ["cds", "default", "spread", "derivative", "swap", "vỡ nợ"],
+                    "type": "document"
+                },
+                "fg_evidence_foreign_exchange_reserve_certificate": {
+                    "title": "Official Sovereign Foreign Exchange & Bullion Audit Certificate",
+                    "description": "Official central treasury certificate documenting official gold bullion holdings and foreign reserve currency allocations, stamped with official gold star seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Reserve Backing Exhibit",
+                    "beats": [2, 3, 5],
+                    "keywords": ["reserve", "gold", "bullion", "forex", "foreign exchange", "dự trữ ngoại hối"],
+                    "type": "document"
+                },
+                "fg_evidence_pension_fund_asset_audit_binder": {
+                    "title": "Institutional Pension Fund Fixed-Income Allocation Binder",
+                    "description": "Thick three-ring binder open on desk showing asset allocation pie charts losing principal value to high interest yields, colored plastic tab dividers, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Institutional Impact Exhibit",
+                    "beats": [3, 4, 5],
+                    "keywords": ["pension", "fund", "allocation", "yield", "binder", "hưu trí", "quỹ đầu tư"],
+                    "type": "document"
+                },
+                "fg_evidence_emergency_recapitalization_order": {
+                    "title": "Executive Statutory Liquidity Intervention Order",
+                    "description": "Formal executive decree on government letterhead signed with blue fountain pen ink, authorising emergency sovereign treasury backstops and recapitalisation funds, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "State Intervention Order",
+                    "beats": [4, 5],
+                    "keywords": ["order", "statutory", "executive", "bailout", "recapitalization", "can thiệp"],
+                    "type": "document"
+                },
+                "fg_evidence_statute_reference_book": {
+                    "title": "Monetary Code & Statutory Debt Ceiling Reference Codex",
+                    "description": "Heavy vintage leather-bound legal codex open to statutory debt limit and central bank charter sections, gold leaf lettering on spine, crisp cream paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Statutory Authority",
+                    "beats": [1, 2, 5],
+                    "keywords": ["statute", "law", "code", "ceiling", "reference", "trần nợ", "luật ngân sách"],
+                    "type": "document"
+                },
+                "fg_evidence_prosecution_complaint_docket": {
+                    "title": "Official Sovereign Debt Default Legal Filing Docket",
+                    "description": "Official legal filing document from the international arbitration court, bold case docket header, stamped with blue official seal, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Lead Prosecution Docket",
+                    "beats": [1, 4, 5],
+                    "keywords": ["docket", "complaint", "default", "legal", "filing", "khởi kiện", "hồ sơ pháp lý"],
+                    "type": "document"
+                },
+                "fg_evidence_gavel_justice_scale": {
+                    "title": "Judicial Sovereign Restructuring Climax Gavel & Scales",
+                    "description": "Dark polished walnut judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "role": "Judicial Climax Artifact",
+                    "beats": [4, 5],
+                    "keywords": ["gavel", "scales", "judge", "court", "verdict", "búa gỗ", "phán quyết"],
+                    "type": "evidence_prop"
+                }
+            }
+            return bg_roster, fg_roster
 
     # =========================================================================
     # GENERAL INVESTIGATIVE / CORPORATE / REGULATORY FALLBACK (BY MARKET)
@@ -362,13 +1191,16 @@ def _generate_topic_anchored_roster_fallback(
             "bg_metropolitan_police_investigative_hq": {"title": "Metropolitan Police Special Investigation Headquarters", "description": "Nocturnal police taskforce briefing room, whiteboards with suspect timeline flowcharts, warm desk spotlights, focused detective mood.", "beats": [3, 4]},
             "bg_consumer_affairs_agency_briefing_room": {"title": "Consumer Affairs Agency Press Briefing Room", "description": "Formal government press conference room, blue backdrop banner with Japanese seal, rows of empty reporter chairs in soft focus, solemn transparency.", "beats": [4, 5]},
             "bg_national_diet_committee_room": {"title": "National Diet Judicial Oversight Committee Hall", "description": "Historic Diet building committee room with carved wood wainscoting, green baize witness table, dignified legislative scrutiny.", "beats": [4, 5]},
-            "bg_tokyo_district_archive_vault": {"title": "Tokyo District Judicial Evidence Archive Vault", "description": "Reinforced steel evidence vault with labeled brown cardboard litigation boxes, heavy vault door ajar in background, archival authenticity.", "beats": [3, 5]}
+            "bg_tokyo_district_archive_vault": {"title": "Tokyo District Judicial Evidence Archive Vault", "description": "Reinforced steel evidence vault with labeled brown cardboard litigation boxes, heavy vault door ajar in background, archival authenticity.", "beats": [3, 5]},
+            "bg_marunouchi_commercial_headquarters": {"title": "Marunouchi Commercial Tower Executive Lobby", "description": "Quiet monumental lobby of historic Tokyo business headquarters, polished granite columns, filtered natural morning light, dignified commercial scale.", "beats": [1, 2]},
+            "bg_tokyo_high_court_bench": {"title": "Tokyo High Court Appellate Chamber", "description": "Formal high court courtroom with elevated judicial bench in polished cedar, Japanese national seal in deep focus, solemn final reckoning atmosphere.", "beats": [4, 5]}
         }
         fg_roster = {
             "fg_character_tokyo_district_prosecutor": {"title": "Tokyo District Public Prosecutor", "description": "Full-body stylized editorial graphic novel digital illustration of a sharp Japanese public prosecutor in tailored dark suit with prosecutor autumn-frost badge on lapel, holding official filing folder, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecutor", "beats": [1, 4, 5], "keywords": ["prosecutor", "court", "indictment", "検察官", "起訴", "裁判"], "type": "character"},
             "fg_character_ministry_safety_inspector": {"title": "Ministry Food & Safety Lead Inspector", "description": "Full-body stylized editorial graphic novel digital illustration of a diligent Japanese ministry quarantine inspector in navy administrative uniform with ministry identification armband, holding inspection checklist, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Inspector", "beats": [1, 2, 3], "keywords": ["inspector", "quarantine", "ministry", "検査官", "厚生労働省"], "type": "character"},
             "fg_character_corporate_director": {"title": "Corporate Compliance Managing Director", "description": "Full-body stylized editorial graphic novel digital illustration of a conflicted Japanese corporate director in crisp white shirt and dark trousers, bowing slightly in formal apology posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Executive", "beats": [2, 4], "keywords": ["director", "executive", "apology", "役員", "企業"], "type": "character"},
             "fg_character_forensic_auditor": {"title": "Forensic Financial Accounting Auditor", "description": "Full-body stylized editorial graphic novel digital illustration of a focused Japanese auditor holding a thick ledger and red verification pen, spectacles reflecting desk light, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Auditor", "beats": [3, 4, 5], "keywords": ["auditor", "accounting", "ledger", "監査", "会計"], "type": "character"},
+            "fg_character_whistleblower_insider": {"title": "Corporate Whistleblower Insider", "description": "Full-body stylized editorial graphic novel digital illustration of a cautious Japanese company employee in business casual jacket, holding confidential manila envelope, resolute watchful expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower Insider", "beats": [2, 3, 4], "keywords": ["whistleblower", "insider", "告発者", "社員", "証言"], "type": "character"},
             "fg_evidence_hanko_stamped_docket": {"title": "Official Vermilion Hanko Stamped Legal Docket", "description": "Official Japanese district court legal filing document, titled prosecution complaint docket, bold Japanese kanji header, stamped with official red vermilion hanko seal, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecution Docket", "beats": [1, 2, 5], "keywords": ["hanko", "docket", "complaint", "kanji", "seal", "判子", "訴状"], "type": "document"},
             "fg_evidence_chemical_residue_inspection_sheet": {"title": f"Official Safety Inspection Analysis Sheet ({metric_highlight})", "description": f"Government accredited laboratory test certificate showing quantitative chemical analysis results with metric highlight '{metric_highlight}', red verification stamp, Japanese kanji column headers, crisp cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Inspection Exhibit", "beats": [1, 2, 3], "keywords": ["inspection", "chemical", "residue", "analysis", "lab", "検査", "分析"], "type": "document"},
             "fg_evidence_damage_calculation_invoice": {"title": "Macro Economic Restitution & Damages Calculation Sheet", "description": "Official audit summary invoice document displaying highlighted financial calculation figures in green ledger ink, stamped diagonally with bold red ink '証拠物件 // 第1号' (EXHIBIT A), crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["damage", "invoice", "restitution", "loss", "損害", "賠償", "請求書"], "type": "document"},
@@ -383,7 +1215,9 @@ def _generate_topic_anchored_roster_fallback(
             "fg_evidence_customs_clearance_stamp_docket": {"title": "Import Declaration & Customs Tariff Docket", "description": "Multi-page import customs declaration with green tariff stamps and circular inspector approval seals, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Trade Import Exhibit", "beats": [2, 3], "keywords": ["customs", "declaration", "tariff", "import", "輸入申告"], "type": "document"},
             "fg_evidence_internal_meeting_minutes_dossier": {"title": "Executive Board Emergency Meeting Minutes", "description": "Stapled confidential corporate document with bold header '臨時取締役会議事録', margin notes written in pencil, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Knowledge Exhibit", "beats": [3, 4], "keywords": ["minutes", "meeting", "board", "executive", "議事録"], "type": "document"},
             "fg_evidence_red_sealed_violation_notice": {"title": "Formal Regulatory Violation & Cease Order", "description": "Government violation notice stamped with prominent square red ministerial seal, crisp paper texture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Violation Exhibit", "beats": [4, 5], "keywords": ["violation", "notice", "cease", "seal", "違反通知"], "type": "document"},
-            "fg_evidence_food_safety_test_report": {"title": "Public Health Environmental Test Certificate", "description": "Official spectrometry test report displaying quantitative safety threshold tables, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Technical Test Proof", "beats": [2, 3], "keywords": ["test", "report", "health", "analysis", "検査成績書"], "type": "document"}
+            "fg_evidence_food_safety_test_report": {"title": "Public Health Environmental Test Certificate", "description": "Official spectrometry test report displaying quantitative safety threshold tables, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Technical Test Proof", "beats": [2, 3], "keywords": ["test", "report", "health", "analysis", "検査成績書"], "type": "document"},
+            "fg_evidence_subpoena_search_warrant": {"title": "Tokyo District Court Search & Seizure Warrant", "description": "Official search and seizure warrant document issued by Tokyo District Court, bold kanji heading '差押許可状', stamped with square red vermilion seal, crisp legal paper edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Compulsory Judicial Warrant", "beats": [2, 4], "keywords": ["warrant", "search", "court", "令状", "差押許可状", "家宅捜索"], "type": "document"},
+            "fg_evidence_encrypted_usb_drive": {"title": "Forensic Tamper-Evident Digital Storage Drive", "description": "High-durability metallic USB evidence flash drive with serialized forensic police tamper-proof label in Japanese, glowing amber indicator LED, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Digital Evidence Artifact", "beats": [2, 3], "keywords": ["usb", "drive", "data", "digital", "証拠品", "デジタル証拠"], "type": "evidence_prop"}
         }
         return bg_roster, fg_roster
 
@@ -404,13 +1238,16 @@ def _generate_topic_anchored_roster_fallback(
             "bg_audit_board_investigative_room": {"title": "Board of Audit and Inspection Examination Room", "description": "Formal government audit review suite, long conference table covered with audit dossiers, solemn oversight atmosphere.", "beats": [3, 4]},
             "bg_public_health_research_center": {"title": "National Institute of Food and Drug Safety Analysis Lab", "description": "Sterile scientific analysis facility with chromatography instruments, cool fluorescent lighting, clinical documentary feel.", "beats": [2, 3]},
             "bg_appellate_courtroom_interior": {"title": "Seoul High Court Appellate Chamber", "description": "Formal high court chamber with elevated judicial bench, traditional carved timber trim, solemn legal reckoning.", "beats": [4, 5]},
-            "bg_executive_library_archive": {"title": "Supreme Court Legal Library Archive", "description": "Quiet double-height jurisprudence library, rows of bound legal precedents, bronze banker lamps, reflective analytical silence.", "beats": [1, 5]}
+            "bg_executive_library_archive": {"title": "Supreme Court Legal Library Archive", "description": "Quiet double-height jurisprudence library, rows of bound legal precedents, bronze banker lamps, reflective analytical silence.", "beats": [1, 5]},
+            "bg_mapo_police_investigative_squad": {"title": "Seoul Metropolitan Police Financial Investigation Team", "description": "Nocturnal white-collar crime police office, whiteboards with money trail flowcharts, fluorescent task lighting, serious detective mood.", "beats": [2, 3]},
+            "bg_jongno_corporate_headquarters_lobby": {"title": "Jongno Historic Corporate Tower Atrium", "description": "Monumental polished granite atrium of major South Korean enterprise, soaring glass facade reflecting twilight city, solemn institutional scale.", "beats": [1, 2]}
         }
         fg_roster = {
             "fg_character_seoul_prosecutor": {"title": "Senior Special Prosecutor", "description": "Full-body stylized editorial graphic novel digital illustration of a resolute Korean senior prosecutor in dark charcoal suit with prosecution emblem pin, holding a thick legal dossier, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecutor", "beats": [1, 4, 5], "keywords": ["prosecutor", "court", "검사", "기소", "검찰"], "type": "character"},
             "fg_character_corporate_sawon": {"title": "Corporate Accounting Manager", "description": "Full-body stylized editorial graphic novel digital illustration of a conflicted Korean corporate manager in crisp white business shirt wearing corporate lanyard ID badge (Sawonjeung), holding financial ledger, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Insider", "beats": [2, 3, 4], "keywords": ["sawonjeung", "manager", "employee", "사원증", "과장"], "type": "character"},
             "fg_character_regulatory_commissioner": {"title": "Fair Trade Oversight Commissioner", "description": "Full-body stylized editorial graphic novel digital illustration of a senior Korean regulatory commissioner in formal navy attire and glasses, holding an administrative cease order, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Commissioner", "beats": [3, 4, 5], "keywords": ["commissioner", "ftc", "위탁", "공정거래위원회"], "type": "character"},
             "fg_character_forensic_auditor": {"title": "Senior Forensic Accounting Auditor", "description": "Full-body stylized editorial graphic novel digital illustration of a Korean forensic accountant holding an audit binder and tablet, analytical sharp gaze, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Auditor", "beats": [2, 3, 5], "keywords": ["auditor", "accountant", "회계사", "감사"], "type": "character"},
+            "fg_character_whistleblower_analyst": {"title": "Corporate Risk Whistleblower Analyst", "description": "Full-body stylized editorial graphic novel digital illustration of a conflicted Korean corporate analyst in business casual coat, holding sealed whistleblower file, determined intense gaze, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower", "beats": [2, 3, 4], "keywords": ["whistleblower", "insider", "analyst", "내부고발", "제보자"], "type": "character"},
             "fg_evidence_ingam_stamped_docket": {"title": "Official Red Vermilion Ingam Stamped Legal Filing Docket", "description": "Official Korean district court legal indictment document, bold Korean Hangul header, stamped with circular crimson ingam seal, crisp paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecution Docket", "beats": [1, 2, 5], "keywords": ["ingam", "docket", "complaint", "indictment", "seal", "인감", "공소장"], "type": "document"},
             "fg_evidence_corporate_sawonjeung_badge": {"title": "Corporate Employee Sawonjeung Identification Card", "description": "Official plastic corporate employee ID badge with lanyard clip, Hangul title '경영지원본부 / 회계팀' (Management Support / Accounting Team), barcode and chip, authentic institutional realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Insider Artifact", "beats": [1, 2, 3], "keywords": ["sawonjeung", "badge", "id", "card", "사원증", "신분증"], "type": "evidence_prop"},
             "fg_evidence_damages_calculation_invoice": {"title": f"Forensic Accounting & Damages Summary Sheet ({metric_highlight})", "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink '증거 제1호' (EXHIBIT 1), crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["damage", "invoice", "restitution", "손해배상", "세금계산서"], "type": "document"},
@@ -425,7 +1262,9 @@ def _generate_topic_anchored_roster_fallback(
             "fg_evidence_bank_transaction_voucher": {"title": "Commercial Bank Wire Transfer Verification Voucher", "description": "Bank transaction voucher slip with dot-matrix printing, official cashier red stamp, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Financial Paper Trail", "beats": [2, 3], "keywords": ["wire", "bank", "voucher", "transfer", "송금확인서"], "type": "document"},
             "fg_evidence_board_resolution_minutes": {"title": "Board of Directors Emergency Resolution Minutes", "description": "Formally bound board meeting minutes document with attendee signatures and red registered seal impressions, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Minutes Exhibit", "beats": [3, 4], "keywords": ["resolution", "board", "minutes", "이사회", "의사록"], "type": "document"},
             "fg_evidence_forensic_cellphone_extraction_report": {"title": "Mobile Device Digital Extraction Forensic Report", "description": "Official police forensic extraction log showing chat logs and timestamps with highlighted red evidence callouts, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Digital Communication Proof", "beats": [2, 4], "keywords": ["chat", "extraction", "forensic", "phone", "포렌식보고서"], "type": "document"},
-            "fg_evidence_prosecution_summons_notice": {"title": "Official Public Prosecution Summons Order", "description": "Formal legal summons notice commanding executive appearance for questioning, red official stamp, crisp paper creases, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Summons Exhibit", "beats": [1, 4], "keywords": ["summons", "notice", "prosecution", "출석요구서"], "type": "document"}
+            "fg_evidence_prosecution_summons_notice": {"title": "Official Public Prosecution Summons Order", "description": "Formal legal summons notice commanding executive appearance for questioning, red official stamp, crisp paper creases, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Summons Exhibit", "beats": [1, 4], "keywords": ["summons", "notice", "prosecution", "출석요구서"], "type": "document"},
+            "fg_evidence_search_seizure_warrant": {"title": "Seoul District Court Search & Seizure Warrant", "description": "Official legal search warrant issued by Seoul Central District Court, titled '압수·수색·검증영장' in bold Hangul, stamped with circular crimson Ingam seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Compulsory Legal Warrant", "beats": [2, 4], "keywords": ["warrant", "search", "court", "영장", "압수수색"], "type": "document"},
+            "fg_evidence_corporate_slush_fund_ledger": {"title": "Confidential Corporate Slush Fund Double Ledger", "description": "Tactile handwritten double-entry accounting ledger notebook recording undisclosed corporate accounts, red stamp impressions, yellow highlighter, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Illicit Finance Paper Trail", "beats": [2, 3], "keywords": ["ledger", "slush fund", "accounting", "비자금", "이중장부"], "type": "document"}
         }
         return bg_roster, fg_roster
 
@@ -446,13 +1285,16 @@ def _generate_topic_anchored_roster_fallback(
             "bg_notary_public_office": {"title": "Văn Phòng Công Chứng & Xác Thực Hồ Sơ Đất Đai", "description": "Phòng công chứng tư pháp với kệ sách lưu trữ văn bản pháp luật, dấu mộc đỏ trên bàn làm việc, ánh sáng chân thực.", "beats": [2, 3]},
             "bg_financial_institute_amphitheater": {"title": "Giảng Đường Viện Chiến Lược Kinh Tế", "description": "Hội trường phân tích kinh tế vĩ mô, bảng số liệu biểu đồ dòng tiền phía sau, bầu không khí học thuật chuyên sâu.", "beats": [2, 5]},
             "bg_appellate_courtroom": {"title": "Phòng Xét Xử Phúc Thẩm Tòa Án Cấp Cao", "description": "Phòng xét xử phúc thẩm với bục hội đồng ba thẩm phán, phù hiệu quốc gia trang nghiêm, bầu không khí phán quyết đanh thép.", "beats": [4, 5]},
-            "bg_executive_reading_room": {"title": "Thư Viện Pháp Luật & Nghiên Cứu Lịch Sử Tư Pháp", "description": "Thư viện tư pháp yên tĩnh với kệ sách bọc da cổ điển, đèn bàn màu xanh ngọc, không gian chiêm nghiệm sâu lắng.", "beats": [1, 5]}
+            "bg_executive_reading_room": {"title": "Thư Viện Pháp Luật & Nghiên Cứu Lịch Sử Tư Pháp", "description": "Thư viện tư pháp yên tĩnh với kệ sách bọc da cổ điển, đèn bàn màu xanh ngọc, không gian chiêm nghiệm sâu lắng.", "beats": [1, 5]},
+            "bg_state_audit_headquarters_chamber": {"title": "Trụ Sở Kiểm Toán Nhà Nước & Hội Trường Kết Luận", "description": "Phòng họp hội trường của Kiểm toán Nhà nước với bàn chữ U gỗ tự nhiên, quốc huy trang trọng, hồ sơ quyết toán ngân sách trên bàn, không khí minh bạch thanh liêm.", "beats": [3, 4]},
+            "bg_city_financial_district_night": {"title": "Đại Lộ Tài Chính Trung Tâm Thành Phố Về Đêm", "description": "Góc nhìn toàn cảnh trung tâm tài chính Quận 1 hoặc Hoàn Kiếm rực sáng ánh đèn cao ốc trong đêm mù sương, sự tĩnh lặng sâu sắc của trung tâm kinh tế.", "beats": [1, 5]}
         }
         fg_roster = {
             "fg_character_vietnamese_inspector": {"title": "Trưởng Đoàn Thanh Tra Nhà Nước", "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một trưởng đoàn thanh tra trong trang phục thanh tra nhà nước trang trọng, cầm kẹp hồ sơ kết luận thanh tra, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Inspector", "beats": [1, 4, 5], "keywords": ["thanh tra", "kết luận", "cán bộ", "đoàn thanh tra"], "type": "character"},
             "fg_character_corporate_chairperson": {"title": "Chủ Tịch Hội Đồng Quản Trị Tập Đoàn", "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một chủ tịch tập đoàn trong bộ vest tối màu trang trọng, nét mặt căng thẳng kiềm chế trước các chứng cứ tài chính, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Figure", "beats": [1, 2, 4], "keywords": ["chủ tịch", "hội đồng quản trị", "doanh nghiệp", "tập đoàn"], "type": "character"},
             "fg_character_forensic_auditor": {"title": "Kiểm Toán Viên Trưởng Pháp Y Tài Chính", "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một kiểm toán viên tài chính cầm tập báo cáo kiểm toán độc lập dày cộp, kính gọng kim loại phản chiếu ánh đèn, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Auditor", "beats": [2, 3, 5], "keywords": ["kiểm toán", "tài chính", "dòng tiền", "báo cáo"], "type": "character"},
             "fg_character_investigative_journalist": {"title": "Nhà Báo Điều Tra Chuyên Sâu", "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một nhà báo điều tra cầm sổ tay ghi chép và thẻ nhà báo, ánh mắt sắc sảo truy tìm chân tướng, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Investigative Reporter", "beats": [1, 3, 4], "keywords": ["nhà báo", "phóng viên", "điều tra", "chân tướng"], "type": "character"},
+            "fg_character_whistleblower_executive": {"title": "Phó Giám Đốc Đấu Thầu Tố Giác Sai Phạm", "description": "Hình minh họa đồ họa biên tập toàn thân sắc nét của một cựu lãnh đạo doanh nghiệp cầm túi hồ sơ tài liệu mật, ánh mắt kiên định nhưng thận trọng, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower Insider", "beats": [2, 3, 4], "keywords": ["tố giác", "nội bộ", "nhân chứng", "sai phạm", "hồ sơ"], "type": "character"},
             "fg_evidence_moc_do_stamped_docket": {"title": "Kết Luận Thanh Tra Đóng Dấu Mộc Đỏ & Chữ Ký Tươi", "description": "Văn bản kết luận thanh tra chính thức của cơ quan nhà nước, tiêu ngữ quốc gia sắc nét, đóng dấu mộc đỏ tươi hình quốc huy và chữ ký bút mực xanh, chất liệu giấy 300gsm góc cạnh sắc sảo, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Official Docket", "beats": [1, 2, 5], "keywords": ["mộc đỏ", "thanh tra", "kết luận", "dấu đỏ", "quuyết định"], "type": "document"},
             "fg_evidence_damages_calculation_invoice": {"title": f"Bảng Tính Chi Phí Thiệt Hại & Bồi Thường Tài Chính ({metric_highlight})", "description": f"Bảng phụ lục kiểm toán tổng hợp thiệt hại kinh tế hiển thị con số '{metric_highlight}' mực xanh nổi bật, đóng dấu chéo mực đỏ 'TÀI LIỆU CHỨNG CỨ', viền cắt giấy sắc nét, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["thiệt hại", "hóa đơn", "bồi thường", "tài chính", "invoice"], "type": "document"},
             "fg_evidence_red_sealed_violation_notice": {"title": "Biên Bản Vi Phạm Hành Chính & Quyết Định Xử Phạt", "description": "Biên bản xử phạt vi phạm hành chính có dấu mộc đỏ của cơ quan chức năng, chữ in vi tính rõ nét, có dấu giáp lai đỏ tươi mép giấy, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Administrative Sanction Exhibit", "beats": [4, 5], "keywords": ["biên bản", "xử phạt", "vi phạm", "mộc đỏ"], "type": "document"},
@@ -464,7 +1306,12 @@ def _generate_topic_anchored_roster_fallback(
             "fg_evidence_notarized_contract": {"title": "Hợp Đồng Kinh Tế Công Chứng Có Dấu Giáp Lai", "description": "Hợp đồng kinh tế nhiều trang được dập dấu mộc đỏ giáp lai giữa các mép giấy, đóng ghim góc trái, có chữ ký đại diện pháp luật, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Contractual Exhibit", "beats": [2, 3], "keywords": ["hợp đồng", "công chứng", "giáp lai", "contract"], "type": "document"},
             "fg_evidence_bank_statement_slip": {"title": "Sao Kê Tài Khoản Ngân Hàng Dấu Giáp Lai Đỏ", "description": "Tập bảng sao kê tài khoản ngân hàng in kim hiển thị các giao dịch chuyển khoản hàng trăm tỷ đồng, dấu tròn ngân hàng đỏ tươi, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Banking Paper Trail", "beats": [2, 3], "keywords": ["sao kê", "ngân hàng", "giao dịch", "chuyển tiền"], "type": "document"},
             "fg_evidence_forensic_sealing_tape": {"title": "Băng Keo Niêm Phong Tang Vật Pháp Lý", "description": "Dải băng keo giấy niêm phong chính thức có đóng dấu giáp lai đỏ đè lên mép dán thùng tài liệu tang vật, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Seal Exhibit", "beats": [3, 4], "keywords": ["niêm phong", "tang vật", "băng keo", "seal"], "type": "evidence_prop"},
-            "fg_evidence_tax_assessment_notice": {"title": "Thông Báo Truy Thu Thuế & Phạt Chậm Nộp", "description": "Văn bản quyết định truy thu thuế và xử phạt vi phạm của Cục Thuế, dấu mộc tròn đỏ của cơ quan thuế, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Tax Penalty Exhibit", "beats": [3, 5], "keywords": ["truy thu", "thuế", "xử phạt", "thông báo"], "type": "document"}
+            "fg_evidence_tax_assessment_notice": {"title": "Thông Báo Truy Thu Thuế & Phạt Chậm Nộp", "description": "Văn bản quyết định truy thu thuế và xử phạt vi phạm của Cục Thuế, dấu mộc tròn đỏ của cơ quan thuế, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Tax Penalty Exhibit", "beats": [3, 5], "keywords": ["truy thu", "thuế", "xử phạt", "thông báo"], "type": "document"},
+            "fg_evidence_c03_investigation_subpoena": {"title": "Giấy Triệu Tập của Cơ Quan Cảnh Sát Điều Tra", "description": "Giấy triệu tập làm việc chính thức của Cơ quan Cảnh sát điều tra Bộ Công an, có quốc huy và dấu mộc đỏ tươi, chữ ký của Thủ trưởng cơ quan điều tra, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Police Investigation Subpoena", "beats": [2, 4], "keywords": ["triệu tập", "công an", "cảnh sát điều tra", "c03", "mộc đỏ"], "type": "document"},
+            "fg_evidence_asset_freeze_decision": {"title": "Quyết Định Phong Tỏa Tài Khoản & Kê Biên Bất Động Sản", "description": "Văn bản pháp lý của Viện kiểm sát nhân dân tối cao về việc phong tỏa tài khoản ngân hàng và kê biên tài sản, đóng dấu mộc đỏ tươi giáp lai, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Asset Freezing Injunction", "beats": [4, 5], "keywords": ["phong tỏa", "kê biên", "viện kiểm sát", "tài khoản", "mộc đỏ"], "type": "document"},
+            "fg_evidence_bidding_collusion_matrix": {"title": "Hồ Sơ Chứng Cứ Thông Thầu & Quân Xanh Quân Đỏ", "description": "Bảng sơ đồ ma trận điều tra bóc tách hành vi liên danh thông thầu, đánh dấu bút dạ quang vàng các nhà thầu chân gỗ, đóng dấu tài liệu mật, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Procurement Fraud Exhibit", "beats": [2, 3], "keywords": ["thông thầu", "quân xanh", "đấu thầu", "chân gỗ", "bằng chứng"], "type": "document"},
+            "fg_evidence_audit_discrepancy_sheet": {"title": "Bảng Đối Soát Chênh Lệch Dòng Tiền & Rút Ruột Dự Án", "description": "Bảng đối soát kiểm toán độc lập hiển thị số liệu rút ruột vốn nhà nước, cột chênh lệch ghi bằng mực đỏ nổi bật, viền giấy sắc nét, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Audit Discrepancy Exhibit", "beats": [3, 4], "keywords": ["đối soát", "chênh lệch", "rút ruột", "kiểm toán", "dòng tiền"], "type": "document"},
+            "fg_evidence_land_notarized_title_deed": {"title": "Giấy Chứng Nhận Quyền Sử Dụng Đất (Sổ Đỏ) Có Dấu Giáp Lai", "description": "Giấy chứng nhận quyền sử dụng đất bìa hồng đỏ chính thức có phôi bảo an quốc gia, đóng dấu mộc tròn đỏ của Sở Tài nguyên & Môi trường, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Real Estate Title Exhibit", "beats": [1, 2], "keywords": ["sổ đỏ", "đất đai", "bất động sản", "chứng nhận", "mộc đỏ"], "type": "document"}
         }
         return bg_roster, fg_roster
 
@@ -486,13 +1333,16 @@ def _generate_topic_anchored_roster_fallback(
             "bg_logistics_shipping_terminal": {"title": "Maritime Commercial Logistics Dock", "description": "Quiet commercial shipping terminal office overlooking automated gantry cranes through rainy glass, industrial authenticity.", "beats": [2, 4]},
             "bg_secure_data_vault": {"title": "Forensic Electronic Evidence Cleanroom", "description": "High-security digital forensic cleanroom with anti-static workbenches, data recovery docks in soft focus, focused investigative realism.", "beats": [3, 4]},
             "bg_press_conference_briefing_hall": {"title": "Government Press Briefing Auditorium", "description": "Formal government agency press theater, dark blue backdrop with federal eagle emblem, empty wooden lectern in sharp focus.", "beats": [4, 5]},
-            "bg_institutional_archive_records_room": {"title": "National Institutional Records Hall", "description": "Double-height archival records room with rolling ladder system, rows of bound legal dockets, soft ambient illumination.", "beats": [3, 5]}
+            "bg_institutional_archive_records_room": {"title": "National Institutional Records Hall", "description": "Double-height archival records room with rolling ladder system, rows of bound legal dockets, soft ambient illumination.", "beats": [3, 5]},
+            "bg_sec_enforcement_war_room": {"title": "Securities Enforcement Strategy War Room", "description": "Government regulatory enforcement command room with whiteboards displaying corporate ownership flowcharts, glowing document scanners, serious investigative mood.", "beats": [3, 4]},
+            "bg_capitol_hill_press_corridor": {"title": "Capitol Hill Congressional Scrutiny Press Corridor", "description": "Neoclassical marble colonnade corridor outside congressional hearing rooms, warm brass chandeliers, media microphones on stanchions in soft focus, dignified institutional setting.", "beats": [1, 5]}
         }
         fg_roster = {
             "fg_character_lead_prosecutor": {"title": "Federal District Lead Prosecutor", "description": "Full-body stylized editorial graphic novel digital illustration of a focused federal prosecutor in dark tailored wool suit, holding prosecution complaint folder, standing with composed authority, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecutor", "beats": [1, 4, 5], "keywords": ["prosecutor", "complaint", "indictment", "court", "justice"], "type": "character"},
             "fg_character_corporate_general_counsel": {"title": "Corporate General Counsel", "description": "Full-body stylized editorial graphic novel digital illustration of a guarded corporate defense attorney in charcoal pinstripe suit, holding closed leather briefcase with firm defensive posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Defense Counsel", "beats": [1, 2, 4], "keywords": ["counsel", "attorney", "corporate", "defense", "executive"], "type": "character"},
             "fg_character_forensic_accountant": {"title": "Senior Forensic Financial Accountant", "description": "Full-body stylized editorial graphic novel digital illustration of a meticulous forensic accountant holding tabulated financial ledger and red audit pen, spectacles reflecting light, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accountant", "beats": [2, 3, 5], "keywords": ["accountant", "audit", "forensic", "ledger", "numbers"], "type": "character"},
             "fg_character_whistleblower_insider": {"title": "Key Corporate Whistleblower Insider", "description": "Full-body stylized editorial graphic novel digital illustration of an observant corporate insider in casual business jacket, holding confidential manila envelope with cautious resolute gaze, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower", "beats": [2, 3, 4], "keywords": ["whistleblower", "insider", "confidential", "secret", "memo"], "type": "character"},
+            "fg_character_investigative_journalist": {"title": "Senior Investigative Financial Journalist", "description": "Full-body stylized editorial graphic novel digital illustration of an investigative journalist in trench coat with press badge on lanyard, holding reporter notepad and pen, focused inquisitive expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Investigative Reporter", "beats": [1, 3, 5], "keywords": ["journalist", "reporter", "investigation", "press", "media"], "type": "character"},
             "fg_evidence_prosecution_complaint_docket": {"title": "Official Legal Prosecution Complaint Docket", "description": "Official legal filing document from the federal district court, bold case header, legal docket stamped with blue ink, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecution Docket", "beats": [1, 2, 5], "keywords": ["docket", "complaint", "indictment", "court", "legal"], "type": "document"},
             "fg_evidence_damages_calculation_invoice": {"title": f"Forensic Accounting & Damages Summary Sheet ({metric_highlight})", "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink 'CONFIDENTIAL / EXHIBIT A', crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["damages", "invoice", "restitution", "loss", "bill"], "type": "document"},
             "fg_evidence_regulatory_audit_binder": {"title": "Forensic Investigative Audit Binder", "description": "Thick three-ring forensic investigative audit binder with tabbed colored dividers, official regulatory growth charts visible on front plastic sleeve, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Macro Financial Evidence", "beats": [3, 4, 5], "keywords": ["binder", "audit", "investigation", "dossier"], "type": "document"},
@@ -504,10 +1354,14 @@ def _generate_topic_anchored_roster_fallback(
             "fg_evidence_subpoena_compliance_order": {"title": "Federal Subpoena Duces Tecum Order", "description": "Official federal court subpoena order commanding production of records, embossed blue judicial seal, signed command line, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Compulsory Legal Order", "beats": [2, 4], "keywords": ["subpoena", "order", "records", "compliance"], "type": "document"},
             "fg_evidence_internal_email_chain_exhibit": {"title": "Printed Executive Internal Email Chain Exhibit", "description": "Printed email records stamped with exhibit letter, highlighting strategic discussions with bold yellow highlighter ink, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Internal Communications Exhibit", "beats": [2, 3], "keywords": ["email", "chain", "exhibit", "communication"], "type": "document"},
             "fg_evidence_financial_audit_reconciliation": {"title": "Forensic Revenue Reconciliation Audit Sheet", "description": "Multi-column audit reconciliation spread sheet on green-tinted paper, red penalty calculations stamped in bottom right corner, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Audit Reconciliation Exhibit", "beats": [3, 4], "keywords": ["reconciliation", "audit", "revenue", "penalty"], "type": "document"},
-            "fg_evidence_compliance_violation_notice": {"title": "Federal Regulatory Formal Violation Notice", "description": "Formal administrative cease-and-desist violation decree with red stamped border and gold agency seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Violation Exhibit", "beats": [4, 5], "keywords": ["violation", "notice", "cease", "sanction"], "type": "document"}
+            "fg_evidence_compliance_violation_notice": {"title": "Federal Regulatory Formal Violation Notice", "description": "Formal administrative cease-and-desist violation decree with red stamped border and gold agency seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Violation Exhibit", "beats": [4, 5], "keywords": ["violation", "notice", "cease", "sanction"], "type": "document"},
+            "fg_evidence_search_warrant_affidavit": {"title": "Federal Court Search Warrant Affidavit", "description": "Sworn legal affidavit for federal search warrant, stamped with blue court seal and signed by special agent, crisp paper textures, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Search Warrant", "beats": [2, 4], "keywords": ["warrant", "search", "affidavit", "federal", "court"], "type": "document"},
+            "fg_evidence_wire_fraud_indictment_sheet": {"title": "Federal Grand Jury True Bill Indictment", "description": "Formal multi-count federal indictment docket with grand jury foreman signature line and embossed gold seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Grand Jury Indictment Exhibit", "beats": [1, 4], "keywords": ["indictment", "grand jury", "charges", "fraud", "true bill"], "type": "document"},
+            "fg_evidence_encrypted_flash_drive": {"title": "Forensic Encrypted Storage Flash Drive", "description": "Metallic USB evidence drive with yellow forensic evidence tag and barcode sticker, tamper-evident security tape, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Digital Hardware Evidence", "beats": [2, 3], "keywords": ["flash drive", "usb", "digital", "evidence", "storage"], "type": "evidence_prop"},
+            "fg_evidence_asset_freeze_injunction_order": {"title": "Federal Asset Freezing Injunction Decree", "description": "Judicial injunction decree commanding worldwide freeze of corporate and executive assets, red embossed court seal, crisp legal edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Restraining Order", "beats": [4, 5], "keywords": ["freeze", "injunction", "assets", "order", "court"], "type": "document"},
+            "fg_evidence_whistleblower_audio_recorder": {"title": "Forensic Digital Audio Recording Device", "description": "Compact brushed metal digital audio dictaphone with visible audio waveform on illuminated LCD screen, marked with yellow evidence label, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Audio Surveillance Evidence", "beats": [2, 3], "keywords": ["recorder", "audio", "wiretap", "dictaphone", "evidence"], "type": "evidence_prop"}
         }
         return bg_roster, fg_roster
-
 
 def extract_dynamic_visual_roster(
     story_text: str = "",
@@ -562,7 +1416,7 @@ def extract_dynamic_visual_roster(
     fg_roster = None
 
     # Thử gọi LLM Gateway để sinh Roster hoàn toàn độc lập và động (bỏ qua trong pytest để test chạy tức thì)
-    is_testing = bool(os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules)
+    is_testing = bool(os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules or os.getenv("VF_SMOKE_TEST") or os.getenv("FAST_ROSTER"))
     if not is_testing:
         try:
             from app.services.model_gateway import get_global_gateway
@@ -1221,8 +2075,8 @@ def main():
     print(f"✅ Đã tạo director_plan.json ({len(scenes)} cảnh, {len(hero_clips)} Veo 3D clips) -> {dp_path}")
 
     # 2. Lưu prompts_forge.json
-    bg_prompts = {k: _sanitize_background_prompt(v["description"], bg_key=k, market=ep_id.split("_")[0]) for k, v in bg_roster.items()}
-    fg_prompts = {k: _sanitize_foreground_prompt(v["description"], fg_key=k, market=ep_id.split("_")[0]) for k, v in fg_roster.items()}
+    bg_prompts = {k: _sanitize_background_prompt(v["description"], bg_key=k, market=mkt) for k, v in bg_roster.items()}
+    fg_prompts = {k: _sanitize_foreground_prompt(v["description"], fg_key=k, market=mkt) for k, v in fg_roster.items()}
     prompts_data = {
         "episode_id": ep_id,
         "backgrounds": bg_prompts,

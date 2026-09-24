@@ -145,7 +145,12 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
 
 def _fetch_native_wiki_extract(subject: str, market: str) -> str:
     """Fetch factual native Wikipedia summary for the subject."""
-    lang_map = {"JP": "ja", "KR": "ko", "EN": "en", "US": "en", "GB": "en", "AU": "en", "CA": "en", "DE": "de", "NZ": "en"}
+    lang_map = {
+        "JP": "ja", "JA": "ja",
+        "KR": "ko", "KO": "ko",
+        "VN": "vi", "VI": "vi",
+        "EN": "en", "US": "en", "GB": "en", "AU": "en", "CA": "en", "DE": "de", "NZ": "en"
+    }
     lang = lang_map.get(market.upper(), "en")
     
     try:

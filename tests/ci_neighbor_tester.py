@@ -126,8 +126,8 @@ def test_block1_trend_contract() -> bool:
             MARKET_CONFIG,
         )
 
-        assert "EN" in MARKET_CONFIG and "JP" in MARKET_CONFIG and "KR" in MARKET_CONFIG
-        logger.info("  ✅ Market configurations validated (EN, JP, KR).")
+        assert "EN" in MARKET_CONFIG and "JP" in MARKET_CONFIG and "KR" in MARKET_CONFIG and "VN" in MARKET_CONFIG
+        logger.info("  ✅ Market configurations validated (EN, JP, KR, VN).")
 
         factsheet = fetch_ground_truth_factsheet("TSMC", "EN")
         assert "wiki_ground_truth" in factsheet
@@ -193,8 +193,8 @@ def test_block15_competitor_contract() -> bool:
             MARKET_LOCALE
         )
 
-        assert "en" in MARKET_LOCALE and "jp" in MARKET_LOCALE and "kr" in MARKET_LOCALE
-        logger.info("  ✅ B1.5 Market Locale Hints OK.")
+        assert "en" in MARKET_LOCALE and "jp" in MARKET_LOCALE and "kr" in MARKET_LOCALE and "vn" in MARKET_LOCALE
+        logger.info("  ✅ B1.5 Market Locale Hints OK (EN, JP, KR, VN).")
 
         raw_comments = [
             {"text": "Why did nobody audit the balance sheet earlier?", "likes": 450, "author": "Alice"},
@@ -480,6 +480,21 @@ def test_block3_director_contract() -> bool:
             en_bgs = set(s.get("bg_reuse_key") for s in en_scenes if s.get("bg_reuse_key"))
             assert len(jp_bgs.intersection(en_bgs)) == 0, f"Background rosters overlapped: {jp_bgs.intersection(en_bgs)}"
             logger.info(f"  ✅ Live Cross-Market Integrity Passed: JP ({len(jp_bgs)} BGs) vs EN ({len(en_bgs)} BGs) 100% disjoint, 0% leakage.")
+
+            # 7. Rule 122 & Rule 128: 4-Market Vox Visual Roster Depth & Multi-Mode Parity (JP, KR, VN, EN)
+            logger.info("  🧪 [7/7] Running 4-Market Vox Visual Roster Depth & Multi-Mode Parity Audit...")
+            from app.services.unified_vox_director import _generate_topic_anchored_roster_fallback
+            for mkt_code in ["EN", "JP", "KR", "VN"]:
+                for is_fin in [True, False]:
+                    test_topic = "Sovereign Debt Liquidity Wall" if is_fin else "Corporate Fraud Antitrust"
+                    bg_r, fg_r = _generate_topic_anchored_roster_fallback(test_topic, mkt_code, key_metrics=["$100B"], claims=[])
+                    assert len(bg_r) >= 18, f"[{mkt_code} fin={is_fin}] Background roster depth below threshold: {len(bg_r)} < 18"
+                    assert len(fg_r) >= 22, f"[{mkt_code} fin={is_fin}] Foreground roster depth below threshold: {len(fg_r)} < 22"
+                    bg_beats = {b for item in bg_r.values() for b in item.get("beats", [])}
+                    fg_beats = {b for item in fg_r.values() for b in item.get("beats", [])}
+                    assert bg_beats == {1, 2, 3, 4, 5}, f"[{mkt_code} fin={is_fin}] BG missing beats: {bg_beats}"
+                    assert fg_beats == {1, 2, 3, 4, 5}, f"[{mkt_code} fin={is_fin}] FG missing beats: {fg_beats}"
+            logger.info("  ✅ 4-Market Vox Visual Roster Parity Passed: All markets (EN, JP, KR, VN) have >= 18 BGs & >= 22 FGs across 5 Beats.")
         finally:
             shutil.rmtree(test_dir, ignore_errors=True)
 

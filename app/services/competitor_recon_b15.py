@@ -97,6 +97,8 @@ MARKET_LOCALE = {
     "en": {"relevanceLanguage": "en", "regionCode": "US", "transcript_langs": ["en"]},
     "jp": {"relevanceLanguage": "ja", "regionCode": "JP", "transcript_langs": ["ja", "en"]},
     "kr": {"relevanceLanguage": "ko", "regionCode": "KR", "transcript_langs": ["ko", "en"]},
+    "vn": {"relevanceLanguage": "vi", "regionCode": "VN", "transcript_langs": ["vi", "en"]},
+    "vi": {"relevanceLanguage": "vi", "regionCode": "VN", "transcript_langs": ["vi", "en"]},
 }
 
 # Strategic comment mining patterns (Thanh Hai YouTube AI 2026 Playbook)

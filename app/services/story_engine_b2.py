@@ -37,7 +37,7 @@ import json as json_lib
 NOTION_STORY_DB_ID = os.getenv("STORY_LIBRARY_DB_ID", "b0301989-2400-836b-bdb5-8131fea17736")
 EPISODES_BASE_DIR = os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")
 PENDING_TASKS_DIR = "/var/vf/pending_tasks"
-KNOWN_MARKETS = {"EN", "JP", "KR"}
+KNOWN_MARKETS = {"EN", "JP", "KR", "VN", "VI"}
 ACT_PATTERN = re.compile(r'(=== ACT [I|V|X]+ ===.*?)(?=(=== ACT [I|V|X]+ ===|\Z))', re.DOTALL)
 
 
@@ -240,7 +240,7 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
     Extracts karaoke highlight keywords and assigns beat_index (1..5).
     """
     mkt = market.upper()
-    lang_name = "English" if mkt == "EN" else ("Japanese" if mkt == "JP" else "Korean")
+    lang_name = "English" if mkt == "EN" else ("Japanese" if mkt in ["JP", "JA"] else ("Korean" if mkt in ["KR", "KO"] else ("Vietnamese" if mkt in ["VN", "VI"] else "English")))
 
     if mkt == "KR":
         target_desc = "3,200 to 3,600 Korean Hangul syllables across 120 to 150 breath-timed sentences (each 20-30 syllables), for ~12-14 min narration at natural docudrama pace (~250-270 syllables/min). Do NOT compress or drop story content."
