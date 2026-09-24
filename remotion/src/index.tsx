@@ -398,7 +398,15 @@ const SubtitleZoneOverlay = ({ height, position }) => {
 // === VOX-STYLE EXPLANATORY MOTION ENGINE (Rule 122 & Rule 128) ===
 // Components modularized into src/components/vox/ (VoxOverlayLayer, VoxDocumentHighlight, VoxKineticCounter, VoxCausalFlowchart, VoxTacticalMap)
 
-const ForensicStampBadge = ({ badge, isLeft }: { badge: string; isLeft?: boolean }) => {
+const ForensicStampBadge = ({
+  badge,
+  isLeft,
+  hasStatCard,
+}: {
+  badge: string;
+  isLeft?: boolean;
+  hasStatCard?: boolean;
+}) => {
   const frame = useCurrentFrame();
   const cfg = useVideoConfig();
   // Dynamic Stamp Slam physics: rapid scale drop from 2.4 down to 1.0 with damping spring
@@ -423,7 +431,7 @@ const ForensicStampBadge = ({ badge, isLeft }: { badge: string; isLeft?: boolean
     <div
       style={{
         position: "absolute",
-        top: 55,
+        top: hasStatCard ? 175 : 65,
         left: isLeft ? "auto" : 70,
         right: isLeft ? 70 : "auto",
         transform: `scale(${scale}) rotate(-8deg)`,
@@ -670,7 +678,7 @@ export const TwoLayerScene = (props) => {
 
       {/* Forensic Stamp Slam Badge (Rule 122 Acting & Evidence Props) */}
       {showOverlay && stampBadge ? (
-        <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} />
+        <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} hasStatCard={Boolean(statValue)} />
       ) : null}
 
       {/* Modern High-Retention Subtitle Dialogue Container (Decision A4: Adaptive Opposing HUD) */}
@@ -1120,7 +1128,7 @@ const OverlaySegmentView = ({
       />
 
       {stampBadge ? (
-        <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} />
+        <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} hasStatCard={Boolean(statValue)} />
       ) : null}
     </AbsoluteFill>
   );
