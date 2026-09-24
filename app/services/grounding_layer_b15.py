@@ -494,7 +494,10 @@ def format_grounded_facts_for_prompt(grounding_result: Dict[str, Any]) -> str:
         "8. CONTEMPORARY EVENT ANCHOR & TREND-INTENT PRIORITY (MANDATORY IN ACT I):",
         "   - When an episode is based on an active trend, breaking investigation, or contemporary crisis: Act I (specifically paragraph 1 or 2) MUST explicitly name the specific real-world Contemporary Catalyst Event (exact dates, acting entities/governments, and verified quantitative drops/metrics from this table).",
         "   - STRICTLY FORBIDDEN: Hiding behind vague, abstract, or generic phrasing (such as 'When an emergency occurs' or 'When systemic volatility happens') when verified contemporary event details are present in the table!",
-        "   - HISTORICAL PRECEDENT DISCIPLINE: Historical comparisons from past eras may ONLY be used in later Acts (Act II/III) as comparative blueprints to explain the legal, institutional, or financial mechanism, NEVER to replace or displace the contemporary catalyst that viewers are actively searching for.\n"
+        "   - HISTORICAL PRECEDENT DISCIPLINE: Historical comparisons from past eras may ONLY be used in later Acts (Act II/III) as comparative blueprints to explain the legal, institutional, or financial mechanism, NEVER to replace or displace the contemporary catalyst that viewers are actively searching for.",
+        "9. EVIDENTIARY DOCUMENT ATTRIBUTION DISCIPLINE (ANTI-HALLUCINATED TITLES):",
+        "   - When citing internal reports, slide presentations, memos, or court records from this Dossier, describe their substance accurately using descriptive attribution (e.g. 'internal company slide decks presented to Congress', 'court-ordered discovery exhibits').",
+        "   - STRICTLY FORBIDDEN: Inventing catchy fictitious document nicknames, exhibit numbers, or quotation-mark titles not present verbatim in this Dossier.\n"
     ]
 
     for idx, c in enumerate(claims, 1):

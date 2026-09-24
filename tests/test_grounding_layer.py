@@ -383,4 +383,23 @@ def test_factual_density_gate_enforcement():
     assert "required >= 8" in reason
 
 
+def test_zero_truncation_and_document_discipline():
+    from app.services.story_fact_auditor_b2 import SYSTEM_STORY_AUDITOR_PROMPT
+    from app.services.grounding_layer_b15 import format_grounded_facts_for_prompt
+
+    # 1. Verify Grounding Dossier includes Document Attribution Discipline
+    sample_intel = {
+        "claims": [
+            {"claim": "Claim 1", "source": "Reuters", "confidence": "verified", "date": "2026-09-01", "causal_role": "primary_catalyst"}
+        ]
+    }
+    formatted = format_grounded_facts_for_prompt(sample_intel)
+    assert "EVIDENTIARY DOCUMENT ATTRIBUTION DISCIPLINE (ANTI-HALLUCINATED TITLES)" in formatted
+
+    # 2. Verify SYSTEM_STORY_AUDITOR_PROMPT includes Evidentiary Document Attribution Policy
+    assert "EVIDENTIARY DOCUMENT ATTRIBUTION POLICY (Rule 118 & Rule 130)" in SYSTEM_STORY_AUDITOR_PROMPT
+    assert "Legitimate Descriptive Document Reference" in SYSTEM_STORY_AUDITOR_PROMPT
+
+
+
 

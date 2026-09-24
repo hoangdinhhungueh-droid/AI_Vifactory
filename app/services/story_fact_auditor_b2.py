@@ -31,7 +31,12 @@ Your mandate is to rigorously verify HARD FACTS, ACCURATE QUANTITATIVE METRICS, 
 5. RESTRAINED EDITORIAL POLICY:
    - You MUST NOT penalize cinematic metaphors, high dramatic suspense, emotional human stakes, or rhetorical questions.
    - Do NOT force the script into a boring news wire or dry legal brief! The writer (Claude Opus 5) is an artistic director; your job is to ensure legal/factual truth AND elevate dramatic pacing.
-6. YOUTUBE SAFETY: Zero glorification of violence, zero self-harm, zero defamatory ungrounded personal attacks.
+6. EVIDENTIARY DOCUMENT ATTRIBUTION POLICY (Rule 118 & Rule 130):
+   - Distinguish between:
+     (A) True Data Fabrication: Fabricating fake monetary penalties, false calendar dates, non-existent judicial orders, or inverted causal catalysts -> STRICT FAIL.
+     (B) Legitimate Descriptive Document Reference: The script referencing internal slide decks, memos, or research studies that ARE substantively anchored in the Grounding Claims -> VALID (PASS).
+   - If the script mentions internal company studies, slide decks, or discovery exhibits that correspond to documented findings in the Grounding Dossier, do NOT penalize as ungrounded merely because the author uses descriptive narrative phrasing, provided the underlying factual claims and dates remain true.
+7. YOUTUBE SAFETY: Zero glorification of violence, zero self-harm, zero defamatory ungrounded personal attacks.
 
 Passing threshold:
 - audit_score >= 8.0/10 (scores >= 7.5 are normalized to PASS)
@@ -203,10 +208,14 @@ def audit_delta_patched_acts(
     m_up = (market or "EN").strip().upper()
     topic = topic_meta.get("topic_name_vi") or topic_meta.get("raw_term") or task_id
 
-    # Format lean grounding table
+    # Format lean grounding table (Rule 126 & 134: Zero-Truncation Parity)
     grounding_brief = []
-    for idx, c in enumerate(grounding_claims[:8], 1):
-        grounding_brief.append(f"[{idx}] {c.get('claim', '')} | Metric: {c.get('verified_metric', 'N/A')} | Source: {c.get('source_title', '')}")
+    for idx, c in enumerate(grounding_claims, 1):
+        claim_txt = c.get('claim', '')
+        metric = c.get('verified_metric', 'N/A')
+        src = c.get('source_title') or c.get('source', '')
+        date = c.get('date', 'N/A')
+        grounding_brief.append(f"[{idx}] ({date}) {claim_txt} | Metric: {metric} | Source: {src}")
     grounding_str = "\n".join(grounding_brief)
 
     # Format patched acts text
@@ -223,7 +232,7 @@ def audit_delta_patched_acts(
     lean_prompt = f"""[TARGETED DELTA RE-AUDIT]
 Task ID: {task_id} | Topic: {topic} | Market: {m_up}
 
-[VERIFIED GROUNDING TRUTH BASELINE]
+[VERIFIED GROUNDING TRUTH BASELINE ({len(grounding_claims)} CLAIMS)]
 {grounding_str}
 
 [PATCHED ACTS UNDER REVIEW (DELTA ONLY)]
@@ -233,7 +242,8 @@ Task ID: {task_id} | Topic: {topic} | Market: {m_up}
 Interrogate the patched Acts strictly against the previous defects:
 1. Did the patch resolve the factual discrepancy or causal inversion?
 2. Did it introduce any newly hallucinated metrics or unauthorized data (Rule 118 & 130)?
-3. RESTRAINED EDITORIAL POLICY: Do NOT penalize high dramatic tension, cinematic pacing, or emotional engagement. Solely verify facts and YouTube safety.
+3. EVIDENTIARY DOCUMENT ATTRIBUTION POLICY: Do NOT flag internal document or slide deck references as ungrounded if their substance matches documented findings in the Grounding Baseline.
+4. RESTRAINED EDITORIAL POLICY: Do NOT penalize high dramatic tension, cinematic pacing, or emotional engagement. Solely verify facts and YouTube safety.
 
 Return strict JSON only:
 {{

@@ -117,18 +117,23 @@ def run_dual_model_convergence(
     gateway = get_global_gateway()
     m_up = (market or "EN").strip().upper()
 
-    # Format Grounding Table
+    # Format Grounding Table (Rule 126 & 134: Zero-Truncation Parity)
     grounding_table_lines = [
         "| Index | Claim / Data Anchor | Source Verification & Date | Verified Metric | Causal Role |",
         "|---|---|---|---|---|"
     ]
-    for idx, c in enumerate(grounding_claims[:10], 1):
+    for idx, c in enumerate(grounding_claims, 1):
+        claim_text = c.get('claim', '')
+        src = c.get('source_title') or c.get('source', '')
+        dt = c.get('date', 'N/A')
+        metric = c.get('verified_metric', '')
+        role = c.get('causal_type') or c.get('causal_role', 'Level 1 Catalyst')
         grounding_table_lines.append(
-            f"| {idx} | {c.get('claim', '')} | {c.get('source_title', '')} ({c.get('date', 'N/A')}) | {c.get('verified_metric', '')} | {c.get('causal_type', 'Level 1 Catalyst')} |"
+            f"| {idx} | {claim_text} | {src} ({dt}) | {metric} | {role} |"
         )
     grounding_table_str = "\n".join(grounding_table_lines)
 
-    logger.info(f"[dual_convergence] Starting Targeted Delta-Convergence for {task_id} ({m_up}) [Max {max_rounds} rounds]...")
+    logger.info(f"[dual_convergence] Starting Targeted Delta-Convergence for {task_id} ({m_up}) [Max {max_rounds} rounds] with {len(grounding_claims)} baseline claims...")
 
     acts_dict = parse_script_into_acts(story_text)
     if len(acts_dict) < 5:
@@ -184,6 +189,11 @@ Your mandate is to REWRITE AND PATCH ONLY THE DEFECTIVE ACTS listed below.
 2. Emotional & Cinematic Power: Maintain high dramatic suspense, human stakes, and pattern interrupts. Do NOT let factual corrections make the script dry or clinical.
 3. Narrative Continuity: Ensure the patched Acts seamlessly flow with the untouched Acts.
 4. Native Diction: Natural high-register native phrasing ({m_up}). Zero raw English jargon in JP/KR.
+5. DOCUMENT & EXHIBIT DISCIPLINE (ANTI-HALLUCINATED TITLES - RULE 118):
+   - When citing internal company documents, slide decks, memos, or court exhibits:
+     STRICTLY FORBIDDEN: Inventing fictitious titles, exhibit labels, or memo numbers in quotation marks (e.g. do NOT invent a slide deck titled "Teen Mental Health Deep Dive" or "Exhibit 42" unless that exact verbatim string exists in the Grounding Table).
+   - Use factual, descriptive attribution anchored in the Grounding Table (e.g., 'internal research presented to Congress', 'company slide presentations detailing user risks', 'court-ordered discovery records').
+   - Anchor evidence to actual verified entities/dates in the Grounding Table without inventing document titles.
 
 Output ONLY the patched Act(s), formatted with standard headers (e.g. '=== ACT I ===', '=== ACT II ==='):"""
 
