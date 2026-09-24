@@ -1168,7 +1168,7 @@ def discover_and_produce_market_trend(
             grounding_hint = t_obj.get("niche_angle_brief") or ""
             grounding_intel = run_grounding_research(topic=grounding_kw, search_hint=grounding_hint, market=m_up)
             
-            gate_ok, gate_msg = passes_grounding_gate(grounding_intel, min_verified=2, require_whitelist=True)
+            gate_ok, gate_msg = passes_grounding_gate(grounding_intel, min_verified=3, min_claims=8, min_dated_claims=3, require_whitelist=True)
             if not gate_ok:
                 logger.warning(f"[{temp_task_id}] Grounding Gate REJECTED: {gate_msg}")
                 print(f"  ❌ [B1.5.5 Grounding Gate] REJECTED: {gate_msg}. Rotating to next candidate...")

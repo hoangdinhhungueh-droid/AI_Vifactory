@@ -104,7 +104,16 @@ def load_competitor_intel(task_id: str, topic: str = "", niche_brief: str = "", 
     )
 
 
-def load_grounding_intel(task_id: str, out_dir: str, topic: str = "", niche_brief: str = "", market: str = "EN") -> tuple[dict, str]:
+def load_grounding_intel(
+    task_id: str,
+    out_dir: str,
+    topic: str = "",
+    niche_brief: str = "",
+    market: str = "EN",
+    min_claims: int = 8,
+    min_verified: int = 3,
+    min_dated_claims: int = 3
+) -> tuple[dict, str]:
     """Load B1.5.5 Grounding Intel Card.
     Enforces strict contract: raises RuntimeError if missing or fails gate, unless bypassed.
     """
@@ -149,7 +158,13 @@ def load_grounding_intel(task_id: str, out_dir: str, topic: str = "", niche_brie
             f"Run B1.5.5 Grounding Layer before B2 story generation!"
         )
 
-    ok, reason = passes_grounding_gate(g_data, min_verified=2, require_whitelist=True)
+    ok, reason = passes_grounding_gate(
+        g_data,
+        min_verified=min_verified,
+        min_claims=min_claims,
+        min_dated_claims=min_dated_claims,
+        require_whitelist=True
+    )
     if not ok:
         raise RuntimeError(
             f"Strict Contract Violation: B1.5.5 Grounding Gate REJECTED for task {task_id} ({reason}). "
@@ -660,7 +675,9 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
         f"• TONE & ATMOSPHERE: Channel the forensic procedural tension of 'Chernobyl', 'Margin Call', and Johnny Harris investigative journalism. "
         f"Ground the narrative in tangible human stakes, institutional blindspots, and the suffocating pressure of white-collar malfeasance. Avoid dry academic lectures.\n"
         f"• SEARCH INTENT PAYOFF (FIRST 120 WORDS OF ACT I): The opening of Act I MUST open with a concrete quantitative stake (%, $, or headcount) in Sentence 1, and MUST naturally weave in at least 3 of the following LIVE SEARCH QUERIES: {', '.join(breakout_queries[:5])}.\n"
-        f"• FORENSIC EVIDENCE WEAVING: Weave at least 10 grounded numbers, dates, and official filings (SEC, DOJ, Court dockets) naturally into the dialogue without sounding defensive or robotic. Speak with sovereign journalistic authority.\n"
+        f"• FACT-LOCK DISCIPLINE (RULE 118 & RULE 130): Anchor the narrative strictly around the verified claims in the Grounded Facts Dossier. "
+        f"STRICTLY FORBIDDEN: Inventing unverified dates, fictitious dollar amounts, false court filings, or speculative causal leaps. "
+        f"Weave verified numbers, dates, and regulatory filings from the Dossier naturally into the dialogue without sounding defensive or robotic.\n"
         f"• CURIOSITY LOOPS & SUSPENSE HOOKS: Plant 8 to 10 explicit curiosity questions across the 5 Acts (~2 per Act), resolving them authoritatively with causal revelations ('that is why', 'the paper trail proved', 'in the end').\n"
         f"• PATTERN INTERRUPT (ACT III): Include at least one sharp, punchy sentence of 2 to 6 words maximum in Act III to reset viewer focus.\n"
         f"• ZERO AI CLICHES: 100% elimination of banned phrases ('in a world where', 'little did they know', 'double-edged sword', 'at the end of the day').{slop_redlines_mandate}\n\n"

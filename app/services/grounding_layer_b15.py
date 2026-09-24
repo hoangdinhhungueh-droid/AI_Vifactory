@@ -217,11 +217,11 @@ def run_grounding_research(
 
     sys_instruction = (
         "You are an Elite Forensic Research Fact-Finder for an investigative documentary channel.\n"
-        "Your mission is to extract 3 to 6 concrete, verifiable factual claims from real-world news and official records.\n\n"
+        "Your mission is to construct a Deep Investigative Factual Dossier containing 12 to 20 concrete, verifiable factual claims across the entire lifecycle of the case (genesis/baseline, early warning signs/mutation, the critical catalyst/rupture, regulatory/prosecution proceedings, and contemporary aftermath).\n\n"
         "MANDATORY FACT-CHECKING & CAUSAL RULES (RULE 118 & RULE 130):\n"
         "1. Extract ONLY facts that actually occurred or are currently reported. NEVER invent statistics, dollar amounts, casualties, or quotes.\n"
         "2. Categorize confidence strictly into:\n"
-        "   - 'verified': Corroborated by major official agencies, regulatory filings, or multiple reputable international news outlets.\n"
+        "   - 'verified': Corroborated by major official agencies, regulatory filings, court dockets, or multiple reputable international news outlets.\n"
         "   - 'reported': Stated by a single reputable news organization or industry analyst.\n"
         "   - 'speculative': Predictions, scenario forecasts, or unverified claims made by commentators.\n"
         "3. Categorize causal_role strictly into:\n"
@@ -229,12 +229,13 @@ def run_grounding_research(
         "   - 'transmission_mechanism': Level 2 institutional/systemic response or choke point that transmitted or amplified the impact (e.g., insurance risk surcharge, liquidity freeze, margin call, export ban, supply chain default, traffic plunge).\n"
         "   - 'background_context': Baseline structural data, historical baseline numbers, geographic or legal statutes existing prior to the catalyst.\n"
         "   MANDATORY RULE 130: Distinguish Level 1 from Level 2. NEVER invert causality or present a transmission mechanism as the original primary trigger.\n"
-        "4. Identify the mechanism of each claim (e.g. 'financial', 'legal', 'military', 'commercial', 'technical', 'regulatory').\n"
-        "5. Include exact publication dates (YYYY-MM-DD) and outlet/source names.\n"
-        "6. If there is insufficient credible evidence or the topic is pure rumor/satire, set 'rejected': true with a clear 'reject_reason'.\n"
-        "7. ADAPTIVE TEMPORAL PROGRESSION & CHRONO-EPOCHS (SCALE-UP ARCHITECTURE):\n"
+        "4. Map each claim to an intended documentary act: 'act_target': 'ACT_I|ACT_II|ACT_III|ACT_IV|ACT_V' to provide balanced factual evidence across all 5 Acts.\n"
+        "5. Identify the mechanism of each claim (e.g. 'financial', 'legal', 'military', 'commercial', 'technical', 'regulatory').\n"
+        "6. Include exact publication dates (YYYY-MM-DD) and outlet/source names.\n"
+        "7. If there is insufficient credible evidence or the topic is pure rumor/satire, set 'rejected': true with a clear 'reject_reason'.\n"
+        "8. ADAPTIVE TEMPORAL PROGRESSION & CHRONO-EPOCHS (SCALE-UP ARCHITECTURE):\n"
         "   - Identify the natural temporal cadence of the topic: 'MACRO_SAGA' (multi-year/decadal, corporate rise/fall, major lawsuit), 'MID_TACTICAL' (months to 1-2 years, policy/product battle), or 'FLASH_CRISIS' (days to weeks, bank-run, flash crash, sudden breach).\n"
-        "   - Extract 2 to 4 pivotal 'causal_epochs' representing the timeline progression:\n"
+        "   - Extract 3 to 5 pivotal 'causal_epochs' representing the timeline progression:\n"
         "     * 'genesis_seed': The foundational origin (initial contract, loan, founding premise, baseline deal, or pre-crisis baseline).\n"
         "     * 'incubation_mutation': The hidden distortion or systemic rot (unheeded warnings, hidden leverage, initial disputes, or brewing crisis).\n"
         "     * 'critical_rupture': The fatal breaking point (criminal conviction, regulatory seizure, whistleblower leak, or default).\n"
@@ -261,7 +262,8 @@ def run_grounding_research(
         "      \"date\": \"YYYY-MM-DD\",\n"
         "      \"confidence\": \"verified|reported|speculative\",\n"
         "      \"causal_role\": \"primary_catalyst|transmission_mechanism|background_context\",\n"
-        "      \"mechanism\": \"legal|military|commercial|financial|technical|regulatory\"\n"
+        "      \"mechanism\": \"legal|military|commercial|financial|technical|regulatory\",\n"
+        "      \"act_target\": \"ACT_I|ACT_II|ACT_III|ACT_IV|ACT_V\"\n"
         "    }\n"
         "  ]\n"
         "}\n"
@@ -269,9 +271,12 @@ def run_grounding_research(
 
     query_text = (
         f"Topic: '{topic}'.\n"
-        f"1. Contemporary Horizon: Identify the immediate breaking event, latest verdict, recent metric, and primary catalyst.\n"
-        f"2. Chronological Backtrace: Investigate the chronological pre-history: when did this entity, conflict, contract, deal, or vulnerability begin? "
-        f"Identify the origin point, any prior criminal/civil disputes, ignored audits, or pre-crisis baseline.\n"
+        f"Construct a comprehensive 12-20 claim forensic factual dossier for a 5-Act investigative documentary:\n"
+        f"1. Contemporary Spark (Act I): Who, what, when, exact financial loss/damages, arrest/indictment details, or market disruption.\n"
+        f"2. Foundation & Origin (Act II): The founding contracts, initial regulatory approvals, original business model, or pre-crisis baseline.\n"
+        f"3. Systemic Blindspot & Rot (Act III): Internal audit red flags, whistleblower reports, regulatory loopholes, hidden debt, or lack of oversight.\n"
+        f"4. The Rupture & Paper Trail (Act IV): Specific court docket numbers, grand jury findings, bankruptcy petitions, forensic accounting evidence, or criminal filings.\n"
+        f"5. Contemporary Fallout (Act V): Unresolved liabilities, asset recovery proceedings, regulatory reforms, or societal impact.\n"
     )
     if search_hint:
         query_text += f" Search focus: '{search_hint}'."
@@ -409,7 +414,7 @@ def passes_grounding_gate(
         return False, f"Grounding Gate Blocked: {reason}"
 
     if len(claims) < min_claims:
-        return False, f"Insufficient total claims ({len(claims)} found, required >= {min_claims})."
+        return False, f"Factual Density Failure: Insufficient total claims ({len(claims)} found, required >= {min_claims} to prevent B2 hallucination)."
 
     verified_claims = [c for c in claims if str(c.get("confidence", "")).lower() == "verified"]
     if len(verified_claims) < min_verified:
@@ -473,19 +478,20 @@ def format_grounded_facts_for_prompt(grounding_result: Dict[str, Any]) -> str:
         return ""
 
     lines = [
-        "### REAL-WORLD GROUNDED FACTS TABLE (MANDATORY TRUTH ANCHOR)",
+        "### REAL-WORLD GROUNDED FACTS DOSSIER (MANDATORY TRUTH ANCHOR)",
         "The following factual claims have been independently verified via live web research.",
-        "MANDATORY SCRIPTWRITING CONSTRAINTS (RULE 118, RULE 130 & RULE 445):",
-        "1. VERIFIED claims: You may assert directly as established facts.",
-        "2. REPORTED claims: Naturally attribute to reporting outlets or agencies (e.g. 'Reuters reported...', 'Bloomberg documented...'). STRICTLY FORBIDDEN: Robotic boilerplate openers like 'according to provided summaries' or 'as stated in the data'.",
-        "3. SPECULATIVE claims: You MUST use cautious conditional framing ('If subsequent assessments hold...', 'Under projected scenarios...').",
-        "4. CAUSAL HIERARCHY & INTEGRITY (RULE 130):",
+        "MANDATORY FACT-LOCK DIRECTIVES (RULE 118, RULE 130 & RULE 445):",
+        "1. FACT-LOCK INTEGRITY: Every Act MUST anchor its core arguments around its designated verified claims. Do NOT invent dates, financial sums, quotes, court filings, or institutional conclusions outside this Dossier.",
+        "2. VERIFIED claims: You may assert directly as established facts.",
+        "3. REPORTED claims: Naturally attribute to reporting outlets or agencies (e.g. 'Reuters reported...', 'Bloomberg documented...'). STRICTLY FORBIDDEN: Robotic boilerplate openers like 'according to provided summaries' or 'as stated in the data'.",
+        "4. SPECULATIVE claims: You MUST use cautious conditional framing ('If subsequent assessments hold...', 'Under projected scenarios...').",
+        "5. CAUSAL HIERARCHY & INTEGRITY (RULE 130):",
         "   - [PRIMARY_CATALYST] (Level 1): The direct physical, military, legal, or commercial spark. Act I Hook MUST feature this catalyst to pay off the viewer's search query immediately.",
         "   - [TRANSMISSION_MECHANISM] (Level 2): The systemic channel (insurance, liquidity, margin call, regulatory notice, supply bottleneck). Acts III & IV must dissect this mechanism.",
         "   - ZERO INVERTED CAUSALITY: Strictly forbidden to present a transmission mechanism as the original primary trigger.",
-        "5. SEARCH-INTENT DIRECT PAYOFF: Do NOT clickbait or drift away into academic abstractions. Address the central headline question within the opening 60 seconds.",
-        "6. ZERO-HALLUCINATION: Do NOT invent dates, numerical fees, casualties, or institutional actors outside this table.",
-        "7. CONTEMPORARY EVENT ANCHOR & TREND-INTENT PRIORITY (MANDATORY IN ACT I):",
+        "6. CONNECTIVE TISSUE RESTRICTION: Connective narrative between facts MUST consist exclusively of forensic analysis, dramatic pacing, procedural questioning, and systemic context—NEVER fabricate new factual events or ungrounded statistics to fill word count.",
+        "7. SEARCH-INTENT DIRECT PAYOFF: Do NOT clickbait or drift away into academic abstractions. Address the central headline question within the opening 60 seconds.",
+        "8. CONTEMPORARY EVENT ANCHOR & TREND-INTENT PRIORITY (MANDATORY IN ACT I):",
         "   - When an episode is based on an active trend, breaking investigation, or contemporary crisis: Act I (specifically paragraph 1 or 2) MUST explicitly name the specific real-world Contemporary Catalyst Event (exact dates, acting entities/governments, and verified quantitative drops/metrics from this table).",
         "   - STRICTLY FORBIDDEN: Hiding behind vague, abstract, or generic phrasing (such as 'When an emergency occurs' or 'When systemic volatility happens') when verified contemporary event details are present in the table!",
         "   - HISTORICAL PRECEDENT DISCIPLINE: Historical comparisons from past eras may ONLY be used in later Acts (Act II/III) as comparative blueprints to explain the legal, institutional, or financial mechanism, NEVER to replace or displace the contemporary catalyst that viewers are actively searching for.\n"
@@ -497,8 +503,9 @@ def format_grounded_facts_for_prompt(grounding_result: Dict[str, Any]) -> str:
         src = c.get("source", "Industry Record")
         mech = c.get("mechanism", "General")
         role = classify_causal_role(c).upper()
+        act_tag = f" [{c['act_target'].upper()}]" if c.get("act_target") else ""
         claim_txt = c.get("claim", "")
-        lines.append(f"{idx}. [{conf}] [{role}] ({date}) [{src} | Mechanism: {mech}]: {claim_txt}")
+        lines.append(f"{idx}. [{conf}] [{role}]{act_tag} ({date}) [{src} | Mechanism: {mech}]: {claim_txt}")
 
     epochs = grounding_result.get("causal_epochs", [])
     cadence = grounding_result.get("temporal_cadence", "ADAPTIVE")

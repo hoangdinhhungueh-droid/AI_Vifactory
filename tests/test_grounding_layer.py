@@ -271,7 +271,7 @@ def test_format_grounded_facts_for_prompt():
         ]
     }
     formatted = format_grounded_facts_for_prompt(sample_result)
-    assert "REAL-WORLD GROUNDED FACTS TABLE" in formatted
+    assert "REAL-WORLD GROUNDED FACTS DOSSIER" in formatted
     assert "RULE 130" in formatted
     assert "[VERIFIED] [PRIMARY_CATALYST] (2026-08-14) [Reuters | Mechanism: military]" in formatted
     assert "[VERIFIED] [TRANSMISSION_MECHANISM] (2026-08-15) [Lloyd's List | Mechanism: commercial]" in formatted
@@ -292,21 +292,26 @@ def test_story_engine_strict_grounding_contract(tmp_path):
     with pytest.raises(RuntimeError, match="Strict Contract Violation: B1.5.5 Grounding Gate REJECTED"):
         load_grounding_intel("TASK_BAD", str(tmp_path))
 
-    # 3. Valid grounding card with >= 2 verified whitelisted claims & valid causal link -> passes and returns block
+    # 3. Valid grounding card with >= 3 verified whitelisted claims & valid causal link & >= 8 claims -> passes and returns block
     good_intel = {
         "topic": "verified",
         "rejected": False,
         "has_live_search": True,
         "claims": [
-            {"claim": "Hostile strike ordered against cargo corridor", "source": "Reuters", "confidence": "verified", "date": "2026-09-01", "causal_role": "primary_catalyst", "mechanism": "military"},
-            {"claim": "Vessel transits plunged 84 percent", "source": "Lloyd's List", "confidence": "verified", "date": "2026-09-02", "causal_role": "transmission_mechanism", "mechanism": "commercial"},
-            {"claim": "Official advisory notice issued to fleet", "source": "US MARAD", "confidence": "reported", "date": "2026-09-03", "causal_role": "transmission_mechanism", "mechanism": "regulatory"}
+            {"claim": "Hostile strike ordered against cargo corridor", "source": "Reuters", "confidence": "verified", "date": "2026-09-01", "causal_role": "primary_catalyst", "mechanism": "military", "act_target": "ACT_I"},
+            {"claim": "Initial concession agreement established 2012", "source": "AP News", "confidence": "verified", "date": "2012-05-10", "causal_role": "background_context", "mechanism": "legal", "act_target": "ACT_II"},
+            {"claim": "Vessel transits plunged 84 percent", "source": "Lloyd's List", "confidence": "verified", "date": "2026-09-02", "causal_role": "transmission_mechanism", "mechanism": "commercial", "act_target": "ACT_III"},
+            {"claim": "Official advisory notice issued to fleet", "source": "US MARAD", "confidence": "reported", "date": "2026-09-03", "causal_role": "transmission_mechanism", "mechanism": "regulatory", "act_target": "ACT_III"},
+            {"claim": "Internal risk assessment ignored warning signs", "source": "Bloomberg", "confidence": "reported", "date": "2026-09-04", "causal_role": "transmission_mechanism", "mechanism": "financial", "act_target": "ACT_IV"},
+            {"claim": "Emergency court filing seeks injunction", "source": "Reuters", "confidence": "verified", "date": "2026-09-05", "causal_role": "transmission_mechanism", "mechanism": "legal", "act_target": "ACT_IV"},
+            {"claim": "Arbitration proceedings initiated in London", "source": "Financial Times", "confidence": "reported", "date": "2026-09-06", "causal_role": "transmission_mechanism", "mechanism": "legal", "act_target": "ACT_V"},
+            {"claim": "Global supply chain rerouting costs estimated at $1.2B", "source": "Wall Street Journal", "confidence": "reported", "date": "2026-09-07", "causal_role": "transmission_mechanism", "mechanism": "commercial", "act_target": "ACT_V"}
         ]
     }
     bad_intel.write_text(json.dumps(good_intel), encoding="utf-8")
     data, block = load_grounding_intel("TASK_GOOD", str(tmp_path))
-    assert len(data["claims"]) == 3
-    assert "REAL-WORLD GROUNDED FACTS TABLE" in block
+    assert len(data["claims"]) == 8
+    assert "REAL-WORLD GROUNDED FACTS DOSSIER" in block
     assert "RULE 130" in block
 
 
@@ -357,5 +362,25 @@ def test_format_grounded_facts_with_chrono_epochs():
     assert "[GENESIS_SEED] (2007): Initial loan guaranteed by commercial bank" in formatted
     assert "[INCUBATION_MUTATION] (2015): Collateral sold at auction" in formatted
     assert "[CRITICAL_RUPTURE] (2026): Arbitration tribunal dismisses all claims" in formatted
+
+
+def test_factual_density_gate_enforcement():
+    # 4 claims should fail when min_claims=8 is enforced for B2 12-15 min docudrama
+    sparse_intel = {
+        "topic": "sparse topic",
+        "rejected": False,
+        "has_live_search": True,
+        "claims": [
+            {"claim": "Catalyst happened", "source": "Reuters", "confidence": "verified", "date": "2026-09-01", "causal_role": "primary_catalyst", "mechanism": "military"},
+            {"claim": "Transmission happened", "source": "Bloomberg", "confidence": "verified", "date": "2026-09-02", "causal_role": "transmission_mechanism", "mechanism": "commercial"},
+            {"claim": "Regulatory note", "source": "US MARAD", "confidence": "verified", "date": "2026-09-03", "causal_role": "transmission_mechanism", "mechanism": "regulatory"},
+            {"claim": "Fourth claim", "source": "AP News", "confidence": "reported", "date": "2026-09-04", "causal_role": "background_context", "mechanism": "legal"}
+        ]
+    }
+    ok, reason = passes_grounding_gate(sparse_intel, min_claims=8, min_verified=3)
+    assert ok is False
+    assert "Factual Density Failure" in reason
+    assert "required >= 8" in reason
+
 
 
