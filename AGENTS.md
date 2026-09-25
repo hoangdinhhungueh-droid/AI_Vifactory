@@ -130,3 +130,47 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 1. **Task-Level Contract**: Mọi nhiệm vụ lớn / Sprint bắt buộc neo theo file `ORIGINAL_REQUEST.md` (chứa User Request gốc, Requirements R1..Rn và Acceptance Criteria `[ ]`).
 2. **Interface Contracts**: Khế ước dữ liệu JSON IN/OUT giữa các block và danh mục file trên VPS tra cứu tại `PIPELINE_CONTRACTS.md`.
 3. **Autonomous Clarification Protocol**: Mọi tác vụ có tính đa chiều, rẽ nhánh kỹ thuật hoặc mơ hồ bắt buộc kích hoạt Cổng Phản Vấn Chủ Động (Rule 129), suy luận sâu và làm rõ với User trước khi triển khai sâu.
+
+---
+
+## 🏗️ IV. QUY CHUẨN HARNESS SYSTEM NGUYÊN TỬ (5 SUBSYSTEMS PRIMITIVES)
+
+> **Kế thừa tinh hoa từ WalkingLabs (Learn Harness Engineering), Codex, Claude Code & DeepSeek:**
+> *"Độ tin cậy đến từ Harness, không phải từ Model. Harness xây chiếc vòng kim cô bảo đảm AI làm việc chuẩn xác, không còn hên xui."*
+
+### 1. Phân Hệ 1: Instructions Subsystem (Directory Page & Progressive Disclosure)
+- **Directory Page Invariant (Codex Standard)**: `AGENTS.md` là mục lục điều hướng và khế ước bất biến (~100-150 dòng), KHÔNG PHẢI bách khoa toàn thư. Kiến thức chuyên sâu đặt trong `docs/`, `config/prompts/` hoặc Notion SoT để nạp theo nhu cầu (JIT).
+- **Startup Workflow 6 Bước Bắt Buộc (Trước khi code)**:
+  1. `pwd`: Xác nhận đúng thư mục làm việc (Local hoặc `/root/video_factory`).
+  2. `read`: Đọc `AGENTS.md` nắm vững các Kỷ luật Thép và định tuyến.
+  3. `state`: Đọc `feature_list.json` hoặc `task_manifest.json` xem trạng thái tính năng hiện tại.
+  4. `verify baseline`: Chạy kiểm tra nền tảng (`./init.sh` hoặc `python scripts/orchestrator/runner.py --mode ci --baseline`) xem hệ thống có đang xanh không. Nếu baseline đỏ $\rightarrow$ Phải fix baseline trước khi thêm tính năng mới!
+  5. `git log`: Kiểm tra 5 commit gần nhất (`git log --oneline -5`) để nắm ngữ cảnh kỹ thuật.
+  6. `pick one`: Chỉ chọn ĐÚNG 1 feature chưa hoàn thành để thực thi.
+
+### 2. Phân Hệ 2: State Subsystem (Persistent Disk-Backed Source of Truth)
+- **Cấm Nhớ Mồm Trong Chat**: Toàn bộ tiến độ, phân nhánh, và kết quả thực thi bắt buộc lưu xuống đĩa cứng vật lý bằng cấu trúc JSON/Markdown (`feature_list.json`, `progress.md`).
+- **Two-Step Save Invariant**: Mọi ghi nhận trạng thái phải ghi chi tiết vào topic file/report trước, sau đó mới cập nhật pointer vào index/manifest. Nếu phiên chat bị ngắt đột ngột, trạng thái vẫn toàn vẹn và có thể khôi phục 100% trong phiên sau.
+- **Model-Visible Means Logged (DeepSeek Invariant)**: Bất kỳ prompt, ngữ cảnh, hoặc output quan trọng nào model đọc/ghi đều phải được log vào session history (`logs/*.jsonl`) để có thể tái hiện lại quá trình suy luận.
+
+### 3. Phân Hệ 3: Verification Subsystem (Fail-Fast & Anti-Premature Victory Gate)
+- **Chống Tuyên Bố Chiến Thắng Sớm (Lecture 9 Law)**: CẤM TUYỆT ĐỐI agent tự đánh giá công việc của mình bằng lời nói chủ quan (*"tôi nghĩ là ổn rồi"*, *"chắc chắn đã xong"*).
+- **Evidence-Based Completion (Definition of Done - DoD 4 Tiêu Chí)**:
+  1. Đã triển khai xong đúng hành vi mục tiêu (Behavior Implemented).
+  2. Đã chạy lệnh kiểm thử thực tế với chế độ Fail-Fast (`set -e` hoặc exit code `0`).
+  3. In và ghi nhận bằng chứng pháp y (`evidence`: stdout, diff lines, HTTP 200, test passes) vào `feature_list.json` hoặc báo cáo nghiệm thu.
+  4. Hệ thống vẫn khởi động lại sạch sẽ được (Restartable Clean State).
+
+### 4. Phân Hệ 4: Scope Subsystem (One-Feature-At-A-Time & Blast Radius Control)
+- **Nguyên Tắc 1 Tính Năng Mỗi Lần (One-Feature-At-A-Time)**: Mỗi phiên làm việc chỉ tập trung vào 1 feature/block duy nhất. Cấm ôm đồm sửa lan man nhiều file không liên quan.
+- **Dependency DAG**: Tuân thủ nghiêm ngặt quan hệ phụ thuộc (`dependencies: [...]`). Không triển khai tính năng khi các tính năng tiền đề chưa hoàn thành và chưa có verification evidence.
+- **Blast Radius Enforcer**: Tuyệt đối không can thiệp vào các module ngoài phạm vi của task hiện tại trừ khi có sự phê duyệt rõ ràng từ User.
+
+### 5. Phân Hệ 5: Session Lifecycle & Handoff Subsystem (Clean State & Cross-Session Continuity)
+- **Quy Trình Kết Thúc Phiên (End-of-Session Routine)**:
+  1. Cập nhật `progress.md` (What's Done, What's In Progress, What's Next, Blockers/Risks).
+  2. Cập nhật `feature_list.json` với trạng thái mới (`completed`, `in-progress`) kèm `evidence`.
+  3. Tạo commit Git mô tả chuẩn Conventional Commits.
+  4. Thực hiện Two-Phase Eviction: Dọn sạch file scratch/tạm tại `/tmp/`, thu hồi zombie processes qua `resource_recycler.py`.
+  5. Đảm bảo phiên tiếp theo (hoặc Agent khác) có thể khởi chạy ngay lập tức mà không cần hỏi lại từ đầu.
+
