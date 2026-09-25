@@ -825,7 +825,7 @@ const buildBackgroundSegments = (scenes, fadeFrames) => {
   });
 };
 
-const BackgroundSegment = ({ src, fadeInFrames, durationInFrames }) => {
+const BackgroundSegment = ({ src, fadeInFrames, durationInFrames, hasForeground = false }: { src: string | null; fadeInFrames: number; durationInFrames: number; hasForeground?: boolean }) => {
   const frame = useCurrentFrame();
   const dur = durationInFrames || 300;
   const opacity =
@@ -840,6 +840,15 @@ const BackgroundSegment = ({ src, fadeInFrames, durationInFrames }) => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+
+  const filterStyle = hasForeground
+    ? "brightness(0.68) saturate(0.75) contrast(1.06) blur(7px)"
+    : "brightness(0.92) saturate(0.95) contrast(1.04) blur(0px)";
+
+  const vignetteStyle = hasForeground
+    ? "radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.40) 55%, rgba(5, 9, 13, 0.82) 100%)"
+    : "radial-gradient(circle at 50% 48%, transparent 50%, rgba(5, 9, 13, 0.40) 100%)";
+
   return (
     <AbsoluteFill style={{ overflow: "hidden", backgroundColor: "#0b0f17" }}>
       {/* Vox Tactical Investigation Canvas: Blueprint Grid & Subtle Halftone Matrix */}
@@ -884,17 +893,17 @@ const BackgroundSegment = ({ src, fadeInFrames, durationInFrames }) => {
                 height: "100%",
                 objectFit: "cover",
                 transform: `scale(${scale * 1.06})`,
-                filter: "brightness(0.32) saturate(0.40) contrast(1.08) blur(14px)",
+                filter: filterStyle,
+                transition: "filter 0.3s ease",
               }}
             />
           )}
-          {/* Vox Investigation Spotlight & Dark Vignette overlay (Triệt tiêu background rườm rà, tôn vinh Foreground & Overlays) */}
+          {/* Vox Investigation Spotlight & Dark Vignette overlay (Dynamic according to foreground presence) */}
           <div
             style={{
               position: "absolute",
               inset: 0,
-              background:
-                "radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.65) 55%, rgba(5, 9, 13, 0.95) 100%)",
+              background: vignetteStyle,
               pointerEvents: "none",
             }}
           />
@@ -1824,6 +1833,7 @@ export const TwoLayerEpisode = (props) => {
                 src={seg.src}
                 fadeInFrames={seg.fadeInFrames}
                 durationInFrames={seg.durationInFrames}
+                hasForeground={Boolean(currentSceneInfo?.scene?.foreground || currentSceneInfo?.scene?.forensicOverlay || currentSceneInfo?.scene?.statValue)}
               />
             </Sequence>
           ))}
