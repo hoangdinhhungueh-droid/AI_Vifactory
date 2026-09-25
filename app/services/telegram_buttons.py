@@ -317,8 +317,6 @@ async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b:
             market = "jp"
         elif ep_lower.startswith("kr_") or ep_lower.startswith("kr-"):
             market = "kr"
-        elif ep_lower.startswith("vn_") or ep_lower.startswith("vn-"):
-            market = "vn"
         else:
             market = "en"
 
@@ -348,7 +346,6 @@ async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b:
     voice_map = {
         "jp": "Edge-TTS ja-JP-KeitaNeural (Japanese Male Voice)",
         "kr": "Edge-TTS ko-KR-InJoonNeural (Korean Male Voice)",
-        "vn": "Edge-TTS vi-VN-NamMinhNeural (Vietnamese Male Voice)",
         "en": "Edge-TTS en-US-GuyNeural (English Male Voice)",
     }
     voice_str = voice_map.get(market.lower(), "Edge-TTS Studio Voice")

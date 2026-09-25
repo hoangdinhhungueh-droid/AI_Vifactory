@@ -9,7 +9,6 @@ from typing import Optional
 # Override per-lang via env: WHISPER_MODEL_EN=medium etc.
 WHISPER_MODEL_PER_LANG = {
     "en": os.getenv("WHISPER_MODEL_EN", "small"),
-    "vi": os.getenv("WHISPER_MODEL_VI", "small"),
     "zh": os.getenv("WHISPER_MODEL_ZH", "small"),
     "ja": os.getenv("WHISPER_MODEL_JA", "small"),
     "ko": os.getenv("WHISPER_MODEL_KO", "small"),

@@ -445,7 +445,7 @@ def fetch_tab_research(access_token, market="KR", top_search_terms=None):
     }
 
     # 1. Market Trending Videos on YouTube
-    region_map = {"KR": "KR", "JP": "JP", "EN": "US", "VN": "VN"}
+    region_map = {"KR": "KR", "JP": "JP", "EN": "US"}
     region_code = region_map.get(market.upper(), "US")
     try:
         trend_res = query_youtube_data_api(access_token, "videos", {

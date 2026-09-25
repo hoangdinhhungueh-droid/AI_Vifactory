@@ -132,11 +132,7 @@ def test_dynamic_visual_roster_multi_market():
     assert any("seoul" in v["title"].lower() or "courthouse" in v["title"].lower() for v in kr_bg.values())
     assert any("ingam" in k or "sawonjeung" in k for k in kr_fg.keys())
 
-    # 3. VN Market
-    vn_bg, vn_fg = extract_dynamic_visual_roster(market="VN", topic="Thanh tra bất động sản")
-    assert any("mộc đỏ" in v["title"].lower() or "thanh tra" in v["title"].lower() for v in vn_fg.values())
-
-    # 4. EN Market
+    # 3. EN Market
     en_bg, en_fg = extract_dynamic_visual_roster(market="EN", topic="Securities antitrust filing")
     assert any("docket" in k or "invoice" in k for k in en_fg.keys())
 
@@ -222,7 +218,7 @@ def test_vox_roster_depth_and_coverage(tmp_path):
     # 1. Roster depth for financial topic
     bg_roster, fg_roster = extract_dynamic_visual_roster(
         market="EN",
-        topic="365 Nghìn Tỷ USD Nợ Toàn Cầu: Cái Bẫy Đáo Hạn Khiến Thế Giới Vay Để Trả Nợ"
+        topic="$365 Trillion Global Sovereign Debt: The Rollover Liquidity Wall"
     )
     assert len(bg_roster) >= 16, f"Expected >= 16 BGs for VOX docudrama, got {len(bg_roster)}"
     assert len(fg_roster) >= 20, f"Expected >= 20 FGs for VOX docudrama, got {len(fg_roster)}"

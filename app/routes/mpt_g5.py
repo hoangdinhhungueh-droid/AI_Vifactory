@@ -8,7 +8,6 @@ router = APIRouter(prefix="/api/v1", tags=["mpt-g5"])
 # LOCK 17/08/2026 (user decision): ALWAYS male voice, every market/lang.
 LANG_VOICE = {
     "en": "en-US-GuyNeural",
-    "vi": "vi-VN-NamMinhNeural",
     "zh": "zh-CN-YunxiNeural",
     "ja": "ja-JP-KeitaNeural",
     "ko": "ko-KR-InJoonNeural",

@@ -130,7 +130,7 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
             "YT-Military-Tactical-Investigation",
             "MILITARY LOGISTICS & GEOPOLITICAL CHOKEPOINTS: forensic deconstruction of supply line failures, tactical blunders, and strategic infrastructure chokepoints based on declassified records; ZERO glorification of violence."
         )
-    elif any(t in text for t in ["refund", "환불", "교환", "반품", "영수증", "바가지", "동탄문구점", "bẫy giá", "giấu giá", "hóa đơn", "không hoàn tiền", "no refund", "cancellation fee", "hidden fee", "hidden cost", "fine print", "consumer trap", "소비자 분쟁", "위약금", "단순 변심", "가격표시제", "bất cân xứng tiêu dùng", "chèn ép người mua", "quy chế hoàn tiền", "overcharge", "unilateral clause", "consumer dispute", "subscription trap"]):
+    elif any(t in text for t in ["refund", "환불", "교환", "반품", "영수증", "바가지", "동탄문구점", "no refund", "cancellation fee", "hidden fee", "hidden cost", "fine print", "consumer trap", "소비자 분쟁", "위약금", "단순 변심", "가격표시제", "overcharge", "unilateral clause", "consumer dispute", "subscription trap"]):
         return (
             "consumer_injustice_institutional_trap",
             "YT-Consumer-Awareness",
@@ -148,7 +148,6 @@ def _fetch_native_wiki_extract(subject: str, market: str) -> str:
     lang_map = {
         "JP": "ja", "JA": "ja",
         "KR": "ko", "KO": "ko",
-        "VN": "vi", "VI": "vi",
         "EN": "en", "US": "en", "GB": "en", "AU": "en", "CA": "en", "DE": "de", "NZ": "en"
     }
     lang = lang_map.get(market.upper(), "en")

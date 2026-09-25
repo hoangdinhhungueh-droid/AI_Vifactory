@@ -126,13 +126,8 @@ def test_resolve_market_profile():
     assert "Korean" in kr["fg_anchor"]
     assert "no Caucasian traits" in kr["fg_negatives"]
 
-    vn = resolve_market_profile("VN")
-    assert vn["market_code"] == "VN"
-    assert "Vietnamese" in vn["fg_anchor"]
-    assert "no Caucasian traits" in vn["fg_negatives"]
-
-    gl = resolve_market_profile("GLOBAL")
-    assert gl["market_code"] == "GLOBAL"
+    en = resolve_market_profile("EN")
+    assert en["market_code"] == "EN"
 
 
 def test_market_adaptive_sanitization_anti_western_bias():
@@ -187,11 +182,6 @@ def test_dynamic_acting_and_active_props_mandate():
     assert "hanko seal (inkan)" in jp_prof["fg_anchor"]
     assert "sha-sho" in jp_prof["fg_anchor"]
     assert "no dead eyes" in jp_prof["fg_negatives"]
-
-    vn_prof = resolve_market_profile("VN")
-    assert "dau moc do" in vn_prof["fg_anchor"]
-    assert "red neck lanyard" in vn_prof["fg_anchor"]
-    assert "no dead eyes" in vn_prof["fg_negatives"]
 
 
 def test_object_and_evidence_prompt_sanitization():

@@ -6,7 +6,7 @@ sys.path.insert(0, "/root/video_factory")
 def test_whisper_model_per_lang():
     from app.services.mpt_ported.subtitle_align import WHISPER_MODEL_PER_LANG
     assert "en" in WHISPER_MODEL_PER_LANG
-    assert "vi" in WHISPER_MODEL_PER_LANG
+    assert "ja" in WHISPER_MODEL_PER_LANG
 
 def test_groq_cap_constant():
     from app.services.mpt_ported.subtitle_align import GROQ_DAILY_CAP_SECONDS

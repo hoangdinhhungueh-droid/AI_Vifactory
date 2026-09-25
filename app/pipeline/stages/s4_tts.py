@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 # LOCK 17/08/2026 (user decision): ALWAYS male voice, every market/lang.
 LANG_VOICE = {
     "en": "en-US-ChristopherNeural",
-    "vi": "vi-VN-NamMinhNeural",
     "zh": "zh-CN-YunxiNeural",
     "ja": "ja-JP-KeitaNeural",
     "ko": "ko-KR-InJoonNeural",
@@ -40,7 +39,7 @@ async def run_s4(episode: dict) -> dict:
     lang_code  = episode.get("lang_code")
     if not lang_code or lang_code == "en":
         market = str(episode.get("market") or episode_id.split("_")[0]).lower()
-        market_to_lang = {"jp": "ja", "ja": "ja", "ko": "ko", "kr": "ko", "vn": "vi", "vi": "vi", "zh": "zh", "cn": "zh", "en": "en"}
+        market_to_lang = {"jp": "ja", "ja": "ja", "ko": "ko", "kr": "ko", "zh": "zh", "cn": "zh", "en": "en"}
         if market in market_to_lang and market_to_lang[market] != "en":
             lang_code = market_to_lang[market]
         else:

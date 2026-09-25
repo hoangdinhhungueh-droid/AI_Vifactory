@@ -21,7 +21,6 @@ def test_is_cjk_market():
     assert is_cjk_market("ko") is True
     assert is_cjk_market("ZH") is True
     assert is_cjk_market("EN") is False
-    assert is_cjk_market("VI") is False
     assert is_cjk_market("") is False
 
 

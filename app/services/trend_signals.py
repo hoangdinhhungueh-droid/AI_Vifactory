@@ -47,7 +47,7 @@ DENYLIST = {
 
 GEO_MAP = {
     "US": "US", "CA": "CA", "GB": "GB", "AU": "AU", "NZ": "NZ",
-    "JP": "JP", "KR": "KR", "IN": "IN", "VN": "VN", "EU": "",
+    "JP": "JP", "KR": "KR", "IN": "IN", "EU": "",
 }
 
 

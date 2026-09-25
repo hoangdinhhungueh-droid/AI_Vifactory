@@ -132,21 +132,12 @@ def resolve_market_profile(market: str = "EN") -> dict:
             "fg_negatives": "no Caucasian traits, no Western facial structure, no blue eyes, no blond hair, no American corporate look, no passive blank stare, no lifeless neutral pose, no passport photo posture, no dead eyes, no English text, no Latin letters",
             "bg_negatives": "no generic Western American cityscapes, no foreign architecture, no New York office aesthetic, no English text, no Latin words on whiteboards, no English signage, no American flags, no generic gray cubicles"
         }
-    elif m in ("VN", "VI"):
+    else:  # EN, US, UK, CA, AU, NZ
         return {
-            "market_code": "VN",
-            "market_name": "Vietnamese (Vietnam)",
-            "fg_anchor": "Authentic Vietnamese individual, distinct Vietnamese facial features and bone structure, Southeast Asian eye shape and hair styling, authentic contemporary Vietnamese professional or civil servant attire, official identification card with red neck lanyard, dynamic authoritative body posture leaning over desk or gesturing with conviction, active physical interaction with props holding official Vietnamese dossier with prominent circular red rubber stamp (dau moc do), intense resolute facial micro-expressions with commanding eyes and firm clenched jaw, authoritative decisive character acting",
-            "bg_anchor": "Authentic Vietnamese corporate or administrative headquarters setting, contemporary Hanoi or Ho Chi Minh City commercial architecture, Hanoi Ba Dinh administrative office or Saigon District 1 financial center, Vietnamese mahogany wood furniture with gold lacquer accents, subtle National Emblem of Vietnam (Quoc huy Viet Nam) on conference wall, document cabinets with official Vietnamese administrative folders, Saigon river or Hanoi cityscape view",
-            "fg_negatives": "no Caucasian traits, no Western facial structure, no blue eyes, no blond hair, no American corporate look, no passive blank stare, no lifeless neutral pose, no passport photo posture, no dead eyes, no English text, no Latin typography",
-            "bg_negatives": "no generic Western American cityscapes, no foreign architecture, no New York office aesthetic, no English text, no Latin words on whiteboards, no foreign flags, no generic gray cubicles"
-        }
-    else:  # EN, US, GLOBAL, etc.
-        return {
-            "market_code": "GLOBAL",
-            "market_name": "Global / Western",
-            "fg_anchor": "Authentic professional attire appropriate to the narrative role and era, dynamic high-stakes body posture, intense facial micro-expressions, active physical interaction with narrative props, stylized expressive character acting",
-            "bg_anchor": "Authentic period architecture and narrative atmosphere matching the story location",
+            "market_code": "EN",
+            "market_name": "English (US/UK/CA/AU/NZ)",
+            "fg_anchor": "Authentic Western individual, distinct bone structure, authentic contemporary Western professional attire, dynamic high-stakes body posture, intense emotive facial micro-expressions with commanding eyes, active physical interaction with narrative props, stylized expressive character acting",
+            "bg_anchor": "Authentic Western corporate or institutional headquarters setting, classic and modern architecture, high-contrast chiaroscuro lighting",
             "fg_negatives": "no passive blank stare, no lifeless neutral pose, no passport photo posture, no dead eyes",
             "bg_negatives": ""
         }

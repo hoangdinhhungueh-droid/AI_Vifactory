@@ -231,8 +231,6 @@ async def notify_episode_done(episode_id: str, final_path: str = None,
                 market = "jp"
             elif ep_lower.startswith("kr_") or ep_lower.startswith("kr-"):
                 market = "kr"
-            elif ep_lower.startswith("vn_") or ep_lower.startswith("vn-"):
-                market = "vn"
 
         # Rule 125 Anti-Double-Dispatch: If continue_after_images.py orchestrator is active, skip internal subprocess
         b4b10_state = ep_dir / "b4b10_state.json"

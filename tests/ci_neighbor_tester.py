@@ -126,8 +126,8 @@ def test_block1_trend_contract() -> bool:
             MARKET_CONFIG,
         )
 
-        assert "EN" in MARKET_CONFIG and "JP" in MARKET_CONFIG and "KR" in MARKET_CONFIG and "VN" in MARKET_CONFIG
-        logger.info("  ✅ Market configurations validated (EN, JP, KR, VN).")
+        assert "EN" in MARKET_CONFIG and "JP" in MARKET_CONFIG and "KR" in MARKET_CONFIG
+        logger.info("  ✅ Market configurations validated (EN, JP, KR).")
 
         factsheet = fetch_ground_truth_factsheet("TSMC", "EN")
         assert "wiki_ground_truth" in factsheet
@@ -193,8 +193,8 @@ def test_block15_competitor_contract() -> bool:
             MARKET_LOCALE
         )
 
-        assert "en" in MARKET_LOCALE and "jp" in MARKET_LOCALE and "kr" in MARKET_LOCALE and "vn" in MARKET_LOCALE
-        logger.info("  ✅ B1.5 Market Locale Hints OK (EN, JP, KR, VN).")
+        assert "en" in MARKET_LOCALE and "jp" in MARKET_LOCALE and "kr" in MARKET_LOCALE
+        logger.info("  ✅ B1.5 Market Locale Hints OK (EN, JP, KR).")
 
         raw_comments = [
             {"text": "Why did nobody audit the balance sheet earlier?", "likes": 450, "author": "Alice"},
@@ -481,10 +481,10 @@ def test_block3_director_contract() -> bool:
             assert len(jp_bgs.intersection(en_bgs)) == 0, f"Background rosters overlapped: {jp_bgs.intersection(en_bgs)}"
             logger.info(f"  ✅ Live Cross-Market Integrity Passed: JP ({len(jp_bgs)} BGs) vs EN ({len(en_bgs)} BGs) 100% disjoint, 0% leakage.")
 
-            # 7. Rule 122 & Rule 128: 4-Market Vox Visual Roster Depth & Multi-Mode Parity (JP, KR, VN, EN)
-            logger.info("  🧪 [7/7] Running 4-Market Vox Visual Roster Depth & Multi-Mode Parity Audit...")
+            # 7. Rule 122 & Rule 128: 3-Market Vox Visual Roster Depth & Multi-Mode Parity (JP, KR, EN)
+            logger.info("  🧪 [7/7] Running 3-Market Vox Visual Roster Depth & Multi-Mode Parity Audit...")
             from app.services.unified_vox_director import _generate_topic_anchored_roster_fallback
-            for mkt_code in ["EN", "JP", "KR", "VN"]:
+            for mkt_code in ["EN", "JP", "KR"]:
                 for is_fin in [True, False]:
                     test_topic = "Sovereign Debt Liquidity Wall" if is_fin else "Corporate Fraud Antitrust"
                     bg_r, fg_r = _generate_topic_anchored_roster_fallback(test_topic, mkt_code, key_metrics=["$100B"], claims=[])
@@ -494,7 +494,7 @@ def test_block3_director_contract() -> bool:
                     fg_beats = {b for item in fg_r.values() for b in item.get("beats", [])}
                     assert bg_beats == {1, 2, 3, 4, 5}, f"[{mkt_code} fin={is_fin}] BG missing beats: {bg_beats}"
                     assert fg_beats == {1, 2, 3, 4, 5}, f"[{mkt_code} fin={is_fin}] FG missing beats: {fg_beats}"
-            logger.info("  ✅ 4-Market Vox Visual Roster Parity Passed: All markets (EN, JP, KR, VN) have >= 18 BGs & >= 22 FGs across 5 Beats.")
+            logger.info("  ✅ 3-Market Vox Visual Roster Parity Passed: All markets (EN, JP, KR) have >= 18 BGs & >= 22 FGs across 5 Beats.")
         finally:
             shutil.rmtree(test_dir, ignore_errors=True)
 
@@ -571,13 +571,13 @@ def test_block26_audio_spine_contract() -> bool:
         from app.services.director_planner_b3 import _is_valid_audio_spine
 
         # 1. Voice configuration and multi-tier rotation roster check
-        for mkt in ["en", "vi", "zh", "ja", "ko"]:
+        for mkt in ["en", "zh", "ja", "ko"]:
             assert mkt in LANG_VOICE, f"Missing voice configuration for market: {mkt}"
             assert mkt in VOICE_ROTATION_ROSTER, f"Missing rotation roster for market: {mkt}"
             assert len(VOICE_ROTATION_ROSTER[mkt]) >= 2, f"Roster must have >= 2 candidate voices for {mkt}"
             assert VOICE_ROTATION_ROSTER[mkt][0] == LANG_VOICE[mkt], f"Primary voice mismatch for {mkt}"
         assert LANG_VOICE["ko"] == "ko-KR-InJoonNeural"
-        logger.info("  ✅ Market Edge-TTS voices and 5-market multi-tier rotation rosters validated.")
+        logger.info("  ✅ Market Edge-TTS voices and multi-tier rotation rosters validated.")
 
         # 2. SRT time format
         assert format_srt_time(1250) == "00:00:01,250"

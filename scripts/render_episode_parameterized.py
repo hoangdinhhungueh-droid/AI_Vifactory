@@ -218,7 +218,7 @@ Examples:
         """
     )
     parser.add_argument("--episode_id", required=True, help="Episode ID (e.g. <MARKET>_EP<XXXX>_<slug>)")
-    parser.add_argument("--market", default="en", choices=["en", "jp", "kr", "vn"], help="Market code (default: en)")
+    parser.add_argument("--market", default="en", choices=["en", "jp", "kr"], help="Market code (default: en)")
     
     args = parser.parse_args()
     

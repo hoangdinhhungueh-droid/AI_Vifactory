@@ -29,7 +29,6 @@ logger = logging.getLogger("vf.beat_tts_engine")
 # Resilient Multi-Tier Voice Rotation Roster per Market (Rule 120/128)
 VOICE_ROTATION_ROSTER: Dict[str, List[str]] = {
     "en": ["en-US-ChristopherNeural", "en-US-GuyNeural", "en-US-EricNeural", "en-US-BrianNeural"],
-    "vi": ["vi-VN-NamMinhNeural", "vi-VN-HoaiMyNeural"],
     "zh": ["zh-CN-YunxiNeural", "zh-CN-YunjianNeural", "zh-CN-YunyangNeural"],
     "ja": ["ja-JP-KeitaNeural", "ja-JP-DaichiNeural", "ja-JP-NanamiNeural"],
     "ko": ["ko-KR-InJoonNeural", "ko-KR-BongJinNeural", "ko-KR-SunHiNeural"]
@@ -269,7 +268,6 @@ async def synthesize_beat_tts_pipeline(
     market_to_lang = {
         "jp": "ja", "ja": "ja",
         "ko": "ko", "kr": "ko",
-        "vn": "vi", "vi": "vi",
         "zh": "zh", "cn": "zh",
         "en": "en"
     }

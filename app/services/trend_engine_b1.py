@@ -132,20 +132,6 @@ MARKET_CONFIG = {
         "gl": "KR",
         "lang_name": "Korean",
         "intent_modifiers": ["원리", "사건의 진실", "폭망 이유", "비하인드", "충격 실체", "해설"]
-    },
-    "VN": {
-        "geos": ["VN"],
-        "hl": "vi",
-        "gl": "VN",
-        "lang_name": "Vietnamese",
-        "intent_modifiers": ["sự thật vụ án", "nguyên nhân sụp đổ", "bẫy tài chính", "vạch trần", "giải mã", "bản án", "đại án"]
-    },
-    "VI": {
-        "geos": ["VN"],
-        "hl": "vi",
-        "gl": "VN",
-        "lang_name": "Vietnamese",
-        "intent_modifiers": ["sự thật vụ án", "nguyên nhân sụp đổ", "bẫy tài chính", "vạch trần", "giải mã", "bản án", "đại án"]
     }
 }
 

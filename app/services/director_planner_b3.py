@@ -685,8 +685,6 @@ def detect_cinematic_archetype(niche: str = "", topic: str = "", story_text: str
         "cholera", "pesticide", "whistleblower",
         # Korean
         "내부고발", "규제", "감독", "식약처", "보건", "인허가", "은폐", "부실감사",
-        # Vietnamese
-        "thanh tra", "giám sát", "nội bộ", "y tế", "thu hồi", "che giấu", "giấy phép",
         # Japanese
         "内部告発", "規制", "監督", "隠蔽", "認可", "不祥事"
     ]):
@@ -710,8 +708,6 @@ def detect_cinematic_archetype(niche: str = "", topic: str = "", story_text: str
         "trading", "business", "rehabilitation", "bankruptcy", "collateral", "lien", "embezzle", "audit failure",
         # Korean
         "횡령", "공금", "회계", "감사", "장부", "자금", "분식회계", "배임", "부실", "적정", "재정", "파산", "금융", "부채", "증권", "은행", "비자금",
-        # Vietnamese
-        "tham ô", "kiểm toán", "gian lận", "ngân hàng", "kế toán", "tài chính", "báo cáo tài chính", "rửa tiền", "nợ xấu", "phá sản",
         # Japanese
         "横領", "粉飾決算", "監査", "裏金", "公金", "破産", "債務", "銀行", "金融", "不正会計"
     ]):
@@ -1253,8 +1249,6 @@ def generate_director_plan(
         market_lang_name = "Japanese (日本語)"
     elif m_up in ["KR", "KO"]:
         market_lang_name = "Korean (한국어)"
-    elif m_up in ["VN", "VI"]:
-        market_lang_name = "Vietnamese (Tiếng Việt)"
     else:
         market_lang_name = "English"
 

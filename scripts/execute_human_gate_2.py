@@ -30,8 +30,6 @@ def main():
             market = "jp"
         elif ep_lower.startswith("kr_") or ep_lower.startswith("kr-"):
             market = "kr"
-        elif ep_lower.startswith("vn_") or ep_lower.startswith("vn-"):
-            market = "vn"
 
     cmd = [
         sys.executable,

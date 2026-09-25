@@ -15,7 +15,6 @@ from app.services.editorial_briefing_generator import (
 def test_extract_market():
     assert extract_market_from_episode_id("JP_EP0003_hamaoka_data_fraud") == "JP"
     assert extract_market_from_episode_id("KR_EP0004_crypto_scheme") == "KR"
-    assert extract_market_from_episode_id("VN_EP0002_scb_bank_run") == "VN"
     assert extract_market_from_episode_id("EN_EP0003_san_diego_daycare_fraud") == "EN"
     assert extract_market_from_episode_id("unknown_slug") == "EN"
 

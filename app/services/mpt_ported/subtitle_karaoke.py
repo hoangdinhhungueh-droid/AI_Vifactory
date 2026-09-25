@@ -4,10 +4,8 @@ from pathlib import Path
 
 SUBTITLE_POSITION = os.getenv("SUBTITLE_POSITION", "bottom")
 NOTO_FONT_PATH = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
-BE_VN_FONT_PATH = "/usr/share/fonts/be-vietnam-pro/BeVietnamPro-Regular.ttf"
 
 FONT_BY_LANG = {
-    "vi": BE_VN_FONT_PATH,
     "zh": NOTO_FONT_PATH,
     "ja": NOTO_FONT_PATH,
     "ko": NOTO_FONT_PATH,

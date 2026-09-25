@@ -18,10 +18,10 @@ def test_consumer_docudrama_theme_detection_multilingual():
     assert t_en == "consumer_injustice_institutional_trap"
     assert s_en == "YT-Consumer-Awareness"
 
-    # Vietnamese
-    t_vn, s_vn, _ = detect_safety_and_theme("bẫy giá hóa đơn siêu thị chèn ép người mua", "VN")
-    assert t_vn == "consumer_injustice_institutional_trap"
-    assert s_vn == "YT-Consumer-Awareness"
+    # Japanese / Global
+    t_jp, s_jp, _ = detect_safety_and_theme("subscription trap cancellation fee fine print", "JP")
+    assert t_jp == "consumer_injustice_institutional_trap"
+    assert s_jp == "YT-Consumer-Awareness"
 
 
 def test_b1_strategic_rules_contains_pillar11_and_anti_tutorial():

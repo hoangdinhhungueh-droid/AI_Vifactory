@@ -31,7 +31,7 @@ COOLDOWN_DAYS   = int(os.getenv("S1_COOLDOWN_DAYS", "7"))
 NOVELTY_PENALTY = float(os.getenv("S1_NOVELTY_PENALTY", "0.15"))
 
 CPM_WEIGHT = {"US": 1.00, "CA": 0.80, "GB": 0.80, "AU": 0.75, "JP": 0.70,
-              "NZ": 0.65, "EU": 0.60, "KR": 0.55, "VN": 0.15, "IN": 0.12}
+              "NZ": 0.65, "EU": 0.60, "KR": 0.55, "IN": 0.12}
 
 # IP-safe allowlist (gate). Keep broad enough to avoid overfitting.
 SAFE_NICHES = [

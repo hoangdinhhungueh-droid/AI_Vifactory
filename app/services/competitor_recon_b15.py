@@ -97,21 +97,17 @@ MARKET_LOCALE = {
     "en": {"relevanceLanguage": "en", "regionCode": "US", "transcript_langs": ["en"]},
     "jp": {"relevanceLanguage": "ja", "regionCode": "JP", "transcript_langs": ["ja", "en"]},
     "kr": {"relevanceLanguage": "ko", "regionCode": "KR", "transcript_langs": ["ko", "en"]},
-    "vn": {"relevanceLanguage": "vi", "regionCode": "VN", "transcript_langs": ["vi", "en"]},
-    "vi": {"relevanceLanguage": "vi", "regionCode": "VN", "transcript_langs": ["vi", "en"]},
 }
 
 # Strategic comment mining patterns (Thanh Hai YouTube AI 2026 Playbook)
 SLOP_PATTERNS = (
     re.compile(r"\b(ai slop|chatgpt script|bot script|sounds like ai|ai generated|lazy writing|generic voiceover|ai hallucination|cliche|fake story)\b", re.I),
-    re.compile(r"\b(chán vì ai|nội dung ai|giọng đọc ai|kịch bản ai|viết bằng ai|sáo rỗng)\b", re.I),
     re.compile(r"\b(aiスクリプト|aiっぽい|機械音声|薄っぺらい)\b", re.I),
     re.compile(r"\b(ai 대본|기계음|챗gpt|양산형)\b", re.I),
 )
 
 WISHLIST_PATTERNS = (
     re.compile(r"\b(please (?:make|do|cover)|next (?:video|topic) (?:should be|on)|can you (?:make|do|cover)|waiting for|wish you (?:would|could) (?:cover|make)|make one about|would love to see)\b", re.I),
-    re.compile(r"\b(làm về|hóng video về|mong ad làm|chờ video về|review về|làm tiếp về)\b", re.I),
     re.compile(r"\b(次(は|の動画は|のテーマは)|取り上げてほしい|解説してほしい|作ってほしい)\b", re.I),
     re.compile(r"\b(다음(은| 영상은)|다뤄주세요|만들어주세요|해줬으면 좋겠어요)\b", re.I),
 )

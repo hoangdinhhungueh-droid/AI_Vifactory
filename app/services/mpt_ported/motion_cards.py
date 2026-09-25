@@ -32,7 +32,6 @@ BG = os.getenv("VF_CARD_BG", "0x0b0e14")
 # Non-Latin scripts (ja/ko/zh/hi/ar/th) fall back to English to avoid tofu boxes.
 LATIN_CTA = {
     "en": "Follow for Part 2",
-    "vi": "Theo d\u00f5i \u0111\u1ec3 xem Ph\u1ea7n 2",
     "es": "Sigue para la Parte 2",
     "pt": "Siga para a Parte 2",
     "fr": "Abonne-toi pour la Partie 2",

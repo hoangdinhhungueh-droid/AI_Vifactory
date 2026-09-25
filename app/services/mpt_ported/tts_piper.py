@@ -6,7 +6,6 @@ from typing import Optional
 
 PIPER_MODELS_DIR = "/var/vf/models/piper"
 DEFAULT_MODELS = {
-    "vi": f"{PIPER_MODELS_DIR}/vi_VN-vais1000-medium.onnx",
     "en": f"{PIPER_MODELS_DIR}/en_US-lessac-medium.onnx",
 }
 

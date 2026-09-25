@@ -36,7 +36,7 @@ def is_cjk_market(market: str) -> bool:
 
 def detect_language(text: str, market: Optional[str] = None) -> str:
     """Detects language flavor based on market code and character distribution.
-    Returns: 'JP', 'KR', 'ZH', 'EN', or 'VI'.
+    Returns: 'JP', 'KR', 'ZH', or 'EN'.
     """
     m_up = (market or "").strip().upper()
     if m_up in ("JP", "JA"):
@@ -45,8 +45,6 @@ def detect_language(text: str, market: Optional[str] = None) -> str:
         return "KR"
     if m_up in ("ZH", "CN", "TW"):
         return "ZH"
-    if m_up == "VI":
-        return "VI"
 
     # Fallback to character analysis if market is ambiguous or EN
     sample = text[:1500] if text else ""

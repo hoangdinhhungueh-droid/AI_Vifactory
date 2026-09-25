@@ -133,7 +133,7 @@ class TestB35PromptForgeTranslation:
         bg_prompt = _sanitize_background_prompt(
             "Confidential court verdict documents scattered across desk",
             bg_key="bg_01",
-            market="VN",
+            market="EN",
             tokens=tokens
         )
         assert "[CAMERA & PERSPECTIVE]" in bg_prompt
@@ -148,7 +148,7 @@ class TestB35PromptForgeTranslation:
         fg_prompt = _sanitize_foreground_prompt(
             "Senior prosecutor holding red ink stamp",
             fg_key="fg_01",
-            market="VN",
+            market="EN",
             tokens=tokens
         )
         assert "[LIGHTING & OPTICS]" in fg_prompt

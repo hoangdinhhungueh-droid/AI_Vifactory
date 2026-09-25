@@ -95,7 +95,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--market",
         default="EN",
-        choices=["EN", "JP", "KR", "VN", "ALL"],
+        choices=["EN", "JP", "KR", "ALL"],
         help="Target market identifier (default: EN)",
     )
     parser.add_argument(

@@ -120,14 +120,6 @@ def _build_dynamic_chapters(
             f"{_fmt(t_act4)} - 제도의 균열과 법적 공방의 결말",
             f"{_fmt(t_act5)} - 최종 판결과 현대적 경고",
         ]
-    elif m == "VN":
-        return [
-            f"{_fmt(t_act1)} - Dấu hiệu bất thường: {kw[:30]}",
-            f"{_fmt(t_act2)} - Cấu trúc quyền lực và góc khuất điều hành",
-            f"{_fmt(t_act3)} - Hồ sơ kiểm toán và dòng tiền bí ẩn",
-            f"{_fmt(t_act4)} - Vết nứt thể chế bộc lộ",
-            f"{_fmt(t_act5)} - Đòn giáng trừng phạt và bài học đắt giá",
-        ]
     else:  # Default EN and others
         return [
             f"{_fmt(t_act1)} - {kw[:35]}: The Catalyst",
