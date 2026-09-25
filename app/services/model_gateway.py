@@ -249,7 +249,7 @@ class ModelGateway:
             except (httpx.HTTPError, ModelGatewayError) as e:
                 last_error = e
                 logger.warning(f"[GATEWAY] HHTech attempt {attempt}/{max_retries} failed: {e}")
-                if isinstance(e, ModelGatewayError) and any(s in str(e) for s in ["503", "hết nguồn khả dụng", "backend error", "400", "BAD_REQUEST", "rejected a generation parameter", "invalid_request_error"]):
+                if isinstance(e, ModelGatewayError) and any(s in str(e) for s in ["502", "503", "hết nguồn khả dụng", "backend error", "400", "BAD_REQUEST", "rejected a generation parameter", "invalid_request_error"]):
                     raise e
                 if attempt < max_retries:
                     import time

@@ -1459,14 +1459,22 @@ def extract_dynamic_visual_roster(
                 "narrative_samples": sample_narr
             }, ensure_ascii=False)
 
-            resp = gateway.call_llm(
-                prompt=user_prompt,
-                system_prompt=system_prompt,
-                model="gpt-6-astra",
-                fallback="claude-opus-5",
-                max_tokens=4500,
-                timeout=30.0
-            )
+            models_to_try = ["gpt-6-astra", "claude-opus-5", "claude-sonnet-5"]
+            resp = None
+            for m_candidate in models_to_try:
+                try:
+                    logger.info(f"[unified_vox_director] Attempting High-Tier LLM: {m_candidate}")
+                    resp = gateway.call_llm(
+                        prompt=user_prompt,
+                        system_prompt=system_prompt,
+                        model=m_candidate,
+                        max_tokens=4500,
+                        timeout=45.0
+                    )
+                    if resp:
+                        break
+                except Exception as ex_m:
+                    logger.warning(f"[unified_vox_director] Model {m_candidate} failed: {ex_m}")
             if resp:
                 cleaned_json = re.sub(r"^```(?:json)?\s*", "", resp.strip(), flags=re.MULTILINE)
                 cleaned_json = re.sub(r"\s*```$", "", cleaned_json, flags=re.MULTILINE)
@@ -2075,6 +2083,7 @@ def main():
     print(f"✅ Đã tạo director_plan.json ({len(scenes)} cảnh, {len(hero_clips)} Veo 3D clips) -> {dp_path}")
 
     # 2. Lưu prompts_forge.json
+    mkt = ep_id.split("_")[0].upper() if ep_id and "_" in ep_id else "EN"
     bg_prompts = {k: _sanitize_background_prompt(v["description"], bg_key=k, market=mkt) for k, v in bg_roster.items()}
     fg_prompts = {k: _sanitize_foreground_prompt(v["description"], fg_key=k, market=mkt) for k, v in fg_roster.items()}
     prompts_data = {
