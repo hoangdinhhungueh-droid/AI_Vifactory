@@ -785,10 +785,12 @@ except Exception as e:
     registered_bgs = set()
     registered_fgs = set()
     for s in dplan.get("scenes", []):
-        if s.get("bg_reuse_key"):
-            registered_bgs.add(s["bg_reuse_key"])
-        if s.get("fg_reuse_key"):
-            registered_fgs.add(s["fg_reuse_key"])
+        bg_k = s.get("bg_reuse_key") or (s.get("background", {}).get("reuse_key") if isinstance(s.get("background"), dict) else None)
+        if bg_k:
+            registered_bgs.add(bg_k)
+        fg_k = s.get("fg_reuse_key") or (s.get("foreground", {}).get("reuse_key") if isinstance(s.get("foreground"), dict) else None)
+        if fg_k:
+            registered_fgs.add(fg_k)
 
     unregistered = []
     for it in items:
