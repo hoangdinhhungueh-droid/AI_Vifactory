@@ -7,6 +7,7 @@ import { VoxTacticalMap } from "./VoxTacticalMap";
 import { VoxKineticCounter } from "./VoxKineticCounter";
 import { VoxCausalFlowchart } from "./VoxCausalFlowchart";
 import { VoxThresholdRatio } from "./VoxThresholdRatio";
+import { VoxInteractiveMap } from "./VoxInteractiveMap";
 import { EvidenceProp3D } from "../EvidenceProp3D";
 
 export interface VoxForensicOverlayData {
@@ -186,12 +187,12 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
           />
         ) : null}
 
-        {/* Tactical Paper Map */}
-        {rawType === "tactical_map" || rawType === "radar_map" || rawType === "surveillance_crt" ? (
-          <VoxTacticalMap
+        {/* Tactical Paper Map & Interactive Maritime Corridor (Vox Engine 2.0) */}
+        {rawType === "tactical_map" || rawType === "radar_map" || rawType === "interactive_map" || rawType === "maritime_route" || rawType === "surveillance_crt" ? (
+          <VoxInteractiveMap
             title={ov.title}
             badge={ov.badge}
-            theme={ov.theme || "vox_paper"}
+            theme={ov.theme || "tactical_navy"}
             layout={layout}
             payload={ov.payload}
             label={ov.label}

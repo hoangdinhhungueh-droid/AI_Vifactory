@@ -148,7 +148,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
 
     # 0. 3D Procedural Evidence Props (12fps Stop-Motion Quantized Physical Artifacts - Priority 0)
     # 0a. Financial Ledger 3D (Ledger, balance sheets, audit discrepancies, wire fraud records)
-    if any(k in t for k in ["ledger", "balance sheet", "accounting record", "wire fraud", "sổ sách", "bảng cân đối", "kế toán gian lận", "dòng tiền ảo", "회계 장부", "원장", "台帳", "帳簿", "決算書", "不正送金", "財務諸表", "会計", "裏金", "資金流", "簿外", "架空計上"]):
+    if any(k in t for k in ["ledger", "balance sheet", "accounting record", "wire fraud", "sổ sách", "bảng cân đối", "kế toán gian lận", "dòng tiền ảo", "회계 장부", "원장", "台帳", "帳簿", "決算書", "不正送金", "財務諸表", "会計", "裏金", "資金流", "簿外", "架空計上", "損益計算", "損益", "予算", "損得"]):
         return {
             "type": "evidence_3d_prop",
             "legacy_type": "evidence_board",
@@ -243,7 +243,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
         }
 
     # 1. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
-    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류", "契約", "条項", "黒塗り", "機密", "内部文書", "調査報告", "監査", "公文書", "記録", "報告書", "規約", "認可", "査察", "捜査", "申請", "不正", "虚偽", "隠蔽"]):
+    if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류", "契約", "条項", "黒塗り", "機密", "内部文書", "調査報告", "監査", "公文書", "記録", "報告書", "規約", "認可", "査察", "捜査", "申請", "不正", "虚偽", "隠蔽", "検査", "検疫", "追跡", "執行", "規則", "原産地", "ホルムアルデヒド", "漂白", "着色", "農薬", "添加物", "食品衛生", "報道", "警告"]):
         sentences = [s.strip() for s in re.split(r'[.!?。]+', narration_text) if len(s.strip()) > 5][:4]
         clauses = [f"{idx+1}. {sent}" for idx, sent in enumerate(sentences)] if sentences else [
             "1. OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
@@ -292,7 +292,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
         }
 
     # 2b. Threshold Ratio Graphic (24x exceedance, statutory baseline limit, chemical residue, toxic ratio)
-    if any(k in t for k in ["24倍", "倍の残留", "基準値の", "基準値を超過", "法定基準", "二酸化硫黄", "残留過剰", "exceedance", "threshold ratio", "toxic ratio", "residue limit"]):
+    if any(k in t for k in ["24倍", "二十四倍", "倍の残留", "基準値の", "基準値を超過", "基準の", "法定基準", "二酸化硫黄", "残留過剰", "exceedance", "threshold ratio", "toxic ratio", "residue limit"]):
         is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
         multiplier = 24
         baseline = 0.03
@@ -303,6 +303,8 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                 multiplier = int(float(ratio_match.group(1)))
             except Exception:
                 multiplier = 24
+        elif "二十四倍" in narration_text or "24倍" in narration_text:
+            multiplier = 24
         return {
             "type": "threshold_ratio",
             "legacy_type": "financial_chart",

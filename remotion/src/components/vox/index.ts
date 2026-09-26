@@ -4,6 +4,7 @@ export * from "./VoxCausalFlowchart";
 export * from "./VoxDisclosureBadge";
 export * from "./VoxDocumentHighlight";
 export * from "./VoxEvidenceBoard";
+export * from "./VoxInteractiveMap";
 export * from "./VoxKineticCounter";
 export * from "./VoxKineticTypography";
 export * from "./VoxOverlayLayer";

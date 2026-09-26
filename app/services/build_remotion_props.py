@@ -61,6 +61,8 @@ def build_structured_overlay(fo_type: str, narration_text: str, theme: str = "vo
                 multiplier = int(float(ratio_match.group(1)))
             except Exception:
                 multiplier = 24
+        elif "二十四倍" in narration_text or "24倍" in narration_text:
+            multiplier = 24
         return {
             "type": "threshold_ratio",
             "legacy_type": "financial_chart",

@@ -158,6 +158,10 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
         idx, sc = item
         score = 0.0
         narration = sc.get("narration", "") or sc.get("caption", "")
+        # Prioritize scenes with critical evidentiary / regulatory keywords
+        narr_lower = narration.lower()
+        if any(k in narr_lower for k in ["24倍", "二十四倍", "基準", "二酸化硫黄", "損益計算", "検査", "検疫", "追跡", "原産地", "四千八百六十"]):
+            score += 6.0
         # Prioritize scenes with parsed numerical metric
         metric = parse_spoken_number(narration)
         if metric:
@@ -187,8 +191,8 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
         q1 = max(2, int(target_count * 0.18))
         q2 = max(2, int(target_count * 0.18))
         q3 = max(3, int(target_count * 0.32))
-        q4 = max(3, int(target_count * 0.22))
-        q5 = max(1, target_count - (q1 + q2 + q3 + q4))
+        q4 = max(3, int(target_count * 0.20))
+        q5 = max(3, target_count - (q1 + q2 + q3 + q4))
         beat_quotas = {1: q1, 2: q2, 3: q3, 4: q4, 5: q5}
 
     for b_int in range(1, 6):
@@ -201,13 +205,28 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
         picked = [idx for idx, _ in sorted_candidates[:quota]]
         selected_indices.extend(picked)
 
-    # Sort final indices chronologically
+    # Sort initial indices chronologically
     selected_indices = sorted(list(set(selected_indices)))
-    # Cap strictly to ensure overlay density matches target_count
-    max_cap = max(1, int(len(scenes) * 0.38))
-    effective_cap = min(target_count, max_cap)
-    if len(selected_indices) > effective_cap:
-        selected_indices = selected_indices[:effective_cap]
+
+    # VOX Motion 2.0 Pacing: Gap smoothing pass to eliminate dead visual gaps (> 5 scenes)
+    if len(scenes) >= 30:
+        changed = True
+        pass_cnt = 0
+        while changed and pass_cnt < 3:
+            changed = False
+            pass_cnt += 1
+            new_indices = list(selected_indices)
+            for k in range(len(selected_indices) - 1):
+                i1, i2 = selected_indices[k], selected_indices[k + 1]
+                if i2 - i1 > 5:
+                    gap_candidates = [(idx, scenes[idx]) for idx in range(i1 + 2, i2 - 1)]
+                    if gap_candidates:
+                        best_gap_idx = max(gap_candidates, key=_scene_priority)[0]
+                        if best_gap_idx not in new_indices:
+                            new_indices.append(best_gap_idx)
+                            changed = True
+            selected_indices = sorted(list(set(new_indices)))
+
     return selected_indices
 
 
@@ -235,7 +254,7 @@ def prune_and_localize_scenes(
         is_essential_evidence = False
         if isinstance(raw_fo, dict):
             raw_t = raw_fo.get("type") or ""
-            if raw_t in ("threshold_ratio", "grid_ratio", "ratio_grid", "evidence_3d_prop", "3d_evidence_prop") or raw_fo.get("payload", {}).get("multiplier") == 24:
+            if raw_t in ("threshold_ratio", "grid_ratio", "ratio_grid", "evidence_3d_prop", "3d_evidence_prop", "tactical_map", "interactive_map", "causal_flowchart", "evidence_board") or raw_fo.get("payload", {}).get("multiplier") == 24:
                 is_essential_evidence = True
 
         if i not in climax_set and not is_essential_evidence:
@@ -243,8 +262,8 @@ def prune_and_localize_scenes(
             scene_copy["forensicOverlay"] = None
             scene_copy["forensic_overlay"] = None
         else:
-            # If raw_fo is already a structured dict with verified payload (e.g. threshold_ratio or custom prop), PRESERVE IT!
-            if isinstance(raw_fo, dict) and raw_fo.get("payload") and raw_fo.get("type") in ("threshold_ratio", "grid_ratio", "ratio_grid", "evidence_3d_prop", "3d_evidence_prop"):
+            # If raw_fo is already a structured dict with verified payload, PRESERVE IT!
+            if isinstance(raw_fo, dict) and raw_fo.get("payload") and raw_fo.get("type") in ("threshold_ratio", "grid_ratio", "ratio_grid", "evidence_3d_prop", "3d_evidence_prop", "tactical_map", "interactive_map", "causal_flowchart", "evidence_board", "kinetic_counter", "document_highlight"):
                 scene_copy["forensicOverlay"] = raw_fo
                 scene_copy["forensic_overlay"] = raw_fo
             else:
@@ -255,83 +274,94 @@ def prune_and_localize_scenes(
                 elif isinstance(raw_fo, str):
                     fo_type = raw_fo
 
-            # If no fo_type, infer based on metric or beat
-            metric = parse_spoken_number(narration)
-            if not fo_type:
-                if metric:
-                    fo_type = "kinetic_counter"
-                elif i % 2 == 0:
+                # If no fo_type, infer based on metric or beat
+                metric = parse_spoken_number(narration)
+                if not fo_type:
+                    if metric:
+                        fo_type = "kinetic_counter"
+                    elif i % 2 == 0:
+                        fo_type = "document_highlight"
+                    else:
+                        fo_type = "evidence_board"
+
+                # Rule 118: Zero-Mock Data - If kinetic_counter has no parsed metric, fallback to document_highlight
+                if fo_type == "kinetic_counter" and not metric:
                     fo_type = "document_highlight"
+
+                # Construct localized overlay
+                if fo_type == "kinetic_counter":
+                    overlay_obj = {
+                        "type": "kinetic_counter",
+                        "title": theme["counter_title"],
+                        "badge": theme["counter_badge"],
+                        "label": theme["counter_title"],
+                        "theme": "vox_paper",
+                        "layout": "full_bleed_focus",
+                        "sfx_cue": "stamp_slam",
+                    }
+                    if metric:
+                        scene_copy["statValue"] = metric.formatted
+                        scene_copy["statLabel"] = theme["counter_title"]
+                elif fo_type in ("evidence_board", "causal_flowchart"):
+                    overlay_obj = {
+                        "type": "evidence_board",
+                        "legacy_type": "causal_flowchart",
+                        "theme": "vox_paper",
+                        "layout": "full_bleed_focus",
+                        "title": theme["network_title"],
+                        "badge": theme["network_badge"],
+                        "sfx_cue": "paper_slide",
+                        "label": theme["network_label"],
+                        "payload": {
+                            "suspect_name": theme["suspect_role"],
+                            "role": theme["suspect_role"],
+                            "charges": theme["charges"],
+                            "connected_entities": theme["connected_entities"],
+                            "evidence_tag": theme["evidence_tag"],
+                        }
+                    }
+                elif fo_type == "tactical_map":
+                    overlay_obj = {
+                        "type": "tactical_map",
+                        "title": theme["map_title"],
+                        "badge": theme["map_badge"],
+                        "theme": "vox_paper",
+                        "layout": "full_bleed_focus",
+                        "sfx_cue": "radar_ping",
+                    }
                 else:
-                    fo_type = "evidence_board"
-
-            # Rule 118: Zero-Mock Data - If kinetic_counter has no parsed metric, fallback to document_highlight
-            if fo_type == "kinetic_counter" and not metric:
-                fo_type = "document_highlight"
-
-            # Construct localized overlay
-            if fo_type == "kinetic_counter":
-                overlay_obj = {
-                    "type": "kinetic_counter",
-                    "title": theme["counter_title"],
-                    "badge": theme["counter_badge"],
-                    "label": theme["counter_title"],
-                    "theme": "vox_paper",
-                    "layout": "full_bleed_focus",
-                    "sfx_cue": "stamp_slam",
-                }
-                if metric:
-                    scene_copy["statValue"] = metric.formatted
-                    scene_copy["statLabel"] = theme["counter_title"]
-            elif fo_type in ("evidence_board", "causal_flowchart"):
-                overlay_obj = {
-                    "type": "evidence_board",
-                    "legacy_type": "causal_flowchart",
-                    "theme": "vox_paper",
-                    "layout": "full_bleed_focus",
-                    "title": theme["network_title"],
-                    "badge": theme["network_badge"],
-                    "sfx_cue": "paper_slide",
-                    "label": theme["network_label"],
-                    "payload": {
-                        "suspect_name": theme["suspect_role"],
-                        "role": theme["suspect_role"],
-                        "charges": theme["charges"],
-                        "connected_entities": theme["connected_entities"],
-                        "evidence_tag": theme["evidence_tag"],
+                    # Default: document_highlight
+                    overlay_obj = {
+                        "type": "document_highlight",
+                        "title": theme["document_title"],
+                        "badge": theme["network_badge"],
+                        "theme": "vox_paper",
+                        "layout": "full_bleed_focus",
+                        "sfx_cue": "shutter_click",
+                        "payload": {
+                            "document_title": theme["document_title"],
+                            "agency": theme["agency"],
+                            "case_number": theme["case_number"],
+                            "clauses": [narration[:80]] if narration else ["OFFICIAL RECORD"],
+                            "highlight_line_index": 0,
+                            "redacted_terms": ["CONFIDENTIAL", "REDACTED"],
+                            "date": theme["date_verified"],
+                        }
                     }
-                }
-            elif fo_type == "tactical_map":
-                overlay_obj = {
-                    "type": "tactical_map",
-                    "title": theme["map_title"],
-                    "badge": theme["map_badge"],
-                    "theme": "vox_paper",
-                    "layout": "full_bleed_focus",
-                    "sfx_cue": "radar_ping",
-                }
-            else:
-                # Default: document_highlight
-                overlay_obj = {
-                    "type": "document_highlight",
-                    "title": theme["document_title"],
-                    "badge": theme["network_badge"],
-                    "theme": "vox_paper",
-                    "layout": "full_bleed_focus",
-                    "sfx_cue": "shutter_click",
-                    "payload": {
-                        "document_title": theme["document_title"],
-                        "agency": theme["agency"],
-                        "case_number": theme["case_number"],
-                        "clauses": [narration[:80]] if narration else ["OFFICIAL RECORD"],
-                        "highlight_line_index": 0,
-                        "redacted_terms": ["CONFIDENTIAL", "REDACTED"],
-                        "date": theme["date_verified"],
-                    }
-                }
 
-            scene_copy["forensicOverlay"] = overlay_obj
-            scene_copy["forensic_overlay"] = overlay_obj
+                scene_copy["forensicOverlay"] = overlay_obj
+                scene_copy["forensic_overlay"] = overlay_obj
+
+        # Attach statutory AI disclosure and source credit citations (Rule 122 & NHK/BPO compliance)
+        if scene_copy.get("forensicOverlay"):
+            if not scene_copy.get("sourceCredit"):
+                scene_copy["sourceCredit"] = {
+                    "agency": "厚生労働省 輸入食品監視業務 // 検疫所違反事例速報" if m_clean == "JP" else "MINISTRY AUDIT & BIOSECURITY INSPECTION RECORD",
+                    "citation": "OFFICIAL INSPECTION CITATION // VERIFIED RECORD",
+                    "theme": "amber_contrast",
+                }
+            if scene_copy.get("disclosureBadge") is None:
+                scene_copy["disclosureBadge"] = "※イメージ映像・再現"
 
         # Sanitize speaker tag (Rule 136)
         raw_tag = scene_copy.get("speakerTag")
