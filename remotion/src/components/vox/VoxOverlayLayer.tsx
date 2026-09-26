@@ -6,6 +6,7 @@ import { VoxBankCheck } from "./VoxBankCheck";
 import { VoxTacticalMap } from "./VoxTacticalMap";
 import { VoxKineticCounter } from "./VoxKineticCounter";
 import { VoxCausalFlowchart } from "./VoxCausalFlowchart";
+import { VoxThresholdRatio } from "./VoxThresholdRatio";
 import { EvidenceProp3D } from "../EvidenceProp3D";
 
 export interface VoxForensicOverlayData {
@@ -45,7 +46,7 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
   const layout = ov.layout || (isLeft ? "split_right" : "split_left");
   const sfxCue = ov.sfx_cue || (
     rawType.includes("doc") || rawType.includes("dossier") ? "marker_stroke" :
-    rawType.includes("check") || rawType.includes("counter") ? "stamp_slam" :
+    rawType.includes("check") || rawType.includes("counter") || rawType.includes("threshold") || rawType.includes("ratio") ? "stamp_slam" :
     rawType.includes("board") ? "paper_slide" :
     rawType.includes("map") ? "sonar_ping" : undefined
   );
@@ -170,6 +171,18 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
               ...(ov.payload?.end_value === undefined && statValue ? { amount: statValue } : {}),
             }}
             label={ov.label || statValue}
+          />
+        ) : null}
+
+        {/* Threshold Ratio Visualization (24x Staccato 6x4 Grid & Statutory Limit) */}
+        {rawType === "threshold_ratio" || rawType === "grid_ratio" || rawType === "ratio_grid" ? (
+          <VoxThresholdRatio
+            title={ov.title}
+            badge={ov.badge}
+            theme={ov.theme || "crimson_alert"}
+            layout={layout}
+            payload={ov.payload}
+            label={ov.label}
           />
         ) : null}
 

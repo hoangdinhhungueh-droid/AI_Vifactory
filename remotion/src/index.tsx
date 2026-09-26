@@ -18,10 +18,17 @@ import {
 } from "remotion";
 import { DataStoryTest } from "./DataStoryTest";
 import { FullStory } from "./FullStory";
-import { VoxOverlayLayer } from "./components/vox/VoxOverlayLayer";
+import {
+  VoxOverlayLayer,
+  VoxAtmosphericLighting,
+  VoxParallaxLayer,
+  VoxThresholdRatio,
+  VoxKineticTypography,
+  VoxSourceCredit,
+  VoxDisclosureBadge,
+} from "./components/vox";
 import { EvidenceProp3D } from "./components/EvidenceProp3D";
-import { VoxAtmosphericLighting } from "./components/vox/VoxAtmosphericLighting";
-import { VoxParallaxLayer } from "./components/vox/VoxParallaxLayer";
+import { WordTimestamp } from "./types";
 import { VoxelStopMotionVideo, calculateTotalFrames } from "./components/VoxelStopMotionVideo";
 
 const INK = "#05090d";
@@ -489,6 +496,9 @@ export const TwoLayerScene = (props) => {
   const statLabel = props.statLabel;
   const forensicOverlay = props.forensicOverlay;
   const stampBadge = props.stampBadge;
+  const sourceCredit = props.sourceCredit || props.source_credit;
+  const disclosureBadge = props.disclosureBadge;
+  const actTitle = props.actTitle;
 
   const cfg = useVideoConfig();
   const durationInFrames = cfg.durationInFrames || 180;
@@ -581,7 +591,100 @@ export const TwoLayerScene = (props) => {
     });
   }
 
-  return (
+  // Floating Minimalist Subtitle: Intelligent Auto-Dodge Calculation
+  const hasForeground = Boolean(foreground);
+  const fgPos = foregroundPosition || "left";
+  const hasFgLeft = hasForeground && fgPos === "left";
+  const hasFgRight = hasForeground && fgPos === "right";
+
+  const rawOverlay = forensicOverlay;
+  const overlayObj = typeof rawOverlay === "object" ? rawOverlay : null;
+  const ovLayout = overlayObj?.layout;
+  const ovType = overlayObj?.type;
+  const isFullBleedOverlay =
+    ovLayout === "full_bleed_focus" ||
+    ovLayout === "fullscreen_dossier" ||
+    (ovType === "threshold_ratio" && (!ovLayout || ovLayout === "full_bleed_focus"));
+  const isOverlayRight = ovLayout === "split_right" || (!ovLayout && hasFgLeft);
+  const isOverlayLeft = ovLayout === "split_left" || (!ovLayout && hasFgRight);
+
+  let subtitleContainerStyle: React.CSSProperties = {
+    position: "absolute",
+    zIndex: 25,
+    pointerEvents: "none",
+    display: "flex",
+    flexDirection: "column",
+  };
+
+  let subtitleTextAlign: "left" | "center" | "right" = "center";
+  let subtitleFontSize = (isLeft || isRight) ? 26 : 28;
+
+  if (isFullBleedOverlay) {
+    // Under full-bleed evidence (e.g. VoxThresholdRatio 6x4 grid), stay in bottom band
+    subtitleContainerStyle = {
+      ...subtitleContainerStyle,
+      bottom: 22,
+      left: "14%",
+      right: "14%",
+      maxWidth: "72%",
+      alignItems: "center",
+    };
+    subtitleTextAlign = "center";
+    subtitleFontSize = 24;
+  } else if ((hasFgLeft && isOverlayRight) || (hasFgRight && isOverlayLeft)) {
+    // Both sides occupied -> Grounded narrow center
+    subtitleContainerStyle = {
+      ...subtitleContainerStyle,
+      bottom: 20,
+      left: "22%",
+      right: "22%",
+      maxWidth: "56%",
+      alignItems: "center",
+    };
+    subtitleTextAlign = "center";
+    subtitleFontSize = 23;
+  } else if (hasFgLeft || isOverlayLeft) {
+    // Left side occupied -> Auto-dodge to Right side
+    subtitleContainerStyle = {
+      ...subtitleContainerStyle,
+      bottom: 34,
+      left: "50%",
+      right: 70,
+      maxWidth: "46%",
+      alignItems: "flex-start",
+    };
+    subtitleTextAlign = "left";
+    subtitleFontSize = 26;
+  } else if (hasFgRight || isOverlayRight) {
+    // Right side occupied -> Auto-dodge to Left side
+    subtitleContainerStyle = {
+      ...subtitleContainerStyle,
+      bottom: 34,
+      left: 70,
+      right: "50%",
+      maxWidth: "46%",
+      alignItems: "flex-start",
+    };
+    subtitleTextAlign = "left";
+    subtitleFontSize = 26;
+  } else {
+    // Clean screen -> Lower center floating
+    subtitleContainerStyle = {
+      ...subtitleContainerStyle,
+      bottom: 42,
+      left: "16%",
+      right: "16%",
+      maxWidth: "68%",
+      alignItems: "center",
+    };
+    subtitleTextAlign = "center";
+    subtitleFontSize = 28;
+  }
+
+  const rawSpeakerTag = cleanSpeakerTag(props.speakerTag, props.actTitle);
+  const showSpeakerTag = Boolean(rawSpeakerTag && rawSpeakerTag !== "BEAT 1: CASE INVESTIGATION");
+
+    return (
     <AbsoluteFill style={{ backgroundColor: showBackground ? INK : "transparent", opacity: entranceOpacity }}>
       {showBackground && background ? (
         <AbsoluteFill>
@@ -681,61 +784,85 @@ export const TwoLayerScene = (props) => {
         <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} hasStatCard={Boolean(statValue)} />
       ) : null}
 
-      {/* Modern High-Retention Subtitle Dialogue Container (Decision A4: Adaptive Opposing HUD) */}
-      {words.length > 0 ? (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 30,
-            left: isLeft ? "52%" : (isRight ? 60 : "18%"),
-            right: isRight ? "52%" : (isLeft ? 60 : "18%"),
-            maxWidth: (isLeft || isRight) ? "45%" : "64%",
-            minHeight: (isLeft || isRight) ? 120 : 95,
-            zIndex: 25,
-            background: "linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(5, 9, 14, 0.96) 100%)",
-            border: "2px solid rgba(242, 166, 59, 0.40)",
-            borderRadius: 18,
-            padding: (isLeft || isRight) ? "14px 22px" : "14px 28px",
-            boxShadow: "0 15px 40px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.15)",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-          }}
-        >
-          {/* Header Speaker / Subject Tag */}
-          <div
-            style={{
-              color: "#f2a63b",
-              fontSize: (isLeft || isRight) ? 16 : 18,
-              fontWeight: 800,
-              letterSpacing: 1.2,
-              textTransform: "uppercase",
-              marginBottom: 6,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontFamily: "'Segoe UI', Roboto, Arial, sans-serif",
-            }}
-          >
-            <span>📜</span>
-            <span>{cleanSpeakerTag(props.speakerTag, props.actTitle)}</span>
-          </div>
+      {/* Vox Kinetic Typography (Word-Level Whisper Keywords Burst) */}
+      {hasExactSubtitles ? (
+        <VoxKineticTypography words={subtitles as WordTimestamp[]} />
+      ) : null}
 
-          {/* Karaoke Word-Highlight Subtitle Line */}
+      {/* Journalistic Source Credit Bar (Rule 130 Causal Integrity) */}
+      {sourceCredit ? (
+        typeof sourceCredit === "string" ? (
+          <VoxSourceCredit
+            source={sourceCredit}
+            position={hasFgLeft ? "bottom_right" : "bottom_left"}
+          />
+        ) : (
+          <VoxSourceCredit {...sourceCredit} />
+        )
+      ) : null}
+
+      {/* Statutory Visual Disclosure Badge (AI Recreation / Reenactment) */}
+      {disclosureBadge !== false ? (
+        <VoxDisclosureBadge
+          text={typeof disclosureBadge === "string" ? disclosureBadge : "※イメージ映像・再現"}
+          position={sourceCredit ? "top_right" : "bottom_right"}
+          isAiGenerated={Boolean(foreground || background)}
+        />
+      ) : null}
+
+      {/* Floating Minimalist Subtitle with Intelligent Auto-Dodge (Vox Motion Engine 2.0) */}
+      {words.length > 0 ? (
+        <div style={subtitleContainerStyle}>
+          {/* Header Speaker / Subject Minimalist Pill Tag */}
+          {showSpeakerTag && rawSpeakerTag ? (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "3px 10px",
+                backgroundColor: "rgba(10, 15, 24, 0.78)",
+                border: "1px solid rgba(242, 166, 59, 0.45)",
+                borderRadius: 4,
+                marginBottom: 6,
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.6)",
+              }}
+            >
+              <span style={{ fontSize: 11 }}>📜</span>
+              <span
+                style={{
+                  color: "#ffd166",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  letterSpacing: 1.2,
+                  textTransform: "uppercase",
+                  fontFamily: "'Zen Kaku Gothic New', 'Segoe UI', Roboto, sans-serif",
+                  fontFeatureSettings: '"palt" 1',
+                }}
+              >
+                {rawSpeakerTag}
+              </span>
+            </div>
+          ) : null}
+
+          {/* Karaoke Word-Highlight Subtitle Line (Floating Minimalist - No Box) */}
           <div
             style={{
-              fontFamily: "'Segoe UI', Roboto, -apple-system, sans-serif",
-              fontSize: (isLeft || isRight) ? 26 : 28,
+              fontFamily: "'Zen Kaku Gothic New', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+              fontFeatureSettings: '"palt" 1',
+              fontSize: subtitleFontSize,
               lineHeight: 1.35,
               color: "#FFFFFF",
-              textAlign: (isLeft || isRight) ? "left" : "center",
+              textAlign: subtitleTextAlign,
+              textShadow:
+                "0 2px 4px rgba(0, 0, 0, 0.95), 0 0 14px rgba(0, 0, 0, 0.9), 0 4px 20px rgba(0, 0, 0, 0.85)",
             }}
           >
             {visibleWords.map((w, wIdx) => {
               const currentGlobalIdx = chunkStartWord + wIdx;
               const isPast = currentGlobalIdx < activeGlobalWordIdx;
               const isActive = currentGlobalIdx === activeGlobalWordIdx;
-              
+
               if (isActive) {
                 return (
                   <span
@@ -743,11 +870,10 @@ export const TwoLayerScene = (props) => {
                     style={{
                       color: "#ffd166",
                       fontWeight: 900,
-                      textShadow: "0 0 14px rgba(255, 209, 102, 0.9), 0 2px 4px rgba(0,0,0,0.9)",
+                      textShadow: "0 0 16px rgba(255, 209, 102, 0.95), 0 2px 6px rgba(0, 0, 0, 1)",
                       marginRight: 8,
                       display: "inline-block",
-                      transform: "scale(1.05)",
-                      transition: "transform 0.1s ease",
+                      transform: "scale(1.08)",
                     }}
                   >
                     {w}
@@ -761,7 +887,7 @@ export const TwoLayerScene = (props) => {
                     style={{
                       color: "#FFFFFF",
                       fontWeight: 700,
-                      textShadow: "0 2px 4px rgba(0,0,0,0.8)",
+                      textShadow: "0 2px 4px rgba(0, 0, 0, 0.9)",
                       marginRight: 8,
                       display: "inline-block",
                     }}
@@ -786,8 +912,7 @@ export const TwoLayerScene = (props) => {
             })}
           </div>
         </div>
-      ) : null}
-    </AbsoluteFill>
+      ) : null}    </AbsoluteFill>
   );
 };
 
@@ -1736,6 +1861,9 @@ export const TwoLayerEpisode = (props) => {
             forensicOverlay={s.forensicOverlay || s.forensic_overlay}
             stampBadge={s.stampBadge || s.stamp_badge}
             transition_out={s.transition_out || s.transitionOut}
+            sourceCredit={s.sourceCredit || s.source_credit}
+            disclosureBadge={s.disclosureBadge}
+            actTitle={s.actTitle}
           />
         </Sequence>
       );

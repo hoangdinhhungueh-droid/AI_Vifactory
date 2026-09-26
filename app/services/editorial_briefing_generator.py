@@ -105,15 +105,49 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
     if len(scenes) <= 4:
         return [i for i, s in enumerate(scenes) if s.get("forensic_overlay") or s.get("forensicOverlay")]
 
-    # Map scenes by beat (1-5)
+    # Map scenes by beat (1-5) with full Roman numeral and Act parsing + Timeline Fallback
     beats_map: Dict[int, List[Tuple[int, Dict[str, Any]]]] = {b: [] for b in range(1, 6)}
+    total_scenes_len = max(1, len(scenes))
     for idx, s in enumerate(scenes):
-        b_raw = s.get("beat_index") or s.get("beat_number") or s.get("act_number") or s.get("beat") or 1
-        try:
-            b_int = int(b_raw)
-        except Exception:
-            m = re.search(r'\d+', str(b_raw))
-            b_int = int(m.group(0)) if m else 1
+        b_int = None
+        # 1. Try explicit numeric field
+        b_raw = s.get("beat_index") or s.get("beat_number") or s.get("act_number") or s.get("beat")
+        if b_raw is not None:
+            try:
+                b_int = int(b_raw)
+            except Exception:
+                m = re.search(r'\d+', str(b_raw))
+                if m:
+                    b_int = int(m.group(0))
+
+        # 2. Try parsing from actTitle or storyBeat (e.g. "ACT I", "ACT II", "ACT III", "ACT IV", "ACT V")
+        if b_int is None:
+            act_title = str(s.get("actTitle") or s.get("storyBeat") or "").upper()
+            if "ACT I " in act_title or "ACT I:" in act_title or "ACT I //" in act_title or "BEAT 1" in act_title or "ACT 1" in act_title:
+                b_int = 1
+            elif "ACT II " in act_title or "ACT II:" in act_title or "ACT II //" in act_title or "BEAT 2" in act_title or "ACT 2" in act_title:
+                b_int = 2
+            elif "ACT III " in act_title or "ACT III:" in act_title or "ACT III //" in act_title or "BEAT 3" in act_title or "ACT 3" in act_title:
+                b_int = 3
+            elif "ACT IV " in act_title or "ACT IV:" in act_title or "ACT IV //" in act_title or "BEAT 4" in act_title or "ACT 4" in act_title:
+                b_int = 4
+            elif "ACT V " in act_title or "ACT V:" in act_title or "ACT V //" in act_title or "BEAT 5" in act_title or "ACT 5" in act_title:
+                b_int = 5
+
+        # 3. Fallback to timeline percentage distribution (Rule 445: 5 Beat Docudrama Pacing)
+        if b_int is None or b_int < 1 or b_int > 5:
+            pct = idx / total_scenes_len
+            if pct < 0.15:
+                b_int = 1
+            elif pct < 0.40:
+                b_int = 2
+            elif pct < 0.65:
+                b_int = 3
+            elif pct < 0.85:
+                b_int = 4
+            else:
+                b_int = 5
+
         b_int = max(1, min(5, b_int))
         beats_map[b_int].append((idx, s))
 
@@ -197,17 +231,29 @@ def prune_and_localize_scenes(
         narration = scene_copy.get("narration", "") or scene_copy.get("caption", "")
         raw_fo = scene_copy.get("forensicOverlay") or scene_copy.get("forensic_overlay")
 
-        if i not in climax_set:
-            # Strictly remove overlay to allow visual breathing room
+        # Check if scene has a verified high-priority evidence overlay that MUST NOT be pruned
+        is_essential_evidence = False
+        if isinstance(raw_fo, dict):
+            raw_t = raw_fo.get("type") or ""
+            if raw_t in ("threshold_ratio", "grid_ratio", "ratio_grid", "evidence_3d_prop", "3d_evidence_prop") or raw_fo.get("payload", {}).get("multiplier") == 24:
+                is_essential_evidence = True
+
+        if i not in climax_set and not is_essential_evidence:
+            # Remove overlay to allow visual breathing room, UNLESS essential evidence
             scene_copy["forensicOverlay"] = None
             scene_copy["forensic_overlay"] = None
         else:
-            # Climax scene: construct or sanitize localized overlay
-            fo_type = None
-            if isinstance(raw_fo, dict):
-                fo_type = raw_fo.get("type")
-            elif isinstance(raw_fo, str):
-                fo_type = raw_fo
+            # If raw_fo is already a structured dict with verified payload (e.g. threshold_ratio or custom prop), PRESERVE IT!
+            if isinstance(raw_fo, dict) and raw_fo.get("payload") and raw_fo.get("type") in ("threshold_ratio", "grid_ratio", "ratio_grid", "evidence_3d_prop", "3d_evidence_prop"):
+                scene_copy["forensicOverlay"] = raw_fo
+                scene_copy["forensic_overlay"] = raw_fo
+            else:
+                # Climax scene: construct or sanitize localized overlay
+                fo_type = None
+                if isinstance(raw_fo, dict):
+                    fo_type = raw_fo.get("type")
+                elif isinstance(raw_fo, str):
+                    fo_type = raw_fo
 
             # If no fo_type, infer based on metric or beat
             metric = parse_spoken_number(narration)
