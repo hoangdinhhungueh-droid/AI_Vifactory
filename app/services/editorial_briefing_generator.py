@@ -209,14 +209,17 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
     selected_indices = sorted(list(set(selected_indices)))
 
     # VOX Motion 2.0 Pacing: Gap smoothing pass to eliminate dead visual gaps (> 5 scenes)
-    if len(scenes) >= 30:
+    if target_count is None and len(scenes) >= 30:
+        max_allowed = min(45, int(len(scenes) * 0.34))
         changed = True
         pass_cnt = 0
-        while changed and pass_cnt < 3:
+        while changed and pass_cnt < 3 and len(selected_indices) < max_allowed:
             changed = False
             pass_cnt += 1
             new_indices = list(selected_indices)
             for k in range(len(selected_indices) - 1):
+                if len(new_indices) >= max_allowed:
+                    break
                 i1, i2 = selected_indices[k], selected_indices[k + 1]
                 if i2 - i1 > 5:
                     gap_candidates = [(idx, scenes[idx]) for idx in range(i1 + 2, i2 - 1)]
@@ -226,6 +229,8 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
                             new_indices.append(best_gap_idx)
                             changed = True
             selected_indices = sorted(list(set(new_indices)))
+    elif target_count is not None and len(selected_indices) > target_count:
+        selected_indices = selected_indices[:target_count]
 
     return selected_indices
 
