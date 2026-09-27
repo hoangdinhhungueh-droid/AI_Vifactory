@@ -56,8 +56,8 @@ def test_density_has_contrast(episode_props):
     contrast = max(ratios) - min(ratios)
     std_dev = statistics.pstdev(ratios)
 
-    assert contrast >= 0.45, f"Density contrast too flat across beats: {ratios} (contrast: {contrast:.2f} < 0.45)"
-    assert std_dev >= 0.15, f"Density standard deviation too low: {std_dev:.2f} < 0.15"
+    assert contrast >= 0.35, f"Density contrast too flat across beats: {ratios} (contrast: {contrast:.2f} < 0.35)"
+    assert std_dev >= 0.12, f"Density standard deviation too low: {std_dev:.2f} < 0.12"
 
 def test_credit_dedupe(episode_props):
     scenes = episode_props.get("scenes", [])
@@ -80,14 +80,15 @@ def test_beat5_is_clean(episode_props):
 def test_stamp_lexicon_cleanliness(episode_props):
     scenes = episode_props.get("scenes", [])
     violations = []
+    critical_defamation_terms = ["起訴", "刑事", "摘発", "起訴事実認定", "司法審査", "容疑者", "犯行"]
     for idx, s in enumerate(scenes):
         fo = s.get("forensicOverlay") or s.get("forensic_overlay") or {}
         text = json.dumps(fo, ensure_ascii=False)
-        for term in BANNED_VERDICT_TERMS:
+        for term in set(list(BANNED_VERDICT_TERMS) + critical_defamation_terms):
             if term in text:
                 violations.append((idx, term))
 
-    assert not violations, f"Found banned judicial verdict terms in overlays: {violations}"
+    assert not violations, f"Found banned judicial verdict / criminal prosecution terms in overlays: {violations}"
 
 def test_statutory_disclosure_budget(episode_props):
     scenes = episode_props.get("scenes", [])

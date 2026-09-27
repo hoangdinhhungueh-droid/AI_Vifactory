@@ -31,6 +31,7 @@ from app.services.editorial_briefing_generator import (
     extract_market_from_episode_id,
     prune_and_localize_scenes,
     LOCALIZED_OVERLAY_THEMES,
+    BANNED_VERDICT_TERMS,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -50,28 +51,31 @@ def audit_props_integrity(props: Dict[str, Any], market: str) -> Tuple[bool, Lis
     if density_pct > 35.0:
         defects.append(f"OVERLAY_DENSITY_TOO_HIGH: {fo_count}/{len(scenes)} scenes ({density_pct:.1f}%) have overlays (max allowed 35.0%).")
 
-    # 2. Market Localization Audit (Rule 122 & Rule 128)
+    # 2. Market Localization Audit & Legal Banned Lexicon (Rule 122, 128, 134)
     m_clean = market.upper()
-    if m_clean != "EN":
-        for i, s in enumerate(scenes):
-            fo = s.get("forensicOverlay")
-            if fo and isinstance(fo, dict):
-                title = str(fo.get("title") or "")
-                badge = str(fo.get("badge") or "")
-                # Flag obvious English boilerplate in non-English videos
+    for i, s in enumerate(scenes):
+        fo = s.get("forensicOverlay")
+        if fo and isinstance(fo, dict):
+            fo_str = json.dumps(fo, ensure_ascii=False)
+            for b_term in BANNED_VERDICT_TERMS:
+                if b_term in fo_str:
+                    defects.append(f"BANNED_LEGAL_LEXICON in Scene {i:02d}: '{b_term}' found in overlay.")
+
+            if m_clean != "EN":
                 english_cliches = [
                     "OFFICIAL INVESTIGATION RECORD", "FINDINGS OF FACT",
                     "AUDIT DISCREPANCY", "CRITICAL FINDING", "SUBPOENAED EVIDENCE",
-                    "INVESTIGATION NETWORK", "GEO-TACTICAL TELEMETRY", "CRIMINAL INDICTMENT"
+                    "INVESTIGATION NETWORK", "GEO-TACTICAL TELEMETRY", "CRIMINAL INDICTMENT",
+                    "DOCKET", "INDICTMENT", "SUBPOENA"
                 ]
                 for cliche in english_cliches:
-                    if cliche in title or cliche in badge:
+                    if cliche in fo_str:
                         defects.append(f"UNLOCALIZED_OVERLAY_TEXT in Scene {i:02d}: '{cliche}' found in {m_clean} episode.")
 
-            # Speaker tag audit (Rule 136)
-            tag = str(s.get("speakerTag") or "")
-            if tag and ("ARCHIVE X" in tag or tag.endswith(".png") or tag.endswith(".jpg")):
-                defects.append(f"LEAKED_ASSET_TAG in Scene {i:02d}: '{tag}'")
+        # Speaker tag audit (Rule 136)
+        tag = str(s.get("speakerTag") or "")
+        if tag and ("ARCHIVE X" in tag or tag.endswith(".png") or tag.endswith(".jpg")):
+            defects.append(f"LEAKED_ASSET_TAG in Scene {i:02d}: '{tag}'")
 
     # 3. Zero-Mock Kinetic Counter Audit (Rule 118)
     for i, s in enumerate(scenes):

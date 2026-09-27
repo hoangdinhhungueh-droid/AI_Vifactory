@@ -33,41 +33,64 @@ BEAT_ENVELOPE = {
 OVERLAY_BLACKOUT_AFTER = 609.0  # Hard stop: 0% overlays after 10:09 (609s)
 
 BANNED_VERDICT_TERMS = {
+    # English Judicial / Criminal Indictment terms
     "VIOLATION", "GUILTY", "ILLEGAL", "CRIME", "CRIMINAL", "FRAUD",
-    "違法", "有罪", "犯罪"
+    "INDICTMENT", "GRAND JURY", "PROSECUTOR", "DOCKET", "SUBPOENA",
+    "FELONY", "DEFENDANT", "CONVICTED", "LAWSUIT",
+    # Japanese Criminal Prosecution terms (Defamation risk - Keihō 230)
+    "違法", "有罪", "犯罪", "起訴", "刑事", "摘発", "起訴事実認定",
+    "起訴状", "容疑者", "犯行", "司法審査", "刑事摘発", "地検",
+    # Korean & Vietnamese equivalents
+    "기소", "형사", "유죄", "범죄", "cáo trạng", "khởi tố", "truy tố"
 }
 
 STAMP_MEASUREMENT_MAP = {
     "VIOLATION": "基準値超過",
     "ILLEGAL": "基準外",
-    "GUILTY": "事実認定",
-    "CRIME": "摘発事案",
-    "CRIMINAL": "摘発事案",
+    "GUILTY": "事実確認",
+    "CRIME": "是正指導事案",
+    "CRIMINAL": "是正指導事案",
     "FRAUD": "記録不整合",
     "PRICE_FRAUD": "不当価格計上",
+    "INDICTMENT": "行政指導",
+    "GRAND JURY": "調査委員会",
+    "PROSECUTOR": "検査官",
+    "DOCKET": "査察記録",
+    "SUBPOENA": "資料提出要請",
+    "FELONY": "重大不適合",
+    "DEFENDANT": "対象事業者",
     "違法": "基準超過",
-    "有罪": "事実認定",
-    "犯罪": "摘発事案",
+    "有罪": "事実確認",
+    "犯罪": "是正指導事案",
+    "起訴": "行政指導",
+    "刑事": "行政検査",
+    "摘発": "回収命令",
+    "起訴事実認定": "基準値超過確認",
+    "起訴状": "検査成績書",
+    "容疑者": "対象事業者",
+    "犯行": "規則違反",
+    "司法審査": "行政検査",
+    "刑事摘発": "回収命令措置",
 }
 
 LOCALIZED_OVERLAY_THEMES: Dict[str, Dict[str, Any]] = {
     "JP": {
-        "document_title": "公式査察・監査記録 // 事実認定書",
-        "agency": "規制監視機構 // 特別調査課",
-        "case_number": "査察記録 // 第782号 審査審議録",
+        "document_title": "公式検査・査察記録 // 検査成績書",
+        "agency": "食品安全監視機構 // 検査指導課",
+        "case_number": "査察記録 // 第782号 行政検査録",
         "date_verified": "公式検証記録 // 承認済",
-        "network_title": "捜査相関図 // 対象組織ネットワーク",
-        "network_badge": "証拠物件 // 刑事摘発",
-        "network_label": "調査調書 // 対象相関図",
-        "suspect_role": "無許可ダミー事業者 / 不正資金受領者",
-        "charges": ["安全基準規則違反", "虚偽データ及び記録改ざんの提出"],
-        "connected_entities": ["規制監督官庁", "対象事業施設", "査察監査保管所"],
-        "evidence_tag": "公式証拠物件",
-        "counter_title": "監査差異 // システム数値逸脱",
+        "network_title": "流通・検査相関図 // 流通経路ネットワーク",
+        "network_badge": "検査成績書 // 基準値超過",
+        "network_label": "検査調書 // 流通相関図",
+        "suspect_role": "無許可加工事業者 / 不正原材料受領者",
+        "charges": ["食品衛生法基準違反", "虚偽データ及び記録改ざんの提出"],
+        "connected_entities": ["規制監督官庁", "対象事業施設", "検査保管所"],
+        "evidence_tag": "検査検体物件",
+        "counter_title": "検査差異 // 基準数値逸脱",
         "counter_badge": "重大指摘事項",
-        "map_title": "地理戦術データ // 対象位置確認",
+        "map_title": "地理流通データ // 対象位置確認",
         "map_badge": "重点監視地域",
-        "default_speaker": "証拠記録 // 時系列検証",
+        "default_speaker": "検査記録 // 時系列検証",
     },
     "KR": {
         "document_title": "공식 감사·검사 기록 // 사실 인정서",
@@ -476,13 +499,13 @@ def prune_and_localize_scenes(
             # Sanitize US legal artifacts and English cliches in non-EN markets
             curr_title = str(overlay_obj.get("title") or "")
             curr_badge = str(overlay_obj.get("badge") or "")
-            if "US DISTRICT COURT" in curr_title or "GRAND JURY" in curr_badge:
+            if "US DISTRICT COURT" in curr_title or "GRAND JURY" in curr_badge or "INDICTMENT" in curr_title:
                 if m_clean == "JP":
-                    overlay_obj["title"] = "司法審査 // 起訴状記録"
-                    overlay_obj["badge"] = "起訴事実認定"
+                    overlay_obj["title"] = "行政指導 // 検査成績書"
+                    overlay_obj["badge"] = "基準値超過確認"
                 else:
-                    overlay_obj["title"] = "JUDICIAL INDICTMENT // OFFICIAL DOCKET"
-                    overlay_obj["badge"] = "INDICTMENT FILING"
+                    overlay_obj["title"] = "ADMINISTRATIVE AUDIT // INSPECTION REPORT"
+                    overlay_obj["badge"] = "STANDARD EXCEEDED"
 
             if m_clean != "EN":
                 cliche_map = {
@@ -494,12 +517,15 @@ def prune_and_localize_scenes(
                     "INVESTIGATION NETWORK": theme["network_title"],
                     "GEO-TACTICAL TELEMETRY": theme["map_title"],
                     "CRIMINAL INDICTMENT": theme["network_badge"],
+                    "LOCATIONAL EVIDENCE": theme.get("map_badge", "重点監視地域"),
                 }
                 for cliche, loc_val in cliche_map.items():
                     if cliche in overlay_obj.get("title", ""):
                         overlay_obj["title"] = overlay_obj["title"].replace(cliche, loc_val)
                     if cliche in overlay_obj.get("badge", ""):
                         overlay_obj["badge"] = overlay_obj["badge"].replace(cliche, loc_val)
+                    if cliche in overlay_obj.get("label", ""):
+                        overlay_obj["label"] = overlay_obj["label"].replace(cliche, loc_val)
 
             # Sanitize banned verdict terms across title, badge, label and payload
             for bad_term in BANNED_VERDICT_TERMS:
@@ -512,16 +538,48 @@ def prune_and_localize_scenes(
 
             if isinstance(overlay_obj.get("payload"), dict):
                 p_load = overlay_obj["payload"]
-                if "charges" in p_load and isinstance(p_load["charges"], list):
-                    clean_charges = []
-                    for ch in p_load["charges"]:
-                        ch_str = str(ch)
-                        for bad_term in BANNED_VERDICT_TERMS:
-                            ch_str = ch_str.replace(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
-                        clean_charges.append(ch_str)
-                    p_load["charges"] = clean_charges
-                if "authentication" in p_load and "CRIMINAL" in str(p_load["authentication"]):
-                    p_load["authentication"] = "公的記録 // 司法審査調書" if m_clean == "JP" else "UNSEALED JUDICIAL DOCKET"
+                def _sanitize_dict(d: dict):
+                    for pk, pv in list(d.items()):
+                        if isinstance(pv, str):
+                            val = pv
+                            if m_clean == "JP":
+                                val = val.replace("CASE DOCKET // ADJUDICATED FILING", theme.get("case_number", "査察記録 // 行政検査録"))
+                                val = val.replace("OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT", theme.get("document_title", "公式検査・査察記録 // 検査成績書"))
+                                val = val.replace("REGULATORY OVERSIGHT // INVESTIGATIVE DIVISION", theme.get("agency", "食品安全監視機構 // 検査指導課"))
+                                val = val.replace("court_indictment_3d", "inspection_dossier_3d")
+                                val = val.replace("EXHIBIT-3D-INDICTMENT", "EXHIBIT-3D-INSPECTION")
+                                val = val.replace("公的記録 // 司法審査調書", "公的記録 // 行政検査調書")
+                                val = val.replace("司法審査", "行政検査")
+                                val = val.replace("起訴状", "検査成績書")
+                                val = val.replace("起訴事実認定", "基準値超過確認")
+                                val = val.replace("刑事摘発", "回収命令")
+                                val = val.replace("刑事", "行政検査")
+                                val = val.replace("摘発", "回収命令")
+                                val = val.replace("起訴", "行政指導")
+                            for bad_term, rep in STAMP_MEASUREMENT_MAP.items():
+                                val = val.replace(bad_term, rep if m_clean == "JP" else "EXCEEDED_STANDARD")
+                            for bad_term in BANNED_VERDICT_TERMS:
+                                val = val.replace(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
+                            d[pk] = val
+                        elif isinstance(pv, list):
+                            clean_list = []
+                            for item in pv:
+                                if isinstance(item, str):
+                                    i_val = item
+                                    if m_clean == "JP":
+                                        i_val = i_val.replace("司法審査", "行政検査").replace("起訴", "行政指導").replace("刑事", "行政検査").replace("摘発", "回収命令")
+                                    for bad_term, rep in STAMP_MEASUREMENT_MAP.items():
+                                        i_val = i_val.replace(bad_term, rep if m_clean == "JP" else "EXCEEDED_STANDARD")
+                                    for bad_term in BANNED_VERDICT_TERMS:
+                                        i_val = i_val.replace(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
+                                    clean_list.append(i_val)
+                                else:
+                                    clean_list.append(item)
+                            d[pk] = clean_list
+                        elif isinstance(pv, dict):
+                            _sanitize_dict(pv)
+
+                _sanitize_dict(p_load)
 
             # Ensure integer stop_motion_fps in payload
             if isinstance(overlay_obj.get("payload"), dict):
@@ -553,7 +611,9 @@ def prune_and_localize_scenes(
             scene_copy["creditStyle"] = credit_style
 
         # Statutory AI Disclosure Badge (Rule 122 & NHK/BPO compliance): Exactly 3 key milestone scenes
-        if i in disclosure_scenes:
+        # Strict visual blackout between 609s and 650s: absolutely NO badge and NO overlay.
+        # The final scene badge is permitted only in the last scene (>= 650s) to anchor the YouTube end-screen.
+        if i in disclosure_scenes and not (609.0 <= start_sec < 650.0):
             scene_copy["disclosureBadge"] = "※イメージ映像・再現" if m_clean == "JP" else "※Reconstruction / Simulation"
         else:
             scene_copy["disclosureBadge"] = None

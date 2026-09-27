@@ -102,11 +102,15 @@ def _build_dynamic_chapters(
         ss = sec % 60
         return f"{mm:02d}:{ss:02d}"
 
-    kw = (target_keyword or "").strip() or (title[:30] if title else "Investigation")
+    kw = (target_keyword or "").strip()
+    if not kw and title:
+        kw = title.split("｜")[0].split("|")[0].split(" - ")[0].strip()
+    kw = kw or "Investigation"
+    topic_clean = re.sub(r'[:|｜-].*$', '', kw).strip()[:24] or kw[:24]
 
     if m == "JP":
         return [
-            f"{_fmt(t_act1)} - {kw[:30]}の発端と疑惑",
+            f"{_fmt(t_act1)} - {topic_clean}の発端と疑惑",
             f"{_fmt(t_act2)} - 組織構造と権限の謎",
             f"{_fmt(t_act3)} - 記録と資金の空白",
             f"{_fmt(t_act4)} - 制度の亀裂と法的対立",
@@ -195,15 +199,27 @@ def sync_exact_chapters_from_remotion(
                     
                     if current_beat_key != last_beat_key or idx == 0:
                         sec = int(current_frame / fps)
-                        # Ensure YouTube constraint: each chapter at least 10s apart, and first is 0
+                        # Ensure YouTube constraint: chapters at least 30s apart to keep progress bar clean (12-16 chapters budget)
                         if not exact_timestamps:
                             exact_timestamps.append(0)
-                        elif sec >= exact_timestamps[-1] + 10:
+                        elif sec >= exact_timestamps[-1] + 30:
                             exact_timestamps.append(sec)
                         last_beat_key = current_beat_key
 
                     current_frame += dur
                 
+                # If still over 16 chapters, thin out by merging closest chapters
+                while len(exact_timestamps) > 16:
+                    # Drop the chapter with the smallest gap from its predecessor (skip 00:00)
+                    min_gap_idx = 1
+                    min_gap = exact_timestamps[1] - exact_timestamps[0]
+                    for g_i in range(2, len(exact_timestamps)):
+                        gap = exact_timestamps[g_i] - exact_timestamps[g_i - 1]
+                        if gap < min_gap:
+                            min_gap = gap
+                            min_gap_idx = g_i
+                    exact_timestamps.pop(min_gap_idx)
+
                 if current_frame > 0:
                     total_dur_s = current_frame / fps
         except Exception as e:
@@ -222,6 +238,9 @@ def sync_exact_chapters_from_remotion(
                 ch_str = str(ch).strip()
                 title_clean = re.sub(r'^\d{1,2}:\d{2}(?::\d{2})?\s*[-:]?\s*', '', ch_str).strip()
                 if title_clean:
+                    # Purge judicial/criminal terms from titles
+                    banned_kw_pattern = r'(起訴状記録|起訴事実認定|刑事摘発|司法審査|起訴|刑事|摘発|容疑者|GRAND JURY|INDICTMENT|PROSECUTOR|CRIMINAL)'
+                    title_clean = re.sub(banned_kw_pattern, '検査・行政指導', title_clean)
                     clean_titles.append(title_clean)
             
             if len(clean_titles) >= len(exact_timestamps):
