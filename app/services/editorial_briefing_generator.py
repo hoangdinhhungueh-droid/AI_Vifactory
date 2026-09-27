@@ -23,11 +23,11 @@ logger = logging.getLogger("editorial_briefing_generator")
 
 # Rule 122 & Vox Motion Engine 3.0: Dynamic Dramatic Density Curve
 BEAT_ENVELOPE = {
-    1: {"overlay_density": 0.35, "cadence": "cutout", "karaoke": "full"},
-    2: {"overlay_density": 0.30, "cadence": "cutout", "karaoke": "full"},
-    3: {"overlay_density": 0.55, "cadence": "fluid",  "karaoke": "dim"},
-    4: {"overlay_density": 0.85, "cadence": "smooth", "karaoke": "dim"},
-    5: {"overlay_density": 0.12, "cadence": "smooth", "karaoke": "full"},
+    1: {"overlay_density": 0.28, "cadence": "cutout", "karaoke": "full"},
+    2: {"overlay_density": 0.20, "cadence": "cutout", "karaoke": "full"},
+    3: {"overlay_density": 0.35, "cadence": "fluid",  "karaoke": "dim"},
+    4: {"overlay_density": 0.45, "cadence": "smooth", "karaoke": "dim"},
+    5: {"overlay_density": 0.10, "cadence": "smooth", "karaoke": "full"},
 }
 
 OVERLAY_BLACKOUT_AFTER = 609.0  # Hard stop: 0% overlays after 10:09 (609s)
@@ -206,6 +206,65 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
 
     selected_indices: List[int] = []
 
+    if target_count is not None:
+        if target_count <= 0:
+            return []
+        if target_count >= len(scenes):
+            return list(range(len(scenes)))
+
+        active_beats = [b for b in range(1, 6) if beats_map[b]]
+        base_alloc: Dict[int, int] = {}
+        remaining = target_count
+
+        if remaining >= len(active_beats):
+            for b in active_beats:
+                base_alloc[b] = 1
+            remaining -= len(active_beats)
+        else:
+            for b in active_beats:
+                base_alloc[b] = 0
+
+        # Distribute remaining quota based on beat weights
+        weights = {b: BEAT_ENVELOPE[b]["overlay_density"] for b in active_beats if len(beats_map[b]) > base_alloc[b]}
+        total_w = sum(weights.values()) or 1.0
+        sorted_beats = sorted(weights.keys(), key=lambda b: weights[b], reverse=True)
+
+        for b in sorted_beats:
+            if remaining <= 0:
+                break
+            can_take = len(beats_map[b]) - base_alloc[b]
+            add = min(can_take, max(1, round(remaining * weights[b] / total_w)))
+            add = min(add, remaining)
+            base_alloc[b] += add
+            remaining -= add
+
+        for b in sorted_beats:
+            if remaining <= 0:
+                break
+            can_take = len(beats_map[b]) - base_alloc[b]
+            if can_take > 0:
+                add = min(can_take, remaining)
+                base_alloc[b] += add
+                remaining -= add
+
+        selected_indices: List[int] = []
+        for b in active_beats:
+            quota = base_alloc.get(b, 0)
+            candidates = beats_map[b]
+            eligible = [
+                (idx, sc) for idx, sc in candidates
+                if not (b == 5 and scene_start_times[idx] >= OVERLAY_BLACKOUT_AFTER)
+            ]
+            if not eligible:
+                eligible = candidates
+            sorted_candidates = sorted(eligible, key=_scene_priority, reverse=True)
+            picked = [idx for idx, _ in sorted_candidates[:quota]]
+            selected_indices.extend(picked)
+
+        return sorted(list(set(selected_indices)))
+
+    # When target_count is None (default full episode pacing):
+    selected_indices: List[int] = []
     for b_int in range(1, 6):
         candidates = beats_map[b_int]
         if not candidates:
@@ -214,19 +273,13 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
         env = BEAT_ENVELOPE[b_int]
         target_density = env["overlay_density"]
 
-        # Eligible candidates (for Beat 5, enforce hard-stop blackout)
         eligible_candidates = []
         for idx, sc in candidates:
             if b_int == 5 and scene_start_times[idx] >= OVERLAY_BLACKOUT_AFTER:
                 continue
             eligible_candidates.append((idx, sc))
 
-        if target_count is not None:
-            # Scaled mode for targeted test fixtures
-            quota = max(1, round(len(eligible_candidates) * target_density))
-        else:
-            quota = max(1, round(len(candidates) * target_density))
-
+        quota = max(1, round(len(candidates) * target_density))
         sorted_candidates = sorted(eligible_candidates, key=_scene_priority, reverse=True)
         picked = [idx for idx, _ in sorted_candidates[:quota]]
         selected_indices.extend(picked)
@@ -234,11 +287,12 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
     selected_indices = sorted(list(set(selected_indices)))
 
     # Gap smoothing pass for narrative body (scenes before OVERLAY_BLACKOUT_AFTER)
+    # Strictly respect the VOX 35% hard ceiling (max 33% from auto-selection)
     if target_count is None and len(scenes) >= 30:
-        max_allowed = min(75, int(len(scenes) * 0.48))
+        max_allowed = min(60, int(len(scenes) * 0.33))
         changed = True
         pass_cnt = 0
-        while changed and pass_cnt < 3 and len(selected_indices) < max_allowed:
+        while changed and pass_cnt < 2 and len(selected_indices) < max_allowed:
             changed = False
             pass_cnt += 1
             new_indices = list(selected_indices)
@@ -246,9 +300,9 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
                 if len(new_indices) >= max_allowed:
                     break
                 i1, i2 = selected_indices[k], selected_indices[k + 1]
-                if i2 - i1 > 5:
+                if i2 - i1 > 7:
                     gap_candidates = [
-                        (idx, scenes[idx]) for idx in range(i1 + 2, i2 - 1)
+                        (idx, scenes[idx]) for idx in range(i1 + 3, i2 - 2)
                         if scene_start_times[idx] < OVERLAY_BLACKOUT_AFTER
                     ]
                     if gap_candidates:
@@ -419,7 +473,7 @@ def prune_and_localize_scenes(
                         }
                     }
 
-            # Sanitize US legal artifacts
+            # Sanitize US legal artifacts and English cliches in non-EN markets
             curr_title = str(overlay_obj.get("title") or "")
             curr_badge = str(overlay_obj.get("badge") or "")
             if "US DISTRICT COURT" in curr_title or "GRAND JURY" in curr_badge:
@@ -429,6 +483,23 @@ def prune_and_localize_scenes(
                 else:
                     overlay_obj["title"] = "JUDICIAL INDICTMENT // OFFICIAL DOCKET"
                     overlay_obj["badge"] = "INDICTMENT FILING"
+
+            if m_clean != "EN":
+                cliche_map = {
+                    "OFFICIAL INVESTIGATION RECORD": theme["document_title"],
+                    "FINDINGS OF FACT": theme["document_title"],
+                    "AUDIT DISCREPANCY": theme["counter_title"],
+                    "CRITICAL FINDING": theme["counter_badge"],
+                    "SUBPOENAED EVIDENCE": theme["network_badge"],
+                    "INVESTIGATION NETWORK": theme["network_title"],
+                    "GEO-TACTICAL TELEMETRY": theme["map_title"],
+                    "CRIMINAL INDICTMENT": theme["network_badge"],
+                }
+                for cliche, loc_val in cliche_map.items():
+                    if cliche in overlay_obj.get("title", ""):
+                        overlay_obj["title"] = overlay_obj["title"].replace(cliche, loc_val)
+                    if cliche in overlay_obj.get("badge", ""):
+                        overlay_obj["badge"] = overlay_obj["badge"].replace(cliche, loc_val)
 
             # Sanitize banned verdict terms across title, badge, label and payload
             for bad_term in BANNED_VERDICT_TERMS:
