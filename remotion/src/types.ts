@@ -1,3 +1,15 @@
+
+export const CADENCE = {
+  smooth: 30,
+  fluid: 15,
+  cutout: 10,
+  archival: 6,
+} as const;
+
+export type CadenceKey = keyof typeof CADENCE;
+export type KaraokeMode = 'full' | 'dim' | 'off';
+export type CreditStyle = 'full' | 'tick' | 'none';
+
 export type CameraMove =
   | "static"
   | "slow_pan_left"
@@ -90,6 +102,7 @@ export interface VoxSourceCreditProps {
   docketNumber?: string;
   position?: "top_right" | "top_left" | "bottom_right" | "bottom_left";
   theme?: "noir" | "paper" | "tech";
+  styleType?: "full" | "tick";
 }
 
 export interface VoxDisclosureBadgeProps {
@@ -131,6 +144,11 @@ export interface Scene {
   forensic_overlay?: VoxForensicOverlayData | string | null;
   stampBadge?: string;
   stamp_badge?: string;
+  cadence?: CadenceKey;
+  karaokeMode?: KaraokeMode;
+  karaoke_mode?: KaraokeMode;
+  creditStyle?: CreditStyle;
+  credit_style?: CreditStyle;
   sourceCredit?: string | VoxSourceCreditProps;
   source_credit?: string | VoxSourceCreditProps;
   disclosureBadge?: string | boolean;

@@ -8,6 +8,7 @@ export const VoxSourceCredit: React.FC<VoxSourceCreditProps> = ({
   docketNumber,
   position = "bottom_left",
   theme = "noir",
+  styleType = "full",
 }) => {
   const frame = useCurrentFrame();
 
@@ -20,11 +21,6 @@ export const VoxSourceCredit: React.FC<VoxSourceCreditProps> = ({
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.bezier(0.16, 1, 0.3, 1),
-  });
-
-  const opacity = interpolate(frame, [0, 8], [0, 0.95], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
   });
 
   // Positioning coordinates
@@ -54,6 +50,56 @@ export const VoxSourceCredit: React.FC<VoxSourceCreditProps> = ({
   const borderColor = isPaper ? "rgba(180, 83, 9, 0.4)" : "rgba(255, 255, 255, 0.12)";
   const accentColor = isPaper ? "#b45309" : "#f2a63b";
   const subtextColor = isPaper ? "#64748b" : "rgba(255, 255, 255, 0.6)";
+
+  // Rule 122 & Vox Engine 3.0: Citation-Event vs Discrete Corner Tick
+  if (styleType === "tick") {
+    return (
+      <div
+        style={{
+          position: "absolute",
+          ...posStyle,
+          zIndex: 35,
+          width: 4,
+          height: 22,
+          backgroundColor: accentColor,
+          borderRadius: 2,
+          opacity: 0.75,
+          boxShadow: `0 0 10px ${accentColor}80`,
+          pointerEvents: "none",
+        }}
+      />
+    );
+  }
+
+  // Full citation card: auto-collapse after 75 frames (2.5s) to avoid screen clutter
+  const fadeIn = interpolate(frame, [0, 8], [0, 0.95], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const fadeOut = interpolate(frame, [65, 75], [1, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const opacity = fadeIn * fadeOut;
+
+  if (opacity <= 0.005) {
+    // After full card collapses, leave a subtle 4px tick anchor
+    return (
+      <div
+        style={{
+          position: "absolute",
+          ...posStyle,
+          zIndex: 35,
+          width: 4,
+          height: 18,
+          backgroundColor: accentColor,
+          borderRadius: 2,
+          opacity: 0.5,
+          pointerEvents: "none",
+        }}
+      />
+    );
+  }
 
   return (
     <div

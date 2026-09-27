@@ -20,6 +20,36 @@ from app.services.text_to_number_parser import parse_spoken_number
 
 logger = logging.getLogger("editorial_briefing_generator")
 
+
+# Rule 122 & Vox Motion Engine 3.0: Dynamic Dramatic Density Curve
+BEAT_ENVELOPE = {
+    1: {"overlay_density": 0.35, "cadence": "cutout", "karaoke": "full"},
+    2: {"overlay_density": 0.30, "cadence": "cutout", "karaoke": "full"},
+    3: {"overlay_density": 0.55, "cadence": "fluid",  "karaoke": "dim"},
+    4: {"overlay_density": 0.85, "cadence": "smooth", "karaoke": "dim"},
+    5: {"overlay_density": 0.12, "cadence": "smooth", "karaoke": "full"},
+}
+
+OVERLAY_BLACKOUT_AFTER = 609.0  # Hard stop: 0% overlays after 10:09 (609s)
+
+BANNED_VERDICT_TERMS = {
+    "VIOLATION", "GUILTY", "ILLEGAL", "CRIME", "CRIMINAL", "FRAUD",
+    "違法", "有罪", "犯罪"
+}
+
+STAMP_MEASUREMENT_MAP = {
+    "VIOLATION": "基準値超過",
+    "ILLEGAL": "基準外",
+    "GUILTY": "事実認定",
+    "CRIME": "摘発事案",
+    "CRIMINAL": "摘発事案",
+    "FRAUD": "記録不整合",
+    "PRICE_FRAUD": "不当価格計上",
+    "違法": "基準超過",
+    "有罪": "事実認定",
+    "犯罪": "摘発事案",
+}
+
 LOCALIZED_OVERLAY_THEMES: Dict[str, Dict[str, Any]] = {
     "JP": {
         "document_title": "公式査察・監査記録 // 事実認定書",
@@ -91,52 +121,53 @@ def extract_market_from_episode_id(episode_id: str) -> str:
 
 
 def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[int] = None) -> List[int]:
-    """Select climax scene indices across 5 Beats for forensic overlays.
+    """Select climax scene indices across 5 Beats strictly following BEAT_ENVELOPE dramatic curve.
     
-    VOX Editorial Motion Pacing:
-    - Automatically scales overlay count to ~30-35% of episode scenes (35-45 overlays for ~130 scenes).
-    - If target_count is explicitly provided (e.g. in test fixtures), strictly respects the provided quota.
-    - Accurately maps scenes across all 5 beats via beat_index / beat_number / act_number.
+    Beat 1: 0.35 (Hook & Anomaly)
+    Beat 2: 0.30 (Institutional Trap - Minimalist, Paper Flow)
+    Beat 3: 0.55 (Forensic Paper Trail & Quantitative Chain)
+    Beat 4: 0.85 (Smoking Gun Climax Peak)
+    Beat 5: 0.12 (Modern Mirror - Philosophical Resolution, Hard Stop at 10:09)
     """
     if not scenes:
         return []
 
-    # For micro test fixtures (len <= 4 scenes), preserve explicit test overlays
     if len(scenes) <= 4:
         return [i for i, s in enumerate(scenes) if s.get("forensic_overlay") or s.get("forensicOverlay")]
 
-    # Map scenes by beat (1-5) with full Roman numeral and Act parsing + Timeline Fallback
+    # Compute timeline timestamps
+    timeline_sec = 0.0
+    scene_start_times: Dict[int, float] = {}
+    for i, s in enumerate(scenes):
+        scene_start_times[i] = timeline_sec
+        dur = s.get("durationInFrames")
+        if dur:
+            dur_s = float(dur) / 30.0
+        else:
+            dur_s = float(s.get("duration_sec") or s.get("duration_seconds") or 4.38)
+        timeline_sec += dur_s
+
+    # Group scenes by beat
     beats_map: Dict[int, List[Tuple[int, Dict[str, Any]]]] = {b: [] for b in range(1, 6)}
-    total_scenes_len = max(1, len(scenes))
+    total_len = max(1, len(scenes))
+
     for idx, s in enumerate(scenes):
+        b_val = s.get("beat_index") or s.get("beat_number") or s.get("act_number") or s.get("beat")
         b_int = None
-        # 1. Try explicit numeric field
-        b_raw = s.get("beat_index") or s.get("beat_number") or s.get("act_number") or s.get("beat")
-        if b_raw is not None:
-            try:
-                b_int = int(b_raw)
-            except Exception:
-                m = re.search(r'\d+', str(b_raw))
-                if m:
-                    b_int = int(m.group(0))
+        if isinstance(b_val, int):
+            b_int = b_val
+        elif isinstance(b_val, str):
+            m_num = re.search(r'([1-5])', b_val)
+            if m_num:
+                b_int = int(m_num.group(1))
+            else:
+                for roman, arab in [("V", 5), ("IV", 4), ("III", 3), ("II", 2), ("I", 1)]:
+                    if roman in b_val.upper():
+                        b_int = arab
+                        break
 
-        # 2. Try parsing from actTitle or storyBeat (e.g. "ACT I", "ACT II", "ACT III", "ACT IV", "ACT V")
         if b_int is None:
-            act_title = str(s.get("actTitle") or s.get("storyBeat") or "").upper()
-            if "ACT I " in act_title or "ACT I:" in act_title or "ACT I //" in act_title or "BEAT 1" in act_title or "ACT 1" in act_title:
-                b_int = 1
-            elif "ACT II " in act_title or "ACT II:" in act_title or "ACT II //" in act_title or "BEAT 2" in act_title or "ACT 2" in act_title:
-                b_int = 2
-            elif "ACT III " in act_title or "ACT III:" in act_title or "ACT III //" in act_title or "BEAT 3" in act_title or "ACT 3" in act_title:
-                b_int = 3
-            elif "ACT IV " in act_title or "ACT IV:" in act_title or "ACT IV //" in act_title or "BEAT 4" in act_title or "ACT 4" in act_title:
-                b_int = 4
-            elif "ACT V " in act_title or "ACT V:" in act_title or "ACT V //" in act_title or "BEAT 5" in act_title or "ACT 5" in act_title:
-                b_int = 5
-
-        # 3. Fallback to timeline percentage distribution (Rule 445: 5 Beat Docudrama Pacing)
-        if b_int is None or b_int < 1 or b_int > 5:
-            pct = idx / total_scenes_len
+            pct = idx / total_len
             if pct < 0.15:
                 b_int = 1
             elif pct < 0.40:
@@ -151,66 +182,60 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
         b_int = max(1, min(5, b_int))
         beats_map[b_int].append((idx, s))
 
-    selected_indices: List[int] = []
-
-    # Helper: score a scene for climax potential
     def _scene_priority(item: Tuple[int, Dict[str, Any]]) -> float:
         idx, sc = item
         score = 0.0
         narration = sc.get("narration", "") or sc.get("caption", "")
-        # Prioritize scenes with critical evidentiary / regulatory keywords
         narr_lower = narration.lower()
         if any(k in narr_lower for k in ["24倍", "二十四倍", "基準", "二酸化硫黄", "損益計算", "検査", "検疫", "追跡", "原産地", "四千八百六十"]):
-            score += 6.0
-        # Prioritize scenes with parsed numerical metric
+            score += 8.0
         metric = parse_spoken_number(narration)
         if metric:
-            score += 5.0
-        # Prioritize scenes that originally had an overlay proposal
-        if sc.get("forensic_overlay") or sc.get("forensicOverlay"):
-            score += 3.0
-        # Prioritize scenes with duration >= 3.5s (allows reading)
+            score += 6.0
+        raw_fo = sc.get("forensic_overlay") or sc.get("forensicOverlay")
+        if isinstance(raw_fo, dict):
+            fo_type = raw_fo.get("type") or ""
+            if fo_type in ("threshold_ratio", "grid_ratio", "causal_flowchart", "evidence_3d_prop"):
+                score += 10.0
+            else:
+                score += 4.0
         dur = sc.get("durationInFrames") or (sc.get("duration_sec", 0) * 30)
         if dur >= 105:
             score += 2.0
         return score
 
-    # Quota allocation:
-    if target_count is None:
-        if len(scenes) >= 50:
-            target_count = min(45, max(12, int(len(scenes) * 0.32)))
-        else:
-            target_count = 7
-
-    if target_count <= 8:
-        beat_quotas = {1: 1, 2: 1, 3: 2, 4: 2, 5: 1}
-        if len(scenes) > 60:
-            beat_quotas[1] = 2
-    else:
-        # VOX high-density motion graphics allocation across 5 beats
-        q1 = max(2, int(target_count * 0.18))
-        q2 = max(2, int(target_count * 0.18))
-        q3 = max(3, int(target_count * 0.32))
-        q4 = max(3, int(target_count * 0.20))
-        q5 = max(3, target_count - (q1 + q2 + q3 + q4))
-        beat_quotas = {1: q1, 2: q2, 3: q3, 4: q4, 5: q5}
+    selected_indices: List[int] = []
 
     for b_int in range(1, 6):
         candidates = beats_map[b_int]
         if not candidates:
             continue
-        # Sort by priority score descending
-        sorted_candidates = sorted(candidates, key=_scene_priority, reverse=True)
-        quota = beat_quotas.get(b_int, 1)
+
+        env = BEAT_ENVELOPE[b_int]
+        target_density = env["overlay_density"]
+
+        # Eligible candidates (for Beat 5, enforce hard-stop blackout)
+        eligible_candidates = []
+        for idx, sc in candidates:
+            if b_int == 5 and scene_start_times[idx] >= OVERLAY_BLACKOUT_AFTER:
+                continue
+            eligible_candidates.append((idx, sc))
+
+        if target_count is not None:
+            # Scaled mode for targeted test fixtures
+            quota = max(1, round(len(eligible_candidates) * target_density))
+        else:
+            quota = max(1, round(len(candidates) * target_density))
+
+        sorted_candidates = sorted(eligible_candidates, key=_scene_priority, reverse=True)
         picked = [idx for idx, _ in sorted_candidates[:quota]]
         selected_indices.extend(picked)
 
-    # Sort initial indices chronologically
     selected_indices = sorted(list(set(selected_indices)))
 
-    # VOX Motion 2.0 Pacing: Gap smoothing pass to eliminate dead visual gaps (> 5 scenes)
+    # Gap smoothing pass for narrative body (scenes before OVERLAY_BLACKOUT_AFTER)
     if target_count is None and len(scenes) >= 30:
-        max_allowed = min(45, int(len(scenes) * 0.34))
+        max_allowed = min(75, int(len(scenes) * 0.48))
         changed = True
         pass_cnt = 0
         while changed and pass_cnt < 3 and len(selected_indices) < max_allowed:
@@ -222,15 +247,16 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
                     break
                 i1, i2 = selected_indices[k], selected_indices[k + 1]
                 if i2 - i1 > 5:
-                    gap_candidates = [(idx, scenes[idx]) for idx in range(i1 + 2, i2 - 1)]
+                    gap_candidates = [
+                        (idx, scenes[idx]) for idx in range(i1 + 2, i2 - 1)
+                        if scene_start_times[idx] < OVERLAY_BLACKOUT_AFTER
+                    ]
                     if gap_candidates:
                         best_gap_idx = max(gap_candidates, key=_scene_priority)[0]
                         if best_gap_idx not in new_indices:
                             new_indices.append(best_gap_idx)
                             changed = True
             selected_indices = sorted(list(set(new_indices)))
-    elif target_count is not None and len(selected_indices) > target_count:
-        selected_indices = selected_indices[:target_count]
 
     return selected_indices
 
@@ -240,7 +266,7 @@ def prune_and_localize_scenes(
     market: str,
     climax_indices: Optional[List[int]] = None,
 ) -> List[Dict[str, Any]]:
-    """Prune forensicOverlay from non-climax scenes and localize authorized overlays."""
+    """Prune forensicOverlay strictly adhering to BEAT_ENVELOPE and Rule 122/128/136."""
     m_clean = market.upper() if market in LOCALIZED_OVERLAY_THEMES else "EN"
     theme = LOCALIZED_OVERLAY_THEMES[m_clean]
 
@@ -250,50 +276,99 @@ def prune_and_localize_scenes(
     climax_set = set(climax_indices)
     sanitized: List[Dict[str, Any]] = []
 
+    # Calculate timeline timestamps
+    timeline_sec = 0.0
+    scene_start_times: Dict[int, float] = {}
+    for i, s in enumerate(scenes):
+        scene_start_times[i] = timeline_sec
+        dur = s.get("durationInFrames")
+        if dur:
+            dur_s = float(dur) / 30.0
+        else:
+            dur_s = float(s.get("duration_sec") or s.get("duration_seconds") or 4.38)
+        timeline_sec += dur_s
+
+    total_len = max(1, len(scenes))
+    seen_sources: set[str] = set()
+
+    # Identify disclosure key scenes: scene 0, first scene of beat 4, last scene of beat 5
+    beat4_first_idx = None
+    for idx in range(len(scenes)):
+        pct = idx / total_len
+        if pct >= 0.65 and beat4_first_idx is None:
+            beat4_first_idx = idx
+            break
+    disclosure_scenes = {0, beat4_first_idx if beat4_first_idx is not None else int(total_len * 0.65), len(scenes) - 1}
+
     for i, s in enumerate(scenes):
         scene_copy = dict(s)
+        start_sec = scene_start_times.get(i, 0.0)
+
+        # Determine beat (1..5)
+        b_val = scene_copy.get("beat_index") or scene_copy.get("beat_number") or scene_copy.get("act_number") or scene_copy.get("beat")
+        b_int = None
+        if isinstance(b_val, int):
+            b_int = b_val
+        elif isinstance(b_val, str):
+            m_num = re.search(r'([1-5])', b_val)
+            if m_num:
+                b_int = int(m_num.group(1))
+            else:
+                for roman, arab in [("V", 5), ("IV", 4), ("III", 3), ("II", 2), ("I", 1)]:
+                    if roman in b_val.upper():
+                        b_int = arab
+                        break
+
+        if b_int is None:
+            pct = i / total_len
+            if pct < 0.15:
+                b_int = 1
+            elif pct < 0.40:
+                b_int = 2
+            elif pct < 0.65:
+                b_int = 3
+            elif pct < 0.85:
+                b_int = 4
+            else:
+                b_int = 5
+        b_int = max(1, min(5, b_int))
+
+        env = BEAT_ENVELOPE[b_int]
+        scene_copy["beat"] = b_int
+        scene_copy["beat_index"] = b_int
+        scene_copy["cadence"] = env["cadence"]
+        scene_copy["karaoke_mode"] = env["karaoke"]
+        scene_copy["karaokeMode"] = env["karaoke"]
+
         narration = scene_copy.get("narration", "") or scene_copy.get("caption", "")
         raw_fo = scene_copy.get("forensicOverlay") or scene_copy.get("forensic_overlay")
 
-        # Check if scene has a verified high-priority evidence overlay that MUST NOT be pruned
-        is_essential_evidence = False
-        if isinstance(raw_fo, dict):
-            raw_t = raw_fo.get("type") or ""
-            if raw_t in ("threshold_ratio", "grid_ratio", "ratio_grid", "evidence_3d_prop", "3d_evidence_prop", "tactical_map", "interactive_map", "causal_flowchart", "evidence_board") or raw_fo.get("payload", {}).get("multiplier") == 24:
-                is_essential_evidence = True
+        # Check overlay eligibility: strictly climax set and before blackout threshold
+        is_eligible = (i in climax_set) and (start_sec < OVERLAY_BLACKOUT_AFTER)
 
-        if i not in climax_set and not is_essential_evidence:
-            # Remove overlay to allow visual breathing room, UNLESS essential evidence
+        if not is_eligible:
             scene_copy["forensicOverlay"] = None
             scene_copy["forensic_overlay"] = None
+            scene_copy["statValue"] = None
+            scene_copy["statLabel"] = None
+            scene_copy["sourceCredit"] = None
+            scene_copy["source_credit"] = None
+            scene_copy["credit_style"] = None
+            scene_copy["creditStyle"] = None
         else:
-            # If raw_fo is already a structured dict with verified payload, PRESERVE IT!
-            if isinstance(raw_fo, dict) and raw_fo.get("payload") and raw_fo.get("type") in ("threshold_ratio", "grid_ratio", "ratio_grid", "evidence_3d_prop", "3d_evidence_prop", "tactical_map", "interactive_map", "causal_flowchart", "evidence_board", "kinetic_counter", "document_highlight"):
-                scene_copy["forensicOverlay"] = raw_fo
-                scene_copy["forensic_overlay"] = raw_fo
+            # Construct or sanitize authorized overlay
+            overlay_obj: Dict[str, Any] = {}
+            if isinstance(raw_fo, dict) and raw_fo.get("type"):
+                overlay_obj = dict(raw_fo)
             else:
-                # Climax scene: construct or sanitize localized overlay
-                fo_type = None
-                if isinstance(raw_fo, dict):
-                    fo_type = raw_fo.get("type")
-                elif isinstance(raw_fo, str):
-                    fo_type = raw_fo
-
-                # If no fo_type, infer based on metric or beat
                 metric = parse_spoken_number(narration)
-                if not fo_type:
-                    if metric:
-                        fo_type = "kinetic_counter"
-                    elif i % 2 == 0:
-                        fo_type = "document_highlight"
-                    else:
-                        fo_type = "evidence_board"
-
-                # Rule 118: Zero-Mock Data - If kinetic_counter has no parsed metric, fallback to document_highlight
-                if fo_type == "kinetic_counter" and not metric:
+                if metric:
+                    fo_type = "kinetic_counter"
+                elif i % 2 == 0:
                     fo_type = "document_highlight"
+                else:
+                    fo_type = "evidence_board"
 
-                # Construct localized overlay
                 if fo_type == "kinetic_counter":
                     overlay_obj = {
                         "type": "kinetic_counter",
@@ -325,17 +400,7 @@ def prune_and_localize_scenes(
                             "evidence_tag": theme["evidence_tag"],
                         }
                     }
-                elif fo_type == "tactical_map":
-                    overlay_obj = {
-                        "type": "tactical_map",
-                        "title": theme["map_title"],
-                        "badge": theme["map_badge"],
-                        "theme": "vox_paper",
-                        "layout": "full_bleed_focus",
-                        "sfx_cue": "radar_ping",
-                    }
                 else:
-                    # Default: document_highlight
                     overlay_obj = {
                         "type": "document_highlight",
                         "title": theme["document_title"],
@@ -354,19 +419,73 @@ def prune_and_localize_scenes(
                         }
                     }
 
-                scene_copy["forensicOverlay"] = overlay_obj
-                scene_copy["forensic_overlay"] = overlay_obj
+            # Sanitize US legal artifacts
+            curr_title = str(overlay_obj.get("title") or "")
+            curr_badge = str(overlay_obj.get("badge") or "")
+            if "US DISTRICT COURT" in curr_title or "GRAND JURY" in curr_badge:
+                if m_clean == "JP":
+                    overlay_obj["title"] = "司法審査 // 起訴状記録"
+                    overlay_obj["badge"] = "起訴事実認定"
+                else:
+                    overlay_obj["title"] = "JUDICIAL INDICTMENT // OFFICIAL DOCKET"
+                    overlay_obj["badge"] = "INDICTMENT FILING"
 
-        # Attach statutory AI disclosure and source credit citations (Rule 122 & NHK/BPO compliance)
-        if scene_copy.get("forensicOverlay"):
-            if not scene_copy.get("sourceCredit"):
-                scene_copy["sourceCredit"] = {
-                    "agency": "厚生労働省 輸入食品監視業務 // 検疫所違反事例速報" if m_clean == "JP" else "MINISTRY AUDIT & BIOSECURITY INSPECTION RECORD",
-                    "citation": "OFFICIAL INSPECTION CITATION // VERIFIED RECORD",
-                    "theme": "amber_contrast",
-                }
-            if scene_copy.get("disclosureBadge") is None:
-                scene_copy["disclosureBadge"] = "※イメージ映像・再現"
+            # Sanitize banned verdict terms across title, badge, label and payload
+            for bad_term in BANNED_VERDICT_TERMS:
+                if bad_term in overlay_obj.get("badge", ""):
+                    overlay_obj["badge"] = STAMP_MEASUREMENT_MAP.get(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
+                if bad_term in overlay_obj.get("title", ""):
+                    overlay_obj["title"] = overlay_obj["title"].replace(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
+                if bad_term in overlay_obj.get("label", ""):
+                    overlay_obj["label"] = overlay_obj["label"].replace(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
+
+            if isinstance(overlay_obj.get("payload"), dict):
+                p_load = overlay_obj["payload"]
+                if "charges" in p_load and isinstance(p_load["charges"], list):
+                    clean_charges = []
+                    for ch in p_load["charges"]:
+                        ch_str = str(ch)
+                        for bad_term in BANNED_VERDICT_TERMS:
+                            ch_str = ch_str.replace(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
+                        clean_charges.append(ch_str)
+                    p_load["charges"] = clean_charges
+                if "authentication" in p_load and "CRIMINAL" in str(p_load["authentication"]):
+                    p_load["authentication"] = "公的記録 // 司法審査調書" if m_clean == "JP" else "UNSEALED JUDICIAL DOCKET"
+
+            # Ensure integer stop_motion_fps in payload
+            if isinstance(overlay_obj.get("payload"), dict):
+                if overlay_obj["payload"].get("stop_motion_fps") == 12:
+                    overlay_obj["payload"]["stop_motion_fps"] = 10
+
+            scene_copy["forensicOverlay"] = overlay_obj
+            scene_copy["forensic_overlay"] = overlay_obj
+
+            # Source Credit Deduplication (Citation-Event vs. Corner Tick)
+            source_agency = "厚生労働省 輸入食品監視業務 // 検疫所違反事例速報" if m_clean == "JP" else "MINISTRY AUDIT & BIOSECURITY INSPECTION RECORD"
+            source_citation = "検疫所食品衛生検査記録 // 輸入届出受理番号・検査結果公示" if m_clean == "JP" else "OFFICIAL REGULATORY INSPECTION CITATION"
+            source_key = f"{source_agency[:25]}_{b_int}"
+
+            if source_key not in seen_sources:
+                seen_sources.add(source_key)
+                credit_style = "full"
+            else:
+                credit_style = "tick"
+
+            scene_copy["sourceCredit"] = {
+                "source": source_citation,
+                "verifiedDate": theme.get("date_verified", "OFFICIAL RECORD"),
+                "docketNumber": source_agency,
+                "styleType": credit_style,
+            }
+            scene_copy["source_credit"] = scene_copy["sourceCredit"]
+            scene_copy["credit_style"] = credit_style
+            scene_copy["creditStyle"] = credit_style
+
+        # Statutory AI Disclosure Badge (Rule 122 & NHK/BPO compliance): Exactly 3 key milestone scenes
+        if i in disclosure_scenes:
+            scene_copy["disclosureBadge"] = "※イメージ映像・再現" if m_clean == "JP" else "※Reconstruction / Simulation"
+        else:
+            scene_copy["disclosureBadge"] = None
 
         # Sanitize speaker tag (Rule 136)
         raw_tag = scene_copy.get("speakerTag")
@@ -374,15 +493,13 @@ def prune_and_localize_scenes(
             clean_tag = str(raw_tag).strip()
             clean_tag = re.sub(r'\.(png|jpg|jpeg|webp)$', '', clean_tag, flags=re.IGNORECASE)
             clean_tag = re.sub(r'^(ARCHIVE\s*X\s*//\s*|DEFAULT\s*//\s*)', '', clean_tag, flags=re.IGNORECASE)
-            # If tag is purely English in non-English video, localize it
-            if m_clean != "EN" and re.search(r'[A-Za-z]{4,}', clean_tag) and not re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7afà-ỹ]', clean_tag):
+            if m_clean != "EN" and re.search(r'[A-Za-z]{4,}', clean_tag) and not re.search(r'[぀-ヿ㐀-䶿一-鿿가-힯à-ỹ]', clean_tag):
                 clean_tag = theme["default_speaker"]
             scene_copy["speakerTag"] = clean_tag
 
         sanitized.append(scene_copy)
 
     return sanitized
-
 
 def generate_editorial_briefing(
     episode_id: str,

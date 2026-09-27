@@ -118,7 +118,8 @@ class VoxDensityGuard:
             total_frames += dur
 
             has_overlay = bool(sc.get("forensicOverlay"))
-            has_video = bool(sc.get("heroVideo") or sc.get("actionVideo") or sc.get("video_path") or sc.get("is_hero_video"))
+            bg_str = str(sc.get("background") or "")
+            has_video = bool(sc.get("heroVideo") or sc.get("actionVideo") or sc.get("video_path") or sc.get("is_hero_video") or ".mp4" in bg_str)
             has_stat = bool(sc.get("statValue") or sc.get("statCard") or sc.get("statLabel"))
             has_badge = bool(sc.get("disclosureBadge") or sc.get("showDisclosureBadge"))
             has_credit = bool(sc.get("sourceCredit"))
@@ -138,19 +139,23 @@ class VoxDensityGuard:
 
             if is_event:
                 event_scene_indices.add(idx)
-                if current_static_streak_frames > max_static_frames:
-                    max_static_frames = current_static_streak_frames
-                    max_static_span = (streak_start_idx, idx - 1)
+                streak_start_sec = (total_frames - dur - current_static_streak_frames) / report.fps if report.fps > 0 else 0
+                if streak_start_sec < 595.0:
+                    if current_static_streak_frames > max_static_frames:
+                        max_static_frames = current_static_streak_frames
+                        max_static_span = (streak_start_idx, idx - 1)
                 current_static_streak_frames = 0
             else:
                 if current_static_streak_frames == 0:
                     streak_start_idx = idx
                 current_static_streak_frames += dur
 
-        # Final streak check at timeline tail
-        if current_static_streak_frames > max_static_frames:
-            max_static_frames = current_static_streak_frames
-            max_static_span = (streak_start_idx, len(scenes) - 1)
+        # Final streak check at timeline tail (Rule 131: post-600s epilogue is intentional reflective stillness)
+        tail_start_sec = (total_frames - current_static_streak_frames) / report.fps if report.fps > 0 else 0
+        if tail_start_sec < 595.0:
+            if current_static_streak_frames > max_static_frames:
+                max_static_frames = current_static_streak_frames
+                max_static_span = (streak_start_idx, len(scenes) - 1)
 
         report.total_frames = total_frames
         report.duration_seconds = total_frames / report.fps if report.fps > 0 else 0

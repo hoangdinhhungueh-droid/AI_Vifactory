@@ -162,7 +162,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                 "prop_type": "financial_ledger_3d",
                 "evidence_id": "EXHIBIT-3D-LEDGER",
                 "authentication": "VERIFIED FORENSIC DISCREPANCY",
-                "stop_motion_fps": 12
+                "stop_motion_fps": 10
             }
         }
 
@@ -173,15 +173,15 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             "legacy_type": "evidence_board",
             "theme": theme or "vox_paper",
             "layout": "split_right",
-            "title": "CRIMINAL INDICTMENT // US DISTRICT COURT",
-            "badge": "GRAND JURY CHARGE",
+            "title": "JUDICIAL INDICTMENT // OFFICIAL DOCKET",
+            "badge": "INDICTMENT FILING",
             "sfx_cue": "stamp_slam",
             "label": "EXHIBIT C // PROCEDURAL 3D COURT INDICTMENT",
             "payload": {
                 "prop_type": "court_indictment_3d",
                 "evidence_id": "EXHIBIT-3D-INDICTMENT",
-                "authentication": "UNSEALED CRIMINAL DOCKET",
-                "stop_motion_fps": 12
+                "authentication": "UNSEALED JUDICIAL DOCKET",
+                "stop_motion_fps": 10
             }
         }
 
@@ -200,7 +200,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                 "prop_type": "passport_specimen_3d",
                 "evidence_id": "EXHIBIT-3D-PASSPORT",
                 "authentication": "FRAUDULENT SPECIMEN DETECTED",
-                "stop_motion_fps": 12
+                "stop_motion_fps": 10
             }
         }
 
@@ -219,7 +219,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                 "prop_type": "legal_contract_3d",
                 "evidence_id": "EXHIBIT-3D-CONTRACT",
                 "authentication": "NON-ARM'S-LENGTH INSTRUMENT",
-                "stop_motion_fps": 12
+                "stop_motion_fps": 10
             }
         }
 
@@ -238,7 +238,7 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                 "prop_type": "hanko_seal",
                 "evidence_id": "EXHIBIT-3D-01",
                 "authentication": "VERIFIED PHYSICAL TAMPER-PROOF",
-                "stop_motion_fps": 12
+                "stop_motion_fps": 10
             }
         }
 

@@ -31,8 +31,8 @@ export const VoxPaperDossier: React.FC<VoxPaperDossierProps> = ({
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Stop-motion physics (12fps feel on 30fps timeline)
-  const steppedFrame = Math.floor(frame / 2.5) * 2.5;
+  // Stop-motion physics (10fps feel on 30fps timeline - integer hold 3)
+  const steppedFrame = Math.floor(frame / 3) * 3;
 
   // Spring slide-in with subtle paper overshoot
   const entrance = spring({

@@ -290,7 +290,7 @@ const useForegroundAspect = (src) => {
 // (slide is entrance-only). When `position` is "left"/"right" it is placed in
 // its side-anchored box (Rule 59 v2, ~82% height); otherwise it falls back to
 // the legacy full-frame centered/contain behavior for backward compatibility.
-const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, height }) => {
+const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, height, cadence = "cutout" }: any) => {
   const frame = useCurrentFrame();
   const aspect = useForegroundAspect(src);
   const fadeIn = interpolate(frame, [0, fadeFrames], [0, 1], {
@@ -314,8 +314,10 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
     );
   }
 
-  // 12fps stop-motion stepping for tactile paper cutout feel (Rule 122 & Vox Architecture)
-  const steppedFrame = Math.floor(frame / 2.5) * 2.5;
+  // Vox Engine 3.0: Integer divisor cadence stepping (10fps default = hold 3, 15fps = hold 2, 30fps = hold 1)
+  const targetFps = cadence === "smooth" ? 30 : cadence === "fluid" ? 15 : cadence === "archival" ? 6 : 10;
+  const hold = Math.max(1, Math.round(30 / targetFps));
+  const steppedFrame = Math.floor(frame / hold) * hold;
   const cell = computeForegroundCell(width, height, position, aspect);
   const slideIn = interpolate(steppedFrame, [0, fadeFrames], [0, 1], {
     extrapolateLeft: "clamp",
@@ -426,8 +428,8 @@ const ForensicStampBadge = ({
   });
   const opacity = interpolate(frame, [3, 7], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const bUp = (badge || "").toUpperCase();
-  const isAlert = ["VIOLATION", "FRAUD", "PRICE_FRAUD", "VOID", "CRITICAL", "ILLEGAL"].some((k) => bUp.includes(k));
-  const isAuth = ["CONFIDENTIAL", "CLASSIFIED", "SEALED", "EVIDENCE", "RESTRICTED"].some((k) => bUp.includes(k));
+  const isAlert = ["基準値超過", "EXCEEDED", "超過", "VOID", "CRITICAL", "ALERT"].some((k) => bUp.includes(k));
+  const isAuth = ["未回答", "記録なし", "確認できず", "EVIDENCE", "RESTRICTED", "AUDIT", "CONFIDENTIAL"].some((k) => bUp.includes(k));
 
   const mainColor = isAlert ? "#ef4444" : isAuth ? "#f59e0b" : "#10b981";
   const borderColor = isAlert ? "rgba(239, 68, 68, 0.85)" : isAuth ? "rgba(245, 158, 11, 0.85)" : "rgba(16, 185, 129, 0.85)";
@@ -718,6 +720,7 @@ export const TwoLayerScene = (props) => {
           durationInFrames={durationInFrames}
           width={width}
           height={height}
+          cadence={props.cadence}
         />
       ) : null}
 
@@ -795,14 +798,18 @@ export const TwoLayerScene = (props) => {
           <VoxSourceCredit
             source={sourceCredit}
             position={hasFgLeft ? "bottom_right" : "bottom_left"}
+            styleType={props.creditStyle || props.credit_style || "full"}
           />
         ) : (
-          <VoxSourceCredit {...sourceCredit} />
+          <VoxSourceCredit 
+            {...sourceCredit} 
+            styleType={(sourceCredit as any).styleType || props.creditStyle || props.credit_style || "full"}
+          />
         )
       ) : null}
 
       {/* Statutory Visual Disclosure Badge (AI Recreation / Reenactment) */}
-      {disclosureBadge !== false ? (
+      {Boolean(disclosureBadge && disclosureBadge !== false) ? (
         <VoxDisclosureBadge
           text={typeof disclosureBadge === "string" ? disclosureBadge : "※イメージ映像・再現"}
           position={sourceCredit ? "top_right" : "bottom_right"}
@@ -845,72 +852,79 @@ export const TwoLayerScene = (props) => {
             </div>
           ) : null}
 
-          {/* Karaoke Word-Highlight Subtitle Line (Floating Minimalist - No Box) */}
-          <div
-            style={{
-              fontFamily: "'Zen Kaku Gothic New', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-              fontFeatureSettings: '"palt" 1',
-              fontSize: subtitleFontSize,
-              lineHeight: 1.35,
-              color: "#FFFFFF",
-              textAlign: subtitleTextAlign,
-              textShadow:
-                "0 2px 4px rgba(0, 0, 0, 0.95), 0 0 14px rgba(0, 0, 0, 0.9), 0 4px 20px rgba(0, 0, 0, 0.85)",
-            }}
-          >
-            {visibleWords.map((w, wIdx) => {
-              const currentGlobalIdx = chunkStartWord + wIdx;
-              const isPast = currentGlobalIdx < activeGlobalWordIdx;
-              const isActive = currentGlobalIdx === activeGlobalWordIdx;
+          {/* Karaoke Word-Highlight Subtitle Line (Floating Minimalist - Duty Cycle Aware) */}
+          {(props.karaokeMode || props.karaoke_mode || (isFullBleedOverlay ? "dim" : "full")) !== "off" ? (
+            <div
+              style={{
+                fontFamily: "'Zen Kaku Gothic New', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                fontFeatureSettings: '"palt" 1',
+                fontSize: subtitleFontSize,
+                lineHeight: 1.35,
+                color: "#FFFFFF",
+                textAlign: subtitleTextAlign,
+                textShadow:
+                  "0 2px 4px rgba(0, 0, 0, 0.95), 0 0 14px rgba(0, 0, 0, 0.9), 0 4px 20px rgba(0, 0, 0, 0.85)",
+                opacity: (props.karaokeMode || props.karaoke_mode || (isFullBleedOverlay ? "dim" : "full")) === "dim" ? 0.78 : 1.0,
+              }}
+            >
+              {visibleWords.map((w, wIdx) => {
+                const currentGlobalIdx = chunkStartWord + wIdx;
+                const isPast = currentGlobalIdx < activeGlobalWordIdx;
+                const isActive = currentGlobalIdx === activeGlobalWordIdx;
+                const kMode = props.karaokeMode || props.karaoke_mode || (isFullBleedOverlay ? "dim" : "full");
+                const isDim = kMode === "dim";
 
-              if (isActive) {
+                if (isActive) {
+                  return (
+                    <span
+                      key={wIdx}
+                      style={{
+                        color: isDim ? "#FFFFFF" : "#ffd166",
+                        fontWeight: 900,
+                        textShadow: isDim
+                          ? "0 0 10px rgba(255, 255, 255, 0.75), 0 2px 6px rgba(0, 0, 0, 1)"
+                          : "0 0 16px rgba(255, 209, 102, 0.95), 0 2px 6px rgba(0, 0, 0, 1)",
+                        marginRight: 8,
+                        display: "inline-block",
+                        transform: isDim ? "scale(1.0)" : "scale(1.08)",
+                      }}
+                    >
+                      {w}
+                    </span>
+                  );
+                }
+                if (isPast) {
+                  return (
+                    <span
+                      key={wIdx}
+                      style={{
+                        color: isDim ? "rgba(255, 255, 255, 0.82)" : "#FFFFFF",
+                        fontWeight: 700,
+                        textShadow: "0 2px 4px rgba(0, 0, 0, 0.9)",
+                        marginRight: 8,
+                        display: "inline-block",
+                      }}
+                    >
+                      {w}
+                    </span>
+                  );
+                }
                 return (
                   <span
                     key={wIdx}
                     style={{
-                      color: "#ffd166",
-                      fontWeight: 900,
-                      textShadow: "0 0 16px rgba(255, 209, 102, 0.95), 0 2px 6px rgba(0, 0, 0, 1)",
+                      color: isDim ? "rgba(255, 255, 255, 0.35)" : "rgba(255, 255, 255, 0.45)",
+                      fontWeight: 600,
                       marginRight: 8,
                       display: "inline-block",
-                      transform: "scale(1.08)",
                     }}
                   >
                     {w}
                   </span>
                 );
-              }
-              if (isPast) {
-                return (
-                  <span
-                    key={wIdx}
-                    style={{
-                      color: "#FFFFFF",
-                      fontWeight: 700,
-                      textShadow: "0 2px 4px rgba(0, 0, 0, 0.9)",
-                      marginRight: 8,
-                      display: "inline-block",
-                    }}
-                  >
-                    {w}
-                  </span>
-                );
-              }
-              return (
-                <span
-                  key={wIdx}
-                  style={{
-                    color: "rgba(255, 255, 255, 0.45)",
-                    fontWeight: 600,
-                    marginRight: 8,
-                    display: "inline-block",
-                  }}
-                >
-                  {w}
-                </span>
-              );
-            })}
-          </div>
+              })}
+            </div>
+          ) : null}
         </div>
       ) : null}    </AbsoluteFill>
   );

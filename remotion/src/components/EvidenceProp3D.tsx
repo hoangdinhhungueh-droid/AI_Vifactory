@@ -25,8 +25,8 @@ export const EvidenceProp3D: React.FC<{
   const { width, height, fps } = useVideoConfig();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Stop-motion physics (12fps feel on 30fps timeline per Vox Style)
-  const steppedFrame = Math.floor(frame / 2.5) * 2.5;
+  // Stop-motion physics (10fps feel on 30fps timeline - integer hold 3 per Vox Style)
+  const steppedFrame = Math.floor(frame / 3) * 3;
 
   // Spring entrance with paper overshoot
   const entrance = spring({
@@ -373,7 +373,7 @@ export const EvidenceProp3D: React.FC<{
         }}
       >
         <div>SPECIMEN: PROCEDURAL HANKO ARTIFACT</div>
-        <div>STOP-MOTION FRAME: {Math.floor(steppedFrame / 2.5)} / 36</div>
+        <div>STOP-MOTION FRAME: {Math.floor(steppedFrame / 3)} / 36</div>
         <div>ARCHIVAL PROOF: ZERO-MESH 3D</div>
       </div>
     </div>
