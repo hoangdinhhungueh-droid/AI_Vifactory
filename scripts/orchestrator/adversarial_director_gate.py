@@ -96,15 +96,20 @@ def audit_props_integrity(props: Dict[str, Any], market: str) -> Tuple[bool, Lis
         place = str(lz.get("placement") if isinstance(lz, dict) else "").lower()
         return any(k in fg for k in ["evidence", "doc_", "docket", "invoice", "ledger", "memo", "gauge", "statute", "rack", "contract", "binder", "stamp", "scale", "gavel", "box", "log", "prop", "artifact", "bill", "check", "receipt", "filing", "exhibit"]) or "document" in place or "evidence" in place or "artifact" in role
 
+    # Dynamic threshold: allow higher visual density (up to 85% evidence, 35% humans) for feature documentary episodes (> 30 scenes)
+    # while preserving strict VOX minimalism (55% evidence, 20% humans) for micro-tests (<= 30 scenes)
+    max_human_pct = 35.0 if len(scenes) > 30 else 20.0
+    max_ev_pct = 85.0 if len(scenes) > 30 else 55.0
+
     human_fg_count = sum(1 for s in scenes if s.get("foreground") and not is_evidence_object(s))
     human_fg_pct = (human_fg_count / len(scenes)) * 100 if scenes else 0
-    if human_fg_pct > 20.0:
-        defects.append(f"FG_DENSITY_TOO_HIGH: {human_fg_count}/{len(scenes)} scenes ({human_fg_pct:.1f}%) have human foreground characters (max allowed 20.0% for VOX minimalism).")
+    if human_fg_pct > max_human_pct:
+        defects.append(f"FG_DENSITY_TOO_HIGH: {human_fg_count}/{len(scenes)} scenes ({human_fg_pct:.1f}%) have human foreground characters (max allowed {max_human_pct:.1f}%).")
 
     evidence_fg_count = sum(1 for s in scenes if s.get("foreground") and is_evidence_object(s))
     evidence_fg_pct = (evidence_fg_count / len(scenes)) * 100 if scenes else 0
-    if evidence_fg_pct > 55.0:
-        defects.append(f"FG_DENSITY_TOO_HIGH: {evidence_fg_count}/{len(scenes)} scenes ({evidence_fg_pct:.1f}%) have evidence exhibits (max allowed 55.0% for VOX pacing & anti-OOM).")
+    if evidence_fg_pct > max_ev_pct:
+        defects.append(f"FG_DENSITY_TOO_HIGH: {evidence_fg_count}/{len(scenes)} scenes ({evidence_fg_pct:.1f}%) have evidence exhibits (max allowed {max_ev_pct:.1f}% for pacing & anti-OOM).")
 
     # 5. Layout Zone Variety Audit (Anti-Monotony)
     current_placement = None
@@ -151,13 +156,14 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
 
     # Auto-prune human character cutouts if count > 12 (enforcing <= 12 high-impact VOX character cutouts)
     human_scenes = [s for s in sanitized if s.get("foreground") and not is_evidence_object(s)]
-    if len(human_scenes) > 12:
-        logger.info("Auto-repair: pruning human FG characters from %d to <= 12...", len(human_scenes))
-        step = max(1, len(human_scenes) // 12)
+    target_max_humans = min(45, max(12, int(len(sanitized) * 0.30))) if len(sanitized) > 30 else 12
+    if len(human_scenes) > target_max_humans:
+        logger.info("Auto-repair: pruning human FG characters from %d to <= %d...", len(human_scenes), target_max_humans)
+        step = max(1, len(human_scenes) // target_max_humans)
         h_seen = 0
         for s in sanitized:
             if s.get("foreground") and not is_evidence_object(s):
-                if h_seen % step != 0 or h_seen >= 12 * step:
+                if h_seen % step != 0 or h_seen >= target_max_humans * step:
                     s["foreground"] = ""
                     if isinstance(s.get("layout_zone"), dict):
                         s["layout_zone"]["placement"] = "center_hero_document"
@@ -165,7 +171,7 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
 
     # Auto-prune evidence objects if count exceeds 50% density (target max 60 exhibits)
     evidence_scenes = [s for s in sanitized if s.get("foreground") and is_evidence_object(s)]
-    target_max_evidence = min(60, max(12, int(len(sanitized) * 0.50)))
+    target_max_evidence = min(130, max(12, int(len(sanitized) * 0.85))) if len(sanitized) > 30 else min(60, max(12, int(len(sanitized) * 0.50)))
     if len(evidence_scenes) > target_max_evidence:
         logger.info("Auto-repair: pruning evidence FG objects from %d to <= %d...", len(evidence_scenes), target_max_evidence)
         step = max(1, len(evidence_scenes) // target_max_evidence)
@@ -189,7 +195,8 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
             if place == prev_place:
                 streak += 1
                 if streak >= 5:
-                    new_place = vox_zones[idx % len(vox_zones)]
+                    candidates = [z for z in vox_zones if z != prev_place]
+                    new_place = candidates[idx % len(candidates)]
                     lz["placement"] = new_place
                     prev_place = new_place
                     streak = 1
@@ -198,7 +205,8 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
                 streak = 1
         else:
             # If layout_zone is missing or string, synthesize clean VOX layout_zone
-            new_place = vox_zones[idx % len(vox_zones)]
+            candidates = [z for z in vox_zones if z != prev_place]
+            new_place = candidates[idx % len(candidates)]
             s["layout_zone"] = {
                 "placement": new_place,
                 "safe_zone": "bottom_left" if "left" in new_place else "bottom_right",

@@ -417,8 +417,17 @@ def extract_custom_beat_titles(brain: dict, brain_input_path: str = "") -> dict[
     if len(beat_titles) < 5:
         try:
             from app.services.seo_package_forge import _build_dynamic_chapters
-            kw = str(brain.get("topic") or brain.get("title_a") or brain.get("episode_id") or "Investigation").strip()
             m = (brain.get("market") or "EN").upper()
+            kw_cand = brain.get("topic") or brain.get("title_a") or brain.get("episode_id") or "Investigation"
+            if m in ("JP", "JA"):
+                vn_chars = "àáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵ"
+                if any(c in str(kw_cand) for c in vn_chars) and brain.get("title_a"):
+                    kw_cand = brain.get("title_a")
+            kw = str(kw_cand).strip()
+            if "｜" in kw:
+                kw = kw.split("｜")[0].strip()
+            elif "|" in kw:
+                kw = kw.split("|")[0].strip()
             dyn_chapters = _build_dynamic_chapters(title=kw, market=m, target_keyword=kw)
             for idx, ch_line in enumerate(dyn_chapters[:5], 1):
                 if idx not in beat_titles:
@@ -847,7 +856,7 @@ def build_remotion_props_data(
 
         # Inject Kinetic Typography on Metric Moments if not already set to a specialized overlay
         if is_metric_shock and not (isinstance(forensic_ov, dict) and forensic_ov.get("type") in ("threshold_ratio", "kinetic_counter")):
-            if b_num == 1 and idx in (0, 1, 2, 3):
+            if b_num == 1 and i in (0, 1, 2, 3):
                 forensic_ov = {
                     "type": "kinetic_counter",
                     "title": "二酸化硫黄 検出値",
@@ -927,7 +936,7 @@ def build_remotion_props_data(
         if foley_raw:
             f_clean = str(foley_raw).strip()
             if not is_valid_sfx(f_clean):
-                sc_id = s.get("id") or s.get("scene_id") or f"scene_{idx}"
+                sc_id = s.get("id") or s.get("scene_id") or f"scene_{i}"
                 raise ValueError(
                     f"❌ B6 REMOTION PROPS SFX AUDIT FAILED at {sc_id}: "
                     f"Unknown foley cue '{foley_raw}'. Not registered in CANONICAL_SFX_REGISTRY! "
@@ -937,7 +946,7 @@ def build_remotion_props_data(
             # Physical Asset Verification Gate
             physical_sfx_path = _REPO_ROOT / "remotion" / "public" / "sfx" / f_filename
             if not physical_sfx_path.exists():
-                sc_id = s.get("id") or s.get("scene_id") or f"scene_{idx}"
+                sc_id = s.get("id") or s.get("scene_id") or f"scene_{i}"
                 raise FileNotFoundError(
                     f"❌ B6 REMOTION PROPS SFX AUDIT FAILED at {sc_id}: "
                     f"Physical asset {physical_sfx_path} does not exist on disk!"
