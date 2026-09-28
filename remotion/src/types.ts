@@ -160,6 +160,12 @@ export interface Scene {
   };
   cameraMovement?: CameraMove;
   tensionLevel?: "low" | "medium" | "high";
+  opticalFx?: {
+    vignette?: boolean;
+    film_grain?: boolean;
+    digital_glitch?: boolean;
+    high_contrast?: boolean;
+  };
 }
 
 export interface SceneMap {

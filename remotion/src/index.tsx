@@ -1418,33 +1418,75 @@ const TopProgressBar = ({ scenes, currentFrame, totalFrames }) => {
   );
 };
 
-const CinematicVignette = () => (
-  <div
-    style={{
-      position: "absolute",
-      top: 0,
-      left: 0,
-      width: "100%",
-      height: "100%",
-      background: "radial-gradient(ellipse at center, transparent 65%, rgba(0, 0, 0, 0.65) 100%)",
-      zIndex: 10,
-      pointerEvents: "none",
-    }}
-  />
-);
-
-const CinematicOverlay = () => (
-  <AbsoluteFill style={{ zIndex: 20, pointerEvents: "none" }}>
-    {/* Cinematic high-contrast editorial tone wash without CPU blend-mode */}
+const CinematicVignette: React.FC<{ active?: boolean; strong?: boolean }> = ({ active = true, strong = false }) => {
+  if (!active) return null;
+  const edgeAlpha = strong ? 0.85 : 0.65;
+  const innerRadius = strong ? "48%" : "65%";
+  return (
     <div
       style={{
         position: "absolute",
-        inset: 0,
-        background: "linear-gradient(135deg, rgba(20, 28, 45, 0.05) 0%, rgba(45, 25, 15, 0.04) 100%)",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        background: `radial-gradient(ellipse at center, transparent ${innerRadius}, rgba(0, 0, 0, ${edgeAlpha}) 100%)`,
+        zIndex: 10,
+        pointerEvents: "none",
       }}
     />
-  </AbsoluteFill>
-);
+  );
+};
+
+const CinematicOverlay: React.FC<{
+  filmGrain?: boolean;
+  digitalGlitch?: boolean;
+  highContrast?: boolean;
+  relFrame?: number;
+}> = ({ filmGrain, digitalGlitch, highContrast, relFrame = 0 }) => {
+  const isGlitchFrame = digitalGlitch && relFrame < 6 && (relFrame % 2 === 1);
+  return (
+    <AbsoluteFill style={{ zIndex: 20, pointerEvents: "none" }}>
+      {/* Cinematic editorial tone wash */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: highContrast
+            ? "linear-gradient(135deg, rgba(20, 28, 45, 0.12) 0%, rgba(45, 25, 15, 0.10) 100%)"
+            : "linear-gradient(135deg, rgba(20, 28, 45, 0.05) 0%, rgba(45, 25, 15, 0.04) 100%)",
+        }}
+      />
+      {/* Film Grain Subtle Noise Texture Layer */}
+      {filmGrain ? (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            opacity: 0.07,
+            backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.20) 1px, transparent 0)",
+            backgroundSize: "4px 4px",
+          }}
+        />
+      ) : null}
+      {/* Metric Shock Digital Chromatic Glitch Bar */}
+      {isGlitchFrame ? (
+        <div
+          style={{
+            position: "absolute",
+            top: `${(relFrame * 17) % 80}%`,
+            left: 0,
+            right: 0,
+            height: 14,
+            background: "rgba(239, 68, 68, 0.35)",
+            boxShadow: "0 0 12px rgba(56, 189, 248, 0.45)",
+            transform: `skewX(${relFrame % 2 === 0 ? 8 : -8}deg)`,
+          }}
+        />
+      ) : null}
+    </AbsoluteFill>
+  );
+};
 
 // === CINEMATIC TRANSITIONS SYSTEM (Rule 122, Rule 128 & Bo-tu-dien-Transition-Animation) ===
 export const CinematicTransitionOverlay: React.FC<{
@@ -2024,8 +2066,16 @@ export const TwoLayerEpisode = (props) => {
       {/* Subtitles, Speaker Tags, and Fixed UI Overlays */}
       {items}
       <VoxAtmosphericLighting intensity={0.9} />
-      <CinematicVignette />
-      <CinematicOverlay />
+      <CinematicVignette
+        active={currentSceneInfo?.scene?.opticalFx?.vignette !== false}
+        strong={Boolean(currentSceneInfo?.scene?.opticalFx?.high_contrast)}
+      />
+      <CinematicOverlay
+        filmGrain={Boolean(currentSceneInfo?.scene?.opticalFx?.film_grain)}
+        digitalGlitch={Boolean(currentSceneInfo?.scene?.opticalFx?.digital_glitch)}
+        highContrast={Boolean(currentSceneInfo?.scene?.opticalFx?.high_contrast)}
+        relFrame={currentSceneInfo?.relFrame}
+      />
       {currentSceneInfo && (
         <CinematicTransitionOverlay
           transitionOut={currentSceneInfo.scene.transition_out || currentSceneInfo.scene.transitionOut}

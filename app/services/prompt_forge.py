@@ -269,6 +269,62 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     return deduplicate_phrase_stutter(p)
 
 
+def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tuple[str, str]:
+    """
+    Resolve character ethnic phenotype, attire, and negative prompts dynamically based on
+    fg_key, context description (p), and market. Prevents Market Anchor Bias where non-Japanese
+    characters in Japanese market episodes get erroneously injected with Japanese salaryman suits,
+    sha-sho badges, or hanko seals.
+    """
+    combined = f"{fg_key} {p}".lower()
+
+    # 1. Chinese regional / agricultural / processing / wholesale characters
+    if any(k in combined for k in [
+        "chinese", "china", "guangdong", "harvester", "fumigation", "farmer", "worker",
+        "laborer", "bamboo", "wholesale", "broker", "plant_owner", "factory", "steam", "sulfur_operator"
+    ]) and not any(k in combined for k in [
+        "japanese", "tokyo", "yokohama", "quarantine", "supermarket", "consumer", "shopper", "ramen"
+    ]):
+        anchor = (
+            "Authentic Chinese individual from regional agricultural or industrial processing sector, "
+            "distinct East Asian facial structure with weathered pragmatic demeanor, durable regional utilitarian "
+            "workwear or protective processing apron and rubber gloves, dynamic posture of manual inspection or harvest labor, "
+            "active interaction with regional agricultural produce and processing tools"
+        )
+        base_negs = prof.get("fg_negatives", "")
+        negs = f"{base_negs}, no Japanese salaryman suit, no corporate sha-sho lapel pin badge, no Japanese inkan hanko seal, no Western Caucasian traits"
+        return anchor, f", {negs}" if negs else ""
+
+    # 2. Japanese institutional / inspector / laboratory characters
+    if any(k in combined for k in [
+        "quarantine", "inspector", "customs", "officer", "analyst", "chemist", "lab", "mhlw", "kasumigaseki"
+    ]):
+        anchor = (
+            "Authentic Japanese public official or quarantine inspection specialist, distinct Japanese facial structure, "
+            "institutional inspection uniform or pristine laboratory coat with ID lanyard and safety eyewear, "
+            "dynamic investigative body posture examining import manifests and testing reagents, intense focused glare"
+        )
+        base_negs = prof.get("fg_negatives", "")
+        negs = f"{base_negs}, no Caucasian traits, no passport photo posture"
+        return anchor, f", {negs}" if negs else ""
+
+    # 3. Japanese domestic consumer / culinary characters
+    if any(k in combined for k in ["consumer", "shopper", "supermarket", "chef", "cook", "ramen", "menma", "housewife"]):
+        anchor = (
+            "Authentic Japanese consumer or culinary professional, natural East Asian eye shape, "
+            "casual contemporary Japanese domestic attire or professional chef apron, dynamic expressive posture "
+            "closely inspecting packaged food labels with nuanced micro-expression of concern, active tactile interaction with grocery packaging"
+        )
+        base_negs = prof.get("fg_negatives", "")
+        negs = f"{base_negs}, no Caucasian traits, no passport photo posture"
+        return anchor, f", {negs}" if negs else ""
+
+    # 4. Standard market profile fallback
+    fg_anchor = prof.get("fg_anchor", "")
+    fg_negs = f", {prof['fg_negatives']}" if prof.get("fg_negatives") else ""
+    return fg_anchor, fg_negs
+
+
 def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: bool = False, market: str = "EN", tokens: list | None = None) -> str:
     """Sanitize and enforce Rule 116 & Rule 435 standards for Layer 2 Foreground prompts with Market Ethnicity Conformance."""
     p = prompt.strip()
@@ -314,8 +370,7 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     p = p.rstrip(",. ").strip()
 
     prof = resolve_market_profile(market)
-    fg_anchor = prof["fg_anchor"]
-    fg_negs = f", {prof['fg_negatives']}" if prof["fg_negatives"] else ""
+    fg_anchor, fg_negs = resolve_character_anchor(fg_key, p, market, prof)
 
     tokens_clauses = []
     if tokens:
@@ -331,7 +386,9 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
         "investigator", "prosecutor", "senator", "caretaker", "official", "executive",
         "judge", "lawyer", "person", "man", "woman", "pilot", "whistleblower", "ceo",
         "director", "agent", "founder", "figure", "character", "analyst", "auditor",
-        "individual", "politician", "plaintiff", "defendant"
+        "individual", "politician", "plaintiff", "defendant", "officer", "inspector",
+        "specialist", "worker", "farmer", "harvester", "laborer", "operator", "chef",
+        "cook", "shopper", "consumer", "housewife", "trader", "broker", "manager", "chemist"
     ]
     has_character = any(ci in p.lower() for ci in character_indicators)
 
@@ -343,9 +400,17 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
         "server rack", "microchip", "circuit", "hard drive", "tape recorder",
         "dossier", "newspaper clipping", "blueprint", "flowchart", "infographic"
     ]
+    is_character_key = (
+        fg_key.lower().startswith("fg_character_") or
+        fg_key.lower().startswith("char_") or
+        any(k in fg_key.lower() for k in ["character", "harvester", "inspector", "officer", "worker", "shopper", "consumer", "chef"])
+    )
     is_object_key = any(k in fg_key.lower() for k in ["doc", "evidence", "object", "prop", "item", "meter", "invoice", "check", "paper", "artifact", "ledger", "gauge", "statute", "envelope", "stamp"])
     has_evidence_kw = any(kw in p.lower() for kw in evidence_keywords)
-    if is_object_key:
+
+    if is_character_key:
+        is_object = False
+    elif is_object_key:
         is_object = True
     else:
         has_character = any(re.search(rf"\b{re.escape(ci)}\b", p, re.IGNORECASE) for ci in character_indicators)
@@ -377,6 +442,14 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
         p = "".join(parts)
 
     p = re.sub(r"\s{2,}", " ", p).strip()
+
+    # Rule 134 Adversarial Invariant: Ensure non-Japanese characters in JP market NEVER leak salaryman or hanko into positive prompt
+    if any(k in f"{fg_key} {prompt}".lower() for k in ["chinese", "guangdong", "bamboo_harvester", "sulfur_fumigation", "processing_plant_owner"]):
+        pos_part = p.split("[STRICT NEGATIVE PROMPT]")[0] if "[STRICT NEGATIVE PROMPT]" in p else p
+        assert "salaryman" not in pos_part.lower(), f"❌ Market Anchor Bias detected: Chinese character positive prompt contains 'salaryman'!"
+        assert "hanko" not in pos_part.lower(), f"❌ Market Anchor Bias detected: Chinese character positive prompt contains 'hanko'!"
+        assert "sha-sho" not in pos_part.lower(), f"❌ Market Anchor Bias detected: Chinese character positive prompt contains 'sha-sho'!"
+
     return p
 
 

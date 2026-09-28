@@ -195,3 +195,33 @@ def test_object_and_evidence_prompt_sanitization():
     assert "no human body" in obj_fg
     assert "full-body head-to-shoes" not in obj_fg
     assert "dynamic high-stakes body posture" not in obj_fg
+
+
+def test_resolve_character_anchor_decoupling_rule128():
+    """Rule 128 & Rule 134: Verify non-Japanese characters in JP market are decoupled from salaryman/hanko bias."""
+    raw_fg = "Chinese agricultural laborer cutting bamboo shoots on hillside"
+    fg_prompt = _sanitize_foreground_prompt(
+        raw_fg,
+        fg_key="fg_character_chinese_bamboo_harvester",
+        market="JP"
+    )
+    # Must have authentic Chinese regional characteristics
+    assert "Authentic Chinese individual" in fg_prompt
+    assert "agricultural produce" in fg_prompt or "utilitarian workwear" in fg_prompt
+    # MUST NOT contain Japanese salaryman or hanko bias in positive prompt
+    pos_fg = fg_prompt.split("[STRICT NEGATIVE PROMPT]")[0]
+    assert "salaryman" not in pos_fg.lower()
+    assert "hanko" not in pos_fg.lower()
+    assert "sha-sho" not in pos_fg.lower()
+    assert "no Japanese salaryman suit" in fg_prompt
+
+    # Test Japanese civil servant character in JP market
+    raw_jp = "Quarantine inspection officer checking import documents"
+    jp_prompt = _sanitize_foreground_prompt(
+        raw_jp,
+        fg_key="fg_character_jp_quarantine_inspector",
+        market="JP"
+    )
+    assert "Authentic Japanese public official" in jp_prompt
+    assert "quarantine inspection specialist" in jp_prompt
+

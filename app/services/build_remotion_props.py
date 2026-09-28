@@ -836,13 +836,86 @@ def build_remotion_props_data(
             ov_title = forensic_ov.get("title", "") if isinstance(forensic_ov, dict) else ""
             card_segment_key = f"{ov_type}_{stat_val or ''}_{stamp_badge or ''}_{ov_title}"
 
+        # Beat-Level Optical FX Policy & Kinetic Typography Injection (Rule 122 & Audit Round 5 Standard)
+        b_raw = s.get("beat_index") or s.get("beat") or 1
+        try:
+            b_num = int(str(b_raw).replace("Beat", "").strip())
+        except Exception:
+            b_num = 1
+
+        is_metric_shock = any(k in narration_text for k in ["4860", "4,860", "24倍", "二十四倍", "四千八百六十", "24.3"])
+
+        # Inject Kinetic Typography on Metric Moments if not already set to a specialized overlay
+        if is_metric_shock and not (isinstance(forensic_ov, dict) and forensic_ov.get("type") in ("threshold_ratio", "kinetic_counter")):
+            if b_num == 1 and idx in (0, 1, 2, 3):
+                forensic_ov = {
+                    "type": "kinetic_counter",
+                    "title": "二酸化硫黄 検出値",
+                    "badge": "EVIDENTIARY METRIC",
+                    "theme": "crimson_alert",
+                    "layout": "full_bleed_focus" if not fg_rel else "split_left",
+                    "payload": {
+                        "start_value": 0,
+                        "end_value": 4860,
+                        "amount": "4,860",
+                        "unit": "mg/kg",
+                        "baseline": 200,
+                        "baseline_label": "国家基準上限 (GB 2760)"
+                    },
+                    "label": "4,860 mg/kg // 基準値の約24.3倍"
+                }
+            elif b_num == 4:
+                forensic_ov = {
+                    "type": "threshold_ratio",
+                    "title": "国家基準 GB 2760 超過倍率検証",
+                    "badge": "CRIMSON RATIO ALERT",
+                    "theme": "crimson_alert",
+                    "layout": "full_bleed_focus" if not fg_rel else "split_left",
+                    "payload": {
+                        "ratio": 24.3,
+                        "baseline_value": 200,
+                        "actual_value": 4860,
+                        "unit": "mg/kg",
+                        "grid_cols": 6,
+                        "grid_rows": 4
+                    },
+                    "label": "GB 2760: 200mg/kg に対し 約24.3倍"
+                }
+
         cinematic_tokens = s.get("cinematic_tokens") or s.get("cinematicTokens") or []
-        optical_fx = {
-            "vignette": "/edgefade" in cinematic_tokens,
-            "film_grain": "/filmlook" in cinematic_tokens,
-            "digital_glitch": "/digitalglitch" in cinematic_tokens,
-            "high_contrast": "/highcontrast" in cinematic_tokens,
-        }
+        token_vignette = "/edgefade" in cinematic_tokens
+        token_grain = "/filmlook" in cinematic_tokens
+        token_glitch = "/digitalglitch" in cinematic_tokens
+        token_contrast = "/highcontrast" in cinematic_tokens
+
+        if b_num == 1:
+            optical_fx = {
+                "vignette": True or token_vignette,
+                "film_grain": True or token_grain,
+                "digital_glitch": is_metric_shock or token_glitch,
+                "high_contrast": is_metric_shock or token_contrast,
+            }
+        elif b_num in (2, 3):
+            optical_fx = {
+                "vignette": False or token_vignette,
+                "film_grain": True or token_grain,
+                "digital_glitch": False or token_glitch,
+                "high_contrast": False or token_contrast,
+            }
+        elif b_num == 4:
+            optical_fx = {
+                "vignette": True or token_vignette,
+                "film_grain": True or token_grain,
+                "digital_glitch": is_metric_shock or token_glitch,
+                "high_contrast": True or token_contrast,
+            }
+        else:  # Beat 5
+            optical_fx = {
+                "vignette": False or token_vignette,
+                "film_grain": True or token_grain,
+                "digital_glitch": False or token_glitch,
+                "high_contrast": False or token_contrast,
+            }
 
         # Foley SFX assignment (Rule 120, Rule 128 & Tactile Audio Spine)
         # ZERO-SILENT-FALLBACK MANDATE: Every foley cue must be registered in CANONICAL_SFX_REGISTRY

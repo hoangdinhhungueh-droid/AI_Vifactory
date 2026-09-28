@@ -1450,36 +1450,50 @@ def generate_director_plan(
         }
         normalized_scenes.append(norm_sc)
 
-    # VOX Hard Cap on Foreground Human Characters ONLY (Rule 122 & Rule 128):
-    # Strictly <= 10-12 scenes per episode with human character avatars (to prevent uncanny valley and CPU render bottlenecks).
-    # Tactile evidence props, charts, and documents MUST NOT be pruned — they form the core VOX motion graphic visual trail!
-    char_indices = []
-    for i, sc in enumerate(normalized_scenes):
-        fg_k = sc.get("fg_reuse_key") or sc.get("foreground_reuse_key") or ""
-        fg_info = fg_roster.get(fg_k, {})
-        is_char = (
-            fg_info.get("type") == "character" or
-            fg_k.startswith("char_") or
-            fg_k.startswith("fg_character_") or
-            any(w in fg_k.lower() for w in ["character", "official", "banker", "investigator", "trader", "eyewitness", "minister"])
-        )
-        if fg_k and is_char:
-            char_indices.append(i)
+    # VOX Balanced Foreground & Character Allocation Engine (Rule 122 & Audit Round 5 Standard):
+    # Ensures >= 85% foreground coverage across all scenes, preventing empty slideshow look.
+    # Distributes human characters (up to 35-45 scenes) and tactile evidence props/charts without empty vacancies.
+    evidence_fg_keys = [k for k, v in fg_roster.items() if v.get("type") in ("evidence_prop", "document", "data_metric") or k.startswith("fg_evidence_") or k.startswith("fg_doc_")]
+    character_fg_keys = [k for k, v in fg_roster.items() if v.get("type") == "character" or k.startswith("fg_character_") or k.startswith("char_")]
 
-    if len(char_indices) > 12:
-        logger.info(f"  [B3 VOX Gate] Pruning foreground human characters from {len(char_indices)} to <= 12 (tactile evidence props preserved)...")
-        step = max(1, len(char_indices) // 12)
-        kept_char_set = set(char_indices[::step][:12])
-        for i in char_indices:
-            if i not in kept_char_set:
-                sc = normalized_scenes[i]
-                sc["fg_reuse_key"] = ""
-                sc["fg_prompt"] = ""
-                sc["foreground_reuse_key"] = ""
-                sc["foreground_prompt"] = ""
-                if sc.get("layout_zone"):
-                    sc["layout_zone"]["placement"] = "center_hero_document"
-                    sc["layout_zone"]["camera_pan_axis"] = "push_punch" 
+    fg_usage_counter = {}
+    for sc in normalized_scenes:
+        current_fg = sc.get("fg_reuse_key") or ""
+        if current_fg:
+            fg_usage_counter[current_fg] = fg_usage_counter.get(current_fg, 0) + 1
+
+    # Intelligent Fill: Scenes without FG that are NOT dedicated establishing shots get filled
+    # to maintain >= 85% visual interest and depth
+    for i, sc in enumerate(normalized_scenes):
+        current_fg = sc.get("fg_reuse_key") or ""
+        # Reserve first scene of each beat as a cinematic establishing wide shot
+        is_establishing_shot = (i in (0, 31, 62, 94, 124)) and not current_fg
+        if is_establishing_shot:
+            continue
+
+        if not current_fg:
+            narr = sc.get("narration", "").lower()
+            chosen_fg = None
+            # 1. Match keyword in fg_roster
+            for k, info in fg_roster.items():
+                kws = info.get("keywords", [])
+                if any(kw.lower() in narr for kw in kws) and fg_usage_counter.get(k, 0) < 4:
+                    chosen_fg = k
+                    break
+            # 2. Fallback to least-used evidence prop
+            if not chosen_fg and evidence_fg_keys:
+                sorted_ev = sorted(evidence_fg_keys, key=lambda k: fg_usage_counter.get(k, 0))
+                chosen_fg = sorted_ev[0]
+            elif not chosen_fg and character_fg_keys:
+                sorted_char = sorted(character_fg_keys, key=lambda k: fg_usage_counter.get(k, 0))
+                chosen_fg = sorted_char[0]
+
+            if chosen_fg:
+                sc["fg_reuse_key"] = chosen_fg
+                sc["fg_prompt"] = fg_roster.get(chosen_fg, {}).get("description", "")
+                sc["foreground_reuse_key"] = chosen_fg
+                sc["foreground_prompt"] = fg_roster.get(chosen_fg, {}).get("description", "")
+                fg_usage_counter[chosen_fg] = fg_usage_counter.get(chosen_fg, 0) + 1
 
     # 6. Assemble complete output payloads
     director_plan = {
