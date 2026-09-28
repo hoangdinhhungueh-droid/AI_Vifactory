@@ -201,14 +201,14 @@ def detect_forensic_overlay(
             "legacy_type": "evidence_board",
             "theme": theme or "vox_paper",
             "layout": "split_right",
-            "title": "JUDICIAL INDICTMENT // OFFICIAL DOCKET",
-            "badge": "INDICTMENT FILING",
+            "title": "REGULATORY INQUIRY // OFFICIAL RECORD",
+            "badge": "AUDIT FILING",
             "sfx_cue": "stamp_slam",
-            "label": "EXHIBIT C // PROCEDURAL 3D COURT INDICTMENT",
+            "label": "EXHIBIT C // PROCEDURAL 3D AUDIT DOSSIER",
             "payload": {
-                "prop_type": "court_indictment_3d",
-                "evidence_id": "EXHIBIT-3D-INDICTMENT",
-                "authentication": "UNSEALED JUDICIAL DOCKET",
+                "prop_type": "inspection_dossier_3d",
+                "evidence_id": "EXHIBIT-3D-INSPECTION",
+                "authentication": "UNSEALED AUDIT RECORD",
                 "stop_motion_fps": 10
             }
         }
@@ -303,7 +303,7 @@ def detect_forensic_overlay(
                 sec_std_name = quant.secondary_standard_name
                 sec_base = quant.secondary_baseline_value
                 sec_multiplier = quant.secondary_ratio or (round(detected / max(1.0, sec_base), 1) if (detected and sec_base) else None)
-                source_cit = quant.source_citation or ("公的検査・検証記録" if is_jp else "OFFICIAL VERIFICATION DOCKET")
+                source_cit = quant.source_citation or ("公的検査・検証記録" if is_jp else "OFFICIAL VERIFICATION RECORD")
 
             # Dynamic Titles and Badges per market
             if is_jp:
@@ -375,13 +375,13 @@ def detect_forensic_overlay(
             "theme": theme or "vox_paper",
             "layout": "full_bleed_focus",
             "title": "OFFICIAL INSPECTION & AUDIT RECORD",
-            "badge": "SUBPOENAED EVIDENCE",
+            "badge": "AUDIT EVIDENCE",
             "sfx_cue": "marker_stroke",
             "label": "CLASSIFIED // REDACTED RECORD",
             "payload": {
                 "document_title": "OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
                 "agency": "REGULATORY OVERSIGHT // INVESTIGATIVE DIVISION",
-                "case_number": "CASE DOCKET // ADJUDICATED FILING",
+                "case_number": "CASE RECORD // ADJUDICATED FILING",
                 "clauses": clauses,
                 "highlight_line_index": 1 if len(clauses) > 1 else 0,
                 "redacted_terms": resolve_market_redacted_terms(market),
@@ -523,7 +523,7 @@ def detect_object_focus(narration_text: str, topic: str = "") -> dict | None:
             "type": "court_docket",
             "title": "DISTRICT COURT // OFFICIAL FILING",
             "agency": "REGULATORY ENFORCEMENT COMMISSION",
-            "source_ref": "DOCKET CASE RECORD // UNSEALED",
+            "source_ref": "OFFICIAL CASE RECORD // UNSEALED",
             "key_snippet": narration_text[:70].strip(),
             "stat_metric": None
         }

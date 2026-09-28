@@ -235,9 +235,34 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
             end_val = p.get("end_value") or p.get("amount")
             if not stat_v and not end_val:
                 fo["type"] = "document_highlight"
-                fo["title"] = "OFFICIAL RECORD // SUBPOENAED EVIDENCE"
+                fo["title"] = "OFFICIAL RECORD // AUDIT EVIDENCE"
                 fo["badge"] = "EVIDENCE"
-                s["forensic_overlay"] = fo
+                s["forensicOverlay"] = fo
+
+    # 5. Deep recursive sanitization of remaining banned legal terms (Rule 122, 128, 134)
+    from app.services.editorial_briefing_generator import get_stamp_measurement_map
+    meas_map = get_stamp_measurement_map(market)
+    fallback_rep = "行政検査" if market.upper() == "JP" else "AUDIT RECORD"
+
+    def _clean_obj(obj: Any) -> Any:
+        if isinstance(obj, str):
+            res = obj
+            for b_term in BANNED_VERDICT_TERMS:
+                if b_term in res:
+                    replacement = meas_map.get(b_term, fallback_rep)
+                    if b_term in replacement:
+                        replacement = fallback_rep
+                    res = res.replace(b_term, replacement)
+            return res
+        elif isinstance(obj, dict):
+            return {k: _clean_obj(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [_clean_obj(elem) for elem in obj]
+        return obj
+
+    for s in sanitized:
+        if "forensicOverlay" in s and isinstance(s["forensicOverlay"], dict):
+            s["forensicOverlay"] = _clean_obj(s["forensicOverlay"])
 
     props["scenes"] = sanitized
     return props

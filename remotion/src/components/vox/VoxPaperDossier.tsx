@@ -80,7 +80,7 @@ export const VoxPaperDossier: React.FC<VoxPaperDossierProps> = ({
       ];
   const highlightIdx = typeof payload?.highlight_line_index === "number" ? payload.highlight_line_index : 1;
   const redactedTerms = payload?.redacted_terms || ["NOMINEE ACCOUNTS", "ZERO QUALIFYING"];
-  const displayBadge = badge || "SUBPOENAED EVIDENCE";
+  const displayBadge = badge || "AUDIT EVIDENCE";
 
   const isFullBleed = layout === "full_bleed_focus" || layout === "fullscreen_dossier";
   const width = isFullBleed ? 1040 : 580;

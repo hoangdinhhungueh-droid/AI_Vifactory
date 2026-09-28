@@ -107,7 +107,7 @@ export const VoxDocumentHighlight: React.FC<VoxDocumentHighlightProps> = ({
       ];
   const highlightIdx = typeof payload?.highlight_line_index === "number" ? payload.highlight_line_index : 1;
   const redactedTerms = payload?.redacted_terms || ["ARBITRATION PROTOCOL", "NON-REFUNDABLE"];
-  const displayBadge = badge || "SUBPOENAED";
+  const displayBadge = badge || "OFFICIAL RECORD";
 
   const isFullscreen = layout === "fullscreen_dossier";
   const width = isFullscreen ? 880 : 520;

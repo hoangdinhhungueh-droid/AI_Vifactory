@@ -88,7 +88,7 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
   const paramName = payload?.parameter_name ?? payload?.chemical_name ?? "QUANTITATIVE AUDIT";
   const standardName = payload?.standard_name ?? "STATUTORY BASELINE";
   const detectedName = payload?.detected_name ?? "VERIFIED OBSERVATION";
-  const sourceCitation = payload?.source_citation ?? "OFFICIAL VERIFICATION DOCKET";
+  const sourceCitation = payload?.source_citation ?? "OFFICIAL VERIFICATION RECORD";
 
   // Two-Stage Reveal parameters (Secondary statutory standard comparison)
   const secondaryStandardName = payload?.secondary_standard_name;

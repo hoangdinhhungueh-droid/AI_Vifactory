@@ -86,3 +86,34 @@ def test_run_adversarial_gate_end_to_end(tmp_path):
     )
     assert report["verdict"] == "PASS"
     assert (tmp_path / "director_gate_report.json").exists()
+
+
+def test_auto_repair_en_banned_legal_lexicon(tmp_path):
+    """Verify that auto_repair_props for EN market thoroughly eliminates all banned legal terms."""
+    bad_scenes = []
+    for i in range(50):
+        bad_scenes.append({
+            "scene_id": f"sc_{i}",
+            "beat_number": (i % 5) + 1,
+            "narration": f"Scene {i} mentioning subpoena and docket record.",
+            "forensicOverlay": {
+                "type": "document_highlight",
+                "title": "OFFICIAL RECORD // SUBPOENAED EVIDENCE",
+                "badge": "SUBPOENAED EVIDENCE",
+                "payload": {
+                    "case_number": "CASE DOCKET // ADJUDICATED FILING",
+                    "clauses": ["SUBPOENA ISSUED BY PROSECUTOR IN CRIMINAL FRAUD CASE"],
+                }
+            }
+        })
+    props = {"scenes": bad_scenes}
+    is_clean, defects = audit_props_integrity(props, market="EN")
+    assert not is_clean
+    assert any("BANNED_LEGAL_LEXICON" in d for d in defects)
+
+    repaired = auto_repair_props(props, market="EN")
+    is_clean_after, defects_after = audit_props_integrity(repaired, market="EN")
+    assert is_clean_after, f"Defects remain: {defects_after}"
+    assert len(defects_after) == 0
+
+

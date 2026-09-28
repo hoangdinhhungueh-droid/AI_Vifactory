@@ -76,7 +76,7 @@ def build_structured_overlay(
             sec_std_name = quant.secondary_standard_name
             sec_base = quant.secondary_baseline_value
             sec_multiplier = quant.secondary_ratio or (round(detected / max(1.0, sec_base), 1) if (detected and sec_base) else None)
-            source_cit = quant.source_citation or ("公的検査・検証記録" if is_jp else "OFFICIAL VERIFICATION DOCKET")
+            source_cit = quant.source_citation or ("公的検査・検証記録" if is_jp else "OFFICIAL VERIFICATION RECORD")
         else:
             multiplier = 2.0
             detected = None
@@ -213,13 +213,13 @@ def build_structured_overlay(
             "theme": theme or "vox_paper",
             "layout": "full_bleed_focus",
             "title": "OFFICIAL INSPECTION & AUDIT RECORD",
-            "badge": "SUBPOENAED EVIDENCE",
+            "badge": "AUDIT EVIDENCE",
             "sfx_cue": "marker_stroke",
             "label": "CLASSIFIED // REDACTED RECORD",
             "payload": {
                 "document_title": "OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
                 "agency": "REGULATORY OVERSIGHT // INVESTIGATIVE DIVISION",
-                "case_number": "CASE DOCKET // ADJUDICATED FILING",
+                "case_number": "CASE RECORD // ADJUDICATED FILING",
                 "clauses": clauses,
                 "highlight_line_index": 0,
                 "redacted_terms": resolve_market_redacted_terms(market),

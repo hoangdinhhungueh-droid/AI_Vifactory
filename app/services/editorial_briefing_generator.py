@@ -88,8 +88,8 @@ STAMP_MEASUREMENT_MAP_EN: Dict[str, str] = {
     "INDICTMENT": "FORMAL INQUIRY",
     "GRAND JURY": "INVESTIGATIVE COMMITTEE",
     "PROSECUTOR": "CHIEF AUDITOR",
-    "DOCKET": "CASE DOCKET",
-    "SUBPOENA": "SUBPOENAED RECORD",
+    "DOCKET": "CASE RECORD",
+    "SUBPOENA": "OFFICIAL SUMMONS",
     "FELONY": "MAJOR IRREGULARITY",
     "DEFENDANT": "SUBJECT ENTITY",
     "CONVICTED": "ADJUDICATED",
@@ -173,7 +173,7 @@ LOCALIZED_OVERLAY_THEMES: Dict[str, Dict[str, Any]] = {
     "EN": {
         "document_title": "OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
         "agency": "REGULATORY OVERSIGHT // INVESTIGATIVE DIVISION",
-        "case_number": "CASE DOCKET // ADJUDICATED FILING",
+        "case_number": "CASE RECORD // ADJUDICATED FILING",
         "date_verified": "OFFICIAL RECORD // VERIFIED",
         "network_title": "INVESTIGATION NETWORK // TARGET ENTITIES",
         "network_badge": "REGULATORY INQUIRY",
@@ -629,8 +629,8 @@ def prune_and_localize_scenes(
                     for pk, pv in list(d.items()):
                         if isinstance(pv, str):
                             val = pv
+                            val = val.replace("CASE DOCKET // ADJUDICATED FILING", theme.get("case_number", "CASE RECORD // ADJUDICATED FILING"))
                             if m_clean == "JP":
-                                val = val.replace("CASE DOCKET // ADJUDICATED FILING", theme.get("case_number", "査察記録 // 行政検査録"))
                                 val = val.replace("OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT", theme.get("document_title", "公式検査・査察記録 // 検査成績書"))
                                 val = val.replace("REGULATORY OVERSIGHT // INVESTIGATIVE DIVISION", theme.get("agency", "食品安全監視機構 // 検査指導課"))
                                 val = val.replace("court_indictment_3d", "inspection_dossier_3d")
