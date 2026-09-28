@@ -258,9 +258,23 @@ def detect_forensic_overlay(
         }
 
     # 1. Threshold Ratio Graphic (Generic Exceedance, statutory baseline limit, metric anomaly, toxic ratio, market dominance)
-    if any(k in t for k in ["倍", "배", "times", "fold", "lần", "exceed", "threshold", "ratio", "residue", "monopoly", "market share", "discrepancy", "基準値", "基準", "法定基準", "超過", "違反", "규제", "한도", "statutory limit", "regulatory limit", "baseline"]):
+    threshold_triggers = [
+        # Multipliers, Ratios & Percentages
+        "倍", "배", "times", "fold", "lần", "gấp", "ratio", "rate", "tỷ lệ", "tỉ lệ", "비율", "倍率", "%", "percent", "phần trăm",
+        # Exceedance, Limits, Ceilings & Caps
+        "exceed", "surpass", "threshold", "residue", "discrepancy", "ceiling", "cap", "overage",
+        "基準値", "基準", "法定基準", "超過", "違反", "限度",
+        "초과", "규제", "한도", "위반",
+        "vượt", "vượt trần", "quá mức", "hạn mức", "ngưỡng",
+        # Market dominance, Concentration & Scale
+        "monopoly", "market share", "dominance", "market", "thị phần", "독점", "점유율", "市場占有率", "シェア",
+        # Regulatory & Statutory
+        "statutory limit", "regulatory limit", "baseline", "antitrust"
+    ]
+    if any(k in t for k in threshold_triggers):
         is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text) or market.upper() == "JP"
         is_kr = market.upper() == "KR"
+        is_vn = market.upper() == "VN"
 
         quant = extract_episode_quantitative_profile(grounding_intel, narration_text, market)
         if quant.status != ProfileStatus.INSUFFICIENT_DATA and (quant.ratio is not None or quant.detected_value is not None):
@@ -286,11 +300,24 @@ def detect_forensic_overlay(
             elif is_kr:
                 title = f"정량 감사 // {param_name}"
                 badge = f"기준의 {multiplier}배 초과"
-                label = f"{std_name} 대비: {multiplier}배 초과"
+                if sec_multiplier:
+                    label = f"{std_name} 대비: {multiplier}배 // 2차 기준({sec_base}{unit}) 대비 {sec_multiplier}배"
+                else:
+                    label = f"{std_name} 대비: {multiplier}배 초과"
+            elif is_vn:
+                title = f"GIÁM SÁT ĐỊNH LƯỢNG // {param_name.upper()}"
+                badge = f"VƯỢT {multiplier} LẦN HẠN MỨC"
+                if sec_multiplier:
+                    label = f"SO SÁNH QUY CHUẨN: VƯỢT {multiplier} LẦN // SO VỚI QUY CHUẨN PHỤ ({sec_base}{unit}) VƯỢT {sec_multiplier} LẦN"
+                else:
+                    label = f"SO SÁNH QUY CHUẨN: VƯỢT {multiplier} LẦN"
             else:
                 title = f"FORENSIC AUDIT // {param_name.upper()}"
                 badge = f"EXCEEDED BY {multiplier}X"
-                label = f"STATUTORY COMPARISON: {multiplier}X EXCEEDANCE"
+                if sec_multiplier:
+                    label = f"{std_name}: {multiplier}X // SECONDARY BENCHMARK ({sec_base}{unit}): {sec_multiplier}X"
+                else:
+                    label = f"STATUTORY COMPARISON: {multiplier}X EXCEEDANCE"
 
             return {
                 "type": "threshold_ratio",
