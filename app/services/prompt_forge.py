@@ -368,7 +368,7 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
             return anchor, f", {negs}" if negs else ""
         elif any(k in combined for k in ["quarantine", "inspector", "customs", "officer", "analyst", "chemist", "lab", "mhlw", "kasumigaseki"]):
             anchor = (
-                "Authentic Japanese public official or regulatory specialist, distinct Japanese facial structure, "
+                "Authentic Japanese public official or quarantine inspection specialist, distinct Japanese facial structure, "
                 "institutional inspection uniform or pristine business attire with ID lanyard, "
                 "dynamic investigative body posture examining official records, intense focused glare"
             )
