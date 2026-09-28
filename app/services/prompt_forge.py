@@ -224,7 +224,7 @@ def _clean_relics(text: str, is_byzantine_topic: bool = False) -> str:
 
 def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: bool = False, market: str = "EN", tokens: list | None = None) -> str:
     """Sanitize and enforce Rule 116 standards for Layer 1 Background prompts with Market Architecture Conformance."""
-    p = prompt.strip()
+    p = _sanitize_evidence_notes(prompt.strip())
     p = re.sub(r"\[STYLE MANDATE\]\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[MARKET & ENVIRONMENT ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[ERA ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
@@ -233,6 +233,7 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     # Eradicate forbidden photorealistic tokens while protecting 'non-photorealistic'
     p = re.sub(r"\bnon-photorealistic\b", "__NON_PHOTO__", p, flags=re.IGNORECASE)
     p = re.sub(r"photorealistic\s*(?:8k)?\s*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"photorealistic,?\s*", "", p, flags=re.IGNORECASE)
     p = p.replace("__NON_PHOTO__", "non-photorealistic")
     p = re.sub(r"\bnon-\s*2d\b", "non-photorealistic 2D", p, flags=re.IGNORECASE)
     p = re.sub(r"\b8k\b", "", p, flags=re.IGNORECASE)
@@ -256,10 +257,13 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
         resolved = resolve_cinematic_tokens(tokens)
         if resolved["camera_directives"]:
             tokens_clauses.append(f"[CAMERA & PERSPECTIVE] {', '.join(resolved['camera_directives'])}.")
-        if resolved["lighting_directives"]:
-            tokens_clauses.append(f"[LIGHTING & OPTICS] {', '.join(resolved['lighting_directives'])}.")
-        if resolved["vfx_directives"]:
-            tokens_clauses.append(f"[OPTICAL STYLE] {', '.join(resolved['vfx_directives'])}.")
+        # Filter out foreground document/counter directives from Layer 1 background plate
+        bg_lighting = [d for d in resolved["lighting_directives"] if not any(k in d.lower() for k in ["evidence document", "critical document", "evidence prop"])]
+        if bg_lighting:
+            tokens_clauses.append(f"[LIGHTING & OPTICS] {', '.join(bg_lighting)}.")
+        bg_vfx = [d for d in resolved["vfx_directives"] if not any(k in d.lower() for k in ["metric counter", "mechanical counter", "spinning up"])]
+        if bg_vfx:
+            tokens_clauses.append(f"[OPTICAL STYLE] {', '.join(bg_vfx)}.")
     flow_str = f" {' '.join(tokens_clauses)}" if tokens_clauses else ""
 
     style_prefix = "[STYLE MANDATE] 16:9 widescreen cinematic editorial environment illustration, stylized graphic novel background, atmospheric volumetric lighting, spatial textures, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay."
@@ -269,65 +273,138 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     return deduplicate_phrase_stutter(p)
 
 
+def _sanitize_evidence_notes(text: str) -> str:
+    """
+    Purge internal reviewer instructions, audit debris, and corrupted QA tokens from visual prompts (Rule 128).
+    E.g. 'able2026 claim supplied; verify release and observation dates'
+    'Record-history start not supplied', 'No 1985 reference', 'claim supplied'
+    """
+    if not text:
+        return ""
+    patterns = [
+        r"able\d{4}\s+claim\s+supplied;?[^'\"]*",
+        r"verify\s+(?:release|observation|dates|sources)[^'\"]*",
+        r"claim\s+supplied;?\s*",
+        r"Record-history\s+start\s+not\s+supplied;?\s*",
+        r"No\s+\d{4}\s+reference;?\s*",
+        r"no\s+ranking\s+claim;?\s*",
+        r"internal\s+verification\s+note[^'\"]*",
+        r"audit\s+note[^'\"]*"
+    ]
+    for pat in patterns:
+        text = re.sub(pat, "", text, flags=re.IGNORECASE)
+    text = re.sub(r",\s*,\s*", ", ", text)
+    text = re.sub(r",\s*\.\s*", ", ", text)
+    text = re.sub(r"\.\s*\.\s*", ". ", text)
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    return text
+
+
 def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tuple[str, str]:
     """
     Resolve character ethnic phenotype, attire, and negative prompts dynamically based on
-    fg_key, context description (p), and market. Prevents Market Anchor Bias where non-Japanese
-    characters in Japanese market episodes get erroneously injected with Japanese salaryman suits,
-    sha-sho badges, or hanko seals.
+    market, fg_key, and context description (p).
+    Rule 128 (Anti-Semantic Bias) & Rule 122 (Ethnic & Market Integrity):
+    - Strictly bound to episode target market (EN, JP, VN, KR).
+    - NEVER leak JP/CN quarantine/agricultural anchors into EN episodes.
+    - NEVER leak Caucasian negatives ('no Caucasian traits') into EN episodes.
+    - Non-human objects/evidence props return empty anchors and empty character negatives.
     """
+    # 1. Non-human evidence props, documents, metric tiles, artifacts
+    is_object_key = any(k in fg_key.lower() for k in [
+        "doc", "evidence", "object", "prop", "item", "meter", "invoice", "check",
+        "paper", "artifact", "ledger", "gauge", "statute", "envelope", "stamp",
+        "tile", "card", "board", "manifest"
+    ])
+    if is_object_key and not fg_key.lower().startswith("fg_character_") and not fg_key.lower().startswith("char_"):
+        return "", ""
+
+    m = (market or "EN").upper().strip()
     combined = f"{fg_key} {p}".lower()
+    base_negs = prof.get("fg_negatives", "")
 
-    # 1. Foreign / cross-border regional / agricultural / processing / wholesale characters
-    if any(k in combined for k in [
-        "chinese", "china", "foreign", "harvester", "fumigation", "farmer", "worker",
-        "laborer", "wholesale", "broker", "plant_owner", "factory", "steam", "supplier"
-    ]) and not any(k in combined for k in [
-        "japanese", "tokyo", "yokohama", "quarantine", "supermarket", "consumer", "shopper", "ramen"
-    ]):
-        anchor = (
-            "Authentic Chinese individual from regional agricultural or industrial processing sector, "
-            "distinct East Asian facial structure with weathered pragmatic demeanor, durable regional utilitarian "
-            "workwear or protective processing apron and rubber gloves, dynamic posture of manual inspection or harvest labor, "
-            "active interaction with regional agricultural produce and processing tools"
-        )
-        base_negs = prof.get("fg_negatives", "")
-        negs = f"{base_negs}, no Japanese salaryman suit, no corporate sha-sho lapel pin badge, no Japanese inkan hanko seal, no Western Caucasian traits"
-        return anchor, f", {negs}" if negs else ""
+    # 2. English / Western / Global Markets (EN, US, UK, EU)
+    if m in ["EN", "US", "UK"]:
+        if any(k in combined for k in [
+            "analyst", "executive", "trader", "broker", "manager", "official", "lawyer",
+            "prosecutor", "judge", "director", "pm", "allocator", "financier", "banker"
+        ]):
+            anchor = (
+                "Authentic contemporary Western professional or institutional analyst, natural American/Western facial features, "
+                "bespoke corporate noir business attire or institutional suit, dynamic investigative body posture, sharp focused expression"
+            )
+            negs = f"{base_negs}, no Japanese salaryman suit, no corporate sha-sho lapel pin badge, no Japanese inkan hanko seal"
+            return anchor, f", {negs}" if negs else ""
+        elif any(k in combined for k in [
+            "worker", "laborer", "engineer", "electrician", "technician", "operator", "infrastructure"
+        ]):
+            anchor = (
+                "Authentic contemporary American/Western specialist or infrastructure engineer, natural facial features, "
+                "durable professional utility workwear or high-visibility vest, dynamic focused posture handling technical documentation or infrastructure tools"
+            )
+            negs = f"{base_negs}, no Japanese salaryman suit, no corporate sha-sho lapel pin badge, no Japanese inkan hanko seal"
+            return anchor, f", {negs}" if negs else ""
+        elif any(k in combined for k in ["retail", "consumer", "investor", "shopper"]):
+            anchor = (
+                "Authentic contemporary American/Western individual, casual contemporary professional attire, "
+                "expressive posture engaging with market documentation or mobile device, nuanced emotive micro-expression"
+            )
+            negs = f"{base_negs}, no Japanese salaryman suit, no corporate sha-sho lapel pin badge, no Japanese inkan hanko seal"
+            return anchor, f", {negs}" if negs else ""
+        else:
+            fg_anchor = prof.get("fg_anchor", "Authentic contemporary Western individual, natural facial features, contemporary attire")
+            return fg_anchor, f", {base_negs}" if base_negs else ""
 
-    # 2. Japanese institutional / inspector / laboratory characters
-    if any(k in combined for k in [
-        "quarantine", "inspector", "customs", "officer", "analyst", "chemist", "lab", "mhlw", "kasumigaseki"
-    ]):
-        anchor = (
-            "Authentic Japanese public official or quarantine inspection specialist, distinct Japanese facial structure, "
-            "institutional inspection uniform or pristine laboratory coat with ID lanyard and safety eyewear, "
-            "dynamic investigative body posture examining import manifests and testing reagents, intense focused glare"
-        )
-        base_negs = prof.get("fg_negatives", "")
-        negs = f"{base_negs}, no Caucasian traits, no passport photo posture"
-        return anchor, f", {negs}" if negs else ""
+    # 3. Japanese Market (JP)
+    elif m == "JP":
+        if any(k in combined for k in ["chinese", "china", "foreign_worker", "regional_worker", "import_broker"]) and not any(k in combined for k in ["japanese", "tokyo", "quarantine", "mhlw"]):
+            anchor = (
+                "Authentic Chinese individual from regional agricultural or industrial processing sector, "
+                "distinct East Asian facial structure with weathered pragmatic demeanor, durable regional utilitarian "
+                "workwear or protective processing apron and rubber gloves, dynamic posture of manual inspection or harvest labor, "
+                "active interaction with regional agricultural produce and processing tools"
+            )
+            negs = f"{base_negs}, no Japanese salaryman suit, no corporate sha-sho lapel pin badge, no Japanese inkan hanko seal, no Western Caucasian traits"
+            return anchor, f", {negs}" if negs else ""
+        elif any(k in combined for k in ["quarantine", "inspector", "customs", "officer", "analyst", "chemist", "lab", "mhlw", "kasumigaseki"]):
+            anchor = (
+                "Authentic Japanese public official or regulatory specialist, distinct Japanese facial structure, "
+                "institutional inspection uniform or pristine business attire with ID lanyard, "
+                "dynamic investigative body posture examining official records, intense focused glare"
+            )
+            negs = f"{base_negs}, no Caucasian traits, no passport photo posture"
+            return anchor, f", {negs}" if negs else ""
+        elif any(k in combined for k in ["consumer", "shopper", "supermarket", "chef", "cook", "ramen", "housewife"]):
+            anchor = (
+                "Authentic Japanese consumer or culinary professional, natural East Asian eye shape, "
+                "casual contemporary Japanese domestic attire or professional apron, dynamic expressive posture, "
+                "closely inspecting packaged product with nuanced micro-expression of concern"
+            )
+            negs = f"{base_negs}, no Caucasian traits, no passport photo posture"
+            return anchor, f", {negs}" if negs else ""
+        else:
+            fg_anchor = prof.get("fg_anchor", "Authentic Japanese individual, distinct East Asian facial structure, contemporary attire")
+            return fg_anchor, f", {base_negs}" if base_negs else ""
 
-    # 3. Japanese domestic consumer / culinary characters
-    if any(k in combined for k in ["consumer", "shopper", "supermarket", "chef", "cook", "ramen", "menma", "housewife"]):
-        anchor = (
-            "Authentic Japanese consumer or culinary professional, natural East Asian eye shape, "
-            "casual contemporary Japanese domestic attire or professional chef apron, dynamic expressive posture "
-            "closely inspecting packaged food labels with nuanced micro-expression of concern, active tactile interaction with grocery packaging"
-        )
-        base_negs = prof.get("fg_negatives", "")
-        negs = f"{base_negs}, no Caucasian traits, no passport photo posture"
-        return anchor, f", {negs}" if negs else ""
+    # 4. Vietnamese Market (VN)
+    elif m == "VN":
+        anchor = prof.get("fg_anchor", "Authentic contemporary Vietnamese individual, natural Southeast Asian facial features, contemporary attire")
+        return anchor, f", {base_negs}" if base_negs else ""
 
-    # 4. Standard market profile fallback
-    fg_anchor = prof.get("fg_anchor", "")
+    # 5. Korean Market (KR)
+    elif m == "KR":
+        anchor = prof.get("fg_anchor", "Authentic contemporary Korean individual, natural Korean facial features, contemporary attire")
+        return anchor, f", {base_negs}" if base_negs else ""
+
+    # Fallback generic
+    fg_anchor = prof.get("fg_anchor", "Authentic individual appropriate to narrative context, contemporary attire")
     fg_negs = f", {prof['fg_negatives']}" if prof.get("fg_negatives") else ""
     return fg_anchor, fg_negs
 
 
 def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: bool = False, market: str = "EN", tokens: list | None = None) -> str:
     """Sanitize and enforce Rule 116 & Rule 435 standards for Layer 2 Foreground prompts with Market Ethnicity Conformance."""
-    p = prompt.strip()
+    p = _sanitize_evidence_notes(prompt.strip())
 
     p = re.sub(r"\bnon-photorealistic\b", "__NON_PHOTO__", p, flags=re.IGNORECASE)
     p = re.sub(r"studio portrait lighting,?\s*", "", p, flags=re.IGNORECASE)
@@ -398,14 +475,14 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
         "algorithm", "meter", "gauge", "dial", "search box", "sponsored", "search card",
         "evidence", "folder", "binder", "stamp", "hanko", "seal", "prop", "artifact",
         "server rack", "microchip", "circuit", "hard drive", "tape recorder",
-        "dossier", "newspaper clipping", "blueprint", "flowchart", "infographic"
+        "dossier", "newspaper clipping", "blueprint", "flowchart", "infographic", "tile"
     ]
     is_character_key = (
         fg_key.lower().startswith("fg_character_") or
         fg_key.lower().startswith("char_") or
         any(k in fg_key.lower() for k in ["character", "harvester", "inspector", "officer", "worker", "shopper", "consumer", "chef"])
     )
-    is_object_key = any(k in fg_key.lower() for k in ["doc", "evidence", "object", "prop", "item", "meter", "invoice", "check", "paper", "artifact", "ledger", "gauge", "statute", "envelope", "stamp"])
+    is_object_key = any(k in fg_key.lower() for k in ["doc", "evidence", "object", "prop", "item", "meter", "invoice", "check", "paper", "artifact", "ledger", "gauge", "statute", "envelope", "stamp", "tile"])
     has_evidence_kw = any(kw in p.lower() for kw in evidence_keywords)
 
     if is_character_key:
@@ -420,12 +497,15 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
 
     if is_object:
         style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich tactile paper and material textures, 1:1 aspect ratio, centered investigative artifact, crisp paper-cutout sticker aesthetic, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
-        p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with clear legible markers. [ERA ANCHOR] Authentic period materials, forensic case evidence. [STRICT NEGATIVE PROMPT] no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no borders, no extraneous ui elements{fg_negs}."
+        p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with clear legible markers. [ERA ANCHOR] Authentic period materials, forensic case evidence. [STRICT NEGATIVE PROMPT] no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no borders, no extraneous ui elements."
     else:
         style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich nuanced colors, 1:1 aspect ratio, full-body head-to-shoes, entire character visible within frame, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
         p = f"{style_prefix} {p}{fg_flow_str}, dynamic high-stakes body posture, dramatic physical posing, intense facial micro-expressions with sharp focused gaze, full-body head-to-shoes visible within frame. [MARKET & ETHNIC ANCHOR] {fg_anchor}. [ERA ANCHOR] Authentic professional attire, stylized expressive character acting, active props interaction. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements{fg_negs}."
 
     p = deduplicate_phrase_stutter(p)
+    p = re.sub(r",\s*\.\s*", ", ", p)
+    p = re.sub(r"\s*,\s*,\s*", ", ", p)
+    p = re.sub(r"\.\s*\.\s*", ". ", p)
 
     matches = list(re.finditer(r"Stylized\s+editorial", p, flags=re.IGNORECASE))
     if len(matches) > 1:

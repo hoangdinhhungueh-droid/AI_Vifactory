@@ -33,7 +33,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from app.services.director_planner_b3 import detect_forensic_overlay
+from app.services.director_planner_b3 import detect_forensic_overlay, resolve_market_redacted_terms
 from app.services.text_to_number_parser import parse_spoken_number
 from app.services.timeline_editor_agent import audit_and_optimize_timeline
 from app.services.sfx_registry import CANONICAL_SFX_REGISTRY, is_valid_sfx, get_sfx_filename
@@ -222,7 +222,7 @@ def build_structured_overlay(
                 "case_number": "CASE DOCKET // ADJUDICATED FILING",
                 "clauses": clauses,
                 "highlight_line_index": 0,
-                "redacted_terms": ["CONFIDENTIAL", "UNVERIFIED", "不適切"],
+                "redacted_terms": resolve_market_redacted_terms(market),
                 "date": "OFFICIAL RECORD // VERIFIED"
             }
         }
@@ -373,6 +373,7 @@ def extract_stat_card(text: str):
         return parsed.formatted, label
 
     patterns = [
+        (r'\b(20(?:1[5-9]|2[0-9]|30))\b', "TIMELINE // RECORD DATE"),
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:만|억|조)?\s*원)', "PRICE ANCHOR // TRANSACTION"),
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆)?\s*円)', "FINANCIAL VALUE // VALUATION"),
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:tỷ|triệu|nghìn)\s*đ(?:ồng)?)', "MARKET METRIC // COST"),

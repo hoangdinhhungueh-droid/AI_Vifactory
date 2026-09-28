@@ -145,6 +145,19 @@ def _sanitize_beat_spoken_for_llm(spoken_list: list) -> list:
     return lean
 
 
+def resolve_market_redacted_terms(market: str = "EN") -> list[str]:
+    """Rule 128: Market-aware redacted terms resolver preventing CJK token bleed into EN documents."""
+    m = (market or "EN").upper().strip()
+    if m in ("EN", "US", "UK"):
+        return ["CONFIDENTIAL", "UNVERIFIED", "RESTRICTED", "CLASSIFIED"]
+    elif m == "JP":
+        return ["CONFIDENTIAL", "UNVERIFIED", "不適切", "不正"]
+    elif m == "VN":
+        return ["MẬT", "CHƯA KIỂM CHỨNG", "VI PHẠM", "ĐÌNH CHỈ"]
+    elif m == "KR":
+        return ["기밀", "미확인", "부적절", "위반"]
+    return ["CONFIDENTIAL", "UNVERIFIED", "RESTRICTED"]
+
 
 def detect_forensic_overlay(
     narration_text: str,
@@ -371,7 +384,7 @@ def detect_forensic_overlay(
                 "case_number": "CASE DOCKET // ADJUDICATED FILING",
                 "clauses": clauses,
                 "highlight_line_index": 1 if len(clauses) > 1 else 0,
-                "redacted_terms": ["CONFIDENTIAL", "UNVERIFIED", "不適切", "不正"],
+                "redacted_terms": resolve_market_redacted_terms(market),
                 "date": "OFFICIAL RECORD // VERIFIED"
             }
         }
@@ -414,6 +427,20 @@ def detect_forensic_overlay(
     parsed_metric = parse_spoken_number(narration_text)
     if parsed_metric is not None and parsed_metric.display_value > 0:
         display_val = parsed_metric.formatted
+        start_val = 0
+        end_val = parsed_metric.display_value
+        trend = parsed_metric.trend
+
+        # Check if narration depicts an explicit two-point decline (e.g. fell from 314 to 188)
+        decline_m = re.search(r"(?:fell|dropped|declined|decreased)\s+from\s+(?:\$)?(\d+(?:\.\d+)?)\s*(?:billion|million|b|m)?\s+to\s+(?:\$)?(\d+(?:\.\d+)?)", narration_text, re.IGNORECASE)
+        if decline_m:
+            try:
+                start_val = float(decline_m.group(1))
+                end_val = float(decline_m.group(2))
+                trend = "down"
+            except Exception:
+                pass
+
         return {
             "type": "kinetic_counter",
             "legacy_type": "financial_chart",
@@ -424,13 +451,13 @@ def detect_forensic_overlay(
             "sfx_cue": "stamp_slam",
             "label": f"EVIDENTIARY VALUE // {display_val}",
             "payload": {
-                "start_value": 0,
-                "end_value": parsed_metric.display_value,
-                "amount": parsed_metric.display_value,
+                "start_value": start_val,
+                "end_value": end_val,
+                "amount": end_val,
                 "unit": parsed_metric.unit,
                 "prefix": parsed_metric.prefix,
                 "suffix": parsed_metric.suffix,
-                "trend": parsed_metric.trend,
+                "trend": trend,
             }
         }
 
@@ -671,8 +698,9 @@ def detect_stat_card(narration_text: str) -> dict | None:
         return {"value": parsed.formatted, "label": label}
 
     patterns = [
+        (r'\b(20(?:1[5-9]|2[0-9]|30))\b', "TIMELINE // RECORD DATE"),
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:만|억|조)?\s*원)', "PRICE ANCHOR // TRANSACTION"),
-        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆)?\s*(?:円|ドル)?)', "FINANCIAL VALUE // VALUATION"),
+        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆)\s*(?:円|ドル)?|\d+(?:,\d{3})*(?:\.\d+)?\s*(?:円|ドル))', "FINANCIAL VALUE // VALUATION"),
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:tỷ|triệu|nghìn)\s*đ(?:ồng)?)', "MARKET METRIC // COST"),
         (r'(\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|TRILLION|B|M|K)?(?:\s*→\s*<\$\d+)?(?:\s*/\s*SHARE)?)', "FINANCIAL METRIC // VALUATION"),
         (r'(-\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|B|M)?)', "BALANCE SHEET // WRITE-DOWN"),
