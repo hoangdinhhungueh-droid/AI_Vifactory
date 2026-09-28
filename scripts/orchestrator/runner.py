@@ -66,9 +66,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=["pipeline", "block", "audit", "ci", "sync", "review", "sweep", "council"],
+        choices=["pipeline", "block", "audit", "ci", "sync", "review", "sweep", "council", "plan"],
         default="pipeline",
         help="Operational mode (default: pipeline)",
+    )
+    parser.add_argument(
+        "--planner-model",
+        default="claude-opus-5-5",
+        help="LLM model used for Phase 0 planning brain (default: claude-opus-5-5 via HHTech API)",
+    )
+    parser.add_argument(
+        "--plan-task",
+        default=None,
+        help="Task description or objective for Phase 0 planning mode",
     )
     parser.add_argument(
         "--ocr-mode",
@@ -214,6 +224,8 @@ class OrchestratorRunner:
                 return self._run_sweep_mode(sandbox)
             elif mode == "council":
                 return self._run_council_mode(sandbox)
+            elif mode == "plan":
+                return self._run_plan_mode(sandbox)
             else:
                 print(f"Unknown mode: {mode}", file=sys.stderr)
                 return 1
@@ -995,6 +1007,62 @@ class OrchestratorRunner:
             print("=================================================================\n")
 
         return 0 if all_passed else 1
+
+    def _run_plan_mode(self, sandbox: ResourceSandbox) -> int:
+        """Executes Phase 0: Master Plan & Grill-Me Engine via Opus 5.5 (HHTech API)."""
+        from scripts.orchestrator.hhtech_planner import generate_plan, DEFAULT_PLANNER_MODEL
+
+        task_id = self.args.task_id or "GENERIC_PLAN_TASK"
+        task_desc = self.args.plan_task or f"Architectural planning and implementation specification for task '{task_id}' (Market: {self.args.market})."
+        planner_model = getattr(self.args, "planner_model", DEFAULT_PLANNER_MODEL)
+
+        print("\n=================================================================")
+        print("🧠 PHASE 0: MASTER STRATEGIC PLANNER (OPUS 5.5 / HHTECH API)")
+        print("=================================================================")
+        print(f"Task ID:        {task_id}")
+        print(f"Market:         {self.args.market}")
+        print(f"Planner Model:  {planner_model}")
+        print(f"Dry Run:        {self.args.dry_run}")
+        print("-----------------------------------------------------------------")
+        print("Enforcing 4 Mandatory Technical Pillars:")
+        print("  1. CI/CD Quality Gates (Neighbor testing, E2E Smoke, OCR)")
+        print("  2. Git Conventional Commits (Atomic with verification evidence)")
+        print("  3. Three-Way Physical Parity & Sync Verification (Rule 126)")
+        print("  4. Real Playwright Visual & Interaction Audit (Zero Mock)")
+        print("=================================================================\n")
+
+        try:
+            plan_text = generate_plan(
+                task_description=task_desc,
+                task_id=task_id,
+                market=self.args.market,
+                dry_run=self.args.dry_run,
+            )
+
+            if self.args.json_output:
+                print(json.dumps({"status": "success", "task_id": task_id, "planner_model": planner_model, "plan": plan_text}, indent=2))
+            else:
+                print(plan_text)
+                print("\n=================================================================")
+                print("✅ PHASE 0 PLAN GENERATION COMPLETE -> READY FOR ACTIVE MODEL EXECUTION")
+                print("=================================================================\n")
+
+            if self.args.task_id:
+                self._update_pipeline_state(
+                    self.args.task_id,
+                    "PHASE_0_PLAN",
+                    "PASSED",
+                    {"planner_model": planner_model, "status": "APPROVED_FOR_ACTIVE_MODEL"}
+                )
+
+            return 0
+        except Exception as e:
+            msg = f"Phase 0 Planning failed: {e}"
+            if self.args.json_output:
+                print(json.dumps({"status": "error", "error": msg}, indent=2))
+            else:
+                print(f"ERROR: {msg}", file=sys.stderr)
+            return 1
 
 
 def main() -> None:
