@@ -108,3 +108,53 @@ def test_generate_editorial_briefing(tmp_path):
     assert briefing["market"] == "JP"
     assert briefing["pacing_verdict"] == "APPROVED_VOX_MINIMALIST"
     assert (tmp_path / "editorial_briefing.json").exists()
+
+
+def test_prune_and_localize_scenes_english_no_cjk():
+    """Verify that English episodes have zero CJK leakage in badges, overlays, and speaker tags."""
+    import re
+    cjk_pattern = re.compile(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]')
+
+    mock_scenes = []
+    for i in range(30):
+        mock_scenes.append({
+            "scene_id": f"scene_{i:03d}",
+            "beat_number": (i % 5) + 1,
+            "narration": f"Narration for scene {i} mentioning SUBPOENA and CRIMINAL investigation $100M.",
+            "forensic_overlay": "evidence_board" if i % 2 == 0 else "document_highlight",
+            "speakerTag": "ARCHIVE X // DEFAULT // NARRATOR",
+            "durationInFrames": 120,
+        })
+
+    sanitized = prune_and_localize_scenes(mock_scenes, market="EN")
+    assert len(sanitized) == 30
+
+    for s in sanitized:
+        fo = s.get("forensicOverlay")
+        if fo:
+            badge = fo.get("badge", "")
+            title = fo.get("title", "")
+            label = fo.get("label", "")
+            assert not cjk_pattern.search(badge), f"CJK leaked in badge: {badge}"
+            assert not cjk_pattern.search(title), f"CJK leaked in title: {title}"
+            assert not cjk_pattern.search(label), f"CJK leaked in label: {label}"
+            assert "資料提出要請" not in badge
+            assert "是正指導事案" not in badge
+            assert "基準値超過" not in badge
+
+            # Check payload
+            p_load = fo.get("payload")
+            if isinstance(p_load, dict):
+                for pk, pv in p_load.items():
+                    if isinstance(pv, str):
+                        assert not cjk_pattern.search(pv), f"CJK leaked in payload[{pk}]: {pv}"
+                    elif isinstance(pv, list):
+                        for item in pv:
+                            if isinstance(item, str):
+                                assert not cjk_pattern.search(item), f"CJK leaked in payload list item: {item}"
+
+        # Speaker tag must have no CJK and no ARCHIVE X
+        tag = s.get("speakerTag", "")
+        assert not cjk_pattern.search(tag), f"CJK leaked in speakerTag: {tag}"
+        assert "ARCHIVE X" not in tag
+

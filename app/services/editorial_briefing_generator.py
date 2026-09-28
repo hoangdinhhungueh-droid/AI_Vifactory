@@ -44,7 +44,7 @@ BANNED_VERDICT_TERMS = {
     "기소", "형사", "유죄", "범죄", "cáo trạng", "khởi tố", "truy tố"
 }
 
-STAMP_MEASUREMENT_MAP = {
+STAMP_MEASUREMENT_MAP_JP: Dict[str, str] = {
     "VIOLATION": "基準値超過",
     "ILLEGAL": "基準外",
     "GUILTY": "事実確認",
@@ -59,6 +59,8 @@ STAMP_MEASUREMENT_MAP = {
     "SUBPOENA": "資料提出要請",
     "FELONY": "重大不適合",
     "DEFENDANT": "対象事業者",
+    "CONVICTED": "確定記録",
+    "LAWSUIT": "民事訴訟",
     "違法": "基準超過",
     "有罪": "事実確認",
     "犯罪": "是正指導事案",
@@ -71,7 +73,65 @@ STAMP_MEASUREMENT_MAP = {
     "犯行": "規則違反",
     "司法審査": "行政検査",
     "刑事摘発": "回収命令措置",
+    "地検": "捜査委員会",
 }
+
+STAMP_MEASUREMENT_MAP_EN: Dict[str, str] = {
+    # English terms -> Clean neutral regulatory/forensic English
+    "VIOLATION": "REGULATORY DISCREPANCY",
+    "ILLEGAL": "NON-COMPLIANT",
+    "GUILTY": "FACTUAL FINDING",
+    "CRIME": "REGULATORY AUDIT",
+    "CRIMINAL": "REGULATORY AUDIT",
+    "FRAUD": "ACCOUNTING DISCREPANCY",
+    "PRICE_FRAUD": "PRICING DISCREPANCY",
+    "INDICTMENT": "FORMAL INQUIRY",
+    "GRAND JURY": "INVESTIGATIVE COMMITTEE",
+    "PROSECUTOR": "CHIEF AUDITOR",
+    "DOCKET": "CASE DOCKET",
+    "SUBPOENA": "SUBPOENAED RECORD",
+    "FELONY": "MAJOR IRREGULARITY",
+    "DEFENDANT": "SUBJECT ENTITY",
+    "CONVICTED": "ADJUDICATED",
+    "LAWSUIT": "CIVIL FILING",
+    # Japanese stray terms -> Clean neutral English
+    "違法": "NON-COMPLIANT",
+    "有罪": "FACTUAL FINDING",
+    "犯罪": "REGULATORY AUDIT",
+    "起訴": "FORMAL INQUIRY",
+    "刑事": "REGULATORY AUDIT",
+    "摘発": "REGULATORY ACTION",
+    "起訴事実認定": "ADJUDICATED FINDING",
+    "起訴状": "OFFICIAL DOSSIER",
+    "容疑者": "SUBJECT ENTITY",
+    "犯行": "DEVIATION",
+    "司法審査": "REGULATORY AUDIT",
+    "刑事摘発": "ENFORCEMENT ACTION",
+    "地検": "INVESTIGATIVE UNIT",
+    "資料提出要請": "RECORD REQUEST",
+    "是正指導事案": "REGULATORY AUDIT",
+    "基準値超過": "EXCEEDED STANDARD",
+    "基準外": "NON-COMPLIANT",
+    "事実確認": "FACTUAL FINDING",
+    "記録不整合": "RECORD INCONSISTENCY",
+    "行政指導": "REGULATORY GUIDANCE",
+    "査察記録": "AUDIT RECORD",
+    "重大不適合": "CRITICAL IRREGULARITY",
+    "対象事業者": "SUBJECT ENTITY",
+    "回収命令": "RECALL NOTICE",
+}
+
+# Maintain backward compatibility for external callers
+STAMP_MEASUREMENT_MAP = STAMP_MEASUREMENT_MAP_JP
+
+
+def get_stamp_measurement_map(market: str) -> Dict[str, str]:
+    """Retrieve market-appropriate regulatory and forensic euphemism mappings."""
+    m = (market or "JP").upper()
+    if m in ("EN", "US", "UK"):
+        return STAMP_MEASUREMENT_MAP_EN
+    return STAMP_MEASUREMENT_MAP_JP
+
 
 LOCALIZED_OVERLAY_THEMES: Dict[str, Dict[str, Any]] = {
     "JP": {
@@ -116,7 +176,7 @@ LOCALIZED_OVERLAY_THEMES: Dict[str, Dict[str, Any]] = {
         "case_number": "CASE DOCKET // ADJUDICATED FILING",
         "date_verified": "OFFICIAL RECORD // VERIFIED",
         "network_title": "INVESTIGATION NETWORK // TARGET ENTITIES",
-        "network_badge": "CRIMINAL INDICTMENT",
+        "network_badge": "REGULATORY INQUIRY",
         "network_label": "INVESTIGATION DOSSIER // SUBJECT NETWORK",
         "suspect_role": "UNLICENSED SHELL OPERATOR / FALSE DISBURSEMENT",
         "charges": ["REGULATORY DEVIATION", "SUBMISSION OF INCONSISTENT RECORD FILINGS"],
@@ -508,11 +568,14 @@ def prune_and_localize_scenes(
                 if m_clean == "JP":
                     overlay_obj["title"] = "行政指導 // 検査成績書"
                     overlay_obj["badge"] = "基準値超過確認"
+                elif m_clean in ("EN", "US", "UK"):
+                    overlay_obj["title"] = "FORMAL INQUIRY // AUDIT REPORT"
+                    overlay_obj["badge"] = "CRITICAL FINDING"
                 else:
                     overlay_obj["title"] = "ADMINISTRATIVE AUDIT // INSPECTION REPORT"
                     overlay_obj["badge"] = "STANDARD EXCEEDED"
 
-            if m_clean != "EN":
+            if m_clean not in ("EN", "US", "UK"):
                 cliche_map = {
                     "OFFICIAL INVESTIGATION RECORD": theme["document_title"],
                     "FINDINGS OF FACT": theme["document_title"],
@@ -533,13 +596,32 @@ def prune_and_localize_scenes(
                         overlay_obj["label"] = overlay_obj["label"].replace(cliche, loc_val)
 
             # Sanitize banned verdict terms across title, badge, label and payload
+            meas_map = get_stamp_measurement_map(m_clean)
+            default_sanitized = "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD"
+
             for bad_term in BANNED_VERDICT_TERMS:
+                rep = meas_map.get(bad_term, default_sanitized)
                 if bad_term in overlay_obj.get("badge", ""):
-                    overlay_obj["badge"] = STAMP_MEASUREMENT_MAP.get(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
+                    b_val = overlay_obj["badge"]
+                    if b_val == bad_term or not b_val.replace(bad_term, "").strip():
+                        overlay_obj["badge"] = rep
+                    else:
+                        overlay_obj["badge"] = b_val.replace(bad_term, rep)
                 if bad_term in overlay_obj.get("title", ""):
-                    overlay_obj["title"] = overlay_obj["title"].replace(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
+                    overlay_obj["title"] = overlay_obj["title"].replace(bad_term, rep)
                 if bad_term in overlay_obj.get("label", ""):
-                    overlay_obj["label"] = overlay_obj["label"].replace(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
+                    overlay_obj["label"] = overlay_obj["label"].replace(bad_term, rep)
+
+            # In EN episodes, ensure absolutely NO CJK remains in badge, title, or label
+            if m_clean in ("EN", "US", "UK"):
+                for field in ("badge", "title", "label"):
+                    val = overlay_obj.get(field, "")
+                    if val and re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]', val):
+                        for cjk_k, cjk_v in STAMP_MEASUREMENT_MAP_EN.items():
+                            val = val.replace(cjk_k, cjk_v)
+                        if re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]', val):
+                            val = re.sub(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]+', 'AUDIT RECORD', val).strip(' /-_')
+                        overlay_obj[field] = val
 
             if isinstance(overlay_obj.get("payload"), dict):
                 p_load = overlay_obj["payload"]
@@ -561,10 +643,16 @@ def prune_and_localize_scenes(
                                 val = val.replace("刑事", "行政検査")
                                 val = val.replace("摘発", "回収命令")
                                 val = val.replace("起訴", "行政指導")
-                            for bad_term, rep in STAMP_MEASUREMENT_MAP.items():
-                                val = val.replace(bad_term, rep if m_clean == "JP" else "EXCEEDED_STANDARD")
+                            for bad_term, rep in meas_map.items():
+                                val = val.replace(bad_term, rep)
                             for bad_term in BANNED_VERDICT_TERMS:
-                                val = val.replace(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
+                                if bad_term in val:
+                                    val = val.replace(bad_term, meas_map.get(bad_term, default_sanitized))
+                            if m_clean in ("EN", "US", "UK"):
+                                if re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]', val):
+                                    for cjk_k, cjk_v in STAMP_MEASUREMENT_MAP_EN.items():
+                                        val = val.replace(cjk_k, cjk_v)
+                                    val = re.sub(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]+', 'AUDIT RECORD', val).strip(' /-_')
                             d[pk] = val
                         elif isinstance(pv, list):
                             clean_list = []
@@ -573,11 +661,20 @@ def prune_and_localize_scenes(
                                     i_val = item
                                     if m_clean == "JP":
                                         i_val = i_val.replace("司法審査", "行政検査").replace("起訴", "行政指導").replace("刑事", "行政検査").replace("摘発", "回収命令")
-                                    for bad_term, rep in STAMP_MEASUREMENT_MAP.items():
-                                        i_val = i_val.replace(bad_term, rep if m_clean == "JP" else "EXCEEDED_STANDARD")
+                                    for bad_term, rep in meas_map.items():
+                                        i_val = i_val.replace(bad_term, rep)
                                     for bad_term in BANNED_VERDICT_TERMS:
-                                        i_val = i_val.replace(bad_term, "基準値超過" if m_clean == "JP" else "EXCEEDED_STANDARD")
+                                        if bad_term in i_val:
+                                            i_val = i_val.replace(bad_term, meas_map.get(bad_term, default_sanitized))
+                                    if m_clean in ("EN", "US", "UK"):
+                                        if re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]', i_val):
+                                            for cjk_k, cjk_v in STAMP_MEASUREMENT_MAP_EN.items():
+                                                i_val = i_val.replace(cjk_k, cjk_v)
+                                            i_val = re.sub(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]+', 'AUDIT RECORD', i_val).strip(' /-_')
                                     clean_list.append(i_val)
+                                elif isinstance(item, dict):
+                                    _sanitize_dict(item)
+                                    clean_list.append(item)
                                 else:
                                     clean_list.append(item)
                             d[pk] = clean_list
@@ -594,9 +691,9 @@ def prune_and_localize_scenes(
             scene_copy["forensicOverlay"] = overlay_obj
             scene_copy["forensic_overlay"] = overlay_obj
 
-            # Source Credit Deduplication (Citation-Event vs. Corner Tick)
-            source_agency = "厚生労働省 輸入食品監視業務 // 検疫所違反事例速報" if m_clean == "JP" else "MINISTRY AUDIT & BIOSECURITY INSPECTION RECORD"
-            source_citation = "検疫所食品衛生検査記録 // 輸入届出受理番号・検査結果公示" if m_clean == "JP" else "OFFICIAL REGULATORY INSPECTION CITATION"
+            # Source Credit Deduplication (Citation-Event vs. Corner Tick) - Rule 128 Anti-Semantic Bias
+            source_agency = theme.get("agency", "REGULATORY OVERSIGHT // INVESTIGATIVE DIVISION" if m_clean != "JP" else "公的規制監督機関 // 査察調査部門")
+            source_citation = theme.get("document_title", "OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT" if m_clean != "JP" else "公的査察・調査記録 // 公式公示録")
             source_key = f"{source_agency[:25]}_{b_int}"
 
             if source_key not in seen_sources:
@@ -629,8 +726,10 @@ def prune_and_localize_scenes(
             clean_tag = str(raw_tag).strip()
             clean_tag = re.sub(r'\.(png|jpg|jpeg|webp)$', '', clean_tag, flags=re.IGNORECASE)
             clean_tag = re.sub(r'^(ARCHIVE\s*X\s*//\s*|DEFAULT\s*//\s*)', '', clean_tag, flags=re.IGNORECASE)
-            if m_clean != "EN" and re.search(r'[A-Za-z]{4,}', clean_tag) and not re.search(r'[぀-ヿ㐀-䶿一-鿿가-힯à-ỹ]', clean_tag):
-                clean_tag = theme["default_speaker"]
+            if m_clean not in ("EN", "US", "UK") and re.search(r'[A-Za-z]{4,}', clean_tag) and not re.search(r'[぀-ヿ㐀-䶿一-鿿가-힯à-ỹ]', clean_tag):
+                clean_tag = theme.get("default_speaker", "CRITICAL EVIDENCE // FORENSIC TIMELINE")
+            elif m_clean in ("EN", "US", "UK") and re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]', clean_tag):
+                clean_tag = theme.get("default_speaker", "CRITICAL EVIDENCE // FORENSIC TIMELINE")
             scene_copy["speakerTag"] = clean_tag
 
         sanitized.append(scene_copy)
