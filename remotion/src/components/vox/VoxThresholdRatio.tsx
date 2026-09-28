@@ -81,8 +81,8 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
 
   // Extract props and numeric values
   const baselineVal = payload?.baseline_value ?? 0.03;
-  const detectedVal = payload?.detected_value ?? 0.72;
-  const multiplier = payload?.multiplier ?? Math.round(detectedVal / Math.max(0.001, baselineVal));
+  const detectedVal = payload?.detected_value ?? (payload as any)?.actual_value ?? 0.72;
+  const multiplier = payload?.multiplier ?? (payload as any)?.ratio ?? Math.round(detectedVal / Math.max(0.001, baselineVal));
   const unit = payload?.unit ?? "g/kg";
   const chemicalName = payload?.chemical_name ?? "二酸化硫黄 (SULFUR DIOXIDE)";
   const standardName = payload?.standard_name ?? "法定基準値 (LEGAL LIMIT)";
@@ -90,7 +90,7 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
   const cols = payload?.grid_cols ?? 6;
   const rows = payload?.grid_rows ?? 4;
   const totalCells = cols * rows; // default 24
-  const sourceCitation = payload?.source_citation ?? "厚生労働省 輸入食品衛生法違反公表資料 // 検疫所検査記録";
+  const sourceCitation = payload?.source_citation ?? "国家標準 GB 2760-2014 & 厚生労働省 検疫所検査";
 
   const displayTitle = title || label || `化学残留検査 // ${chemicalName}`;
   const displayBadge = badge || `基準値の${multiplier}倍を検出`;
@@ -104,8 +104,8 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
   const currentMultiplierVal = 1 + (multiplier - 1) * countProgress;
 
   // Formatted counter string
-  const formattedDetected = currentNumericVal.toFixed(2);
-  const formattedMultiplier = currentMultiplierVal >= 10 ? currentMultiplierVal.toFixed(0) : currentMultiplierVal.toFixed(1);
+  const formattedDetected = currentNumericVal >= 100 ? Math.round(currentNumericVal).toLocaleString() : currentNumericVal.toFixed(2);
+  const formattedMultiplier = currentMultiplierVal.toFixed(1);
 
   // Layout sizing
   const isFullBleed = layout === "full_bleed_focus" || layout === "fullscreen_dossier";
@@ -213,7 +213,7 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
                 lineHeight: 1,
               }}
             >
-              {baselineVal.toFixed(2)}
+              {baselineVal >= 100 ? Math.round(baselineVal).toLocaleString() : baselineVal.toFixed(2)}
             </span>
             <span style={{ fontSize: 14, color: "rgba(255, 255, 255, 0.7)", fontWeight: 700 }}>
               {unit}
@@ -311,9 +311,9 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
             letterSpacing: 0.8,
           }}
         >
-          <span>1セル = 法定基準値 1回分 (0.03 g/kg)</span>
+          <span>1セル = 法定基準値 1回分 ({baselineVal >= 100 ? Math.round(baselineVal).toLocaleString() : baselineVal.toFixed(2)} {unit})</span>
           <span style={{ color: "#ef4444", fontWeight: 900 }}>
-            計 {totalCells} セル (合計 24倍の残留過剰)
+            計 {totalCells} セル (合計 約{multiplier}倍の残留超過)
           </span>
         </div>
 

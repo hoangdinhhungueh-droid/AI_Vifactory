@@ -1440,10 +1440,11 @@ const CinematicVignette: React.FC<{ active?: boolean; strong?: boolean }> = ({ a
 
 const CinematicOverlay: React.FC<{
   filmGrain?: boolean;
+  grainOpacity?: number;
   digitalGlitch?: boolean;
   highContrast?: boolean;
   relFrame?: number;
-}> = ({ filmGrain, digitalGlitch, highContrast, relFrame = 0 }) => {
+}> = ({ filmGrain, grainOpacity, digitalGlitch, highContrast, relFrame = 0 }) => {
   const isGlitchFrame = digitalGlitch && relFrame < 6 && (relFrame % 2 === 1);
   return (
     <AbsoluteFill style={{ zIndex: 20, pointerEvents: "none" }}>
@@ -1463,7 +1464,7 @@ const CinematicOverlay: React.FC<{
           style={{
             position: "absolute",
             inset: 0,
-            opacity: 0.07,
+            opacity: typeof grainOpacity === "number" ? grainOpacity : 0.07,
             backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.20) 1px, transparent 0)",
             backgroundSize: "4px 4px",
           }}
@@ -2072,6 +2073,7 @@ export const TwoLayerEpisode = (props) => {
       />
       <CinematicOverlay
         filmGrain={Boolean(currentSceneInfo?.scene?.opticalFx?.film_grain)}
+        grainOpacity={currentSceneInfo?.scene?.opticalFx?.film_grain_opacity}
         digitalGlitch={Boolean(currentSceneInfo?.scene?.opticalFx?.digital_glitch)}
         highContrast={Boolean(currentSceneInfo?.scene?.opticalFx?.high_contrast)}
         relFrame={currentSceneInfo?.relFrame}

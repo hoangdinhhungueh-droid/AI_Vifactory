@@ -374,6 +374,8 @@ def extract_custom_beat_titles(brain: dict, brain_input_path: str = "") -> dict[
     if seo_data:
         if isinstance(seo_data.get("chapters"), list):
             raw_chapters = [str(c) for c in seo_data["chapters"] if str(c).strip()]
+        elif isinstance(seo_data.get("chapters"), str):
+            raw_chapters = [line.strip() for line in seo_data["chapters"].splitlines() if line.strip()]
         elif isinstance(seo_data.get("description"), str):
             desc = seo_data["description"]
             ch_start = desc.find("Chapters:")
@@ -386,12 +388,33 @@ def extract_custom_beat_titles(brain: dict, brain_input_path: str = "") -> dict[
                     if re.match(r'^\d{1,2}:\d{2}', line_s):
                         raw_chapters.append(line_s)
 
-    # 2. Extract clean titles from chapters (format: "00:00 - Title")
-    for idx, ch_line in enumerate(raw_chapters[:5], 1):
-        clean_title = re.sub(r'^\d{1,2}:\d{2}(?::\d{2})?\s*[-:]?\s*', '', ch_line).strip()
-        clean_title = re.sub(r'^(?:Beat|Act)\s*[1-5IVXLCDM]+[:\-]?\s*', '', clean_title, flags=re.IGNORECASE).strip()
-        if clean_title:
-            beat_titles[idx] = clean_title
+    # 2. Extract clean titles from chapters (format: "00:00 - Title" or "00:00 BEAT 1: Title")
+    # First pass: look for explicit BEAT/ACT markers
+    roman_map = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5}
+    for ch_line in raw_chapters:
+        b_match = re.search(r'\b(?:BEAT|ACT)\s*([1-5]|I{1,3}|IV|V)\s*[:\-–—]?\s*(.+)$', ch_line, re.IGNORECASE)
+        if b_match:
+            b_str = b_match.group(1).upper()
+            b_num = roman_map.get(b_str) or (int(b_str) if b_str.isdigit() else None)
+            if b_num and 1 <= b_num <= 5:
+                title_clean = b_match.group(2).strip()
+                title_clean = re.sub(r'^\d{1,2}:\d{2}(?::\d{2})?\s*[-:]?\s*', '', title_clean).strip()
+                if title_clean:
+                    beat_titles[b_num] = title_clean
+
+    # Second pass: fill any missing beats from sequential chapters
+    if len(beat_titles) < 5:
+        seq_idx = 1
+        for ch_line in raw_chapters:
+            while seq_idx in beat_titles and seq_idx <= 5:
+                seq_idx += 1
+            if seq_idx > 5:
+                break
+            clean_title = re.sub(r'^\d{1,2}:\d{2}(?::\d{2})?\s*[-:]?\s*', '', ch_line).strip()
+            clean_title = re.sub(r'^(?:Beat|Act)\s*[1-5IVXLCDM]+[:\-]?\s*', '', clean_title, flags=re.IGNORECASE).strip()
+            if clean_title and clean_title not in beat_titles.values():
+                beat_titles[seq_idx] = clean_title
+                seq_idx += 1
 
     # 3. Fallback: parse from story text (=== ACT I: TITLE === or similar)
     if len(beat_titles) < 5:
@@ -859,7 +882,7 @@ def build_remotion_props_data(
             if b_num == 1 and i in (0, 1, 2, 3):
                 forensic_ov = {
                     "type": "kinetic_counter",
-                    "title": "二酸化硫黄 検出値",
+                    "title": "二酸化硫黄 検出残留値",
                     "badge": "EVIDENTIARY METRIC",
                     "theme": "crimson_alert",
                     "layout": "full_bleed_focus" if not fg_rel else "split_left",
@@ -873,22 +896,45 @@ def build_remotion_props_data(
                     },
                     "label": "4,860 mg/kg // 基準値の約24.3倍"
                 }
+            elif b_num in (2, 3):
+                forensic_ov = {
+                    "type": "kinetic_counter",
+                    "title": "基準上限 vs 実測値の乖離",
+                    "badge": "STATUTORY AUDIT",
+                    "theme": "noir_dossier",
+                    "layout": "full_bleed_focus" if not fg_rel else "split_left",
+                    "payload": {
+                        "start_value": 200,
+                        "end_value": 4860,
+                        "amount": "4,860",
+                        "unit": "mg/kg",
+                        "baseline": 200,
+                        "baseline_label": "国家標準 GB 2760: 200 mg/kg"
+                    },
+                    "label": "基準値 200mg/kg に対し 4,860mg/kg が検出"
+                }
             elif b_num == 4:
                 forensic_ov = {
                     "type": "threshold_ratio",
-                    "title": "国家基準 GB 2760 超過倍率検証",
-                    "badge": "CRIMSON RATIO ALERT",
+                    "title": "二酸化硫黄残留分析 // 国家標準GB 2760対比",
+                    "badge": "24.3倍の超過残留を検出",
                     "theme": "crimson_alert",
                     "layout": "full_bleed_focus" if not fg_rel else "split_left",
                     "payload": {
                         "ratio": 24.3,
+                        "multiplier": 24.3,
                         "baseline_value": 200,
                         "actual_value": 4860,
+                        "detected_value": 4860,
                         "unit": "mg/kg",
+                        "chemical_name": "二酸化硫黄 (SO₂ 残留)",
+                        "standard_name": "国家標準 GB 2760 (200 mg/kg)",
+                        "detected_name": "検疫実測値 (4,860 mg/kg)",
                         "grid_cols": 6,
-                        "grid_rows": 4
+                        "grid_rows": 4,
+                        "source_citation": "国家標準 GB 2760-2014 & 厚生労働省 検疫所検査記録"
                     },
-                    "label": "GB 2760: 200mg/kg に対し 約24.3倍"
+                    "label": "GB 2760基準: 200mg/kg に対し 約24.3倍 (厚生労働省検疫基準対比: 162倍超過)"
                 }
 
         cinematic_tokens = s.get("cinematic_tokens") or s.get("cinematicTokens") or []
@@ -901,6 +947,7 @@ def build_remotion_props_data(
             optical_fx = {
                 "vignette": True or token_vignette,
                 "film_grain": True or token_grain,
+                "film_grain_opacity": 0.05,
                 "digital_glitch": is_metric_shock or token_glitch,
                 "high_contrast": is_metric_shock or token_contrast,
             }
@@ -908,6 +955,7 @@ def build_remotion_props_data(
             optical_fx = {
                 "vignette": False or token_vignette,
                 "film_grain": True or token_grain,
+                "film_grain_opacity": 0.07 if b_num == 2 else 0.04,
                 "digital_glitch": False or token_glitch,
                 "high_contrast": False or token_contrast,
             }
@@ -915,6 +963,7 @@ def build_remotion_props_data(
             optical_fx = {
                 "vignette": True or token_vignette,
                 "film_grain": True or token_grain,
+                "film_grain_opacity": 0.10,
                 "digital_glitch": is_metric_shock or token_glitch,
                 "high_contrast": True or token_contrast,
             }
@@ -922,6 +971,7 @@ def build_remotion_props_data(
             optical_fx = {
                 "vignette": False or token_vignette,
                 "film_grain": True or token_grain,
+                "film_grain_opacity": 0.04,
                 "digital_glitch": False or token_glitch,
                 "high_contrast": False or token_contrast,
             }

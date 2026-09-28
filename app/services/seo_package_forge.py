@@ -111,26 +111,26 @@ def _build_dynamic_chapters(
     if m == "JP":
         return [
             f"{_fmt(t_act1)} - {topic_clean}の発端と疑惑",
-            f"{_fmt(t_act2)} - 組織構造と権限の謎",
-            f"{_fmt(t_act3)} - 記録と資金の空白",
-            f"{_fmt(t_act4)} - 制度の亀裂と法的対立",
-            f"{_fmt(t_act5)} - 現代組織への警鐘と教訓",
+            f"{_fmt(t_act2)} - 偽りの安全性となぜ起きたのか｜構造の歪み",
+            f"{_fmt(t_act3)} - 流通と検査の死角｜隠された痕跡",
+            f"{_fmt(t_act4)} - 動かぬ物証と基準超過の衝撃",
+            f"{_fmt(t_act5)} - 越境する波紋と現代への警鐘",
         ]
     elif m == "KR":
         return [
             f"{_fmt(t_act1)} - {kw[:30]}: 사건의 발단과 의혹",
-            f"{_fmt(t_act2)} - 은폐된 구조와 권한의 사각지대",
-            f"{_fmt(t_act3)} - 내부 기록과 자금 흐름의 추적",
-            f"{_fmt(t_act4)} - 제도의 균열과 법적 공방의 결말",
-            f"{_fmt(t_act5)} - 최종 판결과 현대적 경고",
+            f"{_fmt(t_act2)} - 왜 발생했는가｜은폐된 구조와 왜곡",
+            f"{_fmt(t_act3)} - 유통과 검역의 사각지대｜추적된 기록",
+            f"{_fmt(t_act4)} - 결정적 물증과 기준 초과의 충격",
+            f"{_fmt(t_act5)} - 국경을 넘은 파문과 현대적 경고",
         ]
     else:  # Default EN and others
         return [
-            f"{_fmt(t_act1)} - {kw[:35]}: The Catalyst",
-            f"{_fmt(t_act2)} - The Architecture of Concealment",
-            f"{_fmt(t_act3)} - Forensic Paper Trail & Missing Capital",
-            f"{_fmt(t_act4)} - The Systemic Fracture",
-            f"{_fmt(t_act5)} - The Reckoning & Final Precedent",
+            f"{_fmt(t_act1)} - {kw[:35]}: The Catalyst & Initial Suspicions",
+            f"{_fmt(t_act2)} - Why It Happened: The Architecture of Concealment",
+            f"{_fmt(t_act3)} - Blind Spots in Inspection: The Paper Trail",
+            f"{_fmt(t_act4)} - Incontrovertible Evidence: The Shock of Standard Violation",
+            f"{_fmt(t_act5)} - Cross-Border Repercussions & Modern Warning",
         ]
 
 
@@ -151,6 +151,8 @@ def sync_exact_chapters_from_remotion(
       4. Falls back gracefully to proportional durations if remotion_props.json is not yet available.
     """
     m = (market or "EN").upper()
+    if existing_chapters and isinstance(existing_chapters, str):
+        existing_chapters = [line.strip() for line in existing_chapters.splitlines() if line.strip()]
     
     # 1. Locate remotion_props.json
     candidates = []

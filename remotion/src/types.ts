@@ -163,6 +163,7 @@ export interface Scene {
   opticalFx?: {
     vignette?: boolean;
     film_grain?: boolean;
+    film_grain_opacity?: number;
     digital_glitch?: boolean;
     high_contrast?: boolean;
   };
