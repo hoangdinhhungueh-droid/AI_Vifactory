@@ -267,7 +267,7 @@ def detect_forensic_overlay(
         "초과", "규제", "한도", "위반",
         "vượt", "vượt trần", "quá mức", "hạn mức", "ngưỡng",
         # Market dominance, Concentration & Scale
-        "monopoly", "market share", "dominance", "market", "thị phần", "독점", "점유율", "市場占有率", "シェア",
+        "monopoly", "market share", "dominance", "thị phần", "독점", "점유율", "市場占有率", "シェア",
         # Regulatory & Statutory
         "statutory limit", "regulatory limit", "baseline", "antitrust"
     ]
@@ -277,17 +277,20 @@ def detect_forensic_overlay(
         is_vn = market.upper() == "VN"
 
         quant = extract_episode_quantitative_profile(grounding_intel, narration_text, market)
-        if quant.status != ProfileStatus.INSUFFICIENT_DATA and (quant.ratio is not None or quant.detected_value is not None):
+        has_ratio = quant.ratio is not None
+        has_comparison = quant.detected_value is not None and quant.baseline_value is not None
+        if quant.status != ProfileStatus.INSUFFICIENT_DATA and (has_ratio or has_comparison):
             detected = quant.detected_value
             baseline = quant.baseline_value
-            multiplier = quant.ratio or (round(detected / max(1.0, baseline), 1) if (detected and baseline) else 2.0)
-            unit = quant.unit or ""
-            param_name = quant.parameter or ("定量異常測定" if is_jp else "QUANTITATIVE ANOMALY")
-            std_name = quant.standard_name or ("法定基準値" if is_jp else "STATUTORY BENCHMARK")
-            sec_std_name = quant.secondary_standard_name
-            sec_base = quant.secondary_baseline_value
-            sec_multiplier = quant.secondary_ratio or (round(detected / max(1.0, sec_base), 1) if (detected and sec_base) else None)
-            source_cit = quant.source_citation or ("公的検査・検証記録" if is_jp else "OFFICIAL VERIFICATION DOCKET")
+            multiplier = quant.ratio or (round(detected / max(1.0, baseline), 1) if (detected and baseline) else None)
+            if multiplier is not None:
+                unit = quant.unit or ""
+                param_name = quant.parameter or ("定量異常測定" if is_jp else "QUANTITATIVE ANOMALY")
+                std_name = quant.standard_name or ("法定基準値" if is_jp else "STATUTORY BENCHMARK")
+                sec_std_name = quant.secondary_standard_name
+                sec_base = quant.secondary_baseline_value
+                sec_multiplier = quant.secondary_ratio or (round(detected / max(1.0, sec_base), 1) if (detected and sec_base) else None)
+                source_cit = quant.source_citation or ("公的検査・検証記録" if is_jp else "OFFICIAL VERIFICATION DOCKET")
 
             # Dynamic Titles and Badges per market
             if is_jp:
