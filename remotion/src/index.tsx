@@ -26,6 +26,7 @@ import {
   VoxKineticTypography,
   VoxSourceCredit,
   VoxDisclosureBadge,
+  LivingCamera,
 } from "./components/vox";
 import { EvidenceProp3D } from "./components/EvidenceProp3D";
 import { WordTimestamp } from "./types";
@@ -2014,12 +2015,14 @@ export const TwoLayerEpisode = (props) => {
               durationInFrames={seg.durationInFrames}
               name={`bg-segment-${i + 1}`}
             >
-              <BackgroundSegment
-                src={seg.src}
-                fadeInFrames={seg.fadeInFrames}
-                durationInFrames={seg.durationInFrames}
-                hasForeground={Boolean(currentSceneInfo?.scene?.foreground || currentSceneInfo?.scene?.forensicOverlay || currentSceneInfo?.scene?.statValue)}
-              />
+              <LivingCamera sceneIndex={i} direction={i % 2 === 0 ? "push" : "pull"}>
+                <BackgroundSegment
+                  src={seg.src}
+                  fadeInFrames={seg.fadeInFrames}
+                  durationInFrames={seg.durationInFrames}
+                  hasForeground={Boolean(currentSceneInfo?.scene?.foreground || currentSceneInfo?.scene?.forensicOverlay || currentSceneInfo?.scene?.statValue)}
+                />
+              </LivingCamera>
             </Sequence>
           ))}
         </VoxParallaxLayer>
@@ -2031,14 +2034,16 @@ export const TwoLayerEpisode = (props) => {
               durationInFrames={seg.end - seg.start}
               name={`fg-segment-${i + 1}`}
             >
-              <ForegroundLayer
-                src={seg.src}
-                position={seg.position}
-                fadeFrames={seg.fadeFrames}
-                durationInFrames={seg.end - seg.start}
-                width={width}
-                height={height}
-              />
+              <LivingCamera sceneIndex={i} direction={i % 2 === 0 ? "pull" : "push"}>
+                <ForegroundLayer
+                  src={seg.src}
+                  position={seg.position}
+                  fadeFrames={seg.fadeFrames}
+                  durationInFrames={seg.end - seg.start}
+                  width={width}
+                  height={height}
+                />
+              </LivingCamera>
             </Sequence>
           ))}
         </VoxParallaxLayer>

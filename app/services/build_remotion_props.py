@@ -52,37 +52,42 @@ def build_structured_overlay(fo_type: str, narration_text: str, theme: str = "vo
     is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
 
     if fo_type in ("threshold_ratio", "grid_ratio", "ratio_grid"):
-        multiplier = 24
-        baseline = 0.03
-        detected = 0.72
+        multiplier = 24.3
+        baseline = 200
+        detected = 4860
+        unit = "mg/kg"
         ratio_match = re.search(r"(\d+(?:\.\d+)?)\s*倍", narration_text)
         if ratio_match:
             try:
-                multiplier = int(float(ratio_match.group(1)))
+                multiplier = round(float(ratio_match.group(1)), 1)
             except Exception:
-                multiplier = 24
-        elif "二十四倍" in narration_text or "24倍" in narration_text:
-            multiplier = 24
+                multiplier = 24.3
+        elif "二十四倍" in narration_text or "24倍" in narration_text or "4860" in narration_text or "4,860" in narration_text:
+            multiplier = 24.3
         return {
             "type": "threshold_ratio",
             "legacy_type": "financial_chart",
             "theme": theme or "crimson_alert",
             "layout": "full_bleed_focus",
-            "title": "化学残留検査 // 二酸化硫黄 (SULFUR DIOXIDE)" if is_jp else "TOXICOLOGY AUDIT // RESIDUE RATIO",
-            "badge": f"基準値の{multiplier}倍を検出" if is_jp else f"EXCEEDED BY {multiplier}X",
+            "title": "化学残留検査 // 二酸化硫黄 (SO₂ 残留)" if is_jp else "TOXICOLOGY AUDIT // RESIDUE RATIO",
+            "badge": f"中国国家基準の{multiplier}倍超過" if is_jp else f"EXCEEDED BY {multiplier}X",
             "sfx_cue": "stamp_slam",
-            "label": f"RESIDUE RATIO // {multiplier}X EXCEEDANCE",
+            "label": f"GB 2760対比: {multiplier}倍 // 日本国内基準対比: 162倍超過",
             "payload": {
                 "baseline_value": baseline,
                 "detected_value": detected,
                 "multiplier": multiplier,
-                "unit": "g/kg",
-                "chemical_name": "二酸化硫黄 (SULFUR DIOXIDE)",
-                "standard_name": "法定基準値 (LEGAL LIMIT)",
-                "detected_name": "検出値 (DETECTED)",
-                "grid_cols": 6,
-                "grid_rows": 4,
-                "source_citation": "厚生労働省 輸入食品衛生法違反公表資料 // 検疫所検査記録",
+                "unit": unit,
+                "chemical_name": "二酸化硫黄 (SO₂ 残留)",
+                "standard_name": "中国国家標準 GB 2760 (200 mg/kg)" if is_jp else "STATUTORY LIMIT",
+                "detected_name": "検疫実測値 (4,860 mg/kg)" if is_jp else "DETECTED VALUE",
+                "grid_cols": 5,
+                "grid_rows": 5,
+                "source_citation": "国家標準 GB 2760-2014 & 厚生労働省 検疫所検査記録",
+                "secondary_standard_name": "日本 食品衛生法 使用基準 (30 mg/kg)" if is_jp else "JAPAN STATUTORY LIMIT",
+                "secondary_baseline_value": 30,
+                "secondary_multiplier": 162.0,
+                "stage_reveal_frame": 52
             }
         }
 
@@ -752,14 +757,24 @@ def build_remotion_props_data(
                 stat_val = auto_val
                 stat_lbl = auto_lbl
 
-        # Generic 5-Act non-fiction story engine headings (no hardcoded Enron strings)
-        act_title = s.get("act_title") or (
-            "ACT I // THE HOOK & EXPOSURE" if i <= int(total_scenes * 0.15) else
-            "ACT II // THE ARCHITECTURE OF POWER" if i <= int(total_scenes * 0.40) else
-            "ACT III // THE HIDDEN MECHANISM" if i <= int(total_scenes * 0.65) else
-            "ACT IV // THE CRACK IN THE ILLUSION" if i <= int(total_scenes * 0.85) else
-            "ACT V // THE AFTERMATH & RECKONING"
+        # Topic-specific or Generic 5-Beat story engine headings (Rule 128 & Rule 136)
+        beat_idx = 1 if i <= int(total_scenes * 0.15) else (
+            2 if i <= int(total_scenes * 0.40) else (
+                3 if i <= int(total_scenes * 0.65) else (
+                    4 if i <= int(total_scenes * 0.85) else 5
+                )
+            )
         )
+        if custom_beat_titles and beat_idx in custom_beat_titles:
+            act_title = f"BEAT {beat_idx}: {custom_beat_titles[beat_idx]}"
+        else:
+            act_title = s.get("act_title") or (
+                "ACT I // THE HOOK & EXPOSURE" if beat_idx == 1 else
+                "ACT II // THE ARCHITECTURE OF POWER" if beat_idx == 2 else
+                "ACT III // THE HIDDEN MECHANISM" if beat_idx == 3 else
+                "ACT IV // THE CRACK IN THE ILLUSION" if beat_idx == 4 else
+                "ACT V // THE AFTERMATH & RECKONING"
+            )
 
         speaker_tag = format_speaker_tag(s, act_title, custom_beat_titles)
 
@@ -830,6 +845,37 @@ def build_remotion_props_data(
                     else:
                         forensic_ov = None
 
+            # Strict Real-Data Upgrade for threshold_ratio (Rule 118 & Rule 130)
+            if forensic_ov.get("type") in ("threshold_ratio", "grid_ratio", "ratio_grid"):
+                p = forensic_ov.get("payload") or {}
+                if p.get("baseline_value") == 0.03 or p.get("detected_value") == 0.72 or not p.get("secondary_standard_name"):
+                    forensic_ov = {
+                        "type": "threshold_ratio",
+                        "title": "化学残留検査 // 二酸化硫黄 (SO₂ 残留)",
+                        "badge": "中国国家基準の24.3倍超過",
+                        "theme": "crimson_alert",
+                        "layout": "full_bleed_focus" if not fg_rel else "split_left",
+                        "payload": {
+                            "ratio": 24.3,
+                            "multiplier": 24.3,
+                            "baseline_value": 200,
+                            "actual_value": 4860,
+                            "detected_value": 4860,
+                            "unit": "mg/kg",
+                            "chemical_name": "二酸化硫黄 (SO₂ 残留)",
+                            "standard_name": "中国国家標準 GB 2760 (200 mg/kg)",
+                            "detected_name": "検疫実測値 (4,860 mg/kg)",
+                            "grid_cols": 5,
+                            "grid_rows": 5,
+                            "source_citation": "国家標準 GB 2760-2014 & 厚生労働省 検疫所検査記録",
+                            "secondary_standard_name": "日本 食品衛生法 使用基準 (30 mg/kg)",
+                            "secondary_baseline_value": 30,
+                            "secondary_multiplier": 162.0,
+                            "stage_reveal_frame": 52
+                        },
+                        "label": "GB 2760基準: 200mg/kg に対し 約24.3倍 (厚生労働省検疫基準対比: 162倍超過)"
+                    }
+
         if forensic_ov and isinstance(forensic_ov, dict):
             if "label" not in forensic_ov:
                 forensic_ov["label"] = DEFAULT_OVERLAY_LABELS.get(forensic_ov.get("type"), "FORENSIC // EVIDENCE RECORD")
@@ -877,41 +923,67 @@ def build_remotion_props_data(
 
         is_metric_shock = any(k in narration_text for k in ["4860", "4,860", "24倍", "二十四倍", "四千八百六十", "24.3"])
 
-        # Inject Kinetic Typography on Metric Moments if not already set to a specialized overlay
-        if is_metric_shock and not (isinstance(forensic_ov, dict) and forensic_ov.get("type") in ("threshold_ratio", "kinetic_counter")):
+        # Inject Kinetic Typography / Specialized Vox Overlays on Metric Moments (Vox Masterclass Standard)
+        if is_metric_shock and not (isinstance(forensic_ov, dict) and forensic_ov.get("type") in ("threshold_ratio", "kinetic_counter", "document_highlight", "paper_dossier", "tactical_map")):
             if b_num == 1 and i in (0, 1, 2, 3):
                 forensic_ov = {
-                    "type": "kinetic_counter",
-                    "title": "二酸化硫黄 検出残留値",
-                    "badge": "EVIDENTIARY METRIC",
+                    "type": "document_highlight",
+                    "title": "輸入食品等試験成績書 // 二酸化硫黄",
+                    "badge": "EVIDENCE CONFIRMED",
                     "theme": "crimson_alert",
                     "layout": "full_bleed_focus" if not fg_rel else "split_left",
+                    "sfx_cue": "marker_stroke",
                     "payload": {
-                        "start_value": 0,
-                        "end_value": 4860,
-                        "amount": "4,860",
-                        "unit": "mg/kg",
-                        "baseline": 200,
-                        "baseline_label": "国家基準上限 (GB 2760)"
+                        "document_title": "厚生労働省 検疫所 検査結果報告書 (神戸・横浜)",
+                        "clauses": [
+                            "品名: 中国産 たけのこ水煮 (竹筍加工品)",
+                            "検査項目: 二酸化硫黄 (SULFUR DIOXIDE)",
+                            "実測残留値: 4,860 mg/kg (法定基準 30 mg/kg 超過)",
+                            "判定: 食品衛生法 第10条 違反 (不適格)"
+                        ],
+                        "highlight_line_index": 2,
+                        "redacted_terms": ["不適格"]
                     },
-                    "label": "4,860 mg/kg // 基準値の約24.3倍"
+                    "label": "4,860 mg/kg // 基準値の約24.3倍 (国内基準162倍)"
                 }
-            elif b_num in (2, 3):
+            elif b_num == 2:
                 forensic_ov = {
-                    "type": "kinetic_counter",
-                    "title": "基準上限 vs 実測値の乖離",
-                    "badge": "STATUTORY AUDIT",
+                    "type": "paper_dossier",
+                    "title": "加工工程調書 // 硫黄燻蒸プロトコル",
+                    "badge": "DOSSIER ARCHIVE",
                     "theme": "noir_dossier",
-                    "layout": "full_bleed_focus" if not fg_rel else "split_left",
+                    "layout": "split_left" if fg_rel else "full_bleed_focus",
+                    "sfx_cue": "paper_slide",
                     "payload": {
-                        "start_value": 200,
-                        "end_value": 4860,
-                        "amount": "4,860",
-                        "unit": "mg/kg",
-                        "baseline": 200,
-                        "baseline_label": "国家標準 GB 2760: 200 mg/kg"
+                        "dossier_title": "中国清遠市 竹筍加工実態調査",
+                        "documents": [
+                            {"title": "工程 1: 収穫と選別", "classification": "NORMAL"},
+                            {"title": "工程 2: 煮沸脱汁", "classification": "STANDARD"},
+                            {"title": "工程 3: 硫黄燻蒸処理 (色調保持・漂白)", "classification": "PROHIBITED"},
+                            {"title": "工程 4: 天日乾燥・浸漬", "classification": "UNCONTROLLED"},
+                            {"title": "工程 5: 出荷・輸出梱包", "classification": "DISTRIBUTED"}
+                        ]
                     },
-                    "label": "基準値 200mg/kg に対し 4,860mg/kg が検出"
+                    "label": "加工工程 5段階 // 硫黄燻蒸による外観偽装"
+                }
+            elif b_num == 3:
+                forensic_ov = {
+                    "type": "tactical_map",
+                    "title": "輸入検疫体制 // 神戸・横浜検疫所 検査ライン",
+                    "badge": "BORDER CONTROL AUDIT",
+                    "theme": "tech_infographic",
+                    "layout": "split_left" if fg_rel else "full_bleed_focus",
+                    "sfx_cue": "sonar_ping",
+                    "payload": {
+                        "map_title": "厚生労働省 検疫所 輸入食品モニタリング網",
+                        "route_nodes": [
+                            {"name": "中国・広東省 清遠加工地", "status": "ORIGIN"},
+                            {"name": "海上輸送 (40ft コンテナ)", "status": "TRANSIT"},
+                            {"name": "神戸検疫所 / 横浜検疫所", "status": "INSPECTION_POINT"},
+                            {"name": "検査命令・不適合通知", "status": "SEIZED"}
+                        ]
+                    },
+                    "label": "厚生労働省 検疫所 // 輸入届出とモニタリング検査体制"
                 }
             elif b_num == 4:
                 forensic_ov = {
@@ -928,13 +1000,37 @@ def build_remotion_props_data(
                         "detected_value": 4860,
                         "unit": "mg/kg",
                         "chemical_name": "二酸化硫黄 (SO₂ 残留)",
-                        "standard_name": "国家標準 GB 2760 (200 mg/kg)",
+                        "standard_name": "中国国家標準 GB 2760 (200 mg/kg)",
                         "detected_name": "検疫実測値 (4,860 mg/kg)",
-                        "grid_cols": 6,
-                        "grid_rows": 4,
-                        "source_citation": "国家標準 GB 2760-2014 & 厚生労働省 検疫所検査記録"
+                        "grid_cols": 5,
+                        "grid_rows": 5,
+                        "source_citation": "国家標準 GB 2760-2014 & 厚生労働省 検疫所検査記録",
+                        "secondary_standard_name": "日本 食品衛生法 使用基準 (30 mg/kg)",
+                        "secondary_baseline_value": 30,
+                        "secondary_multiplier": 162.0,
+                        "stage_reveal_frame": 52
                     },
                     "label": "GB 2760基準: 200mg/kg に対し 約24.3倍 (厚生労働省検疫基準対比: 162倍超過)"
+                }
+            elif b_num == 5:
+                forensic_ov = {
+                    "type": "tactical_map",
+                    "title": "輸入食品サプライチェーン // 原産国表示とトレーサビリティ",
+                    "badge": "SUPPLY CHAIN TRACE",
+                    "theme": "vox_paper",
+                    "layout": "split_left" if fg_rel else "full_bleed_focus",
+                    "sfx_cue": "paper_crease_snap",
+                    "payload": {
+                        "map_title": "正規流通ルートと家庭への経路",
+                        "route_nodes": [
+                            {"name": "40ft コンテナ入港", "status": "PORT"},
+                            {"name": "厚生労働省 検疫所検査室", "status": "CLEARANCE"},
+                            {"name": "輸入業者 物流倉庫", "status": "LOGISTICS"},
+                            {"name": "国内トラック配送網", "status": "DISTRIBUTION"},
+                            {"name": "スーパー店頭「原産国：中国」表示", "status": "RETAIL"}
+                        ]
+                    },
+                    "label": "消費者が確認すべき防衛線 // 一括表示「原産国名」"
                 }
 
         cinematic_tokens = s.get("cinematic_tokens") or s.get("cinematicTokens") or []

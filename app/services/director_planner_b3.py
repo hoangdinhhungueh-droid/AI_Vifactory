@@ -294,37 +294,42 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
     # 2b. Threshold Ratio Graphic (24x exceedance, statutory baseline limit, chemical residue, toxic ratio)
     if any(k in t for k in ["24倍", "二十四倍", "倍の残留", "基準値の", "基準値を超過", "基準の", "法定基準", "二酸化硫黄", "残留過剰", "exceedance", "threshold ratio", "toxic ratio", "residue limit"]):
         is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
-        multiplier = 24
-        baseline = 0.03
-        detected = 0.72
+        multiplier = 24.3
+        baseline = 200
+        detected = 4860
+        unit = "mg/kg"
         ratio_match = re.search(r"(\d+(?:\.\d+)?)\s*倍", narration_text)
         if ratio_match:
             try:
-                multiplier = int(float(ratio_match.group(1)))
+                multiplier = round(float(ratio_match.group(1)), 1)
             except Exception:
-                multiplier = 24
-        elif "二十四倍" in narration_text or "24倍" in narration_text:
-            multiplier = 24
+                multiplier = 24.3
+        elif "二十四倍" in narration_text or "24倍" in narration_text or "4860" in narration_text or "4,860" in narration_text:
+            multiplier = 24.3
         return {
             "type": "threshold_ratio",
             "legacy_type": "financial_chart",
             "theme": theme or "crimson_alert",
             "layout": "full_bleed_focus",
-            "title": "化学残留検査 // 二酸化硫黄 (SULFUR DIOXIDE)" if is_jp else "TOXICOLOGY AUDIT // RESIDUE RATIO",
-            "badge": f"基準値の{multiplier}倍を検出" if is_jp else f"EXCEEDED BY {multiplier}X",
+            "title": "化学残留検査 // 二酸化硫黄 (SO₂ 残留)" if is_jp else "TOXICOLOGY AUDIT // RESIDUE RATIO",
+            "badge": f"中国国家基準の{multiplier}倍超過" if is_jp else f"EXCEEDED BY {multiplier}X",
             "sfx_cue": "stamp_slam",
-            "label": f"RESIDUE RATIO // {multiplier}X EXCEEDANCE",
+            "label": f"GB 2760対比: {multiplier}倍 // 日本国内基準対比: 162倍超過",
             "payload": {
                 "baseline_value": baseline,
                 "detected_value": detected,
                 "multiplier": multiplier,
-                "unit": "g/kg",
-                "chemical_name": "二酸化硫黄 (SULFUR DIOXIDE)",
-                "standard_name": "法定基準値 (LEGAL LIMIT)",
-                "detected_name": "検出値 (DETECTED)",
-                "grid_cols": 6,
-                "grid_rows": 4,
-                "source_citation": "厚生労働省 輸入食品衛生法違反公表資料 // 検疫所検査記録",
+                "unit": unit,
+                "chemical_name": "二酸化硫黄 (SO₂ 残留)",
+                "standard_name": "中国国家標準 GB 2760 (200 mg/kg)" if is_jp else "STATUTORY LIMIT",
+                "detected_name": "検疫実測値 (4,860 mg/kg)" if is_jp else "DETECTED VALUE",
+                "grid_cols": 5,
+                "grid_rows": 5,
+                "source_citation": "国家標準 GB 2760-2014 & 厚生労働省 検疫所検査記録",
+                "secondary_standard_name": "日本 食品衛生法 使用基準 (30 mg/kg)" if is_jp else "JAPAN STATUTORY LIMIT",
+                "secondary_baseline_value": 30,
+                "secondary_multiplier": 162.0,
+                "stage_reveal_frame": 52
             }
         }
 

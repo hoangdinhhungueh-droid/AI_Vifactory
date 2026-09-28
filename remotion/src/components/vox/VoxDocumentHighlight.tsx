@@ -207,19 +207,33 @@ export const VoxDocumentHighlight: React.FC<VoxDocumentHighlightProps> = ({
               }}
             >
               {isHighlighted ? (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    bottom: 0,
-                    width: `${highlightProgress}%`,
-                    backgroundColor: st.highlightColor,
-                    border: st.highlightBorder,
-                    borderRadius: 4,
-                    zIndex: 0,
-                  }}
-                />
+                (() => {
+                  const isLegalStatute = clause.includes("法") || clause.includes("基準") || clause.includes("GB") || clause.includes("ARTICLE") || clause.includes("SECTION");
+                  const markerBg = isLegalStatute
+                    ? "linear-gradient(90deg, rgba(249, 115, 22, 0.45) 0%, rgba(251, 146, 60, 0.52) 85%, rgba(249, 115, 22, 0.65) 100%)"
+                    : "linear-gradient(90deg, rgba(232, 194, 41, 0.45) 0%, rgba(255, 230, 0, 0.55) 85%, rgba(232, 194, 41, 0.65) 100%)";
+                  const markerBorder = isLegalStatute
+                    ? "1px solid rgba(249, 115, 22, 0.85)"
+                    : "1px solid rgba(232, 194, 41, 0.85)";
+                  return (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 1,
+                        left: 0,
+                        bottom: 1,
+                        width: `${highlightProgress}%`,
+                        background: markerBg,
+                        border: markerBorder,
+                        borderRadius: 3,
+                        boxShadow: isLegalStatute
+                          ? "0 0 10px rgba(249, 115, 22, 0.4)"
+                          : "0 0 10px rgba(232, 194, 41, 0.4)",
+                        zIndex: 0,
+                      }}
+                    />
+                  );
+                })()
               ) : null}
 
               <span style={{ position: "relative", zIndex: 1, fontWeight: isHighlighted ? 700 : 500 }}>

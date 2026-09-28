@@ -49,16 +49,22 @@ export interface WordTimestamp {
 }
 
 export interface VoxThresholdRatioPayload {
-  baseline_value?: number; // e.g. 0.03
-  detected_value?: number; // e.g. 0.72
-  multiplier?: number; // e.g. 24
-  unit?: string; // e.g. "g/kg"
+  baseline_value?: number; // e.g. 200 (GB 2760)
+  detected_value?: number; // e.g. 4860
+  multiplier?: number; // e.g. 24.3
+  ratio?: number;
+  actual_value?: number;
+  unit?: string; // e.g. "mg/kg"
   chemical_name?: string; // e.g. "二酸化硫黄" or "Sulfur Dioxide"
-  standard_name?: string; // e.g. "基準値" or "Legal Standard"
-  detected_name?: string; // e.g. "検出値" or "Detected Value"
-  grid_cols?: number; // default 6
-  grid_rows?: number; // default 4
-  source_citation?: string; // e.g. "厚生労働省 検疫所検査結果 / 食品衛生法違反事例"
+  standard_name?: string; // e.g. "中国国家標準 GB 2760"
+  detected_name?: string; // e.g. "検出値"
+  grid_cols?: number; // default 5
+  grid_rows?: number; // default 5
+  source_citation?: string; // e.g. "国家標準 GB 2760-2014 & 厚生労働省 検疫所検査"
+  secondary_standard_name?: string; // e.g. "日本 食品衛生法 基準値"
+  secondary_baseline_value?: number; // e.g. 30
+  secondary_multiplier?: number; // e.g. 162
+  stage_reveal_frame?: number; // frame at which stage 2 reveals (default 50)
 }
 
 export interface VoxForensicOverlayData {
