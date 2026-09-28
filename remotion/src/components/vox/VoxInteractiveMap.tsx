@@ -277,10 +277,10 @@ export const VoxInteractiveMap: React.FC<VoxInteractiveMapProps> = ({
             }}
           >
             <div style={{ color: "#ef4444", fontSize: 12, fontWeight: 900, letterSpacing: 1 }}>
-              🚨 横浜検疫所にて輸入食品検査 摘発
+              🚨 {payload?.alert_title || badge || "BORDER CONTROL INSPECTION INTERCEPT"}
             </div>
             <div style={{ color: "#ffffff", fontSize: 11, fontWeight: 700 }}>
-              二酸化硫黄 0.72 g/kg (法定基準値の24倍) を検出
+              {payload?.alert_detail || label || "CONSIGNMENT INTERCEPTED // STATUTORY VIOLATION"}
             </div>
           </div>
         )}

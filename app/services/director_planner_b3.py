@@ -33,6 +33,12 @@ from app.services.skill_loader import (
     get_cinematic_tokens_dictionary
 )
 from app.services.text_to_number_parser import parse_spoken_number
+from app.services.quant_profile import (
+    extract_episode_quantitative_profile,
+    ProfileStatus,
+    ValueKind
+)
+from app.services.jurisdiction_router import resolve_jurisdiction
 
 DIRECTOR_PLAN_FLAT_DB_ID = "5b201989-2400-8295-be81-81c2c0e4e138"
 DIRECTOR_PLAN_PARENT_PAGE_ID = "73801989-2400-82a7-ae5f-0110bfb666c8"
@@ -140,8 +146,17 @@ def _sanitize_beat_spoken_for_llm(spoken_list: list) -> list:
 
 
 
-def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> dict | None:
-    """Rule 128 & Vox Explanatory Engine: Detect tactile paper-collage evidentiary graphics."""
+def detect_forensic_overlay(
+    narration_text: str,
+    theme: str = "vox_paper",
+    grounding_intel: Optional[dict] = None,
+    market: str = "EN",
+    metadata: Optional[dict] = None
+) -> dict | None:
+    """Rule 128 (Anti-Semantic Bias) & Rule 132 (Pure Transmission Pipe):
+    Dynamically detect tactile paper-collage evidentiary graphics.
+    ZERO episode-specific constants; all parameters resolved via quant_profile and jurisdiction_router.
+    """
     if not narration_text:
         return None
     t = narration_text.lower()
@@ -242,7 +257,69 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             }
         }
 
-    # 1. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
+    # 1. Threshold Ratio Graphic (Generic Exceedance, statutory baseline limit, metric anomaly, toxic ratio, market dominance)
+    if any(k in t for k in ["倍", "배", "times", "fold", "lần", "exceed", "threshold", "ratio", "residue", "monopoly", "market share", "discrepancy", "基準値", "基準", "法定基準", "超過", "違反", "규제", "한도", "statutory limit", "regulatory limit", "baseline"]):
+        is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text) or market.upper() == "JP"
+        is_kr = market.upper() == "KR"
+
+        quant = extract_episode_quantitative_profile(grounding_intel, narration_text, market)
+        if quant.status != ProfileStatus.INSUFFICIENT_DATA and (quant.ratio is not None or quant.detected_value is not None):
+            detected = quant.detected_value
+            baseline = quant.baseline_value
+            multiplier = quant.ratio or (round(detected / max(1.0, baseline), 1) if (detected and baseline) else 2.0)
+            unit = quant.unit or ""
+            param_name = quant.parameter or ("定量異常測定" if is_jp else "QUANTITATIVE ANOMALY")
+            std_name = quant.standard_name or ("法定基準値" if is_jp else "STATUTORY BENCHMARK")
+            sec_std_name = quant.secondary_standard_name
+            sec_base = quant.secondary_baseline_value
+            sec_multiplier = quant.secondary_ratio or (round(detected / max(1.0, sec_base), 1) if (detected and sec_base) else None)
+            source_cit = quant.source_citation or ("公的検査・検証記録" if is_jp else "OFFICIAL VERIFICATION DOCKET")
+
+            # Dynamic Titles and Badges per market
+            if is_jp:
+                title = f"定量的監査 // {param_name}"
+                badge = f"基準の{multiplier}倍超過"
+                if sec_multiplier:
+                    label = f"{std_name}対比: {multiplier}倍 // 国内基準（{sec_base}{unit}未満）に対し{sec_multiplier}倍相当"
+                else:
+                    label = f"{std_name}対比: {multiplier}倍超過"
+            elif is_kr:
+                title = f"정량 감사 // {param_name}"
+                badge = f"기준의 {multiplier}배 초과"
+                label = f"{std_name} 대비: {multiplier}배 초과"
+            else:
+                title = f"FORENSIC AUDIT // {param_name.upper()}"
+                badge = f"EXCEEDED BY {multiplier}X"
+                label = f"STATUTORY COMPARISON: {multiplier}X EXCEEDANCE"
+
+            return {
+                "type": "threshold_ratio",
+                "legacy_type": "financial_chart",
+                "theme": theme or "crimson_alert",
+                "layout": "full_bleed_focus",
+                "title": title,
+                "badge": badge,
+                "sfx_cue": "stamp_slam",
+                "label": label,
+                "payload": {
+                    "baseline_value": baseline,
+                    "detected_value": detected,
+                    "multiplier": multiplier,
+                    "ratio": multiplier,
+                    "unit": unit,
+                    "parameter_name": param_name,
+                    "chemical_name": param_name,  # backward compatibility alias
+                    "standard_name": std_name,
+                    "detected_name": f"{detected} {unit}".strip() if detected is not None else "VERIFIED VALUE",
+                    "source_citation": source_cit,
+                    "secondary_standard_name": sec_std_name,
+                    "secondary_baseline_value": sec_base,
+                    "secondary_multiplier": sec_multiplier,
+                    "stage_reveal_frame": 52 if sec_multiplier else None
+                }
+            }
+
+    # 2. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
     if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류", "契約", "条項", "黒塗り", "機密", "内部文書", "調査報告", "監査", "公文書", "記録", "報告書", "規約", "認可", "査察", "捜査", "申請", "不正", "虚偽", "隠蔽", "検査", "検疫", "追跡", "執行", "規則", "原産地", "ホルムアルデヒド", "漂白", "着色", "農薬", "添加物", "食品衛生", "報道", "警告"]):
         sentences = [s.strip() for s in re.split(r'[.!?。]+', narration_text) if len(s.strip()) > 5][:4]
         clauses = [f"{idx+1}. {sent}" for idx, sent in enumerate(sentences)] if sentences else [
@@ -269,11 +346,21 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
             }
         }
 
-    # 2. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
+    # 3. Tactical Map (Flight, plane, radar, coordinates, vanish, crash, route, locations, surveillance, CCTV)
     if any(k in t for k in ["flight", "plane", "radar", "altitude", "coordinate", "vanish", "crash", "air traffic", "route", "chuyến bay", "đường bay", "tọa độ", "rơi", "rada", "chokepoint", "strait", "sea lane", "eo biển", "hải trình", "surveillance", "cctv", "camera", "facility", "address", "location", "locations", "street", "city", "county", "district", "cơ sở", "địa điểm", "địa chỉ", "khu vực", "시설", "주소", "위치", "warehouse", "giám sát", "seismic zone", "bản đồ", "지도", "좌표", "地図", "マップ", "現場", "ルート", "航路", "監視カメラ", "防犯カメラ", "拠点", "所在地", "工場", "港", "倉庫", "海域", "空域", "位置", "区域", "セクター", "プラント", "現場検証"]):
-        is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
+        is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text) or market.upper() == "JP"
+        juris = resolve_jurisdiction(narration_text, market, metadata)
         loc_words = [w.strip() for w in re.split(r'[,.\s、。]+', narration_text) if len(w.strip()) > 3][:3]
-        target_loc = loc_words[0] if loc_words else ("TARGET OPERATION SECTOR" if not is_jp else "重要監視区域")
+        target_loc = juris.port_name or (loc_words[0] if loc_words else None) or ("TARGET OPERATION SECTOR" if not is_jp else "重要監視区域")
+
+        pois = [f"POI-01: {target_loc}"]
+        if juris.quarantine_authority:
+            pois.append(f"POI-02: {juris.quarantine_authority}")
+        if juris.customs_authority:
+            pois.append(f"POI-03: {juris.customs_authority}")
+        if len(pois) < 3:
+            pois.append("LOGISTICS CHOKEPOINT")
+
         return {
             "type": "tactical_map",
             "legacy_type": "radar_map",
@@ -287,49 +374,9 @@ def detect_forensic_overlay(narration_text: str, theme: str = "vox_paper") -> di
                 "target_name": f"TARGET SECTOR // {target_loc.upper()}" if not is_jp else f"対象区域 // {target_loc}",
                 "coordinates": "INCIDENT GRID // VERIFIED SECTOR",
                 "map_region": "REGIONAL JURISDICTION CORRIDOR",
-                "points_of_interest": [f"POI-01: {target_loc}", "LOGISTICS CHOKEPOINT", "REGULATORY AUDIT CHECKPOINT"]
-            }
-        }
-
-    # 2b. Threshold Ratio Graphic (24x exceedance, statutory baseline limit, chemical residue, toxic ratio)
-    if any(k in t for k in ["24倍", "二十四倍", "倍の残留", "基準値の", "基準値を超過", "基準の", "法定基準", "二酸化硫黄", "残留過剰", "exceedance", "threshold ratio", "toxic ratio", "residue limit"]):
-        is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text)
-        multiplier = 24.3
-        baseline = 200
-        detected = 4860
-        unit = "mg/kg"
-        ratio_match = re.search(r"(\d+(?:\.\d+)?)\s*倍", narration_text)
-        if ratio_match:
-            try:
-                multiplier = round(float(ratio_match.group(1)), 1)
-            except Exception:
-                multiplier = 24.3
-        elif "二十四倍" in narration_text or "24倍" in narration_text or "4860" in narration_text or "4,860" in narration_text:
-            multiplier = 24.3
-        return {
-            "type": "threshold_ratio",
-            "legacy_type": "financial_chart",
-            "theme": theme or "crimson_alert",
-            "layout": "full_bleed_focus",
-            "title": "化学残留検査 // 二酸化硫黄 (SO₂ 残留)" if is_jp else "TOXICOLOGY AUDIT // RESIDUE RATIO",
-            "badge": f"中国国家基準の{multiplier}倍超過" if is_jp else f"EXCEEDED BY {multiplier}X",
-            "sfx_cue": "stamp_slam",
-            "label": f"GB 2760対比: {multiplier}倍 // 日本国内基準対比: 162倍超過",
-            "payload": {
-                "baseline_value": baseline,
-                "detected_value": detected,
-                "multiplier": multiplier,
-                "unit": unit,
-                "chemical_name": "二酸化硫黄 (SO₂ 残留)",
-                "standard_name": "中国国家標準 GB 2760 (200 mg/kg)" if is_jp else "STATUTORY LIMIT",
-                "detected_name": "検疫実測値 (4,860 mg/kg)" if is_jp else "DETECTED VALUE",
-                "grid_cols": 5,
-                "grid_rows": 5,
-                "source_citation": "国家標準 GB 2760-2014 & 厚生労働省 検疫所検査記録",
-                "secondary_standard_name": "日本 食品衛生法 使用基準 (30 mg/kg)" if is_jp else "JAPAN STATUTORY LIMIT",
-                "secondary_baseline_value": 30,
-                "secondary_multiplier": 162.0,
-                "stage_reveal_frame": 52
+                "points_of_interest": pois,
+                "quarantine_authority": juris.quarantine_authority,
+                "customs_authority": juris.customs_authority
             }
         }
 

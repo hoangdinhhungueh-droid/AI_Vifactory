@@ -12,7 +12,15 @@ export interface VoxKineticTypographyProps {
 
 // Default investigative shock keywords that trigger kinetic punch
 const DEFAULT_KEYWORD_PATTERNS = [
-  "24倍",
+  "VIOLATION",
+  "FRAUD",
+  "CRITICAL",
+  "CRASH",
+  "ILLEGAL",
+  "EXCEED",
+  "ALERT",
+  "CORRUPT",
+  "CONTRABAND",
   "基準値",
   "超過",
   "違法",
@@ -21,16 +29,13 @@ const DEFAULT_KEYWORD_PATTERNS = [
   "危険",
   "毒物",
   "摘発",
-  "0.72",
-  "0.03",
-  "二酸化硫黄",
   "劇物",
   "強制捜査",
-  "VIOLATION",
-  "FRAUD",
-  "CRITICAL",
-  "CRASH",
-  "ILLEGAL",
+  "위반",
+  "사기",
+  "불법",
+  "초과",
+  "기준치",
 ];
 
 export const VoxKineticTypography: React.FC<VoxKineticTypographyProps> = ({

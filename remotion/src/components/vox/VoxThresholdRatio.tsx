@@ -79,26 +79,25 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
     extrapolateRight: "clamp",
   });
 
-  // Extract props and numeric values
-  const baselineVal = payload?.baseline_value ?? 200;
-  const detectedVal = payload?.detected_value ?? payload?.actual_value ?? 4860;
-  const rawMultiplier = payload?.multiplier ?? payload?.ratio ?? (detectedVal / Math.max(1, baselineVal));
-  const multiplier = Number(rawMultiplier.toFixed(1)); // 24.3
-  const unit = payload?.unit ?? "mg/kg";
-  const chemicalName = payload?.chemical_name ?? "二酸化硫黄 (SO₂ 残留)";
-  const standardName = payload?.standard_name ?? "中国国家標準 GB 2760 (200 mg/kg)";
-  const detectedName = payload?.detected_name ?? "検疫実測値 (4,860 mg/kg)";
-  const cols = payload?.grid_cols ?? 5;
-  const rows = payload?.grid_rows ?? 5;
-  const totalCells = cols * rows; // 5x5 = 25 cells
-  const sourceCitation = payload?.source_citation ?? "厚生労働省 検疫所検査記録 / 国家標準 GB 2760-2014";
+  // Extract props and numeric values dynamically (Rule 128 Anti-Semantic-Bias)
+  const baselineVal = payload?.baseline_value ?? 1;
+  const detectedVal = payload?.detected_value ?? payload?.actual_value ?? baselineVal;
+  const rawMultiplier = payload?.multiplier ?? payload?.ratio ?? (detectedVal / Math.max(0.0001, baselineVal));
+  const multiplier = Number(rawMultiplier.toFixed(1));
+  const unit = payload?.unit ?? "";
+  const paramName = payload?.parameter_name ?? payload?.chemical_name ?? "QUANTITATIVE AUDIT";
+  const standardName = payload?.standard_name ?? "STATUTORY BASELINE";
+  const detectedName = payload?.detected_name ?? "VERIFIED OBSERVATION";
+  const sourceCitation = payload?.source_citation ?? "OFFICIAL VERIFICATION DOCKET";
 
-  // Two-Stage Reveal parameters (Japan Food Sanitation Act Comparison)
-  const secondaryStandardName = payload?.secondary_standard_name ?? "日本 食品衛生法 使用基準 (30 mg/kg)";
-  const secondaryBaselineVal = payload?.secondary_baseline_value ?? 30;
-  const secondaryMultiplier = payload?.secondary_multiplier ?? Number((detectedVal / secondaryBaselineVal).toFixed(1)); // 162.0
+  // Two-Stage Reveal parameters (Secondary statutory standard comparison)
+  const secondaryStandardName = payload?.secondary_standard_name;
+  const secondaryBaselineVal = payload?.secondary_baseline_value;
+  const secondaryMultiplier = payload?.secondary_multiplier ?? (
+    secondaryBaselineVal ? Number((detectedVal / Math.max(0.0001, secondaryBaselineVal)).toFixed(1)) : null
+  );
   const stageRevealFrame = payload?.stage_reveal_frame ?? 52;
-  const hasStage2 = frame >= stageRevealFrame;
+  const hasStage2 = Boolean(secondaryStandardName && secondaryMultiplier && frame >= stageRevealFrame);
 
   // Stage 2 spring pop
   const stage2Spring = spring({
@@ -114,12 +113,12 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
 
-  const displayTitle = title || label || `化学残留検査 // ${chemicalName}`;
+  const displayTitle = title || label || `QUANTITATIVE AUDIT // ${paramName}`;
   const displayBadge = hasStage2
-    ? `日本法定基準の ${secondaryMultiplier}倍 超過`
-    : (badge || `中国国家基準の ${multiplier}倍 超過`);
+    ? (badge || `${secondaryMultiplier}× EXCEEDANCE DETECTED`)
+    : (badge || `${multiplier}× EXCEEDANCE`);
 
-  // Numeric counter rolling for Stage 1 (0 to 24.3)
+  // Numeric counter rolling for Stage 1 (0 to multiplier)
   const countProgress = interpolate(frame, [8, 38], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -128,21 +127,53 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
   const currentMultiplierVal = 1 + (multiplier - 1) * countProgress;
 
   // Formatted counter string
-  const formattedDetected = currentNumericVal >= 100 ? Math.round(currentNumericVal).toLocaleString() : currentNumericVal.toFixed(1);
+  const formattedDetected = currentNumericVal >= 100
+    ? Math.round(currentNumericVal).toLocaleString()
+    : currentNumericVal.toFixed(1);
   const formattedMultiplier = currentMultiplierVal.toFixed(1);
 
   // Layout sizing
   const isFullBleed = layout === "full_bleed_focus" || layout === "fullscreen_dossier";
-  const width = isFullBleed ? 980 : 560;
+  const containerWidth = isFullBleed ? 980 : 560;
 
-  // Staccato timing parameters for 5x5 grid
+  // Dynamic Scale-Adaptive Layout Selector (Opus 5.5 Architecture)
+  const chooseGrid = () => {
+    if (payload?.grid_cols && payload?.grid_rows) {
+      return { cols: payload.grid_cols, rows: payload.grid_rows };
+    }
+    if (multiplier <= 12) {
+      const c = 4;
+      return { cols: c, rows: Math.max(1, Math.ceil(multiplier / c)) };
+    }
+    if (multiplier <= 25) {
+      return { cols: 5, rows: 5 };
+    }
+    if (multiplier <= 100) {
+      const c = 10;
+      return { cols: c, rows: Math.min(10, Math.max(1, Math.ceil(multiplier / c))) };
+    }
+    // High magnitude: comparative bar mode fallback
+    return { cols: 5, rows: 5, useBars: true };
+  };
+
+  const gridConfig = chooseGrid();
+  const cols = gridConfig.cols;
+  const rows = gridConfig.rows;
+  const totalCells = cols * rows;
+
+  const fullCellsCount = Math.min(totalCells, Math.floor(multiplier));
+  const remainder = Number((multiplier - Math.floor(multiplier)).toFixed(2));
+  const hasPartialCell = remainder > 0.01 && fullCellsCount < totalCells;
+  const partialCellIndex = fullCellsCount;
+
+  // Staccato timing parameters for grid
   const gridStartFrame = 10;
-  const framesPerCell = 1.25;
+  const framesPerCell = Math.max(0.6, 25 / Math.max(1, totalCells));
 
   return (
     <div
       style={{
-        width,
+        width: containerWidth,
         backgroundColor: st.bg,
         border: st.border,
         borderRadius: 14,
@@ -184,7 +215,7 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
               {displayTitle}
             </div>
             <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.55)", letterSpacing: 0.5 }}>
-              FORENSIC STATUTORY COMPLIANCE // TWO-STAGE EXCEEDANCE REVEAL
+              FORENSIC STATUTORY COMPLIANCE // QUANTITATIVE AUDIT REVEAL
             </div>
           </div>
         </div>
@@ -208,7 +239,7 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
         </div>
       </div>
 
-      {/* Main Dual Counter Section: Baseline vs Detected (with tabular-nums) */}
+      {/* Main Dual Counter Section: Baseline vs Detected */}
       <div
         style={{
           display: "grid",
@@ -255,12 +286,12 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
                 border: "1px solid rgba(245, 158, 11, 0.5)",
               }}
             >
-              基準 (1.0x)
+              BASELINE (1.0×)
             </span>
           </div>
         </div>
 
-        {/* Multiplier Exceedance Arrow */}
+        {/* Multiplier Exceedance Badge */}
         {isFullBleed && (
           <div style={{ textAlign: "center", padding: "0 10px" }}>
             <div
@@ -277,7 +308,7 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
               {formattedMultiplier}×
             </div>
             <div style={{ fontSize: 9.5, color: "rgba(239, 68, 68, 0.95)", fontWeight: 800, letterSpacing: 1, marginTop: 2 }}>
-              GB 2760 超過
+              AUDIT EXCEEDANCE
             </div>
           </div>
         )}
@@ -316,13 +347,13 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
                 border: "1px solid rgba(239, 68, 68, 0.6)",
               }}
             >
-              超過 (+{((detectedVal / Math.max(1, baselineVal) - 1) * 100).toFixed(0)}%)
+              +{((detectedVal / Math.max(0.0001, baselineVal) - 1) * 100).toFixed(0)}%
             </span>
           </div>
         </div>
       </div>
 
-      {/* The 5x5 Grid: 24 Full Cells + Cell #25 Filled 30% from Bottom (Visualizing 24.3x) */}
+      {/* Grid Ratio Display or High-Magnitude Comparative View */}
       <div style={{ marginBottom: 14 }}>
         <div
           style={{
@@ -336,13 +367,13 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
             letterSpacing: 0.8,
           }}
         >
-          <span>1セル = 中国基準上限 1回分 ({baselineVal} {unit})</span>
+          <span>1 CELL = 1.0× BASELINE ({baselineVal} {unit})</span>
           <span style={{ color: "#ef4444", fontWeight: 900 }}>
-            5×5 グリッド: 24全満 + 25セル目 30% 残留 ＝ 計 {multiplier}倍
+            {cols}×{rows} MATRIX: {fullCellsCount} FULL {hasPartialCell ? `+ ${remainder}×` : ""} ＝ {multiplier}× TOTAL
           </span>
         </div>
 
-        {/* 5x5 Grid Container */}
+        {/* Dynamic Grid Matrix Container */}
         <div
           style={{
             display: "grid",
@@ -357,7 +388,8 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
         >
           {Array.from({ length: totalCells }).map((_, idx) => {
             const isBaselineCell = idx === 0;
-            const isLastCell = idx === 24; // Cell #25 for the partial .3 fill
+            const isFullActive = idx < fullCellsCount;
+            const isPartialActive = hasPartialCell && idx === partialCellIndex;
             const cellRevealFrame = isBaselineCell ? 4 : gridStartFrame + Math.floor((idx - 1) * framesPerCell);
             const isRevealed = frame >= cellRevealFrame;
 
@@ -377,22 +409,23 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
               { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
             );
 
-            // Cell 25 partial fill from bottom: partial = 0.3 (Opus 5.5 masterclass)
-            const partial = 0.30;
+            // Partial fill animation
             const fillProgress = spring({
               frame: Math.max(0, frame - cellRevealFrame),
               fps,
               config: { mass: 0.6, stiffness: 180, damping: 18 },
             });
-            const partialHeightPercent = isLastCell
-              ? Math.min(100, Math.max(0, fillProgress * partial * 100))
+            const partialHeightPercent = isPartialActive
+              ? Math.min(100, Math.max(0, fillProgress * remainder * 100))
               : 100;
+
+            const shouldHighlight = isRevealed && (isFullActive || isPartialActive);
 
             return (
               <div
                 key={idx}
                 style={{
-                  height: isFullBleed ? 42 : 30,
+                  height: isFullBleed ? (cols > 6 ? 32 : 42) : (cols > 6 ? 24 : 30),
                   borderRadius: 5,
                   display: "flex",
                   flexDirection: "column",
@@ -400,33 +433,33 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
                   alignItems: "center",
                   position: "relative",
                   overflow: "hidden",
-                  transform: isRevealed ? `scale(${cellSpring})` : "scale(1.0)",
-                  opacity: isRevealed ? cellOpacity : 0.15,
-                  backgroundColor: !isRevealed
+                  transform: shouldHighlight ? `scale(${cellSpring})` : "scale(1.0)",
+                  opacity: shouldHighlight ? cellOpacity : 0.15,
+                  backgroundColor: !shouldHighlight
                     ? "rgba(30, 41, 59, 0.35)"
                     : isBaselineCell
                     ? st.cellBaselineBg
-                    : isLastCell
+                    : isPartialActive
                     ? "rgba(30, 41, 59, 0.45)"
                     : st.cellActiveBg,
-                  border: !isRevealed
+                  border: !shouldHighlight
                     ? "1px solid rgba(255, 255, 255, 0.08)"
                     : isBaselineCell
                     ? `2px solid ${st.cellBaselineBorder}`
-                    : isLastCell
+                    : isPartialActive
                     ? "1.5px dashed rgba(245, 158, 11, 0.85)"
                     : `1.5px solid ${st.cellActiveBorder}`,
-                  boxShadow: isRevealed
+                  boxShadow: shouldHighlight
                     ? isBaselineCell
                       ? "0 0 10px rgba(245, 158, 11, 0.4)"
-                      : isLastCell
+                      : isPartialActive
                       ? "0 0 10px rgba(245, 158, 11, 0.3)"
                       : "0 0 10px rgba(239, 68, 68, 0.55)"
                     : "none",
                 }}
               >
-                {/* Cell 25 Bottom Fill Bar (+0.3x) */}
-                {isLastCell && isRevealed && (
+                {/* Partial Fill Bar */}
+                {isPartialActive && isRevealed && (
                   <div
                     style={{
                       position: "absolute",
@@ -444,33 +477,33 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
                 {/* Baseline Cell Indicator Badge */}
                 {isBaselineCell ? (
                   <>
-                    <span style={{ fontSize: isFullBleed ? 11 : 8.5, fontWeight: 900, color: "#f59e0b", letterSpacing: 0.5 }}>
-                      基準値
+                    <span style={{ fontSize: isFullBleed ? 10 : 8, fontWeight: 900, color: "#f59e0b", letterSpacing: 0.5 }}>
+                      BASE
                     </span>
                     <span style={{ fontSize: isFullBleed ? 9.5 : 7.5, color: "rgba(255, 255, 255, 0.8)", fontWeight: 700 }}>
                       1×
                     </span>
                   </>
-                ) : isLastCell ? (
+                ) : isPartialActive ? (
                   <span
                     style={{
                       position: "relative",
                       zIndex: 2,
-                      fontSize: isFullBleed ? 11.5 : 9,
+                      fontSize: isFullBleed ? 11 : 8.5,
                       fontWeight: 900,
                       color: isRevealed ? "#ffffff" : "rgba(255, 255, 255, 0.3)",
                       fontVariantNumeric: "tabular-nums",
                       textShadow: "0 1px 3px rgba(0,0,0,0.8)",
                     }}
                   >
-                    +0.3×
+                    +{remainder}×
                   </span>
                 ) : (
                   <span
                     style={{
-                      fontSize: isFullBleed ? 12 : 9.5,
+                      fontSize: isFullBleed ? (cols > 6 ? 10 : 12) : (cols > 6 ? 8 : 9.5),
                       fontWeight: 900,
-                      color: isRevealed ? "#ffffff" : "rgba(255, 255, 255, 0.3)",
+                      color: shouldHighlight ? "#ffffff" : "rgba(255, 255, 255, 0.3)",
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
@@ -479,7 +512,7 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
                 )}
 
                 {/* Micro Alert Dot for Exceeded Cells */}
-                {isRevealed && !isBaselineCell && !isLastCell && (
+                {shouldHighlight && !isBaselineCell && !isPartialActive && (
                   <div
                     style={{
                       position: "absolute",
@@ -499,8 +532,8 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
         </div>
       </div>
 
-      {/* Stage 2 Explosive Morph: Japan Food Sanitation Act (162x Over Limit) */}
-      {hasStage2 ? (
+      {/* Stage 2 Explosive Morph: Secondary Statutory Comparison (e.g. Domestic vs International) */}
+      {hasStage2 && secondaryBaselineVal ? (
         <div
           style={{
             transform: `scale(${stage2Spring})`,
@@ -517,7 +550,7 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 16 }}>⚡</span>
               <span style={{ fontSize: 12, fontWeight: 900, color: "#fca5a5", letterSpacing: 1.2 }}>
-                日本国内基準との対比 // 食品衛生法 使用基準 (0.030 g/kg ＝ 30 mg/kg)
+                STATUTORY COMPARISON // {secondaryStandardName} ({secondaryBaselineVal} {unit})
               </span>
             </div>
             <div
@@ -529,33 +562,53 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
                 textShadow: "0 0 12px rgba(239, 68, 68, 0.8)",
               }}
             >
-              162.0× OVER LIMIT
+              {secondaryMultiplier}× OVER LIMIT
             </div>
           </div>
 
-          {/* Comparative Ratio Bars: Japan Standard (30mg) vs China GB (200mg) vs Kobe Quarantine (4,860mg) */}
+          {/* Comparative Ratio Bars */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {/* Bar 1: Japan Statutory Limit */}
+            {/* Bar 1: Secondary Statutory Limit */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10.5 }}>
-              <span style={{ width: 140, color: "#94a3b8", fontWeight: 700 }}>日本法定上限 (30 mg/kg):</span>
+              <span style={{ width: 160, color: "#94a3b8", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {secondaryStandardName}:
+              </span>
               <div style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.08)", height: 12, borderRadius: 3, overflow: "hidden" }}>
-                <div style={{ width: `${Math.max(1, (30 / 4860) * 100 * stage2BarProgress)}%`, height: "100%", backgroundColor: "#38bdf8" }} />
+                <div
+                  style={{
+                    width: `${Math.max(1, (secondaryBaselineVal / Math.max(1, detectedVal)) * 100 * stage2BarProgress)}%`,
+                    height: "100%",
+                    backgroundColor: "#38bdf8",
+                  }}
+                />
               </div>
               <span style={{ width: 45, color: "#38bdf8", fontWeight: 800, textAlign: "right" }}>1.0×</span>
             </div>
 
-            {/* Bar 2: China GB 2760 Limit */}
+            {/* Bar 2: Primary Standard Limit */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10.5 }}>
-              <span style={{ width: 140, color: "#94a3b8", fontWeight: 700 }}>中国国家標準 (200 mg/kg):</span>
+              <span style={{ width: 160, color: "#94a3b8", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {standardName}:
+              </span>
               <div style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.08)", height: 12, borderRadius: 3, overflow: "hidden" }}>
-                <div style={{ width: `${Math.max(1, (200 / 4860) * 100 * stage2BarProgress)}%`, height: "100%", backgroundColor: "#f59e0b" }} />
+                <div
+                  style={{
+                    width: `${Math.max(1, (baselineVal / Math.max(1, detectedVal)) * 100 * stage2BarProgress)}%`,
+                    height: "100%",
+                    backgroundColor: "#f59e0b",
+                  }}
+                />
               </div>
-              <span style={{ width: 45, color: "#f59e0b", fontWeight: 800, textAlign: "right" }}>6.7×</span>
+              <span style={{ width: 45, color: "#f59e0b", fontWeight: 800, textAlign: "right" }}>
+                {(baselineVal / Math.max(0.001, secondaryBaselineVal)).toFixed(1)}×
+              </span>
             </div>
 
-            {/* Bar 3: Detected Kobe Quarantine */}
+            {/* Bar 3: Detected Observation */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10.5 }}>
-              <span style={{ width: 140, color: "#fca5a5", fontWeight: 900 }}>検疫実測値 (4,860 mg/kg):</span>
+              <span style={{ width: 160, color: "#fca5a5", fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {detectedName}:
+              </span>
               <div style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.08)", height: 14, borderRadius: 3, overflow: "hidden" }}>
                 <div
                   style={{
@@ -566,7 +619,9 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
                   }}
                 />
               </div>
-              <span style={{ width: 45, color: "#ef4444", fontWeight: 900, textAlign: "right" }}>162.0×</span>
+              <span style={{ width: 45, color: "#ef4444", fontWeight: 900, textAlign: "right" }}>
+                {secondaryMultiplier}×
+              </span>
             </div>
           </div>
         </div>
@@ -595,4 +650,3 @@ export const VoxThresholdRatio: React.FC<VoxThresholdRatioProps> = ({
     </div>
   );
 };
-

@@ -210,7 +210,12 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
         score = 0.0
         narration = sc.get("narration", "") or sc.get("caption", "")
         narr_lower = narration.lower()
-        if any(k in narr_lower for k in ["24倍", "二十四倍", "基準", "二酸化硫黄", "損益計算", "検査", "検疫", "追跡", "原産地", "四千八百六十"]):
+        if any(k in narr_lower for k in [
+            "audit", "benchmark", "threshold", "violation", "evidence", "fraud", "inspection",
+            "기준", "위반", "감사", "증거", "조사",
+            "基準", "超過", "違反", "検査", "検疫", "追跡", "不正", "報告",
+            "bằng chứng", "vi phạm", "thanh tra", "hợp đồng"
+        ]):
             score += 8.0
         metric = parse_spoken_number(narration)
         if metric:

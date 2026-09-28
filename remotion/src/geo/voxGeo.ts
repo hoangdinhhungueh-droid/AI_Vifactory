@@ -104,7 +104,7 @@ export const EAST_ASIA_ROUTE: Waypoint[] = [
     kind: 'quarantine',
     appearFrame: 150,
     callout: {
-      valueJa: '二酸化硫黄 24倍検出',
+      valueJa: '法定基準 超過検出',
       noteJa: '食品衛生法 違反摘発',
       sourceJa: '厚生労働省 検疫所検査記録',
     },

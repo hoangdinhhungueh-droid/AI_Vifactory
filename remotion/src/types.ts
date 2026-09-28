@@ -49,18 +49,19 @@ export interface WordTimestamp {
 }
 
 export interface VoxThresholdRatioPayload {
-  baseline_value?: number; // e.g. 200 (GB 2760)
-  detected_value?: number; // e.g. 4860
-  multiplier?: number; // e.g. 24.3
+  baseline_value?: number; // e.g. 50 or 200
+  detected_value?: number; // e.g. 1200
+  multiplier?: number; // e.g. 24.0
   ratio?: number;
   actual_value?: number;
-  unit?: string; // e.g. "mg/kg"
-  chemical_name?: string; // e.g. "二酸化硫黄" or "Sulfur Dioxide"
-  standard_name?: string; // e.g. "中国国家標準 GB 2760"
-  detected_name?: string; // e.g. "検出値"
+  unit?: string; // e.g. "mg/kg", "%", "USD"
+  parameter_name?: string; // Generic audit parameter e.g. "Sulfur Dioxide", "Ad Revenue", "Operating Deficit"
+  chemical_name?: string; // Alias for backward compatibility
+  standard_name?: string; // e.g. "Statutory Benchmark" or "Industry Limit"
+  detected_name?: string; // e.g. "Verified Value"
   grid_cols?: number; // default 5
   grid_rows?: number; // default 5
-  source_citation?: string; // e.g. "国家標準 GB 2760-2014 & 厚生労働省 検疫所検査"
+  source_citation?: string; // e.g. "Official Verification Docket"
   secondary_standard_name?: string; // e.g. "日本 食品衛生法 基準値"
   secondary_baseline_value?: number; // e.g. 30
   secondary_multiplier?: number; // e.g. 162

@@ -278,10 +278,10 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
     """
     combined = f"{fg_key} {p}".lower()
 
-    # 1. Chinese regional / agricultural / processing / wholesale characters
+    # 1. Foreign / cross-border regional / agricultural / processing / wholesale characters
     if any(k in combined for k in [
-        "chinese", "china", "guangdong", "harvester", "fumigation", "farmer", "worker",
-        "laborer", "bamboo", "wholesale", "broker", "plant_owner", "factory", "steam", "sulfur_operator"
+        "chinese", "china", "foreign", "harvester", "fumigation", "farmer", "worker",
+        "laborer", "wholesale", "broker", "plant_owner", "factory", "steam", "supplier"
     ]) and not any(k in combined for k in [
         "japanese", "tokyo", "yokohama", "quarantine", "supermarket", "consumer", "shopper", "ramen"
     ]):
@@ -443,8 +443,8 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
 
     p = re.sub(r"\s{2,}", " ", p).strip()
 
-    # Rule 134 Adversarial Invariant: Ensure non-Japanese characters in JP market NEVER leak salaryman or hanko into positive prompt
-    if any(k in f"{fg_key} {prompt}".lower() for k in ["chinese", "guangdong", "bamboo_harvester", "sulfur_fumigation", "processing_plant_owner"]):
+    # Rule 134 Adversarial Invariant: Ensure non-local foreign characters in JP market NEVER leak salaryman or hanko into positive prompt
+    if any(k in f"{fg_key} {prompt}".lower() for k in ["chinese", "china", "foreign_worker", "supplier", "regional_worker"]):
         pos_part = p.split("[STRICT NEGATIVE PROMPT]")[0] if "[STRICT NEGATIVE PROMPT]" in p else p
         assert "salaryman" not in pos_part.lower(), f"❌ Market Anchor Bias detected: Chinese character positive prompt contains 'salaryman'!"
         assert "hanko" not in pos_part.lower(), f"❌ Market Anchor Bias detected: Chinese character positive prompt contains 'hanko'!"
