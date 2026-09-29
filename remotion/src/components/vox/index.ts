@@ -14,5 +14,8 @@ export * from "./VoxSourceCredit";
 export * from "./VoxTacticalMap";
 export * from "./VoxThresholdRatio";
 export * from "./CapitalFlowMap";
+export * from "./VoxDynamicChart";
+export * from "./VoxForensicPaper";
+export * from "./VoxKineticHeadline";
 export * from "./springPresets";
 export * from "./LivingCamera";

@@ -204,7 +204,9 @@ def detect_forensic_overlay(
     theme: str = "vox_paper",
     grounding_intel: Optional[dict] = None,
     market: str = "EN",
-    metadata: Optional[dict] = None
+    metadata: Optional[dict] = None,
+    scene_idx: Optional[int] = None,
+    is_cold_hook: bool = False
 ) -> dict | None:
     """Rule 128 (Anti-Semantic Bias) & Rule 132 (Pure Transmission Pipe):
     Dynamically detect tactile paper-collage evidentiary graphics.
@@ -213,6 +215,29 @@ def detect_forensic_overlay(
     if not narration_text:
         return None
     t = narration_text.lower()
+
+    # 00. Kinetic Headline (Cold Hook Impact Typography - Rule 122 & Rule 444)
+    if is_cold_hook and (scene_idx is None or scene_idx == 0):
+        sentences = [s.strip() for s in re.split(r'[.!?。！？\n]', narration_text) if s.strip()]
+        first_sent = sentences[0] if sentences else narration_text
+        words = first_sent.split()
+        headline_text = " ".join(words[:8]) if len(words) > 8 else first_sent
+        highlight_w = words[len(words) // 2] if words else "PARADOX"
+        return {
+            "type": "kinetic_headline",
+            "legacy_type": "redacted_doc",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": headline_text.upper(),
+            "badge": "CRITICAL PARADOX // COLD HOOK",
+            "sfx_cue": "stamp_slam",
+            "label": headline_text,
+            "payload": {
+                "highlight_word": highlight_w.upper(),
+                "subtext": "FORENSIC INVESTIGATION REPORT",
+                "accent_color": "#facc15"
+            }
+        }
 
     # 0. 3D Procedural Evidence Props (12fps Stop-Motion Quantized Physical Artifacts - Priority 0)
     # 0a. Financial Ledger 3D (Ledger, balance sheets, audit discrepancies, wire fraud records)
@@ -313,9 +338,9 @@ def detect_forensic_overlay(
     # 1. Threshold Ratio Graphic (Generic Exceedance, statutory baseline limit, metric anomaly, toxic ratio, market dominance)
     threshold_triggers = [
         # Multipliers, Ratios & Percentages
-        "倍", "배", "times", "fold", "lần", "gấp", "ratio", "rate", "tỷ lệ", "tỉ lệ", "비율", "倍率", "%", "percent", "phần trăm",
+        "倍", "배", "times", "lần", "gấp", "ratio", "tỷ lệ", "tỉ lệ", "비율", "倍率", "%", "percent", "phần trăm",
         # Exceedance, Limits, Ceilings & Caps
-        "exceed", "surpass", "threshold", "residue", "discrepancy", "ceiling", "cap", "overage",
+        "exceed", "surpass", "threshold", "residue", "discrepancy", "ceiling", "overage",
         "基準値", "基準", "法定基準", "超過", "違反", "限度",
         "초과", "규제", "한도", "위반",
         "vượt", "vượt trần", "quá mức", "hạn mức", "ngưỡng",
@@ -324,7 +349,8 @@ def detect_forensic_overlay(
         # Regulatory & Statutory
         "statutory limit", "regulatory limit", "baseline", "antitrust"
     ]
-    if any(k in t for k in threshold_triggers):
+    has_threshold = any(k in t for k in threshold_triggers) or bool(re.search(r'\b(rate|fold|cap)\b', t, re.IGNORECASE))
+    if has_threshold:
         is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text) or market.upper() == "JP"
         is_kr = market.upper() == "KR"
         is_vn = market.upper() == "VN"
@@ -402,6 +428,39 @@ def detect_forensic_overlay(
                 }
             }
 
+    # 2a. Archival Forensic Paper (Highlighter Sweep & Stamp - Vox Engine 4.0)
+    paper_triggers = [
+        "internal memo", "memo", "dossier", "filing", "disclosure", "whistleblower", "unsealed", "statute",
+        "văn bản mật", "hồ sơ nội bộ", "biên bản mật", "báo cáo điều tra", "công văn",
+        "내부 문건", "고발장", "공시 자료", "비밀 보고서", "조사 보고서",
+        "内部文書", "告発状", "開示資料", "捜査報告書", "秘密文書"
+    ]
+    if any(k in t for k in paper_triggers) and not (re.search(r'\bnda\b', t) or any(k in t for k in ["redact", "blacked out", "hợp đồng", "조항", "契約", "条項", "黒塗り"])):
+        sentences = [s.strip() for s in re.split(r'[.!?。！？\n]', narration_text) if len(s.strip()) > 5]
+        highlight_phrase = sentences[0] if sentences else narration_text[:60]
+        if len(highlight_phrase.split()) > 8:
+            highlight_phrase = " ".join(highlight_phrase.split()[:8])
+        doc_hash = (abs(hash(narration_text)) % 900) + 100
+        return {
+            "type": "forensic_paper",
+            "legacy_type": "document_highlight",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": "CONFIDENTIAL INVESTIGATION DOSSIER",
+            "badge": "RESTRICTED",
+            "sfx_cue": "marker_stroke",
+            "label": "ARCHIVAL FORENSIC EVIDENCE",
+            "payload": {
+                "doc_number": f"EXHIBIT-{market}-DOC-{doc_hash}",
+                "date": "OFFICIAL RECORD // ADMISSIBLE",
+                "agency": "FORENSIC AUDIT OVERSIGHT",
+                "body_text": narration_text[:240] + ("..." if len(narration_text) > 240 else ""),
+                "highlighted_phrase": highlight_phrase,
+                "stamp_text": "RESTRICTED",
+                "stamp_color": "#dc2626"
+            }
+        }
+
     # 2. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
     if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류", "契約", "条項", "黒塗り", "機密", "内部文書", "調査報告", "監査", "公文書", "記録", "報告書", "規約", "認可", "査察", "捜査", "申請", "不正", "虚偽", "隠蔽", "検査", "検疫", "追跡", "執行", "規則", "原産地", "ホルムアルデヒド", "漂白", "着色", "農薬", "添加物", "食品衛生", "報道", "警告"]):
         sentences = [s.strip() for s in re.split(r'[.!?。]+', narration_text) if len(s.strip()) > 5][:4]
@@ -463,7 +522,67 @@ def detect_forensic_overlay(
             }
         }
 
-    # 3. Kinetic Counter / Financial Ledger (Strict: requires verified parsed number, Rule 118 Zero-Mock Data)
+    # 3. Dynamic Vector Financial Chart / Candlestick Line Draw (Vox Engine 4.0)
+    chart_triggers = [
+        "inflow", "inflows", "outflow", "outflows", "trajectory", "trend", "quarterly", "surge", "surged",
+        "plunged", "jumped to", "fell from", "dropped from", "dòng vốn", "tăng vọt", "lao dốc", "chỉ số",
+        "lợi suất", "quý", "자금 유입", "유출", "분기", "수익률", "주가", "急騰", "急落", "資金流入", "流出", "四半期", "推移"
+    ]
+    decline_m = re.search(r"(?:fell|dropped|declined|decreased|plunged)\s+from\s+(?:\$)?(\d+(?:\.\d+)?)\s*(?:billion|million|b|m|tỷ|조|兆)?\s+to\s+(?:\$)?(\d+(?:\.\d+)?)", narration_text, re.IGNORECASE)
+    surge_m = re.search(r"(?:jumped|surged|rose|increased|grew)\s+from\s+(?:\$)?(\d+(?:\.\d+)?)\s*(?:billion|million|b|m|tỷ|조|兆)?\s+to\s+(?:\$)?(\d+(?:\.\d+)?)", narration_text, re.IGNORECASE)
+
+    if (decline_m or surge_m or any(k in t for k in chart_triggers)) and not ("stock market liquidity collapse" in t):
+        is_bar = any(k in t for k in ["quarter", "q1", "q2", "q3", "q4", "quý", "분기", "四半期", "breakdown", "comparison"])
+        chart_type = "bar" if is_bar else "line"
+        start_val = 188.0
+        end_val = 942.0
+        trend = "up"
+        unit = "B"
+        prefix = "$"
+        if decline_m:
+            try:
+                start_val = float(decline_m.group(1))
+                end_val = float(decline_m.group(2))
+                trend = "down"
+            except Exception:
+                pass
+        elif surge_m:
+            try:
+                start_val = float(surge_m.group(1))
+                end_val = float(surge_m.group(2))
+                trend = "up"
+            except Exception:
+                pass
+        else:
+            parsed = parse_spoken_number(narration_text)
+            if parsed and parsed.display_value > 0:
+                end_val = parsed.display_value
+                start_val = round(end_val * 0.6, 1) if parsed.trend != "down" else round(end_val * 1.5, 1)
+                trend = parsed.trend
+                unit = parsed.unit or "B"
+                prefix = parsed.prefix or "$"
+
+        return {
+            "type": "dynamic_chart",
+            "legacy_type": "financial_chart",
+            "theme": theme or "vox_paper",
+            "layout": "split_right",
+            "title": f"CAPITAL TRAJECTORY // {unit.upper() if unit else 'FLOW'}",
+            "badge": "MARKET FORENSIC DATA",
+            "sfx_cue": "counter_tick",
+            "label": f"DATA TRAJECTORY // {trend.upper()}",
+            "payload": {
+                "chart_type": chart_type,
+                "start_value": start_val,
+                "end_value": end_val,
+                "unit": unit,
+                "prefix": prefix,
+                "trend": trend,
+                "color": "#ef4444" if trend == "down" else "#10b981",
+            }
+        }
+
+    # 4. Kinetic Counter / Financial Ledger (Strict: requires verified parsed number, Rule 118 Zero-Mock Data)
     parsed_metric = parse_spoken_number(narration_text)
     if parsed_metric is not None and parsed_metric.display_value > 0:
         display_val = parsed_metric.formatted
@@ -1506,7 +1625,12 @@ def generate_director_plan(
         bg_cluster_id = sc.get("bg_cluster_id") or sc.get("bgClusterId") or ((beat_idx - 1) * 4 + (idx % 3) + 1)
         forensic_overlay = sc.get("forensic_overlay") or sc.get("forensicOverlay")
         if not forensic_overlay or isinstance(forensic_overlay, str):
-            auto_overlay = detect_forensic_overlay(narration)
+            auto_overlay = detect_forensic_overlay(
+                narration,
+                market=m_up,
+                scene_idx=idx,
+                is_cold_hook=(idx == 0 and beat_idx == 1)
+            )
             if auto_overlay:
                 forensic_overlay = auto_overlay
 
@@ -1986,7 +2110,12 @@ def _synthesize_beat_scenes(
             dur_frames = sent.get("duration_frames") or int(round(sent.get("duration_sec", 6.0) * 30))
             dur_sec = sent.get("duration_sec") or round(dur_frames / 30.0, 2)
 
-            forensic_overlay = detect_forensic_overlay(sc_text)
+            forensic_overlay = detect_forensic_overlay(
+                sc_text,
+                market=dynamic_context.get("market", "EN") if isinstance(dynamic_context, dict) else "EN",
+                scene_idx=sc_counter,
+                is_cold_hook=(sc_counter in (0, 1) and b_num == 1)
+            )
             stat_card = detect_stat_card(sc_text)
             stamp_badge = detect_stamp_badge(sc_text)
             motion_directive = "dramatic_push" if sc_counter < 10 else ("split_whip" if sc_counter % 3 == 0 else "subtle_drift")
@@ -2088,7 +2217,12 @@ def _synthesize_beat_scenes(
             else:
                 dur = max(5, min(9, round(curr_units / unit_divisor)))
 
-            forensic_overlay = detect_forensic_overlay(sc_text)
+            forensic_overlay = detect_forensic_overlay(
+                sc_text,
+                market=dynamic_context.get("market", "EN") if isinstance(dynamic_context, dict) else "EN",
+                scene_idx=sc_counter,
+                is_cold_hook=(sc_counter in (0, 1) and b_num == 1)
+            )
             stat_card = detect_stat_card(sc_text)
             stamp_badge = detect_stamp_badge(sc_text)
             motion_directive = "dramatic_push" if is_hook else ("split_whip" if sc_counter % 3 == 0 else "subtle_drift")
@@ -2143,7 +2277,12 @@ def _synthesize_beat_scenes(
         bg_cluster_id = ((b_num - 1) * 4) + (sc_counter % 3) + 1
         bg_k = f"{episode_id.lower()}_bg_b{b_num}_tail"
         bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 setting of {b_name}, {dynamic_context['physical_environment']}"
-        forensic_overlay = detect_forensic_overlay(sc_text)
+        forensic_overlay = detect_forensic_overlay(
+            sc_text,
+            market=dynamic_context.get("market", "EN") if isinstance(dynamic_context, dict) else "EN",
+            scene_idx=sc_counter,
+            is_cold_hook=(sc_counter in (0, 1) and b_num == 1)
+        )
         stat_card = detect_stat_card(sc_text)
         stamp_badge = detect_stamp_badge(sc_text)
         motion_directive = "subtle_drift"

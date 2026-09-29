@@ -246,6 +246,107 @@ def build_structured_overlay(
             }
         }
 
+    if fo_type in ("dynamic_chart", "vector_chart", "line_chart", "bar_chart"):
+        is_bar = any(k in narration_text.lower() for k in ["quarter", "q1", "q2", "q3", "q4", "quý", "분기", "四半期", "breakdown", "comparison"])
+        chart_type = "bar" if is_bar else "line"
+        start_val = 188.0
+        end_val = 942.0
+        trend = "up"
+        unit = "B"
+        prefix = "$"
+        decline_m = re.search(r"(?:fell|dropped|declined|decreased|plunged)\s+from\s+(?:\$)?(\d+(?:\.\d+)?)\s*(?:billion|million|b|m|tỷ|조|兆)?\s+to\s+(?:\$)?(\d+(?:\.\d+)?)", narration_text, re.IGNORECASE)
+        surge_m = re.search(r"(?:jumped|surged|rose|increased|grew)\s+from\s+(?:\$)?(\d+(?:\.\d+)?)\s*(?:billion|million|b|m|tỷ|조|兆)?\s+to\s+(?:\$)?(\d+(?:\.\d+)?)", narration_text, re.IGNORECASE)
+        if decline_m:
+            try:
+                start_val = float(decline_m.group(1))
+                end_val = float(decline_m.group(2))
+                trend = "down"
+            except Exception:
+                pass
+        elif surge_m:
+            try:
+                start_val = float(surge_m.group(1))
+                end_val = float(surge_m.group(2))
+                trend = "up"
+            except Exception:
+                pass
+        else:
+            parsed = parse_spoken_number(narration_text)
+            if parsed and parsed.display_value > 0:
+                end_val = parsed.display_value
+                start_val = round(end_val * 0.6, 1) if parsed.trend != "down" else round(end_val * 1.5, 1)
+                trend = parsed.trend
+                unit = parsed.unit or "B"
+                prefix = parsed.prefix or "$"
+
+        return {
+            "type": "dynamic_chart",
+            "legacy_type": "financial_chart",
+            "theme": theme or "vox_paper",
+            "layout": "split_right",
+            "title": f"CAPITAL TRAJECTORY // {unit.upper() if unit else 'FLOW'}",
+            "badge": "MARKET FORENSIC DATA",
+            "sfx_cue": "counter_tick",
+            "label": f"DATA TRAJECTORY // {trend.upper()}",
+            "payload": {
+                "chart_type": chart_type,
+                "start_value": start_val,
+                "end_value": end_val,
+                "unit": unit,
+                "prefix": prefix,
+                "trend": trend,
+                "color": "#ef4444" if trend == "down" else "#10b981",
+            }
+        }
+
+    if fo_type in ("forensic_paper", "highlighter_doc", "archival_paper"):
+        sentences = [s.strip() for s in re.split(r'[.!?。！？\n]', narration_text) if len(s.strip()) > 5]
+        highlight_phrase = sentences[0] if sentences else narration_text[:60]
+        if len(highlight_phrase.split()) > 8:
+            highlight_phrase = " ".join(highlight_phrase.split()[:8])
+        doc_hash = (abs(hash(narration_text)) % 900) + 100
+        return {
+            "type": "forensic_paper",
+            "legacy_type": "document_highlight",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": "CONFIDENTIAL INVESTIGATION DOSSIER",
+            "badge": "RESTRICTED",
+            "sfx_cue": "marker_stroke",
+            "label": "ARCHIVAL FORENSIC EVIDENCE",
+            "payload": {
+                "doc_number": f"EXHIBIT-{market}-DOC-{doc_hash}",
+                "date": "OFFICIAL RECORD // ADMISSIBLE",
+                "agency": "FORENSIC AUDIT OVERSIGHT",
+                "body_text": narration_text[:240] + ("..." if len(narration_text) > 240 else ""),
+                "highlighted_phrase": highlight_phrase,
+                "stamp_text": "RESTRICTED",
+                "stamp_color": "#dc2626"
+            }
+        }
+
+    if fo_type in ("kinetic_headline", "cold_hook_headline", "impact_headline"):
+        sentences = [s.strip() for s in re.split(r'[.!?。！？\n]', narration_text) if s.strip()]
+        first_sent = sentences[0] if sentences else narration_text
+        words = first_sent.split()
+        headline_text = " ".join(words[:8]) if len(words) > 8 else first_sent
+        highlight_w = words[len(words) // 2] if words else "PARADOX"
+        return {
+            "type": "kinetic_headline",
+            "legacy_type": "redacted_doc",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": headline_text.upper(),
+            "badge": "CRITICAL PARADOX // COLD HOOK",
+            "sfx_cue": "stamp_slam",
+            "label": headline_text,
+            "payload": {
+                "highlight_word": highlight_w.upper(),
+                "subtext": "FORENSIC INVESTIGATION REPORT",
+                "accent_color": "#facc15"
+            }
+        }
+
     return None
 
 
@@ -659,6 +760,7 @@ def build_remotion_props_data(
     height: int = 1080,
     fg_fade_sec: float = 0.5,
     skip_missing: bool = False,
+    refresh_overlays: bool = False,
 ) -> dict:
     """Generate props dictionary for Remotion TwoLayerEpisode."""
     with open(brain_input_path, encoding="utf-8") as f:
@@ -830,12 +932,19 @@ def build_remotion_props_data(
         tension_lvl = s.get("tension_level") or (cam.get("tension_level") if isinstance(cam, dict) else "high")
         bg_cluster = s.get("bg_cluster_id") or s.get("bgClusterId")
         forensic_ov = s.get("forensic_overlay") or s.get("forensicOverlay")
-        if not forensic_ov:
-            candidate_ov = detect_forensic_overlay(narration_text)
+        is_ch = bool(s.get("is_cold_hook") or (i == 0 and s.get("beat_index", 1) == 1))
+        if refresh_overlays or not forensic_ov:
+            candidate_ov = detect_forensic_overlay(
+                narration_text,
+                market=market,
+                scene_idx=i,
+                is_cold_hook=is_ch
+            )
             if candidate_ov:
                 cand_type = candidate_ov.get("type")
                 # Anti-monotony: allow overlay if >= 2 scenes since last overlay OR switching to contrasting type
-                if scenes_since_overlay >= 2 or cand_type != last_overlay_type:
+                # For cold hook (scenes 0 and 1), always allow!
+                if i in (0, 1) or scenes_since_overlay >= 2 or cand_type != last_overlay_type:
                     forensic_ov = candidate_ov
                     scenes_since_overlay = 0
                     last_overlay_type = cand_type
@@ -865,6 +974,9 @@ def build_remotion_props_data(
             "evidence_3d_prop": "PHYSICAL EVIDENCE // FORENSIC SPECIMEN",
             "3d_evidence_prop": "PHYSICAL EVIDENCE // FORENSIC SPECIMEN",
             "3d_hanko_seal": "AUTHENTICATED IMPERIAL SEAL // FORENSIC SPECIMEN",
+            "dynamic_chart": "CAPITAL FLOW & ASSET TRAJECTORY",
+            "forensic_paper": "ARCHIVAL FORENSIC EVIDENCE",
+            "kinetic_headline": "CRITICAL PARADOX // COLD HOOK",
         }
         if isinstance(forensic_ov, str):
             fo_type = forensic_ov
@@ -882,7 +994,9 @@ def build_remotion_props_data(
                 theme="vox_paper",
                 grounding_intel=grounding_intel,
                 market=market,
-                metadata=brain.get("metadata")
+                metadata=brain.get("metadata"),
+                scene_idx=i,
+                is_cold_hook=is_ch
             )
 
         # Spatial Layout Collision Prevention & Full-Bleed Focus Promotion (Rule 122 & Vox Paper-Collage)
@@ -937,7 +1051,9 @@ def build_remotion_props_data(
             if "theme" not in forensic_ov or forensic_ov.get("theme") == "noir_dossier":
                 forensic_ov["theme"] = "vox_paper"
 
-            if not fg_rel:
+            if forensic_ov.get("type") in ("kinetic_headline", "cold_hook_headline"):
+                forensic_ov["layout"] = "full_bleed_focus"
+            elif not fg_rel:
                 # When no foreground character is present, promote evidence to full-bleed focus mode!
                 forensic_ov["layout"] = "full_bleed_focus"
             else:
@@ -1165,6 +1281,8 @@ def main():
     ap.add_argument("--fg-fade-sec", type=float, default=0.5)
     ap.add_argument("--skip-missing", action="store_true",
                     help="drop scenes whose background image is missing instead of failing")
+    ap.add_argument("--refresh-overlays", action="store_true",
+                    help="force re-detect forensic overlays from narration")
     args = ap.parse_args()
 
     props = build_remotion_props_data(
@@ -1178,6 +1296,7 @@ def main():
         height=args.height,
         fg_fade_sec=args.fg_fade_sec,
         skip_missing=args.skip_missing,
+        refresh_overlays=args.refresh_overlays,
     )
 
     # Autonomous Editorial Director Gate (Rule 122, 128 & 136):

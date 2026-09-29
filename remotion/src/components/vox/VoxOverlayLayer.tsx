@@ -9,6 +9,9 @@ import { VoxCausalFlowchart } from "./VoxCausalFlowchart";
 import { VoxThresholdRatio } from "./VoxThresholdRatio";
 import { VoxInteractiveMap } from "./VoxInteractiveMap";
 import { CapitalFlowMap } from "./CapitalFlowMap";
+import { VoxDynamicChart } from "./VoxDynamicChart";
+import { VoxForensicPaper } from "./VoxForensicPaper";
+import { VoxKineticHeadline } from "./VoxKineticHeadline";
 import { EvidenceProp3D } from "../EvidenceProp3D";
 
 export interface VoxForensicOverlayData {
@@ -220,6 +223,49 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
             layout={layout}
             payload={ov.payload}
             label={ov.label}
+          />
+        ) : null}
+
+        {/* Dynamic Vector Financial Chart / Candlestick Line Draw (Vox Engine 4.0) */}
+        {rawType === "dynamic_chart" || rawType === "vector_chart" || rawType === "line_chart" || rawType === "bar_chart" ? (
+          <VoxDynamicChart
+            title={ov.title || statLabel}
+            badge={ov.badge || "MARKET FORENSIC DATA"}
+            chartType={ov.payload?.chart_type || (rawType === "bar_chart" ? "bar" : "line")}
+            data={ov.payload?.data}
+            startValue={ov.payload?.start_value}
+            endValue={ov.payload?.end_value}
+            unit={ov.payload?.unit || "B"}
+            prefix={ov.payload?.prefix || "$"}
+            color={ov.payload?.color}
+            trend={ov.payload?.trend}
+            layout={layout}
+          />
+        ) : null}
+
+        {/* Archival Forensic Paper with Yellow Highlighter Sweep & Stamp (Vox Engine 4.0) */}
+        {rawType === "forensic_paper" || rawType === "highlighter_doc" || rawType === "archival_paper" ? (
+          <VoxForensicPaper
+            title={ov.title}
+            documentNumber={ov.payload?.doc_number}
+            date={ov.payload?.date}
+            agency={ov.payload?.agency}
+            bodyText={ov.payload?.body_text || ov.label}
+            highlightedPhrase={ov.payload?.highlighted_phrase}
+            stampText={ov.payload?.stamp_text || ov.badge || "RESTRICTED"}
+            stampColor={ov.payload?.stamp_color}
+            layout={layout}
+          />
+        ) : null}
+
+        {/* Kinetic Headline Word-by-Word Impact Typography (Vox Engine 4.0) */}
+        {rawType === "kinetic_headline" || rawType === "cold_hook_headline" || rawType === "impact_headline" ? (
+          <VoxKineticHeadline
+            headline={ov.title || ov.label}
+            highlightWord={ov.payload?.highlight_word}
+            category={ov.badge || "FORENSIC INVESTIGATION"}
+            subtext={ov.payload?.subtext}
+            accentColor={ov.payload?.accent_color}
           />
         ) : null}
 

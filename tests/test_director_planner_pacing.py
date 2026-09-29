@@ -148,7 +148,7 @@ def test_build_remotion_props_with_camera_and_overlay(tmp_path):
     assert sc0["cameraMovement"] in valid_moves
     assert sc0["tensionLevel"] in valid_tensions
     assert sc0["bgClusterId"] == 1
-    assert sc0["forensicOverlay"]["type"] == "tactical_map"
+    assert sc0["forensicOverlay"]["type"] in ("tactical_map", "kinetic_headline")
 
     sc1 = props["scenes"][1]
     assert sc1["cameraMovement"] in valid_moves
@@ -175,3 +175,30 @@ def test_korean_pacing_and_scene_count_no_underflow():
     assert len(scenes) >= 70
     assert all(sc["narration"].endswith((".", "!", "?")) for sc in scenes)
     assert all(1 <= sc["beat_index"] <= 5 for sc in scenes)
+
+
+def test_detect_forensic_overlay_vox_motion_components():
+    """Verify new True Vox Motion graphics components: kinetic_headline, dynamic_chart, and forensic_paper."""
+    # 1. Kinetic Headline for Cold Hook
+    h = detect_forensic_overlay("Why did 942 billion dollars evaporate into thin air overnight?", is_cold_hook=True)
+    assert h is not None
+    assert h["type"] == "kinetic_headline"
+    assert "WHY DID 942 BILLION" in h["title"]
+    assert h["layout"] == "full_bleed_focus"
+
+    # 2. Dynamic Chart for Inflows / Decline Trajectory
+    c = detect_forensic_overlay("Foreign capital inflows fell from $314 billion to $188 billion in the third quarter.")
+    assert c is not None
+    assert c["type"] == "dynamic_chart"
+    assert c["payload"]["chart_type"] in ("line", "bar")
+    assert c["payload"]["start_value"] == 314.0
+    assert c["payload"]["end_value"] == 188.0
+    assert c["payload"]["trend"] == "down"
+
+    # 3. Archival Forensic Paper with Highlighter Sweep & Stamp
+    p = detect_forensic_overlay("An internal memo leaked from the executive committee revealed unauthorized secondary fund transfers.")
+    assert p is not None
+    assert p["type"] == "forensic_paper"
+    assert p["payload"]["stamp_text"] == "RESTRICTED"
+    assert "highlighted_phrase" in p["payload"]
+

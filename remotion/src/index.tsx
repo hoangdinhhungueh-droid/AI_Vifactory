@@ -315,23 +315,16 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
     );
   }
 
-  // Vox Engine 3.0: Integer divisor cadence stepping (10fps default = hold 3, 15fps = hold 2, 30fps = hold 1)
-  const targetFps = cadence === "smooth" ? 30 : cadence === "fluid" ? 15 : cadence === "archival" ? 6 : 10;
-  const hold = Math.max(1, Math.round(30 / targetFps));
-  const steppedFrame = Math.floor(frame / hold) * hold;
   const cell = computeForegroundCell(width, height, position, aspect);
-  const slideIn = interpolate(steppedFrame, [0, fadeFrames], [0, 1], {
+
+  // Vox Engine 4.0: Tactile organic paper placement drop (Permanent lock after frame 12, zero drift)
+  const settleProgress = interpolate(frame, [0, Math.min(12, fadeFrames)], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
+    easing: Easing.out(Easing.cubic),
   });
-  const offscreenX = position === "left" ? -(cell.left + cell.width) : width - cell.left;
-  const translateX = offscreenX * (1 - slideIn);
-
-  // VOX Stop-Motion micro-jitter & organic paper rotation
-  const jitterSeed = Math.floor(steppedFrame);
-  const jitterX = ((Math.sin(jitterSeed * 3.7) * 1000) % 2.5) - 1.25;
-  const jitterY = ((Math.cos(jitterSeed * 2.9) * 1000) % 2.5) - 1.25;
-  const jitterRot = ((Math.sin(jitterSeed * 1.3) * 1000) % 1.6) - 0.8;
+  const translateY = (1 - settleProgress) * 10;
+  const scale = 0.985 + 0.015 * settleProgress;
 
   return (
     <div
@@ -342,10 +335,10 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
         width: cell.width,
         height: cell.height,
         opacity,
-        transform: `translateX(${translateX}px) translate(${jitterX.toFixed(1)}px, ${jitterY.toFixed(1)}px) rotate(${jitterRot.toFixed(1)}deg)`,
-        // Signature VOX Tactile Paper Cutout Sticker Edge + High-Performance 3D Double Drop Shadow
+        transform: `translateY(${translateY.toFixed(1)}px) scale(${scale.toFixed(3)})`,
+        // Signature VOX Tactile Archival Diorama Shadow (clean, stable, no vibration)
         filter:
-          "drop-shadow(0 25px 35px rgba(0, 0, 0, 0.85)) drop-shadow(0 5px 15px rgba(0, 0, 0, 0.60)) drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.70))",
+          "drop-shadow(0 25px 40px rgba(0, 0, 0, 0.85)) drop-shadow(0 6px 16px rgba(0, 0, 0, 0.60))",
         zIndex: 15,
         pointerEvents: "none",
       }}
