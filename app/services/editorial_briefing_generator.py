@@ -133,6 +133,19 @@ def get_stamp_measurement_map(market: str) -> Dict[str, str]:
     return STAMP_MEASUREMENT_MAP_JP
 
 
+def deduplicate_tokens(text: str) -> str:
+    """Removes stuttering repeated words/tokens like 'RECORDED RECORDED' or 'CASE CASE'."""
+    if not text or not isinstance(text, str):
+        return text
+    # Run multi-pass regex to collapse any consecutively repeated words
+    cleaned = re.sub(r'\b([A-Za-z0-9_-]+)(?:\s+\1\b)+', r'\1', text)
+    # Also clean up repeated phrases like "CASE RECORD CASE RECORD"
+    cleaned = re.sub(r'(\b[A-Za-z0-9_-]+\s+[A-Za-z0-9_-]+\b)(?:\s+\1\b)+', r'\1', cleaned)
+    # Also normalize irregular terms like SUMMONSED
+    cleaned = re.sub(r'\bSUMMONSED\b', 'SUMMONS', cleaned)
+    return cleaned.strip()
+
+
 LOCALIZED_OVERLAY_THEMES: Dict[str, Dict[str, Any]] = {
     "JP": {
         "document_title": "公式検査・査察記録 // 検査成績書",
@@ -621,7 +634,13 @@ def prune_and_localize_scenes(
                             val = val.replace(cjk_k, cjk_v)
                         if re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]', val):
                             val = re.sub(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]+', 'AUDIT RECORD', val).strip(' /-_')
-                        overlay_obj[field] = val
+                    if val:
+                        val = deduplicate_tokens(val)
+                    overlay_obj[field] = val
+            else:
+                for field in ("badge", "title", "label"):
+                    if overlay_obj.get(field):
+                        overlay_obj[field] = deduplicate_tokens(overlay_obj[field])
 
             if isinstance(overlay_obj.get("payload"), dict):
                 p_load = overlay_obj["payload"]
@@ -653,6 +672,7 @@ def prune_and_localize_scenes(
                                     for cjk_k, cjk_v in STAMP_MEASUREMENT_MAP_EN.items():
                                         val = val.replace(cjk_k, cjk_v)
                                     val = re.sub(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]+', 'AUDIT RECORD', val).strip(' /-_')
+                            val = deduplicate_tokens(val)
                             d[pk] = val
                         elif isinstance(pv, list):
                             clean_list = []
@@ -671,6 +691,7 @@ def prune_and_localize_scenes(
                                             for cjk_k, cjk_v in STAMP_MEASUREMENT_MAP_EN.items():
                                                 i_val = i_val.replace(cjk_k, cjk_v)
                                             i_val = re.sub(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]+', 'AUDIT RECORD', i_val).strip(' /-_')
+                                    i_val = deduplicate_tokens(i_val)
                                     clean_list.append(i_val)
                                 elif isinstance(item, dict):
                                     _sanitize_dict(item)
