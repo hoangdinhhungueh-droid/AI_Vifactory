@@ -35,10 +35,15 @@ sys.path.insert(0, "/root/video_factory")
 sys.path.insert(0, "/root/video_factory/scripts")
 
 from app.services.hhtech_reasoner import call_gpt56_sol  # noqa: F401 (re-exported for callers)
-from app.services.seo_autogen_b10 import generate_seo_packaging
-from app.services.youtube_upload import upload_from_payload
-from app.services.youtube_thumbnail import set_thumbnail
-from app.services.telegram_buttons import send_gate3_card
+try:
+    from app.services.youtube_upload import upload_from_payload
+except ImportError:
+    upload_from_payload = None
+
+try:
+    from app.services.youtube_thumbnail import set_thumbnail
+except ImportError:
+    set_thumbnail = None
 from app.services import publish_ledger
 from ag_notion_bridge import update_page_properties, query_db, create_page
 from notion_schema_ext import (
@@ -384,6 +389,21 @@ def _clean_and_localize_seo_description(desc: str, ep_dir: Path, market: str, ti
     except Exception as e:
         print(f"[b10_seo] Chapter sync error: {e}")
 
+    # Tầng 2: Multi-Language Description Bridge (cross_channel_promoter)
+    try:
+        from app.services.cross_channel_promoter import build_description_bridge
+        bridge = build_description_bridge(market)
+        if bridge and "Official Global Network" not in desc_cleaned and "公式グローバルネットワーク" not in desc_cleaned and "공식 글로벌" not in desc_cleaned:
+            for sep in ["\nThis video incorporates", "\nThis story and its"]:
+                if sep in desc_cleaned:
+                    p1, p2 = desc_cleaned.split(sep, 1)
+                    desc_cleaned = f"{p1.rstrip()}\n\n{bridge}\n\n{sep.lstrip()}{p2}"
+                    break
+            else:
+                desc_cleaned = f"{desc_cleaned}\n\n{bridge}".strip()
+    except Exception as e_br:
+        print(f"[b10_seo] Description bridge error: {e_br}")
+
     return desc_cleaned
 
 
@@ -589,6 +609,19 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
     }
     LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
     LEDGER_PATH.write_text(json.dumps(ledger, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    print("=== [B10-AUTO] 7b. Smart Multi-Market Cross-Promotion Dispatch (Phương án A) ===")
+    try:
+        from app.services.cross_channel_promoter import dispatch_cross_promotion
+        cross_res = dispatch_cross_promotion(
+            video_id=video_id,
+            market=market,
+            episode_id=episode_id,
+            title=packaging["title_a"],
+        )
+        print(f"[B10-CROSS-PROMOTION] Partner playlists distribution completed: {json.dumps(cross_res, ensure_ascii=False)}")
+    except Exception as e_cross:
+        print(f"[B10-CROSS-PROMOTION] Warning: Cross-promotion distribution skipped: {e_cross}")
 
     # Rule 125 Idempotency Gate: Prevent duplicate HG3 telegram card within 10 minutes
     hg3_marker = ep_dir / "hg3_dispatched.json"

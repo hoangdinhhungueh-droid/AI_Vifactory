@@ -38,6 +38,7 @@ AI_DISCLOSURE_TEXT = (
 )
 
 from app.services.skill_loader import get_seo_editorial_skills
+from app.services.cross_channel_promoter import build_description_bridge
 
 def get_seo_hook_system_prompt() -> str:
     """Load dynamic SEO packaging system prompt from Notion SoT / external template (Rule 132)."""
@@ -313,6 +314,8 @@ def _fallback_seo_package(
         *chapters_lines,
         "",
         " ".join(hashtags),
+        "",
+        build_description_bridge(market),
         "",
         AI_DISCLOSURE_TEXT
     ]
@@ -672,6 +675,8 @@ def forge_seo_package(
             *chapter_lines,
             "",
             " ".join(hashtags),
+            "",
+            build_description_bridge(m_up),
             "",
             AI_DISCLOSURE_TEXT
         ]
