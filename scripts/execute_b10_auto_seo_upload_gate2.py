@@ -44,6 +44,11 @@ try:
     from app.services.youtube_thumbnail import set_thumbnail
 except ImportError:
     set_thumbnail = None
+
+try:
+    from app.services.telegram_buttons import send_gate3_card
+except ImportError:
+    send_gate3_card = None
 from app.services import publish_ledger
 from ag_notion_bridge import update_page_properties, query_db, create_page
 from notion_schema_ext import (
@@ -638,22 +643,26 @@ async def run(episode_id: str, market: str = "en", privacy_status: str = "unlist
 
     if not recent_dispatch:
         print("=== [B10-AUTO] 8. Dispatching Human Gate 3 Telegram card (4 buttons) ===")
-        await send_gate3_card(
-            video_id=video_id,
-            episode_id=episode_id,
-            title_a=packaging["title_a"],
-            title_b=packaging["title_b"],
-            market=market,
-        )
-        try:
-            hg3_marker.write_text(json.dumps({
-                "episode_id": episode_id,
-                "video_id": video_id,
-                "timestamp_epoch": time.time(),
-                "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            }, indent=2), encoding="utf-8")
-        except Exception:
-            pass
+        if send_gate3_card:
+            try:
+                await send_gate3_card(
+                    episode_id=episode_id,
+                    video_id=video_id,
+                    title_a=packaging.get("title_a", ""),
+                    title_b=packaging.get("title_b", ""),
+                    market=market,
+                )
+                hg3_marker.write_text(json.dumps({
+                    "episode_id": episode_id,
+                    "video_id": video_id,
+                    "timestamp_epoch": time.time(),
+                    "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                }, indent=2), encoding="utf-8")
+                print("✅ [B10-AUTO] Human Gate 3 card dispatched successfully to Telegram.")
+            except Exception as _tg_err:
+                print(f"⚠️ [B10-AUTO] HG3 Telegram card dispatch non-fatal warning: {_tg_err}")
+        else:
+            print("⚠️ [B10-AUTO] send_gate3_card not available, skipping Telegram card.")
     # [POST-SYNC CLEANUP] Rule 125 & Post-Publish Disk Hygiene
     try:
         from scripts.post_sync_cleanup import cleanup_episode_intermediates

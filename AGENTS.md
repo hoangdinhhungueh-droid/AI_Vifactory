@@ -108,6 +108,14 @@
 
 ---
 
+19. **RULE 137 (Zero-Drive-Wipe & Destructive Deletion Prohibition Iron Law - Local & VPS)**:
+    - **Phân Tách Tuyệt Đối Ngữ Nghĩa (Disconnect != Wipe)**: Mọi yêu cầu liên quan đến "ngắt kết nối", "disconnect", "unlink", "remove tool", "unregister", "detach" BẮT BUỘC chỉ thao tác logic trên file config (`.json`, `.yaml`, `.env`). CẤM TUYỆT ĐỐI gọi lệnh xóa file hoặc thư mục vật lý trên đĩa.
+    - **Blacklist Lệnh Tử Thần**: CẤM TUYỆT ĐỐI phát sinh các lệnh xóa đệ quy trên ổ đĩa / thư mục gốc (`Remove-Item -Recurse -Force`, `rm ` + `-rf /`, `rm ` + `-rf *`, `rmdir /s /q`) nhắm vào `C:\`, `D:\`, `/`, `/root`, `/home`, `~`, `*`.
+    - **Cấm Xóa Đệ Quy Trên Symlink/Junction**: Khi xóa liên kết mềm (symlink/junction), bắt buộc dùng lệnh xóa link chuyên dụng (`cmd /c rmdir <link>` hoặc `unlink <link>`), cấm dùng lệnh xóa đệ quy làm phá hủy thư mục gốc.
+    - **Quy Trình Xóa 2 Bước (Two-Phase Human-in-the-Loop)**: Mọi thao tác dọn dẹp thư mục từ 2 file trở lên bắt buộc thực hiện Dry-run in rõ danh sách file $\rightarrow$ Xin phép User xác nhận mới được thực thi.
+
+---
+
 ## 🗺️ II. MA TRẬN ĐỊNH TUYẾN KỸ NĂNG (PROGRESSIVE DISCLOSURE)
 
 Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt Skill chuyên môn hoặc nạp tài liệu tương ứng Just-in-Time khi nhận nhiệm vụ:
