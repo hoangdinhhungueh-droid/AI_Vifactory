@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
 from app.services.model_gateway import get_global_gateway
+from app.services.prompt_forge import lint_visual_prompt, NEGATIVE_R137, R137_CLOSING_DIRECTIVE
 
 logger = logging.getLogger("b36_visual_convergence")
 
@@ -234,6 +235,29 @@ def run_b36_visual_convergence(
     bg_prompts = prompts_data.get("backgrounds", {})
     fg_prompts = prompts_data.get("foregrounds", {})
     thumbnails = prompts_data.get("thumbnails", {})
+
+    # Rule 137 Pre-Convergence Linter Pass (Zero-Text & Zero-Number Invariant)
+    r137_sanitized_count = 0
+    for k, v in list(bg_prompts.items()):
+        prompt_str = v.get("prompt", "") if isinstance(v, dict) else str(v)
+        res = lint_visual_prompt(prompt_str, strict=False)
+        if res.violations:
+            r137_sanitized_count += 1
+            if isinstance(v, dict):
+                v["prompt"] = res.prompt
+            else:
+                bg_prompts[k] = res.prompt
+    for k, v in list(fg_prompts.items()):
+        prompt_str = v.get("prompt", "") if isinstance(v, dict) else str(v)
+        res = lint_visual_prompt(prompt_str, strict=False)
+        if res.violations:
+            r137_sanitized_count += 1
+            if isinstance(v, dict):
+                v["prompt"] = res.prompt
+            else:
+                fg_prompts[k] = res.prompt
+    if r137_sanitized_count > 0:
+        logger.info(f"🛡️ Rule 137: Auto-sanitized {r137_sanitized_count} visual prompts to enforce blank templates & zero text")
 
     # Build balanced representative sample scenes across all 5 beats, including stat cards and overlays
     beat_map = {}

@@ -52,6 +52,46 @@ CANONICAL_BEATS = [
     "Beat 5: The Uncomfortable Modern Mirror & Living Warning"
 ]
 
+# Asset Diversity Invariants (Vox Masterclass Standard)
+MAX_USES_PER_ASSET = 3
+MIN_GAP_SCENES = 4
+
+def validate_asset_reuse_limits(scenes: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Enforces Vox Masterclass asset diversity invariants: max 3 uses per asset, min gap 4 scenes."""
+    bg_usage: Dict[str, List[int]] = {}
+    fg_usage: Dict[str, List[int]] = {}
+    violations: List[str] = []
+
+    for i, sc in enumerate(scenes):
+        bg_k = sc.get("bg_reuse_key") or sc.get("background_reuse_key") or ""
+        fg_k = sc.get("fg_reuse_key") or sc.get("foreground_reuse_key") or ""
+
+        if bg_k:
+            bg_usage.setdefault(bg_k, []).append(i)
+        if fg_k:
+            fg_usage.setdefault(fg_k, []).append(i)
+
+    for k, indices in bg_usage.items():
+        if len(indices) > MAX_USES_PER_ASSET:
+            violations.append(f"BG asset '{k}' overused: {len(indices)} times (max {MAX_USES_PER_ASSET})")
+        for a, b in zip(indices, indices[1:]):
+            if b - a < MIN_GAP_SCENES:
+                violations.append(f"BG asset '{k}' repeated too quickly at scenes {a} and {b} (gap {b-a} < {MIN_GAP_SCENES})")
+
+    for k, indices in fg_usage.items():
+        if len(indices) > MAX_USES_PER_ASSET:
+            violations.append(f"FG asset '{k}' overused: {len(indices)} times (max {MAX_USES_PER_ASSET})")
+        for a, b in zip(indices, indices[1:]):
+            if b - a < MIN_GAP_SCENES:
+                violations.append(f"FG asset '{k}' repeated too quickly at scenes {a} and {b} (gap {b-a} < {MIN_GAP_SCENES})")
+
+    return {
+        "ok": len(violations) == 0,
+        "violations": violations,
+        "bg_usage": {k: len(v) for k, v in bg_usage.items()},
+        "fg_usage": {k: len(v) for k, v in fg_usage.items()}
+    }
+
 # Rule 128: Concise targeted art direction rules (~1.2k chars) replacing 336k chars dump
 TARGETED_ART_RULES = get_b3_strategic_rules()
 
@@ -1560,23 +1600,40 @@ def generate_director_plan(
         }
         normalized_scenes.append(norm_sc)
 
-    # VOX Balanced Foreground & Character Allocation Engine (Rule 122 & Audit Round 5 Standard):
-    # Ensures >= 85% foreground coverage across all scenes, preventing empty slideshow look.
-    # Distributes human characters (up to 35-45 scenes) and tactile evidence props/charts without empty vacancies.
+    # =========================================================================
+    # RULE 122 & VOX MASTERCLASS ASSET DIVERSITY ALLOCATION ENGINE
+    # Invariants:
+    # 1. MAX_USES_PER_ASSET = 3 (strictly halts the 10x asset repetition disaster)
+    # 2. MIN_GAP_SCENES = 4 (prevents rapid repetitive flashing of the same asset)
+    # 3. 55-65% Code MoGraph Protection: Scenes with data graphics keep FG empty
+    # =========================================================================
+    MAX_USES_PER_ASSET = 3
+    MIN_GAP_SCENES = 4
+
     evidence_fg_keys = [k for k, v in fg_roster.items() if v.get("type") in ("evidence_prop", "document", "data_metric") or k.startswith("fg_evidence_") or k.startswith("fg_doc_")]
     character_fg_keys = [k for k, v in fg_roster.items() if v.get("type") == "character" or k.startswith("fg_character_") or k.startswith("char_")]
 
-    fg_usage_counter = {}
-    for sc in normalized_scenes:
+    fg_usage_counter: Dict[str, int] = {}
+    fg_last_seen: Dict[str, int] = {}
+    for i, sc in enumerate(normalized_scenes):
         current_fg = sc.get("fg_reuse_key") or ""
         if current_fg:
             fg_usage_counter[current_fg] = fg_usage_counter.get(current_fg, 0) + 1
+            fg_last_seen[current_fg] = i
 
-    # Intelligent Fill: Scenes without FG that are NOT dedicated establishing shots get filled
-    # to maintain >= 85% visual interest and depth
+    # Intelligent Fill with Strict Diversity Cap & Gap Protection
     for i, sc in enumerate(normalized_scenes):
         current_fg = sc.get("fg_reuse_key") or ""
-        # Reserve first scene of each beat as a cinematic establishing wide shot
+        # 1. Do not force FG onto scenes with dedicated fullscreen motion graphics
+        overlay_type = (sc.get("overlay") or {}).get("type", "") if isinstance(sc.get("overlay"), dict) else ""
+        has_dense_mograph = overlay_type in ("DocumentHighlight", "InteractiveMap", "CausalFlowchart", "EvidenceBoard", "TacticalMap", "BankCheck")
+        if has_dense_mograph:
+            # Leave foreground empty so Remotion data graphics have 100% clean visual hierarchy
+            sc["fg_reuse_key"] = ""
+            sc["foreground_reuse_key"] = ""
+            continue
+
+        # 2. Reserve establishing shots
         is_establishing_shot = (i in (0, 31, 62, 94, 124)) and not current_fg
         if is_establishing_shot:
             continue
@@ -1584,19 +1641,32 @@ def generate_director_plan(
         if not current_fg:
             narr = sc.get("narration", "").lower()
             chosen_fg = None
-            # 1. Match keyword in fg_roster
+            # Helper to check if asset is eligible under diversity invariants
+            def is_eligible(k: str) -> bool:
+                if fg_usage_counter.get(k, 0) >= MAX_USES_PER_ASSET:
+                    return False
+                if k in fg_last_seen and (i - fg_last_seen[k]) < MIN_GAP_SCENES:
+                    return False
+                return True
+
+            # Try matching keyword in fg_roster
             for k, info in fg_roster.items():
                 kws = info.get("keywords", [])
-                if any(kw.lower() in narr for kw in kws) and fg_usage_counter.get(k, 0) < 4:
+                if any(kw.lower() in narr for kw in kws) and is_eligible(k):
                     chosen_fg = k
                     break
-            # 2. Fallback to least-used evidence prop
+
+            # Fallback to least-used eligible evidence prop
             if not chosen_fg and evidence_fg_keys:
-                sorted_ev = sorted(evidence_fg_keys, key=lambda k: fg_usage_counter.get(k, 0))
-                chosen_fg = sorted_ev[0]
-            elif not chosen_fg and character_fg_keys:
-                sorted_char = sorted(character_fg_keys, key=lambda k: fg_usage_counter.get(k, 0))
-                chosen_fg = sorted_char[0]
+                eligible_ev = [k for k in evidence_fg_keys if is_eligible(k)]
+                if eligible_ev:
+                    chosen_fg = sorted(eligible_ev, key=lambda k: fg_usage_counter.get(k, 0))[0]
+
+            # Fallback to least-used eligible character
+            if not chosen_fg and character_fg_keys:
+                eligible_char = [k for k in character_fg_keys if is_eligible(k)]
+                if eligible_char:
+                    chosen_fg = sorted(eligible_char, key=lambda k: fg_usage_counter.get(k, 0))[0]
 
             if chosen_fg:
                 sc["fg_reuse_key"] = chosen_fg
@@ -1604,6 +1674,7 @@ def generate_director_plan(
                 sc["foreground_reuse_key"] = chosen_fg
                 sc["foreground_prompt"] = fg_roster.get(chosen_fg, {}).get("description", "")
                 fg_usage_counter[chosen_fg] = fg_usage_counter.get(chosen_fg, 0) + 1
+                fg_last_seen[chosen_fg] = i
 
     # 6. Assemble complete output payloads
     director_plan = {

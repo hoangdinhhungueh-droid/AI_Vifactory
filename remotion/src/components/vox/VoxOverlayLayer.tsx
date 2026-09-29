@@ -8,6 +8,7 @@ import { VoxKineticCounter } from "./VoxKineticCounter";
 import { VoxCausalFlowchart } from "./VoxCausalFlowchart";
 import { VoxThresholdRatio } from "./VoxThresholdRatio";
 import { VoxInteractiveMap } from "./VoxInteractiveMap";
+import { CapitalFlowMap } from "./CapitalFlowMap";
 import { EvidenceProp3D } from "../EvidenceProp3D";
 
 export interface VoxForensicOverlayData {
@@ -196,6 +197,17 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
             layout={layout}
             payload={ov.payload}
             label={ov.label}
+          />
+        ) : null}
+
+        {/* Global Capital Flow Vectors / Treasury Flow Map (Vox Engine 3.0) */}
+        {rawType === "capital_flow_map" || rawType === "capital_vectors" || rawType === "global_flow" ? (
+          <CapitalFlowMap
+            title={ov.title}
+            badge={ov.badge}
+            flows={ov.payload?.flows}
+            market={ov.payload?.market}
+            layout={layout}
           />
         ) : null}
 

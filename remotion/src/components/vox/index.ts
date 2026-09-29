@@ -13,5 +13,6 @@ export * from "./VoxParallaxLayer";
 export * from "./VoxSourceCredit";
 export * from "./VoxTacticalMap";
 export * from "./VoxThresholdRatio";
+export * from "./CapitalFlowMap";
 export * from "./springPresets";
 export * from "./LivingCamera";

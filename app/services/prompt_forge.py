@@ -13,6 +13,8 @@ import json
 import re
 import requests
 import logging
+from dataclasses import dataclass
+from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -222,8 +224,84 @@ def _clean_relics(text: str, is_byzantine_topic: bool = False) -> str:
     return deduplicate_phrase_stutter(text)
 
 
+# =========================================================================
+# RULE 137: ZERO-TEXT & ZERO-NUMBER IN VISUAL PROMPT MANDATE (VOX ELEVATION)
+# =========================================================================
+
+# Tokens that look numeric/temporal but are visual, cinematographic or era anchors (ALLOWLIST)
+R137_ALLOWLIST = re.compile(r"\b(2\.5D|35mm|50mm|85mm|16:9|1:1|21:9|32:9|\d{4}s)\b", re.IGNORECASE)
+
+R137_BANNED = {
+    "currency": re.compile(r"[$¥₩€£]|\b(USD|JPY|KRW|dollars?|yen|won)\b|달러|원화|ドル|円", re.IGNORECASE),
+    "units": re.compile(r"\b(million|billion|trillion|percent)\b|%|億|兆|万|억|조|만", re.IGNORECASE),
+    "digits": re.compile(r"\d"),
+    "text_claims": re.compile(
+        r"\b(text|words?|letters?|caption|headline|title|label(?:ed)?|reads?|saying|"
+        r"written|typography|font|logo|signage|numbers?|chart values)\b", re.IGNORECASE
+    ),
+    "quoted": re.compile(r"[\"“”'‘’「」『』].+?[\"“”'‘’「」『』]"),
+}
+
+# Documents are allowed, but strictly as blank forensic templates
+DOC_NOUNS = re.compile(r"\b(document|ledger|filing|report|form|memo|invoice|statement|receipt|subpoena|docket)\b", re.IGNORECASE)
+BLANK_TEMPLATE = (
+    "unfilled template with official border, blank amount fields, "
+    "empty ruled lines, embossed seal without inscription, no typography, blank surfaces"
+)
+
+NEGATIVE_R137 = (
+    "no text, no letters, no words, no numbers, no digits, no currency symbols, no watermark, "
+    "no signature, no logo, no caption, no labels, no readable writing, no chart values, "
+    "no subtitles, no UI elements, no hanzi, no kanji, no hangul, no latin script typography"
+)
+R137_CLOSING_DIRECTIVE = "The image contains no writing or readable digits of any kind in any language."
+
+@dataclass
+class LintResult:
+    ok: bool
+    violations: List[Tuple[str, str]]
+    prompt: str
+    negative: str
+
+def lint_visual_prompt(prompt: str, strict: bool = False) -> LintResult:
+    """
+    Rule 137 Strict Prompt Linter.
+    Scans visual prompt to purge and prevent baked-in text, currency symbols, and numbers.
+    In strict mode, returns ok=False if violations exist.
+    In non-strict mode, sanitizes and replaces doc claims with BLANK_TEMPLATE.
+    """
+    if not prompt:
+        return LintResult(ok=True, violations=[], prompt="", negative=NEGATIVE_R137)
+    
+    # 1. Protect allowlisted technical tokens
+    scrubbed = R137_ALLOWLIST.sub(" ", prompt)
+    
+    # 2. Check for banned violations
+    violations: List[Tuple[str, str]] = []
+    for cat, rx in R137_BANNED.items():
+        for m in rx.finditer(scrubbed):
+            violations.append((cat, m.group(0)))
+            
+    # 3. Clean and inject blank template if document nouns present
+    fixed = prompt
+    # Remove quoted strings that might contain fake text
+    fixed = R137_BANNED["quoted"].sub("", fixed)
+    # Strip explicit currency amounts like "$942B", "$426 billion", "188 billion"
+    fixed = re.sub(r"[$¥₩€£]?\s*\b\d+(?:\.\d+)?\s*(?:billion|trillion|million|B|T|M|k|%)?\s*(?:dollars?|yen|won)?\b", "", fixed, flags=re.IGNORECASE)
+    
+    if DOC_NOUNS.search(fixed) and "unfilled template" not in fixed:
+        fixed = f"{fixed.rstrip('. ')}, {BLANK_TEMPLATE}"
+        
+    # Ensure closing directive is present
+    if R137_CLOSING_DIRECTIVE not in fixed:
+        fixed = f"{fixed.rstrip('. ')}. {R137_CLOSING_DIRECTIVE}"
+        
+    ok = len(violations) == 0 if strict else True
+    return LintResult(ok=ok, violations=violations, prompt=fixed, negative=NEGATIVE_R137)
+
+
 def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: bool = False, market: str = "EN", tokens: list | None = None) -> str:
-    """Sanitize and enforce Rule 116 standards for Layer 1 Background prompts with Market Architecture Conformance."""
+    """Sanitize and enforce Rule 116 & Rule 137 standards for Layer 1 Background prompts with Market Architecture Conformance."""
     p = _sanitize_evidence_notes(prompt.strip())
     p = re.sub(r"\[STYLE MANDATE\]\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[MARKET & ENVIRONMENT ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
@@ -242,6 +320,10 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     # Strip non-ASCII / CJK glyphs from English visual prompts (Rule 446)
     p = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]+", "", p)
     p = re.sub(r"\s{2,}", " ", p).strip()
+
+    # Rule 137: Sanitize visual prompt through linter
+    lint_res = lint_visual_prompt(p, strict=False)
+    p = lint_res.prompt
 
     if "16:9" not in p:
         p = f"{p}, 16:9 aspect ratio"
@@ -268,7 +350,7 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
 
     style_prefix = "[STYLE MANDATE] 16:9 widescreen cinematic editorial environment illustration, stylized graphic novel background, atmospheric volumetric lighting, spatial textures, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay."
 
-    p = f"{style_prefix} {p}{flow_str} [MARKET & ENVIRONMENT ANCHOR] {bg_anchor}. [ERA ANCHOR] Authentic period architecture and narrative atmosphere. [STRICT NEGATIVE PROMPT] no prominent foreground human figures, no photorealistic faces, no text, no subtitles, no watermark, no borders, no ui elements, no split frame, no photographic raw camera{bg_negs}."
+    p = f"{style_prefix} {p}{flow_str} [MARKET & ENVIRONMENT ANCHOR] {bg_anchor}. [ERA ANCHOR] Authentic period architecture and narrative atmosphere. [STRICT NEGATIVE PROMPT] no prominent foreground human figures, no photorealistic faces, {NEGATIVE_R137}, no borders, no ui elements, no split frame, no photographic raw camera{bg_negs}. {R137_CLOSING_DIRECTIVE}"
 
     return deduplicate_phrase_stutter(p)
 
@@ -495,12 +577,16 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
             has_character = False
         is_object = has_evidence_kw and not has_character
 
+    # Rule 137: Sanitize visual prompt through linter
+    lint_res = lint_visual_prompt(p, strict=False)
+    p = lint_res.prompt
+
     if is_object:
         style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich tactile paper and material textures, 1:1 aspect ratio, centered investigative artifact, crisp paper-cutout sticker aesthetic, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
-        p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with clear legible markers. [ERA ANCHOR] Authentic period materials, forensic case evidence. [STRICT NEGATIVE PROMPT] no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no borders, no extraneous ui elements."
+        p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with blank unfilled fields. [ERA ANCHOR] Authentic period materials, forensic case evidence. [STRICT NEGATIVE PROMPT] no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no borders, no extraneous ui elements, {NEGATIVE_R137}. {R137_CLOSING_DIRECTIVE}"
     else:
         style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich nuanced colors, 1:1 aspect ratio, full-body head-to-shoes, entire character visible within frame, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
-        p = f"{style_prefix} {p}{fg_flow_str}, dynamic high-stakes body posture, dramatic physical posing, intense facial micro-expressions with sharp focused gaze, full-body head-to-shoes visible within frame. [MARKET & ETHNIC ANCHOR] {fg_anchor}. [ERA ANCHOR] Authentic professional attire, stylized expressive character acting, active props interaction. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements{fg_negs}."
+        p = f"{style_prefix} {p}{fg_flow_str}, dynamic high-stakes body posture, dramatic physical posing, intense facial micro-expressions with sharp focused gaze, full-body head-to-shoes visible within frame. [MARKET & ETHNIC ANCHOR] {fg_anchor}. [ERA ANCHOR] Authentic professional attire, stylized expressive character acting, active props interaction. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements, {NEGATIVE_R137}{fg_negs}. {R137_CLOSING_DIRECTIVE}"
 
     p = deduplicate_phrase_stutter(p)
     p = re.sub(r",\s*\.\s*", ", ", p)
@@ -564,6 +650,10 @@ def _sanitize_vox_collage_prompt(
     p = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]+", "", p)
     p = re.sub(r"\s{2,}", " ", p).strip()
 
+    # Rule 137: Sanitize visual prompt through linter
+    lint_res = lint_visual_prompt(p, strict=False)
+    p = lint_res.prompt
+
     prof = resolve_market_profile(market)
     market_negs = f", {prof['fg_negatives']}" if prof.get("fg_negatives") else ""
 
@@ -586,7 +676,8 @@ def _sanitize_vox_collage_prompt(
     )
     strict_negatives = (
         f"[STRICT NEGATIVE PROMPT] no 3D CGI render, no smooth digital vector illustration, no clean studio portrait, "
-        f"no green screen, no purple chroma, no purple halo, no watermark, no digital overlays, no floating text in bottom subtitle zone{market_negs}."
+        f"no green screen, no purple chroma, no purple halo, no watermark, no digital overlays, no floating text in bottom subtitle zone, "
+        f"{NEGATIVE_R137}{market_negs}. {R137_CLOSING_DIRECTIVE}"
     )
 
     if "16:9" not in p:
