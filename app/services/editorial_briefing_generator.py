@@ -281,8 +281,6 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
     def _scene_priority(item: Tuple[int, Dict[str, Any]]) -> float:
         idx, sc = item
         score = 0.0
-        if idx == 0:
-            score += 25.0  # Cold Hook scene MUST always be prioritized (Rule 444 / Rule 122)
         narration = sc.get("narration", "") or sc.get("caption", "")
         narr_lower = narration.lower()
         if any(k in narr_lower for k in [
