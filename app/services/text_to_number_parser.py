@@ -328,22 +328,24 @@ def parse_spoken_number(text: str) -> Optional[ParsedMetric]:
                 trend=trend
             )
 
-    jp_digit_match = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?)\s*(万|億|兆)?\s*(円|件|人|名|ヶ所|箇所|基|倍|トン|m|km|点|本|台|棟)?', text)
-    if jp_digit_match and (jp_digit_match.group(2) or jp_digit_match.group(3)):
-        base = float(jp_digit_match.group(1).replace(",", ""))
-        unit = jp_digit_match.group(2) or ""
-        suffix = jp_digit_match.group(3) or ""
-        mult = 100_000_000.0 if unit == "億" else (10_000.0 if unit == "万" else (1_000_000_000_000.0 if unit == "兆" else 1.0))
-        return ParsedMetric(
-            raw_value=base * mult,
-            display_value=base,
-            unit=f"{unit}{suffix}",
-            prefix="",
-            suffix="",
-            formatted=f"{base:g}{unit}{suffix}",
-            metric_type="currency" if "円" in suffix else "scale",
-            trend=trend
-        )
+    has_jp = any('\u3040' <= ch <= '\u30ff' or '\u4e00' <= ch <= '\u9fff' for ch in text)
+    if has_jp:
+        jp_digit_match = re.search(r'(\d+(?:,\d{3})*(?:\.\d+)?)\s*(万|億|兆)?\s*(円|件|人|名|ヶ所|箇所|基|倍|トン|m|km|点|本|台|棟)?', text)
+        if jp_digit_match and (jp_digit_match.group(2) or jp_digit_match.group(3)):
+            base = float(jp_digit_match.group(1).replace(",", ""))
+            unit = jp_digit_match.group(2) or ""
+            suffix = jp_digit_match.group(3) or ""
+            mult = 100_000_000.0 if unit == "億" else (10_000.0 if unit == "万" else (1_000_000_000_000.0 if unit == "兆" else 1.0))
+            return ParsedMetric(
+                raw_value=base * mult,
+                display_value=base,
+                unit=f"{unit}{suffix}",
+                prefix="",
+                suffix="",
+                formatted=f"{base:g}{unit}{suffix}",
+                metric_type="currency" if "円" in suffix else "scale",
+                trend=trend
+            )
 
     # 3. Check Percentages: 52%, -38%, +15.4%, 92パーセント
     pct_match = re.search(r'([+-]?\d+(?:\.\d+)?)\s*(?:%|パーセント|％)', text)
@@ -361,13 +363,29 @@ def parse_spoken_number(text: str) -> Optional[ParsedMetric]:
         )
 
     # 4. Check Alphanumeric Dollar / Currency: $10M, $1.2B, $538K, 40 billion dollar, $300,000, $10 million
-    alpha_dollar = re.search(r'(\$)?\s*(\d+(?:,\d{3})*(?:\.\d+)?)\s*(billion|million|trillion|thousand|b|m|k)?\s*(dollars?|usd)?', text, re.IGNORECASE)
+    # Enforce strict word boundaries after single-letter units (b, m, k, t) so "2026 because" does not match "b"
+    alpha_dollar = re.search(r'(\$)?\s*(\d+(?:,\d{3})*(?:\.\d+)?)\s*(billion|million|trillion|thousand|[bmkt]\b)?\s*(dollars?|usd)?', text, re.IGNORECASE)
     if alpha_dollar and (alpha_dollar.group(1) or alpha_dollar.group(3) or alpha_dollar.group(4)):
         base = float(alpha_dollar.group(2).replace(",", ""))
         unit_str = (alpha_dollar.group(3) or "").upper()
+        raw_digits = alpha_dollar.group(2)
+
+        # Disqualify named indices (e.g. S&P 500, Russell 2000, Fortune 500)
+        if re.search(r'\b(?:S&P|Russell|Fortune|Nasdaq|Nikkei|FTSE)\s+' + re.escape(raw_digits) + r'\b', text, re.IGNORECASE):
+            return None
+
+        # Disqualify calendar years if no explicit currency symbol or unit scale was attached
+        if not unit_str and not alpha_dollar.group(1) and not alpha_dollar.group(4):
+            if 1990 <= base <= 2035 and "." not in raw_digits:
+                return None
+
         has_dollar = bool(alpha_dollar.group(1) or alpha_dollar.group(4) or any(k in t_lower for k in ["dollar", "stock", "capital", "fund", "loss"]))
         prefix = "$" if has_dollar else ""
-        if unit_str in ["BILLION", "B"]:
+        if unit_str in ["TRILLION", "T"]:
+            unit = "T"
+            raw_val = base * 1_000_000_000_000.0
+            display_val = base
+        elif unit_str in ["BILLION", "B"]:
             unit = "B"
             raw_val = base * 1_000_000_000.0
             display_val = base
@@ -417,7 +435,14 @@ def parse_spoken_number(text: str) -> Optional[ParsedMetric]:
         if base_num is not None and base_num > 0:
             mult = _SCALES.get(scale_word, 1.0)
             raw_val = base_num * mult
-            unit = "M" if scale_word == "million" else ("B" if scale_word == "billion" else "K")
+            if scale_word == "trillion":
+                unit = "T"
+            elif scale_word == "billion":
+                unit = "B"
+            elif scale_word == "million":
+                unit = "M"
+            else:
+                unit = "K"
             is_dollar = any(k in t_lower for k in ["dollar", "taxpayer", "claim", "reimbursement", "fund", "payment", "fine", "loss", "subsidy", "subsidies"])
             prefix = "$" if is_dollar else ""
             return ParsedMetric(

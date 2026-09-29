@@ -136,3 +136,40 @@ def test_parse_spoken_number_zero_mock_fallback():
     p_ordinary = parse_spoken_number("The detectives arrived at the daycare center early in the morning.")
     assert p_ordinary is None
 
+
+def test_parse_spoken_number_ep0006_regressions():
+    # 1. Trillion scale: "Bank of America Global Research tracked one point two trillion dollars entering..."
+    p_trillion = parse_spoken_number("Bank of America Global Research tracked one point two trillion dollars entering equity funds.")
+    assert p_trillion is not None
+    assert p_trillion.display_value == 1.2
+    assert p_trillion.unit == "T"
+    assert p_trillion.prefix == "$"
+    assert p_trillion.formatted == "$1.2T"
+
+    # 2. Calendar year without currency: "This mattered in 2026 because the debt side had still functioned during 2021."
+    # Must NOT become 2026B!
+    p_year = parse_spoken_number("This mattered in 2026 because the debt side had still functioned during 2021.")
+    assert p_year is None
+
+    # 3. S&P 500 index members: "Only twenty-seven point seven percent of S&P 500 members beat the index in 2024."
+    # Percentage (27.7%) should be parsed, NOT 500m!
+    p_sp500 = parse_spoken_number("Only twenty-seven point seven percent of S&P 500 members beat the index in 2024.")
+    # Percentages or None, never '500m'
+    if p_sp500 is not None:
+        assert p_sp500.unit != "m"
+        assert p_sp500.formatted != "500m"
+
+    # 4. Discrete billions:
+    p_426b = parse_spoken_number("The second quarter alone delivered four hundred twenty-six billion dollars.")
+    assert p_426b is not None
+    assert p_426b.display_value == 426.0
+    assert p_426b.unit == "B"
+    assert p_426b.formatted == "$426B"
+
+    p_188b = parse_spoken_number("They dropped to just one hundred eighty-eight billion dollars.")
+    assert p_188b is not None
+    assert p_188b.display_value == 188.0
+    assert p_188b.unit == "B"
+    assert p_188b.formatted == "$188B"
+
+
