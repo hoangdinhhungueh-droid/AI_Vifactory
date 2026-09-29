@@ -3,7 +3,7 @@
 """app/services/timeline_editor_agent.py
 
 AI Senior Post-Production Editor Gate (Timeline Assembly Optimization).
-Frontier LLM Director (gpt-6-astra / claude-opus-5 via ModelGateway) +
+Frontier LLM Director (gpt-6-astra / claude-opus-5-5 via ModelGateway) +
 Deterministic Heuristic Safety Gate (Word-Locked Punches, Visual Monotony Breaker, Rule 136 Clean Tags).
 Operates as an intelligent editorial layer between B3 Director Plan and B8 Render.
 """
@@ -81,7 +81,7 @@ def llm_timeline_director_review(
     model_override: Optional[str] = None,
     timeout: float = 35.0,
 ) -> Dict[str, Any]:
-    """Invoke Frontier LLM (gpt-6-astra / claude-opus-5) to conduct Senior Director review of timeline.
+    """Invoke Frontier LLM (gpt-6-astra / claude-opus-5-5) to conduct Senior Director review of timeline.
 
     Evaluates narrative tension, pacing rhythm, camera flow (continuous drift/whip/orbit),
     and scene transitions before Remotion render.
@@ -104,7 +104,7 @@ def llm_timeline_director_review(
         return result_record
 
     model = model_override or os.getenv("TIMELINE_DIRECTOR_MODEL", "gpt-6-astra")
-    fallback_model = os.getenv("TIMELINE_DIRECTOR_FALLBACK_MODEL", "claude-opus-5")
+    fallback_model = os.getenv("TIMELINE_DIRECTOR_FALLBACK_MODEL", "claude-opus-5-5")
 
     context = story_context or _load_story_context(episode_id)
     story_snippet = context.get("story_snippet", "")
@@ -224,7 +224,7 @@ def audit_and_optimize_timeline(
 ) -> list[dict[str, Any]]:
     """Master entry point for Timeline Assembly optimization.
     
-    Coordinates Frontier LLM Director Review (gpt-6-astra / claude-opus-5) and
+    Coordinates Frontier LLM Director Review (gpt-6-astra / claude-opus-5-5) and
     Deterministic Heuristic Safety Gate (Word-Locked Punches, Visual Monotony Breaker, Rule 136 Clean Tags).
     Transforms raw mapped scenes into an editorially polished, pacing-optimized
     timeline ready for Remotion rendering.

@@ -1069,7 +1069,7 @@ def discover_and_produce_market_trend(
                 news_catalysts=recon_data.get("news_catalysts", []),
                 rising_queries=rising_queries[:8],
                 traffic=str(c.get("approx_traffic", "")),
-                model="claude-opus-5",
+                model="claude-opus-5-5",
                 fallback_model="gpt-6-astra"
             )
             c_verdict = critic_res.get("verdict", "PASS").upper()

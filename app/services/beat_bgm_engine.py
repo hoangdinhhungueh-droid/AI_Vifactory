@@ -233,7 +233,7 @@ def _llm_select_tracks(
     out_dir: Optional[str] = None,
     model_override: Optional[str] = None
 ) -> Optional[List[Dict[str, Any]]]:
-    """Use HHTech LLM (gpt-6-astra / claude-opus-5) to curate BGM tracks based on story tone."""
+    """Use HHTech LLM (gpt-6-astra / claude-opus-5-5) to curate BGM tracks based on story tone."""
     try:
         from app.services.model_gateway import get_global_gateway
         gateway = get_global_gateway()
@@ -367,7 +367,7 @@ def select_5_beat_tracks(
     """Select 5 cohesive tracks for beats 1..5.
     
     Priority:
-      1. LLM AI Music Supervisor (via HHTech gpt-6-astra / claude-opus-5) if story exists & use_llm is True
+      1. LLM AI Music Supervisor (via HHTech gpt-6-astra / claude-opus-5-5) if story exists & use_llm is True
       2. Deterministic hash-modulo fallback (Rule 125 single truth, zero downtime)
     """
     catalog = catalog or load_bgm_catalog()

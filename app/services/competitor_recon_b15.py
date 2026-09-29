@@ -828,19 +828,19 @@ def call_recon_forensic_llm(
 ) -> str:
     """
     Multi-Tier Resilient LLM Caller for Forensic Competitor Analysis (B1.5):
-      - Tier 1: Primary (claude-opus-5 -> fallback gpt-6-astra)
+      - Tier 1: Primary (claude-opus-5-5 -> fallback gpt-6-astra)
       - Tier 2: Resilient Fallback (kimi-k3 -> fallback claude-sonnet-5)
       - Budget & Token Guard: CostTracker integration and error containment
     """
     from app.services.model_gateway import get_global_gateway
     gateway = get_global_gateway()
 
-    # Tier 1: Opus 5 (with Astra 6 fallback)
+    # Tier 1: Opus 5.5 (with Astra 6 fallback)
     try:
-        logger.info("[b15.llm] Invoking Tier 1: claude-opus-5 (fallback gpt-6-astra)...")
+        logger.info("[b15.llm] Invoking Tier 1: claude-opus-5-5 (fallback gpt-6-astra)...")
         return gateway.call_llm(
             prompt=prompt,
-            model="claude-opus-5",
+            model="claude-opus-5-5",
             system_prompt=system_prompt,
             max_tokens=max_tokens,
             temperature=temperature,

@@ -45,9 +45,9 @@ def test_cost_cap_enforcement():
             print(f"❌ FAIL: Expected 200 VND, got {tracker.get_monthly_total():.2f} VND")
             return False
         
-        # Test 2: claude-opus-5 (2.000 VND / 1M tokens -> 2.0 VND / 1k tokens)
-        print("[TEST] Recording 50,000 tokens of claude-opus-5 (expecting 100 VND)...")
-        tracker.record("claude-opus-5", 50_000, is_image=False)  # 50k tokens * 2.0 = 100 VND
+        # Test 2: claude-opus-5-5 (2.000 VND / 1M tokens -> 2.0 VND / 1k tokens)
+        print("[TEST] Recording 50,000 tokens of claude-opus-5-5 (expecting 100 VND)...")
+        tracker.record("claude-opus-5-5", 50_000, is_image=False)  # 50k tokens * 2.0 = 100 VND
         expected_total = 200.0 + 100.0
         if abs(tracker.get_monthly_total() - expected_total) < 0.01:
             print(f"✅ Success. Total: {tracker.get_monthly_total():.2f} VND")

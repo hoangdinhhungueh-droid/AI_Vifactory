@@ -69,7 +69,7 @@ def audit_candidate_trend_alignment(
     news_catalysts: Optional[List[Dict[str, Any]]] = None,
     rising_queries: Optional[List[str]] = None,
     traffic: str = "",
-    model: str = "claude-opus-5",
+    model: str = "claude-opus-5-5",
     fallback_model: str = "gpt-6-astra"
 ) -> Dict[str, Any]:
     """Execute adversarial critique of candidate and proposed angle.
@@ -111,9 +111,9 @@ Niche Brief: "{niche_brief}"
 
 Interrogate whether this proposed angle truly satisfies the breaking search intent, or if it constitutes a Bait-and-Switch diversion. Return strict JSON only."""
 
-    # Enforce Claude lineage: only claude-opus-5 or claude-sonnet-5 allowed
-    if not (model.startswith("claude-opus-5") or model.startswith("claude-sonnet-5")):
-        chosen_model = "claude-opus-5"
+    # Enforce Claude lineage: only claude-opus-5-5 or claude-sonnet-5 allowed
+    if not (model.startswith("claude-opus-5-5") or model.startswith("claude-sonnet-5")):
+        chosen_model = "claude-opus-5-5"
     else:
         chosen_model = model
 
@@ -128,7 +128,7 @@ Interrogate whether this proposed angle truly satisfies the breaking search inte
             max_tokens=800,
             temperature=0.1,
             timeout=60.0,
-            fallback="claude-sonnet-5" if chosen_model == "claude-opus-5" else "gpt-6-astra"
+            fallback="claude-sonnet-5" if chosen_model == "claude-opus-5-5" else "gpt-6-astra"
         )
     except Exception as e:
         logger.warning(f"[critic_gate] Claude primary ({chosen_model}) failed ({e}), invoking fallback {fallback_model}...")

@@ -199,13 +199,13 @@ Output ONLY the patched Act(s), formatted with standard headers (e.g. '=== ACT I
 
         logger.info(
             f"[dual_convergence] Pass 1 (Round {round_idx}): "
-            f"Invoking Claude Opus 5 to patch {len(failed_acts)} Act(s)..."
+            f"Invoking Claude Opus 5.5 to patch {len(failed_acts)} Act(s)..."
         )
 
         try:
             patched_raw = gateway.call_llm(
                 prompt=patcher_prompt,
-                model="claude-opus-5",
+                model="claude-opus-5-5",
                 system_prompt=system_prompt,
                 max_tokens=3500,
                 temperature=0.3,
@@ -213,7 +213,7 @@ Output ONLY the patched Act(s), formatted with standard headers (e.g. '=== ACT I
                 fallback="claude-sonnet-5"
             )
         except Exception as e_opus:
-            logger.warning(f"[dual_convergence] Claude Opus 5 patcher failed ({e_opus}), trying claude-sonnet-5 fallback...")
+            logger.warning(f"[dual_convergence] Claude Opus 5.5 patcher failed ({e_opus}), trying claude-sonnet-5 fallback...")
             try:
                 patched_raw = gateway.call_llm(
                     prompt=patcher_prompt,

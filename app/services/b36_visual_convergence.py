@@ -148,7 +148,9 @@ def run_b36_visual_convergence(
     story_text: str = "",
     grounding_intel: Optional[Dict[str, Any]] = None,
     seo_package: Optional[Dict[str, Any]] = None,
-    max_rounds: int = 2
+    max_rounds: int = 2,
+    market: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Executes the Decremental Adversarial Convergence Loop (DACL) for B3 & B3.5.
@@ -157,7 +159,7 @@ def run_b36_visual_convergence(
     """
     logger.info(f"🛡️ [B3.5.1 DACL] Starting Visual Convergence Gate for Episode: {episode_id}")
     gateway = get_global_gateway()
-    m_up = episode_id.split("_")[0].upper()
+    m_up = (market or episode_id.split("_")[0]).upper()
     t0 = time.time()
 
     canonical_dirs = [
@@ -355,7 +357,7 @@ def run_b36_visual_convergence(
 
     # Round 1: GPT-6-Astra Forensic Visual Linter & Auditor
     primary_model = os.getenv("B36_AUDIT_MODEL", "gpt-6-astra")
-    fallback_model = os.getenv("B36_FALLBACK_MODEL", "claude-opus-5")
+    fallback_model = os.getenv("B36_FALLBACK_MODEL", "claude-opus-5-5")
     logger.info(f"[B3.5.1 DACL] Round 1: Invoking {primary_model} Forensic Auditor for {episode_id}...")
     try:
         raw_res = gateway.call_llm(
@@ -376,7 +378,7 @@ def run_b36_visual_convergence(
             max_tokens=3500,
             temperature=0.1,
             timeout=70.0,
-            fallback="claude-opus-5"
+            fallback="claude-opus-5-5"
         )
 
     json_match = re.search(r"(\{.*\})", raw_res, re.DOTALL)
@@ -425,8 +427,8 @@ def run_b36_visual_convergence(
                     if tv:
                         current_prompts.setdefault("thumbnails", {})[tk] = tv
 
-            # Round 2: Claude Opus 5 Cross-Audit / Polish on the Delta Only (Zero Context Bloat)
-            logger.info(f"[B3.5.1 DACL] Round 2: Invoking Claude Opus 5 to Refine & Polish Delta ({len(patched_scenes)} scenes, {len(patched_thumbs)} thumbs)...")
+            # Round 2: Claude Opus 5.5 Cross-Audit / Polish on the Delta Only (Zero Context Bloat)
+            logger.info(f"[B3.5.1 DACL] Round 2: Invoking Claude Opus 5.5 to Refine & Polish Delta ({len(patched_scenes)} scenes, {len(patched_thumbs)} thumbs)...")
             patcher_input = {
                 "episode_id": episode_id,
                 "market": m_up,
@@ -441,7 +443,7 @@ def run_b36_visual_convergence(
                 patcher_res = gateway.call_llm(
                     prompt=f"[DELTA PATCH TO REFINE & POLISH]\n{json.dumps(patcher_input, ensure_ascii=False, indent=2)}\n\nVerify, polish and score this Delta Patch. Return strict JSON only.",
                     system_prompt=ASTRA_CROSS_AUDIT_PROMPT,
-                    model="claude-opus-5",
+                    model="claude-opus-5-5",
                     max_tokens=2500,
                     temperature=0.2,
                     timeout=70.0,
@@ -451,7 +453,7 @@ def run_b36_visual_convergence(
                 clean_json2 = j_match2.group(1).strip() if j_match2 else patcher_res.strip()
                 round2_audit = json.loads(clean_json2)
             except Exception as e2:
-                logger.warning(f"[B3.5.1 DACL] Claude Opus 5 refinement failed or errored: {e2}. Keeping initial delta.")
+                logger.warning(f"[B3.5.1 DACL] Claude Opus 5.5 refinement failed or errored: {e2}. Keeping initial delta.")
                 round2_audit = {
                     "cross_audit_verdict": "PASS",
                     "cross_audit_score": max(r1_score, 8.0),
@@ -459,7 +461,7 @@ def run_b36_visual_convergence(
                     "audit_notes": f"Fallback accepted initial delta directly: {e2}"
                 }
 
-            audit_history.append({"round": 2, "actor": "Claude-Opus-5", "result": round2_audit})
+            audit_history.append({"round": 2, "actor": "Claude-Opus-5-5", "result": round2_audit})
 
             # Apply Astra Refinements if present
             refined_delta = round2_audit.get("refined_delta", {})
@@ -483,14 +485,14 @@ def run_b36_visual_convergence(
             verdict = str(round2_audit.get("cross_audit_verdict", "")).upper()
             converged = (final_score >= 8.0 and verdict in ("PASS", "NEEDS_TWEAK"))
         elif r1_score < 8.0:
-            # If Astra identified flaws without providing an explicit delta patch, invoke Claude Opus 5 to resolve
+            # If Astra identified flaws without providing an explicit delta patch, invoke Claude Opus 5.5 to resolve
             flawed_ids = round1_audit.get("flawed_scene_ids", [])
             scene_map = {s["scene_id"]: s for s in current_dplan.get("scenes", [])}
             scenes_to_fix = [scene_map[sid] for sid in flawed_ids if sid in scene_map]
             if not scenes_to_fix:
                 scenes_to_fix = current_dplan.get("scenes", [])[:4]
 
-            logger.info(f"[B3.5.1 DACL] Round 1 scored {r1_score}/10 with {len(scenes_to_fix)} flagged scenes without auto-delta. Invoking Claude Opus 5 to resolve critiques...")
+            logger.info(f"[B3.5.1 DACL] Round 1 scored {r1_score}/10 with {len(scenes_to_fix)} flagged scenes without auto-delta. Invoking Claude Opus 5.5 to resolve critiques...")
             patcher_input = {
                 "episode_id": episode_id,
                 "market": m_up,
@@ -517,7 +519,7 @@ def run_b36_visual_convergence(
                 patcher_res = gateway.call_llm(
                     prompt=f"[FLAWED SCENES REQUIRING TARGETED RESOLUTION]\n{json.dumps(patcher_input, ensure_ascii=False, indent=2)}\n\nReview the critique and resolve flaws in these scenes. Return strict JSON with refined_delta and cross_audit_score.",
                     system_prompt=ASTRA_CROSS_AUDIT_PROMPT,
-                    model="claude-opus-5",
+                    model="claude-opus-5-5",
                     max_tokens=2500,
                     temperature=0.2,
                     timeout=70.0,
@@ -527,7 +529,7 @@ def run_b36_visual_convergence(
                 clean_json2 = j_match2.group(1).strip() if j_match2 else patcher_res.strip()
                 round2_audit = json.loads(clean_json2)
             except Exception as e2:
-                logger.warning(f"[B3.5.1 DACL] Claude Opus 5 refinement failed: {e2}.")
+                logger.warning(f"[B3.5.1 DACL] Claude Opus 5.5 refinement failed: {e2}.")
                 round2_audit = {
                     "cross_audit_verdict": "PASS",
                     "cross_audit_score": max(r1_score, 8.5),
@@ -535,7 +537,7 @@ def run_b36_visual_convergence(
                     "audit_notes": f"Fallback accepted: {e2}"
                 }
 
-            audit_history.append({"round": 2, "actor": "Claude-Opus-5", "result": round2_audit})
+            audit_history.append({"round": 2, "actor": "Claude-Opus-5-5", "result": round2_audit})
             refined_delta = round2_audit.get("refined_delta") or round2_audit.get("delta_patch", {})
             for rs in refined_delta.get("patched_scenes", []):
                 sid = rs.get("scene_id")

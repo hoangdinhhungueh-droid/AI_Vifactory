@@ -825,12 +825,12 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             f"Write the full ~1,800-2,200 word script now, adhering strictly to the 5-Act markers:"
         )
 
-        logger.info(f"[story_engine] Calling Claude Opus 5 (Master Scriptwriter) for 5-Act Script generation (1,800-2,200 words)...")
+        logger.info(f"[story_engine] Calling Claude Opus 5.5 (Master Scriptwriter) for 5-Act Script generation (1,800-2,200 words)...")
         from app.services.model_gateway import get_global_gateway
         gateway = get_global_gateway()
         full_script_raw = gateway.call_llm(
             prompt=user_prompt,
-            model="claude-opus-5",
+            model="claude-opus-5-5",
             system_prompt=system_prompt,
             max_tokens=6000,
             temperature=0.35,
@@ -904,7 +904,7 @@ CRITICAL EDITORIAL RULES:
             try:
                 refined_raw = gateway.call_llm(
                     prompt=refine_user,
-                    model="claude-opus-5",
+                    model="claude-opus-5-5",
                     system_prompt=refine_system_prompt,
                     max_tokens=6000,
                     temperature=0.3,
@@ -945,7 +945,7 @@ CRITICAL EDITORIAL RULES:
 
     # ----------------------------------------------------
     # B2.1 Fact & Causal Integrity Audit Gate (Rule 118 & Rule 130)
-    # Audits full verbatim script against Grounding Fact Table using claude-opus-5
+    # Audits full verbatim script against Grounding Fact Table using claude-opus-5-5
     # ----------------------------------------------------
     fact_audit_result = {}
     grounding_claims = []

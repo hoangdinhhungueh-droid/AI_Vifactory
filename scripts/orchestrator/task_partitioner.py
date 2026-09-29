@@ -145,7 +145,7 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
             "story = open('/var/vf/episodes/{task_id}/story.txt', encoding='utf-8').read(); "
             "claims = json.load(open('/var/vf/episodes/{task_id}/grounding_intel.json', encoding='utf-8')).get('claims', []); "
             "meta = json.load(open('/var/vf/pending_tasks/{task_id}.json', encoding='utf-8')); "
-            "res = audit_story_facts_and_causality(story, claims, {'task_id': '{task_id}', 'topic': meta.get('raw_term')}, market=meta.get('market', 'EN'), model='claude-opus-5'); "
+            "res = audit_story_facts_and_causality(story, claims, {'task_id': '{task_id}', 'topic': meta.get('raw_term')}, market=meta.get('market', 'EN'), model='claude-opus-5-5'); "
             "open('/var/vf/episodes/{task_id}/fact_audit.json', 'w', encoding='utf-8').write(json.dumps(res, ensure_ascii=False, indent=2)); "
             "assert res.get('verdict') == 'PASS' or float(res.get('audit_score', 0)) >= 7.5, f'B2.1 Audit Gate Failed: {res}'",
         ],

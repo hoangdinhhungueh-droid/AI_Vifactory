@@ -94,10 +94,10 @@ def test_dual_model_convergence_opus_patches_astra_audits():
         assert res["story_gate_score"] == 11
         assert res["audit_details"]["verdict"] == "PASS"
 
-        # Verify role separation: First call MUST be claude-opus-5 (Patcher), Second call MUST be gpt-6-astra (Delta Auditor)
+        # Verify role separation: First call MUST be claude-opus-5-5 (Patcher), Second call MUST be gpt-6-astra (Delta Auditor)
         calls = fake_gateway.call_llm.call_args_list
         assert len(calls) == 2
-        assert calls[0].kwargs.get("model") == "claude-opus-5"
+        assert calls[0].kwargs.get("model") == "claude-opus-5-5"
         assert calls[1].kwargs.get("model") == "gpt-6-astra"
 
 

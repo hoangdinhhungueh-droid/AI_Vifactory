@@ -35,10 +35,11 @@ class CostTracker:
     
     # Pricing rates in VND per 1,000,000 (1M) tokens via HHTech API
     # Standardized 18/09/2026 per User Mandate:
-    # - astra 6 (gpt-6-astra) = opus 5 (claude-opus-5) = 2.000 VND / 1M tokens (2.0 VND / 1k tokens)
+    # - astra 6 (gpt-6-astra) = opus 5.5 (claude-opus-5-5) = 2.000 VND / 1M tokens (2.0 VND / 1k tokens)
     # - Các fallback khác (gpt-5-sol, claude-sonnet-5, claude-3.5-sonnet, kimi-k3, default) = 1.600 VND / 1M tokens (1.6 VND / 1k tokens)
     RATES_PER_1M = {
         "gpt-6-astra": 2000.0,
+        "claude-opus-5-5": 2000.0,
         "claude-opus-5": 2000.0,
         "gpt-5-sol": 1600.0,
         "claude-sonnet-5": 1600.0,
@@ -52,6 +53,7 @@ class CostTracker:
     RATES = {
         # LLM models (VND per 1k tokens)
         "gpt-6-astra": 2.0,            # 2.000 VND / 1M tokens
+        "claude-opus-5-5": 2.0,        # 2.000 VND / 1M tokens
         "claude-opus-5": 2.0,          # 2.000 VND / 1M tokens
         "gpt-5-sol": 1.6,              # 1.600 VND / 1M tokens
         "claude-sonnet-5": 1.6,        # 1.600 VND / 1M tokens

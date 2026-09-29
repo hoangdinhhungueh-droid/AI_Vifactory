@@ -2,7 +2,7 @@
 app/services/story_fact_auditor_b2.py - FACT & CAUSAL INTEGRITY AUDIT GATE (B2.1)
 
 Mission:
-  Adversarial audit of generated 5-Beat Docudrama stories using claude-opus-5 (with fallback).
+  Adversarial audit of generated 5-Beat Docudrama stories using claude-opus-5-5 (with fallback).
   Interrogates kịch bản against Grounding Fact Table and Rule 130 Causal Architecture.
 
 Key Invariants:
