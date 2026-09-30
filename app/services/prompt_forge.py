@@ -450,7 +450,7 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
             return anchor, f", {negs}" if negs else ""
         elif any(k in combined for k in ["quarantine", "inspector", "customs", "officer", "analyst", "chemist", "lab", "mhlw", "kasumigaseki"]):
             anchor = (
-                "Authentic Japanese public official or quarantine inspection specialist, distinct Japanese facial structure, "
+                "Authentic Japanese individual, Authentic Japanese public official or quarantine inspection specialist, distinct Japanese facial structure, "
                 "institutional inspection uniform or pristine business attire with ID lanyard, "
                 "dynamic investigative body posture examining official records, intense focused glare"
             )
@@ -458,7 +458,7 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
             return anchor, f", {negs}" if negs else ""
         elif any(k in combined for k in ["consumer", "shopper", "supermarket", "chef", "cook", "ramen", "housewife"]):
             anchor = (
-                "Authentic Japanese consumer or culinary professional, natural East Asian eye shape, "
+                "Authentic Japanese individual, consumer or culinary professional, natural East Asian eye shape, "
                 "casual contemporary Japanese domestic attire or professional apron, dynamic expressive posture, "
                 "closely inspecting packaged product with nuanced micro-expression of concern"
             )
@@ -882,13 +882,16 @@ def generate_scene_prompts(
         "2. ERA & TOPIC AUTHENTICITY (Rule 128): Strictly derive era, architectural style, atmosphere, color palette, and lighting dynamically from the episode topic and scene narration. Zero domain bleed.\n"
         "3. SCENE SEMANTIC COUPLING: Maintain 100% semantic unity between each Background and its paired Foreground character. The setting, time period, indoor/outdoor lighting angle, and mood MUST match between paired assets in each scene.\n"
         "4. LAYER 1 BACKGROUND PROMPT RULES (16:9):\n"
-        "   - Wide-angle cinematic environment establishing scene atmosphere and narrative depth.\n"
+        "   - Minimalist Vox-style editorial paper collage background, heavy 300gsm aged fibrous paper texture.\n"
+        "   - Muted geometric shapes (large circle, rectangular grid), limited color palette (VOX Yellow #EAB308, muted navy, cream, charcoal).\n"
+        "   - Plenty of negative space, zero clutter, zero realistic environment, high-contrast graphic novel composition.\n"
         "   - Authentic period architecture, environment textures, dramatic volumetric lighting.\n"
         "   - NO prominent human figures in the foreground. Leave center/right negative space clear for the Layer 2 character overlay.\n"
         "   - Leave the bottom 20% safe zone clear of critical visual elements for on-screen subtitles.\n"
         "   - Style: Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, rich spatial textures, moody chiaroscuro lighting, 16:9 aspect ratio.\n"
         "5. LAYER 2 FOREGROUND PROMPT RULES (1:1):\n"
         "   - NON-PHOTOREALISTIC, STYLIZED EDITORIAL GRAPHIC NOVEL DIGITAL ILLUSTRATION (clean digital artwork, illustrated character drawing, NOT a studio photograph).\n"
+        "   - Black and white high-contrast vintage editorial cutout illustration, retro magazine collage aesthetic, crisp clean silhouette, 19th-20th century archival engraving style.\n"
         "   - Exactly ONE full-body standing or seated figure/subject visible from head to toe in authentic attire appropriate to the era and role.\n"
         "   - Dynamic dramatic lighting angle aligned with the lighting angle and tone of the paired scene background.\n"
         "   - MUST ALWAYS include the exact technical clause: 'isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames, 1:1 aspect ratio'.\n"

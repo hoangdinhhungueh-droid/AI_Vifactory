@@ -39,7 +39,11 @@ export type TransitionOut =
   | "ink_bleed"
   | "paper_tear"
   | "light_leak"
-  | "circle_wipe";
+  | "circle_wipe"
+  | "vox_push_zoom"
+  | "vox_paper_wipe"
+  | "vox_tape_snap"
+  | string;
 
 export interface WordTimestamp {
   word: string;

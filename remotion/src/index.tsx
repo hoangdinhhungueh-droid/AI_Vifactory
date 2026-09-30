@@ -1599,6 +1599,86 @@ export const CinematicTransitionOverlay: React.FC<{
     );
   }
 
+  // 7. Vox Push-Zoom Match Cut: rapid 6-frame editorial momentum push with subtle blur (Benchmark cXQuNBZA0FA 07:15)
+  if (transitionOut === "vox_push_zoom" || transitionOut === "push_zoom") {
+    if (relFrame > 6) return null;
+    const pZoom = interpolate(relFrame, [0, 6], [1.06, 1.0], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.cubic),
+    });
+    const pBlur = interpolate(relFrame, [0, 2, 6], [3, 1, 0], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return (
+      <AbsoluteFill
+        style={{
+          zIndex: 42,
+          pointerEvents: "none",
+          transform: `scale(${pZoom})`,
+          filter: `blur(${pBlur}px)`,
+        }}
+      />
+    );
+  }
+
+  // 8. Vox Directional Paper Wipe: crisp angled paper banner sweep across screen (Benchmark cXQuNBZA0FA 07:45)
+  if (transitionOut === "vox_paper_wipe" || transitionOut === "paper_wipe") {
+    if (relFrame > 8) return null;
+    const wipeX = interpolate(relFrame, [0, 8], [-120, 120], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+    });
+    return (
+      <AbsoluteFill style={{ zIndex: 45, pointerEvents: "none", overflow: "hidden" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: "-10%",
+            left: `${wipeX}%`,
+            width: "35%",
+            height: "120%",
+            background: "linear-gradient(105deg, #18181b 0%, #eab308 50%, #f4eedd 100%)",
+            boxShadow: "-10px 0 30px rgba(0,0,0,0.6), 10px 0 30px rgba(0,0,0,0.6)",
+            transform: "rotate(6deg)",
+          }}
+        />
+      </AbsoluteFill>
+    );
+  }
+
+  // 9. Vox Tape Snap: semi-transparent masking tape strip stitching the cut (Benchmark cXQuNBZA0FA)
+  if (transitionOut === "vox_tape_snap" || transitionOut === "tape_snap") {
+    if (relFrame > 10) return null;
+    const tapeScaleY = interpolate(relFrame, [0, 3], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.back(1.5)),
+    });
+    const tapeFade = interpolate(relFrame, [6, 10], [0.85, 0], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return (
+      <AbsoluteFill style={{ zIndex: 46, pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div
+          style={{
+            width: "280px",
+            height: "44px",
+            background: "rgba(244, 238, 221, 0.82)",
+            border: "1px dashed rgba(180, 160, 120, 0.6)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
+            transform: `rotate(-12deg) scaleY(${tapeScaleY})`,
+            opacity: tapeFade,
+            borderRadius: "2px",
+          }}
+        />
+      </AbsoluteFill>
+    );
+  }
+
   return null;
 };
 
