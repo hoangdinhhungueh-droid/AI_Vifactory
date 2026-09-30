@@ -1,5 +1,20 @@
 {
-  "anti-drive-wipe-gate": {
+  "code-quality-gate": {
+    "enabled": true,
+    "PostToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/pre_commit_linter.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "destructive-command-guard": {
     "enabled": true,
     "PreToolUse": [
       {
@@ -7,8 +22,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /root/video_factory/scripts/safety_guard.py",
-            "timeout": 5
+            "command": "python scripts/safety_guard.py",
+            "timeout": 10
           }
         ]
       }

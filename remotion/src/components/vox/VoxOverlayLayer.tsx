@@ -30,6 +30,7 @@ export interface VoxOverlayLayerProps {
   isLeft?: boolean;
   statValue?: string;
   statLabel?: string;
+  durationInFrames?: number;
 }
 
 export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
@@ -37,6 +38,7 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
   isLeft,
   statValue,
   statLabel,
+  durationInFrames,
 }) => {
   if (!forensicOverlay) {
     return null;
@@ -67,9 +69,14 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
   if (isFullBleed) {
     positionStyles = {
       ...positionStyles,
-      top: "46%",
+      top: "50%",
       left: "50%",
       transform: "translate(-50%, -50%)",
+      width: "100%",
+      height: "100%",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
     };
   } else if (layout === "split_left") {
     positionStyles = {
@@ -234,7 +241,7 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
             chartType={ov.payload?.chart_type || (rawType === "bar_chart" ? "bar" : "line")}
             data={ov.payload?.data}
             startValue={ov.payload?.start_value}
-            endValue={ov.payload?.end_value}
+            endValue={ov.payload?.end_value !== undefined ? ov.payload?.end_value : (statValue ? parseFloat(String(statValue).replace(/[^0-9.-]/g, "")) : undefined)}
             unit={ov.payload?.unit || "B"}
             prefix={ov.payload?.prefix || "$"}
             color={ov.payload?.color}
@@ -260,13 +267,15 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
 
         {/* Kinetic Headline Word-by-Word Impact Typography (Vox Engine 4.0) */}
         {rawType === "kinetic_headline" || rawType === "cold_hook_headline" || rawType === "impact_headline" ? (
-          <VoxKineticHeadline
-            headline={ov.title || ov.label}
-            highlightWord={ov.payload?.highlight_word}
-            category={ov.badge || "FORENSIC INVESTIGATION"}
-            subtext={ov.payload?.subtext}
-            accentColor={ov.payload?.accent_color}
-          />
+          <div style={{ width: 1400, height: 600, position: "relative" }}>
+            <VoxKineticHeadline
+              headline={ov.title || ov.label}
+              highlightWord={ov.payload?.highlight_word}
+              category={ov.badge || "FORENSIC INVESTIGATION"}
+              subtext={ov.payload?.subtext}
+              accentColor={ov.payload?.accent_color}
+            />
+          </div>
         ) : null}
 
         {/* 3D Procedural Evidence Prop (Vox Stop-Motion 12fps Evidence Specimen) */}

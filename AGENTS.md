@@ -114,6 +114,16 @@
     - **Cấm Xóa Đệ Quy Trên Symlink/Junction**: Khi xóa liên kết mềm (symlink/junction), bắt buộc dùng lệnh xóa link chuyên dụng (`cmd /c rmdir <link>` hoặc `unlink <link>`), cấm dùng lệnh xóa đệ quy làm phá hủy thư mục gốc.
     - **Quy Trình Xóa 2 Bước (Two-Phase Human-in-the-Loop)**: Mọi thao tác dọn dẹp thư mục từ 2 file trở lên bắt buộc thực hiện Dry-run in rõ danh sách file $\rightarrow$ Xin phép User xác nhận mới được thực thi.
 
+20. **RULE 138 (Code-Graph Pre-Impact Check & Anti-Blind Editing Mandate)**:
+    - **Cấm Tuyệt Đối Sửa Code Mù (No Blind Edits)**: Khi can thiệp vào các module cốt lõi, schema chung, hoặc hàm dùng chung (Shared Utilities): Agent BẮT BUỘC phải tra cứu Blast Radius thông qua GitNexus (`impact`) hoặc Antigravity CodeFlow TRƯỚC KHI chỉnh sửa file.
+    - **Ngưỡng Cảnh Báo Rủi Ro**: Nếu một hàm/file có $> 5$ callers phụ thuộc hoặc Blast Radius $> 20\%$: BẮT BUỘC thiết lập kế hoạch bảo toàn tương thích ngược (Backward Compatibility) hoặc refactor đồng bộ toàn bộ callers trong cùng một commit nguyên tử.
+    - **Đồng Bộ Đồ Thị Mã Nguồn**: Sau khi thay đổi cấu trúc, AST hoặc module, bắt buộc cập nhật lại đồ thị mã nguồn để bảo đảm tri thức kiến trúc luôn mới nhất.
+
+21. **RULE 139 (Disciplined Code-ification & Zero-Symptom Patching Mandate)**:
+    - **Chuẩn Hóa "Vibe-to-Code" Thành Kỹ Thuật Có Kỷ Luật**: Mọi ý tưởng dạng tự nhiên ("vibe") khi chuyển thành mã nguồn bắt buộc phải có type annotations, docstring chuẩn hóa, xử lý boundary edge cases và kiểm thử biên. CẤM code theo cảm tính mà không gắn với khế ước.
+    - **Cấm Sửa Triệu Chứng Bằng Try-Except Rỗng**: Khi gặp bug, CẤM TUYỆT ĐỐI bọc `try: ... except: pass` để che giấu lỗi runtime. BẮT BUỘC áp dụng quy trình 4 pha (Isolate $\rightarrow$ Graph Trace $\rightarrow$ Root-Cause Fix $\rightarrow$ Anti-Regression Verify), truy vết đúng call chain để giải quyết tận gốc nguyên nhân.
+    - **Chốt Chặn Kiểm Toán OCR Bắt Buộc**: Mọi đoạn code mới hoặc bản vá bug bắt buộc phải đạt `VERDICT: PASS (0 Critical / 0 High)` từ cổng kiểm toán tất định Alibaba Open Code Review trước khi đóng task.
+
 ---
 
 ## 🗺️ II. MA TRẬN ĐỊNH TUYẾN KỸ NĂNG (PROGRESSIVE DISCLOSURE)
@@ -123,6 +133,8 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 | Lệnh / Giai Đoạn | Nghiệp Vụ Trọng Tâm | Kỹ Năng / Tài Liệu SoT Nạp Vào | Quy Chuẩn Ràng Buộc |
 | :--- | :--- | :--- | :--- |
 | **SoT & Registry** | Tra cứu Database ID, Page ID, Schema DB | Skill `notion-sot-second-brain` | Progressive Querying 3 Tầng |
+| **Code Map & Blast Radius** (`/map`, `/impact`) | Bản đồ kiến trúc HTML Canvas, AST Tree-sitter, GitNexus Graph Impact | Skill `antigravity-codeflow` | Rule 138 (Anti-Blind Edits, Blast Radius $\le 20\%$) |
+| **Code Review & Scan** (`/review`, `/scan`) | Alibaba OCR Hybrid Gate, Diff Review (Delegation Mode), Full Scan | Skill `antigravity-code-review` & `.opencodereview/rule.json` | Rule 121, Rule 139 (0 Critical / 0 High Defect Gate) |
 | **B1, B1.5, B2** | Trend RSS live, YouTube Recon, Kịch bản 5 Beat | `notion_sot_second_brain.md` & `tests/ci_neighbor_tester.py` | Rule 444 (An Ong Hook), 445 (5 Beat Docudrama), 446 (Native-First), 447 (Neighbor-Testing) |
 | **B2.6 / B3_AUDIO** | Hollywood Audio Spine, Beat-Level Edge-TTS, Word Karaoke, Subtitles SRT (`app/services/beat_tts_engine.py`) | `notion_sot_second_brain.md` (Media Production Hub) & `PIPELINE_CONTRACTS.md` | Rule 120 (Karaoke millisecond sync, `durationInFrames` chuẩn timestamp, Hard Gate) |
 | **B3, B3.5** | Dynamic Director Plan (Timecode-Locked) & Prompt Forge | `PIPELINE_CONTRACTS.md` | Layer 1 BG (16:9) + Layer 2 FG (1:1) Prompt English, Rule 120 Hard Gate |
@@ -130,7 +142,7 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 | **B6, B7, B8** | Remotion Master Video Render CPU, BGM Cinematic Ducking, Video QA Audit | `notion_sot_second_brain.md` (Media Production Hub) | Rule 120, Rule 135 (Remotion chapters), Rule 136 (Clean speaker tags) |
 | **B10** | SEO Metadata, Synthetic Media, Gate 2 | `PIPELINE_CONTRACTS.md` | `status.containsSyntheticMedia: true`, Hero Thumbnail, Rule 135 Chapters |
 | **B11** (`/run:b11`) | Analytics 48h, Feedback Dreaming Loop | Skill `vf-b11-analytics` | Rule 113 (48h Law), Rule 440–442 |
-| **Teamwork Pipeline** (`/vf-pipeline-teamwork`) | Hội Đồng Multi-Agent Harness 4 vai (Architect, Builder, QA Test Harness, Adversarial Auditor - strictly review) & 3 Cặp Docs | Skill `vf-pipeline-teamwork` & `scripts/orchestrator/` | Rule 118, 119, 121, 124, 125, 126, 127, 128, 129, 134 |
+| **Teamwork Pipeline** (`/vf-pipeline-teamwork`) | Hội Đồng Multi-Agent Harness 4 vai (Architect, Builder, QA Test Harness, Adversarial Auditor - strictly review) & 3 Cặp Docs | Skill `vf-pipeline-teamwork` & `scripts/orchestrator/` | Rule 118, 119, 121, 124, 125, 126, 127, 128, 129, 134, 138, 139 |
 
 ---
 

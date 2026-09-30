@@ -317,14 +317,22 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
 
   const cell = computeForegroundCell(width, height, position, aspect);
 
-  // Vox Engine 4.0: Tactile organic paper placement drop (Permanent lock after frame 12, zero drift)
-  const settleProgress = interpolate(frame, [0, Math.min(12, fadeFrames)], [0, 1], {
+  // Stage 3: Tactile organic paper placement drop (frames 15-35, calibrated to duration)
+  const dropStart = Math.min(24, Math.max(0, Math.round((durationInFrames || 180) * 0.12)));
+  const relDrop = Math.max(0, frame - dropStart);
+  const dropProgress = interpolate(relDrop, [0, 16], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
+    easing: Easing.bezier(0.16, 1, 0.3, 1),
   });
-  const translateY = (1 - settleProgress) * 10;
-  const scale = 0.985 + 0.015 * settleProgress;
+  const translateY = (1 - dropProgress) * -35;
+  const rotateDeg = (1 - dropProgress) * (position === "right" ? -2.2 : 2.2);
+  const scale = 1.05 - 0.05 * dropProgress;
+  const dropOpacity = frame < dropStart ? 0 : interpolate(relDrop, [0, 6], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const finalOpacity = Math.min(opacity, dropOpacity);
 
   return (
     <div
@@ -334,8 +342,8 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
         top: cell.top,
         width: cell.width,
         height: cell.height,
-        opacity,
-        transform: `translateY(${translateY.toFixed(1)}px) scale(${scale.toFixed(3)})`,
+        opacity: finalOpacity,
+        transform: `translateY(${translateY.toFixed(1)}px) rotate(${rotateDeg.toFixed(2)}deg) scale(${scale.toFixed(3)})`,
         // Signature VOX Tactile Archival Diorama Shadow (clean, stable, no vibration)
         filter:
           "drop-shadow(0 25px 40px rgba(0, 0, 0, 0.85)) drop-shadow(0 6px 16px rgba(0, 0, 0, 0.60))",
@@ -405,22 +413,34 @@ const ForensicStampBadge = ({
   badge,
   isLeft,
   hasStatCard,
+  durationInFrames = 180,
+  slamFrame,
 }: {
   badge: string;
   isLeft?: boolean;
   hasStatCard?: boolean;
+  durationInFrames?: number;
+  slamFrame?: number;
 }) => {
   const frame = useCurrentFrame();
   const cfg = useVideoConfig();
-  // Dynamic Stamp Slam physics: rapid scale drop from 2.4 down to 1.0 with damping spring
+  const dur = Math.max(1, durationInFrames || cfg.durationInFrames || 180);
+  const targetSlam = slamFrame !== undefined
+    ? slamFrame
+    : Math.min(180, Math.max(25, Math.round(dur * 0.65)));
+
+  const relSlam = frame - targetSlam;
+  if (relSlam < 0) return null;
+
+  // Dynamic Stamp Slam physics: rapid scale drop from 2.6 down to 0.95 with scale-overshoot bounce to 1.0
   const scale = spring({
-    frame: Math.max(0, frame - 4),
+    frame: relSlam,
     fps: cfg.fps || 30,
-    config: { damping: 9, mass: 0.35, stiffness: 150 },
-    from: 2.4,
+    config: { damping: 9, mass: 0.35, stiffness: 160 },
+    from: 2.6,
     to: 1.0,
   });
-  const opacity = interpolate(frame, [3, 7], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const opacity = interpolate(relSlam, [0, 2], [0.3, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const bUp = (badge || "").toUpperCase();
   const isAlert = ["基準値超過", "EXCEEDED", "超過", "VOID", "CRITICAL", "ALERT"].some((k) => bUp.includes(k));
   const isAuth = ["未回答", "記録なし", "確認できず", "EVIDENCE", "RESTRICTED", "AUDIT", "CONFIDENTIAL"].some((k) => bUp.includes(k));
@@ -778,7 +798,12 @@ export const TwoLayerScene = (props) => {
 
       {/* Forensic Stamp Slam Badge (Rule 122 Acting & Evidence Props) */}
       {showOverlay && stampBadge ? (
-        <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} hasStatCard={Boolean(statValue)} />
+        <ForensicStampBadge
+          badge={String(stampBadge)}
+          isLeft={isLeft}
+          hasStatCard={Boolean(statValue)}
+          durationInFrames={durationInFrames}
+        />
       ) : null}
 
       {/* Vox Kinetic Typography (Word-Level Whisper Keywords Burst) */}
@@ -1143,7 +1168,8 @@ const computeOverlayKey = (s: any) => {
   const statVal = s.statValue;
   const statLbl = s.statLabel;
   const badge = s.stampBadge || s.stamp_badge;
-  if (!ov && !statVal && !badge) return null;
+  const md = s.motionDirective;
+  if (!ov && !statVal && !badge && !md) return null;
 
   const pos = s.foregroundPosition || "left";
   return JSON.stringify({
@@ -1153,6 +1179,7 @@ const computeOverlayKey = (s: any) => {
     statVal,
     statLbl,
     badge,
+    md,
     pos,
   });
 };
@@ -1164,6 +1191,21 @@ const buildOverlaySegments = (scenes: any[]) => {
     const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
     const key = computeOverlayKey(s);
     const last = raw[raw.length - 1];
+    let effectiveOv = s.forensicOverlay || s.forensic_overlay;
+    if (!effectiveOv && s.motionDirective === "counter_rollup" && s.statValue) {
+      effectiveOv = {
+        type: "kinetic_counter",
+        title: s.statLabel || "EVIDENTIARY METRIC",
+        payload: { amount: s.statValue },
+      };
+    } else if (!effectiveOv && s.motionDirective === "yellow_marker_highlight") {
+      effectiveOv = {
+        type: "document_highlight",
+        title: s.statLabel || "OFFICIAL RECORD",
+        payload: { clauses: [s.caption || s.narration || "DOCUMENTARY AUDIT RECORD"] },
+      };
+    }
+
     if (key && last && last.key === key) {
       last.end += dur;
     } else if (key) {
@@ -1171,7 +1213,7 @@ const buildOverlaySegments = (scenes: any[]) => {
         key,
         start: cursor,
         end: cursor + dur,
-        forensicOverlay: s.forensicOverlay || s.forensic_overlay,
+        forensicOverlay: effectiveOv,
         statValue: s.statValue,
         statLabel: s.statLabel,
         stampBadge: s.stampBadge || s.stamp_badge,
@@ -1197,22 +1239,60 @@ const OverlaySegmentView = ({
   statLabel,
   stampBadge,
   isLeft,
+  durationInFrames = 180,
 }: {
   forensicOverlay?: any;
   statValue?: string;
   statLabel?: string;
   stampBadge?: string;
   isLeft: boolean;
+  durationInFrames?: number;
 }) => {
   const frame = useCurrentFrame();
-  const statSpring = interpolate(frame, [0, 15], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  const dur = Math.max(1, durationInFrames);
+
+  // Stage 4 Entrance: Card drops in after background establishes
+  const cardStartFrame = Math.min(25, Math.round(dur * 0.12));
+  const cardRel = Math.max(0, frame - cardStartFrame);
+  const cardSpring = spring({
+    frame: cardRel,
+    fps: 30,
+    config: { damping: 14, stiffness: 100, mass: 0.7 },
   });
+  const cardTranslateY = interpolate(cardSpring, [0, 1], [-25, 0]);
+  const cardScale = interpolate(cardSpring, [0, 1], [0.94, 1.0]);
+
+  // Stage 6 Slam timing: hits around 65% of segment duration
+  const slamFrame = Math.min(180, Math.max(25, Math.round(dur * 0.65)));
 
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
-      {statValue && (!forensicOverlay || (typeof forensicOverlay === "object" && forensicOverlay?.type !== "kinetic_counter")) ? (
+      {/* Stage 2 Geometric Staging: subtle archival desk corner brackets when an evidence card is active */}
+      {(forensicOverlay || statValue) && (
+        <div
+          style={{
+            position: "absolute",
+            top: 50,
+            left: isLeft ? "auto" : 50,
+            right: isLeft ? 50 : "auto",
+            width: 720,
+            height: 480,
+            pointerEvents: "none",
+            opacity: interpolate(frame, [10, 25], [0, 0.45], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+            border: "1px dashed rgba(242, 166, 59, 0.25)",
+            borderRadius: 8,
+          }}
+        >
+          {/* Corner brackets */}
+          <div style={{ position: "absolute", top: -2, left: -2, width: 14, height: 14, borderTop: "2px solid #f2a63b", borderLeft: "2px solid #f2a63b" }} />
+          <div style={{ position: "absolute", top: -2, right: -2, width: 14, height: 14, borderTop: "2px solid #f2a63b", borderRight: "2px solid #f2a63b" }} />
+          <div style={{ position: "absolute", bottom: -2, left: -2, width: 14, height: 14, borderBottom: "2px solid #f2a63b", borderLeft: "2px solid #f2a63b" }} />
+          <div style={{ position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderBottom: "2px solid #f2a63b", borderRight: "2px solid #f2a63b" }} />
+        </div>
+      )}
+
+      {/* Stage 4/5: Evidentiary Stat Card (ONLY when forensicOverlay is NOT present, avoiding duplicate collision) */}
+      {statValue && !forensicOverlay ? (
         <div
           style={{
             position: "absolute",
@@ -1225,8 +1305,8 @@ const OverlaySegmentView = ({
             borderRadius: 6,
             padding: "14px 24px",
             boxShadow: "0 18px 40px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3)",
-            transform: `scale(${statSpring}) rotate(-1.5deg)`,
-            opacity: statSpring,
+            transform: `translateY(${cardTranslateY.toFixed(1)}px) scale(${cardScale.toFixed(3)}) rotate(-1.5deg)`,
+            opacity: cardSpring,
             display: "flex",
             flexDirection: "column",
             gap: 2,
@@ -1270,7 +1350,13 @@ const OverlaySegmentView = ({
       />
 
       {stampBadge ? (
-        <ForensicStampBadge badge={String(stampBadge)} isLeft={isLeft} hasStatCard={Boolean(statValue)} />
+        <ForensicStampBadge
+          badge={String(stampBadge)}
+          isLeft={isLeft}
+          hasStatCard={Boolean(statValue && !forensicOverlay)}
+          durationInFrames={dur}
+          slamFrame={slamFrame}
+        />
       ) : null}
     </AbsoluteFill>
   );
@@ -1599,15 +1685,14 @@ export const CinematicTransitionOverlay: React.FC<{
     );
   }
 
-  // 7. Vox Push-Zoom Match Cut: rapid 6-frame editorial momentum push with subtle blur (Benchmark cXQuNBZA0FA 07:15)
+  // 7. Vox Push-Zoom Match Cut: rapid 7-frame editorial momentum push with optical punch (Benchmark cXQuNBZA0FA 07:15)
   if (transitionOut === "vox_push_zoom" || transitionOut === "push_zoom") {
-    if (relFrame > 6) return null;
-    const pZoom = interpolate(relFrame, [0, 6], [1.06, 1.0], {
+    if (relFrame > 7) return null;
+    const pFlash = interpolate(relFrame, [0, 1, 7], [0.18, 0.08, 0], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
-      easing: Easing.out(Easing.cubic),
     });
-    const pBlur = interpolate(relFrame, [0, 2, 6], [3, 1, 0], {
+    const vigPunch = interpolate(relFrame, [0, 2, 7], [0.45, 0.20, 0], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
     });
@@ -1616,8 +1701,8 @@ export const CinematicTransitionOverlay: React.FC<{
         style={{
           zIndex: 42,
           pointerEvents: "none",
-          transform: `scale(${pZoom})`,
-          filter: `blur(${pBlur}px)`,
+          backgroundColor: `rgba(255, 255, 255, ${pFlash})`,
+          background: `radial-gradient(circle at center, rgba(255, 255, 255, ${pFlash}) 0%, rgba(0, 0, 0, ${vigPunch}) 100%)`,
         }}
       />
     );
@@ -1693,6 +1778,75 @@ export const computeCameraTransform = (
   const dur = Math.max(1, sceneDurationInFrames);
   const f = Math.max(0, Math.min(sceneRelFrame, dur));
   const mov = cameraMovement || "slow_push_in";
+
+  if (mov === "push_zoom" || mov === "vox_push_zoom") {
+    // 8-frame momentum punch: punch in from 1.10 down to 1.02 settling to 1.04
+    const pZoom = interpolate(f, [0, 8, dur], [1.10, 1.02, 1.045], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+    return `scale(${pZoom})`;
+  }
+
+  if (mov === "dramatic_push") {
+    // High-stakes investigative dramatic push
+    const maxScale = tensionLevel === "high" ? 1.12 : 1.08;
+    const scale = interpolate(f, [0, 15, dur], [1.0, maxScale * 0.95, maxScale], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+    return `scale(${scale})`;
+  }
+
+  if (mov === "forensic_lock") {
+    // Rapid deceleration into a rock-solid forensic examination position
+    const snap = interpolate(f, [0, 8, dur], [0.98, 1.035, 1.04], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+    return `scale(${snap}) rotate(-0.35deg)`;
+  }
+
+  if (mov === "subtle_drift") {
+    // Organic slow documentary camera glide
+    const panX = interpolate(f, [0, dur], [-10, 10], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+    });
+    const panY = interpolate(f, [0, dur], [-4, 4], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    const scale = interpolate(f, [0, dur], [1.01, 1.035], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return `scale(${scale}) translate(${panX.toFixed(2)}px, ${panY.toFixed(2)}px)`;
+  }
+
+  if (mov === "counter_rollup") {
+    // Punchy focus while metric rollup counts up
+    const scale = interpolate(f, [0, 20, dur], [1.0, 1.05, 1.06], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+    return `scale(${scale})`;
+  }
+
+  if (mov === "yellow_marker_highlight") {
+    // Forensic focus locked on highlighted document
+    const scale = interpolate(f, [0, 12, dur], [1.0, 1.045, 1.05], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+    return `scale(${scale})`;
+  }
 
   if (mov === "snap_zoom") {
     // Sharp punch-in within first 8 frames, then subtle creep
@@ -1913,12 +2067,14 @@ export const TwoLayerEpisode = (props) => {
 
   const currentSceneInfo = getCurrentSceneInfo(scenes, currentFrame);
   const currentCameraMov = currentSceneInfo
-    ? currentSceneInfo.scene.cameraMovement || (currentSceneInfo.scene.camera ? currentSceneInfo.scene.camera.movement : undefined)
+    ? currentSceneInfo.scene.cameraMovement ||
+      (currentSceneInfo.scene.camera ? currentSceneInfo.scene.camera.movement : undefined) ||
+      currentSceneInfo.scene.motionDirective
     : undefined;
   const currentDur = currentSceneInfo ? currentSceneInfo.durationInFrames : 300;
   const cameraTransform = currentSceneInfo
     ? computeCameraTransform(
-        currentSceneInfo.scene.cameraMovement || (currentSceneInfo.scene.camera ? currentSceneInfo.scene.camera.movement : undefined),
+        currentCameraMov,
         currentSceneInfo.scene.tensionLevel || (currentSceneInfo.scene.camera ? currentSceneInfo.scene.camera.tension_level : undefined),
         currentSceneInfo.relFrame,
         currentSceneInfo.durationInFrames
@@ -1930,6 +2086,12 @@ export const TwoLayerEpisode = (props) => {
     if (!currentSceneInfo) return 0;
     const { relFrame } = currentSceneInfo;
     const mov = currentCameraMov;
+    if (mov === "push_zoom" || mov === "vox_push_zoom") {
+      return interpolate(relFrame, [0, 2, 6], [3.2, 1.2, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
+    }
     if (mov === "focus_breathe_push") {
       return interpolate(relFrame, [0, 3, 6, 12, 15, 18], [0, 2.5, 0, 0, 1.8, 0], {
         extrapolateLeft: "clamp",
@@ -1991,7 +2153,8 @@ export const TwoLayerEpisode = (props) => {
             bgClusterId={s.bgClusterId || s.bg_cluster_id}
             forensicOverlay={s.forensicOverlay || s.forensic_overlay}
             stampBadge={s.stampBadge || s.stamp_badge}
-            transition_out={s.transition_out || s.transitionOut}
+            transition_out={s.transition_out || s.transitionOut || s.transition}
+            motionDirective={s.motionDirective}
             sourceCredit={s.sourceCredit || s.source_credit}
             disclosureBadge={s.disclosureBadge}
             actTitle={s.actTitle}
@@ -2137,6 +2300,7 @@ export const TwoLayerEpisode = (props) => {
               statLabel={seg.statLabel}
               stampBadge={seg.stampBadge}
               isLeft={seg.isLeft}
+              durationInFrames={seg.durationInFrames}
             />
           </Sequence>
         ))}
@@ -2158,7 +2322,16 @@ export const TwoLayerEpisode = (props) => {
       />
       {currentSceneInfo && (
         <CinematicTransitionOverlay
-          transitionOut={currentSceneInfo.scene.transition_out || currentSceneInfo.scene.transitionOut}
+          transitionOut={
+            currentSceneInfo.scene.transition_out ||
+            currentSceneInfo.scene.transitionOut ||
+            currentSceneInfo.scene.transition ||
+            (currentSceneInfo.index > 0 &&
+             currentSceneInfo.scene.background &&
+             scenes[currentSceneInfo.index - 1]?.background === currentSceneInfo.scene.background
+              ? (currentSceneInfo.index % 2 === 0 ? "vox_push_zoom" : "vox_paper_wipe")
+              : undefined)
+          }
           relFrame={currentSceneInfo.relFrame}
           durationInFrames={currentSceneInfo.durationInFrames}
         />

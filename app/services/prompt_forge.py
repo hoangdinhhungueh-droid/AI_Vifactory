@@ -23,8 +23,8 @@ def _load_env():
     try:
         from app.services.youtube_upload import _load_env as le
         le()
-    except Exception:
-        pass
+    except Exception as _e_le:
+        logger.debug("YouTube upload env load: %s", _e_le)
     if not os.environ.get("NOTION_TOKEN") and os.path.exists("/root/secrets/.env"):
         try:
             with open("/root/secrets/.env", "r", encoding="utf-8") as f:
@@ -33,8 +33,8 @@ def _load_env():
                         os.environ["NOTION_TOKEN"] = line.split("=", 1)[1].strip().strip('"').strip("'")
                     elif line.startswith("NOTION_API_KEY="):
                         os.environ["NOTION_API_KEY"] = line.split("=", 1)[1].strip().strip('"').strip("'")
-        except Exception:
-            pass
+        except Exception as _e_env:
+            logger.debug("Secrets env read error: %s", _e_env)
 
 _load_env()
 
@@ -583,10 +583,10 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
 
     if is_object:
         style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich tactile paper and material textures, 1:1 aspect ratio, centered investigative artifact, crisp paper-cutout sticker aesthetic, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
-        p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with blank unfilled fields. [ERA ANCHOR] Authentic period materials, forensic case evidence. [STRICT NEGATIVE PROMPT] no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no borders, no extraneous ui elements, {NEGATIVE_R137}. {R137_CLOSING_DIRECTIVE}"
+        p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with blank unfilled fields. [ERA ANCHOR] Authentic period materials, forensic case evidence. [STRICT NEGATIVE PROMPT] no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no borders, no extraneous ui elements, no text, no numbers, no charts, no digits, no labels, no typography, {NEGATIVE_R137}. {R137_CLOSING_DIRECTIVE}"
     else:
         style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich nuanced colors, 1:1 aspect ratio, full-body head-to-shoes, entire character visible within frame, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
-        p = f"{style_prefix} {p}{fg_flow_str}, dynamic high-stakes body posture, dramatic physical posing, intense facial micro-expressions with sharp focused gaze, full-body head-to-shoes visible within frame. [MARKET & ETHNIC ANCHOR] {fg_anchor}. [ERA ANCHOR] Authentic professional attire, stylized expressive character acting, active props interaction. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements, {NEGATIVE_R137}{fg_negs}. {R137_CLOSING_DIRECTIVE}"
+        p = f"{style_prefix} {p}{fg_flow_str}, dynamic high-stakes body posture, dramatic physical posing, intense facial micro-expressions with sharp focused gaze, full-body head-to-shoes visible within frame. [MARKET & ETHNIC ANCHOR] {fg_anchor}. [ERA ANCHOR] Authentic professional attire, stylized expressive character acting, active props interaction. [STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no gradients, no cropped head, no cropped feet, no cutoffs, no borders, no ui elements, no text, no numbers, no charts, no labels, no typography, {NEGATIVE_R137}{fg_negs}. {R137_CLOSING_DIRECTIVE}"
 
     p = deduplicate_phrase_stutter(p)
     p = re.sub(r",\s*\.\s*", ", ", p)
@@ -676,6 +676,7 @@ def _sanitize_vox_collage_prompt(
     )
     strict_negatives = (
         f"[STRICT NEGATIVE PROMPT] no 3D CGI render, no smooth digital vector illustration, no clean studio portrait, "
+        f"no text, no numbers, no charts, no digits, no labels, no typography, no financial figures, no written words, "
         f"no green screen, no purple chroma, no purple halo, no watermark, no digital overlays, no floating text in bottom subtitle zone, "
         f"{NEGATIVE_R137}{market_negs}. {R137_CLOSING_DIRECTIVE}"
     )
@@ -697,7 +698,8 @@ def _synthesize_vox_collage_prompt(
 ) -> str:
     """
     Synthesizes a complete 16:9 VOX Tactile Documentary Collage prompt from scene metadata
-    combining Base Texture + Tape-Affixed Dark Card Mat + Halftone Die-Cut Cutouts + Brass Pushpins + Red Yarn + Typewriter Label.
+    combining Base Texture + Tape-Affixed Dark Card Mat + Halftone Die-Cut Cutouts + Brass Pushpins + Red Yarn + Blank Label Strip.
+    Enforces Rule 128 & Zero-Semantic-Bias: NEVER bake in numbers or metrics onto images.
     """
     clean_bg = bg_desc.strip()
     clean_fg = fg_desc.strip() if fg_desc else ""
@@ -705,16 +707,9 @@ def _synthesize_vox_collage_prompt(
 
     obj_title = ""
     obj_type = "investigative evidence"
-    snippet = ""
     if object_focus and isinstance(object_focus, dict):
         obj_type = object_focus.get("type") or "investigative document"
         obj_title = object_focus.get("title") or ""
-        snippet = object_focus.get("key_snippet") or object_focus.get("stat_metric") or ""
-
-    label_text = snippet or obj_title or f"EXHIBIT {scene_idx:02d}"
-    label_text = re.sub(r"[\"'\n\r]+", "", label_text)[:30].upper().strip()
-    if not label_text:
-        label_text = f"EXHIBIT {scene_idx:02d}"
 
     if obj_title:
         exhibit_desc = f"a high-contrast vintage halftone black-and-white print cutout of {obj_type} '{obj_title}' with a distinct 2mm off-white die-cut paper border"
@@ -727,8 +722,8 @@ def _synthesize_vox_collage_prompt(
         f"A multi-layered physical documentary assemblage centered on {exhibit_desc}. "
         f"The exhibit is mounted upon a thick dark charcoal cardboard mat, firmly pinned with golden brass thumbtacks. "
         f"Taut crimson red investigation yarn connects the brass pins to secondary evidentiary nodes and document clippings across the board. "
-        f"At the bottom of the card mat, a weathered off-white paper strip typed with vintage serif text '{label_text}' is affixed with translucent scotch tape. "
-        f"The entire dark card mat is fastened onto an aged vintage newspaper archive surface with faint weathered gothic typography and an antique cartographic map chart, "
+        f"At the bottom of the card mat, a weathered blank off-white paper specimen label strip is affixed with translucent scotch tape. "
+        f"The entire dark card mat is fastened onto an aged vintage newspaper archive surface with faint weathered paper grain and an antique cartographic map chart, "
         f"held down at each corner with textured translucent masking tape showing the newsprint beneath. "
         f"Cinematic documentary lighting, realistic macro tactile texture, natural soft drop shadows cast by each physical paper layer."
     )
@@ -978,8 +973,8 @@ def generate_scene_prompts(
             if m:
                 try:
                     parsed = json.loads(m.group(1))
-                except Exception:
-                    pass
+                except Exception as _e_rec:
+                    logger.debug("Recovery JSON parse failed: %s", _e_rec)
 
     if not parsed or not isinstance(parsed, dict):
         parsed = {"backgrounds": {}, "foregrounds": {}}
@@ -1117,8 +1112,8 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
     token = None
     try:
         token = _bridge._get_token()
-    except Exception:
-        pass
+    except Exception as _e_tok:
+        logger.debug("Token bridge error: %s", _e_tok)
     if not token:
         token = os.environ.get("NOTION_API_KEY") or os.environ.get("NOTION_TOKEN", "")
 
