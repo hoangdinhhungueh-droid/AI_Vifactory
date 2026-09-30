@@ -78,6 +78,22 @@ def _load_story_context(episode_id: Optional[str] = None, options: Optional[Dict
             except Exception as e:
                 logger.debug("[timeline_editor_agent] Error reading %s: %s", p, e)
 
+    # Check for showrunner dossier if present
+    dossier_candidates = [
+        Path(f"/var/vf/episodes/{episode_id}/showrunner_dossier.json"),
+        Path(f"workspace/{episode_id}/showrunner_dossier.json"),
+    ]
+    for dp in dossier_candidates:
+        if dp.exists():
+            try:
+                dossier_data = json.loads(dp.read_text(encoding="utf-8"))
+                context["showrunner_dossier"] = dossier_data
+                if dossier_data.get("vision_statement"):
+                    context["vision_statement"] = dossier_data["vision_statement"]
+                break
+            except Exception as e:
+                logger.debug("[timeline_editor_agent] Error reading %s: %s", dp, e)
+
     return context
 
 
@@ -88,7 +104,7 @@ def llm_timeline_director_review(
     model_override: Optional[str] = None,
     timeout: float = 35.0,
 ) -> Dict[str, Any]:
-    """Invoke Frontier LLM (gpt-6-astra / claude-opus-5-5) to conduct Senior Director review of timeline.
+    """Invoke Frontier LLM (claude-opus-5-5 / gpt-6-astra) to conduct Senior Director review of timeline.
 
     Evaluates narrative tension, pacing rhythm, camera flow (continuous drift/whip/orbit),
     and scene transitions before Remotion render.
@@ -110,8 +126,8 @@ def llm_timeline_director_review(
         logger.info("[timeline_editor_agent] ModelGateway unavailable (%s), using heuristic engine", e)
         return result_record
 
-    model = model_override or os.getenv("TIMELINE_DIRECTOR_MODEL", "gpt-6-astra")
-    fallback_model = os.getenv("TIMELINE_DIRECTOR_FALLBACK_MODEL", "claude-opus-5-5")
+    model = model_override or os.getenv("TIMELINE_DIRECTOR_MODEL", "claude-opus-5-5")
+    fallback_model = os.getenv("TIMELINE_DIRECTOR_FALLBACK_MODEL", "gpt-6-astra")
 
     context = story_context or _load_story_context(episode_id)
     story_snippet = context.get("story_snippet", "")
@@ -166,8 +182,10 @@ def llm_timeline_director_review(
         "}"
     )
 
+    vision_str = f"Showrunner Vision Statement: {context['vision_statement']}\n\n" if context.get("vision_statement") else ""
     user_prompt = (
         f"Episode ID: {episode_id or 'EPISODE'}\n"
+        f"{vision_str}"
         f"Story Overview:\n{story_snippet[:1200] if story_snippet else 'Investigative non-fiction docudrama.'}\n\n"
         f"Mapped Scenes Timeline ({len(scenes)} scenes):\n"
         f"{json.dumps(scene_summaries, ensure_ascii=False, indent=2)}\n\n"

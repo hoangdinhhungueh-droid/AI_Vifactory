@@ -1137,7 +1137,7 @@ def extract_dynamic_visual_roster(
                 "narrative_samples": sample_narr
             }, ensure_ascii=False)
 
-            models_to_try = ["gpt-6-astra", "claude-opus-5-5", "claude-sonnet-5"]
+            models_to_try = ["claude-opus-5-5", "claude-sonnet-5", "gpt-6-astra"]
             resp = None
             for m_candidate in models_to_try:
                 try:
@@ -1677,6 +1677,61 @@ def build_unified_director_plan(
         except Exception:
             pass
 
+    # 3. Tự động sinh và lưu file showrunner_dossier.json (Khế ước Điều Phối Toàn Trình Opus 5.5)
+    dossier_scenes = []
+    for sc in scenes:
+        fg_info = sc.get("foreground")
+        is_char = bool(fg_info and fg_info.get("role"))
+        dossier_scenes.append({
+            "scene_id": sc.get("scene_id"),
+            "beat_index": sc.get("beat_index"),
+            "narration": sc.get("narration"),
+            "visual_archetype": "character" if is_char else ("evidence_prop" if fg_info else "macro_environment"),
+            "camera_movement": sc.get("camera"),
+            "transition": sc.get("transition_out"),
+            "motion_directive": sc.get("remotion_instructions", {}).get("motion_directive", "dramatic_push"),
+            "assigned_bg": sc.get("background", {}).get("reuse_key"),
+            "assigned_fg": fg_info.get("reuse_key") if fg_info else None,
+            "acceptance_criteria": {
+                "no_blank_stare": is_char,
+                "dynamic_pose": is_char,
+                "style_conformance": "stylized_graphic_novel_editorial_illustration",
+                "chroma_key": "#FF00FF",
+                "max_bleed_ratio": 0.0005,
+                "paper_texture": not is_char
+            }
+        })
+
+    showrunner_dossier = {
+        "showrunner_model": "claude-opus-5-5",
+        "episode_id": ep_id,
+        "market": mkt,
+        "topic": topic,
+        "vision_statement": f"Master Vox Docudrama Directorial Blueprint for {ep_id} ({mkt}) under Claude Opus 5.5 Showrunner Governance.",
+        "total_scenes": len(scenes),
+        "total_hero_clips": len(hero_clips),
+        "total_backgrounds": len(bg_roster),
+        "total_foregrounds": len(fg_roster),
+        "scenes": dossier_scenes,
+        "background_roster": bg_roster,
+        "foreground_roster": fg_roster,
+        "b5_audit_criteria": {
+            "max_magenta_bleed_pct": 0.05,
+            "zero_ui_artifacts": True,
+            "non_photorealistic_graphic_novel": True,
+            "ethnic_context_lock": mkt,
+            "dynamic_character_posing": True
+        }
+    }
+
+    for td in target_dirs:
+        try:
+            td.mkdir(parents=True, exist_ok=True)
+            with open(td / "showrunner_dossier.json", "w", encoding="utf-8") as sf:
+                json.dump(showrunner_dossier, sf, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
     # Validate director SFX compliance prior to return (Fail-Fast Gate)
     validate_director_sfx_compliance(scenes, hero_clips)
 
@@ -1684,7 +1739,8 @@ def build_unified_director_plan(
         "scenes": scenes,
         "hero_clips": hero_clips,
         "background_roster": bg_roster,
-        "foreground_roster": fg_roster
+        "foreground_roster": fg_roster,
+        "showrunner_dossier": showrunner_dossier
     }
 
 
@@ -1777,6 +1833,10 @@ def main():
     # 3. flow_video_manifest.json đã được tự động lưu trong build_unified_director_plan()
     man_path = ep_dir / "flow_video_manifest.json"
     print(f"✅ Đã tạo flow_video_manifest.json ({len(hero_clips)} clips phân bổ {len(FLOW_ACCOUNTS)} tài khoản) -> {man_path}")
+
+    # 4. showrunner_dossier.json đã được tự động lưu trong build_unified_director_plan()
+    dos_path = ep_dir / "showrunner_dossier.json"
+    print(f"✅ Đã tạo showrunner_dossier.json (Opus 5.5 Showrunner Governance) -> {dos_path}")
 
     print("\n" + "=" * 70)
     print(f"📊 BẢO CHỨNG PHÂN BỔ {len(hero_clips)} CLIPS VEO CHO {len(FLOW_ACCOUNTS)} TÀI KHOẢN GOOGLE FLOW:")
