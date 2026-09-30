@@ -23,7 +23,7 @@ from app.services.timeline_editor_agent import audit_and_optimize_timeline
 
 
 def prepare_and_render_pilot(
-    episode_id: str = "EN_EP0006_foreign_capital_us_stocks",
+    episode_id: str,
     target_duration_sec: float = 60.0
 ) -> dict:
     ep_dir = Path(f"/var/vf/episodes/{episode_id}")
@@ -145,6 +145,10 @@ def prepare_and_render_pilot(
 
 
 if __name__ == "__main__":
-    ep = sys.argv[1] if len(sys.argv) > 1 else "EN_EP0006_foreign_capital_us_stocks"
-    res = prepare_and_render_pilot(ep)
+    if len(sys.argv) < 2:
+        print("Usage: python run_beat1_opus_pilot.py <EPISODE_ID> [TARGET_DURATION_SEC]")
+        sys.exit(1)
+    ep = sys.argv[1]
+    sec = float(sys.argv[2]) if len(sys.argv) > 2 else 60.0
+    res = prepare_and_render_pilot(ep, sec)
     print(json.dumps(res, indent=2, ensure_ascii=False))
