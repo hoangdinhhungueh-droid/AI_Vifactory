@@ -41,3 +41,10 @@ def test_run_post_render_sweep_missing_file(tmp_path):
     report = run_post_render_sweep("TEST_EP", str(tmp_path))
     assert report["verdict"] == "FAILED"
     assert "Video file not found" in report["error"]
+
+
+def test_probe_audio_loudness_missing():
+    res = probe_audio_loudness("/non/existent/path.mp4")
+    assert res["status"] == "FILE_MISSING"
+    assert res["pass"] is False
+

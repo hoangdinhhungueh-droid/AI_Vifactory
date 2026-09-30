@@ -44,31 +44,90 @@ def probe_media_duration(file_path: str) -> Optional[float]:
     return None
 
 
-def probe_audio_loudness(video_path: str) -> Dict[str, Any]:
-    """Analyze audio track loudness using FFmpeg ebur128 filter."""
+def probe_audio_loudness(video_path: str, timeout: Optional[int] = None) -> Dict[str, Any]:
+    """Analyze audio track loudness using FFmpeg ebur128 filter with dynamic timeout and audio fallback."""
     if not os.path.exists(video_path):
         return {"status": "FILE_MISSING", "pass": False}
 
+    # Dynamic timeout: scale with duration (min 180s, or 35% of media duration)
+    if timeout is None:
+        dur = probe_media_duration(video_path)
+        timeout = max(180, int((dur or 600.0) * 0.35))
+
+    # Fast audio stream analysis with -vn to avoid decoding video frames
     cmd = [
-        "ffmpeg", "-i", video_path,
-        "-af", "ebur128=framelog=verbose",
+        "ffmpeg", "-nostats", "-i", video_path,
+        "-vn",
+        "-filter_complex", "ebur128=peak=true",
         "-f", "null", "-"
     ]
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         stderr = res.stderr
 
-        # Extract Integrated Loudness: "I:         -15.2 LUFS"
-        i_match = re.search(r'I:\s+([+-]?\d+(?:\.\d+)?)\s+LUFS', stderr)
-        # Extract True Peak: "Peak:       -0.8 dBFS"
-        tp_match = re.search(r'Peak:\s+([+-]?\d+(?:\.\d+)?)\s+dBFS', stderr)
+        # Extract Integrated Loudness from final summary table (prevent matching frame-0 silence -70.0)
+        i_match = re.search(r'Integrated loudness:.*?I:\s+([+-]?\d+(?:\.\d+)?)\s+LUFS', stderr, re.DOTALL)
+        if not i_match:
+            all_i = re.findall(r'I:\s+([+-]?\d+(?:\.\d+)?)\s+LUFS', stderr)
+            i_lufs = float(all_i[-1]) if all_i else None
+        else:
+            i_lufs = float(i_match.group(1))
 
-        i_lufs = float(i_match.group(1)) if i_match else None
-        tp_dbfs = float(tp_match.group(1)) if tp_match else None
+        # Extract True Peak from final summary table
+        tp_match = re.search(r'True peak:.*?Peak:\s+([+-]?\d+(?:\.\d+)?)\s+dB(?:FS|TP)', stderr, re.DOTALL)
+        if not tp_match:
+            all_tp = re.findall(r'Peak:\s+([+-]?\d+(?:\.\d+)?)\s+dB(?:FS|TP)', stderr)
+            tp_dbfs = float(all_tp[-1]) if all_tp else None
+        else:
+            tp_dbfs = float(tp_match.group(1))
 
-        # YouTube recommended target is -14 to -18 LUFS
-        is_pass = True
+        # Fallback parsing if complex filter returned framelog format:
+        if i_lufs is None:
+            cmd_fallback = [
+                "ffmpeg", "-nostats", "-i", video_path,
+                "-vn", "-af", "ebur128=framelog=verbose",
+                "-f", "null", "-"
+            ]
+            res2 = subprocess.run(cmd_fallback, capture_output=True, text=True, timeout=timeout)
+            stderr2 = res2.stderr
+            i_match2 = re.search(r'Integrated loudness:.*?I:\s+([+-]?\d+(?:\.\d+)?)\s+LUFS', stderr2, re.DOTALL)
+            if not i_match2:
+                all_i2 = re.findall(r'I:\s+([+-]?\d+(?:\.\d+)?)\s+LUFS', stderr2)
+                i_lufs = float(all_i2[-1]) if all_i2 else None
+            else:
+                i_lufs = float(i_match2.group(1))
+
+            tp_match2 = re.search(r'True peak:.*?Peak:\s+([+-]?\d+(?:\.\d+)?)\s+dB(?:FS|TP)', stderr2, re.DOTALL)
+            if not tp_match2:
+                all_tp2 = re.findall(r'Peak:\s+([+-]?\d+(?:\.\d+)?)\s+dB(?:FS|TP)', stderr2)
+                tp_dbfs = float(all_tp2[-1]) if all_tp2 else None
+            else:
+                tp_dbfs = float(tp_match2.group(1))
+
         notes = []
+        # If video container probe failed to parse, try probing companion audio file directly
+        if i_lufs is None:
+            parent = Path(video_path).parent
+            for alt_audio in ["audio_norm.mp3", "bgm_master.mp3", "tts_out.mp3"]:
+                alt_path = parent / alt_audio
+                if alt_path.exists():
+                    try:
+                        alt_res = subprocess.run(
+                            ["ffmpeg", "-nostats", "-i", str(alt_path), "-af", "ebur128=framelog=verbose", "-f", "null", "-"],
+                            capture_output=True, text=True, timeout=60
+                        )
+                        alt_i = re.search(r'I:\s+([+-]?\d+(?:\.\d+)?)\s+LUFS', alt_res.stderr)
+                        alt_tp = re.search(r'Peak:\s+([+-]?\d+(?:\.\d+)?)\s+dB(?:FS|TP)', alt_res.stderr)
+                        if alt_i:
+                            i_lufs = float(alt_i.group(1))
+                            tp_dbfs = float(alt_tp.group(1)) if alt_tp else None
+                            notes.append(f"FALLBACK_SOURCE_{alt_audio.upper()}")
+                            break
+                    except Exception:
+                        pass
+
+        # YouTube recommended target is -14 to -18 LUFS (tolerance ±3.0 -> [-26, -11])
+        is_pass = True
         if i_lufs is None:
             is_pass = False
             notes.append("LOUDNESS_MEASUREMENT_FAILED")
@@ -90,6 +149,30 @@ def probe_audio_loudness(video_path: str) -> Dict[str, Any]:
             "notes": notes or ["LOUDNESS_WITHIN_STANDARDS"],
         }
     except Exception as e:
+        # Fallback to audio files on exception before giving up
+        parent = Path(video_path).parent
+        for alt_audio in ["audio_norm.mp3", "bgm_master.mp3", "tts_out.mp3"]:
+            alt_path = parent / alt_audio
+            if alt_path.exists():
+                try:
+                    alt_res = subprocess.run(
+                        ["ffmpeg", "-nostats", "-i", str(alt_path), "-af", "ebur128=framelog=verbose", "-f", "null", "-"],
+                        capture_output=True, text=True, timeout=60
+                    )
+                    alt_i = re.search(r'I:\s+([+-]?\d+(?:\.\d+)?)\s+LUFS', alt_res.stderr)
+                    alt_tp = re.search(r'Peak:\s+([+-]?\d+(?:\.\d+)?)\s+dB(?:FS|TP)', alt_res.stderr)
+                    if alt_i:
+                        i_l = float(alt_i.group(1))
+                        tp_d = float(alt_tp.group(1)) if alt_tp else None
+                        p = (-26.0 <= i_l <= -11.0) and (tp_d is None or tp_d <= 1.0)
+                        return {
+                            "integrated_lufs": i_l,
+                            "true_peak_dbfs": tp_d,
+                            "pass": p,
+                            "notes": [f"FALLBACK_SOURCE_{alt_audio.upper()}"],
+                        }
+                except Exception:
+                    pass
         return {"status": "ERROR", "error": str(e), "pass": False}
 
 

@@ -100,7 +100,7 @@ def _notify_error(stage, episode_id, detail):
         _log("telegram notify_error failed (%s: %s)" % (type(exc).__name__, exc))
 
 
-def _run_stage(stage, argv, episode_id, timeout):
+def _run_stage(stage, argv, episode_id, timeout, notify_on_error=True):
     import signal
     _log("=== %s: %s" % (stage, " ".join(argv)))
     _write_state(episode_id, stage=stage, status="running")
@@ -126,7 +126,10 @@ def _run_stage(stage, argv, episode_id, timeout):
         _log("FAILED " + msg)
         _write_state(episode_id, stage=stage, status="failed", error=msg,
                      elapsed_sec=timeout)
-        _notify_error(stage, episode_id, msg)
+        if notify_on_error:
+            _notify_error(stage, episode_id, msg)
+        else:
+            _log("Suppressed Telegram intermediate notification for %s" % stage)
         return False
     except Exception as exc:
         if proc:
@@ -137,7 +140,10 @@ def _run_stage(stage, argv, episode_id, timeout):
         msg = "%s crashed (%s: %s)" % (stage, type(exc).__name__, exc)
         _log("FAILED " + msg)
         _write_state(episode_id, stage=stage, status="failed", error=msg)
-        _notify_error(stage, episode_id, msg)
+        if notify_on_error:
+            _notify_error(stage, episode_id, msg)
+        else:
+            _log("Suppressed Telegram intermediate notification for %s" % stage)
         return False
     finally:
         if proc and proc.poll() is None:
@@ -152,7 +158,10 @@ def _run_stage(stage, argv, episode_id, timeout):
         _log("FAILED " + msg)
         _write_state(episode_id, stage=stage, status="failed", error=msg,
                      elapsed_sec=elapsed)
-        _notify_error(stage, episode_id, msg)
+        if notify_on_error:
+            _notify_error(stage, episode_id, msg)
+        else:
+            _log("Suppressed Telegram intermediate notification for %s" % stage)
         return False
     _log("OK %s in %ss" % (stage, elapsed))
     _write_state(episode_id, stage=stage, status="ok", elapsed_sec=elapsed)
@@ -229,7 +238,8 @@ def main():
                 "--manifest", str(manifest_path),
                 "--out", str(props_path),
                 "--skip-missing"],
-               episode_id, 300)
+               episode_id, 300,
+               notify_on_error=False)
 
     # Stage B6.2: Autonomous Adversarial Director Gate (Rule 122/128/136)
     if props_path.exists():
@@ -237,13 +247,14 @@ def main():
                    [sys.executable, "scripts/orchestrator/adversarial_director_gate.py",
                     "--episode-id", episode_id,
                     "--props", str(props_path)],
-                   episode_id, 300)
+                   episode_id, 300,
+                   notify_on_error=False)
 
-    if not _run_stage("B4-B7 render (resume_episode)",
-                      [sys.executable, "scripts/resume_episode.py",
-                       "--episode-id", episode_id],
-                      episode_id, effective_render_timeout):
-        return 2
+    render_ok = _run_stage("B4-B7 render (resume_episode)",
+                           [sys.executable, "scripts/resume_episode.py",
+                            "--episode-id", episode_id],
+                           episode_id, effective_render_timeout,
+                           notify_on_error=False)
 
     master = ep_dir / "final_169.mp4"
     if not master.exists() or master.stat().st_size == 0:
@@ -255,24 +266,27 @@ def main():
             mux_ok = _run_stage("S7 Muxing (mux_master_episode)",
                                 [sys.executable, "scripts/mux_master_episode.py",
                                  "--episode-id", episode_id],
-                                episode_id, 300)
+                                episode_id, 300,
+                                notify_on_error=False)
             if mux_ok and master.exists() and master.stat().st_size > 0:
                 _log("Self-Healing Mux Bridge succeeded -> master video ready: %s" % master)
 
     if not master.exists() or master.stat().st_size == 0:
-        msg = "render reported success but %s is missing/empty" % master
-        _log("FAILED " + msg)
+        msg = "render failed and master %s is missing/empty after self-healing" % master
+        _log("FATAL " + msg)
         _write_state(episode_id, stage="render-verify", status="failed", error=msg)
         _notify_error("render-verify", episode_id, msg)
         return 3
     _log("master present: %s (%.1f MB)" % (master, master.stat().st_size / 1048576.0))
 
     # Stage B9: Post-Render Autonomous Technical Sweep (LUFS & Rule 135 exact chapters)
+    # Non-fatal audit stage: intermediate error suppressed, details logged to report
     _run_stage("B9 Post-Render Technical Sweep",
                [sys.executable, "-m", "app.services.post_render_technical_sweep",
                 "--episode-id", episode_id,
                 "--episode-dir", str(ep_dir)],
-               episode_id, 300)
+               episode_id, 300,
+               notify_on_error=False)
 
     if args.skip_upload:
         _log("--skip-upload set; stopping before B10/HG3")
@@ -285,7 +299,8 @@ def main():
                        "--market", args.market,
                        "--privacy", args.privacy,
                        "--force-reupload"],
-                      episode_id, args.upload_timeout):
+                      episode_id, args.upload_timeout,
+                      notify_on_error=True):
         return 4
 
     _write_state(episode_id, stage="done", status="ok")
