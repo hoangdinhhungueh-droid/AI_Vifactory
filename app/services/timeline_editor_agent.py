@@ -29,11 +29,18 @@ PUNCH_KEYWORDS = {
 
 VALID_CAMERA_MOVEMENTS = {
     "slow_push_in", "snap_zoom", "slow_pull_out", "cinematic_pan", "macro_tilt",
-    "continuous_drift", "seamless_whip_pan", "macro_orbit", "cinematic_orbit", "handheld_shake"
+    "continuous_drift", "seamless_whip_pan", "macro_orbit", "cinematic_orbit", "handheld_shake",
+    "dramatic_push", "subtle_drift", "split_whip", "forensic_lock"
 }
 
 VALID_TENSION_LEVELS = {"low", "medium", "high", "extreme"}
-VALID_TRANSITIONS = {"cut", "cross_fade", "continuous_whip", "match_cut"}
+VALID_TRANSITIONS = {
+    "cut", "cross_fade", "continuous_whip", "match_cut",
+    "push_zoom", "paper_wipe", "tape_snap", "ink_bleed", "whip_pan_right", "hard_cut", "light_leak", "smash_cut"
+}
+VALID_MOTION_DIRECTIVES = {
+    "dramatic_push", "subtle_drift", "split_whip", "forensic_lock", "counter_rollup", "yellow_marker_highlight"
+}
 
 
 def _load_story_context(episode_id: Optional[str] = None, options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -138,9 +145,10 @@ def llm_timeline_director_review(
         "3. High-Impact Reveals: Use 'snap_zoom' or 'seamless_whip_pan' on catalyst revelations and smoking guns.\n"
         "4. Rule 136 Clean Lower-Thirds: Ensure speaker tags are clean ('NAME // ROLE' or 'BEAT X // TITLE'), never file extensions or asset codes.\n\n"
         "Valid Camera Movements:\n"
-        "slow_push_in, snap_zoom, slow_pull_out, cinematic_pan, macro_tilt, continuous_drift, seamless_whip_pan, macro_orbit, cinematic_orbit, handheld_shake\n\n"
+        "slow_push_in, snap_zoom, slow_pull_out, cinematic_pan, macro_tilt, continuous_drift, seamless_whip_pan, macro_orbit, cinematic_orbit, handheld_shake, dramatic_push, subtle_drift, split_whip, forensic_lock\n\n"
         "Valid Tension Levels: low, medium, high, extreme\n"
-        "Valid Transitions: cut, cross_fade, continuous_whip\n\n"
+        "Valid Transitions: cut, cross_fade, continuous_whip, match_cut, push_zoom, paper_wipe, tape_snap, ink_bleed, whip_pan_right, hard_cut, light_leak, smash_cut\n"
+        "Valid Motion Directives: dramatic_push, subtle_drift, split_whip, forensic_lock, counter_rollup, yellow_marker_highlight\n\n"
         "OUTPUT REQUIREMENT: Respond ONLY with a valid JSON object matching this schema:\n"
         "{\n"
         '  "editorial_rationale": "1-2 sentences on your overall directorial vision for this sequence",\n'
@@ -149,7 +157,8 @@ def llm_timeline_director_review(
         '      "idx": 0,\n'
         '      "cameraMovement": "snap_zoom",\n'
         '      "tensionLevel": "high",\n'
-        '      "transition": "cross_fade",\n'
+        '      "transition": "push_zoom",\n'
+        '      "motionDirective": "dramatic_push",\n'
         '      "speakerTag": "OPTIONAL CLEAN TITLE // SUBTITLE",\n'
         '      "directorNote": "Immediate hook impact"\n'
         '    }\n'
@@ -276,6 +285,9 @@ def audit_and_optimize_timeline(
             new_trans = llm_adj.get("transition")
             if new_trans and new_trans in VALID_TRANSITIONS:
                 scene["transition"] = new_trans
+            new_motion = llm_adj.get("motionDirective") or llm_adj.get("motion_directive")
+            if new_motion and new_motion in VALID_MOTION_DIRECTIVES:
+                scene["motionDirective"] = new_motion
             llm_speaker = llm_adj.get("speakerTag")
             if llm_speaker and isinstance(llm_speaker, str) and llm_speaker.strip():
                 scene["speakerTag"] = llm_speaker.strip()

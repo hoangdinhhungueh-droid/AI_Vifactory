@@ -27,7 +27,11 @@ export type CameraMove =
   | "focus_breathe_push"
   | "continuous_drift"
   | "seamless_whip_pan"
-  | "handheld_shake";
+  | "handheld_shake"
+  | "dramatic_push"
+  | "subtle_drift"
+  | "split_whip"
+  | "forensic_lock";
 
 export type TransitionOut =
   | "hard_cut"
@@ -35,11 +39,15 @@ export type TransitionOut =
   | "stop_motion_flicker_cut"
   | "crossfade_short"
   | "whip_pan"
+  | "whip_pan_right"
   | "macro_zoom_through"
   | "ink_bleed"
   | "paper_tear"
   | "light_leak"
   | "circle_wipe"
+  | "push_zoom"
+  | "paper_wipe"
+  | "tape_snap"
   | "vox_push_zoom"
   | "vox_paper_wipe"
   | "vox_tape_snap"
@@ -171,6 +179,15 @@ export interface Scene {
   };
   cameraMovement?: CameraMove;
   tensionLevel?: "low" | "medium" | "high";
+  motionDirective?:
+    | "dramatic_push"
+    | "subtle_drift"
+    | "split_whip"
+    | "forensic_lock"
+    | "counter_rollup"
+    | "yellow_marker_highlight"
+    | string;
+  directorNote?: string;
   opticalFx?: {
     vignette?: boolean;
     film_grain?: boolean;
