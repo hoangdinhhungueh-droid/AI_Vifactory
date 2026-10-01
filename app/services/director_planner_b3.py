@@ -218,23 +218,37 @@ def detect_forensic_overlay(
 
     # 00. Kinetic Headline (Cold Hook Impact Typography - Rule 122 & Rule 444)
     if is_cold_hook and (scene_idx is None or scene_idx == 0):
-        sentences = [s.strip() for s in re.split(r'[.!?。！？\n]', narration_text) if s.strip()]
-        first_sent = sentences[0] if sentences else narration_text
-        words = first_sent.split()
-        headline_text = " ".join(words[:8]) if len(words) > 8 else first_sent
-        highlight_w = words[len(words) // 2] if words else "PARADOX"
+        meta_hl = metadata.get("headline") if metadata else None
+        meta_stat = (metadata.get("stat_value") or metadata.get("statValue")) if metadata else None
+        meta_sub = (metadata.get("subtext") or metadata.get("statLabel")) if metadata else None
+        meta_hw = (metadata.get("highlight_word") or metadata.get("highlightWord")) if metadata else None
+
+        if meta_hl:
+            headline_text = meta_hl
+        elif meta_stat:
+            headline_text = f"THE {meta_stat} ILLUSION"
+        else:
+            sentences = [s.strip() for s in re.split(r'[.!?。！？\n]', narration_text) if s.strip()]
+            first_sent = sentences[0] if sentences else narration_text
+            words = first_sent.split()
+            headline_text = " ".join(words[:6]) if len(words) > 6 else first_sent
+
+        highlight_w = meta_hw or ("ILLUSION" if "ILLUSION" in headline_text.upper() else "PARADOX")
+        subtext = meta_sub or "Why Record Capital Flows Conceal a Dangerous Structural Exit"
+        badge = (metadata.get("category") if metadata else "CRITICAL PARADOX // COLD HOOK") or "CRITICAL PARADOX // COLD HOOK"
+
         return {
             "type": "kinetic_headline",
             "legacy_type": "redacted_doc",
             "theme": theme or "vox_paper",
             "layout": "full_bleed_focus",
             "title": headline_text.upper(),
-            "badge": "CRITICAL PARADOX // COLD HOOK",
+            "badge": badge,
             "sfx_cue": "stamp_slam",
             "label": headline_text,
             "payload": {
                 "highlight_word": highlight_w.upper(),
-                "subtext": "FORENSIC INVESTIGATION REPORT",
+                "subtext": subtext,
                 "accent_color": "#facc15"
             }
         }
@@ -544,15 +558,15 @@ def detect_forensic_overlay(
                 start_val = float(decline_m.group(1))
                 end_val = float(decline_m.group(2))
                 trend = "down"
-            except Exception:
-                pass
+            except Exception as _e_dec:
+                logger.debug("Parsing decline_m values failed: %s", _e_dec)
         elif surge_m:
             try:
                 start_val = float(surge_m.group(1))
                 end_val = float(surge_m.group(2))
                 trend = "up"
-            except Exception:
-                pass
+            except Exception as _e_srg:
+                logger.debug("Parsing surge_m values failed: %s", _e_srg)
         else:
             parsed = parse_spoken_number(narration_text)
             if parsed and parsed.display_value > 0:
@@ -597,8 +611,8 @@ def detect_forensic_overlay(
                 start_val = float(decline_m.group(1))
                 end_val = float(decline_m.group(2))
                 trend = "down"
-            except Exception:
-                pass
+            except Exception as _e_dec2:
+                logger.debug("Parsing decline_m in kinetic_counter failed: %s", _e_dec2)
 
         return {
             "type": "kinetic_counter",
@@ -1412,8 +1426,8 @@ def generate_director_plan(
                     spoken_sentences = json.loads(sc.read_text(encoding="utf-8"))
                     if spoken_sentences:
                         break
-                except Exception:
-                    pass
+                except Exception as _e_sc:
+                    logger.debug("Loading spoken_sentences candidate %s failed: %s", sc, _e_sc)
     if not spoken_sentences:
         for bc in [var_vf_dir / "brain_input.json", ep_dir / "brain_input.json"]:
             if bc.exists():
@@ -1422,8 +1436,8 @@ def generate_director_plan(
                     spoken_sentences = b_data.get("spoken_sentences", [])
                     if spoken_sentences:
                         break
-                except Exception:
-                    pass
+                except Exception as _e_bc:
+                    logger.debug("Loading brain_input candidate %s failed: %s", bc, _e_bc)
 
     if not story_text:
         story_candidates = [
@@ -1450,8 +1464,8 @@ def generate_director_plan(
                 try:
                     intel_card = json.loads(ic.read_text(encoding="utf-8"))
                     break
-                except Exception:
-                    pass
+                except Exception as _e_ic:
+                    logger.debug("Loading competitor intel candidate %s failed: %s", ic, _e_ic)
         if not intel_card:
             intel_card = {}
 
@@ -1466,8 +1480,8 @@ def generate_director_plan(
             try:
                 grounding_data = json.loads(gc.read_text(encoding="utf-8"))
                 break
-            except Exception:
-                pass
+            except Exception as _e_gc:
+                logger.debug("Loading grounding data candidate %s failed: %s", gc, _e_gc)
     temporal_cadence = (grounding_data.get("temporal_cadence") or "ADAPTIVE").upper()
     causal_epochs = grounding_data.get("causal_epochs") or []
 
@@ -1510,8 +1524,8 @@ def generate_director_plan(
             if bp.exists():
                 try:
                     b_in = json.loads(bp.read_text(encoding="utf-8"))
-                except Exception:
-                    pass
+                except Exception as _e_bp:
+                    logger.debug("Loading existing brain_input %s failed: %s", bp, _e_bp)
             b_in["episode_id"] = episode_id
             b_in["market"] = mkt
             b_in["story"] = story_text
@@ -1526,8 +1540,8 @@ def generate_director_plan(
                     (var_vf_dir / "spoken_script.txt").write_text(spoken_script_txt, encoding="utf-8")
                     (var_vf_dir / "spoken_sentences.json").write_text(json.dumps(raw_sents, ensure_ascii=False, indent=2), encoding="utf-8")
                     (var_vf_dir / "brain_input.json").write_text(json.dumps(b_in, ensure_ascii=False, indent=2), encoding="utf-8")
-                except Exception:
-                    pass
+                except Exception as _e_var:
+                    logger.debug("Mirroring brain_input to var_vf_dir failed: %s", _e_var)
             
             tts_res = asyncio.run(synthesize_beat_tts_pipeline(episode_id, out_dir=str(target_dir), force=True))
             spoken_sentences = tts_res.get("segments") or []
@@ -1702,6 +1716,15 @@ def generate_director_plan(
                 "movement": cam_mov,
                 "tension_level": dynamic_tension
             },
+            "virtual_camera": sc.get("virtual_camera"),
+            "primary_hero": sc.get("primary_hero"),
+            "motion_path": sc.get("motion_path"),
+            "linked_secondary_objects": sc.get("linked_secondary_objects", []),
+            "headline": sc.get("headline"),
+            "highlight_word": sc.get("highlight_word"),
+            "category": sc.get("category"),
+            "subtext": sc.get("subtext"),
+            "accent_color": sc.get("accent_color"),
             "bg_reuse_key": bg_key,
             "bg_prompt": bg_desc,
             "background_reuse_key": bg_key,
@@ -1755,6 +1778,8 @@ def generate_director_plan(
             # Leave foreground empty so Remotion data graphics have 100% clean visual hierarchy
             sc["fg_reuse_key"] = ""
             sc["foreground_reuse_key"] = ""
+            sc["primary_hero"] = None
+            sc["motion_path"] = None
             continue
 
         # 2. Reserve establishing shots
@@ -1797,6 +1822,20 @@ def generate_director_plan(
                 sc["fg_prompt"] = fg_roster.get(chosen_fg, {}).get("description", "")
                 sc["foreground_reuse_key"] = chosen_fg
                 sc["foreground_prompt"] = fg_roster.get(chosen_fg, {}).get("description", "")
+                if not sc.get("primary_hero"):
+                    dur_f = int(sc.get("duration_frames") or 150)
+                    sc["primary_hero"] = {
+                        "id": f"hero_{chosen_fg}",
+                        "src": f"pulled/{chosen_fg}.png",
+                        "role": fg_roster.get(chosen_fg, {}).get("role", "central_investigative_subject"),
+                        "motion_path": [
+                            {"frame": 0, "x_pct": 115, "y_pct": 58, "z_depth": 0.85, "scale": 0.88, "rot_deg": 6, "easing": "bezier"},
+                            {"frame": 24, "x_pct": 55, "y_pct": 50, "z_depth": 1.0, "scale": 1.08, "rot_deg": -1.5, "easing": "spring_overshoot"},
+                            {"frame": 36, "x_pct": 55, "y_pct": 52, "z_depth": 1.0, "scale": 1.0, "rot_deg": 0, "easing": "settle_lock"},
+                            {"frame": dur_f, "x_pct": 53.5, "y_pct": 52, "z_depth": 1.0, "scale": 1.02, "rot_deg": -0.2, "easing": "micro_breathing"}
+                        ]
+                    }
+                    sc["motion_path"] = sc["primary_hero"]["motion_path"]
                 fg_usage_counter[chosen_fg] = fg_usage_counter.get(chosen_fg, 0) + 1
                 fg_last_seen[chosen_fg] = i
 
@@ -1845,8 +1884,8 @@ def generate_director_plan(
                 with open(cf, "r", encoding="utf-8") as bf:
                     existing_brain = json.load(bf)
                 break
-            except Exception:
-                pass
+            except Exception as _e_cf:
+                logger.debug("Loading candidate brain %s failed: %s", cf, _e_cf)
 
     brain_update = {
         "episode_id": episode_id,

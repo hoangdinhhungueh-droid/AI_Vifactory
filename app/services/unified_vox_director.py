@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 try:
     sys.stdout.reconfigure(encoding='utf-8')
-except Exception:
-    pass
+except Exception as ex:
+    logger.debug("Stdout encoding reconfigure skipped: %s", ex)
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -1415,6 +1415,109 @@ def validate_director_sfx_compliance(scenes: List[Dict[str, Any]], hero_clips: L
         )
 
 
+def generate_cinematography_scene_data(
+    idx: int,
+    beat_idx: int,
+    dur_frames: int,
+    assigned_fg: Optional[str],
+    fg_info: Optional[Dict[str, Any]],
+    bg_key: str,
+    layout_choice: str,
+    cam_move: str,
+    narr: str,
+    mkt: str,
+    key_metrics: List[Any],
+    topic: str
+) -> Dict[str, Any]:
+    """Generate 3-entity hierarchy, virtual camera, and parametric motion path waypoints
+    per Opus 5.5 Cinematography Director Engine (Plan Section III).
+    """
+    focal = 28 if beat_idx == 1 else (35 if beat_idx in (2, 3) else (50 if beat_idx == 4 else 85))
+    dof_blur = 3.5 if assigned_fg else 0.5
+    virtual_camera = {
+        "focal_length_mm": focal,
+        "depth_of_field_blur": dof_blur,
+        "key_lighting": "chiaroscuro_noir_top_left" if beat_idx in (1, 4) else "diffused_institutional_daylight",
+        "camera_move": cam_move,
+        "scale_range": [1.0, 1.08] if beat_idx == 1 else ([1.0, 1.05] if beat_idx in (2, 3) else [1.0, 1.10])
+    }
+
+    primary_hero = None
+    if assigned_fg:
+        is_left = "left" in layout_choice
+        start_x = -15 if is_left else 115
+        target_x = 45 if is_left else 55
+        target_y = 50
+        primary_hero = {
+            "id": f"hero_{assigned_fg}",
+            "src": f"pulled/{assigned_fg}.png",
+            "role": (fg_info or {}).get("role", "central_investigative_subject"),
+            "motion_path": [
+                {"frame": 0, "x_pct": start_x, "y_pct": 58, "z_depth": 0.85, "scale": 0.88, "rot_deg": -6 if is_left else 6, "easing": "bezier"},
+                {"frame": 24, "x_pct": target_x, "y_pct": target_y, "z_depth": 1.0, "scale": 1.08, "rot_deg": 1.5 if is_left else -1.5, "easing": "spring_overshoot"},
+                {"frame": 36, "x_pct": target_x, "y_pct": target_y + 2, "z_depth": 1.0, "scale": 1.0, "rot_deg": 0, "easing": "settle_lock"},
+                {"frame": dur_frames, "x_pct": target_x + (1.5 if is_left else -1.5), "y_pct": target_y + 2, "z_depth": 1.0, "scale": 1.02, "rot_deg": 0.2 if is_left else -0.2, "easing": "micro_breathing"}
+            ]
+        }
+
+    linked_secondary = []
+    narr_l = narr.lower()
+    if any(w in narr_l for w in ["fraud", "confidential", "violation", "evidence", "void", "audit", "bằng chứng", "gian lận", "mật", "사기", "증거", "비밀"]):
+        stamp_label = "PRICE_FRAUD" if "fraud" in narr_l or "gian lận" in narr_l else ("CONFIDENTIAL" if "confidential" in narr_l or "mật" in narr_l else "AUDIT_FINDING")
+        linked_secondary.append({
+            "id": f"stamp_{idx}",
+            "type": "stamp",
+            "label": stamp_label,
+            "slam_frame": 18,
+            "x_pct": 68 if "left" in layout_choice else 32,
+            "y_pct": 45,
+            "theme": "danger" if beat_idx >= 3 else "investigation",
+            "rot_deg": -5.5 if idx % 2 == 0 else 4.5
+        })
+
+    if any(w in narr_l for w in ["article", "clause", "provision", "document", "record", "hồ sơ", "điều khoản", "기록", "조항"]):
+        linked_secondary.append({
+            "id": f"marker_{idx}",
+            "type": "marker_sweep",
+            "sweep_start_frame": 12,
+            "sweep_duration_frames": 14,
+            "color": "#ffe600"
+        })
+
+    parsed_num = re.search(r'\$(\d+(?:\.\d+)?)\s*(?:billion|b|tỷ|조|兆)?', narr, re.IGNORECASE)
+    if parsed_num and beat_idx in (1, 3, 4):
+        val = float(parsed_num.group(1))
+        linked_secondary.append({
+            "id": f"odometer_{idx}",
+            "type": "odometer",
+            "start_value": 0,
+            "end_value": val,
+            "prefix": "$",
+            "suffix": "B",
+            "label": "RECORD CAPITAL FLOW",
+            "start_frame": 6,
+            "duration_frames": 24
+        })
+
+    headline_info = {}
+    if idx == 0:
+        metric_str = f"${key_metrics[0]}" if key_metrics else "$942 BILLION"
+        headline_info = {
+            "headline": f"THE {metric_str} ILLUSION".upper(),
+            "highlight_word": "ILLUSION",
+            "category": f"FORENSIC INVESTIGATION // {mkt} MACRO ANALYSIS",
+            "subtext": "Why Record Capital Flows Conceal a Dangerous Structural Exit",
+            "accent_color": "#f59e0b"
+        }
+
+    return {
+        "virtual_camera": virtual_camera,
+        "primary_hero": primary_hero,
+        "linked_secondary_objects": linked_secondary,
+        "headline_info": headline_info
+    }
+
+
 # ============================================================================
 # MASTER UNIFIED DIRECTOR PLANNER (RULE 125 SINGLE TRUTH & RULE 128)
 # ============================================================================
@@ -1444,15 +1547,47 @@ def build_unified_director_plan(
     mkt = (market or meta.get("market") or ep_id.split("_")[0]).upper()
     topic = meta.get("topic") or meta.get("raw_term") or ep_id
 
-    # 1. Trích xuất Dynamic Visual Roster độc lập theo kịch bản và thị trường
-    bg_roster, fg_roster = extract_dynamic_visual_roster(
-        story_text=story_text or "",
-        spoken_sentences=spoken_sentences,
-        grounding_intel=grounding_intel,
-        competitor_card=competitor_card,
-        market=mkt,
-        topic=topic
-    )
+    # 1. Trích xuất Dynamic Visual Roster: Ưu tiên nạp trực tiếp từ images/manifest.json nếu đã có tài nguyên phê duyệt
+    approved_manifest_path = ep_dir / "images" / "manifest.json"
+    if not approved_manifest_path.exists():
+        approved_manifest_path = ep_dir / "manifest.json"
+
+    bg_roster, fg_roster = {}, {}
+    if approved_manifest_path.exists():
+        try:
+            with open(approved_manifest_path, "r", encoding="utf-8") as am_f:
+                m_items = json.load(am_f)
+            if isinstance(m_items, list):
+                for item in m_items:
+                    rk = item.get("reuse_key") or item.get("name")
+                    lt = (item.get("layer_type") or "").lower()
+                    if "background" in lt or rk.startswith("bg_"):
+                        bg_roster[rk] = {
+                            "title": item.get("name", rk),
+                            "description": item.get("description", rk),
+                            "beats": [1, 2, 3, 4, 5]
+                        }
+                    else:
+                        fg_roster[rk] = {
+                            "title": item.get("name", rk),
+                            "description": item.get("description", rk),
+                            "role": item.get("role", "evidentiary_subject"),
+                            "beats": [1, 2, 3, 4, 5],
+                            "type": "character" if "char" in rk else "evidence_prop"
+                        }
+            logger.info("Loaded %d BGs and %d FGs directly from approved manifest: %s", len(bg_roster), len(fg_roster), approved_manifest_path)
+        except Exception as ex:
+            logger.warning("Failed loading approved manifest %s: %s", approved_manifest_path, ex)
+
+    if not bg_roster or not fg_roster:
+        bg_roster, fg_roster = extract_dynamic_visual_roster(
+            story_text=story_text or "",
+            spoken_sentences=spoken_sentences,
+            grounding_intel=grounding_intel,
+            competitor_card=competitor_card,
+            market=mkt,
+            topic=topic
+        )
 
     scenes = []
     hero_clips = []
@@ -1654,13 +1789,74 @@ def build_unified_director_plan(
             } if assigned_fg else None,
             "remotion_instructions": remotion_instructions
         }
+
+        # Opus 5.5 Full Cinematography Director Engine (Plan Section III)
+        cine_data = generate_cinematography_scene_data(
+            idx=idx,
+            beat_idx=beat_idx,
+            dur_frames=dur_frames,
+            assigned_fg=assigned_fg,
+            fg_info=fg_roster.get(assigned_fg) if assigned_fg else None,
+            bg_key=bg_key,
+            layout_choice=layout_choice,
+            cam_move=cam_move,
+            narr=narr,
+            mkt=mkt,
+            key_metrics=key_metrics if 'key_metrics' in locals() else [],
+            topic=topic
+        )
+        scene_obj["virtual_camera"] = cine_data["virtual_camera"]
+        scene_obj["primary_hero"] = cine_data["primary_hero"]
+        scene_obj["motion_path"] = (cine_data["primary_hero"] or {}).get("motion_path")
+        scene_obj["linked_secondary_objects"] = cine_data["linked_secondary_objects"]
+        if cine_data["headline_info"]:
+            scene_obj.update(cine_data["headline_info"])
+
         scenes.append(scene_obj)
 
-    # 2. Tự động sinh và ghi file flow_video_manifest.json (Khế ước VEO Hero clips)
+    # 2. Tự động sinh và ghi file flow_video_manifest.json & vox_scene_manifest.json
     manifest_data = {
         "episode_id": ep_id,
         "total_clips": len(hero_clips),
         "clips": hero_clips
+    }
+
+    vox_manifest_data = {
+        "episode_id": ep_id,
+        "market": mkt,
+        "topic": topic,
+        "total_scenes": len(scenes),
+        "scenes": [
+            {
+                "scene_id": sc["scene_id"],
+                "beat": f"Beat {sc['beat_index']}",
+                "narrative_motif": (
+                    "Cold Strike Shockwave" if sc['beat_index'] == 1 else
+                    "Architecture of Deception" if sc['beat_index'] == 2 else
+                    "Forensic Paper Trail" if sc['beat_index'] == 3 else
+                    "Smoking Gun Climax" if sc['beat_index'] == 4 else
+                    "Systemic Warning & Reckoning"
+                ),
+                "durationInFrames": sc["duration_frames"],
+                "virtual_camera": sc.get("virtual_camera"),
+                "background": {
+                    "src": f"pulled/{sc['background']['reuse_key']}.png",
+                    "reuse_key": sc['background']['reuse_key'],
+                    "motion_path": [
+                        {"frame": 0, "x_pct": 50, "y_pct": 50, "scale": 1.0, "rot_deg": 0},
+                        {"frame": sc["duration_frames"], "x_pct": 50, "y_pct": 52, "scale": 1.05, "rot_deg": 0.25 if sc.get("scene_id", "").endswith(("0", "2", "4", "6", "8")) else -0.25}
+                    ]
+                },
+                "primary_hero": sc.get("primary_hero"),
+                "linked_secondary_objects": sc.get("linked_secondary_objects", []),
+                "headline": sc.get("headline"),
+                "highlight_word": sc.get("highlight_word"),
+                "category": sc.get("category"),
+                "subtext": sc.get("subtext"),
+                "accent_color": sc.get("accent_color")
+            }
+            for sc in scenes
+        ]
     }
     
     # Ghi vào ep_dir và /var/vf/episodes/<ep_id> nếu có
@@ -1674,8 +1870,10 @@ def build_unified_director_plan(
             td.mkdir(parents=True, exist_ok=True)
             with open(td / "flow_video_manifest.json", "w", encoding="utf-8") as mf:
                 json.dump(manifest_data, mf, indent=2, ensure_ascii=False)
-        except Exception:
-            pass
+            with open(td / "vox_scene_manifest.json", "w", encoding="utf-8") as vf:
+                json.dump(vox_manifest_data, vf, indent=2, ensure_ascii=False)
+        except Exception as ex:
+            logger.warning("Failed writing flow/vox manifests to %s: %s", td, ex)
 
     # 3. Tự động sinh và lưu file showrunner_dossier.json (Khế ước Điều Phối Toàn Trình Opus 5.5)
     dossier_scenes = []
@@ -1729,8 +1927,8 @@ def build_unified_director_plan(
             td.mkdir(parents=True, exist_ok=True)
             with open(td / "showrunner_dossier.json", "w", encoding="utf-8") as sf:
                 json.dump(showrunner_dossier, sf, indent=2, ensure_ascii=False)
-        except Exception:
-            pass
+        except Exception as ex:
+            logger.warning("Failed writing showrunner_dossier.json to %s: %s", td, ex)
 
     # Validate director SFX compliance prior to return (Fail-Fast Gate)
     validate_director_sfx_compliance(scenes, hero_clips)

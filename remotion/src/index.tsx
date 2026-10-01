@@ -28,6 +28,14 @@ import {
   VoxDisclosureBadge,
   LivingCamera,
 } from "./components/vox";
+import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
+import {
+  ProceduralMotionFollower,
+  ProceduralMarkerSweep,
+  PhysicalStampSlam,
+  OdometerRollup,
+  evaluateMotionPath,
+} from "./components/kinetics";
 import { EvidenceProp3D } from "./components/EvidenceProp3D";
 import { WordTimestamp } from "./types";
 import { VoxelStopMotionVideo, calculateTotalFrames } from "./components/VoxelStopMotionVideo";
@@ -291,7 +299,16 @@ const useForegroundAspect = (src) => {
 // (slide is entrance-only). When `position` is "left"/"right" it is placed in
 // its side-anchored box (Rule 59 v2, ~82% height); otherwise it falls back to
 // the legacy full-frame centered/contain behavior for backward compatibility.
-const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, height, cadence = "cutout" }: any) => {
+const ForegroundLayer = ({
+  src,
+  position,
+  fadeFrames,
+  durationInFrames,
+  width,
+  height,
+  cadence = "cutout",
+  motionPath,
+}: any) => {
   const frame = useCurrentFrame();
   const aspect = useForegroundAspect(src);
   const fadeIn = interpolate(frame, [0, fadeFrames], [0, 1], {
@@ -305,11 +322,67 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
   const opacity = Math.min(fadeIn, fadeOut);
+
+  // If explicit vector motion path is provided (Parametric Trajectory Spline)
+  if (motionPath && Array.isArray(motionPath) && motionPath.length > 0) {
+    const { xPct, yPct, scale, rotDeg, opacity: pathOpacity, zDepth } = evaluateMotionPath(motionPath, frame, 30);
+    const targetW = Math.round(width * 0.42 * zDepth);
+    const targetH = Math.round(height * 0.78 * zDepth);
+    const finalOpacity = Math.min(opacity, pathOpacity);
+
+    return (
+      <div
+        style={{
+          position: "absolute",
+          left: `${xPct}%`,
+          top: `${yPct}%`,
+          width: targetW,
+          height: targetH,
+          opacity: finalOpacity,
+          transform: `translate(-50%, -50%) scale(${scale.toFixed(3)}) rotate(${rotDeg.toFixed(2)}deg)`,
+          filter: "drop-shadow(0 25px 40px rgba(0, 0, 0, 0.85)) drop-shadow(0 6px 16px rgba(0, 0, 0, 0.60))",
+          zIndex: Math.round(15 * zDepth),
+          pointerEvents: "none",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            bottom: -10,
+            left: "15%",
+            width: "70%",
+            height: 24,
+            borderRadius: "50%",
+            background: "radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.35) 45%, rgba(0, 0, 0, 0) 70%)",
+            transform: "scaleY(0.4)",
+            pointerEvents: "none",
+            zIndex: -1,
+          }}
+        />
+        <Img
+          src={resolveSrc(src)}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            objectPosition: "bottom",
+            filter: "brightness(1.08) contrast(1.20) saturate(1.10)",
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Fallback to organic paper placement with continuous living micro-motion (No dead freeze)
   const hasGrid = position === "left" || position === "right";
 
   if (!hasGrid) {
+    const pushScale = interpolate(frame, [0, durationInFrames || 180], [1.0, 1.04], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
     return (
-      <AbsoluteFill style={{ opacity }}>
+      <AbsoluteFill style={{ opacity, transform: `scale(${pushScale})`, transformOrigin: "center center" }}>
         <Img src={resolveSrc(src)} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </AbsoluteFill>
     );
@@ -325,9 +398,20 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
     extrapolateRight: "clamp",
     easing: Easing.bezier(0.16, 1, 0.3, 1),
   });
-  const translateY = (1 - dropProgress) * -35;
-  const rotateDeg = (1 - dropProgress) * (position === "right" ? -2.2 : 2.2);
-  const scale = 1.05 - 0.05 * dropProgress;
+  const initialTranslateY = (1 - dropProgress) * -35;
+  const initialRotateDeg = (1 - dropProgress) * (position === "right" ? -2.2 : 2.2);
+
+  // Continuous micro-breathing & living sway after landing (prevents dead freeze)
+  const afterDropRel = Math.max(0, relDrop - 16);
+  const liveSwayX = Math.sin(afterDropRel * 0.04) * 3;
+  const liveSwayY = Math.cos(afterDropRel * 0.05) * 2;
+  const liveRot = Math.sin(afterDropRel * 0.03) * 0.4;
+  const liveScale = 1.0 + Math.sin(afterDropRel * 0.03) * 0.01;
+
+  const translateY = initialTranslateY + liveSwayY;
+  const rotateDeg = initialRotateDeg + liveRot;
+  const scale = (1.05 - 0.05 * dropProgress) * liveScale;
+
   const dropOpacity = frame < dropStart ? 0 : interpolate(relDrop, [0, 6], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -338,7 +422,7 @@ const ForegroundLayer = ({ src, position, fadeFrames, durationInFrames, width, h
     <div
       style={{
         position: "absolute",
-        left: cell.left,
+        left: cell.left + liveSwayX,
         top: cell.top,
         width: cell.width,
         height: cell.height,
@@ -836,6 +920,106 @@ export const TwoLayerScene = (props) => {
         />
       ) : null}
 
+      {/* Cold Strike Scene 0 Kinetic Headline (Rule 444 & Vox Architecture) */}
+      {showOverlay && (props.sceneIndex === 0 || props.motionDirective === "kinetic_headline") && (props.headline || props.statValue) ? (
+        <VoxKineticHeadline
+          headline={props.headline || (props.statValue ? `THE ${props.statValue} ILLUSION` : "THE $942 BILLION ILLUSION")}
+          highlightWord={props.highlightWord || "ILLUSION"}
+          category={props.category || "FORENSIC INVESTIGATION // MACRO CAPITAL FLOWS"}
+          subtext={props.subtext || props.statLabel || "Why Record Foreign Buying Conceals a Dangerous Structural Exit"}
+          accentColor={props.accentColor || "#f59e0b"}
+        />
+      ) : null}
+
+      {/* Linked Secondary Objects (Parametric Vector Follower, Physical Stamp Slam, Marker Sweep, Odometer) */}
+      {props.linkedSecondaryObjects && Array.isArray(props.linkedSecondaryObjects) ? (
+        props.linkedSecondaryObjects.map((obj: any, idx: number) => {
+          if (obj.type === "svg_procedural_marker" || obj.type === "marker_sweep") {
+            return (
+              <ProceduralMarkerSweep
+                key={`sec-marker-${idx}`}
+                startFrame={obj.sweep_start_frame || obj.startFrame || 10}
+                durationFrames={obj.sweep_duration_frames || obj.durationFrames || 12}
+                color={obj.color || "#ffe600"}
+                blendMode={obj.blend_mode || "multiply"}
+              />
+            );
+          }
+          if (obj.type === "stamp" || obj.type === "stamp_slam") {
+            return (
+              <div
+                key={`sec-stamp-${idx}`}
+                style={{
+                  position: "absolute",
+                  left: `${obj.x_pct || 65}%`,
+                  top: `${obj.y_pct || 45}%`,
+                  transform: "translate(-50%, -50%)",
+                  zIndex: 28,
+                  pointerEvents: "none",
+                }}
+              >
+                <PhysicalStampSlam
+                  label={obj.label || "CONFIDENTIAL"}
+                  subLabel={obj.subLabel || obj.sub_label}
+                  theme={obj.theme || "danger"}
+                  color={obj.color}
+                  slamFrame={obj.slam_frame || obj.slamFrame || 15}
+                  rotation={obj.rot_deg || obj.rotation || -4}
+                />
+              </div>
+            );
+          }
+          if (obj.type === "odometer" || obj.type === "counter_rollup") {
+            return (
+              <div
+                key={`sec-odo-${idx}`}
+                style={{
+                  position: "absolute",
+                  left: `${obj.x_pct || 50}%`,
+                  top: `${obj.y_pct || 40}%`,
+                  transform: "translate(-50%, -50%)",
+                  zIndex: 28,
+                  pointerEvents: "none",
+                }}
+              >
+                <OdometerRollup
+                  startValue={obj.start_value ?? 0}
+                  endValue={obj.end_value ?? 942}
+                  prefix={obj.prefix ?? "$"}
+                  suffix={obj.suffix ?? "B"}
+                  label={obj.label || "RECORD INFLOW"}
+                  subLabel={obj.sub_label || obj.subLabel}
+                  startFrame={obj.start_frame || 5}
+                  durationFrames={obj.duration_frames || 25}
+                />
+              </div>
+            );
+          }
+          if (obj.src) {
+            return (
+              <ProceduralMotionFollower
+                key={`sec-obj-${idx}`}
+                motionPath={obj.motion_path || obj.motionPath}
+                width={width}
+                height={height}
+                zIndex={20}
+              >
+                <Img
+                  src={resolveSrc(obj.src)}
+                  style={{
+                    maxWidth: 450,
+                    maxHeight: 450,
+                    objectFit: "contain",
+                    filter: "drop-shadow(0 15px 30px rgba(0,0,0,0.8))",
+                  }}
+                />
+              </ProceduralMotionFollower>
+            );
+          }
+          return null;
+        })
+      ) : null}
+
       {/* Floating Minimalist Subtitle with Intelligent Auto-Dodge (Vox Motion Engine 2.0) */}
       {words.length > 0 ? (
         <div style={subtitleContainerStyle}>
@@ -1111,11 +1295,12 @@ const buildForegroundSegments = (scenes, defaultFadeFrames) => {
   scenes.forEach((s, i) => {
     const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
     const bgId = bgIds[i];
-    const explicitFg = s.foreground || null;
+    const explicitFg = s.primary_hero?.src || s.foreground || null;
+    const motionPath = s.primary_hero?.motion_path || s.motion_path || s.motionPath || null;
     const last = raw[raw.length - 1];
     const heldFg = last && last.bgId === bgId ? last.src : null;
     const effectiveFg = explicitFg || heldFg;
-    if (last && last.bgId === bgId && last.src === effectiveFg) {
+    if (last && last.bgId === bgId && last.src === effectiveFg && !motionPath) {
       last.end += dur;
     } else {
       raw.push({
@@ -1125,6 +1310,7 @@ const buildForegroundSegments = (scenes, defaultFadeFrames) => {
         end: cursor + dur,
         fadeFrames: s.foregroundFadeFrames ? s.foregroundFadeFrames : defaultFadeFrames,
         position: s.foregroundPosition,
+        motionPath,
       });
     }
     cursor += dur;
@@ -1169,7 +1355,8 @@ const computeOverlayKey = (s: any) => {
   const statLbl = s.statLabel;
   const badge = s.stampBadge || s.stamp_badge;
   const md = s.motionDirective;
-  if (!ov && !statVal && !badge && !md) return null;
+  const headline = s.headline;
+  if (!ov && !statVal && !badge && !md && !headline) return null;
 
   const pos = s.foregroundPosition || "left";
   return JSON.stringify({
@@ -1181,18 +1368,30 @@ const computeOverlayKey = (s: any) => {
     badge,
     md,
     pos,
+    headline,
   });
 };
 
 const buildOverlaySegments = (scenes: any[]) => {
   const raw: any[] = [];
   let cursor = 0;
-  scenes.forEach((s) => {
+  scenes.forEach((s, idx) => {
     const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
     const key = computeOverlayKey(s);
     const last = raw[raw.length - 1];
     let effectiveOv = s.forensicOverlay || s.forensic_overlay;
-    if (!effectiveOv && s.motionDirective === "counter_rollup" && s.statValue) {
+    if (!effectiveOv && (s.motionDirective === "kinetic_headline" || (idx === 0 && (s.headline || s.statValue)))) {
+      effectiveOv = {
+        type: "kinetic_headline",
+        title: s.headline || (s.statValue ? `RECORD ${s.statValue}` : "THE $942 BILLION ILLUSION"),
+        badge: s.category || "FORENSIC INVESTIGATION // MACRO CAPITAL FLOWS",
+        payload: {
+          highlight_word: s.highlightWord || s.highlight_word || "ILLUSION",
+          subtext: s.subtext || s.statLabel || "Why Record Foreign Buying Conceals a Dangerous Structural Exit",
+          accent_color: s.accentColor || s.accent_color || "#f59e0b",
+        },
+      };
+    } else if (!effectiveOv && s.motionDirective === "counter_rollup" && s.statValue) {
       effectiveOv = {
         type: "kinetic_counter",
         title: s.statLabel || "EVIDENTIARY METRIC",
@@ -1208,9 +1407,9 @@ const buildOverlaySegments = (scenes: any[]) => {
 
     if (key && last && last.key === key) {
       last.end += dur;
-    } else if (key) {
+    } else if (key || effectiveOv) {
       raw.push({
-        key,
+        key: key || `ov_${cursor}`,
         start: cursor,
         end: cursor + dur,
         forensicOverlay: effectiveOv,
@@ -2223,6 +2422,15 @@ export const TwoLayerEpisode = (props) => {
             sourceCredit={s.sourceCredit || s.source_credit}
             disclosureBadge={s.disclosureBadge}
             actTitle={s.actTitle}
+            sceneIndex={i}
+            headline={s.headline}
+            highlightWord={s.highlightWord || s.highlight_word}
+            category={s.category}
+            subtext={s.subtext}
+            accentColor={s.accentColor || s.accent_color}
+            linkedSecondaryObjects={s.linked_secondary_objects || s.linkedSecondaryObjects}
+            primaryHero={s.primary_hero || s.primaryHero}
+            virtualCamera={s.virtual_camera || s.virtualCamera}
           />
         </Sequence>
       );
@@ -2343,6 +2551,7 @@ export const TwoLayerEpisode = (props) => {
                   durationInFrames={seg.end - seg.start}
                   width={width}
                   height={height}
+                  motionPath={seg.motionPath}
                 />
               </LivingCamera>
             </Sequence>

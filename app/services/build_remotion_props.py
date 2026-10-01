@@ -261,15 +261,15 @@ def build_structured_overlay(
                 start_val = float(decline_m.group(1))
                 end_val = float(decline_m.group(2))
                 trend = "down"
-            except Exception:
-                pass
+            except Exception as ex:
+                logger.debug("Failed parsing numeric decline: %s", ex)
         elif surge_m:
             try:
                 start_val = float(surge_m.group(1))
                 end_val = float(surge_m.group(2))
                 trend = "up"
-            except Exception:
-                pass
+            except Exception as ex:
+                logger.debug("Failed parsing numeric surge: %s", ex)
         else:
             parsed = parse_spoken_number(narration_text)
             if parsed and parsed.display_value > 0:
@@ -326,23 +326,37 @@ def build_structured_overlay(
         }
 
     if fo_type in ("kinetic_headline", "cold_hook_headline", "impact_headline"):
-        sentences = [s.strip() for s in re.split(r'[.!?。！？\n]', narration_text) if s.strip()]
-        first_sent = sentences[0] if sentences else narration_text
-        words = first_sent.split()
-        headline_text = " ".join(words[:8]) if len(words) > 8 else first_sent
-        highlight_w = words[len(words) // 2] if words else "PARADOX"
+        meta_hl = (grounding_intel.get("headline") if grounding_intel else None) or (grounding_intel.get("cold_hook_headline") if grounding_intel else None)
+        meta_stat = (grounding_intel.get("stat_value") if grounding_intel else None) or (grounding_intel.get("statValue") if grounding_intel else None)
+        meta_sub = (grounding_intel.get("subtext") if grounding_intel else None) or (grounding_intel.get("statLabel") if grounding_intel else None)
+        meta_hw = (grounding_intel.get("highlight_word") if grounding_intel else None) or (grounding_intel.get("highlightWord") if grounding_intel else None)
+
+        if meta_hl:
+            headline_text = meta_hl
+        elif meta_stat:
+            headline_text = f"THE {meta_stat} ILLUSION"
+        else:
+            sentences = [s.strip() for s in re.split(r'[.!?。！？\n]', narration_text) if s.strip()]
+            first_sent = sentences[0] if sentences else narration_text
+            words = first_sent.split()
+            headline_text = " ".join(words[:6]) if len(words) > 6 else first_sent
+
+        highlight_w = meta_hw or ("ILLUSION" if "ILLUSION" in headline_text.upper() else "PARADOX")
+        subtext = meta_sub or "Why Record Capital Flows Conceal a Dangerous Structural Exit"
+        badge = (grounding_intel.get("category") if grounding_intel else None) or "CRITICAL PARADOX // COLD HOOK"
+
         return {
             "type": "kinetic_headline",
             "legacy_type": "redacted_doc",
             "theme": theme or "vox_paper",
             "layout": "full_bleed_focus",
             "title": headline_text.upper(),
-            "badge": "CRITICAL PARADOX // COLD HOOK",
+            "badge": badge,
             "sfx_cue": "stamp_slam",
             "label": headline_text,
             "payload": {
                 "highlight_word": highlight_w.upper(),
-                "subtext": "FORENSIC INVESTIGATION REPORT",
+                "subtext": subtext,
                 "accent_color": "#facc15"
             }
         }
@@ -512,8 +526,8 @@ def extract_custom_beat_titles(brain: dict, brain_input_path: str = "") -> dict[
             try:
                 with open(seo_path, "r", encoding="utf-8") as sf:
                     seo_data = json.load(sf)
-            except Exception:
-                pass
+            except Exception as ex:
+                logger.warning("Failed loading seo_package.json: %s", ex)
 
     if not seo_data and isinstance(brain.get("seo_package"), dict):
         seo_data = brain["seo_package"]
@@ -573,8 +587,8 @@ def extract_custom_beat_titles(brain: dict, brain_input_path: str = "") -> dict[
                 try:
                     with open(st_path, "r", encoding="utf-8") as st_f:
                         story_text = st_f.read()
-                except Exception:
-                    pass
+                except Exception as ex:
+                    logger.warning("Failed reading story.txt: %s", ex)
         if story_text:
             act_matches = re.findall(r'(?:={2,}\s*)?(?:ACT|BEAT)\s*([1-5]|IV|I{1,3}|V)\s*[:\-–—]\s*([^=\r\n]+)', story_text, re.IGNORECASE)
             roman_map = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5}
@@ -979,12 +993,23 @@ def build_remotion_props_data(
             "kinetic_headline": "CRITICAL PARADOX // COLD HOOK",
         }
         if isinstance(forensic_ov, str):
-            fo_type = forensic_ov
+            gi_payload = dict(grounding_intel or {})
+            if s.get("headline"):
+                gi_payload["headline"] = s.get("headline")
+            if s.get("statValue"):
+                gi_payload["stat_value"] = s.get("statValue")
+            if s.get("subtext") or s.get("statLabel"):
+                gi_payload["subtext"] = s.get("subtext") or s.get("statLabel")
+            if s.get("highlightWord") or s.get("highlight_word"):
+                gi_payload["highlight_word"] = s.get("highlightWord") or s.get("highlight_word")
+            if s.get("category"):
+                gi_payload["category"] = s.get("category")
+
             forensic_ov = build_structured_overlay(
                 fo_type,
                 narration_text,
                 theme="vox_paper",
-                grounding_intel=grounding_intel,
+                grounding_intel=gi_payload,
                 market=market
             )
 
@@ -1018,6 +1043,18 @@ def build_remotion_props_data(
                         }
                     else:
                         forensic_ov = None
+            elif forensic_ov.get("type") in ("kinetic_headline", "cold_hook_headline", "impact_headline"):
+                if s.get("headline"):
+                    forensic_ov["title"] = s["headline"].upper()
+                    forensic_ov["label"] = s["headline"]
+                if s.get("highlightWord") or s.get("highlight_word"):
+                    forensic_ov.setdefault("payload", {})["highlight_word"] = (s.get("highlightWord") or s.get("highlight_word")).upper()
+                elif "ILLUSION" in forensic_ov.get("title", ""):
+                    forensic_ov.setdefault("payload", {})["highlight_word"] = "ILLUSION"
+                if s.get("subtext") or s.get("statLabel"):
+                    forensic_ov.setdefault("payload", {})["subtext"] = s.get("subtext") or s.get("statLabel")
+                if s.get("category"):
+                    forensic_ov["badge"] = s.get("category")
 
             # Dynamic Enrichment for threshold_ratio (Rule 118 Zero-Mock & Rule 128 Anti-Semantic-Bias)
             if forensic_ov.get("type") in ("threshold_ratio", "grid_ratio", "ratio_grid"):
@@ -1195,6 +1232,19 @@ def build_remotion_props_data(
             "transition_out": s.get("transition_out") or s.get("transitionOut") or "hard_cut",
             "subtitles": scene_subtitles,  # Forward Faster-Whisper words
             "words": scene_subtitles,      # Alias for maximum compatibility
+            # Opus 5.5 Full Cinematography & Motion Vector Path (Plan Section III)
+            "virtual_camera": s.get("virtual_camera") or s.get("virtualCamera"),
+            "primary_hero": (
+                dict(s.get("primary_hero"), src=fg_rel)
+                if s.get("primary_hero") and fg_rel else None
+            ),
+            "motion_path": s.get("motion_path") or s.get("motionPath") or (s.get("primary_hero") or {}).get("motion_path"),
+            "linked_secondary_objects": s.get("linked_secondary_objects") or s.get("linkedSecondaryObjects") or [],
+            "headline": s.get("headline"),
+            "highlightWord": s.get("highlight_word") or s.get("highlightWord"),
+            "category": s.get("category"),
+            "subtext": s.get("subtext"),
+            "accentColor": s.get("accent_color") or s.get("accentColor"),
         })
 
     if missing:
