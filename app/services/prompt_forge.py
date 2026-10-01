@@ -626,6 +626,22 @@ UNIVERSAL_VOX_ANIMATION_PROMPT = (
     "slow controlled cinematic document reveal, editorial investigative motion graphics, 6-second clip, 1080p crisp."
 )
 
+ZERO_TEXT_STRICT_NEGATIVE = (
+    "NO TEXT, NO NUMBERS, NO CHARTS, NO DIGITS, NO LABELS, NO TYPOGRAPHY, "
+    "NO FINANCIAL FIGURES, NO PERCENTAGE SIGNS, NO SUBTITLES, NO WATERMARK, "
+    "NO LOGOS, NO GRAPHS, NO INFOGRAPHICS. Pure physical stylized illustration only."
+)
+
+
+def sanitize_numerical_artifacts(text: str) -> str:
+    """Strip numbers, currencies, percentages, and financial metrics from positive prompts to avoid baked AI numbers."""
+    if not text:
+        return ""
+    sanitized = re.sub(r'[\$€£¥]?\d+(?:\.\d+)?\s*(?:B|M|K|T|%|billion|trillion|bn|tn)?\b', '', text, flags=re.IGNORECASE)
+    sanitized = re.sub(r'\b\d+\b', '', sanitized)
+    sanitized = re.sub(r'\s{2,}', ' ', sanitized).strip()
+    return sanitized
+
 
 def _sanitize_vox_collage_prompt(
     prompt: str,
@@ -634,7 +650,7 @@ def _sanitize_vox_collage_prompt(
     tokens: list | None = None
 ) -> str:
     """Sanitize and format 16:9 VOX Tactile Documentary Collage prompt (Rule 116, 122 & 128)."""
-    p = prompt.strip()
+    p = sanitize_numerical_artifacts(prompt.strip())
     p = re.sub(r"\[STYLE MANDATE[^\]]*\]\s*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[STRICT NEGATIVE PROMPT\]\s*.*$", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[MARKET & ENVIRONMENT ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
@@ -701,15 +717,15 @@ def _synthesize_vox_collage_prompt(
     combining Base Texture + Tape-Affixed Dark Card Mat + Halftone Die-Cut Cutouts + Brass Pushpins + Red Yarn + Blank Label Strip.
     Enforces Rule 128 & Zero-Semantic-Bias: NEVER bake in numbers or metrics onto images.
     """
-    clean_bg = bg_desc.strip()
-    clean_fg = fg_desc.strip() if fg_desc else ""
+    clean_bg = sanitize_numerical_artifacts(bg_desc.strip())
+    clean_fg = sanitize_numerical_artifacts(fg_desc.strip()) if fg_desc else ""
     clean_fg = re.sub(r"#FF00FF|magenta|isolated on|clean chroma-key", "", clean_fg, flags=re.IGNORECASE).strip()
 
     obj_title = ""
     obj_type = "investigative evidence"
     if object_focus and isinstance(object_focus, dict):
         obj_type = object_focus.get("type") or "investigative document"
-        obj_title = object_focus.get("title") or ""
+        obj_title = sanitize_numerical_artifacts(object_focus.get("title") or "")
 
     if obj_title:
         exhibit_desc = f"a high-contrast vintage halftone black-and-white print cutout of {obj_type} '{obj_title}' with a distinct 2mm off-white die-cut paper border"

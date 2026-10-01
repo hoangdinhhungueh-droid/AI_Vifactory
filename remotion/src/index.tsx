@@ -2040,6 +2040,71 @@ export const getCurrentSceneInfo = (scenes: any[], globalFrame: number) => {
   return null;
 };
 
+// Living Micro-Life Layer (Rule 122 & YouTube Benchmark cXQuNBZA0FA Parity)
+// Provides continuous tactile micro-dynamics (floating paper motes, ambient light breathing)
+// even during Permanent Lock windows (7.0 - 10.0s), preventing the static dead-cardboard look.
+export const LivingMicroLifeLayer: React.FC<{ frame: number }> = ({ frame }) => {
+  const p1X = (Math.sin(frame * 0.02) * 18 + 120) % 1920;
+  const p1Y = (Math.cos(frame * 0.015) * 12 + 250) % 1080;
+  const p2X = (Math.cos(frame * 0.025) * 14 + 1400) % 1920;
+  const p2Y = (Math.sin(frame * 0.018) * 16 + 680) % 1080;
+  const p3X = (Math.sin(frame * 0.012) * 22 + 960) % 1920;
+  const p3Y = (Math.cos(frame * 0.022) * 15 + 400) % 1080;
+
+  return (
+    <AbsoluteFill style={{ pointerEvents: "none", zIndex: 38, overflow: "hidden" }}>
+      {/* Living Paper Ambient Light Breathing */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "radial-gradient(ellipse at 45% 40%, rgba(255, 235, 190, 0.035) 0%, transparent 70%)",
+          opacity: 1 + Math.sin(frame * 0.06) * 0.15,
+        }}
+      />
+      {/* Tactile Paper Dust Motes */}
+      <div
+        style={{
+          position: "absolute",
+          left: p1X,
+          top: p1Y,
+          width: 3,
+          height: 3,
+          borderRadius: "50%",
+          backgroundColor: "rgba(255, 255, 255, 0.28)",
+          boxShadow: "0 0 4px rgba(255, 255, 255, 0.4)",
+          opacity: 0.6 + Math.sin(frame * 0.04) * 0.3,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          left: p2X,
+          top: p2Y,
+          width: 2.5,
+          height: 2.5,
+          borderRadius: "50%",
+          backgroundColor: "rgba(242, 166, 59, 0.35)",
+          boxShadow: "0 0 3px rgba(242, 166, 59, 0.45)",
+          opacity: 0.5 + Math.cos(frame * 0.05) * 0.25,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          left: p3X,
+          top: p3Y,
+          width: 2,
+          height: 2,
+          borderRadius: "50%",
+          backgroundColor: "rgba(255, 255, 255, 0.22)",
+          opacity: 0.4 + Math.sin(frame * 0.03) * 0.2,
+        }}
+      />
+    </AbsoluteFill>
+  );
+};
+
 export const TwoLayerEpisode = (props) => {
   const scenes = props.scenes ? props.scenes : [];
   const backgroundFadeFrames = props.backgroundFadeFrames
@@ -2308,6 +2373,7 @@ export const TwoLayerEpisode = (props) => {
 
       {/* Subtitles, Speaker Tags, and Fixed UI Overlays */}
       {items}
+      <LivingMicroLifeLayer frame={currentFrame} />
       <VoxAtmosphericLighting intensity={0.9} />
       <CinematicVignette
         active={currentSceneInfo?.scene?.opticalFx?.vignette !== false}

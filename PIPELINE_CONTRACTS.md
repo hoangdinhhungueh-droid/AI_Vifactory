@@ -273,7 +273,7 @@
 * **Lộ Trình Chuẩn Hóa Timeframe Whisper Đồng Nhất Toàn Luồng (Architectural Roadmap Note)**:
   > [!NOTE]
   > Quy hoạch tương lai sẽ tích hợp cơ chế đồng nhất Timeframe khép kín giữa Đạo diễn nghệ thuật (B3 Director Plan) ➔ Visual Assets (B4/B5) ➔ Phân cảnh & Karaoke Subtitles (B7/B8) ➔ Speech TTS Audio (B6) dựa trên Whisper Word Timestamps thực tế, loại bỏ hoàn toàn độ trễ lệch pha giữa nhịp thoại và nhịp cảnh.
-* **Data Schema**:
+* **Data Schema (Remotion Multi-Layer Motion Graphics Contract - Vox Benchmark Parity cXQuNBZA0FA)**:
   ```json
   {
     "audio_path": "audio/narration_master.mp3",
@@ -282,13 +282,61 @@
       {
         "scene_id": "scene_<001>",
         "start_frame": "<INTEGER_START_FRAME>",
-        "duration_in_frames": "<INTEGER_DURATION_FRAMES>",
-        "bg_image": "images/scene_<001>_bg.png",
+        "duration_in_frames": "<INTEGER_DURATION_FRAMES: Max 300 @ 30fps>",
+        "canvas_texture": "paper_kraft_300gsm",
+        "background": "images/scene_<001>_bg.png",
+        "foreground": "images/scene_<001>_fg.png",
+        "geometric_stage": {
+          "shape": "<bracket_dossier | split_screen_diagonal | tactical_grid_matrix>",
+          "color_accent": "<HEX_COLOR: e.g. #f2a63b>",
+          "enter_frame": "<INTEGER: 15-30>"
+        },
+        "subject_layer": {
+          "image_src": "images/scene_<001>_fg.png",
+          "position": "<left | right | center>",
+          "drop_physics": {
+            "enter_frame": "<INTEGER: 45-60>",
+            "drop_distance_px": 35,
+            "damping": 12,
+            "mass": 0.4
+          }
+        },
+        "evidence_documents": [
+          {
+            "doc_id": "doc_<01>",
+            "image_src": "images/scene_<001>_evidence.png",
+            "enter_frame": "<INTEGER: 90-120>",
+            "tilt_deg": "<FLOAT: -3.0 to +3.0>",
+            "stamp_badge": "<CONFIDENTIAL | CRITICAL | LEAKED | EXCEEDED | null>",
+            "stamp_slam_frame": "<INTEGER: 180>"
+          }
+        ],
+        "data_visualization": {
+          "type": "<rising_bar | line_draw | kinetic_counter | causal_flow | null>",
+          "enter_frame": "<INTEGER: 100-150>",
+          "payload": {
+            "start_value": 0,
+            "target_value": "<FLOAT_OR_INT>",
+            "prefix": "<e.g. $ | null>",
+            "suffix": "<e.g. B | % | null>",
+            "chart_points": [
+              {"label": "<LABEL_1>", "value": "<FLOAT>"},
+              {"label": "<LABEL_2>", "value": "<FLOAT>"}
+            ]
+          }
+        },
+        "highlight_marker": {
+          "start_word_index": "<INTEGER>",
+          "end_word_index": "<INTEGER>",
+          "color": "#facc15",
+          "start_frame": "<INTEGER>",
+          "duration_frames": "<INTEGER>"
+        },
         "camera_movement": "<slow_push_in | snap_zoom | cinematic_pan | macro_tilt | slow_pull_out | handheld_shake>",
         "cinematic_tokens": ["<TOKEN_1>", "<TOKEN_2>"],
-        "forensic_overlay": "<evidence_3d_prop | document_highlight | tactical_map | kinetic_counter | evidence_board | causal_flowchart | null>",
         "optical_fx": ["<vignette | film_grain | chromatic_aberration | glitch>"],
         "speakerTag": "<DYNAMIC_BEAT_TITLE: e.g. BEAT 1: The Impossible Contradiction>",
+        "transition_out": "<vox_push_zoom | vox_paper_wipe | tactical_snap_cut>",
         "subtitles": [
           {"word": "<WORD_1>", "start_ms": "<INT_MS>", "end_ms": "<INT_MS>"},
           {"word": "<WORD_2>", "start_ms": "<INT_MS>", "end_ms": "<INT_MS>"}
