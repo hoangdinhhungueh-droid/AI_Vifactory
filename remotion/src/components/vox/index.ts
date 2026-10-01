@@ -20,3 +20,4 @@ export * from "./VoxKineticHeadline";
 export * from "./springPresets";
 export * from "./LivingCamera";
 export * from "./VoxConnectedNetwork";
+export * from "./VoxCompositeStage";

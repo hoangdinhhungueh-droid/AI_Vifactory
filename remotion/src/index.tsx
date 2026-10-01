@@ -28,6 +28,7 @@ import {
   VoxSourceCredit,
   VoxDisclosureBadge,
   LivingCamera,
+  VoxCompositeStage,
 } from "./components/vox";
 import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
 import {
@@ -2734,6 +2735,45 @@ const RemotionRoot = () => {
         id="VoxMasterShowcase"
         component={VoxMasterShowcase}
         durationInFrames={1350}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{}}
+      />
+      {/* Vox Multi-Motion Composite Stage (Tactile Paper Collage Assembly) */}
+      <Composition
+        id="VoxCompositeDemo"
+        component={() => (
+          <AbsoluteFill style={{ backgroundColor: "#020617", justifyContent: "center", alignItems: "center" }}>
+            <VoxCompositeStage
+              title="INCIDENT RECONSTRUCTION // FLIGHT 370"
+              badge="TACTILE DOSSIER // ACT I"
+              backgroundLabel="SOUTH CHINA SEA TO MALACCA STRAIT"
+              dossierTitle="PRIMARY RADAR CONTACT DISRUPTION"
+              dossierAgency="CIVIL AVIATION AUTHORITY & MILITARY AIR DEFENSE"
+              dossierDate="MAR 8, 2014 // 01:21 UTC"
+              dossierText="At waypoint IGARI, secondary surveillance radar transponder vanished. Military 3D air surveillance radar captured return executing sharp tactical turn back toward the Malay Peninsula."
+              highlightPhrase="executing sharp tactical turn back toward the Malay Peninsula"
+              cutoutLabel="BOEING 777-200ER"
+              cutoutRole="MALAYSIA AIRLINES // MH370"
+              connection={{
+                fromX: 30,
+                fromY: 55,
+                toX: 68,
+                toY: 42,
+                label: "TACTICAL TURNAROUND // 40 MIN",
+                color: "#ef4444",
+                drawStartFrame: 28,
+                drawDuration: 22,
+                isYarn: true,
+              }}
+              stampText="239 PEOPLE"
+              stampColor="#dc2626"
+              stampFrame={60}
+            />
+          </AbsoluteFill>
+        )}
+        durationInFrames={150}
         fps={30}
         width={1920}
         height={1080}

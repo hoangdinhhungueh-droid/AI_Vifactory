@@ -13,6 +13,7 @@ import { VoxDynamicChart } from "./VoxDynamicChart";
 import { VoxForensicPaper } from "./VoxForensicPaper";
 import { VoxKineticHeadline } from "./VoxKineticHeadline";
 import { VoxConnectedNetwork } from "./VoxConnectedNetwork";
+import { VoxCompositeStage } from "./VoxCompositeStage";
 import { EvidenceProp3D } from "../EvidenceProp3D";
 
 export interface VoxForensicOverlayData {
@@ -242,6 +243,16 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
               label={ov.label}
             />
           )
+        ) : null}
+
+        {/* Multi-Motion Composite Paper Collage Stage (Vox Multi-Motion Engine) */}
+        {rawType === "composite_stage" || rawType === "paper_collage_assembly" || rawType === "vox_composite" ? (
+          <VoxCompositeStage
+            title={ov.title}
+            badge={ov.badge}
+            layout={layout}
+            {...(ov.payload || {})}
+          />
         ) : null}
 
         {/* Dynamic Vector Financial Chart / Candlestick Line Draw (Vox Engine 4.0) */}

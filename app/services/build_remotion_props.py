@@ -227,6 +227,49 @@ def build_structured_overlay(
             }
         }
 
+    if fo_type in ("composite_stage", "paper_collage_assembly", "vox_composite", "tactile_assembly"):
+        sentences = [s.strip() for s in re.split(r'[.!?。！？\n]', narration_text) if len(s.strip()) > 5]
+        body_text = sentences[0] if sentences else narration_text[:180]
+        words = body_text.split()
+        hl_phrase = " ".join(words[2:7]) if len(words) > 7 else (" ".join(words[:4]) if words else "CRITICAL ANOMALY")
+
+        return {
+            "type": "composite_stage",
+            "legacy_type": "document_highlight",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": "INCIDENT RECONSTRUCTION // FORENSIC TIMELINE",
+            "badge": "TACTILE DOSSIER // ACT I",
+            "sfx_cue": "paper_slide",
+            "label": "MULTI-ACTION COLLAGE ASSEMBLY",
+            "payload": {
+                "dossierTitle": "OFFICIAL TELEMETRY RECORD",
+                "dossierAgency": "REGULATORY OVERSIGHT DESK",
+                "dossierDate": "OFFICIAL FILING // TIME-LOCKED",
+                "dossierText": narration_text[:220],
+                "highlightPhrase": hl_phrase,
+                "redactedPhrases": ["CLASSIFIED TELEMETRY", "RESTRICTED MEMO"],
+                "cutoutLabel": "PRIMARY TARGET ASSET",
+                "cutoutRole": "FORENSIC FOCUS",
+                "connection": {
+                    "fromX": 28,
+                    "fromY": 54,
+                    "toX": 68,
+                    "toY": 42,
+                    "label": "SYSTEMIC INTERCEPT",
+                    "color": "#ef4444",
+                    "drawStartFrame": 28,
+                    "drawDuration": 20,
+                    "isYarn": True
+                },
+                "stampText": "RESTRICTED",
+                "stampColor": "#dc2626",
+                "stampFrame": 58,
+                "hasPushpin": True,
+                "hasCornerTape": True
+            }
+        }
+
     if fo_type in ("connected_network", "money_trail_network", "causal_network", "causal_flowchart", "vox_network"):
         return {
             "type": "connected_network",
