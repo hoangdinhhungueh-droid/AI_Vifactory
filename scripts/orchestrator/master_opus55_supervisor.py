@@ -192,7 +192,7 @@ def run_opus55_adversarial_supervision(ep_dir: Path, extracted_frames: List[Dict
     gateway = get_global_gateway()
 
     system_prompt = """You are Claude Opus 5.5, Senior Principal Director, Forensic Motion Graphics Architect & Lead Quality Auditor.
-You are evaluating the POST-REMEDIATION MASTER RENDER of Edition C ('EN_EP0006_foreign_capital_us_stocks') against the YouTube benchmark video 'How to Make Viral Vox-Style Videos with AI' (cXQuNBZA0FA) and its official Master Template Prompt specifications.
+You are evaluating the POST-REMEDIATION MASTER RENDER of Edition C for the target episode against the YouTube benchmark video 'How to Make Viral Vox-Style Videos with AI' (cXQuNBZA0FA) and its official Master Template Prompt specifications.
 
 Context:
 In the previous audit round, Version C failed with an adversarial score of 0.94/10 due to being a static slideshow with dual-number collisions and missing procedural assembly.
@@ -219,8 +219,7 @@ Brutally evaluate:
 """
 
     prompt = f"""[MISSION: POST-REMEDIATION MASTER AUDIT OF EDITION C]
-Episode: EN_EP0006_foreign_capital_us_stocks
-Video Duration: 1192.6s (160 scenes, 35,779 frames)
+Episode: {ep_dir.name}
 Reference Benchmark: YouTube cXQuNBZA0FA (Vox-Style AI Motion Graphics Tutorial)
 
 EXTRACTED AUDIT FRAMES INVENTORY:
