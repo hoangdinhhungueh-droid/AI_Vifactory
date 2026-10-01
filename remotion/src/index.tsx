@@ -18,6 +18,7 @@ import {
 } from "remotion";
 import { DataStoryTest } from "./DataStoryTest";
 import { FullStory } from "./FullStory";
+import { VoxMasterShowcase } from "./VoxMasterShowcase";
 import {
   VoxOverlayLayer,
   VoxAtmosphericLighting,
@@ -2727,6 +2728,16 @@ const RemotionRoot = () => {
             height,
           };
         }}
+      />
+      {/* Vox Master Showcase (YouTube Tutorial Vox Style Proof) */}
+      <Composition
+        id="VoxMasterShowcase"
+        component={VoxMasterShowcase}
+        durationInFrames={1350}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{}}
       />
     </>
   );

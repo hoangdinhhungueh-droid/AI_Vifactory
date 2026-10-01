@@ -12,6 +12,7 @@ import { CapitalFlowMap } from "./CapitalFlowMap";
 import { VoxDynamicChart } from "./VoxDynamicChart";
 import { VoxForensicPaper } from "./VoxForensicPaper";
 import { VoxKineticHeadline } from "./VoxKineticHeadline";
+import { VoxConnectedNetwork } from "./VoxConnectedNetwork";
 import { EvidenceProp3D } from "../EvidenceProp3D";
 
 export interface VoxForensicOverlayData {
@@ -221,16 +222,26 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
           />
         ) : null}
 
-        {/* Causal Flowchart / Money Trail Network */}
-        {rawType === "causal_flowchart" || rawType === "money_trail_network" ? (
-          <VoxCausalFlowchart
-            title={ov.title}
-            badge={ov.badge}
-            theme={ov.theme || "vox_paper"}
-            layout={layout}
-            payload={ov.payload}
-            label={ov.label}
-          />
+        {/* Causal Flowchart / Connected Vector Network */}
+        {rawType === "causal_flowchart" || rawType === "money_trail_network" || rawType === "connected_network" || rawType === "causal_network" || rawType === "vox_network" ? (
+          ov.payload?.nodes && ov.payload?.edges ? (
+            <VoxConnectedNetwork
+              title={ov.title}
+              badge={ov.badge}
+              layout={layout}
+              nodes={ov.payload.nodes}
+              edges={ov.payload.edges}
+            />
+          ) : (
+            <VoxCausalFlowchart
+              title={ov.title}
+              badge={ov.badge}
+              theme={ov.theme || "vox_paper"}
+              layout={layout}
+              payload={ov.payload}
+              label={ov.label}
+            />
+          )
         ) : null}
 
         {/* Dynamic Vector Financial Chart / Candlestick Line Draw (Vox Engine 4.0) */}

@@ -227,10 +227,33 @@ def build_structured_overlay(
             }
         }
 
-    if fo_type in ("evidence_board", "causal_flowchart"):
+    if fo_type in ("connected_network", "money_trail_network", "causal_network", "causal_flowchart", "vox_network"):
+        return {
+            "type": "connected_network",
+            "legacy_type": "causal_flowchart",
+            "theme": theme or "vox_paper",
+            "layout": "full_bleed_focus",
+            "title": "CAUSAL TRANSMISSION // ASYMMETRIC CHOKE",
+            "badge": "RESTRICTED",
+            "sfx_cue": "node_pop",
+            "label": "INSTITUTIONAL TRANSMISSION // SYSTEMIC CHOKE",
+            "payload": {
+                "nodes": [
+                    {"id": "origin", "label": "Consumer Capital", "subtext": "Initial Inflow", "status": "normal", "theme": "neutral"},
+                    {"id": "intermediary", "label": "Platform Escrow", "subtext": "Clearing Chokepoint", "status": "breach", "theme": "warning"},
+                    {"id": "offshore", "label": "Non-Refund Vault", "subtext": "Trapped Liquidity", "status": "fatal", "theme": "danger"}
+                ],
+                "edges": [
+                    {"from": "origin", "to": "intermediary", "label": "Deposit Stream", "start_frame": 18, "duration_frames": 18, "color": "#38bdf8"},
+                    {"from": "intermediary", "to": "offshore", "label": "Trapped Liquidity", "start_frame": 36, "duration_frames": 18, "color": "#ef4444"}
+                ]
+            }
+        }
+
+    if fo_type in ("evidence_board", "suspect_network"):
         return {
             "type": "evidence_board",
-            "legacy_type": "causal_flowchart",
+            "legacy_type": "evidence_board",
             "theme": theme or "vox_paper",
             "layout": "full_bleed_focus",
             "title": "INVESTIGATION NETWORK // TARGET ENTITIES",
