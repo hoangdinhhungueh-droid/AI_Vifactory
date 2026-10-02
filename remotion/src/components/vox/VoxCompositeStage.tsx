@@ -1,6 +1,15 @@
 import React from "react";
 import { interpolate, spring, useCurrentFrame, useVideoConfig, Easing, Img, staticFile } from "remotion";
 import { SPRING_PRESETS } from "./springPresets";
+import {
+  VoxPaperBackdrop,
+  VoxTornPaper,
+  VoxBrassPin,
+  VoxWashiTape,
+  VoxStickerCutout,
+  VoxConnectingYarn,
+  VoxStampedLabel,
+} from "./papercraft";
 
 export interface VoxConnectionItem {
   fromX: number; // % of board width
@@ -36,11 +45,12 @@ export interface VoxCompositeStageProps {
   layout?: "full_bleed_focus" | "split_right" | "split_left" | string;
 
   /** Visual Theme: dark forensic dossier vs warm vintage paper (AI Playbook style) */
-  theme?: "dark_forensic" | "vintage_paper" | "blueprint";
+  theme?: "dark_forensic" | "vintage_paper" | "blueprint" | "parchment" | "manila" | "vintage_map" | string;
 
   /** Background Configuration */
-  backgroundType?: "vintage_map" | "blueprint_grid" | "archival_desk" | "dark_forensic";
+  backgroundType?: "vintage_map" | "blueprint_grid" | "archival_desk" | "dark_forensic" | string;
   backgroundLabel?: string;
+  backdropTheme?: string;
 
   /** Large Editorial Headline Typography (1-4 Words, AI Playbook style) */
   editorialHeadline?: {
@@ -230,15 +240,46 @@ export const VoxCompositeStage: React.FC<VoxCompositeStageProps> = ({
     ...(radiatingConnections || []),
   ];
 
-  // Theme styling rules
-  const isVintagePaper = theme === "vintage_paper";
-  const boardBg = isVintagePaper ? "#fbf8ee" : "#0d131f";
-  const boardBorder = isVintagePaper ? "2px solid #c9b99a" : "2px solid rgba(242, 166, 59, 0.5)";
-  const boardBoxShadow = isVintagePaper
-    ? "0 30px 80px rgba(60, 45, 25, 0.35), inset 0 0 45px rgba(210, 180, 130, 0.2)"
-    : "0 30px 80px rgba(0, 0, 0, 0.85), inset 0 0 40px rgba(0, 0, 0, 0.6)";
-  const headerTextColor = isVintagePaper ? "#78350f" : "#fbbf24";
-  const headerSubColor = isVintagePaper ? "#57534e" : "#94a3b8";
+  // Theme styling rules (Rule 118 & VOX Paper Collage Specification)
+  const isParchment = theme === "parchment" || theme === "vintage_paper" || !theme;
+  const isBlueprint = theme === "blueprint";
+  const isManila = theme === "manila";
+  const isVintageMap = theme === "vintage_map";
+  const isDarkForensic = theme === "dark_forensic";
+
+  let boardBg = "#FAF7EE"; // Aged warm ivory parchment
+  let boardBorder = "2px solid #C9B99A";
+  let boardBoxShadow = "0 30px 80px rgba(60, 45, 25, 0.35), inset 0 0 45px rgba(210, 180, 130, 0.2)";
+  let headerTextColor = "#78350F";
+  let headerSubColor = "#57534E";
+
+  if (isBlueprint) {
+    boardBg = "#1E293B"; // Tactical navy blueprint
+    boardBorder = "2px solid rgba(56, 189, 248, 0.4)";
+    boardBoxShadow = "0 30px 80px rgba(0, 0, 0, 0.75), inset 0 0 45px rgba(56, 189, 248, 0.08)";
+    headerTextColor = "#38BDF8";
+    headerSubColor = "#94A3B8";
+  } else if (isManila) {
+    boardBg = "#E3DAC9"; // Warm Manila folder
+    boardBorder = "2px solid rgba(160, 130, 90, 0.45)";
+    boardBoxShadow = "0 30px 80px rgba(50, 35, 15, 0.35), inset 0 0 40px rgba(180, 150, 110, 0.25)";
+    headerTextColor = "#5C3A21";
+    headerSubColor = "#786551";
+  } else if (isVintageMap) {
+    boardBg = "#ECE6D5"; // Antique navigational chart
+    boardBorder = "2px solid rgba(140, 110, 80, 0.4)";
+    boardBoxShadow = "0 30px 80px rgba(45, 30, 15, 0.32), inset 0 0 40px rgba(190, 160, 120, 0.2)";
+    headerTextColor = "#7C2D12";
+    headerSubColor = "#786551";
+  } else if (isDarkForensic) {
+    boardBg = "#162032"; // Rich dark forensic slate (tactile texture)
+    boardBorder = "2px solid rgba(242, 166, 59, 0.4)";
+    boardBoxShadow = "0 30px 80px rgba(0, 0, 0, 0.85), inset 0 0 40px rgba(0, 0, 0, 0.5)";
+    headerTextColor = "#FBBF24";
+    headerSubColor = "#94A3B8";
+  }
+
+  const isVintagePaper = !isBlueprint && !isDarkForensic;
 
   return (
     <div
@@ -256,7 +297,7 @@ export const VoxCompositeStage: React.FC<VoxCompositeStageProps> = ({
             linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px)
           `
           : `
-            radial-gradient(rgba(242, 166, 59, 0.08) 1.5px, transparent 1.5px),
+            radial-gradient(rgba(56, 189, 248, 0.08) 1.5px, transparent 1.5px),
             linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
             linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px)
           `,
@@ -270,6 +311,11 @@ export const VoxCompositeStage: React.FC<VoxCompositeStageProps> = ({
         color: isVintagePaper ? "#1c1917" : "#ffffff",
       }}
     >
+      {/* 4 Corner Washi Tape Anchors on Stage Board */}
+      <VoxWashiTape x="2%" y="-10px" corner="top_left" dropFrame={4} />
+      <VoxWashiTape x="98%" y="-10px" corner="top_right" dropFrame={6} />
+      <VoxWashiTape x="2%" y="99%" corner="bottom_left" dropFrame={8} />
+      <VoxWashiTape x="98%" y="99%" corner="bottom_right" dropFrame={10} />
       {/* Background Large Editorial Headline (AI Playbook Prompt 2: 20-50% composition) */}
       {editorialHeadline && editorialHeadline.placement === "background_large" ? (
         <div
@@ -534,179 +580,173 @@ export const VoxCompositeStage: React.FC<VoxCompositeStageProps> = ({
           <div
             style={{
               flex: hasCutout ? "1 1 58%" : "1 1 100%",
-              backgroundColor: isVintagePaper ? "#ffffff" : "#f4ede1",
-              color: "#1a1a1a",
-              borderRadius: 6,
-              padding: "24px 28px",
-              boxShadow: `0 ${dossierShadow}px 45px rgba(0, 0, 0, ${isVintagePaper ? 0.35 : 0.8}), inset 0 0 30px rgba(180, 150, 110, 0.25)`,
-              transform: `translateY(${dossierY}px) scale(${dossierScale}) rotate(-1.5deg)`,
-              transformOrigin: "top left",
-              opacity: interpolate(dossierDrop, [0, 0.2], [0, 1]),
               position: "relative",
-              border: isVintagePaper ? "1px solid #e7e5e4" : "1px solid #d4c5b0",
-              overflow: "hidden",
               zIndex: 15,
+              height: "100%",
             }}
           >
             {/* Masking Tape on Top-Left Corner */}
-            {showTape && tapeSpring > 0.02 ? (
-              <div
-                style={{
-                  position: "absolute",
-                  top: -12,
-                  left: -18,
-                  width: 90,
-                  height: 30,
-                  backgroundColor: "rgba(235, 220, 180, 0.85)",
-                  transform: "rotate(-32deg) scale(" + tapeSpring + ")",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
-                  border: "1px dashed rgba(160, 140, 100, 0.4)",
-                  zIndex: 20,
-                }}
-              />
+            {showTape ? (
+              <VoxWashiTape x="6%" y="-12px" corner="top_left" dropFrame={16} />
             ) : null}
 
-            {/* Brass Pushpin Pinned on Dossier */}
-            {showPushpin && pinSpring > 0.05 ? (
-              <div
-                style={{
-                  position: "absolute",
-                  top: 14,
-                  right: 18,
-                  width: 22,
-                  height: 22,
-                  borderRadius: "50%",
-                  background: "radial-gradient(circle at 35% 35%, #fde047, #ca8a04, #713f12)",
-                  boxShadow: "0 6px 14px rgba(0,0,0,0.6)",
-                  transform: `scale(${pinSpring})`,
-                  zIndex: 22,
-                }}
-              />
+            {/* 3D Brass Pushpin on Top-Right Corner */}
+            {showPushpin ? (
+              <VoxBrassPin x="92%" y="14px" size={24} dropFrame={20} />
             ) : null}
 
-            {/* Dossier Agency Header */}
-            {(dossierAgency || dossierDate) ? (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderBottom: "1.5px solid #1a1a1a",
-                  paddingBottom: 8,
-                  marginBottom: 12,
-                  fontSize: 10,
-                  fontWeight: 800,
-                  letterSpacing: 1.2,
-                  color: "#334155",
-                }}
-              >
-                <span>{dossierAgency}</span>
-                <span>{dossierDate}</span>
-              </div>
-            ) : null}
+            {/* Tactile Deckle Edge Torn Archival Paper */}
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                backgroundColor: isVintagePaper ? "#FAF7EE" : (isBlueprint ? "#1E293B" : "#F4EDE1"),
+                color: isVintagePaper ? "#1A1A1A" : (isBlueprint ? "#F8FAFC" : "#1F2937"),
+                padding: "24px 28px",
+                clipPath: `polygon(
+                  0% 3px, 3% 0px, 8% 4px, 15% 1px, 24% 4px, 33% 0px, 42% 3px, 51% 1px, 60% 4px, 70% 0px, 80% 3px, 90% 1px, 98% 3px, 100% 0px,
+                  99% 12%, 100% 25%, 98% 38%, 100% 50%, 99% 64%, 100% 76%, 98% 88%, 100% 100%,
+                  96% 99%, 86% 100%, 75% 98%, 65% 100%, 54% 97%, 42% 100%, 30% 98%, 18% 100%, 8% 97%, 0% 100%,
+                  2% 88%, 0% 74%, 3% 60%, 1% 45%, 2% 30%, 0% 15%
+                )`,
+                boxShadow: isVintagePaper
+                  ? `0 ${dossierShadow}px 45px rgba(45, 30, 15, 0.30), 0 3px 10px rgba(0, 0, 0, 0.15)`
+                  : `0 ${dossierShadow}px 45px rgba(0, 0, 0, 0.70), 0 4px 12px rgba(0, 0, 0, 0.40)`,
+                transform: `translateY(${dossierY}px) scale(${dossierScale}) rotate(-1.5deg)`,
+                transformOrigin: "top left",
+                opacity: interpolate(dossierDrop, [0, 0.2], [0, 1]),
+                position: "relative",
+                border: isVintagePaper ? "1px solid rgba(180, 160, 130, 0.45)" : "1px solid rgba(56, 189, 248, 0.3)",
+                overflow: "hidden",
+                boxSizing: "border-box",
+                fontFamily: "'Courier Prime', 'Special Elite', 'Courier New', Courier, monospace",
+              }}
+            >
+              {/* Dossier Agency Header */}
+              {(dossierAgency || dossierDate) ? (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderBottom: isVintagePaper ? "1.5px solid #1a1a1a" : "1.5px solid rgba(255, 255, 255, 0.2)",
+                    paddingBottom: 8,
+                    marginBottom: 12,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: 1.2,
+                    color: isVintagePaper ? "#334155" : "#94a3b8",
+                  }}
+                >
+                  <span>{dossierAgency}</span>
+                  <span>{dossierDate}</span>
+                </div>
+              ) : null}
 
-            {dossierTitle ? (
-              <div
-                style={{
-                  fontSize: 15,
-                  fontWeight: 900,
-                  letterSpacing: 1.2,
-                  textTransform: "uppercase",
-                  marginBottom: 12,
-                  color: "#0f172a",
-                }}
-              >
-                {dossierTitle}
-              </div>
-            ) : null}
+              {dossierTitle ? (
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 900,
+                    letterSpacing: 1.2,
+                    textTransform: "uppercase",
+                    marginBottom: 12,
+                    color: isVintagePaper ? "#0f172a" : "#f8fafc",
+                  }}
+                >
+                  {dossierTitle}
+                </div>
+              ) : null}
 
-            {/* Dossier Body Paragraph with Animated Highlighter Sweep */}
-            {dossierText ? (
-              <div
-                style={{
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                  color: "#1e293b",
-                  position: "relative",
-                  marginBottom: 16,
-                }}
-              >
-                {highlightPhrase ? (
-                  dossierText.split(highlightPhrase).map((part, pIdx, arr) => (
-                    <React.Fragment key={pIdx}>
-                      {part}
-                      {pIdx < arr.length - 1 ? (
-                        <span
-                          style={{
-                            background: `linear-gradient(90deg, #facc15 ${hlProgress}%, transparent ${hlProgress}%)`,
-                            color: "#000000",
-                            fontWeight: 900,
-                            padding: "1px 3px",
-                            borderRadius: 2,
-                          }}
-                        >
-                          {highlightPhrase}
-                        </span>
-                      ) : null}
-                    </React.Fragment>
-                  ))
-                ) : (
-                  <span>{dossierText}</span>
-                )}
-              </div>
-            ) : null}
+              {/* Dossier Body Paragraph with Animated Highlighter Sweep */}
+              {dossierText ? (
+                <div
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    color: isVintagePaper ? "#1e293b" : "#e2e8f0",
+                    position: "relative",
+                    marginBottom: 16,
+                  }}
+                >
+                  {highlightPhrase ? (
+                    dossierText.split(highlightPhrase).map((part, pIdx, arr) => (
+                      <React.Fragment key={pIdx}>
+                        {part}
+                        {pIdx < arr.length - 1 ? (
+                          <span
+                            style={{
+                              background: `linear-gradient(90deg, #facc15 ${hlProgress}%, transparent ${hlProgress}%)`,
+                              color: "#000000",
+                              fontWeight: 900,
+                              padding: "1px 3px",
+                              borderRadius: 2,
+                            }}
+                          >
+                            {highlightPhrase}
+                          </span>
+                        ) : null}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <span>{dossierText}</span>
+                  )}
+                </div>
+              ) : null}
 
-            {/* Redacted Classified Clauses */}
-            {redactedPhrases.length > 0 ? (
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                {redactedPhrases.map((phrase, rIdx) => (
-                  <div
-                    key={rIdx}
-                    style={{
-                      backgroundColor: "#000000",
-                      color: "#000000",
-                      fontSize: 10,
-                      padding: "2px 8px",
-                      borderRadius: 2,
-                      letterSpacing: 1,
-                      userSelect: "none",
-                    }}
-                  >
-                    {phrase}
-                  </div>
-                ))}
-              </div>
-            ) : null}
+              {/* Redacted Classified Clauses */}
+              {redactedPhrases.length > 0 ? (
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  {redactedPhrases.map((phrase, rIdx) => (
+                    <div
+                      key={rIdx}
+                      style={{
+                        backgroundColor: "#000000",
+                        color: "#000000",
+                        fontSize: 10,
+                        padding: "2px 8px",
+                        borderRadius: 2,
+                        letterSpacing: 1,
+                        userSelect: "none",
+                      }}
+                    >
+                      {phrase}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
 
-            {/* Slammed Red Rubber Stamp (Rendered ONLY if stampText is present) */}
-            {stampText && frame >= stampFrame && stampOpacity > 0.05 ? (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 24,
-                  right: 32,
-                  border: `3.5px solid ${stampColor}`,
-                  color: stampColor,
-                  padding: "6px 20px",
-                  fontSize: 22,
-                  fontWeight: 900,
-                  letterSpacing: 3,
-                  textTransform: "uppercase",
-                  transform: `rotate(-14deg) scale(${stampScale})`,
-                  transformOrigin: "center center",
-                  opacity: stampOpacity,
-                  borderRadius: 6,
-                  backgroundColor: "rgba(220, 38, 38, 0.06)",
-                  boxShadow: `0 4px 12px rgba(220, 38, 38, 0.3)`,
-                  zIndex: 25,
-                }}
-              >
-                {stampText}
-              </div>
-            ) : null}
+              {/* Slammed Red Rubber Stamp (Rendered ONLY if stampText is present) */}
+              {stampText && frame >= stampFrame && stampOpacity > 0.05 ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 24,
+                    right: 32,
+                    border: `3.5px solid ${stampColor}`,
+                    color: stampColor,
+                    padding: "6px 20px",
+                    fontSize: 22,
+                    fontWeight: 900,
+                    letterSpacing: 3,
+                    textTransform: "uppercase",
+                    transform: `rotate(-14deg) scale(${stampScale})`,
+                    transformOrigin: "center center",
+                    opacity: stampOpacity,
+                    borderRadius: 4,
+                    backgroundColor: "rgba(220, 38, 38, 0.08)",
+                    boxShadow: `0 4px 14px rgba(220, 38, 38, 0.35)`,
+                    fontFamily: "'Impact', 'Arial Black', sans-serif",
+                    zIndex: 25,
+                  }}
+                >
+                  {stampText}
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
-        {/* Right Column: Tactical Cutout Photo & Supporting Cutouts */}
+        {/* Right Column: Tactile Sticker Die-Cut Cutout & Supporting Props */}
         {hasCutout || supportingCutouts.length > 0 ? (
           <div
             style={{
@@ -719,87 +759,60 @@ export const VoxCompositeStage: React.FC<VoxCompositeStageProps> = ({
               zIndex: 18,
             }}
           >
-            {/* Primary Archival Card Wrapper with White Cutout Edge */}
+            {/* Primary Sticker Die-Cut Subject (Rule 122: 3px white die-cut border + tactile drop shadow, NO web card box!) */}
             {hasCutout ? (
               <div
                 style={{
-                  backgroundColor: isVintagePaper ? "#ffffff" : "rgba(15, 23, 42, 0.95)",
-                  border: isVintagePaper ? "2px solid #b45309" : "2px solid #f59e0b",
-                  borderRadius: 12,
-                  padding: 16,
-                  boxShadow: isVintagePaper
-                    ? "0 20px 45px rgba(70, 50, 30, 0.25)"
-                    : "0 20px 50px rgba(0,0,0,0.8), 0 0 20px rgba(245, 158, 11, 0.3)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  gap: 12,
-                  maxWidth: 380,
+                  justifyContent: "center",
                   transform: `scale(${cutoutSpring})`,
                   transformOrigin: "center center",
+                  position: "relative",
                 }}
               >
-                {/* Cutout Container */}
-                <div
-                  style={{
-                    width: cutoutPosition?.width || 280,
-                    height: cutoutPosition?.height || 200,
-                    backgroundColor: isVintagePaper ? "#f5f5f4" : "#020617",
-                    borderRadius: 8,
-                    border: isVintagePaper ? "1.5px solid #d6d3d1" : "1.5px solid rgba(255,255,255,0.15)",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    overflow: "hidden",
-                    position: "relative",
-                  }}
-                >
-                  {cutoutSrc ? (
+                {cutoutSrc ? (
+                  <div
+                    style={{
+                      width: cutoutPosition?.width || 320,
+                      height: cutoutPosition?.height || 360,
+                      position: "relative",
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
                     <Img
                       src={staticFile(cutoutSrc)}
-                      style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        objectPosition: "bottom",
+                        filter: "drop-shadow(3px 0 0 #ffffff) drop-shadow(-3px 0 0 #ffffff) drop-shadow(0 3px 0 #ffffff) drop-shadow(0 -3px 0 #ffffff) drop-shadow(3px 3px 0 #ffffff) drop-shadow(-3px -3px 0 #ffffff) drop-shadow(0 16px 32px rgba(45, 30, 15, 0.40)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.18)) brightness(1.05) contrast(1.14)",
+                      }}
                     />
-                  ) : (
-                    <div style={{ textAlign: "center", color: isVintagePaper ? "#b45309" : "#f59e0b" }}>
-                      <div style={{ fontSize: 36, fontWeight: 900 }}>🏷️</div>
-                      {cutoutLabel ? (
-                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, marginTop: 6 }}>
-                          {cutoutLabel}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
+                    {/* Washi Tape fixing bottom-left of character */}
+                    <VoxWashiTape x="10%" y="82%" corner="bottom_left" dropFrame={24} />
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", color: isVintagePaper ? "#b45309" : "#f59e0b" }}>
+                    <div style={{ fontSize: 36, fontWeight: 900 }}>🏷️</div>
+                  </div>
+                )}
 
-                {/* Cutout Label Dossier */}
+                {/* Stamped Typewriter Evidence Label (Pinned below character) */}
                 {(cutoutLabel || cutoutRole) ? (
-                  <div style={{ textAlign: "center" }}>
-                    {cutoutLabel ? (
-                      <div
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 900,
-                          color: isVintagePaper ? "#1c1917" : "#ffffff",
-                          letterSpacing: 1,
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        {cutoutLabel}
-                      </div>
-                    ) : null}
-                    {cutoutRole ? (
-                      <div
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: isVintagePaper ? "#b45309" : "#fbbf24",
-                          letterSpacing: 1.5,
-                          marginTop: 3,
-                        }}
-                      >
-                        {cutoutRole}
-                      </div>
-                    ) : null}
+                  <div style={{ marginTop: 14, position: "relative" }}>
+                    <VoxStampedLabel
+                      text={cutoutLabel || "PRIMARY EXHIBIT"}
+                      subtext={cutoutRole}
+                      y="0px"
+                      dropFrame={26}
+                      theme={isVintagePaper ? "ivory_typewriter" : "crimson_dymo"}
+                      hasPin={true}
+                    />
                   </div>
                 ) : null}
               </div>

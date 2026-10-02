@@ -895,32 +895,6 @@ def synthesize_scene_motion_props(
                         })
                 res["radiating_connections"] = rad
 
-            # Case B: Document highlight / paper dossier
-            elif forensic_ov.get("type") in ("document_highlight", "paper_dossier", "court_docket", "redacted_memo", "bank_check"):
-                res["connection"] = {
-                    "fromX": 38 if is_left else 62,
-                    "fromY": 54,
-                    "toX": 68 if is_left else 32,
-                    "toY": 40,
-                    "label": forensic_ov.get("badge") or forensic_ov.get("label") or "EVIDENCE LINK",
-                    "color": "#ef4444",
-                    "drawStartFrame": 14,
-                    "drawDuration": 20,
-                }
-
-        # Case C: Stat card / key quantitative anomaly
-        if not res["connection"] and not res["radiating_connections"] and stat_val:
-            res["connection"] = {
-                "fromX": 35 if is_left else 65,
-                "fromY": 52,
-                "toX": 70 if is_left else 30,
-                "toY": 24,
-                "label": stat_lbl or "RECORD METRIC",
-                "color": "#f59e0b",
-                "drawStartFrame": 10,
-                "drawDuration": 18,
-            }
-
         # Case D: Directional Narrative Trend Vectors (Crashes, Surges, Capital Flows)
         if not res["connection"] and not res["radiating_connections"]:
             narr = s.get("narration", "") or s.get("caption", "")
@@ -1434,10 +1408,85 @@ def build_remotion_props_data(
                 )
             foley_file = f"sfx/{f_filename}"
 
+        # Determine Papercraft theme (Parchment, Blueprint, Manila, Vintage Map)
+        papercraft_theme = s.get("papercraft_theme") or s.get("paperTheme")
+        if not papercraft_theme:
+            fo_type_str = forensic_ov.get("type", "") if isinstance(forensic_ov, dict) else str(forensic_ov or "")
+            if fo_type_str in ("market_depth", "circuit_breaker_dial", "radar_contact", "air_corridor"):
+                papercraft_theme = "blueprint"
+            elif b_num in (3, 4):
+                papercraft_theme = "parchment"
+            elif b_num == 2:
+                papercraft_theme = "manila"
+            else:
+                papercraft_theme = "parchment"
+
+        # Documentary Split Rule: Clamp motion_path coordinates to prevent character from wandering into center evidence
+        m_path = s.get("motion_path") or s.get("motionPath") or (s.get("primary_hero") or {}).get("motion_path")
+        if m_path and isinstance(m_path, list) and forensic_ov and fg_rel:
+            clamped_path = []
+            for pt in m_path:
+                p_copy = dict(pt)
+                if "x_pct" in p_copy:
+                    if fg_pos == "right":
+                        p_copy["x_pct"] = max(70.0, float(p_copy["x_pct"]))
+                    elif fg_pos == "left":
+                        p_copy["x_pct"] = min(30.0, float(p_copy["x_pct"]))
+                clamped_path.append(p_copy)
+            m_path = clamped_path
+
+        primary_hero_obj = None
+        if s.get("primary_hero") and fg_rel:
+            primary_hero_obj = dict(s.get("primary_hero"), src=fg_rel)
+            if m_path:
+                primary_hero_obj["motion_path"] = m_path
+
         motion_meta = synthesize_scene_motion_props(s, fg_pos, forensic_ov, stat_val, stat_lbl, i)
+
+        # Construct papercraft_layout per VOX Documentary Paper Collage Specification
+        explicit_papercraft = s.get("papercraft_layout") or s.get("papercraftLayout")
+        if explicit_papercraft and isinstance(explicit_papercraft, dict):
+            papercraft_layout = dict(explicit_papercraft)
+        else:
+            has_tape = bool(forensic_ov or stat_val or s.get("hasCornerTape") or b_num in (1, 2, 3))
+            has_pins = bool(forensic_ov or motion_meta.get("radiating_connections") or s.get("hasPushpin") or b_num in (2, 3, 4))
+            has_yarn = bool(motion_meta.get("radiating_connections") or motion_meta.get("connection") or b_num in (3, 4))
+
+            yarn_conns = []
+            if motion_meta.get("radiating_connections"):
+                yarn_conns = motion_meta["radiating_connections"]
+            elif motion_meta.get("connection"):
+                yarn_conns = [motion_meta["connection"]]
+
+            stamp_badge_obj = None
+            if stamp_badge:
+                stamp_badge_obj = {
+                    "text": str(stamp_badge),
+                    "rotation": -8 if (i % 2 == 0) else -14,
+                    "theme": "crimson" if b_num in (3, 4) else "ivory"
+                }
+
+            papercraft_layout = {
+                "backdrop_theme": papercraft_theme,
+                "has_washi_tape": has_tape,
+                "has_brass_pins": has_pins,
+                "has_connecting_yarn": has_yarn,
+                "yarn_connections": yarn_conns,
+                "stamp_badge": stamp_badge_obj,
+                "has_sticker_cutout": bool(fg_rel),
+                "torn_paper": {
+                    "color": "blueprint_dark" if papercraft_theme == "blueprint" else ("manila" if papercraft_theme == "manila" else "ivory"),
+                    "roughness": "medium",
+                    "rotation": -1.5 if (i % 2 == 0) else 1.2,
+                }
+            }
 
         scenes_out.append({
             "background": bg_rel or "",
+            "papercraft_theme": papercraft_theme,
+            "paperTheme": papercraft_theme,
+            "papercraft_layout": papercraft_layout,
+            "papercraftLayout": papercraft_layout,
             "foreground": fg_rel,
             "foregroundPosition": fg_pos,
             "durationInFrames": max(1, round(dur_sec * fps)),
@@ -1469,11 +1518,8 @@ def build_remotion_props_data(
             "words": scene_subtitles,      # Alias for maximum compatibility
             # Opus 5.5 Full Cinematography & Motion Vector Path (Plan Section III)
             "virtual_camera": s.get("virtual_camera") or s.get("virtualCamera"),
-            "primary_hero": (
-                dict(s.get("primary_hero"), src=fg_rel)
-                if s.get("primary_hero") and fg_rel else None
-            ),
-            "motion_path": s.get("motion_path") or s.get("motionPath") or (s.get("primary_hero") or {}).get("motion_path"),
+            "primary_hero": primary_hero_obj,
+            "motion_path": m_path,
             "linked_secondary_objects": s.get("linked_secondary_objects") or s.get("linkedSecondaryObjects") or [],
             "headline": s.get("headline"),
             "highlightWord": s.get("highlight_word") or s.get("highlightWord"),

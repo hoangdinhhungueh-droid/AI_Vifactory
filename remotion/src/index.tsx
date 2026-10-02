@@ -33,6 +33,15 @@ import {
 } from "./components/vox";
 import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
 import {
+  VoxPaperBackdrop,
+  VoxTornPaper,
+  VoxBrassPin,
+  VoxWashiTape,
+  VoxStickerCutout,
+  VoxConnectingYarn,
+  VoxStampedLabel,
+} from "./components/vox/papercraft";
+import {
   ProceduralMotionFollower,
   ProceduralMarkerSweep,
   PhysicalStampSlam,
@@ -302,6 +311,11 @@ const useForegroundAspect = (src) => {
 // (slide is entrance-only). When `position` is "left"/"right" it is placed in
 // its side-anchored box (Rule 59 v2, ~82% height); otherwise it falls back to
 // the legacy full-frame centered/contain behavior for backward compatibility.
+const STICKER_BORDER_FILTER =
+  "drop-shadow(3px 0 0 #ffffff) drop-shadow(-3px 0 0 #ffffff) drop-shadow(0 3px 0 #ffffff) drop-shadow(0 -3px 0 #ffffff) drop-shadow(3px 3px 0 #ffffff) drop-shadow(-3px -3px 0 #ffffff) drop-shadow(0 16px 30px rgba(45, 30, 15, 0.40)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.18)) brightness(1.06) contrast(1.16) saturate(1.08)";
+const STICKER_CONTAINER_FILTER =
+  "drop-shadow(0 20px 35px rgba(45, 30, 15, 0.30)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.18))";
+
 const ForegroundLayer = ({
   src,
   position,
@@ -333,17 +347,20 @@ const ForegroundLayer = ({
     const targetH = Math.round(height * 0.78 * zDepth);
     const finalOpacity = Math.min(opacity, pathOpacity);
 
+    // Documentary Split Rule: Clamp character to side column to guarantee zero collision with center/opposite evidence
+    const clampedXPct = position === "right" ? Math.max(68, xPct) : position === "left" ? Math.min(32, xPct) : xPct;
+
     return (
       <div
         style={{
           position: "absolute",
-          left: `${xPct}%`,
+          left: `${clampedXPct}%`,
           top: `${yPct}%`,
           width: targetW,
           height: targetH,
           opacity: finalOpacity,
           transform: `translate(-50%, -50%) scale(${scale.toFixed(3)}) rotate(${rotDeg.toFixed(2)}deg)`,
-          filter: "drop-shadow(0 25px 40px rgba(0, 0, 0, 0.85)) drop-shadow(0 6px 16px rgba(0, 0, 0, 0.60))",
+          filter: STICKER_CONTAINER_FILTER,
           zIndex: Math.round(15 * zDepth),
           pointerEvents: "none",
         }}
@@ -356,7 +373,7 @@ const ForegroundLayer = ({
             width: "70%",
             height: 24,
             borderRadius: "50%",
-            background: "radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.35) 45%, rgba(0, 0, 0, 0) 70%)",
+            background: "radial-gradient(ellipse at center, rgba(45, 30, 15, 0.55) 0%, rgba(45, 30, 15, 0.25) 45%, rgba(0, 0, 0, 0) 70%)",
             transform: "scaleY(0.4)",
             pointerEvents: "none",
             zIndex: -1,
@@ -369,7 +386,7 @@ const ForegroundLayer = ({
             height: "100%",
             objectFit: "contain",
             objectPosition: "bottom",
-            filter: "brightness(1.08) contrast(1.20) saturate(1.10)",
+            filter: STICKER_BORDER_FILTER,
           }}
         />
       </div>
@@ -386,7 +403,7 @@ const ForegroundLayer = ({
     });
     return (
       <AbsoluteFill style={{ opacity, transform: `scale(${pushScale})`, transformOrigin: "center center" }}>
-        <Img src={resolveSrc(src)} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        <Img src={resolveSrc(src)} style={{ width: "100%", height: "100%", objectFit: "contain", filter: STICKER_BORDER_FILTER }} />
       </AbsoluteFill>
     );
   }
@@ -431,9 +448,7 @@ const ForegroundLayer = ({
         height: cell.height,
         opacity: finalOpacity,
         transform: `translateY(${translateY.toFixed(1)}px) rotate(${rotateDeg.toFixed(2)}deg) scale(${scale.toFixed(3)})`,
-        // Signature VOX Tactile Archival Diorama Shadow (clean, stable, no vibration)
-        filter:
-          "drop-shadow(0 25px 40px rgba(0, 0, 0, 0.85)) drop-shadow(0 6px 16px rgba(0, 0, 0, 0.60))",
+        filter: STICKER_CONTAINER_FILTER,
         zIndex: 15,
         pointerEvents: "none",
       }}
@@ -447,7 +462,7 @@ const ForegroundLayer = ({
           width: "70%",
           height: 24,
           borderRadius: "50%",
-          background: "radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.35) 45%, rgba(0, 0, 0, 0) 70%)",
+          background: "radial-gradient(ellipse at center, rgba(45, 30, 15, 0.55) 0%, rgba(45, 30, 15, 0.25) 45%, rgba(0, 0, 0, 0) 70%)",
           transform: "scaleY(0.4)",
           pointerEvents: "none",
           zIndex: -1,
@@ -460,7 +475,7 @@ const ForegroundLayer = ({
           height: "100%",
           objectFit: "contain",
           objectPosition: "bottom",
-          filter: "brightness(1.08) contrast(1.20) saturate(1.10)",
+          filter: STICKER_BORDER_FILTER,
         }}
       />
     </div>
@@ -793,29 +808,15 @@ export const TwoLayerScene = (props) => {
   const showSpeakerTag = Boolean(rawSpeakerTag && rawSpeakerTag !== "BEAT 1: CASE INVESTIGATION");
 
     return (
-    <AbsoluteFill style={{ backgroundColor: showBackground ? INK : "transparent", opacity: entranceOpacity }}>
-      {showBackground && background ? (
-        <AbsoluteFill>
-          <Img
-            src={resolveSrc(background)}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              transform: "scale(1.06)",
-              filter: "brightness(0.32) saturate(0.40) contrast(1.08) blur(14px)",
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background:
-                "radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.65) 55%, rgba(5, 9, 13, 0.95) 100%)",
-              pointerEvents: "none",
-            }}
-          />
-        </AbsoluteFill>
+    <AbsoluteFill style={{ backgroundColor: "transparent", opacity: entranceOpacity }}>
+      {showBackground ? (
+        <BackgroundSegment
+          src={background}
+          paperTheme={props.papercraft_theme || props.paperTheme || "parchment"}
+          fadeInFrames={0}
+          durationInFrames={durationInFrames}
+          hasForeground={Boolean(foreground || forensicOverlay || statValue)}
+        />
       ) : null}
 
       {showForeground && foreground ? (
@@ -1238,11 +1239,17 @@ const buildBackgroundSegments = (scenes, fadeFrames) => {
   scenes.forEach((s) => {
     const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
     const src = s.background || null;
+    const paperTheme =
+      s.papercraft_theme ||
+      s.paperTheme ||
+      (s.forensicOverlay?.type === "market_depth" || s.forensicOverlay?.type === "circuit_breaker_dial"
+        ? "blueprint"
+        : "parchment");
     const last = raw[raw.length - 1];
-    if (last && last.src === src) {
+    if (last && last.src === src && last.paperTheme === paperTheme) {
       last.end += dur;
     } else {
-      raw.push({ src, start: cursor, end: cursor + dur });
+      raw.push({ src, paperTheme, start: cursor, end: cursor + dur });
     }
     cursor += dur;
   });
@@ -1252,6 +1259,7 @@ const buildBackgroundSegments = (scenes, fadeFrames) => {
     const fadeOutExtend = next ? Math.min(fadeFrames, next.end - next.start) : 0;
     return {
       src: seg.src,
+      paperTheme: seg.paperTheme,
       from: seg.start,
       durationInFrames: seg.end - seg.start + fadeOutExtend,
       fadeInFrames: fadeIn,
@@ -1259,7 +1267,19 @@ const buildBackgroundSegments = (scenes, fadeFrames) => {
   });
 };
 
-const BackgroundSegment = ({ src, fadeInFrames, durationInFrames, hasForeground = false }: { src: string | null; fadeInFrames: number; durationInFrames: number; hasForeground?: boolean }) => {
+const BackgroundSegment = ({
+  src,
+  fadeInFrames,
+  durationInFrames,
+  hasForeground = false,
+  paperTheme = "parchment",
+}: {
+  src: string | null;
+  fadeInFrames: number;
+  durationInFrames: number;
+  hasForeground?: boolean;
+  paperTheme?: any;
+}) => {
   const frame = useCurrentFrame();
   const dur = durationInFrames || 300;
   const opacity =
@@ -1269,81 +1289,43 @@ const BackgroundSegment = ({ src, fadeInFrames, durationInFrames, hasForeground 
           extrapolateRight: "clamp",
         })
       : 1;
-  // Subtle, smooth editorial zoom (1.0 -> 1.03) without fighting outer camera
-  const scale = interpolate(frame, [0, dur], [1.0, 1.03], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
 
-  const filterStyle = hasForeground
-    ? "brightness(0.68) saturate(0.75) contrast(1.06) blur(7px)"
-    : "brightness(0.92) saturate(0.95) contrast(1.04) blur(0px)";
+  const validTheme = ["parchment", "blueprint", "manila", "vintage_map"].includes(paperTheme)
+    ? paperTheme
+    : "parchment";
 
-  const vignetteStyle = hasForeground
-    ? "radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.40) 55%, rgba(5, 9, 13, 0.82) 100%)"
-    : "radial-gradient(circle at 50% 48%, transparent 50%, rgba(5, 9, 13, 0.40) 100%)";
+  const isVideo = src && (src.endsWith(".mp4") || src.endsWith(".webm") || src.includes(".mp4"));
 
   return (
-    <AbsoluteFill style={{ overflow: "hidden", backgroundColor: "#0b0f17" }}>
-      {/* Vox Tactical Investigation Canvas: Blueprint Grid & Subtle Halftone Matrix */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage:
-            "linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px)",
-          backgroundSize: "30px 30px",
-          pointerEvents: "none",
-        }}
-      />
-
-      {src ? (
+    <VoxPaperBackdrop theme={validTheme} bgImage={isVideo ? null : src} opacity={opacity}>
+      {isVideo && src ? (
         <AbsoluteFill style={{ opacity }}>
-          {src.endsWith(".mp4") || src.endsWith(".webm") || src.includes(".mp4") ? (
-            <Video
-              src={resolveSrc(src)}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-              muted
-              loop
-            />
-          ) : (
-            <Img
-              src={resolveSrc(src)}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                transform: `scale(${scale * 1.06})`,
-                filter: filterStyle,
-                transition: "filter 0.3s ease",
-              }}
-            />
-          )}
-          {/* Vox Investigation Spotlight & Dark Vignette overlay (Dynamic according to foreground presence) */}
+          <Video
+            src={resolveSrc(src)}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              filter:
+                validTheme === "blueprint"
+                  ? "brightness(0.65) contrast(1.15) saturate(0.5) hue-rotate(180deg)"
+                  : "brightness(0.90) saturate(0.7) sepia(0.20) contrast(1.05)",
+            }}
+            muted
+            loop
+          />
           <div
             style={{
               position: "absolute",
               inset: 0,
-              background: vignetteStyle,
-              pointerEvents: "none",
+              backgroundColor: validTheme === "blueprint" ? "#1e293b" : "#F5F2EB",
+              opacity: 0.28,
+              mixBlendMode: "multiply",
             }}
           />
         </AbsoluteFill>
       ) : null}
-    </AbsoluteFill>
+    </VoxPaperBackdrop>
   );
 };
 
@@ -1514,6 +1496,7 @@ const buildOverlaySegments = (scenes: any[]) => {
         statLabel: s.statLabel,
         stampBadge: s.stampBadge || s.stamp_badge,
         isLeft: s.foregroundPosition === "left",
+        hasForeground: Boolean(s.foreground || s.primary_hero),
       });
     }
     cursor += dur;
@@ -1526,6 +1509,7 @@ const buildOverlaySegments = (scenes: any[]) => {
     statLabel: seg.statLabel,
     stampBadge: seg.stampBadge,
     isLeft: seg.isLeft,
+    hasForeground: seg.hasForeground,
   }));
 };
 
@@ -1535,6 +1519,7 @@ const OverlaySegmentView = ({
   statLabel,
   stampBadge,
   isLeft,
+  hasForeground,
   durationInFrames = 180,
 }: {
   forensicOverlay?: any;
@@ -1542,6 +1527,7 @@ const OverlaySegmentView = ({
   statLabel?: string;
   stampBadge?: string;
   isLeft: boolean;
+  hasForeground?: boolean;
   durationInFrames?: number;
 }) => {
   const frame = useCurrentFrame();
@@ -1563,84 +1549,70 @@ const OverlaySegmentView = ({
 
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
-      {/* Stage 2 Geometric Staging: subtle archival desk corner brackets when an evidence card is active */}
-      {(forensicOverlay || statValue) && (
-        <div
-          style={{
-            position: "absolute",
-            top: 50,
-            left: isLeft ? "auto" : 50,
-            right: isLeft ? 50 : "auto",
-            width: 720,
-            height: 480,
-            pointerEvents: "none",
-            opacity: interpolate(frame, [10, 25], [0, 0.45], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
-            border: "1px dashed rgba(242, 166, 59, 0.25)",
-            borderRadius: 8,
-          }}
-        >
-          {/* Corner brackets */}
-          <div style={{ position: "absolute", top: -2, left: -2, width: 14, height: 14, borderTop: "2px solid #f2a63b", borderLeft: "2px solid #f2a63b" }} />
-          <div style={{ position: "absolute", top: -2, right: -2, width: 14, height: 14, borderTop: "2px solid #f2a63b", borderRight: "2px solid #f2a63b" }} />
-          <div style={{ position: "absolute", bottom: -2, left: -2, width: 14, height: 14, borderBottom: "2px solid #f2a63b", borderLeft: "2px solid #f2a63b" }} />
-          <div style={{ position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderBottom: "2px solid #f2a63b", borderRight: "2px solid #f2a63b" }} />
-        </div>
-      )}
-
-      {/* Stage 4/5: Evidentiary Stat Card (ONLY when forensicOverlay is NOT present, avoiding duplicate collision) */}
+      {/* Stage 4/5: Evidentiary Stat Paper Note */}
       {statValue && !forensicOverlay ? (
         <div
           style={{
             position: "absolute",
-            top: 60,
-            left: isLeft ? "auto" : 70,
-            right: isLeft ? 70 : "auto",
+            top: 70,
+            left: isLeft ? "auto" : 80,
+            right: isLeft ? 80 : "auto",
             zIndex: 30,
-            backgroundColor: "#faf7ee",
-            border: "2px solid #b45309",
-            borderRadius: 6,
-            padding: "14px 24px",
-            boxShadow: "0 18px 40px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3)",
             transform: `translateY(${cardTranslateY.toFixed(1)}px) scale(${cardScale.toFixed(3)}) rotate(-1.5deg)`,
             opacity: cardSpring,
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            fontFamily: "'Courier Prime', 'Special Elite', 'Courier New', Courier, monospace",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 20 }}>📊</span>
-            <div
-              style={{
-                color: "#b45309",
-                fontSize: 34,
-                fontWeight: 900,
-                letterSpacing: 1,
-              }}
-            >
-              {statValue}
+          {/* Authentic Washi Tape & Brass Pin Anchors */}
+          <VoxWashiTape x="14%" y="-14px" rotation={-25} corner="top_left" dropFrame={cardStartFrame + 4} />
+          <VoxBrassPin x="90%" y="-10px" size={24} dropFrame={cardStartFrame + 6} />
+
+          <div
+            style={{
+              backgroundColor: "#FAF7EE",
+              border: "1.5px solid rgba(160, 130, 90, 0.45)",
+              borderRadius: 4,
+              padding: "16px 28px",
+              boxShadow: "0 18px 40px rgba(45, 30, 15, 0.28), 0 3px 10px rgba(0, 0, 0, 0.12)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+              fontFamily: "'Courier Prime', 'Special Elite', 'Courier New', Courier, monospace",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 22 }}>📊</span>
+              <div
+                style={{
+                  color: "#92400E",
+                  fontSize: 36,
+                  fontWeight: 900,
+                  letterSpacing: 1.5,
+                }}
+              >
+                {statValue}
+              </div>
             </div>
+            {statLabel ? (
+              <div
+                style={{
+                  color: "#475569",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  letterSpacing: 1.8,
+                  textTransform: "uppercase",
+                }}
+              >
+                {statLabel}
+              </div>
+            ) : null}
           </div>
-          {statLabel ? (
-            <div
-              style={{
-                color: "#475569",
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: 1.5,
-                textTransform: "uppercase",
-              }}
-            >
-              {statLabel}
-            </div>
-          ) : null}
         </div>
       ) : null}
 
       <VoxOverlayLayer
         forensicOverlay={forensicOverlay}
         isLeft={isLeft}
+        hasForeground={hasForeground}
         statValue={statValue}
         statLabel={statLabel}
       />
@@ -2598,7 +2570,7 @@ export const TwoLayerEpisode = (props) => {
   );
 
   return (
-    <AbsoluteFill style={{ backgroundColor: INK }}>
+    <AbsoluteFill style={{ backgroundColor: "#FAF7EE" }}>
       {audioMaster ? (
         <Audio src={resolveSrc(audioMaster)} volume={1.0} />
       ) : null}
@@ -2629,6 +2601,7 @@ export const TwoLayerEpisode = (props) => {
               <LivingCamera sceneIndex={i} direction={i % 2 === 0 ? "push" : "pull"}>
                 <BackgroundSegment
                   src={seg.src}
+                  paperTheme={seg.paperTheme}
                   fadeInFrames={seg.fadeInFrames}
                   durationInFrames={seg.durationInFrames}
                   hasForeground={Boolean(currentSceneInfo?.scene?.foreground || currentSceneInfo?.scene?.forensicOverlay || currentSceneInfo?.scene?.statValue)}
@@ -2676,6 +2649,7 @@ export const TwoLayerEpisode = (props) => {
               statLabel={seg.statLabel}
               stampBadge={seg.stampBadge}
               isLeft={seg.isLeft}
+              hasForeground={seg.hasForeground}
               durationInFrames={seg.durationInFrames}
             />
           </Sequence>
@@ -2844,7 +2818,7 @@ const RemotionRoot = () => {
       <Composition
         id="VoxCompositeDemo"
         component={() => (
-          <AbsoluteFill style={{ backgroundColor: "#020617", justifyContent: "center", alignItems: "center" }}>
+          <AbsoluteFill style={{ backgroundColor: "#F5F2EB", justifyContent: "center", alignItems: "center" }}>
             <VoxCompositeStage
               title="INCIDENT RECONSTRUCTION // FLIGHT 370"
               badge="TACTILE DOSSIER // ACT I"

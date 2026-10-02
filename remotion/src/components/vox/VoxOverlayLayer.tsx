@@ -30,6 +30,7 @@ export interface VoxForensicOverlayData {
 export interface VoxOverlayLayerProps {
   forensicOverlay?: VoxForensicOverlayData | string | null;
   isLeft?: boolean;
+  hasForeground?: boolean;
   statValue?: string;
   statLabel?: string;
   durationInFrames?: number;
@@ -38,6 +39,7 @@ export interface VoxOverlayLayerProps {
 export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
   forensicOverlay,
   isLeft,
+  hasForeground,
   statValue,
   statLabel,
   durationInFrames,
@@ -52,7 +54,17 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
     : forensicOverlay;
 
   const rawType = ov.type || "";
-  const layout = ov.layout || (isLeft ? "split_right" : "split_left");
+  const isCharacterPresent = Boolean(hasForeground);
+  const isHeadline = rawType === "kinetic_headline" || rawType === "cold_hook_headline";
+
+  const effectiveLayout =
+    isCharacterPresent && !isHeadline
+      ? isLeft
+        ? "split_right"
+        : "split_left"
+      : ov.layout || (isLeft ? "split_right" : "split_left");
+
+  const layout = effectiveLayout;
   const sfxCue = ov.sfx_cue || (
     rawType.includes("doc") || rawType.includes("dossier") ? "marker_stroke" :
     rawType.includes("check") || rawType.includes("counter") || rawType.includes("threshold") || rawType.includes("ratio") ? "stamp_slam" :
@@ -114,13 +126,13 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
 
   return (
     <>
-      {/* Background Dimmer Backdrop when Full-Bleed Document is active (Zero blur per anti-dropframe standard) */}
+      {/* Background Dimmer Backdrop with warm paper vignette (Rule 118: Zero digital void) */}
       {isFullBleed ? (
         <div
           style={{
             position: "absolute",
             inset: 0,
-            backgroundColor: "rgba(5, 9, 13, 0.78)",
+            background: "radial-gradient(ellipse at center, rgba(35, 25, 15, 0.52) 0%, rgba(20, 15, 10, 0.80) 100%)",
             zIndex: 27,
             pointerEvents: "none",
           }}

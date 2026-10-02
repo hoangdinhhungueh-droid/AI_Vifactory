@@ -132,11 +132,45 @@ export interface VoxDisclosureBadgeProps {
   isAiGenerated?: boolean;
 }
 
+export interface VoxPapercraftLayout {
+  backdrop_theme?: "parchment" | "blueprint" | "manila" | "vintage_map" | string;
+  has_washi_tape?: boolean;
+  has_brass_pins?: boolean;
+  has_connecting_yarn?: boolean;
+  yarn_connections?: Array<{
+    fromX?: number;
+    fromY?: number;
+    toX?: number;
+    toY?: number;
+    from?: string;
+    to?: string;
+    curvature?: number;
+    color?: string;
+    label?: string;
+  }>;
+  stamp_badge?: {
+    text: string;
+    subtext?: string;
+    rotation?: number;
+    theme?: string;
+  } | string;
+  has_sticker_cutout?: boolean;
+  torn_paper?: {
+    color?: string;
+    roughness?: string;
+    rotation?: number;
+  };
+}
+
 export interface Scene {
   scene_id?: string;
   /** Path relative to Remotion's public/ dir or staticFile() or remote URL */
   video_path?: string;
   background?: string;
+  papercraft_theme?: string;
+  paperTheme?: string;
+  papercraft_layout?: VoxPapercraftLayout;
+  papercraftLayout?: VoxPapercraftLayout;
   foreground?: string;
   foregroundPosition?: "left" | "right" | "center";
   foregroundFadeFrames?: number;

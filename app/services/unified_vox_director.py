@@ -1812,6 +1812,29 @@ def build_unified_director_plan(
         if cine_data["headline_info"]:
             scene_obj.update(cine_data["headline_info"])
 
+        # VOX Mixed-Media Paper Collage Layout (Plan Section VI)
+        paper_theme = "blueprint" if beat_idx in (1, 4) else ("parchment" if beat_idx in (3, 5) else "manila")
+        scene_obj["papercraft_theme"] = paper_theme
+        scene_obj["papercraft_layout"] = {
+            "backdrop_theme": paper_theme,
+            "has_washi_tape": True,
+            "has_brass_pins": True,
+            "has_connecting_yarn": beat_idx in (3, 4),
+            "yarn_connections": [
+                {"from": "evidence_pin", "to": "hero_pin", "curvature": 25, "isYarn": True, "color": "#dc2626"}
+            ] if beat_idx in (3, 4) else [],
+            "stamp_badge": {
+                "text": f"CONFIDENTIAL // BEAT {beat_idx}",
+                "rotation": -8 if (idx % 2 == 0) else -14
+            },
+            "has_sticker_cutout": bool(assigned_fg),
+            "torn_paper": {
+                "color": "blueprint_dark" if paper_theme == "blueprint" else ("manila" if paper_theme == "manila" else "ivory"),
+                "roughness": "medium",
+                "rotation": -1.5 if (idx % 2 == 0) else 1.2,
+            }
+        }
+
         scenes.append(scene_obj)
 
     # 2. Tự động sinh và ghi file flow_video_manifest.json & vox_scene_manifest.json
