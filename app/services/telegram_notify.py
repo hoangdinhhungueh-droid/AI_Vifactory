@@ -195,6 +195,15 @@ async def notify_budget_alert(provider: str, day_used: float, day_cap: float = 0
 
 
 async def notify_error(stage: str, episode_id: str, error: str) -> bool:
+    """Pipeline error hook -> log only; suppressed from Telegram per user mandate.
+
+    The autonomous high-level LLM orchestrator on VPS handles self-debugging and recovery.
+    Telegram is strictly reserved for Human Gates (HG1, HG2, HG3).
+    Set VF_ERROR_NOTIFY_TELEGRAM=1 to force sending error alerts to Telegram.
+    """
+    logger.error(f"[pipeline-error] {stage} - {episode_id}: {error[:1500]}")
+    if os.getenv("VF_ERROR_NOTIFY_TELEGRAM", "0") != "1":
+        return True
     msg = (
         "\U0001F534 <b>VF ERROR</b>\n"
         f"<b>{stage}</b> \u2014 <code>{episode_id}</code>\n"

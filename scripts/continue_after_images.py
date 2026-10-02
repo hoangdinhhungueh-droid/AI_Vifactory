@@ -100,7 +100,7 @@ def _notify_error(stage, episode_id, detail):
         _log("telegram notify_error failed (%s: %s)" % (type(exc).__name__, exc))
 
 
-def _run_stage(stage, argv, episode_id, timeout, notify_on_error=True):
+def _run_stage(stage, argv, episode_id, timeout, notify_on_error=False):
     import signal
     _log("=== %s: %s" % (stage, " ".join(argv)))
     _write_state(episode_id, stage=stage, status="running")
@@ -275,7 +275,7 @@ def main():
         msg = "render failed and master %s is missing/empty after self-healing" % master
         _log("FATAL " + msg)
         _write_state(episode_id, stage="render-verify", status="failed", error=msg)
-        _notify_error("render-verify", episode_id, msg)
+        _log("Suppressed Telegram error alert for render-verify; LLM orchestrator handles VPS auto-debugging")
         return 3
     _log("master present: %s (%.1f MB)" % (master, master.stat().st_size / 1048576.0))
 
@@ -300,7 +300,7 @@ def main():
                        "--privacy", args.privacy,
                        "--force-reupload"],
                       episode_id, args.upload_timeout,
-                      notify_on_error=True):
+                      notify_on_error=False):
         return 4
 
     _write_state(episode_id, stage="done", status="ok")
