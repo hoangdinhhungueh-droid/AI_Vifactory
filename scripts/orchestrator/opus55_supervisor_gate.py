@@ -25,27 +25,39 @@ logger = logging.getLogger("opus55_supervisor_gate")
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [OPUS55_GATE] %(message)s")
 
-MAX_SUPERVISOR_INPUT_TOKENS = 1800
-MAX_SUPERVISOR_OUTPUT_TOKENS = 400
+MAX_SUPERVISOR_INPUT_TOKENS = 10000
+MAX_SUPERVISOR_OUTPUT_TOKENS = 5000
 DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
 
-SUPERVISOR_SYSTEM_PROMPT = """You are Claude Opus 5.5, Supreme System Architect & Quality Supervisor for AI Video Factory.
-Your responsibility is to supervise and evaluate implementation increments executed by the Antigravity Multi-Agent Squad.
+SUPERVISOR_SYSTEM_PROMPT = """You are Claude Opus 5.5, Supreme System Architect & Lead Quality Supervisor for AI Video Factory.
+Your responsibility is to supervise, audit, and provide authoritative forensic evaluation of implementation increments executed by the Antigravity Multi-Agent Squad.
 
 Evaluation Standards:
-1. Architectural Integrity & Contract Adherence: Zero dirty hacks, zero shadow code, proper schema compatibility.
-2. Safety & Blast Radius: Low blast radius, backward-compatible, clean error handling (no empty try-except).
-3. Code Cleanliness: 0 ghost files (.bak, orphan scripts), strict module boundaries.
-4. Verification & Testing: Passes regression/unit tests and OCR rules.
+1. Architectural Integrity & Contract Adherence: Zero dirty hacks, zero shadow code, proper schema compatibility, adherence to Rule 118 - Rule 139.
+2. Safety & Blast Radius: Low blast radius, backward-compatible, clean error handling (no empty try-except, no symptom-patching).
+3. Code Cleanliness: 0 ghost files (.bak, orphan scripts), strict module boundaries, zero dead imports.
+4. Verification & Testing: Passes regression/unit tests and OCR rules with hard forensic evidence.
 
-Output Format: You MUST output STRICT JSON only:
+Output Format: You MUST output STRICT JSON only (you have up to 5,000 output tokens to deliver comprehensive and actionable technical depth):
 {
   "verdict": "APPROVED" or "REVISE_REQUIRED",
   "score": <float 0.0 - 10.0>,
   "architectural_fit": "STRICT_COMPLIANT" or "DEVIATION_DETECTED",
-  "summary": "<1-2 concise sentences summarizing the evaluation>",
-  "observations": ["<key positive or neutral observation>", "..."],
-  "revisions_needed": ["<actionable fix 1>", "..."] (empty list if APPROVED)
+  "summary": "<comprehensive executive summary evaluating the increment>",
+  "component_reviews": [
+    {
+      "component": "<file or module inspected>",
+      "status": "PASS" or "WARN" or "DEFECT",
+      "analysis": "<detailed technical audit of implementation quality, safety, and patterns>"
+    }
+  ],
+  "observations": ["<in-depth structural or architectural observation>", "..."],
+  "revisions_needed": ["<actionable fix or hardening requirement>", "..."],
+  "adherence_matrix": {
+    "iron_laws_compliance": "STRICT",
+    "four_pillars_status": "VERIFIED",
+    "zero_ghost_cleanliness": "VERIFIED"
+  }
 }"""
 
 
@@ -57,7 +69,7 @@ def estimate_tokens(text: str) -> int:
     return int(words * 1.3)
 
 
-def extract_compact_git_diff(root_dir: Path, max_lines: int = 50) -> Tuple[str, str]:
+def extract_compact_git_diff(root_dir: Path, max_lines: int = 250) -> Tuple[str, str]:
     """Extracts git stat and a compacted diff, omitting binary files and large lockfiles."""
     try:
         stat_res = subprocess.run(
@@ -98,7 +110,7 @@ def extract_compact_git_diff(root_dir: Path, max_lines: int = 50) -> Tuple[str, 
         meaningful_lines = []
         for line in raw_diff.splitlines():
             # Skip large metadata or long base64/hash blobs
-            if len(line) > 200:
+            if len(line) > 300:
                 continue
             if line.startswith(("diff --git", "--- ", "+++ ", "@@")):
                 meaningful_lines.append(line)
@@ -106,7 +118,7 @@ def extract_compact_git_diff(root_dir: Path, max_lines: int = 50) -> Tuple[str, 
                 meaningful_lines.append(line)
 
             if len(meaningful_lines) >= max_lines:
-                meaningful_lines.append(f"... [Truncated remaining lines to respect Anti-Token-Bloat budget]")
+                meaningful_lines.append(f"... [Truncated remaining lines to respect 10,000 Anti-Token-Bloat budget]")
                 break
 
         compact_diff = "\n".join(meaningful_lines)
@@ -125,7 +137,7 @@ def build_anti_bloat_digest(
     qa_summary: Optional[str] = None,
     ocr_status: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Constructs a strictly token-budgeted digest for Opus 5.5 supervision."""
+    """Constructs a flexible token-budgeted digest (up to 10,000 tokens) for Opus 5.5 supervision."""
     target_root = root_dir or ROOT_DIR
     if diff_summary is None or compact_diff is None:
         extracted_stat, extracted_diff = extract_compact_git_diff(target_root)
@@ -134,11 +146,11 @@ def build_anti_bloat_digest(
 
     digest = {
         "task_id": task_id,
-        "task_objective": task_objective[:250],
-        "diff_stat": diff_summary[:300],
+        "task_objective": task_objective[:1500],
+        "diff_stat": diff_summary[:1500],
         "compact_diff": compact_diff,
-        "qa_summary": (qa_summary or "QA Harness: Tests Passed, 0 Regressions")[:300],
-        "ocr_status": (ocr_status or "Alibaba OCR Gate: 0 Critical / 0 High Defects")[:200],
+        "qa_summary": (qa_summary or "QA Harness: Tests Passed, 0 Regressions")[:2500],
+        "ocr_status": (ocr_status or "Alibaba OCR Gate: 0 Critical / 0 High Defects")[:1000],
     }
 
     # Verify token count and truncate if approaching limit
@@ -149,7 +161,7 @@ def build_anti_bloat_digest(
         logger.info(f"Digest tokens ({tok_count}) exceeds cap ({MAX_SUPERVISOR_INPUT_TOKENS}). Compacting diff...")
         # Emergency shrink of compact_diff
         diff_lines = digest["compact_diff"].splitlines()
-        digest["compact_diff"] = "\n".join(diff_lines[:25]) + "\n... [Anti-Bloat Truncation Active]"
+        digest["compact_diff"] = "\n".join(diff_lines[:150]) + "\n... [Anti-Bloat Truncation Active at 10,000 tokens limit]"
 
     digest["estimated_tokens"] = estimate_tokens(json.dumps(digest, ensure_ascii=False))
     return digest
@@ -167,12 +179,24 @@ def call_opus55_supervisor(
             "verdict": "APPROVED",
             "score": 9.8,
             "architectural_fit": "STRICT_COMPLIANT",
-            "summary": "Dry-run validation successful. Code increment complies with 4-pillar architectural guidelines.",
+            "summary": "Dry-run validation successful. Code increment complies with 4-pillar architectural guidelines and token budget specifications (<= 10,000 input, <= 5,000 output).",
+            "component_reviews": [
+                {
+                    "component": "Multi-Agent Implementation Increment",
+                    "status": "PASS",
+                    "analysis": "Clean architecture, backward-compatible interface changes, AST compile verified."
+                }
+            ],
             "observations": [
-                "Anti-token-bloat digest strictly enforced.",
-                "Zero ghost files or dirty coupling detected.",
+                "Anti-token-bloat digest strictly enforced under 10,000 tokens ceiling.",
+                "Zero ghost files or dirty coupling detected across all touched components.",
             ],
             "revisions_needed": [],
+            "adherence_matrix": {
+                "iron_laws_compliance": "STRICT",
+                "four_pillars_status": "VERIFIED",
+                "zero_ghost_cleanliness": "VERIFIED"
+            },
             "tokens_consumed": digest.get("estimated_tokens", 0),
             "supervisor_model": f"{model} (dry-run)",
         }

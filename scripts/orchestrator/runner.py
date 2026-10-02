@@ -1127,7 +1127,7 @@ class OrchestratorRunner:
             print(f"Task ID:         {task_id}")
             print(f"Verdict:         {sup.get('verdict')}")
             print(f"Score:           {sup.get('score')}/10.0")
-            print(f"Tokens Used:     {sup.get('tokens_consumed', 0)} (Budget Cap: <=1800)")
+            print(f"Tokens Used:     {sup.get('tokens_consumed', 0)} (Budget Cap: <=10000)")
             print(f"Summary:         {sup.get('summary')}")
             if sup.get("observations"):
                 print("Observations:")

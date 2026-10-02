@@ -37,11 +37,11 @@ class TestOpus55SupervisorGate:
         assert "compact_diff" in digest
 
     def test_build_anti_bloat_digest_compaction_guard(self):
-        # Generate giant diff simulating bloated logs
-        huge_diff = "\n".join([f"+ line_{i} = {i}" for i in range(2000)])
+        # Generate giant diff simulating bloated logs to exceed 10,000 tokens
+        huge_diff = "\n".join([f"+ line_{i} = complex_state_variable_assignment_data_{i}" for i in range(8000)])
         digest = build_anti_bloat_digest(
             task_id="EN_EP0260_macro_liquidity",
-            task_objective="Stress test token compaction",
+            task_objective="Stress test token compaction at 10,000 tokens ceiling",
             compact_diff=huge_diff,
         )
         # Verify it was capped to prevent context blowout
