@@ -66,14 +66,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=["pipeline", "block", "audit", "ci", "sync", "review", "sweep", "council", "plan"],
+        choices=["pipeline", "block", "audit", "ci", "sync", "review", "sweep", "council", "plan", "supervise"],
         default="pipeline",
         help="Operational mode (default: pipeline)",
     )
     parser.add_argument(
         "--planner-model",
         default="claude-opus-5-5",
-        help="LLM model used for Phase 0 planning brain (default: claude-opus-5-5 via HHTech API)",
+        help="LLM model used for Phase 0 planning brain & supervision (default: claude-opus-5-5 via HHTech API)",
+    )
+    parser.add_argument(
+        "--supervise-with-opus",
+        action="store_true",
+        help="Enforces Claude Opus 5.5 Anti-Bloat Supervisory Gate in Council/Pipeline verification",
     )
     parser.add_argument(
         "--plan-task",
@@ -226,6 +231,8 @@ class OrchestratorRunner:
                 return self._run_council_mode(sandbox)
             elif mode == "plan":
                 return self._run_plan_mode(sandbox)
+            elif mode == "supervise":
+                return self._run_supervise_mode(sandbox)
             else:
                 print(f"Unknown mode: {mode}", file=sys.stderr)
                 return 1
@@ -950,18 +957,41 @@ class OrchestratorRunner:
             else f"VETO ISSUED: {'; '.join(auditor_defects)}"
         )
 
-        # 5. Council Deliberation (Quorum: 4/4 Unanimous Approval)
+        # 5. Supreme Supervisor: Claude Opus 5.5 Anti-Bloat Supervisory Gate
+        supervise_opus = getattr(self.args, "supervise_with_opus", False)
+        supervisor_vote = "APPROVED"
+        supervisor_notes = "Standard council review (Opus 5.5 supervision flag not asserted)."
+        supervisor_details = None
+
+        if supervise_opus:
+            from scripts.orchestrator.opus55_supervisor_gate import run_supervisory_gate
+            gate_res = run_supervisory_gate(
+                task_id=task_id,
+                task_objective=f"Council deliberation supervision for {task_id}",
+                root_dir=self.root_dir,
+                qa_summary=qa_notes,
+                dry_run=self.args.dry_run,
+                model=getattr(self.args, "planner_model", "claude-opus-5-5"),
+            )
+            supervisor_details = gate_res["supervision"]
+            supervisor_vote = supervisor_details.get("verdict", "REVISE_REQUIRED")
+            supervisor_notes = (
+                f"Opus 5.5 Score: {supervisor_details.get('score')}/10.0, Tokens: {supervisor_details.get('tokens_consumed', 0)} - {supervisor_details.get('summary')}"
+            )
+
+        # 6. Council Deliberation (Quorum: 4/4 or 5/5 Unanimous Approval)
         all_passed = (
             architect_vote == "AGREE"
             and builder_vote == "COMMITTED"
             and qa_vote == "PASS"
             and auditor_vote == "CLEAR"
+            and (supervisor_vote == "APPROVED" if supervise_opus else True)
         )
         verdict = "APPROVED_FOR_SYNC" if all_passed else "REVISE_REQUIRED"
 
         council_matrix = {
             "task_id": task_id,
-            "council_quorum": "UNANIMOUS_4_OF_4",
+            "council_quorum": "UNANIMOUS_5_OF_5" if supervise_opus else "UNANIMOUS_4_OF_4",
             "verdict": verdict,
             "votes": {
                 "agent_1_architect": {
@@ -992,6 +1022,14 @@ class OrchestratorRunner:
             },
             "duration_seconds": round(time.time() - start_ts, 3),
         }
+        if supervise_opus:
+            council_matrix["votes"]["supreme_supervisor_opus55"] = {
+                "role": "Supreme Architecture Supervisor (Opus 5.5)",
+                "doc_pair": "Anti-Bloat Forensic Digest",
+                "vote": supervisor_vote,
+                "notes": supervisor_notes,
+                "details": supervisor_details,
+            }
 
         if self.args.json_output:
             print(json.dumps({"status": "success" if all_passed else "failure", "council_matrix": council_matrix}, indent=2))
@@ -1063,6 +1101,53 @@ class OrchestratorRunner:
             else:
                 print(f"ERROR: {msg}", file=sys.stderr)
             return 1
+
+    def _run_supervise_mode(self, sandbox: ResourceSandbox) -> int:
+        """Executes Standalone Opus 5.5 Anti-Token-Bloat Supervisory Gate."""
+        from scripts.orchestrator.opus55_supervisor_gate import run_supervisory_gate
+        task_id = self.args.task_id or "GENERIC_SUPERVISION_TASK"
+        objective = self.args.plan_task or f"Multi-agent implementation supervision for {task_id}"
+
+        gate_res = run_supervisory_gate(
+            task_id=task_id,
+            task_objective=objective,
+            root_dir=self.root_dir,
+            dry_run=self.args.dry_run,
+            model=getattr(self.args, "planner_model", "claude-opus-5-5"),
+        )
+        sup = gate_res["supervision"]
+        passed = sup.get("verdict") == "APPROVED"
+
+        if self.args.json_output:
+            print(json.dumps({"status": "success" if passed else "failure", "result": gate_res}, indent=2, ensure_ascii=False))
+        else:
+            print("\n=================================================================")
+            print("🛡️ CLAUDE OPUS 5.5 ANTI-TOKEN-BLOAT SUPERVISORY GATE")
+            print("=================================================================")
+            print(f"Task ID:         {task_id}")
+            print(f"Verdict:         {sup.get('verdict')}")
+            print(f"Score:           {sup.get('score')}/10.0")
+            print(f"Tokens Used:     {sup.get('tokens_consumed', 0)} (Budget Cap: <=1800)")
+            print(f"Summary:         {sup.get('summary')}")
+            if sup.get("observations"):
+                print("Observations:")
+                for o in sup["observations"]:
+                    print(f"  - {o}")
+            if sup.get("revisions_needed"):
+                print("Revisions Needed:")
+                for r in sup["revisions_needed"]:
+                    print(f"  - {r}")
+            print("=================================================================\n")
+
+        if self.args.task_id:
+            self._update_pipeline_state(
+                self.args.task_id,
+                "OPUS55_SUPERVISION",
+                "PASSED" if passed else "FAILED",
+                {"score": sup.get("score"), "verdict": sup.get("verdict")}
+            )
+
+        return 0 if passed else 1
 
 
 def main() -> None:
