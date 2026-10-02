@@ -138,6 +138,9 @@ async def main():
         out_jpg = img_dir / f"{key}.jpg"
         print(f"Generating BG: {key} (16:9)...")
         res = await gen_scene_image(prompt, aspect="16:9")
+        if not res or not res.get("local_path"):
+            print(f"  [B4 STUB] Image generation for BG '{key}' delegated to Antigravity UI (Rule 120/122). Skipping local stub.")
+            continue
         src_path = Path(res["local_path"])
         shutil.copyfile(src_path, out_jpg)
 
@@ -160,6 +163,9 @@ async def main():
         clean_png = img_dir / f"{key}.png"
         print(f"Generating FG: {key} (1:1 #FF00FF)...")
         res = await gen_scene_image(prompt, aspect="1:1")
+        if not res or not res.get("local_path"):
+            print(f"  [B4 STUB] Image generation for FG '{key}' delegated to Antigravity UI (Rule 120/122). Skipping local stub.")
+            continue
         src_path = Path(res["local_path"])
         shutil.copyfile(src_path, raw_png)
 

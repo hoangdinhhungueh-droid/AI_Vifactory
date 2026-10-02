@@ -607,7 +607,19 @@ def run_b36_visual_convergence(
         except Exception as e:
             logger.warning(f"[B3.5.1 DACL] HG2 dispatch note: {e}")
     else:
-        logger.warning(f"[B3.5.1 DACL] Convergence gate NOT met ({final_score:.1f}/10). Withholding HG2 Telegram notification.")
+        logger.warning(f"[B3.5.1 DACL] Convergence gate NOT met ({final_score:.1f}/10). Withholding automated HG2 release.")
+        try:
+            from app.services.telegram_buttons import send_telegram_broadcast
+            alert_msg = (
+                f"⚠️ <b>[B3.5.1 VISUAL CONVERGENCE CẢNH BÁO - {episode_id}]</b>\n"
+                f"• Điểm hội tụ thị giác: <b>{final_score:.1f}/10</b> (Ngưỡng xuất xưởng: ≥ 8.0/10)\n"
+                f"• Đã thực hiện <b>{len(audit_history)} vòng</b> đối soát Astra ⇄ Opus.\n"
+                f"• Trạng thái: Cần tinh chỉnh Remotion payload hoặc prompt thị giác trước khi duyệt.\n"
+                f"• Chi tiết được ghi nhận tại <code>visual_convergence_audit.json</code>."
+            )
+            send_telegram_broadcast(alert_msg)
+        except Exception as te:
+            logger.warning(f"[B3.5.1 DACL] Could not broadcast convergence alert: {te}")
 
     return {
         "converged": converged,

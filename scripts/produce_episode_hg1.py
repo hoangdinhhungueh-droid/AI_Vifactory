@@ -278,12 +278,20 @@ def run_chain(task_id: str) -> int:
     # ---- Human Gate 2 Check & Dispatch Guard (Rule 125 Single Truth) ----
     stage = "HG2"
     audit_file = ep_dir / "visual_convergence_audit.json"
+    is_converged = False
     if audit_file.exists():
+        try:
+            audit_data = json.loads(audit_file.read_text(encoding="utf-8"))
+            is_converged = bool(audit_data.get("converged", False))
+        except Exception:
+            is_converged = False
+
+    if is_converged:
         _log("HG2", "Human Gate 2 card already dispatched after B3.5.1 DACL convergence (Rule 125 Single Truth). Skipping duplicate.")
         return 0
 
-    # Fallback only if B3.5.1 did not run and audit file is absent
-    _log("HG2", "B3.5.1 audit file not found; triggering unified Human Gate 2 fallback...")
+    # Fallback if B3.5.1 convergence gate was not met or audit file is absent
+    _log("HG2", "B3.5.1 DACL not converged or audit file absent; triggering unified Human Gate 2 fallback...")
     from app.services.telegram_buttons import trigger_human_gate_2
     trigger_human_gate_2(task_id)
     _log("HG2", "Fallback Human Gate 2 card sent, waiting for images from Antigravity")
