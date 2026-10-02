@@ -7,7 +7,7 @@ export interface VoxConnectionItem {
   fromY: number; // % of board height
   toX: number;   // % of board width
   toY: number;   // % of board height
-  label?: string; // e.g. "40 MIN TO DISAPPEARANCE"
+  label?: string; // generic label
   color?: string; // default red #ef4444 or gold #f59e0b
   drawStartFrame?: number; // default 30
   drawDuration?: number;   // default 20
@@ -27,7 +27,7 @@ export interface VoxSupportingCutoutItem {
 }
 
 export interface VoxCompositeStageProps {
-  /** Scene Title / Header */
+  /** Scene Title / Header (Generic / Dynamic) */
   title?: string;
   badge?: string;
   category?: string;
@@ -51,7 +51,7 @@ export interface VoxCompositeStageProps {
     frame?: number;
   };
 
-  /** Primary Dossier Document */
+  /** Primary Dossier Document (Optional, 100% Dynamic) */
   dossierTitle?: string;
   dossierAgency?: string;
   dossierDate?: string;
@@ -60,25 +60,25 @@ export interface VoxCompositeStageProps {
   redactedPhrases?: string[];
   dogEarCorner?: "top-right" | "bottom-right" | "none";
 
-  /** Cutout Subject (Photo / Character / Asset) */
+  /** Primary Cutout Subject (Optional, 100% Dynamic) */
   cutoutSrc?: string;
   cutoutLabel?: string;
   cutoutRole?: string;
   cutoutPosition?: { xPct: number; yPct: number; width?: number; height?: number };
 
-  /** Secondary / Supporting Cutouts & Badges (AI Playbook seconds 35, 38, 41) */
+  /** Secondary / Supporting Cutouts & Badges (Dynamic List) */
   supportingCutouts?: VoxSupportingCutoutItem[];
 
   /** Primary Connecting Vector Arrow / Red Yarn */
   connection?: VoxConnectionItem;
 
-  /** Multiple Radiating Connections (AI Playbook seconds 39 & 47) */
+  /** Multiple Radiating Connections */
   radiatingConnections?: VoxConnectionItem[];
 
-  /** Red Rubber Stamp / Certification */
-  stampText?: string; // e.g. "239 PEOPLE", "CRIMINAL FRAUD", "RESTRICTED", "MARKETING WINS"
+  /** Rubber Stamp / Certification (Rendered ONLY if stampText is present) */
+  stampText?: string;
   stampColor?: string; // default #dc2626
-  stampFrame?: number; // default 65
+  stampFrame?: number; // default 60
 
   /** Pushpin / Tape Details */
   hasPushpin?: boolean;
@@ -87,44 +87,34 @@ export interface VoxCompositeStageProps {
 }
 
 export const VoxCompositeStage: React.FC<VoxCompositeStageProps> = ({
-  title = "INCIDENT RECONSTRUCTION // FORENSIC TIMELINE",
-  badge = "TACTILE DOSSIER // ACT I",
-  category = "FLIGHT ANOMALY",
+  title = "",
+  badge = "",
+  category = "",
   layout = "full_bleed_focus",
-  theme = "dark_forensic",
-  backgroundType = "vintage_map",
-  backgroundLabel = "SOUTHEAST ASIA NAUTICAL SECTOR // RADAR SWEEP",
+  theme = "vintage_paper",
+  backgroundType = "archival_desk",
+  backgroundLabel = "",
   editorialHeadline,
-  dossierTitle = "CIVILIAN RADAR TELEMETRY RECORD",
-  dossierAgency = "DEPARTMENT OF CIVIL AVIATION",
-  dossierDate = "MAR 8, 2014 // 01:19 UTC",
-  dossierText = "Forty minutes after departure, transponder transmission abruptly terminated near waypoint IGARI. Military primary radar tracked an unidentified return executing an immediate westward tactical bank.",
-  highlightPhrase = "executing an immediate westward tactical bank",
-  redactedPhrases = ["CLASSIFIED PROTOCOL", "INTERCEPT DISPATCH"],
+  dossierTitle = "",
+  dossierAgency = "",
+  dossierDate = "",
+  dossierText = "",
+  highlightPhrase = "",
+  redactedPhrases = [],
   dogEarCorner = "bottom-right",
   cutoutSrc,
-  cutoutLabel = "BOEING 777-200ER",
-  cutoutRole = "MALAYSIA AIRLINES // MH370",
+  cutoutLabel = "",
+  cutoutRole = "",
   cutoutPosition = { xPct: 68, yPct: 42, width: 280, height: 280 },
   supportingCutouts = [],
-  connection = {
-    fromX: 30,
-    fromY: 55,
-    toX: 68,
-    toY: 42,
-    label: "40 MIN TO DISAPPEARANCE",
-    color: "#ef4444",
-    drawStartFrame: 30,
-    drawDuration: 22,
-    isYarn: true,
-  },
+  connection,
   radiatingConnections = [],
-  stampText = "239 PEOPLE",
+  stampText,
   stampColor = "#dc2626",
-  stampFrame = 62,
-  hasPushpin = true,
+  stampFrame = 60,
+  hasPushpin,
   pinPosition = { xPct: 30, yPct: 55 },
-  hasCornerTape = true,
+  hasCornerTape,
 }) => {
   const frame = useCurrentFrame();
   const { fps, width: canvasW = 1920, height: canvasH = 1080, durationInFrames = 150 } = useVideoConfig();
@@ -135,6 +125,12 @@ export const VoxCompositeStage: React.FC<VoxCompositeStageProps> = ({
   const isFullBleed = layout === "full_bleed_focus";
   const boardW = isFullBleed ? 1580 : 1050;
   const boardH = isFullBleed ? 880 : 640;
+
+  // Determine presence of primary columns
+  const hasDossier = Boolean(dossierTitle || dossierText);
+  const hasCutout = Boolean(cutoutSrc || cutoutLabel);
+  const showPushpin = hasPushpin !== undefined ? hasPushpin : hasDossier;
+  const showTape = hasCornerTape !== undefined ? hasCornerTape : hasDossier;
 
   // ==========================================
   // PHASE 1: Living Camera Drift & Master Canvas Entrance
@@ -156,11 +152,13 @@ export const VoxCompositeStage: React.FC<VoxCompositeStageProps> = ({
   });
 
   // Stamp impact screen shake
-  const shakeFrame = Math.max(0, frame - stampFrame);
-  const shakeAmp = interpolate(shakeFrame, [0, 2, 8, 16], [0, 7, 2, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const shakeFrame = stampText ? Math.max(0, frame - stampFrame) : 0;
+  const shakeAmp = stampText
+    ? interpolate(shakeFrame, [0, 2, 8, 16], [0, 7, 2, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      })
+    : 0;
   const shakeX = Math.sin(shakeFrame * 2.8) * shakeAmp;
   const shakeY = Math.cos(shakeFrame * 3.2) * shakeAmp;
 
@@ -297,52 +295,60 @@ export const VoxCompositeStage: React.FC<VoxCompositeStageProps> = ({
         </div>
       ) : null}
 
-      {/* Top Telemetry Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          borderBottom: isVintagePaper ? "1.5px solid rgba(0, 0, 0, 0.15)" : "1.5px solid rgba(255, 255, 255, 0.15)",
-          paddingBottom: 12,
-          marginBottom: 16,
-          position: "relative",
-          zIndex: 30,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: "50%",
-              backgroundColor: "#ef4444",
-              boxShadow: "0 0 10px #ef4444",
-            }}
-          />
-          <span style={{ color: headerTextColor, fontSize: 14, fontWeight: 900, letterSpacing: 2 }}>
-            {title}
-          </span>
-          <span style={{ color: headerSubColor, fontSize: 11, letterSpacing: 1.2 }}>
-            // {backgroundLabel}
-          </span>
-        </div>
-
+      {/* Top Telemetry Header (Rendered ONLY if title or badge exists) */}
+      {(title || badge) ? (
         <div
           style={{
-            border: isVintagePaper ? "1.5px solid #991b1b" : "1.5px solid #ef4444",
-            color: isVintagePaper ? "#991b1b" : "#f87171",
-            backgroundColor: isVintagePaper ? "rgba(254, 226, 226, 0.7)" : "rgba(69, 26, 26, 0.6)",
-            fontSize: 11,
-            fontWeight: 900,
-            letterSpacing: 1.5,
-            padding: "3px 12px",
-            borderRadius: 4,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            borderBottom: isVintagePaper ? "1.5px solid rgba(0, 0, 0, 0.15)" : "1.5px solid rgba(255, 255, 255, 0.15)",
+            paddingBottom: 12,
+            marginBottom: 16,
+            position: "relative",
+            zIndex: 30,
           }}
         >
-          {badge}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                backgroundColor: "#ef4444",
+                boxShadow: "0 0 10px #ef4444",
+              }}
+            />
+            {title ? (
+              <span style={{ color: headerTextColor, fontSize: 14, fontWeight: 900, letterSpacing: 2 }}>
+                {title}
+              </span>
+            ) : null}
+            {backgroundLabel ? (
+              <span style={{ color: headerSubColor, fontSize: 11, letterSpacing: 1.2 }}>
+                // {backgroundLabel}
+              </span>
+            ) : null}
+          </div>
+
+          {badge ? (
+            <div
+              style={{
+                border: isVintagePaper ? "1.5px solid #991b1b" : "1.5px solid #ef4444",
+                color: isVintagePaper ? "#991b1b" : "#f87171",
+                backgroundColor: isVintagePaper ? "rgba(254, 226, 226, 0.7)" : "rgba(69, 26, 26, 0.6)",
+                fontSize: 11,
+                fontWeight: 900,
+                letterSpacing: 1.5,
+                padding: "3px 12px",
+                borderRadius: 4,
+              }}
+            >
+              {badge}
+            </div>
+          ) : null}
         </div>
-      </div>
+      ) : null}
 
       {/* Stamped Editorial Headline Banner (Top Center or Overlay) */}
       {editorialHeadline && editorialHeadline.placement !== "background_large" ? (
@@ -389,451 +395,479 @@ export const VoxCompositeStage: React.FC<VoxCompositeStageProps> = ({
       ) : null}
 
       {/* SVG Canvas for Dynamic Curved Bezier Vector Arrows & Radiating Paths */}
-      <svg
-        width={boardW}
-        height={boardH}
-        viewBox={`0 0 ${boardW} ${boardH}`}
-        style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none", zIndex: 25 }}
-      >
-        <defs>
-          <filter id="yarnGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-          </filter>
-        </defs>
-
-        {allConnections.map((conn, cIdx) => {
-          const drawStart = conn.drawStartFrame ?? (30 + cIdx * 6);
-          const drawDur = conn.drawDuration ?? 20;
-          const drawProgress = interpolate(frame, [drawStart, drawStart + drawDur], [0, 1], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-            easing: Easing.bezier(0.16, 1, 0.3, 1),
-          });
-
-          if (drawProgress < 0.02) return null;
-
-          const x1 = ((conn.fromX ?? 30) / 100) * boardW;
-          const y1 = ((conn.fromY ?? 55) / 100) * boardH;
-          const x2 = ((conn.toX ?? 68) / 100) * boardW;
-          const y2 = ((conn.toY ?? 42) / 100) * boardH;
-
-          const midX = (x1 + x2) / 2;
-          const midY = (y1 + y2) / 2;
-          const dx = x2 - x1;
-          const dy = y2 - y1;
-          const dist = Math.hypot(dx, dy);
-
-          // Alternating curve bulge for radiating vectors
-          const curveBulge = (cIdx % 2 === 0 ? -35 : 35);
-          const nx = -dy / (dist || 1);
-          const ny = dx / (dist || 1);
-          const cx = midX + nx * curveBulge;
-          const cy = midY + ny * curveBulge;
-
-          const pathD = `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
-          const approxLen = dist * 1.15;
-          const dashOffset = approxLen * (1 - drawProgress);
-
-          const tangentX = x2 - cx;
-          const tangentY = y2 - cy;
-          const angleDeg = (Math.atan2(tangentY, tangentX) * 180) / Math.PI;
-
-          const isDrawn = drawProgress >= 0.98;
-          const pulseT = ((frame - (drawStart + drawDur)) * 0.04) % 1;
-          const ptX = (1 - pulseT) * (1 - pulseT) * x1 + 2 * (1 - pulseT) * pulseT * cx + pulseT * pulseT * x2;
-          const ptY = (1 - pulseT) * (1 - pulseT) * y1 + 2 * (1 - pulseT) * pulseT * cy + pulseT * pulseT * y2;
-
-          const labelSpring = spring({
-            frame: Math.max(0, stepF - (drawStart + Math.round(drawDur * 0.4))),
-            fps,
-            config: SPRING_PRESETS.labelSnap,
-          });
-
-          return (
-            <g key={cIdx}>
-              {/* Shadow Track */}
-              <path
-                d={pathD}
-                fill="none"
-                stroke="rgba(0, 0, 0, 0.5)"
-                strokeWidth={conn.isYarn ? 5 : 3}
-                transform="translate(2, 4)"
-              />
-
-              {/* Glowing Vector Line / Red Yarn */}
-              <path
-                d={pathD}
-                fill="none"
-                stroke={conn.color || "#ef4444"}
-                strokeWidth={conn.isYarn ? 4 : 3.5}
-                strokeDasharray={approxLen}
-                strokeDashoffset={dashOffset}
-                filter="url(#yarnGlow)"
-              />
-
-              {/* Arrowhead at Target */}
-              {drawProgress >= 0.88 ? (
-                <polygon
-                  points="0,-7 14,0 0,7"
-                  fill={conn.color || "#ef4444"}
-                  transform={`translate(${x2}, ${y2}) rotate(${angleDeg})`}
-                  style={{ transformOrigin: "0 0" }}
-                />
-              ) : null}
-
-              {/* Traveling Pulse Particle */}
-              {isDrawn ? (
-                <circle cx={ptX} cy={ptY} r={4.5} fill="#ffffff" filter="url(#yarnGlow)" />
-              ) : null}
-
-              {/* Floating Label Pill Along Arrow Arc */}
-              {conn.label && labelSpring > 0.05 ? (
-                <g transform={`translate(${cx}, ${cy - 14}) scale(${labelSpring})`}>
-                  <rect
-                    x={-((conn.label.length * 7.5 + 24) / 2)}
-                    y={-14}
-                    width={conn.label.length * 7.5 + 24}
-                    height={28}
-                    rx={6}
-                    fill={isVintagePaper ? "rgba(255, 255, 255, 0.96)" : "rgba(15, 23, 42, 0.96)"}
-                    stroke={conn.color || "#ef4444"}
-                    strokeWidth={1.5}
-                  />
-                  <text
-                    x={0}
-                    y={4}
-                    textAnchor="middle"
-                    fill={conn.color || "#ef4444"}
-                    fontSize={11}
-                    fontWeight={900}
-                    letterSpacing={1.2}
-                    fontFamily="'Courier New', monospace"
-                  >
-                    {conn.label}
-                  </text>
-                </g>
-              ) : null}
-            </g>
-          );
-        })}
-      </svg>
-
-      {/* Main Staging Workboard: Split Layout with Archival Dossier + Cutout */}
-      <div style={{ display: "flex", gap: 36, height: "calc(100% - 60px)", position: "relative" }}>
-        {/* Left Column: Tactile Archival Paper Dossier (Drops Frame 6) */}
-        <div
-          style={{
-            flex: "1 1 58%",
-            backgroundColor: isVintagePaper ? "#ffffff" : "#f4ede1",
-            color: "#1a1a1a",
-            borderRadius: 6,
-            padding: "24px 28px",
-            boxShadow: `0 ${dossierShadow}px 45px rgba(0, 0, 0, ${isVintagePaper ? 0.35 : 0.8}), inset 0 0 30px rgba(180, 150, 110, 0.25)`,
-            transform: `translateY(${dossierY}px) scale(${dossierScale}) rotate(-1.5deg)`,
-            transformOrigin: "top left",
-            opacity: interpolate(dossierDrop, [0, 0.2], [0, 1]),
-            position: "relative",
-            border: isVintagePaper ? "1px solid #e7e5e4" : "1px solid #d4c5b0",
-            overflow: "hidden",
-            zIndex: 15,
-          }}
+      {allConnections.length > 0 ? (
+        <svg
+          width={boardW}
+          height={boardH}
+          viewBox={`0 0 ${boardW} ${boardH}`}
+          style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none", zIndex: 25 }}
         >
-          {/* Masking Tape on Top-Left Corner */}
-          {hasCornerTape && tapeSpring > 0.02 ? (
-            <div
-              style={{
-                position: "absolute",
-                top: -12,
-                left: -18,
-                width: 90,
-                height: 30,
-                backgroundColor: "rgba(235, 220, 180, 0.85)",
-                transform: "rotate(-32deg) scale(" + tapeSpring + ")",
-                boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
-                border: "1px dashed rgba(160, 140, 100, 0.4)",
-                zIndex: 20,
-              }}
-            />
-          ) : null}
+          <defs>
+            <filter id="yarnGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
 
-          {/* Brass Pushpin Pinned on Dossier */}
-          {hasPushpin && pinSpring > 0.05 ? (
-            <div
-              style={{
-                position: "absolute",
-                top: 14,
-                right: 18,
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                background: "radial-gradient(circle at 35% 35%, #fde047, #ca8a04, #713f12)",
-                boxShadow: "0 6px 14px rgba(0,0,0,0.6)",
-                transform: `scale(${pinSpring})`,
-                zIndex: 22,
-              }}
-            />
-          ) : null}
+          {allConnections.map((conn, cIdx) => {
+            const drawStart = conn.drawStartFrame ?? (30 + cIdx * 6);
+            const drawDur = conn.drawDuration ?? 20;
+            const drawProgress = interpolate(frame, [drawStart, drawStart + drawDur], [0, 1], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+              easing: Easing.bezier(0.16, 1, 0.3, 1),
+            });
 
-          {/* Dossier Agency Header */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              borderBottom: "1.5px solid #1a1a1a",
-              paddingBottom: 8,
-              marginBottom: 12,
-              fontSize: 10,
-              fontWeight: 800,
-              letterSpacing: 1.2,
-              color: "#334155",
-            }}
-          >
-            <span>{dossierAgency}</span>
-            <span>{dossierDate}</span>
-          </div>
+            if (drawProgress < 0.02) return null;
 
-          <div
-            style={{
-              fontSize: 15,
-              fontWeight: 900,
-              letterSpacing: 1.2,
-              textTransform: "uppercase",
-              marginBottom: 12,
-              color: "#0f172a",
-            }}
-          >
-            {dossierTitle}
-          </div>
+            const x1 = ((conn.fromX ?? 30) / 100) * boardW;
+            const y1 = ((conn.fromY ?? 55) / 100) * boardH;
+            const x2 = ((conn.toX ?? 68) / 100) * boardW;
+            const y2 = ((conn.toY ?? 42) / 100) * boardH;
 
-          {/* Dossier Body Paragraph with Animated Highlighter Sweep */}
-          <div
-            style={{
-              fontSize: 13,
-              lineHeight: 1.6,
-              color: "#1e293b",
-              position: "relative",
-              marginBottom: 16,
-            }}
-          >
-            {dossierText.split(highlightPhrase).map((part, pIdx, arr) => (
-              <React.Fragment key={pIdx}>
-                {part}
-                {pIdx < arr.length - 1 ? (
-                  <span
-                    style={{
-                      background: `linear-gradient(90deg, #facc15 ${hlProgress}%, transparent ${hlProgress}%)`,
-                      color: "#000000",
-                      fontWeight: 900,
-                      padding: "1px 3px",
-                      borderRadius: 2,
-                    }}
-                  >
-                    {highlightPhrase}
-                  </span>
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const dist = Math.hypot(dx, dy);
+
+            // Alternating curve bulge for radiating vectors
+            const curveBulge = (cIdx % 2 === 0 ? -35 : 35);
+            const nx = -dy / (dist || 1);
+            const ny = dx / (dist || 1);
+            const cx = midX + nx * curveBulge;
+            const cy = midY + ny * curveBulge;
+
+            const pathD = `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
+            const approxLen = dist * 1.15;
+            const dashOffset = approxLen * (1 - drawProgress);
+
+            const tangentX = x2 - cx;
+            const tangentY = y2 - cy;
+            const angleDeg = (Math.atan2(tangentY, tangentX) * 180) / Math.PI;
+
+            const isDrawn = drawProgress >= 0.98;
+            const pulseT = ((frame - (drawStart + drawDur)) * 0.04) % 1;
+            const ptX = (1 - pulseT) * (1 - pulseT) * x1 + 2 * (1 - pulseT) * pulseT * cx + pulseT * pulseT * x2;
+            const ptY = (1 - pulseT) * (1 - pulseT) * y1 + 2 * (1 - pulseT) * pulseT * cy + pulseT * pulseT * y2;
+
+            const labelSpring = spring({
+              frame: Math.max(0, stepF - (drawStart + Math.round(drawDur * 0.4))),
+              fps,
+              config: SPRING_PRESETS.labelSnap,
+            });
+
+            return (
+              <g key={cIdx}>
+                {/* Shadow Track */}
+                <path
+                  d={pathD}
+                  fill="none"
+                  stroke="rgba(0, 0, 0, 0.5)"
+                  strokeWidth={conn.isYarn ? 5 : 3}
+                  transform="translate(2, 4)"
+                />
+
+                {/* Glowing Vector Line / Red Yarn */}
+                <path
+                  d={pathD}
+                  fill="none"
+                  stroke={conn.color || "#ef4444"}
+                  strokeWidth={conn.isYarn ? 4 : 3.5}
+                  strokeDasharray={approxLen}
+                  strokeDashoffset={dashOffset}
+                  filter="url(#yarnGlow)"
+                />
+
+                {/* Arrowhead at Target */}
+                {drawProgress >= 0.88 ? (
+                  <polygon
+                    points="0,-7 14,0 0,7"
+                    fill={conn.color || "#ef4444"}
+                    transform={`translate(${x2}, ${y2}) rotate(${angleDeg})`}
+                    style={{ transformOrigin: "0 0" }}
+                  />
                 ) : null}
-              </React.Fragment>
-            ))}
-          </div>
 
-          {/* Redacted Classified Clauses */}
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            {redactedPhrases.map((phrase, rIdx) => (
+                {/* Traveling Pulse Particle */}
+                {isDrawn ? (
+                  <circle cx={ptX} cy={ptY} r={4.5} fill="#ffffff" filter="url(#yarnGlow)" />
+                ) : null}
+
+                {/* Floating Label Pill Along Arrow Arc */}
+                {conn.label && labelSpring > 0.05 ? (
+                  <g transform={`translate(${cx}, ${cy - 14}) scale(${labelSpring})`}>
+                    <rect
+                      x={-((conn.label.length * 7.5 + 24) / 2)}
+                      y={-14}
+                      width={conn.label.length * 7.5 + 24}
+                      height={28}
+                      rx={6}
+                      fill={isVintagePaper ? "rgba(255, 255, 255, 0.96)" : "rgba(15, 23, 42, 0.96)"}
+                      stroke={conn.color || "#ef4444"}
+                      strokeWidth={1.5}
+                    />
+                    <text
+                      x={0}
+                      y={4}
+                      textAnchor="middle"
+                      fill={conn.color || "#ef4444"}
+                      fontSize={11}
+                      fontWeight={900}
+                      letterSpacing={1.2}
+                      fontFamily="'Courier New', monospace"
+                    >
+                      {conn.label}
+                    </text>
+                  </g>
+                ) : null}
+              </g>
+            );
+          })}
+        </svg>
+      ) : null}
+
+      {/* Main Staging Workboard: Split Layout or Centered Focus */}
+      <div style={{ display: "flex", gap: 36, height: "calc(100% - 60px)", position: "relative" }}>
+        {/* Left Column: Tactile Archival Paper Dossier (Rendered ONLY if hasDossier) */}
+        {hasDossier ? (
+          <div
+            style={{
+              flex: hasCutout ? "1 1 58%" : "1 1 100%",
+              backgroundColor: isVintagePaper ? "#ffffff" : "#f4ede1",
+              color: "#1a1a1a",
+              borderRadius: 6,
+              padding: "24px 28px",
+              boxShadow: `0 ${dossierShadow}px 45px rgba(0, 0, 0, ${isVintagePaper ? 0.35 : 0.8}), inset 0 0 30px rgba(180, 150, 110, 0.25)`,
+              transform: `translateY(${dossierY}px) scale(${dossierScale}) rotate(-1.5deg)`,
+              transformOrigin: "top left",
+              opacity: interpolate(dossierDrop, [0, 0.2], [0, 1]),
+              position: "relative",
+              border: isVintagePaper ? "1px solid #e7e5e4" : "1px solid #d4c5b0",
+              overflow: "hidden",
+              zIndex: 15,
+            }}
+          >
+            {/* Masking Tape on Top-Left Corner */}
+            {showTape && tapeSpring > 0.02 ? (
               <div
-                key={rIdx}
                 style={{
-                  backgroundColor: "#000000",
-                  color: "#000000",
+                  position: "absolute",
+                  top: -12,
+                  left: -18,
+                  width: 90,
+                  height: 30,
+                  backgroundColor: "rgba(235, 220, 180, 0.85)",
+                  transform: "rotate(-32deg) scale(" + tapeSpring + ")",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+                  border: "1px dashed rgba(160, 140, 100, 0.4)",
+                  zIndex: 20,
+                }}
+              />
+            ) : null}
+
+            {/* Brass Pushpin Pinned on Dossier */}
+            {showPushpin && pinSpring > 0.05 ? (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 14,
+                  right: 18,
+                  width: 22,
+                  height: 22,
+                  borderRadius: "50%",
+                  background: "radial-gradient(circle at 35% 35%, #fde047, #ca8a04, #713f12)",
+                  boxShadow: "0 6px 14px rgba(0,0,0,0.6)",
+                  transform: `scale(${pinSpring})`,
+                  zIndex: 22,
+                }}
+              />
+            ) : null}
+
+            {/* Dossier Agency Header */}
+            {(dossierAgency || dossierDate) ? (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderBottom: "1.5px solid #1a1a1a",
+                  paddingBottom: 8,
+                  marginBottom: 12,
                   fontSize: 10,
-                  padding: "2px 8px",
-                  borderRadius: 2,
-                  letterSpacing: 1,
-                  userSelect: "none",
+                  fontWeight: 800,
+                  letterSpacing: 1.2,
+                  color: "#334155",
                 }}
               >
-                {phrase}
+                <span>{dossierAgency}</span>
+                <span>{dossierDate}</span>
               </div>
-            ))}
-          </div>
+            ) : null}
 
-          {/* Slammed Red Rubber Stamp */}
-          {stampText && frame >= stampFrame && stampOpacity > 0.05 ? (
-            <div
-              style={{
-                position: "absolute",
-                bottom: 24,
-                right: 32,
-                border: `3.5px solid ${stampColor}`,
-                color: stampColor,
-                padding: "6px 20px",
-                fontSize: 22,
-                fontWeight: 900,
-                letterSpacing: 3,
-                textTransform: "uppercase",
-                transform: `rotate(-14deg) scale(${stampScale})`,
-                transformOrigin: "center center",
-                opacity: stampOpacity,
-                borderRadius: 6,
-                backgroundColor: "rgba(220, 38, 38, 0.06)",
-                boxShadow: `0 4px 12px rgba(220, 38, 38, 0.3)`,
-                zIndex: 25,
-              }}
-            >
-              {stampText}
-            </div>
-          ) : null}
-        </div>
+            {dossierTitle ? (
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 900,
+                  letterSpacing: 1.2,
+                  textTransform: "uppercase",
+                  marginBottom: 12,
+                  color: "#0f172a",
+                }}
+              >
+                {dossierTitle}
+              </div>
+            ) : null}
+
+            {/* Dossier Body Paragraph with Animated Highlighter Sweep */}
+            {dossierText ? (
+              <div
+                style={{
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: "#1e293b",
+                  position: "relative",
+                  marginBottom: 16,
+                }}
+              >
+                {highlightPhrase ? (
+                  dossierText.split(highlightPhrase).map((part, pIdx, arr) => (
+                    <React.Fragment key={pIdx}>
+                      {part}
+                      {pIdx < arr.length - 1 ? (
+                        <span
+                          style={{
+                            background: `linear-gradient(90deg, #facc15 ${hlProgress}%, transparent ${hlProgress}%)`,
+                            color: "#000000",
+                            fontWeight: 900,
+                            padding: "1px 3px",
+                            borderRadius: 2,
+                          }}
+                        >
+                          {highlightPhrase}
+                        </span>
+                      ) : null}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <span>{dossierText}</span>
+                )}
+              </div>
+            ) : null}
+
+            {/* Redacted Classified Clauses */}
+            {redactedPhrases.length > 0 ? (
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                {redactedPhrases.map((phrase, rIdx) => (
+                  <div
+                    key={rIdx}
+                    style={{
+                      backgroundColor: "#000000",
+                      color: "#000000",
+                      fontSize: 10,
+                      padding: "2px 8px",
+                      borderRadius: 2,
+                      letterSpacing: 1,
+                      userSelect: "none",
+                    }}
+                  >
+                    {phrase}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {/* Slammed Red Rubber Stamp (Rendered ONLY if stampText is present) */}
+            {stampText && frame >= stampFrame && stampOpacity > 0.05 ? (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 24,
+                  right: 32,
+                  border: `3.5px solid ${stampColor}`,
+                  color: stampColor,
+                  padding: "6px 20px",
+                  fontSize: 22,
+                  fontWeight: 900,
+                  letterSpacing: 3,
+                  textTransform: "uppercase",
+                  transform: `rotate(-14deg) scale(${stampScale})`,
+                  transformOrigin: "center center",
+                  opacity: stampOpacity,
+                  borderRadius: 6,
+                  backgroundColor: "rgba(220, 38, 38, 0.06)",
+                  boxShadow: `0 4px 12px rgba(220, 38, 38, 0.3)`,
+                  zIndex: 25,
+                }}
+              >
+                {stampText}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* Right Column: Tactical Cutout Photo & Supporting Cutouts */}
-        <div
-          style={{
-            flex: "1 1 38%",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            position: "relative",
-            zIndex: 18,
-          }}
-        >
-          {/* Primary Archival Card Wrapper with White Cutout Edge */}
+        {hasCutout || supportingCutouts.length > 0 ? (
           <div
             style={{
-              backgroundColor: isVintagePaper ? "#ffffff" : "rgba(15, 23, 42, 0.95)",
-              border: isVintagePaper ? "2px solid #b45309" : "2px solid #f59e0b",
-              borderRadius: 12,
-              padding: 16,
-              boxShadow: isVintagePaper
-                ? "0 20px 45px rgba(70, 50, 30, 0.25)"
-                : "0 20px 50px rgba(0,0,0,0.8), 0 0 20px rgba(245, 158, 11, 0.3)",
+              flex: hasDossier ? "1 1 38%" : "1 1 100%",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 12,
-              maxWidth: 380,
-              transform: `scale(${cutoutSpring})`,
-              transformOrigin: "center center",
+              justifyContent: "center",
+              position: "relative",
+              zIndex: 18,
             }}
           >
-            {/* Cutout Container */}
-            <div
-              style={{
-                width: 280,
-                height: 200,
-                backgroundColor: isVintagePaper ? "#f5f5f4" : "#020617",
-                borderRadius: 8,
-                border: isVintagePaper ? "1.5px solid #d6d3d1" : "1.5px solid rgba(255,255,255,0.15)",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                overflow: "hidden",
-                position: "relative",
-              }}
-            >
-              {cutoutSrc ? (
-                <Img
-                  src={staticFile(cutoutSrc)}
-                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                />
-              ) : (
-                <div style={{ textAlign: "center", color: isVintagePaper ? "#b45309" : "#f59e0b" }}>
-                  <div style={{ fontSize: 36, fontWeight: 900 }}>✈️</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, marginTop: 6 }}>
-                    {cutoutLabel}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Cutout Label Dossier */}
-            <div style={{ textAlign: "center" }}>
+            {/* Primary Archival Card Wrapper with White Cutout Edge */}
+            {hasCutout ? (
               <div
                 style={{
-                  fontSize: 14,
-                  fontWeight: 900,
-                  color: isVintagePaper ? "#1c1917" : "#ffffff",
-                  letterSpacing: 1,
-                  textTransform: "uppercase",
-                }}
-              >
-                {cutoutLabel}
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: isVintagePaper ? "#b45309" : "#fbbf24",
-                  letterSpacing: 1.5,
-                  marginTop: 3,
-                }}
-              >
-                {cutoutRole}
-              </div>
-            </div>
-          </div>
-
-          {/* Supporting Cutouts / Badges / Polaroids (AI Playbook multi-layer collage) */}
-          {supportingCutouts.map((sc, scIdx) => {
-            const dropF = sc.dropFrame ?? (26 + scIdx * 8);
-            const scSpring = spring({
-              frame: Math.max(0, stepF - dropF),
-              fps,
-              config: SPRING_PRESETS.paperSlide,
-            });
-
-            if (scSpring < 0.02) return null;
-
-            return (
-              <div
-                key={scIdx}
-                style={{
-                  position: "absolute",
-                  left: `${sc.xPct}%`,
-                  top: `${sc.yPct}%`,
-                  width: sc.width || 120,
-                  height: sc.height || 120,
-                  backgroundColor: isVintagePaper ? "#ffffff" : "#1e293b",
-                  border: isVintagePaper ? "2px solid #d6d3d1" : "2px solid rgba(255,255,255,0.2)",
-                  borderRadius: 8,
-                  padding: 8,
-                  boxShadow: "0 12px 28px rgba(0,0,0,0.35)",
-                  transform: `scale(${scSpring}) rotate(${sc.rotation || (scIdx % 2 === 0 ? -4 : 5)}deg)`,
-                  transformOrigin: "center center",
-                  zIndex: 22 + scIdx,
+                  backgroundColor: isVintagePaper ? "#ffffff" : "rgba(15, 23, 42, 0.95)",
+                  border: isVintagePaper ? "2px solid #b45309" : "2px solid #f59e0b",
+                  borderRadius: 12,
+                  padding: 16,
+                  boxShadow: isVintagePaper
+                    ? "0 20px 45px rgba(70, 50, 30, 0.25)"
+                    : "0 20px 50px rgba(0,0,0,0.8), 0 0 20px rgba(245, 158, 11, 0.3)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  justifyContent: "center",
+                  gap: 12,
+                  maxWidth: 380,
+                  transform: `scale(${cutoutSpring})`,
+                  transformOrigin: "center center",
                 }}
               >
-                {sc.src ? (
-                  <Img
-                    src={staticFile(sc.src)}
-                    style={{ width: "100%", height: "80%", objectFit: "contain" }}
-                  />
-                ) : sc.icon ? (
-                  <div style={{ fontSize: 32 }}>{sc.icon}</div>
-                ) : null}
+                {/* Cutout Container */}
+                <div
+                  style={{
+                    width: cutoutPosition?.width || 280,
+                    height: cutoutPosition?.height || 200,
+                    backgroundColor: isVintagePaper ? "#f5f5f4" : "#020617",
+                    borderRadius: 8,
+                    border: isVintagePaper ? "1.5px solid #d6d3d1" : "1.5px solid rgba(255,255,255,0.15)",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    overflow: "hidden",
+                    position: "relative",
+                  }}
+                >
+                  {cutoutSrc ? (
+                    <Img
+                      src={staticFile(cutoutSrc)}
+                      style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                    />
+                  ) : (
+                    <div style={{ textAlign: "center", color: isVintagePaper ? "#b45309" : "#f59e0b" }}>
+                      <div style={{ fontSize: 36, fontWeight: 900 }}>🏷️</div>
+                      {cutoutLabel ? (
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, marginTop: 6 }}>
+                          {cutoutLabel}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
 
-                {sc.label ? (
-                  <div
-                    style={{
-                      fontSize: 9,
-                      fontWeight: 900,
-                      color: isVintagePaper ? "#1c1917" : "#f1f5f9",
-                      letterSpacing: 0.8,
-                      textAlign: "center",
-                      marginTop: 4,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {sc.label}
+                {/* Cutout Label Dossier */}
+                {(cutoutLabel || cutoutRole) ? (
+                  <div style={{ textAlign: "center" }}>
+                    {cutoutLabel ? (
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 900,
+                          color: isVintagePaper ? "#1c1917" : "#ffffff",
+                          letterSpacing: 1,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {cutoutLabel}
+                      </div>
+                    ) : null}
+                    {cutoutRole ? (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: isVintagePaper ? "#b45309" : "#fbbf24",
+                          letterSpacing: 1.5,
+                          marginTop: 3,
+                        }}
+                      >
+                        {cutoutRole}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
-            );
-          })}
-        </div>
+            ) : null}
+
+            {/* Supporting Cutouts / Badges / Polaroids (AI Playbook multi-layer collage) */}
+            {supportingCutouts.map((sc, scIdx) => {
+              const dropF = sc.dropFrame ?? (26 + scIdx * 8);
+              const scSpring = spring({
+                frame: Math.max(0, stepF - dropF),
+                fps,
+                config: SPRING_PRESETS.paperSlide,
+              });
+
+              if (scSpring < 0.02) return null;
+
+              return (
+                <div
+                  key={scIdx}
+                  style={{
+                    position: "absolute",
+                    left: `${sc.xPct}%`,
+                    top: `${sc.yPct}%`,
+                    width: sc.width || 120,
+                    height: sc.height || 120,
+                    backgroundColor: isVintagePaper ? "#ffffff" : "#1e293b",
+                    border: isVintagePaper ? "2px solid #d6d3d1" : "2px solid rgba(255,255,255,0.2)",
+                    borderRadius: 8,
+                    padding: 8,
+                    boxShadow: "0 12px 28px rgba(0,0,0,0.35)",
+                    transform: `scale(${scSpring}) rotate(${sc.rotation || (scIdx % 2 === 0 ? -4 : 5)}deg)`,
+                    transformOrigin: "center center",
+                    zIndex: 22 + scIdx,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {sc.src ? (
+                    <Img
+                      src={staticFile(sc.src)}
+                      style={{ width: "100%", height: "80%", objectFit: "contain" }}
+                    />
+                  ) : sc.icon ? (
+                    <div style={{ fontSize: 32 }}>{sc.icon}</div>
+                  ) : null}
+
+                  {sc.label ? (
+                    <div
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 900,
+                        color: isVintagePaper ? "#1c1917" : "#f1f5f9",
+                        letterSpacing: 0.8,
+                        textAlign: "center",
+                        marginTop: 4,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {sc.label}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
     </div>
   );

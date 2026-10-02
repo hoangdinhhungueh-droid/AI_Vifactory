@@ -97,7 +97,7 @@
     - Card Pacing Sparsity: Limit visual cards/badges to ~25-30% of scenes at key narrative pivots to avoid eye fatigue and visual overcrowding.
 
 13. VOX EDITORIAL STORYBOARD SCHEMA (OBJECT-FOCUS & ANIMATION CUES):
-    - Every scene MUST declare the following 5 editorial storyboard fields:
+    - Every scene MUST declare the following editorial storyboard fields:
       * 'animation_tier': 'HERO_AI_VIDEO_6S' | 'TACTILE_STOPMOTION_STILL'
       * 'object_focus': Defines the central evidentiary physical/digital object on screen:
         {"type": "court_docket" | "redacted_memo" | "financial_ledger" | "money_trail_network" | "corporate_org_chart" | "archival_photo" | "persona_portrait" | "none", "title": "<OFFICIAL_DOCUMENT_OR_NETWORK_TITLE>", "agency": "<REGULATORY_OR_GOV_BODY>", "source_ref": "<CASE_OR_DOCKET_NUMBER>", "key_snippet": "<EXACT_PHRASE_TO_HIGHLIGHT>", "stat_metric": "<QUANTITATIVE_VALUE_OR_NULL>"}
@@ -107,6 +107,8 @@
         {"effect": "yellow_marker_highlight" | "red_stamp_slam" | "counter_rollup" | "flowchart_arrow_grow" | "magnify_glass_circle" | "radar_sweep", "trigger_word": "<EXACT_WORD_FROM_NARRATION>", "duration_frames": 24}
       * 'frame_transition': Dictates the editorial cut and acoustic punctuation:
         {"type": "match_cut" | "whip_pan" | "smash_cut" | "ink_bleed" | "zoom_through" | "light_leak" | "paper_tear" | "circle_wipe" | "hard_cut", "sfx_cue": "paper_rustle" | "stamp_thud" | "camera_whoosh" | "digital_beep" | "sonar_ping" | "lens_shutter"}
+      * 'composite_stage_directive' (Optional, for tactile paper collage scenes under "Học Sạch" standard):
+        {"theme": "vintage_paper" | "dark_forensic" | "blueprint", "archetype": "ORIGIN_CARD" | "GROWTH_CURVE" | "MORPH_REVEAL" | "AMPLIFIER" | "PROLIFERATION" | "RADIATION" | "SATURATION_GRID" | "CONFRONTATION", "editorial_headline": "<1_TO_4_WORDS_HEADLINE_FROM_NARRATION>", "headline_placement": "top_center" | "stamp_overlay" | "background_large", "hero_cutout": {"label": "<ENTITY_FROM_NARRATION>", "role": "<ROLE_OR_STATUS>"}, "supporting_cutouts": [{"label": "<METRIC_OR_BADGE>", "xPct": 75, "yPct": 55}], "radiating_connections": [{"fromX": 30, "fromY": 50, "toX": 75, "toY": 55, "color": "#ef4444", "label": "<RELATION_LABEL>"}], "stamp_text": "<PUNCHY_VERDICT_OR_NULL>"}
 
 14. 38 CANONICAL CINEMATIC FLOW, TRANSITION & VOX TOKENS:
     - Each scene MUST assign 2 to 3 tokens to the field 'cinematic_tokens': ["<TOKEN_1>", "<TOKEN_2>"] chosen strictly from this 38-token vocabulary across 7 categories:
