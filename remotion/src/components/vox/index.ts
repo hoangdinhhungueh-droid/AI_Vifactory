@@ -21,3 +21,4 @@ export * from "./springPresets";
 export * from "./LivingCamera";
 export * from "./VoxConnectedNetwork";
 export * from "./VoxCompositeStage";
+export * from "./VoxConnectingVectors";

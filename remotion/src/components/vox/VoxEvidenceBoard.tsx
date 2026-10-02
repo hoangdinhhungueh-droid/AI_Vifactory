@@ -1,5 +1,5 @@
 import React from "react";
-import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 
 export interface VoxEvidenceBoardPayload {
   suspect_name?: string;
@@ -186,7 +186,19 @@ export const VoxEvidenceBoard: React.FC<VoxEvidenceBoardProps> = ({
               overflow: "hidden",
             }}
           >
-            <span style={{ fontSize: 48, opacity: 0.85 }}>👤</span>
+            {payload?.photo_url ? (
+              <Img
+                src={payload.photo_url.startsWith("http") ? payload.photo_url : staticFile(payload.photo_url)}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  objectPosition: "top center",
+                }}
+              />
+            ) : (
+              <span style={{ fontSize: 48, opacity: 0.85 }}>👤</span>
+            )}
             <div
               style={{
                 position: "absolute",
@@ -201,7 +213,7 @@ export const VoxEvidenceBoard: React.FC<VoxEvidenceBoardProps> = ({
                 letterSpacing: 1,
               }}
             >
-              FEDERAL ARREST RECORD
+              {evidenceTag}
             </div>
           </div>
 

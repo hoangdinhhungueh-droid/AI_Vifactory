@@ -829,6 +829,173 @@ def match_segments_and_extract_words(scene_text: str, segments: list, start_idx:
     return subtitles, idx, dur_sec, scene_start_ms, scene_end_ms
 
 
+def synthesize_scene_motion_props(
+    s: dict,
+    fg_pos: str,
+    forensic_ov: dict | None,
+    stat_val: str | None,
+    stat_lbl: str | None,
+    scene_idx: int,
+    market: str = "EN"
+) -> dict:
+    """Synthesize high-energy Vox-style explainer motion graphics props.
+    Rule 118 & Rule 128: 100% dynamic, generic architecture without hardcoded text.
+    """
+    res = {
+        "connection": s.get("connection"),
+        "connections": s.get("connections") or [],
+        "radiating_connections": s.get("radiating_connections") or s.get("radiatingConnections") or [],
+        "supporting_cutouts": s.get("supporting_cutouts") or s.get("supportingCutouts") or [],
+        "editorial_headline": s.get("editorial_headline") or s.get("editorialHeadline"),
+    }
+
+    # 1. Connection synthesis if none provided explicitly
+    if not res["connection"] and not res["connections"] and not res["radiating_connections"]:
+        is_left = (fg_pos == "left")
+
+        # Case A: Forensic Overlay with connected entities (e.g. evidence board or flowchart)
+        if isinstance(forensic_ov, dict):
+            payload = forensic_ov.get("payload", {})
+            entities = payload.get("connected_entities", [])
+            ov_type = forensic_ov.get("type", "")
+
+            # If evidence_board, wire suspect character photo_url
+            if ov_type == "evidence_board" and not payload.get("photo_url") and s.get("foreground"):
+                payload["photo_url"] = s["foreground"]
+
+            if entities and isinstance(entities, list):
+                rad = []
+                if ov_type == "evidence_board":
+                    # Calibrated directly to polaroid pin on left (x=32, y=36) -> entity badges on right (x=45, 52, 59, y=49)
+                    for e_idx, ent in enumerate(entities[:3]):
+                        rad.append({
+                            "fromX": 32,
+                            "fromY": 36,
+                            "toX": 45 + e_idx * 7,
+                            "toY": 49,
+                            "label": "",
+                            "isYarn": True,
+                            "color": "#ef4444",
+                            "drawStartFrame": 12 + e_idx * 8,
+                            "drawDuration": 18,
+                        })
+                else:
+                    start_x = 35 if is_left else 65
+                    start_y = 52
+                    for e_idx, ent in enumerate(entities[:4]):
+                        rad.append({
+                            "fromX": start_x,
+                            "fromY": start_y,
+                            "toX": 75 if is_left else 25,
+                            "toY": 25 + e_idx * 18,
+                            "label": str(ent)[:24],
+                            "color": "#ef4444" if e_idx % 2 == 0 else "#f59e0b",
+                            "drawStartFrame": 12 + e_idx * 8,
+                            "drawDuration": 18,
+                        })
+                res["radiating_connections"] = rad
+
+            # Case B: Document highlight / paper dossier
+            elif forensic_ov.get("type") in ("document_highlight", "paper_dossier", "court_docket", "redacted_memo", "bank_check"):
+                res["connection"] = {
+                    "fromX": 38 if is_left else 62,
+                    "fromY": 54,
+                    "toX": 68 if is_left else 32,
+                    "toY": 40,
+                    "label": forensic_ov.get("badge") or forensic_ov.get("label") or "EVIDENCE LINK",
+                    "color": "#ef4444",
+                    "drawStartFrame": 14,
+                    "drawDuration": 20,
+                }
+
+        # Case C: Stat card / key quantitative anomaly
+        if not res["connection"] and not res["radiating_connections"] and stat_val:
+            res["connection"] = {
+                "fromX": 35 if is_left else 65,
+                "fromY": 52,
+                "toX": 70 if is_left else 30,
+                "toY": 24,
+                "label": stat_lbl or "RECORD METRIC",
+                "color": "#f59e0b",
+                "drawStartFrame": 10,
+                "drawDuration": 18,
+            }
+
+        # Case D: Directional Narrative Trend Vectors (Crashes, Surges, Capital Flows)
+        if not res["connection"] and not res["radiating_connections"]:
+            narr = s.get("narration", "") or s.get("caption", "")
+            m_up = market.upper()
+            is_kr = m_up == "KR" or any("\uac00" <= c <= "\ud7a3" for c in narr)
+            is_jp = m_up == "JP" or any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narr)
+            is_vn = m_up == "VN"
+
+            down_kws_kr = ["하락", "매도", "서킷브레이커", "폭락", "위기", "붕괴", "손실", "패닉", "급락", "충격"]
+            up_kws_kr = ["상승", "매수", "유입", "기록", "돌파", "반등", "성장", "급등"]
+
+            down_kws_jp = ["下落", "急落", "暴落", "売却", "危機", "崩壊", "損失", "ショック"]
+            up_kws_jp = ["上昇", "急騰", "買付", "流入", "最高値", "反発", "成長"]
+
+            down_kws_en = ["drop", "crash", "plunge", "collapse", "crisis", "selloff", "panic", "decline"]
+            up_kws_en = ["surge", "rally", "spike", "inflow", "record", "rebound", "growth", "jump"]
+
+            has_down = False
+            has_up = False
+            if is_kr:
+                has_down = any(k in narr for k in down_kws_kr)
+                has_up = any(k in narr for k in up_kws_kr)
+            elif is_jp:
+                has_down = any(k in narr for k in down_kws_jp)
+                has_up = any(k in narr for k in up_kws_jp)
+            else:
+                narr_lower = narr.lower()
+                has_down = any(k in narr_lower for k in down_kws_en)
+                has_up = any(k in narr_lower for k in up_kws_en)
+
+            if has_down:
+                lbl = "하락 추세 // IMPACT" if is_kr else ("急落トレンド" if is_jp else "MARKET IMPACT // DROP")
+                res["connection"] = {
+                    "fromX": 30 if is_left else 70,
+                    "fromY": 36,
+                    "toX": 72 if is_left else 28,
+                    "toY": 66,
+                    "label": lbl,
+                    "color": "#ef4444",
+                    "drawStartFrame": 14,
+                    "drawDuration": 22,
+                }
+            elif has_up:
+                lbl = "상승 유입 // INFLOW" if is_kr else ("資金流入トレンド" if is_jp else "CAPITAL SURGE // INFLOW")
+                res["connection"] = {
+                    "fromX": 30 if is_left else 70,
+                    "fromY": 66,
+                    "toX": 72 if is_left else 28,
+                    "toY": 36,
+                    "label": lbl,
+                    "color": "#10b981",
+                    "drawStartFrame": 14,
+                    "drawDuration": 22,
+                }
+
+    # 2. Editorial Headline synthesis for high-impact scene 0 or explicit headline
+    if not res["editorial_headline"]:
+        if scene_idx == 0 and (s.get("headline") or stat_val):
+            res["editorial_headline"] = {
+                "text": s.get("headline") or str(stat_val),
+                "highlightWord": s.get("highlight_word") or s.get("highlightWord") or "",
+                "subtext": s.get("subtext") or stat_lbl,
+                "color": s.get("accent_color") or s.get("accentColor") or "#f59e0b",
+            }
+        elif s.get("motion_directive") == "kinetic_headline" and s.get("headline"):
+            res["editorial_headline"] = {
+                "text": s.get("headline"),
+                "highlightWord": s.get("highlight_word") or s.get("highlightWord") or "",
+                "subtext": s.get("subtext") or stat_lbl,
+                "color": s.get("accent_color") or s.get("accentColor") or "#f59e0b",
+            }
+
+    return res
+
+
 def build_remotion_props_data(
     episode_id: str,
     brain_input_path: str,
@@ -1267,6 +1434,8 @@ def build_remotion_props_data(
                 )
             foley_file = f"sfx/{f_filename}"
 
+        motion_meta = synthesize_scene_motion_props(s, fg_pos, forensic_ov, stat_val, stat_lbl, i)
+
         scenes_out.append({
             "background": bg_rel or "",
             "foreground": fg_rel,
@@ -1311,6 +1480,12 @@ def build_remotion_props_data(
             "category": s.get("category"),
             "subtext": s.get("subtext"),
             "accentColor": s.get("accent_color") or s.get("accentColor"),
+            # Vox Explainer Continuous Motion Graphics (Rule 122 & Vox Architecture)
+            "connection": motion_meta["connection"],
+            "connections": motion_meta["connections"],
+            "radiatingConnections": motion_meta["radiating_connections"],
+            "supportingCutouts": motion_meta["supporting_cutouts"],
+            "editorialHeadline": motion_meta["editorial_headline"],
         })
 
     if missing:
@@ -1373,6 +1548,25 @@ def build_remotion_props_data(
                     m_code, sum(1 for s in scenes_out if s.get("forensicOverlay")), len(scenes_out))
     except Exception as _e_brief:
         logger.warning("[build_remotion_props] Vox Minimalist Gate fallback: %s", _e_brief)
+
+    # Second-Pass: Finalize Vox Continuous Motion Graphics (Rule 122 & Rule 128)
+    # Guarantees that all localized overlays, stat cards, and directional vectors are wired to Remotion.
+    m_code = episode_id[:2].upper() if len(episode_id) >= 2 else "EN"
+    for i, sc in enumerate(scenes_out):
+        meta = synthesize_scene_motion_props(
+            sc,
+            sc.get("foregroundPosition", "left"),
+            sc.get("forensicOverlay"),
+            sc.get("statValue"),
+            sc.get("statLabel"),
+            i,
+            market=m_code
+        )
+        sc["connection"] = meta["connection"]
+        sc["connections"] = meta["connections"]
+        sc["radiatingConnections"] = meta["radiating_connections"]
+        sc["supportingCutouts"] = meta["supporting_cutouts"]
+        sc["editorialHeadline"] = meta["editorial_headline"]
 
     props = {
         "scenes": scenes_out,

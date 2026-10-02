@@ -29,6 +29,7 @@ import {
   VoxDisclosureBadge,
   LivingCamera,
   VoxCompositeStage,
+  VoxConnectingVectors,
 } from "./components/vox";
 import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
 import {
@@ -601,6 +602,11 @@ export const TwoLayerScene = (props) => {
   const sourceCredit = props.sourceCredit || props.source_credit;
   const disclosureBadge = props.disclosureBadge;
   const actTitle = props.actTitle;
+  const connection = props.connection;
+  const connections = props.connections;
+  const radiatingConnections = props.radiatingConnections || props.radiating_connections;
+  const supportingCutouts = props.supportingCutouts || props.supporting_cutouts;
+  const editorialHeadline = props.editorialHeadline || props.editorial_headline;
 
   const cfg = useVideoConfig();
   const durationInFrames = cfg.durationInFrames || 180;
@@ -922,14 +928,98 @@ export const TwoLayerScene = (props) => {
         />
       ) : null}
 
-      {/* Cold Strike Scene 0 Kinetic Headline (Rule 444 & Vox Architecture) */}
-      {showOverlay && (props.sceneIndex === 0 || props.motionDirective === "kinetic_headline") && (props.headline || props.statValue) ? (
+      {/* Vox Curved Bezier Connecting Vectors & Arrows (Rule 122 & Vox Explainer Motion) */}
+      {(connection || connections || radiatingConnections) ? (
+        <VoxConnectingVectors
+          connections={[
+            ...(connection ? [connection] : []),
+            ...(Array.isArray(connections) ? connections : []),
+            ...(Array.isArray(radiatingConnections) ? radiatingConnections : []),
+          ]}
+          width={width}
+          height={height}
+        />
+      ) : null}
+
+      {/* Supporting Cutouts & Micro-Evidence Pins (Staggered Spring Physics & Rotation) */}
+      {supportingCutouts && Array.isArray(supportingCutouts) ? (
+        supportingCutouts.map((cutout: any, cIdx: number) => {
+          const delay = cutout.dropFrame || cutout.delayFrames || (cIdx * 8 + 6);
+          const cutoutSpring = spring({
+            frame: Math.max(0, frame - delay),
+            fps: cfg.fps || 30,
+            config: { damping: 14, stiffness: 120, mass: 0.8 },
+          });
+          const targetRot = cutout.rotation ?? ((cIdx % 2 === 0 ? -4 : 4) * (cIdx + 1));
+          const rot = Number(interpolate(cutoutSpring, [0, 1], [targetRot - 12, targetRot]));
+          const scale = Number(interpolate(cutoutSpring, [0, 1], [0.5, 1]));
+          const opacity = Number(interpolate(cutoutSpring, [0, 0.3, 1], [0, 0.8, 1]));
+          const left = cutout.xPct ?? (isLeft ? 65 + cIdx * 12 : 20 + cIdx * 12);
+          const top = cutout.yPct ?? (40 + cIdx * 15);
+          return (
+            <div
+              key={`supp-cutout-${cIdx}`}
+              style={{
+                position: "absolute",
+                left: `${left}%`,
+                top: `${top}%`,
+                transform: `translate(-50%, -50%) scale(${scale}) rotate(${rot.toFixed(2)}deg)`,
+                opacity,
+                zIndex: 22,
+                pointerEvents: "none",
+                filter: "drop-shadow(0 14px 28px rgba(0,0,0,0.85))",
+              }}
+            >
+              {cutout.src ? (
+                <Img
+                  src={resolveSrc(cutout.src)}
+                  style={{
+                    maxWidth: cutout.width || 360,
+                    maxHeight: cutout.height || 360,
+                    objectFit: "contain",
+                    border: cutout.border === false ? undefined : "3px solid #ffffff",
+                    borderRadius: 4,
+                  }}
+                />
+              ) : null}
+              {cutout.label ? (
+                <div
+                  style={{
+                    marginTop: 6,
+                    backgroundColor: "rgba(10, 15, 24, 0.90)",
+                    color: "#f8fafc",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    padding: "3px 8px",
+                    borderRadius: 4,
+                    textAlign: "center",
+                    letterSpacing: 1,
+                    textTransform: "uppercase",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                  }}
+                >
+                  {cutout.label}
+                </div>
+              ) : null}
+            </div>
+          );
+        })
+      ) : null}
+
+      {/* Kinetic Headline & Editorial Stamped Typography (Rule 444 & Vox Architecture) */}
+      {showOverlay &&
+      (editorialHeadline || (props.sceneIndex === 0 && (props.headline || props.statValue)) || props.motionDirective === "kinetic_headline") &&
+      (editorialHeadline || props.headline || props.statValue) ? (
         <VoxKineticHeadline
-          headline={props.headline || (props.statValue ? `THE ${props.statValue} ILLUSION` : "THE $942 BILLION ILLUSION")}
-          highlightWord={props.highlightWord || "ILLUSION"}
-          category={props.category || "FORENSIC INVESTIGATION // MACRO CAPITAL FLOWS"}
-          subtext={props.subtext || props.statLabel || "Why Record Foreign Buying Conceals a Dangerous Structural Exit"}
-          accentColor={props.accentColor || "#f59e0b"}
+          headline={
+            typeof editorialHeadline === "object"
+              ? editorialHeadline.text
+              : (editorialHeadline || props.headline || (props.statValue ? String(props.statValue) : undefined))
+          }
+          highlightWord={props.highlightWord || (typeof editorialHeadline === "object" ? editorialHeadline.highlightWord : "")}
+          category={props.category || props.actTitle}
+          subtext={props.subtext || props.statLabel || (typeof editorialHeadline === "object" ? editorialHeadline.subtext : undefined)}
+          accentColor={props.accentColor || (typeof editorialHeadline === "object" ? editorialHeadline.color : "#f59e0b")}
         />
       ) : null}
 
@@ -986,10 +1076,10 @@ export const TwoLayerScene = (props) => {
               >
                 <OdometerRollup
                   startValue={obj.start_value ?? 0}
-                  endValue={obj.end_value ?? 942}
-                  prefix={obj.prefix ?? "$"}
-                  suffix={obj.suffix ?? "B"}
-                  label={obj.label || "RECORD INFLOW"}
+                  endValue={obj.end_value ?? 0}
+                  prefix={obj.prefix ?? ""}
+                  suffix={obj.suffix ?? ""}
+                  label={obj.label || ""}
                   subLabel={obj.sub_label || obj.subLabel}
                   startFrame={obj.start_frame || 5}
                   durationFrames={obj.duration_frames || 25}
@@ -1383,16 +1473,21 @@ const buildOverlaySegments = (scenes: any[]) => {
     const last = raw[raw.length - 1];
     let effectiveOv = s.forensicOverlay || s.forensic_overlay;
     if (!effectiveOv && (s.motionDirective === "kinetic_headline" || (idx === 0 && (s.headline || s.statValue)))) {
-      effectiveOv = {
-        type: "kinetic_headline",
-        title: s.headline || (s.statValue ? `RECORD ${s.statValue}` : "THE $942 BILLION ILLUSION"),
-        badge: s.category || "FORENSIC INVESTIGATION // MACRO CAPITAL FLOWS",
-        payload: {
-          highlight_word: s.highlightWord || s.highlight_word || "ILLUSION",
-          subtext: s.subtext || s.statLabel || "Why Record Foreign Buying Conceals a Dangerous Structural Exit",
-          accent_color: s.accentColor || s.accent_color || "#f59e0b",
-        },
-      };
+      if (s.headline || s.statValue) {
+        const headlineTitle = s.headline || (s.statValue ? `METRIC: ${s.statValue}` : "");
+        const words = headlineTitle.split(" ").filter(Boolean);
+        const lastWord = words.length > 0 ? words[words.length - 1] : "";
+        effectiveOv = {
+          type: "kinetic_headline",
+          title: headlineTitle,
+          badge: s.category || "FORENSIC INVESTIGATION",
+          payload: {
+            highlight_word: s.highlightWord || s.highlight_word || lastWord,
+            subtext: s.subtext || s.statLabel || "",
+            accent_color: s.accentColor || s.accent_color || "#f59e0b",
+          },
+        };
+      }
     } else if (!effectiveOv && s.motionDirective === "counter_rollup" && s.statValue) {
       effectiveOv = {
         type: "kinetic_counter",
@@ -2433,6 +2528,11 @@ export const TwoLayerEpisode = (props) => {
             linkedSecondaryObjects={s.linked_secondary_objects || s.linkedSecondaryObjects}
             primaryHero={s.primary_hero || s.primaryHero}
             virtualCamera={s.virtual_camera || s.virtualCamera}
+            connection={s.connection}
+            connections={s.connections}
+            radiatingConnections={s.radiatingConnections || s.radiating_connections}
+            supportingCutouts={s.supportingCutouts || s.supporting_cutouts}
+            editorialHeadline={s.editorialHeadline || s.editorial_headline}
           />
         </Sequence>
       );

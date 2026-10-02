@@ -10,14 +10,16 @@ export interface VoxKineticHeadlineProps {
 }
 
 export const VoxKineticHeadline: React.FC<VoxKineticHeadlineProps> = ({
-  headline = "THE $942 BILLION ILLUSION",
-  highlightWord = "ILLUSION",
-  category = "FORENSIC INVESTIGATION // MACRO CAPITAL FLOWS",
-  subtext = "Why Record Foreign Buying Conceals a Dangerous Structural Exit",
+  headline,
+  highlightWord = "",
+  category,
+  subtext,
   accentColor = "#f59e0b",
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+
+  if (!headline) return null;
 
   const words = headline.split(" ");
 
@@ -45,29 +47,31 @@ export const VoxKineticHeadline: React.FC<VoxKineticHeadlineProps> = ({
       }}
     >
       {/* Category / Investigation Tag */}
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "6px 16px",
-          backgroundColor: "rgba(245, 158, 11, 0.15)",
-          border: `1.5px solid ${accentColor}`,
-          borderRadius: 8,
-          color: accentColor,
-          fontSize: 14,
-          fontWeight: 900,
-          letterSpacing: 3,
-          textTransform: "uppercase",
-          marginBottom: 24,
-          transform: `scale(${badgeSpring})`,
-          opacity: badgeSpring,
-          boxShadow: `0 0 20px ${accentColor}33`,
-        }}
-      >
-        <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: accentColor }} />
-        {category}
-      </div>
+      {category ? (
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 16px",
+            backgroundColor: "rgba(245, 158, 11, 0.15)",
+            border: `1.5px solid ${accentColor}`,
+            borderRadius: 8,
+            color: accentColor,
+            fontSize: 14,
+            fontWeight: 900,
+            letterSpacing: 3,
+            textTransform: "uppercase",
+            marginBottom: 24,
+            transform: `scale(${badgeSpring})`,
+            opacity: badgeSpring,
+            boxShadow: `0 0 20px ${accentColor}33`,
+          }}
+        >
+          <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: accentColor }} />
+          {category}
+        </div>
+      ) : null}
 
       {/* Main Kinetic Headline (Word-by-Word Impact Pop) */}
       <div

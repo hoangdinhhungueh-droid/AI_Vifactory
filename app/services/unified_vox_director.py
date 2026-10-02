@@ -1500,13 +1500,13 @@ def generate_cinematography_scene_data(
         })
 
     headline_info = {}
-    if idx == 0:
-        metric_str = f"${key_metrics[0]}" if key_metrics else "$942 BILLION"
+    if idx == 0 and key_metrics:
+        m_val = key_metrics[0]
         headline_info = {
-            "headline": f"THE {metric_str} ILLUSION".upper(),
-            "highlight_word": "ILLUSION",
-            "category": f"FORENSIC INVESTIGATION // {mkt} MACRO ANALYSIS",
-            "subtext": "Why Record Capital Flows Conceal a Dangerous Structural Exit",
+            "headline": f"CRITICAL ANOMALY: {m_val}".upper(),
+            "highlight_word": str(m_val),
+            "category": f"FORENSIC INVESTIGATION // {mkt} ANALYSIS",
+            "subtext": "STATUTORY SYSTEMIC AUDIT",
             "accent_color": "#f59e0b"
         }
 
