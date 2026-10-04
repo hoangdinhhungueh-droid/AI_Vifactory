@@ -220,7 +220,7 @@ class TestIntelCard:
 
     def test_schema_keys(self, tmp_path):
         assert set(self._card(tmp_path)) == {
-            "task_id", "target_keyword", "niche", "market",
+            "task_id", "target_keyword", "niche", "market", "traffic_bridges",
             "competitor_benchmarks", "audience_comment_gaps",
             "_b2_to_synthesize", "collection_meta",
             "transposition_opportunities", "ai_slop_redlines", "audience_wishlist_topics",

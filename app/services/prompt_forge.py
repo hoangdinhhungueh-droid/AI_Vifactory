@@ -83,7 +83,27 @@ def resolve_cinematic_tokens(tokens: list | None) -> dict:
         t_clean = tok.strip()
         if not t_clean.startswith("/"):
             t_clean = f"/{t_clean}"
-        info = token_map.get(t_clean)
+        t_normalized = t_clean.lower().replace(" ", "_")
+        # Handle synonyms and shorthand camera commands
+        synonyms = {
+            "/macrozoom": "/macro_zoom",
+            "/macro_zoom": "/macro_zoom",
+            "/pov": "/pov",
+            "/firstperson": "/firstperson",
+            "/earth_zoom": "/earthzoom",
+            "/earthzoom": "/earthzoom",
+            "/360": "/orbit_360",
+            "/orbit360": "/orbit_360",
+            "/orbit_360": "/orbit_360",
+            "/glambot": "/glambot",
+            "/productexplosion": "/product_explosion",
+            "/product_explosion": "/product_explosion",
+            "/tvcommercial": "/commercial_grade",
+            "/tv_commercial": "/commercial_grade",
+            "/commercial_grade": "/commercial_grade"
+        }
+        mapped_key = synonyms.get(t_normalized, t_normalized)
+        info = token_map.get(t_clean) or token_map.get(mapped_key)
         if not info:
             continue
         cat = info.get("category")

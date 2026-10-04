@@ -307,6 +307,62 @@
       "gemini_directive_en": "tactile paper-collage stop-motion animation at 12fps with authentic physical craft texture",
       "remotion_fx": "stop_motion_12fps",
       "remotion_camera_hint": "handheld_shake"
+    },
+    {
+      "token": "/macro_zoom",
+      "category": "motion_camera",
+      "description_vi": "Thu phóng cực cận macro vào con dấu đỏ, chữ ký, vi hạt giấy pháp y (/MACRO ZOOM)",
+      "gemini_directive_en": "high-precision macro zoom moving aggressively into microscopic paper fibers, official ink stamp, and forensic contract signatures",
+      "remotion_fx": "macro_zoom",
+      "remotion_camera_hint": "macro_tilt"
+    },
+    {
+      "token": "/pov",
+      "category": "angle",
+      "description_vi": "Góc nhìn thứ nhất của nhân vật điều tra tại hiện trường (/POV)",
+      "gemini_directive_en": "first-person subjective investigator POV camera perspective directly encountering evidence",
+      "remotion_fx": null,
+      "remotion_camera_hint": "handheld_shake"
+    },
+    {
+      "token": "/earthzoom",
+      "category": "motion_camera",
+      "description_vi": "Thu phóng từ không gian quỹ đạo cắm thẳng xuống cao ốc mục tiêu (/EARTHZOOM)",
+      "gemini_directive_en": "dramatic hyper-descent earth-zoom plunging from orbital satellite altitude directly down into corporate headquarters",
+      "remotion_fx": "earthzoom_plunge",
+      "remotion_camera_hint": "snap_zoom"
+    },
+    {
+      "token": "/glambot",
+      "category": "motion_camera",
+      "description_vi": "Chuyển động camera tốc độ cao kết hợp giảm tốc kịch tính (/GLAMBOT)",
+      "gemini_directive_en": "high-speed mechanical robotic arm glambot camera sweep executing seamless high-velocity deceleration",
+      "remotion_fx": "glambot_curve",
+      "remotion_camera_hint": "continuous_drift"
+    },
+    {
+      "token": "/product_explosion",
+      "category": "vox_graphic",
+      "description_vi": "Bóc tách hồ sơ tài liệu bay bung tỏa trên không gian bàn điều tra (/PRODUCT EXPLOSION)",
+      "gemini_directive_en": "exploded isometric view with forensic documents, financial binders, and evidence cards suspended mid-air",
+      "remotion_fx": "exploded_dossier",
+      "remotion_camera_hint": "slow_pull_out"
+    },
+    {
+      "token": "/orbit_360",
+      "category": "motion_camera",
+      "description_vi": "Xoay quanh chủ thể một vòng 360 độ mượt mà (/360)",
+      "gemini_directive_en": "continuous 360-degree orbital camera rotation circling around central key evidence",
+      "remotion_fx": "orbit_360",
+      "remotion_camera_hint": "continuous_drift"
+    },
+    {
+      "token": "/commercial_grade",
+      "category": "style_vfx",
+      "description_vi": "Ánh sáng thương mại cao cấp, độ bóng bẩy chuẩn phát sóng (/TVCOMMERCIAL)",
+      "gemini_directive_en": "ultra-polished commercial television broadcast lighting with dynamic hero specular highlights",
+      "remotion_fx": "broadcast_grade",
+      "remotion_camera_hint": "cinematic_pan"
     }
   ]
 }

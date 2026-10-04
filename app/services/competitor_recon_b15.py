@@ -1066,12 +1066,24 @@ def build_intel_card(task_id: str, target_keyword: str, niche: str, market: str,
     combined_slop = list(dict.fromkeys((anatomy.get("ai_slop_redlines") or []) + mined_slop))
     combined_wishlist = list(dict.fromkeys((anatomy.get("audience_wishlist_topics") or []) + mined_wishlist))
     transposition = anatomy.get("transposition_opportunities", {})
+    traffic_bridges = [
+        {
+            "video_id": b.get("video_id"),
+            "title": b.get("title"),
+            "channel": b.get("channel"),
+            "url": f"https://www.youtube.com/watch?v={b.get('video_id')}" if b.get("video_id") else "",
+            "seed_tags": (b.get("tags") or [])[:5],
+            "vph": b.get("vph", 0.0)
+        }
+        for b in benchmarks[:3] if b.get("video_id")
+    ]
 
     card = {
         "task_id": task_id,
         "target_keyword": target_keyword,
         "niche": niche,
         "market": market,
+        "traffic_bridges": traffic_bridges,
         "competitor_benchmarks": benchmarks,
         "audience_comment_gaps": [{
             "video_id": g.get("video_id", ""),

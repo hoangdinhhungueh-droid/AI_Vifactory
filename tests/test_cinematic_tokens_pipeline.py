@@ -44,7 +44,7 @@ class TestCinematicTokensDictionary:
 
         assert "tokens" in data
         tokens = data["tokens"]
-        assert len(tokens) == 38, f"Expected exactly 38 tokens, found {len(tokens)}"
+        assert len(tokens) == 45, f"Expected exactly 45 tokens, found {len(tokens)}"
 
         expected_tokens = {
             "/straightdown", "/groundlevel", "/birdseye", "/firstperson", "/secondview",
@@ -54,7 +54,8 @@ class TestCinematicTokensDictionary:
             "/whip_pan", "/smash_cut", "/match_cut", "/ink_bleed", "/zoom_through",
             "/light_leak", "/paper_tear", "/circle_wipe",
             "/dolly_zoom", "/macro_orbit", "/focus_breathe", "/continuous_drift", "/whip_zoom",
-            "/map_pin_drop", "/callout_circle", "/route_draw", "/counter_countup", "/paper_stopmotion"
+            "/map_pin_drop", "/callout_circle", "/route_draw", "/counter_countup", "/paper_stopmotion",
+            "/macro_zoom", "/pov", "/earthzoom", "/glambot", "/product_explosion", "/orbit_360", "/commercial_grade"
         }
         actual_tokens = {t["token"] for t in tokens}
         assert actual_tokens == expected_tokens, f"Token mismatch: {actual_tokens ^ expected_tokens}"
@@ -75,7 +76,7 @@ class TestSkillLoaderIntegration:
         dict_data = get_cinematic_tokens_dictionary(force_refresh=True)
         assert dict_data is not None
         assert "tokens" in dict_data
-        assert len(dict_data["tokens"]) == 38
+        assert len(dict_data["tokens"]) == 45
 
         # Test caching
         cached_data = get_cinematic_tokens_dictionary()
