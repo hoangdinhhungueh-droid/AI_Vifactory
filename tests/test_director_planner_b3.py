@@ -213,3 +213,57 @@ def test_send_gate2_card_no_redundant_buttons():
     asyncio.run(_run())
 
 
+def test_forensic_overlay_decimal_and_word_boundary():
+    """Verify decimal preservation ($143.5M not truncated at dot), word-boundary protection ('coverage' != 'overage'), and bankruptcy causal flowchart."""
+    from app.services.director_planner_b3 import detect_forensic_overlay
+
+    # 1. Decimal preservation in title
+    ov_hook = detect_forensic_overlay(
+        narration_text="A $143.5 million trust fund — 99% of survivor creditors voted to accept.",
+        scene_idx=0,
+        is_cold_hook=True,
+    )
+    assert ov_hook is not None
+    assert "143.5" in ov_hook["title"], f"Expected $143.5 preserved in title, got: {ov_hook['title']}"
+    assert ov_hook["title"] != "A $143"
+
+    # 2. Word boundary: 'coverage' must NOT trigger 'overage' statutory exceedance
+    fake_grounding = {
+        "grounding_table": [
+            {"fact": "Initial plan offered $143.5 million"},
+            {"fact": "Amended trust reached $242 million"},
+        ]
+    }
+    ov_cov = detect_forensic_overlay(
+        narration_text="Insurance coverage disputes stalled the $143.5 million settlement plan in court.",
+        grounding_intel=fake_grounding,
+        scene_idx=31,
+    )
+    if ov_cov is not None:
+        assert ov_cov.get("type") != "threshold_ratio", "Substring 'overage' inside 'coverage' must not trigger threshold_ratio!"
+
+    # 3. Domain-aware causal flowchart for bankruptcy/settlement
+    ov_flow = detect_forensic_overlay(
+        narration_text="The Chapter 11 bankruptcy settlement trust channelled debtor assets through a complex creditor waterfall mechanism.",
+        scene_idx=61,
+    )
+    assert ov_flow is not None
+    assert ov_flow.get("type") == "causal_flowchart"
+    labels = [n["label"] for n in ov_flow.get("payload", {}).get("nodes", [])]
+    assert "Consumer Capital" not in labels
+    assert any("Debtor" in lbl or "Trust" in lbl for lbl in labels)
+
+
+def test_stat_card_context_aware_labels():
+    """Verify context-aware stat_card labels (no 'GROWTH RATE' on creditor votes)."""
+    from app.services.director_planner_b3 import detect_stat_card
+
+    sc_vote = detect_stat_card("99% of survivor creditors voted yes on the reorganization ballot.")
+    assert sc_vote is not None
+    assert sc_vote["value"] == "99%"
+    assert sc_vote["label"] == "VOTE OUTCOME // PERCENTAGE"
+
+    sc_trust = detect_stat_card("The diocese proposed a $143.5 million settlement trust for claimants.")
+    assert sc_trust is not None
+    assert sc_trust["label"] == "SETTLEMENT & CLAIM METRIC"
+

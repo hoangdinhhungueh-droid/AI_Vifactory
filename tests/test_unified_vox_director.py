@@ -256,5 +256,42 @@ def test_vox_roster_depth_and_coverage(tmp_path):
     assert len(char_appearances) <= 12, f"Human character appearances ({len(char_appearances)}) must be <= 12"
 
 
+def test_civil_bankruptcy_domain_isolation_and_in_flight_gate(tmp_path):
+    """Verify civil bankruptcy episode has zero criminal prosecution leaks, dynamic stamps, and passes Opus 5.5 in-flight gate."""
+    from app.services.unified_vox_director import build_unified_director_plan
+    from app.services.prompt_forge import _sanitize_background_prompt, _sanitize_foreground_prompt
+    from scripts.orchestrator.opus55_supervisor_gate import audit_director_assets_in_flight
 
+    sample_scenes = [
+        {"text": "The federal bankruptcy judge rejected the reorganization plan in Oakland.", "beat_index": 1, "duration_sec": 5.0},
+        {"text": "Chapter 11 insolvency proceedings stayed over three hundred survivor claims.", "beat_index": 2, "duration_sec": 5.0},
+        {"text": "Internal accounting ledgers revealed asset transfers before the filing.", "beat_index": 3, "duration_sec": 5.0},
+        {"text": "The creditors committee objected to the non-consensual liability release.", "beat_index": 4, "duration_sec": 5.0},
+        {"text": "The judicial ruling set a precedent for institutional restructuring nationwide.", "beat_index": 5, "duration_sec": 5.0},
+    ]
+    res = build_unified_director_plan(
+        spoken_sentences=sample_scenes,
+        ep_dir=tmp_path,
+        market="EN",
+        metadata={"episode_id": "EN_EP0008_oakland_plan_rejected", "topic": "Oakland Chapter 11 Reorganization Plan Rejected"}
+    )
+    fg_roster = res["foreground_roster"]
+    bg_roster = res["background_roster"]
+    assert "fg_character_lead_prosecutor" not in fg_roster
+    assert "fg_evidence_prosecution_complaint_docket" not in fg_roster
+    assert "fg_evidence_wire_fraud_indictment_sheet" not in fg_roster
 
+    # Save director_plan.json and prompts_forge.json to tmp_path and run in-flight gate
+    (tmp_path / "director_plan.json").write_text(
+        json.dumps({"episode_id": "EN_EP0008_oakland_plan_rejected", "total_scenes": len(res["scenes"]), "scenes": res["scenes"]}),
+        encoding="utf-8"
+    )
+    bg_prompts = {k: _sanitize_background_prompt(v["description"], bg_key=k, market="EN") for k, v in bg_roster.items()}
+    fg_prompts = {k: _sanitize_foreground_prompt(v["description"], fg_key=k, market="EN") for k, v in fg_roster.items()}
+    (tmp_path / "prompts_forge.json").write_text(
+        json.dumps({"episode_id": "EN_EP0008_oakland_plan_rejected", "backgrounds": bg_prompts, "foregrounds": fg_prompts}),
+        encoding="utf-8"
+    )
+    gate_res = audit_director_assets_in_flight(tmp_path, call_llm_audit=False)
+    assert gate_res["verdict"] == "APPROVED", f"Expected APPROVED, got defects: {gate_res['defects']}"
+    assert gate_res["defects_count"] == 0

@@ -88,7 +88,7 @@ class FastVPSClient:
                     headers=self._headers(),
                     method="POST"
                 )
-                with urllib.request.urlopen(req, timeout=35, context=self.ctx) as resp:
+                with urllib.request.urlopen(req, timeout=12, context=self.ctx) as resp:
                     self.session_id = resp.headers.get("mcp-session-id")
 
                 if self.session_id:

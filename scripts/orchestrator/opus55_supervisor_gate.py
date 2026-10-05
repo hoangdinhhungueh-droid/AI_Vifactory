@@ -257,6 +257,153 @@ Return ONLY the specified JSON."""
         }
 
 
+def audit_director_assets_in_flight(
+    ep_dir: Path,
+    call_llm_audit: bool = False,
+    model: str = DEFAULT_PLANNER_MODEL,
+) -> Dict[str, Any]:
+    """Active In-Flight Director & Prompt Forge Supervisory Gate (B3 / B3.5 -> B4 Handoff).
+    Enforces deterministic structural invariants and optional live Claude Opus 5.5 sign-off
+    on director_plan.json, prompts_forge.json, and showrunner_dossier.json across all episodes.
+    """
+    import re
+    ep_path = Path(ep_dir)
+    ep_id = ep_path.name
+    mkt = ep_id.split("_")[0].upper() if "_" in ep_id else "EN"
+
+    defects: List[str] = []
+    warnings: List[str] = []
+
+    dp_file = ep_path / "director_plan.json"
+    pf_file = ep_path / "prompts_forge.json"
+    dos_file = ep_path / "showrunner_dossier.json"
+
+    if not dp_file.exists():
+        defects.append(f"Missing director_plan.json in {ep_path}")
+    if not pf_file.exists():
+        defects.append(f"Missing prompts_forge.json in {ep_path}")
+
+    dp_data: Dict[str, Any] = {}
+    pf_data: Dict[str, Any] = {}
+    if dp_file.exists():
+        try:
+            dp_data = json.loads(dp_file.read_text(encoding="utf-8"))
+        except Exception as e:
+            defects.append(f"Corrupted director_plan.json: {e}")
+    if pf_file.exists():
+        try:
+            pf_data = json.loads(pf_file.read_text(encoding="utf-8"))
+        except Exception as e:
+            defects.append(f"Corrupted prompts_forge.json: {e}")
+
+    # 1. Audit prompts_forge.json invariants
+    bgs = pf_data.get("backgrounds", {})
+    fgs = pf_data.get("foregrounds", {})
+    vox_c = pf_data.get("vox_collages", {})
+
+    for section_name, mapping in [("backgrounds", bgs), ("foregrounds", fgs), ("vox_collages", vox_c)]:
+        for k, p_val in mapping.items():
+            p_str = p_val if isinstance(p_val, str) else str(p_val)
+            # Check for mutilated aspect ratio relics
+            if re.search(r"(?<!\d):\s*(?:aspect\s*ratio|1\s*aspect\s*ratio|9\s*aspect\s*ratio)", p_str, re.IGNORECASE):
+                defects.append(f"[{section_name}:{k}] Mutilated ':aspect ratio' relic detected.")
+            # Check EN market negative token contamination
+            if mkt in ("EN", "US", "UK"):
+                if any(tok in p_str.lower() for tok in ["salaryman", "sha-sho", "hanko"]):
+                    defects.append(f"[{section_name}:{k}] Foreign JP token ('salaryman'/'hanko') leaked into {mkt} prompt.")
+
+    for fg_k, fg_p in fgs.items():
+        p_str = fg_p if isinstance(fg_p, str) else str(fg_p)
+        if "#ff00ff" not in p_str.lower():
+            defects.append(f"[foregrounds:{fg_k}] Missing #FF00FF pure magenta chroma-key mandate.")
+        if "1:1" not in p_str:
+            defects.append(f"[foregrounds:{fg_k}] Missing 1:1 aspect ratio specification.")
+        is_evidence_prop = (
+            fg_k.lower().startswith("fg_evidence_")
+            or any(w in fg_k.lower() for w in ["docket", "invoice", "binder", "ledger", "memo", "book", "drive", "gavel", "order", "exhibit", "sheet", "notice", "affidavit", "recorder"])
+        ) and not fg_k.lower().startswith("fg_character_") and not fg_k.lower().startswith("char_")
+        if is_evidence_prop:
+            pos_part = p_str.split("[STRICT NEGATIVE PROMPT]")[0]
+            if re.search(r"\bFull-body\b|\bfigure\s+in\s+authentic\b|\bhead\s+to\s+toe\s+visible\b", pos_part, re.IGNORECASE):
+                defects.append(f"[foregrounds:{fg_k}] Human character boilerplate leaked into evidence prop positive prompt.")
+
+    # 2. Audit director_plan.json domain & stamp invariants
+    scenes = dp_data.get("scenes", [])
+    if not scenes and dp_file.exists():
+        defects.append("director_plan.json contains 0 scenes.")
+
+    all_narr = " ".join(sc.get("narration", "") for sc in scenes).lower()
+    is_civil_bankruptcy = any(w in all_narr for w in ["chapter 11", "bankruptcy", "reorganization plan"]) and not any(w in all_narr for w in ["grand jury indictment", "wire fraud charges"])
+    if is_civil_bankruptcy:
+        forbidden_criminal_keys = {"fg_character_lead_prosecutor", "fg_evidence_prosecution_complaint_docket", "fg_evidence_wire_fraud_indictment_sheet"}
+        for sc in scenes:
+            fg_obj = sc.get("foreground") or {}
+            rk = fg_obj.get("reuse_key") or sc.get("foreground_reuse_key") or ""
+            if rk in forbidden_criminal_keys:
+                defects.append(f"[Scene {sc.get('scene_id')}] Criminal prosecution key '{rk}' injected into civil bankruptcy episode.")
+
+    confidential_stamps = sum(
+        1 for sc in scenes
+        if "CONFIDENTIAL // BEAT" in str(((sc.get("papercraft_layout") or {}).get("stamp_badge") or {}).get("text", ""))
+    )
+    if len(scenes) > 5 and confidential_stamps == len(scenes):
+        warnings.append("100% of scenes have static 'CONFIDENTIAL // BEAT' stamp badge.")
+
+    verdict = "APPROVED" if not defects else "REVISE_REQUIRED"
+    score = 9.6 if not defects and not warnings else (8.5 if not defects else max(2.0, 9.0 - len(defects) * 1.5))
+
+    gate_report: Dict[str, Any] = {
+        "episode_id": ep_id,
+        "market": mkt,
+        "verdict": verdict,
+        "score": round(score, 2),
+        "total_scenes_audited": len(scenes),
+        "total_bg_prompts_audited": len(bgs),
+        "total_fg_prompts_audited": len(fgs),
+        "defects_count": len(defects),
+        "defects": defects[:25],
+        "warnings": warnings[:15],
+        "supervisor_model": model,
+    }
+
+    if (call_llm_audit or os.getenv("VF_OPUS55_LIVE_ASSET_GATE") == "1") and not defects:
+        try:
+            from app.services.model_gateway import get_global_gateway
+            gw = get_global_gateway()
+            sample_payload = {
+                "episode_id": ep_id,
+                "market": mkt,
+                "total_scenes": len(scenes),
+                "sample_bg_prompts": dict(list(bgs.items())[:2]),
+                "sample_fg_prompts": dict(list(fgs.items())[:3]),
+                "deterministic_gate": "PASS (0 defects)",
+            }
+            llm_resp = gw.call_llm(
+                prompt=json.dumps(sample_payload, ensure_ascii=False),
+                system_prompt="You are Claude Opus 5.5 Showrunner. Review this verified B3/B3.5 asset digest and return JSON: {\"verdict\": \"APPROVED\"|\"REVISE_REQUIRED\", \"score\": 9.5, \"showrunner_note\": \"...\"}",
+                model=model,
+                max_tokens=600,
+                timeout=60.0,
+            )
+            if llm_resp:
+                m_j = re.search(r"(\{.*\})", llm_resp, re.DOTALL)
+                if m_j:
+                    llm_parsed = json.loads(m_j.group(1))
+                    gate_report["live_llm_consult"] = llm_parsed
+        except Exception as ex_llm:
+            logger.warning(f"Live LLM asset consult skipped: {ex_llm}")
+
+    if dos_file.exists():
+        try:
+            dos_data = json.loads(dos_file.read_text(encoding="utf-8"))
+            dos_data["opus55_in_flight_gate"] = gate_report
+            dos_file.write_text(json.dumps(dos_data, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception as ex_dos:
+            logger.warning(f"Could not update showrunner_dossier.json with gate report: {ex_dos}")
+
+    return gate_report
+
+
 def run_supervisory_gate(
     task_id: str,
     task_objective: str,
@@ -289,9 +436,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Opus 5.5 Anti-Token-Bloat Supervisory Gate CLI")
     parser.add_argument("--task-id", default="GENERIC_SUPERVISION_TASK", help="Task ID to inspect")
     parser.add_argument("--objective", default="General multi-agent code update", help="Task objective")
+    parser.add_argument("--ep-dir", default=None, help="Audit a specific episode directory in-flight (B3/B3.5)")
     parser.add_argument("--dry-run", action="store_true", help="Run without calling external LLM")
     parser.add_argument("--model", default=DEFAULT_PLANNER_MODEL, help="Model to use")
     args = parser.parse_args()
+
+    if args.ep_dir:
+        res = audit_director_assets_in_flight(Path(args.ep_dir), call_llm_audit=not args.dry_run, model=args.model)
+        print(json.dumps(res, indent=2, ensure_ascii=False))
+        sys.exit(0 if res.get("verdict") == "APPROVED" else 1)
 
     result = run_supervisory_gate(
         task_id=args.task_id,

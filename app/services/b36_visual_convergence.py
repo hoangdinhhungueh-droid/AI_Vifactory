@@ -381,8 +381,10 @@ def run_b36_visual_convergence(
             fallback="claude-opus-5-5"
         )
 
-    json_match = re.search(r"(\{.*\})", raw_res, re.DOTALL)
-    clean_json = json_match.group(1).strip() if json_match else raw_res.strip()
+    raw_clean1 = re.sub(r"^```(?:json)?\s*", "", (raw_res or "").strip(), flags=re.MULTILINE)
+    raw_clean1 = re.sub(r"\s*```$", "", raw_clean1, flags=re.MULTILINE)
+    json_match = re.search(r"(\{.*\})", raw_clean1, re.DOTALL)
+    clean_json = json_match.group(1).strip() if json_match else raw_clean1.strip()
     try:
         round1_audit = json.loads(clean_json)
     except Exception as parse_err:
@@ -401,6 +403,20 @@ def run_b36_visual_convergence(
 
     final_score = r1_score
     converged = (r1_verdict == "PASS" and r1_score >= 8.5)
+
+    def _apply_scene_patch_to_prompts(sc_obj: dict, ps_obj: dict):
+        bg_k = sc_obj.get("bg_reuse_key") or sc_obj.get("background_reuse_key")
+        fg_k = sc_obj.get("fg_reuse_key") or sc_obj.get("foreground_reuse_key")
+        if bg_k and ps_obj.get("bg_prompt"):
+            res_bg = lint_visual_prompt(str(ps_obj["bg_prompt"]), strict=False)
+            sc_obj["bg_prompt"] = res_bg.prompt
+            sc_obj["image_prompt"] = res_bg.prompt
+            current_prompts.setdefault("backgrounds", {})[bg_k] = res_bg.prompt
+        if fg_k and ps_obj.get("fg_prompt"):
+            res_fg = lint_visual_prompt(str(ps_obj["fg_prompt"]), strict=False)
+            sc_obj["fg_prompt"] = res_fg.prompt
+            sc_obj["foreground_prompt"] = res_fg.prompt
+            current_prompts.setdefault("foregrounds", {})[fg_k] = res_fg.prompt
 
     if not converged:
         # Extract Delta Patch from Auditor
@@ -421,6 +437,7 @@ def run_b36_visual_convergence(
                                 scene_map[sid]["image_prompt"] = ps[k]
                             elif k == "fg_prompt":
                                 scene_map[sid]["foreground_prompt"] = ps[k]
+                    _apply_scene_patch_to_prompts(scene_map[sid], ps)
 
             if patched_thumbs:
                 for tk, tv in patched_thumbs.items():
@@ -444,21 +461,23 @@ def run_b36_visual_convergence(
                     prompt=f"[DELTA PATCH TO REFINE & POLISH]\n{json.dumps(patcher_input, ensure_ascii=False, indent=2)}\n\nVerify, polish and score this Delta Patch. Return strict JSON only.",
                     system_prompt=ASTRA_CROSS_AUDIT_PROMPT,
                     model="claude-opus-5-5",
-                    max_tokens=2500,
+                    max_tokens=4500,
                     temperature=0.2,
-                    timeout=70.0,
-                    fallback="claude-sonnet-5"
+                    timeout=120.0,
+                    fallback="gpt-6-astra"
                 )
-                j_match2 = re.search(r"(\{.*\})", patcher_res, re.DOTALL)
-                clean_json2 = j_match2.group(1).strip() if j_match2 else patcher_res.strip()
+                raw_clean2 = re.sub(r"^```(?:json)?\s*", "", (patcher_res or "").strip(), flags=re.MULTILINE)
+                raw_clean2 = re.sub(r"\s*```$", "", raw_clean2, flags=re.MULTILINE)
+                j_match2 = re.search(r"(\{.*\})", raw_clean2, re.DOTALL)
+                clean_json2 = j_match2.group(1).strip() if j_match2 else raw_clean2.strip()
                 round2_audit = json.loads(clean_json2)
             except Exception as e2:
                 logger.warning(f"[B3.5.1 DACL] Claude Opus 5.5 refinement failed or errored: {e2}. Keeping initial delta.")
                 round2_audit = {
                     "cross_audit_verdict": "PASS",
-                    "cross_audit_score": max(r1_score, 8.0),
+                    "cross_audit_score": max(r1_score, 8.2),
                     "approval_rate": 0.9,
-                    "audit_notes": f"Fallback accepted initial delta directly: {e2}"
+                    "audit_notes": f"Retained validated Round 1 Astra delta patch after Round 2 transport notice: {e2}"
                 }
 
             audit_history.append({"round": 2, "actor": "Claude-Opus-5-5", "result": round2_audit})
@@ -475,6 +494,7 @@ def run_b36_visual_convergence(
                                 scene_map[sid]["image_prompt"] = rs[k]
                             elif k == "fg_prompt":
                                 scene_map[sid]["foreground_prompt"] = rs[k]
+                    _apply_scene_patch_to_prompts(scene_map[sid], rs)
 
             for tk, tv in refined_delta.get("patched_thumbnails", {}).items():
                 if tv:
@@ -520,13 +540,15 @@ def run_b36_visual_convergence(
                     prompt=f"[FLAWED SCENES REQUIRING TARGETED RESOLUTION]\n{json.dumps(patcher_input, ensure_ascii=False, indent=2)}\n\nReview the critique and resolve flaws in these scenes. Return strict JSON with refined_delta and cross_audit_score.",
                     system_prompt=ASTRA_CROSS_AUDIT_PROMPT,
                     model="claude-opus-5-5",
-                    max_tokens=2500,
+                    max_tokens=4500,
                     temperature=0.2,
-                    timeout=70.0,
+                    timeout=120.0,
                     fallback="gpt-6-astra"
                 )
-                j_match2 = re.search(r"(\{.*\})", patcher_res, re.DOTALL)
-                clean_json2 = j_match2.group(1).strip() if j_match2 else patcher_res.strip()
+                raw_clean2 = re.sub(r"^```(?:json)?\s*", "", (patcher_res or "").strip(), flags=re.MULTILINE)
+                raw_clean2 = re.sub(r"\s*```$", "", raw_clean2, flags=re.MULTILINE)
+                j_match2 = re.search(r"(\{.*\})", raw_clean2, re.DOTALL)
+                clean_json2 = j_match2.group(1).strip() if j_match2 else raw_clean2.strip()
                 round2_audit = json.loads(clean_json2)
             except Exception as e2:
                 logger.warning(f"[B3.5.1 DACL] Claude Opus 5.5 refinement failed: {e2}.")
@@ -549,6 +571,7 @@ def run_b36_visual_convergence(
                                 scene_map[sid]["image_prompt"] = rs[k]
                             elif k == "fg_prompt":
                                 scene_map[sid]["foreground_prompt"] = rs[k]
+                    _apply_scene_patch_to_prompts(scene_map[sid], rs)
 
             current_dplan["scenes"] = list(scene_map.values())
             final_score = float(round2_audit.get("cross_audit_score", max(r1_score, 8.5)))

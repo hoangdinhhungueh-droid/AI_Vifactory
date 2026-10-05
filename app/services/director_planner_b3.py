@@ -228,13 +228,13 @@ def detect_forensic_overlay(
         elif meta_stat:
             headline_text = f"THE {meta_stat} ILLUSION"
         else:
-            sentences = [s.strip() for s in re.split(r'[.!?。！？\n]', narration_text) if s.strip()]
+            sentences = [s.strip() for s in re.split(r'(?<!\d)\.(?!\d)|[!?。！？\n]+', narration_text) if s.strip()]
             first_sent = sentences[0] if sentences else narration_text
             words = first_sent.split()
-            headline_text = " ".join(words[:6]) if len(words) > 6 else first_sent
+            headline_text = " ".join(words[:7]) if len(words) > 7 else first_sent
 
         highlight_w = meta_hw or ("ILLUSION" if "ILLUSION" in headline_text.upper() else "PARADOX")
-        subtext = meta_sub or "Why Record Capital Flows Conceal a Dangerous Structural Exit"
+        subtext = meta_sub or (metadata.get("topic") if metadata else None) or "Forensic Investigation // Structural & Institutional Analysis"
         badge = (metadata.get("category") if metadata else "CRITICAL PARADOX // COLD HOOK") or "CRITICAL PARADOX // COLD HOOK"
 
         return {
@@ -350,20 +350,20 @@ def detect_forensic_overlay(
         }
 
     # 1. Threshold Ratio Graphic (Generic Exceedance, statutory baseline limit, metric anomaly, toxic ratio, market dominance)
-    threshold_triggers = [
-        # Multipliers, Ratios & Percentages
-        "倍", "배", "times", "lần", "gấp", "ratio", "tỷ lệ", "tỉ lệ", "비율", "倍率", "%", "percent", "phần trăm",
-        # Exceedance, Limits, Ceilings & Caps
-        "exceed", "surpass", "threshold", "residue", "discrepancy", "ceiling", "overage",
+    cjk_vn_threshold_triggers = [
+        "倍", "배", "lần", "gấp", "tỷ lệ", "tỉ lệ", "비율", "倍率", "%", "phần trăm",
         "基準値", "基準", "法定基準", "超過", "違反", "限度",
         "초과", "규제", "한도", "위반",
         "vượt", "vượt trần", "quá mức", "hạn mức", "ngưỡng",
-        # Market dominance, Concentration & Scale
-        "monopoly", "market share", "dominance", "thị phần", "독점", "점유율", "市場占有率", "シェア",
-        # Regulatory & Statutory
-        "statutory limit", "regulatory limit", "baseline", "antitrust"
+        "thị phần", "독점", "점유율", "市場占有率", "シェア"
     ]
-    has_threshold = any(k in t for k in threshold_triggers) or bool(re.search(r'\b(rate|fold|cap)\b', t, re.IGNORECASE))
+    en_threshold_pat = re.compile(
+        r"\b(times|ratio|percent|exceed(?:s|ed|ing)?|surpass(?:es|ed|ing)?|threshold|residue|discrepancy|"
+        r"ceiling|cost overage|budget overage|monopoly|market share|dominance|statutory limit|regulatory limit|"
+        r"baseline|antitrust|rate|fold|cap)\b",
+        re.IGNORECASE,
+    )
+    has_threshold = any(k in t for k in cjk_vn_threshold_triggers) or bool(en_threshold_pat.search(t))
     if has_threshold:
         is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text) or market.upper() == "JP"
         is_kr = market.upper() == "KR"
@@ -372,7 +372,18 @@ def detect_forensic_overlay(
         quant = extract_episode_quantitative_profile(grounding_intel, narration_text, market)
         has_ratio = quant.ratio is not None
         has_comparison = quant.detected_value is not None and quant.baseline_value is not None
-        if quant.status != ProfileStatus.INSUFFICIENT_DATA and (has_ratio or has_comparison):
+        # Guard against false statutory comparison when two arbitrary currency amounts appear in narration without exceedance terms
+        has_explicit_exceedance = bool(re.search(
+            r"\b(exceed(?:s|ed|ing)?|surpass(?:es|ed|ing)?|threshold|limit|ceiling|cap|times|fold|ratio|baseline)\b|倍|배|초과|超過|基準|vượt|gấp|ngưỡng",
+            t,
+            re.IGNORECASE,
+        ))
+        allow_threshold = (
+            quant.status != ProfileStatus.INSUFFICIENT_DATA
+            and (has_ratio or has_comparison)
+            and not (quant.value_kind == ValueKind.CURRENCY and quant.provenance == "narration" and not has_explicit_exceedance)
+        )
+        if allow_threshold:
             detected = quant.detected_value
             baseline = quant.baseline_value
             multiplier = quant.ratio or (round(detected / max(1.0, baseline), 1) if (detected and baseline) else None)
@@ -450,7 +461,7 @@ def detect_forensic_overlay(
         "内部文書", "告発状", "開示資料", "捜査報告書", "秘密文書"
     ]
     if any(k in t for k in paper_triggers) and not (re.search(r'\bnda\b', t) or any(k in t for k in ["redact", "blacked out", "hợp đồng", "조항", "契約", "条項", "黒塗り"])):
-        sentences = [s.strip() for s in re.split(r'[.!?。！？\n]', narration_text) if len(s.strip()) > 5]
+        sentences = [s.strip() for s in re.split(r'(?<!\d)\.(?!\d)|[!?。！？\n]+', narration_text) if len(s.strip()) > 5]
         highlight_phrase = sentences[0] if sentences else narration_text[:60]
         if len(highlight_phrase.split()) > 8:
             highlight_phrase = " ".join(highlight_phrase.split()[:8])
@@ -477,7 +488,7 @@ def detect_forensic_overlay(
 
     # 2. Document Highlight (Contracts, clauses, terms, NDA, redactions, audits, subpoenas, official files)
     if any(k in t for k in ["contract", "clause", "redact", "nda", "audit", "dossier", "agreement", "classified", "subpoena", "record", "records", "inspection", "capacity", "license", "hợp đồng", "điều khoản", "tài liệu", "biên bản", "thanh tra", "hồ sơ", "chứng cứ", "조항", "감사", "서류", "契約", "条項", "黒塗り", "機密", "内部文書", "調査報告", "監査", "公文書", "記録", "報告書", "規約", "認可", "査察", "捜査", "申請", "不正", "虚偽", "隠蔽", "検査", "検疫", "追跡", "執行", "規則", "原産地", "ホルムアルデヒド", "漂白", "着色", "農薬", "添加物", "食品衛生", "報道", "警告"]):
-        sentences = [s.strip() for s in re.split(r'[.!?。]+', narration_text) if len(s.strip()) > 5][:4]
+        sentences = [s.strip() for s in re.split(r'(?<!\d)\.(?!\d)|[!?。]+', narration_text) if len(s.strip()) > 5][:4]
         clauses = [f"{idx+1}. {sent}" for idx, sent in enumerate(sentences)] if sentences else [
             "1. OFFICIAL INVESTIGATION RECORD // FINDINGS OF FACT",
             "2. REGULATORY AUDIT IDENTIFIED UNVERIFIED CALCULATIONS."
@@ -659,25 +670,48 @@ def detect_forensic_overlay(
 
     # 5. Causal Flowchart (Systemic trap, network, money laundering, shell game, pipeline)
     if any(k in t for k in ["mechanism", "network", "shell", "laundering", "channel", "transmission", "intermediary", "trap", "bẫy", "chuỗi", "dòng tiền", "trung gian", "cơ chế", "dây chuyền", "구조", "우회", "경路", "仕組み", "構造", "メカニズム", "資金ルート", "マネーロンダリング", "迂回", "中間業者", "罠", "連鎖", "パイプライン", "スキーム", "利権", "資金環流"]):
+        if any(w in t for w in ["escrow", "refund", "consumer", "deposit", "platform", "hoàn tiền", "환불"]):
+            fc_nodes = [
+                {"id": "origin", "label": "Consumer Capital", "status": "normal"},
+                {"id": "intermediary", "label": "Platform Escrow", "status": "breach"},
+                {"id": "offshore", "label": "Non-Refund Vault", "status": "fatal"},
+            ]
+            fc_edges = [
+                {"from": "origin", "to": "intermediary", "label": "Deposit Stream"},
+                {"from": "intermediary", "to": "offshore", "label": "Trapped Liquidity"},
+            ]
+        elif any(w in t for w in ["bankruptcy", "creditor", "claim", "trust", "insurer", "diocese", "settlement", "chapter 11", "court", "lawsuit", "phá sản", "chủ nợ"]):
+            fc_nodes = [
+                {"id": "origin", "label": "Debtor Estate & Assets", "status": "normal"},
+                {"id": "intermediary", "label": "Settlement Trust Structure", "status": "breach"},
+                {"id": "resolution", "label": "Creditor & Insurer Contest", "status": "fatal"},
+            ]
+            fc_edges = [
+                {"from": "origin", "to": "intermediary", "label": "Proposed Allocation"},
+                {"from": "intermediary", "to": "resolution", "label": "Contested Liability"},
+            ]
+        else:
+            fc_nodes = [
+                {"id": "origin", "label": "Primary Catalyst Source", "status": "normal"},
+                {"id": "intermediary", "label": "Institutional Transmission", "status": "breach"},
+                {"id": "impact", "label": "Systemic Consequence", "status": "fatal"},
+            ]
+            fc_edges = [
+                {"from": "origin", "to": "intermediary", "label": "Causal Trigger"},
+                {"from": "intermediary", "to": "impact", "label": "Structural Lock"},
+            ]
         return {
             "type": "causal_flowchart",
             "legacy_type": "redacted_doc",
             "theme": theme or "vox_paper",
             "layout": "full_bleed_focus",
-            "title": "CAUSAL TRANSMISSION // ASYMMETRIC CHOKE",
+            "title": "CAUSAL TRANSMISSION // SYSTEMIC STRUCTURE",
             "badge": "RESTRICTED",
             "sfx_cue": "node_pop",
-            "label": "INSTITUTIONAL TRANSMISSION // SYSTEMIC CHOKE",
+            "label": "INSTITUTIONAL TRANSMISSION // SYSTEMIC LINKAGE",
             "payload": {
-                "nodes": [
-                    {"id": "origin", "label": "Consumer Capital", "status": "normal"},
-                    {"id": "intermediary", "label": "Platform Escrow", "status": "breach"},
-                    {"id": "offshore", "label": "Non-Refund Vault", "status": "fatal"}
-                ],
-                "edges": [
-                    {"from": "origin", "to": "intermediary", "label": "Deposit Stream"},
-                    {"from": "intermediary", "to": "offshore", "label": "Trapped Liquidity"}
-                ]
+                "nodes": fc_nodes,
+                "edges": fc_edges,
             }
         }
 
@@ -796,10 +830,10 @@ def detect_animation_cue(narration_text: str, object_focus: dict = None) -> dict
         }
 
     # Red Stamp Slam
-    if any(k in t for k in ["fraud", "illegal", "guilty", "busted", "seized", "void", "breach", "vi phạm", "gian lận", "bị bắt", "vô hiệu", "bất hợp pháp", "위반", "사기", "무효"]):
+    if any(k in t for k in ["fraud", "illegal", "guilty", "busted", "seized", "void", "breach", "reject", "rejected", "denied", "vi phạm", "gian lận", "bị bắt", "vô hiệu", "bất hợp pháp", "bác bỏ", "위반", "사기", "무효"]):
         trigger = first_word
         for w in words:
-            if w.lower() in ["fraud", "illegal", "violation", "breach", "gian lận", "vi phạm", "사기", "위반"]:
+            if w.lower() in ["fraud", "illegal", "violation", "breach", "rejected", "reject", "denied", "gian lận", "vi phạm", "사기", "위반"]:
                 trigger = w
                 break
         return {
@@ -855,6 +889,21 @@ def detect_stat_card(narration_text: str) -> dict | None:
     """Rule 122 & Rule 128: Extract prominent financial metrics or evidentiary scales for Remotion Stat Card."""
     if not narration_text:
         return None
+    t = narration_text.lower()
+
+    def _resolve_pct_label(txt_low: str) -> str:
+        if any(w in txt_low for w in ["reject", "vote", "voting", "creditor", "ballot", "approve", "oppose", "bác bỏ", "biểu quyết", "거부", "투표", "否決", "投票"]):
+            return "VOTE OUTCOME // PERCENTAGE"
+        if any(w in txt_low for w in ["drop", "fell", "decline", "loss", "plunge", "giảm", "sụt", "하락", "減少"]):
+            return "DECLINE RATE // PERCENTAGE"
+        if any(w in txt_low for w in ["growth", "grew", "increase", "surge", "gain", "tăng trưởng", "증가", "成長"]):
+            return "GROWTH RATE // PERCENTAGE"
+        return "QUANTITATIVE RATIO // PERCENTAGE"
+
+    def _resolve_cur_label(txt_low: str) -> str:
+        if any(w in txt_low for w in ["trust", "settlement", "fund", "claim", "liability", "damages", "lawsuit", "bankruptcy", "quỹ", "bồi thường", "dàn xếp"]):
+            return "SETTLEMENT & CLAIM METRIC"
+        return "FINANCIAL METRIC // SCALE"
 
     parsed = parse_spoken_number(narration_text)
     if parsed:
@@ -863,9 +912,9 @@ def detect_stat_card(narration_text: str) -> dict | None:
         elif parsed.suffix and "đồng" in parsed.suffix:
             label = "MARKET METRIC // COST"
         elif parsed.metric_type == "currency":
-            label = "FINANCIAL METRIC // VALUATION"
+            label = _resolve_cur_label(t)
         elif parsed.metric_type == "percentage":
-            label = "GROWTH RATE // PERCENTAGE"
+            label = _resolve_pct_label(t)
         else:
             label = "EVIDENCE // SCALE"
         return {"value": parsed.formatted, "label": label}
@@ -875,12 +924,12 @@ def detect_stat_card(narration_text: str) -> dict | None:
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:만|억|조)?\s*원)', "PRICE ANCHOR // TRANSACTION"),
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆)\s*(?:円|ドル)?|\d+(?:,\d{3})*(?:\.\d+)?\s*(?:円|ドル))', "FINANCIAL VALUE // VALUATION"),
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:tỷ|triệu|nghìn)\s*đ(?:ồng)?)', "MARKET METRIC // COST"),
-        (r'(\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|TRILLION|B|M|K)?(?:\s*→\s*<\$\d+)?(?:\s*/\s*SHARE)?)', "FINANCIAL METRIC // VALUATION"),
+        (r'(\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|TRILLION|B|M|K)?(?:\s*→\s*<\$\d+)?(?:\s*/\s*SHARE)?)', _resolve_cur_label(t)),
         (r'(-\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|B|M)?)', "BALANCE SHEET // WRITE-DOWN"),
-        (r'((?:<\$\d+(?:\.\d+)?|\$\d+(?:\.\d+)?))', "MARKET VALUE // PRICE TARGET"),
-        (r'([+-]?\d+(?:\.\d+)?%)', "GROWTH RATE // PERCENTAGE"),
-        (r'(\d+\+?\s*(?:BOXES|DOCUMENTS|WITNESSES|EMPLOYEES|INVESTIGATORS|개|명|건|곳|人|名|件|ヶ所|箇所|基|倍|トン|m|km|点|本|台|棟|người|vụ|điểm|tấn|hồ sơ))', "EVIDENCE // SCALE"),
-        (r'(\b(?:GUILTY|CONVICTED|VERDICT|FRAUD|CONSPIRACY)\b)', "LEGAL RULING // VERDICT"),
+        (r'((?:<\$\d+(?:\.\d+)?|\$\d+(?:\.\d+)?))', _resolve_cur_label(t)),
+        (r'([+-]?\d+(?:\.\d+)?%)', _resolve_pct_label(t)),
+        (r'(\d+\+?\s*(?:BOXES|DOCUMENTS|WITNESSES|EMPLOYEES|INVESTIGATORS|LAWSUITS|CLAIMS|개|명|건|곳|人|名|件|ヶ所|箇所|基|倍|トン|m|km|点|本|台|棟|người|vụ|điểm|tấn|hồ sơ))', "EVIDENCE // SCALE"),
+        (r'(\b(?:GUILTY|CONVICTED|VERDICT|FRAUD|CONSPIRACY|REJECTED)\b)', "LEGAL RULING // VERDICT"),
         (r'(\b(?:MARK-TO-MARKET|SPECIAL PURPOSE ENTITIES|SPE NETWORK|CIRCULAR HEDGE)\b)', "FINANCIAL MECHANISM"),
     ]
     for p, label in patterns:
@@ -901,10 +950,10 @@ def detect_stamp_badge(narration_text: str) -> str | None:
         return "PRICE_FRAUD"
     if any(k in t for k in ["tài liệu mật", "hợp đồng mật", "비밀", "기밀", "confidential", "classified", "nda", "機密", "極秘", "非公開", "内部告発", "秘密"]):
         return "CONFIDENTIAL"
-    if any(k in t for k in ["bằng chứng", "chứng cứ", "vết nứt", "증거", "단서", "evidence", "proof", "証拠", "物証", "確証", "痕跡", "実態"]):
-        return "EVIDENCE"
-    if any(k in t for k in ["hủy bỏ", "vô hiệu", "취소", "무효", "void", "breach", "無効", "破棄", "契約解除", "差し止め", "取消"]):
+    if any(k in t for k in ["hủy bỏ", "vô hiệu", "bác bỏ", "từ chối", "취소", "무효", "기각", "거부", "void", "breach", "reject", "rejected", "denied", "dismissed", "overruled", "無効", "破棄", "契約解除", "差し止め", "取消", "棄却", "却下"]):
         return "VOID"
+    if any(k in t for k in ["bằng chứng", "chứng cứ", "vết nứt", "phán quyết", "tòa án", "증거", "단서", "판결", "법원", "evidence", "proof", "ruling", "verdict", "judge", "court", "bankruptcy", "chapter 11", "lawsuit", "docket", "証拠", "物証", "確証", "痕跡", "実態", "判決", "裁判所"]):
+        return "EVIDENCE"
     return None
 
 
@@ -1641,7 +1690,9 @@ def generate_director_plan(
         if not forensic_overlay or isinstance(forensic_overlay, str):
             auto_overlay = detect_forensic_overlay(
                 narration,
+                grounding_intel=grounding_data,
                 market=m_up,
+                metadata=metadata,
                 scene_idx=idx,
                 is_cold_hook=(idx == 0 and beat_idx == 1)
             )
@@ -1651,14 +1702,6 @@ def generate_director_plan(
         stat_card = sc.get("stat_card") or sc.get("statCard")
         if not stat_card:
             stat_card = detect_stat_card(narration)
-
-        stamp_badge = sc.get("stamp_badge") or sc.get("stampBadge")
-        if not stamp_badge:
-            stamp_badge = detect_stamp_badge(narration)
-
-        motion_directive = sc.get("motion_directive") or sc.get("motionDirective")
-        if not motion_directive:
-            motion_directive = "dramatic_push" if idx < 15 else ("split_whip" if idx % 3 == 0 else "subtle_drift")
 
         # Dynamic Hollywood tension curve based on beat index and scene flow
         dynamic_tension = cam.get("tension_level") if isinstance(cam, dict) else None
@@ -1673,6 +1716,27 @@ def generate_director_plan(
                 dynamic_tension = "climax" if idx % 2 == 0 else "high"
             else:  # Beat 5
                 dynamic_tension = "climax" if idx == 0 else ("medium" if idx % 2 == 0 else "low")
+
+        stamp_badge = sc.get("stamp_badge") or sc.get("stampBadge")
+        if not stamp_badge:
+            stamp_badge = detect_stamp_badge(narration)
+        if not stamp_badge and dynamic_tension == "climax":
+            stamp_badge = "VOID" if any(w in narration.lower() for w in ["reject", "rejected", "denied", "dismissed", "void", "breach"]) else "EVIDENCE"
+
+        motion_directive = sc.get("motion_directive") or sc.get("motionDirective")
+        if not motion_directive:
+            if dynamic_tension == "climax":
+                motion_directive = "dramatic_push" if idx % 2 == 0 else "forensic_lock"
+            elif idx < 15:
+                motion_directive = "dramatic_push"
+            elif idx % 3 == 0:
+                motion_directive = "split_whip"
+            elif idx % 2 == 0:
+                motion_directive = "forensic_lock"
+            else:
+                motion_directive = "subtle_drift"
+        elif dynamic_tension == "climax" and motion_directive == "subtle_drift":
+            motion_directive = "dramatic_push"
 
         # VOX Editorial Storyboard Fields (Rule 122 & Rule 128)
         object_focus = sc.get("object_focus")
@@ -1943,7 +2007,15 @@ def generate_director_plan(
             from app.services.prompt_forge import generate_scene_prompts, push_prompts_to_notion
             logger.info("  [B3.5] Forging visual prompts via Prompt Forge Engine...")
             bg_req = {k: {"visual_hint": v["description"], "narration_context": v["beat"]} for k, v in bg_roster.items()}
-            fg_req = {k: {"visual_hint": v["description"], "narration_context": v["beat"]} for k, v in fg_roster.items()}
+            fg_req = {
+                k: {
+                    "visual_hint": v["description"],
+                    "narration_context": v["beat"],
+                    "type": v.get("type", "evidence_prop"),
+                    "role": v.get("role", "Key Evidence")
+                }
+                for k, v in fg_roster.items()
+            }
 
             prompts_res = generate_scene_prompts(
                 bg_dict=bg_req,
@@ -1989,7 +2061,7 @@ def generate_director_plan(
                 dp_plan={"scenes": director_plan.get("scenes", [])},
                 prompts_data=prompts_res if 'prompts_res' in locals() else None,
                 story_text=story_text,
-                grounding_intel=grounding_intel if 'grounding_intel' in locals() and grounding_intel else None,
+                grounding_intel=grounding_data if 'grounding_data' in locals() and grounding_data else None,
                 seo_package=intel_card.get("seo_package") if 'intel_card' in locals() and isinstance(intel_card, dict) else None
             )
             if conv_res and "director_plan" in conv_res:
@@ -1998,6 +2070,19 @@ def generate_director_plan(
                 prompts_res = conv_res["prompts_data"]
         except Exception as e:
             logger.warning(f"  [B3.5.1] Adversarial Visual Convergence encountered notice: {e}")
+
+        # 8.6. Step B3.5.2: Opus 5.5 In-Flight Supervisor Gate
+        try:
+            from scripts.orchestrator.opus55_supervisor_gate import audit_director_assets_in_flight
+            for target_dir in canonical_dirs:
+                if (target_dir / "director_plan.json").exists():
+                    gate_res = audit_director_assets_in_flight(target_dir, call_llm_audit=False)
+                    logger.info(
+                        "  [B3.5.2 Opus 5.5 Gate] %s Verdict=%s (Score=%s, Defects=%d)",
+                        target_dir, gate_res.get("verdict"), gate_res.get("score"), gate_res.get("defects_count", 0)
+                    )
+        except Exception as e_gate:
+            logger.warning(f"  [B3.5.2] Opus 5.5 In-Flight Gate check notice: {e_gate}")
 
     # 9. Sync Director Plan to Notion
     if not skip_notion:
