@@ -56,9 +56,19 @@
     },
     "transition_out": {
       "type": "string",
-      "enum": ["hard_cut", "stop_motion_flicker_cut", "crossfade_short"],
+      "enum": [
+        "hard_cut",
+        "stop_motion_flicker_cut",
+        "crossfade_short",
+        "paper_slide",
+        "vox_push_zoom",
+        "match_cut",
+        "vox_tape_snap",
+        "push_through",
+        "vox_paper_wipe"
+      ],
       "default": "hard_cut",
-      "description": "hard_cut hợp phong cách stop-motion nhất. stop_motion_flicker_cut nhấp nháy 2-3 frame giả lập đổi khung hình thủ công."
+      "description": "hard_cut hợp phong cách stop-motion nhất. Các hiệu ứng paper_slide, vox_push_zoom, match_cut, vox_tape_snap, push_through, vox_paper_wipe phục vụ Stateful Investigation Boards."
     },
     "final_veo_prompt": {
       "type": "string",
