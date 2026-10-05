@@ -216,6 +216,110 @@ def classify_causal_role(claim: Dict[str, Any]) -> str:
     return "background_context"
 
 
+def fetch_live_news_rss_chunks(query: str, market: str = "EN", limit: int = 10) -> List[Dict[str, Any]]:
+    """Fetch live news article snippets via Google News RSS Search.
+    100% free, zero token cost, zero rate limit, resilient fallback for search grounding."""
+    try:
+        import urllib.parse
+        import xml.etree.ElementTree as ET
+        
+        m_up = (market or "EN").upper()
+        hl_gl_map = {
+            "EN": ("en-US", "US"),
+            "JA": ("ja", "JP"),
+            "JP": ("ja", "JP"),
+            "KO": ("ko", "KR"),
+            "KR": ("ko", "KR"),
+            "VN": ("vi", "VN"),
+        }
+        hl, gl = hl_gl_map.get(m_up, ("en-US", "US"))
+        
+        enc_query = urllib.parse.quote(query)
+        url = f"https://news.google.com/rss/search?q={enc_query}&hl={hl}&gl={gl}&ceid={gl}:{hl.split('-')[0]}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            xml_data = resp.read()
+        
+        root = ET.fromstring(xml_data)
+        items = root.findall(".//item")[:limit]
+        chunks = []
+        for it in items:
+            title = (it.findtext("title") or "").strip()
+            link = (it.findtext("link") or "").strip()
+            pub_date = (it.findtext("pubDate") or "").strip()
+            desc = (it.findtext("description") or "").strip()
+            if title:
+                chunks.append({
+                    "title": title,
+                    "uri": link,
+                    "date": pub_date,
+                    "snippet": desc
+                })
+        return chunks
+    except Exception as e:
+        logger.warning(f"[grounding] fetch_live_news_rss_chunks failed for '{query}': {e}")
+        return []
+
+
+def _synthesize_with_claude_sonnet(
+    topic: str,
+    search_hint: str = "",
+    market: str = "EN",
+    existing_chunks: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """Robust fallback: uses Google News RSS search chunks + Claude Sonnet 5.5 via HHTech API."""
+    logger.info(f"[grounding] Invoking Claude Sonnet 5.5 synthesis for topic: '{topic}'...")
+    chunks = list(existing_chunks or [])
+    if not chunks:
+        chunks = fetch_live_news_rss_chunks(topic, market=market, limit=10)
+        logger.info(f"[grounding] Fetched {len(chunks)} live RSS news chunks for '{topic}'")
+
+    grounding_context_str = ""
+    if chunks:
+        grounding_context_str = f"\n\nGROUND TRUTH LIVE NEWS SOURCE CHUNKS:\n{json.dumps(chunks, ensure_ascii=False, indent=2)}\n"
+
+    from app.services.model_gateway import get_global_gateway
+    gw = get_global_gateway()
+    prompt = (
+        f"You are an Elite Forensic Research Fact-Finder for an investigative documentary channel.\n"
+        f"Construct a Deep Investigative Factual Dossier containing 12 to 18 concrete, verifiable factual claims for topic: '{topic}'.\n"
+        f"{f'Context / Angle: {search_hint}' if search_hint else ''}\n"
+        f"{grounding_context_str}\n"
+        f"MANDATORY FACT-CHECKING RULES (RULE 118 & RULE 130):\n"
+        f"1. Extract concrete facts, dates, and metrics grounded in the topic and provided news sources. NEVER invent statistics, dollar amounts, or quotes.\n"
+        f"2. Output ONLY valid JSON matching this schema:\n"
+        f'{{\n  "topic": "{topic}",\n  "temporal_cadence": "MACRO_SAGA|MID_TACTICAL|FLASH_CRISIS",\n'
+        f'  "rejected": false,\n  "reject_reason": "",\n'
+        f'  "causal_epochs": [\n    {{"epoch_stage": "genesis_seed|critical_rupture", "time_marker": "...", "event_summary": "...", "verified_claim": "..."}}\n  ],\n'
+        f'  "claims": [\n    {{\n      "claim": "Specific factual claim with concrete metric/action",\n'
+        f'      "source": "Name of reporting outlet or agency",\n      "source_url": "",\n      "date": "YYYY-MM-DD",\n'
+        f'      "confidence": "verified",\n      "causal_role": "primary_catalyst|transmission_mechanism|background_context",\n'
+        f'      "mechanism": "legal|financial|regulatory",\n      "act_target": "ACT_I|ACT_II|ACT_III|ACT_IV|ACT_V"\n    }}\n  ]\n}}'
+    )
+    try:
+        sonnet_res = gw.call_llm(prompt=prompt, model="claude-sonnet-5-5", temperature=0.1, max_tokens=3500)
+        m_s = re.search(r"\{.*\}", sonnet_res, re.DOTALL)
+        if m_s:
+            parsed = json.loads(m_s.group(0))
+            parsed["grounding_chunks"] = chunks
+            parsed["search_queries"] = [topic]
+            parsed["has_live_search"] = bool(chunks)
+            parsed["grounding_model"] = "claude-sonnet-5-5"
+            return parsed
+    except Exception as e:
+        logger.error(f"[grounding] Claude Sonnet 5.5 synthesis failed: {e}")
+
+    return {
+        "topic": topic,
+        "rejected": True,
+        "reject_reason": "Grounding synthesis failed: no verified data found",
+        "claims": [],
+        "grounding_chunks": chunks,
+        "search_queries": [topic],
+        "has_live_search": bool(chunks)
+    }
+
+
 def run_grounding_research(
     topic: str,
     search_hint: str = "",
@@ -223,21 +327,14 @@ def run_grounding_research(
     timeout: float = 60.0
 ) -> Dict[str, Any]:
     """
-    Executes live Google Search Grounding via Gemini 2.5 Flash REST API.
+    Executes live Google Search Grounding via Gemini 2.5 Flash REST API with automatic
+    resilient fallback to Google News RSS live search + Claude Sonnet 5.5 via HHTech API.
     Extracts structured factual claims, dates, sources, confidence levels, mechanisms, and causal roles (Rule 130).
     """
     api_key = get_gemini_api_key()
     if not api_key:
-        logger.warning("[grounding] No GEMINI_API_KEY configured. Returning fallback ungrounded container.")
-        return {
-            "topic": topic,
-            "rejected": False,
-            "reject_reason": "No GEMINI_API_KEY configured",
-            "claims": [],
-            "grounding_chunks": [],
-            "search_queries": [],
-            "has_live_search": False
-        }
+        logger.info("[grounding] No GEMINI_API_KEY configured. Using live RSS + Claude Sonnet 5.5...")
+        return _synthesize_with_claude_sonnet(topic, search_hint=search_hint, market=market)
 
     sys_instruction = (
         "You are an Elite Forensic Research Fact-Finder for an investigative documentary channel.\n"
@@ -429,45 +526,9 @@ def run_grounding_research(
                     continue
                 break
 
-    # Final robust fallback to claude-sonnet-5-5 via HHTech API
-    logger.info(f"[grounding] Invoking primary fallback model claude-sonnet-5-5 via HHTech API...")
-    try:
-        from app.services.model_gateway import get_global_gateway
-        gw = get_global_gateway()
-        fallback_prompt = (
-            f"You are an Elite Forensic Research Fact-Finder for an investigative documentary channel.\n"
-            f"Construct a Deep Investigative Factual Dossier containing 12 to 18 concrete, verifiable factual claims for topic: '{topic}'.\n\n"
-            f"Output ONLY valid JSON matching this schema:\n"
-            f'{{\n  "topic": "{topic}",\n  "temporal_cadence": "MACRO_SAGA|MID_TACTICAL|FLASH_CRISIS",\n'
-            f'  "rejected": false,\n  "reject_reason": "",\n'
-            f'  "causal_epochs": [\n    {{"epoch_stage": "genesis_seed|critical_rupture", "time_marker": "...", "event_summary": "...", "verified_claim": "..."}}\n  ],\n'
-            f'  "claims": [\n    {{\n      "claim": "Specific factual claim with concrete metric/action",\n'
-            f'      "source": "Name of reporting outlet or agency",\n      "source_url": "",\n      "date": "YYYY-MM-DD",\n'
-            f'      "confidence": "verified",\n      "causal_role": "primary_catalyst|transmission_mechanism|background_context",\n'
-            f'      "mechanism": "legal|financial|regulatory",\n      "act_target": "ACT_I|ACT_II|ACT_III|ACT_IV|ACT_V"\n    }}\n  ]\n}}'
-        )
-        sonnet_res = gw.call_llm(prompt=fallback_prompt, model="claude-sonnet-5-5", temperature=0.1, max_tokens=3500)
-        m_s = re.search(r"\{.*\}", sonnet_res, re.DOTALL)
-        if m_s:
-            parsed = json.loads(m_s.group(0))
-            parsed["grounding_chunks"] = []
-            parsed["search_queries"] = []
-            parsed["has_live_search"] = False
-            parsed["grounding_model"] = "claude-sonnet-5-5"
-            return parsed
-    except Exception as e_fb:
-        logger.error(f"[grounding] Fallback claude-sonnet-5-5 failed: {e_fb}")
-
-    logger.error(f"[grounding] All grounding models failed: {last_err}")
-    return {
-        "topic": topic,
-        "rejected": True,
-        "reject_reason": f"All grounding models failed: {last_err}",
-        "claims": [],
-        "grounding_chunks": [],
-        "search_queries": [],
-        "has_live_search": False
-    }
+    # Final robust fallback to Google News RSS search + claude-sonnet-5-5 via HHTech API
+    logger.info(f"[grounding] Invoking primary fallback model claude-sonnet-5-5 via HHTech API (with live RSS search)...")
+    return _synthesize_with_claude_sonnet(topic, search_hint=search_hint, market=market)
 
 
 def passes_grounding_gate(
