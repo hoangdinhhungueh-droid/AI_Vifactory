@@ -84,13 +84,18 @@ CHAT_UPSTREAMS = [
      "model": "gpt-oss-120b"},                              # ctx cap ~64K
     {"name": "gemini", "base": "https://generativelanguage.googleapis.com/v1beta/openai",
      "key": os.getenv("GEMINI_API_KEY", ""),
-     "model": os.getenv("GEMINI_MODEL_25FL", "gemini-2.5-flash-lite")},
+     "model": os.getenv("GEMINI_MODEL_25FL", "claude-sonnet-5-5")},
+    {"name": "hhtech", "base": os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1"),
+     "key": os.getenv("HHTECH_API_KEY", ""),
+     "model": "claude-sonnet-5-5"},
     {"name": "onmay",  "base": os.getenv("ONMAY_BASE_URL", "").rstrip("/"),
      "key": os.getenv("ONMAY_API_KEY", ""),
-     "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash")},  # LUÔN CUỐI
+     "model": os.getenv("GEMINI_MODEL", "claude-sonnet-5-5")},  # LUÔN CUỐI
 ]
 
 REASONING_UPSTREAMS = [
+    {"name": "hhtech",   "base": os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1"),
+     "key": os.getenv("HHTECH_API_KEY", ""), "model": "claude-sonnet-5-5"},
     {"name": "cerebras", "base": os.getenv("CEREBRAS_BASE_URL", "https://api.cerebras.ai/v1"),
      "key": os.getenv("CEREBRAS_API_KEY", ""), "model": "gpt-oss-120b"},
     {"name": "mistral",  "base": os.getenv("MISTRAL_BASE_URL", "https://api.mistral.ai/v1"),
@@ -98,13 +103,13 @@ REASONING_UPSTREAMS = [
      "model": os.getenv("MISTRAL_MODEL", "mistral-medium-latest")},
     {"name": "gemini",   "base": "https://generativelanguage.googleapis.com/v1beta/openai",
      "key": os.getenv("GEMINI_API_KEY", ""),
-     "model": os.getenv("GEMINI_MODEL_25FL", "gemini-2.5-flash-lite")},
+     "model": os.getenv("GEMINI_MODEL_25FL", "claude-sonnet-5-5")},
     {"name": "openrouter","base": "https://openrouter.ai/api/v1",
      "key": os.getenv("OPENROUTER_API_KEY", ""),
      "model": "nvidia/nemotron-3-nano-30b-a3b:free"},
     {"name": "onmay",    "base": os.getenv("ONMAY_BASE_URL", "").rstrip("/"),
      "key": os.getenv("ONMAY_API_KEY", ""),
-     "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash")},
+     "model": os.getenv("GEMINI_MODEL", "claude-sonnet-5-5")},
 ]
 
 # ── v10.1 Budget Gate ─────────────────────────────────────────────────────────

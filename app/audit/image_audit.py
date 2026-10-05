@@ -10,7 +10,7 @@ import re
 
 logger = logging.getLogger(__name__)
 
-_GEMINI_MODEL = "gemini-2.5-flash-lite"
+_GEMINI_MODEL = "claude-sonnet-5-5"
 _GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{_GEMINI_MODEL}:generateContent"
 _GEMINI_TIMEOUT = 15
 _GEMINI_FAILURE_COUNT = 0

@@ -44,11 +44,11 @@ NOTION_VERSION = "2022-06-28"
 # Gemini free tier (250 RPD shared with text chains) exhausted after a few images -> unusable.
 # deepseek-v4-flash on hhtech is TEXT-ONLY (vision request -> HTTP 400, measured 16/08).
 # claude-haiku-4.5 measured: vision OK, 16s/img, 5277 in + 748 out tokens per 1024x576 img.
-GEMINI_MODEL = "gemini-2.5-flash"  # legacy, provider retired 16/08
-HHTECH_MODEL = os.environ.get("AUDIT_VISION_MODEL", "claude-haiku-4.5")
+GEMINI_MODEL = "claude-sonnet-5-5"  # upgraded to claude-sonnet-5-5 via hhtech
+HHTECH_MODEL = os.environ.get("AUDIT_VISION_MODEL", "claude-sonnet-5-5")
 HHTECH_BASE = "https://hhtechapi.com/v1"
 HHTECH_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-AUDIT_METHOD_NAME = "Claude Haiku Vision (auto)"
+AUDIT_METHOD_NAME = "Claude Sonnet Vision (auto)"
 VND_PER_1M_CREDITS = 300.0  # user pricing 16/08; assume 1 token = 1 credit
 MIN_CALL_INTERVAL = 1.0  # hhtech paid: no 10 RPM cap, 1s polite spacing
 

@@ -13,26 +13,26 @@ OR_PRIORITY = [
 ]
 
 FREE_CREATIVE = [
+    {"provider": "hhtech",     "model": "claude-sonnet-5-5",       "type": "paid"},
     {"provider": "cerebras",   "model": "gpt-oss-120b",          "type": "free", "tpd": 1000000},  # ctx free CAP 64K
     {"provider": "openrouter", "model": "OR_PRIORITY",           "type": "free", "rpm": 20, "rpd": 1000},
-    {"provider": "gemini",     "model": "gemini-2.5-flash-lite", "type": "free", "rpd": 1500},
     {"provider": "groq",       "model": "qwen/qwen3-32b",        "type": "free", "rpd": 14400},  # small-ctx only
     {"provider": "mistral",    "model": "mistral-medium-latest", "type": "free", "rpd": 1000000},
-    {"provider": "onmay",      "model": "gemini-2.5-flash",      "type": "free", "rpd": 200},  # LUON FALLBACK CUOI
+    {"provider": "hhtech",     "model": "claude-sonnet-5-5",       "type": "paid"},  # LUON FALLBACK CUOI
 ]
 FREE_REASONING = [
+    {"provider": "hhtech",     "model": "claude-sonnet-5-5",       "type": "paid"},
     {"provider": "openrouter", "model": "OR_PRIORITY",           "type": "free", "rpm": 20, "rpd": 1000},
     {"provider": "cerebras",   "model": "gpt-oss-120b",          "type": "free", "tpd": 1000000},
-    {"provider": "gemini",     "model": "gemini-2.5-flash-lite", "type": "free", "rpd": 1500},
     {"provider": "mistral",    "model": "mistral-medium-latest", "type": "free", "rpd": 1000000},
-    {"provider": "onmay",      "model": "gemini-2.5-flash",      "type": "free", "rpd": 200},
+    {"provider": "hhtech",     "model": "claude-sonnet-5-5",       "type": "paid"},
 ]
 FREE_UTILITY = [
     {"provider": "groq",       "model": "qwen/qwen3-32b",        "type": "free", "rpd": 14400},
-    {"provider": "gemini",     "model": "gemini-2.5-flash-lite", "type": "free", "rpd": 1500},
+    {"provider": "hhtech",     "model": "claude-sonnet-5-5",       "type": "paid"},
     {"provider": "cerebras",   "model": "gpt-oss-120b",          "type": "free", "tpd": 1000000},
     {"provider": "mistral",    "model": "mistral-small-latest",  "type": "free", "rpd": 1000000},
-    {"provider": "onmay",      "model": "gemini-2.5-flash",      "type": "free", "rpd": 200},
+    {"provider": "hhtech",     "model": "claude-sonnet-5-5",       "type": "paid"},
 ]
 EMBED_LOCAL = [
     {"provider": "local", "model": "sentence-transformers/all-MiniLM-L6-v2", "type": "local"},
