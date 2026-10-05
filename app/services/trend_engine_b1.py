@@ -1001,13 +1001,15 @@ def discover_and_produce_market_trend(
         # 2. Ground-truth Wikipedia extract
         factsheet = fetch_ground_truth_factsheet(term, m_up)
 
-        # 3. Viability assessment via HHTech GPT-6-Astra
+        # 3. Viability assessment via HHTech GPT-6-Astra (Grounded on News Catalysts per Rule 118 & 130)
         viability = assess_keyword_video_viability(
             term=term,
             market=m_up,
             traffic=str(c.get("approx_traffic", "")),
             rising_queries=rising_queries[:6],
-            top_videos=viral_videos[:4]
+            top_videos=viral_videos[:4],
+            news_catalysts=recon_data.get("news_catalysts", []),
+            raw_headline=raw_term
         )
 
         # Circuit Breaker check for repeated LLM API infrastructure outages (Rule 118)

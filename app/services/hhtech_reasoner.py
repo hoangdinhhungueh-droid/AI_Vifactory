@@ -427,35 +427,55 @@ def assess_keyword_video_viability(
     traffic: str = None,
     rising_queries: list | None = None,
     top_videos: list | None = None,
+    news_catalysts: list | None = None,
+    raw_headline: str | None = None,
     **kwargs
 ) -> dict:
-    """Pre-Selection Video-Viability Skill for GPT-6-Astra (User Rule 05/09/2026).
+    """Pre-Selection Video-Viability Skill for GPT-6-Astra / Claude Sonnet (Rule 118, 128, 130).
     Evaluates raw candidate keywords on whether they can viably sustain an 8-12 min
     high-retention 5-act non-fiction video with 2-layer Remotion illustration.
+    Strictly grounded on verifiable live catalysts with ZERO fabricated figures.
     """
-    keyword = keyword or term or ""
+    keyword = (keyword or term or raw_headline or "").strip()
     m_up = (market or "EN").strip().upper()
     theme, safety_label, treatment_note = detect_safety_and_theme(keyword, m_up)
     
-    if search_signals is None:
-        search_signals = {}
-    if traffic and "traffic" not in search_signals:
-        search_signals["traffic"] = traffic
-    if rising_queries and "rising_queries" not in search_signals:
-        search_signals["rising_queries"] = rising_queries
-    if top_videos and "top_videos" not in search_signals:
-        search_signals["top_videos"] = top_videos
+    signals = dict(search_signals or {})
+    if traffic and "traffic" not in signals:
+        signals["traffic"] = traffic
+    if rising_queries and "rising_queries" not in signals:
+        signals["rising_queries"] = rising_queries
+    if top_videos and "top_videos" not in signals:
+        signals["top_videos"] = top_videos
+
+    # Format news catalysts as verifiable evidence block (Rule 118 & 130)
+    catalysts_list = news_catalysts or signals.pop("news_catalysts", None) or []
+    catalysts_text = ""
+    if catalysts_list:
+        c_lines = []
+        for i, c in enumerate(catalysts_list[:6], start=1):
+            if isinstance(c, dict):
+                c_title = c.get("title", "").strip()
+                c_src = c.get("source", "").strip()
+                c_pub = c.get("published_at", c.get("published", "")).strip()
+                c_desc = c.get("description", c.get("snippet", "")).strip()[:200]
+                if c_title:
+                    c_lines.append(f"  [N{i}] {c_title} ({c_src} - {c_pub})\n       Summary: {c_desc}")
+            elif isinstance(c, str) and c.strip():
+                c_lines.append(f"  [N{i}] {c.strip()}")
+        if c_lines:
+            catalysts_text = "VERIFIED BREAKING NEWS CATALYSTS (PAST 24-48H):\n" + "\n".join(c_lines) + "\n\n"
 
     signals_str = ""
-    if search_signals:
-        signals_str = f"Search Signals: {json.dumps(search_signals, ensure_ascii=False)}\n"
+    clean_signals = {k: v for k, v in signals.items() if v}
+    if clean_signals:
+        signals_str = f"SEARCH & PLATFORM SIGNALS: {json.dumps(clean_signals, ensure_ascii=False)}\n\n"
 
     system_prompt = (
         "You are the Chief Executive Producer and Video Viability Auditor for Video Factory.\n"
         "Your role is to rigorously evaluate whether a raw trending keyword can be turned into a "
         "compelling, high-retention 8-12 minute non-fiction investigative documentary video.\n\n"
-        "MANDATORY SCOPE: 11 HIGH-RPM/HIGH-RETENTION NON-FICTION CONTENT PILLARS:\n"
-        "The candidate topic MUST strictly fall into one of these pillars:\n"
+        "MANDATORY SCOPE: 11 NON-FICTION CONTENT PILLARS (Select single best fit):\n"
         "  1. Business Rise & Fall: Financial engineering, corporate collapse, accounting fraud, executive hubris.\n"
         "  2. Modern History & Systemic Crisis: 20th-21st century turning points, institutional failure, declassified operations.\n"
         "  3. True Crime Non-Graphic: White-collar schemes, forensic timeline, investigative breakthroughs; ZERO graphic gore.\n"
@@ -464,52 +484,44 @@ def assess_keyword_video_viability(
         "  6. Institutional & Regulatory Chokepoints: Policy loopholes, pension/insurance failures, testing/quality falsification cover-ups.\n"
         "  7. Hidden Asymmetric Fortunes & Underground Flows: Underground flows, money laundering, information asymmetry schemes.\n"
         "  8. Ancient Prehistory & Lost Civilizations: Forensic archaeological evidence, evolutionary survival mechanisms, prehistoric anomalies.\n"
-        "  9. Indigenous Philosophy & Stoic Mindset: Ancient mindset protocols (Dokkodo, Stoicism) applied to modern institutional burnout and social fatigue.\n"
+        "  9. Indigenous Philosophy & Stoic Mindset: Ancient mindset protocols applied to modern institutional burnout and social fatigue.\n"
         "  10. Declassified Military Logistics & Geopolitical Chokepoints: Supply line collapses, strategic maritime straits, undersea infrastructure vulnerabilities.\n"
-        "  11. Everyday Consumer Injustice & Institutional Traps: Asymmetric retail traps, unwritten receipt clauses, hidden fees, toothless regulatory guidance, and minor contract exploitation.\n\n"
+        "  11. Everyday Consumer Injustice & Institutional Traps: Asymmetric retail traps, unwritten receipt clauses, hidden fees, toothless regulatory guidance, minor contract exploitation.\n\n"
         "STRICT REJECTION MANDATE (ZERO-SPECULATION & ANTI-DEFAMATION & ANTI-TUTORIAL):\n"
         "- REJECT immediately if the keyword is celebrity gossip, sports game scores/contract negotiations, entertainment awards, or unverified off-field personal/civil conduct allegations without official documented disciplinary action or court ruling.\n"
         "- REJECT if approving it would require AI speculation, inventing stakes, or defaming real individuals.\n"
-        "- REJECT if the proposed angle is a dry customer service FAQ, tutorial, or how-to guide ('How to', 'Mẹo', '5 bước', '환불하는법'). The angle MUST formulate a high-stakes dramatic clash: [Everyday Item/Transaction + Shock Figure] vs [Unilateral Fine Print / Institutional Trap].\n\n"
-        "SEARCH INTENT FORENSICS & ALGORITHMIC SURGE ANCHOR (RULE 118):\n"
-        "- The 'specific_viral_angle' MUST directly explain the REAL REASON why people are searching, as evidenced by the 'rising_queries'.\n"
-        "- If rising queries indicate that a subject is trending for a new reason (e.g. a new documentary announcement or seasonal holiday), do NOT recycle an outdated historical angle from years ago.\n"
-        "- FORBIDDEN: Hallucinating an unrelated niche angle not supported by real search signals.\n\n"
-        "CRITICAL EVALUATION GATES:\n"
-        "1. VISUAL FEASIBILITY (Layer 1 BG 16:9 + Layer 2 FG Transparent PNG)\n"
-        "2. CAUSAL CONFLICT DEPTH (Systemic mechanism, regulatory loophole, executive hubris, or institutional betrayal)\n"
-        "3. RULE 444 HOOK POTENTIAL (5-10s Quantitative Shock figure, dollar amount, or ticking clock)\n"
-        "4. AUDIENCE RETENTION APPEAL (High cold-traffic curiosity)\n\n"
+        "- REJECT if the proposed angle is a dry customer service FAQ, tutorial, or how-to guide ('How to', 'Mẹo', '5 bước', '환불하는법'). The angle MUST formulate a high-stakes dramatic clash: [Documented Entity/Event] vs [Documented Systemic Mechanism / Institutional Chokepoint].\n\n"
+        "ZERO-HALLUCINATION & STRICT EVIDENCE GROUNDING MANDATE (RULE 118, RULE 128, RULE 130):\n"
+        "1. ZERO FABRICATED METRICS: NEVER invent numbers, dollar figures, debt amounts, percentages, or settlement sums not explicitly present in the candidate headline, news catalysts, or rising queries. If no specific dollar amount exists in the evidence, formulate the angle strictly from the documented conflict and systemic mechanism WITHOUT inventing numbers.\n"
+        "2. CAUSAL FIDELITY (ANTI-BAIT-AND-SWITCH): Maintain 100% fidelity to the documented news catalyst. Never transform one mechanism into an unrelated crime (e.g. never transform user onboarding fraud into insider trading).\n"
+        "3. CONTEMPORARY SEARCH SURGE PAYOFF: The 'specific_viral_angle' MUST directly explain the REAL REASON why people are searching, grounded in the recent catalysts.\n"
+        "4. INSUFFICIENT EVIDENCE EXIT: If the provided evidence is too sparse or ambiguous to explain why the subject is trending without speculation, set verdict to REJECTED. Rejecting an ungroundable candidate is the correct, safe action.\n\n"
+        "EVALUATION CRITERIA:\n"
+        "1. VISUAL FEASIBILITY: Can the story be illustrated with 2-layer Remotion (16:9 illustrated background + transparent foreground)?\n"
+        "2. CONFLICT DEPTH: Is there a documented systemic mechanism, regulatory loophole, executive hubris, or institutional betrayal?\n"
+        "3. HOOK STRENGTH: Does the evidence provide a concrete stake (metric, deadline, or systemic paradox)? Rate LOW if ungrounded.\n"
+        "4. AUDIENCE APPEAL: High curiosity for general viewers without prior knowledge.\n\n"
         "Output ONLY valid JSON matching this schema:\n"
         "{\n"
         '  "is_video_viable": true|false,\n'
         '  "viability_score": <float 1.0 to 10.0>,\n'
         '  "verdict": "APPROVED"|"REJECTED",\n'
-        '  "specific_viral_angle": "<Specific 10x concrete video title/angle explaining the real search surge reason>",\n'
+        '  "specific_viral_angle": "<Concrete video title/angle grounded 100% in verified evidence, or null if rejected>",\n'
         '  "visual_feasibility_score": <int 1 to 10>,\n'
         '  "conflict_depth_score": <int 1 to 10>,\n'
         '  "rejection_reason": "<string if rejected, else null>"\n'
         "}"
     )
 
-    preset_hint = ""
-    if theme == "ancient_prehistory_anthropology":
-        preset_hint = "Assigned Strategic Preset: PRESET_ANCIENT_PREHISTORY_US (Archetype: anthropology_educational_explainer, Target RPM: $15-$35).\n"
-    elif theme == "indigenous_philosophy_stoicism":
-        preset_hint = "Assigned Strategic Preset: PRESET_STOIC_ZEN_JP_KR (Archetype: philosophical_contemplative_docudrama, Target RPM: $5-$12).\n"
-    elif theme == "military_logistics_geopolitics":
-        preset_hint = "Assigned Strategic Preset: PRESET_MILITARY_GEOPOLITICS_US (Archetype: forensic_military_investigation, Target RPM: $20-$40).\n"
-    elif theme == "consumer_injustice_institutional_trap":
-        preset_hint = "Assigned Strategic Preset: PRESET_CONSUMER_DOCUDRAMA (Archetype: social_reality_docudrama, Target RPM: $12-$25).\n"
-
     user_prompt = (
         f"Candidate Keyword: {keyword}\n"
         f"Target Market: {m_up}\n"
         f"Detected Content Theme: {theme}\n"
         f"Platform Safety Label: {safety_label}\n"
-        f"{preset_hint}"
-        f"{signals_str}\n"
-        "Evaluate this keyword now. If approved, formulate a razor-sharp 'specific_viral_angle' (e.g. from 'Enron' -> 'How Enron Staged Fake Trading Floors to Scam $30B')."
+        f"{catalysts_text}"
+        f"{signals_str}"
+        "Evaluate this candidate now based strictly on the verified evidence above. "
+        "If approved, formulate a razor-sharp 'specific_viral_angle' adhering strictly to the Zero-Hallucination Mandate."
     )
 
     try:
@@ -519,6 +531,22 @@ def assess_keyword_video_viability(
             clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json)
             clean_json = re.sub(r"\s*```$", "", clean_json)
         data = json.loads(clean_json)
+
+        # Deterministic Code-Level Post-Validation against Hallucinated Numbers (Rule 118, 128 & 130)
+        if data.get("is_video_viable") and data.get("verdict") == "APPROVED":
+            angle = data.get("specific_viral_angle") or ""
+            all_source_text = f"{keyword} {raw_headline or ''} {catalysts_text} {signals_str}".lower()
+            num_tokens = re.findall(r'[\$€£¥]?\d+(?:[.,]\d+)*(?:\s*(?:billion|million|trillion|percent|%|b|m|k|years?))?', angle, flags=re.IGNORECASE)
+            for token in num_tokens:
+                t_clean = token.strip().lower()
+                digits_only = re.sub(r'\D', '', t_clean)
+                if len(digits_only) >= 2 and digits_only not in all_source_text and t_clean not in all_source_text:
+                    logger.warning(f"[hhtech] Viability post-validation caught ungrounded token '{token}' in angle '{angle}'. Sanitizing angle...")
+                    # Strip or sanitize ungrounded number while preserving entity
+                    clean_angle = angle.replace(token, "").strip()
+                    data["specific_viral_angle"] = clean_angle if len(clean_angle) > 10 else f"{keyword}: The Systemic Breakdown Behind the Surge"
+                    break
+
         return data
     except Exception as e:
         logger.error(f"[hhtech] assess_keyword_video_viability failed: {type(e).__name__}: {e}")
