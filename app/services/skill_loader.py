@@ -203,7 +203,7 @@ TWO_LAYER_VISUAL_RULES = """
 
 ## 2-Layer Visual Composition & Remotion Architecture (Rule 116 & Rule 435)
 • Layer 1 (Background 16:9 2K DCI 2560x1440): Wide-angle cinematic documentary environment, unobstructed bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay.
-• Layer 2 (Foreground 1:1 2048x2048): Stylized editorial graphic novel digital illustration, full-body head-to-shoes standing portrait, on solid #FF00FF pure magenta chroma key.
+• Layer 2 (Foreground 1:1 2048x2048): Stylized editorial graphic novel digital illustration, waist-up three-quarter angle action framing with active hands manipulating physical documentary prop and directional gaze, on solid #FF00FF pure magenta chroma key.
 • Remotion Safe-Zone Subtitle Container: Sole on-screen subtitle mechanism with millisecond karaoke sync. Redundant FFmpeg burning bypassed."""
 
 
@@ -448,7 +448,7 @@ def get_b35_strategic_rules() -> str:
         "=== NOTION SOT CONCISE VISUAL PRODUCTION RULES (RULES 114, 116, 120, 122, 128, 435, 446) ===\n"
         "1. TWO-LAYER COMPOSITION (Rule 116):\n"
         "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic documentary environment. Period architecture, dramatic lighting. No foreground humans. Bottom 20% safe-zone clear for subtitles, center-right negative space for character overlay.\n"
-        "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration. Cel-shading, bold ink linework. Exactly one full-body character head-to-toe in authentic attire. Positioned Right or Left.\n"
+        "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration. Cel-shading, bold ink linework. Waist-up three-quarter angle character with active hands manipulating physical prop and directional gaze in authentic attire. Positioned Right or Left.\n"
         "2. STRICT CHROMA KEY SPEC (Rule 120):\n"
         "   - Foreground MUST be isolated on pure flat solid #FF00FF magenta background for chroma extraction.\n"
         "   - No white borders, no halos, no gradients, no scenery in Layer 2.\n"

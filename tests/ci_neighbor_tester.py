@@ -526,14 +526,24 @@ def test_block4_prompt_contract() -> bool:
         logger.info(f"  ✅ Layer 1 BG Prompt Contract Verified: 16:9 widescreen, safe-zone anchored.")
 
         # 2. Layer 2 (FG) Prompt Contract: Chroma Key Pure #FF00FF + Cel-Shaded Graphic Novel
-        fg_raw = "Senior forensic investigator in rolled up sleeves pointing at anomalous ledger entry"
-        fg_out = _sanitize_foreground_prompt(fg_raw, fg_key="fg_investigator")
+        fg_raw = "Senior forensic investigator in rolled up sleeves pointing at anomalous ledger entry, 1:1 aspect ratio"
+        fg_out = _sanitize_foreground_prompt(fg_raw, fg_key="fg_investigator", market="EN")
         assert "[STYLE MANDATE]" in fg_out
         assert "#FF00FF" in fg_out or "magenta" in fg_out.lower()
+        assert "1:1 aspect ratio" in fg_out
+        assert not re.search(r"(?<!\d):\s*(?:aspect\s*ratio|1\s*aspect\s*ratio)", fg_out, re.IGNORECASE), "Mutilated ':aspect ratio' relic detected in FG prompt!"
+        assert not re.search(r"(?<!\d):\s*(?:aspect\s*ratio|1\s*aspect\s*ratio)", bg_out, re.IGNORECASE), "Mutilated ':aspect ratio' relic detected in BG prompt!"
+        assert "salaryman" not in fg_out.lower() and "hanko" not in fg_out.lower(), "JP token leaked into EN FG prompt!"
+        assert "no magenta, purple, fuchsia, or neon pink attire" in fg_out, "Missing chroma attire lock in EN FG prompt!"
         assert "cel-shading" in fg_out.lower() or "comic" in fg_out.lower() or "graphic novel" in fg_out.lower()
         assert "[ERA ANCHOR]" in fg_out
         assert "[STRICT NEGATIVE PROMPT]" in fg_out
-        logger.info(f"  ✅ Layer 2 FG Prompt Contract Verified: Cel-shaded Graphic Novel + pure #FF00FF Chroma Key.")
+
+        # 2b. Layer 2 Evidence Prop Isolation Contract: Zero human boilerplate
+        prop_out = _sanitize_foreground_prompt("Federal court reorganization plan rejection order, 1:1 aspect ratio", fg_key="fg_evidence_reorganization_order", market="EN")
+        prop_pos = prop_out.split("[STRICT NEGATIVE PROMPT]")[0]
+        assert "full-body" not in prop_pos.lower() and "figure in authentic" not in prop_pos.lower(), "Human boilerplate leaked into evidence prop prompt!"
+        logger.info(f"  ✅ Layer 2 FG & Prop Isolation Contract Verified: Zero ':aspect ratio' relics, zero human bleed on props.")
 
         # 3. Generate Combined Scene Prompt Contract
         assert callable(generate_scene_prompts)
@@ -549,10 +559,34 @@ def test_block4_prompt_contract() -> bool:
         assert len(prompts_bundle) > 0
         logger.info("  ✅ Scene Dual-Layer Prompt Bundle Schema Verified.")
 
+        # 4. Vox Stateful Board & Fact-Safety Uncertainty Guard Contract (Rule 130 & Rule 134)
+        from app.services.build_remotion_props import extract_stat_card, synthesize_scene_motion_props
+        from app.services.unified_vox_director import compile_stateful_boards
+
+        stat_v, _ = extract_stat_card({"narration": "660万件の記録が消失した。"})
+        assert stat_v == "660万件", f"Expected 660万件 from CJK metric extraction, got {stat_v}"
+
+        m_uncertain = synthesize_scene_motion_props(
+            {"narration": "関係は不明ですが、時系列として重なるのは事実です。"},
+            "left", None, None, None, 90, "JP"
+        )
+        assert m_uncertain["connection"]["dashed"] is True and m_uncertain["connection"]["uncertain"] is True
+        assert str(m_uncertain["connection"]["label"]).startswith("?")
+
+        dummy_board_scenes = [
+            {"scene_id": f"s_{i}", "beat_index": (i // 8) + 1, "background": {"reuse_key": f"bg_{i//4}"}, "foreground": {"reuse_key": f"fg_{i%3}"}}
+            for i in range(40)
+        ]
+        compile_stateful_boards(dummy_board_scenes, board_size=4)
+        hc_ratio = sum(1 for s in dummy_board_scenes if s.get("transition_out") == "hard_cut") / len(dummy_board_scenes)
+        assert hc_ratio <= 0.15, f"Stateful Board hard_cut ratio {hc_ratio:.2f} exceeds 0.15 cap!"
+        logger.info(f"  ✅ Vox Stateful Board & Fact-Safety Guard Verified (hard_cut={hc_ratio*100:.1f}%, CJK stat={stat_v}).")
+
         return True
     except Exception as e:
         logger.error(f"❌ BLOCK 4 CONTRACT TEST FAILED: {e}")
         return False
+
 
 
 def test_block26_audio_spine_contract() -> bool:

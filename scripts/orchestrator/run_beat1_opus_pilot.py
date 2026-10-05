@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """scripts/orchestrator/run_beat1_opus_pilot.py
-Hook Beat 1 Comparative Pilot Runner (Rule 122 & Claude Opus 5.5 POW-SIMPLE Suite)
+Hook Beat 1 Comparative Pilot Runner (Rule 122, Rule 128 & Claude Opus 5.5 POW-SIMPLE Suite)
 
-Trích xuất 60 giây mở đầu (Hook Beat 1) của EP0006, áp dụng Tổng Đạo Diễn Claude Opus 5.5
+Trích xuất 60 giây mở đầu (Hook Beat 1) của bất kỳ <EPISODE_ID> nào, áp dụng Tổng Đạo Diễn Claude Opus 5.5
 để gán đầy đủ các Motion Directives (Yellow Marker Highlight, Rolling Counter Punch,
-Tactile Stamp Slam, Seamless Push Zoom & Paper Wipe) và render clip đối chứng độc lập.
+Tactile Stamp Slam, Seamless Push Through & Paper Slide) và render clip đối chứng độc lập.
 """
 
 import os
@@ -66,20 +66,21 @@ def prepare_and_render_pilot(
         }
     )
 
-    # Đảm bảo các phân cảnh có motion directives tiêu biểu của POW-SIMPLE
+    # Đảm bảo các phân cảnh có motion directives và transition_out chuẩn Stateful Board
+    intra_transitions = ["paper_slide", "vox_push_zoom", "match_cut", "push_through"]
     for i, sc in enumerate(optimized_scenes):
+        t_choice = intra_transitions[i % len(intra_transitions)]
+        sc["transition_out"] = t_choice
+        sc["transition"] = t_choice
         if i == 0 and not sc.get("motionDirective"):
             sc["motionDirective"] = "dramatic_push"
-            sc["transition"] = "push_zoom"
         elif i == 1 and not sc.get("motionDirective"):
             sc["motionDirective"] = "yellow_marker_highlight"
-            sc["transition"] = "paper_wipe"
         elif i == 2 and not sc.get("motionDirective"):
             sc["motionDirective"] = "counter_rollup"
-            sc["transition"] = "tape_snap"
         elif i == 3 and not sc.get("motionDirective"):
             sc["motionDirective"] = "forensic_lock"
-            sc["transition"] = "push_zoom"
+
 
     pilot_props = dict(master_props)
     pilot_props["scenes"] = optimized_scenes

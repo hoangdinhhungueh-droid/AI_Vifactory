@@ -135,6 +135,22 @@ def audit_props_integrity(props: Dict[str, Any], market: str) -> Tuple[bool, Lis
             if tw and narr and tw.lower() not in narr.lower():
                 defects.append(f"ANIMATION_TRIGGER_MISMATCH in Scene {i:02d}: Trigger word '{tw}' not found in scene narration.")
 
+    # 7. Hard-Cut Transition Ratio Audit (Vox Stateful Board Pacing: hard_cut <= 15%)
+    if len(scenes) >= 4:
+        hc_count = sum(1 for s in scenes if str(s.get("transition_out") or "hard_cut").strip().lower() == "hard_cut")
+        hc_pct = (hc_count / len(scenes)) * 100.0
+        if hc_pct > 15.0:
+            defects.append(f"HARD_CUT_RATIO_TOO_HIGH: {hc_count}/{len(scenes)} scenes ({hc_pct:.1f}%) use hard_cut (max allowed 15.0%).")
+
+    # 8. Fact-Safety Uncertainty Guard Audit (Rule 130)
+    uncertain_terms = ["不明", "未確認", "断定できない", "불명", "미확인", "chưa rõ", "chưa xác nhận", "unclear", "unverified", "unknown"]
+    for i, s in enumerate(scenes):
+        narr = str(s.get("narration") or s.get("caption") or "")
+        conn = s.get("connection")
+        if isinstance(conn, dict) and any(t in narr.lower() or t in narr for t in uncertain_terms):
+            if not conn.get("dashed") or not conn.get("uncertain"):
+                defects.append(f"FACT_SAFETY_UNCERTAINTY_VIOLATION in Scene {i:02d}: uncertain narration requires dashed=True and uncertain=True on connection.")
+
     is_clean = len(defects) == 0
     return is_clean, defects
 
@@ -264,6 +280,29 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
         if "forensicOverlay" in s and isinstance(s["forensicOverlay"], dict):
             s["forensicOverlay"] = _clean_obj(s["forensicOverlay"])
 
+    # 6. Auto-repair Hard-Cut Ratio (<= 15%) & Fact-Safety Uncertainty Guard
+    intra_transitions = ["paper_slide", "vox_push_zoom", "match_cut"]
+    uncertain_terms = ["不明", "未確認", "断定できない", "불명", "미확인", "chưa rõ", "chưa xác nhận", "unclear", "unverified", "unknown"]
+    for idx, s in enumerate(sanitized):
+        t_out = str(s.get("transition_out") or "hard_cut").strip().lower()
+        b_idx = idx // 4
+        pos = idx % 4
+        if pos < 3:
+            if t_out == "hard_cut":
+                s["transition_out"] = intra_transitions[(b_idx + pos) % len(intra_transitions)]
+        else:
+            if t_out == "hard_cut" and (b_idx % 4 != 3):
+                s["transition_out"] = "push_through"
+
+        narr = str(s.get("narration") or s.get("caption") or "")
+        conn = s.get("connection")
+        if isinstance(conn, dict) and any(t in narr.lower() or t in narr for t in uncertain_terms):
+            conn["dashed"] = True
+            conn["uncertain"] = True
+            lbl = str(conn.get("label") or "")
+            if not lbl.startswith("?"):
+                conn["label"] = f"? {lbl}".strip()
+
     props["scenes"] = sanitized
     return props
 
@@ -323,7 +362,7 @@ def compute_5axis_motion_parity_score(props: Dict[str, Any], defects: List[str])
     """Compute 5-Axis Scorecard against YouTube Benchmark (cXQuNBZA0FA Parity).
     Axis 1: Layer-by-Layer Procedural Assembly
     Axis 2: True Motion & Element-Level Kinematics
-    Axis 3: Match-Cut & Directional Transitions
+    Axis 3: Match-Cut & Directional Transitions (hard_cut <= 15%)
     Axis 4: Evidentiary Purity & Zero Dual-Number Conflict
     Axis 5: Editorial Graphic Novel Art Purity
     """
@@ -338,16 +377,21 @@ def compute_5axis_motion_parity_score(props: Dict[str, Any], defects: List[str])
     has_moves = sum(1 for s in scenes if s.get("cameraMovement") or s.get("motionDirective"))
     score_axis2 = min(10.0, round(6.0 + (has_moves / total_scenes) * 4.0, 1))
 
-    # Axis 3: Transitions (push_zoom / paper_wipe on shared background)
-    score_axis3 = 9.0  # Remotion engine auto-injects push_zoom / paper_wipe
+    # Axis 3: Transitions (real measurement of non-hard_cut transitions)
+    motivated_transitions = sum(
+        1 for s in scenes
+        if str(s.get("transition_out") or "hard_cut").strip().lower() != "hard_cut"
+    )
+    score_axis3 = min(10.0, round((motivated_transitions / total_scenes) * 10.5, 1))
     
-    # Axis 4: Zero Dual-Number conflict
-    dual_conflicts = [d for d in defects if "EMPTY_KINETIC_COUNTER" in d or "CONFLICT" in d]
+    # Axis 4: Zero Dual-Number conflict & Fact-Safety
+    dual_conflicts = [d for d in defects if "EMPTY_KINETIC_COUNTER" in d or "CONFLICT" in d or "FACT_SAFETY" in d]
     score_axis4 = 10.0 if not dual_conflicts else max(2.0, 10.0 - len(dual_conflicts) * 2.0)
 
     # Axis 5: Editorial Art & Market purity
     tag_leaks = [d for d in defects if "LEAKED_ASSET_TAG" in d or "UNLOCALIZED" in d]
     score_axis5 = 9.5 if not tag_leaks else max(4.0, 9.5 - len(tag_leaks) * 1.5)
+
 
     composite_score = round(
         score_axis1 * 0.25 +

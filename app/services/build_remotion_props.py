@@ -431,16 +431,23 @@ def build_structured_overlay(
 
 
 def normalize_camera_movement(raw_mov: str | None) -> str:
-    """Normalize raw camera movement string into one of 12 Remotion canonical movements."""
+    """Normalize raw camera movement string into Remotion canonical movements."""
     if not raw_mov:
         return "slow_push_in"
     m = str(raw_mov).strip().lower()
     canonical = [
         "snap_zoom", "slow_push_in", "slow_pull_out", "cinematic_pan", "macro_tilt", "handheld_shake",
-        "dolly_zoom", "focus_breathe_push", "continuous_drift", "seamless_whip_pan", "macro_orbit", "whip_zoom"
+        "dolly_zoom", "focus_breathe_push", "continuous_drift", "seamless_whip_pan", "macro_orbit", "whip_zoom",
+        "push_through", "paper_slide", "match_cut", "vox_push_zoom", "push_zoom", "dramatic_push", "forensic_lock"
     ]
     if m in canonical:
         return m
+    if "push_through" in m or "plunge" in m:
+        return "push_through"
+    if "paper_slide" in m or "slide" in m:
+        return "paper_slide"
+    if "match" in m:
+        return "match_cut"
     if "dolly" in m or "vertigo" in m:
         return "dolly_zoom"
     if "orbit" in m or "circle" in m:
@@ -534,10 +541,23 @@ def stage_into_public(local_path: str, public_dir: str, episode_id: str) -> str 
     return "pulled/%s/%s" % (episode_id, basename)
 
 
-def extract_stat_card(text: str):
-    """Extract prominent financial metrics / keywords from narration text (KRW, JPY, USD, VND, percentages, spoken words)."""
+def extract_stat_card(text: str | dict):
+    """Extract prominent financial & evidentiary metrics from narration text (KRW, JPY, USD, VND, percentages, counts, durations)."""
+    if isinstance(text, dict):
+        text = str(text.get("narration") or text.get("caption") or "")
     if not text:
         return None, None
+
+    # Priority 1: Explicit CJK compound scale + unit (preserves exact unit like 万件, 万人, 年間)
+    cjk_unit_match = re.search(
+        r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆|만|억|조)\s*(?:件|人|名|社|台|回|円|원|명|건))',
+        text
+    )
+    if cjk_unit_match:
+        val_str = re.sub(r'\s+', '', cjk_unit_match.group(1))
+        if "円" in val_str or "원" in val_str:
+            return val_str, "FINANCIAL VALUE // VALUATION"
+        return val_str, "EVIDENCE // SCALE"
 
     parsed = parse_spoken_number(text)
     if parsed:
@@ -554,16 +574,19 @@ def extract_stat_card(text: str):
         return parsed.formatted, label
 
     patterns = [
-        (r'\b(20(?:1[5-9]|2[0-9]|30))\b', "TIMELINE // RECORD DATE"),
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:만|억|조)?\s*원)', "PRICE ANCHOR // TRANSACTION"),
         (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆)?\s*円)', "FINANCIAL VALUE // VALUATION"),
-        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:tỷ|triệu|nghìn)\s*đ(?:ồng)?)', "MARKET METRIC // COST"),
+        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|億|兆)\s*(?:件|人|名|社|台|回)?)', "EVIDENCE // SCALE"),
+        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:件|人|名|社|台|回|倍|年間|ヶ月|か月|日間|時間))', "EVIDENCE // SCALE"),
+        (r'(\d+(?:,\d{3})*(?:\.\d+)?\s*(?:tỷ|triệu|nghìn)\s*(?:đ(?:ồng)?|người|vụ|hồ sơ)?)', "MARKET METRIC // COST"),
         (r'(\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|TRILLION|B|M|K)?(?:\s*→\s*<\$\d+)?(?:\s*/\s*SHARE)?)', "FINANCIAL METRIC // VALUATION"),
         (r'(-\$\d+(?:\.\d+)?\s*(?:BILLION|MILLION|B|M)?)', "BALANCE SHEET // WRITE-DOWN"),
         (r'((?:<\$\d+(?:\.\d+)?|\$\d+(?:\.\d+)?))', "MARKET VALUE // PRICE TARGET"),
         (r'([+-]?\d+(?:\.\d+)?%)', "GROWTH RATE // PERCENTAGE"),
-        (r'(\d+\+?\s*(?:BOXES|DOCUMENTS|WITNESSES|EMPLOYEES|INVESTIGATORS|개|명|건|곳))', "EVIDENCE // SCALE"),
+        (r'(\d+\+?\s*(?:BOXES|DOCUMENTS|WITNESSES|EMPLOYEES|INVESTIGATORS|RECORDS|ACCOUNTS|YEARS|MONTHS|개|명|건|곳|년|개월))', "EVIDENCE // SCALE"),
+        (r'\b(20(?:1[5-9]|2[0-9]|30))\b', "TIMELINE // RECORD DATE"),
         (r'(\b(?:GUILTY|CONVICTED|VERDICT|FRAUD|CONSPIRACY)\b)', "LEGAL RULING // VERDICT"),
+
         (r'(\b(?:MARK-TO-MARKET|SPECIAL PURPOSE ENTITIES|SPE NETWORK|CIRCULAR HEDGE)\b)', "FINANCIAL MECHANISM"),
     ]
 
@@ -895,50 +918,130 @@ def synthesize_scene_motion_props(
                         })
                 res["radiating_connections"] = rad
 
-        # Case D: Directional Narrative Trend Vectors (Crashes, Surges, Capital Flows)
+        # Case B: Quantitative Stat Card Vector (links actor to tactile PaperStatCard)
+        if not res["connection"] and not res["radiating_connections"] and stat_val:
+            res["connection"] = {
+                "fromX": 34 if is_left else 66,
+                "fromY": 48,
+                "toX": 72 if is_left else 28,
+                "toY": 34,
+                "label": str(stat_lbl or stat_val)[:24],
+                "color": "#d92b2b",
+                "isYarn": True,
+                "drawStartFrame": 10,
+                "drawDuration": 18,
+            }
+
+        # Case C & D: Multilingual Causal / Relational / Timeline & Trend Vectors
+        narr = s.get("narration", "") or s.get("caption", "")
+        m_up = market.upper()
+        is_kr = m_up == "KR" or any("\uac00" <= c <= "\ud7a3" for c in narr)
+        is_jp = m_up == "JP" or any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narr)
+        is_vn = m_up == "VN"
+        narr_lower = narr.lower()
+
+        uncertain_kws_jp = ["不明", "未確認", "断定できない", "わからない", "謎", "調査中"]
+        uncertain_kws_kr = ["불명", "미확인", "단정할 수 없", "알 수 없", "조사 중"]
+        uncertain_kws_vn = ["chưa rõ", "chưa xác nhận", "không rõ", "bí ẩn", "đang điều tra"]
+        uncertain_kws_en = ["unclear", "unknown", "unverified", "unconfirmed", "uncertain"]
+
+        is_uncertain = (
+            any(k in narr for k in uncertain_kws_jp)
+            or any(k in narr for k in uncertain_kws_kr)
+            or any(k in narr_lower for k in uncertain_kws_vn)
+            or any(k in narr_lower for k in uncertain_kws_en)
+        )
+
         if not res["connection"] and not res["radiating_connections"]:
-            narr = s.get("narration", "") or s.get("caption", "")
-            m_up = market.upper()
-            is_kr = m_up == "KR" or any("\uac00" <= c <= "\ud7a3" for c in narr)
-            is_jp = m_up == "JP" or any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narr)
-            is_vn = m_up == "VN"
+            timeline_kws_jp = ["時系列", "前後", "重なる", "直後", "直前", "同時"]
+            timeline_kws_kr = ["시계열", "전후", "겹치", "직후", "직전", "동시"]
+            timeline_kws_vn = ["thời gian", "trước sau", "trùng khớp", "ngay sau", "đồng thời"]
+            timeline_kws_en = ["timeline", "before", "after", "overlap", "coincide", "sequence"]
+
+            causal_kws_jp = ["関係", "関連", "原因", "なぜ", "しかし", "一方", "背景", "つながり", "連鎖", "経緯", "比較", "構造"]
+            causal_kws_kr = ["관계", "관련", "원인", "왜", "그러나", "반면", "배경", "연결", "구조", "비교"]
+            causal_kws_vn = ["quan hệ", "liên quan", "nguyên nhân", "tại sao", "tuy nhiên", "mặt khác", "bối cảnh", "kết nối", "cấu trúc"]
+            causal_kws_en = ["relationship", "related", "cause", "why", "however", "meanwhile", "connection", "link", "structure", "compare"]
+
+            has_timeline = (
+                any(k in narr for k in timeline_kws_jp)
+                or any(k in narr for k in timeline_kws_kr)
+                or any(k in narr_lower for k in timeline_kws_vn)
+                or any(k in narr_lower for k in timeline_kws_en)
+            )
+            has_causal = (
+                any(k in narr for k in causal_kws_jp)
+                or any(k in narr for k in causal_kws_kr)
+                or any(k in narr_lower for k in causal_kws_vn)
+                or any(k in narr_lower for k in causal_kws_en)
+            )
 
             down_kws_kr = ["하락", "매도", "서킷브레이커", "폭락", "위기", "붕괴", "손실", "패닉", "급락", "충격"]
             up_kws_kr = ["상승", "매수", "유입", "기록", "돌파", "반등", "성장", "급등"]
-
-            down_kws_jp = ["下落", "急落", "暴落", "売却", "危機", "崩壊", "損失", "ショック"]
-            up_kws_jp = ["上昇", "急騰", "買付", "流入", "最高値", "反発", "成長"]
-
-            down_kws_en = ["drop", "crash", "plunge", "collapse", "crisis", "selloff", "panic", "decline"]
+            down_kws_jp = ["下落", "急落", "暴落", "売却", "危機", "崩壊", "損失", "ショック", "流出", "漏洩", "不正"]
+            up_kws_jp = ["上昇", "急騰", "買付", "流入", "最高値", "反発", "成長", "拡大", "急増"]
+            down_kws_en = ["drop", "crash", "plunge", "collapse", "crisis", "selloff", "panic", "decline", "breach", "leak"]
             up_kws_en = ["surge", "rally", "spike", "inflow", "record", "rebound", "growth", "jump"]
 
-            has_down = False
-            has_up = False
-            if is_kr:
-                has_down = any(k in narr for k in down_kws_kr)
-                has_up = any(k in narr for k in up_kws_kr)
-            elif is_jp:
-                has_down = any(k in narr for k in down_kws_jp)
-                has_up = any(k in narr for k in up_kws_jp)
-            else:
-                narr_lower = narr.lower()
-                has_down = any(k in narr_lower for k in down_kws_en)
-                has_up = any(k in narr_lower for k in up_kws_en)
+            has_down = (
+                (is_kr and any(k in narr for k in down_kws_kr))
+                or (is_jp and any(k in narr for k in down_kws_jp))
+                or any(k in narr_lower for k in down_kws_en)
+            )
+            has_up = (
+                (is_kr and any(k in narr for k in up_kws_kr))
+                or (is_jp and any(k in narr for k in up_kws_jp))
+                or any(k in narr_lower for k in up_kws_en)
+            )
 
-            if has_down:
-                lbl = "하락 추세 // IMPACT" if is_kr else ("急落トレンド" if is_jp else "MARKET IMPACT // DROP")
+            if has_timeline or has_causal or is_uncertain:
+                if is_uncertain:
+                    lbl = (
+                        "? 관계 불명 // 시계열 검증" if is_kr else
+                        ("? 関係不明 // 時系列検証" if (is_jp and has_timeline) else
+                         ("? 関係不明 // 未確認" if is_jp else
+                          ("? CHƯA RÕ QUAN HỆ" if is_vn else "? UNCLEAR LINK // TIMELINE")))
+                    )
+                elif has_timeline:
+                    lbl = (
+                        "시계열 교차 // TIMELINE" if is_kr else
+                        ("時系列の重なり // TIMELINE" if is_jp else
+                         ("TRÙNG KHỚP THỜI GIAN" if is_vn else "TIMELINE OVERLAP"))
+                    )
+                else:
+                    lbl = (
+                        "인과 구조 // CAUSAL LINK" if is_kr else
+                        ("因果・構造リンク // CAUSAL" if is_jp else
+                         ("LIÊN KẾT NHÂN QUẢ" if is_vn else "CAUSAL STRUCTURE"))
+                    )
+                res["connection"] = {
+                    "fromX": 30 if is_left else 70,
+                    "fromY": 46,
+                    "toX": 72 if is_left else 28,
+                    "toY": 46 if has_timeline else 56,
+                    "label": lbl,
+                    "color": "#d97706" if is_uncertain else "#d92b2b",
+                    "dashed": bool(is_uncertain),
+                    "uncertain": bool(is_uncertain),
+                    "isYarn": True,
+                    "drawStartFrame": 10,
+                    "drawDuration": 20,
+                }
+            elif has_down:
+                lbl = "하락 추세 // IMPACT" if is_kr else ("急落・流出インパクト" if is_jp else "SYSTEMIC IMPACT // DROP")
                 res["connection"] = {
                     "fromX": 30 if is_left else 70,
                     "fromY": 36,
                     "toX": 72 if is_left else 28,
                     "toY": 66,
                     "label": lbl,
-                    "color": "#ef4444",
-                    "drawStartFrame": 14,
-                    "drawDuration": 22,
+                    "color": "#d92b2b",
+                    "isYarn": True,
+                    "drawStartFrame": 12,
+                    "drawDuration": 20,
                 }
             elif has_up:
-                lbl = "상승 유입 // INFLOW" if is_kr else ("資金流入トレンド" if is_jp else "CAPITAL SURGE // INFLOW")
+                lbl = "상승 유입 // INFLOW" if is_kr else ("急増・拡大トレンド" if is_jp else "SCALE SURGE // INFLOW")
                 res["connection"] = {
                     "fromX": 30 if is_left else 70,
                     "fromY": 66,
@@ -946,9 +1049,18 @@ def synthesize_scene_motion_props(
                     "toY": 36,
                     "label": lbl,
                     "color": "#10b981",
-                    "drawStartFrame": 14,
-                    "drawDuration": 22,
+                    "isYarn": True,
+                    "drawStartFrame": 12,
+                    "drawDuration": 20,
                 }
+
+        # Fact-Safety Uncertainty Post-Guard on any existing connection
+        if is_uncertain and isinstance(res.get("connection"), dict):
+            res["connection"]["dashed"] = True
+            res["connection"]["uncertain"] = True
+            lbl_cur = str(res["connection"].get("label") or "")
+            if not lbl_cur.startswith("?"):
+                res["connection"]["label"] = f"? {lbl_cur}".strip()
 
     # 2. Editorial Headline synthesis for high-impact scene 0 or explicit headline
     if not res["editorial_headline"]:
@@ -1595,24 +1707,98 @@ def build_remotion_props_data(
     except Exception as _e_brief:
         logger.warning("[build_remotion_props] Vox Minimalist Gate fallback: %s", _e_brief)
 
-    # Second-Pass: Finalize Vox Continuous Motion Graphics (Rule 122 & Rule 128)
-    # Guarantees that all localized overlays, stat cards, and directional vectors are wired to Remotion.
+    # Second-Pass: Stateful Board Architecture & Vox Continuous Motion Graphics (Rule 122 & Rule 128)
+    # 1. Group scenes into Stateful Boards (size=4, resetting on Act boundary)
+    # 2. Accumulate prior board foreground props as supportingCutouts linked by red yarn
+    # 3. Enforce hard_cut <= 15% cap via motivated transitions (paper_slide, vox_push_zoom, match_cut, push_through)
     m_code = episode_id[:2].upper() if len(episode_id) >= 2 else "EN"
-    for i, sc in enumerate(scenes_out):
-        meta = synthesize_scene_motion_props(
-            sc,
-            sc.get("foregroundPosition", "left"),
-            sc.get("forensicOverlay"),
-            sc.get("statValue"),
-            sc.get("statLabel"),
-            i,
-            market=m_code
-        )
-        sc["connection"] = meta["connection"]
-        sc["connections"] = meta["connections"]
-        sc["radiatingConnections"] = meta["radiating_connections"]
-        sc["supportingCutouts"] = meta["supporting_cutouts"]
-        sc["editorialHeadline"] = meta["editorial_headline"]
+    intra_board_transitions = ["paper_slide", "vox_push_zoom", "match_cut"]
+    boards: list[list[int]] = []
+    cur_board: list[int] = []
+    last_act = None
+    for idx_sc, sc in enumerate(scenes_out):
+        act_cur = sc.get("actTitle")
+        if cur_board and (len(cur_board) >= 4 or (act_cur and act_cur != last_act)):
+            boards.append(cur_board)
+            cur_board = []
+        cur_board.append(idx_sc)
+        if act_cur:
+            last_act = act_cur
+    if cur_board:
+        boards.append(cur_board)
+
+    for b_idx, b_indices in enumerate(boards):
+        board_fgs: list[str] = []
+        b_len = len(b_indices)
+        for pos, sc_idx in enumerate(b_indices):
+            sc = scenes_out[sc_idx]
+            sc["boardId"] = f"board_{b_idx + 1:03d}"
+            sc["boardPosition"] = pos
+            fg_cur = sc.get("foreground") or ""
+            fg_pos = sc.get("foregroundPosition", "left")
+            is_left = (fg_pos == "left")
+
+            # Normalize transition_out so hard_cut is strictly <= 15%
+            t_out = str(sc.get("transition_out") or "hard_cut").strip().lower()
+            if pos < b_len - 1:
+                if t_out == "hard_cut":
+                    sc["transition_out"] = intra_board_transitions[(b_idx + pos) % len(intra_board_transitions)]
+            else:
+                if t_out == "hard_cut" and (b_idx % 4 != 3):
+                    sc["transition_out"] = "push_through"
+
+            # Synthesize base motion props (Stat vectors, Causal/Timeline vectors, Fact-Safety guards)
+            meta = synthesize_scene_motion_props(
+                sc,
+                fg_pos,
+                sc.get("forensicOverlay"),
+                sc.get("statValue"),
+                sc.get("statLabel"),
+                sc_idx,
+                market=m_code
+            )
+
+            # Accumulate prior props on the same Stateful Board tabletop
+            prior_fgs = [p for p in board_fgs if p and p != fg_cur][-2:]
+            if prior_fgs and not meta["supporting_cutouts"]:
+                supp = []
+                rad = list(meta["radiating_connections"] or [])
+                start_x = 34 if is_left else 66
+                start_y = 50
+                for p_i, p_src in enumerate(prior_fgs):
+                    target_x = (74 if is_left else 26) + (p_i * (-8 if is_left else 8))
+                    target_y = 38 + p_i * 22
+                    supp.append({
+                        "src": p_src,
+                        "x": target_x,
+                        "y": target_y,
+                        "scale": 0.44,
+                        "entryFrame": 2 + p_i * 4,
+                        "label": "",
+                    })
+                    if not meta["connection"] and len(rad) < 3:
+                        rad.append({
+                            "fromX": start_x,
+                            "fromY": start_y,
+                            "toX": target_x,
+                            "toY": target_y,
+                            "label": "",
+                            "color": "#d92b2b",
+                            "isYarn": True,
+                            "drawStartFrame": 8 + p_i * 6,
+                            "drawDuration": 16,
+                        })
+                meta["supporting_cutouts"] = supp
+                meta["radiating_connections"] = rad
+
+            if fg_cur and fg_cur not in board_fgs:
+                board_fgs.append(fg_cur)
+
+            sc["connection"] = meta["connection"]
+            sc["connections"] = meta["connections"]
+            sc["radiatingConnections"] = meta["radiating_connections"]
+            sc["supportingCutouts"] = meta["supporting_cutouts"]
+            sc["editorialHeadline"] = meta["editorial_headline"]
 
     props = {
         "scenes": scenes_out,
@@ -1621,6 +1807,7 @@ def build_remotion_props_data(
         "height": height,
     }
     return props
+
 
 
 def main():

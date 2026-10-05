@@ -59,7 +59,7 @@ def _generate_topic_anchored_roster_fallback(
     Guarantees zero photorealism, strict 2D stylized graphic novel aesthetic, and zero empty scenes.
     """
     m_up = str(market or "EN").upper().strip()
-    topic_low = (topic or "").lower()
+    topic_low = f"{topic or ''} {' '.join(claims or [])}".lower()
     if key_metrics:
         metric_highlight = key_metrics[0]
     elif m_up in ["JP", "JA"]:
@@ -67,10 +67,10 @@ def _generate_topic_anchored_roster_fallback(
     elif m_up in ["KR", "KO"]:
         metric_highlight = "정량감사데이터 // 검증기록"
     else:
-        metric_highlight = "CONFIDENTIAL METRIC // AUDIT FINDING"
+        metric_highlight = "FORENSIC QUANTITATIVE RECORD // AUDIT FINDING"
 
     pat = r'(?i)\b(debts?|bonds?|yields?|rates?|banks?|dollars?|currency|currencies|rollover|finances?|financial|gdp|imf|fed|treasury|inflation|credits?|365|trillions?|securities|deficits?|채무|국채|금리|国債)\b'
-    is_financial = bool(re.search(pat, topic_low))
+    is_financial = bool(re.search(pat, (topic or "").lower()))
 
     if is_financial:
         # =========================================================================
@@ -172,7 +172,7 @@ def _generate_topic_anchored_roster_fallback(
             fg_roster = {
                 "fg_character_boj_governor": {
                     "title": "日本銀行総裁",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior Bank of Japan governor in tailored dark charcoal suit, holding official monetary policy brief with quiet resolute authority, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a senior Bank of Japan governor in tailored dark charcoal suit, holding official monetary policy brief with quiet resolute authority, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
                     "role": "Monetary Authority",
                     "beats": [1, 4, 5],
                     "keywords": ["governor", "boj", "monetary", "日本銀行", "総裁", "日銀", "金利"],
@@ -180,7 +180,7 @@ def _generate_topic_anchored_roster_fallback(
                 },
                 "fg_character_jgb_bond_trader": {
                     "title": "メガバンク国債チーフトレーダー",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of an intense Japanese bond trader in crisp white shirt with rolled-up sleeves, reviewing printed yield curve slips with urgent skeptical gaze, corporate lapel badge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of an intense Japanese bond trader in crisp white shirt with rolled-up sleeves, reviewing printed yield curve slips with urgent skeptical gaze, corporate lapel badge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
                     "role": "Market Actor",
                     "beats": [1, 2, 4],
                     "keywords": ["trader", "jgb", "yield", "bond", "国債", "トレーダー", "利回り"],
@@ -188,7 +188,7 @@ def _generate_topic_anchored_roster_fallback(
                 },
                 "fg_character_mof_bureaucrat": {
                     "title": "財務省理財局次長",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior Ministry of Finance bureaucrat in dark navy suit and spectacles, holding tabbed sovereign debt issuance forecast binder, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a senior Ministry of Finance bureaucrat in dark navy suit and spectacles, holding tabbed sovereign debt issuance forecast binder, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
                     "role": "Fiscal Architect",
                     "beats": [2, 3, 5],
                     "keywords": ["mof", "treasury", "fiscal", "財務省", "理財局", "主計局", "予算"],
@@ -196,7 +196,7 @@ def _generate_topic_anchored_roster_fallback(
                 },
                 "fg_character_macro_financial_auditor": {
                     "title": "国際金融特別査察官",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of a meticulous Japanese financial auditor in trench coat, holding heavy forensic dossier and magnifying loupe, stern analytical expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a meticulous Japanese financial auditor in trench coat, holding heavy forensic dossier and magnifying loupe, stern analytical expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
                     "role": "Forensic Investigator",
                     "beats": [3, 4, 5],
                     "keywords": ["auditor", "fsa", "investigation", "金融庁", "査察官", "監査"],
@@ -445,7 +445,7 @@ def _generate_topic_anchored_roster_fallback(
             fg_roster = {
                 "fg_character_bok_governor": {
                     "title": "한국은행 총재",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior Bank of Korea governor in tailored dark charcoal suit, holding official monetary policy brief with composed authoritative posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a senior Bank of Korea governor in tailored dark charcoal suit, holding official monetary policy brief with composed authoritative posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
                     "role": "Monetary Authority",
                     "beats": [1, 4, 5],
                     "keywords": ["governor", "bok", "monetary", "한국은행", "총재", "금리", "금융통화위원회"],
@@ -453,7 +453,7 @@ def _generate_topic_anchored_roster_fallback(
                 },
                 "fg_character_ktb_bond_trader": {
                     "title": "여의도 국고채 수석 딜러",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of an intense Korean sovereign bond trader in crisp white shirt with rolled-up sleeves, reviewing printed yield curve slips with urgent skeptical gaze, wearing Sawonjeung corporate ID lanyard, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of an intense Korean sovereign bond trader in crisp white shirt with rolled-up sleeves, reviewing printed yield curve slips with urgent skeptical gaze, wearing Sawonjeung corporate ID lanyard, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
                     "role": "Market Actor",
                     "beats": [1, 2, 4],
                     "keywords": ["trader", "ktb", "yield", "bond", "국고채", "딜러", "채권"],
@@ -461,7 +461,7 @@ def _generate_topic_anchored_roster_fallback(
                 },
                 "fg_character_moef_fiscal_director": {
                     "title": "기획재정부 국채과장",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior MOEF fiscal official in dark navy blazer and glasses, holding tabbed sovereign borrowing forecast binder, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a senior MOEF fiscal official in dark navy blazer and glasses, holding tabbed sovereign borrowing forecast binder, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
                     "role": "Fiscal Architect",
                     "beats": [2, 3, 5],
                     "keywords": ["moef", "treasury", "fiscal", "기획재정부", "국채", "재정"],
@@ -469,7 +469,7 @@ def _generate_topic_anchored_roster_fallback(
                 },
                 "fg_character_macro_financial_auditor": {
                     "title": "감사원 금융기금 감사관",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of a meticulous sovereign debt auditor in gray trench coat, holding heavy forensic dossier and magnifying loupe, stern analytical expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a meticulous sovereign debt auditor in gray trench coat, holding heavy forensic dossier and magnifying loupe, stern analytical expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
                     "role": "Forensic Investigator",
                     "beats": [3, 4, 5],
                     "keywords": ["auditor", "fss", "investigation", "감사원", "금융감독원", "검사"],
@@ -719,7 +719,7 @@ def _generate_topic_anchored_roster_fallback(
             fg_roster = {
                 "fg_character_central_bank_governor": {
                     "title": "Central Bank Monetary Authority",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior central bank governor in tailored charcoal formal suit, standing with composed authoritative posture, holding official monetary policy brief, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a senior central bank governor in tailored charcoal formal suit, standing with composed authoritative posture, holding official monetary policy brief, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
                     "role": "Monetary Authority",
                     "beats": [1, 4, 5],
                     "keywords": ["governor", "central bank", "fed", "monetary", "rate hike", "policy", "thống đốc", "ngân hàng trung ương"],
@@ -727,7 +727,7 @@ def _generate_topic_anchored_roster_fallback(
                 },
                 "fg_character_sovereign_bond_trader": {
                     "title": "Sovereign Fixed-Income Desk Head",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of an intense sovereign bond trader in crisp white shirt with rolled-up sleeves and dark trousers, reviewing printed yield curve slips with urgent skeptical gaze, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of an intense sovereign bond trader in crisp white shirt with rolled-up sleeves and dark trousers, reviewing printed yield curve slips with urgent skeptical gaze, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
                     "role": "Market Actor",
                     "beats": [1, 2, 4],
                     "keywords": ["trader", "bond desk", "yield", "spread", "market", "dealer", "nhà giao dịch", "trái phiếu"],
@@ -735,7 +735,7 @@ def _generate_topic_anchored_roster_fallback(
                 },
                 "fg_character_treasury_fiscal_official": {
                     "title": "Treasury Debt Management Director",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of a senior government debt management official in dark navy blazer and spectacles, holding tabbed sovereign borrowing forecast binder, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a senior government debt management official in dark navy blazer and spectacles, holding tabbed sovereign borrowing forecast binder, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
                     "role": "Fiscal Architect",
                     "beats": [2, 3, 5],
                     "keywords": ["treasury", "fiscal", "deficit", "borrowing", "issuance", "kho bạc", "ngân sách"],
@@ -743,7 +743,7 @@ def _generate_topic_anchored_roster_fallback(
                 },
                 "fg_character_macro_auditor": {
                     "title": "Forensic Macroeconomic Sovereign Debt Auditor",
-                    "description": "Full-body stylized editorial graphic novel digital illustration of a meticulous sovereign debt auditor in gray trench coat, holding heavy forensic dossier and magnifying loupe, stern analytical expression, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
+                    "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a meticulous sovereign debt auditor in gray trench coat, holding heavy forensic dossier and magnifying loupe, stern analytical expression, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio.",
                     "role": "Forensic Investigator",
                     "beats": [3, 4, 5],
                     "keywords": ["auditor", "investigator", "imf", "scrutiny", "finding", "kiểm toán", "thanh tra"],
@@ -831,7 +831,7 @@ def _generate_topic_anchored_roster_fallback(
                 },
                 "fg_evidence_damages_calculation_invoice": {
                     "title": f"Forensic Interest Servicing Cost Calculation Sheet ({metric_highlight})",
-                    "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink 'CONFIDENTIAL / EXHIBIT A', crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "description": "Government audit summary invoice document displaying structured tabular rows in green ledger ink, stamped diagonally with bold red official verification seal, crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
                     "role": "Forensic Accounting Exhibit",
                     "beats": [1, 3, 5],
                     "keywords": ["invoice", "interest expense", "service", "cost", "calculation", "bill", "chi phí lãi"],
@@ -839,7 +839,7 @@ def _generate_topic_anchored_roster_fallback(
                 },
                 "fg_evidence_sovereign_cds_spread_ticket": {
                     "title": "Sovereign Credit Default Swap Pricing Slip",
-                    "description": "High-finance derivative order confirmation ticket, showing surging basis point credit default swap premiums, stamped with red ink 'CRITICAL EXPOSURE', isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+                    "description": "High-finance derivative order confirmation ticket, showing surging basis point credit default swap premiums, stamped with red official exposure seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
                     "role": "Market Default Pricing",
                     "beats": [3, 4],
                     "keywords": ["cds", "default", "spread", "derivative", "swap", "vỡ nợ"],
@@ -877,10 +877,10 @@ def _generate_topic_anchored_roster_fallback(
                     "keywords": ["statute", "law", "code", "ceiling", "reference", "trần nợ", "luật ngân sách"],
                     "type": "document"
                 },
-                "fg_evidence_prosecution_complaint_docket": {
+                "fg_evidence_sovereign_default_filing_docket": {
                     "title": "Official Sovereign Debt Default Legal Filing Docket",
                     "description": "Official legal filing document from the international arbitration court, bold case docket header, stamped with blue official seal, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
-                    "role": "Lead Prosecution Docket",
+                    "role": "Lead Legal Filing Docket",
                     "beats": [1, 4, 5],
                     "keywords": ["docket", "complaint", "default", "legal", "filing", "khởi kiện", "hồ sơ pháp lý"],
                     "type": "document"
@@ -921,11 +921,11 @@ def _generate_topic_anchored_roster_fallback(
             "bg_tokyo_high_court_bench": {"title": "Tokyo High Court Appellate Chamber", "description": "Formal high court courtroom with elevated judicial bench in polished cedar, Japanese national seal in deep focus, solemn final reckoning atmosphere.", "beats": [4, 5]}
         }
         fg_roster = {
-            "fg_character_tokyo_district_prosecutor": {"title": "Tokyo District Public Prosecutor", "description": "Full-body stylized editorial graphic novel digital illustration of a sharp Japanese public prosecutor in tailored dark suit with prosecutor autumn-frost badge on lapel, holding official filing folder, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecutor", "beats": [1, 4, 5], "keywords": ["prosecutor", "court", "indictment", "検察官", "起訴", "裁判"], "type": "character"},
-            "fg_character_ministry_safety_inspector": {"title": "Ministry Food & Safety Lead Inspector", "description": "Full-body stylized editorial graphic novel digital illustration of a diligent Japanese ministry quarantine inspector in navy administrative uniform with ministry identification armband, holding inspection checklist, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Inspector", "beats": [1, 2, 3], "keywords": ["inspector", "quarantine", "ministry", "検査官", "厚生労働省"], "type": "character"},
-            "fg_character_corporate_director": {"title": "Corporate Compliance Managing Director", "description": "Full-body stylized editorial graphic novel digital illustration of a conflicted Japanese corporate director in crisp white shirt and dark trousers, bowing slightly in formal apology posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Executive", "beats": [2, 4], "keywords": ["director", "executive", "apology", "役員", "企業"], "type": "character"},
-            "fg_character_forensic_auditor": {"title": "Forensic Financial Accounting Auditor", "description": "Full-body stylized editorial graphic novel digital illustration of a focused Japanese auditor holding a thick ledger and red verification pen, spectacles reflecting desk light, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Auditor", "beats": [3, 4, 5], "keywords": ["auditor", "accounting", "ledger", "監査", "会計"], "type": "character"},
-            "fg_character_whistleblower_insider": {"title": "Corporate Whistleblower Insider", "description": "Full-body stylized editorial graphic novel digital illustration of a cautious Japanese company employee in business casual jacket, holding confidential manila envelope, resolute watchful expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower Insider", "beats": [2, 3, 4], "keywords": ["whistleblower", "insider", "告発者", "社員", "証言"], "type": "character"},
+            "fg_character_tokyo_district_prosecutor": {"title": "Tokyo District Public Prosecutor", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a sharp Japanese public prosecutor in tailored dark suit with prosecutor autumn-frost badge on lapel, holding official filing folder, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecutor", "beats": [1, 4, 5], "keywords": ["prosecutor", "court", "indictment", "検察官", "起訴", "裁判"], "type": "character"},
+            "fg_character_ministry_safety_inspector": {"title": "Ministry Food & Safety Lead Inspector", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a diligent Japanese ministry quarantine inspector in navy administrative uniform with ministry identification armband, holding inspection checklist, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Inspector", "beats": [1, 2, 3], "keywords": ["inspector", "quarantine", "ministry", "検査官", "厚生労働省"], "type": "character"},
+            "fg_character_corporate_director": {"title": "Corporate Compliance Managing Director", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a conflicted Japanese corporate director in crisp white shirt and dark trousers, bowing slightly in formal apology posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Executive", "beats": [2, 4], "keywords": ["director", "executive", "apology", "役員", "企業"], "type": "character"},
+            "fg_character_forensic_auditor": {"title": "Forensic Financial Accounting Auditor", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a focused Japanese auditor holding a thick ledger and red verification pen, spectacles reflecting desk light, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Auditor", "beats": [3, 4, 5], "keywords": ["auditor", "accounting", "ledger", "監査", "会計"], "type": "character"},
+            "fg_character_whistleblower_insider": {"title": "Corporate Whistleblower Insider", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a cautious Japanese company employee in business casual jacket, holding confidential manila envelope, resolute watchful expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower Insider", "beats": [2, 3, 4], "keywords": ["whistleblower", "insider", "告発者", "社員", "証言"], "type": "character"},
             "fg_evidence_hanko_stamped_docket": {"title": "Official Vermilion Hanko Stamped Legal Docket", "description": "Official Japanese district court legal filing document, titled prosecution complaint docket, bold Japanese kanji header, stamped with official red vermilion hanko seal, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecution Docket", "beats": [1, 2, 5], "keywords": ["hanko", "docket", "complaint", "kanji", "seal", "判子", "訴状"], "type": "document"},
             "fg_evidence_chemical_residue_inspection_sheet": {"title": f"Official Safety Inspection Analysis Sheet ({metric_highlight})", "description": f"Government accredited laboratory test certificate showing quantitative chemical analysis results with metric highlight '{metric_highlight}', red verification stamp, Japanese kanji column headers, crisp cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Inspection Exhibit", "beats": [1, 2, 3], "keywords": ["inspection", "chemical", "residue", "analysis", "lab", "検査", "分析"], "type": "document"},
             "fg_evidence_damage_calculation_invoice": {"title": "Macro Economic Restitution & Damages Calculation Sheet", "description": "Official audit summary invoice document displaying highlighted financial calculation figures in green ledger ink, stamped diagonally with bold red ink '証拠物件 // 第1号' (EXHIBIT A), crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["damage", "invoice", "restitution", "loss", "損害", "賠償", "請求書"], "type": "document"},
@@ -968,11 +968,11 @@ def _generate_topic_anchored_roster_fallback(
             "bg_jongno_corporate_headquarters_lobby": {"title": "Jongno Historic Corporate Tower Atrium", "description": "Monumental polished granite atrium of major South Korean enterprise, soaring glass facade reflecting twilight city, solemn institutional scale.", "beats": [1, 2]}
         }
         fg_roster = {
-            "fg_character_seoul_prosecutor": {"title": "Senior Special Prosecutor", "description": "Full-body stylized editorial graphic novel digital illustration of a resolute Korean senior prosecutor in dark charcoal suit with prosecution emblem pin, holding a thick legal dossier, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecutor", "beats": [1, 4, 5], "keywords": ["prosecutor", "court", "검사", "기소", "검찰"], "type": "character"},
-            "fg_character_corporate_sawon": {"title": "Corporate Accounting Manager", "description": "Full-body stylized editorial graphic novel digital illustration of a conflicted Korean corporate manager in crisp white business shirt wearing corporate lanyard ID badge (Sawonjeung), holding financial ledger, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Insider", "beats": [2, 3, 4], "keywords": ["sawonjeung", "manager", "employee", "사원증", "과장"], "type": "character"},
-            "fg_character_regulatory_commissioner": {"title": "Fair Trade Oversight Commissioner", "description": "Full-body stylized editorial graphic novel digital illustration of a senior Korean regulatory commissioner in formal navy attire and glasses, holding an administrative cease order, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Commissioner", "beats": [3, 4, 5], "keywords": ["commissioner", "ftc", "위탁", "공정거래위원회"], "type": "character"},
-            "fg_character_forensic_auditor": {"title": "Senior Forensic Accounting Auditor", "description": "Full-body stylized editorial graphic novel digital illustration of a Korean forensic accountant holding an audit binder and tablet, analytical sharp gaze, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Auditor", "beats": [2, 3, 5], "keywords": ["auditor", "accountant", "회계사", "감사"], "type": "character"},
-            "fg_character_whistleblower_analyst": {"title": "Corporate Risk Whistleblower Analyst", "description": "Full-body stylized editorial graphic novel digital illustration of a conflicted Korean corporate analyst in business casual coat, holding sealed whistleblower file, determined intense gaze, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower", "beats": [2, 3, 4], "keywords": ["whistleblower", "insider", "analyst", "내부고발", "제보자"], "type": "character"},
+            "fg_character_seoul_prosecutor": {"title": "Senior Special Prosecutor", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a resolute Korean senior prosecutor in dark charcoal suit with prosecution emblem pin, holding a thick legal dossier, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecutor", "beats": [1, 4, 5], "keywords": ["prosecutor", "court", "검사", "기소", "검찰"], "type": "character"},
+            "fg_character_corporate_sawon": {"title": "Corporate Accounting Manager", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a conflicted Korean corporate manager in crisp white business shirt wearing corporate lanyard ID badge (Sawonjeung), holding financial ledger, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Insider", "beats": [2, 3, 4], "keywords": ["sawonjeung", "manager", "employee", "사원증", "과장"], "type": "character"},
+            "fg_character_regulatory_commissioner": {"title": "Fair Trade Oversight Commissioner", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a senior Korean regulatory commissioner in formal navy attire and glasses, holding an administrative cease order, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Commissioner", "beats": [3, 4, 5], "keywords": ["commissioner", "ftc", "위탁", "공정거래위원회"], "type": "character"},
+            "fg_character_forensic_auditor": {"title": "Senior Forensic Accounting Auditor", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a Korean forensic accountant holding an audit binder and tablet, analytical sharp gaze, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Auditor", "beats": [2, 3, 5], "keywords": ["auditor", "accountant", "회계사", "감사"], "type": "character"},
+            "fg_character_whistleblower_analyst": {"title": "Corporate Risk Whistleblower Analyst", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a conflicted Korean corporate analyst in business casual coat, holding sealed whistleblower file, determined intense gaze, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower", "beats": [2, 3, 4], "keywords": ["whistleblower", "insider", "analyst", "내부고발", "제보자"], "type": "character"},
             "fg_evidence_ingam_stamped_docket": {"title": "Official Red Vermilion Ingam Stamped Legal Filing Docket", "description": "Official Korean district court legal indictment document, bold Korean Hangul header, stamped with circular crimson ingam seal, crisp paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecution Docket", "beats": [1, 2, 5], "keywords": ["ingam", "docket", "complaint", "indictment", "seal", "인감", "공소장"], "type": "document"},
             "fg_evidence_corporate_sawonjeung_badge": {"title": "Corporate Employee Sawonjeung Identification Card", "description": "Official plastic corporate employee ID badge with lanyard clip, Hangul title '경영지원본부 / 회계팀' (Management Support / Accounting Team), barcode and chip, authentic institutional realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Corporate Insider Artifact", "beats": [1, 2, 3], "keywords": ["sawonjeung", "badge", "id", "card", "사원증", "신분증"], "type": "evidence_prop"},
             "fg_evidence_damages_calculation_invoice": {"title": f"Forensic Accounting & Damages Summary Sheet ({metric_highlight})", "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink '증거 제1호' (EXHIBIT 1), crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["damage", "invoice", "restitution", "손해배상", "세금계산서"], "type": "document"},
@@ -1016,28 +1016,29 @@ def _generate_topic_anchored_roster_fallback(
             "bg_capitol_hill_press_corridor": {"title": "Capitol Hill Congressional Scrutiny Press Corridor", "description": "Neoclassical marble colonnade corridor outside congressional hearing rooms, warm brass chandeliers, media microphones on stanchions in soft focus, dignified institutional setting.", "beats": [1, 5]}
         }
         fg_roster = {
-            "fg_character_lead_prosecutor": {"title": "Federal District Lead Prosecutor", "description": "Full-body stylized editorial graphic novel digital illustration of a focused federal prosecutor in dark tailored wool suit, holding prosecution complaint folder, standing with composed authority, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecutor", "beats": [1, 4, 5], "keywords": ["prosecutor", "complaint", "indictment", "court", "justice"], "type": "character"},
-            "fg_character_corporate_general_counsel": {"title": "Corporate General Counsel", "description": "Full-body stylized editorial graphic novel digital illustration of a guarded corporate defense attorney in charcoal pinstripe suit, holding closed leather briefcase with firm defensive posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Defense Counsel", "beats": [1, 2, 4], "keywords": ["counsel", "attorney", "corporate", "defense", "executive"], "type": "character"},
-            "fg_character_forensic_accountant": {"title": "Senior Forensic Financial Accountant", "description": "Full-body stylized editorial graphic novel digital illustration of a meticulous forensic accountant holding tabulated financial ledger and red audit pen, spectacles reflecting light, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accountant", "beats": [2, 3, 5], "keywords": ["accountant", "audit", "forensic", "ledger", "numbers"], "type": "character"},
-            "fg_character_whistleblower_insider": {"title": "Key Corporate Whistleblower Insider", "description": "Full-body stylized editorial graphic novel digital illustration of an observant corporate insider in casual business jacket, holding confidential manila envelope with cautious resolute gaze, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower", "beats": [2, 3, 4], "keywords": ["whistleblower", "insider", "confidential", "secret", "memo"], "type": "character"},
-            "fg_character_investigative_journalist": {"title": "Senior Investigative Financial Journalist", "description": "Full-body stylized editorial graphic novel digital illustration of an investigative journalist in trench coat with press badge on lanyard, holding reporter notepad and pen, focused inquisitive expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Investigative Reporter", "beats": [1, 3, 5], "keywords": ["journalist", "reporter", "investigation", "press", "media"], "type": "character"},
-            "fg_evidence_prosecution_complaint_docket": {"title": "Official Legal Prosecution Complaint Docket", "description": "Official legal filing document from the federal district court, bold case header, legal docket stamped with blue ink, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Prosecution Docket", "beats": [1, 2, 5], "keywords": ["docket", "complaint", "indictment", "court", "legal"], "type": "document"},
-            "fg_evidence_damages_calculation_invoice": {"title": f"Forensic Accounting & Damages Summary Sheet ({metric_highlight})", "description": f"Government audit summary invoice document displaying bold figure '{metric_highlight}' in green ledger ink, stamped diagonally with bold red ink 'CONFIDENTIAL / EXHIBIT A', crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["damages", "invoice", "restitution", "loss", "bill"], "type": "document"},
-            "fg_evidence_regulatory_audit_binder": {"title": "Forensic Investigative Audit Binder", "description": "Thick three-ring forensic investigative audit binder with tabbed colored dividers, official regulatory growth charts visible on front plastic sleeve, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Macro Financial Evidence", "beats": [3, 4, 5], "keywords": ["binder", "audit", "investigation", "dossier"], "type": "document"},
-            "fg_evidence_merchant_accounting_ledger": {"title": "Small Business Financial Accounting Ledger", "description": "Worn merchant bookkeeping ledger notebook open on a wooden table, showing ascending cost charges eroding profit margins, paperclips, tactile ink lines, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Victim Economic Evidence", "beats": [1, 2, 4], "keywords": ["ledger", "bookkeeping", "accounting", "transaction"], "type": "document"},
-            "fg_evidence_sealed_whistleblower_memo": {"title": "Confidential Internal Whistleblower Memo Envelope", "description": "Manila folder envelope stamped 'RESTRICTED DISTRIBUTION // EXECUTIVE EYES ONLY', partially opened revealing internal memo with black redacted bars across strategic paragraphs, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower Document", "beats": [2, 3], "keywords": ["memo", "whistleblower", "confidential", "secret", "envelope"], "type": "document"},
-            "fg_evidence_statute_reference_book": {"title": "Federal Statutory Legal Reference Volume", "description": "Heavy vintage leather-bound legal codex open to federal statutory monopolization and fraud sections, gold leaf lettering on spine, ribbon bookmark, sharp paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Statutory Authority", "beats": [1, 5], "keywords": ["statute", "law", "code", "reference", "volume"], "type": "document"},
-            "fg_evidence_server_rack_drive": {"title": "Automated Algorithm Storage Module", "description": "High-tech brushed metallic enterprise server drive enclosure with flashing blue data activity LEDs, forensic evidence barcode sticker, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Technical Hardware Evidence", "beats": [2, 3], "keywords": ["server", "drive", "data", "algorithm", "module"], "type": "evidence_prop"},
-            "fg_evidence_gavel_justice_scale": {"title": "Federal Court Judicial Gavel & Scales", "description": "Dark polished walnut judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Climax Artifact", "beats": [4, 5], "keywords": ["gavel", "judge", "scales", "court", "verdict"], "type": "evidence_prop"},
-            "fg_evidence_subpoena_compliance_order": {"title": "Federal Subpoena Duces Tecum Order", "description": "Official federal court subpoena order commanding production of records, embossed blue judicial seal, signed command line, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Compulsory Legal Order", "beats": [2, 4], "keywords": ["subpoena", "order", "records", "compliance"], "type": "document"},
-            "fg_evidence_internal_email_chain_exhibit": {"title": "Printed Executive Internal Email Chain Exhibit", "description": "Printed email records stamped with exhibit letter, highlighting strategic discussions with bold yellow highlighter ink, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Internal Communications Exhibit", "beats": [2, 3], "keywords": ["email", "chain", "exhibit", "communication"], "type": "document"},
-            "fg_evidence_financial_audit_reconciliation": {"title": "Forensic Revenue Reconciliation Audit Sheet", "description": "Multi-column audit reconciliation spread sheet on green-tinted paper, red penalty calculations stamped in bottom right corner, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Audit Reconciliation Exhibit", "beats": [3, 4], "keywords": ["reconciliation", "audit", "revenue", "penalty"], "type": "document"},
-            "fg_evidence_compliance_violation_notice": {"title": "Federal Regulatory Formal Violation Notice", "description": "Formal administrative cease-and-desist violation decree with red stamped border and gold agency seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Regulatory Violation Exhibit", "beats": [4, 5], "keywords": ["violation", "notice", "cease", "sanction"], "type": "document"},
-            "fg_evidence_search_warrant_affidavit": {"title": "Federal Court Search Warrant Affidavit", "description": "Sworn legal affidavit for federal search warrant, stamped with blue court seal and signed by special agent, crisp paper textures, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Search Warrant", "beats": [2, 4], "keywords": ["warrant", "search", "affidavit", "federal", "court"], "type": "document"},
-            "fg_evidence_wire_fraud_indictment_sheet": {"title": "Federal Grand Jury True Bill Indictment", "description": "Formal multi-count federal indictment docket with grand jury foreman signature line and embossed gold seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Grand Jury Indictment Exhibit", "beats": [1, 4], "keywords": ["indictment", "grand jury", "charges", "fraud", "true bill"], "type": "document"},
+            "fg_character_presiding_federal_judge": {"title": "Federal Presiding Judge", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a composed federal judge in dark judicial robe at elevated bench, holding official judicial ruling docket with austere authoritative expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Presiding Federal Judge", "beats": [1, 4, 5], "keywords": ["judge", "court", "ruling", "bench", "rejected", "justice", "order"], "type": "character"},
+            "fg_character_claimant_committee_rep": {"title": "Creditors & Survivors Committee Representative", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a resolute claimant representative in dark formal attire, holding sworn testimony dossier with determined expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Claimant Representative", "beats": [1, 2, 4, 5], "keywords": ["survivor", "committee", "claimant", "creditor", "victim", "testimony", "representative"], "type": "character"},
+            "fg_character_corporate_general_counsel": {"title": "Institutional General Counsel", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a guarded institutional defense attorney in charcoal pinstripe suit, holding closed leather briefcase with firm defensive posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Institutional Counsel", "beats": [1, 2, 4], "keywords": ["counsel", "attorney", "corporate", "defense", "executive", "debtor", "diocese"], "type": "character"},
+            "fg_character_forensic_accountant": {"title": "Senior Forensic Financial Accountant", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a meticulous forensic accountant holding tabulated financial ledger and red audit pen, spectacles reflecting light, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accountant", "beats": [2, 3, 5], "keywords": ["accountant", "audit", "forensic", "ledger", "numbers", "valuation"], "type": "character"},
+            "fg_character_whistleblower_insider": {"title": "Key Institutional Whistleblower Insider", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of an observant institutional insider in casual business jacket, holding archival manila envelope with cautious resolute gaze, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Whistleblower", "beats": [2, 3, 4], "keywords": ["whistleblower", "insider", "archive", "record", "memo"], "type": "character"},
+            "fg_character_investigative_journalist": {"title": "Senior Investigative Financial Journalist", "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of an investigative journalist in trench coat with press badge on lanyard, holding reporter notepad and pen, focused inquisitive expression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Investigative Reporter", "beats": [1, 3, 5], "keywords": ["journalist", "reporter", "investigation", "press", "media"], "type": "character"},
+            "fg_evidence_federal_court_ruling_docket": {"title": "Official Federal Court Judicial Ruling & Filing Docket", "description": "Official legal filing document from the federal court, bold case header, judicial docket stamped with official court seal, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Lead Judicial Docket", "beats": [1, 2, 5], "keywords": ["docket", "ruling", "plan", "rejected", "court", "legal", "filing"], "type": "document"},
+            "fg_evidence_damages_calculation_invoice": {"title": f"Forensic Accounting & Valuation Summary Sheet ({metric_highlight})", "description": "Official audit summary valuation document displaying structured tabular rows in green ledger ink, stamped diagonally with bold red official verification seal, crisp paper cutout edge, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Forensic Accounting Exhibit", "beats": [1, 4, 5], "keywords": ["damages", "invoice", "restitution", "loss", "bill", "valuation", "fund"], "type": "document"},
+            "fg_evidence_regulatory_audit_binder": {"title": "Forensic Investigative Audit Binder", "description": "Thick three-ring forensic investigative audit binder with tabbed colored dividers, official financial structure charts visible on front plastic sleeve, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Macro Financial Evidence", "beats": [3, 4, 5], "keywords": ["binder", "audit", "investigation", "dossier"], "type": "document"},
+            "fg_evidence_merchant_accounting_ledger": {"title": "Institutional Financial Accounting Ledger", "description": "Worn institutional bookkeeping ledger notebook open on a wooden table, showing asset transfers and reserve allocations, paperclips, tactile ink lines, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Financial Ledger Evidence", "beats": [1, 2, 4], "keywords": ["ledger", "bookkeeping", "accounting", "transaction", "transfer"], "type": "document"},
+            "fg_evidence_sealed_whistleblower_memo": {"title": "Internal Archival Disclosure Memo Envelope", "description": "Manila folder envelope with official archival seal, partially opened revealing internal memo with black redacted bars across strategic paragraphs, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Internal Disclosure Document", "beats": [2, 3], "keywords": ["memo", "disclosure", "internal", "redacted", "envelope"], "type": "document"},
+            "fg_evidence_statute_reference_book": {"title": "Federal Statutory & Bankruptcy Legal Reference Volume", "description": "Heavy vintage leather-bound legal codex open to federal statutory and bankruptcy restructuring sections, gold leaf lettering on spine, ribbon bookmark, sharp paper edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Statutory Authority", "beats": [1, 5], "keywords": ["statute", "law", "code", "chapter", "reference", "volume"], "type": "document"},
+            "fg_evidence_server_rack_drive": {"title": "Digital Archival Records Storage Module", "description": "High-tech brushed metallic enterprise server drive enclosure with flashing blue data activity LEDs, forensic evidence barcode sticker, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Technical Hardware Evidence", "beats": [2, 3], "keywords": ["server", "drive", "data", "records", "module"], "type": "evidence_prop"},
+            "fg_evidence_gavel_justice_scale": {"title": "Federal Court Judicial Gavel & Scales", "description": "Dark polished walnut judge gavel resting on sounding block beside balanced brass scales of justice, tactile wood grain, courtroom documentary realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Climax Artifact", "beats": [4, 5], "keywords": ["gavel", "judge", "scales", "court", "verdict", "ruling"], "type": "evidence_prop"},
+            "fg_evidence_subpoena_compliance_order": {"title": "Federal Subpoena Duces Tecum Order", "description": "Official federal court subpoena order commanding production of financial records, embossed blue judicial seal, signed command line, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Compulsory Legal Order", "beats": [2, 4], "keywords": ["subpoena", "order", "records", "compliance", "discovery"], "type": "document"},
+            "fg_evidence_internal_email_chain_exhibit": {"title": "Printed Executive Internal Correspondence Exhibit", "description": "Printed correspondence records stamped with exhibit marker, highlighting strategic financial transfers with bold yellow highlighter ink, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Internal Communications Exhibit", "beats": [2, 3], "keywords": ["email", "correspondence", "exhibit", "communication"], "type": "document"},
+            "fg_evidence_financial_audit_reconciliation": {"title": "Forensic Asset & Liability Reconciliation Sheet", "description": "Multi-column audit reconciliation spreadsheet on green-tinted paper, red valuation discrepancies circled in bottom right corner, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Audit Reconciliation Exhibit", "beats": [3, 4], "keywords": ["reconciliation", "audit", "assets", "liability", "discrepancy"], "type": "document"},
+            "fg_evidence_compliance_violation_notice": {"title": "Judicial Objection & Non-Compliance Notice", "description": "Formal judicial notice of objection with red stamped border and court seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Objection Exhibit", "beats": [4, 5], "keywords": ["objection", "notice", "violation", "rejected", "compliance"], "type": "document"},
+            "fg_evidence_sworn_creditor_claim_affidavit": {"title": "Sworn Claimant & Creditor Legal Affidavit", "description": "Sworn legal claim affidavit filed in federal court, stamped with blue court seal and signed by claimant counsel, crisp paper textures, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Sworn Legal Affidavit", "beats": [2, 4], "keywords": ["claim", "affidavit", "creditor", "survivor", "federal", "court"], "type": "document"},
+            "fg_evidence_reorganization_plan_rejection_order": {"title": "Federal Court Reorganization Plan Rejection Order", "description": "Formal multi-page federal court judicial order rejecting reorganization plan, embossed court seal and judicial signature line, red rejection stamp impression, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Rejection Order", "beats": [1, 4, 5], "keywords": ["rejected", "plan", "reorganization", "bankruptcy", "chapter", "settlement", "order"], "type": "document"},
             "fg_evidence_encrypted_flash_drive": {"title": "Forensic Encrypted Storage Flash Drive", "description": "Metallic USB evidence drive with yellow forensic evidence tag and barcode sticker, tamper-evident security tape, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Digital Hardware Evidence", "beats": [2, 3], "keywords": ["flash drive", "usb", "digital", "evidence", "storage"], "type": "evidence_prop"},
-            "fg_evidence_asset_freeze_injunction_order": {"title": "Federal Asset Freezing Injunction Decree", "description": "Judicial injunction decree commanding worldwide freeze of corporate and executive assets, red embossed court seal, crisp legal edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Restraining Order", "beats": [4, 5], "keywords": ["freeze", "injunction", "assets", "order", "court"], "type": "document"},
-            "fg_evidence_whistleblower_audio_recorder": {"title": "Forensic Digital Audio Recording Device", "description": "Compact brushed metal digital audio dictaphone with visible audio waveform on illuminated LCD screen, marked with yellow evidence label, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Audio Surveillance Evidence", "beats": [2, 3], "keywords": ["recorder", "audio", "wiretap", "dictaphone", "evidence"], "type": "evidence_prop"}
+            "fg_evidence_asset_freeze_injunction_order": {"title": "Judicial Stay & Asset Protection Injunction Order", "description": "Judicial injunction decree commanding stay of proceedings and asset protection, red embossed court seal, crisp legal edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Judicial Stay Order", "beats": [4, 5], "keywords": ["stay", "freeze", "injunction", "assets", "order", "court"], "type": "document"},
+            "fg_evidence_whistleblower_audio_recorder": {"title": "Courtroom Hearing Digital Audio Recording Device", "description": "Compact brushed metal digital audio dictaphone with visible audio waveform on illuminated LCD screen, marked with yellow exhibit label, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.", "role": "Hearing Audio Record", "beats": [2, 3], "keywords": ["recorder", "audio", "hearing", "testimony", "evidence"], "type": "evidence_prop"}
         }
         return bg_roster, fg_roster
 
@@ -1066,8 +1067,8 @@ def extract_dynamic_visual_roster(
     # Trích xuất số liệu định lượng và claims thực tế từ grounding
     claims = []
     if isinstance(g_intel, dict):
-        for c in g_intel.get("claims", [])[:10]:
-            txt = c.get("claim") or c.get("text") if isinstance(c, dict) else str(c)
+        for c in (g_intel.get("claims") or g_intel.get("verified_claims") or [])[:10]:
+            txt = c.get("claim") or c.get("text") or c.get("fact") if isinstance(c, dict) else str(c)
             if txt:
                 claims.append(txt[:150])
 
@@ -1090,11 +1091,27 @@ def extract_dynamic_visual_roster(
     elif story_text:
         sample_narr = [line.strip() for line in story_text.split("\n") if line.strip()][:5]
 
+    if not key_metrics:
+        combined_text_src = story_text or " ".join(s.get("text", "") for s in (spoken_sentences or []))
+        if combined_text_src:
+            found_nums = re.findall(
+                r"(?:[$¥₩€£]\s*\d+(?:[.,]\d+)?\s*(?:billion|trillion|million|B|T|M|k|万件|万人|万円|億|兆|万|조|억|만|tỷ|triệu)?|\d+(?:[.,]\d+)?\s*(?:%|percent|billion|trillion|million|万件|万人|万円|億円|兆円|億|兆|万|年|ヶ月|か月|件|조|억|만|년|개월|tỷ|triệu|năm|tháng))",
+                combined_text_src,
+                flags=re.IGNORECASE
+            )
+            key_metrics.extend(list(dict.fromkeys([m.strip() for m in found_nums if m.strip()]))[:6])
+
     bg_roster = None
     fg_roster = None
 
-    # Thử gọi LLM Gateway để sinh Roster hoàn toàn độc lập và động (bỏ qua trong pytest để test chạy tức thì)
-    is_testing = bool(os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules or os.getenv("VF_SMOKE_TEST") or os.getenv("FAST_ROSTER"))
+    # Thử gọi LLM Gateway để sinh Roster hoàn toàn độc lập và động (bỏ qua trong pytest/ci_neighbor_tester để test chạy tức thì)
+    is_testing = bool(
+        os.environ.get("PYTEST_CURRENT_TEST")
+        or "pytest" in sys.modules
+        or os.getenv("VF_SMOKE_TEST")
+        or os.getenv("FAST_ROSTER")
+        or any("ci_neighbor_tester" in str(a) or "smoketest" in str(a) for a in sys.argv)
+    )
     if not is_testing:
         try:
             from app.services.model_gateway import get_global_gateway
@@ -1117,10 +1134,11 @@ def extract_dynamic_visual_roster(
                 "   - Strictly authentic to target market and topic era.\n"
                 "   - Keys MUST be 'bg_<semantic_slug>'.\n"
                 "   - Schema: {\"title\": \"...\", \"description\": \"...\", \"beats\": [1, 2]}\n\n"
-                "2. 'foreground_roster': Exactly 24 to 32 distinct Foregrounds (1:1 2048x2048) on pure flat #FF00FF magenta chroma key.\n"
+                "2. 'foreground_roster': Exactly 20 to 28 distinct Foregrounds (1:1 2048x2048) on pure flat #FF00FF magenta chroma key.\n"
                 "   Divided into:\n"
-                "   A. Key Character Archetypes (10 to 14 items): 'type': 'character', full-body or 3/4 stylized graphic novel figure visible from head to toe/waist on flat #FF00FF magenta background. MUST cover diverse human perspectives across the entire institutional and supply chain (producers, laborers, wholesalers, lab analysts, government inspectors, consumer victims, retail managers). Distinct facial micro-expressions and dynamic posture. Keys: 'fg_character_<role>'.\n"
-                "   B. Tactile Evidence Props, Documents & Charts (14 to 18 items): 'type': 'evidence_prop' | 'document' | 'data_metric'. High-impact, topic-specific evidentiary artifacts (e.g. testing reports, chemical drums, inspection certificates, supply chain flowcharts, threshold comparison bar charts, barcode labels). Keys: 'fg_evidence_<object_name>'.\n"
+                "   A. Key Character Archetypes (6 to 10 items): 'type': 'character', waist-up three-quarter angle action framing on flat #FF00FF magenta background. Every character MUST obey the Vox Actor-Prop Invariant (Actor = Subject + Active Verb + Physical Evidence Prop + Directional Gaze Target), actively gripping, pointing at, or stamping an evidentiary prop. NEVER generate static head-to-shoes passport poses. NEVER use magenta, purple, fuchsia, or neon pink clothing on characters (to prevent #FF00FF chroma key holes). Keys: 'fg_character_<role>'.\n"
+                "   B. Tactile Evidence Props, Documents & Charts (14 to 18 items): 'type': 'evidence_prop' | 'document' | 'data_metric'. High-impact, topic-specific evidentiary artifacts. ZERO human figures or attire in evidence prop descriptions. Keys: 'fg_evidence_<object_name>'.\n"
+                "   C. DOMAIN & LEGAL ACCURACY LOCK: Match the exact legal/institutional domain of the topic (e.g., Chapter 11 civil bankruptcy vs. regulatory antitrust vs. sovereign macro debt). NEVER inject criminal prosecution artifacts ('indictment', 'wire fraud', 'search warrant', 'prosecutor') into civil, bankruptcy, or administrative proceedings.\n"
                 "   - Schema: {\"title\": \"...\", \"description\": \"...\", \"role\": \"...\", \"beats\": [1, 2, 3], \"keywords\": [\"kw1\", \"kw2\"], \"type\": \"character\"|\"document\"|\"evidence_prop\"|\"data_metric\"}\n\n"
                 "Output ONLY valid JSON matching:\n"
                 "{\n"
@@ -1137,7 +1155,7 @@ def extract_dynamic_visual_roster(
                 "narrative_samples": sample_narr
             }, ensure_ascii=False)
 
-            models_to_try = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-sonnet-5", "gpt-6-astra"]
+            models_to_try = ["claude-opus-5-5", "gpt-6-astra", "claude-sonnet-5-5"]
             resp = None
             for m_candidate in models_to_try:
                 try:
@@ -1146,8 +1164,8 @@ def extract_dynamic_visual_roster(
                         prompt=user_prompt,
                         system_prompt=system_prompt,
                         model=m_candidate,
-                        max_tokens=4500,
-                        timeout=45.0
+                        max_tokens=6000,
+                        timeout=180.0
                     )
                     if resp:
                         break
@@ -1156,10 +1174,25 @@ def extract_dynamic_visual_roster(
             if resp:
                 cleaned_json = re.sub(r"^```(?:json)?\s*", "", resp.strip(), flags=re.MULTILINE)
                 cleaned_json = re.sub(r"\s*```$", "", cleaned_json, flags=re.MULTILINE)
-                parsed = json.loads(cleaned_json)
+                try:
+                    parsed = json.loads(cleaned_json)
+                except Exception:
+                    m_json = re.search(r"(\{.*\})", cleaned_json, re.DOTALL)
+                    parsed = json.loads(m_json.group(1)) if m_json else {}
                 bgs = parsed.get("background_roster", {})
                 fgs = parsed.get("foreground_roster", {})
-                if len(bgs) >= 14 and len(fgs) >= 18:
+                if len(bgs) >= 8 and len(fgs) >= 10:
+                    fb_bgs, fb_fgs = _generate_topic_anchored_roster_fallback(topic_str, m_up, key_metrics, claims)
+                    for k, v in fb_bgs.items():
+                        if len(bgs) >= 16:
+                            break
+                        if k not in bgs:
+                            bgs[k] = v
+                    for k, v in fb_fgs.items():
+                        if len(fgs) >= 20:
+                            break
+                        if k not in fgs:
+                            fgs[k] = v
                     bg_roster = bgs
                     fg_roster = fgs
         except Exception as e:
@@ -1462,8 +1495,24 @@ def generate_cinematography_scene_data(
 
     linked_secondary = []
     narr_l = narr.lower()
-    if any(w in narr_l for w in ["fraud", "confidential", "violation", "evidence", "void", "audit", "bằng chứng", "gian lận", "mật", "사기", "증거", "비밀"]):
-        stamp_label = "PRICE_FRAUD" if "fraud" in narr_l or "gian lận" in narr_l else ("CONFIDENTIAL" if "confidential" in narr_l or "mật" in narr_l else "AUDIT_FINDING")
+    stamp_triggers = [
+        "reject", "rejected", "denied", "dismissed", "stay", "stayed", "bankruptcy",
+        "fraud", "confidential", "violation", "evidence", "void", "audit",
+        "bằng chứng", "gian lận", "mật", "vi phạm",
+        "사기", "증거", "비밀", "위반", "기각",
+        "証拠", "違反", "漏洩", "却下", "拒否", "極秘", "機密", "不正", "監査", "記録なし", "未回答", "発覚", "流出", "処分"
+    ]
+    if any(w in narr_l for w in stamp_triggers):
+        if any(w in narr_l for w in ["reject", "rejected", "denied", "dismissed", "却下", "拒否", "기각"]):
+            stamp_label = "REJECTED" if mkt not in ("JP", "JA") else "却下 // REJECTED"
+        elif any(w in narr_l for w in ["stay", "stayed", "bankruptcy", "insolvency", "freeze", "破産", "凍結"]):
+            stamp_label = "STAYED"
+        elif any(w in narr_l for w in ["fraud", "gian lận", "不正", "違反", "漏洩", "流出", "사기", "위반"]):
+            stamp_label = "VIOLATION_FOUND" if mkt not in ("JP", "JA") else "違反確認 // BREACH"
+        elif any(w in narr_l for w in ["confidential", "mật", "極秘", "機密", "비밀", "未回答", "記録なし"]):
+            stamp_label = "REDACTED" if mkt not in ("JP", "JA") else "極秘 // UNDISCLOSED"
+        else:
+            stamp_label = "AUDIT_FINDING" if mkt not in ("JP", "JA") else "監査証拠 // EXHIBIT"
         linked_secondary.append({
             "id": f"stamp_{idx}",
             "type": "stamp",
@@ -1475,7 +1524,13 @@ def generate_cinematography_scene_data(
             "rot_deg": -5.5 if idx % 2 == 0 else 4.5
         })
 
-    if any(w in narr_l for w in ["article", "clause", "provision", "document", "record", "hồ sơ", "điều khoản", "기록", "조항"]):
+    marker_triggers = [
+        "article", "clause", "provision", "document", "record",
+        "hồ sơ", "điều khoản", "tài liệu",
+        "기록", "조항", "문서", "보고서",
+        "条項", "規定", "文書", "報告書", "記録", "データ", "規約", "契約", "調査", "リスト", "一覧", "公表"
+    ]
+    if any(w in narr_l for w in marker_triggers):
         linked_secondary.append({
             "id": f"marker_{idx}",
             "type": "marker_sweep",
@@ -1484,20 +1539,42 @@ def generate_cinematography_scene_data(
             "color": "#ffe600"
         })
 
-    parsed_num = re.search(r'\$(\d+(?:\.\d+)?)\s*(?:billion|b|tỷ|조|兆)?', narr, re.IGNORECASE)
-    if parsed_num and beat_idx in (1, 3, 4):
-        val = float(parsed_num.group(1))
-        linked_secondary.append({
-            "id": f"odometer_{idx}",
-            "type": "odometer",
-            "start_value": 0,
-            "end_value": val,
-            "prefix": "$",
-            "suffix": "B",
-            "label": "RECORD CAPITAL FLOW",
-            "start_frame": 6,
-            "duration_frames": 24
-        })
+    stat_val_extracted = None
+    stat_lbl_extracted = None
+    for m_num in re.finditer(
+        r'(?:([\$¥₩€£])\s*)?(\d+(?:[.,]\d+)?)\s*(万件|万人|万円|億円|兆円|億|兆|万|%|年|ヶ月|か月|日間|時間|件|倍|조|억|만|년|개월|(?:percent|billion|million|trillion|tỷ|triệu|nghìn|năm|tháng|years|months|days|B|M|T)\b)',
+        narr,
+        re.IGNORECASE
+    ):
+        prefix_sym = m_num.group(1) or ""
+        raw_num_str = m_num.group(2).replace(",", "")
+        unit_str = m_num.group(3) or ""
+        try:
+            val = float(raw_num_str)
+        except ValueError:
+            continue
+        # Skip 4-digit calendar years (e.g. 2024年, 2026年) so they aren't mistaken for quantitative metrics
+        if unit_str in ("年", "년", "năm") and 1900 <= val <= 2099:
+            continue
+        stat_val_extracted = f"{prefix_sym}{m_num.group(2)}{unit_str}"
+        stat_lbl_extracted = (
+            "重要検証データ // VERIFIED METRIC" if mkt in ("JP", "JA") else
+            ("핵심 검증 지표 // VERIFIED METRIC" if mkt in ("KR", "KO") else
+             ("CHỈ SỐ KIỂM CHỨNG // VERIFIED METRIC" if mkt in ("VN", "VI") else "VERIFIED FORENSIC METRIC"))
+        )
+        if beat_idx in (1, 3, 4):
+            linked_secondary.append({
+                "id": f"odometer_{idx}",
+                "type": "odometer",
+                "start_value": 0,
+                "end_value": val,
+                "prefix": prefix_sym,
+                "suffix": unit_str[:4],
+                "label": stat_lbl_extracted,
+                "start_frame": 6,
+                "duration_frames": 24
+            })
+        break
 
     headline_info = {}
     if idx == 0 and key_metrics:
@@ -1514,8 +1591,83 @@ def generate_cinematography_scene_data(
         "virtual_camera": virtual_camera,
         "primary_hero": primary_hero,
         "linked_secondary_objects": linked_secondary,
-        "headline_info": headline_info
+        "headline_info": headline_info,
+        "stat_value": stat_val_extracted,
+        "stat_label": stat_lbl_extracted,
     }
+
+
+def compile_stateful_boards(scenes: List[Dict[str, Any]], board_size: int = 4) -> List[Dict[str, Any]]:
+    """Group individual sentence-scenes into Stateful Investigation Boards (3-4 scenes per Board).
+    - Persists the Board tabletop background across scenes within the same Board.
+    - Accumulates evidentiary foreground props across beats within the Board so the tabletop builds a living argument.
+    - Assigns motivated Vox transitions (paper_slide, vox_push_zoom, match_cut within a Board;
+      push_through or vox_paper_wipe between Boards; hard_cut reserved strictly for Beat boundaries <= 15%).
+    """
+    boards: List[Dict[str, Any]] = []
+    current_board: List[Dict[str, Any]] = []
+    last_beat = None
+
+    for sc in scenes:
+        b_idx = sc.get("beat_index", 1)
+        if current_board and (len(current_board) >= board_size or b_idx != last_beat):
+            boards.append({"board_index": len(boards), "beat_index": last_beat, "scenes": current_board})
+            current_board = []
+        current_board.append(sc)
+        last_beat = b_idx
+    if current_board:
+        boards.append({"board_index": len(boards), "beat_index": last_beat, "scenes": current_board})
+
+    internal_transitions = ["paper_slide", "vox_push_zoom", "match_cut", "vox_tape_snap"]
+    boundary_transitions = ["push_through", "vox_paper_wipe"]
+
+    for b_meta in boards:
+        b_idx = b_meta["board_index"]
+        b_id = f"board_{b_idx:02d}"
+        b_scenes = b_meta["scenes"]
+        primary_bg = b_scenes[0].get("background")
+        accumulated_props: List[Dict[str, Any]] = []
+
+        for step_idx, sc in enumerate(b_scenes):
+            sc["board_id"] = b_id
+            sc["board_step"] = step_idx
+            if primary_bg and isinstance(sc.get("background"), dict):
+                sc["background"] = dict(primary_bg)
+
+            # Copy accumulated props from earlier steps in this Board before adding current FG
+            sc["board_accumulated_props"] = list(accumulated_props)
+
+            fg = sc.get("foreground")
+            if isinstance(fg, dict) and fg.get("reuse_key"):
+                rk = fg["reuse_key"]
+                if not any(p.get("reuse_key") == rk for p in accumulated_props):
+                    accumulated_props.append({
+                        "reuse_key": rk,
+                        "title": fg.get("title") or rk,
+                        "role": fg.get("role") or "EVIDENCE",
+                        "step_added": step_idx,
+                    })
+
+            # Motivated Transition Assignment (Hard-cut capped <= 15%)
+            is_last_in_board = (step_idx == len(b_scenes) - 1)
+            if not is_last_in_board:
+                sc["transition_out"] = internal_transitions[(b_idx + step_idx) % len(internal_transitions)]
+            else:
+                next_board = boards[b_idx + 1] if (b_idx + 1) < len(boards) else None
+                is_beat_change = bool(next_board and next_board["beat_index"] != b_meta["beat_index"])
+                if is_beat_change or (b_idx % 6 == 5):
+                    sc["transition_out"] = "hard_cut"
+                else:
+                    sc["transition_out"] = boundary_transitions[b_idx % len(boundary_transitions)]
+
+
+        b_meta["board_id"] = b_id
+        b_meta["surface_bg"] = (primary_bg or {}).get("reuse_key") if isinstance(primary_bg, dict) else None
+        b_meta["scene_ids"] = [s.get("scene_id") for s in b_scenes]
+        b_meta["accumulated_prop_keys"] = [p["reuse_key"] for p in accumulated_props]
+
+    return boards
+
 
 
 # ============================================================================
@@ -1542,10 +1694,50 @@ def build_unified_director_plan(
     ])
     layout_zones = ["split_evidence_left", "center_hero_document", "split_evidence_right", "macro_detail_focus"]
 
+    if metadata is None:
+        for meta_candidate in ("metadata.json", "brain_input.json"):
+            if (ep_dir / meta_candidate).exists():
+                try:
+                    with open(ep_dir / meta_candidate, "r", encoding="utf-8") as mf_in:
+                        metadata = json.load(mf_in)
+                    break
+                except Exception as _e_meta:
+                    logger.debug("Optional %s load skipped: %s", meta_candidate, _e_meta)
+
+    if grounding_intel is None:
+        for gi_candidate in ("grounding_intelligence.json", "grounding_intel.json"):
+            if (ep_dir / gi_candidate).exists():
+                try:
+                    with open(ep_dir / gi_candidate, "r", encoding="utf-8") as gf_in:
+                        grounding_intel = json.load(gf_in)
+                    break
+                except Exception as _e_gi:
+                    logger.debug("Optional %s load skipped: %s", gi_candidate, _e_gi)
+
+    if competitor_card is None:
+        for cc_candidate in ("competitor_intel_card.json", "competitor_card.json"):
+            if (ep_dir / cc_candidate).exists():
+                try:
+                    with open(ep_dir / cc_candidate, "r", encoding="utf-8") as cf_in:
+                        competitor_card = json.load(cf_in)
+                    break
+                except Exception as _e_cc:
+                    logger.debug("Optional %s load skipped: %s", cc_candidate, _e_cc)
+
+    if not story_text:
+        for s_candidate in ("story_script.md", "script.md", "story.txt", "spoken_script.txt"):
+            if (ep_dir / s_candidate).exists():
+                try:
+                    story_text = (ep_dir / s_candidate).read_text(encoding="utf-8")
+                    break
+                except Exception as _e_st:
+                    logger.debug("Optional story script load skipped: %s", _e_st)
+
     meta = metadata or {}
     ep_id = meta.get("episode_id") or ep_dir.name
     mkt = (market or meta.get("market") or ep_id.split("_")[0]).upper()
-    topic = meta.get("topic") or meta.get("raw_term") or ep_id
+    gi_topic = grounding_intel.get("topic") if isinstance(grounding_intel, dict) else None
+    topic = gi_topic or meta.get("topic") or meta.get("raw_term") or ep_id
 
     # 1. Trích xuất Dynamic Visual Roster: Ưu tiên nạp trực tiếp từ images/manifest.json nếu đã có tài nguyên phê duyệt
     approved_manifest_path = ep_dir / "images" / "manifest.json"
@@ -1809,11 +2001,31 @@ def build_unified_director_plan(
         scene_obj["primary_hero"] = cine_data["primary_hero"]
         scene_obj["motion_path"] = (cine_data["primary_hero"] or {}).get("motion_path")
         scene_obj["linked_secondary_objects"] = cine_data["linked_secondary_objects"]
+        if cine_data.get("stat_value"):
+            scene_obj["stat_value"] = cine_data["stat_value"]
+            scene_obj["stat_label"] = cine_data.get("stat_label")
         if cine_data["headline_info"]:
             scene_obj.update(cine_data["headline_info"])
 
         # VOX Mixed-Media Paper Collage Layout (Plan Section VI)
         paper_theme = "blueprint" if beat_idx in (1, 4) else ("parchment" if beat_idx in (3, 5) else "manila")
+        narr_low_sc = narr.lower()
+        if any(w in narr_low_sc for w in ["reject", "rejected", "denied", "dismissed", "veto", "却下", "拒否"]):
+            stamp_badge_text = f"PLAN REJECTED // BEAT {beat_idx}"
+        elif any(w in narr_low_sc for w in ["stay", "stayed", "bankruptcy", "chapter 11", "insolvency", "破産"]):
+            stamp_badge_text = f"STAYED // BEAT {beat_idx}"
+        elif any(w in narr_low_sc for w in ["confidential", "secret", "redacted", "classified", "極秘", "機密", "未回答"]):
+            stamp_badge_text = f"REDACTED // BEAT {beat_idx}"
+        elif beat_idx == 1:
+            stamp_badge_text = f"CASE FILE // BEAT {beat_idx}"
+        elif beat_idx == 2:
+            stamp_badge_text = f"ARCHIVAL RECORD // BEAT {beat_idx}"
+        elif beat_idx == 3:
+            stamp_badge_text = f"FORENSIC AUDIT // BEAT {beat_idx}"
+        elif beat_idx == 4:
+            stamp_badge_text = f"JUDICIAL RULING // BEAT {beat_idx}"
+        else:
+            stamp_badge_text = f"SYSTEMIC RECORD // BEAT {beat_idx}"
         scene_obj["papercraft_theme"] = paper_theme
         scene_obj["papercraft_layout"] = {
             "backdrop_theme": paper_theme,
@@ -1824,7 +2036,7 @@ def build_unified_director_plan(
                 {"from": "evidence_pin", "to": "hero_pin", "curvature": 25, "isYarn": True, "color": "#dc2626"}
             ] if beat_idx in (3, 4) else [],
             "stamp_badge": {
-                "text": f"CONFIDENTIAL // BEAT {beat_idx}",
+                "text": stamp_badge_text,
                 "rotation": -8 if (idx % 2 == 0) else -14
             },
             "has_sticker_cutout": bool(assigned_fg),
@@ -1836,6 +2048,9 @@ def build_unified_director_plan(
         }
 
         scenes.append(scene_obj)
+
+    # 1.5. Compile Stateful Investigation Boards (3-4 scenes per Board, capping hard_cut <= 15%)
+    stateful_boards = compile_stateful_boards(scenes, board_size=4)
 
     # 2. Tự động sinh và ghi file flow_video_manifest.json & vox_scene_manifest.json
     manifest_data = {
@@ -1849,6 +2064,7 @@ def build_unified_director_plan(
         "market": mkt,
         "topic": topic,
         "total_scenes": len(scenes),
+        "total_boards": len(stateful_boards),
         "scenes": [
             {
                 "scene_id": sc["scene_id"],
@@ -2025,38 +2241,87 @@ def main():
     bg_roster = result.get("background_roster", {})
     fg_roster = result.get("foreground_roster", {})
 
-    # 1. Lưu director_plan.json
+    # 1. Sanitize & Forge Prompts (B3.5)
+    from app.services.prompt_forge import _synthesize_vox_collage_prompt, UNIVERSAL_VOX_ANIMATION_PROMPT
+    mkt = ep_id.split("_")[0].upper() if ep_id and "_" in ep_id else "EN"
+    bg_prompts = {k: _sanitize_background_prompt(v["description"], bg_key=k, market=mkt) for k, v in bg_roster.items()}
+    fg_prompts = {k: _sanitize_foreground_prompt(v["description"], fg_key=k, market=mkt) for k, v in fg_roster.items()}
+    vox_collages = {}
+    animation_tiers = {}
+    for idx, sc in enumerate(scenes):
+        bg_k = (sc.get("background") or {}).get("reuse_key") or sc.get("background_reuse_key") or sc.get("bg_reuse_key") or "bg_00"
+        fg_k = (sc.get("foreground") or {}).get("reuse_key") or sc.get("foreground_reuse_key") or sc.get("fg_reuse_key")
+        bg_desc = bg_prompts.get(bg_k, "")
+        fg_desc = fg_prompts.get(fg_k, "") if fg_k else ""
+        if bg_desc:
+            sc["bg_prompt"] = bg_desc
+            sc["image_prompt"] = bg_desc
+            if isinstance(sc.get("background"), dict):
+                sc["background"]["description"] = bg_desc
+        if fg_desc:
+            sc["fg_prompt"] = fg_desc
+            sc["foreground_prompt"] = fg_desc
+            if isinstance(sc.get("foreground"), dict):
+                sc["foreground"]["description"] = fg_desc
+        vox_key = f"vox_sc_{idx+1:03d}_{bg_k}"
+        vox_collages[vox_key] = _synthesize_vox_collage_prompt(
+            bg_desc=bg_desc,
+            fg_desc=fg_desc,
+            object_focus=sc.get("object_focus"),
+            market=mkt,
+            scene_idx=idx+1
+        )
+        animation_tiers[vox_key] = sc.get("animation_tier") or ("HERO_AI_VIDEO_6S" if sc.get("is_hero_video") or sc.get("shot_type") == "HERO_AI_VIDEO" else "TACTILE_STOPMOTION_STILL")
+
+    # 2. Lưu director_plan.json & dp_plan.json
     dp_data = {
         "episode_id": ep_id,
         "total_scenes": len(scenes),
         "total_hero_ai_videos": len(hero_clips),
+        "hero_clips": hero_clips,
+        "background_roster": bg_roster,
+        "foreground_roster": fg_roster,
         "scenes": scenes
     }
     dp_path = ep_dir / "director_plan.json"
     with open(dp_path, "w", encoding="utf-8") as f:
         json.dump(dp_data, f, indent=2, ensure_ascii=False)
-    print(f"✅ Đã tạo director_plan.json ({len(scenes)} cảnh, {len(hero_clips)} Veo 3D clips) -> {dp_path}")
+    with open(ep_dir / "dp_plan.json", "w", encoding="utf-8") as f:
+        json.dump({"episode_id": ep_id, "scenes": scenes}, f, indent=2, ensure_ascii=False)
+    print(f"✅ Đã tạo director_plan.json & dp_plan.json ({len(scenes)} cảnh, {len(hero_clips)} Veo 3D clips) -> {dp_path}")
 
-    # 2. Lưu prompts_forge.json
-    mkt = ep_id.split("_")[0].upper() if ep_id and "_" in ep_id else "EN"
-    bg_prompts = {k: _sanitize_background_prompt(v["description"], bg_key=k, market=mkt) for k, v in bg_roster.items()}
-    fg_prompts = {k: _sanitize_foreground_prompt(v["description"], fg_key=k, market=mkt) for k, v in fg_roster.items()}
+    # 3. Lưu prompts_forge.json & prompts.json
     prompts_data = {
         "episode_id": ep_id,
         "backgrounds": bg_prompts,
-        "foregrounds": fg_prompts
+        "foregrounds": fg_prompts,
+        "vox_collages": vox_collages,
+        "animation_tiers": animation_tiers,
+        "universal_video_prompt": UNIVERSAL_VOX_ANIMATION_PROMPT,
+        "thumbnails": {}
     }
     pf_path = ep_dir / "prompts_forge.json"
     with open(pf_path, "w", encoding="utf-8") as f:
         json.dump(prompts_data, f, indent=2, ensure_ascii=False)
-    print(f"✅ Đã tạo prompts_forge.json ({len(bg_prompts)} BGs, {len(fg_prompts)} FGs) -> {pf_path}")
+    with open(ep_dir / "prompts.json", "w", encoding="utf-8") as f:
+        json.dump(prompts_data, f, indent=2, ensure_ascii=False)
+    print(f"✅ Đã tạo prompts_forge.json ({len(bg_prompts)} BGs, {len(fg_prompts)} FGs, {len(vox_collages)} VOX Collages) -> {pf_path}")
 
-    # 3. flow_video_manifest.json đã được tự động lưu trong build_unified_director_plan()
+    # 4. flow_video_manifest.json đã được tự động lưu trong build_unified_director_plan()
     man_path = ep_dir / "flow_video_manifest.json"
     print(f"✅ Đã tạo flow_video_manifest.json ({len(hero_clips)} clips phân bổ {len(FLOW_ACCOUNTS)} tài khoản) -> {man_path}")
 
-    # 4. showrunner_dossier.json đã được tự động lưu trong build_unified_director_plan()
+    # 4. showrunner_dossier.json + Active Opus 5.5 In-Flight Gate
     dos_path = ep_dir / "showrunner_dossier.json"
+    try:
+        from scripts.orchestrator.opus55_supervisor_gate import audit_director_assets_in_flight
+        gate_res = audit_director_assets_in_flight(ep_dir, call_llm_audit=False)
+        print(f"🛡️ [Opus 5.5 In-Flight Gate] Verdict: {gate_res['verdict']} (Score: {gate_res['score']}, Defects: {gate_res['defects_count']}) -> {dos_path}")
+        if gate_res["defects"]:
+            for d_msg in gate_res["defects"][:5]:
+                print(f"   ⚠️ Defect: {d_msg}")
+    except Exception as ex_gate:
+        logger.warning("Opus 5.5 In-Flight Gate check skipped: %s", ex_gate)
     print(f"✅ Đã tạo showrunner_dossier.json (Opus 5.5 Showrunner Governance) -> {dos_path}")
 
     print("\n" + "=" * 70)

@@ -30,6 +30,9 @@ import {
   LivingCamera,
   VoxCompositeStage,
   VoxConnectingVectors,
+  useStopMotion,
+  PaperStatCard,
+  PushThroughTransitionOverlay,
 } from "./components/vox";
 import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
 import {
@@ -329,6 +332,11 @@ const ForegroundLayer = ({
   motionPath,
 }: any) => {
   const frame = useCurrentFrame();
+  const { qFrame, dx: smDx, dy: smDy, dRot: smDRot } = useStopMotion(
+    12,
+    1.15,
+    position === "right" ? 23 : 11
+  );
   const aspect = useForegroundAspect(src);
   const fadeIn = interpolate(frame, [0, fadeFrames], [0, 1], {
     extrapolateLeft: "clamp",
@@ -344,7 +352,7 @@ const ForegroundLayer = ({
 
   // If explicit vector motion path is provided (Parametric Trajectory Spline)
   if (motionPath && Array.isArray(motionPath) && motionPath.length > 0) {
-    const { xPct, yPct, scale, rotDeg, opacity: pathOpacity, zDepth } = evaluateMotionPath(motionPath, frame, 30);
+    const { xPct, yPct, scale, rotDeg, opacity: pathOpacity, zDepth } = evaluateMotionPath(motionPath, qFrame, 30);
     const targetW = Math.round(width * 0.42 * zDepth);
     const targetH = Math.round(height * 0.78 * zDepth);
     const finalOpacity = Math.min(opacity, pathOpacity);
@@ -361,7 +369,7 @@ const ForegroundLayer = ({
           width: targetW,
           height: targetH,
           opacity: finalOpacity,
-          transform: `translate(-50%, -50%) scale(${scale.toFixed(3)}) rotate(${rotDeg.toFixed(2)}deg)`,
+          transform: `translate(calc(-50% + ${smDx.toFixed(1)}px), calc(-50% + ${smDy.toFixed(1)}px)) scale(${scale.toFixed(3)}) rotate(${(rotDeg + smDRot).toFixed(2)}deg)`,
           filter: STICKER_CONTAINER_FILTER,
           zIndex: Math.round(15 * zDepth),
           pointerEvents: "none",
@@ -395,11 +403,11 @@ const ForegroundLayer = ({
     );
   }
 
-  // Fallback to organic paper placement with continuous living micro-motion (No dead freeze)
+  // Fallback to organic paper placement with 12fps stop-motion micro-life (No dead freeze)
   const hasGrid = position === "left" || position === "right";
 
   if (!hasGrid) {
-    const pushScale = interpolate(frame, [0, durationInFrames || 180], [1.0, 1.04], {
+    const pushScale = interpolate(qFrame, [0, durationInFrames || 180], [1.0, 1.04], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
     });
@@ -415,26 +423,26 @@ const ForegroundLayer = ({
   // Stage 3: Tactile organic paper placement drop (frames 15-35, calibrated to duration)
   const dropStart = Math.min(24, Math.max(0, Math.round((durationInFrames || 180) * 0.12)));
   const relDrop = Math.max(0, frame - dropStart);
-  const dropProgress = interpolate(relDrop, [0, 16], [0, 1], {
+  const dropProgress = interpolate(relDrop, [0, 14], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.bezier(0.16, 1, 0.3, 1),
   });
-  const initialTranslateY = (1 - dropProgress) * -35;
-  const initialRotateDeg = (1 - dropProgress) * (position === "right" ? -2.2 : 2.2);
+  const initialTranslateY = (1 - dropProgress) * -42;
+  const initialRotateDeg = (1 - dropProgress) * (position === "right" ? -3.2 : 3.2);
 
-  // Continuous micro-breathing & living sway after landing (prevents dead freeze)
-  const afterDropRel = Math.max(0, relDrop - 16);
-  const liveSwayX = Math.sin(afterDropRel * 0.04) * 3;
-  const liveSwayY = Math.cos(afterDropRel * 0.05) * 2;
-  const liveRot = Math.sin(afterDropRel * 0.03) * 0.4;
-  const liveScale = 1.0 + Math.sin(afterDropRel * 0.03) * 0.01;
+  // 12fps Stepped Stop-Motion micro-life after landing (Vox tactile collage aesthetic)
+  const landedWeight = relDrop > 14 ? 1 : 0;
+  const liveSwayX = smDx * landedWeight;
+  const liveSwayY = smDy * landedWeight;
+  const liveRot = smDRot * landedWeight;
+  const liveScale = 1.0 + Math.sin(qFrame * 0.03) * 0.008 * landedWeight;
 
   const translateY = initialTranslateY + liveSwayY;
   const rotateDeg = initialRotateDeg + liveRot;
-  const scale = (1.05 - 0.05 * dropProgress) * liveScale;
+  const scale = (1.12 - 0.12 * dropProgress) * liveScale;
 
-  const dropOpacity = frame < dropStart ? 0 : interpolate(relDrop, [0, 6], [0, 1], {
+  const dropOpacity = frame < dropStart ? 0 : interpolate(relDrop, [0, 5], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -536,52 +544,51 @@ const ForensicStampBadge = ({
   const relSlam = frame - targetSlam;
   if (relSlam < 0) return null;
 
-  // Dynamic Stamp Slam physics: rapid scale drop from 2.6 down to 0.95 with scale-overshoot bounce to 1.0
+  // Dynamic Stamp Slam physics: rapid scale drop from 2.4 down to 0.96 with bounce to 1.0
   const scale = spring({
     frame: relSlam,
     fps: cfg.fps || 30,
     config: { damping: 9, mass: 0.35, stiffness: 160 },
-    from: 2.6,
+    from: 2.4,
     to: 1.0,
   });
-  const opacity = interpolate(relSlam, [0, 2], [0.3, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const opacity = interpolate(relSlam, [0, 2], [0.3, 0.92], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const bUp = (badge || "").toUpperCase();
-  const isAlert = ["基準値超過", "EXCEEDED", "超過", "VOID", "CRITICAL", "ALERT"].some((k) => bUp.includes(k));
-  const isAuth = ["未回答", "記録なし", "確認できず", "EVIDENCE", "RESTRICTED", "AUDIT", "CONFIDENTIAL"].some((k) => bUp.includes(k));
+  const isAlert = ["基準値超過", "EXCEEDED", "超過", "VOID", "CRITICAL", "ALERT", "漏洩", "違反", "BREACH"].some((k) => bUp.includes(k));
+  const isAuth = ["未回答", "記録なし", "確認できず", "EVIDENCE", "RESTRICTED", "AUDIT", "CONFIDENTIAL", "不明", "極秘"].some((k) => bUp.includes(k));
 
-  const mainColor = isAlert ? "#ef4444" : isAuth ? "#f59e0b" : "#10b981";
-  const borderColor = isAlert ? "rgba(239, 68, 68, 0.85)" : isAuth ? "rgba(245, 158, 11, 0.85)" : "rgba(16, 185, 129, 0.85)";
-  const bg = isAlert ? "rgba(45, 10, 15, 0.92)" : isAuth ? "rgba(40, 25, 10, 0.92)" : "rgba(10, 35, 20, 0.92)";
-  const icon = isAlert ? "🚨" : isAuth ? "📁" : "⚖️";
+  const inkColor = isAlert ? "#991b1b" : isAuth ? "#92400e" : "#1e3a8a";
+  const paperBg = "rgba(250, 246, 236, 0.92)";
 
   return (
     <div
       style={{
         position: "absolute",
-        top: hasStatCard ? 175 : 65,
-        left: isLeft ? "auto" : 70,
-        right: isLeft ? 70 : "auto",
-        transform: `scale(${scale}) rotate(-8deg)`,
+        top: hasStatCard ? 195 : 70,
+        left: isLeft ? "auto" : 78,
+        right: isLeft ? 78 : "auto",
+        transform: `scale(${scale}) rotate(-7.5deg)`,
         opacity,
         zIndex: 32,
-        border: `3px double ${borderColor}`,
-        borderRadius: 8,
-        padding: "8px 20px",
-        backgroundColor: bg,
-        boxShadow: `0 10px 30px rgba(0,0,0,0.85), 0 0 20px ${mainColor}40`,
-        fontFamily: "'Courier New', Courier, monospace",
+        border: `4px double ${inkColor}`,
+        borderRadius: 3,
+        padding: "6px 18px",
+        backgroundColor: paperBg,
+        boxShadow: "0 6px 16px rgba(35, 22, 10, 0.35)",
+        fontFamily: "'Courier Prime', 'Special Elite', 'Courier New', Courier, monospace",
         textTransform: "uppercase",
         display: "flex",
         alignItems: "center",
-        gap: 10,
+        gap: 8,
         pointerEvents: "none",
       }}
     >
-      <span style={{ fontSize: 20 }}>{icon}</span>
-      <span style={{ color: mainColor, fontSize: 18, fontWeight: 900, letterSpacing: 2 }}>{badge}</span>
+      <span style={{ color: inkColor, fontSize: 13, fontWeight: 900, letterSpacing: 1.5 }}>[STAMP]</span>
+      <span style={{ color: inkColor, fontSize: 18, fontWeight: 900, letterSpacing: 2.2 }}>{badge}</span>
     </div>
   );
 };
+
 
 // Rule 136 (Zero-Asset-Leak & Pure Beat Header Mandate)
 const cleanSpeakerTag = (rawTag: any, actTitle: any): string => {
@@ -833,57 +840,15 @@ export const TwoLayerScene = (props) => {
         />
       ) : null}
 
-      {/* Top Safe-Zone Animated Stat / Financial Alert Card */}
+      {/* Top Safe-Zone Tactile Paper Stat Card (Zero Emoji / Zero Digital HUD) */}
       {showOverlay && statValue ? (
-        <div
-          style={{
-            position: "absolute",
-            top: 50,
-            left: isLeft ? "auto" : 70,
-            right: isLeft ? 70 : "auto",
-            zIndex: 30,
-            backgroundColor: "rgba(12, 18, 28, 0.92)",
-            border: "2px solid #f2a63b",
-            borderRadius: 16,
-            padding: "16px 28px",
-            boxShadow: "0 12px 35px rgba(0,0,0,0.75), 0 0 20px rgba(242, 166, 59, 0.25)",
-            transform: `scale(${statSpring})`,
-            opacity: statSpring,
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 24 }}>⚠️</span>
-            <div
-              style={{
-                color: "#ffd166",
-                fontSize: 38,
-                fontWeight: 900,
-                fontFamily: "'Segoe UI', Roboto, Arial, sans-serif",
-                letterSpacing: 1,
-                textShadow: "0 2px 8px rgba(0,0,0,0.9)",
-              }}
-            >
-              {statValue}
-            </div>
-          </div>
-          {statLabel ? (
-            <div
-              style={{
-                color: "#94a3b8",
-                fontSize: 16,
-                fontWeight: 700,
-                letterSpacing: 1.5,
-                textTransform: "uppercase",
-                fontFamily: "'Segoe UI', Roboto, Arial, sans-serif",
-              }}
-            >
-              {statLabel}
-            </div>
-          ) : null}
-        </div>
+        <PaperStatCard
+          statValue={String(statValue)}
+          statLabel={statLabel ? String(statLabel) : undefined}
+          isLeft={isLeft}
+          dropFrame={10}
+          top={54}
+        />
       ) : null}
 
       {/* Vox-Style Explanatory Motion Engine (Rule 122 & Rule 128) */}
@@ -931,7 +896,7 @@ export const TwoLayerScene = (props) => {
         />
       ) : null}
 
-      {/* Vox Curved Bezier Connecting Vectors & Arrows (Rule 122 & Vox Explainer Motion) */}
+      {/* Vox Curved Bezier Connecting Vectors & Red Yarn Strings (Rule 122 & Vox Explainer Motion) */}
       {(connection || connections || radiatingConnections) ? (
         <VoxConnectingVectors
           connections={[
@@ -944,7 +909,7 @@ export const TwoLayerScene = (props) => {
         />
       ) : null}
 
-      {/* Supporting Cutouts & Micro-Evidence Pins (Staggered Spring Physics & Rotation) */}
+      {/* Supporting Cutouts & Micro-Evidence Pins (Staggered Spring Physics & Tactile Tape Labels) */}
       {supportingCutouts && Array.isArray(supportingCutouts) ? (
         supportingCutouts.map((cutout: any, cIdx: number) => {
           const delay = cutout.dropFrame || cutout.delayFrames || (cIdx * 8 + 6);
@@ -953,10 +918,10 @@ export const TwoLayerScene = (props) => {
             fps: cfg.fps || 30,
             config: { damping: 14, stiffness: 120, mass: 0.8 },
           });
-          const targetRot = cutout.rotation ?? ((cIdx % 2 === 0 ? -4 : 4) * (cIdx + 1));
-          const rot = Number(interpolate(cutoutSpring, [0, 1], [targetRot - 12, targetRot]));
-          const scale = Number(interpolate(cutoutSpring, [0, 1], [0.5, 1]));
-          const opacity = Number(interpolate(cutoutSpring, [0, 0.3, 1], [0, 0.8, 1]));
+          const targetRot = cutout.rotation ?? ((cIdx % 2 === 0 ? -3.5 : 3.5) * (cIdx + 1));
+          const rot = Number(interpolate(cutoutSpring, [0, 1], [targetRot - 10, targetRot]));
+          const scale = Number(interpolate(cutoutSpring, [0, 1], [1.14, 1]));
+          const opacity = Number(interpolate(cutoutSpring, [0, 0.3, 1], [0, 0.85, 1]));
           const left = cutout.xPct ?? (isLeft ? 65 + cIdx * 12 : 20 + cIdx * 12);
           const top = cutout.yPct ?? (40 + cIdx * 15);
           return (
@@ -970,35 +935,37 @@ export const TwoLayerScene = (props) => {
                 opacity,
                 zIndex: 22,
                 pointerEvents: "none",
-                filter: "drop-shadow(0 14px 28px rgba(0,0,0,0.85))",
+                filter: "drop-shadow(0 10px 18px rgba(35, 22, 10, 0.45))",
               }}
             >
               {cutout.src ? (
                 <Img
                   src={resolveSrc(cutout.src)}
                   style={{
-                    maxWidth: cutout.width || 360,
-                    maxHeight: cutout.height || 360,
+                    maxWidth: cutout.width || 340,
+                    maxHeight: cutout.height || 340,
                     objectFit: "contain",
-                    border: cutout.border === false ? undefined : "3px solid #ffffff",
-                    borderRadius: 4,
+                    border: cutout.border === false ? undefined : "4px solid #FAF6EE",
+                    borderRadius: 2,
                   }}
                 />
               ) : null}
               {cutout.label ? (
                 <div
                   style={{
-                    marginTop: 6,
-                    backgroundColor: "rgba(10, 15, 24, 0.90)",
-                    color: "#f8fafc",
-                    fontSize: 13,
-                    fontWeight: 800,
-                    padding: "3px 8px",
-                    borderRadius: 4,
+                    marginTop: 5,
+                    backgroundColor: "#FAF6EC",
+                    color: "#7F1D1D",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    fontFamily: "'Courier Prime', 'Courier New', monospace",
+                    padding: "4px 10px",
+                    borderRadius: 2,
                     textAlign: "center",
-                    letterSpacing: 1,
+                    letterSpacing: 1.2,
                     textTransform: "uppercase",
-                    border: "1px solid rgba(255,255,255,0.2)",
+                    border: "1.5px solid rgba(185, 28, 28, 0.55)",
+                    boxShadow: "0 3px 8px rgba(35, 22, 10, 0.28)",
                   }}
                 >
                   {cutout.label}
@@ -1532,83 +1499,25 @@ const OverlaySegmentView = ({
   hasForeground?: boolean;
   durationInFrames?: number;
 }) => {
-  const frame = useCurrentFrame();
   const dur = Math.max(1, durationInFrames);
 
   // Stage 4 Entrance: Card drops in after background establishes
   const cardStartFrame = Math.min(25, Math.round(dur * 0.12));
-  const cardRel = Math.max(0, frame - cardStartFrame);
-  const cardSpring = spring({
-    frame: cardRel,
-    fps: 30,
-    config: { damping: 14, stiffness: 100, mass: 0.7 },
-  });
-  const cardTranslateY = interpolate(cardSpring, [0, 1], [-25, 0]);
-  const cardScale = interpolate(cardSpring, [0, 1], [0.94, 1.0]);
 
   // Stage 6 Slam timing: hits around 65% of segment duration
   const slamFrame = Math.min(180, Math.max(25, Math.round(dur * 0.65)));
 
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
-      {/* Stage 4/5: Evidentiary Stat Paper Note */}
+      {/* Stage 4/5: Evidentiary Stat Paper Note (Zero Emoji) */}
       {statValue && !forensicOverlay ? (
-        <div
-          style={{
-            position: "absolute",
-            top: 70,
-            left: isLeft ? "auto" : 80,
-            right: isLeft ? 80 : "auto",
-            zIndex: 30,
-            transform: `translateY(${cardTranslateY.toFixed(1)}px) scale(${cardScale.toFixed(3)}) rotate(-1.5deg)`,
-            opacity: cardSpring,
-          }}
-        >
-          {/* Authentic Washi Tape & Brass Pin Anchors */}
-          <VoxWashiTape x="14%" y="-14px" rotation={-25} corner="top_left" dropFrame={cardStartFrame + 4} />
-          <VoxBrassPin x="90%" y="-10px" size={24} dropFrame={cardStartFrame + 6} />
-
-          <div
-            style={{
-              backgroundColor: "#FAF7EE",
-              border: "1.5px solid rgba(160, 130, 90, 0.45)",
-              borderRadius: 4,
-              padding: "16px 28px",
-              boxShadow: "0 18px 40px rgba(45, 30, 15, 0.28), 0 3px 10px rgba(0, 0, 0, 0.12)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 4,
-              fontFamily: "'Courier Prime', 'Special Elite', 'Courier New', Courier, monospace",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 22 }}>📊</span>
-              <div
-                style={{
-                  color: "#92400E",
-                  fontSize: 36,
-                  fontWeight: 900,
-                  letterSpacing: 1.5,
-                }}
-              >
-                {statValue}
-              </div>
-            </div>
-            {statLabel ? (
-              <div
-                style={{
-                  color: "#475569",
-                  fontSize: 13,
-                  fontWeight: 800,
-                  letterSpacing: 1.8,
-                  textTransform: "uppercase",
-                }}
-              >
-                {statLabel}
-              </div>
-            ) : null}
-          </div>
-        </div>
+        <PaperStatCard
+          statValue={String(statValue)}
+          statLabel={statLabel ? String(statLabel) : undefined}
+          isLeft={isLeft}
+          dropFrame={cardStartFrame}
+          top={68}
+        />
       ) : null}
 
       <VoxOverlayLayer
@@ -2034,6 +1943,19 @@ export const CinematicTransitionOverlay: React.FC<{
     );
   }
 
+  if (
+    transitionOut === "push_through" ||
+    transitionOut === "paper_slide" ||
+    transitionOut === "match_cut"
+  ) {
+    return (
+      <PushThroughTransitionOverlay
+        transitionOut={transitionOut}
+        relFrame={relFrame}
+      />
+    );
+  }
+
   return null;
 };
 
@@ -2049,7 +1971,27 @@ export const computeCameraTransform = (
   const f = Math.max(0, Math.min(sceneRelFrame, dur));
   const mov = cameraMovement || "slow_push_in";
 
-  if (mov === "push_zoom" || mov === "vox_push_zoom") {
+  if (mov === "push_through") {
+    // Camera plunges through focal document into new board
+    const pThrough = interpolate(f, [0, 9, dur], [1.18, 1.01, 1.045], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+    return `scale(${pThrough})`;
+  }
+
+  if (mov === "paper_slide") {
+    // Lateral tabletop slide settling into board focus
+    const slideX = interpolate(f, [0, 8, dur], [28, 0, -4], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.22, 1, 0.36, 1),
+    });
+    return `scale(1.03) translateX(${slideX.toFixed(1)}px)`;
+  }
+
+  if (mov === "push_zoom" || mov === "vox_push_zoom" || mov === "match_cut") {
     // 8-frame momentum punch: punch in from 1.10 down to 1.02 settling to 1.04
     const pZoom = interpolate(f, [0, 8, dur], [1.10, 1.02, 1.045], {
       extrapolateLeft: "clamp",

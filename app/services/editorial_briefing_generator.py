@@ -148,22 +148,22 @@ def deduplicate_tokens(text: str) -> str:
 
 LOCALIZED_OVERLAY_THEMES: Dict[str, Dict[str, Any]] = {
     "JP": {
-        "document_title": "公式検査・査察記録 // 検査成績書",
-        "agency": "食品安全監視機構 // 検査指導課",
-        "case_number": "査察記録 // 第782号 行政検査録",
+        "document_title": "公式調査・検証記録 // 監査報告書",
+        "agency": "独立調査検証機関 // 特別監査室",
+        "case_number": "検証記録 // 第782号 行政監査録",
         "date_verified": "公式検証記録 // 承認済",
-        "network_title": "流通・検査相関図 // 流通経路ネットワーク",
-        "network_badge": "検査成績書 // 基準値超過",
-        "network_label": "検査調書 // 流通相関図",
-        "suspect_role": "無許可加工事業者 / 不正原材料受領者",
-        "charges": ["食品衛生法基準違反", "虚偽データ及び記録改ざんの提出"],
-        "connected_entities": ["規制監督官庁", "対象事業施設", "検査保管所"],
-        "evidence_tag": "検査検体物件",
-        "counter_title": "検査差異 // 基準数値逸脱",
+        "network_title": "構造相関図 // 調査対象ネットワーク",
+        "network_badge": "検証記録 // 基準値超過",
+        "network_label": "調査調書 // 構造相関図",
+        "suspect_role": "調査対象主体 / 構造的関与先",
+        "charges": ["管理基準・規約上の重大不備", "虚偽データ及び記録不整合の検証"],
+        "connected_entities": ["規制監督官庁", "対象事業部門", "記録保管システム"],
+        "evidence_tag": "公式検証資料",
+        "counter_title": "監査差異 // 基準数値逸脱",
         "counter_badge": "重大指摘事項",
-        "map_title": "地理流通データ // 対象位置確認",
-        "map_badge": "重点監視地域",
-        "default_speaker": "検査記録 // 時系列検証",
+        "map_title": "地理・拠点データ // 対象位置確認",
+        "map_badge": "重点監視領域",
+        "default_speaker": "検証記録 // 時系列分析",
     },
     "KR": {
         "document_title": "공식 감사·검사 기록 // 사실 인정서",
@@ -504,8 +504,14 @@ def prune_and_localize_scenes(
         if not is_eligible:
             scene_copy["forensicOverlay"] = None
             scene_copy["forensic_overlay"] = None
-            scene_copy["statValue"] = None
-            scene_copy["statLabel"] = None
+            if start_sec >= OVERLAY_BLACKOUT_AFTER:
+                scene_copy["statValue"] = None
+                scene_copy["statLabel"] = None
+            elif not scene_copy.get("statValue"):
+                metric = parse_spoken_number(narration)
+                if metric:
+                    scene_copy["statValue"] = metric.formatted
+                    scene_copy["statLabel"] = theme["counter_title"]
             scene_copy["sourceCredit"] = None
             scene_copy["source_credit"] = None
             scene_copy["credit_style"] = None

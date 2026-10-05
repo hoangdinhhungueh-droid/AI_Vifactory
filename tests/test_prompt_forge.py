@@ -65,9 +65,22 @@ def test_sanitize_foreground_prompt_contract():
     assert "#FF00FF" in fg
     assert "1:1 aspect ratio" in fg
     assert "[STYLE MANDATE]" in fg
-    assert "full-body" in fg
+    assert "waist-up three-quarter angle action framing" in fg
+    assert "active hands" in fg
+    assert "[ACTION & GAZE INVARIANT]" in fg
+    assert "head-to-shoes" not in fg
     # Verify Gate 6 regex clean
     assert re.search(r"(Stylized editorial.*){2,}", fg, re.IGNORECASE) is None
+
+
+def test_vox_actor_prop_invariant_injection():
+    """Verify passive character description automatically receives active verb + prop + gaze invariant."""
+    passive_fg = "Corporate compliance officer in dark suit"
+    fg = _sanitize_foreground_prompt(passive_fg, fg_key="fg_character_officer", market="JP")
+    assert "actively holding up documentary evidence prop" in fg
+    assert "pointing index finger" in fg
+    assert "[ACTION & GAZE INVARIANT]" in fg
+    assert "no static standing figure with arms at sides" in fg
 
 
 from unittest.mock import patch
@@ -225,3 +238,25 @@ def test_resolve_character_anchor_decoupling_rule128():
     assert "Authentic Japanese public official" in jp_prompt
     assert "quarantine inspection specialist" in jp_prompt
 
+
+def test_zero_aspect_ratio_mutilation_and_en_negative_isolation():
+    """Verify 16:9 and 1:1 aspect ratios are never mutilated into ':aspect ratio' and EN market is free of JP tokens."""
+    raw_bg = "Federal bankruptcy courtroom interior, $160 million settlement dispute, 16:9 aspect ratio"
+    bg_out = _sanitize_background_prompt(raw_bg, bg_key="bg_courtroom", market="EN")
+    assert "16:9" in bg_out
+    assert not re.search(r"(?<!\d):\s*(?:aspect\s*ratio|1\s*aspect\s*ratio)", bg_out, re.IGNORECASE)
+
+    raw_fg_char = "Presiding bankruptcy judge in dark judicial robe, 1:1 aspect ratio"
+    fg_char_out = _sanitize_foreground_prompt(raw_fg_char, fg_key="fg_character_presiding_federal_judge", market="EN")
+    assert "1:1 aspect ratio" in fg_char_out
+    assert not re.search(r"(?<!\d):\s*(?:aspect\s*ratio|1\s*aspect\s*ratio)", fg_char_out, re.IGNORECASE)
+    assert "salaryman" not in fg_char_out.lower()
+    assert "hanko" not in fg_char_out.lower()
+    assert "no magenta, purple, fuchsia, or neon pink attire" in fg_char_out
+
+    raw_fg_prop = "Full-body Federal Court Reorganization Plan Rejection Order figure in authentic period attire, 1:1 aspect ratio"
+    fg_prop_out = _sanitize_foreground_prompt(raw_fg_prop, fg_key="fg_evidence_reorganization_plan_rejection_order", market="EN")
+    pos_part = fg_prop_out.split("[STRICT NEGATIVE PROMPT]")[0]
+    assert "full-body" not in pos_part.lower()
+    assert "figure in authentic" not in pos_part.lower()
+    assert "[OBJECT FOCUS]" in fg_prop_out
