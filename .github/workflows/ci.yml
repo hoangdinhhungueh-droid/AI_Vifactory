@@ -42,7 +42,8 @@ jobs:
         run: pytest -m "not integration" -v --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing tests/
       
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
+        continue-on-error: true
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
