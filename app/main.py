@@ -73,9 +73,12 @@ _BROWSER_UA = os.getenv(
 
 # v10 — tách CHAT vs REASONING upstreams
 CHAT_UPSTREAMS = [
+    {"name": "hhtech", "base": os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1"),
+     "key": os.getenv("HHTECH_API_KEY", ""),
+     "model": "claude-sonnet-5-5"},                         # PRIMARY: Claude Sonnet 5.5 via HHTech
     {"name": "openrouter", "base": "https://openrouter.ai/api/v1",
      "key": os.getenv("OPENROUTER_API_KEY", ""),
-     "model": "nvidia/nemotron-3-nano-30b-a3b:free"},       # PRIMARY 256K, tool 100%
+     "model": "nvidia/nemotron-3-nano-30b-a3b:free"},
     {"name": "mistral", "base": os.getenv("MISTRAL_BASE_URL", "https://api.mistral.ai/v1"),
      "key": os.getenv("MISTRAL_API_KEY", ""),
      "model": os.getenv("MISTRAL_MODEL", "mistral-medium-latest")},
@@ -84,13 +87,10 @@ CHAT_UPSTREAMS = [
      "model": "gpt-oss-120b"},                              # ctx cap ~64K
     {"name": "gemini", "base": "https://generativelanguage.googleapis.com/v1beta/openai",
      "key": os.getenv("GEMINI_API_KEY", ""),
-     "model": os.getenv("GEMINI_MODEL_25FL", "claude-sonnet-5-5")},
-    {"name": "hhtech", "base": os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1"),
-     "key": os.getenv("HHTECH_API_KEY", ""),
-     "model": "claude-sonnet-5-5"},
+     "model": os.getenv("GEMINI_MODEL_25FL", "gemini-2.5-flash")},
     {"name": "onmay",  "base": os.getenv("ONMAY_BASE_URL", "").rstrip("/"),
      "key": os.getenv("ONMAY_API_KEY", ""),
-     "model": os.getenv("GEMINI_MODEL", "claude-sonnet-5-5")},  # LUÔN CUỐI
+     "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash")},  # LUÔN CUỐI
 ]
 
 REASONING_UPSTREAMS = [
@@ -103,13 +103,13 @@ REASONING_UPSTREAMS = [
      "model": os.getenv("MISTRAL_MODEL", "mistral-medium-latest")},
     {"name": "gemini",   "base": "https://generativelanguage.googleapis.com/v1beta/openai",
      "key": os.getenv("GEMINI_API_KEY", ""),
-     "model": os.getenv("GEMINI_MODEL_25FL", "claude-sonnet-5-5")},
+     "model": os.getenv("GEMINI_MODEL_25FL", "gemini-2.5-flash")},
     {"name": "openrouter","base": "https://openrouter.ai/api/v1",
      "key": os.getenv("OPENROUTER_API_KEY", ""),
      "model": "nvidia/nemotron-3-nano-30b-a3b:free"},
     {"name": "onmay",    "base": os.getenv("ONMAY_BASE_URL", "").rstrip("/"),
      "key": os.getenv("ONMAY_API_KEY", ""),
-     "model": os.getenv("GEMINI_MODEL", "claude-sonnet-5-5")},
+     "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash")},
 ]
 
 # ── v10.1 Budget Gate ─────────────────────────────────────────────────────────

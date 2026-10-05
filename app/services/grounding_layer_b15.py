@@ -239,8 +239,6 @@ def run_grounding_research(
             "has_live_search": False
         }
 
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-
     sys_instruction = (
         "You are an Elite Forensic Research Fact-Finder for an investigative documentary channel.\n"
         "Your mission is to construct a Deep Investigative Factual Dossier containing 12 to 20 concrete, verifiable factual claims across the entire lifecycle of the case (genesis/baseline, early warning signs/mutation, the critical catalyst/rupture, regulatory/prosecution proceedings, and contemporary aftermath).\n\n"

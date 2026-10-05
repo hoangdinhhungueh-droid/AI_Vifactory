@@ -63,7 +63,7 @@ class ModelGateway:
         self.hhtech_key = os.getenv("HHTECH_API_KEY", "")
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
         self.hhtech_base_url = os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1")
-        self.hhtech_model = os.getenv("HHTECH_MODEL", "gpt-6-astra")
+        self.hhtech_model = os.getenv("HHTECH_MODEL", "claude-sonnet-5-5")
         
         # Load from secrets file if env vars not set or key is masked/invalid
         is_invalid_key = not self.hhtech_key or any(ord(c) > 127 for c in self.hhtech_key) or "••" in self.hhtech_key
@@ -105,7 +105,7 @@ class ModelGateway:
         
         Args:
             prompt: User prompt text
-            model: Model identifier (default: gpt-6-astra)
+            model: Model identifier (default: claude-sonnet-5-5)
             system_prompt: Optional system prompt
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature

@@ -835,7 +835,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             max_tokens=6000,
             temperature=0.35,
             timeout=300.0,
-            fallback="claude-sonnet-5"
+            fallback="claude-sonnet-5-5"
         )
 
         cleaned_acts = []
@@ -909,7 +909,7 @@ CRITICAL EDITORIAL RULES:
                     max_tokens=6000,
                     temperature=0.3,
                     timeout=300.0,
-                    fallback="claude-sonnet-5"
+                    fallback="claude-sonnet-5-5"
                 )
                 refined_len = len(refined_raw) if is_cjk_market else len(refined_raw.split())
                 min_threshold = 1500 if is_cjk_market else 1000

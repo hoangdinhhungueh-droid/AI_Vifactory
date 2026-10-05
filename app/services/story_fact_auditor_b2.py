@@ -135,7 +135,7 @@ Perform strict adversarial forensic audit according to the 8 Iron Criteria. Inte
                 max_tokens=1000,
                 temperature=0.1,
                 timeout=75.0,
-                fallback="claude-sonnet-5"
+                fallback="claude-sonnet-5-5"
             )
         except Exception as e2:
             logger.error(f"[story_auditor] Fallback auditor {fallback_model} also failed: {e2}")

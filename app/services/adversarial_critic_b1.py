@@ -128,7 +128,7 @@ Interrogate whether this proposed angle truly satisfies the breaking search inte
             max_tokens=800,
             temperature=0.1,
             timeout=60.0,
-            fallback="claude-sonnet-5" if chosen_model == "claude-opus-5-5" else "gpt-6-astra"
+            fallback="claude-sonnet-5-5" if chosen_model == "claude-opus-5-5" else "gpt-6-astra"
         )
     except Exception as e:
         logger.warning(f"[critic_gate] Claude primary ({chosen_model}) failed ({e}), invoking fallback {fallback_model}...")

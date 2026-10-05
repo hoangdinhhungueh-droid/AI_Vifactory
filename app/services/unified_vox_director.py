@@ -1137,7 +1137,7 @@ def extract_dynamic_visual_roster(
                 "narrative_samples": sample_narr
             }, ensure_ascii=False)
 
-            models_to_try = ["claude-opus-5-5", "claude-sonnet-5", "gpt-6-astra"]
+            models_to_try = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-sonnet-5", "gpt-6-astra"]
             resp = None
             for m_candidate in models_to_try:
                 try:
