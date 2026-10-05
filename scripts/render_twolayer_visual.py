@@ -75,8 +75,11 @@ def optimize_props_assets(props_path: str, proj_dir: str):
         count = 0
         processed_paths = set()
         for sc in scenes:
-            for key in ["background", "foreground"]:
-                img_rel = sc.get(key)
+            keys_to_check = [("background", False), ("foreground", True)]
+            if isinstance(sc.get("primary_hero"), dict) and sc["primary_hero"].get("src"):
+                keys_to_check.append(("primary_hero", True))
+            for key, is_fg in keys_to_check:
+                img_rel = sc["primary_hero"]["src"] if key == "primary_hero" else sc.get(key)
                 if not img_rel or str(img_rel).startswith("http"):
                     continue
                 full_path = os.path.join(proj_dir, "public", str(img_rel))
@@ -85,7 +88,7 @@ def optimize_props_assets(props_path: str, proj_dir: str):
                 processed_paths.add(full_path)
                 try:
                     with Image.open(full_path) as im:
-                        im = im.convert("RGBA") if key == "foreground" else im.convert("RGB")
+                        im = im.convert("RGBA") if is_fg else im.convert("RGB")
                         modified = False
                         # 1. Scale down to 1080p target
                         max_w = 1080 if key == "foreground" else 1920
@@ -165,7 +168,7 @@ def main():
     optimize_props_assets(args.props, PROJ_DIR)
 
     # Pillar 1: Dynamic CPU concurrency (auto-detects cores, cap at 4 for RAM safety)
-    default_concurrency = min(4, max(1, (os.cpu_count() or 4) - 2))
+    default_concurrency = min(2, max(1, (os.cpu_count() or 4) - 2))
     concurrency = os.environ.get("VF_REMOTION_CONCURRENCY", str(default_concurrency))
 
     # Pillar 3: Dynamic adaptive timeout based on total frames

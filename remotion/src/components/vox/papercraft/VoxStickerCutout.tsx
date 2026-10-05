@@ -63,21 +63,9 @@ export const VoxStickerCutout: React.FC<VoxStickerCutoutProps> = ({
     return staticFile(path);
   };
 
-  // Sticker Die-Cut Contour Filter: crisp white stroke + soft directional paper shadow
-  const bW = stickerBorderWidth;
-  const bC = stickerBorderColor;
-  const shadowAlpha = shadowIntensity === "heavy" ? 0.65 : shadowIntensity === "subtle" ? 0.25 : 0.45;
-
-  const stickerFilter = `
-    drop-shadow(${bW}px 0 0 ${bC})
-    drop-shadow(-${bW}px 0 0 ${bC})
-    drop-shadow(0 ${bW}px 0 ${bC})
-    drop-shadow(0 -${bW}px 0 ${bC})
-    drop-shadow(${bW}px ${bW}px 0 ${bC})
-    drop-shadow(-${bW}px -${bW}px 0 ${bC})
-    drop-shadow(0 18px 35px rgba(0, 0, 0, ${shadowAlpha}))
-    drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25))
-  `;
+  // Optimized VOX Paper Sticker Filter: crisp pre-baked white stroke + single-pass soft directional paper shadow
+  const shadowAlpha = shadowIntensity === "heavy" ? 0.60 : shadowIntensity === "subtle" ? 0.25 : 0.40;
+  const stickerFilter = `drop-shadow(0 14px 22px rgba(0, 0, 0, ${shadowAlpha}))`;
 
   return (
     <div

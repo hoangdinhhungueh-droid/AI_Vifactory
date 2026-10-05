@@ -311,10 +311,12 @@ const useForegroundAspect = (src) => {
 // (slide is entrance-only). When `position` is "left"/"right" it is placed in
 // its side-anchored box (Rule 59 v2, ~82% height); otherwise it falls back to
 // the legacy full-frame centered/contain behavior for backward compatibility.
+// Optimized VOX Paper Sticker Filter (Pillar 2 & Rule 120 Anti-OOM/CPU Acceleration):
+// White sticker border is pre-baked into PNG alpha channel via Python PIL (optimize_props_assets).
+// Single-pass directional paper drop-shadow replaces 10 stacked CPU Gaussian blur convolutions.
 const STICKER_BORDER_FILTER =
-  "drop-shadow(3px 0 0 #ffffff) drop-shadow(-3px 0 0 #ffffff) drop-shadow(0 3px 0 #ffffff) drop-shadow(0 -3px 0 #ffffff) drop-shadow(3px 3px 0 #ffffff) drop-shadow(-3px -3px 0 #ffffff) drop-shadow(0 16px 30px rgba(45, 30, 15, 0.40)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.18)) brightness(1.06) contrast(1.16) saturate(1.08)";
-const STICKER_CONTAINER_FILTER =
-  "drop-shadow(0 20px 35px rgba(45, 30, 15, 0.30)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.18))";
+  "drop-shadow(0 12px 18px rgba(45, 30, 15, 0.38)) brightness(1.06) contrast(1.16) saturate(1.08)";
+const STICKER_CONTAINER_FILTER = undefined;
 
 const ForegroundLayer = ({
   src,
@@ -1806,15 +1808,15 @@ const CinematicOverlay: React.FC<{
             : "linear-gradient(135deg, rgba(20, 28, 45, 0.05) 0%, rgba(45, 25, 15, 0.04) 100%)",
         }}
       />
-      {/* Film Grain Subtle Noise Texture Layer */}
+      {/* Film Grain Subtle Noise Texture Layer (Optimized 16px grid: 8,100 tiles vs 129,600 tiles for fast CPU raster) */}
       {filmGrain ? (
         <div
           style={{
             position: "absolute",
             inset: 0,
             opacity: typeof grainOpacity === "number" ? grainOpacity : 0.07,
-            backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.20) 1px, transparent 0)",
-            backgroundSize: "4px 4px",
+            backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.22) 1.2px, transparent 1.2px)",
+            backgroundSize: "16px 16px",
           }}
         />
       ) : null}
@@ -2587,7 +2589,6 @@ export const TwoLayerEpisode = (props) => {
           transform: cameraTransform,
           filter: focusBlurPx > 0.05 ? `blur(${focusBlurPx.toFixed(1)}px)` : undefined,
           transformOrigin: "center center",
-          willChange: "transform, filter",
         }}
       >
         <VoxParallaxLayer depth="background" cameraMovement={currentCameraMov} durationInFrames={currentDur}>
