@@ -352,3 +352,131 @@ def test_opus_astra_round2_audit_macro_remediations():
     assert "blank legal document folio" in titled_out
 
 
+def test_opus_astra_round3_fragment_and_text_magnet_remediations():
+    """Rule 134: Test all 17 Root Causes & Leaked Fragments identified in Round 3 audit by Opus 5.5 and Astra 6."""
+    # 1. Bar chart & currency fragments
+    raw_trust = "VOX-style comparison bar chart: left bar Trust (Mar 2024) $242 million – Final Offer over 5 years (Dec 2025) with an arrow bridging them"
+    trust_out = _sanitize_foreground_prompt(raw_trust, fg_key="fg_evidence_trust_offer_bar_chart", market="EN")
+    assert "(Mar )" not in trust_out
+    assert "(Dec )" not in trust_out
+    assert ")$" not in trust_out
+    assert "$multimillion" not in trust_out
+    assert "multimillion-dollar final settlement sum" in trust_out
+    assert "over multi-year intervals" in trust_out
+
+    # 2. Priority waterfall
+    raw_waterfall = "Explanatory waterfall diagram: top tier Tier 1, cascading down to Tier 2, then Tier 3, with water drained before reaching the bottom tier"
+    waterfall_out = _sanitize_foreground_prompt(raw_waterfall, fg_key="fg_evidence_priority_waterfall", market="EN")
+    assert "cascading down to, then," not in waterfall_out
+    assert "cascading down through descending structural levels" in waterfall_out
+
+    # 3. Ballot tabulation & text magnets
+    raw_ballot = "Claims agent's declaration with a summary table for the survivor claimant class and a large stylized donut chart showing REJECT versus ACCEPT"
+    ballot_out = _sanitize_foreground_prompt(raw_ballot, fg_key="fg_evidence_ballot_tabulation", market="EN")
+    assert "Claims agent's with" not in ballot_out
+    assert "Claims agent's declaration folio" in ballot_out
+    assert "donut chart showing REJECT versus ACCEPT" not in ballot_out
+    assert "dual-tone proportional ring graphic" in ballot_out
+
+    # 4. Timeline clock
+    raw_clock = "Stylized tear-off desk calendar fused with a clock face, pages flying off from 2023 to 2026, clock hands spinning, a small tag reading 'Exhibit A'"
+    clock_out = _sanitize_foreground_prompt(raw_clock, fg_key="fg_evidence_case_timeline_clock", market="EN")
+    assert "from to," not in clock_out
+    assert "across elapsed calendar years" in clock_out
+    assert "tag reading ." not in clock_out
+    assert "evidentiary archival tag" in clock_out
+
+    # 5. Civil complaint stack
+    raw_complaint = "Towering stack of civil complaints from Superior Court, captions reading, a counter tag reading ."
+    complaint_out = _sanitize_foreground_prompt(raw_complaint, fg_key="fg_evidence_civil_complaint_stack", market="EN")
+    assert "captions reading," not in complaint_out
+    assert "counter tag reading ." not in complaint_out
+    assert "blank official header blocks" in complaint_out
+
+    # 6. Decade histogram
+    raw_hist = "Editorial bar chart with title, bars for 1950s through 2010s with the – bars heavily inked and bracketed ."
+    hist_out = _sanitize_foreground_prompt(raw_hist, fg_key="fg_evidence_claims_decade_histogram", market="EN")
+    assert "– bars" not in hist_out
+    assert "bracketed ." not in hist_out
+    assert "prominent peak period bars" in hist_out
+
+    # 7. Chapter 11 petition
+    raw_ch11 = "Official Form 201, debtor info, filing date May 8, 2023"
+    ch11_out = _sanitize_foreground_prompt(raw_ch11, fg_key="fg_evidence_chapter11_petition", market="EN")
+    assert "Official Form," not in ch11_out
+    assert "filing date May," not in ch11_out
+    assert "Official Form blank template" in ch11_out
+
+    # 8. Motion to dismiss
+    raw_motion = "Court filing captioned 'Motion to Dismiss', filed September 2025, with electronic stamp"
+    motion_out = _sanitize_foreground_prompt(raw_motion, fg_key="fg_evidence_motion_to_dismiss", market="EN")
+    assert "captioned," not in motion_out
+    assert "filed September," not in motion_out
+    assert "with formal judicial header" in motion_out
+
+    # 9. Dismissal order
+    raw_order = "Signed court order, dated October 5, 2026, judge's signature line, a red rubber-stamp style graphic overlay"
+    order_out = _sanitize_foreground_prompt(raw_order, fg_key="fg_evidence_dismissal_order", market="EN")
+    assert "dated October," not in order_out
+    assert "rubber-stamp style graphic overlay" not in order_out
+    assert "with formal date notation line" in order_out
+    assert "geometric dismiss seal stamp without typography" in order_out
+
+    # 10. Operating loss ledger
+    raw_ledger = "Open accounting ledger, totals ending at a red-circled $16 million, a pencil"
+    ledger_out = _sanitize_foreground_prompt(raw_ledger, fg_key="fg_evidence_operating_loss_ledger", market="EN")
+    assert "ending at a red-circled," not in ledger_out
+    assert "ending at a red-circled ledger entry" in ledger_out
+
+    # 11. Professional fees meter
+    raw_meter = "Stylized analog gauge meter with needle swung to, with abstract shading, against a full-scale ring marked, ticking cash-register numerals beneath"
+    meter_out = _sanitize_foreground_prompt(raw_meter, fg_key="fg_evidence_professional_fees_meter", market="EN")
+    assert "needle swung to," not in meter_out
+    assert "ring marked," not in meter_out
+    assert "cash-register numerals" not in meter_out
+    assert "swung high into the critical warning threshold" in meter_out
+    assert "ring marked with division indices" in meter_out
+
+    # 12. Settlement term sheet
+    raw_term = "Settlement term sheet headed 'Agreement', with a payment schedule and a bolded line '$242M'"
+    term_out = _sanitize_foreground_prompt(raw_term, fg_key="fg_evidence_settlement_term_sheet", market="EN")
+    assert "headed," not in term_out
+    assert "bolded line ." not in term_out
+    assert "with formal title block" in term_out
+    assert "bolded highlight summary rule line." in term_out
+
+    # 13. Third amended plan
+    raw_plan = "Thick bound legal document, cover reading 'Third Amended Plan', dated March 2024, with colored tabs for Trust"
+    plan_out = _sanitize_foreground_prompt(raw_plan, fg_key="fg_evidence_third_amended_plan", market="EN")
+    assert "cover reading," not in plan_out
+    assert "dated March," not in plan_out
+    assert "cover folio with blank header block" in plan_out
+    assert "with formal date notation line" in plan_out
+
+    # 14. Character investigative journalist
+    raw_journo = "Journalist reviewing PACER docket sheet for Case 23-40523 and circling key entry"
+    journo_out = _sanitize_foreground_prompt(raw_journo, fg_key="fg_character_investigative_journalist", market="EN")
+    assert "for and circling" not in journo_out
+    assert "printed PACER electronic docket sheet folio, circling a line-item entry with a pen" in journo_out
+
+    # 15. Character state legislator 2019
+    raw_legis = "State lawmaker holding a bound document with AB 218 on the cover"
+    legis_out = _sanitize_foreground_prompt(raw_legis, fg_key="fg_character_state_legislator_2019", market="EN")
+    assert "with on the cover" not in legis_out
+    assert "a bound legislative bill document folio with an official seal on the cover" in legis_out
+
+    # 16. Background insurance policy warehouse
+    raw_wh = "Cavernous records warehouse with banker's boxes labeled by policy year (1960, 1985), a rolling ladder"
+    wh_out = _sanitize_background_prompt(raw_wh, bg_key="bg_insurance_policy_warehouse", market="EN")
+    assert "(, )" not in wh_out
+    assert "by policy year (, )" not in wh_out
+    assert "by historical policy period" in wh_out
+
+    # 17. Background vacated chancery office
+    raw_off = "Diocesan office with stacked moving boxes marked 'Records', a framed diocesan coat of arms"
+    off_out = _sanitize_background_prompt(raw_off, bg_key="bg_vacated_chancery_office", market="EN")
+    assert "boxes marked," not in off_out
+    assert "sealed with tape, a framed" in off_out
+
+
+

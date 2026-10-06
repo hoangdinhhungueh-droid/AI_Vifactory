@@ -265,7 +265,49 @@ def deduplicate_phrase_stutter(text: str) -> str:
                     deduped_items.append(it)
             cleaned = f"{prefix}[STRICT NEGATIVE PROMPT] {', '.join(deduped_items)}.{closing_txt}".strip()
 
-    # 5. Clean up dangling prepositions, commas, and whitespace
+    # 5. Clean up leaked prompt fragments, empty parens, and text-bait triggers (Rule 128 & Rule 137)
+    # Empty or date-only parentheses resulting from stripped years
+    cleaned = re.sub(r"\(\s*,\s*\)", "", cleaned)
+    cleaned = re.sub(r"\(\s*\)", "", cleaned)
+    cleaned = re.sub(r"\(\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*\)", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(?:by\s+)?policy\s+year\s*\(\s*,?\s*\)", "by historical policy periods", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bpolicy\s+year\b", "historical policy period", cleaned, flags=re.IGNORECASE)
+
+    # Leaked prepositions, participles, and dangling punctuation
+    cleaned = re.sub(r"\bfrom\s+to\b", "across elapsed calendar years", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bcascading\s+down\s+to(?:\s+Tier)?\s*,\s*then(?:\s+Tier)?\s*,?", "cascading down through descending structural levels,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bswung\s+to\s*,", "swung high into the critical warning threshold,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bring\s+marked\s*,", "ring marked with division indices,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bending\s+at\s+a\s+red-circled\s*,", "ending at a red-circled ledger entry,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bcounter\s+tag\s+reading\s*[,.]", "counter tag emblem without readable digits,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\btag\s+reading(?:\s+['\"][^'\"]*['\"])?\s*[,.]?", "evidentiary archival tag,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bcaptions?\s+reading(?:\s+['\"][^'\"]*['\"])?\s*[,.]?", "blank official header blocks,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bcover\s+reading(?:\s+['\"][^'\"]*['\"])?\s*[,.]?", "cover folio with blank header block,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bCourt\s+filing\s+captioned(?:\s+['\"][^'\"]*['\"])?\s*[,.]?", "Court filing with formal judicial header,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bcaptioned(?:\s+['\"][^'\"]*['\"])?\s*[,.]?", "with official judicial header block,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bheaded(?:\s+['\"][^'\"]*['\"])?\s*[,.]?", "with formal title block,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bmarked\s*,\s*a\s+framed", "sealed with tape, a framed", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bmarked\s*,", "sealed with tape,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bOfficial\s+Form\s*,", "Official Form blank template,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bPACER\s+docket\s+sheet\s+for(?:\s+federal\s+court\s+case\s+record)?\s+and\s+circling\b", "printed PACER electronic docket sheet folio, circling a line-item entry with a pen", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\ba\s+bound\s+document\s+with(?:\s+legislative\s+assembly\s+bill)?\s+on\s+the\s+cover\b", "a bound legislative bill document folio with an official seal on the cover", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bClaims\s+agent's\s+(?:declaration\s+)?with\s+a\b", "Claims agent's declaration folio with a", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bbolded\s+line\s*\.", "bolded highlight summary rule line.", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bwith\s+the\s+[–-]\s*bars\b", "with prominent peak period bars", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bbracketed\s*\.", "bracketed with callout pointers.", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\brubber-stamp\s+style\s+graphic\s+overlay\b", "geometric dismiss seal stamp without typography", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bdated\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*,", "with formal date notation line,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bfiled\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*,", "with formal electronic filing stamp,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bfiling\s+date\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*,", "official filing date stamp block,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bTrust\s+Bold\s+ink\b", "Trust, bold ink", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bdonut\s+chart\s+showing\s+REJECT\s+versus\s+ACCEPT\b", "dual-tone proportional ring graphic emphasizing contrasting vote shares without typography", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bticking\s+cash-register\s+numerals\s+beneath\b", "mechanical indicator dials beneath without readable numerals", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bcash-register\s+numerals\b", "indicator dials without numbers", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bcarved\s+lettering\b", "carved relief texture without typography", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\)\s*[\$¥₩€£]", ")", cleaned)
+    cleaned = re.sub(r"[\$¥₩€£]\s*(?=[a-zA-Z])", "", cleaned)
+
+    # 6. Clean up dangling prepositions, commas, and whitespace
     cleaned = re.sub(r"\b(with|in|of|and|for|at)\s*([,.;])", r"\2", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r",\s*,+", ", ", cleaned)
     cleaned = re.sub(r"\s*,\s*", ", ", cleaned)
@@ -343,16 +385,19 @@ def apply_semantic_numeral_rewrites(text: str) -> str:
     text = re.sub(r"\bCase\s*#?\s*\d+[-\d]*\b", "federal court case record", text, flags=re.IGNORECASE)
 
     # 3. Currency and metric values
-    text = re.sub(r"\b\$?330\+?\b", "hundreds of", text)
-    text = re.sub(r"\b\$?44\.6\s*(?:million|M)\b", "multimillion-dollar fee total", text, flags=re.IGNORECASE)
-    text = re.sub(r"\b\$?242\s*(?:million|M)\b", "multimillion-dollar final settlement sum", text, flags=re.IGNORECASE)
-    text = re.sub(r"\b\$?143\.5\s*(?:million|M)\b", "multimillion-dollar trust proposal", text, flags=re.IGNORECASE)
-    text = re.sub(r"\b\$?76\.1\s*(?:million|M)\b", "multimillion-dollar estate valuation", text, flags=re.IGNORECASE)
-    text = re.sub(r"\b\$?29\s*(?:million|M)\b", "tens of millions of dollars", text, flags=re.IGNORECASE)
-    text = re.sub(r"\b\$?106\s*(?:million|M)\b", "hundreds of millions of dollars", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\$¥₩€£]?\s*\b330\+?\b", "hundreds of", text)
+    text = re.sub(r"[\$¥₩€£]?\s*\b44\.6\s*(?:million|M)\b", "multimillion-dollar fee total", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\$¥₩€£]?\s*\b242\s*(?:million|M)\b", "multimillion-dollar final settlement sum", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\$¥₩€£]?\s*\b143\.5\s*(?:million|M)\b", "multimillion-dollar trust proposal", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\$¥₩€£]?\s*\b76\.1\s*(?:million|M)\b", "multimillion-dollar estate valuation", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\$¥₩€£]?\s*\b29\s*(?:million|M)\b", "tens of millions of dollars", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\$¥₩€£]?\s*\b106\s*(?:million|M)\b", "hundreds of millions of dollars", text, flags=re.IGNORECASE)
     text = re.sub(r"\b99%\b", "overwhelming majority", text)
     text = re.sub(r"\b42%\b", "substantial forty-percent", text)
     text = re.sub(r"\b59%\b", "majority share", text)
+    text = re.sub(r"\b\d+\s+years\b", "multi-year intervals", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bover\s+years\b", "over multi-year intervals", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\$¥₩€£]\s*(?=[a-zA-Z])", "", text)
 
     return text
 
@@ -410,6 +455,7 @@ def lint_visual_prompt(prompt: str, strict: bool = False, is_prop: bool = False,
 
     # Strip explicit currency amounts like "$942B", "$426 billion", "188 billion" (use space to prevent word welding)
     fixed = re.sub(r"[$¥₩€£]?\s*\b\d+(?:\.\d+)?\s*(?:billion|trillion|million|B|T|M|k|%)?\s*(?:dollars?|yen|won)?\b", " ", fixed, flags=re.IGNORECASE)
+    fixed = re.sub(r"[$¥₩€£]\s*(?=[a-zA-Z])", "", fixed)
 
     # Restore allowlisted tokens
     for raw_tok, mask_tok in aspect_masks.items():
@@ -942,7 +988,7 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     p = re.sub(r"\btitled\s+['\"]?[A-Za-z0-9\s_-]+['\"]?(?=\s+gaze|\s*,|\s*\.|\s+with|\s*$)", "with official blank header block (no typography)", p, flags=re.IGNORECASE)
     p = re.sub(r"\bpage\s+titled\b", "blank legal document folio (no typography)", p, flags=re.IGNORECASE)
     p = re.sub(r"\btitled\b", "with official blank header block", p, flags=re.IGNORECASE)
-    p = re.sub(r"(?:typed\s+in\s+the\s+caption|with\s+the\s+caption|each\s+caption\s+reading|caption\s+reading)\s*[^,.]*(?:\.\s*[^,.]*)?", "with official blank header block (no glyphs, no typography)", p, flags=re.IGNORECASE)
+    p = re.sub(r"(?:typed\s+in\s+the\s+caption|with\s+the\s+caption|each\s+caption\s+reading|captions?\s+reading)\s*[^,.]*(?:\.\s*[^,.]*)?", "with blank official header blocks (no glyphs, no typography)", p, flags=re.IGNORECASE)
     p = re.sub(r"with\s+(?:spine\s+)?label\s+[^,.]*", "with blank spine label insert (no typography)", p, flags=re.IGNORECASE)
     p = re.sub(r"\bheadline(?:\s+reading)?\s*[^,.]*", "abstract banner graphic without typography", p, flags=re.IGNORECASE)
     p = re.sub(r"\bsignage(?:\s+reading)?\s*[^,.]*", "civic plaque texture without typography", p, flags=re.IGNORECASE)
@@ -958,7 +1004,6 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     # Reconcile signature actions with negative prompt
     p = re.sub(r"\bsigning\s+a\s+document\b", "holding a document ready for execution", p, flags=re.IGNORECASE)
     p = re.sub(r"\bsignature\s+line\b", "blank execution line", p, flags=re.IGNORECASE)
-    p = re.sub(r"['\"](?:\s*,\s*|\s+)", " ", p)
 
     # Printed documents, court orders, and legislative bills
     p = re.sub(r"holding\s+[^,.]*?aloft\s+in\s+one\s+hand\s+and\s+pointing\s+at\s+[^,.]*?with\s+the\s+other(?:,\s*gaze\s+directed\s+down\s+at\s+the\s+page)?", "holding a bound legislative bill document at chest height (blank pages with illegible abstract line-marks only, no glyphs, no typography) in one hand while resting a hand flat on the open page, gaze directed down at the page", p, flags=re.IGNORECASE)
