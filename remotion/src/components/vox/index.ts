@@ -28,3 +28,4 @@ export * from "./PaperDrop";
 export * from "./RedString";
 export * from "./PaperStatCard";
 export * from "./transitions/pushThrough";
+export * from "./VoxBuildOnStage";

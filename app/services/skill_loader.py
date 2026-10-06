@@ -45,6 +45,8 @@ _cache = {
     "content_engine": {"data": None, "expiration": 0},
     "media_production": {"data": None, "expiration": 0},
     "bundle": {"data": None, "expiration": 0},
+    "cinematic_tokens": {"data": None, "expiration": 0},
+    "vox_docudrama": {"data": None, "expiration": 0},
     "hits": 0,
     "misses": 0
 }
@@ -687,10 +689,67 @@ def get_cinematic_tokens_dictionary(force_refresh: bool = False) -> dict:
     return data
 
 
+def get_vox_docudrama_prompt(force_refresh: bool = False) -> str:
+    """Return decoupled Vox Docudrama & Paper Collage prompt engine guidelines (Rule 132).
+    Loads dynamically from config/prompts/vox_docudrama_engine.md with caching.
+    """
+    global _cache
+    now = time.time()
+    if not force_refresh and _cache.get("vox_docudrama", {}).get("data") and now < _cache["vox_docudrama"]["expiration"]:
+        _cache["hits"] += 1
+        return _cache["vox_docudrama"]["data"]
+
+    _cache["misses"] += 1
+    prompt_file = ROOT_DIR / "config" / "prompts" / "vox_docudrama_engine.md"
+    content = ""
+    if prompt_file.exists():
+        try:
+            content = prompt_file.read_text(encoding="utf-8").strip()
+        except Exception as e:
+            logger.warning(f"[skill_loader] Failed reading {prompt_file}: {e}")
+
+    if not content:
+        content = (
+            "You are an Elite Documentary Writer and Paper Collage Art Director.\n"
+            "Produce Fern-style high-retention investigative scripts (2.5 wps) and tactile paper collage cutouts."
+        )
+
+    _cache["vox_docudrama"] = {
+        "data": content,
+        "expiration": now + CACHE_TTL_SECONDS
+    }
+    return content
+
+
+def resolve_vox_theme_by_keywords(topic: str = "", niche: str = "") -> str:
+    """Deterministically resolve one of the 9 Canonical Vox Theme Presets from topic keywords and niche."""
+    t_low = (topic or "").lower()
+    n_low = (niche or "").lower()
+
+    if any(k in t_low for k in ["court", "trial", "fbi", "cia", "classified", "leak", "dossier", "redact", "hồ sơ", "mật", "tòa án"]):
+        return "legal-dossier"
+    if any(k in t_low for k in ["bank", "fed", "debt", "wall street", "bond", "ledger", "stock", "ngân hàng", "nợ", "lãi suất", "chứng khoán"]) or n_low == "money_power":
+        return "financial-ledger"
+    if any(k in t_low for k in ["blueprint", "engine", "aviation", "boeing", "rocket", "bridge", "machinery", "kỹ thuật", "máy bay", "động cơ"]):
+        return "technical-blueprint"
+    if any(k in t_low for k in ["hacker", "cyber", "punk", "rebellion", "silicon valley", "crypto", "zine"]):
+        return "punk-zine"
+    if any(k in t_low for k in ["polaroid", "1980s", "1970s", "1990s", "vintage photo", "nostalgia"]):
+        return "retro-polaroid"
+    if any(k in t_low for k in ["ancient", "century", "empire", "roman", "dynasty", "archival", "war", "lịch sử", "thế chiến", "triều đại"]) or n_low == "history":
+        return "vintage-archival"
+    if any(k in t_low for k in ["biology", "nature", "forest", "wildlife", "botanical", "môi trường", "sinh thái"]):
+        return "botanical-field"
+    if any(k in t_low for k in ["app", "software", "saas", "modern", "startup"]) or n_low == "technology":
+        return "minimal-modern"
+
+    return "newsprint-editorial"
+
+
 def clear_cache():
     """Manually clear all cached rules."""
     global _cache
-    for key in ("central", "content_engine", "media_production", "bundle", "cinematic_tokens"):
+    for key in ("central", "content_engine", "media_production", "bundle", "cinematic_tokens", "vox_docudrama"):
         if key in _cache:
             _cache[key]["data"] = None
             _cache[key]["expiration"] = 0
