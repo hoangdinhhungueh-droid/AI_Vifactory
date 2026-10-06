@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   lint-and-test:
+    name: "CI Gate: Lint, Anti-Bias & Hermetic Tests"
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -47,3 +48,54 @@ jobs:
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
+
+  deploy-vps:
+    name: "CD Gate: Automated Zero-Downtime Deploy to Hetzner VPS"
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check VPS Secrets Availability
+        id: check-secrets
+        run: |
+          if [ -z "${{ secrets.VPS_HOST }}" ] || [ -z "${{ secrets.VPS_SSH_KEY }}" ]; then
+            echo "::warning title=VPS CD Pending::VPS_HOST or VPS_SSH_KEY is not configured in GitHub Repository Secrets. Skipping remote SSH deploy step. Set these secrets in Repo Settings -> Secrets to enable automated cloud push."
+            echo "secrets_ready=false" >> $GITHUB_OUTPUT
+          else
+            echo "secrets_ready=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy to VPS via SSH
+        if: steps.check-secrets.outputs.secrets_ready == 'true'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          script: |
+            set -e
+            echo "=== [CD] BẮT ĐẦU TRIỂN KHAI TỰ ĐỘNG LÊN HETZNER VPS ==="
+            cd /root/video_factory
+            
+            # 1. Snapshot an toàn rollback
+            git branch -f backup_pre_deploy HEAD || true
+            
+            # 2. Pull code mới nhất từ main
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # 3. Biên dịch kiểm tra cú pháp toàn bộ Python
+            python3 -m py_compile scripts/orchestrator/runner.py app/services/*.py
+            
+            # 4. Kiểm tra và restart các container nếu cần
+            docker compose down --remove-orphans || true
+            docker compose up -d
+            
+            # 5. Khởi động lại Celery worker an toàn
+            pkill -f "celery -A" || true
+            nohup python3 scripts/start-celery-v2.py > /tmp/celery.log 2>&1 &
+            
+            # 6. Chạy Post-Deployment Health Check
+            python3 scripts/health-check.py
+            echo "=== [CD] TRIỂN KHAI HOÀN TẤT THÀNH CÔNG (PASS) ==="

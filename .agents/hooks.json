@@ -28,5 +28,20 @@
         ]
       }
     ]
+  },
+  "project-memory-guard": {
+    "enabled": false,
+    "PostToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/orchestrator/memory_governor.py --verify-recent",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
   }
 }

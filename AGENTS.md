@@ -142,6 +142,9 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 | **B6, B7, B8** | Remotion Master Video Render CPU, BGM Cinematic Ducking, Video QA Audit | `notion_sot_second_brain.md` (Media Production Hub) | Rule 120, Rule 135 (Remotion chapters), Rule 136 (Clean speaker tags) |
 | **B10** | SEO Metadata, Synthetic Media, Gate 2 | `PIPELINE_CONTRACTS.md` | `status.containsSyntheticMedia: true`, Hero Thumbnail, Rule 135 Chapters |
 | **B11** (`/run:b11`) | Analytics 48h, Feedback Dreaming Loop | Skill `vf-b11-analytics` | Rule 113 (48h Law), Rule 440–442 |
+| **Deploy & CI/CD** (`make deploy`, `make ci`) | Triển khai 1-lệnh full luồng, CI Lint/Test, Rollback Snapshot, Docker Compose & Celery restart, Health probe | `.github/workflows/ci.yml`, `Makefile`, `make.ps1` & `runner.py` | Rule 121, 126 (3-Way Sync), Fail-Fast |
+| **System Health & Report** (`make health`, `make report`) | Giám sát 7 trục đa nền tảng (DB, Redis, RAM, Workers, Ghost Code), xuất Markdown & HTML Dashboard | `scripts/health-check.py`, `system_health_reporter.py` | Rule 119, 125, Zero-Mock Telemetry |
+| **Vibe Memory Governance** (`make memory`) | Kiểm định tính toàn vẹn bộ nhớ dài hạn dự án (`ROADMAP.md`, `CHANGELOG.md`, `specs/`), ngăn ngừa Amnesia | `scripts/orchestrator/memory_governor.py`, `.agents/hooks.json` | Rule 124 (Memory Anchoring & Atomic Commit) |
 | **Teamwork Pipeline** (`/vf-pipeline-teamwork`) | Hội Đồng Multi-Agent Harness (Architect, Builder, QA Test Harness, Adversarial Auditor) + **Opus 5.5 Anti-Bloat Supervisory Gate** ($\le 10,000$ in / $\le 5,000$ out) | Skill `vf-pipeline-teamwork` & `scripts/orchestrator/` | Rule 118, 119, 121, 124, 125, 126, 127, 128, 129, 134, 138, 139 |
 
 ---
@@ -150,6 +153,10 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 1. **Task-Level Contract**: Mọi nhiệm vụ lớn / Sprint bắt buộc neo theo file `ORIGINAL_REQUEST.md` (chứa User Request gốc, Requirements R1..Rn và Acceptance Criteria `[ ]`).
 2. **Interface Contracts**: Khế ước dữ liệu JSON IN/OUT giữa các block và danh mục file trên VPS tra cứu tại `PIPELINE_CONTRACTS.md`.
 3. **Autonomous Clarification Protocol**: Mọi tác vụ có tính đa chiều, rẽ nhánh kỹ thuật hoặc mơ hồ bắt buộc kích hoạt Cổng Phản Vấn Chủ Động (Rule 129), suy luận sâu và làm rõ với User trước khi triển khai sâu.
+4. **Vibe Coding Memory & Specification Traceability**:
+   - Mọi thay đổi kiến trúc/tính năng bắt buộc tuân theo quy trình 2 bản vẽ: `specs/business_flow_template.md` (Business Flow) và `specs/design_spec_template.md` (Design Spec).
+   - Bộ nhớ dự án bắt buộc neo vào `ROADMAP.md` (tiến độ pha, task checklists `[x]`) và `CHANGELOG.md` (chuẩn Keep a Changelog: `Added`, `Changed`, `Fixed`).
+   - Trước khi kết thúc phiên hoặc commit, chạy `make memory` hoặc `python scripts/orchestrator/memory_governor.py --strict` để bảo chứng không mất ngữ cảnh (Anti-Amnesia).
 
 ---
 
