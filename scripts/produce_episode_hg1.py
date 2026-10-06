@@ -150,130 +150,23 @@ def run_chain(task_id: str) -> int:
         raise RuntimeError(f"B2.1 Fact Audit REJECTED ({f_score}/10): {veto_reason}. Halting before B3!")
     _log(stage, f"B2.1 Fact Audit verified OK ({f_score}/10). Proceeding directly to B3 Audio Spine & Visual Director!")
 
-    # ---- B2 Spoken Script Verification (Hollywood Audio-Anchored Standard)
-    if not brain.get("spoken_sentences"):
-        _log("B2_SPOKEN", "Adapting Master Spoken VO script from 5-Act story...")
-        from app.services.story_engine_b2 import adapt_master_spoken_script, adversarial_audit_spoken_script
-        mkt = str(brain.get("market") or meta.get("market") or task_id.split("_")[0]).upper()
-        spoken_data = adapt_master_spoken_script(story_text, market=mkt, topic=keyword)
-        spoken_audit = adversarial_audit_spoken_script(spoken_data, market=mkt, topic=keyword)
-        brain["spoken_script"] = spoken_data.get("spoken_script_text", story_text)
-        brain["spoken_sentences"] = spoken_data.get("sentences", [])
-        brain["spoken_script_audit"] = spoken_audit
-        (ep_dir / "spoken_script.txt").write_text(brain["spoken_script"], encoding="utf-8")
-        (ep_dir / "spoken_sentences.json").write_text(json.dumps(brain["spoken_sentences"], ensure_ascii=False, indent=2), encoding="utf-8")
-        brain_file.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
-        _log("B2_SPOKEN", f"Master Spoken VO ready: {len(brain['spoken_sentences'])} breath-paced sentences (Audit: {spoken_audit.get('audit_score')}/10 {spoken_audit.get('verdict')})")
+    # ---- 100% AUTONOMOUS VOX VIDEO PIPELINE (Rule 125 Single Truth & Vox Upgrade Standard) ----
+    stage = "VOX_PIPELINE"
+    _log(stage, f"Executing 100% Autonomous VOX Video Pipeline for {task_id} (Rule 125 Single Truth)...")
+    from scripts.run_vox_automated_pipeline import run_automated_pipeline
+    mkt = str(meta.get("market") or (brain.get("market") if brain else None) or task_id.split("_")[0]).upper()
 
-    # ---- B3 Audio Spine & Timecode Map (Rule 120 & Hollywood Architecture)
-    stage = "B3_AUDIO"
-    from app.services.beat_tts_engine import synthesize_beat_tts_pipeline
-    _log(stage, "Synthesizing Master Voiceover Audio Spine from B2 Spoken Script...")
-    force_tts = os.getenv("VF_FORCE_TTS", "0") == "1"
-    tts_res = asyncio.run(synthesize_beat_tts_pipeline(task_id, out_dir=str(ep_dir), force=force_tts))
-    dur_sec = float(tts_res.get("total_duration_sec") or 0.0)
-    _log(stage, f"Audio Spine ready: {dur_sec:.1f}s ({len(tts_res.get('segments', []))} sentences mapped)")
-
-    # ---- B3.5 Hollywood Art Director & Shot Breakdown (Rule 125 & 128)
-    stage = "B3_VISUAL"
-    from app.services.director_planner_b3 import generate_director_plan
-    _log(stage, "Executing Hollywood Art Director & shot breakdown from audio timecodes...")
-    director_plan = generate_director_plan(
-        episode_id=task_id,
-        story_text=story_text,
-        spoken_sentences=tts_res.get("segments"),
-        intel_card=card if 'card' in locals() else None,
-        metadata={"niche": brain.get("niche") or "Finance", "topic": brain.get("topic") or task_id}
+    vox_summary = run_automated_pipeline(
+        task_id=task_id,
+        topic=keyword,
+        market=mkt,
+        niche=niche,
+        script_text=story_text if story_text else None,
+        auto=True,
+        out_dir=str(ep_dir)
     )
-    scenes = director_plan.get("scenes") or []
-    _log(stage, "director plan ready: %d scenes (Archetype: %s)" % (len(scenes), director_plan.get("director_archetype", "Standard")))
-    if not scenes:
-        raise RuntimeError("B3 produced no scenes in director plan")
-
-    # ---- B3.5 prompt forge with scene semantic coupling --------------
-    stage = "B3.5"
-    from app.services.prompt_forge import generate_scene_prompts, push_prompts_to_notion, ContentPolicyRefusalError
-    
-    # Build enriched BG and FG metadata preserving scene pairings
-    bg_dict, fg_dict = {}, {}
-    for s in scenes:
-        bg_k = s.get("background_reuse_key")
-        fg_k = s.get("foreground_reuse_key")
-        arc = s.get("arc", "")
-        narration = s.get("narration", "")
-        bg_hint = s.get("image_prompt", "")
-        fg_hint = s.get("foreground_prompt", "")
-
-        if bg_k:
-            if bg_k not in bg_dict:
-                bg_dict[bg_k] = {
-                    "beat": arc,
-                    "narration_context": narration[:400],
-                    "visual_hint": bg_hint,
-                    "paired_foregrounds": [fg_k] if fg_k else []
-                }
-            elif fg_k and fg_k not in bg_dict[bg_k].get("paired_foregrounds", []):
-                bg_dict[bg_k]["paired_foregrounds"].append(fg_k)
-
-        if fg_k:
-            if fg_k not in fg_dict:
-                fg_dict[fg_k] = {
-                    "beat": arc,
-                    "narration_context": narration[:400],
-                    "visual_hint": fg_hint,
-                    "paired_backgrounds": [bg_k] if bg_k else []
-                }
-            elif bg_k and bg_k not in fg_dict[fg_k].get("paired_backgrounds", []):
-                fg_dict[fg_k]["paired_backgrounds"].append(bg_k)
-
-    _log(stage, "forging prompts for %d BG keys, %d FG keys (scene semantic coupling preserved)" % (len(bg_dict), len(fg_dict)))
-    if not bg_dict:
-        raise RuntimeError("no background_reuse_key on any scene -- B2 schema regression")
-    
-    prompts_file = ep_dir / "prompts_forge.json"
-    prompts = None
-    if prompts_file.exists() and prompts_file.stat().st_size > 100:
-        try:
-            prompts = json.loads(prompts_file.read_text(encoding="utf-8"))
-            _log(stage, f"Reusing existing valid prompts from {prompts_file}")
-        except Exception:
-            prompts = None
-
-    if not prompts:
-        # Handle GPT content policy refusals gracefully (02/09/2026 P0 fix)
-        try:
-            prompts = generate_scene_prompts(
-                bg_dict=bg_dict,
-                fg_dict=fg_dict,
-                story_title=brain.get("topic") or task_id,
-                scenes=scenes
-            )
-            prompts_file.write_text(
-                json.dumps(prompts, ensure_ascii=False, indent=2), encoding="utf-8")
-            n_bg = len(prompts.get("backgrounds") or {})
-            n_fg = len(prompts.get("foregrounds") or {})
-            n_thumb = len(prompts.get("thumbnails") or {})
-            _log(stage, "%d BG prompts, %d FG prompts, %d Thumbnails -> Notion" % (n_bg, n_fg, n_thumb))
-            push_prompts_to_notion(prompts, task_id, task_id=task_id)
-        except ContentPolicyRefusalError as e:
-            # GPT refused due to sensitive content - route to HG2.5 manual review
-            _log(stage, "CONTENT POLICY REFUSAL - routing to HG2.5 manual review")
-            _log(stage, "Refusal: %s" % str(e)[:200])
-            refusal_marker = {
-                "status": "NEEDS_MANUAL_REVIEW",
-                "reason": "content_policy_refusal",
-                "refusal_detail": str(e)[:500],
-                "bg_keys_needed": list(bg_dict.keys()),
-                "fg_keys_needed": list(fg_dict.keys()),
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-            }
-            prompts_file.write_text(
-                json.dumps(refusal_marker, ensure_ascii=False, indent=2), encoding="utf-8")
-    else:
-        n_bg = len(prompts.get("backgrounds") or {})
-        n_fg = len(prompts.get("foregrounds") or {})
-        n_thumb = len(prompts.get("thumbnails") or {})
-        _log(stage, "%d BG prompts, %d FG prompts, %d Thumbnails loaded from disk" % (n_bg, n_fg, n_thumb))
+    _log(stage, f"VOX Pipeline complete: {vox_summary.get('totalBeats', 0)} beats, {vox_summary.get('totalFrames', 0)} frames. Human Gate 2 card ready.")
+    return 0
 
     # ---- Human Gate 2 Check & Dispatch Guard (Rule 125 Single Truth) ----
     stage = "HG2"

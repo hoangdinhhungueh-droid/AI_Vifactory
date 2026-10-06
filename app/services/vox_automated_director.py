@@ -247,9 +247,13 @@ class VoxAutomatedDirector:
                 "id": f"scene_{b_idx:02d}",
                 "component": "VoxBuildOnStage",
                 "durationInFrames": duration_frames,
+                "durationSec": round(duration_frames / self.fps, 2),
                 "headline": headline,
                 "subtitle": f"RECORD REF // #{b_idx:02d} • EVIDENCE DOSSIER",
                 "theme": theme,
+                "narration": b.get("narration", ""),
+                "heroSrc": f"images/fg_{b_idx:02d}.png",
+                "background": f"images/bg_{b_idx:02d}.png",
                 "hasMarkerHighlight": True,
                 "stampText": "VERIFIED // IMPORTANT" if b_idx == 1 else "CLASSIFIED EXHIBIT",
                 "stampColor": "#dc2626" if b_idx == 1 else "#b91c1c",
@@ -305,10 +309,13 @@ class VoxAutomatedDirector:
             "width": 1920,
             "height": 1080,
             "totalFrames": total_frames,
+            "audioMaster": "tts_out.mp3",
+            "bgmFile": "bgm/vox_cinematic_pulse.mp3",
+            "bgmVolume": 0.12,
             "scenes": scenes,
             "meta": {
                 "generatedBy": "VoxAutomatedDirector",
-                "compliance": ["Rule 120", "Rule 128", "Rule 132", "WOWZ.CLOUD"]
+                "compliance": ["Rule 120", "Rule 125", "Rule 128", "Rule 132", "WOWZ.CLOUD"]
             }
         }
 

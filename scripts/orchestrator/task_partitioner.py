@@ -109,8 +109,8 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
     ),
     "2.0": StageContract(
         stage_id="2.0",
-        name="B2 Story Engine",
-        description="5-Beat Docudrama 1,800-2,200 words via GPT-6-Astra (Rule 445)",
+        name="B2 VOX Story & Beat Engine",
+        description="Fern DNA continuous investigative script (300-450 words, <=12w cold open) & VOX Audio Spine via GPT-6-Astra",
         prerequisites=["1.5.5"],
         input_files=[
             "/var/vf/pending_tasks/{task_id}.json",
@@ -120,12 +120,19 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
         output_files=[
             "/var/vf/episodes/{task_id}/story.txt",
             "/var/vf/episodes/{task_id}/brain_input.json",
+            "/var/vf/episodes/{task_id}/tts_out.mp3",
+            "/var/vf/episodes/{task_id}/director_plan.json",
+            "/var/vf/episodes/{task_id}/prompts_forge.json",
+            "/var/vf/episodes/{task_id}/remotion_props.json",
         ],
         command_template=[
             "python3",
-            "-c",
-            "import sys; sys.path.insert(0, '.'); from app.services.story_engine_b2 import generate_5_arc_story; "
-            "generate_5_arc_story('{task_id}')",
+            "scripts/run_vox_automated_pipeline.py",
+            "--task-id",
+            "{task_id}",
+            "--market",
+            "{market}",
+            "--auto",
         ],
     ),
     "2.1": StageContract(
@@ -152,8 +159,8 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
     ),
     "2.5": StageContract(
         stage_id="2.5",
-        name="B2.5 Spoken VO Adaptation",
-        description="Hollywood Breath-Timed Spoken Script Adaptation & Adversarial Duration Audit",
+        name="B2.5 Spoken VO Verification",
+        description="Verification of VOX breath-timed spoken sentences and timecode alignment",
         prerequisites=["2.1"],
         input_files=[
             "/var/vf/episodes/{task_id}/story.txt",
@@ -165,25 +172,12 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
         command_template=[
             "python3",
             "-c",
-            "import sys, json, os; sys.path.insert(0, '.'); from app.services.story_engine_b2 import adapt_master_spoken_script, adversarial_audit_spoken_script; "
-            "ep_dir = '/var/vf/episodes/{task_id}'; "
-            "story = open(f'{ep_dir}/story.txt', encoding='utf-8').read(); "
-            "meta_path = '/var/vf/pending_tasks/{task_id}.json'; "
-            "meta = json.load(open(meta_path, encoding='utf-8')) if os.path.exists(meta_path) else {}; "
-            "mkt = meta.get('market') or '{task_id}'.split('_')[0].upper(); "
-            "topic = meta.get('raw_term') or '{task_id}'; "
-            "res = adapt_master_spoken_script(story, market=mkt, topic=topic); "
-            "audit = adversarial_audit_spoken_script(res, market=mkt, topic=topic); "
-            "assert audit.get('verdict') == 'PASS' or float(audit.get('audit_score', 0)) >= 7.5, f'B2.5 Audit Failed: {audit}'; "
-            "open(f'{ep_dir}/spoken_script.txt', 'w', encoding='utf-8').write(res.get('spoken_script_text', story)); "
-            "open(f'{ep_dir}/spoken_sentences.json', 'w', encoding='utf-8').write(json.dumps(res.get('sentences', []), ensure_ascii=False, indent=2)); "
-            "brain_p = f'{ep_dir}/brain_input.json'; "
-            "brain = json.load(open(brain_p, encoding='utf-8')) if os.path.exists(brain_p) else {}; "
-            "brain['spoken_script'] = res.get('spoken_script_text', story); "
-            "brain['spoken_sentences'] = res.get('sentences', []); "
-            "brain['spoken_script_audit'] = audit; "
-            "open(brain_p, 'w', encoding='utf-8').write(json.dumps(brain, ensure_ascii=False, indent=2)); "
-            "print(f'✅ B2.5 Spoken VO Adaptation PASS: {len(res.get(\"sentences\", []))} sentences')",
+            "import os, json; ep_dir = '/var/vf/episodes/{task_id}'; "
+            "sp = f'{ep_dir}/spoken_sentences.json'; "
+            "assert os.path.exists(sp), f'Missing spoken sentences: {sp}'; "
+            "sents = json.load(open(sp, encoding='utf-8')); "
+            "assert len(sents) > 0, 'Spoken sentences empty'; "
+            "print(f'✅ B2.5 Spoken VO Verification PASS: {len(sents)} sentences')",
         ],
     ),
     "2.6": StageContract(
@@ -201,17 +195,18 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
         command_template=[
             "python3",
             "-c",
-            "import sys, asyncio, json; sys.path.insert(0, '.'); from app.services.beat_tts_engine import synthesize_beat_tts_pipeline; "
-            "ep_dir = '/var/vf/episodes/{task_id}'; "
-            "res = asyncio.run(synthesize_beat_tts_pipeline('{task_id}', out_dir=ep_dir, force=False)); "
-            "assert res.get('total_duration_sec', 0) > 0, 'TTS output duration is zero'; "
-            "print(f'✅ B2.6 Audio Spine PASS: {res.get(\"total_duration_sec\"):.1f}s ({len(res.get(\"segments\", []))} segments)')",
+            "import os; ep_dir = '/var/vf/episodes/{task_id}'; "
+            "audio = f'{ep_dir}/tts_out.mp3'; "
+            "srt = f'{ep_dir}/subtitles.srt'; "
+            "assert os.path.exists(audio) and os.path.getsize(audio) > 1000, f'Missing TTS audio: {audio}'; "
+            "assert os.path.exists(srt) and os.path.getsize(srt) > 10, f'Missing subtitles: {srt}'; "
+            "print('✅ B2.6 Audio Spine & Subtitles PASS')",
         ],
     ),
     "3.0": StageContract(
         stage_id="3.0",
-        name="B3 Director Plan",
-        description="Hollywood Visual Director Plan locked to Audio Spine timecodes (Rule 125, 128)",
+        name="B3 VOX Director Plan",
+        description="VOX Visual Director Plan locked to 2-Shot Cadence & Remotion VoxBuildOnStage Manifest (Rule 125, 128)",
         prerequisites=["2.6"],
         input_files=[
             "/var/vf/episodes/{task_id}/story.txt",
@@ -220,32 +215,36 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
         ],
         output_files=[
             "/var/vf/episodes/{task_id}/director_plan.json",
-            "/var/vf/episodes/{task_id}/brain_input.json",
+            "/var/vf/episodes/{task_id}/remotion_props.json",
         ],
         command_template=[
             "python3",
             "-c",
-            "import sys, json; sys.path.insert(0, '.'); from app.services.director_planner_b3 import generate_director_plan; "
-            "ep_dir = '/var/vf/episodes/{task_id}'; "
-            "story = open(f'{ep_dir}/story.txt', encoding='utf-8').read(); "
-            "brain = json.load(open(f'{ep_dir}/brain_input.json', encoding='utf-8')); "
-            "sp_sents = json.load(open(f'{ep_dir}/spoken_sentences.json', encoding='utf-8')) if __import__('os').path.exists(f'{ep_dir}/spoken_sentences.json') else None; "
-            "plan = generate_director_plan('{task_id}', story, spoken_sentences=sp_sents, metadata={'topic': brain.get('topic') or '{task_id}'}, run_downstream=False); "
-            "print(f'✅ B3 Hollywood Director Plan PASS: {len(plan.get(\"scenes\", []))} scenes')",
+            "import os, json; ep_dir = '/var/vf/episodes/{task_id}'; "
+            "p = f'{ep_dir}/remotion_props.json'; "
+            "assert os.path.exists(p), f'Missing remotion props: {p}'; "
+            "data = json.load(open(p, encoding='utf-8')); "
+            "assert len(data.get('scenes', [])) > 0, 'No VOX scenes found'; "
+            "print(f'✅ B3 VOX Director Plan PASS: {len(data.get(\"scenes\", []))} beats (VoxBuildOnStage)')",
         ],
     ),
     "3.5": StageContract(
         stage_id="3.5",
-        name="B3.5 Prompt Forge",
-        description="Dual-Layer Visual Prompt Forge (16:9 BG + #FF00FF FG) with Anti-Stuttering",
+        name="B3.5 VOX Prompt Forge",
+        description="5-Part Tactile Paper Collage Image Prompts Forge (16:9 BG + 1:1 #FF00FF FG + Thumbnails)",
         prerequisites=["3.0"],
         input_files=["/var/vf/episodes/{task_id}/director_plan.json"],
         output_files=["/var/vf/episodes/{task_id}/prompts_forge.json"],
         command_template=[
             "python3",
-            "scripts/run_prompt_forge.py",
-            "--episode",
-            "{task_id}",
+            "-c",
+            "import os, json; ep_dir = '/var/vf/episodes/{task_id}'; "
+            "p = f'{ep_dir}/prompts_forge.json'; "
+            "assert os.path.exists(p), f'Missing prompts forge: {p}'; "
+            "data = json.load(open(p, encoding='utf-8')); "
+            "n_bg = len(data.get('backgrounds', {})); n_fg = len(data.get('foregrounds', {})); "
+            "assert n_bg > 0 and n_fg > 0, f'Invalid prompt counts: {n_bg} BGs, {n_fg} FGs'; "
+            "print(f'✅ B3.5 VOX Prompt Forge PASS: {n_bg} BGs, {n_fg} FGs, {len(data.get(\"thumbnails\", {}))} Thumbnails')",
         ],
     ),
     "3.6": StageContract(

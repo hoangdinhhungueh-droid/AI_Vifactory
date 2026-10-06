@@ -32,7 +32,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 PROJ_DIR = os.environ.get("VF_REMOTION_DIR", "/root/video_factory/remotion")
 ENTRY = "src/index.tsx"
-COMP_ID = "TwoLayerEpisode"
+COMP_ID = os.environ.get("VF_REMOTION_COMP_ID", "VoxBuildOnStage")
 
 
 def preflight_memory_check():

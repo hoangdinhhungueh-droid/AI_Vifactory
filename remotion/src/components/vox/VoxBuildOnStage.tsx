@@ -113,17 +113,18 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   // 12fps Quantized Stop-Motion Jitter
   const { dx: jitterX, dy: jitterY, dRot: jitterRot } = useStopMotion(12, 1.2, 42);
 
-  // Phase Timers in Frames
-  const fUnfoldEnd = Math.round(fps * 1.0);
-  const fHeroEnd = Math.round(fps * 3.5);
-  const fSupportingEnd = Math.round(fps * 5.0);
-  const fDetailsEnd = Math.round(fps * 7.0);
-  const fTotal = Math.round(fps * (durationSec || 10));
+  // Phase Timers in Frames (Adaptive to Beat Duration)
+  const dSec = Math.max(1, durationSec || 10);
+  const fTotal = Math.max(1, Math.round(fps * dSec));
+  const speedRatio = dSec < 7.0 ? Math.max(0.2, dSec / 7.0) : 1.0;
 
-  // Camera Micro-push (Hold Phase breathe 1.00 -> 1.03x)
+  const fMid = Math.max(1, Math.round(fTotal * 0.65));
+  const fEnd = Math.max(fMid + 1, fTotal);
+
+  // Camera Micro-push (Hold Phase breathe 1.00 -> 1.035x)
   const cameraScale = interpolate(
     frame,
-    [0, fDetailsEnd, fTotal],
+    [0, fMid, fEnd],
     [1.0, 1.015, 1.035],
     { extrapolateRight: "clamp" }
   );
@@ -138,7 +139,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const backdropOpacity = interpolate(backdropSpring, [0, 1], [0, 1]);
 
   // 2. HERO CUTOUT SLIDE & DRAG (1.0s - 3.5s)
-  const heroDelayFrames = Math.round(fps * 1.0);
+  const heroDelayFrames = Math.round(fps * 1.0 * speedRatio);
   const heroSpring = spring({
     frame: Math.max(0, frame - heroDelayFrames),
     fps,
@@ -151,7 +152,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const heroDropShadow = interpolate(heroSpring, [0, 1], [0, 18]);
 
   // 3. EDITORIAL HEADLINE STAMP (2.5s - 4.0s)
-  const headlineDelayFrames = Math.round(fps * 2.2);
+  const headlineDelayFrames = Math.round(fps * 2.2 * speedRatio);
   const headlineSpring = spring({
     frame: Math.max(0, frame - headlineDelayFrames),
     fps,
@@ -159,7 +160,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   });
 
   // 4. RUBBER STAMP SLAM (5.0s - 6.5s)
-  const stampDelayFrames = Math.round(fps * 4.8);
+  const stampDelayFrames = Math.round(fps * 4.8 * speedRatio);
   const stampSpring = spring({
     frame: Math.max(0, frame - stampDelayFrames),
     fps,
@@ -429,8 +430,9 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
 
           {/* LAYER 2: SUPPORTING CUTOUTS & EVIDENCE (3.5s - 5.0s) */}
           {supportingCutouts.map((cutout, idx) => {
+            const defaultCutSec = (3.5 + idx * 0.4) * speedRatio;
             const cutDelayFrames = Math.round(
-              fps * (cutout.delaySec !== undefined ? cutout.delaySec : 3.5 + idx * 0.4)
+              fps * (cutout.delaySec !== undefined ? cutout.delaySec : defaultCutSec)
             );
             const cutSpring = spring({
               frame: Math.max(0, frame - cutDelayFrames),
@@ -517,10 +519,11 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
 
           {/* LAYER 3: RED CONNECTING YARN LINES (5.0s - 7.0s) */}
           {yarns.map((yarn, yIdx) => {
+            const defaultYarnSec = (4.8 + yIdx * 0.3) * speedRatio;
             const yarnDelayFrames = Math.round(
-              fps * (yarn.delaySec !== undefined ? yarn.delaySec : 4.8 + yIdx * 0.3)
+              fps * (yarn.delaySec !== undefined ? yarn.delaySec : defaultYarnSec)
             );
-            const yarnDurationFrames = Math.round(fps * 0.6);
+            const yarnDurationFrames = Math.max(6, Math.round(fps * 0.6 * speedRatio));
             const drawProgress = interpolate(
               frame,
               [yarnDelayFrames, yarnDelayFrames + yarnDurationFrames],

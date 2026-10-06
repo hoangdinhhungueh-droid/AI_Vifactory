@@ -1108,6 +1108,64 @@ def build_remotion_props_data(
         by_reuse_key, fg_pool = load_manifest_index(manifest_path)
 
     raw_scenes = brain.get("scenes", [])
+    ep_dir = os.path.dirname(os.path.abspath(brain_input_path))
+
+    # Check if candidate VOX manifests exist in ep_dir if raw_scenes is empty
+    if not raw_scenes:
+        for candidate_manifest in [
+            os.path.join(ep_dir, "remotion_props.json"),
+            os.path.join(ep_dir, "vox_scene_manifest.json"),
+            os.path.join(ep_dir, "director_plan.json"),
+        ]:
+            if os.path.exists(candidate_manifest):
+                try:
+                    cdata = json.loads(Path(candidate_manifest).read_text(encoding="utf-8"))
+                    if isinstance(cdata, dict) and cdata.get("scenes"):
+                        raw_scenes = cdata["scenes"]
+                        logger.info("[build_remotion_props] Recovered %d scenes from %s", len(raw_scenes), candidate_manifest)
+                        break
+                except Exception:
+                    pass
+
+    # VOX BUILD-ON-STAGE PIPELINE HANDLING (Rule 125 Single Truth):
+    is_vox_build_on = any(s.get("component") == "VoxBuildOnStage" for s in raw_scenes) or brain.get("pipeline_version") == "vox_docudrama_v2"
+    if is_vox_build_on and raw_scenes:
+        logger.info("[build_remotion_props] Detected VoxBuildOnStage pipeline for %s (%d beats)", episode_id, len(raw_scenes))
+        for i, s in enumerate(raw_scenes):
+            b_idx = s.get("beat_index", i + 1)
+            # Bind heroSrc
+            fg_file = f"fg_{b_idx:02d}.png"
+            if os.path.exists(os.path.join(ep_dir, "images", fg_file)):
+                s["heroSrc"] = f"images/{fg_file}"
+            elif os.path.exists(os.path.join(ep_dir, "assets", fg_file)):
+                s["heroSrc"] = f"assets/{fg_file}"
+
+            # Bind background
+            bg_file = f"bg_{b_idx:02d}.png"
+            if os.path.exists(os.path.join(ep_dir, "images", bg_file)):
+                s["background"] = f"images/{bg_file}"
+            elif os.path.exists(os.path.join(ep_dir, "assets", bg_file)):
+                s["background"] = f"assets/{bg_file}"
+
+        props = {
+            "episodeId": episode_id,
+            "topic": brain.get("topic") or episode_id,
+            "theme": brain.get("theme", "newsprint-editorial"),
+            "fps": fps,
+            "width": width,
+            "height": height,
+            "totalFrames": sum(s.get("durationInFrames", 150) for s in raw_scenes),
+            "audioMaster": "tts_out.mp3",
+            "bgmFile": "bgm/vox_cinematic_pulse.mp3",
+            "bgmVolume": 0.12,
+            "scenes": raw_scenes,
+            "meta": {
+                "generatedBy": "VoxBuildOnStageBridge",
+                "compliance": ["Rule 120", "Rule 125", "Rule 128"]
+            }
+        }
+        return props
+
     total_scenes = len(raw_scenes)
     scenes_out = []
     missing = []

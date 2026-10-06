@@ -33,6 +33,7 @@ import {
   useStopMotion,
   PaperStatCard,
   PushThroughTransitionOverlay,
+  VoxBuildOnStage,
 } from "./components/vox";
 import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
 import {
@@ -2638,6 +2639,86 @@ export const TwoLayerEpisode = (props) => {
 const totalSceneFrames = (scenes) =>
   (scenes || []).reduce((sum, s) => sum + Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1)), 0);
 
+/**
+ * Master VOX Build-On Episode Container Component (Rule 125 Single Truth).
+ * Iterates through scenes / beats and renders authentic 7-layer tactile
+ * paper build-on assemblies via VoxBuildOnStage, along with master audio,
+ * BGM with automatic ducking, and word-level subtitles.
+ */
+export const VoxBuildOnEpisode: React.FC<{
+  scenes?: any[];
+  audioMaster?: string;
+  bgmFile?: string;
+  bgmVolume?: number;
+  fps?: number;
+  width?: number;
+  height?: number;
+}> = (props) => {
+  const scenes = props.scenes || [];
+  const cfg = useVideoConfig();
+
+  const sceneSequences = React.useMemo(() => {
+    let cursor = 0;
+    return scenes.map((s, idx) => {
+      const dur = Math.max(
+        1,
+        Math.round(
+          s.durationInFrames
+            ? s.durationInFrames
+            : s.durationSec
+            ? s.durationSec * (cfg.fps || 30)
+            : 150
+        )
+      );
+      const from = cursor;
+      cursor += dur;
+
+      const durationSec = dur / (cfg.fps || 30);
+      const heroSrc = s.heroSrc
+        ? resolveSrc(s.heroSrc)
+        : s.foreground
+        ? resolveSrc(s.foreground)
+        : undefined;
+
+      return (
+        <Sequence
+          key={s.id || `vox-beat-${idx}`}
+          from={from}
+          durationInFrames={dur}
+          name={s.headline || `Beat ${idx + 1}`}
+        >
+          <VoxBuildOnStage
+            headline={s.headline}
+            subtitle={s.subtitle}
+            theme={s.theme}
+            heroSrc={heroSrc}
+            heroLabel={s.heroLabel}
+            heroPosition={s.heroPosition}
+            supportingCutouts={s.supportingCutouts}
+            yarns={s.yarns}
+            stampText={s.stampText}
+            stampColor={s.stampColor}
+            hasMarkerHighlight={s.hasMarkerHighlight !== false}
+            durationSec={durationSec}
+          />
+        </Sequence>
+      );
+    });
+  }, [scenes, cfg.fps]);
+
+  const audioMaster = props.audioMaster ? resolveSrc(props.audioMaster) : null;
+  const bgmFile = props.bgmFile ? resolveSrc(props.bgmFile) : null;
+  const bgmVolume = props.bgmVolume !== undefined ? props.bgmVolume : 0.12;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: "#0f172a" }}>
+      {sceneSequences}
+      {audioMaster && <Audio src={audioMaster} />}
+      {bgmFile && <Audio src={bgmFile} volume={bgmVolume} />}
+    </AbsoluteFill>
+  );
+};
+
 const RemotionRoot = () => {
   return (
     <>
@@ -2683,14 +2764,32 @@ const RemotionRoot = () => {
         height={864}
         defaultProps={{}}
       />
-      {/* Generic pipeline-wide composition for the new 2-layer architecture.
-          Not tied to any one episode -- all content comes from `scenes`,
-          built by scripts/build_remotion_props.py. Render with:
-            npx remotion render src/index.tsx TwoLayerEpisode out.mp4 \
-              --props=/var/vf/episodes/<id>/remotion_props.json */}
+      {/* Primary VoxBuildOnStage Composition (Vox Upgrade Standard - Rule 125 Single Truth) */}
+      <Composition
+        id="VoxBuildOnStage"
+        component={VoxBuildOnEpisode}
+        durationInFrames={300}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{ scenes: [] }}
+        calculateMetadata={({ props }: { props: any }) => {
+          const fps = props.fps ? props.fps : 30;
+          const width = props.width ? props.width : 1920;
+          const height = props.height ? props.height : 1080;
+          const total = totalSceneFrames(props.scenes);
+          return {
+            durationInFrames: total > 0 ? total : 300,
+            fps,
+            width,
+            height,
+          };
+        }}
+      />
+      {/* TwoLayerEpisode rewired to VoxBuildOnEpisode for unified single-stream execution */}
       <Composition
         id="TwoLayerEpisode"
-        component={TwoLayerEpisode}
+        component={VoxBuildOnEpisode}
         durationInFrames={300}
         fps={30}
         width={1920}

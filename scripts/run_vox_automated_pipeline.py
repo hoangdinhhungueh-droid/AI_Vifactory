@@ -378,12 +378,6 @@ def run_automated_pipeline(
                 trigger_human_gate_2(ep_id)
             except Exception as he:
                 logger.warning(f"HG2 Telegram dispatch error: {he}")
-            if loc.exists() and loc != target_out:
-                for fname in files_to_sync:
-                    src_f = target_out / fname
-                    if src_f.exists():
-                        import shutil
-                        shutil.copy2(src_f, loc / fname)
 
         # Update brain_input.json
         for loc in sync_locations:
@@ -399,6 +393,7 @@ def run_automated_pipeline(
                     brain["audio_duration_sec"] = effective_duration
                     brain["audio_duration_frames"] = total_frames
                     brain["total_scenes"] = len(beats)
+                    brain["scenes"] = remotion_manifest.get("scenes", [])
                     brain["pipeline_version"] = "vox_docudrama_v2"
                     brain_p.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
                 except Exception as be:
