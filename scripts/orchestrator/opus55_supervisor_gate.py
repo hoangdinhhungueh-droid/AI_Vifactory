@@ -307,6 +307,17 @@ def audit_director_assets_in_flight(
             # Check for mutilated aspect ratio relics
             if re.search(r"(?<!\d):\s*(?:aspect\s*ratio|1\s*aspect\s*ratio|9\s*aspect\s*ratio)", p_str, re.IGNORECASE):
                 defects.append(f"[{section_name}:{k}] Mutilated ':aspect ratio' relic detected.")
+            # Check for fused artifact words resulting from regex numeric stripping
+            if re.search(r"\b(?:turneddegrees|Bottomis|Bottomreserved|Bottomkept|Bottomheld|Contemporaryurban|bottomsafezone|ABbill)\b", p_str):
+                defects.append(f"[{section_name}:{k}] Fused artifact word relic detected (e.g. 'turneddegrees'/'Bottomis'/'Bottomkept'/'ABbill').")
+            if re.search(r"\b[a-z]+degrees\b", p_str):
+                defects.append(f"[{section_name}:{k}] Missing space before 'degrees' detected.")
+            if re.search(r"\bcirca\s*\.", p_str):
+                defects.append(f"[{section_name}:{k}] Dangling 'circa.' without era anchor detected.")
+            if re.search(r"\bpure\s+flat\b|\bclothing\.pure\b|\bpink\.pure\b", p_str, re.IGNORECASE):
+                defects.append(f"[{section_name}:{k}] Dangling 'pure flat' fragment detected.")
+            if re.search(r"\bOaklands\b", p_str):
+                defects.append(f"[{section_name}:{k}] Missing apostrophe in 'Oakland\\'s'.")
             # Check EN market negative token contamination
             if mkt in ("EN", "US", "UK"):
                 if any(tok in p_str.lower() for tok in ["salaryman", "sha-sho", "hanko"]):
@@ -318,6 +329,21 @@ def audit_director_assets_in_flight(
             defects.append(f"[foregrounds:{fg_k}] Missing #FF00FF pure magenta chroma-key mandate.")
         if "1:1" not in p_str:
             defects.append(f"[foregrounds:{fg_k}] Missing 1:1 aspect ratio specification.")
+        if re.search(r"\[OPTICAL STYLE\][^\].]*\b(?:metric counter|mechanical counter|counter spinning)\b", p_str, re.IGNORECASE):
+            defects.append(f"[foregrounds:{fg_k}] Optical metric counter directive leaked into Layer 2 foreground prompt.")
+        if fg_k.startswith("fg_character_") or fg_k.startswith("char_"):
+            if "screen-right" in p_str.lower():
+                defects.append(f"[foregrounds:{fg_k}] Off-frame gaze direction 'screen-right' detected (must be 'screen-left').")
+            if re.search(r"\b(?:slapping|onto a counter|onto a table|onto a desk)\b", p_str, re.IGNORECASE):
+                defects.append(f"[foregrounds:{fg_k}] Furniture contact / isolation breach detected.")
+            if "top caption" in p_str.lower():
+                defects.append(f"[foregrounds:{fg_k}] 'top caption' collides with 'no caption' negative prompt.")
+            if re.search(r"\bor clothing\b", p_str, re.IGNORECASE):
+                defects.append(f"[foregrounds:{fg_k}] Garbled 'or clothing' token detected in clothing clause.")
+            if "in hand with one hand" in p_str.lower():
+                defects.append(f"[foregrounds:{fg_k}] Redundant 'in hand with one hand' detected.")
+            if re.search(r"\bSuperior Court\b", p_str, re.IGNORECASE):
+                defects.append(f"[foregrounds:{fg_k}] Text-bait 'Superior Court' detected in foreground character prompt.")
         is_evidence_prop = (
             fg_k.lower().startswith("fg_evidence_")
             or any(w in fg_k.lower() for w in ["docket", "invoice", "binder", "ledger", "memo", "book", "drive", "gavel", "order", "exhibit", "sheet", "notice", "affidavit", "recorder"])
@@ -348,6 +374,47 @@ def audit_director_assets_in_flight(
     )
     if len(scenes) > 5 and confidential_stamps == len(scenes):
         warnings.append("100% of scenes have static 'CONFIDENTIAL // BEAT' stamp badge.")
+
+    # 3. Semantic Prompt Uniqueness & Anti-Template Gate
+    def extract_core_prompt_body(p_str: str) -> str:
+        core = p_str.split("[STRICT NEGATIVE PROMPT]")[0]
+        core = re.sub(r"\[STYLE MANDATE[^\]]*\]\s*", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"\[MARKET & (?:ETHNIC|ENVIRONMENT) ANCHOR\]\s*[^\[]*", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"\[ERA ANCHOR\]\s*[^\[]*", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"\[ACTION & GAZE INVARIANT\]\s*[^\[]*", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"\[OBJECT FOCUS\]\s*[^\[]*", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"\[CAMERA & PERSPECTIVE\]\s*[^\[]*", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"\[LIGHTING & OPTICS\]\s*[^\[]*", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"\[OPTICAL STYLE\]\s*[^\[]*", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"16:9 widescreen cinematic editorial environment illustration[^.]*\.", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration[^.]*\.", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"\b(?:16:9|1:1)\s+aspect\s+ratio\b", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay", "", core, flags=re.IGNORECASE)
+        core = re.sub(r"\s+", " ", core).strip(" ,.")
+        return core
+
+    seen_bg_cores: Dict[str, str] = {}
+    for k, v in bgs.items():
+        core = extract_core_prompt_body(str(v))
+        if len(core) < 25:
+            defects.append(f"[backgrounds:{k}] Empty or template-only background prompt body (length={len(core)}).")
+        elif core in seen_bg_cores:
+            prior_k = seen_bg_cores[core]
+            defects.append(f"[backgrounds:{k}] Byte-identical prompt body to '{prior_k}'. Unfilled template leak.")
+        else:
+            seen_bg_cores[core] = k
+
+    seen_fg_cores: Dict[str, str] = {}
+    for k, v in fgs.items():
+        if k.startswith("fg_character_") or k.startswith("char_"):
+            core = extract_core_prompt_body(str(v))
+            if len(core) < 25:
+                defects.append(f"[foregrounds:{k}] Empty or template-only character prompt body (length={len(core)}).")
+            elif core in seen_fg_cores:
+                prior_k = seen_fg_cores[core]
+                defects.append(f"[foregrounds:{k}] Byte-identical prompt body to '{prior_k}'. Unfilled character template leak.")
+            else:
+                seen_fg_cores[core] = k
 
     verdict = "APPROVED" if not defects else "REVISE_REQUIRED"
     score = 9.6 if not defects and not warnings else (8.5 if not defects else max(2.0, 9.0 - len(defects) * 1.5))

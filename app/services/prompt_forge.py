@@ -158,7 +158,7 @@ def resolve_market_profile(market: str = "EN") -> dict:
         return {
             "market_code": "EN",
             "market_name": "English (US/UK/CA/AU/NZ)",
-            "fg_anchor": "Authentic Western individual, distinct bone structure, authentic contemporary Western professional attire, dynamic high-stakes body posture, intense emotive facial micro-expressions with commanding eyes, active physical interaction with narrative props, stylized expressive character acting",
+            "fg_anchor": "Authentic contemporary individual reflecting authentic metropolitan demographic diversity, distinct bone structure, authentic contemporary professional attire, dynamic high-stakes body posture, intense emotive facial micro-expressions with commanding eyes, active physical interaction with narrative props, stylized expressive character acting",
             "bg_anchor": "Authentic Western corporate or institutional headquarters setting, classic and modern architecture, high-contrast chiaroscuro lighting",
             "fg_negatives": "no passive blank stare, no lifeless neutral pose, no passport photo posture, no dead eyes",
             "bg_negatives": ""
@@ -230,7 +230,25 @@ def deduplicate_phrase_stutter(text: str) -> str:
             parts.append(cleaned[last_idx:])
             cleaned = "".join(parts)
 
-    # 4. Clean up dangling prepositions, commas, and whitespace
+    # 4. Deduplicate items inside [STRICT NEGATIVE PROMPT] to prevent token dilution
+    if "[STRICT NEGATIVE PROMPT]" in cleaned:
+        neg_split = cleaned.split("[STRICT NEGATIVE PROMPT]")
+        prefix = neg_split[0]
+        neg_tail = neg_split[1]
+        closing_m = re.search(r"The image contains no writing or readable digits of any kind in any language\.?", neg_tail, re.IGNORECASE)
+        closing_txt = f" {closing_m.group(0)}" if closing_m else ""
+        neg_body = neg_tail[:closing_m.start()] if closing_m else neg_tail
+        items = [item.strip(" ,.") for item in neg_body.split(",") if item.strip(" ,.")]
+        seen_neg = set()
+        deduped_items = []
+        for it in items:
+            it_key = re.sub(r"^\bno\s+", "", it, flags=re.IGNORECASE).strip().lower()
+            if it_key and it_key not in seen_neg:
+                seen_neg.add(it_key)
+                deduped_items.append(it)
+        cleaned = f"{prefix}[STRICT NEGATIVE PROMPT] {', '.join(deduped_items)}.{closing_txt}".strip()
+
+    # 5. Clean up dangling prepositions, commas, and whitespace
     cleaned = re.sub(r"\b(with|in|of|and|for|at)\s*([,.;])", r"\2", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r",\s*,+", ", ", cleaned)
     cleaned = re.sub(r"\s*,\s*", ", ", cleaned)
@@ -259,7 +277,7 @@ R137_BANNED = {
         r"\b(text|words?|letters?|caption|headline|title|label(?:ed)?|reads?|saying|"
         r"written|typography|font|logo|signage|numbers?|chart values)\b", re.IGNORECASE
     ),
-    "quoted": re.compile(r"[\"“”'‘’「」『』].+?[\"“”'‘’「」『』]"),
+    "quoted": re.compile(r"[\"“”「」『』].+?[\"“”「」『』]|(?<!\w)['‘’].+?['‘’](?!\w)"),
 }
 
 # Documents are allowed, but strictly as blank forensic templates
@@ -321,8 +339,8 @@ def lint_visual_prompt(prompt: str, strict: bool = False) -> LintResult:
     for raw_tok, mask_tok in aspect_masks.items():
         fixed = re.sub(rf"\b{re.escape(raw_tok)}\b", mask_tok, fixed, flags=re.IGNORECASE)
 
-    # Strip explicit currency amounts like "$942B", "$426 billion", "188 billion"
-    fixed = re.sub(r"[$¥₩€£]?\s*\b\d+(?:\.\d+)?\s*(?:billion|trillion|million|B|T|M|k|%)?\s*(?:dollars?|yen|won)?\b", "", fixed, flags=re.IGNORECASE)
+    # Strip explicit currency amounts like "$942B", "$426 billion", "188 billion" (use space to prevent word welding)
+    fixed = re.sub(r"[$¥₩€£]?\s*\b\d+(?:\.\d+)?\s*(?:billion|trillion|million|B|T|M|k|%)?\s*(?:dollars?|yen|won)?\b", " ", fixed, flags=re.IGNORECASE)
 
     # Restore allowlisted tokens
     for raw_tok, mask_tok in aspect_masks.items():
@@ -331,9 +349,6 @@ def lint_visual_prompt(prompt: str, strict: bool = False) -> LintResult:
     # Clean any dangling :aspect ratio or :1 aspect ratio relics without corrupting 1:1 or 16:9
     fixed = re.sub(r"(?<!\d),?\s*:\s*(?:aspect\s*ratio|\d+\s*aspect\s*ratio)", "", fixed, flags=re.IGNORECASE)
     
-    if DOC_NOUNS.search(fixed) and "unfilled template" not in fixed:
-        fixed = f"{fixed.rstrip('. ')}, {BLANK_TEMPLATE}"
-        
     # Ensure closing directive is present
     if R137_CLOSING_DIRECTIVE not in fixed:
         fixed = f"{fixed.rstrip('. ')}. {R137_CLOSING_DIRECTIVE}"
@@ -342,13 +357,88 @@ def lint_visual_prompt(prompt: str, strict: bool = False) -> LintResult:
     return LintResult(ok=ok, violations=violations, prompt=fixed, negative=NEGATIVE_R137)
 
 
+def resolve_era_anchor(key: str, p: str) -> str:
+    """Resolve era-specific timeline anchor dynamically to prevent generic placeholders (Rule 128)."""
+    combined = f"{key} {p}".lower()
+    m_decade = re.search(r"\b(19[5-9]0s|20[0-2]0s)\b", combined)
+    m_year = re.search(r"\b(19[5-9]\d|20[0-2]\d)\b", combined)
+    if m_decade:
+        return f"{m_decade.group(1)} era documentary aesthetic, authentic archival period atmosphere."
+    elif m_year:
+        return f"{m_year.group(1)} timeline, authentic period setting and documentary fidelity."
+    elif "historical" in combined or "archival" in combined:
+        return "Archival historical timeline, authentic period textures and documentary fidelity."
+    else:
+        return "Contemporary timeline, authentic modern documentary setting."
+
+
+def resolve_background_anchor(bg_key: str, p: str, market: str, prof: dict) -> tuple[str, str]:
+    """
+    Resolve setting-specific background architecture and atmosphere anchor (Rule 122 & Rule 128).
+    Prevents forcing 'corporate headquarters' on cathedrals, courthouses, outdoor scenes, or archives.
+    Accurately distinguishes exterior facades from interior chambers to prevent conflicting cues.
+    """
+    m = (market or "EN").upper().strip()
+    combined = f"{bg_key} {p}".lower()
+    base_anchor = prof.get("bg_anchor", "Authentic contemporary setting, classic and modern architecture, high-contrast chiaroscuro lighting")
+    base_negs = prof.get("bg_negatives", "")
+
+    is_exterior = any(k in combined for k in ["exterior", "dawn", "night", "skyline", "lake", "street", "plaza", "facade", "outdoor", "sidewalk", "entrance"])
+    is_interior = any(k in combined for k in ["interior", "courtroom", "gallery", "hallway", "corridor", "vault", "chambers", "bench", "nave", "rectory", "office"])
+
+    if any(k in combined for k in ["cathedral", "church", "chapel", "sanctuary", "parish", "rectory", "temple", "shrine"]):
+        if is_exterior and not is_interior:
+            anchor = "Authentic ecclesiastical exterior architecture, iconic cathedral facade with glass-and-timber structure, atmospheric exterior volumetric lighting, solemn, austere institutional stillness"
+        else:
+            anchor = "Authentic ecclesiastical interior architecture, sacred sanctuary or rectory corridor, atmospheric volumetric window lighting, solemn, austere institutional stillness"
+        return anchor, f", {base_negs}" if base_negs else ""
+    elif any(k in combined for k in ["federal", "courthouse", "courtroom", "chambers", "bench", "tribunal", "docket", "civic_center", "city_hall", "municipal", "dellums"]):
+        if is_exterior and not is_interior:
+            if any(k in combined for k in ["modern", "glass", "rotunda", "tower", "high-rise", "office"]):
+                anchor = "Authentic regional modern federal office tower and glass rotunda facade, civic plaza architecture, atmospheric exterior documentary lighting"
+            else:
+                anchor = "Authentic regional civic and judicial exterior architecture, monumental courthouse facade and civic plaza, atmospheric exterior documentary lighting"
+        else:
+            anchor = "Authentic judicial or municipal courtroom setting, formal wood paneling, judicial bench, institutional solemnity, raking documentary light"
+        return anchor, f", {base_negs}" if base_negs else ""
+    elif any(k in combined for k in ["lake", "skyline", "fog", "street", "plaza", "exterior", "downtown", "district", "harbor", "port", "bridge"]):
+        anchor = "Authentic regional civic or urban landscape, atmospheric exterior lighting with time-of-day fidelity, natural environmental textures and spatial depth"
+        return anchor, f", {base_negs}" if base_negs else ""
+    elif any(k in combined for k in ["archive", "records", "hallway", "corridor", "vault", "basement", "warehouse", "storage"]):
+        anchor = "Authentic institutional archive or facility, utilitarian architecture, dramatic corridor perspective, high-contrast noir shadows"
+        return anchor, f", {base_negs}" if base_negs else ""
+    else:
+        return base_anchor, f", {base_negs}" if base_negs else ""
+
+
 def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: bool = False, market: str = "EN", tokens: list | None = None) -> str:
     """Sanitize and enforce Rule 116 & Rule 137 standards for Layer 1 Background prompts with Market Architecture Conformance."""
     p = _sanitize_evidence_notes(prompt.strip())
-    p = re.sub(r"\[STYLE MANDATE\]\s*", "", p, flags=re.IGNORECASE)
+    # Strip previous style mandate without swallowing the core description
+    p = re.sub(r"\[STYLE MANDATE[^\]]*\]\s*", "", p, flags=re.IGNORECASE)
+    p = re.sub(
+        r"16:9 widescreen cinematic editorial environment illustration, stylized graphic novel background, atmospheric volumetric lighting, spatial textures, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay\.?,?\s*",
+        "",
+        p,
+        flags=re.IGNORECASE
+    )
     p = re.sub(r"\[MARKET & ENVIRONMENT ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[ERA ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[CAMERA & PERSPECTIVE\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[LIGHTING & OPTICS\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[OPTICAL STYLE\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[STRICT NEGATIVE PROMPT\]\s*.*$", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"The image contains no writing or readable digits of any kind in any language\.?", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*16:9 aspect ratio", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay", "", p, flags=re.IGNORECASE)
+
+    # String-join fixes & text-bait purging
+    p = re.sub(r"\b(?:Bottomkept|Bottomheld|Bottomreserved|Bottomis)\b", "bottom safe-zone", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bOaklands\b", "Oakland's", p)
+    p = re.sub(r",?\s*home of the U\.S\. Bankruptcy Court[^,.]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*Oakland Division[^,.]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bABbill\b", "legislative assembly bill", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bAB\s*\d+\b", "legislative assembly bill", p, flags=re.IGNORECASE)
 
     # Eradicate forbidden photorealistic tokens while protecting 'non-photorealistic'
     p = re.sub(r"\bnon-photorealistic\b", "__NON_PHOTO__", p, flags=re.IGNORECASE)
@@ -366,6 +456,9 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     # Rule 137: Sanitize visual prompt through linter
     lint_res = lint_visual_prompt(p, strict=False)
     p = lint_res.prompt.replace(R137_CLOSING_DIRECTIVE, "").rstrip(". ,")
+    p = re.sub(r"\bOaklands\b", "Oakland's", p)
+    p = re.sub(r"\bABbill\b", "legislative assembly bill", p, flags=re.IGNORECASE)
+    p = re.sub(r"\b(?:Bottomkept|Bottomheld|Bottomreserved|Bottomis)\b", "bottom safe-zone", p, flags=re.IGNORECASE)
 
     p = re.sub(r"(?<!\d),?\s*:\s*(?:aspect\s*ratio|\d+\s*aspect\s*ratio)", "", p, flags=re.IGNORECASE)
     if "16:9" not in p:
@@ -374,8 +467,8 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
         p = f"{p}, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay"
 
     prof = resolve_market_profile(market)
-    bg_anchor = prof["bg_anchor"]
-    bg_negs = f", {prof['bg_negatives']}" if prof["bg_negatives"] else ""
+    bg_anchor, bg_negs = resolve_background_anchor(bg_key, p, market, prof)
+    era_anchor = resolve_era_anchor(bg_key, p)
 
     tokens_clauses = []
     if tokens:
@@ -393,7 +486,7 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
 
     style_prefix = "[STYLE MANDATE] 16:9 widescreen cinematic editorial environment illustration, stylized graphic novel background, atmospheric volumetric lighting, spatial textures, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay."
 
-    p = f"{style_prefix} {p}{flow_str} [MARKET & ENVIRONMENT ANCHOR] {bg_anchor}. [ERA ANCHOR] Authentic period architecture and narrative atmosphere. [STRICT NEGATIVE PROMPT] no prominent foreground human figures, no photorealistic faces, {NEGATIVE_R137}, no borders, no ui elements, no split frame, no photographic raw camera{bg_negs}. {R137_CLOSING_DIRECTIVE}"
+    p = f"{style_prefix} {p}{flow_str} [MARKET & ENVIRONMENT ANCHOR] {bg_anchor}. [ERA ANCHOR] {era_anchor} [STRICT NEGATIVE PROMPT] no prominent foreground human figures, no photorealistic faces, {NEGATIVE_R137}, no borders, no ui elements, no split frame, no photographic raw camera{bg_negs}. {R137_CLOSING_DIRECTIVE}"
 
     return deduplicate_phrase_stutter(p)
 
@@ -451,15 +544,55 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
     # 2. English / Western / Global Markets (EN, US, UK, EU)
     if m in ["EN", "US", "UK"]:
         chroma_safe_negs = "no magenta, purple, fuchsia, or neon pink attire"
-        if any(k in combined for k in [
-            "analyst", "executive", "trader", "broker", "manager", "official", "lawyer",
-            "prosecutor", "judge", "director", "pm", "allocator", "financier", "banker"
-        ]):
+        if any(k in combined for k in ["survivor", "victim", "claimant", "witness"]):
             anchor = (
-                "Authentic contemporary Western professional or institutional analyst, natural American/Western facial features, "
-                "bespoke corporate noir business attire or institutional suit, dynamic investigative body posture, sharp focused expression"
+                "Authentic contemporary individual reflecting authentic metropolitan demographic diversity, natural facial features, "
+                "dignified everyday attire or modest contemporary civilian wardrobe, composed and restrained physical posture, "
+                "steady reflective or somber emotive micro-expression, generic fictionalized individual"
+            )
+            negs = f"{base_negs}, {chroma_safe_negs}, no aggressive pointing, no theatrical courtroom posturing, no sensationalized trauma signaling, no specific real-life likeness, no celebrity likeness"
+            return anchor, f", {negs}" if negs else ""
+        elif any(k in combined for k in ["legislator", "lawmaker", "senator", "representative", "parliamentarian", "congress"]):
+            anchor = (
+                "Authentic contemporary lawmaker or institutional legislator reflecting authentic metropolitan demographic diversity, natural facial features, "
+                "formal legislative committee business attire, dignified authoritative posture addressing statutory inquiry, "
+                "resolute professional expression, generic fictionalized public official"
+            )
+            leg_negs = f"{chroma_safe_negs}, no specific real-life likeness, no celebrity likeness"
+            negs = f"{base_negs}, {leg_negs}" if base_negs else leg_negs
+            return anchor, f", {negs}" if negs else ""
+        elif any(k in combined for k in ["bishop", "clergy", "priest", "pastor", "diocesan", "reverend", "cardinal"]):
+            anchor = (
+                "Authentic contemporary ecclesiastical figure, natural facial features, "
+                "formal clerical attire or ecclesiastical clergy vestments, reserved formal posture, "
+                "solemn guarded expression"
             )
             negs = f"{base_negs}, {chroma_safe_negs}" if base_negs else chroma_safe_negs
+            return anchor, f", {negs}" if negs else ""
+        elif any(k in combined for k in [
+            "attorney", "counsel", "litigator", "lawyer", "prosecutor", "judge",
+            "analyst", "executive", "trader", "broker", "manager", "official",
+            "director", "pm", "allocator", "financier", "banker"
+        ]):
+            if any(k in combined for k in ["judge", "magistrate"]):
+                anchor = (
+                    "Authentic contemporary judicial professional reflecting authentic metropolitan demographic diversity, natural facial features, "
+                    "formal dark judicial attire, disciplined and composed body posture, solemn reserved expression, generic fictionalized official"
+                )
+                lawyer_negs = f"{chroma_safe_negs}, no theatrical courtroom posturing, no sensationalized posturing, no aggressive pointing, no specific real-life likeness, no celebrity likeness"
+            elif any(k in combined for k in ["attorney", "counsel", "litigator", "lawyer"]):
+                anchor = (
+                    "Authentic contemporary plaintiffs' legal counsel or institutional litigator reflecting authentic metropolitan demographic diversity, natural facial features, "
+                    "understated charcoal or dark navy professional attire, disciplined and composed body posture, sharp focused expression, generic fictionalized professional"
+                )
+                lawyer_negs = f"{chroma_safe_negs}, no judicial robes, no theatrical courtroom posturing, no sensationalized posturing, no aggressive pointing, no specific real-life likeness, no celebrity likeness"
+            else:
+                anchor = (
+                    "Authentic contemporary professional or institutional analyst reflecting authentic metropolitan demographic diversity, natural facial features, "
+                    "bespoke corporate noir business attire or institutional suit, dynamic investigative body posture, sharp focused expression"
+                )
+                lawyer_negs = f"{chroma_safe_negs}, no theatrical courtroom posturing, no sensationalized posturing"
+            negs = f"{base_negs}, {lawyer_negs}" if base_negs else lawyer_negs
             return anchor, f", {negs}" if negs else ""
         elif any(k in combined for k in [
             "worker", "laborer", "engineer", "electrician", "technician", "operator", "infrastructure"
@@ -551,10 +684,29 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     p = re.sub(r"positioned strictly on the (?:left|right),?\s*", "centered in frame, ", p, flags=re.IGNORECASE)
     p = re.sub(r"on the (?:far\s+)?(?:left|right)(?:-hand)? side of the frame,?\s*", "centered in frame, ", p, flags=re.IGNORECASE)
 
-    p = re.sub(r"\[STYLE MANDATE\]\s*", "", p, flags=re.IGNORECASE)
+    # Strip previous style mandate without swallowing the core character description
+    p = re.sub(r"\[STYLE MANDATE[^\]]*\]\s*", "", p, flags=re.IGNORECASE)
+    p = re.sub(
+        r"Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich (?:nuanced colors|tactile paper and material textures), 1:1 aspect ratio, (?:waist-up three-quarter angle action framing, active hands and upper figure visible within frame|centered investigative artifact, crisp paper-cutout sticker aesthetic), isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames\.?,?\s*",
+        "",
+        p,
+        flags=re.IGNORECASE
+    )
+    p = re.sub(r"\[ACTION & GAZE INVARIANT\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[MARKET & ETHNIC ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[ERA ANCHOR\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[OBJECT FOCUS\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[CAMERA & PERSPECTIVE\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[LIGHTING & OPTICS\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[OPTICAL STYLE\]\s*[^\[]*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[STRICT NEGATIVE PROMPT\]\s*.*$", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"The image contains no writing or readable digits of any kind in any language\.?", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*actively holding up documentary evidence prop with one hand while (?:pointing index finger at critical detail|presenting critical detail)", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*composed posture holding a folded personal document [^,]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*solemn reserved posture [^,]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*addressing the committee assembly [^,]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*(?:dynamic high-stakes body posture|dignified composed posture|solemn restrained posture)[^,]*, body turned 20 degrees toward active evidence zone", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*(?:intense facial micro-expressions|composed emotive micro-expressions|solemn guarded micro-expressions)[^,.]*", "", p, flags=re.IGNORECASE)
     p = re.sub(
         r"(?:Non-photorealistic\s+2D\s+)?Stylized\s+Editorial(?:\s+Graphic\s+Novel)?(?:\s+Digital)?(?:\s+Illustration)?(?:\s+of)?\s*,?\s*",
         "",
@@ -569,10 +721,72 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     # Strip redundant chroma and isolation clauses from core description to prevent stutter
     p = re.sub(r",?\s*(?:isolated\s+on(?:\s+a)?(?:\s+solid)?(?:\s+flat)?\s*(?:#FF00FF)?(?:\s+pure)?(?:\s+magenta)?(?:\s+background)?)", "", p, flags=re.IGNORECASE)
     p = re.sub(r",?\s*#FF00FF[^,]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\[OPTICAL STYLE\][^\].]*\b(?:metric counter|mechanical counter|counter spinning|counter)\b[^.]*\.?", "", p, flags=re.IGNORECASE)
     p = re.sub(r"(?<!\d),?\s*:\s*(?:aspect\s*ratio|\d+\s*aspect\s*ratio)", "", p, flags=re.IGNORECASE)
     p = re.sub(r",?\s*(?:1:1|16:9|21:9|32:9)\s+aspect\s+ratio", "", p, flags=re.IGNORECASE)
     p = re.sub(r",?\s*(?:isolated\s+on(?:\s+a)?|\bon\b|\bwith\b|\bat\b)\s*$", "", p.strip(), flags=re.IGNORECASE)
     p = p.rstrip(",. ").strip()
+    p = re.sub(r"\bclothing\s*[,.]\s*", "", p, flags=re.IGNORECASE)
+
+    # String-join, chroma artifact, isolation breach, caption collision, and gaze cleaners
+    p = re.sub(r"(?:pink|clothing)\.pure flat", "clothing.", p, flags=re.IGNORECASE)
+    p = re.sub(r"\b(?:pure\s+flat|flat\s+pure)\b\.?", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\b(?:Bottomkept|Bottomheld|Bottomreserved|Bottomis)\b", "bottom safe-zone", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bOaklands\b", "Oakland's", p)
+    p = re.sub(r"\bABbill\b", "legislative assembly bill", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bAB\s*\d+\b", "legislative assembly bill", p, flags=re.IGNORECASE)
+    # Isolation breach & table contact fixes (preserve pure #FF00FF cutout)
+    p = re.sub(r"\bslapping a stack onto a counter\b", "holding a bound case-file portfolio in both hands", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bonto a (?:counter|table|desk|podium)\b", "in hand", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bslapping\b", "firmly presenting", p, flags=re.IGNORECASE)
+    # Caption collide with negative prompt fix & anti-pointing gesture guard
+    p = re.sub(r"\bpointing\s+at\s+(?:the\s+)?top\s+(?:caption|document\s+page|page)\b", "resting two fingers on the top page (blank surface, no typography)", p, flags=re.IGNORECASE)
+    p = re.sub(r"\btop caption\b", "top page", p, flags=re.IGNORECASE)
+
+    # Text-bait, named legal document, and typography trigger purging (Rule 137 & Opus 5.5 Gate)
+    p = re.sub(r"(?:typed\s+in\s+the\s+caption|with\s+the\s+caption|each\s+caption\s+reading|caption\s+reading)\s*[^,.]*(?:\.\s*[^,.]*)?", "with official blank header block (no glyphs, no typography)", p, flags=re.IGNORECASE)
+    p = re.sub(r"with\s+(?:spine\s+)?label\s+[^,.]*", "with blank spine label insert (no typography)", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bheadline(?:\s+reading)?\s*[^,.]*", "abstract banner graphic without typography", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bsignage(?:\s+reading)?\s*[^,.]*", "civic plaque texture without typography", p, flags=re.IGNORECASE)
+
+    # Printed documents, court orders, and legislative bills
+    p = re.sub(r"holding\s+[^,.]*?aloft\s+in\s+one\s+hand\s+and\s+pointing\s+at\s+[^,.]*?with\s+the\s+other(?:,\s*gaze\s+directed\s+down\s+at\s+the\s+page)?", "holding a bound legislative bill document at chest height (blank pages with illegible abstract line-marks only, no glyphs, no typography) in one hand while resting a hand flat on the open page, gaze directed down at the page", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bindicating\s+a\s+highlighted\s+abstract\s+block\b", "resting a hand flat on the open page", p, flags=re.IGNORECASE)
+    p = re.sub(r"\btext\s+aloft\b", "document at chest height", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bprinted\s+California\s+Assembly\s+Bill(?:\s+No\.)?(?:\s+chaptered)?", "Official legislative bill document (blank template with illegible abstract line-marks only, no typography)", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bprinted\s+order\s+of\s+dismissal\b", "bound order of dismissal (blank legal paper with illegible abstract line-marks only, no typography)", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bprinted\s+on\s+cream\s+ledger\s+paper\b", "rendered on cream ledger paper texture (unlabeled abstract geometric bars, no typography, no digits)", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bprinted\s+(?:bill\s+text|document\s+text|order|bill|filing|statute|text)\b", "bound document", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bprinted\b", "bound", p, flags=re.IGNORECASE)
+
+    # Marked passage and labeled
+    p = re.sub(r"\b(?:highlighted\s+statute\s+of\s+limitations\s+section|highlighted\s+document\s+section|marked\s+passage)\b", "highlighted abstract block", p, flags=re.IGNORECASE)
+    p = re.sub(r"\b(?:tall\s+bar\s+)?labeled,?", "with abstract shading,", p, flags=re.IGNORECASE)
+    p = re.sub(r"\blabeled\b", "abstractly shaded", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bcase\s+number\s*-\s*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\ba\s+bold\s+[A-Z\s]+\s+clerk\s+stamp\b", "an embossed circular court clerk seal stamp", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bNo\.\s*", "", p)
+    p = re.sub(r"\bDoe\s+v\.\s+[^,.]*", "unnamed civil lawsuit filing", p, flags=re.IGNORECASE)
+    p = re.sub(r"\btop document page\b", "top document page (blank surface, no typography)", p, flags=re.IGNORECASE)
+
+    # Text-bait and named legal document removal with grammatical consistency
+    p = re.sub(r"\ba\s+(?:confidential\s+)?proof\s+of\s+claim\s+form\b", "a folded sheaf of legal claim papers", p, flags=re.IGNORECASE)
+    p = re.sub(r"\b(?:confidential\s+)?proof\s+of\s+claim\s+form\b", "folded sheaf of legal claim papers", p, flags=re.IGNORECASE)
+    p = re.sub(r"\ba\s+folded\s+legal\s+claim\s+papers\b", "a folded sheaf of legal claim papers", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bAlameda County Superior Court civil complaints\b", "thick stack of bound legal filings", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bSuperior Court civil complaints\b", "bound legal filings", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bin hand with one hand\b", "in one hand", p, flags=re.IGNORECASE)
+
+    # Prop-text mitigation: ensure legal/documentary props specify illegible abstract markings
+    p = re.sub(r"\b(folded sheaf of legal claim papers|bound legal filings|legislative assembly bill folio|bound case-file portfolio|bound order of dismissal)(?!\s*\(blank legal papers)\b", r"\1 (blank legal papers with illegible abstract line-marks only, no glyphs, no typography)", p, flags=re.IGNORECASE)
+    # Gaze direction correction: screen-right points out of frame on center-right overlays, flip to screen-left
+    p = re.sub(r"\bgaze\s+locked\s+screen-left\s+on\s+(?:the\s+stack|documents?|filings?)\b", "gaze directed screen-left toward the judicial bench", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bgaze directed screen-right\b", "gaze directed screen-left toward evidence zone", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bscreen-right\b", "screen-left", p, flags=re.IGNORECASE)
+    # Clothing color guardrail: ensure 'or pink clothing' is never garbled into 'or clothing'
+    p = re.sub(r"\bor clothing\b", "or pink clothing", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*no magenta, purple, fuchsia, or (?:neon\s+)?(?:pink|clothing|attire)\.?,?\s*", " ", p, flags=re.IGNORECASE)
+    p = re.sub(r"(?:^|[\s,])clothing\s*[,.]\s*", " ", p, flags=re.IGNORECASE)
 
     prof = resolve_market_profile(market)
     fg_anchor, fg_negs = resolve_character_anchor(fg_key, p, market, prof)
@@ -629,14 +843,18 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     # Rule 137: Sanitize visual prompt through linter
     lint_res = lint_visual_prompt(p, strict=False)
     p = lint_res.prompt.replace(R137_CLOSING_DIRECTIVE, "").rstrip(". ,")
+    p = re.sub(r"\bOaklands\b", "Oakland's", p)
+    p = re.sub(r"\bABbill\b", "legislative assembly bill", p, flags=re.IGNORECASE)
+    p = re.sub(r"\b(?:Bottomkept|Bottomheld|Bottomreserved|Bottomis)\b", "bottom safe-zone", p, flags=re.IGNORECASE)
     p = re.sub(r"(?<!\d),?\s*:\s*(?:aspect\s*ratio|\d+\s*aspect\s*ratio)", "", p, flags=re.IGNORECASE)
     p = re.sub(r",?\s*(?:1:1|16:9|21:9|32:9)\s+aspect\s+ratio", "", p, flags=re.IGNORECASE)
 
     if is_object:
         p = re.sub(r"\bFull-body\s+", "", p, flags=re.IGNORECASE)
         p = re.sub(r"\s*figure\s+in\s+authentic\s+(?:period|professional)\s+attire", "", p, flags=re.IGNORECASE)
+        era_anchor = resolve_era_anchor(fg_key, p)
         style_prefix = "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, clean bold ink linework, cel-shading, rich tactile paper and material textures, 1:1 aspect ratio, centered investigative artifact, crisp paper-cutout sticker aesthetic, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
-        p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with blank unfilled fields. [ERA ANCHOR] Authentic period materials, forensic case evidence. [STRICT NEGATIVE PROMPT] no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no borders, no extraneous ui elements, no text, no numbers, no charts, no digits, no labels, no typography, {NEGATIVE_R137}. {R137_CLOSING_DIRECTIVE}"
+        p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with blank unfilled fields. [ERA ANCHOR] {era_anchor} [STRICT NEGATIVE PROMPT] no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no borders, no extraneous ui elements, no text, no numbers, no charts, no digits, no labels, no typography, {NEGATIVE_R137}. {R137_CLOSING_DIRECTIVE}"
     else:
         # Vox Actor-Prop Invariant: Subject + Action Verb + Physical Prop + Gaze Target
         action_verbs = [
@@ -646,10 +864,38 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
             "reviewing", "reaching", "gesturing"
         ]
         has_action_verb = any(re.search(rf"\b{v}\b", p, re.IGNORECASE) for v in action_verbs)
-        action_clause = (
-            "" if has_action_verb else
-            ", actively holding up documentary evidence prop with one hand while pointing index finger at critical detail"
-        )
+        comb_fg = f"{fg_key} {p}".lower()
+        if has_action_verb:
+            action_clause = ""
+        elif any(k in comb_fg for k in ["survivor", "victim", "claimant"]):
+            action_clause = ", composed posture holding a folded personal document close with steady restrained hands"
+        elif any(k in comb_fg for k in ["bishop", "clergy", "priest", "pastor"]):
+            action_clause = ", solemn reserved posture with hands folded before them in deliberate silence"
+        elif any(k in comb_fg for k in ["legislator", "lawmaker", "senator", "representative"]):
+            action_clause = ", addressing the committee assembly with an open palm gesture over legislative folio"
+        else:
+            action_clause = ", actively holding up documentary evidence prop with one hand while presenting critical detail"
+
+        if any(w in p.lower() for w in ["turned", "turn", "facing", "angled", "three-quarter"]):
+            turn_clause = ""
+        elif any(k in comb_fg for k in ["survivor", "victim", "claimant"]):
+            turn_clause = ", dignified composed posture, three-quarter angle framing"
+        elif any(k in comb_fg for k in ["bishop", "clergy", "priest"]):
+            turn_clause = ", solemn restrained posture, three-quarter angle framing"
+        else:
+            turn_clause = ", dynamic high-stakes body posture, dramatic physical posing, body turned 20 degrees toward active evidence zone"
+
+        if any(k in comb_fg for k in ["survivor", "victim", "claimant"]):
+            gaze_clause = "composed emotive micro-expressions with steady reflective gaze"
+            action_gaze_tag = "[ACTION & GAZE INVARIANT] Subject exhibiting dignified restraint, steady solemn gaze, holding personal record."
+        elif any(k in comb_fg for k in ["bishop", "clergy", "priest"]):
+            gaze_clause = "solemn guarded micro-expressions with restrained steady gaze"
+            action_gaze_tag = "[ACTION & GAZE INVARIANT] Subject exhibiting solemn formal composure with guarded downward gaze."
+        else:
+            gaze_clause = "intense facial micro-expressions with sharp focused gaze locked onto evidence prop"
+            action_gaze_tag = "[ACTION & GAZE INVARIANT] Subject actively manipulating physical documentary prop with clear hand gesture and directional gaze."
+
+        era_anchor = resolve_era_anchor(fg_key, p)
         style_prefix = (
             "[STYLE MANDATE] Non-photorealistic 2D Stylized Editorial Graphic Novel Digital Illustration, "
             "clean bold ink linework, cel-shading, rich nuanced colors, 1:1 aspect ratio, "
@@ -657,12 +903,11 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
             "isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames."
         )
         p = (
-            f"{style_prefix} {p}{action_clause}{fg_flow_str}, "
-            f"dynamic high-stakes body posture, dramatic physical posing, body turned 20 degrees toward active evidence zone, "
-            f"intense facial micro-expressions with sharp focused gaze locked onto evidence prop. "
-            f"[ACTION & GAZE INVARIANT] Subject actively manipulating physical documentary prop with clear hand gesture and directional gaze. "
+            f"{style_prefix} {p}{action_clause}{fg_flow_str}{turn_clause}, "
+            f"{gaze_clause}. "
+            f"{action_gaze_tag} "
             f"[MARKET & ETHNIC ANCHOR] {fg_anchor}. "
-            f"[ERA ANCHOR] Authentic professional attire, stylized expressive character acting, active props interaction. "
+            f"[ERA ANCHOR] {era_anchor} "
             f"[STRICT NEGATIVE PROMPT] no photograph, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, "
             f"no halo, no gradients, no cropped head, no cropped hands, no cutoffs, no borders, no ui elements, no text, no numbers, no charts, no labels, no typography, "
             f"no static standing figure with arms at sides, no empty passive hands, {NEGATIVE_R137}{fg_negs}. {R137_CLOSING_DIRECTIVE}"
@@ -670,9 +915,11 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
 
     p = deduplicate_phrase_stutter(p)
     p = re.sub(r",\s*\.\s*", ", ", p)
-    p = re.sub(r"\s*,\s*,\s*", ", ", p)
-    p = re.sub(r"\.\s*\.\s*", ". ", p)
     p = re.sub(r"(?<!\d),?\s*:\s*(?:aspect\s*ratio|\d+\s*aspect\s*ratio)", "", p, flags=re.IGNORECASE)
+    # Scrub fused words resulting from upstream numeric stripping
+    p = re.sub(r"\bturned\s*degrees\b", "turned 20 degrees", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bturneddegrees\b", "turned 20 degrees", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bcirca\s*\.", "circa contemporary era.", p, flags=re.IGNORECASE)
 
     matches = list(re.finditer(r"Stylized\s+editorial", p, flags=re.IGNORECASE))
     if len(matches) > 1:
