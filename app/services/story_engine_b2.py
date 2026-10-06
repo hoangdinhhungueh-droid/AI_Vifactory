@@ -42,20 +42,23 @@ MARKET_SYNONYMS = {"JA": "JP", "KO": "KR"}
 KNOWN_MARKETS = SUPPORTED_MARKETS  # Deprecated alias: use SUPPORTED_MARKETS
 ACT_PATTERN = re.compile(r'(=== ACT [I|V|X]+ ===.*?)(?=(=== ACT [I|V|X]+ ===|\Z))', re.DOTALL)
 
-VIETNAMESE_EXCLUSIVE_CHARS = re.compile(
-    r'[đĐ'
-    r'ơƠưƯớỚứỨờỜừỪởỞửỬỡỠữỮợỢựỰ'
-    r'ăĂắẮằẰẳẲẵẴặẶ'
-    r'ấẤầẦẩẨẫẪậẬếẾềỀểỂễỄệỆốỐồỒổỔỗỖộỘ'
-    r'ảẢẻẺỉỈỏỎủỦỷỶ'
-    r'ạẠẹẸịỊọỌụỤỵỴ'
-    r'ĩĨũŨỹỸỳỲ]',
-    re.UNICODE
+# Rule 128 Generic Market Locale Whitelist Patterns:
+# Replaces ad-hoc language blacklists with culture-neutral unicode validation.
+_LATIN_STANDARD_CHARS = re.compile(
+    r"^[\w\s\d.,!?'\"()/:;—–\-%$&#@+*~<>\[\]{}^_=|\u00A0-\u00FF\u2010-\u2027\u2030-\u205E\u20AC\u2018-\u201D\u2026]*$",
+    re.UNICODE,
 )
-VIETNAMESE_STOPWORDS = re.compile(
-    r'\b(và|của|trong|cho|với|tại|từ|bởi|những|các|một|được|bị|đã|đang|sẽ|không|chưa|về|lại|ra|vào|lên|xuống|này|đó|kia)\b',
-    re.IGNORECASE
+_OUT_OF_LOCALE_CHARS = re.compile(
+    r"[\u1EA0-\u1EF9"                                    # Latin Extended Additional (Vietnamese diacritics)
+    r"\u0102\u0103\u0110\u0111\u01A0\u01A1\u01AF\u01B0"  # Latin Extended-A/B (ă, đ, ơ, ư)
+    r"\u0400-\u04FF"                                    # Cyrillic
+    r"\u0600-\u06FF"                                    # Arabic
+    r"\u0E00-\u0E7F]",                                  # Thai
+    re.UNICODE,
 )
+_CJK_CHARS = re.compile(r"[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF]", re.UNICODE)
+_HANGUL_CHARS = re.compile(r"[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]", re.UNICODE)
+_KANA_CHARS = re.compile(r"[\u3040-\u309F\u30A0-\u30FF\u31F0-\u31FF\uFF65-\uFF9F]", re.UNICODE)
 
 
 def normalize_market(market: str) -> str:
@@ -86,49 +89,93 @@ def _strip_market_prefix(text: str) -> str:
     return re.sub(r"^\[(?:KR|JP|JA|KO|EN)\]\s*", "", text).strip()
 
 
-def _is_vietnamese_text(text: str) -> bool:
-    """Accurately detects Vietnamese operator text without false positives
-    on Latin-1 loanwords (e.g. Beyoncé, Nestlé, José, cliché, São Paulo, Café).
+def is_valid_market_text(text: str, market: str) -> bool:
+    """Validates that a topic/text string conforms to the character set of the canonical market (Rule 128).
+    Supports only the 3 canonical production markets: EN, JP, KR.
+    Strictly forbids out-of-locale scripts (e.g. Vietnamese diacritics, Cyrillic, Thai, Arabic).
     """
-    if not text:
+    if not text or not text.strip():
         return False
-    return bool(VIETNAMESE_EXCLUSIVE_CHARS.search(text) or VIETNAMESE_STOPWORDS.search(text))
+    clean = text.strip()
+    m = normalize_market(market)
+
+    if _OUT_OF_LOCALE_CHARS.search(clean):
+        return False
+
+    if m == "EN":
+        if _CJK_CHARS.search(clean) or _HANGUL_CHARS.search(clean):
+            return False
+        if not re.search(r"[A-Za-z]", clean):
+            return False
+        return bool(_LATIN_STANDARD_CHARS.match(clean))
+    elif m == "JP":
+        if _HANGUL_CHARS.search(clean):
+            return False
+        return bool(re.search(r"[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFFA-Za-z]", clean))
+    elif m == "KR":
+        if _KANA_CHARS.search(clean):
+            return False
+        return bool(re.search(r"[\uAC00-\uD7AF\u1100-\u11FF\u4E00-\u9FFFA-Za-z]", clean))
+    return False
 
 
-def _resolve_canonical_topic(raw_topic: str, native_candidate: str = "", task_id: str = "") -> str:
-    """Canonical Topic Precedence and Fail-Fast Guard (Rule 128).
+def _resolve_canonical_topic(
+    raw_topic: str,
+    native_candidate: str = "",
+    task_id: str = "",
+    market: str = "EN",
+) -> str:
+    """Canonical Topic Precedence and Market Locale Whitelist Guard (Rule 128 & Rule 132).
+    Enforces strict locale conformance for the 3 canonical production markets (EN, JP, KR).
+
     Precedence hierarchy:
-      1. If clean_topic contains Vietnamese operator text:
-         - If native_candidate exists and is non-Vietnamese: return clean_native.
-         - Else: raise ValueError (fail-fast, strictly forbids Vietnamese operator text).
-      2. If clean_topic exists (non-Vietnamese):
-         - return clean_topic (clean editorial topic title has primary precedence).
-      3. If native_candidate exists (non-Vietnamese):
-         - return clean_native (fallback to native keyword/subject).
-      4. If task_id exists:
-         - return task_id.strip() (deterministic fallback to unique task identifier).
-      5. If all sources are empty:
-         - raise ValueError (fail-fast, refusing ambiguous unidentifiable episodes).
+      1. If clean_topic exists:
+         - If valid for market: return clean_topic (editorial topic title has primary precedence).
+         - If out-of-locale:
+             - If native_candidate exists and is valid for market:
+                 logger.info(
+                     f"[story_engine] Sanitized out-of-locale topic '{clean_topic}' -> native '{clean_native}' for market '{mkt}'"
+                 )
+                 return clean_native
+             - Else:
+                 raise ValueError(
+                     f"Strict Contract Violation: Detected out-of-locale topic '{raw_topic}' "
+                     f"with no valid native candidate for market '{mkt}'. Pipeline requires valid market topic."
+                 )
+      2. If clean_topic is empty:
+         - If native_candidate exists and is valid for market:
+             return clean_native
+         - If task_id exists and task_id.strip():
+             return task_id.strip()
+         - Else:
+             raise ValueError(
+                 "Strict Contract Violation: Unable to resolve topic. raw_topic, native_candidate, and task_id are all empty."
+             )
     """
+    mkt = normalize_market(market)
     clean_topic = _strip_market_prefix(raw_topic or "")
     clean_native = _strip_market_prefix(native_candidate or "")
 
-    if _is_vietnamese_text(clean_topic):
-        if clean_native and not _is_vietnamese_text(clean_native):
-            logger.info(f"[story_engine] Sanitized Vietnamese operator topic '{clean_topic}' -> native '{clean_native}'")
+    if clean_topic:
+        if is_valid_market_text(clean_topic, mkt):
+            return clean_topic
+        if clean_native and is_valid_market_text(clean_native, mkt):
+            logger.info(
+                f"[story_engine] Sanitized out-of-locale topic '{clean_topic}' -> native '{clean_native}' for market '{mkt}'"
+            )
             return clean_native
         raise ValueError(
-            f"Strict Contract Violation: Detected Vietnamese operator topic '{raw_topic}' "
-            f"with no valid non-Vietnamese native search key. Pipeline requires native topic for canonical markets."
+            f"Strict Contract Violation: Detected out-of-locale topic '{raw_topic}' "
+            f"with no valid native candidate for market '{mkt}'. Pipeline requires valid market topic."
         )
 
-    if clean_topic:
-        return clean_topic
-    if clean_native and not _is_vietnamese_text(clean_native):
+    if clean_native and is_valid_market_text(clean_native, mkt):
         return clean_native
     if task_id and task_id.strip():
         return task_id.strip()
-    raise ValueError("Strict Contract Violation: Unable to resolve topic. raw_topic, native_candidate, and task_id are all empty.")
+    raise ValueError(
+        "Strict Contract Violation: Unable to resolve topic. raw_topic, native_candidate, and task_id are all empty."
+    )
 
 
 def _reconcile_spoken_script(sentences: list[dict], raw_script_text: str = "", market: str = "EN") -> str:
@@ -306,7 +353,7 @@ def load_task_metadata(task_id: str) -> dict:
                 raw_name = _get_txt(props.get("Name", {}))
                 mkt_raw = props.get("Market", {}).get("select", {}).get("name", "EN")
                 mkt = validate_market_supported(mkt_raw)
-                final_topic = _resolve_canonical_topic(raw_name, search_key, task_id)
+                final_topic = _resolve_canonical_topic(raw_name, search_key, task_id, market=mkt)
                 return {
                     "task_id": task_id,
                     "market": mkt,
@@ -318,7 +365,7 @@ def load_task_metadata(task_id: str) -> dict:
                     "page_id": r.get("id")
                 }
     except Exception as e:
-        if "Unsupported market" in str(e) or "Detected Vietnamese" in str(e):
+        if "Unsupported market" in str(e) or "Strict Contract Violation" in str(e) or "out-of-locale" in str(e):
             raise
         logger.warning(f"[story_engine] Error querying Notion Story Library for {task_id}: {e}")
 
@@ -330,7 +377,7 @@ def load_task_metadata(task_id: str) -> dict:
     mkt = norm_head if norm_head in SUPPORTED_MARKETS else "EN"
     body = [p for p in parts[1:] if not re.fullmatch(r"ep\d+", p, re.I)]
     raw_name = "_".join(body) if body else task_id
-    final_topic = _resolve_canonical_topic(raw_name.replace("_", " ").title(), "", task_id)
+    final_topic = _resolve_canonical_topic(raw_name.replace("_", " ").title(), "", task_id, market=mkt)
     theme, safety_label, treatment_note = detect_safety_and_theme(final_topic, mkt)
     
     return {
@@ -642,8 +689,8 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
     mkt = validate_market_supported(meta.get("market", "EN"))
 
     # Rule 128 & Rule 446 Native-First Architecture:
-    # 3 Canonical Markets only (EN, JP, KR). Vietnamese operator titles (topic_name_vi)
-    # are exclusively for Telegram Human Gate 1 review and MUST NEVER leak into the script or prompts!
+    # 3 Canonical Markets only (EN, JP, KR). Out-of-locale operator titles
+    # MUST NEVER leak into the script or prompts!
     native_candidate = (
         meta.get("search_specific_keyword")
         or meta.get("search_key")
@@ -652,7 +699,7 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
         or ""
     )
     raw_topic = meta.get("topic") or meta.get("title_a") or ""
-    topic = _resolve_canonical_topic(raw_topic, native_candidate, task_id)
+    topic = _resolve_canonical_topic(raw_topic, native_candidate, task_id, market=mkt)
     viral_angle = meta.get("specific_viral_angle") or ""
     niche_brief = meta.get("niche_brief") or meta.get("niche_angle_brief") or ""
     story_arcs = meta.get("story_arcs") or meta.get("story_direction_5_arcs") or ""

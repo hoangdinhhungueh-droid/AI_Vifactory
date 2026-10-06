@@ -146,6 +146,7 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 | **System Health & Report** (`make health`, `make report`) | Giám sát 7 trục đa nền tảng (DB, Redis, RAM, Workers, Ghost Code), xuất Markdown & HTML Dashboard | `scripts/health-check.py`, `system_health_reporter.py` | Rule 119, 125, Zero-Mock Telemetry |
 | **Vibe Memory Governance** (`make memory`) | Kiểm định tính toàn vẹn bộ nhớ dài hạn dự án (`ROADMAP.md`, `CHANGELOG.md`, `specs/`), ngăn ngừa Amnesia | `scripts/orchestrator/memory_governor.py`, `.agents/hooks.json` | Rule 124 (Memory Anchoring & Atomic Commit) |
 | **Teamwork Pipeline** (`/vf-pipeline-teamwork`) | Hội Đồng Multi-Agent Harness (Architect, Builder, QA Test Harness, Adversarial Auditor) + **Opus 5.5 Anti-Bloat Supervisory Gate** ($\le 10,000$ in / $\le 5,000$ out) | Skill `vf-pipeline-teamwork` & `scripts/orchestrator/` | Rule 118, 119, 121, 124, 125, 126, 127, 128, 129, 134, 138, 139 |
+| **SDLC Enterprise Delivery** (`/sdlc-enterprise-reporter`) | Enterprise Delivery Engine 14 giai đoạn, 8-Pha Verification, 2-Job CI/CD, Snapshot Rollback, RTM, Playwright Audit | Skill `sdlc-enterprise-reporter` | Rule 121, 126, Zero-Hardcoding, Memory Governance |
 
 ---
 
