@@ -160,8 +160,6 @@ def run_automated_pipeline(
     if not resolved_topic:
         if grounding_data.get("topic"):
             resolved_topic = grounding_data["topic"]
-        elif ep_id == "EN_EP0008_oakland_plan_rejected":
-            resolved_topic = "Federal Judge Rejects Oakland Diocese Bankruptcy Plan"
         else:
             resolved_topic = slug.replace("_", " ").title()
 
@@ -180,37 +178,13 @@ def run_automated_pipeline(
         resolved_script = Path(script_file).read_text(encoding="utf-8").strip()
     elif (target_out / "story.txt").exists():
         resolved_script = (target_out / "story.txt").read_text(encoding="utf-8").strip()
-    elif ep_id == "EN_EP0008_oakland_plan_rejected":
-        # Production Fern Docudrama Script anchored in 100% verified claims from grounding_intel.json
-        resolved_script = (
-            "October 5, 2026. A federal bankruptcy courtroom in Oakland, California. "
-            "Judge William Lafferty signs an order rejecting the Catholic Diocese of Oakland's reorganization plan, "
-            "freezing a 143 million dollar survivor trust fund. "
-            "The decision resets a three-year legal siege that began when the diocese sought Chapter 11 protection under Case 23-40523. "
-            "To trace how a nine-figure settlement collapsed, you have to rewind seven years to October 13, 2019. "
-            "That day, California enacted Assembly Bill 218, unlocking courthouse doors for childhood sexual abuse claims dating back to 1960. "
-            "By May 2023, more than 330 lawsuits converged on the Oakland diocese at once. "
-            "Church officials filed for bankruptcy, triggering an automatic stay that froze individual jury trials across the state. "
-            "Inside federal court, the diocese proposed its Third Amended Plan on March 17, 2025, offering 143.5 million dollars to compensate victims. "
-            "Then came the vote. "
-            "On June 6, 2025, survivor creditors filed their official ballot tally, recording an overwhelming 99 percent rejection rate. "
-            "Claimants refused to sign away their rights for pennies on the dollar while parish properties remained shielded beyond the estate. "
-            "Meanwhile, the machinery of Chapter 11 began devouring itself. "
-            "By March 2026, professional fees paid to lawyers and financial consultants exceeded 44.6 million dollars. "
-            "Those fees consumed 59 percent of the estate's 76.1 million dollars in reported assets. "
-            "Every month of delay drained the very capital meant for victim restitution. "
-            "Feeling the squeeze, the diocese filed a motion to dismiss its own case after absorbing nearly 29 million dollars in operating losses. "
-            "Yet in December 2025, church leadership returned with a 242 million dollar offer labeled as its last and final chance. "
-            "Four months later, a state jury obliterated that valuation. "
-            "In April 2026, an East Bay bellwether trial awarded 16 million dollars to a single survivor. "
-            "Divide 242 million across 330 victims, and each claimant receives roughly 730,000 dollars before legal deductions. "
-            "One jury award had demonstrated what a single courtroom could deliver. "
-            "Compounding the deadlock, the Supreme Court's 2024 Purdue Pharma ruling barred non-consensual legal releases for third-party insurers. "
-            "The diocese could no longer shield its commercial carriers without full creditor consent. "
-            "Judge Lafferty's rejection confirmed that bankruptcy cannot force an ending when consent does not exist. "
-            "Over 330 claimants now face a choice between renegotiation or returning to state court. "
-            "The courtroom doors swung open, but the ledger remained frozen."
-        )
+    elif task_id and Path(f"/var/vf/pending_tasks/{task_id}.json").exists():
+        try:
+            pt = json.loads(Path(f"/var/vf/pending_tasks/{task_id}.json").read_text(encoding="utf-8"))
+            if pt.get("story_text"):
+                resolved_script = pt["story_text"].strip()
+        except Exception:
+            pass
 
     if not resolved_script:
         raise RuntimeError(f"Strict Rule 118 Violation: No script or verified grounding facts found to generate script for {ep_id}")

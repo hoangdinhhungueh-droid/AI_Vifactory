@@ -197,10 +197,16 @@ class VoxAutomatedDirector:
 
             # Scene description anchored to narration
             clean_narr = re.sub(r'[^a-zA-Z0-9\s]', '', b["narration"][:60])
+            seal_desc = (
+                "a red inkan hanko verification stamp" if self.market == "JP" else (
+                    "a red official ingam verification seal stamp" if self.market == "KR" else
+                    "an official red embossed verification seal stamp"
+                )
+            )
             scene_desc = (
                 f"SCENE as layered paper cut-outs: Primary forensic subject representing '{clean_narr}' (dominant, 70% visual weight), "
                 f"accompanied by 2-3 supporting archival scraps: a worn memorandum sheet with official headers, "
-                f"a red hanko verification stamp, and brass thumbtacks pinning elements to the newsprint surface."
+                f"{seal_desc}, and brass thumbtacks pinning elements to the newsprint surface."
             )
 
             prompt_text = (
