@@ -893,7 +893,7 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
         elif any(k in comb_fg for k in ["legislator", "lawmaker", "senator", "representative"]):
             action_clause = ", addressing the committee assembly with an open palm gesture over legislative folio"
         else:
-            action_clause = ", actively holding up documentary evidence prop with one hand while presenting critical detail"
+            action_clause = ", actively holding up documentary evidence prop with one hand while pointing index finger at critical detail"
 
         if any(w in p.lower() for w in ["turned", "turn", "facing", "angled", "three-quarter"]):
             turn_clause = ""
