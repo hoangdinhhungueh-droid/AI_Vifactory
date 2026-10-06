@@ -391,22 +391,28 @@ def run_automated_pipeline(
         # Update brain_input.json
         for loc in sync_locations:
             brain_p = loc / "brain_input.json"
+            brain = {}
             if brain_p.exists():
                 try:
                     brain = json.loads(brain_p.read_text(encoding="utf-8"))
-                    brain["story"] = resolved_script
-                    brain["spoken_script"] = resolved_script
-                    brain["spoken_sentences"] = spoken_sentences
-                    brain["theme"] = resolved_theme
-                    brain["niche"] = resolved_niche
-                    brain["audio_duration_sec"] = effective_duration
-                    brain["audio_duration_frames"] = total_frames
-                    brain["total_scenes"] = len(beats)
-                    brain["scenes"] = remotion_manifest.get("scenes", [])
-                    brain["pipeline_version"] = "vox_docudrama_v2"
-                    brain_p.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
-                except Exception as be:
-                    logger.warning(f"Error updating brain_input.json at {loc}: {be}")
+                except Exception:
+                    brain = {}
+            brain["task_id"] = ep_id
+            brain["story"] = resolved_script
+            brain["spoken_script"] = resolved_script
+            brain["spoken_sentences"] = spoken_sentences
+            brain["story_gate_score"] = dna_audit.get("score", 9.0)
+            brain["theme"] = resolved_theme
+            brain["niche"] = resolved_niche
+            brain["audio_duration_sec"] = effective_duration
+            brain["audio_duration_frames"] = total_frames
+            brain["total_scenes"] = len(beats)
+            brain["scenes"] = remotion_manifest.get("scenes", [])
+            brain["pipeline_version"] = "vox_docudrama_v2"
+            try:
+                brain_p.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception as be:
+                logger.warning(f"Error writing brain_input.json at {loc}: {be}")
 
     summary = {
         "status": "SUCCESS",
