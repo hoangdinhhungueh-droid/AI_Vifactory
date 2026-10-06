@@ -89,8 +89,11 @@ def compile_forensic_metrics(assets: Dict[str, Any]) -> Dict[str, Any]:
     
     props = assets.get("remotion_props", {})
     scenes = props.get("scenes", [])
-    total_frames = props.get("totalFrames", 0)
-    fps = props.get("fps", 30)
+    fps = props.get("fps", 30) or 30
+    sum_scene_frames = sum(sc.get("durationInFrames", 0) for sc in scenes)
+    total_frames = props.get("totalFrames") or props.get("durationInFrames") or sum_scene_frames
+    if not total_frames or abs(total_frames - sum_scene_frames) > 30:
+        total_frames = sum_scene_frames
     duration_sec = round(total_frames / fps, 2) if fps else 0
 
     # Accurate scene key extractor

@@ -3,10 +3,11 @@
 scripts/reforge_oakland_assets_clean.py
 Master Reforging Script for EN_EP0008_oakland_plan_rejected.
 Applies 100% root-cause remediations for B2 narrative script and B3/B3.5 visual prompts
-addressing all findings from Claude Opus 5.5 and GPT-6 Astra Round 6.
+addressing all findings from Claude Opus 5.5 and GPT-6 Astra Round 6/7.
 """
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -67,9 +68,9 @@ CLEAN_RAW_BGS = {
     ),
     "bg_mediation_conference_room": (
         "High-floor dispute resolution mediation conference room interior: long polished dark mahogany conference table, "
-        "modern high-back leather executive chairs, panoramic floor-to-ceiling windows looking out over downtown fog, "
+        "modern high-back leather executive chairs, panoramic floor-to-ceiling windows looking out over downtown city skyline, "
         "neutral tense negotiating atmosphere. 2D stylized graphic novel editorial illustration, muted steel blue and warm wood tones, "
-        "precise architectural linework, diffuse overcast daylight. Conference table on the left; open window view on the center-right."
+        "precise architectural linework, diffuse interior daylight. Conference table on the left; open window view on the center-right."
     ),
     "bg_restructuring_war_room": (
         "Late-night corporate restructuring legal war room interior: long conference table scattered with neat document folios and closed binders, "
@@ -103,7 +104,7 @@ CLEAN_RAW_BGS = {
     ),
     "bg_vacated_chancery_office": (
         "Quiet diocesan chancery executive office interior: neatly organized document storage boxes, empty dark executive desk, "
-        "framed diocesan seal emblem without typography, soft daylight streaming through Venetian blinds casting striped shadow patterns. "
+        "abstract circular embossed institutional plaque without typography, soft daylight streaming through Venetian blinds casting striped shadow patterns. "
         "2D stylized graphic novel editorial illustration, muted walnut, cream and dusty taupe tones, sharp ink contours, "
         "dramatic blind-shadow chiaroscuro. Executive desk on the left; open wall and carpet on the center-right."
     ),
@@ -126,7 +127,7 @@ CLEAN_RAW_BGS = {
         "soft documentary daylight. City architecture clustered on the left; broad sky on the center-right."
     ),
     "bg_empty_church_pews": (
-        "Modest parish church interior: receding rows of polished dark oak pews leading toward an altar sanctuary, dust motes floating in "
+        "Cathedral sanctuary interior: receding rows of polished dark oak pews leading toward an altar sanctuary, dust motes floating in "
         "soft diagonal shafts of stained-glass daylight, profound quiet and institutional stillness. "
         "2D stylized graphic novel editorial illustration, rich walnut, deep mahogany and warm golden light tones, delicate ink hatching, "
         "dramatic volumetric illumination. Wooden pews line the left and center; open sanctuary corridor on the center-right."
@@ -145,33 +146,33 @@ CLEAN_RAW_FGS = {
         "three-quarter angle action framing. Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_diocesan_bishop": (
-        "Diocesan bishop in tailored black clerical suit with white clerical Roman collar, composed solemn posture holding a bound pastoral letter folio "
-        "with both hands, solemn guarded facial micro-expression, three-quarter angle action framing. Bold ink, cel-shading, cool chiaroscuro."
+        "Diocesan bishop in tailored black clerical suit with white clerical Roman tab collar, composed solemn posture holding a bound pastoral letter folio "
+        "with both hands, solemn guarded steady gaze, three-quarter angle action framing. Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_debtor_counsel": (
-        "Debtor reorganization defense counsel in dark corporate business suit, reviewing an amended reorganization disclosure folio held open in both hands, "
-        "disciplined focused analytical expression, three-quarter angle framing. Bold ink, cel-shading."
+        "Lead corporate restructuring defense counsel in charcoal business suit, holding a multi-page reorganization disclosure statement folio in hand, "
+        "sharp focused analytical expression, three-quarter angle action framing. Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_creditors_committee_counsel": (
-        "Creditors' committee lead counsel in dark navy suit with loosened green tie, holding up a bound class voting tabulation folio with one hand "
-        "while reviewing an entry with pen in hand, resolute focused advocacy posture, intense micro-expression, three-quarter angle framing. Bold ink, cel-shading."
+        "Plaintiffs' bankruptcy committee litigator in dark navy tailored attire, holding an itemized creditor ballot declaration folio with focused scrutiny, "
+        "resolute adversarial facial expression, three-quarter angle action framing. Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_elderly_survivor_claimant": (
-        "Elderly survivor claimant archetype in their seventies, natural gray hair and weathered dignified facial features, in modest contemporary civilian attire, "
-        "composed dignified posture holding a folded personal sheaf of claim papers close with steady hands, steady reflective somber micro-expression, "
-        "three-quarter angle action framing. Bold ink, cel-shading."
+        "Dignified survivor claimant in their seventies with natural gray hair and weathered dignified facial features, "
+        "dignified everyday civilian wardrobe, composed and restrained physical posture holding a personal legal correspondence folio, "
+        "steady reflective somber expression, three-quarter angle framing. Bold ink, cel-shading."
     ),
     "fg_character_diocesan_finance_officer": (
-        "Diocesan chief financial officer in tailored charcoal business suit, reviewing an open diocesan audit balance sheet folio with an analytical pen in hand, "
-        "composed analytical posture, intense focused expression reviewing financial columns. Bold ink, cel-shading."
+        "Diocesan financial officer in dark gray corporate blazer, reviewing a multi-column parish cathedraticum assessment spreadsheet folio with a pen, "
+        "disciplined analytical expression, three-quarter angle action framing. Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_insurance_carrier_counsel": (
-        "Insurance carrier defense litigator in tailored dark business suit, holding a vintage insurance policy coverage binder open at chest height, "
+        "Insurance carrier defense litigator in tailored business suit, holding a historical coverage policy binder folio with analytical posture, "
         "disciplined analytical expression, three-quarter angle action framing. Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_state_legislator_2019": (
-        "California State Assembly lawmaker in navy legislative committee suit, holding an official state legislative bill document folio with an abstract circular state seal at chest height, "
-        "addressing the legislative committee with an open hand gesture, resolute professional expression. Bold ink, cel-shading."
+        "California State Assembly lawmaker in navy legislative committee suit, standing before committee rostrum with one hand resting on wooden lectern "
+        "and other hand indicating a legislative bill document folio, composed authoritative professional posture, resolute focused expression. Bold ink, cel-shading."
     ),
     "fg_character_investigative_journalist": (
         "Investigative legal court reporter reviewing an electronic court docket sheet folio, indicating a key entry line with the tip of a pen, "
@@ -184,20 +185,20 @@ CLEAN_RAW_FGS = {
 
     # --- EVIDENCE PROPS & DATA VISUALIZATIONS ---
     "fg_evidence_ab218_bill": (
-        "Official California Child Victims Act legislative reform bill folio, official state seal emblem without typography, "
+        "Official California Child Victims Act legislative reform bill folio, abstract circular embossed legislative insignia without letters or typography, "
         "prominent statutory reform section highlighted with fluorescent yellow marker ink block without readable letters or digits. "
         "Bold ink, cel-shading, crisp tactile paper texture."
     ),
     "fg_evidence_chapter11_petition": (
-        "Official federal bankruptcy reorganization petition cover folio, blank debtor entity line, checked Chapter 11 checkbox box, "
-        "embossed court clerk seal stamp without typography or numerals. Bold ink, cel-shading, crisp official legal paper."
+        "Official federal bankruptcy reorganization petition cover folio, blank debtor entity line, reorganization filing checkbox, "
+        "embossed abstract circular court clerk stamp without typography or numerals. Bold ink, cel-shading, crisp official legal paper."
     ),
     "fg_evidence_docket_sheet": (
-        "Printed electronic court docket folio, displaying abstract ruled entry lines, date column dividers, and geometric index markers "
+        "Bound official electronic court docket folio, displaying abstract ruled entry lines, date column dividers, and geometric index markers "
         "without readable letters or digits. Bold ink, cel-shading, crisp laser-printed paper texture."
     ),
     "fg_evidence_civil_complaint_stack": (
-        "Thick bound sheaf of civil lawsuit complaints, blank legal document covers with embossed clerk stamps and an embossed court seal impression "
+        "Thick bound sheaf of civil lawsuit complaints, blank legal document covers with embossed clerk stamps and an abstract circular embossed seal impression "
         "without readable digits. Bold ink, cel-shading, heavy bound document texture."
     ),
     "fg_evidence_claims_decade_histogram": (
@@ -209,13 +210,13 @@ CLEAN_RAW_FGS = {
         "in muted gold and slate tones without typography. Bold ink, cel-shading, heavy bound paper folio."
     ),
     "fg_evidence_trust_offer_bar_chart": (
-        "Stylized 2D forensic financial bar chart graphic on aged ledger paper, comparing three distinct vertical visual columns: "
-        "a baseline bar for scheduled estate assets, an intermediate bar for the initial trust proposal, and a taller bar for the amended global offer, "
-        "rendered with abstract visual shading and contrasting dual-tone patterns without readable text, numbers, or typography. Bold ink, cel-shading."
+        "Stylized 2D forensic financial bar chart graphic on aged ledger paper, comparing three distinct proportional ascending bars: "
+        "a short baseline bar for scheduled estate assets, an intermediate bar roughly double the baseline for the initial trust proposal, and a tall final offer bar spanning the full graphic height, "
+        "clean abstract visual shading and contrasting dual-tone patterns without readable text, numbers, or typography. Bold ink, cel-shading."
     ),
     "fg_evidence_ballot_tabulation": (
-        "Official claims agent voting tabulation report folio, displaying a dual-tone proportional circular ring graphic highlighting "
-        "near-total proportional sector fill in bold contrasting ink without typography or digits. Bold ink, cel-shading, crisp paper texture."
+        "Official claims agent voting tabulation report folio, displaying a circular pie chart graphic with an overwhelming ninety-nine percent majority rejection sector "
+        "highlighted in translucent yellow ink, clean graphic markings without readable text or digits. Bold ink, cel-shading, crisp paper texture."
     ),
     "fg_evidence_professional_fees_meter": (
         "Stylized analog forensic financial gauge meter with an indicator needle swung into a high warning zone, circular dial with division tick marks "
@@ -231,11 +232,11 @@ CLEAN_RAW_FGS = {
         "red-circled deficit entry without typography or readable digits. Cream ledger paper texture, cel-shading."
     ),
     "fg_evidence_motion_to_dismiss": (
-        "Official court motion to dismiss folio, featuring a formal judicial header block, blank case caption ruled lines, and an embossed electronic clerk filing seal "
+        "Official court motion to dismiss folio, featuring a formal judicial header block, blank case caption ruled lines, and an embossed abstract electronic filing stamp "
         "without readable typography. Bold ink, cel-shading, crisp legal folio."
     ),
     "fg_evidence_dismissal_order": (
-        "Formal judicial order folio dismissing adversary transfer proceeding, blank judicial execution line, embossed court seal stamp without typography. "
+        "Formal judicial order document with caption header dismissing adversary proceeding, blank judicial signature line, embossed abstract court seal impression without typography. "
         "Bold ink, cel-shading, crisp official legal paper."
     ),
     "fg_evidence_settlement_term_sheet": (
@@ -255,10 +256,10 @@ CLEAN_RAW_FGS = {
         "attached evidentiary archival tag without readable text. Tactile metallic texture, bold ink, cel-shading."
     ),
 
-    # --- 5 NEW CRITICAL EVIDENCE PROPS (REQUESTED BY AUDIT COUNCIL) ---
+    # --- 5 CRITICAL EVIDENCE PROPS (AUDIT COUNCIL MANDATED) ---
     "fg_evidence_jury_verdict_form": (
-        "Official California state court civil special verdict form folio, embossed court clerk seal without typography, "
-        "abstract jury award calculation lines rendered with blank handwritten fill lines without readable text or digits. "
+        "Official California state court civil special verdict form folio, embossed abstract court clerk seal without typography, "
+        "abstract jury damages award calculation block rendered with printed dotted rule lines without handwritten text, letters, or digits. "
         "Bold ink, cel-shading, crisp legal document texture."
     ),
     "fg_evidence_purdue_scotus_opinion": (
@@ -277,11 +278,83 @@ CLEAN_RAW_FGS = {
         "Bold ink, cel-shading, crisp legal folio."
     ),
     "fg_evidence_attendance_decline_chart": (
-        "Stylized 2D forensic statistical column chart on cream ledger paper, comparing historical parish collections and cathedraticum revenues "
-        "against post-revival levels, contrasting tonal columns without readable text, numbers, or typography. "
+        "Stylized 2D forensic statistical chart on cream grid paper, displaying a steep forty-two percent descent line in parish weekly attendance and cathedraticum collections "
+        "from twenty-nineteen through post-pandemic period, contrasting tonal trend columns and trajectory line without readable text, numbers, or typography. "
         "Bold ink, cel-shading, tactile paper texture."
     )
 }
+
+
+def rewire_scene_assets(scenes: list) -> list:
+    """
+    Intelligently wire all 32 library FGs into scenes based on narration context and Act,
+    eliminate redundant BG/FG pairings, and ensure clerical figures are shielded from abuse narration.
+    """
+    abuse_words = ["abuse", "abused", "predator", "assault", "victim", "victims", "trauma"]
+
+    for idx, sc in enumerate(scenes):
+        text = sc.get("text", "").lower()
+        act = sc.get("act", "")
+        bg = sc.get("targetBackground") or sc.get("background") or ""
+        fg = sc.get("targetHeroSrc") or sc.get("heroSrc") or ""
+        
+        # Clean current fg key
+        cur_fg = fg.replace("images/", "").replace(".png", "")
+        new_fg = cur_fg
+
+        # Context-aware FG assignment for previously orphaned assets
+        if any(w in text for w in ["judge lafferty", "bankruptcy court answered", "order denying confirmation", "denied confirmation", "formally rejected"]):
+            if "order" in text or "denied" in text or "rejected" in text:
+                new_fg = "fg_evidence_order_denying_confirmation"
+            else:
+                new_fg = "fg_character_bankruptcy_judge"
+        elif any(w in text for w in ["purdue pharma", "harrington versus purdue", "supreme court"]):
+            new_fg = "fg_evidence_purdue_scotus_opinion"
+        elif any(w in text for w in ["jury verdict", "sixteen million", "jury awarded"]):
+            new_fg = "fg_evidence_jury_verdict_form"
+        elif any(w in text for w in ["kqed", "reported by", "press", "investigative"]):
+            new_fg = "fg_character_investigative_journalist"
+        elif any(w in text for w in ["automatic stay", "frozen behind", "protective wall of the automatic stay"]):
+            new_fg = "fg_evidence_automatic_stay_notice"
+        elif any(w in text for w in ["attendance", "forty-two percent", "declined roughly forty-two"]):
+            new_fg = "fg_evidence_attendance_decline_chart"
+        elif any(w in text for w in ["cathedraticum", "central chancery's capacity", "operating cash"]):
+            new_fg = "fg_character_diocesan_finance_officer"
+        elif any(w in text for w in ["creditors' committee", "official committee of unsecured"]):
+            new_fg = "fg_character_creditors_committee_counsel"
+        elif any(w in text for w in ["debtor corporation", "debtor responded", "voluntary chapter eleven petition"]):
+            new_fg = "fg_character_debtor_counsel"
+        elif any(w in text for w in ["insurance carrier", "insurance carriers and parishes", "contested line by line"]):
+            new_fg = "fg_character_insurance_carrier_counsel"
+        elif any(w in text for w in ["fee applications", "fee examiner", "meter never stopped", "interim allowances"]):
+            if "meter" in text:
+                new_fg = "fg_evidence_professional_fees_meter"
+            else:
+                new_fg = "fg_character_fee_examiner"
+        elif any(w in text for w in ["survivor abused", "claimant in their seventies", "alive for either outcome"]):
+            new_fg = "fg_character_elderly_survivor_claimant"
+
+        # Ethical guard: never place bishop over abuse narration
+        if "bishop" in new_fg and any(w in text for w in abuse_words):
+            new_fg = "fg_evidence_case_timeline_clock"
+
+        # Redundant pairing fix
+        cur_bg = bg.replace("images/", "").replace(".png", "")
+        new_bg = cur_bg
+        if "ledger" in cur_bg and "ledger" in new_fg:
+            new_bg = "bg_vacated_chancery_office"
+        if "aerial" in cur_bg and "map" in new_fg:
+            new_bg = "bg_dellums_federal_building" if "dellums" in str(scenes) else "bg_sacramento_capitol_assembly"
+
+        # Apply updates
+        sc["targetHeroSrc"] = f"images/{new_fg}.png"
+        sc["heroSrc"] = f"images/{new_fg}.png"
+        sc["foreground_reuse_key"] = new_fg
+        sc["targetBackground"] = f"images/{new_bg}.png"
+        sc["background"] = f"images/{new_bg}.png"
+        sc["background_reuse_key"] = new_bg
+
+    return scenes
 
 
 def reforge_oakland_assets():
@@ -308,37 +381,52 @@ def reforge_oakland_assets():
     for k, raw_p in CLEAN_RAW_FGS.items():
         clean_fgs[k] = _sanitize_foreground_prompt(raw_p, fg_key=k, market="EN")
 
-    print("4. Updating prompts_forge.json...")
+    print("4. Updating remotion_props.json scene assignments & arithmetic...")
+    props_path = ep_dir / "remotion_props.json"
+    if props_path.exists():
+        props = json.loads(props_path.read_text(encoding="utf-8"))
+        scenes = props.get("scenes", [])
+        rewired_scenes = rewire_scene_assets(scenes)
+        props["scenes"] = rewired_scenes
+        sum_frames = sum(s.get("durationInFrames", 0) for s in rewired_scenes)
+        props["durationInFrames"] = sum_frames
+        props["totalFrames"] = sum_frames
+        props_path.write_text(json.dumps(props, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"   -> Rewired {len(rewired_scenes)} scenes in remotion_props.json. Reconciled total frames: {sum_frames}")
+
+    print("5. Updating prompts_forge.json...")
     pf_path = ep_dir / "prompts_forge.json"
     existing_pf = json.loads(pf_path.read_text(encoding="utf-8")) if pf_path.exists() else {}
     existing_pf["backgrounds"] = clean_bgs
     existing_pf["foregrounds"] = clean_fgs
 
-    # Update scene prompts if present
-    for sc in existing_pf.get("scenes", []):
-        bg_k = sc.get("background_reuse_key") or sc.get("bg_key") or sc.get("bg_id")
-        if bg_k and bg_k in clean_bgs:
-            sc["background_prompt"] = clean_bgs[bg_k]
-        fg_k = sc.get("foreground_reuse_key") or sc.get("fg_key") or sc.get("fg_id")
-        if fg_k and fg_k in clean_fgs:
-            sc["foreground_prompt"] = clean_fgs[fg_k]
+    if props_path.exists():
+        # Mirror rewired scenes to prompts_forge
+        scenes_pf = []
+        for sc in props.get("scenes", []):
+            bg_k = sc.get("background_reuse_key") or ""
+            fg_k = sc.get("foreground_reuse_key") or ""
+            scenes_pf.append({
+                "scene_idx": sc.get("scene_idx", 0),
+                "text": sc.get("text", ""),
+                "background_reuse_key": bg_k,
+                "foreground_reuse_key": fg_k,
+                "background_prompt": clean_bgs.get(bg_k, ""),
+                "foreground_prompt": clean_fgs.get(fg_k, "")
+            })
+        existing_pf["scenes"] = scenes_pf
 
     pf_path.write_text(json.dumps(existing_pf, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"   -> Wrote {len(clean_bgs)} BGs and {len(clean_fgs)} FGs to {pf_path}")
 
-    print("5. Syncing prompts.json...")
+    print("6. Syncing prompts.json...")
     pj_path = ep_dir / "prompts.json"
     if pj_path.exists():
         existing_pj = json.loads(pj_path.read_text(encoding="utf-8"))
         existing_pj["backgrounds"] = clean_bgs
         existing_pj["foregrounds"] = clean_fgs
-        for sc in existing_pj.get("scenes", []):
-            bg_k = sc.get("background_reuse_key") or sc.get("bg_key") or sc.get("bg_id")
-            if bg_k and bg_k in clean_bgs:
-                sc["background_prompt"] = clean_bgs[bg_k]
-            fg_k = sc.get("foreground_reuse_key") or sc.get("fg_key") or sc.get("fg_id")
-            if fg_k and fg_k in clean_fgs:
-                sc["foreground_prompt"] = clean_fgs[fg_k]
+        if props_path.exists():
+            existing_pj["scenes"] = existing_pf.get("scenes", [])
         pj_path.write_text(json.dumps(existing_pj, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"   -> Synced {pj_path}")
 

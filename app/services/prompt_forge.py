@@ -523,6 +523,12 @@ def resolve_era_anchor(key: str, p: str) -> str:
         return "1990s era documentary aesthetic, authentic archival period atmosphere."
 
     combined = f"{key} {p}".replace("_", " ").lower()
+    if any(k in combined for k in ["purdue", "scotus", "supreme court"]):
+        return "2024 contemporary timeline, United States Supreme Court decision record."
+    if any(k in combined for k in ["attendance decline", "attendance_decline"]):
+        return "Contemporary post-pandemic statistical infographic record."
+    if any(k in combined for k in ["docket sheet", "chapter11 petition", "ballot tabulation", "plan confirmation", "fee application", "order denying confirmation", "jury verdict form", "automatic stay notice"]):
+        return "Contemporary federal bankruptcy docket record, modern legal filings."
     if any(k in combined for k in ["ab218", "ab 218", "child victims act"]):
         return "2019 timeline, California Child Victims Act statutory reform era."
     if any(k in combined for k in ["insurance polic", "liability insurance"]):
@@ -596,8 +602,12 @@ def resolve_background_anchor(bg_key: str, p: str, market: str, prof: dict) -> t
         anchor = "Authentic California State Capitol legislative assembly chamber interior, historic legislative rostrum and polished wood desks, atmospheric civic chamber lighting"
         return anchor, f", {base_negs}" if base_negs else ""
 
-    elif any(k in combined for k in ["settlement_mediation", "mediation_chamber", "mediation suite"]):
-        anchor = "Neutral dispute resolution settlement mediation suite interior, conference table with confidential case binders, calm diffused interior daylight"
+    elif any(k in combined for k in ["mediation_conference_room", "mediation", "settlement_mediation", "conference_room"]):
+        anchor = "Neutral dispute resolution settlement mediation suite interior, polished conference table with confidential case binders, calm diffused interior daylight"
+        return anchor, f", {base_negs}" if base_negs else ""
+
+    elif any(k in combined for k in ["vacated_chancery_office", "chancery_office", "diocesan_office", "chancery executive"]):
+        anchor = "Quiet diocesan chancery executive office interior, dark executive desk, organized document storage boxes, Venetian blinds casting daylight shadows"
         return anchor, f", {base_negs}" if base_negs else ""
 
     elif any(k in combined for k in ["restructuring_war_room", "war_room", "legal war room"]):
@@ -611,11 +621,15 @@ def resolve_background_anchor(bg_key: str, p: str, market: str, prof: dict) -> t
             anchor = "Authentic federal bankruptcy courtroom setting, modern wood paneling, elevated judicial bench, solemn institutional atmosphere, documentary lighting"
         return anchor, f", {base_negs}" if base_negs else ""
 
-    elif any(k in combined for k in ["cathedral", "church", "chapel", "sanctuary", "parish", "rectory", "temple", "shrine"]):
+    elif any(k in combined for k in ["cathedral", "church", "chapel", "sanctuary", "parish", "rectory", "temple", "shrine", "pews"]):
         if ("christ_the_light" in combined or "exterior" in combined or "facade" in combined) and "sanctuary interior" not in combined and "corridor" not in combined:
             anchor = "Authentic ecclesiastical exterior architecture, iconic cathedral facade with curved glass-and-timber structure on Lake Merritt, dramatic evening dusk illumination"
+        elif "pews" in combined or "sanctuary" in combined:
+            anchor = "Authentic cathedral sanctuary interior, receding rows of polished wooden pews, dramatic stained-glass daylight illumination, solemn institutional stillness"
+        elif "rectory" in combined:
+            anchor = "Authentic parish rectory interior corridor, dark oak paneling, dramatic window shadows, quiet institutional stillness"
         else:
-            anchor = "Authentic ecclesiastical interior architecture, sacred sanctuary or rectory corridor, atmospheric volumetric window lighting, solemn, austere institutional stillness"
+            anchor = "Authentic ecclesiastical interior architecture, sacred sanctuary, atmospheric volumetric window lighting, solemn institutional stillness"
         return anchor, f", {base_negs}" if base_negs else ""
 
     elif any(k in combined for k in ["federal", "courthouse", "courtroom", "chambers", "bench", "tribunal", "docket", "civic_center", "city_hall", "municipal"]):
@@ -793,7 +807,7 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
     # 2. English / Western / Global Markets (EN, US, UK, EU)
     if m in ["EN", "US", "UK"]:
         chroma_safe_negs = "no magenta, purple, fuchsia, or neon pink attire"
-        likeness_negs = "no specific real-life likeness, no celebrity likeness"
+        likeness_negs = "no specific real-life likeness, no celebrity likeness, no aggressive pointing, no theatrical melodrama"
         k_fg = fg_key.lower().replace("-", "_")
 
         # Step 2A: Explicit fg_key priority matching (guards against narrative word cross-talk)
@@ -859,22 +873,22 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
                 "Authentic contemporary financial officer or forensic accountant reflecting authentic metropolitan demographic diversity, natural facial features, "
                 "understated dark corporate business suit or gray tailored blazer, disciplined body posture analyzing financial records with a pen, sharp focused expression, generic fictionalized professional"
             )
-            negs = f"{base_negs}, {chroma_safe_negs}, no clerical collar, no ecclesiastical vestments, no religious robes, no theatrical posturing, no dramatic physical posing, {likeness_negs}"
+            negs = f"{base_negs}, {chroma_safe_negs}, no clerical collar, no ceremonial liturgical vestments, no religious robes, no theatrical posturing, no dramatic physical posing, {likeness_negs}"
             return anchor, f", {negs}" if negs else ""
 
         elif any(k in k_fg for k in ["bishop", "clergy", "priest", "pastor", "reverend", "cardinal"]):
             anchor = (
                 "Authentic contemporary ecclesiastical figure, natural facial features, "
-                "black clerical cassock or tailored dark suit with white clerical Roman collar, reserved formal posture, "
-                "solemn guarded expression, generic fictionalized ecclesiastical figure"
+                "black tailored clerical suit with white clerical Roman tab collar, reserved formal posture holding bound pastoral correspondence, "
+                "solemn guarded steady gaze, generic fictionalized ecclesiastical figure"
             )
-            negs = f"{base_negs}, {chroma_safe_negs}, no theatrical posturing, no ecclesiastical vestments, no choir dress, no zucchetto, no fascia, no amaranth piping, no magenta vestments, {likeness_negs}"
+            negs = f"{base_negs}, {chroma_safe_negs}, no theatrical posturing, no ceremonial liturgical vestments, no chasuble, no cope, no mitre, no choir dress, no zucchetto, no fascia, no amaranth piping, no purple vestments, {likeness_negs}"
             return anchor, f", {negs}" if negs else ""
 
         elif any(k in k_fg for k in ["legislator", "lawmaker", "senator", "representative", "parliamentarian", "congress"]):
             anchor = (
                 "Authentic contemporary lawmaker or institutional legislator reflecting authentic metropolitan demographic diversity, natural facial features, "
-                "formal legislative committee business attire, dignified authoritative posture addressing statutory inquiry, "
+                "formal legislative committee business attire, standing before committee rostrum with one hand resting on wooden lectern and other hand indicating a legislative bill document folio, composed authoritative professional posture, "
                 "resolute professional expression, generic fictionalized public official"
             )
             negs = f"{base_negs}, {chroma_safe_negs}, no theatrical posturing, no dramatic physical posing, {likeness_negs}"
@@ -958,16 +972,16 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
         elif any(k in combined for k in ["bishop", "clergy", "priest", "pastor", "reverend", "cardinal"]) or ("diocesan" in combined and not any(f in combined for f in ["cfo", "finance", "officer", "staff", "accountant", "auditor"])):
             anchor = (
                 "Authentic contemporary ecclesiastical figure, natural facial features, "
-                "black clerical cassock or tailored dark suit with white clerical Roman collar, reserved formal posture, "
-                "solemn guarded expression, generic fictionalized ecclesiastical figure"
+                "black tailored clerical suit with white clerical Roman tab collar, reserved formal posture holding bound pastoral correspondence, "
+                "solemn guarded steady gaze, generic fictionalized ecclesiastical figure"
             )
-            negs = f"{base_negs}, {chroma_safe_negs}, no theatrical posturing, no ecclesiastical vestments, no choir dress, no zucchetto, no fascia, no amaranth piping, no magenta vestments, {likeness_negs}"
+            negs = f"{base_negs}, {chroma_safe_negs}, no theatrical posturing, no ceremonial liturgical vestments, no chasuble, no cope, no mitre, no choir dress, no zucchetto, no fascia, no amaranth piping, no purple vestments, {likeness_negs}"
             return anchor, f", {negs}" if negs else ""
 
         elif any(k in combined for k in ["legislator", "lawmaker", "senator", "representative", "parliamentarian", "congress"]):
             anchor = (
                 "Authentic contemporary lawmaker or institutional legislator reflecting authentic metropolitan demographic diversity, natural facial features, "
-                "formal legislative committee business attire, dignified authoritative posture addressing statutory inquiry, "
+                "formal legislative committee business attire, standing before committee rostrum with one hand resting on wooden lectern and other hand indicating a legislative bill document folio, composed authoritative professional posture, "
                 "resolute professional expression, generic fictionalized public official"
             )
             negs = f"{base_negs}, {chroma_safe_negs}, no theatrical posturing, no dramatic physical posing, {likeness_negs}"
