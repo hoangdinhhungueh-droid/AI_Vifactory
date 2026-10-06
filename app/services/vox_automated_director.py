@@ -28,6 +28,8 @@ from app.services.skill_loader import (
     get_vox_docudrama_prompt,
     resolve_vox_theme_by_keywords
 )
+from app.services.unified_vox_director import extract_dynamic_visual_roster
+from app.services.prompt_forge import _sanitize_foreground_prompt, _sanitize_background_prompt
 
 logger = logging.getLogger("vf.vox_automated_director")
 
@@ -38,6 +40,10 @@ class VoxAutomatedDirector:
     def __init__(self, market: str = "EN", fps: int = 30):
         self.market = market.upper()
         self.fps = fps
+        self.last_sanitized_bgs: Dict[str, str] = {}
+        self.last_sanitized_fgs: Dict[str, str] = {}
+        self.last_bg_roster: Dict[str, Any] = {}
+        self.last_fg_roster: Dict[str, Any] = {}
 
     def classify_niche(self, topic: str) -> str:
         """State 1: Classify topic deterministically into one of the 8 Canonical Niches."""
@@ -170,9 +176,12 @@ class VoxAutomatedDirector:
         self,
         beats: List[Dict[str, Any]],
         theme: str = "newsprint-editorial",
-        topic: str = ""
+        topic: str = "",
+        story_text: str = "",
+        spoken_sentences: Optional[List[Dict[str, Any]]] = None,
+        grounding_intel: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
-        """State 7: Forge 5-part tactile Image Prompts for every beat's shots."""
+        """State 7: Forge 5-part tactile Image Prompts and dynamic visual roster for every beat."""
         style_block = (
             "Mixed-media hand-cut PAPER COLLAGE, editorial documentary zine style. "
             "Aged newsprint and archival map surfaces, black and white halftone photograph cutouts "
@@ -189,14 +198,117 @@ class VoxAutomatedDirector:
             "Premium documentary collage aesthetic, 16:9, ultra-detailed, 8K."
         )
 
+        # 1. Prepare story text and sentences context if omitted
+        if not story_text:
+            story_text = "\n".join(b.get("narration", "") for b in beats if b.get("narration"))
+        if not spoken_sentences:
+            spoken_sentences = [
+                {
+                    "text": b.get("narration", ""),
+                    "beat_index": b.get("beat_index", 1),
+                    "duration_sec": b.get("duration_sec", 6.0),
+                    "start_sec": b.get("start_sec", 0.0),
+                    "end_sec": b.get("end_sec", 6.0)
+                }
+                for b in beats
+            ]
+
+        # 2. Extract Dynamic Visual Roster anchored to narrative topic
+        bg_roster, fg_roster = extract_dynamic_visual_roster(
+            story_text=story_text,
+            spoken_sentences=spoken_sentences,
+            grounding_intel=grounding_intel or {"topic": topic},
+            competitor_card=None,
+            market=self.market,
+            topic=topic or "investigative docudrama"
+        )
+
+        # 3. Sanitize all background and foreground prompts (Rule 116, 122, 128, 137)
+        sanitized_bgs: Dict[str, str] = {}
+        for bg_k, bg_v in bg_roster.items():
+            desc = bg_v.get("description", bg_v.get("title", bg_k))
+            sanitized_bgs[bg_k] = _sanitize_background_prompt(desc, bg_k, market=self.market)
+
+        sanitized_fgs: Dict[str, str] = {}
+        for fg_k, fg_v in fg_roster.items():
+            desc = fg_v.get("description", fg_v.get("title", fg_k))
+            sanitized_fgs[fg_k] = _sanitize_foreground_prompt(desc, fg_k, market=self.market)
+
+        char_fg_keys = [
+            k for k in fg_roster
+            if fg_roster[k].get("type") == "character"
+            or k.startswith("char_") or k.startswith("fg_character_")
+        ]
+        prop_fg_keys = [k for k in fg_roster if k not in char_fg_keys]
+        if not prop_fg_keys:
+            prop_fg_keys = list(fg_roster.keys())
+
+        total_beats = max(1, len(beats))
+        bg_keys = list(bg_roster.keys())
+        char_count = 0
+        last_char_beat = -99
+
         prompt_manifest: List[Dict[str, Any]] = []
 
         for b in beats:
             b_idx = b["beat_index"]
             headline = b["headline"]
+            narr = b.get("narration", "")
+            narr_lower = narr.lower()
 
-            # Scene description anchored to narration
-            clean_narr = re.sub(r'[^a-zA-Z0-9\s]', '', b["narration"][:60])
+            # Map to 5-Beat Docudrama phase
+            beat_phase = int(b.get("beat_phase") or ((b_idx - 1) // max(1, total_beats // 5)) + 1)
+            beat_phase = min(max(beat_phase, 1), 5)
+
+            # Assign environmental BG (rotating every 3 beats within matching phase)
+            matching_bgs = [k for k, v in bg_roster.items() if beat_phase in v.get("beats", [1, 2, 3, 4, 5])]
+            if not matching_bgs:
+                matching_bgs = bg_keys
+            bg_key = matching_bgs[(b_idx // 3) % len(matching_bgs)]
+
+            # Check if this beat is an actor moment or forensic evidence prop moment
+            is_char_moment = (
+                bool(char_fg_keys) and
+                (char_count < 12) and
+                (b_idx - last_char_beat >= 8) and
+                (any(q in narr for q in ['"', '“', '”', '「', '」']) or
+                 any(w in narr_lower for w in ["said", "testified", "admitted", "warned", "declared", "argued", "ruled", "denied", "objected"]))
+            )
+
+            if is_char_moment:
+                matched_char = None
+                for ck in char_fg_keys:
+                    c_info = fg_roster[ck]
+                    kws = c_info.get("keywords", []) + c_info.get("title", "").lower().split()
+                    if any(kw in narr_lower for kw in kws if len(kw) > 3):
+                        matched_char = ck
+                        break
+                if not matched_char:
+                    matched_char = char_fg_keys[char_count % len(char_fg_keys)]
+                fg_key = matched_char
+                char_count += 1
+                last_char_beat = b_idx
+            else:
+                matched_prop = None
+                best_score = 0
+                for pk in prop_fg_keys:
+                    p_info = fg_roster[pk]
+                    p_beats = p_info.get("beats", [1, 2, 3, 4, 5])
+                    kws = p_info.get("keywords", []) + p_info.get("title", "").lower().split()
+                    score = sum(1 for kw in kws if len(kw) > 3 and kw in narr_lower)
+                    if beat_phase in p_beats:
+                        score += 1
+                    if score > best_score:
+                        best_score = score
+                        matched_prop = pk
+                if not matched_prop or best_score <= 1:
+                    phase_props = [k for k in prop_fg_keys if beat_phase in fg_roster[k].get("beats", [1, 2, 3, 4, 5])] or prop_fg_keys
+                    matched_prop = phase_props[(b_idx // 2) % len(phase_props)]
+                fg_key = matched_prop
+
+            hero_label = fg_roster[fg_key].get("title", "PRIMARY OPERATOR")
+
+            # Build tactile composite prompt
             seal_desc = (
                 "a red inkan hanko verification stamp" if self.market == "JP" else (
                     "a red official ingam verification seal stamp" if self.market == "KR" else
@@ -204,7 +316,7 @@ class VoxAutomatedDirector:
                 )
             )
             scene_desc = (
-                f"SCENE as layered paper cut-outs: Primary forensic subject representing '{clean_narr}' (dominant, 70% visual weight), "
+                f"SCENE as layered paper cut-outs: Primary forensic subject representing '{hero_label}' (dominant, 70% visual weight), "
                 f"accompanied by 2-3 supporting archival scraps: a worn memorandum sheet with official headers, "
                 f"{seal_desc}, and brass thumbtacks pinning elements to the newsprint surface."
             )
@@ -212,20 +324,38 @@ class VoxAutomatedDirector:
             prompt_text = (
                 f"{style_block}\n\n"
                 f"{scene_desc}\n\n"
-                f"Background on a bold flat archival paper background with subtle coordinate grids.\n\n"
+                f"Background setting: {bg_roster[bg_key].get('title', 'archival desk')}.\n\n"
                 f'A torn-paper banner with a big bold headline "{headline}", red seal.\n\n'
                 f"{closer}"
             )
+
+            b["bg_key"] = bg_key
+            b["fg_key"] = fg_key
+            b["bg_prompt"] = sanitized_bgs[bg_key]
+            b["fg_prompt"] = sanitized_fgs[fg_key]
+            b["targetBackground"] = f"images/{bg_key}.png"
+            b["targetHeroSrc"] = f"images/{fg_key}.png"
+            b["heroLabel"] = hero_label
 
             prompt_manifest.append({
                 "beat_index": b_idx,
                 "headline": headline,
                 "narration": b["narration"],
                 "theme": theme,
+                "bg_key": bg_key,
+                "fg_key": fg_key,
+                "heroLabel": hero_label,
+                "targetBackground": f"images/{bg_key}.png",
+                "targetHeroSrc": f"images/{fg_key}.png",
                 "image_prompt": prompt_text,
-                "fg_prompt": f"Isolated forensic cutout subject of '{clean_narr}', rough scissor edges, halftone print, solid flat #FF00FF magenta background, 1:1 aspect ratio.",
-                "bg_prompt": f"Wide archival investigative desk background, aged newsprint map of '{topic or 'investigation'}', faint coordinate grids, muted warm tan tones, 16:9 aspect ratio."
+                "fg_prompt": sanitized_fgs[fg_key],
+                "bg_prompt": sanitized_bgs[bg_key]
             })
+
+        self.last_sanitized_bgs = sanitized_bgs
+        self.last_sanitized_fgs = sanitized_fgs
+        self.last_bg_roster = bg_roster
+        self.last_fg_roster = fg_roster
 
         return prompt_manifest
 
@@ -242,6 +372,9 @@ class VoxAutomatedDirector:
             b_idx = b["beat_index"]
             headline = b["headline"]
             duration_frames = b["end_frame"] - b["start_frame"]
+            bg_key = b.get("bg_key") or f"bg_{b_idx:02d}"
+            fg_key = b.get("fg_key") or f"fg_{b_idx:02d}"
+            hero_label = b.get("heroLabel") or f"SUBJECT #{b_idx}"
 
             scene_entry = {
                 "id": f"scene_{b_idx:02d}",
@@ -252,14 +385,14 @@ class VoxAutomatedDirector:
                 "subtitle": f"RECORD REF // #{b_idx:02d} • EVIDENCE DOSSIER",
                 "theme": theme,
                 "narration": b.get("narration", ""),
-                "heroSrc": None,
-                "background": None,
-                "targetHeroSrc": f"images/fg_{b_idx:02d}.png",
-                "targetBackground": f"images/bg_{b_idx:02d}.png",
+                "heroSrc": f"images/{fg_key}.png",
+                "background": f"images/{bg_key}.png",
+                "targetHeroSrc": f"images/{fg_key}.png",
+                "targetBackground": f"images/{bg_key}.png",
+                "heroLabel": hero_label,
                 "hasMarkerHighlight": True,
                 "stampText": "VERIFIED // IMPORTANT" if b_idx == 1 else "CLASSIFIED EXHIBIT",
                 "stampColor": "#dc2626" if b_idx == 1 else "#b91c1c",
-                "heroLabel": f"SUBJECT #{b_idx}",
                 "heroPosition": {
                     "xPct": 50,
                     "yPct": 52,

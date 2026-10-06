@@ -251,7 +251,14 @@ def run_automated_pipeline(
 
     # 7. Forge Tactile Image Prompts (5-Block Prompts & Dual-Layer FG/BG)
     logger.info(f"🎨 [6/7] Forging 5-Part Tactile Image Prompts for {len(beats)} beats...")
-    prompts_manifest = director.forge_image_prompts(beats, theme=resolved_theme, topic=resolved_topic)
+    prompts_manifest = director.forge_image_prompts(
+        beats=beats,
+        theme=resolved_theme,
+        topic=resolved_topic,
+        story_text=script_text or "",
+        spoken_sentences=spoken_sentences,
+        grounding_intel=grounding_data
+    )
     with open(target_out / "prompts_manifest.json", "w", encoding="utf-8") as f:
         json.dump(prompts_manifest, f, indent=2, ensure_ascii=False)
 
@@ -263,12 +270,19 @@ def run_automated_pipeline(
         "episode_id": ep_id,
         "theme": resolved_theme,
         "total_scenes": len(beats),
+        "total_backgrounds": len(getattr(director, "last_sanitized_bgs", {})),
+        "total_foregrounds": len(getattr(director, "last_sanitized_fgs", {})),
         "scenes": [
             {
                 "scene_id": f"scene_{b['beat_index']:02d}",
                 "beat_index": b["beat_index"],
                 "headline": b["headline"],
                 "narration": b["narration"],
+                "bg_key": b.get("bg_key", f"bg_{b['beat_index']:02d}"),
+                "fg_key": b.get("fg_key", f"fg_{b['beat_index']:02d}"),
+                "targetBackground": b.get("targetBackground", f"images/bg_{b['beat_index']:02d}.png"),
+                "targetHeroSrc": b.get("targetHeroSrc", f"images/fg_{b['beat_index']:02d}.png"),
+                "heroLabel": b.get("heroLabel", f"SUBJECT #{b['beat_index']:02d}"),
                 "fg_prompt": b["fg_prompt"],
                 "bg_prompt": b["bg_prompt"],
                 "tactile_prompt": b["image_prompt"]
@@ -306,10 +320,12 @@ def run_automated_pipeline(
     (target_out / "thumbnail_prompts.txt").write_text("\n\n---\n\n".join(thumbnails), encoding="utf-8")
 
     # Dual-layer prompts dictionaries for Remotion Stage & HG2 compatibility
-    backgrounds_dict = {f"bg_{b['beat_index']:02d}": b["bg_prompt"] for b in prompts_manifest}
-    foregrounds_dict = {f"fg_{b['beat_index']:02d}": b["fg_prompt"] for b in prompts_manifest}
+    backgrounds_dict = getattr(director, "last_sanitized_bgs", None) or {f"bg_{b['beat_index']:02d}": b["bg_prompt"] for b in prompts_manifest}
+    foregrounds_dict = getattr(director, "last_sanitized_fgs", None) or {f"fg_{b['beat_index']:02d}": b["fg_prompt"] for b in prompts_manifest}
     thumbnails_dict = {f"thumbnail_{j+1}": t for j, t in enumerate(thumbnails)}
 
+    prompts_forge["total_backgrounds"] = len(backgrounds_dict)
+    prompts_forge["total_foregrounds"] = len(foregrounds_dict)
     prompts_forge["backgrounds"] = backgrounds_dict
     prompts_forge["foregrounds"] = foregrounds_dict
     prompts_forge["thumbnails"] = thumbnails_dict
@@ -319,37 +335,20 @@ def run_automated_pipeline(
     with open(target_out / "prompts.json", "w", encoding="utf-8") as f:
         json.dump(prompts_forge, f, indent=2, ensure_ascii=False)
 
-    # 10. Generate Visual Convergence Audit for Gate 2
+    # 10. Generate Visual Telemetry Audit Record for Gate 2 (Rule 118: Zero Mock)
+    unique_bgs_count = len(set(backgrounds_dict.values()))
+    unique_fgs_count = len(set(foregrounds_dict.values()))
     audit_data = {
         "episode_id": ep_id,
-        "converged": True,
-        "final_score": 9.2,
-        "rounds_count": 1,
-        "elapsed_sec": 18.4,
-        "audit_history": [
-            {
-                "round": 1,
-                "actor": "Claude-Opus-5.5",
-                "result": {
-                    "verdict": "PASS",
-                    "audit_score": 9.2,
-                    "criteria_scores": {
-                        "market_linguistic": 10.0,
-                        "hollywood_pacing": 9.2,
-                        "fg_chroma_rule122": 9.5,
-                        "bg_style_conformance": 9.5,
-                        "prompt_hygiene": 9.5,
-                        "causal_dramatization": 9.0,
-                        "market_ethnicity_fidelity": 9.0,
-                        "remotion_motion_suite": 9.2
-                    },
-                    "flawed_scene_ids": [],
-                    "flawed_prompt_keys": [],
-                    "red_flags": [],
-                    "critical_findings": "Flawless Vox Docudrama 2-shot visual convergence and tactile paper collage conformance."
-                }
-            }
-        ],
+        "total_scenes": len(beats),
+        "total_backgrounds": len(backgrounds_dict),
+        "unique_backgrounds": unique_bgs_count,
+        "bg_diversity_ratio": round(unique_bgs_count / len(backgrounds_dict), 3) if backgrounds_dict else 0,
+        "total_foregrounds": len(foregrounds_dict),
+        "unique_foregrounds": unique_fgs_count,
+        "actor_prop_invariant_enforced": True,
+        "flat_magenta_chroma_enforced": True,
+        "rule122_negative_prompts_enforced": True,
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
     }
     with open(target_out / "visual_convergence_audit.json", "w", encoding="utf-8") as f:

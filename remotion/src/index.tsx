@@ -2674,10 +2674,18 @@ export const VoxBuildOnEpisode: React.FC<{
       cursor += dur;
 
       const durationSec = dur / (cfg.fps || 30);
+      const bgSrc = s.background
+        ? resolveSrc(s.background)
+        : s.targetBackground
+        ? resolveSrc(s.targetBackground)
+        : undefined;
+
       const heroSrc = s.heroSrc
         ? resolveSrc(s.heroSrc)
         : s.foreground
         ? resolveSrc(s.foreground)
+        : s.targetHeroSrc
+        ? resolveSrc(s.targetHeroSrc)
         : undefined;
 
       return (
@@ -2691,6 +2699,7 @@ export const VoxBuildOnEpisode: React.FC<{
             headline={s.headline}
             subtitle={s.subtitle}
             theme={s.theme}
+            backgroundSrc={bgSrc}
             heroSrc={heroSrc}
             heroLabel={s.heroLabel}
             heroPosition={s.heroPosition}

@@ -60,6 +60,9 @@ export interface VoxBuildOnStageProps {
     | "newsprint-editorial"
     | string;
 
+  /** Layer 1 Environmental Background Image */
+  backgroundSrc?: string;
+
   /** Primary Hero Subject Cutout */
   heroSrc?: string;
   heroLabel?: string;
@@ -97,6 +100,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   headline = "THE IMPOSSIBLE CONTRADICTION",
   subtitle = "CLASSIFIED PAPER TRAIL // EXHIBIT A",
   theme = "newsprint-editorial",
+  backgroundSrc,
   heroSrc,
   heroLabel = "PRIMARY OPERATOR",
   heroPosition = { xPct: 50, yPct: 52, widthPct: 36 },
@@ -228,6 +232,20 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             overflow: "hidden",
           }}
         >
+          {backgroundSrc && (
+            <Img
+              src={backgroundSrc}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                filter: "contrast(1.05) brightness(0.96)",
+              }}
+            />
+          )}
+
           {/* Paper Texture Overlay */}
           <div
             style={{
