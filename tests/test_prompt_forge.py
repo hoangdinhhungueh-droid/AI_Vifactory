@@ -479,4 +479,103 @@ def test_opus_astra_round3_fragment_and_text_magnet_remediations():
     assert "sealed with tape, a framed" in off_out
 
 
+def test_opus_astra_round4_rc1_rc2_remediations():
+    """Rule 134: Test Round 4 Root Causes (RC1 Category-aware negatives & RC2 Role/Background Anchors)."""
+    # RC1.1: Data visualizations/charts must EXEMPT 'no charts' and 'no chart values' from negative prompt
+    chart_keys = [
+        ("fg_evidence_ballot_tabulation", "Tabulation of ballots showing rejection"),
+        ("fg_evidence_claims_decade_histogram", "Histogram of abuse claims by decade"),
+        ("fg_evidence_trust_offer_bar_chart", "Bar chart comparing trust settlement offers"),
+        ("fg_evidence_priority_waterfall", "Priority waterfall chart of bankruptcy payouts")
+    ]
+    for key, desc in chart_keys:
+        out = _sanitize_foreground_prompt(desc, fg_key=key, market="EN")
+        neg_prompt = out.split("[STRICT NEGATIVE PROMPT]")[1]
+        assert "no charts" not in neg_prompt, f"Failed for {key}: 'no charts' found in negative prompt"
+        assert "no chart values" not in neg_prompt, f"Failed for {key}: 'no chart values' found in negative prompt"
+        assert "no human body" in neg_prompt
+        assert "#FF00FF" in out
+
+    # Non-chart objects DO contain 'no charts' in negative prompt
+    doc_out = _sanitize_foreground_prompt("Insurance policy binder on table", fg_key="fg_evidence_liability_policies", market="EN")
+    assert "no charts" in doc_out.split("[STRICT NEGATIVE PROMPT]")[1]
+
+    # RC1.2: Backgrounds must NEVER receive document hygiene suffixes
+    bg_raw = "Sacramento committee hearing room, unfilled template with official border, blank amount fields, empty ruled lines"
+    bg_out = _sanitize_background_prompt(bg_raw, bg_key="bg_hearing_room", market="EN")
+    assert "unfilled template" not in bg_out
+    assert "blank amount fields" not in bg_out
+    assert "empty ruled lines" not in bg_out
+    assert "16:9" in bg_out
+
+    # RC2.1: Legal counsel role anchors (no 180-degree role inversions)
+    debtor_counsel_out = _sanitize_foreground_prompt(
+        "Debtor's restructuring counsel presenting reorganization documents",
+        fg_key="fg_character_debtor_counsel", market="EN"
+    )
+    assert "reorganization debtor defense counsel" in debtor_counsel_out
+    assert "plaintiffs' legal counsel" not in debtor_counsel_out
+
+    carrier_counsel_out = _sanitize_foreground_prompt(
+        "Insurance carrier defense counsel reviewing coverage reservations",
+        fg_key="fg_character_insurance_carrier_counsel", market="EN"
+    )
+    assert "insurance carrier defense litigator" in carrier_counsel_out
+    assert "plaintiffs' legal counsel" not in carrier_counsel_out
+
+    # RC2.2: Creditors' committee counsel must NOT receive claimant invariant
+    comm_counsel_out = _sanitize_foreground_prompt(
+        "Creditors' committee counsel advocating on behalf of survivor claimants",
+        fg_key="fg_character_creditors_committee_counsel", market="EN"
+    )
+    assert "creditors' committee counsel" in comm_counsel_out
+    assert "Subject exhibiting dignified restraint, steady solemn gaze, holding personal record" not in comm_counsel_out
+    assert "Subject actively manipulating physical documentary prop" in comm_counsel_out
+
+    # RC2.3: Court fee examiner and investigative journalist anchors
+    fee_out = _sanitize_foreground_prompt("Court fee examiner auditing billing entries", fg_key="fg_character_fee_examiner", market="EN")
+    assert "court fee examiner or forensic billing auditor" in fee_out
+
+    journo_out = _sanitize_foreground_prompt("Investigative journalist reviewing PACER filings", fg_key="fg_character_investigative_journalist", market="EN")
+    assert "investigative journalist or court reporter" in journo_out
+
+    # RC2.4: State legislator 2019 era anchor
+    legis_out = _sanitize_foreground_prompt("State legislator presenting assembly bill", fg_key="fg_character_state_legislator_2019", market="EN")
+    assert "2019 timeline" in legis_out
+
+    # RC2.5: Background environment anchors (no category bleed)
+    street_out = _sanitize_background_prompt("Street outside parish exterior in 1970", bg_key="bg_1970s_oakland_streetscape", market="EN")
+    assert "1970s East Bay municipal streetscape" in street_out
+    assert "cathedral facade with glass-and-timber structure" not in street_out
+
+    map_out = _sanitize_background_prompt("Dioceses territorial boundary overview", bg_key="bg_california_dioceses_map", market="EN")
+    assert "archival geographic map chart" in map_out
+    assert "rectory corridor" not in map_out
+
+    ledger_out = _sanitize_background_prompt("Detailed audit records grid", bg_key="bg_abstract_ledger_grid", market="EN")
+    assert "forensic financial ledger grid texture" in ledger_out
+    assert "corporate or government headquarters" not in ledger_out
+
+    court_out = _sanitize_background_prompt("Historic county courthouse exterior stonework", bg_key="bg_alameda_superior_courthouse", market="EN")
+    assert "Art Deco county courthouse" in court_out
+    assert "modern federal office tower and glass rotunda" not in court_out
+
+    war_out = _sanitize_background_prompt("Legal war room with conference table", bg_key="bg_restructuring_war_room", market="EN")
+    assert "corporate legal conference war room interior" in war_out
+
+    capitol_out = _sanitize_background_prompt("State assembly chamber interior", bg_key="bg_sacramento_capitol_assembly_2019", market="EN")
+    assert "California State Capitol legislative assembly chamber interior" in capitol_out
+
+    med_out = _sanitize_background_prompt("Settlement negotiation chamber", bg_key="bg_settlement_mediation_chamber", market="EN")
+    assert "settlement mediation suite interior" in med_out
+
+    # RC2.6: Landmark glyphs
+    flag_out = _sanitize_background_prompt("Room with California bear flag on wall", bg_key="bg_office", market="EN")
+    assert "bear-and-star silhouette without typography" in flag_out
+
+    tower_out = _sanitize_background_prompt("Oakland skyline featuring Tribune Tower", bg_key="bg_skyline", market="EN")
+    assert "clock tower with numeral-free clock face" in tower_out
+
+
+
 
