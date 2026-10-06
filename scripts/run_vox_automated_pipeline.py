@@ -214,16 +214,27 @@ def run_automated_pipeline(
     srt_out_path = target_out / "subtitles.srt"
 
     if not dry_run:
-        actual_audio_duration = asyncio.run(
-            synthesize_edge_tts_audio(
-                text=resolved_script,
-                output_audio_path=audio_out_path,
-                output_srt_path=srt_out_path,
-                voice=VOICE_MAP.get(market, "en-US-ChristopherNeural")
+        if audio_out_path.exists() and audio_out_path.stat().st_size > 100000 and srt_out_path.exists():
+            logger.info(f"   Audio already exists ({audio_out_path.stat().st_size / (1024 * 1024):.2f} MB), probing duration...")
+            try:
+                cmd = ["ffprobe", "-i", str(audio_out_path), "-show_entries", "format=duration", "-v", "quiet", "-of", "csv=p=0"]
+                proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                actual_audio_duration = float(proc.stdout.strip())
+            except Exception:
+                actual_audio_duration = float(duration_sec)
+            effective_duration = actual_audio_duration
+            logger.info(f"   Using existing audio: {effective_duration:.2f}s -> {audio_out_path}")
+        else:
+            actual_audio_duration = asyncio.run(
+                synthesize_edge_tts_audio(
+                    text=resolved_script,
+                    output_audio_path=audio_out_path,
+                    output_srt_path=srt_out_path,
+                    voice=VOICE_MAP.get(market, "en-US-ChristopherNeural")
+                )
             )
-        )
-        logger.info(f"   Audio Generated: {actual_audio_duration:.2f}s -> {audio_out_path}")
-        effective_duration = actual_audio_duration
+            logger.info(f"   Audio Generated: {actual_audio_duration:.2f}s -> {audio_out_path}")
+            effective_duration = actual_audio_duration
     else:
         effective_duration = float(duration_sec)
         logger.info("   [Dry-run] Audio synthesis skipped.")
