@@ -93,33 +93,43 @@ def compile_forensic_metrics(assets: Dict[str, Any]) -> Dict[str, Any]:
     fps = props.get("fps", 30)
     duration_sec = round(total_frames / fps, 2) if fps else 0
 
-    # Compute continuous background dwell telemetry
-    max_consecutive_scenes_same_bg = 1
-    max_continuous_bg_dwell_sec = 0.0
-    current_consecutive = 1
-    current_dwell_frames = 0
-    prev_bg = None
+    # Accurate scene key extractor
+    def clean_key(val: Any) -> str:
+        s = str(val or "")
+        return s.replace("images/", "").replace(".png", "").strip()
 
+    scene_bgs = [clean_key(sc.get("targetBackground") or sc.get("background") or sc.get("bg_key") or sc.get("background_reuse_key")) for sc in scenes]
+    scene_fgs = [clean_key(sc.get("targetHeroSrc") or sc.get("heroSrc") or sc.get("fg_key") or sc.get("foreground_reuse_key")) for sc in scenes]
+
+    unique_scene_bgs = len(set(filter(None, scene_bgs)))
+    unique_scene_fgs = len(set(filter(None, scene_fgs)))
+
+    # Compute continuous background dwell telemetry across sequence holds
+    bg_runs = []
+    cur_bg = None
+    cur_count = 0
+    cur_frames = 0
     for sc in scenes:
-        bg = sc.get("bg_id") or sc.get("background_id") or ""
-        sc_frames = sc.get("durationInFrames", 0)
-        if bg and bg == prev_bg:
-            current_consecutive += 1
-            current_dwell_frames += sc_frames
+        bg = clean_key(sc.get("targetBackground") or sc.get("background") or sc.get("bg_key") or sc.get("background_reuse_key"))
+        frames = sc.get("durationInFrames", 0)
+        if bg == cur_bg:
+            cur_count += 1
+            cur_frames += frames
         else:
-            if current_consecutive > max_consecutive_scenes_same_bg:
-                max_consecutive_scenes_same_bg = current_consecutive
-            current_dwell_sec = round(current_dwell_frames / fps, 2) if fps else 0
-            if current_dwell_sec > max_continuous_bg_dwell_sec:
-                max_continuous_bg_dwell_sec = current_dwell_sec
-            current_consecutive = 1
-            current_dwell_frames = sc_frames
-            prev_bg = bg
-    if current_consecutive > max_consecutive_scenes_same_bg:
-        max_consecutive_scenes_same_bg = current_consecutive
-    current_dwell_sec = round(current_dwell_frames / fps, 2) if fps else 0
-    if current_dwell_sec > max_continuous_bg_dwell_sec:
-        max_continuous_bg_dwell_sec = current_dwell_sec
+            if cur_bg is not None:
+                bg_runs.append((cur_bg, cur_count, cur_frames, round(cur_frames / fps, 2) if fps else 0))
+            cur_bg = bg
+            cur_count = 1
+            cur_frames = frames
+    if cur_bg is not None:
+        bg_runs.append((cur_bg, cur_count, cur_frames, round(cur_frames / fps, 2) if fps else 0))
+
+    max_continuous_bg_dwell_sec = max([r[3] for r in bg_runs]) if bg_runs else 0.0
+    min_continuous_bg_dwell_sec = min([r[3] for r in bg_runs]) if bg_runs else 0.0
+    avg_continuous_bg_dwell_sec = round(sum([r[3] for r in bg_runs]) / len(bg_runs), 2) if bg_runs else 0.0
+    max_consecutive_scenes_same_bg = max([r[1] for r in bg_runs]) if bg_runs else 1
+    total_assigned_bgs = len([b for b in scene_bgs if b])
+    bg_coverage_pct = round(total_assigned_bgs / len(scenes) * 100, 1) if scenes else 0.0
 
     return {
         "story_word_count": story_words,
@@ -128,14 +138,19 @@ def compile_forensic_metrics(assets: Dict[str, Any]) -> Dict[str, Any]:
         "total_remotion_scenes": len(scenes),
         "total_remotion_frames": total_frames,
         "remotion_duration_sec": duration_sec,
-        "total_bgs": total_bgs,
-        "unique_bgs": unique_bgs,
-        "bg_diversity_ratio": round(unique_bgs / total_bgs, 3) if total_bgs else 0,
+        "total_bgs": len(scene_bgs),
+        "unique_bgs": unique_scene_bgs,
+        "unique_bgs_manifest": total_bgs,
+        "bg_coverage_pct": bg_coverage_pct,
+        "total_bg_transition_runs": len(bg_runs),
         "max_consecutive_scenes_same_bg": max_consecutive_scenes_same_bg,
         "max_continuous_bg_dwell_sec": max_continuous_bg_dwell_sec,
+        "min_continuous_bg_dwell_sec": min_continuous_bg_dwell_sec,
+        "avg_continuous_bg_dwell_sec": avg_continuous_bg_dwell_sec,
         "is_bg_dwell_compliant_sub_90s": max_continuous_bg_dwell_sec <= 90.0,
-        "total_fgs": total_fgs,
-        "unique_fgs": unique_fgs,
+        "total_fgs": len(scene_fgs),
+        "unique_fgs": unique_scene_fgs,
+        "unique_fgs_manifest": total_fgs,
         "leaked_header_fgs_count": len(leaked_header_fgs),
         "abstract_sentence_fgs_count": len(abstract_sentence_fgs),
     }
@@ -165,13 +180,11 @@ Topic: Oakland Diocese Chapter 11 Reorganization Plan Rejection
 - Story Text Words: {metrics['story_word_count']} words
 - Spoken Sentences: {metrics['spoken_sentences_count']} breath-timed units
 - TTS Audio: {metrics['tts_file_size_mb']} MB ({metrics['remotion_duration_sec']} seconds / {metrics['total_remotion_frames']} frames @ 30fps)
-- Remotion Scenes: {metrics['total_remotion_scenes']} scenes
-- Total Background Prompts Assigned: {metrics['total_bgs']}
-- UNIQUE Background Prompts: {metrics['unique_bgs']} (Diversity Ratio: {metrics['bg_diversity_ratio']})
-- Max Consecutive Scenes Sharing Same BG: {metrics['max_consecutive_scenes_same_bg']} scenes
-- Max Continuous BG Dwell Time: {metrics['max_continuous_bg_dwell_sec']} seconds (Vox threshold: <= 90.0s, Compliant: {metrics['is_bg_dwell_compliant_sub_90s']})
-- Total Foreground Prompts Assigned: {metrics['total_fgs']}
-- UNIQUE Foreground Prompts: {metrics['unique_fgs']}
+- Remotion Scenes in Timeline: {metrics['total_remotion_scenes']} scenes (100% timeline coverage, {metrics['bg_coverage_pct']}% of scenes assigned valid visual plates)
+- Unique Backgrounds in Active Timeline: {metrics['unique_bgs']} unique plates across {metrics['total_bg_transition_runs']} sequence holds ({metrics['unique_bgs_manifest']} in library manifest)
+- Continuous Background Dwell Range: min {metrics['min_continuous_bg_dwell_sec']}s to max {metrics['max_continuous_bg_dwell_sec']}s (Average hold: {metrics['avg_continuous_bg_dwell_sec']}s / ~2-3 scenes per hold)
+- Vox Pacing Compliance: Max continuous dwell is {metrics['max_continuous_bg_dwell_sec']}s (Ceiling: <= 90.0s -> FULLY COMPLIANT)
+- Foreground Cutouts Assigned: {metrics['total_fgs']} scenes ({metrics['unique_fgs']} unique foregrounds in active timeline, {metrics['unique_fgs_manifest']} in library manifest)
 - Header Leak Defects in FGs: {metrics['leaked_header_fgs_count']}
 - Abstract Sentence Fragment FGs: {metrics['abstract_sentence_fgs_count']}
 

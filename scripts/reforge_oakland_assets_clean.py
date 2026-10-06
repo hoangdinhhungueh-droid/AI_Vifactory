@@ -3,7 +3,7 @@
 scripts/reforge_oakland_assets_clean.py
 Master Reforging Script for EN_EP0008_oakland_plan_rejected.
 Applies 100% root-cause remediations for B2 narrative script and B3/B3.5 visual prompts
-addressing all findings from Claude Opus 5.5 and GPT-6 Astra.
+addressing all findings from Claude Opus 5.5 and GPT-6 Astra Round 6.
 """
 import json
 import os
@@ -37,8 +37,8 @@ CLEAN_RAW_BGS = {
     ),
     "bg_cathedral_christ_the_light_dusk": (
         "Cathedral of Christ the Light exterior on Lake Merritt at dusk: iconic contemporary glass-and-timber curved "
-        "architectural facade, dramatic volumetric evening light, reflective waters, solemn civic presence. "
-        "2D stylized graphic novel editorial illustration, deep twilight blues and warm golden interior window glow, "
+        "architectural facade, dramatic evening volumetric illumination, reflective waters, solemn civic presence. "
+        "2D stylized graphic novel editorial illustration, deep twilight blues and warm golden window illumination, "
         "clean ink contours, atmospheric volumetric illumination. Curved cathedral silhouette on the left; open dusk sky on the right."
     ),
     "bg_1960s_rectory_hallway": (
@@ -55,27 +55,27 @@ CLEAN_RAW_BGS = {
     ),
     "bg_1970s_oakland_streetscape": (
         "Late-afternoon nineteen-seventies era East Bay residential streetscape: vintage stucco bungalows, a modest brick parish church exterior "
-        "with square bell tower, parked nineteen-seventies era sedans at curb, overhead utility wires, palm and eucalyptus trees. "
+        "with square bell tower, parked vintage sedans at curb, overhead utility wires, palm and eucalyptus trees. "
         "2D stylized graphic novel editorial illustration, warm faded vintage film palette, bold ink contours, dramatic raking late-afternoon sunlight "
-        "and long shadows. Parish exterior on the left third; open sky and asphalt street on the center-right."
+        "and vintage period shadows. Parish exterior on the left third; open sky and asphalt street on the center-right."
     ),
-    "bg_sacramento_capitol_assembly_2019": (
-        "California State Capitol legislative assembly chamber interior: historic carved wooden legislative rostrum, rows of polished wood "
-        "assembly desks, green leather executive seating, tall arched chamber windows casting soft civic daylight, stylized state banner silhouette "
-        "without typography. 2D stylized graphic novel editorial illustration, rich mahogany and warm brass tones, clean architectural linework, "
-        "stately civic illumination. Rostrum on the left; open chamber floor and desk rows on the center-right."
+    "bg_sacramento_capitol_assembly": (
+        "California State Capitol assembly legislative chamber interior: historic carved wooden rostrum, neat rows of dark wood legislators' desks "
+        "with green leather chairs, ornate gilded classical columns and arched public gallery under warm chandelier lighting. "
+        "2D stylized graphic novel editorial illustration, rich amber, emerald green and deep mahogany palette, sharp ink hatching, "
+        "stately civic chamber lighting. Rostrum on the left; open legislative floor on the center-right."
+    ),
+    "bg_mediation_conference_room": (
+        "High-floor dispute resolution mediation conference room interior: long polished dark mahogany conference table, "
+        "modern high-back leather executive chairs, panoramic floor-to-ceiling windows looking out over downtown fog, "
+        "neutral tense negotiating atmosphere. 2D stylized graphic novel editorial illustration, muted steel blue and warm wood tones, "
+        "precise architectural linework, diffuse overcast daylight. Conference table on the left; open window view on the center-right."
     ),
     "bg_restructuring_war_room": (
-        "Late-night corporate legal conference war room interior: long mahogany conference table scattered with closed case binders and "
-        "neat document folios, high-rise glass window looking out at distant Bay Bridge silhouette lights against a dark night sky, "
-        "warm interior table lamp light contrasting deep exterior night. 2D stylized graphic novel editorial illustration, rich walnut, navy and amber tones, "
-        "crisp ink linework, dramatic chiaroscuro lighting. Conference table on the left; dark skyline window on the center-right."
-    ),
-    "bg_insurance_policy_warehouse": (
-        "Cavernous institutional records archive warehouse: towering heavy steel shelving units holding neatly arranged archival document boxes "
-        "organized by historical policy periods, tall rolling steel library ladder, dramatic industrial perspective and high-contrast shadows. "
-        "2D stylized graphic novel editorial illustration, cool industrial slate and muted rust tones, clean ink perspective lines, "
-        "overhead high-bay atmospheric lighting. Tall shelving on the left; deep receding central aisle on the center-right."
+        "Late-night corporate restructuring legal war room interior: long conference table scattered with neat document folios and closed binders, "
+        "corkboard displaying abstract timeline pin-cards without typography, single desk lamp casting warm focused light in dark room. "
+        "2D stylized graphic novel editorial illustration, deep shadows with amber focal illumination, clean ink outlines, "
+        "intense nocturnal working atmosphere. Main desk cluster on the left; shadowed conference room on the center-right."
     ),
     "bg_abstract_ledger_grid": (
         "Stylized 2D forensic financial ledger grid texture: muted sepia and slate ruled accounting paper, faint perspective debit and credit columns, "
@@ -102,7 +102,7 @@ CLEAN_RAW_BGS = {
         "subtle rainy volumetric mist. Shoreline path and dark trees on the left; open water and dusk sky on the center-right."
     ),
     "bg_vacated_chancery_office": (
-        "Quiet vacated diocesan chancery office interior: neatly stacked moving boxes sealed with packing tape, empty dark executive desk, "
+        "Quiet diocesan chancery executive office interior: neatly organized document storage boxes, empty dark executive desk, "
         "framed diocesan seal emblem without typography, soft daylight streaming through Venetian blinds casting striped shadow patterns. "
         "2D stylized graphic novel editorial illustration, muted walnut, cream and dusty taupe tones, sharp ink contours, "
         "dramatic blind-shadow chiaroscuro. Executive desk on the left; open wall and carpet on the center-right."
@@ -134,35 +134,36 @@ CLEAN_RAW_BGS = {
 }
 
 # =========================================================================
-# 2. CLEAN GROUND-TRUTH FOREGROUND PROMPTS (27 UNIQUE FGs)
-# 10 Characters + 17 Evidence Props (zero splice artifacts, zero typography contradictions)
+# 2. CLEAN GROUND-TRUTH FOREGROUND PROMPTS (32 UNIQUE FGs)
+# 10 Characters + 22 Evidence Props & Charts (Zero positive/negative conflicts)
 # =========================================================================
 CLEAN_RAW_FGS = {
     # --- CHARACTERS ---
     "fg_character_bankruptcy_judge": (
-        "Presiding federal bankruptcy judge in dark judicial attire, seated at an elevated dark mahogany judicial bench, "
-        "resting one hand upon a closed case docket binder, solemn reserved authoritative facial micro-expression, "
+        "Presiding federal bankruptcy judge in dark judicial attire, turning a page of an open legal case docket folio with deliberate judicial focus, "
+        "solemn reserved authoritative facial micro-expression, no judicial bench in foreground cutout, "
         "three-quarter angle action framing. Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_diocesan_bishop": (
-        "Diocesan bishop in formal black clerical suit with white collar insert, composed solemn posture holding a bound diocesan pastoral letter folio "
+        "Diocesan bishop in tailored black clerical suit with white clerical Roman collar, composed solemn posture holding a bound pastoral letter folio "
         "with both hands, solemn guarded facial micro-expression, three-quarter angle action framing. Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_debtor_counsel": (
-        "Debtor reorganization defense counsel in dark corporate business suit, presenting an amended reorganization plan folio with one hand "
-        "while indicating with a pen tip toward the judicial bench, disciplined composed expression, three-quarter angle framing. Bold ink, cel-shading."
+        "Debtor reorganization defense counsel in dark corporate business suit, reviewing an amended reorganization disclosure folio held open in both hands, "
+        "disciplined focused analytical expression, three-quarter angle framing. Bold ink, cel-shading."
     ),
     "fg_character_creditors_committee_counsel": (
         "Creditors' committee lead counsel in dark navy suit with loosened green tie, holding up a bound class voting tabulation folio with one hand "
-        "while indicating an entry with pen tip, resolute focused advocacy posture, intense micro-expression, three-quarter angle framing. Bold ink, cel-shading."
+        "while reviewing an entry with pen in hand, resolute focused advocacy posture, intense micro-expression, three-quarter angle framing. Bold ink, cel-shading."
     ),
     "fg_character_elderly_survivor_claimant": (
-        "Survivor claimant archetype in modest contemporary civilian attire, composed dignified posture holding a folded personal sheaf of claim papers "
-        "close with steady hands, steady reflective somber micro-expression, three-quarter angle action framing. Bold ink, cel-shading."
+        "Elderly survivor claimant archetype in their seventies, natural gray hair and weathered dignified facial features, in modest contemporary civilian attire, "
+        "composed dignified posture holding a folded personal sheaf of claim papers close with steady hands, steady reflective somber micro-expression, "
+        "three-quarter angle action framing. Bold ink, cel-shading."
     ),
     "fg_character_diocesan_finance_officer": (
-        "Diocesan chief financial officer in tailored charcoal business suit, reviewing an open diocesan audit balance sheet folio with an open hand gesture, "
-        "at a highlighted negative cash flow figure with fluorescent yellow marker ink, intense focused analytical expression. Bold ink, cel-shading."
+        "Diocesan chief financial officer in tailored charcoal business suit, reviewing an open diocesan audit balance sheet folio with an analytical pen in hand, "
+        "composed analytical posture, intense focused expression reviewing financial columns. Bold ink, cel-shading."
     ),
     "fg_character_insurance_carrier_counsel": (
         "Insurance carrier defense litigator in tailored dark business suit, holding a vintage insurance policy coverage binder open at chest height, "
@@ -170,7 +171,7 @@ CLEAN_RAW_FGS = {
     ),
     "fg_character_state_legislator_2019": (
         "California State Assembly lawmaker in navy legislative committee suit, holding an official state legislative bill document folio with an abstract circular state seal at chest height, "
-        "addressing the legislative committee with an open hand gesture, resolute professional expression. Era 2019. Bold ink, cel-shading."
+        "addressing the legislative committee with an open hand gesture, resolute professional expression. Bold ink, cel-shading."
     ),
     "fg_character_investigative_journalist": (
         "Investigative legal court reporter reviewing an electronic court docket sheet folio, indicating a key entry line with the tip of a pen, "
@@ -184,8 +185,8 @@ CLEAN_RAW_FGS = {
     # --- EVIDENCE PROPS & DATA VISUALIZATIONS ---
     "fg_evidence_ab218_bill": (
         "Official California Child Victims Act legislative reform bill folio, official state seal emblem without typography, "
-        "prominent revival window statutory section highlighted with fluorescent yellow marker ink block without readable letters or digits. "
-        "Era 2019. Bold ink, cel-shading, crisp tactile paper texture."
+        "prominent statutory reform section highlighted with fluorescent yellow marker ink block without readable letters or digits. "
+        "Bold ink, cel-shading, crisp tactile paper texture."
     ),
     "fg_evidence_chapter11_petition": (
         "Official federal bankruptcy reorganization petition cover folio, blank debtor entity line, checked Chapter 11 checkbox box, "
@@ -196,7 +197,7 @@ CLEAN_RAW_FGS = {
         "without readable letters or digits. Bold ink, cel-shading, crisp laser-printed paper texture."
     ),
     "fg_evidence_civil_complaint_stack": (
-        "Thick bound sheaf of civil lawsuit complaints, blank legal document covers with embossed clerk stamps and an abstract mechanical counter emblem "
+        "Thick bound sheaf of civil lawsuit complaints, blank legal document covers with embossed clerk stamps and an embossed court seal impression "
         "without readable digits. Bold ink, cel-shading, heavy bound document texture."
     ),
     "fg_evidence_claims_decade_histogram": (
@@ -204,17 +205,17 @@ CLEAN_RAW_FGS = {
         "with prominent peak bars highlighted in contrasting tones without typography or digits. Bold ink, cel-shading, tactile grid paper texture."
     ),
     "fg_evidence_third_amended_plan": (
-        "Thick bound Chapter 11 reorganization plan folio, embossed cover with blank official header block, multi-colored divider index tabs "
-        "along right margin without typography. Bold ink, cel-shading, heavy bound paper folio."
+        "Thick bound Chapter 11 reorganization plan folio, embossed cover with blank official header block, divider index tabs along right margin "
+        "in muted gold and slate tones without typography. Bold ink, cel-shading, heavy bound paper folio."
     ),
     "fg_evidence_trust_offer_bar_chart": (
-        "Stylized 2D forensic financial bar chart graphic on aged ledger paper, comparing two distinct vertical visual columns: "
-        "a lower bar representing the initial trust proposal and a taller bar representing the amended global settlement offer, "
+        "Stylized 2D forensic financial bar chart graphic on aged ledger paper, comparing three distinct vertical visual columns: "
+        "a baseline bar for scheduled estate assets, an intermediate bar for the initial trust proposal, and a taller bar for the amended global offer, "
         "rendered with abstract visual shading and contrasting dual-tone patterns without readable text, numbers, or typography. Bold ink, cel-shading."
     ),
     "fg_evidence_ballot_tabulation": (
         "Official claims agent voting tabulation report folio, displaying a dual-tone proportional circular ring graphic highlighting "
-        "overwhelming ninety-nine percent rejection share in bold contrasting ink without typography or digits. Bold ink, cel-shading, crisp paper texture."
+        "near-total proportional sector fill in bold contrasting ink without typography or digits. Bold ink, cel-shading, crisp paper texture."
     ),
     "fg_evidence_professional_fees_meter": (
         "Stylized analog forensic financial gauge meter with an indicator needle swung into a high warning zone, circular dial with division tick marks "
@@ -247,11 +248,38 @@ CLEAN_RAW_FGS = {
     ),
     "fg_evidence_parish_property_map": (
         "Stylized 2D forensic parish property cadastral parcel map, displaying Northern California real estate holdings partitioned into distinct color-shaded estate zones "
-        "with geometric boundary outlines and legend symbols without readable lettering or numbers. Parchment texture, cel-shading."
+        "with clean geometric boundary outlines and shaded zone fills without readable lettering or numbers. Parchment texture, cel-shading."
     ),
     "fg_evidence_case_timeline_clock": (
         "Stylized antique documentary brass clock artifact, numeral-free clock face with clean unnumbered division tick marks and abstract pointer hands, "
         "attached evidentiary archival tag without readable text. Tactile metallic texture, bold ink, cel-shading."
+    ),
+
+    # --- 5 NEW CRITICAL EVIDENCE PROPS (REQUESTED BY AUDIT COUNCIL) ---
+    "fg_evidence_jury_verdict_form": (
+        "Official California state court civil special verdict form folio, embossed court clerk seal without typography, "
+        "abstract jury award calculation lines rendered with blank handwritten fill lines without readable text or digits. "
+        "Bold ink, cel-shading, crisp legal document texture."
+    ),
+    "fg_evidence_purdue_scotus_opinion": (
+        "Official Supreme Court slip opinion folio, formal judicial header block without readable letters, "
+        "crisp legal margins with abstract ruling text rendered as illegible horizontal line-marks. "
+        "Bold ink, cel-shading, archival paper texture."
+    ),
+    "fg_evidence_order_denying_confirmation": (
+        "Official federal bankruptcy court order denying confirmation folio, embossed judicial seal stamp without typography, "
+        "formal decretal paragraph rendered with abstract line-marks without readable text or digits. "
+        "Bold ink, cel-shading, crisp legal parchment."
+    ),
+    "fg_evidence_automatic_stay_notice": (
+        "Official federal bankruptcy automatic stay statutory notice folio, prominent centered judicial emblem without lettering, "
+        "blank case caption block and abstract statutory warning sections without typography or digits. "
+        "Bold ink, cel-shading, crisp legal folio."
+    ),
+    "fg_evidence_attendance_decline_chart": (
+        "Stylized 2D forensic statistical column chart on cream ledger paper, comparing historical parish collections and cathedraticum revenues "
+        "against post-revival levels, contrasting tonal columns without readable text, numbers, or typography. "
+        "Bold ink, cel-shading, tactile paper texture."
     )
 }
 
@@ -275,7 +303,7 @@ def reforge_oakland_assets():
     for k, raw_p in CLEAN_RAW_BGS.items():
         clean_bgs[k] = _sanitize_background_prompt(raw_p, bg_key=k, market="EN")
 
-    print("3. Sanitizing 27 Clean Foregrounds...")
+    print(f"3. Sanitizing {len(CLEAN_RAW_FGS)} Clean Foregrounds...")
     clean_fgs = {}
     for k, raw_p in CLEAN_RAW_FGS.items():
         clean_fgs[k] = _sanitize_foreground_prompt(raw_p, fg_key=k, market="EN")
@@ -288,10 +316,10 @@ def reforge_oakland_assets():
 
     # Update scene prompts if present
     for sc in existing_pf.get("scenes", []):
-        bg_k = sc.get("background_reuse_key") or sc.get("bg_id")
+        bg_k = sc.get("background_reuse_key") or sc.get("bg_key") or sc.get("bg_id")
         if bg_k and bg_k in clean_bgs:
             sc["background_prompt"] = clean_bgs[bg_k]
-        fg_k = sc.get("foreground_reuse_key") or sc.get("fg_id")
+        fg_k = sc.get("foreground_reuse_key") or sc.get("fg_key") or sc.get("fg_id")
         if fg_k and fg_k in clean_fgs:
             sc["foreground_prompt"] = clean_fgs[fg_k]
 
@@ -305,10 +333,10 @@ def reforge_oakland_assets():
         existing_pj["backgrounds"] = clean_bgs
         existing_pj["foregrounds"] = clean_fgs
         for sc in existing_pj.get("scenes", []):
-            bg_k = sc.get("background_reuse_key") or sc.get("bg_id")
+            bg_k = sc.get("background_reuse_key") or sc.get("bg_key") or sc.get("bg_id")
             if bg_k and bg_k in clean_bgs:
                 sc["background_prompt"] = clean_bgs[bg_k]
-            fg_k = sc.get("foreground_reuse_key") or sc.get("fg_id")
+            fg_k = sc.get("foreground_reuse_key") or sc.get("fg_key") or sc.get("fg_id")
             if fg_k and fg_k in clean_fgs:
                 sc["foreground_prompt"] = clean_fgs[fg_k]
         pj_path.write_text(json.dumps(existing_pj, indent=2, ensure_ascii=False), encoding="utf-8")
