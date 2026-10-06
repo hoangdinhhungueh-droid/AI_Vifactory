@@ -66,7 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=["pipeline", "block", "audit", "ci", "sync", "review", "sweep", "council", "plan", "supervise", "clean", "janitor"],
+        choices=["pipeline", "block", "audit", "ci", "sync", "review", "sweep", "council", "plan", "supervise", "clean", "janitor", "report", "health", "memory", "deploy"],
         default="pipeline",
         help="Operational mode (default: pipeline)",
     )
@@ -84,6 +84,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--plan-task",
         default=None,
         help="Task description or objective for Phase 0 planning mode",
+    )
+    parser.add_argument(
+        "--commit-range",
+        default=None,
+        help="Explicit git commit range to audit in supervision mode (e.g. '714e8e2~1..HEAD')",
     )
     parser.add_argument(
         "--ocr-mode",
@@ -235,6 +240,14 @@ class OrchestratorRunner:
                 return self._run_supervise_mode(sandbox)
             elif mode in {"clean", "janitor"}:
                 return self._run_clean_mode(sandbox)
+            elif mode == "report":
+                return self._run_report_mode(sandbox)
+            elif mode == "health":
+                return self._run_health_mode(sandbox)
+            elif mode == "memory":
+                return self._run_memory_mode(sandbox)
+            elif mode == "deploy":
+                return self._run_deploy_mode(sandbox)
             else:
                 print(f"Unknown mode: {mode}", file=sys.stderr)
                 return 1
@@ -1116,6 +1129,7 @@ class OrchestratorRunner:
             root_dir=self.root_dir,
             dry_run=self.args.dry_run,
             model=getattr(self.args, "planner_model", "claude-opus-5-5"),
+            commit_range=getattr(self.args, "commit_range", None),
         )
         sup = gate_res["supervision"]
         passed = sup.get("verdict") == "APPROVED"
@@ -1175,6 +1189,69 @@ class OrchestratorRunner:
             print(f"📦 Bloat Targets:    {len(bloat_items)} ({total_size / (1024 * 1024):.2f} MB reclaimable)")
             print(f"🧟 Zombie Functions: {zombie_data.get('zombie_functions_count', 0)} detected via AST")
             print("=================================================================\n")
+        return 0
+
+    def _run_report_mode(self, sandbox: ResourceSandbox) -> int:
+        """Generates comprehensive system health report and HTML dashboard."""
+        rep_script = self.root_dir / "scripts" / "orchestrator" / "system_health_reporter.py"
+        cmd = [sys.executable, str(rep_script)]
+        if self.args.json_output:
+            cmd.append("--json")
+        if self.args.dry_run:
+            cmd.append("--dry-run")
+        res = subprocess.run(cmd, cwd=str(self.root_dir))
+        return res.returncode
+
+    def _run_health_mode(self, sandbox: ResourceSandbox) -> int:
+        """Executes 7-axis system health check."""
+        health_script = self.root_dir / "scripts" / "health-check.py"
+        res = subprocess.run([sys.executable, str(health_script)], cwd=str(self.root_dir))
+        return res.returncode
+
+    def _run_memory_mode(self, sandbox: ResourceSandbox) -> int:
+        """Audits project memory files (ROADMAP.md & CHANGELOG.md)."""
+        mem_script = self.root_dir / "scripts" / "orchestrator" / "memory_governor.py"
+        res = subprocess.run([sys.executable, str(mem_script), "--strict"], cwd=str(self.root_dir))
+        return res.returncode
+
+    def _run_deploy_mode(self, sandbox: ResourceSandbox) -> int:
+        """Executes automated 1-command release deployment and watches CI/CD."""
+        print("=================================================================")
+        print("🚀 AI VIDEO FACTORY — 1-COMMAND RELEASE DEPLOYMENT GATE")
+        print("=================================================================")
+        
+        # 1. Pre-deployment memory audit
+        mem_code = self._run_memory_mode(sandbox)
+        if mem_code != 0:
+            print("❌ Deploy aborted: Project memory audit failed (check ROADMAP.md / CHANGELOG.md).", file=sys.stderr)
+            return 1
+
+        # 2. Check and stage changes
+        stat_res = subprocess.run(["git", "-C", str(self.root_dir), "status", "--porcelain"], capture_output=True, text=True)
+        has_changes = bool(stat_res.stdout.strip())
+
+        if has_changes:
+            print("[Deploy] Staging all modified and new project files...")
+            subprocess.run(["git", "-C", str(self.root_dir), "add", "-A"], check=True)
+            commit_msg = f"deploy: release {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} via Antigravity"
+            print(f"[Deploy] Committing: '{commit_msg}'")
+            subprocess.run(["git", "-C", str(self.root_dir), "commit", "-m", commit_msg], check=True)
+        else:
+            print("[Deploy] Working tree clean; deploying current HEAD commit.")
+
+        # 3. Push to remote
+        print("[Deploy] Pushing to origin main...")
+        push_res = subprocess.run(["git", "-C", str(self.root_dir), "push", "origin", "main"], capture_output=True, text=True)
+        if push_res.returncode != 0:
+            print(f"❌ Deploy push failed: {push_res.stderr}", file=sys.stderr)
+            return push_res.returncode
+
+        # 4. Watch GitHub Actions CI/CD run (Rule 126 Mandatory Gate)
+        watcher_script = self.root_dir / "scripts" / "watch_github_ci.py"
+        if watcher_script.exists():
+            print("[Deploy] Watching GitHub Actions CI/CD pipeline...")
+            ci_res = subprocess.run([sys.executable, str(watcher_script)], cwd=str(self.root_dir))
+            return ci_res.returncode
         return 0
 
 

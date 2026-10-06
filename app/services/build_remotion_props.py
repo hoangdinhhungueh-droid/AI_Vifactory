@@ -1129,6 +1129,8 @@ def build_remotion_props_data(
                 s["heroSrc"] = f"images/{fg_file}"
             elif os.path.exists(os.path.join(ep_dir, "assets", fg_file)):
                 s["heroSrc"] = f"assets/{fg_file}"
+            else:
+                s["heroSrc"] = None
 
             # Bind background
             bg_file = f"bg_{b_idx:02d}.png"
@@ -1136,6 +1138,8 @@ def build_remotion_props_data(
                 s["background"] = f"images/{bg_file}"
             elif os.path.exists(os.path.join(ep_dir, "assets", bg_file)):
                 s["background"] = f"assets/{bg_file}"
+            else:
+                s["background"] = None
 
         props = {
             "episodeId": episode_id,

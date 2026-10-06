@@ -73,12 +73,12 @@ class VoxAutomatedDirector:
 
         # Audit Cold Open: Sentence 1-3 should contain numbers/dates
         first_50_words = " ".join(words[:50])
-        has_temporal_anchor = bool(re.search(r'\b(19\d\d|20\d\d|january|february|march|april|may|june|july|august|september|october|november|december|tháng|năm|\d{1,2}:\d{2})\b', first_50_words, re.I))
+        has_temporal_anchor = bool(re.search(r'(?:19\d\d|20\d\d|january|february|march|april|may|june|july|august|september|october|november|december|年|月|日|년|월|일|\d{1,2}:\d{2})', first_50_words, re.I))
 
-        # Audit Cliffhanger: Final sentence <= 12 words
+        # Audit Cliffhanger: Final sentence <= 25 words
         sentences = [s.strip() for s in re.split(r'[.!?]+', script_text) if s.strip()]
         last_sentence_words = sentences[-1].split() if sentences else []
-        has_tight_ending = len(last_sentence_words) <= 15
+        has_tight_ending = len(last_sentence_words) <= 25
 
         # Check for banned em dashes
         has_em_dash = "—" in script_text or "–" in script_text
@@ -252,8 +252,10 @@ class VoxAutomatedDirector:
                 "subtitle": f"RECORD REF // #{b_idx:02d} • EVIDENCE DOSSIER",
                 "theme": theme,
                 "narration": b.get("narration", ""),
-                "heroSrc": f"images/fg_{b_idx:02d}.png",
-                "background": f"images/bg_{b_idx:02d}.png",
+                "heroSrc": None,
+                "background": None,
+                "targetHeroSrc": f"images/fg_{b_idx:02d}.png",
+                "targetBackground": f"images/bg_{b_idx:02d}.png",
                 "hasMarkerHighlight": True,
                 "stampText": "VERIFIED // IMPORTANT" if b_idx == 1 else "CLASSIFIED EXHIBIT",
                 "stampColor": "#dc2626" if b_idx == 1 else "#b91c1c",

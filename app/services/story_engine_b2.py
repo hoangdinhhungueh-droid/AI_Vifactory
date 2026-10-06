@@ -37,8 +37,110 @@ import json as json_lib
 NOTION_STORY_DB_ID = os.getenv("STORY_LIBRARY_DB_ID", "b0301989-2400-836b-bdb5-8131fea17736")
 EPISODES_BASE_DIR = os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")
 PENDING_TASKS_DIR = "/var/vf/pending_tasks"
-KNOWN_MARKETS = {"EN", "JP", "KR"}
+SUPPORTED_MARKETS = frozenset({"EN", "JP", "KR"})
+MARKET_SYNONYMS = {"JA": "JP", "KO": "KR"}
+KNOWN_MARKETS = SUPPORTED_MARKETS  # Deprecated alias: use SUPPORTED_MARKETS
 ACT_PATTERN = re.compile(r'(=== ACT [I|V|X]+ ===.*?)(?=(=== ACT [I|V|X]+ ===|\Z))', re.DOTALL)
+
+VIETNAMESE_EXCLUSIVE_CHARS = re.compile(
+    r'[đĐ'
+    r'ơƠưƯớỚứỨờỜừỪởỞửỬỡỠữỮợỢựỰ'
+    r'ăĂắẮằẰẳẲẵẴặẶ'
+    r'ấẤầẦẩẨẫẪậẬếẾềỀểỂễỄệỆốỐồỒổỔỗỖộỘ'
+    r'ảẢẻẺỉỈỏỎủỦỷỶ'
+    r'ạẠẹẸịỊọỌụỤỵỴ'
+    r'ĩĨũŨỹỸỳỲ]',
+    re.UNICODE
+)
+VIETNAMESE_STOPWORDS = re.compile(
+    r'\b(và|của|trong|cho|với|tại|từ|bởi|những|các|một|được|bị|đã|đang|sẽ|không|chưa|về|lại|ra|vào|lên|xuống|này|đó|kia)\b',
+    re.IGNORECASE
+)
+
+
+def normalize_market(market: str) -> str:
+    """Normalize market code to canonical uppercase 2-letter code."""
+    if not market:
+        return "EN"
+    m = market.strip().upper()
+    return MARKET_SYNONYMS.get(m, m)
+
+
+def validate_market_supported(market: str) -> str:
+    """Validate that the market is one of the 3 canonical production markets (EN, JP, KR).
+    Strictly forbids 'VI' or 'VN' (Fail-Fast).
+    """
+    m = normalize_market(market)
+    if m not in SUPPORTED_MARKETS:
+        raise ValueError(
+            f"Unsupported market '{market}'. Video Factory strictly supports canonical markets "
+            f"{sorted(SUPPORTED_MARKETS)}. Market 'VI'/'VN' is forbidden."
+        )
+    return m
+
+
+def _strip_market_prefix(text: str) -> str:
+    """Strip leading market tags like [EN], [JP], [KR], [JA], [KO]."""
+    if not text:
+        return ""
+    return re.sub(r"^\[(?:KR|JP|JA|KO|EN)\]\s*", "", text).strip()
+
+
+def _is_vietnamese_text(text: str) -> bool:
+    """Accurately detects Vietnamese operator text without false positives
+    on Latin-1 loanwords (e.g. Beyoncé, Nestlé, José, cliché, São Paulo, Café).
+    """
+    if not text:
+        return False
+    return bool(VIETNAMESE_EXCLUSIVE_CHARS.search(text) or VIETNAMESE_STOPWORDS.search(text))
+
+
+def _resolve_canonical_topic(raw_topic: str, native_candidate: str = "", task_id: str = "") -> str:
+    """Canonical Topic Precedence and Fail-Fast Guard (Rule 128).
+    Precedence hierarchy:
+      1. If clean_topic contains Vietnamese operator text:
+         - If native_candidate exists and is non-Vietnamese: return clean_native.
+         - Else: raise ValueError (fail-fast, strictly forbids Vietnamese operator text).
+      2. If clean_topic exists (non-Vietnamese):
+         - return clean_topic (clean editorial topic title has primary precedence).
+      3. If native_candidate exists (non-Vietnamese):
+         - return clean_native (fallback to native keyword/subject).
+      4. If task_id exists:
+         - return task_id.strip() (deterministic fallback to unique task identifier).
+      5. If all sources are empty:
+         - raise ValueError (fail-fast, refusing ambiguous unidentifiable episodes).
+    """
+    clean_topic = _strip_market_prefix(raw_topic or "")
+    clean_native = _strip_market_prefix(native_candidate or "")
+
+    if _is_vietnamese_text(clean_topic):
+        if clean_native and not _is_vietnamese_text(clean_native):
+            logger.info(f"[story_engine] Sanitized Vietnamese operator topic '{clean_topic}' -> native '{clean_native}'")
+            return clean_native
+        raise ValueError(
+            f"Strict Contract Violation: Detected Vietnamese operator topic '{raw_topic}' "
+            f"with no valid non-Vietnamese native search key. Pipeline requires native topic for canonical markets."
+        )
+
+    if clean_topic:
+        return clean_topic
+    if clean_native and not _is_vietnamese_text(clean_native):
+        return clean_native
+    if task_id and task_id.strip():
+        return task_id.strip()
+    raise ValueError("Strict Contract Violation: Unable to resolve topic. raw_topic, native_candidate, and task_id are all empty.")
+
+
+def _reconcile_spoken_script(sentences: list[dict], raw_script_text: str = "", market: str = "EN") -> str:
+    """Consolidated deterministic reconciliation helper for spoken VO narration text.
+    Sentences list is the single source of truth whenever present.
+    Korean joins with ' ' (Hangul word spaces), Japanese with '' (no spaces), English with ' '.
+    """
+    if sentences:
+        mkt = normalize_market(market)
+        sep = "" if mkt == "JP" else " "
+        return sep.join(s.get("text", "").strip() for s in sentences if s.get("text", "").strip())
+    return (raw_script_text or "").strip()
 
 
 
@@ -202,12 +304,12 @@ def load_task_metadata(task_id: str) -> dict:
             if task_id in (tid, eid):
                 search_key = _get_txt(props.get("Search-Specific Key", {})) or _get_txt(props.get("Search Specific Keyword", {}))
                 raw_name = _get_txt(props.get("Name", {}))
-                clean_name = re.sub(r"^\[(?:KR|JP|EN)\]\s*", "", raw_name).strip()
-                is_vn = bool(re.search(r'[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]', clean_name, re.IGNORECASE))
-                final_topic = search_key if (is_vn and search_key) else (clean_name or search_key)
+                mkt_raw = props.get("Market", {}).get("select", {}).get("name", "EN")
+                mkt = validate_market_supported(mkt_raw)
+                final_topic = _resolve_canonical_topic(raw_name, search_key, task_id)
                 return {
                     "task_id": task_id,
-                    "market": props.get("Market", {}).get("select", {}).get("name", "EN"),
+                    "market": mkt,
                     "topic": final_topic,
                     "search_specific_keyword": search_key,
                     "story_arcs": _get_txt(props.get("Story Direction (5 Arcs)", {})),
@@ -216,21 +318,27 @@ def load_task_metadata(task_id: str) -> dict:
                     "page_id": r.get("id")
                 }
     except Exception as e:
+        if "Unsupported market" in str(e) or "Detected Vietnamese" in str(e):
+            raise
         logger.warning(f"[story_engine] Error querying Notion Story Library for {task_id}: {e}")
 
     parts = [p for p in re.split(r"[_-]", task_id) if p]
     head = parts[0].upper() if parts else ""
-    mkt = head if head in KNOWN_MARKETS else "EN"
+    if len(head) == 2 and head.isalpha():
+        mkt = validate_market_supported(head)
+    else:
+        mkt = "EN"
     body = [p for p in parts[1:] if not re.fullmatch(r"ep\d+", p, re.I)]
     raw_name = "_".join(body) if body else task_id
-    theme, safety_label, treatment_note = detect_safety_and_theme(raw_name, mkt)
+    final_topic = _resolve_canonical_topic(raw_name.replace("_", " ").title(), "", task_id)
+    theme, safety_label, treatment_note = detect_safety_and_theme(final_topic, mkt)
     
     return {
         "task_id": task_id,
         "market": mkt,
-        "topic": raw_name.replace("_", " ").title(),
-        "story_arcs": "Beat 1 (Nghịch lý mở màn 0-60s) -> Beat 2 (Bẫy truyền thông & Red Herring) -> Beat 3 (Manh mối rò rỉ & Vết nứt thể chế) -> Beat 4 (Cỗ máy lợi ích & Smoking Gun) -> Beat 5 (Gương soi hiện tại & Lời cảnh báo)",
-        "niche_brief": f"Cơ chế ngách và sự kiện lịch sử/kinh tế đằng sau {raw_name}.",
+        "topic": final_topic,
+        "story_arcs": "Beat 1 (Opening Paradox 0-60s) -> Beat 2 (False Narrative & Red Herring) -> Beat 3 (Systemic Blindspot & Paper Trail) -> Beat 4 (Smoking Gun & Culprit) -> Beat 5 (Modern Mirror & Living Warning)",
+        "niche_brief": f"Institutional mechanisms and forensic record behind {final_topic}.",
         "breakout_queries": [],
         "content_theme": theme,
         "safety_label": safety_label,
@@ -357,7 +465,7 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
                     "karaoke_highlights": []
                 })
                 full_text_lines.append(s)
-        joined_text = "".join(full_text_lines) if is_cjk else " ".join(full_text_lines)
+        joined_text = _reconcile_spoken_script(sentences, "", mkt)
         est_mins = round(len(joined_text) / 280.0, 1) if is_cjk else round(len(joined_text.split()) / 150.0, 1)
         parsed = {
             "total_estimated_minutes": est_mins,
@@ -368,10 +476,7 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
     if parsed and isinstance(parsed, dict) and parsed.get("sentences"):
         s_list = parsed.get("sentences", [])
         if s_list:
-            reconstructed = "".join(s.get("text", "").strip() for s in s_list) if is_cjk else " ".join(s.get("text", "").strip() for s in s_list if s.get("text", "").strip())
-            raw_text = (parsed.get("spoken_script_text") or "").strip()
-            if not raw_text or len(reconstructed) > len(raw_text):
-                parsed["spoken_script_text"] = reconstructed
+            parsed["spoken_script_text"] = _reconcile_spoken_script(s_list, parsed.get("spoken_script_text", ""), mkt)
 
     return parsed
 
@@ -497,10 +602,7 @@ def prune_and_tighten_spoken_script(spoken_data: dict, market: str = "EN", topic
         if parsed and parsed.get("sentences") and len(parsed.get("sentences", [])) >= 80:
             logger.info(f"[story_engine] Auto-Pruning LLM pass succeeded with {len(parsed['sentences'])} sentences.")
             s_list = parsed.get("sentences", [])
-            reconstructed = "".join(s.get("text", "").strip() for s in s_list) if is_cjk else " ".join(s.get("text", "").strip() for s in s_list if s.get("text", "").strip())
-            raw_text = (parsed.get("spoken_script_text") or "").strip()
-            if not raw_text or len(reconstructed) > len(raw_text):
-                parsed["spoken_script_text"] = reconstructed
+            parsed["spoken_script_text"] = _reconcile_spoken_script(s_list, parsed.get("spoken_script_text", ""), mkt)
             return parsed
     except Exception as e:
         logger.warning(f"[story_engine] Auto-pruning LLM call error: {e}. Applying deterministic sentence tightening.")
@@ -522,7 +624,7 @@ def prune_and_tighten_spoken_script(spoken_data: dict, market: str = "EN", topic
         })
         full_lines.append(txt)
 
-    joined = "".join(full_lines) if is_cjk else " ".join(full_lines)
+    joined = _reconcile_spoken_script(tightened_sents, "", mkt)
     est = round(len(joined) / 280.0, 1) if is_cjk else round(len(joined.split()) / 150.0, 1)
     return {
         "total_estimated_minutes": est,
@@ -537,7 +639,8 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
     Inherits authentic rules dynamically from Notion SoT (Central Skills + Content Engine Hub).
     """
     meta = custom_meta or load_task_metadata(task_id)
-    mkt = meta.get("market", "EN").upper()
+    mkt = validate_market_supported(meta.get("market", "EN"))
+
     # Rule 128 & Rule 446 Native-First Architecture:
     # 3 Canonical Markets only (EN, JP, KR). Vietnamese operator titles (topic_name_vi)
     # are exclusively for Telegram Human Gate 1 review and MUST NEVER leak into the script or prompts!
@@ -546,16 +649,10 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
         or meta.get("search_key")
         or meta.get("raw_term")
         or meta.get("subject")
+        or ""
     )
     raw_topic = meta.get("topic") or meta.get("title_a") or ""
-    raw_topic = re.sub(r"^\[(?:KR|JP|EN)\]\s*", "", raw_topic).strip()
-
-    is_vietnamese_text = bool(re.search(r'[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]', raw_topic, re.IGNORECASE))
-    if is_vietnamese_text and native_candidate:
-        logger.info(f"[story_engine] Sanitizing Vietnamese operator topic '{raw_topic}' -> using native topic '{native_candidate}'")
-        topic = native_candidate
-    else:
-        topic = native_candidate or raw_topic or task_id
+    topic = _resolve_canonical_topic(raw_topic, native_candidate, task_id)
     viral_angle = meta.get("specific_viral_angle") or ""
     niche_brief = meta.get("niche_brief") or meta.get("niche_angle_brief") or ""
     story_arcs = meta.get("story_arcs") or meta.get("story_direction_5_arcs") or ""
@@ -1209,13 +1306,11 @@ CRITICAL EDITORIAL RULES:
 
     spoken_sentences = spoken_data.get("sentences") or []
     if spoken_sentences:
-        is_cjk = mkt in ("KR", "JP", "ZH")
-        reconstructed_text = "".join(s.get("text", "").strip() for s in spoken_sentences if s.get("text", "").strip()) if is_cjk else " ".join(s.get("text", "").strip() for s in spoken_sentences if s.get("text", "").strip())
-        raw_text = (spoken_data.get("spoken_script_text") or "").strip()
-        if not raw_text or len(reconstructed_text) > len(raw_text):
-            spoken_script_text = reconstructed_text
-        else:
-            spoken_script_text = raw_text
+        spoken_script_text = _reconcile_spoken_script(
+            spoken_sentences,
+            spoken_data.get("spoken_script_text", ""),
+            mkt
+        )
     else:
         spoken_script_text = spoken_data.get("spoken_script_text") or full_script
 

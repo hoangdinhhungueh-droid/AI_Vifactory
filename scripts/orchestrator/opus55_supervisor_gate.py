@@ -32,6 +32,27 @@ DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
 SUPERVISOR_SYSTEM_PROMPT = """You are Claude Opus 5.5, Supreme System Architect & Lead Quality Supervisor for AI Video Factory.
 Your responsibility is to supervise, audit, and provide authoritative forensic evaluation of implementation increments executed by the Antigravity Multi-Agent Squad.
 
+Governing Constitution (Rule 118 - Rule 139 Summary):
+- Rule 118: Zero-Mock Data & Ask-Before-Deviating.
+- Rule 119: Strict Existing Codebase Execution Only (clean /tmp).
+- Rule 120: Whisper Word-Level Timestamps & Timeline Anchor.
+- Rule 121: Strict Forensic Verification Protocol (exit 0, HTTP 200, line evidence).
+- Rule 122: Visual Audit 4-Axis Gate (0% UI artifacts, clean alpha, stylized editorial novel, market context).
+- Rule 124: Atomic Code-ification on agreement.
+- Rule 125: Single Pipeline Version & Zero-Ghost Remnant (no .bak, no shadow routes, single truth).
+- Rule 126: Three-Way Physical Sync (VPS ⇄ GitHub main ⇄ Local Windows, CI Watcher success).
+- Rule 127: Mandatory Programmatic Runtime Execution (py_compile + live function call).
+- Rule 128: Anti-Semantic Bias & Generic Contract Architecture (no hardcoded topic bias).
+- Rule 130: Factual Causal Integrity & Search-Intent Payoff.
+- Rule 131: 10X Beat Architecture & 5-Beat Docudrama.
+- Rule 132: Strict Decoupled Engine & Pure Transmission Pipe.
+- Rule 134: Exact Parity & Adversarial Boundary Verification.
+- Rule 135: Remotion Rendered Timeline Chapter Synchronization.
+- Rule 136: Zero-Asset-Leak Speaker Tag & Beat Header.
+- Rule 137: Zero-Drive-Wipe & Destructive Deletion Prohibition.
+- Rule 138: Code-Graph Pre-Impact Check & Anti-Blind Editing.
+- Rule 139: Disciplined Code-ification & Zero-Symptom Patching.
+
 Evaluation Standards:
 1. Architectural Integrity & Contract Adherence: Zero dirty hacks, zero shadow code, proper schema compatibility, adherence to Rule 118 - Rule 139.
 2. Safety & Blast Radius: Low blast radius, backward-compatible, clean error handling (no empty try-except, no symptom-patching).
@@ -69,39 +90,62 @@ def estimate_tokens(text: str) -> int:
     return int(words * 1.3)
 
 
-def extract_compact_git_diff(root_dir: Path, max_lines: int = 250) -> Tuple[str, str]:
+def _run_git(root_dir: Path, args: list[str]) -> subprocess.CompletedProcess:
+    """Helper for executing git commands safely with strict UTF-8 decoding."""
+    return subprocess.run(
+        ["git", "-C", str(root_dir)] + args,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+
+def extract_compact_git_diff(
+    root_dir: Path,
+    max_lines: int = 250,
+    commit_range: Optional[str] = None,
+) -> Tuple[str, str]:
     """Extracts git stat and a compacted diff, omitting binary files and large lockfiles."""
     try:
-        stat_res = subprocess.run(
-            ["git", "-C", str(root_dir), "diff", "--stat"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        diff_stat = stat_res.stdout.strip() if stat_res.returncode == 0 else "No git stat available"
+        if commit_range:
+            commit_range = commit_range.strip()
+            if commit_range.startswith("-"):
+                raise ValueError(f"Invalid commit_range '{commit_range}': cannot start with option flag '-'")
 
-        diff_res = subprocess.run(
-            ["git", "-C", str(root_dir), "diff", "--no-color", "-U2"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        raw_diff = diff_res.stdout.strip() if diff_res.returncode == 0 else ""
-        if not raw_diff:
-            # Check staged diff if working tree diff is empty
-            diff_staged = subprocess.run(
-                ["git", "-C", str(root_dir), "diff", "--cached", "--no-color", "-U2"],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False,
-            )
-            raw_diff = diff_staged.stdout.strip() if diff_staged.returncode == 0 else ""
+            # Validate commit range endpoint
+            verify_ref = commit_range.split("..")[-1] if ".." in commit_range else commit_range
+            verify_res = _run_git(root_dir, ["rev-parse", "--verify", "--end-of-options", verify_ref])
+            if verify_res.returncode != 0:
+                raise ValueError(f"Invalid git reference in commit_range '{commit_range}': {verify_res.stderr.strip()}")
+
+            stat_res = _run_git(root_dir, ["diff", "--stat", "--end-of-options", commit_range])
+            diff_stat = f"Provenance: Explicit commit-range [{commit_range}]\n" + (stat_res.stdout.strip() if stat_res.returncode == 0 else "No stat available")
+
+            diff_res = _run_git(root_dir, ["diff", "--no-color", "-U2", "--end-of-options", commit_range])
+            raw_diff = diff_res.stdout.strip() if diff_res.returncode == 0 else ""
+        else:
+            stat_res = _run_git(root_dir, ["diff", "--stat"])
+            diff_stat = (f"Provenance: Working-Tree Uncommitted Diff\n" + stat_res.stdout.strip()) if stat_res.returncode == 0 else "No git stat available"
+
+            diff_res = _run_git(root_dir, ["diff", "--no-color", "-U2"])
+            raw_diff = diff_res.stdout.strip() if diff_res.returncode == 0 else ""
+            if not raw_diff:
+                # Check staged diff if working tree diff is empty
+                diff_staged = _run_git(root_dir, ["diff", "--cached", "--no-color", "-U2"])
+                raw_diff = diff_staged.stdout.strip() if diff_staged.returncode == 0 else ""
+                if raw_diff:
+                    stat_staged = _run_git(root_dir, ["diff", "--cached", "--stat"])
+                    diff_stat = f"Provenance: Staged Index Diff\n" + stat_staged.stdout.strip()
+
+            if not raw_diff:
+                # Fallback to recent commits range when working tree is already committed
+                recent_log = _run_git(root_dir, ["log", "-n", "5", "--oneline"]).stdout.strip()
+                diff_range = _run_git(root_dir, ["diff", "HEAD~2..HEAD", "--stat"])
+                diff_stat = f"Provenance: Clean Working Tree -> Fallback Recent Commits:\n{recent_log}\n\nDiff Stat (HEAD~2..HEAD):\n{diff_range.stdout.strip()}"
+                diff_res = _run_git(root_dir, ["diff", "HEAD~2..HEAD", "--no-color", "-U2"])
+                raw_diff = diff_res.stdout.strip() if diff_res.returncode == 0 else ""
 
         if not raw_diff:
             return diff_stat, "Clean working tree (no uncommitted diffs)."
@@ -136,11 +180,12 @@ def build_anti_bloat_digest(
     compact_diff: Optional[str] = None,
     qa_summary: Optional[str] = None,
     ocr_status: Optional[str] = None,
+    commit_range: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Constructs a flexible token-budgeted digest (up to 10,000 tokens) for Opus 5.5 supervision."""
     target_root = root_dir or ROOT_DIR
     if diff_summary is None or compact_diff is None:
-        extracted_stat, extracted_diff = extract_compact_git_diff(target_root)
+        extracted_stat, extracted_diff = extract_compact_git_diff(target_root, commit_range=commit_range)
         diff_summary = diff_summary or extracted_stat
         compact_diff = compact_diff or extracted_diff
 
@@ -478,6 +523,7 @@ def run_supervisory_gate(
     qa_summary: Optional[str] = None,
     dry_run: bool = False,
     model: str = DEFAULT_PLANNER_MODEL,
+    commit_range: Optional[str] = None,
 ) -> Dict[str, Any]:
     """High-level entrypoint for Opus 5.5 Anti-Bloat Supervisory Gate."""
     digest = build_anti_bloat_digest(
@@ -485,6 +531,7 @@ def run_supervisory_gate(
         task_objective=task_objective,
         root_dir=root_dir,
         qa_summary=qa_summary,
+        commit_range=commit_range,
     )
 
     verdict_report = call_opus55_supervisor(
