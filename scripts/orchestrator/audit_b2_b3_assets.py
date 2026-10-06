@@ -141,6 +141,7 @@ def compile_forensic_metrics(assets: Dict[str, Any]) -> Dict[str, Any]:
         "total_bgs": len(scene_bgs),
         "unique_bgs": unique_scene_bgs,
         "unique_bgs_manifest": total_bgs,
+        "bg_diversity_ratio": round(unique_scene_bgs / len(scene_bgs), 3) if scene_bgs else 0.0,
         "bg_coverage_pct": bg_coverage_pct,
         "total_bg_transition_runs": len(bg_runs),
         "max_consecutive_scenes_same_bg": max_consecutive_scenes_same_bg,
@@ -283,8 +284,8 @@ Return a structured adversarial audit report.
     logger.info(">>> Received GPT-6-Astra Verdict.")
 
     # Determine consensus
-    is_opus_pass = "APPROVED" in opus_response.upper() and "REJECTED" not in opus_response.upper()
-    is_astra_pass = "PASS" in astra_response.upper() and "FAIL" not in astra_response.upper() and "DENIED" not in astra_response.upper()
+    is_opus_pass = "VERDICT: APPROVED" in opus_response.upper() or ("APPROVED" in opus_response.upper() and "REJECTED" not in opus_response.upper())
+    is_astra_pass = "VERDICT: PASS" in astra_response.upper() or ("PASS" in astra_response.upper() and "FAIL" not in astra_response.upper() and "DENIED" not in astra_response.upper())
     consensus = "PASS" if (is_opus_pass and is_astra_pass) else "REJECT"
 
     report_content = f"""# 🏛️ HỘI ĐỒNG THẨM ĐỊNH ĐA MÔ THỨC B2 & B3 (OPUS 5.5 & ASTRA 6)
@@ -298,10 +299,11 @@ Return a structured adversarial audit report.
 ## 📊 THỐNG KÊ PHÁP Y THỰC TẾ (TELEMETRY)
 - **Kịch bản B2 (story.txt):** {metrics['story_word_count']} words | {metrics['spoken_sentences_count']} câu nhịp thở
 - **Âm thanh Master B2.6 (tts_out.mp3):** {metrics['tts_file_size_mb']} MB ({metrics['remotion_duration_sec']}s / {metrics['total_remotion_frames']} frames)
-- **Số cảnh Remotion (VoxBuildOnStage):** {metrics['total_remotion_scenes']} scenes
+- **Số cảnh Remotion (VoxBuildOnStage):** {metrics['total_remotion_scenes']} scenes ({metrics['bg_coverage_pct']}% timeline coverage)
 - **Tổng số Background Prompts:** {metrics['total_bgs']}
 - **Số Background Prompts DUY NHẤT (Unique BGs):** **{metrics['unique_bgs']}** (Tỷ lệ phân hóa: {metrics['bg_diversity_ratio']})
-- **Số Foreground Prompts DUY NHẤT (Unique FGs):** **{metrics['unique_fgs']}**
+- **Dwell thời gian giữ Background tối đa:** **{metrics['max_continuous_bg_dwell_sec']}s** (Trung bình: {metrics['avg_continuous_bg_dwell_sec']}s, Tiêu chuẩn Vox: <= 90.0s)
+- **Số Foreground Prompts DUY NHẤT (Unique FGs):** **{metrics['unique_fgs']}** trong timeline ({metrics['unique_fgs_manifest']} trong thư viện)
 - **Lỗi rò rỉ Script Header ('ACT I') trong FG:** **{metrics['leaked_header_fgs_count']} cảnh**
 - **Lỗi Prompt là câu trích dẫn trừu tượng trong FG:** **{metrics['abstract_sentence_fgs_count']} cảnh**
 
