@@ -293,7 +293,7 @@ def rewire_scene_assets(scenes: list) -> list:
     abuse_words = ["abuse", "abused", "predator", "assault", "victim", "victims", "trauma"]
 
     for idx, sc in enumerate(scenes):
-        text = sc.get("text", "").lower()
+        text = (sc.get("narration") or sc.get("text") or "").lower()
         act = sc.get("act", "")
         bg = sc.get("targetBackground") or sc.get("background") or ""
         fg = sc.get("targetHeroSrc") or sc.get("heroSrc") or ""
@@ -303,12 +303,13 @@ def rewire_scene_assets(scenes: list) -> list:
         new_fg = cur_fg
 
         # Context-aware FG assignment for previously orphaned assets
-        if any(w in text for w in ["judge lafferty", "bankruptcy court answered", "order denying confirmation", "denied confirmation", "formally rejected"]):
-            if "order" in text or "denied" in text or "rejected" in text:
-                new_fg = "fg_evidence_order_denying_confirmation"
-            else:
-                new_fg = "fg_character_bankruptcy_judge"
-        elif any(w in text for w in ["purdue pharma", "harrington versus purdue", "supreme court"]):
+        if idx in (110, 121) or any(w in text for w in ["judge rejected the plan", "order denying", "denied confirmation", "formally rejected the third amended"]):
+            new_fg = "fg_evidence_order_denying_confirmation"
+        elif idx in (53, 55) or any(w in text for w in ["operational shifts", "remember that 42%", "cathedraticum", "central chancery", "operating deficits", "operating cash"]):
+            new_fg = "fg_character_diocesan_finance_officer"
+        elif any(w in text for w in ["judge lafferty", "presiding", "one judge, one pool", "federal judge"]):
+            new_fg = "fg_character_bankruptcy_judge"
+        elif any(w in text for w in ["purdue", "harrington", "supreme court"]):
             new_fg = "fg_evidence_purdue_scotus_opinion"
         elif any(w in text for w in ["jury verdict", "sixteen million", "jury awarded"]):
             new_fg = "fg_evidence_jury_verdict_form"
@@ -318,11 +319,11 @@ def rewire_scene_assets(scenes: list) -> list:
             new_fg = "fg_evidence_automatic_stay_notice"
         elif any(w in text for w in ["attendance", "forty-two percent", "declined roughly forty-two"]):
             new_fg = "fg_evidence_attendance_decline_chart"
-        elif any(w in text for w in ["cathedraticum", "central chancery's capacity", "operating cash"]):
+        elif any(w in text for w in ["cathedraticum", "central chancery", "operating deficits", "operating cash", "collections shrank"]):
             new_fg = "fg_character_diocesan_finance_officer"
         elif any(w in text for w in ["creditors' committee", "official committee of unsecured"]):
             new_fg = "fg_character_creditors_committee_counsel"
-        elif any(w in text for w in ["debtor corporation", "debtor responded", "voluntary chapter eleven petition"]):
+        elif any(w in text for w in ["debtor", "chapter 11 petition", "voluntary petition", "diocese responded"]):
             new_fg = "fg_character_debtor_counsel"
         elif any(w in text for w in ["insurance carrier", "insurance carriers and parishes", "contested line by line"]):
             new_fg = "fg_character_insurance_carrier_counsel"
