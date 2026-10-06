@@ -324,10 +324,10 @@ def load_task_metadata(task_id: str) -> dict:
 
     parts = [p for p in re.split(r"[_-]", task_id) if p]
     head = parts[0].upper() if parts else ""
-    if len(head) == 2 and head.isalpha():
-        mkt = validate_market_supported(head)
-    else:
-        mkt = "EN"
+    if head in ("VI", "VN"):
+        raise ValueError(f"Unsupported market '{head}' in task_id '{task_id}'. Market 'VI'/'VN' is forbidden.")
+    norm_head = normalize_market(head)
+    mkt = norm_head if norm_head in SUPPORTED_MARKETS else "EN"
     body = [p for p in parts[1:] if not re.fullmatch(r"ep\d+", p, re.I)]
     raw_name = "_".join(body) if body else task_id
     final_topic = _resolve_canonical_topic(raw_name.replace("_", " ").title(), "", task_id)
