@@ -230,7 +230,6 @@ def fetch_live_news_rss_chunks(query: str, market: str = "EN", limit: int = 10) 
             "JP": ("ja", "JP"),
             "KO": ("ko", "KR"),
             "KR": ("ko", "KR"),
-            "VN": ("vi", "VN"),
         }
         hl, gl = hl_gl_map.get(m_up, ("en-US", "US"))
         

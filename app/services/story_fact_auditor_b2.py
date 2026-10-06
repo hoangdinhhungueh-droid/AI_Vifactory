@@ -17,6 +17,7 @@ import os
 import re
 import json
 import logging
+from datetime import datetime, timezone
 from app.services.model_gateway import get_global_gateway
 from typing import Dict, Any, List, Optional
 
@@ -95,10 +96,11 @@ def audit_story_facts_and_causality(
     if causal_epochs:
         epochs_section = f"\n[CHRONO-CAUSAL EPOCHS & TEMPORAL CADENCE: {temporal_cadence}]\n" + json.dumps(causal_epochs, ensure_ascii=False, indent=2) + "\n"
 
+    current_audit_context = datetime.now(timezone.utc).strftime("%B %Y")
     user_prompt = f"""[TOPIC AUDIT TARGET]
 Task ID: {task_id}
 Topic: {topic} | Market: {m_up}
-Audit Context: September 2026 Live Production Pipeline
+Audit Context: {current_audit_context} Live Production Pipeline
 Temporal Cadence: {temporal_cadence}
 Content Axis / Theme: {topic_meta.get("content_theme") or topic_meta.get("niche_brief") or "Investigative Non-Fiction"}
 Rising Search Queries: {', '.join([str(q) for q in rising_queries[:6]])}

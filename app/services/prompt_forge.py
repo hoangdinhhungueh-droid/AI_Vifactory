@@ -665,12 +665,7 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
             fg_anchor = prof.get("fg_anchor", "Authentic Japanese individual, distinct East Asian facial structure, contemporary attire")
             return fg_anchor, f", {base_negs}" if base_negs else ""
 
-    # 4. Vietnamese Market (VN)
-    elif m == "VN":
-        anchor = prof.get("fg_anchor", "Authentic contemporary Vietnamese individual, natural Southeast Asian facial features, contemporary attire")
-        return anchor, f", {base_negs}" if base_negs else ""
-
-    # 5. Korean Market (KR)
+    # 4. Korean Market (KR)
     elif m == "KR":
         anchor = prof.get("fg_anchor", "Authentic contemporary Korean individual, natural Korean facial features, contemporary attire")
         return anchor, f", {base_negs}" if base_negs else ""
@@ -1254,7 +1249,7 @@ def generate_scene_prompts(
         "CRITICAL ARCHITECTURAL MANDATES (RULE 116 & RULE 435 & RULE 122 & RULE 128):\n"
         f"1. MARKET ETHNICITY & REGIONAL FIDELITY (Rule 122): Strictly adhere to target market {market_prof['market_name']}. "
         "Characters MUST feature authentic ethnic phenotype, bone structure, eye shape, and hairstyles matching this market. "
-        "NEVER default to Caucasian, Western, or American facial features for Asian markets (JP/KR/VN)! "
+        "NEVER default to Caucasian, Western, or American facial features for Asian markets (JP/KR)! "
         "Backgrounds MUST feature authentic local corporate/urban architecture and atmosphere matching this market. "
         "NEVER default to generic American high-rises for Asian settings!\n"
         "2. ERA & TOPIC AUTHENTICITY (Rule 128): Strictly derive era, architectural style, atmosphere, color palette, and lighting dynamically from the episode topic and scene narration. Zero domain bleed.\n"

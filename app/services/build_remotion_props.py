@@ -937,42 +937,35 @@ def synthesize_scene_motion_props(
         m_up = market.upper()
         is_kr = m_up == "KR" or any("\uac00" <= c <= "\ud7a3" for c in narr)
         is_jp = m_up == "JP" or any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narr)
-        is_vn = m_up == "VN"
         narr_lower = narr.lower()
 
         uncertain_kws_jp = ["不明", "未確認", "断定できない", "わからない", "謎", "調査中"]
         uncertain_kws_kr = ["불명", "미확인", "단정할 수 없", "알 수 없", "조사 중"]
-        uncertain_kws_vn = ["chưa rõ", "chưa xác nhận", "không rõ", "bí ẩn", "đang điều tra"]
         uncertain_kws_en = ["unclear", "unknown", "unverified", "unconfirmed", "uncertain"]
 
         is_uncertain = (
             any(k in narr for k in uncertain_kws_jp)
             or any(k in narr for k in uncertain_kws_kr)
-            or any(k in narr_lower for k in uncertain_kws_vn)
             or any(k in narr_lower for k in uncertain_kws_en)
         )
 
         if not res["connection"] and not res["radiating_connections"]:
             timeline_kws_jp = ["時系列", "前後", "重なる", "直後", "直前", "同時"]
             timeline_kws_kr = ["시계열", "전후", "겹치", "직후", "직전", "동시"]
-            timeline_kws_vn = ["thời gian", "trước sau", "trùng khớp", "ngay sau", "đồng thời"]
             timeline_kws_en = ["timeline", "before", "after", "overlap", "coincide", "sequence"]
 
             causal_kws_jp = ["関係", "関連", "原因", "なぜ", "しかし", "一方", "背景", "つながり", "連鎖", "経緯", "比較", "構造"]
             causal_kws_kr = ["관계", "관련", "원인", "왜", "그러나", "반면", "배경", "연결", "구조", "비교"]
-            causal_kws_vn = ["quan hệ", "liên quan", "nguyên nhân", "tại sao", "tuy nhiên", "mặt khác", "bối cảnh", "kết nối", "cấu trúc"]
             causal_kws_en = ["relationship", "related", "cause", "why", "however", "meanwhile", "connection", "link", "structure", "compare"]
 
             has_timeline = (
                 any(k in narr for k in timeline_kws_jp)
                 or any(k in narr for k in timeline_kws_kr)
-                or any(k in narr_lower for k in timeline_kws_vn)
                 or any(k in narr_lower for k in timeline_kws_en)
             )
             has_causal = (
                 any(k in narr for k in causal_kws_jp)
                 or any(k in narr for k in causal_kws_kr)
-                or any(k in narr_lower for k in causal_kws_vn)
                 or any(k in narr_lower for k in causal_kws_en)
             )
 
@@ -999,20 +992,17 @@ def synthesize_scene_motion_props(
                     lbl = (
                         "? 관계 불명 // 시계열 검증" if is_kr else
                         ("? 関係不明 // 時系列検証" if (is_jp and has_timeline) else
-                         ("? 関係不明 // 未確認" if is_jp else
-                          ("? CHƯA RÕ QUAN HỆ" if is_vn else "? UNCLEAR LINK // TIMELINE")))
+                         ("? 関係不明 // 未確認" if is_jp else "? UNCLEAR LINK // TIMELINE"))
                     )
                 elif has_timeline:
                     lbl = (
                         "시계열 교차 // TIMELINE" if is_kr else
-                        ("時系列の重なり // TIMELINE" if is_jp else
-                         ("TRÙNG KHỚP THỜI GIAN" if is_vn else "TIMELINE OVERLAP"))
+                        ("時系列の重なり // TIMELINE" if is_jp else "TIMELINE OVERLAP")
                     )
                 else:
                     lbl = (
                         "인과 구조 // CAUSAL LINK" if is_kr else
-                        ("因果・構造リンク // CAUSAL" if is_jp else
-                         ("LIÊN KẾT NHÂN QUẢ" if is_vn else "CAUSAL STRUCTURE"))
+                        ("因果・構造リンク // CAUSAL" if is_jp else "CAUSAL STRUCTURE")
                     )
                 res["connection"] = {
                     "fromX": 30 if is_left else 70,

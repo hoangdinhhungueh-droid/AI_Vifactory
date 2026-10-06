@@ -192,8 +192,6 @@ def resolve_market_redacted_terms(market: str = "EN") -> list[str]:
         return ["CONFIDENTIAL", "UNVERIFIED", "RESTRICTED", "CLASSIFIED"]
     elif m == "JP":
         return ["CONFIDENTIAL", "UNVERIFIED", "不適切", "不正"]
-    elif m == "VN":
-        return ["MẬT", "CHƯA KIỂM CHỨNG", "VI PHẠM", "ĐÌNH CHỈ"]
     elif m == "KR":
         return ["기밀", "미확인", "부적절", "위반"]
     return ["CONFIDENTIAL", "UNVERIFIED", "RESTRICTED"]
@@ -350,12 +348,11 @@ def detect_forensic_overlay(
         }
 
     # 1. Threshold Ratio Graphic (Generic Exceedance, statutory baseline limit, metric anomaly, toxic ratio, market dominance)
-    cjk_vn_threshold_triggers = [
-        "倍", "배", "lần", "gấp", "tỷ lệ", "tỉ lệ", "비율", "倍率", "%", "phần trăm",
+    cjk_threshold_triggers = [
+        "倍", "배", "비율", "倍率", "%",
         "基準値", "基準", "法定基準", "超過", "違反", "限度",
         "초과", "규제", "한도", "위반",
-        "vượt", "vượt trần", "quá mức", "hạn mức", "ngưỡng",
-        "thị phần", "독점", "점유율", "市場占有率", "シェア"
+        "독점", "점유율", "市場占有率", "シェア"
     ]
     en_threshold_pat = re.compile(
         r"\b(times|ratio|percent|exceed(?:s|ed|ing)?|surpass(?:es|ed|ing)?|threshold|residue|discrepancy|"
@@ -363,18 +360,17 @@ def detect_forensic_overlay(
         r"baseline|antitrust|rate|fold|cap)\b",
         re.IGNORECASE,
     )
-    has_threshold = any(k in t for k in cjk_vn_threshold_triggers) or bool(en_threshold_pat.search(t))
+    has_threshold = any(k in t for k in cjk_threshold_triggers) or bool(en_threshold_pat.search(t))
     if has_threshold:
         is_jp = any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in narration_text) or market.upper() == "JP"
         is_kr = market.upper() == "KR"
-        is_vn = market.upper() == "VN"
 
         quant = extract_episode_quantitative_profile(grounding_intel, narration_text, market)
         has_ratio = quant.ratio is not None
         has_comparison = quant.detected_value is not None and quant.baseline_value is not None
         # Guard against false statutory comparison when two arbitrary currency amounts appear in narration without exceedance terms
         has_explicit_exceedance = bool(re.search(
-            r"\b(exceed(?:s|ed|ing)?|surpass(?:es|ed|ing)?|threshold|limit|ceiling|cap|times|fold|ratio|baseline)\b|倍|배|초과|超過|基準|vượt|gấp|ngưỡng",
+            r"\b(exceed(?:s|ed|ing)?|surpass(?:es|ed|ing)?|threshold|limit|ceiling|cap|times|fold|ratio|baseline)\b|倍|배|초과|超過|基準",
             t,
             re.IGNORECASE,
         ))
@@ -411,13 +407,6 @@ def detect_forensic_overlay(
                     label = f"{std_name} 대비: {multiplier}배 // 2차 기준({sec_base}{unit}) 대비 {sec_multiplier}배"
                 else:
                     label = f"{std_name} 대비: {multiplier}배 초과"
-            elif is_vn:
-                title = f"GIÁM SÁT ĐỊNH LƯỢNG // {param_name.upper()}"
-                badge = f"VƯỢT {multiplier} LẦN HẠN MỨC"
-                if sec_multiplier:
-                    label = f"SO SÁNH QUY CHUẨN: VƯỢT {multiplier} LẦN // SO VỚI QUY CHUẨN PHỤ ({sec_base}{unit}) VƯỢT {sec_multiplier} LẦN"
-                else:
-                    label = f"SO SÁNH QUY CHUẨN: VƯỢT {multiplier} LẦN"
             else:
                 title = f"FORENSIC AUDIT // {param_name.upper()}"
                 badge = f"EXCEEDED BY {multiplier}X"

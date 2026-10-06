@@ -1554,13 +1554,12 @@ def generate_cinematography_scene_data(
         except ValueError:
             continue
         # Skip 4-digit calendar years (e.g. 2024年, 2026年) so they aren't mistaken for quantitative metrics
-        if unit_str in ("年", "년", "năm") and 1900 <= val <= 2099:
+        if unit_str in ("年", "년") and 1900 <= val <= 2099:
             continue
         stat_val_extracted = f"{prefix_sym}{m_num.group(2)}{unit_str}"
         stat_lbl_extracted = (
             "重要検証データ // VERIFIED METRIC" if mkt in ("JP", "JA") else
-            ("핵심 검증 지표 // VERIFIED METRIC" if mkt in ("KR", "KO") else
-             ("CHỈ SỐ KIỂM CHỨNG // VERIFIED METRIC" if mkt in ("VN", "VI") else "VERIFIED FORENSIC METRIC"))
+            ("핵심 검증 지표 // VERIFIED METRIC" if mkt in ("KR", "KO") else "VERIFIED FORENSIC METRIC")
         )
         if beat_idx in (1, 3, 4):
             linked_secondary.append({

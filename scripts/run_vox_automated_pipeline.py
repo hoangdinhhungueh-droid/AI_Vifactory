@@ -47,7 +47,6 @@ logger = logging.getLogger("vf.vox_automated_pipeline")
 
 VOICE_MAP = {
     "EN": "en-US-ChristopherNeural",
-    "VN": "vi-VN-NamMinhNeural",
     "JP": "ja-JP-KeitaNeural",
     "KR": "ko-KR-InJoonNeural",
 }

@@ -200,13 +200,19 @@ def load_task_metadata(task_id: str) -> dict:
             tid = _get_txt(props.get("Task ID", {}))
             eid = _get_txt(props.get("Episode ID", {}))
             if task_id in (tid, eid):
+                search_key = _get_txt(props.get("Search-Specific Key", {})) or _get_txt(props.get("Search Specific Keyword", {}))
+                raw_name = _get_txt(props.get("Name", {}))
+                clean_name = re.sub(r"^\[(?:KR|JP|EN)\]\s*", "", raw_name).strip()
+                is_vn = bool(re.search(r'[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]', clean_name, re.IGNORECASE))
+                final_topic = search_key if (is_vn and search_key) else (clean_name or search_key)
                 return {
                     "task_id": task_id,
                     "market": props.get("Market", {}).get("select", {}).get("name", "EN"),
-                    "topic": _get_txt(props.get("Name", {})),
+                    "topic": final_topic,
+                    "search_specific_keyword": search_key,
                     "story_arcs": _get_txt(props.get("Story Direction (5 Arcs)", {})),
                     "niche_brief": _get_txt(props.get("Niche Angle Brief", {})),
-                    "search_key": _get_txt(props.get("Search-Specific Key", {})),
+                    "search_key": search_key,
                     "page_id": r.get("id")
                 }
     except Exception as e:
@@ -359,6 +365,14 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
             "sentences": sentences
         }
 
+    if parsed and isinstance(parsed, dict) and parsed.get("sentences"):
+        s_list = parsed.get("sentences", [])
+        if s_list:
+            reconstructed = "".join(s.get("text", "").strip() for s in s_list) if is_cjk else " ".join(s.get("text", "").strip() for s in s_list if s.get("text", "").strip())
+            raw_text = (parsed.get("spoken_script_text") or "").strip()
+            if not raw_text or len(reconstructed) > len(raw_text):
+                parsed["spoken_script_text"] = reconstructed
+
     return parsed
 
 
@@ -482,6 +496,11 @@ def prune_and_tighten_spoken_script(spoken_data: dict, market: str = "EN", topic
         parsed = json.loads(cleaned.strip())
         if parsed and parsed.get("sentences") and len(parsed.get("sentences", [])) >= 80:
             logger.info(f"[story_engine] Auto-Pruning LLM pass succeeded with {len(parsed['sentences'])} sentences.")
+            s_list = parsed.get("sentences", [])
+            reconstructed = "".join(s.get("text", "").strip() for s in s_list) if is_cjk else " ".join(s.get("text", "").strip() for s in s_list if s.get("text", "").strip())
+            raw_text = (parsed.get("spoken_script_text") or "").strip()
+            if not raw_text or len(reconstructed) > len(raw_text):
+                parsed["spoken_script_text"] = reconstructed
             return parsed
     except Exception as e:
         logger.warning(f"[story_engine] Auto-pruning LLM call error: {e}. Applying deterministic sentence tightening.")
@@ -519,16 +538,24 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
     """
     meta = custom_meta or load_task_metadata(task_id)
     mkt = meta.get("market", "EN").upper()
-    # Rule 128 Macro Architecture: 3 Canonical Markets only (EN, JP, KR).
-    # Native topic must NEVER fallback to topic_name_vi (which is purely for Telegram Operator Gate 1).
-    topic = (
-        meta.get("topic")
-        or meta.get("title_a")
-        or meta.get("search_specific_keyword")
-        or meta.get("subject")
+    # Rule 128 & Rule 446 Native-First Architecture:
+    # 3 Canonical Markets only (EN, JP, KR). Vietnamese operator titles (topic_name_vi)
+    # are exclusively for Telegram Human Gate 1 review and MUST NEVER leak into the script or prompts!
+    native_candidate = (
+        meta.get("search_specific_keyword")
+        or meta.get("search_key")
         or meta.get("raw_term")
-        or task_id
+        or meta.get("subject")
     )
+    raw_topic = meta.get("topic") or meta.get("title_a") or ""
+    raw_topic = re.sub(r"^\[(?:KR|JP|EN)\]\s*", "", raw_topic).strip()
+
+    is_vietnamese_text = bool(re.search(r'[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]', raw_topic, re.IGNORECASE))
+    if is_vietnamese_text and native_candidate:
+        logger.info(f"[story_engine] Sanitizing Vietnamese operator topic '{raw_topic}' -> using native topic '{native_candidate}'")
+        topic = native_candidate
+    else:
+        topic = native_candidate or raw_topic or task_id
     viral_angle = meta.get("specific_viral_angle") or ""
     niche_brief = meta.get("niche_brief") or meta.get("niche_angle_brief") or ""
     story_arcs = meta.get("story_arcs") or meta.get("story_direction_5_arcs") or ""
@@ -1180,8 +1207,17 @@ CRITICAL EDITORIAL RULES:
             f"Est={spoken_audit.get('estimated_duration_minutes')}m"
         )
 
-    spoken_script_text = spoken_data.get("spoken_script_text") or full_script
     spoken_sentences = spoken_data.get("sentences") or []
+    if spoken_sentences:
+        is_cjk = mkt in ("KR", "JP", "ZH")
+        reconstructed_text = "".join(s.get("text", "").strip() for s in spoken_sentences if s.get("text", "").strip()) if is_cjk else " ".join(s.get("text", "").strip() for s in spoken_sentences if s.get("text", "").strip())
+        raw_text = (spoken_data.get("spoken_script_text") or "").strip()
+        if not raw_text or len(reconstructed_text) > len(raw_text):
+            spoken_script_text = reconstructed_text
+        else:
+            spoken_script_text = raw_text
+    else:
+        spoken_script_text = spoken_data.get("spoken_script_text") or full_script
 
     # Write spoken_script.txt & spoken_sentences.json to both directories
     for d in [out_dir, root_ep_dir]:

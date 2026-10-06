@@ -1,8 +1,8 @@
 """app/services/text_metrics.py - Multi-Lingual Text & Pacing Metric Standard.
 
 Standardizes length measurement, unit counting, and narration pacing estimation
-across all target markets in the AI Video Factory pipeline (EN, JP, KR, ZH, VI):
-1. Latin / Spaced Languages (EN, VI):
+across all target markets in the AI Video Factory pipeline (EN, JP, KR, ZH):
+1. Latin / Spaced Languages (EN):
    - Unit = Words (whitespace / regex delimited).
    - Speed = ~140-150 words per minute (WPM).
 2. Japanese (JP):
