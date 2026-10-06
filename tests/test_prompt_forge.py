@@ -294,3 +294,61 @@ def test_opus_astra_audit_macro_remediations():
     judge_out = _sanitize_foreground_prompt(judge_desc, fg_key="fg_character_judge", market="EN")
     assert "fluorescent yellow marker ink" in judge_out
 
+
+def test_opus_astra_round2_audit_macro_remediations():
+    """Rule 134: Test all Root Causes identified in Round 2 audit by Opus 5.5 and Astra 6."""
+    # 1. Character anchor key-priority routing (Root Cause 1):
+    # Counsel handling survivor claims must receive litigator anchor, NOT survivor civilian attire
+    counsel_desc = "Debtor's lead counsel reviewing survivor claims proof of claim documents"
+    counsel_out = _sanitize_foreground_prompt(counsel_desc, fg_key="fg_character_debtor_counsel", market="EN")
+    assert "institutional litigator" in counsel_out or "plaintiffs' legal counsel" in counsel_out
+    assert "modest contemporary civilian wardrobe" not in counsel_out
+    assert "dignified everyday attire" not in counsel_out
+    assert "no specific real-life likeness, no celebrity likeness" in counsel_out
+
+    comm_counsel_desc = "Creditors' committee counsel holding summary showing 99% rejection, jabbing it with an index finger"
+    comm_out = _sanitize_foreground_prompt(comm_counsel_desc, fg_key="fg_character_creditors_committee_counsel", market="EN")
+    assert "institutional litigator" in comm_out or "plaintiffs' legal counsel" in comm_out
+    assert "no aggressive pointing" in comm_out
+    assert "jabbing" not in comm_out
+    assert "resting an index finger" in comm_out
+
+    # 2. Era anchor misrouting on contemporary figures (Root Cause 2):
+    judge_desc = "Federal bankruptcy judge presiding over Case 23-40523 in courtroom"
+    judge_out = _sanitize_foreground_prompt(judge_desc, fg_key="fg_character_bankruptcy_judge", market="EN")
+    assert "Contemporary timeline" in judge_out
+    assert "1960s" not in judge_out
+
+    bishop_desc = "Diocesan bishop sitting at conference table reviewing past 1960-1989 diocesan records"
+    bishop_out = _sanitize_foreground_prompt(bishop_desc, fg_key="fg_character_diocesan_bishop", market="EN")
+    assert "Contemporary timeline" in bishop_out
+    assert "1960s" not in bishop_out
+    assert "no specific real-life likeness, no celebrity likeness" in bishop_out
+
+    survivor_desc = "Elderly survivor claimant holding plan ballot envelope, reflecting on 1970s experiences"
+    survivor_out = _sanitize_foreground_prompt(survivor_desc, fg_key="fg_character_elderly_survivor_claimant", market="EN")
+    assert "Contemporary timeline" in survivor_out
+    assert "1970s era documentary aesthetic" not in survivor_out
+    assert "folded personal document" not in survivor_out  # Competing prop suppressed because envelope already present!
+
+    # 3. Category bleed into backgrounds (Root Cause 3):
+    archive_bg = "Chancery archive file room with rows of labeled drawers and manila folders"
+    archive_out = _sanitize_background_prompt(archive_bg, bg_key="bg_chancery_archive_file_room", market="EN")
+    assert "unfilled template" not in archive_out
+    assert "official border" not in archive_out
+    assert "labeled drawers" not in archive_out
+
+    court_bg = "Empty federal bankruptcy courtroom with Great Seal of the United States and evidence monitor"
+    court_out = _sanitize_background_prompt(court_bg, bg_key="bg_empty_bankruptcy_courtroom", market="EN")
+    assert "Great Seal of the United States" not in court_out
+    assert "evidence monitor" not in court_out
+    assert "carved wooden eagle" in court_out
+
+    # 4. Text-bait & title removal (Root Cause 4):
+    titled_desc = "Counsel reviewing page titled 'Trust Funding' on podium"
+    titled_out = _sanitize_foreground_prompt(titled_desc, fg_key="fg_character_counsel", market="EN")
+    assert "titled 'Trust Funding'" not in titled_out
+    assert "Trust Funding'" not in titled_out
+    assert "blank legal document folio" in titled_out
+
+
