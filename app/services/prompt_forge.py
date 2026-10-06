@@ -311,6 +311,52 @@ NEGATIVE_R137 = (
 )
 R137_CLOSING_DIRECTIVE = "The image contains no writing or readable digits of any kind in any language."
 
+def apply_semantic_numeral_rewrites(text: str) -> str:
+    """Rewrite numbers, years, chapters, and statutory codes to descriptive words
+    so meaning survives while preventing raw digits from baking into images."""
+    if not text:
+        return ""
+    
+    # 1. Historical decades, centuries, and period years
+    text = re.sub(r"\b1950s\b", "nineteen-fifties era", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b1960s\b", "nineteen-sixties era", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b1970s\b", "nineteen-seventies era", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b1980s\b", "nineteen-eighties era", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b1990s\b", "nineteen-nineties era", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b2000s\b", "two-thousands era", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b2010s\b", "twenty-tens era", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b2020s\b", "twenty-twenties era", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bcirca\s*:\s*", "circa vintage era, ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bcirca\s*19(\d0)s?\b", r"circa nineteen-\1s era", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bcirca\s+197\d\b", "circa nineteen-seventies era", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bcirca\s+198\d\b", "circa nineteen-eighties era", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bcirca\s+196\d\b", "circa nineteen-sixties era", text, flags=re.IGNORECASE)
+
+    # 2. Bankruptcy chapters, legal codes, and statutes
+    text = re.sub(r"\bChapter\s+11\s+(?:voluntary\s+)?petition\b", "federal bankruptcy reorganization petition", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bChapter\s+11\b", "federal bankruptcy reorganization", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bChapter\s+7\b", "federal bankruptcy liquidation", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bChapter\s+13\b", "individual debt reorganization", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bChapter\s+(?:voluntary\s+)?petition\b", "federal bankruptcy reorganization petition", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bAB\s*218\b", "Child Victims Act legislative reform bill", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bAB\s*\d+\b", "legislative assembly bill", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bCase\s*#?\s*\d+[-\d]*\b", "federal court case record", text, flags=re.IGNORECASE)
+
+    # 3. Currency and metric values
+    text = re.sub(r"\b\$?330\+?\b", "hundreds of", text)
+    text = re.sub(r"\b\$?44\.6\s*(?:million|M)\b", "multimillion-dollar fee total", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b\$?242\s*(?:million|M)\b", "multimillion-dollar final settlement sum", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b\$?143\.5\s*(?:million|M)\b", "multimillion-dollar trust proposal", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b\$?76\.1\s*(?:million|M)\b", "multimillion-dollar estate valuation", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b\$?29\s*(?:million|M)\b", "tens of millions of dollars", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b\$?106\s*(?:million|M)\b", "hundreds of millions of dollars", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b99%\b", "overwhelming majority", text)
+    text = re.sub(r"\b42%\b", "substantial forty-percent", text)
+    text = re.sub(r"\b59%\b", "majority share", text)
+
+    return text
+
+
 @dataclass
 class LintResult:
     ok: bool
@@ -318,7 +364,7 @@ class LintResult:
     prompt: str
     negative: str
 
-def lint_visual_prompt(prompt: str, strict: bool = False) -> LintResult:
+def lint_visual_prompt(prompt: str, strict: bool = False, is_character: bool = False) -> LintResult:
     """
     Rule 137 Strict Prompt Linter.
     Scans visual prompt to purge and prevent baked-in text, currency symbols, and numbers.
@@ -327,6 +373,9 @@ def lint_visual_prompt(prompt: str, strict: bool = False) -> LintResult:
     """
     if not prompt:
         return LintResult(ok=True, violations=[], prompt="", negative=NEGATIVE_R137)
+    
+    # 0. Apply semantic rewrites first so conceptual terms survive without digits
+    prompt = apply_semantic_numeral_rewrites(prompt)
     
     # 1. Protect allowlisted technical tokens
     scrubbed = R137_ALLOWLIST.sub(" ", prompt)
@@ -337,12 +386,13 @@ def lint_visual_prompt(prompt: str, strict: bool = False) -> LintResult:
         for m in rx.finditer(scrubbed):
             violations.append((cat, m.group(0)))
             
-    # 3. Clean and inject blank template if document nouns present
+    # 3. Clean and inject blank template if document nouns present (ONLY for non-characters)
     fixed = prompt
     # Remove quoted strings that might contain fake text
     fixed = R137_BANNED["quoted"].sub("", fixed)
-    if not strict and DOC_NOUNS.search(fixed) and "unfilled template" not in fixed:
-        fixed = f"{fixed.rstrip('. ')}, {BLANK_TEMPLATE}"
+    if not strict and not is_character and DOC_NOUNS.search(fixed) and "unfilled template" not in fixed:
+        clean_prefix = re.sub(r"(?:\.|\,)?\s*\bFlat\b(?:\.|\,)?\s*$", "", fixed.strip(), flags=re.IGNORECASE).rstrip(". ,")
+        fixed = f"{clean_prefix}, {BLANK_TEMPLATE}"
     
     # Protect aspect ratios and cinematographic tokens before stripping numeric amounts
     aspect_masks = {
@@ -367,6 +417,11 @@ def lint_visual_prompt(prompt: str, strict: bool = False) -> LintResult:
 
     # Clean any dangling :aspect ratio or :1 aspect ratio relics without corrupting 1:1 or 16:9
     fixed = re.sub(r"(?<!\d),?\s*:\s*(?:aspect\s*ratio|\d+\s*aspect\s*ratio)", "", fixed, flags=re.IGNORECASE)
+    fixed = re.sub(r"\bcirca\s*:\s*", "circa vintage era, ", fixed, flags=re.IGNORECASE)
+    fixed = re.sub(r"\bChapter\s*(?:voluntary\s+)?petition\b", "federal bankruptcy reorganization petition", fixed, flags=re.IGNORECASE)
+    fixed = re.sub(r"\bFlat\s*,\s*", "", fixed)
+    fixed = re.sub(r",\s*Flat\b", "", fixed)
+    fixed = re.sub(r"(?:\.|\,)?\s*\bFlat\b(?:\.|\,)?\s*$", "", fixed.strip(), flags=re.IGNORECASE)
     
     # Ensure closing directive is present
     if R137_CLOSING_DIRECTIVE not in fixed:
@@ -378,13 +433,21 @@ def lint_visual_prompt(prompt: str, strict: bool = False) -> LintResult:
 
 def resolve_era_anchor(key: str, p: str) -> str:
     """Resolve era-specific timeline anchor dynamically to prevent generic placeholders (Rule 128)."""
-    combined = f"{key} {p}".lower()
+    combined = f"{key} {p}".replace("_", " ").lower()
     m_decade = re.search(r"\b(19[5-9]0s|20[0-2]0s)\b", combined)
     m_year = re.search(r"\b(19[5-9]\d|20[0-2]\d)\b", combined)
     if m_decade:
         return f"{m_decade.group(1)} era documentary aesthetic, authentic archival period atmosphere."
     elif m_year:
         return f"{m_year.group(1)} timeline, authentic period setting and documentary fidelity."
+    elif any(k in combined for k in ["1970", "seventies", "1970s"]):
+        return "1970s era documentary aesthetic, authentic archival period atmosphere."
+    elif any(k in combined for k in ["1980", "eighties", "1980s"]):
+        return "1980s era documentary aesthetic, authentic archival period atmosphere."
+    elif any(k in combined for k in ["1990", "nineties", "1990s"]):
+        return "1990s era documentary aesthetic, authentic archival period atmosphere."
+    elif any(k in combined for k in ["1960", "sixties", "1960s"]):
+        return "1960s era documentary aesthetic, authentic archival period atmosphere."
     elif "historical" in combined or "archival" in combined:
         return "Archival historical timeline, authentic period textures and documentary fidelity."
     else:
@@ -480,6 +543,9 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     p = re.sub(r"\b(?:Bottomkept|Bottomheld|Bottomreserved|Bottomis)\b", "bottom safe-zone", p, flags=re.IGNORECASE)
 
     p = re.sub(r"(?<!\d),?\s*:\s*(?:aspect\s*ratio|\d+\s*aspect\s*ratio)", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bcirca\s*:\s*", "circa vintage era, ", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bFlat\s*,\s*", "", p)
+    p = re.sub(r",\s*Flat\b", "", p)
     if "16:9" not in p:
         p = f"{p}, 16:9 aspect ratio"
     if "safe-zone" not in p and "safe zone" not in p:
@@ -580,7 +646,15 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
             leg_negs = f"{chroma_safe_negs}, no specific real-life likeness, no celebrity likeness"
             negs = f"{base_negs}, {leg_negs}" if base_negs else leg_negs
             return anchor, f", {negs}" if negs else ""
-        elif any(k in combined for k in ["bishop", "clergy", "priest", "pastor", "diocesan", "reverend", "cardinal"]):
+        elif any(k in combined for k in ["cfo", "finance", "financial", "accountant", "auditor", "controller", "treasurer"]):
+            anchor = (
+                "Authentic contemporary financial officer or forensic accountant reflecting authentic metropolitan demographic diversity, natural facial features, "
+                "understated dark corporate business suit or gray tailored blazer, disciplined body posture analyzing financial records, sharp focused expression, generic fictionalized professional"
+            )
+            cfo_negs = f"{chroma_safe_negs}, no clerical collar, no ecclesiastical vestments, no religious robes, no specific real-life likeness, no celebrity likeness"
+            negs = f"{base_negs}, {cfo_negs}" if base_negs else cfo_negs
+            return anchor, f", {negs}" if negs else ""
+        elif any(k in combined for k in ["bishop", "clergy", "priest", "pastor", "reverend", "cardinal"]) or ("diocesan" in combined and not any(f in combined for f in ["cfo", "finance", "officer", "staff", "accountant", "auditor"])):
             anchor = (
                 "Authentic contemporary ecclesiastical figure, natural facial features, "
                 "formal clerical attire or ecclesiastical clergy vestments, reserved formal posture, "
@@ -733,8 +807,10 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     p = re.sub(r"\bficial\b", "official", p)
 
     # Strip redundant chroma and isolation clauses from core description to prevent stutter
+    p = re.sub(r",?\s*(?:isolated\s+on\s+(?:a\s+solid\s+)?flat|isolated\s+on\s+flat|isolated\s+on\s+a\s+solid|isolated\s+on)\s*#FF00FF\s*(?:pure\s+)?(?:magenta\s+)?background.*$", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*(?:on\s+a\s+solid\s+flat|on\s+flat|solid\s+flat|flat\s+solid)\s*#FF00FF.*$", "", p, flags=re.IGNORECASE)
     p = re.sub(r",?\s*(?:isolated\s+on(?:\s+a)?(?:\s+solid)?(?:\s+flat)?\s*(?:#FF00FF)?(?:\s+pure)?(?:\s+magenta)?(?:\s+background)?)", "", p, flags=re.IGNORECASE)
-    p = re.sub(r",?\s*#FF00FF[^,]*", "", p, flags=re.IGNORECASE)
+    p = re.sub(r",?\s*#FF00FF[^,.]*", "", p, flags=re.IGNORECASE)
     p = re.sub(r"\[OPTICAL STYLE\][^\].]*\b(?:metric counter|mechanical counter|counter spinning|counter)\b[^.]*\.?", "", p, flags=re.IGNORECASE)
     p = re.sub(r"(?<!\d),?\s*:\s*(?:aspect\s*ratio|\d+\s*aspect\s*ratio)", "", p, flags=re.IGNORECASE)
     p = re.sub(r",?\s*(?:1:1|16:9|21:9|32:9)\s+aspect\s+ratio", "", p, flags=re.IGNORECASE)
@@ -745,6 +821,10 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     # String-join, chroma artifact, isolation breach, caption collision, and gaze cleaners
     p = re.sub(r"(?:pink|clothing)\.pure flat", "clothing.", p, flags=re.IGNORECASE)
     p = re.sub(r"\b(?:pure\s+flat|flat\s+pure)\b\.?", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"(?:\.|\,)?\s*\bFlat\b(?:\.|\,)?\s*$", "", p.strip(), flags=re.IGNORECASE)
+    p = re.sub(r"\bFlat\s*,\s*", "", p)
+    p = re.sub(r",\s*Flat\b", "", p)
+    p = re.sub(r"\bFlat\b\.?", "", p)
     p = re.sub(r"\b(?:Bottomkept|Bottomheld|Bottomreserved|Bottomis)\b", "bottom safe-zone", p, flags=re.IGNORECASE)
     p = re.sub(r"\bOaklands\b", "Oakland's", p)
     p = re.sub(r"\bABbill\b", "legislative assembly bill", p, flags=re.IGNORECASE)
@@ -773,8 +853,10 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     p = re.sub(r"\bprinted\s+(?:bill\s+text|document\s+text|order|bill|filing|statute|text)\b", "bound document", p, flags=re.IGNORECASE)
     p = re.sub(r"\bprinted\b", "bound", p, flags=re.IGNORECASE)
 
-    # Marked passage and labeled
-    p = re.sub(r"\b(?:highlighted\s+statute\s+of\s+limitations\s+section|highlighted\s+document\s+section|marked\s+passage)\b", "highlighted abstract block", p, flags=re.IGNORECASE)
+    # Marked passage and labeled (enforce yellow marker ink to prevent magenta #FF00FF keyout holes)
+    p = re.sub(r"\b(?:highlighted\s+statute\s+of\s+limitations\s+section|highlighted\s+document\s+section|marked\s+passage)\b", "highlighted with fluorescent yellow marker ink abstract block", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bhighlighted\b(?!\s+(?:with\s+yellow|in\s+yellow|yellow))", "highlighted with fluorescent yellow marker ink", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bhighlighting\b(?!\s+(?:with\s+yellow|in\s+yellow|yellow))", "highlighting with fluorescent yellow marker ink", p, flags=re.IGNORECASE)
     p = re.sub(r"\b(?:tall\s+bar\s+)?labeled,?", "with abstract shading,", p, flags=re.IGNORECASE)
     p = re.sub(r"\blabeled\b", "abstractly shaded", p, flags=re.IGNORECASE)
     p = re.sub(r"\bcase\s+number\s*-\s*", "", p, flags=re.IGNORECASE)
@@ -854,8 +936,8 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     # Strip static passport posture relics before linting
     p = re.sub(r",?\s*(?:full-body\s+head-to-shoes|standing\s+head-to-toe|head\s+to\s+toe\s+visible)", "", p, flags=re.IGNORECASE)
 
-    # Rule 137: Sanitize visual prompt through linter
-    lint_res = lint_visual_prompt(p, strict=False)
+    # Rule 137: Sanitize visual prompt through linter (is_character=True prevents BLANK_TEMPLATE from splicing into clothing)
+    lint_res = lint_visual_prompt(p, strict=False, is_character=not is_object)
     p = lint_res.prompt.replace(R137_CLOSING_DIRECTIVE, "").rstrip(". ,")
     p = re.sub(r"\bOaklands\b", "Oakland's", p)
     p = re.sub(r"\bABbill\b", "legislative assembly bill", p, flags=re.IGNORECASE)
@@ -872,10 +954,14 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     else:
         # Vox Actor-Prop Invariant: Subject + Action Verb + Physical Prop + Gaze Target
         action_verbs = [
-            "holding", "pointing", "clutching", "examining", "inspecting", "stamping", "pressing",
-            "presenting", "gripping", "lifting", "cutting", "signing", "writing", "highlighting",
-            "dialing", "opening", "pulling", "pushing", "turning", "counting", "sorting", "checking",
-            "reviewing", "reaching", "gesturing"
+            "holding", "holds", "held", "pointing", "points", "pointed", "clutching", "clutches",
+            "examining", "examines", "inspected", "inspecting", "inspects", "stamping", "stamps",
+            "pressing", "presses", "pressed", "presenting", "presents", "presented", "gripping", "grips",
+            "lifting", "lifts", "cutting", "cuts", "signing", "signs", "signed", "writing", "writes",
+            "highlighting", "highlighted", "dialing", "dials", "opening", "opens", "pulling", "pulls",
+            "pushing", "pushes", "turning", "turns", "counting", "counts", "sorting", "sorts",
+            "checking", "checks", "reviewing", "reviews", "reviewed", "reaching", "reaches",
+            "gesturing", "gestures", "running", "runs", "ran", "analyzing", "analyzes"
         ]
         has_action_verb = any(re.search(rf"\b{v}\b", p, re.IGNORECASE) for v in action_verbs)
         comb_fg = f"{fg_key} {p}".lower()
@@ -930,6 +1016,11 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     p = deduplicate_phrase_stutter(p)
     p = re.sub(r",\s*\.\s*", ", ", p)
     p = re.sub(r"(?<!\d),?\s*:\s*(?:aspect\s*ratio|\d+\s*aspect\s*ratio)", "", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bFlat\s*,\s*", "", p)
+    p = re.sub(r",\s*Flat\b", "", p)
+    p = re.sub(r"(?:\.|\,)?\s*\bFlat\b(?:\.|\,)?\s*", " ", p)
+    p = re.sub(r"\bcirca\s*:\s*", "circa vintage era, ", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bChapter\s*(?:voluntary\s+)?petition\b", "federal bankruptcy reorganization petition", p, flags=re.IGNORECASE)
     # Scrub fused words resulting from upstream numeric stripping
     p = re.sub(r"\bturned\s*degrees\b", "turned 20 degrees", p, flags=re.IGNORECASE)
     p = re.sub(r"\bturneddegrees\b", "turned 20 degrees", p, flags=re.IGNORECASE)

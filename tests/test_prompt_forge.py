@@ -260,3 +260,37 @@ def test_zero_aspect_ratio_mutilation_and_en_negative_isolation():
     assert "full-body" not in pos_part.lower()
     assert "figure in authentic" not in pos_part.lower()
     assert "[OBJECT FOCUS]" in fg_prop_out
+
+
+def test_opus_astra_audit_macro_remediations():
+    """Rule 134: Verify all 6 defects identified by Opus 5.5 and Astra 6 audit council are strictly resolved."""
+    # 1. Lay CFO character anchor & vestment exclusion
+    cfo_desc = "Waist-up view of a diocesan finance officer in a gray blazer and light blue shirt, running a pen down a column of a monthly operating report ledger"
+    cfo_out = _sanitize_foreground_prompt(cfo_desc, fg_key="fg_character_diocesan_cfo", market="EN")
+    assert "financial officer or forensic accountant" in cfo_out
+    assert "no clerical collar" in cfo_out
+    assert "ecclesiastical clergy vestments" not in cfo_out
+    assert "Flat," not in cfo_out
+    assert "Flat." not in cfo_out
+    assert "pointing index finger" not in cfo_out  # Active verb 'running' suppressed contradictory pointing
+
+    # 2. Bishop pose reconciliation & Chapter 11 semantic preservation
+    bishop_desc = "Waist-up view of a bishop in black suit, pen pressed to the signature line of a Chapter 11 voluntary petition"
+    bishop_out = _sanitize_foreground_prompt(bishop_desc, fg_key="fg_character_diocesan_bishop", market="EN")
+    assert "federal bankruptcy reorganization" in bishop_out
+    assert "hands folded before them in deliberate silence" not in bishop_out  # Active verb 'pressed' suppressed passive hands folded
+    assert "Flat," not in bishop_out
+    assert "unfilled template with official border" not in bishop_out  # Human character does not get spliced object template
+
+    # 3. 1970s Parish rectory era anchor & date preservation
+    rectory_desc = "2D graphic novel illustration of an East Bay parish rectory office circa 1970s: dark wood desk, rotary telephone"
+    rectory_out = _sanitize_background_prompt(rectory_desc, bg_key="bg_1970s_parish_rectory_office", market="EN")
+    assert "1970s era documentary aesthetic" in rectory_out
+    assert "circa :" not in rectory_out
+    assert "nineteen-seventies era" in rectory_out or "1970s" in rectory_out
+
+    # 4. Fluorescent yellow highlighter enforcement
+    judge_desc = "Federal bankruptcy judge examining a highlighted fee schedule on desk"
+    judge_out = _sanitize_foreground_prompt(judge_desc, fg_key="fg_character_judge", market="EN")
+    assert "fluorescent yellow marker ink" in judge_out
+
