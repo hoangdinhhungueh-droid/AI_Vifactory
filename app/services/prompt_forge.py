@@ -431,11 +431,15 @@ def lint_visual_prompt(prompt: str, strict: bool = False, is_prop: bool = False,
         for m in rx.finditer(scrubbed):
             violations.append((cat, m.group(0)))
             
-    # 3. Clean and inject blank template if document nouns present (ONLY for evidence props, NEVER environments or characters)
+    # 3. Clean and inject blank template if document nouns present (ONLY for raw evidence props that lack hygiene, NEVER environments, characters, or already-hygienic prompts)
     fixed = prompt
     # Remove quoted strings that might contain fake text
     fixed = R137_BANNED["quoted"].sub("", fixed)
-    if not strict and is_prop and DOC_NOUNS.search(fixed) and "unfilled template" not in fixed:
+    already_hygienic = any(k in fixed.lower() for k in [
+        "without typography", "no typography", "blank unfilled", "blank surfaces",
+        "without readable", "unlabeled abstract", "chart", "histogram", "waterfall"
+    ])
+    if not strict and is_prop and DOC_NOUNS.search(fixed) and not already_hygienic and "unfilled template" not in fixed:
         clean_prefix = re.sub(r"(?:\.|\,)?\s*\bFlat\b(?:\.|\,)?\s*$", "", fixed.strip(), flags=re.IGNORECASE).rstrip(". ,")
         fixed = f"{clean_prefix}, {BLANK_TEMPLATE}"
     
