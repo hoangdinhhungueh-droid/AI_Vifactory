@@ -230,7 +230,7 @@ def deduplicate_phrase_stutter(text: str) -> str:
             parts.append(cleaned[last_idx:])
             cleaned = "".join(parts)
 
-    # 4. Deduplicate items inside [STRICT NEGATIVE PROMPT] to prevent token dilution
+    # 4. Deduplicate items inside [STRICT NEGATIVE PROMPT] to prevent token dilution while preserving R137 contract
     if "[STRICT NEGATIVE PROMPT]" in cleaned:
         neg_split = cleaned.split("[STRICT NEGATIVE PROMPT]")
         prefix = neg_split[0]
@@ -238,15 +238,32 @@ def deduplicate_phrase_stutter(text: str) -> str:
         closing_m = re.search(r"The image contains no writing or readable digits of any kind in any language\.?", neg_tail, re.IGNORECASE)
         closing_txt = f" {closing_m.group(0)}" if closing_m else ""
         neg_body = neg_tail[:closing_m.start()] if closing_m else neg_tail
-        items = [item.strip(" ,.") for item in neg_body.split(",") if item.strip(" ,.")]
-        seen_neg = set()
-        deduped_items = []
-        for it in items:
-            it_key = re.sub(r"^\bno\s+", "", it, flags=re.IGNORECASE).strip().lower()
-            if it_key and it_key not in seen_neg:
-                seen_neg.add(it_key)
-                deduped_items.append(it)
-        cleaned = f"{prefix}[STRICT NEGATIVE PROMPT] {', '.join(deduped_items)}.{closing_txt}".strip()
+
+        has_r137 = NEGATIVE_R137 in neg_body
+        if has_r137:
+            neg_body_without_r137 = neg_body.replace(NEGATIVE_R137, "__R137_BLOCK__")
+            items = [item.strip(" ,.") for item in neg_body_without_r137.split(",") if item.strip(" ,.")]
+            seen_neg = set()
+            deduped_items = []
+            for it in items:
+                if it == "__R137_BLOCK__":
+                    deduped_items.append(NEGATIVE_R137)
+                    continue
+                it_key = re.sub(r"^\bno\s+", "", it, flags=re.IGNORECASE).strip().lower()
+                if it_key and it_key not in seen_neg and f"no {it_key}" not in NEGATIVE_R137.lower():
+                    seen_neg.add(it_key)
+                    deduped_items.append(it)
+            cleaned = f"{prefix}[STRICT NEGATIVE PROMPT] {', '.join(deduped_items)}.{closing_txt}".strip()
+        else:
+            items = [item.strip(" ,.") for item in neg_body.split(",") if item.strip(" ,.")]
+            seen_neg = set()
+            deduped_items = []
+            for it in items:
+                it_key = re.sub(r"^\bno\s+", "", it, flags=re.IGNORECASE).strip().lower()
+                if it_key and it_key not in seen_neg:
+                    seen_neg.add(it_key)
+                    deduped_items.append(it)
+            cleaned = f"{prefix}[STRICT NEGATIVE PROMPT] {', '.join(deduped_items)}.{closing_txt}".strip()
 
     # 5. Clean up dangling prepositions, commas, and whitespace
     cleaned = re.sub(r"\b(with|in|of|and|for|at)\s*([,.;])", r"\2", cleaned, flags=re.IGNORECASE)
@@ -324,6 +341,8 @@ def lint_visual_prompt(prompt: str, strict: bool = False) -> LintResult:
     fixed = prompt
     # Remove quoted strings that might contain fake text
     fixed = R137_BANNED["quoted"].sub("", fixed)
+    if not strict and DOC_NOUNS.search(fixed) and "unfilled template" not in fixed:
+        fixed = f"{fixed.rstrip('. ')}, {BLANK_TEMPLATE}"
     
     # Protect aspect ratios and cinematographic tokens before stripping numeric amounts
     aspect_masks = {
