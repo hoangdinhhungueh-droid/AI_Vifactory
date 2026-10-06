@@ -66,7 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=["pipeline", "block", "audit", "ci", "sync", "review", "sweep", "council", "plan", "supervise"],
+        choices=["pipeline", "block", "audit", "ci", "sync", "review", "sweep", "council", "plan", "supervise", "clean", "janitor"],
         default="pipeline",
         help="Operational mode (default: pipeline)",
     )
@@ -233,6 +233,8 @@ class OrchestratorRunner:
                 return self._run_plan_mode(sandbox)
             elif mode == "supervise":
                 return self._run_supervise_mode(sandbox)
+            elif mode in {"clean", "janitor"}:
+                return self._run_clean_mode(sandbox)
             else:
                 print(f"Unknown mode: {mode}", file=sys.stderr)
                 return 1
@@ -1148,6 +1150,32 @@ class OrchestratorRunner:
             )
 
         return 0 if passed else 1
+
+    def _run_clean_mode(self, sandbox: ResourceSandbox) -> int:
+        """Executes Antigravity Janitor & Clean Vibecoding Routine (Rule 125 & 137)."""
+        from scripts.orchestrator.antigravity_janitor import AntigravityJanitor
+        janitor = AntigravityJanitor(self.root_dir)
+        bloat_items = janitor.scan_disk_bloat()
+        zombie_data = janitor.scan_zombie_code()
+
+        total_size = sum(b["size_bytes"] for b in bloat_items)
+        if self.args.json_output:
+            print(json.dumps({
+                "status": "success",
+                "bloat_items_count": len(bloat_items),
+                "total_bloat_bytes": total_size,
+                "zombie_functions_count": zombie_data.get("zombie_functions_count", 0),
+                "bloat": bloat_items,
+                "zombies": zombie_data.get("zombie_functions", []),
+            }, indent=2, ensure_ascii=False))
+        else:
+            print("\n=================================================================")
+            print("🧹 RUNNER JANITOR: ANTIGRAVITY WORKSPACE HYGIENE AUDIT")
+            print("=================================================================")
+            print(f"📦 Bloat Targets:    {len(bloat_items)} ({total_size / (1024 * 1024):.2f} MB reclaimable)")
+            print(f"🧟 Zombie Functions: {zombie_data.get('zombie_functions_count', 0)} detected via AST")
+            print("=================================================================\n")
+        return 0
 
 
 def main() -> None:

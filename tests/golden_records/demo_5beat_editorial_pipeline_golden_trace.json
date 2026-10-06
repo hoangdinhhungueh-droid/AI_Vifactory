@@ -1,0 +1,47 @@
+{
+  "stage_id": "demo_5beat_editorial_pipeline",
+  "recorded_at": "2026-10-06 11:46:37 UTC",
+  "inputs_hash": "43a7f3aff89fefd8",
+  "inputs": {
+    "market": "EN",
+    "topic": "The South Sea Bubble Forensic Collapse",
+    "timestamp": 1720000000
+  },
+  "output": {
+    "title": "The £100,000,000 Illusion: How Isaac Newton Lost a Fortune",
+    "scenes": [
+      {
+        "beat_index": 1,
+        "title": "Cold Strike",
+        "narration": "In the spring of 1720, the British Empire mortgaged its national debt to a trading company that owned no ships.",
+        "duration_sec": 18.5
+      },
+      {
+        "beat_index": 2,
+        "title": "False Narrative",
+        "narration": "Brokers promised endless South American gold, inflating stock by 800% in six months.",
+        "duration_sec": 24.0
+      },
+      {
+        "beat_index": 3,
+        "title": "Forensic Paper Trail",
+        "narration": "Parliamentary records reveal insiders began liquidating their positions in August.",
+        "duration_sec": 30.2
+      },
+      {
+        "beat_index": 4,
+        "title": "Smoking Gun",
+        "narration": "The bubble burst overnight. Sir Isaac Newton dumped his stock, having lost £20,000.",
+        "duration_sec": 22.0
+      },
+      {
+        "beat_index": 5,
+        "title": "Modern Mirror",
+        "narration": "Three centuries later, every liquidity trap still follows the exact South Sea blueprint.",
+        "duration_sec": 26.1
+      }
+    ],
+    "total_duration_sec": 120.8
+  },
+  "metadata": {}
+}
