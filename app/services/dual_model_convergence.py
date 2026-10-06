@@ -113,7 +113,7 @@ def run_dual_model_convergence(
     import app.services.story_gate as sgate
 
     task_id = topic_meta.get("task_id", "UNKNOWN_TASK")
-    topic = topic_meta.get("topic_name_vi") or topic_meta.get("topic") or task_id
+    topic = topic_meta.get("topic") or topic_meta.get("title_a") or topic_meta.get("raw_term") or task_id
     gateway = get_global_gateway()
     m_up = (market or "EN").strip().upper()
 

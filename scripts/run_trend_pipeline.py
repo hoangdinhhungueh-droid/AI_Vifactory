@@ -178,7 +178,8 @@ def main():
     print("=======================================================")
 
     for t in results["approved_topics"]:
-        print(f"[{t['market']}] {t.get('topic_name_vi')} (Slug: {t.get('task_slug')})")
+        native_topic = t.get('topic') or t.get('title_a') or t.get('topic_name_vi') or t.get('task_slug')
+        print(f"[{t['market']}] {native_topic} (Slug: {t.get('task_slug')})")
         print(f"   Angle: '{t.get('specific_viral_angle')}'")
         print(f"   Blue Ocean Gap: {t.get('competitor_differentiation_gap')}")
         print(f"   Task ID: {t.get('task_id')}")

@@ -86,7 +86,7 @@ def audit_story_facts_and_causality(
 
     task_id = topic_meta.get("task_id", "")
     m_up = (market or "KR").strip().upper()
-    topic = topic_meta.get("topic_name_vi") or topic_meta.get("raw_term") or task_id
+    topic = topic_meta.get("topic") or topic_meta.get("title_a") or topic_meta.get("raw_term") or task_id
     temporal_cadence = (topic_meta.get("temporal_cadence") or "MID_TACTICAL").upper()
     causal_epochs = topic_meta.get("causal_epochs") or []
     rising_queries = topic_meta.get("rising_queries") or []
@@ -206,7 +206,7 @@ def audit_delta_patched_acts(
 
     task_id = topic_meta.get("task_id", "")
     m_up = (market or "EN").strip().upper()
-    topic = topic_meta.get("topic_name_vi") or topic_meta.get("raw_term") or task_id
+    topic = topic_meta.get("topic") or topic_meta.get("title_a") or topic_meta.get("raw_term") or task_id
 
     # Format lean grounding table (Rule 126 & 134: Zero-Truncation Parity)
     grounding_brief = []

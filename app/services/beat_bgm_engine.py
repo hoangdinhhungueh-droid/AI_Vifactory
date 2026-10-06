@@ -196,7 +196,7 @@ def _extract_story_context(episode_id: str, out_dir: Optional[str] = None) -> Di
         try:
             with open(brain_path, "r", encoding="utf-8") as f:
                 bdata = json.load(f)
-            context["topic"] = bdata.get("topic_name_vi") or bdata.get("topic") or episode_id
+            context["topic"] = bdata.get("topic") or bdata.get("title_a") or bdata.get("raw_term") or episode_id
             context["market"] = bdata.get("market", "EN")
             context["pillar"] = bdata.get("niche_angle_brief") or bdata.get("pillar", "")
         except Exception as e:

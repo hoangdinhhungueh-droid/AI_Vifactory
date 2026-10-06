@@ -1112,16 +1112,18 @@ def discover_and_produce_market_trend(
         if comp_gap:
             niche_data["competitor_differentiation_gap"] = comp_gap
 
+        native_topic = niche_data.get("search_specific_keyword") or term
         t_obj = {
             "market": m_up,
             "raw_term": term,
+            "topic": native_topic,
             "geos_present": c.get("geos_present"),
             "approx_traffic": c.get("approx_traffic"),
             "viability_score": score,
             "specific_viral_angle": specific_angle,
             "visual_feasibility": viability.get("visual_feasibility_score"),
             "conflict_depth": viability.get("conflict_depth_score"),
-            "topic_name_vi": niche_data.get("topic_name_vi"),
+            "topic_name_vi": niche_data.get("topic_name_vi"),  # Retained exclusively for Telegram Gate 1 operator display
             "search_specific_keyword": niche_data.get("search_specific_keyword"),
             "task_slug": niche_data.get("task_slug"),
             "niche_angle_brief": niche_data.get("niche_angle_brief"),
@@ -1210,6 +1212,7 @@ def discover_and_produce_market_trend(
                 t_obj["seo_package"] = seo_pkg
                 t_obj["title_a"] = seo_pkg.get("title_a")
                 t_obj["title_b"] = seo_pkg.get("title_b")
+                t_obj["topic"] = seo_pkg.get("title_a") or t_obj.get("topic") or term
                 t_obj["hook_3s"] = seo_pkg.get("hook_3s")
                 t_obj["hook_60s"] = seo_pkg.get("hook_60s")
                 t_obj["specific_viral_angle"] = seo_pkg.get("specific_viral_angle") or t_obj.get("specific_viral_angle")

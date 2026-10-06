@@ -166,13 +166,11 @@ def _write_or_update_card(
         observation: str, directive: str, confidence: float, ts: str
 ):
     """Upsert an InsightCard row in Experiment Lab DB."""
-    # Check existing card for same market+dimension
+    # Check existing card for same market+dimension (keyed by Episode ID)
+    card_ep_id = f'IC_{market}_{dimension}'
     filter_payload = {
         'filter': {
-            'and': [
-                {'property': 'Market',    'select': {'equals': market}},
-                {'property': 'Episode ID', 'rich_text': {'equals': f'IC_{dimension}'}},
-            ]
+            'property': 'Episode ID', 'rich_text': {'equals': card_ep_id}
         }
     }
     existing = _notion_req(
@@ -184,16 +182,19 @@ def _write_or_update_card(
 
     props = {
         'Name': {'title': [{'type': 'text', 'text': {
-            'content': f'[InsightCard] {market} / {dimension}'[:80]
+            'content': f'[{market}] IC_{dimension}'[:80]
         }}]},
         'Episode ID': {'rich_text': [{'type': 'text', 'text': {
-            'content': f'IC_{dimension}'
+            'content': card_ep_id
         }}]},
-        'Market': {'select': {'name': market}},
+        'Task ID': {'rich_text': [{'type': 'text', 'text': {
+            'content': card_ep_id
+        }}]},
         'State Stage': {'select': {'name': INSIGHT_CARD_TYPE}},
         'Insight': {'rich_text': [{'type': 'text', 'text': {
             'content': (
                 f'[DIMENSION] {dimension}\n'
+                f'[MARKET] {market}\n'
                 f'[OBSERVATION] {observation}\n'
                 f'[DIRECTIVE] {directive}\n'
                 f'[CONFIDENCE] {confidence:.2f}\n'
@@ -246,7 +247,7 @@ def fetch_active_insights(
     filter_payload = {
         'filter': {
             'and': [
-                {'property': 'Market', 'select': {'equals': market}},
+                {'property': 'Episode ID', 'rich_text': {'starts_with': f'IC_{market}_'}},
                 {'property': 'State Stage', 'select': {'equals': INSIGHT_CARD_TYPE}},
             ]
         },
@@ -298,7 +299,7 @@ def _parse_insight_text(text: str) -> Optional[dict]:
         return None
     result = {}
     for line in text.splitlines():
-        for key in ['DIMENSION', 'OBSERVATION', 'DIRECTIVE', 'CONFIDENCE', 'EXPIRES_AFTER']:
+        for key in ['DIMENSION', 'MARKET', 'OBSERVATION', 'DIRECTIVE', 'CONFIDENCE', 'EXPIRES_AFTER']:
             prefix = f'[{key}] '
             if line.startswith(prefix):
                 val = line[len(prefix):].strip()
