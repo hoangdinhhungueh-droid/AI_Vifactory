@@ -29,7 +29,7 @@ The formal reorganization proposed a one hundred forty-three point five million 
 
 Yet after three years in Chapter eleven, not a single dollar from the proposed settlement fund had been approved or distributed to claimants.
 
-The roadblock was structural. The size of the recoverable fund was strictly constrained by the legal perimeter of the bankruptcy estate. Initial bankruptcy schedules listed debtor assets of roughly seventy-six point one million dollars, establishing the baseline accounting perimeter for the reorganization. The larger settlement proposals depended on outside contributions from parishes and insurance carriers.
+The roadblock was structural. The size of the recoverable fund depended on where the legal perimeter of the bankruptcy estate was drawn. Initial bankruptcy schedules listed debtor assets of roughly seventy-six point one million dollars, establishing the baseline accounting perimeter for the reorganization. The larger settlement proposals depended on outside contributions from parishes and insurance carriers.
 
 While historical liability insurance policies were assets of the debtor's estate, the diocese maintained that third-party carriers and separate parish corporations were legally distinct entities, outside the central estate perimeter. Both conditioned their financial contributions on complete releases shielding them from future lawsuits.
 
@@ -59,7 +59,7 @@ That narrative was only the comforting half. Chapter eleven seeks collective res
 
 One documented operational reality collided with a rigid legal structure. Parish weekly attendance declined roughly forty-two percent between twenty nineteen and twenty twenty-four, severely eroding parish collections.
 
-According to diocesan financial disclosures and canonical structures, parish operational bank accounts were maintained separately from the central chancery. However, the central chancery depends on monthly cathedraticum assessments, the canonical diocesan cathedraticum assessment, remitted from parish collections.
+According to diocesan financial disclosures and canonical structures, parish operational bank accounts were maintained separately from the central chancery. However, the central chancery depends on monthly cathedraticum assessments remitted from parish collections.
 
 When weekly collections shrank, diocesan assessment revenues contracted in tandem, directly contributing to operating cash deficits that constrained the chancery's capacity to fund multi-million-dollar installments.
 
@@ -67,7 +67,7 @@ Examine the legal perimeter of the estate. The diocese maintained that parishes 
 
 Contested historical insurance added another hurdle. Policies written between nineteen sixty and nineteen eighty-nine required coverage terms and limits to be litigated line by line.
 
-The popular version is that plaintiff attorneys demanded too much, or that the diocese held no assets. Both are myths of comfort.
+The popular version is that plaintiff attorneys demanded too much, or that the diocese held no assets. Both oversimplify the legal reality.
 
 This diocese is an independent legal entity under California law, legally distinct from the global church. Conflating them obscures where assets reside.
 
@@ -79,7 +79,7 @@ While parties contested those boundaries, the administrative clock continued run
 
 March seventeenth, twenty twenty-five. The diocese filed its Third Amended Plan of Reorganization under docket entry twelve oh four. The plan proposed approximately one hundred forty-three point five million dollars for a survivors' trust.
 
-Survivor advocates consistently criticized the offer as insufficient. On June sixth, twenty twenty-five, a voting declaration documented a ninety-nine percent rejection rate among voting survivor creditors.
+In committee filings, survivor advocates consistently criticized the offer as insufficient. On June sixth, twenty twenty-five, a voting declaration documented a ninety-nine percent rejection rate among voting survivor creditors.
 
 Three months later, on September ninth, twenty twenty-five, the diocese moved to dismiss its own Chapter eleven case. The debtor cited a negotiation deadlock after absorbing twenty-nine million dollars in accumulated operating cash deficits across fiscal years twenty twenty-three through twenty twenty-five.
 
@@ -107,9 +107,9 @@ Parish real estate remained outside the debtor's scheduled estate. Following the
 
 === ACT IV ===
 
-The structure failed in stages. After mediation concluded without a consensual Fourth Amended Plan, the parties returned to court, where the debtor sought confirmation of its pending Third Amended Plan before resolving the abated dismissal motion. Judge Lafferty formally denied confirmation on October fifth, twenty twenty-six.
+The structure failed in stages. After mediation concluded without a consensual Fourth Amended Plan, the court proceeded with the scheduled confirmation hearing to test the Third Amended Plan under Title eleven while the debtor's dismissal motion remained pending. Judge Lafferty formally denied confirmation on October fifth, twenty twenty-six.
 
-Six months earlier, in April twenty twenty-six, a decisive new comparison point emerged outside the bankruptcy court. The Bankruptcy Court had granted stay relief for a bellwether test case against the diocese in Alameda County Superior Court. On April twenty-second, twenty twenty-six, an Alameda County jury returned a verdict awarding sixteen million dollars against the diocese, as reported by public media outlet K-Q-E-D.
+Six months earlier, in April twenty twenty-six, a decisive new comparison point emerged outside the bankruptcy court. The Bankruptcy Court had granted stay relief for a bellwether test case against the diocese in Alameda County Superior Court. On April twenty-second, twenty twenty-six, an Alameda County jury returned a verdict awarding sixteen million dollars against the diocese, as reported by public media outlet KQED.
 
 Compare the stark numbers. Dividing headline bankruptcy funds across three hundred thirty active claims yielded illustrative average recoveries of roughly four hundred thirty-five thousand dollars under the plan, or seven hundred thirty-three thousand dollars under the mediation proposal, assuming equal distribution.
 
@@ -125,7 +125,7 @@ Second, statutory confirmation requires compliance with Title eleven under secti
 
 Even if cramdown under section eleven twenty-nine, subsection B, were attempted, cramdown can only bind dissenting creditors to lawful plan terms, and cannot bypass the Supreme Court's statutory bar on nonconsensual third-party releases.
 
-Because the plan conditioned parish and insurer contributions on universal non-debtor releases that survivor claimants refused to grant, the court could not confirm the instrument.
+Because the Third Amended Plan contained nonconsensual non-debtor releases that Class Four rejected, and conditioned parish and insurer contributions on those unauthorized releases, the court could not confirm the instrument.
 
 With that ruling entered, the legal architecture of the debtor's Third Amended Plan collapsed.
 
@@ -155,7 +155,7 @@ After Purdue Pharma, that shield cannot be imposed by decree.
 
 Now return to the question posed at the start: how does a multi-year Chapter eleven proceeding carrying hundreds of millions in settlement proposals stall for three years without a single dollar approved for distribution?
 
-The Oakland reorganization stalled within the perimeter constraint of seventy-six point one million dollars in initial scheduled assets, while outside parish contributions remained conditioned on universal releases survivors would not grant. When one jury valued a single claim at sixteen million dollars, it supplied an independent benchmark far above the illustrative trust averages, sharply challenging the economic basis of any capped settlement.
+The Oakland reorganization stalled against an initial scheduled-asset baseline of seventy-six point one million dollars, while outside parish contributions remained conditioned on universal releases survivors would not grant. When one jury valued a single claim at sixteen million dollars, it supplied an independent benchmark far above the illustrative trust averages, sharply challenging the economic basis of any capped settlement.
 
 The proposed trust could not bridge that valuation chasm. It could not purchase third-party releases without survivor consent.
 

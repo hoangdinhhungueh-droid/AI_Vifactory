@@ -234,7 +234,7 @@ CLEAN_RAW_FGS = {
         "Bold ink, cel-shading, heavy bound document texture."
     ),
     "fg_evidence_claims_decade_histogram": (
-        "Stylized 2D forensic statistical histogram chart on cream archival grid paper, displaying vertical data distribution columns showing chronological claim distributions rising steadily across nineteen-sixties interval columns, reaching prominent peak maximum columns in the nineteen-seventies interval, and tapering downward across nineteen-eighties interval columns, "
+        "Stylized 2D forensic statistical histogram chart on cream archival grid paper, displaying vertical data distribution columns showing chronological claim distributions rising steadily across early period interval columns, reaching prominent peak maximum columns in the intermediate period interval, and tapering downward across subsequent historical interval columns, "
         "with prominent peak bars accented in contrasting tones, plain unruled margins, nonlinguistic graphic rules only. Bold ink, cel-shading, tactile grid paper texture."
     ),
     "fg_evidence_third_amended_plan": (
@@ -242,12 +242,12 @@ CLEAN_RAW_FGS = {
         "in muted gold and slate tones, blank pages with illegible abstract line-marks only. Bold ink, cel-shading, heavy bound paper folio."
     ),
     "fg_evidence_trust_offer_bar_chart": (
-        "Stylized 2D forensic financial bar chart graphic on aged ledger paper: three distinct vertical geometric column bars on a clean horizontal baseline, "
-        "the first left bar rising to roughly one-third graphic height representing scheduled liquid assets, the second middle bar rising to roughly three-fifths graphic height representing the reorganization trust offer, and the third right bar rising to full graphic height representing the mediated settlement benchmark. "
+        "Stylized 2D forensic financial bar chart graphic on aged ledger paper: three distinct ascending vertical geometric column bars on a clean horizontal baseline, "
+        "the first left bar representing scheduled liquid assets, the second middle bar rising higher representing the reorganization trust proposal, and the third right bar reaching the highest level representing the mediated settlement benchmark. "
         "Clean abstract geometric rules, dual-tone fill shading, plain unruled margins, blank nonlinguistic ledger paper texture, nonlinguistic graphic novel styling. Bold ink, cel-shading."
     ),
     "fg_evidence_ballot_tabulation": (
-        "Authentic bankruptcy creditor voting tabulation diagram: two-dimensional circular donut chart dividing ring dominated by a massive dark vermilion segment comprising ninety-nine percent of the circumference, "
+        "Authentic bankruptcy creditor voting tabulation diagram: two-dimensional circular donut chart dividing ring dominated by an overwhelming dark vermilion segment encompassing nearly the entire circumference, "
         "adjacent to a hairline sliver of olive green segment, clean graphic rule lines, plain unruled paper surface, nonlinguistic graphic novel styling. "
         "Bold ink, cel-shading, crisp paper texture."
     ),
@@ -271,8 +271,8 @@ CLEAN_RAW_FGS = {
     "fg_evidence_valuation_comparison": (
         "Editorial illustration of an evidence valuation comparison exhibit card: "
         "a cream rectangular exhibit card displaying comparative solid geometric column bars on a subtle horizontal baseline. "
-        "On the left, a tall solid dark vermilion column filling roughly ninety percent of card height representing the sixteen-million-dollar jury benchmark; "
-        "on the right, two adjacent short solid slate-gray comparative bars measuring approximately three to four percent of the tall column height: an intermediate bar measuring roughly four point six percent representing the seven-hundred-thirty-three-thousand mediation average, and a baseline bar measuring roughly two point seven percent representing the four-hundred-thirty-five-thousand third plan average, "
+        "On the left, a towering solid dark vermilion column dominating the card height representing the independent jury benchmark; "
+        "on the right, two adjacent short solid slate-gray comparative bars standing at a tiny fraction of the tall column height representing the collective trust averages, "
         "illustrating the stark proportional contrast between individual jury verdicts and collective settlement trust payouts. "
         "Clean minimalist graphic novel linework, stylized forensic data infographic on cream documentary presentation card, "
         "plain unruled borders and blank margins, nonlinguistic geometric rules only, "
@@ -287,7 +287,7 @@ CLEAN_RAW_FGS = {
         "Aged paper texture, bold ink, cel-shading."
     ),
     "fg_evidence_parish_property_map": (
-        "Stylized 2D forensic cadastral property map of Alameda and Contra Costa counties: diocesan regional real estate holdings partitioned into distinct color-shaded parcel zones with clean geometric boundary outlines and shaded zone fills, "
+        "Stylized 2D forensic cadastral property map of regional metropolitan counties: diocesan regional real estate holdings partitioned into distinct color-shaded parcel zones with clean geometric boundary outlines and shaded zone fills, "
         "aged cream parchment paper texture, cel-shading."
     ),
     "fg_evidence_case_timeline_clock": (
@@ -297,12 +297,12 @@ CLEAN_RAW_FGS = {
 
     # --- 5 CRITICAL EVIDENCE PROPS (AUDIT COUNCIL MANDATED) ---
     "fg_evidence_jury_verdict_form": (
-        "Official California state court civil special verdict form folio: embossed generic circular geometric court clerk blind-stamp impression circle, "
+        "Official civil trial court special verdict form folio: embossed generic circular geometric court clerk blind-stamp impression circle, "
         "abstract jury damages award calculation block rendered with printed dotted rule lines and blank amount fields, illegible abstract line-marks only. "
         "Bold ink, cel-shading, crisp legal document texture."
     ),
     "fg_evidence_purdue_scotus_opinion": (
-        "Official Supreme Court slip opinion folio, plain unruled header band, "
+        "Official high-court slip opinion folio, plain unruled header band, "
         "crisp legal margins with abstract ruling text rendered as illegible horizontal line-marks only. "
         "Bold ink, cel-shading, archival paper texture."
     ),
@@ -317,7 +317,7 @@ CLEAN_RAW_FGS = {
         "Bold ink, cel-shading, crisp legal folio."
     ),
     "fg_evidence_attendance_decline_chart": (
-        "Authentic statistical bar chart evidence graphic: two distinct vertical comparative columns on cream archival grid paper, a taller baseline column on the left and a substantially lower column on the right at roughly three-fifths height, unlabelled axis grid rules, clean graphic rule lines, plain unruled paper surface. "
+        "Authentic statistical bar chart evidence graphic: two distinct vertical comparative columns on cream archival grid paper, a taller baseline column on the left and a substantially lower column on the right showing marked decline, unlabelled axis grid rules, clean graphic rule lines, plain unruled paper surface. "
         "Bold ink, cel-shading, tactile grid paper texture."
     )
 }
@@ -330,9 +330,11 @@ BG_SEQUENCE = [
     (9, 13, "bg_restructuring_war_room"),
     (14, 17, "bg_cathedral_christ_the_light_dusk"),
     (18, 20, "bg_chancery_archive_file_room"),
-    (21, 22, "bg_1960s_rectory_hallway"),
-    (23, 24, "bg_1970s_oakland_streetscape"),
-    (25, 26, "bg_chancery_archive_file_room"),
+    (21, 21, "bg_1960s_rectory_hallway"),
+    (22, 22, "bg_1970s_oakland_streetscape"),
+    (23, 24, "bg_oakland_skyline_2026"),
+    (25, 25, "bg_chancery_archive_file_room"),
+    (26, 26, "bg_lake_merritt_rain_dusk"),
     (27, 28, "bg_mediation_conference_room"),
 
     # Act II / Beat 2 (scenes 29-57: 29 scenes)
@@ -346,7 +348,9 @@ BG_SEQUENCE = [
 
     # Act III / Beat 3 (scenes 58-84: 27 scenes)
     (58, 62, "bg_ballot_tabulation_room"),
-    (63, 67, "bg_mediation_conference_room"),
+    (63, 64, "bg_mediation_conference_room"),
+    (65, 66, "bg_empty_bankruptcy_courtroom"),
+    (67, 67, "bg_mediation_conference_room"),
     (68, 72, "bg_restructuring_war_room"),
     (73, 77, "bg_chancery_accounting_office"),
     (78, 81, "bg_chancery_archive_file_room"),
@@ -360,8 +364,8 @@ BG_SEQUENCE = [
 
     # Act V / Beat 5 (scenes 105-135: 31 scenes)
     (105, 109, "bg_california_dioceses_map"),
-    (110, 114, "bg_empty_bankruptcy_courtroom"),
-    (115, 119, "bg_alameda_superior_courthouse"),
+    (110, 115, "bg_empty_bankruptcy_courtroom"),
+    (116, 119, "bg_alameda_superior_courthouse"),
     (120, 123, "bg_oakland_skyline_2026"),
     (124, 129, "bg_oakland_federal_courthouse_night"),
     (130, 135, "bg_cathedral_christ_the_light_dusk"),
@@ -398,21 +402,21 @@ DETERMINISTIC_135_FGS = {
     16: "fg_character_insurance_carrier_counsel",     # conditioned contributions on complete releases
     17: "fg_evidence_parish_property_map",            # parish real estate excluded from corp sole
     18: "fg_evidence_automatic_stay_notice",          # automatic stay under section 362
-    19: "fg_evidence_automatic_stay_notice",          # related state actions stayed interim orders
+    19: "fg_evidence_civil_complaint_stack",          # related state actions stayed interim orders
     20: "fg_evidence_priority_waterfall",             # accumulating priority claims
     21: "fg_evidence_claims_decade_histogram",        # abuse between 1960 and 1989
-    22: "fg_evidence_claims_decade_histogram",        # arithmetic is sobering
+    22: "fg_evidence_claims_decade_histogram",        # arithmetic is sobering (different BG: 1970s streetscape)
     23: "fg_character_elderly_survivor_claimant",     # survivor 10 yo in 1962 reached age 74
     24: "fg_evidence_docket_sheet",                   # three years of motions
     25: "fg_evidence_professional_fees_meter",        # three years of professional fee applications
     26: "fg_character_elderly_survivor_claimant",     # elderly claimants waited for resolution
-    27: "fg_character_creditors_committee_counsel",   # whether trust bridge valuation gap
+    27: "fg_evidence_trust_offer_bar_chart",          # whether trust bridge valuation gap
     28: "fg_character_creditors_committee_counsel",   # creditors' committee opposed
 
     # Act II / Beat 2 (29-57)
     29: "fg_character_state_legislator_2019",         # rewind to Oct 13, 2019
     30: "fg_evidence_ab218_bill",                     # signed Assembly Bill 218 Child Victims Act
-    31: "fg_evidence_ab218_bill",                     # extended limitation periods on childhood abuse
+    31: "fg_character_state_legislator_2019",         # extended limitation periods on childhood abuse
     32: "fg_evidence_civil_complaint_stack",          # lawsuits revived across state
     33: "fg_evidence_case_timeline_clock",            # revival window closed Dec 31, 2022
     34: "fg_evidence_chapter11_petition",             # voluntary Chapter 11 petition Judge Lafferty
@@ -424,7 +428,7 @@ DETERMINISTIC_135_FGS = {
     40: "fg_evidence_third_amended_plan",             # caps recovery at whatever estate agrees
     41: "fg_character_diocesan_finance_officer",      # operational reality collided
     42: "fg_evidence_attendance_decline_chart",       # attendance declined roughly 42%
-    43: "fg_character_diocesan_finance_officer",      # operational bank accounts held separately
+    43: "fg_evidence_parish_property_map",            # operational bank accounts held separately
     44: "fg_character_diocesan_finance_officer",      # monthly cathedraticum assessments
     45: "fg_evidence_operating_loss_ledger",          # operating cash deficits constrained chancery
     46: "fg_evidence_parish_property_map",            # examine legal perimeter of estate
@@ -442,28 +446,28 @@ DETERMINISTIC_135_FGS = {
 
     # Act III / Beat 3 (58-84)
     58: "fg_evidence_case_timeline_clock",            # March 17, 2025
-    59: "fg_evidence_third_amended_plan",             # filed Third Amended Plan docket 1204
+    59: "fg_evidence_docket_sheet",                   # filed Third Amended Plan docket 1204
     60: "fg_evidence_third_amended_plan",             # proposed 143.5M for survivors' trust
     61: "fg_character_creditors_committee_counsel",   # survivor advocates criticized
     62: "fg_evidence_ballot_tabulation",              # voting declaration 99% rejection rate
     63: "fg_evidence_motion_to_dismiss",              # Sept 9, 2025 moved to dismiss
     64: "fg_evidence_operating_loss_ledger",          # 29M accumulated operating cash deficits
-    65: "fg_character_bankruptcy_judge",              # court held dismissal motion in abeyance
+    65: "fg_evidence_motion_to_dismiss",              # court held dismissal motion in abeyance
     66: "fg_character_bankruptcy_judge",              # judge ordered intensive mediation
     67: "fg_evidence_docket_sheet",                   # maintained confirmation request on docket
     68: "fg_evidence_settlement_term_sheet",          # mediation produced Dec 2025 242M term sheet
-    69: "fg_evidence_settlement_term_sheet",          # never matured into consensual Fourth Plan
+    69: "fg_evidence_third_amended_plan",             # never matured into consensual Fourth Plan
     70: "fg_character_elderly_survivor_claimant",     # survivors refused pro-rata share
     71: "fg_character_debtor_counsel",                # diocese could not fund larger number
     72: "fg_character_creditors_committee_counsel",   # both sides acted rationally
     73: "fg_evidence_case_timeline_clock",            # structure produced deadlock
     74: "fg_character_fee_examiner",                  # ledger documented where dollars going
     75: "fg_evidence_professional_fees_meter",        # fee applications surpassed 44.6M
-    76: "fg_evidence_professional_fees_meter",        # roughly 59% of initial 76.1M assets
+    76: "fg_character_fee_examiner",                  # roughly 59% of initial 76.1M assets
     77: "fg_evidence_operating_loss_ledger",          # 29M operating deficits, priority claims
     78: "fg_character_fee_examiner",                  # meter never stopped, fee examination
     79: "fg_evidence_priority_waterfall",             # priority rules professional fees paid ahead
-    80: "fg_evidence_priority_waterfall",             # every filed fee application administrative priority
+    80: "fg_character_fee_examiner",                  # every filed fee application administrative priority
     81: "fg_evidence_case_timeline_clock",            # net estate available smaller
     82: "fg_evidence_parish_property_map",            # parish real estate remained outside
     83: "fg_evidence_purdue_scotus_opinion",          # Purdue Pharma decision non-debtor releases
@@ -476,7 +480,7 @@ DETERMINISTIC_135_FGS = {
     88: "fg_character_investigative_journalist",      # six months earlier comparison point emerged
     89: "fg_evidence_automatic_stay_notice",          # stay relief for bellwether Alameda Superior
     90: "fg_evidence_jury_verdict_form",              # jury verdict 16M against diocese (KQED)
-    91: "fg_evidence_jury_verdict_form",              # compare the stark numbers
+    91: "fg_evidence_valuation_comparison",           # compare the stark numbers
     92: "fg_evidence_trust_offer_bar_chart",          # dividing headline bankruptcy funds 143.5M vs 242M
     93: "fg_evidence_valuation_comparison",           # single 16M matched 22 claimants mediation avg
     94: "fg_evidence_third_amended_plan",             # matched 37 claimants Third Plan avg
@@ -501,7 +505,7 @@ DETERMINISTIC_135_FGS = {
     111: "fg_character_bankruptcy_judge",             # ruling procedural not final
     112: "fg_evidence_third_amended_plan",            # rejected plan not closed case not payout
     113: "fg_evidence_order_denying_confirmation",    # nothing distributed on that date
-    114: "fg_evidence_motion_to_dismiss",             # dismissal most direct path to lift stay
+    114: "fg_evidence_automatic_stay_notice",         # dismissal most direct path to lift stay
     115: "fg_evidence_motion_to_dismiss",             # Sept 2025 dismissal motion returned
     116: "fg_evidence_automatic_stay_notice",         # automatic stay dissolves under section 362
     117: "fg_character_elderly_survivor_claimant",    # freed to pursue lawsuits California courts
@@ -593,7 +597,7 @@ def reforge_oakland_assets():
     clean_fgs = {}
     for k, raw_p in CLEAN_RAW_FGS.items():
         sanitized = _sanitize_foreground_prompt(raw_p, fg_key=k, market="EN")
-        clean_fgs[k] = split_prompt_channels(sanitized, default_layout="center")
+        clean_fgs[k] = split_prompt_channels(sanitized, default_layout="subject-right at xPct: 80")
 
     print("4. Updating remotion_props.json scene assignments & arithmetic...")
     props_path = ep_dir / "remotion_props.json"

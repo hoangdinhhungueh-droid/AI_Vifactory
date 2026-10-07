@@ -611,12 +611,12 @@ def test_opus_astra_round5_round16_remediations():
         assert "for graphical overlays" not in pos_bg, f"Failed for {bg_k}: 'for graphical overlays' in positive"
         assert "for overlay" not in pos_bg, f"Failed for {bg_k}: 'for overlay' in positive"
 
-    # 3. Specific asset checks (Round 18/19 audit refinements)
+    # 3. Specific asset checks (Round 18/21 audit refinements)
     val_p = CLEAN_RAW_FGS["fg_evidence_valuation_comparison"]
-    assert "three to four percent" in val_p
+    assert "tiny fraction" in val_p
 
     ballot_p = CLEAN_RAW_FGS["fg_evidence_ballot_tabulation"]
-    assert "ninety-nine percent of the circumference" in ballot_p
+    assert "overwhelming dark vermilion segment" in ballot_p
     assert "stamp" not in ballot_p
 
 

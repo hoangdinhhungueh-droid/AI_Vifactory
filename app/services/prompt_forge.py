@@ -342,8 +342,8 @@ R137_BANNED = {
 # Documents are allowed, but strictly as blank forensic templates
 DOC_NOUNS = re.compile(r"\b(document|ledger|filing|report|form|memo|invoice|statement|receipt|subpoena|docket)\b", re.IGNORECASE)
 BLANK_TEMPLATE = (
-    "unfilled documentary folio with plain unmarked margins, "
-    "empty ruled lines, abstract geometric embossed seal, blank surfaces and illegible abstract line-marks only"
+    "unfilled documentary folio with clean margins, "
+    "nonlinguistic rule lines, blank surfaces and illegible abstract line-marks only"
 )
 
 NEGATIVE_R137 = (
@@ -438,7 +438,9 @@ def lint_visual_prompt(prompt: str, strict: bool = False, is_prop: bool = False,
     already_hygienic = any(k in fixed.lower() for k in [
         "without typography", "no typography", "blank unfilled", "blank surfaces",
         "without readable", "unlabeled abstract", "chart", "histogram", "waterfall",
-        "cadastral", "unmarked surfaces", "plain unmarked margins", "unfilled documentary folio"
+        "cadastral", "unmarked surfaces", "plain unmarked margins", "unfilled documentary folio",
+        "plain unruled", "plain unwritten", "clean margins", "illegible abstract",
+        "abstract line-marks", "nonlinguistic", "bound folio"
     ])
     non_doc_indicators = ["clock", "meter", "gauge", "dial", "map", "chart", "histogram", "waterfall", "donut", "graph"]
     is_non_doc_obj = any(k in fixed.lower() for k in non_doc_indicators)
@@ -493,6 +495,8 @@ def resolve_era_anchor(key: str, p: str) -> str:
     # High-specificity artifact & role checks first
     if any(k in k_norm for k in ["ab218", "ab 218", "child victims act"]):
         return "Contemporary state legislative statutory reform act folio, official bill paper."
+    if any(k in k_norm for k in ["valuation", "comparison"]):
+        return "Contemporary forensic economic exhibit card, modern documentary evidence presentation."
     if "legislator" in k_norm:
         return "2019 contemporary legislative assembly era, authentic modern documentary setting."
     if any(k in k_norm for k in ["insurance polic", "liability insurance"]):
@@ -1557,7 +1561,7 @@ def strip_negative_leakage_from_positive(p: str) -> str:
     p = re.sub(r"\s+([,.;:])", r"\1", p)
     p = re.sub(r"\s{2,}", " ", p).strip()
     p = p.rstrip(",. ").strip()
-    return p
+    return deduplicate_phrase_stutter(p)
 
 
 def lint_positive_channel(p: str) -> bool:
@@ -1620,11 +1624,15 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     else:
         unified_prompt = pos_clean
 
+    layout = default_layout
+    if is_chroma_asset and default_layout in ("subject-left", "center"):
+        layout = "subject-right at xPct: 80"
+
     return {
         "prompt": unified_prompt,
         "positive_prompt": pos_clean,
         "negative_prompt": neg_clean,
-        "layout_anchor": default_layout
+        "layout_anchor": layout
     }
 
 
