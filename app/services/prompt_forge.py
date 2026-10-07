@@ -498,7 +498,7 @@ def resolve_era_anchor(key: str, p: str) -> str:
     if any(k in k_norm for k in ["valuation", "comparison"]):
         return "Contemporary forensic economic exhibit card, modern documentary evidence presentation."
     if "legislator" in k_norm:
-        return "2019 contemporary legislative assembly era, authentic modern documentary setting."
+        return "Contemporary legislative assembly era, authentic modern documentary setting."
     if any(k in k_norm for k in ["insurance polic", "liability insurance"]):
         return "Vintage commercial policy archival era, authentic paper textures."
 
@@ -541,7 +541,7 @@ def resolve_era_anchor(key: str, p: str) -> str:
         if "1970" in key or "1970s" in key:
             return "1970s era municipal setting, authentic period documentary atmosphere."
         if "capitol" in key or "assembly" in key:
-            return "2019 contemporary legislative assembly chamber, stately civic architectural setting."
+            return "Contemporary legislative assembly chamber, stately civic architectural setting."
         if "ballot" in key:
             return "Contemporary administrative office setting, claims administration working atmosphere."
         if "ledger" in key:
@@ -623,7 +623,7 @@ def resolve_background_anchor(bg_key: str, p: str, market: str, prof: dict) -> t
         return anchor, f", {base_negs}" if base_negs else ""
 
     elif any(k in combined for k in ["chancery_accounting", "accounting_office", "ledger_grid", "abstract_ledger", "financial_grid", "accounting paper texture"]):
-        anchor = "Authentic diocesan chancery accounting office interior during evening hours, illuminated emerald green glass banker lamp on mahogany desk, open accounting journals, rich emerald and amber illumination"
+        anchor = "Authentic diocesan chancery accounting office interior during evening hours, illuminated emerald green glass banker lamp on mahogany desk, closed leather accounting ledgers with blank unruled pages, rich emerald and amber illumination"
         return anchor, f", {base_negs}" if base_negs else ""
 
     elif any(k in combined for k in ["1970s_oakland_streetscape", "1970s streetscape", "vintage streetscape"]) or (
@@ -871,7 +871,7 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
         if "debtor" in k_fg and any(k in k_fg for k in ["counsel", "attorney", "lawyer", "litigator"]):
             anchor = (
                 "Authentic contemporary reorganization debtor defense counsel and institutional litigator reflecting authentic metropolitan demographic diversity, natural facial features, "
-                "understated dark corporate business suit, firmly holding an open indexed legal case binder with both hands, thumb resting on the divider tab, sharp focused analytical expression, generic fictionalized professional"
+                "understated dark corporate business suit, lifting an index tab with right hand, binder braced on left forearm, the open legal case binder folio displaying plain unwritten pages and illegible abstract line-marks only, sharp focused analytical expression, generic fictionalized professional"
             )
             negs = f"{base_negs}, {chroma_safe_negs}, no judicial robes, no theatrical courtroom posturing, no sensationalized posturing, no aggressive pointing, {likeness_negs}"
             return anchor, f", {negs}" if negs else ""
@@ -903,7 +903,7 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
         elif any(k in k_fg for k in ["journalist", "reporter", "court_reporter", "press"]):
             anchor = (
                 "Authentic contemporary investigative journalist or court reporter reflecting authentic metropolitan demographic diversity, natural facial features, "
-                "smart casual professional newsroom attire, indicating a key entry line on an open court docket folio with the tip of a pen, observant inquisitive expression, generic fictionalized professional"
+                "smart casual professional newsroom attire, making a margin tick with a pen beside a blank rule line on a bound court docket summary folio, observant inquisitive expression, generic fictionalized professional"
             )
             negs = f"{base_negs}, {chroma_safe_negs}, no judicial robes, no theatrical posturing, {likeness_negs}"
             return anchor, f", {negs}" if negs else ""
@@ -945,7 +945,7 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
         elif any(k in k_fg for k in ["legislator", "lawmaker", "senator", "representative", "parliamentarian", "congress"]):
             anchor = (
                 "Authentic contemporary lawmaker or institutional legislator reflecting authentic metropolitan demographic diversity, natural facial features, "
-                "formal legislative committee business attire, actively turning a printed statutory section page of a bound legislative assembly bill folio with both hands, downward gaze reviewing statutory provisions, "
+                "formal legislative committee business attire, actively turning a statutory section page of a bound legislative assembly bill folio with clean margins and illegible abstract line-marks only with both hands, downward gaze reviewing statutory provisions, "
                 "resolute professional expression, generic fictionalized public official"
             )
             negs = f"{base_negs}, {chroma_safe_negs}, no rostrum, no lectern, no podium, no furniture, no aggressive pointing, no theatrical posturing, no dramatic physical posing, {likeness_negs}"
@@ -1038,7 +1038,7 @@ def resolve_character_anchor(fg_key: str, p: str, market: str, prof: dict) -> tu
         elif any(k in combined for k in ["legislator", "lawmaker", "senator", "representative", "parliamentarian", "congress"]):
             anchor = (
                 "Authentic contemporary lawmaker or institutional legislator reflecting authentic metropolitan demographic diversity, natural facial features, "
-                "formal legislative committee business attire, actively turning a printed statutory section page of a bound legislative assembly bill folio with both hands, downward gaze reviewing statutory provisions, "
+                "formal legislative committee business attire, actively turning a statutory section page of a bound legislative assembly bill folio with clean margins and illegible abstract line-marks only with both hands, downward gaze reviewing statutory provisions, "
                 "composed authoritative professional posture, resolute professional expression, generic fictionalized public official"
             )
             negs = f"{base_negs}, {chroma_safe_negs}, no rostrum, no lectern, no podium, no furniture, no theatrical posturing, no dramatic physical posing, {likeness_negs}"
@@ -1587,6 +1587,15 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     pos_clean = re.sub(r"\bno\s+(?:borders?|frames?|text|words?|letters?|digits?|numbers?)\b,?\s*", "", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\bwithout\s+\w+\b,?\s*", "", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\b(with|or|and)\s+(or|and|with)\b", "", pos_clean, flags=re.IGNORECASE)
+
+    # Positive channel text-magnet linter (Opus 5.5 & Astra Consensus Directive 1)
+    pos_clean = re.sub(r"\b\d{4}\b", "", pos_clean)  # Strip 4-digit years (e.g. 2019) from positive prompts
+    pos_clean = re.sub(r"\b(?:nineteen\s+sixty|nineteen\s+seventy|nineteen\s+eighty|nineteen\s+ninety|twenty\s+twenty)\b(?:\s+through|\s+to)?\s*(?:nineteen\s+\w+|twenty\s+\w+)?", "historical period", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\b(?:forty-two|fifty-eight|ninety-nine)\s+percent\b", "proportional", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\bplain\s+rectangular\s+embossed\s+panel\b", "plain flat tinted cover band", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\bembossed\s+(?:generic\s+circular\s+geometric\s+)?(?:judicial\s+|court\s+clerk\s+)?(?:blind-stamp\s+impression\s+circle|filing\s+blind-stamp|binding\s+strip)\b", "plain flat tinted binding band", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\b(?:printed|embossed)\b", "clean unwritten", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\btwelve\s+division\s+intervals\b", "uniform unmarked tick strokes, blank dial face, no numerals", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r",\s*,+", ", ", pos_clean).strip(" ,.")
 
     # Normalize negative prompt to clean bare concepts without 'no' prefix and without closing sentence
@@ -1599,6 +1608,9 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     BARE_CHROMA = {"magenta", "#ff00ff", "pink", "fuchsia", "purple", "amaranth"} if is_chroma_asset else {"#ff00ff"}
     
     raw_neg_tokens = [t.strip() for t in neg_clean.split(",") if t.strip()]
+    # Ensure evidence negatives include seal, stamp, emblem, crest, numerals, digits
+    if is_chroma_asset:
+        raw_neg_tokens.extend(["seal", "stamp", "emblem", "crest", "numerals", "digits", "percentages", "year labels"])
     deduped_tokens = []
     seen_tok = set()
     for tok in raw_neg_tokens:
@@ -1625,8 +1637,8 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
         unified_prompt = pos_clean
 
     layout = default_layout
-    if is_chroma_asset and default_layout in ("subject-left", "center"):
-        layout = "subject-right at xPct: 80"
+    if is_chroma_asset or "subject-right" in default_layout:
+        layout = "subject-right at xPct: 75"
 
     return {
         "prompt": unified_prompt,

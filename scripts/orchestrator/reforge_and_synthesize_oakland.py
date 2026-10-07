@@ -292,7 +292,7 @@ async def run_reforge_and_synthesis(force_tts: bool = False):
             "stampText": "VERIFIED // IMPORTANT",
             "stampColor": "#dc2626",
             "layoutAnchor": "subject-right",
-            "heroPosition": {"xPct": 78, "yPct": 52, "widthPct": 30},
+            "heroPosition": {"xPct": 75, "yPct": 52, "widthPct": 30},
             "supportingCutouts": [
                 {"id": f"doc_{sc_num}_1", "label": f"EXHIBIT #{sc_num}A", "xPct": 26, "yPct": 62, "widthPct": 22, "rotation": -8, "delaySec": 1.2, "hasPin": True, "hasTape": False},
                 {"id": f"doc_{sc_num}_2", "label": f"RECORD #{sc_num}B", "xPct": 74, "yPct": 60, "widthPct": 24, "rotation": 11, "delaySec": 1.6, "hasPin": False, "hasTape": True}

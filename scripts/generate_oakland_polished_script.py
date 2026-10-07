@@ -19,9 +19,9 @@ Round 15 Comprehensive Forensic Remediation (Opus 5.5 & Astra Consensus Alignmen
 
 STORY_TEXT = """=== ACT I ===
 
-On October fifth, twenty twenty-six, a federal bankruptcy court denied confirmation of the Diocese of Oakland's reorganization plan. The ruling left hundreds of claims without an approved distribution.
+On October fifth, twenty twenty-six, a federal bankruptcy court denied confirmation of the Diocese of Oakland's reorganization plan, leaving hundreds of claims without an approved distribution.
 
-How does a multi-year Chapter eleven bankruptcy proceeding carrying settlement proposals from one hundred forty-three point five million to two hundred forty-two million dollars stall for three years without a single dollar approved for distribution?
+How does a multi-year Chapter eleven proceeding stall for three years without a single dollar approved for distribution? Settlement proposals ranged from one hundred forty-three point five million to two hundred forty-two million dollars, yet nothing was disbursed.
 
 Public headlines recorded the confirmation denial. Court dockets documented hundreds of motions. Neither explained the underlying machinery.
 
@@ -35,7 +35,7 @@ While historical liability insurance policies were assets of the debtor's estate
 
 Because the diocese maintained that independent parish real estate stood outside the central estate, available estate cash remained limited, producing a deep valuation divide with survivor creditors.
 
-Litigation against the diocese was frozen by the Chapter eleven automatic stay under section three sixty-two. Related state court actions against parishes remained stayed under interim emergency court orders.
+Litigation against the diocese was frozen by the Chapter eleven automatic stay under section three sixty-two. Related state court actions against parishes remained stayed under section one oh five injunctions.
 
 Behind that collective pause, the administrative machinery of Chapter eleven began accumulating priority claims against estate assets.
 
@@ -59,7 +59,7 @@ That narrative was only the comforting half. Chapter eleven seeks collective res
 
 One documented operational reality collided with a rigid legal structure. Parish weekly attendance declined roughly forty-two percent between twenty nineteen and twenty twenty-four, severely eroding parish collections.
 
-According to diocesan financial disclosures and canonical structures, parish operational bank accounts were maintained separately from the central chancery. However, the central chancery depends on monthly cathedraticum assessments remitted from parish collections.
+According to diocesan financial disclosures and canonical structures, parish operational bank accounts were maintained separately from the central chancery. However, the central chancery depends on cathedraticum assessments remitted from parish collections.
 
 When weekly collections shrank, diocesan assessment revenues contracted in tandem, directly contributing to operating cash deficits that constrained the chancery's capacity to fund multi-million-dollar installments.
 
@@ -103,13 +103,13 @@ Under Bankruptcy Code priority rules, court-approved professional fees are paid 
 
 Continued administrative expenses risked reducing the estate available for survivor recovery unless offset by additional recoveries or contributions.
 
-Parish real estate remained outside the debtor's scheduled estate, where the Third Amended Plan carried forward a pre-Purdue framework conditioning contributions on nonconsensual releases. Since the Supreme Court's June twenty twenty-four Purdue Pharma decision, non-debtor releases cannot be imposed by decree without creditor consent. The central question shifted: would survivors voluntarily grant them?
+Parish real estate remained outside the debtor's scheduled estate, where the Third Amended Plan conditioned parish contributions on universal non-debtor releases that survivor claimants refused to grant. Since the Supreme Court's June twenty twenty-four Purdue Pharma decision, non-debtor releases cannot be imposed by decree without creditor consent. The central question shifted: would survivors voluntarily grant them?
 
 === ACT IV ===
 
 The structure failed in stages. After mediation concluded without a consensual Fourth Amended Plan, the court proceeded with the scheduled confirmation hearing to test the Third Amended Plan under Title eleven while the debtor's dismissal motion remained pending. Judge Lafferty formally denied confirmation on October fifth, twenty twenty-six.
 
-Six months earlier, in April twenty twenty-six, an independent new comparison point emerged outside the bankruptcy court. The Bankruptcy Court had granted stay relief for a bellwether test case against the diocese in Alameda County Superior Court. On April twenty-second, twenty twenty-six, an Alameda County jury returned a verdict awarding sixteen million dollars against the diocese, as reported by public media outlet KQED.
+Six months earlier, in April twenty twenty-six, an independent new comparison point emerged outside the bankruptcy court. The Bankruptcy Court had granted stay relief for a bellwether test case against the diocese in Alameda County Superior Court. On April twenty-second, twenty twenty-six, an Alameda County jury returned a verdict awarding sixteen million dollars against the diocese, as reported by public media outlet K-Q-E-D.
 
 Compare the stark numbers. Dividing headline bankruptcy funds across three hundred thirty active claims yielded illustrative average recoveries of roughly four hundred thirty-five thousand dollars under the plan, or seven hundred thirty-three thousand dollars under the mediation proposal, assuming equal distribution.
 
@@ -125,7 +125,7 @@ Second, statutory confirmation requires compliance with Title eleven under secti
 
 Even if cramdown under section eleven twenty-nine, subsection B, were attempted, cramdown can only bind dissenting creditors to lawful plan terms, and cannot bypass the Supreme Court's statutory bar on nonconsensual third-party releases.
 
-Because the Third Amended Plan contained nonconsensual non-debtor releases that Class Four rejected, and conditioned parish and insurer contributions on those unauthorized releases, the court could not confirm the instrument.
+Because the Third Amended Plan contained nonconsensual non-debtor parish releases that Class Four rejected, and conditioned outside contributions on those unauthorized releases, the court could not confirm the instrument.
 
 With that ruling entered, the legal architecture of the debtor's Third Amended Plan collapsed.
 

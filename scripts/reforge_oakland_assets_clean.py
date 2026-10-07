@@ -217,28 +217,28 @@ CLEAN_RAW_FGS = {
 
     # --- EVIDENCE PROPS & DATA VISUALIZATIONS ---
     "fg_evidence_ab218_bill": (
-        "Bound statutory legislative reform bill folio: crisp legal paper displaying a plain rectangular embossed panel, clean unwritten margins, "
+        "Bound statutory legislative reform bill folio: crisp legal paper displaying a plain flat tinted cover band, clean unwritten margins, "
         "plain unwritten header band, body pages with abstract horizontal rule lines, and a prominent statutory section accented with a clean translucent yellow highlight bar. "
         "Bold ink, cel-shading, crisp tactile paper texture."
     ),
     "fg_evidence_chapter11_petition": (
         "Federal bankruptcy reorganization petition cover folio: plain unruled header band, blank debtor entity line, empty reorganization filing checkbox, "
-        "plain rectangular embossed panel, clean unwritten margins, plain unruled paper with illegible abstract line-marks only. Bold ink, cel-shading, crisp legal paper."
+        "plain flat tinted cover band, clean unwritten margins, plain unruled paper with faint abstract body rules and illegible abstract line-marks only. Bold ink, cel-shading, crisp legal paper."
     ),
     "fg_evidence_docket_sheet": (
-        "Bound court docket summary folio, displaying plain unruled header band, abstract ruled entry lines, date column dividers, and geometric index markers with illegible abstract line-marks only. "
-        "Bold ink, cel-shading, crisp laser-printed paper texture."
+        "Bound court docket summary folio, displaying plain unruled header band, clean unwritten margins, faint abstract body rules with date column dividers, and geometric index markers with illegible abstract line-marks only. "
+        "Bold ink, cel-shading, crisp tactile paper texture."
     ),
     "fg_evidence_civil_complaint_stack": (
-        "Thick bound sheaf of civil lawsuit complaints: plain legal document covers with plain rectangular embossed binding strip, clean unwritten margins, blank paper with illegible abstract line-marks only. "
+        "Thick bound sheaf of civil lawsuit complaints: plain legal document covers with plain flat tinted binding strip, clean unwritten margins, blank paper with illegible abstract line-marks only. "
         "Bold ink, cel-shading, heavy bound document texture."
     ),
     "fg_evidence_claims_decade_histogram": (
-        "Stylized 2D forensic statistical timeline chart on cream archival grid paper, displaying a continuous horizontal chronological span band spanning nineteen sixty through nineteen eighty-nine with uniform nonlinguistic division ticks, "
-        "clean geometric rule lines, plain unruled margins, nonlinguistic graphic rules only. Bold ink, cel-shading, tactile grid paper texture."
+        "Stylized 2D forensic statistical timeline chart on cream archival grid paper, displaying a continuous horizontal chronological span band spanning a multi-decade historical period with uniform unmarked division tick strokes, "
+        "clean geometric rule lines, blank unruled margins, nonlinguistic graphic rules only. Bold ink, cel-shading, tactile grid paper texture."
     ),
     "fg_evidence_third_amended_plan": (
-        "Thick bound Chapter 11 reorganization plan folio, embossed cover with plain unruled header band, divider index tabs along right margin "
+        "Thick bound Chapter 11 reorganization plan folio, cover with plain flat tinted cover band and plain unruled header band, divider index tabs along right margin "
         "in muted gold and slate tones, blank pages with illegible abstract line-marks only. Bold ink, cel-shading, heavy bound paper folio."
     ),
     "fg_evidence_trust_offer_bar_chart": (
@@ -252,7 +252,7 @@ CLEAN_RAW_FGS = {
         "Bold ink, cel-shading, crisp paper texture."
     ),
     "fg_evidence_professional_fees_meter": (
-        "Stylized analog forensic financial gauge meter with an indicator needle swung into a high warning zone, circular dial with division tick marks "
+        "Stylized analog forensic financial gauge meter with an indicator needle swung into a high warning zone, circular dial with smooth unmarked dial arc with colored warning zone bands only, no numerals, "
         "and abstract indicator rings. Tactile metallic casing, cel-shading."
     ),
     "fg_evidence_priority_waterfall": (
@@ -265,14 +265,14 @@ CLEAN_RAW_FGS = {
         "plain unruled header band and blank margins, nonlinguistic rules and marks in document body with illegible abstract line-marks only. Cream ledger paper texture, cel-shading."
     ),
     "fg_evidence_motion_to_dismiss": (
-        "Court motion to dismiss folio: plain unruled header band, case caption ruled lines, and a plain rectangular embossed filing panel, clean unwritten margins, blank pages with illegible abstract line-marks only. "
+        "Court motion to dismiss folio: plain unruled header band, case caption ruled lines, and a plain flat tinted filing band, clean unwritten margins, blank pages with illegible abstract line-marks only. "
         "Bold ink, cel-shading, crisp legal folio."
     ),
     "fg_evidence_valuation_comparison": (
         "Editorial illustration of an evidence valuation comparison exhibit card: "
         "a cream rectangular exhibit card displaying comparative solid geometric column bars on a subtle horizontal baseline. "
         "On the left, a towering solid dark vermilion column dominating the card height representing the independent single jury verdict benchmark; "
-        "on the right, two adjacent short solid slate-gray comparative unit blocks standing at a tiny fraction of the tall column height representing illustrative gross per-claim proposal averages, "
+        "on the right, two adjacent short solid slate-gray comparative unit blocks with the second block approximately one-and-a-half to one-and-seven-tenths times the height of the first block, both standing at a tiny fraction of the tall column height representing illustrative gross per-claim proposal averages, "
         "illustrating the stark proportional contrast between an individual jury verdict and collective settlement proposal averages. "
         "Clean minimalist graphic novel linework, stylized forensic data infographic on cream documentary presentation card, "
         "plain unruled borders and blank margins, nonlinguistic geometric rules only, "
@@ -291,14 +291,14 @@ CLEAN_RAW_FGS = {
         "aged cream parchment paper texture, cel-shading."
     ),
     "fg_evidence_case_timeline_clock": (
-        "Stylized modern brass case timeline clock artifact: radial tick-marked circular cream dial face with fine geometric tick marks at twelve division intervals, two clean tapered black ink hands pointing to blank tick marks, plain unwritten parchment center, attached plain manila document tab. "
+        "Stylized modern brass case timeline clock artifact: radial tick-marked circular cream dial face with fine geometric tick marks at uniform unmarked division tick strokes, blank dial face, no numerals, two clean tapered black ink hands pointing to blank tick marks, plain unwritten parchment center, attached plain manila document tab. "
         "Tactile metallic texture, bold ink, cel-shading."
     ),
 
     # --- 5 CRITICAL EVIDENCE PROPS (AUDIT COUNCIL MANDATED) ---
     "fg_evidence_jury_verdict_form": (
-        "Civil trial court special verdict form folio: plain rectangular embossed panel, clean unwritten margins, "
-        "abstract jury damages award calculation block rendered with printed dotted rule lines and blank amount fields, illegible abstract line-marks only. "
+        "Civil trial court special verdict form folio: plain flat tinted cover band, clean unwritten margins, "
+        "abstract jury damages award calculation block rendered with clean dotted rule lines and blank amount fields, illegible abstract line-marks only. "
         "Bold ink, cel-shading, crisp legal document texture."
     ),
     "fg_evidence_purdue_scotus_opinion": (
@@ -307,17 +307,17 @@ CLEAN_RAW_FGS = {
         "Bold ink, cel-shading, archival paper texture."
     ),
     "fg_evidence_order_denying_confirmation": (
-        "Federal bankruptcy court order denying confirmation folio: plain rectangular embossed judicial panel, clean unwritten margins, "
+        "Federal bankruptcy court order denying confirmation folio: plain flat tinted judicial cover band, clean unwritten margins, "
         "formal decretal section rendered with blank pages and illegible abstract line-marks only. "
         "Bold ink, cel-shading, crisp legal parchment."
     ),
     "fg_evidence_automatic_stay_notice": (
-        "Federal bankruptcy automatic stay statutory notice folio: plain rectangular embossed header panel, clean unwritten margins, "
+        "Federal bankruptcy automatic stay statutory notice folio: plain flat tinted header band, clean unwritten margins, "
         "plain unruled header band, and abstract statutory warning sections with illegible abstract line-marks only. "
         "Bold ink, cel-shading, crisp legal folio."
     ),
     "fg_evidence_attendance_decline_chart": (
-        "Authentic statistical bar chart evidence graphic: two distinct vertical comparative columns on cream archival grid paper, a taller baseline column on the left and a lower column on the right at fifty-eight percent of baseline height reflecting a forty-two percent decline, unlabelled axis grid rules, clean graphic rule lines, plain unruled paper surface. "
+        "Authentic statistical bar chart evidence graphic: two distinct vertical comparative columns on cream archival grid paper, a taller baseline column on the left and a lower column on the right at roughly three-fifths baseline height illustrating marked decline, unlabelled axis grid rules, clean graphic rule lines, plain document margins. "
         "Bold ink, cel-shading, tactile grid paper texture."
     )
 }
@@ -331,15 +331,16 @@ BG_SEQUENCE = [
     (14, 17, "bg_cathedral_christ_the_light_dusk"),
     (18, 20, "bg_chancery_archive_file_room"),
     (21, 22, "bg_1960s_rectory_hallway"),
-    (23, 24, "bg_1970s_oakland_streetscape"),
-    (25, 26, "bg_chancery_archive_file_room"),
+    (23, 23, "bg_1970s_oakland_streetscape"),
+    (24, 26, "bg_lake_merritt_rain_dusk"),
     (27, 28, "bg_mediation_conference_room"),
 
     # Act II / Beat 2 (scenes 29-57: 29 scenes)
     (29, 33, "bg_sacramento_capitol_assembly"),
     (34, 37, "bg_oakland_federal_courthouse_night"),
     (38, 40, "bg_empty_bankruptcy_courtroom"),
-    (41, 45, "bg_empty_church_pews"),
+    (41, 42, "bg_empty_church_pews"),
+    (43, 45, "bg_chancery_accounting_office"),
     (46, 49, "bg_vacated_chancery_office"),
     (50, 54, "bg_bay_area_parish_property_aerial"),
     (55, 57, "bg_restructuring_war_room"),
@@ -350,13 +351,13 @@ BG_SEQUENCE = [
     (65, 66, "bg_empty_bankruptcy_courtroom"),
     (67, 69, "bg_mediation_conference_room"),
     (70, 72, "bg_restructuring_war_room"),
-    (73, 77, "bg_chancery_accounting_office"),
-    (78, 81, "bg_chancery_archive_file_room"),
+    (73, 77, "bg_ballot_tabulation_room"),
+    (78, 81, "bg_empty_bankruptcy_courtroom"),
     (82, 84, "bg_vacated_chancery_office"),
 
     # Act IV / Beat 4 (scenes 85-104: 20 scenes)
-    (85, 88, "bg_empty_bankruptcy_courtroom"),
-    (89, 96, "bg_alameda_superior_courthouse"),
+    (85, 87, "bg_empty_bankruptcy_courtroom"),
+    (88, 96, "bg_alameda_superior_courthouse"),
     (97, 101, "bg_empty_bankruptcy_courtroom"),
     (102, 104, "bg_lake_merritt_rain_dusk"),
 
@@ -405,10 +406,10 @@ DETERMINISTIC_135_FGS = {
     20: "fg_evidence_priority_waterfall",             # accumulating priority claims
     21: "fg_evidence_claims_decade_histogram",        # abuse between 1960 and 1989
     22: "fg_evidence_case_timeline_clock",            # arithmetic is sobering (rectory hallway)
-    23: "fg_character_elderly_survivor_claimant",     # survivor 10 yo in 1962 reached age 74
+    23: "fg_evidence_claims_decade_histogram",        # survivor 10 yo in 1962 reached age 74 (statistical timeline on streetscape)
     24: "fg_evidence_docket_sheet",                   # three years of motions
     25: "fg_evidence_professional_fees_meter",        # three years of professional fee applications
-    26: "fg_character_elderly_survivor_claimant",     # elderly claimants waited for resolution
+    26: "fg_character_elderly_survivor_claimant",     # elderly claimants waited for resolution (lakeside setting)
     27: "fg_evidence_trust_offer_bar_chart",          # whether trust bridge valuation gap
     28: "fg_character_creditors_committee_counsel",   # creditors' committee opposed
 
@@ -456,7 +457,7 @@ DETERMINISTIC_135_FGS = {
     67: "fg_evidence_docket_sheet",                   # maintained confirmation request on docket
     68: "fg_evidence_settlement_term_sheet",          # mediation produced Dec 2025 242M term sheet
     69: "fg_evidence_third_amended_plan",             # never matured into consensual Fourth Plan
-    70: "fg_character_elderly_survivor_claimant",     # survivors refused pro-rata share
+    70: "fg_character_creditors_committee_counsel",   # survivors refused pro-rata share (litigator asserting rights)
     71: "fg_character_debtor_counsel",                # diocese could not fund larger number
     72: "fg_character_creditors_committee_counsel",   # both sides acted rationally
     73: "fg_evidence_case_timeline_clock",            # structure produced deadlock
@@ -474,13 +475,13 @@ DETERMINISTIC_135_FGS = {
 
     # Act IV / Beat 4 (85-104)
     85: "fg_character_bankruptcy_judge",              # structure failed in stages
-    86: "fg_evidence_motion_to_dismiss",              # addressed confirmation before dismissal motion
+    86: "fg_evidence_third_amended_plan",             # addressed confirmation before dismissal motion
     87: "fg_evidence_order_denying_confirmation",     # confirmation formally denied Oct 5, 2026
     88: "fg_character_investigative_journalist",      # six months earlier comparison point emerged
     89: "fg_evidence_docket_sheet",                   # stay relief for bellwether Alameda Superior (docket 842)
     90: "fg_evidence_jury_verdict_form",              # jury verdict 16M against diocese (KQED)
     91: "fg_evidence_valuation_comparison",           # compare the stark numbers
-    92: "fg_evidence_trust_offer_bar_chart",          # dividing headline bankruptcy funds 143.5M vs 242M
+    92: "fg_evidence_valuation_comparison",           # dividing headline bankruptcy funds 143.5M vs 242M
     93: "fg_evidence_valuation_comparison",           # single 16M matched 22 claimants mediation avg
     94: "fg_evidence_third_amended_plan",             # matched 37 claimants Third Plan avg
     95: "fg_character_investigative_journalist",      # bellwether verdicts do not establish portfolio
