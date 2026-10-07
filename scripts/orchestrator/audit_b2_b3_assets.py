@@ -32,6 +32,7 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
 from app.services.model_gateway import get_global_gateway
+from app.services.prompt_forge import harmonize_prompt_clauses
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("audit_b2_b3_assets")
@@ -270,6 +271,7 @@ def run_preflight_validation_and_remediation(assets: Dict[str, Any], metrics: Di
                     seen_tok.add(tok_clean.lower())
                     deduped_tokens.append(tok_clean)
             neg = ", ".join(deduped_tokens)
+            pos = harmonize_prompt_clauses(pos)
 
             if pos != orig_pos or neg != orig_neg:
                 v["positive_prompt"] = pos.strip()

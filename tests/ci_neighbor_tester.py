@@ -534,7 +534,7 @@ def test_block4_prompt_contract() -> bool:
         assert not re.search(r"(?<!\d):\s*(?:aspect\s*ratio|1\s*aspect\s*ratio)", fg_out, re.IGNORECASE), "Mutilated ':aspect ratio' relic detected in FG prompt!"
         assert not re.search(r"(?<!\d):\s*(?:aspect\s*ratio|1\s*aspect\s*ratio)", bg_out, re.IGNORECASE), "Mutilated ':aspect ratio' relic detected in BG prompt!"
         assert "salaryman" not in fg_out.lower() and "hanko" not in fg_out.lower(), "JP token leaked into EN FG prompt!"
-        assert "no magenta, purple, fuchsia, or neon pink attire" in fg_out, "Missing chroma attire lock in EN FG prompt!"
+        assert "no bright neon attire, no glowing saturated clothes" in fg_out, "Missing chroma attire lock in EN FG prompt!"
         assert "cel-shading" in fg_out.lower() or "comic" in fg_out.lower() or "graphic novel" in fg_out.lower()
         assert "[ERA ANCHOR]" in fg_out
         assert "[STRICT NEGATIVE PROMPT]" in fg_out

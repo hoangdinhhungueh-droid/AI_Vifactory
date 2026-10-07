@@ -623,7 +623,7 @@ def resolve_background_anchor(bg_key: str, p: str, market: str, prof: dict) -> t
         return anchor, f", {base_negs}" if base_negs else ""
 
     elif any(k in combined for k in ["chancery_accounting", "accounting_office", "ledger_grid", "abstract_ledger", "financial_grid", "accounting paper texture"]):
-        anchor = "Authentic diocesan chancery accounting office interior during evening hours, illuminated emerald green glass banker lamp on mahogany desk, closed leather accounting ledgers with blank unruled pages, rich emerald and amber illumination"
+        anchor = "Authentic diocesan chancery accounting office interior during evening hours, illuminated emerald green glass banker lamp on mahogany desk, closed leather accounting ledgers on the dark wood desk, rich emerald and amber illumination"
         return anchor, f", {base_negs}" if base_negs else ""
 
     elif any(k in combined for k in ["1970s_oakland_streetscape", "1970s streetscape", "vintage streetscape"]) or (
@@ -652,7 +652,7 @@ def resolve_background_anchor(bg_key: str, p: str, market: str, prof: dict) -> t
         return anchor, f", {base_negs}" if base_negs else ""
 
     elif any(k in combined for k in ["restructuring_war_room", "war_room", "legal war room"]):
-        anchor = "Late-night corporate legal conference war room interior, polished dark wood conference table, executive chairs, ambient architectural lamp illumination, quiet nocturnal atmosphere"
+        anchor = "Late-night corporate legal conference war room interior, polished dark wood conference table, executive chairs, ambient architectural lamp illumination, focused nocturnal atmosphere"
         return anchor, f", {base_negs}" if base_negs else ""
 
     elif any(k in combined for k in ["dellums", "federal_courthouse", "federal office"]):
@@ -1384,16 +1384,19 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
             obj_negs = f"no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no decorative picture borders, no picture frames, no extraneous ui elements, no text, no numbers, no charts, no digits, no labels, no typography, {evidence_chroma_negs}, {NEGATIVE_R137}"
 
         # Category-aware object focus: instruments, maps, charts, and documents get precise focus without bleed
+        # Macro Palette Lock & Non-reflective finish (Opus 5.5 / Astra 6 Consensus)
+        palette_lock = ", palette locked to warm ochre, slate navy, cream, and muted umber, strictly no violet, no magenta, no pink, no purple tones in subject"
+        metallic_finish = ", matte brushed non-reflective finish, zero specular glare"
         if any(k in fg_key.lower() for k in ["clock", "meter", "gauge", "dial"]):
-            obj_focus = "Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, precision mechanical instrument with clean plain unwritten indicators"
+            obj_focus = f"Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, precision mechanical instrument with clean unmarked matte dial face{metallic_finish}"
         elif any(k in fg_key.lower() for k in ["map"]):
-            obj_focus = "Highly detailed documentary cartographic exhibit, graphic novel editorial flair, geographic parcel boundaries with clean abstract color-shaded zones"
+            obj_focus = f"Highly detailed documentary cartographic exhibit, graphic novel editorial flair, geographic parcel boundaries with clean abstract color-shaded zones in muted earth tones{palette_lock}"
         elif is_data_viz:
-            obj_focus = "Highly detailed documentary evidence chart, graphic novel editorial flair, clean proportional geometric data graphics with plain unruled surfaces"
+            obj_focus = f"Highly detailed documentary evidence chart, graphic novel editorial flair, clean proportional geometric data graphics with nonlinguistic graphic markings{palette_lock}"
         elif is_document_artifact:
-            obj_focus = "Highly detailed documentary evidence legal folio, tactile physical realism with graphic novel editorial flair, forensic investigative prop with plain unruled header band, blank pages, and illegible abstract line-marks only"
+            obj_focus = "Highly detailed documentary evidence legal folio, tactile physical realism with graphic novel editorial flair, forensic investigative prop with blank margins and nonlinguistic markings only"
         else:
-            obj_focus = "Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with plain unruled surfaces"
+            obj_focus = "Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with nonlinguistic abstract detail"
 
         p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] {obj_focus}. [ERA ANCHOR] {era_anchor} [STRICT NEGATIVE PROMPT] {obj_negs}. {R137_CLOSING_DIRECTIVE}"
     else:
@@ -1571,6 +1574,46 @@ def lint_positive_channel(p: str) -> bool:
     return len(banned) == 0
 
 
+def harmonize_prompt_clauses(text: str) -> str:
+    """
+    Macro Engine Clause Harmonizer (Rule 128 & Opus 5.5 / Astra 6 Consensus).
+    Resolves self-contradictions, deduplicates concepts, and eliminates mid-noun-phrase regex splices.
+    """
+    # 1. Closed vs Pages contradiction
+    if "closed" in text.lower() and "pages" in text.lower():
+        text = re.sub(r"closed\s+([^,]+?)\s+with\s+(?:blank\s+)?(?:unruled\s+)?pages", r"closed \1 on the desk", text, flags=re.IGNORECASE)
+
+    # 2. Ruled vs Unruled contradiction
+    if "ruled" in text.lower() and "unruled" in text.lower():
+        text = re.sub(r"\b(?:plain\s+)?unruled\s+(?:surfaces?|header\s+band|pages?|paper)\b,?\s*", "", text, flags=re.IGNORECASE)
+
+    # 3. Dial face: tick-marked vs blank dial face
+    if "blank dial" in text.lower() and "tick" in text.lower():
+        text = re.sub(r"\btick-marked\s+dial\b", "precision indicator dial", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bblank\s+dial\s+face\b", "dial face with uniform unmarked tick strokes and no numerals", text, flags=re.IGNORECASE)
+
+    # 4. Intense vs Quiet nocturnal atmosphere
+    if "intense nocturnal" in text.lower() and "quiet nocturnal" in text.lower():
+        text = re.sub(r"\bintense\s+nocturnal\s+(?:working\s+)?atmosphere\b", "focused nocturnal working atmosphere", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bquiet\s+nocturnal\s+atmosphere\b", "focused nocturnal atmosphere", text, flags=re.IGNORECASE)
+
+    # 5. Civic classical vs PWA Moderne Art Deco
+    if "civic classical" in text.lower() and ("art deco" in text.lower() or "pwa moderne" in text.lower()):
+        text = re.sub(r"\bcivic\s+classical\s+(?:limestone\s+)?facade\b", "monumental PWA Moderne limestone facade", text, flags=re.IGNORECASE)
+
+    # 6. Splicer regex corruptions (elimination of nested/repeated noun phrases):
+    text = re.sub(r"\benvelope\s+with\s+(?:plain\s+unwritten\s+)?plain\s+cream\s+folded\s+envelope\s+with\s+a\s+blank\s+flap\b", "plain cream folded envelope with a blank flap", text, flags=re.IGNORECASE)
+    text = re.sub(r"\ban?\s+open\s+financial\s+ledger\s+with\s+blank\s+columnar\s+rows\s+folio\b", "an open financial ledger folio with blank columnar rows", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bbound\s+plain\s+folio\s+with\s+faint\s+abstract\s+line-marks\s+with\s+ruled\s+grid\b", "bound plain folio with faint abstract line-marks", text, flags=re.IGNORECASE)
+    text = re.sub(r"\ba\s+bound\s+bound\s+plain\s+folio\b", "a bound plain folio with faint abstract line-marks", text, flags=re.IGNORECASE)
+    text = re.sub(r"\ban?\s+creditor\s+ballot\s+ledger\s+with\s+blank\s+ruled\s+tally\s+rows\s+folio\b", "creditor ballot ledger folio with blank ruled tally rows", text, flags=re.IGNORECASE)
+
+    # 7. Collapse whitespace and double punctuation
+    text = re.sub(r",\s*,+", ", ", text)
+    text = re.sub(r"\s{2,}", " ", text).strip(" ,.")
+    return text
+
+
 def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     """
     Split a prompt string at '[STRICT NEGATIVE PROMPT]' into separate positive and negative channels (Rule 128 & Opus 5.5).
@@ -1633,6 +1676,9 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     pos_clean = re.sub(r"The\s+image\s+contains\s+(?:no\s+)?writing\s+or\s+readable\s+digits\s+of\s+any\s+kind\s+in\s+any\s+language\.?", "", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r",\s*,+", ", ", pos_clean).strip(" ,.")
 
+    # Apply Macro Clause Harmonizer
+    pos_clean = harmonize_prompt_clauses(pos_clean)
+
     # 1. Strip R137 closing directive and affirmative text directives BEFORE normalizing 'no ' prefixes
     neg = re.sub(r"The\s+image\s+contains\s+(?:no\s+)?writing\s+or\s+readable\s+digits\s+of\s+any\s+kind\s+in\s+any\s+language\.?", "", neg, flags=re.IGNORECASE).strip()
     if R137_CLOSING_DIRECTIVE in neg:
@@ -1675,6 +1721,9 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     if "printed" in neg_lower:
         pos_clean = re.sub(r"\bprinted\b", "clean unmarked", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r",\s*,+", ", ", pos_clean).strip(" ,.")
+
+    # Post-contradiction harmonizer sweep
+    pos_clean = harmonize_prompt_clauses(pos_clean)
 
     # Collision audit gate
     collisions = {t.strip().lower() for t in neg_clean.split(",")} & BARE_CHROMA
