@@ -39,7 +39,7 @@ Litigation against the diocese was frozen by the Chapter eleven automatic stay u
 
 Behind that collective pause, the administrative machinery of Chapter eleven began accumulating priority claims against estate assets.
 
-Most of the alleged abuse occurred between nineteen sixty and nineteen eighty-nine. The arithmetic is sobering. Consider the passage of time: a survivor ten years old in nineteen sixty-two reached their mid-seventies while the Chapter eleven proceeding passed its third anniversary.
+Most of the alleged abuse occurred between nineteen sixty and nineteen eighty-nine. The arithmetic is sobering. Consider the passage of time: a survivor ten years old in nineteen sixty-two reached their early-to-mid seventies while the Chapter eleven proceeding passed its third anniversary.
 
 Three years of motions. Three years of professional fee applications. Three years in which elderly claimants waited for resolution.
 
@@ -59,7 +59,7 @@ That narrative was only the comforting half. Chapter eleven seeks collective res
 
 One documented operational reality collided with a rigid legal structure. Parish weekly attendance declined roughly forty-two percent between twenty nineteen and twenty twenty-four, severely eroding parish collections.
 
-According to diocesan financial disclosures and canonical structures, parish operational bank accounts were maintained separately from the central chancery. However, the central chancery depends on monthly cathedraticum assessments, the historical diocesan administrative tax, remitted from parish collections.
+According to diocesan financial disclosures and canonical structures, parish operational bank accounts were maintained separately from the central chancery. However, the central chancery depends on monthly cathedraticum assessments, the canonical diocesan cathedraticum assessment, remitted from parish collections.
 
 When weekly collections shrank, diocesan assessment revenues contracted in tandem, directly contributing to operating cash deficits that constrained the chancery's capacity to fund multi-million-dollar installments.
 
@@ -81,7 +81,7 @@ March seventeenth, twenty twenty-five. The diocese filed its Third Amended Plan 
 
 Survivor advocates consistently criticized the offer as insufficient. On June sixth, twenty twenty-five, a voting declaration documented a ninety-nine percent rejection rate among voting survivor creditors.
 
-Three months later, on September ninth, twenty twenty-five, the diocese moved to dismiss its own Chapter eleven case. The debtor cited a negotiation deadlock after absorbing twenty-nine million dollars in accumulated operating cash deficits across fiscal operations.
+Three months later, on September ninth, twenty twenty-five, the diocese moved to dismiss its own Chapter eleven case. The debtor cited a negotiation deadlock after absorbing twenty-nine million dollars in accumulated operating cash deficits across fiscal years twenty twenty-three through twenty twenty-five.
 
 Rather than dismissing the case, the bankruptcy court held the dismissal motion in abeyance. The judge ordered the parties into intensive mediation.
 
@@ -119,7 +119,7 @@ Bellwether verdicts do not establish portfolio valuations across hundreds of dis
 
 The legal barriers to confirmation could not be overcome on this record under federal law.
 
-First, consensual confirmation failed under Title eleven, section eleven twenty-nine a eight, because Class Four, the abuse survivors, rejected the plan by approximately ninety-nine percent of votes cast.
+First, consensual confirmation failed under Title eleven, section eleven twenty-nine, subsection A, eight, because Class Four, the abuse survivors, rejected the plan by approximately ninety-nine percent of votes cast.
 
 Second, statutory confirmation requires compliance with Title eleven under section eleven twenty-nine, subsection A, one. Under the Supreme Court's June twenty-seventh, twenty twenty-four ruling in Harrington versus Purdue Pharma, the Bankruptcy Code does not authorize nonconsensual releases of non-debtor third parties through a Chapter eleven plan.
 
@@ -155,7 +155,7 @@ After Purdue Pharma, that shield cannot be imposed by decree.
 
 Now return to the question posed at the start: how does a multi-year Chapter eleven proceeding carrying hundreds of millions in settlement proposals stall for three years without a single dollar approved for distribution?
 
-The Oakland reorganization stalled because the debtor's scheduled estate held only seventy-six point one million dollars in initial assets, while outside parish contributions remained conditioned on universal releases survivors would not grant. When one jury valued a single claim at sixteen million dollars, it supplied an independent benchmark far above the illustrative trust averages, sharply challenging the economic basis of any capped settlement.
+The Oakland reorganization stalled within the perimeter constraint of seventy-six point one million dollars in initial scheduled assets, while outside parish contributions remained conditioned on universal releases survivors would not grant. When one jury valued a single claim at sixteen million dollars, it supplied an independent benchmark far above the illustrative trust averages, sharply challenging the economic basis of any capped settlement.
 
 The proposed trust could not bridge that valuation chasm. It could not purchase third-party releases without survivor consent.
 

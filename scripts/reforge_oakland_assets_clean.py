@@ -113,7 +113,7 @@ CLEAN_RAW_BGS = {
     ),
     "bg_ballot_tabulation_room": (
         "Institutional bankruptcy claims administration office interior: long sorting tables with document bins, empty tally sorting trays, "
-        "unlit matte display panels, neat industrial office furniture, utilitarian administrative stillness. "
+        "unlit matte display panels, neat industrial office furniture, utilitarian claims administration working atmosphere. "
         "2D stylized graphic novel editorial illustration, cool institutional gray and pale beige tones, clean linear ink hatching, "
         "even fluorescent office lighting. Sorting workbenches on the left; open office floor and paneled wall on the center-right."
     ),
@@ -163,54 +163,54 @@ CLEAN_RAW_FGS = {
     # --- CHARACTERS ---
     "fg_character_bankruptcy_judge": (
         "Presiding federal bankruptcy judge in dark judicial attire, viewed in three-quarter profile with dignified judicial composure, "
-        "turning a page of an open legal case docket folio with plain unmarked margins and illegible abstract line-marks only, "
-        "standing action framing from waist up with hands resting on the docket folio. "
-        "Bold ink, cel-shading, cool chiaroscuro, no specific real-life likeness, no celebrity likeness."
+        "firmly turning a page of an open legal case docket folio with plain unwritten margins and illegible abstract line-marks only, "
+        "standing action framing from waist up with deliberate judicial focus. "
+        "Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_diocesan_bishop": (
         "Diocesan bishop in tailored black clerical suit with white clerical Roman tab collar and simple gold pectoral cross on a slender metallic chain, "
-        "firmly turning a page of a bound pastoral letter folio with one hand while steadying the spine with the other, the folio displaying plain unmarked pages and illegible abstract line-marks only, "
+        "firmly turning a page of a bound pastoral letter folio with one hand while steadying the spine with the other, the folio displaying plain unwritten pages and illegible abstract line-marks only, "
         "solemn guarded downward gaze toward document folio, three-quarter angle action framing. "
-        "Bold ink, cel-shading, cool chiaroscuro, no specific real-life likeness, no celebrity likeness."
+        "Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_debtor_counsel": (
-        "Lead corporate restructuring defense counsel in charcoal business suit, firmly holding an open indexed legal case binder with plain unmarked pages and illegible abstract line-marks only with both hands, "
-        "thumb resting on the divider tab, sharp focused analytical expression, three-quarter angle action framing. "
+        "Lead corporate restructuring defense counsel in charcoal business suit, actively flipping an index tab divider in an open legal case binder folio with plain unwritten pages and illegible abstract line-marks only with deliberate focus, "
+        "sharp focused analytical expression, three-quarter angle action framing. "
         "Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_creditors_committee_counsel": (
-        "Tort claimants' bankruptcy committee litigator in dark navy tailored attire, annotating the margin of a creditor ballot declaration folio displaying plain unmarked surfaces and illegible abstract line-marks only with a fine ink pen, "
+        "Tort claimants' bankruptcy committee litigator in dark navy tailored attire, annotating the margin of a creditor ballot declaration folio displaying plain unruled surfaces and illegible abstract line-marks only with a fine ink pen, "
         "resolute adversarial facial expression, three-quarter angle action framing. "
         "Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_elderly_survivor_claimant": (
         "Dignified survivor claimant in their seventies with natural gray hair and weathered dignified facial features, "
-        "dignified everyday civilian wardrobe, firmly clasping a folded legal correspondence envelope with plain unmarked paper seal with both hands, "
+        "dignified everyday civilian wardrobe, firmly clasping a folded legal correspondence envelope with plain unwritten paper seal with both hands, "
         "steady reflective somber expression, three-quarter angle framing. "
         "Bold ink, cel-shading."
     ),
     "fg_character_diocesan_finance_officer": (
-        "Diocesan financial officer in dark gray corporate blazer, actively annotating a multi-column parish cathedraticum assessment spreadsheet folio with blank rule columns, plain unmarked cells, and illegible abstract line-marks only with a pen, "
+        "Diocesan financial officer in dark gray corporate blazer, actively annotating a multi-column parish cathedraticum assessment spreadsheet folio with blank rule columns, plain unruled cells, and illegible abstract line-marks only with a pen, "
         "disciplined analytical expression, three-quarter angle action framing. "
         "Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_insurance_carrier_counsel": (
-        "Insurance carrier defense litigator in tailored business suit, firmly turning the tabbed section divider of a historical coverage policy binder folio with plain unmarked pages and illegible abstract line-marks only, "
+        "Insurance carrier defense litigator in tailored business suit, firmly turning the tabbed section divider of a historical coverage policy binder folio with plain unwritten pages and illegible abstract line-marks only, "
         "disciplined analytical expression, three-quarter angle action framing. "
         "Bold ink, cel-shading, cool chiaroscuro."
     ),
     "fg_character_state_legislator_2019": (
-        "California State Assembly lawmaker in navy legislative business attire, firmly holding a bound legislative assembly bill folio with plain unmarked pages and illegible abstract line-marks only at chest height with both hands "
-        "while reviewing statutory provisions, composed authoritative posture, generic fictionalized public official, three-quarter angle action framing. "
+        "California State Assembly lawmaker in navy legislative business attire, actively turning a printed statutory section page of a bound legislative assembly bill folio with plain unwritten pages and illegible abstract line-marks only with both hands, "
+        "downward gaze reviewing statutory provisions, composed authoritative posture, generic fictionalized public official, three-quarter angle action framing. "
         "Bold ink, cel-shading."
     ),
     "fg_character_investigative_journalist": (
-        "Investigative legal court reporter reviewing a bound court docket summary folio with plain unmarked pages and illegible abstract line-marks only, "
+        "Investigative legal court reporter reviewing a bound court docket summary folio with plain unwritten pages and illegible abstract line-marks only, "
         "firmly resting a pen tip beside a blank entry rule line, observant inquisitive facial micro-expression, smart professional newsroom attire, three-quarter angle action framing. "
         "Bold ink, cel-shading."
     ),
     "fg_character_fee_examiner": (
-        "Court fee examiner in dark professional office vest over white dress shirt with sleeves rolled to forearms, actively circling line entries on an open itemized billing ledger folio with plain unmarked ledger rules and illegible abstract line-marks only with an analytical pen, "
+        "Court fee examiner in dark professional office vest over white dress shirt with sleeves rolled to forearms, actively circling line entries on an open itemized billing ledger folio with plain unruled ledger rules and illegible abstract line-marks only with an analytical pen, "
         "sharp focused forensic expression reviewing expense entries, downward gaze toward ledger, three-quarter angle framing. "
         "Bold ink, cel-shading."
     ),
@@ -218,15 +218,15 @@ CLEAN_RAW_FGS = {
     # --- EVIDENCE PROPS & DATA VISUALIZATIONS ---
     "fg_evidence_ab218_bill": (
         "Bound statutory legislative reform bill folio: crisp legal paper displaying a generic geometric embossed circular blind-stamp impression circle, "
-        "plain unlettered header band, blank margins, body pages with abstract horizontal rule lines, and a prominent statutory section accented with a clean translucent yellow highlight bar. "
+        "plain unwritten header band, blank margins, body pages with abstract horizontal rule lines, and a prominent statutory section accented with a clean translucent yellow highlight bar. "
         "Bold ink, cel-shading, crisp tactile paper texture."
     ),
     "fg_evidence_chapter11_petition": (
-        "Official federal bankruptcy reorganization petition cover folio: plain unmarked header band, blank debtor entity line, empty reorganization filing checkbox, "
-        "embossed generic circular geometric court clerk blind-stamp impression circle, plain unmarked paper with illegible abstract line-marks only. Bold ink, cel-shading, crisp official legal paper."
+        "Official federal bankruptcy reorganization petition cover folio: plain unruled header band, blank debtor entity line, empty reorganization filing checkbox, "
+        "embossed generic circular geometric court clerk blind-stamp impression circle, plain unruled paper with illegible abstract line-marks only. Bold ink, cel-shading, crisp official legal paper."
     ),
     "fg_evidence_docket_sheet": (
-        "Bound official court docket summary folio, displaying plain unmarked header band, abstract ruled entry lines, date column dividers, and geometric index markers with illegible abstract line-marks only. "
+        "Bound official court docket summary folio, displaying plain unruled header band, abstract ruled entry lines, date column dividers, and geometric index markers with illegible abstract line-marks only. "
         "Bold ink, cel-shading, crisp laser-printed paper texture."
     ),
     "fg_evidence_civil_complaint_stack": (
@@ -234,21 +234,21 @@ CLEAN_RAW_FGS = {
         "Bold ink, cel-shading, heavy bound document texture."
     ),
     "fg_evidence_claims_decade_histogram": (
-        "Stylized 2D forensic statistical histogram chart on cream archival grid paper, displaying vertical data distribution columns grouped across chronological intervals, "
-        "with prominent peak bars accented in contrasting tones. Bold ink, cel-shading, tactile grid paper texture."
+        "Stylized 2D forensic statistical histogram chart on cream archival grid paper, displaying vertical data distribution columns showing chronological claim distributions rising steadily across nineteen-sixties interval columns, reaching prominent peak maximum columns in the nineteen-seventies interval, and tapering downward across nineteen-eighties interval columns, "
+        "with prominent peak bars accented in contrasting tones, plain unruled margins, nonlinguistic graphic rules only. Bold ink, cel-shading, tactile grid paper texture."
     ),
     "fg_evidence_third_amended_plan": (
-        "Thick bound Chapter 11 reorganization plan folio, embossed cover with plain unmarked header band, divider index tabs along right margin "
+        "Thick bound Chapter 11 reorganization plan folio, embossed cover with plain unruled header band, divider index tabs along right margin "
         "in muted gold and slate tones, blank pages with illegible abstract line-marks only. Bold ink, cel-shading, heavy bound paper folio."
     ),
     "fg_evidence_trust_offer_bar_chart": (
         "Stylized 2D forensic financial bar chart graphic on aged ledger paper: three distinct vertical geometric column bars on a clean horizontal baseline, "
-        "the first left bar rising to roughly one-third height, the second middle bar rising to roughly three-fifths height, and the third right bar rising to full graphic height. "
-        "Clean abstract geometric rules, dual-tone fill shading, plain unmarked margins, blank nonlinguistic ledger paper texture, nonlinguistic graphic novel styling. Bold ink, cel-shading."
+        "the first left bar rising to roughly one-third graphic height representing scheduled liquid assets, the second middle bar rising to roughly three-fifths graphic height representing the reorganization trust offer, and the third right bar rising to full graphic height representing the mediated settlement benchmark. "
+        "Clean abstract geometric rules, dual-tone fill shading, plain unruled margins, blank nonlinguistic ledger paper texture, nonlinguistic graphic novel styling. Bold ink, cel-shading."
     ),
     "fg_evidence_ballot_tabulation": (
         "Authentic bankruptcy creditor voting tabulation diagram: two-dimensional circular donut chart dividing ring dominated by a massive dark vermilion segment comprising ninety-nine percent of the circumference, "
-        "adjacent to a hairline sliver of olive green segment, clean graphic rule lines, unmarked paper surface, nonlinguistic graphic novel styling. "
+        "adjacent to a hairline sliver of olive green segment, clean graphic rule lines, plain unruled paper surface, nonlinguistic graphic novel styling. "
         "Bold ink, cel-shading, crisp paper texture."
     ),
     "fg_evidence_professional_fees_meter": (
@@ -257,29 +257,29 @@ CLEAN_RAW_FGS = {
     ),
     "fg_evidence_priority_waterfall": (
         "Stylized 2D forensic bankruptcy priority distribution waterfall diagram on aged parchment, illustrating cascading distribution priority tiers "
-        "rendered as four stacked horizontal geometric bands of descending proportional widths with downward flow arrows, plain unmarked surfaces, nonlinguistic rules only. "
+        "rendered as four stacked horizontal geometric bands of descending proportional widths with downward flow arrows, plain unruled surfaces, nonlinguistic rules only. "
         "Bold ink, cel-shading, aged parchment texture."
     ),
     "fg_evidence_operating_loss_ledger": (
         "Open forensic accounting ledger folio: ruled debit and credit balance columns with abstract geometric rule lines and a prominent rust-orange circled balance entry, "
-        "plain unmarked header band and blank margins, nonlinguistic rules and marks in document body with illegible abstract line-marks only. Cream ledger paper texture, cel-shading."
+        "plain unruled header band and blank margins, nonlinguistic rules and marks in document body with illegible abstract line-marks only. Cream ledger paper texture, cel-shading."
     ),
     "fg_evidence_motion_to_dismiss": (
-        "Official court motion to dismiss folio: plain unmarked header band, case caption ruled lines, and an embossed generic circular geometric filing blind-stamp, blank pages with illegible abstract line-marks only. "
+        "Official court motion to dismiss folio: plain unruled header band, case caption ruled lines, and an embossed generic circular geometric filing blind-stamp, blank pages with illegible abstract line-marks only. "
         "Bold ink, cel-shading, crisp legal folio."
     ),
     "fg_evidence_valuation_comparison": (
         "Editorial illustration of an evidence valuation comparison exhibit card: "
-        "a cream rectangular exhibit card displaying two side-by-side comparative solid geometric column bars on a subtle horizontal baseline. "
-        "On the left, a tall solid dark vermilion column filling roughly ninety percent of card height; "
-        "on the right, an adjacent short solid slate-gray column measuring approximately three to four percent of the tall column's height, "
-        "illustrating the stark proportional contrast between a single jury benchmark and capped collective settlement averages. "
+        "a cream rectangular exhibit card displaying comparative solid geometric column bars on a subtle horizontal baseline. "
+        "On the left, a tall solid dark vermilion column filling roughly ninety percent of card height representing the sixteen-million-dollar jury benchmark; "
+        "on the right, two adjacent short solid slate-gray comparative bars measuring approximately three to four percent of the tall column height: an intermediate bar measuring roughly four point six percent representing the seven-hundred-thirty-three-thousand mediation average, and a baseline bar measuring roughly two point seven percent representing the four-hundred-thirty-five-thousand third plan average, "
+        "illustrating the stark proportional contrast between individual jury verdicts and collective settlement trust payouts. "
         "Clean minimalist graphic novel linework, stylized forensic data infographic on cream documentary presentation card, "
-        "unmarked borders and blank margins, nonlinguistic geometric rules only, "
+        "plain unruled borders and blank margins, nonlinguistic geometric rules only, "
         "isolated on solid flat #FF00FF pure magenta background."
     ),
     "fg_evidence_settlement_term_sheet": (
-        "Settlement mediation term sheet folio, featuring plain document margins, plain structured installment table lines with blank amount fields, and a solid geometric horizontal divider bar, blank pages with illegible abstract line-marks only. "
+        "Settlement mediation term sheet folio, featuring plain unruled document margins, plain structured installment table lines with blank amount fields, and a solid geometric horizontal divider bar, blank pages with illegible abstract line-marks only. "
         "Bold ink, cel-shading, rich paper texture."
     ),
     "fg_evidence_liability_insurance_policies": (
@@ -291,7 +291,7 @@ CLEAN_RAW_FGS = {
         "aged cream parchment paper texture, cel-shading."
     ),
     "fg_evidence_case_timeline_clock": (
-        "Stylized antique documentary brass clock artifact: numberless circular cream dial face with fine geometric tick marks at twelve division intervals, two clean tapered black ink hands pointing to blank tick marks, plain unwritten parchment center, attached plain manila document tab. "
+        "Stylized antique documentary brass clock artifact: radial tick-marked circular cream dial face with fine geometric tick marks at twelve division intervals, two clean tapered black ink hands pointing to blank tick marks, plain unwritten parchment center, attached plain manila document tab. "
         "Tactile metallic texture, bold ink, cel-shading."
     ),
 
@@ -302,7 +302,7 @@ CLEAN_RAW_FGS = {
         "Bold ink, cel-shading, crisp legal document texture."
     ),
     "fg_evidence_purdue_scotus_opinion": (
-        "Official Supreme Court slip opinion folio, plain unmarked header band, "
+        "Official Supreme Court slip opinion folio, plain unruled header band, "
         "crisp legal margins with abstract ruling text rendered as illegible horizontal line-marks only. "
         "Bold ink, cel-shading, archival paper texture."
     ),
@@ -313,11 +313,11 @@ CLEAN_RAW_FGS = {
     ),
     "fg_evidence_automatic_stay_notice": (
         "Official federal bankruptcy automatic stay statutory notice folio: centered generic geometric judicial circular blind-stamp impression circle, "
-        "plain unmarked header band, and abstract statutory warning sections with illegible abstract line-marks only. "
+        "plain unruled header band, and abstract statutory warning sections with illegible abstract line-marks only. "
         "Bold ink, cel-shading, crisp legal folio."
     ),
     "fg_evidence_attendance_decline_chart": (
-        "Authentic statistical bar chart evidence graphic: two distinct vertical comparative columns on cream archival grid paper, a taller baseline column on the left and a substantially lower column on the right at roughly three-fifths height, unlabelled axis grid rules, clean graphic rule lines, plain unmarked paper surface. "
+        "Authentic statistical bar chart evidence graphic: two distinct vertical comparative columns on cream archival grid paper, a taller baseline column on the left and a substantially lower column on the right at roughly three-fifths height, unlabelled axis grid rules, clean graphic rule lines, plain unruled paper surface. "
         "Bold ink, cel-shading, tactile grid paper texture."
     )
 }

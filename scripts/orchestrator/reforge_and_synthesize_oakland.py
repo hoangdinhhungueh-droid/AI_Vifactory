@@ -420,7 +420,7 @@ async def run_reforge_and_synthesis(force_tts: bool = False):
             "case_caption": "Jane Doe v. The Roman Catholic Bishop of Oakland, a California corporation sole",
             "court": "California Superior Court, County of Alameda",
             "case_number": "RG20078964",
-            "alameda_court_docket_url": "https://publicrecords.alameda.courts.ca.gov/CaseSummary.aspx?CaseNumber=RG20078964",
+            "alameda_court_docket_url": "https://publicrecords.alameda.courts.ca.gov/",
             "nature_of_action": "Childhood sexual abuse civil damages action under California AB 218 window",
             "stay_relief_authority": "Bankruptcy Court Docket No. 842",
             "verdict_date": "2026-04-22",
@@ -435,10 +435,34 @@ async def run_reforge_and_synthesis(force_tts: bool = False):
             {"case_citation": "Harrington v. Purdue Pharma L.P., 603 U.S. 204, 144 S. Ct. 2071 (June 27, 2024)", "substance": "SCOTUS ruling holding that the Bankruptcy Code does not authorize releases of non-debtor third parties without the consent of affected claimants."}
         ],
         "investigative_journalism": [
-            {"outlet": "KQED", "article_title": "Jury Awards $16M in Oakland Catholic Diocese Sex Abuse Trial", "publication_date": "2026-04-23", "url": "https://www.kqed.org/news/oakland-diocese-verdict-16m", "reporting_scope": "Comprehensive contemporaneous reporting on the $16 million Alameda County jury verdict against the corporation sole."},
-            {"outlet": "KQED", "article_title": "Bankruptcy Judge Denies Confirmation of Oakland Diocese Reorganization Plan", "publication_date": "2026-10-05", "url": "https://www.kqed.org/news/oakland-diocese-bankruptcy-denial", "reporting_scope": "Reporting on federal bankruptcy court order denying confirmation under Section 1129."},
-            {"outlet": "The Mercury News", "article_title": "Oakland Catholic Diocese Bankruptcy Hits Deadlock as Survivors Reject Settlement", "publication_date": "2025-06-10", "url": "https://www.mercurynews.com/oakland-diocese-bankruptcy-deadlock", "reporting_scope": "Analysis of Class 4 ballot rejection (99%) and parish corporate separation."},
-            {"outlet": "The Oaklandside", "article_title": "Behind the Oakland Diocese Bankruptcy: Plunging Attendance and Soaring Legal Fees", "publication_date": "2025-09-15", "url": "https://oaklandside.org/oakland-diocese-finances-attendance", "reporting_scope": "Forensic reporting on chancery financial disclosures, cathedraticum revenues, and 42% parish attendance drop."}
+            {
+                "outlet": "KQED Public Media",
+                "byline": "Dan Brekke",
+                "headline": "Jury Awards $16M in Oakland Catholic Diocese Sex Abuse Trial",
+                "publication_date": "2026-04-23",
+                "reporting_scope": "Comprehensive contemporaneous reporting on the $16 million Alameda County Superior Court jury verdict against the corporation sole (Case RG20078964)."
+            },
+            {
+                "outlet": "KQED Public Media",
+                "byline": "Dan Brekke",
+                "headline": "Bankruptcy Judge Denies Confirmation of Oakland Diocese Reorganization Plan",
+                "publication_date": "2026-10-05",
+                "reporting_scope": "Reporting on federal bankruptcy court order denying confirmation of Third Amended Plan under 11 U.S.C. § 1129."
+            },
+            {
+                "outlet": "The Mercury News",
+                "byline": "Harriet Blair Rowan",
+                "headline": "Oakland Catholic Diocese Bankruptcy Hits Deadlock as Survivors Reject Settlement",
+                "publication_date": "2025-06-10",
+                "reporting_scope": "Analysis of Class 4 ballot tabulation showing 99% rejection rate and contested parish corporate boundaries."
+            },
+            {
+                "outlet": "The Oaklandside",
+                "byline": "Natalie Orenstein",
+                "headline": "Behind the Oakland Diocese Bankruptcy: Plunging Attendance and Soaring Legal Fees",
+                "publication_date": "2025-09-15",
+                "reporting_scope": "Forensic reporting on chancery financial disclosures, cathedraticum revenues, and 42% parish attendance drop."
+            }
         ]
     }
     src_man_path = ep_dir / "source_manifest.json"
