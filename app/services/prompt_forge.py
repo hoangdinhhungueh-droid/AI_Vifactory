@@ -783,6 +783,8 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     p = re.sub(r",?\s*(?:unfilled\s+template(?:\s+with\s+official\s+border)?|blank\s+amount\s+fields|empty\s+ruled\s+lines|embossed\s+seal\s+without\s+inscription|blank\s+surfaces)[^,.]*", "", p, flags=re.IGNORECASE)
     if "16:9" not in p:
         p = f"{p}, 16:9 aspect ratio"
+    if "safe-zone" not in p and "safe zone" not in p:
+        p = f"{p}, bottom 20% safe-zone for subtitles, clear center-right negative space for foreground character overlay"
 
     prof = resolve_market_profile(market)
     bg_anchor, bg_negs = resolve_background_anchor(bg_key, p, market, prof)
