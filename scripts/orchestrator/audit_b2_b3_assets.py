@@ -393,9 +393,13 @@ Return a structured adversarial audit report.
 
 def main():
     parser = argparse.ArgumentParser(description="Multi-Agent Audit for B2/B3 Assets")
-    parser.add_argument("--episode", default="EN_EP0008_oakland_plan_rejected", help="Episode ID")
+    parser.add_argument("--episode", default=os.environ.get("EPISODE_ID", ""), help="Episode ID")
     parser.add_argument("--ep-dir", default=None, help="Episode directory")
     args = parser.parse_args()
+
+    if not args.episode:
+        logger.error("No --episode specified and EPISODE_ID env var not set.")
+        sys.exit(1)
 
     ep_dir = Path(args.ep_dir) if args.ep_dir else Path(f"/var/vf/episodes/{args.episode}")
     if not ep_dir.exists():

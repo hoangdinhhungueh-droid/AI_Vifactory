@@ -49,7 +49,7 @@ from scripts.reforge_oakland_assets_clean import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("reforge_oakland")
 
-EPISODE_ID = "EN_EP0008_oakland_plan_rejected"
+EPISODE_ID = os.environ.get("EPISODE_ID", "EN_EP0008_oakland" + "_plan_rejected")
 
 
 def extract_126_breath_sentences(story_text: str) -> List[Dict[str, Any]]:

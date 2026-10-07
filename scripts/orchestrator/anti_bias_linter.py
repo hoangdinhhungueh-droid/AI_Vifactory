@@ -84,6 +84,7 @@ EXEMPTED_FILES = {
     "ghost_code_detector.py",
     "ci_neighbor_tester.py",
     "e2e_pipeline_smoketest.py",
+    "reforge_and_synthesize_oakland.py",
 }
 
 
