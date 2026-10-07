@@ -682,6 +682,22 @@ def test_opus_astra_round2_directives_sanitization():
     assert "floor plane" not in map_res["positive_prompt"]
 
 
+def test_opus_astra_round3_orphan_syntax_and_layout_dedup():
+    """Verify that orphan syntax (with ., displaying and) and redundant layout phrases are cleansed."""
+    from app.services.prompt_forge import harmonize_prompt_clauses
+
+    raw_fg = "Geometric chart with clean proportional data graphics with . Creditors counsel displaying and abstract line marks only."
+    cleaned_fg = harmonize_prompt_clauses(raw_fg)
+    assert "with ." not in cleaned_fg
+    assert "displaying and" not in cleaned_fg
+    assert "displaying" in cleaned_fg
+
+    raw_bg = "16:9 widescreen editorial illustration, stylized graphic novel background, clean low-contrast dark floor band, open right space for balance. Courtroom facade on the left; open quiet space in the right third for composition balance, 16:9 aspect ratio, clean low-contrast subdued foreground floor plane across the lower horizontal edge, open quiet space in the right third for composition balance Authentic federal courtroom"
+    cleaned_bg = harmonize_prompt_clauses(raw_bg)
+    assert "16:9 aspect ratio" not in cleaned_bg
+    assert ". Authentic" in cleaned_bg
+
+
 
 
 

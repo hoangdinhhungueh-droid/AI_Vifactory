@@ -1371,7 +1371,7 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
             "petition", "complaint", "docket", "bill", "opinion", "motion", "order", "term_sheet", "policy", "policies", "form", "letter", "envelope", "ledger"
         ])
         is_data_viz = (not is_document_artifact) and bool(re.search(
-            r"\b(charts?|histograms?|waterfalls?|graphs?|tabulations?|infographics?|diagrams?|donut\s+chart|bar\s+chart)\b",
+            r"\b(charts?|histograms?|waterfalls?|graphs?|tabulations?|infographics?|diagrams?|donut\s+chart|bar\s+chart|meters?|gauges?|comparisons?)\b",
             f"{fg_key} {p}",
             re.IGNORECASE
         ))
@@ -1608,8 +1608,23 @@ def harmonize_prompt_clauses(text: str) -> str:
     text = re.sub(r"\ba\s+bound\s+bound\s+plain\s+folio\b", "a bound plain folio with faint abstract line-marks", text, flags=re.IGNORECASE)
     text = re.sub(r"\ban?\s+creditor\s+ballot\s+ledger\s+with\s+blank\s+ruled\s+tally\s+rows\s+folio\b", "creditor ballot ledger folio with blank ruled tally rows", text, flags=re.IGNORECASE)
 
-    # 7. Collapse whitespace and double punctuation
+    # 7. Orphan preposition & conjunction cleanup (Opus 5.5 Directive 1 & Astra 6)
+    text = re.sub(r"\bdisplaying\s+and\b", "displaying", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b(?:with|displaying|featuring|showing|containing|spanning|and|or)\s*([.,;])", r"\1", text, flags=re.IGNORECASE)
+    text = re.sub(r",\s*\.", ".", text)
+    text = re.sub(r"\bwith\s+a\s+fine\s+ink\s+pen\b.*?\bwith\s+an?\s+(?:ink\s+)?pen\b", "with an ink pen", text, flags=re.IGNORECASE)
+
+    # 8. Background layout clause deduplication & sentence boundary punctuation
+    text = re.sub(r",?\s*16:9 aspect ratio,?\s*", ", ", text, flags=re.IGNORECASE)
+    text = re.sub(r",?\s*clean low-contrast subdued foreground floor plane across the lower horizontal edge,?\s*", ", ", text, flags=re.IGNORECASE)
+    text = re.sub(r",?\s*open quiet space in the right third for composition balance,?\s*", ", ", text, flags=re.IGNORECASE)
+    text = re.sub(r"[;:,]\s*,+", ", ", text)
+    text = re.sub(r"[;:,]?\s*(Authentic\s+(?:regional|federal|ecclesiastical|contemporary|institutional))", r". \1", text, flags=re.IGNORECASE)
+
+    # 9. Collapse whitespace and double punctuation
     text = re.sub(r",\s*,+", ", ", text)
+    text = re.sub(r"[,;:]\s*\.", ".", text)
+    text = re.sub(r"\.\s*\.+", ".", text)
     text = re.sub(r"\s{2,}", " ", text).strip(" ,.")
     return text
 
