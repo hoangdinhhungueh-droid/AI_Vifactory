@@ -201,13 +201,16 @@ def run_preflight_validation_and_remediation(assets: Dict[str, Any], metrics: Di
         logger.warning("[PRE-FLIGHT] Dwell violation detected: %.2fs > 90.0s", metrics["max_continuous_bg_dwell_sec"])
 
     # Check 2: Prompt Sanitization & Contradiction Resolution
-    for target_dict, is_fg in [(bgs, True), (fgs, False)]:
+    for target_dict, is_fg in [(bgs, False), (fgs, True)]:
         for k, v in target_dict.items():
             if not isinstance(v, dict):
                 continue
             pos = v.get("positive_prompt", v.get("prompt", ""))
             neg = v.get("negative_prompt", "")
             orig_pos, orig_neg = pos, neg
+
+            # Strip uppercase bracketed tags so they don't leak as header tokens
+            pos = re.sub(r"\[[A-Z\s&_/-]+\]", "", pos).strip()
 
             # Purge functional text-priming nouns -> physical non-text descriptors
             pos = re.sub(r"\bpastoral\s+letter\s+folio\b", "bound plain folio with ruled grid", pos, flags=re.IGNORECASE)
@@ -216,17 +219,57 @@ def run_preflight_validation_and_remediation(assets: Dict[str, Any], metrics: Di
             pos = re.sub(r"\bitemized\s+creditor\s+ballot\s+declaration\b", "creditor ballot ledger with blank ruled tally rows", pos, flags=re.IGNORECASE)
             pos = re.sub(r"\bsubdued\s+lower\s+compositional\s+border\b", "subdued lower compositional negative space", pos, flags=re.IGNORECASE)
             pos = re.sub(r"\bcartographic\s+margins\b", "cartographic layout spacing", pos, flags=re.IGNORECASE)
-            pos = re.sub(r"\bdark\s+floor\s+band\b", "subdued foreground floor plane", pos, flags=re.IGNORECASE)
 
-            # Purge seal/stamp/printed contradictions
-            pos = re.sub(r"\b(?:paper|envelope|official|formal|filing)?\s*seals?\b", "embossed insignia", pos, flags=re.IGNORECASE)
+            # Map/aerial floor-plane boilerplate vs interior
+            is_map_or_aerial = any(kw in k.lower() or kw in pos.lower() for kw in ["map", "aerial", "cartographic", "satellite", "elevation"])
+            if is_map_or_aerial:
+                pos = re.sub(r"\bdark\s+floor\s+band\b", "subdued lower map border", pos, flags=re.IGNORECASE)
+                pos = re.sub(r"\bsubdued\s+foreground\s+floor\s+plane\b", "subdued lower cartographic border", pos, flags=re.IGNORECASE)
+            else:
+                pos = re.sub(r"\bdark\s+floor\s+band\b", "subdued foreground floor plane", pos, flags=re.IGNORECASE)
+
+            # Deduplicate word stutters and prop-slot corruptions
+            pos = re.sub(r"\ba\s+bound\s+bound\s+plain\s+folio\b", "a bound plain folio with faint abstract line-marks", pos, flags=re.IGNORECASE)
+            pos = re.sub(r"\ban?\s+creditor\s+ballot\s+ledger\s+with\s+blank\s+ruled\s+tally\s+rows\s+folio\b", "creditor ballot ledger folio with blank ruled tally rows", pos, flags=re.IGNORECASE)
+            pos = re.sub(r"\baccounting\s+binder\s+with\s+blank\s+columnar\s+grid\s+with\s+structured\s+financial\s+grid\s+columns\b", "accounting binder with structured blank columnar grid", pos, flags=re.IGNORECASE)
+            pos = re.sub(r"\bledger\s+with\s+blank\s+columnar\s+rows\s+folio\s+with\s+clean\s+geometric\s+ledger\s+columns\b", "financial ledger folio with blank columnar rows", pos, flags=re.IGNORECASE)
+            pos = re.sub(r"\bplain\s+unruled\s+division\s+tick\s+strokes\b", "uniform unmarked tick strokes", pos, flags=re.IGNORECASE)
+            pos = re.sub(r"\b(\w+)\s+\1\b", r"\1", pos, flags=re.IGNORECASE)
+
+            # Purge seal/stamp/insignia contradictions
+            pos = re.sub(r"\b(?:paper|envelope|official|formal|filing)?\s*seals?\b", "clean envelope flap", pos, flags=re.IGNORECASE)
+            pos = re.sub(r"\bfingers\s+pressed\s+against\s+the\s+(?:clean\s+unwritten\s+|embossed\s+)?insignia\b", "fingers pressed flat against the plain envelope face", pos, flags=re.IGNORECASE)
+            pos = re.sub(r"\bfingers\s+firmly\s+pressing\s+envelope\s+seal\b", "fingers pressed flat against the plain envelope face", pos, flags=re.IGNORECASE)
+            pos = re.sub(r"\b(?:clean\s+unwritten\s+|formal\s+blind-debossed\s+|blind-debossed\s+|embossed\s+)?insignias?\b", "plain cream folded envelope with a blank flap", pos, flags=re.IGNORECASE)
             pos = re.sub(r"\b(?:rubber[- ]?|filing|date|electronic|court)?\s*stamps?\b", "graphic marking", pos, flags=re.IGNORECASE)
             pos = re.sub(r"\bprinted\b", "clean unmarked", pos, flags=re.IGNORECASE)
             pos = re.sub(r"The\s+image\s+contains\s+(?:no\s+)?writing\s+or\s+readable\s+digits\s+of\s+any\s+kind\s+in\s+any\s+language\.?", "", pos, flags=re.IGNORECASE)
 
+            # Deduplicate BG token repetitions
+            pos = re.sub(r"\b16:9\b(?:\s*,\s*16:9)+", "16:9", pos)
+            pos = re.sub(r"(?:open\s+quiet\s+space\s+in\s+the\s+right\s+third,?\s*){2,}", "open quiet space in the right third, ", pos, flags=re.IGNORECASE)
+            pos = re.sub(r"(?:clean\s+low-contrast\s+subdued\s+foreground\s+floor\s+plane,?\s*){2,}", "clean low-contrast subdued foreground floor plane, ", pos, flags=re.IGNORECASE)
+            pos = re.sub(r",\s*,+", ", ", pos).strip(" ,.")
+
             # Clean negative channel
             neg = re.sub(r"The\s+image\s+contains\s+(?:no\s+)?writing\s+or\s+readable\s+digits\s+of\s+any\s+kind\s+in\s+any\s+language\.?", "", neg, flags=re.IGNORECASE)
             neg = re.sub(r"\bno\s+", "", neg, flags=re.IGNORECASE).strip().rstrip(". ")
+            neg = re.sub(r"\.\s*,", ",", neg)
+            neg = re.sub(r",\s*\.", ".", neg)
+            neg = re.sub(r",\s*,+", ", ", neg)
+
+            # Harden FG chroma negatives
+            raw_neg_tokens = [t.strip(" .") for t in neg.split(",") if t.strip(" .")]
+            if is_fg:
+                raw_neg_tokens.extend(["seal", "stamp", "emblem", "crest", "background gradients", "drop shadow", "cast shadow", "floor shadow", "contact shadow"])
+            deduped_tokens = []
+            seen_tok = set()
+            for tok in raw_neg_tokens:
+                tok_clean = re.sub(r"^\b(?:or|and)\s+", "", tok, flags=re.IGNORECASE).strip(" .")
+                if tok_clean.lower() not in seen_tok and tok_clean:
+                    seen_tok.add(tok_clean.lower())
+                    deduped_tokens.append(tok_clean)
+            neg = ", ".join(deduped_tokens)
 
             if pos != orig_pos or neg != orig_neg:
                 v["positive_prompt"] = pos.strip()

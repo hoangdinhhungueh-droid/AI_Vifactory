@@ -645,6 +645,44 @@ def test_zero_affirmative_text_leakage_and_contradiction():
     assert "The image contains writing" not in res["prompt"]
 
 
+def test_opus_astra_round2_directives_sanitization():
+    """Verify that header tags, stutters, prop corruptions, and chroma shadows are properly sanitized."""
+    from app.services.prompt_forge import split_prompt_channels
+
+    raw = (
+        "[STYLE MANDATE] 2D stylized graphic novel digital illustration, "
+        "Subject holding a bound bound plain folio and fingers pressed against the embossed insignia on pure #FF00FF cutout. "
+        "[ACTION & GAZE INVARIANT] directional gaze. "
+        "[STRICT NEGATIVE PROMPT] no seal, no stamp, photograph. , "
+    )
+    res = split_prompt_channels(raw, default_layout="subject-right at xPct: 75")
+
+    # Header tags stripped from positive
+    assert "[STYLE MANDATE]" not in res["positive_prompt"]
+    assert "[ACTION & GAZE INVARIANT]" not in res["positive_prompt"]
+
+    # Word stutter fixed
+    assert "bound bound" not in res["positive_prompt"]
+
+    # Contradicted embossed insignia resolved to envelope
+    assert "embossed insignia" not in res["positive_prompt"]
+    assert "envelope" in res["positive_prompt"]
+
+    # Chroma negatives hardened with shadow exclusions
+    neg = res["negative_prompt"]
+    assert "background gradients" in neg
+    assert "drop shadow" in neg
+    assert "cast shadow" in neg
+    assert "floor shadow" in neg
+    assert ". ," not in neg
+
+    # Map test: verify aerial/cartographic does not contain floor plane
+    map_raw = "Aerial cartographic map exhibit of Alameda County parcels with dark floor band."
+    map_res = split_prompt_channels(map_raw)
+    assert "floor plane" not in map_res["positive_prompt"]
+
+
+
 
 
 

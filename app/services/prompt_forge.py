@@ -1375,7 +1375,7 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
             f"{fg_key} {p}",
             re.IGNORECASE
         ))
-        evidence_chroma_negs = "white outline border, die-cut stroke, sticker outline, white halo outline, cyan neon glows"
+        evidence_chroma_negs = "white outline border, die-cut stroke, sticker outline, white halo outline, cyan neon glows, background gradients, drop shadow, cast shadow, floor shadow, contact shadow"
         if is_data_viz:
             filtered_r137 = ", ".join([clause.strip() for clause in NEGATIVE_R137.split(",") if "chart" not in clause.lower()])
             data_viz_negs = "no percentage labels, no axis typography, no numerical digits, no dollar figures, no data callouts"
@@ -1442,10 +1442,10 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
 
         if is_claimant_or_survivor:
             gaze_clause = "composed emotive micro-expressions with steady reflective gaze"
-            action_gaze_tag = "[ACTION & GAZE INVARIANT - DIGNITY EXCEPTION] Subject exhibiting survivor dignity, fingers firmly pressing envelope seal with solemn reflective gaze."
+            action_gaze_tag = "[ACTION & GAZE INVARIANT - DIGNITY EXCEPTION] Subject exhibiting survivor dignity, fingers pressed flat against the plain envelope face with solemn reflective gaze."
         elif any(k in comb_fg for k in ["bishop", "clergy", "priest"]):
             gaze_clause = "solemn guarded micro-expressions with downward gaze toward document folio"
-            action_gaze_tag = "[ACTION & GAZE INVARIANT - DIGNITY EXCEPTION] Subject exhibiting solemn formal dignity, turning page of bound pastoral letter folio with focused downward gaze."
+            action_gaze_tag = "[ACTION & GAZE INVARIANT - DIGNITY EXCEPTION] Subject exhibiting solemn formal dignity, firmly turning a page of a bound plain folio with faint abstract line-marks with focused downward gaze."
         else:
             gaze_clause = "intense facial micro-expressions with sharp focused gaze toward document or active prop"
             action_gaze_tag = "[ACTION & GAZE INVARIANT] Subject actively manipulating physical documentary prop with clear hand gesture and directional gaze."
@@ -1462,7 +1462,7 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
             f"[MARKET & ETHNIC ANCHOR] {fg_anchor}. "
             f"[ERA ANCHOR] {era_anchor} "
             f"[STRICT NEGATIVE PROMPT] photograph, photorealistic human, 3D render, CGI skin, white background, gray background, "
-            f"halo, background gradients, cropped head, cropped hands, cutoffs, decorative picture borders, picture frames, ui elements, text, numbers, charts, labels, typography, "
+            f"halo, background gradients, drop shadow, cast shadow, floor shadow, contact shadow, cropped head, cropped hands, cutoffs, decorative picture borders, picture frames, ui elements, text, numbers, charts, labels, typography, "
             f"sticker outline, die-cut border, white halo outline, no specific real-life likeness, no celebrity likeness, "
             f"no static standing figure with arms at sides, no empty passive hands, {NEGATIVE_R137}{fg_negs}. {R137_CLOSING_DIRECTIVE}"
         )
@@ -1584,6 +1584,9 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
 
     pos_clean = strip_negative_leakage_from_positive(pos).strip()
     
+    # Strip uppercase bracketed tags from positive prompt so they don't leak as header tokens
+    pos_clean = re.sub(r"\[[A-Z\s&_/-]+\]", "", pos_clean).strip()
+
     # Positive channel safety lint: ensure no dangling conjunctions or raw 'no' prefixes remain
     pos_clean = re.sub(r"\bno\s+(?:borders?|frames?|text|words?|letters?|digits?|numbers?)\b,?\s*", "", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\bwithout\s+\w+\b,?\s*", "", pos_clean, flags=re.IGNORECASE)
@@ -1605,7 +1608,28 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     pos_clean = re.sub(r"\bitemized\s+creditor\s+ballot\s+declaration\b", "creditor ballot ledger with blank ruled tally rows", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\bsubdued\s+lower\s+compositional\s+border\b", "subdued lower compositional negative space", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\bcartographic\s+margins\b", "cartographic layout spacing", pos_clean, flags=re.IGNORECASE)
-    pos_clean = re.sub(r"\bdark\s+floor\s+band\b", "subdued foreground floor plane", pos_clean, flags=re.IGNORECASE)
+
+    # Map/aerial floor-plane boilerplate vs interior/ground level
+    is_map_or_aerial = any(k in pos_clean.lower() for k in ["map", "aerial", "cartographic", "satellite", "elevation"])
+    if is_map_or_aerial:
+        pos_clean = re.sub(r"\bdark\s+floor\s+band\b", "subdued lower map border", pos_clean, flags=re.IGNORECASE)
+        pos_clean = re.sub(r"\bsubdued\s+foreground\s+floor\s+plane\b", "subdued lower cartographic border", pos_clean, flags=re.IGNORECASE)
+    else:
+        pos_clean = re.sub(r"\bdark\s+floor\s+band\b", "subdued foreground floor plane", pos_clean, flags=re.IGNORECASE)
+
+    # Deduplicate word stutters and prop-slot corruptions
+    pos_clean = re.sub(r"\ba\s+bound\s+bound\s+plain\s+folio\b", "a bound plain folio with faint abstract line-marks", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\ban?\s+creditor\s+ballot\s+ledger\s+with\s+blank\s+ruled\s+tally\s+rows\s+folio\b", "creditor ballot ledger folio with blank ruled tally rows", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\baccounting\s+binder\s+with\s+blank\s+columnar\s+grid\s+with\s+structured\s+financial\s+grid\s+columns\b", "accounting binder with structured blank columnar grid", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\bledger\s+with\s+blank\s+columnar\s+rows\s+folio\s+with\s+clean\s+geometric\s+ledger\s+columns\b", "financial ledger folio with blank columnar rows", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\bplain\s+unruled\s+division\s+tick\s+strokes\b", "uniform unmarked tick strokes", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\b(\w+)\s+\1\b", r"\1", pos_clean, flags=re.IGNORECASE)
+
+    # Background duplicate cleanup
+    pos_clean = re.sub(r"\b16:9\b(?:\s*,\s*16:9)+", "16:9", pos_clean)
+    pos_clean = re.sub(r"(?:open\s+quiet\s+space\s+in\s+the\s+right\s+third,?\s*){2,}", "open quiet space in the right third, ", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"(?:clean\s+low-contrast\s+subdued\s+foreground\s+floor\s+plane,?\s*){2,}", "clean low-contrast subdued foreground floor plane, ", pos_clean, flags=re.IGNORECASE)
+
     pos_clean = re.sub(r"The\s+image\s+contains\s+(?:no\s+)?writing\s+or\s+readable\s+digits\s+of\s+any\s+kind\s+in\s+any\s+language\.?", "", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r",\s*,+", ", ", pos_clean).strip(" ,.")
 
@@ -1624,23 +1648,28 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     raw_neg_tokens = [t.strip() for t in neg_clean.split(",") if t.strip()]
     # Ensure evidence negatives include seal, stamp, emblem, crest, numerals, digits
     if is_chroma_asset:
-        raw_neg_tokens.extend(["seal", "stamp", "emblem", "crest", "numerals", "digits", "percentages", "year labels"])
+        raw_neg_tokens.extend(["seal", "stamp", "emblem", "crest", "numerals", "digits", "percentages", "year labels", "background gradients", "drop shadow", "cast shadow", "floor shadow", "contact shadow"])
     deduped_tokens = []
     seen_tok = set()
     for tok in raw_neg_tokens:
         tok_clean = re.sub(r"^\b(?:or|and)\s+", "", tok, flags=re.IGNORECASE).strip()
-        tok_lower = tok_clean.lower()
+        tok_clean = re.sub(r"\.\s*,", ",", tok_clean)
+        tok_clean = re.sub(r",\s*\.", ".", tok_clean)
+        tok_lower = tok_clean.lower().strip(" .")
         if any(c in tok_lower for c in BARE_CHROMA):
             continue  # Purge any chroma key color token that damages #FF00FF
         if tok_lower not in seen_tok and tok_clean:
             seen_tok.add(tok_lower)
-            deduped_tokens.append(tok_clean)
+            deduped_tokens.append(tok_clean.strip(" ."))
     neg_clean = ", ".join(deduped_tokens)
 
     # Cross-channel contradiction resolution: if negative strictly bans an item, positive MUST NOT contain it
     neg_lower = neg_clean.lower()
-    if "seal" in neg_lower:
-        pos_clean = re.sub(r"\b(?:paper|envelope|official|formal|filing)?\s*seals?\b", "embossed insignia", pos_clean, flags=re.IGNORECASE)
+    if "seal" in neg_lower or "emblem" in neg_lower or "crest" in neg_lower:
+        pos_clean = re.sub(r"\b(?:paper|envelope|official|formal|filing)?\s*seals?\b", "clean envelope flap", pos_clean, flags=re.IGNORECASE)
+        pos_clean = re.sub(r"\bfingers\s+pressed\s+against\s+the\s+(?:clean\s+unwritten\s+|embossed\s+)?insignia\b", "fingers pressed flat against the plain envelope face", pos_clean, flags=re.IGNORECASE)
+        pos_clean = re.sub(r"\bfingers\s+firmly\s+pressing\s+envelope\s+seal\b", "fingers pressed flat against the plain envelope face", pos_clean, flags=re.IGNORECASE)
+        pos_clean = re.sub(r"\b(?:clean\s+unwritten\s+|formal\s+blind-debossed\s+|blind-debossed\s+|embossed\s+)?insignias?\b", "plain cream folded envelope with a blank flap", pos_clean, flags=re.IGNORECASE)
     if "stamp" in neg_lower:
         pos_clean = re.sub(r"\b(?:rubber[- ]?|filing|date|electronic|court)?\s*stamps?\b", "graphic marking", pos_clean, flags=re.IGNORECASE)
     if "printed" in neg_lower:
