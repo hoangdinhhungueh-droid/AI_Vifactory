@@ -342,8 +342,8 @@ R137_BANNED = {
 # Documents are allowed, but strictly as blank forensic templates
 DOC_NOUNS = re.compile(r"\b(document|ledger|filing|report|form|memo|invoice|statement|receipt|subpoena|docket)\b", re.IGNORECASE)
 BLANK_TEMPLATE = (
-    "unfilled documentary folio with clean margins, "
-    "nonlinguistic rule lines, blank surfaces and illegible abstract line-marks only"
+    "unfilled template with official border, blank amount fields, empty ruled lines, "
+    "unfilled documentary folio with clean margins, nonlinguistic rule lines, blank surfaces, no typography and illegible abstract line-marks only"
 )
 
 NEGATIVE_R137 = (
@@ -409,7 +409,7 @@ class LintResult:
     prompt: str
     negative: str
 
-def lint_visual_prompt(prompt: str, strict: bool = False, is_prop: bool = False, **kwargs) -> LintResult:
+def lint_visual_prompt(prompt: str, strict: bool = False, is_prop: bool = True, **kwargs) -> LintResult:
     """
     Rule 137 Strict Prompt Linter.
     Scans visual prompt to purge and prevent baked-in text, currency symbols, and numbers.
@@ -806,7 +806,7 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     border_element = "subdued lower compositional border" if is_cartographic else "clean low-contrast dark floor band"
     style_prefix = f"[STYLE MANDATE] 16:9 widescreen editorial illustration, stylized graphic novel background, {border_element}, open right space for balance."
 
-    p = f"{style_prefix} {p}{flow_str} [MARKET & ENVIRONMENT ANCHOR] {bg_anchor}. [ERA ANCHOR] {era_anchor} [STRICT NEGATIVE PROMPT] prominent foreground human figures, photorealistic faces, {NEGATIVE_R137}, decorative picture borders, picture frames, ui elements, split frame, photographic raw camera{bg_negs}."
+    p = f"{style_prefix} {p}{flow_str} [MARKET & ENVIRONMENT ANCHOR] {bg_anchor}. [ERA ANCHOR] {era_anchor} [STRICT NEGATIVE PROMPT] no prominent foreground human figures, photorealistic faces, {NEGATIVE_R137}, decorative picture borders, picture frames, ui elements, split frame, photographic raw camera{bg_negs}. {R137_CLOSING_DIRECTIVE}"
 
     return deduplicate_phrase_stutter(p)
 
@@ -1379,8 +1379,7 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
             data_viz_negs = "no percentage labels, no axis typography, no numerical digits, no dollar figures, no data callouts"
             obj_negs = f"no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no decorative picture borders, no picture frames, no extraneous ui elements, no text, no numbers, no digits, no labels, no typography, {data_viz_negs}, {evidence_chroma_negs}, {filtered_r137}"
         else:
-            filtered_r137 = ", ".join([clause.strip() for clause in NEGATIVE_R137.split(",") if "chart value" not in clause.lower()])
-            obj_negs = f"no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no decorative picture borders, no picture frames, no extraneous ui elements, no text, no numbers, no charts, no digits, no labels, no typography, {evidence_chroma_negs}, {filtered_r137}"
+            obj_negs = f"no human body, no photorealistic human, no 3D render, no CGI skin, no white background, no gray background, no halo, no cropped object, no cutoffs, no decorative picture borders, no picture frames, no extraneous ui elements, no text, no numbers, no charts, no digits, no labels, no typography, {evidence_chroma_negs}, {NEGATIVE_R137}"
 
         # Category-aware object focus: instruments, maps, charts, and documents get precise focus without bleed
         if any(k in fg_key.lower() for k in ["clock", "meter", "gauge", "dial"]):
@@ -1394,7 +1393,7 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
         else:
             obj_focus = "Highly detailed documentary evidence artifact, tactile physical realism with graphic novel editorial flair, forensic investigative prop with plain unruled surfaces"
 
-        p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] {obj_focus}. [ERA ANCHOR] {era_anchor} [STRICT NEGATIVE PROMPT] {obj_negs}."
+        p = f"{style_prefix} {p}{fg_flow_str}. [OBJECT FOCUS] {obj_focus}. [ERA ANCHOR] {era_anchor} [STRICT NEGATIVE PROMPT] {obj_negs}. {R137_CLOSING_DIRECTIVE}"
     else:
         # Vox Actor-Prop Invariant: Subject + Action Verb + Physical Prop + Gaze Target
         action_verbs = [
@@ -1463,7 +1462,7 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
             f"[STRICT NEGATIVE PROMPT] photograph, photorealistic human, 3D render, CGI skin, white background, gray background, "
             f"halo, background gradients, cropped head, cropped hands, cutoffs, decorative picture borders, picture frames, ui elements, text, numbers, charts, labels, typography, "
             f"sticker outline, die-cut border, white halo outline, no specific real-life likeness, no celebrity likeness, "
-            f"no static standing figure with arms at sides, no empty passive hands, {NEGATIVE_R137}{fg_negs}."
+            f"no static standing figure with arms at sides, no empty passive hands, {NEGATIVE_R137}{fg_negs}. {R137_CLOSING_DIRECTIVE}"
         )
 
     p = deduplicate_phrase_stutter(p)
