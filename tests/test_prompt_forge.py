@@ -420,7 +420,7 @@ def test_opus_astra_round3_fragment_and_text_magnet_remediations():
     assert "dated October," not in order_out
     assert "rubber-stamp style graphic overlay" not in order_out
     assert "with formal date notation line" in order_out
-    assert "geometric dismiss seal stamp without typography" in order_out
+    assert "geometric dismiss graphic marking without typography" in order_out
 
     # 10. Operating loss ledger
     raw_ledger = "Open accounting ledger, totals ending at a red-circled $16 million, a pencil"
@@ -457,13 +457,13 @@ def test_opus_astra_round3_fragment_and_text_magnet_remediations():
     raw_journo = "Journalist reviewing PACER docket sheet for Case 23-40523 and circling key entry"
     journo_out = _sanitize_foreground_prompt(raw_journo, fg_key="fg_character_investigative_journalist", market="EN")
     assert "for and circling" not in journo_out
-    assert "printed PACER electronic docket sheet folio, circling a line-item entry with a pen" in journo_out
+    assert "electronic docket sheet folio with ruled grid, circling a line-item entry with a pen" in journo_out
 
     # 15. Character state legislator 2019
     raw_legis = "State lawmaker holding a bound document with AB 218 on the cover"
     legis_out = _sanitize_foreground_prompt(raw_legis, fg_key="fg_character_state_legislator_2019", market="EN")
     assert "with on the cover" not in legis_out
-    assert "a bound legislative bill document folio with an official seal on the cover" in legis_out
+    assert "a bound legislative bill document folio with a formal blind-debossed insignia on the cover" in legis_out
 
     # 16. Background insurance policy warehouse
     raw_wh = "Cavernous records warehouse with banker's boxes labeled by policy year (1960, 1985), a rolling ladder"
@@ -618,6 +618,32 @@ def test_opus_astra_round5_round16_remediations():
     ballot_p = CLEAN_RAW_FGS["fg_evidence_ballot_tabulation"]
     assert "overwhelming dark vermilion segment" in ballot_p
     assert "stamp" not in ballot_p
+
+
+def test_zero_affirmative_text_leakage_and_contradiction():
+    """Verify that R137 closing directive does not leak into affirmative text and no positive/negative contradictions occur."""
+    from app.services.prompt_forge import split_prompt_channels, R137_CLOSING_DIRECTIVE
+
+    raw = (
+        "Waist-up character holding pastoral letter folio and envelope seal, "
+        "[STRICT NEGATIVE PROMPT] no seal, no stamp, no borders. " + R137_CLOSING_DIRECTIVE
+    )
+    res = split_prompt_channels(raw, default_layout="subject-right at xPct: 65")
+
+    # Positive must not contain functional text-magnet nouns or contradicted terms
+    assert "pastoral letter folio" not in res["positive_prompt"]
+    assert "bound plain folio" in res["positive_prompt"]
+    assert "envelope seal" not in res["positive_prompt"]
+    assert "The image contains" not in res["positive_prompt"]
+
+    # Negative must not contain leaked affirmative sentence
+    assert "The image contains writing or readable digits" not in res["negative_prompt"]
+    assert "The image contains" not in res["prompt"]
+
+    # Full prompt must not contain naked affirmative sentence in exclusions
+    assert "Strictly" in res["prompt"]
+    assert "The image contains writing" not in res["prompt"]
+
 
 
 

@@ -289,16 +289,16 @@ def deduplicate_phrase_stutter(text: str) -> str:
     cleaned = re.sub(r"\bmarked\s*,\s*a\s+framed", "sealed with tape, a framed", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bmarked\s*,", "sealed with tape,", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bOfficial\s+Form\s*,", "Official Form blank template,", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\bPACER\s+docket\s+sheet\s+for(?:\s+federal\s+court\s+case\s+record)?\s+and\s+circling\b", "printed PACER electronic docket sheet folio, circling a line-item entry with a pen", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\ba\s+bound\s+document\s+with(?:\s+legislative\s+assembly\s+bill)?\s+on\s+the\s+cover\b", "a bound legislative bill document folio with an official seal on the cover", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bPACER\s+docket\s+sheet\s+for(?:\s+federal\s+court\s+case\s+record)?\s+and\s+circling\b", "electronic docket sheet folio with ruled grid, circling a line-item entry with a pen", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\ba\s+bound\s+document\s+with(?:\s+legislative\s+assembly\s+bill)?\s+on\s+the\s+cover\b", "a bound legislative bill document folio with a formal blind-debossed insignia on the cover", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bClaims\s+agent's\s+(?:declaration\s+)?with\s+a\b", "Claims agent's declaration folio with a", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bbolded\s+line\s*\.", "bolded highlight summary rule line.", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bwith\s+the\s+[–-]\s*bars\b", "with prominent peak period bars", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bbracketed\s*\.", "bracketed with callout pointers.", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\brubber-stamp\s+style\s+graphic\s+overlay\b", "geometric dismiss seal stamp without typography", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\brubber-stamp\s+style\s+graphic\s+overlay\b", "geometric dismiss graphic marking without typography", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bdated\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*,", "with formal date notation line,", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\bfiled\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*,", "with formal electronic filing stamp,", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\bfiling\s+date\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*,", "official filing date stamp block,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bfiled\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*,", "with formal electronic filing notation mark,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bfiling\s+date\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s*,", "official filing date notation block,", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bTrust\s+Bold\s+ink\b", "Trust, bold ink", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bdonut\s+chart\s+showing\s+REJECT\s+versus\s+ACCEPT\b", "dual-tone proportional ring graphic emphasizing contrasting vote shares without typography", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bticking\s+cash-register\s+numerals\s+beneath\b", "mechanical indicator dials beneath without readable numerals", cleaned, flags=re.IGNORECASE)
@@ -1589,7 +1589,7 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     pos_clean = re.sub(r"\bwithout\s+\w+\b,?\s*", "", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\b(with|or|and)\s+(or|and|with)\b", "", pos_clean, flags=re.IGNORECASE)
 
-    # Positive channel text-magnet linter (Opus 5.5 & Astra Consensus Directive 1)
+    # Positive channel text-magnet linter (Opus 5.5 & Astra Consensus Directives)
     pos_clean = re.sub(r"\b\d{4}\b", "", pos_clean)  # Strip 4-digit years (e.g. 2019) from positive prompts
     pos_clean = re.sub(r"\b(?:nineteen\s+sixty|nineteen\s+seventy|nineteen\s+eighty|nineteen\s+ninety|twenty\s+twenty)\b(?:\s+through|\s+to)?\s*(?:nineteen\s+\w+|twenty\s+\w+)?", "historical period", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\b(?:forty-two|fifty-eight|ninety-nine)\s+percent\b", "proportional", pos_clean, flags=re.IGNORECASE)
@@ -1597,12 +1597,25 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     pos_clean = re.sub(r"\bembossed\s+(?:generic\s+circular\s+geometric\s+)?(?:judicial\s+|court\s+clerk\s+)?(?:blind-stamp\s+impression\s+circle|filing\s+blind-stamp|binding\s+strip)\b", "plain flat tinted binding band", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\b(?:printed|embossed)\b", "clean unwritten", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\btwelve\s+division\s+intervals\b", "uniform unmarked tick strokes, blank dial face, no numerals", pos_clean, flags=re.IGNORECASE)
+    
+    # Text-priming functional nouns -> physical non-text descriptors
+    pos_clean = re.sub(r"\bpastoral\s+letter\s+folio\b", "bound plain folio with ruled grid", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\bspreadsheet\s+folio\b", "accounting binder with blank columnar grid", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\bitemized\s+billing\s+ledger\b", "financial ledger with blank columnar rows", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\bitemized\s+creditor\s+ballot\s+declaration\b", "creditor ballot ledger with blank ruled tally rows", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\bsubdued\s+lower\s+compositional\s+border\b", "subdued lower compositional negative space", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\bcartographic\s+margins\b", "cartographic layout spacing", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"\bdark\s+floor\s+band\b", "subdued foreground floor plane", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r"The\s+image\s+contains\s+(?:no\s+)?writing\s+or\s+readable\s+digits\s+of\s+any\s+kind\s+in\s+any\s+language\.?", "", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r",\s*,+", ", ", pos_clean).strip(" ,.")
 
-    # Normalize negative prompt to clean bare concepts without 'no' prefix and without closing sentence
+    # 1. Strip R137 closing directive and affirmative text directives BEFORE normalizing 'no ' prefixes
+    neg = re.sub(r"The\s+image\s+contains\s+(?:no\s+)?writing\s+or\s+readable\s+digits\s+of\s+any\s+kind\s+in\s+any\s+language\.?", "", neg, flags=re.IGNORECASE).strip()
+    if R137_CLOSING_DIRECTIVE in neg:
+        neg = neg.replace(R137_CLOSING_DIRECTIVE, "").strip()
+
+    # 2. Normalize negative prompt to clean bare concepts without 'no' prefix and without closing sentence
     neg_clean = re.sub(r"\bno\s+", "", neg, flags=re.IGNORECASE).strip().rstrip(". ")
-    if R137_CLOSING_DIRECTIVE in neg_clean:
-        neg_clean = neg_clean.replace(R137_CLOSING_DIRECTIVE, "").strip()
 
     # Rule 128 / Opus 5.5 Directive 1 & 4: Purge key-adjacent colors from negatives of #FF00FF chroma cutouts
     is_chroma_asset = "#ff00ff" in pos.lower() or "magenta" in pos.lower()
@@ -1623,6 +1636,16 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
             seen_tok.add(tok_lower)
             deduped_tokens.append(tok_clean)
     neg_clean = ", ".join(deduped_tokens)
+
+    # Cross-channel contradiction resolution: if negative strictly bans an item, positive MUST NOT contain it
+    neg_lower = neg_clean.lower()
+    if "seal" in neg_lower:
+        pos_clean = re.sub(r"\b(?:paper|envelope|official|formal|filing)?\s*seals?\b", "embossed insignia", pos_clean, flags=re.IGNORECASE)
+    if "stamp" in neg_lower:
+        pos_clean = re.sub(r"\b(?:rubber[- ]?|filing|date|electronic|court)?\s*stamps?\b", "graphic marking", pos_clean, flags=re.IGNORECASE)
+    if "printed" in neg_lower:
+        pos_clean = re.sub(r"\bprinted\b", "clean unmarked", pos_clean, flags=re.IGNORECASE)
+    pos_clean = re.sub(r",\s*,+", ", ", pos_clean).strip(" ,.")
 
     # Collision audit gate
     collisions = {t.strip().lower() for t in neg_clean.split(",")} & BARE_CHROMA
