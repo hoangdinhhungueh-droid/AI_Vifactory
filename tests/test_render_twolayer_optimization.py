@@ -83,3 +83,29 @@ def test_optimize_props_assets_scan(tmp_path):
 
     with Image.open(str(test_img)) as res_im:
         assert res_im.size == (1920, 1080)
+
+
+def test_get_beat_chunks_vox_beat_index(tmp_path):
+    from scripts.render_twolayer_chunks import get_beat_chunks_from_props
+    props_file = tmp_path / "vox_props.json"
+    props_data = {
+        "scenes": [
+            {"id": "s1", "beat_index": 1, "durationInFrames": 100},
+            {"id": "s2", "beat_index": 1, "durationInFrames": 120},
+            {"id": "s3", "beat_index": 2, "durationInFrames": 150},
+            {"id": "s4", "beat_index": 3, "durationInFrames": 130},
+        ]
+    }
+    props_file.write_text(json.dumps(props_data), encoding="utf-8")
+    chunks = get_beat_chunks_from_props(str(props_file))
+    assert len(chunks) == 3
+    assert chunks[0]["name"] == "BEAT 1"
+    assert chunks[0]["start_frame"] == 0
+    assert chunks[0]["end_frame"] == 219
+    assert chunks[1]["name"] == "BEAT 2"
+    assert chunks[1]["start_frame"] == 220
+    assert chunks[1]["end_frame"] == 369
+    assert chunks[2]["name"] == "BEAT 3"
+    assert chunks[2]["start_frame"] == 370
+    assert chunks[2]["end_frame"] == 499
+

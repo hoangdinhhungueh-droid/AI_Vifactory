@@ -1100,12 +1100,55 @@ def build_remotion_props_data(
     raw_scenes = brain.get("scenes", [])
     ep_dir = os.path.dirname(os.path.abspath(brain_input_path))
 
-    # Check if candidate VOX manifests exist in ep_dir if raw_scenes is empty
+    segments = []
+    if segments_path and os.path.exists(segments_path):
+        try:
+            with open(segments_path, "r", encoding="utf-8") as sf:
+                segments = json.load(sf)
+        except Exception as e:
+            logger.warning("[build_remotion_props] Failed to read segments file %s: %s", segments_path, e)
+            segments = []
+    if not segments and isinstance(brain.get("spoken_sentences"), list):
+        segments = brain["spoken_sentences"]
+
+    # Synchronize with canonical B3.5 prompts_forge.json if present in ep_dir
+    forge_scenes = []
+    for forge_cand in [
+        os.path.join(ep_dir, "prompts_forge.json"),
+        os.path.join(ep_dir, "prompts.json"),
+    ]:
+        if os.path.exists(forge_cand):
+            try:
+                fdata = json.loads(Path(forge_cand).read_text(encoding="utf-8"))
+                if isinstance(fdata, dict) and isinstance(fdata.get("scenes"), list) and fdata["scenes"]:
+                    forge_scenes = fdata["scenes"]
+                    break
+            except Exception:
+                pass
+
+    if forge_scenes:
+        if not raw_scenes or (segments and len(raw_scenes) != len(segments) and len(forge_scenes) == len(segments)):
+            logger.info(
+                "[build_remotion_props] Aligning scenes with canonical prompts_forge.json (%d scenes matching %d segments; brain had %d)",
+                len(forge_scenes), len(segments), len(raw_scenes)
+            )
+            raw_scenes = forge_scenes
+        elif len(raw_scenes) == len(forge_scenes):
+            for idx_s, s_item in enumerate(raw_scenes):
+                f_item = forge_scenes[idx_s]
+                if not s_item.get("background_reuse_key") and f_item.get("background_reuse_key"):
+                    s_item["background_reuse_key"] = f_item["background_reuse_key"]
+                if not s_item.get("foreground_reuse_key") and f_item.get("foreground_reuse_key"):
+                    s_item["foreground_reuse_key"] = f_item["foreground_reuse_key"]
+                if not s_item.get("narration") and f_item.get("text"):
+                    s_item["narration"] = f_item["text"]
+
+    # Check if candidate VOX manifests exist in ep_dir if raw_scenes is still empty
     if not raw_scenes:
         for candidate_manifest in [
-            os.path.join(ep_dir, "remotion_props.json"),
             os.path.join(ep_dir, "vox_scene_manifest.json"),
             os.path.join(ep_dir, "director_plan.json"),
+            os.path.join(ep_dir, "remotion_props.json"),
         ]:
             if os.path.exists(candidate_manifest):
                 try:
@@ -1117,69 +1160,10 @@ def build_remotion_props_data(
                 except Exception:
                     pass
 
-    # VOX BUILD-ON-STAGE PIPELINE HANDLING (Rule 125 Single Truth):
-    is_vox_build_on = any(s.get("component") == "VoxBuildOnStage" for s in raw_scenes) or brain.get("pipeline_version") == "vox_docudrama_v2"
-    if is_vox_build_on and raw_scenes:
-        logger.info("[build_remotion_props] Detected VoxBuildOnStage pipeline for %s (%d beats)", episode_id, len(raw_scenes))
-        for i, s in enumerate(raw_scenes):
-            b_idx = s.get("beat_index", i + 1)
-            # Bind heroSrc (prefer semantic targetHeroSrc / foreground_reuse_key, then fg_XX.png)
-            t_hero = s.get("targetHeroSrc") or s.get("heroSrc") or (f"images/{s['foreground_reuse_key']}.png" if s.get("foreground_reuse_key") else None)
-            fg_file = f"fg_{b_idx:02d}.png"
-            if t_hero and os.path.exists(os.path.join(ep_dir, t_hero)):
-                s["heroSrc"] = t_hero
-            elif os.path.exists(os.path.join(ep_dir, "images", fg_file)):
-                s["heroSrc"] = f"images/{fg_file}"
-            elif os.path.exists(os.path.join(ep_dir, "assets", fg_file)):
-                s["heroSrc"] = f"assets/{fg_file}"
-            else:
-                s["heroSrc"] = t_hero
-
-            # Bind background (prefer semantic targetBackground / background_reuse_key, then bg_XX.png)
-            t_bg = s.get("targetBackground") or s.get("background") or (f"images/{s['background_reuse_key']}.png" if s.get("background_reuse_key") else None)
-            bg_file = f"bg_{b_idx:02d}.png"
-            if t_bg and isinstance(t_bg, str) and os.path.exists(os.path.join(ep_dir, t_bg)):
-                s["background"] = t_bg
-            elif os.path.exists(os.path.join(ep_dir, "images", bg_file)):
-                s["background"] = f"images/{bg_file}"
-            elif os.path.exists(os.path.join(ep_dir, "assets", bg_file)):
-                s["background"] = f"assets/{bg_file}"
-            else:
-                s["background"] = t_bg if isinstance(t_bg, str) else None
-
-        props = {
-            "episodeId": episode_id,
-            "topic": brain.get("topic") or episode_id,
-            "theme": brain.get("theme", "newsprint-editorial"),
-            "fps": fps,
-            "width": width,
-            "height": height,
-            "totalFrames": sum(s.get("durationInFrames", 150) for s in raw_scenes),
-            "audioMaster": "tts_out.mp3",
-            "bgmFile": "bgm/vox_cinematic_pulse.mp3",
-            "bgmVolume": 0.12,
-            "scenes": raw_scenes,
-            "meta": {
-                "generatedBy": "VoxBuildOnStageBridge",
-                "compliance": ["Rule 120", "Rule 125", "Rule 128"]
-            }
-        }
-        return props
-
     total_scenes = len(raw_scenes)
     scenes_out = []
     missing = []
     fg_idx = 0
-
-    segments = []
-    if segments_path and os.path.exists(segments_path):
-        try:
-            with open(segments_path, "r", encoding="utf-8") as sf:
-                segments = json.load(sf)
-        except Exception as e:
-            logger.warning("[build_remotion_props] Failed to read segments file %s: %s", segments_path, e)
-            segments = []
-
     seg_cursor = 0
 
     custom_beat_titles = extract_custom_beat_titles(brain, brain_input_path)
@@ -1188,17 +1172,27 @@ def build_remotion_props_data(
     scenes_since_overlay = 4
     last_overlay_type = None
     for i, s in enumerate(raw_scenes):
-        scene_id = s.get("scene_id", f"sc{i:03d}")
+        scene_id = s.get("scene_id") or s.get("id") or f"sc{i+1:03d}"
         shot_type = s.get("shot_type", "")
 
-        # Hỗ trợ cả schema phẳng (legacy) và schema lồng nhau (Unified VOX Director)
+        # Hỗ trợ cả schema phẳng (legacy), prompts_forge và schema Unified VOX Director
         bg_key = s.get("background_reuse_key")
         if not bg_key and isinstance(s.get("background"), dict):
             bg_key = s.get("background", {}).get("reuse_key")
+        if not bg_key and s.get("targetBackground"):
+            bg_key = os.path.splitext(os.path.basename(str(s["targetBackground"])))[0]
+        if not bg_key and isinstance(s.get("background"), str) and s.get("background"):
+            bg_key = os.path.splitext(os.path.basename(str(s["background"])))[0]
 
         fg_key = s.get("foreground_reuse_key")
         if not fg_key and isinstance(s.get("foreground"), dict):
             fg_key = s.get("foreground", {}).get("reuse_key")
+        if not fg_key and s.get("targetHeroSrc"):
+            fg_key = os.path.splitext(os.path.basename(str(s["targetHeroSrc"])))[0]
+        if not fg_key and isinstance(s.get("heroSrc"), str) and s.get("heroSrc"):
+            fg_key = os.path.splitext(os.path.basename(str(s["heroSrc"])))[0]
+        if not fg_key and isinstance(s.get("foreground"), str) and s.get("foreground"):
+            fg_key = os.path.splitext(os.path.basename(str(s["foreground"])))[0]
 
         # Kiểm tra nếu cảnh này là Hero AI Video và đã có clip MP4 hoàn thiện
         video_clip_found = None
@@ -1263,10 +1257,13 @@ def build_remotion_props_data(
         bg_rel = stage_into_public(bg_local, public_dir, episode_id) if bg_local else None
         fg_rel = stage_into_public(fg_local, public_dir, episode_id) if fg_local else None
 
-        caption_text = s.get("caption") or s.get("narration") or ""
-        narration_text = s.get("narration") or caption_text
+        caption_text = s.get("caption") or s.get("narration") or s.get("text") or ""
+        narration_text = s.get("narration") or s.get("text") or caption_text
+        if not narration_text and i < len(segments) and isinstance(segments[i], dict):
+            narration_text = segments[i].get("text") or ""
+            caption_text = narration_text
 
-        dur_sec = float(s.get("duration_sec") or 4.0)
+        dur_sec = float(s.get("duration_sec") or s.get("durationSec") or 4.0)
         scene_subtitles = []
 
         # Single Source of Truth Subtitles & Millisecond-Accurate Karaoke
@@ -1652,14 +1649,29 @@ def build_remotion_props_data(
             }
 
         scenes_out.append({
+            "id": scene_id,
+            "scene_id": scene_id,
+            "component": "VoxBuildOnStage",
+            "beat": b_num,
+            "beat_index": b_num,
+            "theme": s.get("theme") or brain.get("theme") or papercraft_theme,
             "background": bg_rel or "",
+            "backgroundSrc": bg_rel or "",
             "papercraft_theme": papercraft_theme,
             "paperTheme": papercraft_theme,
             "papercraft_layout": papercraft_layout,
             "papercraftLayout": papercraft_layout,
             "foreground": fg_rel,
+            "heroSrc": fg_rel,
+            "heroLabel": s.get("heroLabel") or stat_lbl or speaker_tag,
+            "heroPosition": s.get("heroPosition") or {
+                "xPct": 28 if (fg_pos == "left" and (forensic_ov or stat_val)) else (72 if (forensic_ov or stat_val) else (34 if fg_pos == "left" else 66)),
+                "yPct": 54,
+                "widthPct": 34 if (forensic_ov or stat_val) else 38,
+            },
             "foregroundPosition": fg_pos,
             "durationInFrames": max(1, round(dur_sec * fps)),
+            "durationSec": round(dur_sec, 3),
             "foregroundFadeFrames": max(1, round(fg_fade_sec * fps)),
             "caption": caption_text,
             "narration": narration_text,
@@ -1667,10 +1679,14 @@ def build_remotion_props_data(
             "statValue": stat_val,
             "statLabel": stat_lbl,
             "stampBadge": stamp_badge,
+            "stampText": s.get("stampText") or stamp_badge,
+            "stampColor": s.get("stampColor") or "#dc2626",
+            "hasMarkerHighlight": s.get("hasMarkerHighlight", True),
             "card_segment_key": card_segment_key,
             "motionDirective": motion_directive,
             "speakerTag": speaker_tag,
             "actTitle": act_title,
+            "subtitle": s.get("subtitle") or act_title,
             "cameraMovement": cam_mov or "slow_push_in",
             "tensionLevel": tension_lvl or "high",
             "bgClusterId": bg_cluster,
@@ -1691,7 +1707,7 @@ def build_remotion_props_data(
             "primary_hero": primary_hero_obj,
             "motion_path": m_path,
             "linked_secondary_objects": s.get("linked_secondary_objects") or s.get("linkedSecondaryObjects") or [],
-            "headline": s.get("headline"),
+            "headline": s.get("headline") if (s.get("headline") and str(s.get("headline")).strip().upper() != "ACT") else motion_meta["editorial_headline"],
             "highlightWord": s.get("highlight_word") or s.get("highlightWord"),
             "category": s.get("category"),
             "subtext": s.get("subtext"),
@@ -1700,6 +1716,7 @@ def build_remotion_props_data(
             "connection": motion_meta["connection"],
             "connections": motion_meta["connections"],
             "radiatingConnections": motion_meta["radiating_connections"],
+            "yarns": motion_meta["radiating_connections"],
             "supportingCutouts": motion_meta["supporting_cutouts"],
             "editorialHeadline": motion_meta["editorial_headline"],
         })
@@ -1792,7 +1809,7 @@ def build_remotion_props_data(
             sc = scenes_out[sc_idx]
             sc["boardId"] = f"board_{b_idx + 1:03d}"
             sc["boardPosition"] = pos
-            fg_cur = sc.get("foreground") or ""
+            fg_cur = sc.get("foreground") or sc.get("heroSrc") or ""
             fg_pos = sc.get("foregroundPosition", "left")
             is_left = (fg_pos == "left")
 
@@ -1827,11 +1844,19 @@ def build_remotion_props_data(
                     target_x = (74 if is_left else 26) + (p_i * (-8 if is_left else 8))
                     target_y = 38 + p_i * 22
                     supp.append({
+                        "id": f"supp_{sc_idx}_{p_i}",
                         "src": p_src,
                         "x": target_x,
                         "y": target_y,
+                        "xPct": target_x,
+                        "yPct": target_y,
+                        "widthPct": 22,
                         "scale": 0.44,
+                        "rotation": -6 if p_i % 2 == 0 else 8,
+                        "delaySec": round(0.4 + p_i * 0.3, 2),
                         "entryFrame": 2 + p_i * 4,
+                        "hasPin": p_i % 2 == 0,
+                        "hasTape": p_i % 2 == 1,
                         "label": "",
                     })
                     if not meta["connection"] and len(rad) < 3:
@@ -1843,6 +1868,7 @@ def build_remotion_props_data(
                             "label": "",
                             "color": "#d92b2b",
                             "isYarn": True,
+                            "delaySec": round(0.6 + p_i * 0.3, 2),
                             "drawStartFrame": 8 + p_i * 6,
                             "drawDuration": 16,
                         })
@@ -1855,10 +1881,17 @@ def build_remotion_props_data(
             sc["connection"] = meta["connection"]
             sc["connections"] = meta["connections"]
             sc["radiatingConnections"] = meta["radiating_connections"]
+            sc["yarns"] = meta["radiating_connections"]
             sc["supportingCutouts"] = meta["supporting_cutouts"]
             sc["editorialHeadline"] = meta["editorial_headline"]
+            sc["heroSrc"] = sc.get("foreground") or sc.get("heroSrc")
+            sc["backgroundSrc"] = sc.get("background") or sc.get("backgroundSrc")
 
     props = {
+        "episodeId": episode_id,
+        "topic": brain.get("topic") or episode_id,
+        "theme": brain.get("theme", "newsprint-editorial"),
+        "totalFrames": sum(int(sc.get("durationInFrames", 150)) for sc in scenes_out),
         "scenes": scenes_out,
         "fps": fps,
         "width": width,

@@ -259,7 +259,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             }}
           />
 
-          {/* Archival Map / Grid Coordinates watermark */}
+          {/* Archival Dossier Watermark (Rule 128 Generic Contract) */}
           <div
             style={{
               position: "absolute",
@@ -273,87 +273,91 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
               textTransform: "uppercase",
             }}
           >
-            GRID REF // 35°41'22\"N 139°41'30\"E • DOC ID: RES-VOX-001
+            {subtitle || "ARCHIVAL DOSSIER // FORENSIC RECORD"}
           </div>
 
           {/* EDITORIAL HEADLINE (Large Typography) */}
-          <div
-            style={{
-              position: "absolute",
-              top: "9%",
-              left: "8%",
-              right: "8%",
-              zIndex: 10,
-              opacity: interpolate(headlineSpring, [0, 1], [0, 1]),
-              transform: `translateY(${interpolate(headlineSpring, [0, 1], [-20, 0])}px)`,
-            }}
-          >
-            {subtitle && (
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  color: "#dc2626",
-                  letterSpacing: "0.2em",
-                  marginBottom: "4px",
-                  textTransform: "uppercase",
-                  fontFamily: "monospace",
-                }}
-              >
-                {subtitle}
-              </div>
-            )}
-            <h1
+          {headline && (
+            <div
               style={{
-                fontSize: "44px",
-                fontWeight: 900,
-                color: "#18181b",
-                lineHeight: 1.1,
-                letterSpacing: "-0.03em",
-                textTransform: "uppercase",
-                fontFamily: "Impact, Inter, sans-serif",
-                margin: 0,
-                textShadow: "1px 1px 0 rgba(255,255,255,0.8)",
+                position: "absolute",
+                top: "7%",
+                left: "6%",
+                right: "6%",
+                zIndex: 10,
+                opacity: interpolate(headlineSpring, [0, 1], [0, 1]),
+                transform: `translateY(${interpolate(headlineSpring, [0, 1], [-20, 0])}px)`,
+                pointerEvents: "none",
               }}
             >
-              {headline}
-            </h1>
-
-            {/* Marker Underline Highlight */}
-            {hasMarkerHighlight && (
-              <div
+              {subtitle && (
+                <div
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 800,
+                    color: "#dc2626",
+                    letterSpacing: "0.2em",
+                    marginBottom: "4px",
+                    textTransform: "uppercase",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {subtitle}
+                </div>
+              )}
+              <h1
                 style={{
-                  height: "8px",
-                  backgroundColor: "#facc15",
-                  marginTop: "6px",
-                  borderRadius: "2px",
-                  transformOrigin: "left center",
-                  transform: `scaleX(${interpolate(
-                    frame,
-                    [headlineDelayFrames + 10, headlineDelayFrames + 25],
-                    [0, 1],
-                    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-                  )})`,
-                  opacity: 0.85,
-                  mixBlendMode: "multiply",
+                  fontSize: "38px",
+                  fontWeight: 900,
+                  color: "#18181b",
+                  lineHeight: 1.1,
+                  letterSpacing: "-0.02em",
+                  textTransform: "uppercase",
+                  fontFamily: "Impact, Inter, sans-serif",
+                  margin: 0,
+                  textShadow: "1px 1px 0 rgba(255,255,255,0.85)",
                 }}
-              />
-            )}
-          </div>
+              >
+                {headline}
+              </h1>
+
+              {/* Marker Underline Highlight */}
+              {hasMarkerHighlight && (
+                <div
+                  style={{
+                    height: "8px",
+                    maxWidth: "420px",
+                    backgroundColor: "#facc15",
+                    marginTop: "6px",
+                    borderRadius: "2px",
+                    transformOrigin: "left center",
+                    transform: `scaleX(${interpolate(
+                      frame,
+                      [headlineDelayFrames + 10, headlineDelayFrames + 25],
+                      [0, 1],
+                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                    )})`,
+                    opacity: 0.85,
+                    mixBlendMode: "multiply",
+                  }}
+                />
+              )}
+            </div>
+          )}
 
           {/* LAYER 1: HERO CUTOUT SUBJECT (1.0s - 3.5s) */}
-          <div
-            style={{
-              position: "absolute",
-              left: `${heroCurrentX}%`,
-              top: `${heroPosition.yPct}%`,
-              width: `${heroPosition.widthPct}%`,
-              transform: `translate(-50%, -50%) rotate(${heroRotation}deg)`,
-              filter: `drop-shadow(0 ${heroDropShadow}px 24px rgba(0,0,0,0.35))`,
-              zIndex: 30,
-            }}
-          >
-            {heroSrc ? (
+          {heroSrc && (
+            <div
+              style={{
+                position: "absolute",
+                left: `${heroCurrentX}%`,
+                top: `${heroPosition.yPct}%`,
+                width: `${heroPosition.widthPct || 38}%`,
+                transform: `translate(-50%, -50%) rotate(${heroRotation}deg)`,
+                filter: `drop-shadow(0 ${heroDropShadow}px 24px rgba(0,0,0,0.35))`,
+                zIndex: 30,
+              }}
+            >
               <div style={{ position: "relative" }}>
                 <Img
                   src={heroSrc}
@@ -361,7 +365,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                     width: "100%",
                     height: "auto",
                     display: "block",
-                    filter: "contrast(1.15) grayscale(0.2)",
+                    filter: "contrast(1.08)",
                   }}
                 />
                 {/* White Paper Cutout Border Simulation */}
@@ -375,76 +379,33 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                   }}
                 />
               </div>
-            ) : (
-              /* Fallback Stylized Forensic Hero Badge */
+
+              {/* Brass Pin on Hero Head */}
               <div
                 style={{
-                  width: "280px",
-                  height: "360px",
-                  backgroundColor: "#e2e8f0",
-                  border: "4px solid #ffffff",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.25)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "16px",
-                  boxSizing: "border-box",
+                  position: "absolute",
+                  top: "-10px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  zIndex: 35,
                 }}
               >
-                <div
-                  style={{
-                    width: "100%",
-                    height: "75%",
-                    backgroundColor: "#cbd5e1",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "48px",
-                  }}
-                >
-                  👤
-                </div>
-                <div
-                  style={{
-                    marginTop: "12px",
-                    fontWeight: 800,
-                    fontSize: "13px",
-                    fontFamily: "monospace",
-                    color: "#0f172a",
-                    textAlign: "center",
-                  }}
-                >
-                  {heroLabel}
-                </div>
+                <VoxBrassPin size={18} />
               </div>
-            )}
 
-            {/* Brass Pin on Hero Head */}
-            <div
-              style={{
-                position: "absolute",
-                top: "-10px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 35,
-              }}
-            >
-              <VoxBrassPin size={18} />
+              {/* Corner Washi Tape */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "-8px",
+                  right: "-12px",
+                  zIndex: 35,
+                }}
+              >
+                <VoxWashiTape width={65} rotation={-12} color="translucent" />
+              </div>
             </div>
-
-            {/* Corner Washi Tape */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: "-8px",
-                right: "-12px",
-                zIndex: 35,
-              }}
-            >
-              <VoxWashiTape width={65} rotation={-12} color="translucent" />
-            </div>
-          </div>
+          )}
 
           {/* LAYER 2: SUPPORTING CUTOUTS & EVIDENCE (3.5s - 5.0s) */}
           {supportingCutouts.map((cutout, idx) => {

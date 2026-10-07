@@ -41,6 +41,7 @@ def get_beat_chunks_from_props(props_path: str) -> list[dict]:
         raise ValueError(f"No scenes found in {props_path}")
 
     has_acts = any(bool(s.get("actTitle")) for s in scenes)
+    has_explicit_beats = any(s.get("beat_index") is not None or s.get("beat") is not None for s in scenes)
     beats = []
     current_label = None
     start_frame = 0
@@ -51,9 +52,9 @@ def get_beat_chunks_from_props(props_path: str) -> list[dict]:
         dur = max(1, round(s.get("durationInFrames", 1)))
         
         if has_acts:
-            raw_act = s.get("actTitle") or current_label or f"ACT {chunk_idx}"
-            # Extract high-level Act identifier e.g. "ACT I", "ACT II"
-            m = re.search(r"(ACT\s+[IVXLCDM\d]+)", raw_act, re.IGNORECASE)
+            raw_act = str(s.get("actTitle") or current_label or f"ACT {chunk_idx}")
+            # Extract high-level Act/Beat identifier e.g. "ACT I", "BEAT 1"
+            m = re.search(r"((?:ACT|BEAT)\s+[IVXLCDM\d]+)", raw_act, re.IGNORECASE)
             act_label = m.group(1).upper() if m else raw_act.strip()
             
             if current_label is not None and act_label != current_label:
@@ -67,8 +68,23 @@ def get_beat_chunks_from_props(props_path: str) -> list[dict]:
                 chunk_idx += 1
                 start_frame = current_frame
             current_label = act_label
+        elif has_explicit_beats:
+            b_val = s.get("beat_index") if s.get("beat_index") is not None else s.get("beat")
+            beat_label = f"BEAT {b_val}" if b_val is not None else current_label
+            if beat_label and beat_label != current_label:
+                if current_label is not None:
+                    beats.append({
+                        "name": current_label,
+                        "index": chunk_idx,
+                        "start_frame": start_frame,
+                        "end_frame": current_frame - 1,
+                        "duration": current_frame - start_frame,
+                    })
+                    chunk_idx += 1
+                    start_frame = current_frame
+                current_label = beat_label
         else:
-            tag = s.get("speakerTag", "")
+            tag = str(s.get("speakerTag") or "")
             m = re.search(r"BEAT\s*(\d+)", tag, re.IGNORECASE)
             beat_label = f"BEAT {m.group(1)}" if m else None
             

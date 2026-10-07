@@ -2318,29 +2318,28 @@ export const LivingMicroLifeLayer: React.FC<{ frame: number }> = ({ frame }) => 
   );
 };
 
-export const TwoLayerEpisode = (props) => {
-  const scenes = props.scenes ? props.scenes : [];
-  const backgroundFadeFrames = props.backgroundFadeFrames
-    ? props.backgroundFadeFrames
-    : BACKGROUND_TRANSITION_FRAMES;
-  const backgroundSegments = React.useMemo(
-    () => buildBackgroundSegments(scenes, backgroundFadeFrames),
-    [scenes, backgroundFadeFrames]
-  );
-  const foregroundSegments = React.useMemo(
-    () => buildForegroundSegments(scenes, 15),
-    [scenes]
-  );
-  const overlaySegments = React.useMemo(
-    () => buildOverlaySegments(scenes),
-    [scenes]
-  );
-  if (typeof console !== "undefined" && console.warn) {
-    auditForegroundCoverage(scenes, foregroundSegments);
-  }
+const totalSceneFrames = (scenes) =>
+  (scenes || []).reduce((sum, s) => sum + Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1)), 0);
+
+/**
+ * Master VOX Build-On Episode Container Component (Rule 125 Single Truth).
+ * Unifies 7-layer tactile paper build-on assemblies (VoxBuildOnStage) with:
+ * - Anti-flicker Evidentiary Forensic Overlays & Stat Paper Notes (OverlaySegmentView)
+ * - Faster-Whisper millisecond word-level Karaoke Subtitles & Speaker Tags (TwoLayerScene)
+ * - Tactile Paper Foley SFX, LivingMicroLifeLayer, Optical FX, and TopProgressBar.
+ */
+export const VoxBuildOnEpisode: React.FC<{
+  scenes?: any[];
+  audioMaster?: string;
+  bgmFile?: string;
+  bgmVolume?: number;
+  includeAudio?: boolean;
+  fps?: number;
+  width?: number;
+  height?: number;
+}> = (props) => {
+  const scenes = props.scenes || [];
   const cfg = useVideoConfig();
-  const width = cfg.width;
-  const height = cfg.height;
   const currentFrame = useCurrentFrame();
 
   const currentSceneInfo = getCurrentSceneInfo(scenes, currentFrame);
@@ -2350,74 +2349,99 @@ export const TwoLayerEpisode = (props) => {
       currentSceneInfo.scene.motionDirective
     : undefined;
   const currentDur = currentSceneInfo ? currentSceneInfo.durationInFrames : 300;
-  const cameraTransform = currentSceneInfo
-    ? computeCameraTransform(
-        currentCameraMov,
-        currentSceneInfo.scene.tensionLevel || (currentSceneInfo.scene.camera ? currentSceneInfo.scene.camera.tension_level : undefined),
-        currentSceneInfo.relFrame,
-        currentSceneInfo.durationInFrames
-      )
-    : "scale(1.0)";
 
-  // Fake Focus Breathing & Motion Defocus Pulse (Rule 122 & "The Sauce" VOX optical aesthetic)
-  const focusBlurPx = React.useMemo(() => {
-    if (!currentSceneInfo) return 0;
-    const { relFrame } = currentSceneInfo;
-    const mov = currentCameraMov;
-    if (mov === "push_zoom" || mov === "vox_push_zoom") {
-      return interpolate(relFrame, [0, 2, 6], [3.2, 1.2, 0], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      });
-    }
-    if (mov === "focus_breathe_push") {
-      return interpolate(relFrame, [0, 3, 6, 12, 15, 18], [0, 2.5, 0, 0, 1.8, 0], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      });
-    }
-    if (mov === "whip_zoom") {
-      return interpolate(relFrame, [0, 2, 5], [0, 3.2, 0], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      });
-    }
-    if (mov === "snap_zoom" || mov === "seamless_whip_pan") {
-      return interpolate(relFrame, [0, 2, 5], [0, 2.4, 0], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      });
-    }
-    if (mov === "dolly_zoom") {
-      return interpolate(relFrame, [0, 4, 9], [0, 1.6, 0], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      });
-    }
-    if (relFrame <= 3) {
-      return interpolate(relFrame, [0, 1, 3], [0, 0.8, 0], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      });
-    }
-    return 0;
-  }, [currentSceneInfo, currentCameraMov]);
+  const overlaySegments = React.useMemo(
+    () => buildOverlaySegments(scenes),
+    [scenes]
+  );
 
-  const items = React.useMemo(() => {
+  const sceneSequences = React.useMemo(() => {
     let cursor = 0;
-    return scenes.map((s, i) => {
+    return scenes.map((s, idx) => {
+      const dur = Math.max(
+        1,
+        Math.round(
+          s.durationInFrames
+            ? s.durationInFrames
+            : s.durationSec
+            ? s.durationSec * (cfg.fps || 30)
+            : 150
+        )
+      );
       const from = cursor;
-      const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
       cursor += dur;
+
+      const durationSec = dur / (cfg.fps || 30);
+      const bgRaw = s.background || s.backgroundSrc || s.targetBackground;
+      const bgSrc = bgRaw ? resolveSrc(bgRaw) : undefined;
+
+      const heroRaw = s.heroSrc || s.foreground || s.primary_hero?.src || s.targetHeroSrc;
+      const heroSrc = heroRaw ? resolveSrc(heroRaw) : undefined;
+
+      const fgPos = s.foregroundPosition || (idx % 2 === 0 ? "left" : "right");
+      const hasOv = Boolean(s.forensicOverlay || s.forensic_overlay || s.statValue);
+      const defaultHeroXPct = hasOv ? (fgPos === "left" ? 28 : 72) : (fgPos === "left" ? 34 : 66);
+      const resolvedHeroPosition =
+        s.heroPosition && !(hasOv && s.heroPosition.xPct === 50)
+          ? s.heroPosition
+          : { xPct: defaultHeroXPct, yPct: 54, widthPct: hasOv ? 34 : 38 };
+
+      const rawCutouts = s.supportingCutouts || s.supporting_cutouts || [];
+      const resolvedCutouts = rawCutouts
+        .filter((c: any) => Boolean(c && (c.src || (c.label && !/^MEMO #|^RECORD #/i.test(String(c.label))))))
+        .map((c: any, cIdx: number) => ({
+          ...c,
+          id: c.id || `cutout-${idx}-${cIdx}`,
+          src: c.src ? resolveSrc(c.src) : undefined,
+          xPct: c.xPct !== undefined ? c.xPct : (c.x !== undefined ? c.x : 26 + cIdx * 48),
+          yPct: c.yPct !== undefined ? c.yPct : (c.y !== undefined ? c.y : 60),
+          widthPct: c.widthPct !== undefined ? c.widthPct : (c.scale ? Math.round(c.scale * 50) : 22),
+          hasPin: c.hasPin !== undefined ? c.hasPin : cIdx % 2 === 0,
+          hasTape: c.hasTape !== undefined ? c.hasTape : cIdx % 2 === 1,
+        }));
+
+      const rawYarns =
+        s.yarns ||
+        s.radiatingConnections ||
+        s.radiating_connections ||
+        (s.connection ? [s.connection] : []);
+
+      const cleanHeadline =
+        s.headline && String(s.headline).trim().toUpperCase() !== "ACT"
+          ? s.headline
+          : s.editorialHeadline || s.editorial_headline || undefined;
+
+      const cleanSubtitle = s.subtitle || s.actTitle || s.speakerTag || undefined;
+
       return (
-        <Sequence key={i} from={from} durationInFrames={dur} name={`scene-${i + 1}`}>
+        <Sequence
+          key={s.id || s.scene_id || `vox-beat-${idx}`}
+          from={from}
+          durationInFrames={dur}
+          name={cleanHeadline || `Scene ${idx + 1}`}
+        >
+          <VoxBuildOnStage
+            headline={cleanHeadline}
+            subtitle={cleanSubtitle}
+            theme={s.theme || s.papercraft_theme || s.paperTheme || "newsprint-editorial"}
+            backgroundSrc={bgSrc}
+            heroSrc={heroSrc}
+            heroLabel={s.heroLabel || s.speakerTag}
+            heroPosition={resolvedHeroPosition}
+            supportingCutouts={resolvedCutouts}
+            yarns={rawYarns}
+            stampText={s.stampText || s.stampBadge || s.stamp_badge}
+            stampColor={s.stampColor || "#dc2626"}
+            hasMarkerHighlight={s.hasMarkerHighlight !== false}
+            durationSec={durationSec}
+          />
           <TwoLayerScene
-            background={s.background}
+            background={bgRaw}
             showBackground={false}
             showForeground={false}
             showOverlay={false}
-            foreground={s.foreground}
-            foregroundPosition={s.foregroundPosition}
+            foreground={heroRaw}
+            foregroundPosition={fgPos}
             foregroundFadeFrames={s.foregroundFadeFrames}
             caption={s.caption}
             narration={s.narration}
@@ -2436,8 +2460,8 @@ export const TwoLayerEpisode = (props) => {
             sourceCredit={s.sourceCredit || s.source_credit}
             disclosureBadge={s.disclosureBadge}
             actTitle={s.actTitle}
-            sceneIndex={i}
-            headline={s.headline}
+            sceneIndex={idx}
+            headline={cleanHeadline}
             highlightWord={s.highlightWord || s.highlight_word}
             category={s.category}
             subtext={s.subtext}
@@ -2448,137 +2472,26 @@ export const TwoLayerEpisode = (props) => {
             connection={s.connection}
             connections={s.connections}
             radiatingConnections={s.radiatingConnections || s.radiating_connections}
-            supportingCutouts={s.supportingCutouts || s.supporting_cutouts}
+            supportingCutouts={resolvedCutouts}
             editorialHeadline={s.editorialHeadline || s.editorial_headline}
           />
         </Sequence>
       );
     });
-  }, [scenes]);
+  }, [scenes, cfg.fps]);
 
-  // Foley SFX Audio Layers (Tactile Paper, Thuds, Stamps)
-  const foleyElements = React.useMemo(() => {
-    let cursor = 0;
-    const validSfx = [
-      "sfx/counter_tick.mp3", "sfx/document_table_thud.mp3", "sfx/gavel_thud.mp3",
-      "sfx/marker_stroke.mp3", "sfx/node_pop.mp3", "sfx/paper_crease_snap.mp3",
-      "sfx/paper_page_turn.mp3", "sfx/paper_rustle.mp3", "sfx/paper_slide.mp3",
-      "sfx/sonar_ping.mp3", "sfx/stamp_impact.mp3", "sfx/stamp_slam.mp3",
-      "sfx/gauge_needle_hiss.mp3"
-    ];
-    return scenes.map((s, i) => {
-      const from = cursor;
-      const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
-      cursor += dur;
-      let foleySrc = s.foleysAudio || s.foleys_audio;
-      if (!foleySrc) return null;
-      if (!validSfx.includes(foleySrc) && !foleySrc.startsWith("http")) {
-        console.warn(`[REMOTION SFX AUDIT] Scene ${i + 1} requested unverified SFX '${foleySrc}'. Skipped to prevent sound corruption.`);
-        return null;
-      }
-      return (
-        <Sequence key={`foley-${i}`} from={from} durationInFrames={Math.min(dur, 60)} name={`foley-${i + 1}`}>
-          <Audio src={resolveSrc(foleySrc)} volume={0.85} />
-        </Sequence>
-      );
-    });
-  }, [scenes]);
-
-  const audioMaster = props.audioMaster ? props.audioMaster : null;
-  const bgmFile = props.bgmFile ? props.bgmFile : null;
-  const bgmVolume = props.bgmVolume !== undefined ? props.bgmVolume : 0.15;
-
-  // Auto-ducking BGM (-6dB = 0.5x volume) when Foley SFX triggers
-  const getBgmVolume = React.useCallback(
-    (frame: number) => {
-      let multiplier = 1.0;
-      let cursor = 0;
-      for (let i = 0; i < scenes.length; i++) {
-        const dur = Math.max(1, Math.round(scenes[i].durationInFrames ? scenes[i].durationInFrames : 1));
-        if (scenes[i].foleysAudio || scenes[i].foleys_audio) {
-          if (frame >= cursor && frame < cursor + 30) {
-            const rel = frame - cursor;
-            if (rel < 5) {
-              multiplier = Math.min(multiplier, 1.0 - (rel / 5) * 0.5);
-            } else if (rel < 20) {
-              multiplier = Math.min(multiplier, 0.5);
-            } else {
-              multiplier = Math.min(multiplier, 0.5 + ((rel - 20) / 10) * 0.5);
-            }
-          }
-        }
-        cursor += dur;
-      }
-      return bgmVolume * multiplier;
-    },
-    [scenes, bgmVolume]
-  );
+  // Only mount internal <Audio> tags when explicitly requested via includeAudio=true
+  // (Standard B6 renders twolayer_silent.mp4 and muxes master audio + BGM ducking in S7)
+  const includeAudio = Boolean(props.includeAudio);
+  const audioMaster = includeAudio && props.audioMaster ? resolveSrc(props.audioMaster) : null;
+  const bgmFile = includeAudio && props.bgmFile ? resolveSrc(props.bgmFile) : null;
+  const bgmVolume = props.bgmVolume !== undefined ? props.bgmVolume : 0.12;
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#FAF7EE" }}>
-      {audioMaster ? (
-        <Audio src={resolveSrc(audioMaster)} volume={1.0} />
-      ) : null}
-      {bgmFile ? (
-        <Audio src={resolveSrc(bgmFile)} volume={getBgmVolume} />
-      ) : null}
-      {foleyElements}
+    <AbsoluteFill style={{ backgroundColor: "#0f172a" }}>
+      {sceneSequences}
 
-      {/* Dynamic Cinematic Camera Container (Rule 122 & Rule 128) */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          transform: cameraTransform,
-          filter: focusBlurPx > 0.05 ? `blur(${focusBlurPx.toFixed(1)}px)` : undefined,
-          transformOrigin: "center center",
-        }}
-      >
-        <VoxParallaxLayer depth="background" cameraMovement={currentCameraMov} durationInFrames={currentDur}>
-          {backgroundSegments.map((seg, i) => (
-            <Sequence
-              key={`bgseg-${i}`}
-              from={seg.from}
-              durationInFrames={seg.durationInFrames}
-              name={`bg-segment-${i + 1}`}
-            >
-              <LivingCamera sceneIndex={i} direction={i % 2 === 0 ? "push" : "pull"}>
-                <BackgroundSegment
-                  src={seg.src}
-                  paperTheme={seg.paperTheme}
-                  fadeInFrames={seg.fadeInFrames}
-                  durationInFrames={seg.durationInFrames}
-                  hasForeground={Boolean(currentSceneInfo?.scene?.foreground || currentSceneInfo?.scene?.forensicOverlay || currentSceneInfo?.scene?.statValue)}
-                />
-              </LivingCamera>
-            </Sequence>
-          ))}
-        </VoxParallaxLayer>
-        <VoxParallaxLayer depth="foreground" cameraMovement={currentCameraMov} durationInFrames={currentDur}>
-          {foregroundSegments.map((seg, i) => (
-            <Sequence
-              key={`fgseg-${i}`}
-              from={seg.start}
-              durationInFrames={seg.end - seg.start}
-              name={`fg-segment-${i + 1}`}
-            >
-              <LivingCamera sceneIndex={i} direction={i % 2 === 0 ? "pull" : "push"}>
-                <ForegroundLayer
-                  src={seg.src}
-                  position={seg.position}
-                  fadeFrames={seg.fadeFrames}
-                  durationInFrames={seg.end - seg.start}
-                  width={width}
-                  height={height}
-                  motionPath={seg.motionPath}
-                />
-              </LivingCamera>
-            </Sequence>
-          ))}
-        </VoxParallaxLayer>
-      </div>
-
-      {/* Anti-Flicker Continuous Overlay Segments (Rule 122 & Zero-Flicker Architecture) */}
+      {/* Anti-Flicker Continuous Forensic Overlay & Stat Card Segments */}
       <VoxParallaxLayer depth="midground" cameraMovement={currentCameraMov} durationInFrames={currentDur}>
         {overlaySegments.map((seg, i) => (
           <Sequence
@@ -2600,10 +2513,8 @@ export const TwoLayerEpisode = (props) => {
         ))}
       </VoxParallaxLayer>
 
-      {/* Subtitles, Speaker Tags, and Fixed UI Overlays */}
-      {items}
       <LivingMicroLifeLayer frame={currentFrame} />
-      <VoxAtmosphericLighting intensity={0.9} />
+      <VoxAtmosphericLighting intensity={0.85} />
       <CinematicVignette
         active={currentSceneInfo?.scene?.opticalFx?.vignette !== false}
         strong={Boolean(currentSceneInfo?.scene?.opticalFx?.high_contrast)}
@@ -2620,113 +2531,21 @@ export const TwoLayerEpisode = (props) => {
           transitionOut={
             currentSceneInfo.scene.transition_out ||
             currentSceneInfo.scene.transitionOut ||
-            currentSceneInfo.scene.transition ||
-            (currentSceneInfo.index > 0 &&
-             currentSceneInfo.scene.background &&
-             scenes[currentSceneInfo.index - 1]?.background === currentSceneInfo.scene.background
-              ? (currentSceneInfo.index % 2 === 0 ? "vox_push_zoom" : "vox_paper_wipe")
-              : undefined)
+            currentSceneInfo.scene.transition
           }
           relFrame={currentSceneInfo.relFrame}
           durationInFrames={currentSceneInfo.durationInFrames}
         />
       )}
       <TopProgressBar scenes={scenes} currentFrame={currentFrame} totalFrames={totalSceneFrames(scenes)} />
-    </AbsoluteFill>
-  );
-};
 
-const totalSceneFrames = (scenes) =>
-  (scenes || []).reduce((sum, s) => sum + Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1)), 0);
-
-/**
- * Master VOX Build-On Episode Container Component (Rule 125 Single Truth).
- * Iterates through scenes / beats and renders authentic 7-layer tactile
- * paper build-on assemblies via VoxBuildOnStage, along with master audio,
- * BGM with automatic ducking, and word-level subtitles.
- */
-export const VoxBuildOnEpisode: React.FC<{
-  scenes?: any[];
-  audioMaster?: string;
-  bgmFile?: string;
-  bgmVolume?: number;
-  fps?: number;
-  width?: number;
-  height?: number;
-}> = (props) => {
-  const scenes = props.scenes || [];
-  const cfg = useVideoConfig();
-
-  const sceneSequences = React.useMemo(() => {
-    let cursor = 0;
-    return scenes.map((s, idx) => {
-      const dur = Math.max(
-        1,
-        Math.round(
-          s.durationInFrames
-            ? s.durationInFrames
-            : s.durationSec
-            ? s.durationSec * (cfg.fps || 30)
-            : 150
-        )
-      );
-      const from = cursor;
-      cursor += dur;
-
-      const durationSec = dur / (cfg.fps || 30);
-      const bgSrc = s.background
-        ? resolveSrc(s.background)
-        : s.targetBackground
-        ? resolveSrc(s.targetBackground)
-        : undefined;
-
-      const heroSrc = s.heroSrc
-        ? resolveSrc(s.heroSrc)
-        : s.foreground
-        ? resolveSrc(s.foreground)
-        : s.targetHeroSrc
-        ? resolveSrc(s.targetHeroSrc)
-        : undefined;
-
-      return (
-        <Sequence
-          key={s.id || `vox-beat-${idx}`}
-          from={from}
-          durationInFrames={dur}
-          name={s.headline || `Beat ${idx + 1}`}
-        >
-          <VoxBuildOnStage
-            headline={s.headline}
-            subtitle={s.subtitle}
-            theme={s.theme}
-            backgroundSrc={bgSrc}
-            heroSrc={heroSrc}
-            heroLabel={s.heroLabel}
-            heroPosition={s.heroPosition}
-            supportingCutouts={s.supportingCutouts}
-            yarns={s.yarns}
-            stampText={s.stampText}
-            stampColor={s.stampColor}
-            hasMarkerHighlight={s.hasMarkerHighlight !== false}
-            durationSec={durationSec}
-          />
-        </Sequence>
-      );
-    });
-  }, [scenes, cfg.fps]);
-
-  const audioMaster = props.audioMaster ? resolveSrc(props.audioMaster) : null;
-  const bgmFile = props.bgmFile ? resolveSrc(props.bgmFile) : null;
-  const bgmVolume = props.bgmVolume !== undefined ? props.bgmVolume : 0.12;
-
-  return (
-    <AbsoluteFill style={{ backgroundColor: "#0f172a" }}>
-      {sceneSequences}
       {audioMaster && <Audio src={audioMaster} />}
       {bgmFile && <Audio src={bgmFile} volume={bgmVolume} />}
     </AbsoluteFill>
   );
 };
+
+export const TwoLayerEpisode = VoxBuildOnEpisode;
 
 const RemotionRoot = () => {
   return (

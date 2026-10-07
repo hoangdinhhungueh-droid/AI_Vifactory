@@ -126,6 +126,7 @@ def optimize_props_assets(props_path: str, proj_dir: str):
         for sc in scenes:
             keys_to_check = [
                 ("background", False),
+                ("backgroundSrc", False),
                 ("targetBackground", False),
                 ("foreground", True),
                 ("heroSrc", True),
