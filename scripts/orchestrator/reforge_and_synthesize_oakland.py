@@ -382,8 +382,8 @@ async def run_reforge_and_synthesis(force_tts: bool = False):
         },
         "forensic_economic_methodology": {
             "description": "Per-claim mathematical baseline calculation and accounting perimeter analysis",
-            "plan_ceiling_per_claim": "$434,848.48 (~$435K: $143.5M plan proposed trust fund divided by 330 active claims)",
-            "mediation_ceiling_per_claim": "$733,333.33 (~$733K: $242.0M mediated term sheet offer divided by 330 active claims)",
+            "plan_illustrative_average_per_claim": "$434,848.48 (~$435K: $143.5M plan proposed trust fund divided by 330 active claims)",
+            "mediation_illustrative_average_per_claim": "$733,333.33 (~$733K: $242.0M mediated term sheet offer divided by 330 active claims)",
             "verdict_comparison_ratios": {
                 "verdict_to_mediation_average": "21.8x (~22 claimants' share of highest mediation proposal)",
                 "verdict_to_plan_average": "36.8x (~37 claimants' share of Third Amended Plan proposal)",
@@ -391,7 +391,7 @@ async def run_reforge_and_synthesis(force_tts: bool = False):
                 "mediation_average_to_verdict_percentage": "4.58%"
             },
             "scheduled_assets_clarification": "Initial scheduled assets of $76.1M establish a baseline accounting snapshot of debtor-held assets at petition date. They represent an initial perimeter benchmark rather than a fixed recovery ceiling, as potential insurance rights, third-party contributions, and asset reconciliations interact with administrative claims.",
-            "professional_fees_clarification": "Cumulative filed professional fee applications of $44.6M represent requested amounts seeking administrative priority, subject to final judicial allowance under 11 U.S.C. § 330. They reflect filed administrative claims on estate resources rather than demonstrated cash exhausted.",
+            "professional_fees_clarification": "Cumulative filed professional fee applications of $44.6M represent requested amounts seeking administrative priority, subject to final judicial allowance under 11 U.S.C. § 330. They reflect filed administrative claims on estate resources rather than demonstrated cash exhausted. Final fee allowances may be adjusted by the court upon consideration of the fee examiner's reports.",
             "statutory_caveat": "Per-claim figures represent gross unliquidated mathematical quotients for comparative analysis. They do not represent guaranteed individual claimant net distributions, which would be subject to pro-rata point schedules, administrative deductions, and individual claims matrix assessments."
         },
         "case_information": {

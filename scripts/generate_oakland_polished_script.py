@@ -55,7 +55,7 @@ The revival window closed on December thirty-first, twenty twenty-two. Four mont
 
 In press coverage and public statements, Chapter eleven was presented as an equitable forum. The debtor framed bankruptcy as one court, one pool of assets, and one fair distribution.
 
-That narrative was only the comforting half. Chapter eleven seeks collective resolution by channeling claims into a unified proceeding instead of separate jury trials. The other half: a plan caps recovery at whatever the estate and its contributors agree to pay.
+That narrative was only the comforting half. Chapter eleven seeks collective resolution by channeling claims into a unified proceeding instead of separate jury trials. The other half: the proposed plan would limit recoveries to its funding and distribution terms, subject to creditor rights and statutory confirmation requirements.
 
 One documented operational reality collided with a rigid legal structure. Parish weekly attendance declined roughly forty-two percent between twenty nineteen and twenty twenty-four, severely eroding parish collections.
 
@@ -63,7 +63,7 @@ According to diocesan financial disclosures and canonical structures, parish ope
 
 When weekly collections shrank, diocesan assessment revenues contracted in tandem, directly contributing to operating cash deficits that constrained the chancery's capacity to fund multi-million-dollar installments.
 
-Examine the legal perimeter of the estate. The diocese maintained that parishes and schools operated as separate corporate entities whose assets were held in trust for local ministries, shielded from general diocesan claims. Whether those assets could be drawn into the debtor's bankruptcy estate remained the central contested boundary.
+Examine the legal perimeter of the estate. The diocese maintained that independent parish corporations held legal title to local properties in trust for their parishes, asserting they stood outside the debtor's central estate. Whether those assets could be drawn into the debtor's bankruptcy estate remained the central contested boundary.
 
 Contested historical insurance added another hurdle. Policies written between nineteen sixty and nineteen eighty-nine required coverage terms and limits to be litigated line by line.
 
@@ -101,15 +101,15 @@ The meter never stopped, tracked line by line through court fee examination.
 
 Under Bankruptcy Code priority rules, court-approved professional fees are paid ahead of general unsecured creditors. Every filed fee application seeks administrative priority on the estate, subject to final court allowance.
 
-The longer confirmation stalled, the smaller the net estate available for survivor recovery.
+Continued administrative expenses risked reducing the estate available for survivor recovery unless offset by additional recoveries or contributions.
 
-Parish real estate remained outside the debtor's scheduled estate. Following the Supreme Court's June twenty twenty-four Purdue Pharma decision, non-debtor third-party releases cannot be imposed by judicial decree without creditor consent. The central question shifted: would survivors voluntarily grant them?
+Parish real estate remained outside the debtor's scheduled estate, where the Third Amended Plan carried forward a pre-Purdue framework conditioning contributions on nonconsensual releases. Since the Supreme Court's June twenty twenty-four Purdue Pharma decision, non-debtor releases cannot be imposed by decree without creditor consent. The central question shifted: would survivors voluntarily grant them?
 
 === ACT IV ===
 
 The structure failed in stages. After mediation concluded without a consensual Fourth Amended Plan, the court proceeded with the scheduled confirmation hearing to test the Third Amended Plan under Title eleven while the debtor's dismissal motion remained pending. Judge Lafferty formally denied confirmation on October fifth, twenty twenty-six.
 
-Six months earlier, in April twenty twenty-six, a decisive new comparison point emerged outside the bankruptcy court. The Bankruptcy Court had granted stay relief for a bellwether test case against the diocese in Alameda County Superior Court. On April twenty-second, twenty twenty-six, an Alameda County jury returned a verdict awarding sixteen million dollars against the diocese, as reported by public media outlet KQED.
+Six months earlier, in April twenty twenty-six, an independent new comparison point emerged outside the bankruptcy court. The Bankruptcy Court had granted stay relief for a bellwether test case against the diocese in Alameda County Superior Court. On April twenty-second, twenty twenty-six, an Alameda County jury returned a verdict awarding sixteen million dollars against the diocese, as reported by public media outlet KQED.
 
 Compare the stark numbers. Dividing headline bankruptcy funds across three hundred thirty active claims yielded illustrative average recoveries of roughly four hundred thirty-five thousand dollars under the plan, or seven hundred thirty-three thousand dollars under the mediation proposal, assuming equal distribution.
 
@@ -129,7 +129,7 @@ Because the Third Amended Plan contained nonconsensual non-debtor releases that 
 
 With that ruling entered, the legal architecture of the debtor's Third Amended Plan collapsed.
 
-Meanwhile, professional fee applications, reaching roughly fifty-nine percent of initial scheduled assets, continued mounting as administrative priority claims, while elderly survivors absorbed another year of delay.
+Meanwhile, professional fee applications, reaching roughly fifty-nine percent of initial scheduled assets, continued mounting as administrative priority claims, while the oldest survivors absorbed another year of delay.
 
 === ACT V ===
 
@@ -159,7 +159,7 @@ The Oakland reorganization stalled against an initial scheduled-asset baseline o
 
 The proposed trust could not bridge that valuation chasm. It could not purchase third-party releases without survivor consent.
 
-The clock was the true cost. Legal arguments can be redrafted for years. For the elderly survivors whose claims remain frozen in court, time is the one asset that can never be restored."""
+The clock was the true cost. Legal arguments can be redrafted for years. For the oldest survivors whose claims remain frozen in court, time is the one asset that can never be restored."""
 
 if __name__ == "__main__":
     words = STORY_TEXT.split()
