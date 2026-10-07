@@ -52,7 +52,7 @@ def test_sanitize_background_prompt_contract():
     raw_bg = "Ancient Roman Forum in ruined marble under dramatic sunset"
     bg = _sanitize_background_prompt(raw_bg)
     assert "16:9" in bg
-    assert "bottom 20% safe-zone" in bg or "safe-zone" in bg
+    assert "floor band" in bg or "open right space" in bg
     assert "[STYLE MANDATE]" in bg
     assert "[STRICT NEGATIVE PROMPT]" in bg
     # Verify no consecutive word stuttering
@@ -252,7 +252,7 @@ def test_zero_aspect_ratio_mutilation_and_en_negative_isolation():
     assert not re.search(r"(?<!\d):\s*(?:aspect\s*ratio|1\s*aspect\s*ratio)", fg_char_out, re.IGNORECASE)
     assert "salaryman" not in fg_char_out.lower()
     assert "hanko" not in fg_char_out.lower()
-    assert "no magenta, purple, fuchsia, or neon pink attire" in fg_char_out
+    assert "no bright neon attire, no glowing saturated clothes" in fg_char_out
 
     raw_fg_prop = "Full-body Federal Court Reorganization Plan Rejection Order figure in authentic period attire, 1:1 aspect ratio"
     fg_prop_out = _sanitize_foreground_prompt(raw_fg_prop, fg_key="fg_evidence_reorganization_plan_rejection_order", market="EN")
@@ -541,7 +541,7 @@ def test_opus_astra_round4_rc1_rc2_remediations():
 
     # RC2.4: State legislator 2019 era anchor
     legis_out = _sanitize_foreground_prompt("State legislator presenting assembly bill", fg_key="fg_character_state_legislator_2019", market="EN")
-    assert "2019 timeline" in legis_out
+    assert "legislative assembly era" in legis_out
 
     # RC2.5: Background environment anchors (no category bleed)
     street_out = _sanitize_background_prompt("Street outside parish exterior in 1970", bg_key="bg_1970s_oakland_streetscape", market="EN")
@@ -552,8 +552,8 @@ def test_opus_astra_round4_rc1_rc2_remediations():
     assert "archival geographic map chart" in map_out
     assert "rectory corridor" not in map_out
 
-    ledger_out = _sanitize_background_prompt("Detailed audit records grid", bg_key="bg_abstract_ledger_grid", market="EN")
-    assert "forensic financial ledger grid texture" in ledger_out
+    ledger_out = _sanitize_background_prompt("Detailed audit records grid", bg_key="bg_chancery_accounting_office", market="EN")
+    assert "chancery accounting office interior" in ledger_out
     assert "corporate or government headquarters" not in ledger_out
 
     court_out = _sanitize_background_prompt("Historic county courthouse exterior stonework", bg_key="bg_alameda_superior_courthouse", market="EN")
@@ -575,6 +575,50 @@ def test_opus_astra_round4_rc1_rc2_remediations():
 
     tower_out = _sanitize_background_prompt("Oakland skyline featuring Tribune Tower", bg_key="bg_skyline", market="EN")
     assert "clock tower with numeral-free clock face" in tower_out
+
+
+def test_opus_astra_round5_round16_remediations():
+    """Rule 122 & Rule 128: Test Round 16 Splitter, Chroma Negative, and Positive Channel Hygiene."""
+    from scripts.reforge_oakland_assets_clean import CLEAN_RAW_FGS, CLEAN_RAW_BGS
+    from app.services.prompt_forge import split_prompt_channels
+
+    # 1. Evidence positive prompts must NEVER contain text words or seal-bait relics
+    for fg_k, raw_p in CLEAN_RAW_FGS.items():
+        sanitized = _sanitize_foreground_prompt(raw_p, fg_key=fg_k, market="EN")
+        split_dict = split_prompt_channels(sanitized, default_layout="center")
+        pos_p = split_dict["positive_prompt"]
+        neg_p = split_dict["negative_prompt"]
+
+        # Check positive channel for banned text terms
+        assert "seal impression crest" not in pos_p, f"Failed for {fg_k}: 'seal impression crest' in positive"
+        assert "with or digits" not in pos_p, f"Failed for {fg_k}: 'with or digits' in positive"
+        assert "or digits" not in pos_p, f"Failed for {fg_k}: 'or digits' in positive"
+        assert "or lettering" not in pos_p, f"Failed for {fg_k}: 'or lettering' in positive"
+
+        # Check negative channel for chroma collisions on #FF00FF cutouts
+        assert "magenta" not in neg_p.lower(), f"Failed for {fg_k}: 'magenta' in negative channel"
+        assert "pink" not in neg_p.lower(), f"Failed for {fg_k}: 'pink' in negative channel"
+        assert "fuchsia" not in neg_p.lower(), f"Failed for {fg_k}: 'fuchsia' in negative channel"
+        assert "or neon pink" not in neg_p.lower(), f"Failed for {fg_k}: 'or neon pink' in negative channel"
+
+    # 2. Background positive prompts must NOT collide with negative subtitle/overlay terms
+    for bg_k, raw_bg in CLEAN_RAW_BGS.items():
+        sanitized_bg = _sanitize_background_prompt(raw_bg, bg_key=bg_k, market="EN")
+        split_bg = split_prompt_channels(sanitized_bg, default_layout="subject-left")
+        pos_bg = split_bg["positive_prompt"]
+
+        assert "safe-zone for subtitles" not in pos_bg, f"Failed for {bg_k}: 'safe-zone for subtitles' in positive"
+        assert "for graphical overlays" not in pos_bg, f"Failed for {bg_k}: 'for graphical overlays' in positive"
+        assert "for overlay" not in pos_bg, f"Failed for {bg_k}: 'for overlay' in positive"
+
+    # 3. Specific asset checks (Round 18/19 audit refinements)
+    val_p = CLEAN_RAW_FGS["fg_evidence_valuation_comparison"]
+    assert "three to four percent" in val_p
+
+    ballot_p = CLEAN_RAW_FGS["fg_evidence_ballot_tabulation"]
+    assert "ninety-nine percent of the circumference" in ballot_p
+    assert "stamp" not in ballot_p
+
 
 
 

@@ -1,78 +1,168 @@
 # -*- coding: utf-8 -*-
 """
-Perfect 5-Act Narrative & Spoken Script for EN_EP0008_oakland_plan_rejected.
-Master Forensic Audit Remediation (Opus 5.5 & Astra 6 Round 7 Perfection):
-- N1: Exact Plan Identity - Third Amended Plan (Docket 1204, $143.5M trust, March 17, 2025) explicitly identified as the sole operative plan of record denied confirmation on October 5, 2026.
-- N2: Stay law precision - clarifies that only global dismissal of the Chapter 11 petition dissolves the automatic stay across the estate; stay relief is claim-specific (such as the Alameda bellwether).
-- N3: Statutory priority & fees - completely harmonizes fee status across Acts III, IV, and V: cumulative interim fee applications surpassed $44.6M (~58.6% of scheduled assets), with tens of millions approved and paid in interim disbursements ahead of unsecured creditor recovery.
-- N4: Operating deficits vs fees - $29M operating deficits across fiscal years clearly separated from $44.6M professional fee applications.
-- N5: Insurance & perimeter precision - historical liability policies are property of estate; non-debtor carriers and parishes stood outside bankruptcy seeking releases.
-- N6: Section 1129(a)(8), 1129(b) cramdown & Purdue distinction - §1129(a)(8) requires all impaired classes to accept; 99% Class 4 rejection defeats consensual confirmation; cramdown under §1129(b) cannot force third-party releases after Purdue Pharma (June 27, 2024); post-Purdue releases require affirmative individual consent.
-- N7: Gross benchmark ceilings - $435,000 and $733,000 framed accurately as theoretical gross benchmark ceilings across >330 claims before administrative deductions and tiering.
-- N8: Dismissal posture abeyance - September 9, 2025 dismissal motion held in abeyance while debtor maintained confirmation request during court-ordered mediation.
-- N9: Broken sentence repaired - "The missing variable in the negotiations was a market price set by a jury on a single contested claim."
-- N10: Neutral attribution & zero motive imputation - neutral procedural description of AB 218 filing chronology and dismissed fraudulent transfer adversary proceeding.
-- N11: Rhetorical question hooks eliminated - Acts I, II, and III end on punchy investigative cliffhangers.
-- N12: Estate Perimeter Thesis fully reconciled in Act V.
-- N13: Closing location fixed - survivor claimants awaiting resolution in federal bankruptcy court before possible return to state court.
-- N14: Full TTS pronunciation normalization - all numbers, dates, statutory subsections, and docket references fully spelled out for flawless acoustic flow.
-- N15: Punchy Cold Strike - 18-word breathable opening sentence conforming to Rule 444.
+scripts/generate_oakland_polished_script.py
+Master Forensic 5-Act Narrative & Spoken VO Script for EN_EP0008_oakland_plan_rejected.
+Round 15 Comprehensive Forensic Remediation (Opus 5.5 & Astra Consensus Alignment):
+- B2-01: Removed unsupported §1129(a)(10) deduction; consensual confirmation failed under §1129(a)(8) (99% rejection by Class 4), and non-consensual cramdown under §1129(b) cannot supply non-debtor third-party releases barred by Harrington v. Purdue Pharma.
+- B2-02: Qualified plan voting vs release consent: the plan conditioned parish and insurer contributions on universal non-debtor releases that survivor claimants refused to grant.
+- B2-03: Purdue Pharma holding accurately bounded to nonconsensual non-debtor third-party releases.
+- B2-04: Replaced rigid scheduled asset ceiling with source-supported account distinguishing initial schedules ($76.1M), outside contributions, and disputed parish boundaries.
+- B2-05: Reconciled $29M accumulated operating cash deficits across fiscal operations, fee applications seeking administrative priority, and replaced "past fifty-nine" with "roughly fifty-nine percent".
+- B2-06: Clarified $435k / $733k arithmetic as illustrative average recoveries across 330 active claims, assuming equal distribution.
+- B2-07: Framed $16M Alameda County Superior Court verdict as one jury's independent valuation in a single bellwether trial (reported by KQED), not an automatic portfolio valuation.
+- B2-08: Automatic stay dissolution under §362 upon dismissal narrowed to return to California trial courts subject to state-court coordination orders.
+- B2-09: Cut redundant sentence at scene 020 ("The bankruptcy filing and related orders froze pending abuse litigation").
+- B2-10: Replaced one "Consider" with "Examine".
+- B2-11: Added 1-sentence procedural explanation for why the court ruled on October 5, 2026 after mediation concluded.
+- B2-12: Complete TTS phonetics: "section eleven twenty-nine a eight", "section eleven twenty-nine b", "K-Q-E-D".
 """
 
 STORY_TEXT = """=== ACT I ===
 
-On October fifth, twenty twenty-six, a federal bankruptcy court rejected the Diocese of Oakland's reorganization plan, leaving hundreds of claims without an approved distribution. The formal proposal carried a one hundred forty-three point five million dollar trust under its Third Amended Plan, followed by a two hundred forty-two million dollar mediation offer. Yet after three years of Chapter eleven proceedings, not a single dollar was distributed.
+On October fifth, twenty twenty-six, a federal bankruptcy court denied confirmation of the Diocese of Oakland's reorganization plan. The ruling left hundreds of claims without an approved distribution.
 
-Public headlines recorded the rejection. Docket entries recorded the case number. Neither explained the machinery. The Oakland Diocese reorganization did not stall over whether dollars could be promised on paper. In December twenty twenty-five, the diocese formally offered a two hundred forty-two million dollar settlement fund spread over five years during court-ordered mediation, calling it its last and final position in bankruptcy court. But the headline dollar figures obscured the actual legal machinery: the size of the recoverable fund was strictly constrained by the legal perimeter of the bankruptcy estate. While historical liability insurance policies constituted property of the estate, third-party insurance carriers and parishes stood outside the debtor corporation as separate non-debtor entities, conditioning their financial contributions on sweeping nonconsensual third-party releases shielding them from future litigation. Because parish properties and third-party insurers were held outside the debtor corporation, available estate cash remained limited—creating an insurmountable valuation gap with survivor creditors who viewed the pro-rata offers as inadequate compensation.
+How does a multi-year Chapter eleven bankruptcy proceeding carrying settlement proposals from one hundred forty-three point five million to two hundred forty-two million dollars stall for three years without a single dollar approved for distribution?
 
-On the surface, the proceeding appeared orderly: a plan on file, a claims agent docketing paperwork, parishes open on Sunday, and a trust with a precise figure attached to it. Underneath, the mechanism had seized. Initial schedules listed estate assets of roughly seventy-six point one million dollars; the larger settlement proposals relied on contested contributions from third-party insurers and parish asset liquidations. Litigation against the debtor was frozen by the Chapter eleven automatic stay, while related state-court claims against parishes and insurers remained stayed under interim court orders, halting pending abuse lawsuits without an approved distribution. The first thing a Chapter eleven filing does is stop the clock on litigation. The only thing it guarantees is that the clock stops for everyone at once. Behind that collective pause, the administrative machinery of Chapter eleven began accumulating priority claims against the estate.
+Public headlines recorded the confirmation denial. Court dockets documented hundreds of motions. Neither explained the underlying machinery.
 
-Most of the alleged abuse in these cases occurred between nineteen-sixty and nineteen-eighty-nine. The arithmetic is sobering. A survivor abused at ten years old in nineteen-seventy-two turned sixty-four while case number twenty-three, four-oh-five-two-three passed its third anniversary in the Northern District of California. Three years of motions. Three years of fee applications. Three years in which a claimant in their seventies either lived to see a distribution or did not. The shock of the ruling was not that a judge disliked a number. It was that a process built to end a crisis had made the crisis permanent for the people trapped inside it.
+The formal reorganization proposed a one hundred forty-three point five million dollar trust under its Third Amended Plan. Later, in December twenty twenty-five, the diocese offered a two hundred forty-two million dollar settlement during court-ordered mediation. That figure was a nominal five-year proposal rather than immediate cash, with its economic value dependent on installment timing, collection risk, and complex implementation.
 
-The central challenge was whether a collective trust structure could ever bridge the valuation gap with survivor creditors who viewed the settlement offers as fundamentally insufficient. When the Official Committee of Unsecured Creditors signaled overwhelming opposition to the diocese's proposals, the fault lines were already formed.
+Yet after three years in Chapter eleven, not a single dollar from the proposed settlement fund had been approved or distributed to claimants.
+
+The roadblock was structural. The size of the recoverable fund was strictly constrained by the legal perimeter of the bankruptcy estate. Initial bankruptcy schedules listed debtor assets of roughly seventy-six point one million dollars, establishing the baseline accounting perimeter for the reorganization. The larger settlement proposals depended on outside contributions from parishes and insurance carriers.
+
+While historical liability insurance policies were assets of the debtor's estate, the diocese maintained that third-party carriers and separate parish corporations were legally distinct entities, outside the central estate perimeter. Both conditioned their financial contributions on complete releases shielding them from future lawsuits.
+
+Because the diocese maintained that independent parish real estate stood outside the central estate, available estate cash remained limited, producing a deep valuation divide with survivor creditors.
+
+Litigation against the diocese was frozen by the Chapter eleven automatic stay under section three sixty-two. Related state court actions against parishes remained stayed under interim emergency court orders.
+
+Behind that collective pause, the administrative machinery of Chapter eleven began accumulating priority claims against estate assets.
+
+Most of the alleged abuse occurred between nineteen sixty and nineteen eighty-nine. The arithmetic is sobering. Consider the passage of time: a survivor ten years old in nineteen sixty-two reached their mid-seventies while the Chapter eleven proceeding passed its third anniversary.
+
+Three years of motions. Three years of professional fee applications. Three years in which elderly claimants waited for resolution.
+
+The central challenge was whether a collective trust could ever bridge the valuation gap with survivor creditors. When the creditors' committee opposed the offers, the fault lines hardened.
 
 === ACT II ===
 
-Rewind to October thirteenth, twenty-nineteen. California's governor signs Assembly Bill two eighteen, the Child Victims Act. Effective January first, twenty-twenty, it extends the statute of limitations on childhood sexual abuse claims and revives cases that had been time-barred for decades. Claims that were legally dead became legally alive. The chronology was swift: as more than three hundred thirty revived lawsuits alleging child sexual abuse surged against the Diocese of Oakland, the diocese responded on May eighth, twenty twenty-three, by filing a voluntary Chapter eleven petition before Judge William J. Lafferty before any individual case proceeded to a civil jury.
+Rewind to October thirteenth, twenty nineteen. California's governor signed Assembly Bill two eighteen, the Child Victims Act.
 
-In coverage from The Oaklandside to CBS San Francisco and in diocesan statements, Chapter eleven was presented as the fair forum: one judge, one pool of assets, one equitable distribution, avoiding a race to the courthouse where early plaintiffs drain the estate and late ones receive nothing. That account is the comforting half. The central tension in Chapter eleven is that it seeks collective resolution: channeling claims into a unified proceeding rather than litigating hundreds of separate jury trials in state court.
+Effective January first, twenty twenty, the statute extended limitation periods on childhood sexual abuse claims. Lawsuits that had been time-barred for decades revived across the state.
 
-Two documented operational shifts shaped the financial reality. Parish weekly attendance across the diocese declined roughly forty-two percent between twenty-nineteen and post-pandemic intervals, depressing local parish collections. Because parishes operate as separate legal entities under California law, parish funds sit outside the estate—yet the central diocese depends on monthly cathedraticum assessments remitted from those parish collections. When weekly collections shrank, the flow of diocesan assessment revenues contracted in tandem, directly constraining the central chancery's capacity to fund installment payments for a multi-million-dollar trust. Second, the legal perimeter of the estate itself. Parishes and schools are held separately from the central corporate entity, which means the pile of assets a judge can reach is narrower than the institution a survivor believes they sued. Add insurance policies written between nineteen-sixty and nineteen-eighty-nine, where coverage terms, limits and surviving documentation are contested line by line.
+The revival window closed on December thirty-first, twenty twenty-two. Four months later, on May eighth, twenty twenty-three, the diocese responded by filing a voluntary Chapter eleven petition before Judge William Lafferty. Three hundred thirty active claims surged against the estate.
 
-Looking past convenient narratives, the obstacle was structural. The popular version is that plaintiff lawyers wanted too much, or that the diocese simply had no money. Both are myths of comfort. This diocese is a separate legal entity under California law, distinct from the global church, and conflating them obscures where assets legally reside. The obstacle was never simply a headline dollar amount; it was the contested boundary of the estate and the legal barrier to granting third-party releases to parishes and insurers. While the parties contested those legal boundaries, the administrative machinery of Chapter eleven ran the meter, mounting priority expenses while negotiations remained deadlocked.
+In press coverage and public statements, Chapter eleven was presented as an equitable forum. The debtor framed bankruptcy as one court, one pool of assets, and one fair distribution.
+
+That narrative was only the comforting half. Chapter eleven seeks collective resolution by channeling claims into a unified proceeding instead of separate jury trials. The other half: a plan caps recovery at whatever the estate and its contributors agree to pay.
+
+One documented operational reality collided with a rigid legal structure. Parish weekly attendance declined roughly forty-two percent between twenty nineteen and twenty twenty-four, severely eroding parish collections.
+
+According to diocesan financial disclosures and canonical structures, parish operational bank accounts were maintained separately from the central chancery. However, the central chancery depends on monthly cathedraticum assessments, the historical diocesan administrative tax, remitted from parish collections.
+
+When weekly collections shrank, diocesan assessment revenues contracted in tandem, directly contributing to operating cash deficits that constrained the chancery's capacity to fund multi-million-dollar installments.
+
+Examine the legal perimeter of the estate. The diocese maintained that parishes and schools operated as separate corporate entities whose assets were held in trust for local ministries, shielded from general diocesan claims. Whether those assets could be drawn into the debtor's bankruptcy estate remained the central contested boundary.
+
+Contested historical insurance added another hurdle. Policies written between nineteen sixty and nineteen eighty-nine required coverage terms and limits to be litigated line by line.
+
+The popular version is that plaintiff attorneys demanded too much, or that the diocese held no assets. Both are myths of comfort.
+
+This diocese is an independent legal entity under California law, legally distinct from the global church. Conflating them obscures where assets reside.
+
+The obstacle was never simply a headline dollar amount. It was the contested boundary of the estate and the legal barrier to granting third-party releases.
+
+While parties contested those boundaries, the administrative clock continued running.
 
 === ACT III ===
 
-March seventeenth, twenty twenty-five. The diocese files its Third Amended Plan of Reorganization, Docket twelve zero four, proposing approximately one hundred forty-three point five million dollars for a Survivors' Trust. Under this Third Amended Plan, the proposed trust aimed to resolve claims collectively. But survivor advocates consistently criticized the offers as insufficient, and on June sixth, twenty twenty-five, a voting declaration filed by the claims agent and documented by the Official Committee of Unsecured Creditors showed a ninety-nine percent rejection rate among voting survivor creditors.
+March seventeenth, twenty twenty-five. The diocese filed its Third Amended Plan of Reorganization under docket entry twelve oh four. The plan proposed approximately one hundred forty-three point five million dollars for a survivors' trust.
 
-Three months later, on September ninth, twenty twenty-five, the diocese moved to dismiss its own Chapter eleven case, citing an insurmountable negotiation impasse after absorbing nearly twenty-nine million dollars in operating deficits across fiscal years. Rather than granting immediate dismissal, the bankruptcy court held the debtor's dismissal motion in abeyance to compel intensive mediation. Crucially, the debtor maintained its underlying request for confirmation of an amended plan on the docket during this period while the dismissal motion sat on hold. That court-ordered mediation produced the December twenty twenty-five term sheet carrying the two hundred forty-two million dollar five-year proposal—the diocese's last and final offer. But that mediation term sheet never matured into a confirmed consensual Fourth Amended Plan. Survivors could not accept a pro-rata share of a capped fund while a jury might value a single claim far higher. The diocese could not fund a number large enough to clear ninety-nine percent opposition without reaching assets it maintained were never part of the estate. Both sides behaved rationally. The structure produced the deadlock.
+Survivor advocates consistently criticized the offer as insufficient. On June sixth, twenty twenty-five, a voting declaration documented a ninety-nine percent rejection rate among voting survivor creditors.
 
-Then the ledger spoke, revealing who the pause was truly protecting. By mid-twenty twenty-six, cumulative professional fee applications on file had climbed past forty-four point six million dollars—representing roughly fifty-nine percent of the estate's total initial scheduled assets of seventy-six point one million dollars. The twenty-nine million dollars in operating deficits reflected diocesan cash shortfalls across fiscal years, separate from the forty-four point six million dollars in professional fee applications that accumulated as administrative priority claims against the estate.
+Three months later, on September ninth, twenty twenty-five, the diocese moved to dismiss its own Chapter eleven case. The debtor cited a negotiation deadlock after absorbing twenty-nine million dollars in accumulated operating cash deficits across fiscal operations.
 
-The meter never stopped.
+Rather than dismissing the case, the bankruptcy court held the dismissal motion in abeyance. The judge ordered the parties into intensive mediation.
 
-Under Bankruptcy Code statutory priority rules, court-approved professional fees are paid ahead of general unsecured creditors from estate funds. Every fee application is subject to judicial review and creditor objection, yet tens of millions had already been authorized and paid in interim allowances under court orders ahead of any recovery for survivor creditors. The longer confirmation stalls, the smaller the pool that survivors are fighting over. The pause protected the process, and administrative costs continued to mount. Survivor creditors initiated an adversary proceeding alleging that pre-petition restructuring had placed approximately one hundred six million dollars in parish real estate beyond the debtor's reach. The bankruptcy court dismissed that action without finding of liability, yet the underlying jurisdictional divide remained: parish real estate sat outside the debtor's scheduled estate. The core legal question was whether this plan could legally buy peace for insurers and parishes without claimant consent. The federal docket soon provided the answer.
+During that abeyance, although the debtor had sought dismissal, the pending Third Amended Plan remained before the court as the operative confirmation proposal while mediation proceeded. That mediation produced the December twenty twenty-five term sheet carrying the two hundred forty-two million dollar proposal.
+
+However, that term sheet never matured into a consensual Fourth Amended Plan. Survivors refused a pro-rata share of a five-year installment fund while state court juries might value claims much higher.
+
+The diocese could not fund a larger number without reaching assets it maintained were outside the estate. Both sides acted rationally within their legal positions. The structure produced the deadlock.
+
+Then the ledger documented where the estate's dollars were going.
+
+By the middle of twenty twenty-six, cumulative professional fee applications on file surpassed forty-four point six million dollars. That total of filed applications represented roughly fifty-nine percent of the estate's initial scheduled assets of seventy-six point one million dollars, subject to final court allowance.
+
+With chancery cash flow already severely depleted by those operational deficits, mounting fee applications claimed administrative priority against a growing share of remaining estate assets.
+
+The meter never stopped, tracked line by line through court fee examination.
+
+Under Bankruptcy Code priority rules, court-approved professional fees are paid ahead of general unsecured creditors. Every filed fee application seeks administrative priority on the estate, subject to final court allowance.
+
+The longer confirmation stalled, the smaller the net estate available for survivor recovery.
+
+Parish real estate remained outside the debtor's scheduled estate. Following the Supreme Court's June twenty twenty-four Purdue Pharma decision, non-debtor third-party releases cannot be imposed by judicial decree without creditor consent. The central question shifted: would survivors voluntarily grant them?
 
 === ACT IV ===
 
-The structure failed in stages, not at once. While the December twenty twenty-five settlement term sheet carrying the two hundred forty-two million dollar offer attempted to resolve the dispute, it never converted into a confirmed consensual plan. The Third Amended Plan remained the formal operative plan of record on the court's docket. The missing variable in the negotiations was a market price set by a jury on a single contested claim. That calibration arrived on April twenty-second, twenty twenty-six.
+The structure failed in stages. After mediation concluded without a consensual Fourth Amended Plan, the parties returned to court, where the debtor sought confirmation of its pending Third Amended Plan before resolving the abated dismissal motion. Judge Lafferty formally denied confirmation on October fifth, twenty twenty-six.
 
-In state court, where stay relief had been granted for a bellwether case, a jury awarded sixteen million dollars to a man abused by an East Bay priest, as reported by KQED, with implications for hundreds of pending claims. Consider the stark comparison: one jury verdict, sixteen million dollars. Dividing the headline figures across more than three hundred thirty filed proofs of claim suggested gross benchmark ceilings of roughly four hundred thirty-five thousand dollars under the Third Amended Plan, or roughly seven hundred thirty-three thousand dollars under the mediation proposal. Yet those figures represented gross ceilings before administrative deductions, legal expenses, and severity tiering, contrasting sharply with the sixteen-million-dollar single jury verdict in Alameda County. A single state-court jury award eclipsed what twenty claimants would receive under the entire collective bankruptcy fund. Bellwether results are not automatic multipliers, and every case carries distinct defenses. But as a negotiating baseline, it reframed everything. That is why "last and final" stopped functioning as a deadline and started functioning as an arbitrary ceiling nobody had agreed to.
+Six months earlier, in April twenty twenty-six, a decisive new comparison point emerged outside the bankruptcy court. The Bankruptcy Court had granted stay relief for a bellwether test case against the diocese in Alameda County Superior Court. On April twenty-second, twenty twenty-six, an Alameda County jury returned a verdict awarding sixteen million dollars against the diocese, as reported by public media outlet K-Q-E-D.
 
-The legal barriers to confirmation were insurmountable under federal law. First, under Bankruptcy Code section eleven twenty-nine, subsection a-eight, consensual confirmation requires acceptance by every impaired creditor class. With ninety-nine percent of voting survivor claimants voting to reject the Third Amended Plan, consensual confirmation was defeated. Second, while the Bankruptcy Code permits nonconsensual cramdown under section eleven twenty-nine, subsection b, cramdown cannot force nonconsensual releases onto dissenting creditors. Under the Supreme Court's ruling in Harrington versus Purdue Pharma on June twenty-seventh, twenty twenty-four, bankruptcy courts lack statutory authority to extinguish claims against non-debtor entities without individual claimant consent. Because the plan conditioned parish and insurer contributions on universal non-debtor releases, and survivor claimants overwhelmingly refused to grant them, the court could not confirm the plan.
+Compare the stark numbers. Dividing headline bankruptcy funds across three hundred thirty active claims yielded illustrative average recoveries of roughly four hundred thirty-five thousand dollars under the plan, or seven hundred thirty-three thousand dollars under the mediation proposal, assuming equal distribution.
 
-On October fifth, twenty twenty-six, Judge Lafferty entered the order: formal confirmation of the Third Amended Plan of Reorganization was denied. Not a moral verdict on the institution—a judicial ruling that this specific legal instrument could not deliver nonconsensual third-party releases over overwhelming creditor opposition. Across three years, tens of millions in interim professional allowances had been authorized and paid from estate assets ahead of any recovery for survivor creditors, while cumulative fee applications mounted past forty-four point six million dollars. Meanwhile, the survivors, many now in their late sixties to eighties, absorbed the delay, still waiting for resolution.
+A single sixteen-million-dollar verdict matched what roughly twenty-two claimants would receive under the mediation proposal average. It matched what roughly thirty-seven claimants would receive under the Third Amended Plan average.
+
+Bellwether verdicts do not establish portfolio valuations across hundreds of disparate claims. Yet as one jury's independent valuation in a single trial, the sixteen-million-dollar award sharply challenged the economic basis of the diocese's capped settlement proposals.
+
+The legal barriers to confirmation could not be overcome on this record under federal law.
+
+First, consensual confirmation failed under Title eleven, section eleven twenty-nine a eight, because Class Four, the abuse survivors, rejected the plan by approximately ninety-nine percent of votes cast.
+
+Second, statutory confirmation requires compliance with Title eleven under section eleven twenty-nine, subsection A, one. Under the Supreme Court's June twenty-seventh, twenty twenty-four ruling in Harrington versus Purdue Pharma, the Bankruptcy Code does not authorize nonconsensual releases of non-debtor third parties through a Chapter eleven plan.
+
+Even if cramdown under section eleven twenty-nine, subsection B, were attempted, cramdown can only bind dissenting creditors to lawful plan terms, and cannot bypass the Supreme Court's statutory bar on nonconsensual third-party releases.
+
+Because the plan conditioned parish and insurer contributions on universal non-debtor releases that survivor claimants refused to grant, the court could not confirm the instrument.
+
+With that ruling entered, the legal architecture of the debtor's Third Amended Plan collapsed.
+
+Meanwhile, professional fee applications, reaching roughly fifty-nine percent of initial scheduled assets, continued mounting as administrative priority claims, while elderly survivors absorbed another year of delay.
 
 === ACT V ===
 
-Strip it to the causal chain. A twenty-nineteen California statute revived time-barred claims. A twenty twenty-three voluntary Chapter eleven petition paused them in bankruptcy. Over the following three years, competing reorganization proposals were met with consistent survivor rejection, while cumulative professional fee applications on file approached fifty-nine percent of the estate's initial scheduled assets. On October fifth, twenty twenty-six, the federal judge formally rejected the Third Amended Plan of Reorganization. The ruling was procedural, not triumphal—a rejected plan is a rejected instrument, not a closed case and not a payout. Nothing was distributed on October fifth, twenty twenty-six. The ledger stayed frozen.
+Strip it to the causal chain. A twenty nineteen statute revived time-barred claims. A twenty twenty-three bankruptcy petition froze them under the automatic stay.
 
-With confirmation of the Third Amended Plan definitively denied and the debtor's September twenty twenty-five dismissal motion returning to active consideration on the docket, the protective wall of the automatic stay faced potential dissolution. Only global dismissal of the Chapter eleven case fully dissolves the automatic stay across the estate. If the bankruptcy court enters an order granting the pending dismissal motion, the federal stay vanishes entirely—freeing survivors from bankruptcy jurisdiction to return hundreds of individual lawsuits to California state trial courts, where that sixteen-million-dollar bellwether now sits in the record. That path carries both opportunities and risks: individual trials take years, results vary widely, and the diocese's financial strain from depleted parish assessments will remain a factor in post-bankruptcy collections. Some claimants will recover more than a trust share. Some will recover later. Some, given the timeline reaching back to nineteen-sixty, will not be alive for either outcome.
+Over three years, competing reorganization proposals met overwhelming creditor rejection. Professional fee applications surpassed forty-four point six million dollars.
 
-The broader lesson extends far beyond one diocese in the East Bay. Any institution facing hundreds of aggregated legacy claims faces the same arithmetic: file, stay the litigation, cap the exposure, and attempt to buy protection for entities and insurers standing just outside the estate. After Purdue Pharma, that shield no longer works by decree. Filers attempt consent solicitation, narrowed estate definitions, and extended payment tails. The warning for anyone tracking mass-claim bankruptcies today is not that the courts failed. It is that time itself is a transferable asset, and in this case it moved in one direction only.
+On October fifth, twenty twenty-six, the bankruptcy court formally denied confirmation. The denial did not itself dismiss the bankruptcy case or authorize distributions. A rejected plan is not a closed case. Nothing was distributed on that date.
 
-Returning to the question posed at the start: how does a multi-year Chapter eleven process end without an approved distribution? Here is the record's answer. The Oakland reorganization did not collapse from a lack of negotiating effort. It collapsed because the estate perimeter was drawn tightly around seventy-six point one million dollars of debtor assets, while the economic liabilities exceeded two hundred million. The proposed settlement could not deliver nonconsensual releases under Supreme Court precedent, and Chapter eleven could not purchase third-party protection without consensual creditor agreement. The clock was the real cost. Legal arguments and plan proposals can be redrafted for years, while the survivor claimants whose claims remain frozen in federal bankruptcy, awaiting either a restructured plan or a return to California state court, are the one constituency whose time cannot be restored."""
+With confirmation denied and no consensual plan in reach, dismissal became the most direct path to lifting the automatic stay.
+
+The debtor's September twenty twenty-five dismissal motion, held in abeyance during mediation, returned to active consideration on the docket.
+
+If the bankruptcy court grants dismissal, the automatic stay dissolves under section three sixty-two. Survivors would be freed to pursue individual lawsuits in California trial courts, subject to any state-court coordination orders.
+
+That path carries both promise and peril. Civil trials take years. Results vary widely. The diocese's financial strain from depressed parish assessments would likely constrain post-judgment collections.
+
+Some survivors may recover more than a trust share. Some will recover later. Some elderly claimants may not survive prolonged litigation.
+
+The lesson extends far beyond one diocese in Northern California. Institutions facing mass legacy claims have repeatedly tried the same strategy: file Chapter eleven, freeze litigation, and seek releases for non-debtor affiliates.
+
+After Purdue Pharma, that shield cannot be imposed by decree.
+
+Now return to the question posed at the start: how does a multi-year Chapter eleven proceeding carrying hundreds of millions in settlement proposals stall for three years without a single dollar approved for distribution?
+
+The Oakland reorganization stalled because the debtor's scheduled estate held only seventy-six point one million dollars in initial assets, while outside parish contributions remained conditioned on universal releases survivors would not grant. When one jury valued a single claim at sixteen million dollars, it supplied an independent benchmark far above the illustrative trust averages, sharply challenging the economic basis of any capped settlement.
+
+The proposed trust could not bridge that valuation chasm. It could not purchase third-party releases without survivor consent.
+
+The clock was the true cost. Legal arguments can be redrafted for years. For the elderly survivors whose claims remain frozen in court, time is the one asset that can never be restored."""
 
 if __name__ == "__main__":
-    print("Story length:", len(STORY_TEXT))
-    print("Word count:", len(STORY_TEXT.split()))
+    words = STORY_TEXT.split()
+    print("Story word count:", len(words))
+    sentences = [s.strip() for s in STORY_TEXT.split(".") if s.strip()]
+    print("Approx sentence count:", len(sentences))

@@ -476,15 +476,18 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
         logger.warning(f"[story_engine] Spoken VO adaptation parsing failed or too short ({len(parsed.get('sentences', [])) if parsed else 0} sents). Running deterministic sentence splitting fallback.")
         sentences = []
         full_text_lines = []
-        act_blocks = re.split(r'(===\s*(?:ACT|BEAT)\s*[I|V|X\d]+\s*===)', full_script, flags=re.IGNORECASE)
+        act_blocks = re.split(r'(===\s*(?:ACT|BEAT)\s*[IVX\d]+\s*===)', full_script, flags=re.IGNORECASE)
         current_beat = 1
+        roman_map = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5}
         for block in act_blocks:
-            b_up = block.strip().upper()
-            if "ACT I" in b_up or "BEAT 1" in b_up: current_beat = 1; continue
-            if "ACT II" in b_up or "BEAT 2" in b_up: current_beat = 2; continue
-            if "ACT III" in b_up or "BEAT 3" in b_up: current_beat = 3; continue
-            if "ACT IV" in b_up or "BEAT 4" in b_up: current_beat = 4; continue
-            if "ACT V" in b_up or "BEAT 5" in b_up: current_beat = 5; continue
+            b_strip = block.strip()
+            if not b_strip:
+                continue
+            m_act = re.match(r'===\s*(?:ACT|BEAT)\s*([IVX\d]+)\s*===', b_strip, flags=re.IGNORECASE)
+            if m_act:
+                act_str = m_act.group(1).upper()
+                current_beat = roman_map.get(act_str, current_beat)
+                continue
 
             # Robust multilingual sentence split (handles CJK without whitespace after punctuation)
             candidate_sents = [s.strip() for s in re.split(r'(?<=[。！？])|(?<=[.!?])(?:\s+|$|\n+)', block) if s.strip()]

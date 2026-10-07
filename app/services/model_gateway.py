@@ -202,6 +202,7 @@ class ModelGateway:
         for attempt in range(1, max_retries + 1):
             try:
                 full_content: List[str] = []
+                full_reasoning: List[str] = []
                 total_tokens = 0
                 timeout_config = httpx.Timeout(timeout=timeout, connect=30.0, read=timeout, write=30.0, pool=30.0)
                 
@@ -226,9 +227,15 @@ class ModelGateway:
                                     break
                                 try:
                                     data = json.loads(data_str)
-                                    delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                                    if delta:
-                                        full_content.append(delta)
+                                    choices = data.get("choices", [])
+                                    if choices:
+                                        delta_obj = choices[0].get("delta", {})
+                                        delta_text = delta_obj.get("content", "")
+                                        if delta_text:
+                                            full_content.append(delta_text)
+                                        reasoning_text = delta_obj.get("reasoning_content", "") or delta_obj.get("reasoning", "")
+                                        if reasoning_text:
+                                            full_reasoning.append(reasoning_text)
                                     usage = data.get("usage", {})
                                     if usage:
                                         total_tokens = usage.get("total_tokens", 0)
@@ -240,6 +247,8 @@ class ModelGateway:
                                     logger.debug(f"[GATEWAY] Stream parse error: {e}")
                 
                 result = "".join(full_content)
+                if not result.strip() and full_reasoning:
+                    result = "".join(full_reasoning)
                 if not result.strip():
                     raise ModelGatewayError("Empty response from HHTech API stream")
                 stripped = result.strip()
