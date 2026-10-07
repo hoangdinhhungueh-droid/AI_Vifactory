@@ -64,6 +64,55 @@ def preflight_memory_check():
         print(f"[MEMORY CHECK] psutil check skipped: {e}")
 
 
+def stage_episode_assets_to_remotion_public(props_path: str, proj_dir: str):
+    """Ensure episode images, tts_out.mp3, and BGM exist as physical files in remotion/public."""
+    import shutil
+    try:
+        ep_dir = os.path.dirname(os.path.abspath(props_path))
+        pub_dir = os.path.join(proj_dir, "public")
+        pub_images = os.path.join(pub_dir, "images")
+        pub_bgm = os.path.join(pub_dir, "bgm")
+
+        for p in (pub_images, pub_bgm, os.path.join(pub_dir, "tts_out.mp3")):
+            if os.path.islink(p):
+                os.unlink(p)
+
+        os.makedirs(pub_images, exist_ok=True)
+        os.makedirs(pub_bgm, exist_ok=True)
+
+        # 1. Stage episode images
+        src_images = os.path.join(ep_dir, "images")
+        if os.path.isdir(src_images):
+            for fname in os.listdir(src_images):
+                if fname.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                    s_file = os.path.join(src_images, fname)
+                    d_file = os.path.join(pub_images, fname)
+                    if not os.path.exists(d_file) or os.path.getsize(d_file) != os.path.getsize(s_file):
+                        shutil.copy2(s_file, d_file)
+
+        # 2. Stage tts_out.mp3
+        src_tts = os.path.join(ep_dir, "tts_out.mp3")
+        dst_tts = os.path.join(pub_dir, "tts_out.mp3")
+        if os.path.isfile(src_tts):
+            if not os.path.exists(dst_tts) or os.path.getsize(dst_tts) != os.path.getsize(src_tts):
+                shutil.copy2(src_tts, dst_tts)
+
+        # 3. Stage BGM
+        dst_bgm = os.path.join(pub_bgm, "vox_cinematic_pulse.mp3")
+        if os.path.islink(dst_bgm):
+            os.unlink(dst_bgm)
+        if not os.path.exists(dst_bgm):
+            for cand_bgm in [
+                "/root/video_factory/assets/bgm/dramatic_001_fs768645.mp3",
+                os.path.join(pub_dir, "bgm.mp3"),
+            ]:
+                if os.path.isfile(cand_bgm):
+                    shutil.copy2(cand_bgm, dst_bgm)
+                    break
+    except Exception as e:
+        print(f"[STAGE ASSETS] Warning during asset staging: {e}")
+
+
 def optimize_props_assets(props_path: str, proj_dir: str):
     """Pre-scales images down to 1080p and bakes crisp VOX sticker borders into FG (Pillar 2)."""
     try:
@@ -75,7 +124,13 @@ def optimize_props_assets(props_path: str, proj_dir: str):
         count = 0
         processed_paths = set()
         for sc in scenes:
-            keys_to_check = [("background", False), ("foreground", True)]
+            keys_to_check = [
+                ("background", False),
+                ("targetBackground", False),
+                ("foreground", True),
+                ("heroSrc", True),
+                ("targetHeroSrc", True),
+            ]
             if isinstance(sc.get("primary_hero"), dict) and sc["primary_hero"].get("src"):
                 keys_to_check.append(("primary_hero", True))
             for key, is_fg in keys_to_check:
@@ -91,7 +146,7 @@ def optimize_props_assets(props_path: str, proj_dir: str):
                         im = im.convert("RGBA") if is_fg else im.convert("RGB")
                         modified = False
                         # 1. Scale down to 1080p target
-                        max_w = 1080 if key == "foreground" else 1920
+                        max_w = 1080 if is_fg else 1920
                         max_h = 1080
                         if im.width > max_w or im.height > max_h:
                             ratio = min(max_w / float(im.width), max_h / float(im.height))
@@ -101,7 +156,7 @@ def optimize_props_assets(props_path: str, proj_dir: str):
                             modified = True
 
                         # 2. Bake VOX white sticker border directly into FG alpha
-                        if key == "foreground" and "A" in im.getbands():
+                        if is_fg and "A" in im.getbands():
                             alpha = im.split()[-1]
                             min_a, max_a = alpha.getextrema()
                             if min_a < 250:
@@ -164,6 +219,9 @@ def main():
     # Pre-flight RAM verification
     preflight_memory_check()
 
+    # Stage physical assets into remotion/public for webpack bundling
+    stage_episode_assets_to_remotion_public(args.props, PROJ_DIR)
+
     # Pillar 2: Pre-scale image assets to 1080p to eliminate Chromium downscale bottleneck
     optimize_props_assets(args.props, PROJ_DIR)
 
@@ -182,8 +240,10 @@ def main():
         "--concurrency=" + concurrency,
         "--x264-preset=" + args.x264_preset,
         "--crf=" + str(args.crf),
-        "--bundle-cache",
     ]
+    # Use bundle-cache only on subsequent chunks (non-zero start frame) so Chunk 1 always bundles fresh public/ assets
+    if args.frames and not str(args.frames).startswith("0-"):
+        cmd.append("--bundle-cache")
     if args.frames:
         cmd.append(f"--frames={args.frames}")
     

@@ -364,6 +364,16 @@ async def run_pipeline(
     _render_arch = str((brain or {}).get("render_architecture") or "").strip()
     if not _render_arch:
         _render_arch = str(episode.get("render_architecture") or "").strip()
+    if not _render_arch:
+        if (
+            (brain or {}).get("mode") == "remotion"
+            or os.path.exists(os.path.join(out_dir, "remotion_props.json"))
+            or os.path.exists(os.path.join(out_dir, "images_ready.json"))
+            or os.path.exists(os.path.join(out_dir, "prompts_forge.json"))
+            or os.path.exists(os.path.join(out_dir, "vox_scene_manifest.json"))
+        ):
+            _render_arch = "remotion_twolayer_karaoke_v4"
+            logger.info("[S4.5] auto-detected render_architecture=%s from episode artifacts", _render_arch)
     is_two_layer = _render_arch in ("two_layer_v1", "remotion_twolayer_karaoke_v4") or "twolayer" in _render_arch or _render_arch.startswith("two_layer")
     if is_two_layer:
         logger.info("[S4.5] two_layer_v1 detected; ensuring S6 Whisper transcription is ready for Remotion props")

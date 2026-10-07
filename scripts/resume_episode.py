@@ -93,6 +93,11 @@ def main():
         print("RESULT_ERR", "no brain_input.json found for episode_id=%r at %s" % (eid, brain_path))
         sys.exit(1)
     brain = json.loads(brain_path.read_text())
+    if not brain.get("render_architecture"):
+        if (out_dir / "remotion_props.json").exists() or (out_dir / "prompts_forge.json").exists() or (out_dir / "images_ready.json").exists():
+            brain["render_architecture"] = "remotion_twolayer_karaoke_v4"
+            brain_path.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
+            print("[resume_episode] Auto-injected render_architecture='remotion_twolayer_karaoke_v4'")
 
     story_text = brain.get("story", "")
     if args.story_override:

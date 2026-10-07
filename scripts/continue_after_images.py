@@ -197,11 +197,10 @@ def main():
     arch = str(brain.get("render_architecture") or "").strip()
     is_two_layer = arch in ("two_layer_v1", "remotion_twolayer_karaoke_v4") or "twolayer" in arch or arch.startswith("two_layer")
     if not is_two_layer:
-        # Not fatal for the pipeline, but it means S4.5 will be skipped and the
-        # legacy S5 stock-clip path runs instead -- almost certainly not what
-        # the Antigravity image flow intended. Say so loudly.
-        _log("WARNING render_architecture=%r (not two_layer_v1 / remotion_twolayer_karaoke_v4): S4.5 two-layer "
-             "path will be SKIPPED and legacy S5 will run instead" % arch)
+        _log("AUTO-FIX: render_architecture was %r. Enforcing 'remotion_twolayer_karaoke_v4' for B4-B10 continuation." % arch)
+        brain["render_architecture"] = "remotion_twolayer_karaoke_v4"
+        brain_path.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
+        is_two_layer = True
 
     # Calculate adaptive dynamic render timeout matching run_episode (Pillar 3 & Rule 134)
     props_path = ep_dir / "remotion_props.json"

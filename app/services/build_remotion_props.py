@@ -1123,23 +1123,29 @@ def build_remotion_props_data(
         logger.info("[build_remotion_props] Detected VoxBuildOnStage pipeline for %s (%d beats)", episode_id, len(raw_scenes))
         for i, s in enumerate(raw_scenes):
             b_idx = s.get("beat_index", i + 1)
-            # Bind heroSrc
+            # Bind heroSrc (prefer semantic targetHeroSrc / foreground_reuse_key, then fg_XX.png)
+            t_hero = s.get("targetHeroSrc") or s.get("heroSrc") or (f"images/{s['foreground_reuse_key']}.png" if s.get("foreground_reuse_key") else None)
             fg_file = f"fg_{b_idx:02d}.png"
-            if os.path.exists(os.path.join(ep_dir, "images", fg_file)):
+            if t_hero and os.path.exists(os.path.join(ep_dir, t_hero)):
+                s["heroSrc"] = t_hero
+            elif os.path.exists(os.path.join(ep_dir, "images", fg_file)):
                 s["heroSrc"] = f"images/{fg_file}"
             elif os.path.exists(os.path.join(ep_dir, "assets", fg_file)):
                 s["heroSrc"] = f"assets/{fg_file}"
             else:
-                s["heroSrc"] = None
+                s["heroSrc"] = t_hero
 
-            # Bind background
+            # Bind background (prefer semantic targetBackground / background_reuse_key, then bg_XX.png)
+            t_bg = s.get("targetBackground") or s.get("background") or (f"images/{s['background_reuse_key']}.png" if s.get("background_reuse_key") else None)
             bg_file = f"bg_{b_idx:02d}.png"
-            if os.path.exists(os.path.join(ep_dir, "images", bg_file)):
+            if t_bg and isinstance(t_bg, str) and os.path.exists(os.path.join(ep_dir, t_bg)):
+                s["background"] = t_bg
+            elif os.path.exists(os.path.join(ep_dir, "images", bg_file)):
                 s["background"] = f"images/{bg_file}"
             elif os.path.exists(os.path.join(ep_dir, "assets", bg_file)):
                 s["background"] = f"assets/{bg_file}"
             else:
-                s["background"] = None
+                s["background"] = t_bg if isinstance(t_bg, str) else None
 
         props = {
             "episodeId": episode_id,
