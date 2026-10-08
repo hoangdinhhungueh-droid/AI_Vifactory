@@ -664,6 +664,9 @@ class VoxAutomatedDirector:
 
             scene_entry = {
                 "id": f"scene_{b_idx:02d}",
+                "beat_index": b_idx,
+                "background_reuse_key": bg_key,
+                "foreground_reuse_key": fg_key,
                 "component": "VoxBuildOnStage",
                 "durationInFrames": duration_frames,
                 "durationSec": round(duration_frames / self.fps, 2),

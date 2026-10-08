@@ -459,6 +459,7 @@ def run_automated_pipeline(
     brain["total_scenes"] = len(beats)
     brain["scenes"] = remotion_manifest.get("scenes", [])
     brain["pipeline_version"] = "vox_twolayer_unified_v4"
+    brain["render_architecture"] = "remotion_twolayer_karaoke_v4"
     target_brain_p.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # Run full TwoLayer + VoxOverlayLayer pipeline via build_remotion_props_data
@@ -585,6 +586,7 @@ def run_automated_pipeline(
             brain["total_scenes"] = len(beats)
             brain["scenes"] = remotion_manifest.get("scenes", [])
             brain["pipeline_version"] = "vox_twolayer_unified_v4"
+            brain["render_architecture"] = "remotion_twolayer_karaoke_v4"
             try:
                 brain_p.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
             except Exception as be:

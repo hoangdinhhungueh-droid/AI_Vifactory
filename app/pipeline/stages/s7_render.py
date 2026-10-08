@@ -87,9 +87,17 @@ async def run_s7(episode: dict) -> dict:
         try:
             import json as _json
             with open(os.path.join(out_dir, "brain_input.json"), "r", encoding="utf-8") as _bf:
-                render_arch = str(_json.load(_bf).get("render_architecture") or "").strip()
+                _bdata = _json.load(_bf)
+                render_arch = str(_bdata.get("render_architecture") or "").strip()
+                if not render_arch and str(_bdata.get("pipeline_version") or "").startswith("vox_"):
+                    render_arch = "remotion_twolayer_karaoke_v4"
         except Exception:
             pass
+    if not render_arch and (
+        os.path.exists(os.path.join(out_dir, "twolayer_silent.mp4"))
+        or os.path.exists(os.path.join(out_dir, "remotion_props.json"))
+    ):
+        render_arch = "remotion_twolayer_karaoke_v4"
 
     # 3. Render the 16:9 master ONCE (concat+grade+mux, NO subs yet), then
     #    derive 9:16 & 1:1 from it with a blurred-fill (Hotfix v7 speedup).

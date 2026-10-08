@@ -240,6 +240,14 @@ def gate_b6_remotion_props_and_composition():
     assert "fo_type" not in props_code or "fo_type =" in props_code or "fo_type:" in props_code, "build_remotion_props.py must not have undefined fo_type!"
     print("  [PASS] build_remotion_props.py clean of is_vox_build_on early return and undefined fo_type.")
 
+    from scripts.orchestrator.adversarial_director_gate import audit_props_integrity, auto_repair_props
+    test_props = {"scenes": [{"id": "sc01", "foreground": "", "heroSrc": "images/fg_01.png", "transition_out": "paper_slide"}]}
+    clean, defs = audit_props_integrity(test_props, "EN")
+    assert any("PRUNED_FG_HEROSRC_LEAK" in d for d in defs), "adversarial_director_gate must detect PRUNED_FG_HEROSRC_LEAK!"
+    repaired = auto_repair_props(test_props, "EN")
+    assert repaired["scenes"][0].get("heroSrc") == "", "auto_repair_props must clear heroSrc when foreground is empty!"
+    print("  [PASS] adversarial_director_gate detects and repairs PRUNED_FG_HEROSRC_LEAK.")
+
 def gate_b7_b9_render_and_video_qa():
     print_gate("13. B7-B9 Render Engine & Zero-Mock Video QA Gate (Rule 118, 120, 122)")
     with open(os.path.join(PROJECT_ROOT, "app", "services", "video_audit_runner.py"), "r", encoding="utf-8") as f:

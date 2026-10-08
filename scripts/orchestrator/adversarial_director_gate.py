@@ -151,6 +151,11 @@ def audit_props_integrity(props: Dict[str, Any], market: str) -> Tuple[bool, Lis
             if not conn.get("dashed") or not conn.get("uncertain"):
                 defects.append(f"FACT_SAFETY_UNCERTAINTY_VIOLATION in Scene {i:02d}: uncertain narration requires dashed=True and uncertain=True on connection.")
 
+    # 9. Pruned Foreground vs heroSrc Synchronization Audit (Rule 125 Single Truth)
+    for i, s in enumerate(scenes):
+        if "foreground" in s and not s.get("foreground") and (s.get("heroSrc") or s.get("targetHeroSrc")):
+            defects.append(f"PRUNED_FG_HEROSRC_LEAK in Scene {i:02d}: foreground is empty but heroSrc is still populated.")
+
     is_clean = len(defects) == 0
     return is_clean, defects
 
@@ -181,6 +186,9 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
             if s.get("foreground") and not is_evidence_object(s):
                 if h_seen % step != 0 or h_seen >= target_max_humans * step:
                     s["foreground"] = ""
+                    s["heroSrc"] = ""
+                    s["targetHeroSrc"] = ""
+                    s["primary_hero"] = None
                     if isinstance(s.get("layout_zone"), dict):
                         s["layout_zone"]["placement"] = "center_hero_document"
                 h_seen += 1
@@ -196,6 +204,9 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
             if s.get("foreground") and is_evidence_object(s):
                 if e_seen % step != 0 or e_seen >= target_max_evidence * step:
                     s["foreground"] = ""
+                    s["heroSrc"] = ""
+                    s["targetHeroSrc"] = ""
+                    s["primary_hero"] = None
                     if isinstance(s.get("layout_zone"), dict):
                         s["layout_zone"]["placement"] = "center_hero_document"
                 e_seen += 1
@@ -302,6 +313,12 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
             lbl = str(conn.get("label") or "")
             if not lbl.startswith("?"):
                 conn["label"] = f"? {lbl}".strip()
+
+    for s in sanitized:
+        if "foreground" in s and not s.get("foreground"):
+            s["heroSrc"] = ""
+            s["targetHeroSrc"] = ""
+            s["primary_hero"] = None
 
     props["scenes"] = sanitized
     return props

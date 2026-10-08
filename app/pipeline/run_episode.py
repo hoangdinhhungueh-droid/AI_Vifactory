@@ -374,6 +374,8 @@ async def run_pipeline(
         ):
             _render_arch = "remotion_twolayer_karaoke_v4"
             logger.info("[S4.5] auto-detected render_architecture=%s from episode artifacts", _render_arch)
+    if _render_arch:
+        episode["render_architecture"] = _render_arch
     is_two_layer = _render_arch in ("two_layer_v1", "remotion_twolayer_karaoke_v4") or "twolayer" in _render_arch or _render_arch.startswith("two_layer")
     if is_two_layer:
         logger.info("[S4.5] two_layer_v1 detected; ensuring S6 Whisper transcription is ready for Remotion props")

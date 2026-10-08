@@ -2211,7 +2211,7 @@ export const TwoLayerEpisode: React.FC<{
       const bgRaw = s.background || s.backgroundSrc || s.targetBackground;
       const bgSrc = bgRaw ? resolveSrc(bgRaw) : undefined;
 
-      const heroRaw = s.heroSrc || s.foreground || s.primary_hero?.src || s.targetHeroSrc;
+      const heroRaw = (s.foreground !== undefined && s.foreground !== null) ? (s.foreground || undefined) : (s.heroSrc || s.primary_hero?.src || s.targetHeroSrc);
       const heroSrc = heroRaw ? resolveSrc(heroRaw) : undefined;
 
       const fgPos = s.foregroundPosition || (idx % 2 === 0 ? "left" : "right");
