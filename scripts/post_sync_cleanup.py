@@ -37,33 +37,73 @@ PROTECTED_PATTERNS = [
     p.strip() for p in os.getenv("VF_PROTECTED_PATTERNS", "").split(",") if p.strip()
 ]
 
-# INTERMEDIATE FILES TO PURGE POST-PUBLISH (Always keep finals and assets)
+# INTERMEDIATE FILES TO PURGE POST-PUBLISH (Always keep finals, source assets, and audio)
 INTERMEDIATE_FILENAMES = [
     "twolayer_silent.mp4",
+    "twolayer_silent_opus55.mp4",
+    "twolayer_silent_opus55_unremediated_baseline.mp4",
+    "twolayer_silent_effects.mp4",
+    "final_opus55_169.mp4",
+    "final_opus55_169_unremediated_baseline.mp4",
     "final_169_norm.mp4",
     "preview_2min_master.mp4",
     "preview_2min_silent.mp4",
     "preview_2min_tg.mp4",
-    "final_11.mp4",
-    "final_916.mp4",
     "audio_norm.mp3",
     "test_ducked_audio.mp3",
     "test_bgm_mix.mp3",
 ]
 
 EPISODES_DIR = Path("/var/vf/episodes")
-ARCHIVE_DIR = EPISODES_DIR / "_archive"
+ARCHIVE_SEARCH_DIRS = [
+    EPISODES_DIR / "_archive",
+    Path("/var/vf/archive"),
+    Path("/var/vf/benchmark"),
+]
 
 
 def is_protected(ep_name: str) -> bool:
-    """Check if an episode name matches protected active patterns."""
-    import re
-    if re.match(r"^[A-Z]{2}_EP\d{4}_[a-z0-9_]+$", ep_name):
-        if not (ep_name.startswith(("_dead_", "TEST_", "test_")) or "_TEMP_" in ep_name):
-            return True
+    """Check if an episode is active or protected from cleanup."""
     for pattern in PROTECTED_PATTERNS:
         if pattern and pattern.lower() in ep_name.lower():
             return True
+
+    # 1. Check if episode is actively referenced in running processes
+    try:
+        import subprocess
+        res = subprocess.run(
+            ["pgrep", "-f", ep_name],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True
+        )
+        if res.stdout.strip():
+            return True
+    except Exception:
+        pass
+
+    # 2. Check lock files for active PID
+    for lk_path in [
+        Path(f"/var/vf/locks/{ep_name}.lock"),
+        Path(f"/var/vf/locks/{ep_name}.b3b4.lock"),
+        Path(f"/tmp/vf_render_{ep_name}.lock"),
+    ]:
+        if lk_path.exists():
+            try:
+                pid_str = lk_path.read_text().strip()
+                if pid_str.isdigit() and int(pid_str) > 0:
+                    os.kill(int(pid_str), 0)
+                    return True  # Active PID holds lock
+            except (OSError, ValueError):
+                pass
+
+    # 3. If final_169.mp4 does not exist, episode is NOT complete -> protect it!
+    ep_path = EPISODES_DIR / ep_name
+    if not ep_path.exists():
+        ep_path = Path("episodes") / ep_name
+    if ep_path.exists() and not (ep_path / "final_169.mp4").exists():
+        return True
+
     return False
 
 
@@ -153,7 +193,7 @@ def cleanup_completed_episodes_intermediates(dry_run: bool = False) -> int:
     for ep_folder in sorted(EPISODES_DIR.iterdir()):
         if ep_folder.is_dir() and not ep_folder.name.startswith("."):
             if is_protected(ep_folder.name):
-                logger.info(f"Preserving active episode: {ep_folder.name}")
+                logger.info(f"Preserving active/unrendered episode: {ep_folder.name}")
                 continue
             # Only clean if final_169.mp4 exists (proving render was completed)
             if (ep_folder / "final_169.mp4").exists():
@@ -164,38 +204,39 @@ def cleanup_completed_episodes_intermediates(dry_run: bool = False) -> int:
 
 
 def cleanup_old_archives(days_ttl: int = 7, dry_run: bool = False) -> int:
-    """Remove archive/test directories older than days_ttl in _archive and _dead_*."""
+    """Remove archive/test directories older than days_ttl across all archive locations."""
     total_freed = 0
     now = time.time()
     cutoff = now - (days_ttl * 86400)
 
-    # 1. Clean /var/vf/episodes/_archive
-    if ARCHIVE_DIR.exists():
-        for item in list(ARCHIVE_DIR.iterdir()):
+    for arch_base in ARCHIVE_SEARCH_DIRS:
+        if not arch_base.exists():
+            continue
+        for item in list(arch_base.iterdir()):
             if is_protected(item.name):
                 continue
             try:
                 mtime = item.stat().st_mtime
                 if mtime < cutoff:
-                    size = sum(f.stat().st_size for f in item.glob("**/*") if f.is_file())
+                    size = sum(f.stat().st_size for f in item.glob("**/*") if f.is_file()) if item.is_dir() else item.stat().st_size
                     if not dry_run:
                         if item.is_dir():
                             shutil.rmtree(item, ignore_errors=True)
                         else:
                             item.unlink()
-                        logger.info(f"Purged archive item: {item.name} ({size / (1024*1024):.2f} MB)")
+                        logger.info(f"Purged archive item: {arch_base.name}/{item.name} ({size / (1024*1024):.2f} MB)")
                     else:
-                        logger.info(f"[DRY-RUN] Would purge archive item: {item.name} ({size / (1024*1024):.2f} MB)")
+                        logger.info(f"[DRY-RUN] Would purge archive item: {arch_base.name}/{item.name} ({size / (1024*1024):.2f} MB)")
                     total_freed += size
             except Exception as e:
                 logger.warning(f"Error checking archive item {item}: {e}")
 
-    # 2. Clean dead test folders in /var/vf/episodes
+    # Clean dead test folders in /var/vf/episodes
     if EPISODES_DIR.exists():
         for item in list(EPISODES_DIR.iterdir()):
             if is_protected(item.name):
                 continue
-            if item.name.startswith("_dead_") or item.name == "en-enron-ep000" or item.name == "test_run":
+            if item.name.startswith("_dead_") or item.name in ("en-enron-ep000", "test_run"):
                 try:
                     size = sum(f.stat().st_size for f in item.glob("**/*") if f.is_file())
                     if not dry_run:
@@ -214,18 +255,33 @@ def cleanup_old_archives(days_ttl: int = 7, dry_run: bool = False) -> int:
 
 
 def cleanup_orphaned_tmp_renders(dry_run: bool = False) -> int:
-    """Clean unheld /tmp/react-motion-render* folders older than 12 hours."""
+    """Clean unheld /tmp/react-motion-render* folders and orphaned test files."""
     tmp_path = Path("/tmp")
     now = time.time()
     total_freed = 0
 
+    # 1. Clean react-motion-render* folders older than 4 hours
     for item in tmp_path.glob("react-motion-render*"):
         if not item.is_dir():
             continue
         try:
             mtime = item.stat().st_mtime
             age_hours = (now - mtime) / 3600
-            if age_hours > 12:
+            if age_hours > 4:
+                # Extra check: make sure no process holds files in this directory
+                try:
+                    import subprocess
+                    fuser_res = subprocess.run(
+                        ["fuser", str(item)],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                    if fuser_res.returncode == 0:
+                        logger.info(f"Skipping active tmp render {item.name} (in use by process)")
+                        continue
+                except Exception:
+                    pass
+
                 size = sum(f.stat().st_size for f in item.glob("**/*") if f.is_file())
                 if not dry_run:
                     shutil.rmtree(item, ignore_errors=True)
@@ -236,7 +292,44 @@ def cleanup_orphaned_tmp_renders(dry_run: bool = False) -> int:
         except Exception as e:
             logger.warning(f"Error checking tmp render {item}: {e}")
 
+    # 2. Clean scratch test frames in /tmp
+    for pattern in ["test_frame_*.png", "qa_frame_*.png", "test_showcase_*.mp4"]:
+        for t_file in tmp_path.glob(pattern):
+            if t_file.is_file():
+                try:
+                    size = t_file.stat().st_size
+                    if not dry_run:
+                        t_file.unlink()
+                        logger.info(f"Purged tmp test file: {t_file.name} ({size / (1024*1024):.2f} MB)")
+                    else:
+                        logger.info(f"[DRY-RUN] Would purge tmp test file: {t_file.name} ({size / (1024*1024):.2f} MB)")
+                    total_freed += size
+                except Exception as e:
+                    logger.warning(f"Error checking tmp file {t_file}: {e}")
+
     return total_freed
+
+
+def cleanup_remotion_build(dry_run: bool = False) -> int:
+    """Purge obsolete remotion/build directory if older than 24 hours."""
+    build_dir = Path("/root/video_factory/remotion/build")
+    if not build_dir.exists() or not build_dir.is_dir():
+        return 0
+    now = time.time()
+    try:
+        mtime = build_dir.stat().st_mtime
+        age_hours = (now - mtime) / 3600
+        if age_hours > 24:
+            size = sum(f.stat().st_size for f in build_dir.glob("**/*") if f.is_file())
+            if not dry_run:
+                shutil.rmtree(build_dir, ignore_errors=True)
+                logger.info(f"Purged obsolete remotion/build: ({size / (1024*1024):.2f} MB)")
+            else:
+                logger.info(f"[DRY-RUN] Would purge obsolete remotion/build: ({size / (1024*1024):.2f} MB)")
+            return size
+    except Exception as e:
+        logger.warning(f"Error checking remotion/build: {e}")
+    return 0
 
 
 def cleanup_expired_r2(ttl_days: int = 2, dry_run: bool = False) -> bool:
@@ -255,7 +348,7 @@ def cleanup_expired_r2(ttl_days: int = 2, dry_run: bool = False) -> bool:
 def run_full_maintenance(dry_run: bool = False, r2_ttl_days: int = 2) -> Dict[str, Any]:
     """Execute full routine cleanup across VPS disk, tmp folders, and Cloudflare R2."""
     logger.info("=== STARTING FULL POST-SYNC & SYSTEM MAINTENANCE CLEANUP ===")
-    
+
     # 1. Clean completed episode intermediates
     freed_ep = cleanup_completed_episodes_intermediates(dry_run=dry_run)
     logger.info(f"Episode intermediates freed: {freed_ep / (1024*1024):.2f} MB")
@@ -264,14 +357,18 @@ def run_full_maintenance(dry_run: bool = False, r2_ttl_days: int = 2) -> Dict[st
     freed_arch = cleanup_old_archives(days_ttl=7, dry_run=dry_run)
     logger.info(f"Old archives freed: {freed_arch / (1024*1024):.2f} MB")
 
-    # 3. Clean orphaned tmp renders (>12 hours)
+    # 3. Clean orphaned tmp renders and test files (>4 hours, unheld)
     freed_tmp = cleanup_orphaned_tmp_renders(dry_run=dry_run)
     logger.info(f"Orphaned tmp renders freed: {freed_tmp / (1024*1024):.2f} MB")
 
-    # 4. Clean expired R2 assets
+    # 4. Clean obsolete remotion build directory (>24 hours)
+    freed_build = cleanup_remotion_build(dry_run=dry_run)
+    logger.info(f"Remotion build cache freed: {freed_build / (1024*1024):.2f} MB")
+
+    # 5. Clean expired R2 assets
     r2_success = cleanup_expired_r2(ttl_days=r2_ttl_days, dry_run=dry_run)
 
-    total_freed_mb = round((freed_ep + freed_arch + freed_tmp) / (1024 * 1024), 2)
+    total_freed_mb = round((freed_ep + freed_arch + freed_tmp + freed_build) / (1024 * 1024), 2)
     logger.info(f"=== MAINTENANCE COMPLETE: Total VPS Disk Space Freed: {total_freed_mb} MB | R2 Sweep: {'PASS' if r2_success else 'FAIL'} ===")
 
     return {
@@ -280,6 +377,7 @@ def run_full_maintenance(dry_run: bool = False, r2_ttl_days: int = 2) -> Dict[st
         "episodes_freed_mb": round(freed_ep / (1024 * 1024), 2),
         "archive_freed_mb": round(freed_arch / (1024 * 1024), 2),
         "tmp_freed_mb": round(freed_tmp / (1024 * 1024), 2),
+        "build_freed_mb": round(freed_build / (1024 * 1024), 2),
         "r2_success": r2_success
     }
 

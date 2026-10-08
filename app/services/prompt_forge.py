@@ -2297,8 +2297,35 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
     except Exception as e:
         logger.warning(f"[prompt_forge] Error cleaning old prompts: {e}")
 
+    # Extract dictionaries with robust fallback to 'scenes' array
+    bgs_dict = dict(prompts_data.get("backgrounds", {})) if isinstance(prompts_data, dict) else {}
+    fgs_dict = dict(prompts_data.get("foregrounds", {})) if isinstance(prompts_data, dict) else {}
+    vox_dict = dict(prompts_data.get("vox_collages", {})) if isinstance(prompts_data, dict) else {}
+
+    scenes_list = []
+    if isinstance(prompts_data, dict):
+        scenes_list = prompts_data.get("scenes", [])
+    elif isinstance(prompts_data, list):
+        scenes_list = prompts_data
+
+    if scenes_list:
+        for sc in scenes_list:
+            if not isinstance(sc, dict):
+                continue
+            bg_k = sc.get("bg_key") or f"bg_{sc.get('beat_index', 0):02d}"
+            bg_p = sc.get("bg_prompt")
+            fg_k = sc.get("fg_key") or f"fg_{sc.get('beat_index', 0):02d}"
+            fg_p = sc.get("fg_prompt")
+            tactile_p = sc.get("tactile_prompt") or sc.get("image_prompt")
+            if bg_k and bg_p and bg_k not in bgs_dict:
+                bgs_dict[bg_k] = bg_p
+            if fg_k and fg_p and fg_k not in fgs_dict:
+                fgs_dict[fg_k] = fg_p
+            if bg_k and tactile_p and bg_k not in vox_dict:
+                vox_dict[bg_k] = tactile_p
+
     # 1. Backgrounds
-    for bg_key, prompt in prompts_data.get("backgrounds", {}).items():
+    for bg_key, prompt in bgs_dict.items():
         prompt_str = prompt if isinstance(prompt, str) else prompt.get("prompt", str(prompt))
         bg_props = {
             "Title": {"title": [{"text": {"content": f"[{episode_id}] {bg_key} (BG 16:9)"}}]},
@@ -2317,9 +2344,9 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
             logger.warning(f"[prompt_forge] Exception pushing BG prompt {bg_key}: {e}")
 
     # 1b. VOX Collages (16:9 Tactile Documentary)
-    for vox_key, prompt in prompts_data.get("vox_collages", {}).items():
+    for vox_key, prompt in vox_dict.items():
         prompt_str = prompt if isinstance(prompt, str) else prompt.get("prompt", str(prompt))
-        tier = prompts_data.get("animation_tiers", {}).get(vox_key, "TACTILE_STOPMOTION_STILL")
+        tier = (prompts_data.get("animation_tiers", {}) if isinstance(prompts_data, dict) else {}).get(vox_key, "TACTILE_STOPMOTION_STILL")
         vox_props = {
             "Title": {"title": [{"text": {"content": f"[{episode_id}] {vox_key} (VOX Collage 16:9)"}}]},
             "prompt_text": {"rich_text": [{"text": {"content": prompt_str[:2000]}}]},
@@ -2337,7 +2364,7 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
             logger.warning(f"[prompt_forge] Exception pushing VOX Collage prompt {vox_key}: {e}")
 
     # 2. Foregrounds
-    for fg_key, prompt in prompts_data.get("foregrounds", {}).items():
+    for fg_key, prompt in fgs_dict.items():
         prompt_str = prompt if isinstance(prompt, str) else prompt.get("prompt", str(prompt))
         fg_props = {
             "Title": {"title": [{"text": {"content": f"[{episode_id}] {fg_key} (FG 1:1 #FF00FF)"}}]},

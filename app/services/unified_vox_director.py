@@ -1140,6 +1140,10 @@ def extract_dynamic_visual_roster(
                 "   B. Tactile Evidence Props, Documents & Charts (14 to 18 items): 'type': 'evidence_prop' | 'document' | 'data_metric'. High-impact, topic-specific evidentiary artifacts. ZERO human figures or attire in evidence prop descriptions. Keys: 'fg_evidence_<object_name>'.\n"
                 "   C. DOMAIN & LEGAL ACCURACY LOCK: Match the exact legal/institutional domain of the topic (e.g., Chapter 11 civil bankruptcy vs. regulatory antitrust vs. sovereign macro debt). NEVER inject criminal prosecution artifacts ('indictment', 'wire fraud', 'search warrant', 'prosecutor') into civil, bankruptcy, or administrative proceedings.\n"
                 "   - Schema: {\"title\": \"...\", \"description\": \"...\", \"role\": \"...\", \"beats\": [1, 2, 3], \"keywords\": [\"kw1\", \"kw2\"], \"type\": \"character\"|\"document\"|\"evidence_prop\"|\"data_metric\"}\n\n"
+                "3. 'paper_stock_library': You have access to the VOX PAPER MATERIALS LIBRARY: 'aged_newsprint', 'bleached_newsprint', 'manila_docket', 'vintage_kraft', 'vellum_tracing', 'cotton_parchment'. You may assign an appropriate paper stock to background scene mood.\n"
+                "4. ETHICAL REPRESENTATION SHIELD MANDATES (STRICT NON-NEGOTIABLE):\n"
+                "   A. CHILD REPRESENTATION LAW: If the narrative or topic references minors, children, or students: NEVER depict a child's face or body. ALWAYS translate them into a Symbolic Evidence Artifact: an empty playground swing swaying mid-motion, a small pair of canvas shoes by a doorway, a height growth chart on a doorframe, a school backpack left on concrete steps, or a blank silhouette cutout with torn edges.\n"
+                "   B. REAL-PERSON ANONYMITY LAW: For real named public/historical figures, ALWAYS specify a solid black censor bar across the eyes and non-photorealistic 2D graphic novel illustration styling.\n\n"
                 "Output ONLY valid JSON matching:\n"
                 "{\n"
                 "  \"background_roster\": { \"<bg_key>\": { \"title\": \"...\", \"description\": \"...\", \"beats\": [...] } },\n"
@@ -1202,6 +1206,18 @@ def extract_dynamic_visual_roster(
     if not bg_roster or not fg_roster:
         bg_roster, fg_roster = _generate_topic_anchored_roster_fallback(topic_str, m_up, key_metrics, claims)
 
+    # Master Representation Shield Gate: Audit Child & Real-Person rules BEFORE B3
+    try:
+        from app.services.representation_shield import shield_visual_roster
+        bg_roster, fg_roster = shield_visual_roster(
+            bg_roster=bg_roster,
+            fg_roster=fg_roster,
+            story_text=story_text,
+            market=m_up
+        )
+    except Exception as ex_shield:
+        logger.warning(f"[unified_vox_director] Shield gate execution warning: {ex_shield}")
+
     return bg_roster, fg_roster
 
 
@@ -1209,21 +1225,35 @@ def extract_dynamic_visual_roster(
 # DYNAMIC HERO CADENCE & SPATIAL PHYSICS (RULE 128)
 # ============================================================================
 
-def select_dynamic_hero_indices(spoken_sentences: List[Dict[str, Any]]) -> List[int]:
-    """Rule 128 & User Mandate: Tuyển chọn các cảnh Hero AI Video (VEO) hoàn toàn động dựa trên nhịp điệu kể chuyện (cadence).
-    - Tần suất trung bình - cao: Khoảng 12% - 18% tổng số cảnh (trung bình 5-7 cảnh có 1 cảnh Hero).
-    - Cảnh mở màn (Scene 0) luôn là Hero (Cold Strike / Paradox Hook).
-    - Điểm chuyển giao Beat (Beat transitions: cảnh đầu mỗi Beat).
-    - Cảnh chốt hạ / Đỉnh điểm pháp lý (Climax / Resolution).
-    - Các khoảnh khắc bằng chứng / dữ liệu pháp y trọng yếu (high-stakes catalyst metrics & evidence).
-    - Khoảng cách tối thiểu giữa 2 Hero clips là >= 3 cảnh để tránh dồn ứ, và không vượt quá 8 cảnh để giữ nhịp kịch tính.
-    - CẤM hardcode danh sách chỉ số hay số lượng chết.
+def select_dynamic_hero_indices(
+    spoken_sentences: List[Dict[str, Any]],
+    video_budget_mode: Optional[str] = None
+) -> List[int]:
+    """Rule 128 & User Mandate: Tuyển chọn các cảnh Hero AI Video (VEO / Omni) hoàn toàn động dựa trên nhịp điệu kể chuyện (cadence).
+    Hỗ trợ 3 chế độ ngân sách trên 6 tài khoản Gmail:
+    - 'standard_18': Tối đa 18 clips (6 acc x 3 clips Veo Quality, min_dist=3).
+    - 'low_token_36': Tối đa 36 clips (6 acc x 6 clips Veo Fast / Low-Token, ~216s AI Video, min_dist=2).
+    - 'omni_48': Tối đa 48 clips (6 acc x 8 clips Omni Flash / Low-Token, ~288s AI Video, min_dist=2).
     """
     total = len(spoken_sentences)
     if total == 0:
         return []
     if total <= 3:
         return [0]
+
+    mode = (video_budget_mode or os.getenv("VF_VIDEO_BUDGET_MODE", "standard_18")).lower().strip()
+    if mode == "omni_48":
+        max_cap = 48
+        min_dist = 2
+        max_gap = 4
+    elif mode in ("low_token_36", "veo_fast_36", "veo_fast"):
+        max_cap = 36
+        min_dist = 2
+        max_gap = 5
+    else:
+        max_cap = 18
+        min_dist = 3
+        max_gap = 8
 
     # Nhận diện điểm khởi đầu các Beat
     beat_first_indices = {}
@@ -1257,41 +1287,39 @@ def select_dynamic_hero_indices(spoken_sentences: List[Dict[str, Any]]) -> List[
         text = (sent.get("text") or "").lower()
         dist = idx - last_hero
 
-        if dist < 3:
+        if dist < min_dist:
             continue
 
         is_beat_start = any(idx == b_idx for b_idx in beat_first_indices.values())
         is_climax_or_end = (idx == total - 1) or (idx >= total - 3 and any(w in text for w in ["gavel", "verdict", "judge", "court", "warning", "lesson", "búa", "kết luận", "판결", "判決"]))
         has_catalyst = any(kw in text for kw in catalyst_keywords)
 
-        if dist >= 8:
+        if dist >= max_gap:
             selected.append(idx)
             last_hero = idx
-        elif is_beat_start and dist >= 4:
+        elif is_beat_start and dist >= max(min_dist, 3 if max_cap == 18 else 2):
             selected.append(idx)
             last_hero = idx
-        elif is_climax_or_end and dist >= 3:
+        elif is_climax_or_end and dist >= min_dist:
             selected.append(idx)
             last_hero = idx
-        elif has_catalyst and dist >= 5:
+        elif has_catalyst and dist >= (5 if max_cap == 18 else 2):
             selected.append(idx)
             last_hero = idx
 
-    # Rule 128 & User Mandate: Cap to maximum 18 hero clips for long-form episodes (12-14 mins)
-    # to enforce mathematical budget of 6 accounts x 3 clips = 18 clips.
-    if len(selected) > 18:
+    if len(selected) > max_cap:
         mandatory = {0, selected[-1]}
         for b_idx in beat_first_indices.values():
             if b_idx in selected:
                 mandatory.add(b_idx)
         remaining = [x for x in selected if x not in mandatory]
-        needed = 18 - len(mandatory)
+        needed = max_cap - len(mandatory)
         if needed > 0 and remaining:
             step = len(remaining) / needed
             picked = [remaining[int(i * step)] for i in range(needed)]
             selected = sorted(list(mandatory.union(picked)))
         else:
-            selected = sorted(list(mandatory))[:18]
+            selected = sorted(list(mandatory))[:max_cap]
 
     return selected
 
@@ -1410,6 +1438,41 @@ def get_action_description(action_type: str, seed_title: str, narration: str) ->
             return "resting on dark mahogany desk under dramatic directional studio keylight with 12fps documentary tracking motion"
     else:
         return "resting on table with subtle 12fps micro-jitter in steady documentary tracking"
+
+
+def inject_speech_timestamp_cue(sentence_obj: Dict[str, Any], dur_sec: float) -> str:
+    """Trích xuất mốc giây từ khóa hành động/con số trong câu thoại để nhúng vào Video Prompt (Speech-Locked Timestamp Cue)."""
+    if not isinstance(sentence_obj, dict):
+        return ""
+    text = (sentence_obj.get("text") or "").strip()
+    if not text:
+        return ""
+
+    words_arr = sentence_obj.get("words") or []
+    start_base = float(sentence_obj.get("start_sec") or sentence_obj.get("start") or 0.0)
+
+    # 1. Nếu có word-level timestamps từ Whisper / Edge-TTS
+    if isinstance(words_arr, list) and words_arr:
+        for w_item in words_arr:
+            if not isinstance(w_item, dict):
+                continue
+            w_txt = str(w_item.get("word") or w_item.get("text") or "").strip()
+            if re.search(r"(\d+|%|billion|million|trillion|collapse|open|slam|drop|crash|tear|stamp|verdict|secret|leak)", w_txt, re.I):
+                w_start = float(w_item.get("start") or w_item.get("start_sec") or start_base)
+                rel_sec = max(0.4, min(round(w_start - start_base, 1), max(1.0, round(dur_sec - 0.8, 1))))
+                clean_w = re.sub(r"[^\w$%.-]", "", w_txt)
+                return f"At {rel_sec:.1f}s when narration hits '{clean_w}', trigger primary cutout snap and focus rack."
+
+    # 2. Ước lượng vị trí từ khóa theo vị trí từ trong câu (2.5 words/sec)
+    tokens = text.split()
+    for idx, tok in enumerate(tokens):
+        if re.search(r"(\d+|%|billion|million|trillion|collapse|open|slam|drop|crash|tear|stamp|verdict|secret|leak|tỷ|triệu)", tok, re.I):
+            rel_sec = max(0.5, min(round((idx / max(1, len(tokens))) * dur_sec, 1), max(1.0, round(dur_sec - 0.8, 1))))
+            clean_w = re.sub(r"[^\w$%.-]", "", tok)
+            return f"At {rel_sec:.1f}s when narration hits '{clean_w}', trigger primary cutout snap and focus rack."
+
+    mid_sec = round(dur_sec * 0.45, 1)
+    return f"At {mid_sec:.1f}s mid-sentence beat, trigger primary layer snap and focus rack."
 
 
 def generate_tactile_physics_prompt(scene_idx: int, narration: str, action_type: str, seed_title: str) -> str:

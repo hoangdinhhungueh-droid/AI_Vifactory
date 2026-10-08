@@ -45,7 +45,27 @@ def _lock_path(episode_id):
 
 
 def already_dispatched(episode_id):
-    return _lock_path(episode_id).exists()
+    lock = _lock_path(episode_id)
+    if not lock.exists():
+        return False
+    # Check if PID in lock is actively running
+    try:
+        pid_str = lock.read_text().strip()
+        if pid_str.isdigit():
+            pid = int(pid_str)
+            if pid > 0:
+                os.kill(pid, 0)
+                return True  # Active process holds the lock
+    except (OSError, ValueError):
+        pass
+
+    # Stale lock from dead process -> purge lock and allow dispatch
+    try:
+        lock.unlink(missing_ok=True)
+        _log("%s: cleared stale lock %s" % (episode_id, lock))
+    except Exception:
+        pass
+    return False
 
 
 def spawn_b4_generation(episode_id):
@@ -57,8 +77,14 @@ def spawn_b4_generation(episode_id):
     try:
         fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
-        _log("%s: lock already held, skipping (already running or done)" % episode_id)
-        return False
+        # Check if held lock is stale
+        if already_dispatched(episode_id):
+            _log("%s: lock already held by active process, skipping" % episode_id)
+            return False
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except Exception:
+            return False
     
     log_path = LOG_DIR / ("%s_b4.log" % episode_id)
     try:
@@ -107,9 +133,11 @@ def main():
         if not prompts_forge.exists():
             continue
         
-        # Skip if images/ directory already exists (B4 already started)
+        # Skip if images/ directory already exists AND has generated images
         if images_dir.exists():
-            continue
+            img_count = len(list(images_dir.glob("*.png")) + list(images_dir.glob("*.jpg")))
+            if img_count > 0:
+                continue
         
         # Skip if already dispatched
         if already_dispatched(episode_id):

@@ -1726,7 +1726,7 @@ def build_remotion_props_data(
         print("WARNING: missing local images for reuse keys: %s" % sorted(set(missing)), file=sys.stderr)
     if not scenes_out:
         print("ERROR: no scenes produced (brain_input has no usable scenes, or all were skipped)", file=sys.stderr)
-        sys.exit(1)
+        return {}
 
     # Proportional scaling to match narration audio if video duration is shorter than audio
     audio_path = os.path.join(os.path.dirname(brain_input_path), "tts_out.mp3")

@@ -112,16 +112,21 @@ def run_automated_pipeline(
     mode: str = "remotion",
     auto: bool = True,
     dry_run: bool = False,
-    out_dir: str | None = None
+    out_dir: str | None = None,
+    animation_duration_sec: int = 10,
+    video_engine_mode: str = "flow_veo_fast",
+    video_budget_mode: str = "low_token_36"
 ) -> dict:
     market = validate_market_supported(market)
+    os.environ["VF_VIDEO_BUDGET_MODE"] = video_budget_mode
     logger.info("=" * 70)
     logger.info("🎬 STARTING AUTONOMOUS VOX VIDEO FACTORY PIPELINE")
     logger.info(f"   Task ID: {task_id or 'N/A'} | Topic: {topic or 'N/A'}")
     logger.info(f"   Target Duration: {duration_sec}s | Market: {market} | Mode: {mode}")
+    logger.info(f"   Animation Duration Preset: {animation_duration_sec}s | Video Engine: {video_engine_mode} ({video_budget_mode})")
     logger.info("=" * 70)
 
-    director = VoxAutomatedDirector(market=market, fps=30)
+    director = VoxAutomatedDirector(market=market, fps=30, animation_duration_sec=animation_duration_sec)
 
     # 1. Resolve Target Paths & Task Metadata
     ep_id = task_id or episode_id
@@ -365,13 +370,32 @@ def run_automated_pipeline(
     with open(target_out / "prompts_manifest.json", "w", encoding="utf-8") as f:
         json.dump(prompts_manifest, f, indent=2, ensure_ascii=False)
 
-    bulk_prompts_txt = "\n\n".join(p["image_prompt"] for p in prompts_manifest)
+    bulk_prompts_txt = VoxAutomatedDirector.format_textify_bulk_prompts(prompts_manifest)
     (target_out / "bulk_image_prompts.txt").write_text(bulk_prompts_txt, encoding="utf-8")
+    (target_out / f"{slug}_bulk_prompts.txt").write_text(bulk_prompts_txt, encoding="utf-8")
+
+    # 7b. Forge Paper Diorama Video Prompts (CL3 3-Block + 5-Beat Shot Formula)
+    logger.info(f"🎞️ [6b/7] Forging Paper Diorama 3-Block Video Prompts ({video_engine_mode})...")
+    diorama_video_prompts = director.build_diorama_video_prompts(
+        beats=beats,
+        video_engine_mode=video_engine_mode
+    )
+    with open(target_out / "diorama_video_prompts.json", "w", encoding="utf-8") as f:
+        json.dump(diorama_video_prompts, f, indent=2, ensure_ascii=False)
+
+    bulk_video_txt = VoxAutomatedDirector.format_textify_bulk_prompts(diorama_video_prompts)
+    (target_out / "bulk_video_prompts.txt").write_text(bulk_video_txt, encoding="utf-8")
+    (target_out / f"{slug}_video_prompts.txt").write_text(bulk_video_txt, encoding="utf-8")
+
+    video_prompts_by_beat = {vp["beat_index"]: vp for vp in diorama_video_prompts}
 
     # Dual-layer prompts for Remotion Stage
     prompts_forge = {
         "episode_id": ep_id,
         "theme": resolved_theme,
+        "video_engine_mode": video_engine_mode,
+        "video_budget_mode": video_budget_mode,
+        "style_reference_sheet": "config/prompts/vox_master_style_sheet.png",
         "total_scenes": len(beats),
         "total_backgrounds": len(getattr(director, "last_sanitized_bgs", {})),
         "total_foregrounds": len(getattr(director, "last_sanitized_fgs", {})),
@@ -388,7 +412,9 @@ def run_automated_pipeline(
                 "heroLabel": b.get("heroLabel", f"SUBJECT #{b['beat_index']:02d}"),
                 "fg_prompt": b["fg_prompt"],
                 "bg_prompt": b["bg_prompt"],
-                "tactile_prompt": b["image_prompt"]
+                "tactile_prompt": b["image_prompt"],
+                "video_prompt": video_prompts_by_beat.get(b["beat_index"], {}).get("video_prompt", ""),
+                "diorama_style_block": video_prompts_by_beat.get(b["beat_index"], {}).get("style_block_type", "FLAT_PARALLAX")
             }
             for b in prompts_manifest
         ]
@@ -404,7 +430,8 @@ def run_automated_pipeline(
         beats=beats,
         theme=resolved_theme,
         topic=resolved_topic,
-        episode_id=ep_id
+        episode_id=ep_id,
+        video_engine_mode=video_engine_mode
     )
     # Recalibrate totalFrames to match actual audio duration exactly
     total_frames = int(effective_duration * director.fps)
@@ -442,9 +469,9 @@ def run_automated_pipeline(
             brain_input_path=str(target_brain_p),
             segments_path=str(spoken_sent_path),
             fps=director.fps,
-            skip_missing=True
+            skip_missing=False
         )
-        if unified_props and isinstance(unified_props, dict):
+        if unified_props and isinstance(unified_props, dict) and unified_props.get("scenes"):
             remotion_manifest = unified_props
             remotion_manifest["totalFrames"] = total_frames
             logger.info("✅ Full TwoLayer + VoxOverlayLayer Remotion props successfully built.")
@@ -472,6 +499,7 @@ def run_automated_pipeline(
     prompts_forge["total_foregrounds"] = len(foregrounds_dict)
     prompts_forge["backgrounds"] = backgrounds_dict
     prompts_forge["foregrounds"] = foregrounds_dict
+    prompts_forge["video_prompts"] = {f"video_{vp['beat_index']:02d}": vp["video_prompt"] for vp in diorama_video_prompts}
     prompts_forge["thumbnails"] = thumbnails_dict
 
     with open(target_out / "prompts_forge.json", "w", encoding="utf-8") as f:
@@ -493,6 +521,9 @@ def run_automated_pipeline(
         "actor_prop_invariant_enforced": True,
         "flat_magenta_chroma_enforced": True,
         "rule122_negative_prompts_enforced": True,
+        "diorama_3_block_video_prompts_enforced": True,
+        "video_engine_mode": video_engine_mode,
+        "video_budget_mode": video_budget_mode,
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
     }
     with open(target_out / "visual_convergence_audit.json", "w", encoding="utf-8") as f:
@@ -508,9 +539,10 @@ def run_automated_pipeline(
         files_to_sync = [
             "story.txt", "spoken_script.txt", "spoken_sentences.json",
             "beats.json", "prompts_manifest.json", "prompts_forge.json",
-            "prompts.json", "bulk_image_prompts.txt", "remotion_props.json",
-            "director_plan.json", "vox_scene_manifest.json", "thumbnail_prompts.txt",
-            "visual_convergence_audit.json"
+            "prompts.json", "bulk_image_prompts.txt", f"{slug}_bulk_prompts.txt",
+            "diorama_video_prompts.json", "bulk_video_prompts.txt", f"{slug}_video_prompts.txt",
+            "remotion_props.json", "director_plan.json", "vox_scene_manifest.json",
+            "thumbnail_prompts.txt", "visual_convergence_audit.json"
         ]
         if not dry_run and audio_out_path.exists():
             files_to_sync.extend(["tts_out.mp3", "subtitles.srt"])
@@ -565,6 +597,8 @@ def run_automated_pipeline(
         "niche": resolved_niche,
         "theme": resolved_theme,
         "mode": mode,
+        "videoEngineMode": video_engine_mode,
+        "videoBudgetMode": video_budget_mode,
         "durationSec": round(effective_duration, 2),
         "wordCount": dna_audit["word_count"],
         "dnaScore": dna_audit["score"],
@@ -582,6 +616,10 @@ def run_automated_pipeline(
             "prompts_manifest.json",
             "prompts_forge.json",
             "bulk_image_prompts.txt",
+            f"{slug}_bulk_prompts.txt",
+            "diorama_video_prompts.json",
+            "bulk_video_prompts.txt",
+            f"{slug}_video_prompts.txt",
             "remotion_props.json",
             "director_plan.json",
             "thumbnail_prompts.txt"
@@ -604,6 +642,10 @@ def main():
     parser.add_argument("--task-id", type=str, default=None, help="Target Episode Task ID")
     parser.add_argument("--topic", type=str, default=None, help="Episode topic")
     parser.add_argument("--duration", type=int, default=180, help="Target duration in seconds")
+    parser.add_argument("--animation-duration", type=int, default=10, choices=[6, 10], help="Animation duration preset in seconds (6s or 10s)")
+    parser.add_argument("--video-engine", type=str, default="flow_veo_fast", choices=["flow_veo_fast", "omni_flash", "seedance_2_fast", "remotion_native"], help="AI Video / Diorama engine mode")
+    parser.add_argument("--video-budget-mode", type=str, default="low_token_36", choices=["standard_18", "low_token_36", "omni_48"], help="6-Gmail-Account Video Budget Allocation Mode")
+    parser.add_argument("--generate-ideas", action="store_true", help="Generate 10 documentary video ideas for niche/topic and exit")
     parser.add_argument("--market", type=str, default="EN", help="Target market (EN, JP, KR)")
     parser.add_argument("--theme", type=str, default=None, help="Theme preset override")
     parser.add_argument("--niche", type=str, default=None, help="Niche override")
@@ -614,6 +656,18 @@ def main():
     parser.add_argument("--out-dir", type=str, default=None, help="Custom output directory")
 
     args = parser.parse_args()
+
+    if args.generate_ideas:
+        director = VoxAutomatedDirector(market=args.market, fps=30)
+        niche = args.niche or (director.classify_niche(args.topic) if args.topic else "crime_documentary")
+        ideas = director.generate_ideas(niche=niche, count=10, topic_hint=args.topic or "")
+        print(f"\n🎬 10 DOCUMENTARY VIDEO IDEAS [NICHE: {niche.upper()}]:")
+        print("=" * 70)
+        for i, idea in enumerate(ideas, 1):
+            print(f"{i}. {idea['title']}")
+            print(f"   Hook: {idea['hook']}\n")
+        print("=" * 70)
+        return
 
     res = run_automated_pipeline(
         topic=args.topic,
@@ -626,7 +680,10 @@ def main():
         mode=args.mode,
         auto=args.auto,
         dry_run=args.dry_run,
-        out_dir=args.out_dir
+        out_dir=args.out_dir,
+        animation_duration_sec=args.animation_duration,
+        video_engine_mode=args.video_engine,
+        video_budget_mode=args.video_budget_mode
     )
     print(json.dumps(res, indent=2, ensure_ascii=False))
 
