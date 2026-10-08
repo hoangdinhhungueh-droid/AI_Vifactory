@@ -278,6 +278,7 @@ def deduplicate_phrase_stutter(text: str) -> str:
     cleaned = re.sub(r"\bcascading\s+down\s+to(?:\s+Tier)?\s*,\s*then(?:\s+Tier)?\s*,?", "cascading down through descending structural levels,", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bswung\s+to\s*,", "swung high into the critical warning threshold,", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bring\s+marked\s*,", "ring marked with division indices,", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bending\s+at\s+a\s+red-circled\s+(?:multimillion-dollar\s+sum|multibillion-dollar\s+sum|[\$¥₩€£]?\s*\d+[^,]*|\s*,)", "ending at a red-circled ledger entry,", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bending\s+at\s+a\s+red-circled\s*,", "ending at a red-circled ledger entry,", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bcounter\s+tag\s+reading\s*[,.]", "counter tag emblem without readable digits,", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\btag\s+reading(?:\s+['\"][^'\"]*['\"])?\s*[,.]?", "evidentiary archival tag,", cleaned, flags=re.IGNORECASE)
@@ -381,6 +382,8 @@ def apply_semantic_numeral_rewrites(text: str) -> str:
     text = re.sub(r"\bCase\s*#?\s*\d+[-\d]*\b", "federal court case record", text, flags=re.IGNORECASE)
 
     # 3. Currency and metric values
+    text = re.sub(r"[\$¥₩€£]?\s*\b\d+(?:\.\d+)?\s*(?:million|M)\b\s*[-–—]\s*Final\s+Offer\b", "multimillion-dollar final settlement sum", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\$¥₩€£]?\s*\b\d+(?:\.\d+)?\s*(?:million|M)\b\s+(?:final\s+offer|final\s+settlement)\b", "multimillion-dollar final settlement sum", text, flags=re.IGNORECASE)
     text = re.sub(r"[\$¥₩€£]?\s*\b\d+(?:\.\d+)?\s*(?:billion|B)\b", "multibillion-dollar sum", text, flags=re.IGNORECASE)
     text = re.sub(r"[\$¥₩€£]?\s*\b\d+(?:\.\d+)?\s*(?:million|M)\b", "multimillion-dollar sum", text, flags=re.IGNORECASE)
     text = re.sub(r"\b\d+%\b", "percentage metric", text)
@@ -732,6 +735,8 @@ def _sanitize_background_prompt(prompt: str, bg_key: str = "", is_byzantine: boo
     p = re.sub(r"\bmanila\s+folders\b", "plain archival paper folders", p, flags=re.IGNORECASE)
     p = re.sub(r"\btypewriters?\b", "vintage mechanical desktop device", p, flags=re.IGNORECASE)
     p = re.sub(r"\bofficial\s+border\b", "neat architectural paneling", p, flags=re.IGNORECASE)
+    p = re.sub(r"\bCalifornia\s+[bB]ear\s+[fF]lag\b", "California state banner with stylized bear-and-star silhouette without typography", p)
+    p = re.sub(r"\bTribune\s+Tower\b", "historic Tribune clock tower with numeral-free clock face", p, flags=re.IGNORECASE)
     p = re.sub(r"\bhistoric\s+clock\s+tower\b", "historic clock tower with numeral-free clock face", p, flags=re.IGNORECASE)
 
     # Document hygiene purge: backgrounds must NEVER describe unfilled templates, blank amount fields, or empty ruled lines

@@ -43,13 +43,30 @@ import { WordTimestamp } from "./types";
 const INK = "#05090d";
 const LIGHT = "#ffffff";
 
-const resolveSrc = (src?: string | null) => {
+export const resolveSrc = (src?: string | null): string | null => {
   if (!src) return null;
-  if (/^https?:\/\//i.test(src)) return src;
-  if (/^\/?public\//i.test(src)) {
-    return src.startsWith("/") ? src : `/${src}`;
+  const trimmed = typeof src === "string" ? src.trim() : "";
+  if (!trimmed) return null;
+  if (/^(https?:\/\/|data:|blob:)/i.test(trimmed)) {
+    return trimmed;
   }
-  return staticFile(src);
+  if (
+    typeof window !== "undefined" &&
+    (window as any).remotion_staticBase &&
+    trimmed.startsWith((window as any).remotion_staticBase)
+  ) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("/public/")) {
+    return trimmed;
+  }
+  const clean = trimmed.replace(/^\/?public\//i, "").replace(/^\/+/, "");
+  if (!clean) return null;
+  try {
+    return staticFile(clean);
+  } catch (_e) {
+    return trimmed.startsWith("/") ? trimmed : `/${clean}`;
+  }
 };
 
 const SAFE_ZONE_STYLE = {
@@ -430,6 +447,10 @@ export const TwoLayerScene = (props) => {
   const showBackground = props.showBackground === false ? false : true;
   const showForeground = props.showForeground === false ? false : true;
   const showOverlay = props.showOverlay === false ? false : true;
+  const showSupportingCutouts =
+    props.showSupportingCutouts !== undefined
+      ? Boolean(props.showSupportingCutouts)
+      : showForeground;
   const foreground = props.foreground;
   const foregroundPosition = props.foregroundPosition;
   const caption = props.caption || "";
@@ -726,7 +747,7 @@ export const TwoLayerScene = (props) => {
       ) : null}
 
       {/* Supporting Cutouts & Micro-Evidence Pins (Staggered Spring Physics & Tactile Tape Labels) */}
-      {supportingCutouts && Array.isArray(supportingCutouts) ? (
+      {showSupportingCutouts && supportingCutouts && Array.isArray(supportingCutouts) ? (
         supportingCutouts.map((cutout: any, cIdx: number) => {
           const delay = cutout.dropFrame || cutout.delayFrames || (cIdx * 8 + 6);
           const cutoutSpring = spring({
@@ -2255,6 +2276,7 @@ export const TwoLayerEpisode: React.FC<{
             showBackground={false}
             showForeground={false}
             showOverlay={false}
+            showSupportingCutouts={false}
             foreground={heroRaw}
             foregroundPosition={fgPos}
             foregroundFadeFrames={s.foregroundFadeFrames}

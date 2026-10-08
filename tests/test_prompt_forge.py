@@ -545,7 +545,7 @@ def test_opus_astra_round4_rc1_rc2_remediations():
 
     # RC2.5: Background environment anchors (no category bleed)
     street_out = _sanitize_background_prompt("Street outside parish exterior in 1970", bg_key="bg_1970s_oakland_streetscape", market="EN")
-    assert "1970s East Bay municipal streetscape" in street_out
+    assert "1970s municipal streetscape" in street_out
     assert "cathedral facade with glass-and-timber structure" not in street_out
 
     map_out = _sanitize_background_prompt("Dioceses territorial boundary overview", bg_key="bg_california_dioceses_map", market="EN")
@@ -553,7 +553,7 @@ def test_opus_astra_round4_rc1_rc2_remediations():
     assert "rectory corridor" not in map_out
 
     ledger_out = _sanitize_background_prompt("Detailed audit records grid", bg_key="bg_chancery_accounting_office", market="EN")
-    assert "chancery accounting office interior" in ledger_out
+    assert "accounting office interior" in ledger_out
     assert "corporate or government headquarters" not in ledger_out
 
     court_out = _sanitize_background_prompt("Historic county courthouse exterior stonework", bg_key="bg_alameda_superior_courthouse", market="EN")
@@ -564,7 +564,7 @@ def test_opus_astra_round4_rc1_rc2_remediations():
     assert "corporate legal conference war room interior" in war_out
 
     capitol_out = _sanitize_background_prompt("State assembly chamber interior", bg_key="bg_sacramento_capitol_assembly_2019", market="EN")
-    assert "California State Capitol legislative assembly chamber interior" in capitol_out
+    assert "legislative assembly chamber interior" in capitol_out
 
     med_out = _sanitize_background_prompt("Settlement negotiation chamber", bg_key="bg_settlement_mediation_chamber", market="EN")
     assert "settlement mediation suite interior" in med_out

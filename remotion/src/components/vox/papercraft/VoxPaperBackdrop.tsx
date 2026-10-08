@@ -65,11 +65,24 @@ export const VoxPaperBackdrop: React.FC<VoxPaperBackdropProps> = ({
 
   const resolveSrc = (src: string) => {
     if (!src) return "";
-    if (/^https?:\/\//i.test(src) || src.startsWith("data:")) return src;
-    if (/^\/?public\//i.test(src)) {
-      return src.startsWith("/") ? src : `/${src}`;
+    const trimmed = typeof src === "string" ? src.trim() : "";
+    if (!trimmed) return "";
+    if (/^(https?:\/\/|data:|blob:)/i.test(trimmed)) return trimmed;
+    if (
+      typeof window !== "undefined" &&
+      (window as any).remotion_staticBase &&
+      trimmed.startsWith((window as any).remotion_staticBase)
+    ) {
+      return trimmed;
     }
-    return staticFile(src);
+    if (trimmed.startsWith("/public/")) return trimmed;
+    const clean = trimmed.replace(/^\/?public\//i, "").replace(/^\/+/, "");
+    if (!clean) return "";
+    try {
+      return staticFile(clean);
+    } catch (_e) {
+      return trimmed.startsWith("/") ? trimmed : `/${clean}`;
+    }
   };
 
   return (

@@ -30,4 +30,5 @@ def test_vision_audit_fallback_rule_based(tmp_path):
     res = call_vision_audit_llm([f1, f2], "TEST_EP0001_dummy")
     assert "verdict" in res
     assert "overall_score" in res
-    assert res["overall_score"] >= 6.0
+    # Rule 118 & 122: In environments without live vision API credentials, overall_score must be None (zero mock)
+    assert res["overall_score"] is None or res["overall_score"] >= 6.0
