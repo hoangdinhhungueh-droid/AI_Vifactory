@@ -28,6 +28,7 @@ import {
   PaperStatCard,
   PushThroughTransitionOverlay,
   VoxBuildOnStage,
+  VoxPaperBackdrop,
 } from "./components/vox";
 import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
 import {
