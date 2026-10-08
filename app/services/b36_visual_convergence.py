@@ -38,7 +38,7 @@ Audit against 6 Core Criteria:
    - Adheres to the assigned Hollywood director archetype principle (e.g. David Fincher Noir, Nolan Precision).
    - Dynamic tension curve (varied tension levels across beats: 'low', 'medium', 'high', 'climax'; varied durations, not static 7.0s).
 3. RULE 122 & 435 CEL-SHADED FG:
-   - Pure flat #FF00FF magenta chroma key isolation, 1:1 aspect ratio, full-body head-to-shoes visible within frame.
+   - Pure flat #FF00FF magenta chroma key isolation, 1:1 aspect ratio, waist-up three-quarter angle dynamic action framing with clear silhouette and zero edge clipping.
    - Zero photorealistic human faces/skin; zero white/gray halos; zero cutoffs.
 4. BACKGROUND (BG) STYLE CONFORMANCE:
    - Backgrounds MUST be 2D stylized graphic novel editorial illustrations (2560x1440 QHD, 16:9).

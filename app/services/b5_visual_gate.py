@@ -153,23 +153,41 @@ def audit_and_evaluate_asset(
                 "requires_retry": requires_retry
             }
         except Exception as exc:
-            logger.info("[b5_visual_gate] Vision audit LLM failed (%s), applying heuristic audit rule", exc)
+            logger.error("[b5_visual_gate] Vision audit LLM failed (%s)", exc)
+            return {
+                "status": "AUDIT_FAILED",
+                "overall_score": None,
+                "final_score": None,
+                "passed": False,
+                "scores": {
+                    "ui_artifacts": None,
+                    "alpha_integrity": None,
+                    "style_conformance": None,
+                    "market_context": None,
+                },
+                "notes": f"Visual audit failed (Zero-Mock Rule 118/122): Vision LLM error - {exc}",
+                "reasoning": f"Vision LLM audit call failed: {exc}. Refusing to fabricate mock scores.",
+                "corrective_directive": "[CORRECTIVE DIRECTIVE: Vision LLM service failed; re-audit required]",
+                "requires_retry": True,
+            }
 
-    # Deterministic programmatic fallback (Rule 122 compliant)
-    # Backgrounds and standard evidence props pass if file size > 30KB
-    base_score = 8.5 if file_size > 30000 else 7.5
+    # Gateway unavailable - Rule 118 & Rule 122 Zero-Mock Score Hardening
+    logger.error("[b5_visual_gate] ModelGateway unavailable; refusing to generate mock score")
     return {
-        "status": "APPROVED" if base_score >= 8.0 else "RETRY_REQUIRED",
-        "final_score": base_score,
+        "status": "AUDIT_FAILED",
+        "overall_score": None,
+        "final_score": None,
+        "passed": False,
         "scores": {
-            "ui_artifacts": base_score,
-            "alpha_integrity": base_score,
-            "style_conformance": base_score,
-            "market_context": base_score
+            "ui_artifacts": None,
+            "alpha_integrity": None,
+            "style_conformance": None,
+            "market_context": None,
         },
-        "reasoning": f"Programmatic visual verification passed ({file_size} bytes, clean technical envelope).",
-        "corrective_directive": "",
-        "requires_retry": base_score < 8.0
+        "notes": "Visual audit failed (Zero-Mock Rule 118/122): ModelGateway unavailable",
+        "reasoning": "ModelGateway unavailable; no mock visual scores permitted.",
+        "corrective_directive": "[CORRECTIVE DIRECTIVE: Enable ModelGateway and re-run visual audit]",
+        "requires_retry": True,
     }
 
 

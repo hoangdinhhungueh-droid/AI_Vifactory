@@ -16,19 +16,13 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { DataStoryTest } from "./DataStoryTest";
-import { FullStory } from "./FullStory";
-import { VoxMasterShowcase } from "./VoxMasterShowcase";
 import {
   VoxOverlayLayer,
   VoxAtmosphericLighting,
   VoxParallaxLayer,
-  VoxThresholdRatio,
   VoxKineticTypography,
   VoxSourceCredit,
   VoxDisclosureBadge,
-  LivingCamera,
-  VoxCompositeStage,
   VoxConnectingVectors,
   useStopMotion,
   PaperStatCard,
@@ -37,203 +31,23 @@ import {
 } from "./components/vox";
 import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
 import {
-  VoxPaperBackdrop,
-  VoxTornPaper,
-  VoxBrassPin,
-  VoxWashiTape,
-  VoxStickerCutout,
-  VoxConnectingYarn,
-  VoxStampedLabel,
-} from "./components/vox/papercraft";
-import {
   ProceduralMotionFollower,
   ProceduralMarkerSweep,
   PhysicalStampSlam,
   OdometerRollup,
   evaluateMotionPath,
 } from "./components/kinetics";
-import { EvidenceProp3D } from "./components/EvidenceProp3D";
 import { WordTimestamp } from "./types";
-import { VoxelStopMotionVideo, calculateTotalFrames } from "./components/VoxelStopMotionVideo";
 
 const INK = "#05090d";
 const LIGHT = "#ffffff";
 
-const BEAT_STYLE = {
-  rise: { accent: "#f2a63b", dir: "up" },
-  peak: { accent: "#ffd166", dir: "flat" },
-  collapse: { accent: "#c81e3a", dir: "down" },
-  aftermath: { accent: "#8fa3b0", dir: "flat" },
-};
-
-const ZONE_STYLE = {
-  top_left: { justifyContent: "flex-start", alignItems: "flex-start", textAlign: "left" },
-  top_right: { justifyContent: "flex-start", alignItems: "flex-end", textAlign: "right" },
-  bottom_left: { justifyContent: "flex-end", alignItems: "flex-start", textAlign: "left" },
-  bottom_right: { justifyContent: "flex-end", alignItems: "flex-end", textAlign: "right" },
-};
-
-const POINTS = {
-  up: "0,120 80,96 160,64 240,40 320,8",
-  down: "0,8 80,40 160,72 240,100 320,132",
-  flat: "0,70 80,66 160,72 240,68 320,70",
-};
-
-const SUB_RESERVE = 0.22;
-
-const outline = (px, color) => {
-  const dirs = [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]];
-  const parts = dirs.map((d) => `${d[0] * px}px ${d[1] * px}px 0 ${color}`);
-  parts.push(`0 ${px * 2}px ${px * 3}px rgba(0,0,0,0.55)`);
-  return parts.join(", ");
-};
-
-const TrendIcon = ({ accent, dir, k, progress }) => {
-  const pts = POINTS[dir] ? POINTS[dir] : POINTS.flat;
-  return (
-    <svg width={320 * k} height={140 * k} viewBox="0 0 320 140">
-      <polyline
-        points={pts}
-        fill="none"
-        stroke={INK}
-        strokeWidth={16}
-        strokeLinecap="round"
-        strokeDasharray={520}
-        strokeDashoffset={520 * (1 - progress)}
-        opacity={0.55}
-      />
-      <polyline
-        points={pts}
-        fill="none"
-        stroke={accent}
-        strokeWidth={10}
-        strokeLinecap="round"
-        strokeDasharray={520}
-        strokeDashoffset={520 * (1 - progress)}
-      />
-    </svg>
-  );
-};
-
-export const SceneCard = (props) => {
-  const bgFile = props.bgFile;
-  const statValue = props.statValue;
-  const statLabel = props.statLabel;
-  const storyBeat = props.storyBeat;
-  const hasChartInBg = props.hasChartInBg;
-  const safeZone = props.safeZone ? props.safeZone : "top_left";
-  const accentOverride = props.accentOverride;
-
-  const frame = useCurrentFrame();
-  const cfg = useVideoConfig();
-  const width = cfg.width;
-  const height = cfg.height;
-  const durationInFrames = cfg.durationInFrames;
-  const fps = cfg.fps;
-  const k = width / 1536;
-
-  const beat = BEAT_STYLE[storyBeat] ? BEAT_STYLE[storyBeat] : BEAT_STYLE.rise;
-  const accent = accentOverride ? accentOverride : beat.accent;
-  const zone = ZONE_STYLE[safeZone] ? ZONE_STYLE[safeZone] : ZONE_STYLE.top_left;
-  const isBottom = safeZone.indexOf("bottom") === 0;
-
-  const zoom = interpolate(frame, [0, durationInFrames], [1, 1.06], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const appear = interpolate(frame, [0, Math.round(fps * 0.6)], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const drawP = interpolate(frame, [Math.round(fps * 0.3), Math.round(fps * 1.7)], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  return (
-    <AbsoluteFill style={{ backgroundColor: INK }}>
-      <AbsoluteFill>
-        <Img
-          src={staticFile(bgFile)}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            transform: `scale(${zoom})`,
-          }}
-        />
-      </AbsoluteFill>
-      <AbsoluteFill
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          padding: 64 * k,
-          paddingBottom: isBottom ? height * SUB_RESERVE : 64 * k,
-          justifyContent: zone.justifyContent,
-          alignItems: zone.alignItems,
-          opacity: appear,
-          transform: `translateY(${(1 - appear) * 24 * k}px)`,
-        }}
-      >
-        {hasChartInBg ? null : (
-          <TrendIcon accent={accent} dir={beat.dir} k={k} progress={drawP} />
-        )}
-        <div
-          style={{
-            fontFamily: "Arial, Helvetica, sans-serif",
-            fontWeight: 900,
-            fontSize: 150 * k,
-            lineHeight: 1,
-            color: accent,
-            textAlign: zone.textAlign,
-            textShadow: outline(Math.max(2, 4 * k), INK),
-          }}
-        >
-          {statValue}
-        </div>
-        <div
-          style={{
-            fontFamily: "Arial, Helvetica, sans-serif",
-            fontWeight: 700,
-            fontSize: 40 * k,
-            marginTop: 14 * k,
-            letterSpacing: 2 * k,
-            color: LIGHT,
-            maxWidth: width * 0.55,
-            textAlign: zone.textAlign,
-            textShadow: outline(Math.max(1, 3 * k), INK),
-          }}
-        >
-          {statLabel}
-        </div>
-      </AbsoluteFill>
-    </AbsoluteFill>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// TwoLayerEpisode -- generic, episode-agnostic 2-layer (Background +
-// Foreground/Overlay) composition for the new video architecture (Skill AI
-// Rule 50-52). Not hardcoded to any single episode: driven entirely by the
-// `scenes` prop, which is built by scripts/build_remotion_props.py from
-// brain_input.json + the images pulled by scripts/pull_approved_images.py.
-//
-// Contract per scene:
-//   background            : staticFile()-relative path OR absolute https URL
-//                            (required). Hard-cut only -- never fades.
-//   foreground            : same path rules, optional. Fades in at the start
-//                            of the scene and fades out at the end (Rule 50).
-//   durationInFrames      : integer frames this scene occupies.
-//   foregroundFadeFrames  : frames used for the foreground fade in/out.
-//   caption               : optional text drawn in the reserved safe zone.
-//   safeZone              : "top" | "bottom" | "none" -- which edge is kept
-//                            clear for number/text cards (matches the
-//                            SUB_RESERVE pattern used by SceneCard above).
-// ---------------------------------------------------------------------------
-
-const resolveSrc = (src) => {
+const resolveSrc = (src?: string | null) => {
   if (!src) return null;
   if (/^https?:\/\//i.test(src)) return src;
+  if (/^\/?public\//i.test(src)) {
+    return src.startsWith("/") ? src : `/${src}`;
+  }
   return staticFile(src);
 };
 
@@ -2322,13 +2136,13 @@ const totalSceneFrames = (scenes) =>
   (scenes || []).reduce((sum, s) => sum + Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1)), 0);
 
 /**
- * Master VOX Build-On Episode Container Component (Rule 125 Single Truth).
+ * Master TwoLayerEpisode Container Component (Rule 125 Single Truth).
  * Unifies 7-layer tactile paper build-on assemblies (VoxBuildOnStage) with:
  * - Anti-flicker Evidentiary Forensic Overlays & Stat Paper Notes (OverlaySegmentView)
  * - Faster-Whisper millisecond word-level Karaoke Subtitles & Speaker Tags (TwoLayerScene)
  * - Tactile Paper Foley SFX, LivingMicroLifeLayer, Optical FX, and TopProgressBar.
  */
-export const VoxBuildOnEpisode: React.FC<{
+export const TwoLayerEpisode: React.FC<{
   scenes?: any[];
   audioMaster?: string;
   bgmFile?: string;
@@ -2421,7 +2235,7 @@ export const VoxBuildOnEpisode: React.FC<{
           name={cleanHeadline || `Scene ${idx + 1}`}
         >
           <VoxBuildOnStage
-            headline={cleanHeadline}
+            headline={!hasOv ? cleanHeadline : undefined}
             subtitle={cleanSubtitle}
             theme={s.theme || s.papercraft_theme || s.paperTheme || "newsprint-editorial"}
             backgroundSrc={bgSrc}
@@ -2430,7 +2244,7 @@ export const VoxBuildOnEpisode: React.FC<{
             heroPosition={resolvedHeroPosition}
             supportingCutouts={resolvedCutouts}
             yarns={rawYarns}
-            stampText={s.stampText || s.stampBadge || s.stamp_badge}
+            stampText={s.stampText}
             stampColor={s.stampColor || "#dc2626"}
             hasMarkerHighlight={s.hasMarkerHighlight !== false}
             durationSec={durationSec}
@@ -2472,7 +2286,6 @@ export const VoxBuildOnEpisode: React.FC<{
             connection={s.connection}
             connections={s.connections}
             radiatingConnections={s.radiatingConnections || s.radiating_connections}
-            supportingCutouts={resolvedCutouts}
             editorialHeadline={s.editorialHeadline || s.editorial_headline}
           />
         </Sequence>
@@ -2545,79 +2358,15 @@ export const VoxBuildOnEpisode: React.FC<{
   );
 };
 
-export const TwoLayerEpisode = VoxBuildOnEpisode;
+export const VoxBuildOnEpisode = TwoLayerEpisode;
 
 const RemotionRoot = () => {
   return (
     <>
-      <Composition
-        id="SceneCard"
-        component={SceneCard}
-        durationInFrames={150}
-        fps={30}
-        width={1536}
-        height={864}
-        defaultProps={{
-          bgFile: "bg_rise.jpg",
-          statValue: "$619B",
-          statLabel: "TOTAL DEBT AT FILING",
-          storyBeat: "collapse",
-          hasChartInBg: false,
-          safeZone: "top_left",
-          accentOverride: null,
-        }}
-        calculateMetadata={({ props }: { props: any }) => {
-          return {
-            durationInFrames: props.durationInFrames ? props.durationInFrames : 150,
-            width: props.width ? props.width : 1536,
-            height: props.height ? props.height : 864,
-          };
-        }}
-      />
-      <Composition
-        id="DataStoryTest"
-        component={DataStoryTest}
-        durationInFrames={600}
-        fps={30}
-        width={1536}
-        height={864}
-        defaultProps={{}}
-      />
-      <Composition
-        id="FullStory"
-        component={FullStory}
-        durationInFrames={14101}
-        fps={30}
-        width={1536}
-        height={864}
-        defaultProps={{}}
-      />
-      {/* Primary VoxBuildOnStage Composition (Vox Upgrade Standard - Rule 125 Single Truth) */}
-      <Composition
-        id="VoxBuildOnStage"
-        component={VoxBuildOnEpisode}
-        durationInFrames={300}
-        fps={30}
-        width={1920}
-        height={1080}
-        defaultProps={{ scenes: [] }}
-        calculateMetadata={({ props }: { props: any }) => {
-          const fps = props.fps ? props.fps : 30;
-          const width = props.width ? props.width : 1920;
-          const height = props.height ? props.height : 1080;
-          const total = totalSceneFrames(props.scenes);
-          return {
-            durationInFrames: total > 0 ? total : 300,
-            fps,
-            width,
-            height,
-          };
-        }}
-      />
-      {/* TwoLayerEpisode rewired to VoxBuildOnEpisode for unified single-stream execution */}
+      {/* Primary Canonical TwoLayerEpisode Composition (Rule 125 Single Truth) */}
       <Composition
         id="TwoLayerEpisode"
-        component={VoxBuildOnEpisode}
+        component={TwoLayerEpisode}
         durationInFrames={300}
         fps={30}
         width={1920}
@@ -2636,36 +2385,20 @@ const RemotionRoot = () => {
           };
         }}
       />
-      {/* 3D Procedural Evidence Prop PoC (img2threejs technique) */}
+      {/* VoxBuildOnStage alias wired to unified TwoLayerEpisode engine */}
       <Composition
-        id="EvidenceProp3DTest"
-        component={EvidenceProp3D}
-        durationInFrames={90}
-        fps={30}
-        width={1920}
-        height={1080}
-        defaultProps={{
-          title: "CONFIDENTIAL EVIDENCE // EXHIBIT A",
-          subtitle: "IMPERIAL SEAL / AUTHENTICATION STAMP",
-        }}
-      />
-      {/* Voxel & Stop-Motion Composition (Image-to-Video Engine) */}
-      <Composition
-        id="VoxelStopMotion"
-        component={VoxelStopMotionVideo}
+        id="VoxBuildOnStage"
+        component={TwoLayerEpisode}
         durationInFrames={300}
         fps={30}
         width={1920}
         height={1080}
-        defaultProps={{
-          sceneMap: { project_id: "voxel_default", scenes: [] },
-        }}
+        defaultProps={{ scenes: [] }}
         calculateMetadata={({ props }: { props: any }) => {
           const fps = props.fps ? props.fps : 30;
           const width = props.width ? props.width : 1920;
           const height = props.height ? props.height : 1080;
-          const sceneMap = props.sceneMap || { project_id: "voxel_default", scenes: [] };
-          const total = calculateTotalFrames(sceneMap, fps);
+          const total = totalSceneFrames(props.scenes);
           return {
             durationInFrames: total > 0 ? total : 300,
             fps,
@@ -2673,55 +2406,6 @@ const RemotionRoot = () => {
             height,
           };
         }}
-      />
-      {/* Vox Master Showcase (YouTube Tutorial Vox Style Proof) */}
-      <Composition
-        id="VoxMasterShowcase"
-        component={VoxMasterShowcase}
-        durationInFrames={1350}
-        fps={30}
-        width={1920}
-        height={1080}
-        defaultProps={{}}
-      />
-      {/* Vox Multi-Motion Composite Stage (Tactile Paper Collage Assembly) */}
-      <Composition
-        id="VoxCompositeDemo"
-        component={() => (
-          <AbsoluteFill style={{ backgroundColor: "#F5F2EB", justifyContent: "center", alignItems: "center" }}>
-            <VoxCompositeStage
-              title="INCIDENT RECONSTRUCTION // FLIGHT 370"
-              badge="TACTILE DOSSIER // ACT I"
-              backgroundLabel="SOUTH CHINA SEA TO MALACCA STRAIT"
-              dossierTitle="PRIMARY RADAR CONTACT DISRUPTION"
-              dossierAgency="CIVIL AVIATION AUTHORITY & MILITARY AIR DEFENSE"
-              dossierDate="MAR 8, 2014 // 01:21 UTC"
-              dossierText="At waypoint IGARI, secondary surveillance radar transponder vanished. Military 3D air surveillance radar captured return executing sharp tactical turn back toward the Malay Peninsula."
-              highlightPhrase="executing sharp tactical turn back toward the Malay Peninsula"
-              cutoutLabel="BOEING 777-200ER"
-              cutoutRole="MALAYSIA AIRLINES // MH370"
-              connection={{
-                fromX: 30,
-                fromY: 55,
-                toX: 68,
-                toY: 42,
-                label: "TACTICAL TURNAROUND // 40 MIN",
-                color: "#ef4444",
-                drawStartFrame: 28,
-                drawDuration: 22,
-                isYarn: true,
-              }}
-              stampText="239 PEOPLE"
-              stampColor="#dc2626"
-              stampFrame={60}
-            />
-          </AbsoluteFill>
-        )}
-        durationInFrames={150}
-        fps={30}
-        width={1920}
-        height={1080}
-        defaultProps={{}}
       />
     </>
   );

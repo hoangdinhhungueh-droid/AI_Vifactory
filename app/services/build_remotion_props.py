@@ -1367,6 +1367,7 @@ def build_remotion_props_data(
             "kinetic_headline": "CRITICAL PARADOX // COLD HOOK",
         }
         if isinstance(forensic_ov, str):
+            fo_type = forensic_ov.strip()
             gi_payload = dict(grounding_intel or {})
             if s.get("headline"):
                 gi_payload["headline"] = s.get("headline")

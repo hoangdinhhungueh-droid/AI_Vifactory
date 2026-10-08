@@ -3,7 +3,6 @@ import os, logging
 from app.services.mpt_ported.state import idempotent_stage
 from app.services.mpt_ported.video_render import render_video, derive_aspect_blurpad, burn_subtitles_for_aspect
 from app.services.mpt_ported.audio_normalize import normalize_audio
-from app.services.mpt_ported.bgm_selector import select_bgm
 from app.services.mpt_ported.motion_cards import build_cards
 from app.services.mpt_ported.render_gate import pre_render_check, post_render_check
 from app.services.mpt_ported.subtitle_karaoke import burn_karaoke_for_aspect, karaoke_enabled
@@ -62,17 +61,21 @@ async def run_s7(episode: dict) -> dict:
     bgm_path = None
     bgm_info = {}
     try:
-        from app.services.beat_bgm_engine import generate_beat_adaptive_bgm
-        bgm_info = generate_beat_adaptive_bgm(
+        try:
+            from app.services.beat_bgm_engine import mix_beat_bgm_for_episode as _mix_bgm
+        except ImportError:
+            from app.services.beat_bgm_engine import generate_beat_adaptive_bgm as _mix_bgm
+        bgm_info = _mix_bgm(
             episode_id=episode_id,
             out_dir=out_dir,
             audio_path=norm_path
         )
         bgm_path = bgm_info.get("bgm_path")
-        logger.info("[S7] %s 5-Beat BGM generated: %s (%d tracks)", episode_id, bgm_path, len(bgm_info.get("tracks", [])))
+        logger.info("[S7] %s canonical 5-Beat BGM generated: %s (%d tracks)", episode_id, bgm_path, len(bgm_info.get("tracks", [])))
     except Exception as e:
         logger.warning("[S7] %s 5-Beat BGM failed (%s), falling back to select_bgm", episode_id, e)
         try:
+            from app.services.mpt_ported.bgm_selector import select_bgm
             bgm_info = await select_bgm(mood=mood, duration_s=duration_s)
             bgm_path = bgm_info.get("path")
         except Exception as _e_bgm:
@@ -149,15 +152,6 @@ async def run_s7(episode: dict) -> dict:
     # Single Source of Truth Subtitles: For two_layer_v1, the Remotion Safe-Zone
     # Dialogue Container is the sole on-screen subtitle mechanism. Bypass FFmpeg subtitle
     # burning completely to prevent double/overlapping subtitles.
-    render_arch = str(episode.get("render_architecture") or "").strip()
-    if not render_arch and os.path.exists(os.path.join(out_dir, "brain_input.json")):
-        try:
-            import json as _json
-            with open(os.path.join(out_dir, "brain_input.json"), "r", encoding="utf-8") as _bf:
-                render_arch = str(_json.load(_bf).get("render_architecture") or "").strip()
-        except Exception:
-            pass
-
     if is_two_layer:
         logger.info(
             "[S7] %s render_architecture == '%s': skipping redundant FFmpeg subtitle burning "

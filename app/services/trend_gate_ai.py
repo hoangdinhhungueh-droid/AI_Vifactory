@@ -1,147 +1,24 @@
-def sanitize_episode_slug(slug: str) -> str:
-    """Sanitize a topic slug to lowercase snake_case [a-z0-9_]+."""
-    if not slug:
-        return "topic"
-    s = str(slug).strip().lower()
-    s = re.sub(r'[^a-z0-9]+', '_', s)
-    s = s.strip('_')
-    if not s:
-        return "topic"
-    return s[:45].rstrip('_')
+import re
 
+try:
+    from app.services.episode_numbering import get_next_episode_id, sanitize_episode_slug
+except (ImportError, AttributeError):
+    def sanitize_episode_slug(slug: str) -> str:
+        """Sanitize a topic slug to lowercase snake_case [a-z0-9_]+."""
+        if not slug:
+            return "topic"
+        s = str(slug).strip().lower()
+        s = re.sub(r'[^a-z0-9]+', '_', s)
+        s = s.strip('_')
+        if not s:
+            return "topic"
+        return s[:45].rstrip('_')
 
-def get_next_episode_id(market: str = "EN", slug: str = "", offset: int = 0) -> str:
-    """Generate next market-isolated sequential episode task ID (e.g. EN_EP0001_topic).
-    Strictly isolated per market (EN, JP, KR, etc.).
-    Single Source of Truth is Notion:
-      1. Primary: Notion VF Trend Brain DB (4c101989-2400-8334-8016-01d4f463b09f) & Story Library DB (b0301989-2400-836b-bdb5-8131fea17736)
-         - If Notion has episodes for this market, counts upwards from max(notion_nums).
-         - If Notion is empty for this market (user reset/cleared DB), starts from EP0001.
-      2. Active unexpired tasks in /var/vf/pending_tasks (to avoid collision during concurrent runs).
-      3. Filesystem /var/vf/episodes (only non-archived, non-dead, active directories).
-    Returns: <market>_<EPxxxx>_<name>
-    """
-    import os, re, json, logging
-    _log = logging.getLogger("app.episode_id")
-    target_market = str(market or "EN").strip().upper()
-    clean_slug = sanitize_episode_slug(slug)
+    def get_next_episode_id(market: str = "EN", slug: str = "", offset: int = 0) -> str:
+        """Fallback episode ID generator if episode_numbering is unavailable."""
+        clean = sanitize_episode_slug(slug)
+        return f"{str(market or 'EN').strip().upper()}_EP0001_{clean}"
 
-    def _extract_market_ep_nums(text: str, mkt: str) -> list[int]:
-        if not text:
-            return []
-        t_up = text.upper()
-        patterns = [
-            rf'{mkt}_EP(\d+)',
-            rf'{mkt}-EP(\d+)',
-            rf'EP_{mkt}_(\d+)',
-            rf'EP-{mkt}-(\d+)',
-            rf'{mkt}-.*-EP(\d+)',
-            rf'{mkt}_.*_EP(\d+)',
-        ]
-        found = []
-        for p in patterns:
-            for m in re.finditer(p, t_up):
-                try:
-                    n = int(m.group(1))
-                    if 0 <= n < 10000:
-                        found.append(n)
-                except ValueError:
-                    pass
-        return found
-
-    notion_nums = []
-    # 1. Primary Source of Truth: Notion VF Trend Brain DB & Story Library DB
-    try:
-        import scripts.ag_notion_bridge as bridge
-
-        def _get_prop_txt(prop: dict) -> str:
-            if not prop:
-                return ""
-            ptype = prop.get("type")
-            if ptype == "title":
-                return "".join(x.get("plain_text", "") for x in prop.get("title", []))
-            if ptype == "rich_text":
-                return "".join(x.get("plain_text", "") for x in prop.get("rich_text", []))
-            if ptype == "select":
-                sel = prop.get("select")
-                return sel.get("name", "") if sel else ""
-            return ""
-
-        # Check Trend Brain DB
-        tb_res = bridge.query_db("4c101989-2400-8334-8016-01d4f463b09f")
-        for r in tb_res.get("results", []):
-            props = r.get("properties", {})
-            mkt_prop = _get_prop_txt(props.get("Market", {}))
-            tid_prop = _get_prop_txt(props.get("Task ID", {}))
-            eid_prop = _get_prop_txt(props.get("Episode ID", {}))
-            kw_prop = _get_prop_txt(props.get("Keyword", {}))
-            for txt in [tid_prop, eid_prop, kw_prop]:
-                for num in _extract_market_ep_nums(txt, target_market):
-                    notion_nums.append(num)
-
-        # Check Story Library DB
-        sl_res = bridge.query_db("b0301989-2400-836b-bdb5-8131fea17736")
-        for r in sl_res.get("results", []):
-            props = r.get("properties", {})
-            name_prop = _get_prop_txt(props.get("Name", {}))
-            tid_prop = _get_prop_txt(props.get("Task ID", {}))
-            eid_prop = _get_prop_txt(props.get("Episode ID", {}))
-            for txt in [tid_prop, eid_prop, name_prop]:
-                for num in _extract_market_ep_nums(txt, target_market):
-                    notion_nums.append(num)
-    except Exception as e:
-        _log.warning("[episode_id] Notion SoT scan notice: %s", e)
-
-    # Check active pending tasks in /var/vf/pending_tasks
-    pending_nums = []
-    pending_dir = "/var/vf/pending_tasks"
-    if os.path.exists(pending_dir):
-        try:
-            for f in os.listdir(pending_dir):
-
-                if not f.endswith(".json"):
-                    continue
-                p = os.path.join(pending_dir, f)
-                try:
-                    with open(p, "r", encoding="utf-8") as jf:
-                        data = json.load(jf)
-                    row_m = str(data.get("market", "")).strip().upper()
-                    row_eid = str(data.get("episode_id", "") or data.get("task_id", ""))
-                    if row_m == target_market or row_eid.startswith(f"{target_market}_EP"):
-                        for num in _extract_market_ep_nums(row_eid + " " + f, target_market):
-                            pending_nums.append(num)
-                except Exception:
-                    for num in _extract_market_ep_nums(f, target_market):
-                        pending_nums.append(num)
-        except Exception as e:
-            _log.warning("[episode_id] pending_tasks scan notice: %s", e)
-
-    # Determine next number:
-    all_valid_nums = [0]
-    if notion_nums:
-        all_valid_nums.extend(notion_nums)
-    if pending_nums:
-        all_valid_nums.extend(pending_nums)
-
-    # Fallback: if both Notion and pending are empty, only check active non-archived dirs
-    if len(all_valid_nums) == 1:
-        ep_dir = "/var/vf/episodes"
-        if os.path.exists(ep_dir):
-            try:
-                for f in os.listdir(ep_dir):
-                    if f.startswith("_") or "archive" in f.lower() or "dead" in f.lower() or "test" in f.lower():
-                        continue
-                    for num in _extract_market_ep_nums(f, target_market):
-                        all_valid_nums.append(num)
-            except Exception:
-                pass
-
-    max_num = max(all_valid_nums)
-    next_num = max_num + 1 + offset
-    task_id = f"{target_market}_EP{next_num:04d}_{clean_slug}"
-    _log.info("[episode_id] Generated Task ID %s (market=%s, max_num=%d, next_num=%d, offset=%d, notion_count=%d)",
-              task_id, target_market, max_num, next_num, offset, len(notion_nums))
-    return task_id
 # app/services/trend_gate_ai.py - "Notion AI is the crawl brain" architecture (26/07/2026).
 #
 # WHY: combining SerpApi + Google Trends + evergreen + wiki spikes inside Python was
@@ -309,37 +186,6 @@ def _committed_today(day):
     return counts
 
 
-def _notify_raw_ready(data):
-    """Telegram ping after the automated VPS crawl: raw pool ready for the gate."""
-    try:
-        from app.services.telegram_buttons import send_telegram_broadcast as _send_telegram
-    except Exception:
-        return
-    lines = ["\U0001f4e5 RAW POOL %s da san sang (VPS cao tu dong, CHUA ghi thu vien)."
-             % str(data.get("generated_at") or "")[:10]]
-    for mk, blk in (data.get("by_market") or {}).items():
-        c = (blk or {}).get("_counts") or {}
-        lines.append("%s: %s | tong %d" % (
-            mk, " ".join("%s=%d" % (k, v) for k, v in c.items()), sum(c.values())))
-        # UPDATED 06/08/2026: use _lane_status (EMPTY / thin(x/y) / ok) instead of a
-        # raw zero-check, so under-target ("thin") unofficial free lanes get flagged
-        # too, not just fully-dead ones - these endpoints can get silently rate-limited.
-        lane_status = (blk or {}).get("_lane_status") or {}
-        flagged = ["%s:%s" % (k, v) for k, v in lane_status.items() if v != "ok"]
-        if flagged:
-            lines.append("  \u26a0\ufe0f lane can kiem tra (khong 'ok'): " + ", ".join(flagged))
-        cc = ((blk or {}).get("_context") or {}).get("cross_confirmed_google_youtube") or []
-        if cc:
-            lines.append("  \U0001f525 Google+YouTube CUNG xac nhan (%d): %s"
-                         % (len(cc), ", ".join(cc[:8])))
-    lines.append("\U0001f9e0 Mo Notion AI va go: 'chay gate trend hom nay' -> AI suy luan "
-                 "tren toan bo raw, chot dung %d tu khoa/market vao thu vien + chon 1 "
-                 "key lam video hom nay." % GATE_DAILY_CAP)
-    try:
-        _send_telegram(chr(10).join(lines))
-    except Exception:
-        pass
-
 
 def _slug(term):
     return re.sub(r"[^\w]+", "-", (term or "").strip().lower()).strip("-")
@@ -379,19 +225,6 @@ def _raw_pool_path(day):
     return os.path.join(RAW_POOL_DIR, "trend_raw_pool_%s.json" % day)
 
 
-# ---------------------------------------------------------------- lane collectors
-def _serpapi_weekly_gate_open():
-    """SerpApi now runs WEEKLY (Monday only, Asia/Ho_Chi_Minh) instead of daily
-    (12/08/2026 decision) to stay inside the 250/month free quota once the EN
-    pool fans out to 6 geos. TREND_GATE_FORCE_SERPAPI=1 overrides for manual runs."""
-    if os.getenv("TREND_GATE_FORCE_SERPAPI", "0") == "1":
-        return True
-    try:
-        from zoneinfo import ZoneInfo
-        now_vn = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
-    except Exception:
-        now_vn = datetime.now(timezone.utc)
-    return now_vn.weekday() == 0  # Monday
 
 
 def _lane_serpapi(market, pool):
@@ -661,40 +494,6 @@ def collect_raw_pool(markets=None, pool=20, lanes=None):
     return out
 
 
-class TrendRawRequest(BaseModel):
-    markets: list[str] | None = None
-    pool: int | None = None
-    lanes: list[str] | None = None
-    refresh: bool | None = None  # False/None = reuse today's cached pool if present
-
-
-@router.post("/api/v1/trend-raw")
-def trend_raw(req: TrendRawRequest):
-    """Return the RAW multi-lane candidate pool for the Notion AI gate.
-    Writes nothing to the keyword library. Caches one pool file per UTC day so the
-    gate can re-read it without spending SerpApi quota again."""
-    day = datetime.now(timezone.utc).date().isoformat()
-    path = _raw_pool_path(day)
-    if not req.refresh and os.path.exists(path):
-        try:
-            with open(path) as f:
-                data = json.load(f)
-            data["cached"] = True
-            data["cache_path"] = path
-            return data
-        except Exception:
-            pass
-    data = collect_raw_pool(req.markets, pool=int(req.pool or 20), lanes=req.lanes)
-    data["cached"] = False
-    try:
-        with open(path, "w") as f:
-            json.dump(data, f)
-        data["cache_path"] = path
-    except Exception as e:
-        logger.warning("[gate-ai] could not cache raw pool: %s", e)
-    # ALREADY_PATCHED_1108: RAW POOL Telegram notify DISABLED (11/08/2026 user directive)
-    # -> only /api/v1/trend-virality sends the Telegram alert (after scoring).
-    return data
 
 
 class GateItem(BaseModel):

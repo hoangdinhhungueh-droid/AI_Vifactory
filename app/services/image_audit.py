@@ -85,6 +85,14 @@ Score 0-10 on three dimensions and reply ONLY with compact JSON:
 # 16/08: FG assets are stored AFTER chroma-key (magenta background removed).
 # Transparent edges may compress as black or gray in JPEG previews.
 # Do NOT fail FG on missing magenta if transparent cutout is clean.
+_FG_BG_NOTE = (
+    "\n\nFOREGROUND vs BACKGROUND LAYER SPECIFICATION (Rule 122):"
+    "\n- Foreground (FG 1:1 cutout): Evaluated post-chroma keying (#FF00FF magenta background removed). "
+    "Enforce silhouette clean edges, 0% internal holes on characters or clothing, and 0% magenta spill. "
+    "Do NOT fail FG for black/transparent backgrounds in preview."
+    "\n- Background (BG 16:9 environment): Evaluated for overall environmental consistency, correct perspective, "
+    "and zero English/Latin text leaks in non-English story markets."
+)
 
 _ISSUE_MAP = {
     "prompt_mismatch": "Prompt mismatch",
@@ -415,9 +423,8 @@ def _hhtech_key() -> str:
 
 
 def audit_image_hhtech(image_bytes: bytes, prompt: str, layer: str | None = None) -> dict:
-    """Vision audit via hhtech gateway (chat/completions). 16/08: replaces Gemini
-    native API (free-tier daily quota exhausted after a few images).
-    Returns same keys as audit_image_gemini + _tok_in/_tok_out for metering."""
+    """Vision audit via hhtech gateway (chat/completions).
+    Returns d1, d2, d3, confidence, issues, notes, and token usage for metering."""
     dt = time.time() - _LAST_CALL[0]
     if dt < MIN_CALL_INTERVAL:
         time.sleep(MIN_CALL_INTERVAL - dt)
@@ -470,42 +477,6 @@ def _pending_proposal_count():
     except Exception:
         return "?"
 
-
-def audit_image_gemini(image_bytes: bytes, prompt: str) -> dict:
-    key = _gemini_key()
-    b64 = base64.b64encode(image_bytes).decode()
-    body = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": _AUDIT_PROMPT.format(prompt=prompt or "(no prompt)")},
-                    {"inline_data": {"mime_type": "image/png", "data": b64}},
-                ]
-            }
-        ],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 4096,
-                          "thinkingConfig": {"thinkingBudget": 0}},
-    }
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{GEMINI_MODEL}:generateContent?key={key}"
-    )
-    data = _gemini_post(url, body)
-    parts = (data.get("candidates", [{}])[0].get("content", {}).get("parts", []))
-    text = "".join(p.get("text", "") for p in parts)
-    text = text.replace("```json", "").replace("```", "").strip()
-    m = re.search(r"\{.*\}", text, re.S)
-    if not m:
-        raise RuntimeError(f"gemini returned non-json: {text[:200]}")
-    out = json.loads(m.group(0))
-    return {
-        "d1": float(out.get("d1_prompt_adherence", 0)),
-        "d2": float(out.get("d2_object_accuracy", 0)),
-        "d3": float(out.get("d3_visual_logic", 0)),
-        "confidence": float(out.get("confidence", 0)),
-        "issues": [str(i) for i in out.get("issues", [])],
-        "notes": str(out.get("notes", "")),
-    }
 
 
 def compute_verdict(d1: float, d2: float, d3: float, conf: float) -> tuple[str, float]:

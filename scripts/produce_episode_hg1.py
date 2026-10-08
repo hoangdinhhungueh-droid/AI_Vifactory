@@ -34,28 +34,6 @@ def _load_pending(task_id: str) -> dict:
     return {}
 
 
-async def _notify_gate2(task_id: str, n_scenes: int, n_bg: int, n_fg: int, score: str, n_thumb: int = 2,
-                        topic: str = "", director_archetype: str = "", title_a: str = "", title_b: str = "") -> None:
-    from app.services.telegram_buttons import send_gate2_card
-    await send_gate2_card(task_id, n_scenes, n_bg, n_fg, score, n_thumb=n_thumb,
-                          topic=topic, director_archetype=director_archetype, title_a=title_a, title_b=title_b)
-
-
-
-
-async def _notify_gate25_manual_review(task_id: str, reason: str) -> None:
-    """
-    Notify that episode requires HG2.5 manual prompt engineering review.
-    02/09/2026: Added for content policy refusal routing.
-    """
-    from app.services import telegram_notify as tg
-    await tg.notify_error(
-        "HG2.5 Manual Review Required",
-        task_id,
-        f"GPT content policy refusal. Manual prompt engineering needed.\n\nReason: {reason[:300]}"
-    )
-
-
 async def _notify_failure(task_id: str, stage: str, detail: str) -> None:
     from app.services import telegram_notify as tg
     await tg.notify_error("HG1 chain failed at %s" % stage, task_id, detail)
@@ -166,28 +144,6 @@ def run_chain(task_id: str) -> int:
         out_dir=str(ep_dir)
     )
     _log(stage, f"VOX Pipeline complete: {vox_summary.get('totalBeats', 0)} beats, {vox_summary.get('totalFrames', 0)} frames. Human Gate 2 card ready.")
-    return 0
-
-    # ---- Human Gate 2 Check & Dispatch Guard (Rule 125 Single Truth) ----
-    stage = "HG2"
-    audit_file = ep_dir / "visual_convergence_audit.json"
-    is_converged = False
-    if audit_file.exists():
-        try:
-            audit_data = json.loads(audit_file.read_text(encoding="utf-8"))
-            is_converged = bool(audit_data.get("converged", False))
-        except Exception:
-            is_converged = False
-
-    if is_converged:
-        _log("HG2", "Human Gate 2 card already dispatched after B3.5.1 DACL convergence (Rule 125 Single Truth). Skipping duplicate.")
-        return 0
-
-    # Fallback if B3.5.1 convergence gate was not met or audit file is absent
-    _log("HG2", "B3.5.1 DACL not converged or audit file absent; triggering unified Human Gate 2 fallback...")
-    from app.services.telegram_buttons import trigger_human_gate_2
-    trigger_human_gate_2(task_id)
-    _log("HG2", "Fallback Human Gate 2 card sent, waiting for images from Antigravity")
     return 0
 
 

@@ -665,9 +665,6 @@ def select_competitors(candidates: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
                 len(scored))
     return group1, group2
 
-    logger.info("[b15.pass1] selected %d all-time + %d recent from %d candidates",
-                len(group1), len(group2), len(scored))
-    return group1, group2
 
 
 def fetch_transcript(video_id: str, langs: List[str], head_seconds: int = 180) -> Dict:
@@ -688,37 +685,6 @@ def fetch_transcript(video_id: str, langs: List[str], head_seconds: int = 180) -
                        video_id, type(e).__name__)
         return {"status": "unavailable", "text": None, "source": None}
 
-
-def _whisper_transcript(video_id: str, lang: str, head_seconds: int) -> Optional[str]:
-    """Transcribe opening audio using yt-dlp and Faster-Whisper."""
-    if not os.path.exists(YTDLP_BIN):
-        logger.debug("[b15.pass1] yt-dlp not found at %s", YTDLP_BIN)
-        return None
-    with tempfile.TemporaryDirectory(prefix="b15_audio_") as tmp:
-        out_tmpl = str(Path(tmp) / "a.%(ext)s")
-        proc = subprocess.run(
-            [YTDLP_BIN, "--no-update", "--no-playlist", "-x",
-             "--audio-format", "mp3", "--audio-quality", "128K",
-             "--download-sections", f"*0-{head_seconds}",
-             "-o", out_tmpl, f"https://www.youtube.com/watch?v={video_id}"],
-            capture_output=True, text=True, timeout=180,
-        )
-        audio = next(Path(tmp).glob("a.*"), None)
-        if proc.returncode != 0 or audio is None:
-            logger.info("[b15.pass1] %s: yt-dlp failed rc=%s", video_id, proc.returncode)
-            return None
-        try:
-            from faster_whisper import WhisperModel
-            model = WhisperModel("tiny", device="cpu", compute_type="int8")
-            segments, _ = model.transcribe(str(audio), language=lang, beam_size=1)
-            text = " ".join(s.text.strip() for s in segments if s.start < head_seconds)
-        except Exception as e:
-            logger.warning("[b15.pass1] %s: Faster-Whisper failed: %s", video_id, e)
-            return None
-    if text.strip():
-        logger.info("[b15.pass1] %s: whisper transcribed %d chars", video_id, len(text))
-        return text
-    return None
 
 
 def download_thumbnail(video_id: str, thumbnails: Dict, dest_dir: Path) -> Optional[str]:
@@ -802,17 +768,6 @@ def extract_comment_mined_signals(comments: List[Dict]) -> Tuple[List[str], List
 
     return ai_slop[:5], wishlist[:5]
 
-
-def extract_video_chapters(description: str) -> List[str]:
-    """Extract chapter timestamps from video description if present."""
-    if not description:
-        return []
-    chapters = []
-    for line in description.splitlines():
-        line = line.strip()
-        if re.search(r'\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b', line):
-            chapters.append(line[:100])
-    return chapters[:10]
 
 
 # ==============================================================================

@@ -428,7 +428,7 @@
 | `app/services/build_remotion_props.py` | Ghép timestamp Whisper vào props Remotion | Block 7.0 |
 | `remotion/src/index.tsx` | TwoLayerEpisode 1080p React Remotion Engine | Block 8.0 |
 | `app/pipeline/stages/s7_render.py` | Remotion CPU Render & bypass redundant burning | Block 8.0 |
-| `app/services/seo_autogen_b10.py` | B10 SEO Packaging & Gate 2 Upload Payload | Block 10.0 |
+| `app/services/seo_package_forge.py` | B10 SEO Packaging & Gate 2 Upload Payload | Block 10.0 |
 | `scripts/b11_engine.py` | Analytics 48h Routine Lean Sync & Deep Post-Mortem | Block 11.0 |
 | `scripts/orchestrator/ghost_code_detector.py` | 4-Layer Automated Ghost Code Hunter Engine (VETO Authority) | Core Orchestrator Gate |
 

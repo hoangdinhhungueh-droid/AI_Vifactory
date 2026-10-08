@@ -10,13 +10,8 @@ import {
 import { SPRING_PRESETS } from "./springPresets";
 import { useStopMotion } from "./useStopMotion";
 import {
-  VoxPaperBackdrop,
-  VoxTornPaper,
   VoxBrassPin,
   VoxWashiTape,
-  VoxStickerCutout,
-  VoxConnectingYarn,
-  VoxStampedLabel,
 } from "./papercraft";
 
 export interface VoxBuildOnCutout {
@@ -97,16 +92,16 @@ export interface VoxBuildOnStageProps {
  *                 bóng đổ thở nhẹ và rung giấy vật lý 12fps stop-motion jitter.
  */
 export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
-  headline = "THE IMPOSSIBLE CONTRADICTION",
-  subtitle = "CLASSIFIED PAPER TRAIL // EXHIBIT A",
+  headline,
+  subtitle,
   theme = "newsprint-editorial",
   backgroundSrc,
   heroSrc,
-  heroLabel = "PRIMARY OPERATOR",
+  heroLabel,
   heroPosition = { xPct: 50, yPct: 52, widthPct: 36 },
   supportingCutouts = [],
   yarns = [],
-  stampText = "CONFIDENTIAL // VERIFIED",
+  stampText,
   stampColor = "#dc2626",
   hasMarkerHighlight = true,
   durationSec = 10,
@@ -137,7 +132,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const backdropSpring = spring({
     frame,
     fps,
-    config: SPRING_PRESETS.molassesBouncy,
+    config: SPRING_PRESETS.paperSlide,
   });
   const backdropScale = interpolate(backdropSpring, [0, 1], [0.94, 1.0]);
   const backdropOpacity = interpolate(backdropSpring, [0, 1], [0, 1]);
@@ -147,7 +142,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const heroSpring = spring({
     frame: Math.max(0, frame - heroDelayFrames),
     fps,
-    config: SPRING_PRESETS.crispSnappy,
+    config: SPRING_PRESETS.paperSlide,
   });
   const heroStartX = -15; // slides in from off-screen left
   const heroTargetX = heroPosition.xPct;
@@ -160,7 +155,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const headlineSpring = spring({
     frame: Math.max(0, frame - headlineDelayFrames),
     fps,
-    config: SPRING_PRESETS.impactThud,
+    config: SPRING_PRESETS.stamp,
   });
 
   // 4. RUBBER STAMP SLAM (5.0s - 6.5s)
@@ -168,7 +163,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const stampSpring = spring({
     frame: Math.max(0, frame - stampDelayFrames),
     fps,
-    config: SPRING_PRESETS.impactThud,
+    config: SPRING_PRESETS.stamp,
   });
   const stampScale = interpolate(stampSpring, [0, 1], [2.2, 1.0]);
   const stampOpacity = interpolate(stampSpring, [0, 0.2, 1], [0, 0.95, 0.9]);
@@ -259,22 +254,24 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             }}
           />
 
-          {/* Archival Dossier Watermark (Rule 128 Generic Contract) */}
-          <div
-            style={{
-              position: "absolute",
-              top: "24px",
-              left: "28px",
-              fontFamily: "monospace",
-              fontSize: "12px",
-              fontWeight: 700,
-              color: "rgba(0,0,0,0.25)",
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
-            }}
-          >
-            {subtitle || "ARCHIVAL DOSSIER // FORENSIC RECORD"}
-          </div>
+          {/* Archival Dossier Watermark (Rule 128 Generic Contract — only when subtitle is provided without headline) */}
+          {subtitle && !headline && (
+            <div
+              style={{
+                position: "absolute",
+                top: "24px",
+                left: "28px",
+                fontFamily: "monospace",
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "rgba(0,0,0,0.25)",
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+              }}
+            >
+              {subtitle}
+            </div>
+          )}
 
           {/* EDITORIAL HEADLINE (Large Typography) */}
           {headline && (
@@ -416,7 +413,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             const cutSpring = spring({
               frame: Math.max(0, frame - cutDelayFrames),
               fps,
-              config: SPRING_PRESETS.cardSlam,
+              config: SPRING_PRESETS.paperHeavy,
             });
             const curY = interpolate(
               cutSpring,

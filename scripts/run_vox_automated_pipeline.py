@@ -14,7 +14,7 @@ Executes the 100% automated end-to-end DAG:
   8. Master Multi-Location Atomic State Packaging
 
 Usage:
-  python scripts/run_vox_automated_pipeline.py --task-id EN_EP0008_oakland_plan_rejected --auto
+  python scripts/run_vox_automated_pipeline.py --task-id <MARKET>_EP<0000>_<topic_slug> --auto
   python scripts/run_vox_automated_pipeline.py --topic "D.B. Cooper 1971" --duration 60 --auto
   python scripts/run_vox_automated_pipeline.py --topic "Silicon Valley Chip War" --duration 120 --theme punk-zine --dry-run
 """
@@ -124,7 +124,7 @@ def run_automated_pipeline(
     director = VoxAutomatedDirector(market=market, fps=30)
 
     # 1. Resolve Target Paths & Task Metadata
-    ep_id = task_id or episode_id or (f"{market}_EP0008_oakland_plan_rejected" if "oakland" in (topic or "").lower() else None)
+    ep_id = task_id or episode_id
     if not ep_id:
         slug = re.sub(r'[^a-zA-Z0-9_]', '_', (topic or "vox_video").lower()).strip('_')[:35]
         ep_id = f"{market}_VOX_{slug.upper()}"
@@ -189,6 +189,34 @@ def run_automated_pipeline(
             pass
 
     if not resolved_script:
+        logger.info(f"Dynamically generating 5-beat story script for {ep_id} (topic: '{resolved_topic}', market: '{market}')...")
+        try:
+            try:
+                from app.services.story_engine_b2 import generate_5beat_story
+                story_res = generate_5beat_story(
+                    task_id=ep_id,
+                    topic=resolved_topic,
+                    market=market,
+                    grounding_data=grounding_data
+                )
+            except (ImportError, TypeError):
+                from app.services.story_engine_b2 import generate_5_arc_story
+                custom_meta = {
+                    "market": market,
+                    "topic": resolved_topic,
+                    "raw_term": resolved_topic,
+                    "niche_brief": resolved_niche or "Investigative Documentary",
+                    "grounding_intel": grounding_data,
+                }
+                story_res = generate_5_arc_story(task_id=ep_id, custom_meta=custom_meta)
+            if isinstance(story_res, dict):
+                resolved_script = (story_res.get("story") or story_res.get("full_script") or story_res.get("spoken_script_text") or "").strip()
+            elif isinstance(story_res, str):
+                resolved_script = story_res.strip()
+        except Exception as _gen_err:
+            logger.warning(f"Dynamic story generation failed: {_gen_err}")
+
+    if not resolved_script:
         raise RuntimeError(f"Strict Rule 118 Violation: No script or verified grounding facts found to generate script for {ep_id}")
 
     # Dynamically scale duration_sec to match actual script words
@@ -212,29 +240,48 @@ def run_automated_pipeline(
     logger.info(f"🎙️ [4/7] Synthesizing Hollywood Voiceover Audio Spine (Voice: {VOICE_MAP.get(market, 'en-US-ChristopherNeural')})...")
     audio_out_path = target_out / "tts_out.mp3"
     srt_out_path = target_out / "subtitles.srt"
+    spoken_sent_path = target_out / "spoken_sentences.json"
+    whisper_seg_path = target_out / "whisper_segments.json"
 
+    effective_duration = float(duration_sec)
     if not dry_run:
         if audio_out_path.exists() and audio_out_path.stat().st_size > 100000 and srt_out_path.exists():
             logger.info(f"   Audio already exists ({audio_out_path.stat().st_size / (1024 * 1024):.2f} MB), probing duration...")
             try:
                 cmd = ["ffprobe", "-i", str(audio_out_path), "-show_entries", "format=duration", "-v", "quiet", "-of", "csv=p=0"]
                 proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
-                actual_audio_duration = float(proc.stdout.strip())
+                effective_duration = float(proc.stdout.strip())
             except Exception:
-                actual_audio_duration = float(duration_sec)
-            effective_duration = actual_audio_duration
+                effective_duration = float(duration_sec)
             logger.info(f"   Using existing audio: {effective_duration:.2f}s -> {audio_out_path}")
         else:
-            actual_audio_duration = asyncio.run(
-                synthesize_edge_tts_audio(
-                    text=resolved_script,
-                    output_audio_path=audio_out_path,
-                    output_srt_path=srt_out_path,
-                    voice=VOICE_MAP.get(market, "en-US-ChristopherNeural")
+            try:
+                from app.services.beat_tts_engine import synthesize_beat_audio_and_subtitles
+                tts_res = asyncio.run(
+                    synthesize_beat_audio_and_subtitles(
+                        episode_id=ep_id,
+                        script_text=resolved_script,
+                        market=market,
+                        out_dir=str(target_out)
+                    )
                 )
-            )
-            logger.info(f"   Audio Generated: {actual_audio_duration:.2f}s -> {audio_out_path}")
-            effective_duration = actual_audio_duration
+                if isinstance(tts_res, dict) and tts_res.get("total_duration_sec"):
+                    effective_duration = float(tts_res["total_duration_sec"])
+            except (ImportError, TypeError, Exception) as _beat_tts_err:
+                logger.info(f"   synthesize_beat_audio_and_subtitles notice ({_beat_tts_err}), using edge_tts fallback...")
+                try:
+                    actual_audio_duration = asyncio.run(
+                        synthesize_edge_tts_audio(
+                            text=resolved_script,
+                            output_audio_path=audio_out_path,
+                            output_srt_path=srt_out_path,
+                            voice=VOICE_MAP.get(market, "en-US-ChristopherNeural")
+                        )
+                    )
+                    effective_duration = actual_audio_duration
+                except Exception as _e_synth:
+                    logger.warning(f"Audio synthesis warning: {_e_synth}")
+                    effective_duration = float(duration_sec)
     else:
         effective_duration = float(duration_sec)
         logger.info("   [Dry-run] Audio synthesis skipped.")
@@ -246,19 +293,64 @@ def run_automated_pipeline(
     with open(target_out / "beats.json", "w", encoding="utf-8") as f:
         json.dump(beats, f, indent=2, ensure_ascii=False)
 
-    # Save spoken sentences for subtitle alignment
-    spoken_sentences = [
-        {
-            "index": b["beat_index"],
-            "text": b["narration"],
-            "start_sec": b["start_sec"],
-            "end_sec": b["end_sec"],
-            "headline": b["headline"]
-        }
-        for b in beats
-    ]
-    with open(target_out / "spoken_sentences.json", "w", encoding="utf-8") as f:
+    # Construct canonical B2.6 spoken_sentences with all required fields:
+    # sentence_id, beat_index, text, start_ms, end_ms, start, end, duration_frames, duration_sec, words
+    from app.services.beat_tts_engine import tokenize_for_karaoke
+    lang_code = "ja" if market.upper() in ("JP", "JA") else ("ko" if market.upper() in ("KR", "KO") else "en")
+
+    spoken_sentences = []
+    if spoken_sent_path.exists() and spoken_sent_path.stat().st_size > 200:
+        try:
+            existing_sents = json.loads(spoken_sent_path.read_text(encoding="utf-8"))
+            if isinstance(existing_sents, list) and len(existing_sents) > 0 and "duration_frames" in existing_sents[0]:
+                spoken_sentences = existing_sents
+        except Exception:
+            spoken_sentences = []
+
+    if not spoken_sentences:
+        curr_offset_ms = 0
+        total_beats = len(beats)
+        for b in beats:
+            b_idx = b.get("beat_index", 1)
+            b_text = b.get("narration", "")
+            b_dur_sec = max(1.0, float(b.get("end_sec", 0.0) - b.get("start_sec", 0.0)) if b.get("end_sec") else (effective_duration / max(1, total_beats)))
+            b_dur_ms = int(b_dur_sec * 1000)
+            start_ms = curr_offset_ms
+            end_ms = start_ms + b_dur_ms
+            dur_frames = max(1, int(round(b_dur_sec * director.fps)))
+            words = tokenize_for_karaoke(b_text, start_ms, end_ms, lang_code=lang_code)
+
+            sent_item = {
+                "sentence_id": f"sent_{b_idx:03d}",
+                "beat_index": b_idx,
+                "text": b_text,
+                "start_ms": start_ms,
+                "end_ms": end_ms,
+                "start": round(start_ms / 1000.0, 3),
+                "end": round(end_ms / 1000.0, 3),
+                "duration_frames": dur_frames,
+                "duration_sec": round(b_dur_sec, 3),
+                "words": words,
+                "headline": b.get("headline", "")
+            }
+            spoken_sentences.append(sent_item)
+            curr_offset_ms = end_ms
+
+    with open(spoken_sent_path, "w", encoding="utf-8") as f:
         json.dump(spoken_sentences, f, indent=2, ensure_ascii=False)
+    with open(whisper_seg_path, "w", encoding="utf-8") as f:
+        json.dump(spoken_sentences, f, indent=2, ensure_ascii=False)
+
+    if not srt_out_path.exists() or srt_out_path.stat().st_size < 100:
+        srt_lines = []
+        for idx_srt, seg in enumerate(spoken_sentences, 1):
+            s_ms = seg.get("start_ms", 0)
+            e_ms = seg.get("end_ms", 0)
+            s_str = f"{s_ms // 3600000:02d}:{(s_ms % 3600000) // 60000:02d}:{(s_ms % 60000) // 1000:02d},{s_ms % 1000:03d}"
+            e_str = f"{e_ms // 3600000:02d}:{(e_ms % 3600000) // 60000:02d}:{(e_ms % 60000) // 1000:02d},{e_ms % 1000:03d}"
+            srt_lines.append(f"{idx_srt}\n{s_str} --> {e_str}\n{seg.get('text', '')}\n")
+        srt_out_path.write_text("\n".join(srt_lines), encoding="utf-8")
+
 
     # 7. Forge Tactile Image Prompts (5-Block Prompts & Dual-Layer FG/BG)
     logger.info(f"🎨 [6/7] Forging 5-Part Tactile Image Prompts for {len(beats)} beats...")
@@ -317,6 +409,47 @@ def run_automated_pipeline(
     # Recalibrate totalFrames to match actual audio duration exactly
     total_frames = int(effective_duration * director.fps)
     remotion_manifest["totalFrames"] = total_frames
+
+    # Write brain_input.json to target_out with pipeline_version = "vox_twolayer_unified_v4"
+    target_brain_p = target_out / "brain_input.json"
+    brain = {}
+    if target_brain_p.exists():
+        try:
+            brain = json.loads(target_brain_p.read_text(encoding="utf-8"))
+        except Exception:
+            brain = {}
+    brain["task_id"] = ep_id
+    brain["episode_id"] = ep_id
+    brain["market"] = market
+    brain["story"] = resolved_script
+    brain["spoken_script"] = resolved_script
+    brain["spoken_sentences"] = spoken_sentences
+    brain["story_gate_score"] = dna_audit.get("score", 9.0)
+    brain["theme"] = resolved_theme
+    brain["niche"] = resolved_niche
+    brain["audio_duration_sec"] = effective_duration
+    brain["audio_duration_frames"] = total_frames
+    brain["total_scenes"] = len(beats)
+    brain["scenes"] = remotion_manifest.get("scenes", [])
+    brain["pipeline_version"] = "vox_twolayer_unified_v4"
+    target_brain_p.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # Run full TwoLayer + VoxOverlayLayer pipeline via build_remotion_props_data
+    try:
+        from app.services.build_remotion_props import build_remotion_props_data
+        unified_props = build_remotion_props_data(
+            episode_id=ep_id,
+            brain_input_path=str(target_brain_p),
+            segments_path=str(spoken_sent_path),
+            fps=director.fps,
+            skip_missing=True
+        )
+        if unified_props and isinstance(unified_props, dict):
+            remotion_manifest = unified_props
+            remotion_manifest["totalFrames"] = total_frames
+            logger.info("✅ Full TwoLayer + VoxOverlayLayer Remotion props successfully built.")
+    except Exception as _bprops_err:
+        logger.warning(f"build_remotion_props_data fallback: {_bprops_err}")
 
     with open(target_out / "remotion_props.json", "w", encoding="utf-8") as f:
         json.dump(remotion_manifest, f, indent=2, ensure_ascii=False)
@@ -419,7 +552,7 @@ def run_automated_pipeline(
             brain["audio_duration_frames"] = total_frames
             brain["total_scenes"] = len(beats)
             brain["scenes"] = remotion_manifest.get("scenes", [])
-            brain["pipeline_version"] = "vox_docudrama_v2"
+            brain["pipeline_version"] = "vox_twolayer_unified_v4"
             try:
                 brain_p.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
             except Exception as be:

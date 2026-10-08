@@ -54,6 +54,10 @@ BANNED_CASE_STUDY_ENTITIES = {
     "kokuka": "Kokuka Courageous incident entity",
     "conwartime": "BIMCO CONWARTIME clause entity",
     "voywar": "BIMCO VOYWAR clause entity",
+    "oakland_plan_rejected": "Hardcoded Oakland bankruptcy plan case literal",
+    "cathedraticum": "Hardcoded Oakland diocesan cathedraticum case literal",
+    "en-enron-ep006": "Hardcoded legacy Enron episode slug literal",
+    "RES-VOX-001": "Hardcoded mock research citation ID literal",
 }
 
 # Static dictionary names that should not be hardcoded in generic services
@@ -84,7 +88,6 @@ EXEMPTED_FILES = {
     "ghost_code_detector.py",
     "ci_neighbor_tester.py",
     "e2e_pipeline_smoketest.py",
-    "reforge_and_synthesize_oakland.py",
 }
 
 
@@ -184,8 +187,9 @@ class AntiBiasLinter:
                     continue
 
                 for banned_kw, reason in BANNED_CASE_STUDY_ENTITIES.items():
-                    # Word boundary matching
-                    if re.search(r"\b" + re.escape(banned_kw) + r"\b", val_lower):
+                    # Case-insensitive word boundary or token matching
+                    b_kw_lower = banned_kw.lower()
+                    if re.search(r"\b" + re.escape(b_kw_lower) + r"\b", val_lower) or (len(b_kw_lower) > 8 and b_kw_lower in val_lower):
                         file_violations.append(
                             CodeViolation(
                                 rel_path,

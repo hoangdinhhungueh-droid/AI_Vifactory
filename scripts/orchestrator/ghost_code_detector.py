@@ -52,11 +52,7 @@ IGNORED_DIRS = {
 
 # Forbidden ghost file patterns
 FORBIDDEN_FILE_PATTERNS = [
-    r".*\.bak(_\d+)?$",
-    r".*\.bak\..*$",
-    r".*\.backup(_\d+)?$",
-    r".*\.old$",
-    r".*\.orig$",
+    r".*\.(bak|backup|old|orig|broken)([._-].*)?$",
     r".*~$",
     r".*\.broken.*$",
 ]
@@ -199,14 +195,61 @@ class GhostCodeDetector:
             layer_defects.append(f"[Layer 5] Error executing AntiBiasLinter: {e}")
         return layer_defects
 
+    def check_layer6_remotion_and_zero_mock_invariants(self) -> List[str]:
+        """Layer 6: Remotion composition wiring & Zero-Mock visual/video audit score invariants."""
+        layer_defects = []
+
+        # a) Check remotion/src/index.tsx
+        index_tsx = self.root_dir / "remotion" / "src" / "index.tsx"
+        if index_tsx.exists():
+            try:
+                tsx_content = index_tsx.read_text(encoding="utf-8", errors="ignore")
+                if re.search(
+                    r'<Composition\b(?:(?!</Composition>|\/>).)*?\bid=["\']TwoLayerEpisode["\'](?:(?!</Composition>|\/>).)*?\bcomponent=\{\s*VoxBuildOnEpisode\s*\}',
+                    tsx_content,
+                    re.DOTALL,
+                ):
+                    layer_defects.append(
+                        "[Layer 6] Rule 125/136 violation in remotion/src/index.tsx: "
+                        "<Composition id=\"TwoLayerEpisode\" is wired to VoxBuildOnEpisode leaving TwoLayerEpisode orphaned."
+                    )
+
+                root_idx = tsx_content.find("const RemotionRoot")
+                root_block = tsx_content[root_idx:] if root_idx != -1 else tsx_content
+                for dead_comp in ("DataStoryTest", "FullStory", "SceneCard"):
+                    if re.search(rf'<Composition[^>]*id=["\']{dead_comp}["\']', root_block):
+                        layer_defects.append(
+                            f"[Layer 6] Rule 125 violation in remotion/src/index.tsx: "
+                            f"Dead test composition '{dead_comp}' is registered in RemotionRoot."
+                        )
+            except Exception as e:
+                layer_defects.append(f"[Layer 6] Error reading {index_tsx}: {e}")
+
+        # b) Check app/services/b5_visual_gate.py and app/services/video_audit_runner.py
+        for rel_file in ("app/services/b5_visual_gate.py", "app/services/video_audit_runner.py"):
+            target_f = self.root_dir / rel_file
+            if target_f.exists():
+                try:
+                    f_content = target_f.read_text(encoding="utf-8", errors="ignore")
+                    if "base_score = 8.5" in f_content or '"method": "fallback_baseline"' in f_content:
+                        layer_defects.append(
+                            f"[Layer 6] Rule 118/122 violation in {rel_file}: "
+                            "Hardcoded mock pass score ('base_score = 8.5' or '\"method\": \"fallback_baseline\"') detected."
+                        )
+                except Exception as e:
+                    layer_defects.append(f"[Layer 6] Error reading {rel_file}: {e}")
+
+        return layer_defects
+
     def run_all_checks(self) -> Tuple[bool, List[str]]:
-        """Runs all 5 forensic layers and compiles the final verdict."""
+        """Runs all 6 forensic layers and compiles the final verdict."""
         self.defects = []
         self.defects.extend(self.check_layer1_physical_hygiene())
         self.defects.extend(self.check_layer2_hardcoded_slugs())
         self.defects.extend(self.check_layer3_silent_heuristic_bypasses())
         self.defects.extend(self.check_layer4_documentation_parity())
         self.defects.extend(self.check_layer5_anti_bias_ast())
+        self.defects.extend(self.check_layer6_remotion_and_zero_mock_invariants())
         is_clean = (len(self.defects) == 0)
         return is_clean, self.defects
 
@@ -233,6 +276,9 @@ def scan_workspace(root_dir: str | Path = None) -> List[Dict[str, Any]]:
         elif "[Layer 5" in d:
             layer = "Layer 5"
             rule = "Rule 128"
+        elif "[Layer 6" in d:
+            layer = "Layer 6"
+            rule = "Rule 118"
 
         parsed_defects.append({
             "rule": rule,

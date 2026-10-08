@@ -575,10 +575,18 @@ def commit_trend_task(topic_data: dict) -> str:
     generate competitor intel card, record to History Registry, and sync to Notion SoT.
     """
     try:
-        from app.services.trend_gate_ai import get_next_episode_id
+        from app.services.episode_numbering import get_next_episode_id
         task_id = get_next_episode_id(topic_data.get("market", "EN"), topic_data.get("task_slug") or topic_data.get("raw_term", "topic"))
+    except (ImportError, AttributeError):
+        try:
+            from app.services.trend_gate_ai import get_next_episode_id
+            task_id = get_next_episode_id(topic_data.get("market", "EN"), topic_data.get("task_slug") or topic_data.get("raw_term", "topic"))
+        except Exception as _ep_err:
+            logger.error(f"[trend_engine] Failed to generate episode ID via trend_gate_ai: {_ep_err}")
+            slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(topic_data.get("task_slug") or topic_data.get("raw_term", "topic"))).strip('-')[:25]
+            task_id = f"{topic_data.get('market', 'EN')}_EP9999_{slug}"
     except Exception as _ep_err:
-        logger.error(f"[trend_engine] Failed to generate episode ID via trend_gate_ai: {_ep_err}")
+        logger.error(f"[trend_engine] Failed to generate episode ID via episode_numbering: {_ep_err}")
         slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(topic_data.get("task_slug") or topic_data.get("raw_term", "topic"))).strip('-')[:25]
         task_id = f"{topic_data.get('market', 'EN')}_EP9999_{slug}"
 
@@ -936,22 +944,6 @@ def forensic_pre_filter(candidate: dict, market: str) -> tuple[bool, str]:
     return False, f"No forensic crisis anchor in '{term}' (0 LLM tokens burned)"
 
 
-def get_next_prefiltered_candidate(market: str = "EN", custom_seed: str | None = None) -> dict | None:
-    """Retrieves the next highest-scoring candidate that passes Level-0 Forensic Pre-Filter,
-    without triggering full production. Used by Centralized Orchestrator Leader for Optimal Rotation.
-    """
-    candidates = fetch_live_trending_terms(market=market, custom_seed=custom_seed)
-    for cand in candidates:
-        term = cand.get("term", "").strip()
-        if is_topic_already_handled(term, market=market):
-            continue
-        passed, reason = forensic_pre_filter(cand, market)
-        if passed:
-            logger.info(f"[trend_engine] Next prefiltered candidate for {market}: '{term}' ({reason})")
-            return cand
-        else:
-            logger.info(f"[trend_engine] Candidate '{term}' rejected by Level-0 pre-filter: {reason}")
-    return None
 
 
 def discover_and_produce_market_trend(

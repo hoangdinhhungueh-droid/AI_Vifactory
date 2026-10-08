@@ -8,7 +8,7 @@ step. Added 23/08/2026 per user request; implements Skill AI Rule 119.
 Flow:
   1. Load episode context (brain_input.json + Story Library row for the
      already-validated B1 keyword & breakout queries, Rule 117).
-  2. Auto-call HHTech GPT-6-Astra (app.services.seo_autogen_b10) to generate
+  2. Auto-call HHTech GPT-6-Astra (app.services.seo_package_forge) to generate
      Title/Description/Thumbnail A-B-C/Hook Frame/End Screen packaging --
      same gateway pattern as B2 (produce_b1_b2_b3_gpt56_sol.py).
   3. Sync the generated packaging and breakout queries into the Notion Story Library row.
@@ -34,7 +34,6 @@ from pathlib import Path
 sys.path.insert(0, "/root/video_factory")
 sys.path.insert(0, "/root/video_factory/scripts")
 
-from app.services.hhtech_reasoner import call_gpt56_sol  # noqa: F401 (re-exported for callers)
 try:
     from app.services.youtube_upload import upload_from_payload
 except ImportError:
@@ -204,121 +203,6 @@ def _sync_to_youtube_registry(episode_id: str, market: str, packaging: dict):
     created = create_page(YOUTUBE_REGISTRY_DB_ID, props)
     return {"action": "created", "page_id": created.get("id") if isinstance(created, dict) else None}
 
-
-def compose_hero_thumbnail(ep_dir: Path) -> str | None:
-    """Automate Hero-scene thumbnail composition (thumbnail_a.png) from Scene 000
-    BG and FG cutouts via PIL (Rule 113 / 1-second thumbnail).
-    """
-    target_path = ep_dir / "thumbnail_a.png"
-    if target_path.exists() and target_path.stat().st_size > 1000:
-        return str(target_path)
-
-    try:
-        from PIL import Image
-    except ImportError:
-        print("[thumbnail] PIL/Pillow not available; skipping hero thumbnail composition")
-        return None
-
-    brain = {}
-    brain_path = ep_dir / "brain_input.json"
-    if brain_path.exists():
-        try:
-            with open(brain_path, "r", encoding="utf-8") as bf:
-                brain = json.load(bf)
-        except Exception as e:
-            print(f"[thumbnail] Warning: failed to read {brain_path}: {e}")
-
-    scenes = brain.get("scenes") or []
-    hero_scene = scenes[0] if scenes else {}
-    bg_key = str(hero_scene.get("background_reuse_key") or "").strip()
-    fg_key = str(hero_scene.get("foreground_reuse_key") or "").strip()
-
-    # Search for BG image
-    bg_path = None
-    bg_candidates = []
-    if bg_key:
-        bg_candidates.extend([
-            ep_dir / "images" / f"{bg_key}.png",
-            ep_dir / "assets" / f"{bg_key}.png",
-            ep_dir / "images" / f"{bg_key}.jpg",
-            ep_dir / "assets" / f"{bg_key}.jpg",
-        ])
-    for folder in [ep_dir / "images", ep_dir / "assets"]:
-        if folder.exists():
-            for f in sorted(folder.glob("*.png")):
-                if "fg" not in f.name.lower() and f.name != "thumbnail_a.png":
-                    bg_candidates.append(f)
-
-    for cand in bg_candidates:
-        if cand.exists() and cand.stat().st_size > 1000:
-            bg_path = cand
-            break
-
-    if not bg_path:
-        print("[thumbnail] No background image candidate found for Hero thumbnail")
-        return None
-
-    # Search for FG image
-    fg_path = None
-    fg_candidates = []
-    if fg_key:
-        fg_candidates.extend([
-            ep_dir / "images" / f"{fg_key}.png",
-            ep_dir / "assets" / f"{fg_key}.png",
-        ])
-    for folder in [ep_dir / "images", ep_dir / "assets"]:
-        if folder.exists():
-            for f in sorted(folder.glob("*.png")):
-                if ("fg" in f.name.lower() or "character" in f.name.lower()) and f.name != "thumbnail_a.png":
-                    fg_candidates.append(f)
-
-    for cand in fg_candidates:
-        if cand.exists() and cand.stat().st_size > 1000:
-            fg_path = cand
-            break
-
-    try:
-        # Standard YouTube thumbnail resolution: 1280x720 (16:9)
-        THUMB_WIDTH, THUMB_HEIGHT = 1280, 720
-        with Image.open(bg_path) as bg_img:
-            bg_composite = bg_img.convert("RGBA")
-            bg_ratio = bg_composite.width / float(bg_composite.height)
-            target_ratio = THUMB_WIDTH / float(THUMB_HEIGHT)
-            if bg_ratio > target_ratio:
-                new_w = int(bg_composite.height * target_ratio)
-                left = (bg_composite.width - new_w) // 2
-                bg_composite = bg_composite.crop((left, 0, left + new_w, bg_composite.height))
-            elif bg_ratio < target_ratio:
-                new_h = int(bg_composite.width / target_ratio)
-                top = (bg_composite.height - new_h) // 2
-                bg_composite = bg_composite.crop((0, top, bg_composite.width, top + new_h))
-            bg_composite = bg_composite.resize((THUMB_WIDTH, THUMB_HEIGHT), Image.Resampling.LANCZOS)
-
-            # Composite Foreground if present
-            if fg_path:
-                with Image.open(fg_path) as fg_img:
-                    fg_rgba = fg_img.convert("RGBA")
-                    fg_target_h = int(THUMB_HEIGHT * 0.90)
-                    fg_scale = fg_target_h / float(fg_rgba.height)
-                    fg_target_w = int(fg_rgba.width * fg_scale)
-                    fg_resized = fg_rgba.resize((fg_target_w, fg_target_h), Image.Resampling.LANCZOS)
-
-                    pos_pref = hero_scene.get("foreground_position") or "left"
-                    if pos_pref == "right":
-                        fg_x = THUMB_WIDTH - fg_target_w - 50
-                    else:
-                        fg_x = 50
-                    fg_y = THUMB_HEIGHT - fg_target_h
-
-                    bg_composite.paste(fg_resized, (fg_x, fg_y), fg_resized)
-
-            final_rgb = bg_composite.convert("RGB")
-            final_rgb.save(target_path, format="PNG", optimize=True)
-            print(f"[thumbnail] Successfully composed Hero thumbnail: {target_path} ({THUMB_WIDTH}x{THUMB_HEIGHT})")
-            return str(target_path)
-    except Exception as e:
-        print(f"[thumbnail] Failed to compose Hero thumbnail: {e}")
-        return None
 
 
 def _find_thumbnail_asset(ep_dir: Path) -> str:

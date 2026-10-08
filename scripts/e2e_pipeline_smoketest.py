@@ -208,6 +208,95 @@ def gate_cross_market_dynamic_director():
     finally:
         shutil.rmtree(test_dir, ignore_errors=True)
 
+def gate_b5_zero_mock_audit():
+    print_gate("11. B5 Zero-Mock Visual Gate & Dual-Layer Audit Contract (Rule 118 & 122)")
+    with open(os.path.join(PROJECT_ROOT, "app", "services", "b5_visual_gate.py"), "r", encoding="utf-8") as f:
+        b5_code = f.read()
+    assert "base_score = 8.5" not in b5_code, "b5_visual_gate.py must not contain hardcoded 'base_score = 8.5' mock pass score!"
+    print("  [PASS] b5_visual_gate.py has 0 hardcoded 'base_score = 8.5' fallback.")
+
+    from app.services.image_audit import _FG_BG_NOTE
+    assert isinstance(_FG_BG_NOTE, str) and len(_FG_BG_NOTE) > 50, "_FG_BG_NOTE must be defined and non-empty in image_audit.py"
+    print("  [PASS] image_audit.py correctly exports _FG_BG_NOTE without NameError.")
+
+def gate_b6_remotion_props_and_composition():
+    print_gate("12. B6 Remotion Composition & Vox Build-On Contract (Rule 120, 125 & 128)")
+    with open(os.path.join(PROJECT_ROOT, "remotion", "src", "index.tsx"), "r", encoding="utf-8") as f:
+        index_tsx = f.read()
+    assert re.search(r'id=["\']TwoLayerEpisode["\']\s+component=\{TwoLayerEpisode\}', index_tsx), (
+        "remotion/src/index.tsx must bind id='TwoLayerEpisode' to component={TwoLayerEpisode}!"
+    )
+    print("  [PASS] remotion/src/index.tsx binds id='TwoLayerEpisode' to component={TwoLayerEpisode}.")
+
+    with open(os.path.join(PROJECT_ROOT, "remotion", "src", "components", "vox", "VoxBuildOnStage.tsx"), "r", encoding="utf-8") as f:
+        vox_stage = f.read()
+    assert "RES-VOX-001" not in vox_stage, "VoxBuildOnStage.tsx must not contain hardcoded RES-VOX-001!"
+    assert "THE IMPOSSIBLE CONTRADICTION" not in vox_stage, "VoxBuildOnStage.tsx must not contain hardcoded THE IMPOSSIBLE CONTRADICTION!"
+    print("  [PASS] VoxBuildOnStage.tsx has 0 hardcoded RES-VOX-001 or THE IMPOSSIBLE CONTRADICTION literals.")
+
+    with open(os.path.join(PROJECT_ROOT, "app", "services", "build_remotion_props.py"), "r", encoding="utf-8") as f:
+        props_code = f.read()
+    assert "is_vox_build_on" not in props_code, "build_remotion_props.py must not contain legacy is_vox_build_on early-return bypass!"
+    assert "fo_type" not in props_code or "fo_type =" in props_code or "fo_type:" in props_code, "build_remotion_props.py must not have undefined fo_type!"
+    print("  [PASS] build_remotion_props.py clean of is_vox_build_on early return and undefined fo_type.")
+
+def gate_b7_b9_render_and_video_qa():
+    print_gate("13. B7-B9 Render Engine & Zero-Mock Video QA Gate (Rule 118, 120, 122)")
+    with open(os.path.join(PROJECT_ROOT, "app", "services", "video_audit_runner.py"), "r", encoding="utf-8") as f:
+        runner_code = f.read()
+    assert "fallback_baseline" not in runner_code, "video_audit_runner.py must not contain 'fallback_baseline' mock scores!"
+    print("  [PASS] video_audit_runner.py has 0 fallback_baseline mock scores.")
+
+    with open(os.path.join(PROJECT_ROOT, "app", "pipeline", "stages", "s7_render.py"), "r", encoding="utf-8") as f:
+        s7_code = f.read()
+    assert "beat_bgm_engine" in s7_code, "app/pipeline/stages/s7_render.py must use beat_bgm_engine!"
+    print("  [PASS] s7_render.py successfully integrates beat_bgm_engine.")
+
+def gate_b10_cross_market_chapter_sync():
+    print_gate("14. B10 Cross-Market Chapter Synchronization (Rule 128 & 135)")
+    import tempfile
+    from app.services.seo_package_forge import sync_exact_chapters_from_remotion
+
+    with tempfile.TemporaryDirectory(prefix="e2e_smoketest_b10_") as td:
+        mock_props = {
+            "fps": 30,
+            "scenes": [
+                {"durationInFrames": 900, "speakerTag": "BEAT 1: GRAND JURY INDICTMENT", "beat_index": 1},
+                {"durationInFrames": 900, "speakerTag": "BEAT 2: THE PAPER TRAIL", "beat_index": 2},
+                {"durationInFrames": 900, "speakerTag": "BEAT 3: FINANCIAL CONTAGION", "beat_index": 3},
+            ]
+        }
+        with open(os.path.join(td, "remotion_props.json"), "w", encoding="utf-8") as f:
+            json.dump(mock_props, f)
+
+        chapters = sync_exact_chapters_from_remotion(
+            "smoke_test_en_task",
+            market="EN",
+            ep_dir_path=td,
+            existing_chapters=[
+                "BEAT 1: GRAND JURY INDICTMENT",
+                "BEAT 2: THE PAPER TRAIL",
+                "BEAT 3: FINANCIAL CONTAGION"
+            ]
+        )
+        assert len(chapters) >= 3, f"Expected at least 3 chapters, got: {chapters}"
+        for ch in chapters:
+            assert "検査・行政指導" not in ch, f"Forbidden Japanese term '検査・行政指導' leaked into EN chapters: {ch}"
+        print(f"  [PASS] EN Chapter sync verified ({len(chapters)} chapters). 0% '検査・行政指導' leak.")
+
+def gate_b11_analytics_and_insight_loop():
+    print_gate("15. B11 Analytics Telemetry & Insight Dreaming Loop (Rule 113, 118, 125)")
+    with open(os.path.join(PROJECT_ROOT, "scripts", "b11_antigravity_engine.py"), "r", encoding="utf-8") as f:
+        b11_code = f.read()
+
+    # Verify no undefined token variable in v7 harvester block
+    assert "access_token=token," not in b11_code, "b11_antigravity_engine.py contains undefined 'token' variable in v7 harvest call!"
+    # Verify no bare except passing
+    assert "except Exception as _v7_err:\n                pass" not in b11_code, "b11_antigravity_engine.py must not contain bare 'except Exception as _v7_err: pass'!"
+    # Verify imports distill_insights_to_cards
+    assert "distill_insights_to_cards" in b11_code, "b11_antigravity_engine.py must import distill_insights_to_cards!"
+    print("  [PASS] b11_antigravity_engine.py verified: clean token scoping, no bare exception silencing, imports distill_insights_to_cards.")
+
 def main():
     print("\n" + "="*60)
     print("🛡️ RUNNING MASTER E2E PIPELINE SMOKE TEST (RULE 127)")
@@ -223,6 +312,11 @@ def main():
         gate_cross_market_dynamic_director()
         gate_zero_ghost_and_encoding()
         gate_market_scheduler()
+        gate_b5_zero_mock_audit()
+        gate_b6_remotion_props_and_composition()
+        gate_b7_b9_render_and_video_qa()
+        gate_b10_cross_market_chapter_sync()
+        gate_b11_analytics_and_insight_loop()
 
         print("\n" + "="*60)
         print("🎉 ALL PIPELINE GATES PASSED (100% INTEGRATION RUNTIME OK)!")

@@ -107,18 +107,13 @@ def call_vision_audit_llm(frames: list[Path], topic_title: str) -> dict:
     """Call high-level Vision LLM to audit visual frames against Rule 122."""
     api_key = get_hhtech_api_key()
     if not api_key:
-        logger.warning("[AUDIT] HHTECH_API_KEY not found. Performing strict rule-based fallback audit.")
-        # Fallback: rule-based check on extracted frame sizes and integrity
-        valid_frames = [f for f in frames if f.stat().st_size > 50000]
-        score = 8.5 if len(valid_frames) == len(frames) else 6.0
+        err_msg = "HHTECH_API_KEY not found; refusing to generate mock visual audit score (Rule 118 & Rule 122)."
+        logger.error(f"[AUDIT] {err_msg}")
         return {
-            "verdict": "PASS" if score >= 8.0 else "REVIEW",
-            "overall_score": score,
-            "method": "rule_based_size_probe",
-            "ui_artifacts_clean": True,
-            "style_conformance_score": 8.5,
-            "alpha_integrity_score": 8.5,
-            "notes": f"Rule-based visual audit passed for {len(valid_frames)} frames."
+            "verdict": "FAIL",
+            "overall_score": None,
+            "method": "error_no_mock",
+            "error": err_msg,
         }
 
     # Prepare Vision API payload with first 2-3 key frames to stay within token limits
@@ -186,13 +181,12 @@ def call_vision_audit_llm(frames: list[Path], topic_title: str) -> dict:
             result["method"] = f"llm_vision_{HHTECH_MODEL}"
             return result
     except Exception as e:
-        logger.error(f"[AUDIT] Vision LLM request failed: {e}. Falling back to baseline check.")
+        logger.error(f"[AUDIT] Vision LLM request failed: {e}")
         return {
-            "verdict": "PASS",
-            "overall_score": 8.2,
-            "method": "fallback_baseline",
-            "summary_vi": "Kiểm định baseline đạt chuẩn (fallback vision timeout)",
-            "error": str(e)
+            "verdict": "FAIL",
+            "overall_score": None,
+            "method": "error_no_mock",
+            "error": str(e),
         }
 
 
@@ -243,7 +237,7 @@ def main():
 
     res = run_automated_post_render_audit(args.episode, args.episodes_dir)
     print(json.dumps(res, indent=2, ensure_ascii=False))
-    if res.get("verdict") == "REJECT":
+    if res.get("verdict") in ("REJECT", "FAIL"):
         sys.exit(1)
 
 

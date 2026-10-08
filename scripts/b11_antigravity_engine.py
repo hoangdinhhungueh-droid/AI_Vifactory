@@ -28,10 +28,13 @@ Features:
 import urllib.request
 import urllib.parse
 import json
+import logging
 import os
 import sys
 import time
 from datetime import datetime, timezone, timedelta
+
+logger = logging.getLogger("vf.b11_antigravity_engine")
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -46,6 +49,7 @@ from scripts.b11_channel_analytics import (
     fetch_complete_channel_analytics,
     harvest_v7_suggested_candidates
 )
+from scripts.vf_insight_cards import distill_insights_to_cards
 
 # Notion IDs
 B11_EXPERIMENT_LAB_DB_ID = "76601989-2400-838f-ad45-816777c57ffd"
@@ -575,10 +579,10 @@ def run_b11_engine(mode="routine", dry_run=False, target_market=None):
 
             # V7 SUGGESTED TOPICS HARVESTER (Học từ Công thức V7 An Ong)
             try:
-                winning_ids = [v["id"] for v in all_videos if v.get("views", 0) >= 100]
-                if winning_ids and token:
+                winning_ids = [v["id"] for v in videos if v.get("views", 0) >= 100]
+                if winning_ids and access_token:
                     v7_cands = harvest_v7_suggested_candidates(
-                        access_token=token,
+                        access_token=access_token,
                         winning_video_ids=winning_ids,
                         market=m,
                         min_views=10
@@ -587,7 +591,7 @@ def run_b11_engine(mode="routine", dry_run=False, target_market=None):
                         added = update_v7_pool(m, v7_cands)
                         print(f"  🔥 [V7 HARVESTER] Market {m.upper()}: Đã lọc được {len(v7_cands)} ứng viên V7 đạt chuẩn (Thêm mới: {added}).")
             except Exception as _v7_err:
-                pass
+                logger.warning(f"[B11] V7 Outlier Harvester warning for {m}: {_v7_err}")
         except Exception as e:
             print(f"❌ [MARKET: {m.upper()}] Error processing channel: {e}")
             
@@ -689,6 +693,31 @@ def run_b11_engine(mode="routine", dry_run=False, target_market=None):
             core_enhancement = analysis_text[-350:].strip()
             append_skill_enhancement(notion_token, SKILL_SELF_LEARNING_PAGE_ID, core_enhancement)
             print("  * Appended to Notion Skill: SUCCESS (200 OK)")
+
+            # Distill actionable InsightCards for B2 consumption via scripts.vf_insight_cards
+            for c in supreme_candidates:
+                v = c["video"]
+                mkt = c["market"]
+                a4 = c.get("analytics_4tabs", {})
+                t2 = a4.get("tab_2_content", {})
+                ret = t2.get("engagement_retention", {})
+                card_summary = {
+                    "avd_sec": v.get("avd_sec") or ret.get("average_view_duration_seconds", 0),
+                    "duration_sec": 600.0,
+                    "hook_retention_0_30s": ret.get("retention_30s"),
+                    "hook_retention_0_60s": ret.get("retention_60s"),
+                    "mobile_pct": c.get("mobile_pct", 0.0),
+                    "ctr": ret.get("ctr"),
+                    "views": v.get("views", 0),
+                    "trigger_reason": c.get("reason", ""),
+                }
+                try:
+                    distilled_cards = distill_insights_to_cards(notion_token, mkt, card_summary)
+                    if distilled_cards:
+                        print(f"  * [B11 -> B2 INSIGHT CARD] Market {mkt}: Distilled {len(distilled_cards)} card(s) for B2 consumption.")
+                except Exception as _card_err:
+                    logger.warning(f"[B11] InsightCard distillation warning for {mkt}: {_card_err}")
+
             state["last_supreme_run"] = datetime.now(timezone.utc).isoformat()
     else:
         print("\n✅ [TIER 3 STANDBY] Không có biến động chạm ngưỡng tối cao. Token chi phí: 0.")

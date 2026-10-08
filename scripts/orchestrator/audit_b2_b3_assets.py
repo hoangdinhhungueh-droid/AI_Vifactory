@@ -371,6 +371,10 @@ def run_dual_audit(episode_id: str, ep_dir: Path, preflight_only: bool = False) 
 
     market = episode_id[:2].upper() if len(episode_id) >= 2 else "EN"
     topic_slug = episode_id[8:] if len(episode_id) > 8 else episode_id
+    bg_keys_list = [f"   {i+1}. {k}" for i, k in enumerate(sorted(bg_manifest.keys()))]
+    bg_keys_str = "\n".join(bg_keys_list)
+    fg_keys_list = [f"   {i+1}. {k}" for i, k in enumerate(sorted(fg_manifest.keys()))]
+    fg_keys_str = "\n".join(fg_keys_list)
 
     briefing = f"""[FORENSIC ASSET AUDIT DOSSIER - EPISODE: {episode_id} (ROUND {round_num}/{MAX_AUDIT_ROUNDS})]
 Market: {market}
@@ -389,9 +393,15 @@ Topic: {topic_slug}
 - Abstract Sentence Fragment FGs: {metrics['abstract_sentence_fgs_count']}
 
 2. FULL UNIQUE BACKGROUND PROMPTS MANIFEST ({len(bg_manifest)} Unique BGs):
+All {len(bg_manifest)} Verified Background Keys:
+{bg_keys_str}
+
 {json.dumps(bg_manifest, indent=2, ensure_ascii=False)}
 
 3. FULL UNIQUE FOREGROUND PROMPTS MANIFEST ({len(fg_manifest)} Unique FGs):
+All {len(fg_manifest)} Verified Foreground Keys:
+{fg_keys_str}
+
 {json.dumps(fg_manifest, indent=2, ensure_ascii=False)}
 
 4. FULL 5-ACT NARRATIVE & AUDIO SCRIPT:

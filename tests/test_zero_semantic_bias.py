@@ -24,7 +24,6 @@ EXEMPTED_FILES = {
     "test_b15_seo_package_forge.py",
     "test_zero_semantic_bias.py",
     "anti_bias_linter.py",
-    "reforge_and_synthesize_oakland.py",
 }
 
 # Forbidden episode-specific domain words that must NEVER appear in generic services/scripts

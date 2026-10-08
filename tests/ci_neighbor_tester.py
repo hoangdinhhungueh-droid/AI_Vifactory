@@ -65,12 +65,35 @@ BLOCK_FILES = {
     4.0: [
         "app/services/prompt_forge.py",
         "app/services/build_remotion_props.py",
-        "app/services/composite_generator.py",
         "scripts/flow_video_dispatcher.py",
+    ],
+    5.0: [
+        "app/services/b5_visual_gate.py",
+        "app/services/image_audit.py",
+    ],
+    6.0: [
+        "app/services/build_remotion_props.py",
+        "remotion/src/index.tsx",
+        "remotion/src/components/vox/VoxBuildOnStage.tsx",
+    ],
+    7.0: [
+        "app/services/beat_bgm_engine.py",
+        "app/pipeline/stages/s7_render.py",
+    ],
+    9.0: [
+        "app/services/video_audit_runner.py",
+    ],
+    10.0: [
+        "app/services/seo_package_forge.py",
+        "scripts/execute_b10_auto_seo_upload_gate2.py",
+    ],
+    11.0: [
+        "scripts/b11_antigravity_engine.py",
+        "scripts/b11_channel_analytics.py",
     ],
 }
 
-ALL_BLOCKS = [1.0, 1.5, 2.0, 2.6, 3.0, 4.0]
+ALL_BLOCKS = [1.0, 1.5, 2.0, 2.6, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 10.0, 11.0]
 
 
 def get_changed_files_from_git() -> list[str]:
@@ -686,6 +709,125 @@ def test_block26_audio_spine_contract() -> bool:
         return False
 
 
+def test_block5_visual_gate_contract() -> bool:
+    logger.info("--- [TEST BLOCK 5.0: Pre-Render In-Loop Visual Gate & Image Audit] ---")
+    try:
+        from app.services.b5_visual_gate import audit_and_evaluate_asset
+        from app.services.image_audit import _FG_BG_NOTE
+
+        assert callable(audit_and_evaluate_asset), "audit_and_evaluate_asset must be callable"
+        assert isinstance(_FG_BG_NOTE, str) and len(_FG_BG_NOTE) > 50, "_FG_BG_NOTE must be defined and valid"
+
+        b5_path = ROOT_DIR / "app" / "services" / "b5_visual_gate.py"
+        b5_code = b5_path.read_text(encoding="utf-8")
+        assert "base_score = 8.5" not in b5_code, "Detected hardcoded mock score in b5_visual_gate.py!"
+        logger.info("  ✅ Block 5.0 Visual Gate Contract OK: Zero mock scores, _FG_BG_NOTE verified.")
+        return True
+    except Exception as e:
+        logger.error(f"❌ BLOCK 5.0 CONTRACT TEST FAILED: {e}")
+        return False
+
+
+def test_block6_remotion_props_contract() -> bool:
+    logger.info("--- [TEST BLOCK 6.0: Remotion Props & Master Composition Engine] ---")
+    try:
+        from app.services.build_remotion_props import extract_stat_card, synthesize_scene_motion_props
+
+        assert callable(synthesize_scene_motion_props), "synthesize_scene_motion_props must be callable"
+        assert callable(extract_stat_card), "extract_stat_card must be callable"
+
+        idx_path = ROOT_DIR / "remotion" / "src" / "index.tsx"
+        idx_code = idx_path.read_text(encoding="utf-8")
+        assert re.search(r'id=["\']TwoLayerEpisode["\']\s+component=\{TwoLayerEpisode\}', idx_code), (
+            "index.tsx must bind id='TwoLayerEpisode' to component={TwoLayerEpisode}!"
+        )
+
+        stg_path = ROOT_DIR / "remotion" / "src" / "components" / "vox" / "VoxBuildOnStage.tsx"
+        if stg_path.exists():
+            stg_code = stg_path.read_text(encoding="utf-8")
+            assert "RES-VOX-001" not in stg_code, "Hardcoded RES-VOX-001 in VoxBuildOnStage.tsx!"
+            assert "THE IMPOSSIBLE CONTRADICTION" not in stg_code, "Hardcoded THE IMPOSSIBLE CONTRADICTION in VoxBuildOnStage.tsx!"
+
+        logger.info("  ✅ Block 6.0 Remotion Props Contract OK: TwoLayerEpisode canonical composition verified.")
+        return True
+    except Exception as e:
+        logger.error(f"❌ BLOCK 6.0 CONTRACT TEST FAILED: {e}")
+        return False
+
+
+def test_block7_bgm_mux_contract() -> bool:
+    logger.info("--- [TEST BLOCK 7.0: Beat BGM Engine & S7 Render Mix] ---")
+    try:
+        from app.services.beat_bgm_engine import generate_beat_adaptive_bgm
+
+        assert callable(generate_beat_adaptive_bgm), "generate_beat_adaptive_bgm must be callable"
+
+        s7_path = ROOT_DIR / "app" / "pipeline" / "stages" / "s7_render.py"
+        s7_code = s7_path.read_text(encoding="utf-8")
+        assert "beat_bgm_engine" in s7_code, "s7_render.py must import/reference beat_bgm_engine!"
+        logger.info("  ✅ Block 7.0 Beat BGM Engine Contract OK: s7_render wired to beat_bgm_engine.")
+        return True
+    except Exception as e:
+        logger.error(f"❌ BLOCK 7.0 CONTRACT TEST FAILED: {e}")
+        return False
+
+
+def test_block9_video_qa_contract() -> bool:
+    logger.info("--- [TEST BLOCK 9.0: Video QA Multimodal Audit Gate] ---")
+    try:
+        from app.services.video_audit_runner import call_vision_audit_llm, extract_beat_audit_frames
+
+        assert callable(call_vision_audit_llm), "call_vision_audit_llm must be callable"
+        assert callable(extract_beat_audit_frames), "extract_beat_audit_frames must be callable"
+
+        va_path = ROOT_DIR / "app" / "services" / "video_audit_runner.py"
+        va_code = va_path.read_text(encoding="utf-8")
+        assert "fallback_baseline" not in va_code, "Detected fallback_baseline mock score in video_audit_runner.py!"
+        logger.info("  ✅ Block 9.0 Video QA Contract OK: Zero mock scores, vision functions verified.")
+        return True
+    except Exception as e:
+        logger.error(f"❌ BLOCK 9.0 CONTRACT TEST FAILED: {e}")
+        return False
+
+
+def test_block10_seo_chapters_contract() -> bool:
+    logger.info("--- [TEST BLOCK 10.0: SEO Package Forge & Exact Chapter Sync] ---")
+    try:
+        from app.services.seo_package_forge import sync_exact_chapters_from_remotion, _build_dynamic_chapters
+
+        assert callable(sync_exact_chapters_from_remotion), "sync_exact_chapters_from_remotion must be callable"
+        assert callable(_build_dynamic_chapters), "_build_dynamic_chapters must be callable"
+
+        chapters = _build_dynamic_chapters("Market Crash", "EN", "Market Crash", 720.0)
+        assert len(chapters) >= 3, f"Expected >= 3 chapters, got {len(chapters)}"
+        assert chapters[0].startswith("00:00"), f"First chapter must start at 00:00, got {chapters[0]}"
+        logger.info(f"  ✅ Block 10.0 SEO Chapters Contract OK: Dynamic chapters start at 00:00 ({len(chapters)} acts).")
+        return True
+    except Exception as e:
+        logger.error(f"❌ BLOCK 10.0 CONTRACT TEST FAILED: {e}")
+        return False
+
+
+def test_block11_analytics_contract() -> bool:
+    logger.info("--- [TEST BLOCK 11.0: 48h YouTube Analytics Dreaming Loop] ---")
+    try:
+        from scripts.b11_antigravity_engine import load_state, save_state
+
+        assert callable(load_state), "load_state must be callable"
+        assert callable(save_state), "save_state must be callable"
+
+        b11_path = ROOT_DIR / "scripts" / "b11_antigravity_engine.py"
+        b11_code = b11_path.read_text(encoding="utf-8")
+        assert "access_token=token," not in b11_code, "b11_antigravity_engine.py contains undefined 'token' in v7 harvest!"
+        assert "except Exception as _v7_err:\n                pass" not in b11_code, "b11_antigravity_engine.py has bare except pass!"
+        assert "distill_insights_to_cards" in b11_code, "b11_antigravity_engine.py must import distill_insights_to_cards!"
+        logger.info("  ✅ Block 11.0 Analytics Contract OK: Clean state persistence and telemetry verified.")
+        return True
+    except Exception as e:
+        logger.error(f"❌ BLOCK 11.0 CONTRACT TEST FAILED: {e}")
+        return False
+
+
 def test_zero_ghost_and_pipeline_integrity() -> bool:
     logger.info("--- [TEST SYSTEM GATE: 4-Layer Zero-Ghost Code & Pipeline Integrity (Rule 125)] ---")
     try:
@@ -721,6 +863,18 @@ def run_tests_for_blocks(blocks_to_test: list[float]) -> bool:
             results[3.0] = test_block3_director_contract()
         elif b == 4.0:
             results[4.0] = test_block4_prompt_contract()
+        elif b == 5.0:
+            results[5.0] = test_block5_visual_gate_contract()
+        elif b == 6.0:
+            results[6.0] = test_block6_remotion_props_contract()
+        elif b == 7.0:
+            results[7.0] = test_block7_bgm_mux_contract()
+        elif b == 9.0:
+            results[9.0] = test_block9_video_qa_contract()
+        elif b == 10.0:
+            results[10.0] = test_block10_seo_chapters_contract()
+        elif b == 11.0:
+            results[11.0] = test_block11_analytics_contract()
 
     # Rule 125: Always enforce zero ghost code gate on every run
     results["ghost_hunter"] = test_zero_ghost_and_pipeline_integrity()
@@ -736,9 +890,9 @@ def run_tests_for_blocks(blocks_to_test: list[float]) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="ISO Neighbor-Testing Engine for Blocks 1, 1.5, 2, 2.6, 3, 4")
+    parser = argparse.ArgumentParser(description="ISO Neighbor-Testing Engine for Blocks 1, 1.5, 2, 2.6, 3, 4, 5, 6, 7, 9, 10, 11")
     parser.add_argument("--auto", action="store_true", help="Auto-detect changed block from git status")
-    parser.add_argument("--block", type=float, choices=[1.0, 1.5, 2.0, 2.6, 3.0, 4.0], help="Explicit target block (e.g. 1, 1.5, 2, 2.6, 3, 4)")
+    parser.add_argument("--block", type=float, choices=ALL_BLOCKS, help="Explicit target block")
     parser.add_argument("--all", action="store_true", help="Run all blocks")
 
     args = parser.parse_args()

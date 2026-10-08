@@ -311,6 +311,90 @@ PIPELINE_STAGES: Dict[str, StageContract] = {
             "audit",
         ],
     ),
+    "6.0": StageContract(
+        stage_id="6.0",
+        name="B6 Remotion Master Props & Render",
+        description="Unified TwoLayerEpisode + VoxOverlayLayer Remotion Props & Master Render (Rule 120, 125)",
+        prerequisites=["5.0"],
+        input_files=[
+            "/var/vf/episodes/{task_id}/brain_input.json",
+            "/var/vf/episodes/{task_id}/spoken_sentences.json",
+        ],
+        output_files=[
+            "/var/vf/episodes/{task_id}/remotion_props.json",
+            "/var/vf/episodes/{task_id}/twolayer_silent.mp4",
+        ],
+        command_template=[
+            "python3",
+            "scripts/build_remotion_props.py",
+            "--episode",
+            "{task_id}",
+        ],
+    ),
+    "7.0": StageContract(
+        stage_id="7.0",
+        name="B7 BGM Cinematic Ducking & Muxing",
+        description="Beat-Aware BGM Selection, Sidechain Ducking & Master Video Muxing (Rule 120)",
+        prerequisites=["6.0"],
+        input_files=[
+            "/var/vf/episodes/{task_id}/twolayer_silent.mp4",
+            "/var/vf/episodes/{task_id}/tts_out.mp3",
+        ],
+        output_files=["/var/vf/episodes/{task_id}/final.mp4"],
+        command_template=[
+            "python3",
+            "-c",
+            "import sys; sys.path.insert(0, '.'); from app.services.beat_bgm_engine import mix_beat_bgm_for_episode; "
+            "mix_beat_bgm_for_episode('/var/vf/episodes/{task_id}')",
+        ],
+    ),
+    "9.0": StageContract(
+        stage_id="9.0",
+        name="B9 Video QA & Technical Sweep",
+        description="Post-Render Technical Sweep & Multimodal Video QA Audit (Rule 118, 122)",
+        prerequisites=["7.0"],
+        input_files=["/var/vf/episodes/{task_id}/final.mp4"],
+        output_files=["/var/vf/episodes/{task_id}/video_audit_report.json"],
+        command_template=[
+            "python3",
+            "-c",
+            "import sys, json; sys.path.insert(0, '.'); from app.services.video_audit_runner import run_video_audit; "
+            "res = run_video_audit('/var/vf/episodes/{task_id}/final.mp4', episode_id='{task_id}'); "
+            "open('/var/vf/episodes/{task_id}/video_audit_report.json', 'w', encoding='utf-8').write(json.dumps(res, ensure_ascii=False, indent=2)); "
+            "assert res.get('verdict') == 'PASS', f'B9 Video Audit Failed: {res}'",
+        ],
+    ),
+    "10.0": StageContract(
+        stage_id="10.0",
+        name="B10 Auto SEO, Chapters & YouTube Gate 2",
+        description="Ground-Truth Remotion Chapter Sync, Synthetic Media Flag & YouTube Upload Gate 2 (Rule 135)",
+        prerequisites=["9.0"],
+        input_files=[
+            "/var/vf/episodes/{task_id}/final.mp4",
+            "/var/vf/episodes/{task_id}/remotion_props.json",
+        ],
+        output_files=["/var/vf/episodes/{task_id}/seo_package.json"],
+        command_template=[
+            "python3",
+            "scripts/execute_b10_auto_seo_upload_gate2.py",
+            "--episode",
+            "{task_id}",
+        ],
+    ),
+    "11.0": StageContract(
+        stage_id="11.0",
+        name="B11 Analytics & Dreaming Loop",
+        description="48h YouTube Analytics Telemetry & Instinct Card Conversion for B2 (Rule 113, 118)",
+        prerequisites=["10.0"],
+        input_files=["/var/vf/episodes/{task_id}/seo_package.json"],
+        output_files=["/var/vf/analytics/b11_latest_report.json"],
+        command_template=[
+            "python3",
+            "scripts/b11_antigravity_engine.py",
+            "--market",
+            "{market}",
+        ],
+    ),
 }
 
 STAGE_ALIASES = {
@@ -365,9 +449,35 @@ STAGE_ALIASES = {
     "5": "5.0",
     "5.0": "5.0",
     "b5": "5.0",
+    "6": "6.0",
+    "6.0": "6.0",
+    "b6": "6.0",
+    "remotion": "6.0",
+    "7": "7.0",
+    "7.0": "7.0",
+    "b7": "7.0",
+    "bgm": "7.0",
+    "8": "9.0",
+    "8.0": "9.0",
+    "b8": "9.0",
+    "9": "9.0",
+    "9.0": "9.0",
+    "b9": "9.0",
+    "video_qa": "9.0",
+    "10": "10.0",
+    "10.0": "10.0",
+    "b10": "10.0",
+    "upload": "10.0",
+    "11": "11.0",
+    "11.0": "11.0",
+    "b11": "11.0",
+    "analytics": "11.0",
 }
 
-STAGE_ORDER = ["1.0", "1.5", "1.5.5", "1.6", "2.0", "2.1", "2.5", "2.6", "3.0", "3.5", "3.6", "4.0", "5.0"]
+STAGE_ORDER = [
+    "1.0", "1.5", "1.5.5", "1.6", "2.0", "2.1", "2.5", "2.6",
+    "3.0", "3.5", "3.6", "4.0", "5.0", "6.0", "7.0", "9.0", "10.0", "11.0"
+]
 
 
 @dataclass

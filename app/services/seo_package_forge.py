@@ -155,10 +155,32 @@ def sync_exact_chapters_from_remotion(
     if existing_chapters and isinstance(existing_chapters, str):
         existing_chapters = [line.strip() for line in existing_chapters.splitlines() if line.strip()]
     
+    def _sanitize_chapter_label(label: str, market_code: str = "EN") -> str:
+        """Purge sensitive judicial/criminal terms without cross-market language pollution (Rule 128/135)."""
+        jp_banned = r'(起訴状記録|起訴事実認定|刑事摘発|司法審査|起訴|刑事|摘発|容疑者)'
+        kr_banned = r'(기소장|공소장|형사\s*적발|사법\s*심사|기소|형사|적발|용의자|검찰)'
+        en_banned = r'(GRAND JURY|INDICTMENT|PROSECUTOR|CRIMINAL)'
+
+        # Japanese keywords -> 検査・行政指導
+        res = re.sub(jp_banned, '検査・行政指導', label)
+        # Korean keywords -> 행정 조사
+        res = re.sub(kr_banned, '행정 조사', res)
+        # English keywords -> REGULATORY INQUIRY (or market native if chapter is in CJK)
+        m_code = (market_code or "EN").upper()
+        if m_code in ("JP", "JA") and re.search(r'[\u3040-\u30ff\u4e00-\u9fff]', res):
+            res = re.sub(en_banned, '検査・行政指導', res, flags=re.IGNORECASE)
+        elif m_code in ("KR", "KO") and re.search(r'[\uac00-\ud7a3]', res):
+            res = re.sub(en_banned, '행정 조사', res, flags=re.IGNORECASE)
+        else:
+            res = re.sub(en_banned, 'REGULATORY INQUIRY', res, flags=re.IGNORECASE)
+        return res
+
     # 1. Locate remotion_props.json
     candidates = []
     if ep_dir_path:
         candidates.append(os.path.join(ep_dir_path, "remotion_props.json"))
+    if task_id and (str(task_id).endswith(".json") or os.path.isfile(str(task_id))):
+        candidates.insert(0, str(task_id))
     candidates.extend([
         f"/var/vf/episodes/{task_id}/remotion_props.json",
         f"/root/video_factory/var/vf/episodes/{task_id}/remotion_props.json",
@@ -241,9 +263,7 @@ def sync_exact_chapters_from_remotion(
                 ch_str = str(ch).strip()
                 title_clean = re.sub(r'^\d{1,2}:\d{2}(?::\d{2})?\s*[-:]?\s*', '', ch_str).strip()
                 if title_clean:
-                    # Purge judicial/criminal terms from titles
-                    banned_kw_pattern = r'(起訴状記録|起訴事実認定|刑事摘発|司法審査|起訴|刑事|摘発|容疑者|GRAND JURY|INDICTMENT|PROSECUTOR|CRIMINAL)'
-                    title_clean = re.sub(banned_kw_pattern, '検査・行政指導', title_clean)
+                    title_clean = _sanitize_chapter_label(title_clean, m)
                     clean_titles.append(title_clean)
             
             if len(clean_titles) >= len(exact_timestamps):
@@ -253,13 +273,13 @@ def sync_exact_chapters_from_remotion(
                 return [f"{_fmt(exact_timestamps[i])} - {clean_titles[i]}" for i in range(n)]
 
         fallback_chapters = _build_dynamic_chapters(title or "Investigation", m, target_keyword or title, total_duration_s=total_dur_s)
-        clean_fallback_titles = [re.sub(r'^\d{1,2}:\d{2}\s*[-:]?\s*', '', c).strip() for c in fallback_chapters]
+        clean_fallback_titles = [_sanitize_chapter_label(re.sub(r'^\d{1,2}:\d{2}\s*[-:]?\s*', '', c).strip(), m) for c in fallback_chapters]
         n = min(len(clean_fallback_titles), len(exact_timestamps))
         return [f"{_fmt(exact_timestamps[i])} - {clean_fallback_titles[i]}" for i in range(n)]
 
     # 3. Fallback: remotion_props.json not found or fewer than 3 scenes -> use proportional dynamic chapters
     if existing_chapters and len(existing_chapters) >= 3:
-        return [str(c).strip() for c in existing_chapters if str(c).strip()]
+        return [_sanitize_chapter_label(str(c).strip(), m) for c in existing_chapters if str(c).strip()]
     return _build_dynamic_chapters(title or "Investigation", m, target_keyword or title, total_duration_s=total_dur_s)
 
 
