@@ -2243,9 +2243,11 @@ export const TwoLayerEpisode: React.FC<{
         (s.connection ? [s.connection] : []);
 
       const cleanHeadline =
-        s.headline && String(s.headline).trim().toUpperCase() !== "ACT"
-          ? s.headline
-          : s.editorialHeadline || s.editorial_headline || undefined;
+        typeof s.headline === "string" && s.headline.trim() && s.headline.trim().toUpperCase() !== "ACT"
+          ? s.headline.trim()
+          : (typeof s.editorialHeadline === "string" && s.editorialHeadline.trim()
+            ? s.editorialHeadline.trim()
+            : (typeof s.headline?.text === "string" ? s.headline.text : undefined));
 
       const cleanSubtitle = s.subtitle || s.actTitle || s.speakerTag || undefined;
 
@@ -2257,7 +2259,7 @@ export const TwoLayerEpisode: React.FC<{
           name={cleanHeadline || `Scene ${idx + 1}`}
         >
           <VoxBuildOnStage
-            headline={!hasOv ? cleanHeadline : undefined}
+            headline={cleanHeadline}
             subtitle={cleanSubtitle}
             theme={s.theme || s.papercraft_theme || s.paperTheme || "newsprint-editorial"}
             backgroundSrc={bgSrc}

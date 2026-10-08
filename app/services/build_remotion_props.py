@@ -714,7 +714,7 @@ def extract_custom_beat_titles(brain: dict, brain_input_path: str = "") -> dict[
     return beat_titles
 
 
-def format_speaker_tag(scene: dict, act_title: str = "", custom_beat_titles: dict = None) -> str:
+def format_speaker_tag(scene: dict, act_title: str = "", custom_beat_titles: dict = None, beat_idx: int = None) -> str:
     """Dynamically format dialogue speaker tags or episode-specific beat identification.
     Rule 125, Rule 128 & Rule 136: Never leak internal asset keys, layer names, or hashes.
     Displays:
@@ -736,35 +736,35 @@ def format_speaker_tag(scene: dict, act_title: str = "", custom_beat_titles: dic
         return name.upper()
 
     # Determine beat_idx (1-5)
-    beat_idx = scene.get("beat_index")
-    if not beat_idx:
-        b_match = re.search(r'(?:BEAT|ACT)\s*([1-5]|IV|I{1,3}|V)', str(scene.get("beat") or scene.get("beat_name") or act_title or ""), re.IGNORECASE)
+    resolved_beat = beat_idx if beat_idx is not None else scene.get("beat_index")
+    if resolved_beat is None:
+        b_match = re.search(r'\b(?:BEAT|ACT)\s*([1-5]|IV|I{1,3}|V)\b', str(scene.get("beat") or scene.get("beat_name") or act_title or ""), re.IGNORECASE)
         if b_match:
             val = b_match.group(1).upper()
             roman_map = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5}
-            beat_idx = roman_map.get(val) or (int(val) if val.isdigit() else 1)
+            resolved_beat = roman_map.get(val) or (int(val) if val.isdigit() else 1)
         else:
-            beat_idx = 1
-    beat_idx = min(max(int(beat_idx), 1), 5)
+            resolved_beat = 1
+    beat_num = min(max(int(resolved_beat), 1), 5)
 
     # 1. Custom episode-specific beat title (highest priority when explicitly provided)
-    if custom_beat_titles and beat_idx in custom_beat_titles and custom_beat_titles[beat_idx]:
-        return f"BEAT {beat_idx}: {custom_beat_titles[beat_idx]}".strip().upper()
+    if custom_beat_titles and beat_num in custom_beat_titles and custom_beat_titles[beat_num]:
+        return f"BEAT {beat_num}: {custom_beat_titles[beat_num]}".strip().upper()
 
     # 2. Prioritize explicit beat from scene
     beat_val = scene.get("beat") or scene.get("beat_title") or scene.get("beat_name")
     if beat_val:
         b_str = str(beat_val).strip()
         if not b_str.upper().startswith("BEAT ") and not b_str.upper().startswith("ACT "):
-            return f"BEAT {beat_idx}: {b_str}".strip().upper()
+            return f"BEAT {beat_num}: {b_str}".strip().upper()
         return b_str.upper()
 
     # 3. Clean act title fallback
     if act_title:
-        clean_act = re.sub(r'^ACT\s+[IVXLCDM]+\s*//\s*', '', str(act_title or '').strip(), flags=re.IGNORECASE)
-        return f"BEAT {beat_idx}: {clean_act}".strip().upper()
+        clean_act = re.sub(r'^(?:ACT|BEAT)\s+[IVXLCDM0-9]+(?:\s*[:/\-–—]+\s*|\s+)', '', str(act_title or '').strip(), flags=re.IGNORECASE)
+        return f"BEAT {beat_num}: {clean_act}".strip().upper()
 
-    return f"BEAT {beat_idx}: INVESTIGATION".upper()
+    return f"BEAT {beat_num}: INVESTIGATION".upper()
 
 
 def match_segments_and_extract_words(scene_text: str, segments: list, start_idx: int, fps: int = 30, scene_id: str = ""):
@@ -850,6 +850,58 @@ def match_segments_and_extract_words(scene_text: str, segments: list, start_idx:
                 cur_ms += w_dur
 
     return subtitles, idx, dur_sec, scene_start_ms, scene_end_ms
+
+
+def synthesize_scene_headline(
+    scene: dict,
+    narration: str = "",
+    act_title: str = "",
+    stat_lbl: str = "",
+    stat_val: str = "",
+    beat_idx: int = 1,
+) -> str:
+    """Synthesize a punchy 1-4 word uppercase editorial headline for VoxBuildOnStage.
+    Rule 128 & Rule 136: Guaranteed non-empty, clean uppercase headline for all scenes.
+    """
+    # 1. Explicit headline from scene
+    h_cand = scene.get("headline") or scene.get("editorial_headline") or scene.get("editorialHeadline")
+    if isinstance(h_cand, dict):
+        h_cand = h_cand.get("text") or h_cand.get("headline")
+    if h_cand and str(h_cand).strip():
+        clean_h = str(h_cand).strip()
+        if clean_h.upper() not in ("ACT", "SCENE", "BEAT", "NONE"):
+            return clean_h.upper()
+
+    # 2. Stat card value + label if present
+    if stat_val and stat_lbl:
+        clean_lbl = re.sub(r'//.*$', '', stat_lbl).strip()
+        headline_stat = f"{stat_val} {clean_lbl}".strip().upper()
+        if len(headline_stat) <= 36:
+            return headline_stat
+
+    # 3. Action badge / stamp if present
+    badge = scene.get("stamp_badge") or scene.get("stampBadge")
+    if badge:
+        return str(badge).replace("_", " ").strip().upper()
+
+    # 4. Extract leading key phrase from caption / narration (1-4 words)
+    text = (scene.get("caption") or narration or "").strip()
+    if text:
+        text_clean = re.sub(r'^[0-9:\-\s]+', '', text)
+        text_clean = re.sub(r'["\'`“”]', '', text_clean).strip()
+        first_clause = re.split(r'[,:;.\-—\n!?]', text_clean)[0].strip()
+        words = first_clause.split()
+        if 1 <= len(words) <= 5 and len(first_clause) <= 32:
+            return first_clause.upper()
+        elif len(words) > 5:
+            return " ".join(words[:4]).upper()
+
+    if act_title:
+        clean_act = re.sub(r'^(?:ACT|BEAT)\s+[0-9IVXLCDM]+(?:\s*[:/\-–—]+\s*|\s+)', '', str(act_title or '').strip(), flags=re.IGNORECASE).strip()
+        if clean_act:
+            return clean_act.upper()
+
+    return f"BEAT {beat_idx}: EVIDENCE"
 
 
 def synthesize_scene_motion_props(
@@ -1127,19 +1179,29 @@ def build_remotion_props_data(
                 pass
 
     if forge_scenes:
-        if not raw_scenes or (segments and len(raw_scenes) != len(segments) and len(forge_scenes) == len(segments)):
+        if not raw_scenes:
+            raw_scenes = forge_scenes
+        elif (segments and len(raw_scenes) != len(segments) and len(forge_scenes) == len(segments)):
             logger.info(
                 "[build_remotion_props] Aligning scenes with canonical prompts_forge.json (%d scenes matching %d segments; brain had %d)",
                 len(forge_scenes), len(segments), len(raw_scenes)
             )
-            raw_scenes = forge_scenes
+            merged = []
+            for f_idx, f_item in enumerate(forge_scenes):
+                r_item = raw_scenes[f_idx] if f_idx < len(raw_scenes) else {}
+                item = dict(r_item)
+                item.update(f_item)
+                for k in ["beat_index", "beat", "act_title", "actTitle", "speaker_tag", "character_name", "character_role", "headline", "caption"]:
+                    if r_item.get(k) and not f_item.get(k):
+                        item[k] = r_item[k]
+                merged.append(item)
+            raw_scenes = merged
         elif len(raw_scenes) == len(forge_scenes):
             for idx_s, s_item in enumerate(raw_scenes):
                 f_item = forge_scenes[idx_s]
-                if not s_item.get("background_reuse_key") and f_item.get("background_reuse_key"):
-                    s_item["background_reuse_key"] = f_item["background_reuse_key"]
-                if not s_item.get("foreground_reuse_key") and f_item.get("foreground_reuse_key"):
-                    s_item["foreground_reuse_key"] = f_item["foreground_reuse_key"]
+                for k in ["background_reuse_key", "foreground_reuse_key", "layer1_bg", "layer2_fg", "prompt"]:
+                    if not s_item.get(k) and f_item.get(k):
+                        s_item[k] = f_item[k]
                 if not s_item.get("narration") and f_item.get("text"):
                     s_item["narration"] = f_item["text"]
 
@@ -1293,13 +1355,25 @@ def build_remotion_props_data(
                 stat_lbl = auto_lbl
 
         # Topic-specific or Generic 5-Beat story engine headings (Rule 128 & Rule 136)
-        beat_idx = 1 if i <= int(total_scenes * 0.15) else (
-            2 if i <= int(total_scenes * 0.40) else (
-                3 if i <= int(total_scenes * 0.65) else (
-                    4 if i <= int(total_scenes * 0.85) else 5
+        explicit_beat = s.get("beat_index") or s.get("beat")
+        beat_idx = None
+        if explicit_beat:
+            try:
+                b_val = int(str(explicit_beat).replace("Beat", "").strip())
+                if 1 <= b_val <= 5:
+                    beat_idx = b_val
+            except Exception:
+                pass
+
+        if beat_idx is None:
+            beat_idx = 1 if i <= int(total_scenes * 0.15) else (
+                2 if i <= int(total_scenes * 0.40) else (
+                    3 if i <= int(total_scenes * 0.65) else (
+                        4 if i <= int(total_scenes * 0.85) else 5
+                    )
                 )
             )
-        )
+
         if custom_beat_titles and beat_idx in custom_beat_titles:
             act_title = f"BEAT {beat_idx}: {custom_beat_titles[beat_idx]}"
         else:
@@ -1311,7 +1385,7 @@ def build_remotion_props_data(
                 "ACT V // THE AFTERMATH & RECKONING"
             )
 
-        speaker_tag = format_speaker_tag(s, act_title, custom_beat_titles)
+        speaker_tag = format_speaker_tag(s, act_title, custom_beat_titles, beat_idx=beat_idx)
 
         # Extract Camera Grammar & Evidentiary Forensic Overlays (Rule 122 & Rule 128)
         cam = s.get("camera") or {}
@@ -1498,11 +1572,11 @@ def build_remotion_props_data(
             card_segment_key = f"{ov_type}_{stat_val or ''}_{stamp_badge or ''}_{ov_title}"
 
         # Beat-Level Optical FX Policy & Kinetic Typography Injection (Rule 122 & Audit Round 5 Standard)
-        b_raw = s.get("beat_index") or s.get("beat") or 1
+        b_raw = s.get("beat_index") or s.get("beat") or beat_idx
         try:
             b_num = int(str(b_raw).replace("Beat", "").strip())
         except Exception:
-            b_num = 1
+            b_num = beat_idx
 
         # Rule 128 & Rule 132: Generic metric moment detection for optical fx
         is_metric_shock = bool(
@@ -1610,6 +1684,14 @@ def build_remotion_props_data(
                 primary_hero_obj["motion_path"] = m_path
 
         motion_meta = synthesize_scene_motion_props(s, fg_pos, forensic_ov, stat_val, stat_lbl, i)
+        scene_headline = synthesize_scene_headline(
+            scene=s,
+            narration=narration_text,
+            act_title=act_title,
+            stat_lbl=stat_lbl,
+            stat_val=stat_val,
+            beat_idx=b_num,
+        )
 
         # Construct papercraft_layout per VOX Documentary Paper Collage Specification
         explicit_papercraft = s.get("papercraft_layout") or s.get("papercraftLayout")
@@ -1717,7 +1799,7 @@ def build_remotion_props_data(
             "primary_hero": primary_hero_obj,
             "motion_path": m_path,
             "linked_secondary_objects": s.get("linked_secondary_objects") or s.get("linkedSecondaryObjects") or [],
-            "headline": s.get("headline") if (s.get("headline") and str(s.get("headline")).strip().upper() != "ACT") else motion_meta["editorial_headline"],
+            "headline": scene_headline,
             "highlightWord": s.get("highlight_word") or s.get("highlightWord"),
             "category": s.get("category"),
             "subtext": s.get("subtext"),
@@ -1728,7 +1810,7 @@ def build_remotion_props_data(
             "radiatingConnections": motion_meta["radiating_connections"],
             "yarns": motion_meta["radiating_connections"],
             "supportingCutouts": motion_meta["supporting_cutouts"],
-            "editorialHeadline": motion_meta["editorial_headline"],
+            "editorialHeadline": scene_headline,
         })
 
     if missing:

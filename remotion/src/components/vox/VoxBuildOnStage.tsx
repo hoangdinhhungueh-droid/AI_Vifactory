@@ -144,10 +144,12 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
     fps,
     config: SPRING_PRESETS.paperSlide,
   });
-  const heroStartX = -15; // slides in from off-screen left
   const heroTargetX = heroPosition.xPct;
+  const isRight = heroTargetX > 50;
+  // Natural tactile slide: 12% offset from respective side (settles into target)
+  const heroStartX = isRight ? heroTargetX + 12 : heroTargetX - 12;
   const heroCurrentX = interpolate(heroSpring, [0, 1], [heroStartX, heroTargetX]);
-  const heroRotation = interpolate(heroSpring, [0, 0.8, 1], [-8, 2, 0]);
+  const heroRotation = interpolate(heroSpring, [0, 0.8, 1], [isRight ? 3 : -3, isRight ? -1 : 1, 0]);
   const heroDropShadow = interpolate(heroSpring, [0, 1], [0, 18]);
 
   // 3. EDITORIAL HEADLINE STAMP (2.5s - 4.0s)
@@ -196,7 +198,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
       style={{
         width: "100%",
         height: "100%",
-        backgroundColor: "#0f172a", // Outer dark studio frame
+        backgroundColor: getThemeBackground(), // Match theme background, zero dark studio border
         overflow: "hidden",
         position: "relative",
         display: "flex",
@@ -218,10 +220,10 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
         <div
           style={{
             position: "absolute",
-            inset: "4%",
+            inset: 0,
             backgroundColor: getThemeBackground(),
-            borderRadius: "16px",
-            boxShadow: "0 25px 60px -15px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,0,0,0.1)",
+            borderRadius: 0,
+            boxShadow: "none",
             transform: `scale(${backdropScale})`,
             opacity: backdropOpacity,
             overflow: "hidden",
@@ -304,7 +306,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
               )}
               <h1
                 style={{
-                  fontSize: "38px",
+                  fontSize: headline.length > 36 ? "28px" : "38px",
                   fontWeight: 900,
                   color: "#18181b",
                   lineHeight: 1.1,
@@ -312,6 +314,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                   textTransform: "uppercase",
                   fontFamily: "Impact, Inter, sans-serif",
                   margin: 0,
+                  maxWidth: "85%",
                   textShadow: "1px 1px 0 rgba(255,255,255,0.85)",
                 }}
               >

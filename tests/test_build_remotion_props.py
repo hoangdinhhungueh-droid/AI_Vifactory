@@ -1,5 +1,11 @@
 import pytest
-from app.services.build_remotion_props import extract_custom_beat_titles, format_speaker_tag, normalize_camera_movement
+from app.services.build_remotion_props import (
+    extract_custom_beat_titles,
+    format_speaker_tag,
+    normalize_camera_movement,
+    synthesize_scene_headline,
+    build_remotion_props_data,
+)
 
 def test_extract_custom_beat_titles_from_seo():
     desc = """Some description
@@ -87,5 +93,71 @@ def test_beat_level_optical_fx_and_kinetic_typography():
         "cinematic_tokens": []
     }
     assert not any(k in b2_scene["narration"] for k in ["4860", "24倍"])
+
+
+def test_format_speaker_tag_act_title_without_spaces():
+    """Verify that act_title without leading spaces correctly resolves Roman numerals into Beat 1-5."""
+    scene = {}
+    assert format_speaker_tag(scene, act_title="ACT I // THE HOOK & EXPOSURE") == "BEAT 1: THE HOOK & EXPOSURE"
+    assert format_speaker_tag(scene, act_title="ACT II // THE ARCHITECTURE OF POWER") == "BEAT 2: THE ARCHITECTURE OF POWER"
+    assert format_speaker_tag(scene, act_title="ACT III // THE HIDDEN MECHANISM") == "BEAT 3: THE HIDDEN MECHANISM"
+    assert format_speaker_tag(scene, act_title="ACT IV // THE CRACK IN THE ILLUSION") == "BEAT 4: THE CRACK IN THE ILLUSION"
+    assert format_speaker_tag(scene, act_title="ACT V // THE AFTERMATH & RECKONING") == "BEAT 5: THE AFTERMATH & RECKONING"
+
+
+def test_format_speaker_tag_explicit_beat_idx():
+    """Verify that passing beat_idx overrides/resolves even when scene has no metadata."""
+    scene = {}
+    assert format_speaker_tag(scene, act_title="CRITICAL CLIMAX", beat_idx=4) == "BEAT 4: CRITICAL CLIMAX"
+
+
+def test_synthesize_scene_headline():
+    """Verify that every scene receives a clean, non-empty uppercase editorial headline."""
+    # 1. Explicit headline
+    assert synthesize_scene_headline({"headline": "THE $500B COLLAPSE"}) == "THE $500B COLLAPSE"
+    # 2. Stat card value + label
+    assert synthesize_scene_headline({}, stat_val="$48.6B", stat_lbl="FINANCIAL LOSS") == "$48.6B FINANCIAL LOSS"
+    # 3. Stamp badge
+    assert synthesize_scene_headline({"stamp_badge": "PRICE_FRAUD"}) == "PRICE FRAUD"
+    # 4. Leading clause from narration
+    assert synthesize_scene_headline({}, narration="Amazon executives secretly altered internal metrics.") == "AMAZON EXECUTIVES SECRETLY ALTERED"
+    # 5. Fallback from act title
+    assert synthesize_scene_headline({}, act_title="ACT II // THE ARCHITECTURE OF POWER", beat_idx=2) == "THE ARCHITECTURE OF POWER"
+    # 6. Ultimate fallback
+    assert synthesize_scene_headline({}, beat_idx=3) == "BEAT 3: EVIDENCE"
+
+
+def test_build_remotion_props_data_beat_distribution(tmp_path):
+    """Verify that 20 scenes without explicit beats distribute across Beats 1 to 5 and all have headlines."""
+    import json
+    scenes = [
+        {"id": f"scene_{i}", "narration": f"Narration sentence {i}", "duration_sec": 4.0}
+        for i in range(20)
+    ]
+    brain_file = tmp_path / "brain_input.json"
+    brain_file.write_text(json.dumps({"episode_id": "EN_EP9999", "market": "EN", "scenes": scenes}), encoding="utf-8")
+
+    props = build_remotion_props_data(
+        episode_id="EN_EP9999",
+        brain_input_path=str(brain_file),
+        public_dir=str(tmp_path / "public"),
+        skip_missing=False,
+    )
+
+    out_scenes = props["scenes"]
+    assert len(out_scenes) == 20
+    beats = [s["beat"] for s in out_scenes]
+    assert 1 in beats
+    assert 2 in beats
+    assert 3 in beats
+    assert 4 in beats
+    assert 5 in beats
+    # Verify no scene is left without a headline
+    for s in out_scenes:
+        assert s["headline"]
+        assert isinstance(s["headline"], str)
+        assert len(s["headline"]) > 0
+        assert s["headline"] == s["editorialHeadline"]
+
 
 
