@@ -28,6 +28,11 @@ from typing import Dict, Any, Tuple, Optional, List
 
 logger = logging.getLogger("vf.representation_shield")
 
+def audit_cliffhanger_patterns(*args, **kwargs):
+    """Re-export audit_cliffhanger_patterns from vox_automated_director for cross-module compatibility."""
+    from app.services.vox_automated_director import audit_cliffhanger_patterns as _acp
+    return _acp(*args, **kwargs)
+
 # Multilingual keywords for detecting minors / children across EN, VN, JP, KR
 CHILD_KEYWORDS = [
     # English

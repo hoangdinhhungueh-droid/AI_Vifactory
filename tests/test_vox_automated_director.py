@@ -206,3 +206,84 @@ def test_low_token_36_and_omni_48_budget_modes():
     assert "s when narration hits" in cue or "s mid-sentence beat" in cue
     assert "trigger primary" in cue
 
+
+def test_production_b2_hg2_s45_handoff_parity(tmp_path):
+    """Verify live production B2 -> HG1 -> B3.5 -> HG2 -> S4.5 handoff preserves all Vox & CL3 upgrades."""
+    import json
+    from app.services.story_gate import score_story
+    from app.services.build_remotion_props import build_remotion_props_data
+
+    # 1. Verify live B2 story_gate.score_story includes cliffhanger_audit
+    sample_story = (
+        "On March 14, 2024, $4.2 billion vanished from the clearing house ledger in 18 minutes. "
+        "Wait, why did the auditor sign off on an empty vault? "
+        "Then came the secret memo from Geneva. "
+        "Then, in 2024, the records unsealed."
+    )
+    gate_res = score_story(sample_story)
+    assert "cliffhanger_audit" in gate_res
+    assert gate_res["cliffhanger_audit"]["matched"] is True
+    assert gate_res["cliffhanger_audit"]["pattern"] == "THE_DATED_FORWARD_JUMP"
+
+    # 2. Verify S4.5 build_remotion_props_data forwards CL3 Paper Diorama fields & meta
+    brain_path = tmp_path / "brain_input.json"
+    seg_path = tmp_path / "spoken_sentences.json"
+    brain_payload = {
+        "episode_id": "EN_EP9999_test_parity",
+        "topic": "Test Parity",
+        "theme": "newsprint-editorial",
+        "video_engine_mode": "flow_veo_fast",
+        "video_budget_mode": "low_token_36",
+        "meta": {
+            "generatedBy": "VoxAutomatedDirector",
+            "videoEngineMode": "flow_veo_fast",
+            "videoBudgetMode": "low_token_36",
+            "trimStartSec": 0.25,
+            "nativeSfxVolume": 0.18,
+            "styleReferenceSheet": "config/prompts/vox_master_style_sheet.png",
+        },
+        "scenes": [
+            {
+                "id": "scene_01",
+                "beat_index": 1,
+                "durationInFrames": 180,
+                "durationSec": 6.0,
+                "headline": "EXHIBIT #1",
+                "narration": "On March 14, $4.2 billion vanished.",
+                "background_reuse_key": "bg_01",
+                "foreground_reuse_key": "fg_01",
+                "paper_material": {"id": "newsprint_aged", "hex": "#E8DFCA"},
+                "diorama_style_block": "DEEP_DIORAMA",
+                "video_prompt": "STYLE BLOCK\n\nSHOT:\nBackground...\n\nAUDIO:...\n\nAVOID:...",
+                "speech_timestamp_cue": "At 1.2s when narration hits '$4.2 billion', trigger primary",
+                "named_escalation_beat": "ALERT WASH",
+                "routed_video_model": "flow_veo_fast",
+                "flow_slot": "gmail_slot_1",
+            }
+        ],
+    }
+    brain_path.write_text(json.dumps(brain_payload), encoding="utf-8")
+    seg_path.write_text(
+        json.dumps([{"index": 1, "text": "On March 14, $4.2 billion vanished.", "start_sec": 0.0, "end_sec": 6.0, "duration_sec": 6.0}]),
+        encoding="utf-8",
+    )
+
+    props = build_remotion_props_data(
+        episode_id="EN_EP9999_test_parity",
+        brain_input_path=str(brain_path),
+        segments_path=str(seg_path),
+        fps=30,
+        skip_missing=False,
+    )
+    assert "meta" in props
+    assert props["meta"]["videoEngineMode"] == "flow_veo_fast"
+    assert props["meta"]["videoBudgetMode"] == "low_token_36"
+    assert props["meta"]["trimStartSec"] == 0.25
+    assert props["meta"]["nativeSfxVolume"] == 0.18
+    sc0 = props["scenes"][0]
+    assert sc0["diorama_style_block"] == "DEEP_DIORAMA"
+    assert "STYLE BLOCK" in sc0["video_prompt"]
+    assert sc0["named_escalation_beat"] == "ALERT WASH"
+    assert sc0["paper_material"]["id"] == "newsprint_aged"
+
+

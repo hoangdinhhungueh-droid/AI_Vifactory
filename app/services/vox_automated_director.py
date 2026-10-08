@@ -679,6 +679,13 @@ class VoxAutomatedDirector:
                 "targetHeroSrc": f"images/{fg_key}.png",
                 "targetBackground": f"images/{bg_key}.png",
                 "heroLabel": hero_label,
+                "paper_material": b.get("paper_material"),
+                "diorama_style_block": b.get("diorama_style_block", "FLAT_PARALLAX"),
+                "video_prompt": b.get("video_prompt", ""),
+                "speech_timestamp_cue": b.get("speech_timestamp_cue", ""),
+                "named_escalation_beat": b.get("named_escalation_beat", ""),
+                "routed_video_model": b.get("routed_video_model", video_engine_mode),
+                "flow_slot": b.get("flow_slot", ""),
                 "hasMarkerHighlight": True,
                 "stampText": "VERIFIED // IMPORTANT" if b_idx == 1 else "CLASSIFIED EXHIBIT",
                 "stampColor": "#dc2626" if b_idx == 1 else "#b91c1c",
@@ -871,6 +878,14 @@ class VoxAutomatedDirector:
             # Route model: Seedance 2.0 Fast / First-Frame Direct for public figures, Flow Veo Fast / Omni for general diorama
             routed_model = "seedance_2_fast" if (is_public_figure and video_engine_mode == "omni_flash") else video_engine_mode
             flow_slot = FLOW_ACCOUNTS[idx % len(FLOW_ACCOUNTS)]
+            named_beat_tag = "ALERT WASH" if "ALERT WASH" in named_beat else named_beat.split()[0]
+
+            b["diorama_style_block"] = style_block_key
+            b["video_prompt"] = full_video_prompt
+            b["speech_timestamp_cue"] = ts_cue
+            b["named_escalation_beat"] = named_beat_tag
+            b["routed_video_model"] = routed_model
+            b["flow_slot"] = flow_slot
 
             video_prompts.append({
                 "beat_index": b_idx,
@@ -885,7 +900,7 @@ class VoxAutomatedDirector:
                 "duration_sec": 6 if self.animation_duration_sec == 6 else 6,
                 "trim_start_sec": 0.25,
                 "retain_native_sfx_volume": 0.18,
-                "named_escalation_beat": "ALERT WASH" if "ALERT WASH" in named_beat else named_beat.split()[0],
+                "named_escalation_beat": named_beat_tag,
                 "speech_timestamp_cue": ts_cue,
                 "video_prompt": full_video_prompt
             })

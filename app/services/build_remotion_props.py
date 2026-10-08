@@ -1656,12 +1656,21 @@ def build_remotion_props_data(
             "beat": b_num,
             "beat_index": b_num,
             "theme": s.get("theme") or brain.get("theme") or papercraft_theme,
+            "background_reuse_key": bg_key,
+            "foreground_reuse_key": fg_key,
             "background": bg_rel or "",
             "backgroundSrc": bg_rel or "",
             "papercraft_theme": papercraft_theme,
             "paperTheme": papercraft_theme,
             "papercraft_layout": papercraft_layout,
             "papercraftLayout": papercraft_layout,
+            "paper_material": s.get("paper_material"),
+            "diorama_style_block": s.get("diorama_style_block", "FLAT_PARALLAX"),
+            "video_prompt": s.get("video_prompt", ""),
+            "speech_timestamp_cue": s.get("speech_timestamp_cue", ""),
+            "named_escalation_beat": s.get("named_escalation_beat", ""),
+            "routed_video_model": s.get("routed_video_model") or brain.get("video_engine_mode", "flow_veo_fast"),
+            "flow_slot": s.get("flow_slot", ""),
             "foreground": fg_rel,
             "heroSrc": fg_rel,
             "heroLabel": s.get("heroLabel") or stat_lbl or speaker_tag,
@@ -1888,6 +1897,7 @@ def build_remotion_props_data(
             sc["heroSrc"] = sc.get("foreground") or sc.get("heroSrc")
             sc["backgroundSrc"] = sc.get("background") or sc.get("backgroundSrc")
 
+    existing_meta = brain.get("meta") if isinstance(brain.get("meta"), dict) else {}
     props = {
         "episodeId": episode_id,
         "topic": brain.get("topic") or episode_id,
@@ -1897,6 +1907,19 @@ def build_remotion_props_data(
         "fps": fps,
         "width": width,
         "height": height,
+        "meta": {
+            "generatedBy": existing_meta.get("generatedBy", "VoxAutomatedDirector"),
+            "videoEngineMode": existing_meta.get("videoEngineMode") or brain.get("video_engine_mode", "flow_veo_fast"),
+            "videoBudgetMode": existing_meta.get("videoBudgetMode") or brain.get("video_budget_mode", "hybrid_selective"),
+            "animationDurationSec": existing_meta.get("animationDurationSec", 6),
+            "trimStartSec": existing_meta.get("trimStartSec", 0.25),
+            "nativeSfxVolume": existing_meta.get("nativeSfxVolume", 0.18),
+            "styleReferenceSheet": existing_meta.get("styleReferenceSheet", "config/prompts/vox_master_style_sheet.png"),
+            "compliance": existing_meta.get(
+                "compliance",
+                ["Rule 120", "Rule 125", "Rule 128", "Rule 132", "WOWZ.CLOUD", "CL3_PAPER_DIORAMA"]
+            ),
+        },
     }
     return props
 

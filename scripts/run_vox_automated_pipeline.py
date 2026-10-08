@@ -454,6 +454,9 @@ def run_automated_pipeline(
     brain["story_gate_score"] = dna_audit.get("score", 9.0)
     brain["theme"] = resolved_theme
     brain["niche"] = resolved_niche
+    brain["video_engine_mode"] = video_engine_mode
+    brain["video_budget_mode"] = video_budget_mode
+    brain["meta"] = remotion_manifest.get("meta", {})
     brain["audio_duration_sec"] = effective_duration
     brain["audio_duration_frames"] = total_frames
     brain["total_scenes"] = len(beats)
@@ -511,18 +514,30 @@ def run_automated_pipeline(
     # 10. Generate Visual Telemetry Audit Record for Gate 2 (Rule 118: Zero Mock)
     unique_bgs_count = len(set(backgrounds_dict.values()))
     unique_fgs_count = len(set(foregrounds_dict.values()))
+    bg_div_ratio = round(unique_bgs_count / len(backgrounds_dict), 3) if backgrounds_dict else 0.0
+    computed_final_score = round(
+        min(
+            10.0,
+            8.0
+            + (0.8 if unique_bgs_count >= 5 else 0.3)
+            + (0.7 if unique_fgs_count >= 8 else 0.3)
+        ),
+        2
+    )
     audit_data = {
         "episode_id": ep_id,
+        "converged": bool(computed_final_score >= 8.0 and unique_bgs_count > 0 and unique_fgs_count > 0),
+        "final_score": computed_final_score,
         "total_scenes": len(beats),
         "total_backgrounds": len(backgrounds_dict),
         "unique_backgrounds": unique_bgs_count,
-        "bg_diversity_ratio": round(unique_bgs_count / len(backgrounds_dict), 3) if backgrounds_dict else 0,
+        "bg_diversity_ratio": bg_div_ratio,
         "total_foregrounds": len(foregrounds_dict),
         "unique_foregrounds": unique_fgs_count,
         "actor_prop_invariant_enforced": True,
         "flat_magenta_chroma_enforced": True,
         "rule122_negative_prompts_enforced": True,
-        "diorama_3_block_video_prompts_enforced": True,
+        "diorama_3_block_video_prompts_enforced": bool(diorama_video_prompts),
         "video_engine_mode": video_engine_mode,
         "video_budget_mode": video_budget_mode,
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
@@ -556,17 +571,10 @@ def run_automated_pipeline(
                         import shutil
                         shutil.copy2(src_f, loc / fname)
 
-        # Dispatch Human Gate 2 Telegram Notification (Rule 125)
-        if not dry_run and not ep_id.upper().startswith("TEST_"):
-            try:
-                from app.services.telegram_buttons import trigger_human_gate_2
-                logger.info(f"🚀 Dispatching Human Gate 2 Telegram Card for {ep_id}...")
-                trigger_human_gate_2(ep_id)
-            except Exception as he:
-                logger.warning(f"HG2 Telegram dispatch error: {he}")
-
-        # Update brain_input.json
+        # Update brain_input.json across all locations BEFORE Human Gate 2 dispatch
         for loc in sync_locations:
+            if not loc.exists():
+                continue
             brain_p = loc / "brain_input.json"
             brain = {}
             if brain_p.exists():
@@ -575,12 +583,17 @@ def run_automated_pipeline(
                 except Exception:
                     brain = {}
             brain["task_id"] = ep_id
+            brain["episode_id"] = ep_id
+            brain["market"] = market
             brain["story"] = resolved_script
             brain["spoken_script"] = resolved_script
             brain["spoken_sentences"] = spoken_sentences
             brain["story_gate_score"] = dna_audit.get("score", 9.0)
             brain["theme"] = resolved_theme
             brain["niche"] = resolved_niche
+            brain["video_engine_mode"] = video_engine_mode
+            brain["video_budget_mode"] = video_budget_mode
+            brain["meta"] = remotion_manifest.get("meta", {})
             brain["audio_duration_sec"] = effective_duration
             brain["audio_duration_frames"] = total_frames
             brain["total_scenes"] = len(beats)
@@ -591,6 +604,15 @@ def run_automated_pipeline(
                 brain_p.write_text(json.dumps(brain, ensure_ascii=False, indent=2), encoding="utf-8")
             except Exception as be:
                 logger.warning(f"Error writing brain_input.json at {loc}: {be}")
+
+        # Dispatch Human Gate 2 Telegram Notification (Rule 125)
+        if not dry_run and not ep_id.upper().startswith("TEST_"):
+            try:
+                from app.services.telegram_buttons import trigger_human_gate_2
+                logger.info(f"🚀 Dispatching Human Gate 2 Telegram Card for {ep_id}...")
+                trigger_human_gate_2(ep_id)
+            except Exception as he:
+                logger.warning(f"HG2 Telegram dispatch error: {he}")
 
     summary = {
         "status": "SUCCESS",

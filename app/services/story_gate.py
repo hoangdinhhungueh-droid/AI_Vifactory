@@ -285,6 +285,15 @@ def score_story(story_text: str) -> dict:
         mech_sents = [s for s in re.split(r"(?<=[.!?])\s+", mechanism_text) if s.strip()]
         short_sents = [s for s in mech_sents if 2 <= len(_words(s)) <= PATTERN_INTERRUPT_MAX_WORDS]
 
+    from app.services.vox_automated_director import audit_cliffhanger_patterns
+    last_sent = sents[-1] if sents else story
+    cliffhanger_audit = audit_cliffhanger_patterns(last_sent)
+    if not cliffhanger_audit.get("matched"):
+        # Also check whole story fallback
+        cliff_story = audit_cliffhanger_patterns(story)
+        if cliff_story.get("matched"):
+            cliffhanger_audit = cliff_story
+
     checks = {
         "1_length_1700_2500_words": min_len <= nwords <= max_len,
         "2_hook_has_open_question": bool(re.search(r"\?", hook)) or _count(LOOP_OPEN[1:], hook) > 0,
@@ -298,6 +307,7 @@ def score_story(story_text: str) -> dict:
         "10_banned_phrases": len(banned_hits) == 0,
         "11_according_to_cap": according_to_count <= MAX_ACCORDING_TO,
         "12_pattern_interrupt": len(short_sents) >= 1,
+        "13_vox_cliffhanger_archetypes": bool(cliffhanger_audit.get("matched", False) or cliffhanger_audit.get("passed", False)),
     }
     failed = [k for k, v in checks.items() if not v]
     fixes = {
@@ -313,6 +323,7 @@ def score_story(story_text: str) -> dict:
         "10_banned_phrases": "Remove banned AI-cliche phrases: " + ", ".join(banned_hits) if banned_hits else "No banned phrases found.",
         "11_according_to_cap": "Limit 'According to X...' openers to <= " + str(MAX_ACCORDING_TO) + " paragraphs (found " + str(according_to_count) + ").",
         "12_pattern_interrupt": "Add at least 1 very short sentence (<= " + str(PATTERN_INTERRUPT_MAX_WORDS) + " words) in the Mechanism section (25%-70%) to break rhythm.",
+        "13_vox_cliffhanger_archetypes": "Include at least 2 micro-cliffhangers across the 5 canonical Vox cliffhanger archetypes.",
     }
     score = sum(1 for v in checks.values() if v)
     max_score = len(checks)
@@ -334,6 +345,7 @@ def score_story(story_text: str) -> dict:
         "banned_phrases_found": banned_hits,
         "according_to_count": according_to_count,
         "pattern_interrupt_short_sents": len(short_sents),
+        "cliffhanger_audit": cliffhanger_audit,
         "checks": checks,
         "failed": failed,
         "fix_hints": [fixes[k] for k in failed],

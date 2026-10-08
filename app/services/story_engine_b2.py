@@ -23,7 +23,8 @@ from app.services.skill_loader import (
     get_central_skills,
     get_content_engine_rules,
     get_media_production_rules,
-    get_b2_editorial_skills
+    get_b2_editorial_skills,
+    get_vox_docudrama_prompt
 )
 from app.services import story_gate as sgate
 from scripts.ag_notion_bridge import resolve_id, update_page_properties, create_page, query_db, append_children_blocks, get_blocks, delete_block
@@ -772,8 +773,11 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
     
     lang_name = "English" if mkt == "EN" else ("Japanese" if mkt == "JP" else "Korean")
 
-    # Load authentic dynamic rules directly from Notion Single Source of Truth
+    # Load authentic dynamic rules directly from Notion Single Source of Truth + Vox Docudrama Engine
     editorial_skills = get_b2_editorial_skills()
+    vox_docudrama_rules = get_vox_docudrama_prompt()
+    if vox_docudrama_rules and vox_docudrama_rules not in editorial_skills:
+        editorial_skills = f"{editorial_skills}\n\n{vox_docudrama_rules}"
 
     crime_forensic_mandate = ""
     is_sensitive_crime = theme in ("true_crime_investigative", "psychology_manipulation_fraud") or any(
