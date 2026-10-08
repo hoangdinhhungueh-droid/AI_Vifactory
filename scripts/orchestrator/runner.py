@@ -23,12 +23,15 @@ Options:
 import argparse
 import datetime
 import json
+import logging
 import os
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger("runner")
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -50,12 +53,14 @@ if __package__ is None or __package__ == "":
     from scripts.orchestrator.rule128_governor import Rule128Governor, Rule128ViolationError, validate_generic_task_id
     from scripts.orchestrator.task_partitioner import PIPELINE_STAGES, STAGE_ORDER, PipelineStage, TaskPartitioner
     from scripts.orchestrator.ghost_code_detector import scan_workspace
+    from scripts.orchestrator.real_env_sync_guard import RealEnvSyncGuard
 else:
     from .lifecycle_manager import LifecycleManager, SubprocessWorker, WorkerResult
     from .resource_recycler import ResourceRecycler, ResourceSandbox, get_system_temp_dir
     from .rule128_governor import Rule128Governor, Rule128ViolationError, validate_generic_task_id
     from .task_partitioner import PIPELINE_STAGES, STAGE_ORDER, PipelineStage, TaskPartitioner
     from .ghost_code_detector import scan_workspace
+    from .real_env_sync_guard import RealEnvSyncGuard
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -167,6 +172,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bypass global process lock acquisition (used by internal sub-runners / probes)",
     )
     parser.add_argument(
+        "--with-backup",
+        action="store_true",
+        default=True,
+        help="Creates immutable Git backup checkpoint branch prior to syncing/deploying (default: True)",
+    )
+    parser.add_argument(
+        "--no-backup",
+        dest="with_backup",
+        action="store_false",
+        help="Skips Git backup checkpoint creation",
+    )
+    parser.add_argument(
+        "--audit-real-env",
+        action="store_true",
+        help="Executes live Real Environment E2E audit on VPS host after sync/deploy",
+    )
+    parser.add_argument(
+        "--auto-rollback",
+        action="store_true",
+        default=False,
+        help="Automatically rolls back Git and host environment if live audit or CI fails (default: False)",
+    )
+    parser.add_argument(
+        "--rollback-ref",
+        default=None,
+        help="Rolls back repository to specified Git backup reference",
+    )
+    parser.add_argument(
         "--json-output",
         action="store_true",
         help="Output structured machine-readable JSON to stdout",
@@ -190,6 +223,7 @@ class OrchestratorRunner:
         self.governor = Rule128Governor(strict=args.strict_rule128)
         self.lifecycle = LifecycleManager(max_parallel=args.parallel, default_timeout=args.timeout)
         self.recycler = ResourceRecycler()
+        self.sync_guard = RealEnvSyncGuard(root_dir=self.root_dir)
 
     def run(self) -> int:
         """Entrypoint executing requested orchestrator mode."""
@@ -728,9 +762,28 @@ class OrchestratorRunner:
         return 0 if all_passed else 1
 
     def _run_sync_mode(self, sandbox: ResourceSandbox) -> int:
-        """Executes Three-Way Physical Sync & Ghost Cleanliness Verification."""
+        """Executes Three-Way Physical Sync, Real Environment Verification, Git Backup & Ghost Cleanliness."""
         start_ts = time.time()
         sync_report: Dict[str, Any] = {}
+
+        # 0. Handle explicit rollback request if --rollback-ref provided
+        if getattr(self.args, "rollback_ref", None):
+            logger.info("Explicit rollback requested to ref: %s", self.args.rollback_ref)
+            rb_res = self.sync_guard.rollback_git_checkpoint(self.args.rollback_ref)
+            if self.args.json_output:
+                print(json.dumps({"status": "rollback_completed", "result": rb_res}, indent=2))
+            else:
+                print(f"[Rollback] Restored repository to checkpoint: {self.args.rollback_ref}")
+            return 0 if rb_res.get("status") == "success" else 1
+
+        # 0b. Automated Git Safe Backup Checkpoint (Rule 126 Safe Sync Guard)
+        backup_ref = None
+        if getattr(self.args, "with_backup", True):
+            backup_res = self.sync_guard.create_git_backup_checkpoint(prefix="sync")
+            sync_report["git_backup"] = backup_res
+            if backup_res.get("status") == "success":
+                backup_ref = backup_res["backup_record"].get("backup_branch")
+                logger.info("[Sync Gate] Safe Git backup checkpoint established: %s", backup_ref)
 
         # 1. Check Git status
         git_res = subprocess.run(
@@ -781,7 +834,12 @@ class OrchestratorRunner:
             "errors": compile_errors,
         }
 
-        # 4. Check GitHub Actions CI status for HEAD commit (Rule 126 Mandatory Gate)
+        # 4. Real Environment Sync Feasibility Evaluation Gate
+        eval_res = self.sync_guard.evaluate_real_env_sync(allow_remote_dirty=True)
+        sync_report["real_env_feasibility"] = eval_res
+        real_env_ready = eval_res.get("ready", False)
+
+        # 5. Check GitHub Actions CI status for HEAD commit (Rule 126 Mandatory Gate)
         head_commit_res = subprocess.run(
             ["git", "-C", str(self.root_dir), "rev-parse", "HEAD"],
             capture_output=True,
@@ -821,7 +879,22 @@ class OrchestratorRunner:
             ci_status_info.get("verified", False)
             and ci_status_info.get("conclusion") == "success"
         )
-        all_ok = is_clean and ghost_clean and len(compile_errors) == 0 and ci_passed and ocr_clean
+
+        # 6. Optional Live Real Environment E2E Audit
+        real_audit_passed = True
+        if getattr(self.args, "audit_real_env", False):
+            real_audit_res = self.sync_guard.audit_real_env_e2e(suite="smoke")
+            sync_report["real_env_live_e2e_audit"] = real_audit_res
+            real_audit_passed = real_audit_res.get("passed", False)
+
+        all_ok = is_clean and ghost_clean and len(compile_errors) == 0 and ci_passed and ocr_clean and real_env_ready and real_audit_passed
+
+        # 7. Automated failure rollback if requested
+        if not all_ok and getattr(self.args, "auto_rollback", False) and backup_ref:
+            logger.warning("[Sync Gate] Gate failure detected. Executing auto-rollback to: %s", backup_ref)
+            rb_res = self.sync_guard.rollback_git_checkpoint(backup_ref)
+            sync_report["auto_rollback"] = rb_res
+
         payload = {
             "status": "success" if all_ok else "failure",
             "sync_report": sync_report,
@@ -831,17 +904,26 @@ class OrchestratorRunner:
         if self.args.json_output:
             print(json.dumps(payload, indent=2))
         else:
-            print("=== THREE-WAY SYNC & CLEANLINESS REPORT ===")
+            print("=== THREE-WAY SYNC & REAL ENVIRONMENT REPORT ===")
+            if backup_ref:
+                print(f"Git Safe Backup Checkpoint: {backup_ref}")
             print(f"Git Clean: {'YES' if is_clean else 'NO'}")
             print(f"4-Layer Ghost Code Scan: {'PASS (0 defects)' if ghost_clean else f'FAIL ({len(ghost_defects)} defects)'}")
             print(f"PyCompile: {'PASS' if len(compile_errors) == 0 else 'FAIL'}")
             print(f"OCR Pre-Sync Gate: {'PASS' if ocr_clean else 'FAIL'}")
+            eval_issues = eval_res.get("issues", [])
+            eval_warns = eval_res.get("warnings", [])
+            print(f"Real Env Feasibility: {'READY' if real_env_ready else f'FAIL ({eval_issues})'} ({len(eval_warns)} warnings)")
+            if getattr(self.args, "audit_real_env", False):
+                print(f"Real Env Live E2E Audit: {'PASS' if real_audit_passed else 'FAIL'}")
             ci_verdict = (
                 f"{str(ci_status_info.get('conclusion')).upper()} (Run ID: {ci_status_info.get('run_id')})"
                 if ci_status_info.get("verified")
                 else f"NOT_PASSED ({ci_status_info.get('message', ci_status_info.get('error', 'No run'))})"
             )
             print(f"GitHub Actions CI: {ci_verdict}")
+            if not all_ok and sync_report.get("auto_rollback"):
+                print(f"⚠️ Auto-Rollback Executed: Repos restored to {backup_ref}")
 
         return 0 if all_ok else 1
 
