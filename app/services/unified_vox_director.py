@@ -1761,7 +1761,9 @@ def compile_stateful_boards(scenes: List[Dict[str, Any]], board_size: int = 4) -
         for step_idx, sc in enumerate(b_scenes):
             sc["board_id"] = b_id
             sc["board_step"] = step_idx
-            if primary_bg and isinstance(sc.get("background"), dict):
+            is_collage_sc = (sc.get("layoutVariant") == "paper_collage")
+            has_own_bg = isinstance(sc.get("background"), dict) and bool(sc["background"].get("reuse_key"))
+            if primary_bg and isinstance(sc.get("background"), dict) and (is_collage_sc or not has_own_bg):
                 sc["background"] = dict(primary_bg)
 
             # Copy accumulated props from earlier steps in this Board before adding current FG
@@ -1910,6 +1912,24 @@ def build_unified_director_plan(
             market=mkt,
             topic=topic
         )
+    else:
+        if len(spoken_sentences) >= 75 and len(bg_roster) < 46:
+            bg_roster = expand_longform_background_roster(
+                bg_roster=bg_roster,
+                target_count=46,
+                market=mkt,
+                topic=topic,
+            )
+        try:
+            from app.services.representation_shield import shield_visual_roster
+            bg_roster, fg_roster = shield_visual_roster(
+                bg_roster=bg_roster,
+                fg_roster=fg_roster,
+                story_text=story_text or "",
+                market=mkt,
+            )
+        except Exception as _ex_sh:
+            logger.warning("Manifest roster shield warning: %s", _ex_sh)
 
     scenes = []
     hero_clips = []
@@ -1940,11 +1960,12 @@ def build_unified_director_plan(
         beat_idx = int(sent.get("beat_index") or ((idx // max(1, len(spoken_sentences) // 5)) + 1))
         beat_idx = min(max(beat_idx, 1), 5)
 
-        # Matching Background phù hợp theo Beat và thứ tự cảnh (luân phiên 3 cảnh / 1 BG)
+        # Matching Background phù hợp theo Beat và thứ tự cảnh (luân phiên 2 cảnh / 1 BG cho long-form >=75 cảnh, 3 cảnh cho tập chuẩn)
         matching_bgs = [k for k, v in bg_roster.items() if beat_idx in v.get("beats", [1, 2, 3, 4, 5])]
         if not matching_bgs:
             matching_bgs = bg_keys
-        bg_key = matching_bgs[(idx // 3) % len(matching_bgs)]
+        bg_stride = 2 if len(spoken_sentences) >= 75 else 3
+        bg_key = matching_bgs[(idx // bg_stride) % len(matching_bgs)]
 
         # Matching Foreground Evidence dựa trên từ khóa kể chuyện hoặc luân phiên Beat
         narr_lower = narr.lower()
@@ -2137,7 +2158,29 @@ def build_unified_director_plan(
         if cine_data["headline_info"]:
             scene_obj.update(cine_data["headline_info"])
 
-        # VOX Mixed-Media Paper Collage Layout (Plan Section VI)
+        # VOX Mixed-Media Paper Collage & Multi-Scene Pacing Layout (Plan Section VI)
+        resolved_layout_variant = (
+            "paper_collage"
+            if (idx == 0 or idx % 6 == 0)
+            else (
+                "cinematic_doc"
+                if idx % 6 in (1, 4)
+                else ("kinetic_headline" if idx % 6 == 2 else "evidence_dossier")
+            )
+        )
+        is_collage_mode = (resolved_layout_variant == "paper_collage")
+        scene_obj["layoutVariant"] = resolved_layout_variant
+        scene_obj["sceneLayoutMode"] = resolved_layout_variant
+        from app.services.vox_automated_director import VOX_PAPER_MATERIALS_LIBRARY, DIORAMA_STYLE_BLOCKS
+        paper_mat_keys = list(VOX_PAPER_MATERIALS_LIBRARY.keys())
+        if paper_mat_keys:
+            mat_key = paper_mat_keys[(idx + beat_idx) % len(paper_mat_keys)]
+            scene_obj["paper_material"] = dict(VOX_PAPER_MATERIALS_LIBRARY[mat_key])
+            scene_obj["paper_material_id"] = mat_key
+        diorama_keys = list(DIORAMA_STYLE_BLOCKS.keys())
+        if diorama_keys:
+            scene_obj["diorama_style_block"] = diorama_keys[idx % len(diorama_keys)]
+
         paper_theme = "blueprint" if beat_idx in (1, 4) else ("parchment" if beat_idx in (3, 5) else "manila")
         narr_low_sc = narr.lower()
         if any(w in narr_low_sc for w in ["reject", "rejected", "denied", "dismissed", "veto", "却下", "拒否"]):
@@ -2159,17 +2202,17 @@ def build_unified_director_plan(
         scene_obj["papercraft_theme"] = paper_theme
         scene_obj["papercraft_layout"] = {
             "backdrop_theme": paper_theme,
-            "has_washi_tape": True,
-            "has_brass_pins": True,
-            "has_connecting_yarn": beat_idx in (3, 4),
+            "has_washi_tape": is_collage_mode,
+            "has_brass_pins": is_collage_mode,
+            "has_connecting_yarn": bool(is_collage_mode and beat_idx in (3, 4)),
             "yarn_connections": [
                 {"from": "evidence_pin", "to": "hero_pin", "curvature": 25, "isYarn": True, "color": "#dc2626"}
-            ] if beat_idx in (3, 4) else [],
+            ] if (is_collage_mode and beat_idx in (3, 4)) else [],
             "stamp_badge": {
                 "text": stamp_badge_text,
                 "rotation": -8 if (idx % 2 == 0) else -14
-            },
-            "has_sticker_cutout": bool(assigned_fg),
+            } if (is_collage_mode or resolved_layout_variant == "evidence_dossier") else None,
+            "has_sticker_cutout": bool(is_collage_mode and assigned_fg),
             "torn_paper": {
                 "color": "blueprint_dark" if paper_theme == "blueprint" else ("manila" if paper_theme == "manila" else "ivory"),
                 "roughness": "medium",

@@ -704,7 +704,7 @@ export const TwoLayerScene = (props) => {
       ) : null}
 
       {/* Vox Kinetic Typography (Word-Level Whisper Keywords Burst) */}
-      {hasExactSubtitles ? (
+      {showOverlay && hasExactSubtitles ? (
         <VoxKineticTypography words={subtitles as WordTimestamp[]} />
       ) : null}
 
@@ -734,7 +734,7 @@ export const TwoLayerScene = (props) => {
       ) : null}
 
       {/* Vox Curved Bezier Connecting Vectors & Red Yarn Strings (Rule 122 & Vox Explainer Motion) */}
-      {(connection || connections || radiatingConnections) ? (
+      {showOverlay && (connection || connections || radiatingConnections) ? (
         <VoxConnectingVectors
           connections={[
             ...(connection ? [connection] : []),
@@ -831,7 +831,7 @@ export const TwoLayerScene = (props) => {
       ) : null}
 
       {/* Linked Secondary Objects (Parametric Vector Follower, Physical Stamp Slam, Marker Sweep, Odometer) */}
-      {props.linkedSecondaryObjects && Array.isArray(props.linkedSecondaryObjects) ? (
+      {showOverlay && props.linkedSecondaryObjects && Array.isArray(props.linkedSecondaryObjects) ? (
         props.linkedSecondaryObjects.map((obj: any, idx: number) => {
           if (obj.type === "svg_procedural_marker" || obj.type === "marker_sweep") {
             return (
@@ -1226,81 +1226,55 @@ const auditForegroundCoverage = (scenes, foregroundSegments) => {
 // Groups consecutive scenes that share identical forensic overlays, stat cards,
 // or explicit card_segment_key into a single persistent sequence.
 // Prevents React unmount/remount on scene cuts and eliminates spring slam flickering.
-const computeOverlayKey = (s: any) => {
-  const explicitKey = s.card_segment_key || s.cardSegmentKey;
-  if (explicitKey) return explicitKey;
+const SPECIALIZED_CHART_OVERLAY_TYPES = new Set([
+  "financial_chart",
+  "circuit_breaker_dial",
+  "threshold_ratio",
+  "grid_ratio",
+  "ratio_grid",
+  "market_depth",
+  "causal_chain",
+  "timeline_stepper",
+  "kinetic_counter",
+]);
 
+const computeOverlayKey = (s: any) => {
   const ov = s.forensicOverlay || s.forensic_overlay;
-  const statVal = s.statValue;
-  const statLbl = s.statLabel;
-  const badge = s.stampBadge || s.stamp_badge;
-  const md = s.motionDirective;
-  const headline = s.headline;
-  if (!ov && !statVal && !badge && !md && !headline) return null;
+  const ovType = ov?.type;
+  if (!ovType || !SPECIALIZED_CHART_OVERLAY_TYPES.has(ovType)) return null;
+
+  const variant = s.layoutVariant || s.sceneLayoutMode;
+  if (variant === "kinetic_headline" || variant === "evidence_dossier") return null;
 
   const pos = s.foregroundPosition || "left";
   return JSON.stringify({
-    ovType: ov?.type,
+    ovType,
     ovTitle: ov?.title,
     ovPayload: ov?.payload,
-    statVal,
-    statLbl,
-    badge,
-    md,
     pos,
-    headline,
   });
 };
 
 const buildOverlaySegments = (scenes: any[]) => {
   const raw: any[] = [];
   let cursor = 0;
-  scenes.forEach((s, idx) => {
+  scenes.forEach((s) => {
     const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
     const key = computeOverlayKey(s);
     const last = raw[raw.length - 1];
-    let effectiveOv = s.forensicOverlay || s.forensic_overlay;
-    if (!effectiveOv && (s.motionDirective === "kinetic_headline" || (idx === 0 && (s.headline || s.statValue)))) {
-      if (s.headline || s.statValue) {
-        const headlineTitle = s.headline || (s.statValue ? `METRIC: ${s.statValue}` : "");
-        const words = headlineTitle.split(" ").filter(Boolean);
-        const lastWord = words.length > 0 ? words[words.length - 1] : "";
-        effectiveOv = {
-          type: "kinetic_headline",
-          title: headlineTitle,
-          badge: s.category || "FORENSIC INVESTIGATION",
-          payload: {
-            highlight_word: s.highlightWord || s.highlight_word || lastWord,
-            subtext: s.subtext || s.statLabel || "",
-            accent_color: s.accentColor || s.accent_color || "#f59e0b",
-          },
-        };
-      }
-    } else if (!effectiveOv && s.motionDirective === "counter_rollup" && s.statValue) {
-      effectiveOv = {
-        type: "kinetic_counter",
-        title: s.statLabel || "EVIDENTIARY METRIC",
-        payload: { amount: s.statValue },
-      };
-    } else if (!effectiveOv && s.motionDirective === "yellow_marker_highlight") {
-      effectiveOv = {
-        type: "document_highlight",
-        title: s.statLabel || "OFFICIAL RECORD",
-        payload: { clauses: [s.caption || s.narration || "DOCUMENTARY AUDIT RECORD"] },
-      };
-    }
+    const effectiveOv = key ? (s.forensicOverlay || s.forensic_overlay) : null;
 
     if (key && last && last.key === key) {
       last.end += dur;
-    } else if (key || effectiveOv) {
+    } else if (key && effectiveOv) {
       raw.push({
-        key: key || `ov_${cursor}`,
+        key,
         start: cursor,
         end: cursor + dur,
         forensicOverlay: effectiveOv,
-        statValue: s.statValue,
-        statLabel: s.statLabel,
-        stampBadge: s.stampBadge || s.stamp_badge,
+        statValue: undefined,
+        statLabel: undefined,
+        stampBadge: undefined,
         isLeft: s.foregroundPosition === "left",
         hasForeground: Boolean(s.foreground || s.primary_hero),
       });
@@ -2253,7 +2227,7 @@ export const TwoLayerEpisode: React.FC<{
       const resolvedLayoutVariant =
         s.layoutVariant ||
         s.sceneLayoutMode ||
-        (idx === 0 || resolvedCutouts.length > 0 || rawYarns.length > 0 || idx % 6 === 0
+        (idx === 0 || idx % 6 === 0
           ? "paper_collage"
           : idx % 6 === 1 || idx % 6 === 4
           ? "cinematic_doc"

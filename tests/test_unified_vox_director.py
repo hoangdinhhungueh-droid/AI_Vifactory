@@ -295,3 +295,41 @@ def test_civil_bankruptcy_domain_isolation_and_in_flight_gate(tmp_path):
     gate_res = audit_director_assets_in_flight(tmp_path, call_llm_audit=False)
     assert gate_res["verdict"] == "APPROVED", f"Expected APPROVED, got defects: {gate_res['defects']}"
     assert gate_res["defects_count"] == 0
+
+
+def test_longform_135_scenes_bg_diversity_and_multi_mode_pacing(tmp_path):
+    """Round 2 Adversarial Gate: Verify 135-scene longform episode retains >=40 unique BGs after compile_stateful_boards and enforces 4-mode layoutVariant & tactile pin gating."""
+    from collections import Counter
+    from app.services.unified_vox_director import build_unified_director_plan
+
+    longform_sentences = [
+        {
+            "text": f"Investigative sentence {i+1} examining systemic liquidity risk and audit ledger entries.",
+            "beat_index": (i // 27) + 1,
+            "duration_sec": 4.5,
+            "duration_frames": 135,
+        }
+        for i in range(135)
+    ]
+    res = build_unified_director_plan(
+        spoken_sentences=longform_sentences,
+        ep_dir=tmp_path,
+        market="EN",
+        metadata={"episode_id": "EN_EP0099_longform_round2", "topic": "Sovereign Liquidity Audit"},
+    )
+    scenes = res["scenes"]
+    assert len(scenes) == 135
+    assert len(res["background_roster"]) >= 46
+
+    unique_bgs_assigned = {s["background"]["reuse_key"] for s in scenes if s.get("background")}
+    assert len(unique_bgs_assigned) >= 38, f"Expected >= 38 unique BGs used across 135 scenes, got {len(unique_bgs_assigned)}"
+
+    variants = Counter(s.get("layoutVariant") for s in scenes)
+    assert set(variants.keys()) == {"paper_collage", "cinematic_doc", "kinetic_headline", "evidence_dossier"}
+    for s in scenes:
+        assert "paper_material" in s and isinstance(s["paper_material"], dict)
+        assert "diorama_style_block" in s
+        if s["layoutVariant"] != "paper_collage":
+            assert s["papercraft_layout"]["has_brass_pins"] is False
+            assert s["papercraft_layout"]["has_washi_tape"] is False
+            assert s["papercraft_layout"]["has_connecting_yarn"] is False

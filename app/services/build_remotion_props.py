@@ -1706,44 +1706,6 @@ def build_remotion_props_data(
             beat_idx=b_num,
         )
 
-        # Construct papercraft_layout per VOX Documentary Paper Collage Specification
-        explicit_papercraft = s.get("papercraft_layout") or s.get("papercraftLayout")
-        if explicit_papercraft and isinstance(explicit_papercraft, dict):
-            papercraft_layout = dict(explicit_papercraft)
-        else:
-            has_tape = bool(forensic_ov or stat_val or s.get("hasCornerTape") or b_num in (1, 2, 3))
-            has_pins = bool(forensic_ov or motion_meta.get("radiating_connections") or s.get("hasPushpin") or b_num in (2, 3, 4))
-            has_yarn = bool(motion_meta.get("radiating_connections") or motion_meta.get("connection") or b_num in (3, 4))
-
-            yarn_conns = []
-            if motion_meta.get("radiating_connections"):
-                yarn_conns = motion_meta["radiating_connections"]
-            elif motion_meta.get("connection"):
-                yarn_conns = [motion_meta["connection"]]
-
-            stamp_badge_obj = None
-            if stamp_badge:
-                stamp_badge_obj = {
-                    "text": str(stamp_badge),
-                    "rotation": -8 if (i % 2 == 0) else -14,
-                    "theme": "crimson" if b_num in (3, 4) else "ivory"
-                }
-
-            papercraft_layout = {
-                "backdrop_theme": papercraft_theme,
-                "has_washi_tape": has_tape,
-                "has_brass_pins": has_pins,
-                "has_connecting_yarn": has_yarn,
-                "yarn_connections": yarn_conns,
-                "stamp_badge": stamp_badge_obj,
-                "has_sticker_cutout": bool(fg_rel),
-                "torn_paper": {
-                    "color": "blueprint_dark" if papercraft_theme == "blueprint" else ("manila" if papercraft_theme == "manila" else "ivory"),
-                    "roughness": "medium",
-                    "rotation": -1.5 if (i % 2 == 0) else 1.2,
-                }
-            }
-
         resolved_layout_variant = (
             s.get("layoutVariant")
             or s.get("sceneLayoutMode")
@@ -1762,6 +1724,52 @@ def build_remotion_props_data(
                 )
             )
         )
+        is_collage_variant = (resolved_layout_variant == "paper_collage")
+
+        # Construct papercraft_layout per VOX Documentary Paper Collage Specification
+        explicit_papercraft = s.get("papercraft_layout") or s.get("papercraftLayout")
+        if explicit_papercraft and isinstance(explicit_papercraft, dict):
+            papercraft_layout = dict(explicit_papercraft)
+            if not is_collage_variant:
+                papercraft_layout["has_washi_tape"] = False
+                papercraft_layout["has_brass_pins"] = False
+                papercraft_layout["has_connecting_yarn"] = False
+                papercraft_layout["yarn_connections"] = []
+                papercraft_layout["has_sticker_cutout"] = False
+        else:
+            has_tape = bool(is_collage_variant and (forensic_ov or stat_val or s.get("hasCornerTape") or b_num in (1, 2, 3)))
+            has_pins = bool(is_collage_variant and (forensic_ov or motion_meta.get("radiating_connections") or s.get("hasPushpin") or b_num in (2, 3, 4)))
+            has_yarn = bool(is_collage_variant and (motion_meta.get("radiating_connections") or motion_meta.get("connection") or b_num in (3, 4)))
+
+            yarn_conns = []
+            if is_collage_variant:
+                if motion_meta.get("radiating_connections"):
+                    yarn_conns = motion_meta["radiating_connections"]
+                elif motion_meta.get("connection"):
+                    yarn_conns = [motion_meta["connection"]]
+
+            stamp_badge_obj = None
+            if stamp_badge and (is_collage_variant or resolved_layout_variant == "evidence_dossier"):
+                stamp_badge_obj = {
+                    "text": str(stamp_badge),
+                    "rotation": -8 if (i % 2 == 0) else -14,
+                    "theme": "crimson" if b_num in (3, 4) else "ivory"
+                }
+
+            papercraft_layout = {
+                "backdrop_theme": papercraft_theme,
+                "has_washi_tape": has_tape,
+                "has_brass_pins": has_pins,
+                "has_connecting_yarn": has_yarn,
+                "yarn_connections": yarn_conns,
+                "stamp_badge": stamp_badge_obj,
+                "has_sticker_cutout": bool(is_collage_variant and fg_rel),
+                "torn_paper": {
+                    "color": "blueprint_dark" if papercraft_theme == "blueprint" else ("manila" if papercraft_theme == "manila" else "ivory"),
+                    "roughness": "medium",
+                    "rotation": -1.5 if (i % 2 == 0) else 1.2,
+                }
+            }
 
         scenes_out.append({
             "id": scene_id,
@@ -1959,9 +1967,10 @@ def build_remotion_props_data(
                 market=m_code
             )
 
-            # Accumulate prior props on the same Stateful Board tabletop
+            # Accumulate prior props on the same Stateful Board tabletop (strictly for paper_collage scenes)
+            is_sc_collage = (sc.get("layoutVariant") == "paper_collage")
             prior_fgs = [p for p in board_fgs if p and p != fg_cur][-2:]
-            if prior_fgs and not meta["supporting_cutouts"]:
+            if is_sc_collage and prior_fgs and not meta["supporting_cutouts"]:
                 supp = []
                 rad = list(meta["radiating_connections"] or [])
                 start_x = 34 if is_left else 66
@@ -2006,9 +2015,9 @@ def build_remotion_props_data(
 
             sc["connection"] = meta["connection"]
             sc["connections"] = meta["connections"]
-            sc["radiatingConnections"] = meta["radiating_connections"]
-            sc["yarns"] = meta["radiating_connections"]
-            sc["supportingCutouts"] = meta["supporting_cutouts"]
+            sc["radiatingConnections"] = meta["radiating_connections"] if is_sc_collage else []
+            sc["yarns"] = meta["radiating_connections"] if is_sc_collage else []
+            sc["supportingCutouts"] = meta["supporting_cutouts"] if is_sc_collage else []
             sc["editorialHeadline"] = meta["editorial_headline"]
             sc["heroSrc"] = sc.get("foreground") or sc.get("heroSrc")
             sc["backgroundSrc"] = sc.get("background") or sc.get("backgroundSrc")

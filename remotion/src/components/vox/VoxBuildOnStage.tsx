@@ -138,6 +138,9 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
       : "cinematic_doc");
 
   const isTactileCollage = resolvedVariant === "paper_collage";
+  const isKineticHeadline = resolvedVariant === "kinetic_headline";
+  const isEvidenceDossier = resolvedVariant === "evidence_dossier";
+  const isCinematicDoc = resolvedVariant === "cinematic_doc";
 
   // 12fps Quantized Stop-Motion Jitter (active in tactile collage mode, calm in cinematic_doc)
   const rawJitter = useStopMotion(12, isTactileCollage ? 1.1 : 0.15, 42 + sceneIndex);
@@ -331,8 +334,8 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             </div>
           )}
 
-          {/* EDITORIAL HEADLINE (Large Typography) */}
-          {headline && (
+          {/* EDITORIAL HEADLINE (Standard Top-Left for paper_collage & cinematic_doc) */}
+          {headline && !isKineticHeadline && !isEvidenceDossier && (
             <div
               style={{
                 position: "absolute",
@@ -364,14 +367,20 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                 style={{
                   fontSize: headline.length > 36 ? "28px" : "38px",
                   fontWeight: 900,
-                  color: "#18181b",
+                  color: isCinematicDoc ? "#fafaf9" : "#18181b",
+                  backgroundColor: isCinematicDoc ? "rgba(15, 23, 42, 0.78)" : "transparent",
+                  padding: isCinematicDoc ? "8px 16px" : "0",
+                  borderRadius: isCinematicDoc ? "4px" : "0",
+                  display: isCinematicDoc ? "inline-block" : "block",
                   lineHeight: 1.1,
                   letterSpacing: "-0.02em",
                   textTransform: "uppercase",
                   fontFamily: "Impact, Inter, sans-serif",
                   margin: 0,
                   maxWidth: "85%",
-                  textShadow: "1px 1px 0 rgba(255,255,255,0.85)",
+                  textShadow: isCinematicDoc
+                    ? "0 2px 10px rgba(0,0,0,0.65)"
+                    : "1px 1px 0 rgba(255,255,255,0.85)",
                 }}
               >
                 {headline}
@@ -394,19 +403,176 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                       { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
                     )})`,
                     opacity: 0.85,
-                    mixBlendMode: "multiply",
+                    mixBlendMode: isCinematicDoc ? "normal" : "multiply",
                   }}
                 />
               )}
             </div>
           )}
 
-          {/* LAYER 1: HERO CUTOUT SUBJECT */}
-          {heroSrc && (
+          {/* MODE 3: KINETIC HEADLINE STAGE (Giant Centered Typography Card) */}
+          {isKineticHeadline && headline && (
             <div
               style={{
                 position: "absolute",
-                left: `${heroCurrentX}%`,
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 28,
+                pointerEvents: "none",
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: "rgba(244, 236, 225, 0.94)",
+                  borderTop: "6px solid #dc2626",
+                  borderBottom: "3px solid #18181b",
+                  padding: "32px 48px",
+                  maxWidth: "78%",
+                  boxShadow: "0 24px 48px rgba(0,0,0,0.42)",
+                  transform: `scale(${interpolate(headlineSpring, [0, 1], [0.92, 1])})`,
+                  opacity: interpolate(headlineSpring, [0, 1], [0, 1]),
+                  textAlign: "center",
+                }}
+              >
+                {subtitle && (
+                  <div
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: 800,
+                      color: "#dc2626",
+                      letterSpacing: "0.24em",
+                      marginBottom: "10px",
+                      textTransform: "uppercase",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {subtitle}
+                  </div>
+                )}
+                <h1
+                  style={{
+                    fontSize: headline.length > 36 ? "44px" : "56px",
+                    fontWeight: 900,
+                    color: "#18181b",
+                    lineHeight: 1.06,
+                    letterSpacing: "-0.02em",
+                    textTransform: "uppercase",
+                    fontFamily: "Impact, Inter, sans-serif",
+                    margin: 0,
+                  }}
+                >
+                  {headline}
+                </h1>
+                <div
+                  style={{
+                    height: "10px",
+                    width: "65%",
+                    margin: "14px auto 0 auto",
+                    backgroundColor: "#facc15",
+                    transformOrigin: "left center",
+                    transform: `scaleX(${interpolate(
+                      frame,
+                      [headlineDelayFrames + 8, headlineDelayFrames + 24],
+                      [0, 1],
+                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                    )})`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* MODE 4: EVIDENCE DOSSIER SPLIT-CARD STAGE (Left Manila Card + Right Exhibit Cutout) */}
+          {isEvidenceDossier && (headline || heroLabel) && (
+            <div
+              style={{
+                position: "absolute",
+                top: "14%",
+                left: "6%",
+                width: "44%",
+                backgroundColor: "#f5efe1",
+                borderLeft: "6px solid #b91c1c",
+                border: "1px solid rgba(24,24,27,0.22)",
+                padding: "24px 28px",
+                boxShadow: "0 18px 36px rgba(0,0,0,0.34)",
+                zIndex: 28,
+                opacity: interpolate(headlineSpring, [0, 1], [0, 1]),
+                transform: `translateX(${interpolate(headlineSpring, [0, 1], [-28, 0])}px)`,
+                pointerEvents: "none",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  color: "#b91c1c",
+                  letterSpacing: "0.2em",
+                  marginBottom: "8px",
+                  textTransform: "uppercase",
+                  fontFamily: "monospace",
+                }}
+              >
+                {subtitle || "FORENSIC EVIDENCE DOSSIER"}
+              </div>
+              {headline && (
+                <div
+                  style={{
+                    fontSize: "28px",
+                    fontWeight: 900,
+                    color: "#18181b",
+                    lineHeight: 1.12,
+                    textTransform: "uppercase",
+                    fontFamily: "Impact, Inter, sans-serif",
+                    marginBottom: "12px",
+                  }}
+                >
+                  {headline}
+                </div>
+              )}
+              {heroLabel && (
+                <div
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    color: "#3f3f46",
+                    fontFamily: "monospace",
+                    borderTop: "1px dashed rgba(24,24,27,0.25)",
+                    paddingTop: "10px",
+                  }}
+                >
+                  EXHIBIT // {heroLabel}
+                </div>
+              )}
+              {stampText && (
+                <div
+                  style={{
+                    display: "inline-block",
+                    marginTop: "14px",
+                    border: `2.5px solid ${stampColor}`,
+                    padding: "4px 10px",
+                    color: stampColor,
+                    fontWeight: 900,
+                    fontSize: "12px",
+                    fontFamily: "monospace",
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {stampText}
+                </div>
+              )}
+            </div>
+          )}
+
+
+          {/* LAYER 1: HERO CUTOUT SUBJECT (Active in paper_collage, evidence_dossier right-pane, or when no BG exists) */}
+          {heroSrc && (isTactileCollage || isEvidenceDossier || !backgroundSrc) && (
+            <div
+              style={{
+                position: "absolute",
+                left: `${isEvidenceDossier ? Math.max(heroCurrentX, 68) : heroCurrentX}%`,
                 top: `${heroPosition.yPct}%`,
                 width: `${heroPosition.widthPct || 38}%`,
                 transform: `translate(-50%, -50%) rotate(${heroRotation}deg)`,
@@ -470,8 +636,8 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             </div>
           )}
 
-          {/* LAYER 2: SUPPORTING CUTOUTS & EVIDENCE (3.5s - 5.0s) */}
-          {supportingCutouts.map((cutout, idx) => {
+          {/* LAYER 2: SUPPORTING CUTOUTS & EVIDENCE (Strictly tactile paper_collage mode) */}
+          {isTactileCollage && supportingCutouts.map((cutout, idx) => {
             const defaultCutSec = (3.5 + idx * 0.4) * speedRatio;
             const cutDelayFrames = Math.round(
               fps * (cutout.delaySec !== undefined ? cutout.delaySec : defaultCutSec)
@@ -559,8 +725,8 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             );
           })}
 
-          {/* LAYER 3: RED CONNECTING YARN LINES (5.0s - 7.0s) */}
-          {yarns.map((yarn, yIdx) => {
+          {/* LAYER 3: RED CONNECTING YARN LINES (Strictly tactile paper_collage mode) */}
+          {isTactileCollage && yarns.map((yarn, yIdx) => {
             const defaultYarnSec = (4.8 + yIdx * 0.3) * speedRatio;
             const yarnDelayFrames = Math.round(
               fps * (yarn.delaySec !== undefined ? yarn.delaySec : defaultYarnSec)
@@ -613,8 +779,8 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             );
           })}
 
-          {/* LAYER 4: OFFICIAL RUBBER STAMP SLAM (5.0s - 6.5s) */}
-          {stampText && (
+          {/* LAYER 4: OFFICIAL RUBBER STAMP SLAM (Strictly tactile paper_collage mode) */}
+          {isTactileCollage && stampText && (
             <div
               style={{
                 position: "absolute",
