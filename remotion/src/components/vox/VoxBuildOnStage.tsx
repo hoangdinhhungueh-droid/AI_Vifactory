@@ -78,18 +78,30 @@ export interface VoxBuildOnStageProps {
 
   /** Duration of total clip in seconds (default 10s) */
   durationSec?: number;
+
+  /** Visual Pacing Layout Mode to prevent repetitive slideshow fatigue */
+  layoutVariant?:
+    | "paper_collage"
+    | "cinematic_doc"
+    | "kinetic_headline"
+    | "evidence_dossier"
+    | string;
+
+  /** Scene sequence index for deterministic camera direction variation */
+  sceneIndex?: number;
+
+  /** Explicit camera directive from Director Plan */
+  cameraMovement?: string;
 }
 
 /**
- * VoxBuildOnStage: Authentic 7-Layer Tactile Paper Build-On Assembly Engine.
- * 
- * Recreates the WOWZ.CLOUD / AI Playbook Universal Video Motion sequence:
- * - 0.0s – 1.0s: Nền giấy cổ (Aged newsprint / archival surface) xuất hiện với spring overshoot.
- * - 1.0s – 3.5s: Hero cutout trượt vào từ cạnh khung hình với quán tính paper drag & 2-frame stamp settle.
- * - 3.5s – 5.0s: Supporting cutouts thả vào, ghim lại bằng ghim đồng (BrassPin), dán băng keo (WashiTape).
- * - 5.0s – 7.0s: Typewriter label stamp dập mạnh, dây nối đỏ vẽ từ ghim này sang ghim khác, marker vẽ nét dưới.
- * - 7.0s – 10.0s: Living Paper Poster Hold — cố định 100% vị trí, nhịp thở camera push 1.0 -> 1.03x,
- *                 bóng đổ thở nhẹ và rung giấy vật lý 12fps stop-motion jitter.
+ * VoxBuildOnStage: Adaptive Multi-Mode Vox Visual & Tactile Engine.
+ *
+ * Supports 4 distinct editorial visual modes to match authentic Vox documentary pacing:
+ * 1. "paper_collage" (15-20%): Tactile paper build-on assembly with brass pins, washi tape, and 12fps stop-motion jitter.
+ * 2. "cinematic_doc" (40%): Smooth Ken Burns pan/zoom full-bleed documentary staging without repetitive slide-in or head-pins.
+ * 3. "kinetic_headline" (20%): High-impact editorial typography focus with marker sweep.
+ * 4. "evidence_dossier" (20%): Forensic document & quantitative data staging synchronized with overlay layers.
  */
 export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   headline,
@@ -105,12 +117,33 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   stampColor = "#dc2626",
   hasMarkerHighlight = true,
   durationSec = 10,
+  layoutVariant,
+  sceneIndex = 0,
+  cameraMovement,
 }) => {
   const frame = useCurrentFrame();
-  const { fps, width, height } = useVideoConfig();
+  const { fps } = useVideoConfig();
 
-  // 12fps Quantized Stop-Motion Jitter
-  const { dx: jitterX, dy: jitterY, dRot: jitterRot } = useStopMotion(12, 1.2, 42);
+  // Resolve effective visual mode: reserve full tactile paper_collage for key beats or multi-cutout scenes
+  const resolvedVariant =
+    layoutVariant ||
+    (supportingCutouts.length > 0 || yarns.length > 0 || Boolean(stampText)
+      ? "paper_collage"
+      : sceneIndex % 6 === 0
+      ? "paper_collage"
+      : sceneIndex % 5 === 2
+      ? "kinetic_headline"
+      : sceneIndex % 4 === 1
+      ? "evidence_dossier"
+      : "cinematic_doc");
+
+  const isTactileCollage = resolvedVariant === "paper_collage";
+
+  // 12fps Quantized Stop-Motion Jitter (active in tactile collage mode, calm in cinematic_doc)
+  const rawJitter = useStopMotion(12, isTactileCollage ? 1.1 : 0.15, 42 + sceneIndex);
+  const jitterX = isTactileCollage ? rawJitter.dx : 0;
+  const jitterY = isTactileCollage ? rawJitter.dy : 0;
+  const jitterRot = isTactileCollage ? rawJitter.dRot : 0;
 
   // Phase Timers in Frames (Adaptive to Beat Duration)
   const dSec = Math.max(1, durationSec || 10);
@@ -120,37 +153,60 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const fMid = Math.max(1, Math.round(fTotal * 0.65));
   const fEnd = Math.max(fMid + 1, fTotal);
 
-  // Camera Micro-push (Hold Phase breathe 1.00 -> 1.035x)
+  // Diverse Camera Choreography (Ken Burns push, pull, lateral drift)
+  const camDir = sceneIndex % 4;
+  const isPullOut =
+    cameraMovement === "pull_out" || (!cameraMovement && camDir === 1 && !isTactileCollage);
   const cameraScale = interpolate(
     frame,
     [0, fMid, fEnd],
-    [1.0, 1.015, 1.035],
+    isPullOut ? [1.065, 1.03, 1.0] : isTactileCollage ? [1.0, 1.015, 1.035] : [1.0, 1.03, 1.06],
     { extrapolateRight: "clamp" }
   );
+  const cameraPanX = isTactileCollage
+    ? 0
+    : interpolate(
+        frame,
+        [0, fEnd],
+        camDir === 2 ? [-14, 14] : camDir === 3 ? [14, -14] : [0, 0],
+        { extrapolateRight: "clamp" }
+      );
 
-  // 1. BASE BACKDROP ENTRANCE (0.0s - 1.0s)
+  // 1. BASE BACKDROP ENTRANCE
   const backdropSpring = spring({
     frame,
     fps,
     config: SPRING_PRESETS.paperSlide,
   });
-  const backdropScale = interpolate(backdropSpring, [0, 1], [0.94, 1.0]);
-  const backdropOpacity = interpolate(backdropSpring, [0, 1], [0, 1]);
+  const backdropScale = isTactileCollage
+    ? interpolate(backdropSpring, [0, 1], [0.96, 1.0])
+    : 1.0;
+  const backdropOpacity = isTactileCollage
+    ? interpolate(backdropSpring, [0, 1], [0.2, 1])
+    : interpolate(frame, [0, Math.min(10, fTotal)], [0.85, 1], { extrapolateRight: "clamp" });
 
-  // 2. HERO CUTOUT SLIDE & DRAG (1.0s - 3.5s)
-  const heroDelayFrames = Math.round(fps * 1.0 * speedRatio);
+  // 2. HERO SUBJECT CHOREOGRAPHY (Tactile slide only in paper_collage; grounded rise/fade in cinematic_doc)
+  const heroDelayFrames = isTactileCollage ? Math.round(fps * 0.6 * speedRatio) : 0;
   const heroSpring = spring({
     frame: Math.max(0, frame - heroDelayFrames),
     fps,
-    config: SPRING_PRESETS.paperSlide,
+    config: isTactileCollage ? SPRING_PRESETS.paperSlide : SPRING_PRESETS.paperHeavy,
   });
   const heroTargetX = heroPosition.xPct;
   const isRight = heroTargetX > 50;
-  // Natural tactile slide: 12% offset from respective side (settles into target)
-  const heroStartX = isRight ? heroTargetX + 12 : heroTargetX - 12;
+  const heroStartX = isTactileCollage
+    ? isRight
+      ? heroTargetX + 10
+      : heroTargetX - 10
+    : isRight
+    ? heroTargetX + 2.5
+    : heroTargetX - 2.5;
   const heroCurrentX = interpolate(heroSpring, [0, 1], [heroStartX, heroTargetX]);
-  const heroRotation = interpolate(heroSpring, [0, 0.8, 1], [isRight ? 3 : -3, isRight ? -1 : 1, 0]);
-  const heroDropShadow = interpolate(heroSpring, [0, 1], [0, 18]);
+  const heroRotation = isTactileCollage
+    ? interpolate(heroSpring, [0, 0.8, 1], [isRight ? 2.5 : -2.5, isRight ? -0.8 : 0.8, 0])
+    : 0;
+  const heroDropShadow = interpolate(heroSpring, [0, 1], [4, 18]);
+  const heroOpacity = interpolate(heroSpring, [0, 0.35, 1], [0, 1, 1]);
 
   // 3. EDITORIAL HEADLINE STAMP (2.5s - 4.0s)
   const headlineDelayFrames = Math.round(fps * 2.2 * speedRatio);
@@ -211,7 +267,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
         style={{
           width: "100%",
           height: "100%",
-          transform: `scale(${cameraScale}) translate(${jitterX}px, ${jitterY}px) rotate(${jitterRot}deg)`,
+          transform: `scale(${cameraScale}) translate(${jitterX + cameraPanX}px, ${jitterY}px) rotate(${jitterRot}deg)`,
           transformOrigin: "center center",
           position: "relative",
         }}
@@ -345,7 +401,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             </div>
           )}
 
-          {/* LAYER 1: HERO CUTOUT SUBJECT (1.0s - 3.5s) */}
+          {/* LAYER 1: HERO CUTOUT SUBJECT */}
           {heroSrc && (
             <div
               style={{
@@ -355,6 +411,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                 width: `${heroPosition.widthPct || 38}%`,
                 transform: `translate(-50%, -50%) rotate(${heroRotation}deg)`,
                 filter: `drop-shadow(0 ${heroDropShadow}px 24px rgba(0,0,0,0.35))`,
+                opacity: heroOpacity,
                 zIndex: 30,
               }}
             >
@@ -368,42 +425,48 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                     filter: "contrast(1.08)",
                   }}
                 />
-                {/* White Paper Cutout Border Simulation */}
+                {/* White Paper Cutout Border Simulation (only in tactile paper_collage mode) */}
+                {isTactileCollage && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: "-3px",
+                      border: "2px solid rgba(255,255,255,0.9)",
+                      pointerEvents: "none",
+                      borderRadius: "4px",
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Brass Pin on Hero Head (only in tactile paper_collage mode) */}
+              {isTactileCollage && (
                 <div
                   style={{
                     position: "absolute",
-                    inset: "-3px",
-                    border: "2px solid rgba(255,255,255,0.9)",
-                    pointerEvents: "none",
-                    borderRadius: "4px",
+                    top: "-10px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 35,
                   }}
-                />
-              </div>
+                >
+                  <VoxBrassPin size={18} />
+                </div>
+              )}
 
-              {/* Brass Pin on Hero Head */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: "-10px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  zIndex: 35,
-                }}
-              >
-                <VoxBrassPin size={18} />
-              </div>
-
-              {/* Corner Washi Tape */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-8px",
-                  right: "-12px",
-                  zIndex: 35,
-                }}
-              >
-                <VoxWashiTape width={65} rotation={-12} color="translucent" />
-              </div>
+              {/* Corner Washi Tape (only in tactile paper_collage mode) */}
+              {isTactileCollage && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: "-8px",
+                    right: "-12px",
+                    zIndex: 35,
+                  }}
+                >
+                  <VoxWashiTape width={65} rotation={-12} color="translucent" />
+                </div>
+              )}
             </div>
           )}
 

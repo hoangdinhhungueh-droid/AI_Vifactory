@@ -160,4 +160,50 @@ def test_build_remotion_props_data_beat_distribution(tmp_path):
         assert s["headline"] == s["editorialHeadline"]
 
 
+def test_build_remotion_props_multi_scene_layout_variants_and_forge_preservation(tmp_path, monkeypatch):
+    """Verify 135 longform scenes rotate across all 4 layoutVariants (~15-20% paper_collage) and preserve Vox metadata across forge_scenes merge."""
+    import json
+    from collections import Counter
 
+    monkeypatch.setenv("DISABLE_LLM_TIMELINE_DIRECTOR", "1")
+
+    scenes = [
+        {
+            "id": f"scene_{i+1:03d}",
+            "beat_index": (i // 27) + 1,
+            "narration": f"Scene {i+1}: The forensic audit uncovered $420 million missing from account {i+1}.",
+            "duration_sec": 4.0,
+            "headline": f"EXHIBIT #{i+1}",
+            "paper_material": {"id": "newsprint_aged", "hex": "#E8DFCA"},
+            "diorama_style_block": "DEEP_DIORAMA",
+            "video_prompt": "STYLE BLOCK\n\nSHOT: Wide room",
+        }
+        for i in range(135)
+    ]
+    brain_file = tmp_path / "brain_input.json"
+    brain_file.write_text(json.dumps({"episode_id": "EN_EP9999", "market": "EN", "scenes": scenes}), encoding="utf-8")
+
+    # Also write prompts_forge.json with bare scene dicts to test merge preservation
+    forge_file = tmp_path / "prompts_forge.json"
+    forge_file.write_text(
+        json.dumps({"scenes": [{"id": f"scene_{i+1:03d}", "bg_key": f"bg_{(i % 46)+1:02d}"} for i in range(135)]}),
+        encoding="utf-8",
+    )
+
+    props = build_remotion_props_data(
+        episode_id="EN_EP9999",
+        brain_input_path=str(brain_file),
+        public_dir=str(tmp_path / "public"),
+        skip_missing=False,
+    )
+
+    out_scenes = props["scenes"]
+    assert len(out_scenes) == 135
+    variants = Counter(s["layoutVariant"] for s in out_scenes)
+    assert set(variants.keys()) == {"paper_collage", "cinematic_doc", "kinetic_headline", "evidence_dossier"}
+    collage_ratio = variants["paper_collage"] / len(out_scenes)
+    assert 0.12 <= collage_ratio <= 0.25
+    # Verify forge_scenes merge did NOT overwrite headline, paper_material, or diorama_style_block
+    assert out_scenes[0]["headline"] == "EXHIBIT #1"
+    assert out_scenes[0]["paper_material"]["id"] == "newsprint_aged"
+    assert out_scenes[0]["diorama_style_block"] == "DEEP_DIORAMA"

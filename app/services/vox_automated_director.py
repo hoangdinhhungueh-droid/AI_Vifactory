@@ -494,6 +494,15 @@ class VoxAutomatedDirector:
             topic=topic or "investigative docudrama"
         )
 
+        if len(beats) >= 75:
+            from app.services.unified_vox_director import expand_longform_background_roster
+            bg_roster = expand_longform_background_roster(
+                bg_roster=bg_roster,
+                target_count=46,
+                market=self.market,
+                topic=topic or "investigative docudrama",
+            )
+
         # 2.5 Apply Ethical Representation Shield (Child Representation & Real-Person Shield)
         bg_roster, fg_roster = shield_visual_roster(
             bg_roster=bg_roster,
@@ -539,11 +548,12 @@ class VoxAutomatedDirector:
             beat_phase = int(b.get("beat_phase") or ((b_idx - 1) // max(1, total_beats // 5)) + 1)
             beat_phase = min(max(beat_phase, 1), 5)
 
-            # Assign environmental BG (rotating every 3 beats within matching phase)
+            # Assign environmental BG (rotating every 2 beats for long-form, 3 beats for standard)
             matching_bgs = [k for k, v in bg_roster.items() if beat_phase in v.get("beats", [1, 2, 3, 4, 5])]
             if not matching_bgs:
                 matching_bgs = bg_keys
-            bg_key = matching_bgs[(b_idx // 3) % len(matching_bgs)]
+            bg_stride = 2 if total_beats >= 75 else 3
+            bg_key = matching_bgs[(b_idx // bg_stride) % len(matching_bgs)]
 
             # Check if this beat is an actor moment or forensic evidence prop moment
             is_char_moment = (

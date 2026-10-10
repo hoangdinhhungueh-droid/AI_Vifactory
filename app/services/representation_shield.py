@@ -241,41 +241,84 @@ def shield_visual_roster(
 
     # 1. Audit Backgrounds (Zero prominent human figures)
     for bg_k, bg_v in (bg_roster or {}).items():
-        v_copy = dict(bg_v)
-        desc = v_copy.get("description", "")
-        # Remove any lingering human figure claims from background descriptions
-        desc = re.sub(r"\bwith\s+(?:crowds|people|pedestrians|children|students|witnesses)\b", "with empty architectural spaces", desc, flags=re.IGNORECASE)
-        v_copy["description"] = desc
-        clean_bg[bg_k] = v_copy
+        if isinstance(bg_v, dict):
+            v_copy = dict(bg_v)
+            desc = v_copy.get("description") or v_copy.get("visual_hint") or ""
+            desc = re.sub(
+                r"\bwith\s+(?:crowds|people|pedestrians|children|students|witnesses)\b",
+                "with empty architectural spaces",
+                desc,
+                flags=re.IGNORECASE,
+            )
+            if "description" in v_copy or not v_copy.get("visual_hint"):
+                v_copy["description"] = desc
+            else:
+                v_copy["visual_hint"] = desc
+            clean_bg[bg_k] = v_copy
+        else:
+            desc = re.sub(
+                r"\bwith\s+(?:crowds|people|pedestrians|children|students|witnesses)\b",
+                "with empty architectural spaces",
+                str(bg_v or ""),
+                flags=re.IGNORECASE,
+            )
+            clean_bg[bg_k] = desc
 
     # 2. Audit Foregrounds
     for fg_k, fg_v in (fg_roster or {}).items():
-        v_copy = dict(fg_v)
-        role = v_copy.get("role", "")
-        title = v_copy.get("title", "")
-        desc = v_copy.get("description", "")
-        fg_type = v_copy.get("type", "evidence_prop")
-        combined_text = f"{fg_k} {role} {title} {desc}"
+        if isinstance(fg_v, dict):
+            v_copy = dict(fg_v)
+            role = v_copy.get("role", "")
+            title = v_copy.get("title", "")
+            desc = v_copy.get("description") or v_copy.get("visual_hint") or ""
+            fg_type = v_copy.get(
+                "type",
+                "character"
+                if (fg_k.lower().startswith("fg_character_") or fg_k.lower().startswith("char_"))
+                else "evidence_prop",
+            )
+            combined_text = f"{fg_k} {role} {title} {desc}"
 
-        # Check Child Representation
-        if fg_type == "character" and detect_child_representation(combined_text):
-            logger.info(f"🛡️ [RepresentationShield] Child detected in '{fg_k}'. Converting to Symbolic Artifact.")
-            symbolic = resolve_child_symbolic_artifact(entity_desc=desc, context_text=story_text, market=market)
-            v_copy["title"] = symbolic["title"]
-            v_copy["description"] = symbolic["description"]
-            v_copy["type"] = "evidence_prop"
-            v_copy["role"] = symbolic["role"]
-            v_copy["is_child_symbolic"] = True
-            v_copy["keywords"] = list(set(v_copy.get("keywords", []) + symbolic["keywords"]))
+            # Check Child Representation
+            if detect_child_representation(combined_text):
+                logger.info(
+                    f"🛡️ [RepresentationShield] Child detected in '{fg_k}'. Converting to Symbolic Artifact."
+                )
+                symbolic = resolve_child_symbolic_artifact(
+                    entity_desc=desc, context_text=story_text, market=market
+                )
+                v_copy["title"] = symbolic["title"]
+                v_copy["description"] = symbolic["description"]
+                if "visual_hint" in v_copy:
+                    v_copy["visual_hint"] = symbolic["description"]
+                v_copy["type"] = "evidence_prop"
+                v_copy["role"] = symbolic["role"]
+                v_copy["is_child_symbolic"] = True
+                v_copy["keywords"] = list(set(v_copy.get("keywords", []) + symbolic["keywords"]))
+                clean_fg[fg_k] = v_copy
+                continue
+
+            # Check Real Adult Character -> Enforce Censor Bar
+            if fg_type == "character":
+                shielded_desc = apply_real_person_censor_shield(desc, fg_key=fg_k)
+                v_copy["description"] = shielded_desc
+                if "visual_hint" in v_copy:
+                    v_copy["visual_hint"] = shielded_desc
+                v_copy["censor_bar_enforced"] = True
+
             clean_fg[fg_k] = v_copy
-            continue
-
-        # Check Real Adult Character -> Enforce Censor Bar
-        if fg_type == "character":
-            v_copy["description"] = apply_real_person_censor_shield(desc, fg_key=fg_k)
-            v_copy["censor_bar_enforced"] = True
-
-        clean_fg[fg_k] = v_copy
+        else:
+            desc_str = str(fg_v or "")
+            combined_text = f"{fg_k} {desc_str}"
+            if detect_child_representation(combined_text):
+                symbolic = resolve_child_symbolic_artifact(
+                    entity_desc=desc_str, context_text=story_text, market=market
+                )
+                clean_fg[fg_k] = symbolic["description"]
+            elif fg_k.lower().startswith("fg_character_") or fg_k.lower().startswith("char_"):
+                clean_fg[fg_k] = apply_real_person_censor_shield(desc_str, fg_key=fg_k)
+            else:
+                clean_fg[fg_k] = desc_str
 
     logger.info(f"🛡️ [RepresentationShield] Pre-B3 Audit complete. BGs: {len(clean_bg)}, FGs: {len(clean_fg)}")
     return clean_bg, clean_fg

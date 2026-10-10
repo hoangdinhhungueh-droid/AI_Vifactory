@@ -1199,11 +1199,24 @@ def build_remotion_props_data(
         elif len(raw_scenes) == len(forge_scenes):
             for idx_s, s_item in enumerate(raw_scenes):
                 f_item = forge_scenes[idx_s]
-                for k in ["background_reuse_key", "foreground_reuse_key", "layer1_bg", "layer2_fg", "prompt"]:
+                for k in [
+                    "background_reuse_key",
+                    "foreground_reuse_key",
+                    "layer1_bg",
+                    "layer2_fg",
+                    "prompt",
+                    "beat_index",
+                    "beat",
+                    "headline",
+                    "editorialHeadline",
+                    "paper_material",
+                    "diorama_style_block",
+                    "video_prompt",
+                ]:
                     if not s_item.get(k) and f_item.get(k):
                         s_item[k] = f_item[k]
-                if not s_item.get("narration") and f_item.get("text"):
-                    s_item["narration"] = f_item["text"]
+                if not s_item.get("narration") and (f_item.get("narration") or f_item.get("text")):
+                    s_item["narration"] = f_item.get("narration") or f_item.get("text")
 
     # Check if candidate VOX manifests exist in ep_dir if raw_scenes is still empty
     if not raw_scenes:
@@ -1731,10 +1744,31 @@ def build_remotion_props_data(
                 }
             }
 
+        resolved_layout_variant = (
+            s.get("layoutVariant")
+            or s.get("sceneLayoutMode")
+            or (
+                "paper_collage"
+                if (
+                    i == 0
+                    or s.get("supportingCutouts")
+                    or s.get("supporting_cutouts")
+                    or i % 6 == 0
+                )
+                else (
+                    "cinematic_doc"
+                    if i % 6 in (1, 4)
+                    else ("kinetic_headline" if i % 6 == 2 else "evidence_dossier")
+                )
+            )
+        )
+
         scenes_out.append({
             "id": scene_id,
             "scene_id": scene_id,
             "component": "VoxBuildOnStage",
+            "layoutVariant": resolved_layout_variant,
+            "sceneLayoutMode": resolved_layout_variant,
             "beat": b_num,
             "beat_index": b_num,
             "theme": s.get("theme") or brain.get("theme") or papercraft_theme,

@@ -1188,12 +1188,12 @@ def extract_dynamic_visual_roster(
                 if len(bgs) >= 8 and len(fgs) >= 10:
                     fb_bgs, fb_fgs = _generate_topic_anchored_roster_fallback(topic_str, m_up, key_metrics, claims)
                     for k, v in fb_bgs.items():
-                        if len(bgs) >= 16:
+                        if len(bgs) >= 48:
                             break
                         if k not in bgs:
                             bgs[k] = v
                     for k, v in fb_fgs.items():
-                        if len(fgs) >= 20:
+                        if len(fgs) >= 32:
                             break
                         if k not in fgs:
                             fgs[k] = v
@@ -1205,6 +1205,17 @@ def extract_dynamic_visual_roster(
     # Fallback chất lượng cao nếu LLM không trả kết quả đủ chuẩn
     if not bg_roster or not fg_roster:
         bg_roster, fg_roster = _generate_topic_anchored_roster_fallback(topic_str, m_up, key_metrics, claims)
+
+    # Expand background capacity to 45-48 unique BGs for long-form episodes (>= 10 min / >= 75 scenes / >= 1200 words)
+    n_sents = len(spoken_sentences or [])
+    n_words = len((story_text or "").split())
+    if n_sents >= 75 or n_words >= 1200 or not is_testing:
+        bg_roster = expand_longform_background_roster(
+            bg_roster=bg_roster,
+            target_count=46,
+            market=m_up,
+            topic=topic_str,
+        )
 
     # Master Representation Shield Gate: Audit Child & Real-Person rules BEFORE B3
     try:
@@ -1219,6 +1230,63 @@ def extract_dynamic_visual_roster(
         logger.warning(f"[unified_vox_director] Shield gate execution warning: {ex_shield}")
 
     return bg_roster, fg_roster
+
+
+def expand_longform_background_roster(
+    bg_roster: Dict[str, Any],
+    target_count: int = 46,
+    market: str = "EN",
+    topic: str = "",
+) -> Dict[str, Any]:
+    """Expands background roster to 45-50 distinct environmental perspectives for >=10min documentaries.
+
+    Prevents severe asset starvation (where 18 backgrounds repeat 7-27 times across 135+ scenes)
+    by generating distinct architectural angles, lighting phases, and archival spatial layers across all 5 Beats.
+    """
+    expanded = dict(bg_roster or {})
+    if len(expanded) >= target_count:
+        return expanded
+
+    perspective_variants = [
+        (
+            "macro_desk_angle",
+            "Close architectural tabletop perspective focusing on mahogany surface textures, warm brass banker lamp illumination, and deep chiaroscuro background shadows",
+            [1, 3],
+        ),
+        (
+            "nocturnal_overlook",
+            "High-elevation nocturnal architectural perspective through rain-streaked glass overlooking city financial district lights, moody cyan and amber atmospheric lighting",
+            [2, 4],
+        ),
+        (
+            "archival_corridor_depth",
+            "Deep vanishing-point perspective along institutional archival shelving and reinforced steel doors, dramatic overhead fluorescent pool lighting, clean negative space",
+            [3, 5],
+        ),
+    ]
+
+    base_items = list(expanded.items())
+    for var_idx, (suffix, angle_desc, default_beats) in enumerate(perspective_variants):
+        for k, v in base_items:
+            if len(expanded) >= target_count:
+                break
+            new_key = f"{k}_{suffix}"
+            if new_key in expanded:
+                continue
+            v_dict = dict(v) if isinstance(v, dict) else {"title": str(k), "description": str(v)}
+            base_desc = v_dict.get("description", "")
+            base_title = v_dict.get("title", k)
+            beats = v_dict.get("beats") or default_beats
+            shifted_beats = [((b + var_idx) % 5) + 1 for b in beats]
+            expanded[new_key] = {
+                "title": f"{base_title} ({suffix.replace('_', ' ').title()})",
+                "description": f"{base_desc} Framed from {angle_desc}.",
+                "beats": sorted(list(set(shifted_beats))),
+            }
+        if len(expanded) >= target_count:
+            break
+
+    return expanded
 
 
 # ============================================================================

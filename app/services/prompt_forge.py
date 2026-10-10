@@ -1952,6 +1952,15 @@ def generate_scene_prompts(
     market = str(market).upper()
     market_prof = resolve_market_profile(market)
 
+    # Enforce Ethical Representation Shield across all pipeline entrypoints (Rule 122 & 128)
+    from app.services.representation_shield import shield_visual_roster
+    bg_dict, fg_dict = shield_visual_roster(
+        bg_roster=bg_dict,
+        fg_roster=fg_dict,
+        story_text=story_title,
+        market=market,
+    )
+
     scene_pairings = []
     if scenes:
         seen_pairs = {}
@@ -2233,10 +2242,17 @@ def generate_scene_prompts(
             )
             animation_tiers[vox_key] = "HERO_AI_VIDEO_6S" if idx == 0 else "TACTILE_STOPMOTION_STILL"
 
+    from app.services.vox_automated_director import (
+        VOX_PAPER_MATERIALS_LIBRARY,
+        DIORAMA_STYLE_BLOCKS,
+    )
+
     result = {
         "vox_collages": cleaned_vox_collages,
         "universal_video_prompt": UNIVERSAL_VOX_ANIMATION_PROMPT,
         "animation_tiers": animation_tiers,
+        "paper_stock_materials": VOX_PAPER_MATERIALS_LIBRARY,
+        "diorama_style_blocks": DIORAMA_STYLE_BLOCKS,
         "backgrounds": cleaned_backgrounds,
         "foregrounds": cleaned_foregrounds,
         "thumbnails": {}

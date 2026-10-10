@@ -170,3 +170,37 @@ def test_vox_paper_materials_library():
         assert "description" in mat
         assert "hex" in mat
         assert len(mat["tactile_props"]) >= 2
+
+
+def test_prompt_forge_shield_and_paper_materials_integration():
+    from app.services.prompt_forge import generate_scene_prompts
+
+    bg_dict = {"bg_school_yard": "School courtyard with children and crowds walking"}
+    fg_dict = {"fg_character_student": "A young schoolboy holding a textbook"}
+    res = generate_scene_prompts(
+        bg_dict=bg_dict,
+        fg_dict=fg_dict,
+        story_title="School Audit Investigation",
+        market="EN",
+    )
+    assert "paper_stock_materials" in res
+    assert "diorama_style_blocks" in res
+    assert len(res["paper_stock_materials"]) >= 6
+    fg_prompt = res["foregrounds"]["fg_character_student"].lower()
+    assert "no human figures" in fg_prompt or "symbolic" in fg_prompt or "backpack" in fg_prompt or "silhouette" in fg_prompt
+
+
+def test_expand_longform_background_roster_capacity():
+    from app.services.unified_vox_director import expand_longform_background_roster
+
+    base_roster = {
+        f"bg_scene_{i:02d}": {
+            "title": f"Environment {i}",
+            "description": "Wide architectural room with dramatic lighting",
+            "beats": [(i % 5) + 1],
+        }
+        for i in range(18)
+    }
+    expanded = expand_longform_background_roster(base_roster, target_count=46, market="EN")
+    assert len(expanded) >= 46
+

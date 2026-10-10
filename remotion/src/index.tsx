@@ -2250,6 +2250,16 @@ export const TwoLayerEpisode: React.FC<{
             : (typeof s.headline?.text === "string" ? s.headline.text : undefined));
 
       const cleanSubtitle = s.subtitle || s.actTitle || s.speakerTag || undefined;
+      const resolvedLayoutVariant =
+        s.layoutVariant ||
+        s.sceneLayoutMode ||
+        (idx === 0 || resolvedCutouts.length > 0 || rawYarns.length > 0 || idx % 6 === 0
+          ? "paper_collage"
+          : idx % 6 === 1 || idx % 6 === 4
+          ? "cinematic_doc"
+          : idx % 6 === 2
+          ? "kinetic_headline"
+          : "evidence_dossier");
 
       return (
         <Sequence
@@ -2272,6 +2282,9 @@ export const TwoLayerEpisode: React.FC<{
             stampColor={s.stampColor || "#dc2626"}
             hasMarkerHighlight={s.hasMarkerHighlight !== false}
             durationSec={durationSec}
+            layoutVariant={resolvedLayoutVariant}
+            sceneIndex={idx}
+            cameraMovement={s.cameraMovement || (s.camera ? s.camera.movement : undefined)}
           />
           <TwoLayerScene
             background={bgRaw}
