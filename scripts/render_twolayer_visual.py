@@ -146,7 +146,7 @@ def optimize_props_assets(props_path: str, proj_dir: str):
                     with Image.open(full_path) as im:
                         im = im.convert("RGBA") if is_fg else im.convert("RGB")
                         modified = False
-                        # 1. Scale down to 1080p target
+                        # 1. Scale down to 1080p target (preserve clean alpha without destructive disk border bake)
                         max_w = 1080 if is_fg else 1920
                         max_h = 1080
                         if im.width > max_w or im.height > max_h:
@@ -156,22 +156,11 @@ def optimize_props_assets(props_path: str, proj_dir: str):
                             im = im.resize((nw, nh), Image.Resampling.LANCZOS)
                             modified = True
 
-                        # 2. Bake VOX white sticker border directly into FG alpha
-                        if is_fg and "A" in im.getbands():
-                            alpha = im.split()[-1]
-                            min_a, max_a = alpha.getextrema()
-                            if min_a < 250:
-                                dilated = alpha.filter(ImageFilter.MaxFilter(7))
-                                bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
-                                bg.putalpha(dilated)
-                                im = Image.alpha_composite(bg, im)
-                                modified = True
-
                         if modified:
                             im.save(full_path, optimize=True)
                             count += 1
-                except Exception:
-                    pass
+                except Exception as _opt_err:
+                    print(f"[ASSET OPTIMIZE] Skipped {full_path}: {_opt_err}")
         if count > 0:
             print(f"[ASSET OPTIMIZE] Successfully optimized and pre-scaled {count} assets for fast CPU render.")
     except Exception as e:

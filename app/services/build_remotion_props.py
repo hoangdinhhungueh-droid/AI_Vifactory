@@ -736,7 +736,13 @@ def format_speaker_tag(scene: dict, act_title: str = "", custom_beat_titles: dic
         return name.upper()
 
     # Determine beat_idx (1-5)
-    resolved_beat = beat_idx if beat_idx is not None else scene.get("beat_index")
+    resolved_beat = beat_idx if beat_idx is not None else (scene.get("beat_phase") or scene.get("beat_index"))
+    if resolved_beat is not None:
+        try:
+            if int(resolved_beat) > 5:
+                resolved_beat = scene.get("beat_phase") or 1
+        except Exception:
+            resolved_beat = 1
     if resolved_beat is None:
         b_match = re.search(r'\b(?:BEAT|ACT)\s*([1-5]|IV|I{1,3}|V)\b', str(scene.get("beat") or scene.get("beat_name") or act_title or ""), re.IGNORECASE)
         if b_match:
@@ -1244,6 +1250,16 @@ def build_remotion_props_data(
     custom_beat_titles = extract_custom_beat_titles(brain, brain_input_path)
     logger.info("[build_remotion_props] Episode-specific Beat Titles: %s", custom_beat_titles)
 
+    max_raw_beat_idx = 0
+    for _rs in raw_scenes:
+        try:
+            _bv = int(str(_rs.get("beat_index") or 0).replace("Beat", "").strip())
+            if _bv > max_raw_beat_idx:
+                max_raw_beat_idx = _bv
+        except Exception:
+            pass
+    beat_index_is_sentence_seq = (max_raw_beat_idx > 5)
+
     scenes_since_overlay = 4
     last_overlay_type = None
     for i, s in enumerate(raw_scenes):
@@ -1331,6 +1347,20 @@ def build_remotion_props_data(
 
         bg_rel = stage_into_public(bg_local, public_dir, episode_id) if bg_local else None
         fg_rel = stage_into_public(fg_local, public_dir, episode_id) if fg_local else None
+        if not skip_missing:
+            if not bg_rel and bg_key:
+                bg_rel = (
+                    s.get("targetBackground")
+                    or (s.get("background") if isinstance(s.get("background"), str) and s.get("background") else None)
+                    or f"images/{bg_key}.png"
+                )
+            if not fg_rel and fg_key:
+                fg_rel = (
+                    s.get("targetHeroSrc")
+                    or (s.get("heroSrc") if isinstance(s.get("heroSrc"), str) and s.get("heroSrc") else None)
+                    or (s.get("foreground") if isinstance(s.get("foreground"), str) and s.get("foreground") else None)
+                    or f"images/{fg_key}.png"
+                )
 
         caption_text = s.get("caption") or s.get("narration") or s.get("text") or ""
         narration_text = s.get("narration") or s.get("text") or caption_text
@@ -1356,7 +1386,7 @@ def build_remotion_props_data(
 
         # Alternate Left / Right position
         default_pos = "left" if (i % 2 == 0) else "right"
-        fg_pos = s.get("foreground_position") or default_pos
+        fg_pos = s.get("foreground_position") or s.get("foregroundPosition") or default_pos
 
         # Dynamic Stat Card / Financial Ledger Extraction (Rule 102)
         stat_val = s.get("stat_value") or s.get("statValue")
@@ -1368,7 +1398,8 @@ def build_remotion_props_data(
                 stat_lbl = auto_lbl
 
         # Topic-specific or Generic 5-Beat story engine headings (Rule 128 & Rule 136)
-        explicit_beat = s.get("beat_index") or s.get("beat")
+        explicit_phase = s.get("beat_phase") or s.get("act_beat")
+        explicit_beat = explicit_phase or (None if beat_index_is_sentence_seq else (s.get("beat_index") or s.get("beat")))
         beat_idx = None
         if explicit_beat:
             try:
@@ -1407,7 +1438,7 @@ def build_remotion_props_data(
         tension_lvl = s.get("tension_level") or (cam.get("tension_level") if isinstance(cam, dict) else "high")
         bg_cluster = s.get("bg_cluster_id") or s.get("bgClusterId")
         forensic_ov = s.get("forensic_overlay") or s.get("forensicOverlay")
-        is_ch = bool(s.get("is_cold_hook") or (i == 0 and s.get("beat_index", 1) == 1))
+        is_ch = bool(s.get("is_cold_hook") or (i == 0 and beat_idx == 1))
         if refresh_overlays or not forensic_ov:
             candidate_ov = detect_forensic_overlay(
                 narration_text,
@@ -1585,11 +1616,7 @@ def build_remotion_props_data(
             card_segment_key = f"{ov_type}_{stat_val or ''}_{stamp_badge or ''}_{ov_title}"
 
         # Beat-Level Optical FX Policy & Kinetic Typography Injection (Rule 122 & Audit Round 5 Standard)
-        b_raw = s.get("beat_index") or s.get("beat") or beat_idx
-        try:
-            b_num = int(str(b_raw).replace("Beat", "").strip())
-        except Exception:
-            b_num = beat_idx
+        b_num = beat_idx
 
         # Rule 128 & Rule 132: Generic metric moment detection for optical fx
         is_metric_shock = bool(
@@ -1711,12 +1738,7 @@ def build_remotion_props_data(
             or s.get("sceneLayoutMode")
             or (
                 "paper_collage"
-                if (
-                    i == 0
-                    or s.get("supportingCutouts")
-                    or s.get("supporting_cutouts")
-                    or i % 6 == 0
-                )
+                if (i == 0 or i % 6 == 0)
                 else (
                     "cinematic_doc"
                     if i % 6 in (1, 4)
@@ -1771,6 +1793,23 @@ def build_remotion_props_data(
                 }
             }
 
+        raw_hero_pos = s.get("heroPosition") if isinstance(s.get("heroPosition"), dict) else None
+        if raw_hero_pos and raw_hero_pos.get("xPct") == 50:
+            raw_hero_pos = None
+
+        raw_stamp_txt = s.get("stampText")
+        if raw_stamp_txt in ("CLASSIFIED EXHIBIT", "VERIFIED // IMPORTANT"):
+            raw_stamp_txt = None
+        resolved_stamp_txt = (
+            (raw_stamp_txt or stamp_badge)
+            if (is_collage_variant or resolved_layout_variant == "evidence_dossier")
+            else None
+        )
+
+        raw_subtitle = s.get("subtitle")
+        if isinstance(raw_subtitle, str) and raw_subtitle.startswith("RECORD REF //"):
+            raw_subtitle = None
+
         scenes_out.append({
             "id": scene_id,
             "scene_id": scene_id,
@@ -1779,11 +1818,13 @@ def build_remotion_props_data(
             "sceneLayoutMode": resolved_layout_variant,
             "beat": b_num,
             "beat_index": b_num,
+            "beat_phase": b_num,
             "theme": s.get("theme") or brain.get("theme") or papercraft_theme,
             "background_reuse_key": bg_key,
             "foreground_reuse_key": fg_key,
             "background": bg_rel or "",
             "backgroundSrc": bg_rel or "",
+            "targetBackground": bg_rel or s.get("targetBackground") or (f"images/{bg_key}.png" if bg_key else ""),
             "papercraft_theme": papercraft_theme,
             "paperTheme": papercraft_theme,
             "papercraft_layout": papercraft_layout,
@@ -1797,8 +1838,9 @@ def build_remotion_props_data(
             "flow_slot": s.get("flow_slot", ""),
             "foreground": fg_rel,
             "heroSrc": fg_rel,
+            "targetHeroSrc": fg_rel or s.get("targetHeroSrc") or (f"images/{fg_key}.png" if fg_key else ""),
             "heroLabel": s.get("heroLabel") or stat_lbl or speaker_tag,
-            "heroPosition": s.get("heroPosition") or {
+            "heroPosition": raw_hero_pos or {
                 "xPct": 28 if (fg_pos == "left" and (forensic_ov or stat_val)) else (72 if (forensic_ov or stat_val) else (34 if fg_pos == "left" else 66)),
                 "yPct": 54,
                 "widthPct": 34 if (forensic_ov or stat_val) else 38,
@@ -1813,14 +1855,14 @@ def build_remotion_props_data(
             "statValue": stat_val,
             "statLabel": stat_lbl,
             "stampBadge": stamp_badge,
-            "stampText": s.get("stampText") or stamp_badge,
+            "stampText": resolved_stamp_txt,
             "stampColor": s.get("stampColor") or "#dc2626",
             "hasMarkerHighlight": s.get("hasMarkerHighlight", True),
             "card_segment_key": card_segment_key,
             "motionDirective": motion_directive,
             "speakerTag": speaker_tag,
             "actTitle": act_title,
-            "subtitle": s.get("subtitle") or act_title,
+            "subtitle": raw_subtitle or act_title,
             "cameraMovement": cam_mov or "slow_push_in",
             "tensionLevel": tension_lvl or "high",
             "bgClusterId": bg_cluster,

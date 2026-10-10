@@ -2192,7 +2192,7 @@ export const TwoLayerEpisode: React.FC<{
       const hasOv = Boolean(s.forensicOverlay || s.forensic_overlay || s.statValue);
       const defaultHeroXPct = hasOv ? (fgPos === "left" ? 28 : 72) : (fgPos === "left" ? 34 : 66);
       const resolvedHeroPosition =
-        s.heroPosition && !(hasOv && s.heroPosition.xPct === 50)
+        s.heroPosition && s.heroPosition.xPct !== 50
           ? s.heroPosition
           : { xPct: defaultHeroXPct, yPct: 54, widthPct: hasOv ? 34 : 38 };
 

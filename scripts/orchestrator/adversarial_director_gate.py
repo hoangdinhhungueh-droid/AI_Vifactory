@@ -189,6 +189,13 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
                     s["heroSrc"] = ""
                     s["targetHeroSrc"] = ""
                     s["primary_hero"] = None
+                    if s.get("layoutVariant") in ("evidence_dossier", "paper_collage"):
+                        s["layoutVariant"] = "cinematic_doc"
+                        s["sceneLayoutMode"] = "cinematic_doc"
+                    s["supportingCutouts"] = []
+                    s["yarns"] = []
+                    s["radiatingConnections"] = []
+                    s["stampText"] = None
                     if isinstance(s.get("layout_zone"), dict):
                         s["layout_zone"]["placement"] = "center_hero_document"
                 h_seen += 1
@@ -207,6 +214,13 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
                     s["heroSrc"] = ""
                     s["targetHeroSrc"] = ""
                     s["primary_hero"] = None
+                    if s.get("layoutVariant") in ("evidence_dossier", "paper_collage"):
+                        s["layoutVariant"] = "cinematic_doc"
+                        s["sceneLayoutMode"] = "cinematic_doc"
+                    s["supportingCutouts"] = []
+                    s["yarns"] = []
+                    s["radiatingConnections"] = []
+                    s["stampText"] = None
                     if isinstance(s.get("layout_zone"), dict):
                         s["layout_zone"]["placement"] = "center_hero_document"
                 e_seen += 1

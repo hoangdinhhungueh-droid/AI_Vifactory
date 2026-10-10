@@ -387,10 +387,23 @@ class VoxAutomatedDirector:
         total_words = len(script_text.split())
         cum_sec = 0.0
 
+        total_sents = max(1, len(raw_sentences))
         for b_idx, sent in enumerate(raw_sentences):
             sent_words = sent.split()
             sent_word_count = len(sent_words)
             beat_duration_sec = max(2.0, round(sent_word_count / 2.5, 2))
+
+            # Map sentence position to canonical 5-Beat Docudrama phase (1..5)
+            pct = (b_idx + 1) / total_sents
+            beat_phase = (
+                1 if pct <= 0.15 else (
+                    2 if pct <= 0.40 else (
+                        3 if pct <= 0.65 else (
+                            4 if pct <= 0.85 else 5
+                        )
+                    )
+                )
+            )
 
             # Split sentence into 2 halves for Shot A and Shot B mid-sentence cut
             mid_pt = max(1, sent_word_count // 2)
@@ -407,6 +420,7 @@ class VoxAutomatedDirector:
 
             beat_obj = {
                 "beat_index": b_idx + 1,
+                "beat_phase": beat_phase,
                 "narration": sent,
                 "word_count": sent_word_count,
                 "duration_sec": beat_duration_sec,
@@ -494,7 +508,7 @@ class VoxAutomatedDirector:
             topic=topic or "investigative docudrama"
         )
 
-        if len(beats) >= 75:
+        if len(beats) >= 30:
             from app.services.unified_vox_director import expand_longform_background_roster
             bg_roster = expand_longform_background_roster(
                 bg_roster=bg_roster,
@@ -535,6 +549,7 @@ class VoxAutomatedDirector:
         bg_keys = list(bg_roster.keys())
         char_count = 0
         last_char_beat = -99
+        last_bg_key: Optional[str] = None
 
         prompt_manifest: List[Dict[str, Any]] = []
 
@@ -544,16 +559,21 @@ class VoxAutomatedDirector:
             narr = b.get("narration", "")
             narr_lower = narr.lower()
 
-            # Map to 5-Beat Docudrama phase
-            beat_phase = int(b.get("beat_phase") or ((b_idx - 1) // max(1, total_beats // 5)) + 1)
+            # Map to 5-Beat Docudrama phase (1..5)
+            pct = b_idx / total_beats
+            default_phase = 1 if pct <= 0.15 else (2 if pct <= 0.40 else (3 if pct <= 0.65 else (4 if pct <= 0.85 else 5)))
+            beat_phase = int(b.get("beat_phase") or default_phase)
             beat_phase = min(max(beat_phase, 1), 5)
+            b["beat_phase"] = beat_phase
 
-            # Assign environmental BG (rotating every 2 beats for long-form, 3 beats for standard)
+            # Assign environmental BG with zero consecutive repeats
             matching_bgs = [k for k, v in bg_roster.items() if beat_phase in v.get("beats", [1, 2, 3, 4, 5])]
             if not matching_bgs:
                 matching_bgs = bg_keys
-            bg_stride = 2 if total_beats >= 75 else 3
-            bg_key = matching_bgs[(b_idx // bg_stride) % len(matching_bgs)]
+            bg_key = matching_bgs[(b_idx - 1) % len(matching_bgs)]
+            if bg_key == last_bg_key and len(matching_bgs) > 1:
+                bg_key = matching_bgs[b_idx % len(matching_bgs)]
+            last_bg_key = bg_key
 
             # Check if this beat is an actor moment or forensic evidence prop moment
             is_char_moment = (
@@ -592,10 +612,14 @@ class VoxAutomatedDirector:
                         matched_prop = pk
                 if not matched_prop or best_score <= 1:
                     phase_props = [k for k in prop_fg_keys if beat_phase in fg_roster[k].get("beats", [1, 2, 3, 4, 5])] or prop_fg_keys
-                    matched_prop = phase_props[(b_idx // 2) % len(phase_props)]
+                    matched_prop = phase_props[(b_idx - 1) % len(phase_props)]
                 fg_key = matched_prop
 
             hero_label = fg_roster[fg_key].get("title", "PRIMARY OPERATOR")
+            paper_mats_list = list(VOX_PAPER_MATERIALS_LIBRARY.values())
+            paper_mat = b.get("paper_material") or (
+                paper_mats_list[(b_idx - 1) % len(paper_mats_list)] if paper_mats_list else None
+            )
 
             # Build tactile composite prompt
             seal_desc = (
@@ -625,15 +649,18 @@ class VoxAutomatedDirector:
             b["targetBackground"] = f"images/{bg_key}.png"
             b["targetHeroSrc"] = f"images/{fg_key}.png"
             b["heroLabel"] = hero_label
+            b["paper_material"] = paper_mat
 
             prompt_manifest.append({
                 "beat_index": b_idx,
+                "beat_phase": beat_phase,
                 "headline": headline,
                 "narration": b["narration"],
                 "theme": theme,
                 "bg_key": bg_key,
                 "fg_key": fg_key,
                 "heroLabel": hero_label,
+                "paper_material": paper_mat,
                 "targetBackground": f"images/{bg_key}.png",
                 "targetHeroSrc": f"images/{fg_key}.png",
                 "image_prompt": prompt_text,
@@ -663,25 +690,51 @@ class VoxAutomatedDirector:
         delay_doc1 = 0.72 if is_6s_mode else 1.2
         delay_doc2 = 0.96 if is_6s_mode else 1.6
         delay_yarn = 1.32 if is_6s_mode else 2.2
+        total_beats = max(1, len(beats))
+        paper_mats_list = list(VOX_PAPER_MATERIALS_LIBRARY.values())
 
         for b in beats:
             b_idx = b["beat_index"]
+            idx0 = b_idx - 1
+            pct = b_idx / total_beats
+            default_phase = 1 if pct <= 0.15 else (2 if pct <= 0.40 else (3 if pct <= 0.65 else (4 if pct <= 0.85 else 5)))
+            beat_phase = int(b.get("beat_phase") or default_phase)
+            beat_phase = min(max(beat_phase, 1), 5)
+
             headline = b["headline"]
             duration_frames = b["end_frame"] - b["start_frame"]
             bg_key = b.get("bg_key") or f"bg_{b_idx:02d}"
             fg_key = b.get("fg_key") or f"fg_{b_idx:02d}"
             hero_label = b.get("heroLabel") or f"SUBJECT #{b_idx}"
+            paper_mat = b.get("paper_material") or (
+                paper_mats_list[idx0 % len(paper_mats_list)] if paper_mats_list else None
+            )
+
+            layout_variant = (
+                "paper_collage"
+                if (idx0 == 0 or idx0 % 6 == 0)
+                else (
+                    "cinematic_doc"
+                    if idx0 % 6 in (1, 4)
+                    else ("kinetic_headline" if idx0 % 6 == 2 else "evidence_dossier")
+                )
+            )
+            is_collage = (layout_variant == "paper_collage")
+            fg_pos = "left" if (idx0 % 2 == 0) else "right"
 
             scene_entry = {
                 "id": f"scene_{b_idx:02d}",
                 "beat_index": b_idx,
+                "beat_phase": beat_phase,
+                "layoutVariant": layout_variant,
+                "sceneLayoutMode": layout_variant,
                 "background_reuse_key": bg_key,
                 "foreground_reuse_key": fg_key,
                 "component": "VoxBuildOnStage",
                 "durationInFrames": duration_frames,
                 "durationSec": round(duration_frames / self.fps, 2),
                 "headline": headline,
-                "subtitle": f"RECORD REF // #{b_idx:02d} • EVIDENCE DOSSIER",
+                "subtitle": None,
                 "theme": theme,
                 "narration": b.get("narration", ""),
                 "heroSrc": f"images/{fg_key}.png",
@@ -689,7 +742,8 @@ class VoxAutomatedDirector:
                 "targetHeroSrc": f"images/{fg_key}.png",
                 "targetBackground": f"images/{bg_key}.png",
                 "heroLabel": hero_label,
-                "paper_material": b.get("paper_material"),
+                "foregroundPosition": fg_pos,
+                "paper_material": paper_mat,
                 "diorama_style_block": b.get("diorama_style_block", "FLAT_PARALLAX"),
                 "video_prompt": b.get("video_prompt", ""),
                 "speech_timestamp_cue": b.get("speech_timestamp_cue", ""),
@@ -697,11 +751,11 @@ class VoxAutomatedDirector:
                 "routed_video_model": b.get("routed_video_model", video_engine_mode),
                 "flow_slot": b.get("flow_slot", ""),
                 "hasMarkerHighlight": True,
-                "stampText": "VERIFIED // IMPORTANT" if b_idx == 1 else "CLASSIFIED EXHIBIT",
+                "stampText": "VERIFIED // IMPORTANT" if b_idx == 1 else None,
                 "stampColor": "#dc2626" if b_idx == 1 else "#b91c1c",
                 "heroPosition": {
-                    "xPct": 50,
-                    "yPct": 52,
+                    "xPct": 34 if fg_pos == "left" else 66,
+                    "yPct": 54,
                     "widthPct": 38
                 },
                 "supportingCutouts": [
@@ -727,7 +781,7 @@ class VoxAutomatedDirector:
                         "hasPin": False,
                         "hasTape": True
                     }
-                ],
+                ] if is_collage else [],
                 "yarns": [
                     {
                         "fromX": 30,
@@ -737,7 +791,7 @@ class VoxAutomatedDirector:
                         "color": "#dc2626",
                         "delaySec": delay_yarn
                     }
-                ]
+                ] if is_collage else []
             }
             scenes.append(scene_entry)
 

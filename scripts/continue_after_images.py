@@ -245,7 +245,8 @@ def main():
         _run_stage("B6.2 Adversarial Director Gate",
                    [sys.executable, "scripts/orchestrator/adversarial_director_gate.py",
                     "--episode-id", episode_id,
-                    "--props", str(props_path)],
+                    "--props", str(props_path),
+                    "--no-stills"],
                    episode_id, 300,
                    notify_on_error=False)
 

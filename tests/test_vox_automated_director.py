@@ -207,11 +207,14 @@ def test_low_token_36_and_omni_48_budget_modes():
     assert "trigger primary" in cue
 
 
-def test_production_b2_hg2_s45_handoff_parity(tmp_path):
+def test_production_b2_hg2_s45_handoff_parity(tmp_path, monkeypatch):
     """Verify live production B2 -> HG1 -> B3.5 -> HG2 -> S4.5 handoff preserves all Vox & CL3 upgrades."""
     import json
     from app.services.story_gate import score_story
     from app.services.build_remotion_props import build_remotion_props_data
+
+    monkeypatch.setattr("app.services.hhtech_reasoner.call_gpt6_astra", lambda *a, **kw: "")
+    monkeypatch.setenv("DISABLE_LLM_TIMELINE_DIRECTOR", "1")
 
     # 1. Verify live B2 story_gate.score_story includes cliffhanger_audit
     sample_story = (
@@ -285,5 +288,111 @@ def test_production_b2_hg2_s45_handoff_parity(tmp_path):
     assert "STYLE BLOCK" in sc0["video_prompt"]
     assert sc0["named_escalation_beat"] == "ALERT WASH"
     assert sc0["paper_material"]["id"] == "newsprint_aged"
+
+
+def test_round3_beat_phase_and_layout_anti_collision(tmp_path, monkeypatch):
+    """Verify 30+ sentence beats do not collide with 5-Beat act phases or poison layout variants/heroPosition."""
+    import json
+    from app.services.build_remotion_props import build_remotion_props_data
+    from scripts.orchestrator.adversarial_director_gate import auto_repair_props
+
+    monkeypatch.setattr("app.services.hhtech_reasoner.call_gpt6_astra", lambda *a, **kw: "")
+    monkeypatch.setenv("DISABLE_LLM_TIMELINE_DIRECTOR", "1")
+
+    director = VoxAutomatedDirector(market="EN", fps=30)
+    sentences = [
+        f"Sentence {i + 1} exposes a critical $250 million sovereign audit discrepancy in vault {i + 1}."
+        for i in range(30)
+    ]
+    script_text = " ".join(sentences)
+    beats = director.breakdown_beats(script_text, duration_sec=180)
+    assert len(beats) == 30
+
+    prompts_manifest = director.forge_image_prompts(
+        beats=beats,
+        theme="newsprint-editorial",
+        topic="Sovereign Vault Discrepancy",
+        story_text=script_text,
+    )
+    assert len(prompts_manifest) == 30
+    assert len(director.last_bg_roster) >= 30
+
+    # Zero consecutive BG repeats
+    for i in range(1, len(prompts_manifest)):
+        assert prompts_manifest[i]["bg_key"] != prompts_manifest[i - 1]["bg_key"]
+        assert prompts_manifest[i]["paper_material"] is not None
+
+    manifest = director.build_remotion_manifest(
+        beats=beats,
+        theme="newsprint-editorial",
+        topic="Sovereign Vault Discrepancy",
+        episode_id="EN_EP9998_round3_test",
+    )
+
+    brain_path = tmp_path / "brain_input.json"
+    seg_path = tmp_path / "spoken_sentences.json"
+    brain_path.write_text(
+        json.dumps(
+            {
+                "episode_id": "EN_EP9998_round3_test",
+                "market": "EN",
+                "topic": "Sovereign Vault Discrepancy",
+                "theme": "newsprint-editorial",
+                "scenes": manifest["scenes"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    seg_path.write_text(
+        json.dumps(
+            [
+                {
+                    "index": i + 1,
+                    "text": sentences[i],
+                    "start_sec": i * 6.0,
+                    "end_sec": (i + 1) * 6.0,
+                    "duration_sec": 6.0,
+                }
+                for i in range(30)
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    props = build_remotion_props_data(
+        episode_id="EN_EP9998_round3_test",
+        brain_input_path=str(brain_path),
+        segments_path=str(seg_path),
+        fps=30,
+        skip_missing=False,
+    )
+    scenes = props["scenes"]
+    assert len(scenes) == 30
+
+    # First 4 scenes (<= 15% of 30) must ALL stay in Beat 1 (never jumping 1->2->3->4->5->1)
+    first_four_beats = [s["beat_index"] for s in scenes[:4]]
+    assert first_four_beats == [1, 1, 1, 1]
+
+    # Beat phases across entire 30-scene episode must progress monotonically 1 -> 2 -> 3 -> 4 -> 5
+    all_beats = [s["beat_index"] for s in scenes]
+    assert all_beats == sorted(all_beats)
+    assert set(all_beats) == {1, 2, 3, 4, 5}
+
+    # Check layout variants and non-centered heroPosition
+    variants_seen = {s["layoutVariant"] for s in scenes}
+    assert variants_seen == {"paper_collage", "cinematic_doc", "kinetic_headline", "evidence_dossier"}
+    for s in scenes:
+        assert s["heroPosition"]["xPct"] != 50
+        assert s["background"].endswith(".png")
+        if s["layoutVariant"] != "paper_collage":
+            assert s["supportingCutouts"] == []
+            assert s["yarns"] == []
+
+    # Verify auto_repair_props transitions pruned FG scenes to cinematic_doc
+    repaired = auto_repair_props(props, market="EN")
+    for s in repaired["scenes"]:
+        if not s.get("foreground"):
+            assert not s.get("heroSrc")
+            assert s.get("layoutVariant") not in ("evidence_dossier", "paper_collage")
 
 
