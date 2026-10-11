@@ -489,3 +489,60 @@ async def synthesize_beat_tts_pipeline(
         "total_duration_sec": final_actual_dur_sec,
         "backend": "edge_tts_beat"
     }
+
+
+async def synthesize_beat_audio_and_subtitles(
+    episode_id: str,
+    script_text: str = "",
+    market: str = "EN",
+    out_dir: Optional[str] = None,
+    inter_beat_pause_ms: int = 600,
+    force: bool = False,
+) -> Dict[str, Any]:
+    """Entry point for run_vox_automated_pipeline.py to synthesize beat-level TTS and subtitles.
+
+    Ensures brain_input.json has initial spoken_sentences seeded from script_text before
+    delegating to synthesize_beat_tts_pipeline.
+    """
+    resolved_dir = out_dir or f"/var/vf/episodes/{episode_id}"
+    os.makedirs(resolved_dir, exist_ok=True)
+    brain_path = os.path.join(resolved_dir, "brain_input.json")
+    brain: Dict[str, Any] = {}
+    if os.path.exists(brain_path):
+        try:
+            with open(brain_path, "r", encoding="utf-8") as bf:
+                brain = json.load(bf)
+        except Exception as _be:
+            logger.warning("[BeatTTS] Failed reading existing brain_input.json: %s", _be)
+            brain = {}
+
+    if not brain.get("spoken_sentences") and not brain.get("scenes") and script_text:
+        raw_sents = [
+            s.strip()
+            for s in re.split(r"(?<=[.!?。！？])\s+", script_text.strip())
+            if s.strip()
+        ]
+        total_s = max(1, len(raw_sents))
+        seeded_sents = []
+        for idx, st in enumerate(raw_sents):
+            pct = (idx + 1) / total_s
+            beat_phase = 1 if pct <= 0.15 else (2 if pct <= 0.35 else (3 if pct <= 0.65 else (4 if pct <= 0.85 else 5)))
+            seeded_sents.append({
+                "sentence_id": f"sent_{idx + 1:03d}",
+                "beat_index": idx + 1,
+                "beat_phase": beat_phase,
+                "text": st,
+            })
+        brain["episode_id"] = episode_id
+        brain["market"] = market
+        brain["spoken_sentences"] = seeded_sents
+        with open(brain_path, "w", encoding="utf-8") as bf:
+            json.dump(brain, bf, ensure_ascii=False, indent=2)
+
+    return await synthesize_beat_tts_pipeline(
+        episode_id=episode_id,
+        out_dir=resolved_dir,
+        inter_beat_pause_ms=inter_beat_pause_ms,
+        force=force,
+    )
+

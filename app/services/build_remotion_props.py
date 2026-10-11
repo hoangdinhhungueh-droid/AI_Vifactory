@@ -1251,14 +1251,25 @@ def build_remotion_props_data(
     logger.info("[build_remotion_props] Episode-specific Beat Titles: %s", custom_beat_titles)
 
     max_raw_beat_idx = 0
+    distinct_raw_beats = set()
+    distinct_phase_beats = set()
     for _rs in raw_scenes:
         try:
-            _bv = int(str(_rs.get("beat_index") or 0).replace("Beat", "").strip())
+            _bv = int(str(_rs.get("beat_index") or _rs.get("beat") or 0).replace("Beat", "").strip())
+            if _bv > 0:
+                distinct_raw_beats.add(_bv)
             if _bv > max_raw_beat_idx:
                 max_raw_beat_idx = _bv
         except Exception:
             pass
-    beat_index_is_sentence_seq = (max_raw_beat_idx > 5)
+        try:
+            _pv = int(str(_rs.get("beat_phase") or _rs.get("act_beat") or 0).replace("Beat", "").strip())
+            if _pv > 0:
+                distinct_phase_beats.add(_pv)
+        except Exception:
+            pass
+    beat_index_is_sentence_seq = (max_raw_beat_idx > 5) or (len(raw_scenes) >= 5 and len(distinct_raw_beats) <= 1)
+    beat_phase_is_degenerate = (len(raw_scenes) >= 5 and len(distinct_phase_beats) <= 1 and max(distinct_phase_beats, default=0) <= 1)
 
     scenes_since_overlay = 4
     last_overlay_type = None
@@ -1398,7 +1409,7 @@ def build_remotion_props_data(
                 stat_lbl = auto_lbl
 
         # Topic-specific or Generic 5-Beat story engine headings (Rule 128 & Rule 136)
-        explicit_phase = s.get("beat_phase") or s.get("act_beat")
+        explicit_phase = None if beat_phase_is_degenerate else (s.get("beat_phase") or s.get("act_beat"))
         explicit_beat = explicit_phase or (None if beat_index_is_sentence_seq else (s.get("beat_index") or s.get("beat")))
         beat_idx = None
         if explicit_beat:
@@ -1891,9 +1902,9 @@ def build_remotion_props_data(
             # Vox Explainer Continuous Motion Graphics (Rule 122 & Vox Architecture)
             "connection": motion_meta["connection"],
             "connections": motion_meta["connections"],
-            "radiatingConnections": motion_meta["radiating_connections"],
-            "yarns": motion_meta["radiating_connections"],
-            "supportingCutouts": motion_meta["supporting_cutouts"],
+            "radiatingConnections": (motion_meta["radiating_connections"] or s.get("yarns") or s.get("radiatingConnections") or []) if is_collage_variant else [],
+            "yarns": (motion_meta["radiating_connections"] or s.get("yarns") or s.get("radiatingConnections") or []) if is_collage_variant else [],
+            "supportingCutouts": (motion_meta["supporting_cutouts"] or s.get("supportingCutouts") or []) if is_collage_variant else [],
             "editorialHeadline": scene_headline,
         })
 
@@ -2055,11 +2066,18 @@ def build_remotion_props_data(
             if fg_cur and fg_cur not in board_fgs:
                 board_fgs.append(fg_cur)
 
+            resolved_yarns = meta["radiating_connections"] or sc.get("yarns") or sc.get("radiatingConnections") or []
+            raw_supp = meta["supporting_cutouts"] or sc.get("supportingCutouts") or []
+            dedup_supp = [
+                c for c in raw_supp
+                if isinstance(c, dict) and (not fg_cur or c.get("src") != fg_cur)
+            ] if is_sc_collage else []
+
             sc["connection"] = meta["connection"]
             sc["connections"] = meta["connections"]
-            sc["radiatingConnections"] = meta["radiating_connections"] if is_sc_collage else []
-            sc["yarns"] = meta["radiating_connections"] if is_sc_collage else []
-            sc["supportingCutouts"] = meta["supporting_cutouts"] if is_sc_collage else []
+            sc["radiatingConnections"] = resolved_yarns if is_sc_collage else []
+            sc["yarns"] = resolved_yarns if is_sc_collage else []
+            sc["supportingCutouts"] = dedup_supp
             sc["editorialHeadline"] = meta["editorial_headline"]
             sc["heroSrc"] = sc.get("foreground") or sc.get("heroSrc")
             sc["backgroundSrc"] = sc.get("background") or sc.get("backgroundSrc")

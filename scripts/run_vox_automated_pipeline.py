@@ -328,6 +328,7 @@ def run_automated_pipeline(
             sent_item = {
                 "sentence_id": f"sent_{b_idx:03d}",
                 "beat_index": b_idx,
+                "beat_phase": b.get("beat_phase", 1),
                 "text": b_text,
                 "start_ms": start_ms,
                 "end_ms": end_ms,
@@ -343,8 +344,9 @@ def run_automated_pipeline(
 
     with open(spoken_sent_path, "w", encoding="utf-8") as f:
         json.dump(spoken_sentences, f, indent=2, ensure_ascii=False)
-    with open(whisper_seg_path, "w", encoding="utf-8") as f:
-        json.dump(spoken_sentences, f, indent=2, ensure_ascii=False)
+    if not whisper_seg_path.exists() or whisper_seg_path.stat().st_size < 200:
+        with open(whisper_seg_path, "w", encoding="utf-8") as f:
+            json.dump(spoken_sentences, f, indent=2, ensure_ascii=False)
 
     if not srt_out_path.exists() or srt_out_path.stat().st_size < 100:
         srt_lines = []
@@ -389,6 +391,20 @@ def run_automated_pipeline(
 
     video_prompts_by_beat = {vp["beat_index"]: vp for vp in diorama_video_prompts}
 
+    # 8. Remotion Manifest Build (VoxBuildOnStage)
+    logger.info("🎬 [7/7] Building Remotion VoxBuildOnStage Manifest...")
+    remotion_manifest = director.build_remotion_manifest(
+        beats=beats,
+        theme=resolved_theme,
+        topic=resolved_topic,
+        episode_id=ep_id,
+        video_engine_mode=video_engine_mode
+    )
+    manifest_scenes_by_beat = {
+        sc.get("beat_index", idx + 1): sc
+        for idx, sc in enumerate(remotion_manifest.get("scenes", []))
+    }
+
     # Dual-layer prompts for Remotion Stage
     prompts_forge = {
         "episode_id": ep_id,
@@ -403,6 +419,7 @@ def run_automated_pipeline(
             {
                 "scene_id": f"scene_{b['beat_index']:02d}",
                 "beat_index": b["beat_index"],
+                "beat_phase": b.get("beat_phase", 1),
                 "headline": b["headline"],
                 "narration": b["narration"],
                 "bg_key": b.get("bg_key", f"bg_{b['beat_index']:02d}"),
@@ -410,6 +427,11 @@ def run_automated_pipeline(
                 "targetBackground": b.get("targetBackground", f"images/bg_{b['beat_index']:02d}.png"),
                 "targetHeroSrc": b.get("targetHeroSrc", f"images/fg_{b['beat_index']:02d}.png"),
                 "heroLabel": b.get("heroLabel", f"SUBJECT #{b['beat_index']:02d}"),
+                "paper_material": b.get("paper_material"),
+                "layoutVariant": manifest_scenes_by_beat.get(b["beat_index"], {}).get("layoutVariant"),
+                "heroPosition": manifest_scenes_by_beat.get(b["beat_index"], {}).get("heroPosition"),
+                "supportingCutouts": manifest_scenes_by_beat.get(b["beat_index"], {}).get("supportingCutouts", []),
+                "yarns": manifest_scenes_by_beat.get(b["beat_index"], {}).get("yarns", []),
                 "fg_prompt": b["fg_prompt"],
                 "bg_prompt": b["bg_prompt"],
                 "tactile_prompt": b["image_prompt"],
@@ -424,16 +446,7 @@ def run_automated_pipeline(
     with open(target_out / "prompts.json", "w", encoding="utf-8") as f:
         json.dump(prompts_forge, f, indent=2, ensure_ascii=False)
 
-    # 8. Remotion Manifest Build (VoxBuildOnStage)
-    logger.info("🎬 [7/7] Building Remotion VoxBuildOnStage Manifest...")
-    remotion_manifest = director.build_remotion_manifest(
-        beats=beats,
-        theme=resolved_theme,
-        topic=resolved_topic,
-        episode_id=ep_id,
-        video_engine_mode=video_engine_mode
-    )
-    # Recalibrate totalFrames to match actual audio duration exactly
+    # Recalibrate totalFrames to match actual audio duration or scene sum
     total_frames = int(effective_duration * director.fps)
     remotion_manifest["totalFrames"] = total_frames
 
@@ -477,7 +490,9 @@ def run_automated_pipeline(
         )
         if unified_props and isinstance(unified_props, dict) and unified_props.get("scenes"):
             remotion_manifest = unified_props
-            remotion_manifest["totalFrames"] = total_frames
+            remotion_manifest["totalFrames"] = sum(
+                int(sc.get("durationInFrames", 150)) for sc in remotion_manifest["scenes"]
+            ) or total_frames
             logger.info("✅ Full TwoLayer + VoxOverlayLayer Remotion props successfully built.")
     except Exception as _bprops_err:
         logger.warning(f"build_remotion_props_data fallback: {_bprops_err}")

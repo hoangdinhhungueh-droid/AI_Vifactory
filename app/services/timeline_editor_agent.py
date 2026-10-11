@@ -307,7 +307,13 @@ def audit_and_optimize_timeline(
             if new_motion and new_motion in VALID_MOTION_DIRECTIVES:
                 scene["motionDirective"] = new_motion
             llm_speaker = llm_adj.get("speakerTag")
-            if llm_speaker and isinstance(llm_speaker, str) and llm_speaker.strip():
+            existing_tag = str(scene.get("speakerTag") or "").strip()
+            if (
+                llm_speaker
+                and isinstance(llm_speaker, str)
+                and llm_speaker.strip()
+                and not re.match(r"^BEAT\s*[1-5]\b", existing_tag, flags=re.IGNORECASE)
+            ):
                 scene["speakerTag"] = llm_speaker.strip()
             if llm_adj.get("directorNote"):
                 scene["directorNote"] = llm_adj["directorNote"]
@@ -318,6 +324,7 @@ def audit_and_optimize_timeline(
             clean_tag = str(tag).strip()
             clean_tag = re.sub(r'\.(png|jpg|jpeg|webp)$', '', clean_tag, flags=re.IGNORECASE)
             clean_tag = re.sub(r'^(ARCHIVE\s*X\s*//\s*|DEFAULT\s*//\s*)', '', clean_tag, flags=re.IGNORECASE)
+            clean_tag = re.sub(r'^(fg|bg)_[a-z0-9_]+$', '', clean_tag, flags=re.IGNORECASE).strip()
             scene["speakerTag"] = clean_tag
 
         # Step 4: Visual Monotony Breaker
@@ -336,15 +343,25 @@ def audit_and_optimize_timeline(
         if consecutive_overlay_count > 2 and isinstance(overlay, dict):
             # Break monotony: Switch third identical scene to contrasting kinetic type
             if current_type == "document_highlight":
-                overlay["type"] = "kinetic_counter"
-                overlay["title"] = m_theme["counter_title"]
-                overlay["badge"] = m_theme["counter_badge"]
-                overlay["sfx_cue"] = "stamp_slam"
+                if scene.get("statValue"):
+                    overlay["type"] = "kinetic_counter"
+                    overlay["title"] = m_theme["counter_title"]
+                    overlay["badge"] = m_theme["counter_badge"]
+                    overlay["sfx_cue"] = "stamp_slam"
+                    payload = dict(overlay.get("payload") or {})
+                    payload.setdefault("amount", scene.get("statValue"))
+                    payload.setdefault("end_value", scene.get("statValue"))
+                    overlay["payload"] = payload
+                else:
+                    overlay["type"] = "evidence_board"
+                    overlay["title"] = m_theme["network_title"]
+                    overlay["badge"] = m_theme["network_badge"]
+                    overlay["sfx_cue"] = "paper_slide"
             elif current_type == "kinetic_counter":
                 overlay["type"] = "tactical_map"
                 overlay["title"] = m_theme["map_title"]
                 overlay["badge"] = m_theme["map_badge"]
-                overlay["sfx_cue"] = "radar_ping"
+                overlay["sfx_cue"] = "sonar_ping"
             scene["forensicOverlay"] = overlay
             prev_overlay_type = overlay.get("type")
             consecutive_overlay_count = 1
@@ -367,8 +384,15 @@ def audit_and_optimize_timeline(
             for w in whisper_words:
                 w_start = float(w.get("start_ms", 0))
                 if scene_start_ms <= w_start < scene_end_ms:
-                    word_clean = re.sub(r'[^a-zA-Z0-9\s]', '', str(w.get("word", "")).lower().strip())
-                    if word_clean in PUNCH_KEYWORDS or any(pk in word_clean for pk in PUNCH_KEYWORDS):
+                    raw_word = str(w.get("word", "")).lower().strip()
+                    word_clean = re.sub(r'[^a-zA-Z0-9\s]', '', raw_word).strip()
+                    word_tokens = set(word_clean.split()) if word_clean else set()
+                    is_punch = (
+                        word_clean in PUNCH_KEYWORDS
+                        or bool(word_tokens & PUNCH_KEYWORDS)
+                        or any(pk in raw_word for pk in PUNCH_KEYWORDS if not pk.isascii())
+                    )
+                    if is_punch:
                         frame_offset = max(0, min(dur - 1, round(((w_start - scene_start_ms) / 1000.0) * 30.0)))
                         punches.append({
                             "word": w.get("word"),

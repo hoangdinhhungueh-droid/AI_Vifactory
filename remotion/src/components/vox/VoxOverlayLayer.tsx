@@ -201,7 +201,7 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
         ) : null}
 
         {/* Threshold Ratio Visualization (24x Staccato 6x4 Grid & Statutory Limit) */}
-        {rawType === "threshold_ratio" || rawType === "grid_ratio" || rawType === "ratio_grid" ? (
+        {rawType === "threshold_ratio" || rawType === "grid_ratio" || rawType === "ratio_grid" || rawType === "circuit_breaker_dial" ? (
           <VoxThresholdRatio
             title={ov.title}
             badge={ov.badge}
@@ -236,7 +236,7 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
         ) : null}
 
         {/* Causal Flowchart / Connected Vector Network */}
-        {rawType === "causal_flowchart" || rawType === "money_trail_network" || rawType === "connected_network" || rawType === "causal_network" || rawType === "vox_network" ? (
+        {rawType === "causal_flowchart" || rawType === "causal_chain" || rawType === "timeline_stepper" || rawType === "money_trail_network" || rawType === "connected_network" || rawType === "causal_network" || rawType === "vox_network" ? (
           ov.payload?.nodes && ov.payload?.edges ? (
             <VoxConnectedNetwork
               title={ov.title}
@@ -268,11 +268,11 @@ export const VoxOverlayLayer: React.FC<VoxOverlayLayerProps> = ({
         ) : null}
 
         {/* Dynamic Vector Financial Chart / Candlestick Line Draw (Vox Engine 4.0) */}
-        {rawType === "dynamic_chart" || rawType === "vector_chart" || rawType === "line_chart" || rawType === "bar_chart" ? (
+        {rawType === "dynamic_chart" || rawType === "vector_chart" || rawType === "line_chart" || rawType === "bar_chart" || rawType === "market_depth" ? (
           <VoxDynamicChart
             title={ov.title || statLabel}
             badge={ov.badge || "MARKET FORENSIC DATA"}
-            chartType={ov.payload?.chart_type || (rawType === "bar_chart" ? "bar" : "line")}
+            chartType={ov.payload?.chart_type || (rawType === "bar_chart" || rawType === "market_depth" ? "bar" : "line")}
             data={ov.payload?.data}
             startValue={ov.payload?.start_value}
             endValue={ov.payload?.end_value !== undefined ? ov.payload?.end_value : (statValue ? parseFloat(String(statValue).replace(/[^0-9.-]/g, "")) : undefined)}

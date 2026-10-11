@@ -243,34 +243,49 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
             dur_s = float(s.get("duration_sec") or s.get("duration_seconds") or 4.38)
         timeline_sec += dur_s
 
-    # Group scenes by beat
+    # Group scenes by beat (respecting beat_phase 1..5 when beat_index is sequential 1..N or degenerate constant)
     beats_map: Dict[int, List[Tuple[int, Dict[str, Any]]]] = {b: [] for b in range(1, 6)}
     total_len = max(1, len(scenes))
+    distinct_raw_beats = {int(sc.get("beat_index")) for sc in scenes if isinstance(sc.get("beat_index"), int)}
+    max_raw_beat = max(distinct_raw_beats, default=1)
+    beat_is_invalid = (max_raw_beat > 5) or (len(scenes) >= 5 and len(distinct_raw_beats) <= 1)
+    distinct_phase_beats = {int(sc.get("beat_phase")) for sc in scenes if isinstance(sc.get("beat_phase"), int)}
+    phase_is_invalid = (len(scenes) >= 5 and len(distinct_phase_beats) <= 1 and max(distinct_phase_beats, default=0) <= 1)
 
     for idx, s in enumerate(scenes):
-        b_val = s.get("beat_index") or s.get("beat_number") or s.get("act_number") or s.get("beat")
+        raw_phase = None if phase_is_invalid else s.get("beat_phase")
         b_int = None
-        if isinstance(b_val, int):
-            b_int = b_val
-        elif isinstance(b_val, str):
-            m_num = re.search(r'([1-5])', b_val)
-            if m_num:
-                b_int = int(m_num.group(1))
-            else:
-                for roman, arab in [("V", 5), ("IV", 4), ("III", 3), ("II", 2), ("I", 1)]:
-                    if roman in b_val.upper():
-                        b_int = arab
-                        break
+        if isinstance(raw_phase, int) and 1 <= raw_phase <= 5:
+            b_int = raw_phase
+        else:
+            b_val = (
+                (s.get("beat_index") if not beat_is_invalid else None)
+                or s.get("beat_number")
+                or s.get("act_number")
+                or (s.get("beat") if isinstance(s.get("beat"), int) and 1 <= s.get("beat") <= 5 and not beat_is_invalid else None)
+                or (s.get("beat") if isinstance(s.get("beat"), str) else None)
+            )
+            if isinstance(b_val, int) and 1 <= b_val <= 5:
+                b_int = b_val
+            elif isinstance(b_val, str):
+                m_num = re.search(r'\b([1-5])\b', b_val)
+                if m_num:
+                    b_int = int(m_num.group(1))
+                else:
+                    for roman, arab in [("V", 5), ("IV", 4), ("III", 3), ("II", 2), ("I", 1)]:
+                        if roman in b_val.upper():
+                            b_int = arab
+                            break
 
         if b_int is None:
-            pct = idx / total_len
-            if pct < 0.15:
+            pct = (idx + 1) / total_len
+            if pct <= 0.15:
                 b_int = 1
-            elif pct < 0.40:
+            elif pct <= 0.35:
                 b_int = 2
-            elif pct < 0.65:
+            elif pct <= 0.65:
                 b_int = 3
-            elif pct < 0.85:
+            elif pct <= 0.85:
                 b_int = 4
             else:
                 b_int = 5
@@ -455,34 +470,50 @@ def prune_and_localize_scenes(
             break
     disclosure_scenes = {0, beat4_first_idx if beat4_first_idx is not None else int(total_len * 0.65), len(scenes) - 1}
 
+    distinct_raw_beats = {int(sc.get("beat_index")) for sc in scenes if isinstance(sc.get("beat_index"), int)}
+    max_raw_beat_idx = max(distinct_raw_beats, default=1)
+    beat_is_invalid = (max_raw_beat_idx > 5) or (len(scenes) >= 5 and len(distinct_raw_beats) <= 1)
+    distinct_phase_beats = {int(sc.get("beat_phase")) for sc in scenes if isinstance(sc.get("beat_phase"), int)}
+    phase_is_invalid = (len(scenes) >= 5 and len(distinct_phase_beats) <= 1 and max(distinct_phase_beats, default=0) <= 1)
+
     for i, s in enumerate(scenes):
         scene_copy = dict(s)
         start_sec = scene_start_times.get(i, 0.0)
 
-        # Determine beat (1..5)
-        b_val = scene_copy.get("beat_index") or scene_copy.get("beat_number") or scene_copy.get("act_number") or scene_copy.get("beat")
+        # Determine beat (1..5) respecting beat_phase when beat_index is sequential 1..N or degenerate constant
+        raw_phase = None if phase_is_invalid else scene_copy.get("beat_phase")
         b_int = None
-        if isinstance(b_val, int):
-            b_int = b_val
-        elif isinstance(b_val, str):
-            m_num = re.search(r'([1-5])', b_val)
-            if m_num:
-                b_int = int(m_num.group(1))
-            else:
-                for roman, arab in [("V", 5), ("IV", 4), ("III", 3), ("II", 2), ("I", 1)]:
-                    if roman in b_val.upper():
-                        b_int = arab
-                        break
+        if isinstance(raw_phase, int) and 1 <= raw_phase <= 5:
+            b_int = raw_phase
+        else:
+            b_val = (
+                (scene_copy.get("beat_index") if not beat_is_invalid else None)
+                or scene_copy.get("beat_number")
+                or scene_copy.get("act_number")
+                or (scene_copy.get("beat") if isinstance(scene_copy.get("beat"), int) and 1 <= scene_copy.get("beat") <= 5 and not beat_is_invalid else None)
+                or (scene_copy.get("beat") if isinstance(scene_copy.get("beat"), str) else None)
+            )
+            if isinstance(b_val, int) and 1 <= b_val <= 5:
+                b_int = b_val
+            elif isinstance(b_val, str):
+                m_num = re.search(r'\b([1-5])\b', b_val)
+                if m_num:
+                    b_int = int(m_num.group(1))
+                else:
+                    for roman, arab in [("V", 5), ("IV", 4), ("III", 3), ("II", 2), ("I", 1)]:
+                        if roman in b_val.upper():
+                            b_int = arab
+                            break
 
         if b_int is None:
-            pct = i / total_len
-            if pct < 0.15:
+            pct = (i + 1) / total_len
+            if pct <= 0.15:
                 b_int = 1
-            elif pct < 0.40:
+            elif pct <= 0.35:
                 b_int = 2
-            elif pct < 0.65:
+            elif pct <= 0.65:
                 b_int = 3
-            elif pct < 0.85:
+            elif pct <= 0.85:
                 b_int = 4
             else:
                 b_int = 5
@@ -490,6 +521,7 @@ def prune_and_localize_scenes(
 
         env = BEAT_ENVELOPE[b_int]
         scene_copy["beat"] = b_int
+        scene_copy["beat_phase"] = b_int
         scene_copy["beat_index"] = b_int
         scene_copy["cadence"] = env["cadence"]
         scene_copy["karaoke_mode"] = env["karaoke"]
@@ -539,6 +571,12 @@ def prune_and_localize_scenes(
                         "theme": "vox_paper",
                         "layout": "full_bleed_focus",
                         "sfx_cue": "stamp_slam",
+                        "payload": {
+                            "end_value": getattr(metric, "value", metric.formatted) if metric else None,
+                            "amount": metric.formatted if metric else None,
+                            "title": theme["counter_title"],
+                            "subtitle": theme["counter_badge"],
+                        },
                     }
                     if metric:
                         scene_copy["statValue"] = metric.formatted
@@ -568,7 +606,7 @@ def prune_and_localize_scenes(
                         "badge": theme["network_badge"],
                         "theme": "vox_paper",
                         "layout": "full_bleed_focus",
-                        "sfx_cue": "shutter_click",
+                        "sfx_cue": "marker_stroke",
                         "payload": {
                             "document_title": theme["document_title"],
                             "agency": theme["agency"],
@@ -753,8 +791,16 @@ def prune_and_localize_scenes(
             clean_tag = str(raw_tag).strip()
             clean_tag = re.sub(r'\.(png|jpg|jpeg|webp)$', '', clean_tag, flags=re.IGNORECASE)
             clean_tag = re.sub(r'^(ARCHIVE\s*X\s*//\s*|DEFAULT\s*//\s*)', '', clean_tag, flags=re.IGNORECASE)
+            clean_tag = re.sub(r'^(fg|bg)_[a-z0-9_]+$', '', clean_tag, flags=re.IGNORECASE).strip()
+            # Collapse redundant double-colon BEAT X: <TOPIC>: <BEAT_TITLE> -> BEAT X: <BEAT_TITLE>
+            m_double_colon = re.match(r'^(BEAT\s*[1-5])\s*:\s*[^:]+:\s*(.+)$', clean_tag, flags=re.IGNORECASE)
+            if m_double_colon and len(clean_tag) > 44:
+                clean_tag = f"{m_double_colon.group(1).upper()}: {m_double_colon.group(2).strip()}"
             if m_clean not in ("EN", "US", "UK") and re.search(r'[A-Za-z]{4,}', clean_tag) and not re.search(r'[぀-ヿ㐀-䶿一-鿿가-힯à-ỹ]', clean_tag):
-                clean_tag = theme.get("default_speaker", "CRITICAL EVIDENCE // FORENSIC TIMELINE")
+                if re.match(r'^BEAT\s*[1-5]\b', clean_tag, flags=re.IGNORECASE):
+                    clean_tag = f"BEAT {b_int}: {theme.get('default_speaker', '検証記録 // 時系列分析')}"
+                else:
+                    clean_tag = theme.get("default_speaker", "CRITICAL EVIDENCE // FORENSIC TIMELINE")
             elif m_clean in ("EN", "US", "UK") and re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]', clean_tag):
                 clean_tag = theme.get("default_speaker", "CRITICAL EVIDENCE // FORENSIC TIMELINE")
             scene_copy["speakerTag"] = clean_tag

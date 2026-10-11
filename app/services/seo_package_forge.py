@@ -136,13 +136,14 @@ def _build_dynamic_chapters(
 
 
 def sync_exact_chapters_from_remotion(
-    task_id: str,
+    task_id: str = "",
     market: str = "EN",
     existing_chapters: list = None,
     ep_dir_path: str = None,
     title: str = "",
     target_keyword: str = "",
     total_duration_s: float = 720.0,
+    remotion_props_path: str = None,
 ) -> list[str]:
     """Rule 135: Synchronize YouTube chapters with exact frame-accurate timestamps from remotion_props.json.
     Ground-Truth Video Timeline:
@@ -177,14 +178,17 @@ def sync_exact_chapters_from_remotion(
 
     # 1. Locate remotion_props.json
     candidates = []
+    if remotion_props_path:
+        candidates.append(str(remotion_props_path))
     if ep_dir_path:
         candidates.append(os.path.join(ep_dir_path, "remotion_props.json"))
     if task_id and (str(task_id).endswith(".json") or os.path.isfile(str(task_id))):
         candidates.insert(0, str(task_id))
-    candidates.extend([
-        f"/var/vf/episodes/{task_id}/remotion_props.json",
-        f"/root/video_factory/var/vf/episodes/{task_id}/remotion_props.json",
-    ])
+    if task_id:
+        candidates.extend([
+            f"/var/vf/episodes/{task_id}/remotion_props.json",
+            f"/root/video_factory/var/vf/episodes/{task_id}/remotion_props.json",
+        ])
     
     remotion_path = None
     for cand in candidates:
@@ -204,32 +208,51 @@ def sync_exact_chapters_from_remotion(
             if scenes:
                 current_frame = 0
                 last_beat_key = None
+                distinct_beats = {
+                    int(sc.get("beat_phase") or sc.get("beat_index") or sc.get("beat"))
+                    for sc in scenes
+                    if str(sc.get("beat_phase") or sc.get("beat_index") or sc.get("beat") or "").isdigit()
+                }
+                is_degenerate_beat = (len(scenes) >= 5 and len(distinct_beats) <= 1) or (max(distinct_beats, default=1) > 5)
                 
                 for idx, s in enumerate(scenes):
                     speaker_tag = str(s.get("speakerTag") or "")
-                    beat_val = str(s.get("beat") or "")
+                    beat_val = s.get("beat_phase") or s.get("beat_index") or s.get("beat")
                     act_title = str(s.get("actTitle") or "")
-                    beat_idx = s.get("beat_index")
                     
-                    # Extract canonical beat key (e.g., "BEAT 1", "BEAT 2", "ACT I", etc.)
-                    beat_match = re.search(r'\b(BEAT\s*\d+|ACT\s*[IVXLCDM]+)\b', f"{speaker_tag} {beat_val} {act_title}", re.IGNORECASE)
-                    if beat_match:
-                        current_beat_key = beat_match.group(1).upper()
-                    elif beat_idx:
-                        current_beat_key = f"BEAT {beat_idx}"
-                    else:
-                        current_beat_key = act_title or f"SCENE_{idx}"
+                    # Extract canonical beat key (prioritize integer beat_phase 1..5 so character speakerTags don't trigger false chapter splits)
+                    current_beat_key = None
+                    if not is_degenerate_beat and beat_val is not None:
+                        try:
+                            b_int = int(beat_val)
+                            if 1 <= b_int <= 5:
+                                current_beat_key = f"BEAT {b_int}"
+                        except (ValueError, TypeError):
+                            pass
+                    if not current_beat_key and is_degenerate_beat:
+                        pct = (idx + 1) / max(1, len(scenes))
+                        b_auto = 1 if pct <= 0.15 else (2 if pct <= 0.40 else (3 if pct <= 0.65 else (4 if pct <= 0.85 else 5)))
+                        current_beat_key = f"BEAT {b_auto}"
+                    if not current_beat_key:
+                        beat_match = re.search(r'\b(BEAT\s*\d+|ACT\s*[IVXLCDM]+)\b', f"{speaker_tag} {beat_val or ''} {act_title}", re.IGNORECASE)
+                        if beat_match:
+                            current_beat_key = re.sub(r'\s+', ' ', beat_match.group(1).upper()).strip()
+                        elif beat_val:
+                            current_beat_key = f"BEAT {beat_val}"
+                        else:
+                            current_beat_key = act_title or f"SCENE_{idx}"
 
                     dur = int(s.get("durationInFrames") or 0)
                     
                     if current_beat_key != last_beat_key or idx == 0:
                         sec = int(current_frame / fps)
-                        # Ensure YouTube constraint: chapters at least 30s apart to keep progress bar clean (12-16 chapters budget)
+                        # Ensure YouTube constraint: chapters at least 10s apart (Rule 135)
                         if not exact_timestamps:
                             exact_timestamps.append(0)
-                        elif sec >= exact_timestamps[-1] + 30:
+                            last_beat_key = current_beat_key
+                        elif sec >= exact_timestamps[-1] + 10:
                             exact_timestamps.append(sec)
-                        last_beat_key = current_beat_key
+                            last_beat_key = current_beat_key
 
                     current_frame += dur
                 

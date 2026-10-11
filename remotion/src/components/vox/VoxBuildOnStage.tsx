@@ -490,8 +490,8 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
               style={{
                 position: "absolute",
                 top: "14%",
-                left: "6%",
-                width: "44%",
+                left: heroSrc ? "6%" : "24%",
+                width: heroSrc ? "44%" : "52%",
                 backgroundColor: "#f5efe1",
                 borderLeft: "6px solid #b91c1c",
                 border: "1px solid rgba(24,24,27,0.22)",
@@ -567,8 +567,8 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
           )}
 
 
-          {/* LAYER 1: HERO CUTOUT SUBJECT (Active in paper_collage, evidence_dossier right-pane, or when no BG exists) */}
-          {heroSrc && (isTactileCollage || isEvidenceDossier || !backgroundSrc) && (
+          {/* LAYER 1: HERO CUTOUT SUBJECT (Active in paper_collage, evidence_dossier right-pane, cinematic_doc when kept, or when no BG exists) */}
+          {heroSrc && (isTactileCollage || isEvidenceDossier || isCinematicDoc || !backgroundSrc) && (
             <div
               style={{
                 position: "absolute",

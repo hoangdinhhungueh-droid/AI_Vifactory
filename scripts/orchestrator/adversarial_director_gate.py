@@ -334,6 +334,28 @@ def auto_repair_props(props: Dict[str, Any], market: str) -> Dict[str, Any]:
             s["targetHeroSrc"] = ""
             s["primary_hero"] = None
 
+    # 7. Deduplicate consecutive identical backgrounds (Rule 52.3 & Vox Pacing)
+    distinct_bgs = []
+    for s in sanitized:
+        bg_val = s.get("background") or s.get("backgroundSrc") or s.get("targetBackground")
+        if bg_val and bg_val not in distinct_bgs:
+            distinct_bgs.append(bg_val)
+    if len(distinct_bgs) > 1:
+        for idx in range(1, len(sanitized)):
+            cur_bg = sanitized[idx].get("background") or sanitized[idx].get("backgroundSrc")
+            prev_bg = sanitized[idx - 1].get("background") or sanitized[idx - 1].get("backgroundSrc")
+            if cur_bg and prev_bg and cur_bg == prev_bg:
+                next_bg = sanitized[idx + 1].get("background") if (idx + 1) < len(sanitized) else None
+                for cand_idx in range(len(distinct_bgs)):
+                    cand_bg = distinct_bgs[(idx + cand_idx) % len(distinct_bgs)]
+                    if cand_bg != prev_bg and cand_bg != next_bg:
+                        sanitized[idx]["background"] = cand_bg
+                        if "backgroundSrc" in sanitized[idx]:
+                            sanitized[idx]["backgroundSrc"] = cand_bg
+                        if "targetBackground" in sanitized[idx]:
+                            sanitized[idx]["targetBackground"] = cand_bg
+                        break
+
     props["scenes"] = sanitized
     return props
 

@@ -1761,9 +1761,8 @@ def compile_stateful_boards(scenes: List[Dict[str, Any]], board_size: int = 4) -
         for step_idx, sc in enumerate(b_scenes):
             sc["board_id"] = b_id
             sc["board_step"] = step_idx
-            is_collage_sc = (sc.get("layoutVariant") == "paper_collage")
             has_own_bg = isinstance(sc.get("background"), dict) and bool(sc["background"].get("reuse_key"))
-            if primary_bg and isinstance(sc.get("background"), dict) and (is_collage_sc or not has_own_bg):
+            if primary_bg and isinstance(sc.get("background"), dict) and not has_own_bg:
                 sc["background"] = dict(primary_bg)
 
             # Copy accumulated props from earlier steps in this Board before adding current FG
@@ -1913,7 +1912,7 @@ def build_unified_director_plan(
             topic=topic
         )
     else:
-        if len(spoken_sentences) >= 75 and len(bg_roster) < 46:
+        if len(spoken_sentences) >= 25 and len(bg_roster) < 46:
             bg_roster = expand_longform_background_roster(
                 bg_roster=bg_roster,
                 target_count=46,
@@ -1952,20 +1951,34 @@ def build_unified_director_plan(
 
     char_count = 0
     last_char_scene = -99
+    prev_bg_key = None
+    distinct_sent_beats = {
+        int(s.get("beat_phase") or s.get("beat_index"))
+        for s in spoken_sentences
+        if isinstance(s.get("beat_phase") or s.get("beat_index"), int)
+    }
+    sent_beats_degenerate = (len(spoken_sentences) >= 5 and len(distinct_sent_beats) <= 1) or (max(distinct_sent_beats, default=1) > 5)
 
     for idx, sent in enumerate(spoken_sentences):
         narr = sent.get("text", "")
         dur_frames = int(sent.get("duration_frames") or 150)
         dur_sec = float(sent.get("duration_sec") or ((sent.get("end_ms", 0) - sent.get("start_ms", 0)) / 1000.0 if sent.get("end_ms") else 0.0) or round(dur_frames / 30.0, 3))
-        beat_idx = int(sent.get("beat_index") or ((idx // max(1, len(spoken_sentences) // 5)) + 1))
-        beat_idx = min(max(beat_idx, 1), 5)
+        raw_b = sent.get("beat_phase") or (None if sent_beats_degenerate else sent.get("beat_index"))
+        if isinstance(raw_b, int) and 1 <= raw_b <= 5 and not sent_beats_degenerate:
+            beat_idx = raw_b
+        else:
+            pct_s = (idx + 1) / max(1, len(spoken_sentences))
+            beat_idx = 1 if pct_s <= 0.15 else (2 if pct_s <= 0.35 else (3 if pct_s <= 0.65 else (4 if pct_s <= 0.85 else 5)))
 
-        # Matching Background phù hợp theo Beat và thứ tự cảnh (luân phiên 2 cảnh / 1 BG cho long-form >=75 cảnh, 3 cảnh cho tập chuẩn)
+        # Matching Background phù hợp theo Beat và thứ tự cảnh (0 lặp liên tiếp)
         matching_bgs = [k for k, v in bg_roster.items() if beat_idx in v.get("beats", [1, 2, 3, 4, 5])]
         if not matching_bgs:
             matching_bgs = bg_keys
-        bg_stride = 2 if len(spoken_sentences) >= 75 else 3
-        bg_key = matching_bgs[(idx // bg_stride) % len(matching_bgs)]
+        bg_candidate_idx = idx % len(matching_bgs)
+        bg_key = matching_bgs[bg_candidate_idx]
+        if bg_key == prev_bg_key and len(matching_bgs) > 1:
+            bg_key = matching_bgs[(bg_candidate_idx + 1) % len(matching_bgs)]
+        prev_bg_key = bg_key
 
         # Matching Foreground Evidence dựa trên từ khóa kể chuyện hoặc luân phiên Beat
         narr_lower = narr.lower()
@@ -2096,6 +2109,7 @@ def build_unified_director_plan(
             )
         }
 
+        fg_side = "left" if ("left" in layout_choice or idx % 2 == 0) else "right"
         scene_obj = {
             "scene_id": f"sc{idx:03d}",
             "source_image": source_img,
@@ -2112,12 +2126,19 @@ def build_unified_director_plan(
             "transition_out": transition_choice,
             "final_veo_prompt": veo_prompt,
             "beat_index": beat_idx,
+            "beat_phase": beat_idx,
             "narration": narr,
             "shot_type": shot_type,
             "spatial_physics_type": physics_type,
             "flow_slot": flow_slot,
             "foleys_audio": foleys,
             "veo_action_prompt": veo_prompt,
+            "foregroundPosition": fg_side,
+            "heroPosition": {
+                "xPct": 34 if fg_side == "left" else 66,
+                "yPct": 54,
+                "widthPct": 38,
+            },
             "background": {
                 "reuse_key": bg_key,
                 "title": bg_roster[bg_key]["title"],
@@ -2128,7 +2149,7 @@ def build_unified_director_plan(
                 "title": fg_roster[assigned_fg]["title"] if assigned_fg else None,
                 "description": fg_roster[assigned_fg]["description"] if assigned_fg else None,
                 "role": fg_roster[assigned_fg]["role"] if assigned_fg else None,
-                "position": "left" if "left" in layout_choice else ("right" if "right" in layout_choice else "center")
+                "position": fg_side
             } if assigned_fg else None,
             "remotion_instructions": remotion_instructions
         }

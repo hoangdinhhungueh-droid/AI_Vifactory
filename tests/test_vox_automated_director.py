@@ -396,3 +396,113 @@ def test_round3_beat_phase_and_layout_anti_collision(tmp_path, monkeypatch):
             assert s.get("layoutVariant") not in ("evidence_dossier", "paper_collage")
 
 
+def test_round3_part2_midstream_and_chapter_sync_integrity(tmp_path, monkeypatch):
+    """Verify Round 3 Part 2 fixes across editorial_briefing_generator, timeline_editor_agent, and seo_package_forge."""
+    import json
+    from app.services.editorial_briefing_generator import select_climax_scenes, prune_and_localize_scenes
+    from app.services.timeline_editor_agent import audit_and_optimize_timeline
+    from app.services.seo_package_forge import sync_exact_chapters_from_remotion
+
+    monkeypatch.setenv("DISABLE_LLM_TIMELINE_DIRECTOR", "1")
+
+    # 1. Verify select_climax_scenes and prune_and_localize_scenes respect 1..5 beat phases on 20-scene input
+    raw_scenes = []
+    for i in range(20):
+        b_phase = 1 if i < 4 else (2 if i < 8 else (3 if i < 12 else (4 if i < 16 else 5)))
+        raw_scenes.append({
+            "scene_id": f"scene_{i + 1:02d}",
+            "beat_index": i + 1,  # sequential sentence index 1..20
+            "beat_phase": b_phase,
+            "narration": f"Scene {i + 1} reveals $450 million in the bank vault without any warning.",
+            "foreground": f"fg_{(i % 4) + 1:02d}.png",
+            "background": f"bg_{(i % 6) + 1:02d}.png",
+            "speakerTag": f"BEAT {b_phase}: GENERIC TOPIC HEADER: SOVEREIGN AUDIT TRAIL PHASE {b_phase}",
+            "statValue": "$450M",
+            "durationInFrames": 360,
+        })
+
+    climax = select_climax_scenes(raw_scenes, target_count=5)
+    assert len(climax) == 5
+
+    pruned = prune_and_localize_scenes([dict(s) for s in raw_scenes], market="EN")
+    pruned_beats = [s["beat_index"] for s in pruned]
+    assert pruned_beats == [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]
+    for s in pruned:
+        assert "GENERIC TOPIC HEADER:" not in s["speakerTag"]
+        ov = s.get("forensicOverlay")
+        if isinstance(ov, dict):
+            assert ov.get("sfx_cue") != "shutter_click"
+            if ov.get("type") == "kinetic_counter":
+                assert ov.get("payload", {}).get("end_value") is not None
+
+    # 2. Verify timeline_editor_agent does NOT trigger false word-punch on substring words ("bank", "afraid", "believe", "warning")
+    test_scenes = [
+        {
+            "id": "scene_01",
+            "beat_index": 1,
+            "beat_phase": 1,
+            "durationInFrames": 90,  # 3.0s (0..3000ms)
+            "speakerTag": "BEAT 1: THE COLD STRIKE",
+            "actTitle": "ACT I // THE HOOK & EXPOSURE",
+            "cameraMovement": "slow_push_in",
+        },
+        {
+            "id": "scene_02",
+            "beat_index": 1,
+            "beat_phase": 1,
+            "durationInFrames": 90,  # 3.0s (3000..6000ms)
+            "speakerTag": "AUDITOR // FEDERAL RESERVE",
+            "actTitle": "ACT I // THE HOOK & EXPOSURE",
+            "cameraMovement": "pan_right",
+        },
+    ]
+    whisper_words = [
+        {"word": "urban", "start_ms": 200, "end_ms": 500},
+        {"word": "bank", "start_ms": 600, "end_ms": 1000},
+        {"word": "afraid", "start_ms": 1100, "end_ms": 1500},
+        {"word": "believe", "start_ms": 1600, "end_ms": 2000},
+        {"word": "warning", "start_ms": 2100, "end_ms": 2600},
+        {"word": "collapse", "start_ms": 3500, "end_ms": 4200},
+    ]
+    refined = audit_and_optimize_timeline(
+        test_scenes,
+        whisper_words=whisper_words,
+        options={"episode_id": "EN_EP9997_test", "enable_llm_director": False},
+    )
+    # Scene 1 has only substring matches ("urban", "bank", "afraid", "believe", "warning") -> must NOT punch
+    assert refined[0]["cameraMovement"] == "slow_push_in"
+    # Scene 2 has exact token "collapse" -> must trigger snap_zoom
+    assert refined[1]["cameraMovement"] == "snap_zoom"
+
+    # 3. Verify sync_exact_chapters_from_remotion does not create false chapter splits when speakerTag alternates with character names
+    remotion_file = tmp_path / "remotion_props.json"
+    chapter_scenes = []
+    for b in range(1, 6):
+        for sub_idx in range(3):
+            chapter_scenes.append({
+                "id": f"sc_{b}_{sub_idx}",
+                "beat": b,
+                "beat_index": b,
+                "beat_phase": b,
+                "speakerTag": f"BEAT {b}: PHASE {b}" if sub_idx != 1 else "WITNESS // TREASURY DEPT",
+                "actTitle": f"ACT {b} // INVESTIGATION",
+                "durationInFrames": 450,  # 15s per scene -> 45s per beat
+            })
+    remotion_file.write_text(json.dumps({"fps": 30, "scenes": chapter_scenes}), encoding="utf-8")
+    chapters = sync_exact_chapters_from_remotion(
+        existing_chapters=[
+            "00:00 - The Hook",
+            "01:00 - The Trap",
+            "02:00 - The Paper Trail",
+            "03:00 - The Smoking Gun",
+            "04:00 - The Reckoning",
+        ],
+        market="EN",
+        title="Test Investigation",
+        target_keyword="Test Investigation",
+        remotion_props_path=str(remotion_file),
+    )
+    # Must produce exactly 5 chapters at 00:00, 00:45, 01:30, 02:15, 03:00 (no false splits inside Beat 1..5)
+    assert [c.split(" - ")[0] for c in chapters] == ["00:00", "00:45", "01:30", "02:15", "03:00"]
+
+

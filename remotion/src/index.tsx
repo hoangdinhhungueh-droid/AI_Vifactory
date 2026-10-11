@@ -1236,14 +1236,58 @@ const SPECIALIZED_CHART_OVERLAY_TYPES = new Set([
   "causal_chain",
   "timeline_stepper",
   "kinetic_counter",
+  "document_highlight",
+  "redacted_doc",
+  "paper_dossier",
+  "court_docket",
+  "redacted_memo",
+  "evidence_board",
+  "suspect_network",
+  "corporate_org_chart",
+  "bank_check",
+  "financial_ledger",
+  "tactical_map",
+  "radar_map",
+  "interactive_map",
+  "maritime_route",
+  "surveillance_crt",
+  "capital_flow_map",
+  "capital_vectors",
+  "global_flow",
+  "causal_flowchart",
+  "money_trail_network",
+  "connected_network",
+  "causal_network",
+  "vox_network",
+  "composite_stage",
+  "paper_collage_assembly",
+  "vox_composite",
+  "dynamic_chart",
+  "vector_chart",
+  "line_chart",
+  "bar_chart",
+  "forensic_paper",
+  "highlighter_doc",
+  "archival_paper",
+  "evidence_3d_prop",
+  "evidence_prop",
 ]);
 
-const computeOverlayKey = (s: any) => {
+const computeOverlayKey = (s: any, idx: number = 0) => {
   const ov = s.forensicOverlay || s.forensic_overlay;
-  const ovType = ov?.type;
+  const ovType = typeof ov === "string" ? ov : ov?.type;
   if (!ovType || !SPECIALIZED_CHART_OVERLAY_TYPES.has(ovType)) return null;
 
-  const variant = s.layoutVariant || s.sceneLayoutMode;
+  const variant =
+    s.layoutVariant ||
+    s.sceneLayoutMode ||
+    (idx === 0 || idx % 6 === 0
+      ? "paper_collage"
+      : idx % 6 === 1 || idx % 6 === 4
+      ? "cinematic_doc"
+      : idx % 6 === 2
+      ? "kinetic_headline"
+      : "evidence_dossier");
   if (variant === "kinetic_headline" || variant === "evidence_dossier") return null;
 
   const pos = s.foregroundPosition || "left";
@@ -1258,9 +1302,9 @@ const computeOverlayKey = (s: any) => {
 const buildOverlaySegments = (scenes: any[]) => {
   const raw: any[] = [];
   let cursor = 0;
-  scenes.forEach((s) => {
+  scenes.forEach((s, idx) => {
     const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
-    const key = computeOverlayKey(s);
+    const key = computeOverlayKey(s, idx);
     const last = raw[raw.length - 1];
     const effectiveOv = key ? (s.forensicOverlay || s.forensic_overlay) : null;
 
@@ -1272,9 +1316,9 @@ const buildOverlaySegments = (scenes: any[]) => {
         start: cursor,
         end: cursor + dur,
         forensicOverlay: effectiveOv,
-        statValue: undefined,
-        statLabel: undefined,
-        stampBadge: undefined,
+        statValue: s.statValue,
+        statLabel: s.statLabel,
+        stampBadge: s.stampBadge || s.stamp_badge,
         isLeft: s.foregroundPosition === "left",
         hasForeground: Boolean(s.foreground || s.primary_hero),
       });
@@ -2198,7 +2242,12 @@ export const TwoLayerEpisode: React.FC<{
 
       const rawCutouts = s.supportingCutouts || s.supporting_cutouts || [];
       const resolvedCutouts = rawCutouts
-        .filter((c: any) => Boolean(c && (c.src || (c.label && !/^MEMO #|^RECORD #/i.test(String(c.label))))))
+        .filter((c: any) => {
+          if (!c) return false;
+          const resolvedCutSrc = c.src ? resolveSrc(c.src) : undefined;
+          if (heroSrc && resolvedCutSrc && resolvedCutSrc === heroSrc) return false;
+          return Boolean(resolvedCutSrc || (c.label && !/^MEMO #|^RECORD #/i.test(String(c.label))));
+        })
         .map((c: any, cIdx: number) => ({
           ...c,
           id: c.id || `cutout-${idx}-${cIdx}`,
