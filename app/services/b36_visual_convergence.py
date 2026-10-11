@@ -286,8 +286,9 @@ def run_b36_visual_convergence(
     slim_sample_scenes = []
     for s in sample_scenes_raw:
         dur = s.get("duration_sec") or s.get("duration_est_sec") or 5
+        sid = s.get("scene_id") or s.get("id") or (f"scene_{s.get('beat_index'):02d}" if s.get("beat_index") is not None else "scene_01")
         slim_sample_scenes.append({
-            "scene_id": s.get("scene_id"),
+            "scene_id": sid,
             "beat": s.get("beat") or s.get("beat_name"),
             "duration_sec": dur,
             "duration_est_sec": dur,
@@ -426,7 +427,7 @@ def run_b36_visual_convergence(
 
         if patched_scenes or patched_thumbs:
             # Apply Initial Delta Patch to Working Copy
-            scene_map = {s["scene_id"]: s for s in current_dplan.get("scenes", [])}
+            scene_map = {(s.get("scene_id") or s.get("id") or f"scene_{idx:02d}"): s for idx, s in enumerate(current_dplan.get("scenes", []), 1)}
             for ps in patched_scenes:
                 sid = ps.get("scene_id")
                 if sid in scene_map:
@@ -507,7 +508,7 @@ def run_b36_visual_convergence(
         elif r1_score < 8.0:
             # If Astra identified flaws without providing an explicit delta patch, invoke Claude Opus 5.5 to resolve
             flawed_ids = round1_audit.get("flawed_scene_ids", [])
-            scene_map = {s["scene_id"]: s for s in current_dplan.get("scenes", [])}
+            scene_map = {(s.get("scene_id") or s.get("id") or f"scene_{idx:02d}"): s for idx, s in enumerate(current_dplan.get("scenes", []), 1)}
             scenes_to_fix = [scene_map[sid] for sid in flawed_ids if sid in scene_map]
             if not scenes_to_fix:
                 scenes_to_fix = current_dplan.get("scenes", [])[:4]
@@ -519,7 +520,7 @@ def run_b36_visual_convergence(
                 "director_archetype": director_plan.get("director_archetype"),
                 "scenes_to_patch": [
                     {
-                        "scene_id": s["scene_id"],
+                        "scene_id": s.get("scene_id") or s.get("id") or "scene_01",
                         "narration": s.get("narration"),
                         "bg_prompt": s.get("bg_prompt"),
                         "fg_prompt": s.get("fg_prompt"),
