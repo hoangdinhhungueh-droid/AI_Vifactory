@@ -41,7 +41,11 @@ def get_beat_chunks_from_props(props_path: str) -> list[dict]:
         raise ValueError(f"No scenes found in {props_path}")
 
     has_acts = any(bool(s.get("actTitle")) for s in scenes)
-    has_explicit_beats = any(s.get("beat_index") is not None or s.get("beat") is not None for s in scenes)
+    has_beat_phase = any(s.get("beat_phase") is not None for s in scenes)
+    has_explicit_beats = any(
+        s.get("beat") is not None or (s.get("beat_index") is not None and s.get("beat_index") <= 7)
+        for s in scenes
+    )
     beats = []
     current_label = None
     start_frame = 0
@@ -68,8 +72,23 @@ def get_beat_chunks_from_props(props_path: str) -> list[dict]:
                 chunk_idx += 1
                 start_frame = current_frame
             current_label = act_label
+        elif has_beat_phase:
+            bp = s.get("beat_phase")
+            beat_label = f"BEAT {bp}" if bp is not None else current_label
+            if beat_label and beat_label != current_label:
+                if current_label is not None:
+                    beats.append({
+                        "name": current_label,
+                        "index": chunk_idx,
+                        "start_frame": start_frame,
+                        "end_frame": current_frame - 1,
+                        "duration": current_frame - start_frame,
+                    })
+                    chunk_idx += 1
+                    start_frame = current_frame
+                current_label = beat_label
         elif has_explicit_beats:
-            b_val = s.get("beat_index") if s.get("beat_index") is not None else s.get("beat")
+            b_val = s.get("beat") if s.get("beat") is not None else s.get("beat_index")
             beat_label = f"BEAT {b_val}" if b_val is not None else current_label
             if beat_label and beat_label != current_label:
                 if current_label is not None:
@@ -113,8 +132,9 @@ def get_beat_chunks_from_props(props_path: str) -> list[dict]:
             "duration": current_frame - start_frame,
         })
 
-    # Fallback if no explicit acts/beats found: split into 5 equal chunks
-    if len(beats) < 2:
+    # Guard: If chunks are fragmented (> 7 chunks) or insufficient (< 2 chunks),
+    # partition into exactly 5 equal chunks
+    if len(beats) < 2 or len(beats) > 7:
         beats = []
         total = current_frame
         chunk_size = total // 5

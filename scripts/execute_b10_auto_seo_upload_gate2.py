@@ -31,8 +31,12 @@ import asyncio
 import argparse
 from pathlib import Path
 
-sys.path.insert(0, "/root/video_factory")
-sys.path.insert(0, "/root/video_factory/scripts")
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+_SCRIPTS_DIR = _REPO_ROOT / "scripts"
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
 try:
     from app.services.youtube_upload import upload_from_payload
@@ -265,13 +269,18 @@ def _clean_and_localize_seo_description(desc: str, ep_dir: Path, market: str, ti
         if synced_ch:
             ch_block = "Chapters:\n" + "\n".join(synced_ch)
             if ch_idx != -1:
-                head = desc_cleaned[:ch_idx].rstrip()
-                tail = ""
-                for sep in ["\n#", "\nThis video incorporates", "\nThis story and its"]:
-                    s_idx = desc_cleaned.find(sep, ch_idx)
-                    if s_idx != -1:
-                        tail = desc_cleaned[s_idx:].lstrip()
+                # Robustly find where old chapter lines end: consume blank lines and timestamp lines
+                post_ch = desc_cleaned[ch_idx + len("Chapters:"):]
+                lines_after = post_ch.split("\n")
+                end_line_idx = 0
+                for la in lines_after:
+                    s_la = la.strip()
+                    if not s_la or re.match(r'^\d{1,2}:\d{2}', s_la):
+                        end_line_idx += len(la) + 1
+                    else:
                         break
+                head = desc_cleaned[:ch_idx].rstrip()
+                tail = post_ch[end_line_idx:].lstrip()
                 desc_cleaned = f"{head}\n\n{ch_block}\n\n{tail}".strip()
             else:
                 desc_cleaned = f"{desc_cleaned}\n\n{ch_block}".strip()
@@ -282,7 +291,16 @@ def _clean_and_localize_seo_description(desc: str, ep_dir: Path, market: str, ti
     try:
         from app.services.cross_channel_promoter import build_description_bridge
         bridge = build_description_bridge(market)
-        if bridge and "Official Global Network" not in desc_cleaned and "公式グローバルネットワーク" not in desc_cleaned and "공식 글로벌" not in desc_cleaned:
+        bridge_already_present = any(
+            marker in desc_cleaned for marker in [
+                "Official Global Investigation Network",
+                "Official Global Network",
+                "公式グローバルネットワーク",
+                "공식 글로벌",
+                "@AIVideoFactory_",
+            ]
+        )
+        if bridge and not bridge_already_present:
             for sep in ["\nThis video incorporates", "\nThis story and its"]:
                 if sep in desc_cleaned:
                     p1, p2 = desc_cleaned.split(sep, 1)

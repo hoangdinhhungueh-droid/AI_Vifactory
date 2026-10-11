@@ -229,26 +229,29 @@ def main():
     if not manifest_path.exists():
         manifest_path = ep_dir / "assets" / "manifest.json"
 
-    _run_stage("B6.1 Props Staging",
-               [sys.executable, "scripts/build_remotion_props.py",
-                "--episode-id", episode_id,
-                "--brain-input", str(brain_path),
-                "--segments", str(segments_path),
-                "--manifest", str(manifest_path),
-                "--out", str(props_path),
-                "--skip-missing"],
-               episode_id, 300,
-               notify_on_error=False)
-
-    # Stage B6.2: Autonomous Adversarial Director Gate (Rule 122/128/136)
-    if props_path.exists():
-        _run_stage("B6.2 Adversarial Director Gate",
-                   [sys.executable, "scripts/orchestrator/adversarial_director_gate.py",
+    if segments_path.exists() and manifest_path.exists():
+        _run_stage("B6.1 Props Staging",
+                   [sys.executable, "scripts/build_remotion_props.py",
                     "--episode-id", episode_id,
-                    "--props", str(props_path),
-                    "--no-stills"],
+                    "--brain-input", str(brain_path),
+                    "--segments", str(segments_path),
+                    "--manifest", str(manifest_path),
+                    "--out", str(props_path),
+                    "--skip-missing"],
                    episode_id, 300,
                    notify_on_error=False)
+
+        # Stage B6.2: Autonomous Adversarial Director Gate (Rule 122/128/136)
+        if props_path.exists():
+            _run_stage("B6.2 Adversarial Director Gate",
+                       [sys.executable, "scripts/orchestrator/adversarial_director_gate.py",
+                        "--episode-id", episode_id,
+                        "--props", str(props_path),
+                        "--no-stills"],
+                       episode_id, 300,
+                       notify_on_error=False)
+    else:
+        _log("B6.1 Props Staging skipped in continue_after_images: whisper_segments or manifest not ready yet, delegated to resume_episode.py S4.5")
 
     render_ok = _run_stage("B4-B7 render (resume_episode)",
                            [sys.executable, "scripts/resume_episode.py",
