@@ -213,7 +213,10 @@ def sync_exact_chapters_from_remotion(
                     for sc in scenes
                     if str(sc.get("beat_phase") or sc.get("beat_index") or sc.get("beat") or "").isdigit()
                 }
-                is_degenerate_beat = (len(scenes) >= 5 and len(distinct_beats) <= 1) or (max(distinct_beats, default=1) > 5)
+                is_degenerate_beat = (
+                    (len(scenes) >= 5 and len(distinct_beats) == 1)
+                    or (max(distinct_beats, default=1) > 5)
+                )
                 
                 for idx, s in enumerate(scenes):
                     speaker_tag = str(s.get("speakerTag") or "")

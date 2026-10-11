@@ -248,9 +248,9 @@ def select_climax_scenes(scenes: List[Dict[str, Any]], target_count: Optional[in
     total_len = max(1, len(scenes))
     distinct_raw_beats = {int(sc.get("beat_index")) for sc in scenes if isinstance(sc.get("beat_index"), int)}
     max_raw_beat = max(distinct_raw_beats, default=1)
-    beat_is_invalid = (max_raw_beat > 5) or (len(scenes) >= 5 and len(distinct_raw_beats) <= 1)
+    beat_is_invalid = (max_raw_beat > 5) or (len(scenes) >= 5 and len(distinct_raw_beats) == 1)
     distinct_phase_beats = {int(sc.get("beat_phase")) for sc in scenes if isinstance(sc.get("beat_phase"), int)}
-    phase_is_invalid = (len(scenes) >= 5 and len(distinct_phase_beats) <= 1 and max(distinct_phase_beats, default=0) <= 1)
+    phase_is_invalid = (len(scenes) >= 5 and len(distinct_phase_beats) == 1 and max(distinct_phase_beats, default=0) <= 1)
 
     for idx, s in enumerate(scenes):
         raw_phase = None if phase_is_invalid else s.get("beat_phase")
@@ -472,9 +472,9 @@ def prune_and_localize_scenes(
 
     distinct_raw_beats = {int(sc.get("beat_index")) for sc in scenes if isinstance(sc.get("beat_index"), int)}
     max_raw_beat_idx = max(distinct_raw_beats, default=1)
-    beat_is_invalid = (max_raw_beat_idx > 5) or (len(scenes) >= 5 and len(distinct_raw_beats) <= 1)
+    beat_is_invalid = (max_raw_beat_idx > 5) or (len(scenes) >= 5 and len(distinct_raw_beats) == 1)
     distinct_phase_beats = {int(sc.get("beat_phase")) for sc in scenes if isinstance(sc.get("beat_phase"), int)}
-    phase_is_invalid = (len(scenes) >= 5 and len(distinct_phase_beats) <= 1 and max(distinct_phase_beats, default=0) <= 1)
+    phase_is_invalid = (len(scenes) >= 5 and len(distinct_phase_beats) == 1 and max(distinct_phase_beats, default=0) <= 1)
 
     for i, s in enumerate(scenes):
         scene_copy = dict(s)
