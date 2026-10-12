@@ -4,6 +4,7 @@ import pytest, os, sys
 sys.path.insert(0, "/root/video_factory")
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_ssml_style_differs_from_plain():
     """Synth same text with and without style; file sizes should differ."""

@@ -42,6 +42,7 @@ def test_ssml_voices_dict():
     assert "vi-VN-HoaiMyNeural" in SSML_SUPPORTED_VOICES
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_synthesize_live():
     """Live edge-tts call — skip if network unavailable."""
