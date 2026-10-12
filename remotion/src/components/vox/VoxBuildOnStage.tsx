@@ -15,6 +15,7 @@ import {
   VoxWashiTape,
 } from "./papercraft";
 import { VoxParallaxLayer } from "./VoxParallaxLayer";
+import { VoxDynamicChart, VoxDynamicChartProps } from "./VoxDynamicChart";
 
 export interface VoxBuildOnCutout {
   id: string;
@@ -94,13 +95,16 @@ export interface VoxBuildOnStageProps {
 
   /** Explicit camera directive from Director Plan */
   cameraMovement?: string;
+
+  /** Procedural SVG Data Chart (Vox Dynamic Engine) */
+  chartProps?: VoxDynamicChartProps;
 }
 
 /**
  * VoxBuildOnStage: Adaptive Multi-Mode Vox Visual & Tactile Engine.
  *
  * Supports 4 distinct editorial visual modes to match authentic Vox documentary pacing:
- * 1. "paper_collage" (15-20%): Tactile paper build-on assembly with brass pins, washi tape, and 12fps stop-motion jitter.
+ * 1. "paper_collage" (15-20%): Tactile paper build-on assembly with brass pins, washi tape, and authentic documentary pacing.
  * 2. "cinematic_doc" (40%): Smooth Ken Burns pan/zoom full-bleed documentary staging without repetitive slide-in or head-pins.
  * 3. "kinetic_headline" (20%): High-impact editorial typography focus with marker sweep.
  * 4. "evidence_dossier" (20%): Forensic document & quantitative data staging synchronized with overlay layers.
@@ -122,6 +126,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   layoutVariant,
   sceneIndex = 0,
   cameraMovement,
+  chartProps,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -144,11 +149,10 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   const isEvidenceDossier = resolvedVariant === "evidence_dossier";
   const isCinematicDoc = resolvedVariant === "cinematic_doc";
 
-  // 12fps Quantized Stop-Motion Jitter (active in tactile collage mode, calm in cinematic_doc)
-  const rawJitter = useStopMotion(12, isTactileCollage ? 1.1 : 0.15, 42 + sceneIndex);
-  const jitterX = isTactileCollage ? rawJitter.dx : 0;
-  const jitterY = isTactileCollage ? rawJitter.dy : 0;
-  const jitterRot = isTactileCollage ? rawJitter.dRot : 0;
+  // Zero Jitter Mandate: Smooth cinematic stability without cheap 12fps screen shaking
+  const jitterX = 0;
+  const jitterY = 0;
+  const jitterRot = 0;
 
   // Phase Timers in Frames (Adaptive to Beat Duration)
   const dSec = Math.max(1, durationSec || 10);
@@ -274,7 +278,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
           height: "100%",
           perspective: 1400,
           transformStyle: "preserve-3d",
-          transform: `scale(${cameraScale}) translate(${jitterX + cameraPanX}px, ${jitterY}px) rotate(${jitterRot}deg)`,
+          transform: `scale(${cameraScale}) translate(${cameraPanX}px, 0px)`,
           transformOrigin: "center center",
           position: "relative",
         }}
@@ -317,7 +321,10 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                     width: "100%",
                     height: "100%",
                     objectFit: "cover",
-                    filter: "contrast(1.05) brightness(0.96)",
+                    filter: isTactileCollage
+                      ? "contrast(0.9) brightness(1.08) grayscale(0.55)"
+                      : "contrast(1.05) brightness(0.96)",
+                    opacity: isTactileCollage ? 0.28 : 1.0,
                   }}
                 />
               )
@@ -435,7 +442,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             </div>
           )}
 
-          {/* MODE 3: KINETIC HEADLINE STAGE (Giant Centered Typography Card) */}
+          {/* MODE 3: KINETIC HEADLINE STAGE (Sleek Cinematic Full-Screen Impact Typography) */}
           {isKineticHeadline && headline && (
             <div
               style={{
@@ -450,13 +457,15 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             >
               <div
                 style={{
-                  backgroundColor: "rgba(244, 236, 225, 0.94)",
-                  borderTop: "6px solid #dc2626",
-                  borderBottom: "3px solid #18181b",
-                  padding: "32px 48px",
-                  maxWidth: "78%",
-                  boxShadow: "0 24px 48px rgba(0,0,0,0.42)",
-                  transform: `scale(${interpolate(headlineSpring, [0, 1], [0.92, 1])})`,
+                  backgroundColor: "rgba(10, 15, 24, 0.78)",
+                  backdropFilter: "blur(14px)",
+                  borderLeft: "6px solid #dc2626",
+                  borderRight: "6px solid #dc2626",
+                  padding: "24px 44px",
+                  maxWidth: "85%",
+                  boxShadow: "0 20px 50px rgba(0,0,0,0.8)",
+                  borderRadius: "8px",
+                  transform: `scale(${interpolate(headlineSpring, [0, 1], [0.94, 1])})`,
                   opacity: interpolate(headlineSpring, [0, 1], [0, 1]),
                   textAlign: "center",
                 }}
@@ -466,9 +475,9 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                     style={{
                       fontSize: "14px",
                       fontWeight: 800,
-                      color: "#dc2626",
+                      color: "#f87171",
                       letterSpacing: "0.24em",
-                      marginBottom: "10px",
+                      marginBottom: "8px",
                       textTransform: "uppercase",
                       fontFamily: "monospace",
                     }}
@@ -478,25 +487,27 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                 )}
                 <h1
                   style={{
-                    fontSize: headline.length <= 8 ? "82px" : headline.length > 36 ? "44px" : "56px",
+                    fontSize: headline.length <= 8 ? "86px" : headline.length > 36 ? "46px" : "60px",
                     fontWeight: 900,
-                    color: "#18181b",
+                    color: "#f8fafc",
                     lineHeight: 1.04,
                     letterSpacing: headline.length <= 8 ? "0.04em" : "-0.02em",
                     textTransform: "uppercase",
                     fontFamily: "Impact, 'Zen Kaku Gothic New', Inter, sans-serif",
                     margin: 0,
+                    textShadow: "0 0 30px rgba(220, 38, 38, 0.5), 0 4px 16px rgba(0,0,0,0.9)",
                   }}
                 >
                   {headline}
                 </h1>
                 <div
                   style={{
-                    height: "10px",
-                    width: "65%",
-                    margin: "14px auto 0 auto",
-                    backgroundColor: "#facc15",
-                    transformOrigin: "left center",
+                    height: "6px",
+                    width: "50%",
+                    margin: "12px auto 0 auto",
+                    backgroundColor: "#ef4444",
+                    borderRadius: "3px",
+                    transformOrigin: "center center",
                     transform: `scaleX(${interpolate(
                       frame,
                       [headlineDelayFrames + 8, headlineDelayFrames + 24],
@@ -509,19 +520,21 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             </div>
           )}
 
-          {/* MODE 4: EVIDENCE DOSSIER SPLIT-CARD STAGE (Left Manila Card + Right Exhibit Cutout) */}
+          {/* MODE 4: EVIDENCE DOSSIER SPLIT-CARD STAGE (Sleek Dark Glassmorphism Evidence Badge) */}
           {isEvidenceDossier && (headline || heroLabel) && (
             <div
               style={{
                 position: "absolute",
-                top: "14%",
-                left: heroSrc ? "6%" : "24%",
-                width: heroSrc ? "44%" : "52%",
-                backgroundColor: "#f5efe1",
-                borderLeft: "6px solid #b91c1c",
-                border: "1px solid rgba(24,24,27,0.22)",
-                padding: "24px 28px",
-                boxShadow: "0 18px 36px rgba(0,0,0,0.34)",
+                top: "12%",
+                left: heroSrc ? "6%" : "22%",
+                width: heroSrc ? "42%" : "56%",
+                backgroundColor: "rgba(10, 15, 24, 0.88)",
+                backdropFilter: "blur(14px)",
+                borderLeft: "5px solid #dc2626",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                borderRadius: "8px",
+                padding: "20px 24px",
+                boxShadow: "0 18px 40px rgba(0,0,0,0.75)",
                 zIndex: 28,
                 opacity: interpolate(headlineSpring, [0, 1], [0, 1]),
                 transform: `translateX(${interpolate(headlineSpring, [0, 1], [-28, 0])}px)`,
@@ -532,7 +545,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                 style={{
                   fontSize: "12px",
                   fontWeight: 800,
-                  color: "#b91c1c",
+                  color: "#ef4444",
                   letterSpacing: "0.2em",
                   marginBottom: "8px",
                   textTransform: "uppercase",
@@ -546,7 +559,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                   style={{
                     fontSize: "28px",
                     fontWeight: 900,
-                    color: "#18181b",
+                    color: "#f8fafc",
                     lineHeight: 1.12,
                     textTransform: "uppercase",
                     fontFamily: "Impact, Inter, sans-serif",
@@ -559,11 +572,11 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
               {heroLabel && (
                 <div
                   style={{
-                    fontSize: "14px",
+                    fontSize: "13px",
                     fontWeight: 700,
-                    color: "#3f3f46",
+                    color: "#94a3b8",
                     fontFamily: "monospace",
-                    borderTop: "1px dashed rgba(24,24,27,0.25)",
+                    borderTop: "1px dashed rgba(255, 255, 255, 0.2)",
                     paddingTop: "10px",
                   }}
                 >
@@ -631,56 +644,32 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                     }}
                   />
                 )}
-                {/* White Paper Cutout Border Simulation (only in tactile paper_collage mode) */}
-                {isTactileCollage && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: "-3px",
-                      border: "2px solid rgba(255,255,255,0.9)",
-                      pointerEvents: "none",
-                      borderRadius: "4px",
-                    }}
-                  />
-                )}
               </div>
+            </div>
+          </VoxParallaxLayer>
+        )}
 
-              {/* Brass Pin on Hero Head (only in tactile paper_collage mode) */}
-              {isTactileCollage && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "-10px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    zIndex: 35,
-                  }}
-                >
-                  <VoxBrassPin size={18} />
-                </div>
-              )}
-
-              {/* Corner Washi Tape (only in tactile paper_collage mode) */}
-              {isTactileCollage && (
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: "-8px",
-                    right: "-12px",
-                    zIndex: 35,
-                  }}
-                >
-                  <VoxWashiTape width={65} rotation={-12} color="translucent" />
-                </div>
-              )}
+        {/* LAYER 1.5: PROCEDURAL SVG DYNAMIC CHART (Vox Dynamic Data Engine) */}
+        {chartProps && (
+          <VoxParallaxLayer depth="foreground" cameraMovement={cameraMovement} durationInFrames={fTotal}>
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                zIndex: 32,
+              }}
+            >
+              <VoxDynamicChart {...chartProps} />
             </div>
           </VoxParallaxLayer>
         )}
 
         {/* LAYER 2: SUPPORTING CUTOUTS & EVIDENCE (PARALLAX MIDGROUND) */}
         <VoxParallaxLayer depth="midground" cameraMovement={cameraMovement} durationInFrames={fTotal}>
-          {isTactileCollage && supportingCutouts.map((cutout, idx) => {
-            const defaultCutSec = (3.5 + idx * 0.4) * speedRatio;
+          {(isTactileCollage || supportingCutouts.length > 0) && supportingCutouts.map((cutout, idx) => {
+            const defaultCutSec = Math.min(dSec * 0.45, 0.4 + idx * 0.3) * (dSec < 7.0 ? speedRatio : 1.0);
             const cutDelayFrames = Math.round(
               fps * (cutout.delaySec !== undefined ? cutout.delaySec : defaultCutSec)
             );
@@ -767,9 +756,9 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             );
           })}
 
-          {/* LAYER 3: RED CONNECTING YARN LINES (Strictly tactile paper_collage mode) */}
-          {isTactileCollage && yarns.map((yarn, yIdx) => {
-            const defaultYarnSec = (4.8 + yIdx * 0.3) * speedRatio;
+          {/* LAYER 3: RED CONNECTING YARN LINES (Tactile connecting lines) */}
+          {(isTactileCollage || yarns.length > 0) && yarns.map((yarn, yIdx) => {
+            const defaultYarnSec = Math.min(dSec * 0.65, 0.9 + yIdx * 0.3) * (dSec < 7.0 ? speedRatio : 1.0);
             const yarnDelayFrames = Math.round(
               fps * (yarn.delaySec !== undefined ? yarn.delaySec : defaultYarnSec)
             );
