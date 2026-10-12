@@ -1131,7 +1131,12 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             f"CHRONO-CAUSAL PROGRESSION (TEMPORAL CADENCE: {temporal_cadence}): "
             f"Advance the narrative chronologically across the 5 Acts using the Chrono-Causal Epochs Table (Genesis Seed -> Mutation & Warning -> Critical Rupture -> Modern Aftermath). "
             f"STRICTLY FORBIDDEN: Looping and repeating the exact same single-timestamp figures across every Act. Each Act must uncover a distinct temporal phase of the case.\n"
-            f"Write the full ~1,800-2,200 word script now, adhering strictly to the 5-Act markers:"
+            f"Write the full ~1,800-2,200 word script now, adhering strictly to the 5-Act markers:\n"
+        )
+        user_prompt += (
+            "\nOUTPUT MANDATE: Output ONLY the verbatim script text starting immediately with '=== ACT I ===' "
+            "and ending with '=== ACT V ==='. Absolutely zero preliminary conversational commentary, "
+            "meta-analysis, or word count disclaimers."
         )
 
         logger.info(f"[story_engine] Calling Claude Opus 5.5 (Master Scriptwriter) for 5-Act Script generation (1,800-2,200 words)...")
@@ -1141,7 +1146,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             prompt=user_prompt,
             model="claude-opus-5-5",
             system_prompt=system_prompt,
-            max_tokens=6000,
+            max_tokens=4800,
             temperature=0.35,
             timeout=300.0,
             fallback="claude-sonnet-5-5"
@@ -1215,7 +1220,7 @@ CRITICAL EDITORIAL RULES:
                     prompt=refine_user,
                     model="claude-opus-5-5",
                     system_prompt=refine_system_prompt,
-                    max_tokens=6000,
+                    max_tokens=4200,
                     temperature=0.3,
                     timeout=300.0,
                     fallback="claude-sonnet-5-5"

@@ -126,19 +126,36 @@ def llm_timeline_director_review(
         logger.info("[timeline_editor_agent] ModelGateway unavailable (%s), using heuristic engine", e)
         return result_record
 
-    model = model_override or os.getenv("TIMELINE_DIRECTOR_MODEL", "gpt-6-astra")
-    fallback_model = os.getenv("TIMELINE_DIRECTOR_FALLBACK_MODEL", "claude-sonnet-5")
+    model = model_override or os.getenv("TIMELINE_DIRECTOR_MODEL", "claude-opus-5-5")
+    fallback_model = os.getenv("TIMELINE_DIRECTOR_FALLBACK_MODEL", "gpt-6-astra")
 
     context = story_context or _load_story_context(episode_id)
     story_snippet = context.get("story_snippet", "")
 
-    # Build concise scene manifest for LLM inspection
-    scene_summaries = []
+    # Build compact milestone scene manifest (key anchor scenes to direct macro pacing & pivotal reveals)
+    total_scenes = len(scenes)
+    milestone_indices = set()
+    milestone_indices.add(0)  # Cold hook
+    if total_scenes > 1:
+        milestone_indices.add(total_scenes - 1)  # Final closing shot
+    # Add beat boundaries & scenes with forensic overlays or stats
     for i, s in enumerate(scenes):
+        if (
+            s.get("forensicOverlay")
+            or s.get("forensic_overlay")
+            or s.get("statValue")
+            or i in [round(total_scenes * 0.2), round(total_scenes * 0.4), round(total_scenes * 0.6), round(total_scenes * 0.8)]
+            or i % 8 == 0
+        ):
+            milestone_indices.add(i)
+
+    scene_summaries = []
+    for i in sorted(milestone_indices):
+        s = scenes[i]
         dur_f = max(1, round(s.get("durationInFrames", 1)))
         dur_s = round(dur_f / 30.0, 2)
         narration = s.get("narration", "") or s.get("caption", "")
-        clean_narration = (narration[:90] + "...") if len(narration) > 90 else narration
+        clean_narration = (narration[:75] + "...") if len(narration) > 75 else narration
         current_cam = s.get("cameraMovement") or (s.get("camera", {}).get("movement") if isinstance(s.get("camera"), dict) else "slow_push_in")
         scene_summaries.append({
             "idx": i,
@@ -152,31 +169,37 @@ def llm_timeline_director_review(
 
     system_prompt = (
         "You are an award-winning Hollywood Documentary Executive Post-Production Film Director "
-        "and Senior Colorist/Editor. Your task is to perform the final Director's Cut review of "
-        "the mapped scene timeline before master rendering.\n\n"
-        "Your Goals:\n"
-        "1. Dynamic Pacing & Emotional Curve: Modulate rhythm between slow reflective beats and rapid investigative tension.\n"
-        "2. Vox & Veo Style Continuous Motion: Where scenes belong to the same narrative beat, use continuous camera momentum "
-        "('continuous_drift', 'macro_orbit', 'cinematic_pan') to eliminate jerky stops.\n"
-        "3. High-Impact Reveals: Use 'snap_zoom' or 'seamless_whip_pan' on catalyst revelations and smoking guns.\n"
-        "4. Rule 136 Clean Lower-Thirds: Ensure speaker tags are clean ('NAME // ROLE' or 'BEAT X // TITLE'), never file extensions or asset codes.\n\n"
+        "(Claude Opus 5.5). Your mission is to direct the macro pacing, camera flow, and high-impact reveals "
+        "of this investigative film before master rendering.\n\n"
+        "Your Directorial Directives:\n"
+        "1. Act Pacing (Macro): Set default camera momentum and tension curve across Beats 1 to 5.\n"
+        "2. Pivotal Keyframe Reveals: Choose 8-15 critical moment overrides (snap_zoom on catalyst hooks, "
+        "seamless_whip_pan on smoking guns, clean speaker tags on key figures).\n"
+        "3. Rule 136 Clean Lower-Thirds: 'NAME // ROLE' or 'BEAT X // TITLE' only.\n\n"
         "Valid Camera Movements:\n"
         "slow_push_in, snap_zoom, slow_pull_out, cinematic_pan, macro_tilt, continuous_drift, seamless_whip_pan, macro_orbit, cinematic_orbit, handheld_shake, dramatic_push, subtle_drift, split_whip, forensic_lock\n\n"
         "Valid Tension Levels: low, medium, high, extreme\n"
         "Valid Transitions: cut, cross_fade, continuous_whip, match_cut, push_zoom, paper_wipe, tape_snap, ink_bleed, whip_pan_right, hard_cut, light_leak, smash_cut\n"
         "Valid Motion Directives: dramatic_push, subtle_drift, split_whip, forensic_lock, counter_rollup, yellow_marker_highlight\n\n"
-        "OUTPUT REQUIREMENT: Respond ONLY with a valid JSON object matching this schema:\n"
+        "OUTPUT REQUIREMENT: Respond ONLY with a valid JSON object matching this compact schema:\n"
         "{\n"
-        '  "editorial_rationale": "1-2 sentences on your overall directorial vision for this sequence",\n'
-        '  "scene_adjustments": [\n'
+        '  "editorial_rationale": "1-2 sentences on overall directorial pacing vision",\n'
+        '  "act_camera_style": {\n'
+        '    "beat_1": {"default_camera": "continuous_drift", "tension": "high"},\n'
+        '    "beat_2": {"default_camera": "cinematic_pan", "tension": "medium"},\n'
+        '    "beat_3": {"default_camera": "macro_orbit", "tension": "high"},\n'
+        '    "beat_4": {"default_camera": "dramatic_push", "tension": "extreme"},\n'
+        '    "beat_5": {"default_camera": "slow_pull_out", "tension": "low"}\n'
+        '  },\n'
+        '  "key_scene_adjustments": [\n'
         '    {\n'
         '      "idx": 0,\n'
         '      "cameraMovement": "snap_zoom",\n'
-        '      "tensionLevel": "high",\n'
+        '      "tensionLevel": "extreme",\n'
         '      "transition": "push_zoom",\n'
         '      "motionDirective": "dramatic_push",\n'
         '      "speakerTag": "OPTIONAL CLEAN TITLE // SUBTITLE",\n'
-        '      "directorNote": "Immediate hook impact"\n'
+        '      "directorNote": "Catalyst hook punch"\n'
         '    }\n'
         '  ]\n'
         "}"
@@ -186,10 +209,10 @@ def llm_timeline_director_review(
     user_prompt = (
         f"Episode ID: {episode_id or 'EPISODE'}\n"
         f"{vision_str}"
-        f"Story Overview:\n{story_snippet[:1200] if story_snippet else 'Investigative non-fiction docudrama.'}\n\n"
-        f"Mapped Scenes Timeline ({len(scenes)} scenes):\n"
+        f"Story Overview:\n{story_snippet[:900] if story_snippet else 'Investigative non-fiction docudrama.'}\n\n"
+        f"Timeline Scope: {total_scenes} total scenes. Milestone Anchor Scenes ({len(scene_summaries)} sampled):\n"
         f"{json.dumps(scene_summaries, ensure_ascii=False, indent=2)}\n\n"
-        "Review each scene and provide your directorial adjustments in JSON format."
+        "Provide your compact directorial cut and key adjustments in JSON format."
     )
 
     try:
@@ -198,8 +221,8 @@ def llm_timeline_director_review(
             prompt=user_prompt,
             model=model,
             system_prompt=system_prompt,
-            max_tokens=3500,
-            temperature=0.3,
+            max_tokens=1500,
+            temperature=0.25,
             timeout=timeout,
             fallback=fallback_model,
         )
@@ -209,16 +232,18 @@ def llm_timeline_director_review(
         json_match = re.search(r"\{.*\}", cleaned_json, re.DOTALL)
         if json_match:
             parsed = json.loads(json_match.group(0))
-            adjustments = parsed.get("scene_adjustments", [])
+            adjustments = parsed.get("key_scene_adjustments") or parsed.get("scene_adjustments", [])
+            act_styles = parsed.get("act_camera_style", {})
             rationale = parsed.get("editorial_rationale", "Director review complete.")
 
             result_record["status"] = "success"
             result_record["model"] = model
             result_record["editorial_rationale"] = rationale
             result_record["scene_adjustments"] = adjustments
+            result_record["act_camera_style"] = act_styles
             result_record["duration_sec"] = round(time.time() - start_time, 2)
             logger.info(
-                "[timeline_editor_agent] LLM Director (%s) returned %d scene adjustments in %.2fs: %s",
+                "[timeline_editor_agent] LLM Director (%s) returned %d scene overrides & act pacing in %.2fs: %s",
                 model, len(adjustments), result_record["duration_sec"], rationale[:80]
             )
 
@@ -261,9 +286,7 @@ def audit_and_optimize_timeline(
 
     opts = options or {}
     episode_id = opts.get("episode_id")
-    enable_llm = opts.get("enable_llm_director")
-    if enable_llm is None:
-        enable_llm = os.getenv("ENABLE_LLM_TIMELINE_DIRECTOR", "false").lower() in ("1", "true", "yes")
+    enable_llm = opts.get("enable_llm_director", True)
     if os.getenv("DISABLE_LLM_TIMELINE_DIRECTOR", "").lower() in ("1", "true", "yes"):
         enable_llm = False
 
@@ -271,6 +294,7 @@ def audit_and_optimize_timeline(
 
     # Step 1: Frontier LLM Director Review (if enabled)
     llm_adjustments_by_idx: Dict[int, Dict[str, Any]] = {}
+    act_camera_style: Dict[str, Any] = {}
     if enable_llm and len(scenes) > 0:
         review = llm_timeline_director_review(
             scenes=scenes,
@@ -278,6 +302,7 @@ def audit_and_optimize_timeline(
             model_override=opts.get("model"),
             timeout=float(opts.get("timeout_sec", 35.0)),
         )
+        act_camera_style = review.get("act_camera_style") or {}
         for adj in review.get("scene_adjustments", []):
             idx = adj.get("idx")
             if isinstance(idx, int) and 0 <= idx < len(scenes):
@@ -293,7 +318,20 @@ def audit_and_optimize_timeline(
         dur = max(1, round(scene.get("durationInFrames", 1)))
         overlay = scene.get("forensicOverlay") or scene.get("forensic_overlay")
 
-        # Step 2: Apply LLM Director adjustments where specified
+        # Step 2A: Apply LLM Act-level camera pacing style
+        if act_camera_style:
+            beat_idx = scene.get("beat_index") or scene.get("beat") or (1 + (i * 5 // max(1, len(scenes))))
+            beat_key = f"beat_{beat_idx}"
+            act_style = act_camera_style.get(beat_key) or act_camera_style.get(str(beat_idx)) or {}
+            if act_style:
+                act_cam = act_style.get("default_camera")
+                if act_cam and act_cam in VALID_CAMERA_MOVEMENTS and not scene.get("cameraMovement"):
+                    scene["cameraMovement"] = act_cam
+                act_tension = act_style.get("tension")
+                if act_tension and act_tension in VALID_TENSION_LEVELS and not scene.get("tensionLevel"):
+                    scene["tensionLevel"] = act_tension
+
+        # Step 2B: Apply LLM Director milestone adjustments where specified
         llm_adj = llm_adjustments_by_idx.get(i)
         if llm_adj:
             new_cam = llm_adj.get("cameraMovement")

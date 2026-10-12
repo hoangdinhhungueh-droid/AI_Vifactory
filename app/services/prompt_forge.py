@@ -2061,8 +2061,8 @@ def generate_scene_prompts(
                     prompt=json.dumps(user_payload, ensure_ascii=False),
                     system_prompt=system_prompt,
                     model="claude-opus-5-5",
-                    max_tokens=8500,
-                    timeout=200.0,
+                    max_tokens=5500,
+                    timeout=180.0,
                     fallback="gpt-6-astra"
                 )
                 if raw_response and raw_response.strip():

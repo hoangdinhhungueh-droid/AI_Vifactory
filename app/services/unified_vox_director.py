@@ -1112,39 +1112,27 @@ def extract_dynamic_visual_roster(
         or os.getenv("FAST_ROSTER")
         or any("ci_neighbor_tester" in str(a) or "smoketest" in str(a) for a in sys.argv)
     )
-    use_llm_roster = os.getenv("USE_LLM_ROSTER", "false").lower() in ("1", "true", "yes")
+    use_llm_roster = not bool(os.getenv("DISABLE_LLM_ROSTER", "").lower() in ("1", "true", "yes"))
     if not is_testing and use_llm_roster:
         try:
             from app.services.model_gateway import get_global_gateway
             gateway = get_global_gateway()
 
             system_prompt = (
-                "You are the Lead Cinematographer & VOX Motion Graphics Visual Director for AI Video Factory.\n"
-                "Your mission is to architect an exhaustive, topic-anchored Visual Asset Roster for a 12-20 minute investigative docudrama in VOX / Johnny Harris style.\n"
+                "You are the Lead Cinematographer & VOX Motion Graphics Visual Director (Claude Opus 5.5) for AI Video Factory.\n"
+                "Your mission is to architect an authentic, topic-anchored Visual Asset Roster for a 12-20 minute investigative docudrama in VOX / Johnny Harris style.\n"
                 "The documentary is structured across 5 Beats:\n"
-                "Beat 1: Cold Strike & Paradox Hook (0-60s)\n"
-                "Beat 2: Historical Origin & False Narrative\n"
-                "Beat 3: Forensic Paper Trail & Quantitative Mechanism\n"
-                "Beat 4: The Systemic Climax & Crisis\n"
-                "Beat 5: Modern Mirror & Living Warning\n\n"
-                "MANDATES:\n"
-                "1. 'background_roster': Exactly 16 to 20 distinct environmental Backgrounds (16:9 2560x1440).\n"
-                "   - Distributed evenly across Beats 1 to 5 (3 to 4 distinct BGs per Beat).\n"
-                "   - Non-photorealistic 2D stylized graphic novel editorial illustration, bold ink linework, cel-shading, moody chiaroscuro lighting, rich textures.\n"
-                "   - ZERO prominent human figures in the foreground. Leave center/right negative space clear for tactile foreground overlays. Leave bottom 20% safe zone clear for subtitles.\n"
-                "   - Strictly authentic to target market and topic era.\n"
-                "   - Keys MUST be 'bg_<semantic_slug>'.\n"
-                "   - Schema: {\"title\": \"...\", \"description\": \"...\", \"beats\": [1, 2]}\n\n"
-                "2. 'foreground_roster': Exactly 20 to 28 distinct Foregrounds (1:1 2048x2048) on pure flat #FF00FF magenta chroma key.\n"
-                "   Divided into:\n"
-                "   A. Key Character Archetypes (6 to 10 items): 'type': 'character', waist-up three-quarter angle action framing on flat #FF00FF magenta background. Every character MUST obey the Vox Actor-Prop Invariant (Actor = Subject + Active Verb + Physical Evidence Prop + Directional Gaze Target), actively gripping, pointing at, or stamping an evidentiary prop. NEVER generate static head-to-shoes passport poses. NEVER use magenta, purple, fuchsia, or neon pink clothing on characters (to prevent #FF00FF chroma key holes). Keys: 'fg_character_<role>'.\n"
-                "   B. Tactile Evidence Props, Documents & Charts (14 to 18 items): 'type': 'evidence_prop' | 'document' | 'data_metric'. High-impact, topic-specific evidentiary artifacts. ZERO human figures or attire in evidence prop descriptions. Keys: 'fg_evidence_<object_name>'.\n"
-                "   C. DOMAIN & LEGAL ACCURACY LOCK: Match the exact legal/institutional domain of the topic (e.g., Chapter 11 civil bankruptcy vs. regulatory antitrust vs. sovereign macro debt). NEVER inject criminal prosecution artifacts ('indictment', 'wire fraud', 'search warrant', 'prosecutor') into civil, bankruptcy, or administrative proceedings.\n"
-                "   - Schema: {\"title\": \"...\", \"description\": \"...\", \"role\": \"...\", \"beats\": [1, 2, 3], \"keywords\": [\"kw1\", \"kw2\"], \"type\": \"character\"|\"document\"|\"evidence_prop\"|\"data_metric\"}\n\n"
-                "3. 'paper_stock_library': You have access to the VOX PAPER MATERIALS LIBRARY: 'aged_newsprint', 'bleached_newsprint', 'manila_docket', 'vintage_kraft', 'vellum_tracing', 'cotton_parchment'. You may assign an appropriate paper stock to background scene mood.\n"
-                "4. ETHICAL REPRESENTATION SHIELD MANDATES (STRICT NON-NEGOTIABLE):\n"
-                "   A. CHILD REPRESENTATION LAW: If the narrative or topic references minors, children, or students: NEVER depict a child's face or body. ALWAYS translate them into a Symbolic Evidence Artifact: an empty playground swing swaying mid-motion, a small pair of canvas shoes by a doorway, a height growth chart on a doorframe, a school backpack left on concrete steps, or a blank silhouette cutout with torn edges.\n"
-                "   B. REAL-PERSON ANONYMITY LAW: For real named public/historical figures, ALWAYS specify a solid black censor bar across the eyes and non-photorealistic 2D graphic novel illustration styling.\n\n"
+                "Beat 1: Cold Strike & Paradox Hook (0-60s) | Beat 2: Historical Origin & False Narrative | Beat 3: Forensic Paper Trail | Beat 4: Systemic Climax & Crisis | Beat 5: Modern Warning.\n\n"
+                "DIRECTORIAL MANDATES (TOKEN-OPTIMIZED COMPACT SCHEMA):\n"
+                "1. 'background_roster': 16 to 20 distinct environmental Backgrounds (keys: 'bg_<slug>').\n"
+                "   - Focus strictly on: specific architectural setting, period textures, chiaroscuro lighting mood, and negative space for overlay.\n"
+                "   - Schema: {\"title\": \"...\", \"description\": \"Concise 1-2 sentence setting & lighting description\", \"beats\": [1, 2]}\n\n"
+                "2. 'foreground_roster': 20 to 24 distinct Foregrounds (keys: 'fg_character_<role>' or 'fg_evidence_<name>').\n"
+                "   - Characters (6-8 items): waist-up action framing obeying Vox Actor-Prop Invariant (Actor + Active Verb + Physical Prop + Gaze Target). NO static passport poses. NO magenta clothing.\n"
+                "   - Evidence Props (12-16 items): centered tactile documentary artifact, docket, ledger, or chart. Zero human figures, blank templates.\n"
+                "   - Schema: {\"title\": \"...\", \"description\": \"Concise 1-2 sentence action and prop manipulation\", \"role\": \"...\", \"beats\": [1, 2], \"keywords\": [\"kw1\", \"kw2\"], \"type\": \"character\"|\"document\"|\"evidence_prop\"|\"data_metric\"}\n\n"
+                "3. TOKEN CONSERVATION RULE: Do NOT repeat technical chroma key boilerplate ('isolated on pure #FF00FF...', 'clean cutout', '1:1 ratio') in your output text. Focus 100% on creative narrative authenticity and actions; our downstream pipeline decorates technical chroma parameters deterministically.\n"
+                "4. ETHICAL SHIELD: Minors -> Symbolic artifacts only (empty swing, backpack). Named figures -> solid black censor bar across eyes.\n\n"
                 "Output ONLY valid JSON matching:\n"
                 "{\n"
                 "  \"background_roster\": { \"<bg_key>\": { \"title\": \"...\", \"description\": \"...\", \"beats\": [...] } },\n"
@@ -1155,27 +1143,28 @@ def extract_dynamic_visual_roster(
             user_prompt = json.dumps({
                 "topic": topic_str,
                 "target_market": m_up,
-                "verified_claims": claims,
-                "key_metrics": key_metrics,
-                "narrative_samples": sample_narr
+                "verified_claims": claims[:8] if claims else [],
+                "key_metrics": key_metrics[:4] if key_metrics else [],
+                "narrative_samples": sample_narr[:2] if sample_narr else []
             }, ensure_ascii=False)
 
-            models_to_try = ["gpt-6-astra", "claude-sonnet-5-5"]
+            models_to_try = ["claude-opus-5-5", "gpt-6-astra"]
             resp = None
             for m_candidate in models_to_try:
                 try:
-                    logger.info(f"[unified_vox_director] Attempting LLM roster generator: {m_candidate}")
+                    logger.info(f"[unified_vox_director] Invoking Lead Visual Director ({m_candidate})...")
                     resp = gateway.call_llm(
                         prompt=user_prompt,
                         system_prompt=system_prompt,
                         model=m_candidate,
-                        max_tokens=2500,
-                        timeout=60.0
+                        max_tokens=3000,
+                        timeout=90.0,
+                        fallback="gpt-6-astra" if m_candidate == "claude-opus-5-5" else None
                     )
                     if resp:
                         break
                 except Exception as ex_m:
-                    logger.warning(f"[unified_vox_director] Model {m_candidate} failed: {ex_m}")
+                    logger.warning(f"[unified_vox_director] Director model {m_candidate} failed: {ex_m}")
             if resp:
                 cleaned_json = re.sub(r"^```(?:json)?\s*", "", resp.strip(), flags=re.MULTILINE)
                 cleaned_json = re.sub(r"\s*```$", "", cleaned_json, flags=re.MULTILINE)
@@ -1188,6 +1177,16 @@ def extract_dynamic_visual_roster(
                 fgs = parsed.get("foreground_roster", {})
                 if len(bgs) >= 8 and len(fgs) >= 10:
                     fb_bgs, fb_fgs = _generate_topic_anchored_roster_fallback(topic_str, m_up, key_metrics, claims)
+                    # Decorate and guarantee technical chroma invariants on LLM generated items
+                    for bg_k, bg_v in bgs.items():
+                        desc = bg_v.get("description", "")
+                        if "graphic novel" not in desc.lower() and "illustration" not in desc.lower():
+                            bg_v["description"] = f"{desc}, non-photorealistic 2D stylized graphic novel editorial illustration, bold ink linework, cel-shading, 16:9 aspect ratio."
+                    for fg_k, fg_v in fgs.items():
+                        desc = fg_v.get("description", "")
+                        if "#FF00FF" not in desc and "magenta" not in desc.lower():
+                            fg_v["description"] = f"{desc}, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, 1:1 aspect ratio."
+
                     for k, v in fb_bgs.items():
                         if len(bgs) >= 48:
                             break
