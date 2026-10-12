@@ -121,7 +121,7 @@ Perform strict adversarial forensic audit according to the 8 Iron Criteria. Inte
             prompt=user_prompt,
             model=chosen_model,
             system_prompt=SYSTEM_STORY_AUDITOR_PROMPT,
-            max_tokens=1000,
+            max_tokens=1500,
             temperature=0.1,
             timeout=90.0,
             fallback=fallback_model
@@ -134,7 +134,7 @@ Perform strict adversarial forensic audit according to the 8 Iron Criteria. Inte
                 prompt=user_prompt,
                 model=chosen_model,
                 system_prompt=SYSTEM_STORY_AUDITOR_PROMPT,
-                max_tokens=1000,
+                max_tokens=1500,
                 temperature=0.1,
                 timeout=75.0,
                 fallback="claude-sonnet-5-5"
@@ -148,15 +148,20 @@ Perform strict adversarial forensic audit according to the 8 Iron Criteria. Inte
                 "critical_findings": f"Auditor unavailable ({e2}), bypassed with fallback pass."
             }
 
-    # Robust regex extraction of JSON block to ignore markdown codeblock artifacts or trailing text
-    json_match = re.search(r"(\{.*\})", raw_res, re.DOTALL)
-    if json_match:
-        clean_json = json_match.group(1).strip()
+    # Robust regex extraction of JSON block to ignore markdown codeblock artifacts, thoughts, or preamble
+    clean_json = ""
+    fenced_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw_res, re.DOTALL)
+    if fenced_match:
+        clean_json = fenced_match.group(1).strip()
     else:
-        clean_json = raw_res.strip()
-        if clean_json.startswith("```"):
-            clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json)
-            clean_json = re.sub(r"\s*```$", "", clean_json)
+        json_match = re.search(r"(\{.*\})", raw_res, re.DOTALL)
+        if json_match:
+            clean_json = json_match.group(1).strip()
+        else:
+            clean_json = raw_res.strip()
+            if clean_json.startswith("```"):
+                clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json)
+                clean_json = re.sub(r"\s*```$", "", clean_json)
 
     try:
         audit_result = json.loads(clean_json)

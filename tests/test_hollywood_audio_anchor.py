@@ -133,3 +133,63 @@ def test_visual_director_anchored_to_spoken_sentences():
         assert sc["duration_frames"] == sent["duration_frames"], f"Frames mismatch: {sc['duration_frames']} != {sent['duration_frames']}"
         assert sc["sentence_id"] == sent["sentence_id"]
         assert sc["bg_prompt"], "Background prompt must be present"
+
+
+def test_deterministic_pruning_and_preamble_parsing():
+    """Test deterministic sentence splitting, tightening, and preamble parsing resilience."""
+    from unittest.mock import patch
+    from app.services.story_engine_b2 import (
+        deterministic_split_spoken_script,
+        deterministic_tighten_spoken_script,
+        prune_and_tighten_spoken_script,
+    )
+
+    sample_5act_story = (
+        "=== ACT I ===\n"
+        "In 2024, two expensive rackets triggered a major retail dispute. "
+        "The father returned demanding an immediate refund.\n\n"
+        "=== ACT II ===\n"
+        "Local media amplified the narrative without examining legal guidelines.\n\n"
+        "=== ACT III ===\n"
+        "The paper trail revealed explicit consumer regulations.\n\n"
+        "=== ACT IV ===\n"
+        "The institutional blindspot was complete lack of dispute mediation.\n\n"
+        "=== ACT V ===\n"
+        "The dispute remains an urgent modern lesson.\n"
+    )
+
+    # 1. Deterministic sentence split without LLM
+    res = deterministic_split_spoken_script(sample_5act_story, market="EN")
+    assert isinstance(res, dict)
+    assert len(res["sentences"]) >= 5
+    assert res["total_estimated_minutes"] <= 15.0
+
+    # 2. Deterministic sentence tightening without LLM
+    tightened = deterministic_tighten_spoken_script(res, market="EN")
+    assert len(tightened["sentences"]) == len(res["sentences"])
+    assert tightened["total_estimated_minutes"] <= 15.0
+
+    # 3. Preamble parsing resilience in adversarial_audit_spoken_script
+    raw_with_preamble = (
+        "**Auditing claims and script****Checking script sources**\n"
+        "```json\n"
+        "{\n"
+        '  "verdict": "PASS",\n'
+        '  "audit_score": 9.1,\n'
+        '  "estimated_duration_minutes": 11.5,\n'
+        '  "pacing_verdict": "Paced",\n'
+        '  "bloat_detected": false,\n'
+        '  "critique": "Solid forensic rhythm."\n'
+        "}\n"
+        "```"
+    )
+    with patch("app.services.story_engine_b2.call_gpt6_astra", return_value=raw_with_preamble):
+        audit_res = adversarial_audit_spoken_script(res, market="EN", topic="Pre-amble Test")
+        assert audit_res["verdict"] == "PASS"
+        assert audit_res["audit_score"] == 9.1
+
+    # 4. Prune without LLM returns tightened script
+    with patch.dict("os.environ", {"USE_LLM_PRUNING": "false"}):
+        pruned = prune_and_tighten_spoken_script(res, market="EN", topic="Prune Test")
+        assert len(pruned["sentences"]) == len(res["sentences"])
+
