@@ -1112,7 +1112,8 @@ def extract_dynamic_visual_roster(
         or os.getenv("FAST_ROSTER")
         or any("ci_neighbor_tester" in str(a) or "smoketest" in str(a) for a in sys.argv)
     )
-    if not is_testing:
+    use_llm_roster = os.getenv("USE_LLM_ROSTER", "false").lower() in ("1", "true", "yes")
+    if not is_testing and use_llm_roster:
         try:
             from app.services.model_gateway import get_global_gateway
             gateway = get_global_gateway()
@@ -1159,17 +1160,17 @@ def extract_dynamic_visual_roster(
                 "narrative_samples": sample_narr
             }, ensure_ascii=False)
 
-            models_to_try = ["claude-opus-5-5", "gpt-6-astra", "claude-sonnet-5-5"]
+            models_to_try = ["gpt-6-astra", "claude-sonnet-5-5"]
             resp = None
             for m_candidate in models_to_try:
                 try:
-                    logger.info(f"[unified_vox_director] Attempting High-Tier LLM: {m_candidate}")
+                    logger.info(f"[unified_vox_director] Attempting LLM roster generator: {m_candidate}")
                     resp = gateway.call_llm(
                         prompt=user_prompt,
                         system_prompt=system_prompt,
                         model=m_candidate,
-                        max_tokens=6000,
-                        timeout=180.0
+                        max_tokens=2500,
+                        timeout=60.0
                     )
                     if resp:
                         break

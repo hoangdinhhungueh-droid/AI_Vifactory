@@ -358,7 +358,7 @@ def run_b36_visual_convergence(
 
     # Round 1: GPT-6-Astra Forensic Visual Linter & Auditor
     primary_model = os.getenv("B36_AUDIT_MODEL", "gpt-6-astra")
-    fallback_model = os.getenv("B36_FALLBACK_MODEL", "claude-opus-5-5")
+    fallback_model = os.getenv("B36_FALLBACK_MODEL", "claude-sonnet-5-5")
     logger.info(f"[B3.5.1 DACL] Round 1: Invoking {primary_model} Forensic Auditor for {episode_id}...")
     try:
         raw_res = gateway.call_llm(
@@ -379,7 +379,7 @@ def run_b36_visual_convergence(
             max_tokens=3500,
             temperature=0.1,
             timeout=70.0,
-            fallback="claude-opus-5-5"
+            fallback="claude-sonnet-5-5"
         )
 
     raw_clean1 = re.sub(r"^```(?:json)?\s*", "", (raw_res or "").strip(), flags=re.MULTILINE)
@@ -461,11 +461,11 @@ def run_b36_visual_convergence(
                 patcher_res = gateway.call_llm(
                     prompt=f"[DELTA PATCH TO REFINE & POLISH]\n{json.dumps(patcher_input, ensure_ascii=False, indent=2)}\n\nVerify, polish and score this Delta Patch. Return strict JSON only.",
                     system_prompt=ASTRA_CROSS_AUDIT_PROMPT,
-                    model="claude-opus-5-5",
+                    model=os.getenv("B36_ROUND2_MODEL", "gpt-6-astra"),
                     max_tokens=4500,
                     temperature=0.2,
                     timeout=120.0,
-                    fallback="gpt-6-astra"
+                    fallback="claude-sonnet-5-5"
                 )
                 raw_clean2 = re.sub(r"^```(?:json)?\s*", "", (patcher_res or "").strip(), flags=re.MULTILINE)
                 raw_clean2 = re.sub(r"\s*```$", "", raw_clean2, flags=re.MULTILINE)
@@ -540,11 +540,11 @@ def run_b36_visual_convergence(
                 patcher_res = gateway.call_llm(
                     prompt=f"[FLAWED SCENES REQUIRING TARGETED RESOLUTION]\n{json.dumps(patcher_input, ensure_ascii=False, indent=2)}\n\nReview the critique and resolve flaws in these scenes. Return strict JSON with refined_delta and cross_audit_score.",
                     system_prompt=ASTRA_CROSS_AUDIT_PROMPT,
-                    model="claude-opus-5-5",
+                    model=os.getenv("B36_ROUND2_MODEL", "gpt-6-astra"),
                     max_tokens=4500,
                     temperature=0.2,
                     timeout=120.0,
-                    fallback="gpt-6-astra"
+                    fallback="claude-sonnet-5-5"
                 )
                 raw_clean2 = re.sub(r"^```(?:json)?\s*", "", (patcher_res or "").strip(), flags=re.MULTILINE)
                 raw_clean2 = re.sub(r"\s*```$", "", raw_clean2, flags=re.MULTILINE)

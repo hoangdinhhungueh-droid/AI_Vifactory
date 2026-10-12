@@ -437,7 +437,15 @@ const cleanSpeakerTag = (rawTag: any, actTitle: any): string => {
     if (actTitle && !String(actTitle).includes(".png")) {
       return String(actTitle).toUpperCase();
     }
-    return "BEAT 1: CASE INVESTIGATION";
+    return "";
+  }
+  // Strip out verbose pipeline debug strings like "BEAT 1: ... : ..."
+  if (/^BEAT\s*\d+/i.test(str)) {
+    const match = str.match(/^(BEAT\s*\d+)/i);
+    return match ? `${match[1].toUpperCase()} // INVESTIGATION` : "INVESTIGATION";
+  }
+  if (str.length > 32) {
+    return str.slice(0, 30).toUpperCase() + "...";
   }
   return str.toUpperCase();
 };
@@ -586,72 +594,78 @@ export const TwoLayerScene = (props) => {
   };
 
   let subtitleTextAlign: "left" | "center" | "right" = "center";
-  let subtitleFontSize = (isLeft || isRight) ? 26 : 28;
+  let subtitleFontSize = (isLeft || isRight) ? 38 : 42;
 
   if (isFullBleedOverlay) {
     // Under full-bleed evidence (e.g. VoxThresholdRatio 6x4 grid), stay in bottom band
     subtitleContainerStyle = {
       ...subtitleContainerStyle,
-      bottom: 22,
-      left: "14%",
-      right: "14%",
-      maxWidth: "72%",
+      bottom: 42,
+      left: "10%",
+      right: "10%",
+      maxWidth: "80%",
       alignItems: "center",
     };
     subtitleTextAlign = "center";
-    subtitleFontSize = 24;
+    subtitleFontSize = 38;
   } else if ((hasFgLeft && isOverlayRight) || (hasFgRight && isOverlayLeft)) {
     // Both sides occupied -> Grounded narrow center
     subtitleContainerStyle = {
       ...subtitleContainerStyle,
-      bottom: 20,
-      left: "22%",
-      right: "22%",
-      maxWidth: "56%",
+      bottom: 40,
+      left: "12%",
+      right: "12%",
+      maxWidth: "76%",
       alignItems: "center",
     };
     subtitleTextAlign = "center";
-    subtitleFontSize = 23;
+    subtitleFontSize = 38;
   } else if (hasFgLeft || isOverlayLeft) {
     // Left side occupied -> Auto-dodge to Right side
     subtitleContainerStyle = {
       ...subtitleContainerStyle,
-      bottom: 34,
-      left: "50%",
-      right: 70,
-      maxWidth: "46%",
+      bottom: 48,
+      left: "48%",
+      right: 60,
+      maxWidth: "48%",
       alignItems: "flex-start",
     };
     subtitleTextAlign = "left";
-    subtitleFontSize = 26;
+    subtitleFontSize = 40;
   } else if (hasFgRight || isOverlayRight) {
     // Right side occupied -> Auto-dodge to Left side
     subtitleContainerStyle = {
       ...subtitleContainerStyle,
-      bottom: 34,
-      left: 70,
-      right: "50%",
-      maxWidth: "46%",
+      bottom: 48,
+      left: 60,
+      right: "48%",
+      maxWidth: "48%",
       alignItems: "flex-start",
     };
     subtitleTextAlign = "left";
-    subtitleFontSize = 26;
+    subtitleFontSize = 40;
   } else {
     // Clean screen -> Lower center floating
     subtitleContainerStyle = {
       ...subtitleContainerStyle,
-      bottom: 42,
-      left: "16%",
-      right: "16%",
-      maxWidth: "68%",
+      bottom: 56,
+      left: "10%",
+      right: "10%",
+      maxWidth: "80%",
       alignItems: "center",
     };
     subtitleTextAlign = "center";
-    subtitleFontSize = 28;
+    subtitleFontSize = 44;
   }
 
   const rawSpeakerTag = cleanSpeakerTag(props.speakerTag, props.actTitle);
-  const showSpeakerTag = Boolean(rawSpeakerTag && rawSpeakerTag !== "BEAT 1: CASE INVESTIGATION");
+  // Only show speaker tag if it is meaningful and not a generic internal debug tag
+  const showSpeakerTag = Boolean(
+    rawSpeakerTag &&
+    rawSpeakerTag !== "BEAT 1: CASE INVESTIGATION" &&
+    !rawSpeakerTag.includes("INVESTIGATION") &&
+    !rawSpeakerTag.startsWith("BEAT")
+  );
 
     return (
     <AbsoluteFill style={{ backgroundColor: "transparent", opacity: entranceOpacity }}>
@@ -964,6 +978,11 @@ export const TwoLayerScene = (props) => {
                 lineHeight: 1.35,
                 color: "#FFFFFF",
                 textAlign: subtitleTextAlign,
+                backgroundColor: "rgba(10, 15, 24, 0.85)",
+                padding: "8px 24px",
+                borderRadius: 8,
+                border: "1px solid rgba(255, 255, 255, 0.14)",
+                boxShadow: "0 8px 30px rgba(0, 0, 0, 0.85)",
                 textShadow:
                   "0 2px 4px rgba(0, 0, 0, 0.95), 0 0 14px rgba(0, 0, 0, 0.9), 0 4px 20px rgba(0, 0, 0, 0.85)",
                 opacity: (props.karaokeMode || props.karaoke_mode || (isFullBleedOverlay ? "dim" : "full")) === "dim" ? 0.78 : 1.0,
@@ -2272,7 +2291,9 @@ export const TwoLayerEpisode: React.FC<{
             ? s.editorialHeadline.trim()
             : (typeof s.headline?.text === "string" ? s.headline.text : undefined));
 
-      const cleanSubtitle = s.subtitle || s.actTitle || s.speakerTag || undefined;
+      // Rule 136: Do not leak internal pipeline strings like "BEAT 1: ..." into subtitle or heroLabel
+      const cleanSubtitle = s.subtitle || (s.actTitle && !s.actTitle.startsWith("BEAT") ? s.actTitle : undefined);
+      const cleanHeroLabel = s.heroLabel || (s.speakerTag && !s.speakerTag.startsWith("BEAT") ? s.speakerTag : undefined);
       const resolvedLayoutVariant =
         s.layoutVariant ||
         s.sceneLayoutMode ||
@@ -2297,7 +2318,7 @@ export const TwoLayerEpisode: React.FC<{
             theme={s.theme || s.papercraft_theme || s.paperTheme || "newsprint-editorial"}
             backgroundSrc={bgSrc}
             heroSrc={heroSrc}
-            heroLabel={s.heroLabel || s.speakerTag}
+            heroLabel={cleanHeroLabel}
             heroPosition={resolvedHeroPosition}
             supportingCutouts={resolvedCutouts}
             yarns={rawYarns}

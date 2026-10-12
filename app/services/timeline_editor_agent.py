@@ -126,8 +126,8 @@ def llm_timeline_director_review(
         logger.info("[timeline_editor_agent] ModelGateway unavailable (%s), using heuristic engine", e)
         return result_record
 
-    model = model_override or os.getenv("TIMELINE_DIRECTOR_MODEL", "claude-opus-5-5")
-    fallback_model = os.getenv("TIMELINE_DIRECTOR_FALLBACK_MODEL", "gpt-6-astra")
+    model = model_override or os.getenv("TIMELINE_DIRECTOR_MODEL", "gpt-6-astra")
+    fallback_model = os.getenv("TIMELINE_DIRECTOR_FALLBACK_MODEL", "claude-sonnet-5")
 
     context = story_context or _load_story_context(episode_id)
     story_snippet = context.get("story_snippet", "")
@@ -261,7 +261,9 @@ def audit_and_optimize_timeline(
 
     opts = options or {}
     episode_id = opts.get("episode_id")
-    enable_llm = opts.get("enable_llm_director", True)
+    enable_llm = opts.get("enable_llm_director")
+    if enable_llm is None:
+        enable_llm = os.getenv("ENABLE_LLM_TIMELINE_DIRECTOR", "false").lower() in ("1", "true", "yes")
     if os.getenv("DISABLE_LLM_TIMELINE_DIRECTOR", "").lower() in ("1", "true", "yes"):
         enable_llm = False
 

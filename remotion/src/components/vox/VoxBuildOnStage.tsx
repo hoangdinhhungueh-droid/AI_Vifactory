@@ -478,13 +478,13 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                 )}
                 <h1
                   style={{
-                    fontSize: headline.length > 36 ? "44px" : "56px",
+                    fontSize: headline.length <= 8 ? "82px" : headline.length > 36 ? "44px" : "56px",
                     fontWeight: 900,
                     color: "#18181b",
-                    lineHeight: 1.06,
-                    letterSpacing: "-0.02em",
+                    lineHeight: 1.04,
+                    letterSpacing: headline.length <= 8 ? "0.04em" : "-0.02em",
                     textTransform: "uppercase",
-                    fontFamily: "Impact, Inter, sans-serif",
+                    fontFamily: "Impact, 'Zen Kaku Gothic New', Inter, sans-serif",
                     margin: 0,
                   }}
                 >
