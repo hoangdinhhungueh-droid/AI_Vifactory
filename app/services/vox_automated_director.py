@@ -227,6 +227,18 @@ class VoxAutomatedDirector:
         self.last_bg_roster: Dict[str, Any] = {}
         self.last_fg_roster: Dict[str, Any] = {}
 
+    def plan_claude_storyboard(
+        self,
+        story_text: str,
+        gateway: Optional[Any] = None
+    ) -> List[Dict[str, Any]]:
+        """Sentence-by-Sentence Master Prompt 2 Storyboard Director via ClaudeVoxDirector.
+        Rules 118, 128, 130 Compliant: Dynamic, token-safe, Claude Opus 5.5 + GPT-6-Astra fallback.
+        """
+        from app.services.claude_vox_director import ClaudeVoxDirector
+        director = ClaudeVoxDirector()
+        return director.plan_storyboard(story_text=story_text, market=self.market, gateway=gateway)
+
     def generate_ideas(self, niche: str, count: int = 10, topic_hint: str = "") -> List[Dict[str, str]]:
         """State 2: Generate exactly 10 video ideas in the specified niche with concrete documentary hooks."""
         norm_niche = (niche or "crime_documentary").lower().replace(" and ", "_").replace(" ", "_")
@@ -566,59 +578,90 @@ class VoxAutomatedDirector:
             beat_phase = min(max(beat_phase, 1), 5)
             b["beat_phase"] = beat_phase
 
-            # Assign environmental BG with zero consecutive repeats
+            # Assign environmental BG or warm archival paper canvas with zero consecutive repeats (Zero modulo loops)
             matching_bgs = [k for k, v in bg_roster.items() if beat_phase in v.get("beats", [1, 2, 3, 4, 5])]
             if not matching_bgs:
                 matching_bgs = bg_keys
-            bg_key = matching_bgs[(b_idx - 1) % len(matching_bgs)]
+            bg_key = matching_bgs[b_idx - 1] if (b_idx - 1) < len(matching_bgs) else f"bg_paper_canvas_{b_idx:02d}"
             if bg_key == last_bg_key and len(matching_bgs) > 1:
-                bg_key = matching_bgs[b_idx % len(matching_bgs)]
+                bg_key = matching_bgs[b_idx] if b_idx < len(matching_bgs) else f"bg_paper_canvas_{b_idx:02d}"
+            if bg_key not in bg_roster:
+                bg_roster[bg_key] = {
+                    "title": "warm archival textured paper canvas (#f4ece1)",
+                    "description": "Warm archival off-white textured paper canvas (#f4ece1), subtle fibers and gentle creases, soft ambient studio lighting, generous negative space, minimal clean archival backdrop --no 3D rooms, no walls, no clutter",
+                    "beats": [beat_phase]
+                }
+            if bg_key not in sanitized_bgs:
+                sanitized_bgs[bg_key] = _sanitize_background_prompt(
+                    bg_roster[bg_key].get("description", bg_roster[bg_key].get("title", bg_key)),
+                    bg_key,
+                    market=self.market
+                )
             last_bg_key = bg_key
 
-            # Check if this beat is an actor moment or forensic evidence prop moment
-            is_char_moment = (
-                bool(char_fg_keys) and
-                (char_count < 12) and
-                (b_idx - last_char_beat >= 8) and
-                (any(q in narr for q in ['"', '“', '”', '「', '」']) or
-                 any(w in narr_lower for w in ["said", "testified", "admitted", "warned", "declared", "argued", "ruled", "denied", "objected"]))
-            )
-
-            if is_char_moment:
-                matched_char = None
-                for ck in char_fg_keys:
-                    c_info = fg_roster[ck]
-                    kws = c_info.get("keywords", []) + c_info.get("title", "").lower().split()
-                    if any(kw in narr_lower for kw in kws if len(kw) > 3):
-                        matched_char = ck
-                        break
-                if not matched_char:
-                    matched_char = char_fg_keys[char_count % len(char_fg_keys)]
-                fg_key = matched_char
-                char_count += 1
-                last_char_beat = b_idx
+            # Check if beat has sentence-level Claude Master Prompt 2 storyboard cutout
+            storyboard_cutout = b.get("main_subject_cutout") or b.get("hero_cutout")
+            if storyboard_cutout and isinstance(storyboard_cutout, dict):
+                fg_key = storyboard_cutout.get("name") or f"fg_cutout_{b_idx:02d}"
+                hero_label = storyboard_cutout.get("label") or storyboard_cutout.get("name", "EVIDENTIARY SUBJECT")
+                if fg_key not in fg_roster:
+                    fg_roster[fg_key] = {
+                        "title": hero_label,
+                        "description": storyboard_cutout.get("prompt", f"Isolated forensic cutout representing {hero_label} on solid white background (#FFFFFF)"),
+                        "type": "prop",
+                        "beats": [beat_phase]
+                    }
             else:
-                matched_prop = None
-                best_score = 0
-                for pk in prop_fg_keys:
-                    p_info = fg_roster[pk]
-                    p_beats = p_info.get("beats", [1, 2, 3, 4, 5])
-                    kws = p_info.get("keywords", []) + p_info.get("title", "").lower().split()
-                    score = sum(1 for kw in kws if len(kw) > 3 and kw in narr_lower)
-                    if beat_phase in p_beats:
-                        score += 1
-                    if score > best_score:
-                        best_score = score
-                        matched_prop = pk
-                if not matched_prop or best_score <= 1:
-                    phase_props = [k for k in prop_fg_keys if beat_phase in fg_roster[k].get("beats", [1, 2, 3, 4, 5])] or prop_fg_keys
-                    matched_prop = phase_props[(b_idx - 1) % len(phase_props)]
-                fg_key = matched_prop
+                # Check if this beat is an actor moment or forensic evidence prop moment
+                is_char_moment = (
+                    bool(char_fg_keys) and
+                    (char_count < 12) and
+                    (b_idx - last_char_beat >= 8) and
+                    (any(q in narr for q in ['"', '“', '”', '「', '」']) or
+                     any(w in narr_lower for w in ["said", "testified", "admitted", "warned", "declared", "argued", "ruled", "denied", "objected"]))
+                )
 
-            hero_label = fg_roster[fg_key].get("title", "PRIMARY OPERATOR")
+                if is_char_moment:
+                    matched_char = None
+                    for ck in char_fg_keys:
+                        c_info = fg_roster[ck]
+                        kws = c_info.get("keywords", []) + c_info.get("title", "").lower().split()
+                        if any(kw in narr_lower for kw in kws if len(kw) > 3):
+                            matched_char = ck
+                            break
+                    if not matched_char:
+                        matched_char = char_fg_keys[char_count if char_count < len(char_fg_keys) else len(char_fg_keys) - 1]
+                    fg_key = matched_char
+                    char_count += 1
+                    last_char_beat = b_idx
+                else:
+                    matched_prop = None
+                    best_score = 0
+                    for pk in prop_fg_keys:
+                        p_info = fg_roster[pk]
+                        p_beats = p_info.get("beats", [1, 2, 3, 4, 5])
+                        kws = p_info.get("keywords", []) + p_info.get("title", "").lower().split()
+                        score = sum(1 for kw in kws if len(kw) > 3 and kw in narr_lower)
+                        if beat_phase in p_beats:
+                            score += 1
+                        if score > best_score:
+                            best_score = score
+                            matched_prop = pk
+                    if not matched_prop or best_score <= 1:
+                        phase_props = [k for k in prop_fg_keys if beat_phase in fg_roster[k].get("beats", [1, 2, 3, 4, 5])] or prop_fg_keys
+                        matched_prop = phase_props[(b_idx - 1) if (b_idx - 1) < len(phase_props) else len(phase_props) - 1]
+                    fg_key = matched_prop
+
+            hero_label = fg_roster.get(fg_key, {}).get("title", "PRIMARY OPERATOR")
+            if fg_key not in sanitized_fgs:
+                sanitized_fgs[fg_key] = _sanitize_foreground_prompt(
+                    fg_roster.get(fg_key, {}).get("description", hero_label),
+                    fg_key,
+                    market=self.market
+                )
             paper_mats_list = list(VOX_PAPER_MATERIALS_LIBRARY.values())
             paper_mat = b.get("paper_material") or (
-                paper_mats_list[(b_idx - 1) % len(paper_mats_list)] if paper_mats_list else None
+                paper_mats_list[(b_idx - 1) if (b_idx - 1) < len(paper_mats_list) else len(paper_mats_list) - 1] if paper_mats_list else None
             )
 
             # Build tactile composite prompt
@@ -707,7 +750,7 @@ class VoxAutomatedDirector:
             fg_key = b.get("fg_key") or f"fg_{b_idx:02d}"
             hero_label = b.get("heroLabel") or f"SUBJECT #{b_idx}"
             paper_mat = b.get("paper_material") or (
-                paper_mats_list[idx0 % len(paper_mats_list)] if paper_mats_list else None
+                paper_mats_list[min(idx0, len(paper_mats_list) - 1)] if paper_mats_list else None
             )
 
             layout_variant = (
@@ -756,42 +799,84 @@ class VoxAutomatedDirector:
                 "heroPosition": {
                     "xPct": 34 if fg_pos == "left" else 66,
                     "yPct": 54,
-                    "widthPct": 38
+                    "widthPct": min(b.get("hero_cutout", {}).get("width_pct", 22), 25) if isinstance(b.get("hero_cutout"), dict) else 22
                 },
-                "supportingCutouts": [
-                    {
-                        "id": f"doc_{b_idx}_1",
-                        "label": f"MEMO #{b_idx}A",
-                        "xPct": 26,
-                        "yPct": 62,
-                        "widthPct": 22,
-                        "rotation": -8,
-                        "delaySec": delay_doc1,
-                        "hasPin": True,
-                        "hasTape": False
-                    },
-                    {
-                        "id": f"doc_{b_idx}_2",
-                        "label": f"RECORD #{b_idx}B",
-                        "xPct": 74,
-                        "yPct": 60,
-                        "widthPct": 24,
-                        "rotation": 11,
-                        "delaySec": delay_doc2,
-                        "hasPin": False,
-                        "hasTape": True
-                    }
-                ] if is_collage else [],
-                "yarns": [
-                    {
-                        "fromX": 30,
-                        "fromY": 58,
-                        "toX": 70,
-                        "toY": 56,
-                        "color": "#dc2626",
-                        "delaySec": delay_yarn
-                    }
-                ] if is_collage else []
+                "supportingCutouts": (
+                    [
+                        {
+                            "id": c.get("name") or f"doc_{b_idx}_{c_idx+1}",
+                            "label": c.get("label") or f"EXHIBIT #{c_idx+1}",
+                            "src": c.get("src") or f"images/{c.get('name')}.png",
+                            "xPct": c.get("x_pct", 24 if c_idx == 0 else 76),
+                            "yPct": c.get("y_pct", 64 if c_idx == 0 else 60),
+                            "widthPct": min(c.get("width_pct", 16), 18),
+                            "rotation": c.get("rotation", -8 if c_idx == 0 else 10),
+                            "delaySec": c.get("delay_sec", delay_doc1 if c_idx == 0 else delay_doc2),
+                            "hasPin": c.get("has_pin", True),
+                            "hasTape": c.get("has_tape", False),
+                            "entranceType": c.get("entrance_type", "slide_in_deal" if c_idx % 2 == 0 else "delicate_tack"),
+                            "hasMarkerHighlight": c.get("has_marker_highlight", c_idx == 0),
+                            "highlightText": c.get("highlight_text", c.get("label"))
+                        }
+                        for c_idx, c in enumerate(b.get("supporting_cutouts", []))
+                    ]
+                    if b.get("supporting_cutouts")
+                    else (
+                        [
+                            {
+                                "id": f"doc_{b_idx}_1",
+                                "label": f"MEMO #{b_idx}A",
+                                "xPct": 24,
+                                "yPct": 64,
+                                "widthPct": 16,
+                                "rotation": -8,
+                                "delaySec": delay_doc1,
+                                "hasPin": True,
+                                "hasTape": False,
+                                "entranceType": "slide_in_deal",
+                                "hasMarkerHighlight": True,
+                                "highlightText": f"MEMO #{b_idx}A"
+                            },
+                            {
+                                "id": f"doc_{b_idx}_2",
+                                "label": f"RECORD #{b_idx}B",
+                                "xPct": 76,
+                                "yPct": 60,
+                                "widthPct": 16,
+                                "rotation": 10,
+                                "delaySec": delay_doc2,
+                                "hasPin": False,
+                                "hasTape": True,
+                                "entranceType": "delicate_tack"
+                            }
+                        ] if is_collage else []
+                    )
+                ),
+                "yarns": (
+                    [
+                        {
+                            "fromX": b["yarn_connection"].get("from_point", {}).get("x", 30),
+                            "fromY": b["yarn_connection"].get("from_point", {}).get("y", 58),
+                            "toX": b["yarn_connection"].get("to_point", {}).get("x", 70),
+                            "toY": b["yarn_connection"].get("to_point", {}).get("y", 56),
+                            "color": b["yarn_connection"].get("color", "#dc2626"),
+                            "delaySec": delay_yarn
+                        }
+                    ]
+                    if (b.get("yarn_connection") and b["yarn_connection"].get("has_connection"))
+                    else (
+                        [
+                            {
+                                "fromX": 30,
+                                "fromY": 58,
+                                "toX": 70,
+                                "toY": 56,
+                                "color": "#dc2626",
+                                "delaySec": delay_yarn
+                            }
+                        ] if is_collage else []
+                    )
+                )
             }
             scenes.append(scene_entry)
 

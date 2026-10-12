@@ -796,7 +796,7 @@ export const TwoLayerScene = (props) => {
                     maxWidth: cutout.width || 340,
                     maxHeight: cutout.height || 340,
                     objectFit: "contain",
-                    border: cutout.border === false ? undefined : "4px solid #FAF6EE",
+                    border: cutout.border === true ? "4px solid #FAF6EE" : undefined,
                     borderRadius: 2,
                   }}
                 />
@@ -2257,7 +2257,7 @@ export const TwoLayerEpisode: React.FC<{
       const resolvedHeroPosition =
         s.heroPosition && s.heroPosition.xPct !== 50
           ? s.heroPosition
-          : { xPct: defaultHeroXPct, yPct: 54, widthPct: hasOv ? 34 : 38 };
+          : { xPct: defaultHeroXPct, yPct: 54, widthPct: hasOv ? 20 : 22 };
 
       const rawCutouts = s.supportingCutouts || s.supporting_cutouts || [];
       const resolvedCutouts = rawCutouts
@@ -2273,9 +2273,12 @@ export const TwoLayerEpisode: React.FC<{
           src: c.src ? resolveSrc(c.src) : undefined,
           xPct: c.xPct !== undefined ? c.xPct : (c.x !== undefined ? c.x : 26 + cIdx * 48),
           yPct: c.yPct !== undefined ? c.yPct : (c.y !== undefined ? c.y : 60),
-          widthPct: c.widthPct !== undefined ? c.widthPct : (c.scale ? Math.round(c.scale * 50) : 22),
+          widthPct: c.widthPct !== undefined ? c.widthPct : (c.scale ? Math.round(c.scale * 35) : 16),
           hasPin: c.hasPin !== undefined ? c.hasPin : cIdx % 2 === 0,
           hasTape: c.hasTape !== undefined ? c.hasTape : cIdx % 2 === 1,
+          entranceType: c.entranceType || (cIdx % 2 === 0 ? "slide_in_deal" : "delicate_tack"),
+          hasMarkerHighlight: c.hasMarkerHighlight !== undefined ? c.hasMarkerHighlight : (cIdx === 0),
+          highlightText: c.highlightText || c.label,
         }));
 
       const rawYarns =

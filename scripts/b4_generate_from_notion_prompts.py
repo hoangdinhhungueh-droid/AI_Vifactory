@@ -88,27 +88,11 @@ def fetch_prompts_from_notion(episode_id: str):
 
 def remove_magenta_chromakey(input_path: Path, output_path: Path):
     """
-    Pure PIL Chroma Keyer for flat solid #FF00FF magenta background.
+    Pure PIL Chroma Keyer supporting both flat solid #FF00FF magenta and #FFFFFF white backdrops.
     """
-    img = Image.open(input_path).convert("RGBA")
-    data = img.getdata()
-
-    new_data = []
-    for item in data:
-        r, g, b, a = item
-        # Distance from pure magenta (255, 0, 255)
-        dist = ((r - 255)**2 + (g - 0)**2 + (b - 255)**2)**0.5
-        if dist < 110:
-            new_data.append((r, g, b, 0))
-        elif dist < 150:
-            alpha = int(255 * ((dist - 110) / 40.0))
-            new_data.append((r, g, b, alpha))
-        else:
-            new_data.append(item)
-
-    img.putdata(new_data)
-    img.save(output_path, "PNG")
-    print(f"Chroma-keyed {input_path.name} -> {output_path.name} (Pure PIL #FF00FF) \u2705")
+    from scripts.remove_bg_chromakey import remove_bg_chromakey
+    remove_bg_chromakey(str(input_path), str(output_path))
+    print(f"Chroma-keyed {input_path.name} -> {output_path.name} (Auto-detected backdrop) \u2705")
 
 async def main():
     parser = argparse.ArgumentParser(description="B4 Visual Asset Generation from Notion Prompts")

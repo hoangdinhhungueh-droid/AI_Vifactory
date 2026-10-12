@@ -16,6 +16,7 @@ import {
 } from "./papercraft";
 import { VoxParallaxLayer } from "./VoxParallaxLayer";
 import { VoxDynamicChart, VoxDynamicChartProps } from "./VoxDynamicChart";
+import { ProceduralMarkerSweep } from "../kinetics/ProceduralMarkerSweep";
 
 export interface VoxBuildOnCutout {
   id: string;
@@ -24,11 +25,14 @@ export interface VoxBuildOnCutout {
   role?: string;
   xPct: number; // percentage of stage width (0 - 100)
   yPct: number; // percentage of stage height (0 - 100)
-  widthPct?: number; // width in % of stage
+  widthPct?: number; // width in % of stage (delicate 14-18%)
   rotation?: number; // tilt degrees (-15 to 15)
   delaySec?: number; // entry delay in seconds (default ~ 3.5s)
   hasPin?: boolean;
   hasTape?: boolean;
+  entranceType?: "slide_in_deal" | "delicate_tack" | "stamp_slam" | "drop";
+  hasMarkerHighlight?: boolean;
+  highlightText?: string;
 }
 
 export interface VoxBuildOnYarn {
@@ -116,7 +120,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
   backgroundSrc,
   heroSrc,
   heroLabel,
-  heroPosition = { xPct: 50, yPct: 52, widthPct: 36 },
+  heroPosition = { xPct: 50, yPct: 52, widthPct: 22 },
   supportingCutouts = [],
   yarns = [],
   stampText,
@@ -613,7 +617,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                 position: "absolute",
                 left: `${isEvidenceDossier ? Math.max(heroCurrentX, 68) : heroCurrentX}%`,
                 top: `${heroPosition.yPct}%`,
-                width: `${heroPosition.widthPct || 38}%`,
+                width: `${heroPosition.widthPct || 22}%`,
                 transform: `translate(-50%, -50%) rotate(${heroRotation}deg)`,
                 filter: `drop-shadow(0 ${heroDropShadow}px 24px rgba(0,0,0,0.35))`,
                 opacity: heroOpacity,
@@ -673,34 +677,56 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             const cutDelayFrames = Math.round(
               fps * (cutout.delaySec !== undefined ? cutout.delaySec : defaultCutSec)
             );
+            // Varied Entrance Choreography: slide_in_deal, delicate_tack, stamp_slam
+            const entrance = cutout.entranceType || (idx % 2 === 0 ? "slide_in_deal" : "delicate_tack");
             const cutSpring = spring({
               frame: Math.max(0, frame - cutDelayFrames),
               fps,
-              config: SPRING_PRESETS.paperHeavy,
+              config: entrance === "slide_in_deal"
+                ? SPRING_PRESETS.paperSlide
+                : entrance === "stamp_slam"
+                ? SPRING_PRESETS.stamp
+                : SPRING_PRESETS.paperHeavy,
             });
-            const curY = interpolate(
-              cutSpring,
-              [0, 1],
-              [cutout.yPct - 25, cutout.yPct]
-            );
-            const curRot = interpolate(
-              cutSpring,
-              [0, 1],
-              [(cutout.rotation || 0) * 2, cutout.rotation || 0]
-            );
+
+            let curX = cutout.xPct;
+            let curY = cutout.yPct;
+            let curRot = cutout.rotation || 0;
+            let curScale = 1.0;
+
+            if (entrance === "slide_in_deal") {
+              const startX = cutout.xPct > 50 ? cutout.xPct + 14 : cutout.xPct - 14;
+              curX = interpolate(cutSpring, [0, 1], [startX, cutout.xPct]);
+              curY = cutout.yPct;
+              curRot = interpolate(
+                cutSpring,
+                [0, 0.8, 1],
+                [(cutout.rotation || 0) + (cutout.xPct > 50 ? 5 : -5), (cutout.rotation || 0) - (cutout.xPct > 50 ? 1 : -1), cutout.rotation || 0]
+              );
+            } else if (entrance === "stamp_slam") {
+              curScale = interpolate(cutSpring, [0, 1], [1.7, 1.0]);
+              curX = cutout.xPct;
+              curY = cutout.yPct;
+              curRot = cutout.rotation || 0;
+            } else {
+              // Delicate tack/drop: gentle 8% descent from above (not 25% drop)
+              curX = cutout.xPct;
+              curY = interpolate(cutSpring, [0, 1], [cutout.yPct - 8, cutout.yPct]);
+              curRot = interpolate(cutSpring, [0, 1], [(cutout.rotation || 0) * 1.4, cutout.rotation || 0]);
+            }
 
             return (
               <div
                 key={cutout.id || idx}
                 style={{
                   position: "absolute",
-                  left: `${cutout.xPct}%`,
+                  left: `${curX}%`,
                   top: `${curY}%`,
-                  width: `${cutout.widthPct || 24}%`,
-                  transform: `translate(-50%, -50%) rotate(${curRot}deg)`,
-                  opacity: interpolate(cutSpring, [0, 0.2, 1], [0, 1, 1]),
+                  width: `${cutout.widthPct || 16}%`,
+                  transform: `translate(-50%, -50%) scale(${curScale}) rotate(${curRot}deg)`,
+                  opacity: interpolate(cutSpring, [0, 0.25, 1], [0, 1, 1]),
                   zIndex: 20 + idx,
-                  filter: "drop-shadow(0 12px 20px rgba(0,0,0,0.3))",
+                  filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.22))",
                 }}
               >
                 {cutout.src ? (
@@ -711,20 +737,47 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                 ) : (
                   <div
                     style={{
-                      padding: "12px 14px",
+                      padding: "10px 12px",
                       backgroundColor: "#ffffff",
-                      border: "2px solid #e2e8f0",
-                      borderRadius: "6px",
+                      border: "1.5px solid #e2e8f0",
+                      borderRadius: "4px",
                       fontFamily: "monospace",
-                      fontSize: "11px",
+                      fontSize: "10px",
                       fontWeight: 700,
                       color: "#1e293b",
                     }}
                   >
-                    <div style={{ color: "#dc2626", marginBottom: "4px" }}>
+                    <div style={{ color: "#dc2626", marginBottom: "3px" }}>
                       [EXHIBIT #{idx + 1}]
                     </div>
                     <div>{cutout.label || "FORENSIC RECORD"}</div>
+                  </div>
+                )}
+
+                {/* Secondary Micro-Motion: Procedural Highlighter Sweep across evidence */}
+                {cutout.hasMarkerHighlight && (
+                  <div style={{ marginTop: 4, width: "100%", textAlign: "center" }}>
+                    <ProceduralMarkerSweep
+                      startFrame={cutDelayFrames + 12}
+                      durationFrames={14}
+                      color="#ffe600"
+                      height="1.25em"
+                      blendMode="multiply"
+                    >
+                      <span
+                        style={{
+                          fontFamily: "monospace",
+                          fontSize: "10px",
+                          fontWeight: 800,
+                          color: "#0f172a",
+                          backgroundColor: "rgba(255,255,255,0.75)",
+                          padding: "1px 5px",
+                          borderRadius: "2px",
+                        }}
+                      >
+                        {cutout.highlightText || cutout.label || "VERIFIED"}
+                      </span>
+                    </ProceduralMarkerSweep>
                   </div>
                 )}
 
@@ -749,7 +802,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                       left: "-8px",
                     }}
                   >
-                    <VoxWashiTape width={50} rotation={22} color="yellow" />
+                    <VoxWashiTape width={45} rotation={22} color="yellow" />
                   </div>
                 )}
               </div>
