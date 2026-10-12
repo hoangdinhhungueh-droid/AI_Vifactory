@@ -29,6 +29,7 @@ import {
   PushThroughTransitionOverlay,
   VoxBuildOnStage,
   VoxPaperBackdrop,
+  VoxGlobalPaperLife,
 } from "./components/vox";
 import { VoxKineticHeadline } from "./components/vox/VoxKineticHeadline";
 import {
@@ -2413,6 +2414,7 @@ export const TwoLayerEpisode: React.FC<{
       </VoxParallaxLayer>
 
       <LivingMicroLifeLayer frame={currentFrame} />
+      <VoxGlobalPaperLife intensity={0.7} />
       <VoxAtmosphericLighting intensity={0.85} />
       <CinematicVignette
         active={currentSceneInfo?.scene?.opticalFx?.vignette !== false}

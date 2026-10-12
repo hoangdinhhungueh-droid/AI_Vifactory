@@ -1,33 +1,47 @@
 import React from "react";
 import { Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { VoxBrassPin } from "./VoxBrassPin";
 
 export interface VoxConnectingYarnProps {
-  fromX: number; // % of canvas width
-  fromY: number; // % of canvas height
-  toX: number;   // % of canvas width
-  toY: number;   // % of canvas height
+  fromX: number; // % of canvas width (0-100) or px if > 100
+  fromY: number; // % of canvas height (0-100) or px if > 100
+  toX: number;   // % of canvas width (0-100) or px if > 100
+  toY: number;   // % of canvas height (0-100) or px if > 100
   color?: string; // default #dc2626 (crimson red yarn)
-  yarnThickness?: number; // default 4.5
-  sagAmount?: number;     // catenary curve sag in px (default 35)
-  drawStartFrame?: number; // default 20
-  drawDuration?: number;   // default 25
+  yarnThickness?: number; // default 4.2
+  sagAmount?: number;     // optional catenary curve sag in px (default auto-scaled to distance)
+  drawStartFrame?: number; // default 15
+  drawDuration?: number;   // default 20
   label?: string;          // optional pinned evidence label
+  showPins?: boolean;      // default true: pins yarn ends into the corkboard/paper
+  pinSize?: number;        // default 24
   width?: number;
   height?: number;
   style?: React.CSSProperties;
 }
 
+/**
+ * VoxConnectingYarn: Tactile Handcrafted 3D Red Woolen Yarn Component.
+ *
+ * Implements Rule 122 & Vox Documentary Reference Parity:
+ * - Natural gravitational catenary sag based on Euclidean distance
+ * - 3D twisted multi-ply woolen cord texture with diffuse cast paper shadow
+ * - Spiral fiber braiding overlay simulating authentic twisted string
+ * - Loop knots anchoring onto 3D metallic brass pushpins
+ */
 export const VoxConnectingYarn: React.FC<VoxConnectingYarnProps> = ({
   fromX,
   fromY,
   toX,
   toY,
   color = "#dc2626",
-  yarnThickness = 4.5,
-  sagAmount = 35,
-  drawStartFrame = 20,
-  drawDuration = 25,
+  yarnThickness = 4.2,
+  sagAmount,
+  drawStartFrame = 15,
+  drawDuration = 20,
   label,
+  showPins = true,
+  pinSize = 24,
   width: customW,
   height: customH,
   style,
@@ -37,140 +51,243 @@ export const VoxConnectingYarn: React.FC<VoxConnectingYarnProps> = ({
   const width = customW || configW;
   const height = customH || configH;
 
-  const drawProgress = interpolate(frame, [drawStartFrame, drawStartFrame + drawDuration], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.bezier(0.16, 1, 0.3, 1),
-  });
+  const drawProgress = interpolate(
+    frame,
+    [drawStartFrame, drawStartFrame + drawDuration],
+    [0, 1],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    }
+  );
 
-  if (drawProgress < 0.01) return null;
+  if (drawProgress < 0.005) return null;
 
-  // Pixel coordinates
-  const x1 = (fromX / 100) * width;
-  const y1 = (fromY / 100) * height;
-  const x2 = (toX / 100) * width;
-  const y2 = (toY / 100) * height;
+  // Resolve pixel coordinates (handle either % 0-100 or raw px)
+  const x1 = fromX <= 100 ? (fromX / 100) * width : fromX;
+  const y1 = fromY <= 100 ? (fromY / 100) * height : fromY;
+  const x2 = toX <= 100 ? (toX / 100) * width : toX;
+  const y2 = toY <= 100 ? (toY / 100) * height : toY;
 
-  // Catenary midpoint calculation with gravitational sag
-  const midX = (x1 + x2) / 2;
-  const midY = (y1 + y2) / 2;
+  // Euclidean distance between pin anchors
   const dx = x2 - x1;
   const dy = y2 - y1;
   const dist = Math.hypot(dx, dy);
 
-  // Downward gravity sag
+  // Natural catenary sag (longer span = deeper physical slack)
+  const effectiveSag =
+    sagAmount !== undefined
+      ? sagAmount
+      : Math.min(80, Math.max(22, dist * 0.11));
+
+  // Midpoint with downward gravity deflection
+  const midX = (x1 + x2) / 2;
+  const midY = (y1 + y2) / 2;
   const cx = midX;
-  const cy = midY + sagAmount;
+  const cy = midY + effectiveSag;
 
   const pathD = `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
-  const approxLen = dist * 1.18;
+  // Arc length approximation for quadratic bezier curve
+  const approxLen = dist * 1.15 + effectiveSag * 0.8;
   const dashOffset = approxLen * (1 - drawProgress);
 
-  // Label bounce
-  const labelRel = Math.max(0, frame - (drawStartFrame + Math.round(drawDuration * 0.6)));
+  // Optional evidence label spring bounce
+  const labelRel = Math.max(0, frame - (drawStartFrame + Math.round(drawDuration * 0.65)));
   const labelSpring = spring({
     frame: labelRel,
     fps: 30,
-    config: { damping: 11, mass: 0.4, stiffness: 180 },
+    config: { damping: 12, mass: 0.4, stiffness: 190 },
   });
 
+  const filterId = `yarnShadow-${Math.round(x1)}-${Math.round(x2)}-${Math.round(y1)}`;
+
   return (
-    <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
+    <div
       style={{
         position: "absolute",
-        top: 0,
-        left: 0,
+        inset: 0,
         pointerEvents: "none",
-        zIndex: 24,
+        zIndex: 26,
         ...style,
       }}
     >
-      <defs>
-        <filter id={`yarnShadow-${fromX}-${toX}`} x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur in="SourceAlpha" stdDeviation="3.5" />
-          <feOffset dx="2" dy="6" result="offsetblur" />
-          <feComponentTransfer>
-            <feFuncA type="linear" slope="0.35" />
-          </feComponentTransfer>
-          <feMerge>
-            <feMergeNode />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          overflow: "visible",
+        }}
+      >
+        <defs>
+          <filter id={filterId} x="-20%" y="-20%" width="150%" height="150%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="4.5" />
+            <feOffset dx="3" dy="9" result="offsetblur" />
+            <feComponentTransfer>
+              <feFuncA type="linear" slope="0.42" />
+            </feComponentTransfer>
+            <feMerge>
+              <feMergeNode />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
 
-      {/* Shadow Layer */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke="rgba(0, 0, 0, 0.35)"
-        strokeWidth={yarnThickness + 2}
-        strokeDasharray={approxLen}
-        strokeDashoffset={dashOffset}
-        transform="translate(2, 6)"
-      />
+        {/* 1. PHYSICAL CAST SHADOW LAYER ONTO THE PAPER BACKGROUND */}
+        <path
+          d={pathD}
+          fill="none"
+          stroke="rgba(30, 15, 10, 0.45)"
+          strokeWidth={yarnThickness + 3.5}
+          strokeDasharray={approxLen}
+          strokeDashoffset={dashOffset}
+          strokeLinecap="round"
+          transform="translate(3, 8)"
+          filter="blur(3.5px)"
+        />
 
-      {/* Primary Twisted Yarn Texture (Crimson Base) */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke={color}
-        strokeWidth={yarnThickness}
-        strokeDasharray={approxLen}
-        strokeDashoffset={dashOffset}
-        strokeLinecap="round"
-      />
+        {/* 2. DEEP CRIMSON WOOL CORE BASE */}
+        <path
+          d={pathD}
+          fill="none"
+          stroke="#991b1b"
+          strokeWidth={yarnThickness + 0.8}
+          strokeDasharray={approxLen}
+          strokeDashoffset={dashOffset}
+          strokeLinecap="round"
+        />
 
-      {/* Yarn Fiber Braiding Overlay */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke="rgba(255, 255, 255, 0.4)"
-        strokeWidth={yarnThickness * 0.3}
-        strokeDasharray="4,2"
-        strokeDashoffset={dashOffset}
-        strokeLinecap="round"
-      />
+        {/* 3. PRIMARY VIBRANT WOOLEN BODY */}
+        <path
+          d={pathD}
+          fill="none"
+          stroke={color}
+          strokeWidth={yarnThickness}
+          strokeDasharray={approxLen}
+          strokeDashoffset={dashOffset}
+          strokeLinecap="round"
+        />
 
-      {/* Connection Anchor Nodes (Micro Metal Rings) */}
-      {drawProgress >= 0.05 ? (
-        <circle cx={x1} cy={y1} r={yarnThickness * 0.9} fill="#5D4037" stroke="#FFE082" strokeWidth="1" />
-      ) : null}
-      {drawProgress >= 0.95 ? (
-        <circle cx={x2} cy={y2} r={yarnThickness * 0.9} fill="#5D4037" stroke="#FFE082" strokeWidth="1" />
-      ) : null}
+        {/* 4. BRAIDED TWIST FIBER OVERLAY (Simulates 2-ply twisted woolen yarn) */}
+        <path
+          d={pathD}
+          fill="none"
+          stroke="rgba(254, 202, 202, 0.65)"
+          strokeWidth={yarnThickness * 0.35}
+          strokeDasharray="4 3"
+          strokeDashoffset={dashOffset}
+          strokeLinecap="round"
+        />
 
-      {/* Pinned Evidence Label along the Curve */}
-      {label && labelSpring > 0.05 ? (
-        <g transform={`translate(${cx}, ${cy - 12}) scale(${labelSpring})`}>
-          <rect
-            x={-((label.length * 8 + 26) / 2)}
-            y={-14}
-            width={label.length * 8 + 26}
-            height={28}
-            rx={4}
-            fill="#FAF7EE"
-            stroke="#1E293B"
-            strokeWidth="1.2"
-            filter="drop-shadow(0 3px 6px rgba(0,0,0,0.3))"
+        {/* 5. MICRO FIBER SHINE HIGHLIGHT */}
+        <path
+          d={pathD}
+          fill="none"
+          stroke="rgba(255, 255, 255, 0.45)"
+          strokeWidth={Math.max(1, yarnThickness * 0.2)}
+          strokeDasharray="2 6"
+          strokeDashoffset={dashOffset + 2}
+          strokeLinecap="round"
+        />
+
+        {/* 6. ANCHOR LOOP KNOTS AROUND PUSH PINS */}
+        {drawProgress >= 0.05 && (
+          <g>
+            {/* Start Knot Loop */}
+            <circle
+              cx={x1}
+              cy={y1}
+              r={yarnThickness * 1.5}
+              fill="none"
+              stroke={color}
+              strokeWidth={yarnThickness * 0.85}
+              filter="drop-shadow(1px 3px 3px rgba(0,0,0,0.4))"
+            />
+            <circle
+              cx={x1}
+              cy={y1}
+              r={yarnThickness * 0.6}
+              fill="#7f1d1d"
+            />
+          </g>
+        )}
+
+        {drawProgress >= 0.95 && (
+          <g>
+            {/* End Knot Loop */}
+            <circle
+              cx={x2}
+              cy={y2}
+              r={yarnThickness * 1.5}
+              fill="none"
+              stroke={color}
+              strokeWidth={yarnThickness * 0.85}
+              filter="drop-shadow(1px 3px 3px rgba(0,0,0,0.4))"
+            />
+            <circle
+              cx={x2}
+              cy={y2}
+              r={yarnThickness * 0.6}
+              fill="#7f1d1d"
+            />
+          </g>
+        )}
+
+        {/* 7. PINNED EVIDENCE LABEL SUSPENDED ALONG THE CURVE */}
+        {label && labelSpring > 0.05 && (
+          <g transform={`translate(${cx}, ${cy - 14}) scale(${labelSpring})`}>
+            <rect
+              x={-((label.length * 8.5 + 28) / 2)}
+              y={-14}
+              width={label.length * 8.5 + 28}
+              height={28}
+              rx={3}
+              fill="#FAF7EE"
+              stroke="#991B1B"
+              strokeWidth="1.5"
+              filter="drop-shadow(0 4px 8px rgba(0,0,0,0.35))"
+            />
+            <text
+              x={0}
+              y={4.5}
+              textAnchor="middle"
+              fill="#0F172A"
+              fontSize={11.5}
+              fontWeight={900}
+              letterSpacing={1.3}
+              fontFamily="'Courier New', Courier, monospace"
+            >
+              {label}
+            </text>
+          </g>
+        )}
+      </svg>
+
+      {/* 8. 3D BRASS PINS TACKING THE YARN INTO THE BOARD */}
+      {showPins && (
+        <>
+          <VoxBrassPin
+            x={x1}
+            y={y1}
+            size={pinSize}
+            dropFrame={drawStartFrame}
           />
-          <text
-            x={0}
-            y={4}
-            textAnchor="middle"
-            fill="#0F172A"
-            fontSize={11}
-            fontWeight={900}
-            letterSpacing={1.2}
-            fontFamily="'Courier New', Courier, monospace"
-          >
-            {label}
-          </text>
-        </g>
-      ) : null}
-    </svg>
+          {drawProgress >= 0.85 && (
+            <VoxBrassPin
+              x={x2}
+              y={y2}
+              size={pinSize}
+              dropFrame={drawStartFrame + Math.round(drawDuration * 0.85)}
+            />
+          )}
+        </>
+      )}
+    </div>
   );
 };

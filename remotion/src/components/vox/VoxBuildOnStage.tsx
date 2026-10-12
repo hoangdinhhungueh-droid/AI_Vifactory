@@ -13,6 +13,7 @@ import { useStopMotion } from "./useStopMotion";
 import {
   VoxBrassPin,
   VoxWashiTape,
+  VoxConnectingYarn,
 } from "./papercraft";
 import { VoxParallaxLayer } from "./VoxParallaxLayer";
 import { VoxDynamicChart, VoxDynamicChartProps } from "./VoxDynamicChart";
@@ -200,8 +201,9 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
 
   // 2. HERO SUBJECT CHOREOGRAPHY (Tactile slide only in paper_collage; grounded rise/fade in cinematic_doc)
   const heroDelayFrames = isTactileCollage ? Math.round(fps * 0.6 * speedRatio) : 0;
+  const steppedHeroFrame = isTactileCollage ? Math.floor(frame / 2) * 2 : frame;
   const heroSpring = spring({
-    frame: Math.max(0, frame - heroDelayFrames),
+    frame: Math.max(0, steppedHeroFrame - heroDelayFrames),
     fps,
     config: isTactileCollage ? SPRING_PRESETS.paperSlide : SPRING_PRESETS.paperHeavy,
   });
@@ -648,6 +650,21 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                     }}
                   />
                 )}
+
+                {/* Tactile 3D Brass Pushpin anchoring Hero Cutout in paper_collage mode */}
+                {isTactileCollage && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "-12px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      zIndex: 35,
+                    }}
+                  >
+                    <VoxBrassPin size={28} dropFrame={heroDelayFrames + 4} />
+                  </div>
+                )}
               </div>
             </div>
           </VoxParallaxLayer>
@@ -679,8 +696,9 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
             );
             // Varied Entrance Choreography: slide_in_deal, delicate_tack, stamp_slam
             const entrance = cutout.entranceType || (idx % 2 === 0 ? "slide_in_deal" : "delicate_tack");
+            const steppedCutFrame = isTactileCollage ? Math.floor(frame / 2) * 2 : frame;
             const cutSpring = spring({
-              frame: Math.max(0, frame - cutDelayFrames),
+              frame: Math.max(0, steppedCutFrame - cutDelayFrames),
               fps,
               config: entrance === "slide_in_deal"
                 ? SPRING_PRESETS.paperSlide
@@ -785,12 +803,13 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                   <div
                     style={{
                       position: "absolute",
-                      top: "-8px",
+                      top: "-12px",
                       left: "50%",
                       transform: "translateX(-50%)",
+                      zIndex: 35,
                     }}
                   >
-                    <VoxBrassPin size={16} />
+                    <VoxBrassPin size={26} dropFrame={cutDelayFrames + 4} />
                   </div>
                 )}
 
@@ -798,68 +817,46 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                   <div
                     style={{
                       position: "absolute",
-                      top: "-10px",
-                      left: "-8px",
+                      top: "-14px",
+                      left: "-12px",
+                      zIndex: 35,
                     }}
                   >
-                    <VoxWashiTape width={45} rotation={22} color="yellow" />
+                    <VoxWashiTape
+                      width={85}
+                      height={28}
+                      rotation={22}
+                      color="yellow"
+                      dropFrame={cutDelayFrames + 3}
+                    />
                   </div>
                 )}
               </div>
             );
           })}
 
-          {/* LAYER 3: RED CONNECTING YARN LINES (Tactile connecting lines) */}
+          {/* LAYER 3: RED CONNECTING YARN LINES (3D Catenary Woolen Yarn with Braided Fibers & Cast Shadow) */}
           {(isTactileCollage || yarns.length > 0) && yarns.map((yarn, yIdx) => {
             const defaultYarnSec = Math.min(dSec * 0.65, 0.9 + yIdx * 0.3) * (dSec < 7.0 ? speedRatio : 1.0);
             const yarnDelayFrames = Math.round(
               fps * (yarn.delaySec !== undefined ? yarn.delaySec : defaultYarnSec)
             );
-            const yarnDurationFrames = Math.max(6, Math.round(fps * 0.6 * speedRatio));
-            const drawProgress = interpolate(
-              frame,
-              [yarnDelayFrames, yarnDelayFrames + yarnDurationFrames],
-              [0, 1],
-              {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-                easing: Easing.out(Easing.cubic),
-              }
-            );
-
-            if (drawProgress <= 0) return null;
+            const yarnDurationFrames = Math.max(10, Math.round(fps * 0.7 * speedRatio));
 
             return (
-              <svg
-                key={yIdx}
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  width: "100%",
-                  height: "100%",
-                  pointerEvents: "none",
-                  zIndex: 25,
-                }}
-              >
-                <line
-                  x1={`${yarn.fromX}%`}
-                  y1={`${yarn.fromY}%`}
-                  x2={`${interpolate(
-                    drawProgress,
-                    [0, 1],
-                    [yarn.fromX, yarn.toX]
-                  )}%`}
-                  y2={`${interpolate(
-                    drawProgress,
-                    [0, 1],
-                    [yarn.fromY, yarn.toY]
-                  )}%`}
-                  stroke={yarn.color || "#dc2626"}
-                  strokeWidth="3.5"
-                  strokeDasharray="6 4"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <VoxConnectingYarn
+                key={`yarn-${yIdx}`}
+                fromX={yarn.fromX}
+                fromY={yarn.fromY}
+                toX={yarn.toX}
+                toY={yarn.toY}
+                color={yarn.color || "#dc2626"}
+                yarnThickness={4.5}
+                drawStartFrame={yarnDelayFrames}
+                drawDuration={yarnDurationFrames}
+                showPins={true}
+                pinSize={26}
+              />
             );
           })}
 
