@@ -6,6 +6,7 @@ import {
   useVideoConfig,
   Easing,
   Img,
+  Video,
 } from "remotion";
 import { SPRING_PRESETS } from "./springPresets";
 import { useStopMotion } from "./useStopMotion";
@@ -13,6 +14,7 @@ import {
   VoxBrassPin,
   VoxWashiTape,
 } from "./papercraft";
+import { VoxParallaxLayer } from "./VoxParallaxLayer";
 
 export interface VoxBuildOnCutout {
   id: string;
@@ -270,51 +272,74 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
         style={{
           width: "100%",
           height: "100%",
+          perspective: 1400,
+          transformStyle: "preserve-3d",
           transform: `scale(${cameraScale}) translate(${jitterX + cameraPanX}px, ${jitterY}px) rotate(${jitterRot}deg)`,
           transformOrigin: "center center",
           position: "relative",
         }}
       >
-        {/* LAYER 0: BASE PAPER BACKDROP (0 - 1.0s) */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundColor: getThemeBackground(),
-            borderRadius: 0,
-            boxShadow: "none",
-            transform: `scale(${backdropScale})`,
-            opacity: backdropOpacity,
-            overflow: "hidden",
-          }}
-        >
-          {backgroundSrc && (
-            <Img
-              src={backgroundSrc}
-              style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                filter: "contrast(1.05) brightness(0.96)",
-              }}
-            />
-          )}
-
-          {/* Paper Texture Overlay */}
+        {/* LAYER 0: BASE PAPER BACKDROP (PARALLAX BACKGROUND) */}
+        <VoxParallaxLayer depth="background" cameraMovement={cameraMovement} durationInFrames={fTotal}>
           <div
             style={{
               position: "absolute",
               inset: 0,
-              backgroundImage:
-                "radial-gradient(circle at 50% 50%, rgba(0,0,0,0.02) 1px, transparent 1px)",
-              backgroundSize: "24px 24px",
-              opacity: 0.65,
-              pointerEvents: "none",
+              backgroundColor: getThemeBackground(),
+              borderRadius: 0,
+              boxShadow: "none",
+              transform: `scale(${backdropScale})`,
+              opacity: backdropOpacity,
+              overflow: "hidden",
             }}
-          />
+          >
+            {backgroundSrc && (
+              Boolean(/\.(mp4|webm)($|\?)/i.test(backgroundSrc)) ? (
+                <Video
+                  src={backgroundSrc}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    filter: "contrast(1.05) brightness(0.96)",
+                  }}
+                  muted
+                  loop
+                />
+              ) : (
+                <Img
+                  src={backgroundSrc}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    filter: "contrast(1.05) brightness(0.96)",
+                  }}
+                />
+              )
+            )}
 
+            {/* Paper Texture Overlay */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                backgroundImage:
+                  "radial-gradient(circle at 50% 50%, rgba(0,0,0,0.02) 1px, transparent 1px)",
+                backgroundSize: "24px 24px",
+                opacity: 0.65,
+                pointerEvents: "none",
+              }}
+            />
+          </div>
+        </VoxParallaxLayer>
+
+        {/* MIDGROUND LAYER 1: EDITORIAL HEADLINES & EVIDENCE DOSSIER */}
+        <VoxParallaxLayer depth="midground" cameraMovement={cameraMovement} durationInFrames={fTotal}>
           {/* Archival Dossier Watermark (Rule 128 Generic Contract — only when subtitle is provided without headline) */}
           {subtitle && !headline && (
             <div
@@ -565,10 +590,11 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
               )}
             </div>
           )}
+        </VoxParallaxLayer>
 
-
-          {/* LAYER 1: HERO CUTOUT SUBJECT (Active in paper_collage, evidence_dossier right-pane, cinematic_doc when kept, or when no BG exists) */}
-          {heroSrc && (isTactileCollage || isEvidenceDossier || isCinematicDoc || !backgroundSrc) && (
+        {/* LAYER 1: HERO CUTOUT SUBJECT (PARALLAX FOREGROUND) */}
+        {heroSrc && (isTactileCollage || isEvidenceDossier || isCinematicDoc || !backgroundSrc) && (
+          <VoxParallaxLayer depth="foreground" cameraMovement={cameraMovement} durationInFrames={fTotal}>
             <div
               style={{
                 position: "absolute",
@@ -582,15 +608,29 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
               }}
             >
               <div style={{ position: "relative" }}>
-                <Img
-                  src={heroSrc}
-                  style={{
-                    width: "100%",
-                    height: "auto",
-                    display: "block",
-                    filter: "contrast(1.08)",
-                  }}
-                />
+                {Boolean(/\.(mp4|webm)($|\?)/i.test(heroSrc)) ? (
+                  <Video
+                    src={heroSrc}
+                    style={{
+                      width: "100%",
+                      height: "auto",
+                      display: "block",
+                      filter: "contrast(1.08)",
+                    }}
+                    muted
+                    loop
+                  />
+                ) : (
+                  <Img
+                    src={heroSrc}
+                    style={{
+                      width: "100%",
+                      height: "auto",
+                      display: "block",
+                      filter: "contrast(1.08)",
+                    }}
+                  />
+                )}
                 {/* White Paper Cutout Border Simulation (only in tactile paper_collage mode) */}
                 {isTactileCollage && (
                   <div
@@ -634,9 +674,11 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
                 </div>
               )}
             </div>
-          )}
+          </VoxParallaxLayer>
+        )}
 
-          {/* LAYER 2: SUPPORTING CUTOUTS & EVIDENCE (Strictly tactile paper_collage mode) */}
+        {/* LAYER 2: SUPPORTING CUTOUTS & EVIDENCE (PARALLAX MIDGROUND) */}
+        <VoxParallaxLayer depth="midground" cameraMovement={cameraMovement} durationInFrames={fTotal}>
           {isTactileCollage && supportingCutouts.map((cutout, idx) => {
             const defaultCutSec = (3.5 + idx * 0.4) * speedRatio;
             const cutDelayFrames = Math.round(
@@ -811,7 +853,7 @@ export const VoxBuildOnStage: React.FC<VoxBuildOnStageProps> = ({
               </div>
             </div>
           )}
-        </div>
+        </VoxParallaxLayer>
       </div>
     </div>
   );

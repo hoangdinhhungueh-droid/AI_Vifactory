@@ -167,7 +167,8 @@ class ModelGateway:
         system_prompt: Optional[str],
         max_tokens: int,
         temperature: float,
-        timeout: float
+        timeout: float,
+        image_base64: Optional[str] = None
     ) -> str:
         """Call HHTech API (primary provider) with automatic retry on streaming ReadTimeout."""
         if not self.hhtech_key:
@@ -180,10 +181,23 @@ class ModelGateway:
         if "claude" in model.lower():
             headers["anthropic-beta"] = "prompt-caching-2024-07-31"
         
-        messages: List[Dict[str, str]] = []
+        messages: List[Dict[str, Any]] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
+        
+        if image_base64:
+            user_content: List[Dict[str, Any]] = [
+                {"type": "text", "text": prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{image_base64}"
+                    }
+                }
+            ]
+            messages.append({"role": "user", "content": user_content})
+        else:
+            messages.append({"role": "user", "content": prompt})
         
         payload = {
             "model": model,
@@ -369,6 +383,60 @@ class ModelGateway:
             self.cost_tracker.record(model, total_tokens, is_image=False)
             
             return content
+    
+    def call_vision(
+        self,
+        prompt: str,
+        image_base64: str,
+        model: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        max_tokens: int = 4000,
+        temperature: float = 0.3,
+        timeout: float = 90.0,
+        fallback: Optional[str] = None
+    ) -> str:
+        """
+        Call multimodal LLM with an image (base64) and text prompt.
+        
+        Args:
+            prompt: Text prompt / evaluation instructions
+            image_base64: Base64-encoded JPEG/PNG image data
+            model: Model identifier (default: claude-opus-5-5)
+            system_prompt: Optional system prompt
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            timeout: Request timeout in seconds
+            fallback: Optional fallback model (e.g., "gpt-6-astra")
+            
+        Returns:
+            Generated text analysis / critique
+        """
+        model = model or "claude-opus-5-5"
+        try:
+            logger.info(f"[GATEWAY] Calling vision model: {model}")
+            return self._call_hhtech(
+                prompt=prompt,
+                model=model,
+                system_prompt=system_prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=timeout,
+                image_base64=image_base64
+            )
+        except Exception as e:
+            logger.warning(f"[GATEWAY] Vision model {model} failed: {e}")
+            if fallback:
+                logger.info(f"[GATEWAY] Trying fallback vision model: {fallback}")
+                return self._call_hhtech(
+                    prompt=prompt,
+                    model=fallback,
+                    system_prompt=system_prompt,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    timeout=timeout,
+                    image_base64=image_base64
+                )
+            raise
     
     def call_image(
         self,
