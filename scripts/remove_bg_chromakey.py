@@ -39,6 +39,7 @@ def remove_bg_white_floodfill(im: Image.Image, tol: float = 30.0) -> Image.Image
     """Border-connected flood-fill alpha extraction for pure solid white (#FFFFFF) backdrops.
     Guarantees zero hole punching into interior white document memos, statements, or paper.
     """
+    im = im.convert("RGBA")
     w, h = im.size
     pixels = im.load()
     visited = bytearray(w * h)
