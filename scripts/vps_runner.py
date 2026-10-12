@@ -15,16 +15,16 @@ except (AttributeError, io.UnsupportedOperation) as _e_enc:
 
 ENDPOINTS = [
     {
-        "url": "https://mcp2.vifactory.com/mcp",
-        "token": "8kV2nR9pL4mQ7wF3jB6vN1cY8tZ5hD0aS",
-        "cf_id": None,
-        "cf_secret": None
-    },
-    {
         "url": "https://ag.vifactory.com/mcp",
         "token": "AG_1GWQeTfEGoSlHSsKcC4rJ8O28wYrTsfj4AR4x7xY",
         "cf_id": "8b08f2a93e3c6b29d726695044d7297b.access",
         "cf_secret": "911083c977c4e746f00156fdce8eb6633756cb5a0d815454431869991fac20d6"
+    },
+    {
+        "url": "https://mcp2.vifactory.com/mcp",
+        "token": "8kV2nR9pL4mQ7wF3jB6vN1cY8tZ5hD0aS",
+        "cf_id": None,
+        "cf_secret": None
     }
 ]
 

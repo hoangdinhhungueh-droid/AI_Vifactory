@@ -34,6 +34,7 @@ EPISODES = Path("/var/vf/episodes")
 LOCK_DIR = Path("/var/vf/locks")
 LOG_DIR = Path("/var/vf/logs")
 PROMPTS_FORGE_MIN_AGE_SEC = 300  # 5 minutes
+PROMPTS_FORGE_MAX_AGE_SEC = 86400  # 24 hours (prevents infinite polling of stale/completed episodes)
 
 
 def _log(msg):
@@ -138,12 +139,16 @@ def main():
             img_count = len(list(images_dir.glob("*.png")) + list(images_dir.glob("*.jpg")))
             if img_count > 0:
                 continue
+
+        # Skip if images_manifest.json already exists (B4 already processed)
+        if (ep_dir / "images_manifest.json").exists():
+            continue
         
         # Skip if already dispatched
         if already_dispatched(episode_id):
             continue
         
-        # Check prompts_forge.json age (avoid racing with file creation)
+        # Check prompts_forge.json age (avoid racing with file creation, skip stale historical episodes)
         try:
             mtime = prompts_forge.stat().st_mtime
             age_sec = time.time() - mtime
@@ -151,6 +156,9 @@ def main():
                 _log("%s: prompts_forge.json too recent (%.0fs old), waiting" % 
                      (episode_id, age_sec))
                 found_waiting += 1
+                continue
+            if age_sec > PROMPTS_FORGE_MAX_AGE_SEC:
+                # Stale historical episode (>24h). Skip to prevent infinite polling loops.
                 continue
         except Exception as e:
             _log("%s: cannot stat prompts_forge.json: %s" % (episode_id, e))

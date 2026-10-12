@@ -132,10 +132,35 @@ def resolve_child_symbolic_artifact(
     }
 
 
-def apply_real_person_censor_shield(entity_desc: str, fg_key: str = "") -> str:
-    """Enforces black censor bar, midground distance, and non-photorealistic stylized graphic novel rules for real figures."""
+def apply_real_person_censor_shield(entity_desc: str, fg_key: str = "", enforce_censor_bar: bool = False) -> str:
+    """Enforces non-photorealistic stylized graphic novel rules for figures.
+    
+    If enforce_censor_bar is True, enforces black censor bar for legal anonymity of real public figures.
+    If enforce_censor_bar is False (default for AI docudrama characters), enforces natural expressive
+    open eyes with sharp focused gaze and strictly ZERO creepy black censor bars.
+    """
     p = entity_desc.strip()
     
+    if not enforce_censor_bar:
+        # User Feedback Mandate: AI generated characters must NOT have creepy black censor tape across eyes
+        # Strip existing censor bar mentions if present
+        p = re.sub(r",?\s*(?:featuring\s+a\s+solid\s+black\s+censor\s+bar\s+across\s+the\s+eyes[^,.]*)", "", p, flags=re.IGNORECASE)
+        p = re.sub(r",?\s*(?:a\s+solid\s+black\s+censor\s+bar\s+across\s+the\s+eyes[^,.]*)", "", p, flags=re.IGNORECASE)
+        p = re.sub(r"\b(?:black\s+)?censor\s+bar(?:\s+across\s+the\s+eyes)?\b", "", p, flags=re.IGNORECASE)
+        p = re.sub(r"\s{2,}", " ", p).strip()
+        
+        natural_eye_clause = (
+            " featuring natural expressive open eyes with intense focused investigative gaze, "
+            "no censor bar, positioned at midground distance (never extreme close-up on facial complexion), "
+            "three-quarter angle framing, non-photorealistic 2D stylized graphic novel comic ink illustration, "
+            "no real-life recognizable likeness, no celebrity likeness"
+        )
+        if "waist-up" in p.lower():
+            p = re.sub(r"(waist-up[^,.]*)", r"\1," + natural_eye_clause, p, count=1, flags=re.IGNORECASE)
+        else:
+            p = f"{p},{natural_eye_clause}"
+        return p
+
     # Check if already has censor bar directive
     if "censor bar" in p.lower() or "black censor bar" in p.lower():
         if "midground distance" not in p.lower() and "off in the distance" not in p.lower():
@@ -227,13 +252,14 @@ def shield_visual_roster(
     bg_roster: Dict[str, Any],
     fg_roster: Dict[str, Any],
     story_text: str = "",
-    market: str = "EN"
+    market: str = "EN",
+    enforce_censor_bar: bool = False,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Master Shield Gate executed BEFORE B3 Scene Planning.
     
     Audits 100% of Foregrounds and Backgrounds:
     1. Converts child characters into context-aware Symbolic Artifacts.
-    2. Applies black censor bar and anonymity directives to real named adult figures.
+    2. Applies natural expressive open eyes (or optional censor bar if enforce_censor_bar=True) to adult figures.
     3. Purges human figures from Background environments.
     """
     clean_bg: Dict[str, Any] = {}
@@ -298,13 +324,13 @@ def shield_visual_roster(
                 clean_fg[fg_k] = v_copy
                 continue
 
-            # Check Real Adult Character -> Enforce Censor Bar
+            # Adult Character -> Enforce natural expressive open eyes (or censor bar if explicit)
             if fg_type == "character":
-                shielded_desc = apply_real_person_censor_shield(desc, fg_key=fg_k)
+                shielded_desc = apply_real_person_censor_shield(desc, fg_key=fg_k, enforce_censor_bar=enforce_censor_bar)
                 v_copy["description"] = shielded_desc
                 if "visual_hint" in v_copy:
                     v_copy["visual_hint"] = shielded_desc
-                v_copy["censor_bar_enforced"] = True
+                v_copy["censor_bar_enforced"] = enforce_censor_bar
 
             clean_fg[fg_k] = v_copy
         else:
@@ -316,7 +342,7 @@ def shield_visual_roster(
                 )
                 clean_fg[fg_k] = symbolic["description"]
             elif fg_k.lower().startswith("fg_character_") or fg_k.lower().startswith("char_"):
-                clean_fg[fg_k] = apply_real_person_censor_shield(desc_str, fg_key=fg_k)
+                clean_fg[fg_k] = apply_real_person_censor_shield(desc_str, fg_key=fg_k, enforce_censor_bar=enforce_censor_bar)
             else:
                 clean_fg[fg_k] = desc_str
 

@@ -60,14 +60,22 @@ def test_resolve_child_symbolic_artifact():
 
 def test_apply_real_person_censor_shield():
     desc = "Federal prosecutor Jerome Vance in dark navy wool suit, waist-up three-quarter angle."
-    shielded = apply_real_person_censor_shield(desc, fg_key="fg_character_prosecutor")
+    
+    # 1. Default for AI docudrama: natural expressive open eyes, zero creepy censor bar
+    uncensored = apply_real_person_censor_shield(desc, fg_key="fg_character_prosecutor", enforce_censor_bar=False)
+    assert "no censor bar" in uncensored.lower()
+    assert "natural expressive open eyes" in uncensored.lower()
+    assert "censor bar across the eyes" not in uncensored.lower()
+    
+    # 2. When explicitly requested for real living person anonymity: enforce censor bar
+    shielded = apply_real_person_censor_shield(desc, fg_key="fg_character_prosecutor", enforce_censor_bar=True)
     assert "censor bar" in shielded.lower()
     assert "black censor bar across the eyes" in shielded.lower()
     assert "midground distance" in shielded.lower()
     assert "non-photorealistic" in shielded.lower()
 
     # Re-applying does not duplicate censor bar
-    shielded_again = apply_real_person_censor_shield(shielded, fg_key="fg_character_prosecutor")
+    shielded_again = apply_real_person_censor_shield(shielded, fg_key="fg_character_prosecutor", enforce_censor_bar=True)
     assert shielded_again.count("censor bar") == 1
 
 
@@ -111,7 +119,8 @@ def test_shield_visual_roster_execution():
         }
     }
 
-    clean_bg, clean_fg = shield_visual_roster(bg_roster, fg_roster, story_text="A historic school disappearance case", market="EN")
+    # Test Default AI Character Mode (enforce_censor_bar=False)
+    clean_bg, clean_fg = shield_visual_roster(bg_roster, fg_roster, story_text="A historic school disappearance case", market="EN", enforce_censor_bar=False)
 
     # 1. Background human crowds purged
     assert "empty architectural spaces" in clean_bg["bg_courthouse"]["description"]
@@ -121,12 +130,17 @@ def test_shield_visual_roster_execution():
     assert clean_fg["fg_character_young_victim"].get("is_child_symbolic") is True
     assert "no human figures" in clean_fg["fg_character_young_victim"]["description"].lower()
 
-    # 3. Adult character shielded with censor bar
-    assert "censor bar across the eyes" in clean_fg["fg_character_lead_investigator"]["description"].lower()
-    assert clean_fg["fg_character_lead_investigator"].get("censor_bar_enforced") is True
+    # 3. Adult character has natural open eyes, zero creepy censor bar
+    assert "natural expressive open eyes" in clean_fg["fg_character_lead_investigator"]["description"].lower()
+    assert clean_fg["fg_character_lead_investigator"].get("censor_bar_enforced") is False
 
     # 4. Normal document unchanged in type
     assert clean_fg["fg_evidence_docket"]["type"] == "document"
+
+    # Test Explicit Real Person Shield (enforce_censor_bar=True)
+    _, clean_fg_censored = shield_visual_roster(bg_roster, fg_roster, story_text="A historic case", market="EN", enforce_censor_bar=True)
+    assert "censor bar across the eyes" in clean_fg_censored["fg_character_lead_investigator"]["description"].lower()
+    assert clean_fg_censored["fg_character_lead_investigator"].get("censor_bar_enforced") is True
 
 
 def test_audit_cliffhanger_5_patterns():

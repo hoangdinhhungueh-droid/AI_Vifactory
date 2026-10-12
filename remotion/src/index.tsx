@@ -2329,6 +2329,7 @@ export const TwoLayerEpisode: React.FC<{
             layoutVariant={resolvedLayoutVariant}
             sceneIndex={idx}
             cameraMovement={s.cameraMovement || (s.camera ? s.camera.movement : undefined)}
+            chartProps={s.chartProps || s.chart_props}
           />
           <TwoLayerScene
             background={bgRaw}
