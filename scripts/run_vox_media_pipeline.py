@@ -571,13 +571,14 @@ def evaluate_human_gate(
     return False
 
 
-def run_stage_videos(episode_id: str, limit: int = 0, acc: str = "all") -> bool:
+def run_stage_videos(episode_id: str, limit: int = 0, acc: str = "all", headless: bool = False) -> bool:
     """Thực thi sinh video clips qua flow_video_dispatcher.py (xoay vòng 7 acc)."""
     print("\n" + "=" * 75)
     print("🎬 [BƯỚC 5: SINH VIDEO CLIPS VEO 3.1 XOAY VÒNG 7 TÀI KHOẢN]")
     print(f"   Episode: {episode_id}")
     print(f"   Tài khoản: {acc}")
     print(f"   Giới hạn: {limit if limit > 0 else 'Toàn bộ'} clips / account")
+    print(f"   Chế độ: {'Headless (chạy ngầm)' if headless else 'Headed (mở giao diện)'}")
     print("=" * 75)
 
     cmd = [
@@ -588,6 +589,10 @@ def run_stage_videos(episode_id: str, limit: int = 0, acc: str = "all") -> bool:
     ]
     if limit > 0:
         cmd.extend(["--limit", str(limit)])
+    if headless:
+        cmd.append("--headless")
+    else:
+        cmd.append("--headed")
 
     print(f"🚀 Thực thi lệnh: {' '.join(cmd)}")
     res = subprocess.run(cmd)
@@ -707,7 +712,8 @@ def main():
         ok_vid = run_stage_videos(
             clean_ep,
             limit=total_scenes_to_run,
-            acc=args.acc
+            acc=args.acc,
+            headless=args.headless
         )
         sync_assets_to_blocks_and_flat(clean_ep, block_manifest)
         if not ok_vid:

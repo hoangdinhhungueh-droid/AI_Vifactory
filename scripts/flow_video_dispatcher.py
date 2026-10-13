@@ -72,23 +72,7 @@ PROFILES = {
 def dismiss_dialogs(page):
     """Đóng các popup chào mừng, điều khoản nếu xuất hiện."""
     for _ in range(3):
-        next_btn = page.get_by_role("button", name="Next")
-        if next_btn.count() > 0 and next_btn.first.is_visible():
-            try:
-                next_btn.first.click()
-                time.sleep(1)
-            except Exception:
-                pass
-
-        scroll_target = page.locator(".scroll-end-target")
-        if scroll_target.count() > 0:
-            try:
-                scroll_target.first.scroll_into_view_if_needed(timeout=2000)
-            except Exception:
-                pass
-            time.sleep(1)
-
-        for name in ["Continue", "Get started", "Accept", "Got it", "Dismiss", "Close"]:
+        for name in ["Next", "Tiếp theo", "Continue", "Tiếp tục", "Get started", "Bắt đầu", "Accept", "Chấp nhận", "Got it", "Đã hiểu", "Dismiss", "Bỏ qua", "Close", "Đóng", "I agree", "Tôi đồng ý", "Allow", "Cho phép"]:
             btn = page.get_by_role("button", name=name)
             if btn.count() > 0 and btn.first.is_visible():
                 try:
@@ -98,47 +82,61 @@ def dismiss_dialogs(page):
                 except Exception:
                     pass
 
-def ensure_veo_fast_model(page) -> bool:
-    """Đảm bảo model Veo 3.1 - Fast được chọn."""
-    try:
-        settings_btn = page.locator("button[aria-label='Settings']").first
-        if not settings_btn.is_visible():
-            pbox = page.locator("div.ProseMirror, [contenteditable='true']").first
-            if pbox.count() > 0:
-                pbox.click()
-                time.sleep(1)
-
-        if settings_btn.count() > 0 and settings_btn.is_visible():
-            settings_btn.click()
+        scroll_target = page.locator(".scroll-end-target")
+        if scroll_target.count() > 0:
+            try:
+                scroll_target.first.scroll_into_view_if_needed(timeout=2000)
+            except Exception:
+                pass
             time.sleep(1)
 
-            never_opt = page.locator("text='Never'").first
+def ensure_veo_fast_model(page) -> bool:
+    """Đảm bảo model Veo 3.1 - Fast được chọn trong cài đặt tác nhân."""
+    try:
+        # Settings button trong khung prompt (tune icon)
+        tune_btn = page.locator("button:has-text('tune'), button[aria-label*='Cài đặt' i]:has-text('tune')").first
+        if not tune_btn.is_visible():
+            pbox = page.locator("div.ProseMirror, [contenteditable='true']").first
+            if pbox.count() > 0:
+                pbox.click(force=True)
+                time.sleep(1)
+
+        if tune_btn.count() > 0 and tune_btn.is_visible():
+            tune_btn.click()
+            time.sleep(1.5)
+
+            never_opt = page.locator("text='Không bao giờ', text='Never'").first
             if never_opt.count() > 0:
                 never_opt.click(force=True)
                 time.sleep(0.5)
 
-            model_drop = page.locator("button:has-text('Omni 1.1 Flash'), button:has-text('Veo')").first
+            # Chọn model video Veo 3.1 - Fast
+            model_drop = page.locator("button:has-text('Omni 1.1 Flash'), button:has-text('Veo')").last
             if model_drop.count() > 0:
                 btn_text = model_drop.text_content() or ""
-                if "Veo 3.1 - Fast" not in btn_text:
+                if "Veo 3.1 - Fast" not in btn_text and "Veo" not in btn_text:
                     model_drop.click()
                     time.sleep(1)
-                    veo_choice = page.locator("[role='menuitem'], button").filter(has_text="Veo 3.1 - Fast").last
+                    veo_choice = page.locator("[role='menuitem'], [role='option'], button").filter(has_text="Veo 3.1 - Fast").last
                     if veo_choice.count() > 0:
                         veo_choice.click(force=True)
                         time.sleep(1)
 
-            save_btn = page.locator("button:has-text('Save')").first
-            if save_btn.count() > 0 and save_btn.is_enabled():
+            save_btn = page.locator("button:has-text('Lưu'), button:has-text('Save')").first
+            if save_btn.count() > 0 and save_btn.is_visible() and save_btn.is_enabled():
                 save_btn.click()
                 time.sleep(1)
             else:
-                close_btn = page.locator("button[aria-label='Close'], button:has-text('close')").first
-                if close_btn.count() > 0 and close_btn.is_visible():
-                    close_btn.click()
+                back_btn = page.locator("button:has-text('arrow_back'), button[aria-label*='Back' i], button[aria-label*='Quay lại' i]").first
+                if back_btn.count() > 0 and back_btn.is_visible():
+                    back_btn.click()
                 else:
-                    settings_btn.click()
+                    tune_btn.click()
                 time.sleep(1)
+
+        if page.locator(".cdk-overlay-backdrop").count() > 0:
+            page.keyboard.press("Escape")
+            time.sleep(0.5)
         return True
     except Exception as e:
         print(f"      ⚠️ Lỗi cấu hình model: {e}")
@@ -161,75 +159,111 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             seed_img = brain_seed
 
     try:
-        done_btn = page.locator("button[aria-label='Done editing scene'], button:has-text('Done')").first
+        done_btn = page.locator("button[aria-label*='Done' i], button[aria-label*='Xong' i], button:has-text('Done'), button:has-text('Xong'), button:has-text('Hoàn tất')").first
         if done_btn.count() > 0 and done_btn.is_visible():
             done_btn.click()
             time.sleep(1)
 
-        back_btn = page.locator("button[aria-label*='Back' i]").first
+        back_btn = page.locator("button[aria-label*='Back' i], button[aria-label*='Quay lại' i], button:has-text('arrow_back')").first
         if back_btn.count() > 0 and back_btn.is_visible():
             back_btn.click()
             time.sleep(1)
 
         if seed_img.exists():
             print(f"      🖼️ Đang nạp ảnh Seed: {seed_img.name}...")
-            ingr_btn = page.locator("button[aria-label*='Add ingredients to the prompt box' i], button[aria-label*='Add ingredients' i]").first
-            if ingr_btn.count() > 0 and ingr_btn.is_visible():
-                ingr_btn.click()
-                time.sleep(2)
+            # Check if "I agree" dialog is currently open
+            agree_btn = page.locator("button:has-text('Tôi đồng ý'), button:has-text('I agree')").first
+            if agree_btn.count() > 0 and agree_btn.is_visible():
+                agree_btn.click(force=True)
+                time.sleep(1.5)
 
-                up_btn = page.locator("button:has-text('Upload media'), button:has-text('Upload')").first
-                if up_btn.count() > 0 and up_btn.is_visible():
-                    with page.expect_file_chooser() as fc_info:
-                        up_btn.click()
-                    fc_info.value.set_files(str(seed_img))
-                    time.sleep(4)
+            # Click add menu trigger để mở panel ingredients
+            trigger = page.locator(".add-menu-trigger, button[aria-label*='Thêm thành phần vào ô nhập câu lệnh'], button[aria-label*='Add ingredients to the prompt box'], button[aria-label*='Add ingredients']").first
+            if trigger.count() > 0 and trigger.is_visible():
+                trigger.click(force=True)
+                time.sleep(1.5)
 
-                    agree_btn = page.locator("button:has-text('I agree')").first
-                    if agree_btn.count() > 0 and agree_btn.is_visible():
-                        agree_btn.click()
+            up_btn = page.locator(".sidebar-upload-btn, button:has(.upload-container), button:has-text('Tải nội dung nghe nhìn lên'), button:has-text('Upload media')").first
+            if up_btn.count() > 0 and up_btn.is_visible():
+                box = up_btn.bounding_box()
+                if box:
+                    cx = box['x'] + box['width'] / 2
+                    cy = box['y'] + box['height'] / 2
+                    try:
+                        with page.expect_file_chooser(timeout=10000) as fc_info:
+                            page.mouse.click(cx, cy)
+                        fc = fc_info.value
+                        fc.set_files(str(seed_img))
+                        print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser!")
                         time.sleep(3)
+                    except Exception as e:
+                        print(f"      ⚠️ Lỗi file chooser: {e}")
 
-                    add_to_prompt = page.locator("button:has-text('Add to prompt')").first
-                    if add_to_prompt.count() > 0 and add_to_prompt.is_visible():
-                        add_to_prompt.click()
-                        time.sleep(2)
-                    else:
-                        first_asset = page.locator("img[src*='googleusercontent']").first
-                        if first_asset.count() > 0 and first_asset.is_visible():
-                            first_asset.click()
-                            time.sleep(1)
-                            if add_to_prompt.count() > 0 and add_to_prompt.is_visible():
-                                add_to_prompt.click()
-                                time.sleep(2)
+                agree_btn = page.locator("button:has-text('Tôi đồng ý'), button:has-text('I agree')").first
+                if agree_btn.count() > 0 and agree_btn.is_visible():
+                    agree_btn.click(force=True)
+                    time.sleep(2)
+
+                add_to_prompt = page.locator("button:has-text('Thêm vào câu lệnh'), button:has-text('Add to prompt')").first
+                if add_to_prompt.count() > 0 and add_to_prompt.is_visible():
+                    add_to_prompt.click(force=True)
+                    time.sleep(2)
+                else:
+                    first_asset = page.locator(".asset-item, [role='listitem'], .cdk-drag").first
+                    if first_asset.count() > 0 and first_asset.is_visible():
+                        first_asset.click(force=True)
+                        time.sleep(1)
+                        add_to_prompt = page.locator("button:has-text('Thêm vào câu lệnh'), button:has-text('Add to prompt')").first
+                        if add_to_prompt.count() > 0 and add_to_prompt.is_visible():
+                            add_to_prompt.click(force=True)
+                            time.sleep(2)
 
         prompt_box = page.locator("div.ProseMirror, [contenteditable='true']").first
         if prompt_box.count() == 0:
             print("      ❌ Không tìm thấy ô nhập prompt!")
             return False
 
-        prompt_box.click()
+        prompt_box.click(force=True)
         prompt_box.fill(prompt_text)
         time.sleep(1)
 
-        start_gen = page.locator("button[aria-label*='Start generation' i], button:has-text('arrow_forward')").first
+        start_gen = page.locator("button[aria-label*='Bắt đầu tạo'], button[aria-label*='Start generation' i], button:has-text('arrow_forward')").first
         if start_gen.count() == 0 or not start_gen.is_visible():
             print("      ❌ Không tìm thấy nút Start generation!")
             return False
 
-        start_gen.click()
+        start_gen.click(force=True)
         print("      🚀 Đã bấm Start generation. Đang chờ Veo 3.1 sinh video...")
         time.sleep(3)
 
-        page.evaluate('''() => {
-            const els = Array.from(document.querySelectorAll('*')).filter(el => {
-                const txt = (el.innerText || '').trim();
-                return (txt === 'Approve' || txt === 'Always approve') && !el.className.includes('dimmed');
-            });
-            if (els.length > 0) els[els.length - 1].click();
-        }''')
+        # Chờ dialog phê duyệt tín dụng (có thể mất 3-8s server phản hồi)
+        approved = False
+        for _ in range(15):
+            time.sleep(2)
+            for sel in [
+                "[aria-label*='Luôn phê duyệt']",
+                "[aria-label*='Always approve']",
+                "text='Luôn phê duyệt'",
+                "text='Always approve'",
+                "[aria-label*='Phê duyệt']",
+                "[aria-label*='Approve']",
+                "text='Phê duyệt'",
+                "text='Approve'"
+            ]:
+                appr = page.locator(sel).first
+                if appr.count() > 0 and appr.is_visible():
+                    try:
+                        appr.click(force=True)
+                        print(f"      ✅ Đã bấm phê duyệt chi phí tín dụng ({sel})!")
+                        approved = True
+                        time.sleep(2)
+                        break
+                    except Exception:
+                        pass
+            if approved:
+                break
 
-        max_wait_sec = 210
+        max_wait_sec = 240
         start_time = time.time()
         completed = False
 
@@ -253,51 +287,80 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             return False
 
         time.sleep(3)
-        curr_thumbnails = page.locator("img[src*='googleusercontent'], img[src*='asb']").all()
-        if not curr_thumbnails:
-            print("      ❌ Không tìm thấy thumbnail trên canvas!")
-            return False
-
-        curr_thumbnails[0].click()
+        # Mở video player qua video option ở sidebar phải hoặc video tile trên canvas
+        vid_opt = page.locator("flow-a2ui-video-option, .media-wrapper").first
+        if vid_opt.count() > 0 and vid_opt.is_visible():
+            vid_opt.click(force=True)
+        else:
+            # Fallback: click tọa độ video tile trên canvas
+            page.mouse.click(240, 180)
         time.sleep(3)
 
-        dl_btn = page.locator("button[aria-label*='Download media' i], button:has-text('download')").first
+        dl_btn = page.locator("button[aria-label*='Tải nội dung nghe nhìn xuống'], button[aria-label*='Tải xuống'], button[aria-label*='Download' i], button:has-text('download')").first
         if dl_btn.count() == 0 or not dl_btn.is_visible():
             print("      ❌ Không tìm thấy nút Download media trong player!")
             return False
 
-        dl_btn.click()
-        time.sleep(1)
+        dl_btn.click(force=True)
+        time.sleep(1.5)
 
-        opt_720 = page.locator("div, button, span").filter(has_text="720p").last
-        if opt_720.count() == 0 or not opt_720.is_visible():
-            print("      ❌ Không thấy tùy chọn 720p!")
+        opt_720 = page.locator(".cdk-overlay-container").get_by_text("720p").first
+        if opt_720.count() == 0:
+            opt_720 = page.locator("div, button, span, [role='menuitem']").filter(has_text=re.compile(r'(720p|1080p)', re.I)).last
+
+        if opt_720.count() == 0:
+            print("      ❌ Không thấy tùy chọn 720p/1080p!")
             return False
 
-        opt_720.click()
+        # Thử bắt sự kiện tải xuống của Playwright trước
         downloaded = None
-        for _ in range(35):
+        try:
+            with page.expect_download(timeout=12000) as dl_info:
+                opt_720.click(force=True)
+            pw_dl = dl_info.value
+            pw_dl.save_as(str(out_file))
+            print(f"      ✅ Tải thành công {out_file.name} ({out_file.stat().st_size:,} bytes)")
+            # Đóng player trở về canvas
+            for sel in ["button:has-text('Xong')", "button:has-text('Done')", "button:has-text('arrow_back')", "button[aria-label*='Back' i]"]:
+                btn = page.locator(sel).first
+                if btn.count() > 0 and btn.is_visible():
+                    try:
+                        btn.click(force=True)
+                        time.sleep(1)
+                        break
+                    except Exception:
+                        pass
+            return True
+        except Exception:
+            # Fallback sang quét thư mục download của trình duyệt
+            pass
+
+        for _ in range(40):
             time.sleep(2)
             cr = list(out_file.parent.glob("*.crdownload"))
             if cr:
                 continue
             for f in out_file.parent.glob("*.mp4"):
-                if f.name != out_file.name and (time.time() - f.stat().st_mtime < 45):
+                if f.name != out_file.name and (time.time() - f.stat().st_mtime < 60) and f.stat().st_size > 200000:
                     downloaded = f
                     break
             if downloaded:
                 break
 
-        if not downloaded:
-            for cr in out_file.parent.glob("*.crdownload"):
-                if time.time() - cr.stat().st_mtime < 60 and cr.stat().st_size > 100000:
-                    downloaded = cr
-                    break
-
         if downloaded:
             import shutil
-            shutil.copy2(str(downloaded), str(out_file))
+            if downloaded.resolve() != out_file.resolve():
+                shutil.copy2(str(downloaded), str(out_file))
             print(f"      ✅ Tải thành công {out_file.name} ({out_file.stat().st_size:,} bytes)")
+            for sel in ["button:has-text('Xong')", "button:has-text('Done')", "button:has-text('arrow_back')", "button[aria-label*='Back' i]"]:
+                btn = page.locator(sel).first
+                if btn.count() > 0 and btn.is_visible():
+                    try:
+                        btn.click(force=True)
+                        time.sleep(1)
+                        break
+                    except Exception:
+                        pass
             return True
         else:
             print("      ❌ Không phát hiện file tải về trong thư mục!")
@@ -307,7 +370,7 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         print(f"      ❌ Lỗi khi sinh video {scene_id}: {e}")
         return False
 
-def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: Path) -> dict:
+def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: Path, headless: bool = False) -> dict:
     """Xử lý toàn bộ các clip được giao cho 1 tài khoản."""
     acc_info = PROFILES[acc_key]
     profile_dir = acc_info['path']
@@ -321,7 +384,7 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
         browser = p.chromium.launch_persistent_context(
             user_data_dir=str(profile_dir),
             channel="chrome",
-            headless=True,
+            headless=headless,
             accept_downloads=True,
             args=[
                 "--disable-blink-features=AutomationControlled",
@@ -348,28 +411,31 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
         if "/project/" not in page.url:
             print("   Chờ giao diện trang chủ sẵn sàng...")
             try:
-                page.wait_for_selector(".project-card, button:has-text('New project'), button:has-text('Start Creating')", timeout=25000)
+                page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')", timeout=25000)
             except Exception:
                 pass
             time.sleep(2)
 
-            cards = page.locator(".project-card").all()
-            if cards:
-                print(f"   Mở project có sẵn ({len(cards)} cards)...")
-                cards[0].click()
+            # Tìm project chuyên biệt của episode hoặc tạo project mới sạch sẽ
+            ep_id = episode_dir.name
+            ep_short = ep_id.split('_')[0] if '_' in ep_id else ep_id
+            ep_cards = page.locator(".project-card, [data-project-id]").filter(has_text=re.compile(f"({ep_id}|{ep_short})", re.I)).all()
+            if ep_cards:
+                print(f"   Mở project chuyên biệt {ep_id} ({len(ep_cards)} found)...")
+                ep_cards[0].click()
             else:
-                new_btn = page.locator("button:has-text('New project')").first
+                new_btn = page.locator("button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')").first
                 if new_btn.count() > 0 and new_btn.is_visible():
-                    print("   Tạo project mới qua nút New project...")
+                    print("   Tạo project mới sạch sẽ cho episode qua nút New project / Dự án mới...")
                     new_btn.click()
                 else:
-                    sc_btn = page.locator("button:has-text('Start Creating')").first
-                    if sc_btn.count() > 0 and sc_btn.is_visible():
-                        print("   Tạo project qua nút Start Creating...")
-                        sc_btn.click()
+                    cards = page.locator(".project-card, [data-project-id], a[href*='/project/']").all()
+                    if cards:
+                        print(f"   Mở project có sẵn ({len(cards)} cards)...")
+                        cards[0].click()
                     else:
-                        print("   Click New project bằng text...")
-                        page.get_by_text("New project").first.click(force=True)
+                        print("   Click New project / Dự án mới bằng text...")
+                        page.get_by_text(re.compile(r'(New project|Dự án mới|Start Creating|Bắt đầu tạo)', re.I)).first.click(force=True)
 
         print("   Đợi canvas và prompt editor tải xong...")
         page.wait_for_selector("div.ProseMirror, [contenteditable='true']", timeout=30000)
@@ -384,6 +450,11 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
                 print(f"\n   ⏩ [BỎ QUA] {clip['output_filename']} đã tồn tại hợp lệ ({out_file.stat().st_size:,} bytes)")
                 results[clip["scene_id"]] = True
                 continue
+            elif out_file.exists() and out_file.stat().st_size == 0:
+                try:
+                    out_file.unlink()
+                except Exception:
+                    pass
 
             success = generate_and_download_clip(page, clip, out_file, episode_dir)
             results[clip["scene_id"]] = success
@@ -399,6 +470,8 @@ def main():
     parser.add_argument("--acc", default="all", help="acc_01 to acc_07 or all")
     parser.add_argument("--limit", type=int, default=0, help="Limit total number of clips to generate (0 for unlimited)")
     parser.add_argument("--scenes", default="", help="Comma-separated scene IDs to generate (e.g. SCENE_01,SCENE_02)")
+    parser.add_argument("--headless", action="store_true", default=False, help="Chạy ngầm browser (chú ý: Google Flow có thể chặn bot khi headless)")
+    parser.add_argument("--headed", action="store_false", dest="headless", help="Mở giao diện browser trực quan (mặc định)")
     args = parser.parse_args()
 
     episode_dir = ROOT_DIR / "episodes" / args.episode
@@ -449,7 +522,7 @@ def main():
             print(f"⚠️ Không có clip nào được gán cho {acc}")
             continue
 
-        res = dispatch_for_account(acc, clips, out_dir, episode_dir)
+        res = dispatch_for_account(acc, clips, out_dir, episode_dir, headless=args.headless)
         for s_id, ok in res.items():
             total_processed += 1
             if ok:
