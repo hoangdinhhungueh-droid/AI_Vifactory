@@ -63,7 +63,7 @@ PROFILES = {
         'name': 'Hung Hoang'
     },
     'acc_07': {
-        'path': Path(r"C:\Users\hunghd2\AppData\Local\Google\Chrome\User Data\Profile 7"),
+        'path': PROFILES_BASE_DIR / 'acc_07',
         'email': 'hunghoangdinh090@gmail.com',
         'name': 'Hung Hoang Dinh'
     },
