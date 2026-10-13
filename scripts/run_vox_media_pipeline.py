@@ -22,6 +22,7 @@ import os
 import sys
 import time
 import json
+import re
 import shutil
 import argparse
 import subprocess
@@ -35,6 +36,32 @@ except Exception:
     pass
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+
+
+def build_universal_video_prompt(scene: Dict[str, Any]) -> str:
+    """Xây dựng Universal Video Prompt (Mode 1 / Prompt 3 từ Made by AI Playbook).
+    Định vị chuẩn 4 giai đoạn: S1 Entry, S2 Assembly, S3 Lock, S4 Micro-action.
+    """
+    hero_obj = scene.get("hero_cutout_object", "")
+    motion = scene.get("motion_track_and_assembly", {})
+    entry_act = motion.get("entry_action", "") if isinstance(motion, dict) else ""
+    assembly = motion.get("assembly_step", "") if isinstance(motion, dict) else ""
+    spatial = motion.get("spatial_anchor", "") if isinstance(motion, dict) else ""
+    camera = motion.get("camera_rule", "Completely static camera, no 3D pan/zoom") if isinstance(motion, dict) else ""
+
+    entry_clean = re.sub(r"^\s*[\d\.\-sS:–—]+\s*", "", entry_act).strip()
+    assembly_clean = re.sub(r"^\s*[\d\.\-sS:–—]+\s*", "", assembly).strip()
+
+    parts = [
+        "Editorial paper cutout animation in Vox documentary style.",
+        f"Animate completed composition: {hero_obj}.",
+        f"0.0-2.0s: {entry_clean}." if entry_clean else "",
+        f"2.0-4.5s: {assembly_clean}." if assembly_clean else "",
+        f"Spatial anchor: {spatial}. Every object permanently locked, zero drift." if spatial else "",
+        f"Camera: {camera}.",
+        "Tactile paper motion, crisp deckle white edges, flat top-down desk view, subtle micro-shadow breathing <= 2px."
+    ]
+    return " ".join(p for p in parts if p).strip()
 
 
 def setup_block_directory_structure(episode_id: str) -> Dict[str, Any]:
@@ -59,9 +86,21 @@ def setup_block_directory_structure(episode_id: str) -> Dict[str, Any]:
     scenes = plan.get("scenes", [])
     blocks_map: Dict[str, List[Dict[str, Any]]] = {}
 
+    plan_updated = False
     for s in scenes:
         b_name = s.get("sequence_block", "BLOCK_DEFAULT").lower().strip()
         blocks_map.setdefault(b_name, []).append(s)
+        # Nạp Universal Video Prompt vào scene trong director_plan.json nếu chưa có
+        if not s.get("i2v_prompt") or not s.get("video_prompt"):
+            uv_prompt = build_universal_video_prompt(s)
+            s["i2v_prompt"] = uv_prompt
+            s["video_prompt"] = uv_prompt
+            plan_updated = True
+
+    if plan_updated:
+        with open(plan_file, "w", encoding="utf-8") as f:
+            json.dump(plan, f, indent=2, ensure_ascii=False)
+        print(f"📄 Đã đồng bộ i2v_prompt (Universal Video Prompt) vào {len(scenes)} cảnh trong director_plan.json.")
 
     block_manifest = {
         "episode_id": episode_id,
@@ -91,35 +130,30 @@ def setup_block_directory_structure(episode_id: str) -> Dict[str, Any]:
 
     # Đảm bảo flow_video_manifest.json luôn sẵn sàng cho bước sinh Video
     flow_manifest_path = episode_dir / "flow_video_manifest.json"
-    if not flow_manifest_path.exists():
-        acc_list = [f"acc_{i:02d}" for i in range(1, 8)]
-        clips = []
-        for idx, s in enumerate(scenes):
-            sc_id = s.get("scene_id", f"SCENE_{idx+1:02d}")
-            hero_obj = s.get("hero_cutout_object", "")
-            motion = s.get("motion_track_and_assembly", {})
-            entry_act = motion.get("entry_action", "") if isinstance(motion, dict) else ""
-            prompt = (
-                f"Editorial paper cutout animation in Vox documentary style. {hero_obj}. "
-                f"{entry_act}. Tactile paper motion, crisp deckle white edges, flat top-down desk view. "
-                f"No 3D camera rotation."
-            )
-            clips.append({
-                "scene_id": sc_id,
-                "clip_index": idx + 1,
-                "flow_slot": acc_list[idx % len(acc_list)],
-                "output_filename": f"clip_{sc_id.lower()}.mp4",
-                "prompt": prompt
-            })
-        with open(flow_manifest_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "episode_id": episode_id,
-                "format": "FLOW_VEO_7_ACCOUNT_DISPATCH",
-                "total_clips": len(clips),
-                "accounts_used": acc_list,
-                "clips": clips
-            }, f, indent=2, ensure_ascii=False)
-        print(f"📄 Đã tự động khởi tạo flow_video_manifest.json với {len(clips)} clips xoay vòng 7 tài khoản.")
+    acc_list = [f"acc_{i:02d}" for i in range(1, 8)]
+    clips = []
+    for idx, s in enumerate(scenes):
+        sc_id = s.get("scene_id", f"SCENE_{idx+1:02d}")
+        prompt = s.get("i2v_prompt") or build_universal_video_prompt(s)
+        clips.append({
+            "scene_id": sc_id,
+            "clip_index": idx + 1,
+            "flow_slot": acc_list[idx % len(acc_list)],
+            "output_filename": f"clip_{sc_id.lower()}.mp4",
+            "prompt": prompt,
+            "timeframe": s.get("timeframe", ""),
+            "sentence": s.get("sentence", "")
+        })
+
+    with open(flow_manifest_path, "w", encoding="utf-8") as f:
+        json.dump({
+            "episode_id": episode_id,
+            "format": "FLOW_VEO_7_ACCOUNT_DISPATCH",
+            "total_clips": len(clips),
+            "accounts_used": acc_list,
+            "clips": clips
+        }, f, indent=2, ensure_ascii=False)
+    print(f"📄 Đã cập nhật flow_video_manifest.json ({len(clips)} clips) chuẩn Universal Prompt xoay vòng 7 tài khoản.")
 
     return block_manifest
 
@@ -396,6 +430,11 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
         sentence = sc_data.get("sentence", "")
         hero_obj = sc_data.get("hero_cutout_object", "")
         headline = sc_data.get("headline", "")
+        motion = sc_data.get("motion_track_and_assembly", {})
+        s1 = motion.get("entry_action", "") if isinstance(motion, dict) else ""
+        s2 = motion.get("assembly_step", "") if isinstance(motion, dict) else ""
+        s3 = motion.get("spatial_anchor", "") if isinstance(motion, dict) else ""
+        s4 = sc_data.get("visual_continuity_link_to_next") or (motion.get("camera_rule", "") if isinstance(motion, dict) else "") or "Khóa cứng vĩnh viễn, micro-shadow breathing <= 2px"
 
         badge_color = "#10b981" if status == "APPROVED" else "#ef4444"
         badge_text = "✅ ĐẠT CHUẨN (10/10)" if status == "APPROVED" else f"⚠️ {status}"
@@ -417,6 +456,13 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
                 <div class="headline">{headline}</div>
                 <div class="sentence">{sentence}</div>
                 <div class="hero-obj"><b>Vật thể Vox:</b> {hero_obj}</div>
+                <div class="anim-box">
+                    <div class="anim-title">🎬 Cụm Phân Rã Animation Objects (S1 - S4):</div>
+                    <div class="anim-step"><b style="color: #38bdf8;">S1 (Entry 0-2s):</b> {s1}</div>
+                    <div class="anim-step"><b style="color: #a855f7;">S2 (Assembly 2-4.5s):</b> {s2}</div>
+                    <div class="anim-step"><b style="color: #10b981;">S3 (Locked Anchor):</b> {s3}</div>
+                    <div class="anim-step"><b style="color: #f59e0b;">S4 (Micro/Next):</b> {s4}</div>
+                </div>
             </div>
         </div>
         """
@@ -456,7 +502,10 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
         .res-tag {{ color: #a855f7; font-family: monospace; }}
         .headline {{ font-size: 16px; font-weight: bold; color: #e2e8f0; }}
         .sentence {{ font-size: 14px; color: var(--text-muted); line-height: 1.5; }}
-        .hero-obj {{ font-size: 12px; color: #38bdf8; background: #0f172a; padding: 8px; border-radius: 6px; margin-top: auto; }}
+        .hero-obj {{ font-size: 12px; color: #38bdf8; background: #0f172a; padding: 8px; border-radius: 6px; }}
+        .anim-box {{ background: #020617; padding: 10px 12px; border-radius: 8px; border: 1px solid #1e293b; font-size: 12px; line-height: 1.4; margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }}
+        .anim-title {{ font-weight: bold; color: #fbbf24; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }}
+        .anim-step {{ color: #cbd5e1; }}
     </style>
 </head>
 <body>
@@ -540,10 +589,21 @@ def evaluate_human_gate(
     print(f"   • Kết quả kiểm toán: {approved_imgs}/{total_imgs} ảnh đạt chuẩn ({verdict})")
     print(f"   • Thư mục phân cụm: episodes/{episode_id}/blocks/<block_name>/images/")
     print(f"   • Thư mục hạt giống Remotion: episodes/{episode_id}/composite_seeds/")
-    print(f"   • Chi tiết kiểm toán: episodes/{episode_id}/b5_visual_audit_summary.json")
-    print("\n⚠️ PIPELINE ĐANG TẠM DỪNG TẠI CỔNG NÀY ĐỂ BẠN KIỂM TRA CHẤT LƯỢNG ẢNH.")
-    print("   Chỉ khi có lệnh cho phép của bạn, hệ thống mới bắt đầu chạy sinh video Veo 3.1.")
-    print("=" * 75)
+    print(f"   • Thư viện ảnh HTML trực quan: episodes/{episode_id}/review_gallery.html")
+
+    print("\n📋 BẢNG THẨM ĐỊNH THỊ GIÁC & PHÂN RÃ CỤM ANIMATION OBJECT (S1 - S4):")
+    print(f"{'Scene ID':<10} | {'Vật Thể Vox':<30} | {'S1 (Entry 0-2s)':<26} | {'S2 (Assembly)':<26} | {'Trạng Thái'}")
+    print("-" * 110)
+    for item in scenes_audited:
+        sc_id = item.get("scene_id", "")
+        sc_data = scenes_info.get(sc_id, {})
+        hero_obj = sc_data.get("hero_cutout_object", "")[:28]
+        motion = sc_data.get("motion_track_and_assembly", {})
+        s1 = motion.get("entry_action", "")[:24] if isinstance(motion, dict) else ""
+        s2 = motion.get("assembly_step", "")[:24] if isinstance(motion, dict) else ""
+        st = "✅ ĐẠT" if item.get("status") == "APPROVED" else f"⚠️ {item.get('status')}"
+        print(f"{sc_id:<10} | {hero_obj:<30} | {s1:<26} | {s2:<26} | {st}")
+    print("-" * 110)
 
     # Nếu đang chạy interactive terminal
     if sys.stdin and hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
@@ -571,11 +631,13 @@ def evaluate_human_gate(
     return False
 
 
-def run_stage_videos(episode_id: str, limit: int = 0, acc: str = "all", headless: bool = False) -> bool:
+def run_stage_videos(episode_id: str, limit: int = 0, acc: str = "all", headless: bool = False, model: str = "omni") -> bool:
     """Thực thi sinh video clips qua flow_video_dispatcher.py (xoay vòng 7 acc)."""
+    model_label = "Omni 1.1 Flash" if model == "omni" else "Veo 3.1 - Fast"
     print("\n" + "=" * 75)
-    print("🎬 [BƯỚC 5: SINH VIDEO CLIPS VEO 3.1 XOAY VÒNG 7 TÀI KHOẢN]")
+    print(f"🎬 [BƯỚC 5: SINH VIDEO CLIPS {model_label.upper()} XOAY VÒNG 7 TÀI KHOẢN]")
     print(f"   Episode: {episode_id}")
+    print(f"   Mô hình: {model_label}")
     print(f"   Tài khoản: {acc}")
     print(f"   Giới hạn: {limit if limit > 0 else 'Toàn bộ'} clips / account")
     print(f"   Chế độ: {'Headless (chạy ngầm)' if headless else 'Headed (mở giao diện)'}")
@@ -585,7 +647,8 @@ def run_stage_videos(episode_id: str, limit: int = 0, acc: str = "all", headless
         sys.executable,
         str(ROOT_DIR / "scripts" / "flow_video_dispatcher.py"),
         "--episode", episode_id,
-        "--acc", acc
+        "--acc", acc,
+        "--model", model
     ]
     if limit > 0:
         cmd.extend(["--limit", str(limit)])
@@ -646,6 +709,7 @@ def main():
     parser.add_argument("--approve-gate", action="store_true", help="Bí danh của --trigger-video (phê duyệt cổng dừng)")
     parser.add_argument("--auto-approve", action="store_true", help="Tự động duyệt Human Gate không cần dừng chờ")
     parser.add_argument("--force", action="store_true", help="Sinh lại toàn bộ ảnh và video ngay cả khi đã có sẵn file cục bộ")
+    parser.add_argument("--model", choices=["omni", "veo"], default="omni", help="Mô hình video: omni (Omni 1.1 Flash) hoặc veo (Veo 3.1 - Fast)")
     args = parser.parse_args()
 
     clean_ep = args.episode.strip().strip("'\"")
@@ -713,7 +777,8 @@ def main():
             clean_ep,
             limit=total_scenes_to_run,
             acc=args.acc,
-            headless=args.headless
+            headless=args.headless,
+            model=args.model
         )
         sync_assets_to_blocks_and_flat(clean_ep, block_manifest)
         if not ok_vid:

@@ -90,11 +90,16 @@ def dismiss_dialogs(page):
                 pass
             time.sleep(1)
 
-def ensure_veo_fast_model(page) -> bool:
-    """Đảm bảo model Veo 3.1 - Fast được chọn trong cài đặt tác nhân."""
+def configure_flow_agent_settings(page, model_target: str = "omni") -> bool:
+    """Cấu hình mặc định tác nhân theo chuẩn Agent Eye (Mắt thần):
+    1. Xác nhận trước khi tạo -> 'Không bao giờ' (Never ask credit confirmation).
+    2. Khung hình video mặc định -> 16:9.
+    3. Mô hình sinh video -> Omni 1.1 Flash (mặc định) hoặc Veo 3.1 - Fast.
+    4. Lưu cấu hình an toàn.
+    """
     try:
-        # Settings button trong khung prompt (tune icon)
-        tune_btn = page.locator("button:has-text('tune'), button[aria-label*='Cài đặt' i]:has-text('tune')").first
+        # 1. Tìm nút tune/cài đặt trong khung câu lệnh (tránh nút hidden)
+        tune_btn = page.locator("button.agent-action-button:has-text('tune'), button[aria-label*='Cài đặt']:has-text('tune'), button[aria-label*='Settings']:has-text('tune'), button:has-text('tune'):not([hidden])").last
         if not tune_btn.is_visible():
             pbox = page.locator("div.ProseMirror, [contenteditable='true']").first
             if pbox.count() > 0:
@@ -102,36 +107,48 @@ def ensure_veo_fast_model(page) -> bool:
                 time.sleep(1)
 
         if tune_btn.count() > 0 and tune_btn.is_visible():
-            tune_btn.click()
-            time.sleep(1.5)
+            print("   ⚙️ [MẮT THẦN AGENT] Mở bảng Cài đặt tác nhân Google Flow...")
+            tune_btn.click(force=True)
+            time.sleep(2)
 
-            never_opt = page.locator("text='Không bao giờ', text='Never'").first
-            if never_opt.count() > 0:
+            # 2. Tùy chọn 'Không bao giờ' hỏi lại xác nhận tín dụng
+            never_opt = page.locator("mat-radio-button, [role='radio'], span").filter(has_text=re.compile(r'(Không bao giờ|Never)', re.I)).first
+            if never_opt.count() > 0 and never_opt.is_visible():
                 never_opt.click(force=True)
+                print("      ✅ Đã chọn 'Không bao giờ' xác nhận chi phí tín dụng.")
                 time.sleep(0.5)
 
-            # Chọn model video Veo 3.1 - Fast
-            model_drop = page.locator("button:has-text('Omni 1.1 Flash'), button:has-text('Veo')").last
-            if model_drop.count() > 0:
-                btn_text = model_drop.text_content() or ""
-                if "Veo 3.1 - Fast" not in btn_text and "Veo" not in btn_text:
-                    model_drop.click()
-                    time.sleep(1)
-                    veo_choice = page.locator("[role='menuitem'], [role='option'], button").filter(has_text="Veo 3.1 - Fast").last
-                    if veo_choice.count() > 0:
-                        veo_choice.click(force=True)
-                        time.sleep(1)
+            # 3. Chọn tỉ lệ khung hình 16:9 cho Video (nút 16:9 ở phần video)
+            vid_16_9 = page.locator("button:has-text('16:9')").last
+            if vid_16_9.count() > 0 and vid_16_9.is_visible():
+                vid_16_9.click(force=True)
+                print("      ✅ Đã chọn khung hình Video chuẩn 16:9.")
+                time.sleep(0.5)
 
+            # 4. Chọn Model: Omni 1.1 Flash (mặc định cho cả 6-7 acc) hoặc Veo 3.1
+            model_drop = page.locator("button[aria-label*='Mô hình mặc định của tính năng tạo video'], button[aria-label*='Default video generation model'], button:has-text('Omni'), button:has-text('Veo')").last
+            if model_drop.count() > 0 and model_drop.is_visible():
+                btn_text = model_drop.text_content() or ""
+                target_name = "Omni 1.1 Flash" if model_target.lower() == "omni" else "Veo 3.1 - Fast"
+                if target_name.split()[0].lower() not in btn_text.lower():
+                    model_drop.click(force=True)
+                    time.sleep(1)
+                    choice = page.locator("[role='menuitem'], [role='option'], button, span").filter(has_text=re.compile(rf"{re.escape(target_name)}", re.I)).first
+                    if choice.count() > 0:
+                        choice.click(force=True)
+                        print(f"      ✅ Đã chọn mô hình video: {target_name}.")
+                        time.sleep(0.5)
+
+            # 5. Bấm Lưu
             save_btn = page.locator("button:has-text('Lưu'), button:has-text('Save')").first
             if save_btn.count() > 0 and save_btn.is_visible() and save_btn.is_enabled():
-                save_btn.click()
-                time.sleep(1)
+                save_btn.click(force=True)
+                print("      💾 Đã lưu cấu hình tác nhân thành công!")
+                time.sleep(1.5)
             else:
-                back_btn = page.locator("button:has-text('arrow_back'), button[aria-label*='Back' i], button[aria-label*='Quay lại' i]").first
-                if back_btn.count() > 0 and back_btn.is_visible():
-                    back_btn.click()
-                else:
-                    tune_btn.click()
+                close_btn = page.locator("button:has-text('arrow_back'), button[aria-label*='Back' i], button[aria-label*='Đóng' i], button:has-text('close')").first
+                if close_btn.count() > 0 and close_btn.is_visible():
+                    close_btn.click(force=True)
                 time.sleep(1)
 
         if page.locator(".cdk-overlay-backdrop").count() > 0:
@@ -139,7 +156,7 @@ def ensure_veo_fast_model(page) -> bool:
             time.sleep(0.5)
         return True
     except Exception as e:
-        print(f"      ⚠️ Lỗi cấu hình model: {e}")
+        print(f"      ⚠️ Lỗi cấu hình cài đặt tác nhân: {e}")
         return False
 
 def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Path) -> bool:
@@ -370,7 +387,7 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         print(f"      ❌ Lỗi khi sinh video {scene_id}: {e}")
         return False
 
-def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: Path, headless: bool = False) -> dict:
+def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: Path, headless: bool = False, model_target: str = "omni") -> dict:
     """Xử lý toàn bộ các clip được giao cho 1 tài khoản."""
     acc_info = PROFILES[acc_key]
     profile_dir = acc_info['path']
@@ -442,7 +459,7 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
         time.sleep(3)
         dismiss_dialogs(page)
 
-        ensure_veo_fast_model(page)
+        configure_flow_agent_settings(page, model_target=model_target)
 
         for clip in clips:
             out_file = out_dir / clip["output_filename"]
@@ -472,6 +489,7 @@ def main():
     parser.add_argument("--scenes", default="", help="Comma-separated scene IDs to generate (e.g. SCENE_01,SCENE_02)")
     parser.add_argument("--headless", action="store_true", default=False, help="Chạy ngầm browser (chú ý: Google Flow có thể chặn bot khi headless)")
     parser.add_argument("--headed", action="store_false", dest="headless", help="Mở giao diện browser trực quan (mặc định)")
+    parser.add_argument("--model", choices=["omni", "veo"], default="omni", help="Mô hình video: omni (Omni 1.1 Flash) hoặc veo (Veo 3.1 - Fast)")
     args = parser.parse_args()
 
     episode_dir = ROOT_DIR / "episodes" / args.episode
@@ -498,6 +516,7 @@ def main():
         print(f"🎯 Đã giới hạn tổng cộng {len(all_clips)} clips đầu tiên!")
 
     print(f"🎯 EPISODE: {args.episode}")
+    print(f"🤖 MODEL TARGET: {'Omni 1.1 Flash' if args.model == 'omni' else 'Veo 3.1 - Fast'}")
     print(f"📦 Tổng số clips xử lý: {len(all_clips)}")
     print(f"📁 Thư mục lưu trữ: {out_dir}")
 
@@ -522,7 +541,7 @@ def main():
             print(f"⚠️ Không có clip nào được gán cho {acc}")
             continue
 
-        res = dispatch_for_account(acc, clips, out_dir, episode_dir, headless=args.headless)
+        res = dispatch_for_account(acc, clips, out_dir, episode_dir, headless=args.headless, model_target=args.model)
         for s_id, ok in res.items():
             total_processed += 1
             if ok:
