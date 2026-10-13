@@ -76,3 +76,6 @@ scratch/
 tests/ci_neighbor_tester.log
 workspace/
 b2_b3_opus_astra_audit.md
+
+out/
+reports/
