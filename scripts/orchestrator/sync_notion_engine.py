@@ -179,13 +179,18 @@ def fetch_notion_page_text(page_id: str) -> str:
     return "\n".join(lines).strip()
 
 
-def push_to_notion(reg: dict):
+def push_to_notion(reg: dict, module_key: str = None):
     """Push local prompt files up to Notion SoT subpages."""
     print("=" * 80)
     print("🚀 PUSHING PROMPT FILES TO NOTION SOT (UPLINK SYNC)")
     print("=" * 80)
     
     pages = reg.get("pages", {})
+    if module_key:
+        if module_key not in pages:
+            print(f"❌ Unknown module: {module_key}. Available: {list(pages.keys())}")
+            return
+        pages = {module_key: pages[module_key]}
     success_count = 0
 
     for key, info in pages.items():
@@ -380,6 +385,7 @@ if __name__ == "__main__":
     parser.add_argument("--pull", action="store_true", help="Pull live Notion prompts down to disk & snapshot")
     parser.add_argument("--status", action="store_true", help="Show parity status matrix")
     parser.add_argument("--diff", action="store_true", help="Show textual diff between Notion and local disk")
+    parser.add_argument("--module", type=str, help="Target specific module key (e.g. b1_strategy, b35_visual)")
     args = parser.parse_args()
 
     reg = load_page_registry()
@@ -388,7 +394,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if args.push:
-        push_to_notion(reg)
+        push_to_notion(reg, module_key=args.module)
     elif args.pull:
         pull_from_notion(reg)
     elif args.diff:

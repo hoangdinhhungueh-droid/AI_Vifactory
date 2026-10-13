@@ -32,5 +32,5 @@
 • All search keywords, competitor queries, and audience-facing titles must be in the native language of the target market (JP/KR/EN).
 • Strictly respect target market regulatory jurisdictions and institutional terminology.
 1. ANTI-TUTORIAL PACKAGING (RULE 130):
-• Strictly forbidden to use tutorial or how-to phrasing ('How to', 'Steps to', 'Cách', 'Mẹo', '5 bước', '환불하는법').
+• Strictly forbidden to use tutorial/how-to phrasing ('How to', 'Steps to', 'Cách', 'Mẹo', '5 bước', '환불하는법').
 • Must use the dramatic clash formula: [Everyday Item/Transaction + Shock Figure] vs [Unilateral Fine Print / Institutional Trap].
