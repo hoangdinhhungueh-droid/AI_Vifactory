@@ -34,6 +34,7 @@ def main():
     parser.add_argument("--acc", default="all", help="Tài khoản Google Flow (acc_01 đến acc_07 hoặc all)")
     parser.add_argument("--limit-blocks", type=int, default=0, help="Giới hạn số cụm block cần sinh video")
     parser.add_argument("--limit-scenes", type=int, default=0, help="Giới hạn số cảnh cần sinh video")
+    parser.add_argument("--model", choices=["omni", "veo"], default="omni", help="Mô hình video: omni (Omni 1.1 Flash) hoặc veo (Veo 3.1 - Fast)")
     parser.add_argument("--headless", action="store_true", help="Chạy ngầm browser")
     args = parser.parse_args()
 
@@ -41,8 +42,10 @@ def main():
     if clean_ep.lower().startswith("task:"):
         clean_ep = clean_ep[5:].strip()
 
+    model_name = "Omni 1.1 Flash" if args.model == "omni" else "Veo 3.1 - Fast"
     print("\n" + "=" * 75)
-    print(f"🎬 [TRIGGER COMMAND] KÍCH HOẠT SINH VIDEO VEO 3.1 — EPISODE: {clean_ep}")
+    print(f"🎬 [TRIGGER COMMAND] KÍCH HOẠT SINH VIDEO {model_name.upper()} — EPISODE: {clean_ep}")
+    print(f"   Mô hình: {model_name}")
     print(f"   Tài khoản: {args.acc}")
     print(f"   Giới hạn block: {args.limit_blocks if args.limit_blocks > 0 else 'Toàn bộ'}")
     print(f"   Giới hạn cảnh: {args.limit_scenes if args.limit_scenes > 0 else 'Toàn bộ'}")
@@ -54,7 +57,8 @@ def main():
         "--episode", clean_ep,
         "--stage", "video",
         "--trigger-video",
-        "--acc", args.acc
+        "--acc", args.acc,
+        "--model", args.model
     ]
     if args.limit_blocks > 0:
         cmd.extend(["--limit-blocks", str(args.limit_blocks)])

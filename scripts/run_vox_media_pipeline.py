@@ -592,18 +592,20 @@ def evaluate_human_gate(
     print(f"   • Thư viện ảnh HTML trực quan: episodes/{episode_id}/review_gallery.html")
 
     print("\n📋 BẢNG THẨM ĐỊNH THỊ GIÁC & PHÂN RÃ CỤM ANIMATION OBJECT (S1 - S4):")
-    print(f"{'Scene ID':<10} | {'Vật Thể Vox':<30} | {'S1 (Entry 0-2s)':<26} | {'S2 (Assembly)':<26} | {'Trạng Thái'}")
-    print("-" * 110)
+    print(f"{'Scene ID':<10} | {'Vật Thể Vox':<26} | {'S1 (Entry 0-2s)':<24} | {'S2 (Assembly 2-4.5s)':<24} | {'S3 (Anchor)':<20} | {'S4 (Next Link)':<20} | {'Trạng Thái'}")
+    print("-" * 145)
     for item in scenes_audited:
         sc_id = item.get("scene_id", "")
         sc_data = scenes_info.get(sc_id, {})
-        hero_obj = sc_data.get("hero_cutout_object", "")[:28]
+        hero_obj = sc_data.get("hero_cutout_object", "")[:24]
         motion = sc_data.get("motion_track_and_assembly", {})
-        s1 = motion.get("entry_action", "")[:24] if isinstance(motion, dict) else ""
-        s2 = motion.get("assembly_step", "")[:24] if isinstance(motion, dict) else ""
+        s1 = motion.get("entry_action", "")[:22] if isinstance(motion, dict) else ""
+        s2 = motion.get("assembly_step", "")[:22] if isinstance(motion, dict) else ""
+        s3 = motion.get("spatial_anchor", "")[:18] if isinstance(motion, dict) else ""
+        s4 = sc_data.get("visual_continuity_link_to_next", "")[:18]
         st = "✅ ĐẠT" if item.get("status") == "APPROVED" else f"⚠️ {item.get('status')}"
-        print(f"{sc_id:<10} | {hero_obj:<30} | {s1:<26} | {s2:<26} | {st}")
-    print("-" * 110)
+        print(f"{sc_id:<10} | {hero_obj:<26} | {s1:<24} | {s2:<24} | {s3:<20} | {s4:<20} | {st}")
+    print("-" * 145)
 
     # Nếu đang chạy interactive terminal
     if sys.stdin and hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
