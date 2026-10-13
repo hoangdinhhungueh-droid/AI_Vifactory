@@ -62,6 +62,11 @@ PROFILES = {
         'email': 'untoldstoriesjp@gmail.com',
         'name': 'Hung Hoang'
     },
+    'acc_07': {
+        'path': Path(r"C:\Users\hunghd2\AppData\Local\Google\Chrome\User Data\Profile 7"),
+        'email': 'hunghoangdinh090@gmail.com',
+        'name': 'Hung Hoang Dinh'
+    },
 }
 
 def dismiss_dialogs(page):
@@ -408,9 +413,9 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
     return results
 
 def main():
-    parser = argparse.ArgumentParser(description="Google Flow Video Dispatcher for 6 Accounts")
+    parser = argparse.ArgumentParser(description="Google Flow Video Dispatcher for 7 Accounts")
     parser.add_argument("--episode", required=True, help="Episode ID (e.g. <MARKET>_EP<XXXX>_<slug>)")
-    parser.add_argument("--acc", default="all", help="acc_01 to acc_06 or all")
+    parser.add_argument("--acc", default="all", help="acc_01 to acc_07 or all")
     parser.add_argument("--limit", type=int, default=0, help="Limit number of clips to generate (0 for unlimited)")
     args = parser.parse_args()
 
