@@ -31,22 +31,45 @@ CENTRAL_SKILL_PAGE_ID = "ac901989-2400-827e-bda2-8175dabdcf13"
 CONTENT_ENGINE_PAGE_ID = "9bb01989-2400-82c0-9ed4-01f19c7ee23f"
 MEDIA_PRODUCTION_PAGE_ID = "69e01989-2400-82fe-9352-81d562f63a8b"
 SELF_LEARNING_PAGE_ID = "83cbd0d0-03af-4a60-a765-682a3c5a0a5d"
+PROMPT_ENGINE_HUB_ID = "3f801989-2400-81c5-9459-f75fc00f24a1"
+
+PROMPT_ENGINE_PAGE_IDS = {
+    "b1_strategy": "3f801989-2400-8157-96f9-cd29c62cd7b1",
+    "b2_editorial": "3f801989-2400-818a-adf1-c5f7cc3da7ed",
+    "b3_director": "3f801989-2400-81c9-bdb0-c4dc60b43988",
+    "b35_visual": "3f801989-2400-81e3-8cc6-c9bb0bb4650c",
+    "b10_seo": "3f801989-2400-8172-8655-cc3cd462cbef",
+}
 
 # Backward compatibility alias
 SKILL_AI_PAGE_ID = CENTRAL_SKILL_PAGE_ID
 
 ROOT_DIR = Path(os.getenv("VF_ROOT_DIR", Path(__file__).resolve().parent.parent.parent))
 SNAPSHOT_FILE = Path(os.getenv("VF_SKILLS_SNAPSHOT", ROOT_DIR / "data" / "notion_audit" / "skills_snapshot.json"))
+LEGACY_SNAPSHOT_FILE = Path(os.getenv("VF_LEGACY_SKILLS_SNAPSHOT", ROOT_DIR / "data" / "notion_audit" / "central_skills.md"))
 CACHE_TTL_SECONDS = 3600  # 1 hour cache TTL for Notion skills
+
+PROMPT_LOCAL_FILES = {
+    "b1_strategy": ROOT_DIR / "config" / "prompts" / "b1_strategic_rules.md",
+    "b2_editorial": ROOT_DIR / "config" / "prompts" / "b2_editorial_prompt.md",
+    "b3_director": ROOT_DIR / "config" / "prompts" / "b3_director_prompt.md",
+    "b35_visual": ROOT_DIR / "config" / "prompts" / "b35_visual_rules.md",
+    "b10_seo": ROOT_DIR / "config" / "prompts" / "seo_package_prompt.md",
+}
 
 # In-memory multi-hub cache state
 _cache = {
-    "central": {"data": None, "expiration": 0},
-    "content_engine": {"data": None, "expiration": 0},
-    "media_production": {"data": None, "expiration": 0},
-    "bundle": {"data": None, "expiration": 0},
-    "cinematic_tokens": {"data": None, "expiration": 0},
-    "vox_docudrama": {"data": None, "expiration": 0},
+    "central": {"data": None, "expiration": 0, "source": "NONE"},
+    "content_engine": {"data": None, "expiration": 0, "source": "NONE"},
+    "media_production": {"data": None, "expiration": 0, "source": "NONE"},
+    "bundle": {"data": None, "expiration": 0, "source": "NONE"},
+    "cinematic_tokens": {"data": None, "expiration": 0, "source": "NONE"},
+    "vox_docudrama": {"data": None, "expiration": 0, "source": "NONE"},
+    "b1_strategy": {"data": None, "expiration": 0, "source": "NONE"},
+    "b2_editorial": {"data": None, "expiration": 0, "source": "NONE"},
+    "b3_director": {"data": None, "expiration": 0, "source": "NONE"},
+    "b35_visual": {"data": None, "expiration": 0, "source": "NONE"},
+    "b10_seo": {"data": None, "expiration": 0, "source": "NONE"},
     "hits": 0,
     "misses": 0
 }
@@ -408,64 +431,103 @@ def get_all_skills_bundle(force_refresh: bool = False) -> str:
     return bundle
 
 
-def get_b1_strategic_rules() -> str:
-    """Concise strategic rules (~1,200 chars) for B1 Topic & Niche Reasoning.
-    Distills Rule 1-4 Causal Mechanisms, Rule 444 An Ong Hook, Rule 118 Zero-Mock,
-    and Rule 445 5-Beat Docudrama Architecture without prompt bloat.
+def fetch_prompt_module(key: str, force_refresh: bool = False) -> str:
+    """Dynamically fetch prompt module from Notion SoT, memory cache, or verified snapshot.
+    Respects Rule 118, 126, 132: logs whether source is [NOTION_LIVE] or [NOTION_SNAPSHOT].
     """
+    global _cache
+    now = time.time()
+
+    if key not in _cache:
+        _cache[key] = {"data": None, "expiration": 0, "source": "NONE"}
+
+    entry = _cache[key]
+    if not force_refresh and entry["data"] is not None and now < entry["expiration"]:
+        _cache["hits"] += 1
+        return entry["data"]
+
+    _cache["misses"] += 1
+    page_id = PROMPT_ENGINE_PAGE_IDS.get(key)
+    content = ""
+
+    # 1. Attempt Live Notion API Fetch via ag_notion_bridge
+    if page_id and bridge:
+        try:
+            lines = _fetch_blocks_recursive(page_id, depth=0, max_depth=1)
+            fetched = "\n".join(lines).strip()
+            if len(fetched) >= 100:
+                content = fetched
+                entry["data"] = content
+                entry["expiration"] = now + CACHE_TTL_SECONDS
+                entry["source"] = "NOTION_LIVE"
+                _save_snapshot(key, content)
+                logger.info(f"[skill_loader] [NOTION_LIVE] Successfully loaded {len(content)} chars from Notion SoT page {page_id} for {key}")
+                return content
+        except Exception as e:
+            logger.debug(f"[skill_loader] Notion live fetch failed for {key}: {e}")
+
+    # 2. Verified Snapshot Fallback (from skills_snapshot.json)
+    snapshot = _load_snapshot()
+    snap_entry = snapshot.get(key)
+    if isinstance(snap_entry, dict) and snap_entry.get("content"):
+        content = snap_entry["content"].strip()
+    elif isinstance(snap_entry, str) and snap_entry.strip():
+        content = snap_entry.strip()
+
+    if content and len(content) >= 100:
+        entry["data"] = content
+        entry["expiration"] = now + 600  # 10 min cache for snapshot
+        entry["source"] = "NOTION_SNAPSHOT"
+        logger.info(f"[skill_loader] [NOTION_SNAPSHOT] Loaded {len(content)} chars from verified Notion snapshot for {key}")
+        return content
+
+    # 3. Local Target File Fallback
+    local_file = PROMPT_LOCAL_FILES.get(key)
+    if local_file and local_file.exists():
+        try:
+            content = local_file.read_text(encoding="utf-8").strip()
+            entry["data"] = content
+            entry["expiration"] = now + 300
+            entry["source"] = "LOCAL_FILE"
+            logger.info(f"[skill_loader] [LOCAL_FILE] Loaded {len(content)} chars from {local_file.name} for {key}")
+            return content
+        except Exception as e:
+            logger.warning(f"[skill_loader] Failed reading local prompt file {local_file}: {e}")
+
+    return ""
+
+
+def get_b1_strategic_rules(force_refresh: bool = False) -> str:
+    """Strategic rules for B1 Topic & Niche Reasoning loaded dynamically from Notion SoT."""
+    content = fetch_prompt_module("b1_strategy", force_refresh=force_refresh)
+    if content:
+        return content
     return (
         "CORE STRATEGIC EDITORIAL PRINCIPLES (RULE 118, 444, 445):\n"
-        "1. RULE 118 ZERO-MOCK: Strictly ground the topic and angle in real search signals or YouTube benchmarks. Never invent speculative or synthetic themes.\n"
-        "2. CAUSAL MECHANISM MANDATE: Every approved angle must expose an institutional, financial, or systemic mechanism (how the system broke, who profited, why oversight failed).\n"
-        "3. RULE 444 AN ONG HOOK: Formulate a paradoxical, curiosity-inducing opening hook that subverts conventional wisdom.\n"
-        "4. RULE 445 5-BEAT DOCUDRAMA ARCHITECTURE:\n"
-        "   - Beat 1: Paradox & Shock Opening (0-60s)\n"
-        "   - Beat 2: The Red Herring / False Narrative & Early Warning Signs\n"
-        "   - Beat 3: The Fatal Explanatory Vacuum / Institutional Crack (Competitor Gap)\n"
-        "   - Beat 4: The Smoking Gun / Systemic Exposure & Climax\n"
-        "   - Beat 5: The Living Warning & Enduring Consequence\n"
-        "5. 7 CANONICAL INVESTIGATIVE PILLARS:\n"
-        "   - Pillar 1: Rise and Fall of Corporate Giants\n"
-        "   - Pillar 2: Systemic Financial & Market Crashes\n"
-        "   - Pillar 3: True Crime Non-Graphic & Forensic Fraud\n"
-        "   - Pillar 4: Psychology & Behavioral Manipulation\n"
-        "   - Pillar 5: Technological & Geopolitical Battles\n"
-        "   - Pillar 6: Institutional & Regulatory Chokepoints\n"
-        "   - Pillar 7: Hidden Asymmetric Fortunes & Wealth Transfers\n"
-        "   - Pillar 11: Everyday Consumer Injustice & Institutional Traps\n"
-        "6. NATIVE GROUND TRUTH: All search keywords must be in the native language of the target market (JP/KR/EN).\n"
-        "7. ANTI-TUTORIAL PACKAGING (RULE 130): Strictly forbidden to use tutorial/how-to phrasing ('How to', 'Steps to', 'Cách', 'Mẹo', '5 bước', '환불하는법'). Must use dramatic clash formula: [Everyday Item/Transaction + Shock Figure] vs [Unilateral Fine Print / Institutional Trap]."
+        "1. RULE 118 ZERO-MOCK: Strictly ground the topic and angle in real search signals or YouTube benchmarks.\n"
+        "2. CAUSAL MECHANISM MANDATE: Every approved angle must expose an institutional, financial, or systemic mechanism.\n"
+        "3. RULE 444 AN ONG HOOK: Formulate a paradoxical opening hook.\n"
+        "4. RULE 445 5-BEAT DOCUDRAMA ARCHITECTURE: Beat 1 Paradox, Beat 2 Red Herring, Beat 3 Fatal Vacuum, Beat 4 Smoking Gun, Beat 5 Living Warning.\n"
+        "5. 7 CANONICAL INVESTIGATIVE PILLARS: Corporate Giants, Market Crashes, True Crime Forensic, Tech Geopolitical, Consumer Injustice.\n"
+        "6. NATIVE GROUND TRUTH: All keywords in native language (JP/KR/EN).\n"
+        "7. ANTI-TUTORIAL PACKAGING (RULE 130): Strictly forbidden tutorial phrasing."
     )
 
 
-
-
-def get_b35_strategic_rules() -> str:
-    """Concise strategic visual production rules (~1,800 chars) for B3.5 Prompt Forge.
-    Distills Rule 116 (Two-Layer Composition), Rule 120 (Chroma Key Spec),
-    Rule 122 (Visual Audit & Market Ethnicity Conformance), Rule 128 (Zero Semantic Bias & Era Authenticity),
-    Rule 435 (Graphic Novel Style), Rule 446 (English Production Bridge), and Rule 114 (Hero Thumbnails).
-    """
+def get_b35_strategic_rules(force_refresh: bool = False) -> str:
+    """Concise strategic visual production rules for B3.5 Prompt Forge loaded from Notion SoT."""
+    content = fetch_prompt_module("b35_visual", force_refresh=force_refresh)
+    if content:
+        return content
     return (
         "=== NOTION SOT CONCISE VISUAL PRODUCTION RULES (RULES 114, 116, 120, 122, 128, 435, 446) ===\n"
-        "1. TWO-LAYER COMPOSITION (Rule 116):\n"
-        "   - Layer 1 Background (16:9 widescreen 2560x1440): Cinematic documentary environment. Period architecture, dramatic lighting. No foreground humans. Bottom 20% safe-zone clear for subtitles, center-right negative space for character overlay.\n"
-        "   - Layer 2 Foreground (1:1 2048x2048): Stylized Editorial Graphic Novel Digital Illustration. Cel-shading, bold ink linework. Waist-up three-quarter angle character with active hands manipulating physical prop and directional gaze in authentic attire. Positioned Right or Left.\n"
-        "2. STRICT CHROMA KEY SPEC (Rule 120):\n"
-        "   - Foreground MUST be isolated on pure flat solid #FF00FF magenta background for chroma extraction.\n"
-        "   - No white borders, no halos, no gradients, no scenery in Layer 2.\n"
-        "3. GRAPHIC NOVEL ART STYLE (Rule 435):\n"
-        "   - Non-photorealistic stylized 2D graphic novel illustration. Cel-shading ink. NO photorealism, NO 3D CGI skin.\n"
-        "4. CINEMATIC CONTINUITY & ERA AUTHENTICITY (Rule 128):\n"
-        "   - Harmonize lighting angle, color palette, atmosphere between paired Layer 1 & 2 assets.\n"
-        "   - Zero domain bleed: never inject modern tech into historical scenes or rural relics into corporate scenes.\n"
-        "5. INDIGENOUS CULTURAL PROPS & ANTI-ENGLISH BLEED (Rule 122 & Rule 128):\n"
-        "   - Every scene MUST include tangible local cultural artifacts (JP: hanko cinnabar red seals, King File spine tabs, sha-sho lapel pins; KR: official round seals/stamps, sawonjeung ID lanyards, Taegeuk/court crests).\n"
-        "   - STRICTLY FORBIDDEN: English/Latin text or English words on whiteboards, walls, signs, or folders for Asian markets (JP/KR).\n"
-        "6. ENGLISH PRODUCTION BRIDGE (Rule 446): All visual prompt outputs must be in clear descriptive English.\n"
-        "7. MARKET ETHNICITY & REGIONAL ARCHITECTURE CONFORMANCE (Rule 122 & Rule 128):\n"
-        "   - Foreground characters MUST feature authentic ethnic phenotype (bone structure, eye shape, styling, attire), dynamic high-stakes body posture (leaning forward, decisive pointing, clenched fist), intense facial micro-expressions (furrowed brow, sharp intense glare, zero dead eyes/blank stare), and active interaction with tangible indigenous props. ZERO Caucasian/Western bias.\n"
-        "   - Backgrounds MUST feature authentic local corporate/urban architecture matching target market. ZERO generic American cubicles or Western skyline mismatch."
+        "1. TWO-LAYER COMPOSITION: Layer 1 BG (16:9 2560x1440), Layer 2 FG (1:1 2048x2048 #FF00FF magenta).\n"
+        "2. STRICT CHROMA KEY SPEC: Foregrounds strictly on solid #FF00FF magenta.\n"
+        "3. GRAPHIC NOVEL ART STYLE: Editorial Graphic Novel cel-shading illustration.\n"
+        "4. CINEMATIC CONTINUITY & ERA AUTHENTICITY: Zero domain bleed.\n"
+        "5. INDIGENOUS CULTURAL PROPS: Tangible local artifacts (JP: hanko, KR: sawonjeung/ingam). Zero English bleed.\n"
+        "6. ENGLISH PRODUCTION BRIDGE: Visual prompts in descriptive English.\n"
+        "7. MARKET ETHNICITY: Authentic phenotype, micro-expressions, zero dead eyes."
     )
 
 
@@ -474,66 +536,35 @@ def get_visual_strategic_rules() -> str:
     return get_b35_strategic_rules()
 
 
-def get_b3_strategic_rules() -> str:
-    """Concise strategic art direction rules (~2,000 chars) for B3 Director Planner.
-    Distills Rule 116 (Two-Layer Architecture), Rule 120 (Chroma Key & Safe Zone),
-    Rule 128 (Universal Dynamic Context & Character Ensemble), Rule 130 (Factual Causal Integrity
-    & Visual Catalyst Anchoring), Rule 131 (10X 5-Beat Storyboard Pacing), Rule 445 (5-Beat Structure),
-    Sentence-Atomic Pacing (Subtitle Overflow Prevention), and Archetype-Specific Grammar.
-    """
-    b3_template_file = ROOT_DIR / "config" / "prompts" / "b3_director_prompt.md"
-    if b3_template_file.exists():
-        try:
-            return b3_template_file.read_text(encoding="utf-8").strip()
-        except Exception as e:
-            logger.warning(f"[skill_loader] Failed reading {b3_template_file}: {e}")
-
+def get_b3_strategic_rules(force_refresh: bool = False) -> str:
+    """Hollywood Art Direction & Scene Breakdown rules for B3 Director Planner loaded from Notion SoT."""
+    content = fetch_prompt_module("b3_director", force_refresh=force_refresh)
+    if content:
+        return content
     return (
-        "=== NOTION SOT HOLLYWOOD ART DIRECTION & SCENE BREAKDOWN RULES (RULES 116, 120, 128, 130, 131, 445, 446) ===\n"
-        "1. ROLE: You are the Hollywood Master Visual Director & Lead Cinematographer. Your decisions dictate video pacing across 130 to 160 dynamic scenes (~6-7s per scene) for an 18-20 minute docudrama.\n"
-        "2. FINCHER-STYLE RAPID-FIRE HOOK (0-60s / ACT I, SCENES 1-15):\n"
-        "   - The first 60 seconds MUST be broken down into 12 to 15 rapid-fire scenes (15-25 words each, ~3.5s - 5.0s per scene) across 3 phases: The Asymmetric Paradox (0-15s), The Hard Metric Shock (15-35s), The Investigative Contract (35-60s).\n"
-        "3. CORE INVESTIGATIVE NARRATIVE PACING (ACTS II - V, SCENES 16-160):\n"
-        "   - Narration: strictly 25-35 words per scene (~6.0s - 7.5s duration), 1-2 complete grammatical sentences ending strictly with '.', '!', '?'. NEVER cut mid-sentence.\n"
-        "   - Subtitle line budget: strictly fit within 2 lines on 1920x1080 display (~35-40 characters/line).\n"
-        "   - Duration Estimation: Hook (Scenes 1-15): max(3, min(6, round(word_count / 3.0))); Core (Scenes 16+): max(5, min(9, round(word_count / 2.5))).\n"
-        "4. 6 CANONICAL CINEMATIC CAMERA MOVEMENTS:\n"
-        "   - slow_push_in, snap_zoom, cinematic_pan, macro_tilt, slow_pull_out, handheld_shake.\n"
-        "5. LOCATION CONTINUITY CLUSTERED BACKGROUNDS (Rule 131):\n"
-        "   - 3-4 solid location anchors per Beat (~15-20 total background clusters). Assign 'bg_cluster_id' (1..20) per scene.\n"
-        "6. FORENSIC OVERLAY DIRECTIVES:\n"
-        "   - Tag evidentiary scenes with 'forensic_overlay': 'redacted_doc', 'radar_map', 'financial_chart', 'surveillance_crt', or null.\n"
-        "7. TWO-LAYER COMPOSITION & SUBTITLE SAFE-ZONE INTEGRITY (Rule 116):\n"
-        "   - Layer 1 Background (16:9 2560x1440): Bottom 20% clear for subtitles.\n"
-        "   - Layer 2 Foreground (1:1 2048x2048 #FF00FF): Position strictly 'Right' or 'Left' (Rule of Thirds). NEVER place full-body characters at 'Center'.\n"
-        "8. PRODUCTION BRIDGE (Rule 446): All prompt descriptions and visual hints must be in descriptive English.\n"
-        "9. REMOTION MOTION GRAPHICS & FORENSIC ARTIFACTS (Rule 122):\n"
-        "   - 'stat_card': Tag metric scenes with exact numbers from narration: {'value': '<EXACT_METRIC_FROM_NARRATION>', 'label': 'PRICE ANCHOR' / 'VALUATION COLLAPSE'} or null.\n"
-        "   - 'stamp_badge': Climax evidentiary stamp slam: 'PRICE_FRAUD', 'VIOLATION', 'CONFIDENTIAL', 'EVIDENCE', 'VOID', or null.\n"
-        "   - 'motion_directive': Parallax 2.5D visual motion: 'dramatic_push', 'subtle_drift', 'split_whip', or 'forensic_lock'."
+        "=== NOTION SOT HOLLYWOOD ART DIRECTION RULES (RULES 116, 120, 128, 130, 131, 445, 446) ===\n"
+        "1. ROLE: Hollywood Master Visual Director across 130-160 scenes (~6-7s/scene).\n"
+        "2. FINCHER-STYLE RAPID-FIRE HOOK (0-60s): 12-15 scenes across Paradox (0-15s), Metric Shock (15-35s), Contract (35-60s).\n"
+        "3. CORE INVESTIGATIVE PACING: 25-35 words/scene, 1-2 complete sentences ending with '.', '!', '?'.\n"
+        "4. 12 CAMERA MOVEMENTS: slow_push_in, snap_zoom, cinematic_pan, macro_tilt, handheld_shake, dolly_zoom, etc.\n"
+        "5. LOCATION CONTINUITY: 3-4 anchors per Beat (~15-20 total clusters).\n"
+        "6. FORENSIC OVERLAYS: redacted_doc, radar_map, financial_chart, surveillance_crt.\n"
+        "7. VOX TACTILE COLLAGE: 16:9 composite frame, aged parchment, matte board, halftone cutouts, verdict stamps."
     )
 
-def get_b10_seo_rules() -> str:
-    """Concise strategic rules (~1,200 chars) for B10 YouTube Packaging & SEO Metadata.
-    Distills Rule 118 (Zero-Mock), Rule 444 (An Ong Curiosity Hook in Titles),
-    Breakout Query Search Injections, A/B Testing Title Specs, YouTube 2026
-    Hashtags and Tags algorithms without prompt bloat.
-    """
+
+def get_b10_seo_rules(force_refresh: bool = False) -> str:
+    """Concise strategic rules for B10 YouTube Packaging & SEO Metadata loaded from Notion SoT."""
+    content = fetch_prompt_module("b10_seo", force_refresh=force_refresh)
+    if content:
+        return content
     return (
-        "=== NOTION SOT CONCISE B10 YOUTUBE PACKAGING & SEO RULES (RULES 118, 444, 446) ===\n"
-        "1. RULE 118 ZERO-MOCK & FACTUAL ANCHOR: All titles, descriptions, and tags must be strictly grounded in the real episode narrative and search breakout data. Never invent fictitious events, deceptive clickbait, or hallucinated characters.\n"
-        "2. TITLE DYNAMICS & A/B TESTING (Rule 444 An Ong Hook):\n"
-        "   - Title A (Curiosity / Mystery Hook): High CTR, paradox-driven, emotion-inducing under 70 characters.\n"
-        "   - Title B (Search Intent / High Virality): SEO-optimized, authoritative, incorporating primary keywords under 70 characters.\n"
-        "   - Title C (Casual / Provocative Question): Question-driven angle that triggers immediate curiosity.\n"
-        "3. BREAKOUT QUERY INJECTION (Native-First):\n"
-        "   - Naturally weave Google Trends breakout queries into the top 3 lines of the description and tags for maximum search volume discovery.\n"
-        "4. DESCRIPTION & CHAPTERS SPEC:\n"
-        "   - 3-second hook restated in opening lines followed by deep causal summary.\n"
-        "   - Timestamps/Chapters clearly formatted (e.g. 00:00 [Chapter Title]). Never omit 00:00.\n"
-        "5. TAGS & HASHTAGS BUDGETING:\n"
-        "   - Tags: Comma-separated, priority to breakout terms, capped at <= 500 chars and <= 7 core tags.\n"
-        "   - Hashtags: CamelCase slugs (e.g. #ByzantineEmpire), capped at strictly 3 to 5 hashtags."
+        "=== NOTION SOT B10 YOUTUBE PACKAGING RULES ===\n"
+        "1. ZERO-MOCK DATA: Strictly grounded in episode narrative and breakout data.\n"
+        "2. TITLE DYNAMICS: Title A (Curiosity Hook), Title B (SEO Virality), Title C (Provocative Question).\n"
+        "3. BREAKOUT INJECTION: Weave Trends queries into top lines of description.\n"
+        "4. CHAPTERS SPEC: 00:00 start, timestamps strictly matching Remotion.\n"
+        "5. TAGS & HASHTAGS: <= 500 chars tags, exactly 3 high-intent hashtags."
     )
 
 
@@ -558,14 +589,17 @@ def get_cache_info() -> dict:
     now = time.time()
 
     hubs_info = {}
-    for key in ("central", "content_engine", "media_production", "bundle"):
+    for key in list(_cache.keys()):
+        if key in ("hits", "misses"):
+            continue
         c = _cache[key]
         has_data = c["data"] is not None
         rem = max(0, int(c["expiration"] - now)) if has_data else 0
         hubs_info[key] = {
             "cached": has_data,
             "char_count": len(c["data"]) if has_data else 0,
-            "remaining_seconds": rem
+            "remaining_seconds": rem,
+            "source": c.get("source", "NONE")
         }
 
     return {
@@ -574,8 +608,6 @@ def get_cache_info() -> dict:
         "ttl_seconds": CACHE_TTL_SECONDS,
         "hubs": hubs_info
     }
-
-
 
 
 def get_b11_self_learning_rules(force_refresh: bool = False) -> str:
@@ -592,7 +624,7 @@ def get_b11_self_learning_rules(force_refresh: bool = False) -> str:
         filtered = [l for l in lines if len(l.strip()) > 15]
         text = chr(10).join(filtered[:25]).strip()
         if text:
-            _cache["self_learning"] = {"data": text, "expiration": now + CACHE_TTL_SECONDS}
+            _cache["self_learning"] = {"data": text, "expiration": now + CACHE_TTL_SECONDS, "source": "NOTION_LIVE"}
             return text
     except Exception as e:
         logger.warning(f"[skill_loader] Failed to fetch B11 self-learning rules: {e}")
@@ -600,10 +632,11 @@ def get_b11_self_learning_rules(force_refresh: bool = False) -> str:
 
 
 def get_b2_editorial_skills(force_refresh: bool = False) -> str:
-    """Return high-density, targeted editorial skill prompts for B2 Story Engine.
+    """Return high-density, targeted editorial skill prompts for B2 Story Engine from Notion SoT.
     Combines 10X 5-Beat Docudrama Micro-Pacing Architecture, Rule 113/114/130 YouTube Viral Mandates,
     and B11 Self-Learning post-mortem feedback dynamically without marketing context clutter.
     """
+    base_editorial = fetch_prompt_module("b2_editorial", force_refresh=force_refresh)
     b11_lessons = get_b11_self_learning_rules(force_refresh=force_refresh)
     
     b11_section = ""
@@ -613,13 +646,8 @@ def get_b2_editorial_skills(force_refresh: bool = False) -> str:
             f"{b11_lessons[:1200]}\n"
         )
 
-    b2_template_file = ROOT_DIR / "config" / "prompts" / "b2_editorial_prompt.md"
-    if b2_template_file.exists():
-        try:
-            base_editorial = b2_template_file.read_text(encoding="utf-8").strip()
-            return f"{base_editorial}\n{b11_section}"
-        except Exception as e:
-            logger.warning(f"[skill_loader] Failed reading {b2_template_file}: {e}")
+    if base_editorial:
+        return f"{base_editorial}\n{b11_section}"
 
     editorial_prompt = (
         "=== B2 10X EDITORIAL & INVESTIGATIVE CINEMATIC MANDATES ===\n"
@@ -644,18 +672,10 @@ def get_b2_editorial_skills(force_refresh: bool = False) -> str:
 
 
 def get_seo_editorial_skills(force_refresh: bool = False) -> str:
-    """Return targeted packaging & narrative hook prompt guidelines for B1.5 SEO Package Forge.
-    Decoupled from Python code: loads from config/prompts/seo_package_prompt.md or Notion SoT,
-    and dynamically integrates B11 Continuous Self-Learning feedback.
+    """Return targeted packaging & narrative hook prompt guidelines for B1.5 SEO Package Forge from Notion SoT.
+    Decoupled per Rule 132: loads dynamically from Notion SoT or snapshot with B11 feedback.
     """
-    base_prompt = "You are the Packaging & Narrative Hook Director for Video Factory."
-    prompt_file = ROOT_DIR / "config" / "prompts" / "seo_package_prompt.md"
-    if prompt_file.exists():
-        try:
-            base_prompt = prompt_file.read_text(encoding="utf-8").strip()
-        except Exception as e:
-            logger.warning(f"[skill_loader] Failed reading {prompt_file}: {e}")
-            
+    base_prompt = get_b10_seo_rules(force_refresh=force_refresh)
     b11_lessons = get_b11_self_learning_rules(force_refresh=force_refresh)
     if b11_lessons:
         return f"{base_prompt}\n\n=== B11 CONTINUOUS SELF-LEARNING LESSONS (LIVE NOTION FEEDBACK) ===\n{b11_lessons[:1200]}"

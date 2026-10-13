@@ -19,10 +19,6 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, '/root/video_factory')
 from app.services.hhtech_reasoner import call_gpt6_astra, detect_safety_and_theme
 from app.services.skill_loader import (
-    get_skill_rules,
-    get_central_skills,
-    get_content_engine_rules,
-    get_media_production_rules,
     get_b2_editorial_skills,
     get_vox_docudrama_prompt
 )
