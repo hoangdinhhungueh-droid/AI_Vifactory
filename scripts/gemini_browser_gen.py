@@ -22,6 +22,7 @@ except ImportError:
 from PIL import Image, ImageFilter
 import numpy as np
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
 USER_DATA_DIR = os.environ.get("GEMINI_BROWSER_PROFILE", r"C:\Users\hunghd2\.gemini\browser_profile")
 try:
     os.makedirs(USER_DATA_DIR, exist_ok=True)
@@ -175,9 +176,56 @@ def check_gemini_session(page):
     return None
 
 def fetch_prompts_from_vps(episode_id):
-    """Lấy danh sách prompts_forge.json từ VPS hoặc cache local an toàn không bị giới hạn stdout buffer (hỗ trợ BG, FG, Thumbnails)."""
+    """Lấy danh sách prompts từ director_plan.json (Vox continuous) hoặc prompts_forge.json."""
     local_episode_dir = os.path.join(r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets", episode_id)
     os.makedirs(local_episode_dir, exist_ok=True)
+
+    # 1. Ưu tiên đọc director_plan.json từ local (Chuẩn Vox Continuous Object-Assembly)
+    local_dp = ROOT_DIR / "episodes" / episode_id / "director_plan.json"
+    if local_dp.exists():
+        try:
+            with open(local_dp, "r", encoding="utf-8") as f:
+                dp = json.load(f)
+            if "scenes" in dp:
+                items = []
+                for s in dp.get("scenes", []):
+                    s_id = s.get("scene_id", "")
+                    prompt = s.get("image_prompt", "")
+                    if prompt:
+                        items.append({
+                            "reuse_key": f"composite_{s_id}",
+                            "layer_type": "Background",
+                            "prompt": f"{prompt} [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]"
+                        })
+                if items:
+                    print(f"📋 [Vox Director Plan] Đã nạp thành công {len(items)} prompts từ local director_plan.json!")
+                    return items
+        except Exception as e:
+            print(f"⚠️ Lỗi đọc local director_plan.json: {e}")
+
+    # Fallback kiểm tra director_plan.json trên VPS
+    try:
+        vps_dp_check = client.run_command(f"test -f /var/vf/episodes/{episode_id}/director_plan.json && echo EXISTS")
+        if "EXISTS" in vps_dp_check.get("stdout", ""):
+            vps_dp_read = client.run_command(f"cat /var/vf/episodes/{episode_id}/director_plan.json")
+            dp = json.loads(vps_dp_read.get("stdout", "{}"))
+            if "scenes" in dp:
+                items = []
+                for s in dp.get("scenes", []):
+                    s_id = s.get("scene_id", "")
+                    prompt = s.get("image_prompt", "")
+                    if prompt:
+                        items.append({
+                            "reuse_key": f"composite_{s_id}",
+                            "layer_type": "Background",
+                            "prompt": f"{prompt} [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]"
+                        })
+                if items:
+                    print(f"📋 [Vox Director Plan VPS] Đã nạp thành công {len(items)} prompts từ VPS director_plan.json!")
+                    return items
+    except Exception as e:
+        pass
+
     local_prompts_file = os.path.join(local_episode_dir, "prompts_forge.json")
     
     d = None
@@ -1006,6 +1054,13 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                 # Local storage only during generation (Atomic Batch Archive at end per Rule 119/125)
                 if image_passed and os.path.exists(local_png):
                     print(f"💾 [Local Cache] Ảnh {key}.png sẵn sàng ({layer}). Sẽ đóng gói nguyên tử gửi VPS sau khi hoàn tất.")
+                    try:
+                        seed_dir = ROOT_DIR / "episodes" / episode_id / "composite_seeds"
+                        seed_dir.mkdir(parents=True, exist_ok=True)
+                        import shutil
+                        shutil.copy2(local_png, seed_dir / f"{key}.png")
+                    except Exception as copy_err:
+                        pass
                 
                 if idx < len(prompt_items):
                     print(f"⏳ Giãn cách {pacing_sec}s giữa các prompt theo Rule 436 (Rate Pacing)...")
@@ -1048,6 +1103,7 @@ if __name__ == "__main__":
     parser.add_argument("--headless", action="store_true", help="Chạy không hiện cửa sổ")
     parser.add_argument("--pacing", type=int, default=3, help="Thời gian giãn cách giữa các prompt (giây)")
     parser.add_argument("--force", action="store_true", help="Sinh lại toàn bộ ngay cả khi đã có file cục bộ")
+    parser.add_argument("--limit", type=int, default=0, help="Giới hạn số ảnh cần sinh (0: toàn bộ)")
     parser.add_argument("--no-auto-handoff", action="store_true", help="Tắt tự động trigger B6 render sau khi xong B4/B5 (mặc định B6 tự động kích hoạt)")
     args = parser.parse_args()
     
@@ -1073,5 +1129,8 @@ if __name__ == "__main__":
             clean_ep = clean_ep[5:].strip()
         
         items = fetch_prompts_from_vps(clean_ep)
-        print(f"📋 Đã nạp thành công {len(items)} prompts từ VPS cho episode {clean_ep}")
+        if args.limit > 0:
+            items = items[:args.limit]
+            print(f"🎯 Đã giới hạn sinh {args.limit} ảnh đầu tiên theo tham số --limit!")
+        print(f"📋 Đã nạp thành công {len(items)} prompts cho episode {clean_ep}")
         run_browser_pipeline(clean_ep, items, headless=args.headless, pacing_sec=args.pacing, force=args.force, auto_handoff=auto_handoff)
