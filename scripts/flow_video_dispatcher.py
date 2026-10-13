@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """scripts/flow_video_dispatcher.py
 Bộ điều phối tự động hóa sinh và tải video từ Google Flow (Veo 3.1 - Fast)
-cho 6 tài khoản Google AI Pro (acc_01 đến acc_06).
+cho 7 tài khoản Google AI Pro (acc_01 đến acc_07).
 
 Tuân thủ:
 - Rule 118: Zero-mock, tạo video thật 100% từ Google Flow.
@@ -66,7 +66,7 @@ PROFILES = {
         'path': PROFILES_BASE_DIR / 'acc_07',
         'email': 'hunghoangdinh090@gmail.com',
         'name': 'Hung Hoang Dinh'
-    },
+    }
 }
 
 def dismiss_dialogs(page):
@@ -101,7 +101,6 @@ def dismiss_dialogs(page):
 def ensure_veo_fast_model(page) -> bool:
     """Đảm bảo model Veo 3.1 - Fast được chọn."""
     try:
-        # Check settings
         settings_btn = page.locator("button[aria-label='Settings']").first
         if not settings_btn.is_visible():
             pbox = page.locator("div.ProseMirror, [contenteditable='true']").first
@@ -113,13 +112,11 @@ def ensure_veo_fast_model(page) -> bool:
             settings_btn.click()
             time.sleep(1)
 
-            # Never confirm
             never_opt = page.locator("text='Never'").first
             if never_opt.count() > 0:
                 never_opt.click(force=True)
                 time.sleep(0.5)
 
-            # Model dropdown
             model_drop = page.locator("button:has-text('Omni 1.1 Flash'), button:has-text('Veo')").first
             if model_drop.count() > 0:
                 btn_text = model_drop.text_content() or ""
@@ -157,16 +154,13 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
     print(f"\n   🎬 [BẮT ĐẦU CLIP I2V] {scene_id} -> {output_filename}")
     print(f"      Prompt: \"{prompt_text[:120]}...\"")
 
-    # Tìm file ảnh seed (ưu tiên composite 16:9, sau đó cutout)
     seed_img = episode_dir / "composite_seeds" / f"composite_{scene_id}.png"
     if not seed_img.exists():
-        # Fallback brain dir
         brain_seed = ARTIFACT_DIR / f"composite_{scene_id}.png"
         if brain_seed.exists():
             seed_img = brain_seed
 
     try:
-        # 1. Đảm bảo ở trang canvas sạch (đóng player nếu đang mở)
         done_btn = page.locator("button[aria-label='Done editing scene'], button:has-text('Done')").first
         if done_btn.count() > 0 and done_btn.is_visible():
             done_btn.click()
@@ -177,7 +171,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             back_btn.click()
             time.sleep(1)
 
-        # 2. Upload Seed Image qua Add Ingredients
         if seed_img.exists():
             print(f"      🖼️ Đang nạp ảnh Seed: {seed_img.name}...")
             ingr_btn = page.locator("button[aria-label*='Add ingredients to the prompt box' i], button[aria-label*='Add ingredients' i]").first
@@ -210,7 +203,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                                 add_to_prompt.click()
                                 time.sleep(2)
 
-        # 3. Nhập Prompt vào ProseMirror
         prompt_box = page.locator("div.ProseMirror, [contenteditable='true']").first
         if prompt_box.count() == 0:
             print("      ❌ Không tìm thấy ô nhập prompt!")
@@ -220,7 +212,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         prompt_box.fill(prompt_text)
         time.sleep(1)
 
-        # 4. Bấm Start generation
         start_gen = page.locator("button[aria-label*='Start generation' i], button:has-text('arrow_forward')").first
         if start_gen.count() == 0 or not start_gen.is_visible():
             print("      ❌ Không tìm thấy nút Start generation!")
@@ -230,7 +221,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         print("      🚀 Đã bấm Start generation. Đang chờ Veo 3.1 sinh video...")
         time.sleep(3)
 
-        # Auto approve modal qua JavaScript
         page.evaluate('''() => {
             const els = Array.from(document.querySelectorAll('*')).filter(el => {
                 const txt = (el.innerText || '').trim();
@@ -239,7 +229,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             if (els.length > 0) els[els.length - 1].click();
         }''')
 
-        # 5. Chờ hoàn tất (theo dõi % tiến độ rendering)
         max_wait_sec = 210
         start_time = time.time()
         completed = False
@@ -263,7 +252,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             print(f"\n      ⚠️ Quá thời gian chờ {max_wait_sec}s.")
             return False
 
-        # 6. Mở video thumbnail mới nhất trong canvas hoặc tab Videos
         time.sleep(3)
         curr_thumbnails = page.locator("img[src*='googleusercontent'], img[src*='asb']").all()
         if not curr_thumbnails:
@@ -273,7 +261,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         curr_thumbnails[0].click()
         time.sleep(3)
 
-        # 7. Bấm nút Download media
         dl_btn = page.locator("button[aria-label*='Download media' i], button:has-text('download')").first
         if dl_btn.count() == 0 or not dl_btn.is_visible():
             print("      ❌ Không tìm thấy nút Download media trong player!")
@@ -282,7 +269,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         dl_btn.click()
         time.sleep(1)
 
-        # 8. Chọn 720p và tải về file
         opt_720 = page.locator("div, button, span").filter(has_text="720p").last
         if opt_720.count() == 0 or not opt_720.is_visible():
             print("      ❌ Không thấy tùy chọn 720p!")
@@ -303,7 +289,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                 break
 
         if not downloaded:
-            # Fallback check any freshly modified crdownload file
             for cr in out_file.parent.glob("*.crdownload"):
                 if time.time() - cr.stat().st_mtime < 60 and cr.stat().st_size > 100000:
                     downloaded = cr
@@ -348,7 +333,6 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
         )
         page = browser.pages[0] if browser.pages else browser.new_page()
 
-        # Cấu hình CDP download
         try:
             cdp = page.context.new_cdp_session(page)
             cdp.send("Page.setDownloadBehavior", {
@@ -369,7 +353,6 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
                 pass
             time.sleep(2)
 
-            # Vào project hiện có hoặc tạo mới
             cards = page.locator(".project-card").all()
             if cards:
                 print(f"   Mở project có sẵn ({len(cards)} cards)...")
@@ -393,10 +376,8 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
         time.sleep(3)
         dismiss_dialogs(page)
 
-        # Đảm bảo cấu hình Veo 3.1 - Fast
         ensure_veo_fast_model(page)
 
-        # Sinh từng clip
         for clip in clips:
             out_file = out_dir / clip["output_filename"]
             if out_file.exists() and out_file.stat().st_size > 200000:
@@ -436,13 +417,16 @@ def main():
     print(f"📦 Tổng số clips trong manifest: {len(all_clips)}")
     print(f"📁 Thư mục lưu trữ: {out_dir}")
 
-    # Nhóm clips theo flow_slot
-    clips_by_acc = {}
-    for c in all_clips:
-        slot = c.get("flow_slot", "acc_01")
-        clips_by_acc.setdefault(slot, []).append(c)
+    available_accs = list(PROFILES.keys())
+    clips_by_acc = {acc: [] for acc in available_accs}
+    for i, c in enumerate(all_clips):
+        slot = c.get("flow_slot")
+        if not slot or slot not in PROFILES:
+            slot = available_accs[i % len(available_accs)]
+            c["flow_slot"] = slot
+        clips_by_acc[slot].append(c)
 
-    target_accs = list(PROFILES.keys()) if args.acc == "all" else [args.acc]
+    target_accs = available_accs if args.acc == "all" else [args.acc]
 
     total_success = 0
     total_processed = 0

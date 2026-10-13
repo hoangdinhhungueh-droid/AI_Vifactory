@@ -58,14 +58,17 @@ Output JSON format ONLY:
 
 
 def _compress_plan_for_audit(director_plan: List[Dict[str, Any]]) -> str:
-    """Nén Director Plan thành bản tóm tắt siêu tinh gọn để tiết kiệm token."""
+    """Nén Director Plan thành bản tóm tắt tinh gọn nhưng đầy đủ 5 layer cho Critic Council."""
     lines = []
     for scene in director_plan[:40]:  # Limit top 40 scenes per evaluation
         s_id = scene.get("scene_id", scene.get("scene_number", "SCENE"))
         narration = scene.get("sentence", scene.get("narration", ""))[:120]
-        headline = scene.get("editorial_title", scene.get("headline", ""))
-        metaphor = scene.get("visual_metaphor", "")
-        lines.append(f"[{s_id}] Narration: \"{narration}\" | Headline: \"{headline}\" | Metaphor: \"{metaphor}\"")
+        headline = scene.get("bilingual_headline") or scene.get("editorial_title") or scene.get("headline", "")
+        metaphor = scene.get("visual_metaphor") or (f"{scene.get('hero_cutout_object', '')} interacting with {', '.join(scene.get('interacting_objects', []))}")
+        palette = scene.get("color_accent", "")
+        continuity = scene.get("visual_continuity_link_to_next", "")
+        prompt = scene.get("image_prompt", "")
+        lines.append(f"[{s_id}] Narration: \"{narration}\" | Headline: \"{headline}\" | Metaphor: \"{metaphor}\" | Palette: \"{palette}\" | Continuity: \"{continuity}\" | Prompt: \"{prompt}\"")
     return "\n".join(lines)
 
 
