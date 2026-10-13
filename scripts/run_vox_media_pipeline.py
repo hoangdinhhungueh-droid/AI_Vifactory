@@ -193,7 +193,8 @@ def run_stage_images(episode_id: str, limit: int = 0, headless: bool = False, pa
         sys.executable,
         str(ROOT_DIR / "scripts" / "gemini_browser_gen.py"),
         "--episode", episode_id,
-        "--pacing", str(pacing)
+        "--pacing", str(pacing),
+        "--no-auto-handoff"
     ]
     if limit > 0:
         cmd.extend(["--limit", str(limit)])
@@ -203,6 +204,250 @@ def run_stage_images(episode_id: str, limit: int = 0, headless: bool = False, pa
     print(f"🚀 Thực thi lệnh: {' '.join(cmd)}")
     res = subprocess.run(cmd)
     return res.returncode == 0
+
+
+def perform_b5_visual_audit(episode_id: str, block_manifest: Dict[str, Any], limit: int = 0) -> Dict[str, Any]:
+    """Kiểm toán thị giác Forensic B5 đồng thời trên toàn bộ ảnh vừa sinh (Rule 118, 121, 122)."""
+    print("\n" + "=" * 88)
+    print("🔍 [BƯỚC B5: KIỂM TOÁN THỊ GIÁC ĐỒNG THỜI (FORENSIC VISUAL AUDIT)]")
+    print(f"   Episode: {episode_id}")
+    print("=" * 88)
+
+    try:
+        from PIL import Image
+        import numpy as np
+    except ImportError:
+        Image = None
+        np = None
+
+    episode_dir = ROOT_DIR / "episodes" / episode_id
+    flat_seeds = episode_dir / "composite_seeds"
+    brain_dir = Path(r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets") / episode_id
+
+    # Tập hợp các cảnh cần audit
+    all_scenes: List[Dict[str, Any]] = []
+    for b_name, b_info in block_manifest.get("blocks", {}).items():
+        for sc_id in b_info.get("scenes", []):
+            all_scenes.append({
+                "scene_id": sc_id,
+                "block_name": b_name,
+                "images_dir": b_info.get("images_dir")
+            })
+
+    if limit > 0:
+        all_scenes = all_scenes[:limit]
+
+    audit_details = []
+    approved_count = 0
+
+    print(f"{'Scene ID':<10} | {'Block Name':<18} | {'Resolution':<11} | {'Dung Lượng':<10} | {'Tỷ lệ':<8} | {'Điểm':<5} | Trạng Thái")
+    print("-" * 88)
+
+    for sc in all_scenes:
+        sc_id = sc["scene_id"]
+        b_name = sc["block_name"]
+        sc_lower = sc_id.lower()
+
+        # Tìm ảnh ở các vị trí có thể
+        candidates = [
+            Path(sc["images_dir"]) / f"composite_{sc_id}.png",
+            Path(sc["images_dir"]) / f"{sc_lower}.png",
+            flat_seeds / f"composite_{sc_id}.png",
+            flat_seeds / f"{sc_lower}.png",
+            brain_dir / f"composite_{sc_id}.png",
+            brain_dir / f"{sc_lower}.png"
+        ]
+        found_img = None
+        for cand in candidates:
+            if cand.exists() and cand.stat().st_size > 1024:
+                found_img = cand
+                break
+
+        if not found_img:
+            audit_details.append({
+                "scene_id": sc_id,
+                "block": b_name,
+                "file": f"composite_{sc_id}.png",
+                "resolution": "N/A",
+                "size_bytes": 0,
+                "score": 0.0,
+                "status": "MISSING",
+                "reason": "Chưa có file ảnh"
+            })
+            print(f"{sc_id:<10} | {b_name[:18]:<18} | {'N/A':<11} | {'0 KB':<10} | {'N/A':<8} | {'0.0':<5} | ❌ CHƯA CÓ ẢNH")
+            continue
+
+        sz_bytes = found_img.stat().st_size
+        sz_kb = sz_bytes // 1024
+
+        res_str = "Unknown"
+        aspect_str = "Unknown"
+        score = 8.0
+        is_ok = (sz_kb >= 50)
+
+        if Image:
+            try:
+                with Image.open(found_img) as im:
+                    w, h = im.size
+                    res_str = f"{w}x{h}"
+                    ratio = round(w / h, 2) if h > 0 else 0.0
+                    aspect_str = f"{ratio}:1"
+                    
+                    # Tiêu chuẩn: 16:9 (ratio 1.70 - 1.85) và tối thiểu 1920x1080
+                    res_pass = (w >= 1920 and h >= 1080)
+                    ratio_pass = (1.70 <= ratio <= 1.85)
+
+                    if np:
+                        arr = np.array(im.convert("RGB"))
+                        std_dev = float(np.std(arr))
+                        richness_pass = (std_dev > 15.0)
+                    else:
+                        richness_pass = True
+
+                    score = 10.0
+                    if not ratio_pass:
+                        score -= 2.5
+                    if not res_pass:
+                        score -= 2.5
+                    if not richness_pass:
+                        score -= 2.0
+                    if not (sz_kb >= 50):
+                        score -= 2.0
+                    score = max(0.0, round(score, 1))
+                    is_ok = (score >= 8.0 and res_pass and ratio_pass)
+            except Exception as e:
+                is_ok = False
+                score = 0.0
+                res_str = f"Error: {e}"
+
+        status_text = "APPROVED" if is_ok else "NEEDS_REVIEW"
+        if is_ok:
+            approved_count += 1
+            icon_status = "✅ ĐẠT CHUẨN"
+        else:
+            icon_status = "⚠️ CẦN XEM LẠI"
+
+        print(f"{sc_id:<10} | {b_name[:18]:<18} | {res_str:<11} | {f'{sz_kb:,} KB':<10} | {aspect_str:<8} | {score:<5} | {icon_status}")
+
+        audit_details.append({
+            "scene_id": sc_id,
+            "block": b_name,
+            "file": found_img.name,
+            "path": str(found_img),
+            "resolution": res_str,
+            "size_kb": sz_kb,
+            "aspect_ratio": aspect_str,
+            "score": score,
+            "status": status_text
+        })
+
+    total_scenes_audited = len(all_scenes)
+    overall_verdict = "TECH_PASS" if (approved_count == total_scenes_audited and total_scenes_audited > 0) else ("PARTIAL_PASS" if approved_count > 0 else "FAIL")
+
+    print("-" * 88)
+    print(f"📊 TỔNG KẾT B5: {approved_count}/{total_scenes_audited} Ảnh Đạt Chuẩn ({round((approved_count/total_scenes_audited*100) if total_scenes_audited else 0)}%) | Verdict: {overall_verdict}")
+    print("=" * 88)
+
+    summary_data = {
+        "episode_id": episode_id,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "total_images": total_scenes_audited,
+        "approved_images": approved_count,
+        "verdict": overall_verdict,
+        "scenes": audit_details
+    }
+
+    report_path = episode_dir / "b5_visual_audit_summary.json"
+    with open(report_path, "w", encoding="utf-8") as f:
+        json.dump(summary_data, f, indent=2, ensure_ascii=False)
+
+    return summary_data
+
+
+def evaluate_human_gate(
+    episode_id: str,
+    block_manifest: Dict[str, Any],
+    audit_summary: Dict[str, Any],
+    args: argparse.Namespace
+) -> bool:
+    """Human Gate / Antigravity Stop trước khi chuyển sang bước sinh video."""
+    episode_dir = ROOT_DIR / "episodes" / episode_id
+    gate_file = episode_dir / "human_gate_checkpoint.json"
+
+    # Kiểm tra cờ trigger hoặc pre-approved
+    is_pre_approved = (
+        getattr(args, "trigger_video", False)
+        or getattr(args, "approve_gate", False)
+        or getattr(args, "auto_approve", False)
+    )
+
+    total_imgs = audit_summary.get("total_images", 0)
+    approved_imgs = audit_summary.get("approved_images", 0)
+    verdict = audit_summary.get("verdict", "UNKNOWN")
+
+    checkpoint_data = {
+        "episode_id": episode_id,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "stage": "STAGE_2_IMAGE_AND_AUDIT_COMPLETED",
+        "total_images": total_imgs,
+        "approved_images": approved_imgs,
+        "audit_verdict": verdict,
+        "gate_status": "APPROVED" if is_pre_approved else "PENDING_USER_APPROVAL",
+        "trigger_command": f"python scripts/run_vox_media_pipeline.py --episode {episode_id} --trigger-video",
+        "shortcut_command": f"python scripts/trigger_video_generation.py --episode {episode_id}"
+    }
+
+    if is_pre_approved:
+        checkpoint_data["gate_status"] = "APPROVED"
+        with open(gate_file, "w", encoding="utf-8") as f:
+            json.dump(checkpoint_data, f, indent=2, ensure_ascii=False)
+        print("\n" + "=" * 75)
+        print("🟢 [HUMAN AUDIT GATE: PHÊ DUYỆT TỰ ĐỘNG / ĐÃ KÍCH HOẠT LỆNH TRIGGER]")
+        print(f"   Ảnh đã kiểm toán: {approved_imgs}/{total_imgs} ({verdict})")
+        print("   Tiến hành chuyển tiếp trực tiếp sang BƯỚC 3: SINH VIDEO CLIPS!")
+        print("=" * 75)
+        return True
+
+    # Lưu checkpoint chờ phê duyệt
+    with open(gate_file, "w", encoding="utf-8") as f:
+        json.dump(checkpoint_data, f, indent=2, ensure_ascii=False)
+
+    print("\n" + "=" * 75)
+    print("🛑 [HUMAN AUDIT GATE / ANTIGRAVITY DỪNG CHỜ PHÊ DUYỆT]")
+    print("=" * 75)
+    print(f"📌 BƯỚC SINH ẢNH & KIỂM TOÁN B5 ĐÃ HOÀN TẤT CHO {episode_id}:")
+    print(f"   • Kết quả kiểm toán: {approved_imgs}/{total_imgs} ảnh đạt chuẩn ({verdict})")
+    print(f"   • Thư mục phân cụm: episodes/{episode_id}/blocks/<block_name>/images/")
+    print(f"   • Thư mục hạt giống Remotion: episodes/{episode_id}/composite_seeds/")
+    print(f"   • Chi tiết kiểm toán: episodes/{episode_id}/b5_visual_audit_summary.json")
+    print("\n⚠️ PIPELINE ĐANG TẠM DỪNG TẠI CỔNG NÀY ĐỂ BẠN KIỂM TRA CHẤT LƯỢNG ẢNH.")
+    print("   Chỉ khi có lệnh cho phép của bạn, hệ thống mới bắt đầu chạy sinh video Veo 3.1.")
+    print("=" * 75)
+
+    # Nếu đang chạy interactive terminal
+    if sys.stdin and hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
+        try:
+            print("\n👉 Bạn có muốn DUYỆT và BẮT ĐẦU SINH VIDEO ngay bây giờ không?")
+            print("   [Y] Phê duyệt & Chạy sinh video ngay")
+            print("   [N] Dừng lại để kiểm tra ảnh thủ công (Sẽ chạy lệnh trigger sau)")
+            choice = input("Lựa chọn của bạn (y/N): ").strip().lower()
+            if choice in ("y", "yes", "approve"):
+                checkpoint_data["gate_status"] = "APPROVED"
+                with open(gate_file, "w", encoding="utf-8") as f:
+                    json.dump(checkpoint_data, f, indent=2, ensure_ascii=False)
+                print("✅ Bạn đã phê duyệt! Đang bắt đầu tiến trình sinh video...")
+                return True
+        except (KeyboardInterrupt, EOFError):
+            print("\n⏹️ Nhận tín hiệu dừng từ người dùng.")
+
+    # Tạm dừng an toàn và thông báo lệnh trigger
+    print("\n⏸️ [PIPELINE ĐÃ TẠM DỪNG AN TOÀN TRƯỚC BƯỚC SINH VIDEO]")
+    print("Khi bạn đã kiểm tra ảnh xong và sẵn sàng chạy video, hãy gõ 1 trong các lệnh trigger sau:")
+    print(f"👉 python scripts/run_vox_media_pipeline.py --episode {episode_id} --trigger-video")
+    print("hoặc dùng lệnh tắt chuyên dụng:")
+    print(f"👉 python scripts/trigger_video_generation.py --episode {episode_id}")
+    print("=" * 75 + "\n")
+    return False
 
 
 def run_stage_videos(episode_id: str, limit: int = 0, acc: str = "all") -> bool:
@@ -271,6 +516,9 @@ def main():
     parser.add_argument("--headless", action="store_true", help="Chạy ngầm không mở cửa sổ browser")
     parser.add_argument("--pacing", type=int, default=4, help="Thời gian giãn cách giữa các prompt sinh ảnh (giây)")
     parser.add_argument("--dry-run", action="store_true", help="Chỉ tạo cấu trúc folder và xuất manifest, không sinh media")
+    parser.add_argument("--trigger-video", action="store_true", help="Lệnh trigger phê duyệt Human Gate và khởi chạy ngay giai đoạn sinh video")
+    parser.add_argument("--approve-gate", action="store_true", help="Bí danh của --trigger-video (phê duyệt cổng dừng)")
+    parser.add_argument("--auto-approve", action="store_true", help="Tự động duyệt Human Gate không cần dừng chờ")
     args = parser.parse_args()
 
     clean_ep = args.episode.strip().strip("'\"")
@@ -301,8 +549,9 @@ def main():
             total_scenes_to_run = count_in_blocks
         print(f"🎯 Đã giới hạn {args.limit_blocks} cụm Block đầu tiên (~{total_scenes_to_run} cảnh)!")
 
-    # 2. Chạy Giai đoạn Sinh Ảnh
-    if args.stage in ("all", "image"):
+    # 2. Chạy Giai đoạn Sinh Ảnh & Kiểm Toán Thị Giác B5 Đồng Thời
+    audit_summary = {}
+    if args.stage in ("all", "image") and not (args.trigger_video or args.approve_gate):
         ok_img = run_stage_images(
             clean_ep,
             limit=total_scenes_to_run,
@@ -310,10 +559,26 @@ def main():
             pacing=args.pacing
         )
         sync_assets_to_blocks_and_flat(clean_ep, block_manifest)
+        audit_summary = perform_b5_visual_audit(clean_ep, block_manifest, limit=total_scenes_to_run)
         if not ok_img:
             print("⚠️ Giai đoạn sinh ảnh gặp cảnh báo, tiến trình tiếp tục đồng bộ tài sản hiện có...")
+    else:
+        # Nếu đang ở stage video hoặc được gọi với trigger-video, đối soát nhanh tài sản hiện có
+        audit_summary = perform_b5_visual_audit(clean_ep, block_manifest, limit=total_scenes_to_run)
 
-    # 3. Chạy Giai đoạn Sinh Video
+    # Nếu chỉ chạy stage image thì kết thúc tại đây
+    if args.stage == "image":
+        print_pipeline_summary(clean_ep, block_manifest)
+        return
+
+    # 🛑 HUMAN AUDIT GATE / ANTIGRAVITY STOP (Chặn trước khi sinh Video)
+    if args.stage in ("all", "video"):
+        gate_passed = evaluate_human_gate(clean_ep, block_manifest, audit_summary, args)
+        if not gate_passed:
+            # Dừng lại an toàn tại Human Gate, chờ lệnh trigger của User
+            return
+
+    # 3. Chạy Giai đoạn Sinh Video (Chỉ chạy khi Human Gate đã APPROVED)
     if args.stage in ("all", "video"):
         sync_assets_to_blocks_and_flat(clean_ep, block_manifest)
         ok_vid = run_stage_videos(
