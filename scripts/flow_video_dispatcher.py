@@ -397,7 +397,8 @@ def main():
     parser = argparse.ArgumentParser(description="Google Flow Video Dispatcher for 7 Accounts")
     parser.add_argument("--episode", required=True, help="Episode ID (e.g. <MARKET>_EP<XXXX>_<slug>)")
     parser.add_argument("--acc", default="all", help="acc_01 to acc_07 or all")
-    parser.add_argument("--limit", type=int, default=0, help="Limit number of clips to generate (0 for unlimited)")
+    parser.add_argument("--limit", type=int, default=0, help="Limit total number of clips to generate (0 for unlimited)")
+    parser.add_argument("--scenes", default="", help="Comma-separated scene IDs to generate (e.g. SCENE_01,SCENE_02)")
     args = parser.parse_args()
 
     episode_dir = ROOT_DIR / "episodes" / args.episode
@@ -413,10 +414,21 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     all_clips = manifest.get("clips", [])
+
+    # Lọc theo scenes hoặc giới hạn tổng số clip trước khi phân bổ qua các tài khoản
+    if args.scenes:
+        target_sids = set(s.strip().upper() for s in args.scenes.split(",") if s.strip())
+        all_clips = [c for c in all_clips if c.get("scene_id", "").upper() in target_sids]
+        print(f"🎯 Đã lọc theo danh sách scenes: {len(all_clips)} clips")
+    elif args.limit > 0:
+        all_clips = all_clips[:args.limit]
+        print(f"🎯 Đã giới hạn tổng cộng {len(all_clips)} clips đầu tiên!")
+
     print(f"🎯 EPISODE: {args.episode}")
-    print(f"📦 Tổng số clips trong manifest: {len(all_clips)}")
+    print(f"📦 Tổng số clips xử lý: {len(all_clips)}")
     print(f"📁 Thư mục lưu trữ: {out_dir}")
 
+    # Phân bổ clips theo flow_slot, tự động cân bằng round-robin qua 7 tài khoản (acc_01 đến acc_07)
     available_accs = list(PROFILES.keys())
     clips_by_acc = {acc: [] for acc in available_accs}
     for i, c in enumerate(all_clips):
@@ -436,9 +448,6 @@ def main():
         if not clips:
             print(f"⚠️ Không có clip nào được gán cho {acc}")
             continue
-
-        if args.limit > 0:
-            clips = clips[:args.limit]
 
         res = dispatch_for_account(acc, clips, out_dir, episode_dir)
         for s_id, ok in res.items():

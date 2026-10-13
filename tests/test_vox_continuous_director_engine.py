@@ -67,6 +67,7 @@ def test_continuous_director_plan_generation(mock_episode_dir):
     assert plan["total_scenes"] >= 14
     assert plan["total_sequence_blocks"] >= 3
 
+    # Inspect each scene for strict object-assembly kinematics
     for scene in plan["scenes"]:
         assert "scene_id" in scene
         assert "sequence_block" in scene
@@ -79,18 +80,21 @@ def test_continuous_director_plan_generation(mock_episode_dir):
         assert isinstance(scene["interacting_objects"], list)
         assert len(scene["interacting_objects"]) >= 1
 
+        # Motion track kinematics
         mt = scene["motion_track_and_assembly"]
         assert "entry_action" in mt
         assert "assembly_step" in mt
         assert "spatial_anchor" in mt
         assert mt["camera_rule"] == "Completely static camera, no 3D pan/zoom"
 
+        # Typography & Bridging link
         assert "graphic_typography" in scene
         assert "headline" in scene["graphic_typography"]
         assert "english_tag" in scene["graphic_typography"]
         assert "visual_continuity_link_to_next" in scene
         assert len(scene["visual_continuity_link_to_next"]) > 15
 
+        # 5-Layer Image Prompt
         prompt = scene["image_prompt"]
         assert "Layer 1:" in prompt
         assert "Layer 2:" in prompt
@@ -112,5 +116,6 @@ def test_7_account_flow_manifest_round_robin(mock_episode_dir):
     assert manifest["accounts_used"] == FLOW_ACCOUNTS
     assert manifest["total_clips"] >= 14
 
+    # Verify that all 7 accounts are utilized
     assigned_slots = {clip["flow_slot"] for clip in manifest["clips"]}
     assert assigned_slots == set(FLOW_ACCOUNTS), "Every single one of the 7 accounts must be assigned clips!"

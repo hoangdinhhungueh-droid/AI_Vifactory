@@ -96,6 +96,8 @@ def split_script_into_sentences(script_data: Dict[str, Any]) -> List[Dict[str, A
             current_act = act_match.group(1).upper()
             continue
 
+        # Split line by sentence terminators
+        # Matches Korean/Japanese/English/Vietnamese punctuation (. ? ! 。)
         sentence_chunks = re.split(r"(?<=[.?!。])\s+", line)
         for chunk in sentence_chunks:
             chunk = chunk.strip()
@@ -114,9 +116,11 @@ def compute_timeframes(sentences: List[Dict[str, Any]], target_duration_sec: flo
     if total_chars == 0:
         return sentences
 
+    # Default ~4.5 - 5.5s per sentence
     current_time = 0.0
     for idx, s in enumerate(sentences):
         char_len = len(s["sentence"])
+        # Estimate duration: base 2.5s + char proportion
         dur = max(3.5, min(7.0, char_len * 0.12))
         start_sec = current_time
         end_sec = current_time + dur
@@ -139,8 +143,10 @@ def compute_timeframes(sentences: List[Dict[str, Any]], target_duration_sec: flo
 def group_into_sequence_blocks(sentences: List[Dict[str, Any]], scenes_per_block: int = 6) -> List[Dict[str, Any]]:
     """Partition sentences into thematic Sequence Blocks with shared canvas workspaces."""
     block_index = 1
+    current_block_scenes = []
 
     for idx, s in enumerate(sentences):
+        # Create new block if needed
         if idx > 0 and (idx % scenes_per_block == 0 or (idx < len(sentences) - 1 and s.get("act") != sentences[idx - 1].get("act"))):
             block_index += 1
 
@@ -156,6 +162,7 @@ def extract_vox_metaphor_entities(sentence: str, market: str, scene_idx: int) ->
     """Extract or synthesize tactile hero cutout object and interacting elements."""
     s_low = sentence.lower()
 
+    # Domain keywords detection
     if any(k in s_low for k in ["법인세", "tax", "과세", "소송", "판결", "대법원", "court", "ruling"]):
         hero = "An official corporate tax demand and court ruling document on tactile aged parchment"
         interacting = ["A crimson wax dismissal seal stamped over the figures", "Paper shears cutting through the tax document"]
@@ -177,6 +184,7 @@ def extract_vox_metaphor_entities(sentence: str, market: str, scene_idx: int) ->
         interacting = ["Brass label plates reading 'ROYALTY' vs 'BUSINESS PROFIT'", "A skeleton brass key hovering over the keyhole"]
         color = VOX_PALETTE["muted_gold"]
     else:
+        # Fallback tactile object based on rhythm
         generic_heroes = [
             "An archival dossier envelope stamped with confidential investigation markers",
             "A tactile paper evidence board with taut red threads connecting data nodes",
@@ -277,6 +285,7 @@ def generate_continuous_director_plan(
         hero, interacting, color_accent = extract_vox_metaphor_entities(sentence_text, market, idx)
         motion_track = synthesize_motion_track(hero, interacting, idx)
 
+        # Generate headline
         words = [w for w in re.split(r"\s+", sentence_text) if len(w) > 1]
         native_hl = " ".join(words[:3]) if words else f"SCENE {idx + 1}"
         english_tag = f"BEAT {idx + 1}"
@@ -323,10 +332,12 @@ def generate_continuous_director_plan(
         "scenes": processed_scenes
     }
 
+    # Save director_plan.json
     out_path = episode_dir / output_filename
     out_path.write_text(json.dumps(final_plan, ensure_ascii=False, indent=2), encoding="utf-8")
     logger.info(f"✅ Generated {len(processed_scenes)} continuous Vox scenes in {out_path}")
 
+    # Generate flow_video_manifest.json with 7-account round-robin rotation
     generate_7acc_flow_manifest(episode_dir, processed_scenes)
 
     return final_plan
@@ -340,6 +351,7 @@ def generate_7acc_flow_manifest(episode_dir: Path, scenes: List[Dict[str, Any]])
         flow_slot = FLOW_ACCOUNTS[idx % len(FLOW_ACCOUNTS)]
         out_fn = f"clip_{s_id.lower()}.mp4"
 
+        # Construct concise Veo prompt
         action = s["motion_track_and_assembly"]["entry_action"]
         subject = s["hero_cutout_object"].split(" on ")[0]
         veo_prompt = (
