@@ -138,55 +138,50 @@ def sync_assets_to_blocks_and_flat(episode_id: str, block_manifest: Dict[str, An
         for sc_id in b_info["scenes"]:
             sc_lower = sc_id.lower()
 
-            # 1. Đồng bộ Ảnh Seed
+            # 1. Đồng bộ Ảnh Seed: Ưu tiên file có mtime mới nhất
             img_cands = [
+                brain_dir / f"composite_{sc_id}.png",
+                brain_dir / f"{sc_lower}.png",
                 b_imgs / f"composite_{sc_id}.png",
                 b_imgs / f"{sc_lower}.png",
                 flat_seeds / f"composite_{sc_id}.png",
-                brain_dir / f"composite_{sc_id}.png",
-                brain_dir / f"{sc_lower}.png",
             ]
-            found_img = None
-            for c in img_cands:
-                if c.exists() and c.stat().st_size > 1024:
-                    found_img = c
-                    break
+            valid_cands = [c for c in img_cands if c.exists() and c.stat().st_size > 1024]
+            found_img = max(valid_cands, key=lambda c: c.stat().st_mtime) if valid_cands else None
 
             if found_img:
                 dest_block_img = b_imgs / f"composite_{sc_id}.png"
                 dest_flat_img = flat_seeds / f"composite_{sc_id}.png"
-                if not dest_block_img.exists() or dest_block_img != found_img:
+                if not dest_block_img.exists() or dest_block_img.resolve() != found_img.resolve():
                     shutil.copy2(str(found_img), str(dest_block_img))
-                if not dest_flat_img.exists() or dest_flat_img != found_img:
+                if not dest_flat_img.exists() or dest_flat_img.resolve() != found_img.resolve():
                     shutil.copy2(str(found_img), str(dest_flat_img))
 
-            # 2. Đồng bộ Video Clip
+            # 2. Đồng bộ Video Clip: Ưu tiên file có mtime mới nhất
             vid_cands = [
                 b_vids / f"clip_{sc_lower}.mp4",
                 flat_videos / f"clip_{sc_lower}.mp4",
+                episode_dir / f"clip_{sc_lower}.mp4",
             ]
-            found_vid = None
-            for c in vid_cands:
-                if c.exists() and c.stat().st_size > 100000:
-                    found_vid = c
-                    break
+            valid_vids = [c for c in vid_cands if c.exists() and c.stat().st_size > 100000]
+            found_vid = max(valid_vids, key=lambda c: c.stat().st_mtime) if valid_vids else None
 
             if found_vid:
                 dest_block_vid = b_vids / f"clip_{sc_lower}.mp4"
                 dest_flat_vid = flat_videos / f"clip_{sc_lower}.mp4"
-                if not dest_block_vid.exists() or dest_block_vid != found_vid:
+                if not dest_block_vid.exists() or dest_block_vid.resolve() != found_vid.resolve():
                     shutil.copy2(str(found_vid), str(dest_block_vid))
-                if not dest_flat_vid.exists() or dest_flat_vid != found_vid:
+                if not dest_flat_vid.exists() or dest_flat_vid.resolve() != found_vid.resolve():
                     shutil.copy2(str(found_vid), str(dest_flat_vid))
 
 
-def run_stage_images(episode_id: str, limit: int = 0, headless: bool = False, pacing: int = 4) -> bool:
+def run_stage_images(episode_id: str, limit: int = 0, headless: bool = False, pacing: int = 4, force: bool = False) -> bool:
     """Thực thi sinh ảnh qua gemini_browser_gen.py."""
     print("\n" + "=" * 75)
     print("🎨 [BƯỚC 4: SINH ẢNH SEED CHUẨN VOX CONTINUOUS]")
     print(f"   Episode: {episode_id}")
     print(f"   Giới hạn: {limit if limit > 0 else 'Toàn bộ'} ảnh")
-    print(f"   Headless: {headless} | Pacing: {pacing}s")
+    print(f"   Headless: {headless} | Pacing: {pacing}s | Force: {force}")
     print("=" * 75)
 
     cmd = [
@@ -200,6 +195,8 @@ def run_stage_images(episode_id: str, limit: int = 0, headless: bool = False, pa
         cmd.extend(["--limit", str(limit)])
     if headless:
         cmd.append("--headless")
+    if force:
+        cmd.append("--force")
 
     print(f"🚀 Thực thi lệnh: {' '.join(cmd)}")
     res = subprocess.run(cmd)
@@ -361,7 +358,131 @@ def perform_b5_visual_audit(episode_id: str, block_manifest: Dict[str, Any], lim
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump(summary_data, f, indent=2, ensure_ascii=False)
 
+    # Tự động xuất trang HTML Gallery để user mở xem trực quan
+    gallery_path = generate_html_review_gallery(episode_id, block_manifest, summary_data)
+    print(f"🌐 [HTML Gallery] Đã tạo trang xem trực quan tại: {gallery_path.name}")
+
     return summary_data
+
+
+def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any], audit_summary: Dict[str, Any]) -> Path:
+    """Tạo trang HTML Gallery trực quan để user mở duyệt ảnh ngay lập tức bằng 1 cú click."""
+    episode_dir = ROOT_DIR / "episodes" / episode_id
+    plan_file = episode_dir / "director_plan.json"
+    scenes_info = {}
+    if plan_file.exists():
+        try:
+            with open(plan_file, "r", encoding="utf-8") as f:
+                dp = json.load(f)
+            for s in dp.get("scenes", []):
+                scenes_info[s.get("scene_id")] = s
+        except Exception:
+            pass
+
+    gallery_html_path = episode_dir / "review_gallery.html"
+    scenes_audited = audit_summary.get("scenes", [])
+
+    cards_html = []
+    for item in scenes_audited:
+        sc_id = item.get("scene_id", "")
+        b_name = item.get("block", "")
+        file_name = item.get("file", "")
+        res = item.get("resolution", "")
+        sz = item.get("size_kb", 0)
+        status = item.get("status", "")
+        img_rel_path = f"blocks/{b_name}/images/{file_name}"
+
+        sc_data = scenes_info.get(sc_id, {})
+        sentence = sc_data.get("sentence", "")
+        hero_obj = sc_data.get("hero_cutout_object", "")
+        headline = sc_data.get("headline", "")
+
+        badge_color = "#10b981" if status == "APPROVED" else "#ef4444"
+        badge_text = "✅ ĐẠT CHUẨN (10/10)" if status == "APPROVED" else f"⚠️ {status}"
+
+        card = f"""
+        <div class="card">
+            <div class="img-wrapper">
+                <a href="{img_rel_path}" target="_blank" title="Bấm để xem ảnh gốc 2K">
+                    <img src="{img_rel_path}" alt="{sc_id}"/>
+                </a>
+                <span class="badge" style="background: {badge_color};">{badge_text}</span>
+            </div>
+            <div class="content">
+                <div class="meta">
+                    <span class="scene-id">{sc_id}</span>
+                    <span class="block-id">{b_name}</span>
+                    <span class="res-tag">{res} • {sz:,} KB</span>
+                </div>
+                <div class="headline">{headline}</div>
+                <div class="sentence">{sentence}</div>
+                <div class="hero-obj"><b>Vật thể Vox:</b> {hero_obj}</div>
+            </div>
+        </div>
+        """
+        cards_html.append(card)
+
+    total_audited = audit_summary.get("total_images", 0)
+    total_approved = audit_summary.get("approved_images", 0)
+    verdict = audit_summary.get("verdict", "UNKNOWN")
+    grid_inner = "".join(cards_html)
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Human Audit Gate: {episode_id}</title>
+    <style>
+        :root {{ --bg: #0f172a; --card-bg: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --primary: #38bdf8; --accent: #f59e0b; --border: #334155; }}
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{ background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 30px 20px; }}
+        .header {{ max-width: 1400px; margin: 0 auto 30px; padding: 24px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); }}
+        .header h1 {{ font-size: 24px; margin-bottom: 8px; color: var(--primary); }}
+        .header p {{ color: var(--text-muted); font-size: 15px; margin-bottom: 16px; }}
+        .stats {{ display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }}
+        .stat-badge {{ background: #0f172a; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--border); font-size: 14px; }}
+        .stat-badge b {{ color: var(--primary); font-size: 16px; }}
+        .trigger-box {{ background: #020617; padding: 16px; border-radius: 8px; border: 1px dashed var(--accent); font-family: Consolas, monospace; font-size: 14px; color: #fbbf24; display: flex; justify-content: space-between; align-items: center; }}
+        .grid {{ max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 24px; }}
+        .card {{ background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s; }}
+        .card:hover {{ transform: translateY(-4px); border-color: var(--primary); }}
+        .img-wrapper {{ position: relative; width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden; }}
+        .img-wrapper img {{ width: 100%; height: 100%; object-fit: cover; cursor: pointer; }}
+        .badge {{ position: absolute; top: 12px; right: 12px; color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }}
+        .content {{ padding: 18px; display: flex; flex-direction: column; gap: 10px; flex-grow: 1; }}
+        .meta {{ display: flex; justify-content: space-between; align-items: center; font-size: 12px; }}
+        .scene-id {{ background: #3b82f6; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: bold; }}
+        .block-id {{ color: var(--text-muted); font-size: 12px; }}
+        .res-tag {{ color: #a855f7; font-family: monospace; }}
+        .headline {{ font-size: 16px; font-weight: bold; color: #e2e8f0; }}
+        .sentence {{ font-size: 14px; color: var(--text-muted); line-height: 1.5; }}
+        .hero-obj {{ font-size: 12px; color: #38bdf8; background: #0f172a; padding: 8px; border-radius: 6px; margin-top: auto; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛑 HUMAN AUDIT GATE: THẨM ĐỊNH THỊ GIÁC B5</h1>
+        <p>Tập phim: <b>{episode_id}</b> | Bấm vào ảnh bất kỳ để phóng to toàn màn hình 2560x1440 2K.</p>
+        <div class="stats">
+            <div class="stat-badge">Đã kiểm toán: <b>{total_audited} Cảnh</b></div>
+            <div class="stat-badge">Đạt chuẩn 100%: <b>{total_approved}/{total_audited}</b></div>
+            <div class="stat-badge">Kết luận kỹ thuật: <b style="color: #10b981;">{verdict}</b></div>
+        </div>
+        <div class="trigger-box">
+            <span>🚀 Lệnh kích hoạt sinh video khi bạn đồng ý:</span>
+            <code>python scripts/trigger_video_generation.py --episode {episode_id} --limit-blocks 1</code>
+        </div>
+    </div>
+    <div class="grid">
+        {grid_inner}
+    </div>
+</body>
+</html>"""
+
+    with open(gallery_html_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    return gallery_html_path
 
 
 def evaluate_human_gate(
@@ -519,6 +640,7 @@ def main():
     parser.add_argument("--trigger-video", action="store_true", help="Lệnh trigger phê duyệt Human Gate và khởi chạy ngay giai đoạn sinh video")
     parser.add_argument("--approve-gate", action="store_true", help="Bí danh của --trigger-video (phê duyệt cổng dừng)")
     parser.add_argument("--auto-approve", action="store_true", help="Tự động duyệt Human Gate không cần dừng chờ")
+    parser.add_argument("--force", action="store_true", help="Sinh lại toàn bộ ảnh và video ngay cả khi đã có sẵn file cục bộ")
     args = parser.parse_args()
 
     clean_ep = args.episode.strip().strip("'\"")
@@ -556,7 +678,8 @@ def main():
             clean_ep,
             limit=total_scenes_to_run,
             headless=args.headless,
-            pacing=args.pacing
+            pacing=args.pacing,
+            force=args.force
         )
         sync_assets_to_blocks_and_flat(clean_ep, block_manifest)
         audit_summary = perform_b5_visual_audit(clean_ep, block_manifest, limit=total_scenes_to_run)

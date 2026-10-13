@@ -42,11 +42,12 @@ VOX_PALETTE = {
 }
 
 DEFAULT_NEGATIVE_PROMPT = (
-    "no clutter, no unnecessary objects, no excessive icons, no visual noise, no random decorations, "
-    "no fantasy elements, no sci-fi elements, no anime, no cartoon style, no CGI look, no glossy 3D rendering, "
-    "no photorealistic background, no oversaturated rainbow colors, no poor composition, no distorted anatomy, "
-    "no watermark, no logos, maintain a clean premium VOX-style editorial collage with layered paper textures "
-    "and documentary-quality composition."
+    "no text overlay, no floating text, no subtitles, no captions, no typography, no letters, no words floating in air, "
+    "no headlines, no beat numbers, no tags, no speech bubbles, no title text, no clutter, no unnecessary objects, "
+    "no excessive icons, no visual noise, no random decorations, no fantasy elements, no sci-fi elements, no anime, "
+    "no cartoon style, no CGI look, no glossy 3D rendering, no photorealistic background, no oversaturated rainbow colors, "
+    "no poor composition, no distorted anatomy, no watermark, no logos, maintain a clean premium VOX-style editorial collage "
+    "with layered paper textures and documentary-quality composition."
 )
 
 CANVAS_WORKSPACES = [
@@ -241,13 +242,13 @@ def build_image_prompt(
     interacting_str = ", ".join(interacting)
     layer_bg = f"Layer 1: {canvas}"
     layer_geo = f"Layer 2: bold flat geometric color block in {color_bar}"
-    layer_headline = f"Layer 3: negative space reserved for large bold editorial typography '{headline}', occupying 25-35% of frame"
+    layer_space = "Layer 3: generous clean editorial negative space and balanced compositional breathing room, strictly zero floating typography or subtitles (typography is animated in post-production)"
     layer_cutout = f"Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge and realistic soft drop shadow: {hero}. Interacting elements: {interacting_str}"
     layer_texture = "Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration"
 
     prompt = (
         f"Editorial investigative documentary frame in signature VOX paper-cut collage style. "
-        f"[{layer_bg}] -> [{layer_geo}] -> [{layer_headline}] -> [{layer_cutout}] -> [{layer_texture}]. "
+        f"[{layer_bg}] -> [{layer_geo}] -> [{layer_space}] -> [{layer_cutout}] -> [{layer_texture}]. "
         f"Strictly locked color palette: Vox Yellow #F2C230, Terracotta #C85A32, Navy #1B2B4A, Muted Gold #D4AF37 on Off-white Cream #F4F1EA. "
         f"Clear object-assembly composition, strong editorial hierarchy, tactile paper craft. "
         f"Negative prompt: {DEFAULT_NEGATIVE_PROMPT}"
@@ -285,10 +286,24 @@ def generate_continuous_director_plan(
         hero, interacting, color_accent = extract_vox_metaphor_entities(sentence_text, market, idx)
         motion_track = synthesize_motion_track(hero, interacting, idx)
 
-        # Generate headline
+        # Generate headline and clean editorial topic tag (strictly no internal 'BEAT' numbering)
         words = [w for w in re.split(r"\s+", sentence_text) if len(w) > 1]
         native_hl = " ".join(words[:3]) if words else f"SCENE {idx + 1}"
-        english_tag = f"BEAT {idx + 1}"
+        s_low = sentence_text.lower()
+        if any(k in s_low for k in ["법인세", "tax", "과세"]):
+            english_tag = "CORPORATE TAX"
+        elif any(k in s_low for k in ["소송", "판결", "대법원", "court", "패소"]):
+            english_tag = "COURT RULING"
+        elif any(k in s_low for k in ["매출", "revenue", "조", "billion", "trillion"]):
+            english_tag = "REVENUE SCALE"
+        elif any(k in s_low for k in ["싱가포르", "offshore", "해외", "국경"]):
+            english_tag = "OFFSHORE CAPITAL"
+        elif any(k in s_low for k in ["서버", "고정사업장", "pe", "establishment"]):
+            english_tag = "PERMANENT ESTABLISHMENT"
+        elif any(k in s_low for k in ["조약", "beps", "oecd", "treaty"]):
+            english_tag = "TAX TREATY"
+        else:
+            english_tag = "FORENSIC TRAIL"
         bilingual_hl = f"{native_hl} // {english_tag}"
 
         next_sent = blocked_sentences[idx + 1]["sentence"] if idx + 1 < len(blocked_sentences) else None

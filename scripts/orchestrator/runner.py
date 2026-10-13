@@ -71,9 +71,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=["pipeline", "block", "audit", "ci", "sync", "review", "sweep", "council", "plan", "supervise", "clean", "janitor", "report", "health", "memory", "deploy"],
+        choices=["pipeline", "block", "audit", "ci", "sync", "review", "sweep", "council", "plan", "supervise", "clean", "janitor", "report", "health", "memory", "deploy", "boss"],
         default="pipeline",
         help="Operational mode (default: pipeline)",
+    )
+    parser.add_argument(
+        "--boss-phase",
+        choices=["plan", "audit", "template_247"],
+        default="plan",
+        help="Phase for --mode boss (plan, audit, template_247)",
     )
     parser.add_argument(
         "--planner-model",
@@ -282,6 +288,8 @@ class OrchestratorRunner:
                 return self._run_memory_mode(sandbox)
             elif mode == "deploy":
                 return self._run_deploy_mode(sandbox)
+            elif mode == "boss":
+                return self._run_boss_mode(sandbox)
             else:
                 print(f"Unknown mode: {mode}", file=sys.stderr)
                 return 1
@@ -1335,6 +1343,31 @@ class OrchestratorRunner:
             ci_res = subprocess.run([sys.executable, str(watcher_script)], cwd=str(self.root_dir))
             return ci_res.returncode
         return 0
+
+    def _run_boss_mode(self, sandbox: ResourceSandbox) -> int:
+        """Executes Three-Tier Boss Orchestrator Harness (Opus 5.5 + Gemini 3.8 + Low-Cost 24/7)."""
+        boss_script = self.root_dir / "scripts" / "orchestrator" / "boss_orchestrator.py"
+        cmd = [
+            sys.executable,
+            str(boss_script),
+            "--phase",
+            getattr(self.args, "boss_phase", "plan"),
+        ]
+        if self.args.plan_task:
+            cmd.extend(["--task", self.args.plan_task])
+        elif self.args.task_id:
+            cmd.extend(["--task", f"Task execution for {self.args.task_id}"])
+        if self.args.task_id:
+            cmd.extend(["--task-id", self.args.task_id])
+        if self.args.commit_range:
+            cmd.extend(["--commit-range", self.args.commit_range])
+        if self.args.dry_run:
+            cmd.append("--dry-run")
+        if self.args.json_output:
+            cmd.append("--json-output")
+
+        res = subprocess.run(cmd, cwd=str(self.root_dir))
+        return res.returncode
 
 
 def main() -> None:

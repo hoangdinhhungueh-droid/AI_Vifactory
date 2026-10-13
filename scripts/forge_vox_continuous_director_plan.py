@@ -712,17 +712,18 @@ def build_vox_object_prompt(scene):
     
     layer_bg = f"Layer 1: {canvas}"
     layer_geo = f"Layer 2: bold flat geometric color block in {color_bar}"
-    layer_headline = f"Layer 3: negative space reserved for large bold editorial typography '{korean_hl} // {english_tag}', occupying 25-35% of frame"
+    layer_space = "Layer 3: generous clean editorial negative space and balanced compositional breathing room, strictly zero floating typography or subtitles (typography is animated in post-production)"
     layer_cutout = f"Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge and realistic soft drop shadow: {hero}. Interacting elements: {interacting}"
     layer_texture = "Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration"
     
     prompt = (
         f"Editorial investigative documentary frame in signature VOX paper-cut collage style. "
-        f"[{layer_bg}] -> [{layer_geo}] -> [{layer_headline}] -> [{layer_cutout}] -> [{layer_texture}]. "
+        f"[{layer_bg}] -> [{layer_geo}] -> [{layer_space}] -> [{layer_cutout}] -> [{layer_texture}]. "
         f"Strictly locked color palette: Vox Yellow #F2C230, Terracotta #C85A32, Navy #1B2B4A, Muted Gold #D4AF37 on Off-white Cream #F4F1EA. "
         f"Clear object-assembly composition, strong editorial hierarchy, tactile paper craft. "
-        f"Negative prompt: no clutter, no unnecessary objects, no excessive icons, no visual noise, no random decorations, "
-        f"no fantasy elements, no sci-fi elements, no anime, no cartoon style, no CGI look, no glossy 3D rendering, "
+        f"Negative prompt: no text overlay, no floating text, no subtitles, no captions, no typography, no letters, no words floating in air, "
+        f"no headlines, no beat numbers, no tags, no speech bubbles, no title text, no clutter, no unnecessary objects, no excessive icons, "
+        f"no visual noise, no random decorations, no fantasy elements, no sci-fi elements, no anime, no cartoon style, no CGI look, no glossy 3D rendering, "
         f"no photorealistic background, no oversaturated rainbow colors, no poor composition, no distorted anatomy, no watermark, no logos, "
         f"maintain a clean premium VOX-style editorial collage with layered paper textures and documentary-quality composition."
     )
