@@ -25,6 +25,6 @@ def test_ghost_scanner_clean():
 
 
 def test_import_legacy_module_blocked():
-    """Attempting to import from legacy package must fail."""
-    with pytest.raises(LegacyFlowError):
+    """Legacy package is completely removed from active repo (Rule 125)."""
+    with pytest.raises((LegacyFlowError, ModuleNotFoundError)):
         import legacy  # noqa: F401

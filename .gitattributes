@@ -1,8 +1,22 @@
-# Enforce LF line endings for all code and config files across Windows and Linux
-* text=auto
+# Auto detect text files and perform LF normalization
+* text=auto eol=lf
+
+# Explicit source code LF line endings
 *.py text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
 *.json text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf
 *.md text eol=lf
 *.sh text eol=lf
+
+# Binary media assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.mp3 binary
+*.mp4 binary
+*.wav binary
+*.mov binary

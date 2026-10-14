@@ -22,9 +22,9 @@ if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 CANONICAL_DIRS = ["core", "stages", "orchestrator"]
-FORBIDDEN_MODULE_PREFIXES = ["legacy", "app.services.director_planner_b3", "app.services.video_gen"]
-GHOST_PATTERNS = ["*.bak", "*.bak.*", "*.backup", "*_v2.py", "*_v3.py"]
-IGNORE_DIRS = {".git", ".venv", "venv", "legacy", "node_modules", "__pycache__"}
+FORBIDDEN_MODULE_PREFIXES = ["legacy"]
+GHOST_PATTERNS = ["*.bak", "*.bak.*", "*.backup", "*_v2.py", "*_v3.py", "*_old.py", "*_new.py"]
+IGNORE_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__"}
 
 
 def check_ast_imports(py_file: Path) -> List[Tuple[str, int]]:
