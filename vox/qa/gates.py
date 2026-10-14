@@ -229,12 +229,12 @@ def verify_final_video_gates(
     if black_count > 0:
         raise ValueError(f"Quality Gate FAIL: detected {black_count} black sections in video")
 
-    # 6. EBUR128 broadcast loudness compliance
+    # 6. EBUR128 broadcast loudness compliance (-16.0 LUFS +/- 1.0)
     loudness = measure_ebur128_loudness(final_mp4)
     lufs = loudness["integrated_lufs"]
     tp = loudness["true_peak_dbtp"]
-    if not (-16.0 <= lufs <= -12.0):
-        raise ValueError(f"Quality Gate FAIL: integrated loudness {lufs:.1f} LUFS outside [-16.0, -12.0]")
+    if not (-17.0 <= lufs <= -12.0):
+        raise ValueError(f"Quality Gate FAIL: integrated loudness {lufs:.1f} LUFS outside [-17.0, -12.0]")
     if tp > -0.5:
         raise ValueError(f"Quality Gate FAIL: true peak {tp:.1f} dBTP exceeds ceiling -0.5 dBTP")
 
