@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from core.legacy_guard import forbid_legacy
+forbid_legacy(__name__)
+
+forbid_legacy(__name__)
+
 """
 video_gen.py - DEPRECATED (03/07, Decisions Log Moc 1 Item 1.13).
 

@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from core.legacy_guard import forbid_legacy
+forbid_legacy(__name__)
+
 #!/usr/bin/env python3
 """
 Human Gate 2 - Telegram Message Formatter v2

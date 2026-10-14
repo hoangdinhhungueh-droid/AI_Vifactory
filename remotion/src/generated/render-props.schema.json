@@ -1,0 +1,184 @@
+{
+  "$defs": {
+    "KaraokeWord": {
+      "additionalProperties": false,
+      "description": "Word-level timestamp for Remotion karaoke subtitles.",
+      "properties": {
+        "word": {
+          "title": "Word",
+          "type": "string"
+        },
+        "start": {
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "title": "End",
+          "type": "number"
+        }
+      },
+      "required": [
+        "word",
+        "start",
+        "end"
+      ],
+      "title": "KaraokeWord",
+      "type": "object"
+    },
+    "SceneRenderProp": {
+      "additionalProperties": false,
+      "description": "Single Scene render specification for Remotion.",
+      "properties": {
+        "scene_id": {
+          "title": "Scene Id",
+          "type": "string"
+        },
+        "duration_in_frames": {
+          "title": "Duration In Frames",
+          "type": "integer"
+        },
+        "video_clip_path": {
+          "title": "Video Clip Path",
+          "type": "string"
+        },
+        "audio_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Audio Path"
+        },
+        "subtitles": {
+          "items": {
+            "$ref": "#/$defs/KaraokeWord"
+          },
+          "title": "Subtitles",
+          "type": "array"
+        },
+        "headline": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Headline"
+        },
+        "bilingual_headline": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bilingual Headline"
+        },
+        "color_accent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color Accent"
+        }
+      },
+      "required": [
+        "scene_id",
+        "duration_in_frames",
+        "video_clip_path"
+      ],
+      "title": "SceneRenderProp",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Full input props object injected into Remotion composition.",
+  "properties": {
+    "episode_id": {
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "fps": {
+      "default": 30,
+      "title": "Fps",
+      "type": "integer"
+    },
+    "width": {
+      "default": 1920,
+      "title": "Width",
+      "type": "integer"
+    },
+    "height": {
+      "default": 1080,
+      "title": "Height",
+      "type": "integer"
+    },
+    "duration_in_frames": {
+      "title": "Duration In Frames",
+      "type": "integer"
+    },
+    "scenes": {
+      "items": {
+        "$ref": "#/$defs/SceneRenderProp"
+      },
+      "title": "Scenes",
+      "type": "array"
+    },
+    "bgm_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bgm Path"
+    },
+    "bgm_volume": {
+      "default": 0.15,
+      "title": "Bgm Volume",
+      "type": "number"
+    },
+    "audio_spine_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Audio Spine Path"
+    }
+  },
+  "required": [
+    "episode_id",
+    "title",
+    "duration_in_frames",
+    "scenes"
+  ],
+  "title": "RemotionRenderProps",
+  "type": "object"
+}

@@ -1,0 +1,29 @@
+# config/profiles/e2e_min.yaml — Minimal E2E Verification Profile (Zero-Cost / Low Quota)
+name: e2e_min
+pipeline_version: "2.0.0"
+
+limits:
+  max_scenes: 1            # Only 1 single scene
+  max_blocks: 1            # Only 1 block
+  critic_max_rounds: 1     # Single round audit
+
+video_generation:
+  model: "omni"
+  aspect: "16:9"
+  duration_per_clip_sec: 5.0
+  account_pool: ["acc_01"]
+  circuit_breaker_threshold: 1
+
+voice:
+  tts_engine: "edge_tts"
+  voice_en: "en-US-ChristopherNeural"
+  voice_kr: "ko-KR-InJoonNeural"
+  voice_jp: "ja-JP-KeitaNeural"
+  voice_vn: "vi-VN-NamMinhNeural"
+
+render:
+  engine: "remotion"
+  fps: 30
+  width: 1920
+  height: 1080
+  bgm_volume: 0.15

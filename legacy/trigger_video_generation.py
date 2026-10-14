@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from core.legacy_guard import forbid_legacy
+forbid_legacy(__name__)
+
+forbid_legacy(__name__)
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """scripts/trigger_video_generation.py — Human Gate Video Trigger Command.

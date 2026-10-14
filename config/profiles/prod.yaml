@@ -1,0 +1,29 @@
+# config/profiles/prod.yaml — Production Profile (Full Episode)
+name: prod
+pipeline_version: "2.0.0"
+
+limits:
+  max_scenes: 0            # 0 means all scenes from script
+  max_blocks: 0            # 0 means all blocks
+  critic_max_rounds: 2     # Max revisions for Critic Council
+
+video_generation:
+  model: "omni"            # omni (Omni 1.1 Flash) or veo (Veo 3.1 Fast)
+  aspect: "16:9"
+  duration_per_clip_sec: 10.0
+  account_pool: ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06", "acc_07"]
+  circuit_breaker_threshold: 7  # If all 7 accounts fail, stop and save checkpoint
+
+voice:
+  tts_engine: "edge_tts"
+  voice_en: "en-US-ChristopherNeural"
+  voice_kr: "ko-KR-InJoonNeural"
+  voice_jp: "ja-JP-KeitaNeural"
+  voice_vn: "vi-VN-NamMinhNeural"
+
+render:
+  engine: "remotion"
+  fps: 30
+  width: 1920
+  height: 1080
+  bgm_volume: 0.15
