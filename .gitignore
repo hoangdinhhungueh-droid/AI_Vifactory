@@ -96,6 +96,7 @@ audits/
 *.json
 !tools/codemap/**/*.json
 !remotion/**/*.json
+remotion/public/*.json
 docs/
 make.ps1
 Makefile
