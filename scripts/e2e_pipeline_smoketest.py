@@ -314,8 +314,8 @@ def gate_b11_analytics_and_insight_loop():
     assert "except Exception as _v7_err:\n                pass" not in b11_code, "b11_antigravity_engine.py must not contain bare 'except Exception as _v7_err: pass'!"
     # Live execution of distill_insights_to_cards
     from scripts.vf_insight_cards import distill_insights_to_cards
-    test_metrics = {"views": 1500, "ctr": 0.082, "avd_sec": 240, "retention_30s": 0.72}
-    cards = distill_insights_to_cards("TEST_EP001", test_metrics)
+    test_metrics = {"views": 1500, "ctr": 0.082, "avd_sec": 240, "duration_sec": 480, "hook_retention_0_30s": 0.72, "hook_retention_0_60s": 0.55}
+    cards = distill_insights_to_cards("dummy_test_token", "EN", test_metrics)
     assert isinstance(cards, list), f"Expected list of insight cards, got: {type(cards)}"
     print(f"  [PASS] b11_antigravity_engine.py verified & live insight card engine executed ({len(cards)} cards generated).")
 
