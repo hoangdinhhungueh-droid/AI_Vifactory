@@ -10,7 +10,7 @@ from tools.codemap.runtime import pipeline_stage
     upstream=["mini_s1"],
     downstream=[],
     artifacts=["output/s2.json"],
-    verify_cmds=["pytest test_s2.py"]
+    verify_cmds=[]
 )
 def run_stage_two(data: str) -> dict:
     return {"result": data, "length": len(data)}

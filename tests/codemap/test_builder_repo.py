@@ -11,6 +11,10 @@ def test_builder_and_freshness_on_real_repo():
     registry = build_codemap(repo_root)
 
     assert registry.schema_version == "1.0"
+    stage_ids = [s.id for s in registry.stages]
+    assert "mini_s1" not in stage_ids
+    assert "mini_s2" not in stage_ids
+    assert "stage_consumer" not in stage_ids
     assert len(registry.stages) >= 11
     assert registry.summary["mismatches"] == 0
 

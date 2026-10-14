@@ -15,11 +15,11 @@ def helper_transform(text: str) -> str:
     upstream=[],
     downstream=["mini_s2"],
     artifacts=["output/s1.json"],
-    verify_cmds=["pytest test_s1.py"]
+    verify_cmds=[]
 )
 def run_stage_one(raw: str) -> str:
     try:
         res = helper_transform(raw)
         return res
     except Exception as e:
-        raise RuntimeError(f"Transform failed: {e}")
+        raise RuntimeError(f"Transform failed: {e}") from e

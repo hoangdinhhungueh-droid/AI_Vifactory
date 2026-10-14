@@ -178,27 +178,43 @@ def verify_final_video_gates(
     if a_rate not in (44100, 48000, 96000):
         raise ValueError(f"Quality Gate FAIL: audio sample rate {a_rate} not in [44100, 48000, 96000]")
 
-    # 3. Duration match check (+- 0.5s tolerance)
-    act_dur = float(fmt.get("duration", 0.0))
+    # 3. Stream-level video duration check via nb_frames / fps
+    v_frames = int(video_stream.get("nb_frames", 0))
+    r_fps_str = video_stream.get("r_frame_rate", "30/1")
+    if "/" in r_fps_str:
+        num, den = map(float, r_fps_str.split("/"))
+        fps = num / max(1.0, den)
+    else:
+        fps = float(r_fps_str) if r_fps_str else 30.0
+
+    if v_frames > 0 and fps > 0:
+        act_dur = v_frames / fps
+    else:
+        act_dur = float(video_stream.get("duration", fmt.get("duration", 0.0)))
+
     dur_diff = abs(act_dur - expected_duration)
-    if dur_diff > 0.5:
-        raise ValueError(f"Quality Gate FAIL: video duration {act_dur:.2f}s differs from audio {expected_duration:.2f}s by {dur_diff:.2f}s > 0.5s")
+    if dur_diff > 0.05:
+        raise ValueError(
+            f"Quality Gate FAIL: video stream duration {act_dur:.3f}s ({v_frames} frames @ {fps:.1f}fps) "
+            f"differs from audio {expected_duration:.3f}s by {dur_diff:.3f}s > 0.05s"
+        )
 
-    # 4. Camera variety checks (if plan available)
-    unique_moves = 0
-    if plan and plan.scenes:
-        moves = [s.camera for s in plan.scenes]
-        for a, b in zip(moves, moves[1:]):
-            if a == b:
-                raise ValueError(f"Quality Gate FAIL: consecutive scenes share identical camera move: {a}")
+    # 4. Camera variety checks (Mandatory ScenePlan)
+    if not plan or not plan.scenes:
+        raise ValueError("Quality Gate FAIL: ScenePlan is required to verify camera moves and prompt semantics")
 
-        unique_moves = len(set(moves))
-        min_required_unique = min(len(moves), 6)
-        if unique_moves < min_required_unique:
-            raise ValueError(f"Quality Gate FAIL: unique camera moves {unique_moves} < {min_required_unique}")
+    moves = [s.camera for s in plan.scenes]
+    for a, b in zip(moves, moves[1:]):
+        if a == b:
+            raise ValueError(f"Quality Gate FAIL: consecutive scenes share identical camera move: {a}")
 
-        # Check prompt semantics & FG hash uniqueness
-        verify_prompt_semantics(plan)
+    unique_moves = len(set(moves))
+    min_required_unique = min(len(moves), 6)
+    if unique_moves < min_required_unique or unique_moves == 0:
+        raise ValueError(f"Quality Gate FAIL: unique camera moves {unique_moves} < {min_required_unique}")
+
+    # Check prompt semantics & FG hash uniqueness
+    verify_prompt_semantics(plan)
 
     # 5. Black frame detection
     from vox.ffmpeg_utils import get_ffmpeg_binary
@@ -227,8 +243,10 @@ def verify_final_video_gates(
         "audio_codec": a_codec,
         "width": w,
         "height": h,
-        "actual_duration_sec": round(act_dur, 2),
-        "expected_duration_sec": round(expected_duration, 2),
+        "video_frames": v_frames,
+        "video_fps": round(fps, 2),
+        "actual_duration_sec": round(act_dur, 3),
+        "expected_duration_sec": round(expected_duration, 3),
         "duration_drift_sec": round(dur_diff, 3),
         "unique_camera_moves": unique_moves,
         "black_sections_detected": black_count,
@@ -274,7 +292,17 @@ def main() -> int:
                 with wave.open(str(audio_p), "rb") as wf:
                     expected_dur = wf.getnframes() / float(wf.getframerate())
 
-        report = verify_final_video_gates(final_video_path, expected_dur)
+        # Reconstruct ScenePlan from manifest scenes
+        from vox.schemas import ScenePlan
+        scenes_data = manifest_data.get("scenes", [])
+        if not scenes_data:
+            raise ValueError("Quality Gate FAIL: manifest contains 0 scenes")
+        plan = ScenePlan(
+            title=manifest_data.get("title", "vox_manifest"),
+            scenes=scenes_data
+        )
+
+        report = verify_final_video_gates(final_video_path, expected_dur, plan=plan)
         print(f"[QA GATE AUDIT: PASS] {json.dumps(report, indent=2)}")
         return 0
     except Exception as e:

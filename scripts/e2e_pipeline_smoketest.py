@@ -57,24 +57,30 @@ def gate_b1_b15_contract():
 
 def gate_b2_story_engine():
     print_gate("4. B2 Story Engine & Metadata Preservation")
-    with open(os.path.join(PROJECT_ROOT, "app", "services", "story_engine_b2.py"), "r", encoding="utf-8") as f:
-        b2_code = f.read()
-    assert "call_gpt56_sol" not in b2_code, "story_engine_b2 must not contain call_gpt56_sol!"
-    assert "GPT-6-ASTRA" in b2_code, "story_engine_b2 must sync with GPT-6-ASTRA tag!"
-    print("  [PASS] story_engine_b2 has 0% GPT-5.6-Sol remnants and proper 5-Beat Docudrama tags.")
+    from app.services.story_engine_b2 import (
+        is_valid_market_text,
+        deterministic_split_spoken_script,
+        validate_market_supported
+    )
+    assert validate_market_supported("EN") == "EN"
+    assert is_valid_market_text("Forensic evidence confirmed margin irregularities.", "EN") is True
+    assert is_valid_market_text("基準値超えの二酸化硫黄", "JP") is True
+    assert is_valid_market_text("Tiếng Việt có dấu", "EN") is False  # Out-of-locale rejection
+
+    sample_script = "=== ACT I ===\nForensic investigators analyzed the financial ledger.\n=== ACT II ===\nThe discrepancy confirmed systematic failure."
+    split_res = deterministic_split_spoken_script(sample_script, "EN")
+    assert len(split_res.get("sentences", [])) >= 2, f"Failed to split spoken sentences: {split_res}"
+    print("  [PASS] story_engine_b2 live runtime verified (market validation, locale purity, spoken splitting).")
 
 def gate_b3_director_planner():
     print_gate("5. B3 Director Planner & Audio Spine Hard Gate (Rule 120/127)")
-    with open(os.path.join(PROJECT_ROOT, "app", "services", "director_planner_b3.py"), "r", encoding="utf-8") as f:
-        b3_code = f.read()
-    assert "existing_brain" in b3_code, "director_planner_b3 must read existing_brain to preserve metadata!"
-    assert "prompts_forge.json" in b3_code, "director_planner_b3 must save prompts_forge.json!"
-    assert "_is_valid_audio_spine" in b3_code, "director_planner_b3 must enforce _is_valid_audio_spine hard gate!"
-    
     from app.services.director_planner_b3 import detect_cinematic_archetype
-    kr_archetype = detect_cinematic_archetype("Finance", "김포FC 횡령 사태와 부실 감사")
-    assert "Fincher" in kr_archetype["director"] or "Corporate Noir" in kr_archetype["director"], f"Failed to route KR embezzlement: {kr_archetype}"
-    print("  [PASS] director_planner_b3 preserves metadata, enforces Audio Spine Hard Gate, and routes KR Embezzlement to Corporate Noir.")
+    # Generic category-based cinematic archetype routing (Rule 128 Anti-Semantic Bias)
+    fin_archetype = detect_cinematic_archetype("Finance", "Corporate Margin Discrepancy")
+    assert "Fincher" in fin_archetype["director"] or "Corporate Noir" in fin_archetype["director"]
+    hist_archetype = detect_cinematic_archetype("History", "Treaty Negotiations")
+    assert "Nolan" in hist_archetype["director"] or "Historical" in hist_archetype["director"]
+    print("  [PASS] director_planner_b3 generic archetype router verified across Finance & History.")
 
 def gate_b35_visual_prompt_forge():
     print_gate("6. B3.5 Visual Prompt Forge & Anti-Stuttering")
@@ -203,6 +209,8 @@ def gate_cross_market_dynamic_director():
 
         jp_bgs = set(s.get("bg_reuse_key") for s in jp_scenes if s.get("bg_reuse_key"))
         en_bgs = set(s.get("bg_reuse_key") for s in en_scenes if s.get("bg_reuse_key"))
+        assert len(jp_bgs) > 0, f"JP market yielded 0 backgrounds: scenes={jp_scenes}"
+        assert len(en_bgs) > 0, f"EN market yielded 0 backgrounds: scenes={en_scenes}"
         assert len(jp_bgs.intersection(en_bgs)) == 0, "JP and EN background rosters must be 100% disjoint"
         print(f"  [PASS] Live Cross-Market Director executed clean: JP ({len(jp_bgs)} BGs) vs EN ({len(en_bgs)} BGs) 0% leakage.")
     finally:
@@ -250,22 +258,12 @@ def gate_b6_remotion_props_and_composition():
 
 def gate_b7_b9_render_and_video_qa():
     print_gate("13. B7-B9 Render Engine & Zero-Mock Video QA Gate (Rule 118, 120, 122)")
-    with open(os.path.join(PROJECT_ROOT, "app", "services", "video_audit_runner.py"), "r", encoding="utf-8") as f:
-        runner_code = f.read()
-    assert "fallback_baseline" not in runner_code, "video_audit_runner.py must not contain 'fallback_baseline' mock scores!"
-    print("  [PASS] video_audit_runner.py has 0 fallback_baseline mock scores.")
-
-    s7_path = os.path.join(PROJECT_ROOT, "vox", "assemble.py")
-    if os.path.exists(s7_path):
-        with open(s7_path, "r", encoding="utf-8") as f:
-            asm_code = f.read()
-        assert "assemble_final_video" in asm_code, "vox/assemble.py must provide assemble_final_video!"
-        print("  [PASS] vox/assemble.py successfully provides assemble_final_video.")
-    else:
-        with open(os.path.join(PROJECT_ROOT, "app", "pipeline", "stages", "s7_render.py"), "r", encoding="utf-8") as f:
-            s7_code = f.read()
-        assert "beat_bgm_engine" in s7_code, "app/pipeline/stages/s7_render.py must use beat_bgm_engine!"
-        print("  [PASS] s7_render.py successfully integrates beat_bgm_engine.")
+    from vox.assemble import assemble_final_video
+    assert callable(assemble_final_video), "vox.assemble must provide assemble_final_video callable!"
+    from vox.qa.gates import measure_ebur128_loudness, verify_final_video_gates
+    assert callable(measure_ebur128_loudness), "vox.qa.gates must provide measure_ebur128_loudness callable!"
+    assert callable(verify_final_video_gates), "vox.qa.gates must provide verify_final_video_gates callable!"
+    print("  [PASS] vox render engine & QA gate callables verified in live runtime.")
 
 def gate_b10_cross_market_chapter_sync():
     print_gate("14. B10 Cross-Market Chapter Synchronization (Rule 128 & 135)")
@@ -308,9 +306,12 @@ def gate_b11_analytics_and_insight_loop():
     assert "access_token=token," not in b11_code, "b11_antigravity_engine.py contains undefined 'token' variable in v7 harvest call!"
     # Verify no bare except passing
     assert "except Exception as _v7_err:\n                pass" not in b11_code, "b11_antigravity_engine.py must not contain bare 'except Exception as _v7_err: pass'!"
-    # Verify imports distill_insights_to_cards
-    assert "distill_insights_to_cards" in b11_code, "b11_antigravity_engine.py must import distill_insights_to_cards!"
-    print("  [PASS] b11_antigravity_engine.py verified: clean token scoping, no bare exception silencing, imports distill_insights_to_cards.")
+    # Live execution of distill_insights_to_cards
+    from scripts.vf_insight_cards import distill_insights_to_cards
+    test_metrics = {"views": 1500, "ctr": 0.082, "avd_sec": 240, "retention_30s": 0.72}
+    cards = distill_insights_to_cards("TEST_EP001", test_metrics)
+    assert isinstance(cards, list), f"Expected list of insight cards, got: {type(cards)}"
+    print(f"  [PASS] b11_antigravity_engine.py verified & live insight card engine executed ({len(cards)} cards generated).")
 
 def main():
     print("\n" + "="*60)

@@ -31,7 +31,8 @@ def test_lineage_intact(tmp_path):
     rep = reports[0]
     assert rep.overall == "INTACT"
     verdicts = {v.path: v.verdict for v in rep.fields}
-    assert verdicts.get("/args/0/title") == "CARRIED" or verdicts.get("/title") == "CARRIED" or any(v == "CARRIED" for v in verdicts.values())
+    assert verdicts["/title"] == "CARRIED"
+    assert verdicts["/scenes"] == "CARRIED"
 
 
 def test_lineage_modified_drift(tmp_path):
@@ -49,7 +50,9 @@ def test_lineage_modified_drift(tmp_path):
     assert len(reports) == 1
     rep = reports[0]
     assert rep.overall == "DRIFT"
-    assert any(v.verdict in ("MODIFIED", "DROPPED") for v in rep.fields)
+    verdicts = {v.path: v.verdict for v in rep.fields}
+    assert verdicts["/title"] == "MODIFIED"
+    assert verdicts["/scenes"] == "CARRIED"
 
 
 def test_lineage_not_consumed_bypass(tmp_path):

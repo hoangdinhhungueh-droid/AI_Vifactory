@@ -8,22 +8,30 @@ Extracts symbols, caller/callee graphs, `@pipeline_stage` declarations, and fail
 from __future__ import annotations
 
 import ast
+import builtins
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from tools.codemap.schema import FailureMode, SourceRef, Stage, Symbol
 
+BUILTIN_NAMES = set(dir(builtins))
+
 EXCLUDED_PARTS = {
     ".git", ".venv", "venv", "node_modules", "__pycache__",
     ".pytest_cache", ".mypy_cache", "site-packages", "dist", "build",
-    "runs", "episodes", "output", "renders", ".agents"
+    "runs", "episodes", "output", "renders", ".agents",
+    "tests", "fixtures"
 }
 
 
-def is_path_excluded(path: Path) -> bool:
+def is_path_excluded(path: Path, include_tests: bool = False) -> bool:
+    excluded = set(EXCLUDED_PARTS)
+    if include_tests:
+        excluded.discard("tests")
+        excluded.discard("fixtures")
     for part in path.parts:
-        if part in EXCLUDED_PARTS or part.startswith(".bak"):
+        if part in excluded or part.startswith(".bak"):
             return True
     return False
 
@@ -136,6 +144,8 @@ class FileAstVisitor(ast.NodeVisitor):
     def _resolve_call_target(self, func_node: ast.AST) -> Optional[str]:
         if isinstance(func_node, ast.Name):
             name = func_node.id
+            if name in BUILTIN_NAMES:
+                return name
             if name in self.imports:
                 return self.imports[name]
             return f"{self.mod_qualname}.{name}"
@@ -230,8 +240,9 @@ class FileAstVisitor(ast.NodeVisitor):
 class CodebaseASTScanner:
     """Scans all Python files across repo and compiles the complete symbol & stage graph."""
 
-    def __init__(self, repo_root: Path):
+    def __init__(self, repo_root: Path, include_tests: bool = False):
         self.repo_root = repo_root.resolve()
+        self.include_tests = include_tests
         self.symbols: Dict[str, Symbol] = {}
         self.stages: List[Stage] = []
 
@@ -239,14 +250,21 @@ class CodebaseASTScanner:
         self.symbols.clear()
         self.stages.clear()
 
+        excluded = set(EXCLUDED_PARTS)
+        if self.include_tests:
+            excluded.discard("tests")
+            excluded.discard("fixtures")
+
         for root, dirs, files in os.walk(self.repo_root):
-            dirs[:] = [d for d in dirs if d not in EXCLUDED_PARTS and not d.startswith(".bak")]
+            dirs[:] = [d for d in dirs if d not in excluded and not d.startswith(".bak")]
             for file in files:
                 if not file.endswith(".py"):
                     continue
                 py_file = Path(root) / file
+                if is_path_excluded(py_file, include_tests=self.include_tests):
+                    continue
                 try:
-                    tree = ast.parse(py_file.read_text(encoding="utf-8", errors="replace"))
+                    tree = ast.parse(py_file.read_text(encoding="utf-8", errors="replace"), filename=str(py_file))
                     visitor = FileAstVisitor(py_file, self.repo_root)
                     visitor.visit(tree)
 

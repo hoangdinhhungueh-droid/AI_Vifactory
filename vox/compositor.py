@@ -36,8 +36,9 @@ def render_scene_clip(
 
     start_sec = scene.start if scene.start is not None else 0.0
     end_sec = scene.end if scene.end is not None else 5.0
-    duration_sec = max(0.5, end_sec - start_sec)
-    total_frames = max(15, int(round(duration_sec * fps)))
+    start_frame = int(round(start_sec * fps))
+    end_frame = int(round(end_sec * fps))
+    total_frames = max(15, end_frame - start_frame)
 
     # Load and verify background canvas (RGB)
     bg_img = Image.open(str(bg_path)).convert("RGB")

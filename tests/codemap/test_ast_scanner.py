@@ -8,7 +8,7 @@ from tools.codemap.ast_scanner import CodebaseASTScanner
 
 def test_ast_scanner_mini_pipeline():
     repo_root = Path(__file__).resolve().parent.parent.parent
-    scanner = CodebaseASTScanner(repo_root)
+    scanner = CodebaseASTScanner(repo_root, include_tests=True)
     symbols, stages = scanner.scan()
 
     # Find mini_s1 and mini_s2 stages
@@ -26,7 +26,7 @@ def test_ast_scanner_mini_pipeline():
 
     # Verify failure modes detected
     exc_types = [fm.exc_type for fm in s1.failure_modes]
-    assert "RuntimeError" in exc_types or "ValueError" in exc_types or "Exception" in exc_types
+    assert "RuntimeError" in exc_types
 
     s2 = stage_ids["mini_s2"]
     assert s2.order == 2

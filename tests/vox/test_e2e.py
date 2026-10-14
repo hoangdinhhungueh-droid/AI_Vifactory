@@ -35,3 +35,15 @@ def test_vox_single_pipeline_golden_e2e(tmp_path):
     assert qa["height"] == 1080
     assert qa["black_sections_detected"] == 0
     assert qa["unique_camera_moves"] >= 3
+
+    # Regression test: CLI and embedded gate outputs are strictly identical
+    import subprocess
+    import json
+    import sys
+    cmd_cli = [sys.executable, "-m", "vox.qa.gates", "verify", str(manifest_file)]
+    res = subprocess.run(cmd_cli, capture_output=True, text=True, check=True)
+    assert res.returncode == 0
+    assert "[QA GATE AUDIT: PASS]" in res.stdout
+    cli_json_str = res.stdout.split("[QA GATE AUDIT: PASS]", 1)[1].strip()
+    cli_qa = json.loads(cli_json_str)
+    assert cli_qa == qa
