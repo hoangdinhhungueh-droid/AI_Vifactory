@@ -7,8 +7,7 @@ from pathlib import Path
 sys.path.insert(0, '/root/video_factory')
 from app.services.director_planner_b3 import generate_director_plan
 
-# Canonical alias
-generate_50_scene_plan = generate_director_plan
+# Canonical Director Planner Dispatcher (Rule 125 Single Pipeline Truth)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

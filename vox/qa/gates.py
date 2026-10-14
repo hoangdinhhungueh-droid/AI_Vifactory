@@ -229,14 +229,18 @@ def verify_final_video_gates(
     if black_count > 0:
         raise ValueError(f"Quality Gate FAIL: detected {black_count} black sections in video")
 
-    # 6. EBUR128 broadcast loudness compliance (-16.0 LUFS +/- 1.0)
+    # 6. EBUR128 / AES TD1004 broadcast loudness compliance
+    # Standard: EBU R128 (-23 LUFS broadcast), AES TD1004 / YouTube Online Streaming (-16.0 LUFS ± 1.0 LU tolerance, TP <= -1.0 dBTP ceiling, target -2.0 dBTP for AAC compression)
     loudness = measure_ebur128_loudness(final_mp4)
     lufs = loudness["integrated_lufs"]
     tp = loudness["true_peak_dbtp"]
     if not (-17.0 <= lufs <= -12.0):
-        raise ValueError(f"Quality Gate FAIL: integrated loudness {lufs:.1f} LUFS outside [-17.0, -12.0]")
-    if tp > -0.5:
-        raise ValueError(f"Quality Gate FAIL: true peak {tp:.1f} dBTP exceeds ceiling -0.5 dBTP")
+        raise ValueError(
+            f"Quality Gate FAIL: integrated loudness {lufs:.1f} LUFS outside [-17.0, -12.0] "
+            f"(Target: -16.0 LUFS ± 1.0 per AES TD1004 / EBU Tech 3343)"
+        )
+    if tp > -1.0:
+        raise ValueError(f"Quality Gate FAIL: true peak {tp:.1f} dBTP exceeds ceiling -1.0 dBTP per AES TD1004")
 
     # 7. Word-Level Anchor & Reverse Karaoke Drift Hard Gate (Rule 120 & Boss Item 1)
     if plan and plan.scenes and timeline and hasattr(timeline, "words"):

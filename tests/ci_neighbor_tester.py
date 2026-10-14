@@ -378,7 +378,7 @@ def test_block3_director_contract() -> bool:
             audit_director_plan,
             audit_director,
         )
-        from scripts.generate_50_director_plan import generate_50_scene_plan
+        from scripts.generate_50_director_plan import generate_director_plan
 
         # 1. Canonical 5 Beats Structure Verification
         assert len(CANONICAL_BEATS) == 5, f"Expected 5 Canonical Beats, got {len(CANONICAL_BEATS)}"
@@ -395,9 +395,9 @@ def test_block3_director_contract() -> bool:
         assert "Fincher" in kr_noir["director"] or "Corporate Noir" in kr_noir["director"], f"Failed to detect Corporate Noir for Korean financial embezzlement: {kr_noir['director']}"
         logger.info(f"  ✅ Director Archetype Routing OK: Finance -> '{fincher['director']}', History -> '{nolan['director']}', KR Embezzlement -> '{kr_noir['director']}'.")
 
-        # 3. Forwarding script check
-        assert callable(generate_50_scene_plan)
-        logger.info("  ✅ Legacy generate_50_scene_plan wrapper forwards to B3 engine correctly.")
+        # 3. Canonical dispatcher check (Rule 125 Single Truth)
+        assert callable(generate_director_plan)
+        logger.info("  ✅ Canonical generate_director_plan engine verified (legacy wrapper purged).")
 
         # 4. 8-Axis Director Audit Engine Verification
         # Build an authentic 5-Beat production plan

@@ -66,7 +66,8 @@ def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200():
     # 1. Health
     res_h = client.get("/api/v1/health")
     assert res_h.status_code == 200
-    assert res_h.json() == {"status": "ok"}
+    assert res_h.json().get("status") == "ok"
+    assert "git_sha" in res_h.json()
 
     # 2. Diag
     res_d = client.get("/api/v1/diag")

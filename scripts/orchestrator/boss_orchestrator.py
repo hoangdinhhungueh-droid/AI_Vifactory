@@ -861,7 +861,7 @@ def collect_raw_forensic_packet(commit_range: Optional[str] = None, task_id: Opt
         "| sanitize_beat_spoken_for_llm | stages/s05_director_plan.py:209 | Prunes heavy Whisper metadata, preserves sentence_id/text/duration_sec, strictly rejects end <= start | tests/test_contracts.py & tests/test_director_plan.py |\n"
         "| _synthesize_deterministic_director_plan | app/services/director_planner_b3.py:165 | Synthesizes 1:1 scenes anchored to spoken sentences timecodes | tests/test_hollywood_audio_anchor.py::test_visual_director_anchored_to_spoken_sentences |\n"
         "| _synthesize_beat_scenes | app/services/director_planner_b3.py:65 | Generates 1:1 scenes with visual metaphors, camera moves, and prompts | tests/test_hollywood_audio_anchor.py (4 tests) |\n"
-        "| generate_director_plan | app/services/director_planner_b3.py:215 | Main B3 entrypoint dispatching audio-anchored director plan | scripts/execute_pipeline_b2_b35.py & tests/test_hollywood_audio_anchor.py |\n"
+        "| generate_director_plan | app/services/director_planner_b3.py:215 | Main B3 entrypoint dispatching audio-anchored director plan | vox/pipeline.py & tests/test_hollywood_audio_anchor.py |\n"
         "| resolve_market_redacted_terms | stages/s05_director_plan.py:238 | Market-aware redacted terms resolver (EN, JP, KR) preventing token bleed | Rule 128 verified by CI linter |\n"
         "| build_universal_video_prompt | stages/s05_director_plan.py:22 | Full Prompt 3 builder (0-7s build, 7-10s micro-hold) | tests/test_director_plan.py::test_universal_video_prompt_builder |\n"
     )

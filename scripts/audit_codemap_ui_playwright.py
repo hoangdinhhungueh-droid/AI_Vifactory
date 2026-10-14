@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 HTML_PATH = ROOT / ".codemap" / "pipeline.html"
 SCREENSHOTS_DIR = ROOT / ".codemap" / "screenshots"
 
@@ -26,14 +28,8 @@ def audit_codemap_ui() -> dict:
     SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     try:
         from playwright.sync_api import sync_playwright
-    except ImportError:
-        cache_file = ROOT / "specs" / "audit_artifacts" / "playwright_audit.json"
-        if not cache_file.exists():
-            cache_file = ROOT / ".codemap" / "playwright_audit.json"
-        if cache_file.exists():
-            data = json.loads(cache_file.read_text(encoding="utf-8"))
-            return data
-        raise
+    except ImportError as e:
+        raise RuntimeError("Playwright is not installed. Live audit cannot be replayed from cache.") from e
 
     if not HTML_PATH.exists():
         from tools.codemap.ui.render import generate_pipeline_html

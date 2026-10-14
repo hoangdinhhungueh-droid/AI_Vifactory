@@ -46,7 +46,14 @@ except ImportError:
 # ── Health ───────────────────────────────────────────────────────────────────
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok"}
+    git_sha = os.getenv("GIT_COMMIT_SHA", "")
+    if not git_sha:
+        try:
+            import subprocess
+            git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=Path(__file__).parent.parent).decode().strip()
+        except Exception:
+            git_sha = "unknown"
+    return {"status": "ok", "git_sha": git_sha}
 
 @app.get("/api/v1/diag")
 def diag():

@@ -81,8 +81,12 @@ b2_b3_opus_astra_audit.md
 out/
 reports/
 runs/
+db
 db/
 legacy_inventory.json
+boss_audit.log
+*.log
+!tests/ci_neighbor_tester.log
 
 # Local scratch & auxiliary files
 .safe_trash/

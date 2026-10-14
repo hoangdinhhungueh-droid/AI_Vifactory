@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Single Unified Vox Pipeline with Tactile Object Decomposition (`AVF-VOX-001`)**: Hoàn thiện pipeline phong cách Vox/Fern đơn nhất (`vox/`), phân rã đối tượng foreground/background từng scene, tích hợp two-pass EBU R128 loudnorm (-16.0 LUFS, TP <= -1.5 dBTP), word-level Whisper alignment (parity drift <= 33.3ms), dynamic 2.5D multiplane camera compositing, và QA Gates xác thực video CFR 30fps H.264/AAC.
+- **Single Unified Vox Pipeline with Tactile Object Decomposition (`AVF-VOX-001`)**: Hoàn thiện pipeline phong cách Vox/Fern đơn nhất (`vox/`), phân rã đối tượng foreground/background từng scene, tích hợp two-pass EBU R128 loudnorm (-16.0 LUFS, TP <= -2.0 dBTP to absorb AAC overshoot per AES TD1004), word-level Whisper alignment (parity drift <= 33.3ms), dynamic 2.5D multiplane camera compositing, và QA Gates xác thực video CFR 30fps H.264/AAC.
 - **Hermetic Pipeline Smoketests & Non-Vacuous Cross-Market Neighbor Testing**: Bổ sung dry-run sink cho Gate 15 Notion insights, kiểm thử đối kháng đa thị trường JP vs EN 100% disjoint.
 - **Automated Ruff Linter Baseline & Strict Zero-Error Enforcement**: Cấu hình ruff linting trên `vox/` và `tools/` với 0 cảnh báo.
 - **Full-Loop CI/CD Pipeline (`.github/workflows/ci.yml`)**: Bổ sung Job 2 tự động deploy lên Hetzner VPS thông qua SSH, tích hợp cơ chế snapshot rollback an toàn, `py_compile`, docker compose restart và post-deployment health check.

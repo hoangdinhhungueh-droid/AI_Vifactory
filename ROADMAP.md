@@ -58,11 +58,13 @@
 
 ---
 
-### Phase 5: Render Video Remotion & Phân Phối Tự Động (B6..B10)
-- [x] **B6/B7 Remotion Master Video Render (`remotion/`)**: Render CPU/GPU mượt mà, layout 2 lớp (BG parallax + FG kinetic), typographic titles.
+### Phase 5: Render Video (Primary Vox Compositor & Remotion Suite) & Phân Phối (B6..B10)
+- [x] **Primary Render Engine: Vox Tactile Compositor (`vox/assemble.py`, `vox/compositor.py`)**: Native Python/FFmpeg multi-layer compositor with two-pass EBU R128 (-16 LUFS, TP <= -2.0 dBTP), sub-frame A/V drift (< 1 frame), and ASS word-level karaoke burn-in.
+- [x] **Secondary Render Engine: Remotion Post-Production Suite (`remotion/`)**: Render CPU/GPU React motion canvas, layout 2 lớp (BG parallax + FG kinetic), kinetic typography titles.
+- [x] **Chapter Synchronization SoT (Rule 135)**: Trích xuất mốc chapter trực tiếp từ `manifest.json` / `remotion_props.json` dựa trên timeline thực tế đã render.
 - [x] **B8 BGM Cinematic Ducking (`app/services/beat_bgm_engine.py`)**: Tự động dìm nhạc nền khi có voiceover và đẩy cao trào tại các beat chuyển đoạn.
-- [x] **B10 YouTube Auto SEO & Gate 2 (`scripts/execute_b10_auto_seo_upload_gate2.py`)**: Đồng bộ chapters chuẩn timeline Remotion (Rule 135), gắn cờ Synthetic Media.
-- [x] **Rule 136 Pure Beat Header**: Chống rò rỉ mã asset/hash/layer lên tiêu đề phụ đề Remotion.
+- [x] **B10 YouTube Auto SEO & Gate 2 (`scripts/execute_b10_auto_seo_upload_gate2.py`)**: Đồng bộ chapters chuẩn timeline thực tế, gắn cờ Synthetic Media.
+- [x] **Rule 136 Pure Beat Header**: Chống rò rỉ mã asset/hash/layer lên tiêu đề phụ đề Remotion/ASS.
 
 ---
 

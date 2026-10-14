@@ -48,7 +48,7 @@ def assemble_final_video(
     ]
     subprocess.run(cmd_concat, capture_output=True, check=True)
 
-    # 2. Multiplex audio and burn ASS subtitles with two-pass loudnorm (EBU R128: I=-16.0, TP=-1.5)
+    # 2. Multiplex audio and burn ASS subtitles with two-pass loudnorm (EBU R128 / AES TD1004: I=-16.0, TP=-2.0 to absorb AAC overshoot)
     # Measure exact audio duration to avoid premature truncation
     import json
     import wave
@@ -59,11 +59,11 @@ def assemble_final_video(
     pass1_cmd = [
         ffmpeg_bin, "-y",
         "-i", str(audio_wav),
-        "-af", "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json",
+        "-af", "loudnorm=I=-16:TP=-2.0:LRA=11:print_format=json",
         "-f", "null", "-"
     ]
     p1_res = subprocess.run(pass1_cmd, capture_output=True, text=True, check=False)
-    loudnorm_filter = "loudnorm=I=-16:TP=-1.5:LRA=11"
+    loudnorm_filter = "loudnorm=I=-16:TP=-2.0:LRA=11"
     try:
         err_out = p1_res.stderr
         json_start = err_out.rfind("{")
@@ -71,16 +71,16 @@ def assemble_final_video(
         if json_start != -1 and json_end != -1 and json_end > json_start:
             p1_data = json.loads(err_out[json_start:json_end + 1])
             m_i = p1_data.get("input_i", "-16.0")
-            m_tp = p1_data.get("input_tp", "-1.5")
+            m_tp = p1_data.get("input_tp", "-2.0")
             m_lra = p1_data.get("input_lra", "11.0")
             m_thresh = p1_data.get("input_thresh", "-26.0")
             offset = p1_data.get("target_offset", "0.0")
             loudnorm_filter = (
-                f"loudnorm=I=-16:TP=-1.5:LRA=11:measured_I={m_i}:measured_TP={m_tp}:"
+                f"loudnorm=I=-16:TP=-2.0:LRA=11:measured_I={m_i}:measured_TP={m_tp}:"
                 f"measured_LRA={m_lra}:measured_thresh={m_thresh}:offset={offset}:linear=true"
             )
     except Exception:
-        loudnorm_filter = "loudnorm=I=-16:TP=-1.5:LRA=11"
+        loudnorm_filter = "loudnorm=I=-16:TP=-2.0:LRA=11"
 
     # Escape path for ffmpeg subtitles filter (replace backslashes with forward slashes)
     ass_escaped = ass_subtitles.resolve().as_posix().replace(":", "\\:")

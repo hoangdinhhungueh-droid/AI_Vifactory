@@ -79,33 +79,36 @@ def generate_ass_subtitles(
         raise ValueError("WordTimeline contains zero words")
 
     events: list[str] = []
+    from itertools import groupby
 
-    # Chunk words into legible phrasing events
-    i = 0
-    while i < len(words):
-        chunk = words[i:i + words_per_event]
-        if not chunk:
-            break
+    # Group words by scene_idx so that subtitle events strictly respect scene boundaries (Rule 120 & Boss Item 8)
+    for _scene_idx, scene_words_iter in groupby(words, key=lambda w: w.scene_idx):
+        sc_words = list(scene_words_iter)
+        i = 0
+        while i < len(sc_words):
+            chunk = sc_words[i:i + words_per_event]
+            if not chunk:
+                break
 
-        ev_start = chunk[0].start
-        ev_end = chunk[-1].end
+            ev_start = chunk[0].start
+            ev_end = chunk[-1].end
 
-        # Format line with \kf tags: {\kf<centiseconds>}word
-        line_parts = []
-        curr_cs = 0
-        for idx_w, w in enumerate(chunk):
-            next_t = chunk[idx_w + 1].start if idx_w + 1 < len(chunk) else w.end
-            target_end_cs = max(curr_cs + 1, int(round((next_t - ev_start) * 100)))
-            duration_cs = target_end_cs - curr_cs
-            curr_cs = target_end_cs
-            line_parts.append(f"{{\\kf{duration_cs}}}{w.text} ")
+            # Format line with \kf tags: {\kf<centiseconds>}word
+            line_parts = []
+            curr_cs = 0
+            for idx_w, w in enumerate(chunk):
+                next_t = chunk[idx_w + 1].start if idx_w + 1 < len(chunk) else w.end
+                target_end_cs = max(curr_cs + 1, int(round((next_t - ev_start) * 100)))
+                duration_cs = target_end_cs - curr_cs
+                curr_cs = target_end_cs
+                line_parts.append(f"{{\\kf{duration_cs}}}{w.text} ")
 
-        event_text = "".join(line_parts).strip()
-        ev_start_str = format_ass_time(ev_start)
-        ev_end_str = format_ass_time(ev_end)
+            event_text = "".join(line_parts).strip()
+            ev_start_str = format_ass_time(ev_start)
+            ev_end_str = format_ass_time(ev_end)
 
-        events.append(f"Dialogue: 0,{ev_start_str},{ev_end_str},Default,,0,0,0,,{event_text}")
-        i += len(chunk)
+            events.append(f"Dialogue: 0,{ev_start_str},{ev_end_str},Default,,0,0,0,,{event_text}")
+            i += len(chunk)
 
     full_ass_content = ASS_HEADER_TEMPLATE + "\n".join(events) + "\n"
     out_file.write_text(full_ass_content, encoding="utf-8")
