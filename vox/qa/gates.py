@@ -252,9 +252,15 @@ def main() -> int:
 
     try:
         manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
-        final_video_path = Path(manifest_data.get("final_video", {}).get("path", ""))
-        if not final_video_path.is_absolute():
-            final_video_path = manifest_path.parent / final_video_path
+        raw_path = Path(manifest_data.get("final_video", {}).get("path", ""))
+        if raw_path.exists():
+            final_video_path = raw_path
+        elif (manifest_path.parent / raw_path.name).exists():
+            final_video_path = manifest_path.parent / raw_path.name
+        elif (manifest_path.parent / raw_path).exists():
+            final_video_path = manifest_path.parent / raw_path
+        else:
+            final_video_path = raw_path
 
         expected_dur = float(manifest_data.get("final_video", {}).get("telemetry", {}).get("format", {}).get("duration", 0.0))
         if expected_dur == 0.0:
