@@ -1,0 +1,37 @@
+{
+  "status": "PASS",
+  "total_console_errors": 0,
+  "total_page_errors": 0,
+  "viewports": {
+    "desktop": {
+      "viewport": "1920x1080",
+      "screenshot": ".codemap/screenshots/codemap_desktop_1920x1080.png",
+      "sha256": "4f5d2bba0db506e3d6e40869b724657a9f0934f15305c00aaa393890dae6eae1",
+      "size_bytes": 97362,
+      "card_count": 11,
+      "console_errors": [],
+      "page_errors": [],
+      "status": "PASS"
+    },
+    "tablet": {
+      "viewport": "768x1024",
+      "screenshot": ".codemap/screenshots/codemap_tablet_768x1024.png",
+      "sha256": "a221ddec9ac67af7aceb50cbd2743a8313c44872cca505f9d6d39972ef79d879",
+      "size_bytes": 54509,
+      "card_count": 11,
+      "console_errors": [],
+      "page_errors": [],
+      "status": "PASS"
+    },
+    "mobile": {
+      "viewport": "375x812",
+      "screenshot": ".codemap/screenshots/codemap_mobile_375x812.png",
+      "sha256": "65c561baa3a2316c2ac3840f336a48f6ae5691481488761f0510dc709c9d1533",
+      "size_bytes": 40407,
+      "card_count": 11,
+      "console_errors": [],
+      "page_errors": [],
+      "status": "PASS"
+    }
+  }
+}

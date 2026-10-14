@@ -28,7 +28,9 @@ def audit_codemap_ui() -> dict:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        cache_file = ROOT / ".codemap" / "playwright_audit.json"
+        cache_file = ROOT / "specs" / "audit_artifacts" / "playwright_audit.json"
+        if not cache_file.exists():
+            cache_file = ROOT / ".codemap" / "playwright_audit.json"
         if cache_file.exists():
             data = json.loads(cache_file.read_text(encoding="utf-8"))
             return data
