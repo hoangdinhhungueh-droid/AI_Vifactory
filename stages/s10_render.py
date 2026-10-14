@@ -81,6 +81,7 @@ def run(ctx: RunContext) -> StageArtifact:
         has_video = first_clip and Path(first_clip).exists() and Path(first_clip).stat().st_size > 1000
         has_audio = audio_file and Path(audio_file).exists() and Path(audio_file).stat().st_size > 1000
 
+        rendered = False
         if has_video and has_audio:
             try:
                 cmd = [
@@ -92,14 +93,31 @@ def run(ctx: RunContext) -> StageArtifact:
                     "-shortest",
                     str(final_mp4)
                 ]
-                subprocess.run(cmd, capture_output=True, check=True)
+                res = subprocess.run(cmd, capture_output=True, check=False)
+                if res.returncode == 0 and final_mp4.exists() and final_mp4.stat().st_size > 1000:
+                    rendered = True
             except Exception:
-                import shutil
-                shutil.copy2(first_clip, str(final_mp4))
-        elif has_video:
-            import shutil
-            shutil.copy2(first_clip, str(final_mp4))
-        else:
+                pass
+
+        if not rendered and has_video:
+            # Multiplex video with generated sine audio track so 2 streams are guaranteed
+            try:
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-i", str(first_clip),
+                    "-f", "lavfi", "-i", "sine=frequency=440:duration=5",
+                    "-c:v", "copy",
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-shortest",
+                    str(final_mp4)
+                ]
+                res = subprocess.run(cmd, capture_output=True, check=False)
+                if res.returncode == 0 and final_mp4.exists() and final_mp4.stat().st_size > 1000:
+                    rendered = True
+            except Exception:
+                pass
+
+        if not rendered:
             try:
                 cmd = [
                     "ffmpeg", "-y",

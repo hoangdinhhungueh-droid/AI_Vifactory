@@ -10,6 +10,7 @@ from __future__ import annotations
 import time
 import json
 import asyncio
+import subprocess
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -45,6 +46,16 @@ def run(ctx: RunContext) -> StageArtifact:
         subtitles.append(KaraokeWord(word=w, start=curr_time, end=curr_time + dur).model_dump())
         curr_time += dur
 
+    # Detect market safely
+    market = "EN"
+    s1_path = ctx.paths.artifact_file(StageID.S1_IDEATION.value)
+    if s1_path.exists():
+        try:
+            s1_data = json.loads(s1_path.read_text(encoding="utf-8"))
+            market = s1_data.get("payload", {}).get("market", "EN")
+        except Exception:
+            pass
+
     # Check if voice audio already exists
     if not audio_file.exists() or ctx.force:
         legacy_audio = ctx.paths.root / "narration.mp3"
@@ -53,29 +64,36 @@ def run(ctx: RunContext) -> StageArtifact:
             shutil.copy2(str(legacy_audio), str(audio_file))
         else:
             # Generate real voice audio using Edge-TTS live
+            voice = ctx.config.voice.voice_en
+            m_low = market.lower()
+            if m_low in ("ja", "jp"):
+                voice = ctx.config.voice.voice_jp
+            elif m_low in ("ko", "kr"):
+                voice = ctx.config.voice.voice_kr
+            elif m_low in ("vi", "vn"):
+                voice = ctx.config.voice.voice_vn
+
+            text_to_speak = full_text if full_text else "AI Video Factory master video narration."
+            tts_success = False
             try:
                 import edge_tts
-                voice = "en-US-ChristopherNeural"
-                m_low = (ctx.market or "en").lower()
-                if m_low == "ja":
-                    voice = "ja-JP-KeitaNeural"
-                elif m_low == "ko":
-                    voice = "ko-KR-InJoonNeural"
-                elif m_low == "vn":
-                    voice = "vi-VN-NamMinhNeural"
-
-                text_to_speak = full_text if full_text else "AI Video Factory master video narration."
                 communicate = edge_tts.Communicate(text_to_speak, voice)
                 asyncio.run(communicate.save(str(audio_file)))
+                if audio_file.exists() and audio_file.stat().st_size > 1000:
+                    tts_success = True
             except Exception:
-                # Fallback to ffmpeg audio tone if network unavailable
+                pass
+
+            if not tts_success:
+                # Fallback to ffmpeg audio tone (clean valid MP3 stream)
                 try:
                     subprocess.run(
                         ["ffmpeg", "-y", "-f", "lavfi", "-i", f"sine=frequency=440:duration={max(curr_time, 5.0)}",
-                         "-c:a", "libmp3lame", str(audio_file)],
+                         "-c:a", "libmp3lame", "-b:a", "128k", str(audio_file)],
                         capture_output=True, check=True
                     )
                 except Exception:
+                    # Minimal valid silent MP3 frame stream
                     audio_file.write_bytes(b"\xff\xfb\x90\x44" + b"\x00" * 8192)
 
     subtitles_file.write_text(json.dumps(subtitles, indent=2, ensure_ascii=False), encoding="utf-8")
