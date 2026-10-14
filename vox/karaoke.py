@@ -94,8 +94,9 @@ def generate_ass_subtitles(
 
         # Format line with \kf tags: {\kf<centiseconds>}word
         line_parts = []
-        for w in chunk:
-            duration_cs = max(1, int(round((w.end - w.start) * 100)))
+        for idx_w, w in enumerate(chunk):
+            next_t = chunk[idx_w + 1].start if idx_w + 1 < len(chunk) else w.end
+            duration_cs = max(1, int(round((next_t - w.start) * 100)))
             line_parts.append(f"{{\\kf{duration_cs}}}{w.text} ")
 
         event_text = "".join(line_parts).strip()
