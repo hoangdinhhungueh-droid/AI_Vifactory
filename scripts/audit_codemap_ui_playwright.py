@@ -25,6 +25,15 @@ SCREENSHOTS_DIR = ROOT / ".codemap" / "screenshots"
 
 def audit_codemap_ui() -> dict:
     SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        cache_file = ROOT / ".codemap" / "playwright_audit.json"
+        if cache_file.exists():
+            data = json.loads(cache_file.read_text(encoding="utf-8"))
+            return data
+        raise
+
     if not HTML_PATH.exists():
         from tools.codemap.ui.render import generate_pipeline_html
         generate_pipeline_html()
