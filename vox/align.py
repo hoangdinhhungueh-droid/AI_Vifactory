@@ -71,7 +71,8 @@ def align_script_with_audio(
                     whisper_words.append({
                         "word": w_obj.word.strip(),
                         "start": float(w_obj.start),
-                        "end": float(w_obj.end)
+                        "end": float(w_obj.end),
+                        "probability": float(getattr(w_obj, "probability", 1.0)),
                     })
         if whisper_words:
             whisper_success = True
@@ -88,7 +89,8 @@ def align_script_with_audio(
             whisper_words.append({
                 "word": w_text,
                 "start": round(curr, 3),
-                "end": round(max(curr + 0.1, end_t), 3)
+                "end": round(max(curr + 0.1, end_t), 3),
+                "probability": 1.0,
             })
             curr = end_t
 
@@ -104,10 +106,12 @@ def align_script_with_audio(
     last_end = 0.0
     for i, (orig_text, sc_idx) in enumerate(script_words):
         # Find closest match or interpolate
+        prob = 1.0
         if i < len(whisper_words):
             w_item = whisper_words[i]
             w_start = max(last_end, w_item["start"])
             w_end = max(w_start + 0.08, w_item["end"])
+            prob = float(w_item.get("probability", 1.0))
             if i < len(whisper_tokens) and script_tokens[i] == whisper_tokens[i]:
                 matches += 1
         else:
@@ -120,28 +124,37 @@ def align_script_with_audio(
             text=orig_text,
             start=round(w_start, 3),
             end=round(w_end, 3),
-            scene_idx=sc_idx
+            scene_idx=sc_idx,
+            probability=round(prob, 3),
         ))
         last_end = w_end
 
     match_ratio = round(max(0.95, matches / max(1, len(script_words))), 3)
 
-    # 4. Populate Scene start and end boundaries
-    for sc in plan.scenes:
+    fps = 30.0
+    # 4. Populate Scene start and end boundaries on 30fps frame grid
+    for i, sc in enumerate(plan.scenes):
         sc_words = [w for w in aligned_words if w.scene_idx == sc.idx]
         if sc_words:
-            sc.start = sc_words[0].start
-            sc.end = sc_words[-1].end
+            sc_start = 0.0 if i == 0 else plan.scenes[i - 1].end
+            sc.start = round(round(sc_start * fps) / fps, 3)
+            raw_end = sc_words[-1].end
+            sc.end = round(round(raw_end * fps) / fps, 3)
         else:
-            sc.start = 0.0
-            sc.end = audio_dur
+            sc.start = 0.0 if i == 0 else plan.scenes[i - 1].end
+            sc.end = round(round(audio_dur * fps) / fps, 3)
 
     # Ensure seamless boundary stitching between scenes and cover entire audio duration
     if plan.scenes:
         plan.scenes[0].start = 0.0
         for i in range(len(plan.scenes) - 1):
             plan.scenes[i + 1].start = plan.scenes[i].end
-        plan.scenes[-1].end = max(plan.scenes[-1].end, audio_dur)
+        plan.scenes[-1].end = max(plan.scenes[-1].end, round(round(audio_dur * fps) / fps, 3))
+        # Synchronize each scene's last word endpoint to scene end on 30fps grid (Rule 120 & Boss Item 1)
+        for sc in plan.scenes:
+            sc_w = [w for w in aligned_words if w.scene_idx == sc.idx]
+            if sc_w:
+                sc_w[-1].end = sc.end
 
     timeline = WordTimeline(
         words=aligned_words,

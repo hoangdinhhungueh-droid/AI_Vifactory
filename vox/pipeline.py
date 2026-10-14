@@ -118,6 +118,31 @@ def run_pipeline(
     # 3. Whisper Alignment
     print("\n[3/7] Aligning Whisper word timestamps with script text...")
     timeline, plan = align_script_with_audio(plan, audio_wav)
+
+    # Frame-grid scene boundaries and word endpoints synchronization (Rule 120 & Boss Item 1)
+    fps = 30.0
+    for i, sc in enumerate(plan.scenes):
+        sc_words = [w for w in timeline.words if w.scene_idx == sc.idx]
+        if not sc_words:
+            continue
+        sc_start = 0.0 if i == 0 else plan.scenes[i - 1].end
+        sc.start = round(round(sc_start * fps) / fps, 3)
+        raw_end = sc_words[-1].end
+        sc_end = round(round(raw_end * fps) / fps, 3)
+        if i == len(plan.scenes) - 1:
+            sc_end = max(sc_end, round(round(timeline.audio_duration * fps) / fps, 3))
+        sc.end = sc_end
+        sc_words[-1].end = sc_end
+
+    if plan.scenes:
+        plan.scenes[0].start = 0.0
+        for i in range(len(plan.scenes) - 1):
+            plan.scenes[i + 1].start = plan.scenes[i].end
+        plan.scenes[-1].end = max(plan.scenes[-1].end, round(round(timeline.audio_duration * fps) / fps, 3))
+        last_sc_words = [w for w in timeline.words if w.scene_idx == plan.scenes[-1].idx]
+        if last_sc_words:
+            last_sc_words[-1].end = plan.scenes[-1].end
+
     print(f"      Aligned {len(timeline.words)} words. Match ratio: {timeline.match_ratio*100:.1f}%. Duration: {timeline.audio_duration:.2f}s.")
 
     # 4. ASS Karaoke Subtitles
@@ -206,7 +231,13 @@ def run_pipeline(
 
     # 7. Quality Gates Audit
     print("\n[7/7] Executing quantitative forensic quality gates audit...")
-    gate_results = verify_final_video_gates(final_video, timeline.audio_duration, plan)
+    gate_results = verify_final_video_gates(
+        final_video,
+        timeline.audio_duration,
+        plan=plan,
+        timeline=timeline,
+        max_drift_ms=max_drift_ms,
+    )
     print(f"      Gate Audit Result: {gate_results['status']} (Streams: 2, Codec: {gate_results['video_codec']}+{gate_results['audio_codec']})")
 
     # Serialize Atomic Manifest

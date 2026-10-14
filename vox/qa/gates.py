@@ -138,6 +138,9 @@ def verify_final_video_gates(
     final_mp4: Path,
     expected_duration: float,
     plan: Optional[ScenePlan] = None,
+    timeline: Optional[Any] = None,
+    max_drift_ms: Optional[float] = None,
+    manifest_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Performs deep quantitative inspection on final rendered video asset."""
     final_mp4 = Path(final_mp4)
@@ -237,6 +240,40 @@ def verify_final_video_gates(
     if tp > -0.5:
         raise ValueError(f"Quality Gate FAIL: true peak {tp:.1f} dBTP exceeds ceiling -0.5 dBTP")
 
+    # 7. Word-Level Anchor & Reverse Karaoke Drift Hard Gate (Rule 120 & Boss Item 1)
+    if plan and plan.scenes and timeline and hasattr(timeline, "words"):
+        for sc in plan.scenes:
+            sc_words = [w for w in timeline.words if w.scene_idx == sc.idx]
+            if sc_words:
+                delta_frames = round(abs(sc.end - sc_words[-1].end) * 30.0, 2)
+                if delta_frames > 1.0:
+                    raise ValueError(
+                        f"Quality Gate FAIL: scene {sc.idx} word anchor boundary delta {delta_frames} frames "
+                        f"exceeds ceiling 1.0 frame (scene.end={sc.end:.3f}s, last_word.end={sc_words[-1].end:.3f}s)"
+                    )
+
+    if max_drift_ms is not None:
+        if max_drift_ms > 33.3:
+            raise ValueError(
+                f"Quality Gate FAIL: reverse karaoke drift {max_drift_ms:.2f}ms exceeds 33.3ms ceiling (1 frame @ 30fps)"
+            )
+
+    if manifest_data:
+        sub_info = manifest_data.get("subtitles", {})
+        if sub_info.get("reverse_parity_status") == "FAIL":
+            raise ValueError("Quality Gate FAIL: manifest subtitles.reverse_parity_status is FAIL")
+        m_drift = sub_info.get("max_reverse_drift_ms", 0.0)
+        if m_drift > 33.3:
+            raise ValueError(f"Quality Gate FAIL: manifest subtitles max_reverse_drift_ms {m_drift} > 33.3ms")
+        for sc_dict in manifest_data.get("scenes", []):
+            anchor = sc_dict.get("word_anchor")
+            if anchor:
+                b_delta = anchor.get("boundary_delta_frames", 0.0)
+                if b_delta > 1.0:
+                    raise ValueError(
+                        f"Quality Gate FAIL: manifest scene {sc_dict.get('idx')} word_anchor boundary_delta_frames {b_delta} > 1.0"
+                    )
+
     return {
         "status": "PASS",
         "video_codec": v_codec,
@@ -302,7 +339,7 @@ def main() -> int:
             scenes=scenes_data
         )
 
-        report = verify_final_video_gates(final_video_path, expected_dur, plan=plan)
+        report = verify_final_video_gates(final_video_path, expected_dur, plan=plan, manifest_data=manifest_data)
         print(f"[QA GATE AUDIT: PASS] {json.dumps(report, indent=2)}")
         return 0
     except Exception as e:

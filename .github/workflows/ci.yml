@@ -47,6 +47,9 @@ jobs:
 
       - name: Run hermetic tests (unit + contract)
         run: pytest -m "not integration" -v --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing tests/
+
+      - name: Full Vox Single Pipeline Test Suite (Rule 125 & 127)
+        run: pytest -v tests/vox/
       
       - name: Upload coverage
         uses: codecov/codecov-action@v4
