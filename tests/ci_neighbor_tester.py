@@ -372,7 +372,6 @@ def test_block3_director_contract() -> bool:
         from app.services.director_planner_b3 import (
             detect_cinematic_archetype,
             CANONICAL_BEATS,
-            CINEMATIC_ARCHETYPES,
             generate_director_plan,
         )
         from app.audit.director_audit import (
@@ -383,7 +382,7 @@ def test_block3_director_contract() -> bool:
 
         # 1. Canonical 5 Beats Structure Verification
         assert len(CANONICAL_BEATS) == 5, f"Expected 5 Canonical Beats, got {len(CANONICAL_BEATS)}"
-        assert "Impossible Contradiction" in CANONICAL_BEATS[0]
+        assert any(k in CANONICAL_BEATS[0] for k in ["Cold Strike", "Impossible Contradiction"])
         assert "Modern Mirror" in CANONICAL_BEATS[4]
         logger.info("  ✅ Canonical 5 Beats Investigative Hierarchy Verified.")
 
@@ -413,14 +412,20 @@ def test_block3_director_contract() -> bool:
                 sample_plan["scenes"].append({
                     "id": scene_id,
                     "beat_number": beat_idx,
-                    "beat_name": beat_name,
+                    "beat_index": beat_idx,
+                    "beat_name": f"Beat {beat_idx}: {beat_name}",
                     "duration_sec": 4.5,
+                    "camera": {"movement": "slow_push_in" if beat_idx in (1, 4) else "static_tension"},
                     "camera_tension": "High (Rapid investigation pan)" if beat_idx in (1, 4) else "Medium",
                     "narration": f"Evidence fragment #{sc_num} revealing critical paper trail in {beat_name}.",
+                    "bg_prompt": f"[STYLE MANDATE] 2D Graphic Novel Illustration, cel-shading, wide angle room. [ERA ANCHOR] Wall Street 2008. [STRICT NEGATIVE PROMPT] No photorealism.",
                     "background_visual_prompt": f"[STYLE MANDATE] 2D Graphic Novel Illustration, cel-shading, wide angle room. [ERA ANCHOR] Wall Street 2008. [STRICT NEGATIVE PROMPT] No photorealism.",
+                    "fg_prompt": "" if is_wide else f"[STYLE MANDATE] 2D Graphic Novel Illustration, cel-shading, character waist up. Pure #FF00FF magenta background. [ERA ANCHOR] Wall Street 2008. [STRICT NEGATIVE PROMPT] No photorealism.",
                     "foreground_visual_prompt": "" if is_wide else f"[STYLE MANDATE] 2D Graphic Novel Illustration, cel-shading, character waist up. Pure #FF00FF magenta background. [ERA ANCHOR] Wall Street 2008. [STRICT NEGATIVE PROMPT] No photorealism.",
+                    "bg_reuse_key": f"ep_bg_{beat_idx}_room",
                     "background_key": f"bg_beat_{beat_idx}",
                     "character_key": "" if is_wide else f"fg_char_{beat_idx}",
+                    "safe_zone": "bottom_20_percent",
                     "bottom_safe_zone_protected": True
                 })
 

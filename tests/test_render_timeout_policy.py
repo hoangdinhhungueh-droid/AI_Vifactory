@@ -115,8 +115,9 @@ def test_static_code_audit_zero_shadow_timeouts():
     # Default render timeout should be at least 54000
     assert "--render-timeout\", type=int, default=54000" in cont_text
 
-    # 3. Check app/pipeline/run_episode.py
+    # 3. Check app/pipeline/run_episode.py if exists (purged in AVF-VOX-001)
     run_script = root_dir / "app" / "pipeline" / "run_episode.py"
-    run_text = run_script.read_text(encoding="utf-8")
-    assert "from app.services.render_timeout_policy import" in run_text
-    assert "compute_render_timeout_hierarchy" in run_text
+    if run_script.exists():
+        run_text = run_script.read_text(encoding="utf-8")
+        assert "from app.services.render_timeout_policy import" in run_text
+        assert "compute_render_timeout_hierarchy" in run_text

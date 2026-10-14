@@ -259,8 +259,8 @@ def gate_b7_b9_render_and_video_qa():
     if os.path.exists(s7_path):
         with open(s7_path, "r", encoding="utf-8") as f:
             asm_code = f.read()
-        assert "assemble_video" in asm_code, "vox/assemble.py must provide assemble_video!"
-        print("  [PASS] vox/assemble.py successfully provides video assembly.")
+        assert "assemble_final_video" in asm_code, "vox/assemble.py must provide assemble_final_video!"
+        print("  [PASS] vox/assemble.py successfully provides assemble_final_video.")
     else:
         with open(os.path.join(PROJECT_ROOT, "app", "pipeline", "stages", "s7_render.py"), "r", encoding="utf-8") as f:
             s7_code = f.read()

@@ -38,14 +38,28 @@ def detect_forensic_overlay(narration_text: str, **kwargs) -> Optional[Dict[str,
     return {"type": "kinetic_headline", "theme": "vox_paper", "layout": "full_bleed_focus"}
 
 
-def detect_cinematic_archetype(category: str = "", topic: str = "") -> Dict[str, str]:
+def detect_cinematic_archetype(category: str = "", topic: str = "", story_text: str = "") -> Dict[str, str]:
     """Cinematic archetype router for smoke test backward compatibility."""
+    cat_low = (category or "").lower()
+    top_low = (topic or "").lower()
+    if any(k in cat_low or k in top_low for k in ["history", "oppenheimer", "cold war", "manhattan", "chernobyl", "war"]):
+        return {"director": "Christopher Nolan / Historical Tension", "visual_tone": "Cinematic", "tone": "Historical Dramatic", "palette": "Desaturated"}
     return {"director": "David Fincher / Corporate Noir", "visual_tone": "Clinical", "tone": "Forensic Investigative", "palette": "Moody"}
 
 
-def _is_valid_audio_spine(data: Any) -> bool:
-    """Validates audio spine completeness."""
-    return bool(data)
+def _is_valid_audio_spine(spoken_sentences: Any, dirs: Any = None) -> bool:
+    """Validate that Hollywood Audio Spine exists and is timecode-locked (Rule 120/127)."""
+    if not spoken_sentences or not isinstance(spoken_sentences, list):
+        return False
+    valid_count = sum(1 for s in spoken_sentences if isinstance(s, dict) and (s.get("duration_frames", 0) > 0 or s.get("duration_sec", 0) > 0 or (s.get("end_ms", 0) > s.get("start_ms", 0))))
+    if len(spoken_sentences) == 0 or (valid_count / len(spoken_sentences)) < 0.8:
+        return False
+    if dirs:
+        has_audio = any((d / "tts_out.mp3").exists() and (d / "tts_out.mp3").stat().st_size > 10240 for d in dirs if isinstance(d, Path) and d.exists())
+        has_sub = any(((d / "whisper_segments.json").exists() and (d / "whisper_segments.json").stat().st_size > 100) or ((d / "subtitles.srt").exists() and (d / "subtitles.srt").stat().st_size > 100) for d in dirs if isinstance(d, Path) and d.exists())
+        if not (has_audio and has_sub):
+            return False
+    return True
 
 
 def detect_stat_card(text: str) -> Optional[Dict[str, Any]]:
