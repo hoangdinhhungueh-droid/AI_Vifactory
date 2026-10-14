@@ -357,16 +357,25 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     # 2. Remote VPS Telemetry & Parity
     is_on_vps = Path("/root/video_factory").exists() and ROOT_DIR == Path("/root/video_factory")
+    vps_client: Optional[Any] = None
+    if not is_on_vps:
+        try:
+            from scripts.vps_runner import FastVPSClient
+            vps_client = FastVPSClient()
+        except Exception as ex:
+            logger.warning(f"Failed to pre-initialize FastVPSClient: {ex}")
+
     def run_on_vps(cmd: str) -> Tuple[int, str]:
+        nonlocal vps_client
         if is_on_vps:
             res = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd="/root/video_factory")
             return res.returncode, (res.stdout + "\n" + res.stderr).strip()
         else:
             try:
-                from scripts.vps_runner import FastVPSClient
-                client = FastVPSClient()
-                r = client.run_command(cmd)
-                client.close()
+                if vps_client is None:
+                    from scripts.vps_runner import FastVPSClient
+                    vps_client = FastVPSClient()
+                r = vps_client.run_command(cmd, timeout=300)
                 return r.get("exit_code", 1), (r.get("stdout", "") + "\n" + r.get("stderr", "")).strip()
             except Exception as ex:
                 return 1, f"VPS connection failed: {ex}"
@@ -719,6 +728,12 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"Summary Log:\n{git_log_res.stdout.strip()}\n\n"
         f"Detailed Commit Log:\n{git_full_log.stdout.strip()}\n"
     )
+
+    if vps_client is not None:
+        try:
+            vps_client.close()
+        except Exception:
+            pass
 
     raw_evidence_str = "\n".join(evidence_blocks)
     return {

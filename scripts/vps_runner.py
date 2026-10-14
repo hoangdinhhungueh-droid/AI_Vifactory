@@ -88,7 +88,7 @@ class FastVPSClient:
                     headers=self._headers(),
                     method="POST"
                 )
-                with urllib.request.urlopen(req, timeout=12, context=self.ctx) as resp:
+                with urllib.request.urlopen(req, timeout=30, context=self.ctx) as resp:
                     self.session_id = resp.headers.get("mcp-session-id")
 
                 if self.session_id:
@@ -100,7 +100,7 @@ class FastVPSClient:
                             headers=self._headers(),
                             method="POST"
                         )
-                        with urllib.request.urlopen(req_notif, timeout=10, context=self.ctx) as _resp_notif:
+                        with urllib.request.urlopen(req_notif, timeout=15, context=self.ctx) as _resp_notif:
                             _ = _resp_notif.read()
                     except Exception as _e_notif:
                         logger_msg = str(_e_notif)
@@ -115,7 +115,7 @@ class FastVPSClient:
                     raise e
         return self.session_id
 
-    def call_tool(self, tool_name, arguments=None, timeout=180, retries=3):
+    def call_tool(self, tool_name, arguments=None, timeout=300, retries=3):
         for attempt in range(retries):
             try:
                 if not self.session_id:
@@ -157,7 +157,7 @@ class FastVPSClient:
                     raise e
         return {}
 
-    def run_command(self, cmd, timeout=180):
+    def run_command(self, cmd, timeout=300):
         return self.call_tool("run_command", {"command": cmd, "confirm": True, "timeout": timeout}, timeout=timeout)
 
 _client = None
@@ -168,7 +168,7 @@ def get_client():
         _client = FastVPSClient()
     return _client
 
-def run_vps_cmd(cmd, confirm=True, timeout=180):
+def run_vps_cmd(cmd, confirm=True, timeout=300):
     return get_client().run_command(cmd, timeout=timeout)
 
 if __name__ == "__main__":
