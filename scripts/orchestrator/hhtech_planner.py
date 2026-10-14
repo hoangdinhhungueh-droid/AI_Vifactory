@@ -66,24 +66,29 @@ Deliver the plan with:
 """
 
 def resolve_api_key() -> str:
-    """Finds HHTech API key from environment, VPS secrets, or config."""
+    """Finds HHTech API key from environment, local .env, VPS .env, or config."""
     key = os.getenv("HHTECH_API_KEY", "")
     if key and not key.startswith("••"):
         return key
 
-    # VPS secrets location
-    secrets_path = Path("/root/secrets/.env")
-    if secrets_path.exists():
-        try:
-            with open(secrets_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.startswith("HHTECH_API_KEY="):
-                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
-                        if val:
-                            os.environ["HHTECH_API_KEY"] = val
-                            return val
-        except Exception as e:
-            logger.debug(f"Could not read VPS secrets: {e}")
+    root_dir = Path(__file__).resolve().parent.parent.parent
+    candidate_paths = [
+        root_dir / ".env",
+        Path("/root/video_factory/.env"),
+        Path("/root/secrets/.env"),
+    ]
+    for p in candidate_paths:
+        if p.exists():
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.startswith("HHTECH_API_KEY="):
+                            val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            if val and not val.startswith("••"):
+                                os.environ["HHTECH_API_KEY"] = val
+                                return val
+            except Exception as e:
+                logger.debug(f"Could not read {p}: {e}")
 
     return ""
 
