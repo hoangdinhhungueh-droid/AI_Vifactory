@@ -340,7 +340,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         tree_res = subprocess.run(["git", "-C", str(ROOT_DIR), "rev-parse", "HEAD^{tree}"], capture_output=True, text=True, check=False)
         git_tree = tree_res.stdout.strip()
         remote_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-remote", "origin", "main"], capture_output=True, text=True, check=False)
-        local_status_res = subprocess.run(["git", "-C", str(ROOT_DIR), "status", "--porcelain", "-uno"], capture_output=True, text=True, check=False)
+        local_status_res = subprocess.run(["git", "-C", str(ROOT_DIR), "status", "--porcelain"], capture_output=True, text=True, check=False)
         local_content_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files", "-s"], capture_output=True, text=True, check=False)
         import hashlib
         local_content_hash = hashlib.sha256(local_content_res.stdout.encode("utf-8")).hexdigest()
@@ -418,9 +418,9 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     )
 
     # 5. Full Vox Unit & Codemap Test Suites + CI Neighbor Tester
-    code_pytest_vox, out_pytest_vox = run_on_vps("cd /root/video_factory && python3 -m pytest tests/vox -v")
-    code_pytest_codemap, out_pytest_codemap = run_on_vps("cd /root/video_factory && python3 -m pytest tests/codemap -v")
-    code_neighbor, out_neighbor = run_on_vps("cd /root/video_factory && python3 tests/ci_neighbor_tester.py")
+    code_pytest_vox, out_pytest_vox = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox -v")
+    code_pytest_codemap, out_pytest_codemap = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/codemap -v")
+    code_neighbor, out_neighbor = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 tests/ci_neighbor_tester.py")
     code_pytest = 0 if (code_pytest_vox == 0 and code_pytest_codemap == 0 and code_neighbor == 0) else 1
     evidence_blocks.append(
         f"### [5. RUNTIME PYTEST SUITES: VOX + CODEMAP + NEIGHBOR TESTER (Rule 127)]\n"
@@ -433,7 +433,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     )
 
     # 6. VPS Master Smoke Gate (All 15 Gates Live, Zero Notion 401s)
-    code_smoke, out_smoke = run_on_vps("cd /root/video_factory && python3 scripts/e2e_pipeline_smoketest.py")
+    code_smoke, out_smoke = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 scripts/e2e_pipeline_smoketest.py")
     evidence_blocks.append(f"### [6. VPS MASTER SMOKE GATE: ALL 15 GATES PASS (Rule 127)]\nExit Code: {code_smoke}\nOutput:\n{out_smoke}\n")
 
     # 7. Golden Real-Asset E2E Video Execution & FFprobe Stream Telemetry + Loudness Physics
@@ -469,14 +469,23 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     # 8. Physical Visual Proof, Pixel Forensic Statistics & OCR Audit (Rule 122 & 139)
     code_frames, out_frames = run_on_vps(
-        "mkdir -p /root/video_factory/out/golden/frames && "
-        "ffmpeg -y -ss 0.3 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc01_fg1.png 2>&1 | tail -n 2 && "
-        "ffmpeg -y -ss 0.8 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc01_fg2.png 2>&1 | tail -n 2 && "
-        "ffmpeg -y -ss 5.8 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc02_fg1.png 2>&1 | tail -n 2 && "
-        "ffmpeg -y -ss 6.3 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc02_fg2.png 2>&1 | tail -n 2 && "
-        "ffmpeg -y -ss 14.0 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc03_fg1.png 2>&1 | tail -n 2 && "
-        "ffmpeg -y -ss 14.5 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc03_fg2.png 2>&1 | tail -n 2 && "
-        "ls -lh /root/video_factory/out/golden/frames/*.png && sha256sum /root/video_factory/out/golden/frames/*.png"
+        "python3 -c \""
+        "import json, subprocess, os\n"
+        "with open('/root/video_factory/out/golden/manifest.json') as f:\n"
+        "    m = json.load(f)\n"
+        "scenes = m.get('scenes', [])\n"
+        "os.makedirs('/root/video_factory/out/golden/frames', exist_ok=True)\n"
+        "for i, sc in enumerate(scenes):\n"
+        "    start_t = float(sc.get('start', 0.0))\n"
+        "    end_t = float(sc.get('end', 5.0))\n"
+        "    mid_t = round((start_t + end_t) / 2.0, 2)\n"
+        "    bound_t = round(min(end_t - 0.2, start_t + 0.5), 2)\n"
+        "    p1 = f'/root/video_factory/out/golden/frames/sc{i+1:02d}_fg1.png'\n"
+        "    p2 = f'/root/video_factory/out/golden/frames/sc{i+1:02d}_fg2.png'\n"
+        "    subprocess.run(['ffmpeg', '-y', '-ss', str(bound_t), '-i', '/root/video_factory/out/golden/final.mp4', '-frames:v', '1', '-update', '1', p1], check=True, capture_output=True)\n"
+        "    subprocess.run(['ffmpeg', '-y', '-ss', str(mid_t), '-i', '/root/video_factory/out/golden/final.mp4', '-frames:v', '1', '-update', '1', p2], check=True, capture_output=True)\n"
+        "print(f'DYNAMIC_FRAMES_EXTRACTED: {len(scenes)*2} frames computed from scene boundaries')\n"
+        "\" && ls -lh /root/video_factory/out/golden/frames/*.png && sha256sum /root/video_factory/out/golden/frames/*.png"
     )
     code_vis, out_vis = run_on_vps(
         "python3 -c \""
@@ -604,27 +613,17 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     # 12. Atomic Git Commits Log & Commit Separation Documentation
     git_log_res = subprocess.run(
-        ["git", "-C", str(ROOT_DIR), "log", "--format=%H %s", f"{effective_range}"],
+        ["git", "-C", str(ROOT_DIR), "log", "--format=%h %s", "2456870^..HEAD"],
         capture_output=True, text=True, check=False
     )
     git_full_log = subprocess.run(
-        ["git", "-C", str(ROOT_DIR), "log", "--format=%H%n%B", "2456870^..HEAD"],
+        ["git", "-C", str(ROOT_DIR), "log", "--format=%h - %an: %s%n%b", "2456870^..HEAD"],
         capture_output=True, text=True, check=False
     )
-    separation_doc = (
-        "COMMIT SEPARATION & PROVENANCE BREAKDOWN:\n"
-        "- 2456870: feat(vox): implement single unified vox pipeline with tactile object decomposition and purge legacy pipeline\n"
-        "- 9887664: fix(vox): bound subtitle drift to 9.0ms via cumulative centiseconds, add reverse drift gate to manifest\n"
-        "- 68443d1: fix(vox): full asset provenance metadata and unified contact sheet generation\n"
-        "- b540512: fix(vox): audio alignment adversarial tests, codemap playwright audit, and notion card parity\n"
-        "- 7e5cea4: fix(vox): frame-grid scene boundary alignment, hard-gate word anchors, and enforce ci tests/vox\n"
-        "QUANTFLOW codemap and login_acc07 modules belong to auxiliary infrastructure tooling and maintain independent contract boundaries."
-    )
     evidence_blocks.append(
-        f"### [12. ATOMIC CONVENTIONAL COMMITS LOG ({effective_range})]\n"
-        f"{git_log_res.stdout.strip()}\n\n"
-        f"{separation_doc}\n\n"
-        f"Full Commit Messages:\n{git_full_log.stdout.strip()}\n"
+        f"### [12. ATOMIC CONVENTIONAL COMMITS LOG (2456870^..HEAD)]\n"
+        f"Summary Log:\n{git_log_res.stdout.strip()}\n\n"
+        f"Detailed Commit Log:\n{git_full_log.stdout.strip()}\n"
     )
 
     raw_evidence_str = "\n".join(evidence_blocks)

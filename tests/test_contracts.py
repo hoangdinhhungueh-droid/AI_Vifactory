@@ -80,5 +80,12 @@ class TestContracts(unittest.TestCase):
         self.assertIn("violates Rule 118", str(ctx.exception))
 
 
+    def test_stage_s10_render_import_integrity(self):
+        """Rule 125 & 127: Ensures stages/s10_render.py imports cleanly with zero broken imports."""
+        import stages.s10_render as s10
+        self.assertIsNotNone(s10.run)
+        self.assertEqual(s10.STAGE.value, "s10_render")
+
+
 if __name__ == "__main__":
     unittest.main()

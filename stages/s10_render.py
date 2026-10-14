@@ -18,8 +18,6 @@ from core.contracts.render_props import RemotionRenderProps, SceneRenderProp, Ka
 from core.config import RunContext
 from core.gates import require_input, emit_artifact, compute_file_sha256
 from tools.codemap.runtime import pipeline_stage
-from vox.compositor import generate_scene_clips
-from vox.assemble import assemble_final_video
 
 STAGE: StageID = StageID.S10_RENDER
 
