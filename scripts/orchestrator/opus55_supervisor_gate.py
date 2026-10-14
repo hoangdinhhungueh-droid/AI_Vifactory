@@ -208,10 +208,10 @@ def build_anti_bloat_digest(
     digest = {
         "task_id": task_id,
         "task_objective": task_objective[:2000],
-        "diff_stat": diff_summary[:2000],
-        "compact_diff": compact_diff,
-        "qa_summary": (qa_summary or "QA Harness: Tests Passed, 0 Regressions")[:6000],
-        "ocr_status": (ocr_status or "Alibaba OCR Gate: 0 Critical / 0 High Defects")[:1000],
+        "diff_stat": diff_summary[:10000],
+        "compact_diff": compact_diff[:25000],
+        "qa_summary": (qa_summary or "QA Harness: Tests Passed, 0 Regressions")[:30000],
+        "ocr_status": (ocr_status or "Alibaba OCR Gate: 0 Critical / 0 High Defects")[:2000],
     }
 
     # Verify token count and truncate if approaching limit
