@@ -114,40 +114,40 @@ def distill_insights_to_cards(
             directive = 'Maintain aggressive hook compression: open with paradox or quantitative shock within 30s'
             obs = f'Hook 0-30s retention: {hook_30s:.0%} (strong)'
             confidence = min(0.60 + (hook_30s - 0.70) * 2, 0.95)
-            _write_or_update_card(
+            card_id = _write_or_update_card(
                 notion_token, market, 'hook_pacing',
                 obs, directive, confidence, ts
             )
-            written_cards.append({'dimension': 'hook_pacing', 'directive': directive})
+            written_cards.append({'dimension': 'hook_pacing', 'directive': directive, 'id': card_id})
         elif hook_60s < 0.55:
             directive = 'Shorten hook to under 35s: cut exposition, lead with core contradiction immediately'
             obs = f'Hook 0-60s retention: {hook_60s:.0%} (weak -- viewers dropping early)'
             confidence = min(0.60 + (0.55 - hook_60s) * 1.5, 0.90)
-            _write_or_update_card(
+            card_id = _write_or_update_card(
                 notion_token, market, 'hook_pacing',
                 obs, directive, confidence, ts
             )
-            written_cards.append({'dimension': 'hook_pacing', 'directive': directive})
+            written_cards.append({'dimension': 'hook_pacing', 'directive': directive, 'id': card_id})
 
     # --- Pattern: AVD / story structure --------------------------------------
     if avd_ratio >= 0.68:
         directive = 'Maintain current 5-beat story structure balance -- high retention confirms pacing works'
         obs = f'AVD/Duration ratio: {avd_ratio:.0%} (above 68% threshold)'
         confidence = min(0.60 + (avd_ratio - 0.68) * 1.5, 0.90)
-        _write_or_update_card(
+        card_id = _write_or_update_card(
             notion_token, market, 'story_structure',
             obs, directive, confidence, ts
         )
-        written_cards.append({'dimension': 'story_structure', 'directive': directive})
+        written_cards.append({'dimension': 'story_structure', 'directive': directive, 'id': card_id})
     elif avd_ratio < 0.45:
         directive = 'Insert micro-cliffhanger at mid-story (around 45-50% mark) -- AVD drop indicates engagement loss'
         obs = f'AVD/Duration ratio: {avd_ratio:.0%} (below 45% -- mid-story drop detected)'
         confidence = min(0.60 + (0.45 - avd_ratio) * 1.5, 0.88)
-        _write_or_update_card(
+        card_id = _write_or_update_card(
             notion_token, market, 'story_structure',
             obs, directive, confidence, ts
         )
-        written_cards.append({'dimension': 'story_structure', 'directive': directive})
+        written_cards.append({'dimension': 'story_structure', 'directive': directive, 'id': card_id})
 
     if written_cards:
         print(f'[vf_insight_cards] Distilled {len(written_cards)} InsightCard(s) '
@@ -208,6 +208,7 @@ def _write_or_update_card(
                     method='PATCH', payload={'properties': props})
         print(f'[vf_insight_cards] Updated InsightCard page {page_id} '
               f'({market}/{dimension}) confidence={confidence:.2f}', flush=True)
+        return page_id
     else:
         create_payload = {
             'parent': {'database_id': EXPERIMENT_LAB_DB_ID},
@@ -220,6 +221,7 @@ def _write_or_update_card(
             raise RuntimeError(f"[vf_insight_cards] Failed to create InsightCard in Notion DB {EXPERIMENT_LAB_DB_ID}: empty response")
         print(f'[vf_insight_cards] Created InsightCard {new_id} '
               f'({market}/{dimension}) confidence={confidence:.2f}', flush=True)
+        return new_id
 
 
 # ---- FETCH: B2 reads InsightCards -------------------------------------------
