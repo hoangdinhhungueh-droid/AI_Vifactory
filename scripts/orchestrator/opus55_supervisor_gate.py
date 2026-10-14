@@ -64,11 +64,16 @@ Governing Constitution (Rule 118 - Rule 139 Summary):
 - Rule 138: Code-Graph Pre-Impact Check & Anti-Blind Editing.
 - Rule 139: Disciplined Code-ification & Zero-Symptom Patching.
 
-Evaluation Standards:
-1. Architectural Integrity & Contract Adherence: Zero dirty hacks, zero shadow code, proper schema compatibility, adherence to Rule 118 - Rule 139.
-2. Safety & Blast Radius: Low blast radius, backward-compatible, clean error handling (no empty try-except, no symptom-patching).
-3. Code Cleanliness: 0 ghost files (.bak, orphan scripts), strict module boundaries, zero dead imports.
-4. Verification & Testing: Passes regression/unit tests and OCR rules with hard forensic evidence.
+Evaluation Standards (Zero-Compromise 10/10 Mandate):
+1. Raw Physical Evidence Inspection: You are examining RAW FORENSIC EVIDENCE directly from Git, Linux VPS runtime, and GitHub Actions CI. Refuse to accept conversational claims, narrative summaries, or promises from the Worker. Inspect the exact raw git diff, tree parity hash, pytest outputs & exit codes, ghost scan status, GitHub CI conclusion, and ffprobe video stream JSON.
+2. Architectural Integrity & Contract Adherence: Zero dirty hacks, zero shadow code, proper schema compatibility, 100% adherence to Rule 118 - Rule 139.
+3. Safety & Blast Radius: Low blast radius, backward-compatible, clean error handling (no empty try-except, no symptom-patching).
+4. Code Cleanliness: 0 ghost files (.bak, orphan scripts), strict module boundaries, zero dead imports.
+5. Verification & Testing: Passes regression/unit tests and OCR rules with hard forensic evidence (exit code 0).
+
+Scoring Policy (Zero Compromise):
+- Score 10.0 / 10.0 (APPROVED): Only awarded when 100% of physical evidence is verified: clean working tree, exit code 0 across all test suites on VPS, 0 ghost files, valid ffprobe video metadata, GitHub CI success, and zero architectural deviations.
+- Score < 10.0 (REVISE_REQUIRED): If ANY unverified claim, code defect, missing proof, unexplained warning, or unaddressed requirement exists, you MUST assign REVISE_REQUIRED with a score < 10.0 and enumerate exact actionable items in 'revisions_needed'.
 
 Output Format: You MUST output STRICT JSON only (you have up to 5,000 output tokens to deliver comprehensive and actionable technical depth):
 {
@@ -202,10 +207,10 @@ def build_anti_bloat_digest(
 
     digest = {
         "task_id": task_id,
-        "task_objective": task_objective[:1500],
-        "diff_stat": diff_summary[:1500],
+        "task_objective": task_objective[:2000],
+        "diff_stat": diff_summary[:2000],
         "compact_diff": compact_diff,
-        "qa_summary": (qa_summary or "QA Harness: Tests Passed, 0 Regressions")[:2500],
+        "qa_summary": (qa_summary or "QA Harness: Tests Passed, 0 Regressions")[:6000],
         "ocr_status": (ocr_status or "Alibaba OCR Gate: 0 Critical / 0 High Defects")[:1000],
     }
 
@@ -233,7 +238,7 @@ def call_opus55_supervisor(
         logger.info("Dry-run mode: Emitting simulated Opus 5.5 PASS verdict.")
         return {
             "verdict": "APPROVED",
-            "score": 9.8,
+            "score": 10.0,
             "architectural_fit": "STRICT_COMPLIANT",
             "summary": "Dry-run validation successful. Code increment complies with 4-pillar architectural guidelines and token budget specifications (<= 10,000 input, <= 5,000 output).",
             "component_reviews": [
@@ -264,17 +269,20 @@ def call_opus55_supervisor(
 TASK DIGEST:
 Task ID: {digest.get('task_id')}
 Objective: {digest.get('task_objective')}
+
+RAW PHYSICAL GIT EVIDENCE:
 Git Diff Stat:
 {digest.get('diff_stat')}
 
 Compact Semantic Diff:
 {digest.get('compact_diff')}
 
-Quality & QA Matrix:
+RAW PHYSICAL RUNTIME & TELEMETRY EVIDENCE (VPS TESTS, GHOST SCAN, FFPROBE & GITHUB CI):
 {digest.get('qa_summary')}
+
 OCR Status: {digest.get('ocr_status')}
 
-Enforce 18 Iron Laws and 4 Pillars (CI/CD Gates, Git Commits, 3-Way Sync Parity, Real Testing).
+Enforce 18 Iron Laws, 4 Pillars, and the 10/10 Zero-Compromise Quality Mandate.
 Return ONLY the specified JSON."""
 
     try:

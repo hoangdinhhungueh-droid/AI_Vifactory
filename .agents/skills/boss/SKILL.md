@@ -46,23 +46,32 @@ Agent hiển thị câu hỏi xác nhận qua công cụ `ask_question`:
   4. Kiểm thử cú pháp và runtime trước khi đồng bộ VPS (Rule 126).
 
 ### Bước 4: Tự Động Kích Hoạt Boss Opus 5.5 Thẩm Định & Vòng Lặp Tự Sửa Lỗi (Phase 3: Mandatory Auto-Audit & Self-Healing Loop)
-> **KỶ LUẬT BẮT BUỘC (MANDATORY)**: Worker Gemini CẤM TUYỆT ĐỐI tự ý báo cáo hoàn thành cho Người Dùng khi Boss Claude Opus 5.5 chưa thẩm định và phê duyệt. Ngay khi hoàn tất code và test kỹ thuật, Worker BẮT BUỘC PHẢI TỰ ĐỘNG GỬI payload bằng chứng pháp y sang Boss Claude Opus 5.5 qua HHTech API mà không cần đợi User nhắc nhở.
+> **KỶ LUẬT THÉP BẮT BUỘC (ZERO-NARRATIVE & RAW EVIDENCE INJECTION)**:
+> 1. Worker Gemini CẤM TUYỆT ĐỐI tự ý báo cáo hoa mỹ cho Người Dùng khi Boss Claude Opus 5.5 chưa thẩm định và phê duyệt.
+> 2. CẤM TUYỆT ĐỐI Worker tự bịa lời văn tóm tắt ("nói đỡ") trong digest gửi cho Boss. Boss Claude Opus 5.5 BẮT BUỘC phải soi thẳng vào **DỮ LIỆU THÔ VẬT LÝ TRỰC TIẾP TỪ GIT VÀ VPS**:
+>    - Raw `git diff --stat <BASE>..HEAD` (toàn văn không cắt xén).
+>    - Raw Tree Byte Parity: `git ls-files -z | sha256sum`.
+>    - Raw stdout & exit code thực tế của `pytest`, `e2e_pipeline_smoketest.py`, `ghost_scan.py` trên VPS.
+>    - Raw `ffprobe` JSON stream/format của file video thực tế trên VPS.
+>    - Raw GitHub Actions API JSON (`status`, `conclusion`, `html_url`).
+> 3. Worker tự động gửi toàn bộ bằng chứng thô này thẳng sang Boss Opus 5.5 qua HHTech API ngay khi hoàn thành code, hoàn toàn tự động không cần User yêu cầu.
 
 1. **Lệnh Thẩm Định Tự Động**:
    ```bash
    python scripts/orchestrator/boss_orchestrator.py --phase audit --commit-range <BASE_COMMIT>..HEAD --task-id <TASK_ID>
    ```
-2. **Tiêu Chuẩn Đánh Giá Khắt Khe (Zero-Compromise Quality Standard)**:
-   - Mục tiêu: **10/10 điểm hoàn hảo** (hoặc đạt chuẩn tối đa không tì vết, tối thiểu $\ge 9.0/10.0$).
-   - 0 lỗi Critical, 0 lỗi High, 0 tàn dư Ghost Code.
-   - Bắt buộc đính kèm đầy đủ bằng chứng pháp y: GitHub Actions CI Run URL (`conclusion: success`), log pytest exit 0, Run Manifest live execution, SHA256 parity.
+2. **Tiêu Chuẩn Đánh Giá Khắt Khe (Zero-Compromise 10/10 Quality Mandate)**:
+   - **Mục tiêu bất di bất dịch: Đúng 10/10 điểm hoàn hảo (`score == 10.0` & `VERDICT: APPROVED`)**. Tuyệt đối không thỏa hiệp với điểm 8.x hay 9.x.
+   - 0 lỗi Critical, 0 lỗi High, 0 warning không rõ nguồn gốc, 0 tàn dư Ghost Code.
+   - Bắt buộc đính kèm đầy đủ bằng chứng pháp y: GitHub Actions CI Run URL (`conclusion: success`), log pytest exit 0, Run Manifest live execution, SHA256 parity, ffprobe telemetry.
 3. **Vòng Lặp Tự Sửa Lỗi Tự Động (Automated Self-Healing Loop - Tối đa 2 Vòng)**:
-   - **Vòng 1**: Nếu Boss trả về `VERDICT: REVISE_REQUIRED`, Worker tự động bóc tách danh sách `revisions_needed`, lập tức sửa đổi code/hợp đồng/bằng chứng tương ứng và tự động nộp lại cho Boss thẩm định lần 2.
-   - **Vòng 2**: Nếu Boss vẫn yêu cầu chỉnh sửa, Worker thực hiện lượt sửa cuối cùng và nộp thẩm định chốt chặn.
-   - **Chốt chặn an toàn**: Nếu sau 2 vòng tự sửa Boss vẫn chưa ký duyệt `APPROVED`, Worker mới được dừng lại, xuất trình toàn bộ biên bản đối kháng của Boss kèm các phương án kỹ thuật để User ra quyết định tối cao.
+   - **Vòng 1**: Nếu Boss trả về `VERDICT: REVISE_REQUIRED` hoặc `score < 10.0`, Worker tự động bóc tách danh sách `revisions_needed`, lập tức sửa đổi code/hợp đồng/bằng chứng tương ứng trên đĩa, chạy kiểm thử sống, đồng bộ và tự động nộp lại cho Boss thẩm định lần 2.
+   - **Vòng 2**: Nếu Boss vẫn chưa chấm 10/10, Worker thực hiện lượt hoàn thiện triệt để cuối cùng và nộp thẩm định chốt chặn.
+   - **Chốt chặn an toàn**: Nếu sau 2 vòng tự sửa Boss vẫn chưa ký duyệt 10/10 `APPROVED`, Worker mới được dừng lại, xuất trình toàn văn biên bản đối kháng của Boss kèm các phương án kỹ thuật để User ra quyết định tối cao.
 
-### Bước 5: Báo Cáo Nghiệm Thu Duy Nhất Khi Có Dấu "APPROVED" (Single Truth Acceptance)
-Chỉ khi Boss Claude Opus 5.5 chính thức ký **`VERDICT: APPROVED`**:
+### Bước 5: Báo Cáo Nghiệm Thu Duy Nhất Khi Có Dấu "APPROVED" 10/10 (Single Truth Acceptance)
+Chỉ khi Boss Claude Opus 5.5 chính thức ký **`VERDICT: APPROVED` (Điểm 10/10)**:
 - Worker mới xuất bản Báo cáo nghiệm thu hoàn thiện gửi Người Dùng.
-- Báo cáo phải trích dẫn rõ: Chữ ký thẩm định của Boss, điểm số, log HTTP 200 từ HHTech API, URL GitHub CI success, và hướng dẫn vận hành chuẩn.
+- Báo cáo phải trích dẫn rõ: Chữ ký thẩm định của Boss, điểm số 10/10, log HTTP 200 từ HHTech API, URL GitHub CI success, và hướng dẫn vận hành chuẩn.
+
 
