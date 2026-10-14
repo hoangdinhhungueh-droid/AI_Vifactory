@@ -64,9 +64,9 @@ class TestHG1GateLock:
                         assert "start_new_session" in call_args.kwargs
                         assert call_args.kwargs["start_new_session"] is True
                         
-                        # Verify script is produce_episode_hg1.py (check any item contains it)
+                        # Verify script is canonical orchestrator/run_pipeline.py
                         cmd = call_args[0][0]  # This is the list of command args
-                        script_found = any("produce_episode_hg1.py" in str(item) for item in cmd)
+                        script_found = any("run_pipeline.py" in str(item) for item in cmd)
                         assert script_found
 
     def test_lock_pid_stored(self):
@@ -146,7 +146,7 @@ class TestHG1Subprocess:
                         
                         # Check command structure
                         assert "python3" in cmd[0]
-                        script_found = any("produce_episode_hg1.py" in str(item) for item in cmd)
+                        script_found = any("run_pipeline.py" in str(item) for item in cmd)
                         assert script_found
                         assert task_id in cmd
 
