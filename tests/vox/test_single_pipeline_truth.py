@@ -89,9 +89,10 @@ def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200():
 
     # 6. Notion Gate logic behavioral parity
     from app.main import _apply_notion_gates, NOTION_KEEP
+    kept_tool = next(iter(NOTION_KEEP))
     dummy_body = {
         "tools": [
-            {"function": {"name": "API-post-search"}},
+            {"function": {"name": kept_tool}},
             {"function": {"name": "API-unauthorized-shadow-call"}},
             {"function": {"name": "local_calc"}},
         ]
@@ -99,7 +100,7 @@ def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200():
     # Test NOTION CAP: unconditional stripping of non-whitelisted API-*
     gated_cap = _apply_notion_gates(dummy_body, last_user="inspect notion db", autonomous=False)
     tool_names_cap = [t["function"]["name"] for t in gated_cap["tools"]]
-    assert "API-post-search" in tool_names_cap
+    assert kept_tool in tool_names_cap
     assert "API-unauthorized-shadow-call" not in tool_names_cap
     assert "local_calc" in tool_names_cap
 
