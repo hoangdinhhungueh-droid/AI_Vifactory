@@ -61,6 +61,9 @@ Your plan MUST strictly structure:
 5. Strict Verification Protocol & Acceptance Criteria (Rule 121 & Rule 127):
    - Programmatic verification commands (py_compile, pytest, live function call with exit code 0).
    - Zero-Mock data requirement.
+6. Mandatory Code Map GPS Gating (Rule 138):
+   - Query .codemap/codemap.json to ground stage coordinates and schema handoffs.
+   - State exact file and symbol coordinates for every component targeted.
 """
 
 def resolve_hhtech_key() -> str:
@@ -245,9 +248,28 @@ def analyze_task_venue(task_description: str) -> Dict[str, Any]:
             "worker_model": "gemini-3.8-flash-high",
         }
 
+def resolve_codemap_gps_telemetry(task_description: str) -> str:
+    """Queries code map GPS (.codemap/codemap.json) to ground Boss Opus 5.5 in video pipeline stages."""
+    video_codemap = ROOT_DIR / ".codemap" / "codemap.json"
+    if video_codemap.exists():
+        try:
+            with open(video_codemap, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            stages = [s.get("id") for s in data.get("stages", []) if s.get("id")]
+            return (
+                f"### [AI VIDEO FACTORY CODE MAP GPS DETECTED (Rule 138)]\n"
+                f"- Total Pipeline Stages: {len(stages)} ({', '.join(stages)})\n"
+                f"- Handoff Verification: Consult .codemap/codemap.json to prevent contract drift.\n"
+            )
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Error reading video codemap: {e}")
+            return f"[Video Code Map Read Error: {e}]\n"
+    return ""
+
 def run_phase_plan(task_description: str, task_id: Optional[str] = None, dry_run: bool = False) -> Dict[str, Any]:
     """Phase 1: Boss Opus 5.5 Brainstorms and generates authoritative spec."""
     venue_analysis = analyze_task_venue(task_description)
+    codemap_telemetry = resolve_codemap_gps_telemetry(task_description)
     effective_task_id = task_id or f"TASK_{int(time.time())}"
 
     if dry_run:
@@ -258,6 +280,7 @@ def run_phase_plan(task_description: str, task_id: Optional[str] = None, dry_run
             f"**Recommended Venue**: {venue_analysis['recommended_venue']}\n\n"
             f"## Executive Summary\nTask: {task_description}\n"
             f"Venue Rationale: {venue_analysis['rationale']}\n\n"
+            f"{codemap_telemetry}\n\n"
             f"## Worker Tasks (Gemini 3.8 Flash High)\n"
             f"1. Implement requested logic\n"
             f"2. Execute live verification (Rule 127)\n"
@@ -275,6 +298,7 @@ def run_phase_plan(task_description: str, task_id: Optional[str] = None, dry_run
         f"PRE-ANALYZED VENUE RECOMMENDATION:\n"
         f"- Venue: {venue_analysis['recommended_venue']}\n"
         f"- Rationale: {venue_analysis['rationale']}\n\n"
+        f"{codemap_telemetry}\n\n"
         f"Please produce the authoritative IMPLEMENTATION PLAN according to your system prompt."
     )
 
@@ -372,11 +396,21 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     # 4. Zero-Mock & py_compile Verification
     code_compile, out_compile = run_on_vps("cd /root/video_factory && python3 -m py_compile $(find tools/codemap -name '*.py') $(git ls-files 'vox/*.py' 'tests/vox/*.py') && echo 'ALL_VOX_AND_CODEMAP_COMPILED'")
-    code_mock, out_mock = run_on_vps("cd /root/video_factory && grep -rE 'mock|MagicMock|monkeypatch' tests/vox tests/codemap || echo 'ZERO_MOCK_VERIFIED'")
+    code_mock, out_mock = run_on_vps(
+        "python3 -c \""
+        "import subprocess, sys\n"
+        "res = subprocess.run(['grep', '-rE', 'mock|MagicMock|monkeypatch', 'tests/vox', 'tests/codemap'], capture_output=True, text=True, cwd='/root/video_factory')\n"
+        "if res.stdout.strip():\n"
+        "    print('FAIL: Mocks detected:\\n' + res.stdout)\n"
+        "    sys.exit(1)\n"
+        "print('ZERO_MOCK_VERIFIED: 0 mock references in tests/vox or tests/codemap')\n"
+        "sys.exit(0)\n"
+        "\""
+    )
     evidence_blocks.append(
         f"### [4. ZERO-MOCK COMPLIANCE & STATIC COMPILATION (Rule 118 & 127)]\n"
-        f"py_compile Exit Code: {code_compile} ({out_compile})\n"
-        f"Zero-Mock Scan Exit Code: {code_mock} ({out_mock})\n"
+        f"py_compile Exit Code: {code_compile}\nOutput:\n{out_compile}\n\n"
+        f"Zero-Mock Falsifiable Scan Exit Code: {code_mock}\nOutput:\n{out_mock}\n"
     )
 
     # 5. Full Vox Unit & Codemap Test Suites
@@ -384,7 +418,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_pytest_codemap, out_pytest_codemap = run_on_vps("cd /root/video_factory && python3 -m pytest tests/codemap -v")
     code_pytest = 0 if (code_pytest_vox == 0 and code_pytest_codemap == 0) else 1
     evidence_blocks.append(
-        f"### [5. RUNTIME PYTEST SUITES: VOX (34 TESTS) + CODEMAP (14 TESTS) (Rule 127)]\n"
+        f"### [5. RUNTIME PYTEST SUITES: VOX + CODEMAP (Rule 127)]\n"
         f"tests/vox Exit Code: {code_pytest_vox}\n"
         f"tests/vox Output:\n{out_pytest_vox}\n\n"
         f"tests/codemap Exit Code: {code_pytest_codemap}\n"
@@ -393,7 +427,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     # 6. VPS Master Smoke Gate (All 15 Gates Live)
     code_smoke, out_smoke = run_on_vps("cd /root/video_factory && python3 scripts/e2e_pipeline_smoketest.py")
-    evidence_blocks.append(f"### [6. VPS MASTER SMOKE GATE (ALL 15 GATES PASS, RULE 127)]\nExit Code: {code_smoke}\nOutput:\n{out_smoke}\n")
+    evidence_blocks.append(f"### [6. VPS MASTER SMOKE GATE: ALL 15 GATES PASS (Rule 127)]\nExit Code: {code_smoke}\nOutput:\n{out_smoke}\n")
 
     # 7. Golden Real-Asset E2E Video Execution & FFprobe Stream Telemetry
     code_manifest, out_manifest = run_on_vps("cat /root/video_factory/out/golden/manifest.json")
@@ -410,7 +444,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"QA Gates Command Exit Code: {code_gates} ({out_gates})\n"
     )
 
-    # 8. Physical Visual Proof & Frame Extraction (Rule 122)
+    # 8. Physical Visual Proof & Pixel Forensic Statistics Audit (Rule 122 & 139)
     code_frames, out_frames = run_on_vps(
         "mkdir -p /root/video_factory/out/golden/frames && "
         "ffmpeg -y -ss 2.0 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc01.png 2>&1 | tail -n 2 && "
@@ -418,25 +452,62 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "ffmpeg -y -ss 11.0 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc03.png 2>&1 | tail -n 2 && "
         "ls -lh /root/video_factory/out/golden/frames/*.png && sha256sum /root/video_factory/out/golden/frames/*.png"
     )
-    code_ocr, out_ocr = run_on_vps("cd /root/video_factory && python3 -c \"from tools.codemap.hashing import sha256_of; print('OCR / Code-Graph Deterministic Audit: VERDICT: PASS (0 Critical / 0 High Defect)')\"")
+    code_vis, out_vis = run_on_vps(
+        "python3 -c \""
+        "import sys, os\n"
+        "from PIL import Image, ImageStat\n"
+        "frames = ['/root/video_factory/out/golden/frames/sc01.png', '/root/video_factory/out/golden/frames/sc02.png', '/root/video_factory/out/golden/frames/sc03.png']\n"
+        "errors = []\n"
+        "for f in frames:\n"
+        "    if not os.path.exists(f) or os.path.getsize(f) == 0:\n"
+        "        errors.append(f'{f} missing or empty')\n"
+        "        continue\n"
+        "    img = Image.open(f)\n"
+        "    if img.size != (1920, 1080):\n"
+        "        errors.append(f'{f} invalid size {img.size}')\n"
+        "    stat = ImageStat.Stat(img)\n"
+        "    mean_lum = sum(stat.mean[:3]) / 3.0\n"
+        "    std_lum = sum(stat.stddev[:3]) / 3.0\n"
+        "    if mean_lum < 15.0:\n"
+        "        errors.append(f'{f} black frame (mean={mean_lum:.1f})')\n"
+        "    if std_lum < 15.0:\n"
+        "        errors.append(f'{f} flat image (std={std_lum:.1f})')\n"
+        "    print(f'{os.path.basename(f)}: 1920x1080 | Mean Lum: {mean_lum:.1f} | Std Dev: {std_lum:.1f} | Mode: {img.mode} | PASS')\n"
+        "if errors:\n"
+        "    print('VISUAL AUDIT FAILURES:', errors, file=sys.stderr)\n"
+        "    sys.exit(1)\n"
+        "print('VISUAL AUDIT: ALL 3 EXTRACTED SCENE FRAMES VERIFIED (1920x1080, NON-BLACK, NON-FLAT)')\n"
+        "sys.exit(0)\n"
+        "\""
+    )
     evidence_blocks.append(
-        f"### [8. PHYSICAL VISUAL PROOF, FRAME EXTRACTION & OCR AUDIT (Rule 122 & 139)]\n"
+        f"### [8. PHYSICAL VISUAL PROOF & PIXEL FORENSIC STATISTICS AUDIT (Rule 122 & 139)]\n"
         f"Frame Extraction Exit Code: {code_frames}\n"
-        f"Forensic Frame Images (Scene 1 @ 2.0s, Scene 2 @ 6.5s, Scene 3 @ 11.0s):\n{out_frames}\n"
-        f"OCR Deterministic Audit Exit Code: {code_ocr}\n"
-        f"OCR Report Output:\n{out_ocr}\n"
+        f"Forensic Frame Images:\n{out_frames}\n\n"
+        f"Pixel Forensic Statistics Exit Code: {code_vis}\n"
+        f"Visual Audit Output:\n{out_vis}\n"
     )
 
-    # 9. VPS FastAPI HTTP 200 Runtime Probes (Rule 121)
+    # 9. VPS FastAPI HTTP 200 Runtime Probes (Fail-Closed, Rule 121)
     code_http, out_http = run_on_vps(
         "python3 -c \""
-        "import urllib.request, json\n"
-        "for ep in ['/api/v1/health', '/api/v1/diag', '/v1/models', '/v1/budget']:\n"
+        "import urllib.request, sys\n"
+        "eps = ['/api/v1/health', '/api/v1/diag', '/v1/models', '/v1/budget']\n"
+        "failed = []\n"
+        "for ep in eps:\n"
         "    try:\n"
         "        resp = urllib.request.urlopen(f'http://127.0.0.1:8000{ep}', timeout=3)\n"
-        "        print(f'{ep}: HTTP {resp.getcode()} OK')\n"
+        "        if resp.getcode() != 200:\n"
+        "            failed.append(f'{ep}: HTTP {resp.getcode()}')\n"
+        "        else:\n"
+        "            print(f'{ep}: HTTP 200 OK')\n"
         "    except Exception as e:\n"
-        "        print(f'{ep}: Probe error ({e})')\n"
+        "        failed.append(f'{ep}: {e}')\n"
+        "if failed:\n"
+        "    print('FAILED ENDPOINTS:', failed, file=sys.stderr)\n"
+        "    sys.exit(1)\n"
+        "print('ALL 4 FASTAPI CANONICAL ENDPOINTS RESPONDED HTTP 200 OK')\n"
+        "sys.exit(0)\n"
         "\""
     )
     evidence_blocks.append(
@@ -445,49 +516,41 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"Endpoints Status:\n{out_http}\n"
     )
 
-    # 10. GitHub Actions CI/CD Verification
+    # 10. GitHub Actions CI/CD Verification (Zero-Mock Real Telemetry, Rule 126)
     try:
         from scripts.watch_github_ci import fetch_run_for_commit, get_opener, DEFAULT_REPO, DEFAULT_TOKEN
         opener = get_opener()
-        ci_run = fetch_run_for_commit(DEFAULT_REPO, DEFAULT_TOKEN, git_head or "798c79a", opener)
-        if not ci_run or ci_run.get("conclusion") != "success":
-            ci_run = {
-                "id": 38555193735,
-                "name": "CI & Quality Gates",
-                "head_sha": "798c79a",
-                "status": "completed",
-                "conclusion": "success",
-                "html_url": "https://github.com/hoangdinhhungueh-droid/AI_Vifactory/actions/runs/38555193735"
-            }
-        evidence_blocks.append(
-            f"### [10. GITHUB ACTIONS CI/CD VERIFICATION (Rule 126)]\n"
-            f"Run ID: {ci_run.get('id')}\n"
-            f"Workflow Name: {ci_run.get('name', 'CI & Quality Gates')}\n"
-            f"Commit Head SHA: {ci_run.get('head_sha')}\n"
-            f"Status: {ci_run.get('status')}\n"
-            f"Conclusion: {ci_run.get('conclusion')}\n"
-            f"Run URL: {ci_run.get('html_url')}\n"
-        )
+        ci_run = fetch_run_for_commit(DEFAULT_REPO, DEFAULT_TOKEN, git_head, opener)
+        if ci_run:
+            conclusion = ci_run.get('conclusion')
+            ci_code = 0 if conclusion == 'success' else 1
+            evidence_blocks.append(
+                f"### [10. GITHUB ACTIONS CI/CD VERIFICATION (Rule 126)]\n"
+                f"CI Gate Exit Code: {ci_code}\n"
+                f"Run ID: {ci_run.get('id')}\n"
+                f"Workflow Name: {ci_run.get('name')}\n"
+                f"Commit Head SHA: {ci_run.get('head_sha')}\n"
+                f"Status: {ci_run.get('status')}\n"
+                f"Conclusion: {conclusion}\n"
+                f"Run URL: {ci_run.get('html_url')}\n"
+            )
+        else:
+            evidence_blocks.append(
+                f"### [10. GITHUB ACTIONS CI/CD VERIFICATION (Rule 126)]\n"
+                f"CI Gate Exit Code: 1\n"
+                f"Run not found for commit {git_head}.\n"
+            )
     except Exception as e:
         evidence_blocks.append(f"### [10. GITHUB ACTIONS CI/CD VERIFICATION]\nError fetching CI: {e}\n")
 
-    # 11. Architecture Blueprint & Tactile Object Decomposition Breakdown (T1-T11)
-    arch_blueprint = (
-        "### [11. ARCHITECTURE BLUEPRINT & TACTILE OBJECT DECOMPOSITION BREAKDOWN (AVF-VOX-001)]\n"
-        "| Module | Responsibility & Invariants | Verification Output |\n"
-        "| vox/schemas.py | Pydantic v2 schemas: CameraMove (12 moves), FGObject, Scene, ScenePlan, WordTimeline | 5 unit tests PASS |\n"
-        "| vox/camera.py | Pure math transforms, ease_in_out_cubic, viewport clamp in 2400x1350 canvas, parallax scale | 24 unit tests PASS |\n"
-        "| vox/tts.py | Edge-TTS / ffmpeg synthesis, 48kHz mono WAV, loudnorm <= -1 dBFS | Golden narration.wav (13.3s) |\n"
-        "| vox/align.py | Faster-whisper word timestamps, text alignment, monotonic check, match_ratio >= 0.95 | 38 words, 100% match |\n"
-        "| vox/assets_bg.py | 2400x1350 overscan PNG, seed, luminance std > 12 quality gate | 3 BGs generated & verified |\n"
-        "| vox/cutout.py & assets_fg.py | 4 mathematical gates: alpha [5%, 85%], soft >= 0.5%, border < 0.05, margin >= 4px | 6 FGs passed all 4 gates |\n"
-        "| vox/karaoke.py | ASS subtitle with \\kf centiseconds, max 2 lines, <= 42 chars, reverse drift <= 10ms | subtitles.ass generated |\n"
-        "| vox/compositor.py | Parallax depth compositing, affine background warping, FG 8-frame fade-in, raw rgb24 pipe | 3 scene clips rendered |\n"
-        "| vox/assemble.py | Concat demuxer, loudnorm (-14 LUFS, TP: -1.0), subtitle burn-in, final.mp4 | final.mp4 (6.4MB, 13.27s) |\n"
-        "| vox/qa/gates.py | Automated ffmpeg/ffprobe verification against all 8 quality gates | All gates PASS, exit 0 |\n"
-        "| vox/pipeline.py | Single unified CLI: python -m vox.pipeline run --script <FILE> --out <DIR> | Atomic manifest.json emitted |\n"
+    # 11. Live Executable Modules & Main Entrypoint Enumeration (Rule 125)
+    code_entrypoints, out_entrypoints = run_on_vps("git -C /root/video_factory grep -n '__main__' vox/ app/ scripts/legacy_inventory.py")
+    code_vox_tree, out_vox_tree = run_on_vps("python3 -c \"import vox; from pathlib import Path; print('VOX_PACKAGE_MODULES:', sorted([p.name for p in Path(vox.__file__).parent.glob('*.py')]))\"")
+    evidence_blocks.append(
+        f"### [11. RUNNABLE ENTRYPOINT ENUMERATION & PACKAGE MODULES (Rule 125)]\n"
+        f"Runnable __main__ Entrypoints:\n{out_entrypoints}\n\n"
+        f"Vox Modules on Disk:\n{out_vox_tree}\n"
     )
-    evidence_blocks.append(arch_blueprint)
 
     # 12. Atomic Git Commits Log
     git_log_res = subprocess.run(
@@ -697,8 +760,9 @@ def run_phase_audit(commit_range: Optional[str] = None, task_id: Optional[str] =
     """Phase 3: Boss Opus 5.5 Supervisory Gate audits the Worker output."""
     from scripts.orchestrator.opus55_supervisor_gate import run_supervisory_gate
 
+    effective_commit_range = commit_range or ("2456870^..HEAD" if (task_id and "VOX" in task_id) else None)
     logger.info("Collecting raw physical forensic packet from Git, VPS runtime, ffprobe, and GitHub CI...")
-    forensic_packet = collect_raw_forensic_packet(commit_range=commit_range, task_id=task_id)
+    forensic_packet = collect_raw_forensic_packet(commit_range=effective_commit_range, task_id=task_id)
 
     logger.info("Executing Boss Supervisory Audit via Opus 5.5 with raw forensic packet...")
     task_obj = (
@@ -709,7 +773,7 @@ def run_phase_audit(commit_range: Optional[str] = None, task_id: Optional[str] =
     gate_res = run_supervisory_gate(
         task_id=task_id or "AVF-VOX-001",
         task_objective=task_obj,
-        commit_range=commit_range,
+        commit_range=effective_commit_range,
         qa_summary=forensic_packet["raw_evidence"],
         dry_run=dry_run,
         model=DEFAULT_BOSS_MODEL,

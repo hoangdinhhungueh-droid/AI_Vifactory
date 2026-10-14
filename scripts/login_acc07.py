@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""scripts/login_acc07.py
+r"""scripts/login_acc07.py
 Công cụ mở trình duyệt Chrome với Profile tài khoản thứ 7 (acc_07)
 để người dùng đăng nhập tài khoản Google AI Pro một lần duy nhất.
 Lưu trữ đồng bộ cùng thư mục với các tài khoản khác tại C:\Users\hunghd2\.gemini\profiles\acc_07

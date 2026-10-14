@@ -35,10 +35,16 @@ jobs:
       
       - name: Lint with ruff
         run: ruff check app/ scripts/ --exit-zero
-      
+
+      - name: Static compilation check (Rule 127)
+        run: python -m compileall -q scripts tools vox app tests
+
+      - name: Rule 125 Ghost Code Scanner Gate
+        run: python tools/ghost_scan.py
+
       - name: Rule 128 & Rule 132 Zero Semantic Bias Linter Gate
         run: pytest -v tests/test_zero_semantic_bias.py
-      
+
       - name: Run hermetic tests (unit + contract)
         run: pytest -m "not integration" -v --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing tests/
       

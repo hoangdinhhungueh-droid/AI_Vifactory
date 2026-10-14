@@ -121,6 +121,40 @@ def run_pipeline(
     assemble_final_video(scene_clips, audio_wav, ass_file, final_video)
     print(f"      Final video generated: {final_video}")
 
+    # Calculate word-level anchors for each scene and reverse karaoke drift
+    from vox.karaoke import parse_words_from_ass
+    reconstructed_words = parse_words_from_ass(ass_file)
+    max_drift_ms = 0.0
+    for orig, rec in zip(timeline.words, reconstructed_words):
+        d_start = abs(orig.start - rec["start"]) * 1000.0
+        d_end = abs(orig.end - rec["end"]) * 1000.0
+        if max(d_start, d_end) > max_drift_ms:
+            max_drift_ms = max(d_start, d_end)
+
+    enriched_scenes = []
+    max_boundary_drift_frames = 0.0
+    for sc in plan.scenes:
+        sc_dict = sc.model_dump()
+        sc_words = [w for w in timeline.words if w.scene_idx == sc.idx]
+        if sc_words:
+            first_idx = timeline.words.index(sc_words[0])
+            last_idx = timeline.words.index(sc_words[-1])
+            drift_frames = round(abs(sc.end - sc_words[-1].end) * 30.0, 2)
+            if drift_frames > max_boundary_drift_frames:
+                max_boundary_drift_frames = drift_frames
+            sc_dict["word_anchor"] = {
+                "first_word_idx": first_idx,
+                "first_word": sc_words[0].text,
+                "last_word_idx": last_idx,
+                "last_word": sc_words[-1].text,
+                "whisper_start": sc_words[0].start,
+                "whisper_end": sc_words[-1].end,
+                "boundary_delta_frames": drift_frames,
+            }
+        else:
+            sc_dict["word_anchor"] = None
+        enriched_scenes.append(sc_dict)
+
     # 7. Quality Gates Audit
     print("\n[7/7] Executing quantitative forensic quality gates audit...")
     gate_results = verify_final_video_gates(final_video, timeline.audio_duration, plan)
@@ -148,9 +182,11 @@ def run_pipeline(
             "path": str(ass_file),
             "total_words": len(timeline.words),
             "match_ratio": timeline.match_ratio,
+            "max_reverse_drift_ms": round(max_drift_ms, 2),
+            "reverse_parity_status": "PASS" if max_drift_ms <= 20.0 else "FAIL",
         },
         "scene_count": len(plan.scenes),
-        "scenes": [s.model_dump() for s in plan.scenes],
+        "scenes": enriched_scenes,
         "assets": manifest_assets,
         "qa_gates": gate_results,
     }
