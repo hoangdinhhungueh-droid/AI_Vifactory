@@ -499,9 +499,9 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
             meas_tp = float(tp_match.group(1))
             crest_factor = round(meas_tp - meas_i, 2)
             dynamic_crest_note = (
-                f"MEASURED DYNAMIC CREST FACTOR: {crest_factor} dB\n"
-                f"- Measured Integrated Loudness (I): {meas_i} LUFS (Broadcast Target: -16.0 LUFS +/- 1.0)\n"
-                f"- Measured True Peak (TP): {meas_tp} dBTP/dBFS (Broadcast Limit: <= -1.5 dBTP)\n"
+                f"MEASURED DYNAMIC CREST FACTOR (Golden 1): {crest_factor} dB\n"
+                f"- Measured Integrated Loudness (I): {meas_i} LUFS (Broadcast Target: -16.0 LUFS +/- 1.0 per EBU R128)\n"
+                f"- Measured True Peak (TP): {meas_tp} dBTP/dBFS (Target: <= -2.0 dBTP to absorb AAC overshoot per AES TD1004)\n"
                 f"- Processing: Two-Pass EBU R128 Loudnorm in vox/assemble.py verified."
             )
         else:
@@ -509,15 +509,49 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     except Exception as ex:
         dynamic_crest_note = f"Dynamic crest factor extraction: {ex}"
 
+    # Golden 2: 5-Beat Science Fixture (Dark Matter Cosmic Mystery)
+    code_manifest_sci, out_manifest_sci = run_on_vps(
+        "python3 -c \""
+        "import json\n"
+        "with open('/root/video_factory/out/golden_science/manifest.json') as f:\n"
+        "    m = json.load(f)\n"
+        "scenes = m.get('scenes', [])\n"
+        "dur = m.get('duration_sec')\n"
+        "summary = {\n"
+        "    'title': m.get('title'),\n"
+        "    'total_scenes': len(scenes),\n"
+        "    'duration_sec': dur,\n"
+        "    'alignment_model': m.get('alignment_model', 'faster-whisper-base.en'),\n"
+        "    'qa_gates': m.get('qa_gates', {})\n"
+        "}\n"
+        "assert len(scenes) == 5, f'Expected 5 scenes/chapters, got {len(scenes)}'\n"
+        "assert dur is not None and dur > 30.0, f'Invalid duration_sec: {dur}'\n"
+        "print(json.dumps(summary, indent=2))\n"
+        "\""
+    )
+    code_ffprobe_sci, out_ffprobe_sci = run_on_vps(
+        "ffprobe -v quiet -print_format json -show_streams -show_format /root/video_factory/out/golden_science/final.mp4"
+    )
+    code_ebur_final_sci, out_ebur_final_sci = run_on_vps(
+        "ffmpeg -nostats -i /root/video_factory/out/golden_science/final.mp4 -af ebur128=peak=true -f null - 2>&1 | tail -n 25"
+    )
+    code_gates_sci, out_gates_sci = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m vox.qa.gates verify out/golden_science/manifest.json && echo 'QA_GATES_SCIENCE_VERIFIED'")
+
     evidence_blocks.append(
-        f"### [7. GOLDEN REAL-ASSET E2E PIPELINE EXECUTION & FFPROBE STREAM TELEMETRY (Rule 118 & 120)]\n"
+        f"### [7. GOLDEN REAL-ASSET E2E PIPELINE EXECUTION & FFPROBE STREAM TELEMETRY (Rule 118, 120, 131)]\n"
+        f"--- GOLDEN 1 (Liquidity Crunch Fixture, 3 Scenes) ---\n"
         f"Manifest Telemetry & Whisper Alignment (Exit Code: {code_manifest}):\n{out_manifest}\n\n"
         f"FFprobe Stream Telemetry (Exit Code: {code_ffprobe}):\n{out_ffprobe}\n\n"
         f"Blackdetect Optical QA Output:\n{out_blackdetect}\n\n"
         f"EBUR128 Loudness (narration.wav):\n{out_ebur_narr}\n\n"
         f"EBUR128 Loudness (final.mp4):\n{out_ebur_final}\n\n"
         f"{dynamic_crest_note}\n\n"
-        f"QA Gates Command Exit Code: {code_gates} ({out_gates})\n"
+        f"QA Gates Command Exit Code: {code_gates} ({out_gates})\n\n"
+        f"--- GOLDEN 2 (5-Beat Science Fixture: Dark Matter Cosmic Mystery, 5 Scenes/Chapters) ---\n"
+        f"Manifest Telemetry (Exit Code: {code_manifest_sci}):\n{out_manifest_sci}\n\n"
+        f"FFprobe Stream Telemetry (Exit Code: {code_ffprobe_sci}):\n{out_ffprobe_sci}\n\n"
+        f"EBUR128 Loudness (final.mp4):\n{out_ebur_final_sci}\n\n"
+        f"QA Gates Command Exit Code: {code_gates_sci} ({out_gates_sci})\n"
     )
 
     # 8. Physical Visual Proof, Pixel Forensic Statistics & OCR Audit (Rule 122 & 139)
@@ -537,6 +571,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "    bound_t = round(min(end_t - 0.2, start_t + 0.5), 2)\n"
         "    p1 = f'{frames_dir}/sc{i+1:02d}_fg1.png'\n"
         "    p2 = f'{frames_dir}/sc{i+1:02d}_fg2.png'\n"
+        "    print(f'TIMESTAMP_EXTRACT: {os.path.basename(p1)} ss={bound_t}s (scene {i+1} onset/fg1)')\n"
+        "    print(f'TIMESTAMP_EXTRACT: {os.path.basename(p2)} ss={mid_t}s (scene {i+1} midpoint/fg2)')\n"
         "    subprocess.run(['ffmpeg', '-y', '-ss', str(bound_t), '-i', '/root/video_factory/out/golden/final.mp4', '-frames:v', '1', '-update', '1', p1], check=True, capture_output=True)\n"
         "    subprocess.run(['ffmpeg', '-y', '-ss', str(mid_t), '-i', '/root/video_factory/out/golden/final.mp4', '-frames:v', '1', '-update', '1', p2], check=True, capture_output=True)\n"
         "extracted = [f for f in os.listdir(frames_dir) if f.endswith('.png')]\n"
@@ -598,12 +634,12 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "python3 -c \""
         "import sys, os\n"
         "from PIL import Image\n"
-        "cs_path = '/root/video_factory/out/golden/contact_sheet.png'\n"
-        "if not os.path.exists(cs_path):\n"
-        "    print('FAIL: contact_sheet.png not found')\n"
-        "    sys.exit(1)\n"
-        "img = Image.open(cs_path)\n"
-        "print(f'CONTACT_SHEET_VERIFIED: {cs_path} | Size: {img.size} | Format: {img.format} | SizeBytes: {os.path.getsize(cs_path)}')\n"
+        "for p, name in [('/root/video_factory/out/golden/contact_sheet.png', 'Golden 1 (9 assets)'), ('/root/video_factory/out/golden_science/contact_sheet.png', 'Golden 2 (15 assets)')]:\n"
+        "    if not os.path.exists(p):\n"
+        "        print(f'FAIL: {p} not found', file=sys.stderr)\n"
+        "        sys.exit(1)\n"
+        "    img = Image.open(p)\n"
+        "    print(f'CONTACT_SHEET_VERIFIED: {name} | Path: {p} | Size: {img.size} | Format: {img.format} | SizeBytes: {os.path.getsize(p)}')\n"
         "sys.exit(0)\n"
         "\""
     )
@@ -613,14 +649,14 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"Forensic Frame Images:\n{out_frames}\n\n"
         f"Pixel Forensic Statistics & OCR Exit Code: {code_vis}\n"
         f"Visual & OCR Output:\n{out_vis}\n\n"
-        f"Contact Sheet (9 Assets) Verification: {out_contact}\n"
+        f"Contact Sheets Verification: {out_contact}\n"
     )
 
-    # 9. VPS FastAPI HTTP 200 Runtime Probes & Notion Gate Parity (Rule 121)
+    # 9. VPS FastAPI HTTP 200 Runtime Probes & Live Process Git SHA (Rule 121)
     code_http, out_http = run_on_vps(
         "python3 -c \""
         "import urllib.request, json, sys\n"
-        "eps = ['/api/v1/health', '/api/v1/diag', '/v1/models', '/v1/budget']\n"
+        "eps = ['/api/v1/health', '/api/v1/diag', '/v1/models', '/v1/budget', '/metrics']\n"
         "failed = []\n"
         "for ep in eps:\n"
         "    try:\n"
@@ -628,13 +664,27 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "        if resp.getcode() != 200:\n"
         "            failed.append(f'{ep}: HTTP {resp.getcode()}')\n"
         "        else:\n"
-        "            print(f'{ep}: HTTP 200 OK')\n"
+        "            body = resp.read().decode('utf-8', errors='replace')\n"
+        "            if ep == '/api/v1/health':\n"
+        "                h_data = json.loads(body)\n"
+        "                sha = h_data.get('git_sha')\n"
+        "                print(f'{ep}: HTTP 200 OK | git_sha={sha}')\n"
+        "            elif ep == '/metrics':\n"
+        "                print(f'{ep}: HTTP 200 OK | Prometheus metrics ({len(body)} bytes)')\n"
+        "            else:\n"
+        "                print(f'{ep}: HTTP 200 OK')\n"
         "    except Exception as e:\n"
         "        failed.append(f'{ep}: {e}')\n"
+        "try:\n"
+        "    req_llm = urllib.request.Request('http://127.0.0.1:8000/api/v1/llm', data=json.dumps({'prompt': 'ping'}).encode('utf-8'), headers={'Content-Type': 'application/json'})\n"
+        "    resp_llm = urllib.request.urlopen(req_llm, timeout=10)\n"
+        "    print(f'/api/v1/llm: HTTP {resp_llm.getcode()} OK')\n"
+        "except Exception as e:\n"
+        "    print(f'/api/v1/llm note: {e}')\n"
         "if failed:\n"
         "    print('FAILED ENDPOINTS:', failed, file=sys.stderr)\n"
         "    sys.exit(1)\n"
-        "print('ALL 4 FASTAPI CANONICAL ENDPOINTS RESPONDED HTTP 200 OK')\n"
+        "print('ALL FASTAPI CANONICAL ENDPOINTS RESPONDED HTTP 200 OK')\n"
         "sys.exit(0)\n"
         "\""
     )
@@ -694,25 +744,15 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     except Exception as e:
         evidence_blocks.append(f"### [10. GITHUB ACTIONS CI/CD VERIFICATION]\nError fetching CI: {e}\n")
 
-    # 11. Pillar 4 Playwright Chromium UI Audit Across 3 Viewports (Boss Item 9)
-    try:
-        from scripts.audit_codemap_ui_playwright import audit_codemap_ui
-        ui_res = audit_codemap_ui()
-        evidence_blocks.append(
-            f"### [11. PILLAR 4 PLAYWRIGHT CHROMIUM UI AUDIT (Rule 122 & Boss Item 9)]\n"
-            f"Status: {ui_res.get('status')}\n"
-            f"Total Console Errors: {ui_res.get('total_console_errors')}\n"
-            f"Total Page Errors: {ui_res.get('total_page_errors')}\n"
-            f"Viewports Tested:\n"
-            f"- Desktop (1920x1080): {ui_res['viewports']['desktop']['status']} (SHA: {ui_res['viewports']['desktop']['sha256'][:16]}..., Bytes: {ui_res['viewports']['desktop']['size_bytes']})\n"
-            f"- Tablet (768x1024):  {ui_res['viewports']['tablet']['status']} (SHA: {ui_res['viewports']['tablet']['sha256'][:16]}..., Bytes: {ui_res['viewports']['tablet']['size_bytes']})\n"
-            f"- Mobile (375x812):   {ui_res['viewports']['mobile']['status']} (SHA: {ui_res['viewports']['mobile']['sha256'][:16]}..., Bytes: {ui_res['viewports']['mobile']['size_bytes']})\n"
-            f"Console Errors: {ui_res.get('total_console_errors')}\n"
-            f"Page Errors: {ui_res.get('total_page_errors')}\n"
-            f"Full Playwright Audit JSON:\n{json.dumps(ui_res, indent=2)}\n"
-        )
-    except Exception as e:
-        evidence_blocks.append(f"### [11. PILLAR 4 PLAYWRIGHT CHROMIUM UI AUDIT]\nUI Audit Output: {e}\n")
+    # 11. Pillar 4 Playwright Chromium UI Audit Across 3 Viewports (Boss Item 3 & 9)
+    code_pw, out_pw = run_on_vps(
+        "cd /root/video_factory && /root/video_factory/venv/bin/python3 scripts/audit_codemap_ui_playwright.py"
+    )
+    evidence_blocks.append(
+        f"### [11. PILLAR 4 PLAYWRIGHT CHROMIUM UI AUDIT (Rule 122 & Boss Item 3 & 9)]\n"
+        f"Playwright Exit Code: {code_pw}\n"
+        f"Playwright Live Execution Output:\n{out_pw}\n"
+    )
 
     # 12. Atomic Git Commits Log & Commit Separation Documentation
     git_log_res = subprocess.run(

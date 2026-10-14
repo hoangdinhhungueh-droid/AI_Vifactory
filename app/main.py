@@ -12,7 +12,8 @@
 #            API-* when msg doesn't mention Notion; bypass x-vf-autonomous:1);
 #            DUMP_SYS (env DUMP_SYS=1 → breakdown san(sys) by header)
 
-import os, json, re, time
+import os, json, re, time, subprocess
+from pathlib import Path
 from contextlib import asynccontextmanager
 import requests as _rq
 from datetime import datetime, timezone
