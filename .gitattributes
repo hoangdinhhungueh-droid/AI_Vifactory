@@ -1,14 +1,8 @@
-* text=auto eol=lf
+# Enforce LF line endings for all code and config files across Windows and Linux
+* text=auto
 *.py text eol=lf
-*.tsx text eol=lf
-*.ts text eol=lf
 *.json text eol=lf
-*.md text eol=lf
-*.yml text eol=lf
 *.yaml text eol=lf
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.mp3 binary
-*.mp4 binary
-*.webp binary
+*.yml text eol=lf
+*.md text eol=lf
+*.sh text eol=lf

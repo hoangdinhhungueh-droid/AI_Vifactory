@@ -69,6 +69,16 @@ class TestContracts(unittest.TestCase):
         self.assertEqual(len(props.scenes), 1)
         self.assertEqual(props.fps, 30)
 
+    def test_adversarial_timestamp_end_le_start_fails(self):
+        """Rule 118 & Rule 120: Adversarial test ensuring invalid timestamps end <= start strictly raise error."""
+        from app.services.director_planner_b3 import _sanitize_beat_spoken_for_llm
+        invalid_spoken = [
+            {"sentence_id": "s1", "text": "Testing error", "start": 5.0, "end": 4.0}
+        ]
+        with self.assertRaises(ValueError) as ctx:
+            _sanitize_beat_spoken_for_llm(invalid_spoken)
+        self.assertIn("violates Rule 118", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

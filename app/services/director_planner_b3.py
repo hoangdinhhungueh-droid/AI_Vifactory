@@ -180,7 +180,11 @@ def _sanitize_beat_spoken_for_llm(spoken_list: list) -> list:
         if duration_s is None:
             start = s.get("start", 0)
             end = s.get("end", 0)
-            duration_s = round(end - start, 2) if end > start else 5.0
+            if end <= start:
+                raise ValueError(f"Invalid sentence timestamp: end ({end}) <= start ({start}) violates Rule 118 & Rule 120")
+            duration_s = round(end - start, 2)
+        elif duration_s <= 0:
+            raise ValueError(f"Invalid duration_sec ({duration_s}) <= 0 violates Rule 118")
         lean.append({
             "sentence_id": s.get("sentence_id") or s.get("id") or f"sent_{len(lean)+1:03d}",
             "text": s.get("text") or s.get("sentence") or "",
