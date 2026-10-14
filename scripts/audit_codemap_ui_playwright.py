@@ -16,7 +16,6 @@ import json
 import os
 import sys
 from pathlib import Path
-from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 HTML_PATH = ROOT / ".codemap" / "pipeline.html"
