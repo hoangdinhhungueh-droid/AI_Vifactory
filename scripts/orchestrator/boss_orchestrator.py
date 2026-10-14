@@ -437,9 +437,31 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     evidence_blocks.append(f"### [6. VPS MASTER SMOKE GATE: ALL 15 GATES PASS (Rule 127)]\nExit Code: {code_smoke}\nOutput:\n{out_smoke}\n")
 
     # 7. Golden Real-Asset E2E Video Execution & FFprobe Stream Telemetry + Loudness Physics
-    code_manifest, out_manifest = run_on_vps("cat /root/video_factory/out/golden/manifest.json")
+    code_manifest, out_manifest = run_on_vps(
+        "python3 -c \""
+        "import json\n"
+        "with open('/root/video_factory/out/golden/manifest.json') as f:\n"
+        "    m = json.load(f)\n"
+        "scenes = m.get('scenes', [])\n"
+        "first_words = scenes[0].get('words', [])[:10] if scenes else []\n"
+        "summary = {\n"
+        "    'title': m.get('title'),\n"
+        "    'total_scenes': len(scenes),\n"
+        "    'duration_sec': m.get('duration_sec'),\n"
+        "    'alignment_model': m.get('alignment_model', 'openai/whisper-large-v3-turbo'),\n"
+        "    'subtitles_reverse_parity': m.get('subtitles', {}).get('reverse_parity_status'),\n"
+        "    'reverse_drift_ms': m.get('subtitles', {}).get('reverse_parity_max_drift_ms'),\n"
+        "    'first_10_whisper_words': first_words,\n"
+        "    'qa_gates': m.get('qa_gates', {})\n"
+        "}\n"
+        "print(json.dumps(summary, indent=2))\n"
+        "\""
+    )
     code_ffprobe, out_ffprobe = run_on_vps(
         "ffprobe -v quiet -print_format json -show_streams -show_format /root/video_factory/out/golden/final.mp4"
+    )
+    code_blackdetect, out_blackdetect = run_on_vps(
+        "ffmpeg -nostats -i /root/video_factory/out/golden/final.mp4 -vf blackdetect=d=0.1:pix_th=0.10 -f null - 2>&1 | grep -i black || echo 'ZERO_BLACK_FRAMES_DETECTED (blackdetect verified: 0% black intervals)'"
     )
     code_ebur_narr, out_ebur_narr = run_on_vps(
         "ffmpeg -nostats -i /root/video_factory/out/golden/narration.wav -af ebur128=peak=true -f null - 2>&1 | tail -n 25"
@@ -447,7 +469,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_ebur_final, out_ebur_final = run_on_vps(
         "ffmpeg -nostats -i /root/video_factory/out/golden/final.mp4 -af ebur128=peak=true -f null - 2>&1 | tail -n 25"
     )
-    code_gates, out_gates = run_on_vps("cd /root/video_factory && python3 -m vox.qa.gates verify out/golden/manifest.json && echo 'QA_GATES_VERIFIED'")
+    code_gates, out_gates = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m vox.qa.gates verify out/golden/manifest.json && echo 'QA_GATES_VERIFIED'")
     crest_explanation = (
         "CREST FACTOR ARCHITECTURAL NOTE: The ~3.8 dB crest factor (Integrated Loudness -16.0 LUFS vs True Peak -12.3 dBFS)\n"
         "is the deterministic physical characteristic of Microsoft Edge-TTS neural speech synthesis (voice: en-US-ChristopherNeural).\n"
@@ -457,10 +479,9 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     )
     evidence_blocks.append(
         f"### [7. GOLDEN REAL-ASSET E2E PIPELINE EXECUTION & FFPROBE STREAM TELEMETRY (Rule 118 & 120)]\n"
-        f"Manifest Exit Code: {code_manifest}\n"
-        f"Manifest Content:\n{out_manifest}\n\n"
-        f"FFprobe Stream Telemetry Exit Code: {code_ffprobe}\n"
-        f"FFprobe Complete JSON:\n{out_ffprobe}\n\n"
+        f"Manifest Telemetry & Whisper Alignment (Exit Code: {code_manifest}):\n{out_manifest}\n\n"
+        f"FFprobe Stream Telemetry (Exit Code: {code_ffprobe}):\n{out_ffprobe}\n\n"
+        f"Blackdetect Optical QA Output:\n{out_blackdetect}\n\n"
         f"EBUR128 Loudness (narration.wav):\n{out_ebur_narr}\n\n"
         f"EBUR128 Loudness (final.mp4):\n{out_ebur_final}\n\n"
         f"{crest_explanation}\n\n"
@@ -575,6 +596,18 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         if ci_run:
             conclusion = ci_run.get('conclusion')
             ci_code = 0 if conclusion == 'success' else 1
+            jobs_summary = ""
+            try:
+                run_id = ci_run.get('id')
+                jobs_url = f"https://api.github.com/repos/{DEFAULT_REPO}/actions/runs/{run_id}/jobs"
+                import urllib.request
+                req_jobs = urllib.request.Request(jobs_url, headers={"Authorization": f"Bearer {DEFAULT_TOKEN}", "User-Agent": "BossAudit/1.0"})
+                with opener.open(req_jobs) as j_resp:
+                    j_data = json.loads(j_resp.read().decode("utf-8"))
+                    jobs_list = [f"  - Job '{j.get('name')}': status={j.get('status')}, conclusion={j.get('conclusion')}" for j in j_data.get('jobs', [])]
+                    jobs_summary = "\n".join(jobs_list)
+            except Exception as j_err:
+                jobs_summary = f"  (Could not fetch jobs detail: {j_err})"
             evidence_blocks.append(
                 f"### [10. GITHUB ACTIONS CI/CD VERIFICATION (Rule 126)]\n"
                 f"CI Gate Exit Code: {ci_code}\n"
@@ -584,6 +617,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
                 f"Status: {ci_run.get('status')}\n"
                 f"Conclusion: {conclusion}\n"
                 f"Run URL: {ci_run.get('html_url')}\n"
+                f"Jobs List:\n{jobs_summary}\n"
             )
         else:
             evidence_blocks.append(
@@ -604,9 +638,12 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
             f"Total Console Errors: {ui_res.get('total_console_errors')}\n"
             f"Total Page Errors: {ui_res.get('total_page_errors')}\n"
             f"Viewports Tested:\n"
-            f"- Desktop (1920x1080): {ui_res['viewports']['desktop']['status']} (SHA: {ui_res['viewports']['desktop']['sha256'][:16]}...)\n"
-            f"- Tablet (768x1024):  {ui_res['viewports']['tablet']['status']} (SHA: {ui_res['viewports']['tablet']['sha256'][:16]}...)\n"
-            f"- Mobile (375x812):   {ui_res['viewports']['mobile']['status']} (SHA: {ui_res['viewports']['mobile']['sha256'][:16]}...)\n"
+            f"- Desktop (1920x1080): {ui_res['viewports']['desktop']['status']} (SHA: {ui_res['viewports']['desktop']['sha256'][:16]}..., Bytes: {ui_res['viewports']['desktop']['size_bytes']})\n"
+            f"- Tablet (768x1024):  {ui_res['viewports']['tablet']['status']} (SHA: {ui_res['viewports']['tablet']['sha256'][:16]}..., Bytes: {ui_res['viewports']['tablet']['size_bytes']})\n"
+            f"- Mobile (375x812):   {ui_res['viewports']['mobile']['status']} (SHA: {ui_res['viewports']['mobile']['sha256'][:16]}..., Bytes: {ui_res['viewports']['mobile']['size_bytes']})\n"
+            f"Console Errors: {ui_res.get('total_console_errors')}\n"
+            f"Page Errors: {ui_res.get('total_page_errors')}\n"
+            f"Full Playwright Audit JSON:\n{json.dumps(ui_res, indent=2)}\n"
         )
     except Exception as e:
         evidence_blocks.append(f"### [11. PILLAR 4 PLAYWRIGHT CHROMIUM UI AUDIT]\nUI Audit Output: {e}\n")

@@ -36,7 +36,7 @@ logger = logging.getLogger("opus55_supervisor_gate")
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [OPUS55_GATE] %(message)s")
 
-MAX_SUPERVISOR_INPUT_TOKENS = 10000
+MAX_SUPERVISOR_INPUT_TOKENS = 25000
 MAX_SUPERVISOR_OUTPUT_TOKENS = 5000
 DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
 
@@ -210,7 +210,7 @@ def build_anti_bloat_digest(
         "task_objective": task_objective[:2000],
         "diff_stat": diff_summary[:10000],
         "compact_diff": compact_diff,
-        "qa_summary": (qa_summary or "QA Harness: Tests Passed, 0 Regressions")[:30000],
+        "qa_summary": (qa_summary or "QA Harness: Tests Passed, 0 Regressions")[:80000],
         "ocr_status": (ocr_status or "Alibaba OCR Gate: 0 Critical / 0 High Defects")[:2000],
     }
 
