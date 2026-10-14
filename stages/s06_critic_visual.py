@@ -13,10 +13,23 @@ from typing import Dict, Any
 from core.contracts.stages import StageID, StageArtifact, Provenance, CouncilDecision, CriticVerdict
 from core.config import RunContext
 from core.gates import require_input, emit_artifact
+from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S6_CRITIC_VISUAL
 
 
+@pipeline_stage(
+    id="s06_critic_visual",
+    order=6,
+    name="Critic Visual & Composition Audit",
+    input_model="StageArtifact",
+    output_model="StageArtifact",
+    triggers=["stage:s05_director_plan"],
+    upstream=["s05_director_plan"],
+    downstream=["s07_image_gen"],
+    artifacts=["runs/{run_id}/s06_critic_visual/artifact.json"],
+    verify_cmds=["python -m orchestrator.run_pipeline --only s06_critic_visual --profile e2e_min"]
+)
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S6: Visual Critic Council Audit."""
     start_ts = time.time()

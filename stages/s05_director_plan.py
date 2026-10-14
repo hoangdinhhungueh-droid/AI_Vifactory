@@ -16,6 +16,8 @@ from core.contracts.stages import StageID, StageArtifact, Provenance, Scene, Sho
 from core.config import RunContext
 from core.gates import require_input, emit_artifact
 
+from tools.codemap.runtime import pipeline_stage
+
 STAGE: StageID = StageID.S5_DIRECTOR_PLAN
 
 
@@ -37,6 +39,18 @@ def build_universal_video_prompt(scene: Scene) -> str:
     return " ".join(parts)
 
 
+@pipeline_stage(
+    id="s05_director_plan",
+    order=5,
+    name="Dynamic Director Plan & Cutouts",
+    input_model="StageArtifact",
+    output_model="StageArtifact",
+    triggers=["stage:s04_critic_script"],
+    upstream=["s04_critic_script"],
+    downstream=["s06_critic_visual"],
+    artifacts=["runs/{run_id}/s05_director_plan/artifact.json"],
+    verify_cmds=["python -m orchestrator.run_pipeline --only s05_director_plan --profile e2e_min"]
+)
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S5: Director Plan & Prompts Forge."""
     start_ts = time.time()

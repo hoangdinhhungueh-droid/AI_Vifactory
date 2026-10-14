@@ -18,10 +18,23 @@ from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.contracts.render_props import KaraokeWord
 from core.config import RunContext
 from core.gates import require_input, emit_artifact, compute_file_sha256
+from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S9_VOICE_TTS
 
 
+@pipeline_stage(
+    id="s09_voice_tts",
+    order=9,
+    name="Edge-TTS Hollywood Voiceover & Karaoke",
+    input_model="StageArtifact",
+    output_model="StageArtifact",
+    triggers=["stage:s03_script"],
+    upstream=["s03_script"],
+    downstream=["s10_render"],
+    artifacts=["runs/{run_id}/audio/voice_narration.mp3", "runs/{run_id}/audio/word_timestamps.json"],
+    verify_cmds=["python -m orchestrator.run_pipeline --only s09_voice_tts --profile e2e_min"]
+)
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S9: Voice Narration TTS & Whisper Timestamps."""
     start_ts = time.time()

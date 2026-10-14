@@ -17,10 +17,23 @@ from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.contracts.render_props import RemotionRenderProps, SceneRenderProp, KaraokeWord
 from core.config import RunContext
 from core.gates import require_input, emit_artifact, compute_file_sha256
+from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S10_RENDER
 
 
+@pipeline_stage(
+    id="s10_render",
+    order=10,
+    name="Remotion Master Video Render",
+    input_model="StageArtifact",
+    output_model="StageArtifact",
+    triggers=["stage:s08_video_gen", "stage:s09_voice_tts"],
+    upstream=["s08_video_gen", "s09_voice_tts"],
+    downstream=["s11_qc"],
+    artifacts=["runs/{run_id}/10_render/final.mp4"],
+    verify_cmds=["python -m orchestrator.run_pipeline --only s10_render --profile e2e_min"]
+)
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S10: Remotion Master Video Render."""
     start_ts = time.time()

@@ -15,10 +15,23 @@ from typing import Dict, Any
 from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.config import RunContext
 from core.gates import require_input, emit_artifact
+from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S11_QC
 
 
+@pipeline_stage(
+    id="s11_qc",
+    order=11,
+    name="Master QC Final Verification",
+    input_model="StageArtifact",
+    output_model="StageArtifact",
+    triggers=["stage:s10_render"],
+    upstream=["s10_render"],
+    downstream=[],
+    artifacts=["runs/{run_id}/s11_qc/artifact.json"],
+    verify_cmds=["python -m orchestrator.run_pipeline --only s11_qc --profile e2e_min"]
+)
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S11: Master Video QC Gate."""
     start_ts = time.time()

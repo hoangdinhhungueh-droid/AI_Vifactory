@@ -86,18 +86,10 @@ def remove_background(
     if src_img.mode != "RGBA":
         src_img = src_img.convert("RGBA")
 
-    # Attempt rembg
-    try:
-        from rembg import remove
-        out = remove(src_img)
-        return out
-    except Exception:
-        pass
-
     w, h = src_img.size
     alpha_src = np.array(src_img.getchannel("A"), dtype=np.uint8)
 
-    # If image already has explicit transparency (e.g. drawn subject on transparent canvas)
+    # Fast-path: If image already has explicit transparency (e.g. drawn subject on transparent canvas)
     if np.any(alpha_src == 0) and np.any(alpha_src > 0):
         from PIL import ImageFilter
         # Create smooth anti-aliased edge transition (Gate 2: soft_ratio >= 0.5%)
@@ -113,6 +105,14 @@ def remove_background(
         rgb = np.array(src_img)[:, :, :3]
         rgba = np.dstack([rgb, alpha_arr])
         return Image.fromarray(rgba, mode="RGBA")
+
+    # Attempt neural rembg for opaque inputs
+    try:
+        from rembg import remove
+        out = remove(src_img)
+        return out
+    except Exception:
+        pass
 
     # High quality aesthetic Chroma / Alpha falloff keyer for opaque inputs
     arr = np.array(src_img, dtype=np.float32)

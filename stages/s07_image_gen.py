@@ -15,10 +15,23 @@ from typing import Dict, Any, List
 from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.config import RunContext
 from core.gates import require_input, emit_artifact, compute_file_sha256
+from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S7_IMAGE_GEN
 
 
+@pipeline_stage(
+    id="s07_image_gen",
+    order=7,
+    name="Gemini Seed Image Generation",
+    input_model="StageArtifact",
+    output_model="StageArtifact",
+    triggers=["stage:s06_critic_visual"],
+    upstream=["s06_critic_visual"],
+    downstream=["s08_video_gen"],
+    artifacts=["runs/{run_id}/composite_seeds/*.png"],
+    verify_cmds=["python -m orchestrator.run_pipeline --only s07_image_gen --profile e2e_min"]
+)
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S7: Composite Image Generation."""
     start_ts = time.time()
