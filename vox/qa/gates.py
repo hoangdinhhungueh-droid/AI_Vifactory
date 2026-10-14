@@ -262,9 +262,17 @@ def main() -> int:
         else:
             final_video_path = raw_path
 
-        expected_dur = float(manifest_data.get("final_video", {}).get("telemetry", {}).get("format", {}).get("duration", 0.0))
+        expected_dur = float(manifest_data.get("audio", {}).get("duration_sec", 0.0))
         if expected_dur == 0.0:
             expected_dur = float(manifest_data.get("timeline", {}).get("audio_duration", 0.0))
+        if expected_dur == 0.0:
+            audio_p = Path(manifest_data.get("audio", {}).get("path", ""))
+            if not audio_p.exists():
+                audio_p = manifest_path.parent / audio_p.name
+            if audio_p.exists():
+                import wave
+                with wave.open(str(audio_p), "rb") as wf:
+                    expected_dur = wf.getnframes() / float(wf.getframerate())
 
         report = verify_final_video_gates(final_video_path, expected_dur)
         print(f"[QA GATE AUDIT: PASS] {json.dumps(report, indent=2)}")
