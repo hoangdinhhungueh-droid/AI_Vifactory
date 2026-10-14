@@ -53,30 +53,11 @@ def _visual_terms(b):
 
 
 async def _render(episode_id: str, brain: dict, story_text: str):
-    from app.pipeline.run_episode import run_pipeline
-    lang = brain.get("lang_code") or brain.get("language")
-    market = str(brain.get("market") or episode_id.split("_")[0]).lower()
-    market_to_lang = {"jp": "ja", "ja": "ja", "ko": "ko", "kr": "ko", "zh": "zh", "cn": "zh", "en": "en"}
-    if not lang or (lang == "en" and market in market_to_lang and market_to_lang[market] != "en"):
-        lang = market_to_lang.get(market, "en")
-    if isinstance(lang, list):
-        lang = lang[0] if lang else "en"
-    return await run_pipeline(
-        episode_id=episode_id,
-        skip_story_gate=True,  # Bypass gate for resume - already human-approved at B3.5
-        niche=brain.get("niche", "history documentary"),
-        lang_code=lang,
-        tts_backend="auto",
-        story_text=story_text,
-        visual_terms=[],  # Rule 116 Go-Live: stock visuals bypassed
-        bgm_mood=brain.get("bgm_mood", "epic"),
-        hook_3s=brain.get("hook_3s"),
-        scenes=brain.get("scenes"),
-        character_pack=brain.get("character_pack"),
-        art_style=brain.get("art_style"),
-        trend_keywords=brain.get("trend_keywords"),
-        brain=brain,
-    )
+    from orchestrator.run_pipeline import execute_pipeline
+    exit_code = execute_pipeline(profile="prod", run_id=episode_id, from_stage="s09")
+    if exit_code != 0:
+        raise RuntimeError(f"Pipeline failed with exit code {exit_code}")
+    return {"status": "ok", "episode_id": episode_id}
 
 
 def main():

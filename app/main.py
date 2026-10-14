@@ -398,11 +398,7 @@ def oai_models():
 from app.routes.mpt_g5 import router as mpt_g5_router
 app.include_router(mpt_g5_router)
 
-# -- S2 run-episode route (full pipeline) --------------------------------
-from app.routes.run_episode_route import router as run_episode_router
-from app.routes.produce_episode_route import router as produce_episode_router
-app.include_router(run_episode_router)
-app.include_router(produce_episode_router)
+# -- Legacy run-episode / produce-episode routes retired (AVF-VOX-001) --
 
 # Trend/keyword discovery engine (free crawl + SerpApi-confirm top-N), 18/06
 # REMOVED 27/07/2026: trend_discovery.py (v3) is superseded by discover-v5

@@ -78,7 +78,7 @@ BLOCK_FILES = {
     ],
     7.0: [
         "app/services/beat_bgm_engine.py",
-        "app/pipeline/stages/s7_render.py",
+        "vox/assemble.py",
     ],
     9.0: [
         "app/services/video_audit_runner.py",
@@ -756,16 +756,17 @@ def test_block6_remotion_props_contract() -> bool:
 
 
 def test_block7_bgm_mux_contract() -> bool:
-    logger.info("--- [TEST BLOCK 7.0: Beat BGM Engine & S7 Render Mix] ---")
+    logger.info("--- [TEST BLOCK 7.0: Beat BGM Engine & Assemble Contract] ---")
     try:
         from app.services.beat_bgm_engine import generate_beat_adaptive_bgm
 
         assert callable(generate_beat_adaptive_bgm), "generate_beat_adaptive_bgm must be callable"
 
-        s7_path = ROOT_DIR / "app" / "pipeline" / "stages" / "s7_render.py"
-        s7_code = s7_path.read_text(encoding="utf-8")
-        assert "beat_bgm_engine" in s7_code, "s7_render.py must import/reference beat_bgm_engine!"
-        logger.info("  ✅ Block 7.0 Beat BGM Engine Contract OK: s7_render wired to beat_bgm_engine.")
+        asm_path = ROOT_DIR / "vox" / "assemble.py"
+        assert asm_path.exists(), "vox/assemble.py must exist!"
+        asm_code = asm_path.read_text(encoding="utf-8")
+        assert "loudnorm" in asm_code, "vox/assemble.py must implement audio loudnorm"
+        logger.info("  ✅ Block 7.0 Assemble Contract OK: vox/assemble wired to audio/video mux.")
         return True
     except Exception as e:
         logger.error(f"❌ BLOCK 7.0 CONTRACT TEST FAILED: {e}")

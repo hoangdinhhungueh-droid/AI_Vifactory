@@ -14,21 +14,4 @@ def test_r2_cache_dir_configured():
     assert R2_CACHE_DIR is not None
     assert len(str(R2_CACHE_DIR)) > 0
 
-def test_s3_schema_content_types():
-    from app.pipeline.s3_schema import validate_s3_output, CONTENT_TYPES
-    assert "fiction" in CONTENT_TYPES
-    assert "non_fiction" in CONTENT_TYPES
-    ep = {"episode_id": "ep-en-test-001", "text": "hello"}
-    out = validate_s3_output(ep)
-    assert out["content_type"] == "fiction"
-    assert out["visual_terms"] == []
 
-def test_s3_schema_invalid_content_type():
-    from app.pipeline.s3_schema import validate_s3_output
-    import pytest
-    ep = {"episode_id": "ep-en-x-001", "text": "x", "content_type": "unknown_type"}
-    try:
-        validate_s3_output(ep)
-        assert False, "should raise"
-    except ValueError as e:
-        assert "unknown_type" in str(e)

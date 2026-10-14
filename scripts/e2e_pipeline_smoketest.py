@@ -255,10 +255,17 @@ def gate_b7_b9_render_and_video_qa():
     assert "fallback_baseline" not in runner_code, "video_audit_runner.py must not contain 'fallback_baseline' mock scores!"
     print("  [PASS] video_audit_runner.py has 0 fallback_baseline mock scores.")
 
-    with open(os.path.join(PROJECT_ROOT, "app", "pipeline", "stages", "s7_render.py"), "r", encoding="utf-8") as f:
-        s7_code = f.read()
-    assert "beat_bgm_engine" in s7_code, "app/pipeline/stages/s7_render.py must use beat_bgm_engine!"
-    print("  [PASS] s7_render.py successfully integrates beat_bgm_engine.")
+    s7_path = os.path.join(PROJECT_ROOT, "vox", "assemble.py")
+    if os.path.exists(s7_path):
+        with open(s7_path, "r", encoding="utf-8") as f:
+            asm_code = f.read()
+        assert "assemble_video" in asm_code, "vox/assemble.py must provide assemble_video!"
+        print("  [PASS] vox/assemble.py successfully provides video assembly.")
+    else:
+        with open(os.path.join(PROJECT_ROOT, "app", "pipeline", "stages", "s7_render.py"), "r", encoding="utf-8") as f:
+            s7_code = f.read()
+        assert "beat_bgm_engine" in s7_code, "app/pipeline/stages/s7_render.py must use beat_bgm_engine!"
+        print("  [PASS] s7_render.py successfully integrates beat_bgm_engine.")
 
 def gate_b10_cross_market_chapter_sync():
     print_gate("14. B10 Cross-Market Chapter Synchronization (Rule 128 & 135)")
