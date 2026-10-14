@@ -61,7 +61,8 @@ def execute_pipeline(
     from_stage: Optional[str] = None,
     only_stage: Optional[str] = None,
     dry_run: bool = False,
-    force: bool = False
+    force: bool = False,
+    topic: Optional[str] = None,
 ) -> int:
     """Main execution engine loop over all 11 stages."""
     print("=" * 75)
@@ -73,7 +74,8 @@ def execute_pipeline(
     if run_id:
         paths = resolve_run_paths(run_id, repo_root=ROOT_DIR)
     else:
-        paths = new_run_paths(prefix="RUN", repo_root=ROOT_DIR)
+        prefix = f"RUN_{topic.lower().replace(' ', '_')[:30]}" if topic else "RUN"
+        paths = new_run_paths(prefix=prefix, repo_root=ROOT_DIR)
 
     effective_run_id = paths.run_id
     print(f"📌 Run ID:             {effective_run_id}")
@@ -175,6 +177,7 @@ def main():
     parser.add_argument("--only", dest="only_stage", default=None, help="Execute only the specified stage")
     parser.add_argument("--dry-run", action="store_true", help="Fast execution simulation without external API calls")
     parser.add_argument("--force", action="store_true", help="Force re-generation of all artifacts ignoring cache")
+    parser.add_argument("--topic", default=None, help="Optional topic seed string")
 
     args = parser.parse_args()
 
@@ -184,7 +187,8 @@ def main():
         from_stage=args.from_stage,
         only_stage=args.only_stage,
         dry_run=args.dry_run,
-        force=args.force
+        force=args.force,
+        topic=args.topic,
     )
     sys.exit(exit_code)
 
