@@ -47,8 +47,11 @@ def test_vox_single_pipeline_golden_e2e(tmp_path):
     import subprocess
     import json
     import sys
+    import os
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    cmd_env = dict(os.environ, PYTHONPATH=str(repo_root))
     cmd_cli = [sys.executable, "-m", "vox.qa.gates", "verify", str(manifest_file)]
-    res = subprocess.run(cmd_cli, capture_output=True, text=True, check=True)
+    res = subprocess.run(cmd_cli, capture_output=True, text=True, check=True, cwd=str(repo_root), env=cmd_env)
     assert res.returncode == 0
     assert "[QA GATE AUDIT: PASS]" in res.stdout
     cli_json_str = res.stdout.split("[QA GATE AUDIT: PASS]", 1)[1].strip()
