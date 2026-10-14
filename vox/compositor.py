@@ -118,12 +118,14 @@ def render_scene_clip(
                 dest_pt = M_fg @ np.array([src_x, src_y, 1.0])
                 dx, dy = dest_pt[0], dest_pt[1]
 
-                # Adjust alpha channel by fade progress
-                fg_cur = fg_img.copy()
+                # Adjust alpha channel only during the 8-frame fade-in
                 if fade_progress < 1.0:
-                    r, g, b, a = fg_cur.split()
-                    a = a.point(lambda p: int(p * fade_progress))
-                    fg_cur = Image.merge("RGBA", (r, g, b, a))
+                    fg_cur = fg_img.copy()
+                    r_ch, g_ch, b_ch, a_ch = fg_cur.split()
+                    a_ch = a_ch.point(lambda p: int(p * fade_progress))
+                    fg_cur = Image.merge("RGBA", (r_ch, g_ch, b_ch, a_ch))
+                else:
+                    fg_cur = fg_img
 
                 # Paste centered at (dx, dy)
                 top_left_x = int(dx - (fg_cur.width / 2.0))
@@ -142,5 +144,8 @@ def render_scene_clip(
             proc.stdin.close()
         proc.kill()
         raise RuntimeError(f"Compositor rendering failed for scene {scene.idx}: {e}")
+    finally:
+        import gc
+        gc.collect()
 
     return out_clip

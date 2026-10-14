@@ -13,10 +13,23 @@ from typing import Dict, Any, List
 from core.contracts.stages import StageID, StageArtifact, Provenance, CouncilDecision, CriticVerdict
 from core.config import RunContext
 from core.gates import require_input, emit_artifact
+from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S4_CRITIC_SCRIPT
 
 
+@pipeline_stage(
+    id="s04_critic_script",
+    order=4,
+    name="Critic Council Script Audit",
+    input_model="StageArtifact",
+    output_model="StageArtifact",
+    triggers=["stage:s03_script"],
+    upstream=["s03_script"],
+    downstream=["s05_director_plan"],
+    artifacts=["runs/{run_id}/s04_critic_script/artifact.json"],
+    verify_cmds=["python -m orchestrator.run_pipeline --only s04_critic_script --profile e2e_min"]
+)
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S4: Script Critic Council Audit."""
     start_ts = time.time()

@@ -13,10 +13,23 @@ from typing import Dict, Any
 from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.config import RunContext
 from core.gates import require_input, emit_artifact
+from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S1_IDEATION
 
 
+@pipeline_stage(
+    id="s01_ideation",
+    order=1,
+    name="Trend Discovery & Ideation",
+    input_model=None,
+    output_model="StageArtifact",
+    triggers=["cli:run_pipeline"],
+    upstream=[],
+    downstream=["s02_research"],
+    artifacts=["runs/{run_id}/s01_ideation/artifact.json"],
+    verify_cmds=["python -m orchestrator.run_pipeline --only s01_ideation --profile e2e_min"]
+)
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S1: Trend Discovery."""
     start_ts = time.time()

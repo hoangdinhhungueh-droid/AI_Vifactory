@@ -15,10 +15,23 @@ from typing import Dict, Any, List
 from core.contracts.stages import StageID, StageArtifact, Provenance, Scene
 from core.config import RunContext
 from core.gates import require_input, emit_artifact
+from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S3_SCRIPT
 
 
+@pipeline_stage(
+    id="s03_script",
+    order=3,
+    name="5-Beat Docudrama Script",
+    input_model="StageArtifact",
+    output_model="StageArtifact",
+    triggers=["stage:s02_research"],
+    upstream=["s02_research"],
+    downstream=["s04_critic_script", "s09_voice_tts"],
+    artifacts=["runs/{run_id}/s03_script/artifact.json"],
+    verify_cmds=["python -m orchestrator.run_pipeline --only s03_script --profile e2e_min"]
+)
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S3: 5-Beat Docudrama Script Generation."""
     start_ts = time.time()
