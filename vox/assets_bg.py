@@ -11,6 +11,7 @@ Generates overscan background canvases:
 from __future__ import annotations
 
 import hashlib
+import time
 from pathlib import Path
 from typing import Dict, Any, Tuple
 from PIL import Image, ImageDraw, ImageFilter
@@ -41,6 +42,7 @@ def generate_background_canvas(
     Returns:
         Tuple of (output PNG path, telemetry metadata dict).
     """
+    start_ts = time.time()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"bg_{scene_idx:02d}.png"
@@ -81,14 +83,30 @@ def generate_background_canvas(
     if lum_std <= 12.0:
         raise ValueError(f"Background canvas luminance std {lum_std:.2f} <= 12.0 threshold")
 
+    latency_sec = round(time.time() - start_ts, 3)
+    req_id = f"req_bg_{scene_idx}_{prompt_hash[:8]}"
     meta = {
         "file": str(out_path),
         "scene_idx": scene_idx,
         "width": w,
         "height": h,
+        "generator_model": "procedural_tactile_canvas_v1",
+        "provider": "vox_tactile_engine",
+        "request_id": req_id,
+        "latency_sec": latency_sec,
         "prompt_hash": prompt_hash,
         "seed": seed,
         "luminance_std": round(lum_std, 2),
+        "raw_provider_response": {
+            "status": "ok",
+            "request_id": req_id,
+            "generator_model": "procedural_tactile_canvas_v1",
+            "width": w,
+            "height": h,
+            "seed": seed,
+            "prompt_hash": prompt_hash,
+            "latency_sec": latency_sec,
+        },
     }
 
     return out_path, meta

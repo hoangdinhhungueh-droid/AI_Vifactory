@@ -50,7 +50,9 @@ INSIGHT_CARD_TYPE = 'InsightCard'  # property to tag rows in Experiment Lab DB
 # ---- NOTION HTTP HELPER -------------------------------------------------------
 def _notion_req(notion_token: str, endpoint: str,
                 method: str = 'GET', payload: Optional[dict] = None) -> dict:
-    """Minimal Notion API call -- mirrors notion_api() in b11_engine.py."""
+    """Minimal Notion API call -- fail closed on HTTP errors (Rule 118/139)."""
+    if not notion_token:
+        raise ValueError("[vf_insight_cards] Missing notion_token for Notion API call")
     url = f'https://api.notion.com/v1/{endpoint}'
     data = json.dumps(payload).encode('utf-8') if payload else None
     req = urllib.request.Request(
@@ -61,12 +63,8 @@ def _notion_req(notion_token: str, endpoint: str,
             'Content-Type': 'application/json',
         }
     )
-    try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            return json.loads(resp.read().decode('utf-8'))
-    except Exception as e:
-        print(f'[vf_insight_cards] Notion API error ({endpoint}): {e}', flush=True)
-        return {}
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        return json.loads(resp.read().decode('utf-8'))
 
 
 # ---- DISTILLATION: B11 -> InsightCard -----------------------------------------
@@ -217,7 +215,10 @@ def _write_or_update_card(
         }
         resp = _notion_req(notion_token, 'pages',
                            method='POST', payload=create_payload)
-        print(f'[vf_insight_cards] Created InsightCard {resp.get("id","?")} '
+        new_id = resp.get("id")
+        if not new_id or new_id == "?":
+            raise RuntimeError(f"[vf_insight_cards] Failed to create InsightCard in Notion DB {EXPERIMENT_LAB_DB_ID}: empty response")
+        print(f'[vf_insight_cards] Created InsightCard {new_id} '
               f'({market}/{dimension}) confidence={confidence:.2f}', flush=True)
 
 

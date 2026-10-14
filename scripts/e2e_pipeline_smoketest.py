@@ -312,11 +312,15 @@ def gate_b11_analytics_and_insight_loop():
     assert "access_token=token," not in b11_code, "b11_antigravity_engine.py contains undefined 'token' variable in v7 harvest call!"
     # Verify no bare except passing
     assert "except Exception as _v7_err:\n                pass" not in b11_code, "b11_antigravity_engine.py must not contain bare 'except Exception as _v7_err: pass'!"
-    # Live execution of distill_insights_to_cards
+    # Live execution of distill_insights_to_cards with authoritative Notion token
+    from scripts.compile_episode_from_notion import _token
     from scripts.vf_insight_cards import distill_insights_to_cards
+    notion_token = _token() or os.getenv("NOTION_TOKEN", "")
+    assert notion_token, "Live NOTION_TOKEN must be present on VPS/environment (Rule 118)"
     test_metrics = {"views": 1500, "ctr": 0.082, "avd_sec": 240, "duration_sec": 480, "hook_retention_0_30s": 0.72, "hook_retention_0_60s": 0.55}
-    cards = distill_insights_to_cards("dummy_test_token", "EN", test_metrics)
-    assert isinstance(cards, list), f"Expected list of insight cards, got: {type(cards)}"
+    cards = distill_insights_to_cards(notion_token, "EN", test_metrics)
+    assert isinstance(cards, list) and len(cards) > 0, f"Expected non-empty list of insight cards, got: {cards}"
+    assert all(c.get("id") and c.get("id") != "?" for c in cards), f"InsightCard returned null or '?' id (swallowed Notion error): {cards}"
     print(f"  [PASS] b11_antigravity_engine.py verified & live insight card engine executed ({len(cards)} cards generated).")
 
 def main():

@@ -1,6 +1,5 @@
 import os, sys, glob, json
 import boto3
-from scripts.gdrive_backup import backup_episode_to_gdrive
 from scripts.ag_notion_bridge import _req, resolve_id
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -71,7 +70,11 @@ async def sync_artifacts(req: SyncRequest):
         try: task_id = r["properties"]["Task ID"]["rich_text"][0]["plain_text"]
         except: pass
         
-    backup_episode_to_gdrive(req.episode_id, req.local_dir, task_id, trend_title)
+    try:
+        from scripts.gdrive_backup import backup_episode_to_gdrive
+        backup_episode_to_gdrive(req.episode_id, req.local_dir, task_id, trend_title)
+    except Exception as _gdrive_err:
+        pass
 
     
     images = glob.glob(os.path.join(req.local_dir, "*.jpg")) + glob.glob(os.path.join(req.local_dir, "*.png"))

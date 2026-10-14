@@ -17,6 +17,7 @@ from core.config import RunContext
 from core.gates import require_input, emit_artifact
 
 from tools.codemap.runtime import pipeline_stage
+from vox.planner import plan_scenes_from_script
 
 STAGE: StageID = StageID.S5_DIRECTOR_PLAN
 

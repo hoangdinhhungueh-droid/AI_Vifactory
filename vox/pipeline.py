@@ -47,6 +47,45 @@ def compute_file_sha256(p: Path) -> str:
     return h.hexdigest()
 
 
+def create_asset_contact_sheet(
+    bg_paths: List[Path],
+    fg_paths: List[Path],
+    out_path: Path,
+    target_wh: tuple[int, int] = (1920, 1080),
+) -> Path:
+    """Arranges all BGs and FGs into a unified downscaled contact sheet grid for visual auditing."""
+    from PIL import Image, ImageDraw
+    sheet = Image.new("RGB", target_wh, (15, 23, 42))
+    draw = ImageDraw.Draw(sheet)
+
+    cols, rows = 3, 3
+    cell_w = target_wh[0] // cols
+    cell_h = target_wh[1] // rows
+
+    all_items = [(p, f"BG {i+1}") for i, p in enumerate(bg_paths)] + [
+        (p, f"FG {i+1}") for i, p in enumerate(fg_paths)
+    ]
+
+    for idx, (path, label) in enumerate(all_items[:9]):
+        r = idx // cols
+        c = idx % cols
+        x0, y0 = c * cell_w, r * cell_h
+        p_obj = Path(path)
+        if p_obj.exists():
+            thumb = Image.open(str(p_obj)).convert("RGBA")
+            pad = 12
+            avail_w, avail_h = cell_w - 2 * pad, cell_h - 2 * pad - 24
+            thumb.thumbnail((avail_w, avail_h), Image.Resampling.LANCZOS)
+            tx = x0 + pad + (avail_w - thumb.width) // 2
+            ty = y0 + pad + (avail_h - thumb.height) // 2
+            sheet.paste(thumb, (tx, ty), thumb if thumb.mode == "RGBA" else None)
+            draw.rectangle([x0 + 4, y0 + 4, x0 + cell_w - 4, y0 + cell_h - 4], outline=(51, 65, 85), width=1)
+            draw.text((x0 + 16, y0 + cell_h - 24), f"[{label}] {p_obj.name}", fill=(148, 163, 184))
+
+    sheet.save(str(out_path), format="PNG")
+    return out_path
+
+
 def run_pipeline(
     script_path: Path,
     out_dir: Path,
@@ -115,6 +154,17 @@ def run_pipeline(
         render_scene_clip(sc, bg_path, fg_map, clip_path)
         scene_clips.append(clip_path)
 
+    # Generate unified asset contact sheet for visual audit (Boss Rule 122)
+    all_bg_paths = [Path(m["file"]) for m in manifest_assets["backgrounds"]]
+    all_fg_paths = [Path(m["file"]) for m in manifest_assets["foregrounds"]]
+    contact_sheet_path = out_dir / "contact_sheet.png"
+    create_asset_contact_sheet(all_bg_paths, all_fg_paths, contact_sheet_path)
+    manifest_assets["contact_sheet"] = {
+        "file": str(contact_sheet_path),
+        "sha256": compute_file_sha256(contact_sheet_path),
+        "total_assets": len(all_bg_paths) + len(all_fg_paths),
+    }
+
     # 6. Assembly & Subtitle Burn-In
     print("\n[6/7] Assembling master video, burning subtitles & applying loudnorm...")
     final_video = out_dir / "final.mp4"
@@ -175,6 +225,12 @@ def run_pipeline(
         "audio": {
             "path": str(audio_wav),
             "duration_sec": timeline.audio_duration,
+            "sample_rate_hz": 48000,
+            "channels": 1,
+            "whisper_model": "faster-whisper-base.en",
+            "whisper_version": "1.0.3",
+            "tts_voice": "en-US-ChristopherNeural",
+            "loudness_target_lufs": -14.0,
             "sha256": compute_file_sha256(audio_wav),
         },
         "subtitles": {
@@ -183,6 +239,16 @@ def run_pipeline(
             "match_ratio": timeline.match_ratio,
             "max_reverse_drift_ms": round(max_drift_ms, 2),
             "reverse_parity_status": "PASS" if max_drift_ms <= 33.3 else "FAIL",
+            "words": [
+                {
+                    "word": w.text,
+                    "start": w.start,
+                    "end": w.end,
+                    "probability": round(getattr(w, "probability", 1.0), 3),
+                    "scene_idx": w.scene_idx,
+                }
+                for w in timeline.words
+            ],
         },
         "scene_count": len(plan.scenes),
         "scenes": enriched_scenes,

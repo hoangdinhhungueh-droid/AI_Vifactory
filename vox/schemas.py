@@ -70,6 +70,7 @@ class Word(BaseModel):
     start: float
     end: float
     scene_idx: int
+    probability: float = 1.0
 
 
 class WordTimeline(BaseModel):

@@ -16,6 +16,7 @@ from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.config import RunContext
 from core.gates import require_input, emit_artifact
 from tools.codemap.runtime import pipeline_stage
+from vox.qa.gates import verify_final_video_gates
 
 STAGE: StageID = StageID.S11_QC
 

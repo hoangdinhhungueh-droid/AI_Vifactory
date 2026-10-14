@@ -13,13 +13,25 @@
 #            DUMP_SYS (env DUMP_SYS=1 → breakdown san(sys) by header)
 
 import os, json, re, time
+from contextlib import asynccontextmanager
 import requests as _rq
 from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-app = FastAPI(title="AI Video Factory API", version="v11.8")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Telegram inline-button poller startup (Phase 4)
+    try:
+        from app.services.telegram_poller import start_poller as _vf_start_tg_poller
+        _vf_start_tg_poller()
+    except Exception as _e:
+        import logging as _lg
+        _lg.getLogger("app.main").warning("tg poller startup failed: %s", _e)
+    yield
+
+app = FastAPI(title="AI Video Factory API", version="v11.8", lifespan=lifespan)
 
 # --- Prometheus metrics endpoint (G6-8) ---
 try:
@@ -419,20 +431,7 @@ from app import log_redact  # noqa: F401  (mask api_key in logs)
 # app.include_router(_reason_router)
 
 
-# -- Telegram inline-button poller (two-way approval loop, Phase 4) ---------
-try:
-    from app.services.telegram_poller import start_poller as _vf_start_tg_poller
-
-    @app.on_event("startup")
-    async def _vf_startup_tg_poller():
-        try:
-            _vf_start_tg_poller()
-        except Exception as _e:  # noqa: BLE001
-            import logging as _lg
-            _lg.getLogger("app.main").warning("tg poller start failed: %s", _e)
-except Exception as _e:  # noqa: BLE001
-    import logging as _lg
-    _lg.getLogger("app.main").warning("tg poller import failed: %s", _e)
+# Telegram inline-button poller is managed by lifespan handler at app initialization
 
 
 # DISABLED 28/07/2026: discover-v5 fully superseded by trend_gate_ai.py

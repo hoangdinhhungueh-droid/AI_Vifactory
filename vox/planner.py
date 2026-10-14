@@ -121,17 +121,22 @@ def plan_scenes_from_script(
             )
             fgs = [fg1, fg2]
         else:
-            # Generic smart decomposition
-            primary_term = content_words[0] if content_words else f"system_node_{sc_idx}"
+            # Generic domain-adaptive decomposition (Rule 128 compliant: zero financial semantic bias)
+            primary_term = content_words[0] if content_words else f"subject_{sc_idx}"
             secondary_term = content_words[1] if len(content_words) > 1 else "evidence"
+
+            fg1_types = ["artifact", "folio", "diagram", "specimen", "manuscript", "instrument"]
+            fg2_types = ["emblem", "insignia", "token", "schematic", "seal", "relic"]
+            t1 = fg1_types[i % len(fg1_types)]
+            t2 = fg2_types[i % len(fg2_types)]
             
             bg_prompt = (
                 f"atmospheric editorial graphic novel illustration of {primary_term} environment, "
-                f"dimly lit institutional architecture, textured comic paper, muted colors, wordless composition, zero text"
+                f"textured comic paper, muted colors, wordless composition, zero text"
             )
             fg1 = FGObject(
                 id=f"obj_{sc_idx}_1",
-                prompt=f"tactile vintage retro editorial {primary_term} ledger dossier with archival binding, comic ink hatching, wordless composition, zero text",
+                prompt=f"tactile vintage retro editorial {primary_term} {t1} with archival binding, comic ink hatching, wordless composition, zero text",
                 anchor_x=0.45 if (i % 2 == 0) else 0.55,
                 anchor_y=0.52,
                 scale=0.42,
@@ -142,7 +147,7 @@ def plan_scenes_from_script(
             if len(content_words) > 1:
                 fg2 = FGObject(
                     id=f"obj_{sc_idx}_2",
-                    prompt=f"tactile {secondary_term} forensic emblem medallion with etched metallic edge on aged paper, wordless composition, zero text",
+                    prompt=f"tactile {secondary_term} {t2} with etched metallic edge on aged paper, wordless composition, zero text",
                     anchor_x=0.68 if (i % 2 == 0) else 0.32,
                     anchor_y=0.65,
                     scale=0.28,
