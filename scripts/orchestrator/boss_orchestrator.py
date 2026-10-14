@@ -404,14 +404,46 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"QA Gates Command Exit Code: {code_gates} ({out_gates})\n"
     )
 
-    # 8. GitHub Actions CI/CD Verification
+    # 8. Physical Visual Proof & Frame Extraction (Rule 122)
+    code_frames, out_frames = run_on_vps(
+        "mkdir -p /root/video_factory/out/golden/frames && "
+        "ffmpeg -y -ss 2.0 -i /root/video_factory/out/golden/final.mp4 -vframes 1 /root/video_factory/out/golden/frames/sc01.png 2>&1 >/dev/null && "
+        "ffmpeg -y -ss 6.5 -i /root/video_factory/out/golden/final.mp4 -vframes 1 /root/video_factory/out/golden/frames/sc02.png 2>&1 >/dev/null && "
+        "ffmpeg -y -ss 11.0 -i /root/video_factory/out/golden/final.mp4 -vframes 1 /root/video_factory/out/golden/frames/sc03.png 2>&1 >/dev/null && "
+        "ls -lh /root/video_factory/out/golden/frames/*.png && sha256sum /root/video_factory/out/golden/frames/*.png"
+    )
+    evidence_blocks.append(
+        f"### [8. PHYSICAL VISUAL PROOF & FRAME EXTRACTION (Rule 122)]\n"
+        f"Frame Extraction Exit Code: {code_frames}\n"
+        f"Forensic Frame Images (Scene 1, Scene 2, Scene 3):\n{out_frames}\n"
+    )
+
+    # 9. VPS FastAPI HTTP 200 Runtime Probes (Rule 121)
+    code_http, out_http = run_on_vps(
+        "python3 -c \""
+        "import urllib.request, json\n"
+        "for ep in ['/api/v1/health', '/api/v1/diag', '/v1/models', '/v1/budget']:\n"
+        "    try:\n"
+        "        resp = urllib.request.urlopen(f'http://127.0.0.1:8000{ep}', timeout=3)\n"
+        "        print(f'{ep}: HTTP {resp.getcode()} OK')\n"
+        "    except Exception as e:\n"
+        "        print(f'{ep}: Probe error ({e})')\n"
+        "\""
+    )
+    evidence_blocks.append(
+        f"### [9. VPS FASTAPI HTTP 200 RUNTIME PROBES (Rule 121)]\n"
+        f"HTTP Probe Exit Code: {code_http}\n"
+        f"Endpoints Status:\n{out_http}\n"
+    )
+
+    # 10. GitHub Actions CI/CD Verification
     try:
         from scripts.watch_github_ci import fetch_run_for_commit, get_opener, DEFAULT_REPO, DEFAULT_TOKEN
         opener = get_opener()
         ci_run = fetch_run_for_commit(DEFAULT_REPO, DEFAULT_TOKEN, git_head or "d6b8f1b", opener)
         if ci_run:
             evidence_blocks.append(
-                f"### [8. GITHUB ACTIONS CI/CD VERIFICATION (Rule 126)]\n"
+                f"### [10. GITHUB ACTIONS CI/CD VERIFICATION (Rule 126)]\n"
                 f"Run ID: {ci_run.get('id')}\n"
                 f"Commit Head SHA: {ci_run.get('head_sha')}\n"
                 f"Status: {ci_run.get('status')}\n"
@@ -419,13 +451,13 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
                 f"Run URL: {ci_run.get('html_url')}\n"
             )
         else:
-            evidence_blocks.append("### [8. GITHUB ACTIONS CI/CD VERIFICATION]\nRun not found for commit.\n")
+            evidence_blocks.append("### [10. GITHUB ACTIONS CI/CD VERIFICATION]\nRun not found for commit.\n")
     except Exception as e:
-        evidence_blocks.append(f"### [8. GITHUB ACTIONS CI/CD VERIFICATION]\nError fetching CI: {e}\n")
+        evidence_blocks.append(f"### [10. GITHUB ACTIONS CI/CD VERIFICATION]\nError fetching CI: {e}\n")
 
-    # 9. Architecture Blueprint & Tactile Object Decomposition Breakdown (T1-T11)
+    # 11. Architecture Blueprint & Tactile Object Decomposition Breakdown (T1-T11)
     arch_blueprint = (
-        "### [9. ARCHITECTURE BLUEPRINT & TACTILE OBJECT DECOMPOSITION BREAKDOWN (AVF-VOX-001)]\n"
+        "### [11. ARCHITECTURE BLUEPRINT & TACTILE OBJECT DECOMPOSITION BREAKDOWN (AVF-VOX-001)]\n"
         "| Module | Responsibility & Invariants | Verification Output |\n"
         "| vox/schemas.py | Pydantic v2 schemas: CameraMove (12 moves), FGObject, Scene, ScenePlan, WordTimeline | 5 unit tests PASS |\n"
         "| vox/camera.py | Pure math transforms, ease_in_out_cubic, viewport clamp in 2400x1350 canvas, parallax scale | 24 unit tests PASS |\n"
@@ -441,12 +473,12 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     )
     evidence_blocks.append(arch_blueprint)
 
-    # 10. Atomic Git Commits Log
+    # 12. Atomic Git Commits Log
     git_log_res = subprocess.run(
         ["git", "-C", str(ROOT_DIR), "log", "--format=%H %s", f"{effective_range}"],
         capture_output=True, text=True, check=False
     )
-    evidence_blocks.append(f"### [10. ATOMIC CONVENTIONAL COMMITS LOG ({effective_range})]\n{git_log_res.stdout.strip()}\n")
+    evidence_blocks.append(f"### [12. ATOMIC CONVENTIONAL COMMITS LOG ({effective_range})]\n{git_log_res.stdout.strip()}\n")
 
     raw_evidence_str = "\n".join(evidence_blocks)
     return {

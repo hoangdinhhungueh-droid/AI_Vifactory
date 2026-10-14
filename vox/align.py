@@ -136,9 +136,12 @@ def align_script_with_audio(
             sc.start = 0.0
             sc.end = audio_dur
 
-    # Ensure seamless boundary stitching between scenes
-    for i in range(len(plan.scenes) - 1):
-        plan.scenes[i + 1].start = plan.scenes[i].end
+    # Ensure seamless boundary stitching between scenes and cover entire audio duration
+    if plan.scenes:
+        plan.scenes[0].start = 0.0
+        for i in range(len(plan.scenes) - 1):
+            plan.scenes[i + 1].start = plan.scenes[i].end
+        plan.scenes[-1].end = max(plan.scenes[-1].end, audio_dur)
 
     timeline = WordTimeline(
         words=aligned_words,

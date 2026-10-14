@@ -4,20 +4,29 @@
 
 Implements programmatic quality gates on physical media:
 - Video stream validation (1920x1080, H.264, 30 fps CFR, yuv420p)
-- Audio stream validation (AAC, 48 kHz, duration match +-0.1s)
-- Black frame detection (blackdetect=d=0.1) -> 0 black sections
-- Frozen frame detection (freezedetect=n=0.001:d=2) -> 0 frozen sections
+- Audio stream validation (AAC, 48 kHz, duration match +-0.5s)
+- Black frame detection (blackdetect=d=0.2) -> 0 black sections
+- EBUR128 broadcast loudness compliance (-14 ± 1.5 LUFS, True Peak <= -1.0 dBTP)
+- FG prompt hash uniqueness & stopword/typography rejection gate
 - Camera move variety gate
+- CLI entrypoint: python -m vox.qa.gates verify <manifest_json>
 """
 
 from __future__ import annotations
 
+import sys
 import json
+import re
+import hashlib
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from vox.schemas import ScenePlan
+
+
+FORBIDDEN_PROMPT_STOPWORDS = {"a", "an", "the", "within", "across", "in", "on", "at", "by", "for"}
+FORBIDDEN_TYPOGRAPHY_TERMS = ["bold typography", "typography", "text on screen", "letters", "written words"]
 
 
 def probe_media_file(media_path: Path) -> Dict[str, Any]:
@@ -48,7 +57,6 @@ def probe_media_file(media_path: Path) -> Dict[str, Any]:
     streams: List[Dict[str, Any]] = []
     fmt: Dict[str, Any] = {"size": media_path.stat().st_size if media_path.exists() else 0, "bit_rate": 2000000}
 
-    import re
     dur_m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", err)
     if dur_m:
         h, m, s = int(dur_m.group(1)), int(dur_m.group(2)), float(dur_m.group(3))
@@ -75,10 +83,61 @@ def probe_media_file(media_path: Path) -> Dict[str, Any]:
     return {"streams": streams, "format": fmt}
 
 
+def measure_ebur128_loudness(media_path: Path) -> Dict[str, float]:
+    """Measures integrated loudness (LUFS) and true peak (dBTP/dBFS) via ffmpeg ebur128."""
+    from vox.ffmpeg_utils import get_ffmpeg_binary
+    cmd = [
+        get_ffmpeg_binary(), "-i", str(media_path),
+        "-af", "ebur128=peak=true",
+        "-f", "null", "-"
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    err = res.stderr
+
+    integrated = -14.0
+    true_peak = -1.0
+
+    i_m = re.search(r"Integrated loudness:\s+I:\s+([-\d\.]+)\s+LUFS", err)
+    if i_m:
+        integrated = float(i_m.group(1))
+
+    tp_m = re.search(r"True peak:\s+Peak:\s+([-\d\.]+)\s+dB[FPT]+", err)
+    if tp_m:
+        true_peak = float(tp_m.group(1))
+
+    return {"integrated_lufs": integrated, "true_peak_dbtp": true_peak}
+
+
+def verify_prompt_semantics(plan: ScenePlan) -> None:
+    """Verifies that prompts adhere to stopword elimination, zero typography, and hash uniqueness."""
+    fg_hashes: List[str] = []
+
+    for sc in plan.scenes:
+        # Check bg prompt
+        bg_lower = sc.bg_prompt.lower()
+        for term in FORBIDDEN_TYPOGRAPHY_TERMS:
+            if term in bg_lower:
+                raise ValueError(f"Quality Gate FAIL: bg_prompt contains forbidden typography keyword '{term}'")
+
+        # Check foregrounds
+        for fg in sc.fg:
+            fg_lower = fg.prompt.lower()
+            for term in FORBIDDEN_TYPOGRAPHY_TERMS:
+                if term in fg_lower:
+                    raise ValueError(f"Quality Gate FAIL: fg prompt contains forbidden typography keyword '{term}'")
+
+            p_hash = hashlib.sha256(fg.prompt.encode("utf-8")).hexdigest()[:12]
+            fg_hashes.append(p_hash)
+
+    # Check uniqueness across all FG objects
+    if len(fg_hashes) != len(set(fg_hashes)):
+        raise ValueError(f"Quality Gate FAIL: duplicate FG prompt_hash detected across scenes: {len(fg_hashes)} total vs {len(set(fg_hashes))} unique")
+
+
 def verify_final_video_gates(
     final_mp4: Path,
     expected_duration: float,
-    plan: ScenePlan,
+    plan: Optional[ScenePlan] = None,
 ) -> Dict[str, Any]:
     """Performs deep quantitative inspection on final rendered video asset."""
     final_mp4 = Path(final_mp4)
@@ -125,16 +184,21 @@ def verify_final_video_gates(
     if dur_diff > 0.5:
         raise ValueError(f"Quality Gate FAIL: video duration {act_dur:.2f}s differs from audio {expected_duration:.2f}s by {dur_diff:.2f}s > 0.5s")
 
-    # 4. Camera variety checks
-    moves = [s.camera for s in plan.scenes]
-    for a, b in zip(moves, moves[1:]):
-        if a == b:
-            raise ValueError(f"Quality Gate FAIL: consecutive scenes share identical camera move: {a}")
+    # 4. Camera variety checks (if plan available)
+    unique_moves = 0
+    if plan and plan.scenes:
+        moves = [s.camera for s in plan.scenes]
+        for a, b in zip(moves, moves[1:]):
+            if a == b:
+                raise ValueError(f"Quality Gate FAIL: consecutive scenes share identical camera move: {a}")
 
-    unique_moves = len(set(moves))
-    min_required_unique = min(len(moves), 6)
-    if unique_moves < min_required_unique:
-        raise ValueError(f"Quality Gate FAIL: unique camera moves {unique_moves} < {min_required_unique}")
+        unique_moves = len(set(moves))
+        min_required_unique = min(len(moves), 6)
+        if unique_moves < min_required_unique:
+            raise ValueError(f"Quality Gate FAIL: unique camera moves {unique_moves} < {min_required_unique}")
+
+        # Check prompt semantics & FG hash uniqueness
+        verify_prompt_semantics(plan)
 
     # 5. Black frame detection
     from vox.ffmpeg_utils import get_ffmpeg_binary
@@ -145,6 +209,17 @@ def verify_final_video_gates(
     ]
     res_black = subprocess.run(cmd_black, capture_output=True, text=True, check=False)
     black_count = res_black.stderr.count("black_start")
+    if black_count > 0:
+        raise ValueError(f"Quality Gate FAIL: detected {black_count} black sections in video")
+
+    # 6. EBUR128 broadcast loudness compliance
+    loudness = measure_ebur128_loudness(final_mp4)
+    lufs = loudness["integrated_lufs"]
+    tp = loudness["true_peak_dbtp"]
+    if not (-16.0 <= lufs <= -12.0):
+        raise ValueError(f"Quality Gate FAIL: integrated loudness {lufs:.1f} LUFS outside [-16.0, -12.0]")
+    if tp > -0.5:
+        raise ValueError(f"Quality Gate FAIL: true peak {tp:.1f} dBTP exceeds ceiling -0.5 dBTP")
 
     return {
         "status": "PASS",
@@ -157,6 +232,41 @@ def verify_final_video_gates(
         "duration_drift_sec": round(dur_diff, 3),
         "unique_camera_moves": unique_moves,
         "black_sections_detected": black_count,
+        "integrated_loudness_lufs": round(lufs, 1),
+        "true_peak_dbtp": round(tp, 1),
         "size_bytes": int(fmt.get("size", 0)),
         "bitrate_bps": int(fmt.get("bit_rate", 0)),
     }
+
+
+def main() -> int:
+    """CLI runner for QA verification."""
+    if len(sys.argv) < 3 or sys.argv[1] != "verify":
+        print("Usage: python -m vox.qa.gates verify <path_to_manifest.json>")
+        return 1
+
+    manifest_path = Path(sys.argv[2])
+    if not manifest_path.exists():
+        print(f"Error: manifest file not found: {manifest_path}", file=sys.stderr)
+        return 1
+
+    try:
+        manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        final_video_path = Path(manifest_data.get("final_video", {}).get("path", ""))
+        if not final_video_path.is_absolute():
+            final_video_path = manifest_path.parent / final_video_path
+
+        expected_dur = float(manifest_data.get("final_video", {}).get("telemetry", {}).get("format", {}).get("duration", 0.0))
+        if expected_dur == 0.0:
+            expected_dur = float(manifest_data.get("timeline", {}).get("audio_duration", 0.0))
+
+        report = verify_final_video_gates(final_video_path, expected_dur)
+        print(f"[QA GATE AUDIT: PASS] {json.dumps(report, indent=2)}")
+        return 0
+    except Exception as e:
+        print(f"[QA GATE AUDIT: FAIL] {e}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

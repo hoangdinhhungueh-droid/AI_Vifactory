@@ -81,3 +81,4 @@ out/
 reports/
 runs/
 db/
+legacy_inventory.json

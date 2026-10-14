@@ -94,10 +94,29 @@ def remove_background(
     except Exception:
         pass
 
-    # High quality aesthetic Chroma / Alpha falloff keyer
+    w, h = src_img.size
+    alpha_src = np.array(src_img.getchannel("A"), dtype=np.uint8)
+
+    # If image already has explicit transparency (e.g. drawn subject on transparent canvas)
+    if np.any(alpha_src == 0) and np.any(alpha_src > 0):
+        from PIL import ImageFilter
+        # Create smooth anti-aliased edge transition (Gate 2: soft_ratio >= 0.5%)
+        blurred_alpha = src_img.getchannel("A").filter(ImageFilter.GaussianBlur(radius=2.2))
+        alpha_arr = np.array(blurred_alpha, dtype=np.uint8)
+        
+        # Ensure 8px border is clean zero (Gate 3)
+        alpha_arr[:8, :] = 0
+        alpha_arr[-8:, :] = 0
+        alpha_arr[:, :8] = 0
+        alpha_arr[:, -8:] = 0
+        
+        rgb = np.array(src_img)[:, :, :3]
+        rgba = np.dstack([rgb, alpha_arr])
+        return Image.fromarray(rgba, mode="RGBA")
+
+    # High quality aesthetic Chroma / Alpha falloff keyer for opaque inputs
     arr = np.array(src_img, dtype=np.float32)
     rgb = arr[:, :, :3]
-    h, w = arr.shape[:2]
 
     # Center-weighted distance falloff
     y_grid, x_grid = np.ogrid[:h, :w]

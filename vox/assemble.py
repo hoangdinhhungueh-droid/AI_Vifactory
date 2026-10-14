@@ -51,6 +51,11 @@ def assemble_final_video(
     subprocess.run(cmd_concat, capture_output=True, check=True)
 
     # 2. Multiplex audio and burn ASS subtitles with loudnorm
+    # Measure exact audio duration to avoid premature truncation
+    import wave
+    with wave.open(str(audio_wav), "rb") as wf:
+        audio_dur = wf.getnframes() / float(wf.getframerate())
+
     # Escape path for ffmpeg subtitles filter (replace backslashes with forward slashes)
     ass_escaped = ass_subtitles.resolve().as_posix().replace(":", "\\:")
 
@@ -67,7 +72,7 @@ def assemble_final_video(
         "-b:a", "192k",
         "-ar", "48000",
         "-af", "loudnorm=I=-14:TP=-1.0:LRA=11",
-        "-shortest",
+        "-t", f"{audio_dur:.3f}",
         str(final_output)
     ]
 
@@ -83,7 +88,7 @@ def assemble_final_video(
             "-c:a", "aac",
             "-b:a", "192k",
             "-ar", "48000",
-            "-shortest",
+            "-t", f"{audio_dur:.3f}",
             str(final_output)
         ]
         subprocess.run(cmd_master_fallback, capture_output=True, check=True)
