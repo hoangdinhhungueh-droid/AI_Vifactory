@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/planner.py — LLM / Rule-Based Scene Decomposition & Director Planner (AVF-VOX-001).
 
 Decomposes script narrative into structured ScenePlan:
@@ -11,11 +10,8 @@ Decomposes script narrative into structured ScenePlan:
 from __future__ import annotations
 
 import re
-from pathlib import Path
-from typing import List, Optional, Set, Tuple
 
-from vox.schemas import ScenePlan, Scene, FGObject, CameraMove
-
+from vox.schemas import CameraMove, FGObject, Scene, ScenePlan
 
 CAMERA_SEQUENCE = [
     CameraMove.PUSH_IN,
@@ -32,7 +28,7 @@ CAMERA_SEQUENCE = [
     CameraMove.STATIC_BREATH,
 ]
 
-STOPWORDS: Set[str] = {
+STOPWORDS: set[str] = {
     "a", "an", "the", "in", "on", "at", "to", "for", "with", "by", "from",
     "up", "about", "into", "over", "after", "within", "across", "during",
     "through", "before", "between", "under", "along", "without", "against",
@@ -70,7 +66,7 @@ THEMATIC_KNOWLEDGE = [
 ]
 
 
-def extract_content_keywords(text: str) -> List[str]:
+def extract_content_keywords(text: str) -> list[str]:
     """Extracts non-stopword alphabetic content words."""
     tokens = re.findall(r"[A-Za-z]{3,}", text.lower())
     return [t for t in tokens if t not in STOPWORDS]
@@ -81,12 +77,11 @@ def plan_scenes_from_script(
     title: str = "Vox Explainer Episode",
 ) -> ScenePlan:
     """Decomposes a script into structured ScenePlan adhering to all Vox contracts."""
-    raw_lines = [l.strip() for l in script_text.strip().splitlines() if l.strip()]
+    raw_lines = [line_str.strip() for line_str in script_text.strip().splitlines() if line_str.strip()]
     if not raw_lines:
         raise ValueError("Script text is empty")
 
-    scenes: List[Scene] = []
-    used_fg_hashes: Set[str] = set()
+    scenes: list[Scene] = []
 
     for i, line in enumerate(raw_lines):
         sc_idx = i + 1
@@ -129,7 +124,7 @@ def plan_scenes_from_script(
             fg2_types = ["emblem", "insignia", "token", "schematic", "seal", "relic"]
             t1 = fg1_types[i % len(fg1_types)]
             t2 = fg2_types[i % len(fg2_types)]
-            
+
             bg_prompt = (
                 f"atmospheric editorial graphic novel illustration of {primary_term} environment, "
                 f"textured comic paper, muted colors, wordless composition, zero text"

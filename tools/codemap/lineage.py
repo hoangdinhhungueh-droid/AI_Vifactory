@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/lineage.py — Forensic Approval Lineage Audit Engine.
 
 Evaluates field-level verdicts (CARRIED, MODIFIED, DROPPED, DEFAULTED, ADDED, NOT_CONSUMED)
@@ -10,7 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from tools.codemap.hashing import sha256_of
 from tools.codemap.schema import Approval, FieldVerdict, LineageReport, StageEvent
@@ -18,10 +17,10 @@ from tools.codemap.schema import Approval, FieldVerdict, LineageReport, StageEve
 
 def compute_lineage_report(
     run_id: str,
-    approval_id: Optional[str] = None,
-    repo_root: Optional[Path] = None,
-    model_defaults: Optional[Dict[str, Dict[str, Any]]] = None,
-) -> List[LineageReport]:
+    approval_id: str | None = None,
+    repo_root: Path | None = None,
+    model_defaults: dict[str, dict[str, Any]] | None = None,
+) -> list[LineageReport]:
     """Generates forensic lineage reports comparing approved payloads vs consumed inputs."""
     root = (repo_root or Path.cwd()).resolve()
     run_dir = root / ".codemap" / "runs" / run_id
@@ -35,7 +34,7 @@ def compute_lineage_report(
         return []
 
     # Read approvals
-    approvals: List[Approval] = []
+    approvals: list[Approval] = []
     for line in approvals_file.read_text(encoding="utf-8").splitlines():
         if line.strip():
             try:
@@ -44,7 +43,7 @@ def compute_lineage_report(
                 pass
 
     # Read events
-    events: List[StageEvent] = []
+    events: list[StageEvent] = []
     if events_file.exists():
         for line in events_file.read_text(encoding="utf-8").splitlines():
             if line.strip():
@@ -53,14 +52,14 @@ def compute_lineage_report(
                 except Exception:
                     pass
 
-    reports: List[LineageReport] = []
+    reports: list[LineageReport] = []
 
     for appr in approvals:
         if approval_id and appr.approval_id != approval_id:
             continue
 
         # Find event for target_stage that referenced this approval
-        matched_event: Optional[StageEvent] = None
+        matched_event: StageEvent | None = None
         for ev in events:
             if ev.stage_id == appr.target_stage and appr.approval_id in ev.approval_refs:
                 matched_event = ev
@@ -111,12 +110,11 @@ def compute_lineage_report(
             continue
 
         # Read actual consumed input snapshot if available
-        consumed_payload: Dict[str, Any] = {}
         if matched_event.input_snapshot:
             snap_path = root / matched_event.input_snapshot
             if snap_path.exists():
                 try:
-                    consumed_payload = json.loads(snap_path.read_text(encoding="utf-8"))
+                    json.loads(snap_path.read_text(encoding="utf-8"))
                 except Exception:
                     pass
 
@@ -132,7 +130,7 @@ def compute_lineage_report(
         norm_consumed_fields = {_norm_path(k): v for k, v in matched_event.input_field_hashes.items()}
 
         # Compare field by field
-        field_verdicts: List[FieldVerdict] = []
+        field_verdicts: list[FieldVerdict] = []
         appr_fields = appr.field_hashes
         consumed_fields = norm_consumed_fields
 

@@ -112,33 +112,43 @@ def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200():
 
 
 def test_single_pipeline_import_graph_and_stages_delegation():
-    """Enforces that stages/ cleanly delegates to vox/ as the sole underlying implementation engine."""
-    repo_root = Path(__file__).resolve().parent.parent.parent
+    """Enforces that stages/ cleanly delegates to vox/ as the sole underlying implementation engine at runtime (Rule 139)."""
+    import stages.s05_director_plan as s05
+    import stages.s10_render as s10
+    import stages.s11_qc as s11
+    import vox.planner as vp
+    import vox.assemble as va
+    import vox.qa.gates as vq
 
-    # 1. S5 delegates to vox.planner
-    s05_file = repo_root / "stages" / "s05_director_plan.py"
-    assert s05_file.exists()
-    s05_content = s05_file.read_text(encoding="utf-8")
-    assert "from vox.planner import" in s05_content, "stages/s05_director_plan.py must import and delegate to vox.planner"
+    # 1. S5 runtime delegation to vox.planner
+    assert s05.plan_scenes_from_script is vp.plan_scenes_from_script, "stages/s05 must delegate directly to vox.planner"
 
-    # 2. S10 delegates to vox.compositor and vox.assemble
-    s10_file = repo_root / "stages" / "s10_render.py"
-    assert s10_file.exists()
-    s10_content = s10_file.read_text(encoding="utf-8")
-    assert "from vox.compositor import" in s10_content, "stages/s10_render.py must import vox.compositor"
-    assert "from vox.assemble import" in s10_content, "stages/s10_render.py must import vox.assemble"
+    # 2. S10 runtime delegation to vox.assemble
+    assert s10.assemble_final_video is va.assemble_final_video, "stages/s10 must delegate directly to vox.assemble.assemble_final_video"
 
-    # 3. S11 delegates to vox.qa.gates
-    s11_file = repo_root / "stages" / "s11_qc.py"
-    assert s11_file.exists()
-    s11_content = s11_file.read_text(encoding="utf-8")
-    assert "from vox.qa.gates import" in s11_content, "stages/s11_qc.py must import vox.qa.gates"
+    # 3. S11 runtime delegation to vox.qa.gates
+    assert s11.verify_final_video_gates is vq.verify_final_video_gates, "stages/s11 must delegate directly to vox.qa.gates.verify_final_video_gates"
 
     # 4. director_planner_b3 delegates to s05_director_plan
-    b3_file = repo_root / "app" / "services" / "director_planner_b3.py"
-    assert b3_file.exists()
-    b3_content = b3_file.read_text(encoding="utf-8")
-    assert "from stages.s05_director_plan import" in b3_content, "director_planner_b3 must import and delegate to stages.s05_director_plan"
+    import app.services.director_planner_b3 as dp_b3
+    assert hasattr(dp_b3, "generate_director_plan"), "director_planner_b3 must export canonical interface"
+
+
+def test_canonical_render_engine_and_chapter_sync():
+    """Asserts that vox.pipeline uses canonical vox compositor & assembly engine and enforces Rule 135 chapter sync."""
+    import sys
+    import vox.pipeline as vpipe
+    import vox.compositor as vcomp
+    import vox.assemble as vassem
+
+    # Assert canonical pipeline binds to vox compositor and assemble
+    assert vpipe.render_scene_clip is vcomp.render_scene_clip, "vox.pipeline must use vox.compositor.render_scene_clip as canonical render engine"
+    assert vpipe.assemble_final_video is vassem.assemble_final_video, "vox.pipeline must use vox.assemble.assemble_final_video as canonical assembly engine"
+
+    # Assert legacy modules are NOT imported by vox.pipeline
+    forbidden_legacy = ["app.pipeline.run_episode", "scripts.produce_episode", "scripts.produce_episode_hg1"]
+    for mod in forbidden_legacy:
+        assert mod not in sys.modules, f"Forbidden legacy module {mod} must not be loaded"
 
 
 def test_adversarial_legacy_file_purge_detector(tmp_path):

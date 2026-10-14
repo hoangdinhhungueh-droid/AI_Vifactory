@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/karaoke.py — ASS Word-Level Karaoke Subtitle Generator (AVF-VOX-001).
 
 Generates Advanced SubStation Alpha (.ass) subtitle files with word-level \\kf tags:
@@ -13,10 +12,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import Any
 
-from vox.schemas import WordTimeline, Word
-
+from vox.schemas import WordTimeline
 
 ASS_HEADER_TEMPLATE = """[Script Info]
 Title: Vox Tactile Subtitles
@@ -80,7 +78,7 @@ def generate_ass_subtitles(
     if not words:
         raise ValueError("WordTimeline contains zero words")
 
-    events: List[str] = []
+    events: list[str] = []
 
     # Chunk words into legible phrasing events
     i = 0
@@ -114,12 +112,12 @@ def generate_ass_subtitles(
     return out_file
 
 
-def parse_words_from_ass(ass_file: Path) -> List[Dict[str, Any]]:
+def parse_words_from_ass(ass_file: Path) -> list[dict[str, Any]]:
     """Reverse parses ASS subtitle file to extract reconstructed word timings."""
     ass_file = Path(ass_file)
     content = ass_file.read_text(encoding="utf-8")
 
-    reconstructed: List[Dict[str, Any]] = []
+    reconstructed: list[dict[str, Any]] = []
     dialogue_re = re.compile(r"Dialogue:\s*\d+,([^,]+),([^,]+),Default,[^,]*,0,0,0,,(.*)")
     kf_re = re.compile(r"\{\\kf(\d+)\}([^\s\{]+)")
 

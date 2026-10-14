@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/ffmpeg_utils.py — Dynamic FFmpeg & FFprobe Resolution Utility (AVF-VOX-001).
 
 Resolves ffmpeg and ffprobe executable paths across Windows and Linux VPS.

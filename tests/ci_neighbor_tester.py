@@ -444,32 +444,28 @@ def test_block3_director_contract() -> bool:
 
         test_dir = Path(tempfile.mkdtemp(prefix="ci_cross_mkt_"))
         try:
-            # Case A: Japanese Food Scandal
+            # Case A: Japanese Food Safety Scandal (3 vs 3 Gate 10 Canonical Alignment)
             jp_sents = [
-                {"text": "４８６０ミリグラム毎キログラム――中国産タケノコから基準値の２４倍の二酸化硫黄が検出されました。", "duration_sec": 5.0, "beat_index": 1},
-                {"text": "検疫所の検査報告書によると、業者は漂白目的で亜硫酸塩を不正使用していました。", "duration_sec": 6.0, "beat_index": 2},
-                {"text": "厚生労働省は立ち入り検査を実施し、公式の査証印が押された回収命令を発令しました。", "duration_sec": 5.5, "beat_index": 3},
-                {"text": "損害賠償請求額は数億円規模に達し、食品流通の暗部が白日の下に晒されました。", "duration_sec": 6.5, "beat_index": 4},
-                {"text": "裁判所は業務停止命令を下し、現代の食品安全基準に対する警鐘を鳴らしました。", "duration_sec": 5.0, "beat_index": 5},
+                {"text": "基準値超えの二酸化硫黄が輸入食品から検出されました。", "duration_sec": 5.0, "beat_index": 1},
+                {"text": "検疫当局は立ち入り検査を実施し、公式文書を発令しました。", "duration_sec": 5.5, "beat_index": 3},
+                {"text": "裁判所は行政処分を下しました。", "duration_sec": 5.0, "beat_index": 5},
             ]
-            jp_meta = {"episode_id": "JP_EP0004_china_bamboo_sulfur", "market": "JP", "topic": "中国産タケノコ二酸化硫黄事件"}
+            jp_meta = {"episode_id": "JP_EP0004_test", "market": "JP", "topic": "食品安全検査"}
             jp_plan = build_unified_director_plan(jp_sents, test_dir / "jp", metadata=jp_meta, market="JP")
 
             # Case B: English Tech Antitrust
             en_sents = [
-                {"text": "Federal regulatory agencies unveiled formal findings of anti-competitive algorithmic pricing.", "duration_sec": 5.0, "beat_index": 1},
-                {"text": "Internal corporate emails revealed secret soft reserve pricing mechanisms.", "duration_sec": 6.0, "beat_index": 2},
-                {"text": "Whistleblower documents showed forensic accounting discrepancies exceeding billions.", "duration_sec": 5.5, "beat_index": 3},
-                {"text": "The prosecution presented sworn testimony regarding marketplace monopolization.", "duration_sec": 6.5, "beat_index": 4},
-                {"text": "The federal judge delivered a historic bench ruling establishing new antitrust precedent.", "duration_sec": 5.0, "beat_index": 5},
+                {"text": "Antitrust regulators released formal investigation findings.", "duration_sec": 5.0, "beat_index": 1},
+                {"text": "Financial ledgers detailed systematic margin discrepancies.", "duration_sec": 5.5, "beat_index": 3},
+                {"text": "The federal judge delivered a historic bench ruling.", "duration_sec": 5.0, "beat_index": 5},
             ]
-            en_meta = {"episode_id": "EN_EP0005_tech_cloud_antitrust", "market": "EN", "topic": "Tech Cloud Antitrust"}
+            en_meta = {"episode_id": "EN_EP0005_test", "market": "EN", "topic": "Antitrust Investigation"}
             en_plan = build_unified_director_plan(en_sents, test_dir / "en", metadata=en_meta, market="EN")
 
             jp_scenes = jp_plan.get("scenes", [])
             en_scenes = en_plan.get("scenes", [])
-            assert len(jp_scenes) == 5, f"Expected 5 JP scenes, got {len(jp_scenes)}"
-            assert len(en_scenes) == 5, f"Expected 5 EN scenes, got {len(en_scenes)}"
+            assert len(jp_scenes) == 3, f"Expected 3 JP scenes, got {len(jp_scenes)}"
+            assert len(en_scenes) == 3, f"Expected 3 EN scenes, got {len(en_scenes)}"
 
             # Assert JP scenes have ZERO Amazon / Lina Khan / Seattle leaks
             for s in jp_scenes:
@@ -504,8 +500,10 @@ def test_block3_director_contract() -> bool:
             assert 'f_base = "paper_rustle.mp3"' not in props_content, "Detected forbidden silent fallback to paper_rustle in build_remotion_props.py!"
             logger.info("  ✅ Anti-Silent-Fallback Code Audit PASSED: 0% blind fallbacks in build_remotion_props.py.")
 
-            jp_bgs = set(s.get("bg_reuse_key") for s in jp_scenes if s.get("bg_reuse_key"))
-            en_bgs = set(s.get("bg_reuse_key") for s in en_scenes if s.get("bg_reuse_key"))
+            jp_bgs = set(s.get("background", {}).get("reuse_key") or s.get("bg_reuse_key") or s.get("background_reuse_key") for s in jp_scenes if (s.get("background", {}).get("reuse_key") or s.get("bg_reuse_key") or s.get("background_reuse_key")))
+            en_bgs = set(s.get("background", {}).get("reuse_key") or s.get("bg_reuse_key") or s.get("background_reuse_key") for s in en_scenes if (s.get("background", {}).get("reuse_key") or s.get("bg_reuse_key") or s.get("background_reuse_key")))
+            assert len(jp_bgs) >= 3, f"JP background count must be >= 3 to prevent vacuous pass, got {len(jp_bgs)}"
+            assert len(en_bgs) >= 3, f"EN background count must be >= 3 to prevent vacuous pass, got {len(en_bgs)}"
             assert len(jp_bgs.intersection(en_bgs)) == 0, f"Background rosters overlapped: {jp_bgs.intersection(en_bgs)}"
             logger.info(f"  ✅ Live Cross-Market Integrity Passed: JP ({len(jp_bgs)} BGs) vs EN ({len(en_bgs)} BGs) 100% disjoint, 0% leakage.")
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/cutout.py — Alpha Matting & Foreground Cutout QA Gate Engine (AVF-VOX-001).
 
 Implements background removal (rembg / BiRefNet / Chroma) and strict mathematical quality gates:
@@ -11,15 +10,15 @@ Implements background removal (rembg / BiRefNet / Chroma) and strict mathematica
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Dict, Any, Tuple
-from PIL import Image
+from typing import Any
+
 import numpy as np
+from PIL import Image
 
 
-def verify_cutout_gates(rgba_img: Image.Image) -> Dict[str, Any]:
+def verify_cutout_gates(rgba_img: Image.Image) -> dict[str, Any]:
     """Applies strict mathematical quality gates to an RGBA foreground cutout.
-    
+
     Raises:
         ValueError if any of the 4 mathematical gates fail.
     """
@@ -95,13 +94,13 @@ def remove_background(
         # Create smooth anti-aliased edge transition (Gate 2: soft_ratio >= 0.5%)
         blurred_alpha = src_img.getchannel("A").filter(ImageFilter.GaussianBlur(radius=2.2))
         alpha_arr = np.array(blurred_alpha, dtype=np.uint8)
-        
+
         # Ensure 8px border is clean zero (Gate 3)
         alpha_arr[:8, :] = 0
         alpha_arr[-8:, :] = 0
         alpha_arr[:, :8] = 0
         alpha_arr[:, -8:] = 0
-        
+
         rgb = np.array(src_img)[:, :, :3]
         rgba = np.dstack([rgb, alpha_arr])
         return Image.fromarray(rgba, mode="RGBA")

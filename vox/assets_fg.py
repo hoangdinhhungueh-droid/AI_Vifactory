@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/assets_fg.py — Foreground RGBA Object Generator & Cutout Engine (AVF-VOX-001).
 
 Generates isolated tactical foreground cutouts:
@@ -15,12 +14,13 @@ import hashlib
 import math
 import time
 from pathlib import Path
-from typing import Dict, Any, Tuple
-from PIL import Image, ImageDraw
-import numpy as np
+from typing import Any
 
-from vox.schemas import FGObject
+import numpy as np
+from PIL import Image, ImageDraw
+
 from vox.cutout import remove_background, verify_cutout_gates
+from vox.schemas import FGObject
 
 
 def _draw_ledger_folio(draw: ImageDraw.ImageDraw, cx: int, cy: int, w: int, h: int, scale: float, rng: np.random.Generator) -> None:
@@ -169,8 +169,8 @@ def generate_fg_cutout(
     fg_obj: FGObject,
     scene_idx: int,
     out_dir: Path,
-    target_wh: Tuple[int, int] = (1024, 1024),
-) -> Tuple[Path, Dict[str, Any]]:
+    target_wh: tuple[int, int] = (1024, 1024),
+) -> tuple[Path, dict[str, Any]]:
     """Generates an isolated tactile foreground object cutout PNG with verified alpha."""
     start_ts = time.time()
     out_dir = Path(out_dir)

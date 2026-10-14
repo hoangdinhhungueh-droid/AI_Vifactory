@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/handoff.py — Inter-stage handoff boundary contract validation.
 
 Compares upstream producer output schema vs downstream consumer input schema.
@@ -8,17 +7,18 @@ Eliminates contract drift and boundary blindness.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
 from tools.codemap.schema import FieldIssue, Handoff, HandoffStatus
 
 
 def analyze_handoff(
     from_stage: str,
     to_stage: str,
-    producer_model: Optional[str],
-    consumer_model: Optional[str],
-    producer_schema: Optional[Dict[str, Any]],
-    consumer_schema: Optional[Dict[str, Any]],
+    producer_model: str | None,
+    consumer_model: str | None,
+    producer_schema: dict[str, Any] | None,
+    consumer_schema: dict[str, Any] | None,
 ) -> Handoff:
     """Validates contract compatibility between producer output and consumer input."""
 
@@ -46,7 +46,7 @@ def analyze_handoff(
             issues=issues
         )
 
-    issues: List[FieldIssue] = []
+    issues: list[FieldIssue] = []
 
     prod_props = producer_schema.get("properties", {})
     cons_props = consumer_schema.get("properties", {})

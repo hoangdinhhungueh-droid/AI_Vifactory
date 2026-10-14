@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/tts.py — TTS Voiceover Synthesis Engine for Vox Pipeline (AVF-VOX-001).
 
 Synthesizes high-fidelity voice narration audio from ScenePlan.
@@ -13,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, Optional
 
 from vox.schemas import ScenePlan
 
@@ -25,13 +23,13 @@ def synthesize_narration(
     rate: str = "+0%",
 ) -> Path:
     """Synthesizes voice narration from ScenePlan to a standardized 48kHz mono WAV file.
-    
+
     Args:
         plan: Validated ScenePlan object.
         out_file: Path to destination WAV file.
         voice: Edge-TTS voice identifier.
         rate: Speed modifier.
-        
+
     Returns:
         Path to output WAV file.
     """

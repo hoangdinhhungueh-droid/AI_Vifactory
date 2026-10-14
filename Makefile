@@ -31,6 +31,7 @@ test:
 	$(PYTEST) -m "not integration" -v tests/
 
 lint:
+	$(RUFF) check vox/ tools/
 	$(RUFF) check app/ scripts/ --exit-zero
 	$(PYTEST) -v tests/test_zero_semantic_bias.py
 

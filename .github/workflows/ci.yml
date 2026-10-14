@@ -34,7 +34,9 @@ jobs:
           sudo chown -R $USER:$USER /var/vf
       
       - name: Lint with ruff
-        run: ruff check app/ scripts/ --exit-zero
+        run: |
+          ruff check vox/ tools/
+          ruff check app/ scripts/ --exit-zero
 
       - name: Static compilation check (Rule 127)
         run: python -m compileall -q scripts tools vox app tests

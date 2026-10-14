@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/ui/render.py — Self-contained HTML Visual Pipeline Flow Generator.
 
 Embeds codemap registry and optional runtime traces into a 0-dependency offline HTML dashboard.
@@ -9,17 +8,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
 
 from tools.codemap.lineage import compute_lineage_report
-from tools.codemap.schema import CodemapRegistry
 
 
 def generate_pipeline_html(
-    codemap_file: Optional[Path] = None,
-    run_id: Optional[str] = None,
-    output_html: Optional[Path] = None,
-    repo_root: Optional[Path] = None,
+    codemap_file: Path | None = None,
+    run_id: str | None = None,
+    output_html: Path | None = None,
+    repo_root: Path | None = None,
 ) -> Path:
     root = (repo_root or Path.cwd()).resolve()
     cmap_path = codemap_file or (root / ".codemap" / "codemap.json")
@@ -147,7 +144,7 @@ def _build_default_html(json_payload: str) -> str:
     .badge-ok {{ background: rgba(34, 197, 94, 0.15); color: var(--success); border-color: var(--success); }}
     .badge-warn {{ background: rgba(245, 158, 11, 0.15); color: var(--warning); border-color: var(--warning); }}
     .badge-err {{ background: rgba(239, 68, 68, 0.15); color: var(--danger); border-color: var(--danger); }}
-    
+
     .nav-tabs {{ display: flex; gap: 8px; }}
     .tab-btn {{
       background: transparent;
@@ -165,7 +162,7 @@ def _build_default_html(json_payload: str) -> str:
       border-color: var(--accent);
       font-weight: 700;
     }}
-    
+
     main {{
       display: flex;
       flex: 1;
@@ -190,7 +187,7 @@ def _build_default_html(json_payload: str) -> str:
       flex-direction: column;
       gap: 20px;
     }}
-    
+
     /* Stage Nodes */
     .stage-card {{
       background: var(--surface);
@@ -212,7 +209,7 @@ def _build_default_html(json_payload: str) -> str:
     .stage-header {{ display: flex; justify-content: space-between; align-items: center; }}
     .stage-title {{ font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }}
     .stage-meta {{ font-size: 12px; color: var(--text-muted); font-family: monospace; }}
-    
+
     .stage-io {{
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -224,7 +221,7 @@ def _build_default_html(json_payload: str) -> str:
       font-family: monospace;
     }}
     .io-label {{ color: var(--text-muted); font-size: 11px; text-transform: uppercase; }}
-    
+
     .connector {{
       width: 2px;
       height: 24px;
@@ -239,7 +236,7 @@ def _build_default_html(json_payload: str) -> str:
       font-size: 10px;
       color: var(--border);
     }}
-    
+
     /* Inspector */
     h3 {{ font-size: 15px; text-transform: uppercase; color: var(--accent); letter-spacing: 0.5px; }}
     .code-block {{
@@ -270,7 +267,7 @@ def _build_default_html(json_payload: str) -> str:
       font-size: 12px;
     }}
     .ide-link:hover {{ text-decoration: underline; }}
-    
+
     /* Lineage table */
     .lineage-table {{ width: 100%; border-collapse: collapse; font-size: 12px; }}
     .lineage-table th, .lineage-table td {{

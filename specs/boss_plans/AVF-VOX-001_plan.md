@@ -1,4 +1,18 @@
-  PUSH_IN = "push_in"                  # zoom 1.00→1.20
+# Implementation Plan: AVF-VOX-001 — Single Unified Vox Pipeline with Tactile Object Decomposition
+
+> **Architectural Authority**: Boss Claude Opus 5.5
+> **Engine**: `vox.compositor` + `vox.assemble` (Single Canonical Video Rendering Engine)
+> **Compliance**: Rule 118 (Zero-Mock), Rule 120 (Word Timeline), Rule 125 (Single Truth), Rule 135 (Ground-Truth Chapters)
+
+## 1. Architectural Blueprint & Canonical Engine
+
+The AI Video Factory pipeline is consolidated into a single, unified Vox-Style architecture under `vox/`. All legacy stages and shadow scripts are completely purged.
+- **Canonical Render Engine**: `vox.compositor` (dynamic 2.5D multiplane parallax canvas) + `vox.assemble` (broadcast FFmpeg assembly with two-pass EBU R128 loudnorm).
+- **Chapter Synchronization (Rule 135)**: Exact video timeline chapters are synchronized from Whisper word-aligned scene boundaries in `manifest.json`.
+
+```python
+class CameraMove(str, Enum):
+    PUSH_IN = "push_in"                  # zoom 1.00→1.20
     PULL_OUT = "pull_out"                # zoom 1.20→1.00
     PAN_LEFT = "pan_left"
     PAN_RIGHT = "pan_right"
@@ -9,6 +23,7 @@
     PARALLAX_LEFT = "parallax_left"      # BG chậm, FG nhanh theo depth
     PARALLAX_RIGHT = "parallax_right"
     ROLL_PUSH = "roll_push"              # zoom 1.0→1.15 + roll ±2°
+
 
 class FGObject(BaseModel):
     id: str
@@ -152,7 +167,8 @@ python -m vox.qa.gates verify out/golden/manifest.json
 | Video stream | h264, yuv420p, 1920×1080, 30 fps CFR |
 | Audio stream | AAC, 48 kHz |
 | Duration | Bằng duration của audio, sai lệch ±0.1 s |
-| Loudness | `ebur128`: −14 LUFS ±1, true peak ≤ −1 dBTP |
+| Loudness | Two-pass EBU R128: −16.0 LUFS ±1.0, true peak ≤ −1.5 dBTP |
+| Chapters (Rule 135) | Word-aligned scene boundaries in manifest.json starting at 00:00, strictly monotonic |
 | Black frames | `blackdetect=d=0.1`: 0 đoạn |
 | Frozen frames | `freezedetect=n=0.001:d=2`: 0 đoạn |
 | Karaoke | Sai lệch timing từng từ trong ASS so với WordTimeline ≤ 10 ms; mọi từ của script đều xuất hiện |

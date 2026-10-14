@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/ast_scanner.py — High-precision Python AST Dependency & Stage Scanner.
 
 Extracts symbols, caller/callee graphs, `@pipeline_stage` declarations, and failure modes.
@@ -11,7 +10,7 @@ import ast
 import builtins
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Union
 
 from tools.codemap.schema import FailureMode, SourceRef, Stage, Symbol
 
@@ -44,11 +43,11 @@ class FileAstVisitor(ast.NodeVisitor):
         self.mod_qualname = self.rel_file.replace("/", ".").replace(".py", "")
 
         # Import mapping: alias -> full qualname
-        self.imports: Dict[str, str] = {}
+        self.imports: dict[str, str] = {}
 
-        self.symbols: List[Symbol] = []
-        self.stages: List[Stage] = []
-        self.current_class: Optional[str] = None
+        self.symbols: list[Symbol] = []
+        self.stages: list[Stage] = []
+        self.current_class: str | None = None
 
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
@@ -132,7 +131,7 @@ class FileAstVisitor(ast.NodeVisitor):
         except Exception:
             return getattr(d, "id", "decorator")
 
-    def _collect_calls(self, fn_node: ast.AST) -> List[str]:
+    def _collect_calls(self, fn_node: ast.AST) -> list[str]:
         calls = set()
         for sub in ast.walk(fn_node):
             if isinstance(sub, ast.Call):
@@ -141,7 +140,7 @@ class FileAstVisitor(ast.NodeVisitor):
                     calls.add(target)
         return sorted(calls)
 
-    def _resolve_call_target(self, func_node: ast.AST) -> Optional[str]:
+    def _resolve_call_target(self, func_node: ast.AST) -> str | None:
         if isinstance(func_node, ast.Name):
             name = func_node.id
             if name in BUILTIN_NAMES:
@@ -156,7 +155,7 @@ class FileAstVisitor(ast.NodeVisitor):
             return f"?{func_node.attr}"
         return None
 
-    def _collect_failure_modes(self, fn_node: ast.AST) -> List[FailureMode]:
+    def _collect_failure_modes(self, fn_node: ast.AST) -> list[FailureMode]:
         modes = []
         for sub in ast.walk(fn_node):
             if isinstance(sub, ast.Raise):
@@ -200,8 +199,8 @@ class FileAstVisitor(ast.NodeVisitor):
         node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
         qualname: str,
         ref: SourceRef,
-        failure_modes: List[FailureMode]
-    ) -> Optional[Stage]:
+        failure_modes: list[FailureMode]
+    ) -> Stage | None:
         for d in node.decorator_list:
             if isinstance(d, ast.Call):
                 name = getattr(d.func, "id", "") or getattr(d.func, "attr", "")
@@ -243,10 +242,10 @@ class CodebaseASTScanner:
     def __init__(self, repo_root: Path, include_tests: bool = False):
         self.repo_root = repo_root.resolve()
         self.include_tests = include_tests
-        self.symbols: Dict[str, Symbol] = {}
-        self.stages: List[Stage] = []
+        self.symbols: dict[str, Symbol] = {}
+        self.stages: list[Stage] = []
 
-    def scan(self) -> Tuple[Dict[str, Symbol], List[Stage]]:
+    def scan(self) -> tuple[dict[str, Symbol], list[Stage]]:
         self.symbols.clear()
         self.stages.clear()
 
@@ -275,7 +274,7 @@ class CodebaseASTScanner:
                     pass
 
         # Build fast suffix index
-        suffix_index: Dict[str, List[str]] = {}
+        suffix_index: dict[str, list[str]] = {}
         for qual in self.symbols:
             short_name = qual.split(".")[-1]
             suffix_index.setdefault(short_name, []).append(qual)
@@ -303,7 +302,7 @@ class CodebaseASTScanner:
         return self.symbols, self.stages
 
     def _propagate_stage_reachability(self, stage_id: str, entry_qualname: str):
-        visited: Set[str] = set()
+        visited: set[str] = set()
         queue = [entry_qualname]
 
         while queue:

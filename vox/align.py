@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/align.py — Whisper Word Timestamps & Script Text Alignment Engine (AVF-VOX-001).
 
 Aligns speech audio with canonical script text:
@@ -17,7 +16,7 @@ from __future__ import annotations
 import difflib
 import wave
 from pathlib import Path
-from typing import List, Tuple, Dict, Any
+from typing import Any
 
 from vox.schemas import ScenePlan, Word, WordTimeline
 
@@ -34,14 +33,14 @@ def align_script_with_audio(
     plan: ScenePlan,
     wav_path: Path,
     model_size: str = "base",
-) -> Tuple[WordTimeline, ScenePlan]:
+) -> tuple[WordTimeline, ScenePlan]:
     """Aligns script narration to audio wav file and populates scene timecodes.
-    
+
     Args:
         plan: Input ScenePlan with scenes needing start/end timestamps.
         wav_path: Path to 48kHz mono WAV narration file.
         model_size: Faster-whisper model size ('tiny', 'base', 'small', 'medium').
-        
+
     Returns:
         Tuple of (WordTimeline, updated ScenePlan).
     """
@@ -49,7 +48,7 @@ def align_script_with_audio(
     audio_dur = get_audio_duration_wav(wav_path)
 
     # Collect all script words mapped to their scene index
-    script_words: List[Tuple[str, int]] = []
+    script_words: list[tuple[str, int]] = []
     for sc in plan.scenes:
         for w in sc.narration.strip().split():
             script_words.append((w, sc.idx))
@@ -57,7 +56,7 @@ def align_script_with_audio(
     if not script_words:
         raise ValueError("ScenePlan contains zero words across all scenes")
 
-    whisper_words: List[Dict[str, Any]] = []
+    whisper_words: list[dict[str, Any]] = []
 
     # 1. Attempt live faster-whisper extraction
     whisper_success = False
@@ -98,8 +97,8 @@ def align_script_with_audio(
     script_tokens = [w[0].lower().strip(".,!?:;\"'()[]{}") for w in script_words]
     whisper_tokens = [w["word"].lower().strip(".,!?:;\"'()[]{}") for w in whisper_words]
 
-    matcher = difflib.SequenceMatcher(None, script_tokens, whisper_tokens)
-    aligned_words: List[Word] = []
+    difflib.SequenceMatcher(None, script_tokens, whisper_tokens)
+    aligned_words: list[Word] = []
     matches = 0
 
     # Distribute timestamps monotonically

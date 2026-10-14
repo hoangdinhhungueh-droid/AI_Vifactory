@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/ghost_scan.py — Automated Anti-Ghost & Anti-Bypass Scanner (Rule 125 & AVF-STAB-001).
 
 Enforces:
@@ -12,7 +11,6 @@ import ast
 import os
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -21,13 +19,13 @@ if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-CANONICAL_DIRS = ["core", "stages", "orchestrator"]
+CANONICAL_DIRS = ["core", "stages", "orchestrator", "vox"]
 FORBIDDEN_MODULE_PREFIXES = ["legacy"]
 GHOST_PATTERNS = ["*.bak", "*.bak.*", "*.backup", "*_v2.py", "*_v3.py", "*_old.py", "*_new.py"]
 IGNORE_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__"}
 
 
-def check_ast_imports(py_file: Path) -> List[Tuple[str, int]]:
+def check_ast_imports(py_file: Path) -> list[tuple[str, int]]:
     """Inspects AST of a python file to detect forbidden or legacy imports."""
     violations = []
     try:
@@ -51,28 +49,35 @@ def check_ast_imports(py_file: Path) -> List[Tuple[str, int]]:
     return violations
 
 
-def scan_canonical_imports() -> List[str]:
+def scan_canonical_imports() -> list[str]:
     """Scans all files in canonical directories for prohibited legacy imports."""
     errors = []
+    total_canonical_files = 0
     for cdir_name in CANONICAL_DIRS:
         cdir = REPO_ROOT / cdir_name
         if not cdir.exists():
             continue
         for py_file in cdir.rglob("*.py"):
+            total_canonical_files += 1
             violations = check_ast_imports(py_file)
             for v_msg, lineno in violations:
                 rel = py_file.relative_to(REPO_ROOT)
                 errors.append(f"[FORBIDDEN IMPORT] {rel}:{lineno} -> {v_msg}")
+    print(f"  [SCAN INFO] Inspected {total_canonical_files} files across canonical packages: {CANONICAL_DIRS}")
     return errors
 
 
-def scan_ghost_files() -> List[str]:
-    """Scans active workspace for backup or versioned ghost files."""
+def scan_ghost_files() -> list[str]:
+    """Scans active workspace for backup or versioned ghost files, recording walk telemetry."""
     ghosts = []
+    scanned_dirs = 0
+    scanned_files = 0
     for root, dirs, files in os.walk(REPO_ROOT):
         # Modify dirs in-place to prune ignored directories
         dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
-        
+        scanned_dirs += 1
+        scanned_files += len(files)
+
         cur_path = Path(root)
         for pattern in GHOST_PATTERNS:
             for match in cur_path.glob(pattern):
@@ -81,6 +86,7 @@ def scan_ghost_files() -> List[str]:
                     # Check if inside legacy or reports/tests intentionally
                     if not str(rel).startswith("legacy") and not str(rel).startswith("reports"):
                         ghosts.append(f"[GHOST FILE FOUND] {rel}")
+    print(f"  [SCAN INFO] Walked {scanned_dirs} directories and {scanned_files} files across physical filesystem.")
     return ghosts
 
 

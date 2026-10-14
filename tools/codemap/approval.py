@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/approval.py — Forensic Approval Freezing and Audit Tracker.
 
 Freezes approved user/agent decisions with bit-for-bit SHA256 hashes and field maps.
@@ -11,7 +10,7 @@ import datetime
 import json
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Literal
 
 from tools.codemap.hashing import field_hashes, redact, sha256_of
 from tools.codemap.schema import Approval
@@ -23,7 +22,7 @@ def record_approval(
     payload: Any,
     actor: Literal["user", "agent"] = "user",
     channel: str = "chat",
-    repo_root: Optional[Path] = None,
+    repo_root: Path | None = None,
 ) -> Approval:
     """Freezes an approval decision to disk and returns the Approval object."""
     root = (repo_root or Path.cwd()).resolve()
@@ -33,7 +32,7 @@ def record_approval(
     snapshot_dir.mkdir(parents=True, exist_ok=True)
 
     approval_id = f"appr_{uuid.uuid4().hex[:12]}"
-    ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    ts = datetime.datetime.now(datetime.UTC).isoformat()
 
     p_hash = sha256_of(payload)
     f_hashes = field_hashes(payload)

@@ -87,8 +87,6 @@ legacy_inventory.json
 # Local scratch & auxiliary files
 .safe_trash/
 .trash/
-CHANGELOG.md
-ROADMAP.md
 active_candidate/
 archive/
 audits/
@@ -99,4 +97,5 @@ remotion/public/*.json
 .agents/
 python*.bat
 python*.cmd
+temp_test/
 

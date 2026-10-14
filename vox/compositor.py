@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/compositor.py — Tactical Scene Compositor with Parallax & Camera Warping (AVF-VOX-001).
 
 Renders a scene into an individual video clip (.mp4):
@@ -13,22 +12,22 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-from PIL import Image
-import numpy as np
 
-from vox.schemas import Scene, FGObject
+import numpy as np
+from PIL import Image
+
 from vox.camera import move_transform
+from vox.schemas import FGObject, Scene
 
 
 def render_scene_clip(
     scene: Scene,
     bg_path: Path,
-    fg_map: Dict[str, Path],
+    fg_map: dict[str, Path],
     out_clip: Path,
     fps: int = 30,
-    out_wh: Tuple[int, int] = (1920, 1080),
-    canvas_wh: Tuple[int, int] = (2400, 1350),
+    out_wh: tuple[int, int] = (1920, 1080),
+    canvas_wh: tuple[int, int] = (2400, 1350),
 ) -> Path:
     """Renders a single scene into an MP4 clip using deterministic parallax compositing."""
     out_clip = Path(out_clip)
@@ -46,7 +45,7 @@ def render_scene_clip(
         bg_img = bg_img.resize(canvas_wh, Image.Resampling.LANCZOS)
 
     # Preload and resize foreground objects (RGBA)
-    fg_data: List[Tuple[FGObject, Image.Image]] = []
+    fg_data: list[tuple[FGObject, Image.Image]] = []
     for fg_obj in scene.fg:
         f_path = fg_map.get(fg_obj.id)
         if f_path and Path(f_path).exists():

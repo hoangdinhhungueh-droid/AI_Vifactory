@@ -18,7 +18,6 @@ from core.contracts.render_props import RemotionRenderProps, SceneRenderProp, Ka
 from core.config import RunContext
 from core.gates import require_input, emit_artifact, compute_file_sha256
 from tools.codemap.runtime import pipeline_stage
-from vox.compositor import render_scene_clip
 from vox.assemble import assemble_final_video
 
 STAGE: StageID = StageID.S10_RENDER
@@ -99,17 +98,15 @@ def run(ctx: RunContext) -> StageArtifact:
         rendered = False
         if has_video and has_audio:
             try:
-                cmd = [
-                    "ffmpeg", "-y",
-                    "-i", str(first_clip),
-                    "-i", str(audio_file),
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-b:v", "2500k",
-                    "-c:a", "aac", "-b:a", "192k",
-                    "-shortest",
-                    str(final_mp4)
-                ]
-                res = subprocess.run(cmd, capture_output=True, check=False)
-                if res.returncode == 0 and final_mp4.exists() and final_mp4.stat().st_size > 1000:
+                # Delegate to canonical vox assembly engine with two-pass loudnorm (Rule 125 & 139)
+                clip_paths = [Path(cl.get("file_path")) for cl in clips if cl.get("file_path") and Path(cl["file_path"]).exists()]
+                if not clip_paths:
+                    clip_paths = [Path(first_clip)]
+                ass_file = ctx.paths.root / "subtitles.ass"
+                if not ass_file.exists():
+                    ass_file.write_text("[Script Info]\nScriptType: v4.00+\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n", encoding="utf-8")
+                assemble_final_video(clip_paths, Path(audio_file), ass_file, final_mp4)
+                if final_mp4.exists() and final_mp4.stat().st_size > 1000:
                     rendered = True
             except Exception:
                 pass

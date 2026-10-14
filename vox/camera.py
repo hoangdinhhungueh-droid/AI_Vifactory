@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/camera.py — Pure Mathematical 12-Move Camera & Parallax Transform Engine (AVF-VOX-001).
 
 Implements deterministic 2x3 affine transformation matrices for:
@@ -12,7 +11,7 @@ Implements deterministic 2x3 affine transformation matrices for:
 from __future__ import annotations
 
 import math
-from typing import Tuple
+
 import numpy as np
 
 from vox.schemas import CameraMove
@@ -31,19 +30,19 @@ def ease_in_out_cubic(t: float) -> float:
 def move_transform(
     move: CameraMove,
     t_norm: float,
-    canvas_wh: Tuple[int, int] = (2400, 1350),
-    out_wh: Tuple[int, int] = (1920, 1080),
+    canvas_wh: tuple[int, int] = (2400, 1350),
+    out_wh: tuple[int, int] = (1920, 1080),
     depth: float = 0.0,
 ) -> np.ndarray:
     """Computes a 2x3 affine matrix mapping canvas coordinates to output viewport coordinates.
-    
+
     Args:
         move: One of the 12 CameraMove enums.
         t_norm: Normalized timeline progress [0.0, 1.0].
         canvas_wh: Dimensions (width, height) of the source overscan canvas.
         out_wh: Dimensions (width, height) of the target output viewport.
         depth: Foreground object depth [0.0 = BG anchor, 1.0 = camera plane].
-    
+
     Returns:
         np.ndarray of shape (2, 3), float64.
     """
@@ -53,7 +52,7 @@ def move_transform(
 
     # Base scale ratio between canvas and target output (e.g. 1920 / 2400 = 0.8)
     base_s = ow / cw
-    
+
     # Parallax multiplier for depth
     p_factor = 1.0 + (max(0.0, min(1.0, depth)) * 0.6)
 

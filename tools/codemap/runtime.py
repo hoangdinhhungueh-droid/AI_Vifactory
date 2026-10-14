@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/runtime.py — Zero-cost @pipeline_stage decorator and execution tracer.
 
 Guarantees:
@@ -16,18 +15,16 @@ import functools
 import inspect
 import json
 import logging
-import os
-import sys
-import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 
-from tools.codemap.hashing import canonical_json, field_hashes, redact, sha256_of
+from tools.codemap.hashing import field_hashes, redact, sha256_of
 from tools.codemap.schema import ArtifactRef, SourceRef, StageEvent
 
 logger = logging.getLogger("codemap.runtime")
 
-_current_run_ctx: contextvars.ContextVar[Optional[Dict[str, Any]]] = contextvars.ContextVar(
+_current_run_ctx: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
     "_current_run_ctx", default=None
 )
 
@@ -38,9 +35,9 @@ class run_context:
     def __init__(
         self,
         run_id: str,
-        repo_root: Optional[Union[str, Path]] = None,
-        approval_refs: Optional[List[str]] = None,
-        git_commit: Optional[str] = None,
+        repo_root: str | Path | None = None,
+        approval_refs: list[str] | None = None,
+        git_commit: str | None = None,
     ):
         self.run_id = run_id
         self.repo_root = Path(repo_root or Path.cwd()).resolve()
@@ -68,28 +65,27 @@ class run_context:
             _current_run_ctx.reset(self.token)
 
 
-def get_current_run_context() -> Optional[Dict[str, Any]]:
+def get_current_run_context() -> dict[str, Any] | None:
     return _current_run_ctx.get()
 
 
 def pipeline_stage(
     id: str,
     order: int = 0,
-    name: Optional[str] = None,
-    input_model: Optional[Any] = None,
-    output_model: Optional[Any] = None,
-    triggers: Optional[List[str]] = None,
-    upstream: Optional[List[str]] = None,
-    downstream: Optional[List[str]] = None,
-    artifacts: Optional[List[str]] = None,
-    verify_cmds: Optional[List[str]] = None,
+    name: str | None = None,
+    input_model: Any | None = None,
+    output_model: Any | None = None,
+    triggers: list[str] | None = None,
+    upstream: list[str] | None = None,
+    downstream: list[str] | None = None,
+    artifacts: list[str] | None = None,
+    verify_cmds: list[str] | None = None,
 ):
     """Decorator marking a function as a tracked pipeline stage."""
 
     def decorator(fn: Callable):
-        stage_name = name or id
-        in_model_name = getattr(input_model, "__name__", str(input_model)) if input_model else None
-        out_model_name = getattr(output_model, "__name__", str(output_model)) if output_model else None
+        getattr(input_model, "__name__", str(input_model)) if input_model else None
+        getattr(output_model, "__name__", str(output_model)) if output_model else None
 
         # Inspect source ref once
         try:
@@ -133,12 +129,12 @@ def _execute_traced(
     fn: Callable,
     args: tuple,
     kwargs: dict,
-    ctx: Dict[str, Any],
+    ctx: dict[str, Any],
     stage_id: str,
     code_ref: SourceRef,
-    artifact_patterns: Optional[List[str]],
+    artifact_patterns: list[str] | None,
 ) -> Any:
-    ts_start = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    ts_start = datetime.datetime.now(datetime.UTC).isoformat()
     ctx["seq"] += 1
     seq = ctx["seq"]
 
@@ -173,7 +169,7 @@ def _execute_traced(
         }
         raise
     finally:
-        ts_end = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        ts_end = datetime.datetime.now(datetime.UTC).isoformat()
         out_hash = sha256_of(output_result) if output_result is not None else None
         out_field_hashes = field_hashes(output_result) if output_result is not None else {}
 
@@ -234,12 +230,12 @@ async def _execute_traced_async(
     fn: Callable,
     args: tuple,
     kwargs: dict,
-    ctx: Dict[str, Any],
+    ctx: dict[str, Any],
     stage_id: str,
     code_ref: SourceRef,
-    artifact_patterns: Optional[List[str]],
+    artifact_patterns: list[str] | None,
 ) -> Any:
-    ts_start = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    ts_start = datetime.datetime.now(datetime.UTC).isoformat()
     ctx["seq"] += 1
     seq = ctx["seq"]
 
@@ -273,7 +269,7 @@ async def _execute_traced_async(
         }
         raise
     finally:
-        ts_end = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        ts_end = datetime.datetime.now(datetime.UTC).isoformat()
         out_hash = sha256_of(output_result) if output_result is not None else None
         out_field_hashes = field_hashes(output_result) if output_result is not None else {}
 

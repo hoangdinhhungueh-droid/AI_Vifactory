@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/__main__.py — Unified CLI for Codemap GPS Brain & Lineage Tracker.
 
 Subcommands:
@@ -20,7 +19,6 @@ from pathlib import Path
 
 from tools.codemap.builder import build_codemap, check_codemap
 from tools.codemap.lineage import compute_lineage_report
-from tools.codemap.schema import CodemapRegistry
 from tools.codemap.ui.render import generate_pipeline_html
 
 

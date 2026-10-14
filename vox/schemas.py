@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/schemas.py — Typed Pydantic Contracts for Unified Vox Pipeline (AVF-VOX-001).
 
 Implements strict validation for:
@@ -13,7 +12,7 @@ Implements strict validation for:
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, List
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -46,15 +45,15 @@ class Scene(BaseModel):
     idx: int
     narration: str = Field(min_length=1)
     bg_prompt: str = Field(min_length=10)     # requirements: background without main subject
-    fg: List[FGObject] = Field(min_length=1, max_length=3)
+    fg: list[FGObject] = Field(min_length=1, max_length=3)
     camera: CameraMove
-    start: Optional[float] = None             # filled by align.py
-    end: Optional[float] = None
+    start: float | None = None             # filled by align.py
+    end: float | None = None
 
 
 class ScenePlan(BaseModel):
     title: str
-    scenes: List[Scene] = Field(min_length=1)
+    scenes: list[Scene] = Field(min_length=1)
 
     @model_validator(mode="after")
     def _camera_variety(self) -> ScenePlan:
@@ -74,6 +73,6 @@ class Word(BaseModel):
 
 
 class WordTimeline(BaseModel):
-    words: List[Word]
+    words: list[Word]
     audio_duration: float
     match_ratio: float  # token match ratio between script and Whisper

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/assets_bg.py — Background 16:9 Overscan Generation Engine (AVF-VOX-001).
 
 Generates overscan background canvases:
@@ -13,9 +12,10 @@ from __future__ import annotations
 import hashlib
 import time
 from pathlib import Path
-from typing import Dict, Any, Tuple
-from PIL import Image, ImageDraw, ImageFilter
+from typing import Any
+
 import numpy as np
+from PIL import Image, ImageDraw
 
 
 def compute_luminance_std(img: Image.Image) -> float:
@@ -29,16 +29,16 @@ def generate_background_canvas(
     bg_prompt: str,
     scene_idx: int,
     out_dir: Path,
-    target_wh: Tuple[int, int] = (2400, 1350),
-) -> Tuple[Path, Dict[str, Any]]:
+    target_wh: tuple[int, int] = (2400, 1350),
+) -> tuple[Path, dict[str, Any]]:
     """Generates a textured editorial background canvas matching Vox aesthetics.
-    
+
     Args:
         bg_prompt: Stylized editorial novel background description.
         scene_idx: Scene index.
         out_dir: Destination folder.
         target_wh: Target overscan resolution (2400, 1350).
-        
+
     Returns:
         Tuple of (output PNG path, telemetry metadata dict).
     """

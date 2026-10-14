@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/schema.py — Canonical Pydantic Schemas for Codemap & Traceability.
 
 Governed by extra="forbid" to eliminate contract drift.
@@ -8,9 +7,9 @@ Standardizes static code map, runtime event traces, approvals, and lineage repor
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, Literal
 
+from pydantic import BaseModel, ConfigDict, Field
 
 HandoffStatus = Literal["MATCH", "PARTIAL", "MISMATCH", "UNRESOLVED"]
 
@@ -31,7 +30,7 @@ class FailureMode(BaseModel):
     exc_type: str = Field(description="e.g. ValueError, TimeoutError, GateError")
     origin: Literal["raise", "except", "declared"] = Field(description="How failure mode was detected")
     ref: SourceRef = Field(description="Location of throw/catch")
-    note: Optional[str] = Field(default=None, description="Optional diagnostic comment")
+    note: str | None = Field(default=None, description="Optional diagnostic comment")
 
 
 class Stage(BaseModel):
@@ -43,14 +42,14 @@ class Stage(BaseModel):
     order: int = Field(description="Execution sequence order (1-11)")
     qualname: str = Field(description="Fully qualified dotted import path")
     ref: SourceRef = Field(description="Source file line range")
-    input_model: Optional[str] = Field(default=None, description="Input Pydantic model qualname")
-    output_model: Optional[str] = Field(default=None, description="Output Pydantic model qualname")
-    triggers: List[str] = Field(default_factory=list, description="Triggers, e.g. cli:run, approval:script")
-    upstream: List[str] = Field(default_factory=list, description="Predecessor stage IDs")
-    downstream: List[str] = Field(default_factory=list, description="Successor stage IDs")
-    artifacts: List[str] = Field(default_factory=list, description="Artifact paths or glob patterns")
-    failure_modes: List[FailureMode] = Field(default_factory=list)
-    verify_cmds: List[str] = Field(default_factory=list, description="CLI commands to verify stage execution")
+    input_model: str | None = Field(default=None, description="Input Pydantic model qualname")
+    output_model: str | None = Field(default=None, description="Output Pydantic model qualname")
+    triggers: list[str] = Field(default_factory=list, description="Triggers, e.g. cli:run, approval:script")
+    upstream: list[str] = Field(default_factory=list, description="Predecessor stage IDs")
+    downstream: list[str] = Field(default_factory=list, description="Successor stage IDs")
+    artifacts: list[str] = Field(default_factory=list, description="Artifact paths or glob patterns")
+    failure_modes: list[FailureMode] = Field(default_factory=list)
+    verify_cmds: list[str] = Field(default_factory=list, description="CLI commands to verify stage execution")
 
 
 class Symbol(BaseModel):
@@ -60,10 +59,10 @@ class Symbol(BaseModel):
     qualname: str = Field(description="Fully qualified symbol name")
     kind: Literal["function", "method", "class", "async_function"] = Field(description="Symbol type")
     ref: SourceRef = Field(description="Source location")
-    decorators: List[str] = Field(default_factory=list, description="Decorators on this symbol")
-    calls: List[str] = Field(default_factory=list, description="Functions/classes called by this symbol")
-    called_by: List[str] = Field(default_factory=list, description="Symbols calling this symbol")
-    stage_id: Optional[str] = Field(default=None, description="Stage to which symbol belongs via reachability")
+    decorators: list[str] = Field(default_factory=list, description="Decorators on this symbol")
+    calls: list[str] = Field(default_factory=list, description="Functions/classes called by this symbol")
+    called_by: list[str] = Field(default_factory=list, description="Symbols calling this symbol")
+    stage_id: str | None = Field(default=None, description="Stage to which symbol belongs via reachability")
 
 
 class FieldIssue(BaseModel):
@@ -81,10 +80,10 @@ class Handoff(BaseModel):
 
     from_stage: str = Field(description="Producer stage ID")
     to_stage: str = Field(description="Consumer stage ID")
-    producer_model: Optional[str] = Field(default=None, description="Upstream output model qualname")
-    consumer_model: Optional[str] = Field(default=None, description="Downstream input model qualname")
+    producer_model: str | None = Field(default=None, description="Upstream output model qualname")
+    consumer_model: str | None = Field(default=None, description="Downstream input model qualname")
     status: HandoffStatus = Field(description="MATCH, PARTIAL, MISMATCH, or UNRESOLVED")
-    issues: List[FieldIssue] = Field(default_factory=list, description="List of boundary issues")
+    issues: list[FieldIssue] = Field(default_factory=list, description="List of boundary issues")
 
 
 class Entrypoint(BaseModel):
@@ -102,14 +101,14 @@ class CodemapRegistry(BaseModel):
 
     schema_version: Literal["1.0"] = "1.0"
     generated_at: str = Field(description="ISO8601 UTC timestamp")
-    git_commit: Optional[str] = Field(default=None, description="Git HEAD commit hash")
+    git_commit: str | None = Field(default=None, description="Git HEAD commit hash")
     source_hash: str = Field(description="SHA256 of all scanned python source files")
-    summary: Dict[str, Any] = Field(description="L0 high-level summary")
-    entrypoints: List[Entrypoint] = Field(default_factory=list)
-    stages: List[Stage] = Field(default_factory=list)
-    handoffs: List[Handoff] = Field(default_factory=list)
-    models: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="Qualname -> JSON schema")
-    symbols: Dict[str, Symbol] = Field(default_factory=dict)
+    summary: dict[str, Any] = Field(description="L0 high-level summary")
+    entrypoints: list[Entrypoint] = Field(default_factory=list)
+    stages: list[Stage] = Field(default_factory=list)
+    handoffs: list[Handoff] = Field(default_factory=list)
+    models: dict[str, dict[str, Any]] = Field(default_factory=dict, description="Qualname -> JSON schema")
+    symbols: dict[str, Symbol] = Field(default_factory=dict)
 
 
 # ==============================================================================
@@ -133,19 +132,19 @@ class StageEvent(BaseModel):
     seq: int = Field(description="Sequence index within this run")
     stage_id: str = Field(description="Target stage ID")
     ts_start: str = Field(description="ISO8601 start timestamp")
-    ts_end: Optional[str] = Field(default=None, description="ISO8601 end timestamp")
+    ts_end: str | None = Field(default=None, description="ISO8601 end timestamp")
     status: Literal["OK", "ERROR", "SKIPPED"] = Field(description="Execution result")
-    input_hash: Optional[str] = Field(default=None, description="SHA256 of canonical input JSON")
-    output_hash: Optional[str] = Field(default=None, description="SHA256 of canonical output JSON")
-    input_field_hashes: Dict[str, str] = Field(default_factory=dict, description="Path -> SHA256 of field")
-    output_field_hashes: Dict[str, str] = Field(default_factory=dict, description="Path -> SHA256 of field")
-    input_snapshot: Optional[str] = Field(default=None, description="Path to redacted input snapshot")
-    output_snapshot: Optional[str] = Field(default=None, description="Path to redacted output snapshot")
-    artifacts: List[ArtifactRef] = Field(default_factory=list)
-    approval_refs: List[str] = Field(default_factory=list, description="IDs of approvals applied")
-    error: Optional[Dict[str, Any]] = Field(default=None, description="Exception details if failed")
+    input_hash: str | None = Field(default=None, description="SHA256 of canonical input JSON")
+    output_hash: str | None = Field(default=None, description="SHA256 of canonical output JSON")
+    input_field_hashes: dict[str, str] = Field(default_factory=dict, description="Path -> SHA256 of field")
+    output_field_hashes: dict[str, str] = Field(default_factory=dict, description="Path -> SHA256 of field")
+    input_snapshot: str | None = Field(default=None, description="Path to redacted input snapshot")
+    output_snapshot: str | None = Field(default=None, description="Path to redacted output snapshot")
+    artifacts: list[ArtifactRef] = Field(default_factory=list)
+    approval_refs: list[str] = Field(default_factory=list, description="IDs of approvals applied")
+    error: dict[str, Any] | None = Field(default=None, description="Exception details if failed")
     code_ref: SourceRef = Field(description="Source location executed")
-    git_commit: Optional[str] = Field(default=None)
+    git_commit: str | None = Field(default=None)
 
 
 class Approval(BaseModel):
@@ -159,7 +158,7 @@ class Approval(BaseModel):
     channel: str = Field(description="chat, telegram, ide, or cli")
     ts: str = Field(description="ISO8601 approval timestamp")
     payload_hash: str = Field(description="SHA256 of canonical approved payload")
-    field_hashes: Dict[str, str] = Field(default_factory=dict, description="Path -> SHA256 per field")
+    field_hashes: dict[str, str] = Field(default_factory=dict, description="Path -> SHA256 per field")
     payload_snapshot: str = Field(description="Path to redacted snapshot file on disk")
 
 
@@ -171,9 +170,9 @@ class FieldVerdict(BaseModel):
     verdict: Literal["CARRIED", "MODIFIED", "DROPPED", "DEFAULTED", "ADDED"] = Field(
         description="Lineage status for this field"
     )
-    approved_hash: Optional[str] = Field(default=None)
-    consumed_hash: Optional[str] = Field(default=None)
-    note: Optional[str] = Field(default=None)
+    approved_hash: str | None = Field(default=None)
+    consumed_hash: str | None = Field(default=None)
+    note: str | None = Field(default=None)
 
 
 class LineageReport(BaseModel):
@@ -184,4 +183,4 @@ class LineageReport(BaseModel):
     approval_id: str
     target_stage: str
     overall: Literal["INTACT", "DRIFT", "NOT_CONSUMED"]
-    fields: List[FieldVerdict] = Field(default_factory=list)
+    fields: list[FieldVerdict] = Field(default_factory=list)

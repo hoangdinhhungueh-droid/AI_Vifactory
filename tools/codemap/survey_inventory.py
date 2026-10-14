@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/survey_inventory.py — Phase 0 Survey for Code Map & Pipeline Traceability.
 
 Discovers:
@@ -12,10 +11,8 @@ Discovers:
 
 import ast
 import json
-import os
-import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -30,7 +27,7 @@ def is_excluded(path: Path) -> bool:
             return True
     return False
 
-def scan_entrypoints() -> List[Dict[str, Any]]:
+def scan_entrypoints() -> list[dict[str, Any]]:
     entrypoints = []
     for py_file in ROOT_DIR.glob("**/*.py"):
         if is_excluded(py_file):
@@ -57,7 +54,7 @@ def scan_entrypoints() -> List[Dict[str, Any]]:
             pass
     return sorted(entrypoints, key=lambda x: x["file"])
 
-def scan_candidate_stages() -> List[Dict[str, Any]]:
+def scan_candidate_stages() -> list[dict[str, Any]]:
     stages = []
     stages_dir = ROOT_DIR / "stages"
     if stages_dir.exists():
@@ -74,7 +71,7 @@ def scan_candidate_stages() -> List[Dict[str, Any]]:
                             break
                         if entry_fn is None and not node.name.startswith("_"):
                             entry_fn = {"name": node.name, "line": node.lineno}
-                
+
                 stages.append({
                     "stage_id": stem,
                     "file": rel_path,
@@ -93,7 +90,7 @@ def scan_candidate_stages() -> List[Dict[str, Any]]:
                 })
     return stages
 
-def scan_models() -> List[Dict[str, Any]]:
+def scan_models() -> list[dict[str, Any]]:
     models = []
     for py_file in ROOT_DIR.glob("**/*.py"):
         if is_excluded(py_file):
@@ -120,7 +117,7 @@ def scan_models() -> List[Dict[str, Any]]:
             pass
     return sorted(models, key=lambda x: (x["file"], x["line"]))
 
-def scan_approval_handlers() -> List[Dict[str, Any]]:
+def scan_approval_handlers() -> list[dict[str, Any]]:
     handlers = []
     keywords = [
         "human_gate_checkpoint", "APPROVED_BY_USER", "CouncilDecision",
@@ -147,7 +144,7 @@ def scan_approval_handlers() -> List[Dict[str, Any]]:
             pass
     return handlers
 
-def scan_artifact_dirs() -> List[str]:
+def scan_artifact_dirs() -> list[str]:
     common = ["runs", "episodes", "output", "renders", ".codemap", "docs", "specs/boss_plans"]
     present = []
     for d in common:
@@ -168,7 +165,7 @@ def main():
         "artifact_dirs": scan_artifact_dirs(),
     }
     inventory["stage_count"] = len(inventory["candidate_stages"])
-    
+
     out_file = ROOT_DIR / ".codemap" / "inventory.json"
     out_file.parent.mkdir(parents=True, exist_ok=True)
     out_file.write_text(json.dumps(inventory, indent=2, ensure_ascii=False), encoding="utf-8")

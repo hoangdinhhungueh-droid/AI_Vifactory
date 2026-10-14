@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/introspect.py — Safe subprocess Pydantic model introspection.
 
 Extracts JSON Schema and field defaults in an isolated subprocess with timeout to prevent side effects.
@@ -11,14 +10,14 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 
 def introspect_model(
     model_qualname: str,
-    repo_root: Optional[Path] = None,
+    repo_root: Path | None = None,
     timeout: int = 15,
-) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, Any]]:
+) -> tuple[str, dict[str, Any] | None, dict[str, Any]]:
     """Imports model_qualname in an isolated subprocess and extracts JSON schema + field defaults.
 
     Returns:
@@ -42,7 +41,7 @@ try:
     mod = __import__(mod_name, fromlist=[cls_name])
     cls = getattr(mod, cls_name)
     schema = cls.model_json_schema() if hasattr(cls, "model_json_schema") else cls.schema()
-    
+
     # Extract defaults
     defaults = {{}}
     fields = getattr(cls, "model_fields", {{}})

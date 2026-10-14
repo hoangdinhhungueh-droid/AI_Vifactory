@@ -72,11 +72,12 @@ def distill_insights_to_cards(
         notion_token: str,
         market: str,
         analytics_summary: dict,
-        existing_cards: Optional[list] = None
+        existing_cards: Optional[list] = None,
+        dry_run: bool = False,
 ) -> list:
     """
     Analyse analytics_summary from B11 supreme run and distill into
-    actionable InsightCards. Writes new/updated cards to Experiment Lab DB.
+    actionable InsightCards. Writes new/updated cards to Experiment Lab DB (or dry-run sink).
 
     Args:
         notion_token: Notion API token
@@ -108,25 +109,25 @@ def distill_insights_to_cards(
     hook_60s = analytics_summary.get('hook_retention_0_60s', None)
     avd_ratio = avd_sec / duration_sec if duration_sec else 0
 
+    def _save_card(dim: str, obs: str, dir_text: str, conf: float) -> str:
+        if dry_run:
+            print(f"[vf_insight_cards] [DRY-RUN] Verified InsightCard for {market}/{dim} (confidence={conf:.2f}, zero Notion writes)", flush=True)
+            return f"dry_run_{market}_{dim}_{int(time.time())}"
+        return _write_or_update_card(notion_token, market, dim, obs, dir_text, conf, ts)
+
     # --- Pattern: Hook pacing ------------------------------------------------
     if hook_30s is not None and hook_60s is not None:
         if hook_30s >= 0.70:
             directive = 'Maintain aggressive hook compression: open with paradox or quantitative shock within 30s'
             obs = f'Hook 0-30s retention: {hook_30s:.0%} (strong)'
             confidence = min(0.60 + (hook_30s - 0.70) * 2, 0.95)
-            card_id = _write_or_update_card(
-                notion_token, market, 'hook_pacing',
-                obs, directive, confidence, ts
-            )
+            card_id = _save_card('hook_pacing', obs, directive, confidence)
             written_cards.append({'dimension': 'hook_pacing', 'directive': directive, 'id': card_id})
         elif hook_60s < 0.55:
             directive = 'Shorten hook to under 35s: cut exposition, lead with core contradiction immediately'
             obs = f'Hook 0-60s retention: {hook_60s:.0%} (weak -- viewers dropping early)'
             confidence = min(0.60 + (0.55 - hook_60s) * 1.5, 0.90)
-            card_id = _write_or_update_card(
-                notion_token, market, 'hook_pacing',
-                obs, directive, confidence, ts
-            )
+            card_id = _save_card('hook_pacing', obs, directive, confidence)
             written_cards.append({'dimension': 'hook_pacing', 'directive': directive, 'id': card_id})
 
     # --- Pattern: AVD / story structure --------------------------------------
@@ -134,24 +135,19 @@ def distill_insights_to_cards(
         directive = 'Maintain current 5-beat story structure balance -- high retention confirms pacing works'
         obs = f'AVD/Duration ratio: {avd_ratio:.0%} (above 68% threshold)'
         confidence = min(0.60 + (avd_ratio - 0.68) * 1.5, 0.90)
-        card_id = _write_or_update_card(
-            notion_token, market, 'story_structure',
-            obs, directive, confidence, ts
-        )
+        card_id = _save_card('story_structure', obs, directive, confidence)
         written_cards.append({'dimension': 'story_structure', 'directive': directive, 'id': card_id})
     elif avd_ratio < 0.45:
         directive = 'Insert micro-cliffhanger at mid-story (around 45-50% mark) -- AVD drop indicates engagement loss'
         obs = f'AVD/Duration ratio: {avd_ratio:.0%} (below 45% -- mid-story drop detected)'
         confidence = min(0.60 + (0.45 - avd_ratio) * 1.5, 0.88)
-        card_id = _write_or_update_card(
-            notion_token, market, 'story_structure',
-            obs, directive, confidence, ts
-        )
+        card_id = _save_card('story_structure', obs, directive, confidence)
         written_cards.append({'dimension': 'story_structure', 'directive': directive, 'id': card_id})
 
     if written_cards:
+        dest_label = "Dry-Run Sink" if dry_run else "Experiment Lab DB"
         print(f'[vf_insight_cards] Distilled {len(written_cards)} InsightCard(s) '
-              f'for market={market} -> Experiment Lab DB', flush=True)
+              f'for market={market} -> {dest_label}', flush=True)
     else:
         print(f'[vf_insight_cards] No patterns crossed confidence threshold '
               f'for market={market} -- no cards written', flush=True)

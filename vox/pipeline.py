@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/pipeline.py — Master Unified Single Pipeline Orchestrator (AVF-VOX-001).
 
 Single CLI entrypoint for Vox Tactile Explainer video generation.
@@ -18,25 +17,23 @@ Orchestrates:
 
 from __future__ import annotations
 
-import sys
-import os
-import json
-import time
 import argparse
 import hashlib
+import json
+import sys
+import time
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
 
-from vox.schemas import ScenePlan
-from vox.planner import plan_scenes_from_script
-from vox.tts import synthesize_narration
 from vox.align import align_script_with_audio
-from vox.karaoke import generate_ass_subtitles
+from vox.assemble import assemble_final_video
 from vox.assets_bg import generate_background_canvas
 from vox.assets_fg import generate_fg_cutout
 from vox.compositor import render_scene_clip
-from vox.assemble import assemble_final_video
+from vox.karaoke import generate_ass_subtitles
+from vox.planner import plan_scenes_from_script
 from vox.qa.gates import verify_final_video_gates
+from vox.tts import synthesize_narration
 
 
 def compute_file_sha256(p: Path) -> str:
@@ -48,8 +45,8 @@ def compute_file_sha256(p: Path) -> str:
 
 
 def create_asset_contact_sheet(
-    bg_paths: List[Path],
-    fg_paths: List[Path],
+    bg_paths: list[Path],
+    fg_paths: list[Path],
     out_path: Path,
     target_wh: tuple[int, int] = (1920, 1080),
 ) -> Path:
@@ -90,7 +87,7 @@ def run_pipeline(
     script_path: Path,
     out_dir: Path,
     title: str = "Vox Explainer Video",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Runs the complete 1-pipeline Vox video generation flow."""
     start_ts = time.time()
     out_dir = Path(out_dir)
@@ -158,8 +155,8 @@ def run_pipeline(
     assets_dir.mkdir(exist_ok=True)
     clips_dir.mkdir(exist_ok=True)
 
-    scene_clips: List[Path] = []
-    manifest_assets: Dict[str, Any] = {"backgrounds": [], "foregrounds": []}
+    scene_clips: list[Path] = []
+    manifest_assets: dict[str, Any] = {"backgrounds": [], "foregrounds": []}
 
     for sc in plan.scenes:
         print(f"      Rendering Scene {sc.idx}/{len(plan.scenes)} (Camera: {sc.camera.value}, Time: {sc.start:.2f}s - {sc.end:.2f}s)...")
@@ -168,7 +165,7 @@ def run_pipeline(
         manifest_assets["backgrounds"].append(bg_meta)
 
         # Generate Foregrounds
-        fg_map: Dict[str, Path] = {}
+        fg_map: dict[str, Path] = {}
         for fg_obj in sc.fg:
             fg_path, fg_meta = generate_fg_cutout(fg_obj, sc.idx, assets_dir)
             fg_map[fg_obj.id] = fg_path
@@ -202,8 +199,7 @@ def run_pipeline(
     max_drift_ms = 0.0
     for orig, rec in zip(timeline.words, reconstructed_words):
         d_start = abs(orig.start - rec["start"]) * 1000.0
-        if d_start > max_drift_ms:
-            max_drift_ms = d_start
+        max_drift_ms = max(max_drift_ms, d_start)
 
     enriched_scenes = []
     max_boundary_drift_frames = 0.0
@@ -214,8 +210,7 @@ def run_pipeline(
             first_idx = timeline.words.index(sc_words[0])
             last_idx = timeline.words.index(sc_words[-1])
             drift_frames = round(abs(sc.end - sc_words[-1].end) * 30.0, 2)
-            if drift_frames > max_boundary_drift_frames:
-                max_boundary_drift_frames = drift_frames
+            max_boundary_drift_frames = max(max_boundary_drift_frames, drift_frames)
             sc_dict["word_anchor"] = {
                 "first_word_idx": first_idx,
                 "first_word": sc_words[0].text,
@@ -225,8 +220,18 @@ def run_pipeline(
                 "whisper_end": sc_words[-1].end,
                 "boundary_delta_frames": drift_frames,
             }
+            sc_dict["words"] = [
+                {
+                    "word": w.text,
+                    "start": w.start,
+                    "end": w.end,
+                    "probability": round(getattr(w, "probability", 1.0), 3),
+                }
+                for w in sc_words
+            ]
         else:
             sc_dict["word_anchor"] = None
+            sc_dict["words"] = []
         enriched_scenes.append(sc_dict)
 
     # 7. Quality Gates Audit
@@ -242,11 +247,16 @@ def run_pipeline(
 
     # Serialize Atomic Manifest
     total_time = round(time.time() - start_ts, 2)
+    drift_val = round(max_drift_ms, 2) if max_drift_ms is not None else None
+    parity_status = "PASS" if (drift_val is not None and drift_val <= 33.3 and len(timeline.words) > 0) else "FAIL"
+
     manifest = {
         "pipeline": "vox_tactile_explainer_v1",
         "title": title,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "total_latency_sec": total_time,
+        "duration_sec": timeline.audio_duration,
+        "alignment_model": "faster-whisper-base.en",
         "script_source": str(script_path),
         "final_video": {
             "path": str(final_video),
@@ -261,15 +271,17 @@ def run_pipeline(
             "whisper_model": "faster-whisper-base.en",
             "whisper_version": "1.0.3",
             "tts_voice": "en-US-ChristopherNeural",
-            "loudness_target_lufs": -14.0,
+            "loudness_target_lufs": -16.0,
+            "true_peak_target_dbtp": -1.5,
             "sha256": compute_file_sha256(audio_wav),
         },
         "subtitles": {
             "path": str(ass_file),
             "total_words": len(timeline.words),
             "match_ratio": timeline.match_ratio,
-            "max_reverse_drift_ms": round(max_drift_ms, 2),
-            "reverse_parity_status": "PASS" if max_drift_ms <= 33.3 else "FAIL",
+            "max_reverse_drift_ms": drift_val,
+            "reverse_parity_max_drift_ms": drift_val,
+            "reverse_parity_status": parity_status,
             "words": [
                 {
                     "word": w.text,

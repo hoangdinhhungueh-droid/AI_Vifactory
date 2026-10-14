@@ -1,3 +1,5 @@
-Astronomers detected an unexplained radio pulse radiating from a distant magnetar across the Perseus cluster.
-Spectroscopic arrays mapped extreme magnetic fluctuations, challenging standard models of stellar collapse.
-Within days, international observatories coordinated synchronized radio telemetry to triangulate the source.
+Astronomers detected an unexplained high-energy radio pulse radiating from a distant magnetar across the Perseus cluster.
+Initial astrophysical models dismissed the signal as routine orbital sensor noise or satellite telemetry interference.
+Deep spectroscopic calibration revealed sharp harmonic intervals, definitively ruling out thermal background radiation.
+Synchronized observatory logs across four continents confirmed an identical millisecond magnetic pulsation pattern.
+The recorded anomaly established an empirical baseline, transforming modern theoretical models of compact stellar collapse.

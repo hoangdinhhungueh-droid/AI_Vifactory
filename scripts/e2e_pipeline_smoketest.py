@@ -39,12 +39,16 @@ def gate_b1_reasoner():
     print("  [PASS] hhtech_reasoner correctly imported get_b1_strategic_rules without NameError.")
 
 def gate_b1_episode_numbering():
-    print_gate("2. B1 Dynamic Episode Numbering (Rule 117)")
+    print_gate("2. B1 Dynamic Episode Numbering (Rule 117 & Boss Rule 120)")
     from app.services.trend_gate_ai import get_next_episode_id
-    ep_en = get_next_episode_id("EN", "smoke_test_topic")
-    print(f"  [INFO] Next EN Episode: {ep_en}")
-    assert re.match(r"^EN_EP\d{4}_", ep_en), f"Episode ID format invalid: {ep_en}"
-    print(f"  [PASS] Dynamic Episode Numbering allocates valid sequential task ID ({ep_en}).")
+    ep_en_1 = get_next_episode_id("EN", "smoke_test_topic")
+    ep_en_2 = get_next_episode_id("EN", "smoke_test_topic")
+    print(f"  [INFO] Next EN Episode Preview: {ep_en_1}")
+    assert re.match(r"^EN_EP\d{4}_", ep_en_1), f"Episode ID format invalid: {ep_en_1}"
+    assert ep_en_1 == ep_en_2, f"Idempotency violation: preview advanced counter ({ep_en_1} != {ep_en_2})"
+    pending_file = os.path.join("/var/vf/pending_tasks", f"{ep_en_1}.json")
+    assert not os.path.exists(pending_file), f"Pending task was committed to disk during smoke test: {pending_file}"
+    print(f"  [PASS] Dynamic Episode Numbering allocates valid sequential task ID ({ep_en_1}) without advancing production counter.")
 
 def gate_b1_b15_contract():
     print_gate("3. B1 ➔ B1.5 Competitor Recon Contract & Data Flow")
@@ -337,10 +341,10 @@ def gate_b11_analytics_and_insight_loop():
     notion_token = _token() or os.getenv("NOTION_TOKEN", "")
     assert notion_token, "Live NOTION_TOKEN must be present on VPS/environment (Rule 118)"
     test_metrics = {"views": 1500, "ctr": 0.082, "avd_sec": 240, "duration_sec": 480, "hook_retention_0_30s": 0.72, "hook_retention_0_60s": 0.55}
-    cards = distill_insights_to_cards(notion_token, "EN", test_metrics)
+    cards = distill_insights_to_cards(notion_token, "EN", test_metrics, dry_run=True)
     assert isinstance(cards, list) and len(cards) > 0, f"Expected non-empty list of insight cards, got: {cards}"
-    assert all(c.get("id") and c.get("id") != "?" for c in cards), f"InsightCard returned null or '?' id (swallowed Notion error): {cards}"
-    print(f"  [PASS] b11_antigravity_engine.py verified & live insight card engine executed ({len(cards)} cards generated).")
+    assert all(c.get("id") and "dry_run" in c.get("id") for c in cards), f"InsightCard must write to hermetic dry-run sink: {cards}"
+    print(f"  [PASS] b11_antigravity_engine.py verified & hermetic insight card engine executed ({len(cards)} cards generated to dry-run sink, zero Notion pollution).")
 
 def main():
     print("\n" + "="*60)

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """vox/qa/gates.py — Quantitative Forensic Quality Verification Gates (AVF-VOX-001).
 
 Implements programmatic quality gates on physical media:
@@ -14,24 +13,23 @@ Implements programmatic quality gates on physical media:
 
 from __future__ import annotations
 
-import sys
+import hashlib
 import json
 import re
-import hashlib
 import subprocess
+import sys
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 from vox.schemas import ScenePlan
-
 
 FORBIDDEN_PROMPT_STOPWORDS = {"a", "an", "the", "within", "across", "in", "on", "at", "by", "for"}
 FORBIDDEN_TYPOGRAPHY_TERMS = ["bold typography", "typography", "text on screen", "letters", "written words"]
 
 
-def probe_media_file(media_path: Path) -> Dict[str, Any]:
+def probe_media_file(media_path: Path) -> dict[str, Any]:
     """Runs ffprobe on a media file and returns parsed JSON streams and format."""
-    from vox.ffmpeg_utils import get_ffprobe_binary, get_ffmpeg_binary
+    from vox.ffmpeg_utils import get_ffmpeg_binary, get_ffprobe_binary
     ffprobe_bin = get_ffprobe_binary()
     ffmpeg_bin = get_ffmpeg_binary()
 
@@ -54,8 +52,8 @@ def probe_media_file(media_path: Path) -> Dict[str, Any]:
     res = subprocess.run(cmd, capture_output=True, text=True, check=False)
     err = res.stderr
 
-    streams: List[Dict[str, Any]] = []
-    fmt: Dict[str, Any] = {"size": media_path.stat().st_size if media_path.exists() else 0, "bit_rate": 2000000}
+    streams: list[dict[str, Any]] = []
+    fmt: dict[str, Any] = {"size": media_path.stat().st_size if media_path.exists() else 0, "bit_rate": 2000000}
 
     dur_m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", err)
     if dur_m:
@@ -83,7 +81,7 @@ def probe_media_file(media_path: Path) -> Dict[str, Any]:
     return {"streams": streams, "format": fmt}
 
 
-def measure_ebur128_loudness(media_path: Path) -> Dict[str, float]:
+def measure_ebur128_loudness(media_path: Path) -> dict[str, float]:
     """Measures integrated loudness (LUFS) and true peak (dBTP/dBFS) via ffmpeg ebur128."""
     from vox.ffmpeg_utils import get_ffmpeg_binary
     cmd = [
@@ -110,7 +108,7 @@ def measure_ebur128_loudness(media_path: Path) -> Dict[str, float]:
 
 def verify_prompt_semantics(plan: ScenePlan) -> None:
     """Verifies that prompts adhere to stopword elimination, zero typography, and hash uniqueness."""
-    fg_hashes: List[str] = []
+    fg_hashes: list[str] = []
 
     for sc in plan.scenes:
         # Check bg prompt
@@ -137,11 +135,11 @@ def verify_prompt_semantics(plan: ScenePlan) -> None:
 def verify_final_video_gates(
     final_mp4: Path,
     expected_duration: float,
-    plan: Optional[ScenePlan] = None,
-    timeline: Optional[Any] = None,
-    max_drift_ms: Optional[float] = None,
-    manifest_data: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    plan: ScenePlan | None = None,
+    timeline: Any | None = None,
+    max_drift_ms: float | None = None,
+    manifest_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Performs deep quantitative inspection on final rendered video asset."""
     final_mp4 = Path(final_mp4)
     if not final_mp4.exists():

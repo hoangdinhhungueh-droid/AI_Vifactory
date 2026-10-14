@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/hashing.py — Canonical JSON serialization, hashing, flattening, and redaction.
 
 Guarantees deterministic bit-for-bit SHA256 hashes across Windows, Linux, and different Python versions.
@@ -13,7 +12,8 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
+
 from pydantic import BaseModel
 
 SECRET_KEY_PATTERN = re.compile(r"(api[_-]?key|token|secret|password|authorization|auth_bearer)", re.IGNORECASE)
@@ -59,11 +59,11 @@ def sha256_of(obj: Any) -> str:
     return hashlib.sha256(canonical_json(obj)).hexdigest()
 
 
-def flatten(obj: Any, prefix: str = "") -> Dict[str, Any]:
+def flatten(obj: Any, prefix: str = "") -> dict[str, Any]:
     """Flattens a nested dict or list into a flat dict of JSON pointer paths.
     e.g. {'a': [{'b': 1}]} -> {'/a/0/b': 1}
     """
-    items: Dict[str, Any] = {}
+    items: dict[str, Any] = {}
     cleaned = serialize_canonical(obj)
 
     def _recurse(curr: Any, path: str):
@@ -84,7 +84,7 @@ def flatten(obj: Any, prefix: str = "") -> Dict[str, Any]:
     return items
 
 
-def field_hashes(obj: Any) -> Dict[str, str]:
+def field_hashes(obj: Any) -> dict[str, str]:
     """Maps every JSON pointer path to the sha256 hash of its value."""
     flat = flatten(obj)
     return {k: sha256_of(v) for k, v in flat.items()}

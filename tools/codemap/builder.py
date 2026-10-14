@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """tools/codemap/builder.py — Master Codemap Registry Builder and Stale Checker.
 
 Compiles L0-L2 into .codemap/codemap.json.
@@ -14,13 +13,16 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from tools.codemap.ast_scanner import CodebaseASTScanner, EXCLUDED_PARTS
+from tools.codemap.ast_scanner import EXCLUDED_PARTS, CodebaseASTScanner
 from tools.codemap.handoff import analyze_handoff
-from tools.codemap.hashing import sha256_of
 from tools.codemap.introspect import introspect_model
-from tools.codemap.schema import CodemapRegistry, Entrypoint, Handoff, SourceRef, Stage, Symbol
+from tools.codemap.schema import (
+    CodemapRegistry,
+    Entrypoint,
+    Handoff,
+)
 
 
 def compute_source_hash(repo_root: Path) -> str:
@@ -44,7 +46,7 @@ def compute_source_hash(repo_root: Path) -> str:
     return hasher.hexdigest()
 
 
-def get_git_commit(repo_root: Path) -> Optional[str]:
+def get_git_commit(repo_root: Path) -> str | None:
     try:
         res = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -61,7 +63,7 @@ def get_git_commit(repo_root: Path) -> Optional[str]:
     return None
 
 
-def build_codemap(repo_root: Optional[Path] = None, output_file: Optional[Path] = None) -> CodemapRegistry:
+def build_codemap(repo_root: Path | None = None, output_file: Path | None = None) -> CodemapRegistry:
     root = (repo_root or Path.cwd()).resolve()
     target_json = output_file or (root / ".codemap" / "codemap.json")
     target_json.parent.mkdir(parents=True, exist_ok=True)
@@ -74,8 +76,8 @@ def build_codemap(repo_root: Optional[Path] = None, output_file: Optional[Path] 
     stages = sorted(stages, key=lambda s: s.order)
 
     # Introspect models
-    model_schemas: Dict[str, Dict[str, Any]] = {}
-    model_defaults: Dict[str, Dict[str, Any]] = {}
+    model_schemas: dict[str, dict[str, Any]] = {}
+    model_defaults: dict[str, dict[str, Any]] = {}
 
     models_to_fetch = set()
     for s in stages:
@@ -93,7 +95,7 @@ def build_codemap(repo_root: Optional[Path] = None, output_file: Optional[Path] 
 
     # Analyze Handoffs
     stage_by_id = {s.id: s for s in stages}
-    handoffs: List[Handoff] = []
+    handoffs: list[Handoff] = []
 
     for s in stages:
         for ds_id in s.downstream:
@@ -112,7 +114,7 @@ def build_codemap(repo_root: Optional[Path] = None, output_file: Optional[Path] 
                 handoffs.append(h)
 
     # Scan entrypoints
-    entrypoints: List[Entrypoint] = []
+    entrypoints: list[Entrypoint] = []
     for s_qual, sym in symbols.items():
         if "main" in sym.qualname.lower() or "cli" in sym.qualname.lower():
             if sym.kind in ("function", "async_function"):
@@ -125,7 +127,7 @@ def build_codemap(repo_root: Optional[Path] = None, output_file: Optional[Path] 
     # Source hash
     source_hash = compute_source_hash(root)
     git_head = get_git_commit(root)
-    generated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    generated_at = datetime.datetime.now(datetime.UTC).isoformat()
 
     mismatches = sum(1 for h in handoffs if h.status == "MISMATCH")
     summary = {
@@ -165,7 +167,7 @@ def build_codemap(repo_root: Optional[Path] = None, output_file: Optional[Path] 
     return registry
 
 
-def check_codemap(repo_root: Optional[Path] = None, codemap_file: Optional[Path] = None) -> Tuple[int, str]:
+def check_codemap(repo_root: Path | None = None, codemap_file: Path | None = None) -> tuple[int, str]:
     """Validates freshness of codemap against current disk state."""
     root = (repo_root or Path.cwd()).resolve()
     target_json = codemap_file or (root / ".codemap" / "codemap.json")
