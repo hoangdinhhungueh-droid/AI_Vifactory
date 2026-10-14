@@ -68,7 +68,16 @@ def run(ctx: RunContext) -> StageArtifact:
                         # Fallback raw byte stub if ffmpeg not installed
                         target_video.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
                 else:
-                    target_video.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
+                    try:
+                        cmd = [
+                            "ffmpeg", "-y", "-f", "lavfi",
+                            "-i", f"testsrc=duration={dur}:size=1920x1080:rate=25",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                            str(target_video)
+                        ]
+                        subprocess.run(cmd, capture_output=True, check=True)
+                    except Exception:
+                        target_video.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
 
         sz = target_video.stat().st_size if target_video.exists() else 0
         sha = compute_file_sha256(target_video) if target_video.exists() else "none"

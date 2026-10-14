@@ -9,6 +9,7 @@ markers = [
     "unit: Unit tests",
     "integration: Integration tests",
     "e2e: End-to-end tests",
+    "asyncio: Asyncio marker",
 ]
 # Loại archive_legacy và legacy khỏi collect
 norecursedirs = ["legacy", "archive_legacy_20260822", "archive_legacy_20260823_backups", "venv", "venv_rembg", ".git", "_archive", "_backups_20260824", "_bak_archive"]

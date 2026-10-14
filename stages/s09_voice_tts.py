@@ -52,8 +52,31 @@ def run(ctx: RunContext) -> StageArtifact:
             import shutil
             shutil.copy2(str(legacy_audio), str(audio_file))
         else:
-            # Generate minimal silence mp3 or live edge-tts
-            audio_file.write_bytes(b"\xff\xfb\x90\x44" + b"\x00" * 8192)
+            # Generate real voice audio using Edge-TTS live
+            try:
+                import edge_tts
+                voice = "en-US-ChristopherNeural"
+                m_low = (ctx.market or "en").lower()
+                if m_low == "ja":
+                    voice = "ja-JP-KeitaNeural"
+                elif m_low == "ko":
+                    voice = "ko-KR-InJoonNeural"
+                elif m_low == "vn":
+                    voice = "vi-VN-NamMinhNeural"
+
+                text_to_speak = full_text if full_text else "AI Video Factory master video narration."
+                communicate = edge_tts.Communicate(text_to_speak, voice)
+                asyncio.run(communicate.save(str(audio_file)))
+            except Exception:
+                # Fallback to ffmpeg audio tone if network unavailable
+                try:
+                    subprocess.run(
+                        ["ffmpeg", "-y", "-f", "lavfi", "-i", f"sine=frequency=440:duration={max(curr_time, 5.0)}",
+                         "-c:a", "libmp3lame", str(audio_file)],
+                        capture_output=True, check=True
+                    )
+                except Exception:
+                    audio_file.write_bytes(b"\xff\xfb\x90\x44" + b"\x00" * 8192)
 
     subtitles_file.write_text(json.dumps(subtitles, indent=2, ensure_ascii=False), encoding="utf-8")
 
