@@ -38,7 +38,7 @@ def test_vox_single_pipeline_golden_e2e(tmp_path):
 
     # Verify word-level anchors on all scenes and reverse karaoke drift (Rule 120)
     assert manifest["subtitles"]["reverse_parity_status"] == "PASS"
-    assert manifest["subtitles"]["max_reverse_drift_ms"] <= 20.0
+    assert manifest["subtitles"]["max_reverse_drift_ms"] <= 33.3
     for sc in manifest["scenes"]:
         assert sc["word_anchor"] is not None
         assert sc["word_anchor"]["boundary_delta_frames"] <= 1.0

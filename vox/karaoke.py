@@ -94,9 +94,12 @@ def generate_ass_subtitles(
 
         # Format line with \kf tags: {\kf<centiseconds>}word
         line_parts = []
+        curr_cs = 0
         for idx_w, w in enumerate(chunk):
             next_t = chunk[idx_w + 1].start if idx_w + 1 < len(chunk) else w.end
-            duration_cs = max(1, int(round((next_t - w.start) * 100)))
+            target_end_cs = max(curr_cs + 1, int(round((next_t - ev_start) * 100)))
+            duration_cs = target_end_cs - curr_cs
+            curr_cs = target_end_cs
             line_parts.append(f"{{\\kf{duration_cs}}}{w.text} ")
 
         event_text = "".join(line_parts).strip()
@@ -125,17 +128,18 @@ def parse_words_from_ass(ass_file: Path) -> List[Dict[str, Any]]:
         if m:
             ev_start = parse_ass_time(m.group(1))
             raw_text = m.group(3)
-            curr = ev_start
+            curr_cs = 0
 
             for kf_match in kf_re.finditer(raw_text):
                 dur_cs = int(kf_match.group(1))
                 word_text = kf_match.group(2)
-                dur_sec = dur_cs / 100.0
+                w_start = ev_start + curr_cs / 100.0
+                w_end = ev_start + (curr_cs + dur_cs) / 100.0
                 reconstructed.append({
                     "text": word_text,
-                    "start": round(curr, 2),
-                    "end": round(curr + dur_sec, 2)
+                    "start": round(w_start, 3),
+                    "end": round(w_end, 3),
                 })
-                curr += dur_sec
+                curr_cs += dur_cs
 
     return reconstructed
