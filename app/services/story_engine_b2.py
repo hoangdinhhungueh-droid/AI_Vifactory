@@ -161,6 +161,15 @@ def _resolve_canonical_topic(
                 f"[story_engine] Sanitized out-of-locale topic '{clean_topic}' -> native '{clean_native}' for market '{mkt}'"
             )
             return clean_native
+        if task_id:
+            m_slug = re.match(r"^[A-Z]{2}_EP\d+_(.+)$", task_id.strip())
+            if m_slug:
+                slug_text = m_slug.group(1).replace("_", " ").strip()
+                if is_valid_market_text(slug_text, mkt):
+                    logger.info(
+                        f"[story_engine] Sanitized out-of-locale topic '{clean_topic}' -> task slug '{slug_text}' for market '{mkt}'"
+                    )
+                    return slug_text.title()
         raise ValueError(
             f"Strict Contract Violation: Detected out-of-locale topic '{raw_topic}' "
             f"with no valid native candidate for market '{mkt}'. Pipeline requires valid market topic."

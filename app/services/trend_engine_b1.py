@@ -946,18 +946,22 @@ def forensic_pre_filter(candidate: dict, market: str) -> tuple[bool, str]:
 
 
 
+MAX_B2_ATTEMPTS_DEFAULT = int(os.getenv("MAX_B2_ATTEMPTS_PER_RUN", "2"))
+
+
 def discover_and_produce_market_trend(
     market: str = "EN",
     custom_seed: str = None,
     auto_produce: bool = True,
-    max_scan_candidates: int = 60
+    max_scan_candidates: int = 60,
+    max_b2_attempts: int = MAX_B2_ATTEMPTS_DEFAULT
 ) -> list[dict]:
     """Execute canonical B1 trend discovery and automated B1.5 -> B2 -> B3 pipeline
     for exactly 1 topic per market per day.
     """
     m_up = (market or "EN").upper()
     print(f"\n=======================================================")
-    print(f"🚀 [TREND ENGINE B1] Scanning Market {m_up} for Daily Production Topic")
+    print(f"🚀 [TREND ENGINE B1] Scanning Market {m_up} for Daily Production Topic (Max B2 Attempts: {max_b2_attempts})")
     print(f"=======================================================")
 
     candidates = fetch_live_trending_terms(m_up, custom_seed=custom_seed)
@@ -969,6 +973,7 @@ def discover_and_produce_market_trend(
     viability_passed_candidates = []
     consecutive_api_errors = 0
     max_consecutive_api_errors = 3
+    b2_attempts_count = 0
 
     for idx, c in enumerate(candidates[:max_scan_candidates], start=1):
         raw_term = c["term"]
@@ -1221,7 +1226,8 @@ def discover_and_produce_market_trend(
             json.dump(t_obj, tf, ensure_ascii=False, indent=2)
 
         # 6. Generate B2 5-Beat Investigative Docudrama Script
-        print(f"  ⚙️ [B2] Generating 12-15 min docudrama script for {temp_task_id} via HHTech Reasoner...")
+        b2_attempts_count += 1
+        print(f"  ⚙️ [B2 Attempt {b2_attempts_count}/{max_b2_attempts}] Generating 12-15 min docudrama script for {temp_task_id} via HHTech Reasoner...")
         try:
             from app.services.story_engine_b2 import generate_5_arc_story
             brain = generate_5_arc_story(temp_task_id)
@@ -1229,7 +1235,7 @@ def discover_and_produce_market_trend(
             t_obj["story_text"] = story_text
             t_obj["story_gate_score"] = brain.get("story_gate_score")
             t_obj["story_verdict"] = brain.get("story_verdict", "PASS")
-            print(f"  ✅ [B2] Script generated ({len(story_text.split())} words, Gate Score: {t_obj['story_gate_score']}, Verdict: {t_obj['story_verdict']})")
+            print(f"  ✅ [B2 Attempt {b2_attempts_count}] Script generated ({len(story_text.split())} words, Gate Score: {t_obj['story_gate_score']}, Verdict: {t_obj['story_verdict']})")
         except Exception as b2_err:
             logger.error(f"[{temp_task_id}] B2 Story generation failed: {b2_err}. Rotating to next candidate...")
             record_handled_topic(term=term, task_id=temp_task_id, market=m_up)
@@ -1238,12 +1244,27 @@ def discover_and_produce_market_trend(
                     os.remove(temp_task_file)
                 except Exception:
                     pass
+            if b2_attempts_count >= max_b2_attempts:
+                cb_err_msg = (
+                    f"🚨 <b>[RULE 118 B2 CIRCUIT BREAKER ACTIVATED]</b>\n"
+                    f"Market: <code>{m_up}</code> | B2 Attempts: <code>{b2_attempts_count}/{max_b2_attempts}</code>\n"
+                    f"Quá trình sinh B2 thất bại trên {b2_attempts_count} ứng viên liên tiếp. Lỗi gần nhất: <code>{str(b2_err)[:200]}</code>\n"
+                    f"🛑 <b>Hành động:</b> Ngắt pipeline ngay lập tức để bảo vệ ngân sách token và quota API."
+                )
+                print(f"\n{cb_err_msg}\n")
+                logger.critical(f"[{m_up}] B2 Circuit Breaker triggered on exception after {b2_attempts_count} attempts.")
+                try:
+                    from app.services.telegram_buttons import send_telegram_broadcast
+                    send_telegram_broadcast(cb_err_msg)
+                except Exception:
+                    pass
+                break
             continue
 
         # Check Story Gate verdict (Rule 121 & Rule 127)
         if t_obj.get("story_verdict") == "FAIL":
-            logger.error(f"[{temp_task_id}] B2 Story Gate REJECTED ({t_obj.get('story_gate_score')}). Candidate rejected, rotating to next candidate...")
-            print(f"  ❌ [B2 STORY GATE REJECTED] Score: {t_obj.get('story_gate_score')}. Rotating to next candidate in queue...")
+            logger.error(f"[{temp_task_id}] B2 Story Gate REJECTED ({t_obj.get('story_gate_score')}). Candidate rejected...")
+            print(f"  ❌ [B2 STORY GATE REJECTED] Score: {t_obj.get('story_gate_score')}.")
             record_handled_topic(term=term, task_id=temp_task_id, market=m_up)
             if os.path.exists(temp_task_file):
                 try:
@@ -1259,6 +1280,24 @@ def discover_and_produce_market_trend(
                         shutil.rmtree(t_dir)
                     except Exception:
                         pass
+
+            # Rule 118 Hard Circuit Breaker for B2 (Anti-Token-Drain Law)
+            if b2_attempts_count >= max_b2_attempts:
+                cb_msg = (
+                    f"🚨 <b>[RULE 118 B2 CIRCUIT BREAKER ACTIVATED]</b>\n"
+                    f"Market: <code>{m_up}</code> | B2 Attempts: <code>{b2_attempts_count}/{max_b2_attempts}</code>\n"
+                    f"Đã thử sinh và kiểm toán B2 cho {b2_attempts_count} ứng viên liên tiếp nhưng chưa đạt Story Gate 11/13 "
+                    f"(Ứng viên gần nhất: <code>{term}</code> - Score: {t_obj.get('story_gate_score')}).\n"
+                    f"🛑 <b>Hành động:</b> Ngắt pipeline ngay lập tức để bảo vệ ngân sách token và chi phí API."
+                )
+                print(f"\n{cb_msg}\n")
+                logger.critical(f"[{m_up}] B2 Circuit Breaker triggered after {b2_attempts_count} candidate attempts.")
+                try:
+                    from app.services.telegram_buttons import send_telegram_broadcast
+                    send_telegram_broadcast(cb_msg)
+                except Exception:
+                    pass
+                break
             continue
 
         # 7. B2.1 Independent Fact & Causal Integrity Audit Gate (Rule 118, 122 & 130 - GPT-6-Astra / Claude Opus 5)

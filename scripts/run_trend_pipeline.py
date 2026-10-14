@@ -100,6 +100,14 @@ def main():
         idx = args.index("--term")
         custom_term = args[idx + 1] if idx + 1 < len(args) else None
 
+    max_b2_attempts = 2
+    if "--max-b2-attempts" in args:
+        idx = args.index("--max-b2-attempts")
+        try:
+            max_b2_attempts = int(args[idx + 1])
+        except (IndexError, ValueError):
+            max_b2_attempts = 2
+
     # 1. Evaluate schedule based on Vietnam Timezone (UTC+7)
     schedule_info = get_market_schedule_info()
 
@@ -141,12 +149,21 @@ def main():
         print(f"DRY-RUN COMPLETE: Target markets would be {markets}. Auto-produce: {auto_produce}")
         return
 
+    # Track baseline cost before execution for session cost telemetry
+    initial_month_cost = 0.0
+    try:
+        from app.services.cost_tracker import get_global_tracker
+        initial_month_cost = sum(get_global_tracker().monthly_report().values())
+    except Exception:
+        pass
+
     print("=======================================================")
     print("🚀 LAUNCHING UNIFIED TREND & PRODUCTION PIPELINE (B1 ➔ B1.5 ➔ B2)")
     print(f"Execution Time (UTC): {datetime.now(timezone.utc).isoformat()}")
     print(f"Execution Time (VN):  {get_vn_now().isoformat()}")
     print(f"Markets in scope:     {markets}")
     print(f"Auto-Produce B2/B3:   {auto_produce}")
+    print(f"Max B2 Attempts:      {max_b2_attempts}")
     print("=======================================================")
 
     results = {"success": True, "approved_topics": []}
@@ -156,7 +173,8 @@ def main():
         topics = discover_and_produce_market_trend(
             market=custom_market,
             custom_seed=custom_term,
-            auto_produce=auto_produce
+            auto_produce=auto_produce,
+            max_b2_attempts=max_b2_attempts
         )
         results["approved_topics"].extend(topics)
     else:
@@ -165,11 +183,23 @@ def main():
             try:
                 topics = discover_and_produce_market_trend(
                     market=mkt,
-                    auto_produce=auto_produce
+                    auto_produce=auto_produce,
+                    max_b2_attempts=max_b2_attempts
                 )
                 results["approved_topics"].extend(topics)
             except Exception as e:
                 logger.error(f"Error during daily cycle for {mkt}: {e}")
+
+    # Output session cost telemetry
+    try:
+        from app.services.cost_tracker import get_global_tracker
+        final_month_cost = sum(get_global_tracker().monthly_report().values())
+        session_cost = max(0.0, final_month_cost - initial_month_cost)
+        print("\n-------------------------------------------------------")
+        print(f"📊 [COST TELEMETRY] Session Cost: {session_cost:,.2f} VND | Month Total: {final_month_cost:,.2f} VND")
+        print("-------------------------------------------------------")
+    except Exception:
+        pass
 
     # Print summary to console logs (Rule 125: Telegram already notified via Human Gate 1 & Human Gate 2)
     total = len(results["approved_topics"])

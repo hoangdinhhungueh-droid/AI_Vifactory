@@ -97,7 +97,10 @@ def test_canonical_topic_precedence_all_branches():
     assert _resolve_canonical_topic("Kế hoạch Oakland bị bác bỏ", "Oakland Port Deal", "EN_EP0008", market="EN") == "Oakland Port Deal"
     assert _resolve_canonical_topic("Vụ án Livedoor", "ライブドア事件", "JP_EP0007", market="JP") == "ライブドア事件"
 
-    # Branch 2: Out-of-locale operator topic with empty native candidate -> raises ValueError
+    # Branch 1b: Out-of-locale operator topic + empty native candidate + valid task slug -> returns sanitized task slug
+    assert _resolve_canonical_topic("Vụ án Oakland bị bác bỏ", "", "EN_EP0008_oakland_plan_rejected", market="EN") == "Oakland Plan Rejected"
+
+    # Branch 2: Out-of-locale operator topic with empty native candidate and no valid task slug -> raises ValueError
     with pytest.raises(ValueError, match="Detected out-of-locale topic"):
         _resolve_canonical_topic("Vụ án Oakland bị bác bỏ", "", "EN_EP0008", market="EN")
 

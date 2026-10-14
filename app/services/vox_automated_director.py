@@ -141,18 +141,21 @@ NAMED_ESCALATION_BEATS: List[str] = ["ALERT WASH", "STAMP", "TICK-UP", "TEAR", "
 
 
 def audit_cliffhanger_patterns(final_sentence: str) -> Dict[str, Any]:
-    """Audits the final sentence against the 5 Canonical Documentary Cliffhanger Patterns:
+    """Audits the final sentence against the 5 Canonical Documentary Cliffhanger Patterns (Rule 128 Multilingual):
     1. THE_UNRESOLVED_OBJECT: ends on a physical thing that still exists / remains missing.
     2. THE_DATED_FORWARD_JUMP: leaps forward to a later date/decade.
     3. THE_MISSING_PIECE: names the one thing investigators never found.
     4. THE_QUIET_CONTRADICTION: cold paradox that undermines preceding narrative.
     5. THE_PRICE_LINE: cold human or financial cost stated flat.
+    Supports: EN, JP, KR, VN natively.
     """
     s_low = (final_sentence or "").lower().strip()
     words = s_low.split()
     
     # 1. THE_PRICE_LINE
-    if re.search(r'\b(the\s+price|the\s+cost|total\s+loss|toll\s+was|bill\s+was|damage\s+was|losses?\s+(?:totaled|exceeded)|paid\s+the\s+price|millions?\s+(?:of\s+)?(?:lives|dollars)|billions?\s+(?:of\s+)?(?:dollars|euros))\b', s_low):
+    re_price_western = r'\b(the\s+price|the\s+cost|total\s+loss|toll\s+was|bill\s+was|damage\s+was|losses?\s+(?:totaled|exceeded)|paid\s+the\s+price|millions?\s+(?:of\s+)?(?:lives|dollars)|billions?\s+(?:of\s+)?(?:dollars|euros)|cái\s+giá|thiệt\s+hại|tổn\s+thất|hóa\s+đơn|trả\s+giá|hàng\s+tỷ|nghìn\s+tỷ|triệu\s+usd)\b'
+    re_price_cjk = r'(?:代償|代価|損失|被害|代償を払|負債|数千億|兆円|億円|億|兆|犠牲|負担|대가|비용|손실|피해|대가를\s*치|부채|조원|억원|희생|부담|지불)'
+    if re.search(re_price_western, s_low) or re.search(re_price_cjk, s_low):
         return {
             "pattern": "THE_PRICE_LINE",
             "matched": True,
@@ -161,7 +164,9 @@ def audit_cliffhanger_patterns(final_sentence: str) -> Dict[str, Any]:
         }
         
     # 2. THE_DATED_FORWARD_JUMP
-    if re.search(r'\b(?:then,?\s+in\s+\d{4}|decades?\s+later|years?\s+later|by\s+\d{4}|in\s+\d{4},?\s+(?:a\s+|the\s+|investigators)|until\s+\d{4}|to\s+this\s+day)\b', s_low):
+    re_date_western = r'\b(?:then,?\s+in\s+\d{4}|decades?\s+later|years?\s+later|by\s+\d{4}|in\s+\d{4},?\s+(?:a\s+|the\s+|investigators)|until\s+\d{4}|to\s+this\s+day|nhiều\s+năm\s+sau|nhiều\s+thập\s+kỷ\s+sau|cho\s+đến\s+ngày\s+nay|đến\s+tận\s+hôm\s+nay|đến\s+năm\s+\d{4})\b'
+    re_date_cjk = r'(?:それから\s*\d{4}年|数十年後|数年後|\d{4}年(?:現在|まで)|今日に至るまで|現在もなお|今もなお|そして\s*\d{4}年|수십년\s*뒤|수년\s*뒤|\d{4}년(?:까지|현재)|오늘날까지|지금도|현재까지)'
+    if re.search(re_date_western, s_low) or re.search(re_date_cjk, s_low):
         return {
             "pattern": "THE_DATED_FORWARD_JUMP",
             "matched": True,
@@ -170,7 +175,9 @@ def audit_cliffhanger_patterns(final_sentence: str) -> Dict[str, Any]:
         }
 
     # 3. THE_MISSING_PIECE
-    if re.search(r'\b(?:they\s+had\s+.*they\s+never|found\s+.*never\s+found|had\s+.*never\s+had|one\s+piece\s+was\s+missing|only\s+one\s+thing\s+was\s+missing|the\s+name\s+was\s+never|identity\s+remains|never\s+identified)\b', s_low):
+    re_missing_western = r'\b(?:they\s+had\s+.*they\s+never|found\s+.*never\s+found|had\s+.*never\s+had|one\s+piece\s+was\s+missing|only\s+one\s+thing\s+was\s+missing|the\s+name\s+was\s+never|identity\s+remains|never\s+identified|không\s+bao\s+giờ\s+tìm\s+thấy|chưa\s+từng\s+được\s+làm\s+rõ|manh\s+mối\s+duy\s+nhất|danh\s+tính\s+vẫn|vẫn\s+là\s+bí\s+ẩn)\b'
+    re_missing_cjk = r'(?:見つからな(?:かった|い)|発見され(?:てい|な)い|手がかりは|真相は|解明され(?:てい|な)い|誰にも分からな|찾지\s*못했|발견되지\s*않|진상은|누구도\s*알지|풀리지\s*않|끝내\s*밝혀지지)'
+    if re.search(re_missing_western, s_low) or re.search(re_missing_cjk, s_low):
         return {
             "pattern": "THE_MISSING_PIECE",
             "matched": True,
@@ -179,7 +186,9 @@ def audit_cliffhanger_patterns(final_sentence: str) -> Dict[str, Any]:
         }
 
     # 4. THE_UNRESOLVED_OBJECT
-    if re.search(r'\b(?:never\s+found|never\s+recovered|never\s+surfaced|remains?\s+(?:locked|unsolved|missing|undiscovered|lost)|has\s+never\s+been\s+found|vault\s+remains|tape\s+has\s+never)\b', s_low):
+    re_unres_western = r'\b(?:never\s+found|never\s+recovered|never\s+surfaced|remains?\s+(?:locked|unsolved|missing|undiscovered|lost)|has\s+never\s+been\s+found|vault\s+remains|tape\s+has\s+never|vẫn\s+chưa\s+được\s+giải\s+quyết|bị\s+niêm\s+phong|biến\s+mất\s+không\s+dấu\s+vết|chôn\s+vùi|bỏ\s+ngỏ)\b'
+    re_unres_cjk = r'(?:行方不明|消えたまま|封印されたまま|闇に葬られ|記録は失われ|証拠は残|残されたまま|행방불명|사라진\s*채|봉인된\s*채|남겨진\s*채|기록은\s*남아|증거는)'
+    if re.search(re_unres_western, s_low) or re.search(re_unres_cjk, s_low):
         return {
             "pattern": "THE_UNRESOLVED_OBJECT",
             "matched": True,
@@ -188,7 +197,9 @@ def audit_cliffhanger_patterns(final_sentence: str) -> Dict[str, Any]:
         }
 
     # 5. THE_QUIET_CONTRADICTION
-    if re.search(r'\b(?:yet\s+|however\s+|empty\s+all\s+along|nothing\s+was\s+there|was\s+never\s+there|the\s+opposite\s+was\s+true|myth\s+all\s+along)\b', s_low):
+    re_quiet_western = r'\b(?:yet\s+|however\s+|empty\s+all\s+along|nothing\s+was\s+there|was\s+never\s+there|the\s+opposite\s+was\s+true|myth\s+all\s+along|thế\s+nhưng|tuy\s+nhiên|nghịch\s+lý\s+là|sự\s+thật\s+lại|ngược\s+lại\s+hoàn\s+toàn)\b'
+    re_quiet_cjk = r'(?:しかし|だが|それにもかかわらず|皮肉にも|真実は|現実は|逆であった|하지만|그러나|그럼에도|역설적이게도|진실은|현실은|반대였다)'
+    if re.search(re_quiet_western, s_low) or re.search(re_quiet_cjk, s_low):
         return {
             "pattern": "THE_QUIET_CONTRADICTION",
             "matched": True,
@@ -197,12 +208,14 @@ def audit_cliffhanger_patterns(final_sentence: str) -> Dict[str, Any]:
         }
 
     # Fallback tight ending (concise but not one of the 5 canonical cliffhanger archetypes)
-    if len(words) <= 12 and not any(q in s_low for q in ["?", "imagine", "subscribe", "thanks"]):
+    is_cjk_line = bool(re.search(r'[\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]', s_low))
+    is_concise = (len(s_low) <= 30) if is_cjk_line else (len(words) <= 12)
+    if is_concise and not any(q in s_low for q in ["?", "？", "imagine", "subscribe", "thanks", "구독", "チャンネル登録"]):
         return {
             "pattern": "CONCISE_DECLARATIVE",
             "matched": False,
             "is_concise": True,
-            "description": "Short declarative ending (<= 12 words), but lacks 5 canonical cliffhanger archetypes.",
+            "description": "Short declarative ending, but lacks 5 canonical cliffhanger archetypes.",
             "confidence": 0.60
         }
 

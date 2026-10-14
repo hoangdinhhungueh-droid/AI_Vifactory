@@ -125,9 +125,9 @@ ACT_CUES = {
 ACT_ORDER = ["act1_hook_shock", "act2_build", "act3_knot",
              "act4_resolution", "act5_denouement"]
 
-SHOCK_WESTERN = r"\b(?:largest|biggest|worst|deadliest|first|never|nobody|no one|collapse|bankrupt|stole|fraud|scandal|crash|tragedy|executed|shock)\b"
-SHOCK_CJK = r"(?:최대|최악|사망|붕괴|사기|스캔들|파산|충격|처음|비극|위험|검출|오염|독성|경고|最大|最悪|死亡|崩壊|詐欺|事件|破綻|衝撃|危機|不正|辞任)"
-SHOCK = rf"(?:\$\s?\d[\d,\.]*\s?(?:billion|million|trillion|hundred|thousand)?|[₩¥￥]\s?\d[\d,\.]*|\d[\d,\.]*\s?(?:%|percent|만|억|조|회|건|명|億|万|件)|{SHOCK_WESTERN}|{SHOCK_CJK})"
+SHOCK_WESTERN = r"\b(?:largest|biggest|worst|deadliest|first|never|nobody|no one|collapse|bankrupt|stole|fraud|scandal|crash|tragedy|executed|shock|lớn nhất|kinh hoàng|thiệt hại|tử vong|phá sản|sụp đổ|lừa đảo|chấn động|kỷ lục|vạch trần|khủng hoảng)\b"
+SHOCK_CJK = r"(?:최대|최악|사망|붕괴|사기|스캔들|파산|충격|처음|비극|위험|검출|오염|독성|경고|배|적자|폭락|폐업|最大|最悪|死亡|崩壊|詐欺|事件|破綻|衝撃|危機|不正|辞任|検出|壊滅|被害|倒産|廃業|告発|急落|赤字)"
+SHOCK = rf"(?:\$\s?\d[\d,\.]*\s?(?:billion|million|trillion|hundred|thousand)?|[₩¥￥]\s?\d[\d,\.]*|\d[\d,\.]*\s?(?:%|percent|만|억|조|회|건|명|億|万|件|倍|割|円|人|度|mg|kg|tỷ|triệu|người|vụ)|{SHOCK_WESTERN}|{SHOCK_CJK})"
 
 MAX_PARA_WORDS = 160
 MIN_PARAS = 15
@@ -217,23 +217,27 @@ def score_story(story_text: str) -> dict:
     is_korean = len(korean_chars) > len(cjk_chars) * 0.5 if is_cjk else False
 
     if is_korean:
-        # Korean narration speed: ~245 syllables/min in investigative docudrama
-        minutes = len(korean_chars) / 245.0 if korean_chars else (nwords / WPM)
-        min_len = 950
-        max_len = 1650
+        # Korean narration speed: ~245 syllables/min in investigative docudrama (target 10-16 min)
+        primary_metric = len(korean_chars)
+        minutes = primary_metric / 245.0 if primary_metric else (nwords / WPM)
+        min_len = 2400
+        max_len = 4200
     elif is_cjk:
-        # Japanese/Chinese narration speed: ~275 characters/min
-        minutes = len(cjk_chars) / 275.0 if cjk_chars else (nwords / WPM)
-        min_len = 1000
-        max_len = 1800
+        # Japanese/Chinese narration speed: ~275 characters/min (target 10-16 min)
+        primary_metric = len(cjk_chars)
+        minutes = primary_metric / 275.0 if primary_metric else (nwords / WPM)
+        min_len = 2500
+        max_len = 4500
     else:
+        # Western / Spaced languages (EN, VN): word count (target 11-16 min)
+        primary_metric = nwords
         minutes = nwords / WPM if nwords else 0.0
-        min_len = 1700
-        max_len = 2500
+        min_len = 1600
+        max_len = 2600
 
     sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+|[。！？\n]+", story) if s.strip()]
     hook = " ".join(sents[:8] if len(sents) >= 8 else sents)  # Expand to first 8 sents to capture multi-para opening questions
-    first60 = " ".join(words[:60])
+    hook_shock_zone = story[:220] if is_cjk else " ".join(words[:60])
 
     nums = re.findall(NUM, story)
     loops_open = _count(LOOP_OPEN, story)
@@ -242,11 +246,27 @@ def score_story(story_text: str) -> dict:
     need_loops = max(1, math.ceil(minutes / 1.5)) if minutes else 1
     need_nums = max(1, math.ceil(minutes * 60 / 90)) if minutes else 1
 
-    # --- arc (v3): split into five equal-word fifths, score each act's own cues
-    fifth = max(1, nwords // 5)
-    segments = [" ".join(words[i * fifth:(i + 1) * fifth]) for i in range(5)]
-    if nwords > fifth * 5:
-        segments[4] += " " + " ".join(words[fifth * 5:])
+    # --- arc (v3): split into five acts, score each act's own cues
+    # Prioritize explicit 5-Act delimiters (Rule 128 & Rule 131)
+    act_header_pattern = re.compile(r"(?:^|\n)\s*===?\s*ACT\s+([I|V|X]+|[1-5])\s*===?", re.IGNORECASE)
+    act_matches = list(act_header_pattern.finditer(story))
+    if len(act_matches) == 5:
+        segments = []
+        for i in range(5):
+            start = act_matches[i].start()
+            end = act_matches[i + 1].start() if i < 4 else len(story)
+            segments.append(story[start:end])
+    elif is_cjk:
+        fifth_c = max(1, len(story) // 5)
+        segments = [story[i * fifth_c:(i + 1) * fifth_c] for i in range(5)]
+        if len(story) > fifth_c * 5:
+            segments[4] += story[fifth_c * 5:]
+    else:
+        fifth = max(1, nwords // 5)
+        segments = [" ".join(words[i * fifth:(i + 1) * fifth]) for i in range(5)]
+        if nwords > fifth * 5:
+            segments[4] += " " + " ".join(words[fifth * 5:])
+
     arc_hits = {}
     for i, act in enumerate(ACT_ORDER):
         arc_hits[act] = _count(ACT_CUES[act], segments[i]) if i < len(segments) else 0
@@ -274,7 +294,8 @@ def score_story(story_text: str) -> dict:
         mech_end_c = int(nchars * 0.70)
         mech_raw = story[mech_start_c:mech_end_c]
         mech_sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+|[。！？\n]+", mech_raw) if s.strip()]
-        short_sents = [s for s in mech_sents if 2 <= len(_words(s)) <= PATTERN_INTERRUPT_MAX_WORDS]
+        # In CJK (JP, KR, ZH), short punchy interrupt sentences are 4 to 18 characters (e.g. 紙の証跡は消えた。)
+        short_sents = [s for s in mech_sents if 4 <= len(s) <= 18 and not s.startswith("=")]
     else:
         mech_start = int(nwords * 0.25)
         mech_end = int(nwords * 0.70)
@@ -283,7 +304,7 @@ def score_story(story_text: str) -> dict:
         else:
             mechanism_text = story
         mech_sents = [s for s in re.split(r"(?<=[.!?])\s+", mechanism_text) if s.strip()]
-        short_sents = [s for s in mech_sents if 2 <= len(_words(s)) <= PATTERN_INTERRUPT_MAX_WORDS]
+        short_sents = [s for s in mech_sents if 2 <= len(_words(s)) <= PATTERN_INTERRUPT_MAX_WORDS and not s.startswith("=")]
 
     from app.services.vox_automated_director import audit_cliffhanger_patterns
     last_sent = sents[-1] if sents else story
@@ -295,15 +316,15 @@ def score_story(story_text: str) -> dict:
             cliffhanger_audit = cliff_story
 
     checks = {
-        "1_length_1700_2500_words": min_len <= nwords <= max_len,
-        "2_hook_has_open_question": bool(re.search(r"\?", hook)) or _count(LOOP_OPEN[1:], hook) > 0,
+        "1_length_1700_2500_words": min_len <= primary_metric <= max_len,
+        "2_hook_has_open_question": bool(re.search(r"\?|？", hook)) or _count(LOOP_OPEN[1:], hook) > 0,
         "3_open_loops_enough": loops_open >= need_loops,
         "4_loops_closed": loops_close >= max(1, math.ceil(need_loops * 0.5)),
         "5_sourced_numbers": len(nums) >= need_nums and sources >= 2,
-        "6_pace_in_band": min_len <= nwords <= max_len,
+        "6_pace_in_band": min_len <= primary_metric <= max_len,
         "7_arc_five_acts": acts_present == 5,
         "8_segmentation": len(paras) >= MIN_PARAS and not oversized,
-        "9_hook_shock_in_first_60w": bool(re.search(SHOCK, first60)),
+        "9_hook_shock_in_first_60w": bool(re.search(SHOCK, hook_shock_zone)),
         "10_banned_phrases": len(banned_hits) == 0,
         "11_according_to_cap": according_to_count <= MAX_ACCORDING_TO,
         "12_pattern_interrupt": len(short_sents) >= 1,
@@ -328,7 +349,11 @@ def score_story(story_text: str) -> dict:
     score = sum(1 for v in checks.values() if v)
     max_score = len(checks)
     return {
-        "words": nwords,
+        "words": primary_metric,
+        "raw_words": nwords,
+        "primary_metric": primary_metric,
+        "is_cjk": is_cjk,
+        "is_korean": is_korean,
         "est_minutes": round(minutes, 2),
         "paragraphs": len(paras),
         "longest_paragraph_words": longest_para,
