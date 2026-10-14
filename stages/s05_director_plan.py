@@ -93,3 +93,70 @@ def run(ctx: RunContext) -> StageArtifact:
 
     emit_artifact(artifact, ctx.paths)
     return artifact
+
+
+CANONICAL_BEATS: List[str] = [
+    "Cold Strike",
+    "False Narrative",
+    "Forensic Paper Trail",
+    "Smoking Gun",
+    "Modern Mirror",
+]
+
+CANONICAL_CAMERA_MOVES: List[str] = [
+    "top_down_static",
+    "slow_push_in",
+    "locked_macro",
+    "isometric_pan",
+]
+
+
+def validate_asset_reuse_limits(scenes: List[Dict[str, Any]], max_reuse: int = 3) -> Dict[str, Any]:
+    """Validates that asset reuse keys do not exceed max_reuse threshold across scenes (Rule 120 & 136)."""
+    counts: Dict[str, int] = {}
+    for sc in scenes:
+        for key_name in ["foreground_reuse_key", "background_reuse_key", "reuse_key"]:
+            k = sc.get(key_name)
+            if k:
+                counts[k] = counts.get(k, 0) + 1
+                if counts[k] > max_reuse:
+                    raise ValueError(
+                        f"Asset reuse limit exceeded: key '{k}' used {counts[k]} times (max allowed: {max_reuse})"
+                    )
+    return {"valid": True, "reuse_counts": counts}
+
+
+def validate_cinematic_tokens(prompt: str) -> bool:
+    """Validates that visual prompts contain required Vox documentary styling tokens."""
+    if not prompt or not isinstance(prompt, str):
+        return False
+    p_lower = prompt.lower()
+    has_style = any(tok in p_lower for tok in ["editorial", "vox", "paper", "cutout", "documentary"])
+    has_camera = any(tok in p_lower for tok in ["camera", "view", "angle", "focus", "static"])
+    return has_style and has_camera
+
+
+def sanitize_beat_spoken_for_llm(spoken_list: list) -> list:
+    """Sanitizes spoken sentences; strictly rejects invalid end <= start (Rule 118 & 120)."""
+    if not spoken_list:
+        return []
+    lean = []
+    for s in spoken_list:
+        if not isinstance(s, dict):
+            continue
+        duration_s = s.get("duration_sec")
+        if duration_s is None:
+            start, end = s.get("start", 0), s.get("end", 0)
+            if end <= start:
+                raise ValueError(f"Invalid sentence timestamp: end ({end}) <= start ({start}) violates Rule 118 & Rule 120")
+            duration_s = round(end - start, 2)
+        elif duration_s <= 0:
+            raise ValueError(f"Invalid duration_sec ({duration_s}) <= 0 violates Rule 118")
+        lean.append({
+            "sentence_id": s.get("sentence_id") or f"sent_{len(lean)+1:03d}",
+            "text": s.get("text", "").strip(),
+            "duration_sec": duration_s,
+            "beat_index": s.get("beat_index", 1)
+        })
+    return lean
+

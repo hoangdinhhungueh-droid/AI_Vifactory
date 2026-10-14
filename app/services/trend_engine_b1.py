@@ -1405,8 +1405,9 @@ def discover_and_produce_market_trend(
         if auto_produce:
             print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {task_id}...")
             try:
-                from scripts.produce_episode_hg1 import run_chain
-                res_code = run_chain(task_id)
+                from orchestrator.run_pipeline import execute_pipeline
+                manifest = execute_pipeline(profile_name="prod", run_id=task_id)
+                res_code = 0 if manifest.status == "ok" else 1
                 if res_code == 0:
                     print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B2.1 -> B3 -> Gate 2 for {task_id}!")
                     produced_topics.append(t_obj)

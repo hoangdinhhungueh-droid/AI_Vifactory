@@ -180,7 +180,7 @@ def _spawn_production(task_id):
         # Use os.open() for unbuffered I/O (better for detached subprocesses)
         logfd = os.open(log_path, os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o644)
         proc = subprocess.Popen(
-            ["/root/video_factory/venv/bin/python3", "scripts/produce_episode_hg1.py", str(task_id)],
+            ["/root/video_factory/venv/bin/python3", "orchestrator/run_pipeline.py", "--run-id", str(task_id)],
             cwd="/root/video_factory",
             stdout=logfd, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
             start_new_session=True,

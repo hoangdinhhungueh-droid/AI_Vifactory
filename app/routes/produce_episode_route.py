@@ -182,7 +182,7 @@ async def _render(brain):
 async def produce_episode_endpoint(req: ProduceEpisodeRequest):
     """One-button: Notion Episodes row (status=approved) -> full S2->S7 render.
 
-    Mirrors scripts/produce_episode.py so n8n (or any caller) can trigger
+    Mirrors orchestrator/run_pipeline.py so n8n (or any caller) can trigger
     production via HTTP instead of shelling into the VPS.
     """
     try:

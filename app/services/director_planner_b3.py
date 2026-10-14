@@ -10,7 +10,17 @@ Enforces audio spine integrity: _is_valid_audio_spine.
 
 from typing import List, Dict, Any, Optional
 from core.contracts.stages import Scene, Shot
-from stages.s05_director_plan import build_universal_video_prompt
+from stages.s05_director_plan import (
+    build_universal_video_prompt,
+    CANONICAL_BEATS,
+    CANONICAL_CAMERA_MOVES,
+    validate_asset_reuse_limits,
+    validate_cinematic_tokens,
+    sanitize_beat_spoken_for_llm,
+)
+
+# Re-export alias for backward compatibility
+_sanitize_beat_spoken_for_llm = sanitize_beat_spoken_for_llm
 
 
 def resolve_market_redacted_terms(market: str = "EN") -> List[str]:
@@ -35,22 +45,3 @@ def _is_valid_audio_spine(data: Any) -> bool:
     """Validates audio spine completeness."""
     return bool(data)
 
-
-def _sanitize_beat_spoken_for_llm(spoken_list: list) -> list:
-    """Sanitizes spoken sentences; strictly rejects invalid end <= start (Rule 118 & 120)."""
-    if not spoken_list:
-        return []
-    lean = []
-    for s in spoken_list:
-        if not isinstance(s, dict):
-            continue
-        duration_s = s.get("duration_sec")
-        if duration_s is None:
-            start, end = s.get("start", 0), s.get("end", 0)
-            if end <= start:
-                raise ValueError(f"Invalid sentence timestamp: end ({end}) <= start ({start}) violates Rule 118 & Rule 120")
-            duration_s = round(end - start, 2)
-        elif duration_s <= 0:
-            raise ValueError(f"Invalid duration_sec ({duration_s}) <= 0 violates Rule 118")
-        lean.append({"sentence_id": s.get("sentence_id") or f"sent_{len(lean)+1:03d}", "text": s.get("text", ""), "duration_sec": duration_s, "beat_index": s.get("beat_index", 1)})
-    return lean
