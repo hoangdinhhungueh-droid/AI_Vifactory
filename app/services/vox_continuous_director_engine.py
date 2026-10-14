@@ -46,16 +46,16 @@ DEFAULT_NEGATIVE_PROMPT = (
     "no headlines, no beat numbers, no tags, no speech bubbles, no title text, no clutter, no unnecessary objects, "
     "no excessive icons, no visual noise, no random decorations, no fantasy elements, no sci-fi elements, no anime, "
     "no cartoon style, no CGI look, no glossy 3D rendering, no photorealistic background, no oversaturated rainbow colors, "
-    "no poor composition, no distorted anatomy, no watermark, no logos, maintain a clean premium VOX-style editorial collage "
-    "with layered paper textures and documentary-quality composition."
+    "no poor composition, no distorted anatomy, no watermark, no logos, no VOX logo, no Veo logo, no brand icons, "
+    "no wooden table, no wood grain, no brown wood desk, no corkboard, no cork texture, no floating currency symbols, "
+    "no floating dollar signs, no floating euro signs, no cartoon gavel, no garbled letters, maintain a clean premium "
+    "VOX-style editorial collage on aged cream paper surface with layered paper textures and documentary-quality composition."
 )
 
 CANVAS_WORKSPACES = [
-    "Aged Cream Newsprint Desk #F4F1EA with subtle print halftone grid",
-    "Forensic Evidence Cork Board #EBE6DD with muted isometric drafting lines",
-    "Macro Financial Ledger Desk #F4F1EA printed with faint corporate balance sheets",
-    "Tactile Archival Parchment Surface #EFEAE1 with subtle press misregistration",
-    "Minimalist Editorial Drafting Board #F6F3ED with delicate measurement crosshairs",
+    "Aged Cream Newsprint Workspace #F4F1EA with subtle print halftone grid and clean editorial top-down lighting",
+    "Aged Cream Archival Paper Surface #F4F1EA with delicate drafting crosshairs and soft directional desk shadow",
+    "Aged Cream Documentary Ledger Desk #F4F1EA with faint geometric measurement grid in muted charcoal",
 ]
 
 
@@ -159,69 +159,295 @@ def group_into_sequence_blocks(sentences: List[Dict[str, Any]], scenes_per_block
     return sentences
 
 
-def extract_vox_metaphor_entities(sentence: str, market: str, scene_idx: int) -> Tuple[str, List[str], str]:
-    """Extract or synthesize tactile hero cutout object and interacting elements."""
+# Multilingual Thematic Archetypes for Vox Investigative Collage (Rule 128 Generic Contract)
+VOX_THEMATIC_ARCHETYPES = {
+    "LEGAL_DISMISSAL": {
+        "triggers": ["법인세", "과세", "tax", "소송", "판결", "대법원", "court", "ruling", "패소", "lawsuit", "verdict", "thuế", "toà", "án", "裁判", "判決"],
+        "variants": [
+            (
+                "An official corporate tax demand and judicial dismissal decree on tactile aged parchment",
+                ["A crimson wax dismissal seal stamped over the disputed figures", "Paper shears cutting through the tax document"],
+                VOX_PALETTE["terracotta"]
+            ),
+            (
+                "A formal judicial ruling scroll with gold foil official seal stamp",
+                ["A crisp red-line strike-through annotation across the disputed claims", "A wooden verification caliper measuring the legal margin"],
+                VOX_PALETTE["charcoal"]
+            ),
+            (
+                "A statutory tax code dossier with paper bookmarks and highlighted legal clauses",
+                ["A brass pointer arrow pointing to the statutory exemption section", "A bold terracotta #C85A32 document classification tab"],
+                VOX_PALETTE["terracotta"]
+            )
+        ]
+    },
+    "FINANCIAL_SCALE": {
+        "triggers": ["매출", "revenue", "조", "billion", "trillion", "dollar", "돈", "profit", "원", "수익", "doanh thu", "lợi nhuận", "tiền", "売上", "利益"],
+        "variants": [
+            (
+                "A towering vertical skyscraper built from stacked paper ledger pages and currency bundles",
+                ["A measurement caliper clamping the total height", "A bold Vox Yellow #F2C230 highlight circle"],
+                VOX_PALETTE["yellow"]
+            ),
+            (
+                "A tactile multi-tiered paper bar chart illustrating massive financial divergence",
+                ["Dashed red vector comparison lines", "A crisp cutout percentage label badge"],
+                VOX_PALETTE["yellow"]
+            ),
+            (
+                "A forensic financial balance sheet ledger with cut paper income columns",
+                ["A magnifying loupe hovering over zero-tax liabilities", "A bold charcoal contrast border"],
+                VOX_PALETTE["charcoal"]
+            )
+        ]
+    },
+    "OFFSHORE_FLOW": {
+        "triggers": ["싱가포르", "offshore", "국경", "해외", "이전", "flow", "transfer", "ship", "singapore", "chuyển giá", "xuyên biên giới", "hải ngoại", "海外", "移転"],
+        "variants": [
+            (
+                "A stylized paper cargo freighter boat carrying stacked digital data containers",
+                ["Dashed vector shipping route lines printed in terracotta ink", "Dual national flag badges"],
+                VOX_PALETTE["navy"]
+            ),
+            (
+                "An isometric transnational capital pipeline conduit carved from layered parchment",
+                ["Tactile paper arrows indicating offshore capital velocity", "A brass junction valve cutout"],
+                VOX_PALETTE["navy"]
+            ),
+            (
+                "A cut-paper international jurisdiction map showing cross-border monetary transfer",
+                ["Luminous yellow trajectory curves", "A stamped customs clearance mark"],
+                VOX_PALETTE["yellow"]
+            )
+        ]
+    },
+    "INFRASTRUCTURE_PE": {
+        "triggers": ["고정사업장", "서버", "server", "office", "사무실", "거점", "pe", "establishment", "hạ tầng", "máy chủ", "cơ sở", "サーバー", "拠点"],
+        "variants": [
+            (
+                "An isometric paper diorama of a server rack building with translucent wireframe grid",
+                ["A magnifying loupe hovering over empty concrete foundations", "A bold red question mark cutout"],
+                VOX_PALETTE["charcoal"]
+            ),
+            (
+                "A tactile architectural blueprint cutout of a corporate branch without physical servers",
+                ["A red hatched exclusion boundary zone", "A crisp brass drafting pin"],
+                VOX_PALETTE["navy"]
+            ),
+            (
+                "A cut paper telecommunications satellite uplink terminal mounted on a paper grid",
+                ["Concentric radar pulse rings in muted charcoal", "A disconnected cable plug cutout"],
+                VOX_PALETTE["charcoal"]
+            )
+        ]
+    },
+    "TREATY_CLASSIFICATION": {
+        "triggers": ["조약", "법률", "treaty", "서랍", "조세조약", "beps", "oecd", "drawer", "hiệp định", "phân loại", "条約", "分類"],
+        "variants": [
+            (
+                "A dual-drawer wooden filing cabinet rendered in clean flat paper collage cutouts",
+                ["Brass label plates reading 'ROYALTY' vs 'BUSINESS PROFIT'", "A skeleton brass key hovering over the keyhole"],
+                VOX_PALETTE["muted_gold"]
+            ),
+            (
+                "An antique two-pan balance scale tipping under conflicting legal interpretations",
+                ["Cut paper weights labeled with statutory articles", "A taut red indicator needle"],
+                VOX_PALETTE["muted_gold"]
+            ),
+            (
+                "A bilateral tax treaty parchment document with official wax ribbons",
+                ["A dual-color classification divider separating royalty from profit", "A stamped diplomatic seal"],
+                VOX_PALETTE["terracotta"]
+            )
+        ]
+    },
+    "INVESTIGATIVE_AUDIT": {
+        "triggers": ["조사", "자료", "증거", "국세청", "investigation", "evidence", "audit", "thanh tra", "bằng chứng", "調査", "証拠"],
+        "variants": [
+            (
+                "An archival confidential dossier folder stamped with red investigation markers",
+                ["A tactile paper paperclip binding critical audit findings", "A bold terracotta #C85A32 classification stamp"],
+                VOX_PALETTE["terracotta"]
+            ),
+            (
+                "A tactile paper evidence board with taut red threads connecting corporate nodes",
+                ["Cutout documentary photograph markers", "A crisp stamped verification badge"],
+                VOX_PALETTE["navy"]
+            ),
+            (
+                "A vintage forensic magnifying loupe highlighting microscopic paper audit trails",
+                ["A bold yellow indicator beacon", "A series of numbered evidence tags"],
+                VOX_PALETTE["yellow"]
+            )
+        ]
+    }
+}
+
+
+def extract_vox_metaphor_entities(
+    sentence: str,
+    market: str = "KR",
+    scene_idx: int = 0,
+    sentence_data: Optional[Dict[str, Any]] = None,
+    used_heroes: Optional[List[str]] = None
+) -> Tuple[str, List[str], str]:
+    """Extract or synthesize tactile hero cutout object and interacting elements with strict anti-repetition deduplication."""
+    # 1. Respect pre-existing upstream metadata if already forged by high-level planner (Rule 118 & 132)
+    if sentence_data:
+        existing_hero = sentence_data.get("hero_cutout_object") or sentence_data.get("visual_metaphor")
+        existing_interacting = sentence_data.get("interacting_objects")
+        existing_color = sentence_data.get("color_accent")
+        if existing_hero and len(existing_hero) > 10 and existing_interacting:
+            color = existing_color or VOX_PALETTE["terracotta"]
+            return existing_hero, existing_interacting, color
+
     s_low = sentence.lower()
 
-    # Domain keywords detection
-    if any(k in s_low for k in ["법인세", "tax", "과세", "소송", "판결", "대법원", "court", "ruling"]):
-        hero = "An official corporate tax demand and court ruling document on tactile aged parchment"
-        interacting = ["A crimson wax dismissal seal stamped over the figures", "Paper shears cutting through the tax document"]
-        color = VOX_PALETTE["terracotta"]
-    elif any(k in s_low for k in ["매출", "revenue", "조", "billion", "trillion", "dollar", "돈", "profit", "원"]):
-        hero = "A towering vertical skyscraper built from stacked paper ledger pages and currency bundles"
-        interacting = ["A measurement caliper clamping the total height", "A bold Vox Yellow #F2C230 highlight circle"]
-        color = VOX_PALETTE["yellow"]
-    elif any(k in s_low for k in ["싱가포르", "offshore", "국경", "해외", "이전", "flow", "transfer", "ship"]):
-        hero = "A stylized paper cargo freighter boat carrying stacked digital data containers"
-        interacting = ["Dashed vector shipping route lines printed in terracotta ink", "Dual national flag badges"]
-        color = VOX_PALETTE["navy"]
-    elif any(k in s_low for k in ["고정사업장", "서버", "server", "office", "사무실", "거점", "pe", "establishment"]):
-        hero = "An isometric paper diorama of a server rack building with translucent wireframe grid"
-        interacting = ["A magnifying loupe hovering over empty concrete foundations", "A bold red question mark cutout"]
-        color = VOX_PALETTE["charcoal"]
-    elif any(k in s_low for k in ["조약", "법률", "treaty", "서랍", "조세조약", "beps", "oecd"]):
-        hero = "A dual-drawer wooden filing cabinet rendered in clean flat paper collage cutouts"
-        interacting = ["Brass label plates reading 'ROYALTY' vs 'BUSINESS PROFIT'", "A skeleton brass key hovering over the keyhole"]
-        color = VOX_PALETTE["muted_gold"]
-    else:
-        # Fallback tactile object based on rhythm
-        generic_heroes = [
-            "An archival dossier envelope stamped with confidential investigation markers",
-            "A tactile paper evidence board with taut red threads connecting data nodes",
+    # 2. Generic fallback pool
+    generic_pool = [
+        (
+            "An archival confidential dossier folder stamped with red investigation markers",
+            ["A tactile paper paperclip binding critical audit findings", "A bold terracotta #C85A32 classification stamp"],
+            VOX_PALETTE["terracotta"]
+        ),
+        (
+            "A tactile paper evidence board with taut red threads connecting corporate nodes",
+            ["Cutout documentary photograph markers", "A crisp stamped verification badge"],
+            VOX_PALETTE["navy"]
+        ),
+        (
             "A vintage mechanical balance scale tipping under paper document weights",
-            "A stylized architectural floor plan map with cut paper zone overlays"
-        ]
-        hero = generic_heroes[scene_idx % len(generic_heroes)]
-        interacting = ["Tactile paper arrows indicating direction of capital flow", "A crisp stamped verification badge"]
-        color = VOX_PALETTE["terracotta"] if scene_idx % 2 == 0 else VOX_PALETTE["yellow"]
+            ["Tactile paper arrows indicating direction of capital flow", "A bold Vox Yellow #F2C230 highlight circle"],
+            VOX_PALETTE["yellow"]
+        ),
+        (
+            "A stylized architectural floor plan map with cut paper zone overlays",
+            ["Isometric drafting pins in brass", "A stamped jurisdiction boundary border"],
+            VOX_PALETTE["muted_gold"]
+        ),
+        (
+            "An antique two-pan balance scale tipping under conflicting legal interpretations",
+            ["Cut paper weights labeled with statutory articles", "A taut red indicator needle"],
+            VOX_PALETTE["muted_gold"]
+        ),
+        (
+            "A dual-drawer wooden filing cabinet rendered in clean flat paper collage cutouts",
+            ["Brass label plates reading 'ROYALTY' vs 'BUSINESS PROFIT'", "A skeleton brass key hovering over the keyhole"],
+            VOX_PALETTE["muted_gold"]
+        )
+    ]
 
-    return hero, interacting, color
+    # 3. Match against thematic archetypes
+    matched_archetype = None
+    for arch_name, arch_data in VOX_THEMATIC_ARCHETYPES.items():
+        if any(trig in s_low for trig in arch_data["triggers"]):
+            matched_archetype = arch_name
+            break
+
+    if matched_archetype:
+        variants = VOX_THEMATIC_ARCHETYPES[matched_archetype]["variants"]
+        # Prioritize first variant that has not been used in used_heroes
+        selected_variant = None
+        for v in variants:
+            if used_heroes and v[0] in used_heroes:
+                continue
+            selected_variant = v
+            break
+        # If all archetype variants are exhausted, draw from unused generic pool
+        if selected_variant is None:
+            for g in generic_pool:
+                if used_heroes and g[0] in used_heroes:
+                    continue
+                selected_variant = g
+                break
+        # Ultimate fallback
+        if selected_variant is None:
+            selected_variant = variants[scene_idx % len(variants)]
+        return selected_variant[0], list(selected_variant[1]), selected_variant[2]
+
+    # 4. If no archetype matched, draw from generic pool with deduplication
+    selected_generic = None
+    for g in generic_pool:
+        if used_heroes and g[0] in used_heroes:
+            continue
+        selected_generic = g
+        break
+    if selected_generic is None:
+        selected_generic = generic_pool[scene_idx % len(generic_pool)]
+
+    return selected_generic[0], list(selected_generic[1]), selected_generic[2]
 
 
-def synthesize_motion_track(hero: str, interacting: List[str], scene_idx: int) -> Dict[str, str]:
-    """Generate deterministic Vox object-assembly motion track."""
+def synthesize_motion_track(
+    hero: str,
+    interacting: List[str],
+    scene_idx: int,
+    duration_sec: float = 6.0
+) -> Dict[str, Any]:
+    """Generate deterministic Vox object-assembly motion track with dynamic beats (S1..Sn)."""
     quadrants = ["Center stage", "Center-left of canvas", "Center-right of canvas", "Bottom-center stage"]
     anchor = quadrants[scene_idx % len(quadrants)]
+    hero_short = hero.split(" on ")[0].split(" built ")[0].strip()
 
-    entry_actions = [
-        f"0.0-2.0s: {hero.split(' on ')[0]} slides smoothly into {anchor} from top edge",
-        f"0.0-2.0s: {hero.split(' on ')[0]} drops flat onto the desk with a tactile paper snap",
-        f"0.0-2.0s: {hero.split(' on ')[0]} folds open across {anchor} with crisp paper shadows",
-        f"0.0-2.0s: Cutout shears snip across the seam as the document lands on {anchor}"
+    entry_verbs = [
+        "slides smoothly into",
+        "drops flat onto the desk with a tactile paper snap at",
+        "folds open across",
+        "lands firmly onto"
     ]
+    entry_verb = entry_verbs[scene_idx % len(entry_verbs)]
 
-    assembly_steps = [
-        f"2.0-4.5s: {interacting[0]} firmly stamps onto the surface; {interacting[1] if len(interacting) > 1 else 'measurement line'} locks into place",
-        f"2.0-4.5s: {interacting[0]} attaches via red vector thread; the composition firmly anchors to the desk grid",
-        f"2.0-4.5s: Supporting paper layers drop in rapid sequence, settling flat with realistic drop shadows"
-    ]
+    # Dynamic Motion Beats generation based on story pacing and interacting props
+    beats = []
+
+    # S1: Hero Entry
+    t1_end = min(2.0, round(duration_sec * 0.35, 1))
+    beats.append({
+        "step": 1,
+        "timing": f"0.0-{t1_end}s",
+        "action": f"{hero_short} {entry_verb} {anchor} and settles with tactile paper drop shadow",
+        "type": "ENTRY"
+    })
+
+    # S2: First Interacting Element Assembly
+    inter1 = interacting[0] if interacting else "tactile measurement caliper"
+    t2_start = t1_end
+    t2_end = min(3.8, round(duration_sec * 0.7, 1)) if len(interacting) > 1 else duration_sec
+    beats.append({
+        "step": 2,
+        "timing": f"{t2_start}-{t2_end}s",
+        "action": f"{inter1} stamps firmly onto the surface, anchoring into place",
+        "type": "ASSEMBLY"
+    })
+
+    # S3: Second Interacting Element or Red Vector Thread Connection
+    if len(interacting) > 1:
+        inter2 = interacting[1]
+        beats.append({
+            "step": 3,
+            "timing": f"{t2_end}-{duration_sec:.1f}s",
+            "action": f"{inter2} connects via red vector thread, locking the complete paper composition in place",
+            "type": "INTERACTION"
+        })
+
+    # S4: Micro-shadow breathing for longer scenes (>= 6.5s)
+    if duration_sec >= 6.5:
+        beats.append({
+            "step": len(beats) + 1,
+            "timing": f"{max(4.5, duration_sec - 1.5):.1f}-{duration_sec:.1f}s",
+            "action": "Subtle micro-shadow breathing <= 2px while entire cutout cluster remains completely static on desk grid",
+            "type": "SETTLE"
+        })
+
+    entry_action = f"0.0-{t1_end}s: {hero_short} {entry_verb} {anchor}"
+    assembly_step = f"{t1_end}-{duration_sec:.1f}s: {inter1} stamps onto surface and locks into place"
 
     return {
-        "entry_action": entry_actions[scene_idx % len(entry_actions)],
-        "assembly_step": assembly_steps[scene_idx % len(assembly_steps)],
-        "spatial_anchor": f"{anchor}, permanently locked as the base anchor for the next scene",
-        "camera_rule": "Completely static camera, no 3D pan/zoom"
+        "dynamic_motion_beats": beats,
+        "spatial_anchor": f"{anchor}, permanently locked on desk grid with zero drift",
+        "camera_rule": "Completely static camera, no 3D pan/zoom",
+        "entry_action": entry_action,
+        "assembly_step": assembly_step
     }
 
 
@@ -256,6 +482,30 @@ def build_image_prompt(
     return prompt
 
 
+def extract_editorial_tag(sentence_text: str) -> Tuple[str, str]:
+    """Extract native headline and generic English editorial tag across languages (Rule 128)."""
+    words = [w for w in re.split(r"\s+", sentence_text) if len(w) > 1]
+    native_hl = " ".join(words[:3]) if words else "SCENE"
+    s_low = sentence_text.lower()
+
+    if any(k in s_low for k in ["법인세", "과세", "tax", "thuế", "taxation", "소송", "판결", "대법원", "court", "ruling", "패소", "toà", "án", "裁判", "判決"]):
+        english_tag = "CORPORATE TAX & RULING"
+    elif any(k in s_low for k in ["매출", "revenue", "조", "billion", "trillion", "profit", "doanh thu", "lợi nhuận", "tiền", "売上", "利益"]):
+        english_tag = "REVENUE SCALE"
+    elif any(k in s_low for k in ["싱가포르", "offshore", "해외", "국경", "transfer", "flow", "singapore", "xuyên biên giới", "海外", "移転"]):
+        english_tag = "OFFSHORE CAPITAL"
+    elif any(k in s_low for k in ["서버", "고정사업장", "pe", "establishment", "server", "máy chủ", "cơ sở", "サーバー", "拠点"]):
+        english_tag = "PERMANENT ESTABLISHMENT"
+    elif any(k in s_low for k in ["조약", "beps", "oecd", "treaty", "서랍", "hiệp định", "phân loại", "条約", "分類"]):
+        english_tag = "TAX TREATY"
+    elif any(k in s_low for k in ["조사", "자료", "증거", "evidence", "investigation", "audit", "thanh tra", "bằng chứng", "調査", "証拠"]):
+        english_tag = "FORENSIC AUDIT"
+    else:
+        english_tag = "INVESTIGATIVE DOSSIER"
+
+    return native_hl, english_tag
+
+
 def generate_continuous_director_plan(
     episode_dir: Path,
     output_filename: str = "director_plan.json"
@@ -275,6 +525,7 @@ def generate_continuous_director_plan(
 
     processed_scenes = []
     unique_blocks = set()
+    used_heroes: List[str] = []
 
     for idx, s in enumerate(blocked_sentences):
         scene_id = f"SCENE_{idx + 1:02d}"
@@ -282,28 +533,14 @@ def generate_continuous_director_plan(
         unique_blocks.add(seq_block)
         canvas = s["canvas_workspace"]
         sentence_text = s["sentence"]
+        duration_sec = s.get("duration_sec", 6.0)
 
-        hero, interacting, color_accent = extract_vox_metaphor_entities(sentence_text, market, idx)
-        motion_track = synthesize_motion_track(hero, interacting, idx)
+        hero, interacting, color_accent = extract_vox_metaphor_entities(sentence_text, market, idx, s, used_heroes)
+        used_heroes.append(hero)
+        motion_track = synthesize_motion_track(hero, interacting, idx, duration_sec)
 
         # Generate headline and clean editorial topic tag (strictly no internal 'BEAT' numbering)
-        words = [w for w in re.split(r"\s+", sentence_text) if len(w) > 1]
-        native_hl = " ".join(words[:3]) if words else f"SCENE {idx + 1}"
-        s_low = sentence_text.lower()
-        if any(k in s_low for k in ["법인세", "tax", "과세"]):
-            english_tag = "CORPORATE TAX"
-        elif any(k in s_low for k in ["소송", "판결", "대법원", "court", "패소"]):
-            english_tag = "COURT RULING"
-        elif any(k in s_low for k in ["매출", "revenue", "조", "billion", "trillion"]):
-            english_tag = "REVENUE SCALE"
-        elif any(k in s_low for k in ["싱가포르", "offshore", "해외", "국경"]):
-            english_tag = "OFFSHORE CAPITAL"
-        elif any(k in s_low for k in ["서버", "고정사업장", "pe", "establishment"]):
-            english_tag = "PERMANENT ESTABLISHMENT"
-        elif any(k in s_low for k in ["조약", "beps", "oecd", "treaty"]):
-            english_tag = "TAX TREATY"
-        else:
-            english_tag = "FORENSIC TRAIL"
+        native_hl, english_tag = extract_editorial_tag(sentence_text)
         bilingual_hl = f"{native_hl} // {english_tag}"
 
         next_sent = blocked_sentences[idx + 1]["sentence"] if idx + 1 < len(blocked_sentences) else None
@@ -366,12 +603,19 @@ def generate_7acc_flow_manifest(episode_dir: Path, scenes: List[Dict[str, Any]])
         flow_slot = FLOW_ACCOUNTS[idx % len(FLOW_ACCOUNTS)]
         out_fn = f"clip_{s_id.lower()}.mp4"
 
-        # Construct concise Veo prompt
-        action = s["motion_track_and_assembly"]["entry_action"]
-        subject = s["hero_cutout_object"].split(" on ")[0]
+        # Construct comprehensive Veo prompt from dynamic motion beats
+        motion_track = s.get("motion_track_and_assembly", {})
+        dynamic_steps = motion_track.get("dynamic_motion_beats", [])
+        subject = s["hero_cutout_object"].split(" on ")[0].split(" built ")[0].strip()
+        step_narratives = [f"{st['timing']}: {st['action']}" for st in dynamic_steps]
+        steps_text = "; ".join(step_narratives) if step_narratives else motion_track.get("entry_action", "")
+        anchor = motion_track.get("spatial_anchor", "Center stage, permanently locked on desk grid with zero drift")
+
         veo_prompt = (
-            f"Editorial paper cutout animation in Vox documentary style. {subject}. {action}. "
-            f"Tactile paper motion, crisp deckle white edges, flat top-down desk view. No 3D camera rotation."
+            f"Editorial paper cutout animation in Vox documentary style. Animate completed composition: {subject}. "
+            f"{steps_text}. Spatial anchor: {anchor}. Every object permanently locked, zero drift. "
+            f"Camera: Completely static top-down desk view, no 3D pan/zoom, no camera tilt. "
+            f"Tactile paper motion, crisp deckle white edges, subtle micro-shadow breathing <= 2px."
         )
 
         clips.append({

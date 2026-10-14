@@ -220,13 +220,17 @@ def call_opus55_with_fallbacks(
 
 def call_via_vps_runner(prompt: str, task_id: Optional[str] = None) -> str:
     """Routes planning request through VPS runner if running locally without local API key."""
+    import base64
     from scripts.vps_runner import FastVPSClient
     client = FastVPSClient()
-    escaped_prompt = json.dumps(prompt)
+    prompt_b64 = base64.b64encode(prompt.encode("utf-8")).decode("ascii")
+    safe_task_id = (task_id or "").replace("'", "")
     cmd = (
         f"PYTHONPATH=/root/video_factory python3 -c \""
+        f"import base64, json; "
         f"from scripts.orchestrator.hhtech_planner import generate_plan; "
-        f"p = generate_plan({escaped_prompt}, task_id='{task_id or ''}'); "
+        f"raw_prompt = base64.b64decode('{prompt_b64}').decode('utf-8'); "
+        f"p = generate_plan(raw_prompt, task_id='{safe_task_id}'); "
         f"print(json.dumps({{'plan': p}}))\""
     )
     logger.info("Routing planning request through VPS runner to use secure VPS credentials...")

@@ -38,29 +38,82 @@ except Exception:
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
 
+def extract_dynamic_motion_steps(scene: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Trích xuất các bước hành động dynamic (S1..Sn) từ scene mà không bị ép khuôn 4S."""
+    # 1. Ưu tiên dynamic_motion_beats nếu đã có trong schema mới
+    if "dynamic_motion_beats" in scene and isinstance(scene["dynamic_motion_beats"], list) and len(scene["dynamic_motion_beats"]) > 0:
+        steps = []
+        for idx, b in enumerate(scene["dynamic_motion_beats"]):
+            if isinstance(b, dict):
+                steps.append({
+                    "step": str(b.get("step", idx + 1)),
+                    "timing": str(b.get("timing", f"{idx*2.0:.1f}-{(idx+1)*2.0:.1f}s")),
+                    "action": str(b.get("action", ""))
+                })
+            elif isinstance(b, str):
+                steps.append({
+                    "step": str(idx + 1),
+                    "timing": f"{idx*2.0:.1f}-{(idx+1)*2.0:.1f}s",
+                    "action": b
+                })
+        if steps:
+            return steps
+
+    # 2. Fallback từ motion_track_and_assembly một cách thông minh
+    motion = scene.get("motion_track_and_assembly", {})
+    steps = []
+    if isinstance(motion, dict):
+        entry_act = motion.get("entry_action", "").strip()
+        assembly = motion.get("assembly_step", "").strip()
+
+        if entry_act:
+            timing_match = re.match(r"^([\d\.\-sS:–—]+):\s*(.*)$", entry_act)
+            if timing_match:
+                t_str, act_str = timing_match.group(1).strip(), timing_match.group(2).strip()
+            else:
+                t_str, act_str = "0.0-2.0s", entry_act
+            steps.append({"step": "1", "timing": t_str, "action": act_str})
+
+        if assembly:
+            timing_match = re.match(r"^([\d\.\-sS:–—]+):\s*(.*)$", assembly)
+            if timing_match:
+                t_str, act_str = timing_match.group(1).strip(), timing_match.group(2).strip()
+            else:
+                t_str, act_str = "2.0-4.5s", assembly
+            steps.append({"step": "2", "timing": t_str, "action": act_str})
+
+    return steps
+
+
 def build_universal_video_prompt(scene: Dict[str, Any]) -> str:
     """Xây dựng Universal Video Prompt (Mode 1 / Prompt 3 từ Made by AI Playbook).
-    Định vị chuẩn 4 giai đoạn: S1 Entry, S2 Assembly, S3 Lock, S4 Micro-action.
+    Hỗ trợ phân rã động linh hoạt S1..Sn theo nhịp truyện thực tế.
     """
     hero_obj = scene.get("hero_cutout_object", "")
     motion = scene.get("motion_track_and_assembly", {})
-    entry_act = motion.get("entry_action", "") if isinstance(motion, dict) else ""
-    assembly = motion.get("assembly_step", "") if isinstance(motion, dict) else ""
     spatial = motion.get("spatial_anchor", "") if isinstance(motion, dict) else ""
     camera = motion.get("camera_rule", "Completely static camera, no 3D pan/zoom") if isinstance(motion, dict) else ""
 
-    entry_clean = re.sub(r"^\s*[\d\.\-sS:–—]+\s*", "", entry_act).strip()
-    assembly_clean = re.sub(r"^\s*[\d\.\-sS:–—]+\s*", "", assembly).strip()
+    steps = extract_dynamic_motion_steps(scene)
 
     parts = [
         "Editorial paper cutout animation in Vox documentary style.",
-        f"Animate completed composition: {hero_obj}.",
-        f"0.0-2.0s: {entry_clean}." if entry_clean else "",
-        f"2.0-4.5s: {assembly_clean}." if assembly_clean else "",
-        f"Spatial anchor: {spatial}. Every object permanently locked, zero drift." if spatial else "",
-        f"Camera: {camera}.",
-        "Tactile paper motion, crisp deckle white edges, flat top-down desk view, subtle micro-shadow breathing <= 2px."
+        f"Animate completed composition: {hero_obj}."
     ]
+
+    for s in steps:
+        timing = s.get("timing", "")
+        act = s.get("action", "").strip()
+        if act:
+            parts.append(f"{timing}: {act}.")
+
+    if spatial:
+        clean_spatial = re.sub(r",?\s*permanently locked.*$", "", spatial, flags=re.I).strip().rstrip(",")
+        parts.append(f"Spatial anchor: {clean_spatial}. Every object permanently locked, zero drift.")
+
+    parts.append(f"Camera: {camera}.")
+    parts.append("Tactile paper motion, crisp white deckle edges, flat top-down desk view, subtle micro-shadow breathing <= 2px.")
+
     return " ".join(p for p in parts if p).strip()
 
 
@@ -269,10 +322,19 @@ def perform_b5_visual_audit(episode_id: str, block_manifest: Dict[str, Any], lim
         all_scenes = all_scenes[:limit]
 
     audit_details = []
-    approved_count = 0
+    plan_file = episode_dir / "director_plan.json"
+    scenes_info = {}
+    if plan_file.exists():
+        try:
+            with open(plan_file, "r", encoding="utf-8") as f:
+                dp = json.load(f)
+            for s in dp.get("scenes", []):
+                scenes_info[s.get("scene_id")] = s
+        except Exception:
+            pass
 
-    print(f"{'Scene ID':<10} | {'Block Name':<18} | {'Resolution':<11} | {'Dung Lượng':<10} | {'Tỷ lệ':<8} | {'Điểm':<5} | Trạng Thái")
-    print("-" * 88)
+    print(f"\n{'Scene ID':<10} | {'File Name':<24} | {'Kích Thước':<11} | {'Dung Lượng':<11} | {'Đánh Giá Thị Giác 4 Trục (Rule 122)':<55} | Trạng Thái")
+    print("-" * 135)
 
     for sc in all_scenes:
         sc_id = sc["scene_id"]
@@ -305,7 +367,7 @@ def perform_b5_visual_audit(episode_id: str, block_manifest: Dict[str, Any], lim
                 "status": "MISSING",
                 "reason": "Chưa có file ảnh"
             })
-            print(f"{sc_id:<10} | {b_name[:18]:<18} | {'N/A':<11} | {'0 KB':<10} | {'N/A':<8} | {'0.0':<5} | ❌ CHƯA CÓ ẢNH")
+            print(f"{sc_id:<10} | {f'composite_{sc_id}.png':<24} | {'N/A':<11} | {'0 KB':<11} | {'Chưa tìm thấy file ảnh hạt giống trên đĩa':<55} | ❌ CHƯA CÓ ẢNH")
             continue
 
         sz_bytes = found_img.stat().st_size
@@ -351,14 +413,21 @@ def perform_b5_visual_audit(episode_id: str, block_manifest: Dict[str, Any], lim
                 score = 0.0
                 res_str = f"Error: {e}"
 
-        status_text = "APPROVED" if is_ok else "NEEDS_REVIEW"
+        sc_data = scenes_info.get(sc_id, {})
+        hero = sc_data.get("hero_cutout_object", "")
+        steps = extract_dynamic_motion_steps(sc_data)
+
         if is_ok:
             approved_count += 1
-            icon_status = "✅ ĐẠT CHUẨN"
+            rule122_text = f"Nền giấy #F4F1EA sạch bóng chữ; {hero[:30]}. Zero text."
+            status_text = "APPROVED"
+            status_tag = "✅ SẠCH 100%"
         else:
-            icon_status = "⚠️ CẦN XEM LẠI"
+            rule122_text = f"Lỗi kiểm toán: {res_str}, {aspect_str}, dung lượng {sz_kb}KB"
+            status_text = "NEEDS_REVIEW"
+            status_tag = "⚠️ CẦN XEM LẠI"
 
-        print(f"{sc_id:<10} | {b_name[:18]:<18} | {res_str:<11} | {f'{sz_kb:,} KB':<10} | {aspect_str:<8} | {score:<5} | {icon_status}")
+        print(f"{sc_id:<10} | {found_img.name:<24} | {res_str:<11} | {f'{sz_kb:,} KB':<11} | {rule122_text:<55} | {status_tag}")
 
         audit_details.append({
             "scene_id": sc_id,
@@ -369,7 +438,9 @@ def perform_b5_visual_audit(episode_id: str, block_manifest: Dict[str, Any], lim
             "size_kb": sz_kb,
             "aspect_ratio": aspect_str,
             "score": score,
-            "status": status_text
+            "status": status_text,
+            "rule122_text": rule122_text,
+            "dynamic_steps": steps
         })
 
     total_scenes_audited = len(all_scenes)
@@ -417,11 +488,12 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
     scenes_audited = audit_summary.get("scenes", [])
 
     cards_html = []
+    table_rows = []
     for item in scenes_audited:
         sc_id = item.get("scene_id", "")
         b_name = item.get("block", "")
-        file_name = item.get("file", "")
-        res = item.get("resolution", "")
+        file_name = item.get("file", f"composite_{sc_id}.png")
+        res = item.get("resolution", "2560x1440")
         sz = item.get("size_kb", 0)
         status = item.get("status", "")
         img_rel_path = f"blocks/{b_name}/images/{file_name}"
@@ -430,14 +502,32 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
         sentence = sc_data.get("sentence", "")
         hero_obj = sc_data.get("hero_cutout_object", "")
         headline = sc_data.get("headline", "")
-        motion = sc_data.get("motion_track_and_assembly", {})
-        s1 = motion.get("entry_action", "") if isinstance(motion, dict) else ""
-        s2 = motion.get("assembly_step", "") if isinstance(motion, dict) else ""
-        s3 = motion.get("spatial_anchor", "") if isinstance(motion, dict) else ""
-        s4 = sc_data.get("visual_continuity_link_to_next") or (motion.get("camera_rule", "") if isinstance(motion, dict) else "") or "Khóa cứng vĩnh viễn, micro-shadow breathing <= 2px"
+
+        # Dynamic motion steps
+        steps = extract_dynamic_motion_steps(sc_data)
+        steps_summary = " | ".join([f"S{s['step']} ({s['timing']}): {s['action']}" for s in steps])
+        if not steps_summary:
+            steps_summary = "Chờ phân rã"
+
+        steps_card_html = "".join([f'<div class="anim-step"><b style="color: #38bdf8;">S{s["step"]} ({s["timing"]}):</b> {s["action"]}</div>' for s in steps])
+        if not steps_card_html:
+            steps_card_html = '<div class="anim-step" style="color: #94a3b8;">Chưa cấu hình dynamic beats</div>'
 
         badge_color = "#10b981" if status == "APPROVED" else "#ef4444"
-        badge_text = "✅ ĐẠT CHUẨN (10/10)" if status == "APPROVED" else f"⚠️ {status}"
+        badge_text = "✅ SẠCH 100%" if status == "APPROVED" else f"⚠️ {status}"
+        rule122_desc = item.get("rule122_text") or (f"Nền giấy #F4F1EA sạch bóng chữ; {hero_obj[:30]}. Zero text." if status == "APPROVED" else "Lỗi kiểm toán thị giác")
+
+        row = f"""
+        <tr>
+            <td class="cell-id"><b>{sc_id}</b></td>
+            <td class="cell-file"><code>{file_name}</code></td>
+            <td>{res}</td>
+            <td>{sz:,} KB</td>
+            <td class="cell-audit">{rule122_desc}</td>
+            <td class="cell-motion">{steps_summary}</td>
+            <td><span class="table-badge" style="background: {badge_color};">{badge_text}</span></td>
+        </tr>"""
+        table_rows.append(row)
 
         card = f"""
         <div class="card">
@@ -457,11 +547,8 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
                 <div class="sentence">{sentence}</div>
                 <div class="hero-obj"><b>Vật thể Vox:</b> {hero_obj}</div>
                 <div class="anim-box">
-                    <div class="anim-title">🎬 Cụm Phân Rã Animation Objects (S1 - S4):</div>
-                    <div class="anim-step"><b style="color: #38bdf8;">S1 (Entry 0-2s):</b> {s1}</div>
-                    <div class="anim-step"><b style="color: #a855f7;">S2 (Assembly 2-4.5s):</b> {s2}</div>
-                    <div class="anim-step"><b style="color: #10b981;">S3 (Locked Anchor):</b> {s3}</div>
-                    <div class="anim-step"><b style="color: #f59e0b;">S4 (Micro/Next):</b> {s4}</div>
+                    <div class="anim-title">🎬 Phân Rã Hành Động Dynamic (S₁ - Sₙ):</div>
+                    {steps_card_html}
                 </div>
             </div>
         </div>
@@ -472,6 +559,7 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
     total_approved = audit_summary.get("approved_images", 0)
     verdict = audit_summary.get("verdict", "UNKNOWN")
     grid_inner = "".join(cards_html)
+    table_inner = "".join(table_rows)
 
     html_content = f"""<!DOCTYPE html>
 <html lang="vi">
@@ -482,13 +570,24 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
         :root {{ --bg: #0f172a; --card-bg: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --primary: #38bdf8; --accent: #f59e0b; --border: #334155; }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{ background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 30px 20px; }}
-        .header {{ max-width: 1400px; margin: 0 auto 30px; padding: 24px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); }}
+        .header {{ max-width: 1400px; margin: 0 auto 20px; padding: 24px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); }}
         .header h1 {{ font-size: 24px; margin-bottom: 8px; color: var(--primary); }}
         .header p {{ color: var(--text-muted); font-size: 15px; margin-bottom: 16px; }}
         .stats {{ display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }}
         .stat-badge {{ background: #0f172a; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--border); font-size: 14px; }}
         .stat-badge b {{ color: var(--primary); font-size: 16px; }}
         .trigger-box {{ background: #020617; padding: 16px; border-radius: 8px; border: 1px dashed var(--accent); font-family: Consolas, monospace; font-size: 14px; color: #fbbf24; display: flex; justify-content: space-between; align-items: center; }}
+        .table-card {{ max-width: 1400px; margin: 0 auto 30px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; padding: 20px; }}
+        .table-title {{ font-size: 16px; font-weight: bold; color: var(--primary); margin-bottom: 12px; }}
+        .form-table {{ width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }}
+        .form-table th {{ background: #0f172a; color: var(--primary); padding: 12px 14px; border-bottom: 2px solid var(--border); }}
+        .form-table td {{ padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }}
+        .form-table tr:hover {{ background: #26334d; }}
+        .cell-id {{ color: #f8fafc; font-weight: bold; }}
+        .cell-file code {{ background: #0f172a; padding: 3px 6px; border-radius: 4px; color: #a855f7; font-size: 12px; }}
+        .cell-audit {{ color: #cbd5e1; max-width: 320px; line-height: 1.4; }}
+        .cell-motion {{ color: #94a3b8; max-width: 380px; font-size: 12px; line-height: 1.4; }}
+        .table-badge {{ display: inline-block; padding: 4px 8px; border-radius: 6px; color: #fff; font-size: 11px; font-weight: bold; }}
         .grid {{ max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 24px; }}
         .card {{ background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s; }}
         .card:hover {{ transform: translateY(-4px); border-color: var(--primary); }}
@@ -521,6 +620,25 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
             <span>🚀 Lệnh kích hoạt sinh video khi bạn đồng ý:</span>
             <code>python scripts/trigger_video_generation.py --episode {episode_id} --limit-blocks 1</code>
         </div>
+    </div>
+    <div class="table-card">
+        <div class="table-title">📋 BẢNG THẨM ĐỊNH THỊ GIÁC & PHÂN RÃ HÀNH ĐỘNG DYNAMIC (RULE 122)</div>
+        <table class="form-table">
+            <thead>
+                <tr>
+                    <th>Scene ID</th>
+                    <th>File Name</th>
+                    <th>Kích Thước</th>
+                    <th>Dung Lượng</th>
+                    <th>Đánh Giá Thị Giác 4 Trục (Rule 122)</th>
+                    <th>Phân Rã Hành Động Chuyển Động Dynamic (S₁..Sₙ)</th>
+                    <th>Trạng Thái</th>
+                </tr>
+            </thead>
+            <tbody>
+                {table_inner}
+            </tbody>
+        </table>
     </div>
     <div class="grid">
         {grid_inner}
@@ -591,21 +709,26 @@ def evaluate_human_gate(
     print(f"   • Thư mục hạt giống Remotion: episodes/{episode_id}/composite_seeds/")
     print(f"   • Thư viện ảnh HTML trực quan: episodes/{episode_id}/review_gallery.html")
 
-    print("\n📋 BẢNG THẨM ĐỊNH THỊ GIÁC & PHÂN RÃ CỤM ANIMATION OBJECT (S1 - S4):")
-    print(f"{'Scene ID':<10} | {'Vật Thể Vox':<26} | {'S1 (Entry 0-2s)':<24} | {'S2 (Assembly 2-4.5s)':<24} | {'S3 (Anchor)':<20} | {'S4 (Next Link)':<20} | {'Trạng Thái'}")
-    print("-" * 145)
+    print("\n📋 BẢNG THẨM ĐỊNH THỊ GIÁC & PHÂN RÃ HÀNH ĐỘNG DYNAMIC (RULE 122 & ANIMATION BEATS):")
+    print(f"{'Scene ID':<10} | {'File Name':<24} | {'Kích Thước':<11} | {'Dung Lượng':<11} | {'Đánh Giá Thị Giác 4 Trục (Rule 122)':<45} | {'Phân Rã Chuyển Động Dynamic (S₁..Sₙ)':<45} | Trạng Thái")
+    print("-" * 165)
     for item in scenes_audited:
         sc_id = item.get("scene_id", "")
         sc_data = scenes_info.get(sc_id, {})
-        hero_obj = sc_data.get("hero_cutout_object", "")[:24]
-        motion = sc_data.get("motion_track_and_assembly", {})
-        s1 = motion.get("entry_action", "")[:22] if isinstance(motion, dict) else ""
-        s2 = motion.get("assembly_step", "")[:22] if isinstance(motion, dict) else ""
-        s3 = motion.get("spatial_anchor", "")[:18] if isinstance(motion, dict) else ""
-        s4 = sc_data.get("visual_continuity_link_to_next", "")[:18]
-        st = "✅ ĐẠT" if item.get("status") == "APPROVED" else f"⚠️ {item.get('status')}"
-        print(f"{sc_id:<10} | {hero_obj:<26} | {s1:<24} | {s2:<24} | {s3:<20} | {s4:<20} | {st}")
-    print("-" * 145)
+        hero_obj = sc_data.get("hero_cutout_object", "")
+        file_name = item.get("file", f"composite_{sc_id}.png")
+        res_str = item.get("resolution", "2560x1440")
+        sz_kb = item.get("size_kb", 0)
+
+        steps = extract_dynamic_motion_steps(sc_data)
+        steps_str = " | ".join([f"S{s['step']} ({s['timing']}): {s['action'][:22]}" for s in steps])
+        if not steps_str:
+            steps_str = "Chờ phân rã"
+
+        rule122_desc = item.get("rule122_text") or (f"Nền giấy #F4F1EA sạch bóng chữ; {hero_obj[:28]}." if item.get("status") == "APPROVED" else "Lỗi kiểm toán thị giác")
+        st = "✅ SẠCH 100%" if item.get("status") == "APPROVED" else f"⚠️ {item.get('status')}"
+        print(f"{sc_id:<10} | {file_name:<24} | {res_str:<11} | {f'{sz_kb:,} KB':<11} | {rule122_desc[:45]:<45} | {steps_str[:45]:<45} | {st}")
+    print("-" * 165)
 
     # Nếu đang chạy interactive terminal
     if sys.stdin and hasattr(sys.stdin, "isatty") and sys.stdin.isatty():

@@ -86,6 +86,14 @@ def test_continuous_director_plan_generation(mock_episode_dir):
         assert "assembly_step" in mt
         assert "spatial_anchor" in mt
         assert mt["camera_rule"] == "Completely static camera, no 3D pan/zoom"
+        assert "dynamic_motion_beats" in mt
+        assert isinstance(mt["dynamic_motion_beats"], list)
+        assert 2 <= len(mt["dynamic_motion_beats"]) <= 4
+        for b in mt["dynamic_motion_beats"]:
+            assert "step" in b
+            assert "timing" in b
+            assert "action" in b
+            assert "type" in b
 
         # Typography & Bridging link
         assert "graphic_typography" in scene
