@@ -340,7 +340,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         tree_res = subprocess.run(["git", "-C", str(ROOT_DIR), "rev-parse", "HEAD^{tree}"], capture_output=True, text=True, check=False)
         git_tree = tree_res.stdout.strip()
         remote_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-remote", "origin", "main"], capture_output=True, text=True, check=False)
-        local_status_res = subprocess.run(["git", "-C", str(ROOT_DIR), "status", "--porcelain"], capture_output=True, text=True, check=False)
+        local_status_res = subprocess.run(["git", "-C", str(ROOT_DIR), "status", "--porcelain", "-uno"], capture_output=True, text=True, check=False)
         local_content_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files", "-s"], capture_output=True, text=True, check=False)
         import hashlib
         local_content_hash = hashlib.sha256(local_content_res.stdout.encode("utf-8")).hexdigest()
@@ -472,10 +472,10 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "mkdir -p /root/video_factory/out/golden/frames && "
         "ffmpeg -y -ss 0.3 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc01_fg1.png 2>&1 | tail -n 2 && "
         "ffmpeg -y -ss 0.8 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc01_fg2.png 2>&1 | tail -n 2 && "
-        "ffmpeg -y -ss 4.35 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc02_fg1.png 2>&1 | tail -n 2 && "
-        "ffmpeg -y -ss 4.85 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc02_fg2.png 2>&1 | tail -n 2 && "
-        "ffmpeg -y -ss 9.53 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc03_fg1.png 2>&1 | tail -n 2 && "
-        "ffmpeg -y -ss 10.0 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc03_fg2.png 2>&1 | tail -n 2 && "
+        "ffmpeg -y -ss 5.8 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc02_fg1.png 2>&1 | tail -n 2 && "
+        "ffmpeg -y -ss 6.3 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc02_fg2.png 2>&1 | tail -n 2 && "
+        "ffmpeg -y -ss 14.0 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc03_fg1.png 2>&1 | tail -n 2 && "
+        "ffmpeg -y -ss 14.5 -i /root/video_factory/out/golden/final.mp4 -frames:v 1 -update 1 /root/video_factory/out/golden/frames/sc03_fg2.png 2>&1 | tail -n 2 && "
         "ls -lh /root/video_factory/out/golden/frames/*.png && sha256sum /root/video_factory/out/golden/frames/*.png"
     )
     code_vis, out_vis = run_on_vps(
@@ -615,7 +615,9 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "COMMIT SEPARATION & PROVENANCE BREAKDOWN:\n"
         "- 2456870: feat(vox): implement single unified vox pipeline with tactile object decomposition and purge legacy pipeline\n"
         "- 9887664: fix(vox): bound subtitle drift to 9.0ms via cumulative centiseconds, add reverse drift gate to manifest\n"
-        "- HEAD: fix(vox): asset provenance, contact sheet, audio alignment adversarial tests, and Playwright UI audit\n"
+        "- 68443d1: fix(vox): full asset provenance metadata and unified contact sheet generation\n"
+        "- b540512: fix(vox): audio alignment adversarial tests, codemap playwright audit, and notion card parity\n"
+        "- 7e5cea4: fix(vox): frame-grid scene boundary alignment, hard-gate word anchors, and enforce ci tests/vox\n"
         "QUANTFLOW codemap and login_acc07 modules belong to auxiliary infrastructure tooling and maintain independent contract boundaries."
     )
     evidence_blocks.append(
