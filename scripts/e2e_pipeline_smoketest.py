@@ -207,10 +207,16 @@ def gate_cross_market_dynamic_director():
             for b_ent in banned_entities:
                 assert b_ent not in txt, f"Banned entity {b_ent} leaked into JP scene: {txt}"
 
-        jp_bgs = set(s.get("bg_reuse_key") for s in jp_scenes if s.get("bg_reuse_key"))
-        en_bgs = set(s.get("bg_reuse_key") for s in en_scenes if s.get("bg_reuse_key"))
-        assert len(jp_bgs) > 0, f"JP market yielded 0 backgrounds: scenes={jp_scenes}"
-        assert len(en_bgs) > 0, f"EN market yielded 0 backgrounds: scenes={en_scenes}"
+        def _get_bg_key(s):
+            bg = s.get("background")
+            if isinstance(bg, dict):
+                return bg.get("reuse_key")
+            return s.get("bg_reuse_key")
+
+        jp_bgs = set(_get_bg_key(s) for s in jp_scenes if _get_bg_key(s))
+        en_bgs = set(_get_bg_key(s) for s in en_scenes if _get_bg_key(s))
+        assert len(jp_bgs) > 0, f"JP market yielded 0 backgrounds"
+        assert len(en_bgs) > 0, f"EN market yielded 0 backgrounds"
         assert len(jp_bgs.intersection(en_bgs)) == 0, "JP and EN background rosters must be 100% disjoint"
         print(f"  [PASS] Live Cross-Market Director executed clean: JP ({len(jp_bgs)} BGs) vs EN ({len(en_bgs)} BGs) 0% leakage.")
     finally:
