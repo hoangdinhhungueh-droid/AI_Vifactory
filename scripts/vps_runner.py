@@ -13,18 +13,27 @@ except (AttributeError, io.UnsupportedOperation) as _e_enc:
     # Stdout already configured or doesn't support reconfigure
     pass_silent = True
 
+import os
+
+DEFAULT_MCP2_URL = os.getenv("VPS_MCP2_URL", "https://mcp2.vifactory.com/mcp")
+DEFAULT_MCP2_TOKEN = os.getenv("VPS_MCP2_TOKEN", "8kV2nR9pL4mQ7wF3jB6vN1cY8tZ5hD0aS")
+DEFAULT_AG_URL = os.getenv("VPS_AG_URL", "https://ag.vifactory.com/mcp")
+DEFAULT_AG_TOKEN = os.getenv("VPS_AG_TOKEN", "AG_1GWQeTfEGoSlHSsKcC4rJ8O28wYrTsfj4AR4x7xY")
+DEFAULT_CF_ID = os.getenv("CF_ACCESS_CLIENT_ID", "8b08f2a93e3c6b29d726695044d7297b.access")
+DEFAULT_CF_SECRET = os.getenv("CF_ACCESS_CLIENT_SECRET", "911083c977c4e746f00156fdce8eb6633756cb5a0d815454431869991fac20d6")
+
 ENDPOINTS = [
     {
-        "url": "https://mcp2.vifactory.com/mcp",
-        "token": "8kV2nR9pL4mQ7wF3jB6vN1cY8tZ5hD0aS",
+        "url": DEFAULT_MCP2_URL,
+        "token": DEFAULT_MCP2_TOKEN,
         "cf_id": None,
         "cf_secret": None
     },
     {
-        "url": "https://ag.vifactory.com/mcp",
-        "token": "AG_1GWQeTfEGoSlHSsKcC4rJ8O28wYrTsfj4AR4x7xY",
-        "cf_id": "8b08f2a93e3c6b29d726695044d7297b.access",
-        "cf_secret": "911083c977c4e746f00156fdce8eb6633756cb5a0d815454431869991fac20d6"
+        "url": DEFAULT_AG_URL,
+        "token": DEFAULT_AG_TOKEN,
+        "cf_id": DEFAULT_CF_ID,
+        "cf_secret": DEFAULT_CF_SECRET
     }
 ]
 

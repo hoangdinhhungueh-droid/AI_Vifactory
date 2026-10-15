@@ -274,9 +274,9 @@ def gate_b6_remotion_props_and_composition():
     with open(os.path.join(PROJECT_ROOT, "remotion", "src", "index.tsx"), "r", encoding="utf-8") as f:
         index_tsx = f.read()
     assert "TwoLayerEpisode" in index_tsx or "VoxBuildOnStage" in index_tsx, (
-        "remotion/src/index.tsx must bind canonical video composition!"
+        "remotion/src/index.tsx must bind auxiliary video composition!"
     )
-    print("  [PASS] remotion/src/index.tsx binds canonical composition.")
+    print("  [PASS] remotion/src/index.tsx binds auxiliary composition.")
 
     # 3. Verify zero hardcoded literals in VoxBuildOnStage
     with open(os.path.join(PROJECT_ROOT, "remotion", "src", "components", "vox", "VoxBuildOnStage.tsx"), "r", encoding="utf-8") as f:

@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -32,7 +33,13 @@ from vox.assets_fg import generate_fg_cutout
 from vox.compositor import render_scene_clip
 from vox.karaoke import generate_ass_subtitles
 from vox.planner import plan_scenes_from_script
-from vox.qa.gates import verify_final_video_gates
+from vox.qa.gates import (
+    BROADCAST_LUFS_MAX,
+    BROADCAST_LUFS_MIN,
+    BROADCAST_LUFS_TARGET,
+    BROADCAST_TRUE_PEAK_CEILING,
+    verify_final_video_gates,
+)
 from vox.tts import synthesize_narration
 
 
@@ -250,14 +257,27 @@ def run_pipeline(
     drift_val = round(max_drift_ms, 2) if max_drift_ms is not None else None
     parity_status = "PASS" if (drift_val is not None and drift_val <= 33.3 and len(timeline.words) > 0) else "FAIL"
 
+    git_sha = "unknown"
+    try:
+        git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
+    except Exception:
+        pass
+
     manifest = {
         "pipeline": "vox_tactile_explainer_v1",
         "title": title,
+        "git_sha": git_sha,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "total_latency_sec": total_time,
         "duration_sec": timeline.audio_duration,
         "alignment_model": "faster-whisper-base.en",
         "script_source": str(script_path),
+        "gate_thresholds": {
+            "lufs_target": BROADCAST_LUFS_TARGET,
+            "lufs_min": BROADCAST_LUFS_MIN,
+            "lufs_max": BROADCAST_LUFS_MAX,
+            "true_peak_ceiling_dbtp": BROADCAST_TRUE_PEAK_CEILING,
+        },
         "final_video": {
             "path": str(final_video),
             "sha256": compute_file_sha256(final_video),
@@ -271,8 +291,8 @@ def run_pipeline(
             "whisper_model": "faster-whisper-base.en",
             "whisper_version": "1.0.3",
             "tts_voice": "en-US-ChristopherNeural",
-            "loudness_target_lufs": -16.0,
-            "true_peak_target_dbtp": -1.5,
+            "loudness_target_lufs": BROADCAST_LUFS_TARGET,
+            "true_peak_target_dbtp": BROADCAST_TRUE_PEAK_CEILING,
             "sha256": compute_file_sha256(audio_wav),
         },
         "subtitles": {

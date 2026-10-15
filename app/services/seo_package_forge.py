@@ -178,6 +178,14 @@ def sync_exact_chapters_from_remotion(
 
     # 1. Locate remotion_props.json
     candidates = []
+    # Prioritize Vox canonical pipeline manifest (Rule 125 Single Truth & Rule 135)
+    if ep_dir_path:
+        candidates.append(os.path.join(ep_dir_path, "manifest.json"))
+    if task_id:
+        candidates.extend([
+            f"/var/vf/episodes/{task_id}/manifest.json",
+            f"/root/video_factory/var/vf/episodes/{task_id}/manifest.json",
+        ])
     if remotion_props_path:
         candidates.append(str(remotion_props_path))
     if ep_dir_path:
@@ -205,6 +213,7 @@ def sync_exact_chapters_from_remotion(
                 rdata = json.load(rf)
             scenes = rdata.get("scenes", [])
             fps = float(rdata.get("fps") or 30.0)
+            is_vox_manifest = any("start" in sc for sc in scenes if isinstance(sc, dict))
             if scenes:
                 current_frame = 0
                 last_beat_key = None
@@ -245,10 +254,14 @@ def sync_exact_chapters_from_remotion(
                         else:
                             current_beat_key = act_title or f"SCENE_{idx}"
 
-                    dur = int(s.get("durationInFrames") or 0)
+                    if is_vox_manifest and "start" in s:
+                        sec = int(float(s["start"]))
+                        dur = int(round(float(s.get("end", s["start"]) - s["start"]) * fps))
+                    else:
+                        dur = int(s.get("durationInFrames") or 0)
+                        sec = int(current_frame / fps)
                     
                     if current_beat_key != last_beat_key or idx == 0:
-                        sec = int(current_frame / fps)
                         # Ensure YouTube constraint: chapters at least 10s apart (Rule 135)
                         if not exact_timestamps:
                             exact_timestamps.append(0)

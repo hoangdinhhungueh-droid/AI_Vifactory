@@ -30,7 +30,7 @@
 - [x] **18 Kỷ Luật Thép Antigravity (AGENTS.md)**: Rule 118 (Zero-Mock), Rule 119 (Existing Codebase), Rule 121 (Verification), Rule 122 (Visual Audit), Rule 124 (Atomic Commit), Rule 125 (Zero Ghost Code), Rule 126 (Three-Way Sync), Rule 127 (Programmatic Runtime), Rule 128 (Generic Contract), Rule 137 (Zero-Drive-Wipe).
 - [x] **Hạ tầng Multi-Agent Orchestrator (`scripts/orchestrator/runner.py`)**: Council deliberation, Lifecycle Manager, Resource Sandbox (`/tmp/` isolation), Ghost Code Hunter.
 - [x] **Open Code Review (OCR) Engine**: Tích hợp Alibaba OCR (`ocr review`, `ocr delegate`) cho kiểm toán AST tự động.
-- [x] **Pre-Push Blast Guard (`pre_push_blast_guard.py`)**: Ngăn chặn rò rỉ kiến trúc và refactor diện rộng > 25% blast radius.
+- [x] **Pre-Push Blast Guard (`scripts/orchestrator/runner.py`)**: Ngăn chặn rò rỉ kiến trúc và refactor diện rộng > 25% blast radius (Pillar 1 Gate).
 - [x] **Hệ thống CI/CD & Deploy 1-Lệnh (`Makefile` + GitHub Actions)**: Tự động hóa kiểm thử, build và deploy an toàn lên Hetzner VPS.
 
 ---

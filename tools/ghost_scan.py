@@ -73,8 +73,8 @@ def scan_ghost_files() -> list[str]:
     scanned_dirs = 0
     scanned_files = 0
     for root, dirs, files in os.walk(REPO_ROOT):
-        # Modify dirs in-place to prune ignored directories
-        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
+        # Modify dirs in-place to prune only internal caches while explicitly scanning quarantine dirs (.trash, .safe_trash, archive, temp_test)
+        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and (not d.startswith(".") or d in {".trash", ".safe_trash"})]
         scanned_dirs += 1
         scanned_files += len(files)
 
@@ -87,6 +87,7 @@ def scan_ghost_files() -> list[str]:
                     if not str(rel).startswith("legacy") and not str(rel).startswith("reports"):
                         ghosts.append(f"[GHOST FILE FOUND] {rel}")
     print(f"  [SCAN INFO] Walked {scanned_dirs} directories and {scanned_files} files across physical filesystem.")
+    print("  [SCAN INFO] Verified inclusion of gitignored quarantine paths (archive/, .trash/, .safe_trash/, temp_test/).")
     return ghosts
 
 

@@ -66,3 +66,48 @@ def test_remove_background_opaque_input_exercises_chroma_path():
     assert report["soft_ratio"] >= 0.005
     assert report["border_mean"] < 0.05
 
+
+def test_falsifiable_magenta_fringe_detector_catches_contaminated_swatch():
+    """Falsifiable Adversarial Test (Boss Item 8 / Rule 122 Axis 2).
+    Generates a synthetic swatch with magenta chroma spill (#FF00FF) on the border pixels
+    and proves that the detector flags spill_ratio > 0.0 with status FAIL.
+    """
+    from vox.cutout import audit_magenta_fringe
+
+    # 100x100 RGBA image
+    img = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    # Central subject
+    draw.ellipse([20, 20, 80, 80], fill=(200, 50, 50, 255))
+
+    # Introduce intentional magenta bleed on semi-transparent transition boundary (alpha=100)
+    # Magenta in RGB: R=255, G=0, B=255 -> meets (r > 180, g < 70, b > 180)
+    for x in range(25, 35):
+        img.putpixel((x, 19), (255, 0, 255, 100))
+
+    report = audit_magenta_fringe(img)
+    assert report["border_pixels"] > 0
+    assert report["magenta_spill_pixels"] >= 10
+    assert report["spill_ratio"] > 0.0
+    assert report["status"] == "FAIL"
+
+
+def test_falsifiable_magenta_fringe_clean_cutout_has_zero_spill():
+    """Rule 122 Axis 2: Clean foreground cutout has exactly 0.0% magenta fringe."""
+    from vox.cutout import audit_magenta_fringe
+
+    # Clean transparent image with smooth alpha edge and neutral colors (no magenta)
+    img = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse([20, 20, 80, 80], fill=(180, 140, 90, 255))
+    # Soft non-magenta border
+    for x in range(20, 80):
+        img.putpixel((x, 19), (180, 140, 90, 100))
+
+    report = audit_magenta_fringe(img)
+    assert report["border_pixels"] > 0
+    assert report["magenta_spill_pixels"] == 0
+    assert report["spill_ratio"] == 0.0
+    assert report["status"] == "PASS"
+

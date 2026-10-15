@@ -78,6 +78,36 @@ def verify_cutout_gates(rgba_img: Image.Image) -> dict[str, Any]:
     }
 
 
+def audit_magenta_fringe(rgba_img: Image.Image) -> dict[str, Any]:
+    """Audits RGBA image for magenta fringe spill (#FF00FF) on semi-transparent boundary pixels (Rule 122 Axis 2).
+
+    Returns:
+        dict with border_pixels, magenta_spill_pixels, spill_ratio, status ('PASS' if spill_ratio == 0.0 else 'FAIL').
+    """
+    if rgba_img.mode != "RGBA":
+        rgba_img = rgba_img.convert("RGBA")
+
+    arr = np.array(rgba_img)
+    alpha = arr[:, :, 3]
+    border_mask = (alpha >= 1) & (alpha <= 254)
+    border_count = int(np.sum(border_mask))
+
+    if border_count == 0:
+        return {"border_pixels": 0, "magenta_spill_pixels": 0, "spill_ratio": 0.0, "status": "PASS"}
+
+    r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
+    magenta_spill = border_mask & (r > 180) & (g < 70) & (b > 180)
+    spill_count = int(np.sum(magenta_spill))
+    spill_ratio = float(spill_count) / float(border_count)
+
+    return {
+        "border_pixels": border_count,
+        "magenta_spill_pixels": spill_count,
+        "spill_ratio": round(spill_ratio, 4),
+        "status": "PASS" if spill_ratio == 0.0 else "FAIL",
+    }
+
+
 def remove_background(
     src_img: Image.Image,
 ) -> Image.Image:

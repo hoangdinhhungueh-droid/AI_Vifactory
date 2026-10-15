@@ -756,7 +756,7 @@ def test_block6_remotion_props_contract() -> bool:
             assert "RES-VOX-001" not in stg_code, "Hardcoded RES-VOX-001 in VoxBuildOnStage.tsx!"
             assert "THE IMPOSSIBLE CONTRADICTION" not in stg_code, "Hardcoded THE IMPOSSIBLE CONTRADICTION in VoxBuildOnStage.tsx!"
 
-        logger.info("  ✅ Block 6.0 Remotion Props Contract OK: TwoLayerEpisode canonical composition verified.")
+        logger.info("  ✅ Block 6.0 Remotion Props Contract OK: TwoLayerEpisode auxiliary composition verified.")
         return True
     except Exception as e:
         logger.error(f"❌ BLOCK 6.0 CONTRACT TEST FAILED: {e}")

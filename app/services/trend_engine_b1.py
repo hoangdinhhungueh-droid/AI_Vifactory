@@ -946,7 +946,7 @@ def forensic_pre_filter(candidate: dict, market: str) -> tuple[bool, str]:
 
 
 
-MAX_B2_ATTEMPTS_DEFAULT = int(os.getenv("MAX_B2_ATTEMPTS_PER_RUN", "1"))
+MAX_B2_ATTEMPTS_DEFAULT = int(os.getenv("MAX_B2_ATTEMPTS_PER_RUN", "2"))
 MAX_SCAN_CANDIDATES_DEFAULT = int(os.getenv("MAX_SCAN_CANDIDATES", "10"))
 MAX_VIABILITY_LLM_EVALS_DEFAULT = int(os.getenv("MAX_VIABILITY_LLM_EVALS", "6"))
 

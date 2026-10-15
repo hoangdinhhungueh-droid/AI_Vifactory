@@ -91,8 +91,18 @@ def audit_codemap_ui() -> dict:
 
         browser.close()
 
+    import subprocess
+    import time
+    git_sha = "unknown"
+    try:
+        git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
+    except Exception:
+        pass
+
     summary = {
         "status": "PASS" if not total_console_errors and not total_page_errors else "FAIL",
+        "git_sha": git_sha,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "total_console_errors": len(total_console_errors),
         "total_page_errors": len(total_page_errors),
         "viewports": results,

@@ -26,6 +26,12 @@ from vox.schemas import ScenePlan
 FORBIDDEN_PROMPT_STOPWORDS = {"a", "an", "the", "within", "across", "in", "on", "at", "by", "for"}
 FORBIDDEN_TYPOGRAPHY_TERMS = ["bold typography", "typography", "text on screen", "letters", "written words"]
 
+# Broadcast Standards: AES TD1004 / EBU R128 / EBU Tech 3343 Online Streaming Specification
+BROADCAST_LUFS_TARGET: float = -16.0
+BROADCAST_LUFS_MIN: float = -17.0
+BROADCAST_LUFS_MAX: float = -15.0
+BROADCAST_TRUE_PEAK_CEILING: float = -2.0
+
 
 def probe_media_file(media_path: Path) -> dict[str, Any]:
     """Runs ffprobe on a media file and returns parsed JSON streams and format."""
@@ -236,15 +242,15 @@ def verify_final_video_gates(
     loudness = measure_ebur128_loudness(final_mp4)
     lufs = loudness["integrated_lufs"]
     tp = loudness["true_peak_dbtp"]
-    if not (-17.0 <= lufs <= -15.0):
+    if not (BROADCAST_LUFS_MIN <= lufs <= BROADCAST_LUFS_MAX):
         raise ValueError(
-            f"Quality Gate FAIL: integrated loudness {lufs:.1f} LUFS outside [-17.0, -15.0] "
-            f"(Target: -16.0 LUFS ± 1.0 per AES TD1004 / EBU Tech 3343)"
+            f"Quality Gate FAIL: integrated loudness {lufs:.1f} LUFS outside [{BROADCAST_LUFS_MIN}, {BROADCAST_LUFS_MAX}] "
+            f"(Target: {BROADCAST_LUFS_TARGET} LUFS ± 1.0 per AES TD1004 / EBU Tech 3343)"
         )
-    if tp > -2.0:
+    if tp > BROADCAST_TRUE_PEAK_CEILING:
         raise ValueError(
-            f"Quality Gate FAIL: true peak {tp:.1f} dBTP exceeds zero-tolerance ceiling -2.0 dBTP "
-            f"(Target: <= -2.0 dBTP per AES TD1004 / EBU Tech 3343 to absorb lossy AAC compression bounce)"
+            f"Quality Gate FAIL: true peak {tp:.1f} dBTP exceeds zero-tolerance ceiling {BROADCAST_TRUE_PEAK_CEILING} dBTP "
+            f"(Target: <= {BROADCAST_TRUE_PEAK_CEILING} dBTP per AES TD1004 / EBU Tech 3343 to absorb lossy AAC compression bounce)"
         )
 
     # 7. Word-Level Anchor & Reverse Karaoke Drift Hard Gate (Rule 120 & Boss Item 1)
