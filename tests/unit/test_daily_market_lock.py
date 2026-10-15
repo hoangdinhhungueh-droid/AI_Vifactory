@@ -186,3 +186,31 @@ def test_concurrent_acquire_in_progress_mutual_exclusion(temp_state_dir):
     assert results.count(True) == 1, f"Expected exactly 1 winner, got {results.count(True)}: {results}"
     assert results.count(False) == n_workers - 1
 
+
+def test_minimum_vn_hour_policy_protects_morning_window(temp_state_dir):
+    """Boss Item 5: A post-midnight run (< 06:00 AM VN) must NOT seal the market as EXHAUSTED_TODAY,
+    ensuring the scheduled 06:00 AM VN production window can evaluate fresh morning news."""
+    from app.services.daily_market_lock import VN_TZ, is_market_done_today, mark_exhausted_today
+
+    # Simulated post-midnight time: 00:42 AM VN on 2026-10-16
+    midnight_vn = datetime(2026, 10, 16, 0, 42, tzinfo=VN_TZ)
+
+    # Off-hours run fails to seal EXHAUSTED_TODAY
+    res = mark_exhausted_today("EN", scan_count=10, state_dir=temp_state_dir, now=midnight_vn)
+    assert res is False
+
+    # Check eligibility at 06:00 AM VN: market should NOT be done today!
+    morning_vn = datetime(2026, 10, 16, 6, 0, tzinfo=VN_TZ)
+    is_done, reason, details = is_market_done_today("EN", state_dir=temp_state_dir, now=morning_vn)
+    assert is_done is False
+    assert reason == "not_produced_yet"
+
+    # In contrast, an afternoon exhaustion at 15:00 VN seals normally
+    afternoon_vn = datetime(2026, 10, 16, 15, 0, tzinfo=VN_TZ)
+    res_pm = mark_exhausted_today("EN", scan_count=10, state_dir=temp_state_dir, now=afternoon_vn)
+    assert res_pm is True
+
+    is_done_pm, reason_pm, _ = is_market_done_today("EN", state_dir=temp_state_dir, now=afternoon_vn)
+    assert is_done_pm is True
+    assert reason_pm == "lock_exhausted_today"
+

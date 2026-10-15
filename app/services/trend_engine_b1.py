@@ -40,7 +40,9 @@ if "/root/video_factory" not in sys.path:
     sys.path.insert(0, "/root/video_factory")
 
 from app.services.alert_cooldown import (
+    LockTimeoutError,
     record_alert_sent,
+    rollback_alert_reservation,
     should_send_alert,
 )
 from app.services.competitor_recon_b15 import QuotaTracker, run_b15, youtube_search, youtube_video_details
@@ -1607,7 +1609,14 @@ def discover_and_produce_market_trend(
         scanned_count = min(len(candidates), max_scan_candidates)
         if viability_passed_candidates:
             # Candidates passed B1 Viability Gate, but were stopped downstream (Critic, Grounding, or B2 Story/Fact Audit)
-            can_send, suppressed, suffix = should_send_alert("b1_b2_bottleneck", m_up, state_dir=state_dir)
+            try:
+                can_send, suppressed, suffix = should_send_alert("b1_b2_bottleneck", m_up, state_dir=state_dir)
+            except LockTimeoutError as lock_err:
+                logger.warning(f"[{m_up}] Alert cooldown lock timed out: {lock_err}. Suppressing alert (fail-closed).")
+                can_send = False
+                suppressed = 0
+                suffix = ""
+
             if can_send:
                 alert_msg = (
                     f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
@@ -1623,10 +1632,18 @@ def discover_and_produce_market_trend(
                     record_alert_sent("b1_b2_bottleneck", m_up, state_dir=state_dir)
                 except Exception as _tel_err:
                     logger.warning(f"Failed to send B1 bottleneck alert to Telegram: {_tel_err}")
+                    rollback_alert_reservation("b1_b2_bottleneck", m_up, previous_suppressed=suppressed, state_dir=state_dir)
             else:
                 logger.info(f"[{m_up}] Suppressed repeated B2/B3 bottleneck alert due to cooldown ({suppressed} suppressed).")
         else:
-            can_send, suppressed, suffix = should_send_alert("b1_viability", m_up, state_dir=state_dir)
+            try:
+                can_send, suppressed, suffix = should_send_alert("b1_viability", m_up, state_dir=state_dir)
+            except LockTimeoutError as lock_err:
+                logger.warning(f"[{m_up}] Alert cooldown lock timed out: {lock_err}. Suppressing alert (fail-closed).")
+                can_send = False
+                suppressed = 0
+                suffix = ""
+
             if can_send:
                 alert_msg = (
                     f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
@@ -1641,6 +1658,7 @@ def discover_and_produce_market_trend(
                     record_alert_sent("b1_viability", m_up, state_dir=state_dir)
                 except Exception as _tel_err:
                     logger.warning(f"Failed to send B1 alert to Telegram: {_tel_err}")
+                    rollback_alert_reservation("b1_viability", m_up, previous_suppressed=suppressed, state_dir=state_dir)
             else:
                 logger.info(f"[{m_up}] Suppressed repeated B1 viability alert due to cooldown ({suppressed} suppressed).")
 

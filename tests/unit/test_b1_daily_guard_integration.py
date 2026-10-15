@@ -66,3 +66,20 @@ def test_b1_force_crawl_env_bypasses_daily_completion(isolated_env):
             assert mock_fetch.call_count == 1
         finally:
             os.environ.pop("B1_FORCE_CRAWL", None)
+
+
+def test_b1_caller_handling_of_lock_timeout_error_no_alert(isolated_env):
+    """Boss Item 9: When LockTimeoutError is raised during alert cooldown checks,
+    B1 must handle it cleanly: suppress alert, send 0 Telegram messages, and exit cleanly with logged reason."""
+    from app.services.alert_cooldown import LockTimeoutError
+
+    cand = [{"term": "test query", "raw_term": "test query", "approx_traffic": "10K+", "geos_present": ["US"]}]
+
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=cand), \
+         patch("app.services.trend_engine_b1.should_send_alert", side_effect=LockTimeoutError("Simulated lock timeout")), \
+         patch("app.services.telegram_buttons.send_telegram_broadcast") as mock_tg:
+
+        results = discover_and_produce_market_trend(market="EN", auto_produce=False, state_dir=isolated_env)
+        assert results == []
+        # Assert NO alert was broadcast
+        mock_tg.assert_not_called()

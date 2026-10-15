@@ -246,3 +246,23 @@ def test_stale_lock_reclaim_with_tombstone(temp_state_dir):
     # After exit, lock should be cleaned up
     assert not lock_file.exists()
 
+
+def test_dispatch_failure_rollback_allows_subsequent_send(temp_state_dir):
+    """Boss Item 7: If Telegram dispatch fails after atomic reservation,
+    rollback_alert_reservation must restore state so the next attempt is immediately allowed."""
+    from app.services.alert_cooldown import rollback_alert_reservation
+
+    # First attempt: reserved
+    can_send, suppressed, _ = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir, reserve_on_send=True)
+    assert can_send is True
+
+    # Simulate dispatch failure (e.g. Telegram network timeout)
+    # Roll back reservation
+    rolled_back = rollback_alert_reservation("b1_viability", "EN", previous_suppressed=suppressed, state_dir=temp_state_dir)
+    assert rolled_back is True
+
+    # Next attempt immediately after rollback should be allowed
+    can_send_retry, suppressed_retry, _ = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir, reserve_on_send=True)
+    assert can_send_retry is True
+    assert suppressed_retry == 0
+
