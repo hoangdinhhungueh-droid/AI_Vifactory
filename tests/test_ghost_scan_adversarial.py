@@ -8,11 +8,6 @@ Verifies that tools/ghost_scan.py is truly falsifiable and immediately catches:
 3. Quarantined legacy imports in canonical directories.
 """
 
-import ast
-from pathlib import Path
-
-import pytest
-
 from tools import ghost_scan
 
 

@@ -1,19 +1,17 @@
-import ssl
+import io
 import json
+import os
+import ssl
 import sys
 import time
-import re
 import urllib.request
-import threading
 
 try:
     sys.stdout.reconfigure(encoding='utf-8')
     sys.stderr.reconfigure(encoding='utf-8')
-except (AttributeError, io.UnsupportedOperation) as _e_enc:
+except (AttributeError, io.UnsupportedOperation):
     # Stdout already configured or doesn't support reconfigure
-    pass_silent = True
-
-import os
+    pass
 
 DEFAULT_MCP2_URL = os.getenv("VPS_MCP2_URL", "https://mcp2.vifactory.com/mcp")
 DEFAULT_MCP2_TOKEN = os.getenv("VPS_MCP2_TOKEN", "8kV2nR9pL4mQ7wF3jB6vN1cY8tZ5hD0aS")
@@ -111,8 +109,8 @@ class FastVPSClient:
                         )
                         with urllib.request.urlopen(req_notif, timeout=15, context=self.ctx) as _resp_notif:
                             _ = _resp_notif.read()
-                    except Exception as _e_notif:
-                        logger_msg = str(_e_notif)
+                    except Exception:
+                        pass
                     return self.session_id
 
             except Exception as e:

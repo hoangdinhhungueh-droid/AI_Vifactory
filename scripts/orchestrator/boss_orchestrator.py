@@ -777,7 +777,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     # Negative External Probes from Outside Host (Rule 121 / Boss Requirement 7)
     neg_probe_lines = []
     try:
-        import urllib.request, urllib.error
+        import urllib.error
+        import urllib.request
         # Probe 1: Public ingress to port 8000
         p1_blocked = False
         try:
