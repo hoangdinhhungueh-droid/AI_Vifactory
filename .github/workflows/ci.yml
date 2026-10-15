@@ -51,11 +51,14 @@ jobs:
       - name: Rule 128 & Rule 132 Zero Semantic Bias Linter Gate
         run: pytest -v tests/test_zero_semantic_bias.py
 
-      - name: Hermetic Unit & Adversarial Test Suite (Rule 121 & Rule 125 JUnit Zero-Skip Gate)
+      - name: Verify faster-whisper dependency availability (Rule 120 & Boss Item 5)
+        run: python -c "import faster_whisper; print('faster-whisper runtime available for speech alignment')"
+
+      - name: Hermetic Unit, Codemap & Adversarial Test Suite (Rule 121 & Rule 125 JUnit Zero-Skip Gate)
         shell: bash
         run: |
           set -eo pipefail
-          pytest -v -rA --junitxml=/tmp/junit_unit.xml tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py
+          pytest -v -rA --junitxml=/tmp/junit_unit.xml tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py
           python -c "
           import xml.etree.ElementTree as ET, sys
           tree = ET.parse('/tmp/junit_unit.xml')
@@ -65,9 +68,9 @@ jobs:
           fails = sum(int(s.attrib.get('failures', 0)) for s in suites)
           skips = sum(int(s.attrib.get('skipped', 0)) for s in suites)
           tests = sum(int(s.attrib.get('tests', 0)) for s in suites)
-          print(f'Unit JUnit Audit: tests={tests}, failures={fails}, errors={errs}, skipped={skips}')
+          print(f'Unit/Contracts/Codemap JUnit Audit: tests={tests}, failures={fails}, errors={errs}, skipped={skips}')
           if errs > 0 or fails > 0 or skips > 0:
-              print('CI FAIL: Unit suite contains non-passing or skipped tests!')
+              print('CI FAIL: Unit/Codemap suite contains non-passing or skipped tests!')
               sys.exit(1)
           "
 
@@ -77,7 +80,7 @@ jobs:
           ALLOW_SYNTHETIC_ALIGNMENT: "true"
         run: |
           set -eo pipefail
-          pytest -v -rA --junitxml=/tmp/junit_vox.xml tests/vox/
+          pytest -v -rA --cov=vox --cov-report=xml:coverage.xml --junitxml=/tmp/junit_vox.xml tests/vox/
           python -c "
           import xml.etree.ElementTree as ET, sys
           tree = ET.parse('/tmp/junit_vox.xml')

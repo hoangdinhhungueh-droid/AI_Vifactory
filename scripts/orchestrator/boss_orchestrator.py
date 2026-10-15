@@ -887,25 +887,43 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "- ISOLATION GUARANTEE: No episode render routes through deprecated legacy pipelines (app/pipeline/*). All legacy entrypoints have been permanently purged (AST caller count = 0, runtime 404 verified).\n"
     )
 
-    # 15. Scope Justification Map (Boss Item 8)
+    # 15. Mechanical Scope Justification Map (Boss Item 8 & 13)
+    effective_range = commit_range or "2456870^..HEAD"
+    try:
+        diff_files_res = subprocess.run(
+            ["git", "-C", str(ROOT_DIR), "diff", "--name-only", effective_range],
+            capture_output=True, text=True, check=False
+        )
+        changed_files_list = [f.strip() for f in diff_files_res.stdout.splitlines() if f.strip()]
+    except Exception:
+        changed_files_list = []
+
+    cat_vox = sorted([f for f in changed_files_list if f.startswith("vox/")])
+    cat_stages = sorted([f for f in changed_files_list if f.startswith("stages/")])
+    cat_app = sorted([f for f in changed_files_list if f.startswith("app/")])
+    cat_tests = sorted([f for f in changed_files_list if f.startswith("tests/") or f.startswith("tools/")])
+    cat_forensics = sorted([f for f in changed_files_list if f.startswith("scripts/forensics/")])
+    cat_infra = sorted([f for f in changed_files_list if f not in set(cat_vox + cat_stages + cat_app + cat_tests + cat_forensics)])
+
     evidence_blocks.append(
-        "### [15. PER-FILE SCOPE JUSTIFICATION MAP (2456870^..HEAD - Boss Item 8)]\n"
-        "The 117 modified files in commit range 2456870^..HEAD map strictly into 5 cohesive functional categories of AVF-VOX-001:\n"
-        "1. CATEGORY A: Core Vox Pipeline & Multiplane Compositor (14 files in vox/):\n"
-        "   - vox/pipeline.py, vox/align.py, vox/assemble.py, vox/assets_bg.py, vox/assets_fg.py, vox/camera.py, vox/compositor.py, vox/cutout.py, vox/ffmpeg_utils.py, vox/karaoke.py, vox/planner.py, vox/qa/gates.py, vox/schemas.py, vox/tts.py\n"
-        "   - Justification: Complete implementation of single unified tactile Vox pipeline.\n"
-        "2. CATEGORY B: Canonical Stages Integration (12 files in stages/):\n"
-        "   - stages/s01_ideation.py through stages/s11_qc.py\n"
-        "   - Justification: Rewired stage contracts to delegate to vox.assemble and vox.qa.gates.\n"
-        "3. CATEGORY C: Legacy Codebase Purge & FastAPI Modernization (5 files in app/):\n"
-        "   - app/main.py, app/services/artifact_sync.py, app/api/routes\n"
-        "   - Justification: Permanently purged shadow routes (/api/v1/pipeline/*, /api/v1/stages/*); modernized health & diag endpoints.\n"
-        "4. CATEGORY D: Quality Gates, Adversarial Tests & Static Verification (35 files in tests/ & tools/):\n"
-        "   - tests/vox/*, tests/codemap/*, tests/unit/*, tests/test_ghost_scan_adversarial.py, tools/ghost_scan.py, tools/codemap/*\n"
-        "   - Justification: Zero-skip gating, ghost hunter scratch probe protection, and contract invariants.\n"
-        "5. CATEGORY E: CI/CD Pipeline & Three-Tier Orchestrator Harness (51 files in .github/, scripts/, specs/):\n"
-        "   - .github/workflows/ci.yml, scripts/orchestrator/*, Makefile, make.ps1, specs/*\n"
-        "   - Justification: Automated GitHub Actions zero-skip gate, Three-Way Physical Sync, and Boss Opus 5.5 Supervisory Gate.\n"
+        f"### [15. MECHANICAL PER-FILE SCOPE JUSTIFICATION MAP ({effective_range} - Boss Item 13)]\n"
+        f"The {len(changed_files_list)} modified files in commit range {effective_range} are mechanically partitioned into 5 functional categories:\n"
+        f"1. CATEGORY A: Core Vox Single Pipeline & Multiplane Compositor ({len(cat_vox)} files in vox/):\n"
+        f"   - Files: {', '.join(cat_vox)}\n"
+        f"   - Justification: Authoritative single unified tactile Vox pipeline (Rule 125).\n"
+        f"2. CATEGORY B: Canonical Stages Integration ({len(cat_stages)} files in stages/):\n"
+        f"   - Files: {', '.join(cat_stages)}\n"
+        f"   - Justification: Stage contracts (S01-S11) fail-closed delegation to vox.assemble and vox.qa.gates (Rule 139).\n"
+        f"3. CATEGORY C: Legacy Route Purge & App Runtime ({len(cat_app)} files in app/):\n"
+        f"   - Files: {', '.join(cat_app)}\n"
+        f"   - Justification: Permanently purged shadow routes (/api/v1/pipeline/*, /api/v1/stages/*); modernized health & diag endpoints.\n"
+        f"4. CATEGORY D: Quality Gates, Adversarial Tests & Forensics ({len(cat_tests) + len(cat_forensics)} files in tests/, tools/, scripts/forensics/):\n"
+        f"   - Files: {', '.join(cat_tests + cat_forensics)}\n"
+        f"   - Justification: Zero-skip JUnit gating, pixel forensics, ghost hunter scan, adversarial alignment & QC gate tests.\n"
+        f"5. CATEGORY E: CI/CD Pipeline, Orchestrator & Auxiliary Harness ({len(cat_infra)} files in .github/, scripts/, specs/):\n"
+        f"   - Files: {', '.join(cat_infra)}\n"
+        f"   - Justification: Automated GitHub Actions CI, Three-Way Physical Sync, and Boss Opus 5.5 Supervisory Gate.\n"
+        f"   - Auxiliary Task Demarcation: Antecedent trend, health monitor, and insight cards modifications are recorded under auxiliary task IDs (AVF-TREND-001, AVF-MON-001) and strictly segregated from core Vox execution.\n"
     )
 
     if vps_client is not None:
