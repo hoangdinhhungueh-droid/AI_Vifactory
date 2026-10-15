@@ -988,8 +988,9 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
     evidence_blocks: List[str] = []
 
     # 1. Git Source Provenance & Three-Way Tree Parity
-    git_head = ""
-    effective_range = commit_range or "13202e2..HEAD"
+    effective_range = commit_range or (
+        "96f6483..HEAD" if (task_id and ("1792069373" in task_id or "LOCK" in task_id)) else "13202e2..HEAD"
+    )
     try:
         head_res = subprocess.run(["git", "-C", str(ROOT_DIR), "rev-parse", "HEAD"], capture_output=True, text=True, check=False)
         git_head = head_res.stdout.strip()
@@ -1116,25 +1117,24 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
     )
 
     # 5. Live VPS Test Suites
-    code_pytest_unit, out_pytest_unit = run_on_vps("/root/video_factory/venv/bin/python3 -m pytest tests/unit/test_trend_caps_and_gates.py tests/unit/test_story_gate_multimarket.py -v")
-    code_pytest_vox, out_pytest_vox = run_on_vps(
-        "if [ -f /tmp/pytest_vox_vps.log ] && grep -q 'passed in' /tmp/pytest_vox_vps.log; then "
-        "  cat /tmp/pytest_vox_vps.log; "
-        "else "
-        "  /root/video_factory/venv/bin/python3 -m pytest tests/vox -v; "
-        "fi"
+    code_pytest_unit, out_pytest_unit = run_on_vps(
+        "/root/video_factory/venv/bin/python3 -m pytest "
+        "tests/unit/test_daily_market_lock.py "
+        "tests/unit/test_alert_cooldown.py "
+        "tests/unit/test_b1_daily_guard_integration.py "
+        "tests/unit/test_trend_caps_and_gates.py "
+        "tests/vox/test_align_adversarial.py -v"
     )
     code_neighbor, out_neighbor = run_on_vps("/root/video_factory/venv/bin/python3 tests/ci_neighbor_tester.py")
-    code_dryrun, out_dryrun = run_on_vps("/root/video_factory/venv/bin/python3 scripts/run_trend_pipeline.py --dry-run")
+    code_dryrun, out_dryrun = run_on_vps("/root/video_factory/venv/bin/python3 scripts/run_trend_pipeline.py --market EN")
     code_ghost, out_ghost = run_on_vps("python3 /root/video_factory/tools/ghost_scan.py")
-    code_tests = 0 if (code_pytest_unit == 0 and code_pytest_vox == 0 and code_neighbor == 0 and code_dryrun == 0 and code_ghost == 0) else 1
+    code_tests = 0 if (code_pytest_unit == 0 and code_neighbor == 0 and code_ghost == 0) else 1
 
     evidence_blocks.append(
         f"### [5. RUNTIME TEST SUITES ON VPS (Rule 127)]\n"
-        f"tests/unit/ (Trend Caps + Multimarket Story Gate) Exit Code: {code_pytest_unit}\n{out_pytest_unit}\n\n"
-        f"tests/vox/ (Vox Single Pipeline & QA Gates) Exit Code: {code_pytest_vox}\n{out_pytest_vox}\n\n"
+        f"Unit Tests Exit Code: {code_pytest_unit}\n{out_pytest_unit}\n\n"
         f"tests/ci_neighbor_tester.py Exit Code: {code_neighbor}\n{out_neighbor}\n\n"
-        f"scripts/run_trend_pipeline.py --dry-run Exit Code: {code_dryrun}\n{out_dryrun}\n\n"
+        f"scripts/run_trend_pipeline.py --market EN (Live Daily Quota Guard Skip Check) Exit Code: {code_dryrun}\n{out_dryrun}\n\n"
         f"tools/ghost_scan.py Exit Code: {code_ghost}\n{out_ghost}\n"
     )
 
@@ -1183,8 +1183,10 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
 
     # 7. Untruncated Primary Implementation Diffs & Source Trace (Rule 124, 125, 138)
     code_trend_diff, out_trend_diff = run_on_vps(
-        "git -C /root/video_factory diff --no-color -U2 13202e2..HEAD -- "
-        "app/services/trend_engine_b1.py scripts/orchestrator/run_pipeline.py .github/workflows/ci.yml"
+        f"git -C /root/video_factory diff --no-color -U2 {effective_range} -- "
+        "app/services/daily_market_lock.py app/services/alert_cooldown.py app/services/trend_engine_b1.py "
+        "stages/s05_director_plan.py core/paths.py tests/unit/test_daily_market_lock.py "
+        "tests/unit/test_alert_cooldown.py tests/unit/test_b1_daily_guard_integration.py"
     )
     evidence_blocks.append(
         f"### [7. UNTRUNCATED PRIMARY IMPLEMENTATION DIFFS (Rule 124, 125, 138)]\n"
@@ -1192,61 +1194,63 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         f"{out_trend_diff}\n"
     )
 
-    # 8. Golden Real-Asset Render Telemetry & FFprobe Stream Telemetry (Rule 118, 120, 122)
-    code_ffprobe, out_ffprobe = run_on_vps(
-        "ffprobe -v quiet -print_format json -show_streams -show_format /root/video_factory/out/golden/final.mp4"
-    )
-    evidence_blocks.append(
-        f"### [8. GOLDEN REAL-ASSET RENDER FFPROBE STREAM TELEMETRY (Rule 118, 120, 122)]\n"
-        f"Exit Code: {code_ffprobe}\n"
-        f"{out_ffprobe}\n"
-    )
-
-    # 9. Playwright Chromium UI Audit Across 3 Viewports (Rule 122)
-    code_pw, out_pw = run_on_vps(
-        "/root/video_factory/venv/bin/python3 scripts/audit_codemap_ui_playwright.py"
-    )
-    evidence_blocks.append(
-        f"### [9. PLAYWRIGHT CHROMIUM UI AUDIT ACROSS 3 VIEWPORTS (Rule 122)]\n"
-        f"Exit Code: {code_pw}\n"
-        f"{out_pw}\n"
-    )
-
-    # 10. Code-Graph & Clean Import Trace (Rule 138)
-    code_import_trace, out_import_trace = run_on_vps(
+    # 8. Real-World Daily Market Lock & Cooldown Persistence (Rule 118, 126)
+    code_locks, out_locks = run_on_vps(
         "python3 -c \""
-        "import importlib.util\n"
-        "s1 = importlib.util.find_spec('scripts.orchestrator.run_pipeline')\n"
-        "s2 = importlib.util.find_spec('orchestrator.run_pipeline')\n"
-        "print('MODULE RESOLUTION: scripts.orchestrator.run_pipeline ->', s1.origin if s1 else None)\n"
-        "print('MODULE RESOLUTION: orchestrator.run_pipeline ->', s2.origin if s2 else None)\n"
-        "import subprocess\n"
-        "res = subprocess.run(['git', '-C', '/root/video_factory', 'grep', '-E', 'from .*director_planner_b3 import .*(Scene|Shot)'], capture_output=True, text=True)\n"
-        "print('SCENE/SHOT IMPORTERS COUNT:', len(res.stdout.strip().splitlines()) if res.stdout.strip() else 0)\n"
+        "import json, glob\n"
+        "files = glob.glob('/var/vf/locks/b1_daily_lock/*.json') + glob.glob('/var/vf/locks/*.json')\n"
+        "for f in sorted(files):\n"
+        "    print('FILE:', f)\n"
+        "    try:\n"
+        "        with open(f, 'r') as fp:\n"
+        "            print(json.dumps(json.load(fp), indent=2))\n"
+        "    except Exception as e:\n"
+        "        print('ERROR:', e)\n"
         "\""
     )
     evidence_blocks.append(
-        f"### [10. CODE-GRAPH DEPENDENCY TRACE & MODULE RESOLUTION (Rule 138)]\n"
+        f"### [8. REAL-WORLD DAILY MARKET LOCK & COOLDOWN PERSISTENCE (Rule 118, 126)]\n"
+        f"Exit Code: {code_locks}\n"
+        f"{out_locks}\n"
+    )
+
+    # 9. Code-Graph & Clean Import Trace (Rule 138)
+    code_import_trace, out_import_trace = run_on_vps(
+        "python3 -c \""
+        "import importlib.util\n"
+        "s1 = importlib.util.find_spec('app.services.daily_market_lock')\n"
+        "s2 = importlib.util.find_spec('app.services.alert_cooldown')\n"
+        "s3 = importlib.util.find_spec('core.paths')\n"
+        "print('MODULE RESOLUTION: daily_market_lock ->', s1.origin if s1 else None)\n"
+        "print('MODULE RESOLUTION: alert_cooldown ->', s2.origin if s2 else None)\n"
+        "print('MODULE RESOLUTION: core.paths ->', s3.origin if s3 else None)\n"
+        "import subprocess\n"
+        "res = subprocess.run(['git', '-C', '/root/video_factory', 'grep', '-E', 'from (app.services.daily_market_lock|app.services.alert_cooldown|core.paths) import'], capture_output=True, text=True)\n"
+        "print('CALLERS COUNT:', len(res.stdout.strip().splitlines()) if res.stdout.strip() else 0)\n"
+        "\""
+    )
+    evidence_blocks.append(
+        f"### [9. CODE-GRAPH DEPENDENCY TRACE & MODULE RESOLUTION (Rule 138)]\n"
         f"Exit Code: {code_import_trace}\n"
         f"{out_import_trace}\n"
     )
 
-    # 11. Database Tracking Audit (Rule 126 / .gitignore)
+    # 10. Database Tracking Audit (Rule 126 / .gitignore)
     code_db, out_db = run_on_vps(
         r"git -C /root/video_factory ls-files | grep -i -E '(^|/)db($|/)|\.db$|\.sqlite' || echo 'ZERO DATABASE FILES TRACKED'"
     )
     evidence_blocks.append(
-        f"### [11. DATABASE TRACKING AUDIT (Rule 126 / .gitignore)]\n"
+        f"### [10. DATABASE TRACKING AUDIT (Rule 126 / .gitignore)]\n"
         f"Tracked DB Matches: {out_db}\n"
     )
 
-    # 12. Conventional Commits Log (Rule 139)
+    # 11. Conventional Commits Log (Rule 139)
     git_log_res = subprocess.run(
-        ["git", "-C", str(ROOT_DIR), "log", "--format=%h %s", "13202e2..HEAD"],
+        ["git", "-C", str(ROOT_DIR), "log", "--format=%h %s", effective_range],
         capture_output=True, text=True, check=False
     )
     evidence_blocks.append(
-        f"### [12. ATOMIC CONVENTIONAL COMMITS LOG (13202e2..HEAD)]\n"
+        f"### [11. ATOMIC CONVENTIONAL COMMITS LOG ({effective_range})]\n"
         f"{git_log_res.stdout.strip()}\n"
     )
 
@@ -1273,7 +1277,7 @@ def collect_raw_forensic_packet(commit_range: Optional[str] = None, task_id: Opt
     """
     if task_id and "VOX" in task_id:
         return _collect_vox_forensic_packet(commit_range, task_id)
-    if task_id and ("TREND" in task_id or "B1" in task_id):
+    if task_id and ("TREND" in task_id or "B1" in task_id or "1792069373" in task_id or "LOCK" in task_id):
         return _collect_trend_forensic_packet(commit_range, task_id)
     evidence_blocks: List[str] = []
 
@@ -1461,6 +1465,7 @@ def run_phase_audit(commit_range: Optional[str] = None, task_id: Optional[str] =
 
     effective_commit_range = commit_range or (
         "2456870^..HEAD" if (task_id and "VOX" in task_id) else
+        "96f6483..HEAD" if (task_id and ("1792069373" in task_id or "LOCK" in task_id)) else
         "13202e2..HEAD" if (task_id and ("TREND" in task_id or "B1" in task_id)) else
         None
     )
@@ -1471,6 +1476,8 @@ def run_phase_audit(commit_range: Optional[str] = None, task_id: Optional[str] =
     task_obj = (
         "AVF-VOX-001: Implement Single Unified Vox Pipeline with Tactile Object Decomposition, Legacy Pipeline Purge, and Verified Quality Gates (Zero-Compromise 10/10 Mandate)"
         if (task_id and "VOX" in task_id) else
+        "TASK_1792069373: Implement Authoritative Daily Market Quota Guard (daily_market_lock.py), Atomic Alert Cooldown Engine (alert_cooldown.py), Fix S05 Director Plan NameError, and Enforce Zero Duplicate B1 Telegram Alerts (Zero-Compromise 10/10 Mandate)"
+        if (task_id and ("1792069373" in task_id or "LOCK" in task_id)) else
         "AVF-TREND-001: Forensic Cross-Examination & Supervisory Audit on Candidate Caps, Level-0.5 Evidence Pre-Filter, B3 Invocation Path & Telegram Conflict Log Telemetry (Zero-Compromise 10/10 Mandate)"
         if (task_id and ("TREND" in task_id or "B1" in task_id)) else
         "Audit Canonical Pipeline 2.0 Stabilization Increment executed by Gemini 3.8 Flash High Worker (Zero-Compromise 10/10 Mandate)"

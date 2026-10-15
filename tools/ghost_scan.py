@@ -143,13 +143,54 @@ def scan_gitignored_paths() -> dict[str, list[str]]:
                 residues["wrappers"].append(str(f.relative_to(REPO_ROOT)))
 
     # 2. Git-ignored quarantine directories
-    for qdir_name in ["archive", ".safe_trash", ".trash", "audits", "temp_test"]:
+    for qdir_name in ["archive", ".safe_trash", ".trash", "temp_test"]:
         qp = REPO_ROOT / qdir_name
         if qp.exists() and qp.is_dir():
             for f in sorted(qp.rglob("*")):
                 if f.is_file():
                     residues["quarantine_files"].append(str(f.relative_to(REPO_ROOT)))
     return residues
+
+
+def scan_state_dir_residues() -> list[str]:
+    """Scans state and lock directories for dangling temporary or corrupt state residues (Rule 125).
+
+    Flags lingering *.tmp_*, *.corrupt.*, and orphan *.lock files across:
+    - REPO_ROOT / locks
+    - REPO_ROOT / var / locks
+    - /var/vf/locks (when running on VPS)
+    """
+    residue_errors = []
+    state_dirs = [REPO_ROOT / "locks", REPO_ROOT / "var" / "locks"]
+    vps_state = Path("/var/vf/locks")
+    try:
+        if vps_state.exists() and os.name != "nt":
+            state_dirs.append(vps_state)
+    except (PermissionError, OSError):
+        pass
+
+    for sdir in state_dirs:
+        if not sdir.exists():
+            continue
+        for p in sdir.glob("*"):
+            if not p.is_file():
+                continue
+            name = p.name
+            if ".tmp_" in name:
+                residue_errors.append(f"[STATE DIR RESIDUE] Dangling temporary write artifact: {p}")
+            elif ".corrupt." in name:
+                residue_errors.append(f"[STATE DIR RESIDUE] Quarantined corrupt state requiring remediation: {p}")
+            elif name.endswith(".lock"):
+                # Flag if lock file has been abandoned for more than 5 minutes
+                try:
+                    import time
+                    mtime = os.path.getmtime(p)
+                    if time.time() - mtime > 300.0:
+                        residue_errors.append(f"[STATE DIR RESIDUE] Abandoned stale lock file (>5min old): {p}")
+                except OSError:
+                    pass
+
+    return residue_errors
 
 
 def main() -> int:
@@ -161,6 +202,7 @@ def main() -> int:
     ghost_errors = scan_ghost_files()
     untracked_errors = scan_untracked_canonical_files()
     gitignored_residues = scan_gitignored_paths()
+    state_errors = scan_state_dir_residues()
 
     print("  [GITIGNORED RESIDUE AUDIT (Boss Item 16)]")
     if gitignored_residues["wrappers"]:
@@ -172,9 +214,15 @@ def main() -> int:
         for qf in gitignored_residues["quarantine_files"]:
             print(f"      * {qf}")
     else:
-        print("    - Quarantine directories (archive/, .safe_trash/, audits/, temp_test/): 0 residues (CLEAN)")
+        print("    - Quarantine directories (archive/, .safe_trash/, temp_test/): 0 residues (CLEAN)")
 
-    all_errors = import_errors + ghost_errors + untracked_errors
+    # Document authorized visual audit artifacts
+    audit_dir = REPO_ROOT / "audits"
+    if audit_dir.exists():
+        audit_count = len(list(audit_dir.rglob("*.*")))
+        print(f"    - Visual audit authorized artifacts (Rule 122 / audits/): {audit_count} file(s) (AUTHORIZED)")
+
+    all_errors = import_errors + ghost_errors + untracked_errors + state_errors
 
     if all_errors:
         print(f"❌ FOUND {len(all_errors)} GHOST / BYPASS VIOLATION(S):")

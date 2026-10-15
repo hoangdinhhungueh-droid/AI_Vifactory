@@ -157,3 +157,54 @@ def test_corrupt_json_quarantine(temp_state_dir):
     corrupt_files = list(Path(temp_state_dir).glob("alert_cooldown.json.corrupt.*"))
     assert len(corrupt_files) == 1
     assert "corrupt: json" in corrupt_files[0].read_text(encoding="utf-8")
+
+
+def _worker_should_send(args):
+    """Top-level worker helper for multiprocess concurrency testing."""
+    alert_type, market, state_dir = args
+    from app.services.alert_cooldown import should_send_alert
+    can_send, _, _ = should_send_alert(alert_type, market, state_dir=state_dir, reserve_on_send=True)
+    return can_send
+
+
+def test_concurrent_should_send_alert_atomic_reservation(temp_state_dir):
+    """Multiple racing processes calling should_send_alert simultaneously;
+    strictly ONE caller must receive can_send=True, all others must be throttled with can_send=False.
+    """
+    from concurrent.futures import ProcessPoolExecutor
+    n_workers = 6
+    tasks = [("b1_viability", "EN", temp_state_dir) for _ in range(n_workers)]
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        results = list(executor.map(_worker_should_send, tasks))
+
+    assert results.count(True) == 1, f"Expected exactly 1 winner, got {results.count(True)}: {results}"
+    assert results.count(False) == n_workers - 1
+
+
+def test_lock_timeout_error_fail_closed(temp_state_dir):
+    """_interprocess_lock must fail-closed and raise LockTimeoutError when lock cannot be acquired."""
+    from pathlib import Path
+
+    from app.services.alert_cooldown import LockTimeoutError, _interprocess_lock
+
+    target_file = Path(temp_state_dir) / "test.json"
+    lock_file = target_file.with_suffix(".json.lock")
+    lock_file.write_text("99999:held_by_someone_else", encoding="utf-8")
+
+    # When lock is held, acquiring with short timeout must raise LockTimeoutError
+    with pytest.raises(LockTimeoutError):
+        with _interprocess_lock(target_file, timeout=0.1, poll_interval=0.02):
+            pass
+
+
+def test_alert_type_validation_raises_on_invalid(temp_state_dir):
+    """Passing None, empty string, or whitespace for alert_type should raise ValueError."""
+    with pytest.raises(ValueError, match="non-empty string"):
+        should_send_alert(None, "EN", state_dir=temp_state_dir)
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        should_send_alert("", "EN", state_dir=temp_state_dir)
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        should_send_alert("   ", "EN", state_dir=temp_state_dir)
+

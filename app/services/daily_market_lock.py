@@ -34,46 +34,7 @@ def _validate_market(market: Any) -> str:
     return market.strip().upper()
 
 
-def resolve_state_dir(custom_dir: Optional[str] = None, read_only: bool = False) -> Path:
-    """Resolve directory used for lock files and volatile state.
-    Eliminates silent split-brain in production.
-    """
-    if custom_dir:
-        p = Path(custom_dir)
-        if not read_only:
-            p.mkdir(parents=True, exist_ok=True)
-        return p
-
-    env_dir = os.getenv("AVF_STATE_DIR") or os.getenv("VF_LOCK_DIR")
-    if env_dir:
-        p = Path(env_dir)
-        if not read_only:
-            p.mkdir(parents=True, exist_ok=True)
-        return p
-
-    # Standard VPS location
-    vps_lock = Path("/var/vf/locks")
-    try:
-        if vps_lock.exists() or (os.path.isdir("/var/vf") and os.name != "nt"):
-            if not read_only:
-                vps_lock.mkdir(parents=True, exist_ok=True)
-            return vps_lock
-    except (PermissionError, OSError):
-        pass
-
-    # Development / Test / Local fallback
-    if os.getenv("AVF_DEV_MODE") == "1" or os.name == "nt" or os.getenv("PYTEST_CURRENT_TEST"):
-        project_root = Path(__file__).resolve().parent.parent.parent
-        local_locks = project_root / "locks"
-        if not read_only:
-            local_locks.mkdir(parents=True, exist_ok=True)
-        return local_locks
-
-    # Production Linux without /var/vf and without AVF_STATE_DIR
-    raise RuntimeError(
-        "Production lock directory /var/vf/locks is not available and AVF_STATE_DIR is not set. "
-        "Set AVF_STATE_DIR or AVF_DEV_MODE=1."
-    )
+from core.paths import resolve_state_dir  # Canonical authority re-exported for backwards compatibility
 
 
 def vn_now(now: Optional[datetime] = None) -> datetime:

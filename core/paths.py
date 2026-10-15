@@ -106,3 +106,44 @@ def new_run_paths(prefix: str = "RUN", repo_root: Optional[Path] = None) -> RunP
     ts = time.strftime("%Y%m%d_%H%M%S")
     run_id = f"{prefix}_{ts}"
     return RunPaths(run_id=run_id, repo_root=repo_root)
+
+
+def resolve_state_dir(custom_dir: Optional[str] = None, read_only: bool = False) -> Path:
+    """Resolve directory used for lock files and volatile state.
+    Single authoritative implementation eliminating split-brain in production.
+    """
+    if custom_dir:
+        p = Path(custom_dir)
+        if not read_only:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    env_dir = os.getenv("AVF_STATE_DIR") or os.getenv("VF_LOCK_DIR")
+    if env_dir:
+        p = Path(env_dir)
+        if not read_only:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    # Standard VPS location
+    vps_lock = Path("/var/vf/locks")
+    try:
+        if vps_lock.exists() or (os.path.isdir("/var/vf") and os.name != "nt"):
+            if not read_only:
+                vps_lock.mkdir(parents=True, exist_ok=True)
+            return vps_lock
+    except (PermissionError, OSError):
+        pass
+
+    # Safe repository local fallback
+    repo_fallback = Path(__file__).resolve().parent.parent / "var" / "locks"
+    if not read_only:
+        try:
+            repo_fallback.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError):
+            import tempfile
+            tmp_fallback = Path(tempfile.gettempdir()) / "avf_locks"
+            tmp_fallback.mkdir(parents=True, exist_ok=True)
+            return tmp_fallback
+    return repo_fallback
+
