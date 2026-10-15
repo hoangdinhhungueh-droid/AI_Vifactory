@@ -1241,12 +1241,16 @@ def discover_and_produce_market_trend(
 
             # Persist grounding_intel.json to episode folders under temp_task_id
             for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-                g_dir = Path(ep_base) / temp_task_id
-                if g_dir.parent.exists() or Path(ep_base).exists():
-                    g_dir.mkdir(parents=True, exist_ok=True)
-                    (g_dir / "grounding_intel.json").write_text(
-                        json.dumps(grounding_intel, ensure_ascii=False, indent=2), encoding="utf-8"
-                    )
+                try:
+                    p = Path(ep_base)
+                    if p.is_dir() or (p.parent.is_dir() and os.access(p.parent, os.W_OK)):
+                        g_dir = p / temp_task_id
+                        g_dir.mkdir(parents=True, exist_ok=True)
+                        (g_dir / "grounding_intel.json").write_text(
+                            json.dumps(grounding_intel, ensure_ascii=False, indent=2), encoding="utf-8"
+                        )
+                except OSError:
+                    pass
         except Exception as g_err:
             logger.error(f"[{temp_task_id}] Grounding Layer exception: {g_err}. Rotating to next candidate...")
             print(f"  ❌ [B1.5.5 Grounding Gate] Exception: {g_err}. Rotating to next candidate...")
