@@ -237,7 +237,7 @@ def audit_provenance_and_size_signatures(fixtures: list[tuple[str, str]]) -> Non
         if not m_path.exists():
             continue
         with open(m_path, encoding="utf-8") as f:
-            m = json.load(f)
+            json.load(f)
 
         print(f"\n{name}:")
         print("  - Fixture Status: DETERMINISTIC CALIBRATION FIXTURE (is_fixture: true)")
