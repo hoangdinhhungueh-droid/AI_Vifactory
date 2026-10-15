@@ -79,7 +79,22 @@ def audit_frames(fixture_dir: str, name: str) -> list[dict[str, Any]]:
         raw_ocr = pytesseract.image_to_string(sub_crop).strip()
         ocr_clean = raw_ocr.replace("\n", " ")
 
-        exp_narration = scenes[i].get("narration", "") if i < len(scenes) else ""
+        # Derive expected subtitle tokens active at midpoint frame
+        exp_narration = ""
+        if i < len(scenes):
+            scene_words = scenes[i].get("words", [])
+            if scene_words:
+                start_t = float(scenes[i].get("start", 0.0))
+                end_t = float(scenes[i].get("end", 5.0))
+                mid_t = (start_t + end_t) / 2.0
+                active_words = [
+                    w["word"] for w in scene_words
+                    if abs(float(w.get("start", 0.0)) - mid_t) <= 2.5 or abs(float(w.get("end", 0.0)) - mid_t) <= 2.5
+                ]
+                exp_narration = " ".join(active_words) if active_words else scenes[i].get("narration", "")
+            else:
+                exp_narration = scenes[i].get("narration", "")
+
         ocr_res = verify_subtitle_ocr_precision_recall(
             ocr_clean,
             exp_narration,
