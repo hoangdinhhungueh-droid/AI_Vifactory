@@ -100,13 +100,21 @@ def main():
         idx = args.index("--term")
         custom_term = args[idx + 1] if idx + 1 < len(args) else None
 
-    max_b2_attempts = 2
+    max_b2_attempts = int(os.getenv("MAX_B2_ATTEMPTS_PER_RUN", "1"))
     if "--max-b2-attempts" in args:
         idx = args.index("--max-b2-attempts")
         try:
             max_b2_attempts = int(args[idx + 1])
         except (IndexError, ValueError):
-            max_b2_attempts = 2
+            max_b2_attempts = 1
+
+    max_candidates = int(os.getenv("MAX_SCAN_CANDIDATES", "10"))
+    if "--max-candidates" in args:
+        idx = args.index("--max-candidates")
+        try:
+            max_candidates = int(args[idx + 1])
+        except (IndexError, ValueError):
+            max_candidates = 10
 
     # 1. Evaluate schedule based on Vietnam Timezone (UTC+7)
     schedule_info = get_market_schedule_info()
@@ -174,6 +182,7 @@ def main():
             market=custom_market,
             custom_seed=custom_term,
             auto_produce=auto_produce,
+            max_scan_candidates=max_candidates,
             max_b2_attempts=max_b2_attempts
         )
         results["approved_topics"].extend(topics)
@@ -184,6 +193,7 @@ def main():
                 topics = discover_and_produce_market_trend(
                     market=mkt,
                     auto_produce=auto_produce,
+                    max_scan_candidates=max_candidates,
                     max_b2_attempts=max_b2_attempts
                 )
                 results["approved_topics"].extend(topics)

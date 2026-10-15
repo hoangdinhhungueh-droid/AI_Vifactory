@@ -946,14 +946,16 @@ def forensic_pre_filter(candidate: dict, market: str) -> tuple[bool, str]:
 
 
 
-MAX_B2_ATTEMPTS_DEFAULT = int(os.getenv("MAX_B2_ATTEMPTS_PER_RUN", "2"))
+MAX_B2_ATTEMPTS_DEFAULT = int(os.getenv("MAX_B2_ATTEMPTS_PER_RUN", "1"))
+MAX_SCAN_CANDIDATES_DEFAULT = int(os.getenv("MAX_SCAN_CANDIDATES", "10"))
+MAX_VIABILITY_LLM_EVALS_DEFAULT = int(os.getenv("MAX_VIABILITY_LLM_EVALS", "6"))
 
 
 def discover_and_produce_market_trend(
     market: str = "EN",
     custom_seed: str = None,
     auto_produce: bool = True,
-    max_scan_candidates: int = 60,
+    max_scan_candidates: int = MAX_SCAN_CANDIDATES_DEFAULT,
     max_b2_attempts: int = MAX_B2_ATTEMPTS_DEFAULT
 ) -> list[dict]:
     """Execute canonical B1 trend discovery and automated B1.5 -> B2 -> B3 pipeline
@@ -974,6 +976,7 @@ def discover_and_produce_market_trend(
     consecutive_api_errors = 0
     max_consecutive_api_errors = 3
     b2_attempts_count = 0
+    viability_evals_count = 0
 
     for idx, c in enumerate(candidates[:max_scan_candidates], start=1):
         raw_term = c["term"]
@@ -998,6 +1001,21 @@ def discover_and_produce_market_trend(
         # 2. Ground-truth Wikipedia extract
         factsheet = fetch_ground_truth_factsheet(term, m_up)
 
+        # Level-0.5 Evidence Catalyst Pre-Filter Gate (0 LLM Tokens Burned - Rule 118, 128, 130)
+        news_catalysts = recon_data.get("news_catalysts", [])
+        is_live_news = c.get("traffic") in ["google_news_live", "specialized_rss_live"]
+        has_verified_catalyst = bool(news_catalysts) or is_live_news or bool(factsheet.get("extract"))
+        if not has_verified_catalyst and not custom_seed:
+            print(f"  ⏭️ [PRE-FILTER LEVEL-0 REJECT] No breaking news catalysts or verified entity factsheet for '{term}' (0 LLM tokens burned).")
+            continue
+
+        # Hard Circuit Breaker for Viability LLM evaluations per market run
+        if viability_evals_count >= MAX_VIABILITY_LLM_EVALS_DEFAULT and not custom_seed:
+            print(f"  🛑 [RULE 118 CAP] Viability LLM evaluation cap reached ({viability_evals_count}/{MAX_VIABILITY_LLM_EVALS_DEFAULT}). Halting further candidate LLM evaluations for {m_up}.")
+            break
+
+        viability_evals_count += 1
+
         # 3. Viability assessment via HHTech GPT-6-Astra (Grounded on News Catalysts per Rule 118 & 130)
         viability = assess_keyword_video_viability(
             term=term,
@@ -1005,7 +1023,7 @@ def discover_and_produce_market_trend(
             traffic=str(c.get("approx_traffic", "")),
             rising_queries=rising_queries[:6],
             top_videos=viral_videos[:4],
-            news_catalysts=recon_data.get("news_catalysts", []),
+            news_catalysts=news_catalysts,
             raw_headline=raw_term
         )
 
@@ -1314,9 +1332,10 @@ def discover_and_produce_market_trend(
         print(f"  ⚖️ [B2.1 Fact & Causal Audit Result] Verdict={f_verdict}, Score={f_score}/10")
 
         if f_verdict == "FAIL" or f_score < 7.5:
+            b2_attempts_count += 1
             veto_reason = fact_audit.get("veto_reason") or fact_audit.get("audit_notes") or "Script failed fact/causal integrity audit"
             logger.error(f"[{temp_task_id}] B2.1 Audit REJECTED ({f_score}/10): {veto_reason}. Candidate rejected, rotating to next candidate...")
-            print(f"  ❌ [B2.1 REJECTED] {veto_reason}. Rotating to next candidate in queue...")
+            print(f"  ❌ [B2.1 REJECTED] {veto_reason}. (B2 Attempt {b2_attempts_count}/{max_b2_attempts})")
             # User approved: no telegram notification for B2.1 candidate rotation.
             # If all fail, B1 VIABILITY ALERT or BOTTLENECK ALERT will cover; if passes, HG1 will cover.
             record_handled_topic(term=term, task_id=temp_task_id, market=m_up)
@@ -1334,6 +1353,21 @@ def discover_and_produce_market_trend(
                         shutil.rmtree(t_dir)
                     except Exception:
                         pass
+            if b2_attempts_count >= max_b2_attempts:
+                cb_msg = (
+                    f"🚨 <b>[RULE 118 B2 CIRCUIT BREAKER ACTIVATED]</b>\n"
+                    f"Market: <code>{m_up}</code> | B2 Attempts: <code>{b2_attempts_count}/{max_b2_attempts}</code>\n"
+                    f"Đã đạt trần số lần thử B2 ({b2_attempts_count}/{max_b2_attempts}).\n"
+                    f"🛑 <b>Hành động:</b> Ngắt pipeline ngay lập tức để bảo vệ ngân sách token và chi phí API."
+                )
+                print(f"\n{cb_msg}\n")
+                logger.critical(f"[{m_up}] B2 Circuit Breaker triggered after {b2_attempts_count} candidate attempts.")
+                try:
+                    from app.services.telegram_buttons import send_telegram_broadcast
+                    send_telegram_broadcast(cb_msg)
+                except Exception:
+                    pass
+                break
             continue
 
         print(f"  🎉 [B2.1 AUDIT PASSED!] Score: {f_score}/10. Moving to OFFICIAL TASK ID COMMIT & NOTION SYNC & HG1 NOTIFICATION!")
@@ -1400,26 +1434,24 @@ def discover_and_produce_market_trend(
 
         # 9. Send Pure Telegram Gate 1 Notification (Now fully enriched with Title A/B, 60s Hook & B2.1 PASS!)
         send_pure_telegram_gate1_notification(t_obj)
+        produced_topics.append(t_obj)
 
         # 10. Proceed directly to B3 Hollywood Director Plan & B3.5 Prompt Forge
         if auto_produce:
             print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {task_id}...")
             try:
-                from orchestrator.run_pipeline import execute_pipeline
-                manifest = execute_pipeline(profile_name="prod", run_id=task_id)
-                res_code = 0 if manifest.status == "ok" else 1
+                import subprocess
+                cmd = [sys.executable, "/root/video_factory/orchestrator/run_pipeline.py", "--run-id", str(task_id)]
+                proc = subprocess.run(cmd, cwd="/root/video_factory", capture_output=True, text=True, timeout=1800)
+                res_code = proc.returncode
                 if res_code == 0:
                     print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B2.1 -> B3 -> Gate 2 for {task_id}!")
-                    produced_topics.append(t_obj)
-                    break  # Exactly 1 completed topic per market per day!
                 else:
-                    logger.error(f"[{task_id}] Pipeline stopped at gate with exit code {res_code}. Freezing pipeline.")
-                    break
+                    logger.error(f"[{task_id}] Downstream pipeline stopped at stage with exit code {res_code}: {proc.stderr[:300]}")
             except Exception as prod_err:
-                logger.error(f"[{task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}. Freezing pipeline.")
-                break
+                logger.error(f"[{task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}")
+            break
         else:
-            produced_topics.append(t_obj)
             break
 
     if not produced_topics and not custom_seed:
