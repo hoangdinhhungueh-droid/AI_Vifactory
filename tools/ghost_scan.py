@@ -126,6 +126,32 @@ def scan_untracked_canonical_files() -> list[str]:
     return untracked_errors
 
 
+def scan_gitignored_paths() -> dict[str, list[str]]:
+    """Scans git-ignored quarantine locations and wrapper scripts (Rule 125 & Boss Item 16).
+
+    Reports lingering residues across archive/, .safe_trash/, audits/, temp_test/,
+    and root-level python*.bat / python*.cmd wrappers.
+    """
+    residues: dict[str, list[str]] = {
+        "wrappers": [],
+        "quarantine_files": []
+    }
+    # 1. Root-level wrappers
+    for p in ["python*.bat", "python*.cmd"]:
+        for f in REPO_ROOT.glob(p):
+            if f.is_file():
+                residues["wrappers"].append(str(f.relative_to(REPO_ROOT)))
+
+    # 2. Git-ignored quarantine directories
+    for qdir_name in ["archive", ".safe_trash", ".trash", "audits", "temp_test"]:
+        qp = REPO_ROOT / qdir_name
+        if qp.exists() and qp.is_dir():
+            for f in sorted(qp.rglob("*")):
+                if f.is_file():
+                    residues["quarantine_files"].append(str(f.relative_to(REPO_ROOT)))
+    return residues
+
+
 def main() -> int:
     print("=" * 70)
     print("🔍 GHOST HUNTER SCANNER (Rule 125 & AVF-STAB-001 Gate)")
@@ -134,6 +160,19 @@ def main() -> int:
     import_errors = scan_canonical_imports()
     ghost_errors = scan_ghost_files()
     untracked_errors = scan_untracked_canonical_files()
+    gitignored_residues = scan_gitignored_paths()
+
+    print("  [GITIGNORED RESIDUE AUDIT (Boss Item 16)]")
+    if gitignored_residues["wrappers"]:
+        print(f"    - Execution wrappers found: {gitignored_residues['wrappers']}")
+    else:
+        print("    - Execution wrappers (python*.bat/cmd): 0 found (CLEAN)")
+    if gitignored_residues["quarantine_files"]:
+        print(f"    - Quarantine residues: {len(gitignored_residues['quarantine_files'])} file(s):")
+        for qf in gitignored_residues["quarantine_files"]:
+            print(f"      * {qf}")
+    else:
+        print("    - Quarantine directories (archive/, .safe_trash/, audits/, temp_test/): 0 residues (CLEAN)")
 
     all_errors = import_errors + ghost_errors + untracked_errors
 

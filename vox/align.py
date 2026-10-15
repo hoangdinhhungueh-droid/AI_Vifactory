@@ -62,7 +62,7 @@ def align_script_with_audio(
     model_size: str = "base",
     market: str = "EN",
     language: str | None = None,
-    allow_synthetic_alignment: bool = False,
+    allow_synthetic_alignment: bool | None = None,
 ) -> tuple[WordTimeline, ScenePlan]:
     """Aligns script narration to audio wav file and populates scene timecodes.
 
@@ -97,7 +97,10 @@ def align_script_with_audio(
     whisper_success = False
     alignment_model = resolved_model
 
-    allow_synthetic = allow_synthetic_alignment or (os.getenv("ALLOW_SYNTHETIC_ALIGNMENT", "").lower() in ("1", "true"))
+    if allow_synthetic_alignment is None:
+        allow_synthetic = os.getenv("ALLOW_SYNTHETIC_ALIGNMENT", "").lower() in ("1", "true")
+    else:
+        allow_synthetic = bool(allow_synthetic_alignment)
 
     # 1. Attempt live faster-whisper extraction
     try:

@@ -18,14 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Antigravity Memory Governance (`ROADMAP.md`, `CHANGELOG.md`, `scripts/orchestrator/memory_governor.py`)**: Thiết lập bộ nhớ dự án dài hạn chống mất ngữ cảnh khi agent bị compaction (học hỏi từ bài học 6 bước Vibe Coding).
 - **Custom Commands Suite Upgrades (`vf-pipeline-teamwork`)**: Mở rộng Chat UI subcommands `/vf-pipeline-teamwork deploy`, `health`, `report`, `memory` và vai trò số 7 (Vibe Memory & CD Gatekeeper).
 - **Safe Vibe-to-Code Engine Upgrades (`antigravity-code-review`)**: Tích hợp quy trình 8 bước Vibe-to-Code kèm chốt chặn Memory Anchoring & One-Command Readiness.
-- **VS Code Tasks Integration (`.vscode/tasks.json`)**: Bổ sung các task tự động hóa một chạm trên IDE cho Health Check, HTML Dashboard, Memory Audit, Full CI, VPS Deploy, OCR Review và Ghost Hunter.
-- **Comprehensive System Health Reporter (`scripts/orchestrator/system_health_reporter.py`)**: Thu thập chỉ số phần cứng (CPU, RAM, Swap, Disk), dịch vụ (PostgreSQL, Redis, Celery), Remotion và AI Quotas; xuất báo kép (Markdown + Interactive HTML Dashboard).
 - **Vibe Coding Spec Templates (`specs/business_flow_template.md` & `specs/design_spec_template.md`)**: Cung cấp bản vẽ chuẩn cho mọi module trước khi viết mã nguồn.
 - **SDLC Enterprise Reporter Upgrade (`sdlc-enterprise-reporter`)**: Nâng cấp toàn diện 14 giai đoạn với kiến trúc CI/CD 2-Job, Deploy 1-lệnh (`make deploy`), Health check 7 trục, Interactive HTML Dashboard, và Memory Governance chống Amnesia (`ROADMAP.md` & `CHANGELOG.md`).
 
 ### Changed
-- **Health Check Engine (`scripts/health-check.py`)**: Nâng cấp từ kiểm tra đơn sơ (3 lệnh) lên kiểm toán 7 trục toàn diện, bao gồm cả tài nguyên bộ nhớ, trạng thái container và kiểm tra độ sạch mã nguồn (Rule 125).
 - **Orchestrator Runner (`scripts/orchestrator/runner.py`)**: Hỗ trợ 4 mode vận hành mới: `--mode health`, `--mode report`, `--mode memory`, `--mode deploy`, mở rộng khả năng gọi composable capabilities.
+
+---
+
+## [1.2.1] - 2026-10-13 (Commit a6bda51)
+### Added
+- **Comprehensive System Health Reporter (`scripts/orchestrator/system_health_reporter.py`)**: Thu thập chỉ số phần cứng (CPU, RAM, Swap, Disk), dịch vụ (PostgreSQL, Redis, Celery), Remotion và AI Quotas; xuất báo kép (Markdown + Interactive HTML Dashboard).
+
+### Changed
+- **Health Check Engine (`scripts/health-check.py`)**: Nâng cấp từ kiểm tra đơn sơ (3 lệnh) lên kiểm toán 7 trục toàn diện, bao gồm cả tài nguyên bộ nhớ, trạng thái container và kiểm tra độ sạch mã nguồn (Rule 125).
 
 ---
 
