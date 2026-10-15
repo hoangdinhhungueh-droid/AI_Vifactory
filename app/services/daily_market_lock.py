@@ -99,6 +99,7 @@ def is_market_done_today(
     now: Optional[datetime] = None,
     force: bool = False,
     check_registry: bool = True,
+    check_episodes: bool = True,
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """Check whether the given market has already completed or is currently
     producing today's episode.
@@ -200,40 +201,41 @@ def is_market_done_today(
             logger.debug(f"[daily_market_lock] Registry check notice: {reg_err}")
 
     # 3. Check Episode directories on disk
-    episodes_roots = [
-        Path("/var/vf/episodes"),
-        Path("/root/video_factory/episodes"),
-        Path(__file__).resolve().parent.parent.parent / "episodes",
-    ]
-    for ep_root in episodes_roots:
-        if not ep_root.is_dir():
-            continue
-        try:
-            prefix = f"{m_up}_EP"
-            for ep_dir in ep_root.iterdir():
-                if not ep_dir.is_dir() or not ep_dir.name.startswith(prefix):
-                    continue
-                # Check manifest or directory timestamp
-                manifest_file = ep_dir / "run_manifest.json"
-                if manifest_file.exists():
-                    try:
-                        m_stat = manifest_file.stat()
-                        m_vn_date = vn_today(datetime.fromtimestamp(m_stat.st_mtime, timezone.utc))
-                        if m_vn_date == date_str:
-                            details = {
-                                "market": m_up,
-                                "vn_date": date_str,
-                                "status": "COMPLETED",
-                                "topic_id": ep_dir.name,
-                                "source": "episode_dir_completed",
-                                "completed_at_utc": datetime.now(timezone.utc).isoformat(),
-                            }
-                            _atomic_write_json(lock_path, details)
-                            return True, "episode_dir_completed", details
-                    except Exception:
-                        pass
-        except Exception as ep_err:
-            logger.debug(f"[daily_market_lock] Episode dir check notice: {ep_err}")
+    if check_episodes:
+        episodes_roots = [
+            Path("/var/vf/episodes"),
+            Path("/root/video_factory/episodes"),
+            Path(__file__).resolve().parent.parent.parent / "episodes",
+        ]
+        for ep_root in episodes_roots:
+            if not ep_root.is_dir():
+                continue
+            try:
+                prefix = f"{m_up}_EP"
+                for ep_dir in ep_root.iterdir():
+                    if not ep_dir.is_dir() or not ep_dir.name.startswith(prefix):
+                        continue
+                    # Check manifest or directory timestamp
+                    manifest_file = ep_dir / "run_manifest.json"
+                    if manifest_file.exists():
+                        try:
+                            m_stat = manifest_file.stat()
+                            m_vn_date = vn_today(datetime.fromtimestamp(m_stat.st_mtime, timezone.utc))
+                            if m_vn_date == date_str:
+                                details = {
+                                    "market": m_up,
+                                    "vn_date": date_str,
+                                    "status": "COMPLETED",
+                                    "topic_id": ep_dir.name,
+                                    "source": "episode_dir_completed",
+                                    "completed_at_utc": datetime.now(timezone.utc).isoformat(),
+                                }
+                                _atomic_write_json(lock_path, details)
+                                return True, "episode_dir_completed", details
+                        except Exception:
+                            pass
+            except Exception as ep_err:
+                logger.debug(f"[daily_market_lock] Episode dir check notice: {ep_err}")
 
     if stale_lock_found:
         return False, "stale_lock", stale_data
