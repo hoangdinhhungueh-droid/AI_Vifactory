@@ -85,3 +85,27 @@ def test_ghost_scan_detects_planted_scratch_probe_file(tmp_path, monkeypatch):
     assert len(ghosts) == 1
     assert "scratch_probe_test.py" in ghosts[0]
 
+
+def test_ghost_scan_detects_planted_probe_file_and_exits_nonzero(tmp_path, monkeypatch):
+    """Adversarial Test: Planting an untracked scripts/probe_*.py must trigger scan_untracked_canonical_files and exit 1."""
+    import subprocess
+    fake_root = tmp_path / "repo"
+    fake_root.mkdir()
+    subprocess.run(["git", "init"], cwd=str(fake_root), capture_output=True, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=str(fake_root), capture_output=True, check=True)
+    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=str(fake_root), capture_output=True, check=True)
+
+    scripts_dir = fake_root / "scripts"
+    scripts_dir.mkdir()
+    (scripts_dir / "probe_income.py").write_text("print('probe')", encoding="utf-8")
+
+    monkeypatch.setattr(ghost_scan, "REPO_ROOT", fake_root)
+    untracked = ghost_scan.scan_untracked_canonical_files()
+    assert len(untracked) == 1
+    assert "probe_income.py" in untracked[0]
+
+    exit_code = ghost_scan.main()
+    assert exit_code == 1
+
+
+

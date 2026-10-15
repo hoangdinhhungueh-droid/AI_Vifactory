@@ -36,7 +36,7 @@ logger = logging.getLogger("opus55_supervisor_gate")
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [OPUS55_GATE] %(message)s")
 
-MAX_SUPERVISOR_INPUT_TOKENS = 25000
+MAX_SUPERVISOR_INPUT_TOKENS = 100000
 MAX_SUPERVISOR_OUTPUT_TOKENS = 5000
 DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
 

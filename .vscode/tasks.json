@@ -2,23 +2,6 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "AGQ Quota Sentinel",
-      "type": "shell",
-      "command": "wscript.exe \"${workspaceFolder}\\scripts\\agq_silent_start.vbs\"",
-      "windows": {
-        "command": "wscript.exe \"${workspaceFolder}\\scripts\\agq_silent_start.vbs\""
-      },
-      "presentation": {
-        "reveal": "never",
-        "echo": false,
-        "focus": false,
-        "panel": "shared",
-        "showReuseMessage": false,
-        "clear": false
-      },
-      "problemMatcher": []
-    },
-    {
       "label": "VF: System Health Check",
       "type": "shell",
       "command": "powershell -ExecutionPolicy Bypass -File .\\make.ps1 health",

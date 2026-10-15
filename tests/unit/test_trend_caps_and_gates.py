@@ -246,7 +246,6 @@ def test_b3_module_find_spec_and_subprocess_help_contract():
 
 def test_candidate_loop_halts_at_max_scan_candidates():
     """Verify candidate loop halts strictly at max_scan_candidates ceiling."""
-    from unittest.mock import MagicMock
     from app.services.trend_engine_b1 import discover_and_produce_market_trend
 
     # Generate 25 candidates
@@ -279,7 +278,6 @@ def test_candidate_loop_halts_at_max_scan_candidates():
 
 def test_llm_viability_calls_stop_at_max_viability_llm_evals():
     """Verify LLM viability calls halt strictly at max_viability_llm_evals ceiling."""
-    from unittest.mock import MagicMock
     from app.services.trend_engine_b1 import discover_and_produce_market_trend
 
     # Generate 15 candidates that all pass Level-0 and Level-0.5

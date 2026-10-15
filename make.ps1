@@ -61,6 +61,9 @@ switch ($Target.ToLower()) {
     "clean" {
         & $PYTHON scripts/orchestrator/runner.py --cleanup-tmp
     }
+    "sweep" {
+        & $PYTHON tools/ghost_scan.py
+    }
     "docker-up" {
         docker compose up -d
     }

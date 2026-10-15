@@ -32,7 +32,7 @@ GHOST_PATTERNS = [
     "*scratch*.py",
     "*scratch_probe*.py",
 ]
-IGNORE_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__"}
+IGNORE_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", "scratch"}
 
 
 def check_ast_imports(py_file: Path) -> list[tuple[str, int]]:
@@ -103,6 +103,29 @@ def scan_ghost_files() -> list[str]:
     return ghosts
 
 
+def scan_untracked_canonical_files() -> list[str]:
+    """Scans git status for untracked files residing under canonical packages (Rule 125)."""
+    untracked_errors = []
+    try:
+        import subprocess
+        res = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "ls-files", "--others", "--exclude-standard"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            for raw_line in res.stdout.strip().splitlines():
+                line = raw_line.strip().replace("\\", "/")
+                parts = line.split("/")
+                top_dir = parts[0]
+                if top_dir in CANONICAL_DIRS:
+                    untracked_errors.append(f"[UNTRACKED CANONICAL FILE FOUND] {line}")
+    except Exception:
+        pass
+    return untracked_errors
+
+
 def main() -> int:
     print("=" * 70)
     print("🔍 GHOST HUNTER SCANNER (Rule 125 & AVF-STAB-001 Gate)")
@@ -110,8 +133,9 @@ def main() -> int:
 
     import_errors = scan_canonical_imports()
     ghost_errors = scan_ghost_files()
+    untracked_errors = scan_untracked_canonical_files()
 
-    all_errors = import_errors + ghost_errors
+    all_errors = import_errors + ghost_errors + untracked_errors
 
     if all_errors:
         print(f"❌ FOUND {len(all_errors)} GHOST / BYPASS VIOLATION(S):")

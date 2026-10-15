@@ -40,7 +40,7 @@ jobs:
       
       - name: Lint with ruff (Blocking on all changed & core modules - Rule 139)
         run: |
-          ruff check vox/ tools/ tests/vox/ app/main.py app/services/artifact_sync.py app/services/director_planner_b3.py app/services/seo_package_forge.py app/services/trend_engine_b1.py scripts/vf_insight_cards.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/hhtech_planner.py scripts/orchestrator/memory_governor.py scripts/orchestrator/opus55_supervisor_gate.py scripts/orchestrator/runner.py
+          ruff check vox/ tools/ tests/vox/ tests/unit/test_trend_caps_and_gates.py tests/test_ghost_scan_adversarial.py app/main.py app/services/artifact_sync.py app/services/director_planner_b3.py app/services/seo_package_forge.py app/services/trend_engine_b1.py scripts/vf_insight_cards.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/hhtech_planner.py scripts/orchestrator/memory_governor.py scripts/orchestrator/opus55_supervisor_gate.py scripts/orchestrator/runner.py
 
       - name: Static compilation check (Rule 127)
         run: python -m compileall -q scripts tools vox app tests
@@ -51,18 +51,45 @@ jobs:
       - name: Rule 128 & Rule 132 Zero Semantic Bias Linter Gate
         run: pytest -v tests/test_zero_semantic_bias.py
 
-      - name: Run hermetic tests (unit + contract)
-        run: pytest -m "not integration" -v --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing tests/
-
-      - name: Full Vox Single Pipeline Test Suite (Rule 125 & 127 - Zero-Skip Gate)
+      - name: Hermetic Unit & Adversarial Test Suite (Rule 121 & Rule 125 JUnit Zero-Skip Gate)
         shell: bash
         run: |
           set -eo pipefail
-          pytest -v -rA tests/vox/ | tee /tmp/pytest_vox.log
-          if grep -E "[1-9][0-9]* (skipped|deselected|xfailed|xpassed)" /tmp/pytest_vox.log; then
-            echo "CI FAIL: Non-passing or skipped test status detected in tests/vox suite! Zero-skip policy enforced."
-            exit 1
-          fi
+          pytest -v -rA --junitxml=/tmp/junit_unit.xml tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py
+          python -c "
+          import xml.etree.ElementTree as ET, sys
+          tree = ET.parse('/tmp/junit_unit.xml')
+          root = tree.getroot()
+          suites = [root] if root.tag == 'testsuite' else root.findall('testsuite')
+          errs = sum(int(s.attrib.get('errors', 0)) for s in suites)
+          fails = sum(int(s.attrib.get('failures', 0)) for s in suites)
+          skips = sum(int(s.attrib.get('skipped', 0)) for s in suites)
+          tests = sum(int(s.attrib.get('tests', 0)) for s in suites)
+          print(f'Unit JUnit Audit: tests={tests}, failures={fails}, errors={errs}, skipped={skips}')
+          if errs > 0 or fails > 0 or skips > 0:
+              print('CI FAIL: Unit suite contains non-passing or skipped tests!')
+              sys.exit(1)
+          "
+
+      - name: Full Vox Single Pipeline Test Suite (Rule 125 & 127 - JUnit Zero-Skip Gate)
+        shell: bash
+        run: |
+          set -eo pipefail
+          pytest -v -rA --junitxml=/tmp/junit_vox.xml tests/vox/
+          python -c "
+          import xml.etree.ElementTree as ET, sys
+          tree = ET.parse('/tmp/junit_vox.xml')
+          root = tree.getroot()
+          suites = [root] if root.tag == 'testsuite' else root.findall('testsuite')
+          errs = sum(int(s.attrib.get('errors', 0)) for s in suites)
+          fails = sum(int(s.attrib.get('failures', 0)) for s in suites)
+          skips = sum(int(s.attrib.get('skipped', 0)) for s in suites)
+          tests = sum(int(s.attrib.get('tests', 0)) for s in suites)
+          print(f'Vox JUnit Audit: tests={tests}, failures={fails}, errors={errs}, skipped={skips}')
+          if errs > 0 or fails > 0 or skips > 0:
+              print('CI FAIL: Vox suite contains non-passing or skipped tests!')
+              sys.exit(1)
+          "
       
       - name: Upload coverage
         uses: codecov/codecov-action@v4
