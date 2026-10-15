@@ -157,3 +157,51 @@ def test_b3_invocation_command_contract():
     assert "--profile" in cmd
     assert cmd[cmd.index("--profile") + 1] == "prod"
     assert cmd[cmd.index("--run-id") + 1] == task_id
+
+
+def test_b3_failure_yields_zero_committed_and_single_failed_alert():
+    """Rule 125 & Single Pipeline State: When B3 fails (res_code != 0):
+    1. Zero topics are committed.
+    2. Exactly ONE terminal Telegram message with status FAILED is emitted.
+    3. No contradictory Gate 1 success or bottleneck message is sent.
+    """
+    from unittest.mock import MagicMock
+
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    fake_candidate = {
+        "term": "corporate bankruptcy collapse crisis",
+        "approx_traffic": "google_news_live",
+        "source": "google_news_live",
+        "geos_present": ["US"],
+    }
+
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[fake_candidate]), \
+         patch("app.services.trend_engine_b1.perform_direct_platform_recon", return_value={"rising_queries": [], "viral_videos": [], "news_catalysts": [{"title": "News"}]}), \
+         patch("app.services.trend_engine_b1.fetch_ground_truth_factsheet", return_value={"extract": "Entity factsheet"}), \
+         patch("app.services.trend_engine_b1.assess_keyword_video_viability", return_value={"viability_score": 9.0, "is_video_viable": True, "reasoning": "High impact", "specific_viral_angle": "Test Angle"}), \
+         patch("app.services.adversarial_critic_b1.audit_candidate_trend_alignment", return_value={"verdict": "PASS", "audit_score": 9.5}), \
+         patch("app.services.trend_engine_b1.run_b15", return_value={"competitor_narrative_anatomy": {"fatal_explanatory_vacuum": "gap"}}), \
+         patch("app.services.grounding_layer_b15.run_grounding_research", return_value={}), \
+         patch("app.services.grounding_layer_b15.passes_grounding_gate", return_value=(True, "Grounding passed")), \
+         patch("app.services.seo_package_forge.forge_seo_package", return_value={}), \
+         patch("app.services.trend_engine_b1.reason_topic_niche", return_value={"search_specific_keyword": "corporate collapse", "topic_name_vi": "Test", "task_slug": "test_slug", "niche_angle_brief": "Brief", "story_direction_5_arcs": "Arcs"}), \
+         patch("app.services.story_engine_b2.generate_5_arc_story", return_value={"story": "Valid script text", "story_gate_score": 12, "story_verdict": "PASS", "fact_causal_audit": {"verdict": "PASS", "audit_score": 9.0}}), \
+         patch("subprocess.run") as mock_sub, \
+         patch("app.services.telegram_buttons.send_telegram_broadcast") as mock_tele, \
+         patch("app.services.trend_engine_b1.commit_trend_task") as mock_commit:
+
+        mock_sub.return_value = MagicMock(returncode=1, stderr="Subprocess error in B3")
+
+        produced = discover_and_produce_market_trend(market="EN", auto_produce=True, max_scan_candidates=1)
+
+        # 1. Zero topics produced and zero committed
+        assert len(produced) == 0
+        mock_commit.assert_not_called()
+
+        # 2. Exactly ONE terminal Telegram broadcast emitted
+        assert mock_tele.call_count == 1
+        broadcast_msg = mock_tele.call_args[0][0]
+        assert "[VF PIPELINE B3 FAILED - RULE 118]" in broadcast_msg
+        assert "0 topics committed" in broadcast_msg
+

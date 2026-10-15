@@ -69,20 +69,20 @@ async def sync_artifacts(req: SyncRequest):
     trend_title = req.episode_id
     if q.get("results"):
         r = q["results"][0]
-        try:
-            trend_title = r["properties"]["Name"]["title"][0]["plain_text"]
-        except Exception:
-            pass
-        try:
-            task_id = r["properties"]["Task ID"]["rich_text"][0]["plain_text"]
-        except Exception:
-            pass
+        props = r.get("properties", {})
+        title_items = props.get("Name", {}).get("title", [])
+        if title_items:
+            trend_title = title_items[0].get("plain_text", req.episode_id)
+        task_items = props.get("Task ID", {}).get("rich_text", [])
+        if task_items:
+            task_id = task_items[0].get("plain_text", req.episode_id)
 
     try:
         from scripts.gdrive_backup import backup_episode_to_gdrive
         backup_episode_to_gdrive(req.episode_id, req.local_dir, task_id, trend_title)
     except Exception as _gdrive_err:
-        pass
+        import logging
+        logging.getLogger("artifact_sync").warning(f"[{req.episode_id}] Notice during gdrive backup: {_gdrive_err}")
 
 
     images = glob.glob(os.path.join(req.local_dir, "*.jpg")) + glob.glob(os.path.join(req.local_dir, "*.png"))

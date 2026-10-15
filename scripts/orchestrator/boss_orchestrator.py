@@ -947,15 +947,18 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
 
     def run_on_vps(cmd: str) -> Tuple[int, str]:
         nonlocal vps_client
+        clean_cmd = cmd.strip()
+        if not clean_cmd.startswith("cd /root/video_factory"):
+            clean_cmd = f"cd /root/video_factory && PYTHONPATH=/root/video_factory {clean_cmd}"
         if is_on_vps:
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd="/root/video_factory")
+            res = subprocess.run(clean_cmd, shell=True, capture_output=True, text=True, cwd="/root/video_factory")
             return res.returncode, (res.stdout + "\n" + res.stderr).strip()
         else:
             try:
                 if vps_client is None:
                     from scripts.vps_runner import FastVPSClient
                     vps_client = FastVPSClient()
-                r = vps_client.run_command(cmd, timeout=300)
+                r = vps_client.run_command(clean_cmd, timeout=300)
                 return r.get("exit_code", 1), (r.get("stdout", "") + "\n" + r.get("stderr", "")).strip()
             except Exception as ex:
                 return 1, f"VPS connection failed: {ex}"

@@ -82,7 +82,8 @@ b2_b3_opus_astra_audit.md
 out/
 reports/
 runs/
-/db/
+db/
+archive/
 legacy_inventory.json
 boss_audit.log
 *.log

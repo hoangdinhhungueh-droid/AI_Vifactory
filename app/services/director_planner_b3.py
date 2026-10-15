@@ -34,7 +34,6 @@ __all__ = [
     "sanitize_beat_spoken_for_llm",
     "validate_asset_reuse_limits",
     "validate_cinematic_tokens",
-    "_sanitize_beat_spoken_for_llm",
 ]
 
 

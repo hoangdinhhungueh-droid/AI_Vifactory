@@ -1016,6 +1016,7 @@ def discover_and_produce_market_trend(
     max_consecutive_api_errors = 3
     b2_attempts_count = 0
     viability_evals_count = 0
+    terminal_alert_sent = False
 
     for idx, c in enumerate(candidates[:max_scan_candidates], start=1):
         raw_term = c["term"]
@@ -1224,10 +1225,6 @@ def discover_and_produce_market_trend(
         # 5.2. Grounding Layer Fact-Verification & Gate (B1.5.5 - Rule 118 & Rule 121)
         print(f"  🔍 [B1.5.5] Running Live Grounding Research & Verification Gate for {temp_task_id}...")
         try:
-            import importlib
-
-            import app.services.grounding_layer_b15 as gl_b15
-            importlib.reload(gl_b15)
             from app.services.grounding_layer_b15 import passes_grounding_gate, run_grounding_research
             grounding_kw = t_obj.get("search_specific_keyword") or term
             grounding_hint = t_obj.get("niche_angle_brief") or ""
@@ -1421,7 +1418,62 @@ def discover_and_produce_market_trend(
         t_obj["fact_audit_model"] = fact_audit.get("auditor_model", "GPT-6-Astra")
         t_obj["fact_audit_passed"] = True
 
-        # 8. NOW OFFICIALLY COMMIT TASK ID, SYNC NOTION, RENAME TEMP FOLDERS, & SEND HG1 NOTIFICATION!
+        # 8. Downstream Pipeline Execution (B3 Hollywood Director Plan & B3.5 Prompt Forge)
+        # Rule 125 & Rule 126 Single Pipeline State: Task is officially committed ONLY after B3 succeeds.
+        res_code = 0
+        b3_timeout = _parse_env_int("B3_PIPELINE_TIMEOUT", 1800, min_val=60)
+        terminal_alert_sent = False
+
+        if auto_produce:
+            print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {temp_task_id} (profile=prod, timeout={b3_timeout}s)...")
+            cmd = [
+                sys.executable,
+                "-m",
+                "orchestrator.run_pipeline",
+                "--profile",
+                "prod",
+                "--run-id",
+                str(temp_task_id),
+            ]
+            sub_env = os.environ.copy()
+            sub_env["PYTHONPATH"] = f"{_PROJECT_ROOT}:{sub_env.get('PYTHONPATH', '')}".strip(":")
+            try:
+                proc = subprocess.run(cmd, cwd=str(_PROJECT_ROOT), env=sub_env, capture_output=True, text=True, timeout=b3_timeout)
+                res_code = proc.returncode
+                if res_code != 0:
+                    stderr_tail = "\n".join(proc.stderr.strip().splitlines()[-15:]) if proc.stderr else "No stderr emitted."
+                    logger.error(f"[{temp_task_id}] Downstream pipeline stopped at stage with exit code {res_code}:\n{stderr_tail}")
+            except subprocess.TimeoutExpired:
+                res_code = 124
+                logger.error(f"[{temp_task_id}] Downstream pipeline timed out after {b3_timeout}s.")
+            except Exception as prod_err:
+                res_code = 1
+                logger.exception(f"[{temp_task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}")
+
+            if res_code != 0:
+                # B3 failed: Do NOT commit task. Emit exactly ONE terminal failure message.
+                fail_msg = (
+                    f"🚨 <b>[VF PIPELINE B3 FAILED - RULE 118]</b>\n"
+                    f"Market: <code>{m_up}</code> | Candidate: <code>{term}</code> (Temp: <code>{temp_task_id}</code>)\n"
+                    f"B3 Downstream Director Plan execution failed with exit code {res_code}.\n"
+                    f"🛑 <b>Hành động:</b> 0 topics committed. Pipeline dừng an toàn để bảo vệ ngân sách token và tính toàn vẹn hệ thống."
+                )
+                print(f"\n{fail_msg}\n")
+                logger.error(f"[{m_up}] Task {temp_task_id} B3 failed (exit code {res_code}). Emitted single terminal failure alert.")
+                try:
+                    from app.services.telegram_buttons import send_telegram_broadcast
+                    send_telegram_broadcast(fail_msg)
+                except Exception as _tel_err:
+                    logger.warning(f"Failed to send B3 failure alert to Telegram: {_tel_err}")
+                terminal_alert_sent = True
+                if os.path.exists(temp_task_file):
+                    try:
+                        os.remove(temp_task_file)
+                    except OSError as _rm_err:
+                        logger.debug(f"[{temp_task_id}] Notice cleaning temp pending task: {_rm_err}")
+                break
+
+        # 9. B3 SUCCEEDED (or auto_produce=False): NOW OFFICIALLY COMMIT TASK ID, SYNC NOTION, MIGRATE ARTIFACTS, & SEND SINGLE HG1 NOTIFICATION!
         task_id = commit_trend_task(t_obj)
         t_obj["task_id"] = task_id
         print(f"  💾 Officially Committed Task ID: {task_id}")
@@ -1478,54 +1530,16 @@ def discover_and_produce_market_trend(
         except Exception as _m_err:
             logger.warning(f"[trend_engine] Notice migrating Story Library Task ID: {_m_err}")
 
-        # 9. Send Pure Telegram Gate 1 Notification (Now fully enriched with Title A/B, 60s Hook & B2.1 PASS!)
+        # Send EXACTLY ONE Pure Telegram Gate 1 Notification!
         send_pure_telegram_gate1_notification(t_obj)
         committed_tasks.append(task_id)
+        produced_topics.append(t_obj)
+        print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B2.1 -> B3 -> Gate 2 for {task_id}!")
+        break
 
-        # 10. Proceed directly to B3 Hollywood Director Plan & B3.5 Prompt Forge
-        res_code = 0
-        b3_timeout = _parse_env_int("B3_PIPELINE_TIMEOUT", 1800, min_val=60)
-        if auto_produce:
-            print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {task_id} (profile=prod, timeout={b3_timeout}s)...")
-            cmd = [
-                sys.executable,
-                "-m",
-                "orchestrator.run_pipeline",
-                "--profile",
-                "prod",
-                "--run-id",
-                str(task_id),
-            ]
-            try:
-                proc = subprocess.run(cmd, cwd=str(_PROJECT_ROOT), capture_output=True, text=True, timeout=b3_timeout)
-                res_code = proc.returncode
-                if res_code == 0:
-                    print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B2.1 -> B3 -> Gate 2 for {task_id}!")
-                    produced_topics.append(t_obj)
-                else:
-                    stderr_tail = "\n".join(proc.stderr.strip().splitlines()[-15:]) if proc.stderr else "No stderr emitted."
-                    logger.error(f"[{task_id}] Downstream pipeline stopped at stage with exit code {res_code}:\n{stderr_tail}")
-            except subprocess.TimeoutExpired:
-                res_code = 124
-                logger.error(f"[{task_id}] Downstream pipeline timed out after {b3_timeout}s.")
-            except Exception as prod_err:
-                res_code = 1
-                logger.exception(f"[{task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}")
-            break
-        else:
-            produced_topics.append(t_obj)
-            break
-
-    if not produced_topics and not custom_seed:
+    if not produced_topics and not custom_seed and not terminal_alert_sent:
         scanned_count = min(len(candidates), max_scan_candidates)
-        if committed_tasks and res_code != 0:
-            alert_msg = (
-                f"⚠️ <b>[VF PIPELINE B3 DOWNSTREAM ALERT - RULE 118]</b>\n"
-                f"Thị trường <b>{m_up}</b>: Đề tài <code>{committed_tasks[0]}</code> đã <b>ĐẠT GATE 1</b> nhưng B3 render pipeline gặp sự cố (Exit code {res_code}).\n"
-                f"🔧 Trạng thái: Kịch bản đã lưu an toàn tại Notion Story Library. Vui lòng kiểm tra log B3 để tiếp tục render."
-            )
-            logger.warning(f"[{m_up}] Task {committed_tasks[0]} passed Gate 1 but downstream B3 pipeline halted with exit code {res_code}.")
-        elif viability_passed_candidates:
+        if viability_passed_candidates:
             # Candidates passed B1 Viability Gate, but were stopped downstream (Critic, Grounding, or B2 Story/Fact Audit)
             alert_msg = (
                 f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
