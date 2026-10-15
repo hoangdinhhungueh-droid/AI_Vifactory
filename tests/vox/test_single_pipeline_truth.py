@@ -152,6 +152,9 @@ def test_canonical_render_engine_and_chapter_sync():
     for mod in forbidden_legacy:
         assert mod not in sys.modules, f"Forbidden legacy module {mod} must not be loaded"
 
+    # Assert build_remotion_props is not used as pipeline render engine (Rule 125/135)
+    assert not hasattr(vpipe, "render_remotion_video"), "vox.pipeline must not contain remotion render alternate path"
+
 
 def test_adversarial_legacy_file_purge_detector(tmp_path):
     """Plants a legacy pattern file in a temp directory and asserts detection and removal (Rule 125)."""

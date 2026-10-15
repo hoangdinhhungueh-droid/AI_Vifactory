@@ -82,6 +82,8 @@
    - *Rationale*: Enforces Rule 118 (Zero-Mock Data) & Rule 130 (Factual Causal Integrity). Provides strictly capped, verified non-fiction topics to prevent pipeline starvation or fallback to mock data.
 3. **Memory Governance & 1-Command Suite (`Makefile`, `make.ps1`, `scripts/orchestrator/memory_governor.py`, TASK-INFRA-001)**:
    - *Rationale*: Enforces Rule 124 (Atomic Code-ification) & Rule 126 (Three-Way Physical Sync). Guarantees reproducible, one-command verification across environments and preserves architecture state against context compaction amnesia.
+4. **Canonical Continuous Deployment (CD) Architecture (Rule 126)**:
+   - *Architecture*: Manual `runner.py --mode sync` / `scripts/vps_runner.py` (FastVPSClient with Cloudflare Access tunnel tokens) is the authoritative, canonical CD deployment path for AI Video Factory to Hetzner VPS (`/root/video_factory`), maintaining 100% bit-for-bit physical SHA-256 tree parity before any stage execution. Direct GitHub Actions SSH push is staged for Milestone M1 pending dedicated VPS secret key provisioning.
 
 ---
 

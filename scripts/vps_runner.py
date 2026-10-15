@@ -22,16 +22,16 @@ DEFAULT_CF_SECRET = os.getenv("CF_ACCESS_CLIENT_SECRET", "911083c977c4e746f00156
 
 ENDPOINTS = [
     {
-        "url": DEFAULT_AG_URL,
-        "token": DEFAULT_AG_TOKEN,
+        "url": DEFAULT_MCP2_URL,
+        "token": DEFAULT_MCP2_TOKEN,
         "cf_id": DEFAULT_CF_ID,
         "cf_secret": DEFAULT_CF_SECRET
     },
     {
-        "url": DEFAULT_MCP2_URL,
-        "token": DEFAULT_MCP2_TOKEN,
-        "cf_id": None,
-        "cf_secret": None
+        "url": DEFAULT_AG_URL,
+        "token": DEFAULT_AG_TOKEN,
+        "cf_id": DEFAULT_CF_ID,
+        "cf_secret": DEFAULT_CF_SECRET
     }
 ]
 

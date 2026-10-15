@@ -159,8 +159,18 @@ def _write_cooldown_data(file_path: Path, data: Dict[str, Any]) -> None:
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
             f.flush()
-            os.fsync(f.fileno())
-        os.replace(str(tmp_path), str(file_path))
+            try:
+                os.fsync(f.fileno())
+            except OSError:
+                pass
+        for attempt in range(10):
+            try:
+                os.replace(str(tmp_path), str(file_path))
+                break
+            except (PermissionError, OSError):
+                if attempt == 9:
+                    raise
+                time.sleep(0.05)
     except Exception as e:
         if tmp_path.exists():
             try:
