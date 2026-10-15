@@ -150,7 +150,19 @@ def main():
         print("=======================================================")
 
     if is_dry_run:
-        print(f"DRY-RUN COMPLETE: Target markets would be {markets}. Auto-produce: {auto_produce}")
+        print(f"DRY-RUN EVALUATION: Target markets in scope: {markets}. Auto-produce: {auto_produce}")
+        for mkt in markets:
+            if not force_crawl:
+                is_done, reason, details = is_market_done_today(mkt)
+                if is_done:
+                    status_name = details.get("status") or reason
+                    topic_name = details.get("topic_id") or details.get("raw_term") or ""
+                    vn_d = details.get("vn_date") or ""
+                    print(f"  🛑 {mkt}: SKIP ({status_name}) — VN Date: {vn_d} {topic_name}".strip())
+                else:
+                    print(f"  🚀 {mkt}: CRAWL (READY) — Not produced yet today.")
+            else:
+                print(f"  ⚠️ {mkt}: CRAWL (FORCED) — Bypassing lock due to --force / B1_FORCE_CRAWL=1.")
         return
 
     # Track baseline cost before execution for session cost telemetry

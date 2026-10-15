@@ -66,6 +66,27 @@ THEMATIC_KNOWLEDGE = [
 ]
 
 
+def sanitize_narration_line(raw_line: str) -> str:
+    """Strips internal speaker tags, stage directions, and beat headers (Rule 136).
+
+    Prevents leaking internal metadata into TTS synthesis, ASS subtitles, or rendered assets.
+    """
+    line = raw_line.strip()
+    prev = None
+    while line != prev:
+        prev = line
+        # Strip beat header prefixes like 'BEAT 1: COLD STRIKE // ', 'BEAT 2: ... // '
+        line = re.sub(r"^BEAT\s*\d+\s*:\s*[^/:]*(?://|:)\s*", "", line, flags=re.IGNORECASE)
+        # Strip shadow internal archive tags like 'ARCHIVE X // '
+        line = re.sub(r"^ARCHIVE\s*[A-Z0-9_]+\s*//\s*", "", line, flags=re.IGNORECASE)
+        # Strip speaker prefixes like 'NARRATOR:', '[SPEAKER: NARRATOR]', 'HOST:'
+        line = re.sub(r"^(?:\[?[A-Za-z0-9_\s]+:\s*[A-Za-z0-9_\s]+\]|\b[A-Za-z_][A-Za-z0-9_]{1,20}:)\s*", "", line)
+        # Strip stage direction parentheses like '(whispering)', '(pause)'
+        line = re.sub(r"^\([^)]*\)\s*", "", line)
+        line = line.strip()
+    return line
+
+
 def extract_content_keywords(text: str) -> list[str]:
     """Extracts non-stopword alphabetic content words."""
     tokens = re.findall(r"[A-Za-z]{3,}", text.lower())
@@ -84,10 +105,11 @@ def plan_scenes_from_script(
     scenes: list[Scene] = []
 
     for i, line in enumerate(raw_lines):
+        clean_line = sanitize_narration_line(line) or line
         sc_idx = i + 1
         cam_move = CAMERA_SEQUENCE[i % len(CAMERA_SEQUENCE)]
 
-        content_words = extract_content_keywords(line)
+        content_words = extract_content_keywords(clean_line)
         matched_theme = None
         for theme in THEMATIC_KNOWLEDGE:
             if any(kw in content_words for kw in theme["keywords"]):
@@ -153,7 +175,7 @@ def plan_scenes_from_script(
 
         scenes.append(Scene(
             idx=sc_idx,
-            narration=line,
+            narration=clean_line,
             bg_prompt=bg_prompt,
             fg=fgs,
             camera=cam_move,

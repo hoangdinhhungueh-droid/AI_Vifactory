@@ -17,6 +17,8 @@ import pytest
 
 from app.services.trend_engine_b1 import (
     LIVE_TRAFFIC_SOURCES,
+    MAX_SCAN_CANDIDATES_DEFAULT,
+    MAX_VIABILITY_LLM_EVALS_DEFAULT,
     _parse_env_int,
     check_evidence_catalyst_gate,
 )
@@ -173,7 +175,7 @@ def test_b3_invocation_command_contract():
     assert cmd[cmd.index("--run-id") + 1] == task_id
 
 
-def test_b3_failure_yields_zero_committed_and_single_failed_alert():
+def test_b3_failure_yields_zero_committed_and_single_failed_alert(tmp_path):
     """Rule 125 & Single Pipeline State: When B3 fails (res_code != 0):
     1. Zero topics are committed.
     2. Exactly ONE terminal Telegram message with status FAILED is emitted.
@@ -208,7 +210,7 @@ def test_b3_failure_yields_zero_committed_and_single_failed_alert():
 
         mock_sub.return_value = MagicMock(returncode=1, stderr="Subprocess error in B3")
 
-        produced = discover_and_produce_market_trend(market="EN", auto_produce=True, max_scan_candidates=1)
+        produced = discover_and_produce_market_trend(market="EN", auto_produce=True, max_scan_candidates=1, state_dir=str(tmp_path))
 
         # 1. Zero topics produced and zero committed
         assert len(produced) == 0
@@ -258,8 +260,8 @@ def test_b3_module_find_spec_and_subprocess_help_contract():
     assert "--profile" in proc.stdout
 
 
-def test_candidate_loop_halts_at_max_scan_candidates():
-    """Verify candidate loop halts strictly at max_scan_candidates ceiling."""
+def test_candidate_loop_halts_at_max_scan_candidates(tmp_path):
+    """Verify candidate loop halts strictly at MAX_SCAN_CANDIDATES_DEFAULT (10) ceiling (Boss Item 18)."""
     from app.services.trend_engine_b1 import discover_and_produce_market_trend
 
     # Generate 25 candidates
@@ -285,13 +287,19 @@ def test_candidate_loop_halts_at_max_scan_candidates():
          patch("app.services.trend_engine_b1.assess_keyword_video_viability", return_value={"viability_score": 5.0, "is_video_viable": False, "reasoning": "Low score"}), \
          patch("app.services.telegram_buttons.send_telegram_broadcast"):
 
-        produced = discover_and_produce_market_trend(market="EN", auto_produce=False, max_scan_candidates=10)
+        produced = discover_and_produce_market_trend(
+            market="EN",
+            auto_produce=False,
+            max_scan_candidates=MAX_SCAN_CANDIDATES_DEFAULT,
+            max_viability_llm_evals=20,
+            state_dir=str(tmp_path),
+        )
         assert len(produced) == 0
-        assert len(scanned_terms) <= 10
+        assert len(scanned_terms) == MAX_SCAN_CANDIDATES_DEFAULT == 10
 
 
-def test_llm_viability_calls_stop_at_max_viability_llm_evals():
-    """Verify LLM viability calls halt strictly at max_viability_llm_evals ceiling."""
+def test_llm_viability_calls_stop_at_max_viability_llm_evals(tmp_path):
+    """Verify LLM viability calls halt strictly at max_viability_llm_evals ceiling (Boss Item 18)."""
     from app.services.trend_engine_b1 import discover_and_produce_market_trend
 
     # Generate 15 candidates that all pass Level-0 and Level-0.5
@@ -319,10 +327,14 @@ def test_llm_viability_calls_stop_at_max_viability_llm_evals():
          patch("app.services.telegram_buttons.send_telegram_broadcast"):
 
         produced = discover_and_produce_market_trend(
-            market="EN", auto_produce=False, max_scan_candidates=15, max_viability_llm_evals=6
+            market="EN",
+            auto_produce=False,
+            max_scan_candidates=10,
+            max_viability_llm_evals=MAX_VIABILITY_LLM_EVALS_DEFAULT,
+            state_dir=str(tmp_path),
         )
         assert len(produced) == 0
-        assert llm_eval_count <= 6
+        assert llm_eval_count <= MAX_VIABILITY_LLM_EVALS_DEFAULT == 6
 
 
 def test_market_exhausted_today_lock_and_cron_skip(tmp_path, monkeypatch):

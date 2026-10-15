@@ -40,7 +40,7 @@ jobs:
       
       - name: Lint with ruff (Blocking on all changed & core modules - Rule 139)
         run: |
-          ruff check vox/ tools/ tests/vox/ tests/unit/test_trend_caps_and_gates.py tests/test_ghost_scan_adversarial.py app/main.py app/services/artifact_sync.py app/services/director_planner_b3.py app/services/seo_package_forge.py app/services/trend_engine_b1.py app/services/daily_market_lock.py app/services/alert_cooldown.py scripts/vf_insight_cards.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/hhtech_planner.py scripts/orchestrator/memory_governor.py scripts/orchestrator/opus55_supervisor_gate.py scripts/orchestrator/runner.py stages/s10_render.py stages/s11_qc.py tests/unit/test_s11_qc_gate.py scripts/forensics/visual_audit.py tests/unit/test_visual_audit.py tests/unit/test_daily_market_lock.py tests/unit/test_alert_cooldown.py tests/unit/test_b1_daily_guard_integration.py
+          ruff check vox/ tools/ tests/vox/ tests/unit/test_trend_caps_and_gates.py tests/test_ghost_scan_adversarial.py app/main.py app/services/artifact_sync.py app/services/director_planner_b3.py app/services/seo_package_forge.py app/services/trend_engine_b1.py app/services/daily_market_lock.py app/services/alert_cooldown.py scripts/vf_insight_cards.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/hhtech_planner.py scripts/orchestrator/memory_governor.py scripts/orchestrator/opus55_supervisor_gate.py scripts/orchestrator/runner.py stages/s05_director_plan.py stages/s10_render.py stages/s11_qc.py tests/unit/test_s05_director_plan.py tests/unit/test_s11_qc_gate.py scripts/forensics/visual_audit.py tests/unit/test_visual_audit.py tests/unit/test_daily_market_lock.py tests/unit/test_alert_cooldown.py tests/unit/test_b1_daily_guard_integration.py tests/unit/test_corrupt_retention_policy.py tests/vox/test_rule_131_and_136.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py
 
       - name: Static compilation check (Rule 127)
         run: python -m compileall -q scripts tools vox app tests
@@ -58,7 +58,7 @@ jobs:
         shell: bash
         run: |
           set -eo pipefail
-          pytest -v -rA --junitxml=/tmp/junit_unit.xml tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py
+          pytest -v -rA --junitxml=/tmp/junit_unit.xml tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py
           python -c "
           import xml.etree.ElementTree as ET, sys
           tree = ET.parse('/tmp/junit_unit.xml')
@@ -78,7 +78,7 @@ jobs:
         shell: bash
         run: |
           set -eo pipefail
-          pytest -v -rA --cov=vox --cov-report=xml:coverage.xml --junitxml=/tmp/junit_vox.xml tests/vox/
+          pytest -v -rA --cov=vox --cov=app --cov-report=xml:coverage.xml --junitxml=/tmp/junit_vox.xml tests/vox/
           python -c "
           import xml.etree.ElementTree as ET, sys
           tree = ET.parse('/tmp/junit_vox.xml')
@@ -101,9 +101,26 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
 
+  windows-lock-tests:
+    name: "Windows Platform Lock & Cooldown Gating"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pydantic pyyaml
+      - name: Run Windows-specific lock, retention, and s05 tests
+        run: |
+          pytest -v tests/unit/test_alert_cooldown.py tests/unit/test_daily_market_lock.py tests/unit/test_corrupt_retention_policy.py tests/unit/test_s05_director_plan.py
+
   optional-cd-vps:
     name: "Optional CD: Automated Zero-Downtime Deploy to Hetzner VPS (Secret-Gated)"
-    needs: lint-and-test
+    needs: [lint-and-test, windows-lock-tests]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:

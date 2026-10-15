@@ -40,22 +40,23 @@ def test_b1_skips_immediately_when_market_already_completed(isolated_env):
         mock_fetch.assert_not_called()
 
 
-def test_b1_force_crawl_bypasses_daily_completion(isolated_env):
-    """When B1_FORCE_CRAWL=1 or custom_seed is given, it should bypass the lock."""
+def test_b1_custom_seed_bypasses_daily_completion(isolated_env):
+    """When custom_seed is supplied, discover_and_produce_market_trend must bypass the lock (call_count == 1)."""
     mark_completed("EN", topic_id="EN_EP0001_retatrutide_shadow_market", state_dir=isolated_env)
-
     with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[]) as mock_fetch:
-        # With custom_seed
         results = discover_and_produce_market_trend(market="EN", custom_seed="custom_topic", auto_produce=False)
         assert results == []
-        assert mock_fetch.called
+        assert mock_fetch.call_count == 1
 
-    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[]) as mock_fetch2:
-        # With B1_FORCE_CRAWL=1
+
+def test_b1_force_crawl_env_bypasses_daily_completion(isolated_env):
+    """When B1_FORCE_CRAWL=1 is active, discover_and_produce_market_trend must bypass the lock (call_count == 1)."""
+    mark_completed("EN", topic_id="EN_EP0001_retatrutide_shadow_market", state_dir=isolated_env)
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[]) as mock_fetch:
         os.environ["B1_FORCE_CRAWL"] = "1"
         try:
             results = discover_and_produce_market_trend(market="EN", auto_produce=False)
             assert results == []
-            assert mock_fetch2.called
+            assert mock_fetch.call_count == 1
         finally:
             os.environ.pop("B1_FORCE_CRAWL", None)

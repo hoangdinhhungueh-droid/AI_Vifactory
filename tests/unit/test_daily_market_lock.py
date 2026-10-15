@@ -3,7 +3,6 @@ tests/unit/test_daily_market_lock.py — HERMETIC UNIT TESTS FOR DAILY MARKET LO
 """
 
 import json
-import os
 import shutil
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -101,7 +100,7 @@ def test_corrupt_lock_file_fails_closed(temp_state_dir):
     assert reason == "corrupt_lock_fail_closed"
 
 
-def test_force_flag_bypasses_lock(temp_state_dir):
+def test_force_flag_bypasses_lock(temp_state_dir, monkeypatch):
     """The force flag should override COMPLETED lock."""
     mark_completed("TEST_MKT", topic_id="TEST_EP0001_done", state_dir=temp_state_dir)
 
@@ -114,14 +113,11 @@ def test_force_flag_bypasses_lock(temp_state_dir):
     assert done is False
     assert reason == "forced_override"
 
-    # With env var B1_FORCE_CRAWL=1 -> False
-    os.environ["B1_FORCE_CRAWL"] = "1"
-    try:
-        done, reason, _ = is_market_done_today("TEST_MKT", state_dir=temp_state_dir, check_registry=False, check_episodes=False)
-        assert done is False
-        assert reason == "forced_override"
-    finally:
-        os.environ.pop("B1_FORCE_CRAWL", None)
+    # With env var B1_FORCE_CRAWL=1 -> False (via monkeypatch per Boss Item 17)
+    monkeypatch.setenv("B1_FORCE_CRAWL", "1")
+    done, reason, _ = is_market_done_today("TEST_MKT", state_dir=temp_state_dir, check_registry=False, check_episodes=False)
+    assert done is False
+    assert reason == "forced_override"
 
 
 def test_release_lock(temp_state_dir):
@@ -140,22 +136,19 @@ def test_release_lock(temp_state_dir):
 
 def test_detects_completed_episode_on_disk(temp_state_dir):
     """When an episode directory exists with run_manifest.json created today,
-    it should detect episode_dir_completed and auto-heal the lock.
+    it should detect episode_dir_completed and auto-heal the lock on real disk (0 mocks, Boss Item 17).
     """
     ep_dir = Path(temp_state_dir) / "episodes" / "TEST_EP0099_sample_topic"
     ep_dir.mkdir(parents=True, exist_ok=True)
     manifest = ep_dir / "run_manifest.json"
     manifest.write_text(json.dumps({"status": "done"}), encoding="utf-8")
 
-    from unittest.mock import patch
-    with patch("app.services.daily_market_lock.Path.is_dir", return_value=True):
-        with patch("app.services.daily_market_lock.Path.iterdir", return_value=[ep_dir]):
-            done, reason, details = is_market_done_today(
-                "TEST", state_dir=temp_state_dir, check_registry=False, check_episodes=True
-            )
-            assert done is True
-            assert reason == "episode_dir_completed"
-            assert details["topic_id"] == "TEST_EP0099_sample_topic"
+    done, reason, details = is_market_done_today(
+        "TEST", state_dir=temp_state_dir, check_registry=False, check_episodes=True
+    )
+    assert done is True
+    assert reason == "episode_dir_completed"
+    assert details["topic_id"] == "TEST_EP0099_sample_topic"
 
 
 def _worker_acquire(args):

@@ -118,7 +118,7 @@ def resolve_state_dir(custom_dir: Optional[str] = None, read_only: bool = False)
             p.mkdir(parents=True, exist_ok=True)
         return p
 
-    env_dir = os.getenv("AVF_STATE_DIR") or os.getenv("VF_LOCK_DIR")
+    env_dir = os.getenv("VF_STATE_DIR") or os.getenv("AVF_STATE_DIR") or os.getenv("VF_LOCK_DIR")
     if env_dir:
         p = Path(env_dir)
         if not read_only:

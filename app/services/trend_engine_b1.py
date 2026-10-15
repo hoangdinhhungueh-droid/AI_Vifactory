@@ -1012,6 +1012,7 @@ def discover_and_produce_market_trend(
     max_scan_candidates: int = MAX_SCAN_CANDIDATES_DEFAULT,
     max_b2_attempts: int = MAX_B2_ATTEMPTS_DEFAULT,
     max_viability_llm_evals: int = MAX_VIABILITY_LLM_EVALS_DEFAULT,
+    state_dir: Optional[str] = None,
 ) -> list[dict]:
     """Execute canonical B1 trend discovery and automated B1.5 -> B2 -> B3 pipeline
     for exactly 1 topic per market per day.
@@ -1022,7 +1023,7 @@ def discover_and_produce_market_trend(
     # RULE: DAILY MARKET COMPLETION GUARD (Rule 118 & Rule 125)
     # Check if this market has already produced today's episode or has active work
     if not force_crawl:
-        is_done, reason, details = is_market_done_today(m_up)
+        is_done, reason, details = is_market_done_today(m_up, state_dir=state_dir)
         if is_done:
             topic_name = details.get("topic_id") or details.get("raw_term") or ("Exhausted Candidates" if reason == "lock_exhausted_today" else "Existing Episode")
             vn_d = details.get("vn_date") or ""
@@ -1042,7 +1043,10 @@ def discover_and_produce_market_trend(
             return []
 
     print("\n=======================================================")
-    print(f"🚀 [TREND ENGINE B1] Scanning Market {m_up} for Daily Production Topic (Max B2 Attempts: {max_b2_attempts})")
+    print(f"🚀 [TREND ENGINE B1] Scanning Market {m_up} for Daily Production Topic")
+    print(f"   Effective Resolved Caps: MAX_SCAN_CANDIDATES={max_scan_candidates} (Default={MAX_SCAN_CANDIDATES_DEFAULT}) | "
+          f"MAX_VIABILITY_LLM_EVALS={max_viability_llm_evals} (Default={MAX_VIABILITY_LLM_EVALS_DEFAULT}) | "
+          f"MAX_B2_ATTEMPTS={max_b2_attempts} (Default={MAX_B2_ATTEMPTS_DEFAULT})")
     print("=======================================================")
 
     candidates = fetch_live_trending_terms(m_up, custom_seed=custom_seed)
@@ -1476,7 +1480,7 @@ def discover_and_produce_market_trend(
 
         if auto_produce:
             # Acquire IN_PROGRESS daily lock to guard against overlapping cron runs
-            acquire_in_progress(m_up, topic_id=temp_task_id)
+            acquire_in_progress(m_up, topic_id=temp_task_id, state_dir=state_dir)
             print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {temp_task_id} (profile=prod, timeout={b3_timeout}s)...")
             cmd = [
                 sys.executable,
@@ -1504,7 +1508,7 @@ def discover_and_produce_market_trend(
 
             if res_code != 0:
                 # Release in-progress lock on failure so retry or fix can proceed
-                release_lock(m_up)
+                release_lock(m_up, state_dir=state_dir)
                 # B3 failed: Do NOT commit task. Emit exactly ONE terminal failure message.
                 fail_msg = (
                     f"🚨 <b>[VF PIPELINE B3 FAILED - RULE 118]</b>\n"
@@ -1532,7 +1536,7 @@ def discover_and_produce_market_trend(
         t_obj["task_id"] = task_id
         print(f"  💾 Officially Committed Task ID: {task_id}")
         # Mark daily market production as COMPLETED in authoritative lock
-        mark_completed(m_up, task_id, extra_metadata={"topic": native_topic, "slug": t_obj.get("task_slug")})
+        mark_completed(m_up, task_id, extra_metadata={"topic": native_topic, "slug": t_obj.get("task_slug")}, state_dir=state_dir)
 
         # Migrate episode and pending task artifacts from temp_task_id to canonical task_id
         import shutil
@@ -1603,7 +1607,7 @@ def discover_and_produce_market_trend(
         scanned_count = min(len(candidates), max_scan_candidates)
         if viability_passed_candidates:
             # Candidates passed B1 Viability Gate, but were stopped downstream (Critic, Grounding, or B2 Story/Fact Audit)
-            can_send, suppressed, suffix = should_send_alert("b1_b2_bottleneck", m_up)
+            can_send, suppressed, suffix = should_send_alert("b1_b2_bottleneck", m_up, state_dir=state_dir)
             if can_send:
                 alert_msg = (
                     f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
@@ -1616,13 +1620,13 @@ def discover_and_produce_market_trend(
                 try:
                     from app.services.telegram_buttons import send_telegram_broadcast
                     send_telegram_broadcast(alert_msg)
-                    record_alert_sent("b1_b2_bottleneck", m_up)
+                    record_alert_sent("b1_b2_bottleneck", m_up, state_dir=state_dir)
                 except Exception as _tel_err:
                     logger.warning(f"Failed to send B1 bottleneck alert to Telegram: {_tel_err}")
             else:
                 logger.info(f"[{m_up}] Suppressed repeated B2/B3 bottleneck alert due to cooldown ({suppressed} suppressed).")
         else:
-            can_send, suppressed, suffix = should_send_alert("b1_viability", m_up)
+            can_send, suppressed, suffix = should_send_alert("b1_viability", m_up, state_dir=state_dir)
             if can_send:
                 alert_msg = (
                     f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
@@ -1634,7 +1638,7 @@ def discover_and_produce_market_trend(
                 try:
                     from app.services.telegram_buttons import send_telegram_broadcast
                     send_telegram_broadcast(alert_msg)
-                    record_alert_sent("b1_viability", m_up)
+                    record_alert_sent("b1_viability", m_up, state_dir=state_dir)
                 except Exception as _tel_err:
                     logger.warning(f"Failed to send B1 alert to Telegram: {_tel_err}")
             else:
@@ -1645,6 +1649,7 @@ def discover_and_produce_market_trend(
             mark_exhausted_today(
                 market=m_up,
                 scan_count=scanned_count,
+                state_dir=state_dir,
                 extra_metadata={
                     "viability_evals_count": viability_evals_count,
                     "reason": "no_candidates_passed_viability",

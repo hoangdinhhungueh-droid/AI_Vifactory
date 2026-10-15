@@ -17,6 +17,7 @@ Mandate:
 import json
 import logging
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -92,6 +93,44 @@ def _emit_operator_corrupt_alert(lock_path: Path, error_msg: str, market: str, d
         pass
 
 
+def cleanup_corrupt_quarantines(directory: Path, max_age_seconds: float = 86400 * 7, max_files: int = 5) -> int:
+    """Retention policy for *.corrupt.* quarantine files to prevent unbounded accumulation (Rule 125 & Boss Item 14).
+
+    Prunes files exceeding max_age_seconds or keeping at most the newest max_files.
+    Returns count of pruned files.
+    """
+    if not directory.exists():
+        return 0
+    corrupt_files = sorted(
+        directory.glob("*.corrupt.*"),
+        key=lambda p: p.stat().st_mtime if p.exists() else 0,
+        reverse=True,
+    )
+    pruned = 0
+    now = time.time()
+    for idx, cf in enumerate(corrupt_files):
+        try:
+            age = now - cf.stat().st_mtime
+            if idx >= max_files or age > max_age_seconds:
+                cf.unlink(missing_ok=True)
+                pruned += 1
+        except OSError as cf_err:
+            logger.warning(f"[daily_market_lock] Error pruning corrupt quarantine file {cf}: {cf_err}")
+    return pruned
+
+
+def _quarantine_corrupt_lock(lock_path: Path) -> Path:
+    """Quarantines unreadable lock file to *.corrupt.<epoch> and prunes stale quarantines."""
+    ts = int(time.time())
+    corrupt_path = lock_path.with_name(f"{lock_path.name}.corrupt.{ts}")
+    try:
+        os.replace(str(lock_path), str(corrupt_path))
+    except OSError as q_err:
+        logger.warning(f"[daily_market_lock] Error quarantining corrupt lock {lock_path} to {corrupt_path}: {q_err}")
+    cleanup_corrupt_quarantines(lock_path.parent)
+    return corrupt_path
+
+
 def is_market_done_today(
     market: str,
     state_dir: Optional[str] = None,
@@ -127,13 +166,16 @@ def is_market_done_today(
             with open(lock_path, "r", encoding="utf-8") as f:
                 content = f.read().strip()
                 if not content:
+                    _quarantine_corrupt_lock(lock_path)
                     _emit_operator_corrupt_alert(lock_path, "File is completely empty (0 bytes)", m_up, date_str)
                     return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str}
                 data = json.loads(content)
                 if not isinstance(data, dict):
+                    _quarantine_corrupt_lock(lock_path)
                     _emit_operator_corrupt_alert(lock_path, f"Top-level JSON is not an object: {type(data)}", m_up, date_str)
                     return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str}
         except Exception as e:
+            _quarantine_corrupt_lock(lock_path)
             _emit_operator_corrupt_alert(lock_path, str(e), m_up, date_str)
             return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str, "error": str(e)}
 
@@ -206,10 +248,13 @@ def is_market_done_today(
 
     # 3. Check Episode directories on disk
     if check_episodes:
-        episodes_roots = [
+        episodes_roots = []
+        if state_dir and (Path(state_dir) / "episodes").is_dir():
+            episodes_roots.append(Path(state_dir) / "episodes")
+        episodes_roots.extend([
             Path("/var/vf/episodes"),
             Path(__file__).resolve().parent.parent.parent / "episodes",
-        ]
+        ])
         try:
             if os.path.isdir("/root"):
                 episodes_roots.append(Path("/root/video_factory/episodes"))

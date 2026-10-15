@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 import time
 import uuid
 from contextlib import contextmanager
@@ -46,6 +47,54 @@ def _resolve_cooldown_file(state_dir: Optional[str] = None) -> Path:
     return base / "alert_cooldown.json"
 
 
+def is_pid_alive(pid: int) -> bool:
+    """Platform-safe check whether process with given PID is currently alive without terminating it.
+
+    Windows: Uses ctypes OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION) and GetExitCodeProcess.
+             PermissionError / ERROR_ACCESS_DENIED treats PID as alive (Rule 126 Windows Safety).
+    Linux/POSIX: Uses os.kill(pid, 0) handling PermissionError (alive) and ProcessLookupError / ESRCH (dead).
+    """
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        import ctypes
+        import ctypes.wintypes
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        kernel32 = ctypes.windll.kernel32
+        h_proc = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not h_proc:
+            err = kernel32.GetLastError()
+            ERROR_ACCESS_DENIED = 5
+            if err == ERROR_ACCESS_DENIED:
+                return True
+            return False
+        try:
+            exit_code = ctypes.wintypes.DWORD()
+            if kernel32.GetExitCodeProcess(h_proc, ctypes.byref(exit_code)):
+                return exit_code.value == STILL_ACTIVE
+            return False
+        finally:
+            kernel32.CloseHandle(h_proc)
+    else:
+        import errno
+        try:
+            os.kill(pid, 0)
+            return True
+        except PermissionError:
+            # Process exists and is running under another user / privilege
+            return True
+        except ProcessLookupError:
+            # ESRCH: Process does not exist
+            return False
+        except OSError as e:
+            if e.errno == errno.EPERM:
+                return True
+            if e.errno == errno.ESRCH:
+                return False
+            return True
+
+
 @contextmanager
 def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: float = 0.05):
     """Zero-dependency fail-closed cross-platform inter-process lock using O_CREAT | O_EXCL.
@@ -68,7 +117,7 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
             break
         except FileExistsError:
             now_ts = time.time()
-            # Stale lock check: if lock file age exceeds 30.0s and dead pid or timed out
+            # Stale lock check: if lock file age exceeds 30.0s and dead pid
             try:
                 mtime = os.path.getmtime(lock_file)
                 if now_ts - mtime > 30.0:
@@ -79,22 +128,30 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
                         dead_pid = False
                         if parts and parts[0].isdigit():
                             pid = int(parts[0])
+                            dead_pid = not is_pid_alive(pid)
+
+                        if dead_pid:
+                            # TOCTOU-safe reclaim: atomically rename stale lock_file to unique tombstone
+                            tombstone = lock_file.with_name(f"{lock_file.name}.tombstone.{uuid.uuid4().hex}")
                             try:
-                                os.kill(pid, 0)
-                            except OSError:
-                                dead_pid = True
-                        if dead_pid or (now_ts - mtime > 60.0):
-                            logger.warning(
-                                f"[alert_cooldown] Reclaiming dead/stale lock {lock_file} (mtime={mtime})"
-                            )
-                            try:
-                                os.unlink(lock_file)
-                            except OSError:
-                                pass
-                    except OSError:
-                        pass
-            except OSError:
-                pass
+                                os.rename(str(lock_file), str(tombstone))
+                                # We won the race to reclaim this stale lock
+                                try:
+                                    with open(tombstone, "r", encoding="utf-8") as tf:
+                                        tomb_content = tf.read().strip()
+                                    if tomb_content == raw:
+                                        logger.warning(
+                                            f"[alert_cooldown] Reclaimed dead PID {pid} lock {lock_file} via tombstone {tombstone.name}"
+                                        )
+                                    os.unlink(str(tombstone))
+                                except OSError as t_err:
+                                    logger.warning(f"[alert_cooldown] Error reading/unlinking tombstone {tombstone}: {t_err}")
+                            except (FileNotFoundError, OSError) as ren_err:
+                                logger.debug(f"[alert_cooldown] Stale lock race on rename {lock_file}: {ren_err}")
+                    except OSError as r_err:
+                        logger.warning(f"[alert_cooldown] Error checking stale lock {lock_file}: {r_err}")
+            except OSError as stat_err:
+                logger.warning(f"[alert_cooldown] Error stating lock file {lock_file}: {stat_err}")
 
             if time.time() - start_time >= timeout:
                 raise LockTimeoutError(
@@ -112,8 +169,8 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
         if acquired and fd is not None:
             try:
                 os.close(fd)
-            except OSError:
-                pass
+            except OSError as close_err:
+                logger.warning(f"[alert_cooldown] Error closing fd {fd} for {lock_file}: {close_err}")
             # Only unlink if the token matches our token (prevent unlinking someone else's reclaimed lock)
             try:
                 if lock_file.exists():
@@ -121,8 +178,8 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
                         existing_token = rf.read().strip()
                     if existing_token == token:
                         os.unlink(lock_file)
-            except OSError:
-                pass
+            except OSError as unlink_err:
+                logger.warning(f"[alert_cooldown] Error unlinking lock_file {lock_file}: {unlink_err}")
 
 
 def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
@@ -148,7 +205,34 @@ def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
             os.replace(str(file_path), str(corrupt_path))
         except OSError as ex:
             logger.warning(f"[alert_cooldown] Failed to quarantine corrupt file {file_path}: {ex}")
+        cleanup_corrupt_quarantines(file_path.parent)
         return {}
+
+
+def cleanup_corrupt_quarantines(directory: Path, max_age_seconds: float = 86400 * 7, max_files: int = 5) -> int:
+    """Retention policy for *.corrupt.* quarantine files to prevent unbounded accumulation (Rule 125 & Boss Item 14).
+
+    Prunes files exceeding max_age_seconds or keeping at most the newest max_files.
+    Returns count of pruned files.
+    """
+    if not directory.exists():
+        return 0
+    corrupt_files = sorted(
+        directory.glob("*.corrupt.*"),
+        key=lambda p: p.stat().st_mtime if p.exists() else 0,
+        reverse=True,
+    )
+    pruned = 0
+    now = time.time()
+    for idx, cf in enumerate(corrupt_files):
+        try:
+            age = now - cf.stat().st_mtime
+            if idx >= max_files or age > max_age_seconds:
+                cf.unlink(missing_ok=True)
+                pruned += 1
+        except OSError as cf_err:
+            logger.warning(f"[alert_cooldown] Error pruning quarantine file {cf}: {cf_err}")
+    return pruned
 
 
 def _write_cooldown_data(file_path: Path, data: Dict[str, Any]) -> None:
@@ -161,8 +245,8 @@ def _write_cooldown_data(file_path: Path, data: Dict[str, Any]) -> None:
             f.flush()
             try:
                 os.fsync(f.fileno())
-            except OSError:
-                pass
+            except OSError as fsync_err:
+                logger.warning(f"[alert_cooldown] Notice fsync on {tmp_path}: {fsync_err}")
         for attempt in range(10):
             try:
                 os.replace(str(tmp_path), str(file_path))
@@ -175,8 +259,8 @@ def _write_cooldown_data(file_path: Path, data: Dict[str, Any]) -> None:
         if tmp_path.exists():
             try:
                 os.unlink(tmp_path)
-            except OSError:
-                pass
+            except OSError as rm_err:
+                logger.warning(f"[alert_cooldown] Error removing tmp file {tmp_path}: {rm_err}")
         raise IOError(f"Failed to persist cooldown data to {file_path}: {e}") from e
 
 

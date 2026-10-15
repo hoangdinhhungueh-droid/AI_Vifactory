@@ -222,7 +222,9 @@ def main() -> int:
         audit_count = len(list(audit_dir.rglob("*.*")))
         print(f"    - Visual audit authorized artifacts (Rule 122 / audits/): {audit_count} file(s) (AUTHORIZED)")
 
-    all_errors = import_errors + ghost_errors + untracked_errors + state_errors
+    quarantine_errors = [f"[QUARANTINE RESIDUE FOUND] {qf}" for qf in gitignored_residues["quarantine_files"]]
+
+    all_errors = import_errors + ghost_errors + untracked_errors + state_errors + quarantine_errors
 
     if all_errors:
         print(f"❌ FOUND {len(all_errors)} GHOST / BYPASS VIOLATION(S):")

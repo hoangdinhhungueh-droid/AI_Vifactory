@@ -10,26 +10,12 @@ Covers:
   5. Rule 118 Zero-Mock Compliance & Resilient Fallback.
 =============================================================================
 """
-import os
 import json
-import tempfile
-import pytest
 from datetime import datetime, timezone
 
-from scripts.b11_channel_analytics import (
-    calculate_v7_benchmarks,
-    harvest_v7_suggested_candidates
-)
-from scripts.b11_antigravity_engine import (
-    load_v7_pool,
-    save_v7_pool,
-    update_v7_pool
-)
-from app.services.trend_engine_b1 import (
-    fetch_pending_v7_candidates,
-    mark_v7_candidate_consumed
-)
-
+from app.services.trend_engine_b1 import fetch_pending_v7_candidates, mark_v7_candidate_consumed
+from scripts.b11_antigravity_engine import load_v7_pool, update_v7_pool
+from scripts.b11_channel_analytics import calculate_v7_benchmarks, harvest_v7_suggested_candidates
 
 # ==============================================================================
 # 1. BENCHMARK CALCULATION TESTS
@@ -128,7 +114,7 @@ def test_v7_harvesting_three_layer_filter(monkeypatch):
 
 def test_v7_pool_save_load_update(tmp_path, monkeypatch):
     test_pool_file = str(tmp_path / "v7_winning_pool.json")
-    
+
     import scripts.b11_antigravity_engine as b11_ae
     monkeypatch.setattr(b11_ae, "V7_POOL_FILE", test_pool_file)
 

@@ -5,7 +5,9 @@ tests/unit/test_alert_cooldown.py — UNIT TESTS FOR ALERT RATE LIMITER & COOLDO
 import os
 import shutil
 import tempfile
+import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
@@ -207,4 +209,40 @@ def test_alert_type_validation_raises_on_invalid(temp_state_dir):
 
     with pytest.raises(ValueError, match="non-empty string"):
         should_send_alert("   ", "EN", state_dir=temp_state_dir)
+
+
+def test_is_pid_alive_platform_safe():
+    """Verify platform-safe PID liveness probe across Windows and POSIX."""
+    from app.services.alert_cooldown import is_pid_alive
+
+    # Current process is alive
+    assert is_pid_alive(os.getpid()) is True
+    # Non-existent PID
+    assert is_pid_alive(9999999) is False
+    # Invalid PID
+    assert is_pid_alive(-1) is False
+    assert is_pid_alive(0) is False
+
+
+def test_stale_lock_reclaim_with_tombstone(temp_state_dir):
+    """Verify that a lock older than 30s with a dead PID is safely reclaimed via atomic tombstone."""
+    from app.services.alert_cooldown import _interprocess_lock
+
+    target_file = Path(temp_state_dir) / "test_stale.json"
+    lock_file = target_file.with_suffix(".json.lock")
+
+    # Write a stale lock with dead PID (9999999)
+    lock_file.write_text("9999999:dead_token_xyz", encoding="utf-8")
+    # Backdate mtime to 35 seconds ago
+    old_time = time.time() - 35.0
+    os.utime(str(lock_file), (old_time, old_time))
+
+    # Acquiring should detect dead PID, rename to tombstone, and succeed
+    acquired = False
+    with _interprocess_lock(target_file, timeout=2.0, poll_interval=0.05):
+        acquired = True
+
+    assert acquired is True
+    # After exit, lock should be cleaned up
+    assert not lock_file.exists()
 

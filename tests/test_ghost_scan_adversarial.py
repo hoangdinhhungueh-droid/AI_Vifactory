@@ -108,4 +108,18 @@ def test_ghost_scan_detects_planted_probe_file_and_exits_nonzero(tmp_path, monke
     assert exit_code == 1
 
 
+def test_ghost_scan_detects_quarantine_directory_residue_and_exits_nonzero(tmp_path, monkeypatch):
+    """Adversarial Test: Planting any file in .safe_trash/, archive/, temp_test/ must trigger violation and exit 1."""
+    fake_root = tmp_path / "repo"
+    fake_root.mkdir()
+    safe_trash = fake_root / ".safe_trash"
+    safe_trash.mkdir()
+    (safe_trash / "probe_orders.py").write_text("print('stale')", encoding="utf-8")
 
+    monkeypatch.setattr(ghost_scan, "REPO_ROOT", fake_root)
+    residues = ghost_scan.scan_gitignored_paths()
+    assert len(residues["quarantine_files"]) == 1
+    assert "probe_orders.py" in residues["quarantine_files"][0]
+
+    exit_code = ghost_scan.main()
+    assert exit_code == 1

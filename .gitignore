@@ -94,8 +94,9 @@ boss_audit.log
 .trash/
 active_candidate/
 audits/
-remotion/public/*.json
-.agents/
+.agents/*
+!.agents/skills/
+!.agents/hooks.json
 python*.bat
 python*.cmd
 temp_test/
