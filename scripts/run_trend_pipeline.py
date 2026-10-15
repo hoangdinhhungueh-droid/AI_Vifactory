@@ -57,6 +57,7 @@ from app.services.trend_engine_b1 import (
     discover_and_produce_market_trend,
     run_daily_all_markets
 )
+from app.services.daily_market_lock import is_market_done_today
 from app.services.market_scheduler import (
     get_market_schedule_info,
     get_scheduled_market_for_date,
@@ -85,6 +86,7 @@ def main():
     auto_produce = "--no-produce" not in args
     is_dry_run = "--dry-run" in args
     force_all = "--force-all-markets" in args
+    force_crawl = "--force" in args or "--force-crawl" in args or os.getenv("B1_FORCE_CRAWL") == "1"
 
     cli_markets = None
     if "--markets" in args:
@@ -189,6 +191,18 @@ def main():
     else:
         for mkt in markets:
             print(f"\n--- Running Daily Cycle for Market: {mkt} ---")
+            if not force_crawl:
+                is_done, reason, details = is_market_done_today(mkt)
+                if is_done:
+                    topic_name = details.get("topic_id") or details.get("raw_term") or "Existing Episode"
+                    vn_d = details.get("vn_date") or ""
+                    print("=======================================================")
+                    print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {mkt} already produced today!")
+                    print(f"   Reason: {reason} | Topic/Episode: {topic_name} (VN Date: {vn_d})")
+                    print("   SKIPPING CRAWL to protect LLM quota, avoid duplicate videos, and prevent duplicate Telegram alerts.")
+                    print("   (Pass --force or B1_FORCE_CRAWL=1 to override)")
+                    print("=======================================================")
+                    continue
             try:
                 topics = discover_and_produce_market_trend(
                     market=mkt,

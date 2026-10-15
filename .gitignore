@@ -56,6 +56,7 @@ checkpoints/
 
 # Runtime data & logs
 logs/
+locks/
 n8n-data/
 data/
 db/*.log

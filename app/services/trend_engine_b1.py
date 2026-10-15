@@ -45,6 +45,16 @@ from app.services.hhtech_reasoner import (
     assess_keyword_video_viability,
     reason_topic_niche,
 )
+from app.services.daily_market_lock import (
+    acquire_in_progress,
+    is_market_done_today,
+    mark_completed,
+    release_lock,
+)
+from app.services.alert_cooldown import (
+    record_alert_sent,
+    should_send_alert,
+)
 from app.services.topic_history_registry import is_topic_already_handled, record_handled_topic
 from app.services.trend_free_signals import (
     fetch_specialized_market_rss,
@@ -1006,6 +1016,24 @@ def discover_and_produce_market_trend(
     for exactly 1 topic per market per day.
     """
     m_up = (market or "EN").upper()
+    force_crawl = bool(custom_seed) or os.getenv("B1_FORCE_CRAWL") == "1"
+
+    # RULE: DAILY MARKET COMPLETION GUARD (Rule 118 & Rule 125)
+    # Check if this market has already produced today's episode or has active work
+    if not force_crawl:
+        is_done, reason, details = is_market_done_today(m_up)
+        if is_done:
+            topic_name = details.get("topic_id") or details.get("raw_term") or "Existing Episode"
+            vn_d = details.get("vn_date") or ""
+            print("=======================================================")
+            print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {m_up} already produced today!")
+            print(f"   Reason: {reason} | Topic/Episode: {topic_name} (VN Date: {vn_d})")
+            print("   SKIPPING CRAWL to protect LLM quota, avoid duplicate videos, and prevent duplicate Telegram alerts.")
+            print("   (Pass custom seed or set B1_FORCE_CRAWL=1 to override)")
+            print("=======================================================")
+            logger.info(f"[{m_up}] Skipping crawl: market already produced today ({reason}: {topic_name}).")
+            return []
+
     print("\n=======================================================")
     print(f"🚀 [TREND ENGINE B1] Scanning Market {m_up} for Daily Production Topic (Max B2 Attempts: {max_b2_attempts})")
     print("=======================================================")
@@ -1440,6 +1468,8 @@ def discover_and_produce_market_trend(
         terminal_alert_sent = False
 
         if auto_produce:
+            # Acquire IN_PROGRESS daily lock to guard against overlapping cron runs
+            acquire_in_progress(m_up, topic_id=temp_task_id)
             print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {temp_task_id} (profile=prod, timeout={b3_timeout}s)...")
             cmd = [
                 sys.executable,
@@ -1466,6 +1496,8 @@ def discover_and_produce_market_trend(
                 logger.exception(f"[{temp_task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}")
 
             if res_code != 0:
+                # Release in-progress lock on failure so retry or fix can proceed
+                release_lock(m_up)
                 # B3 failed: Do NOT commit task. Emit exactly ONE terminal failure message.
                 fail_msg = (
                     f"🚨 <b>[VF PIPELINE B3 FAILED - RULE 118]</b>\n"
@@ -1492,6 +1524,8 @@ def discover_and_produce_market_trend(
         task_id = commit_trend_task(t_obj)
         t_obj["task_id"] = task_id
         print(f"  💾 Officially Committed Task ID: {task_id}")
+        # Mark daily market production as COMPLETED in authoritative lock
+        mark_completed(m_up, task_id, extra_metadata={"topic": native_topic, "slug": t_obj.get("task_slug")})
 
         # Migrate episode and pending task artifacts from temp_task_id to canonical task_id
         import shutil
@@ -1562,27 +1596,42 @@ def discover_and_produce_market_trend(
         scanned_count = min(len(candidates), max_scan_candidates)
         if viability_passed_candidates:
             # Candidates passed B1 Viability Gate, but were stopped downstream (Critic, Grounding, or B2 Story/Fact Audit)
-            alert_msg = (
-                f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
-                f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live cho thị trường <b>{m_up}</b>.\n"
-                f"📊 <b>Kết quả B1:</b> Có <b>{len(viability_passed_candidates)}</b> ứng viên đạt Viability Gate (≥ 8.0/10).\n"
-                f"❌ <b>Điểm nghẽn:</b> Toàn bộ ứng viên đã bị chặn tại các chốt kiểm định hạ nguồn (Adversarial Critic Gate hoặc B2 Story/Fact Audit Gate).\n"
-                f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra log chi tiết."
-            )
-            logger.warning(f"[{m_up}] {len(viability_passed_candidates)} candidates passed viability gate but none passed downstream B2/B3 gates.")
+            can_send, suppressed, suffix = should_send_alert("b1_b2_bottleneck", m_up)
+            if can_send:
+                alert_msg = (
+                    f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
+                    f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live cho thị trường <b>{m_up}</b>.\n"
+                    f"📊 <b>Kết quả B1:</b> Có <b>{len(viability_passed_candidates)}</b> ứng viên đạt Viability Gate (≥ 8.0/10).{suffix}\n"
+                    f"❌ <b>Điểm nghẽn:</b> Toàn bộ ứng viên đã bị chặn tại các chốt kiểm định hạ nguồn (Adversarial Critic Gate hoặc B2 Story/Fact Audit Gate).\n"
+                    f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra log chi tiết."
+                )
+                logger.warning(f"[{m_up}] {len(viability_passed_candidates)} candidates passed viability gate but none passed downstream B2/B3 gates.")
+                try:
+                    from app.services.telegram_buttons import send_telegram_broadcast
+                    send_telegram_broadcast(alert_msg)
+                    record_alert_sent("b1_b2_bottleneck", m_up)
+                except Exception as _tel_err:
+                    logger.warning(f"Failed to send B1 bottleneck alert to Telegram: {_tel_err}")
+            else:
+                logger.info(f"[{m_up}] Suppressed repeated B2/B3 bottleneck alert due to cooldown ({suppressed} suppressed).")
         else:
-            alert_msg = (
-                f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
-                f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live từ đa kênh (RSS, Discover, YouTube) cho thị trường <b>{m_up}</b>, "
-                f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 8.0/10) để làm phóng sự điều tra.\n"
-                f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra hoặc cấp seed chỉ định."
-            )
-            logger.warning(f"[{m_up}] No candidates passed viability gate.")
-        try:
-            from app.services.telegram_buttons import send_telegram_broadcast
-            send_telegram_broadcast(alert_msg)
-        except Exception as _tel_err:
-            logger.warning(f"Failed to send B1 alert to Telegram: {_tel_err}")
+            can_send, suppressed, suffix = should_send_alert("b1_viability", m_up)
+            if can_send:
+                alert_msg = (
+                    f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
+                    f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live từ đa kênh (RSS, Discover, YouTube) cho thị trường <b>{m_up}</b>, "
+                    f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 8.0/10) để làm phóng sự điều tra.{suffix}\n"
+                    f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra hoặc cấp seed chỉ định."
+                )
+                logger.warning(f"[{m_up}] No candidates passed viability gate.")
+                try:
+                    from app.services.telegram_buttons import send_telegram_broadcast
+                    send_telegram_broadcast(alert_msg)
+                    record_alert_sent("b1_viability", m_up)
+                except Exception as _tel_err:
+                    logger.warning(f"Failed to send B1 alert to Telegram: {_tel_err}")
+            else:
+                logger.info(f"[{m_up}] Suppressed repeated B1 viability alert due to cooldown ({suppressed} suppressed).")
 
     return produced_topics
 

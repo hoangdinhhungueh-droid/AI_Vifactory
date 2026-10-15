@@ -15,9 +15,22 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-REGISTRY_PATH = "/root/video_factory/data/topic_history.json"
-PENDING_DIR = "/var/vf/pending_tasks"
-EPISODES_DIR = "/root/video_factory/episodes"
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+REGISTRY_PATH = os.getenv("TOPIC_HISTORY_PATH") or (
+    "/root/video_factory/data/topic_history.json"
+    if os.path.exists("/root/video_factory/data")
+    else str(_PROJECT_ROOT / "data" / "topic_history.json")
+)
+PENDING_DIR = os.getenv("PENDING_TASKS_DIR") or (
+    "/var/vf/pending_tasks"
+    if os.path.exists("/var/vf/pending_tasks")
+    else str(_PROJECT_ROOT / "pending_tasks")
+)
+EPISODES_DIR = os.getenv("EPISODES_DIR") or (
+    "/root/video_factory/episodes"
+    if os.path.exists("/root/video_factory/episodes")
+    else str(_PROJECT_ROOT / "episodes")
+)
 
 
 def _normalize_key(text: str) -> str:
