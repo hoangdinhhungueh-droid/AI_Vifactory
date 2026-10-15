@@ -16,12 +16,11 @@ Architecture:
 """
 from __future__ import annotations
 
-import os
-import sys
 import json
-import time
-import re
 import logging
+import os
+import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -37,8 +36,9 @@ AI_DISCLOSURE_TEXT = (
     "and stylized visual illustrations created under human editorial direction."
 )
 
-from app.services.skill_loader import get_seo_editorial_skills
 from app.services.cross_channel_promoter import build_description_bridge
+from app.services.skill_loader import get_seo_editorial_skills
+
 
 def get_seo_hook_system_prompt() -> str:
     """Load dynamic SEO packaging system prompt from Notion SoT / external template (Rule 132)."""
@@ -155,7 +155,7 @@ def sync_exact_chapters_from_remotion(
     m = (market or "EN").upper()
     if existing_chapters and isinstance(existing_chapters, str):
         existing_chapters = [line.strip() for line in existing_chapters.splitlines() if line.strip()]
-    
+
     def _sanitize_chapter_label(label: str, market_code: str = "EN") -> str:
         """Purge sensitive judicial/criminal terms without cross-market language pollution (Rule 128/135)."""
         jp_banned = r'(起訴状記録|起訴事実認定|刑事摘発|司法審査|起訴|刑事|摘発|容疑者)'
@@ -197,7 +197,7 @@ def sync_exact_chapters_from_remotion(
             f"/var/vf/episodes/{task_id}/remotion_props.json",
             f"/root/video_factory/var/vf/episodes/{task_id}/remotion_props.json",
         ])
-    
+
     remotion_path = None
     for cand in candidates:
         if os.path.exists(cand):
@@ -226,12 +226,12 @@ def sync_exact_chapters_from_remotion(
                     (len(scenes) >= 5 and len(distinct_beats) == 1)
                     or (max(distinct_beats, default=1) > 5)
                 )
-                
+
                 for idx, s in enumerate(scenes):
                     speaker_tag = str(s.get("speakerTag") or "")
                     beat_val = s.get("beat_phase") or s.get("beat_index") or s.get("beat")
                     act_title = str(s.get("actTitle") or "")
-                    
+
                     # Extract canonical beat key (prioritize integer beat_phase 1..5 so character speakerTags don't trigger false chapter splits)
                     current_beat_key = None
                     if not is_degenerate_beat and beat_val is not None:
@@ -260,7 +260,7 @@ def sync_exact_chapters_from_remotion(
                     else:
                         dur = int(s.get("durationInFrames") or 0)
                         sec = int(current_frame / fps)
-                    
+
                     if current_beat_key != last_beat_key or idx == 0:
                         # Ensure YouTube constraint: chapters at least 10s apart (Rule 135)
                         if not exact_timestamps:
@@ -271,7 +271,7 @@ def sync_exact_chapters_from_remotion(
                             last_beat_key = current_beat_key
 
                     current_frame += dur
-                
+
                 # If still over 16 chapters, thin out by merging closest chapters
                 while len(exact_timestamps) > 16:
                     # Drop the chapter with the smallest gap from its predecessor (skip 00:00)
@@ -304,7 +304,7 @@ def sync_exact_chapters_from_remotion(
                 if title_clean:
                     title_clean = _sanitize_chapter_label(title_clean, m)
                     clean_titles.append(title_clean)
-            
+
             if len(clean_titles) >= len(exact_timestamps):
                 return [f"{_fmt(exact_timestamps[i])} - {clean_titles[i]}" for i in range(len(exact_timestamps))]
             elif len(clean_titles) >= 3:
@@ -335,14 +335,14 @@ def _fallback_seo_package(
     kw_words = raw_kw.split()
     kw = " ".join(kw_words[:4]) if len(kw_words) > 4 else raw_kw
     clean_tag = re.sub(r"[^\w]", "", kw.title()) or "Documentary"
-    
+
     title_a = f"{kw}: The Hidden Investigation"[:100]
     title_b = f"{kw}: What Official Reports Concealed"[:100]
     desc_hook = f"The untold investigative documentary behind {kw}. Exposing the systemic evidence and critical turning points."[:150]
-    
+
     hashtags = [f"#{clean_tag}", "#Investigation", "#Docudrama"][:3]
     tags = [kw, f"{kw} documentary", f"{kw} investigation", "investigative docudrama", "unfiltered facts", market.lower()]
-    
+
     hook_3s = f"Everything you were told about {kw} ignores a single, undeniable contradiction."
     hook_60s = (
         f"In the official records of {kw}, the narrative appeared settled. "
@@ -359,7 +359,7 @@ def _fallback_seo_package(
         angle = f"Exposing the systemic institutional mechanisms behind {kw}"
 
     thumbnail_variants = [
-        {"variant": "A", "framework": "emotion_first", "headline_text": f"THEY HID THIS"[:32], "visual_concept": "High-contrast dramatic lighting focusing on confidential investigative records."},
+        {"variant": "A", "framework": "emotion_first", "headline_text": "THEY HID THIS"[:32], "visual_concept": "High-contrast dramatic lighting focusing on confidential investigative records."},
         {"variant": "B", "framework": "keyword_first", "headline_text": f"{kw.upper()[:32]}", "visual_concept": "Central focal illustration of the primary subject under intense forensic spotlight."},
         {"variant": "C", "framework": "curiosity_gap", "headline_text": "THE FATAL LIE"[:32], "visual_concept": "Split composition contrasting official reports with unredacted leaked memos."}
     ]
@@ -412,7 +412,7 @@ def _rt(content: str) -> dict:
 def sync_seo_package_to_youtube_registry(task_id: str, market: str, package: dict) -> dict:
     """Upsert SEO package into DB 'YouTube Channel & Video Metadata Registry' (3c301989-2400-81b9-a4bb-e5568ce942f8)."""
     try:
-        from scripts.ag_notion_bridge import query_db, update_page_properties, create_page
+        from scripts.ag_notion_bridge import create_page, query_db, update_page_properties
     except ImportError:
         logger.warning("[seo_package_forge] ag_notion_bridge not available for YouTube Registry sync")
         return {"action": "skipped", "error": "ag_notion_bridge_import_error"}

@@ -19,18 +19,17 @@ Standardized Architecture:
      - Auto-transition to B2 Story Engine (12-15 min docudrama) & B3 Director Plan (2-layer).
      - Fallback loop: If B2 fails Story Gate 12/12 after self-repair, automatically rotates to next candidate.
 """
-import os
-import sys
-import re
 import json
 import logging
-import asyncio
-import urllib.request
+import os
+import re
+import sys
 import urllib.parse
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
+import urllib.request
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
-from typing import Optional, Dict, Any, List, Tuple
+from pathlib import Path
+from typing import Optional
 
 # Ensure workspace root is in sys.path
 _PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
@@ -39,29 +38,20 @@ if _PROJECT_ROOT not in sys.path:
 if "/root/video_factory" not in sys.path:
     sys.path.insert(0, "/root/video_factory")
 
-from app.services.trend_free_signals import (
-    gtrends_daily_rss,
-    youtube_autocomplete,
-    google_autocomplete,
-    gtrends_discover_trending_searches,
-    google_news_topic_rss,
-    fetch_specialized_market_rss
-)
-from app.services.competitor_recon_b15 import (
-    youtube_search,
-    youtube_video_details,
-    QuotaTracker,
-    run_b15
-)
+from app.services.competitor_recon_b15 import QuotaTracker, run_b15, youtube_search, youtube_video_details
 from app.services.hhtech_reasoner import (
+    _fetch_native_wiki_extract,
     assess_keyword_video_viability,
     reason_topic_niche,
-    detect_safety_and_theme,
-    _fetch_native_wiki_extract
 )
-from app.services.topic_history_registry import (
-    is_topic_already_handled,
-    record_handled_topic
+from app.services.topic_history_registry import is_topic_already_handled, record_handled_topic
+from app.services.trend_free_signals import (
+    fetch_specialized_market_rss,
+    google_autocomplete,
+    google_news_topic_rss,
+    gtrends_daily_rss,
+    gtrends_discover_trending_searches,
+    youtube_autocomplete,
 )
 
 logger = logging.getLogger("trend_engine_b1")
@@ -719,8 +709,9 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
         return
 
     try:
-        from app.services.telegram_buttons import send_telegram_broadcast
         import html
+
+        from app.services.telegram_buttons import send_telegram_broadcast
         mkt = topic_data.get("market", "EN")
         flag = "🇺🇸" if mkt == "EN" else ("🇯🇵" if mkt == "JP" else "🇰🇷")
         raw_term = html.escape(str(topic_data.get("raw_term", "")))
@@ -1005,9 +996,9 @@ def discover_and_produce_market_trend(
     for exactly 1 topic per market per day.
     """
     m_up = (market or "EN").upper()
-    print(f"\n=======================================================")
+    print("\n=======================================================")
     print(f"🚀 [TREND ENGINE B1] Scanning Market {m_up} for Daily Production Topic (Max B2 Attempts: {max_b2_attempts})")
-    print(f"=======================================================")
+    print("=======================================================")
 
     candidates = fetch_live_trending_terms(m_up, custom_seed=custom_seed)
     if not candidates:
@@ -1228,13 +1219,14 @@ def discover_and_produce_market_trend(
         print(f"  🔍 [B1.5.5] Running Live Grounding Research & Verification Gate for {temp_task_id}...")
         try:
             import importlib
+
             import app.services.grounding_layer_b15 as gl_b15
             importlib.reload(gl_b15)
-            from app.services.grounding_layer_b15 import run_grounding_research, passes_grounding_gate
+            from app.services.grounding_layer_b15 import passes_grounding_gate, run_grounding_research
             grounding_kw = t_obj.get("search_specific_keyword") or term
             grounding_hint = t_obj.get("niche_angle_brief") or ""
             grounding_intel = run_grounding_research(topic=grounding_kw, search_hint=grounding_hint, market=m_up)
-            
+
             gate_ok, gate_msg = passes_grounding_gate(grounding_intel, min_verified=3, min_claims=8, min_dated_claims=3, require_whitelist=True)
             if not gate_ok:
                 logger.warning(f"[{temp_task_id}] Grounding Gate REJECTED: {gate_msg}")

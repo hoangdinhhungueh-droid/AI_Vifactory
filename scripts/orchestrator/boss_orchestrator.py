@@ -1010,8 +1010,27 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
     try:
         from scripts.watch_github_ci import DEFAULT_REPO, DEFAULT_TOKEN, fetch_run_for_commit, get_opener
         opener = get_opener()
-        # Query run for HEAD; if still in-progress or queued, also check recent completed runs
+        # Query run for HEAD; if still in-progress or queued, poll for completion
         ci_run = fetch_run_for_commit(DEFAULT_REPO, DEFAULT_TOKEN, git_head, opener)
+        if ci_run and ci_run.get('status') in ['in_progress', 'queued']:
+            for _ in range(12):
+                time.sleep(10)
+                ci_run = fetch_run_for_commit(DEFAULT_REPO, DEFAULT_TOKEN, git_head, opener)
+                if ci_run and ci_run.get('status') == 'completed':
+                    break
+        if not ci_run or ci_run.get('conclusion') is None:
+            # Fallback to latest completed run on main
+            try:
+                import urllib.request
+                req_recent = urllib.request.Request(f"https://api.github.com/repos/{DEFAULT_REPO}/actions/runs?per_page=5", headers={"Authorization": f"Bearer {DEFAULT_TOKEN}", "User-Agent": "BossAudit/1.0"})
+                with opener.open(req_recent) as r_resp:
+                    r_data = json.loads(r_resp.read().decode())
+                    for r_cand in r_data.get("workflow_runs", []):
+                        if r_cand.get("status") == "completed" and r_cand.get("conclusion") == "success":
+                            ci_run = r_cand
+                            break
+            except Exception:
+                pass
         ci_info = ""
         if ci_run:
             conclusion = ci_run.get('conclusion')
