@@ -982,32 +982,32 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     # 14. Remotion Architecture & Role Clarification (Rule 120 / Rule 135 / Boss Item 6)
     evidence_blocks.append(
-        f"### [14. REMOTION ARCHITECTURE & ROLE CLARIFICATION (Rule 120 / Rule 135 / Boss Item 6)]\n"
-        f"- ARCHITECTURAL ROLE: Remotion (remotion/src) is formally designated as the Dedicated Post-Production Motion Graphics & Complex Timeline Engine.\n"
-        f"- ROLE BOUNDARY: Remotion is invoked specifically when advanced multi-layer motion graphics, kinetic typography, dynamic lower-thirds, or cinematic audio ducking are demanded.\n"
-        f"- CANONICAL PIPELINE ENTRYPOINT: vox.pipeline is the single canonical Python orchestration entrypoint. Episode renders in the Vox pipeline execute deterministically through vox.pipeline and vox.assemble.\n"
-        f"- ISOLATION GUARANTEE: No episode render routes through deprecated legacy pipelines (app/pipeline/*). All legacy entrypoints have been permanently purged (AST caller count = 0, runtime 404 verified).\n"
+        "### [14. REMOTION ARCHITECTURE & ROLE CLARIFICATION (Rule 120 / Rule 135 / Boss Item 6)]\n"
+        "- ARCHITECTURAL ROLE: Remotion (remotion/src) is formally designated as the Dedicated Post-Production Motion Graphics & Complex Timeline Engine.\n"
+        "- ROLE BOUNDARY: Remotion is invoked specifically when advanced multi-layer motion graphics, kinetic typography, dynamic lower-thirds, or cinematic audio ducking are demanded.\n"
+        "- CANONICAL PIPELINE ENTRYPOINT: vox.pipeline is the single canonical Python orchestration entrypoint. Episode renders in the Vox pipeline execute deterministically through vox.pipeline and vox.assemble.\n"
+        "- ISOLATION GUARANTEE: No episode render routes through deprecated legacy pipelines (app/pipeline/*). All legacy entrypoints have been permanently purged (AST caller count = 0, runtime 404 verified).\n"
     )
 
     # 15. Scope Justification Map (Boss Item 8)
     evidence_blocks.append(
-        f"### [15. PER-FILE SCOPE JUSTIFICATION MAP (2456870^..HEAD - Boss Item 8)]\n"
-        f"The 117 modified files in commit range 2456870^..HEAD map strictly into 5 cohesive functional categories of AVF-VOX-001:\n"
-        f"1. CATEGORY A: Core Vox Pipeline & Multiplane Compositor (14 files in vox/):\n"
-        f"   - vox/pipeline.py, vox/align.py, vox/assemble.py, vox/assets_bg.py, vox/assets_fg.py, vox/camera.py, vox/compositor.py, vox/cutout.py, vox/ffmpeg_utils.py, vox/karaoke.py, vox/planner.py, vox/qa/gates.py, vox/schemas.py, vox/tts.py\n"
-        f"   - Justification: Complete implementation of single unified tactile Vox pipeline.\n"
-        f"2. CATEGORY B: Canonical Stages Integration (12 files in stages/):\n"
-        f"   - stages/s01_ideation.py through stages/s11_qc.py\n"
-        f"   - Justification: Rewired stage contracts to delegate to vox.assemble and vox.qa.gates.\n"
-        f"3. CATEGORY C: Legacy Codebase Purge & FastAPI Modernization (5 files in app/):\n"
-        f"   - app/main.py, app/services/artifact_sync.py, app/api/routes\n"
-        f"   - Justification: Permanently purged shadow routes (/api/v1/pipeline/*, /api/v1/stages/*); modernized health & diag endpoints.\n"
-        f"4. CATEGORY D: Quality Gates, Adversarial Tests & Static Verification (35 files in tests/ & tools/):\n"
-        f"   - tests/vox/*, tests/codemap/*, tests/unit/*, tests/test_ghost_scan_adversarial.py, tools/ghost_scan.py, tools/codemap/*\n"
-        f"   - Justification: Zero-skip gating, ghost hunter scratch probe protection, and contract invariants.\n"
-        f"5. CATEGORY E: CI/CD Pipeline & Three-Tier Orchestrator Harness (51 files in .github/, scripts/, specs/):\n"
-        f"   - .github/workflows/ci.yml, scripts/orchestrator/*, Makefile, make.ps1, specs/*\n"
-        f"   - Justification: Automated GitHub Actions zero-skip gate, Three-Way Physical Sync, and Boss Opus 5.5 Supervisory Gate.\n"
+        "### [15. PER-FILE SCOPE JUSTIFICATION MAP (2456870^..HEAD - Boss Item 8)]\n"
+        "The 117 modified files in commit range 2456870^..HEAD map strictly into 5 cohesive functional categories of AVF-VOX-001:\n"
+        "1. CATEGORY A: Core Vox Pipeline & Multiplane Compositor (14 files in vox/):\n"
+        "   - vox/pipeline.py, vox/align.py, vox/assemble.py, vox/assets_bg.py, vox/assets_fg.py, vox/camera.py, vox/compositor.py, vox/cutout.py, vox/ffmpeg_utils.py, vox/karaoke.py, vox/planner.py, vox/qa/gates.py, vox/schemas.py, vox/tts.py\n"
+        "   - Justification: Complete implementation of single unified tactile Vox pipeline.\n"
+        "2. CATEGORY B: Canonical Stages Integration (12 files in stages/):\n"
+        "   - stages/s01_ideation.py through stages/s11_qc.py\n"
+        "   - Justification: Rewired stage contracts to delegate to vox.assemble and vox.qa.gates.\n"
+        "3. CATEGORY C: Legacy Codebase Purge & FastAPI Modernization (5 files in app/):\n"
+        "   - app/main.py, app/services/artifact_sync.py, app/api/routes\n"
+        "   - Justification: Permanently purged shadow routes (/api/v1/pipeline/*, /api/v1/stages/*); modernized health & diag endpoints.\n"
+        "4. CATEGORY D: Quality Gates, Adversarial Tests & Static Verification (35 files in tests/ & tools/):\n"
+        "   - tests/vox/*, tests/codemap/*, tests/unit/*, tests/test_ghost_scan_adversarial.py, tools/ghost_scan.py, tools/codemap/*\n"
+        "   - Justification: Zero-skip gating, ghost hunter scratch probe protection, and contract invariants.\n"
+        "5. CATEGORY E: CI/CD Pipeline & Three-Tier Orchestrator Harness (51 files in .github/, scripts/, specs/):\n"
+        "   - .github/workflows/ci.yml, scripts/orchestrator/*, Makefile, make.ps1, specs/*\n"
+        "   - Justification: Automated GitHub Actions zero-skip gate, Three-Way Physical Sync, and Boss Opus 5.5 Supervisory Gate.\n"
     )
 
     if vps_client is not None:
