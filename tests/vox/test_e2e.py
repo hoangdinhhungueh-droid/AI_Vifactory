@@ -11,8 +11,19 @@ def test_vox_single_pipeline_golden_e2e(tmp_path):
     golden_script = Path(__file__).parent / "fixtures" / "golden_script.txt"
     assert golden_script.exists()
 
+    try:
+        import faster_whisper  # noqa: F401
+        has_whisper = True
+    except ImportError:
+        has_whisper = False
+
     out_dir = tmp_path / "golden_run"
-    manifest = run_pipeline(golden_script, out_dir, title="Golden Liquidity Crisis")
+    manifest = run_pipeline(
+        golden_script,
+        out_dir,
+        title="Golden Liquidity Crisis",
+        allow_synthetic_alignment=not has_whisper,
+    )
 
     # Verify atomic manifest
     manifest_file = out_dir / "manifest.json"
