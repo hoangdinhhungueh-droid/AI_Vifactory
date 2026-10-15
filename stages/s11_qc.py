@@ -44,13 +44,22 @@ def run(ctx: RunContext) -> StageArtifact:
         raise FileNotFoundError(f"Master video missing or zero size at: {final_video}")
 
     sz = p.stat().st_size
+    qc_details = {}
+    try:
+        # Delegate directly to canonical vox.qa.gates for forensic verification (Rule 125 & 139)
+        verify_final_video_gates(p)
+        qc_details["gates_verified"] = True
+    except Exception as e:
+        qc_details["gates_verified"] = False
+        qc_details["gate_note"] = str(e)
 
     payload = {
         "task_id": ctx.run_id,
-        "qc_verdict": "PASS",
+        "qc_verdict": "PASS" if qc_details.get("gates_verified", True) else "FAIL",
         "final_video_path": str(p),
         "size_bytes": sz,
         "integrity_verified": True,
+        "qc_details": qc_details,
         "message": f"Master video successfully verified ({sz:,} bytes)."
     }
 

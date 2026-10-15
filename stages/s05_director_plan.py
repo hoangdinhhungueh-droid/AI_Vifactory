@@ -61,8 +61,17 @@ def run(ctx: RunContext) -> StageArtifact:
     if not s3_artifact_path.exists():
         raise FileNotFoundError(f"Missing S3 artifact at: {s3_artifact_path}")
     
-    s3_data = json.loads(s3_artifact_path.read_text(encoding="utf-8"))
     raw_scenes = s3_data.get("payload", {}).get("scenes", [])
+    script_text = s3_data.get("payload", {}).get("script_text", "")
+
+    # Ground scenes with canonical vox.planner engine (Rule 125 & 139)
+    if script_text:
+        try:
+            vox_plan = plan_scenes_from_script(script_text)
+            if vox_plan and vox_plan.scenes and not raw_scenes:
+                raw_scenes = [{"scene_id": f"SC_{sc.idx:02d}", "visual_metaphor": sc.bg_prompt, "headline": sc.narration[:30]} for sc in vox_plan.scenes]
+        except Exception:
+            pass
 
     acc_pool = ctx.config.video_generation.account_pool or ["acc_01"]
     scenes: List[Scene] = []

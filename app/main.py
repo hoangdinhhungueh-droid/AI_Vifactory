@@ -12,14 +12,27 @@
 #            API-* when msg doesn't mention Notion; bypass x-vf-autonomous:1);
 #            DUMP_SYS (env DUMP_SYS=1 → breakdown san(sys) by header)
 
-import os, json, re, time, subprocess
-from pathlib import Path
+import json
+import os
+import re
+import time
 from contextlib import asynccontextmanager
+from pathlib import Path
+
 import requests as _rq
-from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+
+from app import log_redact  # noqa: F401
+from app.routes.mpt_g5 import router as mpt_g5_router
+from app.services.artifact_sync import router as _sync_router
+from app.services.episode_images import router as _episode_images_router
+from app.services.preflight_episode import router as _preflight_router
+from app.services.story_check import router as _story_check_router
+from app.services.trend_gate_ai import router as _trend_gate_router
+from app.services.trend_verify import router as _trend_verify_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,8 +49,8 @@ app = FastAPI(title="AI Video Factory API", version="v11.8", lifespan=lifespan)
 
 # --- Prometheus metrics endpoint (G6-8) ---
 try:
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry, REGISTRY
     from fastapi.responses import Response as _Resp
+    from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, generate_latest
     @app.get("/metrics")
     def metrics_endpoint():
         return _Resp(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
@@ -153,9 +166,13 @@ def _gate(provider: str) -> dict:
         "min_reset": now + 60, "day_reset": now + 86400,
     })
     if now > s["min_reset"]:
-        s["min_calls"] = 0; s["min_tokens"] = 0; s["min_reset"] = now + 60
+        s["min_calls"] = 0
+        s["min_tokens"] = 0
+        s["min_reset"] = now + 60
     if now > s["day_reset"]:
-        s["day_calls"] = 0; s["day_tokens"] = 0; s["day_reset"] = now + 86400
+        s["day_calls"] = 0
+        s["day_tokens"] = 0
+        s["day_reset"] = now + 86400
     return s
 
 def _would_exceed(provider: str, est_tok: int) -> str | None:
@@ -167,17 +184,19 @@ def _would_exceed(provider: str, est_tok: int) -> str | None:
     if lim["rpm"] and s["min_calls"] + 1 > lim["rpm"] * SAFETY:
         return f"near rpm limit ({s['min_calls']}/{lim['rpm']})"
     if lim["tpm"] and s["min_tokens"] + est_tok > lim["tpm"] * SAFETY:
-        return f"near tpm limit"
+        return "near tpm limit"
     if lim["rpd"] and s["day_calls"] + 1 > lim["rpd"] * SAFETY:
         return f"near rpd limit ({s['day_calls']}/{lim['rpd']})"
     if lim["tpd"] and s["day_tokens"] + est_tok > lim["tpd"] * SAFETY:
-        return f"near tpd limit"
+        return "near tpd limit"
     return None
 
 def _record(provider: str, tok: int):
     s = _gate(provider)
-    s["min_calls"] += 1; s["min_tokens"] += tok
-    s["day_calls"] += 1; s["day_tokens"] += tok
+    s["min_calls"] += 1
+    s["min_tokens"] += tok
+    s["day_calls"] += 1
+    s["day_tokens"] += tok
 
 @app.get("/v1/budget")
 def budget_snapshot():
@@ -227,7 +246,7 @@ def _apply_notion_gates(body: dict, last_user: str | None, autonomous: bool) -> 
             )
         else:
             last_user_str = str(last_user) if last_user else ""
-        
+
         if last_user_str and not NOTION_RE.search(last_user_str):
             tools = [t for t in tools
                      if not t.get("function", {}).get("name", "").startswith("API-")]
@@ -334,7 +353,8 @@ async def oai_chat_completions(request: Request):
 
     # loop-guard v9.1: tool_msgs>=4 or est>30000 → strip tools, force text
     if tool_msgs >= 4 or est > 30000:
-        body.pop("tools", None); body.pop("tool_choice", None)
+        body.pop("tools", None)
+        body.pop("tool_choice", None)
         print(f"[loop-guard] stripped tools (tool_msgs={tool_msgs} est={est}) → force text", flush=True)
 
     # v10: is_heavy → REASONING chain; else CHAT chain
@@ -407,73 +427,11 @@ def oai_models():
     return {"object": "list", "data": [{"id": "auto", "object": "model", "owned_by": "vpsRouter"}]}
 
 # S1 trend scoring + pipeline entrypoint (page 03/05 spec, 2026-06-12)
-# DISABLED 28/07/2026: legacy CPM/niche S1 scorer (pre-dates trend_gate_ai.py
-# 26/07 redesign). Not wired into current raw-pool/gate flow; no active cron,
-# n8n workflow, or celery beat calls it (verified). Disabled to stop duplicate
-# "TREND_READY" Telegram noti alongside the RAW POOL / GATE noti. Kept
-# importable (app.tasks still imports score_pipeline_run), just not routed.
-# from app.s1_score import router as s1_router
-# app.include_router(s1_router)
-
-from app.routes.mpt_g5 import router as mpt_g5_router
 app.include_router(mpt_g5_router)
-
-# -- Legacy run-episode / produce-episode routes retired (AVF-VOX-001) --
-
-# Trend/keyword discovery engine (free crawl + SerpApi-confirm top-N), 18/06
-# REMOVED 27/07/2026: trend_discovery.py (v3) is superseded by discover-v5
-# (repointed 26/06; discover-v5 is the sole live n8n cron target and the
-# only Notion-AI-gated writer). File renamed to .deprecated_<ts> for
-# rollback safety; no longer imported or routed.
-
-from app import log_redact  # noqa: F401  # mask api_key in logs (b)
-from app import log_redact  # noqa: F401  (mask api_key in logs)
-
-# discover-digest router (N1, 18/06)
-# ARCHIVED 09/08/2026 Phase-1: trend_digest router retired (v3 flow superseded)
-# ARCHIVED 09/08/2026 Phase-1: trend_digest include removed
-
-# DISABLED 22/07 - trend_reasoning superseded by Smart Trend-Keyword Cache Gate1/Gate2
-# (stops unwanted 'VF REASONING' Telegram spam). Kept importable, just not routed.
-# from app.services.trend_reasoning import router as _reason_router
-# app.include_router(_reason_router)
-
-
-# Telegram inline-button poller is managed by lifespan handler at app initialization
-
-
-# DISABLED 28/07/2026: discover-v5 fully superseded by trend_gate_ai.py
-# (/api/v1/trend-raw + /api/v1/trend-commit, 26/07 "Notion AI is the crawl
-# brain" redesign). VPS cron that called this was already disabled 26/07
-# (see /etc/crontab). Also disabled because _persist_brain_v5() writes
-# accepted candidates DIRECTLY to the Notion Brain DB, bypassing the gate -
-# conflicts with "Notion AI gate is the ONLY library writer" design. Kept
-# importable, just not routed, to stop duplicate "DISCOVER-v5"/"RAW POOL"
-# Telegram noti and prevent unreviewed writes.
-# from app.services.trend_discovery_v5 import router as _discover_v5_router
-# app.include_router(_discover_v5_router)
-
-
-# Notion AI = crawl brain + curation gate (26/07/2026): /api/v1/trend-raw + /api/v1/trend-commit
-from app.services.trend_gate_ai import router as _trend_gate_router
-from app.services.trend_verify import router as _trend_verify_router
 app.include_router(_trend_gate_router)
 app.include_router(_trend_verify_router)
-# Phase 2b (10/08/2026): story-check endpoint — gate story from Story
-# Library body, write scores back to Notion (Luong chuan v1 BUOC 3).
-from app.services.story_check import router as _story_check_router
 app.include_router(_story_check_router)
-# Phase 2b (10/08/2026): generate-images endpoint — compile from Notion
-# then BG/FG generation + chroma-key (Rule 76) + R2 + IAL rows (BUOC 6).
-from app.services.episode_images import router as _episode_images_router
 app.include_router(_episode_images_router)
-# Phase 2b (10/08/2026): preflight endpoint — combined green-light gate
-# before render (compile --require-images + hash match + duration + TTS).
-from app.services.preflight_episode import router as _preflight_router
 app.include_router(_preflight_router)
-
-
-
-
-from app.services.artifact_sync import router as _sync_router
 app.include_router(_sync_router)
+

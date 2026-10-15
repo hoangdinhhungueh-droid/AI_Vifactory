@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """tests/vox/test_e2e.py — End-to-End Production Verification on Golden Fixture (AVF-VOX-001)."""
 
-import pytest
 from pathlib import Path
 
 from vox.pipeline import run_pipeline
@@ -44,10 +43,10 @@ def test_vox_single_pipeline_golden_e2e(tmp_path):
         assert sc["word_anchor"]["boundary_delta_frames"] <= 1.0
 
     # Regression test: CLI and embedded gate outputs are strictly identical
-    import subprocess
     import json
-    import sys
     import os
+    import subprocess
+    import sys
     repo_root = Path(__file__).resolve().parent.parent.parent
     cmd_env = dict(os.environ, PYTHONPATH=str(repo_root))
     cmd_cli = [sys.executable, "-m", "vox.qa.gates", "verify", str(manifest_file)]

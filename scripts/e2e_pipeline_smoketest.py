@@ -306,6 +306,8 @@ def gate_b10_cross_market_chapter_sync():
                 {"durationInFrames": 900, "speakerTag": "BEAT 1: GRAND JURY INDICTMENT", "beat_index": 1},
                 {"durationInFrames": 900, "speakerTag": "BEAT 2: THE PAPER TRAIL", "beat_index": 2},
                 {"durationInFrames": 900, "speakerTag": "BEAT 3: FINANCIAL CONTAGION", "beat_index": 3},
+                {"durationInFrames": 900, "speakerTag": "BEAT 4: THE SMOKING GUN", "beat_index": 4},
+                {"durationInFrames": 900, "speakerTag": "BEAT 5: SYSTEMIC AFTERMATH", "beat_index": 5},
             ]
         }
         with open(os.path.join(td, "remotion_props.json"), "w", encoding="utf-8") as f:
@@ -318,10 +320,12 @@ def gate_b10_cross_market_chapter_sync():
             existing_chapters=[
                 "BEAT 1: GRAND JURY INDICTMENT",
                 "BEAT 2: THE PAPER TRAIL",
-                "BEAT 3: FINANCIAL CONTAGION"
+                "BEAT 3: FINANCIAL CONTAGION",
+                "BEAT 4: THE SMOKING GUN",
+                "BEAT 5: SYSTEMIC AFTERMATH"
             ]
         )
-        assert len(chapters) >= 3, f"Expected at least 3 chapters, got: {chapters}"
+        assert len(chapters) == 5, f"Expected exactly 5 canonical beat chapters, got: {chapters}"
         for ch in chapters:
             assert "検査・行政指導" not in ch, f"Forbidden Japanese term '検査・行政指導' leaked into EN chapters: {ch}"
         print(f"  [PASS] EN Chapter sync verified ({len(chapters)} chapters). 0% '検査・行政指導' leak.")

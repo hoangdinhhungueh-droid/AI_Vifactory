@@ -48,19 +48,19 @@ if __package__ is None or __package__ == "":
     _root = Path(__file__).resolve().parent.parent.parent
     if str(_root) not in sys.path:
         sys.path.insert(0, str(_root))
-    from scripts.orchestrator.lifecycle_manager import LifecycleManager, SubprocessWorker, WorkerResult
-    from scripts.orchestrator.resource_recycler import ResourceRecycler, ResourceSandbox, get_system_temp_dir
-    from scripts.orchestrator.rule128_governor import Rule128Governor, Rule128ViolationError, validate_generic_task_id
-    from scripts.orchestrator.task_partitioner import PIPELINE_STAGES, STAGE_ORDER, PipelineStage, TaskPartitioner
     from scripts.orchestrator.ghost_code_detector import scan_workspace
+    from scripts.orchestrator.lifecycle_manager import LifecycleManager, SubprocessWorker
     from scripts.orchestrator.real_env_sync_guard import RealEnvSyncGuard
+    from scripts.orchestrator.resource_recycler import ResourceRecycler, ResourceSandbox
+    from scripts.orchestrator.rule128_governor import Rule128Governor, validate_generic_task_id
+    from scripts.orchestrator.task_partitioner import TaskPartitioner
 else:
-    from .lifecycle_manager import LifecycleManager, SubprocessWorker, WorkerResult
-    from .resource_recycler import ResourceRecycler, ResourceSandbox, get_system_temp_dir
-    from .rule128_governor import Rule128Governor, Rule128ViolationError, validate_generic_task_id
-    from .task_partitioner import PIPELINE_STAGES, STAGE_ORDER, PipelineStage, TaskPartitioner
     from .ghost_code_detector import scan_workspace
+    from .lifecycle_manager import LifecycleManager, SubprocessWorker
     from .real_env_sync_guard import RealEnvSyncGuard
+    from .resource_recycler import ResourceRecycler, ResourceSandbox
+    from .rule128_governor import Rule128Governor, validate_generic_task_id
+    from .task_partitioner import TaskPartitioner
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -388,7 +388,7 @@ class OrchestratorRunner:
                     print(f"  Inputs:  {p['input_paths']}")
                     print(f"  Outputs: {p['output_paths']}")
                     print(f"  Command: {' '.join(p['command'])}\n")
-                print(f"Status: DRY-RUN OK (0 external API calls invoked).")
+                print("Status: DRY-RUN OK (0 external API calls invoked).")
             return 0
 
         # Live Execution mode
@@ -639,7 +639,7 @@ class OrchestratorRunner:
             if self.args.json_output:
                 print(json.dumps(result, indent=2))
             else:
-                print(f"=== OPEN CODE REVIEW (DELEGATION MODE) ===")
+                print("=== OPEN CODE REVIEW (DELEGATION MODE) ===")
                 print(f"Target files to review ({reviewable_count}): {', '.join(file_paths)}")
                 print(f"Rule groups resolved: {len(rules_data.get('groups', []))}")
                 print("Delegated to Host AI Agent (Antigravity) for semantic line-level verification.")
@@ -658,7 +658,7 @@ class OrchestratorRunner:
             "--output",
             str(out_file),
         ]
-        rev_res = subprocess.run(review_cmd, cwd=str(self.root_dir), capture_output=True, text=True)
+        subprocess.run(review_cmd, cwd=str(self.root_dir), capture_output=True, text=True)
 
         issues: List[Dict[str, Any]] = []
         if out_file.exists():
@@ -937,16 +937,15 @@ class OrchestratorRunner:
 
     def _run_sweep_mode(self, sandbox: ResourceSandbox) -> int:
         """Executes Post-Upgrade Multi-Touchpoint Remnant & Ghost Sweep (Lead-Doer Pair)."""
-        start_ts = time.time()
         try:
             if __package__ is None or __package__ == "":
-                from scripts.orchestrator.sweep_governor import run_sweep, TOUCHPOINTS
+                from scripts.orchestrator.sweep_governor import TOUCHPOINTS, run_sweep
             else:
-                from .sweep_governor import run_sweep, TOUCHPOINTS
+                from .sweep_governor import TOUCHPOINTS, run_sweep
         except ImportError:
             import sys
             sys.path.insert(0, str(self.root_dir))
-            from scripts.orchestrator.sweep_governor import run_sweep, TOUCHPOINTS
+            from scripts.orchestrator.sweep_governor import TOUCHPOINTS, run_sweep
 
         touchpoints_arg = getattr(self.args, "touchpoints", "all")
         if touchpoints_arg.lower() == "all":
@@ -1153,7 +1152,7 @@ class OrchestratorRunner:
 
     def _run_plan_mode(self, sandbox: ResourceSandbox) -> int:
         """Executes Phase 0: Master Plan & Grill-Me Engine via Opus 5.5 (HHTech API)."""
-        from scripts.orchestrator.hhtech_planner import generate_plan, DEFAULT_PLANNER_MODEL
+        from scripts.orchestrator.hhtech_planner import DEFAULT_PLANNER_MODEL, generate_plan
 
         task_id = self.args.task_id or "GENERIC_PLAN_TASK"
         task_desc = self.args.plan_task or f"Architectural planning and implementation specification for task '{task_id}' (Market: {self.args.market})."
@@ -1309,25 +1308,23 @@ class OrchestratorRunner:
         print("=================================================================")
         print("🚀 AI VIDEO FACTORY — 1-COMMAND RELEASE DEPLOYMENT GATE")
         print("=================================================================")
-        
+
         # 1. Pre-deployment memory audit
         mem_code = self._run_memory_mode(sandbox)
         if mem_code != 0:
             print("❌ Deploy aborted: Project memory audit failed (check ROADMAP.md / CHANGELOG.md).", file=sys.stderr)
             return 1
 
-        # 2. Check and stage changes
+        # 2. Check working tree cleanliness (Pillar 2 & Rule 126: No auto-commits)
         stat_res = subprocess.run(["git", "-C", str(self.root_dir), "status", "--porcelain"], capture_output=True, text=True)
         has_changes = bool(stat_res.stdout.strip())
 
         if has_changes:
-            print("[Deploy] Staging all modified and new project files...")
-            subprocess.run(["git", "-C", str(self.root_dir), "add", "-A"], check=True)
-            commit_msg = f"deploy: release {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} via Antigravity"
-            print(f"[Deploy] Committing: '{commit_msg}'")
-            subprocess.run(["git", "-C", str(self.root_dir), "commit", "-m", commit_msg], check=True)
-        else:
-            print("[Deploy] Working tree clean; deploying current HEAD commit.")
+            print("❌ Deploy aborted: Working tree is dirty. All changes must be explicitly committed with verification evidence (Pillar 2 / Rule 126).", file=sys.stderr)
+            print(f"Uncommitted files:\n{stat_res.stdout.strip()}", file=sys.stderr)
+            return 1
+
+        print("[Deploy] Working tree clean; deploying verified HEAD commit.")
 
         # 3. Push to remote
         print("[Deploy] Pushing to origin main...")

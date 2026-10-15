@@ -86,7 +86,6 @@ db/
 legacy_inventory.json
 boss_audit.log
 *.log
-!tests/ci_neighbor_tester.log
 
 # Local scratch & auxiliary files
 .safe_trash/
@@ -94,9 +93,6 @@ boss_audit.log
 active_candidate/
 archive/
 audits/
-episodes/
-runs/
-out/
 remotion/public/*.json
 .agents/
 python*.bat

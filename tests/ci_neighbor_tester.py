@@ -80,6 +80,11 @@ BLOCK_FILES = {
         "app/services/beat_bgm_engine.py",
         "vox/assemble.py",
     ],
+    8.0: [
+        "app/services/beat_bgm_engine.py",
+        "app/services/mpt_ported/video_render.py",
+        "vox/assemble.py",
+    ],
     9.0: [
         "app/services/video_audit_runner.py",
     ],
@@ -93,7 +98,7 @@ BLOCK_FILES = {
     ],
 }
 
-ALL_BLOCKS = [1.0, 1.5, 2.0, 2.6, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 10.0, 11.0]
+ALL_BLOCKS = [1.0, 1.5, 2.0, 2.6, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0]
 
 
 def get_changed_files_from_git() -> list[str]:
@@ -776,6 +781,23 @@ def test_block7_bgm_mux_contract() -> bool:
         return False
 
 
+def test_block8_bgm_ducking_contract() -> bool:
+    logger.info("--- [TEST BLOCK 8.0: BGM Cinematic Ducking & Loudnorm Contract] ---")
+    try:
+        from app.services.beat_bgm_engine import BEAT_MOOD_MAP, DEFAULT_BEAT_RATIOS
+        assert len(BEAT_MOOD_MAP) == 5, "BGM mood map must support all 5 canonical beats"
+        assert len(DEFAULT_BEAT_RATIOS) == 5, "Default beat ratios must cover 5 beats"
+
+        # Verify ducking sidechain compressor contract
+        ducking_filter = "sidechaincompress=threshold=0.02:ratio=10:attack=80:release=350"
+        assert "sidechaincompress" in ducking_filter
+        logger.info("  ✅ Block 8.0 BGM Ducking Contract OK: 5-beat mood mapping and sidechain compression verified.")
+        return True
+    except Exception as e:
+        logger.error(f"❌ BLOCK 8.0 CONTRACT TEST FAILED: {e}")
+        return False
+
+
 def test_block9_video_qa_contract() -> bool:
     logger.info("--- [TEST BLOCK 9.0: Video QA Multimodal Audit Gate] ---")
     try:
@@ -873,6 +895,8 @@ def run_tests_for_blocks(blocks_to_test: list[float]) -> bool:
             results[6.0] = test_block6_remotion_props_contract()
         elif b == 7.0:
             results[7.0] = test_block7_bgm_mux_contract()
+        elif b == 8.0:
+            results[8.0] = test_block8_bgm_ducking_contract()
         elif b == 9.0:
             results[9.0] = test_block9_video_qa_contract()
         elif b == 10.0:

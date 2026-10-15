@@ -29,10 +29,33 @@ def get_audio_duration_wav(wav_path: Path) -> float:
         return frames / float(rate)
 
 
+def resolve_whisper_model_and_language(market: str = "EN", model_size: str = "base") -> tuple[str, str | None]:
+    """Resolves market-aware Whisper model and language tag per Rule 120 & 128.
+
+    Multilingual markets (JP, KR, VN) require the multilingual Whisper model
+    without the '.en' monolingual suffix, and specify the ISO language code.
+    """
+    m_upper = market.upper()
+    lang_map = {
+        "JA": "ja", "JP": "ja",
+        "KO": "ko", "KR": "ko",
+        "VI": "vi", "VN": "vi",
+        "EN": "en", "US": "en"
+    }
+    lang = lang_map.get(m_upper, "en")
+    if lang == "en" and not model_size.endswith(".en") and model_size in ("tiny", "base", "small", "medium"):
+        resolved_model = f"{model_size}.en"
+    else:
+        resolved_model = model_size.replace(".en", "")
+    return resolved_model, lang
+
+
 def align_script_with_audio(
     plan: ScenePlan,
     wav_path: Path,
     model_size: str = "base",
+    market: str = "EN",
+    language: str | None = None,
 ) -> tuple[WordTimeline, ScenePlan]:
     """Aligns script narration to audio wav file and populates scene timecodes.
 
@@ -40,12 +63,16 @@ def align_script_with_audio(
         plan: Input ScenePlan with scenes needing start/end timestamps.
         wav_path: Path to 48kHz mono WAV narration file.
         model_size: Faster-whisper model size ('tiny', 'base', 'small', 'medium').
+        market: Canonical market identifier ('EN', 'JA', 'KO', 'VN').
+        language: Optional explicit ISO language code override.
 
     Returns:
         Tuple of (WordTimeline, updated ScenePlan).
     """
     wav_path = Path(wav_path)
     audio_dur = get_audio_duration_wav(wav_path)
+    resolved_model, detected_lang = resolve_whisper_model_and_language(market, model_size)
+    target_lang = language or detected_lang
 
     # Collect all script words mapped to their scene index
     script_words: list[tuple[str, int]] = []
@@ -62,8 +89,8 @@ def align_script_with_audio(
     whisper_success = False
     try:
         from faster_whisper import WhisperModel
-        model = WhisperModel(model_size, device="cpu", compute_type="int8")
-        segments, _ = model.transcribe(str(wav_path), word_timestamps=True)
+        model = WhisperModel(resolved_model, device="cpu", compute_type="int8")
+        segments, _ = model.transcribe(str(wav_path), word_timestamps=True, language=target_lang)
         for seg in segments:
             if seg.words:
                 for w_obj in seg.words:

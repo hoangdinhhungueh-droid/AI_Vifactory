@@ -12,10 +12,11 @@ import math
 import struct
 import wave
 from pathlib import Path
+
 import pytest
 
-from vox.schemas import ScenePlan, Scene, FGObject, CameraMove
 from vox.align import align_script_with_audio, get_audio_duration_wav
+from vox.schemas import CameraMove, FGObject, Scene, ScenePlan
 
 
 def _create_synthetic_wav(path: Path, duration_sec: float, sample_rate: int = 48000, tone_hz: float = 440.0, leading_silence_sec: float = 0.0):
@@ -23,12 +24,12 @@ def _create_synthetic_wav(path: Path, duration_sec: float, sample_rate: int = 48
     path.parent.mkdir(parents=True, exist_ok=True)
     total_frames = int(duration_sec * sample_rate)
     silence_frames = int(leading_silence_sec * sample_rate)
-    
+
     with wave.open(str(path), "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
         wf.setframerate(sample_rate)
-        
+
         frames = bytearray()
         for i in range(total_frames):
             if i < silence_frames:
@@ -140,7 +141,7 @@ def test_adversarial_leading_offset_detection(tmp_path):
     assert abs(dur - 6.0) < 0.01
 
     timeline, plan_out = align_script_with_audio(plan, wav_padded)
-    
+
     # Assert monotonic timestamps
     for i in range(len(timeline.words) - 1):
         assert timeline.words[i].start <= timeline.words[i].end

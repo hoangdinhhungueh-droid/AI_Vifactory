@@ -33,9 +33,9 @@ jobs:
           sudo mkdir -p /var/vf/episodes /var/vf/pending_tasks /var/vf/models
           sudo chown -R $USER:$USER /var/vf
       
-      - name: Lint with ruff
+      - name: Lint with ruff (Blocking on all changed & core modules - Rule 139)
         run: |
-          ruff check vox/ tools/
+          ruff check vox/ tools/ tests/vox/ app/main.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/runner.py
           ruff check app/ scripts/ --exit-zero
 
       - name: Static compilation check (Rule 127)

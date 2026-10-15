@@ -10,7 +10,6 @@ Guarantees:
 
 import ast
 from pathlib import Path
-import pytest
 
 
 def test_legacy_routes_absent_from_ast():
@@ -48,6 +47,7 @@ def test_legacy_routes_absent_from_ast():
 def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200():
     """Runs runtime 404 tests against FastAPI app without skip (fail-closed, Rule 125/127)."""
     from fastapi.testclient import TestClient
+
     from app.main import app
     client = TestClient(app)
 
@@ -89,7 +89,7 @@ def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200():
     assert res_l_empty.status_code == 422
 
     # 6. Notion Gate logic behavioral parity
-    from app.main import _apply_notion_gates, NOTION_KEEP
+    from app.main import NOTION_KEEP, _apply_notion_gates
     kept_tool = next(iter(NOTION_KEEP))
     dummy_body = {
         "tools": [
@@ -117,8 +117,8 @@ def test_single_pipeline_import_graph_and_stages_delegation():
     import stages.s05_director_plan as s05
     import stages.s10_render as s10
     import stages.s11_qc as s11
-    import vox.planner as vp
     import vox.assemble as va
+    import vox.planner as vp
     import vox.qa.gates as vq
 
     # 1. S5 runtime delegation to vox.planner
@@ -138,9 +138,10 @@ def test_single_pipeline_import_graph_and_stages_delegation():
 def test_canonical_render_engine_and_chapter_sync():
     """Asserts that vox.pipeline uses canonical vox compositor & assembly engine and enforces Rule 135 chapter sync."""
     import sys
-    import vox.pipeline as vpipe
-    import vox.compositor as vcomp
+
     import vox.assemble as vassem
+    import vox.compositor as vcomp
+    import vox.pipeline as vpipe
 
     # Assert canonical pipeline binds to vox compositor and assemble
     assert vpipe.render_scene_clip is vcomp.render_scene_clip, "vox.pipeline must use vox.compositor.render_scene_clip as canonical render engine"
@@ -155,6 +156,7 @@ def test_canonical_render_engine_and_chapter_sync():
 def test_adversarial_legacy_file_purge_detector(tmp_path):
     """Plants a legacy pattern file in a temp directory and asserts detection and removal (Rule 125)."""
     import fnmatch
+
     from tools.ghost_scan import GHOST_PATTERNS
 
     fake_ghost = tmp_path / "legacy_shadow_module_v2.py"

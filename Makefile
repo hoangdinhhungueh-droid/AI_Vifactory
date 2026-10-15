@@ -19,7 +19,7 @@ help:
 	@echo "  make review    - Audit Code with Alibaba Open Code Review (OCR)"
 	@echo "  make ci        - Run ISO Neighbor Testing & Master E2E Smoke Gate"
 	@echo "  make sync      - Verify Three-Way Sync (Local - VPS - GitHub)"
-	@echo "  make deploy    - Stage, commit, push & trigger automated VPS deployment"
+	@echo "  make deploy    - Verify clean state, push & watch GitHub Actions CI/CD deployment"
 	@echo "  make health    - 7-Axis System Health Check (Hardware & Services)"
 	@echo "  make report    - Generate System Metrics Report (Markdown + HTML)"
 	@echo "  make memory    - Verify Project Memory (ROADMAP.md & CHANGELOG.md)"
@@ -31,7 +31,7 @@ test:
 	$(PYTEST) -m "not integration" -v tests/
 
 lint:
-	$(RUFF) check vox/ tools/
+	$(RUFF) check vox/ tools/ tests/vox/ app/main.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/runner.py
 	$(RUFF) check app/ scripts/ --exit-zero
 	$(PYTEST) -v tests/test_zero_semantic_bias.py
 

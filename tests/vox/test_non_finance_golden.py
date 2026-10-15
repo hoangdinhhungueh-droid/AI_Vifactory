@@ -3,8 +3,9 @@
 """tests/vox/test_non_finance_golden.py — Verifies Zero Semantic Bias and 5-Beat E2E Render on Science Fixture (Rule 128 & Boss Item 12)."""
 
 from pathlib import Path
-from vox.planner import plan_scenes_from_script
+
 from vox.pipeline import run_pipeline
+from vox.planner import plan_scenes_from_script
 
 
 def test_science_golden_script_has_zero_finance_lexicon_leakage():

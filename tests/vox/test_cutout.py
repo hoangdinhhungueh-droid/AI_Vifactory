@@ -4,11 +4,10 @@
 
 import pytest
 from PIL import Image, ImageDraw
-import numpy as np
 
-from vox.schemas import FGObject
 from vox.assets_fg import generate_fg_cutout
-from vox.cutout import verify_cutout_gates, remove_background
+from vox.cutout import remove_background, verify_cutout_gates
+from vox.schemas import FGObject
 
 
 def test_generated_fg_cutout_passes_all_gates(tmp_path):
@@ -35,7 +34,7 @@ def test_cutout_touching_border_fails():
     draw = ImageDraw.Draw(img)
     # Draw rectangle touching x=0
     draw.rectangle([0, 10, 80, 80], fill=(255, 0, 0, 255))
-    
+
     with pytest.raises(ValueError) as exc:
         verify_cutout_gates(img)
     assert "Cutout Gate" in str(exc.value)
@@ -46,3 +45,24 @@ def test_cutout_completely_transparent_fails():
     with pytest.raises(ValueError) as exc:
         verify_cutout_gates(img)
     assert "Gate 1" in str(exc.value) or "Gate 4" in str(exc.value)
+
+
+def test_remove_background_opaque_input_exercises_chroma_path():
+    """Exercises the Chroma / Alpha falloff keyer on a fully opaque RGB input (Boss Item 7)."""
+    # Create fully opaque 512x512 RGB canvas with zero existing transparency
+    opaque_img = Image.new("RGB", (512, 512), (240, 235, 220))
+    draw = ImageDraw.Draw(opaque_img)
+    # Draw central tactile seal
+    draw.ellipse([128, 128, 384, 384], fill=(180, 40, 40))
+
+    cutout = remove_background(opaque_img)
+    assert cutout.mode == "RGBA"
+    assert cutout.size == (512, 512)
+
+    # Verify mathematical cutout gates
+    report = verify_cutout_gates(cutout)
+    assert report["status"] == "PASS"
+    assert report["solid_ratio"] >= 0.05
+    assert report["soft_ratio"] >= 0.005
+    assert report["border_mean"] < 0.05
+

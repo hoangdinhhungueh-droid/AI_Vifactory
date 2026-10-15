@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 """tests/vox/test_karaoke.py — Tests for ASS Karaoke Generator and Timing Parity (AVF-VOX-001)."""
 
-import pytest
-from vox.schemas import Word, WordTimeline
 from vox.karaoke import generate_ass_subtitles, parse_words_from_ass
+from vox.schemas import Word, WordTimeline
 
 
 def test_ass_karaoke_generation_and_reverse_timing_parity(tmp_path):
