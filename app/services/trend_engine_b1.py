@@ -48,6 +48,7 @@ from app.services.daily_market_lock import (
     acquire_in_progress,
     is_market_done_today,
     mark_completed,
+    mark_exhausted_today,
     release_lock,
 )
 from app.services.hhtech_reasoner import (
@@ -1023,15 +1024,21 @@ def discover_and_produce_market_trend(
     if not force_crawl:
         is_done, reason, details = is_market_done_today(m_up)
         if is_done:
-            topic_name = details.get("topic_id") or details.get("raw_term") or "Existing Episode"
+            topic_name = details.get("topic_id") or details.get("raw_term") or ("Exhausted Candidates" if reason == "lock_exhausted_today" else "Existing Episode")
             vn_d = details.get("vn_date") or ""
             print("=======================================================")
-            print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {m_up} already produced today!")
-            print(f"   Reason: {reason} | Topic/Episode: {topic_name} (VN Date: {vn_d})")
-            print("   SKIPPING CRAWL to protect LLM quota, avoid duplicate videos, and prevent duplicate Telegram alerts.")
-            print("   (Pass custom seed or set B1_FORCE_CRAWL=1 to override)")
+            if reason == "lock_exhausted_today":
+                print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {m_up} candidate pool exhausted for today ({vn_d})!")
+                print(f"   Reason: {reason} | Evaluated {details.get('scan_count', 'N')} candidates without passing.")
+                print("   SKIPPING AUTOMATED CRAWL to prevent infinite loops. The scheduler will resume tomorrow for the next market.")
+                print("   (Pass custom seed or set B1_FORCE_CRAWL=1 / --force to re-run manually)")
+            else:
+                print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {m_up} already produced today!")
+                print(f"   Reason: {reason} | Topic/Episode: {topic_name} (VN Date: {vn_d})")
+                print("   SKIPPING CRAWL to protect LLM quota, avoid duplicate videos, and prevent duplicate Telegram alerts.")
+                print("   (Pass custom seed or set B1_FORCE_CRAWL=1 to override)")
             print("=======================================================")
-            logger.info(f"[{m_up}] Skipping crawl: market already produced today ({reason}: {topic_name}).")
+            logger.info(f"[{m_up}] Skipping crawl: market already produced or exhausted today ({reason}: {topic_name}).")
             return []
 
     print("\n=======================================================")
@@ -1632,6 +1639,19 @@ def discover_and_produce_market_trend(
                     logger.warning(f"Failed to send B1 alert to Telegram: {_tel_err}")
             else:
                 logger.info(f"[{m_up}] Suppressed repeated B1 viability alert due to cooldown ({suppressed} suppressed).")
+
+        # Mark daily lock as EXHAUSTED_TODAY so automated cron will NOT retry in a loop today
+        if not custom_seed:
+            mark_exhausted_today(
+                market=m_up,
+                scan_count=scanned_count,
+                extra_metadata={
+                    "viability_evals_count": viability_evals_count,
+                    "reason": "no_candidates_passed_viability",
+                }
+            )
+            print(f"🛑 [DAILY MARKET LOCK] Marked Market {m_up} as EXHAUSTED_TODAY ({scanned_count} candidates evaluated).")
+            print("   Automated scheduler will NOT retry today. Next scheduled market will run tomorrow automatically.")
 
     return produced_topics
 

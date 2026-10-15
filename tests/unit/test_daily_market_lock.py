@@ -156,3 +156,40 @@ def test_detects_completed_episode_on_disk(temp_state_dir):
             assert done is True
             assert reason == "episode_dir_completed"
             assert details["topic_id"] == "TEST_EP0099_sample_topic"
+
+
+def _worker_acquire(args):
+    """Top-level worker helper for multiprocess concurrency testing on Windows & Linux."""
+    market, topic_id, state_dir = args
+    from app.services.daily_market_lock import acquire_in_progress
+    return acquire_in_progress(market, topic_id=topic_id, state_dir=state_dir)
+
+
+def test_market_validation_raises_on_invalid(temp_state_dir):
+    """Passing None, empty string, or whitespace should raise ValueError."""
+    with pytest.raises(ValueError, match="non-empty string"):
+        acquire_in_progress(None, topic_id="t1", state_dir=temp_state_dir)
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        acquire_in_progress("", topic_id="t1", state_dir=temp_state_dir)
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        is_market_done_today(None, state_dir=temp_state_dir)
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        mark_completed("   ", topic_id="t1", state_dir=temp_state_dir)
+
+
+def test_concurrent_acquire_in_progress_mutual_exclusion(temp_state_dir):
+    """Multiple racing processes attempting to acquire lock simultaneously;
+    strictly ONE must win, all others must fail.
+    """
+    from concurrent.futures import ProcessPoolExecutor
+    n_workers = 6
+    tasks = [("TEST_RACE", f"topic_{i}", temp_state_dir) for i in range(n_workers)]
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        results = list(executor.map(_worker_acquire, tasks))
+
+    assert results.count(True) == 1, f"Expected exactly 1 winner, got {results.count(True)}: {results}"
+    assert results.count(False) == n_workers - 1
+

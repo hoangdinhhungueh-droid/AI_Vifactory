@@ -7,15 +7,13 @@ Implements Stage Shape Standard. Encodes Prompt 2 (Director & Image) and Prompt 
 
 from __future__ import annotations
 
-import time
 import json
-from pathlib import Path
-from typing import Dict, Any, List
+import time
+from typing import Any, Dict, List
 
-from core.contracts.stages import StageID, StageArtifact, Provenance, Scene, Shot
 from core.config import RunContext
-from core.gates import require_input, emit_artifact
-
+from core.contracts.stages import Provenance, Scene, Shot, StageArtifact, StageID
+from core.gates import emit_artifact
 from tools.codemap.runtime import pipeline_stage
 from vox.planner import plan_scenes_from_script
 
@@ -32,7 +30,7 @@ def build_universal_video_prompt(scene: Scene) -> str:
         "Editorial paper cutout animation in Vox documentary style.",
         f"Animate completed composition: {hero_obj} on Cream Paper #F4F1EA background.",
         f"0.0-2.0s: Tactile entry of bold geometric paper shapes and headline '{headline}'.",
-        f"2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges.",
+        "2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges.",
         "7.0-10.0s: Spatial anchor locked, subtle micro-shadow breathing <= 2px, zero drift.",
         "Camera: Completely static top-down desk view, crisp focus, no 3D pan or tilt.",
         f"Color Palette: {color} on muted paper texture."
@@ -55,12 +53,15 @@ def build_universal_video_prompt(scene: Scene) -> str:
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S5: Director Plan & Prompts Forge."""
     start_ts = time.time()
-    
+
     # Read S3 script artifact directly to retrieve scenes
     s3_artifact_path = ctx.paths.artifact_file(StageID.S3_SCRIPT.value)
     if not s3_artifact_path.exists():
         raise FileNotFoundError(f"Missing S3 artifact at: {s3_artifact_path}")
-    
+
+    with open(s3_artifact_path, "r", encoding="utf-8") as f:
+        s3_data = json.load(f)
+
     raw_scenes = s3_data.get("payload", {}).get("scenes", [])
     script_text = s3_data.get("payload", {}).get("script_text", "")
 

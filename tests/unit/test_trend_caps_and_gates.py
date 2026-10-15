@@ -325,3 +325,41 @@ def test_llm_viability_calls_stop_at_max_viability_llm_evals():
         assert llm_eval_count <= 6
 
 
+def test_market_exhausted_today_lock_and_cron_skip(tmp_path, monkeypatch):
+    """Verify mark_exhausted_today locks the market for today and prevents cron re-run without --force."""
+    from app.services.daily_market_lock import is_market_done_today, mark_exhausted_today
+    from datetime import datetime, timezone
+
+    monkeypatch.delenv("B1_FORCE_CRAWL", raising=False)
+    test_now = datetime(2026, 10, 15, 12, 0, 0, tzinfo=timezone.utc)
+    market = "EN"
+
+    # 1. Before scan: not produced yet
+    is_done, reason, details = is_market_done_today(market, state_dir=str(tmp_path), now=test_now)
+    assert is_done is False
+    assert reason == "not_produced_yet"
+
+    # 2. Mark exhausted after 10 failed candidates
+    success = mark_exhausted_today(market, scan_count=10, state_dir=str(tmp_path), now=test_now)
+    assert success is True
+
+    # 3. Automated cron checks: must return True (is_done=True), reason='lock_exhausted_today'
+    is_done, reason, details = is_market_done_today(market, state_dir=str(tmp_path), now=test_now)
+    assert is_done is True
+    assert reason == "lock_exhausted_today"
+    assert details.get("status") == "EXHAUSTED_TODAY"
+    assert details.get("scan_count") == 10
+
+    # 4. Manual override with force=True bypasses the lock
+    is_done_force, reason_force, _ = is_market_done_today(market, state_dir=str(tmp_path), now=test_now, force=True)
+    assert is_done_force is False
+    assert reason_force == "forced_override"
+
+    # 5. Next day (2026-10-16): lock does not block
+    next_day = datetime(2026, 10, 16, 12, 0, 0, tzinfo=timezone.utc)
+    is_done_next, reason_next, _ = is_market_done_today(market, state_dir=str(tmp_path), now=next_day)
+    assert is_done_next is False
+    assert reason_next == "not_produced_yet"
+
+
+

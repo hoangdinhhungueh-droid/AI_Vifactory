@@ -10,7 +10,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.services.alert_cooldown import (
+    check_alert_eligibility,
     record_alert_sent,
+    record_alert_suppressed,
     should_send_alert,
 )
 
@@ -101,3 +103,57 @@ def test_disable_alert_cooldown_override(temp_state_dir):
         assert can_send is True
     finally:
         os.environ.pop("DISABLE_ALERT_COOLDOWN", None)
+
+
+def test_market_validation_raises_on_invalid(temp_state_dir):
+    """Passing None, empty string, or whitespace should raise ValueError."""
+    with pytest.raises(ValueError, match="non-empty string"):
+        should_send_alert("b1_viability", None, state_dir=temp_state_dir)
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        should_send_alert("b1_viability", "", state_dir=temp_state_dir)
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        should_send_alert("b1_viability", "   ", state_dir=temp_state_dir)
+
+
+def test_check_alert_eligibility_is_pure_read_only(temp_state_dir):
+    """check_alert_eligibility must be pure read-only and never mutate suppression count."""
+    t0 = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
+    record_alert_sent("b1_viability", "EN", state_dir=temp_state_dir, now=t0)
+
+    # Calling check_alert_eligibility 5 times within window
+    t1 = t0 + timedelta(minutes=5)
+    for _ in range(5):
+        can_send, suppressed, suffix = check_alert_eligibility(
+            "b1_viability", "EN", state_dir=temp_state_dir, window_seconds=14400, now=t1
+        )
+        assert can_send is False
+        assert suppressed == 0  # Still 0 because pure check never mutates!
+
+    # Now call record_alert_suppressed explicitly
+    new_count = record_alert_suppressed("b1_viability", "EN", state_dir=temp_state_dir, now=t1)
+    assert new_count == 1
+
+    can_send, suppressed, suffix = check_alert_eligibility(
+        "b1_viability", "EN", state_dir=temp_state_dir, window_seconds=14400, now=t1
+    )
+    assert can_send is False
+    assert suppressed == 1
+
+
+def test_corrupt_json_quarantine(temp_state_dir):
+    """Corrupt JSON in alert_cooldown.json should be quarantined with .corrupt.<ts> suffix."""
+    from pathlib import Path
+    cooldown_file = Path(temp_state_dir) / "alert_cooldown.json"
+    cooldown_file.write_text("{corrupt: json content here!", encoding="utf-8")
+
+    # should_send_alert should handle gracefully without crashing
+    can_send, suppressed, suffix = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir)
+    assert can_send is True
+    assert suppressed == 0
+
+    # Verify corrupt file was renamed/quarantined
+    corrupt_files = list(Path(temp_state_dir).glob("alert_cooldown.json.corrupt.*"))
+    assert len(corrupt_files) == 1
+    assert "corrupt: json" in corrupt_files[0].read_text(encoding="utf-8")

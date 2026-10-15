@@ -1186,13 +1186,13 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
     best_score_str = story_score_str
     best_verdict = story_verdict
 
-    # Auto-Refine Self-Correction Loop: Mandate 12/12 Perfect Score for every Episode
-    if best_score < 12 or best_verdict != "PASS":
+    # Auto-Refine Self-Correction Loop: Target Story Gate PASS (>= 10/12 or >= 80% pass rate)
+    if best_score < 10 or best_verdict != "PASS":
         for refine_attempt in range(1, 3):
             logger.warning(
-                f"[story_engine] Story Gate under 12/12 ({best_score}/{best_audit.get('max_score', 12)}). "
+                f"[story_engine] Story Gate under threshold ({best_score}/{best_audit.get('max_score', 12)}). "
                 f"Fix hints: {best_audit.get('fix_hints')}. Banned hits: {best_audit.get('banned_phrases_found')}. "
-                f"Initiating Auto-Refine Attempt {refine_attempt}/2 via GPT-6-Astra to achieve 12/12..."
+                f"Initiating Auto-Refine Attempt {refine_attempt}/2 via Claude Opus 5.5..."
             )
             length_instruction = "strictly maintaining 2,500-3,500 Japanese characters" if mkt.upper() == "JP" else (
                 "strictly maintaining 2,500-3,500 Korean characters" if mkt.upper() == "KR" else

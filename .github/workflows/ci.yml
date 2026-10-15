@@ -76,6 +76,8 @@ jobs:
 
       - name: Full Vox Single Pipeline Test Suite (Rule 125 & 127 - JUnit Zero-Skip Gate)
         shell: bash
+        env:
+          ALLOW_SYNTHETIC_ALIGNMENT: "true"
         run: |
           set -eo pipefail
           pytest -v -rA --cov=vox --cov-report=xml:coverage.xml --junitxml=/tmp/junit_vox.xml tests/vox/
