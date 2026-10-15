@@ -51,6 +51,7 @@ remotion/node_modules/
 # Large media / render artifacts
 assets/
 remotion/public/*
+remotion/public/*.json
 !remotion/public/sfx/
 checkpoints/
 
@@ -100,4 +101,8 @@ audits/
 python*.bat
 python*.cmd
 temp_test/
+
+# Boss audit runtime state and visual audit reports
+specs/boss_audits/.state_*.json
+specs/boss_audits/visual_audit_report.json
 
