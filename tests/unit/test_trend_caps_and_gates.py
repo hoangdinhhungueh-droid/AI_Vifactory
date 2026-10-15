@@ -327,8 +327,9 @@ def test_llm_viability_calls_stop_at_max_viability_llm_evals():
 
 def test_market_exhausted_today_lock_and_cron_skip(tmp_path, monkeypatch):
     """Verify mark_exhausted_today locks the market for today and prevents cron re-run without --force."""
-    from app.services.daily_market_lock import is_market_done_today, mark_exhausted_today
     from datetime import datetime, timezone
+
+    from app.services.daily_market_lock import is_market_done_today, mark_exhausted_today
 
     monkeypatch.delenv("B1_FORCE_CRAWL", raising=False)
     test_now = datetime(2026, 10, 15, 12, 0, 0, tzinfo=timezone.utc)
