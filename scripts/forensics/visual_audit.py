@@ -33,6 +33,31 @@ from vox.qa.gates import (
 )
 
 
+def get_expected_subtitle_at_time(ass_path: Path, t_sec: float) -> str:
+    """Parses ASS subtitle file and returns the dialogue text active at t_sec."""
+    import re
+    if not ass_path.exists():
+        return ""
+    with open(ass_path, encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            if line.startswith("Dialogue:"):
+                parts = line.split(",", 9)
+                if len(parts) >= 10:
+                    start_str, end_str, raw_text = parts[1].strip(), parts[2].strip(), parts[9].strip()
+                    try:
+                        def parse_ass_time(s: str) -> float:
+                            h, m, sec = s.split(":")
+                            return float(h) * 3600 + float(m) * 60 + float(sec)
+                        start_sec = parse_ass_time(start_str)
+                        end_sec = parse_ass_time(end_str)
+                        if start_sec <= t_sec <= end_sec:
+                            clean_txt = re.sub(r"\{.*?\}", "", raw_text).strip()
+                            return clean_txt
+                    except Exception:
+                        continue
+    return ""
+
+
 def audit_frames(fixture_dir: str, name: str) -> list[dict[str, Any]]:
     """Audits speech midpoint frames for resolution, luminance, and subtitle OCR."""
     import pytesseract
@@ -79,21 +104,14 @@ def audit_frames(fixture_dir: str, name: str) -> list[dict[str, Any]]:
         raw_ocr = pytesseract.image_to_string(sub_crop).strip()
         ocr_clean = raw_ocr.replace("\n", " ")
 
-        # Derive expected subtitle tokens active at midpoint frame
-        exp_narration = ""
-        if i < len(scenes):
-            scene_words = scenes[i].get("words", [])
-            if scene_words:
-                start_t = float(scenes[i].get("start", 0.0))
-                end_t = float(scenes[i].get("end", 5.0))
-                mid_t = (start_t + end_t) / 2.0
-                active_words = [
-                    w["word"] for w in scene_words
-                    if abs(float(w.get("start", 0.0)) - mid_t) <= 2.5 or abs(float(w.get("end", 0.0)) - mid_t) <= 2.5
-                ]
-                exp_narration = " ".join(active_words) if active_words else scenes[i].get("narration", "")
-            else:
-                exp_narration = scenes[i].get("narration", "")
+        # Derive expected subtitle tokens active at midpoint frame from ASS
+        ass_path = Path(fixture_dir) / "subtitles.ass"
+        start_t = float(scenes[i].get("start", 0.0)) if i < len(scenes) else 0.0
+        end_t = float(scenes[i].get("end", 5.0)) if i < len(scenes) else 5.0
+        mid_t = (start_t + end_t) / 2.0
+        exp_narration = get_expected_subtitle_at_time(ass_path, mid_t)
+        if not exp_narration and i < len(scenes):
+            exp_narration = scenes[i].get("narration", "")
 
         ocr_res = verify_subtitle_ocr_precision_recall(
             ocr_clean,
