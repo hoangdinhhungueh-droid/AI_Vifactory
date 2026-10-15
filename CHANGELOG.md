@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Vox Director Autonomous Engine (`AVF-VOX-001`)**: Tích hợp pipeline làm video phong cách Vox/Fern tactile paper-collage với living poster animation và dynamic counter tickers.
 - **Single Unified Vox Pipeline with Tactile Object Decomposition (`AVF-VOX-001`)**: Hoàn thiện pipeline phong cách Vox/Fern đơn nhất (`vox/`), phân rã đối tượng foreground/background từng scene, tích hợp two-pass EBU R128 loudnorm (-16.0 LUFS, TP <= -2.0 dBTP to absorb AAC overshoot per AES TD1004), word-level Whisper alignment (parity drift <= 33.3ms), dynamic 2.5D multiplane camera compositing, và QA Gates xác thực video CFR 30fps H.264/AAC.
 - **Hermetic Pipeline Smoketests & Non-Vacuous Cross-Market Neighbor Testing**: Bổ sung dry-run sink cho Gate 15 Notion insights, kiểm thử đối kháng đa thị trường JP vs EN 100% disjoint.
 - **Automated Ruff Linter Baseline & Strict Zero-Error Enforcement**: Cấu hình ruff linting trên `vox/` và `tools/` với 0 cảnh báo.
@@ -30,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0] - 2026-10-06
 ### Added
-- **Vox Director Autonomous Engine**: Tích hợp pipeline làm video phong cách Vox/Fern tactile paper-collage với living poster animation và dynamic counter tickers.
 - **Automated Human Gate 2 Dispatch**: Cơ chế duyệt kịch bản và đạo diễn tự động qua Telegram Interactive Buttons.
 - **Opus 5.5 Anti-Bloat Supervisory Gate**: Giám sát giới hạn token ($\le 10,000$ in / $\le 5,000$ out) cho các tác vụ lập kế hoạch và review hội đồng.
 
