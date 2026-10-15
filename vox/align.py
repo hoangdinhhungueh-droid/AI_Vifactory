@@ -261,7 +261,8 @@ def align_script_with_audio(
     timeline = WordTimeline(
         words=aligned_words,
         audio_duration=round(audio_dur, 3),
-        match_ratio=match_ratio
+        match_ratio=match_ratio,
+        alignment_model=alignment_model,
     )
 
     return timeline, plan

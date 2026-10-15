@@ -270,7 +270,7 @@ def run_pipeline(
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "total_latency_sec": total_time,
         "duration_sec": timeline.audio_duration,
-        "alignment_model": "faster-whisper-base.en",
+        "alignment_model": getattr(timeline, "alignment_model", "whisper"),
         "script_source": str(script_path),
         "gate_thresholds": {
             "lufs_target": BROADCAST_LUFS_TARGET,
