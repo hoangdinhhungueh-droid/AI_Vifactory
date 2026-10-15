@@ -30,6 +30,7 @@ import urllib.parse
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
+from typing import Optional, Dict, Any, List, Tuple
 
 # Ensure workspace root is in sys.path
 _PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
