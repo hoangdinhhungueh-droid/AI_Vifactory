@@ -87,7 +87,7 @@ def scan_ghost_files() -> list[str]:
                     if not str(rel).startswith("legacy") and not str(rel).startswith("reports"):
                         ghosts.append(f"[GHOST FILE FOUND] {rel}")
     print(f"  [SCAN INFO] Walked {scanned_dirs} directories and {scanned_files} files across physical filesystem.")
-    print("  [SCAN INFO] Verified inclusion of gitignored quarantine paths (archive/, .trash/, .safe_trash/, temp_test/).")
+    print("  [SCAN INFO] Verified inclusion of physical directories including gitignored paths (active_candidate/, audits/, .trash/, .safe_trash/, temp_test/).")
     return ghosts
 
 

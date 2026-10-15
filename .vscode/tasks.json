@@ -1,0 +1,113 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Auto-Start AGQ Quota Sentinel",
+      "type": "shell",
+      "command": "wscript.exe \"C:\\Users\\hunghd2\\Documents\\antigravity\\AI Video Factory\\scripts\\agq_silent_start.vbs\"",
+      "windows": {
+        "command": "wscript.exe \"C:\\Users\\hunghd2\\Documents\\antigravity\\AI Video Factory\\scripts\\agq_silent_start.vbs\""
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "never",
+        "echo": false,
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": false,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "VF: System Health Check",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File .\\make.ps1 health",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "VF: System Health Report (HTML Dashboard)",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File .\\make.ps1 report",
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "VF: Vibe Memory Governance Audit",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File .\\make.ps1 memory",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "VF: Full CI Quality Gates",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File .\\make.ps1 ci",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "VF: Full-Loop Deploy (VPS)",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File .\\make.ps1 deploy",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "VF: Alibaba Open Code Review (OCR)",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File .\\make.ps1 review",
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "VF: Remnant & Ghost Code Hunter",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File .\\make.ps1 sweep",
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "SDLC: Memory Audit & Health Dashboard",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File .\\make.ps1 memory; powershell -ExecutionPolicy Bypass -File .\\make.ps1 report",
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -9,13 +9,13 @@ Enforces:
 4. Structured Supervisory Verdict (APPROVED / REVISE_REQUIRED).
 """
 
-import os
-import sys
 import json
 import logging
+import os
 import subprocess
+import sys
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -143,7 +143,7 @@ def extract_compact_git_diff(
             raw_diff = diff_res.stdout.strip() if diff_res.returncode == 0 else ""
         else:
             stat_res = _run_git(root_dir, ["diff", "--stat"])
-            diff_stat = (f"Provenance: Working-Tree Uncommitted Diff\n" + stat_res.stdout.strip()) if stat_res.returncode == 0 else "No git stat available"
+            diff_stat = ("Provenance: Working-Tree Uncommitted Diff\n" + stat_res.stdout.strip()) if stat_res.returncode == 0 else "No git stat available"
 
             diff_res = _run_git(root_dir, ["diff", "--no-color", "-U2"])
             raw_diff = diff_res.stdout.strip() if diff_res.returncode == 0 else ""
@@ -153,7 +153,7 @@ def extract_compact_git_diff(
                 raw_diff = diff_staged.stdout.strip() if diff_staged.returncode == 0 else ""
                 if raw_diff:
                     stat_staged = _run_git(root_dir, ["diff", "--cached", "--stat"])
-                    diff_stat = f"Provenance: Staged Index Diff\n" + stat_staged.stdout.strip()
+                    diff_stat = "Provenance: Staged Index Diff\n" + stat_staged.stdout.strip()
 
             if not raw_diff:
                 # Fallback to recent commits range when working tree is already committed
@@ -178,7 +178,7 @@ def extract_compact_git_diff(
                 meaningful_lines.append(line)
 
             if len(meaningful_lines) >= max_lines:
-                meaningful_lines.append(f"... [Truncated remaining lines to respect 10,000 Anti-Token-Bloat budget]")
+                meaningful_lines.append("... [Truncated remaining lines to respect 10,000 Anti-Token-Bloat budget]")
                 break
 
         compact_diff = "\n".join(meaningful_lines)

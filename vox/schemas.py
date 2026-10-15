@@ -50,17 +50,46 @@ class Scene(BaseModel):
     start: float | None = None             # filled by align.py
     end: float | None = None
 
+    @model_validator(mode="after")
+    def _validate_scene_timestamps(self) -> Scene:
+        if self.start is not None and self.end is not None:
+            if self.end <= self.start:
+                raise ValueError(
+                    f"scene {self.idx}: end ({self.end}) must be strictly greater than start ({self.start})"
+                )
+        return self
+
 
 class ScenePlan(BaseModel):
     title: str
     scenes: list[Scene] = Field(min_length=1)
+    audio_duration: float | None = None
 
     @model_validator(mode="after")
-    def _camera_variety(self) -> ScenePlan:
-        # Prevent 2 consecutive scenes from using the exact same camera move
+    def _validate_plan_invariants(self) -> ScenePlan:
+        # 1. Prevent 2 consecutive scenes from using the exact same camera move
         for a, b in zip(self.scenes, self.scenes[1:]):
             if a.camera == b.camera:
                 raise ValueError(f"scene {a.idx}/{b.idx} duplicate camera move: {a.camera}")
+            # 2. Strict contiguous boundary invariant (zero gap, zero overlap)
+            if a.end is not None and b.start is not None:
+                if abs(a.end - b.start) > 0.001:
+                    raise ValueError(
+                        f"scene gap/overlap: scene {a.idx} end ({a.end}) does not match scene {b.idx} start ({b.start})"
+                    )
+
+        # 3. First scene must start at 0.0
+        if self.scenes and self.scenes[0].start is not None:
+            if abs(self.scenes[0].start - 0.0) > 0.001:
+                raise ValueError(f"first scene start must be 0.0, got {self.scenes[0].start}")
+
+        # 4. Final scene must not exceed audio_duration
+        if self.audio_duration is not None and self.scenes and self.scenes[-1].end is not None:
+            if self.scenes[-1].end > round(self.audio_duration + 0.001, 3):
+                raise ValueError(
+                    f"final scene end ({self.scenes[-1].end}) exceeds audio_duration ({self.audio_duration})"
+                )
+
         return self
 
 

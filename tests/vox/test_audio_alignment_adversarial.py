@@ -181,3 +181,89 @@ def test_empty_words_fails_closed(tmp_path):
 
     with pytest.raises(ValueError, match="zero words"):
         align_script_with_audio(plan, wav)
+
+
+def test_non_frame_divisible_duration_no_degenerate_scene(tmp_path):
+    """Adversarial duration not divisible by 1/30s (7.123s) must produce valid non-degenerate contiguous scenes."""
+    plan = ScenePlan(
+        title="Non-Frame-Divisible Duration Test",
+        scenes=[
+            Scene(
+                idx=1,
+                narration="First segment introduces the investigation.",
+                bg_prompt="A textured comic paper illustration, wordless, zero text",
+                camera=CameraMove.STATIC_BREATH,
+                fg=[
+                    FGObject(
+                        id="obj1",
+                        prompt="vintage parchment dossier, zero text",
+                        anchor_x=0.5,
+                        anchor_y=0.5,
+                        scale=0.4,
+                        depth=0.5,
+                        enter_at=0.0,
+                    )
+                ],
+            ),
+            Scene(
+                idx=2,
+                narration="Second segment presents intermediate financial telemetry.",
+                bg_prompt="An editorial dark background, wordless, zero text",
+                camera=CameraMove.PAN_RIGHT,
+                fg=[
+                    FGObject(
+                        id="obj2",
+                        prompt="metallic emblem token, zero text",
+                        anchor_x=0.6,
+                        anchor_y=0.5,
+                        scale=0.35,
+                        depth=0.7,
+                        enter_at=0.2,
+                    )
+                ],
+            ),
+            Scene(
+                idx=3,
+                narration="Final segment delivers conclusive smoking gun proof.",
+                bg_prompt="An archival forensic blueprint, wordless, zero text",
+                camera=CameraMove.TILT_UP,
+                fg=[
+                    FGObject(
+                        id="obj3",
+                        prompt="stamped ledger receipt, zero text",
+                        anchor_x=0.4,
+                        anchor_y=0.5,
+                        scale=0.45,
+                        depth=0.6,
+                        enter_at=0.1,
+                    )
+                ],
+            ),
+        ]
+    )
+
+    wav = tmp_path / "non_divisible.wav"
+    adversarial_dur = 7.123
+    _create_synthetic_wav(wav, duration_sec=adversarial_dur)
+
+    timeline, plan_out = align_script_with_audio(plan, wav)
+
+    assert abs(timeline.audio_duration - adversarial_dur) < 0.001
+    assert plan_out.scenes[0].start == 0.0
+    assert abs(plan_out.scenes[-1].end - adversarial_dur) < 0.001
+
+    # Invariants for every scene
+    frame_dur = 1.0 / 30.0
+    for i, sc in enumerate(plan_out.scenes):
+        assert sc.end > sc.start, f"Scene {sc.idx} has degenerate end <= start ({sc.end} <= {sc.start})"
+        assert sc.end - sc.start >= frame_dur - 0.005, f"Scene {sc.idx} duration {sc.end - sc.start} < 1 frame"
+        if i > 0:
+            assert abs(sc.start - plan_out.scenes[i - 1].end) <= 0.001, f"Gap/overlap between scene {i} and {i+1}"
+
+    # Assert words are strictly monotonic and fully cover timeline
+    for k in range(len(timeline.words) - 1):
+        assert timeline.words[k].start <= timeline.words[k].end
+        assert timeline.words[k].end <= timeline.words[k + 1].start + 0.001
+
+    assert abs(timeline.words[-1].end - adversarial_dur) < 0.001
+

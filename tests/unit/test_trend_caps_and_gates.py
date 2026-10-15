@@ -11,17 +11,12 @@ Verifies:
 
 import os
 import sys
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 from app.services.trend_engine_b1 import (
-    check_evidence_catalyst_gate,
-    _parse_env_int,
-    MAX_SCAN_CANDIDATES_DEFAULT,
-    MAX_VIABILITY_LLM_EVALS_DEFAULT,
-    MAX_B2_ATTEMPTS_DEFAULT,
     LIVE_TRAFFIC_SOURCES,
+    _parse_env_int,
+    check_evidence_catalyst_gate,
 )
 
 
@@ -85,6 +80,42 @@ def test_level_0_5_gate_bypasses_on_custom_seed():
     )
     assert ok
     assert "Bypassed: custom seed" in reason
+
+
+def test_level_0_5_gate_rejects_empty_term():
+    """Branch (d): Rejects candidate when candidate_term is empty or blank spaces."""
+    ok, reason = check_evidence_catalyst_gate(
+        news_catalysts=[{"title": "Valid News"}],
+        traffic_source="google_news_live",
+        factsheet_extract="Valid entity",
+        is_custom_seed=False,
+        candidate_term="",
+    )
+    assert not ok
+    assert "blank or empty" in reason
+
+    ok_ws, reason_ws = check_evidence_catalyst_gate(
+        news_catalysts=[{"title": "Valid News"}],
+        traffic_source="google_news_live",
+        factsheet_extract="Valid entity",
+        is_custom_seed=False,
+        candidate_term="   ",
+    )
+    assert not ok_ws
+    assert "blank or empty" in reason_ws
+
+
+def test_level_0_5_gate_handles_none_factsheet_safely():
+    """Branch (e): Gracefully handles None or empty factsheet_extract without AttributeError."""
+    ok, reason = check_evidence_catalyst_gate(
+        news_catalysts=[],
+        traffic_source="youtube_autocomplete",
+        factsheet_extract=None,
+        is_custom_seed=False,
+        candidate_term="valid_term",
+    )
+    assert not ok
+    assert "0 LLM tokens burned" in reason
 
 
 def test_env_int_parsing_and_minimum_bound():

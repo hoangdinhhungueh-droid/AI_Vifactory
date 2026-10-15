@@ -91,6 +91,7 @@ def generate_background_canvas(
         "height": h,
         "generator_model": "vox_tactile_canvas_v1",
         "provider": "vox_native_papercraft",
+        "request_id": f"req_bg_{prompt_hash}_{int(start_ts)}",
         "render_latency_sec": latency_sec,
         "prompt_hash": prompt_hash,
         "seed": seed,

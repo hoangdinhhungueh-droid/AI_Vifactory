@@ -217,6 +217,7 @@ def generate_fg_cutout(
         "fg_id": fg_obj.id,
         "generator_model": "vox_tactile_cutout_v1",
         "provider": "vox_native_papercraft",
+        "request_id": f"req_fg_{prompt_hash}_{int(start_ts)}",
         "render_latency_sec": latency_sec,
         "prompt_hash": prompt_hash,
         "seed": seed,

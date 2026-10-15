@@ -59,3 +59,42 @@ def test_word_timeline():
     tl = WordTimeline(words=[w1, w2], audio_duration=0.75, match_ratio=1.0)
     assert len(tl.words) == 2
     assert tl.match_ratio == 1.0
+
+
+def test_scene_end_must_exceed_start():
+    fg = FGObject(id="obj_1", prompt="vintage retro typewriter on mahogany wood desk", anchor_x=0.5, anchor_y=0.5, scale=0.4, depth=0.5, enter_at=0.0)
+    with pytest.raises(ValidationError, match="must be strictly greater than start"):
+        Scene(idx=1, narration="Scene 1", bg_prompt="investigative newsroom archives background", fg=[fg], camera=CameraMove.PUSH_IN, start=4.0, end=4.0)
+
+    with pytest.raises(ValidationError, match="must be strictly greater than start"):
+        Scene(idx=1, narration="Scene 1", bg_prompt="investigative newsroom archives background", fg=[fg], camera=CameraMove.PUSH_IN, start=5.0, end=4.0)
+
+
+def test_scene_plan_contiguous_boundaries():
+    fg = FGObject(id="obj_1", prompt="vintage retro typewriter on mahogany wood desk", anchor_x=0.5, anchor_y=0.5, scale=0.4, depth=0.5, enter_at=0.0)
+    sc1 = Scene(idx=1, narration="Scene 1", bg_prompt="investigative newsroom archives background", fg=[fg], camera=CameraMove.PUSH_IN, start=0.0, end=3.0)
+    # Gap: sc2 starts at 3.5 instead of 3.0
+    sc2_gap = Scene(idx=2, narration="Scene 2", bg_prompt="investigative newsroom archives background", fg=[fg], camera=CameraMove.PAN_RIGHT, start=3.5, end=6.0)
+    with pytest.raises(ValidationError, match="scene gap/overlap"):
+        ScenePlan(title="Gap Plan", scenes=[sc1, sc2_gap])
+
+    # Overlap: sc2 starts at 2.5 instead of 3.0
+    sc2_overlap = Scene(idx=2, narration="Scene 2", bg_prompt="investigative newsroom archives background", fg=[fg], camera=CameraMove.PAN_RIGHT, start=2.5, end=6.0)
+    with pytest.raises(ValidationError, match="scene gap/overlap"):
+        ScenePlan(title="Overlap Plan", scenes=[sc1, sc2_overlap])
+
+
+def test_scene_plan_audio_duration_bound():
+    fg = FGObject(id="obj_1", prompt="vintage retro typewriter on mahogany wood desk", anchor_x=0.5, anchor_y=0.5, scale=0.4, depth=0.5, enter_at=0.0)
+    sc1 = Scene(idx=1, narration="Scene 1", bg_prompt="investigative newsroom archives background", fg=[fg], camera=CameraMove.PUSH_IN, start=0.0, end=5.0)
+    sc2 = Scene(idx=2, narration="Scene 2", bg_prompt="investigative newsroom archives background", fg=[fg], camera=CameraMove.PAN_RIGHT, start=5.0, end=10.5)
+
+    # Audio duration is 10.0, but final scene ends at 10.5 -> should fail
+    with pytest.raises(ValidationError, match="exceeds audio_duration"):
+        ScenePlan(title="Exceeded Plan", scenes=[sc1, sc2], audio_duration=10.0)
+
+    # First scene must start at 0.0
+    sc1_bad = Scene(idx=1, narration="Scene 1", bg_prompt="investigative newsroom archives background", fg=[fg], camera=CameraMove.PUSH_IN, start=0.5, end=5.0)
+    with pytest.raises(ValidationError, match="first scene start must be 0.0"):
+        ScenePlan(title="Bad Start Plan", scenes=[sc1_bad])
+

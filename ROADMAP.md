@@ -74,7 +74,19 @@
 
 ---
 
+## 🧩 ARCHITECTURAL SCOPE & CROSS-CUTTING FOUNDATION JUSTIFICATION
+
+1. **Code Map GPS & AST Toolkit (`tools/codemap/`, TASK-CODEMAP-001)**:
+   - *Rationale*: Enforces Rule 138 (Blast Radius Analysis & Pre-Impact Graph Check). Required during AVF-VOX-001 to programmatically verify that deleting legacy `app/pipeline/` and deprecated routes left exactly 0 orphan callers across all 11 stages.
+2. **Trend Engine Candidate Bounds (`app/services/trend_engine_b1.py`, TASK-TREND-001)**:
+   - *Rationale*: Enforces Rule 118 (Zero-Mock Data) & Rule 130 (Factual Causal Integrity). Provides strictly capped, verified non-fiction topics to prevent pipeline starvation or fallback to mock data.
+3. **Memory Governance & 1-Command Suite (`Makefile`, `make.ps1`, `scripts/orchestrator/memory_governor.py`, TASK-INFRA-001)**:
+   - *Rationale*: Enforces Rule 124 (Atomic Code-ification) & Rule 126 (Three-Way Physical Sync). Guarantees reproducible, one-command verification across environments and preserves architecture state against context compaction amnesia.
+
+---
+
 ## 🎯 CÁC MỤC TIÊU TIẾP THEO (NEXT MILESTONES)
 - [ ] **M1**: Tích hợp Docker containerization hoàn chỉnh cho Remotion render engine trên VPS nhằm cô lập 100% môi trường Chrome/NodeJS.
 - [ ] **M2**: Dashboard giám sát hệ thống thời gian thực (Real-time WebSocket Health Monitor) trên Flower/FastAPI.
 - [ ] **M3**: Mở rộng hỗ trợ tự động hóa đa kênh (TikTok, Facebook Reels, YouTube Shorts) bằng cơ chế Dynamic Aspect Ratio 9:16.
+

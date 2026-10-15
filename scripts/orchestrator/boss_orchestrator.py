@@ -982,7 +982,9 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "assert ok05_wiki, 'Level-0.5 should pass on Wikipedia factsheet'\n"
         "ok05_custom, reason05_custom = check_evidence_catalyst_gate([], 'unknown', '', True)\n"
         "assert ok05_custom, 'Level-0.5 should bypass on custom seed'\n"
-        "print('PRE_FILTER_FALSIFIABILITY_VERIFIED: Level-0 anchor and Level-0.5 evidence catalyst gates verified across all 6 branches.')\n"
+        "ok05_empty_term, reason05_empty_term = check_evidence_catalyst_gate([], 'google_news_live', '', False, '')\n"
+        "assert not ok05_empty_term, 'Level-0.5 should reject empty candidate_term'\n"
+        "print('PRE_FILTER_FALSIFIABILITY_VERIFIED: Level-0 anchor and Level-0.5 evidence catalyst gates verified across all branches.')\n"
         "\""
     )
     evidence_blocks.append(
@@ -993,14 +995,16 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
 
     # 5. Live VPS Test Suites
     code_pytest_unit, out_pytest_unit = run_on_vps("/root/video_factory/venv/bin/python3 -m pytest tests/unit/test_trend_caps_and_gates.py tests/unit/test_story_gate_multimarket.py -v")
+    code_pytest_vox, out_pytest_vox = run_on_vps("/root/video_factory/venv/bin/python3 -m pytest tests/vox -v")
     code_neighbor, out_neighbor = run_on_vps("/root/video_factory/venv/bin/python3 tests/ci_neighbor_tester.py")
     code_dryrun, out_dryrun = run_on_vps("/root/video_factory/venv/bin/python3 scripts/run_trend_pipeline.py --dry-run")
     code_ghost, out_ghost = run_on_vps("python3 /root/video_factory/tools/ghost_scan.py")
-    code_tests = 0 if (code_pytest_unit == 0 and code_neighbor == 0 and code_dryrun == 0 and code_ghost == 0) else 1
+    code_tests = 0 if (code_pytest_unit == 0 and code_pytest_vox == 0 and code_neighbor == 0 and code_dryrun == 0 and code_ghost == 0) else 1
 
     evidence_blocks.append(
         f"### [5. RUNTIME TEST SUITES ON VPS (Rule 127)]\n"
         f"tests/unit/ (Trend Caps + Multimarket Story Gate) Exit Code: {code_pytest_unit}\n{out_pytest_unit}\n\n"
+        f"tests/vox/ (Vox Single Pipeline & QA Gates) Exit Code: {code_pytest_vox}\n{out_pytest_vox}\n\n"
         f"tests/ci_neighbor_tester.py Exit Code: {code_neighbor}\n{out_neighbor}\n\n"
         f"scripts/run_trend_pipeline.py --dry-run Exit Code: {code_dryrun}\n{out_dryrun}\n\n"
         f"tools/ghost_scan.py Exit Code: {code_ghost}\n{out_ghost}\n"

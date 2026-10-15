@@ -14,10 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Automated Ruff Linter Baseline & Strict Zero-Error Enforcement**: Cấu hình ruff linting trên `vox/` và `tools/` với 0 cảnh báo.
 - **CI/CD Pipeline with Conditional VPS CD Template (`.github/workflows/ci.yml`)**: Bổ sung Job 2 deploy lên Hetzner VPS thông qua SSH (tự động kích hoạt khi cấu hình VPS_HOST/VPS_SSH_KEY repository secrets, an toàn bỏ qua với cảnh báo khi chưa nạp secrets; tích hợp cơ chế snapshot rollback an toàn, py_compile, docker compose restart và post-deployment health check).
 - **1-Command Makefile & PowerShell Suite (`Makefile`, `make.ps1`)**: Chuẩn hóa toàn bộ tác vụ của dự án (`make test`, `make lint`, `make review`, `make ci`, `make sync`, `make deploy`, `make health`, `make report`, `make memory`, `make clean`).
-- **Antigravity Memory Governance (`ROADMAP.md`, `CHANGELOG.md`, `memory_governor.py`)**: Thiết lập bộ nhớ dự án dài hạn chống mất ngữ cảnh khi agent bị compaction (học hỏi từ bài học 6 bước Vibe Coding).
+- **Antigravity Memory Governance (`ROADMAP.md`, `CHANGELOG.md`, `scripts/orchestrator/memory_governor.py`)**: Thiết lập bộ nhớ dự án dài hạn chống mất ngữ cảnh khi agent bị compaction (học hỏi từ bài học 6 bước Vibe Coding).
 - **Custom Commands Suite Upgrades (`vf-pipeline-teamwork`)**: Mở rộng Chat UI subcommands `/vf-pipeline-teamwork deploy`, `health`, `report`, `memory` và vai trò số 7 (Vibe Memory & CD Gatekeeper).
 - **Safe Vibe-to-Code Engine Upgrades (`antigravity-code-review`)**: Tích hợp quy trình 8 bước Vibe-to-Code kèm chốt chặn Memory Anchoring & One-Command Readiness.
-- **VS Code Tasks Integration (`.vscode/tasks.json`)**: Bổ sung 7 task tự động hóa một chạm trên IDE cho Health Check, HTML Dashboard, Memory Audit, Full CI, VPS Deploy, OCR Review và Ghost Hunter.
+- **VS Code Tasks Integration (`.vscode/tasks.json`)**: Bổ sung các task tự động hóa một chạm trên IDE cho Health Check, HTML Dashboard, Memory Audit, Full CI, VPS Deploy, OCR Review và Ghost Hunter.
 - **Comprehensive System Health Reporter (`scripts/orchestrator/system_health_reporter.py`)**: Thu thập chỉ số phần cứng (CPU, RAM, Swap, Disk), dịch vụ (PostgreSQL, Redis, Celery), Remotion và AI Quotas; xuất báo kép (Markdown + Interactive HTML Dashboard).
 - **Vibe Coding Spec Templates (`specs/business_flow_template.md` & `specs/design_spec_template.md`)**: Cung cấp bản vẽ chuẩn cho mọi module trước khi viết mã nguồn.
 - **SDLC Enterprise Reporter Upgrade (`sdlc-enterprise-reporter`)**: Nâng cấp toàn diện 14 giai đoạn với kiến trúc CI/CD 2-Job, Deploy 1-lệnh (`make deploy`), Health check 7 trục, Interactive HTML Dashboard, và Memory Governance chống Amnesia (`ROADMAP.md` & `CHANGELOG.md`).
@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Four-Role Council Deliberation (`runner.py --mode council`)**: Hội đồng 4 Agent (Architect, Builder, QA Test Harness, Adversarial Auditor) kiểm định đồng thuận 4/4 trước khi nghiệm thu.
 - **Alibaba Open Code Review (OCR)**: Tích hợp cổng kiểm toán AST tĩnh và rà soát diff tự động trước khi commit.
-- **Automated 4-Layer Ghost Code Hunter (`ghost_code_detector.py`)**: Quét đĩa cứng vật lý loại bỏ toàn bộ file rác `.bak*`, orphan scripts và bypass code.
+- **Automated 4-Layer Ghost Code Hunter (`tools/ghost_scan.py`)**: Quét đĩa cứng vật lý loại bỏ toàn bộ file rác `.bak*`, orphan scripts và bypass code.
 
 ---
 

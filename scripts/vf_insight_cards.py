@@ -17,10 +17,9 @@ Integration:
   B2 calls fetch_active_insights(market) before generating story prompt
 =============================================================================
 """
-import os
 import json
+import os
 import time
-import uuid
 import urllib.request
 from datetime import datetime, timezone
 from typing import Optional

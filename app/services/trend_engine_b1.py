@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import urllib.parse
 import urllib.request
@@ -967,14 +968,17 @@ def check_evidence_catalyst_gate(
     traffic_source: str,
     factsheet_extract: Optional[str] = None,
     is_custom_seed: bool = False,
+    candidate_term: Optional[str] = None,
 ) -> tuple[bool, str]:
     """Level-0.5 Evidence Catalyst Pre-Filter Gate (0 LLM Tokens Burned - Rule 118, 128, 130).
     Rejects candidates lacking breaking news catalysts or verified Wikipedia extract.
     """
     if is_custom_seed:
         return True, "Bypassed: custom seed"
+    if candidate_term is not None and not str(candidate_term).strip():
+        return False, "Candidate term is blank or empty"
     is_live_news = traffic_source in LIVE_TRAFFIC_SOURCES
-    has_catalyst = bool(news_catalysts) or is_live_news or bool(factsheet_extract and factsheet_extract.strip())
+    has_catalyst = bool(news_catalysts) or is_live_news or bool(factsheet_extract and str(factsheet_extract).strip())
     if not has_catalyst:
         return False, "No breaking news catalysts, live RSS, or verified entity factsheet (0 LLM tokens burned)"
     reason = (
@@ -1038,11 +1042,13 @@ def discover_and_produce_market_trend(
 
         # Level-0.5 Evidence Catalyst Pre-Filter Gate (0 LLM Tokens Burned - Rule 118, 128, 130)
         news_catalysts = recon_data.get("news_catalysts", [])
+        factsheet_text = (factsheet or {}).get("extract", "") if isinstance(factsheet, dict) else ""
         has_catalyst, catalyst_reason = check_evidence_catalyst_gate(
             news_catalysts=news_catalysts,
-            traffic_source=c.get("traffic", ""),
-            factsheet_extract=factsheet.get("extract", ""),
+            traffic_source=c.get("source", c.get("approx_traffic", "")),
+            factsheet_extract=factsheet_text,
             is_custom_seed=bool(custom_seed),
+            candidate_term=term,
         )
         if not has_catalyst:
             print(f"  ⏭️ [PRE-FILTER LEVEL-0.5 REJECT] {catalyst_reason} for '{term}'.")
@@ -1300,8 +1306,8 @@ def discover_and_produce_market_trend(
             if os.path.exists(temp_task_file):
                 try:
                     os.remove(temp_task_file)
-                except Exception:
-                    pass
+                except OSError as _rm_err:
+                    logger.debug(f"[{temp_task_id}] Notice removing temp task file: {_rm_err}")
             if b2_attempts_count >= max_b2_attempts:
                 cb_err_msg = (
                     f"🚨 <b>[RULE 118 B2 CIRCUIT BREAKER ACTIVATED]</b>\n"
@@ -1314,8 +1320,8 @@ def discover_and_produce_market_trend(
                 try:
                     from app.services.telegram_buttons import send_telegram_broadcast
                     send_telegram_broadcast(cb_err_msg)
-                except Exception:
-                    pass
+                except Exception as _cb_tel_err:
+                    logger.warning(f"Failed to send B2 circuit breaker alert to Telegram: {_cb_tel_err}")
                 break
             continue
 
@@ -1327,8 +1333,8 @@ def discover_and_produce_market_trend(
             if os.path.exists(temp_task_file):
                 try:
                     os.remove(temp_task_file)
-                except Exception:
-                    pass
+                except OSError as _rm_err:
+                    logger.debug(f"[{temp_task_id}] Notice removing temp task file: {_rm_err}")
             # Clean up temp episode directory to prevent stale cache contamination (Rule 118 & 125)
             import shutil
             for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
@@ -1336,8 +1342,8 @@ def discover_and_produce_market_trend(
                 if t_dir.exists():
                     try:
                         shutil.rmtree(t_dir)
-                    except Exception:
-                        pass
+                    except OSError as _rm_err:
+                        logger.debug(f"[{temp_task_id}] Notice cleaning temp episode dir {t_dir}: {_rm_err}")
 
             # Rule 118 Hard Circuit Breaker for B2 (Anti-Token-Drain Law)
             if b2_attempts_count >= max_b2_attempts:
@@ -1353,8 +1359,8 @@ def discover_and_produce_market_trend(
                 try:
                     from app.services.telegram_buttons import send_telegram_broadcast
                     send_telegram_broadcast(cb_msg)
-                except Exception:
-                    pass
+                except Exception as _cb_tel_err:
+                    logger.warning(f"Failed to send B2 circuit breaker alert to Telegram: {_cb_tel_err}")
                 break
             continue
 
@@ -1382,8 +1388,8 @@ def discover_and_produce_market_trend(
             if os.path.exists(temp_task_file):
                 try:
                     os.remove(temp_task_file)
-                except Exception:
-                    pass
+                except OSError as _rm_err:
+                    logger.debug(f"[{temp_task_id}] Notice removing temp task file: {_rm_err}")
             # Clean up temp episode directory to prevent stale cache contamination (Rule 118 & 125)
             import shutil
             for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
@@ -1391,8 +1397,8 @@ def discover_and_produce_market_trend(
                 if t_dir.exists():
                     try:
                         shutil.rmtree(t_dir)
-                    except Exception:
-                        pass
+                    except OSError as _rm_err:
+                        logger.debug(f"[{temp_task_id}] Notice cleaning temp episode dir {t_dir}: {_rm_err}")
             if b2_attempts_count >= max_b2_attempts:
                 cb_msg = (
                     f"🚨 <b>[RULE 118 B2 CIRCUIT BREAKER ACTIVATED]</b>\n"
@@ -1405,8 +1411,8 @@ def discover_and_produce_market_trend(
                 try:
                     from app.services.telegram_buttons import send_telegram_broadcast
                     send_telegram_broadcast(cb_msg)
-                except Exception:
-                    pass
+                except Exception as _cb_tel_err:
+                    logger.warning(f"Failed to send B2 circuit breaker alert to Telegram: {_cb_tel_err}")
                 break
             continue
 
@@ -1450,8 +1456,8 @@ def discover_and_produce_market_trend(
         if os.path.exists(temp_task_file):
             try:
                 os.remove(temp_task_file)
-            except Exception:
-                pass
+            except OSError as _rm_err:
+                logger.debug(f"[{temp_task_id}] Notice cleaning temp pending task: {_rm_err}")
 
         # Update Notion Story Library row from temp_task_id to canonical task_id (Rule 125 & 126 Single Truth)
         try:
@@ -1478,8 +1484,9 @@ def discover_and_produce_market_trend(
 
         # 10. Proceed directly to B3 Hollywood Director Plan & B3.5 Prompt Forge
         res_code = 0
+        b3_timeout = _parse_env_int("B3_PIPELINE_TIMEOUT", 1800, min_val=60)
         if auto_produce:
-            print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {task_id} (profile=prod)...")
+            print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {task_id} (profile=prod, timeout={b3_timeout}s)...")
             cmd = [
                 sys.executable,
                 "-m",
@@ -1490,7 +1497,7 @@ def discover_and_produce_market_trend(
                 str(task_id),
             ]
             try:
-                proc = subprocess.run(cmd, cwd=str(_PROJECT_ROOT), capture_output=True, text=True, timeout=1800)
+                proc = subprocess.run(cmd, cwd=str(_PROJECT_ROOT), capture_output=True, text=True, timeout=b3_timeout)
                 res_code = proc.returncode
                 if res_code == 0:
                     print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B2.1 -> B3 -> Gate 2 for {task_id}!")
@@ -1500,10 +1507,10 @@ def discover_and_produce_market_trend(
                     logger.error(f"[{task_id}] Downstream pipeline stopped at stage with exit code {res_code}:\n{stderr_tail}")
             except subprocess.TimeoutExpired:
                 res_code = 124
-                logger.error(f"[{task_id}] Downstream pipeline timed out after 1800s.")
+                logger.error(f"[{task_id}] Downstream pipeline timed out after {b3_timeout}s.")
             except Exception as prod_err:
                 res_code = 1
-                logger.error(f"[{task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}")
+                logger.exception(f"[{task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}")
             break
         else:
             produced_topics.append(t_obj)
@@ -1511,7 +1518,7 @@ def discover_and_produce_market_trend(
 
     if not produced_topics and not custom_seed:
         scanned_count = min(len(candidates), max_scan_candidates)
-        if committed_tasks:
+        if committed_tasks and res_code != 0:
             alert_msg = (
                 f"⚠️ <b>[VF PIPELINE B3 DOWNSTREAM ALERT - RULE 118]</b>\n"
                 f"Thị trường <b>{m_up}</b>: Đề tài <code>{committed_tasks[0]}</code> đã <b>ĐẠT GATE 1</b> nhưng B3 render pipeline gặp sự cố (Exit code {res_code}).\n"

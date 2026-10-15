@@ -23,7 +23,8 @@ env/
 .venv/
 
 # IDE & OS
-.vscode/
+.vscode/*
+!.vscode/tasks.json
 .idea/
 *.swp
 *.swo
@@ -81,8 +82,7 @@ b2_b3_opus_astra_audit.md
 out/
 reports/
 runs/
-db
-db/
+/db/
 legacy_inventory.json
 boss_audit.log
 *.log
@@ -91,7 +91,6 @@ boss_audit.log
 .safe_trash/
 .trash/
 active_candidate/
-archive/
 audits/
 remotion/public/*.json
 .agents/

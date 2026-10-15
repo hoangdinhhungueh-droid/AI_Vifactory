@@ -8,21 +8,34 @@ Metadata preservation: reads existing_brain and produces prompts_forge.json thro
 Enforces audio spine integrity: _is_valid_audio_spine.
 """
 
-from typing import List, Dict, Any, Optional
-from core.contracts.stages import Scene, Shot
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from stages.s05_director_plan import (
-    build_universal_video_prompt,
     CANONICAL_BEATS,
     CANONICAL_CAMERA_MOVES,
     MAX_USES_PER_ASSET,
     MIN_GAP_SCENES,
+    build_universal_video_prompt,
+    sanitize_beat_spoken_for_llm,
     validate_asset_reuse_limits,
     validate_cinematic_tokens,
-    sanitize_beat_spoken_for_llm,
 )
 
-# Re-export alias for backward compatibility
+# Re-export aliases for backward compatibility
 _sanitize_beat_spoken_for_llm = sanitize_beat_spoken_for_llm
+
+__all__ = [
+    "CANONICAL_BEATS",
+    "CANONICAL_CAMERA_MOVES",
+    "MAX_USES_PER_ASSET",
+    "MIN_GAP_SCENES",
+    "build_universal_video_prompt",
+    "sanitize_beat_spoken_for_llm",
+    "validate_asset_reuse_limits",
+    "validate_cinematic_tokens",
+    "_sanitize_beat_spoken_for_llm",
+]
 
 
 def resolve_market_redacted_terms(market: str = "EN") -> List[str]:

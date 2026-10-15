@@ -18,13 +18,13 @@ Key Capabilities:
   5. Handoff: Generates structured Implementation Plan Artifact for Antigravity active model execution
 """
 
+import argparse
+import json
+import logging
 import os
 import sys
-import json
-import argparse
-import logging
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Optional
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [PLANNER] %(message)s")
 logger = logging.getLogger("hhtech_planner")
@@ -175,8 +175,8 @@ def call_opus55_direct(
     except ImportError:
         pass
 
-    import urllib.request
     import urllib.error
+    import urllib.request
     payload["stream"] = False
     req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
 
@@ -226,6 +226,7 @@ def call_opus55_with_fallbacks(
 def call_via_vps_runner(prompt: str, task_id: Optional[str] = None) -> str:
     """Routes planning request through VPS runner if running locally without local API key."""
     import base64
+
     from scripts.vps_runner import FastVPSClient
     client = FastVPSClient()
     prompt_b64 = base64.b64encode(prompt.encode("utf-8")).decode("ascii")

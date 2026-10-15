@@ -158,29 +158,60 @@ def align_script_with_audio(
     match_ratio = round(max(0.95, matches / max(1, len(script_words))), 3)
 
     fps = 30.0
-    # 4. Populate Scene start and end boundaries on 30fps frame grid
-    for i, sc in enumerate(plan.scenes):
-        sc_words = [w for w in aligned_words if w.scene_idx == sc.idx]
-        if sc_words:
-            sc_start = 0.0 if i == 0 else plan.scenes[i - 1].end
-            sc.start = round(round(sc_start * fps) / fps, 3)
-            raw_end = sc_words[-1].end
-            sc.end = round(round(raw_end * fps) / fps, 3)
-        else:
-            sc.start = 0.0 if i == 0 else plan.scenes[i - 1].end
-            sc.end = round(round(audio_dur * fps) / fps, 3)
+    frame_dur = round(1.0 / fps, 3)
+    num_scenes = len(plan.scenes)
+    audio_dur_clean = round(audio_dur, 3)
 
-    # Ensure seamless boundary stitching between scenes and cover entire audio duration
-    if plan.scenes:
+    # 4. Populate Scene start and end boundaries on 30fps frame grid
+    # Every scene MUST span at least 1 frame (>= frame_dur) and cover the exact audio duration
+    if num_scenes == 1:
         plan.scenes[0].start = 0.0
-        for i in range(len(plan.scenes) - 1):
-            plan.scenes[i + 1].start = plan.scenes[i].end
-        plan.scenes[-1].end = max(plan.scenes[-1].end, round(round(audio_dur * fps) / fps, 3))
-        # Synchronize each scene's last word endpoint to scene end on 30fps grid (Rule 120 & Boss Item 1)
-        for sc in plan.scenes:
-            sc_w = [w for w in aligned_words if w.scene_idx == sc.idx]
-            if sc_w:
-                sc_w[-1].end = sc.end
+        plan.scenes[0].end = audio_dur_clean
+    else:
+        # Initial forward allocation bounded by remaining frame requirements
+        curr_start = 0.0
+        for i in range(num_scenes - 1):
+            sc = plan.scenes[i]
+            sc.start = curr_start
+            sc_words = [w for w in aligned_words if w.scene_idx == sc.idx]
+            min_end = round(sc.start + frame_dur, 3)
+            max_end = round(audio_dur_clean - (num_scenes - 1 - i) * frame_dur, 3)
+
+            if sc_words:
+                raw_target = sc_words[-1].end
+            else:
+                raw_target = sc.start + (audio_dur_clean - sc.start) / (num_scenes - i)
+
+            snapped_target = round(round(raw_target * fps) / fps, 3)
+            # Bound scene end so all remaining scenes have at least 1 frame
+            sc.end = round(min(max(snapped_target, min_end), max_end), 3)
+            curr_start = sc.end
+
+        # Final scene consumes exactly up to audio duration
+        plan.scenes[-1].start = plan.scenes[-2].end
+        plan.scenes[-1].end = audio_dur_clean
+
+        # Backtrack safety guard: ensure final scene has at least 1 frame
+        if plan.scenes[-1].end <= plan.scenes[-1].start:
+            for j in range(num_scenes - 2, -1, -1):
+                plan.scenes[j].end = round(audio_dur_clean - (num_scenes - 1 - j) * frame_dur, 3)
+                plan.scenes[j + 1].start = plan.scenes[j].end
+
+    plan.scenes[0].start = 0.0
+    plan.scenes[-1].end = audio_dur_clean
+    plan.audio_duration = audio_dur_clean
+
+    # Synchronize words to scene boundaries and guarantee monotonicity
+    for sc in plan.scenes:
+        sc_w = [w for w in aligned_words if w.scene_idx == sc.idx]
+        if sc_w:
+            for w in sc_w:
+                w.start = max(sc.start, min(w.start, sc.end - 0.005))
+                w.end = max(w.start + 0.005, min(w.end, sc.end))
+            for k in range(len(sc_w) - 1):
+                if sc_w[k].end > sc_w[k + 1].start:
+                    sc_w[k + 1].start = sc_w[k].end
+            sc_w[-1].end = sc.end
 
     timeline = WordTimeline(
         words=aligned_words,
