@@ -21,7 +21,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import requests as _rq
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -42,8 +42,7 @@ async def lifespan(app: FastAPI):
         from app.services.telegram_poller import start_poller as _vf_start_tg_poller
         _vf_start_tg_poller()
     except Exception as _e:
-        import logging as _lg
-        _lg.getLogger("app.main").warning("tg poller startup failed: %s", _e)
+        _logger.warning("tg poller startup failed: %s", _e)
     yield
 
 app = FastAPI(title="AI Video Factory API", version="v11.8", lifespan=lifespan)
@@ -99,6 +98,25 @@ def _resolve_git_sha() -> str:
 def health():
     return {"status": "ok", "git_sha": _resolve_git_sha()}
 
+# ── Auth Helper ─────────────────────────────────────────────────────────────
+VF_API_TOKEN = os.getenv("VF_API_TOKEN", "").strip()
+
+
+def _verify_auth(request: Request) -> None:
+    """Verifies Bearer token if VF_API_TOKEN is configured in environment.
+    If VF_API_TOKEN is unset, allows internal loopback IPC without token.
+    """
+    if not VF_API_TOKEN:
+        return
+    auth_header = request.headers.get("Authorization", "")
+    expected = f"Bearer {VF_API_TOKEN}"
+    if auth_header != expected:
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized: invalid or missing Bearer token",
+        )
+
+
 @app.get("/api/v1/diag")
 def diag():
     """Provider audit & health diagnostics via ModelGateway."""
@@ -112,7 +130,11 @@ def diag():
             "cost_summary": gw.cost_tracker.monthly_report() if gw.cost_tracker else {},
         }
     except Exception as e:
-        return {"status": "error", "reason": str(e)}
+        _logger.error("Diagnostic failure in /api/v1/diag: %s", e)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "reason": "Diagnostic failure"},
+        )
 
 # ── §1.3 Pipeline LLM endpoint (ModelGateway + Cost Tracking) ────────────────
 class LLMRequest(BaseModel):
@@ -121,13 +143,14 @@ class LLMRequest(BaseModel):
     system: str = ""
 
 @app.post("/api/v1/llm")
-def call_llm(req: LLMRequest):
+def call_llm(req: LLMRequest, request: Request):
     """Pipeline router for n8n/local agents.
 
-    Security posture: Bound to 127.0.0.1:8000 localhost loopback. Public ports 80/443
-    are completely closed on host. External traffic is routed exclusively through
-    authenticated Cloudflare Access Tunnels (Rule 121 perimeter security).
+    Security posture: Bound strictly to 127.0.0.1:8000 localhost loopback for internal
+    IPC and n8n workflows. When VF_API_TOKEN is set in environment, Bearer token
+    authentication is enforced (Rule 121 application security).
     """
+    _verify_auth(request)
     from app.services.model_gateway import get_global_gateway
     gw = get_global_gateway()
     text = gw.call_llm(prompt=req.prompt, system_prompt=req.system)
@@ -273,17 +296,8 @@ def _apply_notion_gates(body: dict, last_user: str | None, autonomous: bool) -> 
              or t["function"]["name"] in NOTION_KEEP]
 
     # ② NOTION INTENT GATE: if enabled + not autonomous + not in tool-loop + no Notion mention → strip all API-*
-    if NOTION_GATE_ENABLED and not autonomous and last_user is not None:
-        # Defensive: ensure last_user is string (edge case: API can send nested list structures)
-        if isinstance(last_user, list):
-            last_user_str = " ".join(
-                p.get("text", "") if isinstance(p, dict) else str(p)
-                for p in last_user
-            )
-        else:
-            last_user_str = str(last_user) if last_user else ""
-
-        if last_user_str and not NOTION_RE.search(last_user_str):
+    if NOTION_GATE_ENABLED and not autonomous and last_user:
+        if not NOTION_RE.search(last_user):
             tools = [t for t in tools
                      if not t.get("function", {}).get("name", "").startswith("API-")]
             print("[gate:②] stripped all API-* (no Notion intent in last_user)", flush=True)
@@ -355,6 +369,12 @@ def _fake_sse(data):
 # ── Main chat handler ─────────────────────────────────────────────────────────
 @app.post("/v1/chat/completions")
 async def oai_chat_completions(request: Request):
+    """OpenAI-compatible chat completions proxy for local agent brains.
+
+    Security posture: Bound to 127.0.0.1:8000 localhost loopback. When VF_API_TOKEN
+    is configured in environment, Bearer token authentication is enforced.
+    """
+    _verify_auth(request)
     body = await request.json()           # raw JSON — KHÔNG Pydantic → không 422
     autonomous = request.headers.get("x-vf-autonomous") == "1"
 
@@ -462,7 +482,7 @@ async def oai_chat_completions(request: Request):
 def oai_models():
     return {"object": "list", "data": [{"id": "auto", "object": "model", "owned_by": "vpsRouter"}]}
 
-# S1 trend scoring + pipeline entrypoint (page 03/05 spec, 2026-06-12)
+# Modular sub-routers for specialized pipeline services (MPT, Trend, Story, Sync)
 app.include_router(mpt_g5_router)
 app.include_router(_trend_gate_router)
 app.include_router(_trend_verify_router)

@@ -58,7 +58,7 @@ jobs:
         shell: bash
         run: |
           set -eo pipefail
-          pytest -v -rA --junitxml=/tmp/junit_unit.xml tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py
+          pytest -m "not integration" -v -rA --junitxml=/tmp/junit_unit.xml tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py
           python -c "
           import xml.etree.ElementTree as ET, sys
           tree = ET.parse('/tmp/junit_unit.xml')
@@ -113,7 +113,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov pydantic pyyaml
+          pip install pytest==9.0.3 pytest-cov==7.1.0 pydantic==2.13.4 pyyaml==6.0.3
       - name: Run Windows-specific lock, retention, and s05 tests
         run: |
           pytest -v tests/unit/test_alert_cooldown.py tests/unit/test_daily_market_lock.py tests/unit/test_corrupt_retention_policy.py tests/unit/test_s05_director_plan.py

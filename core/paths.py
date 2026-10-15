@@ -17,13 +17,8 @@ from typing import Optional
 class RunPaths:
     """Canonical path resolver for a specific Pipeline run or Episode."""
 
-    def __init__(self, run_id: str | Path, repo_root: Optional[Path] = None):
-        if isinstance(run_id, Path):
-            self.run_id = run_id.name
-            if repo_root is None:
-                repo_root = run_id.parent
-        else:
-            self.run_id = str(run_id)
+    def __init__(self, run_id: str, repo_root: Optional[Path] = None):
+        self.run_id = str(run_id)
 
         if repo_root is not None:
             self.repo_root = Path(repo_root).resolve()
@@ -158,13 +153,18 @@ def resolve_state_dir(custom_dir: Optional[str] = None, read_only: bool = False)
     return repo_fallback
 
 
-def resolve_episodes_dir(repo_root: Optional[Path] = None, custom_dir: Optional[str] = None) -> Path:
+def resolve_episodes_dir(
+    repo_root: Optional[Path] = None,
+    custom_dir: Optional[str] = None,
+    ensure_dir: bool = True,
+) -> Path:
     """Canonical path resolver for episodes directory (Rule 132).
     Eliminates hardcoded /var/vf/episodes or /root/video_factory paths.
     """
     if custom_dir:
         p = Path(custom_dir)
-        p.mkdir(parents=True, exist_ok=True)
+        if ensure_dir:
+            p.mkdir(parents=True, exist_ok=True)
         return p
 
     if repo_root is not None:
@@ -176,6 +176,7 @@ def resolve_episodes_dir(repo_root: Optional[Path] = None, custom_dir: Optional[
         else:
             p = Path(__file__).resolve().parent.parent / "episodes"
 
-    p.mkdir(parents=True, exist_ok=True)
+    if ensure_dir:
+        p.mkdir(parents=True, exist_ok=True)
     return p
 

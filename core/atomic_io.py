@@ -14,7 +14,7 @@ import os
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +61,10 @@ def cleanup_corrupt_quarantines(
     max_age_seconds: float = 86400 * 7,
     max_files: int = 5,
 ) -> int:
-    """Retention policy for quarantine files to prevent unbounded disk accumulation (Rule 125).
+    """Retention policy for quarantine files to prevent unbounded disk accumulation (Rule 125 & Boss Item 29).
 
     Prunes files matching pattern exceeding max_age_seconds or keeping at most the newest max_files.
+    Logs pruned files at INFO level.
     Returns the count of pruned files.
     """
     directory = Path(directory)
@@ -82,7 +83,26 @@ def cleanup_corrupt_quarantines(
             age = now - cf.stat().st_mtime
             if idx >= max_files or age > max_age_seconds:
                 cf.unlink(missing_ok=True)
+                logger.info(f"[atomic_io] Pruned stale retention file {cf.name} (age={int(age)}s)")
                 pruned += 1
         except OSError as cf_err:
             logger.warning(f"[atomic_io] Error pruning quarantine file {cf}: {cf_err}")
+
+    # Also clean up stale tombstone files (*tombstone*) older than 300s
+    if pattern != "*tombstone*":
+        tombstones = sorted(
+            directory.glob("*tombstone*"),
+            key=lambda p: p.stat().st_mtime if p.exists() else 0,
+            reverse=True,
+        )
+        for t_idx, tf in enumerate(tombstones):
+            try:
+                t_age = now - tf.stat().st_mtime
+                if t_idx >= max_files or t_age > 300.0:
+                    tf.unlink(missing_ok=True)
+                    logger.info(f"[atomic_io] Pruned stale tombstone file {tf.name} (age={int(t_age)}s)")
+                    pruned += 1
+            except OSError as tf_err:
+                logger.warning(f"[atomic_io] Error pruning tombstone file {tf}: {tf_err}")
+
     return pruned

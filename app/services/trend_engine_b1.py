@@ -41,7 +41,6 @@ if "/root/video_factory" not in sys.path:
 
 from app.services.alert_cooldown import (
     LockTimeoutError,
-    record_alert_sent,
     rollback_alert_reservation,
     should_send_alert,
 )
@@ -1022,15 +1021,14 @@ def discover_and_produce_market_trend(
     m_up = (market or "EN").upper()
     force_crawl = bool(custom_seed) or os.getenv("B1_FORCE_CRAWL") == "1"
 
-    # RULE: DAILY MARKET COMPLETION GUARD (Rule 118 & Rule 125)
-    # Check if this market has already produced today's episode or has active work
+    lock_token: Optional[str] = None
     if not force_crawl:
         is_done, reason, details = is_market_done_today(m_up, state_dir=state_dir)
         if is_done:
             topic_name = details.get("topic_id") or details.get("raw_term") or ("Exhausted Candidates" if reason == "lock_exhausted_today" else "Existing Episode")
             vn_d = details.get("vn_date") or ""
             print("=======================================================")
-            if reason == "lock_exhausted_today":
+            if reason in ("lock_exhausted_today", "lock_exhausted_offhours"):
                 print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {m_up} candidate pool exhausted for today ({vn_d})!")
                 print(f"   Reason: {reason} | Evaluated {details.get('scan_count', 'N')} candidates without passing.")
                 print("   SKIPPING AUTOMATED CRAWL to prevent infinite loops. The scheduler will resume tomorrow for the next market.")
@@ -1042,6 +1040,19 @@ def discover_and_produce_market_trend(
                 print("   (Pass custom seed or set B1_FORCE_CRAWL=1 to override)")
             print("=======================================================")
             logger.info(f"[{m_up}] Skipping crawl: market already produced or exhausted today ({reason}: {topic_name}).")
+            return []
+
+        # Acquire IN_PROGRESS daily lock immediately to prevent TOCTOU race (Boss Item 13)
+        import uuid
+        lock_token = uuid.uuid4().hex
+        acquired = acquire_in_progress(
+            m_up, topic_id="", state_dir=state_dir, owner_pid=os.getpid(), lock_token=lock_token
+        )
+        if not acquired:
+            logger.warning(
+                f"[{m_up}] Failed to acquire daily IN_PROGRESS lock: another process holds the lock. "
+                f"Aborting crawl to prevent concurrent runs (Boss Item 13)."
+            )
             return []
 
     print("\n=======================================================")
@@ -1509,8 +1520,8 @@ def discover_and_produce_market_trend(
                 logger.exception(f"[{temp_task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}")
 
             if res_code != 0:
-                # Release in-progress lock on failure so retry or fix can proceed
-                release_lock(m_up, state_dir=state_dir)
+                # Release in-progress lock on failure so retry or fix can proceed (Boss Item 14)
+                release_lock(m_up, state_dir=state_dir, lock_token=lock_token, owner_pid=os.getpid())
                 # B3 failed: Do NOT commit task. Emit exactly ONE terminal failure message.
                 fail_msg = (
                     f"🚨 <b>[VF PIPELINE B3 FAILED - RULE 118]</b>\n"
@@ -1537,8 +1548,15 @@ def discover_and_produce_market_trend(
         task_id = commit_trend_task(t_obj)
         t_obj["task_id"] = task_id
         print(f"  💾 Officially Committed Task ID: {task_id}")
-        # Mark daily market production as COMPLETED in authoritative lock
-        mark_completed(m_up, task_id, extra_metadata={"topic": native_topic, "slug": t_obj.get("task_slug")}, state_dir=state_dir)
+        # Mark daily market production as COMPLETED in authoritative lock (Boss Item 14)
+        mark_completed(
+            m_up,
+            task_id,
+            extra_metadata={"topic": native_topic, "slug": t_obj.get("task_slug")},
+            state_dir=state_dir,
+            lock_token=lock_token,
+            owner_pid=os.getpid(),
+        )
 
         # Migrate episode and pending task artifacts from temp_task_id to canonical task_id
         import shutil
@@ -1610,59 +1628,83 @@ def discover_and_produce_market_trend(
         if viability_passed_candidates:
             # Candidates passed B1 Viability Gate, but were stopped downstream (Critic, Grounding, or B2 Story/Fact Audit)
             try:
-                can_send, suppressed, suffix = should_send_alert("b1_b2_bottleneck", m_up, state_dir=state_dir)
+                decision = should_send_alert("b1_b2_bottleneck", m_up, state_dir=state_dir)
             except LockTimeoutError as lock_err:
                 logger.warning(f"[{m_up}] Alert cooldown lock timed out: {lock_err}. Suppressing alert (fail-closed).")
-                can_send = False
-                suppressed = 0
-                suffix = ""
+                decision = None
 
-            if can_send:
+            if decision and decision.can_send:
                 alert_msg = (
                     f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
                     f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live cho thị trường <b>{m_up}</b>.\n"
-                    f"📊 <b>Kết quả B1:</b> Có <b>{len(viability_passed_candidates)}</b> ứng viên đạt Viability Gate (≥ 8.0/10).{suffix}\n"
+                    f"📊 <b>Kết quả B1:</b> Có <b>{len(viability_passed_candidates)}</b> ứng viên đạt Viability Gate (≥ 8.0/10).{decision.suffix}\n"
                     f"❌ <b>Điểm nghẽn:</b> Toàn bộ ứng viên đã bị chặn tại các chốt kiểm định hạ nguồn (Adversarial Critic Gate hoặc B2 Story/Fact Audit Gate).\n"
                     f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra log chi tiết."
                 )
                 logger.warning(f"[{m_up}] {len(viability_passed_candidates)} candidates passed viability gate but none passed downstream B2/B3 gates.")
                 try:
                     from app.services.telegram_buttons import send_telegram_broadcast
-                    send_telegram_broadcast(alert_msg)
-                    record_alert_sent("b1_b2_bottleneck", m_up, state_dir=state_dir)
+                    sent = send_telegram_broadcast(alert_msg)
+                    if not sent:
+                        logger.warning(f"[{m_up}] Telegram broadcast returned falsy. Rolling back reservation (Boss Item 19).")
+                        rollback_alert_reservation(
+                            "b1_b2_bottleneck",
+                            m_up,
+                            previous_suppressed=decision.suppressed,
+                            previous_last_sent=decision.previous_last_sent,
+                            state_dir=state_dir,
+                        )
                 except Exception as _tel_err:
                     logger.warning(f"Failed to send B1 bottleneck alert to Telegram: {_tel_err}")
-                    rollback_alert_reservation("b1_b2_bottleneck", m_up, previous_suppressed=suppressed, state_dir=state_dir)
-            else:
-                logger.info(f"[{m_up}] Suppressed repeated B2/B3 bottleneck alert due to cooldown ({suppressed} suppressed).")
+                    rollback_alert_reservation(
+                        "b1_b2_bottleneck",
+                        m_up,
+                        previous_suppressed=decision.suppressed,
+                        previous_last_sent=decision.previous_last_sent,
+                        state_dir=state_dir,
+                    )
+            elif decision:
+                logger.info(f"[{m_up}] Suppressed repeated B2/B3 bottleneck alert due to cooldown ({decision.suppressed} suppressed).")
         else:
             try:
-                can_send, suppressed, suffix = should_send_alert("b1_viability", m_up, state_dir=state_dir)
+                decision = should_send_alert("b1_viability", m_up, state_dir=state_dir)
             except LockTimeoutError as lock_err:
                 logger.warning(f"[{m_up}] Alert cooldown lock timed out: {lock_err}. Suppressing alert (fail-closed).")
-                can_send = False
-                suppressed = 0
-                suffix = ""
+                decision = None
 
-            if can_send:
+            if decision and decision.can_send:
                 alert_msg = (
                     f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
                     f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live từ đa kênh (RSS, Discover, YouTube) cho thị trường <b>{m_up}</b>, "
-                    f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 8.0/10) để làm phóng sự điều tra.{suffix}\n"
+                    f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 8.0/10) để làm phóng sự điều tra.{decision.suffix}\n"
                     f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra hoặc cấp seed chỉ định."
                 )
                 logger.warning(f"[{m_up}] No candidates passed viability gate.")
                 try:
                     from app.services.telegram_buttons import send_telegram_broadcast
-                    send_telegram_broadcast(alert_msg)
-                    record_alert_sent("b1_viability", m_up, state_dir=state_dir)
+                    sent = send_telegram_broadcast(alert_msg)
+                    if not sent:
+                        logger.warning(f"[{m_up}] Telegram broadcast returned falsy. Rolling back reservation (Boss Item 19).")
+                        rollback_alert_reservation(
+                            "b1_viability",
+                            m_up,
+                            previous_suppressed=decision.suppressed,
+                            previous_last_sent=decision.previous_last_sent,
+                            state_dir=state_dir,
+                        )
                 except Exception as _tel_err:
                     logger.warning(f"Failed to send B1 alert to Telegram: {_tel_err}")
-                    rollback_alert_reservation("b1_viability", m_up, previous_suppressed=suppressed, state_dir=state_dir)
-            else:
-                logger.info(f"[{m_up}] Suppressed repeated B1 viability alert due to cooldown ({suppressed} suppressed).")
+                    rollback_alert_reservation(
+                        "b1_viability",
+                        m_up,
+                        previous_suppressed=decision.suppressed,
+                        previous_last_sent=decision.previous_last_sent,
+                        state_dir=state_dir,
+                    )
+            elif decision:
+                logger.info(f"[{m_up}] Suppressed repeated B1 viability alert due to cooldown ({decision.suppressed} suppressed).")
 
-        # Mark daily lock as EXHAUSTED_TODAY so automated cron will NOT retry in a loop today
+        # Mark daily lock as EXHAUSTED_TODAY so automated cron will NOT retry in a loop today (Boss Item 14 & 18)
         if not custom_seed:
             mark_exhausted_today(
                 market=m_up,
@@ -1671,7 +1713,9 @@ def discover_and_produce_market_trend(
                 extra_metadata={
                     "viability_evals_count": viability_evals_count,
                     "reason": "no_candidates_passed_viability",
-                }
+                },
+                lock_token=lock_token,
+                owner_pid=os.getpid(),
             )
             print(f"🛑 [DAILY MARKET LOCK] Marked Market {m_up} as EXHAUSTED_TODAY ({scanned_count} candidates evaluated).")
             print("   Automated scheduler will NOT retry today. Next scheduled market will run tomorrow automatically.")

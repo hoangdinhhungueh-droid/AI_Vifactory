@@ -1,0 +1,58 @@
+he on_event startup is migrated to lifespan, the duplicate log_redact import is removed and git_sha is cached. The semicolon chains are split and empty except/pass blocks are replaced with logging. Remaining issues: (a) /api/v1/llm and /v1/chat/completions have zero application-level authentication. The docstring asserts traffic arrives 'exclusively through authenticated Cloudflare Access Tunnels', but the cloudflared ingress shown routes only to ports 8811-8819 and never to 8000. The claim is unverified and misleading, and any local process can drain upstream LLM budget. (b) /api/v1/diag returns HTTP 200 with status:error on exception, so the HTTP 200 probe proves nothing about diag health. (c) The stale comment 'S1 trend scoring + pipeline entrypoint' sits above the unrelated include_router block. (d) The list branch in _apply_notion_gates is dead because callers already coerce to str. (e) A redundant inner `import logging as _lg` in lifespan duplicates the module _logger."
+    },
+    {
+      "component": "vox/* core modules (align, assemble, compositor, cutout, planner, pipeline, qa/gates, schemas)",
+      "status": "WARN",
+      "analysis": "Behaviour is evidenced indirectly: 72/72 vox tests pass, schemas reject consecutive duplicate camera moves, QA gates reject TP breach, loudness out of range and photoreal style, and reverse karaoke parity drift is 0-4 ms. Per-file source diffs for vox/ are absent; section 13 stops after app/main.py and part of s10_render.py. Rule 121 line-level evidence and the Rule 128 anti-bias review of planner.py / qa/gates.py cannot be completed. The 'Lehman Brothers' and 'Wall Street' era anchors in fixtures are acceptable, but hardcoded market/ethnic heuristics in qa/gates.py cannot be ruled out without source."
+    },
+    {
+      "component": "Golden E2E renders + ffprobe + EBUR128",
+      "status": "PASS",
+      "analysis": "Both MP4s are structurally valid. h264 High yuv420p, 30/1 CFR, 644 and 1137 frames, AAC LC 48 kHz mono, A/V duration delta 13 ms and 4 ms. Integrated loudness is -16.4 LUFS for both, within [-17, -15]. TP is -2.5 / -2.4 dBTP, within the <= -2.0 ceiling. Blackdetect is zero. Whisper word timestamps are real and monotonic, with match ratio 1.00. Minor inconsistency: the narrative cites -16.3 LUFS while the measured summary is -16.4, and the 13.8 dB crest factor has no shown measurement command."
+    },
+    {
+      "component": "scripts/forensics/visual_audit.py / Rule 122 4-axis gate",
+      "status": "DEFECT",
+      "analysis": "OCR precision and recall of 1.00 on 8 frames, and 0px boundary touch with 0.0% magenta spill on 16 FG assets, are real pixel measurements. Both goldens are flagged is_calibration_fixture: true. FG assets are 6.8-23.5 KB with repeated identical border_alpha_px (16815 appears three times across different fixtures), which is consistent with procedurally templated shapes rather than generated editorial illustration. photorealism_metric 0.0 on such assets is vacuous. The Axis 3 'Cel-shaded Graphic Novel... Dynamic comic line art' and Axis 4 adjudications are prose, not measurements. Rule 122's stylized editorial novel and market context axes remain unproven on real provider-generated BG/FG assets traversing S07 to S11."
+    },
+    {
+      "component": "Legacy purge / Rule 125 single truth / ghost scan",
+      "status": "PASS",
+      "analysis": "app/pipeline/** (8 files), two legacy routes, scripts/execute_pipeline_b2_b35.py and archive/deprecated_scripts/* are deleted. The AST caller scan finds 0 callers, runtime legacy routes return 404 in test_single_pipeline_truth, and ghost_scan exits 0 with adversarial planted-file tests (7/7) proving the scanner is falsifiable. Inventory reports remove=0. Deletion of tests/mpt_ported/test_r2_quota.py is justified by the R2 retirement."
+    },
+    {
+      "component": ".github/workflows/ci.yml",
+      "status": "WARN",
+      "analysis": "Good hardening: setup-python v5, ffmpeg and tesseract installed, compileall, a blocking ghost scan, and a JUnit zero-skip/zero-fail parser for both suites, plus a Windows job. The compact diff shows 'Lint with ruff ... run: |' with an empty body, and the packet's own 'Step Definition' uses '...' ellipses. The raw blocking ruff target list is not evidenced. The CD job logs '::notice' and skips deploy, so 'Continuous Deployment runs via runner.py/FastVPSClient' is an out-of-band path not gated by CI."
+    },
+    {
+      "component": "Network perimeter (UFW / cloudflared)",
+      "status": "WARN",
+      "analysis": "Uvicorn is bound to 127.0.0.1:8000 and 80/443 have no listeners, so public exposure is currently nil. UFW still ALLOWs 80/tcp and 443/tcp from Anywhere, which is a latent exposure if any future process binds 0.0.0.0. 2222/tcp is LIMIT-open with no listener evidence. The negative Cloudflare probe returning 403 does not name the hostname probed."
+    },
+    {
+      "component": "Scope / Rule 138 blast radius",
+      "status": "DEFECT",
+      "analysis": "The audited range bundles AVF-VOX-001 with TASK-TREND-001 (trend_engine_b1 +508/-, hhtech_reasoner 1160 lines churned, daily_market_lock, alert_cooldown), TASK-CODEMAP (tools/codemap/** ~2,500 lines plus a UI), TASK-INFRA (Makefile, make.ps1, memory_governor, ROADMAP, CHANGELOG), boss_orchestrator.py (+1741) and audit artifacts for TASK_1792069373. Supervisory tooling and unrelated feature work in the same increment prevent isolated rollback. The ROADMAP justification section is retroactive, and item 4 is an empty bullet."
+    },
+    {
+      "component": "ROADMAP.md / CHANGELOG.md",
+      "status": "WARN",
+      "analysis": "The ROADMAP section 'Canonical Continuous Deployment (CD) Architecture (Rule 126):' has no content. Phase 5 still describes chapter SoT as 'manifest.json / remotion_props.json', which keeps two sources alive in documentation. CHANGELOG [1.2.1] references system_health_reporter.py and health-check.py, which are not in this diff and whose existence is unverified."
+    }
+  ],
+  "observations": [
+    "The evidence packet contradicts itself in at least four places: test_align_adversarial deleted vs collected/executed; '0 mock references in tests/vox' vs scan exit 1; 'hermetic' neighbor tester vs live Notion/YouTube/TTS logs; and HEAD 795f1eb vs Playwright git_sha e9dac20. Narrative assertions inside the packet should be removed. Only raw command output with exit codes should be submitted.",
+    "The commit history (~85 commits, many titled 'address Boss RoundN punchlist', including a commit titled 'achieve 10/10 Boss approval') shows audit-driven oscillation: synthetic alignment added, removed, then restored, and loudness gates loosened then reverted. This is the Rule 139 symptom-patching pattern at the process level.",
+    "Visual QA gates are falsifiable (synthetic magenta and photoreal swatches are flagged). The goldens themselves are calibration fixtures, so the gates are proven to reject bad input but not proven to accept real production output.",
+    "Fail-closed refactoring of S10/S11 is the strongest architectural improvement in the range. It eliminates fabricated sine/testsrc outputs that previously violated Rule 118 at runtime.",
+    "VPS vox suite runtime is 563 s, roughly 30x the unit suite. Live Whisper and render work should be explicitly marked and separated from hermetic CI selection to keep the zero-skip gate honest.",
+    "Unauthenticated LLM proxy endpoints protected only by loopback binding are acceptable as a deliberate posture only if documented accurately. The current docstring overstates the protection."
+  ],
+  "adherence_matrix": {
+    "iron_laws_compliance": "PARTIAL (Rules 118, 122, 126, 132, 138 deviations)",
+    "four_pillars_status": "UNVERIFIED (provenance drift at HEAD, truncated core diffs)",
+    "zero_ghost_cleanliness": "VERIFIED (ghost_scan exit 0, adversarial scanner tests 7/7, legacy purge 0 callers)"
+  },
+  "audit_file": "/root/video_factory/specs/boss_audits/AVF-VOX-001_audit_round_3.json"
+}

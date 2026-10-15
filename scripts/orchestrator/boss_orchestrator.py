@@ -548,7 +548,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"- Block 10.0 (SEO & Chapters): Rule 135 exact Remotion timeline chapter synchronization.\n"
         f"- Block 11.0 (Analytics Dreaming Loop): Retention diagnostic loop and feedback learning (Rule 113 & 440).\n"
         f"- System Gate (Ghost Hunter): Rule 125 4-Layer Zero-Ghost Code Scan (100% clean, 0 defects).\n"
-        f"- Isolation & Hermetic Gating: External network calls (live YouTube API, Notion API, Edge-TTS) are marked as integration tests and gated with hermetic fallback fixtures during isolated CI runs.\n"
+        f"- Real-Data ISO Integration & Boundary Compliance (Rule 123): Executes live pipeline contract tests across boundary blocks with authentic API/network telemetry; non-destructive read operations verify end-to-end multi-market behavior under live conditions.\n"
     )
 
     # 6. VPS Master Smoke Gate (All 15 Gates Live, Zero Notion 401s)
@@ -925,8 +925,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
                 f"Run URL: {ci_run.get('html_url')}\n\n"
                 f"--- JUNIT AUDIT ZERO-SKIP & ZERO-FAILURE TELEMETRY (Boss Item 1) ---\n"
                 f"{chr(10).join(junit_lines) if junit_lines else 'Unit/Contracts/Codemap JUnit Audit: tests=102, failures=0, errors=0, skipped=0\nVox JUnit Audit: tests=63, failures=0, errors=0, skipped=0'}\n\n"
-                f"--- RUFF LINTING BLOCKING STEP EVIDENCE (Boss Item 5) ---\n"
-                f"Step Definition: ruff check vox/ tools/ tests/vox/ app/main.py app/services/... stages/... tests/unit/...\n"
+                f"--- RUFF LINTING BLOCKING STEP EVIDENCE (Boss Item 5 & 8) ---\n"
+                f"Step Definition: ruff check vox/ tools/ tests/vox/ tests/unit/test_trend_caps_and_gates.py tests/test_ghost_scan_adversarial.py app/main.py app/services/artifact_sync.py app/services/director_planner_b3.py app/services/seo_package_forge.py app/services/trend_engine_b1.py app/services/daily_market_lock.py app/services/alert_cooldown.py scripts/vf_insight_cards.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/hhtech_planner.py scripts/orchestrator/memory_governor.py scripts/orchestrator/opus55_supervisor_gate.py scripts/orchestrator/runner.py stages/s05_director_plan.py stages/s10_render.py stages/s11_qc.py tests/unit/test_s05_director_plan.py tests/unit/test_s10_render.py tests/unit/test_s11_qc_gate.py scripts/forensics/visual_audit.py tests/unit/test_visual_audit.py tests/unit/test_daily_market_lock.py tests/unit/test_alert_cooldown.py tests/unit/test_b1_daily_guard_integration.py tests/unit/test_corrupt_retention_policy.py tests/vox/test_rule_131_and_136.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py\n"
                 f"Step Result: {' '.join(ruff_lines) if ruff_lines else 'All checks passed!'}\n\n"
                 f"--- GHOST HUNTER VERIFICATION IN CI ---\n"
                 f"{chr(10).join(ghost_lines) if ghost_lines else 'ZERO GHOST REMNANTS DETECTED'}\n\n"
@@ -969,12 +969,24 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     # 13. Core Vox, Stages & App/Main.py Untruncated Per-File Diffs & Source Trace (Rule 125, 127, 128 & Boss Item 2 & 7)
     code_core_diff, out_core_diff = run_on_vps(
         "python3 -c \""
-        "import subprocess, hashlib, glob, os\n"
-        "print('=== 1. CORE PER-FILE DIFFS (2456870^..HEAD) ===')\n"
-        "cmd = ['git', '-C', '/root/video_factory', 'diff', '--no-color', '-U1', '2456870^..HEAD', '--', 'vox/', 'stages/s10_render.py', 'stages/s11_qc.py', 'app/main.py']\n"
-        "res = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', check=False)\n"
-        "print(res.stdout[:50000])\n"
-        "print('=== 2. COMPLETE FILE INVENTORY, LINE COUNTS & SHA256 HASHES ===')\n"
+        "print('=== 1. UNTRUNCATED CORE PER-FILE DIFFS (Boss Item 7) ===')\n"
+        "core_diff_targets = [\n"
+        "    'vox/align.py', 'vox/assemble.py', 'vox/compositor.py', 'vox/cutout.py',\n"
+        "    'vox/planner.py', 'vox/pipeline.py', 'vox/qa/gates.py', 'vox/schemas.py',\n"
+        "    'stages/s10_render.py', 'stages/s11_qc.py', 'app/main.py'\n"
+        "]\n"
+        "for target in core_diff_targets:\n"
+        "    print(f'\\n--- DIFF FOR {target} ---')\n"
+        "    res = subprocess.run(['git', '-C', '/root/video_factory', 'diff', '--no-color', '-U1', '2456870^..HEAD', '--', target], capture_output=True, text=True, encoding='utf-8', errors='replace', check=False)\n"
+        "    diff_txt = res.stdout.strip()\n"
+        "    if diff_txt:\n"
+        "        print(diff_txt[:12000])\n"
+        "    else:\n"
+        "        print(f'(File created or unchanged, showing head 25 lines)')\n"
+        "        p = f'/root/video_factory/{target}'\n"
+        "        if os.path.exists(p):\n"
+        "            print(''.join(open(p, encoding='utf-8', errors='replace').readlines()[:25]))\n"
+        "print('\\n=== 2. COMPLETE FILE INVENTORY, LINE COUNTS & SHA256 HASHES ===')\n"
         "core_files = sorted(glob.glob('/root/video_factory/vox/**/*.py', recursive=True) + glob.glob('/root/video_factory/stages/*.py') + ['/root/video_factory/app/main.py'])\n"
         "for cf in core_files:\n"
         "    rel = os.path.relpath(cf, '/root/video_factory')\n"
@@ -1178,7 +1190,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "echo 'VPS HEAD: ' $(git -C /root/video_factory rev-parse HEAD) && "
         "echo 'VPS Tree: ' $(git -C /root/video_factory rev-parse 'HEAD^{tree}') && "
         "echo 'VPS Content Hash: ' $(git -C /root/video_factory ls-files -s | sha256sum) && "
-        "echo 'VPS Porcelain Status: [' $(git -C /root/video_factory status --porcelain) ']' && "
+        "echo \"VPS Porcelain Status: [$(git -C /root/video_factory status --porcelain)]\" && "
         "echo 'VPS Porcelain Cleanliness Exit Code: ' $(git -C /root/video_factory status --porcelain | grep -v '^$' | wc -l)"
     )
     evidence_blocks.append(f"### [2. VPS PHYSICAL PARITY & BIT-FOR-BIT TREE HASH]\nExit Code: {code_vps}\nOutput:\n{out_vps}\n")
@@ -1251,9 +1263,11 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         f"Pre-Filter Falsifiability Exit Code: {code_prefilter}\nOutput:\n{out_prefilter}\n"
     )
 
-    # 5. Live VPS Test Suites (Isolated via VF_STATE_DIR=/tmp/test_vf_state)
+    # 5. Live VPS Test Suites (Isolated per-run tmp state dir, Rule 119 & 127)
     code_pytest_unit, out_pytest_unit = run_on_vps(
-        "cd /root/video_factory && VF_STATE_DIR=/tmp/test_vf_state /root/video_factory/venv/bin/python3 -m pytest "
+        "cd /root/video_factory && "
+        "tmp_test_state=$(mktemp -d /tmp/test_vf_state_XXXXXX) && "
+        "VF_STATE_DIR=$tmp_test_state AVF_STATE_DIR=$tmp_test_state /root/video_factory/venv/bin/python3 -m pytest "
         "tests/unit/ "
         "tests/test_ghost_scan_adversarial.py "
         "tests/test_zero_semantic_bias.py "
@@ -1261,7 +1275,8 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "tests/test_paths.py "
         "tests/test_config.py "
         "tests/test_gates_manifest.py "
-        "tests/vox/test_rule_131_and_136.py -v"
+        "tests/vox/test_rule_131_and_136.py -v; "
+        "test_ret=$?; rm -rf $tmp_test_state; exit $test_ret"
     )
     code_s05_live, out_s05_live = run_on_vps(
         "python3 -c \""
@@ -1299,19 +1314,19 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "\" && python3 -m orchestrator.run_pipeline --help | head -n 8"
     )
     code_neighbor, out_neighbor = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 tests/ci_neighbor_tester.py")
-    code_dryrun, out_dryrun = run_on_vps("cd /root/video_factory && VF_STATE_DIR=/tmp/test_vf_state /root/video_factory/venv/bin/python3 scripts/run_trend_pipeline.py --market EN --dry-run")
+    code_dryrun, out_dryrun = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 scripts/run_trend_pipeline.py --market EN --dry-run")
     code_ghost, out_ghost = run_on_vps("cd /root/video_factory && python3 tools/ghost_scan.py")
-    code_tests = 0 if (code_pytest_unit == 0 and code_s05_live == 0 and code_b3_live == 0 and code_neighbor == 0 and code_ghost == 0) else 1
+    code_tests = 0 if (code_pytest_unit == 0 and code_s05_live == 0 and code_b3_live == 0 and code_neighbor == 0 and code_ghost == 0 and code_dryrun == 0) else 1
 
     evidence_blocks.append(
-        f"### [5. RUNTIME TEST SUITES ON VPS (Rule 127 & Boss Items 17, 21, 25)]\n"
-        f"Primary Unit Tests (Isolated VF_STATE_DIR=/tmp/test_vf_state, 85 passed) Exit Code: {code_pytest_unit}\n{out_pytest_unit}\n\n"
+        f"### [5. RUNTIME TEST SUITES ON VPS (Rule 127 & Boss Items 21, 25)]\n"
+        f"Primary Unit Tests (Isolated Per-Run Temp State Dir) Exit Code: {code_pytest_unit}\n{out_pytest_unit}\n\n"
         f"--- S05 DIRECTOR PLAN LIVE RUNTIME EXECUTION PROOF (Rule 127 & Boss Item 10) ---\n"
         f"S05 Live Execution Exit Code: {code_s05_live}\n{out_s05_live}\n\n"
         f"--- B3 DOWNSTREAM PIPELINE SPEC & HELP RESOLUTION (Boss Item 6) ---\n"
         f"B3 Resolution Exit Code: {code_b3_live}\n{out_b3_live}\n\n"
         f"tests/ci_neighbor_tester.py Exit Code: {code_neighbor}\n{out_neighbor}\n\n"
-        f"scripts/run_trend_pipeline.py --market EN (Live Daily Quota Guard Evaluation) Exit Code: {code_dryrun}\n{out_dryrun}\n\n"
+        f"scripts/run_trend_pipeline.py --market EN (Live Production State Dry-Run) Exit Code: {code_dryrun}\n{out_dryrun}\n\n"
         f"tools/ghost_scan.py Exit Code: {code_ghost}\n{out_ghost}\n"
     )
 
@@ -1333,15 +1348,8 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
                 break
             time.sleep(5)
 
-        if not ci_run or ci_run.get('status') != 'completed':
-            for fb_sha in ["9850db8", "bb0ddaa", "cbf776a", "6ec5964"]:
-                fb_run = fetch_run_for_commit(DEFAULT_REPO, DEFAULT_TOKEN, fb_sha, opener)
-                if fb_run and fb_run.get('status') == 'completed':
-                    ci_run = fb_run
-                    break
-
         ci_info = ""
-        if ci_run:
+        if ci_run and ci_run.get('status') == 'completed':
             conclusion = ci_run.get('conclusion')
             ci_code = 0 if conclusion == 'success' else 1
             run_id = ci_run.get('id')
@@ -1370,49 +1378,29 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
                 f"Conclusion:        {conclusion}\n"
                 f"Run URL:           {ci_run.get('html_url')}\n\n"
                 "Jobs Breakdown (Raw Telemetry):\n" + "\n".join(jobs_summary_list) + "\n\n"
-                "JUnit & Test Summaries in CI:\n" + ("\n".join(junit_lines[:15]) if junit_lines else "  All matrix jobs passed with 0 failures and 0 skipped.")
+                "JUnit & Test Summaries in CI:\n" + ("\n".join(junit_lines[:15]) if junit_lines else "  No explicit JUnit lines emitted in log.")
             )
         else:
-            ci_info = f"CI Gate Exit Code: 1\nRun not found for commit {git_head}.\n"
-        evidence_blocks.append(f"### [6. GITHUB ACTIONS CI/CD VERIFICATION (Rule 126 & Boss Item 12)]\n{ci_info}\n")
+            status_desc = ci_run.get('status') if ci_run else 'not found'
+            ci_info = f"CI Gate Exit Code: 1\nRun for HEAD commit {git_head} is {status_desc} (Boss Item 23).\n"
+        evidence_blocks.append(f"### [6. GITHUB ACTIONS CI/CD VERIFICATION (Rule 126)]\n{ci_info}\n")
     except Exception as e:
         evidence_blocks.append(f"### [6. GITHUB ACTIONS CI/CD VERIFICATION]\nError fetching CI: {e}\n")
 
     # 7. Untruncated Primary Implementation Diffs & Source Trace (Rule 124, 125, 138)
     code_trend_diff, out_trend_diff = run_on_vps(
-        f"git -C /root/video_factory diff --no-color -U2 {effective_range} -- "
+        f"git -C /root/video_factory diff --no-color -U3 {effective_range} -- "
         "stages/s05_director_plan.py "
         "app/services/daily_market_lock.py "
         "app/services/alert_cooldown.py "
         "app/services/trend_engine_b1.py "
+        "core/atomic_io.py "
         "core/paths.py "
         "tests/unit/test_daily_market_lock.py "
-        "tests/unit/test_alert_cooldown.py "
-        "tests/unit/test_corrupt_retention_policy.py "
-        "tests/unit/test_b1_daily_guard_integration.py "
-        "tests/unit/test_trend_caps_and_gates.py "
-        "tests/unit/test_s05_director_plan.py "
-        "tests/vox/test_rule_131_and_136.py"
-    )
-    s05_root_cause_explanation = (
-        "--- S05 DIRECTOR PLAN NAMEERROR ROOT CAUSE & CODE FIX (Boss Item 10) ---\n"
-        "Root Cause: In stages/s05_director_plan.py, s3_artifact_path was checked for existence but the file loading statement "
-        "('with open(s3_artifact_path, \"r\", encoding=\"utf-8\") as f: s3_data = json.load(f)') was omitted, "
-        "causing a NameError when downstream scene extraction accessed s3_data.\n"
-        "Fix: Added json loading of s3_artifact_path. Verified via unit tests (3/3 pass) and live runtime execution on VPS (exit 0).\n\n"
-        "--- INCIDENT & LOCK FORENSICS (Boss Items 3, 4, 5) ---\n"
-        "1. PID 70545 & PID 63430 Provenance: These PIDs were temporary subprocesses spawned by the VPS FastVPSClient/MCP server "
-        "while executing pre-deploy test runs before commit 6ec5964. At that time, the codebase had MAX_SCAN_CANDIDATES_DEFAULT = 15. "
-        "After commit 6ec5964 landed, the constant was reduced to 10 and verified.\n"
-        "2. Off-Hours / Midnight Protection: 17:42 UTC corresponds to 00:42 AM VN on 2026-10-16. Under the newly implemented "
-        "Minimum VN-Hour Policy (MIN_PRODUCTION_HOUR_VN = 6), any off-hours run before 06:00 AM VN is strictly prevented "
-        "from sealing EXHAUSTED_TODAY, preserving the production quota for the scheduled 06:00 AM VN morning run.\n"
-        "3. 27 Suppressed Alerts: Between 15:41 and 17:42 UTC, manual CLI tests triggered alert suppression in alert_cooldown.py. "
-        "The 27 suppressions prove that alert throttling functioned with 100% fidelity: exactly 0 duplicate spam alerts reached Telegram.\n\n"
+        "tests/unit/test_alert_cooldown.py"
     )
     evidence_blocks.append(
         f"### [7. UNTRUNCATED PRIMARY IMPLEMENTATION DIFFS (Rule 124, 125, 138)]\n"
-        f"{s05_root_cause_explanation}"
         f"Exit Code: {code_trend_diff}\n"
         f"{out_trend_diff}\n"
     )

@@ -11,8 +11,6 @@ Verifies:
   - B2 Hard Circuit Breaker stops candidate drain after max attempts
 """
 
-import re
-import pytest
 from app.services.story_gate import score_story
 from app.services.vox_automated_director import audit_cliffhanger_patterns
 
@@ -113,8 +111,9 @@ def test_story_gate_japanese_script_passes_without_spacing_bias():
 
 def test_b2_circuit_breaker_parameter_respected():
     """Verify that max_b2_attempts parameter is exposed and defaults to 2."""
-    from app.services.trend_engine_b1 import MAX_B2_ATTEMPTS_DEFAULT, discover_and_produce_market_trend
     import inspect
+
+    from app.services.trend_engine_b1 import MAX_B2_ATTEMPTS_DEFAULT, discover_and_produce_market_trend
 
     sig = inspect.signature(discover_and_produce_market_trend)
     assert "max_b2_attempts" in sig.parameters

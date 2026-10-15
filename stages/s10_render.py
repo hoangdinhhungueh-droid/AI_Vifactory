@@ -107,8 +107,23 @@ def run(ctx: RunContext) -> StageArtifact:
 
     is_valid_existing = False
     if final_mp4.exists() and not ctx.force:
-        if final_mp4.stat().st_size >= 1000:
-            is_valid_existing = True
+        try:
+            import subprocess
+            probe_cmd = [
+                "ffprobe", "-v", "error", "-show_streams", "-show_format",
+                "-of", "json", str(final_mp4)
+            ]
+            probe_res = subprocess.run(probe_cmd, capture_output=True, text=True, check=True)
+            probe_data = json.loads(probe_res.stdout)
+            streams = probe_data.get("streams", [])
+            has_video = any(s.get("codec_type") == "video" for s in streams)
+            has_audio = any(s.get("codec_type") == "audio" for s in streams)
+            dur_str = probe_data.get("format", {}).get("duration", "0")
+            dur = float(dur_str)
+            if has_video and has_audio and dur > 0.0:
+                is_valid_existing = True
+        except Exception:
+            is_valid_existing = False
 
     if not is_valid_existing:
         if not clips:
@@ -133,13 +148,12 @@ def run(ctx: RunContext) -> StageArtifact:
         if not audio_file or not Path(audio_file).exists() or Path(audio_file).stat().st_size < 100:
             raise MissingAudioError(f"Stage S10 requires valid audio narration file from S9, got '{audio_file}'")
 
-        # Source subtitles path from S9 artifact payload contract (Rule 132), with root fallback
-        s9_sub_path = s9_data.get("payload", {}).get("subtitles_file") or s9_data.get("payload", {}).get("ass_file")
-        if s9_sub_path and Path(s9_sub_path).exists():
-            ass_file = Path(s9_sub_path)
-        else:
-            ass_file = ctx.paths.root / "subtitles.ass"
+        # Source subtitles path strictly from S9 payload contract (Rule 125 & Boss Item 5)
+        s9_sub_path = s9_data.get("payload", {}).get("subtitles_file")
+        if not s9_sub_path:
+            raise MissingSubtitlesError("Stage S10 requires canonical 'subtitles_file' key in S9 payload contract")
 
+        ass_file = Path(s9_sub_path)
         if not ass_file.exists() or ass_file.stat().st_size == 0:
             raise MissingSubtitlesError(f"Stage S10 requires valid subtitles file at '{ass_file}'")
 

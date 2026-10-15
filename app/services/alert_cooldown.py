@@ -34,6 +34,37 @@ class LockTimeoutError(TimeoutError):
     pass
 
 
+class AlertSendDecision:
+    """Encapsulates alert sending decision with backward-compatible tuple unpacking (Boss Item 19)."""
+
+    def __init__(
+        self,
+        can_send: bool,
+        suppressed: int,
+        suffix: str,
+        previous_last_sent: Optional[str] = None,
+    ):
+        self.can_send = bool(can_send)
+        self.suppressed = int(suppressed)
+        self.suffix = str(suffix)
+        self.previous_last_sent = previous_last_sent
+
+    def __bool__(self) -> bool:
+        return self.can_send
+
+    def __iter__(self):
+        return iter((self.can_send, self.suppressed, self.suffix))
+
+    def __getitem__(self, item):
+        return (self.can_send, self.suppressed, self.suffix)[item]
+
+    def __repr__(self) -> str:
+        return (
+            f"AlertSendDecision(can_send={self.can_send}, suppressed={self.suppressed}, "
+            f"suffix={self.suffix!r}, previous_last_sent={self.previous_last_sent!r})"
+        )
+
+
 def _validate_alert_args(alert_type: Any, market: Any) -> Tuple[str, str]:
     """Validate and normalize alert_type and market strings; reject None, empty, whitespace, or non-string."""
     if not alert_type or not isinstance(alert_type, str) or not alert_type.strip():
@@ -210,7 +241,7 @@ def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
         corrupt_path = file_path.with_name(f"{file_path.name}.corrupt.{ts}")
         logger.error(
             f"[alert_cooldown] Corrupt cooldown file {file_path}: {e}. "
-            f"Quarantining to {corrupt_path.name}"
+            f"Quarantining to {corrupt_path.name} (fail-closed)"
         )
         try:
             os.replace(str(file_path), str(corrupt_path))
@@ -313,18 +344,19 @@ def should_send_alert(
     window_seconds: int = DEFAULT_COOLDOWN_WINDOW_SECONDS,
     now: Optional[datetime] = None,
     reserve_on_send: bool = True,
-) -> Tuple[bool, int, str]:
+) -> AlertSendDecision:
     """Atomic check, suppression increment, and send reservation inside a SINGLE lock acquisition.
     Guarantees that under N parallel callers racing at the same instant, exactly ONE caller
     receives can_send=True, while all others are immediately throttled and counted as suppressed.
 
     Returns:
-        (can_send, suppressed_count, formatted_suffix)
+        AlertSendDecision(can_send, suppressed_count, formatted_suffix, previous_last_sent)
+        Supports backward-compatible 3-element unpacking: (can_send, suppressed_count, suffix).
     """
     a_clean, m_clean = _validate_alert_args(alert_type, market)
 
     if os.getenv("DISABLE_ALERT_COOLDOWN") == "1":
-        return True, 0, ""
+        return AlertSendDecision(True, 0, "", None)
 
     key = f"{a_clean}::{m_clean}"
     cooldown_file = _resolve_cooldown_file(state_dir)
@@ -355,9 +387,10 @@ def should_send_alert(
                         f"[alert_cooldown] Throttled alert '{key}' (elapsed {int(elapsed)}s < {window_seconds}s). "
                         f"Total suppressed: {new_suppressed}"
                     )
-                    return False, new_suppressed, ""
+                    return AlertSendDecision(False, new_suppressed, "", last_sent_str)
             except Exception as _p_err:
-                logger.warning(f"[alert_cooldown] Error parsing timestamp: {_p_err}")
+                logger.error(f"[alert_cooldown] Error parsing timestamp '{last_sent_str}': {_p_err}. Failing closed.")
+                return AlertSendDecision(False, suppressed, "", last_sent_str)
 
         # Eligible to send!
         suffix = ""
@@ -374,7 +407,7 @@ def should_send_alert(
             data[key] = entry
             _write_cooldown_data(cooldown_file, data)
 
-        return True, suppressed, suffix
+        return AlertSendDecision(True, suppressed, suffix, last_sent_str)
 
 
 def record_alert_sent(
@@ -383,7 +416,7 @@ def record_alert_sent(
     state_dir: Optional[str] = None,
     now: Optional[datetime] = None,
 ) -> None:
-    """Record that an alert was successfully dispatched to Telegram."""
+    """Record that an alert was successfully dispatched to Telegram, preserving existing fields (Boss Item 19)."""
     a_clean, m_clean = _validate_alert_args(alert_type, market)
     key = f"{a_clean}::{m_clean}"
     cooldown_file = _resolve_cooldown_file(state_dir)
@@ -391,12 +424,14 @@ def record_alert_sent(
 
     with _interprocess_lock(cooldown_file):
         data = _read_cooldown_data(cooldown_file)
-        data[key] = {
-            "last_sent_utc": now_utc.isoformat(),
-            "suppressed_since_last": 0,
-            "market": m_clean,
-            "alert_type": a_clean,
-        }
+        if data.get("__corrupt__"):
+            data = {}
+        entry = data.get(key, {})
+        entry["last_sent_utc"] = now_utc.isoformat()
+        entry["suppressed_since_last"] = 0
+        entry["market"] = m_clean
+        entry["alert_type"] = a_clean
+        data[key] = entry
         _write_cooldown_data(cooldown_file, data)
 
 

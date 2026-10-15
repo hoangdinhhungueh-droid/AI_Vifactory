@@ -51,11 +51,15 @@ def test_daily_market_lock_retention_policy_prunes_stale_files(tmp_path: Path):
 
 
 def test_quarantine_corrupt_lock_creates_file_and_cleans_up(tmp_path: Path):
-    """Verifies that _quarantine_corrupt_lock moves the unreadable lock to *.corrupt.<epoch>."""
+    """Verifies that _quarantine_corrupt_lock moves the unreadable lock to *.corrupt.<epoch> and seals original."""
+    import json
     bad_lock = tmp_path / "EN_20261015.lock"
     bad_lock.write_text("invalid json", encoding="utf-8")
 
     corrupt_path = _quarantine_corrupt_lock(bad_lock)
-    assert not bad_lock.exists()
     assert corrupt_path.exists()
     assert ".corrupt." in corrupt_path.name
+
+    marker = json.loads(bad_lock.read_text(encoding="utf-8"))
+    assert marker.get("status") == "CORRUPT_FAIL_CLOSED"
+

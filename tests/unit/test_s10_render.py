@@ -152,3 +152,61 @@ def test_s10_render_reverifies_stale_mp4(tmp_path: Path, monkeypatch: pytest.Mon
     assert assembly_called is True
     assert art.status == "ok"
     assert stale_mp4.stat().st_size >= 1000
+
+
+def test_s10_render_fails_closed_when_subtitles_file_key_missing(tmp_path: Path) -> None:
+    """Verifies that S10 raises MissingSubtitlesError when S9 lacks the canonical 'subtitles_file' key."""
+    from stages.s10_render import MissingSubtitlesError
+
+    run_id = "test_s10_missing_sub_key"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    paths.final_render_dir.mkdir(parents=True, exist_ok=True)
+
+    clip0 = tmp_path / "clip0.mp4"
+    clip0.write_bytes(b"A" * 200)
+
+    s8_artifact = {
+        "run_id": run_id,
+        "stage": StageID.S8_VIDEO_GEN.value,
+        "status": "ok",
+        "payload": {
+            "clips": [{"scene_id": "SCENE_01", "file_path": str(clip0), "duration_sec": 2.0}]
+        },
+        "provenance": {"generator": "stages.s8_video_gen"},
+    }
+    s8_file = paths.artifact_file(StageID.S8_VIDEO_GEN.value)
+    s8_file.parent.mkdir(parents=True, exist_ok=True)
+    s8_file.write_text(json.dumps(s8_artifact), encoding="utf-8")
+
+    audio_file = tmp_path / "narration.wav"
+    audio_file.write_bytes(b"C" * 500)
+
+    # S9 payload intentionally omitting 'subtitles_file'
+    s9_artifact = {
+        "run_id": run_id,
+        "stage": StageID.S9_VOICE_TTS.value,
+        "status": "ok",
+        "payload": {
+            "audio_file": str(audio_file),
+            "subtitles": []
+        },
+        "provenance": {"generator": "stages.s9_voice_tts"},
+    }
+    s9_file = paths.artifact_file(StageID.S9_VOICE_TTS.value)
+    s9_file.parent.mkdir(parents=True, exist_ok=True)
+    s9_file.write_text(json.dumps(s9_artifact), encoding="utf-8")
+
+    cfg = load_profile("e2e_min")
+    manifest = RunManifest.create_new(run_id, profile="e2e_min")
+    ctx = RunContext(
+        run_id=run_id,
+        paths=paths,
+        manifest=manifest,
+        config=cfg,
+        force=True,
+        dry_run=False,
+    )
+
+    with pytest.raises(MissingSubtitlesError, match="canonical 'subtitles_file' key in S9 payload contract"):
+        run_s10_render(ctx)
+

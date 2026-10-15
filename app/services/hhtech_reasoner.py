@@ -13,9 +13,14 @@ PATTERN 3 UPDATE (02/09/2026):
   - Fallback support to Anthropic Claude if HHTech fails
 """
 
-import os, json, logging, re, urllib.request, urllib.parse
-from app.services.skill_loader import get_skill_rules, get_b1_strategic_rules
-from datetime import datetime, timezone
+import json
+import logging
+import os
+import re
+import urllib.parse
+import urllib.request
+
+from app.services.skill_loader import get_b1_strategic_rules
 
 logger = logging.getLogger(__name__)
 
@@ -69,13 +74,13 @@ def extract_clean_breakout_queries(rising_queries: list, max_count: int = 5) -> 
 def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str, str]:
     """Detect 4-Tier Content Theme, YouTube Safety Label, and Treatment Note from subject keywords."""
     text = (subject or "").lower()
-    
+
     truecrime_terms = ['killer', 'ripper', 'murder', 'serial', 'gacy', 'bundy', 'dahmer', 'rader', 'golden state', '조두순', 'n번방', 'nth room', 'sarin', '오우무', 'aum', '真理教', 'サリン', '신창원', '유영철']
     fraud_terms = ['fraud', 'scam', 'ponzi', 'madoff', 'enron', 'ftx', 'theranos', 'livedoor', 'ライブドア', 'worldcom', 'lehman', 'bankruptcy', 'insolvency', 'restructuring', 'creditor', 'liquidation', 'chapter 11', '다단계', '보이스피싱', '전세사기', '동양그룹', '東芝不正会計', 'オリンパス', '파산', '부도', '회생', '도산', '倒産', '破産']
     gambling_terms = ['gambling', 'casino', 'slot', 'pachinko', 'パチンコ', '도박', '강원랜드', '바다이야기', '사행성']
     societal_terms = ['kodokushi', '孤独死', '過労死', 'ひきこもり', '引きこもり', '고독사', '은둔']
     history_terms = ['war', 'uprising', 'movement', 'occupation', '광주', '민주화', '일제강점기', '한국전쟁', '제주 4.3', '을미사변', 'roman empire', 'byzantine', 'crusade', 'genghis khan', 'mongol', 'ottoman', 'tulip mania']
-    
+
     if any(t in text for t in truecrime_terms):
         return (
             "true_crime_investigative",
@@ -130,13 +135,13 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
             "YT-Military-Tactical-Investigation",
             "MILITARY LOGISTICS & GEOPOLITICAL CHOKEPOINTS: forensic deconstruction of supply line failures, tactical blunders, and strategic infrastructure chokepoints based on declassified records; ZERO glorification of violence."
         )
-    elif any(t in text for t in ["refund", "환불", "교환", "반품", "영수증", "바가지", "동탄문구점", "no refund", "cancellation fee", "hidden fee", "hidden cost", "fine print", "consumer trap", "소비자 분쟁", "위약금", "단순 변심", "가격표시제", "overcharge", "unilateral clause", "consumer dispute", "subscription trap"]):
+    elif any(t in text for t in ["refund", "환불", "교환", "반품", "영수증", "바가지", "no refund", "cancellation fee", "hidden fee", "hidden cost", "fine print", "consumer trap", "소비자 분쟁", "위약금", "단순 변심", "가격표시제", "overcharge", "unilateral clause", "consumer dispute", "subscription trap"]):
         return (
             "consumer_injustice_institutional_trap",
             "YT-Consumer-Awareness",
             "SOCIAL REALITY & CONSUMER INJUSTICE DOCUDRAMA: dissect everyday retail traps, asymmetric contract fine print, and regulatory loopholes; empathetic focus on victim struggle and institutional confrontation; ZERO defamation, strictly verified public records."
         )
-    
+
     return (
         "business_rise_fall",
         "YT-Safe-Standard",
@@ -151,7 +156,7 @@ def _fetch_native_wiki_extract(subject: str, market: str) -> str:
         "EN": "en", "US": "en", "GB": "en", "AU": "en", "CA": "en", "DE": "de", "NZ": "en"
     }
     lang = lang_map.get(market.upper(), "en")
-    
+
     try:
         url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(subject.replace(' ', '_'))}"
         req = urllib.request.Request(url, headers={"User-Agent": "VF-Reasoner/2.0"})
@@ -439,7 +444,7 @@ def assess_keyword_video_viability(
     keyword = (keyword or term or raw_headline or "").strip()
     m_up = (market or "EN").strip().upper()
     theme, safety_label, treatment_note = detect_safety_and_theme(keyword, m_up)
-    
+
     signals = dict(search_signals or {})
     if traffic and "traffic" not in signals:
         signals["traffic"] = traffic

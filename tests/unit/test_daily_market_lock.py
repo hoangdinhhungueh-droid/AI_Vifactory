@@ -224,22 +224,27 @@ def test_concurrent_acquire_in_progress_mutual_exclusion(temp_state_dir):
 
 
 def test_minimum_vn_hour_policy_protects_morning_window(temp_state_dir):
-    """Boss Item 5: A post-midnight run (< 06:00 AM VN) must NOT seal the market as EXHAUSTED_TODAY,
-    ensuring the scheduled 06:00 AM VN production window can evaluate fresh morning news."""
+    """Boss Item 5 & 18: A post-midnight run (< 06:00 AM VN) writes an EXHAUSTED_OFFHOURS lock
+    that throttles off-hours ticks but expires at 06:00 AM VN to protect the scheduled morning run."""
     from app.services.daily_market_lock import VN_TZ, is_market_done_today, mark_exhausted_today
 
     # Simulated post-midnight time: 00:42 AM VN on 2026-10-16
     midnight_vn = datetime(2026, 10, 16, 0, 42, tzinfo=VN_TZ)
 
-    # Off-hours run fails to seal EXHAUSTED_TODAY
+    # Off-hours run writes EXHAUSTED_OFFHOURS lock (Boss Item 18)
     res = mark_exhausted_today("EN", scan_count=10, state_dir=temp_state_dir, now=midnight_vn)
-    assert res is False
+    assert res is True
 
-    # Check eligibility at 06:00 AM VN: market should NOT be done today!
+    # Mid-night tick at 01:00 VN is throttled (prevents midnight cron burn)
+    done_off, reason_off, _ = is_market_done_today("EN", state_dir=temp_state_dir, now=midnight_vn)
+    assert done_off is True
+    assert reason_off == "lock_exhausted_offhours"
+
+    # Check eligibility at 06:00 AM VN: off-hours lock expires, morning run permitted!
     morning_vn = datetime(2026, 10, 16, 6, 0, tzinfo=VN_TZ)
     is_done, reason, details = is_market_done_today("EN", state_dir=temp_state_dir, now=morning_vn)
     assert is_done is False
-    assert reason == "not_produced_yet"
+    assert reason in ("stale_lock", "not_produced_yet")
 
     # In contrast, an afternoon exhaustion at 15:00 VN seals normally
     afternoon_vn = datetime(2026, 10, 16, 15, 0, tzinfo=VN_TZ)
@@ -327,7 +332,151 @@ def test_incident_1_b3_crash_blocks_incident_2_re_crawl(temp_state_dir, monkeypa
     )
 
     assert is_done is True, f"Expected B1 to skip re-crawl on Incident 2, but got is_done=False (reason={reason})"
-    assert reason in ("lock_in_progress", "registry_completed")
+    assert reason in ("lock_in_progress", "registry_committed_pending_render", "registry_completed")
     assert details.get("topic_id") == topic_id
+
+
+def test_held_lock_prevents_second_run_making_llm_calls(temp_state_dir, monkeypatch):
+    """Boss Item 13: An active IN_PROGRESS lock must abort a concurrent run immediately,
+    guaranteeing ZERO LLM calls or crawls occur under mutual exclusion."""
+    from app.services.daily_market_lock import acquire_in_progress
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    # First runner acquires IN_PROGRESS lock
+    ok = acquire_in_progress("EN", topic_id="ACTIVE_RUN", state_dir=temp_state_dir)
+    assert ok is True
+
+    # Spy on LLM viability call
+    llm_called = False
+    def mock_assess(*args, **kwargs):
+        nonlocal llm_called
+        llm_called = True
+        return {"is_video_viable": False}
+
+    monkeypatch.setattr("app.services.trend_engine_b1.assess_keyword_video_viability", mock_assess)
+
+    # Second runner attempts to crawl the same market
+    res = discover_and_produce_market_trend(market="EN", state_dir=temp_state_dir, auto_produce=False)
+    assert res == []
+    assert llm_called is False, "A held IN_PROGRESS lock must prevent any LLM calls in concurrent runs"
+
+
+def test_holder_verification_protects_lock_mutations(temp_state_dir):
+    """Boss Item 14: release_lock, mark_completed, and mark_exhausted_today must verify holder (pid + token)
+    and refuse to overwrite or unlink locks owned by another process."""
+    from app.services.daily_market_lock import (
+        acquire_in_progress,
+        is_market_done_today,
+        mark_completed,
+        mark_exhausted_today,
+        release_lock,
+    )
+
+    owner_pid = 4242
+    owner_token = "token_alpha_123"
+    wrong_pid = 9999
+    wrong_token = "token_bravo_456"
+
+    # Acquire lock with specific owner credentials
+    ok = acquire_in_progress(
+        "EN",
+        topic_id="OWNED_RUN",
+        state_dir=temp_state_dir,
+        owner_pid=owner_pid,
+        lock_token=owner_token,
+    )
+    assert ok is True
+
+    # Attempt to release with wrong token/pid -> REFUSED
+    rel_wrong = release_lock("EN", state_dir=temp_state_dir, lock_token=wrong_token, owner_pid=wrong_pid)
+    assert rel_wrong is False
+
+    # Verify lock still exists and is IN_PROGRESS
+    done, reason, _ = is_market_done_today("EN", state_dir=temp_state_dir, check_registry=False, check_episodes=False)
+    assert done is True
+    assert reason == "lock_in_progress"
+
+    # Attempt to mark_completed with wrong token -> REFUSED
+    comp_wrong = mark_completed(
+        "EN",
+        topic_id="FAKE_DONE",
+        state_dir=temp_state_dir,
+        lock_token=wrong_token,
+        owner_pid=wrong_pid,
+    )
+    assert comp_wrong is False
+
+    # Attempt to mark_exhausted_today with wrong token -> REFUSED
+    ex_wrong = mark_exhausted_today(
+        "EN",
+        scan_count=5,
+        state_dir=temp_state_dir,
+        lock_token=wrong_token,
+        owner_pid=wrong_pid,
+    )
+    assert ex_wrong is False
+
+    # Legitimate owner marks COMPLETED -> SUCCEEDS
+    comp_ok = mark_completed(
+        "EN",
+        topic_id="REAL_DONE",
+        state_dir=temp_state_dir,
+        lock_token=owner_token,
+        owner_pid=owner_pid,
+    )
+    assert comp_ok is True
+
+    done_final, reason_final, details_final = is_market_done_today(
+        "EN", state_dir=temp_state_dir, check_registry=False, check_episodes=False
+    )
+    assert done_final is True
+    assert reason_final == "lock_completed"
+    assert details_final.get("topic_id") == "REAL_DONE"
+
+
+def test_load_history_raises_fails_closed(temp_state_dir, monkeypatch):
+    """Boss Item 15: If load_history raises an unexpected exception, is_market_done_today
+    must fail closed (return is_done=True, reason='registry_unreadable_fail_closed') instead of failing open."""
+    import app.services.topic_history_registry as reg_mod
+    from app.services.daily_market_lock import is_market_done_today
+
+    def mock_broken_history():
+        raise IOError("Simulated corrupted registry database")
+
+    monkeypatch.setattr(reg_mod, "load_history", mock_broken_history)
+
+    is_done, reason, details = is_market_done_today(
+        "EN",
+        state_dir=temp_state_dir,
+        check_registry=True,
+        check_episodes=False,
+    )
+    assert is_done is True, "Unexpected registry errors must fail closed to protect quota"
+    assert reason == "registry_unreadable_fail_closed"
+    assert "Simulated corrupted registry" in details.get("error", "")
+
+
+def test_repeated_off_hours_ticks_throttled(temp_state_dir):
+    """Boss Item 18: Repeated ticks before 06:00 AM VN must stay throttled via EXHAUSTED_OFFHOURS,
+    and then automatically expire at 06:00 AM VN to permit scheduled morning production."""
+    from app.services.daily_market_lock import VN_TZ, is_market_done_today, mark_exhausted_today
+
+    # 1. First tick at 01:15 AM VN: scan finds no candidate, writes EXHAUSTED_OFFHOURS
+    t1 = datetime(2026, 10, 16, 1, 15, tzinfo=VN_TZ)
+    marked = mark_exhausted_today("EN", scan_count=10, state_dir=temp_state_dir, now=t1)
+    assert marked is True
+
+    # 2. Subsequent ticks at 02:00, 03:00, 04:00, 05:00 VN must all be throttled
+    for h in [2, 3, 4, 5]:
+        t_tick = datetime(2026, 10, 16, h, 0, tzinfo=VN_TZ)
+        is_done, reason, _ = is_market_done_today("EN", state_dir=temp_state_dir, now=t_tick)
+        assert is_done is True, f"Tick at {h:02d}:00 VN should be throttled by EXHAUSTED_OFFHOURS"
+        assert reason == "lock_exhausted_offhours"
+
+    # 3. Morning arrives at 06:05 AM VN: lock expired, market is ready!
+    t_morn = datetime(2026, 10, 16, 6, 5, tzinfo=VN_TZ)
+    is_done_morn, reason_morn, _ = is_market_done_today("EN", state_dir=temp_state_dir, now=t_morn)
+    assert is_done_morn is False, "At 06:00 AM VN, off-hours throttle must expire to permit morning production"
+    assert reason_morn in ("stale_lock", "not_produced_yet")
 
 

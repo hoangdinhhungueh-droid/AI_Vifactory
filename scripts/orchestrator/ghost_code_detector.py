@@ -24,7 +24,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Any, Dict, List, Tuple
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -55,6 +55,7 @@ FORBIDDEN_FILE_PATTERNS = [
     r".*\.(bak|backup|old|orig|broken)([._-].*)?$",
     r".*~$",
     r".*\.broken.*$",
+    r".*\.tombstone.*$",
 ]
 
 # Forbidden directories
@@ -110,7 +111,7 @@ class GhostCodeDetector:
         """Layer 2: Detects hardcoded specific episode slugs in production scripts (Rule 128)."""
         layer_defects = []
         target_dirs = [self.root_dir / "app", self.root_dir / "scripts"]
-        
+
         # Files permitted to mention slugs for testing/reference
         whitelist_files = {
             "ghost_code_detector.py",
@@ -155,7 +156,7 @@ class GhostCodeDetector:
     def check_layer4_documentation_parity(self) -> List[str]:
         """Layer 4: Ensures documentation across AGENTS.md and PIPELINE_CONTRACTS.md matches single truth."""
         layer_defects = []
-        
+
         # Check AGENTS.md
         agents_md = self.root_dir / "AGENTS.md"
         if agents_md.exists():
