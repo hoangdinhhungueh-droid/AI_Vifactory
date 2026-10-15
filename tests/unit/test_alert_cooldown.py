@@ -2,17 +2,15 @@
 tests/unit/test_alert_cooldown.py — UNIT TESTS FOR ALERT RATE LIMITER & COOLDOWN ENGINE
 """
 
-import json
 import os
 import shutil
 import tempfile
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+
 import pytest
 
 from app.services.alert_cooldown import (
     record_alert_sent,
-    reset_alert_cooldown,
     should_send_alert,
 )
 

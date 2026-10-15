@@ -8,16 +8,14 @@ import shutil
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
 import pytest
 
 from app.services.daily_market_lock import (
-    VN_TZ,
     acquire_in_progress,
     is_market_done_today,
     mark_completed,
     release_lock,
-    resolve_state_dir,
-    vn_now,
     vn_today,
 )
 

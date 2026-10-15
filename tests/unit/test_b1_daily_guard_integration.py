@@ -6,6 +6,7 @@ import os
 import shutil
 import tempfile
 from unittest.mock import patch
+
 import pytest
 
 from app.services.daily_market_lock import mark_completed
@@ -46,6 +47,7 @@ def test_b1_force_crawl_bypasses_daily_completion(isolated_env):
     with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[]) as mock_fetch:
         # With custom_seed
         results = discover_and_produce_market_trend(market="EN", custom_seed="custom_topic", auto_produce=False)
+        assert results == []
         assert mock_fetch.called
 
     with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[]) as mock_fetch2:
@@ -53,6 +55,7 @@ def test_b1_force_crawl_bypasses_daily_completion(isolated_env):
         os.environ["B1_FORCE_CRAWL"] = "1"
         try:
             results = discover_and_produce_market_trend(market="EN", auto_produce=False)
+            assert results == []
             assert mock_fetch2.called
         finally:
             os.environ.pop("B1_FORCE_CRAWL", None)

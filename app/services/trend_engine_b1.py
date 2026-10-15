@@ -39,21 +39,21 @@ if _PROJECT_ROOT not in sys.path:
 if "/root/video_factory" not in sys.path:
     sys.path.insert(0, "/root/video_factory")
 
-from app.services.competitor_recon_b15 import QuotaTracker, run_b15, youtube_search, youtube_video_details
-from app.services.hhtech_reasoner import (
-    _fetch_native_wiki_extract,
-    assess_keyword_video_viability,
-    reason_topic_niche,
+from app.services.alert_cooldown import (
+    record_alert_sent,
+    should_send_alert,
 )
+from app.services.competitor_recon_b15 import QuotaTracker, run_b15, youtube_search, youtube_video_details
 from app.services.daily_market_lock import (
     acquire_in_progress,
     is_market_done_today,
     mark_completed,
     release_lock,
 )
-from app.services.alert_cooldown import (
-    record_alert_sent,
-    should_send_alert,
+from app.services.hhtech_reasoner import (
+    _fetch_native_wiki_extract,
+    assess_keyword_video_viability,
+    reason_topic_niche,
 )
 from app.services.topic_history_registry import is_topic_already_handled, record_handled_topic
 from app.services.trend_free_signals import (

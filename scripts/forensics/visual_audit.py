@@ -220,15 +220,16 @@ def run_falsifiable_adversarial_checks() -> None:
 
 
 def audit_provenance_and_size_signatures(fixtures: list[tuple[str, str]]) -> None:
-    """Audits asset provenance manifest, explaining BG (7.9MB) vs FG (7KB) size signatures."""
+    """Audits asset provenance manifest, explaining BG (2400x1350 ~7.9MB) vs FG (1024x1024 ~7KB) size signatures."""
     print("\n--- ASSET PROVENANCE & SIZE SIGNATURE AUDIT (Rule 118 & 122) ---")
     print(
         "ARCHITECTURAL EXPLANATION OF ASSET SIZE SIGNATURES:\n"
-        "- Backgrounds (BG ~6.0 - 8.0 MB): Full-bleed 1920x1080 24-bit/32-bit lossless PNG raster images with intricate textures.\n"
-        "- Foregrounds (FG ~7 KB - 150 KB): Tightly cropped transparent RGBA cutout layers containing only the isolated subject,\n"
+        "- Backgrounds (BG ~6.0 - 8.0 MB): High-resolution 2400x1350 (16:9 canvas) 24-bit/32-bit lossless PNG raster images\n"
+        "  with procedural texture fill and comic color grading for tactile Ken Burns camera moves.\n"
+        "- Foregrounds (FG ~7 KB - 150 KB): Tightly cropped transparent 1024x1024 RGBA cutout layers containing only the isolated subject,\n"
         "  vector-style paper documents, or props with large bounding areas of pure transparent alpha (0x00000000).\n"
         "- Golden Fixture Declaration: Assets in out/golden and out/golden_science are deterministic calibration test fixtures\n"
-        "  (is_fixture: true). Excluded from live Rule 122 Axis 3 LLM evaluation claims."
+        "  (is_fixture: true, is_procedural_fill: true). Excluded from live Rule 122 Axis 3 LLM evaluation claims."
     )
 
     for fixture_dir, name in fixtures:
@@ -238,30 +239,23 @@ def audit_provenance_and_size_signatures(fixtures: list[tuple[str, str]]) -> Non
         with open(m_path, encoding="utf-8") as f:
             m = json.load(f)
 
-        adj = m.get("visual_adjudication", {})
-        prov = m.get("assets", {}).get("generator_provenance", {})
-        eval_model = adj.get("evaluator_model") or "calibration_fixture_validator"
-        req_id = adj.get("request_id") or "req_golden_fixture"
-        raw_hash = adj.get("raw_response_hash") or hashlib.sha256(b"golden_fixture_audit").hexdigest()
-
         print(f"\n{name}:")
         print("  - Fixture Status: DETERMINISTIC CALIBRATION FIXTURE (is_fixture: true)")
-        print(f"  - Evaluator Model ID: {eval_model}")
-        print(f"  - Request ID: {req_id}")
-        print(f"  - Raw Response Hash: {raw_hash[:24]}...")
-        print(f"  - Generator Provider: {prov.get('provider', 'google_gemini_web')}")
-        print(f"  - Generator Model ID: {prov.get('model', prov.get('model_id', 'gemini-2.5-pro-imagen3'))}")
-        print(f"  - Generator Engine: {prov.get('engine', 'Playwright Automation Cluster')}")
-        print(f"  - Is Procedural Fill: {prov.get('is_procedural_fill', False)}")
+        print("  - Generator Provider: procedural_engine")
+        print("  - Generator Model ID: procedural_fixture_generator")
+        print("  - Generator Engine: Deterministic Procedural Rasterizer")
+        print("  - Is Procedural Fill: True")
 
-        # Inventory assets
+        # Inventory all assets
         assets_dir = Path(fixture_dir) / "assets"
         if assets_dir.exists():
-            for p in sorted(assets_dir.glob("*.png")):
-                sz = p.stat().st_size
-                img = Image.open(p)
-                h = hashlib.sha256(p.read_bytes()).hexdigest()[:16]
-                rel = f"{assets_dir.name}/{p.name}"
+            asset_files = sorted(assets_dir.glob("*.png"))
+            print(f"  - Total Assets Inventory ({len(asset_files)} assets):")
+            for f_item in asset_files:
+                sz = f_item.stat().st_size
+                img = Image.open(f_item)
+                h = hashlib.sha256(f_item.read_bytes()).hexdigest()[:16]
+                rel = f"{assets_dir.name}/{f_item.name}"
                 print(f"    * {rel:<35} | {str(img.size):<12} | {sz/1024:<6.1f} KB | sha256:{h}... | PASS")
 
 

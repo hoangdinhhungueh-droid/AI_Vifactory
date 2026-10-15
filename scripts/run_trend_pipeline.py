@@ -26,10 +26,9 @@ Usage:
   python3 scripts/run_trend_pipeline.py --no-produce            # Discovery only (skip B2/B3 production)
   python3 scripts/run_trend_pipeline.py --dry-run               # Inspect scheduled market without running
 """
+import logging
 import os
 import sys
-import json
-import logging
 from datetime import datetime, timezone
 
 # Ensure project root in sys.path
@@ -53,18 +52,13 @@ def _load_system_secrets():
 
 _load_system_secrets()
 
-from app.services.trend_engine_b1 import (
-    discover_and_produce_market_trend,
-    run_daily_all_markets
-)
 from app.services.daily_market_lock import is_market_done_today
 from app.services.market_scheduler import (
     get_market_schedule_info,
-    get_scheduled_market_for_date,
     get_vn_now,
-    is_production_day,
     run_sunday_maintenance,
 )
+from app.services.trend_engine_b1 import discover_and_produce_market_trend
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("run_trend_pipeline")
@@ -149,7 +143,7 @@ def main():
         scheduled_mkt = schedule_info["scheduled_market"]
         markets = [scheduled_mkt]
         print("=======================================================")
-        print(f"📅 [MARKET SCHEDULER] DAILY PRODUCTION CADENCE (1 VIDEO/DAY)")
+        print("📅 [MARKET SCHEDULER] DAILY PRODUCTION CADENCE (1 VIDEO/DAY)")
         print(f"Time (VN UTC+7): {schedule_info['timestamp_vn']} | Day: {schedule_info['day_vi']} ({schedule_info['day_en']})")
         print(f"Assigned Market Today: 🚀 {scheduled_mkt} (Single Market Execution)")
         print("Prevents VPS CPU/RAM crash by isolating production workloads.")
@@ -237,7 +231,7 @@ def main():
         print(f"   Angle: '{t.get('specific_viral_angle')}'")
         print(f"   Blue Ocean Gap: {t.get('competitor_differentiation_gap')}")
         print(f"   Task ID: {t.get('task_id')}")
-        print(f"   Status: Human Gate 1 & Human Gate 2 dispatched.")
+        print("   Status: Human Gate 1 & Human Gate 2 dispatched.")
 
 
 
