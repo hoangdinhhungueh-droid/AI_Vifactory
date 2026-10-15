@@ -93,13 +93,13 @@ def test_audio_alignment_with_known_duration_offset(tmp_path):
     _create_synthetic_wav(wav_base, duration_sec=4.0)
     _create_synthetic_wav(wav_expanded, duration_sec=8.0)
 
-    timeline_base, plan_base = align_script_with_audio(plan1, wav_base)
+    timeline_base, plan_base = align_script_with_audio(plan1, wav_base, allow_synthetic_alignment=True)
     assert timeline_base.audio_duration == 4.0
     assert plan_base.scenes[0].start == 0.0
     assert plan_base.scenes[-1].end == 4.0
 
     plan2 = _make_test_plan()
-    timeline_exp, plan_exp = align_script_with_audio(plan2, wav_expanded)
+    timeline_exp, plan_exp = align_script_with_audio(plan2, wav_expanded, allow_synthetic_alignment=True)
     assert timeline_exp.audio_duration == 8.0
     assert plan_exp.scenes[0].start == 0.0
     assert plan_exp.scenes[-1].end == 8.0
@@ -140,7 +140,7 @@ def test_adversarial_leading_offset_detection(tmp_path):
     dur = get_audio_duration_wav(wav_padded)
     assert abs(dur - 6.0) < 0.01
 
-    timeline, plan_out = align_script_with_audio(plan, wav_padded)
+    timeline, plan_out = align_script_with_audio(plan, wav_padded, allow_synthetic_alignment=True)
 
     # Assert monotonic timestamps
     for i in range(len(timeline.words) - 1):
@@ -246,7 +246,7 @@ def test_non_frame_divisible_duration_no_degenerate_scene(tmp_path):
     adversarial_dur = 7.123
     _create_synthetic_wav(wav, duration_sec=adversarial_dur)
 
-    timeline, plan_out = align_script_with_audio(plan, wav)
+    timeline, plan_out = align_script_with_audio(plan, wav, allow_synthetic_alignment=True)
 
     assert abs(timeline.audio_duration - adversarial_dur) < 0.001
     assert plan_out.scenes[0].start == 0.0

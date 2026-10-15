@@ -76,7 +76,8 @@ def test_multilingual_audio_alignment_japanese(tmp_path):
         ]
     )
 
-    timeline, updated_plan = align_script_with_audio(plan, wav_p, market="JA")
+    timeline, updated_plan = align_script_with_audio(plan, wav_p, market="JA", allow_synthetic_alignment=True)
+    assert timeline.alignment_model == "synthetic"
     assert len(timeline.words) > 0
     assert updated_plan.scenes[0].start == 0.0
     assert updated_plan.scenes[-1].end <= 7.55
@@ -106,7 +107,8 @@ def test_multilingual_audio_alignment_korean(tmp_path):
         ]
     )
 
-    timeline, updated_plan = align_script_with_audio(plan, wav_p, market="KO")
+    timeline, updated_plan = align_script_with_audio(plan, wav_p, market="KO", allow_synthetic_alignment=True)
+    assert timeline.alignment_model == "synthetic"
     assert len(timeline.words) > 0
     assert updated_plan.scenes[0].start == 0.0
     assert updated_plan.scenes[0].end <= 6.05
