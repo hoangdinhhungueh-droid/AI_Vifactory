@@ -946,9 +946,51 @@ def forensic_pre_filter(candidate: dict, market: str) -> tuple[bool, str]:
 
 
 
-MAX_B2_ATTEMPTS_DEFAULT = int(os.getenv("MAX_B2_ATTEMPTS_PER_RUN", "2"))
-MAX_SCAN_CANDIDATES_DEFAULT = int(os.getenv("MAX_SCAN_CANDIDATES", "10"))
-MAX_VIABILITY_LLM_EVALS_DEFAULT = int(os.getenv("MAX_VIABILITY_LLM_EVALS", "6"))
+LIVE_TRAFFIC_SOURCES: frozenset[str] = frozenset({"google_news_live", "specialized_rss_live"})
+
+
+def _parse_env_int(var_name: str, default: int, min_val: int = 1) -> int:
+    """Robustly parse environment integers with logging fallback and minimum bound."""
+    raw = os.getenv(var_name, "").strip()
+    if not raw:
+        return default
+    try:
+        val = int(raw)
+        if val < min_val:
+            logger.warning(f"Env {var_name}={val} is below minimum {min_val}. Clamping to {min_val}.")
+            return min_val
+        return val
+    except ValueError:
+        logger.warning(f"Invalid integer for env {var_name}='{raw}'. Falling back to default {default}.")
+        return default
+
+
+MAX_B2_ATTEMPTS_DEFAULT = _parse_env_int("MAX_B2_ATTEMPTS_PER_RUN", 2, min_val=1)
+MAX_SCAN_CANDIDATES_DEFAULT = _parse_env_int("MAX_SCAN_CANDIDATES", 10, min_val=1)
+MAX_VIABILITY_LLM_EVALS_DEFAULT = _parse_env_int("MAX_VIABILITY_LLM_EVALS", 6, min_val=1)
+
+
+def check_evidence_catalyst_gate(
+    news_catalysts: list,
+    traffic_source: str,
+    factsheet_extract: Optional[str] = None,
+    is_custom_seed: bool = False,
+) -> tuple[bool, str]:
+    """Level-0.5 Evidence Catalyst Pre-Filter Gate (0 LLM Tokens Burned - Rule 118, 128, 130).
+    Rejects candidates lacking breaking news catalysts or verified Wikipedia extract.
+    """
+    if is_custom_seed:
+        return True, "Bypassed: custom seed"
+    is_live_news = traffic_source in LIVE_TRAFFIC_SOURCES
+    has_catalyst = bool(news_catalysts) or is_live_news or bool(factsheet_extract and factsheet_extract.strip())
+    if not has_catalyst:
+        return False, "No breaking news catalysts, live RSS, or verified entity factsheet (0 LLM tokens burned)"
+    reason = (
+        f"Verified with {len(news_catalysts)} breaking news catalyst(s)" if news_catalysts
+        else f"Verified live news source: {traffic_source}" if is_live_news
+        else "Verified ground-truth entity factsheet"
+    )
+    return True, reason
 
 
 def discover_and_produce_market_trend(
@@ -972,6 +1014,7 @@ def discover_and_produce_market_trend(
         return []
 
     produced_topics = []
+    committed_tasks = []
     viability_passed_candidates = []
     consecutive_api_errors = 0
     max_consecutive_api_errors = 3
@@ -1003,10 +1046,14 @@ def discover_and_produce_market_trend(
 
         # Level-0.5 Evidence Catalyst Pre-Filter Gate (0 LLM Tokens Burned - Rule 118, 128, 130)
         news_catalysts = recon_data.get("news_catalysts", [])
-        is_live_news = c.get("traffic") in ["google_news_live", "specialized_rss_live"]
-        has_verified_catalyst = bool(news_catalysts) or is_live_news or bool(factsheet.get("extract"))
-        if not has_verified_catalyst and not custom_seed:
-            print(f"  ⏭️ [PRE-FILTER LEVEL-0 REJECT] No breaking news catalysts or verified entity factsheet for '{term}' (0 LLM tokens burned).")
+        has_catalyst, catalyst_reason = check_evidence_catalyst_gate(
+            news_catalysts=news_catalysts,
+            traffic_source=c.get("traffic", ""),
+            factsheet_extract=factsheet.get("extract", ""),
+            is_custom_seed=bool(custom_seed),
+        )
+        if not has_catalyst:
+            print(f"  ⏭️ [PRE-FILTER LEVEL-0.5 REJECT] {catalyst_reason} for '{term}'.")
             continue
 
         # Hard Circuit Breaker for Viability LLM evaluations per market run
@@ -1434,29 +1481,51 @@ def discover_and_produce_market_trend(
 
         # 9. Send Pure Telegram Gate 1 Notification (Now fully enriched with Title A/B, 60s Hook & B2.1 PASS!)
         send_pure_telegram_gate1_notification(t_obj)
-        produced_topics.append(t_obj)
+        committed_tasks.append(task_id)
 
         # 10. Proceed directly to B3 Hollywood Director Plan & B3.5 Prompt Forge
+        res_code = 0
         if auto_produce:
-            print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {task_id}...")
+            print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {task_id} (profile=prod)...")
+            cmd = [
+                sys.executable,
+                "-m",
+                "orchestrator.run_pipeline",
+                "--profile",
+                "prod",
+                "--run-id",
+                str(task_id),
+            ]
             try:
-                import subprocess
-                cmd = [sys.executable, "/root/video_factory/orchestrator/run_pipeline.py", "--run-id", str(task_id)]
-                proc = subprocess.run(cmd, cwd="/root/video_factory", capture_output=True, text=True, timeout=1800)
+                proc = subprocess.run(cmd, cwd=str(_PROJECT_ROOT), capture_output=True, text=True, timeout=1800)
                 res_code = proc.returncode
                 if res_code == 0:
                     print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B2.1 -> B3 -> Gate 2 for {task_id}!")
+                    produced_topics.append(t_obj)
                 else:
-                    logger.error(f"[{task_id}] Downstream pipeline stopped at stage with exit code {res_code}: {proc.stderr[:300]}")
+                    stderr_tail = "\n".join(proc.stderr.strip().splitlines()[-15:]) if proc.stderr else "No stderr emitted."
+                    logger.error(f"[{task_id}] Downstream pipeline stopped at stage with exit code {res_code}:\n{stderr_tail}")
+            except subprocess.TimeoutExpired:
+                res_code = 124
+                logger.error(f"[{task_id}] Downstream pipeline timed out after 1800s.")
             except Exception as prod_err:
+                res_code = 1
                 logger.error(f"[{task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}")
             break
         else:
+            produced_topics.append(t_obj)
             break
 
     if not produced_topics and not custom_seed:
         scanned_count = min(len(candidates), max_scan_candidates)
-        if viability_passed_candidates:
+        if committed_tasks:
+            alert_msg = (
+                f"⚠️ <b>[VF PIPELINE B3 DOWNSTREAM ALERT - RULE 118]</b>\n"
+                f"Thị trường <b>{m_up}</b>: Đề tài <code>{committed_tasks[0]}</code> đã <b>ĐẠT GATE 1</b> nhưng B3 render pipeline gặp sự cố (Exit code {res_code}).\n"
+                f"🔧 Trạng thái: Kịch bản đã lưu an toàn tại Notion Story Library. Vui lòng kiểm tra log B3 để tiếp tục render."
+            )
+            logger.warning(f"[{m_up}] Task {committed_tasks[0]} passed Gate 1 but downstream B3 pipeline halted with exit code {res_code}.")
+        elif viability_passed_candidates:
             # Candidates passed B1 Viability Gate, but were stopped downstream (Critic, Grounding, or B2 Story/Fact Audit)
             alert_msg = (
                 f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"

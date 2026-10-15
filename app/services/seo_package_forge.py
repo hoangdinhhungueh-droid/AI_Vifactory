@@ -256,7 +256,7 @@ def sync_exact_chapters_from_remotion(
 
                     if is_vox_manifest and "start" in s:
                         sec = int(float(s["start"]))
-                        dur = int(round(float(s.get("end", s["start"]) - s["start"]) * fps))
+                        dur = int(round((float(s.get("end", s["start"])) - float(s["start"])) * fps))
                     else:
                         dur = int(s.get("durationInFrames") or 0)
                         sec = int(current_frame / fps)

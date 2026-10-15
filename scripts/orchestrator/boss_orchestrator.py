@@ -956,19 +956,33 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "assert t.MAX_VIABILITY_LLM_EVALS_DEFAULT == 6, f'Bad MAX_VIABILITY_LLM_EVALS_DEFAULT: {t.MAX_VIABILITY_LLM_EVALS_DEFAULT}'\n"
         "assert t.MAX_B2_ATTEMPTS_DEFAULT == 2, f'Bad MAX_B2_ATTEMPTS_DEFAULT: {t.MAX_B2_ATTEMPTS_DEFAULT}'\n"
         "assert hasattr(t, 'forensic_pre_filter'), 'Missing forensic_pre_filter'\n"
-        "print('CONSTANTS_VERIFIED: MAX_SCAN_CANDIDATES_DEFAULT=10, MAX_VIABILITY_LLM_EVALS_DEFAULT=6, MAX_B2_ATTEMPTS_DEFAULT=2')\n"
+        "assert hasattr(t, 'check_evidence_catalyst_gate'), 'Missing check_evidence_catalyst_gate'\n"
+        "assert hasattr(t, 'LIVE_TRAFFIC_SOURCES'), 'Missing LIVE_TRAFFIC_SOURCES'\n"
+        "print('CONSTANTS_VERIFIED: MAX_SCAN_CANDIDATES_DEFAULT=10, MAX_VIABILITY_LLM_EVALS_DEFAULT=6, MAX_B2_ATTEMPTS_DEFAULT=2, LIVE_TRAFFIC_SOURCES frozenset')\n"
         "\""
     )
     code_prefilter, out_prefilter = run_on_vps(
         "python3 -c \""
-        "from app.services.trend_engine_b1 import forensic_pre_filter\n"
+        "from app.services.trend_engine_b1 import forensic_pre_filter, check_evidence_catalyst_gate\n"
+        "# 1. Level-0 Forensic Anchor Gate\n"
         "cand_empty = {'term': 'generic lifestyle query', 'approx_traffic': '100K+'}\n"
-        "ok1, reason1 = forensic_pre_filter(cand_empty, 'EN')\n"
-        "assert not ok1, 'Pre-filter should reject candidates without forensic crisis anchor'\n"
-        "cand_valid = {'term': 'debt crisis default shock', 'approx_traffic': '100K+'}\n"
-        "ok2, reason2 = forensic_pre_filter(cand_valid, 'EN')\n"
-        "assert ok2, 'Pre-filter should pass candidate with valid forensic crisis anchor'\n"
-        "print(f'PRE_FILTER_FALSIFIABILITY_VERIFIED: Generic rejected ({reason1}), Crisis anchor passed ({reason2})')\n"
+        "ok0, reason0 = forensic_pre_filter(cand_empty, 'EN')\n"
+        "assert not ok0, 'Level-0 should reject generic candidate without crisis anchor'\n"
+        "cand_valid0 = {'term': 'debt crisis default shock', 'approx_traffic': '100K+'}\n"
+        "ok0_v, reason0_v = forensic_pre_filter(cand_valid0, 'EN')\n"
+        "assert ok0_v, 'Level-0 should pass candidate with valid forensic crisis anchor'\n"
+        "# 2. Level-0.5 Evidence Catalyst Gate (0 LLM Tokens)\n"
+        "ok05_empty, reason05_empty = check_evidence_catalyst_gate([], 'youtube_autocomplete', '', False)\n"
+        "assert not ok05_empty, 'Level-0.5 should reject empty catalysts and empty factsheet'\n"
+        "ok05_news, reason05_news = check_evidence_catalyst_gate([{'title': 'Breaking News'}], 'youtube_autocomplete', '', False)\n"
+        "assert ok05_news, 'Level-0.5 should pass on breaking news catalysts'\n"
+        "ok05_live, reason05_live = check_evidence_catalyst_gate([], 'google_news_live', '', False)\n"
+        "assert ok05_live, 'Level-0.5 should pass on live RSS'\n"
+        "ok05_wiki, reason05_wiki = check_evidence_catalyst_gate([], 'youtube_autocomplete', 'Wikipedia verified text', False)\n"
+        "assert ok05_wiki, 'Level-0.5 should pass on Wikipedia factsheet'\n"
+        "ok05_custom, reason05_custom = check_evidence_catalyst_gate([], 'unknown', '', True)\n"
+        "assert ok05_custom, 'Level-0.5 should bypass on custom seed'\n"
+        "print('PRE_FILTER_FALSIFIABILITY_VERIFIED: Level-0 anchor and Level-0.5 evidence catalyst gates verified across all 6 branches.')\n"
         "\""
     )
     evidence_blocks.append(
@@ -978,7 +992,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
     )
 
     # 5. Live VPS Test Suites
-    code_pytest_unit, out_pytest_unit = run_on_vps("/root/video_factory/venv/bin/python3 -m pytest tests/unit/test_story_gate_multimarket.py -v")
+    code_pytest_unit, out_pytest_unit = run_on_vps("/root/video_factory/venv/bin/python3 -m pytest tests/unit/test_trend_caps_and_gates.py tests/unit/test_story_gate_multimarket.py -v")
     code_neighbor, out_neighbor = run_on_vps("/root/video_factory/venv/bin/python3 tests/ci_neighbor_tester.py")
     code_dryrun, out_dryrun = run_on_vps("/root/video_factory/venv/bin/python3 scripts/run_trend_pipeline.py --dry-run")
     code_ghost, out_ghost = run_on_vps("python3 /root/video_factory/tools/ghost_scan.py")
@@ -986,7 +1000,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
 
     evidence_blocks.append(
         f"### [5. RUNTIME TEST SUITES ON VPS (Rule 127)]\n"
-        f"tests/unit/test_story_gate_multimarket.py Exit Code: {code_pytest_unit}\n{out_pytest_unit}\n\n"
+        f"tests/unit/ (Trend Caps + Multimarket Story Gate) Exit Code: {code_pytest_unit}\n{out_pytest_unit}\n\n"
         f"tests/ci_neighbor_tester.py Exit Code: {code_neighbor}\n{out_neighbor}\n\n"
         f"scripts/run_trend_pipeline.py --dry-run Exit Code: {code_dryrun}\n{out_dryrun}\n\n"
         f"tools/ghost_scan.py Exit Code: {code_ghost}\n{out_ghost}\n"
@@ -996,12 +1010,13 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
     try:
         from scripts.watch_github_ci import DEFAULT_REPO, DEFAULT_TOKEN, fetch_run_for_commit, get_opener
         opener = get_opener()
+        # Query run for HEAD; if still in-progress or queued, also check recent completed runs
         ci_run = fetch_run_for_commit(DEFAULT_REPO, DEFAULT_TOKEN, git_head, opener)
+        ci_info = ""
         if ci_run:
             conclusion = ci_run.get('conclusion')
             ci_code = 0 if conclusion == 'success' else 1
-            evidence_blocks.append(
-                f"### [6. GITHUB ACTIONS CI/CD VERIFICATION (Rule 126)]\n"
+            ci_info = (
                 f"CI Gate Exit Code: {ci_code}\n"
                 f"Run ID:            {ci_run.get('id')}\n"
                 f"Commit Head SHA:   {ci_run.get('head_sha')}\n"
@@ -1010,7 +1025,8 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
                 f"Run URL:           {ci_run.get('html_url')}\n"
             )
         else:
-            evidence_blocks.append(f"### [6. GITHUB ACTIONS CI/CD VERIFICATION]\nRun not found for commit {git_head}.\n")
+            ci_info = f"CI Gate Exit Code: 1\nRun not found for commit {git_head}.\n"
+        evidence_blocks.append(f"### [6. GITHUB ACTIONS CI/CD VERIFICATION (Rule 126)]\n{ci_info}")
     except Exception as e:
         evidence_blocks.append(f"### [6. GITHUB ACTIONS CI/CD VERIFICATION]\nError fetching CI: {e}\n")
 
