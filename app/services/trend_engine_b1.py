@@ -999,7 +999,8 @@ def discover_and_produce_market_trend(
     custom_seed: str = None,
     auto_produce: bool = True,
     max_scan_candidates: int = MAX_SCAN_CANDIDATES_DEFAULT,
-    max_b2_attempts: int = MAX_B2_ATTEMPTS_DEFAULT
+    max_b2_attempts: int = MAX_B2_ATTEMPTS_DEFAULT,
+    max_viability_llm_evals: int = MAX_VIABILITY_LLM_EVALS_DEFAULT,
 ) -> list[dict]:
     """Execute canonical B1 trend discovery and automated B1.5 -> B2 -> B3 pipeline
     for exactly 1 topic per market per day.
@@ -1061,8 +1062,8 @@ def discover_and_produce_market_trend(
             continue
 
         # Hard Circuit Breaker for Viability LLM evaluations per market run
-        if viability_evals_count >= MAX_VIABILITY_LLM_EVALS_DEFAULT and not custom_seed:
-            print(f"  🛑 [RULE 118 CAP] Viability LLM evaluation cap reached ({viability_evals_count}/{MAX_VIABILITY_LLM_EVALS_DEFAULT}). Halting further candidate LLM evaluations for {m_up}.")
+        if viability_evals_count >= max_viability_llm_evals and not custom_seed:
+            print(f"  🛑 [RULE 118 CAP] Viability LLM evaluation cap reached ({viability_evals_count}/{max_viability_llm_evals}). Halting further candidate LLM evaluations for {m_up}.")
             break
 
         viability_evals_count += 1
@@ -1443,7 +1444,7 @@ def discover_and_produce_market_trend(
             cmd = [
                 sys.executable,
                 "-m",
-                "orchestrator.run_pipeline",
+                "scripts.orchestrator.run_pipeline",
                 "--profile",
                 "prod",
                 "--run-id",

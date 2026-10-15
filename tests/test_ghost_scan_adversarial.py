@@ -70,3 +70,18 @@ def test_ghost_scan_main_exits_nonzero_on_violation(tmp_path, monkeypatch):
     monkeypatch.setattr(ghost_scan, "REPO_ROOT", fake_root)
     code = ghost_scan.main()
     assert code == 1
+
+
+def test_ghost_scan_detects_planted_scratch_probe_file(tmp_path, monkeypatch):
+    """Adversarial Test: Planting an untracked scratch probe file must trigger a violation."""
+    fake_root = tmp_path / "repo"
+    fake_root.mkdir()
+    scripts_dir = fake_root / "scripts"
+    scripts_dir.mkdir()
+    (scripts_dir / "scratch_probe_test.py").write_text("print('scratch')", encoding="utf-8")
+
+    monkeypatch.setattr(ghost_scan, "REPO_ROOT", fake_root)
+    ghosts = ghost_scan.scan_ghost_files()
+    assert len(ghosts) == 1
+    assert "scratch_probe_test.py" in ghosts[0]
+

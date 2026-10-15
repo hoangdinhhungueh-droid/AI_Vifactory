@@ -138,14 +138,14 @@ def test_env_int_parsing_and_minimum_bound():
 def test_b3_invocation_command_contract():
     """Verifies B3 invocation constructs module call with --profile prod and --run-id."""
     task_id = "EN_EP0001_test_case"
-    expected_prefix = [sys.executable, "-m", "orchestrator.run_pipeline"]
+    expected_prefix = [sys.executable, "-m", "scripts.orchestrator.run_pipeline"]
     expected_args = ["--profile", "prod", "--run-id", task_id]
 
     # Reconstruct cmd matching trend_engine_b1.py:1488
     cmd = [
         sys.executable,
         "-m",
-        "orchestrator.run_pipeline",
+        "scripts.orchestrator.run_pipeline",
         "--profile",
         "prod",
         "--run-id",
@@ -205,4 +205,111 @@ def test_b3_failure_yields_zero_committed_and_single_failed_alert():
         broadcast_msg = mock_tele.call_args[0][0]
         assert "[VF PIPELINE B3 FAILED - RULE 118]" in broadcast_msg
         assert "0 topics committed" in broadcast_msg
+
+        # 3. Explicitly verify ZERO success-flavoured or contradictory messages emitted
+        all_messages = [call_args[0][0] for call_args in mock_tele.call_args_list]
+        assert not any("GATE 1" in m for m in all_messages)
+        assert not any("BOTTLENECK" in m for m in all_messages)
+
+
+def test_b3_module_find_spec_and_subprocess_help_contract():
+    """Verify B3 scripts.orchestrator.run_pipeline can be found by importlib and runs with --help."""
+    import importlib.util
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    project_root = Path(__file__).resolve().parents[2]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+
+    # 1. importlib find_spec must find scripts.orchestrator.run_pipeline
+    spec = importlib.util.find_spec("scripts.orchestrator.run_pipeline")
+    assert spec is not None
+    assert spec.origin is not None
+    assert "run_pipeline" in spec.origin
+
+    # 2. Subprocess execution with --help must succeed with exit code 0
+    sub_env = os.environ.copy()
+    sub_env["PYTHONPATH"] = f"{project_root}:{sub_env.get('PYTHONPATH', '')}".strip(":")
+    proc = subprocess.run(
+        [sys.executable, "-m", "scripts.orchestrator.run_pipeline", "--help"],
+        cwd=str(project_root),
+        env=sub_env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert proc.returncode == 0
+    assert "--profile" in proc.stdout
+
+
+def test_candidate_loop_halts_at_max_scan_candidates():
+    """Verify candidate loop halts strictly at max_scan_candidates ceiling."""
+    from unittest.mock import MagicMock
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    # Generate 25 candidates
+    candidates = [
+        {
+            "term": f"financial bankruptcy collapse {i}",
+            "approx_traffic": "100K+",
+            "source": "google_news_live",
+            "geos_present": ["US"],
+        }
+        for i in range(25)
+    ]
+
+    scanned_terms = []
+
+    def mock_recon(term, *args, **kwargs):
+        scanned_terms.append(term)
+        return {"rising_queries": [], "viral_videos": [], "news_catalysts": [{"title": f"News {term}"}]}
+
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=candidates), \
+         patch("app.services.trend_engine_b1.perform_direct_platform_recon", side_effect=mock_recon), \
+         patch("app.services.trend_engine_b1.fetch_ground_truth_factsheet", return_value={"extract": "Fact"}), \
+         patch("app.services.trend_engine_b1.assess_keyword_video_viability", return_value={"viability_score": 5.0, "is_video_viable": False, "reasoning": "Low score"}), \
+         patch("app.services.telegram_buttons.send_telegram_broadcast"):
+
+        produced = discover_and_produce_market_trend(market="EN", auto_produce=False, max_scan_candidates=10)
+        assert len(produced) == 0
+        assert len(scanned_terms) <= 10
+
+
+def test_llm_viability_calls_stop_at_max_viability_llm_evals():
+    """Verify LLM viability calls halt strictly at max_viability_llm_evals ceiling."""
+    from unittest.mock import MagicMock
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    # Generate 15 candidates that all pass Level-0 and Level-0.5
+    candidates = [
+        {
+            "term": f"debt default crisis shock {i}",
+            "approx_traffic": "google_news_live",
+            "source": "google_news_live",
+            "geos_present": ["US"],
+        }
+        for i in range(15)
+    ]
+
+    llm_eval_count = 0
+
+    def mock_eval(*args, **kwargs):
+        nonlocal llm_eval_count
+        llm_eval_count += 1
+        return {"viability_score": 6.0, "is_video_viable": False, "reasoning": "Sub-threshold"}
+
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=candidates), \
+         patch("app.services.trend_engine_b1.perform_direct_platform_recon", return_value={"rising_queries": [], "viral_videos": [], "news_catalysts": [{"title": "News"}]}), \
+         patch("app.services.trend_engine_b1.fetch_ground_truth_factsheet", return_value={"extract": "Fact"}), \
+         patch("app.services.trend_engine_b1.assess_keyword_video_viability", side_effect=mock_eval), \
+         patch("app.services.telegram_buttons.send_telegram_broadcast"):
+
+        produced = discover_and_produce_market_trend(
+            market="EN", auto_produce=False, max_scan_candidates=15, max_viability_llm_evals=6
+        )
+        assert len(produced) == 0
+        assert llm_eval_count <= 6
+
 

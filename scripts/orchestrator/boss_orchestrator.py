@@ -923,11 +923,15 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         remote_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-remote", "origin", "main"], capture_output=True, text=True, check=False)
         local_status_res = subprocess.run(["git", "-C", str(ROOT_DIR), "status", "--porcelain"], capture_output=True, text=True, check=False)
         local_diffstat = subprocess.run(["git", "-C", str(ROOT_DIR), "diff", "--stat", effective_range], capture_output=True, text=True, check=False)
+        ls_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files", "-s"], capture_output=True, check=False)
+        import hashlib
+        local_content_hash = hashlib.sha256(ls_res.stdout).hexdigest()
         evidence_blocks.append(
             f"### [1. GIT SOURCE PROVENANCE & THREE-WAY TREE PARITY (Rule 126)]\n"
             f"Commit Range:                {effective_range}\n"
             f"Local Windows HEAD SHA:      {git_head}\n"
             f"Local Windows Tree Hash:     {git_tree}\n"
+            f"Local Windows Content Hash:  {local_content_hash}\n"
             f"Local Windows Porcelain:     [{local_status_res.stdout.strip()}]\n"
             f"Origin Remote Main SHA:      {remote_res.stdout.strip()}\n"
             f"Diffstat ({effective_range}):\n{local_diffstat.stdout.strip()}\n"

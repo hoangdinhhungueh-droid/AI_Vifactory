@@ -292,12 +292,12 @@ def verify_final_video_gates(
         bgs = assets_info.get("backgrounds", [])
         fgs = assets_info.get("foregrounds", [])
         for bg in bgs:
-            if not bg.get("generator_model") or not bg.get("prompt_hash"):
+            if not bg.get("generator_model") or not (bg.get("prompt_hash") or bg.get("prompt_sha256")):
                 raise ValueError("Quality Gate FAIL: background asset missing generator_model or prompt_hash")
             if bg.get("luminance_std", 0.0) <= 12.0:
                 raise ValueError(f"Quality Gate FAIL: background luminance_std {bg.get('luminance_std')} <= 12.0")
         for fg in fgs:
-            if not fg.get("generator_model") or not fg.get("prompt_hash"):
+            if not fg.get("generator_model") or not (fg.get("prompt_hash") or fg.get("prompt_sha256")):
                 raise ValueError("Quality Gate FAIL: foreground asset missing generator_model or prompt_hash")
             fg_size = fg.get("file_size_bytes", 0)
             if fg_size > 0 and fg_size < 15000:

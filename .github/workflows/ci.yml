@@ -55,10 +55,12 @@ jobs:
         run: pytest -m "not integration" -v --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing tests/
 
       - name: Full Vox Single Pipeline Test Suite (Rule 125 & 127 - Zero-Skip Gate)
+        shell: bash
         run: |
+          set -eo pipefail
           pytest -v -rA tests/vox/ | tee /tmp/pytest_vox.log
-          if grep -E "[1-9][0-9]* skipped" /tmp/pytest_vox.log; then
-            echo "CI FAIL: Skipped tests detected in tests/vox suite! Zero-skip policy enforced."
+          if grep -E "[1-9][0-9]* (skipped|deselected|xfailed|xpassed)" /tmp/pytest_vox.log; then
+            echo "CI FAIL: Non-passing or skipped test status detected in tests/vox suite! Zero-skip policy enforced."
             exit 1
           fi
       

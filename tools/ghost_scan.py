@@ -21,7 +21,17 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 CANONICAL_DIRS = ["core", "stages", "orchestrator", "vox", "app", "scripts"]
 FORBIDDEN_MODULE_PREFIXES = ["legacy"]
-GHOST_PATTERNS = ["*.bak", "*.bak.*", "*.backup", "*_v2.py", "*_v3.py", "*_old.py", "*_new.py"]
+GHOST_PATTERNS = [
+    "*.bak",
+    "*.bak.*",
+    "*.backup",
+    "*_v2.py",
+    "*_v3.py",
+    "*_old.py",
+    "*_new.py",
+    "*scratch*.py",
+    "*scratch_probe*.py",
+]
 IGNORE_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__"}
 
 
@@ -70,6 +80,7 @@ def scan_canonical_imports() -> list[str]:
 def scan_ghost_files() -> list[str]:
     """Scans active workspace for backup or versioned ghost files, recording walk telemetry."""
     ghosts = []
+    seen_matches = set()
     scanned_dirs = 0
     scanned_files = 0
     for root, dirs, files in os.walk(REPO_ROOT):
@@ -81,7 +92,8 @@ def scan_ghost_files() -> list[str]:
         cur_path = Path(root)
         for pattern in GHOST_PATTERNS:
             for match in cur_path.glob(pattern):
-                if match.is_file():
+                if match.is_file() and match not in seen_matches:
+                    seen_matches.add(match)
                     rel = match.relative_to(REPO_ROOT)
                     # Check if inside legacy or reports/tests intentionally
                     if not str(rel).startswith("legacy") and not str(rel).startswith("reports"):

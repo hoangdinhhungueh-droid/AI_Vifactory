@@ -1,4 +1,5 @@
 import glob
+import logging
 import os
 import sys
 
@@ -10,6 +11,8 @@ from scripts.ag_notion_bridge import _req, resolve_id
 
 sys.path.insert(0, '/root/video_factory')
 from scripts.ag_notion_bridge import create_page, resolve_episode_image_asset_db
+
+logger = logging.getLogger("artifact_sync")
 
 router = APIRouter(prefix="/api/v1", tags=["artifacts"])
 
@@ -69,11 +72,11 @@ async def sync_artifacts(req: SyncRequest):
     trend_title = req.episode_id
     if q.get("results"):
         r = q["results"][0]
-        props = r.get("properties", {})
-        title_items = props.get("Name", {}).get("title", [])
+        props = r.get("properties") or {}
+        title_items = (props.get("Name") or {}).get("title", [])
         if title_items:
             trend_title = title_items[0].get("plain_text", req.episode_id)
-        task_items = props.get("Task ID", {}).get("rich_text", [])
+        task_items = (props.get("Task ID") or {}).get("rich_text", [])
         if task_items:
             task_id = task_items[0].get("plain_text", req.episode_id)
 
@@ -81,8 +84,7 @@ async def sync_artifacts(req: SyncRequest):
         from scripts.gdrive_backup import backup_episode_to_gdrive
         backup_episode_to_gdrive(req.episode_id, req.local_dir, task_id, trend_title)
     except Exception as _gdrive_err:
-        import logging
-        logging.getLogger("artifact_sync").warning(f"[{req.episode_id}] Notice during gdrive backup: {_gdrive_err}")
+        logger.warning("[%s] Notice during gdrive backup: %s", req.episode_id, _gdrive_err)
 
 
     images = glob.glob(os.path.join(req.local_dir, "*.jpg")) + glob.glob(os.path.join(req.local_dir, "*.png"))
