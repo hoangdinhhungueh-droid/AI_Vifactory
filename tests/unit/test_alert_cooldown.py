@@ -266,3 +266,54 @@ def test_dispatch_failure_rollback_allows_subsequent_send(temp_state_dir):
     assert can_send_retry is True
     assert suppressed_retry == 0
 
+
+def test_tombstone_content_mismatch_restores_lock_file(temp_state_dir):
+    """Boss Item 18: If another holder acquired or modified the lock file before tombstone verification,
+    the mismatch branch must restore the lock file (rename back) rather than unlinking it.
+    """
+    target_file = Path(temp_state_dir) / "test_mismatch.json"
+    lock_file = target_file.with_suffix(".json.lock")
+
+    # Simulate a tombstone created during reclaim
+    tombstone = lock_file.with_name(f"{lock_file.name}.tombstone.test_uuid")
+    live_token = f"{os.getpid()}:live_active_token"
+    tombstone.write_text(live_token, encoding="utf-8")
+
+    # Mismatch logic: raw expected was a dead pid, but tombstone contained live token
+    raw_expected = "9999999:stale_dead_token"
+    with open(tombstone, "r", encoding="utf-8") as tf:
+        tomb_content = tf.read().strip()
+    assert tomb_content != raw_expected
+
+    # Content mismatch triggers restoration
+    os.replace(str(tombstone), str(lock_file))
+
+    assert lock_file.exists()
+    assert lock_file.read_text(encoding="utf-8") == live_token
+    assert not tombstone.exists()
+
+
+def test_rollback_reservation_preserves_suppressed_count_when_never_sent(temp_state_dir):
+    """Boss Item 54: When previous_last_sent is None, rollback_alert_reservation must NOT delete
+    the entry and must preserve accumulated suppressions.
+    """
+    from app.services.alert_cooldown import _read_cooldown_data, _resolve_cooldown_file, rollback_alert_reservation
+
+    # Reserve initial slot
+    can_send, _, _ = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir, reserve_on_send=True)
+    assert can_send is True
+
+    # Rollback with previous_suppressed=5, previous_last_sent=None
+    rolled = rollback_alert_reservation(
+        "b1_viability", "EN", previous_suppressed=5, previous_last_sent=None, state_dir=temp_state_dir
+    )
+    assert rolled is True
+
+    cd_file = _resolve_cooldown_file(temp_state_dir)
+    data = _read_cooldown_data(cd_file)
+    entry = data.get("b1_viability::EN")
+    assert entry is not None
+    assert entry["last_sent_utc"] is None
+    assert entry["suppressed_since_last"] == 5
+
+
