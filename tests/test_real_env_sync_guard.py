@@ -8,12 +8,12 @@ Validates:
   5. Integration with OrchestratorRunner (--mode sync, --mode deploy).
 """
 
-import json
-import os
 import subprocess
 import sys
 import unittest
 from pathlib import Path
+
+import pytest
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
@@ -59,6 +59,7 @@ class TestRealEnvSyncGuard(unittest.TestCase):
         self.assertEqual(res.get("status"), "error")
         self.assertIn("does not exist", res.get("error", ""))
 
+    @pytest.mark.integration
     def test_03_evaluate_real_env_sync(self):
         """Verifies real environment feasibility evaluation against live VPS."""
         res = self.guard.evaluate_real_env_sync(allow_remote_dirty=True)
@@ -70,6 +71,7 @@ class TestRealEnvSyncGuard(unittest.TestCase):
         self.assertGreater(checks.get("vps_free_disk_mb", 0), 2000)
         self.assertGreater(checks.get("vps_free_ram_mb", 0), 300)
 
+    @pytest.mark.integration
     def test_04_audit_real_env_e2e_live(self):
         """Verifies live Real Environment E2E audit on VPS host."""
         res = self.guard.audit_real_env_e2e(suite="smoke")
