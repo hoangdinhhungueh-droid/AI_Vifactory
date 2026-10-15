@@ -13,11 +13,25 @@ import os
 import sys
 from unittest.mock import patch
 
+import pytest
+
 from app.services.trend_engine_b1 import (
     LIVE_TRAFFIC_SOURCES,
     _parse_env_int,
     check_evidence_catalyst_gate,
 )
+
+
+@pytest.fixture(autouse=True)
+def force_crawl_for_caps_tests():
+    """Ensure caps and inner candidate loop tests are not preempted by daily quota guard."""
+    old = os.environ.get("B1_FORCE_CRAWL")
+    os.environ["B1_FORCE_CRAWL"] = "1"
+    yield
+    if old is not None:
+        os.environ["B1_FORCE_CRAWL"] = old
+    else:
+        os.environ.pop("B1_FORCE_CRAWL", None)
 
 
 def test_level_0_5_gate_rejects_empty_evidence():
