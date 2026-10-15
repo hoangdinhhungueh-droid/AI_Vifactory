@@ -8,13 +8,11 @@ Implements Stage Shape Standard. Performs forensic verification on final rendere
 from __future__ import annotations
 
 import time
-import json
 from pathlib import Path
-from typing import Dict, Any
 
-from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.config import RunContext
-from core.gates import require_input, emit_artifact
+from core.contracts.stages import Provenance, StageArtifact, StageID
+from core.gates import emit_artifact, require_input
 from tools.codemap.runtime import pipeline_stage
 from vox.qa.gates import verify_final_video_gates
 
@@ -45,22 +43,38 @@ def run(ctx: RunContext) -> StageArtifact:
 
     sz = p.stat().st_size
     qc_details = {}
+    gate_passed = False
+
+    fps = float(s10_art.payload.get("fps", 30.0) or 30.0)
+    frames = s10_art.payload.get("duration_in_frames")
+    expected_dur = (frames / fps) if frames else None
+
     try:
         # Delegate directly to canonical vox.qa.gates for forensic verification (Rule 125 & 139)
-        verify_final_video_gates(p)
+        gate_res = verify_final_video_gates(p, expected_duration=expected_dur)
+        qc_details.update(gate_res)
         qc_details["gates_verified"] = True
+        gate_passed = True
     except Exception as e:
         qc_details["gates_verified"] = False
         qc_details["gate_note"] = str(e)
+        gate_passed = False
+
+    qc_verdict = "PASS" if gate_passed else "FAIL"
+    integrity_verified = gate_passed
 
     payload = {
         "task_id": ctx.run_id,
-        "qc_verdict": "PASS" if qc_details.get("gates_verified", True) else "FAIL",
+        "qc_verdict": qc_verdict,
         "final_video_path": str(p),
         "size_bytes": sz,
-        "integrity_verified": True,
+        "integrity_verified": integrity_verified,
         "qc_details": qc_details,
-        "message": f"Master video successfully verified ({sz:,} bytes)."
+        "message": (
+            f"Master video successfully verified ({sz:,} bytes)."
+            if gate_passed
+            else f"Master video FAILED quality gates: {qc_details.get('gate_note', 'Unknown QA error')}"
+        ),
     }
 
     prov = Provenance(
@@ -71,7 +85,7 @@ def run(ctx: RunContext) -> StageArtifact:
     artifact = StageArtifact(
         run_id=ctx.run_id,
         stage=STAGE,
-        status="ok",
+        status="ok" if gate_passed else "failed",
         payload=payload,
         provenance=prov
     )

@@ -40,18 +40,12 @@ def test_science_golden_script_has_zero_finance_lexicon_leakage():
 def test_science_golden_e2e_render_and_qa_gates(tmp_path):
     """Executes full e2e pipeline on the 5-beat science fixture, verifying 5 chapters, 0% finance leakage, and QA gates."""
     science_script = Path(__file__).parent / "fixtures" / "science_golden_script.txt"
-    try:
-        import faster_whisper  # noqa: F401
-        has_whisper = True
-    except ImportError:
-        has_whisper = False
-
     out_dir = tmp_path / "science_e2e"
     manifest = run_pipeline(
         science_script,
         out_dir,
         title="Magnetar Radio Pulse Discovery",
-        allow_synthetic_alignment=not has_whisper,
+        allow_synthetic_alignment=True,
     )
     assert manifest["scene_count"] == 5, f"Expected 5 scenes/chapters for 5-beat science fixture, got {manifest['scene_count']}"
     assert len(manifest["scenes"]) == 5

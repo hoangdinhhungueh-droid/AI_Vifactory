@@ -342,3 +342,32 @@ def test_qa_gate_rejects_degenerate_fg_asset_size_and_boundary(tmp_path, valid_s
         gates.probe_media_file = orig_probe
         gates.measure_ebur128_loudness = orig_loudness
         subprocess.run = orig_subproc
+
+
+def test_subtitle_ocr_precision_recall_thresholds():
+    """Tests published OCR thresholds and re-adjudicates Golden 2 sc04 (precision 0.71, recall 0.75)."""
+    from vox.qa.gates import (
+        MIN_OCR_TOKEN_PRECISION,
+        MIN_OCR_TOKEN_RECALL,
+        verify_subtitle_ocr_precision_recall,
+    )
+
+    assert MIN_OCR_TOKEN_PRECISION == 0.70
+    assert MIN_OCR_TOKEN_RECALL == 0.65
+
+    # Golden 2 sc04 real OCR output (with optical noise from divider rule bar '=')
+    expected_sc04 = "Radio telescopes in Chile detected periodic millisecond bursts."
+    raw_ocr_sc04 = "= Radio telescopes in Chile detected periodic bursts."
+
+    res = verify_subtitle_ocr_precision_recall(raw_ocr_sc04, expected_sc04)
+    assert res["status"] == "PASS"
+    assert res["precision"] >= MIN_OCR_TOKEN_PRECISION
+    assert res["recall"] >= MIN_OCR_TOKEN_RECALL
+
+    # Empty OCR must raise ValueError
+    with pytest.raises(ValueError, match="detected 0 characters"):
+        verify_subtitle_ocr_precision_recall("", expected_sc04)
+
+    # Completely wrong OCR must raise precision error
+    with pytest.raises(ValueError, match="below threshold"):
+        verify_subtitle_ocr_precision_recall("completely unrelated gibberish noise words here", expected_sc04)

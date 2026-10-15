@@ -57,17 +57,35 @@ try:
 except ImportError:
     pass
 
+import logging as _logging
+
+_logger = _logging.getLogger("app.main")
+
+
+def _resolve_git_sha() -> str:
+    """Resolves git commit SHA once at startup (logged with fallback/warning)."""
+    git_sha = os.getenv("GIT_COMMIT_SHA", "").strip()
+    if git_sha:
+        return git_sha
+    try:
+        import subprocess
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parent.parent,
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+    except Exception as exc:
+        _logger.warning("Failed to resolve git_sha at startup: %s", exc)
+        return "unknown"
+
+
+_STARTUP_GIT_SHA: str = _resolve_git_sha()
+
+
 # ── Health ───────────────────────────────────────────────────────────────────
 @app.get("/api/v1/health")
 def health():
-    git_sha = os.getenv("GIT_COMMIT_SHA", "")
-    if not git_sha:
-        try:
-            import subprocess
-            git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=Path(__file__).parent.parent).decode().strip()
-        except Exception:
-            git_sha = "unknown"
-    return {"status": "ok", "git_sha": git_sha}
+    return {"status": "ok", "git_sha": _STARTUP_GIT_SHA}
 
 @app.get("/api/v1/diag")
 def diag():
@@ -91,7 +109,13 @@ class LLMRequest(BaseModel):
     system: str = ""
 
 @app.post("/api/v1/llm")
-def call_llm(req: LLMRequest):
+def call_llm(req: LLMRequest, request: Request):
+    """Pipeline router for n8n/local agents.
+
+    Security posture: Bound to 127.0.0.1:8000 localhost loopback. Public ports 80/443
+    are completely closed on host. External traffic is routed exclusively through
+    authenticated Cloudflare Access Tunnels (Rule 121 perimeter security).
+    """
     from app.services.model_gateway import get_global_gateway
     gw = get_global_gateway()
     text = gw.call_llm(prompt=req.prompt, system_prompt=req.system)
@@ -288,8 +312,8 @@ def _dump_sys(messages: list):
     try:
         with open("/tmp/sys_dump.txt", "w") as f:
             f.write(out + "\n")
-    except Exception:
-        pass
+    except Exception as exc:
+        _logger.debug("Failed writing /tmp/sys_dump.txt: %s", exc)
 
 # ── SSE helper (MUST be above @app.post decorator — lesson 04/06) ─────────────
 def _fake_sse(data):

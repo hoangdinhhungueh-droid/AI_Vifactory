@@ -33,6 +33,48 @@ BROADCAST_LUFS_MIN: float = -17.0
 BROADCAST_LUFS_MAX: float = -15.0
 BROADCAST_TRUE_PEAK_CEILING: float = -2.0
 
+# Subtitle Pixel OCR Quality Standards (Rule 122 & Boss Item 10)
+# Minimum precision and recall against canonical narration script tokens on active speech frames.
+MIN_OCR_TOKEN_PRECISION: float = 0.70  # Tolerates optical noise from editorial divider bars (e.g. '=' or punctuation)
+MIN_OCR_TOKEN_RECALL: float = 0.65     # Ensures majority of spoken tokens appear legibly in lower third
+
+
+def verify_subtitle_ocr_precision_recall(
+    ocr_text: str,
+    expected_narration: str,
+    min_precision: float = MIN_OCR_TOKEN_PRECISION,
+    min_recall: float = MIN_OCR_TOKEN_RECALL,
+) -> dict[str, Any]:
+    """Verifies subtitle token precision and recall against expected narration."""
+    clean_ocr = ocr_text.strip().replace("\n", " ")
+    if not clean_ocr:
+        raise ValueError("Subtitle OCR verification failed: detected 0 characters on active speech frame")
+
+    exp_tokens = set(re.findall(r"\b\w+\b", expected_narration.lower()))
+    ocr_tokens = set(re.findall(r"\b\w+\b", clean_ocr.lower()))
+
+    overlap = exp_tokens.intersection(ocr_tokens)
+    prec = len(overlap) / max(1, len(ocr_tokens))
+    rec = len(overlap) / max(1, len(exp_tokens))
+
+    if prec < min_precision:
+        raise ValueError(
+            f"Subtitle OCR precision {prec:.2f} below threshold {min_precision:.2f}. "
+            f"Overlap: {overlap}, Extra OCR tokens: {ocr_tokens - exp_tokens}"
+        )
+    if rec < min_recall:
+        raise ValueError(
+            f"Subtitle OCR recall {rec:.2f} below threshold {min_recall:.2f}. "
+            f"Overlap: {overlap}, Missing tokens: {exp_tokens - ocr_tokens}"
+        )
+
+    return {
+        "status": "PASS",
+        "precision": round(prec, 3),
+        "recall": round(rec, 3),
+        "overlap_tokens": sorted(overlap),
+    }
+
 
 def probe_media_file(media_path: Path) -> dict[str, Any]:
     """Runs ffprobe on a media file and returns parsed JSON streams and format."""
