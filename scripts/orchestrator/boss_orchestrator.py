@@ -1318,8 +1318,8 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
                 f"Status:            {ci_run.get('status')}\n"
                 f"Conclusion:        {conclusion}\n"
                 f"Run URL:           {ci_run.get('html_url')}\n\n"
-                f"Jobs Breakdown:\n" + "\n".join(jobs_summary_list) + "\n\n"
-                f"JUnit & Test Summaries in CI:\n" + ("\n".join(junit_lines[:15]) if junit_lines else "  All matrix jobs passed with 0 failures and 0 skipped.")
+                "Jobs Breakdown:\n" + "\n".join(jobs_summary_list) + "\n\n"
+                "JUnit & Test Summaries in CI:\n" + ("\n".join(junit_lines[:15]) if junit_lines else "  All matrix jobs passed with 0 failures and 0 skipped.")
             )
         else:
             ci_info = f"CI Gate Exit Code: 1\nRun not found for commit {git_head}.\n"
