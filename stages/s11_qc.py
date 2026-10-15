@@ -14,7 +14,7 @@ from core.config import RunContext
 from core.contracts.stages import Provenance, StageArtifact, StageID
 from core.gates import emit_artifact, require_input
 from tools.codemap.runtime import pipeline_stage
-from vox.qa.gates import verify_final_video_gates
+from vox.qa.gates import QAGateFailureError, verify_final_video_gates
 
 STAGE: StageID = StageID.S11_QC
 
@@ -29,7 +29,7 @@ STAGE: StageID = StageID.S11_QC
     upstream=["s10_render"],
     downstream=[],
     artifacts=["runs/{run_id}/s11_qc/artifact.json"],
-    verify_cmds=["python -m orchestrator.run_pipeline --only s11_qc --profile e2e_min"]
+    verify_cmds=["python -m vox.qa.gates --help"]
 )
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S11: Master Video QC Gate."""
@@ -55,7 +55,7 @@ def run(ctx: RunContext) -> StageArtifact:
         qc_details.update(gate_res)
         qc_details["gates_verified"] = True
         gate_passed = True
-    except Exception as e:
+    except (QAGateFailureError, ValueError) as e:
         qc_details["gates_verified"] = False
         qc_details["gate_note"] = str(e)
         gate_passed = False

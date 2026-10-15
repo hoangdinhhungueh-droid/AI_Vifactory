@@ -65,3 +65,49 @@ def test_s11_qc_fails_closed_on_gate_violation(tmp_path: Path, monkeypatch: pyte
     assert artifact.status == "failed"
     assert "FAILED quality gates" in artifact.payload["message"]
     assert artifact.payload["qc_details"]["gates_verified"] is False
+
+
+def test_s11_qc_propagates_programming_errors_unconverted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies that non-QA gate exceptions (e.g. TypeError, NameError) are NOT converted to FAIL and propagate (Boss Item 6)."""
+    run_id = "test_qc_programming_err"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    paths.final_render_dir.mkdir(parents=True, exist_ok=True)
+
+    valid_mp4 = paths.final_render_dir / "final.mp4"
+    valid_mp4.write_bytes(b"dummy_mp4_bytes_nonzero")
+
+    s10_artifact = {
+        "run_id": run_id,
+        "stage": StageID.S10_RENDER.value,
+        "status": "ok",
+        "payload": {
+            "task_id": run_id,
+            "final_video_path": str(valid_mp4),
+            "fps": 30.0,
+            "duration_in_frames": 150,
+        },
+        "provenance": {"generator": "stages.s10_render", "latency_sec": 1.0},
+    }
+    s10_art_file = paths.artifact_file(StageID.S10_RENDER.value)
+    s10_art_file.parent.mkdir(parents=True, exist_ok=True)
+    s10_art_file.write_text(json.dumps(s10_artifact), encoding="utf-8")
+
+    cfg = load_profile("e2e_min")
+    manifest = RunManifest.create_new(run_id, profile="e2e_min")
+    ctx = RunContext(
+        run_id=run_id,
+        paths=paths,
+        manifest=manifest,
+        config=cfg,
+        force=True,
+        dry_run=False,
+    )
+
+    # Monkeypatch verify_final_video_gates to raise a programming error (TypeError)
+    def _buggy_verify(*args, **kwargs):
+        raise TypeError("Unexpected code defect: unsupported operand type")
+
+    monkeypatch.setattr("stages.s11_qc.verify_final_video_gates", _buggy_verify)
+
+    with pytest.raises(TypeError, match="unsupported operand type"):
+        run_s11_qc(ctx)

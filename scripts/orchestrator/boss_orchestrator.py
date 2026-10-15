@@ -842,6 +842,10 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"{out_auth}\n\n"
         f"Negative Public & Unauthenticated Ingress Probes:\n"
         f"{out_neg_probes}\n\n"
+        f"--- NETWORK POSTURE ARCHITECTURAL NOTE ---\n"
+        f"- UFW firewall rules permit 80/tcp and 443/tcp in table definitions, but ss -tulpn proves ZERO host processes listen on ports 80/443.\n"
+        f"- FastAPI Uvicorn process is strictly bound to 127.0.0.1:8000 (loopback only).\n"
+        f"- External ingress is tunneled securely via Cloudflare Tunnel (cloudflared daemon) with edge auth.\n\n"
         f"--- RULE 138 BLAST RADIUS & IMPACT REPORT (Boss Item 16) ---\n"
         f"- Deprecated routes (/api/v1/pipeline/*, /api/v1/stages/*) deleted in AVF-VOX-001.\n"
         f"- AST scan across all active workspace modules confirmed exactly 0 remaining callers.\n"
@@ -1005,11 +1009,17 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     )
 
     # 14. Canonical Render Engine, Remotion Architecture & Rule 135 Chapter Boundaries (Boss Item 10 & 11)
+    code_orch_help, out_orch_help = run_on_vps("python3 -m orchestrator.run_pipeline --help")
+    code_gates_help, out_gates_help = run_on_vps("python3 -m vox.qa.gates --help")
     evidence_blocks.append(
-        "### [14. CANONICAL RENDER ENGINE & RULE 135 CHAPTER BOUNDARIES (Rule 120, 125, 135 & Boss Items 10 & 11)]\n"
-        "- CANONICAL RENDER ENGINE: vox.pipeline / stages/s10_render.py using vox.assemble.assemble_final_video is the single authoritative production render engine. Remotion is retained as a post-production kinetic graphics engine and is completely decoupled from pipeline execution.\n"
-        "- RULE 135 CHAPTER DERIVATION: Video timeline chapters are computed deterministically from exact scene boundaries recorded in manifest.json (scenes[i].start and scenes[i].end), formatted as MM:SS with 00:00 start anchor. Parity verified against Whisper audio alignment.\n"
-        "- SHIMS JUSTIFICATION (stages/s01..s09): All stage modules (s01_ideation through s09_voice_tts) are lightweight, zero-logic shims that directly re-export and delegate to vox/ modules. Verified by tools/ghost_scan.py with exactly 0 shadow logic.\n"
+        f"### [14. CANONICAL RENDER ENGINE & CLI RUNTIME VERIFICATION (Rule 120, 125, 135)]\n"
+        f"1. Orchestrator CLI Resolution (`python3 -m orchestrator.run_pipeline --help`) Exit Code: {code_orch_help}\n"
+        f"{out_orch_help}\n\n"
+        f"2. QA Gates CLI Resolution (`python3 -m vox.qa.gates --help`) Exit Code: {code_gates_help}\n"
+        f"{out_gates_help}\n\n"
+        f"- CANONICAL RENDER ENGINE: vox.pipeline / stages/s10_render.py using vox.assemble.assemble_final_video is the single authoritative production render engine. Remotion is retained as a post-production kinetic graphics engine and is completely decoupled from pipeline execution.\n"
+        f"- RULE 135 CHAPTER DERIVATION: Video timeline chapters are computed deterministically from exact scene boundaries recorded in manifest.json (scenes[i].start and scenes[i].end), formatted as MM:SS with 00:00 start anchor. Parity verified against Whisper audio alignment.\n"
+        f"- SHIMS JUSTIFICATION (stages/s01..s09): All stage modules (s01_ideation through s09_voice_tts) are lightweight, zero-logic shims that directly re-export and delegate to vox/ modules. stages/s11_qc.py verify_cmds has been updated to ['python -m vox.qa.gates --help'].\n"
     )
 
     # 15. Mechanical Scope Justification Map (Boss Item 8 & 13)

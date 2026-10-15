@@ -13,6 +13,7 @@
 #            DUMP_SYS (env DUMP_SYS=1 → breakdown san(sys) by header)
 
 import json
+import logging as _logging
 import os
 import re
 import time
@@ -57,35 +58,33 @@ try:
 except ImportError:
     pass
 
-import logging as _logging
-
 _logger = _logging.getLogger("app.main")
 
 
 def _resolve_git_sha() -> str:
-    """Resolves git commit SHA once at startup (logged with fallback/warning)."""
-    git_sha = os.getenv("GIT_COMMIT_SHA", "").strip()
-    if git_sha:
-        return git_sha
+    """Resolves git commit SHA dynamically from disk git rev-parse HEAD, with env fallback."""
     try:
         import subprocess
-        return subprocess.check_output(
+        sha = subprocess.check_output(
             ["git", "rev-parse", "HEAD"],
             cwd=Path(__file__).resolve().parent.parent,
             stderr=subprocess.DEVNULL
         ).decode().strip()
+        if sha:
+            return sha
     except Exception as exc:
-        _logger.warning("Failed to resolve git_sha at startup: %s", exc)
-        return "unknown"
+        _logger.debug("Failed to resolve git_sha via git rev-parse: %s", exc)
 
-
-_STARTUP_GIT_SHA: str = _resolve_git_sha()
+    git_sha = os.getenv("GIT_COMMIT_SHA", "").strip()
+    if git_sha:
+        return git_sha
+    return "unknown"
 
 
 # ── Health ───────────────────────────────────────────────────────────────────
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "git_sha": _STARTUP_GIT_SHA}
+    return {"status": "ok", "git_sha": _resolve_git_sha()}
 
 @app.get("/api/v1/diag")
 def diag():
@@ -109,7 +108,7 @@ class LLMRequest(BaseModel):
     system: str = ""
 
 @app.post("/api/v1/llm")
-def call_llm(req: LLMRequest, request: Request):
+def call_llm(req: LLMRequest):
     """Pipeline router for n8n/local agents.
 
     Security posture: Bound to 127.0.0.1:8000 localhost loopback. Public ports 80/443

@@ -50,8 +50,9 @@ def _resolve_cooldown_file(state_dir: Optional[str] = None) -> Path:
 def is_pid_alive(pid: int) -> bool:
     """Platform-safe check whether process with given PID is currently alive without terminating it.
 
-    Windows: Uses ctypes OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION) and GetExitCodeProcess.
-             PermissionError / ERROR_ACCESS_DENIED treats PID as alive (Rule 126 Windows Safety).
+    Windows: Uses ctypes.WinDLL('kernel32', use_last_error=True) and OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION).
+             Treats ONLY ERROR_INVALID_PARAMETER (87) as dead PID (Rule 126 Windows Safety).
+             Returns True (fail-closed) for ERROR_ACCESS_DENIED or any other error.
     Linux/POSIX: Uses os.kill(pid, 0) handling PermissionError (alive) and ProcessLookupError / ESRCH (dead).
     """
     if pid <= 0:
@@ -61,19 +62,20 @@ def is_pid_alive(pid: int) -> bool:
         import ctypes.wintypes
         PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
         STILL_ACTIVE = 259
-        kernel32 = ctypes.windll.kernel32
+        ERROR_INVALID_PARAMETER = 87
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
         h_proc = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
         if not h_proc:
-            err = kernel32.GetLastError()
-            ERROR_ACCESS_DENIED = 5
-            if err == ERROR_ACCESS_DENIED:
-                return True
-            return False
+            err = ctypes.get_last_error()
+            if err == ERROR_INVALID_PARAMETER:
+                return False
+            # Fail-closed for all other errors (ACCESS_DENIED, etc.)
+            return True
         try:
             exit_code = ctypes.wintypes.DWORD()
             if kernel32.GetExitCodeProcess(h_proc, ctypes.byref(exit_code)):
                 return exit_code.value == STILL_ACTIVE
-            return False
+            return True  # Fail-closed if GetExitCodeProcess fails
         finally:
             kernel32.CloseHandle(h_proc)
     else:
@@ -437,6 +439,34 @@ def record_alert_sent(
             "alert_type": a_clean,
         }
         _write_cooldown_data(cooldown_file, data)
+
+
+def rollback_alert_reservation(
+    alert_type: str,
+    market: str,
+    previous_suppressed: int = 0,
+    previous_last_sent: Optional[str] = None,
+    state_dir: Optional[str] = None,
+) -> bool:
+    """Roll back an alert reservation if Telegram dispatch fails (Boss Item 7).
+    Restores prior last_sent_utc and suppressed count so subsequent attempts are not silenced.
+    """
+    a_clean, m_clean = _validate_alert_args(alert_type, market)
+    key = f"{a_clean}::{m_clean}"
+    cooldown_file = _resolve_cooldown_file(state_dir)
+
+    with _interprocess_lock(cooldown_file):
+        data = _read_cooldown_data(cooldown_file)
+        if key in data:
+            if previous_last_sent is not None:
+                data[key]["last_sent_utc"] = previous_last_sent
+                data[key]["suppressed_since_last"] = previous_suppressed
+            else:
+                del data[key]
+            _write_cooldown_data(cooldown_file, data)
+            logger.info(f"[alert_cooldown] Rolled back reservation for '{key}'. Next attempt is allowed.")
+            return True
+    return False
 
 
 def reset_alert_cooldown(alert_type: str, market: str, state_dir: Optional[str] = None) -> bool:

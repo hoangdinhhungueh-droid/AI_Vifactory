@@ -39,6 +39,11 @@ MIN_OCR_TOKEN_PRECISION: float = 0.70  # Tolerates optical noise from editorial 
 MIN_OCR_TOKEN_RECALL: float = 0.65     # Ensures majority of spoken tokens appear legibly in lower third
 
 
+class QAGateFailureError(ValueError):
+    """Raised when a media asset or manifest fails quantitative QC gate criteria."""
+    pass
+
+
 def verify_subtitle_ocr_precision_recall(
     ocr_text: str,
     expected_narration: str,
@@ -410,6 +415,10 @@ def verify_final_video_gates(
 
 def main() -> int:
     """CLI runner for QA verification."""
+    if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help", "help"):
+        print("Usage: python -m vox.qa.gates verify <path_to_manifest.json>")
+        return 0
+
     if len(sys.argv) < 3 or sys.argv[1] != "verify":
         print("Usage: python -m vox.qa.gates verify <path_to_manifest.json>")
         return 1

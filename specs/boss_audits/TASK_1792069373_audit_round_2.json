@@ -1,0 +1,105 @@
+{
+  "task_id": "TASK_1792069373",
+  "round": 2,
+  "timestamp": "2026-10-15T18:51:20Z",
+  "verdict": "REVISE_REQUIRED",
+  "score": 7.2,
+  "passing_threshold": 10.0,
+  "supervisor_model": "claude-opus-5-5",
+  "tokens_consumed": 6728,
+  "summary": "The increment adds two new services (daily_market_lock, alert_cooldown), a canonical resolve_state_dir in core/paths.py, an S05 fix, and 28 Windows-gated plus 49 VPS-run unit tests. The design direction is sound: VN-date keyed lock files, fail-closed O_EXCL inter-process locking with holder tokens, corrupt-file quarantine with retention, and a read-only eligibility probe separated from the atomic reservation. Three-way SHA parity holds at 9850db8 (local, origin/main and VPS tree 98d63f1b match; content hash 81395dd6 matches). The increment cannot be approved for four reasons. (1) The GitHub CI gate exited 1. Run 38788619617 shows the primary Linux job 'CI Gate: Lint, Anti-Bias & Hermetic Tests (3.12)' still in_progress with conclusion=None. Only the Windows job concluded success. Rule 126 requires conclusion=success for the full run. (2) Production state on the VPS shows the guard is not yet behaving as an authoritative quota guard. alert_cooldown.json records 27 suppressed b1_viability alerts between 15:41 and 17:42 UTC, which means B1 was re-invoked roughly every 4-5 minutes for two hours. Both lock files record scan_count=15, which contradicts MAX_SCAN_CANDIDATES_DEFAULT=10. EN_2026-10-16 was marked EXHAUSTED_TODAY at 00:42 VN by pid 70545, and that lock is what produces the dry-run 'SKIP (EXHAUSTED_TODAY)'. The process that wrote it is unidentified, and its scan_count does not match the deployed constants. If this was a worker test or a pre-deploy build run against live /var/vf/locks, it has blocked the production EN market for a full day. That is a Rule 118 and Rule 137 concern. (3) The VPS working tree is not clean. Porcelain reports 'db' and 'specs/boss_audits/visual_audit_report.json', while the diff-cleanliness check reports exit 0. The two signals contradict each other. (4) The commit range mixes AVF-VOX-001 work with TASK_1792069373. That includes an unexplained 1160-line churn in hhtech_reasoner.py, about 1042 lines in boss_orchestrator.py, deletion of tests/vox/test_align_adversarial.py, removal of remotion/public/*.json from .gitignore, and a 'relax viability evidence gate' change. Rule 124 atomicity and Rule 138 pre-impact checks cannot be verified for these files. Section 7 is labelled untruncated primary implementation diffs, but it shows only tests. The diffs for stages/s05_director_plan.py, trend_engine_b1.py and daily_market_lock.py are absent, so the S05 NameError root cause and the B1 duplicate-alert wiring cannot be audited from the evidence provided.",
+  "revisions_needed": [
+    "Re-poll GitHub Actions run 38788619617, or a new run on the final HEAD, until status=completed. Provide raw JSON with conclusion=success for every job, including 'CI Gate: Lint, Anti-Bias & Hermetic Tests (3.12)', plus html_url.",
+    "Make the VPS working tree clean. Resolve 'db' and 'specs/boss_audits/visual_audit_report.json' by gitignoring legitimate runtime artifacts or removing residue via the approved .safe_trash path, never rm -rf (Rule 137). Change the cleanliness gate to use `git status --porcelain` instead of git diff exit code.",
+    "Identify pid 70545 and pid 63430 from cron logs, systemd journal or shell history, with raw log lines. Explain why both lock files record scan_count=15 when MAX_SCAN_CANDIDATES_DEFAULT=10. If either lock was produced by a test or pre-deploy build against live /var/vf/locks, report it, then ask the user before removing EN_2026-10-16.json, since it is currently blocking production EN.",
+    "Identify and fix the source of about 27 B1 invocations in 2 hours (15:41-17:42 UTC). Provide `crontab -l`, systemd timers and any retry loop in vps_runner.py or run_trend_pipeline.py. Show that the daily lock now short-circuits these runs before any crawl, which is the Rule 139 root cause, not just alert throttling.",
+    "Define and test a minimum VN-hour policy, or document an explicit user-approved decision, so that a post-midnight run cannot exhaust the market before the scheduled morning window.",
+    "Provide live VPS proof that B3 resolves: run `importlib.util.find_spec('orchestrator.run_pipeline')` and `python -m orchestrator.run_pipeline --help` under the exact cron cwd, env and PYTHONPATH, with exit 0. Show the code ordering that guarantees Gate 1 Telegram and 'Officially Committed' happen only after B3 succeeds, or that failure produces exactly one failed alert and zero committed tasks.",
+    "Add a test for Telegram dispatch failure after cooldown reservation. Either roll back the reservation or record it only on confirmed send, and assert that the next attempt is allowed.",
+    "Fix Windows is_pid_alive. Use ctypes.WinDLL('kernel32', use_last_error=True) with ctypes.get_last_error(), and treat only ERROR_INVALID_PARAMETER (87) as dead. Return True (fail-closed) for all other errors. Add lock-file age as a secondary guard against PID reuse.",
+    "Show the caller handling of LockTimeoutError in trend_engine_b1, with a test proving no alert is sent and the cron exits cleanly with a logged reason.",
+    "Provide full untruncated diffs for stages/s05_director_plan.py, app/services/trend_engine_b1.py, app/services/daily_market_lock.py and core/paths.py. State the S05 NameError root cause, and provide a live S05 invocation against a real run directory (Rule 127) in addition to pytest.",
+    "Run `git diff -w --ignore-cr-at-eol --stat 96f6483..HEAD -- app/services/hhtech_reasoner.py scripts/orchestrator/boss_orchestrator.py` to prove the churn is non-semantic. Otherwise, justify every semantic change under Rule 138.",
+    "Separate AVF-VOX-001 commits (6ec5964, de000a0, 75b1024 and related) from the TASK_1792069373 audit range, or re-scope the audit explicitly, so each task is atomic and independently revertible (Rule 124).",
+    "Justify the deletion of tests/vox/test_align_adversarial.py and provide replacement Rule 120 and Rule 134 adversarial alignment coverage using real or recorded Whisper word timestamps (no synthetic alignment).",
+    "Justify removing 'remotion/public/*.json' from .gitignore, or restore it.",
+    "Document user approval (Rule 118 ask-before-deviating) for commit 3125580's relaxed viability evidence gate and B2 threshold change. Provide raw pytest output instead of the echoed 'PRE_FILTER_FALSIFIABILITY_VERIFIED' string.",
+    "Remove the resolve_state_dir re-export from daily_market_lock.py, or show a caller that requires it.",
+    "Run the full test suite on the VPS (`pytest tests/` with isolated VF_STATE_DIR), including test_paths.py, test_config.py, test_gates_manifest.py, test_v7_feedback_loop.py and test_ghost_scan_adversarial.py. Provide raw output and exit 0."
+  ],
+  "component_reviews": [
+    {
+      "component": "GitHub Actions run 38788619617",
+      "status": "DEFECT",
+      "analysis": "CI Gate exit code is 1. The primary lint-and-test job is in_progress with conclusion=None. The windows-lock-tests job succeeded with 28 tests, which matches 12+10+3+3 across the four listed files. Rule 126 and Rule 121 require the full run to show conclusion=success with an html_url. The evidence collector polled before completion, so the gate must re-poll until the run reaches a terminal state. Minor: actions/setup-python@v4 is outdated. Pin to v5, consistent with the checkout@v4 style."
+    },
+    {
+      "component": "VPS working tree / Rule 126 parity",
+      "status": "DEFECT",
+      "analysis": "HEAD, tree hash and content hash match across all three nodes. However, porcelain is non-empty ('db', 'specs/boss_audits/visual_audit_report.json') while 'Git Diff Cleanliness Exit Code: 0' is reported. git diff ignores untracked files, so the cleanliness check is measuring the wrong thing. Either these paths are runtime artifacts that belong in .gitignore, or they are untracked residue that violates Rule 125. A clean tree requires empty `git status --porcelain`."
+    },
+    {
+      "component": "app/services/daily_market_lock.py (production behaviour)",
+      "status": "DEFECT",
+      "analysis": "The unit contract is well tested: VN timezone shift, stale in-progress expiry, fail-closed on corrupt lock, force bypass, next-day release, concurrent mutual exclusion, and on-disk episode detection. Live state contradicts the deployed configuration. Both EN lock files carry scan_count=15 while the verified constant is 10, and the Incident 2 log shows 10/10 candidates. Either an older build wrote these files, or an env override is active in cron. The EN_2026-10-16 lock was written at 17:42:21 UTC (00:42 VN) by pid 70545 in the same millisecond window as the last cooldown suppression, so it was a real B1 crawl. Its originator is undocumented. There is also a policy gap. A single post-midnight run with stale overnight news can exhaust the entire VN day and pre-empt the 06:xx morning run that actually produced Incident 1's episode. Line 38 re-exports resolve_state_dir 'for backwards compatibility'. That is a shadow import path under Rule 125 unless at least one caller depends on it, and the Rule 138 caller trace shows none."
+    },
+    {
+      "component": "app/services/alert_cooldown.py",
+      "status": "WARN",
+      "analysis": "Strengths: input validation and normalization, O_EXCL lock with pid:uuid token and token-checked unlink, LockTimeoutError fail-closed behaviour, a read-only eligibility probe, the '(+N suppressed)' counter, and quarantine of corrupt JSON. Concerns: (a) The docstring says last_sent_utc is recorded 'ONLY after successful dispatch (or atomic reservation)'. If reservation precedes dispatch, a failed Telegram send silences the market for 4h unless the reservation is rolled back. No test covers dispatch failure followed by rollback. (b) The Windows is_pid_alive uses ctypes.windll.kernel32.GetLastError(), which is unreliable after ctypes calls. Use ctypes.WinDLL('kernel32', use_last_error=True) with ctypes.get_last_error(). (c) The Windows branch returns False (dead) for any OpenProcess error other than ACCESS_DENIED, which enables stale-lock reclaim of a possibly live holder. That is fail-open, and it is inconsistent with the POSIX branch, which returns True on unknown errno. Only ERROR_INVALID_PARAMETER (87) should map to dead. (d) PID-reuse reclaim risk is accepted implicitly. Pair the PID check with lock-file age. (e) The caller-side handling of LockTimeoutError in trend_engine_b1 is not shown. It must neither send the alert nor crash the cron."
+    },
+    {
+      "component": "app/services/trend_engine_b1.py (Telegram dedup and B3 failure path)",
+      "status": "DEFECT",
+      "analysis": "The diff is not provided (114 lines changed). In the Incident 1 log, the Gate 1 Telegram (msg_id=691) and 'Officially Committed Task ID' occur before B3 crashes with 'No module named orchestrator.run_pipeline'. Unit tests test_b3_failure_yields_zero_committed_and_single_failed_alert and test_b3_module_find_spec_and_subprocess_help_contract exist. There is no post-fix live evidence that the module resolves under the cron environment's cwd and PYTHONPATH on the VPS. There is also no evidence that the commit and Gate 1 ordering now follows B3 success. The 27 suppressions prove throttling works. They also show that the upstream re-invocation loop, the actual root cause of the spam, was not addressed during that window. That is symptom patching under Rule 139 unless explained."
+    },
+    {
+      "component": "stages/s05_director_plan.py",
+      "status": "WARN",
+      "analysis": "Three tests pass on VPS, covering prompt build, S3 data loading and the FileNotFoundError path. The 19-line fix diff is not in evidence, so the NameError root cause cannot be audited. It is unclear whether the fix is a missing import, a variable ordering issue, or a rename, and whether other stages share the defect. The 'live execution' proof is a pytest invocation, not a live S05 run against a real run directory as Rule 127 requires."
+    },
+    {
+      "component": "tests/vox/test_align_adversarial.py (deleted) and CI ALLOW_SYNTHETIC_ALIGNMENT removal",
+      "status": "WARN",
+      "analysis": "Removing synthetic alignment from CI aligns with Rule 118. Deleting 210 lines of adversarial alignment tests removes Rule 120 and Rule 134 boundary coverage for Whisper word-level timestamps. The replacement test_rule_131_and_136.py covers sanitization and 5-beat planning, which is a different contract. No replacement adversarial alignment test against real or recorded Whisper fixtures is shown."
+    },
+    {
+      "component": "app/services/hhtech_reasoner.py, scripts/orchestrator/boss_orchestrator.py, SKILL.md, vox/planner.py, visual_audit.py",
+      "status": "DEFECT",
+      "analysis": "These are out of the task's stated scope. hhtech_reasoner shows a near-symmetric ±580 line churn, which is consistent with line-ending or formatter rewrites hiding semantic changes. `git diff -w --ignore-cr-at-eol --stat` is required to prove otherwise. Commits 6ec5964, de000a0 and 75b1024 belong to AVF-VOX-001. Bundling two task IDs in one audited range violates Rule 124 atomicity and prevents a clean revert."
+    },
+    {
+      "component": ".gitignore",
+      "status": "WARN",
+      "analysis": "Adding locks/ is correct. Removing 'remotion/public/*.json' with no justification risks committing generated render props. The .agents/* negation pattern is correct."
+    },
+    {
+      "component": "Commit 3125580 'relax viability evidence gate, calibrate B2 story threshold'",
+      "status": "WARN",
+      "analysis": "Relaxing a factual-evidence gate is a Rule 130 change, and it sits outside a quota-guard task. The 'PRE_FILTER_FALSIFIABILITY_VERIFIED' output is a single echoed string, not raw test output. Ask-before-deviating (Rule 118) approval for this threshold change is not documented."
+    },
+    {
+      "component": "VPS test execution scope",
+      "status": "WARN",
+      "analysis": "49 selected tests passed. Commit 9850db8 deliberately narrowed the VPS pytest list. Modified files tests/test_v7_feedback_loop.py, tests/test_ghost_scan_adversarial.py and tests/vox/test_single_pipeline_truth.py, plus other tests/unit/ suites such as test_s11_qc_gate.py, were not run on the VPS. core/paths.py has 26 callers, but tests/test_paths.py, test_config.py and test_gates_manifest.py are not in the VPS run."
+    },
+    {
+      "component": "tools/ghost_scan.py, OCR, ci_neighbor_tester, golden ffprobe",
+      "status": "PASS",
+      "analysis": "Ghost scan exit 0 over 357 canonical files, with the gitignored residue audit clean. OCR shows 0 Critical and 0 High. The neighbor tester passed all blocks, though its log head is truncated. The golden ffprobe shows valid H.264 High 1920x1080@30, 21.47s. The no-MP4 waiver for this task is acceptable."
+    }
+  ],
+  "observations": [
+    "Tree parity is verified bit-for-bit across local, origin/main and VPS at 9850db8. Parity was never the blocker. CI terminal state and a clean tree are.",
+    "In alert_cooldown.json, last_suppressed_utc (17:42:21.666) and the EN_2026-10-16 exhausted_at_utc (17:42:21.669) are 3 ms apart. This proves the same B1 run performed a full 15-candidate crawl after the date rollover. Something is invoking B1 far more often than the documented 06:xx cron.",
+    "The guard design is fail-closed on corrupt state and lock timeout, which is correct. On Windows, PID liveness is fail-open on unknown errors. The platform branches must share the same failure semantics.",
+    "core/paths.resolve_state_dir as the single state-root authority is a good consolidation. The re-export in daily_market_lock undermines it.",
+    "The evidence packet labels section 7 as untruncated primary implementation diffs, but it contains only test diffs. The collector is truncating the files that matter most."
+  ],
+  "adherence_matrix": {
+    "iron_laws_compliance": "PARTIAL",
+    "four_pillars_status": "UNVERIFIED",
+    "zero_ghost_cleanliness": "PARTIAL"
+  },
+  "audit_file": "C:\\Users\\hunghd2\\Documents\\antigravity\\AI Video Factory\\specs\\boss_audits\\TASK_1792069373_audit_round_2.json"
+}

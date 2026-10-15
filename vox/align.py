@@ -2,7 +2,7 @@
 """vox/align.py — Whisper Word Timestamps & Script Text Alignment Engine (AVF-VOX-001).
 
 Aligns speech audio with canonical script text:
-- Extracts word-level timestamps using faster-whisper or acoustic fallback
+- Extracts word-level timestamps using faster-whisper (Zero-Mock Mandatory Rule 118 & 120)
 - Aligns detected speech tokens to exact original script words (preserving casing & punctuation)
 - Strictly enforces:
   - match_ratio >= 0.95

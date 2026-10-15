@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 VN_TZ = timezone(timedelta(hours=7))
 DEFAULT_TTL_SECONDS = 21600  # 6 hours
+MIN_PRODUCTION_HOUR_VN = 6  # 06:00 AM VN (Scheduled Morning Window - Boss Item 5)
 
 
 def _validate_market(market: Any) -> str:
@@ -35,7 +36,7 @@ def _validate_market(market: Any) -> str:
     return market.strip().upper()
 
 
-from core.paths import resolve_state_dir  # Canonical authority re-exported for backwards compatibility
+from core.paths import resolve_state_dir as _resolve_state_dir
 
 
 def vn_now(now: Optional[datetime] = None) -> datetime:
@@ -53,7 +54,7 @@ def vn_today(now: Optional[datetime] = None) -> str:
 
 
 def _get_lock_file_path(market: str, state_dir: Optional[str] = None, now: Optional[datetime] = None) -> Path:
-    base = resolve_state_dir(state_dir)
+    base = _resolve_state_dir(state_dir)
     lock_subdir = base / "b1_daily_lock"
     lock_subdir.mkdir(parents=True, exist_ok=True)
     m_up = _validate_market(market)
@@ -390,14 +391,27 @@ def mark_exhausted_today(
     state_dir: Optional[str] = None,
     now: Optional[datetime] = None,
     extra_metadata: Optional[dict] = None,
+    allow_off_hours: bool = False,
 ) -> bool:
     """Mark daily market production as EXHAUSTED_TODAY.
     When a daily scan evaluates all N candidates without any passing,
     this lock ensures automated cron/scheduler will NOT re-run in loop today,
     while permitting the next day's scheduled market to run normally.
     Manual re-runs can still bypass using --force.
+
+    Minimum VN-Hour Policy (Boss Item 5 & Rule 118):
+    Runs before 06:00 AM VN (post-midnight off-hours) are rejected from sealing
+    the market as EXHAUSTED_TODAY, ensuring the scheduled morning run can evaluate fresh news.
     """
     m_up = _validate_market(market)
+    now_vn = vn_now(now)
+    if now_vn.hour < MIN_PRODUCTION_HOUR_VN and not allow_off_hours:
+        logger.warning(
+            f"[daily_market_lock] Minimum VN-Hour Policy: Run at {now_vn.strftime('%H:%M')} VN (< {MIN_PRODUCTION_HOUR_VN:02d}:00 VN). "
+            f"Skipping EXHAUSTED_TODAY lock for {m_up} to preserve scheduled 06:00 AM VN production window."
+        )
+        return False
+
     date_str = vn_today(now)
     lock_path = _get_lock_file_path(m_up, state_dir, now)
 
