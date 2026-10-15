@@ -94,6 +94,7 @@ def run_pipeline(
     script_path: Path,
     out_dir: Path,
     title: str = "Vox Explainer Video",
+    allow_synthetic_alignment: bool = False,
 ) -> dict[str, Any]:
     """Runs the complete 1-pipeline Vox video generation flow."""
     start_ts = time.time()
@@ -121,7 +122,7 @@ def run_pipeline(
 
     # 3. Whisper Alignment
     print("\n[3/7] Aligning Whisper word timestamps with script text...")
-    timeline, plan = align_script_with_audio(plan, audio_wav)
+    timeline, plan = align_script_with_audio(plan, audio_wav, allow_synthetic_alignment=allow_synthetic_alignment)
 
     # Frame-grid scene boundaries and word endpoints synchronization (Rule 120 & Boss Item 1)
     fps = 30.0
