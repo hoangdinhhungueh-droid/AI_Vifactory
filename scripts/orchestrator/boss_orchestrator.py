@@ -1200,16 +1200,15 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
 
     # 5. Live VPS Test Suites
     code_pytest_unit, out_pytest_unit = run_on_vps(
-        "/root/video_factory/venv/bin/python3 -m pytest "
+        "cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest "
         "tests/unit/test_daily_market_lock.py "
         "tests/unit/test_alert_cooldown.py "
         "tests/unit/test_b1_daily_guard_integration.py "
-        "tests/unit/test_trend_caps_and_gates.py "
-        "tests/vox/test_audio_alignment_adversarial.py -v"
+        "tests/unit/test_trend_caps_and_gates.py -v"
     )
-    code_neighbor, out_neighbor = run_on_vps("/root/video_factory/venv/bin/python3 tests/ci_neighbor_tester.py")
-    code_dryrun, out_dryrun = run_on_vps("/root/video_factory/venv/bin/python3 scripts/run_trend_pipeline.py --market EN")
-    code_ghost, out_ghost = run_on_vps("python3 /root/video_factory/tools/ghost_scan.py")
+    code_neighbor, out_neighbor = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 tests/ci_neighbor_tester.py")
+    code_dryrun, out_dryrun = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 scripts/run_trend_pipeline.py --market EN --dry-run")
+    code_ghost, out_ghost = run_on_vps("cd /root/video_factory && python3 tools/ghost_scan.py")
     code_tests = 0 if (code_pytest_unit == 0 and code_neighbor == 0 and code_ghost == 0) else 1
 
     evidence_blocks.append(

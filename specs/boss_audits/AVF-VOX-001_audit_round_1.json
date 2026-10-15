@@ -1,0 +1,64 @@
+d in 785.43s with exit 0, and collection was verified. Coverage spans adversarial Whisper alignment on real PCM audio, multilingual alignment (JA/KO), camera viewport bounds for 12 motions, magenta-fringe falsifiable detectors, QA-gate rejection paths (true peak, LUFS range, repeated camera moves, photoreal style, off-market context), a non-finance golden script for the Rule 128 anti-bias check, and single-pipeline truth via AST and runtime 404/200 checks. The deleted test_align_adversarial.py (mock-based) is replaced by a zero-mock real-audio equivalent. Note: a 13-minute runtime in CI implies real renders, so the CI timeout budget must be confirmed."
+    },
+    {
+      "component": "CI unit/codemap/contracts suite (105 tests, VPS)",
+      "status": "DEFECT",
+      "analysis": "The header claims 'Exit Code 0', but the raw output is truncated inside the -rA PASSES section, during test_b3_failure_yields_zero_committed_and_single_failed_alert. No '=== N passed ===' terminal line and no JUnit audit line (tests/failures/errors/skipped) is present. Under Rule 121 this claim is unverified. In test_b1_force_crawl_bypasses_daily_completion, the B1 scan banner and the 'No unhandled candidates found' warning each appear twice in one test. That suggests a double invocation of the scan loop, which is an unexplained anomaly that needs a causal explanation or a fix."
+    },
+    {
+      "component": ".github/workflows/ci.yml",
+      "status": "WARN",
+      "analysis": "The JUnit zero-skip gates are a solid hardening, as are the blocking compileall step, the ghost-scan gate and the ffmpeg/tesseract install. Four issues remain. (1) In the compact diff, the 'Lint with ruff (Blocking...)' step shows 'run: |' with no visible body. If that is the committed state, the step is empty or invalid, and the blocking-lint claim is unproven. (2) Test selection moved from 'pytest tests/' to an explicit allow-list. tests/test_real_env_sync_guard.py, tests/ci_neighbor_tester.py, tests/test_v7_feedback_loop.py and any other root-level tests no longer run in CI. (3) Coverage now targets only --cov=vox, so app/ coverage reporting is dropped. (4) No CI run evidence is supplied, so none of this is proven to be green."
+    },
+    {
+      "component": "Legacy purge (app/pipeline/*, app/routes/*_episode_route.py, archive/deprecated_scripts/*)",
+      "status": "PASS",
+      "analysis": "Deletions are physical and present in the diffstat. legacy_inventory.json was committed in 2456870 and later untracked and ignored, with net-zero presence in the range. The inventory reports remove=0, keep=24 and 9/9 canonical roles mapped uniquely to vox.*. The runtime test confirms legacy routes return 404. The 24 'keep' entries are not itemized in the evidence, so their legitimacy cannot be audited."
+    },
+    {
+      "component": "stages/s01–s11 (delegation layer)",
+      "status": "WARN",
+      "analysis": "stages s01–s09 each gain exactly +13 lines and s10_render changes by 119 lines. That uniform pattern indicates generated delegation shims. test_single_pipeline_import_graph_and_stages_delegation passes, but the shim bodies are not in the evidence. The open question is whether stages/ is a second orchestration surface that bypasses vox.pipeline:run_pipeline, which would violate Rule 125 and Rule 132. s10_render also coexists with vox.assemble and a Remotion chapter-sync test. The bundle must state which engine is canonical for final render (ffmpeg compositor or Remotion) and show that only one is reachable in production (Rule 135)."
+    },
+    {
+      "component": "vox/* package (planner, tts, align, karaoke, assets_bg/fg, cutout, camera, compositor, assemble, qa/gates)",
+      "status": "WARN",
+      "analysis": "The module boundaries map cleanly to the 9 canonical roles, and tests exercise each role. The source diff for vox/* is truncated out of the bundle, so error handling (no bare except), dead imports and hardcoded topic lexicons cannot be inspected line by line. The test_zero_semantic_bias AST linter passing is indirect evidence only. Rule 131 (5-beat docudrama) and Rule 136 (speaker tag and beat header leakage into rendered assets) have no dedicated test or artifact in the evidence."
+    },
+    {
+      "component": "Rendered output telemetry (ffprobe / OCR / visual audit)",
+      "status": "DEFECT",
+      "analysis": "No ffprobe JSON is provided for any VPS-rendered MP4, so codec, resolution, fps, duration, audio stream and loudness metadata are all unverified. 'Alibaba OCR Gate: 0 Critical / 0 High Defects' is a one-line assertion with no report file, frame samples or tool output. Rule 122's 4-axis visual audit has no physical artifact."
+    },
+    {
+      "component": "Scope: app/services/{alert_cooldown,daily_market_lock,trend_engine_b1,hhtech_reasoner}.py, tools/codemap/*, scripts/orchestrator/boss_orchestrator.py, Makefile, make.ps1, .vscode/tasks.json, ROADMAP.md",
+      "status": "DEFECT",
+      "analysis": "None of these components are required by the AVF-VOX-001 objective. boss_orchestrator.py alone grows by about 1.5k lines, hhtech_reasoner.py churns 1,160 lines, and trend_engine_b1.py churns 483. Bundling them into one audit range violates Rule 124 (atomic code-ification) and Rule 139. It inflates blast radius and makes a rollback of the Vox pipeline impossible without also reverting unrelated quota, alerting and tooling changes."
+    },
+    {
+      "component": ".gitignore",
+      "status": "WARN",
+      "analysis": "'.agents/' is now ignored while .agents/skills/boss/SKILL.md is tracked and modified in this range. Future files under .agents/ will silently stay untracked, which drifts governance docs out of three-way sync. 'remotion/public/*.json' may hide render props that the chapter-sync test depends on, so confirm they are generated rather than source. The broad '*.log' pattern is acceptable."
+    },
+    {
+      "component": "Unit-test doubles (25 references) vs Rule 118",
+      "status": "WARN",
+      "analysis": "The isolation justifications for Telegram, the YouTube quota and tmp_path are architecturally reasonable for unit scope, and tests/vox is verified at 0 mocks. However, test_v7_feedback_loop.py is cited as a justified double user even though it is not in the CI selection, so either it is dead or it is untested in CI. Rule 118 deviations require explicit user sign-off, which is not evidenced."
+    }
+  ],
+  "observations": [
+    "Source-of-truth parity is genuinely solid. This is the strongest part of the submission and should be preserved as the template for future rounds.",
+    "Header labels like 'Exit Code 0' and 'Boss Item N' are narrative framing. Only terminal pytest summary lines, JUnit XML counts and raw API JSON count as evidence under Rule 121.",
+    "A ghost scanner that reports residues and still exits 0 is a gate that cannot fail on that class of input. Its own adversarial test suite should have caught this inconsistency.",
+    "The increment mixes at least five independent change sets: the Vox pipeline plus legacy purge, codemap tooling, B1 trend quota and locks, alert cooldown, and orchestrator/skill governance. Each needs its own task ID and audit range.",
+    "Narrowing CI from 'tests/' to an allow-list while adding a zero-skip gate creates false confidence. Zero skips among the selected tests says nothing about the tests that were deselected.",
+    "The Vox e2e suite runtime (about 13 minutes) depends on real rendering and Whisper models. CI must pin and cache the faster-whisper model or it will be flaky, and the import check alone does not prove model availability.",
+    "The quarantine files written by alert_cooldown (*.corrupt.<epoch>) will accumulate in production lock directories with no retention policy."
+  ],
+  "adherence_matrix": {
+    "iron_laws_compliance": "PARTIAL",
+    "four_pillars_status": "UNVERIFIED",
+    "zero_ghost_cleanliness": "DEFECT"
+  },
+  "audit_file": "/root/video_factory/specs/boss_audits/AVF-VOX-001_audit_round_1.json"
+}
