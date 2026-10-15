@@ -105,3 +105,4 @@ class WordTimeline(BaseModel):
     words: list[Word]
     audio_duration: float
     match_ratio: float  # token match ratio between script and Whisper
+    alignment_model: str = "whisper"

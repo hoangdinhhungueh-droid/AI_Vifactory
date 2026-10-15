@@ -21,6 +21,11 @@ from typing import Any
 from vox.schemas import ScenePlan, Word, WordTimeline
 
 
+class AlignmentUnavailableError(RuntimeError):
+    """Raised when audio speech alignment is unavailable or fails match threshold."""
+    pass
+
+
 def get_audio_duration_wav(wav_path: Path) -> float:
     """Reads exact duration of WAV file from headers."""
     with wave.open(str(wav_path), "rb") as wf:
@@ -56,6 +61,7 @@ def align_script_with_audio(
     model_size: str = "base",
     market: str = "EN",
     language: str | None = None,
+    allow_synthetic_alignment: bool = False,
 ) -> tuple[WordTimeline, ScenePlan]:
     """Aligns script narration to audio wav file and populates scene timecodes.
 
@@ -65,6 +71,9 @@ def align_script_with_audio(
         model_size: Faster-whisper model size ('tiny', 'base', 'small', 'medium').
         market: Canonical market identifier ('EN', 'JA', 'KO', 'VN').
         language: Optional explicit ISO language code override.
+        allow_synthetic_alignment: If False (production default), raises AlignmentUnavailableError
+            on faster-whisper failure or low match ratio (<0.95). If True (tests only),
+            falls back to deterministic linear allocation and tags alignment_model='synthetic'.
 
     Returns:
         Tuple of (WordTimeline, updated ScenePlan).
@@ -84,9 +93,10 @@ def align_script_with_audio(
         raise ValueError("ScenePlan contains zero words across all scenes")
 
     whisper_words: list[dict[str, Any]] = []
+    whisper_success = False
+    alignment_model = resolved_model
 
     # 1. Attempt live faster-whisper extraction
-    whisper_success = False
     try:
         from faster_whisper import WhisperModel
         model = WhisperModel(resolved_model, device="cpu", compute_type="int8")
@@ -102,11 +112,25 @@ def align_script_with_audio(
                     })
         if whisper_words:
             whisper_success = True
-    except Exception:
-        pass
+    except (ImportError, RuntimeError) as exc:
+        if not allow_synthetic_alignment:
+            raise AlignmentUnavailableError(
+                f"faster-whisper runtime alignment unavailable: {exc}. "
+                "Production paths require real audio alignment (Rule 118 & 120)."
+            ) from exc
+    except Exception as exc:
+        if not allow_synthetic_alignment:
+            raise AlignmentUnavailableError(
+                f"faster-whisper transcription error: {exc}"
+            ) from exc
 
-    # 2. Fallback: linear timecode allocation across actual audio duration if offline
+    # 2. Test fallback gated strictly by allow_synthetic_alignment=True
     if not whisper_success or len(whisper_words) == 0:
+        if not allow_synthetic_alignment:
+            raise AlignmentUnavailableError(
+                "Whisper detected 0 words in audio stream and allow_synthetic_alignment is False"
+            )
+        alignment_model = "synthetic"
         total_chars = sum(len(w[0]) for w in script_words)
         curr = 0.0
         for w_text, sc_idx in script_words:
@@ -120,31 +144,52 @@ def align_script_with_audio(
             })
             curr = end_t
 
-    # 3. Align script tokens with Whisper timestamps using SequenceMatcher
+    # 3. Align script tokens with Whisper timestamps using SequenceMatcher opcodes
     script_tokens = [w[0].lower().strip(".,!?:;\"'()[]{}") for w in script_words]
     whisper_tokens = [w["word"].lower().strip(".,!?:;\"'()[]{}") for w in whisper_words]
 
-    difflib.SequenceMatcher(None, script_tokens, whisper_tokens)
-    aligned_words: list[Word] = []
-    matches = 0
+    matcher = difflib.SequenceMatcher(None, script_tokens, whisper_tokens)
+    opcodes = matcher.get_opcodes()
+    real_match_ratio = matcher.ratio()
 
-    # Distribute timestamps monotonically
+    if real_match_ratio < 0.95 and not allow_synthetic_alignment:
+        raise AlignmentUnavailableError(
+            f"Speech alignment match ratio {real_match_ratio:.3f} is below mandatory threshold 0.95 (Rule 120). "
+            f"Expected script: '{' '.join(script_tokens[:10])}...', "
+            f"Whisper heard: '{' '.join(whisper_tokens[:10])}...'"
+        )
+
+    # Use SequenceMatcher opcodes to map script tokens to Whisper timestamps
+    script_to_whisper: dict[int, int] = {}
+    for tag, i1, i2, j1, j2 in opcodes:
+        if tag == "equal":
+            for offset in range(i2 - i1):
+                script_to_whisper[i1 + offset] = j1 + offset
+        elif tag == "replace":
+            span_s = i2 - i1
+            span_w = j2 - j1
+            for offset in range(span_s):
+                w_idx = j1 + int(offset * span_w / max(1, span_s))
+                script_to_whisper[i1 + offset] = min(w_idx, len(whisper_words) - 1)
+
+    aligned_words: list[Word] = []
     last_end = 0.0
     for i, (orig_text, sc_idx) in enumerate(script_words):
-        # Find closest match or interpolate
         prob = 1.0
-        if i < len(whisper_words):
+        if i in script_to_whisper and script_to_whisper[i] < len(whisper_words):
+            w_item = whisper_words[script_to_whisper[i]]
+            w_start = max(last_end, w_item["start"])
+            w_end = max(w_start + 0.08, w_item["end"])
+            prob = float(w_item.get("probability", 1.0))
+        elif i < len(whisper_words):
             w_item = whisper_words[i]
             w_start = max(last_end, w_item["start"])
             w_end = max(w_start + 0.08, w_item["end"])
             prob = float(w_item.get("probability", 1.0))
-            if i < len(whisper_tokens) and script_tokens[i] == whisper_tokens[i]:
-                matches += 1
         else:
             w_start = last_end
             w_end = min(audio_dur, w_start + 0.3)
 
-        # Monotonicity guard
         w_end = min(audio_dur + 0.05, max(w_start + 0.05, w_end))
         aligned_words.append(Word(
             text=orig_text,
@@ -155,7 +200,7 @@ def align_script_with_audio(
         ))
         last_end = w_end
 
-    match_ratio = round(max(0.95, matches / max(1, len(script_words))), 3)
+    match_ratio = round(real_match_ratio, 3)
 
     fps = 30.0
     frame_dur = round(1.0 / fps, 3)
