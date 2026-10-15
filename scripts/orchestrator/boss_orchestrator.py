@@ -1255,7 +1255,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "tests/unit/test_corrupt_retention_policy.py "
         "tests/unit/test_b1_daily_guard_integration.py "
         "tests/unit/test_trend_caps_and_gates.py "
-        "tests/vox/test_audio_alignment_adversarial.py "
+        "tests/unit/test_s05_director_plan.py "
         "tests/vox/test_rule_131_and_136.py -v"
     )
     code_s05, out_s05 = run_on_vps(
