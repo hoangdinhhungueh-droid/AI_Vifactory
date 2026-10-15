@@ -350,7 +350,8 @@ def acquire_in_progress(
         # Lock exists: check if stale
         try:
             with open(lock_path, "r", encoding="utf-8") as f:
-                existing = json.load(f)
+                raw_stale = f.read().strip()
+            existing = json.loads(raw_stale)
             if existing.get("status") == "IN_PROGRESS":
                 c_str = existing.get("created_at_utc")
                 if c_str:
@@ -368,6 +369,23 @@ def acquire_in_progress(
                             os.replace(str(lock_path), str(tombstone))
                         except (FileNotFoundError, OSError) as ren_err:
                             logger.debug(f"[daily_market_lock] Stale lock takeover race on rename {lock_path}: {ren_err}")
+                            return False
+
+                        # Verify we captured the expected stale lock, not a concurrent fresh lock
+                        try:
+                            with open(tombstone, "r", encoding="utf-8") as tf:
+                                captured = tf.read().strip()
+                            if captured != raw_stale:
+                                logger.warning(
+                                    f"[daily_market_lock] Stale lock mismatch on {lock_path}: restoring concurrent holder's lock"
+                                )
+                                try:
+                                    os.replace(str(tombstone), str(lock_path))
+                                except OSError as rest_err:
+                                    logger.error(f"[daily_market_lock] Failed to restore lock: {rest_err}")
+                                return False
+                        except OSError as read_err:
+                            logger.warning(f"[daily_market_lock] Error reading tombstone: {read_err}")
                             return False
 
                         try:

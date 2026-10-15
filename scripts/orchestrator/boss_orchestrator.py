@@ -1272,7 +1272,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "from core.paths import RunPaths\n"
         "from stages.s05_director_plan import run as run_s05\n"
         "with tempfile.TemporaryDirectory() as tmp:\n"
-        "    rp = RunPaths(Path(tmp))\n"
+        "    rp = RunPaths(run_id='test_s05_live', repo_root=Path(tmp))\n"
         "    rp.ensure_dirs()\n"
         "    s3_path = rp.artifact_file(StageID.S3_SCRIPT.value)\n"
         "    s3_path.parent.mkdir(parents=True, exist_ok=True)\n"

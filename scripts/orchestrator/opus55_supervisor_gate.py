@@ -121,7 +121,7 @@ def _run_git(root_dir: Path, args: list[str]) -> subprocess.CompletedProcess:
 
 def extract_compact_git_diff(
     root_dir: Path,
-    max_lines: int = 1200,
+    max_lines: int = 3500,
     commit_range: Optional[str] = None,
 ) -> Tuple[str, str]:
     """Extracts git stat and a compacted diff, omitting binary files and large lockfiles."""
