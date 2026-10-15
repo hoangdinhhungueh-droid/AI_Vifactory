@@ -2,14 +2,11 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Auto-Start AGQ Quota Sentinel",
+      "label": "AGQ Quota Sentinel",
       "type": "shell",
-      "command": "wscript.exe \"C:\\Users\\hunghd2\\Documents\\antigravity\\AI Video Factory\\scripts\\agq_silent_start.vbs\"",
+      "command": "wscript.exe \"${workspaceFolder}\\scripts\\agq_silent_start.vbs\"",
       "windows": {
-        "command": "wscript.exe \"C:\\Users\\hunghd2\\Documents\\antigravity\\AI Video Factory\\scripts\\agq_silent_start.vbs\""
-      },
-      "runOptions": {
-        "runOn": "folderOpen"
+        "command": "wscript.exe \"${workspaceFolder}\\scripts\\agq_silent_start.vbs\""
       },
       "presentation": {
         "reveal": "never",

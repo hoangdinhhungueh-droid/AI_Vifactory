@@ -5,7 +5,7 @@ Implements programmatic quality gates on physical media:
 - Video stream validation (1920x1080, H.264, 30 fps CFR, yuv420p)
 - Audio stream validation (AAC, 48 kHz, duration match +-0.5s)
 - Black frame detection (blackdetect=d=0.2) -> 0 black sections
-- EBUR128 broadcast loudness compliance (-14 ± 1.5 LUFS, True Peak <= -1.0 dBTP)
+- Streaming Loudness Compliance (AES TD1004 / YouTube Target: -16.0 ± 1.0 LUFS, True Peak <= -2.0 dBTP; measured via ITU-R BS.1770 ebur128 filter)
 - FG prompt hash uniqueness & stopword/typography rejection gate
 - Camera move variety gate
 - CLI entrypoint: python -m vox.qa.gates verify <manifest_json>
@@ -26,7 +26,8 @@ from vox.schemas import ScenePlan
 FORBIDDEN_PROMPT_STOPWORDS = {"a", "an", "the", "within", "across", "in", "on", "at", "by", "for"}
 FORBIDDEN_TYPOGRAPHY_TERMS = ["bold typography", "typography", "text on screen", "letters", "written words"]
 
-# Broadcast Standards: AES TD1004 / EBU R128 / EBU Tech 3343 Online Streaming Specification
+# Online Streaming Loudness Standards: AES TD1004 / YouTube Online Streaming Specification
+# (Target: -16.0 LUFS, Tolerance: [-17.0, -15.0] LUFS, True Peak ceiling: <= -2.0 dBTP; measured via ITU-R BS.1770)
 BROADCAST_LUFS_TARGET: float = -16.0
 BROADCAST_LUFS_MIN: float = -17.0
 BROADCAST_LUFS_MAX: float = -15.0
@@ -298,6 +299,48 @@ def verify_final_video_gates(
         for fg in fgs:
             if not fg.get("generator_model") or not fg.get("prompt_hash"):
                 raise ValueError("Quality Gate FAIL: foreground asset missing generator_model or prompt_hash")
+            fg_size = fg.get("file_size_bytes", 0)
+            if fg_size > 0 and fg_size < 15000:
+                raise ValueError(
+                    f"Quality Gate FAIL: foreground asset {fg.get('id', 'unknown')} size {fg_size}B below 15KB threshold (degenerate placeholder)"
+                )
+            if fg.get("entropy", 5.0) < 3.0:
+                raise ValueError(
+                    f"Quality Gate FAIL: foreground asset {fg.get('id', 'unknown')} entropy below 3.0 bits threshold"
+                )
+            if fg.get("border_pixels_touching_edge", 0) > 0:
+                raise ValueError(
+                    f"Quality Gate FAIL: foreground asset {fg.get('id', 'unknown')} touches canvas boundary (Rule 122 violation)"
+                )
+
+    vis_adj = manifest_data.get("visual_adjudication", {}) if manifest_data else {}
+    style_adj = vis_adj.get("axis_3_style_conformance")
+    if style_adj is not None:
+        if style_adj.get("verdict") == "FAIL" or float(style_adj.get("score", 0.0)) < 8.0:
+            raise ValueError(
+                f"Quality Gate FAIL: Rule 122 Axis 3 (Style Conformance) breach: score {style_adj.get('score')} < 8.0 or verdict FAIL"
+            )
+        if style_adj.get("flag_photorealistic"):
+            raise ValueError(
+                "Quality Gate FAIL: Rule 122 Axis 3 breach: photorealistic frame detected (Rule 116/435 violation)"
+            )
+        axis_3 = "PASS"
+    else:
+        axis_3 = "PENDING_HUMAN_REVIEW"
+
+    ethnic_adj = vis_adj.get("axis_4_ethnic_context")
+    if ethnic_adj is not None:
+        if ethnic_adj.get("verdict") == "FAIL" or float(ethnic_adj.get("score", 0.0)) < 8.0:
+            raise ValueError(
+                f"Quality Gate FAIL: Rule 122 Axis 4 (Ethnic/Era Context) breach: score {ethnic_adj.get('score')} < 8.0 or verdict FAIL"
+            )
+        if ethnic_adj.get("flag_off_market"):
+            raise ValueError(
+                "Quality Gate FAIL: Rule 122 Axis 4 breach: off-market ethnic/era context detected"
+            )
+        axis_4 = "PASS"
+    else:
+        axis_4 = "PENDING_HUMAN_REVIEW"
 
     return {
         "status": "PASS",
@@ -318,8 +361,8 @@ def verify_final_video_gates(
         "bitrate_bps": int(fmt.get("bit_rate", 0)),
         "axis_1_ui_artifacts": "PASS",
         "axis_2_alpha_edge": "PASS",
-        "axis_3_style_conformance": "PASS",
-        "axis_4_ethnic_context": "PASS",
+        "axis_3_style_conformance": axis_3,
+        "axis_4_ethnic_context": axis_4,
     }
 
 

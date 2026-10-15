@@ -221,3 +221,124 @@ def test_qa_gate_passes_strictly_compliant_video(tmp_path, valid_scene_plan):
         gates.probe_media_file = orig_probe
         gates.measure_ebur128_loudness = orig_loudness
         subprocess.run = orig_subproc
+
+
+def test_qa_gate_rejects_photorealistic_style(tmp_path, valid_scene_plan):
+    """Adversarial Falsifiable Test: Frame flagged as photorealistic fails Axis 3."""
+    dummy_mp4 = tmp_path / "final.mp4"
+    dummy_mp4.write_bytes(b"dummy")
+
+    probe_spec = {
+        "streams": [
+            {"codec_type": "video", "codec_name": "h264", "width": 1920, "height": 1080, "pix_fmt": "yuv420p", "nb_frames": "300", "r_frame_rate": "30/1"},
+            {"codec_type": "audio", "codec_name": "aac", "sample_rate": 48000},
+        ],
+        "format": {"duration": "10.0", "size": "1000000", "bit_rate": "2000000"},
+    }
+    orig_probe = gates.probe_media_file
+    orig_loudness = gates.measure_ebur128_loudness
+    orig_subproc = subprocess.run
+    try:
+        gates.probe_media_file = lambda p: probe_spec
+        gates.measure_ebur128_loudness = lambda p: {"integrated_lufs": -16.0, "true_peak_dbtp": -2.5}
+        subprocess.run = lambda *args, **kwargs: SimpleNamespace(stderr="", returncode=0)
+
+        manifest_with_photoreal = {
+            "visual_adjudication": {
+                "axis_3_style_conformance": {
+                    "verdict": "FAIL",
+                    "score": 4.5,
+                    "flag_photorealistic": True,
+                    "reason": "Photorealistic live photography detected"
+                }
+            }
+        }
+        with pytest.raises(ValueError) as exc:
+            verify_final_video_gates(dummy_mp4, expected_duration=10.0, plan=valid_scene_plan, manifest_data=manifest_with_photoreal)
+        assert "Axis 3 (Style Conformance) breach" in str(exc.value)
+    finally:
+        gates.probe_media_file = orig_probe
+        gates.measure_ebur128_loudness = orig_loudness
+        subprocess.run = orig_subproc
+
+
+def test_qa_gate_rejects_off_market_ethnic_context(tmp_path, valid_scene_plan):
+    """Adversarial Falsifiable Test: Frame with off-market context fails Axis 4."""
+    dummy_mp4 = tmp_path / "final.mp4"
+    dummy_mp4.write_bytes(b"dummy")
+
+    probe_spec = {
+        "streams": [
+            {"codec_type": "video", "codec_name": "h264", "width": 1920, "height": 1080, "pix_fmt": "yuv420p", "nb_frames": "300", "r_frame_rate": "30/1"},
+            {"codec_type": "audio", "codec_name": "aac", "sample_rate": 48000},
+        ],
+        "format": {"duration": "10.0", "size": "1000000", "bit_rate": "2000000"},
+    }
+    orig_probe = gates.probe_media_file
+    orig_loudness = gates.measure_ebur128_loudness
+    orig_subproc = subprocess.run
+    try:
+        gates.probe_media_file = lambda p: probe_spec
+        gates.measure_ebur128_loudness = lambda p: {"integrated_lufs": -16.0, "true_peak_dbtp": -2.5}
+        subprocess.run = lambda *args, **kwargs: SimpleNamespace(stderr="", returncode=0)
+
+        manifest_with_offmarket = {
+            "visual_adjudication": {
+                "axis_3_style_conformance": {"verdict": "PASS", "score": 9.5, "flag_photorealistic": False},
+                "axis_4_ethnic_context": {
+                    "verdict": "FAIL",
+                    "score": 5.0,
+                    "flag_off_market": True,
+                    "reason": "Western Latin typography detected on Japanese street background"
+                }
+            }
+        }
+        with pytest.raises(ValueError) as exc:
+            verify_final_video_gates(dummy_mp4, expected_duration=10.0, plan=valid_scene_plan, manifest_data=manifest_with_offmarket)
+        assert "Axis 4 (Ethnic/Era Context) breach" in str(exc.value)
+    finally:
+        gates.probe_media_file = orig_probe
+        gates.measure_ebur128_loudness = orig_loudness
+        subprocess.run = orig_subproc
+
+
+def test_qa_gate_rejects_degenerate_fg_asset_size_and_boundary(tmp_path, valid_scene_plan):
+    """Adversarial Falsifiable Test: Degenerate 7KB placeholder FG fails minimum size gate."""
+    dummy_mp4 = tmp_path / "final.mp4"
+    dummy_mp4.write_bytes(b"dummy")
+
+    probe_spec = {
+        "streams": [
+            {"codec_type": "video", "codec_name": "h264", "width": 1920, "height": 1080, "pix_fmt": "yuv420p", "nb_frames": "300", "r_frame_rate": "30/1"},
+            {"codec_type": "audio", "codec_name": "aac", "sample_rate": 48000},
+        ],
+        "format": {"duration": "10.0", "size": "1000000", "bit_rate": "2000000"},
+    }
+    orig_probe = gates.probe_media_file
+    orig_loudness = gates.measure_ebur128_loudness
+    orig_subproc = subprocess.run
+    try:
+        gates.probe_media_file = lambda p: probe_spec
+        gates.measure_ebur128_loudness = lambda p: {"integrated_lufs": -16.0, "true_peak_dbtp": -2.5}
+        subprocess.run = lambda *args, **kwargs: SimpleNamespace(stderr="", returncode=0)
+
+        manifest_with_tiny_fg = {
+            "assets": {
+                "backgrounds": [{"generator_model": "gemini-web", "prompt_hash": "abc", "luminance_std": 25.0}],
+                "foregrounds": [
+                    {
+                        "id": "fg_placeholder",
+                        "generator_model": "gemini-web",
+                        "prompt_hash": "def",
+                        "file_size_bytes": 7120,
+                    }
+                ]
+            }
+        }
+        with pytest.raises(ValueError) as exc:
+            verify_final_video_gates(dummy_mp4, expected_duration=10.0, plan=valid_scene_plan, manifest_data=manifest_with_tiny_fg)
+        assert "below 15KB threshold (degenerate placeholder)" in str(exc.value)
+    finally:
+        gates.probe_media_file = orig_probe
+        gates.measure_ebur128_loudness = orig_loudness
+        subprocess.run = orig_subproc
