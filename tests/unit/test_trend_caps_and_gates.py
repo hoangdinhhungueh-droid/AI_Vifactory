@@ -188,6 +188,7 @@ def test_b3_failure_yields_zero_committed_and_single_failed_alert():
          patch("app.services.trend_engine_b1.reason_topic_niche", return_value={"search_specific_keyword": "corporate collapse", "topic_name_vi": "Test", "task_slug": "test_slug", "niche_angle_brief": "Brief", "story_direction_5_arcs": "Arcs"}), \
          patch("app.services.story_engine_b2.generate_5_arc_story", return_value={"story": "Valid script text", "story_gate_score": 12, "story_verdict": "PASS", "fact_causal_audit": {"verdict": "PASS", "audit_score": 9.0}}), \
          patch("subprocess.run") as mock_sub, \
+         patch("app.services.trend_engine_b1.record_handled_topic"), \
          patch("app.services.telegram_buttons.send_telegram_broadcast") as mock_tele, \
          patch("app.services.trend_engine_b1.commit_trend_task") as mock_commit:
 

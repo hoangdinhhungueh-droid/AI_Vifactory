@@ -593,23 +593,28 @@ def commit_trend_task(topic_data: dict) -> str:
     logger.info(f"[trend_engine] Saved pending task to {task_file}")
 
     # 2. Save Competitor Intel Card
-    for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes"]:
-        ep_dir = os.path.join(ep_base, task_id)
-        os.makedirs(ep_dir, exist_ok=True)
-        card_file = os.path.join(ep_dir, "competitor_intel_card.json")
-        intel_card = {
-            "task_id": task_id,
-            "target_keyword": topic_data["raw_term"],
-            "niche": topic_data.get("niche_angle_brief", ""),
-            "competitor_gap": topic_data.get("competitor_differentiation_gap", ""),
-            "market": topic_data["market"],
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "rising_queries": topic_data.get("rising_queries", []),
-            "competitors": topic_data.get("viral_competitor_videos", []),
-            "ground_truth_wiki": topic_data.get("factsheet", {}).get("has_verified_wiki", False)
-        }
-        with open(card_file, "w", encoding="utf-8") as f:
-            json.dump(intel_card, f, ensure_ascii=False, indent=2)
+    for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
+        try:
+            if not os.path.isdir(ep_base):
+                continue
+            ep_dir = os.path.join(ep_base, task_id)
+            os.makedirs(ep_dir, exist_ok=True)
+            card_file = os.path.join(ep_dir, "competitor_intel_card.json")
+            intel_card = {
+                "task_id": task_id,
+                "target_keyword": topic_data["raw_term"],
+                "niche": topic_data.get("niche_angle_brief", ""),
+                "competitor_gap": topic_data.get("competitor_differentiation_gap", ""),
+                "market": topic_data["market"],
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "rising_queries": topic_data.get("rising_queries", []),
+                "competitors": topic_data.get("viral_competitor_videos", []),
+                "ground_truth_wiki": topic_data.get("factsheet", {}).get("has_verified_wiki", False)
+            }
+            with open(card_file, "w", encoding="utf-8") as f:
+                json.dump(intel_card, f, ensure_ascii=False, indent=2)
+        except (OSError, PermissionError) as _pe_err:
+            logger.debug(f"Could not write competitor intel card to {ep_base}: {_pe_err}")
 
     # 3. Record to Permanent History Registry (Anti-Duplicate Lock)
     record_handled_topic(
@@ -1211,10 +1216,15 @@ def discover_and_produce_market_trend(
                 recon_card["task_id"] = temp_task_id
             if recon_card and isinstance(recon_card, dict):
                 for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-                    t_dir = Path(ep_base) / temp_task_id
-                    t_dir.mkdir(parents=True, exist_ok=True)
-                    (t_dir / "competitor_intel_card.json").write_text(
-                        json.dumps(recon_card, ensure_ascii=False, indent=2), encoding="utf-8")
+                    try:
+                        base_p = Path(ep_base)
+                        if base_p.is_dir():
+                            t_dir = base_p / temp_task_id
+                            t_dir.mkdir(parents=True, exist_ok=True)
+                            (t_dir / "competitor_intel_card.json").write_text(
+                                json.dumps(recon_card, ensure_ascii=False, indent=2), encoding="utf-8")
+                    except (OSError, PermissionError) as _pe_err:
+                        logger.debug(f"[{temp_task_id}] Could not persist competitor_intel_card to {ep_base}: {_pe_err}")
                 gap_val = recon_card.get("competitor_narrative_anatomy", {}).get("fatal_explanatory_vacuum", "") or comp_gap
                 if gap_val:
                     t_obj["competitor_differentiation_gap"] = gap_val
@@ -1485,23 +1495,29 @@ def discover_and_produce_market_trend(
         # Migrate episode and pending task artifacts from temp_task_id to canonical task_id
         import shutil
         for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-            temp_p = Path(ep_base) / temp_task_id
-            canon_p = Path(ep_base) / task_id
-            if temp_p.exists():
-                canon_p.mkdir(parents=True, exist_ok=True)
-                for f_item in temp_p.iterdir():
-                    dest_file = canon_p / f_item.name
+            try:
+                base_p = Path(ep_base)
+                if not base_p.is_dir():
+                    continue
+                temp_p = base_p / temp_task_id
+                canon_p = base_p / task_id
+                if temp_p.exists():
+                    canon_p.mkdir(parents=True, exist_ok=True)
+                    for f_item in temp_p.iterdir():
+                        dest_file = canon_p / f_item.name
+                        try:
+                            if f_item.is_file():
+                                shutil.copy2(f_item, dest_file)
+                            elif f_item.is_dir():
+                                shutil.copytree(f_item, dest_file, dirs_exist_ok=True)
+                        except Exception as _cp_err:
+                            logger.warning(f"Could not copy {f_item} to {dest_file}: {_cp_err}")
                     try:
-                        if f_item.is_file():
-                            shutil.copy2(f_item, dest_file)
-                        elif f_item.is_dir():
-                            shutil.copytree(f_item, dest_file, dirs_exist_ok=True)
-                    except Exception as _cp_err:
-                        logger.warning(f"Could not copy {f_item} to {dest_file}: {_cp_err}")
-                try:
-                    shutil.rmtree(temp_p)
-                except Exception as _rm_err:
-                    logger.warning(f"Could not remove temp folder {temp_p}: {_rm_err}")
+                        shutil.rmtree(temp_p)
+                    except Exception as _rm_err:
+                        logger.warning(f"Could not remove temp folder {temp_p}: {_rm_err}")
+            except (OSError, PermissionError) as _pe_err:
+                logger.debug(f"Could not migrate artifacts in {ep_base}: {_pe_err}")
 
         # Update canonical pending task file with full object
         canon_task_file = os.path.join(pending_dir, f"{task_id}.json")
