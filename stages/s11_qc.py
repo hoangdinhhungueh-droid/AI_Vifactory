@@ -47,7 +47,9 @@ def run(ctx: RunContext) -> StageArtifact:
 
     fps = float(s10_art.payload.get("fps", 30.0) or 30.0)
     frames = s10_art.payload.get("duration_in_frames")
-    expected_dur = (frames / fps) if frames else None
+    if frames is None or frames <= 0:
+        raise ValueError(f"Stage S11 requires positive duration_in_frames in S10 artifact payload, got: {frames}")
+    expected_dur = frames / fps
 
     try:
         # Delegate directly to canonical vox.qa.gates for forensic verification (Rule 125 & 139)

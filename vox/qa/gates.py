@@ -247,6 +247,11 @@ def verify_final_video_gates(
     else:
         act_dur = float(video_stream.get("duration", fmt.get("duration", 0.0)))
 
+    if expected_duration is None or expected_duration <= 0.0:
+        raise ValueError(
+            f"Quality Gate FAIL: expected_duration is required and must be positive, got {expected_duration}"
+        )
+
     dur_diff = abs(act_dur - expected_duration)
     if dur_diff > 0.05:
         raise ValueError(

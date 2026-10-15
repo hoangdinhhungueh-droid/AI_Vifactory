@@ -34,8 +34,8 @@ def get_hhtech_key() -> str:
                             key = line.split("=", 1)[1].strip().strip('"').strip("'")
                             if key:
                                 os.environ["HHTECH_API_KEY"] = key
-        except Exception:
-            pass
+        except (IOError, OSError) as e:
+            logger.warning(f"[hhtech_reasoner] Could not read secrets file: {e}")
     return key or ""
 
 def is_clean_search_query(q: str) -> bool:
@@ -160,8 +160,8 @@ def _fetch_native_wiki_extract(subject: str, market: str) -> str:
             extract = data.get("extract", "")
             if extract:
                 return extract[:1500]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[hhtech] Could not fetch native wiki summary for {subject}: {e}")
     return ""
 
 def call_gpt6_astra(

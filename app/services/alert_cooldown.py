@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 from core.paths import resolve_state_dir
+from core.atomic_io import atomic_write_json, cleanup_corrupt_quarantines
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,17 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
                                         logger.warning(
                                             f"[alert_cooldown] Reclaimed dead PID {pid} lock {lock_file} via tombstone {tombstone.name}"
                                         )
-                                    os.unlink(str(tombstone))
+                                        os.unlink(str(tombstone))
+                                    else:
+                                        # Content mismatch: another process updated lock between read and rename.
+                                        # Restore lock_file immediately so we do not hijack a live holder's lock (Boss Item 18).
+                                        logger.error(
+                                            f"[alert_cooldown] Stale lock mismatch: expected {raw!r}, found {tomb_content!r}. Restoring lock_file!"
+                                        )
+                                        try:
+                                            os.replace(str(tombstone), str(lock_file))
+                                        except OSError as rest_err:
+                                            logger.error(f"[alert_cooldown] Failed to restore lock_file {lock_file}: {rest_err}")
                                 except OSError as t_err:
                                     logger.warning(f"[alert_cooldown] Error reading/unlinking tombstone {tombstone}: {t_err}")
                             except (FileNotFoundError, OSError) as ren_err:
@@ -161,8 +172,6 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
                 )
             time.sleep(poll_interval)
         except Exception as e:
-            if isinstance(e, LockTimeoutError):
-                raise
             raise RuntimeError(f"Unexpected error acquiring lock {lock_file}: {e}") from e
 
     try:
@@ -211,59 +220,9 @@ def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
         return {}
 
 
-def cleanup_corrupt_quarantines(directory: Path, max_age_seconds: float = 86400 * 7, max_files: int = 5) -> int:
-    """Retention policy for *.corrupt.* quarantine files to prevent unbounded accumulation (Rule 125 & Boss Item 14).
-
-    Prunes files exceeding max_age_seconds or keeping at most the newest max_files.
-    Returns count of pruned files.
-    """
-    if not directory.exists():
-        return 0
-    corrupt_files = sorted(
-        directory.glob("*.corrupt.*"),
-        key=lambda p: p.stat().st_mtime if p.exists() else 0,
-        reverse=True,
-    )
-    pruned = 0
-    now = time.time()
-    for idx, cf in enumerate(corrupt_files):
-        try:
-            age = now - cf.stat().st_mtime
-            if idx >= max_files or age > max_age_seconds:
-                cf.unlink(missing_ok=True)
-                pruned += 1
-        except OSError as cf_err:
-            logger.warning(f"[alert_cooldown] Error pruning quarantine file {cf}: {cf_err}")
-    return pruned
-
-
 def _write_cooldown_data(file_path: Path, data: Dict[str, Any]) -> None:
-    """Atomic write with fsync and exception propagation. Cleans up tmp file on failure."""
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = file_path.with_suffix(f".tmp_{os.getpid()}_{uuid.uuid4().hex}")
-    try:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-            f.flush()
-            try:
-                os.fsync(f.fileno())
-            except OSError as fsync_err:
-                logger.warning(f"[alert_cooldown] Notice fsync on {tmp_path}: {fsync_err}")
-        for attempt in range(10):
-            try:
-                os.replace(str(tmp_path), str(file_path))
-                break
-            except (PermissionError, OSError):
-                if attempt == 9:
-                    raise
-                time.sleep(0.05)
-    except Exception as e:
-        if tmp_path.exists():
-            try:
-                os.unlink(tmp_path)
-            except OSError as rm_err:
-                logger.warning(f"[alert_cooldown] Error removing tmp file {tmp_path}: {rm_err}")
-        raise IOError(f"Failed to persist cooldown data to {file_path}: {e}") from e
+    """Atomic write via core.atomic_io.atomic_write_json (Rule 125 single truth)."""
+    atomic_write_json(file_path, data)
 
 
 def check_alert_eligibility(
@@ -458,11 +417,8 @@ def rollback_alert_reservation(
     with _interprocess_lock(cooldown_file):
         data = _read_cooldown_data(cooldown_file)
         if key in data:
-            if previous_last_sent is not None:
-                data[key]["last_sent_utc"] = previous_last_sent
-                data[key]["suppressed_since_last"] = previous_suppressed
-            else:
-                del data[key]
+            data[key]["last_sent_utc"] = previous_last_sent
+            data[key]["suppressed_since_last"] = previous_suppressed
             _write_cooldown_data(cooldown_file, data)
             logger.info(f"[alert_cooldown] Rolled back reservation for '{key}'. Next attempt is allowed.")
             return True

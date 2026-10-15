@@ -1,0 +1,63 @@
+itles.ass'` instead of coming from the S9 artifact contract, which breaks the Rule 132 pure transmission pipe. Minor: `if not final_mp4.exists() or ctx.force` reuses a stale MP4 without re-verifying it, and the >100-byte clip threshold is arbitrary."
+    },
+    {
+      "component": "stages/s11_qc.py",
+      "status": "PASS",
+      "analysis": "Delegates to verify_final_video_gates, maps QAGateFailureError/ValueError to qc_verdict=FAIL with status='failed', and lets programming errors propagate (covered by test_s11_qc_propagates_programming_errors_unconverted). One residual gap: when duration_in_frames is absent, expected_duration=None, and it is unverified whether the gate then skips the duration-drift check. That case should fail closed."
+    },
+    {
+      "component": "Rule 125 single pipeline truth (vox.pipeline vs stages/ DAG)",
+      "status": "WARN",
+      "analysis": "The legacy app/pipeline tree and its routes are purged, and the AST/404 tests are falsifiable. Two orchestration surfaces still coexist, however: vox.pipeline:run_pipeline and the stages/ s01-s11 DAG (scripts/orchestrator/run_pipeline.py). s07_image_gen is described as delegating to a 'Gemini Web Image Pipeline', while vox.assets_bg/assets_fg generate layers independently, which means two image-generation paths. The legacy_inventory scanner checks 9 vox roles and does not evaluate whether stages s01-s09 duplicate them."
+    },
+    {
+      "component": "Runtime Delegation Trace (packet section 13.3)",
+      "status": "DEFECT",
+      "analysis": "The trace claims 's07_image_gen ... verified live in Gate 7', 's10_render ... Gate 10', and 's11_qc ... Gate 11'. In the actual smoketest output, Gate 7 is the Zero-Ghost linter, Gate 10 is the Cross-Market Director, and Gate 11 is the B5 Visual Gate. No smoketest gate executes stage modules s01-s11. This is a fabricated narrative claim, which Rule 121 and the Zero-Narrative mandate prohibit."
+    },
+    {
+      "component": "CI workflow (.github/workflows/ci.yml)",
+      "status": "WARN",
+      "analysis": "The JUnit zero-skip/zero-failure gate, blocking ruff, compileall, ghost_scan, and the faster-whisper import probe are all real hardening. Three issues remain. (1) CI reports tests=127 for the unit suite while the VPS 'EXACT CI UNIT SUITE' run collected 130; the 3-test delta (likely test_story_gate_multimarket.py or marker deselection) is unexplained, which breaks Rule 134 exact parity. (2) The packet shows the ruff step with an empty `run: |` block and a truncated target list, so the actual lint scope is unverifiable. (3) The windows-lock-tests job has no zero-skip JUnit assertion, so skipped Windows tests would pass silently."
+    },
+    {
+      "component": "Golden renders / ffprobe / EBU R128",
+      "status": "PASS",
+      "analysis": "Stream telemetry is internally consistent: Golden 1 has 644 frames at 30 fps = 21.467 s against 21.48 s audio (13 ms drift); Golden 2 has 1137 frames = 37.9 s (4 ms drift); both are yuv420p, High@L4.0, and AAC LC 48 kHz. Loudness of -16.4 LUFS integrated with -2.5/-2.4 dBTP true peak meets the declared streaming target. Narrative inconsistency: the crest-factor block states -16.3 LUFS while the ebur128 summary states -16.4. Commit messages and constants label a streaming -16 LUFS target as 'broadcast', which conflicts with EBU R128 broadcast (-23 LUFS); rename for contract clarity. Both goldens run 21-38 s, so there is no evidence the compositor holds memory and wall-time bounds at production length (~2085-word scripts, roughly 13-15 min)."
+    },
+    {
+      "component": "Rule 122 visual 4-axis audit (scripts/forensics/visual_audit.py)",
+      "status": "WARN",
+      "analysis": "Falsifiable adversarial checks (synthetic magenta swatch, synthetic photoreal frame) are present, and alpha boundary and fringe metrics are pixel-derived. Weaknesses: (1) visual_audit_report.json lists 12 FG assets while the text audit lists 16, omitting Golden 2 fg_04/fg_05, so the artifact is incomplete. (2) Asset names collide across fixtures without a fixture key. (3) The sha256 values are truncated to 16 hex characters and are not verifiable hashes. (4) Both fixtures are flagged is_calibration_fixture=true with photorealism_metric exactly 0.0. FG assets of 7-23 KB and the identical border_alpha_px=16815 across three assets indicate procedural placeholders, not generated editorial illustration. Axis 3 ('Cel-shaded Graphic Novel') and the Axis 4 era/ethnic claims are therefore narrative assertions, and Axis 4 is measured only by a CJK character count from OCR."
+    },
+    {
+      "component": "Auth posture / network perimeter",
+      "status": "WARN",
+      "analysis": "The loopback bind on 127.0.0.1:8000 and zero listeners on 80/443 are verified. The cloudflared config shown routes only to ports 8811-8819 and contains no ingress for 8000, so the 'Cloudflare Ingress Unauthenticated Probe: HTTP 403' is not evidence about the FastAPI service. UFW still allows 80/443 inbound with no listener, a latent exposure if any process binds there. For defense in depth, add application-layer auth (shared token or Cloudflare Access JWT validation) to /api/v1/llm and /v1/chat/completions."
+    },
+    {
+      "component": "Rule 135 Remotion chapter synchronization",
+      "status": "WARN",
+      "analysis": "ROADMAP now declares the Vox compositor the single render engine and Remotion 'auxiliary', and seo_package_forge prioritizes manifest.json chapters. Rule 135 mandates Remotion-rendered timeline chapter sync, so this is an architectural deviation from the constitution. Rule 118 (ask-before-deviating) requires explicit user sign-off, and none appears in the evidence."
+    },
+    {
+      "component": "Core vox modules (align, qa/gates, cutout, compositor, pipeline, planner)",
+      "status": "WARN",
+      "analysis": "Section 13 truncates mid-docstring in vox/align.py. The source for qa/gates.py (474 lines), pipeline.py (357), compositor.py, cutout.py, and planner.py was not provided, so error-handling patterns, hardcoded thresholds, and Rule 128 topic bias in these modules cannot be audited. Tests are numerous and falsifiable, but behavioral tests do not substitute for source review under the zero-compromise standard."
+    }
+  ],
+  "observations": [
+    "The ab1b264 vs 36b9730 discrepancy is the most serious finding. The server answering HTTP 200 probes reports a SHA different from the CI-verified, three-way-synced HEAD, so none of the HTTP or Playwright runtime evidence is provably tied to the audited commit.",
+    "The 'Alibaba OCR Gate: 0 Critical / 0 High Defects' line has no supporting artifact, tool output, or exit code anywhere in the packet.",
+    "ci_neighbor_tester on the VPS performs live Notion reads (NOTION_LIVE), a live YouTube scrape, and live Edge-TTS synthesis. The packet asserts hermetic fallbacks in CI but provides no CI log proving which path executed.",
+    "The packet references audit Rounds 9, 10, 14, and 17 across commits while the loop protocol caps self-healing at 2 rounds. The round-state machine and the committed specs/boss_audits/ history (mixed .md and .json) are inconsistent with the documented exit-code-1 FAILED_MAX_ROUNDS stop condition.",
+    "Golden 1 is a 3-scene fixture with no beat structure. Only Golden 2 exercises the Rule 131 5-beat contract, which is acceptable if Golden 1 is explicitly documented as a structural smoke fixture only.",
+    "legacy_inventory.json was committed in 2456870 (+565 lines) and later removed and gitignored. The net state is clean, but the file remains in history."
+  ],
+  "adherence_matrix": {
+    "iron_laws_compliance": "PARTIAL (Rules 121, 124, 126, 132, 134, 135 deviations)",
+    "four_pillars_status": "PARTIALLY_VERIFIED (runtime SHA mismatch; visual axes 3/4 unproven)",
+    "zero_ghost_cleanliness": "VERIFIED (ghost_scan exit 0, clean porcelain, quarantine paths absent)"
+  },
+  "audit_file": "/root/video_factory/specs/boss_audits/AVF-VOX-001_audit_round_2.json"
+}

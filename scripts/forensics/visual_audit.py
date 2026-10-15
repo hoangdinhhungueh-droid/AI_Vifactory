@@ -172,9 +172,11 @@ def audit_fg_alpha_and_boundary(asset_dirs: list[str]) -> list[dict[str, Any]]:
                 if spill_ratio > 0.0:
                     raise ValueError(f"FG asset {os.path.basename(fg_path)} magenta fringe spill: {spill_ratio:.4f}")
 
-            h_fg = hashlib.sha256(Path(fg_path).read_bytes()).hexdigest()[:16]
+            h_fg = hashlib.sha256(Path(fg_path).read_bytes()).hexdigest()
+            fixture_name = Path(d).parent.name
             res = {
-                "asset": os.path.basename(fg_path),
+                "fixture": fixture_name,
+                "asset": f"{fixture_name}/{os.path.basename(fg_path)}",
                 "sha256": h_fg,
                 "size_bytes": Path(fg_path).stat().st_size,
                 "touching_edge_px": touching_edge,
@@ -184,8 +186,8 @@ def audit_fg_alpha_and_boundary(asset_dirs: list[str]) -> list[dict[str, Any]]:
             }
             results.append(res)
             print(
-                f"{os.path.basename(fg_path)}: Boundary touch={touching_edge}px | "
-                f"Alpha transition px={border_count} | Magenta fringe={spill_ratio:.1%} | sha256:{h_fg} | PASS"
+                f"[{fixture_name}] {os.path.basename(fg_path)}: Boundary touch={touching_edge}px | "
+                f"Alpha transition px={border_count} | Magenta fringe={spill_ratio:.1%} | sha256:{h_fg[:16]}... | PASS"
             )
 
     return results
@@ -352,7 +354,7 @@ def main() -> int:
                     "ocr_precision_recall": {"min_precision": 0.70, "min_recall": 0.65, "status": "PASS"}
                 }
             ],
-            "fg_assets_inventory": fg_audit_results[:12],
+            "fg_assets_inventory": fg_audit_results,
             "adversarial_checks": {
                 "synthetic_magenta_fringe_detector": "FLAGGED_AS_EXPECTED (Exit 0)",
                 "synthetic_photorealism_detector": "FLAGGED_AS_EXPECTED (Exit 0)"

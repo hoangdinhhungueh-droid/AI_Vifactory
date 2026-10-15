@@ -18,9 +18,13 @@ import json
 import logging
 import os
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+
+from core.paths import resolve_state_dir as _resolve_state_dir, resolve_episodes_dir
+from core.atomic_io import atomic_write_json, cleanup_corrupt_quarantines
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +38,6 @@ def _validate_market(market: Any) -> str:
     if not market or not isinstance(market, str) or not market.strip():
         raise ValueError(f"Market identifier must be a non-empty string, got: {market!r}")
     return market.strip().upper()
-
-
-from core.paths import resolve_state_dir as _resolve_state_dir
 
 
 def vn_now(now: Optional[datetime] = None) -> datetime:
@@ -63,17 +64,9 @@ def _get_lock_file_path(market: str, state_dir: Optional[str] = None, now: Optio
 
 
 def _atomic_write_json(path: Path, data: dict) -> bool:
-    """Write dictionary to JSON file atomically via temp file."""
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = path.with_suffix(f".tmp_{os.getpid()}_{int(datetime.now(timezone.utc).timestamp())}")
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp_path, path)
-        return True
-    except Exception as e:
-        logger.error(f"[daily_market_lock] Failed to write {path}: {e}")
-        return False
+    """Write dictionary to JSON file atomically via core.atomic_io.atomic_write_json (Rule 125)."""
+    atomic_write_json(path, data)
+    return True
 
 
 def _emit_operator_corrupt_alert(lock_path: Path, error_msg: str, market: str, date_str: str) -> None:
@@ -90,38 +83,47 @@ def _emit_operator_corrupt_alert(lock_path: Path, error_msg: str, market: str, d
     try:
         from app.services.telegram_buttons import send_telegram_broadcast
         send_telegram_broadcast(alert_text)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"[daily_market_lock] Failed to emit operator corrupt alert to Telegram: {type(e).__name__}: {e}")
 
 
-def cleanup_corrupt_quarantines(directory: Path, max_age_seconds: float = 86400 * 7, max_files: int = 5) -> int:
-    """Retention policy for *.corrupt.* quarantine files to prevent unbounded accumulation (Rule 125 & Boss Item 14).
-
-    Prunes files exceeding max_age_seconds or keeping at most the newest max_files.
-    Returns count of pruned files.
+def _quarantine_and_seal_corrupt_lock(
+    lock_path: Path,
+    error_msg: str,
+    market: str,
+    date_str: str,
+    now: Optional[datetime] = None,
+) -> Path:
+    """Quarantines unreadable lock file to *.corrupt.<epoch>, cleans up old quarantines,
+    and writes persistent CORRUPT_FAIL_CLOSED marker so subsequent ticks stay fail-closed (Boss Item 16).
     """
-    if not directory.exists():
-        return 0
-    corrupt_files = sorted(
-        directory.glob("*.corrupt.*"),
-        key=lambda p: p.stat().st_mtime if p.exists() else 0,
-        reverse=True,
-    )
-    pruned = 0
-    now = time.time()
-    for idx, cf in enumerate(corrupt_files):
-        try:
-            age = now - cf.stat().st_mtime
-            if idx >= max_files or age > max_age_seconds:
-                cf.unlink(missing_ok=True)
-                pruned += 1
-        except OSError as cf_err:
-            logger.warning(f"[daily_market_lock] Error pruning corrupt quarantine file {cf}: {cf_err}")
-    return pruned
+    ts = int(time.time())
+    corrupt_path = lock_path.with_name(f"{lock_path.name}.corrupt.{ts}")
+    try:
+        os.replace(str(lock_path), str(corrupt_path))
+    except OSError as q_err:
+        logger.warning(f"[daily_market_lock] Error quarantining corrupt lock {lock_path} to {corrupt_path}: {q_err}")
+    cleanup_corrupt_quarantines(lock_path.parent)
+
+    marker_payload = {
+        "market": market,
+        "vn_date": date_str,
+        "status": "CORRUPT_FAIL_CLOSED",
+        "quarantined_to": corrupt_path.name,
+        "quarantined_at_utc": vn_now(now).astimezone(timezone.utc).isoformat(),
+        "error": str(error_msg),
+    }
+    try:
+        atomic_write_json(lock_path, marker_payload)
+    except Exception as w_err:
+        logger.error(f"[daily_market_lock] Failed to write CORRUPT_FAIL_CLOSED marker: {w_err}")
+
+    _emit_operator_corrupt_alert(lock_path, error_msg, market, date_str)
+    return corrupt_path
 
 
 def _quarantine_corrupt_lock(lock_path: Path) -> Path:
-    """Quarantines unreadable lock file to *.corrupt.<epoch> and prunes stale quarantines."""
+    """Backward-compatible helper to quarantine corrupt lock file."""
     ts = int(time.time())
     corrupt_path = lock_path.with_name(f"{lock_path.name}.corrupt.{ts}")
     try:
@@ -167,47 +169,54 @@ def is_market_done_today(
             with open(lock_path, "r", encoding="utf-8") as f:
                 content = f.read().strip()
                 if not content:
-                    _quarantine_corrupt_lock(lock_path)
-                    _emit_operator_corrupt_alert(lock_path, "File is completely empty (0 bytes)", m_up, date_str)
+                    _quarantine_and_seal_corrupt_lock(lock_path, "File is completely empty (0 bytes)", m_up, date_str, now)
                     return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str}
                 data = json.loads(content)
                 if not isinstance(data, dict):
-                    _quarantine_corrupt_lock(lock_path)
-                    _emit_operator_corrupt_alert(lock_path, f"Top-level JSON is not an object: {type(data)}", m_up, date_str)
+                    _quarantine_and_seal_corrupt_lock(lock_path, f"Top-level JSON is not an object: {type(data)}", m_up, date_str, now)
                     return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str}
         except Exception as e:
-            _quarantine_corrupt_lock(lock_path)
-            _emit_operator_corrupt_alert(lock_path, str(e), m_up, date_str)
+            _quarantine_and_seal_corrupt_lock(lock_path, str(e), m_up, date_str, now)
             return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str, "error": str(e)}
 
         status = data.get("status", "").upper()
         if status == "COMPLETED":
             return True, "lock_completed", data
-
-        if status in ("EXHAUSTED_TODAY", "EXHAUSTED"):
+        elif status in ("EXHAUSTED_TODAY", "EXHAUSTED"):
             return True, "lock_exhausted_today", data
-
-        if status == "IN_PROGRESS":
+        elif status == "CORRUPT_FAIL_CLOSED":
+            return True, "corrupt_lock_fail_closed", data
+        elif status == "IN_PROGRESS":
             created_at_str = data.get("created_at_utc")
             ttl = int(data.get("ttl_seconds", DEFAULT_TTL_SECONDS))
-            if created_at_str:
-                try:
-                    c_dt = datetime.fromisoformat(created_at_str)
-                    if c_dt.tzinfo is None:
-                        c_dt = c_dt.replace(tzinfo=timezone.utc)
-                    age_seconds = (vn_now(now).astimezone(timezone.utc) - c_dt).total_seconds()
-                    if age_seconds < ttl:
-                        return True, "lock_in_progress", data
-                    else:
-                        logger.warning(
-                            f"[daily_market_lock] Stale IN_PROGRESS lock for {m_up} on {date_str} "
-                            f"(age={int(age_seconds)}s > ttl={ttl}s). Allowing re-run."
-                        )
-                        stale_lock_found = True
-                        stale_data = data
-                except Exception as _parse_err:
-                    logger.warning(f"[daily_market_lock] Error parsing lock timestamp: {_parse_err}")
+            if not created_at_str:
+                logger.warning(
+                    f"[daily_market_lock] IN_PROGRESS lock missing created_at_utc for {m_up} on {date_str}. Failing closed (Boss Item 16)."
+                )
+                return True, "lock_in_progress", data
+
+            try:
+                c_dt = datetime.fromisoformat(created_at_str)
+                if c_dt.tzinfo is None:
+                    c_dt = c_dt.replace(tzinfo=timezone.utc)
+                age_seconds = (vn_now(now).astimezone(timezone.utc) - c_dt).total_seconds()
+                if age_seconds < ttl:
                     return True, "lock_in_progress", data
+                else:
+                    logger.warning(
+                        f"[daily_market_lock] Stale IN_PROGRESS lock for {m_up} on {date_str} "
+                        f"(age={int(age_seconds)}s > ttl={ttl}s). Allowing re-run."
+                    )
+                    stale_lock_found = True
+                    stale_data = data
+            except Exception as _parse_err:
+                logger.warning(f"[daily_market_lock] Error parsing lock timestamp: {_parse_err}")
+                return True, "lock_in_progress", data
+        else:
+            logger.warning(
+                f"[daily_market_lock] Unrecognized lock status '{status}' for {m_up} on {date_str}. Failing closed (Boss Item 16)."
+            )
+            return True, f"lock_unrecognized_{status.lower()}", data
 
     # 2. Check topic_history_registry if requested
     if check_registry:
@@ -242,25 +251,16 @@ def is_market_done_today(
                             }
                             _atomic_write_json(lock_path, details)
                             return True, "registry_completed", details
-                    except Exception:
-                        pass
+                    except (ValueError, TypeError, KeyError) as parse_err:
+                        logger.debug(f"[daily_market_lock] Registry date parse notice: {parse_err}")
         except Exception as reg_err:
             logger.debug(f"[daily_market_lock] Registry check notice: {reg_err}")
 
     # 3. Check Episode directories on disk
     if check_episodes:
-        episodes_roots = []
+        episodes_roots = [resolve_episodes_dir(custom_dir=f"{state_dir}/episodes" if state_dir else None)]
         if state_dir and (Path(state_dir) / "episodes").is_dir():
             episodes_roots.append(Path(state_dir) / "episodes")
-        episodes_roots.extend([
-            Path("/var/vf/episodes"),
-            Path(__file__).resolve().parent.parent.parent / "episodes",
-        ])
-        try:
-            if os.path.isdir("/root"):
-                episodes_roots.append(Path("/root/video_factory/episodes"))
-        except (PermissionError, OSError):
-            pass
 
         for ep_root in episodes_roots:
             try:
@@ -273,21 +273,36 @@ def is_market_done_today(
                     manifest_file = ep_dir / "run_manifest.json"
                     if manifest_file.exists():
                         try:
-                            m_stat = manifest_file.stat()
-                            m_vn_date = vn_today(datetime.fromtimestamp(m_stat.st_mtime, timezone.utc))
-                            if m_vn_date == date_str:
-                                details = {
-                                    "market": m_up,
-                                    "vn_date": date_str,
-                                    "status": "COMPLETED",
-                                    "topic_id": ep_dir.name,
-                                    "source": "episode_dir_completed",
-                                    "completed_at_utc": vn_now(now).astimezone(timezone.utc).isoformat(),
-                                }
-                                _atomic_write_json(lock_path, details)
-                                return True, "episode_dir_completed", details
-                        except (PermissionError, OSError):
-                            pass
+                            with open(manifest_file, "r", encoding="utf-8") as mf:
+                                m_data = json.load(mf)
+                            if not isinstance(m_data, dict):
+                                continue
+                            m_status = str(m_data.get("status", "")).lower()
+                            # Completion check: status must indicate completed
+                            if m_status in ("ok", "done", "completed", "success"):
+                                m_ts_str = m_data.get("completed_at") or m_data.get("created_at") or m_data.get("timestamp")
+                                if m_ts_str:
+                                    try:
+                                        m_dt = datetime.fromisoformat(m_ts_str)
+                                        m_vn_date = vn_today(m_dt)
+                                    except (ValueError, TypeError):
+                                        m_vn_date = vn_today(datetime.fromtimestamp(manifest_file.stat().st_mtime, timezone.utc))
+                                else:
+                                    m_vn_date = vn_today(datetime.fromtimestamp(manifest_file.stat().st_mtime, timezone.utc))
+
+                                if m_vn_date == date_str:
+                                    details = {
+                                        "market": m_up,
+                                        "vn_date": date_str,
+                                        "status": "COMPLETED",
+                                        "topic_id": ep_dir.name,
+                                        "source": "episode_dir_completed",
+                                        "completed_at_utc": vn_now(now).astimezone(timezone.utc).isoformat(),
+                                    }
+                                    _atomic_write_json(lock_path, details)
+                                    return True, "episode_dir_completed", details
+                        except (json.JSONDecodeError, OSError) as mf_err:
+                            logger.warning(f"[daily_market_lock] Error inspecting episode manifest {manifest_file}: {mf_err}")
             except (PermissionError, OSError) as ep_err:
                 logger.debug(f"[daily_market_lock] Episode dir check notice: {ep_err}")
 
@@ -344,10 +359,27 @@ def acquire_in_progress(
                     age = (now_utc - c_dt).total_seconds()
                     if age > ttl_seconds:
                         logger.warning(
-                            f"[daily_market_lock] Overwriting stale IN_PROGRESS lock for {m_up} "
+                            f"[daily_market_lock] Attempting exclusive takeover of stale IN_PROGRESS lock for {m_up} "
                             f"(age={int(age)}s > {ttl_seconds}s)"
                         )
-                        return _atomic_write_json(lock_path, payload)
+                        tombstone = lock_path.with_name(f"{lock_path.name}.tombstone_{os.getpid()}_{uuid.uuid4().hex}")
+                        try:
+                            os.replace(str(lock_path), str(tombstone))
+                        except (FileNotFoundError, OSError) as ren_err:
+                            logger.debug(f"[daily_market_lock] Stale lock takeover race on rename {lock_path}: {ren_err}")
+                            return False
+
+                        try:
+                            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+                            with os.fdopen(fd, "w", encoding="utf-8") as f_new:
+                                json.dump(payload, f_new, ensure_ascii=False, indent=2)
+                            logger.info(f"[daily_market_lock] Won exclusive takeover of stale lock for {m_up} on {date_str}")
+                            tombstone.unlink(missing_ok=True)
+                            return True
+                        except FileExistsError:
+                            logger.warning(f"[daily_market_lock] Lost race to acquire stale lock for {m_up}")
+                            tombstone.unlink(missing_ok=True)
+                            return False
         except Exception as ex:
             logger.error(f"[daily_market_lock] Error inspecting existing lock {lock_path}: {ex}")
         return False

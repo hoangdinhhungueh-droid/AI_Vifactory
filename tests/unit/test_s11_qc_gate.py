@@ -111,3 +111,45 @@ def test_s11_qc_propagates_programming_errors_unconverted(tmp_path: Path, monkey
 
     with pytest.raises(TypeError, match="unsupported operand type"):
         run_s11_qc(ctx)
+
+
+def test_s11_qc_fails_closed_when_duration_in_frames_missing(tmp_path: Path) -> None:
+    """Verifies that S11 fails closed with ValueError when duration_in_frames is missing in S10 artifact (Boss Item 4)."""
+    run_id = "test_qc_missing_duration"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    paths.final_render_dir.mkdir(parents=True, exist_ok=True)
+
+    valid_mp4 = paths.final_render_dir / "final.mp4"
+    valid_mp4.write_bytes(b"dummy_mp4_bytes_nonzero")
+
+    # s10 artifact with missing duration_in_frames
+    s10_artifact = {
+        "run_id": run_id,
+        "stage": StageID.S10_RENDER.value,
+        "status": "ok",
+        "payload": {
+            "task_id": run_id,
+            "final_video_path": str(valid_mp4),
+            "fps": 30.0,
+            # duration_in_frames omitted
+        },
+        "provenance": {"generator": "stages.s10_render", "latency_sec": 1.0},
+    }
+    s10_art_file = paths.artifact_file(StageID.S10_RENDER.value)
+    s10_art_file.parent.mkdir(parents=True, exist_ok=True)
+    s10_art_file.write_text(json.dumps(s10_artifact), encoding="utf-8")
+
+    cfg = load_profile("e2e_min")
+    manifest = RunManifest.create_new(run_id, profile="e2e_min")
+    ctx = RunContext(
+        run_id=run_id,
+        paths=paths,
+        manifest=manifest,
+        config=cfg,
+        force=True,
+        dry_run=False,
+    )
+
+    with pytest.raises(ValueError, match="Stage S11 requires positive duration_in_frames"):
+        run_s11_qc(ctx)
+

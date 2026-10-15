@@ -105,21 +105,41 @@ def run(ctx: RunContext) -> StageArtifact:
     # Render target final.mp4
     final_mp4 = ctx.paths.final_render_dir / "final.mp4"
 
-    if not final_mp4.exists() or ctx.force:
-        clip_paths = [
-            Path(cl.get("file_path"))
-            for cl in clips
-            if cl.get("file_path") and Path(cl["file_path"]).exists() and Path(cl["file_path"]).stat().st_size > 100
-        ]
-        if not clip_paths:
+    is_valid_existing = False
+    if final_mp4.exists() and not ctx.force:
+        if final_mp4.stat().st_size >= 1000:
+            is_valid_existing = True
+
+    if not is_valid_existing:
+        if not clips:
+            raise MissingClipsError("Stage S10 requires declared S8 video clips, but clips list is empty")
+
+        clip_paths: List[Path] = []
+        invalid_clip_indices: List[int] = []
+        for idx, cl in enumerate(clips):
+            fp = cl.get("file_path")
+            if not fp or not Path(fp).exists() or Path(fp).stat().st_size <= 100:
+                invalid_clip_indices.append(idx)
+            else:
+                clip_paths.append(Path(fp))
+
+        if invalid_clip_indices:
             raise MissingClipsError(
-                f"Stage S10 requires valid video clips from S8, found {len(clips)} entries with 0 existing files"
+                f"Stage S10 requires all declared S8 video clips to be valid and >100B. "
+                f"Found {len(invalid_clip_indices)} invalid clip(s) at index/indices {invalid_clip_indices} "
+                f"(declared: {len(clips)}, valid: {len(clip_paths)})"
             )
 
         if not audio_file or not Path(audio_file).exists() or Path(audio_file).stat().st_size < 100:
             raise MissingAudioError(f"Stage S10 requires valid audio narration file from S9, got '{audio_file}'")
 
-        ass_file = ctx.paths.root / "subtitles.ass"
+        # Source subtitles path from S9 artifact payload contract (Rule 132), with root fallback
+        s9_sub_path = s9_data.get("payload", {}).get("subtitles_file") or s9_data.get("payload", {}).get("ass_file")
+        if s9_sub_path and Path(s9_sub_path).exists():
+            ass_file = Path(s9_sub_path)
+        else:
+            ass_file = ctx.paths.root / "subtitles.ass"
+
         if not ass_file.exists() or ass_file.stat().st_size == 0:
             raise MissingSubtitlesError(f"Stage S10 requires valid subtitles file at '{ass_file}'")
 

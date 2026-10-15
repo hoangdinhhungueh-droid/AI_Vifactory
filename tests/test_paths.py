@@ -49,6 +49,22 @@ class TestCorePaths(unittest.TestCase):
         self.assertTrue(paths.root.exists())
         shutil.rmtree(paths.root, ignore_errors=True)
 
+    def test_run_paths_with_path_instance(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "custom_run_path"
+            paths = RunPaths(p)
+            self.assertEqual(paths.run_id, "custom_run_path")
+            self.assertTrue(paths.root.exists())
+            paths.ensure_dirs()
+            self.assertTrue(paths.composite_seeds_dir.exists())
+
+    def test_resolve_episodes_dir(self):
+        from core.paths import resolve_episodes_dir
+        ep_dir = resolve_episodes_dir()
+        self.assertTrue(ep_dir.exists())
+        self.assertEqual(ep_dir.name, "episodes")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -61,8 +61,22 @@ except ImportError:
 _logger = _logging.getLogger("app.main")
 
 
+_CACHED_GIT_SHA: str | None = None
+
+
 def _resolve_git_sha() -> str:
-    """Resolves git commit SHA dynamically from disk git rev-parse HEAD, with env fallback."""
+    """Resolves git commit SHA dynamically from env or disk git rev-parse HEAD.
+    Cached once per process to prevent unbounded subprocess overhead (Rule 126/138).
+    """
+    global _CACHED_GIT_SHA
+    if _CACHED_GIT_SHA is not None:
+        return _CACHED_GIT_SHA
+
+    env_sha = os.getenv("GIT_COMMIT_SHA", "").strip()
+    if env_sha:
+        _CACHED_GIT_SHA = env_sha
+        return _CACHED_GIT_SHA
+
     try:
         import subprocess
         sha = subprocess.check_output(
@@ -71,14 +85,13 @@ def _resolve_git_sha() -> str:
             stderr=subprocess.DEVNULL
         ).decode().strip()
         if sha:
-            return sha
+            _CACHED_GIT_SHA = sha
+            return _CACHED_GIT_SHA
     except Exception as exc:
-        _logger.debug("Failed to resolve git_sha via git rev-parse: %s", exc)
+        _logger.warning("Failed to resolve git_sha via git rev-parse: %s", exc)
 
-    git_sha = os.getenv("GIT_COMMIT_SHA", "").strip()
-    if git_sha:
-        return git_sha
-    return "unknown"
+    _CACHED_GIT_SHA = "unknown"
+    return _CACHED_GIT_SHA
 
 
 # ── Health ───────────────────────────────────────────────────────────────────
