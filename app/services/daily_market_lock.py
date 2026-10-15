@@ -41,12 +41,12 @@ def resolve_state_dir(custom_dir: Optional[str] = None) -> Path:
 
     # Default VPS location vs Local workspace fallback
     vps_lock = Path("/var/vf/locks")
-    if vps_lock.exists() or os.name != "nt":
-        try:
+    try:
+        if vps_lock.exists() or os.name != "nt":
             vps_lock.mkdir(parents=True, exist_ok=True)
             return vps_lock
-        except (PermissionError, OSError):
-            pass
+    except (PermissionError, OSError):
+        pass
 
     # Local fallback
     project_root = Path(__file__).resolve().parent.parent.parent
@@ -203,13 +203,19 @@ def is_market_done_today(
     if check_episodes:
         episodes_roots = [
             Path("/var/vf/episodes"),
-            Path("/root/video_factory/episodes"),
             Path(__file__).resolve().parent.parent.parent / "episodes",
         ]
+        # Only probe /root/video_factory if /root is accessible
+        try:
+            if os.path.isdir("/root"):
+                episodes_roots.append(Path("/root/video_factory/episodes"))
+        except (PermissionError, OSError):
+            pass
+
         for ep_root in episodes_roots:
-            if not ep_root.is_dir():
-                continue
             try:
+                if not ep_root.is_dir():
+                    continue
                 prefix = f"{m_up}_EP"
                 for ep_dir in ep_root.iterdir():
                     if not ep_dir.is_dir() or not ep_dir.name.startswith(prefix):
@@ -231,9 +237,9 @@ def is_market_done_today(
                                 }
                                 _atomic_write_json(lock_path, details)
                                 return True, "episode_dir_completed", details
-                        except Exception:
+                        except (PermissionError, OSError):
                             pass
-            except Exception as ep_err:
+            except (PermissionError, OSError) as ep_err:
                 logger.debug(f"[daily_market_lock] Episode dir check notice: {ep_err}")
 
     if stale_lock_found:
