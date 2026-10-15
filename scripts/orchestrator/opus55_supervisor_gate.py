@@ -12,6 +12,7 @@ Enforces:
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -210,7 +211,7 @@ def build_anti_bloat_digest(
         "task_objective": task_objective[:2000],
         "diff_stat": diff_summary[:10000],
         "compact_diff": compact_diff,
-        "qa_summary": (qa_summary or "QA Harness: Tests Passed, 0 Regressions")[:80000],
+        "qa_summary": (qa_summary or "QA Harness: Tests Passed, 0 Regressions")[:35000],
         "ocr_status": (ocr_status or "Alibaba OCR Gate: 0 Critical / 0 High Defects")[:2000],
     }
 
@@ -291,6 +292,7 @@ Return ONLY the specified JSON."""
             system_prompt=SUPERVISOR_SYSTEM_PROMPT,
             primary_model=model,
             max_tokens=MAX_SUPERVISOR_OUTPUT_TOKENS,
+            timeout=180.0,
         )
 
         # Parse JSON from response
@@ -303,7 +305,14 @@ Return ONLY the specified JSON."""
             clean_json = clean_json[:-3]
         clean_json = clean_json.strip()
 
-        parsed = json.loads(clean_json)
+        try:
+            parsed = json.loads(clean_json)
+        except Exception:
+            m = re.search(r"(\{[\s\S]*\})", raw_response)
+            if m:
+                parsed = json.loads(m.group(1))
+            else:
+                raise
         parsed["tokens_consumed"] = digest.get("estimated_tokens", 0)
         parsed["supervisor_model"] = model
         return parsed

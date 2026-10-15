@@ -98,12 +98,15 @@ def call_opus55_direct(
     model: str = DEFAULT_PLANNER_MODEL,
     max_tokens: int = 750,
     temperature: float = 0.3,
-    timeout: float = 60.0,
+    timeout: float = 180.0,
     api_key: Optional[str] = None,
     base_url: str = DEFAULT_HHTECH_URL,
 ) -> str:
     """Performs call to HHTech API for Opus 5.5, preferring model_gateway with streaming."""
-    sys_content = (system_prompt or "") + "\n" + FOUR_PILLARS_PROMPT
+    if system_prompt and ("Supervisor" in system_prompt or "Audit" in system_prompt or "JSON" in system_prompt):
+        sys_content = system_prompt
+    else:
+        sys_content = (system_prompt or "") + "\n" + FOUR_PILLARS_PROMPT
 
     # 1. Try centralized Model Gateway if in workspace (has streaming & prompt caching)
     try:
@@ -203,6 +206,7 @@ def call_opus55_with_fallbacks(
     system_prompt: Optional[str] = None,
     primary_model: str = DEFAULT_PLANNER_MODEL,
     max_tokens: int = 750,
+    timeout: float = 180.0,
 ) -> str:
     """Tries primary Opus 5.5, then cascades down fallback models."""
     models_to_try = [primary_model] + [m for m in FALLBACK_MODELS if m != primary_model]
@@ -216,6 +220,7 @@ def call_opus55_with_fallbacks(
                 system_prompt=system_prompt,
                 model=model_name,
                 max_tokens=max_tokens,
+                timeout=timeout,
             )
         except Exception as e:
             last_error = e
