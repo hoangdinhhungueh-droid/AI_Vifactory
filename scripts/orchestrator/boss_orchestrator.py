@@ -1962,6 +1962,7 @@ def main():
     parser.add_argument("--task", default=None, help="User request description for planning phase")
     parser.add_argument("--task-id", default=None, help="Identifier for the task")
     parser.add_argument("--commit-range", default=None, help="Git commit range for supervisory audit")
+    parser.add_argument("--round-num", type=int, default=1, help="Supervisory audit round number")
     parser.add_argument("--dry-run", action="store_true", help="Execute in dry-run mode without external API calls")
     parser.add_argument("--json-output", action="store_true", help="Emit structured machine-readable JSON output")
 
@@ -1991,7 +1992,12 @@ def main():
         sys.exit(0)
 
     elif args.phase == "audit":
-        res = run_phase_audit(commit_range=args.commit_range, task_id=args.task_id, dry_run=args.dry_run)
+        res = run_phase_audit(
+            commit_range=args.commit_range,
+            task_id=args.task_id,
+            dry_run=args.dry_run,
+            round_num=args.round_num,
+        )
         if args.json_output:
             print(json.dumps(res, indent=2, ensure_ascii=False))
         else:
