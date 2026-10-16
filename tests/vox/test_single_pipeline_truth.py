@@ -44,8 +44,9 @@ def test_legacy_routes_absent_from_ast():
         assert c_target in extracted_routes, f"Expected canonical route '{c_target}' missing from app/main.py!"
 
 
-def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200():
+def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200(monkeypatch):
     """Runs runtime 404 tests against FastAPI app without skip (fail-closed, Rule 125/127)."""
+    monkeypatch.setenv("VF_API_TOKEN", "test_secret_truth_token")
     from fastapi.testclient import TestClient
 
     from app.main import app
@@ -69,8 +70,9 @@ def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200():
     assert res_h.json().get("status") == "ok"
     assert "git_sha" in res_h.json()
 
-    # 2. Diag
-    res_d = client.get("/api/v1/diag")
+    # 2. Diag (Authenticated canonical endpoint)
+    auth_headers = {"Authorization": "Bearer test_secret_truth_token"}
+    res_d = client.get("/api/v1/diag", headers=auth_headers)
     assert res_d.status_code == 200
     assert res_d.json().get("status") == "ok"
 
