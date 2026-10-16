@@ -20,20 +20,28 @@ logger = logging.getLogger(__name__)
 class RunPaths:
     """Canonical path resolver for a specific Pipeline run or Episode."""
 
-    def __init__(self, run_id: str, repo_root: Optional[Path] = None):
-        self.run_id = str(run_id)
-
-        if repo_root is not None:
-            self.repo_root = Path(repo_root).resolve()
+    def __init__(self, run_id: str | Path, repo_root: Optional[Path] = None):
+        if isinstance(run_id, Path):
+            self.run_id = run_id.name
+            self.root = run_id.resolve()
+            if repo_root is not None:
+                self.repo_root = Path(repo_root).resolve()
+            else:
+                self.repo_root = self.root.parent
         else:
-            # Anchor to workspace root
-            self.repo_root = Path(__file__).resolve().parent.parent
+            clean_id = Path(str(run_id)).name
+            self.run_id = clean_id
+            if repo_root is not None:
+                self.repo_root = Path(repo_root).resolve()
+            else:
+                # Anchor to workspace root
+                self.repo_root = Path(__file__).resolve().parent.parent
 
-        # Support both runs/<run_id> and episodes/<run_id> for backward compatibility
-        if self.run_id.startswith("EP_") or "_EP" in self.run_id:
-            self.root = self.repo_root / "episodes" / self.run_id
-        else:
-            self.root = self.repo_root / "runs" / self.run_id
+            # Support both runs/<run_id> and episodes/<run_id> for backward compatibility
+            if self.run_id.startswith("EP_") or "_EP" in self.run_id:
+                self.root = self.repo_root / "episodes" / self.run_id
+            else:
+                self.root = self.repo_root / "runs" / self.run_id
 
         self.manifest_file = self.root / "run_manifest.json"
         self.log_file = self.root / "pipeline.log"
@@ -164,10 +172,12 @@ def resolve_topic_history_path(custom_path: Optional[str] = None) -> Path:
     env_path = os.getenv("TOPIC_HISTORY_PATH")
     if env_path:
         return Path(env_path)
-    state_dir = os.getenv("VF_STATE_DIR") or os.getenv("AVF_STATE_DIR")
+    state_dir = os.getenv("VF_STATE_DIR") or os.getenv("AVF_STATE_DIR") or os.getenv("VF_LOCK_DIR")
     if state_dir:
-        return Path(state_dir) / "topic_history.json"
-    if os.path.exists("/root/video_factory/data"):
+        p = Path(state_dir) / "topic_history.json"
+        if p.exists():
+            return p
+    if os.path.exists("/root/video_factory/data/topic_history.json"):
         return Path("/root/video_factory/data/topic_history.json")
     return Path(__file__).resolve().parent.parent / "data" / "topic_history.json"
 
@@ -200,14 +210,25 @@ def resolve_episodes_dir(
             p.mkdir(parents=True, exist_ok=True)
         return p
 
+    env_dir = os.getenv("VF_EPISODES_DIR") or os.getenv("EPISODES_DIR")
+    if env_dir:
+        p = Path(env_dir)
+        if ensure_dir:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
+
     if repo_root is not None:
         p = Path(repo_root).resolve() / "episodes"
     else:
-        state_dir = os.getenv("VF_STATE_DIR") or os.getenv("AVF_STATE_DIR")
-        if state_dir and (Path(state_dir) / "episodes").is_dir():
-            p = Path(state_dir) / "episodes"
+        # Canonical VPS production location
+        if os.name != "nt" and os.path.isdir("/var/vf/episodes"):
+            p = Path("/var/vf/episodes")
         else:
-            p = Path(__file__).resolve().parent.parent / "episodes"
+            state_dir = os.getenv("VF_STATE_DIR") or os.getenv("AVF_STATE_DIR")
+            if state_dir and (Path(state_dir) / "episodes").is_dir():
+                p = Path(state_dir) / "episodes"
+            else:
+                p = Path(__file__).resolve().parent.parent / "episodes"
 
     if ensure_dir:
         p.mkdir(parents=True, exist_ok=True)

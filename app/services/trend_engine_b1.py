@@ -114,6 +114,45 @@ def mark_v7_candidate_consumed(candidate_id: str, episode_id: str) -> bool:
         logger.error(f"[trend_engine] Failed to mark V7 candidate {candidate_id} consumed: {e}")
     return False
 
+
+def _send_guarded_alert(alert_type: str, market: str, message: str, state_dir: Optional[str] = None) -> bool:
+    """Send an alert to Telegram guarded by cooldown with automatic rollback on failure."""
+    try:
+        decision = should_send_alert(alert_type, market, state_dir=state_dir)
+    except Exception as _alert_err:
+        logger.warning(f"[{market}] Alert cooldown evaluation notice ({alert_type}): {_alert_err}. Suppressing alert (fail-closed).")
+        return False
+
+    if not decision or not decision.can_send:
+        if decision:
+            logger.info(f"[{market}] Suppressed repeated {alert_type} alert due to cooldown ({decision.suppressed} suppressed).")
+        return False
+
+    try:
+        from app.services.telegram_buttons import send_telegram_broadcast
+        sent = send_telegram_broadcast(message)
+        if not sent:
+            logger.warning(f"[{market}] Telegram broadcast returned falsy for {alert_type}. Rolling back reservation.")
+            rollback_alert_reservation(
+                alert_type,
+                market,
+                previous_suppressed=decision.suppressed,
+                previous_last_sent=decision.previous_last_sent,
+                state_dir=state_dir,
+            )
+            return False
+        return True
+    except Exception as _tel_err:
+        logger.warning(f"Failed to send {alert_type} alert to Telegram: {_tel_err}")
+        rollback_alert_reservation(
+            alert_type,
+            market,
+            previous_suppressed=decision.suppressed,
+            previous_last_sent=decision.previous_last_sent,
+            state_dir=state_dir,
+        )
+        return False
+
 MARKET_CONFIG = {
     "EN": {
         "geos": EN_SUB_GEOS,
@@ -1148,11 +1187,8 @@ def discover_and_produce_market_trend(
                     )
                     print(f"\n{circuit_alert}\n")
                     logger.critical(f"[{m_up}] Rule 118 Circuit Breaker triggered after {consecutive_api_errors} consecutive LLM failures.")
-                    try:
-                        from app.services.telegram_buttons import send_telegram_broadcast
-                        send_telegram_broadcast(circuit_alert)
-                    except Exception:
-                        pass
+                    _send_guarded_alert("rule_118_circuit_breaker", m_up, circuit_alert, state_dir=state_dir)
+                    terminal_alert_sent = True
                     break
                 continue
             else:
@@ -1382,11 +1418,8 @@ def discover_and_produce_market_trend(
                     )
                     print(f"\n{cb_err_msg}\n")
                     logger.critical(f"[{m_up}] B2 Circuit Breaker triggered on exception after {b2_attempts_count} attempts.")
-                    try:
-                        from app.services.telegram_buttons import send_telegram_broadcast
-                        send_telegram_broadcast(cb_err_msg)
-                    except Exception as _cb_tel_err:
-                        logger.warning(f"Failed to send B2 circuit breaker alert to Telegram: {_cb_tel_err}")
+                    _send_guarded_alert("b2_circuit_breaker", m_up, cb_err_msg, state_dir=state_dir)
+                    terminal_alert_sent = True
                     break
                 continue
 
@@ -1421,11 +1454,8 @@ def discover_and_produce_market_trend(
                     )
                     print(f"\n{cb_msg}\n")
                     logger.critical(f"[{m_up}] B2 Circuit Breaker triggered after {b2_attempts_count} candidate attempts.")
-                    try:
-                        from app.services.telegram_buttons import send_telegram_broadcast
-                        send_telegram_broadcast(cb_msg)
-                    except Exception as _cb_tel_err:
-                        logger.warning(f"Failed to send B2 circuit breaker alert to Telegram: {_cb_tel_err}")
+                    _send_guarded_alert("b2_circuit_breaker", m_up, cb_msg, state_dir=state_dir)
+                    terminal_alert_sent = True
                     break
                 continue
 
@@ -1473,11 +1503,8 @@ def discover_and_produce_market_trend(
                     )
                     print(f"\n{cb_msg}\n")
                     logger.critical(f"[{m_up}] B2 Circuit Breaker triggered after {b2_attempts_count} candidate attempts.")
-                    try:
-                        from app.services.telegram_buttons import send_telegram_broadcast
-                        send_telegram_broadcast(cb_msg)
-                    except Exception as _cb_tel_err:
-                        logger.warning(f"Failed to send B2 circuit breaker alert to Telegram: {_cb_tel_err}")
+                    _send_guarded_alert("b2_circuit_breaker", m_up, cb_msg, state_dir=state_dir)
+                    terminal_alert_sent = True
                     break
                 continue
 
@@ -1490,7 +1517,6 @@ def discover_and_produce_market_trend(
             # Rule 125 & Rule 126 Single Pipeline State: Task is officially committed ONLY after B3 succeeds.
             res_code = 0
             b3_timeout = _parse_env_int("B3_PIPELINE_TIMEOUT", 1800, min_val=60)
-            terminal_alert_sent = False
 
             if auto_produce:
                 # We already hold the authoritative IN_PROGRESS lock acquired at the beginning of the crawl
@@ -1552,11 +1578,7 @@ def discover_and_produce_market_trend(
                     )
                     print(f"\n{fail_msg}\n")
                     logger.error(f"[{m_up}] Task {temp_task_id} B3 failed (exit code {res_code}). Emitted single terminal failure alert.")
-                    try:
-                        from app.services.telegram_buttons import send_telegram_broadcast
-                        send_telegram_broadcast(fail_msg)
-                    except Exception as _tel_err:
-                        logger.warning(f"Failed to send B3 failure alert to Telegram: {_tel_err}")
+                    _send_guarded_alert("b3_downstream_failure", m_up, fail_msg, state_dir=state_dir)
                     terminal_alert_sent = True
                     if os.path.exists(temp_task_file):
                         try:

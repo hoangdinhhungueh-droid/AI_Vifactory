@@ -38,19 +38,20 @@ def _normalize_key(text: str) -> str:
     return s
 
 
-def load_history() -> dict:
+def load_history(registry_path: Optional[str] = None, allow_backfill: bool = True) -> dict:
     """Load registry from file and automatically backfill from pending tasks and episodes."""
+    target_path = str(registry_path) if registry_path else REGISTRY_PATH
     history = {}
-    if os.path.exists(REGISTRY_PATH):
+    if os.path.exists(target_path):
         try:
-            with open(REGISTRY_PATH, "r", encoding="utf-8") as f:
+            with open(target_path, "r", encoding="utf-8") as f:
                 history = json.load(f)
         except Exception as e:
-            logger.warning(f"[history] Failed to read {REGISTRY_PATH}: {e}")
+            logger.warning(f"[history] Failed to read {target_path}: {e}")
             history = {}
 
-    # Backfill from /var/vf/pending_tasks
-    if os.path.exists(PENDING_DIR):
+    # Backfill from /var/vf/pending_tasks (only when using global production registry)
+    if allow_backfill and not registry_path and os.path.exists(PENDING_DIR):
         for f in os.listdir(PENDING_DIR):
             if f.endswith(".json"):
                 try:

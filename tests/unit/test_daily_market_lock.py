@@ -236,30 +236,31 @@ def test_minimum_vn_hour_policy_protects_morning_window(temp_state_dir):
     that throttles off-hours ticks but expires at 06:00 AM VN to protect the scheduled morning run."""
     from app.services.daily_market_lock import VN_TZ, is_market_done_today, mark_exhausted_today
 
+    mkt = "TEST_WINDOW"
     # Simulated post-midnight time: 00:42 AM VN on 2026-10-16
     midnight_vn = datetime(2026, 10, 16, 0, 42, tzinfo=VN_TZ)
 
     # Off-hours run writes EXHAUSTED_OFFHOURS lock (Boss Item 18)
-    res = mark_exhausted_today("EN", scan_count=10, state_dir=temp_state_dir, now=midnight_vn)
+    res = mark_exhausted_today(mkt, scan_count=10, state_dir=temp_state_dir, now=midnight_vn)
     assert res is True
 
     # Mid-night tick at 01:00 VN is throttled (prevents midnight cron burn)
-    done_off, reason_off, _ = is_market_done_today("EN", state_dir=temp_state_dir, now=midnight_vn)
+    done_off, reason_off, _ = is_market_done_today(mkt, state_dir=temp_state_dir, now=midnight_vn, check_registry=False, check_episodes=False)
     assert done_off is True
     assert reason_off == "lock_exhausted_offhours"
 
     # Check eligibility at 06:00 AM VN: off-hours lock expires, morning run permitted!
     morning_vn = datetime(2026, 10, 16, 6, 0, tzinfo=VN_TZ)
-    is_done, reason, details = is_market_done_today("EN", state_dir=temp_state_dir, now=morning_vn)
+    is_done, reason, details = is_market_done_today(mkt, state_dir=temp_state_dir, now=morning_vn, check_registry=False, check_episodes=False)
     assert is_done is False
     assert reason in ("stale_lock", "not_produced_yet")
 
     # In contrast, an afternoon exhaustion at 15:00 VN seals normally
     afternoon_vn = datetime(2026, 10, 16, 15, 0, tzinfo=VN_TZ)
-    res_pm = mark_exhausted_today("EN", scan_count=10, state_dir=temp_state_dir, now=afternoon_vn)
+    res_pm = mark_exhausted_today(mkt, scan_count=10, state_dir=temp_state_dir, now=afternoon_vn)
     assert res_pm is True
 
-    is_done_pm, reason_pm, _ = is_market_done_today("EN", state_dir=temp_state_dir, now=afternoon_vn)
+    is_done_pm, reason_pm, _ = is_market_done_today(mkt, state_dir=temp_state_dir, now=afternoon_vn, check_registry=False, check_episodes=False)
     assert is_done_pm is True
     assert reason_pm == "lock_exhausted_today"
 
@@ -469,21 +470,22 @@ def test_repeated_off_hours_ticks_throttled(temp_state_dir):
     and then automatically expire at 06:00 AM VN to permit scheduled morning production."""
     from app.services.daily_market_lock import VN_TZ, is_market_done_today, mark_exhausted_today
 
+    mkt = "TEST_THROTTLED"
     # 1. First tick at 01:15 AM VN: scan finds no candidate, writes EXHAUSTED_OFFHOURS
     t1 = datetime(2026, 10, 16, 1, 15, tzinfo=VN_TZ)
-    marked = mark_exhausted_today("EN", scan_count=10, state_dir=temp_state_dir, now=t1)
+    marked = mark_exhausted_today(mkt, scan_count=10, state_dir=temp_state_dir, now=t1)
     assert marked is True
 
     # 2. Subsequent ticks at 02:00, 03:00, 04:00, 05:00 VN must all be throttled
     for h in [2, 3, 4, 5]:
         t_tick = datetime(2026, 10, 16, h, 0, tzinfo=VN_TZ)
-        is_done, reason, _ = is_market_done_today("EN", state_dir=temp_state_dir, now=t_tick)
+        is_done, reason, _ = is_market_done_today(mkt, state_dir=temp_state_dir, now=t_tick, check_registry=False, check_episodes=False)
         assert is_done is True, f"Tick at {h:02d}:00 VN should be throttled by EXHAUSTED_OFFHOURS"
         assert reason == "lock_exhausted_offhours"
 
     # 3. Morning arrives at 06:05 AM VN: lock expired, market is ready!
     t_morn = datetime(2026, 10, 16, 6, 5, tzinfo=VN_TZ)
-    is_done_morn, reason_morn, _ = is_market_done_today("EN", state_dir=temp_state_dir, now=t_morn)
+    is_done_morn, reason_morn, _ = is_market_done_today(mkt, state_dir=temp_state_dir, now=t_morn, check_registry=False, check_episodes=False)
     assert is_done_morn is False, "At 06:00 AM VN, off-hours throttle must expire to permit morning production"
     assert reason_morn in ("stale_lock", "not_produced_yet")
 
@@ -496,15 +498,16 @@ def test_concurrent_0600_offhours_transition_race(temp_state_dir):
 
     from app.services.daily_market_lock import VN_TZ, mark_exhausted_today
 
+    mkt = "TEST_OFFHOURS_RACE"
     # 1. Setup an EXHAUSTED_OFFHOURS lock written at 02:00 AM VN
     t_off = datetime(2026, 10, 16, 2, 0, tzinfo=VN_TZ)
-    marked = mark_exhausted_today("EN", scan_count=10, state_dir=temp_state_dir, now=t_off)
+    marked = mark_exhausted_today(mkt, scan_count=10, state_dir=temp_state_dir, now=t_off)
     assert marked is True
 
     # 2. At 06:00 AM VN, N processes simultaneously attempt to acquire lock
     morning_vn = datetime(2026, 10, 16, 6, 0, tzinfo=VN_TZ)
     n_workers = 6
-    tasks = [("EN", f"morning_topic_{i}", temp_state_dir, morning_vn) for i in range(n_workers)]
+    tasks = [(mkt, f"morning_topic_{i}", temp_state_dir, morning_vn) for i in range(n_workers)]
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
         results = list(executor.map(_worker_offhours_transition, tasks))
 
@@ -519,16 +522,18 @@ def test_crawl_midstream_exception_releases_lock(temp_state_dir, monkeypatch):
     from app.services.daily_market_lock import is_market_done_today
     from app.services.trend_engine_b1 import discover_and_produce_market_trend
 
+    mkt = "TEST_CRASH"
+
     def mock_failing_fetch(*args, **kwargs):
         raise RuntimeError("Simulated transient network failure mid-crawl")
 
     monkeypatch.setattr("app.services.trend_engine_b1.fetch_live_trending_terms", mock_failing_fetch)
 
     with pytest.raises(RuntimeError, match="Simulated transient network failure"):
-        discover_and_produce_market_trend("EN", state_dir=temp_state_dir, auto_produce=False)
+        discover_and_produce_market_trend(mkt, state_dir=temp_state_dir, auto_produce=False)
 
     # Verify that the lock was cleanly released in finally and does NOT block subsequent runs
-    done, reason, _ = is_market_done_today("EN", state_dir=temp_state_dir, check_registry=False, check_episodes=False)
+    done, reason, _ = is_market_done_today(mkt, state_dir=temp_state_dir, check_registry=False, check_episodes=False)
     assert done is False, f"Lock should have been released on exception, but got done=True ({reason})"
     assert reason == "not_produced_yet"
 
@@ -540,6 +545,8 @@ def test_non_timeout_cooldown_error_does_not_abort_quota_stamp(temp_state_dir, m
     import app.services.alert_cooldown as ac
     from app.services.daily_market_lock import is_market_done_today
     from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    mkt = "TEST_COOLDOWN"
 
     # Mock fetch to return candidate that fails pre-filter so crawl exhausts candidates
     def mock_fetch(*args, **kwargs):
@@ -554,11 +561,11 @@ def test_non_timeout_cooldown_error_does_not_abort_quota_stamp(temp_state_dir, m
     monkeypatch.setattr(ac, "should_send_alert", mock_broken_alert)
 
     # Run crawl: should not raise, should stamp EXHAUSTED_TODAY (or EXHAUSTED_OFFHOURS if before 06:00 VN)
-    res = discover_and_produce_market_trend("EN", state_dir=temp_state_dir, auto_produce=False)
+    res = discover_and_produce_market_trend(mkt, state_dir=temp_state_dir, auto_produce=False)
     assert res == []
 
     # Market must be marked EXHAUSTED_TODAY or EXHAUSTED_OFFHOURS (both represent quota exhaustion)
-    done, reason, details = is_market_done_today("EN", state_dir=temp_state_dir, check_registry=False, check_episodes=False)
+    done, reason, details = is_market_done_today(mkt, state_dir=temp_state_dir, check_registry=False, check_episodes=False)
     assert done is True
     assert reason in ("lock_exhausted_today", "lock_exhausted_offhours")
 
@@ -597,14 +604,17 @@ def test_topic_history_registry_vn_day_boundary_attribution(temp_state_dir, monk
 
     hist_file = Path(temp_state_dir) / "topic_history.json"
     monkeypatch.setattr(thr, "REGISTRY_PATH", str(hist_file))
+    monkeypatch.setattr(thr, "PENDING_DIR", str(Path(temp_state_dir) / "no_pending"))
+    monkeypatch.setattr(thr, "EPISODES_DIR", str(Path(temp_state_dir) / "no_episodes"))
 
+    mkt = "TEST_VN_BOUNDARY"
     # Case A: 2026-10-15 17:05:00 UTC == 2026-10-16 00:05:00 VN (just after VN midnight)
     # Naive ISO string "2026-10-15T17:05:00" representing UTC
     hist_data = {
         "retatrutide": {
             "term": "retatrutide",
-            "task_id": "EN_EP0001_retatrutide",
-            "market": "EN",
+            "task_id": "TEST_EP0001_retatrutide",
+            "market": mkt,
             "recorded_at": "2026-10-15T17:05:00",
         }
     }
@@ -613,7 +623,7 @@ def test_topic_history_registry_vn_day_boundary_attribution(temp_state_dir, monk
     # Probe on 2026-10-16 VN date: should detect entry as recorded on 2026-10-16
     now_vn_16th = datetime(2026, 10, 16, 8, 0, tzinfo=VN_TZ)
     done, reason, details = is_market_done_today(
-        "EN",
+        mkt,
         state_dir=temp_state_dir,
         now=now_vn_16th,
         check_registry=True,
@@ -621,7 +631,7 @@ def test_topic_history_registry_vn_day_boundary_attribution(temp_state_dir, monk
     )
     assert done is True
     assert reason == "registry_committed_pending_render"
-    assert details["topic_id"] == "EN_EP0001_retatrutide"
+    assert details["topic_id"] == "TEST_EP0001_retatrutide"
     assert details["vn_date"] == "2026-10-16"
 
     # Case B: 2026-10-15 16:55:00 UTC == 2026-10-15 23:55:00 VN (5 minutes before VN midnight)
@@ -629,7 +639,7 @@ def test_topic_history_registry_vn_day_boundary_attribution(temp_state_dir, monk
     hist_file.write_text(json.dumps(hist_data), encoding="utf-8")
 
     done_b, reason_b, _ = is_market_done_today(
-        "EN",
+        mkt,
         state_dir=temp_state_dir,
         now=now_vn_16th,
         check_registry=True,
@@ -649,12 +659,13 @@ def test_exception_mid_crawl_releases_lock_in_finally(temp_state_dir, monkeypatc
     from app.services.daily_market_lock import is_market_done_today
     from app.services.trend_engine_b1 import discover_and_produce_market_trend
 
+    mkt = "TEST_FINALLY"
     with mock.patch("app.services.trend_engine_b1.fetch_live_trending_terms", side_effect=RuntimeError("Simulated mid-crawl crash")):
         with pytest.raises(RuntimeError, match="Simulated mid-crawl crash"):
-            discover_and_produce_market_trend("EN", auto_produce=False, state_dir=temp_state_dir)
+            discover_and_produce_market_trend(mkt, auto_produce=False, state_dir=temp_state_dir)
 
     # After exception, lock should be released
-    done, reason, _ = is_market_done_today("EN", state_dir=temp_state_dir)
+    done, reason, _ = is_market_done_today(mkt, state_dir=temp_state_dir, check_registry=False, check_episodes=False)
     assert done is False
     assert reason == "not_produced_yet"
 
@@ -668,17 +679,18 @@ def test_non_timeout_cooldown_error_preserves_quota_mark(temp_state_dir, monkeyp
     from app.services.daily_market_lock import is_market_done_today
     from app.services.trend_engine_b1 import discover_and_produce_market_trend
 
+    mkt = "TEST_QUOTA_MARK"
     fake_candidates = [{"term": "test term", "approx_traffic": "10K+", "geos_present": ["US"]}]
     with mock.patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=fake_candidates):
         with mock.patch("app.services.trend_engine_b1.forensic_pre_filter", return_value=(False, "Rejected for test")):
             with mock.patch("app.services.trend_engine_b1.should_send_alert", side_effect=IOError("Corrupt disk alert error")):
-                res = discover_and_produce_market_trend("EN", auto_produce=False, state_dir=temp_state_dir)
+                res = discover_and_produce_market_trend(mkt, auto_produce=False, state_dir=temp_state_dir)
                 assert res == []
 
     # Daily lock must be stamped EXHAUSTED_TODAY despite alert error
-    done, reason, _ = is_market_done_today("EN", state_dir=temp_state_dir)
+    done, reason, _ = is_market_done_today(mkt, state_dir=temp_state_dir, check_registry=False, check_episodes=False)
     assert done is True
-    assert reason == "lock_exhausted_today"
+    assert reason in ("lock_exhausted_today", "lock_exhausted_offhours")
 
 
 

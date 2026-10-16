@@ -57,8 +57,7 @@ jobs:
       - name: Hermetic Unit, Codemap & Adversarial Test Suite (Rule 121 & Rule 125 JUnit Zero-Skip Gate)
         shell: bash
         run: |
-          set -eo pipefail
-          pytest -m "not integration" -v -rA --junitxml=/tmp/junit_unit.xml tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py
+          pytest -m "not integration" -v -rA --junitxml=/tmp/junit_unit.xml tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py tests/test_paths.py tests/test_config.py tests/test_gates_manifest.py
           python -c "
           import xml.etree.ElementTree as ET, sys
           tree = ET.parse('/tmp/junit_unit.xml')

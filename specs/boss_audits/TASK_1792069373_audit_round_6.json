@@ -1,0 +1,101 @@
+{
+  "task_id": "TASK_1792069373",
+  "round": 6,
+  "timestamp": "2026-10-16T02:21:58Z",
+  "verdict": "REVISE_REQUIRED",
+  "score": 5.4,
+  "passing_threshold": 10.0,
+  "supervisor_model": "claude-opus-5-5",
+  "tokens_consumed": 31112,
+  "summary": "Rejected. The VPS primary unit suite exits 1 (9 failed, 112 passed). Two of the failures hit the task's core guarantees directly. First, test_concurrent_acquire_in_progress_mutual_exclusion produced 2 winners out of 6 contenders, so the IN_PROGRESS lock does not provide mutual exclusion. Second, the raw VPS log shows two Telegram messages (id=736, id=737) dispatched 265 ms apart for KR at 23:08:17, which contradicts the 'Zero Duplicate B1 Telegram Alerts' objective. Six of the other failures share one root cause: is_market_done_today reads the live production topic_history registry (EN_EP0001_retatrutide_shadow_market) instead of the test state dir, so the suites are not hermetic. CI is green only because the GitHub runner has no such registry. The VPS dry-run also reports 'EN: CRAWL (READY) — Not produced yet today' while the same host's guard returns registry_committed_pending_render for EN. The two code paths disagree on production state (split-brain, Rule 125). The local Windows tree is dirty (M core/paths.py), which breaks the Rule 126 clean three-way parity requirement even though HEAD and tree SHAs match. test_paths.py shows that RunPaths' new str(run_id) coercion changed the public run_id contract. CI does not include tests/test_paths.py, so this regression is invisible to CI. On-disk lock artifacts (EN_2026-10-15.json missing lock_token and viability_passed_count; scan_count=15 above the cap of 10) predate HEAD, so there is no post-HEAD live production run evidence. Positive items: the S05 NameError fix is correct and live-executed (exit 0), CI run 38839163619 succeeded on HEAD ccd7341, ghost_scan exits 0, and ffprobe telemetry is valid for the golden asset.",
+  "revisions_needed": [
+    "Make acquire_in_progress create the lock with content atomically (tmp + fsync + os.link, or equivalent), and treat empty or unparseable lock files younger than a grace window as IN_PROGRESS rather than corrupt. test_concurrent_acquire_in_progress_mutual_exclusion must pass 50 consecutive iterations on the VPS with multiprocessing (separate PIDs), not threads.",
+    "Inject the registry path into is_market_done_today: derive it from state_dir or add a registry_path parameter passed through to load_history. All 8 test_daily_market_lock failures must pass on the VPS with the live /root/video_factory/data/topic_history.json present.",
+    "Unify scripts/run_trend_pipeline.py dry-run and trend_engine_b1 on the identical is_market_done_today call signature. Show both returning the same verdict for EN on the VPS in the same minute.",
+    "Route ALL terminal Telegram alerts (B2 circuit breaker, B3 failure, LLM circuit breaker, bottleneck, viability) through one cooldown-gated dispatcher, and set terminal_alert_sent on every terminal path. Add a test asserting exactly 1 send_telegram_broadcast call when the B2 circuit breaker fires.",
+    "Replace 'except Exception: pass' around the LLM circuit-breaker broadcast with logged handling.",
+    "Fix RunPaths run_id normalization (Path inputs -> .name; reject absolute paths) so tests/test_paths.py passes, and add tests/test_paths.py to the CI unit target list.",
+    "Replace hardcoded episode and pending-task paths in trend_engine_b1 with core.paths resolvers, and make resolve_episodes_dir cover the canonical /var/vf/episodes production location so the daily guard sees every completed episode.",
+    "Provide the untruncated trend_engine_b1 hunk proving the viability-cap 'break' still exists, and explain scan_count=15 against MAX_SCAN_CANDIDATES_DEFAULT=10.",
+    "Make rollback_alert_reservation delta-safe (preserve suppressions recorded after reservation), make check_alert_eligibility fail closed on parse errors, and explain the live b1_viability::EN state inconsistency.",
+    "Require an explicit token or opt-in for release_lock; remove or wire reconcile_daily_lock, get_current_lock_token, and the unused alert_cooldown helpers.",
+    "Resolve the dual run_pipeline.py entrypoints (orchestrator/ vs scripts/orchestrator/) to a single canonical module, and extend ghost_scan to detect duplicate entrypoint module names.",
+    "Restore or justify the removed Makefile ruff targets, and run ruff on app/ scripts/ with exit 0.",
+    "Remove the unreachable return tuples in detect_safety_and_theme, and document the '동탄문구점' keyword removal. Re-normalize line endings so hhtech_reasoner.py and trend_engine_b1.py diffs reflect only semantic changes.",
+    "Decide the auth posture for /v1/chat/completions: fail closed by default or require an explicit unauthenticated opt-in. Rate-limit the unset-token CRITICAL log.",
+    "Commit or revert core/paths.py on local Windows, and re-capture porcelain as [] on all three nodes.",
+    "After the fixes, provide one post-HEAD live VPS cron run showing: a single lock acquisition, a terminal stamp containing lock_token and viability_passed_count, exactly one Telegram message, and a second tick skipping with lock_exhausted_today and zero Telegram messages."
+  ],
+  "component_reviews": [
+    {
+      "component": "app/services/daily_market_lock.py :: acquire_in_progress",
+      "status": "DEFECT",
+      "analysis": "Root cause of the 2-winner race. O_CREAT|O_EXCL creates an empty file, and json.dump then writes it non-atomically. A contender that hits FileExistsError inside that window reads 0 bytes and calls _quarantine_and_seal_corrupt_lock. That moves the LIVE holder's lock to *.corrupt.<ts> and then rewrites a CORRUPT marker. Between os.replace and atomic_write_json, a third contender's O_EXCL succeeds, which yields two True returns. The empty-file-means-corrupt heuristic destroys a live holder's lock (it should be treated as lock_in_progress), and it also fires spurious CORRUPT operator Telegram alerts. Fix: write the payload to a unique tmp file, fsync, then os.link(tmp, lock_path), which is atomic create-if-absent with content on POSIX and NTFS. Alternatively, treat empty or unparseable files younger than a grace window (e.g. 5s) as IN_PROGRESS. A secondary issue: data.get('status','').upper() raises AttributeError when status is explicitly null."
+    },
+    {
+      "component": "app/services/daily_market_lock.py :: is_market_done_today (registry & episodes)",
+      "status": "DEFECT",
+      "analysis": "The registry check calls topic_history_registry.load_history(), which resolves REGISTRY_PATH at import time to /root/video_factory/data/topic_history.json. That bypasses state_dir, so 6 VPS tests short-circuit on live data and the test's monkeypatch of thr.REGISTRY_PATH is ineffective. Registry access must be injectable (pass a registry_path or derive it from state_dir). Episode scanning uses resolve_episodes_dir() (repo/episodes) only, while trend_engine_b1 still writes to the hardcoded ['/var/vf/episodes', '/root/video_factory/episodes', './episodes']. Completed episodes under /var/vf/episodes are invisible to the guard (Rule 132 split-brain). release_lock() with both lock_token and owner_pid set to None unlinks unconditionally, which is an unsafe default for a holder-verified API. reconcile_daily_lock and get_current_lock_token have no production callers in the code-graph trace (dead surface)."
+    },
+    {
+      "component": "app/services/trend_engine_b1.py :: alert dispatch",
+      "status": "DEFECT",
+      "analysis": "Duplicate alerts are not eliminated. The B2 circuit breaker, B3 failure, and Rule 118 LLM circuit breaker messages all call send_telegram_broadcast directly, bypassing should_send_alert. When the B2 circuit breaker break fires, produced_topics stays empty and terminal_alert_sent stays False, so the bottom block also sends a bottleneck alert: two messages per run. This matches raw log ids 736/737. The LLM circuit breaker wraps the broadcast in 'except Exception: pass', a silent swallow that violates the evaluation standard. Every terminal alert path must go through one cooldown-gated dispatcher, and any terminal message must set terminal_alert_sent."
+    },
+    {
+      "component": "app/services/trend_engine_b1.py :: lock lifecycle & caps",
+      "status": "WARN",
+      "analysis": "Single acquisition plus try/finally release is structurally correct, and the EXHAUSTED stamp precedes alert I/O as intended. However, the early return on 'No unhandled candidates' releases the lock without a terminal stamp, so every cron tick re-crawls. In the compact diff, the 'break' after the RULE 118 viability cap print is not visible in the re-indented block. The cap may be a no-op, and EN lock scan_count=15 exceeds MAX_SCAN_CANDIDATES_DEFAULT=10. Supply the untruncated hunk to prove it. pending_dir is still hardcoded to '/var/vf/pending_tasks' even though core.paths.resolve_pending_tasks_dir exists. The 1257-line churn is mostly re-indentation, which inflates blast radius and limits reviewability (Rule 138)."
+    },
+    {
+      "component": "app/services/alert_cooldown.py",
+      "status": "WARN",
+      "analysis": "should_send_alert correctly performs check, increment, and reserve under one lock, and it fails closed on timestamp parse errors. Remaining issues: (1) check_alert_eligibility fails OPEN on parse errors (logs a warning, then returns eligible), which is inconsistent with should_send_alert. (2) rollback_alert_reservation overwrites suppressed_since_last with a stale snapshot, losing suppressions recorded between reservation and rollback. It should restore last_sent_utc and add the deltas instead. (3) The finally-unlink is a read-then-unlink TOCTOU against a concurrent tombstone reclaim. (4) The live /var/vf/locks/alert_cooldown.json shows b1_viability::EN with last_suppressed_utc (17:42) later than last_sent_utc (15:41) but suppressed_since_last=0. No code path in HEAD produces that state, so it is unexplained. (5) record_alert_suppressed, record_alert_sent, check_alert_eligibility, and reset_alert_cooldown have no production callers."
+    },
+    {
+      "component": "core/paths.py",
+      "status": "DEFECT",
+      "analysis": "RunPaths.__init__ now does self.run_id = str(run_id). Passing a Path instance yields the full absolute path, which breaks tests/test_paths.py::test_run_paths_with_path_instance on the VPS. Normalize with Path(run_id).name for Path inputs, or reject absolute paths. The resolvers are inconsistent: resolve_state_dir honors VF_LOCK_DIR but resolve_topic_history_path does not, and resolve_episodes_dir never returns /var/vf/episodes. The file is uncommitted-modified on local Windows, so the content behind the reported parity is not the reviewed content."
+    },
+    {
+      "component": "stages/s05_director_plan.py",
+      "status": "PASS",
+      "analysis": "The NameError is resolved: s3_data is now loaded via json.load before use. Imports are sorted, the unused Path import is removed, and the stray f-string is fixed. Live execution exits 0 with status=ok. Minor: dropping require_input for a manual exists() check bypasses the shared gate contract, and live proof covers only scenes=1."
+    },
+    {
+      "component": "app/main.py",
+      "status": "WARN",
+      "analysis": "Uses hmac.compare_digest, and /diag no longer leaks exception text (returns 503). Auth fails OPEN when VF_API_TOKEN is unset on an LLM proxy endpoint, and it logs CRITICAL on every request, which spams logs. Production should fail closed unless an explicit opt-in such as ALLOW_UNAUTHENTICATED_LOOPBACK=1 is set. This auth change is outside the declared task scope and needs explicit sign-off."
+    },
+    {
+      "component": "app/services/hhtech_reasoner.py",
+      "status": "WARN",
+      "analysis": "This is a 1165-line full-file rewrite (likely line-ending churn) for roughly 5 semantic changes: import cleanup, narrowed except, debug log, and removal of the '동탄문구점' keyword. Two return tuples (tech_geopolitical_battle and ancient_prehistory_anthropology) remain unreachable dead code after the history branch, because their elif guards are missing. The file was touched but this dead code was preserved. The keyword removal is an undocumented classifier behavior change."
+    },
+    {
+      "component": "tests/unit/test_daily_market_lock.py + CI",
+      "status": "DEFECT",
+      "analysis": "8 of 9 VPS failures come from this file. CI and the Windows job pass because their environments lack the production registry, which shows the tests are environment-dependent rather than hermetic. tests/test_paths.py is absent from the CI unit target list. Makefile lost two ruff check lines with net -2, so the lint gate scope may be reduced and must be justified."
+    },
+    {
+      "component": "orchestrator/ vs scripts/orchestrator/ run_pipeline.py",
+      "status": "WARN",
+      "analysis": "The B3 resolution evidence shows two physical run_pipeline.py modules (scripts/orchestrator/ and orchestrator/), and core.paths callers include orchestrator/run_pipeline.py. That is a dual-entrypoint Rule 125 violation, and it is the same module ambiguity behind Incident 1 ('No module named orchestrator.run_pipeline'). ghost_scan reports clean, which indicates a detector blind spot."
+    }
+  ],
+  "observations": [
+    "Raw VPS log: KR B2 Story Gate REJECTED (10/13) is followed by Telegram messages 736 and 737 within about 265 ms, which is direct physical evidence of duplicate alerting.",
+    "KR_2026-10-16.json records reason=no_candidates_passed_viability and has no viability_passed_count, yet KR_TEMP_6 reached B2 and a b1_b2_bottleneck::KR alert was sent. The lock was written by pre-HEAD code, and its metadata contradicts the run.",
+    "Incident 1 shows commit_trend_task and the Gate 1 notification executing before B3. HEAD reorders this, but no post-HEAD production cron run is evidenced.",
+    "The VPS dry-run reports EN 'Not produced yet today' while is_market_done_today on the same host returns registry_committed_pending_render (vn_date 2026-10-16). The operator-facing CLI and the runtime guard use different state sources.",
+    "Local Windows porcelain is [M core/paths.py] while content hashes match. Either the hash is computed over the index rather than the working tree, or the change is whitespace-only. Either way Rule 126 requires a clean tree.",
+    "The ffprobe golden asset (21.48s, 1080p30 H.264, mono AAC) is valid but not produced by this increment. The waiver is acceptable, but it does not count as task proof.",
+    "Multiple public helpers were added without production callers, which expands the API surface without use (Rule 125 zero-ghost spirit)."
+  ],
+  "adherence_matrix": {
+    "iron_laws_compliance": "VIOLATED (Rules 121, 125, 126, 127, 132, 138)",
+    "four_pillars_status": "NOT_VERIFIED (VPS pytest exit 1)",
+    "zero_ghost_cleanliness": "PARTIAL (ghost_scan exit 0, but dual run_pipeline entrypoints, dead helpers, unreachable returns)"
+  },
+  "audit_file": "C:\\Users\\hunghd2\\Documents\\antigravity\\AI Video Factory\\specs\\boss_audits\\TASK_1792069373_audit_round_6.json"
+}

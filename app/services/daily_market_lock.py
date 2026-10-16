@@ -371,11 +371,14 @@ def acquire_in_progress(
         "ttl_seconds": ttl_seconds,
     }
 
+    payload_bytes = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
+        try:
+            os.write(fd, payload_bytes)
+        finally:
+            os.close(fd)
         logger.info(f"[daily_market_lock] Exclusively acquired IN_PROGRESS lock for {m_up} on {date_str} (pid={pid}, token={token[:8]})")
         return True
     except FileExistsError:
@@ -384,13 +387,33 @@ def acquire_in_progress(
             with open(lock_path, "r", encoding="utf-8") as f:
                 raw_stale = f.read().strip()
             if not raw_stale:
+                try:
+                    mtime = lock_path.stat().st_mtime
+                    if (time.time() - mtime) < 2.0:
+                        time.sleep(0.05)
+                        with open(lock_path, "r", encoding="utf-8") as f:
+                            raw_stale = f.read().strip()
+                except OSError:
+                    pass
+            if not raw_stale:
                 _quarantine_and_seal_corrupt_lock(lock_path, "File is completely empty (0 bytes)", m_up, date_str, now)
                 return False
             try:
                 existing = json.loads(raw_stale)
             except Exception as j_err:
-                _quarantine_and_seal_corrupt_lock(lock_path, str(j_err), m_up, date_str, now)
-                return False
+                try:
+                    mtime = lock_path.stat().st_mtime
+                    if (time.time() - mtime) < 2.0:
+                        time.sleep(0.05)
+                        with open(lock_path, "r", encoding="utf-8") as f:
+                            raw_stale = f.read().strip()
+                        existing = json.loads(raw_stale)
+                    else:
+                        _quarantine_and_seal_corrupt_lock(lock_path, str(j_err), m_up, date_str, now)
+                        return False
+                except Exception as j2_err:
+                    _quarantine_and_seal_corrupt_lock(lock_path, str(j2_err), m_up, date_str, now)
+                    return False
 
             ex_status = existing.get("status")
 

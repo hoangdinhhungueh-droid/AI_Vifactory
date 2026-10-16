@@ -100,6 +100,8 @@ audits/
 !.agents/hooks.json
 python*.bat
 python*.cmd
+login_acc*.bat
+scripts/login_acc*.py
 temp_test/
 
 # Boss audit runtime state and visual audit reports

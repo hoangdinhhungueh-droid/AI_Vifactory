@@ -966,8 +966,11 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     # 13. Core Vox, Stages & App/Main.py Untruncated Per-File Diffs & Source Trace (Rule 125, 127, 128 & Boss Item 2 & 7)
     code_core_diff, out_core_diff = run_on_vps(
         "python3 -c \""
+        "import os, sys, glob, subprocess, hashlib\n"
         "print('=== 1. UNTRUNCATED CORE PER-FILE DIFFS (Boss Item 7) ===')\n"
         "core_diff_targets = [\n"
+        "    'stages/s05_director_plan.py', 'core/paths.py', 'app/services/trend_engine_b1.py',\n"
+        "    'app/services/daily_market_lock.py', 'app/services/alert_cooldown.py',\n"
         "    'vox/align.py', 'vox/assemble.py', 'vox/compositor.py', 'vox/cutout.py',\n"
         "    'vox/planner.py', 'vox/pipeline.py', 'vox/qa/gates.py', 'vox/schemas.py',\n"
         "    'stages/s10_render.py', 'stages/s11_qc.py', 'app/main.py'\n"
@@ -1280,7 +1283,9 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "        'tests/vox/test_rule_131_and_136.py',\n"
         "        '-v'\n"
         "    ]\n"
-        "    res = subprocess.run(cmd, cwd='/root/video_factory', env=env)\n"
+        "    res = subprocess.run(cmd, cwd='/root/video_factory', env=env, capture_output=True, text=True)\n"
+        "    if res.stdout: print(res.stdout)\n"
+        "    if res.stderr: print(res.stderr, file=sys.stderr)\n"
         "    sys.exit(res.returncode)\n"
         "\""
     )
