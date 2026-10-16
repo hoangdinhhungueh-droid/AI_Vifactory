@@ -114,10 +114,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest==9.0.3 pytest-cov==7.1.0 pydantic==2.13.4 pyyaml==6.0.3 requests==2.34.2
+          pip install pytest==9.0.3 pytest-cov==7.1.0 pydantic==2.13.4 pyyaml==6.0.3 requests==2.34.2 httpx==0.28.1
       - name: Run Windows-specific lock, retention, atomic_io, and s05 tests
         run: |
-          pytest -v tests/unit/test_alert_cooldown.py tests/unit/test_daily_market_lock.py tests/unit/test_corrupt_retention_policy.py tests/unit/test_s05_director_plan.py tests/unit/test_s10_render.py tests/unit/test_atomic_io.py tests/unit/test_align_adversarial.py tests/unit/test_hhtech_reasoner_branches.py tests/test_paths.py
+          pytest -v tests/unit/test_alert_cooldown.py tests/unit/test_daily_market_lock.py tests/unit/test_corrupt_retention_policy.py tests/unit/test_s05_director_plan.py tests/unit/test_s10_render.py tests/unit/test_atomic_io.py tests/unit/test_align_adversarial.py tests/unit/test_hhtech_detect_theme.py tests/unit/test_hhtech_reasoner_branches.py tests/test_paths.py
 
   optional-cd-vps:
     name: "Optional CD: Automated Zero-Downtime Deploy to Hetzner VPS (Secret-Gated)"
