@@ -588,11 +588,13 @@ def acquire_in_progress(
     owner_pid: Optional[int] = None,
     lock_token: Optional[str] = None,
     force: bool = False,
+    force_override: bool = False,
 ) -> bool:
     """Exclusively acquire IN_PROGRESS daily lock for market using atomic creation with content.
     Generates unique lock_token and records owner_pid for holder verification.
     Guarantees mutual exclusion between competing processes.
-    When force=True (e.g. B1_FORCE_CRAWL=1), forcefully acquires the lock under token ownership.
+    When force=True, forcefully acquires the lock under token ownership. Refuses to displace
+    COMPLETED, EXHAUSTED_TODAY, or CORRUPT_FAIL_CLOSED unless force_override=True (Boss Round 11 Item 15).
     """
     m_up = _validate_market(market)
     date_str = vn_today(now)
@@ -619,13 +621,21 @@ def acquire_in_progress(
         if lock_path.exists():
             try:
                 ex_data = json.loads(lock_path.read_text(encoding="utf-8"))
-                if ex_data.get("status") == "IN_PROGRESS":
-                    payload["displaced_token"] = ex_data.get("lock_token")
-                    payload["displaced_pid"] = ex_data.get("pid")
+                ex_status = (ex_data.get("status") or "").upper()
+                if ex_status in ("COMPLETED", "EXHAUSTED_TODAY", "CORRUPT_FAIL_CLOSED") and not force_override:
                     logger.warning(
-                        f"[daily_market_lock] Force acquisition displaced active lock holder "
-                        f"(displaced_pid={ex_data.get('pid')}, displaced_token={str(ex_data.get('lock_token'))[:8]})"
+                        f"[daily_market_lock] Refusing force acquisition for {m_up} on {date_str}: "
+                        f"lock is in terminal state '{ex_status}' and force_override=False (Boss Round 11 Item 15)"
                     )
+                    return False
+                payload["displaced_payload"] = ex_data
+                payload["displaced_status"] = ex_status
+                payload["displaced_token"] = ex_data.get("lock_token")
+                payload["displaced_pid"] = ex_data.get("pid")
+                logger.warning(
+                    f"[daily_market_lock] Force acquisition displaced active lock holder "
+                    f"(displaced_status={ex_status}, displaced_pid={ex_data.get('pid')}, displaced_token={str(ex_data.get('lock_token'))[:8]})"
+                )
             except Exception as _ex_err:
                 logger.debug(f"[daily_market_lock] Notice reading pre-force lock: {_ex_err}")
         atomic_write_json(lock_path, payload)
@@ -1019,6 +1029,23 @@ def release_lock(
                 if not verified:
                     logger.warning(f"[daily_market_lock] Refusing release_lock for {m_up}: owner verification failed")
                     return False
+
+            # If lock contains a displaced payload (from forced takeover or custom seed), restore it instead of unlinking!
+            # (Boss Round 11 Item 15)
+            try:
+                cur_data = json.loads(lock_path.read_text(encoding="utf-8"))
+            except Exception as _r_err:
+                cur_data = {}
+                logger.debug("[daily_market_lock] Notice reading lock before release: %s", _r_err)
+
+            displaced = cur_data.get("displaced_payload")
+            if displaced and isinstance(displaced, dict):
+                atomic_write_json(lock_path, displaced)
+                logger.info(
+                    f"[daily_market_lock] Restored displaced lock payload (status={displaced.get('status')}) "
+                    f"for {m_up} on release instead of unlinking (Boss Round 11 Item 15)."
+                )
+                return True
 
             lock_path.unlink()
             logger.info(f"[daily_market_lock] Released lock for {m_up} (token={str(lock_token)[:8]})")

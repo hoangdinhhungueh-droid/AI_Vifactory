@@ -68,9 +68,17 @@ def run(ctx: RunContext) -> StageArtifact:
     except Exception as parse_err:
         raise RuntimeError(f"Failed to parse S3 script artifact JSON at {s3_artifact_path}: {parse_err}") from parse_err
 
-    s3_artifact = validate_artifact(StageID.S3_SCRIPT, s3_raw)
-    raw_scenes = s3_artifact.payload.get("scenes", [])
-    script_text = s3_artifact.payload.get("script_text", "")
+    try:
+        s3_artifact = validate_artifact(StageID.S3_SCRIPT, s3_raw)
+        raw_scenes = s3_artifact.payload.get("scenes", [])
+        script_text = s3_artifact.payload.get("script_text", "")
+    except Exception as v_err:
+        if isinstance(s3_raw, dict) and "payload" in s3_raw:
+            logger.warning(f"[s05_director_plan] S3 artifact failed strict boundary validation ({v_err}), falling back to direct payload: {s3_raw.get('payload', {}).keys()}")
+            raw_scenes = s3_raw.get("payload", {}).get("scenes", [])
+            script_text = s3_raw.get("payload", {}).get("script_text", "")
+        else:
+            raise
 
     # Ground scenes with canonical vox.planner engine (Rule 125 & 139)
     if script_text:

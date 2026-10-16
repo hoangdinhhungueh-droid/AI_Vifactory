@@ -899,4 +899,56 @@ def test_concurrent_takeover_vs_release_mutex_serialization(temp_state_dir):
     assert lock_file.exists() or results["release"] is True
 
 
+def test_custom_seed_after_completed_preserves_completed(temp_state_dir):
+    """Boss Round 11 Item 15: A custom seed run after COMPLETED must refuse to displace
+    COMPLETED without force_override, and if forced with override and fails, must restore
+    the original COMPLETED terminal state instead of unlinking."""
+    import json
+    from app.services.daily_market_lock import (
+        acquire_in_progress,
+        mark_completed,
+        release_lock,
+        is_market_done_today,
+        _get_lock_file_path,
+    )
+
+    # 1. Day completes successfully
+    owner_token = "prod_token_111"
+    owner_pid = 1234
+    ok = acquire_in_progress("EN", topic_id="FINISHED_TOPIC", state_dir=temp_state_dir, lock_token=owner_token, owner_pid=owner_pid)
+    assert ok is True
+    ok = mark_completed("EN", topic_id="FINISHED_TOPIC", state_dir=temp_state_dir, lock_token=owner_token, owner_pid=owner_pid)
+    assert ok is True
+
+    # 2. Force acquisition without force_override is REFUSED
+    seed_token = "seed_token_222"
+    seed_pid = 5678
+    refused = acquire_in_progress("EN", topic_id="SEED_TOPIC", state_dir=temp_state_dir, lock_token=seed_token, owner_pid=seed_pid, force=True, force_override=False)
+    assert refused is False
+
+    # 3. Force acquisition with force_override=True succeeds and captures displaced payload
+    acquired = acquire_in_progress("EN", topic_id="SEED_TOPIC", state_dir=temp_state_dir, lock_token=seed_token, owner_pid=seed_pid, force=True, force_override=True)
+    assert acquired is True
+
+    lock_file = _get_lock_file_path("EN", temp_state_dir)
+    in_flight = json.loads(lock_file.read_text(encoding="utf-8"))
+    assert in_flight["status"] == "IN_PROGRESS"
+    assert in_flight["displaced_payload"]["status"] == "COMPLETED"
+    assert in_flight["displaced_payload"]["topic_id"] == "FINISHED_TOPIC"
+
+    # 4. Custom seed fails and releases lock: MUST RESTORE COMPLETED rather than unlink
+    rel_ok = release_lock("EN", state_dir=temp_state_dir, lock_token=seed_token, owner_pid=seed_pid)
+    assert rel_ok is True
+    assert lock_file.exists()
+
+    restored = json.loads(lock_file.read_text(encoding="utf-8"))
+    assert restored["status"] == "COMPLETED"
+    assert restored["topic_id"] == "FINISHED_TOPIC"
+
+    is_done, reason, details = is_market_done_today("EN", state_dir=temp_state_dir, check_registry=False, check_episodes=False)
+    assert is_done is True
+    assert reason == "lock_completed"
+
+
+
 

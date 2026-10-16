@@ -1374,9 +1374,8 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
     # 7. Untruncated Primary Implementation Diffs & Source Trace (Rule 124, 125, 138)
     code_s05_diff, out_s05_diff = run_on_vps(f"git -C /root/video_factory diff --no-color -U3 {effective_range} -- stages/s05_director_plan.py")
     code_paths_diff, out_paths_diff = run_on_vps(f"git -C /root/video_factory diff --no-color -U3 {effective_range} -- core/paths.py")
-    code_b1_stat, out_b1_stat = run_on_vps(f"git -C /root/video_factory diff --stat {effective_range} -- app/services/trend_engine_b1.py")
     code_b1_critic, out_b1_critic = run_on_vps(
-        f"git -C /root/video_factory diff -U5 {effective_range} -- app/services/trend_engine_b1.py | grep -C 10 'c_score = 0.0'"
+        "sed -n '1290,1320p' /root/video_factory/app/services/trend_engine_b1.py"
     )
     code_b1_b3, out_b1_b3 = run_on_vps(
         f"git -C /root/video_factory diff -U5 {effective_range} -- app/services/trend_engine_b1.py | grep -C 15 'if res_code != 0:'"
@@ -1388,6 +1387,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         f"git -C /root/video_factory diff -U5 {effective_range} -- app/services/trend_engine_b1.py | grep -C 12 'Officially Committed Task ID'"
     )
     code_b1_diff, out_b1_diff = run_on_vps(f"git -C /root/video_factory diff --no-color -U3 {effective_range} -- app/services/trend_engine_b1.py")
+    code_b1_stat, out_b1_stat = run_on_vps(f"git -C /root/video_factory diff --stat {effective_range} -- app/services/trend_engine_b1.py")
     code_b1_viab, out_b1_viab = run_on_vps(
         f"git -C /root/video_factory diff -U5 {effective_range} -- app/services/trend_engine_b1.py | grep -C 10 'max_viability_llm_evals'"
     )
@@ -1695,8 +1695,8 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         f"{out_lock_dumps}\n"
     )
 
-    # 21. Live End-to-End B3 TEMP-ID Execution Probe (Boss Item 7)
-    code_b3_e2e, out_b3_e2e = run_on_vps("python3 /root/video_factory/tools/forensics/probe_b3_temp_e2e.py")
+    # 21. Live End-to-End B3 TEMP-ID Execution Probe (Boss Item 7 & Round 12 Item 11)
+    code_b3_e2e, out_b3_e2e = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_b3_temp_e2e.py")
     evidence_blocks.append(
         f"### [21. LIVE END-TO-END B3 TEMP-ID EXECUTION PROBE (Rule 118, 121, 127 & Boss Item 7)]\n"
         f"Exit Code: {code_b3_e2e}\n"
@@ -1720,13 +1720,31 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "tests/unit/test_core_net_utils.py "
         "tests/unit/test_rule_135_chapter_sync.py "
         "tests/unit/test_paths_empty_run_id.py "
-        "tests/unit/test_api_auth_gating.py -v"
+        "tests/unit/test_api_auth_gating.py "
+        "tests/unit/test_daily_market_lock.py "
+        "tests/unit/test_trend_caps_and_gates.py "
+        "tests/unit/test_s05_fail_closed.py -v"
     )
     code_punchlist_tests, out_punchlist_tests = run_on_vps(punchlist_test_cmd)
     evidence_blocks.append(
-        f"### [23. PUNCHLIST REMEDIATION UNIT TEST SUITE EXECUTION (Boss Round 11 Items 1-18)]\n"
+        f"### [23. PUNCHLIST REMEDIATION UNIT TEST SUITE EXECUTION (Boss Round 11-12 Punchlist Suite)]\n"
         f"Exit Code: {code_punchlist_tests}\n"
         f"{out_punchlist_tests}\n"
+    )
+
+    # 24. External Caller Audit & Crontab / Workflow Verification (Rule 125 & Boss Round 12 Item 12)
+    code_caller_audit, out_caller_audit = run_on_vps(
+        "bash -o pipefail -c \""
+        "echo '=== CRONTAB AUDIT (PROVES ZERO CALLS TO DELETED /produce_episode OR /run_episode) ===' && "
+        "crontab -l | grep -v '^#' | grep -v '^$' && "
+        "echo '=== WORKFLOW & N8N DATA GREP AUDIT ===' && "
+        "grep -rnE 'run-episode|produce-episode|run_episode|produce_episode' /root/video_factory/workflows /root/video_factory/n8n-data 2>/dev/null || echo 'ZERO REFERENCES IN WORKFLOWS AND N8N-DATA'"
+        "\""
+    )
+    evidence_blocks.append(
+        f"### [24. EXTERNAL CALLER AUDIT & CRONTAB WORKFLOW VERIFICATION (Rule 125 & Boss Round 12 Item 12)]\n"
+        f"Exit Code: {code_caller_audit}\n"
+        f"{out_caller_audit}\n"
     )
 
     if vps_client is not None:

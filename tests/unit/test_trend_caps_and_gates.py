@@ -597,6 +597,101 @@ def test_custom_seed_does_not_preempt_active_in_progress_lock(tmp_path, monkeypa
     assert "forced" not in lock_data
 
 
+def test_b2_story_verdict_fails_closed_when_not_pass(tmp_path, monkeypatch):
+    """Boss Round 11 Item 17: When story_verdict is missing or not PASS, candidate must be rejected."""
+    from unittest.mock import patch
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    # Single viable candidate
+    cand = {
+        "term": "Banking Collapse Inquest",
+        "approx_traffic": "50K+",
+        "news_catalysts": [{"title": "Bank Collapses", "url": "https://news.com/1"}],
+        "factsheet": "Major bank collapse investigation.",
+        "traffic_source": "google_trends_rss",
+        "rising_queries": [],
+        "breakout_queries": [],
+    }
+
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[cand]), \
+         patch("app.services.trend_engine_b1._evaluate_viability_cached", return_value=(True, 9.0, {"hook_angle": "Banking Collapse"})), \
+         patch("app.services.story_engine_b2.generate_5_arc_story", return_value={"story": "text", "story_gate_score": 9.0, "story_verdict": "FAIL"}):
+        produced = discover_and_produce_market_trend(
+            market="EN",
+            auto_produce=True,
+            state_dir=str(tmp_path),
+            max_scan_candidates=10,
+        )
+        assert len(produced) == 0
+
+
+def test_b21_fact_causal_audit_fails_closed_when_missing_or_score_low(tmp_path, monkeypatch):
+    """Boss Round 11 Item 17: When fact_causal_audit is missing or score < 7.5 or verdict != PASS,
+    candidate must be rejected and must never be overridden to PASS."""
+    from unittest.mock import patch
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    cand = {
+        "term": "Accounting Fraud Inquiry",
+        "approx_traffic": "50K+",
+        "news_catalysts": [{"title": "Fraud Exposed", "url": "https://news.com/2"}],
+        "factsheet": "Accounting fraud audit.",
+        "traffic_source": "google_trends_rss",
+        "rising_queries": [],
+        "breakout_queries": [],
+    }
+
+    # Case 1: Missing fact_causal_audit entirely
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[cand]), \
+         patch("app.services.trend_engine_b1._evaluate_viability_cached", return_value=(True, 9.0, {"hook_angle": "Fraud Inquiry"})), \
+         patch("app.services.story_engine_b2.generate_5_arc_story", return_value={"story": "text", "story_gate_score": 10.0, "story_verdict": "PASS"}):
+        produced = discover_and_produce_market_trend(
+            market="EN",
+            auto_produce=True,
+            state_dir=str(tmp_path),
+            max_scan_candidates=10,
+        )
+        assert len(produced) == 0
+
+    # Case 2: Auditor returned FAIL despite score >= 7.5 (must not override!)
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[cand]), \
+         patch("app.services.trend_engine_b1._evaluate_viability_cached", return_value=(True, 9.0, {"hook_angle": "Fraud Inquiry"})), \
+         patch("app.services.story_engine_b2.generate_5_arc_story", return_value={
+             "story": "text",
+             "story_gate_score": 10.0,
+             "story_verdict": "PASS",
+             "fact_causal_audit": {"verdict": "FAIL", "audit_score": 8.0, "veto_reason": "Unverified premise"}
+         }):
+        produced = discover_and_produce_market_trend(
+            market="EN",
+            auto_produce=True,
+            state_dir=str(tmp_path),
+            max_scan_candidates=10,
+        )
+        assert len(produced) == 0
+
+
+def test_partial_scan_does_not_stamp_exhausted_today(tmp_path, monkeypatch):
+    """Boss Round 11 Item 16: Partial scans with max_scan_candidates < 10 must release lock
+    without stamping EXHAUSTED_TODAY, preserving daily cron quota."""
+    from unittest.mock import patch
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+    from app.services.daily_market_lock import is_market_done_today
+
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[]):
+        produced = discover_and_produce_market_trend(
+            market="EN",
+            auto_produce=True,
+            state_dir=str(tmp_path),
+            max_scan_candidates=1,
+        )
+        assert len(produced) == 0
+        is_done, reason, _ = is_market_done_today("EN", state_dir=str(tmp_path), check_registry=False, check_episodes=False)
+        assert is_done is False
+        assert reason == "not_produced_yet"
+
+
+
 
 
 

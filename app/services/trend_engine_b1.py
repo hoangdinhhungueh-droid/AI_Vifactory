@@ -1469,7 +1469,7 @@ def discover_and_produce_market_trend(
                 story_text = brain.get("story") or brain.get("full_script") or ""
                 t_obj["story_text"] = story_text
                 t_obj["story_gate_score"] = brain.get("story_gate_score")
-                t_obj["story_verdict"] = brain.get("story_verdict", "PASS")
+                t_obj["story_verdict"] = brain.get("story_verdict", "FAIL")
                 print(f"  ✅ [B2 Attempt {b2_attempts_count}] Script generated ({len(story_text.split())} words, Gate Score: {t_obj['story_gate_score']}, Verdict: {t_obj['story_verdict']})")
             except Exception as b2_err:
                 logger.error(f"[{temp_task_id}] B2 Story generation failed: {b2_err}. Rotating to next candidate...")
@@ -1505,8 +1505,8 @@ def discover_and_produce_market_trend(
                     break
                 continue
 
-            # Check Story Gate verdict (Rule 121 & Rule 127)
-            if t_obj.get("story_verdict") == "FAIL":
+            # Check Story Gate verdict (Rule 121, Rule 127 & Boss Round 11 Item 17)
+            if t_obj.get("story_verdict") != "PASS":
                 logger.error(f"[{temp_task_id}] B2 Story Gate REJECTED ({t_obj.get('story_gate_score')}). Candidate rejected...")
                 print(f"  ❌ [B2 STORY GATE REJECTED] Score: {t_obj.get('story_gate_score')}.")
                 record_handled_topic(term=term, task_id="REJECTED_OR_HANDLED", market=m_up)
@@ -1552,20 +1552,22 @@ def discover_and_produce_market_trend(
                     break
                 continue
 
-            # 7. B2.1 Independent Fact & Causal Integrity Audit Gate (Rule 118, 122 & 130 - GPT-6-Astra / Claude Opus 5)
-            fact_audit = brain.get("fact_causal_audit") or {}
+            # 7. B2.1 Independent Fact & Causal Integrity Audit Gate (Rule 118, 122 & 130 & Boss Round 11 Item 17)
+            fact_audit = brain.get("fact_causal_audit")
+            if not fact_audit or not isinstance(fact_audit, dict):
+                f_verdict = "FAIL"
+                f_score = 0.0
+                fact_audit = {"verdict": "FAIL", "audit_score": 0.0, "veto_reason": "Missing fact_causal_audit in brain"}
+            else:
+                f_score = float(fact_audit.get("audit_score", 0.0))
+                # Never override auditor FAIL to PASS (Boss Round 11 Item 17)
+                f_verdict = str(fact_audit.get("verdict", "FAIL")).upper()
+
             auditor_disp_name = fact_audit.get("auditor_model") or "GPT-6-Astra"
             print(f"  🛡️ [B2.1 Fact & Causal Audit] Script audited by {auditor_disp_name}...")
-            is_converged = fact_audit.get("convergence_status") == "CONVERGED"
-            f_score = float(fact_audit.get("audit_score", 10.0))
-            if (is_converged or f_score >= 7.5) and fact_audit.get("verdict") != "PASS":
-                f_verdict = "PASS"
-                fact_audit["verdict"] = "PASS"
-            else:
-                f_verdict = fact_audit.get("verdict", "PASS").upper()
             print(f"  ⚖️ [B2.1 Fact & Causal Audit Result] Verdict={f_verdict}, Score={f_score}/10")
 
-            if f_verdict == "FAIL" or f_score < 7.5:
+            if f_verdict != "PASS" or f_score < 7.5:
                 veto_reason = fact_audit.get("veto_reason") or fact_audit.get("audit_notes") or "Script failed fact/causal integrity audit"
                 logger.error(f"[{temp_task_id}] B2.1 Audit REJECTED ({f_score}/10): {veto_reason}. Candidate rejected, rotating to next candidate...")
                 print(f"  ❌ [B2.1 REJECTED] {veto_reason}. (B2 Attempt {b2_attempts_count}/{max_b2_attempts})")
@@ -1805,27 +1807,35 @@ def discover_and_produce_market_trend(
                 scanned_count = min(len(candidates), max_scan_candidates)
                 exhaust_reason = "bottleneck_downstream_gates" if viability_passed_candidates else "no_candidates_passed_viability"
 
-                # 1. First: Stamp EXHAUSTED_TODAY immediately so automated cron will NOT retry in a loop today (Boss Item 14 & 18)
-                if not is_terminal_stamped:
-                    mark_ok = mark_exhausted_today(
-                        market=m_up,
-                        scan_count=scanned_count,
-                        state_dir=state_dir,
-                        now=now,
-                        extra_metadata={
-                            "viability_evals_count": viability_evals_count,
-                            "viability_passed_count": len(viability_passed_candidates),
-                            "reason": exhaust_reason,
-                        },
-                        lock_token=lock_token,
-                        owner_pid=os.getpid(),
+                # 1. First: Stamp EXHAUSTED_TODAY only if full candidate pool was evaluated (Boss Round 11 Item 16)
+                if max_scan_candidates >= MAX_SCAN_CANDIDATES_DEFAULT:
+                    if not is_terminal_stamped:
+                        mark_ok = mark_exhausted_today(
+                            market=m_up,
+                            scan_count=scanned_count,
+                            state_dir=state_dir,
+                            now=now,
+                            extra_metadata={
+                                "viability_evals_count": viability_evals_count,
+                                "viability_passed_count": len(viability_passed_candidates),
+                                "reason": exhaust_reason,
+                            },
+                            lock_token=lock_token,
+                            owner_pid=os.getpid(),
+                        )
+                        if mark_ok:
+                            is_terminal_stamped = True
+                            print(f"🛑 [DAILY MARKET LOCK] Marked Market {m_up} as EXHAUSTED_TODAY ({scanned_count} candidates evaluated, reason={exhaust_reason}).")
+                            print("   Automated scheduler will NOT retry today. Next scheduled market will run tomorrow automatically.")
+                        else:
+                            logger.warning(f"[{m_up}] Failed to mark market as EXHAUSTED_TODAY.")
+                else:
+                    logger.info(
+                        f"[{m_up}] Partial scan completed ({scanned_count} < {MAX_SCAN_CANDIDATES_DEFAULT}). "
+                        f"Releasing uncommitted lock without stamping EXHAUSTED_TODAY to preserve daily cron quota (Boss Round 11 Item 16)."
                     )
-                    if mark_ok:
-                        is_terminal_stamped = True
-                        print(f"🛑 [DAILY MARKET LOCK] Marked Market {m_up} as EXHAUSTED_TODAY ({scanned_count} candidates evaluated, reason={exhaust_reason}).")
-                        print("   Automated scheduler will NOT retry today. Next scheduled market will run tomorrow automatically.")
-                    else:
-                        logger.warning(f"[{m_up}] Failed to mark market as EXHAUSTED_TODAY.")
+                    release_lock(m_up, state_dir=state_dir, lock_token=lock_token, owner_pid=os.getpid(), now=now)
+                    is_terminal_stamped = True
 
                 # 2. Second: Alert dispatch with cooldown (catch broad Exception so alert I/O can NEVER bypass quota mark)
                 if viability_passed_candidates:

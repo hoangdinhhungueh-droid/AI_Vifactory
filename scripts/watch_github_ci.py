@@ -21,7 +21,7 @@ except Exception:
     pass
 
 DEFAULT_REPO = "hoangdinhhungueh-droid/AI_Vifactory"
-DEFAULT_TOKEN = "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"
+DEFAULT_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
 
 
 class NoAuthRedirect(urllib.request.HTTPRedirectHandler):
