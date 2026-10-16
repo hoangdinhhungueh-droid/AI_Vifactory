@@ -17,7 +17,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Add project root to sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
 from core.paths import resolve_state_dir
+
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("dispose_retatrutide")
