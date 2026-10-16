@@ -16,8 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from core.atomic_io import atomic_write_json
 from core.paths import (
-    resolve_episodes_dir,
     resolve_pending_tasks_dir,
     resolve_topic_history_path,
 )
@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 # Module-level defaults are None so paths resolve lazily; tests may monkeypatch REGISTRY_PATH
 REGISTRY_PATH: Optional[str] = None
 PENDING_DIR: Optional[str] = None
-EPISODES_DIR: Optional[str] = None
 
 
 def _resolve_target_path(registry_path: Optional[str] = None) -> str:
@@ -65,8 +64,7 @@ def load_history(registry_path: Optional[str] = None, allow_backfill: bool = Tru
             logger.warning(f"[history] Failed to read {target_path}: {e}")
             history = {}
 
-    # Backfill from /var/vf/pending_tasks (only when using global production registry)
-    pending_dir = str(resolve_pending_tasks_dir(ensure_dir=False))
+    # Backfill from pending_tasks (only when using global production registry and backfill enabled)
     if allow_backfill and not registry_path and os.path.exists(pending_dir):
         for f in os.listdir(pending_dir):
             if f.endswith(".json"):
@@ -99,14 +97,10 @@ def load_history(registry_path: Optional[str] = None, allow_backfill: bool = Tru
 
 
 def save_history(history: dict, registry_path: Optional[str] = None) -> None:
-    """Persist history registry atomically to disk."""
-    target_path = _resolve_target_path(registry_path)
+    """Persist history registry atomically to disk via atomic_write_json (Rule 125 & Boss Item 11)."""
+    target_path = Path(_resolve_target_path(registry_path))
     try:
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        tmp = target_path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(history, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, target_path)
+        atomic_write_json(target_path, history)
     except Exception as e:
         logger.warning(f"[history] Failed to save {target_path}: {e}")
 

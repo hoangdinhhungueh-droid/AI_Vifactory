@@ -121,24 +121,26 @@ def _verify_auth(request: Request) -> None:
     token = os.getenv("VF_API_TOKEN", "").strip() or VF_API_TOKEN
     if not token:
         allow_loopback = (
-            os.getenv("ALLOW_UNAUTHENTICATED_LOOPBACK") == "1"
-            or os.getenv("VF_ALLOW_UNAUTH_LOOPBACK") == "1"
+            os.getenv("VF_ALLOW_UNAUTH_LOOPBACK") == "1"
+            or os.getenv("ALLOW_UNAUTHENTICATED_LOOPBACK") == "1"
         )
+        client_host = getattr(getattr(request, "client", None), "host", "")
+        is_loopback = client_host in ("127.0.0.1", "::1", "localhost", "testclient")
         now = time.time()
         if now - _last_unset_token_log_time >= 60.0:
             _last_unset_token_log_time = now
-            if allow_loopback:
+            if allow_loopback and is_loopback:
                 _logger.warning(
-                    "[SECURITY ALERT] VF_API_TOKEN is unset. VF_ALLOW_UNAUTH_LOOPBACK=1 is active; loopback call permitted."
+                    f"[SECURITY ALERT] VF_API_TOKEN is unset. VF_ALLOW_UNAUTH_LOOPBACK=1 is active; verified loopback call from {client_host} permitted."
                 )
             else:
                 _logger.critical(
-                    "[SECURITY ALERT] VF_API_TOKEN is unset and loopback opt-in not set. Rejecting request (fail-closed)."
+                    f"[SECURITY ALERT] VF_API_TOKEN is unset or caller {client_host} is non-loopback. Rejecting request (fail-closed)."
                 )
-        if not allow_loopback:
+        if not (allow_loopback and is_loopback):
             raise HTTPException(
                 status_code=401,
-                detail="Unauthorized: server authentication token not configured (fail-closed)",
+                detail="Unauthorized: server authentication token not configured or non-loopback caller (fail-closed)",
             )
         return
 

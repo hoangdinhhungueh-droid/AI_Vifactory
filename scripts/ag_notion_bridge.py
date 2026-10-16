@@ -8,9 +8,12 @@ import sys
 import os
 import json
 import argparse
+import logging
 import urllib.request
 import urllib.parse
 from pathlib import Path
+
+logger = logging.getLogger("ag_notion_bridge")
 
 # Add scripts dir to path to import _token from compile_episode_from_notion
 _scripts_dir = os.path.dirname(os.path.abspath(__file__))
@@ -90,8 +93,8 @@ def resolve_id(name_or_id):
             cache = json.loads(ID_CACHE.read_text(encoding="utf-8"))
             if name_or_id in cache:
                 return cache[name_or_id]
-        except Exception:
-            pass
+        except Exception as _ex:
+            logger.debug(f"ID cache read notice: {_ex}")
 
     # Check canonical env
     if name_or_id in CANONICAL_DBS:

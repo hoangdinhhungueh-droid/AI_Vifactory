@@ -57,8 +57,8 @@ def test_acquire_in_progress_and_completion(temp_state_dir):
     assert reason == "lock_in_progress"
     assert details["topic_id"] == "TEST_TEMP_test1"
 
-    # Mark COMPLETED
-    ok = mark_completed("TEST_MKT", topic_id="TEST_EP0001_final", state_dir=temp_state_dir)
+    # Mark COMPLETED with owner verification
+    ok = mark_completed("TEST_MKT", topic_id="TEST_EP0001_final", state_dir=temp_state_dir, owner_pid=os.getpid())
     assert ok is True
 
     # Should report lock_completed
@@ -166,7 +166,7 @@ def test_release_lock(temp_state_dir):
 
 def test_detects_completed_episode_on_disk(temp_state_dir):
     """When an episode directory exists with run_manifest.json created today,
-    it should detect episode_dir_completed and auto-heal the lock on real disk (0 mocks, Boss Item 17).
+    it should detect episode_dir_completed as a pure read check without mutating disk (0 mocks, Boss Round 8).
     """
     ep_dir = Path(temp_state_dir) / "episodes" / "TEST_EP0099_sample_topic"
     ep_dir.mkdir(parents=True, exist_ok=True)
@@ -258,7 +258,7 @@ def test_minimum_vn_hour_policy_protects_morning_window(temp_state_dir):
 
     # In contrast, an afternoon exhaustion at 15:00 VN seals normally
     afternoon_vn = datetime(2026, 10, 16, 15, 0, tzinfo=VN_TZ)
-    res_pm = mark_exhausted_today(mkt, scan_count=10, state_dir=temp_state_dir, now=afternoon_vn)
+    res_pm = mark_exhausted_today(mkt, scan_count=10, state_dir=temp_state_dir, now=afternoon_vn, owner_pid=os.getpid())
     assert res_pm is True
 
     is_done_pm, reason_pm, _ = is_market_done_today(mkt, state_dir=temp_state_dir, now=afternoon_vn, check_registry=False, check_episodes=False)
@@ -606,7 +606,6 @@ def test_topic_history_registry_vn_day_boundary_attribution(temp_state_dir, monk
     hist_file = Path(temp_state_dir) / "topic_history.json"
     monkeypatch.setattr(thr, "REGISTRY_PATH", str(hist_file))
     monkeypatch.setattr(thr, "PENDING_DIR", str(Path(temp_state_dir) / "no_pending"))
-    monkeypatch.setattr(thr, "EPISODES_DIR", str(Path(temp_state_dir) / "no_episodes"))
 
     mkt = "TEST_VN_BOUNDARY"
     # Case A: 2026-10-15 17:05:00 UTC == 2026-10-16 00:05:00 VN (just after VN midnight)
@@ -720,4 +719,60 @@ def test_unreadable_lock_file_fails_closed_without_exception(temp_state_dir):
         lock_path.rmdir()
 
 
+def test_registry_check_ignores_temp_ids(temp_state_dir):
+    """Ensure that B2/B2.1-rejected or in-flight *_TEMP_* task entries in topic_history_registry
+    are NOT treated as committed by is_market_done_today (Boss Round 8 Revision 6).
+    """
+    from app.services.daily_market_lock import is_market_done_today
+
+    reg_file = Path(temp_state_dir) / "topic_history.json"
+    temp_registry = {
+        "en-failed-candidate": {
+            "market": "EN",
+            "task_id": "EN_TEMP_failed123",
+            "raw_term": "Failed Candidate",
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        },
+        "en-rejected-handled": {
+            "market": "EN",
+            "task_id": "REJECTED_OR_HANDLED",
+            "raw_term": "Rejected Candidate",
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        }
+    }
+    with open(reg_file, "w", encoding="utf-8") as f:
+        json.dump(temp_registry, f)
+
+    is_done, reason, details = is_market_done_today(
+        "EN", state_dir=temp_state_dir, registry_path=str(reg_file), check_registry=True, check_episodes=False
+    )
+    assert is_done is False, "TEMP and REJECTED_OR_HANDLED ids must not mark market done"
+    assert reason == "not_produced_yet"
+
+
+def test_unverified_mark_refuses_to_overwrite_existing_lock(temp_state_dir):
+    """Boss Round 8 Item 16: mark_completed and mark_exhausted_today must refuse to overwrite
+    an existing held lock unless the caller provides matching lock_token or explicit force_unverified=True.
+    """
+    from app.services.daily_market_lock import acquire_in_progress, mark_completed, mark_exhausted_today
+
+    holder_token = "valid_holder_token_abc"
+    acquired = acquire_in_progress("EN", topic_id="", state_dir=temp_state_dir, lock_token=holder_token)
+    assert acquired is True
+
+    # 1. Unverified mark_completed (no token, no force) -> must return False
+    res1 = mark_completed("EN", topic_id="EN_EP9999_fake", state_dir=temp_state_dir)
+    assert res1 is False
+
+    # 2. Unverified mark_exhausted_today (no token, no force) -> must return False
+    res2 = mark_exhausted_today("EN", scan_count=5, state_dir=temp_state_dir)
+    assert res2 is False
+
+    # 3. Mismatched token -> must return False
+    res3 = mark_completed("EN", topic_id="EN_EP9999_fake", state_dir=temp_state_dir, lock_token="wrong_token_xyz")
+    assert res3 is False
+
+    # 4. Correct token -> succeeds
+    res4 = mark_completed("EN", topic_id="EN_EP9999_fake", state_dir=temp_state_dir, lock_token=holder_token)
+    assert res4 is True
 

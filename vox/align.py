@@ -14,11 +14,14 @@ Aligns speech audio with canonical script text:
 from __future__ import annotations
 
 import difflib
+import logging
 import wave
 from pathlib import Path
 from typing import Any
 
 from vox.schemas import ScenePlan, Word, WordTimeline
+
+logger = logging.getLogger(__name__)
 
 
 class AlignmentUnavailableError(RuntimeError):
@@ -107,8 +110,8 @@ def align_script_with_audio(
                     return _real_av_open(*args, **kwargs)
                 _safe_av_open._safe_metadata_wrapped = True  # type: ignore[attr-defined]
                 av.open = _safe_av_open
-        except Exception:
-            pass
+        except Exception as _ex:
+            logger.debug(f"PyAV wrapper notice: {_ex}")
 
         from faster_whisper import WhisperModel
         model = WhisperModel(resolved_model, device="cpu", compute_type="int8")

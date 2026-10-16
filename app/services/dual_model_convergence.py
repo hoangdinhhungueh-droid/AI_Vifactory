@@ -108,7 +108,6 @@ def run_dual_model_convergence(
     - Astra acts as Targeted Patcher (rewrites only defective Acts).
     - Opus 5 acts as Pure Forensic Auditor (audits only the delta patch in Round 2+).
     """
-    from app.services.model_gateway import get_global_gateway
     from app.services.story_fact_auditor_b2 import audit_delta_patched_acts
     import app.services.story_gate as sgate
 

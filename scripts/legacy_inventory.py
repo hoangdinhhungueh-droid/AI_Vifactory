@@ -20,20 +20,23 @@ from __future__ import annotations
 import os
 import ast
 import json
+import logging
 import sys
 from pathlib import Path
 from typing import Dict, List, Set, Any
 
+logger = logging.getLogger("legacy_inventory")
+
 if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug(f"stdout reconfigure notice: {_ex}")
 if hasattr(sys.stderr, "reconfigure"):
     try:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug(f"stderr reconfigure notice: {_ex}")
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -118,8 +121,8 @@ def parse_direct_imports(file_path: Path) -> Set[str]:
             elif isinstance(node, ast.ImportFrom):
                 if node.module:
                     imports.add(node.module)
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug(f"AST parse direct imports notice for {file_path}: {_ex}")
     return imports
 
 def build_falsifiable_audit() -> Dict[str, Any]:
@@ -171,8 +174,8 @@ def build_falsifiable_audit() -> Dict[str, Any]:
                     continue
                 if pattern in content and not rel.startswith("tests/"):
                     shadow_defects.append(f"{rel}: {desc} ('{pattern}')")
-        except Exception:
-            pass
+        except Exception as _ex:
+            logger.debug(f"Shadow pattern scan notice for {pyf}: {_ex}")
 
     # 3. Falsifiable verification of pre-2456870 pipeline symbol dispositions (Boss Round 4 Item 11)
     disposition_audit = []

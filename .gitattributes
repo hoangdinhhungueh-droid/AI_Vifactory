@@ -15,3 +15,27 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+
+# Remotion and web assets enforce LF
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+
+# Binary media assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.mp3 binary
+*.mp4 binary
+*.wav binary
+*.mov binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary

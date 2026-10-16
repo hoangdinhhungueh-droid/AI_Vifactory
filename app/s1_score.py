@@ -208,6 +208,13 @@ def s1_score(req: S1Request):
     return run_s1(req.niches, req.markets)
 
 
+def _send_telegram(msg: str) -> None:
+    try:
+        send_telegram_broadcast(msg)
+    except Exception as e:
+        logger.warning(f"[s1_score] Telegram broadcast error: {e}")
+
+
 @router.post("/api/v1/pipeline/run")
 async def pipeline_run(request: Request):
     """n8n entrypoint (vf-cron-trend-score). Body: {stage, niches?, markets?}."""

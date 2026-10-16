@@ -52,6 +52,7 @@ from app.services.alert_cooldown import (
 from app.services.competitor_recon_b15 import QuotaTracker, run_b15, youtube_search, youtube_video_details
 from app.services.daily_market_lock import (
     acquire_in_progress,
+    get_vn_now,
     is_market_done_today,
     mark_completed,
     mark_exhausted_today,
@@ -133,12 +134,11 @@ def _send_guarded_alert(alert_type: str, market: str, message: str, state_dir: O
         logger.warning(f"[{market}] Alert cooldown evaluation notice ({alert_type}): {_alert_err}. Suppressing alert (fail-closed).")
         return False
 
-    if not decision or not decision.can_send:
-        if decision:
-            logger.info(f"[{market}] Suppressed repeated {alert_type} alert due to cooldown ({decision.suppressed} suppressed).")
+    if not decision.can_send:
+        logger.info(f"[{market}] Suppressed repeated {alert_type} alert due to cooldown ({decision.suppressed} suppressed).")
         return False
 
-    full_message = f"{message}{decision.suffix}" if (decision and decision.suffix) else message
+    full_message = f"{message}{decision.suffix}" if decision.suffix else message
 
     try:
         from app.services.telegram_buttons import send_telegram_broadcast
@@ -1067,11 +1067,12 @@ def discover_and_produce_market_trend(
     for exactly 1 topic per market per day.
     """
     m_up = (market or "EN").upper()
+    now = get_vn_now()
     force_crawl = bool(custom_seed) or os.getenv("B1_FORCE_CRAWL") == "1"
 
     lock_token: Optional[str] = None
     if not force_crawl:
-        is_done, reason, details = is_market_done_today(m_up, state_dir=state_dir)
+        is_done, reason, details = is_market_done_today(m_up, state_dir=state_dir, now=now)
         if is_done:
             topic_name = details.get("topic_id") or details.get("raw_term") or ("Exhausted Candidates" if reason == "lock_exhausted_today" else "Existing Episode")
             vn_d = details.get("vn_date") or ""
@@ -1094,7 +1095,7 @@ def discover_and_produce_market_trend(
         import uuid
         lock_token = uuid.uuid4().hex
         acquired = acquire_in_progress(
-            m_up, topic_id="", state_dir=state_dir, owner_pid=os.getpid(), lock_token=lock_token
+            m_up, topic_id="", state_dir=state_dir, owner_pid=os.getpid(), lock_token=lock_token, now=now
         )
         if not acquired:
             logger.warning(
@@ -1214,6 +1215,7 @@ def discover_and_produce_market_trend(
                             market=m_up,
                             scan_count=idx,
                             state_dir=state_dir,
+                            now=now,
                             extra_metadata={"reason": "rule_118_circuit_breaker", "consecutive_api_errors": consecutive_api_errors},
                             lock_token=lock_token,
                             owner_pid=os.getpid(),
@@ -1250,6 +1252,9 @@ def discover_and_produce_market_trend(
             # 3.2 B1.1 Adversarial Critic Gate (Rule 130 & Anti-Bait-and-Switch Early VETO - Claude Opus 5)
             # Filters out false trends, stale anchors, and bait-and-switch before wasting tokens/scrapes on B1.5!
             print(f"  🛡️ [B1.1 Critic Gate] Interrogating candidate '{term}' and angle for live trend fidelity...")
+            c_score = 0.0
+            c_verdict = "FAIL"
+            critic_res = None
             try:
                 from app.services.adversarial_critic_b1 import audit_candidate_trend_alignment
                 critic_res = audit_candidate_trend_alignment(
@@ -1272,7 +1277,8 @@ def discover_and_produce_market_trend(
                     continue
                 print(f"  ✅ CRITIC GATE PASSED! Score: {c_score}/10 | Angle verified aligned with live trend.")
             except Exception as _critic_err:
-                logger.warning(f"[{m_up}] Critic Gate execution warning for '{term}': {_critic_err}")
+                logger.warning(f"[{m_up}] Critic Gate execution error for '{term}': {_critic_err}; fail-closed (rejecting candidate)")
+                continue
 
             # 3.5 B1.5 Pre-Recon (Rule 123 & Rule 128: Data-Driven Competitor Recon Before Niche Decision)
             print(f"  🎯 [B1.5 Pre-Recon] Harvesting Competitor Benchmarks & Audience Frustrations for '{term}'...")
@@ -1431,7 +1437,7 @@ def discover_and_produce_market_trend(
                 print(f"  ✅ [B2 Attempt {b2_attempts_count}] Script generated ({len(story_text.split())} words, Gate Score: {t_obj['story_gate_score']}, Verdict: {t_obj['story_verdict']})")
             except Exception as b2_err:
                 logger.error(f"[{temp_task_id}] B2 Story generation failed: {b2_err}. Rotating to next candidate...")
-                record_handled_topic(term=term, task_id=temp_task_id, market=m_up)
+                record_handled_topic(term=term, task_id="REJECTED_OR_HANDLED", market=m_up)
                 if os.path.exists(temp_task_file):
                     try:
                         os.remove(temp_task_file)
@@ -1451,6 +1457,7 @@ def discover_and_produce_market_trend(
                             market=m_up,
                             scan_count=idx,
                             state_dir=state_dir,
+                            now=now,
                             extra_metadata={"reason": "b2_circuit_breaker_exception", "b2_attempts_count": b2_attempts_count},
                             lock_token=lock_token,
                             owner_pid=os.getpid(),
@@ -1466,7 +1473,7 @@ def discover_and_produce_market_trend(
             if t_obj.get("story_verdict") == "FAIL":
                 logger.error(f"[{temp_task_id}] B2 Story Gate REJECTED ({t_obj.get('story_gate_score')}). Candidate rejected...")
                 print(f"  ❌ [B2 STORY GATE REJECTED] Score: {t_obj.get('story_gate_score')}.")
-                record_handled_topic(term=term, task_id=temp_task_id, market=m_up)
+                record_handled_topic(term=term, task_id="REJECTED_OR_HANDLED", market=m_up)
                 if os.path.exists(temp_task_file):
                     try:
                         os.remove(temp_task_file)
@@ -1498,6 +1505,7 @@ def discover_and_produce_market_trend(
                             market=m_up,
                             scan_count=idx,
                             state_dir=state_dir,
+                            now=now,
                             extra_metadata={"reason": "b2_circuit_breaker", "b2_attempts_count": b2_attempts_count},
                             lock_token=lock_token,
                             owner_pid=os.getpid(),
@@ -1528,7 +1536,7 @@ def discover_and_produce_market_trend(
                 print(f"  ❌ [B2.1 REJECTED] {veto_reason}. (B2 Attempt {b2_attempts_count}/{max_b2_attempts})")
                 # User approved: no telegram notification for B2.1 candidate rotation.
                 # If all fail, B1 VIABILITY ALERT or BOTTLENECK ALERT will cover; if passes, HG1 will cover.
-                record_handled_topic(term=term, task_id=temp_task_id, market=m_up)
+                record_handled_topic(term=term, task_id="REJECTED_OR_HANDLED", market=m_up)
                 if os.path.exists(temp_task_file):
                     try:
                         os.remove(temp_task_file)
@@ -1557,6 +1565,7 @@ def discover_and_produce_market_trend(
                             market=m_up,
                             scan_count=idx,
                             state_dir=state_dir,
+                            now=now,
                             extra_metadata={"reason": "b2_circuit_breaker", "b2_attempts_count": b2_attempts_count},
                             lock_token=lock_token,
                             owner_pid=os.getpid(),
@@ -1592,7 +1601,7 @@ def discover_and_produce_market_trend(
                     str(temp_task_id),
                 ]
                 sub_env = os.environ.copy()
-                sub_env["PYTHONPATH"] = f"{_PROJECT_ROOT}:{sub_env.get('PYTHONPATH', '')}".strip(":")
+                sub_env["PYTHONPATH"] = f"{_PROJECT_ROOT}{os.pathsep}{sub_env.get('PYTHONPATH', '')}".strip(os.pathsep)
                 try:
                     proc = subprocess.run(cmd, cwd=str(_PROJECT_ROOT), env=sub_env, capture_output=True, text=True, timeout=b3_timeout)
                     res_code = proc.returncode
@@ -1613,6 +1622,7 @@ def discover_and_produce_market_trend(
                         market=m_up,
                         scan_count=idx,
                         state_dir=state_dir,
+                        now=now,
                         extra_metadata={
                             "reason": "b3_downstream_failure",
                             "failed_task_id": temp_task_id,
@@ -1626,7 +1636,7 @@ def discover_and_produce_market_trend(
                         logger.info(f"[{m_up}] Stamped EXHAUSTED_TODAY lock after B3 failure (task={temp_task_id})")
                     else:
                         logger.warning(f"[{m_up}] Failed to stamp EXHAUSTED_TODAY, falling back to release_lock")
-                        release_lock(m_up, state_dir=state_dir, lock_token=lock_token, owner_pid=os.getpid())
+                        release_lock(m_up, state_dir=state_dir, lock_token=lock_token, owner_pid=os.getpid(), now=now)
 
                     # B3 failed: Do NOT commit task. Emit exactly ONE terminal failure message with recovery command.
                     fail_msg = (
@@ -1657,6 +1667,7 @@ def discover_and_produce_market_trend(
                 task_id,
                 extra_metadata={"topic": native_topic, "slug": t_obj.get("task_slug")},
                 state_dir=state_dir,
+                now=now,
                 lock_token=lock_token,
                 owner_pid=os.getpid(),
             )
@@ -1738,6 +1749,7 @@ def discover_and_produce_market_trend(
                     market=m_up,
                     scan_count=scanned_count,
                     state_dir=state_dir,
+                    now=now,
                     extra_metadata={
                         "viability_evals_count": viability_evals_count,
                         "viability_passed_count": len(viability_passed_candidates),
@@ -1783,9 +1795,17 @@ def discover_and_produce_market_trend(
                     f"[{m_up}] Crawl execution exited without terminal lock mark (COMPLETED or EXHAUSTED_TODAY). "
                     f"Releasing uncommitted lock (token={lock_token[:8]}) in finally block (Boss Item 18)."
                 )
-                release_lock(m_up, state_dir=state_dir, lock_token=lock_token, owner_pid=os.getpid())
+                release_lock(m_up, state_dir=state_dir, lock_token=lock_token, owner_pid=os.getpid(), now=now)
             except Exception as _fin_rel_err:
-                logger.debug(f"[{m_up}] Error releasing lock in finally: {_fin_rel_err}")
+                logger.error(f"[{m_up}] Error releasing lock in finally: {_fin_rel_err}")
+
+            fin_alert = (
+                f"🚨 <b>[VF PIPELINE B1 UNEXPECTED TERMINATION]</b>\n"
+                f"Market: <code>{m_up}</code> | Lock Token: <code>{lock_token[:8]}</code>\n"
+                f"Crawl execution exited without terminal lock mark (COMPLETED or EXHAUSTED_TODAY).\n"
+                f"Uncommitted lock released in finally block to prevent scheduler deadlock."
+            )
+            _send_guarded_alert("b1_unexpected_termination", m_up, fin_alert, state_dir=state_dir)
 
 
 # Backwards compatibility aliases

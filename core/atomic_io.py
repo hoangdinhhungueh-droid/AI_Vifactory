@@ -38,7 +38,25 @@ def atomic_write_json(file_path: Path, data: Any, indent: int = 2) -> None:
             except OSError as fsync_err:
                 logger.debug(f"[atomic_io] Notice fsync on {tmp_path}: {fsync_err}")
 
-        # fsync parent directory on POSIX systems where supported to ensure directory entry durability (Rule 126 & Boss Round 4 Item 13)
+        # Atomic replace with Windows anti-virus/sharing-violation retry loop
+        for attempt in range(10):
+            try:
+                os.replace(str(tmp_path), str(file_path))
+                break
+            except PermissionError:
+                if attempt == 9:
+                    raise
+                time.sleep(0.05)
+            except OSError as os_err:
+                # Windows sharing violation (ERROR_SHARING_VIOLATION=32, ERROR_LOCK_VIOLATION=33)
+                if sys.platform == "win32" and getattr(os_err, "winerror", None) in (32, 33):
+                    if attempt == 9:
+                        raise
+                    time.sleep(0.05)
+                else:
+                    raise
+
+        # fsync parent directory after os.replace on POSIX systems where supported to ensure directory entry durability (Rule 126 & Boss Item 11)
         if hasattr(os, "O_DIRECTORY") and sys.platform != "win32":
             try:
                 dir_fd = os.open(str(file_path.parent), os.O_RDONLY)
@@ -48,16 +66,6 @@ def atomic_write_json(file_path: Path, data: Any, indent: int = 2) -> None:
                     os.close(dir_fd)
             except OSError as dir_fsync_err:
                 logger.debug(f"[atomic_io] Notice dir fsync on {file_path.parent}: {dir_fsync_err}")
-
-        # Windows anti-virus retry loop for atomic replace
-        for attempt in range(10):
-            try:
-                os.replace(str(tmp_path), str(file_path))
-                break
-            except (PermissionError, OSError):
-                if attempt == 9:
-                    raise
-                time.sleep(0.05)
     except Exception as e:
         if tmp_path.exists():
             try:

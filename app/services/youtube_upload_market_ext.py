@@ -1,11 +1,20 @@
+import os
+import sys
+import json
+import time
 from loguru import logger
-import os, sys, json
 from dotenv import load_dotenv
+
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+from googleapiclient.errors import HttpError
+
 from app.services import publish_ledger
+from app.services.youtube_upload import TOKEN_URI, SCOPES, _resolve_privacy
+
 def _load_env():
     load_dotenv('/root/video_factory/.env')
-
-from dotenv import load_dotenv
 """Multi-market patch for youtube_upload.py.
 
 Adds _build_client_for_market(market) and upload_from_payload_market(market, ...)

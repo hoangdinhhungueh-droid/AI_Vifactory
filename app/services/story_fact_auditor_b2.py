@@ -82,7 +82,6 @@ def audit_story_facts_and_causality(
     """Execute adversarial forensic audit of the 5-Beat Docudrama story.
     Audits verbatim text against Grounding Fact Table and Rule 130 Causal Architecture via GPT-6-Astra.
     """
-    from app.services.model_gateway import get_global_gateway
     gateway = get_global_gateway()
 
     task_id = topic_meta.get("task_id", "")
@@ -208,7 +207,6 @@ def audit_delta_patched_acts(
     Interrogates ONLY the patched Acts against the previous critique and Grounding Table via GPT-6-Astra,
     drastically reducing input tokens (from ~25K to ~3-5K) and cost.
     """
-    from app.services.model_gateway import get_global_gateway
     gateway = get_global_gateway()
 
     task_id = topic_meta.get("task_id", "")

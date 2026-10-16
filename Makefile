@@ -32,6 +32,7 @@ test:
 
 lint:
 	$(RUFF) check vox/ tools/ tests/vox/ app/main.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/runner.py app/services/trend_engine_b1.py app/services/daily_market_lock.py app/services/alert_cooldown.py core/paths.py
+	$(RUFF) check --select F821,F811 app/ scripts/ stages/ vox/ core/ tools/
 	$(RUFF) check app/ scripts/ --exit-zero
 	$(PYTEST) -v tests/test_zero_semantic_bias.py
 

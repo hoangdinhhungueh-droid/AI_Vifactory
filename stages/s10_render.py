@@ -8,9 +8,12 @@ Implements Stage Shape Standard. Assembles RemotionRenderProps and renders final
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
 from typing import List
+
+logger = logging.getLogger("s10_render")
 
 from core.config import RunContext
 from core.contracts.render_props import KaraokeWord, RemotionRenderProps, SceneRenderProp
@@ -113,7 +116,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 "ffprobe", "-v", "error", "-show_streams", "-show_format",
                 "-of", "json", str(final_mp4)
             ]
-            probe_res = subprocess.run(probe_cmd, capture_output=True, text=True, check=True)
+            probe_res = subprocess.run(probe_cmd, capture_output=True, text=True, check=True, timeout=30.0)
             probe_data = json.loads(probe_res.stdout)
             streams = probe_data.get("streams", [])
             has_video = any(s.get("codec_type") == "video" for s in streams)
@@ -122,7 +125,8 @@ def run(ctx: RunContext) -> StageArtifact:
             dur = float(dur_str)
             if has_video and has_audio and dur > 0.0:
                 is_valid_existing = True
-        except Exception:
+        except Exception as _probe_err:
+            logger.debug(f"[s10_render] Existing final.mp4 probe invalid or failed ({_probe_err}), will render fresh output")
             is_valid_existing = False
 
     if not is_valid_existing:

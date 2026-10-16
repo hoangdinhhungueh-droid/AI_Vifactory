@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import subprocess
 import sys
@@ -22,6 +23,8 @@ from pathlib import Path
 from typing import Any
 
 from vox.schemas import ScenePlan
+
+logger = logging.getLogger(__name__)
 
 FORBIDDEN_PROMPT_STOPWORDS = {"a", "an", "the", "within", "across", "in", "on", "at", "by", "for"}
 FORBIDDEN_TYPOGRAPHY_TERMS = ["bold typography", "typography", "text on screen", "letters", "written words"]
@@ -98,8 +101,8 @@ def probe_media_file(media_path: Path) -> dict[str, Any]:
         ]
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return json.loads(res.stdout)
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug(f"ffprobe invocation notice: {_ex}")
 
     # 2. Fallback to ffmpeg -i parsing if standalone ffprobe is absent
     cmd = [ffmpeg_bin, "-i", str(media_path)]

@@ -47,8 +47,8 @@ def _load_system_secrets():
                             k, v = k.strip(), v.strip().strip('"').strip("'")
                             if k and v and k not in os.environ:
                                 os.environ[k] = v
-        except Exception:
-            pass
+        except Exception as _ex:
+            logger.debug(f"Secret file read notice: {_ex}")
 
 _load_system_secrets()
 
@@ -170,8 +170,8 @@ def main():
     try:
         from app.services.cost_tracker import get_global_tracker
         initial_month_cost = sum(get_global_tracker().monthly_report().values())
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug(f"Initial cost calculation notice: {_ex}")
 
     print("=======================================================")
     print("🚀 LAUNCHING UNIFIED TREND & PRODUCTION PIPELINE (B1 ➔ B1.5 ➔ B2)")
@@ -228,8 +228,8 @@ def main():
         print("\n-------------------------------------------------------")
         print(f"📊 [COST TELEMETRY] Session Cost: {session_cost:,.2f} VND | Month Total: {final_month_cost:,.2f} VND")
         print("-------------------------------------------------------")
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug(f"Final cost calculation notice: {_ex}")
 
     # Print summary to console logs (Rule 125: Telegram already notified via Human Gate 1 & Human Gate 2)
     total = len(results["approved_topics"])

@@ -336,6 +336,7 @@ def perform_b5_visual_audit(episode_id: str, block_manifest: Dict[str, Any], lim
     print(f"\n{'Scene ID':<10} | {'File Name':<24} | {'Kích Thước':<11} | {'Dung Lượng':<11} | {'Đánh Giá Thị Giác 4 Trục (Rule 122)':<55} | Trạng Thái")
     print("-" * 135)
 
+    approved_count = 0
     for sc in all_scenes:
         sc_id = sc["scene_id"]
         b_name = sc["block_name"]
@@ -708,6 +709,18 @@ def evaluate_human_gate(
     print(f"   • Thư mục phân cụm: episodes/{episode_id}/blocks/<block_name>/images/")
     print(f"   • Thư mục hạt giống Remotion: episodes/{episode_id}/composite_seeds/")
     print(f"   • Thư viện ảnh HTML trực quan: episodes/{episode_id}/review_gallery.html")
+
+    scenes_audited = audit_summary.get("scenes", [])
+    plan_file = episode_dir / "director_plan.json"
+    scenes_info = {}
+    if plan_file.exists():
+        try:
+            with open(plan_file, "r", encoding="utf-8") as f:
+                dp = json.load(f)
+            for s in dp.get("scenes", []):
+                scenes_info[s.get("scene_id")] = s
+        except Exception:
+            pass
 
     print("\n📋 BẢNG THẨM ĐỊNH THỊ GIÁC & PHÂN RÃ HÀNH ĐỘNG DYNAMIC (RULE 122 & ANIMATION BEATS):")
     print(f"{'Scene ID':<10} | {'File Name':<24} | {'Kích Thước':<11} | {'Dung Lượng':<11} | {'Đánh Giá Thị Giác 4 Trục (Rule 122)':<45} | {'Phân Rã Chuyển Động Dynamic (S₁..Sₙ)':<45} | Trạng Thái")

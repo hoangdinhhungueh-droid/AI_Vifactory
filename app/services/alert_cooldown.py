@@ -201,7 +201,17 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
                                             raw, tomb_content,
                                         )
                                         try:
-                                            os.replace(str(tombstone), str(lock_file))
+                                            try:
+                                                os.link(str(tombstone), str(lock_file))
+                                            except (AttributeError, NotImplementedError, OSError) as _link_err:
+                                                if not lock_file.exists():
+                                                    os.replace(str(tombstone), str(lock_file))
+                                                else:
+                                                    logger.debug(f"[alert_cooldown] Target lock_file exists, link avoided clobbering: {_link_err}")
+                                            try:
+                                                os.unlink(str(tombstone))
+                                            except OSError as _t_unl_err:
+                                                logger.debug(f"[alert_cooldown] Notice unlinking tombstone after restore: {_t_unl_err}")
                                         except OSError as rest_err:
                                             logger.error("[alert_cooldown] Failed to restore lock_file %s: %s", lock_file, rest_err)
                                 except OSError as t_err:
@@ -252,7 +262,7 @@ def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
             if not isinstance(data, dict):
                 raise ValueError(f"Expected dict root, got {type(data).__name__}")
             return data
-    except Exception as e:
+    except (json.JSONDecodeError, ValueError) as e:
         ts = int(datetime.now(timezone.utc).timestamp())
         corrupt_path = file_path.with_name(f"{file_path.name}.corrupt.{ts}")
         logger.error(
@@ -264,6 +274,9 @@ def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
         except OSError as ex:
             logger.warning(f"[alert_cooldown] Failed to quarantine corrupt file {file_path}: {ex}")
         cleanup_corrupt_quarantines(file_path.parent)
+        return {}
+    except (IOError, OSError) as io_err:
+        logger.warning(f"[alert_cooldown] Transient I/O error reading cooldown file {file_path}: {io_err}")
         return {}
 
 

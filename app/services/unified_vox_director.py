@@ -2166,7 +2166,7 @@ def build_unified_director_plan(
             cam_move=cam_move,
             narr=narr,
             mkt=mkt,
-            key_metrics=key_metrics if 'key_metrics' in locals() else [],
+            key_metrics=locals().get('key_metrics', []),
             topic=topic
         )
         scene_obj["virtual_camera"] = cine_data["virtual_camera"]

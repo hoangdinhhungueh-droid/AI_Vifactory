@@ -58,6 +58,10 @@ def vn_today(now: Optional[datetime] = None) -> str:
     return vn_now(now).strftime("%Y-%m-%d")
 
 
+get_vn_now = vn_now
+
+
+
 def _get_lock_file_path(
     market: str,
     state_dir: Optional[str] = None,
@@ -286,7 +290,7 @@ def is_market_done_today(
                     continue
 
                 task_id = str(entry.get("task_id") or "")
-                if task_id in ("REJECTED_OR_HANDLED", "HANDLED", ""):
+                if task_id in ("REJECTED_OR_HANDLED", "HANDLED", "") or "_TEMP_" in task_id:
                     continue
 
                 rec_at = entry.get("recorded_at")
@@ -651,6 +655,7 @@ def mark_completed(
     extra_metadata: Optional[dict] = None,
     lock_token: Optional[str] = None,
     owner_pid: Optional[int] = None,
+    force_unverified: bool = False,
 ) -> bool:
     """Mark daily market production as COMPLETED with strict holder verification (Boss Item 14)."""
     m_up = _validate_market(market)
@@ -659,6 +664,12 @@ def mark_completed(
 
     pid = owner_pid or os.getpid()
     if lock_path.exists():
+        if lock_token is None and owner_pid is None and not force_unverified:
+            logger.error(
+                f"[daily_market_lock] Refusing unverified mark_completed for {m_up}: "
+                f"must provide lock_token, owner_pid, or force_unverified=True to overwrite held lock"
+            )
+            return False
         verified, existing = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
         if not verified:
             logger.error(f"[daily_market_lock] Refusing mark_completed for {m_up}: caller is not the lock holder")
@@ -703,6 +714,7 @@ def mark_exhausted_today(
     allow_off_hours: bool = False,
     lock_token: Optional[str] = None,
     owner_pid: Optional[int] = None,
+    force_unverified: bool = False,
 ) -> bool:
     """Mark daily market production as EXHAUSTED_TODAY or EXHAUSTED_OFFHOURS.
 
@@ -718,6 +730,12 @@ def mark_exhausted_today(
     pid = owner_pid or os.getpid()
 
     if lock_path.exists():
+        if lock_token is None and owner_pid is None and not force_unverified:
+            logger.error(
+                f"[daily_market_lock] Refusing unverified mark_exhausted for {m_up}: "
+                f"must provide lock_token, owner_pid, or force_unverified=True to overwrite held lock"
+            )
+            return False
         verified, existing = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
         if not verified:
             logger.error(f"[daily_market_lock] Refusing mark_exhausted for {m_up}: caller is not the lock holder")

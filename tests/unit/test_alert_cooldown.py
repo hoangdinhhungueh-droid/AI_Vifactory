@@ -358,4 +358,45 @@ def test_windows_interprocess_lock_contention_and_permission_error(temp_state_di
     assert shared_counter[0] == 60
 
 
+def test_send_telegram_broadcast_returns_truthy_on_success(monkeypatch):
+    """Boss Round 8 Item 5: Prove with test that send_telegram_broadcast returns truthy on success,
+    enabling _send_guarded_alert to verify delivery before confirming alert state.
+    """
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from app.services.telegram_buttons import send_telegram_broadcast
+
+    monkeypatch.setenv("TELEGRAM_ENABLED", "1")
+    monkeypatch.setenv("VF_TG_BOT_TOKEN", "mock_bot_token_123")
+    monkeypatch.setenv("VF_TG_CHAT_ID", "mock_chat_id_456")
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"ok": True, "result": {"message_id": 789}}
+
+    mock_client = AsyncMock()
+    mock_client.post.return_value = mock_resp
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        msg_id = send_telegram_broadcast("<b>Test Alert</b>")
+        assert msg_id == 789
+        assert bool(msg_id) is True
+
+    # Test failure returns falsy / None
+    mock_fail_resp = MagicMock()
+    mock_fail_resp.status_code = 500
+    mock_fail_resp.text = "Internal Server Error"
+    mock_fail_client = AsyncMock()
+    mock_fail_client.post.return_value = mock_fail_resp
+    mock_fail_client.__aenter__.return_value = mock_fail_client
+    mock_fail_client.__aexit__.return_value = None
+
+    with patch("httpx.AsyncClient", return_value=mock_fail_client):
+        fail_id = send_telegram_broadcast("<b>Fail Alert</b>")
+        assert fail_id is None
+        assert bool(fail_id) is False
+
+
+
 

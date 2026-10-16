@@ -256,8 +256,8 @@ def _fallback_for_hub(hub_key: str) -> str:
         try:
             logger.info(f"[skill_loader] Using legacy markdown snapshot for central skills")
             return LEGACY_SNAPSHOT_FILE.read_text(encoding="utf-8")
-        except Exception:
-            pass
+        except Exception as _ex:
+            logger.debug(f"Legacy snapshot read notice: {_ex}")
 
     # Built-in authoritative fallbacks aligned with Notion SoT
     if hub_key == "content_engine":

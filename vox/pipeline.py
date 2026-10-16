@@ -20,22 +20,25 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug(f"stdout reconfigure notice: {_ex}")
 if hasattr(sys.stderr, "reconfigure"):
     try:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug(f"stderr reconfigure notice: {_ex}")
 
 from vox.align import align_script_with_audio
 from vox.assemble import assemble_final_video
@@ -271,8 +274,8 @@ def run_pipeline(
     git_sha = "unknown"
     try:
         git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug(f"Git rev-parse notice: {_ex}")
 
     manifest = {
         "pipeline": "vox_tactile_explainer_v1",

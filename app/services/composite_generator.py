@@ -8,6 +8,7 @@ Compliant with Rule 122 (Visual Audit) and Rule 128 (Generic Contract Architectu
 
 import sys
 from pathlib import Path
+from typing import Optional
 from PIL import Image, ImageFilter, ImageEnhance
 
 sys.stdout.reconfigure(encoding='utf-8')

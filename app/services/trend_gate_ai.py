@@ -68,11 +68,12 @@ def _new_getaddrinfo(*args, **kwargs):
     return [r for r in res if r[0] == socket.AF_INET]
 socket.getaddrinfo = _new_getaddrinfo
 # ----------------------------------------
-import re
 import json
-import time
 import logging
+import time
 from datetime import datetime, timezone
+
+logger = logging.getLogger("trend_gate_ai")
 try:
     from fastapi import APIRouter
     from pydantic import BaseModel
@@ -408,24 +409,8 @@ def _lane_wiki_spike(market, free_market_block, pool):
 
 
 def _lane_evergreen(market, limit=None):
-    limit = int(limit or LANE_MIN["evergreen"])
     # Legacy evergreen lane retired; handled by canonical B1 trend engine
     return []
-    out = []
-    for ev in items[:limit]:
-        term = ev.get("t")
-        if not term:
-            continue
-        try:
-            sg = wiki_article_spike(proj, term) or {}
-        except Exception:
-            sg = {}
-        out.append({"term": term, "lane": "evergreen", "theme_hint": ev.get("theme"),
-                    "views": int(sg.get("recent_avg", 0) or 0),
-                    "spike": float(sg.get("spike", 0.0) or 0.0),
-                    "level": float(sg.get("level", 0.0) or 0.0),
-                    "signal": "curated_library+wiki_level"})
-    return out
 
 
 def collect_raw_pool(markets=None, pool=20, lanes=None):

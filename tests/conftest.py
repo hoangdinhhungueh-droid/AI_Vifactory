@@ -25,6 +25,17 @@ def guard_test_state_dir_isolation(monkeypatch, tmp_path):
         test_history = tmp_path / "isolated_topic_history.json"
         monkeypatch.setenv("TOPIC_HISTORY_PATH", str(test_history))
 
+    if "PENDING_TASKS_DIR" not in os.environ:
+        test_pending = tmp_path / "pending_tasks"
+        test_pending.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setenv("PENDING_TASKS_DIR", str(test_pending))
+
+    if "VF_EPISODES_DIR" not in os.environ and "EPISODES_DIR" not in os.environ:
+        test_episodes = tmp_path / "episodes"
+        test_episodes.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setenv("VF_EPISODES_DIR", str(test_episodes))
+        monkeypatch.setenv("EPISODES_DIR", str(test_episodes))
+
     # Assert that resolved state directory does not point to live VPS production lock path
     resolved = resolve_state_dir(read_only=True)
     resolved_str = str(resolved).replace("\\", "/")
@@ -32,8 +43,18 @@ def guard_test_state_dir_isolation(monkeypatch, tmp_path):
         f"Test state isolation violation: resolve_state_dir returned production path '{resolved}'!"
     )
 
-    from core.paths import resolve_topic_history_path
+    from core.paths import resolve_topic_history_path, resolve_pending_tasks_dir, resolve_episodes_dir
     resolved_history = str(resolve_topic_history_path()).replace("\\", "/")
     assert not resolved_history.startswith("/root/video_factory/data"), (
         f"Topic history isolation violation: resolve_topic_history_path returned production path '{resolved_history}'!"
+    )
+
+    resolved_pending = str(resolve_pending_tasks_dir(ensure_dir=False)).replace("\\", "/")
+    assert not resolved_pending.startswith("/var/vf/pending_tasks"), (
+        f"Pending tasks isolation violation: resolve_pending_tasks_dir returned production path '{resolved_pending}'!"
+    )
+
+    resolved_episodes = str(resolve_episodes_dir(ensure_dir=False)).replace("\\", "/")
+    assert not resolved_episodes.startswith("/var/vf/episodes"), (
+        f"Episodes dir isolation violation: resolve_episodes_dir returned production path '{resolved_episodes}'!"
     )

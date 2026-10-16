@@ -18,24 +18,24 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+logger = logging.getLogger("opus55_supervisor_gate")
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [OPUS55_GATE] %(message)s")
+
 if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug(f"stdout reconfigure notice: {_ex}")
 if hasattr(sys.stderr, "reconfigure"):
     try:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug(f"stderr reconfigure notice: {_ex}")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
-
-logger = logging.getLogger("opus55_supervisor_gate")
-if not logger.handlers:
-    logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [OPUS55_GATE] %(message)s")
 
 MAX_SUPERVISOR_INPUT_TOKENS = 100000
 MAX_SUPERVISOR_OUTPUT_TOKENS = 5000

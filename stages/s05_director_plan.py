@@ -12,13 +12,13 @@ import logging
 import time
 from typing import Any, Dict, List
 
-logger = logging.getLogger("s05_director_plan")
-
 from core.config import RunContext
 from core.contracts.stages import Provenance, Scene, Shot, StageArtifact, StageID
 from core.gates import emit_artifact
 from tools.codemap.runtime import pipeline_stage
 from vox.planner import plan_scenes_from_script
+
+logger = logging.getLogger("s05_director_plan")
 
 STAGE: StageID = StageID.S5_DIRECTOR_PLAN
 
