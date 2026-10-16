@@ -6,12 +6,15 @@ Mandate:
   2. Permanently tracks handled topics across local disks (/var/vf/pending_tasks, episodes/) and Notion.
   3. Provides fast normalization and deduplication check before any external API / LLM calls.
 """
+from __future__ import annotations
+
 import json
 import logging
 import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
