@@ -391,18 +391,44 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         except Exception as ex:
             logger.warning(f"Failed to pre-initialize FastVPSClient: {ex}")
 
-    def run_on_vps(cmd: str) -> Tuple[int, str]:
+    def run_on_vps(cmd: str, timeout: int = 300) -> Tuple[int, str]:
         nonlocal vps_client
+        clean_cmd = cmd.strip()
+        if not clean_cmd.startswith("cd /root/video_factory"):
+            clean_cmd = f"cd /root/video_factory && PYTHONPATH=/root/video_factory {clean_cmd}"
+        clean_cmd = f"bash -o pipefail -c {shlex.quote(clean_cmd)}"
         if is_on_vps:
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd="/root/video_factory")
+            res = subprocess.run(clean_cmd, shell=True, capture_output=True, text=True, cwd="/root/video_factory")
             return res.returncode, (res.stdout + "\n" + res.stderr).strip()
         else:
             try:
                 if vps_client is None:
                     from scripts.vps_runner import FastVPSClient
                     vps_client = FastVPSClient()
-                r = vps_client.run_command(cmd, timeout=300)
-                return r.get("exit_code", 1), (r.get("stdout", "") + "\n" + r.get("stderr", "")).strip()
+                if timeout > 50:
+                    import uuid
+                    job_id = uuid.uuid4().hex[:8]
+                    log_file = f"/tmp/vps_job_{job_id}.log"
+                    done_file = f"/tmp/vps_job_{job_id}.done"
+                    launch_cmd = f"nohup bash -c '({clean_cmd}) > {log_file} 2>&1; echo $? > {done_file}' >/dev/null 2>&1 &"
+                    vps_client.run_command(launch_cmd, timeout=30)
+                    start_poll = time.time()
+                    while time.time() - start_poll < timeout:
+                        time.sleep(3.0)
+                        check_res = vps_client.run_command(f"if [ -f {done_file} ]; then cat {done_file}; fi", timeout=15)
+                        done_content = check_res.get("stdout", "").strip()
+                        if done_content:
+                            try:
+                                exit_code = int(done_content)
+                            except ValueError:
+                                exit_code = 1
+                            out_res = vps_client.run_command(f"cat {log_file} && rm -f {log_file} {done_file}", timeout=30)
+                            return exit_code, out_res.get("stdout", "").strip()
+                    vps_client.run_command(f"rm -f {log_file} {done_file}", timeout=15)
+                    return 124, f"VPS command timed out after {timeout}s (Cloudflare 524 defense)"
+                else:
+                    r = vps_client.run_command(clean_cmd, timeout=timeout)
+                    return r.get("exit_code", 1), (r.get("stdout", "") + "\n" + r.get("stderr", "")).strip()
             except Exception as ex:
                 return 1, f"VPS connection failed: {ex}"
 
@@ -1148,7 +1174,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         except Exception as ex:
             logger.warning(f"Failed to pre-initialize FastVPSClient: {ex}")
 
-    def run_on_vps(cmd: str) -> Tuple[int, str]:
+    def run_on_vps(cmd: str, timeout: int = 300) -> Tuple[int, str]:
         nonlocal vps_client
         clean_cmd = cmd.strip()
         if not clean_cmd.startswith("cd /root/video_factory"):
@@ -1162,8 +1188,30 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
                 if vps_client is None:
                     from scripts.vps_runner import FastVPSClient
                     vps_client = FastVPSClient()
-                r = vps_client.run_command(clean_cmd, timeout=300)
-                return r.get("exit_code", 1), (r.get("stdout", "") + "\n" + r.get("stderr", "")).strip()
+                if timeout > 50:
+                    import uuid
+                    job_id = uuid.uuid4().hex[:8]
+                    log_file = f"/tmp/vps_job_{job_id}.log"
+                    done_file = f"/tmp/vps_job_{job_id}.done"
+                    launch_cmd = f"nohup bash -c '({clean_cmd}) > {log_file} 2>&1; echo $? > {done_file}' >/dev/null 2>&1 &"
+                    vps_client.run_command(launch_cmd, timeout=30)
+                    start_poll = time.time()
+                    while time.time() - start_poll < timeout:
+                        time.sleep(3.0)
+                        check_res = vps_client.run_command(f"if [ -f {done_file} ]; then cat {done_file}; fi", timeout=15)
+                        done_content = check_res.get("stdout", "").strip()
+                        if done_content:
+                            try:
+                                exit_code = int(done_content)
+                            except ValueError:
+                                exit_code = 1
+                            out_res = vps_client.run_command(f"cat {log_file} && rm -f {log_file} {done_file}", timeout=30)
+                            return exit_code, out_res.get("stdout", "").strip()
+                    vps_client.run_command(f"rm -f {log_file} {done_file}", timeout=15)
+                    return 124, f"VPS command timed out after {timeout}s (Cloudflare 524 defense)"
+                else:
+                    r = vps_client.run_command(clean_cmd, timeout=timeout)
+                    return r.get("exit_code", 1), (r.get("stdout", "") + "\n" + r.get("stderr", "")).strip()
             except Exception as ex:
                 return 1, f"VPS connection failed: {ex}"
 
