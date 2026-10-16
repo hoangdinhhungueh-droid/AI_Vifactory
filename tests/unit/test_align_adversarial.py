@@ -89,14 +89,20 @@ def test_align_fails_closed_without_whisper(sample_plan: ScenePlan, dummy_wav: P
 
 def test_run_pipeline_has_no_synthetic_alignment_parameter() -> None:
     """Rule 118 & Boss Item 4: Asserts that run_pipeline has zero synthetic-alignment parameters and cannot bypass real Whisper."""
-    import inspect
+    import ast
 
-    from vox.pipeline import run_pipeline
+    pipeline_file = Path(__file__).resolve().parent.parent.parent / "vox" / "pipeline.py"
+    tree = ast.parse(pipeline_file.read_text(encoding="utf-8"))
 
-    sig = inspect.signature(run_pipeline)
-    assert "allow_synthetic_alignment" not in sig.parameters
-    assert "allow_synthetic" not in sig.parameters
-    assert "synthetic" not in sig.parameters
+    found = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "run_pipeline":
+            found = True
+            params = [a.arg for a in node.args.args] + [a.arg for a in node.args.kwonlyargs]
+            assert "allow_synthetic_alignment" not in params
+            assert "allow_synthetic" not in params
+            assert "synthetic" not in params
+    assert found, "Function run_pipeline not found in vox/pipeline.py"
 
 
 def test_adversarial_substitution_breaks_match_ratio(sample_plan: ScenePlan, dummy_wav: Path, monkeypatch: pytest.MonkeyPatch) -> None:

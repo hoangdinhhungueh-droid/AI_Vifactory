@@ -640,4 +640,45 @@ def test_topic_history_registry_vn_day_boundary_attribution(temp_state_dir, monk
     assert reason_b == "not_produced_yet"
 
 
+def test_exception_mid_crawl_releases_lock_in_finally(temp_state_dir, monkeypatch):
+    """Boss Item 18 & 29: When an exception raises mid-crawl, the uncommitted IN_PROGRESS lock
+    must be cleanly released in the finally block so subsequent runs are not stuck.
+    """
+    import unittest.mock as mock
+
+    from app.services.daily_market_lock import is_market_done_today
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    with mock.patch("app.services.trend_engine_b1.fetch_live_trending_terms", side_effect=RuntimeError("Simulated mid-crawl crash")):
+        with pytest.raises(RuntimeError, match="Simulated mid-crawl crash"):
+            discover_and_produce_market_trend("EN", auto_produce=False, state_dir=temp_state_dir)
+
+    # After exception, lock should be released
+    done, reason, _ = is_market_done_today("EN", state_dir=temp_state_dir)
+    assert done is False
+    assert reason == "not_produced_yet"
+
+
+def test_non_timeout_cooldown_error_preserves_quota_mark(temp_state_dir, monkeypatch):
+    """Boss Item 18 & 29: If alert cooldown raises an arbitrary non-timeout exception (e.g. ValueError or IOError),
+    mark_exhausted_today has already stamped the quota, and the exception is caught safely without leaking.
+    """
+    import unittest.mock as mock
+
+    from app.services.daily_market_lock import is_market_done_today
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    fake_candidates = [{"term": "test term", "approx_traffic": "10K+", "geos_present": ["US"]}]
+    with mock.patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=fake_candidates):
+        with mock.patch("app.services.trend_engine_b1.forensic_pre_filter", return_value=(False, "Rejected for test")):
+            with mock.patch("app.services.trend_engine_b1.should_send_alert", side_effect=IOError("Corrupt disk alert error")):
+                res = discover_and_produce_market_trend("EN", auto_produce=False, state_dir=temp_state_dir)
+                assert res == []
+
+    # Daily lock must be stamped EXHAUSTED_TODAY despite alert error
+    done, reason, _ = is_market_done_today("EN", state_dir=temp_state_dir)
+    assert done is True
+    assert reason == "lock_exhausted_today"
+
+
 

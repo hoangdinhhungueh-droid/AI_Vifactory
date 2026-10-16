@@ -98,6 +98,18 @@ def align_script_with_audio(
 
     # 1. Attempt live faster-whisper extraction
     try:
+        try:
+            import av
+            if hasattr(av, "open") and not getattr(av.open, "_safe_metadata_wrapped", False):
+                _real_av_open = av.open
+                def _safe_av_open(*args: Any, **kwargs: Any) -> Any:
+                    kwargs.pop("metadata_errors", None)
+                    return _real_av_open(*args, **kwargs)
+                _safe_av_open._safe_metadata_wrapped = True  # type: ignore[attr-defined]
+                av.open = _safe_av_open
+        except Exception:
+            pass
+
         from faster_whisper import WhisperModel
         model = WhisperModel(resolved_model, device="cpu", compute_type="int8")
         segments, _ = model.transcribe(str(wav_path), word_timestamps=True, language=target_lang)

@@ -409,7 +409,16 @@ def acquire_in_progress(
                     age = (now_utc - c_dt).total_seconds()
                     rec_ttl = int(existing.get("ttl_seconds", ttl_seconds))
                     if age > rec_ttl:
-                        is_stale_in_progress = True
+                        from app.services.alert_cooldown import is_pid_alive
+                        ex_pid = existing.get("pid")
+                        if ex_pid and isinstance(ex_pid, int) and is_pid_alive(ex_pid):
+                            is_stale_in_progress = False
+                            logger.info(
+                                f"[daily_market_lock] IN_PROGRESS lock for {m_up} age={int(age)}s > ttl={rec_ttl}s, "
+                                f"but holder PID {ex_pid} is still alive. Refusing stale takeover."
+                            )
+                        else:
+                            is_stale_in_progress = True
 
             if is_expired_offhours or is_stale_in_progress:
                 action_desc = "expired off-hours" if is_expired_offhours else "stale IN_PROGRESS"
@@ -433,7 +442,14 @@ def acquire_in_progress(
                         )
                         try:
                             if not lock_path.exists():
-                                os.replace(str(tombstone), str(lock_path))
+                                try:
+                                    os.link(str(tombstone), str(lock_path))
+                                    tombstone.unlink(missing_ok=True)
+                                except (AttributeError, OSError):
+                                    if not lock_path.exists():
+                                        os.replace(str(tombstone), str(lock_path))
+                                    else:
+                                        tombstone.unlink(missing_ok=True)
                             else:
                                 tombstone.unlink(missing_ok=True)
                         except OSError as rest_err:

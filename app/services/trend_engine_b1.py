@@ -1544,7 +1544,7 @@ def discover_and_produce_market_trend(
 
                     # B3 failed: Do NOT commit task. Emit exactly ONE terminal failure message with recovery command.
                     fail_msg = (
-                        f"🚨 <b>[VF PIPELINE B3 FAILED - OPERATOR INTERVENTION REQUIRED]</b>\n"
+                        f"🚨 <b>[VF PIPELINE B3 FAILED - RULE 118] [OPERATOR INTERVENTION REQUIRED]</b>\n"
                         f"Market: <code>{m_up}</code> | Candidate: <code>{term}</code> (Temp: <code>{temp_task_id}</code>)\n"
                         f"B3 Downstream Director Plan execution failed with exit code {res_code}.\n"
                         f"🛑 <b>Hành động:</b> 0 topics committed. Daily quota locked to prevent retry storms.\n"

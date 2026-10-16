@@ -26,14 +26,19 @@ def synthesize_linear_word_timeline(plan: ScenePlan, wav_path: Path) -> tuple[Wo
         dur = max(0.2, (len(w_text) / max(1, total_chars)) * audio_dur)
         end_t = min(audio_dur, curr + dur)
         timeline_words.append(Word(
-            word=w_text,
+            text=w_text,
             start=round(curr, 3),
             end=round(max(curr + 0.1, end_t), 3),
             probability=1.0,
             scene_idx=sc_idx,
         ))
         curr = end_t
-    timeline = WordTimeline(words=timeline_words, audio_duration=audio_dur, alignment_model="test_synthetic_helper")
+    timeline = WordTimeline(
+        words=timeline_words,
+        audio_duration=audio_dur,
+        match_ratio=1.0,
+        alignment_model="test_synthetic_helper",
+    )
     updated_scenes = []
     for sc in plan.scenes:
         sc_words = [w for w in timeline_words if w.scene_idx == sc.idx]

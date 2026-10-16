@@ -110,7 +110,7 @@ def cleanup_corrupt_quarantines(
         for t_idx, tf in enumerate(tombstones):
             try:
                 t_age = now - tf.stat().st_mtime
-                if t_idx >= max_files or t_age > 300.0:
+                if t_age > 300.0:
                     tf.unlink(missing_ok=True)
                     logger.info(f"[atomic_io] Pruned stale tombstone file {tf.name} (age={int(t_age)}s)")
                     pruned += 1

@@ -25,15 +25,9 @@ from app.services.trend_engine_b1 import (
 
 
 @pytest.fixture(autouse=True)
-def force_crawl_for_caps_tests():
+def force_crawl_for_caps_tests(monkeypatch):
     """Ensure caps and inner candidate loop tests are not preempted by daily quota guard."""
-    old = os.environ.get("B1_FORCE_CRAWL")
-    os.environ["B1_FORCE_CRAWL"] = "1"
-    yield
-    if old is not None:
-        os.environ["B1_FORCE_CRAWL"] = old
-    else:
-        os.environ.pop("B1_FORCE_CRAWL", None)
+    monkeypatch.setenv("B1_FORCE_CRAWL", "1")
 
 
 def test_level_0_5_gate_rejects_empty_evidence():
@@ -219,7 +213,7 @@ def test_b3_failure_yields_zero_committed_and_single_failed_alert(tmp_path):
         # 2. Exactly ONE terminal Telegram broadcast emitted
         assert mock_tele.call_count == 1
         broadcast_msg = mock_tele.call_args[0][0]
-        assert "[VF PIPELINE B3 FAILED - RULE 118]" in broadcast_msg
+        assert "[VF PIPELINE B3 FAILED - RULE 118" in broadcast_msg
         assert "0 topics committed" in broadcast_msg
 
         # 3. Explicitly verify ZERO success-flavoured or contradictory messages emitted
