@@ -425,52 +425,78 @@ def acquire_in_progress(
                 logger.warning(
                     f"[daily_market_lock] Attempting exclusive takeover of {action_desc} lock for {m_up}"
                 )
-                tombstone = lock_path.with_name(f"{lock_path.name}.tombstone_{pid}_{uuid.uuid4().hex}")
+                takeover_lock = lock_path.with_suffix(lock_path.suffix + ".takeover")
                 try:
-                    os.replace(str(lock_path), str(tombstone))
-                except (FileNotFoundError, OSError) as ren_err:
-                    logger.debug(f"[daily_market_lock] Stale lock takeover race on rename {lock_path}: {ren_err}")
+                    fd_takeover = os.open(str(takeover_lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+                except FileExistsError:
+                    try:
+                        t_age = time.time() - takeover_lock.stat().st_mtime
+                        if t_age > 10.0:
+                            takeover_lock.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    logger.debug(f"[daily_market_lock] Lost takeover race to another contender for {m_up}")
+                    return False
+                except OSError as tok_err:
+                    logger.debug(f"[daily_market_lock] Takeover mutex error for {m_up}: {tok_err}")
                     return False
 
-                # Verify we captured the expected stale lock, not a concurrent fresh lock
                 try:
-                    with open(tombstone, "r", encoding="utf-8") as tf:
-                        captured = tf.read().strip()
-                    if captured != raw_stale:
-                        logger.warning(
-                            f"[daily_market_lock] Stale lock mismatch on {lock_path}: restoring concurrent holder's lock"
-                        )
-                        try:
-                            if not lock_path.exists():
-                                try:
-                                    os.link(str(tombstone), str(lock_path))
-                                    tombstone.unlink(missing_ok=True)
-                                except (AttributeError, OSError):
-                                    if not lock_path.exists():
-                                        os.replace(str(tombstone), str(lock_path))
-                                    else:
-                                        tombstone.unlink(missing_ok=True)
-                            else:
-                                tombstone.unlink(missing_ok=True)
-                        except OSError as rest_err:
-                            logger.error(f"[daily_market_lock] Failed to restore lock: {rest_err}")
+                    try:
+                        with open(lock_path, "r", encoding="utf-8") as rf:
+                            current_content = rf.read().strip()
+                        current_data = json.loads(current_content)
+                    except Exception as recheck_err:
+                        logger.warning(f"[daily_market_lock] Error re-reading lock under mutex: {recheck_err}")
                         return False
-                except OSError as read_err:
-                    logger.warning(f"[daily_market_lock] Error reading tombstone: {read_err}")
-                    tombstone.unlink(missing_ok=True)
-                    return False
 
-                try:
-                    fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-                    with os.fdopen(fd, "w", encoding="utf-8") as f_new:
-                        json.dump(payload, f_new, ensure_ascii=False, indent=2)
-                    logger.info(f"[daily_market_lock] Won exclusive takeover of {action_desc} lock for {m_up} on {date_str}")
-                    tombstone.unlink(missing_ok=True)
-                    return True
-                except (OSError, FileExistsError):
-                    logger.warning(f"[daily_market_lock] Lost race to acquire {action_desc} lock for {m_up}")
-                    tombstone.unlink(missing_ok=True)
-                    return False
+                    curr_status = current_data.get("status")
+                    curr_still_expired = (
+                        curr_status in ("EXHAUSTED_OFFHOURS", "OFFHOURS_THROTTLED")
+                        and vn_now(now).hour >= MIN_PRODUCTION_HOUR_VN
+                    )
+                    curr_still_stale = False
+                    if curr_status == "IN_PROGRESS":
+                        curr_c_str = current_data.get("created_at_utc")
+                        if curr_c_str:
+                            curr_c_dt = datetime.fromisoformat(curr_c_str)
+                            if curr_c_dt.tzinfo is None:
+                                curr_c_dt = curr_c_dt.replace(tzinfo=timezone.utc)
+                            curr_age = (now_utc - curr_c_dt).total_seconds()
+                            curr_rec_ttl = int(current_data.get("ttl_seconds", ttl_seconds))
+                            if curr_age > curr_rec_ttl:
+                                from app.services.alert_cooldown import is_pid_alive
+                                curr_pid = current_data.get("pid")
+                                if not (curr_pid and isinstance(curr_pid, int) and is_pid_alive(curr_pid)):
+                                    curr_still_stale = True
+
+                    if not (curr_still_expired or curr_still_stale):
+                        logger.info(f"[daily_market_lock] Lock {lock_path} no longer stale under mutex, aborting takeover")
+                        return False
+
+                    tmp_new = lock_path.with_name(f"{lock_path.name}.tmp_{pid}_{uuid.uuid4().hex}")
+                    try:
+                        with open(tmp_new, "w", encoding="utf-8") as f_tmp:
+                            json.dump(payload, f_tmp, ensure_ascii=False, indent=2)
+                            f_tmp.flush()
+                            try:
+                                os.fsync(f_tmp.fileno())
+                            except OSError:
+                                pass
+                        os.replace(str(tmp_new), str(lock_path))
+                        logger.info(f"[daily_market_lock] Won exclusive takeover of {action_desc} lock for {m_up} on {date_str}")
+                        return True
+                    except OSError as rep_err:
+                        logger.error(f"[daily_market_lock] Failed atomic replace during takeover: {rep_err}")
+                        return False
+                    finally:
+                        tmp_new.unlink(missing_ok=True)
+                finally:
+                    try:
+                        os.close(fd_takeover)
+                    except OSError:
+                        pass
+                    takeover_lock.unlink(missing_ok=True)
         except Exception as ex:
             logger.error(f"[daily_market_lock] Error inspecting existing lock {lock_path}: {ex}")
         return False
