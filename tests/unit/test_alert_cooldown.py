@@ -180,13 +180,14 @@ def test_lock_timeout_error_fail_closed(temp_state_dir):
     from app.services.alert_cooldown import LockTimeoutError, _interprocess_lock
 
     target_file = Path(temp_state_dir) / "test.json"
-    lock_file = target_file.with_suffix(".json.lock")
-    lock_file.write_text("99999:held_by_someone_else", encoding="utf-8")
 
-    # When lock is held, acquiring with short timeout must raise LockTimeoutError
-    with pytest.raises(LockTimeoutError):
-        with _interprocess_lock(target_file, timeout=0.1, poll_interval=0.02):
-            pass
+    # Hold the lock in outer context
+    with _interprocess_lock(target_file, timeout=2.0):
+        # When lock is already held, acquiring with short timeout must raise LockTimeoutError
+        with pytest.raises(LockTimeoutError):
+            with _interprocess_lock(target_file, timeout=0.1, poll_interval=0.02):
+                pass
+
 
 
 def test_alert_type_validation_raises_on_invalid(temp_state_dir):
@@ -214,27 +215,23 @@ def test_is_pid_alive_platform_safe():
     assert is_pid_alive(0) is False
 
 
-def test_stale_lock_reclaim_with_tombstone(temp_state_dir):
-    """Verify that a lock older than 30s with a dead PID is safely reclaimed via atomic tombstone."""
+def test_os_advisory_lock_released_on_exit(temp_state_dir):
+    """Verify that OS advisory lock is properly released on context exit, allowing immediate re-acquisition."""
     from app.services.alert_cooldown import _interprocess_lock
 
-    target_file = Path(temp_state_dir) / "test_stale.json"
-    lock_file = target_file.with_suffix(".json.lock")
+    target_file = Path(temp_state_dir) / "test_lifecycle.json"
 
-    # Write a stale lock with dead PID (9999999)
-    lock_file.write_text("9999999:dead_token_xyz", encoding="utf-8")
-    # Backdate mtime to 35 seconds ago
-    old_time = time.time() - 35.0
-    os.utime(str(lock_file), (old_time, old_time))
-
-    # Acquiring should detect dead PID, rename to tombstone, and succeed
-    acquired = False
+    # First acquisition
     with _interprocess_lock(target_file, timeout=2.0, poll_interval=0.05):
-        acquired = True
+        pass
 
-    assert acquired is True
-    # After exit, lock should be cleaned up
-    assert not lock_file.exists()
+    # Second acquisition on same persistent lock file succeeds immediately
+    acquired_second = False
+    with _interprocess_lock(target_file, timeout=2.0, poll_interval=0.05):
+        acquired_second = True
+
+    assert acquired_second is True
+
 
 
 def test_dispatch_failure_rollback_allows_subsequent_send(temp_state_dir):
@@ -257,50 +254,25 @@ def test_dispatch_failure_rollback_allows_subsequent_send(temp_state_dir):
     assert suppressed_retry == 0
 
 
-def test_tombstone_content_mismatch_restores_lock_file(temp_state_dir, monkeypatch):
-    """Boss Round 7 Item 10: Drive real _interprocess_lock and inject a fresh live holder token
-    during the tombstone reclaim window to prove that the mismatch branch restores lock_file
-    and does NOT unlink or hijack the live holder's lock.
-    """
-    from app.services.alert_cooldown import LockTimeoutError, _interprocess_lock
+def test_permission_error_fails_immediately_without_spinning(temp_state_dir, monkeypatch):
+    """Boss Round 9 Item 6: PermissionError on os.open must fail fast immediately without spinning for timeout."""
+    from app.services.alert_cooldown import _interprocess_lock
 
-    target_file = Path(temp_state_dir) / "test_mismatch.json"
-    lock_file = target_file.with_suffix(".json.lock")
+    target_file = Path(temp_state_dir) / "test_perm.json"
 
-    # 1. Write an initial stale lock with dead PID (9999999) older than 30s
-    dead_token = "9999999:stale_dead_token"
-    lock_file.write_text(dead_token, encoding="utf-8")
-    old_time = time.time() - 35.0
-    os.utime(str(lock_file), (old_time, old_time))
+    def mock_open_perm_error(*args, **kwargs):
+        raise PermissionError("Simulated EACCES filesystem error")
 
-    # 2. Hook os.rename so that right when _interprocess_lock renames lock_file to tombstone,
-    # we simulate an adversarial race where a new live holder wrote to lock_file right before rename
-    real_rename = os.rename
-    live_token = f"{os.getpid()}:live_active_token"
-    injected = False
+    monkeypatch.setattr(os, "open", mock_open_perm_error)
 
-    def hook_rename(src, dst, *args, **kwargs):
-        nonlocal injected
-        if not injected and ".tombstone." in str(dst):
-            # Injects fresh live holder content into the file right before the atomic rename moves it
-            Path(src).write_text(live_token, encoding="utf-8")
-            injected = True
-        return real_rename(src, dst, *args, **kwargs)
-
-    monkeypatch.setattr(os, "rename", hook_rename)
-
-    # 3. _interprocess_lock attempts to acquire with short timeout.
-    # It reads dead_token, renames to tombstone, notices tombstone has live_token != dead_token,
-    # restores lock_file via os.replace(tombstone, lock_file), and subsequently fails to acquire
-    # because live_token belongs to os.getpid() which is alive.
-    with pytest.raises(LockTimeoutError):
-        with _interprocess_lock(target_file, timeout=0.3, poll_interval=0.05):
+    t0 = time.time()
+    with pytest.raises(PermissionError, match="Filesystem permission error"):
+        with _interprocess_lock(target_file, timeout=5.0, poll_interval=0.05):
             pass
+    elapsed = time.time() - t0
+    # Must fail fast in less than 0.5s, NOT spinning for the full 5.0s timeout
+    assert elapsed < 0.5, f"Expected fast failure, but took {elapsed:.2f}s"
 
-    assert injected is True, "Expected rename hook to be invoked during stale lock reclaim"
-    # Verify that lock_file was restored and holds the live holder's token
-    assert lock_file.exists(), "Lock file must be restored after mismatch"
-    assert lock_file.read_text(encoding="utf-8") == live_token, "Live holder's token must survive unmodified"
 
 
 def test_rollback_reservation_preserves_suppressed_count_when_never_sent(temp_state_dir):
@@ -396,6 +368,65 @@ def test_send_telegram_broadcast_returns_truthy_on_success(monkeypatch):
         fail_id = send_telegram_broadcast("<b>Fail Alert</b>")
         assert fail_id is None
         assert bool(fail_id) is False
+
+
+def test_transient_ioerror_fails_open_without_overwriting(temp_state_dir):
+    """Boss Round 9 Item 5: Transient OSError during read should fail-open without overwriting disk state."""
+    from unittest.mock import patch
+    import json
+    from app.services.alert_cooldown import _resolve_cooldown_file, rollback_alert_reservation, CooldownReadError
+
+    cooldown_file = _resolve_cooldown_file(temp_state_dir)
+    original_data = {"b1_viability::EN": {"last_sent_utc": "2026-10-15T12:00:00+00:00", "suppressed_since_last": 5}}
+    cooldown_file.write_text(json.dumps(original_data), encoding="utf-8")
+
+    with patch("app.services.alert_cooldown._read_cooldown_data", side_effect=CooldownReadError("Simulated transient EIO")):
+        decision = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir)
+        assert decision.can_send is True
+        assert decision.suppressed == 0
+
+        # Rollback should also safely abort without writing corrupted/empty data
+        rb_ok = rollback_alert_reservation("b1_viability", "EN", state_dir=temp_state_dir)
+        assert rb_ok is False
+
+    # Verify original file content was completely preserved on disk
+    saved_data = json.loads(cooldown_file.read_text(encoding="utf-8"))
+    assert saved_data == original_data
+
+
+def test_read_cooldown_data_raises_cooldown_read_error_on_ioerror(temp_state_dir):
+    """Verify that _read_cooldown_data converts OSError to CooldownReadError."""
+    from unittest.mock import patch
+    from app.services.alert_cooldown import _read_cooldown_data, _resolve_cooldown_file, CooldownReadError
+
+    cooldown_file = _resolve_cooldown_file(temp_state_dir)
+    cooldown_file.write_text("{}", encoding="utf-8")
+
+    with patch("builtins.open", side_effect=OSError("Disk read failure")):
+        with pytest.raises(CooldownReadError):
+            _read_cooldown_data(cooldown_file)
+
+
+
+def test_corrupt_timestamp_quarantines_field_and_fails_open(temp_state_dir):
+    """Boss Round 9 Item 5: Corrupt timestamp string should quarantine field to corrupted_last_sent_utc and fail open."""
+    import json
+    from app.services.alert_cooldown import _resolve_cooldown_file
+
+    cooldown_file = _resolve_cooldown_file(temp_state_dir)
+    corrupted_data = {"b1_viability::EN": {"last_sent_utc": "BAD_TIMESTAMP_STRING_XYZ", "suppressed_since_last": 2}}
+    cooldown_file.write_text(json.dumps(corrupted_data), encoding="utf-8")
+
+    decision = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir)
+    assert decision.can_send is True
+
+    # Check that disk entry was quarantined and healed with fresh timestamp
+    saved_data = json.loads(cooldown_file.read_text(encoding="utf-8"))
+    entry = saved_data["b1_viability::EN"]
+    assert entry.get("corrupted_last_sent_utc") == "BAD_TIMESTAMP_STRING_XYZ"
+    assert entry.get("last_sent_utc") is not None
+    assert entry.get("last_sent_utc") != "BAD_TIMESTAMP_STRING_XYZ"
+
 
 
 

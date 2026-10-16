@@ -327,8 +327,8 @@ def test_block2_story_contract() -> bool:
         if not sample_story and story_candidates:
             try:
                 sample_story = story_candidates[0].read_text(encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as _read_err:
+                logger.debug(f"[ci_neighbor_tester] Notice reading fallback candidate {story_candidates[0]}: {_read_err}")
 
         if not sample_story:
             # Hermetic Golden Fixture Story fallback (5-Act structure)
@@ -383,7 +383,6 @@ def test_block3_director_contract() -> bool:
             audit_director_plan,
             audit_director,
         )
-        from scripts.generate_50_director_plan import generate_director_plan
 
         # 1. Canonical 5 Beats Structure Verification
         assert len(CANONICAL_BEATS) == 5, f"Expected 5 Canonical Beats, got {len(CANONICAL_BEATS)}"

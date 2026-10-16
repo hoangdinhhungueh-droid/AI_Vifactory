@@ -18,22 +18,27 @@ Tuân thủ:
 
 from __future__ import annotations
 
-import os
-import sys
-import time
+import argparse
 import json
+import logging
+import os
 import re
 import shutil
-import argparse
 import subprocess
+import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List
 
+logger = logging.getLogger(__name__)
+
 try:
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
-except Exception:
-    pass
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception as _ex:
+    logger.debug("Stream reconfigure notice: %s", _ex)
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
@@ -330,8 +335,8 @@ def perform_b5_visual_audit(episode_id: str, block_manifest: Dict[str, Any], lim
                 dp = json.load(f)
             for s in dp.get("scenes", []):
                 scenes_info[s.get("scene_id")] = s
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError) as _ex:
+            logger.debug("Director plan read notice: %s", _ex)
 
     print(f"\n{'Scene ID':<10} | {'File Name':<24} | {'Kích Thước':<11} | {'Dung Lượng':<11} | {'Đánh Giá Thị Giác 4 Trục (Rule 122)':<55} | Trạng Thái")
     print("-" * 135)
@@ -482,8 +487,8 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
                 dp = json.load(f)
             for s in dp.get("scenes", []):
                 scenes_info[s.get("scene_id")] = s
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError) as _ex:
+            logger.debug("Gallery plan read notice: %s", _ex)
 
     gallery_html_path = episode_dir / "review_gallery.html"
     scenes_audited = audit_summary.get("scenes", [])
@@ -719,8 +724,8 @@ def evaluate_human_gate(
                 dp = json.load(f)
             for s in dp.get("scenes", []):
                 scenes_info[s.get("scene_id")] = s
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError) as _ex:
+            logger.debug("Plan inspect read notice: %s", _ex)
 
     print("\n📋 BẢNG THẨM ĐỊNH THỊ GIÁC & PHÂN RÃ HÀNH ĐỘNG DYNAMIC (RULE 122 & ANIMATION BEATS):")
     print(f"{'Scene ID':<10} | {'File Name':<24} | {'Kích Thước':<11} | {'Dung Lượng':<11} | {'Đánh Giá Thị Giác 4 Trục (Rule 122)':<45} | {'Phân Rã Chuyển Động Dynamic (S₁..Sₙ)':<45} | Trạng Thái")

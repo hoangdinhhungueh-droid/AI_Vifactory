@@ -1,0 +1,109 @@
+{
+  "task_id": "TASK_1792069373",
+  "round": 8,
+  "timestamp": "2026-10-16T05:48:12Z",
+  "verdict": "REVISE_REQUIRED",
+  "score": 6.3,
+  "passing_threshold": 10.0,
+  "supervisor_model": "claude-opus-5-5",
+  "tokens_consumed": 64988,
+  "summary": "Round 8 shows real, physically verified progress. Three-way parity at 2db27a7 is bit-exact with empty porcelain on all nodes. GitHub run 38856490617 concluded success on all three jobs, including Windows lock gating (66 passed) and hermetic CI (177 + 67 tests, 0 skipped). The VPS unit/isolation suite reports 125 passed. ghost_scan and ci_neighbor_tester exit 0. The production dry-run now agrees with the runtime guard (EN SKIP EXHAUSTED_TODAY, matching EN_2026-10-16.json). The increment still cannot be approved, for four reasons. (1) The mandated Rule 127 S05 live call exits 1, and this round's evidence contains no substitute proof. (2) The B3 resolution gate reports exit 0 while its own stdout says 'No module named scripts.orchestrator.run_pipeline', because the pipe into head masks the failure. (3) app/services/hhtech_reasoner.py references an undefined name `ancient_terms` in detect_safety_and_theme, which is a probable runtime NameError on the B1 viability path, and non-blocking ruff on app/ lets it through. (4) No post-HEAD scheduled cron tick is evidenced. The only post-HEAD production run (EN, 05:33 UTC, pid 152506) is off-schedule, has no stated provenance, and dispatched a real Telegram alert. In addition: the trend_engine_b1 diff is still truncated (Round 6 and 7 item), test isolation does not cover episodes or pending_tasks, the evidence harness still injects literal success narratives, scope remains bundled across AVF-VOX-001 and governance work, and source modules are gitignored under app/services.",
+  "revisions_needed": [
+    "Define or remove `ancient_terms` in hhtech_reasoner.detect_safety_and_theme. Add a unit test that drives a subject through every branch, including the default fall-through. Make `ruff check --select F821,F811 app/ scripts/ stages/` blocking in CI and attach its exit-0 output.",
+    "Re-run the S05 live invocation on the VPS to exit 0 and attach raw stdout. Diagnose the 'read operation timed out' (MCP2 endpoint priority in 2db27a7) and attach the root cause.",
+    "Fix the B3 resolution gate: drop the deleted `scripts.orchestrator.run_pipeline` reference and run every VPS gate under `set -o pipefail`. Execute the exact crontab command line for daily_cron_b1_b2 on the VPS with `--help` or a dry-run, and attach its exit code.",
+    "Attach the untruncated trend_engine_b1.py hunks proving (a) the viability-cap `break` exists inside the new try block and (b) the B3 failure block is guarded by `if res_code != 0:`. Initialize `c_score` before the critic try, and use os.pathsep for PYTHONPATH.",
+    "Make mark_completed and mark_exhausted_today refuse to overwrite an existing lock unless lock_token matches or an explicit force flag is passed. Update test_b1_daily_guard_integration accordingly.",
+    "Stop the registry check from treating `*_TEMP_*` entries recorded on B2 or B2.1 rejection as committed. Either write task_id='REJECTED_OR_HANDLED' for rejections or filter TEMP ids, and add a regression test.",
+    "Extend tests/conftest.py to isolate VF_EPISODES_DIR and PENDING_TASKS_DIR to tmp_path, with a fail-closed assertion against /var/vf/episodes and /var/vf/pending_tasks. Audit and clean any test residue already written to those production directories, after user confirmation (Rule 137).",
+    "Provide provenance (journal or cron line, parent process, command line) for the EN B1 run at 2026-10-16T05:33:12Z (pid 152506) and for the 'legacy_migrated_token' mutation of EN_2026-10-15.json. Obtain explicit user approval for any further production lock mutation.",
+    "Provide one post-HEAD scheduled cron tick showing a single lock acquisition, a terminal stamp with lock_token and viability_passed_count, exactly one Telegram message, and a second tick that skips with lock_exhausted_today and zero sendMessage calls.",
+    "In alert_cooldown tombstone-mismatch restore, replace os.replace with os.link(tombstone, lock_file) plus an unlink of the tombstone, so a newer O_EXCL holder is never clobbered. Restrict corrupt-quarantine in _read_cooldown_data to JSONDecodeError and ValueError.",
+    "Log the ffprobe re-verification failure in stages/s10_render.py and add a subprocess timeout. Move the s05 `logger` assignment below the imports (E402).",
+    "Remove all literal success and narrative strings from boss_orchestrator.py (assertion counts, ZERO_MOCK forced exit, retained-module table, network posture, user-approval block, test-double justifications) and replace them with computed tool output. Define or remove `code_pytest_ci_unit`. Run the OCR AST scan over every modified Python file in the range.",
+    "Remove the gitignore rules hiding source modules (app/services/agq_*, scripts/agq*, scripts/login_acc*.py, scripts/setup_*_profiles.py, tests/unit/test_agq_fleet.py). Commit them under their own task, or relocate them outside production package paths. Restore the binary and *.ts/*.tsx eol rules in .gitattributes, or justify their removal.",
+    "Provide evidence that VF_API_TOKEN is configured on the VPS and that every loopback caller (n8n, local agents) sends the Bearer header, for example a 200 from an authenticated call and a 401 from an unauthenticated one. Otherwise, document an approved ALLOW_UNAUTHENTICATED_LOOPBACK posture.",
+    "Attach evidence that the Cloudflare Access service token and MCP/AG tokens previously committed in vps_runner.py were rotated.",
+    "Resolve the governance contradiction: either honour the 2-round cap in SKILL.md and escalate to the user, or amend the cap with user approval. Split the AVF-VOX-001, AVF-GOV-001 and visual-audit changes out of the TASK_1792069373 range (Rule 124)."
+  ],
+  "component_reviews": [
+    {
+      "component": "app/services/hhtech_reasoner.py",
+      "status": "DEFECT",
+      "analysis": "In detect_safety_and_theme, `elif any(t in text for t in ancient_terms):` references `ancient_terms`. The diff defines truecrime/fraud/gambling/societal/history/tech term lists but no ancient_terms. Any subject that falls through the first five branches raises NameError. Both reason_topic_niche and assess_keyword_video_viability call this function outside their try blocks, so a NameError would crash the B1 candidate loop rather than produce a REJECTED_API_ERROR. CI runs `ruff check app/ --exit-zero` and Makefile ruff targets exclude this file, so F821 cannot block. The whole-file churn (1169 lines) persists despite .gitattributes, so the semantic change set (tech_terms branch, \\bwar\\b regex, '동탄문구점' removal) is still not isolated."
+    },
+    {
+      "component": "stages/s05_director_plan.py (Rule 127 live proof)",
+      "status": "DEFECT",
+      "analysis": "The root-cause fix is now line-visible: s3_data was referenced without being loaded, and the json.load is restored. 3/3 unit tests pass. However, the mandated live S05 invocation exits 1 with 'VPS connection failed: The read operation timed out'. This coincides with commit 2db27a7 reprioritizing the MCP2 endpoint. Under Rule 121 a failed gate is a failed gate. Separately, `logger = ...` placed between import blocks triggers E402, and stages/ is outside the blocking ruff scope."
+    },
+    {
+      "component": "scripts/orchestrator/boss_orchestrator.py (evidence harness)",
+      "status": "DEFECT",
+      "analysis": "1) The B3 check runs `... && python3 -m scripts.orchestrator.run_pipeline --help | head -n 8` without pipefail. The module was deleted this round, the stdout shows ModuleNotFoundError, and the gate reports exit 0. 2) Hardcoded narrative literals remain: 'All 8 assertions passed', the 'ZERO_MOCK_VERIFIED ... (Exit 0)' print followed by a forced sys.exit(0), the 24-module 'retained' rationale table, the 'NETWORK POSTURE' note, the 'EXPLICIT HUMAN-IN-THE-LOOP USER APPROVAL' block, and the Rule 118 test-double justifications. 3) `code_pytest_ci_unit` is interpolated in the vox packet but its assignment does not appear in the diff. 4) The OCR scan in the trend packet still covers a fixed list of 7 files, and it cannot detect undefined names, swallowed exceptions in s10, or unreachable code outside that list. 5) The SKILL.md state machine caps self-healing at 2 rounds and escalation to the user, yet this is round 8, driven via --round-num. The harness bypasses its own governance."
+    },
+    {
+      "component": "app/services/trend_engine_b1.py",
+      "status": "WARN",
+      "analysis": "Good: a single acquire_in_progress happens before any crawl, a try/finally releases the lock when no terminal stamp is set, EXHAUSTED is stamped before alert dispatch, _send_guarded_alert rolls back on a falsy or raised send, and B3 now invokes `-m orchestrator.run_pipeline`. Unverified: the section-7 diff is still truncated (it starts mid-token at 'egram_gate1_notification'). The compact diff removes the old viability-cap `break` and shows no re-indented replacement under the new try. It also shows no `if res_code != 0:` guard above the new B3 failure block. Both are Round 6/7 items and must be line-proven. Latent bugs: `c_score` is undefined in t_obj when the critic import or call raises, and PYTHONPATH is joined with ':' instead of os.pathsep."
+    },
+    {
+      "component": "app/services/daily_market_lock.py",
+      "status": "WARN",
+      "analysis": "O_EXCL/link acquisition, the takeover mutex with re-check, the CORRUPT_FAIL_CLOSED seal, and pure-read is_market_done_today are sound and well tested. Remaining issues: (a) when the caller passes neither lock_token nor owner_pid, mark_completed and mark_exhausted_today verify against no expectations, so any caller can overwrite a held lock. test_b1_daily_guard_integration does exactly this. This contradicts the Round 4 mandate 'never overwrite a lock the caller does not own'. (b) The registry check treats B2-rejected EN_TEMP_* entries written by record_handled_topic as 'registry_committed_pending_render', which mislabels a rejection as a commit. (c) Production EN_2026-10-15.json now carries lock_token='legacy_migrated_token'. A production lock file was mutated, and no user confirmation or script provenance is shown (Rule 118 and Rule 137, Round 1 Item 10)."
+    },
+    {
+      "component": "app/services/alert_cooldown.py",
+      "status": "WARN",
+      "analysis": "Atomic single-lock reservation, delta-safe rollback, and Windows is_pid_alive semantics are correct and pass on windows-latest. Residual race: on tombstone content mismatch, `os.replace(tombstone, lock_file)` can clobber a lock that a third contender created via O_EXCL after the rename. Use os.link(tombstone, lock_file) (fails if it exists) and then unlink the tombstone. _read_cooldown_data catches all exceptions, including transient OSError on open, and quarantines a possibly valid state file. Restrict quarantine to JSONDecodeError and ValueError."
+    },
+    {
+      "component": "tests/conftest.py and test isolation (Rule 119)",
+      "status": "DEFECT",
+      "analysis": "The autouse fixture isolates VF_STATE_DIR and topic history only. VF_EPISODES_DIR and PENDING_TASKS_DIR are not isolated, so on the VPS, resolve_episodes_dir and resolve_pending_tasks_dir resolve to /var/vf/episodes and /var/vf/pending_tasks. B1 tests that pass the pre-filter (B2 circuit-breaker and B3 failure tests) write competitor_intel_card.json, grounding_intel.json and *_TEMP_*.json into production directories. test_resolve_episodes_dir with ensure_dir=True also targets the production path. Extend the fixture and its fail-closed assertion to both resolvers."
+    },
+    {
+      "component": "Live production behaviour (task objective)",
+      "status": "DEFECT",
+      "analysis": "The KR tick at 23:00 UTC ran pre-HEAD code. It emitted Telegram 736 and 737 within 265 ms and stamped reason=no_candidates_passed_viability despite 1 candidate passing, with no viability_passed_count field. The only post-HEAD run is EN at 05:33:12 UTC (12:33 VN), which is off the cron schedule. It used pid 152506, sent b1_viability::EN for real, and had no command-line or journal provenance attached. No second scheduled tick is shown proving lock_exhausted_today with zero Telegram dispatch (Round 6 final item)."
+    },
+    {
+      "component": "app/main.py",
+      "status": "WARN",
+      "analysis": "Fail-closed Bearer auth with hmac.compare_digest, a rate-limited unset-token log, cached git SHA, and restored list normalization in _apply_notion_gates are correct. Blast radius is unverified: CD deployed this to production. No evidence shows that VF_API_TOKEN is set on the VPS or that n8n and local-agent callers send the header. If it is unset, /v1/chat/completions and call_llm now return 401 in production (Rule 138)."
+    },
+    {
+      "component": "stages/s10_render.py / s11_qc.py",
+      "status": "WARN",
+      "analysis": "Fail-closed partial-clip handling and S9-contract subtitle sourcing are correct. However, the ffprobe re-verification uses `except Exception: is_valid_existing = False` without logging (Rule 139) and calls subprocess without a timeout. S11 narrows its except to (QAGateFailureError, ValueError), which is correct."
+    },
+    {
+      "component": ".gitignore / .gitattributes",
+      "status": "DEFECT",
+      "analysis": ".gitignore now excludes source modules: app/services/agq_*, scripts/agq*, tests/unit/test_agq_fleet.py, scripts/login_acc*.py and scripts/setup_*_profiles.py. These are off-repo modules living in production package paths, which breaks Rule 125 single truth and Rule 126 parity, because the parity hash cannot see them. .gitattributes dropped the explicit `binary` declarations for png/jpg/webp/mp3/mp4/wav/mov and the eol=lf rules for *.ts/*.tsx (Remotion), with no justification."
+    },
+    {
+      "component": "scripts/vps_runner.py",
+      "status": "WARN",
+      "analysis": "Removing the in-source credential defaults is correct. Credential rotation for the previously committed CF Access secret and MCP tokens is still not evidenced (Round 7). The endpoint reprioritization coincides with this round's S05 timeout."
+    },
+    {
+      "component": "CI / Parity / Ghost / ffprobe",
+      "status": "PASS",
+      "analysis": "Run 38856490617 on HEAD 2db27a7 completed with success on all three jobs, and JUnit shows 177/0/0/0 and 67/0/0/0. HEAD, tree and content hash match across Local, VPS and origin, and porcelain is [] on all three. ghost_scan exits 0, including adversarial duplicate-entrypoint detection. The golden ffprobe output is a valid H.264 1080p30 + AAC 48k mono file of 21.48 s. Its waiver as non-task output is accepted."
+    }
+  ],
+  "observations": [
+    "BUNDLED_SCOPE_USER_APPROVAL.md asserts that `grep -rE \"mock|MagicMock|monkeypatch\" tests/vox` 'exits 0' as proof of zero mocks. grep exits 0 only when matches are found, so the stated evidence contradicts the claim it supports. The cited approval ('đồng ý thực thi cả 15 bước') approves 15 remediation steps, not the bundling of AVF-VOX-001, AVF-GOV-001 and the vox/align, planner and gates changes into this range (Rule 124).",
+    "Non-blocking lint (`ruff check app/ scripts/ --exit-zero`) is the systemic reason an undefined name reached production code. Make F821 and F811 blocking repo-wide even if style rules stay advisory.",
+    "Gate exit codes are still computed from shell pipelines without `set -o pipefail`. Every gate in the harness must run under pipefail, or capture PIPESTATUS, before its exit code is trusted.",
+    "The deletion of scripts/orchestrator/run_pipeline.py correctly resolves the dual-entrypoint ghost. Production B3 invocation from trend_engine_b1 still needs proof under the exact cron environment (user, cwd, interpreter, PYTHONPATH from the crontab line), not only `python3 -m` from the repo cwd.",
+    "Several stale docstrings remain, for example test_detects_completed_episode_on_disk still claims it 'auto-heals the lock', which the now-pure read path no longer does. topic_history_registry.load_history assigns pending_dir twice, which silently ignores the PENDING_DIR override and leaves EPISODES_DIR as dead state."
+  ],
+  "adherence_matrix": {
+    "iron_laws_compliance": "DEVIATION (Rules 118, 119, 121, 124, 125, 127, 137, 138, 139)",
+    "four_pillars_status": "PARTIAL (parity, CI success, VPS pytest 125/125 and ghost scan verified; S05 live proof failed, B3 gate masked, post-HEAD cron behaviour unverified)",
+    "zero_ghost_cleanliness": "PARTIAL (ghost_scan exit 0 and duplicate entrypoint removed; gitignored source modules, an undefined name, dead assignments and harness literals remain)"
+  },
+  "audit_file": "C:\\Users\\hunghd2\\Documents\\antigravity\\AI Video Factory\\specs\\boss_audits\\TASK_1792069373_audit_round_8.json"
+}

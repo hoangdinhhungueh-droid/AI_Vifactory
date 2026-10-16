@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import urllib.parse
@@ -30,7 +31,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 try:
     if hasattr(sys.stdout, "reconfigure"):
@@ -145,6 +146,21 @@ def _send_guarded_alert(alert_type: str, market: str, message: str, state_dir: O
         sent = send_telegram_broadcast(full_message)
         if not sent:
             logger.warning(f"[{market}] Telegram broadcast returned falsy for {alert_type}. Rolling back reservation.")
+            try:
+                rollback_alert_reservation(
+                    alert_type,
+                    market,
+                    previous_suppressed=decision.suppressed,
+                    previous_last_sent=decision.previous_last_sent,
+                    state_dir=state_dir,
+                )
+            except Exception as _rb_err:
+                logger.error(f"Failed to rollback alert reservation for {alert_type}: {_rb_err}")
+            return False
+        return True
+    except Exception as _tel_err:
+        logger.error(f"Failed to send {alert_type} alert to Telegram: {_tel_err}")
+        try:
             rollback_alert_reservation(
                 alert_type,
                 market,
@@ -152,17 +168,8 @@ def _send_guarded_alert(alert_type: str, market: str, message: str, state_dir: O
                 previous_last_sent=decision.previous_last_sent,
                 state_dir=state_dir,
             )
-            return False
-        return True
-    except Exception as _tel_err:
-        logger.error(f"Failed to send {alert_type} alert to Telegram: {_tel_err}")
-        rollback_alert_reservation(
-            alert_type,
-            market,
-            previous_suppressed=decision.suppressed,
-            previous_last_sent=decision.previous_last_sent,
-            state_dir=state_dir,
-        )
+        except Exception as _rb_err:
+            logger.error(f"Failed to rollback alert reservation after send failure for {alert_type}: {_rb_err}")
         return False
 
 MARKET_CONFIG = {
@@ -1062,15 +1069,23 @@ def discover_and_produce_market_trend(
     max_b2_attempts: int = MAX_B2_ATTEMPTS_DEFAULT,
     max_viability_llm_evals: int = MAX_VIABILITY_LLM_EVALS_DEFAULT,
     state_dir: Optional[str] = None,
+    **kwargs: Any,
 ) -> list[dict]:
     """Execute canonical B1 trend discovery and automated B1.5 -> B2 -> B3 pipeline
     for exactly 1 topic per market per day.
     """
+    if "auto_commit" in kwargs:
+        auto_produce = bool(kwargs.pop("auto_commit"))
+    if "max_candidates" in kwargs:
+        max_scan_candidates = int(kwargs.pop("max_candidates"))
+
     m_up = (market or "EN").upper()
     now = get_vn_now()
     force_crawl = bool(custom_seed) or os.getenv("B1_FORCE_CRAWL") == "1"
 
-    lock_token: Optional[str] = None
+    import uuid
+    lock_token = uuid.uuid4().hex
+
     if not force_crawl:
         is_done, reason, details = is_market_done_today(m_up, state_dir=state_dir, now=now)
         if is_done:
@@ -1092,8 +1107,6 @@ def discover_and_produce_market_trend(
             return []
 
         # Acquire IN_PROGRESS daily lock immediately to prevent TOCTOU race (Boss Item 13)
-        import uuid
-        lock_token = uuid.uuid4().hex
         acquired = acquire_in_progress(
             m_up, topic_id="", state_dir=state_dir, owner_pid=os.getpid(), lock_token=lock_token, now=now
         )
@@ -1103,6 +1116,12 @@ def discover_and_produce_market_trend(
                 f"Aborting crawl to prevent concurrent runs (Boss Item 13)."
             )
             return []
+    else:
+        # B1_FORCE_CRAWL / custom_seed: acquire forced lock with token ownership (Boss Item 8)
+        acquire_in_progress(
+            m_up, topic_id="", state_dir=state_dir, owner_pid=os.getpid(), lock_token=lock_token, now=now, force=True
+        )
+        logger.info(f"[{m_up}] Forced crawl active: acquired lock with token {lock_token[:8]}")
 
     is_terminal_stamped: bool = False
     try:
@@ -1121,6 +1140,7 @@ def discover_and_produce_market_trend(
                     market=m_up,
                     scan_count=0,
                     state_dir=state_dir,
+                    now=now,
                     extra_metadata={"reason": "no_unhandled_candidates"},
                     lock_token=lock_token,
                     owner_pid=os.getpid(),
@@ -1480,7 +1500,6 @@ def discover_and_produce_market_trend(
                     except OSError as _rm_err:
                         logger.debug(f"[{temp_task_id}] Notice removing temp task file: {_rm_err}")
                 # Clean up temp episode directory to prevent stale cache contamination (Rule 118 & 125)
-                import shutil
                 ep_base = resolve_episodes_dir(ensure_dir=False)
                 t_dir = ep_base / temp_task_id
                 if t_dir.exists():
@@ -1543,7 +1562,6 @@ def discover_and_produce_market_trend(
                     except OSError as _rm_err:
                         logger.debug(f"[{temp_task_id}] Notice removing temp task file: {_rm_err}")
                 # Clean up temp episode directory to prevent stale cache contamination (Rule 118 & 125)
-                import shutil
                 ep_base = resolve_episodes_dir(ensure_dir=False)
                 t_dir = ep_base / temp_task_id
                 if t_dir.exists():
@@ -1637,6 +1655,7 @@ def discover_and_produce_market_trend(
                     else:
                         logger.warning(f"[{m_up}] Failed to stamp EXHAUSTED_TODAY, falling back to release_lock")
                         release_lock(m_up, state_dir=state_dir, lock_token=lock_token, owner_pid=os.getpid(), now=now)
+                        is_terminal_stamped = True
 
                     # B3 failed: Do NOT commit task. Emit exactly ONE terminal failure message with recovery command.
                     fail_msg = (
@@ -1655,6 +1674,12 @@ def discover_and_produce_market_trend(
                             os.remove(temp_task_file)
                         except OSError as _rm_err:
                             logger.debug(f"[{temp_task_id}] Notice cleaning temp pending task: {_rm_err}")
+                    t_dir = ep_base / temp_task_id
+                    if t_dir.exists():
+                        try:
+                            shutil.rmtree(t_dir, ignore_errors=True)
+                        except OSError as _rm_err:
+                            logger.debug(f"[{temp_task_id}] Notice cleaning temp episode dir {t_dir}: {_rm_err}")
                     break
 
             # 9. B3 SUCCEEDED (or auto_produce=False): NOW OFFICIALLY COMMIT TASK ID, SYNC NOTION, MIGRATE ARTIFACTS, & SEND SINGLE HG1 NOTIFICATION!
@@ -1678,7 +1703,6 @@ def discover_and_produce_market_trend(
                 logger.warning(f"[{m_up}] Failed to mark daily lock COMPLETED for {task_id}")
 
             # Migrate episode and pending task artifacts from temp_task_id to canonical task_id
-            import shutil
             ep_base = resolve_episodes_dir(ensure_dir=True)
             try:
                 temp_p = ep_base / temp_task_id

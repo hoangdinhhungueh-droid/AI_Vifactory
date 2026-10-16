@@ -15,7 +15,6 @@ import logging
 import os
 import sys
 import time
-import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,6 +32,13 @@ class LockTimeoutError(TimeoutError):
     """Raised when an inter-process lock cannot be acquired within the timeout window (fail-closed)."""
 
     pass
+
+
+class CooldownReadError(OSError):
+    """Raised when transient I/O or filesystem error prevents reading cooldown data."""
+
+    pass
+
 
 
 class AlertSendDecision:
@@ -132,122 +138,127 @@ def is_pid_alive(pid: int) -> bool:
 
 @contextmanager
 def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: float = 0.05):
-    """Zero-dependency fail-closed cross-platform inter-process lock using O_CREAT | O_EXCL.
-    Writes unique holder token (pid:uuid).
-    Unlinks only if token matches in finally.
+    """Zero-dependency fail-closed cross-platform inter-process advisory lock
+    using fcntl.flock on POSIX and msvcrt.locking on Windows on a persistent .lock file.
+    Eliminates all stale-lock TOCTOU races since the OS kernel automatically releases
+    the advisory lock when the process terminates or crashes.
     Raises LockTimeoutError on timeout (fail-closed).
     """
     lock_file = file_path.with_suffix(file_path.suffix + ".lock")
     lock_file.parent.mkdir(parents=True, exist_ok=True)
-    token = f"{os.getpid()}:{uuid.uuid4().hex}"
     start_time = time.time()
     fd = None
-    acquired = False
 
     while True:
         try:
-            fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_RDWR)
-            try:
-                os.write(fd, token.encode("utf-8"))
-            except Exception:
+            # Step 1: Open/create persistent lock file.
+            # Any PermissionError here is a true filesystem permission fault (fail fast, no spinning)
+            fd = os.open(str(lock_file), os.O_CREAT | os.O_RDWR, 0o644)
+        except PermissionError as perm_err:
+            raise PermissionError(
+                f"Filesystem permission error opening lock file {lock_file}: {perm_err}"
+            ) from perm_err
+        except OSError as os_err:
+            raise OSError(f"OS error opening lock file {lock_file}: {os_err}") from os_err
+
+        # Step 2: Acquire OS advisory lock
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+
+                if os.fstat(fd).st_size == 0:
+                    os.write(fd, b"\0")
+                    os.fsync(fd)
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            # Successfully acquired OS advisory lock
+            payload = f"PID: {os.getpid()}\nACQUIRED: {datetime.now(timezone.utc).isoformat()}\n"
+            os.ftruncate(fd, 0)
+            os.lseek(fd, 0, os.SEEK_SET)
+            os.write(fd, payload.encode("utf-8"))
+            break
+        except (BlockingIOError, PermissionError) as lock_err:
+            if fd is not None:
                 try:
                     os.close(fd)
-                except OSError as close_err:
-                    logger.debug(f"[alert_cooldown] Error closing fd on abort: {close_err}")
+                except OSError as _e:
+                    logger.debug("[alert_cooldown] lock fd close notice: %s", _e)
                 fd = None
-                lock_file.unlink(missing_ok=True)
-                raise
-            acquired = True
-            break
-        except (FileExistsError, PermissionError):
-            now_ts = time.time()
-            # Stale lock check: if lock file age exceeds 30.0s and dead pid
-            try:
-                mtime = os.path.getmtime(lock_file)
-                if now_ts - mtime > 30.0:
-                    try:
-                        with open(lock_file, "r", encoding="utf-8") as rf:
-                            raw = rf.read().strip()
-                        parts = raw.split(":")
-                        dead_pid = False
-                        if parts and parts[0].isdigit():
-                            pid = int(parts[0])
-                            dead_pid = not is_pid_alive(pid)
-                        else:
-                            # Empty or unparseable lock file older than 30.0s is considered dead
-                            dead_pid = True
-                            pid = 0
-
-                        if dead_pid:
-                            # TOCTOU-safe reclaim: atomically rename stale lock_file to unique tombstone
-                            tombstone = lock_file.with_name(f"{lock_file.name}.tombstone.{uuid.uuid4().hex}")
-                            try:
-                                os.rename(str(lock_file), str(tombstone))
-                                # We won the race to reclaim this stale lock
-                                try:
-                                    with open(tombstone, "r", encoding="utf-8") as tf:
-                                        tomb_content = tf.read().strip()
-                                    if tomb_content == raw:
-                                        logger.warning(
-                                            "[alert_cooldown] Reclaimed dead PID %s lock %s via tombstone %s",
-                                            pid, lock_file, tombstone.name,
-                                        )
-                                        os.unlink(str(tombstone))
-                                    else:
-                                        # Content mismatch: another process updated lock between read and rename.
-                                        # Restore lock_file immediately so we do not hijack a live holder's lock (Boss Item 18).
-                                        logger.error(
-                                            "[alert_cooldown] Stale lock mismatch: expected %r, found %r. Restoring lock_file!",
-                                            raw, tomb_content,
-                                        )
-                                        try:
-                                            try:
-                                                os.link(str(tombstone), str(lock_file))
-                                            except (AttributeError, NotImplementedError, OSError) as _link_err:
-                                                if not lock_file.exists():
-                                                    os.replace(str(tombstone), str(lock_file))
-                                                else:
-                                                    logger.debug(f"[alert_cooldown] Target lock_file exists, link avoided clobbering: {_link_err}")
-                                            try:
-                                                os.unlink(str(tombstone))
-                                            except OSError as _t_unl_err:
-                                                logger.debug(f"[alert_cooldown] Notice unlinking tombstone after restore: {_t_unl_err}")
-                                        except OSError as rest_err:
-                                            logger.error("[alert_cooldown] Failed to restore lock_file %s: %s", lock_file, rest_err)
-                                except OSError as t_err:
-                                    logger.warning("[alert_cooldown] Error reading/unlinking tombstone %s: %s", tombstone, t_err)
-                            except (FileNotFoundError, OSError) as ren_err:
-                                logger.debug("[alert_cooldown] Stale lock race on rename %s: %s", lock_file, ren_err)
-                    except OSError as r_err:
-                        logger.warning("[alert_cooldown] Error checking stale lock %s: %s", lock_file, r_err)
-            except OSError as stat_err:
-                logger.warning("[alert_cooldown] Error stating lock file %s: %s", lock_file, stat_err)
 
             if time.time() - start_time >= timeout:
                 raise LockTimeoutError(
-                    f"Timeout acquiring lock for {file_path} after {timeout}s (lock_file={lock_file})"
-                )
+                    f"Timeout acquiring OS lock for {file_path} after {timeout}s (lock_file={lock_file}): {lock_err}"
+                ) from lock_err
             time.sleep(poll_interval)
+        except OSError as os_err:
+            import errno
+            if getattr(os_err, "errno", None) in (errno.EACCES, errno.EAGAIN, errno.EDEADLK, errno.EBUSY):
+                if fd is not None:
+                    try:
+                        os.close(fd)
+                    except OSError as _e:
+                        logger.debug("[alert_cooldown] lock fd close notice: %s", _e)
+                    fd = None
+
+                if time.time() - start_time >= timeout:
+                    raise LockTimeoutError(
+                        f"Timeout acquiring OS lock for {file_path} after {timeout}s (lock_file={lock_file}): {os_err}"
+                    ) from os_err
+                time.sleep(poll_interval)
+            else:
+                if fd is not None:
+                    try:
+                        os.close(fd)
+                    except OSError as _e:
+                        logger.debug("[alert_cooldown] lock fd close notice on write error: %s", _e)
+                    fd = None
+                try:
+                    lock_file.unlink(missing_ok=True)
+                except OSError as _e:
+                    logger.debug("[alert_cooldown] lock unlink notice on write error: %s", _e)
+                raise RuntimeError(f"Unexpected error acquiring lock {lock_file}: {os_err}") from os_err
         except Exception as e:
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError as _e:
+                    logger.debug("[alert_cooldown] lock fd close notice: %s", _e)
+                fd = None
+            try:
+                lock_file.unlink(missing_ok=True)
+            except OSError as _e:
+                logger.debug("[alert_cooldown] lock unlink notice: %s", _e)
             raise RuntimeError(f"Unexpected error acquiring lock {lock_file}: {e}") from e
 
     try:
         yield
     finally:
-        if acquired and fd is not None:
+        if fd is not None:
             try:
+                if sys.platform == "win32":
+                    import msvcrt
+
+                    try:
+                        os.lseek(fd, 0, os.SEEK_SET)
+                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                    except OSError as _e:
+                        logger.debug("[alert_cooldown] win32 unlock notice: %s", _e)
+                else:
+                    import fcntl
+
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_UN)
+                    except OSError as _e:
+                        logger.debug("[alert_cooldown] posix unlock notice: %s", _e)
                 os.close(fd)
             except OSError as close_err:
-                logger.warning(f"[alert_cooldown] Error closing fd {fd} for {lock_file}: {close_err}")
-            # Only unlink if the token matches our token (prevent unlinking someone else's reclaimed lock)
-            try:
-                if lock_file.exists():
-                    with open(lock_file, "r", encoding="utf-8") as rf:
-                        existing_token = rf.read().strip()
-                    if existing_token == token:
-                        os.unlink(lock_file)
-            except OSError as unlink_err:
-                logger.warning(f"[alert_cooldown] Error unlinking lock_file {lock_file}: {unlink_err}")
+                logger.warning(f"[alert_cooldown] Error unlocking/closing fd for {lock_file}: {close_err}")
+
 
 
 def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
@@ -277,7 +288,7 @@ def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
         return {}
     except (IOError, OSError) as io_err:
         logger.warning(f"[alert_cooldown] Transient I/O error reading cooldown file {file_path}: {io_err}")
-        return {}
+        raise CooldownReadError(f"Transient I/O error reading cooldown file {file_path}: {io_err}") from io_err
 
 
 def _write_cooldown_data(file_path: Path, data: Dict[str, Any]) -> None:
@@ -311,7 +322,15 @@ def should_send_alert(
     now_utc = now.astimezone(timezone.utc) if now else datetime.now(timezone.utc)
 
     with _interprocess_lock(cooldown_file):
-        data = _read_cooldown_data(cooldown_file)
+        try:
+            data = _read_cooldown_data(cooldown_file)
+        except CooldownReadError as cre:
+            logger.error(
+                f"[alert_cooldown] Transient read error for {cooldown_file}: {cre}. "
+                "Failing open without persisting state to protect file contents."
+            )
+            return AlertSendDecision(True, 0, "", None)
+
         entry = data.get(key, {})
         last_sent_str = entry.get("last_sent_utc")
         suppressed = int(entry.get("suppressed_since_last", 0))
@@ -340,9 +359,15 @@ def should_send_alert(
                     else:
                         # Pure read-only check: return current suppression count without mutating state
                         return AlertSendDecision(False, suppressed, "", last_sent_str)
-            except Exception as _p_err:
-                logger.error(f"[alert_cooldown] Error parsing timestamp '{last_sent_str}': {_p_err}. Failing closed.")
-                return AlertSendDecision(False, suppressed, "", last_sent_str)
+            except (ValueError, TypeError) as _p_err:
+                logger.error(
+                    f"[alert_cooldown] Corrupt timestamp '{last_sent_str}' for key '{key}': {_p_err}. "
+                    "Quarantining entry field and failing open to preserve operator visibility."
+                )
+                entry["corrupted_last_sent_utc"] = last_sent_str
+                entry.pop("last_sent_utc", None)
+                data[key] = entry
+                _write_cooldown_data(cooldown_file, data)
 
         # Eligible to send!
         suffix = ""
@@ -378,7 +403,15 @@ def rollback_alert_reservation(
     cooldown_file = _resolve_cooldown_file(state_dir)
 
     with _interprocess_lock(cooldown_file):
-        data = _read_cooldown_data(cooldown_file)
+        try:
+            data = _read_cooldown_data(cooldown_file)
+        except CooldownReadError as cre:
+            logger.error(
+                f"[alert_cooldown] Transient read error during rollback for {cooldown_file}: {cre}. "
+                "Skipping persistence to protect file contents."
+            )
+            return False
+
         entry = data.get(key, {})
         current_suppressed = int(entry.get("suppressed_since_last", 0))
         entry["last_sent_utc"] = previous_last_sent

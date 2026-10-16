@@ -15,11 +15,13 @@ UPGRADED 24/08/2026 (v3 - R1):
   - Fast execution & robust seed coverage for JP/KR to prevent timeout and ensure real data pass-through
 """
 
-import os, json, time, urllib.request, urllib.parse, logging, math, re
+import os, json, time, logging, math, re
 from datetime import datetime, timezone
 
+from core.paths import resolve_raw_pool_dir
+
 logger = logging.getLogger(__name__)
-RAW_POOL_DIR = os.environ.get("VF_DB_DIR", "/root/video_factory/db")
+RAW_POOL_DIR = str(resolve_raw_pool_dir())
 
 LOCALE = {"US": ("en", "US"), "EN": ("en", "US"), "JP": ("ja", "JP"), "KR": ("ko", "KR")}
 AC_HL_GL = {"US": ("en", "US"), "EN": ("en", "US"), "JP": ("ja", "JP"), "KR": ("ko", "KR"), "GB": ("en", "GB"), "AU": ("en", "AU"), "CA": ("en", "CA"), "DE": ("de", "DE"), "NZ": ("en", "NZ")}
@@ -91,8 +93,8 @@ def _parse_growth_value(val) -> tuple[int, str]:
             if num >= 5000:
                 return num + 10_000_000, f"+{num}% (Breakout)"
             return num, f"+{num}%"
-        except (ValueError, OverflowError):
-            pass
+        except (ValueError, OverflowError) as _parse_err:
+            logger.debug(f"[virality_score] Notice invalid float parsing '{match.group(1)}': {_parse_err}")
     return 0, val_str or "+0%"
 
 
@@ -666,16 +668,16 @@ def score_pool(day=None):
         try:
             with open(refined_path) as f:
                 refined = json.load(f)
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError) as _read_err:
+            logger.debug(f"[virality_score] Notice unreadable refined pool {refined_path}: {_read_err}")
 
     raw = {}
     if os.path.exists(raw_path):
         try:
             with open(raw_path) as f:
                 raw = json.load(f)
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError) as _read_err:
+            logger.debug(f"[virality_score] Notice unreadable raw pool {raw_path}: {_read_err}")
 
     out = {
         "generated_at": datetime.now(timezone.utc).isoformat(),

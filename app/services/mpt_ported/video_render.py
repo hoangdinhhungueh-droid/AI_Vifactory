@@ -88,8 +88,8 @@ def _clips_signature(clips: list, aspect: str) -> str:
         h.update(str(c).encode())
         try:
             h.update(str(os.path.getmtime(c)).encode())
-        except OSError:
-            pass
+        except OSError as _ex:
+            logger.debug("Clip mtime read error: %s", _ex)
     return h.hexdigest()[:20]
 
 
@@ -462,8 +462,8 @@ async def _concat_clips(clips: list, output_path: str, aspect: str,
                 if acc_is_temp:
                     try:
                         os.remove(acc)
-                    except OSError:
-                        pass
+                    except OSError as _ex:
+                        logger.debug("Temp accumulator remove notice: %s", _ex)
                 acc = step_out
                 acc_is_temp = True
             acc_dur = new_dur
@@ -852,8 +852,8 @@ async def _concat_clips_batched(clips, output_path, aspect, episode_id=None):
     finally:
         try:
             shutil.rmtree(tmp_dir)
-        except Exception:
-            pass
+        except OSError as _ex:
+            logger.debug("Temp dir cleanup notice: %s", _ex)
 
 
 async def derive_aspect_blurpad(src_path, output_path, aspect):

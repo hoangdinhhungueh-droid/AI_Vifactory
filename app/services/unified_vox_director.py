@@ -35,7 +35,6 @@ if str(ROOT_DIR) not in sys.path:
 
 from app.services.prompt_forge import _sanitize_foreground_prompt, _sanitize_background_prompt
 from app.services.sfx_registry import (
-    CANONICAL_SFX_REGISTRY,
     get_canonical_sfx_list,
     is_valid_sfx,
     resolve_semantic_foley
@@ -1930,6 +1929,20 @@ def build_unified_director_plan(
         except Exception as _ex_sh:
             logger.warning("Manifest roster shield warning: %s", _ex_sh)
 
+    key_metrics: List[Any] = []
+    if isinstance(grounding_intel, dict):
+        gt = grounding_intel.get("grounding_table") or []
+        if isinstance(gt, list):
+            for r in gt:
+                if isinstance(r, dict):
+                    p = r.get("parameter") or r.get("metric") or ""
+                    v = r.get("value") or ""
+                    u = r.get("unit") or ""
+                    if p or v:
+                        key_metrics.append(f"{p}: {v} {u}".strip())
+        if not key_metrics and grounding_intel.get("key_figures"):
+            key_metrics.extend([str(x) for x in grounding_intel.get("key_figures", [])[:6]])
+
     scenes = []
     hero_clips = []
     hero_count = 0
@@ -2166,7 +2179,7 @@ def build_unified_director_plan(
             cam_move=cam_move,
             narr=narr,
             mkt=mkt,
-            key_metrics=locals().get('key_metrics', []),
+            key_metrics=key_metrics,
             topic=topic
         )
         scene_obj["virtual_camera"] = cine_data["virtual_camera"]

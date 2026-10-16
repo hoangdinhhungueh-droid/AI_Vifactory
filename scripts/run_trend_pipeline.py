@@ -58,7 +58,7 @@ from app.services.market_scheduler import (
     get_vn_now,
     run_sunday_maintenance,
 )
-from app.services.trend_engine_b1 import discover_and_produce_market_trend
+from app.services.trend_engine_b1 import MAX_B2_ATTEMPTS_DEFAULT, discover_and_produce_market_trend
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("run_trend_pipeline")
@@ -81,6 +81,8 @@ def main():
     is_dry_run = "--dry-run" in args
     force_all = "--force-all-markets" in args
     force_crawl = "--force" in args or "--force-crawl" in args or os.getenv("B1_FORCE_CRAWL") == "1"
+    if force_crawl:
+        os.environ["B1_FORCE_CRAWL"] = "1"
 
     cli_markets = None
     if "--markets" in args:
@@ -96,13 +98,13 @@ def main():
         idx = args.index("--term")
         custom_term = args[idx + 1] if idx + 1 < len(args) else None
 
-    max_b2_attempts = int(os.getenv("MAX_B2_ATTEMPTS_PER_RUN", "1"))
+    max_b2_attempts = int(os.getenv("MAX_B2_ATTEMPTS_PER_RUN", str(MAX_B2_ATTEMPTS_DEFAULT)))
     if "--max-b2-attempts" in args:
         idx = args.index("--max-b2-attempts")
         try:
             max_b2_attempts = int(args[idx + 1])
         except (IndexError, ValueError):
-            max_b2_attempts = 1
+            max_b2_attempts = MAX_B2_ATTEMPTS_DEFAULT
 
     max_candidates = int(os.getenv("MAX_SCAN_CANDIDATES", "10"))
     if "--max-candidates" in args:
@@ -197,28 +199,17 @@ def main():
     else:
         for mkt in markets:
             print(f"\n--- Running Daily Cycle for Market: {mkt} ---")
-            if not force_crawl:
-                is_done, reason, details = is_market_done_today(mkt)
-                if is_done:
-                    topic_name = details.get("topic_id") or details.get("raw_term") or "Existing Episode"
-                    vn_d = details.get("vn_date") or ""
-                    print("=======================================================")
-                    print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {mkt} already produced today!")
-                    print(f"   Reason: {reason} | Topic/Episode: {topic_name} (VN Date: {vn_d})")
-                    print("   SKIPPING CRAWL to protect LLM quota, avoid duplicate videos, and prevent duplicate Telegram alerts.")
-                    print("   (Pass --force or B1_FORCE_CRAWL=1 to override)")
-                    print("=======================================================")
-                    continue
             try:
                 topics = discover_and_produce_market_trend(
                     market=mkt,
                     auto_produce=auto_produce,
                     max_scan_candidates=max_candidates,
-                    max_b2_attempts=max_b2_attempts
+                    max_b2_attempts=max_b2_attempts,
                 )
                 results["approved_topics"].extend(topics)
             except Exception as e:
                 logger.error(f"Error during daily cycle for {mkt}: {e}")
+
 
     # Output session cost telemetry
     try:

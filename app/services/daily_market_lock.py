@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -90,6 +91,40 @@ def _emit_operator_corrupt_alert(lock_path: Path, error_msg: str, market: str, d
         send_telegram_broadcast(alert_text)
     except Exception as e:
         logger.error(f"[daily_market_lock] Failed to emit operator corrupt alert to Telegram: {type(e).__name__}: {e}")
+
+
+HARD_MAX_IN_PROGRESS_AGE_SECONDS = 7200  # 2 hours hard cap (Boss Item 6)
+
+
+def _get_process_start_time(pid: Optional[int] = None) -> float:
+    """Returns start time of process for PID identity verification (PID reuse defense)."""
+    effective_pid = pid or os.getpid()
+    if sys.platform != "win32" and os.path.exists(f"/proc/{effective_pid}"):
+        try:
+            return os.stat(f"/proc/{effective_pid}").st_ctime
+        except OSError as _e:
+            logger.debug("[daily_market_lock] proc stat notice for PID %s: %s", effective_pid, _e)
+    return 0.0
+
+
+def _emit_operator_stale_holder_alert(market: str, date_str: str, pid: int, age_sec: int, ttl_sec: int, state_dir: Optional[str] = None) -> None:
+    """Emits operator alert when acquire_in_progress is refused for a stale-but-'alive' holder (Boss Item 6)."""
+    alert_text = (
+        f"⚠️ <b>[STALE LOCK HOLDER ALERT - RULE 118]</b>\n"
+        f"Market: <b>{market}</b> | VN Date: <b>{date_str}</b>\n"
+        f"Khóa IN_PROGRESS giữ bởi PID <code>{pid}</code> đã vượt TTL ({age_sec}s > {ttl_sec}s).\n"
+        f"Tiến trình giữ khóa vẫn đang chạy (alive); hệ thống từ chối cướp khóa tự động để bảo toàn khế ước.\n"
+        f"🔧 <b>Khắc phục:</b> Kiểm tra tiến trình PID {pid} hoặc giải phóng khóa bằng cờ <code>--force</code>."
+    )
+    logger.warning(alert_text)
+    try:
+        from app.services.alert_cooldown import should_send_alert
+        from app.services.telegram_buttons import send_telegram_broadcast
+        decision = should_send_alert("stale_lock_holder", market, state_dir=state_dir)
+        if decision.can_send:
+            send_telegram_broadcast(alert_text + decision.suffix)
+    except Exception as e:
+        logger.debug(f"[daily_market_lock] Error broadcasting stale holder alert: {e}")
 
 
 def _quarantine_and_seal_corrupt_lock(
@@ -384,10 +419,12 @@ def acquire_in_progress(
     now: Optional[datetime] = None,
     owner_pid: Optional[int] = None,
     lock_token: Optional[str] = None,
+    force: bool = False,
 ) -> bool:
     """Exclusively acquire IN_PROGRESS daily lock for market using atomic creation with content.
     Generates unique lock_token and records owner_pid for holder verification.
     Guarantees mutual exclusion between competing processes.
+    When force=True (e.g. B1_FORCE_CRAWL=1), forcefully acquires the lock under token ownership.
     """
     m_up = _validate_market(market)
     date_str = vn_today(now)
@@ -407,7 +444,13 @@ def acquire_in_progress(
         "created_at_utc": now_utc.isoformat(),
         "updated_at_utc": now_utc.isoformat(),
         "ttl_seconds": ttl_seconds,
+        "process_start_time": _get_process_start_time(pid),
     }
+    if force:
+        payload["forced"] = True
+        atomic_write_json(lock_path, payload)
+        logger.info(f"[daily_market_lock] Forcefully acquired IN_PROGRESS lock for {m_up} on {date_str} (pid={pid}, token={token[:8]})")
+        return True
 
     payload_bytes = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -515,15 +558,30 @@ def acquire_in_progress(
                     c_dt = c_dt.replace(tzinfo=timezone.utc)
                 age = (now_utc - c_dt).total_seconds()
                 rec_ttl = int(existing.get("ttl_seconds", ttl_seconds))
-                if age > rec_ttl:
+                if age > HARD_MAX_IN_PROGRESS_AGE_SECONDS:
+                    # Hard max-age exceeded: unconditionally stale (PID-reuse defense - Boss Item 6)
+                    is_stale_in_progress = True
+                    logger.warning(
+                        f"[daily_market_lock] IN_PROGRESS lock for {m_up} age={int(age)}s exceeds hard max-age "
+                        f"{HARD_MAX_IN_PROGRESS_AGE_SECONDS}s. Forcing stale takeover (PID reuse defense)."
+                    )
+                elif age > rec_ttl:
                     from app.services.alert_cooldown import is_pid_alive
                     ex_pid = existing.get("pid")
-                    if ex_pid and isinstance(ex_pid, int) and is_pid_alive(ex_pid):
+                    ex_start = float(existing.get("process_start_time", 0.0))
+                    curr_start = _get_process_start_time(ex_pid) if ex_pid else 0.0
+
+                    is_same_proc = True
+                    if ex_start > 0 and curr_start > 0 and abs(curr_start - ex_start) > 2.0:
+                        is_same_proc = False
+
+                    if ex_pid and isinstance(ex_pid, int) and is_pid_alive(ex_pid) and is_same_proc:
                         is_stale_in_progress = False
-                        logger.info(
+                        logger.warning(
                             f"[daily_market_lock] IN_PROGRESS lock for {m_up} age={int(age)}s > ttl={rec_ttl}s, "
                             f"but holder PID {ex_pid} is still alive. Refusing stale takeover."
                         )
+                        _emit_operator_stale_holder_alert(m_up, date_str, ex_pid, int(age), rec_ttl, state_dir=state_dir)
                     else:
                         is_stale_in_progress = True
 

@@ -22,12 +22,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import requests as _rq
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app import log_redact  # noqa: F401
 from app.routes.mpt_g5 import router as mpt_g5_router
+from app.s1_score import router as _s1_score_router
 from app.services.artifact_sync import router as _sync_router
 from app.services.episode_images import router as _episode_images_router
 from app.services.preflight_episode import router as _preflight_router
@@ -41,8 +42,8 @@ async def lifespan(app: FastAPI):
     # Security posture check on startup (Rule 121 & Boss Round 4 Item 5)
     token = os.getenv("VF_API_TOKEN", "").strip() or VF_API_TOKEN
     if not token:
-        _logger.critical(
-            "[STARTUP AUDIT] VF_API_TOKEN is unset in environment. Loopback IPC endpoints operating without Bearer token gating."
+        _logger.warning(
+            "[STARTUP AUDIT] VF_API_TOKEN is unset in environment. Requests will fail-closed with 401 Unauthorized unless VF_ALLOW_UNAUTH_LOOPBACK=1 is explicitly configured for local loopback IPC."
         )
     # Telegram inline-button poller startup (Phase 4)
     try:
@@ -119,13 +120,12 @@ def _verify_auth(request: Request) -> None:
     """
     global _last_unset_token_log_time
     token = os.getenv("VF_API_TOKEN", "").strip() or VF_API_TOKEN
+    client_host = getattr(getattr(request, "client", None), "host", "")
+    has_forwarded = bool(request.headers.get("x-forwarded-for") or request.headers.get("cf-connecting-ip"))
+    is_loopback = client_host in ("127.0.0.1", "::1", "localhost") and not has_forwarded
+
     if not token:
-        allow_loopback = (
-            os.getenv("VF_ALLOW_UNAUTH_LOOPBACK") == "1"
-            or os.getenv("ALLOW_UNAUTHENTICATED_LOOPBACK") == "1"
-        )
-        client_host = getattr(getattr(request, "client", None), "host", "")
-        is_loopback = client_host in ("127.0.0.1", "::1", "localhost", "testclient")
+        allow_loopback = os.getenv("VF_ALLOW_UNAUTH_LOOPBACK") == "1"
         now = time.time()
         if now - _last_unset_token_log_time >= 60.0:
             _last_unset_token_log_time = now
@@ -146,7 +146,7 @@ def _verify_auth(request: Request) -> None:
 
     auth_header = request.headers.get("Authorization", "")
     expected = f"Bearer {token}"
-    if not hmac.compare_digest(auth_header, expected):
+    if not hmac.compare_digest(auth_header.encode("utf-8"), expected.encode("utf-8")):
         raise HTTPException(
             status_code=401,
             detail="Unauthorized: invalid or missing Bearer token",
@@ -533,7 +533,8 @@ def oai_models():
 
 # Modular sub-routers for specialized pipeline services (MPT, Trend, Story, Sync)
 app.include_router(mpt_g5_router)
-app.include_router(_trend_gate_router)
+app.include_router(_trend_gate_router, dependencies=[Depends(_verify_auth)])
+app.include_router(_s1_score_router, dependencies=[Depends(_verify_auth)])
 app.include_router(_trend_verify_router)
 app.include_router(_story_check_router)
 app.include_router(_episode_images_router)

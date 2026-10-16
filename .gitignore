@@ -107,5 +107,4 @@ temp_test/
 # Boss audit runtime state and visual audit reports
 specs/boss_audits/.state_*.json
 specs/boss_audits/visual_audit_report.json
-specs/boss_audits/*_audit_round_*.json
 

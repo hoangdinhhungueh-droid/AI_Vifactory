@@ -29,7 +29,9 @@ class RunPaths:
             else:
                 self.repo_root = self.root.parent
         else:
-            clean_id = Path(str(run_id)).name
+            clean_id = str(run_id).strip()
+            if ".." in clean_id or "/" in clean_id or "\\" in clean_id:
+                raise ValueError(f"Path traversal detected in run_id: {run_id!r}")
             self.run_id = clean_id
             if repo_root is not None:
                 self.repo_root = Path(repo_root).resolve()
@@ -37,9 +39,17 @@ class RunPaths:
                 # Anchor to workspace root
                 self.repo_root = Path(__file__).resolve().parent.parent
 
-            # Support both runs/<run_id> and episodes/<run_id> for backward compatibility
-            if self.run_id.startswith("EP_") or "_EP" in self.run_id:
-                self.root = self.repo_root / "episodes" / self.run_id
+            # Support both runs/<run_id> and episodes/<run_id> for backward compatibility.
+            # Route all episodes and temporary candidate runs (*_TEMP_*, TEMP_*) to resolve_episodes_dir().
+            episodes_base = resolve_episodes_dir(repo_root=self.repo_root, ensure_dir=False)
+            if (
+                self.run_id.startswith("EP_")
+                or "_EP" in self.run_id
+                or "_TEMP_" in self.run_id
+                or self.run_id.startswith("TEMP_")
+                or (episodes_base / self.run_id).exists()
+            ):
+                self.root = episodes_base / self.run_id
             else:
                 self.root = self.repo_root / "runs" / self.run_id
 
@@ -157,11 +167,9 @@ def resolve_state_dir(custom_dir: Optional[str] = None, read_only: bool = False)
     if not read_only:
         try:
             repo_fallback.mkdir(parents=True, exist_ok=True)
-        except (PermissionError, OSError):
-            import tempfile
-            tmp_fallback = Path(tempfile.gettempdir()) / "avf_locks"
-            tmp_fallback.mkdir(parents=True, exist_ok=True)
-            return tmp_fallback
+        except (PermissionError, OSError) as e:
+            logger.error(f"[core.paths] Repo lock directory {repo_fallback} unwriteable: {e}")
+            raise IOError(f"Local state directory {repo_fallback} unwriteable (fail-closed): {e}") from e
     return repo_fallback
 
 
@@ -173,7 +181,7 @@ def resolve_topic_history_path(custom_path: Optional[str] = None) -> Path:
     if env_path:
         return Path(env_path)
     state_dir = os.getenv("VF_STATE_DIR") or os.getenv("AVF_STATE_DIR") or os.getenv("VF_LOCK_DIR")
-    if state_dir:
+    if state_dir and ("test" in state_dir.lower() or "PYTEST_CURRENT_TEST" in os.environ):
         return Path(state_dir) / "topic_history.json"
     return Path(__file__).resolve().parent.parent / "data" / "topic_history.json"
 
@@ -229,4 +237,20 @@ def resolve_episodes_dir(
     if ensure_dir:
         p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def resolve_raw_pool_dir(ensure_dir: bool = True) -> Path:
+    """Canonical path resolver for trend discovery RAW_POOL_DIR (Rule 132)."""
+    env_dir = os.getenv("VF_RAW_POOL_DIR") or os.getenv("RAW_POOL_DIR")
+    if env_dir:
+        p = Path(env_dir)
+    elif os.name != "nt" and os.path.isdir("/var/vf/db"):
+        p = Path("/var/vf/db")
+    else:
+        repo_root = Path(__file__).resolve().parent.parent
+        p = repo_root / "db"
+    if ensure_dir:
+        p.mkdir(parents=True, exist_ok=True)
+    return p
+
 

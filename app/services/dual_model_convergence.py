@@ -14,19 +14,16 @@ Implements the Adversarial Targeted Delta-Convergence Protocol (Rule 125 & Rule 
    - Multi-Lingual Length Validity (Rule 120 / text_metrics.py: JP >= 2500 chars, KR >= 2200 chars / 750 words, EN >= 1200 words).
 """
 
-import json
 import logging
-import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
+from app.services.model_gateway import get_global_gateway
 from app.services.text_metrics import (
-    validate_script_length,
     get_script_units,
     get_unit_name,
-    detect_language
+    validate_script_length,
 )
-from app.services.model_gateway import get_global_gateway
 
 logger = logging.getLogger("dual_model_convergence")
 
@@ -108,11 +105,10 @@ def run_dual_model_convergence(
     - Astra acts as Targeted Patcher (rewrites only defective Acts).
     - Opus 5 acts as Pure Forensic Auditor (audits only the delta patch in Round 2+).
     """
-    from app.services.story_fact_auditor_b2 import audit_delta_patched_acts
     import app.services.story_gate as sgate
+    from app.services.story_fact_auditor_b2 import audit_delta_patched_acts
 
     task_id = topic_meta.get("task_id", "UNKNOWN_TASK")
-    topic = topic_meta.get("topic") or topic_meta.get("title_a") or topic_meta.get("raw_term") or task_id
     gateway = get_global_gateway()
     m_up = (market or "EN").strip().upper()
 
@@ -188,10 +184,10 @@ Your mandate is to REWRITE AND PATCH ONLY THE DEFECTIVE ACTS listed below.
 2. Emotional & Cinematic Power: Maintain high dramatic suspense, human stakes, and pattern interrupts. Do NOT let factual corrections make the script dry or clinical.
 3. Narrative Continuity: Ensure the patched Acts seamlessly flow with the untouched Acts.
 4. Native Diction: Natural high-register native phrasing ({m_up}). Zero raw English jargon in JP/KR.
-5. DOCUMENT & EXHIBIT DISCIPLINE (ANTI-HALLUCINATED TITLES - RULE 118):
+5. DOCUMENT & EXHIBIT DISCIPLINE (ANTI-HALLUCINATED TITLES - RULE 118 & RULE 128):
    - When citing internal company documents, slide decks, memos, or court exhibits:
-     STRICTLY FORBIDDEN: Inventing fictitious titles, exhibit labels, or memo numbers in quotation marks (e.g. do NOT invent a slide deck titled "Teen Mental Health Deep Dive" or "Exhibit 42" unless that exact verbatim string exists in the Grounding Table).
-   - Use factual, descriptive attribution anchored in the Grounding Table (e.g., 'internal research presented to Congress', 'company slide presentations detailing user risks', 'court-ordered discovery records').
+     STRICTLY FORBIDDEN: Inventing fictitious titles, exhibit labels, or memo numbers in quotation marks (e.g. do NOT invent a title such as "Internal Strategy Memo" or "Exhibit 42" unless that exact verbatim string exists in the Grounding Table).
+   - Use factual, descriptive attribution anchored in the Grounding Table (e.g., 'internal research presented to regulators', 'company slide presentations detailing risk assessments', 'court-ordered discovery records').
    - Anchor evidence to actual verified entities/dates in the Grounding Table without inventing document titles.
 
 Output ONLY the patched Act(s), formatted with standard headers (e.g. '=== ACT I ===', '=== ACT II ==='):"""

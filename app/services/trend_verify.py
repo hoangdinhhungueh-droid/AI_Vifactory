@@ -33,7 +33,9 @@ HOT_LAST = float(os.getenv("TREND_VERIFY_HOT_LAST", "8"))
 HOT_MOM = float(os.getenv("TREND_VERIFY_HOT_MOM", "1.25"))
 WARM_LAST = float(os.getenv("TREND_VERIFY_WARM_LAST", "3"))
 
-RAW_POOL_DIR = os.getenv("TREND_RAW_POOL_DIR", "/root/video_factory/db")
+from core.paths import resolve_raw_pool_dir
+
+RAW_POOL_DIR = str(resolve_raw_pool_dir())
 
 
 class VerifyReq(BaseModel):

@@ -26,24 +26,90 @@ blocks Gate-1 sending or episode production.
 """
 import os
 
-# --- PATCH: FORCED IPV4 FOR NOTION API ---
-import socket
-_old_getaddrinfo = socket.getaddrinfo
-def _new_getaddrinfo(*args, **kwargs):
-    res = _old_getaddrinfo(*args, **kwargs)
-    return [r for r in res if r[0] == socket.AF_INET]
-socket.getaddrinfo = _new_getaddrinfo
-# ----------------------------------------
+import contextlib
 import json
-import time
 import logging
+import re
+import socket
+import time
 
 logger = logging.getLogger(__name__)
+
+
+@contextlib.contextmanager
+def force_ipv4_dns():
+    """Scoped context manager that temporarily forces IPv4 DNS resolution during Notion API calls only.
+    Restores global socket.getaddrinfo immediately upon exit to prevent process-wide side effects (Rule 125/139).
+    """
+    old_getaddrinfo = socket.getaddrinfo
+
+    def _new_getaddrinfo(*args, **kwargs):
+        res = old_getaddrinfo(*args, **kwargs)
+        return [r for r in res if r[0] == socket.AF_INET] or res
+
+    socket.getaddrinfo = _new_getaddrinfo
+    try:
+        yield
+    finally:
+        socket.getaddrinfo = old_getaddrinfo
 
 PENDING_DIR = "/var/vf/pending_tasks"
 PENDING_CACHE_TTL_HOURS = 24
 STORY_DB_ID = "b0301989-2400-836b-bdb5-8131fea17736"
 NOTION_PAGES_URL = "https://api.notion.com/v1/pages"
+
+
+def sanitize_episode_slug(slug: str) -> str:
+    """Sanitize a topic slug to lowercase snake_case [a-z0-9_]+."""
+    if not slug:
+        return "topic"
+    s = str(slug).strip().lower()
+    s = re.sub(r"[^a-z0-9]+", "_", s)
+    s = s.strip("_")
+    if not s:
+        return "topic"
+    return s[:45].rstrip("_")
+
+
+def get_next_episode_id(market: str = "EN", slug: str = "", offset: int = 0) -> str:
+    """Preview next sequential episode ID for market with format <MARKET>_EP<4digits>_<slug>.
+    Scans both local episodes directory and pending tasks cache to find the highest number.
+    Idempotent: does not write or claim any number until committed.
+    """
+    mkt = str(market or "EN").strip().upper()
+    clean_slug = sanitize_episode_slug(slug)
+    ep_pattern = re.compile(rf"^{re.escape(mkt)}_EP(\d{{4}})_", re.IGNORECASE)
+
+    max_num = 0
+
+    # 1. Scan episodes directory
+    try:
+        from core.paths import resolve_episodes_dir
+        episodes_dir = resolve_episodes_dir(ensure_dir=False)
+        if episodes_dir.exists():
+            for entry in episodes_dir.iterdir():
+                m = ep_pattern.match(entry.name)
+                if m:
+                    max_num = max(max_num, int(m.group(1)))
+    except Exception as _e:
+        logger.debug("[episode_numbering] error scanning episodes dir: %s", _e)
+
+    # 2. Scan pending tasks dir
+    try:
+        if os.path.exists(PENDING_DIR):
+            for fname in os.listdir(PENDING_DIR):
+                if not fname.endswith(".json"):
+                    continue
+                name_without_ext = fname[:-5]
+                m = ep_pattern.match(name_without_ext)
+                if m:
+                    max_num = max(max_num, int(m.group(1)))
+    except Exception as _e:
+        logger.debug("[episode_numbering] error scanning pending tasks: %s", _e)
+
+    next_num = max(1, max_num + 1 + offset)
+    return f"{mkt}_EP{next_num:04d}_{clean_slug}"
+
 
 
 def _pending_path(episode_id: str) -> str:
@@ -86,8 +152,8 @@ def remove_pending_task(episode_id: str) -> bool:
         try:
             os.remove(path)
             removed = True
-        except Exception:
-            pass
+        except OSError as _rm_err:
+            logger.debug(f"[episode_numbering] Notice unlinking pending path {path}: {_rm_err}")
     if os.path.exists(PENDING_DIR):
         for fname in os.listdir(PENDING_DIR):
             if not fname.endswith(".json"):
@@ -101,8 +167,8 @@ def remove_pending_task(episode_id: str) -> bool:
                 try:
                     os.remove(fpath)
                     removed = True
-                except Exception:
-                    pass
+                except OSError as _rm_err:
+                    logger.debug(f"[episode_numbering] Notice unlinking pending fpath {fpath}: {_rm_err}")
     return removed
 
 
@@ -156,15 +222,16 @@ def _write_story_library_row(episode_id: str, market: str, data: dict) -> bool:
             },
             "page_size": 1
         }
-        q_res = httpx.post(f"https://api.notion.com/v1/databases/{STORY_DB_ID}/query", headers=headers, json=q_body, timeout=10.0)
-        if q_res.status_code == 200:
-            results = q_res.json().get("results", [])
-            if results:
-                existing_page_id = results[0]["id"]
-                patch_res = httpx.patch(f"https://api.notion.com/v1/pages/{existing_page_id}", headers=headers, json={"properties": props}, timeout=10.0)
-                if patch_res.status_code in (200, 201):
-                    logger.info("[episode_numbering] UPDATED existing Story Library row %s for %s", existing_page_id, episode_id)
-                    return True
+        with force_ipv4_dns():
+            q_res = httpx.post(f"https://api.notion.com/v1/databases/{STORY_DB_ID}/query", headers=headers, json=q_body, timeout=10.0)
+            if q_res.status_code == 200:
+                results = q_res.json().get("results", [])
+                if results:
+                    existing_page_id = results[0]["id"]
+                    patch_res = httpx.patch(f"https://api.notion.com/v1/pages/{existing_page_id}", headers=headers, json={"properties": props}, timeout=10.0)
+                    if patch_res.status_code in (200, 201):
+                        logger.info("[episode_numbering] UPDATED existing Story Library row %s for %s", existing_page_id, episode_id)
+                        return True
     except Exception as _qe:
         logger.warning("[episode_numbering] query existing check failed %s: %s", episode_id, _qe)
 
@@ -174,7 +241,8 @@ def _write_story_library_row(episode_id: str, market: str, data: dict) -> bool:
         "properties": props,
     }
     try:
-        res = httpx.post(NOTION_PAGES_URL, headers=headers, json=row, timeout=15.0)
+        with force_ipv4_dns():
+            res = httpx.post(NOTION_PAGES_URL, headers=headers, json=row, timeout=15.0)
         if res.status_code in (200, 201):
             logger.info("[episode_numbering] COMMITTED %s to Story Library (delayed increment now claimed)", episode_id)
             return True
@@ -241,8 +309,8 @@ def commit_if_pending(episode_id: str) -> bool:
                     if row_eid.lower() == safe_id.lower() or safe_id.lower() in row_eid.lower():
                         found_file = fpath
                         break
-                except Exception:
-                    pass
+                except (json.JSONDecodeError, OSError) as _read_err:
+                    logger.debug(f"[episode_numbering] Notice unreadable pending json {fpath}: {_read_err}")
         if found_file:
             path = found_file
         else:
@@ -256,8 +324,8 @@ def commit_if_pending(episode_id: str) -> bool:
             logger.warning("[episode_numbering] stale pending task %s (age %.1fh > %dh TTL), removing", episode_id, age_hours, PENDING_CACHE_TTL_HOURS)
             try:
                 os.remove(path)
-            except Exception:
-                pass
+            except OSError as _rm_err:
+                logger.debug(f"[episode_numbering] Notice removing stale pending cache {path}: {_rm_err}")
             return False
         market = data.get("market", "EN")
         resolved_eid = data.get("episode_id") or episode_id
@@ -265,8 +333,8 @@ def commit_if_pending(episode_id: str) -> bool:
         if ok:
             try:
                 os.remove(path)
-            except Exception:
-                pass
+            except OSError as _rm_err:
+                logger.debug(f"[episode_numbering] Notice removing committed pending cache {path}: {_rm_err}")
         return ok
     except Exception as e:
         logger.warning("[episode_numbering] commit_if_pending failed for %s: %s", episode_id, e)

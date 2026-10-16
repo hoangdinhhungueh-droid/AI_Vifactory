@@ -73,6 +73,22 @@ def extract_clean_breakout_queries(rising_queries: list, max_count: int = 5) -> 
                 res.append(q)
     return res[:max_count]
 
+def _matches_any_term(target_text: str, terms: list[str]) -> bool:
+    """Helper to match terms with word boundary for ascii words to avoid false positive substring matches."""
+    for t in terms:
+        t_clean = t.strip().lower()
+        if not t_clean:
+            continue
+        if re.fullmatch(r"[a-z0-9 \-]+", t_clean):
+            pattern = rf"\b{re.escape(t_clean)}\b"
+            if re.search(pattern, target_text):
+                return True
+        else:
+            if t_clean in target_text:
+                return True
+    return False
+
+
 def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str, str]:
     """Detect 4-Tier Content Theme, YouTube Safety Label, and Treatment Note from subject keywords."""
     text = (subject or "").lower()
@@ -84,62 +100,65 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
     history_terms = ['uprising', 'movement', 'occupation', '광주', '민주화', '일제강점기', '한국전쟁', '제주 4.3', '을미사변', 'roman empire', 'byzantine', 'crusade', 'genghis khan', 'mongol', 'ottoman', 'tulip mania']
     tech_terms = ['chip', 'semiconductor', 'asml', 'tsmc', 'huawei', 'nvidia', 'geopolitic', 'supply chain', 'lithography', 'satellite', 'submarine cable', 'rare earth', 'quantum', 'embargo', 'sanction', 'trade war', 'export control', 'trade ban', 'export ban', 'tech ban', 'telecom switch']
     ancient_terms = ['ancient', 'gobekli', 'göbekli', 'younger dryas', 'denisovan', 'megalith', 'clovis', 'prehistoric', 'lost civilization', 'civilization', 'ice age', 'stonehenge', 'sundaland', 'neanderthal', 'australopithecus', 'archaeolog', 'fossil', 'hominid', '잃어버린 문명', '선사시대', '고대 인류', '고대 문명', '縄文', '古代文明', 'ancient humans']
+    stoic_terms = ['stoic', 'stoicism', 'marcus aurelius', 'seneca', 'epictetus', 'musashi', 'dokkodo', '독행도', '스토아', '아우렐리우스', 'burnout', 'mental resilience', 'zen detachment', '번아웃', '孤独の力', '宮本武蔵', '折れない心', '人間関係の疲れ', '내면의 평화', '감정 조절']
+    military_terms = ['military logistics', 'geopolitical choke', 'malacca', 'undersea cable', 'starfish prime', 'supply line', 'airlift', 'defense doctrine', 'strategic blunder', '군사 물류', '지정학', '해저 케이블', '兵站', 'チョークポイント', 'chokepoint', 'blockade']
+    consumer_terms = ["refund", "환불", "교환", "반품", "영수증", "바가지", "no refund", "cancellation fee", "hidden fee", "hidden cost", "fine print", "consumer trap", "소비자 분쟁", "위약금", "단순 변심", "가격표시제", "overcharge", "unilateral clause", "consumer dispute", "subscription trap"]
 
-    if any(t in text for t in truecrime_terms):
+    if _matches_any_term(text, truecrime_terms):
         return (
             "true_crime_investigative",
             "YT-Sensitive-TrueCrime",
             "CASE-SOLVING DOCUMENTARY ONLY: focus strictly on forensic reasoning, investigative breakthrough, institutional failure, and legal accountability; ZERO graphic gore, ZERO method instruction, ZERO victim exploitation, and ZERO killer glorification."
         )
-    elif any(t in text for t in gambling_terms):
+    elif _matches_any_term(text, gambling_terms):
         return (
             "psychology_manipulation_fraud",
             "YT-Gambling-Awareness",
             "GAMBLING AWARENESS ONLY: cautionary educational framing dissecting psychological manipulation traps and regulatory loopholes; ZERO promotion or glamorization of illicit gambling."
         )
-    elif any(t in text for t in fraud_terms):
+    elif _matches_any_term(text, fraud_terms):
         return (
             "business_rise_fall",
             "YT-Fraud-Education",
             "BUSINESS & FRAUD EDUCATION: dissect financial engineering, accounting loopholes, leverage spirals, and executive hubris; strictly educational with verified public records."
         )
-    elif any(t in text for t in societal_terms):
+    elif _matches_any_term(text, societal_terms):
         return (
             "psychology_manipulation_fraud",
             "YT-Societal-Crisis-Documentary",
             "SOCIETAL CRISIS DOCUMENTARY: objective socio-economic analysis of demographic shifts and welfare safety net gaps; empathetic, constructive, and systemic."
         )
-    elif any(t in text for t in tech_terms):
+    elif _matches_any_term(text, tech_terms):
         return (
             "tech_geopolitical_battle",
             "YT-Tech-Geopolitical-Investigation",
             "TECH & GEOPOLITICAL INVESTIGATION: analyze technological chokeholds, semiconductor espionage, state-subsidized dominance, and supply chain warfare with verified industrial and trade records."
         )
-    elif any(t in text for t in ancient_terms):
+    elif _matches_any_term(text, ancient_terms):
         return (
             "ancient_prehistory_anthropology",
             "YT-Educational-Anthropology",
             "PREHISTORIC ANTHROPOLOGY & ANCIENT HUMAN SURVIVAL: forensic deep-dive into fossil evidence, archaeological stratigraphy, and evolutionary mechanics; strictly educational and evidence-grounded."
         )
-    elif bool(re.search(r"\bwar\b", text)) or any(t in text for t in history_terms):
+    elif bool(re.search(r"\bwar\b", text)) or _matches_any_term(text, history_terms):
         return (
             "modern_history_untold",
             "YT-History-Factual-Neutral",
             "FACTUAL HISTORY DOCUMENTARY: objective analysis of institutional decay, economic debasement, and systemic power dynamics backed by historical sources."
         )
-    elif any(t in text for t in ['stoic', 'stoicism', 'marcus aurelius', 'seneca', 'epictetus', 'musashi', 'dokkodo', '독행도', '스토아', '아우렐리우스', 'burnout', 'mental resilience', 'zen detachment', '번아웃', '孤独の力', '宮本武蔵', '折れない心', '人間関係の疲れ', '내면의 평화', '감정 조절']):
+    elif _matches_any_term(text, stoic_terms):
         return (
             "indigenous_philosophy_stoicism",
             "YT-Philosophy-Mindset",
             "INDIGENOUS PHILOSOPHY & CONTEMPLATIVE RESILIENCE: dissect ancient mindset protocols applied to modern institutional burnout; calm, reflective, grounded in primary historical texts."
         )
-    elif any(t in text for t in ['military logistics', 'geopolitical choke', 'malacca', 'undersea cable', 'starfish prime', 'supply line', 'airlift', 'defense doctrine', 'strategic blunder', '군사 물류', '지정학', '해저 케이블', '兵站', 'チョークポイント', 'chokepoint', 'blockade']):
+    elif _matches_any_term(text, military_terms):
         return (
             "military_logistics_geopolitics",
             "YT-Military-Tactical-Investigation",
             "MILITARY LOGISTICS & GEOPOLITICAL CHOKEPOINTS: forensic deconstruction of supply line failures, tactical blunders, and strategic infrastructure chokepoints based on declassified records; ZERO glorification of violence."
         )
-    elif any(t in text for t in ["refund", "환불", "교환", "반품", "영수증", "바가지", "no refund", "cancellation fee", "hidden fee", "hidden cost", "fine print", "consumer trap", "소비자 분쟁", "위약금", "단순 변심", "가격표시제", "overcharge", "unilateral clause", "consumer dispute", "subscription trap"]):
+    elif _matches_any_term(text, consumer_terms):
         return (
             "consumer_injustice_institutional_trap",
             "YT-Consumer-Awareness",
@@ -168,7 +187,7 @@ def _fetch_native_wiki_extract(subject: str, market: str) -> str:
             data = json.loads(resp.read().decode("utf-8"))
             extract = data.get("extract", "")
             if extract:
-                return extract[:1500]
+                return extract[:3000]
     except Exception as e:
         logger.debug(f"[hhtech] Could not fetch native wiki summary for {subject}: {e}")
     return ""

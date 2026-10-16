@@ -1182,8 +1182,8 @@ def build_remotion_props_data(
                 if isinstance(fdata, dict) and isinstance(fdata.get("scenes"), list) and fdata["scenes"]:
                     forge_scenes = fdata["scenes"]
                     break
-            except Exception:
-                pass
+            except (OSError, json.JSONDecodeError, KeyError) as _ex:
+                logger.debug("Forge candidate read error: %s", _ex)
 
     if forge_scenes:
         if not raw_scenes:
@@ -1239,8 +1239,8 @@ def build_remotion_props_data(
                         raw_scenes = cdata["scenes"]
                         logger.info("[build_remotion_props] Recovered %d scenes from %s", len(raw_scenes), candidate_manifest)
                         break
-                except Exception:
-                    pass
+                except (OSError, json.JSONDecodeError, KeyError) as _ex:
+                    logger.debug("Candidate manifest read error: %s", _ex)
 
     total_scenes = len(raw_scenes)
     scenes_out = []
@@ -1261,14 +1261,14 @@ def build_remotion_props_data(
                 distinct_raw_beats.add(_bv)
             if _bv > max_raw_beat_idx:
                 max_raw_beat_idx = _bv
-        except Exception:
-            pass
+        except (ValueError, TypeError, AttributeError) as _ex:
+            logger.debug("Beat index parse notice: %s", _ex)
         try:
             _pv = int(str(_rs.get("beat_phase") or _rs.get("act_beat") or 0).replace("Beat", "").strip())
             if _pv > 0:
                 distinct_phase_beats.add(_pv)
-        except Exception:
-            pass
+        except (ValueError, TypeError, AttributeError) as _ex:
+            logger.debug("Beat phase parse notice: %s", _ex)
     beat_index_is_sentence_seq = (max_raw_beat_idx > 5) or (len(raw_scenes) >= 5 and len(distinct_raw_beats) <= 1)
     beat_phase_is_degenerate = (len(raw_scenes) >= 5 and len(distinct_phase_beats) <= 1 and max(distinct_phase_beats, default=0) <= 1)
 
@@ -1418,8 +1418,8 @@ def build_remotion_props_data(
                 b_val = int(str(explicit_beat).replace("Beat", "").strip())
                 if 1 <= b_val <= 5:
                     beat_idx = b_val
-            except Exception:
-                pass
+            except (ValueError, TypeError, AttributeError) as _ex:
+                logger.debug("Explicit beat parse notice: %s", _ex)
 
         if beat_idx is None:
             beat_idx = 1 if i <= int(total_scenes * 0.15) else (

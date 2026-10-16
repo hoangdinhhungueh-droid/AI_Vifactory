@@ -40,6 +40,7 @@ def _build_client_for_market(market="en"):
       - JP/KR: tries YT_OAUTH_{KEY}_JP/_KR first, then shared YT_OAUTH_{KEY}
       - EN: uses legacy keys (same as _build_client())
     """
+    _load_env()
     m = (market or "en").lower().strip()
     su = m.upper()
 
@@ -173,8 +174,8 @@ def upload_from_payload_market(market, episode_dir,
         from app.services import rate_risk_controller
         vid = response.get("id") if isinstance(response, dict) else None
         rate_risk_controller.record_upload(platform, vid or "")
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug("[youtube_upload] rate_risk_controller record notice: %s", _ex)
 
     try:
         vid = response.get("id") if isinstance(response, dict) else None
@@ -182,7 +183,7 @@ def upload_from_payload_market(market, episode_dir,
             publish_ledger.record_upload(
                 vid, payload.get("title", ""), episode_dir, resolved_privacy
             )
-    except Exception:
-        pass
+    except Exception as _ex:
+        logger.debug("[youtube_upload] publish_ledger record notice: %s", _ex)
 
     return response

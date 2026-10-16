@@ -42,7 +42,7 @@ jobs:
         run: |
           ruff check vox/ tools/ tests/vox/ app/main.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/runner.py
           ruff check --select F821,F811 app/ scripts/ stages/ vox/ core/ tools/
-          ruff check app/ scripts/ --exit-zero
+          ruff check --select F821,F811,F401 app/main.py app/s1_score.py app/services/alert_cooldown.py app/services/daily_market_lock.py app/services/dual_model_convergence.py app/services/episode_numbering.py app/services/trend_brain_mirror.py app/services/trend_engine_b1.py app/services/trend_gate_ai.py app/services/trend_verify.py app/services/unified_vox_director.py app/services/virality_score.py core/paths.py scripts/run_trend_pipeline.py scripts/orchestrator/audit_b2_b3_assets.py scripts/orchestrator/boss_orchestrator.py
 
       - name: Static compilation check (Rule 127)
         run: python -m compileall -q scripts tools vox app tests
@@ -59,6 +59,7 @@ jobs:
       - name: Hermetic Unit, Codemap & Adversarial Test Suite (Rule 121 & Rule 125 JUnit Zero-Skip Gate)
         shell: bash
         run: |
+          set -eo pipefail
           pytest -m "not integration" -v -rA --junitxml=/tmp/junit_unit.xml tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py tests/test_paths.py tests/test_config.py tests/test_gates_manifest.py
           python -c "
           import xml.etree.ElementTree as ET, sys

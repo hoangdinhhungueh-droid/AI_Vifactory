@@ -184,7 +184,8 @@ def get_and_increment_audit_round(ep_dir: Path) -> int:
         try:
             data = json.loads(state_file.read_text(encoding="utf-8"))
             round_num = int(data.get("round", 0)) + 1
-        except Exception:
+        except (OSError, json.JSONDecodeError, ValueError) as _rd_err:
+            logger.warning("Notice reading audit_round_state.json for %s, initializing round 1: %s", ep_dir, _rd_err)
             round_num = 1
     state_file.write_text(json.dumps({"round": round_num, "updated_at": time.time()}, indent=2), encoding="utf-8")
     return round_num
@@ -572,8 +573,8 @@ Return a structured adversarial audit report.
     local_report = ROOT_DIR / "b2_b3_opus_astra_audit.md"
     try:
         local_report.write_text(report_content, encoding="utf-8")
-    except Exception:
-        pass
+    except OSError as _ex:
+        logger.debug("Failed writing local audit copy to %s: %s", local_report, _ex)
 
     logger.info("Saved audit report to %s and %s", report_path, local_report)
     return {
@@ -598,9 +599,14 @@ def main():
         logger.error("No --episode specified and EPISODE_ID env var not set.")
         sys.exit(1)
 
-    ep_dir = Path(args.ep_dir) if args.ep_dir else Path(f"/var/vf/episodes/{args.episode}")
-    if not ep_dir.exists():
-        ep_dir = ROOT_DIR / "workspace" / args.episode
+    if args.ep_dir:
+        ep_dir = Path(args.ep_dir)
+    else:
+        from core.paths import resolve_episodes_dir
+        ep_base = resolve_episodes_dir(ensure_dir=False)
+        ep_dir = ep_base / args.episode
+        if not ep_dir.exists():
+            ep_dir = ROOT_DIR / "workspace" / args.episode
     if not ep_dir.exists():
         logger.error("Episode directory does not exist: %s", ep_dir)
         sys.exit(1)

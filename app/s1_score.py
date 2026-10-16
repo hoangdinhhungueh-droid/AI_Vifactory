@@ -6,11 +6,18 @@
 #   (P0) require a REAL trend signal (serpapi/pytrends) to PASS — no silent NEUTRAL pass
 #   (P1) trend via app.services.trend_signals.trend_meta (serpapi -> pytrends -> neutral, cached)
 #   (P2) cooldown/novelty penalty via scoring_history so 1 keyword can't dominate for a week
-import os, json, logging
+import hmac
+import json
+import logging
+import os
 from datetime import datetime, timezone
+
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
-import psycopg2
 from app.services.telegram_buttons import send_telegram_broadcast
 
 logger = logging.getLogger(__name__)
@@ -91,7 +98,7 @@ def _trend_meta(niche, market):
 def _recent_passed_niches(cooldown_days=COOLDOWN_DAYS):
     """Distinct niches that recently passed (anti-repeat). Best-effort; never crash."""
     url = os.getenv("DATABASE_URL")
-    if not url:
+    if not url or psycopg2 is None:
         return set()
     try:
         with psycopg2.connect(url) as conn:
@@ -120,8 +127,8 @@ def _recent_passed_niches(cooldown_days=COOLDOWN_DAYS):
 def _persist(rows):
     """Best-effort insert vao scoring_history — runtime column mapping, khong crash vi lech schema."""
     url = os.getenv("DATABASE_URL")
-    if not url:
-        return "skipped: DATABASE_URL not set"
+    if not url or psycopg2 is None:
+        return "skipped: DATABASE_URL not set or psycopg2 missing"
     try:
         with psycopg2.connect(url) as conn:
             with conn.cursor() as cur:
@@ -222,9 +229,11 @@ async def pipeline_run(request: Request):
         body = await request.json()
     except Exception:
         body = {}
-    expected = os.getenv("PIPELINE_API_KEY", "")
-    if expected and request.headers.get("X-API-Key", "") != expected:
-        return {"status": "denied", "reason": "bad X-API-Key"}
+    expected = os.getenv("PIPELINE_API_KEY", "").strip()
+    if expected:
+        provided = request.headers.get("X-API-Key", "").strip()
+        if not hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8")):
+            return {"status": "denied", "reason": "bad X-API-Key"}
     stage = str(body.get("stage") or "S1").upper()
     if stage != "S1":
         return {"status": "not_implemented", "stage": stage,

@@ -1,24 +1,3 @@
-import re
-
-try:
-    from app.services.episode_numbering import get_next_episode_id, sanitize_episode_slug
-except (ImportError, AttributeError):
-    def sanitize_episode_slug(slug: str) -> str:
-        """Sanitize a topic slug to lowercase snake_case [a-z0-9_]+."""
-        if not slug:
-            return "topic"
-        s = str(slug).strip().lower()
-        s = re.sub(r'[^a-z0-9]+', '_', s)
-        s = s.strip('_')
-        if not s:
-            return "topic"
-        return s[:45].rstrip('_')
-
-    def get_next_episode_id(market: str = "EN", slug: str = "", offset: int = 0) -> str:
-        """Fallback episode ID generator if episode_numbering is unavailable."""
-        clean = sanitize_episode_slug(slug)
-        return f"{str(market or 'EN').strip().upper()}_EP0001_{clean}"
-
 # app/services/trend_gate_ai.py - "Notion AI is the crawl brain" architecture (26/07/2026).
 #
 # WHY: combining SerpApi + Google Trends + evergreen + wiki spikes inside Python was
@@ -58,20 +37,14 @@ except (ImportError, AttributeError):
 # stay inside the 250/month free quota with the wider fan-out. Free-lane per-geo calls
 # (gtrends_daily / youtube_autocomplete / google_autocomplete) are spaced with a small
 # sleep between geos to reduce rate-limit risk on Google's unofficial endpoints.
-import os
-
-# --- PATCH: FORCED IPV4 FOR NOTION API ---
-import socket
-_old_getaddrinfo = socket.getaddrinfo
-def _new_getaddrinfo(*args, **kwargs):
-    res = _old_getaddrinfo(*args, **kwargs)
-    return [r for r in res if r[0] == socket.AF_INET]
-socket.getaddrinfo = _new_getaddrinfo
-# ----------------------------------------
 import json
 import logging
+import os
+import re
 import time
 from datetime import datetime, timezone
+
+from core.paths import resolve_raw_pool_dir
 
 logger = logging.getLogger("trend_gate_ai")
 try:
@@ -87,7 +60,7 @@ except ImportError:
     router = _DummyRouter()
     BaseModel = object
 
-RAW_POOL_DIR = "/root/video_factory/db"
+RAW_POOL_DIR = str(resolve_raw_pool_dir())
 DEFAULT_MARKETS = [m.strip().upper() for m in
                    os.getenv("DISCOVERY_V5_MARKETS", "EN,JP,KR").split(",") if m.strip()]
 SERP_GEO = {"US": "US", "JP": "JP", "KR": "KR", "GB": "GB", "AU": "AU", "CA": "CA",
@@ -182,8 +155,8 @@ def _committed_today(day):
                 for it in (rec.get("items") or []):
                     mk = (it.get("market") or "US").upper()
                     counts[mk] = counts.get(mk, 0) + 1
-    except Exception:
-        pass
+    except (OSError, json.JSONDecodeError) as _ex:
+        logger.debug("[gate-ai] commits read notice for %s: %s", day, _ex)
     return counts
 
 
@@ -474,8 +447,8 @@ def collect_raw_pool(markets=None, pool=20, lanes=None):
     try:
         from app.services import serp_budget
         out["serp_budget"] = getattr(serp_budget, "read_budget", lambda: None)()
-    except Exception:
-        pass
+    except (ImportError, OSError, ValueError) as _ex:
+        logger.debug("[gate-ai] serp budget read notice: %s", _ex)
     return out
 
 
@@ -578,8 +551,8 @@ def trend_commit(req: TrendCommitRequest):
                 msg.append("\u27a1\ufe0f Buoc tiep: mo Notion AI va go: \"sinh story cho "
                            + pick + "\"")
             _send_telegram("\n".join(msg))
-        except Exception:
-            pass
+        except Exception as _ex:
+            logger.debug("[gate-ai] telegram broadcast notice: %s", _ex)
     return {"status": "ok", "saved": saved, "by_source": by_source,
             "received": len(req.items or []), "day": day,
             "dropped": dropped, "daily_cap": GATE_DAILY_CAP,
@@ -622,9 +595,9 @@ def trend_virality(req: TrendViralityRequest):
     approved_topics = []
     by_market = {}
 
-    for m in ["EN", "JP", "KR"]:
+    for m in (req.markets or ["EN", "JP", "KR"]):
         try:
-            topics = discover_approach_b(market=m, max_candidates=1, auto_commit=True)
+            topics = discover_approach_b(market=m, auto_produce=bool(req.auto_commit), max_scan_candidates=req.max_candidates)
             if topics:
                 approved_topics.extend(topics)
                 by_market[m] = topics[0]
@@ -658,7 +631,8 @@ def trend_virality(req: TrendViralityRequest):
                     asyncio.create_task(tb.send_gate1_card(en_p, jp_p, kr_p))
                 else:
                     loop.run_until_complete(tb.send_gate1_card(en_p, jp_p, kr_p))
-            except Exception:
+            except Exception as _e_loop:
+                logger.debug("Loop run_until_complete notice, falling back to asyncio.run: %s", _e_loop)
                 asyncio.run(tb.send_gate1_card(en_p, jp_p, kr_p))
         except Exception as te:
             logger.warning(f"[trend-virality] Telegram notify error: {te}")

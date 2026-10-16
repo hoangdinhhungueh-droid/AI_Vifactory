@@ -104,3 +104,33 @@ def test_theme_empty_and_none_input():
     theme2, label2, note2 = detect_safety_and_theme(None, "EN")
     assert theme2 == "business_rise_fall"
     assert label2 == "YT-Safe-Standard"
+
+
+def test_theme_word_boundary_negative_cases():
+    """Boss Round 9 Item 9: Negative tests proving word-boundary regex prevents substring false positives."""
+    # 'chip' must not match 'relationship' or 'championship'
+    theme_rel, label_rel, _ = detect_safety_and_theme("Healthy Interpersonal Relationship Advice", "EN")
+    assert theme_rel != "tech_geopolitical_battle"
+    assert theme_rel == "business_rise_fall"
+
+    theme_champ, _, _ = detect_safety_and_theme("World Chess Championship Tournament", "EN")
+    assert theme_champ != "tech_geopolitical_battle"
+
+    # 'war' must not match 'warning', 'forward', 'hardware', or 'software'
+    theme_warn, _, _ = detect_safety_and_theme("Software System Warning Analysis", "EN")
+    assert theme_warn != "modern_history_untold"
+
+    theme_fwd, _, _ = detect_safety_and_theme("Forward Looking Corporate Strategy", "EN")
+    assert theme_fwd != "modern_history_untold"
+
+    # 'sanction' must not match 'distinction'
+    theme_dist, _, _ = detect_safety_and_theme("Academic Distinction and Award", "EN")
+    assert theme_dist != "tech_geopolitical_battle"
+
+    # Positive confirmation: actual chip or war should match
+    theme_chip, _, _ = detect_safety_and_theme("Global Silicon Chip Supply Shortage", "EN")
+    assert theme_chip == "tech_geopolitical_battle"
+
+    theme_war, _, _ = detect_safety_and_theme("Historical Proxy War Tactics", "EN")
+    assert theme_war == "modern_history_untold"
+

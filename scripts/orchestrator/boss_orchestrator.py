@@ -177,9 +177,10 @@ def call_hhtech_llm(
                             logger.debug(f"Stream chunk parse notice: {_chunk_err}")
                 content = "".join(full_chunks).strip()
                 latency = round(time.time() - start_ts, 2)
-                logger.info(f"HHTech API response HTTP 200 OK ({latency}s) — Content length: {len(content)} chars")
+                logger.info(f"HHTech API response HTTP {resp.status_code} ({latency}s) — Content length: {len(content)} chars")
                 return {
                     "success": True,
+                    "status_code": resp.status_code,
                     "model": model,
                     "content": content,
                     "latency_sec": latency,
@@ -201,9 +202,10 @@ def call_hhtech_llm(
             data = json.loads(raw)
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             usage = data.get("usage", {})
-            logger.info(f"HHTech API response HTTP 200 OK ({latency}s) — Total Tokens: {usage.get('total_tokens', 'N/A')}")
+            logger.info(f"HHTech API response HTTP {response.status} ({latency}s) — Total Tokens: {usage.get('total_tokens', 'N/A')}")
             return {
                 "success": True,
+                "status_code": response.status,
                 "model": model,
                 "content": content.strip(),
                 "latency_sec": latency,
@@ -321,7 +323,7 @@ def run_phase_plan(task_description: str, task_id: Optional[str] = None, dry_run
         f"# 👔 CLAUDE OPUS 5.5 IMPLEMENTATION PLAN (AUTHENTICATED)\n"
         f"> **Forensic Provenance & Telemetry (Rule 118 & Rule 121)**:\n"
         f"> - **Task ID**: `{effective_task_id}`\n"
-        f"> - **Architect Model**: `{result.get('model', DEFAULT_BOSS_MODEL)}` (Live HHTech API HTTP 200 OK)\n"
+        f"> - **Architect Model**: `{result.get('model', DEFAULT_BOSS_MODEL)}` (HTTP {result.get('status_code', 200)} | Latency: {result.get('latency_sec', 0.0)}s | Tokens: {tokens_est})\n"
         f"> - **Latency**: `{result.get('latency_sec', 0.0)}s`\n"
         f"> - **Tokens Total Estimate**: `{tokens_est}`\n"
         f"> - **Recommended Venue**: `{venue_analysis['recommended_venue']}`\n"
@@ -335,6 +337,7 @@ def run_phase_plan(task_description: str, task_id: Optional[str] = None, dry_run
 
     return {
         "status": "success",
+        "status_code": result.get("status_code", 200),
         "task_id": effective_task_id,
         "planner_model": result["model"],
         "latency_sec": result.get("latency_sec", 0.0),
@@ -1281,11 +1284,14 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "PYTHONPATH=/root/video_factory /root/video_factory/venv/bin/python3 -m orchestrator.run_pipeline --help"
         "\""
     )
+    code_b3_handoff, out_b3_handoff = run_on_vps(
+        "cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_b3_handoff_contract.py tests/unit/test_api_auth_gating.py -v"
+    )
     code_neighbor, out_neighbor = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 tests/ci_neighbor_tester.py")
     code_dryrun, out_dryrun = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 scripts/run_trend_pipeline.py --market EN --dry-run")
     code_cron_cmd, out_cron_cmd = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 scripts/run_trend_pipeline.py --help")
     code_ghost, out_ghost = run_on_vps("cd /root/video_factory && python3 tools/ghost_scan.py")
-    code_tests = 0 if (code_pytest_unit == 0 and code_s05_live == 0 and code_b3_live == 0 and code_neighbor == 0 and code_ghost == 0 and code_dryrun == 0 and code_cron_cmd == 0) else 1
+    code_tests = 0 if (code_pytest_unit == 0 and code_s05_live == 0 and code_b3_live == 0 and code_b3_handoff == 0 and code_neighbor == 0 and code_ghost == 0 and code_dryrun == 0 and code_cron_cmd == 0) else 1
 
     evidence_blocks.append(
         f"### [5. RUNTIME TEST SUITES ON VPS (Rule 127 & Boss Items 21, 25)]\n"
@@ -1294,6 +1300,8 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         f"S05 Live Execution Exit Code: {code_s05_live}\n{out_s05_live}\n\n"
         f"--- B3 DOWNSTREAM PIPELINE SPEC & HELP RESOLUTION (Boss Item 6 & 14) ---\n"
         f"B3 Resolution Exit Code: {code_b3_live}\n{out_b3_live}\n\n"
+        f"--- B1-B3 PRODUCER-CONSUMER HANDOFF & API AUTH CONTRACT TESTS (Boss Item 3 & 11) ---\n"
+        f"B3 Handoff & Auth Exit Code: {code_b3_handoff}\n{out_b3_handoff}\n\n"
         f"--- EXACT CRONTAB LINE EXECUTION ON VPS (Boss Item 14) ---\n"
         f"Crontab Line (--help) Exit Code: {code_cron_cmd}\n{out_cron_cmd}\n\n"
         f"tests/ci_neighbor_tester.py Exit Code: {code_neighbor}\n{out_neighbor}\n\n"
@@ -1539,6 +1547,8 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "    'defects': defects\n"
         "}\n"
         "print(json.dumps(report, indent=2))\n"
+        "import sys\n"
+        "sys.exit(1 if defects else 0)\n"
         "\""
     )
     evidence_blocks.append(
@@ -1561,6 +1571,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "pytest_code": code_tests,
         "smoke_gate_code": "WAIVED",
         "ffprobe_code": "WAIVED",
+        "ocr_code": code_ocr,
     }
 
 
@@ -2114,7 +2125,7 @@ def main():
             print("👔 CLAUDE OPUS 5.5 MASTER ARCHITECTURAL PLAN (VERIFIED LIVE)")
             print("=" * 70)
             print(f"Task ID:             {res['task_id']}")
-            print(f"Architect Model:     {res['planner_model']} (HHTech API HTTP 200 OK)")
+            print(f"Architect Model:     {res['planner_model']} (HHTech API HTTP {res.get('status_code', 200)} OK)")
             print(f"Latency:             {res['latency_sec']}s")
             print(f"Tokens Estimate:     {res.get('tokens_estimate', 'N/A')}")
             print(f"Recommended Venue:   {res['venue_analysis']['recommended_venue']}")
