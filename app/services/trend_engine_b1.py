@@ -36,10 +36,7 @@ from typing import Optional
 _PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
-from core.paths import (
-    resolve_episodes_dir,
-    resolve_pending_tasks_dir,
-)
+
 from app.services.alert_cooldown import (
     rollback_alert_reservation,
     should_send_alert,
@@ -65,6 +62,10 @@ from app.services.trend_free_signals import (
     gtrends_daily_rss,
     gtrends_discover_trending_searches,
     youtube_autocomplete,
+)
+from core.paths import (
+    resolve_episodes_dir,
+    resolve_pending_tasks_dir,
 )
 
 logger = logging.getLogger("trend_engine_b1")
@@ -1106,6 +1107,18 @@ def discover_and_produce_market_trend(
         candidates = fetch_live_trending_terms(m_up, custom_seed=custom_seed)
         if not candidates:
             logger.warning(f"[{m_up}] No unhandled candidates found.")
+            if not custom_seed:
+                mark_ok = mark_exhausted_today(
+                    market=m_up,
+                    scan_count=0,
+                    state_dir=state_dir,
+                    extra_metadata={"reason": "no_unhandled_candidates"},
+                    lock_token=lock_token,
+                    owner_pid=os.getpid(),
+                )
+                if mark_ok:
+                    is_terminal_stamped = True
+                    logger.info(f"[{m_up}] Stamped EXHAUSTED_TODAY lock: no unhandled candidates")
             return []
 
         produced_topics = []
@@ -1188,6 +1201,17 @@ def discover_and_produce_market_trend(
                     )
                     print(f"\n{circuit_alert}\n")
                     logger.critical(f"[{m_up}] Rule 118 Circuit Breaker triggered after {consecutive_api_errors} consecutive LLM failures.")
+                    if not custom_seed:
+                        mark_ok = mark_exhausted_today(
+                            market=m_up,
+                            scan_count=idx,
+                            state_dir=state_dir,
+                            extra_metadata={"reason": "rule_118_circuit_breaker", "consecutive_api_errors": consecutive_api_errors},
+                            lock_token=lock_token,
+                            owner_pid=os.getpid(),
+                        )
+                        if mark_ok:
+                            is_terminal_stamped = True
                     _send_guarded_alert("rule_118_circuit_breaker", m_up, circuit_alert, state_dir=state_dir)
                     terminal_alert_sent = True
                     break
@@ -1455,6 +1479,17 @@ def discover_and_produce_market_trend(
                     )
                     print(f"\n{cb_msg}\n")
                     logger.critical(f"[{m_up}] B2 Circuit Breaker triggered after {b2_attempts_count} candidate attempts.")
+                    if not custom_seed:
+                        mark_ok = mark_exhausted_today(
+                            market=m_up,
+                            scan_count=idx,
+                            state_dir=state_dir,
+                            extra_metadata={"reason": "b2_circuit_breaker", "b2_attempts_count": b2_attempts_count},
+                            lock_token=lock_token,
+                            owner_pid=os.getpid(),
+                        )
+                        if mark_ok:
+                            is_terminal_stamped = True
                     _send_guarded_alert("b2_circuit_breaker", m_up, cb_msg, state_dir=state_dir)
                     terminal_alert_sent = True
                     break
@@ -1504,6 +1539,17 @@ def discover_and_produce_market_trend(
                     )
                     print(f"\n{cb_msg}\n")
                     logger.critical(f"[{m_up}] B2 Circuit Breaker triggered after {b2_attempts_count} candidate attempts.")
+                    if not custom_seed:
+                        mark_ok = mark_exhausted_today(
+                            market=m_up,
+                            scan_count=idx,
+                            state_dir=state_dir,
+                            extra_metadata={"reason": "b2_circuit_breaker", "b2_attempts_count": b2_attempts_count},
+                            lock_token=lock_token,
+                            owner_pid=os.getpid(),
+                        )
+                        if mark_ok:
+                            is_terminal_stamped = True
                     _send_guarded_alert("b2_circuit_breaker", m_up, cb_msg, state_dir=state_dir)
                     terminal_alert_sent = True
                     break
@@ -1526,7 +1572,7 @@ def discover_and_produce_market_trend(
                 cmd = [
                     sys.executable,
                     "-m",
-                    "scripts.orchestrator.run_pipeline",
+                    "orchestrator.run_pipeline",
                     "--profile",
                     "prod",
                     "--run-id",
