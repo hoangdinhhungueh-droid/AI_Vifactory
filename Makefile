@@ -31,8 +31,7 @@ test:
 	$(PYTEST) -m "not integration" -v tests/
 
 lint:
-	$(RUFF) check vox/ tools/ tests/vox/ app/main.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/runner.py
-	$(RUFF) check app/ scripts/ --exit-zero
+	$(RUFF) check vox/ tools/ tests/vox/ tests/unit/test_trend_caps_and_gates.py tests/test_ghost_scan_adversarial.py app/main.py app/services/artifact_sync.py app/services/director_planner_b3.py app/services/seo_package_forge.py app/services/trend_engine_b1.py app/services/daily_market_lock.py app/services/alert_cooldown.py scripts/vf_insight_cards.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/hhtech_planner.py scripts/orchestrator/memory_governor.py scripts/orchestrator/opus55_supervisor_gate.py scripts/orchestrator/runner.py stages/s05_director_plan.py stages/s10_render.py stages/s11_qc.py tests/unit/test_s05_director_plan.py tests/unit/test_s10_render.py tests/unit/test_s11_qc_gate.py scripts/forensics/visual_audit.py tests/unit/test_visual_audit.py tests/unit/test_daily_market_lock.py tests/unit/test_alert_cooldown.py tests/unit/test_b1_daily_guard_integration.py tests/unit/test_corrupt_retention_policy.py tests/vox/test_rule_131_and_136.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py tests/unit/test_atomic_io.py tests/unit/test_align_adversarial.py core/atomic_io.py core/paths.py
 	$(PYTEST) -v tests/test_zero_semantic_bias.py
 
 review:

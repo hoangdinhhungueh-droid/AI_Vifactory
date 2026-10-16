@@ -420,9 +420,9 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_git_status_inv, out_git_status_inv = run_on_vps("git -C /root/video_factory status --porcelain legacy_inventory.json")
     code_ghost_ls, out_ghost_ls = run_on_vps("git -C /root/video_factory ls-tree HEAD tools/ghost_scan.py")
     code_inv_tracked, out_inv_tracked = run_on_vps("git -C /root/video_factory ls-files legacy_inventory.json")
-    code_ghost_live, out_ghost_live = run_on_vps("python3 /root/video_factory/tools/ghost_scan.py; echo EXIT=$?")
+    code_ghost_live, out_ghost_live = run_on_vps("python3 /root/video_factory/tools/ghost_scan.py")
     code_quarantine_dirs, out_quarantine_dirs = run_on_vps("ls -la /root/video_factory/archive /root/video_factory/.trash /root/video_factory/.safe_trash /root/video_factory/temp_test /root/video_factory/active_candidate 2>&1 || true")
-    code_inv_explicit, out_inv_explicit = run_on_vps("python3 -c \"import json; print(json.dumps({'remove': 0, 'keep': 24, 'review': 0, 'status': 'CLEAN'}, indent=2))\"")
+    code_inv_explicit, out_inv_explicit = run_on_vps("python3 /root/video_factory/scripts/legacy_inventory.py")
     retained_24_itemized = "\n".join([
         "  1. vox/__init__.py                      | Public exports and initialization of unified vox package",
         "  2. vox/schemas.py                      | Pydantic schema contracts: CameraMove, FGObject, Scene, ScenePlan, WordTimeline",
@@ -498,21 +498,21 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"py_compile Exit Code: {code_compile}\nOutput:\n{out_compile}\n\n"
         f"Zero-Mock Falsifiable Scan Exit Code: {code_mock}\nOutput:\n{out_mock}\n\n"
         f"Extended Unit Test-Double Audit & Rule 118 Justifications (Exit Code: {code_mock_ext}):\n{out_mock_ext}\n\n"
-        f"--- RESOLUTION OF tests/vox/test_align_adversarial.py (Boss Item 1 & 2) ---\n"
-        f"- Deleted tests/vox/test_align_adversarial.py which contained legacy test-double mocks.\n"
+        f"--- RESOLUTION OF tests/vox/test_align_adversarial.py (Boss Item 15) ---\n"
+        f"- Moved tests/vox/test_align_adversarial.py to tests/unit/test_align_adversarial.py as a hermetic unit test-double, preserving 100% real audio execution without mocks in tests/vox/test_audio_alignment_adversarial.py.\n"
         f"- Adversarial alignment is 100% verified using real 48kHz mono PCM WAV audio in tests/vox/test_audio_alignment_adversarial.py (Zero Mocks).\n"
         f"- Pytest Collection Verification on tests/vox/ (Exit Code: {code_collect}):\n{out_collect}\n"
     )
 
     # 5. Full Non-Integration Pytest Suites: Vox + Codemap + Trend Caps + Adversarial Ghost + Contracts + Render Timeout + CI Neighbor Tester (Boss Item 9, 11 & 12)
     code_pytest_vox, out_pytest_vox = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox -v")
-    code_pytest_ci_unit, out_pytest_ci_unit = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest -v tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py; echo EXIT_CODE=$?")
+    code_pytest_ci_unit, out_pytest_ci_unit = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest -v tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py")
     code_pytest_codemap, out_pytest_codemap = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/codemap -v")
     code_pytest_trend, out_pytest_trend = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_trend_caps_and_gates.py -v")
     code_pytest_ghost, out_pytest_ghost = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/test_ghost_scan_adversarial.py -v")
     code_pytest_contracts, out_pytest_contracts = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/test_contracts.py -v")
     code_pytest_timeout, out_pytest_timeout = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/test_render_timeout_policy.py -v")
-    code_unit_new, out_unit_new = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_s11_qc_gate.py tests/unit/test_visual_audit.py tests/unit/test_corrupt_retention_policy.py tests/vox/test_rule_131_and_136.py -v; echo EXIT_CODE=$?")
+    code_unit_new, out_unit_new = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_s11_qc_gate.py tests/unit/test_visual_audit.py tests/unit/test_corrupt_retention_policy.py tests/vox/test_rule_131_and_136.py -v")
     code_compileall, out_compileall = run_on_vps("cd /root/video_factory && python3 -m compileall -q app scripts tools vox tests && echo 'ALL_PACKAGES_COMPILEALL_PASS'")
     code_bias_tree, out_bias_tree = run_on_vps("git -C /root/video_factory ls-tree HEAD tests/test_zero_semantic_bias.py")
     code_neighbor, out_neighbor = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 tests/ci_neighbor_tester.py")
@@ -628,15 +628,15 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "    m = json.load(f)\n"
         "scenes = m.get('scenes', [])\n"
         "dur = m.get('duration_sec')\n"
+        "drift = m.get('subtitles', {}).get('reverse_drift_ms', m.get('reverse_drift_ms'))\n"
+        "parity_st = m.get('subtitles', {}).get('reverse_parity_status', m.get('reverse_parity_status'))\n"
         "summary = {\n"
         "    'title': m.get('title'),\n"
         "    'total_scenes': len(scenes),\n"
         "    'duration_sec': dur,\n"
         "    'alignment_model': m.get('alignment_model', 'faster-whisper-base.en'),\n"
-        "    'subtitles_reverse_parity': 'PASS',\n"
-        "    'reverse_drift_ms': 4.0,\n"
-        "    'alignment_mismatch_tokens': 0,\n"
-        "    'match_ratio_enforced': '>= 0.95 (actual: 1.00)',\n"
+        "    'subtitles_reverse_parity': parity_st,\n"
+        "    'reverse_drift_ms': drift,\n"
         "    'qa_gates': m.get('qa_gates', {})\n"
         "}\n"
         "assert len(scenes) == 5, f'Expected 5 scenes/chapters, got {len(scenes)}'\n"
@@ -863,9 +863,6 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         )
         opener = get_opener()
         ci_run = fetch_run_for_commit(DEFAULT_REPO, DEFAULT_TOKEN, git_head, opener)
-        # Fallback to recent runs if git_head commit is very new
-        if not ci_run:
-            ci_run = fetch_run_for_commit(DEFAULT_REPO, DEFAULT_TOKEN, "230f4f8", opener)
         if ci_run:
             conclusion = ci_run.get('conclusion')
             ci_code = 0 if conclusion == 'success' else 1
@@ -924,12 +921,12 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
                 f"Conclusion: {conclusion}\n"
                 f"Run URL: {ci_run.get('html_url')}\n\n"
                 f"--- JUNIT AUDIT ZERO-SKIP & ZERO-FAILURE TELEMETRY (Boss Item 1) ---\n"
-                f"{chr(10).join(junit_lines) if junit_lines else 'Unit/Contracts/Codemap JUnit Audit: tests=102, failures=0, errors=0, skipped=0\nVox JUnit Audit: tests=63, failures=0, errors=0, skipped=0'}\n\n"
+                f"{chr(10).join(junit_lines) if junit_lines else 'NOT_FOUND'}\n\n"
                 f"--- RUFF LINTING BLOCKING STEP EVIDENCE (Boss Item 5 & 8) ---\n"
                 f"Step Definition: ruff check vox/ tools/ tests/vox/ tests/unit/test_trend_caps_and_gates.py tests/test_ghost_scan_adversarial.py app/main.py app/services/artifact_sync.py app/services/director_planner_b3.py app/services/seo_package_forge.py app/services/trend_engine_b1.py app/services/daily_market_lock.py app/services/alert_cooldown.py scripts/vf_insight_cards.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/hhtech_planner.py scripts/orchestrator/memory_governor.py scripts/orchestrator/opus55_supervisor_gate.py scripts/orchestrator/runner.py stages/s05_director_plan.py stages/s10_render.py stages/s11_qc.py tests/unit/test_s05_director_plan.py tests/unit/test_s10_render.py tests/unit/test_s11_qc_gate.py scripts/forensics/visual_audit.py tests/unit/test_visual_audit.py tests/unit/test_daily_market_lock.py tests/unit/test_alert_cooldown.py tests/unit/test_b1_daily_guard_integration.py tests/unit/test_corrupt_retention_policy.py tests/vox/test_rule_131_and_136.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py\n"
-                f"Step Result: {' '.join(ruff_lines) if ruff_lines else 'All checks passed!'}\n\n"
+                f"Step Result: {' '.join(ruff_lines) if ruff_lines else 'NOT_FOUND'}\n\n"
                 f"--- GHOST HUNTER VERIFICATION IN CI ---\n"
-                f"{chr(10).join(ghost_lines) if ghost_lines else 'ZERO GHOST REMNANTS DETECTED'}\n\n"
+                f"{chr(10).join(ghost_lines) if ghost_lines else 'NOT_FOUND'}\n\n"
                 f"Jobs & Steps Breakdown:\n{jobs_summary}\n"
             )
         else:
@@ -1265,18 +1262,27 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
 
     # 5. Live VPS Test Suites (Isolated per-run tmp state dir, Rule 119 & 127)
     code_pytest_unit, out_pytest_unit = run_on_vps(
-        "cd /root/video_factory && "
-        "tmp_test_state=$(mktemp -d /tmp/test_vf_state_XXXXXX) && "
-        "VF_STATE_DIR=$tmp_test_state AVF_STATE_DIR=$tmp_test_state /root/video_factory/venv/bin/python3 -m pytest "
-        "tests/unit/ "
-        "tests/test_ghost_scan_adversarial.py "
-        "tests/test_zero_semantic_bias.py "
-        "tests/test_v7_feedback_loop.py "
-        "tests/test_paths.py "
-        "tests/test_config.py "
-        "tests/test_gates_manifest.py "
-        "tests/vox/test_rule_131_and_136.py -v; "
-        "test_ret=$?; rm -rf $tmp_test_state; exit $test_ret"
+        "python3 -c \""
+        "import tempfile, subprocess, sys, os\n"
+        "with tempfile.TemporaryDirectory(prefix='test_vf_state_') as tmp_dir:\n"
+        "    env = os.environ.copy()\n"
+        "    env['VF_STATE_DIR'] = tmp_dir\n"
+        "    env['AVF_STATE_DIR'] = tmp_dir\n"
+        "    cmd = [\n"
+        "        '/root/video_factory/venv/bin/python3', '-m', 'pytest',\n"
+        "        'tests/unit/',\n"
+        "        'tests/test_ghost_scan_adversarial.py',\n"
+        "        'tests/test_zero_semantic_bias.py',\n"
+        "        'tests/test_v7_feedback_loop.py',\n"
+        "        'tests/test_paths.py',\n"
+        "        'tests/test_config.py',\n"
+        "        'tests/test_gates_manifest.py',\n"
+        "        'tests/vox/test_rule_131_and_136.py',\n"
+        "        '-v'\n"
+        "    ]\n"
+        "    res = subprocess.run(cmd, cwd='/root/video_factory', env=env)\n"
+        "    sys.exit(res.returncode)\n"
+        "\""
     )
     code_s05_live, out_s05_live = run_on_vps(
         "python3 -c \""
@@ -1307,11 +1313,17 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
     )
     code_b3_live, out_b3_live = run_on_vps(
         "python3 -c \""
-        "import importlib.util as u, sys\n"
-        "spec = u.find_spec('orchestrator.run_pipeline')\n"
-        "print('B3_SPEC:', spec.origin if spec else None)\n"
-        "assert spec is not None, 'orchestrator.run_pipeline missing'\n"
-        "\" && python3 -m orchestrator.run_pipeline --help | head -n 8"
+        "import importlib.util as u, os, sys\n"
+        "root = '/root/video_factory'\n"
+        "scripts = '/root/video_factory/scripts'\n"
+        "if root not in sys.path: sys.path.insert(0, root)\n"
+        "if scripts not in sys.path: sys.path.insert(1, scripts)\n"
+        "spec_s = u.find_spec('scripts.orchestrator.run_pipeline')\n"
+        "spec_o = u.find_spec('orchestrator.run_pipeline')\n"
+        "print('SCRIPTS_ORCHESTRATOR_SPEC:', spec_s.origin if spec_s else None)\n"
+        "print('ORCHESTRATOR_SPEC:', spec_o.origin if spec_o else None)\n"
+        "assert spec_s is not None or spec_o is not None, 'Neither scripts.orchestrator nor orchestrator spec found'\n"
+        "\" && PYTHONPATH=/root/video_factory:/root/video_factory/scripts python3 -m scripts.orchestrator.run_pipeline --help | head -n 8"
     )
     code_neighbor, out_neighbor = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 tests/ci_neighbor_tester.py")
     code_dryrun, out_dryrun = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 scripts/run_trend_pipeline.py --market EN --dry-run")
@@ -1388,20 +1400,27 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         evidence_blocks.append(f"### [6. GITHUB ACTIONS CI/CD VERIFICATION]\nError fetching CI: {e}\n")
 
     # 7. Untruncated Primary Implementation Diffs & Source Trace (Rule 124, 125, 138)
+    code_s05_diff, out_s05_diff = run_on_vps(f"git -C /root/video_factory diff --no-color -U3 {effective_range} -- stages/s05_director_plan.py")
+    code_paths_diff, out_paths_diff = run_on_vps(f"git -C /root/video_factory diff --no-color -U3 {effective_range} -- core/paths.py")
+    code_b1_diff, out_b1_diff = run_on_vps(f"git -C /root/video_factory diff --no-color -U3 {effective_range} -- app/services/trend_engine_b1.py")
     code_trend_diff, out_trend_diff = run_on_vps(
         f"git -C /root/video_factory diff --no-color -U3 {effective_range} -- "
-        "stages/s05_director_plan.py "
         "app/services/daily_market_lock.py "
         "app/services/alert_cooldown.py "
-        "app/services/trend_engine_b1.py "
+        "app/services/topic_history_registry.py "
         "core/atomic_io.py "
-        "core/paths.py "
         "tests/unit/test_daily_market_lock.py "
         "tests/unit/test_alert_cooldown.py"
     )
     evidence_blocks.append(
         f"### [7. UNTRUNCATED PRIMARY IMPLEMENTATION DIFFS (Rule 124, 125, 138)]\n"
-        f"Exit Code: {code_trend_diff}\n"
+        f"--- STAGES/S05_DIRECTOR_PLAN.PY DIFF (NameError Resolution, Exit Code: {code_s05_diff}) ---\n"
+        f"{out_s05_diff}\n\n"
+        f"--- CORE/PATHS.PY DIFF (Fail-Closed VPS Lock Resolution, Exit Code: {code_paths_diff}) ---\n"
+        f"{out_paths_diff}\n\n"
+        f"--- APP/SERVICES/TREND_ENGINE_B1.PY DIFF (Single Lock Acquisition, EXHAUSTED Stamping & Try/Finally, Exit Code: {code_b1_diff}) ---\n"
+        f"{out_b1_diff}\n\n"
+        f"--- DAILY MARKET LOCK & ALERT COOLDOWN DIFFS (Exit Code: {code_trend_diff}) ---\n"
         f"{out_trend_diff}\n"
     )
 
@@ -1476,7 +1495,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "- TASK OBJECTIVE & BOUNDARY WAIVER: TASK_1792069373 is an authoritative daily market quota guard, alert cooldown, and Stage S05 fix increment. It produces no new episode video MP4 on disk.\n"
         "- GOLDEN VIDEO PIPELINE RUNTIME TELEMETRY: The underlying video production engine was verified against /root/video_factory/out/golden/final.mp4:\n"
         f"FFprobe Exit Code: {code_ffprobe}\n"
-        f"Stream & Format Telemetry:\n{out_ffprobe[:1500]}\n"
+        f"Stream & Format Telemetry (Full Untruncated JSON):\n{out_ffprobe}\n"
     )
 
     # 13. Alibaba Open Code Review (OCR) AST Quality Scan (Rule 139)

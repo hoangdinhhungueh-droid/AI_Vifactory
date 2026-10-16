@@ -45,7 +45,6 @@ def test_science_golden_e2e_render_and_qa_gates(tmp_path):
         science_script,
         out_dir,
         title="Magnetar Radio Pulse Discovery",
-        allow_synthetic_alignment=True,
     )
     assert manifest["scene_count"] == 5, f"Expected 5 scenes/chapters for 5-beat science fixture, got {manifest['scene_count']}"
     assert len(manifest["scenes"]) == 5

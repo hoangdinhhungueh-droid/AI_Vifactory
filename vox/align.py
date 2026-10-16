@@ -14,7 +14,6 @@ Aligns speech audio with canonical script text:
 from __future__ import annotations
 
 import difflib
-import os
 import wave
 from pathlib import Path
 from typing import Any
@@ -62,9 +61,12 @@ def align_script_with_audio(
     model_size: str = "base",
     market: str = "EN",
     language: str | None = None,
-    allow_synthetic_alignment: bool | None = None,
 ) -> tuple[WordTimeline, ScenePlan]:
     """Aligns script narration to audio wav file and populates scene timecodes.
+
+    Strictly conforms to Rule 118 & 120: requires authentic faster-whisper alignment.
+    Fails closed with AlignmentUnavailableError if faster-whisper is unavailable,
+    if 0 words are detected, or if word match ratio is below 0.95.
 
     Args:
         plan: Input ScenePlan with scenes needing start/end timestamps.
@@ -72,9 +74,6 @@ def align_script_with_audio(
         model_size: Faster-whisper model size ('tiny', 'base', 'small', 'medium').
         market: Canonical market identifier ('EN', 'JA', 'KO', 'VN').
         language: Optional explicit ISO language code override.
-        allow_synthetic_alignment: If False (production default), raises AlignmentUnavailableError
-            on faster-whisper failure or low match ratio (<0.95). If True (tests only),
-            falls back to deterministic linear allocation and tags alignment_model='synthetic'.
 
     Returns:
         Tuple of (WordTimeline, updated ScenePlan).
@@ -97,11 +96,6 @@ def align_script_with_audio(
     whisper_success = False
     alignment_model = resolved_model
 
-    if allow_synthetic_alignment is None:
-        allow_synthetic = os.getenv("ALLOW_SYNTHETIC_ALIGNMENT", "").lower() in ("1", "true")
-    else:
-        allow_synthetic = bool(allow_synthetic_alignment)
-
     # 1. Attempt live faster-whisper extraction
     try:
         from faster_whisper import WhisperModel
@@ -119,36 +113,20 @@ def align_script_with_audio(
         if whisper_words:
             whisper_success = True
     except (ImportError, RuntimeError) as exc:
-        if not allow_synthetic:
-            raise AlignmentUnavailableError(
-                f"faster-whisper runtime alignment unavailable: {exc}. "
-                "Production paths require real audio alignment (Rule 118 & 120)."
-            ) from exc
+        raise AlignmentUnavailableError(
+            f"faster-whisper runtime alignment unavailable: {exc}. "
+            "Production paths require real audio alignment (Rule 118 & 120)."
+        ) from exc
     except Exception as exc:
-        if not allow_synthetic:
-            raise AlignmentUnavailableError(
-                f"faster-whisper transcription error: {exc}"
-            ) from exc
+        raise AlignmentUnavailableError(
+            f"faster-whisper transcription error: {exc}"
+        ) from exc
 
-    # 2. Test fallback gated strictly by allow_synthetic=True
+    # 2. Strict validation: 0 words detected is a hard failure (Rule 118/120)
     if not whisper_success or len(whisper_words) == 0:
-        if not allow_synthetic:
-            raise AlignmentUnavailableError(
-                "Whisper detected 0 words in audio stream and allow_synthetic_alignment is False"
-            )
-        alignment_model = "synthetic"
-        total_chars = sum(len(w[0]) for w in script_words)
-        curr = 0.0
-        for w_text, sc_idx in script_words:
-            dur = max(0.2, (len(w_text) / max(1, total_chars)) * audio_dur)
-            end_t = min(audio_dur, curr + dur)
-            whisper_words.append({
-                "word": w_text,
-                "start": round(curr, 3),
-                "end": round(max(curr + 0.1, end_t), 3),
-                "probability": 1.0,
-            })
-            curr = end_t
+        raise AlignmentUnavailableError(
+            "Whisper detected 0 words in audio stream. Speech audio missing or unintelligible."
+        )
 
     # 3. Align script tokens with Whisper timestamps using SequenceMatcher opcodes
     script_tokens = [w[0].lower().strip(".,!?:;\"'()[]{}") for w in script_words]
@@ -158,7 +136,7 @@ def align_script_with_audio(
     opcodes = matcher.get_opcodes()
     real_match_ratio = matcher.ratio()
 
-    if real_match_ratio < 0.95 and not allow_synthetic:
+    if real_match_ratio < 0.95:
         raise AlignmentUnavailableError(
             f"Speech alignment match ratio {real_match_ratio:.3f} is below mandatory threshold 0.95 (Rule 120). "
             f"Expected script: '{' '.join(script_tokens[:10])}...', "

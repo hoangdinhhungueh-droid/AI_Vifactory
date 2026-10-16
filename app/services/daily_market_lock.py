@@ -61,7 +61,6 @@ def vn_today(now: Optional[datetime] = None) -> str:
 def _get_lock_file_path(market: str, state_dir: Optional[str] = None, now: Optional[datetime] = None) -> Path:
     base_dir = Path(state_dir) if state_dir else resolve_state_dir()
     locks_dir = base_dir / "b1_daily_lock"
-    locks_dir.mkdir(parents=True, exist_ok=True)
     m_up = _validate_market(market)
     date_str = vn_today(now)
     return locks_dir / f"{m_up}_{date_str}.json"
@@ -119,16 +118,6 @@ def _quarantine_and_seal_corrupt_lock(
     return corrupt_path
 
 
-def _quarantine_corrupt_lock(
-    lock_path: Path,
-    error_msg: str = "Corrupt lock",
-    market: str = "EN",
-    date_str: str = "2026-10-16",
-) -> Path:
-    """Compatibility wrapper for quarantine retention policy tests."""
-    return _quarantine_and_seal_corrupt_lock(lock_path, error_msg, market, date_str)
-
-
 def is_market_done_today(
     market: str,
     state_dir: Optional[str] = None,
@@ -138,7 +127,7 @@ def is_market_done_today(
     check_episodes: bool = True,
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """Pure read-only check whether the given market has completed or has active work today.
-    DOES NOT perform mutating writes or directory creation (Boss Item 16).
+    DOES NOT perform mutating writes or directory creation (Boss Item 16 & 20).
 
     Returns:
         (is_done, reason, details)
@@ -161,20 +150,20 @@ def is_market_done_today(
     stale_lock_found = False
     stale_data = {}
 
-    # 1. Check lock file
+    # 1. Check lock file (pure read-only: fail-closed on corrupt content without mutating disk)
     if lock_path.exists():
         try:
             with open(lock_path, "r", encoding="utf-8") as f:
                 content = f.read().strip()
                 if not content:
-                    _quarantine_and_seal_corrupt_lock(lock_path, "File is completely empty (0 bytes)", m_up, date_str, now)
-                    return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str}
+                    logger.error(f"[daily_market_lock] Lock file is empty: {lock_path} (fail-closed)")
+                    return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str, "error": "empty file"}
                 data = json.loads(content)
                 if not isinstance(data, dict):
-                    _quarantine_and_seal_corrupt_lock(lock_path, f"Top-level JSON is not an object: {type(data)}", m_up, date_str, now)
-                    return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str}
+                    logger.error(f"[daily_market_lock] Lock JSON is not a dict: {lock_path} (fail-closed)")
+                    return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str, "error": "non-dict root"}
         except Exception as e:
-            _quarantine_and_seal_corrupt_lock(lock_path, str(e), m_up, date_str, now)
+            logger.error(f"[daily_market_lock] Corrupt lock file {lock_path} (fail-closed): {e}")
             return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str, "error": str(e)}
 
         status = data.get("status", "").upper()
@@ -247,6 +236,8 @@ def is_market_done_today(
                 if rec_at:
                     try:
                         rec_dt = datetime.fromisoformat(rec_at)
+                        if rec_dt.tzinfo is None:
+                            rec_dt = rec_dt.replace(tzinfo=timezone.utc)
                         rec_vn_date = vn_today(rec_dt)
                         if rec_vn_date == date_str:
                             details = {
@@ -392,24 +383,23 @@ def acquire_in_progress(
         try:
             with open(lock_path, "r", encoding="utf-8") as f:
                 raw_stale = f.read().strip()
-            existing = json.loads(raw_stale)
+            if not raw_stale:
+                _quarantine_and_seal_corrupt_lock(lock_path, "File is completely empty (0 bytes)", m_up, date_str, now)
+                return False
+            try:
+                existing = json.loads(raw_stale)
+            except Exception as j_err:
+                _quarantine_and_seal_corrupt_lock(lock_path, str(j_err), m_up, date_str, now)
+                return False
+
             ex_status = existing.get("status")
 
-            # Check if existing lock is an expired off-hours lock (06:00 AM VN arrived)
-            if ex_status in ("EXHAUSTED_OFFHOURS", "OFFHOURS_THROTTLED") and vn_now(now).hour >= MIN_PRODUCTION_HOUR_VN:
-                tombstone = lock_path.with_name(f"{lock_path.name}.tombstone_{pid}_{uuid.uuid4().hex}")
-                try:
-                    os.replace(str(lock_path), str(tombstone))
-                    fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-                    with os.fdopen(fd, "w", encoding="utf-8") as f_new:
-                        json.dump(payload, f_new, ensure_ascii=False, indent=2)
-                    tombstone.unlink(missing_ok=True)
-                    logger.info(f"[daily_market_lock] Transitioned expired off-hours lock to IN_PROGRESS for {m_up}")
-                    return True
-                except (OSError, FileExistsError):
-                    tombstone.unlink(missing_ok=True)
-                    return False
-
+            # Check if existing lock is an expired off-hours lock OR stale IN_PROGRESS lock
+            is_expired_offhours = (
+                ex_status in ("EXHAUSTED_OFFHOURS", "OFFHOURS_THROTTLED")
+                and vn_now(now).hour >= MIN_PRODUCTION_HOUR_VN
+            )
+            is_stale_in_progress = False
             if ex_status == "IN_PROGRESS":
                 c_str = existing.get("created_at_utc")
                 if c_str:
@@ -417,46 +407,54 @@ def acquire_in_progress(
                     if c_dt.tzinfo is None:
                         c_dt = c_dt.replace(tzinfo=timezone.utc)
                     age = (now_utc - c_dt).total_seconds()
-                    if age > ttl_seconds:
+                    rec_ttl = int(existing.get("ttl_seconds", ttl_seconds))
+                    if age > rec_ttl:
+                        is_stale_in_progress = True
+
+            if is_expired_offhours or is_stale_in_progress:
+                action_desc = "expired off-hours" if is_expired_offhours else "stale IN_PROGRESS"
+                logger.warning(
+                    f"[daily_market_lock] Attempting exclusive takeover of {action_desc} lock for {m_up}"
+                )
+                tombstone = lock_path.with_name(f"{lock_path.name}.tombstone_{pid}_{uuid.uuid4().hex}")
+                try:
+                    os.replace(str(lock_path), str(tombstone))
+                except (FileNotFoundError, OSError) as ren_err:
+                    logger.debug(f"[daily_market_lock] Stale lock takeover race on rename {lock_path}: {ren_err}")
+                    return False
+
+                # Verify we captured the expected stale lock, not a concurrent fresh lock
+                try:
+                    with open(tombstone, "r", encoding="utf-8") as tf:
+                        captured = tf.read().strip()
+                    if captured != raw_stale:
                         logger.warning(
-                            f"[daily_market_lock] Attempting exclusive takeover of stale IN_PROGRESS lock for {m_up} "
-                            f"(age={int(age)}s > {ttl_seconds}s)"
+                            f"[daily_market_lock] Stale lock mismatch on {lock_path}: restoring concurrent holder's lock"
                         )
-                        tombstone = lock_path.with_name(f"{lock_path.name}.tombstone_{pid}_{uuid.uuid4().hex}")
                         try:
-                            os.replace(str(lock_path), str(tombstone))
-                        except (FileNotFoundError, OSError) as ren_err:
-                            logger.debug(f"[daily_market_lock] Stale lock takeover race on rename {lock_path}: {ren_err}")
-                            return False
+                            if not lock_path.exists():
+                                os.replace(str(tombstone), str(lock_path))
+                            else:
+                                tombstone.unlink(missing_ok=True)
+                        except OSError as rest_err:
+                            logger.error(f"[daily_market_lock] Failed to restore lock: {rest_err}")
+                        return False
+                except OSError as read_err:
+                    logger.warning(f"[daily_market_lock] Error reading tombstone: {read_err}")
+                    tombstone.unlink(missing_ok=True)
+                    return False
 
-                        # Verify we captured the expected stale lock, not a concurrent fresh lock
-                        try:
-                            with open(tombstone, "r", encoding="utf-8") as tf:
-                                captured = tf.read().strip()
-                            if captured != raw_stale:
-                                logger.warning(
-                                    f"[daily_market_lock] Stale lock mismatch on {lock_path}: restoring concurrent holder's lock"
-                                )
-                                try:
-                                    os.replace(str(tombstone), str(lock_path))
-                                except OSError as rest_err:
-                                    logger.error(f"[daily_market_lock] Failed to restore lock: {rest_err}")
-                                return False
-                        except OSError as read_err:
-                            logger.warning(f"[daily_market_lock] Error reading tombstone: {read_err}")
-                            return False
-
-                        try:
-                            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-                            with os.fdopen(fd, "w", encoding="utf-8") as f_new:
-                                json.dump(payload, f_new, ensure_ascii=False, indent=2)
-                            logger.info(f"[daily_market_lock] Won exclusive takeover of stale lock for {m_up} on {date_str}")
-                            tombstone.unlink(missing_ok=True)
-                            return True
-                        except FileExistsError:
-                            logger.warning(f"[daily_market_lock] Lost race to acquire stale lock for {m_up}")
-                            tombstone.unlink(missing_ok=True)
-                            return False
+                try:
+                    fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+                    with os.fdopen(fd, "w", encoding="utf-8") as f_new:
+                        json.dump(payload, f_new, ensure_ascii=False, indent=2)
+                    logger.info(f"[daily_market_lock] Won exclusive takeover of {action_desc} lock for {m_up} on {date_str}")
+                    tombstone.unlink(missing_ok=True)
+                    return True
+                except (OSError, FileExistsError):
+                    logger.warning(f"[daily_market_lock] Lost race to acquire {action_desc} lock for {m_up}")
+                    tombstone.unlink(missing_ok=True)
+                    return False
         except Exception as ex:
             logger.error(f"[daily_market_lock] Error inspecting existing lock {lock_path}: {ex}")
         return False
@@ -494,10 +492,10 @@ def _verify_lock_ownership(
 
         if expected_token is not None:
             actual_token = data.get("lock_token")
-            if actual_token and actual_token != expected_token:
+            if not actual_token or actual_token != expected_token:
                 logger.warning(
                     f"[daily_market_lock] Lock token mismatch on {lock_path}: "
-                    f"held by {actual_token[:8]}, requested by {expected_token[:8]}"
+                    f"held by {actual_token[:8] if actual_token else 'NONE'}, requested by {expected_token[:8]}"
                 )
                 return False, data
 

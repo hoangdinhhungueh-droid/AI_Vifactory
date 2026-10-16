@@ -12,6 +12,7 @@
 #            API-* when msg doesn't mention Notion; bypass x-vf-autonomous:1);
 #            DUMP_SYS (env DUMP_SYS=1 → breakdown san(sys) by header)
 
+import hmac
 import json
 import logging as _logging
 import os
@@ -37,12 +38,18 @@ from app.services.trend_verify import router as _trend_verify_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Security posture check on startup (Rule 121 & Boss Round 4 Item 5)
+    token = os.getenv("VF_API_TOKEN", "").strip() or VF_API_TOKEN
+    if not token:
+        _logger.critical(
+            "[STARTUP AUDIT] VF_API_TOKEN is unset in environment. Loopback IPC endpoints operating without Bearer token gating."
+        )
     # Telegram inline-button poller startup (Phase 4)
     try:
         from app.services.telegram_poller import start_poller as _vf_start_tg_poller
         _vf_start_tg_poller()
     except Exception as _e:
-        _logger.warning("tg poller startup failed: %s", _e)
+        _logger.error("Telegram poller startup failed during lifespan init: %s", _e, exc_info=True)
     yield
 
 app = FastAPI(title="AI Video Factory API", version="v11.8", lifespan=lifespan)
@@ -104,17 +111,23 @@ VF_API_TOKEN = os.getenv("VF_API_TOKEN", "").strip()
 
 def _verify_auth(request: Request) -> None:
     """Verifies Bearer token if VF_API_TOKEN is configured in environment.
-    If VF_API_TOKEN is unset, allows internal loopback IPC without token.
+    If VF_API_TOKEN is unset, logs a critical alert and allows internal loopback IPC.
+    Uses timing-safe hmac.compare_digest (Rule 121/125 & Boss Item 25).
     """
-    if not VF_API_TOKEN:
+    token = os.getenv("VF_API_TOKEN", "").strip() or VF_API_TOKEN
+    if not token:
+        _logger.critical(
+            "[SECURITY ALERT] VF_API_TOKEN is unset. Unauthenticated loopback IPC call allowed."
+        )
         return
     auth_header = request.headers.get("Authorization", "")
-    expected = f"Bearer {VF_API_TOKEN}"
-    if auth_header != expected:
+    expected = f"Bearer {token}"
+    if not hmac.compare_digest(auth_header, expected):
         raise HTTPException(
             status_code=401,
             detail="Unauthorized: invalid or missing Bearer token",
         )
+
 
 
 @app.get("/api/v1/diag")
@@ -285,10 +298,22 @@ NOTION_RE = re.compile(
     re.I,
 )
 
-def _apply_notion_gates(body: dict, last_user: str | None, autonomous: bool) -> dict:
+def _apply_notion_gates(body: dict, last_user: str | list | None, autonomous: bool) -> dict:
     tools = body.get("tools")
     if not tools:
         return body
+
+    # Normalize last_user if list or other structure (Rule 121 & Boss Item 25)
+    user_text = ""
+    if isinstance(last_user, list):
+        user_text = " ".join(
+            p.get("text", "") if isinstance(p, dict) else str(p)
+            for p in last_user
+        )
+    elif isinstance(last_user, str):
+        user_text = last_user
+    elif last_user is not None:
+        user_text = str(last_user)
 
     # ① NOTION CAP: strip API-* not in NOTION_KEEP (always, unconditional)
     tools = [t for t in tools
@@ -296,8 +321,8 @@ def _apply_notion_gates(body: dict, last_user: str | None, autonomous: bool) -> 
              or t["function"]["name"] in NOTION_KEEP]
 
     # ② NOTION INTENT GATE: if enabled + not autonomous + not in tool-loop + no Notion mention → strip all API-*
-    if NOTION_GATE_ENABLED and not autonomous and last_user:
-        if not NOTION_RE.search(last_user):
+    if NOTION_GATE_ENABLED and not autonomous and user_text:
+        if not NOTION_RE.search(user_text):
             tools = [t for t in tools
                      if not t.get("function", {}).get("name", "").startswith("API-")]
             print("[gate:②] stripped all API-* (no Notion intent in last_user)", flush=True)

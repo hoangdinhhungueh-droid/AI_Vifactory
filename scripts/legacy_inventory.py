@@ -82,6 +82,29 @@ CANONICAL_ROLES = {
     },
 }
 
+PRE_2456870_PIPELINE_DISPOSITION = [
+    {"symbol": "app/pipeline/produce_episode.py", "type": "file", "disposition": "DELETED", "migrated_to": "vox.pipeline:run_pipeline", "rationale": "Legacy unmounted pipeline coordinator without checkpointing."},
+    {"symbol": "app/pipeline/run_episode.py", "type": "file", "disposition": "DELETED", "migrated_to": "vox.pipeline:run_pipeline", "rationale": "Legacy episode runner without state machine."},
+    {"symbol": "app/pipeline/stage_01_ideation.py", "type": "file", "disposition": "DELETED", "migrated_to": "stages.s01_ideation", "rationale": "Migrated to canonical stages directory."},
+    {"symbol": "app/pipeline/stage_02_research.py", "type": "file", "disposition": "DELETED", "migrated_to": "stages.s02_research", "rationale": "Migrated to canonical stages directory."},
+    {"symbol": "app/pipeline/stage_03_script.py", "type": "file", "disposition": "DELETED", "migrated_to": "stages.s03_script", "rationale": "Migrated to canonical stages directory."},
+    {"symbol": "app/pipeline/stage_04_critic_script.py", "type": "file", "disposition": "DELETED", "migrated_to": "stages.s04_critic_script", "rationale": "Migrated to canonical stages directory."},
+    {"symbol": "app/pipeline/stage_05_director_plan.py", "type": "file", "disposition": "DELETED", "migrated_to": "stages.s05_director_plan", "rationale": "Migrated to canonical stages directory."},
+    {"symbol": "app/pipeline/stage_06_critic_visual.py", "type": "file", "disposition": "DELETED", "migrated_to": "stages.s06_critic_visual", "rationale": "Migrated to canonical stages directory."},
+    {"symbol": "app/pipeline/stage_07_image_gen.py", "type": "file", "disposition": "DELETED", "migrated_to": "stages.s07_image_gen", "rationale": "Migrated to canonical stages directory."},
+    {"symbol": "app/pipeline/stage_08_video_gen.py", "type": "file", "disposition": "DELETED", "migrated_to": "stages.s08_video_gen", "rationale": "Migrated to canonical stages directory."},
+    {"symbol": "app/pipeline/stage_09_voice_tts.py", "type": "file", "disposition": "DELETED", "migrated_to": "stages.s09_voice_tts", "rationale": "Migrated to canonical stages directory."},
+    {"symbol": "app/pipeline/stage_10_render.py", "type": "file", "disposition": "DELETED", "migrated_to": "stages.s10_render -> vox.assemble", "rationale": "Migrated to canonical stage delegate."},
+    {"symbol": "app/pipeline/stage_11_qc.py", "type": "file", "disposition": "DELETED", "migrated_to": "stages.s11_qc -> vox.qa.gates", "rationale": "Migrated to canonical stage delegate."},
+    {"symbol": "scripts/produce_episode.py", "type": "file", "disposition": "DELETED", "migrated_to": "orchestrator.run_pipeline", "rationale": "Legacy loose script replaced by orchestrator CLI."},
+    {"symbol": "scripts/produce_episode_hg1.py", "type": "file", "disposition": "DELETED", "migrated_to": "orchestrator.run_pipeline", "rationale": "Legacy bypass entrypoint retired."},
+    {"symbol": "scripts/execute_pipeline_b2_b35.py", "type": "file", "disposition": "DELETED", "migrated_to": "vox.pipeline", "rationale": "Legacy multi-script bypass retired."},
+    {"symbol": "app/services/dual_model_chunk_auditor_v2.py", "type": "file", "disposition": "DELETED", "migrated_to": "vox.qa.gates", "rationale": "Dual-model auditing unified into deterministic QA gates."},
+    {"symbol": "app/services/hg2_telegram_format_v2.py", "type": "file", "disposition": "DELETED", "migrated_to": "app.services.telegram_buttons", "rationale": "Telegram formatting unified into telegram_buttons."},
+    {"symbol": "POST /api/v1/run-episode", "type": "route", "disposition": "DELETED", "migrated_to": "orchestrator.run_pipeline", "rationale": "Unauthenticated remote trigger route permanently unmounted."},
+    {"symbol": "POST /api/v1/produce-episode", "type": "route", "disposition": "DELETED", "migrated_to": "orchestrator.run_pipeline", "rationale": "Unauthenticated remote trigger route permanently unmounted."},
+]
+
 def parse_direct_imports(file_path: Path) -> Set[str]:
     """Parses all imported module names from a Python source file using AST."""
     imports = set()
@@ -151,7 +174,39 @@ def build_falsifiable_audit() -> Dict[str, Any]:
         except Exception:
             pass
 
-    verdict = "PASS" if (all(r["status"] == "PASS" for r in role_audit.values()) and len(shadow_defects) == 0) else "FAIL"
+    # 3. Falsifiable verification of pre-2456870 pipeline symbol dispositions (Boss Round 4 Item 11)
+    disposition_audit = []
+    main_py_content = (ROOT / "app/main.py").read_text(encoding="utf-8", errors="replace") if (ROOT / "app/main.py").exists() else ""
+    for item in PRE_2456870_PIPELINE_DISPOSITION:
+        sym = item["symbol"]
+        item_type = item["type"]
+        if item_type == "file":
+            exists = (ROOT / sym).exists()
+            disposition_audit.append({
+                "symbol": sym,
+                "type": "file",
+                "disposition": item["disposition"],
+                "migrated_to": item["migrated_to"],
+                "physically_deleted": not exists,
+                "status": "PASS" if not exists else "FAIL"
+            })
+            if exists:
+                shadow_defects.append(f"Pre-2456870 legacy file {sym} still exists on disk!")
+        elif item_type == "route":
+            route_path = sym.split()[-1]
+            route_mounted = f'"{route_path}"' in main_py_content or f"'{route_path}'" in main_py_content
+            disposition_audit.append({
+                "symbol": sym,
+                "type": "route",
+                "disposition": item["disposition"],
+                "migrated_to": item["migrated_to"],
+                "permanently_unmounted": not route_mounted,
+                "status": "PASS" if not route_mounted else "FAIL"
+            })
+            if route_mounted:
+                shadow_defects.append(f"Pre-2456870 route {sym} is still mounted in app/main.py!")
+
+    verdict = "PASS" if (all(r["status"] == "PASS" for r in role_audit.values()) and all(d["status"] == "PASS" for d in disposition_audit) and len(shadow_defects) == 0) else "FAIL"
 
     audit_result = {
         "verdict": verdict,
@@ -159,6 +214,9 @@ def build_falsifiable_audit() -> Dict[str, Any]:
         "canonical_roles_verified": len([r for r in role_audit.values() if r["status"] == "PASS"]),
         "total_canonical_roles": len(CANONICAL_ROLES),
         "roles": role_audit,
+        "pre_2456870_disposition": disposition_audit,
+        "pre_2456870_symbols_purged": len([d for d in disposition_audit if d["status"] == "PASS"]),
+        "total_pre_2456870_symbols": len(PRE_2456870_PIPELINE_DISPOSITION),
         "shadow_defects_count": len(shadow_defects),
         "shadow_defects": shadow_defects,
         "total_python_files_scanned": len(all_py_files)

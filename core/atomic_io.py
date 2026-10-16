@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -36,6 +37,17 @@ def atomic_write_json(file_path: Path, data: Any, indent: int = 2) -> None:
                 os.fsync(f.fileno())
             except OSError as fsync_err:
                 logger.debug(f"[atomic_io] Notice fsync on {tmp_path}: {fsync_err}")
+
+        # fsync parent directory on POSIX systems where supported to ensure directory entry durability (Rule 126 & Boss Round 4 Item 13)
+        if hasattr(os, "O_DIRECTORY") and sys.platform != "win32":
+            try:
+                dir_fd = os.open(str(file_path.parent), os.O_RDONLY)
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
+            except OSError as dir_fsync_err:
+                logger.debug(f"[atomic_io] Notice dir fsync on {file_path.parent}: {dir_fsync_err}")
 
         # Windows anti-virus retry loop for atomic replace
         for attempt in range(10):

@@ -16,7 +16,6 @@ def test_vox_single_pipeline_golden_e2e(tmp_path):
         golden_script,
         out_dir,
         title="Golden Liquidity Crisis",
-        allow_synthetic_alignment=True,
     )
 
     # Verify atomic manifest

@@ -1,0 +1,113 @@
+{
+  "task_id": "TASK_1792069373",
+  "round": 5,
+  "timestamp": "2026-10-15T20:55:39Z",
+  "verdict": "REVISE_REQUIRED",
+  "score": 5.8,
+  "passing_threshold": 10.0,
+  "supervisor_model": "claude-opus-5-5",
+  "tokens_consumed": 31015,
+  "summary": "Three-way parity is verified: local, origin/main, and VPS all report HEAD c811de5 with tree a18005a and content hash 85a5d741, and porcelain is clean. GitHub CI run 38804523427 concluded success across the Linux, Windows lock, and CD jobs (147 unit, 67 vox, 43 Windows tests). Ghost scan and ci_neighbor_tester exit 0. The S05 live runtime call exits 0. The increment still cannot be approved, for five reasons. (1) The primary VPS unit suite, which runs in an isolated temp state dir, exits 1 with empty captured output. That is a hard Rule 121/127 failure, and nothing in the packet explains it. (2) The forensic harness (boss_orchestrator.py) is part of this diff and contains hardcoded literals that it presents as evidence. These include an inventory JSON, alignment drift and match-ratio figures, fallback JUnit, ruff and ghost strings, a hardcoded CI fallback commit, a claimed user approval, and a false statement that test_align_adversarial.py was deleted when git shows a rename to tests/unit. Several VPS commands also mask exit codes with '; echo EXIT=$?'. This violates Rule 118 inside the audit pipeline itself. (3) acquire_in_progress has a real mutual-exclusion race on the EXHAUSTED_OFFHOURS transition path, and trend_engine_b1 makes a second acquire_in_progress call whose result is ignored. (4) Several lock-lifecycle gaps exist: no try/finally release, mark_exhausted runs after alert I/O that can raise, release-on-B3-failure is neutralized by the registry check, and is_market_done_today has side effects despite its 'pure read' contract. (5) Scope is bundled far beyond the three-item objective: 48 files, including vox/, stages s10/s11, app/main.py auth, a whole-file rewrite of hhtech_reasoner, ghost_code_detector churn, and AVF-VOX-001 audit artifacts. app/main.py also introduces a functional regression in _apply_notion_gates. The live VPS state files (cooldown and EN_2026-10-15 lock) are inconsistent with the HEAD code's write semantics, so the packet does not prove that production behavior comes from this commit.",
+  "revisions_needed": [
+    "Attach the raw stdout/stderr of the failing VPS primary unit suite, identify the failing test(s), fix the root cause, and re-run to exit 0. Align the CI unit selection with the VPS selection so neither can diverge.",
+    "Remove every hardcoded evidence literal from boss_orchestrator.py: inventory JSON, drift/match-ratio values, JUnit/ruff/ghost fallback strings, CI fallback commit '230f4f8', unconditional sys.exit(0), user-approval and network-posture prose. Missing evidence must render as 'NOT_FOUND' with a non-zero gate code.",
+    "Remove exit-code masking ('; echo EXIT=$?' / 'EXIT_CODE=$?') from all VPS gate commands, or parse the echoed code and propagate it as the real gate result.",
+    "Correct the false 'Deleted tests/vox/test_align_adversarial.py' claim. Either delete the mock-based test, or state accurately that it was moved to tests/unit and justify it as a unit test-double.",
+    "Fix the acquire_in_progress EXHAUSTED_OFFHOURS transition race by applying the same read → rename → verify-captured-content → restore protocol used for stale IN_PROGRESS. Add a concurrent 06:00 transition test with N processes asserting exactly one True.",
+    "Remove the redundant second acquire_in_progress call in trend_engine_b1 (~L1493), or replace it with an ownership-verified topic_id update.",
+    "Wrap the post-acquisition B1 crawl in try/finally so the IN_PROGRESS lock is released or terminally stamped on any exception. Move mark_exhausted_today before alert dispatch, and catch all alert_cooldown exceptions (not just LockTimeoutError) so alert I/O can never skip the quota stamp.",
+    "Resolve the release-on-B3-failure contradiction. Either mark the registry entry so the guard permits a retry, or keep blocking but emit a cooldown-gated operator alert. Update the misleading comment either way.",
+    "Make is_market_done_today truly side-effect-free (no mkdir, no quarantine, no Telegram) and move the corrupt-lock sealing into the mutating path, or change the documented contract. Dry-run must not mutate state.",
+    "Treat tokenless or legacy locks as non-owned in _verify_lock_ownership (require exact token equality when expected_token is given), and migrate or handle the live tokenless EN lock.",
+    "In _interprocess_lock, close the fd and unlink the lock file if os.write fails after O_EXCL creation. Make empty or unparseable lock files reclaimable after the stale age.",
+    "Remove dead code: the '__corrupt__' check in record_alert_sent, the unreachable return tuples in hhtech_reasoner.detect_safety_and_theme, and the hardcoded-default _quarantine_corrupt_lock shim (point tests at _quarantine_and_seal_corrupt_lock).",
+    "Make resolve_state_dir fail closed (raise or log at ERROR) instead of silently falling back to repo or tempdir lock directories in production. Consolidate the topic_history_registry path resolution into core.paths.",
+    "Revert or isolate the _apply_notion_gates list-normalization removal in app/main.py, and switch token comparison to hmac.compare_digest. Move main.py, hhtech_reasoner, and vox/stage changes out of this task's range or into separately audited commits.",
+    "Provide the untruncated diffs for stages/s05_director_plan.py, core/paths.py, and trend_engine_b1.py, plus proof that orchestrator.run_pipeline resolves under the actual cron invocation (same interpreter, cwd, and env as daily_cron_b1_b2).",
+    "Confirm the topic_history_registry recorded_at format (aware or naive, UTC or VN) and add a test proving the correct VN-day attribution at the 00:00 VN boundary.",
+    "After deploy, show one real production tick on c811de5 producing a tokenized lock file and a cooldown entry consistent with the HEAD semantics (suppressed counter incrementing inside the window).",
+    "Tighten the incident-replay test to assert the exact reason 'registry_committed_pending_render'. Add tests for an exception mid-crawl, non-timeout cooldown errors, and an O_EXCL write failure.",
+    "Provide the full ffprobe JSON (all streams plus format) without truncation, or drop the golden-asset section from this task's packet as out of scope."
+  ],
+  "component_reviews": [
+    {
+      "component": "VPS Runtime Test Suite (Section 5: Primary Unit Tests)",
+      "status": "DEFECT",
+      "analysis": "Exit code 1 with zero captured stdout/stderr. The VPS selection adds tests/test_paths.py, tests/test_config.py, tests/test_gates_manifest.py and tests/vox/test_rule_131_and_136.py to the CI unit set, so the CI 147/147 green result does not cover the failing VPS run. The aggregate code_tests is therefore 1. The rest of the packet reports success around this failure, which is a Rule 121 violation. The raw pytest output is needed, and the failing test(s) must be fixed or root-caused."
+    },
+    {
+      "component": "app/services/daily_market_lock.py :: acquire_in_progress",
+      "status": "DEFECT",
+      "analysis": "The EXHAUSTED_OFFHOURS → IN_PROGRESS transition performs os.replace(lock_path, tombstone) without the tombstone content check used on the stale IN_PROGRESS path. Race: process A transitions and writes a fresh IN_PROGRESS. Process B, holding an earlier raw_stale read, then renames A's fresh lock into its own tombstone, creates its own lock, and unlinks A's. Both A and B return True, so mutual exclusion is broken at exactly 06:00 VN, when racing crons are most likely. On the stale IN_PROGRESS path, the restore step's os.replace(tombstone, lock_path) can overwrite a third racer's newly created lock. Stale takeover is age-only and never checks pid liveness, even though is_pid_alive exists in alert_cooldown. The takeover also applies the caller's ttl_seconds instead of the lock's recorded TTL."
+    },
+    {
+      "component": "app/services/daily_market_lock.py :: is_market_done_today / helpers",
+      "status": "DEFECT",
+      "analysis": "The docstring promises 'DOES NOT perform mutating writes or directory creation'. In practice, _get_lock_file_path calls mkdir(parents=True), resolve_state_dir() mkdirs, and a corrupt lock triggers quarantine, a marker write, and a Telegram broadcast. scripts/run_trend_pipeline.py --dry-run therefore mutates state. _verify_lock_ownership checks 'if actual_token and actual_token != expected_token', so any legacy or tokenless lock (like the live EN_2026-10-15.json) passes verification for any caller. _quarantine_corrupt_lock is a test-only shim in a production module with hardcoded defaults market='EN', date_str='2026-10-16' (Rule 118/125). Registry date matching uses vn_today(datetime.fromisoformat(recorded_at)), and vn_now treats naive datetimes as UTC+7. If topic_history_registry writes naive UTC timestamps, the day boundary shifts by 7h. The write format is not shown, so this is unverified. The MIN_PRODUCTION_HOUR_VN 'minimum production hour' does not block a first pre-06:00 crawl. The dry-run at ~03:52 VN reported 'CRAWL (READY)', which contradicts the stated quota semantics."
+    },
+    {
+      "component": "app/services/trend_engine_b1.py (lock & alert integration)",
+      "status": "DEFECT",
+      "analysis": "(a) At ~L1493, the second acquire_in_progress(m_up, topic_id=temp_task_id) call's return value is ignored. In the guarded path it always fails because this process already holds the O_EXCL file. In the force path it creates a lock with a random token. It is dead or misleading code, and the lock topic_id is never updated. (b) There is no try/finally after acquisition. Any exception between acquire and the terminal mark leaves IN_PROGRESS for the 4h TTL. (c) Only LockTimeoutError is caught around should_send_alert. RuntimeError from _interprocess_lock, IOError from atomic_write_json, and ValueError propagate out before mark_exhausted_today runs, because the exhausted mark is sequenced after alert I/O. The guard should be stamped first. (d) The comment on release_lock after a B3 failure says it lets 'retry or fix proceed', but record_handled_topic has already run, so is_market_done_today returns registry_committed_pending_render for the rest of the VN day. Release is a no-op for retry purposes, and a B3 crash silently loses the day without an operator alert. (e) mark_completed/release_lock return values are not checked or logged by the caller."
+    },
+    {
+      "component": "app/services/alert_cooldown.py",
+      "status": "WARN",
+      "analysis": "The single-lock reservation in should_send_alert is correct, and the Windows OpenProcess/ERROR_INVALID_PARAMETER handling is sound. Defects: if os.write fails after O_CREAT|O_EXCL succeeds, the code raises RuntimeError and leaks both the fd and an empty lock file. parts[0].isdigit() is then false, so the file is never reclaimable and every subsequent alert hits LockTimeoutError, silently suppressing alerts forever. record_alert_sent checks data.get('__corrupt__'), a key _read_cooldown_data never produces, which is dead code (Rule 125). rollback_alert_reservation overwrites suppressed_since_last with the pre-reservation value and loses suppressions recorded by concurrent callers between reserve and rollback. The quarantine name uses second-resolution timestamps, so collisions overwrite earlier quarantines. check_alert_eligibility is labeled read-only but can quarantine and prune files."
+    },
+    {
+      "component": "core/paths.py :: resolve_state_dir / core/atomic_io.py",
+      "status": "WARN",
+      "analysis": "resolve_state_dir uses 'except (PermissionError, OSError): pass' and then silently falls back to repo var/locks, and then to tempdir. If /var/vf/locks is transiently unwritable for one process, processes resolve different lock directories and mutual exclusion silently splits (split-brain, Rule 125). Production should fail closed or log at ERROR. The read_only parameter exists but no caller passes it. The OCR scanner misses this pattern because it only flags untyped 'except: pass'. In atomic_io, the cleanup_corrupt_quarantines tombstone pruning (idx >= max_files) can delete a tombstone younger than 300s that another process is mid-verification on. topic_history_registry adds a third, import-time path resolver (os.path.exists probes plus TOPIC_HISTORY_PATH/EPISODES_DIR env) instead of using core.paths, which recreates the split-brain this increment claims to remove."
+    },
+    {
+      "component": "scripts/orchestrator/boss_orchestrator.py (forensic harness)",
+      "status": "DEFECT",
+      "analysis": "The audit evidence generator contains fabricated or hardcoded evidence, which is the most serious Rule 118/121 issue in this increment. Examples: code_inv_explicit prints a literal {'remove':0,'keep':24,'status':'CLEAN'}. Alignment metrics are literals ('reverse_drift_ms': 4.0, 'actual: 1.00'). The JUnit fallback is 'tests=102 ... skipped=0', and the ruff and ghost fallbacks are literal success strings used when log extraction finds nothing. A hardcoded CI fallback commit '230f4f8' is used when the HEAD run is not found. The ZERO_MOCK script calls sys.exit(0) unconditionally. A hardcoded 'EXPLICIT HUMAN-IN-THE-LOOP USER APPROVAL' block and a network-posture claim are not derived from commands. The harness also states 'Deleted tests/vox/test_align_adversarial.py' while git shows a rename into tests/unit, which relocates the mocks to evade the tests/vox scan rather than eliminating them. Exit-code masking: code_unit_new and code_ghost_live append '; echo EXIT...=$?', so the remote exit is always 0 and the aggregate gate becomes non-falsifiable. 'Alibaba OCR' is a single bare-except-pass AST check that reports medium/low counts as hardcoded 0, so the label overstates its coverage. The task-ID-specific range hardcode ('1792069373' → 96f6483) and the line-slice log extraction lines[19660:19775] are brittle cherry-picking."
+    },
+    {
+      "component": "app/main.py",
+      "status": "DEFECT",
+      "analysis": "Out of scope for this task. _apply_notion_gates removed the list-normalization branch, which was documented as handling nested list payloads from the API, and now calls NOTION_RE.search(last_user) directly. A list payload raises TypeError, which is a functional regression. _verify_auth compares tokens with '!=' instead of hmac.compare_digest. When VF_API_TOKEN is unset, the endpoints are fully unauthenticated, and the safety of that relies on undocumented deployment binding. VF_API_TOKEN is read once at import. The /diag 503 change and the cached git SHA are acceptable."
+    },
+    {
+      "component": "app/services/hhtech_reasoner.py",
+      "status": "WARN",
+      "analysis": "This is a 1165-line full-file churn, likely from line-ending normalization, with a small set of real changes: import cleanup, typed except handlers, and removal of the hardcoded entity '동탄문구점' (positive under Rule 128). It inflates blast radius and makes the diff unreviewable. Unreachable code remains in a touched file: two return tuples after the history_terms branch (tech_geopolitical_battle, ancient_prehistory_anthropology) are dead (Rule 125). The call_gpt6_astra docstring says Tier 2 is kimi-k3, but the code uses claude-sonnet-5. The change is unrelated to the task objective."
+    },
+    {
+      "component": "stages/s05_director_plan.py (NameError fix)",
+      "status": "WARN",
+      "analysis": "The live S05 execution exits 0 with status=ok and scenes=1, and the unit tests exist. However, the 19-line s05 diff is not present in Section 7, which is truncated mid-test, so the fix cannot be line-verified per Rule 121. The incident log shows the actual 06:21 VN crash was 'No module named orchestrator.run_pipeline', not an S05 NameError. orchestrator/ is not in the diffstat, and the B3 resolution proof was run with cwd=/root/video_factory, not from the cron invocation context. No evidence shows Incident 1's root cause is resolved under cron."
+    },
+    {
+      "component": "Live VPS State (/var/vf/locks)",
+      "status": "WARN",
+      "analysis": "EN_2026-10-15.json has no lock_token, while the HEAD mark_exhausted_today always writes one. It also records scan_count=15 against MAX_SCAN_CANDIDATES_DEFAULT=10. alert_cooldown.json shows last_suppressed_utc (17:42Z) about 2h after last_sent_utc (15:41Z) inside the 4h window, yet suppressed_since_last=0. The HEAD throttle path always increments. Both files therefore appear to come from pre-HEAD code, and no post-deploy production tick on c811de5 is evidenced."
+    },
+    {
+      "component": ".github/workflows/ci.yml & Three-Way Sync",
+      "status": "PASS",
+      "analysis": "HEAD c811de5 matches across local, origin/main, and VPS (tree and content hash identical, porcelain clean). Run 38804523427 completed with conclusion=success on all three jobs. Removing ALLOW_SYNTHETIC_ALIGNMENT is correct. The Windows job with pinned dependencies is a good addition. Note that the CI unit selection differs from the VPS selection, which is how the VPS failure escaped CI."
+    },
+    {
+      "component": "tests/unit/test_daily_market_lock.py et al.",
+      "status": "WARN",
+      "analysis": "The incident-replay test asserts reason in ('lock_in_progress', 'registry_committed_pending_render', 'registry_completed'). 'registry_completed' is not a reason the code can emit, and the assertion is loose enough to mask regressions. It should assert the exact expected reason. No test covers concurrent EXHAUSTED_OFFHOURS transition at 06:00, an exception during the crawl leaving IN_PROGRESS, non-LockTimeout cooldown failures, a write failure after O_EXCL in _interprocess_lock, or a naive versus aware recorded_at."
+    }
+  ],
+  "observations": [
+    "Verified physical facts: three-way SHA/tree/content-hash parity, clean porcelain, CI success with per-job conclusions, ghost_scan exit 0, ci_neighbor_tester exit 0, S05 live call exit 0, and B3 module spec resolution from the repo cwd.",
+    "Not verified: the VPS unit suite (exit 1, no output), the untruncated s05/core.paths/trend_engine_b1 diffs, a post-deploy production tick writing tokenized locks, the cron-context resolution of orchestrator.run_pipeline, and the complete ffprobe JSON (truncated at 1500 chars, no format block or audio stream visible).",
+    "The evidence harness is part of the reviewed diff and injects literal success strings. Any score derived from its output is contaminated until the harness is fixed. Harness integrity outranks the feature work in priority.",
+    "The registry-based guard converts any B3 crash into a full-day silent production loss. That may be the intended quota policy, but it needs an explicit operator alert and a documented recovery path (--force / B1_FORCE_CRAWL). Today only corrupt locks trigger an operator alert.",
+    "Scope bundling: the commit range spans AVF-VOX-001, AVF-GOV-001, AVF-ALERT-001 and AVF-TREND-001 work. The harness's own 'segregated auxiliary tasks' text contradicts the single range under audit. This breaks Rule 124 atomicity and makes blast-radius analysis (Rule 138) impossible at the task level.",
+    "The 'OCR 0 Critical / 0 High' result has low evidentiary value. The scanner only matches untyped 'except: pass' and misses typed silent swallows such as core/paths.py resolve_state_dir."
+  ],
+  "adherence_matrix": {
+    "iron_laws_compliance": "VIOLATED (Rule 118 harness literals, 121 unexplained exit 1, 124 bundled scope, 125 dead code/split-brain paths)",
+    "four_pillars_status": "PARTIAL (parity and CI verified; runtime tests failed; lock mutual exclusion has a race)",
+    "zero_ghost_cleanliness": "NOT_VERIFIED (ghost_scan exit 0, but dead code remains in touched files and the scanner does not detect it)"
+  },
+  "audit_file": "C:\\Users\\hunghd2\\Documents\\antigravity\\AI Video Factory\\specs\\boss_audits\\TASK_1792069373_audit_round_5.json"
+}

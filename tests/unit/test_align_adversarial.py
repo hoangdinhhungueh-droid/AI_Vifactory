@@ -5,7 +5,7 @@ Tests:
 - Token alignment with SequenceMatcher opcodes
 - Adversarial tests for inserted, dropped, and substituted words
 - Enforcement of match_ratio >= 0.95 (raising AlignmentUnavailableError on corruption)
-- allow_synthetic_alignment gating (raising in production, allowing in tests with alignment_model='synthetic')
+- Fail-closed contract without Whisper & run_pipeline signature verification (Zero synthetic parameter)
 """
 
 from __future__ import annotations
@@ -84,18 +84,19 @@ def test_align_fails_closed_without_whisper(sample_plan: ScenePlan, dummy_wav: P
     monkeypatch.setitem(sys.modules, "faster_whisper", None)
 
     with pytest.raises(AlignmentUnavailableError, match="faster-whisper runtime alignment unavailable"):
-        align_script_with_audio(sample_plan, dummy_wav, allow_synthetic_alignment=False)
+        align_script_with_audio(sample_plan, dummy_wav)
 
 
-def test_allow_synthetic_alignment_marks_model_synthetic(sample_plan: ScenePlan, dummy_wav: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Asserts that allow_synthetic_alignment=True works in test paths and flags alignment_model='synthetic'."""
-    monkeypatch.setitem(sys.modules, "faster_whisper", None)
+def test_run_pipeline_has_no_synthetic_alignment_parameter() -> None:
+    """Rule 118 & Boss Item 4: Asserts that run_pipeline has zero synthetic-alignment parameters and cannot bypass real Whisper."""
+    import inspect
 
-    timeline, updated_plan = align_script_with_audio(sample_plan, dummy_wav, allow_synthetic_alignment=True)
-    assert timeline.alignment_model == "synthetic"
-    assert len(timeline.words) > 0
-    assert updated_plan.scenes[0].start == 0.0
-    assert updated_plan.scenes[-1].end == pytest.approx(1.0, abs=0.05)
+    from vox.pipeline import run_pipeline
+
+    sig = inspect.signature(run_pipeline)
+    assert "allow_synthetic_alignment" not in sig.parameters
+    assert "allow_synthetic" not in sig.parameters
+    assert "synthetic" not in sig.parameters
 
 
 def test_adversarial_substitution_breaks_match_ratio(sample_plan: ScenePlan, dummy_wav: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -132,7 +133,7 @@ def test_adversarial_substitution_breaks_match_ratio(sample_plan: ScenePlan, dum
     monkeypatch.setitem(sys.modules, "faster_whisper", mock_mod)
 
     with pytest.raises(AlignmentUnavailableError, match="below mandatory threshold 0.95"):
-        align_script_with_audio(sample_plan, dummy_wav, allow_synthetic_alignment=False)
+        align_script_with_audio(sample_plan, dummy_wav)
 
 
 def test_adversarial_dropped_word_detected(sample_plan: ScenePlan, dummy_wav: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -165,7 +166,7 @@ def test_adversarial_dropped_word_detected(sample_plan: ScenePlan, dummy_wav: Pa
     monkeypatch.setitem(sys.modules, "faster_whisper", mock_mod)
 
     with pytest.raises(AlignmentUnavailableError, match="below mandatory threshold 0.95"):
-        align_script_with_audio(sample_plan, dummy_wav, allow_synthetic_alignment=False)
+        align_script_with_audio(sample_plan, dummy_wav)
 
 
 def test_high_fidelity_alignment_succeeds(sample_plan: ScenePlan, dummy_wav: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -200,7 +201,7 @@ def test_high_fidelity_alignment_succeeds(sample_plan: ScenePlan, dummy_wav: Pat
     mock_mod.WhisperModel = MockWhisperModel  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "faster_whisper", mock_mod)
 
-    timeline, updated_plan = align_script_with_audio(sample_plan, dummy_wav, allow_synthetic_alignment=False)
+    timeline, updated_plan = align_script_with_audio(sample_plan, dummy_wav)
     assert timeline.match_ratio >= 0.95
     assert len(timeline.words) == len(script_words)
     assert updated_plan.scenes[0].start == 0.0

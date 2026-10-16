@@ -9,8 +9,12 @@ import time
 from pathlib import Path
 
 from app.services.alert_cooldown import cleanup_corrupt_quarantines as alert_cleanup
-from app.services.daily_market_lock import _quarantine_corrupt_lock
-from app.services.daily_market_lock import cleanup_corrupt_quarantines as lock_cleanup
+from app.services.daily_market_lock import (
+    _quarantine_and_seal_corrupt_lock,
+)
+from app.services.daily_market_lock import (
+    cleanup_corrupt_quarantines as lock_cleanup,
+)
 
 
 def test_alert_cooldown_retention_policy_prunes_excess_files(tmp_path: Path):
@@ -51,15 +55,16 @@ def test_daily_market_lock_retention_policy_prunes_stale_files(tmp_path: Path):
 
 
 def test_quarantine_corrupt_lock_creates_file_and_cleans_up(tmp_path: Path):
-    """Verifies that _quarantine_corrupt_lock moves the unreadable lock to *.corrupt.<epoch> and seals original."""
+    """Verifies that _quarantine_and_seal_corrupt_lock moves the unreadable lock to *.corrupt.<epoch> and seals original."""
     import json
     bad_lock = tmp_path / "EN_20261015.lock"
     bad_lock.write_text("invalid json", encoding="utf-8")
 
-    corrupt_path = _quarantine_corrupt_lock(bad_lock)
+    corrupt_path = _quarantine_and_seal_corrupt_lock(bad_lock, "invalid json", "EN", "2026-10-15")
     assert corrupt_path.exists()
     assert ".corrupt." in corrupt_path.name
 
     marker = json.loads(bad_lock.read_text(encoding="utf-8"))
     assert marker.get("status") == "CORRUPT_FAIL_CLOSED"
+
 

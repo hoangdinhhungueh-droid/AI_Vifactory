@@ -317,3 +317,35 @@ def test_rollback_reservation_preserves_suppressed_count_when_never_sent(temp_st
     assert entry["suppressed_since_last"] == 5
 
 
+def test_windows_interprocess_lock_contention_and_permission_error(temp_state_dir):
+    """Boss Round 4 Item 7: High-contention concurrency test.
+    Exercises concurrent lock acquisition across multiple worker threads,
+    verifying that PermissionError / contention is retried without crashing.
+    """
+    import concurrent.futures
+
+    from app.services.alert_cooldown import _interprocess_lock
+
+    test_file = Path(temp_state_dir) / "contention_test.json"
+    shared_counter = [0]
+    errors = []
+
+    def worker(worker_id: int):
+        try:
+            for _ in range(10):
+                with _interprocess_lock(test_file, timeout=15.0, poll_interval=0.01):
+                    val = shared_counter[0]
+                    time.sleep(0.005)
+                    shared_counter[0] = val + 1
+        except Exception as exc:
+            errors.append((worker_id, exc))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        futures = [executor.submit(worker, i) for i in range(6)]
+        concurrent.futures.wait(futures)
+
+    assert len(errors) == 0, f"Errors under lock contention: {errors}"
+    assert shared_counter[0] == 60
+
+
+

@@ -146,10 +146,19 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
     while True:
         try:
             fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_RDWR)
-            os.write(fd, token.encode("utf-8"))
+            try:
+                os.write(fd, token.encode("utf-8"))
+            except Exception:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+                fd = None
+                lock_file.unlink(missing_ok=True)
+                raise
             acquired = True
             break
-        except FileExistsError:
+        except (FileExistsError, PermissionError):
             now_ts = time.time()
             # Stale lock check: if lock file age exceeds 30.0s and dead pid
             try:
@@ -163,6 +172,10 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
                         if parts and parts[0].isdigit():
                             pid = int(parts[0])
                             dead_pid = not is_pid_alive(pid)
+                        else:
+                            # Empty or unparseable lock file older than 30.0s is considered dead
+                            dead_pid = True
+                            pid = 0
 
                         if dead_pid:
                             # TOCTOU-safe reclaim: atomically rename stale lock_file to unique tombstone
@@ -175,27 +188,29 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
                                         tomb_content = tf.read().strip()
                                     if tomb_content == raw:
                                         logger.warning(
-                                            f"[alert_cooldown] Reclaimed dead PID {pid} lock {lock_file} via tombstone {tombstone.name}"
+                                            "[alert_cooldown] Reclaimed dead PID %s lock %s via tombstone %s",
+                                            pid, lock_file, tombstone.name,
                                         )
                                         os.unlink(str(tombstone))
                                     else:
                                         # Content mismatch: another process updated lock between read and rename.
                                         # Restore lock_file immediately so we do not hijack a live holder's lock (Boss Item 18).
                                         logger.error(
-                                            f"[alert_cooldown] Stale lock mismatch: expected {raw!r}, found {tomb_content!r}. Restoring lock_file!"
+                                            "[alert_cooldown] Stale lock mismatch: expected %r, found %r. Restoring lock_file!",
+                                            raw, tomb_content,
                                         )
                                         try:
                                             os.replace(str(tombstone), str(lock_file))
                                         except OSError as rest_err:
-                                            logger.error(f"[alert_cooldown] Failed to restore lock_file {lock_file}: {rest_err}")
+                                            logger.error("[alert_cooldown] Failed to restore lock_file %s: %s", lock_file, rest_err)
                                 except OSError as t_err:
-                                    logger.warning(f"[alert_cooldown] Error reading/unlinking tombstone {tombstone}: {t_err}")
+                                    logger.warning("[alert_cooldown] Error reading/unlinking tombstone %s: %s", tombstone, t_err)
                             except (FileNotFoundError, OSError) as ren_err:
-                                logger.debug(f"[alert_cooldown] Stale lock race on rename {lock_file}: {ren_err}")
+                                logger.debug("[alert_cooldown] Stale lock race on rename %s: %s", lock_file, ren_err)
                     except OSError as r_err:
-                        logger.warning(f"[alert_cooldown] Error checking stale lock {lock_file}: {r_err}")
+                        logger.warning("[alert_cooldown] Error checking stale lock %s: %s", lock_file, r_err)
             except OSError as stat_err:
-                logger.warning(f"[alert_cooldown] Error stating lock file {lock_file}: {stat_err}")
+                logger.warning("[alert_cooldown] Error stating lock file %s: %s", lock_file, stat_err)
 
             if time.time() - start_time >= timeout:
                 raise LockTimeoutError(
@@ -424,8 +439,6 @@ def record_alert_sent(
 
     with _interprocess_lock(cooldown_file):
         data = _read_cooldown_data(cooldown_file)
-        if data.get("__corrupt__"):
-            data = {}
         entry = data.get(key, {})
         entry["last_sent_utc"] = now_utc.isoformat()
         entry["suppressed_since_last"] = 0
@@ -451,13 +464,15 @@ def rollback_alert_reservation(
 
     with _interprocess_lock(cooldown_file):
         data = _read_cooldown_data(cooldown_file)
-        if key in data:
-            data[key]["last_sent_utc"] = previous_last_sent
-            data[key]["suppressed_since_last"] = previous_suppressed
-            _write_cooldown_data(cooldown_file, data)
-            logger.info(f"[alert_cooldown] Rolled back reservation for '{key}'. Next attempt is allowed.")
-            return True
-    return False
+        entry = data.get(key, {})
+        entry["last_sent_utc"] = previous_last_sent
+        entry["suppressed_since_last"] = previous_suppressed
+        entry["market"] = m_clean
+        entry["alert_type"] = a_clean
+        data[key] = entry
+        _write_cooldown_data(cooldown_file, data)
+        logger.info("[alert_cooldown] Rolled back reservation for '%s'. Next attempt is allowed.", key)
+        return True
 
 
 def reset_alert_cooldown(alert_type: str, market: str, state_dir: Optional[str] = None) -> bool:

@@ -15,22 +15,16 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+from core.paths import (
+    resolve_episodes_dir,
+    resolve_pending_tasks_dir,
+    resolve_topic_history_path,
+)
+
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-REGISTRY_PATH = os.getenv("TOPIC_HISTORY_PATH") or (
-    "/root/video_factory/data/topic_history.json"
-    if os.path.exists("/root/video_factory/data")
-    else str(_PROJECT_ROOT / "data" / "topic_history.json")
-)
-PENDING_DIR = os.getenv("PENDING_TASKS_DIR") or (
-    "/var/vf/pending_tasks"
-    if os.path.exists("/var/vf/pending_tasks")
-    else str(_PROJECT_ROOT / "pending_tasks")
-)
-EPISODES_DIR = os.getenv("EPISODES_DIR") or (
-    "/root/video_factory/episodes"
-    if os.path.exists("/root/video_factory/episodes")
-    else str(_PROJECT_ROOT / "episodes")
-)
+REGISTRY_PATH = str(resolve_topic_history_path())
+PENDING_DIR = str(resolve_pending_tasks_dir(ensure_dir=False))
+EPISODES_DIR = str(resolve_episodes_dir(ensure_dir=False))
 
 
 def _normalize_key(text: str) -> str:

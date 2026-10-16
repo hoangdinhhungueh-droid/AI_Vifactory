@@ -194,6 +194,14 @@ def _worker_stale_takeover(args):
     return acquire_in_progress(market, topic_id=topic_id, state_dir=state_dir, ttl_seconds=10)
 
 
+def _worker_offhours_transition(args):
+    """Top-level worker helper for 06:00 VN off-hours transition race testing (Boss Item 16)."""
+    market, topic_id, state_dir, morning_vn = args
+    from app.services.daily_market_lock import acquire_in_progress
+    return acquire_in_progress(market, topic_id=topic_id, state_dir=state_dir, now=morning_vn)
+
+
+
 def test_market_validation_raises_on_invalid(temp_state_dir):
     """Passing None, empty string, or whitespace should raise ValueError."""
     with pytest.raises(ValueError, match="non-empty string"):
@@ -332,7 +340,7 @@ def test_incident_1_b3_crash_blocks_incident_2_re_crawl(temp_state_dir, monkeypa
     )
 
     assert is_done is True, f"Expected B1 to skip re-crawl on Incident 2, but got is_done=False (reason={reason})"
-    assert reason in ("lock_in_progress", "registry_committed_pending_render", "registry_completed")
+    assert reason == "registry_committed_pending_render"
     assert details.get("topic_id") == topic_id
 
 
@@ -478,5 +486,158 @@ def test_repeated_off_hours_ticks_throttled(temp_state_dir):
     is_done_morn, reason_morn, _ = is_market_done_today("EN", state_dir=temp_state_dir, now=t_morn)
     assert is_done_morn is False, "At 06:00 AM VN, off-hours throttle must expire to permit morning production"
     assert reason_morn in ("stale_lock", "not_produced_yet")
+
+
+def test_concurrent_0600_offhours_transition_race(temp_state_dir):
+    """Boss Item 16: Multiple concurrent processes racing to take over an expired EXHAUSTED_OFFHOURS
+    lock at 06:00 AM VN; strictly ONE process must win and transition to IN_PROGRESS, all others must fail.
+    """
+    from concurrent.futures import ProcessPoolExecutor
+
+    from app.services.daily_market_lock import VN_TZ, mark_exhausted_today
+
+    # 1. Setup an EXHAUSTED_OFFHOURS lock written at 02:00 AM VN
+    t_off = datetime(2026, 10, 16, 2, 0, tzinfo=VN_TZ)
+    marked = mark_exhausted_today("EN", scan_count=10, state_dir=temp_state_dir, now=t_off)
+    assert marked is True
+
+    # 2. At 06:00 AM VN, N processes simultaneously attempt to acquire lock
+    morning_vn = datetime(2026, 10, 16, 6, 0, tzinfo=VN_TZ)
+    n_workers = 6
+    tasks = [("EN", f"morning_topic_{i}", temp_state_dir, morning_vn) for i in range(n_workers)]
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        results = list(executor.map(_worker_offhours_transition, tasks))
+
+    assert results.count(True) == 1, f"Expected exactly 1 takeover winner, got {results.count(True)}: {results}"
+    assert results.count(False) == n_workers - 1
+
+
+def test_crawl_midstream_exception_releases_lock(temp_state_dir, monkeypatch):
+    """Boss Item 18 & 29: If an unhandled exception occurs mid-crawl after acquiring lock,
+    the try/finally block must automatically release the IN_PROGRESS lock so the market is not hung for 4 hours.
+    """
+    from app.services.daily_market_lock import is_market_done_today
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    def mock_failing_fetch(*args, **kwargs):
+        raise RuntimeError("Simulated transient network failure mid-crawl")
+
+    monkeypatch.setattr("app.services.trend_engine_b1.fetch_live_trending_terms", mock_failing_fetch)
+
+    with pytest.raises(RuntimeError, match="Simulated transient network failure"):
+        discover_and_produce_market_trend("EN", state_dir=temp_state_dir, auto_produce=False)
+
+    # Verify that the lock was cleanly released in finally and does NOT block subsequent runs
+    done, reason, _ = is_market_done_today("EN", state_dir=temp_state_dir, check_registry=False, check_episodes=False)
+    assert done is False, f"Lock should have been released on exception, but got done=True ({reason})"
+    assert reason == "not_produced_yet"
+
+
+def test_non_timeout_cooldown_error_does_not_abort_quota_stamp(temp_state_dir, monkeypatch):
+    """Boss Item 18 & 29: If alert cooldown raises a non-timeout error (e.g. ValueError or IOError),
+    mark_exhausted_today has already stamped the lock and the error is suppressed so the quota is protected.
+    """
+    import app.services.alert_cooldown as ac
+    from app.services.daily_market_lock import is_market_done_today
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    # Mock fetch to return candidate that fails pre-filter so crawl exhausts candidates
+    def mock_fetch(*args, **kwargs):
+        return [{"term": "test_term_fail", "approx_traffic": 0, "geos_present": []}]
+
+    monkeypatch.setattr("app.services.trend_engine_b1.fetch_live_trending_terms", mock_fetch)
+
+    # Alert cooldown throws unexpected IOError
+    def mock_broken_alert(*args, **kwargs):
+        raise IOError("Disk full when reserving alert lock")
+
+    monkeypatch.setattr(ac, "should_send_alert", mock_broken_alert)
+
+    # Run crawl: should not raise, should stamp EXHAUSTED_TODAY (or EXHAUSTED_OFFHOURS if before 06:00 VN)
+    res = discover_and_produce_market_trend("EN", state_dir=temp_state_dir, auto_produce=False)
+    assert res == []
+
+    # Market must be marked EXHAUSTED_TODAY or EXHAUSTED_OFFHOURS (both represent quota exhaustion)
+    done, reason, details = is_market_done_today("EN", state_dir=temp_state_dir, check_registry=False, check_episodes=False)
+    assert done is True
+    assert reason in ("lock_exhausted_today", "lock_exhausted_offhours")
+
+
+def test_interprocess_lock_write_failure_cleans_up(tmp_path):
+    """Boss Item 22 & 29: If os.write fails after O_CREAT|O_EXCL creation in _interprocess_lock,
+    it must close the fd and unlink the lock file so it does not leave a permanent unparseable lock.
+    """
+    import unittest.mock as mock
+
+    from app.services.alert_cooldown import _interprocess_lock
+
+    target_file = tmp_path / "test.json"
+    actual_lock_file = target_file.with_suffix(target_file.suffix + ".lock")
+
+    def broken_write(fd, data):
+        raise OSError("Simulated disk error during lock write")
+
+    with mock.patch("os.write", side_effect=broken_write):
+        with pytest.raises(RuntimeError, match="Unexpected error acquiring lock"):
+            with _interprocess_lock(target_file, timeout=1.0):
+                pass
+
+    # Lock file must be unlinked and not left on disk
+    assert not actual_lock_file.exists(), "Lock file should have been cleaned up after write failure"
+
+
+def test_topic_history_registry_vn_day_boundary_attribution(temp_state_dir, monkeypatch):
+    """Boss Item 27: Verify that both UTC-aware and naive ISO timestamps in topic_history_registry
+    are correctly converted to VN date (UTC+7) across the 00:00 VN boundary.
+    """
+    import json
+
+    import app.services.topic_history_registry as thr
+    from app.services.daily_market_lock import VN_TZ, is_market_done_today
+
+    hist_file = Path(temp_state_dir) / "topic_history.json"
+    monkeypatch.setattr(thr, "REGISTRY_PATH", str(hist_file))
+
+    # Case A: 2026-10-15 17:05:00 UTC == 2026-10-16 00:05:00 VN (just after VN midnight)
+    # Naive ISO string "2026-10-15T17:05:00" representing UTC
+    hist_data = {
+        "retatrutide": {
+            "term": "retatrutide",
+            "task_id": "EN_EP0001_retatrutide",
+            "market": "EN",
+            "recorded_at": "2026-10-15T17:05:00",
+        }
+    }
+    hist_file.write_text(json.dumps(hist_data), encoding="utf-8")
+
+    # Probe on 2026-10-16 VN date: should detect entry as recorded on 2026-10-16
+    now_vn_16th = datetime(2026, 10, 16, 8, 0, tzinfo=VN_TZ)
+    done, reason, details = is_market_done_today(
+        "EN",
+        state_dir=temp_state_dir,
+        now=now_vn_16th,
+        check_registry=True,
+        check_episodes=False,
+    )
+    assert done is True
+    assert reason == "registry_committed_pending_render"
+    assert details["topic_id"] == "EN_EP0001_retatrutide"
+    assert details["vn_date"] == "2026-10-16"
+
+    # Case B: 2026-10-15 16:55:00 UTC == 2026-10-15 23:55:00 VN (5 minutes before VN midnight)
+    hist_data["retatrutide"]["recorded_at"] = "2026-10-15T16:55:00Z"
+    hist_file.write_text(json.dumps(hist_data), encoding="utf-8")
+
+    done_b, reason_b, _ = is_market_done_today(
+        "EN",
+        state_dir=temp_state_dir,
+        now=now_vn_16th,
+        check_registry=True,
+        check_episodes=False,
+    )
+    # On 2026-10-16, the entry from 2026-10-15 does NOT match today's date
+    assert done_b is False
+    assert reason_b == "not_produced_yet"
+
 
 

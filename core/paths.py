@@ -8,10 +8,13 @@ Eliminates F2 (Path Entropy). All returned paths are absolute and normalized.
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class RunPaths:
@@ -132,15 +135,16 @@ def resolve_state_dir(custom_dir: Optional[str] = None, read_only: bool = False)
 
     # Standard VPS location
     vps_lock = Path("/var/vf/locks")
-    try:
-        if vps_lock.exists() or (os.path.isdir("/var/vf") and os.name != "nt"):
+    if os.path.isdir("/var/vf") and os.name != "nt":
+        try:
             if not read_only:
                 vps_lock.mkdir(parents=True, exist_ok=True)
             return vps_lock
-    except (PermissionError, OSError):
-        pass
+        except (PermissionError, OSError) as e:
+            logger.error(f"[core.paths] Canonical VPS lock directory /var/vf/locks inaccessible: {e}")
+            raise IOError(f"Production lock directory /var/vf/locks unwriteable (fail-closed): {e}") from e
 
-    # Safe repository local fallback
+    # Safe repository local fallback (development / test only)
     repo_fallback = Path(__file__).resolve().parent.parent / "var" / "locks"
     if not read_only:
         try:
@@ -151,6 +155,35 @@ def resolve_state_dir(custom_dir: Optional[str] = None, read_only: bool = False)
             tmp_fallback.mkdir(parents=True, exist_ok=True)
             return tmp_fallback
     return repo_fallback
+
+
+def resolve_topic_history_path(custom_path: Optional[str] = None) -> Path:
+    """Canonical resolver for topic_history.json registry (Rule 132/138)."""
+    if custom_path:
+        return Path(custom_path)
+    env_path = os.getenv("TOPIC_HISTORY_PATH")
+    if env_path:
+        return Path(env_path)
+    state_dir = os.getenv("VF_STATE_DIR") or os.getenv("AVF_STATE_DIR")
+    if state_dir:
+        return Path(state_dir) / "topic_history.json"
+    if os.path.exists("/root/video_factory/data"):
+        return Path("/root/video_factory/data/topic_history.json")
+    return Path(__file__).resolve().parent.parent / "data" / "topic_history.json"
+
+
+def resolve_pending_tasks_dir(ensure_dir: bool = True) -> Path:
+    """Canonical resolver for pending tasks directory (Rule 132)."""
+    env_dir = os.getenv("PENDING_TASKS_DIR")
+    if env_dir:
+        p = Path(env_dir)
+    elif os.path.isdir("/var/vf/pending_tasks"):
+        p = Path("/var/vf/pending_tasks")
+    else:
+        p = Path(__file__).resolve().parent.parent / "pending_tasks"
+    if ensure_dir:
+        p.mkdir(parents=True, exist_ok=True)
+    return p
 
 
 def resolve_episodes_dir(
