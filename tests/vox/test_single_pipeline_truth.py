@@ -81,8 +81,8 @@ def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200(monkey
     assert res_m.status_code == 200
     assert res_m.json().get("object") == "list"
 
-    # 4. Budget
-    res_b = client.get("/v1/budget")
+    # 4. Budget (Authenticated canonical endpoint)
+    res_b = client.get("/v1/budget", headers=auth_headers)
     assert res_b.status_code == 200
     assert any(p in res_b.json() for p in ("openrouter", "gemini", "cerebras", "mistral"))
 
