@@ -21,9 +21,19 @@ def guard_test_state_dir_isolation(monkeypatch, tmp_path):
         monkeypatch.setenv("VF_STATE_DIR", str(test_state))
         monkeypatch.setenv("AVF_STATE_DIR", str(test_state))
 
+    if "TOPIC_HISTORY_PATH" not in os.environ:
+        test_history = tmp_path / "isolated_topic_history.json"
+        monkeypatch.setenv("TOPIC_HISTORY_PATH", str(test_history))
+
     # Assert that resolved state directory does not point to live VPS production lock path
     resolved = resolve_state_dir(read_only=True)
     resolved_str = str(resolved).replace("\\", "/")
     assert not resolved_str.startswith("/var/vf/locks"), (
         f"Test state isolation violation: resolve_state_dir returned production path '{resolved}'!"
+    )
+
+    from core.paths import resolve_topic_history_path
+    resolved_history = str(resolve_topic_history_path()).replace("\\", "/")
+    assert not resolved_history.startswith("/root/video_factory/data"), (
+        f"Topic history isolation violation: resolve_topic_history_path returned production path '{resolved_history}'!"
     )

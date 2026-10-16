@@ -695,3 +695,29 @@ def test_non_timeout_cooldown_error_preserves_quota_mark(temp_state_dir, monkeyp
 
 
 
+def test_unreadable_lock_file_fails_closed_without_exception(temp_state_dir):
+    """Boss Round 7 Item 3: An unreadable lock file (or directory at lock path) must fail closed
+    (is_done=True, reason='corrupt_lock_fail_closed') without crashing with UnboundLocalError or any exception.
+    """
+    from app.services.daily_market_lock import _get_lock_file_path, is_market_done_today
+
+    mkt = "TEST_UNREADABLE"
+    lock_path = _get_lock_file_path(mkt, state_dir=temp_state_dir)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create a directory at the lock file path (makes open() raise IsADirectoryError / PermissionError / OSError)
+    lock_path.mkdir(parents=True, exist_ok=True)
+
+    try:
+        is_done, reason, details = is_market_done_today(
+            mkt, state_dir=temp_state_dir, check_registry=False, check_episodes=False
+        )
+        assert is_done is True, "Unreadable lock path must fail closed to protect quota"
+        assert reason == "corrupt_lock_fail_closed"
+        assert "error" in details
+    finally:
+        # Cleanup
+        lock_path.rmdir()
+
+
+

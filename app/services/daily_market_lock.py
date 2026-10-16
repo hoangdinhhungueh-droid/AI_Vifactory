@@ -58,8 +58,13 @@ def vn_today(now: Optional[datetime] = None) -> str:
     return vn_now(now).strftime("%Y-%m-%d")
 
 
-def _get_lock_file_path(market: str, state_dir: Optional[str] = None, now: Optional[datetime] = None) -> Path:
-    base_dir = Path(state_dir) if state_dir else resolve_state_dir()
+def _get_lock_file_path(
+    market: str,
+    state_dir: Optional[str] = None,
+    now: Optional[datetime] = None,
+    read_only: bool = False,
+) -> Path:
+    base_dir = Path(state_dir) if state_dir else resolve_state_dir(read_only=read_only)
     locks_dir = base_dir / "b1_daily_lock"
     m_up = _validate_market(market)
     date_str = vn_today(now)
@@ -146,34 +151,43 @@ def is_market_done_today(
         return False, "forced_override", {"market": m_up, "forced": True}
 
     date_str = vn_today(now)
-    lock_path = _get_lock_file_path(m_up, state_dir, now)
+    lock_path = _get_lock_file_path(m_up, state_dir, now, read_only=True)
 
     stale_lock_found = False
     stale_data = {}
 
     # 1. Check lock file (pure read-only: fail-closed on corrupt content without mutating disk)
     if lock_path.exists():
+        content = ""
         try:
-            with open(lock_path, "r", encoding="utf-8") as f:
-                content = f.read().strip()
+            try:
+                with open(lock_path, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+            except OSError as open_err:
+                logger.error(f"[daily_market_lock] Unreadable lock file {lock_path} (fail-closed): {open_err}")
+                return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str, "error": str(open_err)}
+
             if not content:
                 # Concurrent creation grace window
                 try:
                     age = time.time() - lock_path.stat().st_mtime
                     if age < 5.0:
                         time.sleep(0.05)
-                        with open(lock_path, "r", encoding="utf-8") as f:
-                            content = f.read().strip()
-                except OSError:
-                    pass
+                        try:
+                            with open(lock_path, "r", encoding="utf-8") as f:
+                                content = f.read().strip()
+                        except OSError as retry_err:
+                            logger.debug(f"[daily_market_lock] Grace window retry read failed for {lock_path}: {retry_err}")
+                except OSError as stat_err:
+                    logger.debug(f"[daily_market_lock] Grace window stat failed for {lock_path}: {stat_err}")
             if not content:
                 try:
                     age = time.time() - lock_path.stat().st_mtime
                     if age < 5.0:
                         logger.info(f"[daily_market_lock] Lock {lock_path} empty during concurrent write (age < 5s). Treating as lock_in_progress.")
                         return True, "lock_in_progress", {"market": m_up, "date": date_str, "status": "IN_PROGRESS"}
-                except OSError:
-                    pass
+                except OSError as stat_err:
+                    logger.debug(f"[daily_market_lock] Grace window empty stat failed for {lock_path}: {stat_err}")
                 logger.error(f"[daily_market_lock] Lock file is empty: {lock_path} (fail-closed)")
                 return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str, "error": "empty file"}
 
@@ -198,13 +212,14 @@ def is_market_done_today(
                     except json.JSONDecodeError as decode_err:
                         logger.error(f"[daily_market_lock] Corrupt lock file {lock_path} (fail-closed): {decode_err}")
                         return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str, "error": str(decode_err)}
-                    except Exception:
+                    except Exception as retry_other_err:
+                        logger.debug(f"[daily_market_lock] Grace window json retry failed: {retry_other_err}")
                         return True, "lock_in_progress", {"market": m_up, "date": date_str, "status": "IN_PROGRESS"}
                 else:
                     logger.error(f"[daily_market_lock] Corrupt lock file {lock_path} (fail-closed): {e}")
                     return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str, "error": str(e)}
-            except OSError:
-                logger.error(f"[daily_market_lock] Corrupt lock file {lock_path} (fail-closed): {e}")
+            except OSError as stat_err:
+                logger.error(f"[daily_market_lock] Corrupt lock file {lock_path} stat error (fail-closed): {e} (stat: {stat_err})")
                 return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str, "error": str(e)}
 
         status = (data.get("status") or "").upper()
@@ -401,8 +416,8 @@ def acquire_in_progress(
             f_tmp.flush()
             try:
                 os.fsync(f_tmp.fileno())
-            except OSError:
-                pass
+            except OSError as fsync_err:
+                logger.debug(f"[daily_market_lock] fsync skipped on {tmp_path}: {fsync_err}")
         try:
             os.link(str(tmp_path), str(lock_path))
             acquired = True
@@ -432,8 +447,8 @@ def acquire_in_progress(
         try:
             with open(lock_path, "r", encoding="utf-8") as f:
                 raw_stale = f.read().strip()
-        except OSError:
-            pass
+        except OSError as read_err:
+            logger.debug(f"[daily_market_lock] Could not read candidate lock file {lock_path}: {read_err}")
 
         if not raw_stale:
             try:
@@ -442,8 +457,8 @@ def acquire_in_progress(
                     time.sleep(0.05)
                     with open(lock_path, "r", encoding="utf-8") as f:
                         raw_stale = f.read().strip()
-            except OSError:
-                pass
+            except OSError as retry_err:
+                logger.debug(f"[daily_market_lock] Retrying read after stat error on {lock_path}: {retry_err}")
 
         if not raw_stale:
             try:
@@ -451,8 +466,8 @@ def acquire_in_progress(
                 if (time.time() - mtime) < 5.0:
                     logger.info(f"[daily_market_lock] Lock {lock_path} empty during concurrent creation (age < 5s). Treating as held IN_PROGRESS.")
                     return False
-            except OSError:
-                pass
+            except OSError as stat_err:
+                logger.debug(f"[daily_market_lock] Secondary stat check error on {lock_path}: {stat_err}")
             _quarantine_and_seal_corrupt_lock(lock_path, "File is completely empty (0 bytes)", m_up, date_str, now)
             return False
 
@@ -475,8 +490,8 @@ def acquire_in_progress(
                     if (time.time() - mtime) < 5.0:
                         logger.info(f"[daily_market_lock] Lock {lock_path} unparseable during concurrent creation (age < 5s). Treating as held IN_PROGRESS.")
                         return False
-                except OSError:
-                    pass
+                except OSError as stat_err:
+                    logger.debug(f"[daily_market_lock] Stat check error during corrupt quarantine on {lock_path}: {stat_err}")
                 _quarantine_and_seal_corrupt_lock(lock_path, str(j_err), m_up, date_str, now)
                 return False
 
@@ -521,8 +536,8 @@ def acquire_in_progress(
                     t_age = time.time() - takeover_lock.stat().st_mtime
                     if t_age > 10.0:
                         takeover_lock.unlink(missing_ok=True)
-                except OSError:
-                    pass
+                except OSError as unl_err:
+                    logger.debug(f"[daily_market_lock] Error unlinking stale takeover lock {takeover_lock}: {unl_err}")
                 logger.debug(f"[daily_market_lock] Lost takeover race to another contender for {m_up}")
                 return False
             except OSError as tok_err:
@@ -569,8 +584,8 @@ def acquire_in_progress(
                         f_tmp.flush()
                         try:
                             os.fsync(f_tmp.fileno())
-                        except OSError:
-                            pass
+                        except OSError as fsync_err:
+                            logger.debug(f"[daily_market_lock] fsync error on tmp_new {tmp_new}: {fsync_err}")
                     os.replace(str(tmp_new), str(lock_path))
                     logger.info(f"[daily_market_lock] Won exclusive takeover of {action_desc} lock for {m_up} on {date_str}")
                     return True
@@ -582,8 +597,8 @@ def acquire_in_progress(
             finally:
                 try:
                     os.close(fd_takeover)
-                except OSError:
-                    pass
+                except OSError as close_err:
+                    logger.debug(f"[daily_market_lock] Error closing fd_takeover: {close_err}")
                 takeover_lock.unlink(missing_ok=True)
     except Exception as ex:
         logger.error(f"[daily_market_lock] Error inspecting existing lock {lock_path}: {ex}")
@@ -650,7 +665,13 @@ def mark_completed(
             return False
         token = lock_token or (existing.get("lock_token") if existing else uuid.uuid4().hex)
     else:
-        token = lock_token or uuid.uuid4().hex
+        if lock_token is not None:
+            logger.error(
+                f"[daily_market_lock] Refusing mark_completed for {m_up}: "
+                f"caller provided lock_token {lock_token[:8]} but lock file {lock_path} no longer exists"
+            )
+            return False
+        token = uuid.uuid4().hex
 
     payload = {
         "market": m_up,
@@ -703,7 +724,13 @@ def mark_exhausted_today(
             return False
         token = lock_token or (existing.get("lock_token") if existing else uuid.uuid4().hex)
     else:
-        token = lock_token or uuid.uuid4().hex
+        if lock_token is not None:
+            logger.error(
+                f"[daily_market_lock] Refusing mark_exhausted for {m_up}: "
+                f"caller provided lock_token {lock_token[:8]} but lock file {lock_path} no longer exists"
+            )
+            return False
+        token = uuid.uuid4().hex
 
     if now_vn.hour < MIN_PRODUCTION_HOUR_VN and not allow_off_hours:
         # Pre-06:00 VN off-hours: write short-TTL throttle lock expiring at 06:00 AM VN
@@ -784,9 +811,19 @@ def release_lock(
             return False
 
     try:
+        # Re-check lock token immediately before unlinking to minimize TOCTOU window
+        if not force_unverified and lock_token is not None:
+            re_verified, _ = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
+            if not re_verified:
+                logger.warning(
+                    f"[daily_market_lock] Refusing release_lock for {m_up}: "
+                    f"ownership lost immediately prior to unlink"
+                )
+                return False
         lock_path.unlink()
         logger.info(f"[daily_market_lock] Released lock for {m_up} (token={str(lock_token)[:8]})")
         return True
     except OSError as e:
         logger.warning(f"[daily_market_lock] Failed to remove lock file {lock_path}: {e}")
         return False
+

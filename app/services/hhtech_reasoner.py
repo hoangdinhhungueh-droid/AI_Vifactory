@@ -7,6 +7,8 @@ Standardized Architecture (24/08/2026 - Go-Live 2026):
   - Google Trends Rising / Breakout Queries Injection for Act 1 Hook Shock.
   - YouTube Safety Labeling & 4-Tier Content Categorization (Decisions 19/08 - 24/08).
   - Vietnamese Output for Human Gate 1 (topic_name_vi, niche_angle_brief, story_direction_5_arcs).
+  - Rule 128 / Rule 130 Anti-Bias: Specific ephemeral case keywords (including '동탄문구점')
+    have been permanently removed from keyword lists to enforce generic canonical contracts.
 
 PATTERN 3 UPDATE (02/09/2026):
   - Routed through Model Gateway for automatic cost tracking and telemetry
@@ -79,7 +81,9 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
     fraud_terms = ['fraud', 'scam', 'ponzi', 'madoff', 'enron', 'ftx', 'theranos', 'livedoor', 'ライブドア', 'worldcom', 'lehman', 'bankruptcy', 'insolvency', 'restructuring', 'creditor', 'liquidation', 'chapter 11', '다단계', '보이스피싱', '전세사기', '동양그룹', '東芝不正会計', 'オリンパス', '파산', '부도', '회생', '도산', '倒産', '破産']
     gambling_terms = ['gambling', 'casino', 'slot', 'pachinko', 'パチンコ', '도박', '강원랜드', '바다이야기', '사행성']
     societal_terms = ['kodokushi', '孤独死', '過労死', 'ひきこもり', '引きこもり', '고독사', '은둔']
-    history_terms = ['war', 'uprising', 'movement', 'occupation', '광주', '민주화', '일제강점기', '한국전쟁', '제주 4.3', '을미사변', 'roman empire', 'byzantine', 'crusade', 'genghis khan', 'mongol', 'ottoman', 'tulip mania']
+    history_terms = ['uprising', 'movement', 'occupation', '광주', '민주화', '일제강점기', '한국전쟁', '제주 4.3', '을미사변', 'roman empire', 'byzantine', 'crusade', 'genghis khan', 'mongol', 'ottoman', 'tulip mania']
+    tech_terms = ['chip', 'semiconductor', 'asml', 'tsmc', 'huawei', 'nvidia', 'geopolitic', 'supply chain', 'lithography', 'satellite', 'submarine cable', 'rare earth', 'quantum', 'embargo', 'sanction', 'trade war', 'export control', 'trade ban', 'export ban', 'tech ban', 'telecom switch']
+    ancient_terms = ['ancient', 'gobekli', 'göbekli', 'younger dryas', 'denisovan', 'megalith', 'clovis', 'prehistoric', 'lost civilization', 'civilization', 'ice age', 'stonehenge', 'sundaland', 'neanderthal', 'australopithecus', 'archaeolog', 'fossil', 'hominid', '잃어버린 문명', '선사시대', '고대 인류', '고대 문명', '縄文', '古代文明', 'ancient humans']
 
     if any(t in text for t in truecrime_terms):
         return (
@@ -105,23 +109,23 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
             "YT-Societal-Crisis-Documentary",
             "SOCIETAL CRISIS DOCUMENTARY: objective socio-economic analysis of demographic shifts and welfare safety net gaps; empathetic, constructive, and systemic."
         )
-    elif any(t in text for t in history_terms):
-        return (
-            "modern_history_untold",
-            "YT-History-Factual-Neutral",
-            "FACTUAL HISTORY DOCUMENTARY: objective analysis of institutional decay, economic debasement, and systemic power dynamics backed by historical sources."
-        )
-    elif any(t in text for t in ['chip', 'semiconductor', 'asml', 'tsmc', 'huawei', 'nvidia', 'geopolitic', 'supply chain', 'lithography', 'satellite', 'submarine cable', 'rare earth', 'quantum', 'embargo', 'sanction', 'trade war', 'export control', 'trade ban', 'export ban', 'tech ban', 'telecom switch']):
+    elif any(t in text for t in tech_terms):
         return (
             "tech_geopolitical_battle",
             "YT-Tech-Geopolitical-Investigation",
             "TECH & GEOPOLITICAL INVESTIGATION: analyze technological chokeholds, semiconductor espionage, state-subsidized dominance, and supply chain warfare with verified industrial and trade records."
         )
-    elif any(t in text for t in ['ancient', 'gobekli', 'göbekli', 'younger dryas', 'denisovan', 'megalith', 'clovis', 'prehistoric', 'lost civilization', 'civilization', 'ice age', 'stonehenge', 'sundaland', 'neanderthal', 'australopithecus', 'archaeolog', 'fossil', 'hominid', '잃어버린 문명', '선사시대', '고대 인류', '고대 문명', '縄文', '古代文明', 'ancient humans']):
+    elif any(t in text for t in ancient_terms):
         return (
             "ancient_prehistory_anthropology",
             "YT-Educational-Anthropology",
             "PREHISTORIC ANTHROPOLOGY & ANCIENT HUMAN SURVIVAL: forensic deep-dive into fossil evidence, archaeological stratigraphy, and evolutionary mechanics; strictly educational and evidence-grounded."
+        )
+    elif bool(re.search(r"\bwar\b", text)) or any(t in text for t in history_terms):
+        return (
+            "modern_history_untold",
+            "YT-History-Factual-Neutral",
+            "FACTUAL HISTORY DOCUMENTARY: objective analysis of institutional decay, economic debasement, and systemic power dynamics backed by historical sources."
         )
     elif any(t in text for t in ['stoic', 'stoicism', 'marcus aurelius', 'seneca', 'epictetus', 'musashi', 'dokkodo', '독행도', '스토아', '아우렐리우스', 'burnout', 'mental resilience', 'zen detachment', '번아웃', '孤独の力', '宮本武蔵', '折れない心', '人間関係の疲れ', '내면의 평화', '감정 조절']):
         return (

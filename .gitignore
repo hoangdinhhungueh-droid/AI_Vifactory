@@ -102,9 +102,15 @@ python*.bat
 python*.cmd
 login_acc*.bat
 scripts/login_acc*.py
+scripts/setup_*_profiles.py
 temp_test/
 
 # Boss audit runtime state and visual audit reports
 specs/boss_audits/.state_*.json
 specs/boss_audits/visual_audit_report.json
+
+# Antigravity Quota (AGQ) Local Fleet Manager (Rule 126 & 137)
+app/services/agq_*
+scripts/agq*
+tests/unit/test_agq_fleet.py
 

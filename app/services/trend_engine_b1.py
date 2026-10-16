@@ -32,6 +32,14 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Optional
 
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception as _reconf_err:
+    sys.stderr.write(f"Notice: stdio reconfigure skipped: {_reconf_err}\n")
+
 # Ensure workspace root is in sys.path
 _PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
 if _PROJECT_ROOT not in sys.path:
@@ -740,16 +748,16 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
     # 1. Gate Order Integrity Guard (Rule 125 & Anti-Ghost Out-of-Order Gate Violation)
     # Human Gate 1 can ONLY be dispatched BEFORE B3/Gate 2. If B3 is already done or HG2 dispatched, BLOCK!
     if task_id:
-        for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-            plan_file = os.path.join(ep_base, task_id, "director_plan.json")
-            audit_file = os.path.join(ep_base, task_id, "visual_convergence_audit.json")
-            if os.path.exists(plan_file) or os.path.exists(audit_file):
-                logger.warning(
-                    f"[trend_engine] GATE ORDER VIOLATION BLOCKED: Refusing to dispatch Human Gate 1 for {task_id} "
-                    f"because B3 Director Plan / HG2 visual convergence already exists ({plan_file})! "
-                    f"Human Gate 1 MUST NEVER be dispatched after Human Gate 2."
-                )
-                return
+        ep_dir = resolve_episodes_dir(ensure_dir=False)
+        plan_file = ep_dir / task_id / "director_plan.json"
+        audit_file = ep_dir / task_id / "visual_convergence_audit.json"
+        if plan_file.exists() or audit_file.exists():
+            logger.warning(
+                f"[trend_engine] GATE ORDER VIOLATION BLOCKED: Refusing to dispatch Human Gate 1 for {task_id} "
+                f"because B3 Director Plan / HG2 visual convergence already exists ({plan_file})! "
+                f"Human Gate 1 MUST NEVER be dispatched after Human Gate 2."
+            )
+            return
 
     # 2. Fact & Causal Audit Strict Pass Enforcement (Rule 118 & Rule 130)
     try:
@@ -1330,16 +1338,14 @@ def discover_and_produce_market_trend(
                 else:
                     recon_card["task_id"] = temp_task_id
                 if recon_card and isinstance(recon_card, dict):
-                    for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-                        try:
-                            base_p = Path(ep_base)
-                            if base_p.is_dir():
-                                t_dir = base_p / temp_task_id
-                                t_dir.mkdir(parents=True, exist_ok=True)
-                                (t_dir / "competitor_intel_card.json").write_text(
-                                    json.dumps(recon_card, ensure_ascii=False, indent=2), encoding="utf-8")
-                        except (OSError, PermissionError) as _pe_err:
-                            logger.debug(f"[{temp_task_id}] Could not persist competitor_intel_card to {ep_base}: {_pe_err}")
+                    ep_base = resolve_episodes_dir(ensure_dir=True)
+                    try:
+                        t_dir = ep_base / temp_task_id
+                        t_dir.mkdir(parents=True, exist_ok=True)
+                        (t_dir / "competitor_intel_card.json").write_text(
+                            json.dumps(recon_card, ensure_ascii=False, indent=2), encoding="utf-8")
+                    except (OSError, PermissionError) as _pe_err:
+                        logger.warning(f"[{temp_task_id}] Could not persist competitor_intel_card to {ep_base}: {_pe_err}")
                     gap_val = recon_card.get("competitor_narrative_anatomy", {}).get("fatal_explanatory_vacuum", "") or comp_gap
                     if gap_val:
                         t_obj["competitor_differentiation_gap"] = gap_val
@@ -1364,18 +1370,16 @@ def discover_and_produce_market_trend(
                 t_obj["grounding_intel"] = grounding_intel
                 print(f"  ✅ [B1.5.5 Grounding Gate] {gate_msg}")
 
-                # Persist grounding_intel.json to episode folders under temp_task_id
-                for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-                    try:
-                        p = Path(ep_base)
-                        if p.is_dir() or (p.parent.is_dir() and os.access(p.parent, os.W_OK)):
-                            g_dir = p / temp_task_id
-                            g_dir.mkdir(parents=True, exist_ok=True)
-                            (g_dir / "grounding_intel.json").write_text(
-                                json.dumps(grounding_intel, ensure_ascii=False, indent=2), encoding="utf-8"
-                            )
-                    except OSError:
-                        pass
+                # Persist grounding_intel.json to episode folder under temp_task_id
+                ep_base = resolve_episodes_dir(ensure_dir=True)
+                try:
+                    g_dir = ep_base / temp_task_id
+                    g_dir.mkdir(parents=True, exist_ok=True)
+                    (g_dir / "grounding_intel.json").write_text(
+                        json.dumps(grounding_intel, ensure_ascii=False, indent=2), encoding="utf-8"
+                    )
+                except OSError as _gp_err:
+                    logger.debug(f"[{temp_task_id}] Could not persist grounding_intel to {ep_base}: {_gp_err}")
             except Exception as g_err:
                 logger.error(f"[{temp_task_id}] Grounding Layer exception: {g_err}. Rotating to next candidate...")
                 print(f"  ❌ [B1.5.5 Grounding Gate] Exception: {g_err}. Rotating to next candidate...")
@@ -1409,8 +1413,7 @@ def discover_and_produce_market_trend(
                 logger.warning(f"[{temp_task_id}] Early SEO package forge warning: {seo_err}")
 
             # Temporarily save pending task under temp_task_id so B2 can read metadata
-            pending_dir = "/var/vf/pending_tasks"
-            os.makedirs(pending_dir, exist_ok=True)
+            pending_dir = str(resolve_pending_tasks_dir())
             temp_task_file = os.path.join(pending_dir, f"{temp_task_id}.json")
             with open(temp_task_file, "w", encoding="utf-8") as tf:
                 json.dump(t_obj, tf, ensure_ascii=False, indent=2)
@@ -1443,6 +1446,17 @@ def discover_and_produce_market_trend(
                     )
                     print(f"\n{cb_err_msg}\n")
                     logger.critical(f"[{m_up}] B2 Circuit Breaker triggered on exception after {b2_attempts_count} attempts.")
+                    if not custom_seed:
+                        mark_ok = mark_exhausted_today(
+                            market=m_up,
+                            scan_count=idx,
+                            state_dir=state_dir,
+                            extra_metadata={"reason": "b2_circuit_breaker_exception", "b2_attempts_count": b2_attempts_count},
+                            lock_token=lock_token,
+                            owner_pid=os.getpid(),
+                        )
+                        if mark_ok:
+                            is_terminal_stamped = True
                     _send_guarded_alert("b2_circuit_breaker", m_up, cb_err_msg, state_dir=state_dir)
                     terminal_alert_sent = True
                     break
@@ -1460,13 +1474,13 @@ def discover_and_produce_market_trend(
                         logger.debug(f"[{temp_task_id}] Notice removing temp task file: {_rm_err}")
                 # Clean up temp episode directory to prevent stale cache contamination (Rule 118 & 125)
                 import shutil
-                for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-                    t_dir = Path(ep_base) / temp_task_id
-                    if t_dir.exists():
-                        try:
-                            shutil.rmtree(t_dir)
-                        except OSError as _rm_err:
-                            logger.debug(f"[{temp_task_id}] Notice cleaning temp episode dir {t_dir}: {_rm_err}")
+                ep_base = resolve_episodes_dir(ensure_dir=False)
+                t_dir = ep_base / temp_task_id
+                if t_dir.exists():
+                    try:
+                        shutil.rmtree(t_dir)
+                    except OSError as _rm_err:
+                        logger.debug(f"[{temp_task_id}] Notice cleaning temp episode dir {t_dir}: {_rm_err}")
 
                 # Rule 118 Hard Circuit Breaker for B2 (Anti-Token-Drain Law)
                 if b2_attempts_count >= max_b2_attempts:
@@ -1509,7 +1523,6 @@ def discover_and_produce_market_trend(
             print(f"  ⚖️ [B2.1 Fact & Causal Audit Result] Verdict={f_verdict}, Score={f_score}/10")
 
             if f_verdict == "FAIL" or f_score < 7.5:
-                b2_attempts_count += 1
                 veto_reason = fact_audit.get("veto_reason") or fact_audit.get("audit_notes") or "Script failed fact/causal integrity audit"
                 logger.error(f"[{temp_task_id}] B2.1 Audit REJECTED ({f_score}/10): {veto_reason}. Candidate rejected, rotating to next candidate...")
                 print(f"  ❌ [B2.1 REJECTED] {veto_reason}. (B2 Attempt {b2_attempts_count}/{max_b2_attempts})")
@@ -1523,13 +1536,13 @@ def discover_and_produce_market_trend(
                         logger.debug(f"[{temp_task_id}] Notice removing temp task file: {_rm_err}")
                 # Clean up temp episode directory to prevent stale cache contamination (Rule 118 & 125)
                 import shutil
-                for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-                    t_dir = Path(ep_base) / temp_task_id
-                    if t_dir.exists():
-                        try:
-                            shutil.rmtree(t_dir)
-                        except OSError as _rm_err:
-                            logger.debug(f"[{temp_task_id}] Notice cleaning temp episode dir {t_dir}: {_rm_err}")
+                ep_base = resolve_episodes_dir(ensure_dir=False)
+                t_dir = ep_base / temp_task_id
+                if t_dir.exists():
+                    try:
+                        shutil.rmtree(t_dir)
+                    except OSError as _rm_err:
+                        logger.debug(f"[{temp_task_id}] Notice cleaning temp episode dir {t_dir}: {_rm_err}")
                 if b2_attempts_count >= max_b2_attempts:
                     cb_msg = (
                         f"🚨 <b>[RULE 118 B2 CIRCUIT BREAKER ACTIVATED]</b>\n"
@@ -1655,30 +1668,27 @@ def discover_and_produce_market_trend(
 
             # Migrate episode and pending task artifacts from temp_task_id to canonical task_id
             import shutil
-            for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-                try:
-                    base_p = Path(ep_base)
-                    if not base_p.is_dir():
-                        continue
-                    temp_p = base_p / temp_task_id
-                    canon_p = base_p / task_id
-                    if temp_p.exists():
-                        canon_p.mkdir(parents=True, exist_ok=True)
-                        for f_item in temp_p.iterdir():
-                            dest_file = canon_p / f_item.name
-                            try:
-                                if f_item.is_file():
-                                    shutil.copy2(f_item, dest_file)
-                                elif f_item.is_dir():
-                                    shutil.copytree(f_item, dest_file, dirs_exist_ok=True)
-                            except Exception as _cp_err:
-                                logger.warning(f"Could not copy {f_item} to {dest_file}: {_cp_err}")
+            ep_base = resolve_episodes_dir(ensure_dir=True)
+            try:
+                temp_p = ep_base / temp_task_id
+                canon_p = ep_base / task_id
+                if temp_p.exists():
+                    canon_p.mkdir(parents=True, exist_ok=True)
+                    for f_item in temp_p.iterdir():
+                        dest_file = canon_p / f_item.name
                         try:
-                            shutil.rmtree(temp_p)
-                        except Exception as _rm_err:
-                            logger.warning(f"Could not remove temp folder {temp_p}: {_rm_err}")
-                except (OSError, PermissionError) as _pe_err:
-                    logger.debug(f"Could not migrate artifacts in {ep_base}: {_pe_err}")
+                            if f_item.is_file():
+                                shutil.copy2(f_item, dest_file)
+                            elif f_item.is_dir():
+                                shutil.copytree(f_item, dest_file, dirs_exist_ok=True)
+                        except Exception as _cp_err:
+                            logger.warning(f"Could not copy {f_item} to {dest_file}: {_cp_err}")
+                    try:
+                        shutil.rmtree(temp_p)
+                    except Exception as _rm_err:
+                        logger.warning(f"Could not remove temp folder {temp_p}: {_rm_err}")
+            except (OSError, PermissionError) as _pe_err:
+                logger.debug(f"Could not migrate artifacts in {ep_base}: {_pe_err}")
 
             # Update canonical pending task file with full object
             canon_task_file = os.path.join(pending_dir, f"{task_id}.json")
@@ -1723,104 +1733,47 @@ def discover_and_produce_market_trend(
             exhaust_reason = "bottleneck_downstream_gates" if viability_passed_candidates else "no_candidates_passed_viability"
 
             # 1. First: Stamp EXHAUSTED_TODAY immediately so automated cron will NOT retry in a loop today (Boss Item 14 & 18)
-            mark_ok = mark_exhausted_today(
-                market=m_up,
-                scan_count=scanned_count,
-                state_dir=state_dir,
-                extra_metadata={
-                    "viability_evals_count": viability_evals_count,
-                    "viability_passed_count": len(viability_passed_candidates),
-                    "reason": exhaust_reason,
-                },
-                lock_token=lock_token,
-                owner_pid=os.getpid(),
-            )
-            if mark_ok:
-                is_terminal_stamped = True
-                print(f"🛑 [DAILY MARKET LOCK] Marked Market {m_up} as EXHAUSTED_TODAY ({scanned_count} candidates evaluated, reason={exhaust_reason}).")
-                print("   Automated scheduler will NOT retry today. Next scheduled market will run tomorrow automatically.")
-            else:
-                logger.warning(f"[{m_up}] Failed to mark market as EXHAUSTED_TODAY.")
+            if not is_terminal_stamped:
+                mark_ok = mark_exhausted_today(
+                    market=m_up,
+                    scan_count=scanned_count,
+                    state_dir=state_dir,
+                    extra_metadata={
+                        "viability_evals_count": viability_evals_count,
+                        "viability_passed_count": len(viability_passed_candidates),
+                        "reason": exhaust_reason,
+                    },
+                    lock_token=lock_token,
+                    owner_pid=os.getpid(),
+                )
+                if mark_ok:
+                    is_terminal_stamped = True
+                    print(f"🛑 [DAILY MARKET LOCK] Marked Market {m_up} as EXHAUSTED_TODAY ({scanned_count} candidates evaluated, reason={exhaust_reason}).")
+                    print("   Automated scheduler will NOT retry today. Next scheduled market will run tomorrow automatically.")
+                else:
+                    logger.warning(f"[{m_up}] Failed to mark market as EXHAUSTED_TODAY.")
 
             # 2. Second: Alert dispatch with cooldown (catch broad Exception so alert I/O can NEVER bypass quota mark)
             if viability_passed_candidates:
                 # Candidates passed B1 Viability Gate, but were stopped downstream (Critic, Grounding, or B2 Story/Fact Audit)
-                try:
-                    decision = should_send_alert("b1_b2_bottleneck", m_up, state_dir=state_dir)
-                except Exception as alert_err:
-                    logger.warning(f"[{m_up}] Alert cooldown evaluation notice: {alert_err}. Suppressing alert (fail-closed).")
-                    decision = None
-
-                if decision and decision.can_send:
-                    alert_msg = (
-                        f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
-                        f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live cho thị trường <b>{m_up}</b>.\n"
-                        f"📊 <b>Kết quả B1:</b> Có <b>{len(viability_passed_candidates)}</b> ứng viên đạt Viability Gate (≥ 8.0/10).{decision.suffix}\n"
-                        f"❌ <b>Điểm nghẽn:</b> Toàn bộ ứng viên đã bị chặn tại các chốt kiểm định hạ nguồn (Adversarial Critic Gate hoặc B2 Story/Fact Audit Gate).\n"
-                        f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra log chi tiết."
-                    )
-                    logger.warning(f"[{m_up}] {len(viability_passed_candidates)} candidates passed viability gate but none passed downstream B2/B3 gates.")
-                    try:
-                        from app.services.telegram_buttons import send_telegram_broadcast
-                        sent = send_telegram_broadcast(alert_msg)
-                        if not sent:
-                            logger.warning(f"[{m_up}] Telegram broadcast returned falsy. Rolling back reservation (Boss Item 19).")
-                            rollback_alert_reservation(
-                                "b1_b2_bottleneck",
-                                m_up,
-                                previous_suppressed=decision.suppressed,
-                                previous_last_sent=decision.previous_last_sent,
-                                state_dir=state_dir,
-                            )
-                    except Exception as _tel_err:
-                        logger.warning(f"Failed to send B1 bottleneck alert to Telegram: {_tel_err}")
-                        rollback_alert_reservation(
-                            "b1_b2_bottleneck",
-                            m_up,
-                            previous_suppressed=decision.suppressed,
-                            previous_last_sent=decision.previous_last_sent,
-                            state_dir=state_dir,
-                        )
-                elif decision:
-                    logger.info(f"[{m_up}] Suppressed repeated B2/B3 bottleneck alert due to cooldown ({decision.suppressed} suppressed).")
+                alert_msg = (
+                    f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
+                    f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live cho thị trường <b>{m_up}</b>.\n"
+                    f"📊 <b>Kết quả B1:</b> Có <b>{len(viability_passed_candidates)}</b> ứng viên đạt Viability Gate (≥ 8.0/10).\n"
+                    f"❌ <b>Điểm nghẽn:</b> Toàn bộ ứng viên đã bị chặn tại các chốt kiểm định hạ nguồn (Adversarial Critic Gate hoặc B2 Story/Fact Audit Gate).\n"
+                    f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra log chi tiết."
+                )
+                logger.warning(f"[{m_up}] {len(viability_passed_candidates)} candidates passed viability gate but none passed downstream B2/B3 gates.")
+                _send_guarded_alert("b1_b2_bottleneck", m_up, alert_msg, state_dir=state_dir)
             else:
-                try:
-                    decision = should_send_alert("b1_viability", m_up, state_dir=state_dir)
-                except Exception as alert_err:
-                    logger.warning(f"[{m_up}] Alert cooldown evaluation notice: {alert_err}. Suppressing alert (fail-closed).")
-                    decision = None
-
-                if decision and decision.can_send:
-                    alert_msg = (
-                        f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
-                        f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live từ đa kênh (RSS, Discover, YouTube) cho thị trường <b>{m_up}</b>, "
-                        f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 8.0/10) để làm phóng sự điều tra.{decision.suffix}\n"
-                        f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra hoặc cấp seed chỉ định."
-                    )
-                    logger.warning(f"[{m_up}] No candidates passed viability gate.")
-                    try:
-                        from app.services.telegram_buttons import send_telegram_broadcast
-                        sent = send_telegram_broadcast(alert_msg)
-                        if not sent:
-                            logger.warning(f"[{m_up}] Telegram broadcast returned falsy. Rolling back reservation (Boss Item 19).")
-                            rollback_alert_reservation(
-                                "b1_viability",
-                                m_up,
-                                previous_suppressed=decision.suppressed,
-                                previous_last_sent=decision.previous_last_sent,
-                                state_dir=state_dir,
-                            )
-                    except Exception as _tel_err:
-                        logger.warning(f"Failed to send B1 alert to Telegram: {_tel_err}")
-                        rollback_alert_reservation(
-                            "b1_viability",
-                            m_up,
-                            previous_suppressed=decision.suppressed,
-                            previous_last_sent=decision.previous_last_sent,
-                            state_dir=state_dir,
-                        )
-                elif decision:
-                    logger.info(f"[{m_up}] Suppressed repeated B1 viability alert due to cooldown ({decision.suppressed} suppressed).")
+                alert_msg = (
+                    f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
+                    f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live từ đa kênh (RSS, Discover, YouTube) cho thị trường <b>{m_up}</b>, "
+                    f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 8.0/10) để làm phóng sự điều tra.\n"
+                    f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra hoặc cấp seed chỉ định."
+                )
+                logger.warning(f"[{m_up}] No candidates passed viability gate.")
+                _send_guarded_alert("b1_viability", m_up, alert_msg, state_dir=state_dir)
 
         return produced_topics
     finally:

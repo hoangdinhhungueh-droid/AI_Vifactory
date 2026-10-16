@@ -61,8 +61,8 @@ try:
     @app.get("/metrics")
     def metrics_endpoint():
         return _Resp(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
-except ImportError:
-    pass
+except ImportError as _p_err:
+    _logging.getLogger("app.main").debug("Prometheus client not installed, skipping /metrics: %s", _p_err)
 
 _logger = _logging.getLogger("app.main")
 
@@ -107,19 +107,41 @@ def health():
 
 # ── Auth Helper ─────────────────────────────────────────────────────────────
 VF_API_TOKEN = os.getenv("VF_API_TOKEN", "").strip()
+_last_unset_token_log_time: float = 0.0
 
 
 def _verify_auth(request: Request) -> None:
-    """Verifies Bearer token if VF_API_TOKEN is configured in environment.
-    If VF_API_TOKEN is unset, logs a critical alert and allows internal loopback IPC.
+    """Verifies Bearer token.
+    Fail-closed posture: If VF_API_TOKEN is unset, rejects requests with 401 Unauthorized
+    unless ALLOW_UNAUTHENTICATED_LOOPBACK=1 is explicitly configured.
+    Rate limits unset-token warning to once per 60 seconds.
     Uses timing-safe hmac.compare_digest (Rule 121/125 & Boss Item 25).
     """
+    global _last_unset_token_log_time
     token = os.getenv("VF_API_TOKEN", "").strip() or VF_API_TOKEN
     if not token:
-        _logger.critical(
-            "[SECURITY ALERT] VF_API_TOKEN is unset. Unauthenticated loopback IPC call allowed."
+        allow_loopback = (
+            os.getenv("ALLOW_UNAUTHENTICATED_LOOPBACK") == "1"
+            or os.getenv("VF_ALLOW_UNAUTH_LOOPBACK") == "1"
         )
+        now = time.time()
+        if now - _last_unset_token_log_time >= 60.0:
+            _last_unset_token_log_time = now
+            if allow_loopback:
+                _logger.warning(
+                    "[SECURITY ALERT] VF_API_TOKEN is unset. VF_ALLOW_UNAUTH_LOOPBACK=1 is active; loopback call permitted."
+                )
+            else:
+                _logger.critical(
+                    "[SECURITY ALERT] VF_API_TOKEN is unset and loopback opt-in not set. Rejecting request (fail-closed)."
+                )
+        if not allow_loopback:
+            raise HTTPException(
+                status_code=401,
+                detail="Unauthorized: server authentication token not configured (fail-closed)",
+            )
         return
+
     auth_header = request.headers.get("Authorization", "")
     expected = f"Bearer {token}"
     if not hmac.compare_digest(auth_header, expected):

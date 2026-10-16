@@ -1,0 +1,43 @@
+on_gates`, the cached git SHA and the 503 on diag failure are all reasonable. Round 6 Item 12 is unresolved: with VF_API_TOKEN unset, `/v1/chat/completions` and `/call_llm` stay open (fail-open) and log CRITICAL on every request with no rate limit. Fail-closed by default, or an explicit opt-in such as VF_ALLOW_UNAUTH_LOOPBACK=1, is still required. This file remains out of scope for this task."
+    },
+    {
+      "component": "app/services/hhtech_reasoner.py, scripts/orchestrator/ghost_code_detector.py",
+      "status": "DEFECT",
+      "analysis": "Both files show full-file line-ending churn: 1165 and 713 changed lines for roughly 4 and 1 semantic changes. The two unreachable `return (...)` tuples after the history branch in `detect_safety_and_theme` are still present. Removal was requested in Rounds 3, 4, 5 and 6. The '동탄문구점' keyword removal is undocumented. No .gitattributes was added (Round 4)."
+    },
+    {
+      "component": "scripts/orchestrator/boss_orchestrator.py (evidence harness)",
+      "status": "DEFECT",
+      "analysis": "The harness still routes on task-ID literals ('1792069373', 'LOCK'), which Round 4 asked to remove. It injects hardcoded narrative as evidence: the 'RULE 118 ARCHITECTURAL JUSTIFICATION' prints, the 'NETWORK POSTURE NOTE', 'EXPLICIT HUMAN-IN-THE-LOOP USER APPROVAL', the 24-module rationale, and the echoed 'PRE_FILTER_FALSIFIABILITY_VERIFIED' string. The generic collector returns hardcoded `vps_parity_code: 0`, `smoke_gate_code: 0` and `ffprobe_code: 0` without running anything. These are fabricated success codes (Rule 118/121). Incident 2 is labelled '15:29 VN (08:29 UTC)', but the extracted lines are timestamped 2026-10-15 23:08 UTC. Log extraction uses a fixed `lines[19660:19775]` slice. `save_state` claims to be atomic but uses write_text, and `load_or_init_state` swallows exceptions with `pass`. The OCR scanner still only detects untyped `except: pass`, so its '0 Critical / 0 High' verdict misses the typed silent swallows listed above."
+    },
+    {
+      "component": "Makefile / lint",
+      "status": "DEFECT",
+      "analysis": "The ruff targets for `vox/ tools/ tests/vox/ app/main.py ...` and `app/ scripts/ --exit-zero` were removed without justification. Round 6 Item 10 required restoring them, or running `ruff check app/ scripts/` with exit 0 and attaching the output. Neither is evidenced."
+    },
+    {
+      "component": "Live production behaviour (task objective: zero duplicate B1 alerts)",
+      "status": "DEFECT",
+      "analysis": "The only raw Telegram evidence is KR msg_id 736 and 737, 265 ms apart, from pre-HEAD code, which demonstrates the defect. No post-16b4b6a cron run is shown. The required proof is a single tokenized lock acquisition, a terminal stamp containing lock_token and viability_passed_count, exactly one sendMessage, and a second tick that skips with zero sends (Round 6 Item 14). The live `/var/vf/locks` state section is absent from this packet. The dry-run 'EN: CRAWL (READY)' at 10:06 VN is consistent but does not prove dedup."
+    },
+    {
+      "component": "specs/boss_audits/BUNDLED_SCOPE_USER_APPROVAL.md",
+      "status": "WARN",
+      "analysis": "This is a self-authored attestation, not a verifiable approval artifact such as a chat or issue reference with a timestamp. It claims five partitions, but the table lists only two (AVF-MAP-001, AVF-GOV-001). The range still bundles VOX, GOV, codemap, profile tooling and the quota guard (Rule 124)."
+    }
+  ],
+  "observations": [
+    "Real progress since Round 6: test_daily_market_lock no longer fails on the VPS (8 failures resolved via registry_path injection), RunPaths normalisation passes test_paths.py, the LLM circuit-breaker `except Exception: pass` is gone, and Windows CI exists with pinned dependencies.",
+    "Fail-closed design is inconsistent across the three guards. The daily lock fails closed on corruption but can crash with UnboundLocalError on an unreadable file. The cooldown file fails open on corruption. The B2-exception breaker releases the lock. One documented policy per risk class (quota burn versus alert spam) is still missing.",
+    "The B3 entrypoint flip to `orchestrator.run_pipeline` reverses the direction of the original crash, while both `orchestrator/run_pipeline.py` and `scripts/orchestrator/run_pipeline.py` still exist. Until one is deleted and ghost_scan detects duplicate module basenames, the cron failure mode can recur.",
+    "Evidence-harness integrity is still the governing risk. Hardcoded success codes and narrative strings inside the reviewed diff mean the packet's own framing cannot be trusted. Only raw tool output was weighted in this audit.",
+    "Committed PII and an in-source credential default are blocking regardless of functional correctness. Removing the file from HEAD does not remove it from history. History rewriting is destructive and needs explicit user approval (Rule 137), while credential rotation should happen immediately.",
+    "ffprobe golden telemetry is not included in this packet. The Round 6 waiver (no video produced by this task) is accepted, but the harness should report it as 'WAIVED' rather than a hardcoded ffprobe_code=0."
+  ],
+  "adherence_matrix": {
+    "iron_laws_compliance": "VIOLATED (Rule 118 harness literals and committed PII/secret default; 121 fabricated exit codes; 124 bundled scope; 125 dead helpers, dual entrypoints, duplicated alert logic; 132 hardcoded paths; 138 unexplained vps_runner and main.py changes; 139 silent `except OSError: pass`)",
+    "four_pillars_status": "PARTIAL (parity, CI success, VPS pytest 121/121, S05 live call verified; post-HEAD dedup behaviour, cron-context B3 resolution and lint unverified)",
+    "zero_ghost_cleanliness": "PARTIAL (ghost_scan exit 0, but unreachable returns, unused public helpers, unused _PROJECT_ROOT and duplicate run_pipeline modules remain undetected)"
+  },
+  "audit_file": "/root/video_factory/specs/boss_audits/TASK_1792069373_audit_round_7.json"
+}

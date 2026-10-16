@@ -5,6 +5,7 @@ Mandate:
   2. Tracks suppressed alert count and appends '(+N suppressed)' to next eligible alert.
   3. Records last_sent_utc ONLY after successful dispatch (or atomic reservation).
   4. Cross-platform safe: Windows & Linux compatible, fail-closed inter-process locking.
+  5. Corrupt state policy: Fail-open quarantine. Corrupt state files are quarantined to *.corrupt.<ts> and state resets to {} so operator alert delivery is preserved.
 """
 
 from __future__ import annotations
@@ -151,8 +152,8 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
             except Exception:
                 try:
                     os.close(fd)
-                except OSError:
-                    pass
+                except OSError as close_err:
+                    logger.debug(f"[alert_cooldown] Error closing fd on abort: {close_err}")
                 fd = None
                 lock_file.unlink(missing_ok=True)
                 raise
@@ -256,7 +257,7 @@ def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
         corrupt_path = file_path.with_name(f"{file_path.name}.corrupt.{ts}")
         logger.error(
             f"[alert_cooldown] Corrupt cooldown file {file_path}: {e}. "
-            f"Quarantining to {corrupt_path.name} (fail-closed)"
+            f"Quarantining to {corrupt_path.name} (fail-open to preserve operator visibility)"
         )
         try:
             os.replace(str(file_path), str(corrupt_path))
@@ -269,88 +270,6 @@ def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
 def _write_cooldown_data(file_path: Path, data: Dict[str, Any]) -> None:
     """Atomic write via core.atomic_io.atomic_write_json (Rule 125 single truth)."""
     atomic_write_json(file_path, data)
-
-
-def check_alert_eligibility(
-    alert_type: str,
-    market: str,
-    state_dir: Optional[str] = None,
-    window_seconds: int = DEFAULT_COOLDOWN_WINDOW_SECONDS,
-    now: Optional[datetime] = None,
-) -> Tuple[bool, int, str]:
-    """Pure read-only check of alert eligibility. Does NOT record suppression or mutate state.
-
-    Returns:
-        (can_send, suppressed_count, formatted_suffix)
-        - can_send: True if window has passed or first alert; False if throttled.
-        - suppressed_count: number of alerts suppressed during the cooldown window.
-        - formatted_suffix: formatted note e.g. " (+3 cảnh báo tương tự đã được gom trong 4h qua)"
-    """
-    a_clean, m_clean = _validate_alert_args(alert_type, market)
-
-    if os.getenv("DISABLE_ALERT_COOLDOWN") == "1":
-        return True, 0, ""
-
-    key = f"{a_clean}::{m_clean}"
-    cooldown_file = _resolve_cooldown_file(state_dir)
-
-    with _interprocess_lock(cooldown_file):
-        data = _read_cooldown_data(cooldown_file)
-
-    now_utc = now.astimezone(timezone.utc) if now else datetime.now(timezone.utc)
-    entry = data.get(key, {})
-    last_sent_str = entry.get("last_sent_utc")
-    suppressed = int(entry.get("suppressed_since_last", 0))
-
-    if last_sent_str:
-        try:
-            last_dt = datetime.fromisoformat(last_sent_str)
-            if last_dt.tzinfo is None:
-                last_dt = last_dt.replace(tzinfo=timezone.utc)
-            elapsed = (now_utc - last_dt).total_seconds()
-            if elapsed < window_seconds:
-                return False, suppressed, ""
-        except Exception as _p_err:
-            logger.error(f"[alert_cooldown] Error parsing timestamp '{last_sent_str}': {_p_err}. Failing closed.")
-            return False, suppressed, ""
-
-    # Eligible to send!
-    suffix = ""
-    if suppressed > 0:
-        hrs = max(1, int(round(window_seconds / 3600.0)))
-        suffix = f"\n<i>ℹ️ (+{suppressed} cảnh báo tương tự đã được gom trong {hrs}h qua)</i>"
-
-    return True, suppressed, suffix
-
-
-def record_alert_suppressed(
-    alert_type: str,
-    market: str,
-    state_dir: Optional[str] = None,
-    now: Optional[datetime] = None,
-) -> int:
-    """Explicitly record that an alert was suppressed, incrementing suppressed_since_last atomically.
-    Returns the updated suppressed_since_last count.
-    """
-    a_clean, m_clean = _validate_alert_args(alert_type, market)
-    key = f"{a_clean}::{m_clean}"
-    cooldown_file = _resolve_cooldown_file(state_dir)
-    now_utc = now.astimezone(timezone.utc) if now else datetime.now(timezone.utc)
-
-    with _interprocess_lock(cooldown_file):
-        data = _read_cooldown_data(cooldown_file)
-        entry = data.get(key, {})
-        current_suppressed = int(entry.get("suppressed_since_last", 0))
-        new_suppressed = current_suppressed + 1
-        entry["suppressed_since_last"] = new_suppressed
-        entry["last_suppressed_utc"] = now_utc.isoformat()
-        entry["market"] = m_clean
-        entry["alert_type"] = a_clean
-        data[key] = entry
-        _write_cooldown_data(cooldown_file, data)
-
-    logger.info(f"[alert_cooldown] Recorded suppression for '{key}'. Total suppressed: {new_suppressed}")
-    return new_suppressed
 
 
 def should_send_alert(
@@ -391,19 +310,23 @@ def should_send_alert(
                     last_dt = last_dt.replace(tzinfo=timezone.utc)
                 elapsed = (now_utc - last_dt).total_seconds()
                 if elapsed < window_seconds:
-                    # Throttled! Atomically increment suppressed counter and persist
-                    new_suppressed = suppressed + 1
-                    entry["suppressed_since_last"] = new_suppressed
-                    entry["last_suppressed_utc"] = now_utc.isoformat()
-                    entry["market"] = m_clean
-                    entry["alert_type"] = a_clean
-                    data[key] = entry
-                    _write_cooldown_data(cooldown_file, data)
-                    logger.info(
-                        f"[alert_cooldown] Throttled alert '{key}' (elapsed {int(elapsed)}s < {window_seconds}s). "
-                        f"Total suppressed: {new_suppressed}"
-                    )
-                    return AlertSendDecision(False, new_suppressed, "", last_sent_str)
+                    if reserve_on_send:
+                        # Throttled! Atomically increment suppressed counter and persist
+                        new_suppressed = suppressed + 1
+                        entry["suppressed_since_last"] = new_suppressed
+                        entry["last_suppressed_utc"] = now_utc.isoformat()
+                        entry["market"] = m_clean
+                        entry["alert_type"] = a_clean
+                        data[key] = entry
+                        _write_cooldown_data(cooldown_file, data)
+                        logger.info(
+                            f"[alert_cooldown] Throttled alert '{key}' (elapsed {int(elapsed)}s < {window_seconds}s). "
+                            f"Total suppressed: {new_suppressed}"
+                        )
+                        return AlertSendDecision(False, new_suppressed, "", last_sent_str)
+                    else:
+                        # Pure read-only check: return current suppression count without mutating state
+                        return AlertSendDecision(False, suppressed, "", last_sent_str)
             except Exception as _p_err:
                 logger.error(f"[alert_cooldown] Error parsing timestamp '{last_sent_str}': {_p_err}. Failing closed.")
                 return AlertSendDecision(False, suppressed, "", last_sent_str)
@@ -425,30 +348,6 @@ def should_send_alert(
             _write_cooldown_data(cooldown_file, data)
 
         return AlertSendDecision(True, suppressed, suffix, last_sent_str)
-
-
-def record_alert_sent(
-    alert_type: str,
-    market: str,
-    state_dir: Optional[str] = None,
-    now: Optional[datetime] = None,
-) -> None:
-    """Record that an alert was successfully dispatched to Telegram, preserving existing fields (Boss Item 19)."""
-    a_clean, m_clean = _validate_alert_args(alert_type, market)
-    key = f"{a_clean}::{m_clean}"
-    cooldown_file = _resolve_cooldown_file(state_dir)
-    now_utc = now.astimezone(timezone.utc) if now else datetime.now(timezone.utc)
-
-    with _interprocess_lock(cooldown_file):
-        data = _read_cooldown_data(cooldown_file)
-        entry = data.get(key, {})
-        entry["last_sent_utc"] = now_utc.isoformat()
-        entry["suppressed_since_last"] = 0
-        entry.pop("last_suppressed_utc", None)
-        entry["market"] = m_clean
-        entry["alert_type"] = a_clean
-        data[key] = entry
-        _write_cooldown_data(cooldown_file, data)
 
 
 def rollback_alert_reservation(
@@ -480,16 +379,3 @@ def rollback_alert_reservation(
             key, entry["suppressed_since_last"]
         )
         return True
-
-
-def reset_alert_cooldown(alert_type: str, market: str, state_dir: Optional[str] = None) -> bool:
-    """Reset cooldown state for testing or manual override."""
-    a_clean, m_clean = _validate_alert_args(alert_type, market)
-    key = f"{a_clean}::{m_clean}"
-    cooldown_file = _resolve_cooldown_file(state_dir)
-    with _interprocess_lock(cooldown_file):
-        data = _read_cooldown_data(cooldown_file)
-        if key in data:
-            del data[key]
-            _write_cooldown_data(cooldown_file, data)
-    return True

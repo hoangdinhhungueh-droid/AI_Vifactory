@@ -123,3 +123,22 @@ def test_ghost_scan_detects_quarantine_directory_residue_and_exits_nonzero(tmp_p
 
     exit_code = ghost_scan.main()
     assert exit_code == 1
+
+
+def test_ghost_scan_detects_duplicate_entrypoints(tmp_path, monkeypatch):
+    """Adversarial Test: Multiple run_pipeline.py in canonical directories must trigger violation."""
+    fake_root = tmp_path / "repo"
+    fake_root.mkdir()
+    orch_dir = fake_root / "orchestrator"
+    orch_dir.mkdir()
+    (orch_dir / "run_pipeline.py").write_text("# main entrypoint", encoding="utf-8")
+
+    scripts_orch_dir = fake_root / "scripts" / "orchestrator"
+    scripts_orch_dir.mkdir(parents=True)
+    (scripts_orch_dir / "run_pipeline.py").write_text("# duplicate entrypoint", encoding="utf-8")
+
+    monkeypatch.setattr(ghost_scan, "REPO_ROOT", fake_root)
+    errors = ghost_scan.scan_duplicate_entrypoints()
+    assert len(errors) == 1
+    assert "DUPLICATE ENTRYPOINT DETECTED" in errors[0]
+

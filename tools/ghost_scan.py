@@ -8,9 +8,12 @@ Enforces:
 """
 
 import ast
+import logging
 import os
 import sys
 from pathlib import Path
+
+logger = logging.getLogger("ghost_scan")
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -121,8 +124,8 @@ def scan_untracked_canonical_files() -> list[str]:
                 top_dir = parts[0]
                 if top_dir in CANONICAL_DIRS:
                     untracked_errors.append(f"[UNTRACKED CANONICAL FILE FOUND] {line}")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[ghost_scan] Error checking untracked files: {e}")
     return untracked_errors
 
 
@@ -166,8 +169,8 @@ def scan_state_dir_residues() -> list[str]:
     try:
         if vps_state.exists() and os.name != "nt":
             state_dirs.append(vps_state)
-    except (PermissionError, OSError):
-        pass
+    except (PermissionError, OSError) as e:
+        logger.debug(f"[ghost_scan] Cannot access VPS locks path: {e}")
 
     for sdir in state_dirs:
         if not sdir.exists():
@@ -187,10 +190,35 @@ def scan_state_dir_residues() -> list[str]:
                     mtime = os.path.getmtime(p)
                     if time.time() - mtime > 300.0:
                         residue_errors.append(f"[STATE DIR RESIDUE] Abandoned stale lock file (>5min old): {p}")
-                except OSError:
-                    pass
+                except OSError as e:
+                    logger.debug(f"[ghost_scan] Could not stat lock file {p}: {e}")
 
     return residue_errors
+
+
+def scan_duplicate_entrypoints() -> list[str]:
+    """Detect duplicate entrypoint module names across the codebase (Rule 125 & Boss Round 6).
+
+    Disallows having multiple physical files with the same entrypoint name (e.g., run_pipeline.py)
+    in different canonical directories (such as orchestrator/ vs scripts/orchestrator/).
+    """
+    errors = []
+    entrypoint_names = ["run_pipeline.py"]
+    for ep_name in entrypoint_names:
+        matches = []
+        for cdir_name in CANONICAL_DIRS:
+            cdir = REPO_ROOT / cdir_name
+            if not cdir.exists():
+                continue
+            for p in cdir.rglob(ep_name):
+                rel = p.relative_to(REPO_ROOT)
+                matches.append(str(rel).replace("\\", "/"))
+        if len(matches) > 1:
+            errors.append(
+                f"[DUPLICATE ENTRYPOINT DETECTED] Multiple conflicting '{ep_name}' modules found: {matches}. "
+                f"Rule 125 requires exactly ONE canonical entrypoint (orchestrator/{ep_name})."
+            )
+    return errors
 
 
 def main() -> int:
@@ -203,6 +231,7 @@ def main() -> int:
     untracked_errors = scan_untracked_canonical_files()
     gitignored_residues = scan_gitignored_paths()
     state_errors = scan_state_dir_residues()
+    duplicate_entrypoint_errors = scan_duplicate_entrypoints()
 
     print("  [GITIGNORED RESIDUE AUDIT (Boss Item 16)]")
     if gitignored_residues["wrappers"]:
@@ -224,7 +253,14 @@ def main() -> int:
 
     quarantine_errors = [f"[QUARANTINE RESIDUE FOUND] {qf}" for qf in gitignored_residues["quarantine_files"]]
 
-    all_errors = import_errors + ghost_errors + untracked_errors + state_errors + quarantine_errors
+    all_errors = (
+        import_errors
+        + ghost_errors
+        + untracked_errors
+        + state_errors
+        + quarantine_errors
+        + duplicate_entrypoint_errors
+    )
 
     if all_errors:
         print(f"❌ FOUND {len(all_errors)} GHOST / BYPASS VIOLATION(S):")
@@ -236,6 +272,7 @@ def main() -> int:
     print("✅ ZERO GHOST REMNANTS DETECTED:")
     print("  - Canonical code is 100% decoupled from legacy/.")
     print("  - No unapproved versioned (_v2/_v3) or backup files in active paths.")
+    print("  - No duplicate canonical entrypoints.")
     print("=" * 70)
     return 0
 

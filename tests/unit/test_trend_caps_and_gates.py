@@ -148,14 +148,14 @@ def test_env_int_parsing_and_minimum_bound():
 def test_b3_invocation_command_contract():
     """Verifies B3 invocation constructs module call with --profile prod and --run-id."""
     task_id = "EN_EP0001_test_case"
-    expected_prefix = [sys.executable, "-m", "scripts.orchestrator.run_pipeline"]
+    expected_prefix = [sys.executable, "-m", "orchestrator.run_pipeline"]
     expected_args = ["--profile", "prod", "--run-id", task_id]
 
-    # Reconstruct cmd matching trend_engine_b1.py:1488
+    # Reconstruct cmd matching trend_engine_b1.py
     cmd = [
         sys.executable,
         "-m",
-        "scripts.orchestrator.run_pipeline",
+        "orchestrator.run_pipeline",
         "--profile",
         "prod",
         "--run-id",
@@ -223,18 +223,25 @@ def test_b3_failure_yields_zero_committed_and_single_failed_alert(tmp_path):
 
 
 def test_b3_module_find_spec_and_subprocess_help_contract():
-    """Verify B3 scripts.orchestrator.run_pipeline can be found by importlib and runs with --help."""
+    """Verify B3 orchestrator.run_pipeline can be found by importlib and runs with --help."""
+    import importlib
     import importlib.util
     import subprocess
     import sys
     from pathlib import Path
 
     project_root = Path(__file__).resolve().parents[2]
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
+    project_root_str = str(project_root)
+    if project_root_str in sys.path:
+        sys.path.remove(project_root_str)
+    sys.path.insert(0, project_root_str)
 
-    # 1. importlib find_spec must find scripts.orchestrator.run_pipeline
-    spec = importlib.util.find_spec("scripts.orchestrator.run_pipeline")
+    if "orchestrator" in sys.modules:
+        del sys.modules["orchestrator"]
+    importlib.invalidate_caches()
+
+    # 1. importlib find_spec must find orchestrator.run_pipeline
+    spec = importlib.util.find_spec("orchestrator.run_pipeline")
     assert spec is not None
     assert spec.origin is not None
     assert "run_pipeline" in spec.origin
@@ -243,7 +250,7 @@ def test_b3_module_find_spec_and_subprocess_help_contract():
     sub_env = os.environ.copy()
     sub_env["PYTHONPATH"] = f"{project_root}:{sub_env.get('PYTHONPATH', '')}".strip(":")
     proc = subprocess.run(
-        [sys.executable, "-m", "scripts.orchestrator.run_pipeline", "--help"],
+        [sys.executable, "-m", "orchestrator.run_pipeline", "--help"],
         cwd=str(project_root),
         env=sub_env,
         capture_output=True,
@@ -375,6 +382,125 @@ def test_market_exhausted_today_lock_and_cron_skip(tmp_path, monkeypatch):
     )
     assert is_done_next is False
     assert reason_next == "not_produced_yet"
+
+
+def test_b2_circuit_breaker_emits_exactly_one_telegram_alert(tmp_path, monkeypatch):
+    """Rule 118 & Boss Item 18: When B2 attempts reach MAX_B2_ATTEMPTS:
+    1. Circuit breaker triggers and stamps EXHAUSTED_TODAY lock with reason='b2_circuit_breaker'.
+    2. Exactly ONE telegram alert with '[RULE 118 B2 CIRCUIT BREAKER ACTIVATED]' is emitted.
+    3. Pipeline halts and produces 0 topics.
+    4. Subsequent cron run sees market is done/exhausted today and skips.
+    """
+    from app.services.daily_market_lock import is_market_done_today
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    monkeypatch.delenv("B1_FORCE_CRAWL", raising=False)
+
+    candidates = [
+        {
+            "term": f"corporate bankruptcy collapse scandal {i}",
+            "approx_traffic": "google_news_live",
+            "source": "google_news_live",
+            "geos_present": ["US"],
+        }
+        for i in range(5)
+    ]
+
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=candidates), \
+         patch("app.services.trend_engine_b1.perform_direct_platform_recon", return_value={"rising_queries": [], "viral_videos": [], "news_catalysts": [{"title": "News"}]}), \
+         patch("app.services.trend_engine_b1.fetch_ground_truth_factsheet", return_value={"extract": "Entity factsheet"}), \
+         patch("app.services.trend_engine_b1.assess_keyword_video_viability", return_value={"viability_score": 9.0, "is_video_viable": True, "reasoning": "High impact", "specific_viral_angle": "Test Angle"}), \
+         patch("app.services.adversarial_critic_b1.audit_candidate_trend_alignment", return_value={"verdict": "PASS", "audit_score": 9.5}), \
+         patch("app.services.trend_engine_b1.run_b15", return_value={"competitor_narrative_anatomy": {"fatal_explanatory_vacuum": "gap"}}), \
+         patch("app.services.grounding_layer_b15.run_grounding_research", return_value={}), \
+         patch("app.services.grounding_layer_b15.passes_grounding_gate", return_value=(True, "Grounding passed")), \
+         patch("app.services.seo_package_forge.forge_seo_package", return_value={}), \
+         patch("app.services.trend_engine_b1.reason_topic_niche", return_value={"search_specific_keyword": "corporate collapse", "topic_name_vi": "Test", "task_slug": "test_slug", "niche_angle_brief": "Brief", "story_direction_5_arcs": "Arcs"}), \
+         patch("app.services.story_engine_b2.generate_5_arc_story", return_value={"story": "Rejected story", "story_gate_score": 6, "story_verdict": "REJECT", "fact_causal_audit": {"verdict": "FAIL", "audit_score": 5.0}}), \
+         patch("app.services.trend_engine_b1.record_handled_topic"), \
+         patch("app.services.telegram_buttons.send_telegram_broadcast", return_value="msg_12345") as mock_tele, \
+         patch("app.services.trend_engine_b1.commit_trend_task") as mock_commit:
+
+        produced = discover_and_produce_market_trend(
+            market="EN",
+            auto_produce=True,
+            max_scan_candidates=5,
+            max_b2_attempts=2,
+            state_dir=str(tmp_path),
+        )
+
+        # 1. Pipeline produced 0 topics and committed 0 tasks
+        assert len(produced) == 0
+        mock_commit.assert_not_called()
+
+        # 2. Exactly ONE telegram broadcast emitted
+        assert mock_tele.call_count == 1
+        broadcast_msg = mock_tele.call_args[0][0]
+        assert "[RULE 118 B2 CIRCUIT BREAKER ACTIVATED]" in broadcast_msg
+
+        # 3. Market lock is stamped EXHAUSTED_TODAY with reason="b2_circuit_breaker"
+        is_done, reason, details = is_market_done_today("EN", state_dir=str(tmp_path), check_registry=False, check_episodes=False)
+        assert is_done is True
+        assert reason == "lock_exhausted_today"
+        assert details.get("reason") == "b2_circuit_breaker"
+
+
+def test_b2_exception_circuit_breaker_stamps_exhausted_today(tmp_path, monkeypatch):
+    """Boss Round 7 Item 4: When B2 raises exceptions on consecutive candidates reaching max_b2_attempts:
+    1. Circuit breaker triggers and stamps EXHAUSTED_TODAY lock with reason='b2_circuit_breaker_exception'.
+    2. Exactly ONE telegram alert with '[RULE 118 B2 CIRCUIT BREAKER ACTIVATED]' is emitted.
+    3. The lock is NOT released in finally block (prevents automated quota burn).
+    4. Subsequent cron run sees market is done/exhausted today and skips.
+    """
+    from app.services.daily_market_lock import is_market_done_today
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    monkeypatch.delenv("B1_FORCE_CRAWL", raising=False)
+
+    candidates = [
+        {
+            "term": f"corporate bankruptcy exception test {i}",
+            "approx_traffic": "google_news_live",
+            "source": "google_news_live",
+            "geos_present": ["US"],
+        }
+        for i in range(5)
+    ]
+
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=candidates), \
+         patch("app.services.trend_engine_b1.perform_direct_platform_recon", return_value={"rising_queries": [], "viral_videos": [], "news_catalysts": [{"title": "News"}]}), \
+         patch("app.services.trend_engine_b1.fetch_ground_truth_factsheet", return_value={"extract": "Entity factsheet"}), \
+         patch("app.services.trend_engine_b1.assess_keyword_video_viability", return_value={"viability_score": 9.0, "is_video_viable": True, "reasoning": "High impact", "specific_viral_angle": "Test Angle"}), \
+         patch("app.services.adversarial_critic_b1.audit_candidate_trend_alignment", return_value={"verdict": "PASS", "audit_score": 9.5}), \
+         patch("app.services.trend_engine_b1.run_b15", return_value={"competitor_narrative_anatomy": {"fatal_explanatory_vacuum": "gap"}}), \
+         patch("app.services.grounding_layer_b15.run_grounding_research", return_value={}), \
+         patch("app.services.grounding_layer_b15.passes_grounding_gate", return_value=(True, "Grounding passed")), \
+         patch("app.services.seo_package_forge.forge_seo_package", return_value={}), \
+         patch("app.services.trend_engine_b1.reason_topic_niche", return_value={"search_specific_keyword": "corporate collapse", "topic_name_vi": "Test", "task_slug": "test_slug", "niche_angle_brief": "Brief", "story_direction_5_arcs": "Arcs"}), \
+         patch("app.services.story_engine_b2.generate_5_arc_story", side_effect=RuntimeError("Simulated B2 LLM Outage")), \
+         patch("app.services.trend_engine_b1.record_handled_topic"), \
+         patch("app.services.telegram_buttons.send_telegram_broadcast", return_value="msg_exception_123") as mock_tele, \
+         patch("app.services.trend_engine_b1.commit_trend_task") as mock_commit:
+
+        produced = discover_and_produce_market_trend(
+            market="EN",
+            auto_produce=True,
+            max_scan_candidates=5,
+            max_b2_attempts=2,
+            state_dir=str(tmp_path),
+        )
+
+        assert len(produced) == 0
+        mock_commit.assert_not_called()
+        assert mock_tele.call_count == 1
+        broadcast_msg = mock_tele.call_args[0][0]
+        assert "[RULE 118 B2 CIRCUIT BREAKER ACTIVATED]" in broadcast_msg
+
+        is_done, reason, details = is_market_done_today("EN", state_dir=str(tmp_path), check_registry=False, check_episodes=False)
+        assert is_done is True
+        assert reason == "lock_exhausted_today"
+        assert details.get("reason") == "b2_circuit_breaker_exception"
+
 
 
 

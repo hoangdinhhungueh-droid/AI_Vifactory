@@ -8,8 +8,11 @@ Implements Stage Shape Standard. Encodes Prompt 2 (Director & Image) and Prompt 
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Any, Dict, List
+
+logger = logging.getLogger("s05_director_plan")
 
 from core.config import RunContext
 from core.contracts.stages import Provenance, Scene, Shot, StageArtifact, StageID
@@ -71,8 +74,8 @@ def run(ctx: RunContext) -> StageArtifact:
             vox_plan = plan_scenes_from_script(script_text)
             if vox_plan and vox_plan.scenes and not raw_scenes:
                 raw_scenes = [{"scene_id": f"SC_{sc.idx:02d}", "visual_metaphor": sc.bg_prompt, "headline": sc.narration[:30]} for sc in vox_plan.scenes]
-        except Exception:
-            pass
+        except Exception as plan_err:
+            logger.warning(f"[s05_director_plan] Fallback vox planning skipped: {plan_err}")
 
     acc_pool = ctx.config.video_generation.account_pool or ["acc_01"]
     scenes: List[Scene] = []

@@ -13,7 +13,12 @@ import urllib.parse
 from pathlib import Path
 
 # Add scripts dir to path to import _token from compile_episode_from_notion
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_scripts_dir = os.path.dirname(os.path.abspath(__file__))
+if _scripts_dir not in sys.path:
+    sys.path.append(_scripts_dir)
+_repo_root = str(Path(__file__).resolve().parents[1])
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
 try:
     import compile_episode_from_notion as comp
     _get_token = comp._token

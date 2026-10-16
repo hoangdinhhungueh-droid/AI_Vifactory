@@ -169,16 +169,12 @@ def resolve_topic_history_path(custom_path: Optional[str] = None) -> Path:
     """Canonical resolver for topic_history.json registry (Rule 132/138)."""
     if custom_path:
         return Path(custom_path)
-    env_path = os.getenv("TOPIC_HISTORY_PATH")
-    if env_path:
-        return Path(env_path)
     state_dir = os.getenv("VF_STATE_DIR") or os.getenv("AVF_STATE_DIR") or os.getenv("VF_LOCK_DIR")
     if state_dir:
-        p = Path(state_dir) / "topic_history.json"
-        if p.exists():
-            return p
-    if os.path.exists("/root/video_factory/data/topic_history.json"):
-        return Path("/root/video_factory/data/topic_history.json")
+        return Path(state_dir) / "topic_history.json"
+    env_path = os.getenv("TOPIC_HISTORY_PATH") or os.getenv("VF_TOPIC_HISTORY_PATH")
+    if env_path:
+        return Path(env_path)
     return Path(__file__).resolve().parent.parent / "data" / "topic_history.json"
 
 

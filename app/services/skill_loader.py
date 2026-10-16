@@ -20,9 +20,17 @@ import time
 import json
 from pathlib import Path
 
-# Add scripts dir to path for ag_notion_bridge
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../..", "scripts"))
-import ag_notion_bridge as bridge
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+_SCRIPTS_DIR = str(Path(__file__).resolve().parents[2] / "scripts")
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.append(_SCRIPTS_DIR)
+
+try:
+    from scripts import ag_notion_bridge as bridge
+except ImportError:
+    import ag_notion_bridge as bridge
 
 logger = logging.getLogger(__name__)
 

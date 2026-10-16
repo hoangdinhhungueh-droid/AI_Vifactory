@@ -12,9 +12,6 @@ from pathlib import Path
 import pytest
 
 from app.services.alert_cooldown import (
-    check_alert_eligibility,
-    record_alert_sent,
-    record_alert_suppressed,
     should_send_alert,
 )
 
@@ -38,10 +35,9 @@ def test_cooldown_throttling_within_window(temp_state_dir):
     """Subsequent alerts within window should be throttled and increment suppressed count."""
     t0 = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
 
-    # First alert dispatched at t0
+    # First alert dispatched at t0 (reserve_on_send=True by default)
     can_send, _, _ = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir, now=t0)
     assert can_send is True
-    record_alert_sent("b1_viability", "EN", state_dir=temp_state_dir, now=t0)
 
     # Second alert 10 minutes later (t0 + 10m)
     t1 = t0 + timedelta(minutes=10)
@@ -69,8 +65,6 @@ def test_cooldown_throttling_within_window(temp_state_dir):
     assert "2" in suffix
     assert "chặn" in suffix or "gom" in suffix
 
-    # Record dispatch at t3, verifying suppressed reset
-    record_alert_sent("b1_viability", "EN", state_dir=temp_state_dir, now=t3)
     t4 = t3 + timedelta(minutes=5)
     can_send, suppressed, _ = should_send_alert(
         "b1_viability", "EN", state_dir=temp_state_dir, window_seconds=14400, now=t4
@@ -82,7 +76,7 @@ def test_cooldown_throttling_within_window(temp_state_dir):
 def test_independent_markets_do_not_block_each_other(temp_state_dir):
     """An alert throttled for EN should NOT throttle JP or KR."""
     t0 = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
-    record_alert_sent("b1_viability", "EN", state_dir=temp_state_dir, now=t0)
+    should_send_alert("b1_viability", "EN", state_dir=temp_state_dir, now=t0)
 
     # EN is throttled
     can_en, _, _ = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir, now=t0 + timedelta(minutes=5))
@@ -97,7 +91,7 @@ def test_independent_markets_do_not_block_each_other(temp_state_dir):
 def test_disable_alert_cooldown_override(temp_state_dir):
     """Env DISABLE_ALERT_COOLDOWN=1 bypasses throttling entirely."""
     t0 = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
-    record_alert_sent("b1_viability", "EN", state_dir=temp_state_dir, now=t0)
+    should_send_alert("b1_viability", "EN", state_dir=temp_state_dir, now=t0)
 
     os.environ["DISABLE_ALERT_COOLDOWN"] = "1"
     try:
@@ -119,29 +113,25 @@ def test_market_validation_raises_on_invalid(temp_state_dir):
         should_send_alert("b1_viability", "   ", state_dir=temp_state_dir)
 
 
-def test_check_alert_eligibility_is_pure_read_only(temp_state_dir):
-    """check_alert_eligibility must be pure read-only and never mutate suppression count."""
-    t0 = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
-    record_alert_sent("b1_viability", "EN", state_dir=temp_state_dir, now=t0)
+def test_should_send_alert_reserve_on_send_false_does_not_reserve(temp_state_dir):
+    """When reserve_on_send=False, should_send_alert must report eligibility without reserving the slot."""
+    # Calling should_send_alert with reserve_on_send=False
+    can_send, suppressed, suffix = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir, reserve_on_send=False)
+    assert can_send is True
+    assert suppressed == 0
 
-    # Calling check_alert_eligibility 5 times within window
-    t1 = t0 + timedelta(minutes=5)
-    for _ in range(5):
-        can_send, suppressed, suffix = check_alert_eligibility(
-            "b1_viability", "EN", state_dir=temp_state_dir, window_seconds=14400, now=t1
-        )
-        assert can_send is False
-        assert suppressed == 0  # Still 0 because pure check never mutates!
+    # Because slot was NOT reserved, a subsequent call still reports can_send=True!
+    can_send2, suppressed2, suffix2 = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir, reserve_on_send=False)
+    assert can_send2 is True
+    assert suppressed2 == 0
 
-    # Now call record_alert_suppressed explicitly
-    new_count = record_alert_suppressed("b1_viability", "EN", state_dir=temp_state_dir, now=t1)
-    assert new_count == 1
+    # Once reserved with reserve_on_send=True:
+    can_send3, _, _ = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir, reserve_on_send=True)
+    assert can_send3 is True
 
-    can_send, suppressed, suffix = check_alert_eligibility(
-        "b1_viability", "EN", state_dir=temp_state_dir, window_seconds=14400, now=t1
-    )
-    assert can_send is False
-    assert suppressed == 1
+    # Immediate next call is now throttled!
+    can_send4, _, _ = should_send_alert("b1_viability", "EN", state_dir=temp_state_dir)
+    assert can_send4 is False
 
 
 def test_corrupt_json_quarantine(temp_state_dir):
@@ -267,30 +257,50 @@ def test_dispatch_failure_rollback_allows_subsequent_send(temp_state_dir):
     assert suppressed_retry == 0
 
 
-def test_tombstone_content_mismatch_restores_lock_file(temp_state_dir):
-    """Boss Item 18: If another holder acquired or modified the lock file before tombstone verification,
-    the mismatch branch must restore the lock file (rename back) rather than unlinking it.
+def test_tombstone_content_mismatch_restores_lock_file(temp_state_dir, monkeypatch):
+    """Boss Round 7 Item 10: Drive real _interprocess_lock and inject a fresh live holder token
+    during the tombstone reclaim window to prove that the mismatch branch restores lock_file
+    and does NOT unlink or hijack the live holder's lock.
     """
+    from app.services.alert_cooldown import LockTimeoutError, _interprocess_lock
+
     target_file = Path(temp_state_dir) / "test_mismatch.json"
     lock_file = target_file.with_suffix(".json.lock")
 
-    # Simulate a tombstone created during reclaim
-    tombstone = lock_file.with_name(f"{lock_file.name}.tombstone.test_uuid")
+    # 1. Write an initial stale lock with dead PID (9999999) older than 30s
+    dead_token = "9999999:stale_dead_token"
+    lock_file.write_text(dead_token, encoding="utf-8")
+    old_time = time.time() - 35.0
+    os.utime(str(lock_file), (old_time, old_time))
+
+    # 2. Hook os.rename so that right when _interprocess_lock renames lock_file to tombstone,
+    # we simulate an adversarial race where a new live holder wrote to lock_file right before rename
+    real_rename = os.rename
     live_token = f"{os.getpid()}:live_active_token"
-    tombstone.write_text(live_token, encoding="utf-8")
+    injected = False
 
-    # Mismatch logic: raw expected was a dead pid, but tombstone contained live token
-    raw_expected = "9999999:stale_dead_token"
-    with open(tombstone, "r", encoding="utf-8") as tf:
-        tomb_content = tf.read().strip()
-    assert tomb_content != raw_expected
+    def hook_rename(src, dst, *args, **kwargs):
+        nonlocal injected
+        if not injected and ".tombstone." in str(dst):
+            # Injects fresh live holder content into the file right before the atomic rename moves it
+            Path(src).write_text(live_token, encoding="utf-8")
+            injected = True
+        return real_rename(src, dst, *args, **kwargs)
 
-    # Content mismatch triggers restoration
-    os.replace(str(tombstone), str(lock_file))
+    monkeypatch.setattr(os, "rename", hook_rename)
 
-    assert lock_file.exists()
-    assert lock_file.read_text(encoding="utf-8") == live_token
-    assert not tombstone.exists()
+    # 3. _interprocess_lock attempts to acquire with short timeout.
+    # It reads dead_token, renames to tombstone, notices tombstone has live_token != dead_token,
+    # restores lock_file via os.replace(tombstone, lock_file), and subsequently fails to acquire
+    # because live_token belongs to os.getpid() which is alive.
+    with pytest.raises(LockTimeoutError):
+        with _interprocess_lock(target_file, timeout=0.3, poll_interval=0.05):
+            pass
+
+    assert injected is True, "Expected rename hook to be invoked during stale lock reclaim"
+    # Verify that lock_file was restored and holds the live holder's token
+    assert lock_file.exists(), "Lock file must be restored after mismatch"
+    assert lock_file.read_text(encoding="utf-8") == live_token, "Live holder's token must survive unmodified"
 
 
 def test_rollback_reservation_preserves_suppressed_count_when_never_sent(temp_state_dir):

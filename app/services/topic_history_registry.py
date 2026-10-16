@@ -16,18 +16,28 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger(__name__)
-
 from core.paths import (
     resolve_episodes_dir,
     resolve_pending_tasks_dir,
     resolve_topic_history_path,
 )
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-REGISTRY_PATH = str(resolve_topic_history_path())
-PENDING_DIR = str(resolve_pending_tasks_dir(ensure_dir=False))
-EPISODES_DIR = str(resolve_episodes_dir(ensure_dir=False))
+logger = logging.getLogger(__name__)
+
+# Module-level defaults are None so paths resolve lazily; tests may monkeypatch REGISTRY_PATH
+REGISTRY_PATH: Optional[str] = None
+PENDING_DIR: Optional[str] = None
+EPISODES_DIR: Optional[str] = None
+
+
+def _resolve_target_path(registry_path: Optional[str] = None) -> str:
+    """Resolve topic history path lazily at call time (Boss Round 7 Item 11 & Rule 132)."""
+    if registry_path:
+        return str(registry_path)
+    current = globals().get("REGISTRY_PATH")
+    if current is not None and current != "":
+        return str(current)
+    return str(resolve_topic_history_path())
 
 
 def _normalize_key(text: str) -> str:
@@ -43,7 +53,9 @@ def _normalize_key(text: str) -> str:
 
 def load_history(registry_path: Optional[str] = None, allow_backfill: bool = True) -> dict:
     """Load registry from file and automatically backfill from pending tasks and episodes."""
-    target_path = str(registry_path) if registry_path else REGISTRY_PATH
+    target_path = _resolve_target_path(registry_path)
+    pending_dir = PENDING_DIR or str(resolve_pending_tasks_dir(ensure_dir=False))
+
     history = {}
     if os.path.exists(target_path):
         try:
@@ -54,11 +66,12 @@ def load_history(registry_path: Optional[str] = None, allow_backfill: bool = Tru
             history = {}
 
     # Backfill from /var/vf/pending_tasks (only when using global production registry)
-    if allow_backfill and not registry_path and os.path.exists(PENDING_DIR):
-        for f in os.listdir(PENDING_DIR):
+    pending_dir = str(resolve_pending_tasks_dir(ensure_dir=False))
+    if allow_backfill and not registry_path and os.path.exists(pending_dir):
+        for f in os.listdir(pending_dir):
             if f.endswith(".json"):
                 try:
-                    p = os.path.join(PENDING_DIR, f)
+                    p = os.path.join(pending_dir, f)
                     with open(p, "r", encoding="utf-8") as jf:
                         d = json.load(jf)
                         term = d.get("raw_term") or d.get("keyword") or ""
@@ -79,25 +92,26 @@ def load_history(registry_path: Optional[str] = None, allow_backfill: bool = Tru
                                 ),
                                 "source": "pending_tasks"
                             }
-                except Exception:
-                    pass
+                except Exception as p_err:
+                    logger.debug(f"[history] Could not parse pending task {p}: {p_err}")
 
     return history
 
 
-def save_history(history: dict) -> None:
+def save_history(history: dict, registry_path: Optional[str] = None) -> None:
     """Persist history registry atomically to disk."""
+    target_path = _resolve_target_path(registry_path)
     try:
-        os.makedirs(os.path.dirname(REGISTRY_PATH), exist_ok=True)
-        tmp = REGISTRY_PATH + ".tmp"
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        tmp = target_path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(history, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, REGISTRY_PATH)
+        os.replace(tmp, target_path)
     except Exception as e:
-        logger.warning(f"[history] Failed to save {REGISTRY_PATH}: {e}")
+        logger.warning(f"[history] Failed to save {target_path}: {e}")
 
 
-def is_topic_already_handled(term: str, market: str = None) -> bool:
+def is_topic_already_handled(term: str, market: str = None, registry_path: Optional[str] = None) -> bool:
     """Check if a topic or its close variants have already been processed in the pipeline.
     Returns True if already handled -> Skip completely to save tokens and avoid duplicate videos.
     """
@@ -107,7 +121,7 @@ def is_topic_already_handled(term: str, market: str = None) -> bool:
     if not norm:
         return False
 
-    history = load_history()
+    history = load_history(registry_path=registry_path)
     if norm in history:
         return True
 
@@ -128,13 +142,20 @@ def is_topic_already_handled(term: str, market: str = None) -> bool:
     return False
 
 
-def record_handled_topic(term: str, task_id: str = "", market: str = "EN", slug: str = None, specific_angle: str = None) -> None:
+def record_handled_topic(
+    term: str,
+    task_id: str = "",
+    market: str = "EN",
+    slug: str = None,
+    specific_angle: str = None,
+    registry_path: Optional[str] = None,
+) -> None:
     """Record newly approved or produced topic into the permanent registry."""
     norm = _normalize_key(term)
     if not norm:
         return
 
-    history = load_history()
+    history = load_history(registry_path=registry_path)
     history[norm] = {
         "task_id": task_id or "REJECTED_OR_HANDLED",
         "raw_term": term,
@@ -144,8 +165,9 @@ def record_handled_topic(term: str, task_id: str = "", market: str = "EN", slug:
         "recorded_at": datetime.now(timezone.utc).isoformat(),
         "source": "live_pipeline"
     }
-    save_history(history)
+    save_history(history, registry_path=registry_path)
     logger.info(f"[history] Recorded '{term}' ({task_id or 'HANDLED'}) into permanent topic registry.")
+
 
 
 if __name__ == "__main__":

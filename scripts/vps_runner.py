@@ -1,35 +1,60 @@
 import io
 import json
+import logging
 import os
 import ssl
 import sys
 import time
 import urllib.request
 
+logger = logging.getLogger("vps_runner")
+
 try:
     sys.stdout.reconfigure(encoding='utf-8')
     sys.stderr.reconfigure(encoding='utf-8')
-except (AttributeError, io.UnsupportedOperation):
-    # Stdout already configured or doesn't support reconfigure
-    pass
+except (AttributeError, io.UnsupportedOperation) as _reconf_err:
+    logger.debug(f"Stdout reconfigure notice: {_reconf_err}")
 
-DEFAULT_MCP2_URL = os.getenv("VPS_MCP2_URL", "https://mcp2.vifactory.com/mcp")
-DEFAULT_MCP2_TOKEN = os.getenv("VPS_MCP2_TOKEN", "8kV2nR9pL4mQ7wF3jB6vN1cY8tZ5hD0aS")
+def _load_env():
+    """Load key-value pairs from .env in repository root if present without external dependencies."""
+    from pathlib import Path
+    env_file = Path(__file__).resolve().parent.parent / ".env"
+    if env_file.is_file():
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip("'\"")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+        except Exception as _env_err:
+            logger.debug(f"Could not load .env: {_env_err}")
+
+_load_env()
+
 DEFAULT_AG_URL = os.getenv("VPS_AG_URL", "https://ag.vifactory.com/mcp")
-DEFAULT_AG_TOKEN = os.getenv("VPS_AG_TOKEN", "AG_1GWQeTfEGoSlHSsKcC4rJ8O28wYrTsfj4AR4x7xY")
-DEFAULT_CF_ID = os.getenv("CF_ACCESS_CLIENT_ID", "8b08f2a93e3c6b29d726695044d7297b.access")
-DEFAULT_CF_SECRET = os.getenv("CF_ACCESS_CLIENT_SECRET", "911083c977c4e746f00156fdce8eb6633756cb5a0d815454431869991fac20d6")
+DEFAULT_AG_TOKEN = os.getenv("VPS_AG_TOKEN")
+DEFAULT_MCP2_URL = os.getenv("VPS_MCP2_URL", "https://mcp2.vifactory.com/mcp")
+DEFAULT_MCP2_TOKEN = os.getenv("VPS_MCP2_TOKEN")
+DEFAULT_CF_ID = os.getenv("CF_ACCESS_CLIENT_ID")
+DEFAULT_CF_SECRET = os.getenv("CF_ACCESS_CLIENT_SECRET")
 
+# Primary endpoint is AG (index 0), secondary fallback is MCP2 (index 1)
 ENDPOINTS = [
     {
-        "url": DEFAULT_MCP2_URL,
-        "token": DEFAULT_MCP2_TOKEN,
+        "name": "ag",
+        "url": DEFAULT_AG_URL,
+        "token": DEFAULT_AG_TOKEN,
         "cf_id": DEFAULT_CF_ID,
         "cf_secret": DEFAULT_CF_SECRET
     },
     {
-        "url": DEFAULT_AG_URL,
-        "token": DEFAULT_AG_TOKEN,
+        "name": "mcp2",
+        "url": DEFAULT_MCP2_URL,
+        "token": DEFAULT_MCP2_TOKEN,
         "cf_id": DEFAULT_CF_ID,
         "cf_secret": DEFAULT_CF_SECRET
     }
@@ -41,6 +66,18 @@ class FastVPSClient:
         self.ep = ENDPOINTS[self.endpoint_idx]
         self.url = self.ep["url"]
         self.token = self.ep["token"]
+        if not self.ep.get("cf_id") or not self.ep.get("cf_secret"):
+            raise RuntimeError(
+                "Missing Cloudflare Access credentials! Please set CF_ACCESS_CLIENT_ID and "
+                "CF_ACCESS_CLIENT_SECRET in environment or .env file (fail-closed security policy). "
+                "Recommendation: If service token credentials were previously exposed in git history, "
+                "rotate the Cloudflare Access service token immediately in the Cloudflare Zero Trust dashboard."
+            )
+        if not self.token:
+            raise RuntimeError(
+                f"Missing bearer token for endpoint '{self.ep.get('name', self.url)}'! "
+                f"Please set VPS_AG_TOKEN or VPS_MCP2_TOKEN in environment or .env file."
+            )
         self.session_id = None
         self._req_id = 0
         self.ctx = ssl.create_default_context()
