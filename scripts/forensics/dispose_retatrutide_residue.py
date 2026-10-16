@@ -14,11 +14,18 @@ Mandate:
   4. Exits NON-ZERO if any disposal step fails (Strict Rule 118 & Rule 121 Zero-False-Success).
 """
 
+import io
 import json
 import logging
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+except (AttributeError, io.UnsupportedOperation):
+    pass
 
 # Add project root to sys.path
 _ROOT = Path(__file__).resolve().parent.parent.parent

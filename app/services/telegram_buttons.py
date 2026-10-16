@@ -11,6 +11,7 @@ UPDATED 2026-09-02: Added answer_callback() and edit_message_text() helper funct
 for HG1 button UX fix (immediate feedback before backend dispatch).
 """
 import os
+import re
 import json
 import logging
 import html
@@ -58,6 +59,10 @@ def _chat_id() -> str:
 def is_enabled() -> bool:
     if os.environ.get("TELEGRAM_ENABLED", "").strip() == "0":
         return False
+    # Suppress real Telegram broadcast in test environments unless explicitly forced (Rule 123)
+    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("VF_TEST_MODE") == "1":
+        if os.environ.get("FORCE_REAL_TELEGRAM_IN_TEST", "").strip() != "1":
+            return False
     return bool(_token() and _chat_id())
 
 def _save_gate1_pending(pending_map: dict):
@@ -168,6 +173,11 @@ def send_telegram_broadcast(text: str, parse_mode: str = "HTML") -> Optional[int
     _load_env_secrets()
     if not is_enabled():
         logger.warning("[tg-btn] Telegram notifier is disabled or missing credentials.")
+        return None
+
+    # Never broadcast test markets or mock test errors to live Telegram (Rule 123)
+    if re.search(r"\bTEST_[A-Za-z0-9_]+\b", text):
+        logger.info("[tg-btn] Suppressed Telegram broadcast for test market payload.")
         return None
 
     try:

@@ -72,11 +72,19 @@ def sanitize_narration_line(raw_line: str) -> str:
     Prevents leaking internal metadata into TTS synthesis, ASS subtitles, or rendered assets.
     """
     line = raw_line.strip()
+    if line.startswith("```"):
+        return ""
+    line = re.sub(r"^`+|`+$", "", line).strip()
+
     prev = None
     while line != prev:
         prev = line
+        # Strip markdown fence remnants
+        line = re.sub(r"^`{3,}[a-zA-Z0-9_-]*\s*", "", line)
         # Strip beat header prefixes like 'BEAT 1: COLD STRIKE // ', 'BEAT 2: ... // '
         line = re.sub(r"^BEAT\s*\d+\s*:\s*[^/:]*(?://|:)\s*", "", line, flags=re.IGNORECASE)
+        # Strip act prefixes like 'ACT I: ... //', 'ACT 1: ...'
+        line = re.sub(r"^ACT\s*(?:[IVX]+|\d+)\s*:\s*[^/:]*(?://|:)\s*", "", line, flags=re.IGNORECASE)
         # Strip shadow internal archive tags like 'ARCHIVE X // '
         line = re.sub(r"^ARCHIVE\s*[A-Z0-9_]+\s*//\s*", "", line, flags=re.IGNORECASE)
         # Strip speaker prefixes like 'NARRATOR:', '[SPEAKER: NARRATOR]', 'HOST:'

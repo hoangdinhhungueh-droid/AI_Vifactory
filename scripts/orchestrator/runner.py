@@ -858,13 +858,15 @@ class OrchestratorRunner:
         if head_sha:
             try:
                 import urllib.request
-                gh_token = os.getenv("GITHUB_TOKEN", "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")
+                gh_token = os.getenv("GITHUB_TOKEN", "").strip()
                 url = f"https://api.github.com/repos/hoangdinhhungueh-droid/AI_Vifactory/actions/runs?head_sha={head_sha}&per_page=1"
-                req = urllib.request.Request(url, headers={
-                    "Authorization": f"Bearer {gh_token}",
+                headers = {
                     "Accept": "application/vnd.github.v3+json",
                     "User-Agent": "VF-Orchestrator"
-                })
+                }
+                if gh_token:
+                    headers["Authorization"] = f"Bearer {gh_token}"
+                req = urllib.request.Request(url, headers=headers)
                 with urllib.request.urlopen(req, timeout=10) as resp:
                     data = json.loads(resp.read().decode())
                     runs = data.get("workflow_runs", [])

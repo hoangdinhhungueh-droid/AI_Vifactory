@@ -1,6 +1,9 @@
 {
   "version": "1.0.0",
-  "description": "Ratchet baseline allowlist for legacy unmigrated scripts (Rule 139). Active pipeline components (core/, stages/, vox/, and touched services) must maintain strictly 0 defects.",
+  "canonical_source": false,
+  "canonical_sot_path": "config/ast_ratchet_baseline.json",
+  "replica_path": "specs/rule139_allowlist.json",
+  "description": "Synchronized replica of canonical baseline config/ast_ratchet_baseline.json per Rule 125 Single Truth and Boss Round 12 Item 11. Maintained for backward compatibility. Canonical single source of truth is config/ast_ratchet_baseline.json.",
   "max_legacy_defects": 232,
   "entries_count": 232,
   "entries": [

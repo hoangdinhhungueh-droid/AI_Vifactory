@@ -29,14 +29,6 @@ def test_unauthenticated_request_rejected_401(auth_client):
     resp_commit = auth_client.post("/api/v1/trend-commit", json={"items": []})
     assert resp_commit.status_code == 401
 
-    # /api/v1/s1-score
-    resp_s1 = auth_client.post("/api/v1/s1-score", json={"niches": ["ai"], "markets": ["EN"]})
-    assert resp_s1.status_code == 401
-
-    # /api/v1/pipeline/run
-    resp_run = auth_client.post("/api/v1/pipeline/run", json={"stage": "S1"})
-    assert resp_run.status_code == 401
-
     # /v1/budget
     resp_budget = auth_client.get("/v1/budget")
     assert resp_budget.status_code == 401

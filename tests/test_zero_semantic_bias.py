@@ -42,6 +42,7 @@ FORBIDDEN_DOMAIN_PATTERNS = [
     (r"\bhamaoka\b", "Hamaoka nuclear plant entity domain bleed"),
     (r"\bnidec\b", "Nidec shareholder entity domain bleed"),
     (r"\bgimpo\s+fc\b", "Gimpo FC entity domain bleed"),
+    (r"동탄문구점", "Episode-specific entity bleed (동탄문구점)"),
 ]
 
 

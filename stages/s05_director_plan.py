@@ -14,7 +14,7 @@ from typing import Any, Dict, List
 
 from core.config import RunContext
 from core.contracts.stages import Provenance, Scene, Shot, StageArtifact, StageID
-from core.gates import emit_artifact
+from core.gates import emit_artifact, validate_artifact
 from tools.codemap.runtime import pipeline_stage
 from vox.planner import plan_scenes_from_script
 
@@ -57,16 +57,20 @@ def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S5: Director Plan & Prompts Forge."""
     start_ts = time.time()
 
-    # Read S3 script artifact directly to retrieve scenes
+    # Read and validate S3 script artifact schema (Rule 121, Rule 139)
     s3_artifact_path = ctx.paths.artifact_file(StageID.S3_SCRIPT.value)
     if not s3_artifact_path.exists():
         raise FileNotFoundError(f"Missing S3 artifact at: {s3_artifact_path}")
 
-    with open(s3_artifact_path, "r", encoding="utf-8") as f:
-        s3_data = json.load(f)
+    try:
+        with open(s3_artifact_path, "r", encoding="utf-8") as f:
+            s3_raw = json.load(f)
+    except Exception as parse_err:
+        raise RuntimeError(f"Failed to parse S3 script artifact JSON at {s3_artifact_path}: {parse_err}") from parse_err
 
-    raw_scenes = s3_data.get("payload", {}).get("scenes", [])
-    script_text = s3_data.get("payload", {}).get("script_text", "")
+    s3_artifact = validate_artifact(StageID.S3_SCRIPT, s3_raw)
+    raw_scenes = s3_artifact.payload.get("scenes", [])
+    script_text = s3_artifact.payload.get("script_text", "")
 
     # Ground scenes with canonical vox.planner engine (Rule 125 & 139)
     if script_text:
@@ -74,8 +78,15 @@ def run(ctx: RunContext) -> StageArtifact:
             vox_plan = plan_scenes_from_script(script_text)
             if vox_plan and vox_plan.scenes and not raw_scenes:
                 raw_scenes = [{"scene_id": f"SC_{sc.idx:02d}", "visual_metaphor": sc.bg_prompt, "headline": sc.narration[:30]} for sc in vox_plan.scenes]
-        except Exception as plan_err:
+        except (ValueError, TypeError, KeyError, AttributeError, RuntimeError) as plan_err:
+            if not raw_scenes:
+                logger.critical(f"[s05_director_plan] Canonical vox planning failed on script_text with no raw scenes (fail-closed): {plan_err}")
+                raise RuntimeError(f"Stage S05 failed closed: vox.planner error with empty raw_scenes: {plan_err}") from plan_err
             logger.warning(f"[s05_director_plan] Fallback vox planning skipped: {plan_err}")
+
+    if not raw_scenes:
+        logger.critical("[s05_director_plan] No scenes available in S3 artifact or vox.planner output (fail-closed)")
+        raise RuntimeError("Stage S05 failed closed: no scenes found in S3 artifact or vox.planner output")
 
     acc_pool = ctx.config.video_generation.account_pool or ["acc_01"]
     scenes: List[Scene] = []

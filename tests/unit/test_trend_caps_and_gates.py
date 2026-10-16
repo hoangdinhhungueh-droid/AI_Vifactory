@@ -438,10 +438,10 @@ def test_b2_circuit_breaker_emits_exactly_one_telegram_alert(tmp_path, monkeypat
         broadcast_msg = mock_tele.call_args[0][0]
         assert "[RULE 118 B2 CIRCUIT BREAKER ACTIVATED]" in broadcast_msg
 
-        # 3. Market lock is stamped EXHAUSTED_TODAY with reason="b2_circuit_breaker"
+        # 3. Market lock is stamped EXHAUSTED_TODAY or EXHAUSTED_OFFHOURS with reason="b2_circuit_breaker"
         is_done, reason, details = is_market_done_today("EN", state_dir=str(tmp_path), check_registry=False, check_episodes=False)
         assert is_done is True
-        assert reason == "lock_exhausted_today"
+        assert reason in ("lock_exhausted_today", "lock_exhausted_offhours")
         assert details.get("reason") == "b2_circuit_breaker"
 
 
@@ -498,7 +498,7 @@ def test_b2_exception_circuit_breaker_stamps_exhausted_today(tmp_path, monkeypat
 
         is_done, reason, details = is_market_done_today("EN", state_dir=str(tmp_path), check_registry=False, check_episodes=False)
         assert is_done is True
-        assert reason == "lock_exhausted_today"
+        assert reason in ("lock_exhausted_today", "lock_exhausted_offhours")
         assert details.get("reason") == "b2_circuit_breaker_exception"
 
 
@@ -559,6 +559,43 @@ def test_custom_seed_failure_releases_lock_in_finally(tmp_path, monkeypatch):
         is_done, reason, _ = is_market_done_today("EN", state_dir=str(tmp_path), check_registry=False, check_episodes=False)
         assert is_done is False
         assert reason == "not_produced_yet"
+
+
+def test_custom_seed_does_not_preempt_active_in_progress_lock(tmp_path, monkeypatch):
+    """Boss Round 12 Item 4: Manual/custom seed must NOT imply force=True.
+    It must respect an active IN_PROGRESS lock and abort cleanly without stealing the lock.
+    """
+    import json
+    from app.services.daily_market_lock import acquire_in_progress, is_market_done_today, _get_lock_file_path
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    monkeypatch.delenv("B1_FORCE_CRAWL", raising=False)
+
+    # 1. Active worker acquires IN_PROGRESS lock
+    holder_token = "holder_token_active_123"
+    holder_pid = os.getpid()
+    ok = acquire_in_progress("EN", topic_id="ACTIVE_EPISODE", state_dir=str(tmp_path), lock_token=holder_token, owner_pid=holder_pid)
+    assert ok is True
+
+    # 2. Another caller runs with custom_seed (no force flag)
+    produced = discover_and_produce_market_trend(
+        market="EN",
+        custom_seed="emergency override seed",
+        auto_produce=True,
+        state_dir=str(tmp_path),
+    )
+
+    # 3. Must abort cleanly, return [] and NOT preempt active holder
+    assert len(produced) == 0
+
+    # 4. Verify active holder's lock is completely intact
+    lock_path = _get_lock_file_path("EN", state_dir=str(tmp_path))
+    assert lock_path.exists()
+    lock_data = json.loads(lock_path.read_text(encoding="utf-8"))
+    assert lock_data.get("lock_token") == holder_token
+    assert lock_data.get("topic_id") == "ACTIVE_EPISODE"
+    assert "forced" not in lock_data
+
 
 
 

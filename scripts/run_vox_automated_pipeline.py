@@ -232,6 +232,15 @@ def run_automated_pipeline(
     # Sanitize em dashes to simple hyphens for smooth voiceover pacing
     resolved_script = resolved_script.replace("—", " - ").replace("–", " - ")
 
+    # Sanitize narration lines (Rule 136: Strip speaker tags, beat labels, markdown fences)
+    from vox.planner import sanitize_narration_line
+    cleaned_lines = []
+    for raw_l in resolved_script.splitlines():
+        cl = sanitize_narration_line(raw_l)
+        if cl:
+            cleaned_lines.append(cl)
+    resolved_script = "\n\n".join(cleaned_lines) if cleaned_lines else resolved_script
+
     # Validate Script DNA
     dna_audit = director.validate_script_dna(resolved_script, duration_sec)
     logger.info(f"📝 [3/7] Script DNA Audit Score: {dna_audit['score']}/10 (Words: {dna_audit['word_count']}, Words Budget: {dna_audit['target_word_budget']})")

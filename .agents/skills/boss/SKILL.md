@@ -74,6 +74,7 @@ python scripts/orchestrator/boss_orchestrator.py --phase loop-step --task-id <TA
 - **Nếu Exit Code = 1 (`FAILED_MAX_ROUNDS`)**:
   - Đã hết tối đa 2 vòng tự sửa mà Boss vẫn chưa duyệt 10/10.
   - Worker dừng lại, mở file `specs/boss_audits/TASK_<ID>_audit_round_2.json` và xuất trình toàn văn điểm bất đồng cho User quyết định.
+  - *Ngoại lệ ủy quyền (Cap Extension Protocol - Boss Round 12 Item 8 & 12)*: Khi User cấp ủy quyền tiếp tục liên tục (ví dụ: `"Tiếp tục"`, `"tiếp tục"`, hoặc `"/boss đồng ý thực thi..."` như đã ghi nhận trong `BUNDLED_SCOPE_USER_APPROVAL.md`), cờ `--max-rounds` được mở rộng linh hoạt (`--max-rounds N` hoặc tiếp tục loop theo từng round đơn lẻ) để Agent và Boss tự sửa lặp lại cho tới khi đạt điểm tuyệt đối **`10.0 / 10.0 VERDICT: APPROVED`**, không thỏa hiệp chất lượng.
 
 ---
 

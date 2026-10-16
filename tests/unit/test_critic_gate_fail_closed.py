@@ -28,6 +28,13 @@ def dummy_candidate_context():
     ]
 
 
+@pytest.fixture(autouse=True)
+def hermetic_alert_guard():
+    with patch("app.services.trend_engine_b1._send_guarded_alert", return_value=True), \
+         patch("app.services.telegram_buttons.send_telegram_broadcast", return_value=123):
+        yield
+
+
 @patch("app.services.trend_engine_b1.acquire_in_progress", return_value="dummy_token")
 @patch("app.services.trend_engine_b1.fetch_live_trending_terms")
 @patch("app.services.trend_engine_b1.forensic_pre_filter", return_value=(True, "pass"))
@@ -58,7 +65,7 @@ def test_critic_gate_exception_fails_closed(
         side_effect=RuntimeError("HHTech API network failure")
     ):
         results = discover_and_produce_market_trend(
-            market="US",
+            market="EN",
             max_candidates=1,
             auto_commit=False,
             strict_critic_gate=True
@@ -99,7 +106,7 @@ def test_critic_gate_revise_or_fail_verdict_rejects(
         return_value={"verdict": "REVISE", "audit_score": 6.0, "veto_reason": "Angle lacks high-stakes hook"}
     ):
         results_revise = discover_and_produce_market_trend(
-            market="US",
+            market="EN",
             max_candidates=1,
             auto_commit=False,
             strict_critic_gate=True
@@ -115,7 +122,7 @@ def test_critic_gate_revise_or_fail_verdict_rejects(
         return_value={"verdict": "FAIL", "audit_score": 4.0, "veto_reason": "Bait and switch topic"}
     ):
         results_fail = discover_and_produce_market_trend(
-            market="US",
+            market="EN",
             max_candidates=1,
             auto_commit=False,
             strict_critic_gate=True
@@ -154,7 +161,7 @@ def test_critic_gate_low_score_rejects(
         return_value={"verdict": "PASS", "audit_score": 7.0, "veto_reason": "Score below 7.5 threshold"}
     ):
         results = discover_and_produce_market_trend(
-            market="US",
+            market="EN",
             max_candidates=1,
             auto_commit=False,
             strict_critic_gate=True

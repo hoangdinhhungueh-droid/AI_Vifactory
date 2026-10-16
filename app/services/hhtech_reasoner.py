@@ -7,7 +7,7 @@ Standardized Architecture (24/08/2026 - Go-Live 2026):
   - Google Trends Rising / Breakout Queries Injection for Act 1 Hook Shock.
   - YouTube Safety Labeling & 4-Tier Content Categorization (Decisions 19/08 - 24/08).
   - Vietnamese Output for Human Gate 1 (topic_name_vi, niche_angle_brief, story_direction_5_arcs).
-  - Rule 128 / Rule 130 Anti-Bias: Specific ephemeral case keywords (including '동탄문구점')
+  - Rule 128 / Rule 130 Anti-Bias: Specific ephemeral case keywords
     have been permanently removed from keyword lists to enforce generic canonical contracts.
 
 PATTERN 3 UPDATE (02/09/2026):
@@ -73,18 +73,36 @@ def extract_clean_breakout_queries(rising_queries: list, max_count: int = 5) -> 
                 res.append(q)
     return res[:max_count]
 
+STEM_INFLECTIONS = {
+    "archaeolog": r"\barchaeolog(?:y|ical|ist|ists)?\b",
+    "geopolitic": r"\bgeopolitic(?:s|al)?\b",
+    "fossil": r"\bfossil(?:s)?\b(?!\s+fuels?\b)",
+    "revolution": r"(?<!\bai\s)(?<!\btech\s)(?<!\btechnological\s)(?<!\bdigital\s)\brevolution(?:s)?\b",
+    "forensic": r"\bforensic(?:s)?\b(?!\s+accounting\b)",
+}
+
+
 def _matches_any_term(target_text: str, terms: list[str]) -> bool:
     """Helper to match terms with word boundary for ascii words to avoid false positive substring matches
-    while supporting stems, plurals, and standard inflections (e.g. archaeolog -> archaeology,
+    while supporting controlled stems, plurals, and standard inflections (e.g. archaeolog -> archaeology/archaeological,
     semiconductor -> semiconductors, sanction -> sanctions, murder -> murdered).
+    Guards against over-matching short roots (e.g., 'cult' does NOT match 'culture', 'chip' does NOT match 'Chipotle',
+    'fab' does NOT match 'fabric', 'serial' does NOT match 'serialized').
     """
     for t in terms:
         t_clean = t.strip().lower()
         if not t_clean:
             continue
-        if re.fullmatch(r"[a-z0-9 \-]+", t_clean):
-            # Match stem/root with leading word boundary and optional word-character suffix up to word boundary
-            pattern = rf"\b{re.escape(t_clean)}\w*\b"
+        if t_clean in STEM_INFLECTIONS:
+            if re.search(STEM_INFLECTIONS[t_clean], target_text, re.IGNORECASE):
+                return True
+        elif re.fullmatch(r"[a-z0-9 \-]+", t_clean):
+            # For short words (<= 4 chars) or specific roots like 'serial': only exact or plural
+            if len(t_clean) <= 4 or t_clean in {"serial"}:
+                pattern = rf"\b{re.escape(t_clean)}(?:s|es)?\b"
+            else:
+                # Controlled inflections for longer words
+                pattern = rf"\b{re.escape(t_clean)}(?:s|es|ed|ing|er|ers)?\b"
             if re.search(pattern, target_text, re.IGNORECASE):
                 return True
         else:
@@ -99,15 +117,15 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
     """
     text = (subject or "").lower()
 
-    truecrime_terms = ['killer', 'ripper', 'murder', 'serial', 'homicide', 'abduction', 'cold case', 'unsolved', 'forensic', 'sarin', 'cult', 'n번방', 'nth room', 'aum', '真理教', 'サリン', '연쇄살인', '강력범죄']
+    truecrime_terms = ['killer', 'ripper', 'murder', 'serial', 'homicide', 'abduction', 'cold case', 'unsolved', 'forensic', 'cult terror', 'cyber exploitation', 'digital sex crime', 'neurotoxin attack', '연쇄살인', '강력범죄']
     fraud_terms = ['fraud', 'scam', 'ponzi', 'embezzlement', 'accounting fraud', 'pyramid scheme', 'shell company', 'money laundering', 'insider trading', 'securities fraud', 'bankruptcy', 'insolvency', 'restructuring', 'creditor', 'liquidation', 'chapter 11', '다단계', '보이스피싱', '전세사기', '분식회계', '주가조작', '파산', '부도', '회생', '도산', '倒産', '破産', '不正会計']
-    gambling_terms = ['gambling', 'casino', 'slot', 'pachinko', 'パチンコ', '도박', '강원랜드', '바다이야기', '사행성']
+    gambling_terms = ['gambling', 'casino', 'slot', 'pachinko', 'パチンコ', '도박', '사설카지노', '불법도박', '사행성']
     societal_terms = ['kodokushi', '孤独死', '過労死', 'ひきこもり', '引きこもり', '고독사', '은둔']
-    history_terms = ['uprising', 'movement', 'occupation', 'revolution', 'treaty', '광주', '민주화', '일제강점기', '한국전쟁', '제주 4.3', '을미사변', 'roman empire', 'byzantine', 'crusade', 'mongol', 'ottoman', 'tulip mania']
+    history_terms = ['uprising', 'civilian uprising', 'movement', 'occupation', 'revolution', 'treaty', '민주화', '일제강점기', '한국전쟁', 'civil conflict', 'regicide', 'roman empire', 'byzantine', 'crusade', 'mongol', 'ottoman', 'speculative bubble']
     tech_terms = ['chip', 'semiconductor', 'foundry', 'microchip', 'geopolitic', 'supply chain', 'lithography', 'satellite', 'submarine cable', 'rare earth', 'quantum', 'embargo', 'sanction', 'trade war', 'export control', 'trade ban', 'export ban', 'tech ban', 'telecom switch', 'ai chip', 'fab']
-    ancient_terms = ['ancient', 'younger dryas', 'denisovan', 'megalith', 'clovis', 'prehistoric', 'lost civilization', 'civilization', 'ice age', 'stonehenge', 'sundaland', 'neanderthal', 'australopithecus', 'archaeolog', 'fossil', 'hominid', '잃어버린 문명', '선사시대', '고대 인류', '고대 문명', '縄文', '古代文明', 'ancient humans']
+    ancient_terms = ['ancient', 'younger dryas', 'denisovan', 'megalith', 'clovis', 'prehistoric', 'lost civilization', 'civilization', 'ice age', 'stonehenge', 'sundaland', 'neanderthal', 'australopithecus', 'archaeolog', 'fossil', 'hominid', '잃어버린 문명', '선사시대', '고대 인류', '고대 문명', 'paleolithic', 'neolithic', 'ancient humans']
     stoic_terms = ['stoic', 'stoicism', 'philosophy', 'meditations', 'dokkodo', '독행도', '스토아', 'burnout', 'mental resilience', 'zen detachment', '번아웃', '孤独の力', '折れない心', '人間関係の疲れ', '내면의 평화', '감정 조절']
-    military_terms = ['military logistics', 'geopolitical choke', 'malacca', 'undersea cable', 'starfish prime', 'supply line', 'airlift', 'defense doctrine', 'strategic blunder', '군사 물류', '지정학', '해저 케이블', '兵站', 'チョークポイント', 'chokepoint', 'blockade']
+    military_terms = ['military logistics', 'geopolitical choke', 'strategic strait', 'undersea cable', 'high altitude nuclear test', 'supply line', 'airlift', 'defense doctrine', 'strategic blunder', '군사 물류', '지정학', '해저 케이블', '兵站', 'チョークポイント', 'chokepoint', 'blockade']
     consumer_terms = ["refund", "환불", "교환", "반품", "영수증", "바가지", "no refund", "cancellation fee", "hidden fee", "hidden cost", "fine print", "consumer trap", "소비자 분쟁", "위약금", "단순 변심", "가격표시제", "overcharge", "unilateral clause", "consumer dispute", "subscription trap"]
 
     if _matches_any_term(text, truecrime_terms):
@@ -134,6 +152,12 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
             "YT-Societal-Crisis-Documentary",
             "SOCIETAL CRISIS DOCUMENTARY: objective socio-economic analysis of demographic shifts and welfare safety net gaps; empathetic, constructive, and systemic."
         )
+    elif _matches_any_term(text, military_terms):
+        return (
+            "military_logistics_geopolitics",
+            "YT-Military-Tactical-Investigation",
+            "MILITARY LOGISTICS & GEOPOLITICAL CHOKEPOINTS: forensic deconstruction of supply line failures, tactical blunders, and strategic infrastructure chokepoints based on declassified records; ZERO glorification of violence."
+        )
     elif _matches_any_term(text, tech_terms):
         return (
             "tech_geopolitical_battle",
@@ -157,12 +181,6 @@ def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str,
             "indigenous_philosophy_stoicism",
             "YT-Philosophy-Mindset",
             "INDIGENOUS PHILOSOPHY & CONTEMPLATIVE RESILIENCE: dissect ancient mindset protocols applied to modern institutional burnout; calm, reflective, grounded in primary historical texts."
-        )
-    elif _matches_any_term(text, military_terms):
-        return (
-            "military_logistics_geopolitics",
-            "YT-Military-Tactical-Investigation",
-            "MILITARY LOGISTICS & GEOPOLITICAL CHOKEPOINTS: forensic deconstruction of supply line failures, tactical blunders, and strategic infrastructure chokepoints based on declassified records; ZERO glorification of violence."
         )
     elif _matches_any_term(text, consumer_terms):
         return (

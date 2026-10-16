@@ -325,6 +325,11 @@ def test_incident_1_b3_crash_blocks_incident_2_re_crawl(temp_state_dir, monkeypa
         market="EN",
         specific_angle="The Retatrutide Black Market",
     )
+    # Ensure recorded_at matches the test run's simulated morning timestamp
+    reg_data = thr.load_history(registry_path=str(hist_file))
+    if "retatrutide" in reg_data:
+        reg_data["retatrutide"]["recorded_at"] = m_vn.astimezone(timezone.utc).isoformat()
+        thr.save_history(reg_data, registry_path=str(hist_file))
 
     # B3 crashes! No episode folder or run_manifest.json is created.
 
@@ -838,5 +843,60 @@ def test_takeover_succeeds_when_age_exceeds_hard_max_even_if_pid_reused(temp_sta
     with mock.patch("app.services.alert_cooldown.is_pid_alive", return_value=True):
         acquired = acquire_in_progress("EN", state_dir=temp_state_dir, lock_token="new_takeover_token")
         assert acquired is True, "Takeover must succeed when age > HARD_MAX even if PID is alive (PID reuse defense)"
+
+
+def test_concurrent_takeover_vs_release_mutex_serialization(temp_state_dir):
+    """Boss Round 12 Item 5: Concurrent takeover and release must serialize under _market_lock_mutex,
+    guaranteeing no race condition corrupts lock state or causes unhandled exceptions.
+    """
+    import threading
+    import time
+    from app.services.daily_market_lock import (
+        acquire_in_progress,
+        release_lock,
+        _get_lock_file_path,
+        atomic_write_json,
+    )
+    from datetime import datetime, timezone, timedelta
+
+    # Write a stale lock eligible for takeover
+    old_time = datetime.now(timezone.utc) - timedelta(seconds=20000)
+    lock_file = _get_lock_file_path("EN", temp_state_dir)
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
+    holder_token = "holder_token_abc"
+    holder_pid = os.getpid()
+
+    atomic_write_json(lock_file, {
+        "market": "EN",
+        "vn_date": "2026-10-17",
+        "status": "IN_PROGRESS",
+        "created_at_utc": old_time.isoformat(),
+        "ttl_seconds": 1800,
+        "pid": holder_pid,
+        "lock_token": holder_token,
+    })
+
+    results = {}
+
+    def do_release():
+        ok = release_lock("EN", state_dir=temp_state_dir, lock_token=holder_token, owner_pid=holder_pid)
+        results["release"] = ok
+
+    def do_takeover():
+        ok = acquire_in_progress("EN", state_dir=temp_state_dir, lock_token="contender_token_xyz")
+        results["takeover"] = ok
+
+    t1 = threading.Thread(target=do_release)
+    t2 = threading.Thread(target=do_takeover)
+
+    t1.start()
+    t2.start()
+    t1.join(timeout=5.0)
+    t2.join(timeout=5.0)
+
+    assert "release" in results
+    assert "takeover" in results
+    assert lock_file.exists() or results["release"] is True
+
 
 

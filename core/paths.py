@@ -191,12 +191,12 @@ def resolve_topic_history_path(custom_path: Optional[str] = None) -> Path:
     return Path(__file__).resolve().parent.parent / "data" / "topic_history.json"
 
 
-def resolve_pending_tasks_dir(ensure_dir: bool = True) -> Path:
+def resolve_pending_tasks_dir(ensure_dir: bool = False) -> Path:
     """Canonical resolver for pending tasks directory (Rule 132)."""
     env_dir = os.getenv("PENDING_TASKS_DIR")
     if env_dir:
         p = Path(env_dir)
-    elif os.path.isdir("/var/vf/pending_tasks"):
+    elif os.name != "nt" and os.path.isdir("/var/vf/pending_tasks"):
         p = Path("/var/vf/pending_tasks")
     else:
         p = Path(__file__).resolve().parent.parent / "pending_tasks"
@@ -208,7 +208,7 @@ def resolve_pending_tasks_dir(ensure_dir: bool = True) -> Path:
 def resolve_episodes_dir(
     repo_root: Optional[Path] = None,
     custom_dir: Optional[str] = None,
-    ensure_dir: bool = True,
+    ensure_dir: bool = False,
 ) -> Path:
     """Canonical path resolver for episodes directory (Rule 132).
     Eliminates hardcoded /var/vf/episodes or /root/video_factory paths.
@@ -239,9 +239,10 @@ def resolve_episodes_dir(
     return p
 
 
-def resolve_raw_pool_dir(ensure_dir: bool = True) -> Path:
+def resolve_raw_pool_dir(ensure_dir: bool = False) -> Path:
     """Canonical path resolver for trend discovery RAW_POOL_DIR (Rule 132).
     Honors VF_RAW_POOL_DIR, RAW_POOL_DIR, TREND_RAW_POOL_DIR, and VF_DB_DIR.
+    Checks repo_root / 'db' before /var/vf/db (Boss Round 11 Item 19).
     """
     env_dir = (
         os.getenv("VF_RAW_POOL_DIR")
@@ -251,13 +252,44 @@ def resolve_raw_pool_dir(ensure_dir: bool = True) -> Path:
     )
     if env_dir:
         p = Path(env_dir)
-    elif os.name != "nt" and os.path.isdir("/var/vf/db"):
-        p = Path("/var/vf/db")
     else:
         repo_root = Path(__file__).resolve().parent.parent
-        p = repo_root / "db"
+        repo_db = repo_root / "db"
+        if repo_db.is_dir():
+            p = repo_db
+        elif os.name != "nt" and os.path.isdir("/var/vf/db"):
+            p = Path("/var/vf/db")
+        else:
+            p = repo_db
     if ensure_dir:
         p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+_GIT_SHA_CACHE: Optional[str] = None
+
+
+def get_current_git_sha() -> str:
+    """Returns current git commit SHA for production provenance tracking (Rule 126 & Boss Round 11)."""
+    global _GIT_SHA_CACHE
+    if _GIT_SHA_CACHE:
+        return _GIT_SHA_CACHE
+    env_sha = os.getenv("GIT_COMMIT") or os.getenv("GITHUB_SHA") or os.getenv("VF_GIT_SHA")
+    if env_sha:
+        _GIT_SHA_CACHE = env_sha[:12]
+        return _GIT_SHA_CACHE
+    try:
+        import subprocess
+        res = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent.parent), "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=False, timeout=2.0
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            _GIT_SHA_CACHE = res.stdout.strip()[:12]
+            return _GIT_SHA_CACHE
+    except Exception as _git_err:
+        logger.debug("[paths] Notice resolving git rev-parse HEAD: %s", _git_err)
+    _GIT_SHA_CACHE = "unknown"
+    return _GIT_SHA_CACHE
 
 

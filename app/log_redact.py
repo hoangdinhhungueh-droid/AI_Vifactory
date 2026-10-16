@@ -9,15 +9,18 @@ _PATTERNS = [
     re.compile(r"(bot\d{6,12}:)[A-Za-z0-9_\-]+", re.I),
     re.compile(r"(https?://api\.telegram\.org/bot)[^/\s]+", re.I),
     re.compile(r"(Bearer\s+)[A-Za-z0-9_\-\.]{15,}", re.I),
+    re.compile(r"\b(secret_[A-Za-z0-9_]{20,})\b"),
+    re.compile(r"\b(ntn_[A-Za-z0-9_]{20,})\b"),
+    re.compile(r"\b(sk-[A-Za-z0-9_\-]{20,})\b"),
 ]
 
 
 def _redact(v: object) -> object:
     s = str(v)
     s_lower = s.lower()
-    if any(k in s_lower for k in ("api_key", "bot", "bearer", "telegram")):
+    if any(k in s_lower for k in ("api_key", "bot", "bearer", "telegram", "secret_", "ntn_", "sk-")):
         for p in _PATTERNS:
-            s = p.sub(lambda m: m.group(1) + "***", s)
+            s = p.sub(lambda m: m.group(1) + "***" if m.lastindex else "***", s)
         return s
     return v
 
@@ -32,8 +35,10 @@ class RedactFilter(logging.Filter):
                         record.msg = p.sub(lambda m: m.group(1) + "***", record.msg)
             if isinstance(record.args, tuple) and record.args:
                 record.args = tuple(_redact(a) for a in record.args)
-        except Exception:
-            pass
+            elif isinstance(record.args, dict) and record.args:
+                record.args = {k: _redact(v) for k, v in record.args.items()}
+        except Exception as _redact_err:
+            logging.getLogger(__name__).debug("RedactFilter formatting error: %s", _redact_err)
         return True
 
 

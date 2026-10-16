@@ -50,12 +50,56 @@ The physical files modified across the unified remediation range (`2456870^..HEA
    - Exactly one unified production pipeline engine (`vox.pipeline`).
    - Legacy orchestrator script `scripts/orchestrator/run_pipeline.py` permanently purged in git commit `2456870`.
    - Retatrutide incident residue physically disposed and verified on disk and API:
-     * `scripts/forensics/dispose_retatrutide_residue.py` executed live with exit code 0.
-     * `resolve_topic_history_path()` (/root/video_factory/data/topic_history.json) registry record updated to `DISPOSED_INCIDENT_RESIDUE` with before/after dumps.
-     * Notion rows physically archived via confirmed API calls (`archived: true`):
-       - Trend Brain ID: `3f901989-2400-8142-9e2e-c238241a1b21`
-       - Story Library ID: `3f901989-2400-81f0-8475-c60a0cad7257`
-       - YouTube Metadata ID: `3f901989-2400-81ac-9e9f-ed4748e149fc`
+     * `scripts/forensics/dispose_retatrutide_residue.py` executed live on VPS with exit code 0:
+       ```text
+=================================================================
+AUDITABLE RETATRUTIDE RESIDUE DISPOSAL & ARCHITECTURE AUDIT
+=================================================================
+--- 1. Disposing Pending Task File: EN_EP0001_retatrutide_shadow_market ---
+  [OK] No residual pending file at /var/vf/pending_tasks/EN_EP0001_retatrutide_shadow_market.json
+  [OK] No residual pending file at /root/video_factory/var/locks/pending_tasks/EN_EP0001_retatrutide_shadow_market.json
+
+--- 2. Updating Topic History Registry via resolve_topic_history_path() ---
+  Resolved Topic History Path: /root/video_factory/data/topic_history.json
+  [BEFORE DUMP] Found 1 matching registry record(s):
+    Key: retatrutide -> {
+      "task_id": "EN_EP0001_retatrutide_shadow_market",
+      "raw_term": "retatrutide",
+      "slug": "retatrutide_shadow_market",
+      "specific_angle": "The Retatrutide Black Market",
+      "market": "EN",
+      "source": "live_pipeline"
+    }
+  [AFTER DUMP] Verified persisted registry records:
+    Key: retatrutide -> status=DISPOSED_INCIDENT_RESIDUE, disposed_at=2026-10-16T12:05:00+00:00
+  [SUCCESS] Topic history registry successfully updated and verified on disk.
+
+--- 3. Archiving Notion Incident Rows across Hubs ---
+  Archiving Trend Brain row (Page ID: 3f901989-2400-8142-9e2e-c238241a1b21)...
+    [OK] Page 3f901989-2400-8142-9e2e-c238241a1b21 is archived (API confirmed: archived=True).
+    Response Dump: {"object": "page", "id": "3f901989-2400-8142-9e2e-c238241a1b21", "archived": true, "properties": {"Topic": {"title": [{"text": {"content": "retatrutide"}}]}}}
+  Archiving Story Library row (Page ID: 3f901989-2400-81f0-8475-c60a0cad7257)...
+    [OK] Page 3f901989-2400-81f0-8475-c60a0cad7257 is archived (API confirmed: archived=True).
+    Response Dump: {"object": "page", "id": "3f901989-2400-81f0-8475-c60a0cad7257", "archived": true, "properties": {"Title": {"title": [{"text": {"content": "EN_EP0001_retatrutide_shadow_market"}}]}}}
+  Archiving YouTube Metadata row (Page ID: 3f901989-2400-81ac-9e9f-ed4748e149fc)...
+    [OK] Page 3f901989-2400-81ac-9e9f-ed4748e149fc is archived (API confirmed: archived=True).
+    Response Dump: {"object": "page", "id": "3f901989-2400-81ac-9e9f-ed4748e149fc", "archived": true, "properties": {"Video Title": {"title": [{"text": {"content": "The Retatrutide Black Market"}}]}}}
+
+--- 4. Single-Truth Pipeline Orchestration Architecture (Rule 125) ---
+  1. Master Stage Pipeline Orchestrator: orchestrator/run_pipeline.py (Canonical AVF-STAB-001)
+     - Manages 11 pipeline stages (S01..S11) end-to-end with atomic manifests and RunPaths.
+  2. Market Trend & Cron Driver:          scripts/run_trend_pipeline.py
+     - Drives B1 market discovery, daily quota locking, and candidate graduation.
+  3. Legacy Batch Runner CLI:             scripts/orchestrator/runner.py
+     - Re-scoped for multi-agent batch execution and health verification.
+  4. Legacy Duplicate Disposition:
+     - scripts/orchestrator/run_pipeline.py was PERMANENTLY REMOVED via git rm in commit 2456870.
+     - Zero duplicate entrypoints remain in active codebase.
+
+=================================================================
+ALL RESIDUE SUCCESSFULLY DISPOSED & VERIFIED ON DISK & NOTION API.
+=================================================================
+       ```
 
 3. **Rule 126 (Three-Way Bit-for-Bit Physical Parity)**:
    - 100% clean porcelain on Local Windows and Hetzner VPS (`/root/video_factory`).

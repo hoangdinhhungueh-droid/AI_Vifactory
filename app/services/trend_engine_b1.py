@@ -125,6 +125,11 @@ def mark_v7_candidate_consumed(candidate_id: str, episode_id: str) -> bool:
 
 def _send_guarded_alert(alert_type: str, market: str, message: str, state_dir: Optional[str] = None) -> bool:
     """Send an alert to Telegram guarded by cooldown with automatic rollback on failure."""
+    m_up = (market or "").upper()
+    if m_up.startswith("TEST_"):
+        logger.info(f"[{market}] Suppressed live Telegram alert for test market ({alert_type}).")
+        return False
+
     try:
         decision = should_send_alert(alert_type, market, state_dir=state_dir)
     except Exception as _alert_err:
@@ -1077,29 +1082,42 @@ def discover_and_produce_market_trend(
 
     m_up = (market or "EN").upper()
     now = get_vn_now()
-    force_crawl = bool(custom_seed) or os.getenv("B1_FORCE_CRAWL") == "1"
-
+    explicit_force = os.getenv("B1_FORCE_CRAWL") == "1" or bool(kwargs.pop("force", False))
     lock_token = uuid.uuid4().hex
 
-    if not force_crawl:
+    if not explicit_force:
         is_done, reason, details = is_market_done_today(m_up, state_dir=state_dir, now=now)
         if is_done:
+            # If an active IN_PROGRESS lock is held, manual seeds MUST respect it (Boss Round 12 Item 4)
+            if reason == "lock_in_progress":
+                holder_pid = details.get("pid")
+                logger.warning(
+                    f"[{m_up}] Active IN_PROGRESS lock currently held by PID {holder_pid}. "
+                    f"Aborting crawl to prevent concurrent runs (custom seed does not imply force)."
+                )
+                print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {m_up} is currently being processed by PID {holder_pid}.")
+                print("   SKIPPING CRAWL to respect active lock holder. Use B1_FORCE_CRAWL=1 or --force to preempt.")
+                return []
+
             topic_name = details.get("topic_id") or details.get("raw_term") or ("Exhausted Candidates" if reason == "lock_exhausted_today" else "Existing Episode")
             vn_d = details.get("vn_date") or ""
-            print("=======================================================")
-            if reason in ("lock_exhausted_today", "lock_exhausted_offhours"):
-                print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {m_up} candidate pool exhausted for today ({vn_d})!")
-                print(f"   Reason: {reason} | Evaluated {details.get('scan_count', 'N')} candidates without passing.")
-                print("   SKIPPING AUTOMATED CRAWL to prevent infinite loops. The scheduler will resume tomorrow for the next market.")
-                print("   (Pass custom seed or set B1_FORCE_CRAWL=1 / --force to re-run manually)")
+            if not custom_seed:
+                print("=======================================================")
+                if reason in ("lock_exhausted_today", "lock_exhausted_offhours"):
+                    print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {m_up} candidate pool exhausted for today ({vn_d})!")
+                    print(f"   Reason: {reason} | Evaluated {details.get('scan_count', 'N')} candidates without passing.")
+                    print("   SKIPPING AUTOMATED CRAWL to prevent infinite loops. The scheduler will resume tomorrow for the next market.")
+                    print("   (Pass custom seed or set B1_FORCE_CRAWL=1 / --force to re-run manually)")
+                else:
+                    print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {m_up} already produced today!")
+                    print(f"   Reason: {reason} | Topic/Episode: {topic_name} (VN Date: {vn_d})")
+                    print("   SKIPPING CRAWL to protect LLM quota, avoid duplicate videos, and prevent duplicate Telegram alerts.")
+                    print("   (Pass custom seed or set B1_FORCE_CRAWL=1 to override)")
+                print("=======================================================")
+                logger.info(f"[{m_up}] Skipping crawl: market already produced or exhausted today ({reason}: {topic_name}).")
+                return []
             else:
-                print(f"🛑 [DAILY MARKET QUOTA GUARD] Market {m_up} already produced today!")
-                print(f"   Reason: {reason} | Topic/Episode: {topic_name} (VN Date: {vn_d})")
-                print("   SKIPPING CRAWL to protect LLM quota, avoid duplicate videos, and prevent duplicate Telegram alerts.")
-                print("   (Pass custom seed or set B1_FORCE_CRAWL=1 to override)")
-            print("=======================================================")
-            logger.info(f"[{m_up}] Skipping crawl: market already produced or exhausted today ({reason}: {topic_name}).")
-            return []
+                logger.info(f"[{m_up}] Custom seed provided: proceeding to acquire lock despite {reason} status ({topic_name}).")
 
         # Acquire IN_PROGRESS daily lock immediately to prevent TOCTOU race (Boss Item 13)
         acquired = acquire_in_progress(
@@ -1108,14 +1126,17 @@ def discover_and_produce_market_trend(
         if not acquired:
             logger.warning(
                 f"[{m_up}] Failed to acquire daily IN_PROGRESS lock: another process holds the lock. "
-                f"Aborting crawl to prevent concurrent runs (Boss Item 13)."
+                f"Aborting crawl to prevent concurrent runs (Boss Item 13 & Round 12 Item 4)."
             )
             return []
     else:
-        # B1_FORCE_CRAWL / custom_seed: acquire forced lock with token ownership (Boss Item 8)
-        acquire_in_progress(
+        # B1_FORCE_CRAWL / --force: acquire forced lock with token ownership and verify return value (Boss Round 12 Item 4)
+        acquired = acquire_in_progress(
             m_up, topic_id="", state_dir=state_dir, owner_pid=os.getpid(), lock_token=lock_token, now=now, force=True
         )
+        if not acquired:
+            logger.error(f"[{m_up}] Forced crawl failed to acquire daily IN_PROGRESS lock. Aborting.")
+            return []
         logger.info(f"[{m_up}] Forced crawl active: acquired lock with token {lock_token[:8]}")
 
     is_terminal_stamped: bool = False
@@ -1848,9 +1869,9 @@ def discover_and_produce_market_trend(
             if not custom_seed:
                 fin_alert = (
                     f"🚨 <b>[VF PIPELINE B1 UNEXPECTED TERMINATION]</b>\n"
-                    f"Market: <code>{m_up}</code> | Lock Token: <code>{lock_token[:8]}</code>\n"
-                    f"Crawl execution exited without terminal lock mark (COMPLETED or EXHAUSTED_TODAY).\n"
-                    f"Uncommitted lock released in finally block to prevent scheduler deadlock."
+                    f"Thị trường: <b>{m_up}</b>\n"
+                    f"Tiến trình cào dừng đột ngột trước khi hoàn tất chu trình hôm nay.\n"
+                    f"Hệ thống đã tự động giải phóng lock an toàn để tránh nghẽn lịch trình."
                 )
                 _send_guarded_alert("b1_unexpected_termination", m_up, fin_alert, state_dir=state_dir)
 

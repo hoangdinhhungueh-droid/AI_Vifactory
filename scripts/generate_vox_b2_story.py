@@ -65,25 +65,25 @@ Chronology / Timeline:
 {json.dumps(chronology, ensure_ascii=False, indent=2)}
 
 [TASK REQUIREMENT]
-Write a complete, highly engaging 5-Beat Docudrama Script in KOREAN (Hangul) following the exact B2 Investigative Docudrama Editorial Rules provided in the system prompt.
-Total Length: 1,800 - 2,200 words (~3,200 - 3,600 Hangul syllables).
+Write a complete, highly engaging 5-Beat Docudrama Script in the target market language following the exact B2 Investigative Docudrama Editorial Rules provided in the system prompt.
+Total Length: 1,800 - 2,200 words (~3,200 - 3,600 syllables/characters).
 Make sure to satisfy all 5 Acts:
-- Act I: Impossible Contradiction & Cold Strike (Lead with exact numbers in first 60 words: 1,540억 won vs $0 permanent establishment).
-- Act II: False Narrative & The Amazon Contrast (Amazon conceded 1,500억 won, Google appealed and won).
-- Act III: Systemic Blindspot & Paper Trail (Permanent establishment legal loophole, transfer pricing fee, cost-plus marketing contract).
-- Act IV: The Smoking Gun & Climax (The court verdict, NTS evidentiary breakdown).
-- Act V: Modern Mirror & Living Warning (Global digital tax reforms, OECD Pillar One, ongoing public revenue leak).
+- Act I: Impossible Contradiction & Cold Strike (Lead with verified quantitative metrics and primary catalyst in first 60 words).
+- Act II: False Narrative & The Surface Contrast (Official narrative, consensus assumption, and the emerging anomaly).
+- Act III: Systemic Blindspot & Paper Trail (Forensic evidentiary paper trail, regulatory/contractual loopholes, institutional mechanisms).
+- Act IV: The Smoking Gun & Climax (The decisive evidentiary breakdown, exposure, and structural reckoning).
+- Act V: Modern Mirror & Living Warning (Systemic implications, ongoing vulnerabilities, and living warning for the modern world).
 
 Output JSON matching this exact structure:
 {{
-  "title": "<Catchy Korean Investigative Title>",
-  "topic_slug": "google_kr_tax_loss",
+  "title": "<Catchy Investigative Title in Market Language>",
+  "topic_slug": "<topic_slug>",
   "market": "{market}",
-  "act_1_cold_strike": "<Act 1 Hangul text>",
-  "act_2_false_narrative": "<Act 2 Hangul text>",
-  "act_3_paper_trail": "<Act 3 Hangul text>",
-  "act_4_smoking_gun": "<Act 4 Hangul text>",
-  "act_5_modern_mirror": "<Act 5 Hangul text>",
+  "act_1_cold_strike": "<Act 1 text>",
+  "act_2_false_narrative": "<Act 2 text>",
+  "act_3_paper_trail": "<Act 3 text>",
+  "act_4_smoking_gun": "<Act 4 text>",
+  "act_5_modern_mirror": "<Act 5 text>",
   "full_spoken_script": "<Combined continuous voiceover narrative text>"
 }}
 """

@@ -28,7 +28,6 @@ from pydantic import BaseModel
 
 from app import log_redact  # noqa: F401
 from app.routes.mpt_g5 import router as mpt_g5_router
-from app.s1_score import router as _s1_score_router
 from app.services.artifact_sync import router as _sync_router
 from app.services.episode_images import router as _episode_images_router
 from app.services.preflight_episode import router as _preflight_router
@@ -103,8 +102,27 @@ def _resolve_git_sha() -> str:
 
 # ── Health ───────────────────────────────────────────────────────────────────
 @app.get("/api/v1/health")
-def health():
-    return {"status": "ok", "git_sha": _resolve_git_sha()}
+def health(request: Request):
+    """Health check endpoint.
+    Drops git_sha for unauthenticated external requests (Boss Round 12 Item 8).
+    Includes git_sha for authenticated callers, verified loopback, or test clients.
+    """
+    token = os.getenv("VF_API_TOKEN", "").strip() or VF_API_TOKEN
+    auth_header = request.headers.get("Authorization", "")
+    client_host = getattr(getattr(request, "client", None), "host", "")
+    has_forwarded = bool(request.headers.get("x-forwarded-for") or request.headers.get("cf-connecting-ip"))
+    is_loopback = client_host in ("127.0.0.1", "::1", "localhost", "testclient", "") and not has_forwarded
+
+    is_authed = False
+    if token and auth_header and hmac.compare_digest(auth_header.encode("utf-8"), f"Bearer {token}".encode("utf-8")):
+        is_authed = True
+    elif is_loopback or os.getenv("VF_ALLOW_PUBLIC_HEALTH_GIT_SHA") == "1":
+        is_authed = True
+
+    resp: dict[str, Any] = {"status": "ok"}
+    if is_authed:
+        resp["git_sha"] = _resolve_git_sha()
+    return resp
 
 # ── Auth Helper ─────────────────────────────────────────────────────────────
 VF_API_TOKEN = os.getenv("VF_API_TOKEN", "").strip()
@@ -154,6 +172,17 @@ def _verify_auth(request: Request) -> None:
             status_code=401,
             detail="Unauthorized: invalid or missing Bearer token",
         )
+
+
+# --- Prometheus metrics endpoint (G6-8, gated by _verify_auth - Boss Round 12 Item 8) ---
+try:
+    from fastapi.responses import Response as _Resp
+    from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, generate_latest
+    @app.get("/metrics", dependencies=[Depends(_verify_auth)])
+    def metrics_endpoint():
+        return _Resp(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
+except ImportError as _p_err:
+    _logging.getLogger("app.main").debug("Prometheus client not installed, skipping /metrics: %s", _p_err)
 
 
 
@@ -535,9 +564,9 @@ def oai_models():
     return {"object": "list", "data": [{"id": "auto", "object": "model", "owned_by": "vpsRouter"}]}
 
 # Modular sub-routers for specialized pipeline services (MPT, Trend, Story, Sync)
+# Note: app.s1_score router was decommissioned on 28/07/2026 to prevent duplicate alerts (Rule 125 Single Truth).
 app.include_router(mpt_g5_router, dependencies=[Depends(_verify_auth)])
 app.include_router(_trend_gate_router, dependencies=[Depends(_verify_auth)])
-app.include_router(_s1_score_router, dependencies=[Depends(_verify_auth)])
 app.include_router(_trend_verify_router, dependencies=[Depends(_verify_auth)])
 app.include_router(_story_check_router, dependencies=[Depends(_verify_auth)])
 app.include_router(_episode_images_router, dependencies=[Depends(_verify_auth)])

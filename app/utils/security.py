@@ -1,4 +1,5 @@
 """Security utilities for masking sensitive data in logs."""
+import logging
 import re
 
 
@@ -80,8 +81,6 @@ def mask_exception_text(exception_text: str) -> str:
     return exception_text
 
 
-import logging
-
 class SensitiveDataFilter(logging.Filter):
     """Logging filter that automatically redacts Telegram bot tokens, presigned URLs, and secrets."""
     def filter(self, record: logging.LogRecord) -> bool:
@@ -94,7 +93,8 @@ class SensitiveDataFilter(logging.Filter):
                     record.args = {k: (mask_sensitive_url(str(v)) if isinstance(v, str) else v) for k, v in record.args.items()}
                 elif isinstance(record.args, tuple):
                     record.args = tuple(mask_sensitive_url(str(v)) if isinstance(v, str) else v for v in record.args)
-        except Exception:
+        except Exception as _filter_err:
+            logging.getLogger(__name__).debug("SensitiveDataFilter formatting notice: %s", _filter_err)
             return True
         return True
 

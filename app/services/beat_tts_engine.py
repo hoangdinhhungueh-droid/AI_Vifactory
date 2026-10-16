@@ -305,7 +305,12 @@ async def synthesize_beat_tts_pipeline(
         b_units = beats[b_idx]
         beat_texts = []
         for u in b_units:
-            t = (u.get("text") or u.get("narration") or "").strip()
+            raw_t = (u.get("text") or u.get("narration") or "").strip()
+            try:
+                from vox.planner import sanitize_narration_line
+                t = sanitize_narration_line(raw_t)
+            except Exception:
+                t = raw_t
             if t:
                 beat_texts.append(t)
         beat_text = "\n\n".join(beat_texts)
@@ -517,10 +522,15 @@ async def synthesize_beat_audio_and_subtitles(
             brain = {}
 
     if not brain.get("spoken_sentences") and not brain.get("scenes") and script_text:
+        try:
+            from vox.planner import sanitize_narration_line
+        except Exception:
+            sanitize_narration_line = lambda s: s.strip()
+
         raw_sents = [
-            s.strip()
+            sanitize_narration_line(s.strip())
             for s in re.split(r"(?<=[.!?。！？])\s+", script_text.strip())
-            if s.strip()
+            if sanitize_narration_line(s.strip())
         ]
         total_s = max(1, len(raw_sents))
         seeded_sents = []

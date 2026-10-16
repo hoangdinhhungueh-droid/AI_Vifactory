@@ -24,6 +24,7 @@ import os
 import sys
 import time
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -82,13 +83,18 @@ def _get_lock_file_path(
 
 
 def _emit_operator_corrupt_alert(lock_path: Path, error_msg: str, market: str, date_str: str) -> None:
+    if market.upper().startswith("TEST_") or os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("VF_TEST_MODE") == "1":
+        logger.info(f"[{market}] Suppressed live corrupt lock alert in test environment.")
+        return
+
+    lock_name = lock_path.name
     alert_text = (
         f"🚨 <b>[FAIL-CLOSED LOCK INTEGRITY ALERT - RULE 118]</b>\n"
-        f"Phát hiện file lock bị hỏng/rỗng tại: <code>{lock_path}</code>\n"
+        f"Phát hiện file lock bất thường: <code>{lock_name}</code>\n"
         f"Thị trường: <b>{market}</b> | Ngày VN: <b>{date_str}</b>\n"
-        f"Lỗi: <code>{error_msg}</code>\n"
-        f"🛑 <b>Hành động:</b> Đã kích hoạt chốt chặn Fail-Closed, từ chối cào tự động để bảo vệ hệ thống.\n"
-        f"🔧 <b>Quy trình khôi phục:</b> Xóa file lock hỏng bằng tay hoặc chạy pipeline với cờ <code>--force</code> (hoặc <code>B1_FORCE_CRAWL=1</code>)."
+        f"Chi tiết: <code>{error_msg}</code>\n"
+        f"🛑 <b>Hành động:</b> Đã kích hoạt chốt chặn Fail-Closed, dừng cào tự động để bảo vệ hệ thống.\n"
+        f"🔧 <b>Xử lý:</b> Kiểm tra tính toàn vẹn của lock hoặc kích hoạt chế độ tái cào có kiểm soát."
     )
     logger.critical(alert_text)
     try:
@@ -96,6 +102,45 @@ def _emit_operator_corrupt_alert(lock_path: Path, error_msg: str, market: str, d
         send_telegram_broadcast(alert_text)
     except Exception as e:
         logger.error(f"[daily_market_lock] Failed to emit operator corrupt alert to Telegram: {type(e).__name__}: {e}")
+
+
+
+@contextmanager
+def _market_lock_mutex(lock_path: Path, timeout_sec: float = 10.0):
+    """File lock mutex to serialize verify-and-mutate operations (takeover, release, mark_completed, mark_exhausted).
+    Eliminates TOCTOU races between concurrent takeover and release/completion (Boss Round 12 Item 5).
+    """
+    mutex_path = lock_path.with_suffix(lock_path.suffix + ".mutex")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = None
+    start_t = time.time()
+    while True:
+        try:
+            fd = os.open(str(mutex_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+            break
+        except FileExistsError:
+            try:
+                m_age = time.time() - mutex_path.stat().st_mtime
+                if m_age > timeout_sec:
+                    mutex_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            if time.time() - start_t > timeout_sec:
+                logger.warning(f"[daily_market_lock] Timed out waiting for mutex on {lock_path} after {timeout_sec}s")
+                raise TimeoutError(f"Timed out acquiring mutex for {lock_path}")
+            time.sleep(0.02)
+        except OSError as e:
+            logger.error(f"[daily_market_lock] Mutex acquisition error on {lock_path}: {e}")
+            raise e
+    try:
+        yield
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+        mutex_path.unlink(missing_ok=True)
 
 
 HARD_MAX_IN_PROGRESS_AGE_SECONDS = 28800  # 8 hours hard cap exceeding max TTL (Boss Item 6)
@@ -235,6 +280,9 @@ def _is_lock_stale(
 
 def _emit_operator_stale_holder_alert(market: str, date_str: str, pid: int, age_sec: int, ttl_sec: int, state_dir: Optional[str] = None) -> None:
     """Emits operator alert when acquire_in_progress is refused for a stale-but-'alive' holder (Boss Item 6)."""
+    if market.upper().startswith("TEST_") or os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("VF_TEST_MODE") == "1":
+        logger.info(f"[{market}] Suppressed live stale holder alert in test environment.")
+        return
     alert_text = (
         f"⚠️ <b>[STALE LOCK HOLDER ALERT - RULE 118]</b>\n"
         f"Market: <b>{market}</b> | VN Date: <b>{date_str}</b>\n"
@@ -683,62 +731,44 @@ def acquire_in_progress(
             logger.warning(
                 f"[daily_market_lock] Attempting exclusive takeover of {action_desc} lock for {m_up}"
             )
-            takeover_lock = lock_path.with_suffix(lock_path.suffix + ".takeover")
             try:
-                fd_takeover = os.open(str(takeover_lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-            except FileExistsError:
-                try:
-                    t_age = time.time() - takeover_lock.stat().st_mtime
-                    if t_age > 10.0:
-                        takeover_lock.unlink(missing_ok=True)
-                except OSError as unl_err:
-                    logger.debug(f"[daily_market_lock] Error unlinking stale takeover lock {takeover_lock}: {unl_err}")
-                logger.debug(f"[daily_market_lock] Lost takeover race to another contender for {m_up}")
+                with _market_lock_mutex(lock_path, timeout_sec=5.0):
+                    try:
+                        with open(lock_path, "r", encoding="utf-8") as rf:
+                            current_content = rf.read().strip()
+                        current_data = json.loads(current_content)
+                    except Exception as recheck_err:
+                        logger.warning(f"[daily_market_lock] Error re-reading lock under mutex: {recheck_err}")
+                        return False
+
+                    curr_still_stale, curr_stale_reason = _is_lock_stale(
+                        current_data, now_utc, ttl_seconds, m_up=m_up, date_str=date_str, state_dir=state_dir, emit_alert=False
+                    )
+
+                    if not curr_still_stale:
+                        logger.info(f"[daily_market_lock] Lock {lock_path} no longer stale under mutex ({curr_stale_reason}), aborting takeover")
+                        return False
+
+                    tmp_new = lock_path.with_name(f"{lock_path.name}.tmp_{pid}_{uuid.uuid4().hex}")
+                    try:
+                        with open(tmp_new, "w", encoding="utf-8") as f_tmp:
+                            json.dump(payload, f_tmp, ensure_ascii=False, indent=2)
+                            f_tmp.flush()
+                            try:
+                                os.fsync(f_tmp.fileno())
+                            except OSError as fsync_err:
+                                logger.debug(f"[daily_market_lock] fsync error on tmp_new {tmp_new}: {fsync_err}")
+                        os.replace(str(tmp_new), str(lock_path))
+                        logger.info(f"[daily_market_lock] Won exclusive takeover of {action_desc} lock for {m_up} on {date_str}")
+                        return True
+                    except OSError as rep_err:
+                        logger.error(f"[daily_market_lock] Failed atomic replace during takeover: {rep_err}")
+                        return False
+                    finally:
+                        tmp_new.unlink(missing_ok=True)
+            except (TimeoutError, OSError) as tok_err:
+                logger.debug(f"[daily_market_lock] Takeover mutex conflict for {m_up}: {tok_err}")
                 return False
-            except OSError as tok_err:
-                logger.debug(f"[daily_market_lock] Takeover mutex error for {m_up}: {tok_err}")
-                return False
-
-            try:
-                try:
-                    with open(lock_path, "r", encoding="utf-8") as rf:
-                        current_content = rf.read().strip()
-                    current_data = json.loads(current_content)
-                except Exception as recheck_err:
-                    logger.warning(f"[daily_market_lock] Error re-reading lock under mutex: {recheck_err}")
-                    return False
-
-                curr_still_stale, curr_stale_reason = _is_lock_stale(
-                    current_data, now_utc, ttl_seconds, m_up=m_up, date_str=date_str, state_dir=state_dir, emit_alert=False
-                )
-
-                if not curr_still_stale:
-                    logger.info(f"[daily_market_lock] Lock {lock_path} no longer stale under mutex ({curr_stale_reason}), aborting takeover")
-                    return False
-
-                tmp_new = lock_path.with_name(f"{lock_path.name}.tmp_{pid}_{uuid.uuid4().hex}")
-                try:
-                    with open(tmp_new, "w", encoding="utf-8") as f_tmp:
-                        json.dump(payload, f_tmp, ensure_ascii=False, indent=2)
-                        f_tmp.flush()
-                        try:
-                            os.fsync(f_tmp.fileno())
-                        except OSError as fsync_err:
-                            logger.debug(f"[daily_market_lock] fsync error on tmp_new {tmp_new}: {fsync_err}")
-                    os.replace(str(tmp_new), str(lock_path))
-                    logger.info(f"[daily_market_lock] Won exclusive takeover of {action_desc} lock for {m_up} on {date_str}")
-                    return True
-                except OSError as rep_err:
-                    logger.error(f"[daily_market_lock] Failed atomic replace during takeover: {rep_err}")
-                    return False
-                finally:
-                    tmp_new.unlink(missing_ok=True)
-            finally:
-                try:
-                    os.close(fd_takeover)
-                except OSError as close_err:
-                    logger.debug(f"[daily_market_lock] Error closing fd_takeover: {close_err}")
-                takeover_lock.unlink(missing_ok=True)
     except Exception as ex:
         logger.error(f"[daily_market_lock] Error inspecting existing lock {lock_path}: {ex}")
     return False
@@ -798,56 +828,57 @@ def mark_completed(
     lock_path = _get_lock_file_path(m_up, state_dir, now)
 
     pid = owner_pid or os.getpid()
-    if lock_path.exists():
-        if force_unverified:
-            try:
-                prev_text = lock_path.read_text(encoding="utf-8")
-                logger.warning(
-                    f"[daily_market_lock] Overwriting existing lock with force_unverified=True for {m_up} on {date_str}. "
-                    f"Previous lock content: {prev_text}"
-                )
-            except OSError as _audit_err:
-                logger.debug(f"[daily_market_lock] Notice reading old lock for force audit: {_audit_err}")
-        elif lock_token is None and owner_pid is None:
-            logger.error(
-                f"[daily_market_lock] Refusing unverified mark_completed for {m_up}: "
-                f"must provide lock_token, owner_pid, or force_unverified=True to overwrite held lock"
-            )
-            return False
-        if not force_unverified:
-            verified, existing = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
-            if not verified:
-                logger.error(f"[daily_market_lock] Refusing mark_completed for {m_up}: caller is not the lock holder")
-                return False
-            token = lock_token or (existing.get("lock_token") if existing else uuid.uuid4().hex)
-        else:
-            token = lock_token or uuid.uuid4().hex
-    else:
-        if lock_token is not None:
-            logger.error(
-                f"[daily_market_lock] Refusing mark_completed for {m_up}: "
-                f"caller provided lock_token {lock_token[:8]} but lock file {lock_path} no longer exists"
-            )
-            return False
-        token = uuid.uuid4().hex
-
-    payload = {
-        "market": m_up,
-        "vn_date": date_str,
-        "status": "COMPLETED",
-        "topic_id": topic_id,
-        "pid": pid,
-        "lock_token": token,
-        "completed_at_utc": vn_now(now).astimezone(timezone.utc).isoformat(),
-        "git_sha": _get_current_git_sha(),
-    }
-    if extra_metadata:
-        payload.update(extra_metadata)
-
     try:
-        atomic_write_json(lock_path, payload)
-        logger.info(f"[daily_market_lock] Marked COMPLETED lock for {m_up} on {date_str} (topic={topic_id})")
-        return True
+        with _market_lock_mutex(lock_path, timeout_sec=10.0):
+            if lock_path.exists():
+                if force_unverified:
+                    try:
+                        prev_text = lock_path.read_text(encoding="utf-8")
+                        logger.warning(
+                            f"[daily_market_lock] Overwriting existing lock with force_unverified=True for {m_up} on {date_str}. "
+                            f"Previous lock content: {prev_text}"
+                        )
+                    except OSError as _audit_err:
+                        logger.debug(f"[daily_market_lock] Notice reading old lock for force audit: {_audit_err}")
+                elif lock_token is None and owner_pid is None:
+                    logger.error(
+                        f"[daily_market_lock] Refusing unverified mark_completed for {m_up}: "
+                        f"must provide lock_token, owner_pid, or force_unverified=True to overwrite held lock"
+                    )
+                    return False
+                if not force_unverified:
+                    verified, existing = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
+                    if not verified:
+                        logger.error(f"[daily_market_lock] Refusing mark_completed for {m_up}: caller is not the lock holder")
+                        return False
+                    token = lock_token or (existing.get("lock_token") if existing else uuid.uuid4().hex)
+                else:
+                    token = lock_token or uuid.uuid4().hex
+            else:
+                if lock_token is not None:
+                    logger.error(
+                        f"[daily_market_lock] Refusing mark_completed for {m_up}: "
+                        f"caller provided lock_token {lock_token[:8]} but lock file {lock_path} no longer exists"
+                    )
+                    return False
+                token = uuid.uuid4().hex
+
+            payload = {
+                "market": m_up,
+                "vn_date": date_str,
+                "status": "COMPLETED",
+                "topic_id": topic_id,
+                "pid": pid,
+                "lock_token": token,
+                "completed_at_utc": vn_now(now).astimezone(timezone.utc).isoformat(),
+                "git_sha": _get_current_git_sha(),
+            }
+            if extra_metadata:
+                payload.update(extra_metadata)
+
+            atomic_write_json(lock_path, payload)
+            logger.info(f"[daily_market_lock] Marked COMPLETED lock for {m_up} on {date_str} (topic={topic_id})")
+            return True
     except Exception as e:
         logger.error(f"[daily_market_lock] Failed to mark COMPLETED for {m_up}: {e}")
         return False
@@ -876,86 +907,82 @@ def mark_exhausted_today(
     lock_path = _get_lock_file_path(m_up, state_dir, now)
     now_vn = vn_now(now)
     pid = owner_pid or os.getpid()
-
-    if lock_path.exists():
-        if force_unverified:
-            try:
-                prev_text = lock_path.read_text(encoding="utf-8")
-                logger.warning(
-                    f"[daily_market_lock] Overwriting existing lock with force_unverified=True for {m_up} on {date_str}. "
-                    f"Previous lock content: {prev_text}"
-                )
-            except OSError as _audit_err:
-                logger.debug(f"[daily_market_lock] Notice reading old lock for force audit: {_audit_err}")
-        elif lock_token is None and owner_pid is None:
-            logger.error(
-                f"[daily_market_lock] Refusing unverified mark_exhausted for {m_up}: "
-                f"must provide lock_token, owner_pid, or force_unverified=True to overwrite held lock"
-            )
-            return False
-        if not force_unverified:
-            verified, existing = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
-            if not verified:
-                logger.error(f"[daily_market_lock] Refusing mark_exhausted for {m_up}: caller is not the lock holder")
-                return False
-            token = lock_token or (existing.get("lock_token") if existing else uuid.uuid4().hex)
-        else:
-            token = lock_token or uuid.uuid4().hex
-    else:
-        if lock_token is not None:
-            logger.error(
-                f"[daily_market_lock] Refusing mark_exhausted for {m_up}: "
-                f"caller provided lock_token {lock_token[:8]} but lock file {lock_path} no longer exists"
-            )
-            return False
-        token = uuid.uuid4().hex
-
-    if now_vn.hour < MIN_PRODUCTION_HOUR_VN and not allow_off_hours:
-        # Pre-06:00 VN off-hours: write short-TTL throttle lock expiring at 06:00 AM VN
-        target_6am_vn = now_vn.replace(hour=MIN_PRODUCTION_HOUR_VN, minute=0, second=0, microsecond=0)
-        offhours_ttl = max(60, int((target_6am_vn - now_vn).total_seconds()))
-        payload = {
-            "market": m_up,
-            "vn_date": date_str,
-            "status": "EXHAUSTED_OFFHOURS",
-            "scan_count": scan_count,
-            "pid": pid,
-            "lock_token": token,
-            "exhausted_at_utc": now_vn.astimezone(timezone.utc).isoformat(),
-            "ttl_seconds": offhours_ttl,
-            "expires_at_vn": target_6am_vn.isoformat(),
-            "git_sha": _get_current_git_sha(),
-        }
-        if extra_metadata:
-            payload.update(extra_metadata)
-        try:
-            atomic_write_json(lock_path, payload)
-            logger.info(
-                f"[daily_market_lock] Marked EXHAUSTED_OFFHOURS lock for {m_up} on {date_str} "
-                f"until 06:00 AM VN (ttl={offhours_ttl}s, scan_count={scan_count})"
-            )
-            return True
-        except Exception as e:
-            logger.error(f"[daily_market_lock] Failed to write EXHAUSTED_OFFHOURS for {m_up}: {e}")
-            return False
-
-    payload = {
-        "market": m_up,
-        "vn_date": date_str,
-        "status": "EXHAUSTED_TODAY",
-        "scan_count": scan_count,
-        "pid": pid,
-        "lock_token": token,
-        "exhausted_at_utc": now_vn.astimezone(timezone.utc).isoformat(),
-        "git_sha": _get_current_git_sha(),
-    }
-    if extra_metadata:
-        payload.update(extra_metadata)
-
     try:
-        atomic_write_json(lock_path, payload)
-        logger.info(f"[daily_market_lock] Marked EXHAUSTED_TODAY lock for {m_up} on {date_str} (scan_count={scan_count})")
-        return True
+        with _market_lock_mutex(lock_path, timeout_sec=10.0):
+            if lock_path.exists():
+                if force_unverified:
+                    try:
+                        prev_text = lock_path.read_text(encoding="utf-8")
+                        logger.warning(
+                            f"[daily_market_lock] Overwriting existing lock with force_unverified=True for {m_up} on {date_str}. "
+                            f"Previous lock content: {prev_text}"
+                        )
+                    except OSError as _audit_err:
+                        logger.debug(f"[daily_market_lock] Notice reading old lock for force audit: {_audit_err}")
+                elif lock_token is None and owner_pid is None:
+                    logger.error(
+                        f"[daily_market_lock] Refusing unverified mark_exhausted for {m_up}: "
+                        f"must provide lock_token, owner_pid, or force_unverified=True to overwrite held lock"
+                    )
+                    return False
+                if not force_unverified:
+                    verified, existing = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
+                    if not verified:
+                        logger.error(f"[daily_market_lock] Refusing mark_exhausted for {m_up}: caller is not the lock holder")
+                        return False
+                    token = lock_token or (existing.get("lock_token") if existing else uuid.uuid4().hex)
+                else:
+                    token = lock_token or uuid.uuid4().hex
+            else:
+                if lock_token is not None:
+                    logger.error(
+                        f"[daily_market_lock] Refusing mark_exhausted for {m_up}: "
+                        f"caller provided lock_token {lock_token[:8]} but lock file {lock_path} no longer exists"
+                    )
+                    return False
+                token = uuid.uuid4().hex
+
+            if now_vn.hour < MIN_PRODUCTION_HOUR_VN and not allow_off_hours:
+                # Pre-06:00 VN off-hours: write short-TTL throttle lock expiring at 06:00 AM VN
+                target_6am_vn = now_vn.replace(hour=MIN_PRODUCTION_HOUR_VN, minute=0, second=0, microsecond=0)
+                offhours_ttl = max(60, int((target_6am_vn - now_vn).total_seconds()))
+                payload = {
+                    "market": m_up,
+                    "vn_date": date_str,
+                    "status": "EXHAUSTED_OFFHOURS",
+                    "scan_count": scan_count,
+                    "pid": pid,
+                    "lock_token": token,
+                    "exhausted_at_utc": now_vn.astimezone(timezone.utc).isoformat(),
+                    "ttl_seconds": offhours_ttl,
+                    "expires_at_vn": target_6am_vn.isoformat(),
+                    "git_sha": _get_current_git_sha(),
+                }
+                if extra_metadata:
+                    payload.update(extra_metadata)
+                atomic_write_json(lock_path, payload)
+                logger.info(
+                    f"[daily_market_lock] Marked EXHAUSTED_OFFHOURS lock for {m_up} on {date_str} "
+                    f"until 06:00 AM VN (ttl={offhours_ttl}s, scan_count={scan_count})"
+                )
+                return True
+
+            payload = {
+                "market": m_up,
+                "vn_date": date_str,
+                "status": "EXHAUSTED_TODAY",
+                "scan_count": scan_count,
+                "pid": pid,
+                "lock_token": token,
+                "exhausted_at_utc": now_vn.astimezone(timezone.utc).isoformat(),
+                "git_sha": _get_current_git_sha(),
+            }
+            if extra_metadata:
+                payload.update(extra_metadata)
+
+            atomic_write_json(lock_path, payload)
+            logger.info(f"[daily_market_lock] Marked EXHAUSTED_TODAY lock for {m_up} on {date_str} (scan_count={scan_count})")
+            return True
     except Exception as e:
         logger.error(f"[daily_market_lock] Failed to mark EXHAUSTED_TODAY for {m_up}: {e}")
         return False
@@ -969,40 +996,33 @@ def release_lock(
     owner_pid: Optional[int] = None,
     force_unverified: bool = False,
 ) -> bool:
-    """Release or remove daily lock with strict holder verification.
+    """Release or remove daily lock with strict holder verification under mutex (Boss Round 12 Item 5).
     Never unlinks a lock unless verified by lock_token / owner_pid or explicit force_unverified=True.
     """
     m_up = _validate_market(market)
     lock_path = _get_lock_file_path(m_up, state_dir, now)
-    if not lock_path.exists():
-        return False
-
-    if lock_token is None and owner_pid is None and not force_unverified:
-        logger.error(
-            f"[daily_market_lock] Refusing unverified release_lock for {m_up}: "
-            f"must provide lock_token, owner_pid, or force_unverified=True"
-        )
-        return False
-
-    if not force_unverified:
-        verified, _ = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
-        if not verified:
-            logger.warning(f"[daily_market_lock] Refusing release_lock for {m_up}: owner verification failed")
-            return False
 
     try:
-        # Re-check lock token immediately before unlinking to minimize TOCTOU window
-        if not force_unverified and lock_token is not None:
-            re_verified, _ = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
-            if not re_verified:
-                logger.warning(
-                    f"[daily_market_lock] Refusing release_lock for {m_up}: "
-                    f"ownership lost immediately prior to unlink"
+        with _market_lock_mutex(lock_path, timeout_sec=10.0):
+            if not lock_path.exists():
+                return False
+
+            if lock_token is None and owner_pid is None and not force_unverified:
+                logger.error(
+                    f"[daily_market_lock] Refusing unverified release_lock for {m_up}: "
+                    f"must provide lock_token, owner_pid, or force_unverified=True"
                 )
                 return False
-        lock_path.unlink()
-        logger.info(f"[daily_market_lock] Released lock for {m_up} (token={str(lock_token)[:8]})")
-        return True
+
+            if not force_unverified:
+                verified, _ = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
+                if not verified:
+                    logger.warning(f"[daily_market_lock] Refusing release_lock for {m_up}: owner verification failed")
+                    return False
+
+            lock_path.unlink()
+            logger.info(f"[daily_market_lock] Released lock for {m_up} (token={str(lock_token)[:8]})")
+            return True
     except OSError as e:
         logger.warning(f"[daily_market_lock] Failed to remove lock file {lock_path}: {e}")
         return False
