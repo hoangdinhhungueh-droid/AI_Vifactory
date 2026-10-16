@@ -1516,7 +1516,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
     code_ocr, out_ocr = run_on_vps(
         "python3 -c \""
         "import ast, glob, json, subprocess, os\n"
-        "allowlist_path = '/root/video_factory/config/ast_ratchet_baseline.json' if os.path.exists('/root/video_factory/config/ast_ratchet_baseline.json') else '/root/video_factory/specs/rule139_allowlist.json'\n"
+        "allowlist_path = '/root/video_factory/config/ast_ratchet_baseline.json'\n"
         "allowlist = set()\n"
         "if os.path.exists(allowlist_path):\n"
         "    try:\n"

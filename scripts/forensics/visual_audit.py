@@ -224,11 +224,12 @@ def audit_provenance_and_size_signatures(fixtures: list[tuple[str, str]]) -> Non
     print("\n--- ASSET PROVENANCE & SIZE SIGNATURE AUDIT (Rule 118 & 122) ---")
     print(
         "ARCHITECTURAL EXPLANATION OF ASSET SIZE SIGNATURES:\n"
-        "- Backgrounds (BG ~6.0 - 8.0 MB): Full-bleed 1920x1080 24-bit/32-bit lossless PNG raster images with intricate textures.\n"
+        "- Backgrounds (BG ~6.0 - 8.0 MB): Full-bleed 1920x1080 or native 2400x1350 asset resolution (lossless PNG raster images with intricate textures rendered onto 1920x1080 canvas).\n"
         "- Foregrounds (FG ~7 KB - 150 KB): Tightly cropped transparent RGBA cutout layers containing only the isolated subject,\n"
         "  vector-style paper documents, or props with large bounding areas of pure transparent alpha (0x00000000).\n"
         "- Golden Fixture Declaration: Assets in out/golden and out/golden_science are deterministic calibration test fixtures\n"
-        "  (is_fixture: true). Excluded from live Rule 122 Axis 3 LLM evaluation claims."
+        "  (is_fixture: true). Excluded from live Rule 122 Axis 3 LLM evaluation claims.\n"
+        "- Rule 122 Axis 3 VLM: NOT_EVALUATED_FOR_FIXTURES (Live VLM evaluator only executes on new production runs, calibration goldens verify deterministic pixel metrics Axis 1, 2, 4)."
     )
 
     for fixture_dir, name in fixtures:
@@ -240,15 +241,28 @@ def audit_provenance_and_size_signatures(fixtures: list[tuple[str, str]]) -> Non
 
         adj = m.get("visual_adjudication", {})
         prov = m.get("assets", {}).get("generator_provenance", {})
-        eval_model = adj.get("evaluator_model") or "calibration_fixture_validator"
-        req_id = adj.get("request_id") or "req_golden_fixture"
-        raw_hash = adj.get("raw_response_hash") or hashlib.sha256(b"golden_fixture_audit").hexdigest()
 
         print(f"\n{name}:")
         print("  - Fixture Status: DETERMINISTIC CALIBRATION FIXTURE (is_fixture: true)")
-        print(f"  - Evaluator Model ID: {eval_model}")
-        print(f"  - Request ID: {req_id}")
-        print(f"  - Raw Response Hash: {raw_hash[:24]}...")
+        print("  - Rule 122 Axis 3 VLM: NOT_EVALUATED_FOR_FIXTURES (Live VLM evaluator only executes on new production runs, calibration goldens verify deterministic pixel metrics Axis 1, 2, 4)")
+        if adj.get("evaluator_model"):
+            print(f"  - Evaluator Model ID: {adj['evaluator_model']}")
+        else:
+            print("  - Evaluator Model ID: NOT_APPLICABLE_FOR_FIXTURES")
+
+        real_req_id = adj.get("request_id")
+        if real_req_id and not real_req_id.startswith("req_golden") and not real_req_id.startswith("req_00"):
+            print(f"  - Request ID: {real_req_id}")
+        else:
+            print("  - Request ID: NOT_APPLICABLE_FOR_FIXTURES")
+
+        raw_hash = adj.get("raw_response_hash")
+        empty_sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        if raw_hash and not raw_hash.startswith(empty_sha[:8]):
+            print(f"  - Raw Response Hash: {raw_hash[:24]}...")
+        else:
+            print("  - Raw Response Hash: NOT_APPLICABLE_FOR_FIXTURES")
+
         print(f"  - Generator Provider: {prov.get('provider', 'google_gemini_web')}")
         print(f"  - Generator Model ID: {prov.get('model', prov.get('model_id', 'gemini-2.5-pro-imagen3'))}")
         print(f"  - Generator Engine: {prov.get('engine', 'Playwright Automation Cluster')}")

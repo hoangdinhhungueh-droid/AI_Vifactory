@@ -211,7 +211,7 @@ def _fetch_native_wiki_extract(subject: str, market: str) -> str:
             data = json.loads(resp.read().decode("utf-8"))
             extract = data.get("extract", "")
             if extract:
-                return extract[:3000]
+                return extract[:1500]
     except Exception as e:
         logger.debug(f"[hhtech] Could not fetch native wiki summary for {subject}: {e}")
     return ""

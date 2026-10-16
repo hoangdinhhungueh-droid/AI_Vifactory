@@ -602,20 +602,29 @@ def test_b2_story_verdict_fails_closed_when_not_pass(tmp_path, monkeypatch):
     from unittest.mock import patch
     from app.services.trend_engine_b1 import discover_and_produce_market_trend
 
-    # Single viable candidate
+    monkeypatch.delenv("B1_FORCE_CRAWL", raising=False)
+
     cand = {
-        "term": "Banking Collapse Inquest",
-        "approx_traffic": "50K+",
-        "news_catalysts": [{"title": "Bank Collapses", "url": "https://news.com/1"}],
-        "factsheet": "Major bank collapse investigation.",
-        "traffic_source": "google_trends_rss",
-        "rising_queries": [],
-        "breakout_queries": [],
+        "term": "corporate bankruptcy collapse crisis",
+        "approx_traffic": "google_news_live",
+        "source": "google_news_live",
+        "geos_present": ["US"],
     }
 
     with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[cand]), \
-         patch("app.services.trend_engine_b1._evaluate_viability_cached", return_value=(True, 9.0, {"hook_angle": "Banking Collapse"})), \
-         patch("app.services.story_engine_b2.generate_5_arc_story", return_value={"story": "text", "story_gate_score": 9.0, "story_verdict": "FAIL"}):
+         patch("app.services.trend_engine_b1.perform_direct_platform_recon", return_value={"rising_queries": [], "viral_videos": [], "news_catalysts": [{"title": "News"}]}), \
+         patch("app.services.trend_engine_b1.fetch_ground_truth_factsheet", return_value={"extract": "Entity factsheet"}), \
+         patch("app.services.trend_engine_b1.assess_keyword_video_viability", return_value={"viability_score": 9.0, "is_video_viable": True, "reasoning": "High impact", "specific_viral_angle": "Banking Collapse"}), \
+         patch("app.services.adversarial_critic_b1.audit_candidate_trend_alignment", return_value={"verdict": "PASS", "audit_score": 9.5}), \
+         patch("app.services.trend_engine_b1.run_b15", return_value={"competitor_narrative_anatomy": {"fatal_explanatory_vacuum": "gap"}}), \
+         patch("app.services.grounding_layer_b15.run_grounding_research", return_value={}), \
+         patch("app.services.grounding_layer_b15.passes_grounding_gate", return_value=(True, "Grounding passed")), \
+         patch("app.services.seo_package_forge.forge_seo_package", return_value={}), \
+         patch("app.services.trend_engine_b1.reason_topic_niche", return_value={"search_specific_keyword": "corporate collapse", "topic_name_vi": "Test", "task_slug": "test_slug", "niche_angle_brief": "Brief", "story_direction_5_arcs": "Arcs"}), \
+         patch("app.services.story_engine_b2.generate_5_arc_story", return_value={"story": "text", "story_gate_score": 9.0, "story_verdict": "FAIL"}), \
+         patch("app.services.trend_engine_b1.record_handled_topic"), \
+         patch("app.services.telegram_buttons.send_telegram_broadcast"), \
+         patch("app.services.trend_engine_b1.commit_trend_task") as mock_commit:
         produced = discover_and_produce_market_trend(
             market="EN",
             auto_produce=True,
@@ -623,6 +632,7 @@ def test_b2_story_verdict_fails_closed_when_not_pass(tmp_path, monkeypatch):
             max_scan_candidates=10,
         )
         assert len(produced) == 0
+        mock_commit.assert_not_called()
 
 
 def test_b21_fact_causal_audit_fails_closed_when_missing_or_score_low(tmp_path, monkeypatch):
@@ -631,20 +641,30 @@ def test_b21_fact_causal_audit_fails_closed_when_missing_or_score_low(tmp_path, 
     from unittest.mock import patch
     from app.services.trend_engine_b1 import discover_and_produce_market_trend
 
+    monkeypatch.delenv("B1_FORCE_CRAWL", raising=False)
+
     cand = {
-        "term": "Accounting Fraud Inquiry",
-        "approx_traffic": "50K+",
-        "news_catalysts": [{"title": "Fraud Exposed", "url": "https://news.com/2"}],
-        "factsheet": "Accounting fraud audit.",
-        "traffic_source": "google_trends_rss",
-        "rising_queries": [],
-        "breakout_queries": [],
+        "term": "corporate bankruptcy collapse crisis",
+        "approx_traffic": "google_news_live",
+        "source": "google_news_live",
+        "geos_present": ["US"],
     }
 
     # Case 1: Missing fact_causal_audit entirely
     with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[cand]), \
-         patch("app.services.trend_engine_b1._evaluate_viability_cached", return_value=(True, 9.0, {"hook_angle": "Fraud Inquiry"})), \
-         patch("app.services.story_engine_b2.generate_5_arc_story", return_value={"story": "text", "story_gate_score": 10.0, "story_verdict": "PASS"}):
+         patch("app.services.trend_engine_b1.perform_direct_platform_recon", return_value={"rising_queries": [], "viral_videos": [], "news_catalysts": [{"title": "News"}]}), \
+         patch("app.services.trend_engine_b1.fetch_ground_truth_factsheet", return_value={"extract": "Entity factsheet"}), \
+         patch("app.services.trend_engine_b1.assess_keyword_video_viability", return_value={"viability_score": 9.0, "is_video_viable": True, "reasoning": "High impact", "specific_viral_angle": "Fraud Inquiry"}), \
+         patch("app.services.adversarial_critic_b1.audit_candidate_trend_alignment", return_value={"verdict": "PASS", "audit_score": 9.5}), \
+         patch("app.services.trend_engine_b1.run_b15", return_value={"competitor_narrative_anatomy": {"fatal_explanatory_vacuum": "gap"}}), \
+         patch("app.services.grounding_layer_b15.run_grounding_research", return_value={}), \
+         patch("app.services.grounding_layer_b15.passes_grounding_gate", return_value=(True, "Grounding passed")), \
+         patch("app.services.seo_package_forge.forge_seo_package", return_value={}), \
+         patch("app.services.trend_engine_b1.reason_topic_niche", return_value={"search_specific_keyword": "corporate collapse", "topic_name_vi": "Test", "task_slug": "test_slug", "niche_angle_brief": "Brief", "story_direction_5_arcs": "Arcs"}), \
+         patch("app.services.story_engine_b2.generate_5_arc_story", return_value={"story": "text", "story_gate_score": 10.0, "story_verdict": "PASS"}), \
+         patch("app.services.trend_engine_b1.record_handled_topic"), \
+         patch("app.services.telegram_buttons.send_telegram_broadcast"), \
+         patch("app.services.trend_engine_b1.commit_trend_task") as mock_commit:
         produced = discover_and_produce_market_trend(
             market="EN",
             auto_produce=True,
@@ -652,16 +672,28 @@ def test_b21_fact_causal_audit_fails_closed_when_missing_or_score_low(tmp_path, 
             max_scan_candidates=10,
         )
         assert len(produced) == 0
+        mock_commit.assert_not_called()
 
     # Case 2: Auditor returned FAIL despite score >= 7.5 (must not override!)
     with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[cand]), \
-         patch("app.services.trend_engine_b1._evaluate_viability_cached", return_value=(True, 9.0, {"hook_angle": "Fraud Inquiry"})), \
+         patch("app.services.trend_engine_b1.perform_direct_platform_recon", return_value={"rising_queries": [], "viral_videos": [], "news_catalysts": [{"title": "News"}]}), \
+         patch("app.services.trend_engine_b1.fetch_ground_truth_factsheet", return_value={"extract": "Entity factsheet"}), \
+         patch("app.services.trend_engine_b1.assess_keyword_video_viability", return_value={"viability_score": 9.0, "is_video_viable": True, "reasoning": "High impact", "specific_viral_angle": "Fraud Inquiry"}), \
+         patch("app.services.adversarial_critic_b1.audit_candidate_trend_alignment", return_value={"verdict": "PASS", "audit_score": 9.5}), \
+         patch("app.services.trend_engine_b1.run_b15", return_value={"competitor_narrative_anatomy": {"fatal_explanatory_vacuum": "gap"}}), \
+         patch("app.services.grounding_layer_b15.run_grounding_research", return_value={}), \
+         patch("app.services.grounding_layer_b15.passes_grounding_gate", return_value=(True, "Grounding passed")), \
+         patch("app.services.seo_package_forge.forge_seo_package", return_value={}), \
+         patch("app.services.trend_engine_b1.reason_topic_niche", return_value={"search_specific_keyword": "corporate collapse", "topic_name_vi": "Test", "task_slug": "test_slug", "niche_angle_brief": "Brief", "story_direction_5_arcs": "Arcs"}), \
          patch("app.services.story_engine_b2.generate_5_arc_story", return_value={
              "story": "text",
              "story_gate_score": 10.0,
              "story_verdict": "PASS",
              "fact_causal_audit": {"verdict": "FAIL", "audit_score": 8.0, "veto_reason": "Unverified premise"}
-         }):
+         }), \
+         patch("app.services.trend_engine_b1.record_handled_topic"), \
+         patch("app.services.telegram_buttons.send_telegram_broadcast"), \
+         patch("app.services.trend_engine_b1.commit_trend_task") as mock_commit:
         produced = discover_and_produce_market_trend(
             market="EN",
             auto_produce=True,
@@ -669,6 +701,7 @@ def test_b21_fact_causal_audit_fails_closed_when_missing_or_score_low(tmp_path, 
             max_scan_candidates=10,
         )
         assert len(produced) == 0
+        mock_commit.assert_not_called()
 
 
 def test_partial_scan_does_not_stamp_exhausted_today(tmp_path, monkeypatch):
@@ -677,6 +710,8 @@ def test_partial_scan_does_not_stamp_exhausted_today(tmp_path, monkeypatch):
     from unittest.mock import patch
     from app.services.trend_engine_b1 import discover_and_produce_market_trend
     from app.services.daily_market_lock import is_market_done_today
+
+    monkeypatch.delenv("B1_FORCE_CRAWL", raising=False)
 
     with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[]):
         produced = discover_and_produce_market_trend(

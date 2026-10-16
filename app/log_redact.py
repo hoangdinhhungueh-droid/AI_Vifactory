@@ -9,9 +9,9 @@ _PATTERNS = [
     re.compile(r"(bot\d{6,12}:)[A-Za-z0-9_\-]+", re.I),
     re.compile(r"(https?://api\.telegram\.org/bot)[^/\s]+", re.I),
     re.compile(r"(Bearer\s+)[A-Za-z0-9_\-\.]{15,}", re.I),
-    re.compile(r"\b(secret_[A-Za-z0-9_]{20,})\b"),
-    re.compile(r"\b(ntn_[A-Za-z0-9_]{20,})\b"),
-    re.compile(r"\b(sk-[A-Za-z0-9_\-]{20,})\b"),
+    re.compile(r"\b(secret_)[A-Za-z0-9_]{15,}\b", re.I),
+    re.compile(r"\b(ntn_)[A-Za-z0-9_]{15,}\b", re.I),
+    re.compile(r"\b(sk-)[A-Za-z0-9_\-]{15,}\b", re.I),
 ]
 
 
@@ -30,9 +30,9 @@ class RedactFilter(logging.Filter):
         try:
             if isinstance(record.msg, str):
                 msg_lower = record.msg.lower()
-                if any(k in msg_lower for k in ("api_key", "bot", "bearer", "telegram")):
+                if any(k in msg_lower for k in ("api_key", "bot", "bearer", "telegram", "secret_", "ntn_", "sk-")):
                     for p in _PATTERNS:
-                        record.msg = p.sub(lambda m: m.group(1) + "***", record.msg)
+                        record.msg = p.sub(lambda m: m.group(1) + "***" if m.lastindex else "***", record.msg)
             if isinstance(record.args, tuple) and record.args:
                 record.args = tuple(_redact(a) for a in record.args)
             elif isinstance(record.args, dict) and record.args:

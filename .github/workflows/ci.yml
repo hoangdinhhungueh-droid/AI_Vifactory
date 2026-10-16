@@ -40,7 +40,7 @@ jobs:
       
       - name: Lint with ruff (Blocking on all changed & core modules - Rule 139)
         run: |
-          ruff check vox/ tools/ tests/vox/ app/main.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/runner.py
+          ruff check vox/ tools/ tests/vox/ app/main.py scripts/orchestrator/boss_orchestrator.py scripts/orchestrator/runner.py app/services/trend_engine_b1.py app/services/daily_market_lock.py app/services/alert_cooldown.py core/paths.py
           ruff check --select F821,F811 app/ scripts/ stages/ vox/ core/ tools/
           ruff check --select F821,F811,F401 app/main.py app/s1_score.py app/services/alert_cooldown.py app/services/daily_market_lock.py app/services/dual_model_convergence.py app/services/episode_numbering.py app/services/trend_brain_mirror.py app/services/trend_engine_b1.py app/services/trend_gate_ai.py app/services/trend_verify.py app/services/unified_vox_director.py app/services/virality_score.py core/paths.py scripts/run_trend_pipeline.py scripts/orchestrator/audit_b2_b3_assets.py scripts/orchestrator/boss_orchestrator.py
 
@@ -52,6 +52,22 @@ jobs:
 
       - name: Rule 128 & Rule 132 Zero Semantic Bias Linter Gate
         run: pytest -v tests/test_zero_semantic_bias.py
+
+      - name: Rule 139 AST Ratchet Monotonic Boundary Check (Rule 125 & Boss Item 9)
+        shell: bash
+        run: |
+          python -c "
+          import json, sys
+          with open('config/ast_ratchet_baseline.json', encoding='utf-8') as f:
+              data = json.load(f)
+          entries = data.get('entries', [])
+          count = len(entries)
+          max_allowed = data.get('max_legacy_defects', 221)
+          print(f'AST Ratchet Baseline: entries={count}, max_allowed={max_allowed}')
+          assert count <= max_allowed, f'Ratchet violation: entries ({count}) exceeds max_legacy_defects ({max_allowed})'
+          assert count <= 227, f'Ratchet violation: count ({count}) exceeds strict ceiling 227'
+          print('AST Ratchet Monotonic Boundary Check: PASS')
+          "
 
       - name: Verify faster-whisper dependency availability (Rule 120 & Boss Item 5)
         run: python -c "import faster_whisper; print('faster-whisper runtime available for speech alignment')"

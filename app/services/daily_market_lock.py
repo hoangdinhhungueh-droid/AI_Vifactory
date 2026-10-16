@@ -145,31 +145,12 @@ def _market_lock_mutex(lock_path: Path, timeout_sec: float = 10.0):
 
 HARD_MAX_IN_PROGRESS_AGE_SECONDS = 28800  # 8 hours hard cap exceeding max TTL (Boss Item 6)
 
-_GIT_SHA_CACHE: Optional[str] = None
-
-
 def _get_current_git_sha() -> str:
-    """Returns current git commit SHA for production provenance tracking (Boss Item 15)."""
-    global _GIT_SHA_CACHE
-    if _GIT_SHA_CACHE:
-        return _GIT_SHA_CACHE
-    env_sha = os.getenv("GIT_COMMIT") or os.getenv("GITHUB_SHA") or os.getenv("VF_GIT_SHA")
-    if env_sha:
-        _GIT_SHA_CACHE = env_sha[:12]
-        return _GIT_SHA_CACHE
-    try:
-        import subprocess
-        res = subprocess.run(
-            ["git", "-C", str(Path(__file__).resolve().parent.parent.parent), "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=False, timeout=2.0
-        )
-        if res.returncode == 0 and res.stdout.strip():
-            _GIT_SHA_CACHE = res.stdout.strip()[:12]
-            return _GIT_SHA_CACHE
-    except Exception as _git_err:
-        logger.debug("[daily_market_lock] Notice resolving git rev-parse HEAD: %s", _git_err)
-    _GIT_SHA_CACHE = "unknown"
-    return _GIT_SHA_CACHE
+    """Returns current git commit SHA for production provenance tracking (Boss Item 15).
+    Delegates to core.paths.get_current_git_sha per Rule 125 single source of truth.
+    """
+    from core.paths import get_current_git_sha
+    return get_current_git_sha()
 
 
 def _get_process_start_time(pid: Optional[int] = None) -> float:

@@ -1118,10 +1118,21 @@ def discover_and_produce_market_trend(
                 return []
             else:
                 logger.info(f"[{m_up}] Custom seed provided: proceeding to acquire lock despite {reason} status ({topic_name}).")
+                custom_seed_override = True
+        else:
+            custom_seed_override = False
 
         # Acquire IN_PROGRESS daily lock immediately to prevent TOCTOU race (Boss Item 13)
+        # Custom seed overrides terminal status (COMPLETED/EXHAUSTED) but never preempts active IN_PROGRESS (Boss Round 12 Item 4)
         acquired = acquire_in_progress(
-            m_up, topic_id="", state_dir=state_dir, owner_pid=os.getpid(), lock_token=lock_token, now=now
+            m_up,
+            topic_id="",
+            state_dir=state_dir,
+            owner_pid=os.getpid(),
+            lock_token=lock_token,
+            now=now,
+            force=custom_seed_override,
+            force_override=custom_seed_override,
         )
         if not acquired:
             logger.warning(
@@ -1132,7 +1143,7 @@ def discover_and_produce_market_trend(
     else:
         # B1_FORCE_CRAWL / --force: acquire forced lock with token ownership and verify return value (Boss Round 12 Item 4)
         acquired = acquire_in_progress(
-            m_up, topic_id="", state_dir=state_dir, owner_pid=os.getpid(), lock_token=lock_token, now=now, force=True
+            m_up, topic_id="", state_dir=state_dir, owner_pid=os.getpid(), lock_token=lock_token, now=now, force=True, force_override=True
         )
         if not acquired:
             logger.error(f"[{m_up}] Forced crawl failed to acquire daily IN_PROGRESS lock. Aborting.")
@@ -1151,7 +1162,7 @@ def discover_and_produce_market_trend(
         candidates = fetch_live_trending_terms(m_up, custom_seed=custom_seed)
         if not candidates:
             logger.warning(f"[{m_up}] No unhandled candidates found.")
-            if not custom_seed:
+            if not custom_seed and max_scan_candidates >= MAX_SCAN_CANDIDATES_DEFAULT:
                 mark_ok = mark_exhausted_today(
                     market=m_up,
                     scan_count=0,
@@ -1167,7 +1178,7 @@ def discover_and_produce_market_trend(
             else:
                 if release_lock(m_up, state_dir=state_dir, lock_token=lock_token, owner_pid=os.getpid(), now=now):
                     is_terminal_stamped = True
-                    logger.info(f"[{m_up}] Released lock after custom seed had no candidates")
+                    logger.info(f"[{m_up}] Released lock (custom seed or partial scan had no candidates)")
             return []
 
         produced_topics = []

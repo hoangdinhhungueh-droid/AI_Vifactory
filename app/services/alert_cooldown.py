@@ -286,8 +286,8 @@ def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
 def _write_cooldown_data(file_path: Path, data: Dict[str, Any]) -> None:
     """Atomic write via core.atomic_io.atomic_write_json (Rule 125 single truth)."""
     try:
-        from app.services.daily_market_lock import _get_current_git_sha
-        data["_git_sha"] = _get_current_git_sha()
+        from core.paths import get_current_git_sha
+        data["_git_sha"] = get_current_git_sha()
     except Exception as _sha_err:
         logger.debug(f"[alert_cooldown] git sha attach notice: {_sha_err}")
     atomic_write_json(file_path, data)
