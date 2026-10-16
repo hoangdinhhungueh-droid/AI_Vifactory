@@ -37,6 +37,10 @@ def test_unauthenticated_request_rejected_401(auth_client):
     resp_run = auth_client.post("/api/v1/pipeline/run", json={"stage": "S1"})
     assert resp_run.status_code == 401
 
+    # /v1/budget
+    resp_budget = auth_client.get("/v1/budget")
+    assert resp_budget.status_code == 401
+
 
 def test_invalid_bearer_token_rejected_401(auth_client):
     """Endpoints must reject invalid Bearer tokens with 401 Unauthorized."""
@@ -62,6 +66,11 @@ def test_authenticated_request_accepted(auth_client, monkeypatch):
         data = resp.json()
         assert data.get("ok") is True
         assert data.get("pipeline") == "approach_b_direct_recon"
+
+    # Authenticated /v1/budget
+    resp_budget = auth_client.get("/v1/budget", headers=headers)
+    assert resp_budget.status_code == 200
+    assert isinstance(resp_budget.json(), dict)
 
 
 def test_testclient_not_in_loopback_allowlist(monkeypatch):

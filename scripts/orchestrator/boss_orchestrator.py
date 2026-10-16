@@ -1650,12 +1650,12 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "\""
     )
     code_vox_tests, out_vox_tests = run_on_vps(
-        "cd /root/video_factory && /root/video_factory/venv/bin/pytest tests/vox/test_camera.py tests/vox/test_cutout.py tests/vox/test_karaoke.py tests/vox/test_schemas.py tests/vox/test_qa_gates.py tests/vox/test_single_pipeline_truth.py -v"
+        "cd /root/video_factory && /root/video_factory/venv/bin/pytest tests/vox/ -v"
     )
     evidence_blocks.append(
         f"### [18. VOX PIPELINE TEST SUITE & EXTENDED UNIT TEST-DOUBLES COUNT (Rule 118, 121 & Boss Item 2)]\n"
         f"Test-Doubles Audit (Exit Code: {code_mock_ext}):\n{out_mock_ext}\n\n"
-        f"Vox Fast/Core Suite Execution (Exit Code: {code_vox_tests}):\n{out_vox_tests}\n"
+        f"Vox Full Suite Execution (Exit Code: {code_vox_tests}):\n{out_vox_tests}\n"
     )
 
     # 19. Bundled Scope & Multi-Round Self-Healing User Authorization (Boss Item 16)
@@ -1701,6 +1701,32 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         f"### [21. LIVE END-TO-END B3 TEMP-ID EXECUTION PROBE (Rule 118, 121, 127 & Boss Item 7)]\n"
         f"Exit Code: {code_b3_e2e}\n"
         f"{out_b3_e2e}\n"
+    )
+
+    # 22. Standalone Pixel Forensic, Subtitle OCR & Visual Audit Engine (Rule 122 & AVF-VOX-001)
+    code_visual, out_visual = run_on_vps("python3 /root/video_factory/scripts/forensics/visual_audit.py")
+    evidence_blocks.append(
+        f"### [22. STANDALONE PIXEL FORENSIC, SUBTITLE OCR & VISUAL AUDIT ENGINE (Rule 122 & AVF-VOX-001)]\n"
+        f"Exit Code: {code_visual}\n"
+        f"{out_visual}\n"
+    )
+
+    # 23. Complete Boss Punchlist Remediation Test Suite Execution
+    punchlist_test_cmd = (
+        "cd /root/video_factory && /root/video_factory/venv/bin/pytest "
+        "tests/unit/test_hhtech_stem_matching.py "
+        "tests/unit/test_critic_gate_fail_closed.py "
+        "tests/unit/test_lock_timing_reconciliation.py "
+        "tests/unit/test_core_net_utils.py "
+        "tests/unit/test_rule_135_chapter_sync.py "
+        "tests/unit/test_paths_empty_run_id.py "
+        "tests/unit/test_api_auth_gating.py -v"
+    )
+    code_punchlist_tests, out_punchlist_tests = run_on_vps(punchlist_test_cmd)
+    evidence_blocks.append(
+        f"### [23. PUNCHLIST REMEDIATION UNIT TEST SUITE EXECUTION (Boss Round 11 Items 1-18)]\n"
+        f"Exit Code: {code_punchlist_tests}\n"
+        f"{out_punchlist_tests}\n"
     )
 
     if vps_client is not None:

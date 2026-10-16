@@ -62,22 +62,22 @@ def _parse_llm_json(raw: str) -> dict:
         return {}
     try:
         return json.loads(text)
-    except Exception:
-        pass
+    except Exception as _e1:
+        logger.debug("Direct json.loads failed in _parse_llm_json: %s", _e1)
 
     match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
     if match:
         try:
             return json.loads(match.group(1))
-        except Exception:
-            pass
+        except Exception as _e2:
+            logger.debug("Code block json.loads failed in _parse_llm_json: %s", _e2)
 
     match = re.search(r"(\{.*\})", text, re.DOTALL)
     if match:
         try:
             return json.loads(match.group(1))
-        except Exception:
-            pass
+        except Exception as _e3:
+            logger.debug("Regex match json.loads failed in _parse_llm_json: %s", _e3)
     return {}
 
 
@@ -247,8 +247,8 @@ def sync_exact_chapters_from_remotion(
                             b_int = int(beat_val)
                             if 1 <= b_int <= 5:
                                 current_beat_key = f"BEAT {b_int}"
-                        except (ValueError, TypeError):
-                            pass
+                        except (ValueError, TypeError) as _ve:
+                            logger.debug("Non-integer beat_val %r in scene %s: %s", beat_val, idx, _ve)
                     if not current_beat_key and is_degenerate_beat:
                         pct = (idx + 1) / max(1, len(scenes))
                         b_auto = 1 if pct <= 0.15 else (2 if pct <= 0.40 else (3 if pct <= 0.65 else (4 if pct <= 0.85 else 5)))

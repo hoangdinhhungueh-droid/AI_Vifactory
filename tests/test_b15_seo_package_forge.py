@@ -10,21 +10,18 @@ Verifies:
   6. Direct B2 Story Engine integration (Zero-Drift Hook Handoff).
   7. B10 Upload stage zero-LLM fast load from seo_package.json.
 """
-import os
 import sys
 import json
-import pytest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core.paths import resolve_episodes_dir
 from app.services.seo_package_forge import (
     _fallback_seo_package,
     _clean_hashtag,
     _parse_llm_json,
     forge_seo_package,
-    sync_seo_package_to_youtube_registry,
-    sync_seo_package_to_story_library,
 )
 
 
@@ -116,8 +113,10 @@ class TestSeoPackageForge:
         assert pkg["task_id"] == task_id
         assert pkg["title_a"].startswith("Autonomous Drone Swarms")
         
-        # Verify disk persistence in /var/vf/episodes/<task_id>/seo_package.json
-        expected_path = Path(f"/var/vf/episodes/{task_id}/seo_package.json")
+        # Verify disk persistence in canonical episodes dir
+        expected_path = resolve_episodes_dir() / task_id / "seo_package.json"
+        if not expected_path.exists():
+            expected_path = Path(f"/var/vf/episodes/{task_id}/seo_package.json")
         assert expected_path.exists(), f"Expected {expected_path} to exist"
         saved = json.loads(expected_path.read_text(encoding="utf-8"))
         assert saved["task_id"] == task_id

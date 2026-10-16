@@ -114,7 +114,7 @@ _last_unset_token_log_time: float = 0.0
 def _verify_auth(request: Request) -> None:
     """Verifies Bearer token.
     Fail-closed posture: If VF_API_TOKEN is unset, rejects requests with 401 Unauthorized
-    unless ALLOW_UNAUTHENTICATED_LOOPBACK=1 is explicitly configured.
+    unless VF_ALLOW_UNAUTH_LOOPBACK=1 or ALLOW_UNAUTHENTICATED_LOOPBACK=1 is explicitly configured.
     Rate limits unset-token warning to once per 60 seconds.
     Uses timing-safe hmac.compare_digest (Rule 121/125 & Boss Item 25).
     """
@@ -125,13 +125,16 @@ def _verify_auth(request: Request) -> None:
     is_loopback = client_host in ("127.0.0.1", "::1", "localhost") and not has_forwarded
 
     if not token:
-        allow_loopback = os.getenv("VF_ALLOW_UNAUTH_LOOPBACK") == "1"
+        allow_loopback = (
+            os.getenv("VF_ALLOW_UNAUTH_LOOPBACK") == "1"
+            or os.getenv("ALLOW_UNAUTHENTICATED_LOOPBACK") == "1"
+        )
         now = time.time()
         if now - _last_unset_token_log_time >= 60.0:
             _last_unset_token_log_time = now
             if allow_loopback and is_loopback:
                 _logger.warning(
-                    f"[SECURITY ALERT] VF_API_TOKEN is unset. VF_ALLOW_UNAUTH_LOOPBACK=1 is active; verified loopback call from {client_host} permitted."
+                    f"[SECURITY ALERT] VF_API_TOKEN is unset. Loopback unauthenticated bypass is active; verified loopback call from {client_host} permitted."
                 )
             else:
                 _logger.critical(
@@ -294,7 +297,7 @@ def _record(provider: str, tok: int):
     s["day_calls"] += 1
     s["day_tokens"] += tok
 
-@app.get("/v1/budget")
+@app.get("/v1/budget", dependencies=[Depends(_verify_auth)])
 def budget_snapshot():
     now = time.time()
     out = {}

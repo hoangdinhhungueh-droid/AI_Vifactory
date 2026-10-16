@@ -166,7 +166,7 @@ def _get_process_start_time(pid: Optional[int] = None) -> float:
 def _is_lock_stale(
     data: Dict[str, Any],
     now_utc: datetime,
-    default_ttl: int,
+    default_ttl: int = DEFAULT_TTL_SECONDS,
     m_up: Optional[str] = None,
     date_str: Optional[str] = None,
     state_dir: Optional[str] = None,

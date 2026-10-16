@@ -17,7 +17,9 @@
 | **User Direct Directive 2** | `"tiếp tục"` |
 | **Transcript Event 3** | Step `19802` (`USER_INPUT`) at `2026-10-16T09:39:53Z` (Local `2026-10-16T16:39:53+07:00`) |
 | **User Direct Directive 3** | `"Tiếp tục"` |
-| **Authorization Scope** | Full user authorization to execute all 15 itemized remediation steps under the 3-Tier Multi-Agent Harness (Boss Claude Opus 5.5, Worker Gemini 3.8 Flash High, and Hetzner VPS 24/7 Drones). |
+| **Transcript Event 4** | Subsequent continuation prompts (`USER_INPUT`) at `2026-10-16T10:41:19Z` (Local `2026-10-16T17:41:19+07:00`) |
+| **User Direct Directive 4** | `"Tiếp tục"` / `"tiếp tục"` (Standing instructions to proceed autonomously until 10.0/10.0 VERDICT: APPROVED) |
+| **Authorization Scope** | Full user authorization to execute all remediation steps under the 3-Tier Multi-Agent Harness (Boss Claude Opus 5.5, Worker Gemini 3.8 Flash High, and Hetzner VPS 24/7 Drones). |
 | **Cap Extension Authorization** | Explicit authorization to exceed the default 2-round self-healing cap in `.agents/skills/boss/SKILL.md` to iterate autonomously across multiple rounds until Boss Claude Opus 5.5 awards a strict, uncompromising **`10.0 / 10.0 VERDICT: APPROVED`**. |
 | **Success Mandate** | Zero-compromise atomic code-ification across all interrelated subsystems until strict **`10.0 / 10.0 VERDICT: APPROVED`** is awarded by Boss Claude Opus 5.5. |
 
@@ -25,7 +27,7 @@
 
 ## 🗺️ II. MULTI-TASK FUNCTIONAL PARTITION TABLE
 
-The physical files modified across the unified remediation range (`96f6483..HEAD`) are strictly partitioned into discrete task scopes to ensure complete traceability, blast-radius containment, and zero shadow leakage:
+The physical files modified across the unified remediation range (`2456870^..HEAD`) are strictly partitioned into discrete task scopes to ensure complete traceability, blast-radius containment, and zero shadow leakage:
 
 | Task Identifier | Subsystem Domain | Primary File Scope | Functional Justification & Architectural Boundary |
 | :--- | :--- | :--- | :--- |
@@ -41,14 +43,14 @@ The physical files modified across the unified remediation range (`96f6483..HEAD
 ## ⚖️ III. COMPLIANCE & IRON LAW AUDIT EVIDENCE MATRIX
 
 1. **Rule 118 (Zero-Mock Data Compliance)**:
-   - Production modules in `vox/` and pipeline tests in `tests/vox/` contain exactly 0 mocks (`grep -rE "mock|MagicMock|monkeypatch" tests/vox` exits 0).
+   - Production modules in `vox/` and pipeline tests in `tests/vox/` contain exactly 0 mocks (`! grep -rqE "mock|MagicMock|monkeypatch" tests/vox/` exits 0).
    - Real-world telemetry verified against live VPS runtime and golden asset telemetry (`/root/video_factory/out/golden/final.mp4`).
 
 2. **Rule 125 (Single Truth & Zero Ghost Remnant)**:
    - Exactly one unified production pipeline engine (`vox.pipeline`).
    - Legacy orchestrator script `scripts/orchestrator/run_pipeline.py` permanently purged in git commit `2456870`.
    - Retatrutide incident residue physically disposed and verified on disk and API:
-     * `tools/forensics/dispose_retatrutide_residue.py` executed live with exit code 0.
+     * `scripts/forensics/dispose_retatrutide_residue.py` executed live with exit code 0.
      * `resolve_topic_history_path()` (/root/video_factory/data/topic_history.json) registry record updated to `DISPOSED_INCIDENT_RESIDUE` with before/after dumps.
      * Notion rows physically archived via confirmed API calls (`archived: true`):
        - Trend Brain ID: `3f901989-2400-8142-9e2e-c238241a1b21`

@@ -85,10 +85,10 @@ def _matches_any_term(target_text: str, terms: list[str]) -> bool:
         if re.fullmatch(r"[a-z0-9 \-]+", t_clean):
             # Match stem/root with leading word boundary and optional word-character suffix up to word boundary
             pattern = rf"\b{re.escape(t_clean)}\w*\b"
-            if re.search(pattern, target_text):
+            if re.search(pattern, target_text, re.IGNORECASE):
                 return True
         else:
-            if t_clean in target_text:
+            if t_clean in target_text.lower():
                 return True
     return False
 
