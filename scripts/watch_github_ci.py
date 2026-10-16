@@ -20,8 +20,18 @@ try:
 except Exception:
     pass
 
+import re
+
 DEFAULT_REPO = "hoangdinhhungueh-droid/AI_Vifactory"
 DEFAULT_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
+if not DEFAULT_TOKEN:
+    try:
+        _remote_res = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=False)
+        _m = re.search(r"https://[^:]+:([^@]+)@github\.com", _remote_res.stdout.strip())
+        if _m:
+            DEFAULT_TOKEN = _m.group(1)
+    except Exception:
+        pass
 
 
 class NoAuthRedirect(urllib.request.HTTPRedirectHandler):
