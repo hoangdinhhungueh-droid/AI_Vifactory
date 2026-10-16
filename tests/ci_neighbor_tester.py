@@ -22,9 +22,7 @@ Usage:
   python3 tests/ci_neighbor_tester.py --all          # Test all blocks
 """
 import argparse
-import json
 import logging
-import os
 import re
 import subprocess
 import sys
@@ -394,7 +392,6 @@ def test_block3_director_contract() -> bool:
         )
         from app.audit.director_audit import (
             audit_director_plan,
-            audit_director,
         )
 
         # 1. Canonical 5 Beats Structure Verification
@@ -498,7 +495,6 @@ def test_block3_director_contract() -> bool:
                 CANONICAL_SFX_REGISTRY,
                 verify_physical_sfx_assets,
                 is_valid_sfx,
-                get_canonical_sfx_list,
             )
             # A. Physical disk audit (100% 1:1 parity with public/sfx)
             ok_sfx, missing_sfx = verify_physical_sfx_assets()
@@ -681,9 +677,8 @@ def test_block26_audio_spine_contract() -> bool:
         test_beat_mp3 = test_cache_dir / "beat_test.mp3"
         test_beat_bnd = test_cache_dir / "beat_test_bnd.json"
 
-        try:
-            import edge_tts
-        except ImportError:
+        import importlib.util
+        if importlib.util.find_spec("edge_tts") is None:
             logger.warning("  ⚠️ edge_tts not installed in current environment. Skipping live audio synthesis (enforced on VPS runtime).")
             return True
 

@@ -12,7 +12,6 @@ import json
 import logging
 import asyncio
 import subprocess
-from pathlib import Path
 from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.contracts.render_props import KaraokeWord
 from core.config import RunContext
-from core.gates import require_input, emit_artifact, compute_file_sha256
+from core.gates import emit_artifact
 from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S9_VOICE_TTS

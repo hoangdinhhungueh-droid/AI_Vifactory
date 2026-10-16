@@ -17,10 +17,13 @@ Stores JSON records:
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 _LEDGER_FILE = Path(os.getenv("PUBLISH_LEDGER_FILE", "/root/video_factory/db/publish_ledger.json"))
 _VAR_LEDGER_FILE = Path("/var/vf/data/publish_ledger.json")

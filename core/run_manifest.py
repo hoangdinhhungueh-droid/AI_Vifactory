@@ -7,12 +7,13 @@ Manages execution state, idempotency hash matching, and deterministic resume.
 
 from __future__ import annotations
 
-import os
-import json
 import datetime
+import logging
 from pathlib import Path
 from typing import Dict, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
+
+logger = logging.getLogger(__name__)
 
 from core.paths import RunPaths
 from core.contracts.stages import StageID, SCHEMA_VERSION

@@ -7,7 +7,6 @@ and B3 (RunPaths / orchestrator.run_pipeline). Eliminates F2 Split-Brain / Path 
 """
 
 import json
-from pathlib import Path
 import pytest
 
 from core.paths import RunPaths, resolve_episodes_dir
@@ -88,7 +87,6 @@ def test_b3_failure_guard_fails_closed_without_release_lock(monkeypatch):
     2. is_terminal_stamped is NOT set to True.
     3. Critical fail-closed log is emitted.
     """
-    from unittest.mock import MagicMock
     import app.services.trend_engine_b1 as b1
 
     release_called = []

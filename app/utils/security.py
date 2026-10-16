@@ -1,6 +1,5 @@
 """Security utilities for masking sensitive data in logs."""
 import re
-from typing import Optional
 
 
 def mask_telegram_token(token: str) -> str:
