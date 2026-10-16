@@ -311,7 +311,8 @@ def check_alert_eligibility(
             if elapsed < window_seconds:
                 return False, suppressed, ""
         except Exception as _p_err:
-            logger.warning(f"[alert_cooldown] Error parsing timestamp: {_p_err}")
+            logger.error(f"[alert_cooldown] Error parsing timestamp '{last_sent_str}': {_p_err}. Failing closed.")
+            return False, suppressed, ""
 
     # Eligible to send!
     suffix = ""
@@ -417,6 +418,7 @@ def should_send_alert(
         if reserve_on_send:
             entry["last_sent_utc"] = now_utc.isoformat()
             entry["suppressed_since_last"] = 0
+            entry.pop("last_suppressed_utc", None)
             entry["market"] = m_clean
             entry["alert_type"] = a_clean
             data[key] = entry
@@ -442,6 +444,7 @@ def record_alert_sent(
         entry = data.get(key, {})
         entry["last_sent_utc"] = now_utc.isoformat()
         entry["suppressed_since_last"] = 0
+        entry.pop("last_suppressed_utc", None)
         entry["market"] = m_clean
         entry["alert_type"] = a_clean
         data[key] = entry
@@ -456,7 +459,7 @@ def rollback_alert_reservation(
     state_dir: Optional[str] = None,
 ) -> bool:
     """Roll back an alert reservation if Telegram dispatch fails (Boss Item 7).
-    Restores prior last_sent_utc and suppressed count so subsequent attempts are not silenced.
+    Delta-safe: preserves suppressions recorded between reservation and rollback.
     """
     a_clean, m_clean = _validate_alert_args(alert_type, market)
     key = f"{a_clean}::{m_clean}"
@@ -465,13 +468,17 @@ def rollback_alert_reservation(
     with _interprocess_lock(cooldown_file):
         data = _read_cooldown_data(cooldown_file)
         entry = data.get(key, {})
+        current_suppressed = int(entry.get("suppressed_since_last", 0))
         entry["last_sent_utc"] = previous_last_sent
-        entry["suppressed_since_last"] = previous_suppressed
+        entry["suppressed_since_last"] = previous_suppressed + current_suppressed
         entry["market"] = m_clean
         entry["alert_type"] = a_clean
         data[key] = entry
         _write_cooldown_data(cooldown_file, data)
-        logger.info("[alert_cooldown] Rolled back reservation for '%s'. Next attempt is allowed.", key)
+        logger.info(
+            "[alert_cooldown] Rolled back reservation for '%s' (suppressed=%d). Next attempt is allowed.",
+            key, entry["suppressed_since_last"]
+        )
         return True
 
 

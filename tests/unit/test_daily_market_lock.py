@@ -3,6 +3,7 @@ tests/unit/test_daily_market_lock.py — HERMETIC UNIT TESTS FOR DAILY MARKET LO
 """
 
 import json
+import os
 import shutil
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -155,7 +156,7 @@ def test_release_lock(temp_state_dir):
     done, _, _ = is_market_done_today("TEST_MKT", state_dir=temp_state_dir, check_registry=False, check_episodes=False)
     assert done is True
 
-    released = release_lock("TEST_MKT", state_dir=temp_state_dir)
+    released = release_lock("TEST_MKT", state_dir=temp_state_dir, owner_pid=os.getpid())
     assert released is True
 
     done, reason, _ = is_market_done_today("TEST_MKT", state_dir=temp_state_dir, check_registry=False, check_episodes=False)
@@ -449,7 +450,7 @@ def test_load_history_raises_fails_closed(temp_state_dir, monkeypatch):
     import app.services.topic_history_registry as reg_mod
     from app.services.daily_market_lock import is_market_done_today
 
-    def mock_broken_history():
+    def mock_broken_history(*args, **kwargs):
         raise IOError("Simulated corrupted registry database")
 
     monkeypatch.setattr(reg_mod, "load_history", mock_broken_history)

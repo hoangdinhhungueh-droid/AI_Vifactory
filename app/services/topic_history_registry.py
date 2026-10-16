@@ -72,7 +72,11 @@ def load_history(registry_path: Optional[str] = None, allow_backfill: bool = Tru
                                 "raw_term": term,
                                 "slug": slug,
                                 "market": mkt,
-                                "recorded_at": datetime.now(timezone.utc).isoformat(),
+                                "recorded_at": (
+                                    d.get("recorded_at")
+                                    or d.get("created_at")
+                                    or datetime.fromtimestamp(os.path.getmtime(p), timezone.utc).isoformat()
+                                ),
                                 "source": "pending_tasks"
                             }
                 except Exception:

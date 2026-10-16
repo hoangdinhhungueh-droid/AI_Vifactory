@@ -36,9 +36,10 @@ from typing import Optional
 _PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
-if "/root/video_factory" not in sys.path:
-    sys.path.insert(0, "/root/video_factory")
-
+from core.paths import (
+    resolve_episodes_dir,
+    resolve_pending_tasks_dir,
+)
 from app.services.alert_cooldown import (
     rollback_alert_reservation,
     should_send_alert,
@@ -128,9 +129,11 @@ def _send_guarded_alert(alert_type: str, market: str, message: str, state_dir: O
             logger.info(f"[{market}] Suppressed repeated {alert_type} alert due to cooldown ({decision.suppressed} suppressed).")
         return False
 
+    full_message = f"{message}{decision.suffix}" if (decision and decision.suffix) else message
+
     try:
         from app.services.telegram_buttons import send_telegram_broadcast
-        sent = send_telegram_broadcast(message)
+        sent = send_telegram_broadcast(full_message)
         if not sent:
             logger.warning(f"[{market}] Telegram broadcast returned falsy for {alert_type}. Rolling back reservation.")
             rollback_alert_reservation(
@@ -143,7 +146,7 @@ def _send_guarded_alert(alert_type: str, market: str, message: str, state_dir: O
             return False
         return True
     except Exception as _tel_err:
-        logger.warning(f"Failed to send {alert_type} alert to Telegram: {_tel_err}")
+        logger.error(f"Failed to send {alert_type} alert to Telegram: {_tel_err}")
         rollback_alert_reservation(
             alert_type,
             market,
@@ -635,7 +638,7 @@ def commit_trend_task(topic_data: dict) -> str:
     topic_data["task_id"] = task_id
 
     # 1. Save pending task to disk
-    pending_dir = "/var/vf/pending_tasks"
+    pending_dir = str(resolve_pending_tasks_dir())
     os.makedirs(pending_dir, exist_ok=True)
     task_file = os.path.join(pending_dir, f"{task_id}.json")
     with open(task_file, "w", encoding="utf-8") as f:
@@ -643,28 +646,26 @@ def commit_trend_task(topic_data: dict) -> str:
     logger.info(f"[trend_engine] Saved pending task to {task_file}")
 
     # 2. Save Competitor Intel Card
-    for ep_base in ["/var/vf/episodes", "/root/video_factory/episodes", "./episodes"]:
-        try:
-            if not os.path.isdir(ep_base):
-                continue
-            ep_dir = os.path.join(ep_base, task_id)
-            os.makedirs(ep_dir, exist_ok=True)
-            card_file = os.path.join(ep_dir, "competitor_intel_card.json")
-            intel_card = {
-                "task_id": task_id,
-                "target_keyword": topic_data["raw_term"],
-                "niche": topic_data.get("niche_angle_brief", ""),
-                "competitor_gap": topic_data.get("competitor_differentiation_gap", ""),
-                "market": topic_data["market"],
-                "generated_at": datetime.now(timezone.utc).isoformat(),
-                "rising_queries": topic_data.get("rising_queries", []),
-                "competitors": topic_data.get("viral_competitor_videos", []),
-                "ground_truth_wiki": topic_data.get("factsheet", {}).get("has_verified_wiki", False)
-            }
-            with open(card_file, "w", encoding="utf-8") as f:
-                json.dump(intel_card, f, ensure_ascii=False, indent=2)
-        except (OSError, PermissionError) as _pe_err:
-            logger.debug(f"Could not write competitor intel card to {ep_base}: {_pe_err}")
+    ep_base = str(resolve_episodes_dir())
+    try:
+        ep_dir = os.path.join(ep_base, task_id)
+        os.makedirs(ep_dir, exist_ok=True)
+        card_file = os.path.join(ep_dir, "competitor_intel_card.json")
+        intel_card = {
+            "task_id": task_id,
+            "target_keyword": topic_data["raw_term"],
+            "niche": topic_data.get("niche_angle_brief", ""),
+            "competitor_gap": topic_data.get("competitor_differentiation_gap", ""),
+            "market": topic_data["market"],
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "rising_queries": topic_data.get("rising_queries", []),
+            "competitors": topic_data.get("viral_competitor_videos", []),
+            "ground_truth_wiki": topic_data.get("factsheet", {}).get("has_verified_wiki", False)
+        }
+        with open(card_file, "w", encoding="utf-8") as f:
+            json.dump(intel_card, f, ensure_ascii=False, indent=2)
+    except (OSError, PermissionError) as _pe_err:
+        logger.debug(f"Could not write competitor intel card to {ep_base}: {_pe_err}")
 
     # 3. Record to Permanent History Registry (Anti-Duplicate Lock)
     record_handled_topic(
