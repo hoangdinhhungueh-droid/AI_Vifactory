@@ -30,6 +30,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+import uuid
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -59,9 +60,6 @@ from app.services.hhtech_reasoner import (
     reason_topic_niche,
 )
 from app.services.topic_history_registry import is_topic_already_handled, record_handled_topic
-
-# Canonical viability threshold required for candidate graduation (Rule 134 parity)
-VIABILITY_THRESHOLD: float = 8.0
 from app.services.trend_free_signals import (
     fetch_specialized_market_rss,
     google_autocomplete,
@@ -77,8 +75,9 @@ from core.paths import (
 
 logger = logging.getLogger("trend_engine_b1")
 
+# Canonical viability threshold required for candidate graduation (Rule 134 parity)
+VIABILITY_THRESHOLD: float = 8.0
 EN_SUB_GEOS = ["US", "GB", "CA", "AU", "NZ"]
-VIABILITY_THRESHOLD = 8.0
 
 V7_POOL_FILE = os.path.join(_PROJECT_ROOT, "data", "v7_winning_pool.json")
 
@@ -1080,7 +1079,6 @@ def discover_and_produce_market_trend(
     now = get_vn_now()
     force_crawl = bool(custom_seed) or os.getenv("B1_FORCE_CRAWL") == "1"
 
-    import uuid
     lock_token = uuid.uuid4().hex
 
     if not force_crawl:
@@ -1272,9 +1270,6 @@ def discover_and_produce_market_trend(
             # 3.2 B1.1 Adversarial Critic Gate (Rule 130 & Anti-Bait-and-Switch Early VETO - Claude Opus 5)
             # Filters out false trends, stale anchors, and bait-and-switch before wasting tokens/scrapes on B1.5!
             print(f"  🛡️ [B1.1 Critic Gate] Interrogating candidate '{term}' and angle for live trend fidelity...")
-            c_score = 0.0
-            c_verdict = "FAIL"
-            critic_res = None
             try:
                 from app.services.adversarial_critic_b1 import audit_candidate_trend_alignment
                 critic_res = audit_candidate_trend_alignment(
@@ -1288,9 +1283,9 @@ def discover_and_produce_market_trend(
                     model="claude-opus-5-5",
                     fallback_model="gpt-6-astra"
                 )
-                c_verdict = critic_res.get("verdict", "PASS").upper()
-                c_score = critic_res.get("audit_score", 0.0)
-                if c_verdict == "FAIL" or c_score < 7.5:
+                c_verdict = (critic_res.get("verdict") or "FAIL").upper()
+                c_score = float(critic_res.get("audit_score") or 0.0)
+                if c_verdict != "PASS" or c_score < 7.5:
                     veto_msg = critic_res.get("veto_reason") or "Failed adversarial trend alignment audit"
                     print(f"  ❌ VETOED BY CRITIC GATE (Score: {c_score}/10): {veto_msg}")
                     logger.warning(f"[{m_up}] Critic Gate VETOED '{term}': {veto_msg}")

@@ -26,32 +26,15 @@ blocks Gate-1 sending or episode production.
 """
 import os
 
-import contextlib
 import json
 import logging
 import re
-import socket
 import time
 
 logger = logging.getLogger(__name__)
 
 
-@contextlib.contextmanager
-def force_ipv4_dns():
-    """Scoped context manager that temporarily forces IPv4 DNS resolution during Notion API calls only.
-    Restores global socket.getaddrinfo immediately upon exit to prevent process-wide side effects (Rule 125/139).
-    """
-    old_getaddrinfo = socket.getaddrinfo
-
-    def _new_getaddrinfo(*args, **kwargs):
-        res = old_getaddrinfo(*args, **kwargs)
-        return [r for r in res if r[0] == socket.AF_INET] or res
-
-    socket.getaddrinfo = _new_getaddrinfo
-    try:
-        yield
-    finally:
-        socket.getaddrinfo = old_getaddrinfo
+from core.net_utils import get_ipv4_client
 
 PENDING_DIR = "/var/vf/pending_tasks"
 PENDING_CACHE_TTL_HOURS = 24
@@ -173,7 +156,6 @@ def remove_pending_task(episode_id: str) -> bool:
 
 
 def _write_story_library_row(episode_id: str, market: str, data: dict) -> bool:
-    import httpx
     ntoken = os.getenv("NOTION_TOKEN")
     if not ntoken:
         logger.warning("[episode_numbering] NOTION_TOKEN missing, cannot commit %s", episode_id)
@@ -222,13 +204,13 @@ def _write_story_library_row(episode_id: str, market: str, data: dict) -> bool:
             },
             "page_size": 1
         }
-        with force_ipv4_dns():
-            q_res = httpx.post(f"https://api.notion.com/v1/databases/{STORY_DB_ID}/query", headers=headers, json=q_body, timeout=10.0)
+        with get_ipv4_client(timeout=10.0) as client:
+            q_res = client.post(f"https://api.notion.com/v1/databases/{STORY_DB_ID}/query", headers=headers, json=q_body)
             if q_res.status_code == 200:
                 results = q_res.json().get("results", [])
                 if results:
                     existing_page_id = results[0]["id"]
-                    patch_res = httpx.patch(f"https://api.notion.com/v1/pages/{existing_page_id}", headers=headers, json={"properties": props}, timeout=10.0)
+                    patch_res = client.patch(f"https://api.notion.com/v1/pages/{existing_page_id}", headers=headers, json={"properties": props})
                     if patch_res.status_code in (200, 201):
                         logger.info("[episode_numbering] UPDATED existing Story Library row %s for %s", existing_page_id, episode_id)
                         return True
@@ -241,8 +223,8 @@ def _write_story_library_row(episode_id: str, market: str, data: dict) -> bool:
         "properties": props,
     }
     try:
-        with force_ipv4_dns():
-            res = httpx.post(NOTION_PAGES_URL, headers=headers, json=row, timeout=15.0)
+        with get_ipv4_client(timeout=15.0) as client:
+            res = client.post(NOTION_PAGES_URL, headers=headers, json=row)
         if res.status_code in (200, 201):
             logger.info("[episode_numbering] COMMITTED %s to Story Library (delayed increment now claimed)", episode_id)
             return True

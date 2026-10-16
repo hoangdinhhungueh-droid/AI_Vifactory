@@ -39,8 +39,8 @@ def get_production_cost_baseline() -> float:
                     if line.strip():
                         row = json.loads(line)
                         total_usd += float(row.get("usd") or 0.0)
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug("Failed reading cost line from %s: %s", p, _e)
     return round(total_usd, 6)
 
 
@@ -160,8 +160,8 @@ def main():
     finally:
         try:
             shutil.rmtree(isolated_state, ignore_errors=True)
-        except Exception:
-            pass
+        except Exception as _cleanup_err:
+            logger.debug("Failed cleaning isolated_state %s: %s", isolated_state, _cleanup_err)
 
 
 if __name__ == "__main__":

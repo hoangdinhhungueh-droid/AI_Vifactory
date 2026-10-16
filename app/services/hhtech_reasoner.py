@@ -74,13 +74,17 @@ def extract_clean_breakout_queries(rising_queries: list, max_count: int = 5) -> 
     return res[:max_count]
 
 def _matches_any_term(target_text: str, terms: list[str]) -> bool:
-    """Helper to match terms with word boundary for ascii words to avoid false positive substring matches."""
+    """Helper to match terms with word boundary for ascii words to avoid false positive substring matches
+    while supporting stems, plurals, and standard inflections (e.g. archaeolog -> archaeology,
+    semiconductor -> semiconductors, sanction -> sanctions, murder -> murdered).
+    """
     for t in terms:
         t_clean = t.strip().lower()
         if not t_clean:
             continue
         if re.fullmatch(r"[a-z0-9 \-]+", t_clean):
-            pattern = rf"\b{re.escape(t_clean)}\b"
+            # Match stem/root with leading word boundary and optional word-character suffix up to word boundary
+            pattern = rf"\b{re.escape(t_clean)}\w*\b"
             if re.search(pattern, target_text):
                 return True
         else:
@@ -90,17 +94,19 @@ def _matches_any_term(target_text: str, terms: list[str]) -> bool:
 
 
 def detect_safety_and_theme(subject: str, market: str = "US") -> tuple[str, str, str]:
-    """Detect 4-Tier Content Theme, YouTube Safety Label, and Treatment Note from subject keywords."""
+    """Detect 4-Tier Content Theme, YouTube Safety Label, and Treatment Note from subject keywords
+    using generic domain taxonomies compliant with Rule 128 (Zero Semantic Bias).
+    """
     text = (subject or "").lower()
 
-    truecrime_terms = ['killer', 'ripper', 'murder', 'serial', 'gacy', 'bundy', 'dahmer', 'rader', 'golden state', '조두순', 'n번방', 'nth room', 'sarin', '오우무', 'aum', '真理教', 'サリン', '신창원', '유영철']
-    fraud_terms = ['fraud', 'scam', 'ponzi', 'madoff', 'enron', 'ftx', 'theranos', 'livedoor', 'ライブドア', 'worldcom', 'lehman', 'bankruptcy', 'insolvency', 'restructuring', 'creditor', 'liquidation', 'chapter 11', '다단계', '보이스피싱', '전세사기', '동양그룹', '東芝不正会計', 'オリンパス', '파산', '부도', '회생', '도산', '倒産', '破産']
+    truecrime_terms = ['killer', 'ripper', 'murder', 'serial', 'homicide', 'abduction', 'cold case', 'unsolved', 'forensic', 'sarin', 'cult', 'n번방', 'nth room', 'aum', '真理教', 'サリン', '연쇄살인', '강력범죄']
+    fraud_terms = ['fraud', 'scam', 'ponzi', 'embezzlement', 'accounting fraud', 'pyramid scheme', 'shell company', 'money laundering', 'insider trading', 'securities fraud', 'bankruptcy', 'insolvency', 'restructuring', 'creditor', 'liquidation', 'chapter 11', '다단계', '보이스피싱', '전세사기', '분식회계', '주가조작', '파산', '부도', '회생', '도산', '倒産', '破産', '不正会計']
     gambling_terms = ['gambling', 'casino', 'slot', 'pachinko', 'パチンコ', '도박', '강원랜드', '바다이야기', '사행성']
     societal_terms = ['kodokushi', '孤独死', '過労死', 'ひきこもり', '引きこもり', '고독사', '은둔']
-    history_terms = ['uprising', 'movement', 'occupation', '광주', '민주화', '일제강점기', '한국전쟁', '제주 4.3', '을미사변', 'roman empire', 'byzantine', 'crusade', 'genghis khan', 'mongol', 'ottoman', 'tulip mania']
-    tech_terms = ['chip', 'semiconductor', 'asml', 'tsmc', 'huawei', 'nvidia', 'geopolitic', 'supply chain', 'lithography', 'satellite', 'submarine cable', 'rare earth', 'quantum', 'embargo', 'sanction', 'trade war', 'export control', 'trade ban', 'export ban', 'tech ban', 'telecom switch']
-    ancient_terms = ['ancient', 'gobekli', 'göbekli', 'younger dryas', 'denisovan', 'megalith', 'clovis', 'prehistoric', 'lost civilization', 'civilization', 'ice age', 'stonehenge', 'sundaland', 'neanderthal', 'australopithecus', 'archaeolog', 'fossil', 'hominid', '잃어버린 문명', '선사시대', '고대 인류', '고대 문명', '縄文', '古代文明', 'ancient humans']
-    stoic_terms = ['stoic', 'stoicism', 'marcus aurelius', 'seneca', 'epictetus', 'musashi', 'dokkodo', '독행도', '스토아', '아우렐리우스', 'burnout', 'mental resilience', 'zen detachment', '번아웃', '孤独の力', '宮本武蔵', '折れない心', '人間関係の疲れ', '내면의 평화', '감정 조절']
+    history_terms = ['uprising', 'movement', 'occupation', 'revolution', 'treaty', '광주', '민주화', '일제강점기', '한국전쟁', '제주 4.3', '을미사변', 'roman empire', 'byzantine', 'crusade', 'mongol', 'ottoman', 'tulip mania']
+    tech_terms = ['chip', 'semiconductor', 'foundry', 'microchip', 'geopolitic', 'supply chain', 'lithography', 'satellite', 'submarine cable', 'rare earth', 'quantum', 'embargo', 'sanction', 'trade war', 'export control', 'trade ban', 'export ban', 'tech ban', 'telecom switch', 'ai chip', 'fab']
+    ancient_terms = ['ancient', 'younger dryas', 'denisovan', 'megalith', 'clovis', 'prehistoric', 'lost civilization', 'civilization', 'ice age', 'stonehenge', 'sundaland', 'neanderthal', 'australopithecus', 'archaeolog', 'fossil', 'hominid', '잃어버린 문명', '선사시대', '고대 인류', '고대 문명', '縄文', '古代文明', 'ancient humans']
+    stoic_terms = ['stoic', 'stoicism', 'philosophy', 'meditations', 'dokkodo', '독행도', '스토아', 'burnout', 'mental resilience', 'zen detachment', '번아웃', '孤独の力', '折れない心', '人間関係の疲れ', '내면의 평화', '감정 조절']
     military_terms = ['military logistics', 'geopolitical choke', 'malacca', 'undersea cable', 'starfish prime', 'supply line', 'airlift', 'defense doctrine', 'strategic blunder', '군사 물류', '지정학', '해저 케이블', '兵站', 'チョークポイント', 'chokepoint', 'blockade']
     consumer_terms = ["refund", "환불", "교환", "반품", "영수증", "바가지", "no refund", "cancellation fee", "hidden fee", "hidden cost", "fine print", "consumer trap", "소비자 분쟁", "위약금", "단순 변심", "가격표시제", "overcharge", "unilateral clause", "consumer dispute", "subscription trap"]
 

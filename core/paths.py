@@ -29,9 +29,11 @@ class RunPaths:
             else:
                 self.repo_root = self.root.parent
         else:
-            clean_id = str(run_id).strip()
-            if ".." in clean_id or "/" in clean_id or "\\" in clean_id:
-                raise ValueError(f"Path traversal detected in run_id: {run_id!r}")
+            if not run_id or not isinstance(run_id, str) or not run_id.strip():
+                raise ValueError(f"run_id must be a non-empty string, got: {run_id!r}")
+            clean_id = run_id.strip()
+            if ".." in clean_id or "/" in clean_id or "\\" in clean_id or ":" in clean_id:
+                raise ValueError(f"Path traversal or drive letter detected in run_id: {run_id!r}")
             self.run_id = clean_id
             if repo_root is not None:
                 self.repo_root = Path(repo_root).resolve()
@@ -42,6 +44,7 @@ class RunPaths:
             # Support both runs/<run_id> and episodes/<run_id> for backward compatibility.
             # Route all episodes and temporary candidate runs (*_TEMP_*, TEMP_*) to resolve_episodes_dir().
             episodes_base = resolve_episodes_dir(repo_root=self.repo_root, ensure_dir=False)
+            legacy_episodes = self.repo_root / "episodes"
             if (
                 self.run_id.startswith("EP_")
                 or "_EP" in self.run_id
@@ -50,6 +53,8 @@ class RunPaths:
                 or (episodes_base / self.run_id).exists()
             ):
                 self.root = episodes_base / self.run_id
+            elif (legacy_episodes / self.run_id).exists():
+                self.root = legacy_episodes / self.run_id
             else:
                 self.root = self.repo_root / "runs" / self.run_id
 

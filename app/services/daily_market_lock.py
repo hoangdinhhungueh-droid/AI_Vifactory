@@ -39,10 +39,15 @@ MIN_PRODUCTION_HOUR_VN = 6    # 06:00 AM VN minimum production hour
 
 
 def _validate_market(market: Any) -> str:
-    """Validate and normalize market identifier; reject non-string, empty, or whitespace."""
+    """Validate and normalize market identifier; normalize JA->JP and KO->KR aliases; reject non-string, empty, or whitespace."""
     if not market or not isinstance(market, str) or not market.strip():
         raise ValueError(f"Market identifier must be a non-empty string, got: {market!r}")
-    return market.strip().upper()
+    m = market.strip().upper()
+    if m == "JA":
+        return "JP"
+    if m == "KO":
+        return "KR"
+    return m
 
 
 def vn_now(override: Optional[datetime] = None) -> datetime:
@@ -93,7 +98,7 @@ def _emit_operator_corrupt_alert(lock_path: Path, error_msg: str, market: str, d
         logger.error(f"[daily_market_lock] Failed to emit operator corrupt alert to Telegram: {type(e).__name__}: {e}")
 
 
-HARD_MAX_IN_PROGRESS_AGE_SECONDS = 7200  # 2 hours hard cap (Boss Item 6)
+HARD_MAX_IN_PROGRESS_AGE_SECONDS = 28800  # 8 hours hard cap exceeding max TTL (Boss Item 6)
 
 _GIT_SHA_CACHE: Optional[str] = None
 
@@ -190,11 +195,12 @@ def _is_lock_stale(
                 c_dt = c_dt.replace(tzinfo=timezone.utc)
             age = (now_utc - c_dt).total_seconds()
             rec_ttl = int(data.get("ttl_seconds", default_ttl))
+            hard_max = max(rec_ttl + 7200, HARD_MAX_IN_PROGRESS_AGE_SECONDS)
 
             # 1. Hard max-age exceeded: unconditionally stale (PID-reuse defense - Boss Item 4 & 6)
-            if age > HARD_MAX_IN_PROGRESS_AGE_SECONDS:
+            if age > hard_max:
                 logger.warning(
-                    f"[daily_market_lock] IN_PROGRESS lock age={int(age)}s exceeds HARD_MAX {HARD_MAX_IN_PROGRESS_AGE_SECONDS}s. "
+                    f"[daily_market_lock] IN_PROGRESS lock age={int(age)}s exceeds hard_max {hard_max}s. "
                     f"Forcing stale takeover (PID reuse defense)."
                 )
                 return True, "hard_max_age_exceeded"
@@ -382,54 +388,38 @@ def is_market_done_today(
                 return True, "corrupt_lock_fail_closed", {"market": m_up, "date": date_str, "error": str(e)}
 
         status = (data.get("status") or "").upper()
-        if status == "COMPLETED":
-            return True, "lock_completed", data
-        elif status in ("EXHAUSTED_TODAY", "EXHAUSTED"):
-            return True, "lock_exhausted_today", data
-        elif status in ("EXHAUSTED_OFFHOURS", "OFFHOURS_THROTTLED"):
-            now_v = vn_now(now)
-            if now_v.hour < MIN_PRODUCTION_HOUR_VN:
-                return True, "lock_exhausted_offhours", data
-            else:
-                logger.info(
-                    f"[daily_market_lock] EXHAUSTED_OFFHOURS lock expired at 06:00 VN for {m_up}. "
-                    f"Permitting scheduled morning production."
-                )
-                stale_lock_found = True
-                stale_data = data
-        elif status == "CORRUPT_FAIL_CLOSED":
-            return True, "corrupt_lock_fail_closed", data
-        elif status == "IN_PROGRESS":
-            created_at_str = data.get("created_at_utc")
-            ttl = int(data.get("ttl_seconds", DEFAULT_TTL_SECONDS))
-            if not created_at_str:
-                logger.warning(
-                    f"[daily_market_lock] IN_PROGRESS lock missing created_at_utc for {m_up} on {date_str}. Failing closed (Boss Item 16)."
-                )
-                return True, "lock_in_progress", data
-
-            try:
-                c_dt = datetime.fromisoformat(created_at_str)
-                if c_dt.tzinfo is None:
-                    c_dt = c_dt.replace(tzinfo=timezone.utc)
-                age_seconds = (vn_now(now).astimezone(timezone.utc) - c_dt).total_seconds()
-                if age_seconds < ttl:
-                    return True, "lock_in_progress", data
-                else:
-                    logger.warning(
-                        f"[daily_market_lock] Stale IN_PROGRESS lock for {m_up} on {date_str} "
-                        f"(age={int(age_seconds)}s > ttl={ttl}s). Allowing re-run."
-                    )
-                    stale_lock_found = True
-                    stale_data = data
-            except Exception as _parse_err:
-                logger.warning(f"[daily_market_lock] Error parsing lock timestamp: {_parse_err}")
-                return True, "lock_in_progress", data
-        else:
-            logger.warning(
-                f"[daily_market_lock] Unrecognized lock status '{status}' for {m_up} on {date_str}. Failing closed (Boss Item 16)."
+        now_utc = vn_now(now).astimezone(timezone.utc)
+        is_stale, stale_reason = _is_lock_stale(
+            data,
+            now_utc,
+            default_ttl=DEFAULT_TTL_SECONDS,
+            emit_alert=False,
+            m_up=m_up,
+            date_str=date_str,
+            state_dir=state_dir,
+        )
+        if is_stale:
+            logger.info(
+                f"[daily_market_lock] Stale lock found for {m_up} on {date_str} (reason: {stale_reason}). Allowing re-run."
             )
-            return True, f"lock_unrecognized_{status.lower()}", data
+            stale_lock_found = True
+            stale_data = data
+        else:
+            if status == "COMPLETED":
+                return True, "lock_completed", data
+            elif status in ("EXHAUSTED_TODAY", "EXHAUSTED"):
+                return True, "lock_exhausted_today", data
+            elif status in ("EXHAUSTED_OFFHOURS", "OFFHOURS_THROTTLED"):
+                return True, "lock_exhausted_offhours", data
+            elif status == "CORRUPT_FAIL_CLOSED":
+                return True, "corrupt_lock_fail_closed", data
+            elif status == "IN_PROGRESS":
+                return True, "lock_in_progress", data
+            else:
+                logger.warning(
+                    f"[daily_market_lock] Unrecognized lock status '{status}' for {m_up} on {date_str}. Failing closed (Boss Item 16)."
+                )
+                return True, f"lock_unrecognized_{status.lower()}", data
 
     # 2. Check topic_history_registry (Pure Read, Fail-Closed on Unexpected Exceptions - Boss Item 15 & 16)
     if check_registry:
@@ -494,9 +484,13 @@ def is_market_done_today(
             try:
                 if not ep_root.is_dir():
                     continue
-                prefix = f"{m_up}_EP"
+                prefixes = (f"{m_up}_EP",)
+                if m_up == "JP":
+                    prefixes = ("JP_EP", "JA_EP")
+                elif m_up == "KR":
+                    prefixes = ("KR_EP", "KO_EP")
                 for ep_dir in ep_root.iterdir():
-                    if not ep_dir.is_dir() or not ep_dir.name.startswith(prefix):
+                    if not ep_dir.is_dir() or not any(ep_dir.name.startswith(pfx) for pfx in prefixes):
                         continue
                     manifest_file = ep_dir / "run_manifest.json"
                     if manifest_file.exists():
@@ -574,6 +568,18 @@ def acquire_in_progress(
     }
     if force:
         payload["forced"] = True
+        if lock_path.exists():
+            try:
+                ex_data = json.loads(lock_path.read_text(encoding="utf-8"))
+                if ex_data.get("status") == "IN_PROGRESS":
+                    payload["displaced_token"] = ex_data.get("lock_token")
+                    payload["displaced_pid"] = ex_data.get("pid")
+                    logger.warning(
+                        f"[daily_market_lock] Force acquisition displaced active lock holder "
+                        f"(displaced_pid={ex_data.get('pid')}, displaced_token={str(ex_data.get('lock_token'))[:8]})"
+                    )
+            except Exception as _ex_err:
+                logger.debug(f"[daily_market_lock] Notice reading pre-force lock: {_ex_err}")
         atomic_write_json(lock_path, payload)
         logger.info(f"[daily_market_lock] Forcefully acquired IN_PROGRESS lock for {m_up} on {date_str} (pid={pid}, token={token[:8]})")
         return True

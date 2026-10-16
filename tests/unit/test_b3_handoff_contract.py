@@ -70,7 +70,16 @@ def test_runpaths_routes_all_canonical_episode_shapes(tmp_path, monkeypatch):
 
 
 def test_runpaths_rejects_path_traversal():
-    """RunPaths must reject path traversal attempts with ValueError."""
+    """RunPaths must reject path traversal, empty string, and drive letter attempts with ValueError."""
+    with pytest.raises(ValueError, match="non-empty string"):
+        RunPaths("")
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        RunPaths("   ")
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        RunPaths(None)
+
     with pytest.raises(ValueError, match="Path traversal"):
         RunPaths("../escape_dir")
 
@@ -79,6 +88,19 @@ def test_runpaths_rejects_path_traversal():
 
     with pytest.raises(ValueError, match="Path traversal"):
         RunPaths("sub/folder")
+
+    with pytest.raises(ValueError, match="drive letter"):
+        RunPaths("C:escape_drive")
+
+
+def test_runpaths_routes_legacy_episodes(tmp_path):
+    """RunPaths must resolve pre-existing episodes located under repo_root/episodes."""
+    repo = tmp_path / "repo"
+    legacy_ep = repo / "episodes" / "old_run_01"
+    legacy_ep.mkdir(parents=True)
+
+    rp = RunPaths("old_run_01", repo_root=repo)
+    assert rp.root == legacy_ep, f"Expected {legacy_ep}, got {rp.root}"
 
 
 def test_b3_failure_guard_fails_closed_without_release_lock(monkeypatch):

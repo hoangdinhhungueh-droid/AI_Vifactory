@@ -51,10 +51,10 @@ def detect_forensic_overlay(narration_text: str, **kwargs) -> Optional[Dict[str,
 
 
 def detect_cinematic_archetype(category: str = "", topic: str = "", story_text: str = "") -> Dict[str, str]:
-    """Cinematic archetype router for smoke test backward compatibility."""
+    """Cinematic archetype router for smoke test backward compatibility (Rule 128 compliant)."""
     cat_low = (category or "").lower()
     top_low = (topic or "").lower()
-    if any(k in cat_low or k in top_low for k in ["history", "oppenheimer", "cold war", "manhattan", "chernobyl", "war"]):
+    if any(k in cat_low or k in top_low for k in ["history", "historical", "war", "military", "geopolitics", "geopolitical"]):
         return {"director": "Christopher Nolan / Historical Tension", "visual_tone": "Cinematic", "tone": "Historical Dramatic", "palette": "Desaturated"}
     return {"director": "David Fincher / Corporate Noir", "visual_tone": "Clinical", "tone": "Forensic Investigative", "palette": "Moody"}
 

@@ -22,11 +22,9 @@
 
 import os
 
-import contextlib
 import json
 import logging
 import re
-import socket
 import time
 import urllib.request
 from datetime import datetime, timezone
@@ -34,22 +32,7 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 
-@contextlib.contextmanager
-def force_ipv4_dns():
-    """Scoped context manager that temporarily forces IPv4 DNS resolution during Notion API calls only.
-    Restores global socket.getaddrinfo immediately upon exit to prevent process-wide side effects (Rule 125/139).
-    """
-    old_getaddrinfo = socket.getaddrinfo
-
-    def _new_getaddrinfo(*args, **kwargs):
-        res = old_getaddrinfo(*args, **kwargs)
-        return [r for r in res if r[0] == socket.AF_INET] or res
-
-    socket.getaddrinfo = _new_getaddrinfo
-    try:
-        yield
-    finally:
-        socket.getaddrinfo = old_getaddrinfo
+from core.net_utils import ipv4_urlopen
 
 DB_ID = os.getenv("TREND_BRAIN_DB_ID", "4c101989-2400-8334-8016-01d4f463b09f")
 # CANONICAL_LABEL_2026_08_23: Story Library DB id, used by is_keyword_locked()
@@ -108,9 +91,8 @@ def _call(method, path, payload=None):
     req.add_header("Notion-Version", NOTION_VERSION)
     req.add_header("Content-Type", "application/json")
     try:
-        with force_ipv4_dns():
-            with urllib.request.urlopen(req, timeout=20) as resp:
-                return json.loads(resp.read().decode("utf-8"))
+        with ipv4_urlopen(req, timeout=20) as resp:
+            return json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         err_body = ""
         if hasattr(e, "read"):

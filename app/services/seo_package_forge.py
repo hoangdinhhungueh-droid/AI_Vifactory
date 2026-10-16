@@ -24,10 +24,18 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from core.paths import resolve_episodes_dir, resolve_pending_tasks_dir
+
 logger = logging.getLogger("vf.seo_package_forge")
 
-EPISODES_BASE = Path("/var/vf/episodes")
-PENDING_BASE = Path("/var/vf/pending_tasks")
+def _episodes_base() -> Path:
+    return Path(resolve_episodes_dir())
+
+def _pending_base() -> Path:
+    return Path(resolve_pending_tasks_dir())
+
+EPISODES_BASE = _episodes_base()
+PENDING_BASE = _pending_base()
 YOUTUBE_REGISTRY_DB_ID = "3c301989-2400-81b9-a4bb-e5568ce942f8"
 STORY_LIBRARY_DB_ID = "b0301989-2400-836b-bdb5-8131fea17736"
 
@@ -182,9 +190,9 @@ def sync_exact_chapters_from_remotion(
     if ep_dir_path:
         candidates.append(os.path.join(ep_dir_path, "manifest.json"))
     if task_id:
+        ep_dir = _episodes_base() / task_id
         candidates.extend([
-            f"/var/vf/episodes/{task_id}/manifest.json",
-            f"/root/video_factory/var/vf/episodes/{task_id}/manifest.json",
+            str(ep_dir / "manifest.json"),
         ])
     if remotion_props_path:
         candidates.append(str(remotion_props_path))
@@ -193,9 +201,9 @@ def sync_exact_chapters_from_remotion(
     if task_id and (str(task_id).endswith(".json") or os.path.isfile(str(task_id))):
         candidates.insert(0, str(task_id))
     if task_id:
+        ep_dir = _episodes_base() / task_id
         candidates.extend([
-            f"/var/vf/episodes/{task_id}/remotion_props.json",
-            f"/root/video_factory/var/vf/episodes/{task_id}/remotion_props.json",
+            str(ep_dir / "remotion_props.json"),
         ])
 
     remotion_path = None
@@ -544,18 +552,13 @@ def forge_seo_package(
 
     # Load grounding intel if not explicitly passed
     if not grounding_intel:
-        for cand in [
-            os.path.join(EPISODES_BASE, task_id, "grounding_intel.json"),
-            os.path.join("/root/video_factory/episodes", task_id, "grounding_intel.json"),
-        ]:
-            if os.path.exists(cand):
-                try:
-                    with open(cand, "r", encoding="utf-8") as gf:
-                        grounding_intel = json.load(gf)
-                        if grounding_intel:
-                            break
-                except Exception:
-                    pass
+        cand = os.path.join(_episodes_base(), task_id, "grounding_intel.json")
+        if os.path.exists(cand):
+            try:
+                with open(cand, "r", encoding="utf-8") as gf:
+                    grounding_intel = json.load(gf)
+            except Exception as _ge:
+                logger.debug(f"[seo_package_forge] Could not read grounding intel from {cand}: {_ge}")
 
     verified_facts = []
     if grounding_intel and isinstance(grounding_intel, dict):
@@ -765,17 +768,16 @@ def forge_seo_package(
             "is_fallback": False
         }
 
-    # 1. Save to /var/vf/episodes/<task_id>/seo_package.json
-    for ep_base in [EPISODES_BASE, Path("/root/video_factory/episodes")]:
-        try:
-            ep_dir = ep_base / task_id
-            ep_dir.mkdir(parents=True, exist_ok=True)
-            pkg_path = ep_dir / "seo_package.json"
-            with open(pkg_path, "w", encoding="utf-8") as f:
-                json.dump(package, f, ensure_ascii=False, indent=2)
-            logger.info(f"[seo_package_forge] Saved SEO package to {pkg_path}")
-        except Exception as _fe:
-            logger.warning(f"[seo_package_forge] Could not write package to {ep_base}: {_fe}")
+    # 1. Save to canonical episodes dir
+    try:
+        ep_dir = _episodes_base() / task_id
+        ep_dir.mkdir(parents=True, exist_ok=True)
+        pkg_path = ep_dir / "seo_package.json"
+        with open(pkg_path, "w", encoding="utf-8") as f:
+            json.dump(package, f, ensure_ascii=False, indent=2)
+        logger.info(f"[seo_package_forge] Saved SEO package to {pkg_path}")
+    except Exception as _fe:
+        logger.warning(f"[seo_package_forge] Could not write package to {_episodes_base()}: {_fe}")
 
     # 2. Update pending task JSON if present
     try:
