@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from scripts.forensics.visual_audit import (
+from tools.forensics.visual_audit import (
     audit_fg_alpha_and_boundary,
     audit_provenance_and_size_signatures,
     run_falsifiable_adversarial_checks,

@@ -9,10 +9,17 @@ Storage: one JSONL file per UTC day under VF_COST_DIR (default /var/vf/cost).
 Each line: {ts, kind, units, usd, episode_id, note}
 """
 import json
+import logging
 import os
 import time
 
+logger = logging.getLogger("cost_ledger")
+
 LEDGER_DIR = os.environ.get("VF_COST_DIR", "/var/vf/cost")
+
+
+def _get_ledger_dir() -> str:
+    return os.environ.get("VF_COST_DIR", LEDGER_DIR)
 
 # Unit prices in USD. Override any of them with env vars when pricing changes.
 # of the current chain is free, but we still record the units so the breakdown
@@ -28,7 +35,7 @@ UNIT_USD = {
 
 def _path(ts=None) -> str:
     day = time.strftime("%Y-%m-%d", time.gmtime(ts or time.time()))
-    return os.path.join(LEDGER_DIR, day + ".jsonl")
+    return os.path.join(_get_ledger_dir(), day + ".jsonl")
 
 
 def record(kind: str, units: float = 1.0, episode_id: str = "",
@@ -37,7 +44,7 @@ def record(kind: str, units: float = 1.0, episode_id: str = "",
     try:
         if usd is None:
             usd = UNIT_USD.get(kind, 0.0) * float(units)
-        os.makedirs(LEDGER_DIR, exist_ok=True)
+        os.makedirs(_get_ledger_dir(), exist_ok=True)
         row = {
             "ts": round(time.time(), 3),
             "kind": kind,
@@ -48,8 +55,8 @@ def record(kind: str, units: float = 1.0, episode_id: str = "",
         }
         with open(_path(), "a", encoding="utf-8") as f:
             f.write(json.dumps(row) + "\n")
-    except Exception:
-        pass
+    except Exception as _rec_err:
+        logger.debug("cost_ledger record notice: %s", _rec_err)
 
 
 def _rows(t_from: float = 0.0, t_to=None):
@@ -93,8 +100,8 @@ def breakdown_between(t_from: float, t_to=None) -> dict:
             cur = agg.setdefault(k, {"units": 0.0, "usd": 0.0})
             cur["units"] += float(r.get("units") or 0)
             cur["usd"] = round(cur["usd"] + float(r.get("usd") or 0), 6)
-    except Exception:
-        pass
+    except Exception as _agg_err:
+        logger.debug("cost_ledger breakdown notice: %s", _agg_err)
     return agg
 
 

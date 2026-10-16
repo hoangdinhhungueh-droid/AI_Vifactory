@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import time
 import json
+import logging
 import asyncio
 import subprocess
 from pathlib import Path
 from typing import Dict, Any, List
+
+logger = logging.getLogger(__name__)
 
 from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.contracts.render_props import KaraokeWord
@@ -66,8 +69,8 @@ def run(ctx: RunContext) -> StageArtifact:
         try:
             s1_data = json.loads(s1_path.read_text(encoding="utf-8"))
             market = s1_data.get("payload", {}).get("market", "EN")
-        except Exception:
-            pass
+        except Exception as _m_err:
+            logger.debug("[s09_voice_tts] S1 read notice, using default EN: %s", _m_err)
 
     # Check if voice audio already exists
     if not audio_file.exists() or ctx.force:
@@ -94,8 +97,8 @@ def run(ctx: RunContext) -> StageArtifact:
                 asyncio.run(communicate.save(str(audio_file)))
                 if audio_file.exists() and audio_file.stat().st_size > 1000:
                     tts_success = True
-            except Exception:
-                pass
+            except Exception as _tts_err:
+                logger.warning("[s09_voice_tts] Edge-TTS generation notice: %s", _tts_err)
 
             if not tts_success:
                 # Fallback to ffmpeg audio tone (clean valid MP3 stream)
@@ -105,7 +108,8 @@ def run(ctx: RunContext) -> StageArtifact:
                          "-c:a", "libmp3lame", "-b:a", "128k", str(audio_file)],
                         capture_output=True, check=True
                     )
-                except Exception:
+                except Exception as _ff_err:
+                    logger.warning("[s09_voice_tts] FFmpeg tone generation fallback notice: %s", _ff_err)
                     # Minimal valid silent MP3 frame stream
                     audio_file.write_bytes(b"\xff\xfb\x90\x44" + b"\x00" * 8192)
 

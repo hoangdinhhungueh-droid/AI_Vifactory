@@ -572,8 +572,8 @@ def test_non_timeout_cooldown_error_does_not_abort_quota_stamp(temp_state_dir, m
 
 
 def test_interprocess_lock_write_failure_cleans_up(tmp_path):
-    """Boss Item 22 & 29: If os.write fails after O_CREAT|O_EXCL creation in _interprocess_lock,
-    it must close the fd and unlink the lock file so it does not leave a permanent unparseable lock.
+    """Boss Round 10 Item 5: Persistent advisory lock file must never be unlinked on error paths,
+    so concurrent holders' mutual exclusion remains intact on POSIX.
     """
     import unittest.mock as mock
 
@@ -590,8 +590,36 @@ def test_interprocess_lock_write_failure_cleans_up(tmp_path):
             with _interprocess_lock(target_file, timeout=1.0):
                 pass
 
-    # Lock file must be unlinked and not left on disk
-    assert not actual_lock_file.exists(), "Lock file should have been cleaned up after write failure"
+    # Persistent lock file must NOT be unlinked on error (Boss Item 5)
+    assert actual_lock_file.exists(), "Persistent advisory lock file must not be unlinked on error"
+
+
+def test_interprocess_lock_holder_error_still_blocks_contenders(tmp_path):
+    """Boss Round 10 Item 5: When Process A holds the lock, and Process B encounters
+    an injected OSError, Process C still cannot acquire while Process A holds the lock.
+    """
+    import unittest.mock as mock
+
+    from app.services.alert_cooldown import LockTimeoutError, _interprocess_lock
+
+    target_file = tmp_path / "cooldown.json"
+
+    # Process A acquires lock
+    with _interprocess_lock(target_file, timeout=2.0):
+        # Process B tries to acquire but hits an injected OSError
+        def broken_lseek(fd, pos, how):
+            raise OSError("Simulated error in Process B")
+
+        with mock.patch("os.lseek", side_effect=broken_lseek):
+            with pytest.raises((RuntimeError, LockTimeoutError)):
+                with _interprocess_lock(target_file, timeout=0.1):
+                    pass
+
+        # Process C tries to acquire while Process A still holds the lock -> must timeout fail-closed
+        with pytest.raises(LockTimeoutError):
+            with _interprocess_lock(target_file, timeout=0.1):
+                pass
+
 
 
 def test_topic_history_registry_vn_day_boundary_attribution(temp_state_dir, monkeypatch):
@@ -775,4 +803,40 @@ def test_unverified_mark_refuses_to_overwrite_existing_lock(temp_state_dir):
     # 4. Correct token -> succeeds
     res4 = mark_completed("EN", topic_id="EN_EP9999_fake", state_dir=temp_state_dir, lock_token=holder_token)
     assert res4 is True
+
+
+def test_takeover_succeeds_when_age_exceeds_hard_max_even_if_pid_reused(temp_state_dir):
+    """Boss Round 10 Item 4: When lock age exceeds HARD_MAX_IN_PROGRESS_AGE_SECONDS,
+    takeover must succeed even if the PID is currently alive and reused.
+    """
+    import unittest.mock as mock
+    from datetime import datetime, timezone, timedelta
+    from app.services.daily_market_lock import (
+        acquire_in_progress,
+        HARD_MAX_IN_PROGRESS_AGE_SECONDS,
+        _get_lock_file_path,
+        atomic_write_json,
+    )
+
+    # Write an old lock that exceeds HARD_MAX (e.g. 3 hours old) with an "alive" reused PID
+    old_time = datetime.now(timezone.utc) - timedelta(seconds=HARD_MAX_IN_PROGRESS_AGE_SECONDS + 600)
+    lock_file = _get_lock_file_path("EN", temp_state_dir)
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
+
+    reused_pid = 99999
+    atomic_write_json(lock_file, {
+        "market": "EN",
+        "vn_date": "2026-10-16",
+        "status": "IN_PROGRESS",
+        "created_at_utc": old_time.isoformat(),
+        "ttl_seconds": 1800,
+        "pid": reused_pid,
+        "lock_token": "old_token",
+    })
+
+    # Even if is_pid_alive returns True (PID reused by another process)
+    with mock.patch("app.services.alert_cooldown.is_pid_alive", return_value=True):
+        acquired = acquire_in_progress("EN", state_dir=temp_state_dir, lock_token="new_takeover_token")
+        assert acquired is True, "Takeover must succeed when age > HARD_MAX even if PID is alive (PID reuse defense)"
+
 

@@ -10,10 +10,13 @@ Implements background removal (rembg / BiRefNet / Chroma) and strict mathematica
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import numpy as np
 from PIL import Image
+
+logger = logging.getLogger(__name__)
 
 
 def verify_cutout_gates(rgba_img: Image.Image) -> dict[str, Any]:
@@ -140,8 +143,8 @@ def remove_background(
         from rembg import remove
         out = remove(src_img)
         return out
-    except Exception:
-        pass
+    except Exception as _rem_err:
+        logger.debug("[cutout] rembg neural keyer notice, using procedural chromatic falloff: %s", _rem_err)
 
     # High quality aesthetic Chroma / Alpha falloff keyer for opaque inputs
     arr = np.array(src_img, dtype=np.float32)

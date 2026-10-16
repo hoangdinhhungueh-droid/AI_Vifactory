@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""scripts/forensics/probe_s05_live.py — Programmatic live runtime execution probe for Stage S05 (Rule 127).
+"""tools/forensics/probe_s05_live.py — Programmatic live runtime execution probe for Stage S05 (Rule 127).
 
 Hermetically executes Stage S05 against real filesystem paths and verifies:
 1. S3 payload loading from disk without NameError or KeyError.

@@ -19,6 +19,7 @@ Standardized Architecture:
      - Auto-transition to B2 Story Engine (12-15 min docudrama) & B3 Director Plan (2-layer).
      - Fallback loop: If B2 fails Story Gate 12/12 after self-repair, automatically rotates to next candidate.
 """
+import hashlib
 import json
 import logging
 import os
@@ -32,14 +33,6 @@ from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Optional
-
-try:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    if hasattr(sys.stderr, "reconfigure"):
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-except Exception as _reconf_err:
-    sys.stderr.write(f"Notice: stdio reconfigure skipped: {_reconf_err}\n")
 
 # Ensure workspace root is in sys.path
 _PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
@@ -65,6 +58,9 @@ from app.services.hhtech_reasoner import (
     reason_topic_niche,
 )
 from app.services.topic_history_registry import is_topic_already_handled, record_handled_topic
+
+# Canonical viability threshold required for candidate graduation (Rule 134 parity)
+VIABILITY_THRESHOLD: float = 8.0
 from app.services.trend_free_signals import (
     fetch_specialized_market_rss,
     google_autocomplete,
@@ -1148,6 +1144,10 @@ def discover_and_produce_market_trend(
                 if mark_ok:
                     is_terminal_stamped = True
                     logger.info(f"[{m_up}] Stamped EXHAUSTED_TODAY lock: no unhandled candidates")
+            else:
+                if release_lock(m_up, state_dir=state_dir, lock_token=lock_token, owner_pid=os.getpid(), now=now):
+                    is_terminal_stamped = True
+                    logger.info(f"[{m_up}] Released lock after custom seed had no candidates")
             return []
 
         produced_topics = []
@@ -1251,8 +1251,8 @@ def discover_and_produce_market_trend(
 
             score = viability.get("viability_score", 0)
 
-            if not viability.get("is_video_viable") or score < 8.0:
-                print(f"  ❌ REJECTED: {viability.get('rejection_reason', 'Low viability score (< 8.0)')}")
+            if not viability.get("is_video_viable") or score < VIABILITY_THRESHOLD:
+                print(f"  ❌ REJECTED: {viability.get('rejection_reason', f'Low viability score (< {VIABILITY_THRESHOLD})')}")
                 continue
 
             specific_angle = viability.get("specific_viral_angle") or term
@@ -1260,11 +1260,10 @@ def discover_and_produce_market_trend(
             viability_passed_candidates.append({"term": term, "score": score, "angle": specific_angle})
 
             # Temporary pipeline task ID for pre-audit stages (B1 -> B1.1 -> B1.5 -> B1.5.5 -> B1.6 -> B2 -> B2.1)
-            import hashlib
             clean_slug = re.sub(r'[^a-zA-Z0-9]+', '-', str(term).lower()).strip('-')[:20]
             if not clean_slug:
                 # CJK term without latin letters: anchor with deterministic MD5 hash
-                term_hash = hashlib.md5(str(term).encode('utf-8')).hexdigest()[:8]
+                term_hash = hashlib.md5(str(term).encode('utf-8'), usedforsecurity=False).hexdigest()[:8]
                 temp_task_id = f"{m_up}_TEMP_{term_hash}"
             else:
                 temp_task_id = f"{m_up}_TEMP_{clean_slug}"
@@ -1620,6 +1619,7 @@ def discover_and_produce_market_trend(
                 ]
                 sub_env = os.environ.copy()
                 sub_env["PYTHONPATH"] = f"{_PROJECT_ROOT}{os.pathsep}{sub_env.get('PYTHONPATH', '')}".strip(os.pathsep)
+                sub_env["VF_EPISODES_DIR"] = str(resolve_episodes_dir(ensure_dir=True))
                 try:
                     proc = subprocess.run(cmd, cwd=str(_PROJECT_ROOT), env=sub_env, capture_output=True, text=True, timeout=b3_timeout)
                     res_code = proc.returncode
@@ -1649,13 +1649,33 @@ def discover_and_produce_market_trend(
                         lock_token=lock_token,
                         owner_pid=os.getpid(),
                     )
+                    if not mark_ok:
+                        time.sleep(0.5)
+                        mark_ok = mark_exhausted_today(
+                            market=m_up,
+                            scan_count=idx,
+                            state_dir=state_dir,
+                            now=now,
+                            extra_metadata={
+                                "reason": "b3_downstream_failure",
+                                "failed_task_id": temp_task_id,
+                                "b3_exit_code": res_code,
+                                "retry": 1,
+                            },
+                            lock_token=lock_token,
+                            owner_pid=os.getpid(),
+                        )
+
                     if mark_ok:
                         is_terminal_stamped = True
                         logger.info(f"[{m_up}] Stamped EXHAUSTED_TODAY lock after B3 failure (task={temp_task_id})")
                     else:
-                        logger.warning(f"[{m_up}] Failed to stamp EXHAUSTED_TODAY, falling back to release_lock")
-                        release_lock(m_up, state_dir=state_dir, lock_token=lock_token, owner_pid=os.getpid(), now=now)
-                        is_terminal_stamped = True
+                        # Fail-closed: DO NOT call release_lock (prevents automated retry storms).
+                        # Leave IN_PROGRESS until stale expiry, and do NOT set is_terminal_stamped.
+                        logger.critical(
+                            f"[{m_up}] FAIL-CLOSED: Failed to persist EXHAUSTED_TODAY lock after B3 failure. "
+                            f"Leaving IN_PROGRESS lock in place to prevent retry storm until stale expiry."
+                        )
 
                     # B3 failed: Do NOT commit task. Emit exactly ONE terminal failure message with recovery command.
                     fail_msg = (
@@ -1763,57 +1783,63 @@ def discover_and_produce_market_trend(
             print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B2.1 -> B3 -> Gate 2 for {task_id}!")
             break
 
-        if not produced_topics and not custom_seed and not terminal_alert_sent:
-            scanned_count = min(len(candidates), max_scan_candidates)
-            exhaust_reason = "bottleneck_downstream_gates" if viability_passed_candidates else "no_candidates_passed_viability"
+        if not produced_topics:
+            if not custom_seed and not terminal_alert_sent:
+                scanned_count = min(len(candidates), max_scan_candidates)
+                exhaust_reason = "bottleneck_downstream_gates" if viability_passed_candidates else "no_candidates_passed_viability"
 
-            # 1. First: Stamp EXHAUSTED_TODAY immediately so automated cron will NOT retry in a loop today (Boss Item 14 & 18)
-            if not is_terminal_stamped:
-                mark_ok = mark_exhausted_today(
-                    market=m_up,
-                    scan_count=scanned_count,
-                    state_dir=state_dir,
-                    now=now,
-                    extra_metadata={
-                        "viability_evals_count": viability_evals_count,
-                        "viability_passed_count": len(viability_passed_candidates),
-                        "reason": exhaust_reason,
-                    },
-                    lock_token=lock_token,
-                    owner_pid=os.getpid(),
-                )
-                if mark_ok:
-                    is_terminal_stamped = True
-                    print(f"🛑 [DAILY MARKET LOCK] Marked Market {m_up} as EXHAUSTED_TODAY ({scanned_count} candidates evaluated, reason={exhaust_reason}).")
-                    print("   Automated scheduler will NOT retry today. Next scheduled market will run tomorrow automatically.")
+                # 1. First: Stamp EXHAUSTED_TODAY immediately so automated cron will NOT retry in a loop today (Boss Item 14 & 18)
+                if not is_terminal_stamped:
+                    mark_ok = mark_exhausted_today(
+                        market=m_up,
+                        scan_count=scanned_count,
+                        state_dir=state_dir,
+                        now=now,
+                        extra_metadata={
+                            "viability_evals_count": viability_evals_count,
+                            "viability_passed_count": len(viability_passed_candidates),
+                            "reason": exhaust_reason,
+                        },
+                        lock_token=lock_token,
+                        owner_pid=os.getpid(),
+                    )
+                    if mark_ok:
+                        is_terminal_stamped = True
+                        print(f"🛑 [DAILY MARKET LOCK] Marked Market {m_up} as EXHAUSTED_TODAY ({scanned_count} candidates evaluated, reason={exhaust_reason}).")
+                        print("   Automated scheduler will NOT retry today. Next scheduled market will run tomorrow automatically.")
+                    else:
+                        logger.warning(f"[{m_up}] Failed to mark market as EXHAUSTED_TODAY.")
+
+                # 2. Second: Alert dispatch with cooldown (catch broad Exception so alert I/O can NEVER bypass quota mark)
+                if viability_passed_candidates:
+                    # Candidates passed B1 Viability Gate, but were stopped downstream (Critic, Grounding, or B2 Story/Fact Audit)
+                    alert_msg = (
+                        f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
+                        f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live cho thị trường <b>{m_up}</b>.\n"
+                        f"📊 <b>Kết quả B1:</b> Có <b>{len(viability_passed_candidates)}</b> ứng viên đạt Viability Gate (≥ 8.0/10).\n"
+                        f"❌ <b>Điểm nghẽn:</b> Toàn bộ ứng viên đã bị chặn tại các chốt kiểm định hạ nguồn (Adversarial Critic Gate hoặc B2 Story/Fact Audit Gate).\n"
+                        f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra log chi tiết."
+                    )
+                    logger.warning(f"[{m_up}] {len(viability_passed_candidates)} candidates passed viability gate but none passed downstream B2/B3 gates.")
+                    _send_guarded_alert("b1_b2_bottleneck", m_up, alert_msg, state_dir=state_dir)
                 else:
-                    logger.warning(f"[{m_up}] Failed to mark market as EXHAUSTED_TODAY.")
-
-            # 2. Second: Alert dispatch with cooldown (catch broad Exception so alert I/O can NEVER bypass quota mark)
-            if viability_passed_candidates:
-                # Candidates passed B1 Viability Gate, but were stopped downstream (Critic, Grounding, or B2 Story/Fact Audit)
-                alert_msg = (
-                    f"⚠️ <b>[VF PIPELINE B2/B3 BOTTLENECK ALERT - RULE 118]</b>\n"
-                    f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live cho thị trường <b>{m_up}</b>.\n"
-                    f"📊 <b>Kết quả B1:</b> Có <b>{len(viability_passed_candidates)}</b> ứng viên đạt Viability Gate (≥ 8.0/10).\n"
-                    f"❌ <b>Điểm nghẽn:</b> Toàn bộ ứng viên đã bị chặn tại các chốt kiểm định hạ nguồn (Adversarial Critic Gate hoặc B2 Story/Fact Audit Gate).\n"
-                    f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra log chi tiết."
-                )
-                logger.warning(f"[{m_up}] {len(viability_passed_candidates)} candidates passed viability gate but none passed downstream B2/B3 gates.")
-                _send_guarded_alert("b1_b2_bottleneck", m_up, alert_msg, state_dir=state_dir)
-            else:
-                alert_msg = (
-                    f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
-                    f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live từ đa kênh (RSS, Discover, YouTube) cho thị trường <b>{m_up}</b>, "
-                    f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 8.0/10) để làm phóng sự điều tra.\n"
-                    f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra hoặc cấp seed chỉ định."
-                )
-                logger.warning(f"[{m_up}] No candidates passed viability gate.")
-                _send_guarded_alert("b1_viability", m_up, alert_msg, state_dir=state_dir)
+                    alert_msg = (
+                        f"⚠️ <b>[B1 VIABILITY ALERT - RULE 118]</b>\n"
+                        f"Đã quét qua {scanned_count}/{len(candidates)} ứng viên live từ đa kênh (RSS, Discover, YouTube) cho thị trường <b>{m_up}</b>, "
+                        f"nhưng không có đề tài nào vượt qua Viability Gate (≥ 8.0/10) để làm phóng sự điều tra.\n"
+                        f"🛑 Hệ thống tuân thủ Rule 118 & Rule 123: Dừng lại và KHÔNG tự ý sinh seed giả định. Vui lòng kiểm tra hoặc cấp seed chỉ định."
+                    )
+                    logger.warning(f"[{m_up}] No candidates passed viability gate.")
+                    _send_guarded_alert("b1_viability", m_up, alert_msg, state_dir=state_dir)
+            elif custom_seed:
+                if not is_terminal_stamped:
+                    if release_lock(m_up, state_dir=state_dir, lock_token=lock_token, owner_pid=os.getpid(), now=now):
+                        is_terminal_stamped = True
+                        logger.info(f"[{m_up}] Released lock after custom seed failed to produce completed topic")
 
         return produced_topics
     finally:
-        if not is_terminal_stamped and not custom_seed and lock_token:
+        if not is_terminal_stamped and lock_token:
             try:
                 logger.warning(
                     f"[{m_up}] Crawl execution exited without terminal lock mark (COMPLETED or EXHAUSTED_TODAY). "
@@ -1823,13 +1849,14 @@ def discover_and_produce_market_trend(
             except Exception as _fin_rel_err:
                 logger.error(f"[{m_up}] Error releasing lock in finally: {_fin_rel_err}")
 
-            fin_alert = (
-                f"🚨 <b>[VF PIPELINE B1 UNEXPECTED TERMINATION]</b>\n"
-                f"Market: <code>{m_up}</code> | Lock Token: <code>{lock_token[:8]}</code>\n"
-                f"Crawl execution exited without terminal lock mark (COMPLETED or EXHAUSTED_TODAY).\n"
-                f"Uncommitted lock released in finally block to prevent scheduler deadlock."
-            )
-            _send_guarded_alert("b1_unexpected_termination", m_up, fin_alert, state_dir=state_dir)
+            if not custom_seed:
+                fin_alert = (
+                    f"🚨 <b>[VF PIPELINE B1 UNEXPECTED TERMINATION]</b>\n"
+                    f"Market: <code>{m_up}</code> | Lock Token: <code>{lock_token[:8]}</code>\n"
+                    f"Crawl execution exited without terminal lock mark (COMPLETED or EXHAUSTED_TODAY).\n"
+                    f"Uncommitted lock released in finally block to prevent scheduler deadlock."
+                )
+                _send_guarded_alert("b1_unexpected_termination", m_up, fin_alert, state_dir=state_dir)
 
 
 # Backwards compatibility aliases
@@ -1852,6 +1879,14 @@ def run_daily_all_markets(markets: list[str] = None, auto_produce: bool = True) 
 
 
 if __name__ == "__main__":
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception as _reconf_err:
+        sys.stderr.write(f"Notice: stdio reconfigure skipped: {_reconf_err}\n")
+
     import argparse
     parser = argparse.ArgumentParser(description="Canonical Trend Engine B1 Discovery & Production")
     parser.add_argument("term", nargs="?", default=None, help="Custom seed term")

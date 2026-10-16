@@ -79,3 +79,36 @@ def mask_exception_text(exception_text: str) -> str:
     exception_text = mask_sensitive_url(exception_text)
     
     return exception_text
+
+
+import logging
+
+class SensitiveDataFilter(logging.Filter):
+    """Logging filter that automatically redacts Telegram bot tokens, presigned URLs, and secrets."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            if isinstance(record.msg, str):
+                record.msg = mask_sensitive_url(record.msg)
+                record.msg = mask_exception_text(record.msg)
+            if record.args:
+                if isinstance(record.args, dict):
+                    record.args = {k: (mask_sensitive_url(str(v)) if isinstance(v, str) else v) for k, v in record.args.items()}
+                elif isinstance(record.args, tuple):
+                    record.args = tuple(mask_sensitive_url(str(v)) if isinstance(v, str) else v for v in record.args)
+        except Exception:
+            return True
+        return True
+
+
+def configure_secure_logging():
+    """Sets httpx/httpcore loggers to WARNING and attaches SensitiveDataFilter to all root handlers."""
+    for logger_name in ("httpx", "httpcore", "urllib3"):
+        log = logging.getLogger(logger_name)
+        log.setLevel(logging.WARNING)
+
+    root = logging.getLogger()
+    filt = SensitiveDataFilter()
+    root.addFilter(filt)
+    for h in root.handlers:
+        h.addFilter(filt)
+

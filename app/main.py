@@ -154,7 +154,7 @@ def _verify_auth(request: Request) -> None:
 
 
 
-@app.get("/api/v1/diag")
+@app.get("/api/v1/diag", dependencies=[Depends(_verify_auth)])
 def diag():
     """Provider audit & health diagnostics via ModelGateway."""
     try:
@@ -532,12 +532,12 @@ def oai_models():
     return {"object": "list", "data": [{"id": "auto", "object": "model", "owned_by": "vpsRouter"}]}
 
 # Modular sub-routers for specialized pipeline services (MPT, Trend, Story, Sync)
-app.include_router(mpt_g5_router)
+app.include_router(mpt_g5_router, dependencies=[Depends(_verify_auth)])
 app.include_router(_trend_gate_router, dependencies=[Depends(_verify_auth)])
 app.include_router(_s1_score_router, dependencies=[Depends(_verify_auth)])
-app.include_router(_trend_verify_router)
-app.include_router(_story_check_router)
-app.include_router(_episode_images_router)
-app.include_router(_preflight_router)
-app.include_router(_sync_router)
+app.include_router(_trend_verify_router, dependencies=[Depends(_verify_auth)])
+app.include_router(_story_check_router, dependencies=[Depends(_verify_auth)])
+app.include_router(_episode_images_router, dependencies=[Depends(_verify_auth)])
+app.include_router(_preflight_router, dependencies=[Depends(_verify_auth)])
+app.include_router(_sync_router, dependencies=[Depends(_verify_auth)])
 

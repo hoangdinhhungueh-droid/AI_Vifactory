@@ -1,0 +1,124 @@
+{
+  "task_id": "TASK_1792069373",
+  "round": 10,
+  "timestamp": "2026-10-16T09:14:40Z",
+  "verdict": "REVISE_REQUIRED",
+  "score": 7.2,
+  "passing_threshold": 10.0,
+  "supervisor_model": "claude-opus-5-5",
+  "tokens_consumed": 69637,
+  "summary": "This is a substantial and mostly well-engineered control-plane increment. The daily market lock state machine, token-verified mutations, the cross-platform advisory lock, unified atomic IO, fail-closed API auth, scoped IPv4 DNS forcing, and B3 failure stamping are real improvements. Their behavior is backed by green CI (run 38877670289, 3/3 jobs success), VPS pytest exit 0 (153 + 7 + 53), clean ghost_scan, and a live EXHAUSTED_TODAY skip on scheduled ticks. The increment still cannot be approved, for six reasons. (1) Three-way parity is broken: local Windows porcelain shows an uncommitted modification to scripts/orchestrator/boss_orchestrator.py, and the digest diffstat (11464+/4213-) disagrees with the evidence diffstat (11332+/4194-). (2) The Rule 139 AST anti-symptom scanner exits 1 with dozens of unaddressed HIGH silent except-pass findings, including in pipeline stages (s03, s09) and vox modules. (3) A production secret leaked: the Telegram bot token appears in plaintext in httpx INFO logs included in this evidence packet. (4) The residue-disposal script reports COMPLETED while its Notion step failed with ModuleNotFoundError and its registry step probed non-canonical paths. The BUNDLED_SCOPE claim of full disposal is therefore false. (5) The 'isolated' terminal crawl verification leaked into production: it sent a real Telegram alert (msg 787) bypassing the production cooldown, and it reads the production topic registry. (6) There are latent correctness defects in lock takeover re-verification, custom-seed lock lifecycle, lock-file unlinking under flock, and producer/consumer episode-path resolution for B3.",
+  "revisions_needed": [
+    "Rotate the Telegram bot token immediately. Set the 'httpx' and 'httpcore' loggers to WARNING (or add a redacting logging.Filter for '/bot<token>/'). Scrub /var/vf/logs and any specs/boss_audits or CI artifact containing the token. Prove absence with a grep that returns 0 matches, without echoing the value.",
+    "Commit or revert the local modification to scripts/orchestrator/boss_orchestrator.py. Regenerate the evidence packet from a clean tree so that the digest diffstat equals the evidence diffstat and the local porcelain is empty.",
+    "Make the Rule 139 AST scanner exit 0. Remediate the HIGH silent-except findings, prioritizing stages/s03, stages/s09, and vox/{tts,cutout,ffmpeg_utils}. For out-of-scope legacy scripts, use a committed, reviewed allowlist with per-entry justification so the gate passes deterministically.",
+    "daily_market_lock: unify the staleness predicate into one function used for both the pre-check and the under-mutex re-check, including HARD_MAX age and process start-time comparison. Replace the /proc st_ctime heuristic with /proc/<pid>/stat field 22. Add a test proving takeover succeeds when age exceeds HARD_MAX and the PID has been reused.",
+    "alert_cooldown._interprocess_lock: remove every lock_file.unlink() call from error paths. Add a test where process A holds the flock, process B hits an injected OSError, and process C still cannot acquire.",
+    "trend_engine_b1: for custom_seed runs, either skip lock acquisition entirely or guarantee release or stamping in finally. Only set is_terminal_stamped after release_lock returns True. Add tests for custom-seed failure leaving no IN_PROGRESS lock.",
+    "Prove the B1→B3 episode-root parity on the VPS. Print resolve_episodes_dir() from the trend process and RunPaths('<MKT>_TEMP_x').root from the orchestrator subprocess with the production environment, and show they are identical. Then run one real auto_produce B3 invocation to exit 0, or pass the episodes root explicitly to the subprocess via VF_EPISODES_DIR.",
+    "core/paths.resolve_topic_history_path: remove the test-detection branch. Isolation must come from explicit TOPIC_HISTORY_PATH and VF_STATE_DIR injection. Restore backward-compatible honoring of VF_DB_DIR and TREND_RAW_POOL_DIR, or document the migration and prove data continuity for the RAW_POOL_DIR relocation.",
+    "verify_live_crawl_terminal.py: inject isolated TOPIC_HISTORY_PATH, PENDING_TASKS_DIR, and VF_EPISODES_DIR, and disable or redirect Telegram dispatch (for example, a dedicated test chat) so verification cannot alert the production operator.",
+    "dispose_retatrutide_residue.py: use the canonical resolve_topic_history_path() and the existing Notion client module (scripts.ag_notion_bridge), write via atomic_write_json, store the backup in a durable audit directory, and exit non-zero if any step fails. Re-run it and include raw output showing the registry entry and the Notion row archived. Correct the BUNDLED_SCOPE claim until then.",
+    "Apply _verify_auth to the remaining mounted routers (mpt_g5, trend_verify, story_check, episode_images) and /api/v1/diag, or document why each is safe unauthenticated. Provide evidence that the n8n workflows were updated with the Bearer token for /api/v1/pipeline/run. Stop returning raw DB exception text from _persist.",
+    "Consolidate force_ipv4_dns into a single core helper, preferably an httpx transport bound to IPv4 rather than a global socket monkeypatch.",
+    "Split the CRLF→LF normalization into its own commit, recorded in .git-blame-ignore-revs, so semantic diffs for s1_score, hhtech_reasoner, trend_gate_ai, dual_model_convergence, audit_b2_b3_assets, and ghost_code_detector are reviewable.",
+    "Keep a single copy of BUNDLED_SCOPE_USER_APPROVAL.md. Replace the Worker-authored authorization with a user-attested record. Regenerate or remove the 1-line TASK_1792069373_audit_round_9.json.",
+    "Record git_sha in every lock and cooldown payload so that production state provenance can be tied to a specific code version."
+  ],
+  "component_reviews": [
+    {
+      "component": "Rule 126 Three-Way Parity (Local ⇄ GitHub ⇄ VPS)",
+      "status": "DEFECT",
+      "analysis": "VPS HEAD, tree, and content hash match origin/main (8ee4ea3, tree 9e5d8f6), and VPS porcelain is clean. Local Windows porcelain reports 'M scripts/orchestrator/boss_orchestrator.py', so the audited harness differs from the committed one. The digest diffstat shows boss_orchestrator.py at 1443 lines changed and dispose_retatrutide_residue.py at 136 lines. The raw evidence diffstat shows 1297 and 131 for the same files. The packet was therefore generated from a different working state than HEAD. Parity is not three-way verified."
+    },
+    {
+      "component": "Rule 139 AST Anti-Symptom Scanner",
+      "status": "DEFECT",
+      "analysis": "Exit code 1, with many HIGH RULE_139_SILENT_EXCEPT_PASS findings across scripts/, stages/s03_script.py:58, stages/s09_voice_tts.py:69/97, vox/cutout.py:143, vox/ffmpeg_utils.py:21, and vox/tts.py:52. The packet neither remediates these nor provides an approved, scoped allowlist with justification. A failing mandatory gate cannot coexist with a 10/10 verdict. The 'OCR Gate: 0 Critical / 0 High' line does not offset this. It is a different gate."
+    },
+    {
+      "component": "Secret Hygiene (Telegram bot token in logs)",
+      "status": "DEFECT",
+      "analysis": "Section 15 logs the full Telegram sendMessage URL, including the bot token (TELEGRAM bot token path segment), via httpx INFO logging. The token is now exposed in the audit packet and in VPS logs, and possibly in specs/boss_audits artifacts and the CI logs this packet was sent through. This is a high-severity credential exposure, independent of code quality. Remediation requires three steps: rotate the token via BotFather, raise the httpx and httpcore loggers to WARNING (or add a redaction filter), and scrub the persisted logs and audit artifacts."
+    },
+    {
+      "component": "app/services/daily_market_lock.py",
+      "status": "WARN",
+      "analysis": "Strengths: a hardlink-based exclusive acquire with content pre-written, token and PID ownership verification on every mutation, a persistent CORRUPT_FAIL_CLOSED seal, a read-only is_market_done_today, and the off-hours TTL policy. Defects: (a) Takeover re-verification under the mutex is inconsistent with the initial staleness decision. The initial check treats age > HARD_MAX_IN_PROGRESS_AGE_SECONDS as unconditionally stale and considers process_start_time. The re-check under the mutex only checks is_pid_alive. In the PID-reuse case the hard-max defense therefore always aborts, so the defense is ineffective. (b) _get_process_start_time uses os.stat('/proc/<pid>').st_ctime, which is not a reliable process start time. Field 22 of /proc/<pid>/stat combined with boot time is the authoritative value. (c) The registry check does not exclude entries with status DISPOSED_INCIDENT_RESIDUE. (d) force=True unconditionally overwrites an existing COMPLETED record with no audit trail of the overwritten state."
+    },
+    {
+      "component": "app/services/alert_cooldown.py",
+      "status": "WARN",
+      "analysis": "The single-lock check-plus-reserve design, the delta-safe rollback, and the backward-compatible AlertSendDecision are sound, and the Windows CI job passes. One defect: in the unexpected-OSError and generic-Exception branches of _interprocess_lock, the code calls lock_file.unlink(). On POSIX, unlinking a flock-protected file that another process currently holds lets the next contender create a fresh inode and acquire it concurrently. That silently breaks mutual exclusion. A persistent advisory lock file must never be unlinked on the error path. Fail-open on transient read without reservation is documented and acceptable."
+    },
+    {
+      "component": "app/services/trend_engine_b1.py (lock lifecycle & B3 handoff)",
+      "status": "DEFECT",
+      "analysis": "The try/finally lock release, the B3 failure stamping, and the post-B3 commit ordering are correct for the scheduled path. Defects: (a) When custom_seed is set, a forced IN_PROGRESS lock is written, but every mark_exhausted_today call and the finally-release are gated on 'not custom_seed'. A failed custom-seed run therefore leaves an IN_PROGRESS lock that blocks the scheduled cron for the full 4h TTL. (b) On the B3-failure fallback, is_terminal_stamped is set True even when release_lock returns False, which suppresses the termination alert while the lock may still be held. (c) Episode-path split-brain risk: the producer writes temp artifacts via resolve_episodes_dir(), which returns /var/vf/episodes when it exists. The consumer subprocess resolves RunPaths(run_id) with repo_root defaulted to the repo, so resolve_episodes_dir(repo_root=...) returns <repo>/episodes unless VF_EPISODES_DIR is set. No VPS evidence shows the env value or a successful live B3 handoff run. --help resolution only proves importability. (d) Module-level sys.stdout.reconfigure is an import-time side effect in a library module."
+    },
+    {
+      "component": "core/paths.py",
+      "status": "WARN",
+      "analysis": "The path-traversal guard on run_id, the fail-closed /var/vf/locks resolution, and the centralized resolvers align with Rule 132. Defects: (a) resolve_topic_history_path branches on 'test' in the state_dir name or on PYTEST_CURRENT_TEST. Production code that changes behavior based on test detection violates Rule 118, and it is exactly why the isolated verification read the production registry ('vf_isolated_state_*' contains no 'test'). (b) RunPaths routing depends on disk state ((episodes_base / run_id).exists()), so routing is non-deterministic. (c) Env-var compatibility regressed: VF_DB_DIR (virality_score) and TREND_RAW_POOL_DIR (trend_verify) are no longer honored, and resolve_raw_pool_dir may relocate RAW_POOL_DIR from /root/video_factory/db to /var/vf/db when the latter exists. The change also adds an import-time mkdir. No migration note or data-continuity proof is provided."
+    },
+    {
+      "component": "app/main.py & app/s1_score.py (API auth)",
+      "status": "WARN",
+      "analysis": "The fail-closed Bearer auth, hmac.compare_digest, the forwarded-header-aware loopback detection, and the rate-limited warnings are correct. Remaining exposure: mpt_g5_router, _trend_verify_router, _story_check_router, _episode_images_router, and /api/v1/diag are still mounted without _verify_auth. /api/v1/pipeline/run now requires both a Bearer token and X-API-Key, which is a breaking contract for n8n workflows with no evidence of n8n credential updates. _persist returns raw DB exception text to the API caller, which leaks internal information."
+    },
+    {
+      "component": "scripts/forensics/dispose_retatrutide_residue.py",
+      "status": "DEFECT",
+      "analysis": "The raw output proves partial failure. The Notion step raised 'No module named app.services.notion_client', yet the script printed '✅ COMPLETED' and exited 0. The registry step probed /var/vf/locks/topic_history.json and /var/vf/topic_history.json, but the canonical path is <repo>/data/topic_history.json, where the 2026-10-14 log shows the entry was recorded. The backup went to /tmp, which is non-durable and conflicts with Rule 119. Registry writes use non-atomic write_text instead of atomic_write_json. The BUNDLED_SCOPE claim that residue was disposed across pending tasks, history registries, and Notion is therefore an unverified and partially false claim."
+    },
+    {
+      "component": "scripts/forensics/verify_live_crawl_terminal.py",
+      "status": "DEFECT",
+      "analysis": "The run reports 'isolated', but it dispatched a real Telegram message to the production operator chat (msg_id=787), bypassing the production cooldown that had already recorded b1_viability::EN at 05:33. It also reads the production topic registry (see the core/paths finding) and writes to production pending_tasks and episodes resolvers. The lock-stamp assertion is valid. Isolation is not."
+    },
+    {
+      "component": "app/services/hhtech_reasoner.py",
+      "status": "PASS",
+      "analysis": "Word-boundary matching via _matches_any_term, removal of the ephemeral '동탄문구점' term (Rule 128), narrowed exception handling, and an explicit 'war' regex. All 13 branch tests pass, including the ancient_terms and negative-boundary cases, which disproves an F821 in the final file even though the compact diff omitted the definition. Branch reordering (tech before history) is intentional and tested."
+    },
+    {
+      "component": "stages/s05, s10, s11",
+      "status": "PASS",
+      "analysis": "S05 now actually loads s3_data, which fixes a NameError, and the live probe exits 0. S10 fails closed on partial clip loss, re-verifies stale MP4s via ffprobe with a timeout, and sources subtitles strictly from the S9 contract. S11 propagates programming errors. Unit tests cover all three."
+    },
+    {
+      "component": "app/services/episode_numbering.py & trend_brain_mirror.py (force_ipv4_dns)",
+      "status": "WARN",
+      "analysis": "Scoping the previously global getaddrinfo patch is an improvement. However, it is still a process-global monkeypatch for the duration of the context, so it is not thread-safe under FastAPI's threadpool, and nested or concurrent contexts can restore the wrong function. It is also duplicated verbatim in two modules, which violates Rule 125. A single core helper using an httpx transport with local_address='0.0.0.0' would remove both problems."
+    },
+    {
+      "component": "Diff hygiene (whole-file rewrites)",
+      "status": "WARN",
+      "analysis": "s1_score.py, dual_model_convergence.py, hhtech_reasoner.py, trend_gate_ai.py, audit_b2_b3_assets.py, and ghost_code_detector.py are presented as full-file delete and re-add for small semantic changes, consistent with CRLF→LF normalization from the .gitattributes change. This hides real edits from line-level review (Rule 138). Normalization should be an isolated commit, ideally recorded in .git-blame-ignore-revs."
+    },
+    {
+      "component": "Governance artifacts (BUNDLED_SCOPE, SKILL.md, audit rounds)",
+      "status": "WARN",
+      "analysis": "BUNDLED_SCOPE_USER_APPROVAL.md exists in two divergent copies (repo root at 27 lines, specs/boss_audits at 51 lines), which violates single truth. The authorization to exceed the SKILL.md 2-round cap is authored by the Worker, not attested by the user. TASK_1792069373_audit_round_9.json is 1 line, which suggests an empty or truncated artifact."
+    },
+    {
+      "component": "CI & Test Evidence",
+      "status": "PASS",
+      "analysis": "CI conclusion is success on 8ee4ea3 across the Linux, Windows lock, and CD jobs. JUnit reports 205 unit/contract and 67 vox tests with 0 failures and 0 skips, and the Windows job passed 87. The VPS suites pass. The golden ffprobe output is valid (H.264 1920x1080@30, AAC 48kHz). Producing no new MP4 is acceptable for a control-plane increment."
+    }
+  ],
+  "observations": [
+    "Production lock provenance is internally inconsistent. KR_2026-10-16.json records reason='no_candidates_passed_viability', but the same-run log states '1 candidates passed viability gate' and 'B2 Circuit Breaker triggered after 1 candidate attempts' while max_b2_attempts=2. The run also emitted two Telegram messages (736, 737). Either this run predates HEAD or the reason and alert dedup logic is wrong. The commit SHA that produced each lock is not recorded in the payload.",
+    "EN_2026-10-15.json carries lock_token='legacy_migrated_token', which indicates manual or scripted mutation of production state with no provenance record.",
+    "There is still no live proof of a successful B1→B3 handoff (orchestrator.run_pipeline --run-id <MKT>_TEMP_* completing against the same episodes root that B1 wrote). The original Retatrutide failure class (B3 module or path resolution) is only proven fixed at the importability level.",
+    "cleanup_corrupt_quarantines also deletes any '*tombstone*' file older than 300s in the target directory. That glob is broad for a shared state directory and should be scoped to known prefixes.",
+    "The Rule 128 classifier keyword lists still embed case-specific proper nouns (e.g. individual perpetrators). This is defensible for safety labeling but should live in a versioned config, not in code.",
+    "The VPS unit selection (153) and the CI unit selection (205) differ. The VPS run should execute the same canonical selector as CI so parity is demonstrable."
+  ],
+  "adherence_matrix": {
+    "iron_laws_compliance": "PARTIAL",
+    "four_pillars_status": "NOT_VERIFIED",
+    "zero_ghost_cleanliness": "VERIFIED"
+  },
+  "audit_file": "C:\\Users\\hunghd2\\Documents\\antigravity\\AI Video Factory\\specs\\boss_audits\\TASK_1792069373_audit_round_10.json"
+}

@@ -63,8 +63,8 @@ def _load() -> List[Dict[str, Any]]:
                 if vid and vid not in seen_vids:
                     seen_vids.add(vid)
                     records.append(r)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as _ld_err:
+            logger.debug("[publish_ledger] Primary ledger load notice: %s", _ld_err)
 
     # 2. Secondary fallback /var/vf/data file if present
     if _VAR_LEDGER_FILE.exists() and _VAR_LEDGER_FILE != _LEDGER_FILE:
@@ -75,8 +75,8 @@ def _load() -> List[Dict[str, Any]]:
                 if vid and vid not in seen_vids:
                     seen_vids.add(vid)
                     records.append(r)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as _vld_err:
+            logger.debug("[publish_ledger] Secondary ledger load notice: %s", _vld_err)
 
     return records
 
@@ -89,8 +89,8 @@ def _save(records: List[Dict[str, Any]]) -> bool:
         if _VAR_LEDGER_FILE.parent.exists():
             try:
                 _VAR_LEDGER_FILE.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as _sv_err:
+                logger.debug("[publish_ledger] Secondary ledger sync notice: %s", _sv_err)
         return True
     except Exception:  # noqa: BLE001
         return False
@@ -118,8 +118,8 @@ def record_upload(video_id: str, title: str = "", episode_dir: str = "",
                     if now_ts - r_ts < 300:  # < 5 min
                         # Already uploaded recently, skip
                         return True  # FAIL-SAFE: pretend success
-                except:
-                    pass
+                except (ValueError, TypeError) as _ts_err:
+                    logger.debug("[publish_ledger] Timestamp parse notice: %s", _ts_err)
     
     status = "public" if privacy_status == "public" else "private"
     for r in records:

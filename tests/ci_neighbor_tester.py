@@ -189,9 +189,22 @@ def test_block1_trend_contract() -> bool:
         from app.services.trend_engine_b1 import VIABILITY_THRESHOLD
         from app.services.hhtech_reasoner import HHTechReasoner
         
-        # 1. Viability Threshold Parity Check
+        # 1. Viability Threshold Parity Check (Constant & AST comparison site)
         assert VIABILITY_THRESHOLD == 8.0, f"VIABILITY_THRESHOLD mismatch: expected 8.0, got {VIABILITY_THRESHOLD}"
-        logger.info(f"  ✅ Rule 134 Parity Check: VIABILITY_THRESHOLD is strictly {VIABILITY_THRESHOLD}.")
+        import ast
+        b1_file = ROOT_DIR / "app" / "services" / "trend_engine_b1.py"
+        b1_tree = ast.parse(b1_file.read_text(encoding="utf-8"))
+        comparison_found = False
+        for node in ast.walk(b1_tree):
+            if isinstance(node, ast.Compare):
+                left = getattr(node.left, "id", None)
+                if left == "score" and len(node.comparators) == 1:
+                    comp = node.comparators[0]
+                    if isinstance(comp, ast.Name) and comp.id == "VIABILITY_THRESHOLD":
+                        comparison_found = True
+                        break
+        assert comparison_found, "Rule 134 AST violation: trend_engine_b1.py does not use VIABILITY_THRESHOLD at comparison site!"
+        logger.info(f"  ✅ Rule 134 Parity Check: VIABILITY_THRESHOLD is strictly {VIABILITY_THRESHOLD} and asserted at AST comparison site.")
 
         # 2. Reasoner 7 Canonical Pillars Parity Check
         reasoner = HHTechReasoner()

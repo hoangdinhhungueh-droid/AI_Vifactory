@@ -6,8 +6,11 @@ Resolves ffmpeg and ffprobe executable paths across Windows and Linux VPS.
 
 from __future__ import annotations
 
+import logging
 import shutil
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def get_ffmpeg_binary() -> str:
@@ -18,8 +21,8 @@ def get_ffmpeg_binary() -> str:
     try:
         import imageio_ffmpeg
         return imageio_ffmpeg.get_ffmpeg_exe()
-    except Exception:
-        pass
+    except Exception as _ff_err:
+        logger.debug("imageio_ffmpeg lookup notice: %s", _ff_err)
     return "ffmpeg"
 
 

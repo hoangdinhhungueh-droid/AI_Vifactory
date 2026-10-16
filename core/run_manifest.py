@@ -105,8 +105,8 @@ class RunManifest(BaseModel):
             try:
                 raw_json = paths.manifest_file.read_text(encoding="utf-8")
                 return cls.model_validate_json(raw_json)
-            except Exception:
-                pass
+            except Exception as _man_err:
+                logger.warning("Failed to load existing manifest at %s, recreating: %s", paths.manifest_file, _man_err)
         m = cls.create_new(run_id=paths.run_id, profile=profile)
         m.save_atomic(paths)
         return m

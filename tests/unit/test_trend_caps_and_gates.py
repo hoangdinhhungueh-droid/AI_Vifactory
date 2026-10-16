@@ -502,5 +502,65 @@ def test_b2_exception_circuit_breaker_stamps_exhausted_today(tmp_path, monkeypat
         assert details.get("reason") == "b2_circuit_breaker_exception"
 
 
+def test_custom_seed_empty_candidates_releases_lock(tmp_path, monkeypatch):
+    """Boss Item 7: Custom seed run with 0 candidates releases IN_PROGRESS lock."""
+    from app.services.daily_market_lock import _get_lock_file_path, is_market_done_today
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    monkeypatch.delenv("B1_FORCE_CRAWL", raising=False)
+
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=[]):
+        produced = discover_and_produce_market_trend(
+            market="EN",
+            custom_seed="nonexistent topic seed",
+            auto_produce=True,
+            state_dir=str(tmp_path),
+        )
+
+        assert len(produced) == 0
+        lock_path = _get_lock_file_path("EN", state_dir=str(tmp_path))
+        assert not lock_path.exists()
+        is_done, reason, _ = is_market_done_today("EN", state_dir=str(tmp_path), check_registry=False, check_episodes=False)
+        assert is_done is False
+        assert reason == "not_produced_yet"
+
+
+def test_custom_seed_failure_releases_lock_in_finally(tmp_path, monkeypatch):
+    """Boss Item 7: Custom seed run that fails during processing releases IN_PROGRESS lock."""
+    from app.services.daily_market_lock import _get_lock_file_path, is_market_done_today
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend
+
+    monkeypatch.delenv("B1_FORCE_CRAWL", raising=False)
+
+    candidates = [
+        {
+            "term": "custom seed test",
+            "approx_traffic": "google_news_live",
+            "source": "google_news_live",
+            "geos_present": ["US"],
+        }
+    ]
+
+    with patch("app.services.trend_engine_b1.fetch_live_trending_terms", return_value=candidates), \
+         patch("app.services.trend_engine_b1.perform_direct_platform_recon", return_value={"rising_queries": [], "viral_videos": [], "news_catalysts": [{"title": "News"}]}), \
+         patch("app.services.trend_engine_b1.fetch_ground_truth_factsheet", return_value={"extract": "Entity factsheet"}), \
+         patch("app.services.trend_engine_b1.assess_keyword_video_viability", return_value={"viability_score": 5.0, "is_video_viable": False, "reasoning": "Low score"}):
+
+        produced = discover_and_produce_market_trend(
+            market="EN",
+            custom_seed="custom seed test",
+            auto_produce=True,
+            state_dir=str(tmp_path),
+        )
+
+        assert len(produced) == 0
+        lock_path = _get_lock_file_path("EN", state_dir=str(tmp_path))
+        assert not lock_path.exists()
+        is_done, reason, _ = is_market_done_today("EN", state_dir=str(tmp_path), check_registry=False, check_episodes=False)
+        assert is_done is False
+        assert reason == "not_produced_yet"
+
+
+
 
 

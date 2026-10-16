@@ -33,7 +33,6 @@ DB_TITLE = "Image Asset Library"
 
 def _token():
     return os.environ.get("NOTION_TOKEN")
-    return None
 
 
 def _request(method, path, token, body=None):

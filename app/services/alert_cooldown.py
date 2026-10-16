@@ -217,10 +217,6 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
                     except OSError as _e:
                         logger.debug("[alert_cooldown] lock fd close notice on write error: %s", _e)
                     fd = None
-                try:
-                    lock_file.unlink(missing_ok=True)
-                except OSError as _e:
-                    logger.debug("[alert_cooldown] lock unlink notice on write error: %s", _e)
                 raise RuntimeError(f"Unexpected error acquiring lock {lock_file}: {os_err}") from os_err
         except Exception as e:
             if fd is not None:
@@ -229,10 +225,6 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
                 except OSError as _e:
                     logger.debug("[alert_cooldown] lock fd close notice: %s", _e)
                 fd = None
-            try:
-                lock_file.unlink(missing_ok=True)
-            except OSError as _e:
-                logger.debug("[alert_cooldown] lock unlink notice: %s", _e)
             raise RuntimeError(f"Unexpected error acquiring lock {lock_file}: {e}") from e
 
     try:
@@ -293,6 +285,11 @@ def _read_cooldown_data(file_path: Path) -> Dict[str, Any]:
 
 def _write_cooldown_data(file_path: Path, data: Dict[str, Any]) -> None:
     """Atomic write via core.atomic_io.atomic_write_json (Rule 125 single truth)."""
+    try:
+        from app.services.daily_market_lock import _get_current_git_sha
+        data["_git_sha"] = _get_current_git_sha()
+    except Exception as _sha_err:
+        logger.debug(f"[alert_cooldown] git sha attach notice: {_sha_err}")
     atomic_write_json(file_path, data)
 
 

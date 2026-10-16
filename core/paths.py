@@ -181,7 +181,7 @@ def resolve_topic_history_path(custom_path: Optional[str] = None) -> Path:
     if env_path:
         return Path(env_path)
     state_dir = os.getenv("VF_STATE_DIR") or os.getenv("AVF_STATE_DIR") or os.getenv("VF_LOCK_DIR")
-    if state_dir and ("test" in state_dir.lower() or "PYTEST_CURRENT_TEST" in os.environ):
+    if state_dir:
         return Path(state_dir) / "topic_history.json"
     return Path(__file__).resolve().parent.parent / "data" / "topic_history.json"
 
@@ -217,22 +217,17 @@ def resolve_episodes_dir(
     env_dir = os.getenv("VF_EPISODES_DIR") or os.getenv("EPISODES_DIR")
     if env_dir:
         p = Path(env_dir)
-        if ensure_dir:
-            p.mkdir(parents=True, exist_ok=True)
-        return p
-
-    if repo_root is not None:
+    elif os.name != "nt" and os.path.isdir("/var/vf/episodes"):
+        # Canonical VPS production location takes precedence on POSIX
+        p = Path("/var/vf/episodes")
+    elif repo_root is not None:
         p = Path(repo_root).resolve() / "episodes"
     else:
-        # Canonical VPS production location
-        if os.name != "nt" and os.path.isdir("/var/vf/episodes"):
-            p = Path("/var/vf/episodes")
+        state_dir = os.getenv("VF_STATE_DIR") or os.getenv("AVF_STATE_DIR")
+        if state_dir and (Path(state_dir) / "episodes").is_dir():
+            p = Path(state_dir) / "episodes"
         else:
-            state_dir = os.getenv("VF_STATE_DIR") or os.getenv("AVF_STATE_DIR")
-            if state_dir and (Path(state_dir) / "episodes").is_dir():
-                p = Path(state_dir) / "episodes"
-            else:
-                p = Path(__file__).resolve().parent.parent / "episodes"
+            p = Path(__file__).resolve().parent.parent / "episodes"
 
     if ensure_dir:
         p.mkdir(parents=True, exist_ok=True)
@@ -240,8 +235,15 @@ def resolve_episodes_dir(
 
 
 def resolve_raw_pool_dir(ensure_dir: bool = True) -> Path:
-    """Canonical path resolver for trend discovery RAW_POOL_DIR (Rule 132)."""
-    env_dir = os.getenv("VF_RAW_POOL_DIR") or os.getenv("RAW_POOL_DIR")
+    """Canonical path resolver for trend discovery RAW_POOL_DIR (Rule 132).
+    Honors VF_RAW_POOL_DIR, RAW_POOL_DIR, TREND_RAW_POOL_DIR, and VF_DB_DIR.
+    """
+    env_dir = (
+        os.getenv("VF_RAW_POOL_DIR")
+        or os.getenv("RAW_POOL_DIR")
+        or os.getenv("TREND_RAW_POOL_DIR")
+        or os.getenv("VF_DB_DIR")
+    )
     if env_dir:
         p = Path(env_dir)
     elif os.name != "nt" and os.path.isdir("/var/vf/db"):

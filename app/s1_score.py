@@ -158,7 +158,7 @@ def _persist(rows):
             return "inserted %d rows" % n
     except Exception as e:
         logger.warning("[S1] scoring_history persist failed: %s", e)
-        return "failed: %s" % e
+        return "failed: database persist error"
 
 
 def run_s1(niches=None, markets=None):

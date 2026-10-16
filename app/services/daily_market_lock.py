@@ -95,16 +95,136 @@ def _emit_operator_corrupt_alert(lock_path: Path, error_msg: str, market: str, d
 
 HARD_MAX_IN_PROGRESS_AGE_SECONDS = 7200  # 2 hours hard cap (Boss Item 6)
 
+_GIT_SHA_CACHE: Optional[str] = None
+
+
+def _get_current_git_sha() -> str:
+    """Returns current git commit SHA for production provenance tracking (Boss Item 15)."""
+    global _GIT_SHA_CACHE
+    if _GIT_SHA_CACHE:
+        return _GIT_SHA_CACHE
+    env_sha = os.getenv("GIT_COMMIT") or os.getenv("GITHUB_SHA") or os.getenv("VF_GIT_SHA")
+    if env_sha:
+        _GIT_SHA_CACHE = env_sha[:12]
+        return _GIT_SHA_CACHE
+    try:
+        import subprocess
+        res = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent.parent.parent), "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=False, timeout=2.0
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            _GIT_SHA_CACHE = res.stdout.strip()[:12]
+            return _GIT_SHA_CACHE
+    except Exception as _git_err:
+        logger.debug("[daily_market_lock] Notice resolving git rev-parse HEAD: %s", _git_err)
+    _GIT_SHA_CACHE = "unknown"
+    return _GIT_SHA_CACHE
+
 
 def _get_process_start_time(pid: Optional[int] = None) -> float:
-    """Returns start time of process for PID identity verification (PID reuse defense)."""
+    """Returns start time of process for PID identity verification (PID reuse defense).
+    Uses /proc/<pid>/stat field 22 (starttime) + /proc/stat btime on Linux (Boss Item 4).
+    """
     effective_pid = pid or os.getpid()
-    if sys.platform != "win32" and os.path.exists(f"/proc/{effective_pid}"):
-        try:
-            return os.stat(f"/proc/{effective_pid}").st_ctime
-        except OSError as _e:
-            logger.debug("[daily_market_lock] proc stat notice for PID %s: %s", effective_pid, _e)
+    if sys.platform != "win32":
+        stat_path = f"/proc/{effective_pid}/stat"
+        if os.path.exists(stat_path):
+            try:
+                with open(stat_path, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                rparen = content.rfind(")")
+                if rparen != -1:
+                    fields = content[rparen + 1:].split()
+                    if len(fields) > 19:
+                        raw_ticks = float(fields[19])
+                        clk_tck = 100.0
+                        try:
+                            clk_tck = float(os.sysconf(os.sysconf_names.get("SC_CLK_TCK", -1)))
+                        except (AttributeError, ValueError, OSError):
+                            clk_tck = 100.0
+                        btime = 0.0
+                        try:
+                            with open("/proc/stat", "r", encoding="utf-8") as sf:
+                                for sline in sf:
+                                    if sline.startswith("btime "):
+                                        btime = float(sline.split()[1])
+                                        break
+                        except Exception as _b_err:
+                            logger.debug("[daily_market_lock] proc stat btime notice: %s", _b_err)
+                        return btime + (raw_ticks / clk_tck)
+            except Exception as _e:
+                logger.debug("[daily_market_lock] proc stat field 22 notice for PID %s: %s", effective_pid, _e)
     return 0.0
+
+
+def _is_lock_stale(
+    data: Dict[str, Any],
+    now_utc: datetime,
+    default_ttl: int,
+    m_up: Optional[str] = None,
+    date_str: Optional[str] = None,
+    state_dir: Optional[str] = None,
+    emit_alert: bool = False,
+) -> Tuple[bool, str]:
+    """Unified staleness predicate used for BOTH candidate pre-check and under-mutex re-check (Boss Item 4).
+    Guarantees consistent decision between pre-mutex and under-mutex re-check.
+
+    Returns:
+        (is_stale, reason_description)
+    """
+    status = (data.get("status") or "").upper()
+    if status in ("EXHAUSTED_OFFHOURS", "OFFHOURS_THROTTLED"):
+        now_v = vn_now(now_utc)
+        if now_v.hour >= MIN_PRODUCTION_HOUR_VN:
+            return True, "expired off-hours"
+        return False, "active off-hours"
+
+    if status == "IN_PROGRESS":
+        c_str = data.get("created_at_utc")
+        if not c_str:
+            return False, "missing created_at_utc"
+        try:
+            c_dt = datetime.fromisoformat(c_str)
+            if c_dt.tzinfo is None:
+                c_dt = c_dt.replace(tzinfo=timezone.utc)
+            age = (now_utc - c_dt).total_seconds()
+            rec_ttl = int(data.get("ttl_seconds", default_ttl))
+
+            # 1. Hard max-age exceeded: unconditionally stale (PID-reuse defense - Boss Item 4 & 6)
+            if age > HARD_MAX_IN_PROGRESS_AGE_SECONDS:
+                logger.warning(
+                    f"[daily_market_lock] IN_PROGRESS lock age={int(age)}s exceeds HARD_MAX {HARD_MAX_IN_PROGRESS_AGE_SECONDS}s. "
+                    f"Forcing stale takeover (PID reuse defense)."
+                )
+                return True, "hard_max_age_exceeded"
+
+            # 2. TTL expiration check with PID aliveness & process start time verification
+            if age > rec_ttl:
+                from app.services.alert_cooldown import is_pid_alive
+                ex_pid = data.get("pid")
+                ex_start = float(data.get("process_start_time", 0.0))
+                curr_start = _get_process_start_time(ex_pid) if ex_pid else 0.0
+
+                is_same_proc = True
+                if ex_start > 0 and curr_start > 0 and abs(curr_start - ex_start) > 2.0:
+                    is_same_proc = False
+
+                if ex_pid and isinstance(ex_pid, int) and is_pid_alive(ex_pid) and is_same_proc:
+                    if emit_alert and m_up and date_str:
+                        logger.warning(
+                            f"[daily_market_lock] IN_PROGRESS lock for {m_up} age={int(age)}s > ttl={rec_ttl}s, "
+                            f"but holder PID {ex_pid} is alive. Refusing stale takeover."
+                        )
+                        _emit_operator_stale_holder_alert(m_up, date_str, ex_pid, int(age), rec_ttl, state_dir=state_dir)
+                    return False, "holder_alive"
+                else:
+                    return True, "ttl_expired_holder_dead"
+        except Exception as _parse_err:
+            logger.debug(f"[daily_market_lock] Staleness check timestamp parse error: {_parse_err}")
+            return False, "parse_error"
+
+    return False, "not_stale"
 
 
 def _emit_operator_stale_holder_alert(market: str, date_str: str, pid: int, age_sec: int, ttl_sec: int, state_dir: Optional[str] = None) -> None:
@@ -325,7 +445,13 @@ def is_market_done_today(
                     continue
 
                 task_id = str(entry.get("task_id") or "")
-                if task_id in ("REJECTED_OR_HANDLED", "HANDLED", "") or "_TEMP_" in task_id:
+                status_val = str(entry.get("status") or "")
+                if (
+                    task_id in ("REJECTED_OR_HANDLED", "HANDLED", "")
+                    or "_TEMP_" in task_id
+                    or "DISPOSED" in status_val
+                    or "DISPOSED" in task_id
+                ):
                     continue
 
                 rec_at = entry.get("recorded_at")
@@ -542,51 +668,12 @@ def acquire_in_progress(
                 _quarantine_and_seal_corrupt_lock(lock_path, str(j_err), m_up, date_str, now)
                 return False
 
-        ex_status = (existing.get("status") or "").upper()
-
-        # Check if existing lock is an expired off-hours lock OR stale IN_PROGRESS lock
-        is_expired_offhours = (
-            ex_status in ("EXHAUSTED_OFFHOURS", "OFFHOURS_THROTTLED")
-            and vn_now(now).hour >= MIN_PRODUCTION_HOUR_VN
+        is_stale, stale_reason = _is_lock_stale(
+            existing, now_utc, ttl_seconds, m_up=m_up, date_str=date_str, state_dir=state_dir, emit_alert=True
         )
-        is_stale_in_progress = False
-        if ex_status == "IN_PROGRESS":
-            c_str = existing.get("created_at_utc")
-            if c_str:
-                c_dt = datetime.fromisoformat(c_str)
-                if c_dt.tzinfo is None:
-                    c_dt = c_dt.replace(tzinfo=timezone.utc)
-                age = (now_utc - c_dt).total_seconds()
-                rec_ttl = int(existing.get("ttl_seconds", ttl_seconds))
-                if age > HARD_MAX_IN_PROGRESS_AGE_SECONDS:
-                    # Hard max-age exceeded: unconditionally stale (PID-reuse defense - Boss Item 6)
-                    is_stale_in_progress = True
-                    logger.warning(
-                        f"[daily_market_lock] IN_PROGRESS lock for {m_up} age={int(age)}s exceeds hard max-age "
-                        f"{HARD_MAX_IN_PROGRESS_AGE_SECONDS}s. Forcing stale takeover (PID reuse defense)."
-                    )
-                elif age > rec_ttl:
-                    from app.services.alert_cooldown import is_pid_alive
-                    ex_pid = existing.get("pid")
-                    ex_start = float(existing.get("process_start_time", 0.0))
-                    curr_start = _get_process_start_time(ex_pid) if ex_pid else 0.0
 
-                    is_same_proc = True
-                    if ex_start > 0 and curr_start > 0 and abs(curr_start - ex_start) > 2.0:
-                        is_same_proc = False
-
-                    if ex_pid and isinstance(ex_pid, int) and is_pid_alive(ex_pid) and is_same_proc:
-                        is_stale_in_progress = False
-                        logger.warning(
-                            f"[daily_market_lock] IN_PROGRESS lock for {m_up} age={int(age)}s > ttl={rec_ttl}s, "
-                            f"but holder PID {ex_pid} is still alive. Refusing stale takeover."
-                        )
-                        _emit_operator_stale_holder_alert(m_up, date_str, ex_pid, int(age), rec_ttl, state_dir=state_dir)
-                    else:
-                        is_stale_in_progress = True
-
-        if is_expired_offhours or is_stale_in_progress:
-            action_desc = "expired off-hours" if is_expired_offhours else "stale IN_PROGRESS"
+        if is_stale:
+            action_desc = stale_reason
             logger.warning(
                 f"[daily_market_lock] Attempting exclusive takeover of {action_desc} lock for {m_up}"
             )
@@ -615,28 +702,12 @@ def acquire_in_progress(
                     logger.warning(f"[daily_market_lock] Error re-reading lock under mutex: {recheck_err}")
                     return False
 
-                curr_status = (current_data.get("status") or "").upper()
-                curr_still_expired = (
-                    curr_status in ("EXHAUSTED_OFFHOURS", "OFFHOURS_THROTTLED")
-                    and vn_now(now).hour >= MIN_PRODUCTION_HOUR_VN
+                curr_still_stale, curr_stale_reason = _is_lock_stale(
+                    current_data, now_utc, ttl_seconds, m_up=m_up, date_str=date_str, state_dir=state_dir, emit_alert=False
                 )
-                curr_still_stale = False
-                if curr_status == "IN_PROGRESS":
-                    curr_c_str = current_data.get("created_at_utc")
-                    if curr_c_str:
-                        curr_c_dt = datetime.fromisoformat(curr_c_str)
-                        if curr_c_dt.tzinfo is None:
-                            curr_c_dt = curr_c_dt.replace(tzinfo=timezone.utc)
-                        curr_age = (now_utc - curr_c_dt).total_seconds()
-                        curr_rec_ttl = int(current_data.get("ttl_seconds", ttl_seconds))
-                        if curr_age > curr_rec_ttl:
-                            from app.services.alert_cooldown import is_pid_alive
-                            curr_pid = current_data.get("pid")
-                            if not (curr_pid and isinstance(curr_pid, int) and is_pid_alive(curr_pid)):
-                                curr_still_stale = True
 
-                if not (curr_still_expired or curr_still_stale):
-                    logger.info(f"[daily_market_lock] Lock {lock_path} no longer stale under mutex, aborting takeover")
+                if not curr_still_stale:
+                    logger.info(f"[daily_market_lock] Lock {lock_path} no longer stale under mutex ({curr_stale_reason}), aborting takeover")
                     return False
 
                 tmp_new = lock_path.with_name(f"{lock_path.name}.tmp_{pid}_{uuid.uuid4().hex}")
@@ -722,17 +793,29 @@ def mark_completed(
 
     pid = owner_pid or os.getpid()
     if lock_path.exists():
-        if lock_token is None and owner_pid is None and not force_unverified:
+        if force_unverified:
+            try:
+                prev_text = lock_path.read_text(encoding="utf-8")
+                logger.warning(
+                    f"[daily_market_lock] Overwriting existing lock with force_unverified=True for {m_up} on {date_str}. "
+                    f"Previous lock content: {prev_text}"
+                )
+            except OSError as _audit_err:
+                logger.debug(f"[daily_market_lock] Notice reading old lock for force audit: {_audit_err}")
+        elif lock_token is None and owner_pid is None:
             logger.error(
                 f"[daily_market_lock] Refusing unverified mark_completed for {m_up}: "
                 f"must provide lock_token, owner_pid, or force_unverified=True to overwrite held lock"
             )
             return False
-        verified, existing = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
-        if not verified:
-            logger.error(f"[daily_market_lock] Refusing mark_completed for {m_up}: caller is not the lock holder")
-            return False
-        token = lock_token or (existing.get("lock_token") if existing else uuid.uuid4().hex)
+        if not force_unverified:
+            verified, existing = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
+            if not verified:
+                logger.error(f"[daily_market_lock] Refusing mark_completed for {m_up}: caller is not the lock holder")
+                return False
+            token = lock_token or (existing.get("lock_token") if existing else uuid.uuid4().hex)
+        else:
+            token = lock_token or uuid.uuid4().hex
     else:
         if lock_token is not None:
             logger.error(
@@ -750,6 +833,7 @@ def mark_completed(
         "pid": pid,
         "lock_token": token,
         "completed_at_utc": vn_now(now).astimezone(timezone.utc).isoformat(),
+        "git_sha": _get_current_git_sha(),
     }
     if extra_metadata:
         payload.update(extra_metadata)
@@ -788,17 +872,29 @@ def mark_exhausted_today(
     pid = owner_pid or os.getpid()
 
     if lock_path.exists():
-        if lock_token is None and owner_pid is None and not force_unverified:
+        if force_unverified:
+            try:
+                prev_text = lock_path.read_text(encoding="utf-8")
+                logger.warning(
+                    f"[daily_market_lock] Overwriting existing lock with force_unverified=True for {m_up} on {date_str}. "
+                    f"Previous lock content: {prev_text}"
+                )
+            except OSError as _audit_err:
+                logger.debug(f"[daily_market_lock] Notice reading old lock for force audit: {_audit_err}")
+        elif lock_token is None and owner_pid is None:
             logger.error(
                 f"[daily_market_lock] Refusing unverified mark_exhausted for {m_up}: "
                 f"must provide lock_token, owner_pid, or force_unverified=True to overwrite held lock"
             )
             return False
-        verified, existing = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
-        if not verified:
-            logger.error(f"[daily_market_lock] Refusing mark_exhausted for {m_up}: caller is not the lock holder")
-            return False
-        token = lock_token or (existing.get("lock_token") if existing else uuid.uuid4().hex)
+        if not force_unverified:
+            verified, existing = _verify_lock_ownership(lock_path, expected_token=lock_token, expected_pid=owner_pid)
+            if not verified:
+                logger.error(f"[daily_market_lock] Refusing mark_exhausted for {m_up}: caller is not the lock holder")
+                return False
+            token = lock_token or (existing.get("lock_token") if existing else uuid.uuid4().hex)
+        else:
+            token = lock_token or uuid.uuid4().hex
     else:
         if lock_token is not None:
             logger.error(
@@ -822,6 +918,7 @@ def mark_exhausted_today(
             "exhausted_at_utc": now_vn.astimezone(timezone.utc).isoformat(),
             "ttl_seconds": offhours_ttl,
             "expires_at_vn": target_6am_vn.isoformat(),
+            "git_sha": _get_current_git_sha(),
         }
         if extra_metadata:
             payload.update(extra_metadata)
@@ -844,6 +941,7 @@ def mark_exhausted_today(
         "pid": pid,
         "lock_token": token,
         "exhausted_at_utc": now_vn.astimezone(timezone.utc).isoformat(),
+        "git_sha": _get_current_git_sha(),
     }
     if extra_metadata:
         payload.update(extra_metadata)

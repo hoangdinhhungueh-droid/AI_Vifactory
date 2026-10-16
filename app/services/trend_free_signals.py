@@ -318,6 +318,9 @@ def gtrends_discover_trending_searches(market="EN", timeout=15.0, geo=None, coun
         all_terms = []
         seen = set()
         
+        consecutive_429 = 0
+        MAX_CONSECUTIVE_429 = 3
+
         for seed in seeds:
             try:
                 # Create pytrends request object
@@ -350,12 +353,27 @@ def gtrends_discover_trending_searches(market="EN", timeout=15.0, geo=None, coun
                             seen.add(query.lower())
                             all_terms.append(query)
                 
+                consecutive_429 = 0
                 # Small sleep between seeds to avoid rate limiting
                 time.sleep(0.5)
                 
             except Exception as e:
-                logger.warning("[free-signals] gtrends_discover seed '%s' failed for %s: %s", 
-                             seed, market, e)
+                err_str = str(e)
+                if "429" in err_str:
+                    consecutive_429 += 1
+                    logger.warning(
+                        "[free-signals] gtrends_discover HTTP 429 rate limit on seed '%s' (%d/%d consecutive)",
+                        seed, consecutive_429, MAX_CONSECUTIVE_429
+                    )
+                    if consecutive_429 >= MAX_CONSECUTIVE_429:
+                        logger.error(
+                            "[free-signals] Aborting remaining gtrends_discover seeds for geo=%s after %d consecutive 429s (degraded-source flag set).",
+                            geo, consecutive_429
+                        )
+                        break
+                    time.sleep(1.5 * consecutive_429)
+                else:
+                    logger.warning("[free-signals] gtrends_discover seed '%s' failed for %s: %s", seed, market, e)
                 continue
         
         _cache_set(key, all_terms)

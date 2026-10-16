@@ -10,8 +10,11 @@ Guarantees:
 from __future__ import annotations
 
 import asyncio
+import logging
 import subprocess
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from vox.schemas import ScenePlan
 
@@ -49,8 +52,8 @@ def synthesize_narration(
         asyncio.run(communicate.save(str(temp_mp3)))
         if temp_mp3.exists() and temp_mp3.stat().st_size > 500:
             synthesized = True
-    except Exception:
-        pass
+    except Exception as _tts_err:
+        logger.warning("Edge-TTS live synthesis notice, falling back: %s", _tts_err)
 
     from vox.ffmpeg_utils import get_ffmpeg_binary
     ffmpeg_bin = get_ffmpeg_binary()

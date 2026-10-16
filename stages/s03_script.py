@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import time
 import json
+import logging
 from pathlib import Path
 from typing import Dict, Any, List
+
+logger = logging.getLogger(__name__)
 
 from core.contracts.stages import StageID, StageArtifact, Provenance, Scene
 from core.config import RunContext
@@ -55,8 +58,8 @@ def run(ctx: RunContext) -> StageArtifact:
                     color_accent=s.get("color_accent"),
                     duration_est_sec=float(s.get("duration_est_sec", 6.0))
                 ))
-        except Exception:
-            pass
+        except Exception as _plan_err:
+            logger.debug("[s03_script] Notice reading existing director plan: %s", _plan_err)
 
     if not existing_scenes:
         # Generate default canonical 5-Beat scenes

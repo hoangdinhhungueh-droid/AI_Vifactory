@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-scripts/forensics/probe_golden_ffprobe.py — Golden MP4 Forensic Inspector
+tools/forensics/probe_golden_ffprobe.py — Golden MP4 Forensic Inspector
 Mandate:
   1. Inspects out/golden/final.mp4 and out/golden_science/final.mp4.
   2. Dumps exact file size, sha256 checksum, and ffprobe stream/format metadata.
-  3. Proves zero-mock compliance (Rule 118 & Rule 121).
+  3. Formats video streams (width, height, fps) and audio streams (sample_rate, channel layout).
+  4. Proves zero-mock compliance (Rule 118 & Rule 121).
 """
 
 import hashlib
@@ -21,7 +22,6 @@ TARGETS = [
 
 def probe_video(video_path: Path) -> dict:
     if not video_path.exists():
-        # Fallback to local repo relative path if running on workstation
         rel_path = Path(__file__).resolve().parent.parent.parent / video_path.relative_to("/root/video_factory")
         if rel_path.exists():
             video_path = rel_path
@@ -81,9 +81,16 @@ def main():
             for idx, s in enumerate(info.get("streams", [])):
                 codec_type = s.get("codec_type")
                 codec_name = s.get("codec_name")
-                w, h = s.get("width"), s.get("height")
-                r_frame_rate = s.get("r_frame_rate")
-                print(f"  Stream #{idx} ({codec_type}): {codec_name} | {w}x{h} @ {r_frame_rate} fps")
+                if codec_type == "video":
+                    w, h = s.get("width"), s.get("height")
+                    r_frame_rate = s.get("r_frame_rate")
+                    print(f"  Stream #{idx} (video): {codec_name} | {w}x{h} @ {r_frame_rate} fps")
+                elif codec_type == "audio":
+                    sr = s.get("sample_rate")
+                    ch = s.get("channel_layout") or f"{s.get('channels')} channels"
+                    print(f"  Stream #{idx} (audio): {codec_name} | {sr} Hz, {ch}")
+                else:
+                    print(f"  Stream #{idx} ({codec_type}): {codec_name}")
         else:
             print(f"  NOT FOUND: {target}")
 
