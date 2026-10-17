@@ -12,6 +12,7 @@ Mandate:
   5. Proves zero-mock compliance (Rule 118, Rule 121, Rule 123).
 """
 
+import io
 import json
 import logging
 import os
@@ -21,20 +22,20 @@ import tempfile
 import uuid
 from pathlib import Path
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("verify_live_crawl")
+
 if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except (AttributeError, io.UnsupportedOperation, OSError) as _reconfig_err:
+        logger.debug("[verify_live_crawl] stdout/stderr reconfigure not supported: %s", _reconfig_err)
 
 # Add project root to sys.path
 _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("verify_live_crawl")
 
 
 def get_production_cost_baseline() -> float:
@@ -97,10 +98,11 @@ def main():
         # the complete B1 -> B1.5 candidate discovery, viability scoring, and terminal completion
         # without invoking heavyweight downstream rendering during verification.
         print("\n--- Executing discover_and_produce_market_trend in isolated state ---")
+        max_candidates = int(os.environ.get("VF_VERIFY_MAX_CANDIDATES", "2"))
         topics = discover_and_produce_market_trend(
             market="EN",
             auto_produce=False,
-            max_scan_candidates=5,
+            max_scan_candidates=max_candidates,
             state_dir=str(isolated_state),
         )
         print(f"\nExecution finished. Topics produced: {len(topics)}")

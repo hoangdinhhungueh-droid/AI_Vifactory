@@ -1763,8 +1763,19 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         f"{out_probe_golden}\n"
     )
 
-    # 15. Post-Deploy Live Terminal Crawl Run Verification (Boss Item 8)
-    code_live_crawl, out_live_crawl = run_on_vps("python3 /root/video_factory/scripts/forensics/verify_live_crawl_terminal.py")
+    # 15. Post-Deploy Live Terminal Crawl Run Verification (Boss Item 8 & Round 19)
+    # Includes transient Cloudflare HTTP 524 retry with exponential backoff per Boss Round 19
+    code_live_crawl, out_live_crawl = 1, "Not run"
+    for _crawl_attempt in range(2):
+        code_live_crawl, out_live_crawl = run_on_vps(
+            "python3 /root/video_factory/scripts/forensics/verify_live_crawl_terminal.py",
+            timeout=240,
+        )
+        if code_live_crawl == 0:
+            break
+        if "524" in out_live_crawl or "timed out" in out_live_crawl.lower() or "connection failed" in out_live_crawl.lower():
+            logger.warning(f"[BOSS] Section 15 hit transient timeout (attempt {_crawl_attempt+1}/2), retrying with backoff...")
+            time.sleep(5 * (_crawl_attempt + 1))
     evidence_blocks.append(
         f"### [15. POST-DEPLOY LIVE TERMINAL CRAWL RUN VERIFICATION (Rule 121, 123 & Boss Item 8)]\n"
         f"Exit Code: {code_live_crawl}\n"
