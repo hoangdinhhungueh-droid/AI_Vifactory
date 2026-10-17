@@ -71,7 +71,7 @@ _logger = _logging.getLogger("app.main")
 _CACHED_GIT_SHA: str | None = None
 
 
-def _read_git_sha_from_disk() -> Optional[str]:
+def _read_git_sha_from_disk() -> str | None:
     """Reads git SHA directly from git refs on disk without spawning subprocess (Boss Round 14 Item 9)."""
     try:
         git_dir = Path(__file__).resolve().parent.parent / ".git"

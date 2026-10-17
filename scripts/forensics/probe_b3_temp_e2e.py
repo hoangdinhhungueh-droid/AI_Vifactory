@@ -19,8 +19,8 @@ from pathlib import Path
 try:
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
-except (AttributeError, io.UnsupportedOperation):
-    pass
+except (AttributeError, io.UnsupportedOperation, OSError) as _e:
+    sys.stderr.write(f"Notice reconfiguring output encoding: {_e}\n")
 
 # Add project root to sys.path
 _ROOT = Path(__file__).resolve().parent.parent.parent
