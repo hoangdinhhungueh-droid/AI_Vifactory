@@ -13,6 +13,7 @@ Proves:
 """
 
 import concurrent.futures
+import io
 import json
 import multiprocessing as mp
 import os
@@ -25,13 +26,13 @@ from unittest.mock import patch
 if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except (AttributeError, io.UnsupportedOperation, OSError) as _rec_err:
+        sys.stderr.write(f"Notice reconfiguring stdout: {_rec_err}\n")
 if hasattr(sys.stderr, "reconfigure"):
     try:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except (AttributeError, io.UnsupportedOperation, OSError) as _rec_err:
+        sys.stderr.write(f"Notice reconfiguring stderr: {_rec_err}\n")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:

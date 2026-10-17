@@ -83,3 +83,27 @@ def test_ipv4_urlopen_uses_custom_opener(mock_build_opener):
     args, _ = mock_build_opener.call_args
     assert any(isinstance(h, IPv4HTTPSHandler) for h in args)
     assert socket.getaddrinfo is original_getaddrinfo
+
+
+def test_vf_force_ipv4_toggle_behavior(monkeypatch):
+    """Test VF_FORCE_IPV4 env toggle defaulting to False (dual-stack) and forcing IPv4 when True (Boss Round 14 Item 7)."""
+    from core.net_utils import should_force_ipv4
+
+    # Default: False (dual-stack)
+    monkeypatch.delenv("VF_FORCE_IPV4", raising=False)
+    assert should_force_ipv4() is False
+    c_default = get_ipv4_client(timeout=5.0)
+    assert c_default._transport is not None
+    c_default.close()
+
+    # Explicitly enabled: True (force IPv4)
+    monkeypatch.setenv("VF_FORCE_IPV4", "1")
+    assert should_force_ipv4() is True
+    c_forced = get_ipv4_client(timeout=5.0)
+    assert c_forced._transport is not None
+    c_forced.close()
+
+    # Explicit parameter override
+    c_param_false = get_ipv4_client(timeout=5.0, force_ipv4=False)
+    assert c_param_false is not None
+    c_param_false.close()

@@ -30,8 +30,8 @@ if not DEFAULT_TOKEN:
         _m = re.search(r"https://[^:]+:([^@]+)@github\.com", _remote_res.stdout.strip())
         if _m:
             DEFAULT_TOKEN = _m.group(1)
-    except Exception:
-        pass
+    except (OSError, subprocess.SubprocessError) as _git_err:
+        sys.stderr.write(f"Notice reading git token: {_git_err}\n")
 
 
 class NoAuthRedirect(urllib.request.HTTPRedirectHandler):

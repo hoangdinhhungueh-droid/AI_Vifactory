@@ -37,7 +37,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-MAX_SUPERVISOR_INPUT_TOKENS = 180000
+MAX_SUPERVISOR_INPUT_TOKENS = 80000
 MAX_SUPERVISOR_OUTPUT_TOKENS = 5000
 DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
 
@@ -223,7 +223,7 @@ def build_anti_bloat_digest(
         logger.info(f"Digest tokens ({tok_count}) exceeds cap ({MAX_SUPERVISOR_INPUT_TOKENS}). Compacting diff...")
         # Emergency shrink of compact_diff while preserving cross-directory hunks
         diff_lines = digest["compact_diff"].splitlines()
-        digest["compact_diff"] = "\n".join(diff_lines[:4000]) + "\n... [Anti-Bloat Truncation Active at 180,000 tokens limit]"
+        digest["compact_diff"] = "\n".join(diff_lines[:1200]) + "\n... [Anti-Bloat Truncation Active at 80,000 tokens limit]"
 
     digest["estimated_tokens"] = estimate_tokens(json.dumps(digest, ensure_ascii=False))
     return digest
@@ -295,24 +295,33 @@ Return ONLY the specified JSON."""
             timeout=180.0,
         )
 
-        # Parse JSON from response
-        clean_json = raw_response.strip()
-        if clean_json.startswith("```json"):
-            clean_json = clean_json[7:]
-        if clean_json.startswith("```"):
-            clean_json = clean_json[3:]
-        if clean_json.endswith("```"):
-            clean_json = clean_json[:-3]
-        clean_json = clean_json.strip()
+        # Persist raw response for audit traceability
+        try:
+            raw_log_path = ROOT_DIR / "specs" / "boss_audits" / f"{digest.get('task_id', 'TASK')}_last_raw_supervisor_response.txt"
+            raw_log_path.parent.mkdir(parents=True, exist_ok=True)
+            raw_log_path.write_text(raw_response or "", encoding="utf-8")
+        except Exception as _persist_err:
+            logger.debug(f"Raw response persist notice: {_persist_err}")
+
+        # Parse JSON from response by finding outer object boundaries
+        clean_json = (raw_response or "").strip()
+        start_idx = clean_json.find("{")
+        end_idx = clean_json.rfind("}")
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            clean_json = clean_json[start_idx:end_idx + 1]
 
         try:
             parsed = json.loads(clean_json)
-        except Exception:
-            m = re.search(r"(\{[\s\S]*\})", raw_response)
+        except Exception as _json_parse_err:
+            m = re.search(r"(\{[\s\S]*\})", raw_response or "")
             if m:
-                parsed = json.loads(m.group(1))
+                try:
+                    parsed = json.loads(m.group(1))
+                except Exception:
+                    raise _json_parse_err
             else:
-                raise
+                raise _json_parse_err
+
         parsed["tokens_consumed"] = digest.get("estimated_tokens", 0)
         parsed["supervisor_model"] = model
         return parsed

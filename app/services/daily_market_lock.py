@@ -123,8 +123,8 @@ def _market_lock_mutex(lock_path: Path, timeout_sec: float = 10.0):
                 m_age = time.time() - mutex_path.stat().st_mtime
                 if m_age > timeout_sec:
                     mutex_path.unlink(missing_ok=True)
-            except OSError:
-                pass
+            except OSError as _stale_err:
+                logger.debug(f"[daily_market_lock] Stale mutex inspection suppressed: {_stale_err}")
             if time.time() - start_t > timeout_sec:
                 logger.warning(f"[daily_market_lock] Timed out waiting for mutex on {lock_path} after {timeout_sec}s")
                 raise TimeoutError(f"Timed out acquiring mutex for {lock_path}")
@@ -138,8 +138,8 @@ def _market_lock_mutex(lock_path: Path, timeout_sec: float = 10.0):
         if fd is not None:
             try:
                 os.close(fd)
-            except OSError:
-                pass
+            except OSError as _close_err:
+                logger.debug(f"[daily_market_lock] Mutex fd close notice: {_close_err}")
         mutex_path.unlink(missing_ok=True)
 
 
@@ -259,17 +259,35 @@ def _is_lock_stale(
     return False, "not_stale"
 
 
+def _resolve_process_name(pid: int) -> str:
+    """Resolves process name/cmdline for a given PID for operator triage (Boss Round 14 Item 10)."""
+    try:
+        if sys.platform != "win32":
+            cmdline_path = Path(f"/proc/{pid}/cmdline")
+            if cmdline_path.exists():
+                cmd = cmdline_path.read_bytes().replace(b"\x00", b" ").decode("utf-8", errors="replace").strip()
+                if cmd:
+                    return cmd[:80]
+        import psutil
+        p = psutil.Process(pid)
+        return " ".join(p.cmdline())[:80] or p.name()
+    except Exception as _p_err:
+        logger.debug(f"[daily_market_lock] Notice resolving process name for PID {pid}: {_p_err}")
+        return "python"
+
+
 def _emit_operator_stale_holder_alert(market: str, date_str: str, pid: int, age_sec: int, ttl_sec: int, state_dir: Optional[str] = None) -> None:
-    """Emits operator alert when acquire_in_progress is refused for a stale-but-'alive' holder (Boss Item 6)."""
+    """Emits operator alert when acquire_in_progress is refused for a stale-but-'alive' holder (Boss Item 6 & 10)."""
     if market.upper().startswith("TEST_") or os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("VF_TEST_MODE") == "1":
         logger.info(f"[{market}] Suppressed live stale holder alert in test environment.")
         return
+    proc_name = _resolve_process_name(pid)
     alert_text = (
         f"⚠️ <b>[STALE LOCK HOLDER ALERT - RULE 118]</b>\n"
         f"Market: <b>{market}</b> | VN Date: <b>{date_str}</b>\n"
-        f"Khóa IN_PROGRESS giữ bởi PID <code>{pid}</code> đã vượt TTL ({age_sec}s > {ttl_sec}s).\n"
+        f"Khóa IN_PROGRESS giữ bởi PID <code>{pid}</code> ({proc_name}) đã vượt TTL ({age_sec}s > {ttl_sec}s).\n"
         f"Tiến trình giữ khóa vẫn đang chạy (alive); hệ thống từ chối cướp khóa tự động để bảo toàn khế ước.\n"
-        f"🔧 <b>Khắc phục:</b> Kiểm tra tiến trình PID {pid} hoặc giải phóng khóa bằng cờ <code>--force</code>."
+        f"🔧 <b>Khắc phục:</b> Kiểm tra tiến trình PID {pid} ({proc_name}) hoặc giải phóng khóa bằng cờ <code>--force</code>."
     )
     logger.warning(alert_text)
     try:
@@ -277,9 +295,17 @@ def _emit_operator_stale_holder_alert(market: str, date_str: str, pid: int, age_
         from app.services.telegram_buttons import send_telegram_broadcast
         decision = should_send_alert("stale_lock_holder", market, state_dir=state_dir)
         if decision.can_send:
-            send_telegram_broadcast(alert_text + decision.suffix)
+            sent = send_telegram_broadcast(alert_text + decision.suffix)
+            if not sent:
+                logger.warning(
+                    f"[daily_market_lock] Telegram broadcast returned falsy for stale holder alert PID {pid} on {market}. "
+                    f"FALLBACK ALERT LOGGED: {alert_text}"
+                )
     except Exception as e:
-        logger.debug(f"[daily_market_lock] Error broadcasting stale holder alert: {e}")
+        logger.warning(
+            f"[daily_market_lock] Failed to broadcast stale holder alert to Telegram: {e}. "
+            f"FALLBACK ALERT LOGGED: {alert_text}"
+        )
 
 
 def _quarantine_and_seal_corrupt_lock(

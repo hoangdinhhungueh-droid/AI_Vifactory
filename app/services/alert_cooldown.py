@@ -422,3 +422,43 @@ def rollback_alert_reservation(
             key, entry["suppressed_since_last"]
         )
         return True
+
+
+def emit_critical_infrastructure_alert(
+    alert_type: str,
+    market: str,
+    alert_message: str,
+    state_dir: Optional[str] = None,
+    window_seconds: int = 3600,
+) -> bool:
+    """Emits critical infrastructure alert with warning-level logging and fallback channel (Boss Round 14 Item 4).
+    Guarantees operator visibility: if Telegram broadcast fails or is unconfigured, logs to warning/critical fallback channel.
+    """
+    decision = should_send_alert(alert_type, market, state_dir=state_dir, window_seconds=window_seconds)
+    if not decision.can_send:
+        logger.info(f"[alert_cooldown] Suppressed repeat {alert_type} on {market} ({decision.suppressed} suppressed).")
+        return False
+
+    full_message = f"{alert_message}{decision.suffix}" if decision.suffix else alert_message
+    sent = False
+    try:
+        from app.services.telegram_buttons import send_telegram_broadcast
+        sent = bool(send_telegram_broadcast(full_message))
+    except Exception as _e:
+        logger.warning(f"[alert_cooldown] Primary Telegram broadcast failed for {alert_type} on {market}: {_e}")
+
+    if not sent:
+        logger.critical(
+            f"[INFRASTRUCTURE ALERT FALLBACK] Alert '{alert_type}' on market '{market}' failed primary dispatch. "
+            f"FALLBACK BROADCAST: {full_message}"
+        )
+        rollback_alert_reservation(
+            alert_type,
+            market,
+            previous_suppressed=decision.suppressed,
+            previous_last_sent=decision.previous_last_sent,
+            state_dir=state_dir,
+        )
+        return False
+
+    return True

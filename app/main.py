@@ -71,19 +71,40 @@ _logger = _logging.getLogger("app.main")
 _CACHED_GIT_SHA: str | None = None
 
 
-def _resolve_git_sha() -> str:
-    """Resolves git commit SHA dynamically from env or disk git rev-parse HEAD.
-    Cached once per process to prevent unbounded subprocess overhead (Rule 126/138).
-    """
-    global _CACHED_GIT_SHA
-    if _CACHED_GIT_SHA is not None:
-        return _CACHED_GIT_SHA
+def _read_git_sha_from_disk() -> Optional[str]:
+    """Reads git SHA directly from git refs on disk without spawning subprocess (Boss Round 14 Item 9)."""
+    try:
+        git_dir = Path(__file__).resolve().parent.parent / ".git"
+        head_file = git_dir / "HEAD"
+        if head_file.exists():
+            ref = head_file.read_text(encoding="utf-8").strip()
+            if ref.startswith("ref: "):
+                ref_path = git_dir / ref[5:].strip()
+                if ref_path.exists():
+                    return ref_path.read_text(encoding="utf-8").strip()
+                packed = git_dir / "packed-refs"
+                if packed.exists():
+                    target_ref = ref[5:].strip()
+                    for line in packed.read_text(encoding="utf-8").splitlines():
+                        if line.startswith("#") or not line.strip():
+                            continue
+                        parts = line.split()
+                        if len(parts) >= 2 and parts[1] == target_ref:
+                            return parts[0]
+            elif len(ref) >= 40:
+                return ref
+    except Exception as _e:
+        _logger.debug("Notice reading git sha from disk: %s", _e)
+    return None
 
+
+def _init_module_git_sha() -> str:
     env_sha = os.getenv("GIT_COMMIT_SHA", "").strip()
     if env_sha:
-        _CACHED_GIT_SHA = env_sha
-        return _CACHED_GIT_SHA
-
+        return env_sha
+    disk_sha = _read_git_sha_from_disk()
+    if disk_sha:
+        return disk_sha
     try:
         import subprocess
         sha = subprocess.check_output(
@@ -93,12 +114,17 @@ def _resolve_git_sha() -> str:
             shell=False,
         ).decode().strip()
         if sha:
-            _CACHED_GIT_SHA = sha
-            return _CACHED_GIT_SHA
+            return sha
     except Exception as exc:
-        _logger.warning("Failed to resolve git_sha via git rev-parse: %s", exc)
+        _logger.debug("Notice resolving git_sha via git rev-parse: %s", exc)
+    return "unknown"
 
-    _CACHED_GIT_SHA = "unknown"
+
+_CACHED_GIT_SHA: str = _init_module_git_sha()
+
+
+def _resolve_git_sha() -> str:
+    """Returns module-level cached git commit SHA without runtime subprocess overhead (Boss Round 14 Item 9)."""
     return _CACHED_GIT_SHA
 
 

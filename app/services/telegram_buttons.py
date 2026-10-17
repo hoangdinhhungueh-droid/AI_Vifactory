@@ -45,8 +45,8 @@ def _load_env_secrets():
                             elif k in ("VF_TG_CHAT_ID", "TELEGRAM_CHAT_ID", "TELEGRAM_ENABLED") and v:
                                 if k not in os.environ or not os.environ[k]:
                                     os.environ[k] = v
-    except Exception:
-        pass
+    except (OSError, ValueError) as _env_err:
+        logger.debug(f"[telegram_buttons] Notice loading env secrets: {_env_err}")
 
 def _token() -> str:
     _load_env_secrets()
@@ -485,8 +485,8 @@ def trigger_human_gate_2(episode_id: str) -> Optional[int]:
         try:
             dp_data = json.loads(dp_file.read_text(encoding="utf-8"))
             n_scenes = len(dp_data.get("scenes", []))
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError) as _dp_err:
+            logger.debug(f"[telegram_buttons] Notice reading dp_file: {_dp_err}")
 
     # 3. Extract prompts counts
     pforge_file = ep_dir / "prompts_forge.json"
@@ -499,8 +499,8 @@ def trigger_human_gate_2(episode_id: str) -> Optional[int]:
             n_bg = len(p_data.get("backgrounds", {}))
             n_fg = len(p_data.get("foregrounds", {}))
             n_thumb = len(p_data.get("thumbnails", {}))
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError) as _pf_err:
+            logger.debug(f"[telegram_buttons] Notice reading pforge_file: {_pf_err}")
 
     # 4. Extract Titles from seo_package
     title_a, title_b = "", ""
@@ -510,8 +510,8 @@ def trigger_human_gate_2(episode_id: str) -> Optional[int]:
             s_data = json.loads(seo_file.read_text(encoding="utf-8"))
             title_a = s_data.get("title_a", "")
             title_b = s_data.get("title_b", "")
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError) as _seo_err:
+            logger.debug(f"[telegram_buttons] Notice reading seo_file: {_seo_err}")
 
     # 5. Extract topic, archetype, story_score
     topic = dp_data.get("topic") or episode_id
@@ -525,8 +525,8 @@ def trigger_human_gate_2(episode_id: str) -> Optional[int]:
             b2_val = b_data.get("story_gate_score")
             if b2_val:
                 b2_score = str(b2_val)
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError) as _b2_err:
+            logger.debug(f"[telegram_buttons] Notice reading brain_file: {_b2_err}")
 
     # 5. Extract B3.5.1 score and verify convergence (Rule 121 & Rule 125)
     b35_score = None

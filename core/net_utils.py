@@ -11,15 +11,23 @@ Provides:
 """
 from __future__ import annotations
 
+import os
 import contextlib
 import http.client
 import logging
 import urllib.request
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 import httpx
 
 logger = logging.getLogger(__name__)
+
+
+def should_force_ipv4() -> bool:
+    """Returns True only when explicitly forced via VF_FORCE_IPV4 env toggle (Boss Round 14 Item 7).
+    Defaults to False to support modern dual-stack and IPv6-only environments.
+    """
+    return os.getenv("VF_FORCE_IPV4", "0").strip().lower() in ("1", "true", "yes", "on")
 
 
 class IPv4HTTPSConnection(http.client.HTTPSConnection):
@@ -49,14 +57,22 @@ class IPv4HTTPHandler(urllib.request.HTTPHandler):
 
 
 def get_ipv4_transport(**kwargs: Any) -> httpx.HTTPTransport:
-    """Return an httpx.HTTPTransport enforcing IPv4 through local address binding."""
-    return httpx.HTTPTransport(local_address="0.0.0.0", **kwargs)
+    """Return an httpx.HTTPTransport. If VF_FORCE_IPV4=1, binds local_address to '0.0.0.0'."""
+    if should_force_ipv4():
+        return httpx.HTTPTransport(local_address="0.0.0.0", **kwargs)
+    return httpx.HTTPTransport(**kwargs)
 
 
-def get_ipv4_client(timeout: float = 15.0, **kwargs: Any) -> httpx.Client:
-    """Return an httpx.Client configured with thread-safe IPv4 transport."""
-    transport = get_ipv4_transport()
-    return httpx.Client(transport=transport, timeout=timeout, **kwargs)
+def get_ipv4_client(timeout: float = 15.0, force_ipv4: Optional[bool] = None, **kwargs: Any) -> httpx.Client:
+    """Return an httpx.Client configured with transport.
+    If force_ipv4 is explicitly True or VF_FORCE_IPV4=1, forces IPv4 binding (Boss Round 14 Item 7);
+    otherwise defaults to standard dual-stack transport to prevent breaking IPv6-only environments.
+    """
+    is_forced = should_force_ipv4() if force_ipv4 is None else force_ipv4
+    if is_forced:
+        transport = httpx.HTTPTransport(local_address="0.0.0.0")
+        return httpx.Client(transport=transport, timeout=timeout, **kwargs)
+    return httpx.Client(timeout=timeout, **kwargs)
 
 
 def get_ipv4_urllib_opener() -> urllib.request.OpenerDirector:

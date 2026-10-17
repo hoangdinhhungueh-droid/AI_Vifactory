@@ -1782,23 +1782,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
     )
 
     # 25. Live AST Ratchet Monotonic Boundary Check on VPS (Rule 125, 139 & Boss Round 13 Item 3, 12)
-    code_ratchet_check, out_ratchet_check = run_on_vps(
-        "python3 -c \""
-        "import json, sys\n"
-        "with open('/root/video_factory/config/ast_ratchet_baseline.json', encoding='utf-8') as f:\n"
-        "    data = json.load(f)\n"
-        "entries = data.get('entries', [])\n"
-        "count = len(entries)\n"
-        "max_allowed = data.get('max_legacy_defects', 221)\n"
-        "print(f'AST Ratchet Baseline: entries={count}, max_allowed={max_allowed}')\n"
-        "assert count <= max_allowed, f'Ratchet violation: entries ({count}) exceeds max_legacy_defects ({max_allowed})'\n"
-        "assert count <= 227, f'Ratchet violation: count ({count}) exceeds strict ceiling 227'\n"
-        "print('AST Ratchet Monotonic Boundary Check: PASS (Exit Code: 0)')\n"
-        "print('Sample AST Baseline Entries:')\n"
-        "for e in entries[:4]:\n"
-        "    print(f'  - File: {e.get(\"file\")}, Line: {e.get(\"line\")}, Rule: {e.get(\"rule\")}')\n"
-        "\""
-    )
+    code_ratchet_check, out_ratchet_check = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_ast_ratchet_gate.py")
     evidence_blocks.append(
         f"### [25. LIVE AST RATCHET MONOTONIC BOUNDARY CHECK ON VPS (Rule 125, 139 & Boss Round 13 Item 3, 12)]\n"
         f"Exit Code: {code_ratchet_check}\n"
