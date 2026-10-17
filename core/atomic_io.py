@@ -38,23 +38,15 @@ def atomic_write_json(file_path: Path, data: Any, indent: int = 2) -> None:
             except OSError as fsync_err:
                 logger.debug(f"[atomic_io] Notice fsync on {tmp_path}: {fsync_err}")
 
-        # Atomic replace with Windows anti-virus/sharing-violation retry loop
-        for attempt in range(10):
+        # Atomic replace with Windows anti-virus/sharing-violation retry loop (Boss Round 15 Item 9)
+        for attempt in range(25):
             try:
                 os.replace(str(tmp_path), str(file_path))
                 break
-            except PermissionError:
-                if attempt == 9:
+            except (PermissionError, OSError) as os_err:
+                if attempt == 24:
                     raise
-                time.sleep(0.05)
-            except OSError as os_err:
-                # Windows sharing violation (ERROR_SHARING_VIOLATION=32, ERROR_LOCK_VIOLATION=33)
-                if sys.platform == "win32" and getattr(os_err, "winerror", None) in (32, 33):
-                    if attempt == 9:
-                        raise
-                    time.sleep(0.05)
-                else:
-                    raise
+                time.sleep(0.02 + 0.01 * attempt)
 
         # fsync parent directory after os.replace on POSIX systems where supported to ensure directory entry durability (Rule 126 & Boss Item 11)
         if hasattr(os, "O_DIRECTORY") and sys.platform != "win32":

@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -25,6 +26,7 @@ from core.paths import resolve_state_dir
 
 logger = logging.getLogger(__name__)
 
+_intraprocess_lock = threading.Lock()
 DEFAULT_COOLDOWN_WINDOW_SECONDS = 14400  # 4 hours
 
 
@@ -333,7 +335,7 @@ def should_send_alert(
     cooldown_file = _resolve_cooldown_file(state_dir)
     now_utc = now.astimezone(timezone.utc) if now else datetime.now(timezone.utc)
 
-    with _interprocess_lock(cooldown_file):
+    with _intraprocess_lock, _interprocess_lock(cooldown_file):
         try:
             data = _read_cooldown_data(cooldown_file)
         except CooldownReadError as cre:
@@ -414,7 +416,7 @@ def rollback_alert_reservation(
     key = f"{a_clean}::{m_clean}"
     cooldown_file = _resolve_cooldown_file(state_dir)
 
-    with _interprocess_lock(cooldown_file):
+    with _intraprocess_lock, _interprocess_lock(cooldown_file):
         try:
             data = _read_cooldown_data(cooldown_file)
         except CooldownReadError as cre:

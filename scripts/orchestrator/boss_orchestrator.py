@@ -1863,7 +1863,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py tests/test_paths.py "
         "tests/test_config.py tests/test_gates_manifest.py"
     )
-    summary_lines = [l.strip() for l in out_unit_all.splitlines() if any(k in l for k in ["passed in", "failed in", "short test summary info", "ERRORS", "FAILURES"])]
+    summary_lines = [line.strip() for line in out_unit_all.splitlines() if any(k in line for k in ["passed in", "failed in", "short test summary info", "ERRORS", "FAILURES"])]
     pytest_summary_line = summary_lines[-1] if summary_lines else "Pytest execution completed with exit code 0"
 
     unit_lines = out_unit_all.splitlines()

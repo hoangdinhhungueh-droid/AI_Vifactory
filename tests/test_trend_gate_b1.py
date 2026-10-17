@@ -7,7 +7,7 @@ Tests for B1 Trend Gate (Commit 1)
 import pytest
 import json
 import os
-from app.services.trend_gate_ai import sanitize_episode_slug, get_next_episode_id
+from app.services.episode_numbering import get_next_episode_id, sanitize_episode_slug
 
 
 class TestTrendGateB1:
