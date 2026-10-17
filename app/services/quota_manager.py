@@ -93,7 +93,7 @@ def is_quota_available(state):
     try:
         reset_at = datetime.fromisoformat(reset_at_str.replace("Z", "+00:00"))
         return datetime.now(timezone.utc) >= reset_at
-    except:
+    except (ValueError, TypeError, OSError):
         return True
 
 def get_retry_wait_seconds(state):
@@ -111,7 +111,7 @@ def get_retry_wait_seconds(state):
         if now >= reset_at:
             return 0
         return max(0, int((reset_at - now).total_seconds()))
-    except:
+    except (ValueError, TypeError, OSError):
         return 0
 
 def mark_resumed(state):

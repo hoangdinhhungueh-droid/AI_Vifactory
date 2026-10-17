@@ -67,29 +67,31 @@ def run(ctx: RunContext) -> StageArtifact:
                 shutil.copy2(str(found), str(target_video))
             else:
                 # If dry_run or fallback: generate a valid minimal mp4 clip via ffmpeg if available
+                from vox.ffmpeg_utils import get_ffmpeg_binary
+                ffmpeg_bin = get_ffmpeg_binary()
                 seed_img = ctx.paths.seed_image_path(sc_id)
                 dur = ctx.config.video_generation.duration_per_clip_sec
                 if seed_img.exists():
                     try:
                         cmd = [
-                            "ffmpeg", "-y", "-loop", "1", "-i", str(seed_img),
+                            ffmpeg_bin, "-y", "-loop", "1", "-i", str(seed_img),
                             "-c:v", "libx264", "-t", str(dur), "-pix_fmt", "yuv420p",
                             "-vf", "scale=1920:1080", str(target_video)
                         ]
                         subprocess.run(cmd, capture_output=True, check=True)
-                    except Exception:
+                    except Exception as _ff_err:
                         # Fallback raw byte stub if ffmpeg not installed
                         target_video.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
                 else:
                     try:
                         cmd = [
-                            "ffmpeg", "-y", "-f", "lavfi",
+                            ffmpeg_bin, "-y", "-f", "lavfi",
                             "-i", f"testsrc=duration={dur}:size=1920x1080:rate=25",
                             "-c:v", "libx264", "-pix_fmt", "yuv420p",
                             str(target_video)
                         ]
                         subprocess.run(cmd, capture_output=True, check=True)
-                    except Exception:
+                    except Exception as _ff_err:
                         target_video.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
 
         sz = target_video.stat().st_size if target_video.exists() else 0

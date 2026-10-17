@@ -46,14 +46,33 @@ def assemble_final_video(
         "-c", "copy",
         str(temp_concat_video)
     ]
-    subprocess.run(cmd_concat, capture_output=True, check=True)
+    try:
+        subprocess.run(cmd_concat, capture_output=True, check=True)
+    except subprocess.CalledProcessError as _c_err:
+        err_msg = _c_err.stderr.decode("utf-8", errors="replace") if _c_err.stderr else str(_c_err)
+        raise RuntimeError(f"assemble_final_video concat failed: {err_msg}") from _c_err
 
     # 2. Multiplex audio and burn ASS subtitles with two-pass loudnorm (EBU R128 / AES TD1004: I=-16.0, TP=-2.0 to absorb AAC overshoot)
     # Measure exact audio duration to avoid premature truncation
     import json
     import wave
-    with wave.open(str(audio_wav), "rb") as wf:
-        audio_dur = wf.getnframes() / float(wf.getframerate())
+    audio_dur = 0.0
+    try:
+        with wave.open(str(audio_wav), "rb") as wf:
+            audio_dur = wf.getnframes() / float(wf.getframerate())
+    except Exception:
+        # Fallback to ffmpeg -i duration parsing (works everywhere without requiring ffprobe)
+        try:
+            import re
+            cmd_probe = [ffmpeg_bin, "-i", str(audio_wav)]
+            p_res = subprocess.run(cmd_probe, capture_output=True, text=True)
+            m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", p_res.stderr or "")
+            if m:
+                audio_dur = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
+            else:
+                audio_dur = 0.0
+        except Exception:
+            audio_dur = 0.0
 
     # Pass 1: Measure audio loudness statistics
     pass1_cmd = [

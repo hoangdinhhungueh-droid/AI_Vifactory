@@ -101,9 +101,11 @@ def run(ctx: RunContext) -> StageArtifact:
 
             if not tts_success:
                 # Fallback to ffmpeg audio tone (clean valid MP3 stream)
+                from vox.ffmpeg_utils import get_ffmpeg_binary
+                ffmpeg_bin = get_ffmpeg_binary()
                 try:
                     subprocess.run(
-                        ["ffmpeg", "-y", "-f", "lavfi", "-i", f"sine=frequency=440:duration={max(curr_time, 5.0)}",
+                        [ffmpeg_bin, "-y", "-f", "lavfi", "-i", f"sine=frequency=440:duration={max(curr_time, 5.0)}",
                          "-c:a", "libmp3lame", "-b:a", "128k", str(audio_file)],
                         capture_output=True, check=True
                     )
@@ -114,12 +116,58 @@ def run(ctx: RunContext) -> StageArtifact:
 
     subtitles_file.write_text(json.dumps(subtitles, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    # Generate broadcast-compliant ASS subtitle file for S10 Assembly & libass burning
+    ass_file = ctx.paths.audio_dir / "subtitles.ass"
+    ass_lines = [
+        "[Script Info]",
+        "Title: Vox Tactile Subtitles",
+        "ScriptType: v4.00+",
+        "WrapStyle: 0",
+        "ScaledBorderAndShadow: yes",
+        "YCbCr Matrix: TV.709",
+        "PlayResX: 1920",
+        "PlayResY: 1080",
+        "",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+        "Style: Default,Arial,64,&H00FFFFFF,&H0000FFFF,&H00141414,&H80000000,-1,0,0,0,100,100,0,0,1,4,2,2,80,80,90,1",
+        "",
+        "[Events]",
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
+    ]
+    words_per_event = 6
+    for i in range(0, max(1, len(subtitles)), words_per_event):
+        chunk = subtitles[i:i + words_per_event]
+        if not chunk:
+            break
+        s_start = chunk[0].get("start", 0.0)
+        s_end = chunk[-1].get("end", s_start + 1.0)
+        chunk_text = " ".join(w.get("word", "") for w in chunk)
+
+        def _to_ass_time(sec: float) -> str:
+            sec = max(0.0, float(sec))
+            h = int(sec // 3600)
+            m = int((sec % 3600) // 60)
+            s = int(sec % 60)
+            cs = int(round((sec - int(sec)) * 100))
+            if cs >= 100:
+                cs = 0
+                s += 1
+            return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+        ass_lines.append(f"Dialogue: 0,{_to_ass_time(s_start)},{_to_ass_time(s_end)},Default,,0,0,0,,{chunk_text}")
+
+    if not subtitles:
+        ass_lines.append("Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,AI Video Factory")
+    ass_file.write_text("\n".join(ass_lines), encoding="utf-8")
+
     payload = {
         "task_id": ctx.run_id,
         "audio_file": str(audio_file),
         "total_words": len(subtitles),
         "total_duration_sec": curr_time,
-        "subtitles_file": str(subtitles_file),
+        "subtitles_file": str(ass_file),
+        "word_timestamps_file": str(subtitles_file),
         "subtitles": subtitles
     }
 
