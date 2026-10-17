@@ -90,6 +90,9 @@
      1. CLI Flag: `python3 scripts/run_trend_pipeline.py --market <MKT> --force`
      2. Environment Variable: `B1_FORCE_CRAWL=1 python3 scripts/run_trend_pipeline.py --market <MKT>`
    - Both mechanisms atomically bypass existing daily lock files, safely clear stale states, and initiate a fresh live trend candidate evaluation loop while preserving audit logging.
+   - *5.1 Partial Scan Behavior (< MAX_SCAN_CANDIDATES) vs Full Scan Quota Exhaustion (Boss Round 11 Item 16 & Round 18)*:
+     * **Partial Scan (< 10 candidates)**: When an exploratory or testing crawl runs with `max_scan_candidates < MAX_SCAN_CANDIDATES_DEFAULT` (10) and finishes without topic production, the uncommitted lock is intentionally RELEASED via `release_lock()` without stamping `EXHAUSTED_TODAY`. This preserves the daily cron quota for subsequent scheduled runs so the market is not prematurely locked out. `is_market_done_today()` remains `False`.
+     * **Full Scan (>= 10 candidates)**: When a canonical crawl exhausts the full candidate quota (`scan_count >= 10`) without any candidate passing the viability gate, `mark_exhausted_today()` atomically stamps `EXHAUSTED_TODAY` with `reason="no_candidates_passed_viability"`. This terminates the editorial day for that market and protects LLM token budget. `is_market_done_today()` returns `True`.
 6. **Editorial Schedule & MIN_PRODUCTION_HOUR_VN=6 Policy (Boss Round 15 Item 10)**:
    - *Rationale*: 06:00 AM Asia/Ho_Chi_Minh (UTC+7 / 23:00 UTC previous day) marks the official opening of the Vietnam editorial day. Automated morning crawlers execute from 06:00 AM onwards when Asian financial markets open and US/EU late evening digests are complete. Overnight hours (00:00 - 05:59 VN) are gated to prevent unmonitored quota burn, bypassable with `--force` or `B1_FORCE_CRAWL=1`.
 7. **Windows NTFS `msvcrt.locking` 1-Byte Lock Semantics (Boss Round 15 Item 9)**:
