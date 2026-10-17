@@ -8,6 +8,7 @@ that 'testclient' is rejected when unauthenticated (Boss Item 11).
 
 import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 
@@ -74,3 +75,15 @@ def test_testclient_not_in_loopback_allowlist(monkeypatch):
     # Calling from TestClient has host 'testclient' which is excluded from loopback allowlist
     resp = client.post("/api/v1/trend-virality", json={"auto_commit": False, "max_candidates": 1})
     assert resp.status_code == 401
+
+
+def test_loopback_ipc_backward_compatibility_when_token_configured(monkeypatch):
+    """When VF_ALLOW_UNAUTH_LOOPBACK=1 is set, loopback caller (127.0.0.1) is permitted
+    even if VF_API_TOKEN is configured, preserving existing local n8n/IPC workflows (Boss Round 13 Item 5)."""
+    monkeypatch.setenv("VF_API_TOKEN", "production_secret_token")
+    monkeypatch.setenv("VF_ALLOW_UNAUTH_LOOPBACK", "1")
+    client = TestClient(app, client=("127.0.0.1", 54321))
+
+    resp = client.get("/v1/budget")
+    assert resp.status_code == 200
+    assert isinstance(resp.json(), dict)

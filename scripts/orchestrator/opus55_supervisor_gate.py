@@ -37,7 +37,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-MAX_SUPERVISOR_INPUT_TOKENS = 100000
+MAX_SUPERVISOR_INPUT_TOKENS = 180000
 MAX_SUPERVISOR_OUTPUT_TOKENS = 5000
 DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
 
@@ -221,9 +221,9 @@ def build_anti_bloat_digest(
 
     if tok_count > MAX_SUPERVISOR_INPUT_TOKENS:
         logger.info(f"Digest tokens ({tok_count}) exceeds cap ({MAX_SUPERVISOR_INPUT_TOKENS}). Compacting diff...")
-        # Emergency shrink of compact_diff
+        # Emergency shrink of compact_diff while preserving cross-directory hunks
         diff_lines = digest["compact_diff"].splitlines()
-        digest["compact_diff"] = "\n".join(diff_lines[:150]) + "\n... [Anti-Bloat Truncation Active at 10,000 tokens limit]"
+        digest["compact_diff"] = "\n".join(diff_lines[:4000]) + "\n... [Anti-Bloat Truncation Active at 180,000 tokens limit]"
 
     digest["estimated_tokens"] = estimate_tokens(json.dumps(digest, ensure_ascii=False))
     return digest

@@ -84,6 +84,12 @@
    - *Rationale*: Enforces Rule 124 (Atomic Code-ification) & Rule 126 (Three-Way Physical Sync). Guarantees reproducible, one-command verification across environments and preserves architecture state against context compaction amnesia.
 4. **Canonical Continuous Deployment (CD) Architecture (Rule 126)**:
    - *Architecture*: Manual `runner.py --mode sync` / `scripts/vps_runner.py` (FastVPSClient with Cloudflare Access tunnel tokens) is the authoritative, canonical CD deployment path for AI Video Factory to Hetzner VPS (`/root/video_factory`), maintaining 100% bit-for-bit physical SHA-256 tree parity before any stage execution. Direct GitHub Actions SSH push is staged for Milestone M1 pending dedicated VPS secret key provisioning.
+5. **Daily Market Lock Quota & Operator Force Override (`app/services/daily_market_lock.py`, TASK_1792069373)**:
+   - *Rationale*: Enforces Rule 118 (Zero-Mock Data) & Rule 126 (Three-Way Physical Parity). Prevents duplicate episode production and unconstrained LLM token burning by enforcing exactly-one successful episode per market per calendar day (UTC/VN timezone).
+   - *Operator Override Runbook*: When an episode run encounters an unrecoverable downstream error (e.g. B3 runtime error, network timeout) after stamping `EXHAUSTED_TODAY` or `IN_PROGRESS`, operators can safely force an immediate re-run using either:
+     1. CLI Flag: `python3 scripts/run_trend_pipeline.py --market <MKT> --force`
+     2. Environment Variable: `B1_FORCE_CRAWL=1 python3 scripts/run_trend_pipeline.py --market <MKT>`
+   - Both mechanisms atomically bypass existing daily lock files, safely clear stale states, and initiate a fresh live trend candidate evaluation loop while preserving audit logging.
 
 ---
 

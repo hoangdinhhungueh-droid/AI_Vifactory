@@ -89,7 +89,8 @@ def _resolve_git_sha() -> str:
         sha = subprocess.check_output(
             ["git", "rev-parse", "HEAD"],
             cwd=Path(__file__).resolve().parent.parent,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
+            shell=False,
         ).decode().strip()
         if sha:
             _CACHED_GIT_SHA = sha
@@ -112,7 +113,8 @@ def health(request: Request):
     auth_header = request.headers.get("Authorization", "")
     client_host = getattr(getattr(request, "client", None), "host", "")
     has_forwarded = bool(request.headers.get("x-forwarded-for") or request.headers.get("cf-connecting-ip"))
-    is_loopback = client_host in ("127.0.0.1", "::1", "localhost", "testclient", "") and not has_forwarded
+    is_test_mode = os.getenv("VF_TEST_MODE") in ("1", "true", "True") or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    is_loopback = (client_host in ("127.0.0.1", "::1", "localhost", "") or (is_test_mode and client_host == "testclient")) and not has_forwarded
 
     is_authed = False
     if token and auth_header and hmac.compare_digest(auth_header.encode("utf-8"), f"Bearer {token}".encode("utf-8")):
@@ -134,6 +136,8 @@ def _verify_auth(request: Request) -> None:
     """Verifies Bearer token.
     Fail-closed posture: If VF_API_TOKEN is unset, rejects requests with 401 Unauthorized
     unless VF_ALLOW_UNAUTH_LOOPBACK=1 or ALLOW_UNAUTHENTICATED_LOOPBACK=1 is explicitly configured.
+    Preserves backward compatibility with verified local loopback IPC (n8n/scripts) when
+    VF_ALLOW_UNAUTH_LOOPBACK=1 is set, even if VF_API_TOKEN is configured (Boss Round 13 Item 5).
     Rate limits unset-token warning to once per 60 seconds.
     Uses timing-safe hmac.compare_digest (Rule 121/125 & Boss Item 25).
     """
@@ -143,28 +147,26 @@ def _verify_auth(request: Request) -> None:
     has_forwarded = bool(request.headers.get("x-forwarded-for") or request.headers.get("cf-connecting-ip"))
     is_loopback = client_host in ("127.0.0.1", "::1", "localhost") and not has_forwarded
 
+    allow_loopback = (
+        os.getenv("VF_ALLOW_UNAUTH_LOOPBACK") == "1"
+        or os.getenv("ALLOW_UNAUTHENTICATED_LOOPBACK") == "1"
+    )
+
+    if allow_loopback and is_loopback:
+        # Verified local loopback IPC bypass active (e.g. local n8n workflow or script on localhost)
+        return
+
     if not token:
-        allow_loopback = (
-            os.getenv("VF_ALLOW_UNAUTH_LOOPBACK") == "1"
-            or os.getenv("ALLOW_UNAUTHENTICATED_LOOPBACK") == "1"
-        )
         now = time.time()
         if now - _last_unset_token_log_time >= 60.0:
             _last_unset_token_log_time = now
-            if allow_loopback and is_loopback:
-                _logger.warning(
-                    f"[SECURITY ALERT] VF_API_TOKEN is unset. Loopback unauthenticated bypass is active; verified loopback call from {client_host} permitted."
-                )
-            else:
-                _logger.critical(
-                    f"[SECURITY ALERT] VF_API_TOKEN is unset or caller {client_host} is non-loopback. Rejecting request (fail-closed)."
-                )
-        if not (allow_loopback and is_loopback):
-            raise HTTPException(
-                status_code=401,
-                detail="Unauthorized: server authentication token not configured or non-loopback caller (fail-closed)",
+            _logger.critical(
+                f"[SECURITY ALERT] VF_API_TOKEN is unset or caller {client_host} is non-loopback. Rejecting request (fail-closed)."
             )
-        return
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized: server authentication token not configured or non-loopback caller (fail-closed)",
+        )
 
     auth_header = request.headers.get("Authorization", "")
     expected = f"Bearer {token}"

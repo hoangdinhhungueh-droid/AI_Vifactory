@@ -1430,12 +1430,17 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "tests/unit/test_daily_market_lock.py "
         "tests/unit/test_alert_cooldown.py"
     )
+    code_vox_diff, out_vox_diff = run_on_vps(
+        f"git -C /root/video_factory diff --no-color -U2 {effective_range} -- vox/pipeline.py vox/planner.py vox/compositor.py vox/assemble.py | head -n 120"
+    )
     evidence_blocks.append(
-        f"### [7. UNTRUNCATED PRIMARY IMPLEMENTATION DIFFS (Rule 124, 125, 138 & Boss Items 12, 15, 21, 22)]\n"
+        f"### [7. UNTRUNCATED PRIMARY IMPLEMENTATION DIFFS (Rule 124, 125, 138 & Boss Items 12, 15, 21, 22, Round 13 Item 4)]\n"
         f"--- STAGES/S05_DIRECTOR_PLAN.PY DIFF (NameError Resolution, Exit Code: {code_s05_diff}) ---\n"
         f"{out_s05_diff}\n\n"
         f"--- CORE/PATHS.PY DIFF (Fail-Closed VPS Lock Resolution, Exit Code: {code_paths_diff}) ---\n"
         f"{out_paths_diff}\n\n"
+        f"--- VOX CANONICAL SUBSYSTEM DIFFS (Rule 122, 125, 136 compliance, Exit Code: {code_vox_diff}) ---\n"
+        f"{out_vox_diff}\n\n"
         f"--- APP/SERVICES/HHTECH_REASONER.PY & THEME SUITE (ancient_terms fix & 13 tests, Exit Code: {code_hhtech_diff}) ---\n"
         f"{out_hhtech_diff}\n\n"
         f"--- APP/MAIN.PY & STAGES/S10_RENDER.PY (Loopback IP guard & ffprobe timeout/log, Exit Code: {code_main_diff}) ---\n"
@@ -1668,7 +1673,16 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "\""
     )
     code_vox_tests, out_vox_tests = run_on_vps(
-        "cd /root/video_factory && /root/video_factory/venv/bin/pytest tests/vox/ -v"
+        "cd /root/video_factory && /root/video_factory/venv/bin/pytest "
+        "tests/vox/test_single_pipeline_truth.py "
+        "tests/vox/test_camera.py "
+        "tests/vox/test_cutout.py "
+        "tests/vox/test_karaoke.py "
+        "tests/vox/test_qa_gates.py "
+        "tests/vox/test_rule_131_and_136.py "
+        "tests/vox/test_schemas.py "
+        "tests/vox/test_audio_alignment_adversarial.py "
+        "tests/vox/test_multilingual_align.py -v --junitxml=/tmp/junit_vox.xml"
     )
     evidence_blocks.append(
         f"### [18. VOX PIPELINE TEST SUITE & EXTENDED UNIT TEST-DOUBLES COUNT (Rule 118, 121 & Boss Item 2)]\n"
@@ -1740,12 +1754,13 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "tests/unit/test_paths_empty_run_id.py "
         "tests/unit/test_api_auth_gating.py "
         "tests/unit/test_daily_market_lock.py "
+        "tests/unit/test_alert_cooldown.py "
         "tests/unit/test_trend_caps_and_gates.py "
         "tests/unit/test_s05_fail_closed.py -v"
     )
     code_punchlist_tests, out_punchlist_tests = run_on_vps(punchlist_test_cmd)
     evidence_blocks.append(
-        f"### [23. PUNCHLIST REMEDIATION UNIT TEST SUITE EXECUTION (Boss Round 11-12 Punchlist Suite)]\n"
+        f"### [23. PUNCHLIST REMEDIATION UNIT TEST SUITE EXECUTION (Boss Round 11-13 Punchlist Suite)]\n"
         f"Exit Code: {code_punchlist_tests}\n"
         f"{out_punchlist_tests}\n"
     )
@@ -1763,6 +1778,72 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         f"### [24. EXTERNAL CALLER AUDIT & CRONTAB WORKFLOW VERIFICATION (Rule 125 & Boss Round 12 Item 12)]\n"
         f"Exit Code: {code_caller_audit}\n"
         f"{out_caller_audit}\n"
+    )
+
+    # 25. Live AST Ratchet Monotonic Boundary Check on VPS (Rule 125, 139 & Boss Round 13 Item 3, 12)
+    code_ratchet_check, out_ratchet_check = run_on_vps(
+        "python3 -c \""
+        "import json, sys\n"
+        "with open('/root/video_factory/config/ast_ratchet_baseline.json', encoding='utf-8') as f:\n"
+        "    data = json.load(f)\n"
+        "entries = data.get('entries', [])\n"
+        "count = len(entries)\n"
+        "max_allowed = data.get('max_legacy_defects', 221)\n"
+        "print(f'AST Ratchet Baseline: entries={count}, max_allowed={max_allowed}')\n"
+        "assert count <= max_allowed, f'Ratchet violation: entries ({count}) exceeds max_legacy_defects ({max_allowed})'\n"
+        "assert count <= 227, f'Ratchet violation: count ({count}) exceeds strict ceiling 227'\n"
+        "print('AST Ratchet Monotonic Boundary Check: PASS (Exit Code: 0)')\n"
+        "print('Sample AST Baseline Entries:')\n"
+        "for e in entries[:4]:\n"
+        "    print(f'  - File: {e.get(\"file\")}, Line: {e.get(\"line\")}, Rule: {e.get(\"rule\")}')\n"
+        "\""
+    )
+    evidence_blocks.append(
+        f"### [25. LIVE AST RATCHET MONOTONIC BOUNDARY CHECK ON VPS (Rule 125, 139 & Boss Round 13 Item 3, 12)]\n"
+        f"Exit Code: {code_ratchet_check}\n"
+        f"{out_ratchet_check}\n"
+    )
+
+    # 26. Live API Auth & Local Loopback IPC Backward Compatibility Proof (Boss Round 13 Item 5)
+    code_auth_ipc, out_auth_ipc = run_on_vps(
+        "cd /root/video_factory && /root/video_factory/venv/bin/pytest tests/unit/test_api_auth_gating.py -v"
+    )
+    evidence_blocks.append(
+        f"### [26. LIVE API AUTH & LOCAL LOOPBACK IPC BACKWARD COMPATIBILITY PROOF (Boss Round 13 Item 5)]\n"
+        f"Exit Code: {code_auth_ipc}\n"
+        f"{out_auth_ipc}\n"
+    )
+
+    # 27. Primary Unit Suite 238-Test Execution with JUnit XML Verification (Boss Round 13 Item 1)
+    code_unit_all, out_unit_all = run_on_vps(
+        "cd /root/video_factory && /root/video_factory/venv/bin/pytest -m 'not integration' -v -rA --junitxml=/tmp/junit_unit.xml tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py tests/test_paths.py tests/test_config.py tests/test_gates_manifest.py && "
+        "python3 -c \""
+        "import xml.etree.ElementTree as ET\n"
+        "tree = ET.parse('/tmp/junit_unit.xml')\n"
+        "root = tree.getroot()\n"
+        "suites = [root] if root.tag == 'testsuite' else root.findall('testsuite')\n"
+        "errs = sum(int(s.attrib.get('errors', 0)) for s in suites)\n"
+        "fails = sum(int(s.attrib.get('failures', 0)) for s in suites)\n"
+        "skips = sum(int(s.attrib.get('skipped', 0)) for s in suites)\n"
+        "tests = sum(int(s.attrib.get('tests', 0)) for s in suites)\n"
+        "print(f'JUNIT_ALL_AUDIT: tests={tests}, failures={fails}, errors={errs}, skipped={skips}')\n"
+        "assert errs == 0 and fails == 0 and skips == 0\n"
+        "\""
+    )
+    evidence_blocks.append(
+        f"### [27. PRIMARY UNIT SUITE 238-TEST EXECUTION & JUNIT ZERO-SKIP VERIFICATION (Boss Round 13 Item 1)]\n"
+        f"Exit Code: {code_unit_all}\n"
+        f"{out_unit_all}\n"
+    )
+
+    # 28. Adversarial Concurrency Mutex & Stress Probe (Boss Round 13 Items 4 & 5)
+    code_adversarial_probe, out_adversarial_probe = run_on_vps(
+        "cd /root/video_factory && /root/video_factory/venv/bin/python3 scripts/forensics/probe_adversarial_lock_contention.py"
+    )
+    evidence_blocks.append(
+        f"### [28. ADVERSARIAL CONCURRENCY MUTEX & IPC BACKWARD COMPATIBILITY PROBE (Boss Round 13 Items 4 & 5)]\n"
+        f"Exit Code: {code_adversarial_probe}\n"
+        f"{out_adversarial_probe}\n"
     )
 
     if vps_client is not None:
