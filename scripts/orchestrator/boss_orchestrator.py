@@ -1852,7 +1852,7 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         "echo '=== 1. GREP ORPHAN IMPORTS FOR DELETED APP.PIPELINE / PRODUCE_EPISODE ===' && "
         "(grep -rnE 'from app\\.pipeline|from app\\.routes\\.produce_episode_route|produce_episode_route|run_episode_route' /root/video_factory/app /root/video_factory/scripts /root/video_factory/stages /root/video_factory/vox || echo 'SCAN_CLEAN: ZERO ORPHAN IMPORTS DETECTED') && "
         "echo '=== 2. TOOLS/CODEMAP AST FRESHNESS & STAGE CONTRACT INTEGRITY ===' && "
-        "cd /root/video_factory && /root/video_factory/venv/bin/python3 -m tools.codemap check"
+        "cd /root/video_factory && PYTHONPATH=/root/video_factory /root/video_factory/venv/bin/python3 -m tools.codemap check"
         "\""
     )
     evidence_blocks.append(
