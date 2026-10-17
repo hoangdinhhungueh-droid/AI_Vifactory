@@ -13,13 +13,11 @@ Supports:
 
 from __future__ import annotations
 
-import sys
-import os
-import time
 import argparse
 import importlib
+import sys
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Optional
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -33,11 +31,11 @@ try:
 except Exception:
     pass
 
-from core.paths import resolve_run_paths, new_run_paths
-from core.contracts.stages import StageID, StageArtifact
-from core.run_manifest import RunManifest
-from core.config import load_profile, RunContext
+from core.config import RunContext, load_profile
+from core.contracts.stages import StageID
 from core.gates import GateError, compute_file_sha256
+from core.paths import new_run_paths, resolve_run_paths
+from core.run_manifest import RunManifest
 
 # Stage modules registry
 STAGE_MODULES = {
@@ -59,6 +57,7 @@ def execute_pipeline(
     profile_name: str = "prod",
     run_id: Optional[str] = None,
     from_stage: Optional[str] = None,
+    to_stage: Optional[str] = None,
     only_stage: Optional[str] = None,
     dry_run: bool = False,
     force: bool = False,
@@ -103,10 +102,19 @@ def execute_pipeline(
         if matched is not None:
             start_idx = matched
 
+    end_idx = len(stage_list) - 1
+    if to_stage:
+        clean_to = to_stage.lower()
+        matched_to = next((i for i, s in enumerate(stage_list) if clean_to in s.value), None)
+        if matched_to is not None:
+            end_idx = matched_to
+
     # 3. Stage Execution Loop
     for idx, stage in enumerate(stage_list):
         if idx < start_idx:
             continue
+        if idx > end_idx:
+            break
 
         if only_stage:
             clean_only = only_stage.lower()
@@ -137,8 +145,8 @@ def execute_pipeline(
 
         try:
             stage_mod = importlib.import_module(mod_name)
-            artifact = stage_mod.run(ctx)
-            
+            _artifact = stage_mod.run(ctx)
+
             sha_new = compute_file_sha256(art_path) if art_path.exists() else "none"
             manifest.mark(stage, "done", artifact_sha256=sha_new)
             manifest.save_atomic(paths)
@@ -174,6 +182,7 @@ def main():
     parser.add_argument("--profile", default="prod", choices=["prod", "e2e_min"], help="Profile to execute (default: prod)")
     parser.add_argument("--run-id", default=None, help="Optional existing Run ID or Episode ID to resume")
     parser.add_argument("--from", dest="from_stage", default=None, help="Resume execution starting from specified stage")
+    parser.add_argument("--to", dest="to_stage", default=None, help="Stop execution after specified stage")
     parser.add_argument("--only", dest="only_stage", default=None, help="Execute only the specified stage")
     parser.add_argument("--dry-run", action="store_true", help="Fast execution simulation without external API calls")
     parser.add_argument("--force", action="store_true", help="Force re-generation of all artifacts ignoring cache")
@@ -185,6 +194,7 @@ def main():
         profile_name=args.profile,
         run_id=args.run_id,
         from_stage=args.from_stage,
+        to_stage=args.to_stage,
         only_stage=args.only_stage,
         dry_run=args.dry_run,
         force=args.force,

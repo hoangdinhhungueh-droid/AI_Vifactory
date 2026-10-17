@@ -8,12 +8,19 @@ Mandate:
   4. Proves zero-mock compliance (Rule 118, Rule 121, Rule 127).
 """
 
+import io
 import json
 import logging
 import os
 import subprocess
 import sys
 from pathlib import Path
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except (AttributeError, io.UnsupportedOperation):
+    pass
 
 # Add project root to sys.path
 _ROOT = Path(__file__).resolve().parent.parent.parent
@@ -39,7 +46,7 @@ def main():
     print("=======================================================")
     print("🎬 RUNNING LIVE B3 TEMP-ID END-TO-END EXECUTION PROBE")
     print(f"Run ID: {TEMP_RUN_ID}")
-    print(f"Target Stages: S01 through S05")
+    print("Target Stages: S01 through S05")
     print("=======================================================")
 
     # 1. Run orchestrator.run_pipeline through S05
@@ -50,13 +57,22 @@ def main():
         "--run-id", TEMP_RUN_ID,
         "--topic", "Global Semiconductor Supply Chain Shock",
         "--from", "s01_ideation",
-        "--only", "s05_director_plan",
+        "--to", "s05_director_plan",
     ]
     sub_env = os.environ.copy()
     sub_env["PYTHONPATH"] = f"{_ROOT}{os.pathsep}{sub_env.get('PYTHONPATH', '')}".strip(os.pathsep)
 
     print(f"Executing: {' '.join(cmd)}")
-    proc = subprocess.run(cmd, cwd=str(_ROOT), env=sub_env, capture_output=True, text=True, timeout=300)
+    proc = subprocess.run(
+        cmd,
+        cwd=str(_ROOT),
+        env=sub_env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=300,
+    )
     print(f"Process Exit Code: {proc.returncode}")
     if proc.returncode != 0:
         print(f"❌ Process failed with returncode {proc.returncode}")

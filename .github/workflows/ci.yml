@@ -119,6 +119,7 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
 
+  # Windows job runs lock/cooldown/path/I/O subset (~91 tests) targeting highest cross-platform risk modules (daily_market_lock, alert_cooldown, atomic_io, core_net_utils, paths). Full 305+ test suite validated on Linux CI Gate job for efficiency.
   windows-lock-tests:
     name: "Windows Platform Lock & Cooldown Gating"
     runs-on: windows-latest

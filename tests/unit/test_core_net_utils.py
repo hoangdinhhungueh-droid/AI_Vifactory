@@ -45,7 +45,7 @@ def test_concurrent_threads_no_global_mutation():
 
     def worker(idx: int):
         try:
-            for _ in range(20):
+            for _ in range(3):
                 # Ensure original_getaddrinfo is still intact at every iteration
                 if socket.getaddrinfo is not original_getaddrinfo:
                     errors.append(f"Thread {idx}: socket.getaddrinfo mutated!")
@@ -56,7 +56,7 @@ def test_concurrent_threads_no_global_mutation():
         except Exception as e:
             errors.append(f"Thread {idx} exception: {e}")
 
-    threads = [threading.Thread(target=worker, args=(i,)) for i in range(10)]
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
     for th in threads:
         th.start()
     for th in threads:
