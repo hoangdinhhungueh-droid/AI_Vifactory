@@ -44,6 +44,7 @@ import re
 import time
 from datetime import datetime, timezone
 
+from app.services.episode_numbering import get_next_episode_id, sanitize_episode_slug
 from core.paths import resolve_raw_pool_dir
 
 logger = logging.getLogger("trend_gate_ai")

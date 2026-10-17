@@ -53,7 +53,7 @@ jobs:
       - name: Rule 128 & Rule 132 Zero Semantic Bias Linter Gate
         run: pytest -v tests/test_zero_semantic_bias.py
 
-      - name: Rule 139 AST Ratchet Monotonic Boundary Check (Rule 125 & Boss Item 6, 9)
+      - name: Rule 139 AST Ratchet Monotonic Boundary Check (Rule 125, 139 & Boss Round 15 Strict Zero-Buffer Gate)
         shell: bash
         run: |
           python -c "
@@ -64,14 +64,12 @@ jobs:
           count = len(entries)
           max_allowed = data.get('max_legacy_defects', 221)
           override_url = os.getenv('VF_AST_RATCHET_OVERRIDE', '').strip()
-          # Dynamic ceiling provides max_legacy_defects + 10 buffer for controlled growth (Boss Round 14 Item 6)
-          dynamic_ceiling = max_allowed + 10
-          print(f'AST Ratchet Baseline: entries={count}, max_allowed={max_allowed}, dynamic_ceiling={dynamic_ceiling}')
+          # Strict Monotonic Policy: ZERO buffer (+0), count must be strictly <= max_allowed (Boss Round 15 Item 6)
+          print(f'AST Ratchet Baseline: entries={count}, max_allowed={max_allowed} (Strict Zero-Buffer Monotonic Ceiling)')
           if override_url:
               print(f'AST Ratchet Override active via VF_AST_RATCHET_OVERRIDE: {override_url}')
           else:
-              assert count <= max_allowed, f'Ratchet violation: entries ({count}) exceeds max_legacy_defects ({max_allowed})'
-              assert count <= dynamic_ceiling, f'Ratchet violation: count ({count}) exceeds dynamic ceiling ({dynamic_ceiling})'
+              assert count <= max_allowed, f'Strict monotonic ratchet violation: entries ({count}) exceeds max_legacy_defects ({max_allowed})'
           print('AST Ratchet Monotonic Boundary Check: PASS')
           "
 

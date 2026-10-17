@@ -17,6 +17,7 @@ import json
 import logging as _logging
 import os
 import re
+import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -156,6 +157,7 @@ def health(request: Request):
 # ── Auth Helper ─────────────────────────────────────────────────────────────
 VF_API_TOKEN = os.getenv("VF_API_TOKEN", "").strip()
 _last_unset_token_log_time: float = 0.0
+_unset_token_lock = threading.Lock()
 
 
 def _verify_auth(request: Request) -> None:
@@ -164,7 +166,7 @@ def _verify_auth(request: Request) -> None:
     unless VF_ALLOW_UNAUTH_LOOPBACK=1 or ALLOW_UNAUTHENTICATED_LOOPBACK=1 is explicitly configured.
     Preserves backward compatibility with verified local loopback IPC (n8n/scripts) when
     VF_ALLOW_UNAUTH_LOOPBACK=1 is set, even if VF_API_TOKEN is configured (Boss Round 13 Item 5).
-    Rate limits unset-token warning to once per 60 seconds.
+    Rate limits unset-token warning to once per 60 seconds with strict thread-safety (Boss Round 15 Item 4).
     Uses timing-safe hmac.compare_digest (Rule 121/125 & Boss Item 25).
     """
     global _last_unset_token_log_time
@@ -183,12 +185,13 @@ def _verify_auth(request: Request) -> None:
         return
 
     if not token:
-        now = time.time()
-        if now - _last_unset_token_log_time >= 60.0:
-            _last_unset_token_log_time = now
-            _logger.critical(
-                f"[SECURITY ALERT] VF_API_TOKEN is unset or caller {client_host} is non-loopback. Rejecting request (fail-closed)."
-            )
+        with _unset_token_lock:
+            now = time.time()
+            if now - _last_unset_token_log_time >= 60.0:
+                _last_unset_token_log_time = now
+                _logger.critical(
+                    f"[SECURITY ALERT] VF_API_TOKEN is unset or caller {client_host} is non-loopback. Rejecting request (fail-closed)."
+                )
         raise HTTPException(
             status_code=401,
             detail="Unauthorized: server authentication token not configured or non-loopback caller (fail-closed)",

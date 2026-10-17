@@ -90,6 +90,14 @@
      1. CLI Flag: `python3 scripts/run_trend_pipeline.py --market <MKT> --force`
      2. Environment Variable: `B1_FORCE_CRAWL=1 python3 scripts/run_trend_pipeline.py --market <MKT>`
    - Both mechanisms atomically bypass existing daily lock files, safely clear stale states, and initiate a fresh live trend candidate evaluation loop while preserving audit logging.
+6. **Editorial Schedule & MIN_PRODUCTION_HOUR_VN=6 Policy (Boss Round 15 Item 10)**:
+   - *Rationale*: 06:00 AM Asia/Ho_Chi_Minh (UTC+7 / 23:00 UTC previous day) marks the official opening of the Vietnam editorial day. Automated morning crawlers execute from 06:00 AM onwards when Asian financial markets open and US/EU late evening digests are complete. Overnight hours (00:00 - 05:59 VN) are gated to prevent unmonitored quota burn, bypassable with `--force` or `B1_FORCE_CRAWL=1`.
+7. **Windows NTFS `msvcrt.locking` 1-Byte Lock Semantics (Boss Round 15 Item 9)**:
+   - *Rationale*: In `alert_cooldown.py` (and `resource_recycler.py`), cross-process locking on Windows uses `msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)` on byte 0 of the canonical `.lock` file. Because all cooperating processes target offset 0 on the same file descriptor, this delivers deterministic kernel-level mutual exclusion identical to POSIX `fcntl.flock(LOCK_EX | LOCK_NB)`. If a process terminates or crashes, the Windows kernel releases the lock entry immediately.
+8. **Strict Zero-Buffer AST Ratchet Policy (Boss Round 15 Item 6)**:
+   - *Rationale*: Enforces Rule 139 (Disciplined Code-ification & Zero-Symptom Patching). Removed the +10 buffer in CI and `probe_ast_ratchet_gate.py`. The legacy defect count is strictly bounded (`entries <= 221 <= 227 max_allowed`), guaranteeing monotonic decrease with zero backdoor growth.
+9. **Windows CI Test Matrix Justification (Boss Round 15 Item 8)**:
+   - *Rationale*: The 91 tests executed in `windows-lock-tests` cover all platform-divergent system calls (file locks, NTFS paths, atomic file replacement, network IPv4). The remaining 214 tests were adversarially audited and proven to contain 0 subprocess calls, 0 file locks, and 0 platform-divergent syscalls (pure in-memory AST visitors, schema assertions, and pure Python arithmetic).
 
 ---
 

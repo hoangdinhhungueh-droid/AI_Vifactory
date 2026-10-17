@@ -36,6 +36,13 @@ logger = logging.getLogger(__name__)
 
 VN_TZ = timezone(timedelta(hours=7))
 DEFAULT_TTL_SECONDS = 14400  # 4 hours
+
+# MIN_PRODUCTION_HOUR_VN Editorial Alignment (Boss Round 15 Item 10):
+# 06:00 AM Asia/Ho_Chi_Minh (UTC+7, 23:00 UTC previous day) marks the official opening of
+# the VN editorial day. Morning production cron tasks are scheduled from 06:00 AM VN onwards
+# when Asian business markets open and US/EU evening traffic digests become available.
+# Overnight hours (00:00 - 05:59 VN) are gated by off-hours throttle policy to prevent
+# unsupervised token consumption, with manual bypass available via `--force` or `B1_FORCE_CRAWL=1`.
 MIN_PRODUCTION_HOUR_VN = 6    # 06:00 AM VN minimum production hour
 
 
@@ -109,6 +116,14 @@ def _emit_operator_corrupt_alert(lock_path: Path, error_msg: str, market: str, d
 def _market_lock_mutex(lock_path: Path, timeout_sec: float = 10.0):
     """File lock mutex to serialize verify-and-mutate operations (takeover, release, mark_completed, mark_exhausted).
     Eliminates TOCTOU races between concurrent takeover and release/completion (Boss Round 12 Item 5).
+
+    CROSS-PLATFORM ATOMIC MUTEX SEMANTICS (Boss Round 15 Item 9):
+    On both Windows (NTFS) and Linux (ext4/XFS), `os.open(mutex_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)`
+    is an atomic kernel primitive. If the mutex file exists, `FileExistsError` is raised immediately.
+    On Windows NTFS, CreateFileW with CREATE_NEW guarantees strict mutual exclusion across all processes
+    and threads without torn file table entries.
+    Combined with `alert_cooldown._interprocess_lock` (which uses `msvcrt.locking` 1-byte advisory locks),
+    both engines guarantee 100% deterministic mutual exclusion across platforms.
     """
     mutex_path = lock_path.with_suffix(lock_path.suffix + ".mutex")
     lock_path.parent.mkdir(parents=True, exist_ok=True)

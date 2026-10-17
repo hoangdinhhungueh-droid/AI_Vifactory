@@ -635,6 +635,12 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
 def commit_trend_task(topic_data: dict) -> str:
     """Save approved topic to /var/vf/pending_tasks/<task_id>.json,
     generate competitor intel card, record to History Registry, and sync to Notion SoT.
+
+    ARCHITECTURAL INVARIANT (Boss Round 15 Item 5):
+    This helper is a pure task metadata/Notion sync sink and does NOT touch or mutate daily
+    market locks. Market lock mutations (mark_completed, mark_exhausted_today, acquire_in_progress)
+    are strictly isolated to run_trend_pipeline() and require explicit lock_token and owner_pid
+    ownership verification.
     """
     try:
         from app.services.episode_numbering import get_next_episode_id
@@ -745,7 +751,11 @@ def commit_trend_task(topic_data: dict) -> str:
 
 
 def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
-    """Send pure informative broadcast for Human Gate 1 (0 interactive buttons)."""
+    """Send pure informative broadcast for Human Gate 1 (0 interactive buttons).
+
+    ARCHITECTURAL INVARIANT (Boss Round 15 Item 5):
+    This helper is a pure notification sink and does NOT touch or mutate daily market locks.
+    """
     # Block notifications if it is a synthetic test seed
     if topic_data.get("is_test_seed") or topic_data.get("source") == "custom_seed":
         logger.info(f"[trend_engine] Skipping Telegram notification for test seed: {topic_data.get('raw_term')}")

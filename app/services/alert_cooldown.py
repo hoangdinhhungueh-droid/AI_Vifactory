@@ -142,6 +142,21 @@ def _interprocess_lock(file_path: Path, timeout: float = 10.0, poll_interval: fl
     using fcntl.flock on POSIX and msvcrt.locking on Windows on a persistent .lock file.
     Eliminates all stale-lock TOCTOU races since the OS kernel automatically releases
     the advisory lock when the process terminates or crashes.
+
+    WINDOWS NTFS 1-BYTE LOCK SEMANTICS (Boss Round 15 Item 9):
+    On Windows (NTFS / ReFS), `msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)` locks exactly the first
+    byte (offset 0, length 1) of the file descriptor in exclusive non-blocking mode.
+    Since all cooperating processes in the factory open the same canonical `.lock` path and
+    seek to byte 0 before requesting exclusive LK_NBLCK on length 1:
+      1. Any subsequent process attempting `msvcrt.locking` on byte 0 receives an immediate
+         `PermissionError` or `OSError` (errno 13 EACCES / errno 36 EDEADLK), preventing concurrent
+         entry.
+      2. If the holder process terminates unexpectedly (SIGKILL, crash, reboot), the Windows
+         kernel immediately closes all open handles and releases the 1-byte file lock table entry,
+         eliminating orphan/stale lock accumulation.
+      3. This behavior is functionally identical to POSIX `fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)`
+         for inter-process mutual exclusion.
+
     Raises LockTimeoutError on timeout (fail-closed).
     """
     lock_file = file_path.with_suffix(file_path.suffix + ".lock")

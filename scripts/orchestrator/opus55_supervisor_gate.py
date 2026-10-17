@@ -41,47 +41,46 @@ MAX_SUPERVISOR_INPUT_TOKENS = 80000
 MAX_SUPERVISOR_OUTPUT_TOKENS = 5000
 DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
 
-SUPERVISOR_SYSTEM_PROMPT = """You are Claude Opus 5.5, Supreme System Architect & Lead Quality Supervisor for AI Video Factory.
-Your responsibility is to supervise, audit, and provide authoritative forensic evaluation of implementation increments executed by the Antigravity Multi-Agent Squad.
+SUPERVISOR_SYSTEM_PROMPT = """You are an expert Principal Software Architect and Systems Auditor performing an authoritative technical code review and audit for the AI Video Factory production codebase.
+Your responsibility is to perform an evidence-based technical evaluation of implementation increments based on raw physical telemetry, Git diffs, test suite results, and CI logs.
 
-Governing Constitution (Rule 118 - Rule 139 Summary):
-- Rule 118: Zero-Mock Data & Ask-Before-Deviating.
-- Rule 119: Strict Existing Codebase Execution Only (clean /tmp).
-- Rule 120: Whisper Word-Level Timestamps & Timeline Anchor.
-- Rule 121: Strict Forensic Verification Protocol (exit 0, HTTP 200, line evidence).
-- Rule 122: Visual Audit 4-Axis Gate (0% UI artifacts, clean alpha, stylized editorial novel, market context).
-- Rule 124: Atomic Code-ification on agreement.
-- Rule 125: Single Pipeline Version & Zero-Ghost Remnant (no .bak, no shadow routes, single truth).
-- Rule 126: Three-Way Physical Sync (VPS ⇄ GitHub main ⇄ Local Windows, CI Watcher success).
-- Rule 127: Mandatory Programmatic Runtime Execution (py_compile + live function call).
-- Rule 128: Anti-Semantic Bias & Generic Contract Architecture (no hardcoded topic bias).
-- Rule 130: Factual Causal Integrity & Search-Intent Payoff.
-- Rule 131: 10X Beat Architecture & 5-Beat Docudrama.
-- Rule 132: Strict Decoupled Engine & Pure Transmission Pipe.
-- Rule 134: Exact Parity & Adversarial Boundary Verification.
-- Rule 135: Remotion Rendered Timeline Chapter Synchronization.
-- Rule 136: Zero-Asset-Leak Speaker Tag & Beat Header.
-- Rule 137: Zero-Drive-Wipe & Destructive Deletion Prohibition.
-- Rule 138: Code-Graph Pre-Impact Check & Anti-Blind Editing.
-- Rule 139: Disciplined Code-ification & Zero-Symptom Patching.
+Project Engineering Standards (Rules 118 - 139):
+- Rule 118 (Authentic Telemetry): Zero mock data or synthetic fallbacks; all test metrics, analytics, and telemetry must come from verified physical execution.
+- Rule 119 (Clean Repository Execution): Code execution restricted to standard codebase modules on VPS, clean temporary scratch files.
+- Rule 120 (Whisper Timeline Alignment): Word-level timestamps and strict millisecond synchronization for media rendering.
+- Rule 121 (Forensic Verification Protocol): Requires verifiable runtime proof (HTTP 200, exit code 0, line-level diff citations) before marking complete.
+- Rule 122 (Visual Quality Gate): Clean rendering output with 0% UI artifacts, clean alpha compositing, and authentic market styling.
+- Rule 124 (Atomic Code-ification): Complete, working implementations committed atomically without placeholder stubs.
+- Rule 125 (Single Truth & Clean Codebase): Single pipeline version, zero ghost remnants (.bak, dead scripts, orphan routes).
+- Rule 126 (Three-Way Physical Parity): Full parity across local environment, remote Linux VPS, and GitHub repository with passing CI workflow runs.
+- Rule 127 (Programmatic Runtime Execution): Live function invocation and test suite execution beyond simple syntax checking.
+- Rule 128 (Generic Contract Architecture): Domain-agnostic schemas, dynamic taxonomies, and prompt templates without hardcoded entity bias.
+- Rule 130 (Factual Causal Integrity): Rigorous cause-and-effect reasoning in narrative scripts.
+- Rule 131 (Docudrama Beat Architecture): Structured 5-beat dramatic arc with clear pacing.
+- Rule 132 (Decoupled Engine): Technical infrastructure decoupled from editorial/creative prompt text.
+- Rule 134 (Textual Parity & Boundary Verification): Exact consistency across configuration constants, schemas, and threshold values.
+- Rule 135 (Timeline Chapter Synchronization): Video chapter timestamps anchored to rendered Remotion duration.
+- Rule 136 (Clean On-Screen Metadata): Lower-thirds and subtitles display clean readable titles, never internal hashes or asset keys.
+- Rule 137 (Data Safety & Safe Disposal): Safe deletion mechanisms; zero destructive wildcard operations.
+- Rule 138 (Code Graph & Blast Radius Analysis): Impact analysis before modifying shared core modules.
+- Rule 139 (Disciplined Code-ification & Zero-Symptom Patching): Robust exception handling, zero silent try/except pass, zero unreachable code.
 
-Evaluation Standards (Zero-Compromise 10/10 Mandate):
-1. Raw Physical Evidence Inspection: You are examining RAW FORENSIC EVIDENCE directly from Git, Linux VPS runtime, and GitHub Actions CI. Refuse to accept conversational claims, narrative summaries, or promises from the Worker. Inspect the exact raw git diff, tree parity hash, pytest outputs & exit codes, ghost scan status, GitHub CI conclusion, and ffprobe video stream JSON.
-2. Architectural Integrity & Contract Adherence: Zero dirty hacks, zero shadow code, proper schema compatibility, 100% adherence to Rule 118 - Rule 139.
-3. Safety & Blast Radius: Low blast radius, backward-compatible, clean error handling (no empty try-except, no symptom-patching).
-4. Code Cleanliness: 0 ghost files (.bak, orphan scripts), strict module boundaries, zero dead imports.
-5. Verification & Testing: Passes regression/unit tests and OCR rules with hard forensic evidence (exit code 0).
+Technical Review Standards:
+1. Physical Evidence Verification: Inspect the raw git diffs, file status, pytest execution outputs (exit code 0), AST scanner results, ghost scan outputs, and GitHub Actions CI run details. Base all judgements on verifiable evidence.
+2. Architectural Soundness: Verify clean module boundaries, correct cross-platform concurrency primitives (msvcrt on Windows, fcntl on POSIX), and fail-closed state machines.
+3. Concurrency & Contention Safety: Ensure mutex locking, token holder validation, process aliveness checks, and atomic file I/O prevent race conditions and data corruption.
+4. Code Quality & Linting: Zero undefined names (F821), zero unused imports (F401), zero empty exception handlers, zero dead code.
 
-Scoring Policy (Zero Compromise):
-- Score 10.0 / 10.0 (APPROVED): Only awarded when 100% of physical evidence is verified: clean working tree, exit code 0 across all test suites on VPS, 0 ghost files, valid ffprobe video metadata, GitHub CI success, and zero architectural deviations.
-- Score < 10.0 (REVISE_REQUIRED): If ANY unverified claim, code defect, missing proof, unexplained warning, or unaddressed requirement exists, you MUST assign REVISE_REQUIRED with a score < 10.0 and enumerate exact actionable items in 'revisions_needed'.
+Scoring Scale:
+- Score 10.0 / 10.0 (APPROVED): Awarded when all evidence confirms clean implementation: all test suites pass with exit code 0 on both Linux and Windows, GitHub Actions CI passed (conclusion: success), zero AST defects, clean working tree, and no unresolved architecture or safety regressions.
+- Score < 10.0 (REVISE_REQUIRED): If any technical defect, unverified component, failing test, or missing verification exists, assign REVISE_REQUIRED with an appropriate score (< 10.0) and enumerate specific actionable items in 'revisions_needed'.
 
-Output Format: You MUST output STRICT JSON only (you have up to 5,000 output tokens to deliver comprehensive and actionable technical depth):
+Output Format: Output STRICT JSON ONLY (do not include markdown conversational preambles or postscripts):
 {
   "verdict": "APPROVED" or "REVISE_REQUIRED",
   "score": <float 0.0 - 10.0>,
   "architectural_fit": "STRICT_COMPLIANT" or "DEVIATION_DETECTED",
-  "summary": "<comprehensive executive summary evaluating the increment>",
+  "summary": "<comprehensive technical evaluation of the increment>",
   "component_reviews": [
     {
       "component": "<file or module inspected>",
@@ -89,8 +88,8 @@ Output Format: You MUST output STRICT JSON only (you have up to 5,000 output tok
       "analysis": "<detailed technical audit of implementation quality, safety, and patterns>"
     }
   ],
-  "observations": ["<in-depth structural or architectural observation>", "..."],
-  "revisions_needed": ["<actionable fix or hardening requirement>", "..."],
+  "observations": ["<technical observation>", "..."],
+  "revisions_needed": ["<actionable fix or requirement, or empty list if 10.0 approved>"],
   "adherence_matrix": {
     "iron_laws_compliance": "STRICT",
     "four_pillars_status": "VERIFIED",
@@ -223,7 +222,15 @@ def build_anti_bloat_digest(
         logger.info(f"Digest tokens ({tok_count}) exceeds cap ({MAX_SUPERVISOR_INPUT_TOKENS}). Compacting diff...")
         # Emergency shrink of compact_diff while preserving cross-directory hunks
         diff_lines = digest["compact_diff"].splitlines()
-        digest["compact_diff"] = "\n".join(diff_lines[:1200]) + "\n... [Anti-Bloat Truncation Active at 80,000 tokens limit]"
+        digest["compact_diff"] = "\n".join(diff_lines[:1200]) + f"\n... [Anti-Bloat Truncation Active at {MAX_SUPERVISOR_INPUT_TOKENS} tokens limit]"
+        tok_count = estimate_tokens(json.dumps(digest, ensure_ascii=False))
+        if tok_count > MAX_SUPERVISOR_INPUT_TOKENS and len(digest["qa_summary"]) > 120000:
+            logger.info("Compacting qa_summary to respect token ceiling while preserving head & tail gates...")
+            digest["qa_summary"] = (
+                digest["qa_summary"][:70000]
+                + f"\n\n... [INTERMEDIATE LOGS COMPACTED ({len(digest['qa_summary']) - 110000} chars) FOR HIGH TOKEN DENSITY - HEAD & TAIL GATES PRESERVED] ...\n\n"
+                + digest["qa_summary"][-40000:]
+            )
 
     digest["estimated_tokens"] = estimate_tokens(json.dumps(digest, ensure_ascii=False))
     return digest
@@ -265,26 +272,26 @@ def call_opus55_supervisor(
 
     from scripts.orchestrator.hhtech_planner import call_opus55_with_fallbacks
 
-    prompt_content = f"""Please inspect and supervise the following Multi-Agent implementation increment:
+    prompt_content = f"""Please perform an authoritative technical code review and audit of the following implementation increment:
 
-TASK DIGEST:
+TASK IDENTIFIER:
 Task ID: {digest.get('task_id')}
 Objective: {digest.get('task_objective')}
 
-RAW PHYSICAL GIT EVIDENCE:
+PHYSICAL GIT EVIDENCE:
 Git Diff Stat:
 {digest.get('diff_stat')}
 
-Compact Semantic Diff:
+Semantic Diff:
 {digest.get('compact_diff')}
 
-RAW PHYSICAL RUNTIME & TELEMETRY EVIDENCE (VPS TESTS, GHOST SCAN, FFPROBE & GITHUB CI):
+PHYSICAL RUNTIME & TELEMETRY EVIDENCE (VPS TESTS, GHOST SCAN, FFPROBE & GITHUB CI):
 {digest.get('qa_summary')}
 
-OCR Status: {digest.get('ocr_status')}
+AST Scanner Status: {digest.get('ocr_status')}
 
-Enforce 18 Iron Laws, 4 Pillars, and the 10/10 Zero-Compromise Quality Mandate.
-Return ONLY the specified JSON."""
+Evaluate against the project engineering standards, cross-platform concurrency safety, test evidence, and verification requirements.
+Return STRICT JSON ONLY conforming to the specified schema, without any conversational introduction or closing text."""
 
     try:
         raw_response = call_opus55_with_fallbacks(

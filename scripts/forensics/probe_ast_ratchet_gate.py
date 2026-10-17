@@ -25,14 +25,12 @@ entries = data.get("entries", [])
 count = len(entries)
 max_allowed = data.get("max_legacy_defects", 221)
 override_url = os.getenv("VF_AST_RATCHET_OVERRIDE", "").strip()
-dynamic_ceiling = max_allowed + 10
 
-print(f"AST Ratchet Baseline: entries={count}, max_allowed={max_allowed}, dynamic_ceiling={dynamic_ceiling}")
+print(f"AST Ratchet Baseline: entries={count}, max_allowed={max_allowed} (Strict Zero-Buffer Monotonic Ceiling)")
 if override_url:
     print(f"AST Ratchet Override active via VF_AST_RATCHET_OVERRIDE: {override_url}")
 else:
-    assert count <= max_allowed, f"Ratchet violation: entries ({count}) exceeds max_legacy_defects ({max_allowed})"
-    assert count <= dynamic_ceiling, f"Ratchet violation: count ({count}) exceeds dynamic ceiling ({dynamic_ceiling})"
+    assert count <= max_allowed, f"Strict monotonic ratchet violation: entries ({count}) exceeds max_legacy_defects ({max_allowed})"
 
 print("AST Ratchet Monotonic Boundary Check: PASS (Exit Code: 0)")
 print("Sample AST Baseline Entries:")

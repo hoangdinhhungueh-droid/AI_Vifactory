@@ -270,7 +270,10 @@ _GIT_SHA_CACHE: Optional[str] = None
 
 
 def get_current_git_sha() -> str:
-    """Returns current git commit SHA for production provenance tracking (Rule 126 & Boss Round 11)."""
+    """Returns current git commit SHA for production provenance tracking (Rule 126 & Boss Round 11/15).
+    Reads directly from .git/HEAD and packed-refs with explicit error handling around packed-refs read
+    to prevent permission/OS error crashes (Boss Round 15 Item 7).
+    """
     global _GIT_SHA_CACHE
     if _GIT_SHA_CACHE:
         return _GIT_SHA_CACHE
@@ -278,10 +281,41 @@ def get_current_git_sha() -> str:
     if env_sha:
         _GIT_SHA_CACHE = env_sha[:12]
         return _GIT_SHA_CACHE
+
+    repo_root = Path(__file__).resolve().parent.parent
+    git_dir = repo_root / ".git"
+    try:
+        head_file = git_dir / "HEAD"
+        if head_file.exists():
+            ref = head_file.read_text(encoding="utf-8").strip()
+            if ref.startswith("ref: "):
+                ref_path = git_dir / ref[5:].strip()
+                if ref_path.exists():
+                    _GIT_SHA_CACHE = ref_path.read_text(encoding="utf-8").strip()[:12]
+                    return _GIT_SHA_CACHE
+                packed = git_dir / "packed-refs"
+                if packed.exists():
+                    try:
+                        target_ref = ref[5:].strip()
+                        for line in packed.read_text(encoding="utf-8").splitlines():
+                            if line.startswith("#") or not line.strip():
+                                continue
+                            parts = line.split()
+                            if len(parts) >= 2 and parts[1] == target_ref:
+                                _GIT_SHA_CACHE = parts[0][:12]
+                                return _GIT_SHA_CACHE
+                    except (OSError, PermissionError, UnicodeDecodeError) as _packed_err:
+                        logger.debug("[paths] Notice reading packed-refs: %s", _packed_err)
+            elif len(ref) >= 40:
+                _GIT_SHA_CACHE = ref[:12]
+                return _GIT_SHA_CACHE
+    except (OSError, PermissionError, UnicodeDecodeError) as _disk_err:
+        logger.debug("[paths] Notice reading git refs from disk: %s", _disk_err)
+
     try:
         import subprocess
         res = subprocess.run(
-            ["git", "-C", str(Path(__file__).resolve().parent.parent), "rev-parse", "HEAD"],
+            ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
             capture_output=True, text=True, check=False, timeout=2.0
         )
         if res.returncode == 0 and res.stdout.strip():

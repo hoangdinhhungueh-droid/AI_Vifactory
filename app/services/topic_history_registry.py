@@ -144,7 +144,11 @@ def record_handled_topic(
     specific_angle: str = None,
     registry_path: Optional[str] = None,
 ) -> None:
-    """Record newly approved or produced topic into the permanent registry."""
+    """Record newly approved or produced topic into the permanent registry.
+
+    ARCHITECTURAL INVARIANT (Boss Round 15 Item 5):
+    This helper is a pure topic deduplication sink and does NOT touch or mutate daily market locks.
+    """
     norm = _normalize_key(term)
     if not norm:
         return
