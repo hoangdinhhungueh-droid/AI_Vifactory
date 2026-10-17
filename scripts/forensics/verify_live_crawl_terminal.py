@@ -38,11 +38,14 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 
-def get_production_cost_baseline() -> float:
-    cost_dir = Path(os.environ.get("VF_COST_DIR", "/var/vf/cost"))
+from typing import Optional
+
+
+def get_production_cost_baseline(cost_dir: Optional[Path] = None) -> float:
+    target_dir = cost_dir or Path(os.environ.get("VF_COST_DIR", "/var/vf/cost"))
     total_usd = 0.0
-    if cost_dir.exists():
-        for p in cost_dir.glob("*.jsonl"):
+    if target_dir.exists():
+        for p in target_dir.glob("*.jsonl"):
             try:
                 for line in p.read_text(encoding="utf-8").splitlines():
                     if line.strip():
@@ -55,7 +58,8 @@ def get_production_cost_baseline() -> float:
 
 def main():
     # 0. Measure production baseline before execution
-    prod_cost_before = get_production_cost_baseline()
+    prod_cost_dir = Path(os.environ.get("VF_COST_DIR", "/var/vf/cost"))
+    prod_cost_before = get_production_cost_baseline(prod_cost_dir)
     prod_cooldown_path = Path("/var/vf/alert_cooldown.json")
     prod_cooldown_mtime_before = prod_cooldown_path.stat().st_mtime if prod_cooldown_path.exists() else 0.0
 
@@ -200,7 +204,7 @@ def main():
         print(f"Isolated spend recorded: ${isolated_spend:.6f} USD")
 
         # Verify production cost and cooldown were NOT touched
-        prod_cost_after = get_production_cost_baseline()
+        prod_cost_after = get_production_cost_baseline(prod_cost_dir)
         prod_cooldown_mtime_after = prod_cooldown_path.stat().st_mtime if prod_cooldown_path.exists() else 0.0
         print("\n--- Production Side-Effect Invariance Check ---")
         print(f"Production Spend Delta:    ${(prod_cost_after - prod_cost_before):.6f}")
