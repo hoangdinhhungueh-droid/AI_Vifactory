@@ -114,4 +114,6 @@ tests/unit/test_agq_fleet.py
 specs/boss_audits/.state_*.json
 specs/boss_audits/visual_audit_report.json
 specs/boss_audits/TASK_*_audit_round_*.json
+specs/boss_audits/*.txt
+
 
