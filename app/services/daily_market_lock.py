@@ -802,7 +802,7 @@ def acquire_in_progress(
                 logger.debug(f"[daily_market_lock] Takeover mutex conflict for {m_up}: {tok_err}")
                 return False
     except Exception as ex:
-        logger.error(f"[daily_market_lock] Error inspecting existing lock {lock_path}: {ex}")
+        logger.error(f"[daily_market_lock] Error inspecting existing lock {lock_path} (market={m_up}): {ex}")
     return False
 
 
@@ -840,7 +840,7 @@ def _verify_lock_ownership(
 
         return True, data
     except Exception as e:
-        logger.error(f"[daily_market_lock] Error checking lock ownership on {lock_path}: {e}")
+        logger.error(f"[daily_market_lock] Error checking lock ownership on {lock_path} (expected_token={expected_token}, expected_pid={expected_pid}): {e}")
         return False, None
 
 
@@ -912,7 +912,7 @@ def mark_completed(
             logger.info(f"[daily_market_lock] Marked COMPLETED lock for {m_up} on {date_str} (topic={topic_id})")
             return True
     except Exception as e:
-        logger.error(f"[daily_market_lock] Failed to mark COMPLETED for {m_up}: {e}")
+        logger.error(f"[daily_market_lock] Failed to mark COMPLETED for {m_up} (topic={topic_id}, token={lock_token}, pid={owner_pid}): {e}")
         return False
 
 
@@ -1016,7 +1016,7 @@ def mark_exhausted_today(
             logger.info(f"[daily_market_lock] Marked EXHAUSTED_TODAY lock for {m_up} on {date_str} (scan_count={scan_count})")
             return True
     except Exception as e:
-        logger.error(f"[daily_market_lock] Failed to mark EXHAUSTED_TODAY for {m_up}: {e}")
+        logger.error(f"[daily_market_lock] Failed to mark EXHAUSTED_TODAY for {m_up} (scan_count={scan_count}, token={lock_token}, pid={owner_pid}): {e}")
         return False
 
 
@@ -1058,7 +1058,7 @@ def release_lock(
                 cur_data = json.loads(lock_path.read_text(encoding="utf-8"))
             except Exception as _r_err:
                 cur_data = {}
-                logger.debug("[daily_market_lock] Notice reading lock before release: %s", _r_err)
+                logger.debug(f"[daily_market_lock] Notice reading lock before release for {m_up} (token={lock_token}, pid={owner_pid}): {_r_err}")
 
             displaced = cur_data.get("displaced_payload")
             if displaced and isinstance(displaced, dict):
