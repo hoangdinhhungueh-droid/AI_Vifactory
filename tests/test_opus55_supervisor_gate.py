@@ -140,3 +140,36 @@ class TestOpus55SupervisorGate:
         assert digest["estimated_tokens"] <= MAX_SUPERVISOR_INPUT_TOKENS
         assert digest["estimated_tokens"] <= 12000
         assert "2000 passed in 30.0s" in digest["qa_summary"]
+
+    def test_incremental_delta_audit_digest_and_preservation(self):
+        passed_comps = ["core/paths.py", "app/services/alert_cooldown.py"]
+        prev_revs = ["Fix regex pattern in vox/planner.py"]
+        invariance_cert = "✅ 100% INVARIANCE PASS: All 2 previously approved components remain strictly untouched."
+
+        digest = build_anti_bloat_digest(
+            task_id="TEST_DELTA_TASK",
+            task_objective="Verify delta audit preserves passed components and punchlist focus",
+            diff_summary="vox/planner.py | 4 ++--",
+            compact_diff="+ sanitize_narration_line()",
+            qa_summary="tests/vox/test_planner.py PASSED",
+            is_delta_audit=True,
+            round_num=2,
+            invariance_certificate=invariance_cert,
+            previous_revisions=prev_revs,
+            passed_components=passed_comps,
+        )
+
+        assert digest["is_delta_audit"] is True
+        assert digest["round_num"] == 2
+        assert digest["invariance_certificate"] == invariance_cert
+        assert digest["previous_revisions"] == prev_revs
+        assert digest["passed_components"] == passed_comps
+        assert digest["estimated_tokens"] < 2500  # Highly compact
+
+        # Verify dry-run call preserves passed components in component_reviews
+        res = call_opus55_supervisor(digest, dry_run=True)
+        assert res["verdict"] == "APPROVED"
+        reviewed_comps = {c["component"] for c in res["component_reviews"]}
+        for pc in passed_comps:
+            assert pc in reviewed_comps
+        assert any("Incremental delta audit verified" in obs for obs in res["observations"])

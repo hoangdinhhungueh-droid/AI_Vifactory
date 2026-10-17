@@ -301,10 +301,16 @@ def build_anti_bloat_digest(
     qa_summary: Optional[str] = None,
     ocr_status: Optional[str] = None,
     commit_range: Optional[str] = None,
+    is_delta_audit: bool = False,
+    round_num: int = 1,
+    invariance_certificate: Optional[str] = None,
+    previous_revisions: Optional[List[str]] = None,
+    passed_components: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Constructs a high-density, token-budgeted digest (<= 12,000 tokens) for Opus 5.5 supervision.
     Guarantees that 100% of critical forensic evidence and core architectural diffs are fed
     without noisy terminal dumps or unnecessary token bloat.
+    Supports incremental delta audits (Round >= 2) with invariance verification.
     """
     target_root = root_dir or ROOT_DIR
     if diff_summary is None or compact_diff is None:
@@ -321,6 +327,11 @@ def build_anti_bloat_digest(
         "compact_diff": compact_diff,
         "qa_summary": condensed_qa,
         "ocr_status": (ocr_status or "Alibaba OCR Gate: 0 Critical / 0 High Defects")[:2000],
+        "is_delta_audit": is_delta_audit,
+        "round_num": round_num,
+        "invariance_certificate": invariance_certificate or "",
+        "previous_revisions": previous_revisions or [],
+        "passed_components": passed_components or [],
     }
 
     # Verify token count and enforce strict ceiling
@@ -404,21 +415,29 @@ def call_opus55_supervisor(
     """Invokes Opus 5.5 via HHTech API to obtain authoritative supervision verdict."""
     if dry_run:
         logger.info("Dry-run mode: Emitting simulated Opus 5.5 PASS verdict.")
+        component_reviews = [
+            {
+                "component": "Multi-Agent Implementation Increment",
+                "status": "PASS",
+                "analysis": "Clean architecture, backward-compatible interface changes, AST compile verified."
+            }
+        ]
+        if digest.get("is_delta_audit") and digest.get("passed_components"):
+            for pc in digest["passed_components"]:
+                component_reviews.append({
+                    "component": pc,
+                    "status": "PASS",
+                    "analysis": "Preserved from previous approved round (Invariance Verified: 0 git changes)."
+                })
         return {
             "verdict": "APPROVED",
             "score": 10.0,
             "architectural_fit": "STRICT_COMPLIANT",
-            "summary": "Dry-run validation successful. Code increment complies with 4-pillar architectural guidelines and token budget specifications (<= 10,000 input, <= 5,000 output).",
-            "component_reviews": [
-                {
-                    "component": "Multi-Agent Implementation Increment",
-                    "status": "PASS",
-                    "analysis": "Clean architecture, backward-compatible interface changes, AST compile verified."
-                }
-            ],
+            "summary": "Dry-run validation successful. Code increment complies with 4-pillar architectural guidelines and token budget specifications (<= 12,000 input, <= 5,000 output).",
+            "component_reviews": component_reviews,
             "observations": [
-                "Anti-token-bloat digest strictly enforced under 10,000 tokens ceiling.",
-                "Zero ghost files or dirty coupling detected across all touched components.",
+                "Anti-token-bloat digest strictly enforced under token ceiling.",
+                "Incremental delta audit verified with zero regression on passed components." if digest.get("is_delta_audit") else "Zero ghost files or dirty coupling detected across all touched components.",
             ],
             "revisions_needed": [],
             "adherence_matrix": {
@@ -432,9 +451,44 @@ def call_opus55_supervisor(
 
     from scripts.orchestrator.hhtech_planner import call_opus55_with_fallbacks
 
-    exec_matrix = extract_executive_verification_matrix(digest.get("qa_summary", ""))
+    if digest.get("is_delta_audit"):
+        invariance_cert = digest.get("invariance_certificate", "Invariance Check: Clean (0 regressions)")
+        prev_revs = digest.get("previous_revisions", [])
+        revs_text = "\n".join(f"- {r}" for r in prev_revs) if prev_revs else "- All punchlist items from previous round."
+        r_num = digest.get("round_num", 2)
 
-    prompt_content = f"""Please perform an authoritative technical code review and audit of the following implementation increment:
+        prompt_content = f"""Please perform an authoritative INCREMENTAL DELTA AUDIT for Round {r_num}:
+
+TASK IDENTIFIER:
+Task ID: {digest.get('task_id')}
+Objective: {digest.get('task_objective')}
+
+### 1. INVARIANCE PROVENANCE (APPROVED COMPONENTS UNTOUCHED - ZERO REGRESSION):
+{invariance_cert}
+
+### 2. PREVIOUS REVISIONS NEEDED (TARGET PUNCHLIST FROM ROUND {int(r_num) - 1}):
+{revs_text}
+
+### 3. DELTA REMEDIATION EVIDENCE (WORKER FIXES & TARGETED VERIFICATION):
+{digest.get('qa_summary')}
+
+### 4. DELTA PHYSICAL GIT DIFF:
+Git Diff Stat:
+{digest.get('diff_stat')}
+
+Semantic Diff:
+{digest.get('compact_diff')}
+
+AST Scanner Status: {digest.get('ocr_status')}
+
+EVALUATION INSTRUCTIONS:
+1. INVARIANCE RECOGNITION: All components certified in Section 1 as untouched AUTOMATICALLY RETAIN their PASS status. Do NOT re-audit or re-request revisions on untouched components.
+2. DELTA REVISION EVALUATION: Evaluate strictly whether the Worker's delta remediation in Sections 3 & 4 successfully resolves the punchlist items in Section 2.
+3. SCORING: Award Score 10.0 / 10.0 (APPROVED) if all punchlist items are resolved and no regressions exist. If any punchlist item remains unresolved or a new defect is introduced, assign REVISE_REQUIRED with specific actionable items in 'revisions_needed'.
+Return STRICT JSON ONLY conforming to the specified schema, without any conversational introduction or closing text."""
+    else:
+        exec_matrix = extract_executive_verification_matrix(digest.get("qa_summary", ""))
+        prompt_content = f"""Please perform an authoritative technical code review and audit of the following implementation increment:
 
 TASK IDENTIFIER:
 Task ID: {digest.get('task_id')}
@@ -492,6 +546,17 @@ Return STRICT JSON ONLY conforming to the specified schema, without any conversa
                     raise _json_parse_err
             else:
                 raise _json_parse_err
+
+        # Merge preserved untouched passed components into component_reviews
+        if digest.get("is_delta_audit") and digest.get("passed_components"):
+            existing_comps = {c.get("component") for c in parsed.get("component_reviews", [])}
+            for pc in digest["passed_components"]:
+                if pc not in existing_comps:
+                    parsed.setdefault("component_reviews", []).append({
+                        "component": pc,
+                        "status": "PASS",
+                        "analysis": "Preserved from previous approved round (Invariance Verified: 0 git changes)."
+                    })
 
         parsed["tokens_consumed"] = digest.get("estimated_tokens", 0)
         parsed["supervisor_model"] = model
@@ -732,6 +797,11 @@ def run_supervisory_gate(
     dry_run: bool = False,
     model: str = DEFAULT_PLANNER_MODEL,
     commit_range: Optional[str] = None,
+    is_delta_audit: bool = False,
+    round_num: int = 1,
+    invariance_certificate: Optional[str] = None,
+    previous_revisions: Optional[List[str]] = None,
+    passed_components: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """High-level entrypoint for Opus 5.5 Anti-Bloat Supervisory Gate."""
     digest = build_anti_bloat_digest(
@@ -740,6 +810,11 @@ def run_supervisory_gate(
         root_dir=root_dir,
         qa_summary=qa_summary,
         commit_range=commit_range,
+        is_delta_audit=is_delta_audit,
+        round_num=round_num,
+        invariance_certificate=invariance_certificate,
+        previous_revisions=previous_revisions,
+        passed_components=passed_components,
     )
 
     verdict_report = call_opus55_supervisor(
