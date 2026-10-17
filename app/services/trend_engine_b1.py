@@ -126,7 +126,12 @@ def mark_v7_candidate_consumed(candidate_id: str, episode_id: str) -> bool:
 def _send_guarded_alert(alert_type: str, market: str, message: str, state_dir: Optional[str] = None) -> bool:
     """Send an alert to Telegram guarded by cooldown with automatic rollback on failure."""
     m_up = (market or "").upper()
-    if m_up.startswith("TEST_"):
+    if (
+        m_up.startswith("TEST_")
+        or os.getenv("VF_TEST_MODE") == "1"
+        or os.getenv("TELEGRAM_ENABLED") == "0"
+        or os.getenv("VF_SUPPRESS_ALERTS") == "1"
+    ):
         logger.info(f"[{market}] Suppressed live Telegram alert for test market ({alert_type}).")
         return False
 
@@ -756,8 +761,16 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
     ARCHITECTURAL INVARIANT (Boss Round 15 Item 5):
     This helper is a pure notification sink and does NOT touch or mutate daily market locks.
     """
-    # Block notifications if it is a synthetic test seed
-    if topic_data.get("is_test_seed") or topic_data.get("source") == "custom_seed":
+    # Block notifications if it is a synthetic test seed or running in test mode
+    mkt_up = str(topic_data.get("market", "")).upper()
+    if (
+        topic_data.get("is_test_seed")
+        or topic_data.get("source") == "custom_seed"
+        or mkt_up.startswith("TEST_")
+        or os.getenv("VF_TEST_MODE") == "1"
+        or os.getenv("TELEGRAM_ENABLED") == "0"
+        or os.getenv("VF_SUPPRESS_ALERTS") == "1"
+    ):
         logger.info(f"[trend_engine] Skipping Telegram notification for test seed: {topic_data.get('raw_term')}")
         return
 
@@ -1656,6 +1669,8 @@ def discover_and_produce_market_trend(
                     "prod",
                     "--run-id",
                     str(temp_task_id),
+                    "--to",
+                    "s05_director_plan",
                 ]
                 sub_env = os.environ.copy()
                 sub_env["PYTHONPATH"] = f"{_PROJECT_ROOT}{os.pathsep}{sub_env.get('PYTHONPATH', '')}".strip(os.pathsep)
@@ -1828,8 +1843,8 @@ def discover_and_produce_market_trend(
                 scanned_count = min(len(candidates), max_scan_candidates)
                 exhaust_reason = "bottleneck_downstream_gates" if viability_passed_candidates else "no_candidates_passed_viability"
 
-                # 1. First: Stamp EXHAUSTED_TODAY only if full candidate pool was evaluated (Boss Round 11 Item 16)
-                if max_scan_candidates >= MAX_SCAN_CANDIDATES_DEFAULT:
+                # 1. First: Stamp EXHAUSTED_TODAY if full candidate pool or all available candidates were evaluated
+                if max_scan_candidates >= MAX_SCAN_CANDIDATES_DEFAULT or (candidates and scanned_count >= len(candidates)):
                     if not is_terminal_stamped:
                         mark_ok = mark_exhausted_today(
                             market=m_up,

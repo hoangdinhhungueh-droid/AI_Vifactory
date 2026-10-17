@@ -407,6 +407,14 @@ def run_grounding_research(
     else:
         query_text += " Search live web news and official records, then return the JSON factual extraction."
 
+    # Fetch real live news RSS chunks (100% free, zero rate limit, zero 429 error)
+    chunks = fetch_live_news_rss_chunks(topic, market=market, limit=10)
+    rss_context = ""
+    if chunks:
+        rss_context = f"\n\nLIVE GROUND TRUTH NEWS SOURCE ARTICLES (Use these verified facts, metrics, and dates):\n{json.dumps(chunks, ensure_ascii=False, indent=2)}\n"
+
+    query_text += rss_context
+
     payload = {
         "systemInstruction": {
             "parts": [{"text": sys_instruction}]
@@ -415,14 +423,11 @@ def run_grounding_research(
             "parts": [{
                 "text": query_text
             }]
-        }],
-        "tools": [{
-            "googleSearch": {}
         }]
     }
 
     headers = {"Content-Type": "application/json"}
-    candidate_models = ["gemini-2.5-flash"]
+    candidate_models = ["gemini-3.8-flash", "gemini-3.6-flash"]
     last_err = None
 
     for model_name in candidate_models:
@@ -430,7 +435,7 @@ def run_grounding_research(
         max_retries = 2
         for attempt in range(max_retries):
             try:
-                logger.info(f"[grounding] Executing Google Search Grounding with {model_name} (attempt {attempt+1}/{max_retries}) for topic: '{topic[:60]}'")
+                logger.info(f"[grounding] Executing Fact Grounding with {model_name} (attempt {attempt+1}/{max_retries}) for topic: '{topic[:60]}'")
                 req = urllib.request.Request(api_url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
                     raw_data = json.loads(resp.read().decode("utf-8"))
@@ -438,19 +443,6 @@ def run_grounding_research(
                 candidate = raw_data.get("candidates", [{}])[0]
                 parts = candidate.get("content", {}).get("parts", [])
                 text_resp = "".join([p.get("text", "") for p in parts]).strip()
-
-                # Extract grounding metadata (queries and source chunks)
-                grounding_meta = candidate.get("groundingMetadata", {})
-                web_queries = grounding_meta.get("webSearchQueries", [])
-                raw_chunks = grounding_meta.get("groundingChunks", [])
-                grounding_chunks = []
-                for c in raw_chunks:
-                    web = c.get("web", {})
-                    if web:
-                        grounding_chunks.append({
-                            "title": web.get("title", ""),
-                            "uri": web.get("uri", "")
-                        })
 
                 # Safe JSON parsing with regex extraction
                 parsed = None
@@ -470,8 +462,7 @@ def run_grounding_research(
                         repair_prompt = (
                             f"You are an Elite Forensic Research Fact-Finder for an investigative documentary channel.\n"
                             f"Synthesize and extract 12 to 18 verified factual claims for topic '{topic}' based on the following search intelligence:\n"
-                            f"SEARCH QUERIES: {json.dumps(web_queries)}\n"
-                            f"SEARCH SOURCES: {json.dumps(grounding_chunks)}\n"
+                            f"SEARCH SOURCES: {json.dumps(chunks, ensure_ascii=False, indent=2)}\n"
                             f"RAW RESPONSE SNIPPET: {text_resp[:2000]}\n\n"
                             f"Output ONLY valid JSON matching this schema:\n"
                             f'{{\n  "topic": "{topic}",\n  "temporal_cadence": "MACRO_SAGA|MID_TACTICAL|FLASH_CRISIS",\n'
@@ -496,12 +487,12 @@ def run_grounding_research(
                         logger.warning(f"[grounding] Claude Sonnet 5.5 repair error: {sonnet_err}")
 
                 if parsed and parsed.get("claims"):
-                    parsed["grounding_chunks"] = grounding_chunks
-                    parsed["search_queries"] = web_queries
-                    parsed["has_live_search"] = bool(grounding_chunks)
+                    parsed["grounding_chunks"] = chunks
+                    parsed["search_queries"] = [topic]
+                    parsed["has_live_search"] = bool(chunks)
                     if "grounding_model" not in parsed:
-                        parsed["grounding_model"] = "claude-sonnet-5-5"
-                    logger.info(f"[grounding] Successfully extracted {len(parsed.get('claims', []))} claims with {len(grounding_chunks)} search sources via {parsed.get('grounding_model')}.")
+                        parsed["grounding_model"] = model_name
+                    logger.info(f"[grounding] Successfully extracted {len(parsed.get('claims', []))} claims with {len(chunks)} search sources via {parsed.get('grounding_model')}.")
                     return parsed
 
             except json.JSONDecodeError as je:
@@ -515,7 +506,7 @@ def run_grounding_research(
                     time.sleep(wait_sec)
                     continue
                 else:
-                    logger.warning(f"[grounding] HTTP {he.code} on {model_name}. Fallback to claude-sonnet-5-5...")
+                    logger.warning(f"[grounding] HTTP {he.code} on {model_name}. Fallback to next candidate...")
                     break
             except Exception as e:
                 last_err = e
@@ -527,7 +518,7 @@ def run_grounding_research(
 
     # Final robust fallback to Google News RSS search + claude-sonnet-5-5 via HHTech API
     logger.info(f"[grounding] Invoking primary fallback model claude-sonnet-5-5 via HHTech API (with live RSS search)...")
-    return _synthesize_with_claude_sonnet(topic, search_hint=search_hint, market=market)
+    return _synthesize_with_claude_sonnet(topic, search_hint=search_hint, market=market, existing_chunks=chunks)
 
 
 def passes_grounding_gate(
