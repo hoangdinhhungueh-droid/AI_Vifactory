@@ -1126,25 +1126,19 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
     # 1. THREE-WAY PHYSICAL TREE PARITY & GIT PROVENANCE (Rule 126 - Boss Round 15 Priority 1)
     effective_range = _resolve_default_range(commit_range)
     git_head = ""
-    git_tree = ""
     local_ls_z_hash = ""
     try:
         head_res = subprocess.run(["git", "-C", str(ROOT_DIR), "rev-parse", "HEAD"], capture_output=True, text=True, check=False)
         git_head = head_res.stdout.strip()
-        tree_res = subprocess.run(["git", "-C", str(ROOT_DIR), "rev-parse", "HEAD^{tree}"], capture_output=True, text=True, check=False)
-        git_tree = tree_res.stdout.strip()
         remote_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-remote", "origin", "main"], capture_output=True, text=True, check=False)
         local_status_res = subprocess.run(["git", "-C", str(ROOT_DIR), "status", "--porcelain"], capture_output=True, text=True, check=False)
         local_diffstat = subprocess.run(["git", "-C", str(ROOT_DIR), "diff", "--stat", effective_range], capture_output=True, text=True, check=False)
         ls_z_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files", "-z"], capture_output=True, check=False)
         import hashlib
         local_ls_z_hash = hashlib.sha256(ls_z_res.stdout).hexdigest()
-        ls_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files", "-s"], capture_output=True, check=False)
-        local_content_hash = hashlib.sha256(ls_res.stdout).hexdigest()
     except Exception as e:
         local_ls_z_hash = "unknown"
         git_head = "unknown"
-        git_tree = "unknown"
         local_status_res = subprocess.CompletedProcess([], 1, stdout="", stderr=str(e))
         local_diffstat = subprocess.CompletedProcess([], 1, stdout="", stderr=str(e))
         remote_res = subprocess.CompletedProcess([], 1, stdout="", stderr=str(e))
@@ -1346,9 +1340,9 @@ def _collect_trend_forensic_packet(commit_range: Optional[str] = None, task_id: 
         code_win_tests = 0
         out_win_tests = f"Windows tests previously verified in CI (91 passed): {_w_err}"
 
-    u_summary = [l.strip() for l in out_unit_all.splitlines() if any(k in l for k in ["passed in", "failed in"])]
-    v_summary = [l.strip() for l in out_vox_tests.splitlines() if any(k in l for k in ["passed in", "failed in"])]
-    w_summary = [l.strip() for l in out_win_tests.splitlines() if any(k in l for k in ["passed in", "failed in"])]
+    u_summary = [line_item.strip() for line_item in out_unit_all.splitlines() if any(k in line_item for k in ["passed in", "failed in"])]
+    v_summary = [line_item.strip() for line_item in out_vox_tests.splitlines() if any(k in line_item for k in ["passed in", "failed in"])]
+    w_summary = [line_item.strip() for line_item in out_win_tests.splitlines() if any(k in line_item for k in ["passed in", "failed in"])]
 
     summary_u = u_summary[-1] if u_summary else "238 passed (exit code 0)"
     summary_v = v_summary[-1] if v_summary else "67 passed (exit code 0)"
