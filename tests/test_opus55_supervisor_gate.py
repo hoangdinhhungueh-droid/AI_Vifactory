@@ -1,17 +1,16 @@
 """tests/test_opus55_supervisor_gate.py — Tests for Opus 5.5 Anti-Token-Bloat Supervisory Engine."""
 
 import json
-from pathlib import Path
-import pytest
 
 from scripts.orchestrator.opus55_supervisor_gate import (
-    estimate_tokens,
+    MAX_SUPERVISOR_INPUT_TOKENS,
     build_anti_bloat_digest,
     call_opus55_supervisor,
+    condense_qa_telemetry,
+    estimate_tokens,
     run_supervisory_gate,
-    MAX_SUPERVISOR_INPUT_TOKENS,
 )
-from scripts.orchestrator.runner import build_parser, OrchestratorRunner
+from scripts.orchestrator.runner import OrchestratorRunner, build_parser
 
 
 class TestOpus55SupervisorGate:
@@ -104,3 +103,40 @@ class TestOpus55SupervisorGate:
         assert matrix["council_quorum"] == "UNANIMOUS_5_OF_5"
         assert "supreme_supervisor_opus55" in matrix["votes"]
         assert matrix["votes"]["supreme_supervisor_opus55"]["vote"] == "APPROVED"
+
+    def test_condense_qa_telemetry_strips_verbose_passed(self):
+        verbose_lines = [
+            "============================= test session starts =============================",
+            "collected 100 items",
+        ]
+        for i in range(100):
+            verbose_lines.append(f"tests/unit/test_subsystem.py::test_case_{i} PASSED [ {i}%]")
+        verbose_lines.append("FAILED tests/unit/test_critical.py::test_fail - AssertionError: check failed")
+        verbose_lines.append("======================== 99 passed, 1 failed in 4.20s =========================")
+
+        raw_telemetry = "\n".join(verbose_lines)
+        condensed = condense_qa_telemetry(raw_telemetry)
+
+        # Verified: Individual 100 PASSED lines are collapsed into a high-density summary
+        assert "100 individual unit/integration tests PASSED - line-by-line verbosity condensed" in condensed
+        # Verified: Failure is 100% PRESERVED with zero loss
+        assert "FAILED tests/unit/test_critical.py::test_fail - AssertionError: check failed" in condensed
+        assert "99 passed, 1 failed in 4.20s" in condensed
+        assert len(condensed) < len(raw_telemetry) / 4
+
+    def test_build_anti_bloat_digest_enforces_12k_ceiling_with_massive_payload(self):
+        # Giant test outputs and giant diff
+        giant_qa = "\n".join([f"tests/test_{i}.py::test_{i} PASSED [ {i%100}%]" for i in range(2000)])
+        giant_qa += "\n=== 2000 passed in 30.0s ==="
+        giant_diff = "\n".join([f"+ def function_{i}():\n+     return {i} * 2" for i in range(1500)])
+
+        digest = build_anti_bloat_digest(
+            task_id="MASSIVE_SCALE_TASK",
+            task_objective="Verify 12k ceiling under extreme payload stress",
+            compact_diff=giant_diff,
+            qa_summary=giant_qa,
+        )
+
+        assert digest["estimated_tokens"] <= MAX_SUPERVISOR_INPUT_TOKENS
+        assert digest["estimated_tokens"] <= 12000
+        assert "2000 passed in 30.0s" in digest["qa_summary"]
