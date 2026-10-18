@@ -494,12 +494,12 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     )
 
     # 5. Full Non-Integration Pytest Suites: Vox + Codemap + Trend Caps + Adversarial Ghost + Contracts + Render Timeout + CI Neighbor Tester (Boss Item 9, 11 & 12)
-    code_v1, out_v1 = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox/test_camera.py tests/vox/test_cutout.py tests/vox/test_karaoke.py tests/vox/test_multilingual_align.py tests/vox/test_rule_131_and_136.py tests/vox/test_schemas.py tests/vox/test_single_pipeline_truth.py -v", timeout=60)
+    code_v1, out_v1 = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox/test_camera.py tests/vox/test_cutout.py tests/vox/test_karaoke.py tests/vox/test_multilingual_align.py tests/vox/test_rule_131_and_136.py tests/vox/test_schemas.py tests/vox/test_single_pipeline_truth.py tests/vox/test_qa_gates.py tests/vox/test_audio_alignment_adversarial.py -v", timeout=60)
     code_v2, out_v2 = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox/test_e2e.py -v", timeout=60)
     code_v3, out_v3 = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox/test_non_finance_golden.py -v", timeout=60)
     code_pytest_vox = 0 if (code_v1 == 0 and code_v2 == 0 and code_v3 == 0) else 1
     out_pytest_vox = f"{out_v1}\n\n{out_v2}\n\n{out_v3}"
-    code_pytest_ci_unit, out_pytest_ci_unit = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest -v tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py", timeout=300)
+    code_pytest_ci_unit, out_pytest_ci_unit = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest -m 'not integration' -v tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py", timeout=60)
     code_pytest_codemap, out_pytest_codemap = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/codemap -v")
     code_pytest_trend, out_pytest_trend = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_trend_caps_and_gates.py -v")
     code_pytest_ghost, out_pytest_ghost = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/test_ghost_scan_adversarial.py -v")

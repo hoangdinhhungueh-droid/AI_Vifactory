@@ -44,7 +44,11 @@ import re
 import time
 from datetime import datetime, timezone
 
+from app.services.episode_numbering import get_next_episode_id, sanitize_episode_slug
 from core.paths import resolve_raw_pool_dir
+
+__all__ = ["get_next_episode_id", "sanitize_episode_slug"]
+
 
 logger = logging.getLogger("trend_gate_ai")
 try:
@@ -337,30 +341,30 @@ def _lane_gtrends_discover(market, limit=None):
     via pytrends.related_queries(). Complements gtrends_daily_rss (which
     gets news-driven "trending topics") by finding what people actually TYPE
     in the Google search box right now.
-    
+
     Only runs for JP/KR markets (EN has sufficient coverage from 6-geo fan-out
     across other lanes). Returns candidates in standard lane format.
     """
     if market not in ["JP", "KR"]:
         return []
-    
+
     limit = int(limit or LANE_MIN.get("gtrends_discover", 10))
-    
+
     if os.getenv("TREND_GATE_GTRENDS_DISCOVER", "1") != "1":
         return []
-    
+
     try:
         from app.services.trend_free_signals import gtrends_discover_trending_searches
     except Exception as e:
         logger.warning("[gate-ai] gtrends-discover lane import failed %s: %s", market, e)
         return []
-    
+
     try:
         terms = gtrends_discover_trending_searches(market) or []
     except Exception as e:
         logger.warning("[gate-ai] gtrends-discover lane failed %s: %s", market, e)
         return []
-    
+
     candidates = []
     for term in terms[:limit]:
         candidates.append({
@@ -369,7 +373,7 @@ def _lane_gtrends_discover(market, limit=None):
             "signal": "pytrends_trending_searches",
             "market": market
         })
-    
+
     logger.info("[gate-ai] gtrends-discover lane %s: %d candidates", market, len(candidates))
     return candidates
 
@@ -587,9 +591,10 @@ def trend_virality(req: TrendViralityRequest):
     Replaces old theoretical virality scoring with real YouTube & Google Trends data.
     Auto-commits to pending tasks, competitor intel card, permanent history registry, and Notion SoT.
     """
-    from app.services.trend_engine_b1 import discover_and_produce_market_trend as discover_approach_b
-    from app.services import telegram_buttons as tb
     import asyncio
+
+    from app.services import telegram_buttons as tb
+    from app.services.trend_engine_b1 import discover_and_produce_market_trend as discover_approach_b
 
     logger.info("[trend-virality] Triggered Unified Approach B Pipeline for markets EN, JP, KR...")
     approved_topics = []
