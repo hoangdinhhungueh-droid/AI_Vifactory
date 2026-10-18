@@ -82,8 +82,10 @@ class FastVPSClient:
         self.session_id = None
         self._req_id = 0
         self.ctx = ssl.create_default_context()
-        self.ctx.check_hostname = False
-        self.ctx.verify_mode = ssl.CERT_NONE
+        if os.getenv("ALLOW_INSECURE_TLS", "").lower() in ("1", "true", "yes"):
+            logger.warning("INSECURE TLS: Certificate verification disabled via ALLOW_INSECURE_TLS.")
+            self.ctx.check_hostname = False
+            self.ctx.verify_mode = ssl.CERT_NONE
         if auto_connect:
             self.init_session()
 
