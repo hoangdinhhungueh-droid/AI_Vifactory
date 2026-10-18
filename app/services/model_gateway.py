@@ -437,17 +437,17 @@ class ModelGateway:
         Args:
             prompt: Text prompt / evaluation instructions
             image_base64: Base64-encoded JPEG/PNG image data
-            model: Model identifier (default: claude-opus-5-5)
+            model: Model identifier (default: gpt-6.1-sol)
             system_prompt: Optional system prompt
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature
             timeout: Request timeout in seconds
-            fallback: Optional fallback model (e.g., "gpt-6-astra")
+            fallback: Optional fallback model (e.g., "claude-sonnet-5")
             
         Returns:
             Generated text analysis / critique
         """
-        model = model or "claude-opus-5-5"
+        model = model or "gpt-6.1-sol"
         try:
             logger.info(f"[GATEWAY] Calling vision model: {model}")
             return self._call_hhtech(
