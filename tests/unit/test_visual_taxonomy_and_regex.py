@@ -94,6 +94,50 @@ def test_taxonomy_missing_domains_or_markets_fails_closed(tmp_path: Path):
     assert "missing 'markets' mapping" in str(exc_info.value)
 
 
+def test_taxonomy_malformed_nested_structures_fails_closed(tmp_path: Path):
+    """Boss Round 5 Item 4: Tests malformed markets, missing rosters, invalid field types, and bad beat arrays."""
+    # 1. Missing bg_roster
+    no_bg = tmp_path / "no_bg.json"
+    no_bg.write_text('{"domains": {"test": {"markets": {"EN": {"fg_roster": {}}}}}}', encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        _load_visual_taxonomy(custom_path=no_bg)
+    assert "missing 'bg_roster' dict" in str(exc.value)
+
+    # 2. Missing fg_roster
+    no_fg = tmp_path / "no_fg.json"
+    no_fg.write_text('{"domains": {"test": {"markets": {"EN": {"bg_roster": {}}}}}}', encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        _load_visual_taxonomy(custom_path=no_fg)
+    assert "missing 'fg_roster' dict" in str(exc.value)
+
+    # 3. Missing title in roster item
+    no_title = tmp_path / "no_title.json"
+    no_title.write_text('{"domains": {"test": {"markets": {"EN": {"bg_roster": {"bg_1": {"description": "desc", "beats": [1]}}, "fg_roster": {}}}}}}', encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        _load_visual_taxonomy(custom_path=no_title)
+    assert "missing valid 'title'" in str(exc.value)
+
+    # 4. Missing description in roster item
+    no_desc = tmp_path / "no_desc.json"
+    no_desc.write_text('{"domains": {"test": {"markets": {"EN": {"bg_roster": {"bg_1": {"title": "T1", "beats": [1]}}, "fg_roster": {}}}}}}', encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        _load_visual_taxonomy(custom_path=no_desc)
+    assert "missing valid 'description'" in str(exc.value)
+
+    # 5. Invalid beat arrays (empty beats or non-int beats)
+    empty_beats = tmp_path / "empty_beats.json"
+    empty_beats.write_text('{"domains": {"test": {"markets": {"EN": {"bg_roster": {"bg_1": {"title": "T1", "description": "D1", "beats": []}}, "fg_roster": {}}}}}}', encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        _load_visual_taxonomy(custom_path=empty_beats)
+    assert "invalid 'beats' array" in str(exc.value)
+
+    str_beats = tmp_path / "str_beats.json"
+    str_beats.write_text('{"domains": {"test": {"markets": {"EN": {"bg_roster": {"bg_1": {"title": "T1", "description": "D1", "beats": ["one"]}}, "fg_roster": {}}}}}}', encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        _load_visual_taxonomy(custom_path=str_beats)
+    assert "invalid 'beats' array" in str(exc.value)
+
+
 def test_taxonomy_cache_invalidation():
     """Verifies that _reset_taxonomy_cache cleanly clears cached state."""
     _reset_taxonomy_cache()

@@ -148,7 +148,7 @@ def condense_qa_telemetry(qa_summary: str, max_chars: int = 24000) -> str:
 
     result = "\n".join(condensed_lines)
     allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT", "").strip() in ("1", "true", "yes")
-    effective_max = 70000 if allow_massive else max_chars
+    effective_max = 38000 if allow_massive else max_chars
     if len(result) > effective_max:
         head_len = int(effective_max * 0.6)
         tail_len = int(effective_max * 0.4)
@@ -252,7 +252,7 @@ def extract_compact_git_diff(
                 tier_2.append((f_name, f_lines))
 
         allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT", "").strip() in ("1", "true", "yes")
-        eff_max_lines = 1500 if allow_massive else max_lines
+        eff_max_lines = 750 if allow_massive else max_lines
 
         # Process prioritized files
         ordered_chunks = tier_1 + tier_2 + tier_3
@@ -263,7 +263,7 @@ def extract_compact_git_diff(
                 break
 
             file_lines_added = 0
-            max_per_file = 150 if allow_massive else (45 if f_name in [c[0] for c in tier_1] else 25)
+            max_per_file = 95 if allow_massive else (45 if f_name in [c[0] for c in tier_1] else 25)
 
             for line in chunk_lines:
                 if len(meaningful_lines) >= eff_max_lines:

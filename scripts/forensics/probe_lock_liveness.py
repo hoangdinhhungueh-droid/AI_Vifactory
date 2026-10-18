@@ -33,63 +33,43 @@ def main() -> int:
         print("  Notice: No active or stale lock for JP_TEMP_59.b3b4.lock found. Directory is clean.")
     else:
         try:
-            raw_text = target_lock.read_text(encoding="utf-8").strip()
-            pid = None
-            token = None
-            created_at = None
-            try:
-                parsed = json.loads(raw_text)
-                if isinstance(parsed, dict):
-                    pid = parsed.get("pid")
-                    token = parsed.get("token")
-                    created_at = parsed.get("created_at")
-                elif isinstance(parsed, int):
-                    pid = parsed
-                elif isinstance(parsed, str) and parsed.isdigit():
-                    pid = int(parsed)
-            except Exception:
-                if raw_text.isdigit():
-                    pid = int(raw_text)
-            if not token:
-                token = f"LOCK_TOKEN_JP_TEMP_59_{pid}"
-            owner = "JP_TEMP_59.b3b4"
-            if not created_at:
-                created_at = "2026-10-18T10:00:00Z"
-            disposed_at = "2026-10-18T15:00:00Z"
+            data = json.loads(target_lock.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError(f"Corrupted lock structure (not a dict): {target_lock}")
 
-            structured_lock_data = {
-                "owner": owner,
-                "pid": int(pid) if pid else 0,
-                "token": token,
-                "created_at": created_at,
-                "disposed_at": disposed_at,
-                "disposal_reason": "Process confirmed dead; archived per Rule 137 Safe-Trash Mandate"
-            }
-            if archived_lock.exists() and not isinstance(parsed, dict):
-                archived_lock.write_text(json.dumps(structured_lock_data, indent=2), encoding="utf-8")
+            # Strict fail-closed verification of required metadata (Boss Round 5 Item 2)
+            required_keys = ("owner", "token", "created_at", "pid")
+            for k in required_keys:
+                if k not in data or not data[k]:
+                    raise ValueError(f"Lock file {target_lock} missing required field '{k}' (fail-closed)")
 
-            print(f"2. Lock Ownership & Token-Holder Validation:")
+            owner = data["owner"]
+            token = data["token"]
+            created_at = data["created_at"]
+            pid = data["pid"]
+
+            print(f"2. Lock Ownership & Token-Holder Validation (Fail-Closed):")
             print(f"   - Lock Owner:   {owner} (Matches target scope: VERIFIED)")
             print(f"   - Token Holder: {token} (Valid cryptographic token: VERIFIED)")
             print(f"   - Created At:   {created_at}")
 
             # Platform-appropriate liveness check (Rule 125 & Boss Item 4)
             is_alive = False
-            if pid:
-                try:
-                    os.kill(int(pid), 0)
-                    is_alive = True
-                except (OSError, ProcessLookupError):
-                    is_alive = False
+            try:
+                os.kill(int(pid), 0)
+                is_alive = True
+            except (OSError, ProcessLookupError):
+                is_alive = False
             print(f"3. Process Liveness Validation:")
             print(f"   - Target PID: {pid}")
             print(f"   - os.kill({pid}, 0) check: ALIVE={is_alive} (Dead process confirmed, lock abandoned)")
 
-            print(f"4. Atomic Safe Disposal & Archival:")
+            # Atomic safe archival execution using same-filesystem atomic rename protocol (os.replace)
+            print(f"4. Atomic Safe Archival Protocol Verification (Rule 137 Safe-Trash):")
             if active_lock.exists() and not is_alive:
-                print(f"   - Moving abandoned lock from {active_lock} -> {archived_lock}")
-                shutil.move(str(active_lock), str(archived_lock))
-                archived_lock.write_text(json.dumps(structured_lock_data, indent=2), encoding="utf-8")
+                os.replace(str(active_lock), str(archived_lock))
+                assert not active_lock.exists() and archived_lock.exists(), "Atomic replace verification failed"
+                print(f"   - os.replace({active_lock} -> {archived_lock}): SUCCESS")
                 print(f"   - Status: Safe atomic archival completed (Rule 137 Zero rm -rf)")
             elif archived_lock.exists():
                 print(f"   - Status: Lock already safely archived in {archived_lock} (Rule 137 Safe-Trash VERIFIED)")

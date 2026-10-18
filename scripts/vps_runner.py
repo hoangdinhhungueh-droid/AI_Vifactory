@@ -154,9 +154,9 @@ class FastVPSClient:
 
             except Exception as e:
                 print(f"[vps_runner] init_session attempt {attempt} error on {self.url}: {type(e).__name__}: {e}", file=sys.stderr)
-                if len(ENDPOINTS) > 1:
+                if len(self.endpoints) > 1:
                     self.switch_endpoint()
-                time.sleep(1)
+                time.sleep(0.1)
                 if attempt == retries - 1:
                     raise e
         return self.session_id

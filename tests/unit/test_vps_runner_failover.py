@@ -52,3 +52,65 @@ def test_fast_vps_client_initialization_with_custom_endpoint():
     assert client_0.endpoint_idx == 1
     assert client_0.ep["name"] == "isolated_secondary"
     assert client_0.url == "https://mcp-secondary.test.internal/mcp"
+
+
+def test_fast_vps_client_real_failover_and_recovery(monkeypatch):
+    """Boss Round 5 Item 7: Exercises connection failure, endpoint rotation, token selection, and recovery without synthetic production credentials."""
+    import urllib.error
+    import urllib.request
+
+    isolated_endpoints = [
+        {
+            "name": "isolated_primary",
+            "url": "https://mcp-primary.test.internal/mcp",
+            "token": "tok_pri_abc123",
+            "cf_id": "cf_id_primary",
+            "cf_secret": "cf_sec_primary",
+        },
+        {
+            "name": "isolated_secondary",
+            "url": "https://mcp-secondary.test.internal/mcp",
+            "token": "tok_sec_xyz789",
+            "cf_id": "cf_id_secondary",
+            "cf_secret": "cf_sec_secondary",
+        },
+    ]
+
+    call_history = []
+
+    class DummyResponse:
+        headers = {"mcp-session-id": "sess_recovered_secondary_999"}
+        def read(self):
+            return b'{"jsonrpc": "2.0", "result": {}}'
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+
+    def mock_urlopen(req, *args, **kwargs):
+        target_url = req.full_url if hasattr(req, "full_url") else str(req)
+        call_history.append({
+            "url": target_url,
+            "auth": req.headers.get("Authorization"),
+            "cf_id": req.headers.get("Cf-access-client-id"),
+        })
+        if "primary" in target_url:
+            raise urllib.error.URLError("Connection refused to primary endpoint")
+        return DummyResponse()
+
+    monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen)
+
+    client = FastVPSClient(endpoint_idx=0, auto_connect=True, endpoints=isolated_endpoints)
+    # Assert client successfully failed over and recovered
+    assert client.endpoint_idx == 1
+    assert client.ep["name"] == "isolated_secondary"
+    assert client.url == "https://mcp-secondary.test.internal/mcp"
+    assert client.token == "tok_sec_xyz789"
+    assert client.session_id == "sess_recovered_secondary_999"
+
+    # Verify that primary failed first, then secondary was contacted with correct token
+    assert len(call_history) >= 2
+    assert "primary" in call_history[0]["url"]
+    assert call_history[0]["auth"] == "Bearer tok_pri_abc123"
+    assert "secondary" in call_history[1]["url"]
+    assert call_history[1]["auth"] == "Bearer tok_sec_xyz789"

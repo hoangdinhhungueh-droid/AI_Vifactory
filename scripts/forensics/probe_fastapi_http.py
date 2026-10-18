@@ -106,14 +106,13 @@ def main() -> int:
     try:
         req_chat = urllib.request.Request(f"{base_url}/v1/chat/completions", data=chat_payload, headers=headers_auth)
         try:
-            resp_chat = urllib.request.urlopen(req_chat, timeout=5)
-            print(f"  [PASS] {'/v1/chat/completions':20} -> HTTP {resp_chat.getcode()} OK")
-        except urllib.error.HTTPError as he:
-            # Upstream dispatch or Notion gate handled response
-            if he.code in (200, 400, 422, 502):
-                print(f"  [PASS] {'/v1/chat/completions':20} -> Handled HTTP {he.code} (Notion intent gate active)")
+            resp_chat = urllib.request.urlopen(req_chat, timeout=15)
+            if resp_chat.getcode() == 200:
+                print(f"  [PASS] {'/v1/chat/completions':20} -> HTTP 200 OK")
             else:
-                failures.append(f"Auth POST /v1/chat/completions unexpected HTTP {he.code}")
+                failures.append(f"Auth POST /v1/chat/completions expected HTTP 200, got {resp_chat.getcode()}")
+        except urllib.error.HTTPError as he:
+            failures.append(f"Auth POST /v1/chat/completions failed with HTTP {he.code}: {he.reason}")
     except Exception as e:
         failures.append(f"Auth POST /v1/chat/completions raised: {e}")
 

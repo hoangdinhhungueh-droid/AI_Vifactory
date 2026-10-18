@@ -72,6 +72,24 @@ def _load_visual_taxonomy(custom_path: Optional[Path] = None) -> Dict[str, Any]:
                     raise ValueError(f"Domain '{d_name}' must be a dict: {tax_path}")
                 if "markets" not in d_val or not isinstance(d_val["markets"], dict):
                     raise ValueError(f"Domain '{d_name}' missing 'markets' mapping: {tax_path}")
+                for mkt_name, mkt_val in d_val["markets"].items():
+                    if not isinstance(mkt_val, dict):
+                        raise ValueError(f"Market '{mkt_name}' in domain '{d_name}' must be a dict: {tax_path}")
+                    if "bg_roster" not in mkt_val or not isinstance(mkt_val["bg_roster"], dict):
+                        raise ValueError(f"Market '{mkt_name}' in domain '{d_name}' missing 'bg_roster' dict: {tax_path}")
+                    if "fg_roster" not in mkt_val or not isinstance(mkt_val["fg_roster"], dict):
+                        raise ValueError(f"Market '{mkt_name}' in domain '{d_name}' missing 'fg_roster' dict: {tax_path}")
+                    for r_type, r_map in [("bg_roster", mkt_val["bg_roster"]), ("fg_roster", mkt_val["fg_roster"])]:
+                        for item_k, item_v in r_map.items():
+                            if not isinstance(item_v, dict):
+                                raise ValueError(f"Item '{item_k}' in {r_type} must be a dict: {tax_path}")
+                            if not isinstance(item_v.get("title"), str) or not item_v["title"]:
+                                raise ValueError(f"Item '{item_k}' in {r_type} missing valid 'title': {tax_path}")
+                            if not isinstance(item_v.get("description"), str) or not item_v["description"]:
+                                raise ValueError(f"Item '{item_k}' in {r_type} missing valid 'description': {tax_path}")
+                            beats = item_v.get("beats")
+                            if not isinstance(beats, list) or not beats or not all(isinstance(b, int) for b in beats):
+                                raise ValueError(f"Item '{item_k}' in {r_type} invalid 'beats' array: {tax_path}")
             if custom_path is None:
                 _TAXONOMY_CACHE = data
             return data

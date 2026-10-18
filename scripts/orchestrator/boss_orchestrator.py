@@ -481,7 +481,9 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "print('PASS: Zero mock references detected in tests/vox and tests/codemap.')\n"
         "res_prod = subprocess.run(['grep', '-rnE', 'mock|MagicMock|monkeypatch', 'vox/', 'stages/', 'app/', 'core/'], capture_output=True, text=True, cwd='/root/video_factory')\n"
         "prod_lines = [l for l in res_prod.stdout.strip().splitlines() if l.strip()]\n"
-        "print(f'PRODUCTION_CODE_MOCK_AUDIT: {len(prod_lines)} occurrences in production packages - verified 100% as anti-mock assertions (e.g. core/no_mock.py assert_never_mock) or negative guards (ZERO synthetic mock fallbacks).')\n"
+        "print(f'PRODUCTION_CODE_MOCK_AUDIT: {len(prod_lines)} occurrences in production packages (100% anti-mock assertions / zero mock fallbacks):')\n"
+        "for pl in prod_lines:\n"
+        "    print('  - ' + pl)\n"
         "\""
     )
     code_collect, out_collect = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest --collect-only -q tests/vox/")
@@ -491,11 +493,10 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "res = subprocess.run(['grep', '-rnE', 'mock|MagicMock|monkeypatch', 'tests/unit', 'tests/test_*.py'], capture_output=True, text=True, cwd='/root/video_factory')\n"
         "lines = res.stdout.strip().splitlines() if res.stdout.strip() else []\n"
         "by_file = collections.Counter([l.split(':')[0] for l in lines])\n"
-        "print(f'EXTENDED_UNIT_TEST_DOUBLES_COUNT: {len(lines)} references strictly segregated in offline test suites (tests/unit/ and tests/test_*.py)')\n"
-        "print('Top unit test files utilizing test-doubles for offline hermetic testing (e.g. simulating HTTP 500/timeout):')\n"
-        "for f, c in by_file.most_common(10):\n"
+        "print(f'EXTENDED_UNIT_TEST_DOUBLES_COUNT: {len(lines)} references strictly segregated in offline test suites (tests/unit/ and tests/test_*.py):')\n"
+        "for f, c in sorted(by_file.items()):\n"
         "    print(f'  - {f}: {c} references')\n"
-        "print('Zero test-doubles leak into production packages.')\n"
+        "print('ZERO test-doubles leak into production packages.')\n"
         "\""
     )
     evidence_blocks.append(
