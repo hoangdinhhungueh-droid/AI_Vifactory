@@ -46,19 +46,25 @@ FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06", "ac
 _TAXONOMY_CACHE: Optional[Dict[str, Any]] = None
 
 def _load_visual_taxonomy() -> Dict[str, Any]:
-    """Loads external taxonomy config (Rule 128 & 132 SoT)."""
+    """Loads external taxonomy config (Rule 128 & 132 SoT).
+    Fails closed if taxonomy file is missing or corrupted.
+    """
     global _TAXONOMY_CACHE
     if _TAXONOMY_CACHE is not None:
         return _TAXONOMY_CACHE
     tax_path = ROOT_DIR / "config" / "taxonomies" / "visual_rosters.json"
-    if tax_path.exists():
-        try:
-            with open(tax_path, "r", encoding="utf-8") as f:
-                _TAXONOMY_CACHE = json.load(f)
-                return _TAXONOMY_CACHE
-        except Exception as _e:
-            logger.warning(f"[unified_vox_director] Failed to load visual taxonomy: {_e}")
-    return {}
+    if not tax_path.exists():
+        raise FileNotFoundError(f"[unified_vox_director] Critical SoT failure: visual taxonomy file not found: {tax_path}")
+    try:
+        with open(tax_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if not isinstance(data, dict) or not data:
+                raise ValueError(f"Taxonomy root must be a non-empty JSON object: {tax_path}")
+            _TAXONOMY_CACHE = data
+            return _TAXONOMY_CACHE
+    except Exception as _e:
+        logger.error(f"[unified_vox_director] Fail-closed: corrupted visual taxonomy file {tax_path}: {_e}")
+        raise
 
 def generate_topic_anchored_roster(
     topic: str,

@@ -155,6 +155,23 @@ def health(request: Request):
     return resp
 
 # ── Auth Helper ─────────────────────────────────────────────────────────────
+def _populate_env_from_secrets() -> None:
+    for p in ["/root/secrets/.env", str(Path(__file__).resolve().parent.parent / ".env")]:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip('"').strip("'")
+                            if k and k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+
+_populate_env_from_secrets()
 VF_API_TOKEN = os.getenv("VF_API_TOKEN", "").strip()
 _last_unset_token_log_time: float = 0.0
 _unset_token_lock = threading.Lock()

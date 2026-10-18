@@ -253,3 +253,62 @@ def test_a10_domain_taxonomy_robust_matching_and_negative_case():
     assert "bg_boj_market_operations_floor" in bgs_fin or "bg_jgb_syndicate_auction_hall" in bgs_fin, "Finance case failed to select JGB/BOJ roster"
 
 
+def test_a11_taxonomy_loader_fail_closed_on_missing_or_corrupt_file(tmp_path, monkeypatch):
+    """A11: Verifies that visual taxonomy loader fails closed on missing or corrupt files (Boss Round 2 Item 6)."""
+    import json
+    import pytest
+    from app.services import unified_vox_director
+
+    # Reset cache
+    monkeypatch.setattr(unified_vox_director, "_TAXONOMY_CACHE", None)
+
+    # 1. Missing file -> raises FileNotFoundError
+    non_existent = tmp_path / "does_not_exist.json"
+    monkeypatch.setattr(unified_vox_director, "ROOT_DIR", tmp_path)
+    with pytest.raises(FileNotFoundError) as exc_info:
+        unified_vox_director._load_visual_taxonomy()
+    assert "Critical SoT failure" in str(exc_info.value)
+
+    # 2. Corrupt file -> raises json.decoder.JSONDecodeError or ValueError
+    tax_dir = tmp_path / "config" / "taxonomies"
+    tax_dir.mkdir(parents=True, exist_ok=True)
+    corrupt_file = tax_dir / "visual_rosters.json"
+    corrupt_file.write_text("{invalid_json: true,", encoding="utf-8")
+    monkeypatch.setattr(unified_vox_director, "_TAXONOMY_CACHE", None)
+    with pytest.raises(Exception):
+        unified_vox_director._load_visual_taxonomy()
+
+    # Reset cache
+    monkeypatch.setattr(unified_vox_director, "_TAXONOMY_CACHE", None)
+
+
+def test_a12_taxonomy_schema_integrity():
+    """A12: Verifies that all visual taxonomy entries conform to required schema keys (Boss Round 2 Item 6)."""
+    from app.services.unified_vox_director import _load_visual_taxonomy
+    tax = _load_visual_taxonomy()
+    assert "domains" in tax, "Taxonomy missing 'domains' root key"
+    domains = tax["domains"]
+    assert "healthcare" in domains, "Taxonomy missing 'healthcare' domain"
+    hc = domains["healthcare"]
+    assert "keywords_cjk" in hc, "Healthcare domain missing 'keywords_cjk'"
+    assert "keywords_en_regex" in hc, "Healthcare domain missing 'keywords_en_regex'"
+    assert "negative_finance_tokens" in hc, "Healthcare domain missing 'negative_finance_tokens'"
+    assert "markets" in hc and "JP" in hc["markets"], "Healthcare missing JP market"
+
+    jp_market = hc["markets"]["JP"]
+    assert "bg_roster" in jp_market, "JP market missing 'bg_roster'"
+    assert "fg_roster" in jp_market, "JP market missing 'fg_roster'"
+
+    req_bg_keys = {"title", "description", "beats"}
+    for bg_key, bg_val in jp_market["bg_roster"].items():
+        missing = req_bg_keys - set(bg_val.keys())
+        assert not missing, f"Healthcare background {bg_key} missing required keys: {missing}"
+        assert len(bg_val["description"].strip()) > 10, f"Healthcare background {bg_key} has empty/short description"
+
+    req_fg_keys = {"title", "description", "role", "type", "keywords"}
+    for fg_key, fg_val in jp_market["fg_roster"].items():
+        missing = req_fg_keys - set(fg_val.keys())
+        assert not missing, f"Healthcare foreground {fg_key} missing required keys: {missing}"
+
+
+

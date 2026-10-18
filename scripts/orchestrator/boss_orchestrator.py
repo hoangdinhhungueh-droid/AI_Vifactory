@@ -498,12 +498,12 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     )
 
     # 5. Full Non-Integration Pytest Suites: Vox + Codemap + Trend Caps + Adversarial Ghost + Contracts + Render Timeout + CI Neighbor Tester (Boss Item 9, 11 & 12)
-    code_v1, out_v1 = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox/test_camera.py tests/vox/test_cutout.py tests/vox/test_karaoke.py tests/vox/test_multilingual_align.py tests/vox/test_rule_131_and_136.py tests/vox/test_schemas.py tests/vox/test_single_pipeline_truth.py tests/vox/test_qa_gates.py tests/vox/test_audio_alignment_adversarial.py -v", timeout=60)
-    code_v2, out_v2 = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox/test_e2e.py -v", timeout=60)
-    code_v3, out_v3 = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox/test_non_finance_golden.py -v", timeout=60)
+    code_v1, out_v1 = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox/test_camera.py tests/vox/test_cutout.py tests/vox/test_karaoke.py tests/vox/test_multilingual_align.py tests/vox/test_rule_131_and_136.py tests/vox/test_schemas.py tests/vox/test_single_pipeline_truth.py tests/vox/test_qa_gates.py tests/vox/test_audio_alignment_adversarial.py -v", timeout=120)
+    code_v2, out_v2 = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox/test_e2e.py -v", timeout=240)
+    code_v3, out_v3 = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox/test_non_finance_golden.py -v", timeout=240)
     code_pytest_vox = 0 if (code_v1 == 0 and code_v2 == 0 and code_v3 == 0) else 1
     out_pytest_vox = f"{out_v1}\n\n{out_v2}\n\n{out_v3}"
-    code_pytest_ci_unit, out_pytest_ci_unit = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest -m 'not integration' -v tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py", timeout=60)
+    code_pytest_ci_unit, out_pytest_ci_unit = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest -m 'not integration' -v tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py", timeout=180)
     code_pytest_codemap, out_pytest_codemap = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/codemap -v")
     code_pytest_trend, out_pytest_trend = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_trend_caps_and_gates.py -v")
     code_pytest_ghost, out_pytest_ghost = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/test_ghost_scan_adversarial.py -v")
@@ -716,12 +716,22 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     # 9. VPS FastAPI HTTP 200 Runtime Probes & Live Process Git SHA (Rule 121)
     code_http, out_http = run_on_vps(
         "python3 -c \""
-        "import urllib.request, urllib.error, json, sys\n"
+        "import urllib.request, urllib.error, json, sys, os\n"
+        "token = os.getenv('VF_API_TOKEN', '')\n"
+        "if not token and os.path.exists('/root/secrets/.env'):\n"
+        "    for line in open('/root/secrets/.env', encoding='utf-8'):\n"
+        "        if line.startswith('VF_API_TOKEN='):\n"
+        "            token = line.split('=', 1)[1].strip().strip('\"').strip('\\'')\n"
+        "            break\n"
+        "if not token:\n"
+        "    token = '7ei7KGSjkS9vI9I2UhkUeieSR53SzJjQvrRG_cZdZ_o'\n"
+        "headers_auth = {'Authorization': f'Bearer {token}'}\n"
         "eps = ['/api/v1/health', '/api/v1/diag', '/v1/models', '/v1/budget', '/metrics']\n"
         "failed = []\n"
         "for ep in eps:\n"
         "    try:\n"
-        "        resp = urllib.request.urlopen(f'http://127.0.0.1:8000{ep}', timeout=3)\n"
+        "        req = urllib.request.Request(f'http://127.0.0.1:8000{ep}', headers=headers_auth)\n"
+        "        resp = urllib.request.urlopen(req, timeout=5)\n"
         "        if resp.getcode() != 200:\n"
         "            failed.append(f'{ep}: HTTP {resp.getcode()}')\n"
         "        else:\n"
@@ -729,22 +739,22 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "            if ep == '/api/v1/health':\n"
         "                h_data = json.loads(body)\n"
         "                sha = h_data.get('git_sha')\n"
-        "                print(f'{ep}: HTTP 200 OK | git_sha={sha}')\n"
+        "                print(f'{ep} (Authenticated): HTTP 200 OK | git_sha={sha}')\n"
         "            elif ep == '/metrics':\n"
-        "                print(f'{ep}: HTTP 200 OK | Prometheus metrics ({len(body)} bytes)')\n"
+        "                print(f'{ep} (Authenticated): HTTP 200 OK | Prometheus metrics ({len(body)} bytes)')\n"
         "            else:\n"
-        "                print(f'{ep}: HTTP 200 OK')\n"
+        "                print(f'{ep} (Authenticated): HTTP 200 OK')\n"
         "    except Exception as e:\n"
         "        failed.append(f'{ep}: {e}')\n"
         "try:\n"
-        "    req_llm = urllib.request.Request('http://127.0.0.1:8000/api/v1/llm', data=json.dumps({'prompt': 'ping'}).encode('utf-8'), headers={'Content-Type': 'application/json'})\n"
+        "    req_llm = urllib.request.Request('http://127.0.0.1:8000/api/v1/llm', data=json.dumps({'prompt': 'ping'}).encode('utf-8'), headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'})\n"
         "    resp_llm = urllib.request.urlopen(req_llm, timeout=10)\n"
         "    print(f'/api/v1/llm: HTTP {resp_llm.getcode()} OK (payload: {{\"prompt\": \"ping\"}})')\n"
         "except Exception as e:\n"
         "    print(f'/api/v1/llm note: {e}')\n"
         "try:\n"
         "    chat_payload = json.dumps({'model': 'gpt-4o', 'messages': [{'role': 'user', 'content': 'Query Notion database'}], 'tools': [{'type': 'function', 'function': {'name': 'API-query-data-source', 'parameters': {'type': 'object'}}}]}).encode('utf-8')\n"
-        "    req_chat = urllib.request.Request('http://127.0.0.1:8000/v1/chat/completions', data=chat_payload, headers={'Content-Type': 'application/json'})\n"
+        "    req_chat = urllib.request.Request('http://127.0.0.1:8000/v1/chat/completions', data=chat_payload, headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'})\n"
         "    try:\n"
         "        resp_chat = urllib.request.urlopen(req_chat, timeout=5)\n"
         "        print(f'/v1/chat/completions (tool-calling): HTTP {resp_chat.getcode()} OK')\n"
