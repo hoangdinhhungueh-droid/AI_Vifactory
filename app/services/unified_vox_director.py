@@ -12,15 +12,16 @@ Compliant with:
 - Rule 445 (5-Beat Docudrama Storyboard Structure)
 """
 
-import os
-import sys
-import re
+import argparse
 import json
 import logging
-import argparse
-import yaml
+import os
+import re
+import sys
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +34,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from app.services.prompt_forge import _sanitize_foreground_prompt, _sanitize_background_prompt
-from app.services.sfx_registry import (
-    get_canonical_sfx_list,
-    is_valid_sfx,
-    resolve_semantic_foley
-)
+from app.services.prompt_forge import _sanitize_background_prompt, _sanitize_foreground_prompt
+from app.services.sfx_registry import get_canonical_sfx_list, is_valid_sfx, resolve_semantic_foley
 
 FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06", "acc_07"]
 
@@ -69,7 +66,7 @@ def _generate_topic_anchored_roster_fallback(
         metric_highlight = "FORENSIC QUANTITATIVE RECORD // AUDIT FINDING"
 
     pat = r'(?i)\b(debts?|bonds?|yields?|rates?|banks?|dollars?|currency|currencies|rollover|finances?|financial|gdp|imf|fed|treasury|inflation|credits?|365|trillions?|securities|deficits?|채무|국채|금리|国債)\b'
-    is_financial = bool(re.search(pat, (topic or "").lower()))
+    is_financial = bool(re.search(pat, topic_low))
 
     if is_financial:
         # =========================================================================
@@ -1475,7 +1472,7 @@ def format_final_veo_prompt(
     mot = preset.get("motion_behavior", "")
     neg = preset.get("negative", "")
     lt = lighting or preset.get("lighting_defaults", "")
-    
+
     prompt = (
         f"{pos}, {mot}. "
         f"Scene: {subject} {action} in {setting}. "
@@ -2205,7 +2202,7 @@ def build_unified_director_plan(
         is_collage_mode = (resolved_layout_variant == "paper_collage")
         scene_obj["layoutVariant"] = resolved_layout_variant
         scene_obj["sceneLayoutMode"] = resolved_layout_variant
-        from app.services.vox_automated_director import VOX_PAPER_MATERIALS_LIBRARY, DIORAMA_STYLE_BLOCKS
+        from app.services.vox_automated_director import DIORAMA_STYLE_BLOCKS, VOX_PAPER_MATERIALS_LIBRARY
         paper_mat_keys = list(VOX_PAPER_MATERIALS_LIBRARY.keys())
         if paper_mat_keys:
             mat_key = paper_mat_keys[(idx + beat_idx) % len(paper_mat_keys)]
@@ -2366,7 +2363,7 @@ def build_unified_director_plan(
             for sc in scenes
         ]
     }
-    
+
     # Ghi vào ep_dir và /var/vf/episodes/<ep_id> nếu có
     target_dirs = [ep_dir]
     var_ep_dir = Path(f"/var/vf/episodes/{ep_id}")
@@ -2511,7 +2508,7 @@ def main():
     fg_roster = result.get("foreground_roster", {})
 
     # 1. Sanitize & Forge Prompts (B3.5)
-    from app.services.prompt_forge import _synthesize_vox_collage_prompt, UNIVERSAL_VOX_ANIMATION_PROMPT
+    from app.services.prompt_forge import UNIVERSAL_VOX_ANIMATION_PROMPT, _synthesize_vox_collage_prompt
     mkt = ep_id.split("_")[0].upper() if ep_id and "_" in ep_id else "EN"
     bg_prompts = {k: _sanitize_background_prompt(v["description"], bg_key=k, market=mkt) for k, v in bg_roster.items()}
     fg_prompts = {k: _sanitize_foreground_prompt(v["description"], fg_key=k, market=mkt) for k, v in fg_roster.items()}

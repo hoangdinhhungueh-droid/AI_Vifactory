@@ -297,6 +297,7 @@ def run(ctx: RunContext) -> StageArtifact:
 
     # Synchronize director_plan.json to episode directory for Remotion & downstream consumers
     import os
+    from pathlib import Path
     ep_candidates = [
         Path(os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")) / ctx.run_id,
         ctx.paths.repo_root / "episodes" / ctx.run_id,
