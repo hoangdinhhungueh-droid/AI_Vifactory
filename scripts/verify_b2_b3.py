@@ -8,7 +8,6 @@ Returns exit code 0 on PASS, 1 on FAIL.
 """
 
 import argparse
-import hashlib
 import json
 import sys
 import unicodedata
@@ -176,9 +175,9 @@ def verify_episode(episode_id_or_path: str, repo_root: Path = ROOT_DIR) -> bool:
     else:
         print("🎉 ALL FORENSIC CHECKS PASSED (100% Zero-Mock & Parity Verified)!")
         print(f"   • {len(scenes)} scenes fully decomposed with physical objects & kinematics.")
-        print(f"   • 100% narration preservation without alterations.")
-        print(f"   • Zero mock canary remnants detected.")
-        print(f"   • Both Omni and Google Flow I2V prompts ready for production.")
+        print("   • 100% narration preservation without alterations.")
+        print("   • Zero mock canary remnants detected.")
+        print("   • Both Omni and Google Flow I2V prompts ready for production.")
         return True
 
 

@@ -15,7 +15,7 @@ import logging
 import re
 import unicodedata
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -24,7 +24,7 @@ logger = logging.getLogger("b2_b3_contract")
 
 class B2ContractError(RuntimeError):
     """Raised when B2 spoken script is missing, empty, or fails contract shape.
-    
+
     Rule 118 & Rule 125: Strictly fail-closed. Never silently fallback to mock beats.
     """
     pass
@@ -132,7 +132,7 @@ def segment_multilingual(text: str, market: str = "JA") -> List[str]:
     m_up = (market or "JA").upper()
     if m_up in {"JA", "JP"}:
         return segment_ja(text)
-    
+
     # Generic Latin / CJK segmentation
     norm = unicodedata.normalize("NFKC", text).strip()
     # Split by standard sentence delimiters
@@ -149,7 +149,7 @@ def load_spoken_script(
     market: str = "JA"
 ) -> SpokenScript:
     """Strictly loads B2 spoken script from an episode directory.
-    
+
     Tries in priority order:
     1. spoken_sentences.json (Pre-split sentences from story_engine_b2)
     2. spoken_script.txt (Verbatim full spoken narration)
