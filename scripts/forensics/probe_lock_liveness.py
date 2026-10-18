@@ -33,10 +33,23 @@ def main() -> int:
         print("  Notice: No active or stale lock for JP_TEMP_59.b3b4.lock found. Directory is clean.")
     else:
         try:
-            lock_data = json.loads(target_lock.read_text(encoding="utf-8"))
-            pid = lock_data.get("pid")
-            token = lock_data.get("token")
-            created_at = lock_data.get("created_at")
+            raw_text = target_lock.read_text(encoding="utf-8").strip()
+            pid = None
+            token = None
+            created_at = None
+            try:
+                parsed = json.loads(raw_text)
+                if isinstance(parsed, dict):
+                    pid = parsed.get("pid")
+                    token = parsed.get("token")
+                    created_at = parsed.get("created_at")
+                elif isinstance(parsed, int):
+                    pid = parsed
+                elif isinstance(parsed, str) and parsed.isdigit():
+                    pid = int(parsed)
+            except Exception:
+                if raw_text.isdigit():
+                    pid = int(raw_text)
             print(f"  Lock Metadata: PID={pid}, Token={token}, CreatedAt={created_at}")
 
             # Platform-appropriate liveness check (Rule 125 & Boss Item 4)
