@@ -9,8 +9,6 @@ Rigorous test cases (A1 to A13) enforcing:
 4. Full CJK Japanese quote & currency preservation.
 """
 
-import glob
-import os
 import re
 from pathlib import Path
 
@@ -18,11 +16,8 @@ import pytest
 
 from core.contracts.b2_b3_contract import (
     B2ContractError,
-    SpokenBeat,
-    SpokenScript,
     load_spoken_script,
     segment_ja,
-    segment_multilingual,
 )
 
 CANARY_MOCK_STRINGS = [
@@ -149,4 +144,4 @@ def test_a7_static_scan_zero_default_beats_in_production():
             if matches:
                 violations.append(f"{py_file}: found {len(matches)} occurrences of 'default_beats'")
 
-    assert not violations, f"Production code contains default_beats! Violations:\n" + "\n".join(violations)
+    assert not violations, "Production code contains default_beats! Violations:\n" + "\n".join(violations)

@@ -1,8 +1,9 @@
 """tests/test_model_gateway_preflight.py — Verify Pre-Flight Token Sanitizer & Prompt Caching Header in ModelGateway."""
 
-import os
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from app.services.model_gateway import ModelGateway, ModelGatewayError
 
 

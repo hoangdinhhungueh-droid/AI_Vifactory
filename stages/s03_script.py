@@ -7,17 +7,16 @@ Implements Stage Shape Standard. Produces structured Scene objects governed by R
 
 from __future__ import annotations
 
-import time
-import json
 import logging
+import time
 from typing import List
 
-logger = logging.getLogger(__name__)
-
-from core.contracts.stages import StageID, StageArtifact, Provenance, Scene
 from core.config import RunContext
-from core.gates import require_input, emit_artifact
+from core.contracts.stages import Provenance, Scene, StageArtifact, StageID
+from core.gates import emit_artifact, require_input
 from tools.codemap.runtime import pipeline_stage
+
+logger = logging.getLogger(__name__)
 
 STAGE: StageID = StageID.S3_SCRIPT
 
@@ -41,7 +40,7 @@ def run(ctx: RunContext) -> StageArtifact:
     topic = s2_art.payload.get("topic", "Corporate Monopoly Inquest")
 
     # Strict B2 Spoken Script Ingestion (Rule 118 Zero-Mock & Rule 125 Single Pipeline)
-    from core.contracts.b2_b3_contract import load_spoken_script, B2ContractError
+    from core.contracts.b2_b3_contract import load_spoken_script
 
     market = "JA" if "JP_" in ctx.run_id else ("KO" if "KR_" in ctx.run_id else ("VI" if "VN_" in ctx.run_id else "EN"))
     spoken_script = load_spoken_script(ctx.paths.root, episode_id=ctx.run_id, market=market)

@@ -10,13 +10,12 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from core.config import RunContext
 from core.contracts.stages import Provenance, Scene, Shot, StageArtifact, StageID
 from core.gates import emit_artifact, validate_artifact
 from tools.codemap.runtime import pipeline_stage
-from vox.planner import plan_scenes_from_script
 
 logger = logging.getLogger("s05_director_plan")
 

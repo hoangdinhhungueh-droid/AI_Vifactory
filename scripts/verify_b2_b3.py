@@ -10,7 +10,6 @@ Returns exit code 0 on PASS, 1 on FAIL.
 import argparse
 import hashlib
 import json
-import os
 import sys
 import unicodedata
 from pathlib import Path
