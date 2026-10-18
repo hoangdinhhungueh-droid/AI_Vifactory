@@ -449,30 +449,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_quarantine_dirs, out_quarantine_dirs = run_on_vps("ls -la /root/video_factory/archive /root/video_factory/.trash /root/video_factory/.safe_trash /root/video_factory/temp_test /root/video_factory/active_candidate 2>&1 || true")
     code_inv_explicit, out_inv_explicit = run_on_vps("python3 /root/video_factory/scripts/legacy_inventory.py")
     code_retained, out_retained = run_on_vps("git -C /root/video_factory ls-files 'vox/*.py' 'stages/*.py' 'app/main.py' 'app/services/trend_engine_b1.py' 'app/services/daily_market_lock.py' 'app/services/unified_vox_director.py'")
-    code_lock_provenance, out_lock_provenance = run_on_vps(
-        "python3 -c \""
-        "import os, json\n"
-        "print('=== LOCK DISPOSAL PROVENANCE & PROCESS LIVENESS (Boss Round 3 Item 4) ===')\n"
-        "stale_path = '/var/vf/locks/_stale/JP_TEMP_59.b3b4.lock'\n"
-        "active_path = '/var/vf/locks/JP_TEMP_59.b3b4.lock'\n"
-        "print('1. Active Lock Exists:', os.path.exists(active_path))\n"
-        "print('2. Stale Archive Exists:', os.path.exists(stale_path))\n"
-        "if os.path.exists(stale_path):\n"
-        "    try:\n"
-        "        data = json.load(open(stale_path))\n"
-        "        pid = data.get('pid')\n"
-        "        print('   Stale Lock Data:', data)\n"
-        "        try:\n"
-        "            os.kill(int(pid), 0)\n"
-        "            alive = True\n"
-        "        except OSError:\n"
-        "            alive = False\n"
-        "        print(f'3. PID {pid} Liveness Check: ALIVE={alive} (Dead process confirmed - abandoned lock)')\n"
-        "    except Exception as e:\n"
-        "        print('   Error reading stale lock:', e)\n"
-        "print('4. Safe Disposal: Archived to /var/vf/locks/_stale/ per Rule 137 Safe-Trash Mandate (Zero rm -rf)')\n"
-        "\""
-    )
+    code_lock_provenance, out_lock_provenance = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_lock_liveness.py")
     evidence_blocks.append(
         f"### [3. SINGLE PIPELINE TRUTH & LEGACY CODEBASE PURGE (Rule 125)]\n"
         f"Legacy Purge Commit: 2456870 (feat(vox): implement single unified vox pipeline with tactile object decomposition and purge legacy pipeline)\n"
@@ -2328,7 +2305,7 @@ def check_invariance_and_resolve_delta(
         )
 
     delta_range = f"{last_head}..HEAD"
-    return True, invariance_cert, passed_components, previous_revisions, delta_range
+    return True, invariance_cert, passed_components, previous_revisions, commit_range or delta_range
 
 
 def run_phase_audit(
