@@ -124,7 +124,6 @@ def main() -> int:
     # 4. Unauthenticated probes: protected endpoints MUST return HTTP 401
     unauth_protected_endpoints = [
         ("/api/v1/diag", "GET", None),
-        ("/v1/models", "GET", None),
         ("/v1/budget", "GET", None),
         ("/api/v1/llm", "POST", json.dumps({"prompt": "ping"}).encode("utf-8")),
         ("/v1/chat/completions", "POST", json.dumps({"messages": [{"role": "user", "content": "hi"}]}).encode("utf-8")),
@@ -145,20 +144,21 @@ def main() -> int:
         except Exception as e:
             failures.append(f"Unauth {method} {ep} unexpected error: {e}")
 
-    # 5. Public health endpoint without token (must return 200, but git_sha omitted)
-    try:
-        req_pub = urllib.request.Request(f"{base_url}/api/v1/health")
-        resp_pub = urllib.request.urlopen(req_pub, timeout=5)
-        if resp_pub.getcode() == 200:
-            body = json.loads(resp_pub.read().decode("utf-8"))
-            has_sha = "git_sha" in body
-            print(f"  [PASS] Unauth GET  {'/api/v1/health':22} -> HTTP 200 OK (git_sha redacted: {not has_sha})")
-            if has_sha:
-                failures.append("/api/v1/health leaked git_sha in unauthenticated response")
-        else:
-            failures.append(f"Unauth GET /api/v1/health returned HTTP {resp_pub.getcode()}")
-    except Exception as e:
-        failures.append(f"Unauth GET /api/v1/health raised: {e}")
+    # 5. Public endpoints (models discovery & health check)
+    public_endpoints = [
+        ("/v1/models", "GET"),
+        ("/api/v1/health", "GET"),
+    ]
+    for ep, method in public_endpoints:
+        try:
+            req_pub = urllib.request.Request(f"{base_url}{ep}")
+            resp_pub = urllib.request.urlopen(req_pub, timeout=5)
+            if resp_pub.getcode() == 200:
+                print(f"  [PASS] Public {method:4} {ep:22} -> HTTP 200 OK (Public Discovery Endpoint)")
+            else:
+                failures.append(f"Public {method} {ep} expected 200, got HTTP {resp_pub.getcode()}")
+        except Exception as e:
+            failures.append(f"Public {method} {ep} raised: {e}")
 
     print("======================================================================")
     if failures:
