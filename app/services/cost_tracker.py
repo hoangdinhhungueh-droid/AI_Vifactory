@@ -38,6 +38,7 @@ class CostTracker:
     # - astra 6 (gpt-6-astra) = opus 5.5 (claude-opus-5-5) = 2.000 VND / 1M tokens (2.0 VND / 1k tokens)
     # - Các fallback khác (gpt-5-sol, claude-sonnet-5, claude-3.5-sonnet, kimi-k3, default) = 1.600 VND / 1M tokens (1.6 VND / 1k tokens)
     RATES_PER_1M = {
+        "gpt-6.1-sol": 800.0,
         "gpt-6-astra": 2000.0,
         "claude-opus-5-5": 2000.0,
         "claude-opus-5": 2000.0,
@@ -52,6 +53,7 @@ class CostTracker:
     # Rates in VND per 1k tokens (used by _calculate_cost: rate * tokens / 1000)
     RATES = {
         # LLM models (VND per 1k tokens)
+        "gpt-6.1-sol": 0.8,            # 800 VND / 1M tokens
         "gpt-6-astra": 2.0,            # 2.000 VND / 1M tokens
         "claude-opus-5-5": 2.0,        # 2.000 VND / 1M tokens
         "claude-opus-5": 2.0,          # 2.000 VND / 1M tokens
