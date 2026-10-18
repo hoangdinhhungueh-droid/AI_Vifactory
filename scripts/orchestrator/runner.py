@@ -83,8 +83,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--planner-model",
-        default="claude-opus-5-5",
-        help="LLM model used for Phase 0 planning brain & supervision (default: claude-opus-5-5 via HHTech API)",
+        default="gpt-6.1-sol",
+        help="LLM model used for Phase 0 planning brain & supervision (default: gpt-6.1-sol via HHTech API, fallback claude-sonnet-5)",
     )
     parser.add_argument(
         "--supervise-with-opus",
@@ -1077,7 +1077,7 @@ class OrchestratorRunner:
                 root_dir=self.root_dir,
                 qa_summary=qa_notes,
                 dry_run=self.args.dry_run,
-                model=getattr(self.args, "planner_model", "claude-opus-5-5"),
+                model=getattr(self.args, "planner_model", "gpt-6.1-sol"),
             )
             supervisor_details = gate_res["supervision"]
             supervisor_vote = supervisor_details.get("verdict", "REVISE_REQUIRED")
@@ -1219,7 +1219,7 @@ class OrchestratorRunner:
             task_objective=objective,
             root_dir=self.root_dir,
             dry_run=self.args.dry_run,
-            model=getattr(self.args, "planner_model", "claude-opus-5-5"),
+            model=getattr(self.args, "planner_model", "gpt-6.1-sol"),
             commit_range=getattr(self.args, "commit_range", None),
         )
         sup = gate_res["supervision"]
