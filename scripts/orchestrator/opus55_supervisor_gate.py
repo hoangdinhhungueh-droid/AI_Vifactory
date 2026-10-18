@@ -40,7 +40,7 @@ if str(ROOT_DIR) not in sys.path:
 MAX_SUPERVISOR_INPUT_TOKENS = 12000
 MAX_SUPERVISOR_OUTPUT_TOKENS = 5000
 TARGET_DIFF_MAX_LINES = 450
-DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
+DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "gpt-6.1-sol")
 
 SUPERVISOR_SYSTEM_PROMPT = """You are an expert Principal Software Architect and Systems Auditor performing an authoritative technical code review and audit for the AI Video Factory production codebase.
 Your responsibility is to perform an evidence-based technical evaluation of implementation increments based on raw physical telemetry, Git diffs, test suite results, and CI logs.
