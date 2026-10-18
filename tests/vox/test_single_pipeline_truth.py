@@ -9,6 +9,7 @@ Guarantees:
 """
 
 import ast
+import os
 from pathlib import Path
 
 
@@ -44,74 +45,81 @@ def test_legacy_routes_absent_from_ast():
         assert c_target in extracted_routes, f"Expected canonical route '{c_target}' missing from app/main.py!"
 
 
-def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200(monkeypatch):
+def test_runtime_legacy_routes_return_404_and_canonical_routes_return_200():
     """Runs runtime 404 tests against FastAPI app without skip (fail-closed, Rule 125/127)."""
-    monkeypatch.setenv("VF_API_TOKEN", "test_secret_truth_token")
-    from fastapi.testclient import TestClient
+    old_token = os.environ.get("VF_API_TOKEN")
+    os.environ["VF_API_TOKEN"] = "test_secret_truth_token"
+    try:
+        from fastapi.testclient import TestClient
 
-    from app.main import app
-    client = TestClient(app)
+        from app.main import app
+        client = TestClient(app)
 
-    legacy_routes = [
-        "/produce_episode",
-        "/run_episode",
-        "/api/v1/produce_episode",
-        "/api/v1/run_episode",
-        "/trigger_video_generation",
-    ]
-    for route in legacy_routes:
-        assert client.post(route, json={"topic": "Test"}).status_code == 404
-        assert client.get(route).status_code == 404
-
-    # Behavioral parity on surviving canonical endpoints
-    # 1. Health
-    res_h = client.get("/api/v1/health")
-    assert res_h.status_code == 200
-    assert res_h.json().get("status") == "ok"
-    assert "git_sha" in res_h.json()
-
-    # 2. Diag (Authenticated canonical endpoint)
-    auth_headers = {"Authorization": "Bearer test_secret_truth_token"}
-    res_d = client.get("/api/v1/diag", headers=auth_headers)
-    assert res_d.status_code == 200
-    assert res_d.json().get("status") == "ok"
-
-    # 3. Models
-    res_m = client.get("/v1/models")
-    assert res_m.status_code == 200
-    assert res_m.json().get("object") == "list"
-
-    # 4. Budget (Authenticated canonical endpoint)
-    res_b = client.get("/v1/budget", headers=auth_headers)
-    assert res_b.status_code == 200
-    assert any(p in res_b.json() for p in ("openrouter", "gemini", "cerebras", "mistral"))
-
-    # 5. LLM Endpoint schema validation (fails closed with 422 on invalid/missing payload)
-    res_l_empty = client.post("/api/v1/llm", json={})
-    assert res_l_empty.status_code == 422
-
-    # 6. Notion Gate logic behavioral parity
-    from app.main import NOTION_KEEP, _apply_notion_gates
-    kept_tool = next(iter(NOTION_KEEP))
-    dummy_body = {
-        "tools": [
-            {"function": {"name": kept_tool}},
-            {"function": {"name": "API-unauthorized-shadow-call"}},
-            {"function": {"name": "local_calc"}},
+        legacy_routes = [
+            "/produce_episode",
+            "/run_episode",
+            "/api/v1/produce_episode",
+            "/api/v1/run_episode",
+            "/trigger_video_generation",
         ]
-    }
-    # Test NOTION CAP: unconditional stripping of non-whitelisted API-*
-    gated_cap = _apply_notion_gates(dummy_body, last_user="inspect notion db", autonomous=False)
-    tool_names_cap = [t["function"]["name"] for t in gated_cap["tools"]]
-    assert kept_tool in tool_names_cap
-    assert "API-unauthorized-shadow-call" not in tool_names_cap
-    assert "local_calc" in tool_names_cap
+        for route in legacy_routes:
+            assert client.post(route, json={"topic": "Test"}).status_code == 404
+            assert client.get(route).status_code == 404
 
-    # Test NOTION INTENT GATE: strips ALL API-* when message has 0 notion intent
-    gated_intent = _apply_notion_gates(dummy_body, last_user="tell me a joke about dogs", autonomous=False)
-    tool_names_intent = [t["function"]["name"] for t in gated_intent["tools"]]
-    assert not any(name.startswith("API-") for name in tool_names_intent)
-    assert "local_calc" in tool_names_intent
+        # Behavioral parity on surviving canonical endpoints
+        # 1. Health
+        res_h = client.get("/api/v1/health")
+        assert res_h.status_code == 200
+        assert res_h.json().get("status") == "ok"
+        assert "git_sha" in res_h.json()
+
+        # 2. Diag (Authenticated canonical endpoint)
+        auth_headers = {"Authorization": "Bearer test_secret_truth_token"}
+        res_d = client.get("/api/v1/diag", headers=auth_headers)
+        assert res_d.status_code == 200
+        assert res_d.json().get("status") == "ok"
+
+        # 3. Models
+        res_m = client.get("/v1/models")
+        assert res_m.status_code == 200
+        assert res_m.json().get("object") == "list"
+
+        # 4. Budget (Authenticated canonical endpoint)
+        res_b = client.get("/v1/budget", headers=auth_headers)
+        assert res_b.status_code == 200
+        assert any(p in res_b.json() for p in ("openrouter", "gemini", "cerebras", "mistral"))
+
+        # 5. LLM Endpoint schema validation (fails closed with 422 on invalid/missing payload)
+        res_l_empty = client.post("/api/v1/llm", json={})
+        assert res_l_empty.status_code == 422
+
+        # 6. Notion Gate logic behavioral parity
+        from app.main import NOTION_KEEP, _apply_notion_gates
+        kept_tool = next(iter(NOTION_KEEP))
+        dummy_body = {
+            "tools": [
+                {"function": {"name": kept_tool}},
+                {"function": {"name": "API-unauthorized-shadow-call"}},
+                {"function": {"name": "local_calc"}},
+            ]
+        }
+        # Test NOTION CAP: unconditional stripping of non-whitelisted API-*
+        gated_cap = _apply_notion_gates(dummy_body, last_user="inspect notion db", autonomous=False)
+        tool_names_cap = [t["function"]["name"] for t in gated_cap["tools"]]
+        assert kept_tool in tool_names_cap
+        assert "API-unauthorized-shadow-call" not in tool_names_cap
+        assert "local_calc" in tool_names_cap
+
+        # Test NOTION INTENT GATE: strips ALL API-* when message has 0 notion intent
+        gated_intent = _apply_notion_gates(dummy_body, last_user="tell me a joke about dogs", autonomous=False)
+        tool_names_intent = [t["function"]["name"] for t in gated_intent["tools"]]
+        assert not any(name.startswith("API-") for name in tool_names_intent)
+        assert "local_calc" in tool_names_intent
+    finally:
+        if old_token is not None:
+            os.environ["VF_API_TOKEN"] = old_token
+        else:
+            os.environ.pop("VF_API_TOKEN", None)
 
 
 def test_single_pipeline_import_graph_and_stages_delegation():

@@ -1,0 +1,228 @@
+{
+  "version": "1.0.0",
+  "description": "Rule 128 & Rule 132 Canonical Visual Taxonomy SoT for Topic-Anchored Director Rosters (AVF-STAB-001).",
+  "domains": {
+    "healthcare": {
+      "keywords_cjk": [
+        "医療",
+        "クリニック",
+        "病院",
+        "歯科",
+        "診療所",
+        "医師",
+        "患者",
+        "レセプト",
+        "薬局",
+        "医薬品",
+        "閉院",
+        "病床",
+        "中医協",
+        "診療報酬"
+      ],
+      "keywords_en_regex": "(?<![a-z])(clinic|hospital|doctor|dental|pharmac|medic|healthcare|physician|patient|prescription|reimbursement)",
+      "negative_finance_tokens": [
+        "JGB",
+        "国債",
+        "日銀",
+        "利回り",
+        "BOJ",
+        "債券",
+        "長期金利",
+        "イールドカーブ"
+      ],
+      "markets": {
+        "JP": {
+          "metric_highlight_default": "医療機関倒産動向統計 // 東京商工リサーチ公表値",
+          "bg_roster": {
+            "bg_clinic_waiting_room": {
+              "title": "地域医療クリニック待合室",
+              "description": "Cinematic wide-angle interior of Japanese neighborhood medical clinic waiting room, warm wooden reception counter, empty waiting chairs with pastel vinyl cushions, wall bulletin board with consultation hours and infection control notices, diffused daylight through frosted glass doors, quiet poignant community healthcare atmosphere, clean negative space.",
+              "beats": [1, 2]
+            },
+            "bg_clinic_director_examination_room": {
+              "title": "クリニック院長診察室",
+              "description": "Authentic Japanese clinic doctor consultation office, dark oak desk with diagnostic stethoscope, electronic medical record terminal displaying patient queue in soft focus, anatomical skeletal charts on muted gray walls, directional desk lamp light, serious clinical diagnostic gravity.",
+              "beats": [1, 4]
+            },
+            "bg_dental_operatory_bay": {
+              "title": "地域歯科診療所診療ユニット",
+              "description": "Modern Japanese dental clinic operatory bay, ergonomic patient chair with overhead circular examination lamp, sterile stainless steel instrument tray, frosted glass partition, quiet clinical documentary atmosphere.",
+              "beats": [1, 3]
+            },
+            "bg_dispensing_pharmacy_counter": {
+              "title": "門前調剤薬局受付カウンター",
+              "description": "Japanese dispensing pharmacy interior, clean white service counter with plastic prescription intake tray, shelves lined with amber medicine bottles in soft background focus, bright diffused fluorescent illumination.",
+              "beats": [2, 3]
+            },
+            "bg_chuikyo_statutory_negotiation_hall": {
+              "title": "中央社会保険医療協議会総会議場",
+              "description": "Kasumigaseki formal government ministry negotiation chamber for Central Social Insurance Medical Council Chuikyo, horseshoe conference tables with brass microphones and official wooden delegate nameplates, austere bureaucratic regulatory authority.",
+              "beats": [2, 4]
+            },
+            "bg_social_insurance_fund_processing_center": {
+              "title": "社会保険診療報酬支払基金審査室",
+              "description": "Spacious administrative institutional processing hall with endless desks piled with blue medical fee receipt audit folders, glowing dual-monitor terminals in soft focus, slate partitions, meticulous bureaucratic verification atmosphere.",
+              "beats": [3, 4]
+            },
+            "bg_regional_bankruptcy_court_hearing_room": {
+              "title": "地方裁判所破産管財人審問室",
+              "description": "Austere judicial hearing room in Japanese district court, elevated polished cedar judge bench, long wooden tables for bankruptcy administrator and debtor representatives, solemn judicial reckoning mood.",
+              "beats": [4, 5]
+            },
+            "bg_closed_clinic_entrance_night": {
+              "title": "夜間閉鎖された駅前診療所玄関",
+              "description": "Exterior street-level view of closed Japanese neighborhood clinic at night, glass automatic sliding doors dark with taped white paper notice reading '閉院のお知らせ', dim streetlamp amber reflection on wet asphalt, poignant systemic loss.",
+              "beats": [1, 5]
+            },
+            "bg_tokyo_shoko_research_press_room": {
+              "title": "信用調査機関動向速報記者会見室",
+              "description": "Corporate intelligence press briefing room with large presentation display showing rising corporate and clinic bankruptcy charts, microphone lectern, rows of empty chairs in soft focus.",
+              "beats": [1, 4]
+            },
+            "bg_regional_bank_loan_consultation_booth": {
+              "title": "地方銀行事業融資相談ブース",
+              "description": "Private banking consultation booth with frosted glass acoustic dividers, wooden meeting table with loan repayment amortization schedules and corporate balance sheets, tense financial negotiation mood.",
+              "beats": [2, 3]
+            },
+            "bg_medical_equipment_warehouse": {
+              "title": "医療機器差押・再販物流デポ",
+              "description": "Vast industrial storage warehouse with rows of decommissioned ultrasound scanners, X-ray consoles, and surgical equipment with yellow asset auction tags, cool overhead industrial lighting.",
+              "beats": [3, 4]
+            },
+            "bg_mhlw_medical_policy_corridor": {
+              "title": "厚生労働省医政局本庁舎廊下",
+              "description": "Long quiet institutional corridor in Kasumigaseki Ministry of Health Labour and Welfare building, polished linoleum floor reflecting overhead recessed lights, heavy office doors with brass plaques, bureaucratic stillness.",
+              "beats": [2, 5]
+            },
+            "bg_medical_association_executive_board": {
+              "title": "日本医師会政策提言臨時代議員会館",
+              "description": "Formal medical association assembly hall, dark cedar wainscoting, rows of conference desks with microphones, dignified professional leadership atmosphere.",
+              "beats": [3, 5]
+            },
+            "bg_hospital_accounting_office": {
+              "title": "医療法人総務経理統括室",
+              "description": "Crowded administrative backoffice of medical practice, metal desks stacked with pending supplier bills, invoice binders, computer screens showing cash-flow deficit warnings, late-night tension.",
+              "beats": [2, 4]
+            },
+            "bg_suburban_clinic_street_dusk": {
+              "title": "郊外住宅街医療モール夕景",
+              "description": "Wide twilight street view of suburban Japanese community medical center building, glowing acrylic signboards for internal medicine and pediatrics, darkening indigo evening sky, quiet residential scale.",
+              "beats": [1, 5]
+            },
+            "bg_district_court_insolvency_archive": {
+              "title": "地方裁判所民事破産原簿記録書庫",
+              "description": "High-density steel archive vault filled with standardized legal case file boxes holding corporate and medical insolvency dockets, clean polished concrete floor, forensic legal discovery mood.",
+              "beats": [4, 5]
+            }
+          },
+          "fg_roster": {
+            "fg_character_clinic_director_doctor": {
+              "title": "地域医療クリニック院長",
+              "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a veteran Japanese clinic director in white lab coat over navy scrubs with stethoscope, grave weary resolute expression, holding diagnostic clipboard, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Clinic Physician Lead",
+              "beats": [1, 2, 4],
+              "keywords": ["doctor", "clinic", "physician", "院長", "医師", "内科", "診療所"],
+              "type": "character"
+            },
+            "fg_character_dental_clinic_director": {
+              "title": "街の歯科診療所院長",
+              "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of an intense Japanese dentist in surgical scrub top, holding printed dental material price surge invoice with furrowed brow, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Dental Practice Lead",
+              "beats": [1, 2, 3],
+              "keywords": ["dentist", "dental", "歯科", "歯科医院", "院長", "歯科医"],
+              "type": "character"
+            },
+            "fg_character_chuikyo_bureaucrat": {
+              "title": "厚生労働省医療課長・中医協調査官",
+              "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a senior Japanese health ministry official in dark tailored suit and wire spectacles, holding thick official statutory fee schedule binder with unyielding bureaucratic posture, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Regulatory Pricing Authority",
+              "beats": [2, 3, 5],
+              "keywords": ["mhlw", "chuikyo", "official", "厚生労働省", "中医協", "診療報酬", "官僚"],
+              "type": "character"
+            },
+            "fg_character_bankruptcy_receiver_attorney": {
+              "title": "裁判所選任破産管財人弁護士",
+              "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a meticulous Japanese bankruptcy trustee attorney in dark charcoal suit with gold attorney sunflower lapel pin, reviewing court liquidation docket with stern analytical authority, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Judicial Liquidation Trustee",
+              "beats": [3, 4, 5],
+              "keywords": ["lawyer", "attorney", "trustee", "receiver", "管財人", "弁護士", "破産"],
+              "type": "character"
+            },
+            "fg_character_regional_bank_loan_officer": {
+              "title": "地方銀行事業融資審査担当役",
+              "description": "Waist-up three-quarter angle action stylized editorial graphic novel digital illustration of a conflicted Japanese regional bank loan manager in business suit, holding red-flagged pandemic loan repayment schedule binder, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Commercial Credit Officer",
+              "beats": [2, 3, 4],
+              "keywords": ["banker", "loan", "lender", "融資", "地銀", "銀行員", "返済"],
+              "type": "character"
+            },
+            "fg_evidence_unpaid_medical_fee_receipt": {
+              "title": "未払社会保険診療報酬レセプト請求書",
+              "description": "Tactile paper medical insurance fee receipt reimbursement claim form with Japanese kanji grid columns, showing highlighted 2-month payment delay gap, red payment fund processing seal, crisp cutout edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Reimbursement Lag Exhibit",
+              "beats": [1, 2, 3],
+              "keywords": ["receipt", "reimbursement", "claim", "レセプト", "請求書", "支払基金"],
+              "type": "document"
+            },
+            "fg_evidence_chuikyo_statutory_fee_schedule": {
+              "title": "中医協告示診療報酬点数表",
+              "description": "Official 300gsm Japanese statutory medical fee schedule codex open to clinic outpatient consultation tariffs, fixed point values highlighted in red marker ink, official ministerial seal, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Fixed Price Regulation Proof",
+              "beats": [1, 2, 5],
+              "keywords": ["fee", "schedule", "points", "tariff", "点数表", "公定価格", "診療報酬"],
+              "type": "document"
+            },
+            "fg_evidence_zero_zero_loan_repayment_notice": {
+              "title": "コロナ特例ゼロゼロ融資元金返済督促状",
+              "description": "Formal commercial bank credit demand notice on heavy paper, stamped with bold crimson warning box reading '元金据置期間満了 // 返済開始督促', outstanding multi-million yen balance in crisp typography, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Pandemic Debt Burden Proof",
+              "beats": [2, 3, 4],
+              "keywords": ["loan", "pandemic", "zero-zero", "notice", "融資", "ゼロゼロ融資", "督促状"],
+              "type": "document"
+            },
+            "fg_evidence_clinic_insolvency_liquidation_docket": {
+              "title": "医療法人破産手続開始申立決定書",
+              "description": "Official Japanese district court legal filing document with bold title '破産手続開始決定通知書', stamped with large square vermilion court seal, crisp document paper texture with clean sharp edges, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Bankruptcy Climax Exhibit",
+              "beats": [1, 4, 5],
+              "keywords": ["docket", "insolvency", "court", "filing", "破産申立", "裁判所", "倒産"],
+              "type": "document"
+            },
+            "fg_evidence_tokyo_shoko_bankruptcy_report": {
+              "title": "東京商工リサーチ医療機関倒産動向報告書",
+              "description": "High-contrast quantitative bar graph research document on heavy paper, displaying ascending historical peak of 59 clinic bankruptcies highlighted in fluorescent red ink, official research agency masthead, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Quantitative Insolvency Metric",
+              "beats": [1, 3, 5],
+              "keywords": ["report", "research", "statistics", "tsr", "東京商工リサーチ", "59件", "動向"],
+              "type": "data_metric"
+            },
+            "fg_evidence_pharmaceutical_wholesaler_unpaid_invoice": {
+              "title": "医薬品卸連盟未収金回収督促票",
+              "description": "Carbon-copy commercial invoice for essential clinical pharmaceuticals and medical consumables with prominent red overdue stamp reading '至急支払要請', detailed line-item drug prices, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Operational Cost Pressure Exhibit",
+              "beats": [2, 3, 4],
+              "keywords": ["invoice", "pharma", "drugs", "wholesaler", "医薬品", "卸", "請求書"],
+              "type": "document"
+            },
+            "fg_evidence_shuttered_clinic_closure_announcement": {
+              "title": "診療所閉院告知書掲示板",
+              "description": "Formal paper announcement on clinic letterhead reading '閉院のおしらせ', stamped with director doctor personal circular red hanko seal, corner adhesive tape textures, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Community Impact Artifact",
+              "beats": [1, 4, 5],
+              "keywords": ["closure", "announcement", "notice", "閉院", "告知", "お知らせ"],
+              "type": "document"
+            },
+            "fg_evidence_stethoscope_prescription_pad": {
+              "title": "聴診器と未交付処方箋束",
+              "description": "Classic stainless steel medical stethoscope resting atop a pad of Japanese official prescription forms on clinic wooden desk, tactile documentary medical realism, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Core Medical Emblem",
+              "beats": [1, 2, 5],
+              "keywords": ["stethoscope", "prescription", "pad", "聴診器", "処方箋", "医療器具"],
+              "type": "document"
+            }
+          }
+        }
+      }
+    }
+  }
+}

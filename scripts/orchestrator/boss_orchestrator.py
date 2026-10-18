@@ -368,15 +368,18 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         remote_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-remote", "origin", "main"], capture_output=True, text=True, check=False)
         local_status_res = subprocess.run(["git", "-C", str(ROOT_DIR), "status", "--porcelain"], capture_output=True, text=True, check=False)
         local_content_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files", "-s"], capture_output=True, text=True, check=False)
+        local_path_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files", "-z"], capture_output=True, check=False)
         import hashlib
         local_content_hash = hashlib.sha256(local_content_res.stdout.encode("utf-8")).hexdigest()
+        local_path_hash = hashlib.sha256(local_path_res.stdout).hexdigest()
         evidence_blocks.append(
             f"### [1. GIT SOURCE PROVENANCE & THREE-WAY TREE PARITY (Rule 126)]\n"
-            f"Local Windows HEAD SHA:      {git_head}\n"
-            f"Local Windows Tree Hash:     {git_tree}\n"
-            f"Local Windows Content Hash:  {local_content_hash}\n"
-            f"Local Windows Porcelain:     [{local_status_res.stdout.strip()}]\n"
-            f"Origin Remote Main SHA:      {remote_res.stdout.strip()}\n"
+            f"Local Windows HEAD SHA:           {git_head}\n"
+            f"Local Windows Tree Hash:          {git_tree}\n"
+            f"Local Windows Content Hash (-s):  {local_content_hash}\n"
+            f"Local Windows Path Hash (-z):     {local_path_hash}\n"
+            f"Local Windows Porcelain:          [{local_status_res.stdout.strip()}]\n"
+            f"Origin Remote Main SHA:           {remote_res.stdout.strip()}\n"
         )
     except Exception as e:
         evidence_blocks.append(f"### [1. GIT SOURCE PROVENANCE]\nFailed to query local git: {e}\n")
@@ -420,7 +423,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_vps, out_vps = run_on_vps(
         "echo 'VPS HEAD: ' $(git -C /root/video_factory rev-parse HEAD) && "
         "echo 'VPS Tree: ' $(git -C /root/video_factory rev-parse 'HEAD^{tree}') && "
-        "echo 'VPS Content Hash: ' $(git -C /root/video_factory ls-files -s | sha256sum) && "
+        "echo 'VPS Content Hash (-s): ' $(git -C /root/video_factory ls-files -s | sha256sum) && "
+        "echo 'VPS Path Hash (-z): ' $(git -C /root/video_factory ls-files -z | sha256sum) && "
         "echo 'VPS Git Diff Cleanliness Exit Code: ' $(git -C /root/video_factory diff --quiet HEAD; echo $?) && "
         "echo 'VPS Porcelain Status: [' \"$(git -C /root/video_factory status --porcelain=v1 --untracked-files=all)\" ']'"
     )
@@ -444,7 +448,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_ghost_live, out_ghost_live = run_on_vps("python3 /root/video_factory/tools/ghost_scan.py")
     code_quarantine_dirs, out_quarantine_dirs = run_on_vps("ls -la /root/video_factory/archive /root/video_factory/.trash /root/video_factory/.safe_trash /root/video_factory/temp_test /root/video_factory/active_candidate 2>&1 || true")
     code_inv_explicit, out_inv_explicit = run_on_vps("python3 /root/video_factory/scripts/legacy_inventory.py")
-    code_retained, out_retained = run_on_vps("git -C /root/video_factory ls-files 'vox/*.py' 'stages/*.py' 'app/main.py' 'app/services/trend_engine_b1.py' 'app/services/daily_market_lock.py'")
+    code_retained, out_retained = run_on_vps("git -C /root/video_factory ls-files 'vox/*.py' 'stages/*.py' 'app/main.py' 'app/services/trend_engine_b1.py' 'app/services/daily_market_lock.py' 'app/services/unified_vox_director.py'")
     evidence_blocks.append(
         f"### [3. SINGLE PIPELINE TRUTH & LEGACY CODEBASE PURGE (Rule 125)]\n"
         f"Legacy Purge Commit: 2456870 (feat(vox): implement single unified vox pipeline with tactile object decomposition and purge legacy pipeline)\n"

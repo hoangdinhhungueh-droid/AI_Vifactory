@@ -9,6 +9,7 @@ Rigorous test cases (A1 to A13) enforcing:
 4. Full CJK Japanese quote & currency preservation.
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -185,10 +186,16 @@ def test_a8_director_plan_spatial_decomposition_and_kinematics(tmp_path):
         omni_prompt_low = sc["i2v_prompt_omni"].lower()
         assert "paper" in omni_prompt_low and "cutout" in omni_prompt_low
 
+        # 4. Strict Zero-JGB Finance Lexicon Negative Assertion across all scene fields (Boss Item 3)
+        finance_blacklist = ["jgb", "国債", "日銀", "boj", "利回り", "sovereign bond", "yield curve", "ktb"]
+        sc_dump = f"{sc.get('headline', '')} {sc.get('scene_title', '')} {sc.get('visual_metaphor', '')} {sc.get('i2v_prompt_omni', '')} {json.dumps(objs)}".lower()
+        for bad_tok in finance_blacklist:
+            assert bad_tok not in sc_dump, f"Forbidden finance/JGB token '{bad_tok}' leaked into healthcare scene: {sc.get('scene_id')}"
+
 
 def test_a9_healthcare_roster_zero_jgb_bonds_leak():
-    """A9: Verifies topic-anchored healthcare roster contains clinical assets and 0 JGB bond leaks (Rule 128)."""
-    from app.services.unified_vox_director import _generate_topic_anchored_roster_fallback
+    """A9: Verifies topic-anchored healthcare roster contains clinical assets and 0 JGB bond leaks (Rule 128 & Boss Item 3)."""
+    from app.services.unified_vox_director import generate_topic_anchored_roster
 
     topic = "医療機関 倒産 過去最多59件"
     claims = [
@@ -196,15 +203,53 @@ def test_a9_healthcare_roster_zero_jgb_bonds_leak():
         "Straight liquidation accounted for over 97% of clinic failures.",
         "Reimbursement payments from the Social Insurance Fund take 2 months.",
     ]
-    bgs, fgs = _generate_topic_anchored_roster_fallback(topic, "JP", ["59件"], claims)
+    bgs, fgs = generate_topic_anchored_roster(topic, "JP", ["59件"], claims)
 
     # Must contain authentic clinical assets
     assert "bg_clinic_waiting_room" in bgs or "bg_clinic_director_examination_room" in bgs
     assert any("clinic" in k or "receipt" in k or "medical" in k or "doctor" in k for k in fgs)
 
-    # Must have 0 JGB sovereign debt leaks
-    for bg_key in bgs:
-        assert "jgb" not in bg_key.lower() and "boj" not in bg_key.lower(), f"Leak detected: {bg_key} in healthcare topic!"
-    for fg_key in fgs:
-        assert "jgb" not in fg_key.lower() and "boj" not in fg_key.lower(), f"Leak detected: {fg_key} in healthcare topic!"
+    # Schema consistency: all entries must have required keys (Boss Item 2)
+    for bg_k, bg_v in bgs.items():
+        assert "title" in bg_v and bg_v["title"], f"{bg_k} missing title"
+        assert "description" in bg_v and bg_v["description"], f"{bg_k} missing description"
+        assert "beats" in bg_v, f"{bg_k} missing beats"
+
+    # Must have 0 JGB sovereign debt leaks across keys and descriptions
+    finance_blacklist = ["jgb", "国債", "日銀", "boj", "利回り", "sovereign bond", "yield curve", "ktb"]
+    for bg_key, bg_val in bgs.items():
+        bg_dump = f"{bg_key} {bg_val.get('title', '')} {bg_val.get('description', '')}".lower()
+        for bad_tok in finance_blacklist:
+            assert bad_tok not in bg_dump, f"Leak detected: '{bad_tok}' in {bg_key}"
+    for fg_key, fg_val in fgs.items():
+        fg_dump = f"{fg_key} {fg_val.get('title', '')} {fg_val.get('description', '')}".lower()
+        for bad_tok in finance_blacklist:
+            assert bad_tok not in fg_dump, f"Leak detected: '{bad_tok}' in {fg_key}"
+
+
+def test_a10_domain_taxonomy_robust_matching_and_negative_case():
+    """A10: Verifies CJK unsegmented text, underscore slugs, plurals, and negative non-healthcare case (Boss Item 1)."""
+    from app.services.unified_vox_director import generate_topic_anchored_roster
+
+    # 1. Unsegmented Japanese narration
+    unsegmented_jp = "医療機関の倒産が過去最多となり、地域診療所が次々と閉鎖されている"
+    bgs_jp, fgs_jp = generate_topic_anchored_roster(unsegmented_jp, "JP", [], [])
+    assert "bg_clinic_waiting_room" in bgs_jp, "Unsegmented JP text failed to activate healthcare roster"
+
+    # 2. Underscore-delimited slug
+    slug_topic = "jp_ep9999_clinic_insolvency_liquidation"
+    bgs_slug, fgs_slug = generate_topic_anchored_roster(slug_topic, "JP", [], [])
+    assert "bg_clinic_waiting_room" in bgs_slug, "Underscore slug failed to activate healthcare roster"
+
+    # 3. English plurals and derivatives
+    plural_topic = "Hospitals, clinics, and pharmaceutical wholesalers face catastrophic liquidity shortfalls"
+    bgs_en, fgs_en = generate_topic_anchored_roster(plural_topic, "EN", [], [])
+    assert "bg_clinic_waiting_room" in bgs_en, "English plurals failed to activate healthcare roster"
+
+    # 4. Negative non-healthcare case (BOJ sovereign bond policy) -> MUST NOT trigger healthcare roster
+    finance_topic = "BOJ raises interest rates on Japanese Government Bonds as JGB yields surge"
+    bgs_fin, fgs_fin = generate_topic_anchored_roster(finance_topic, "JP", ["1.5%"], ["BOJ adjusts yield curve"])
+    assert "bg_clinic_waiting_room" not in bgs_fin, "Negative case falsely activated healthcare roster"
+    assert "bg_boj_market_operations_floor" in bgs_fin or "bg_jgb_syndicate_auction_hall" in bgs_fin, "Finance case failed to select JGB/BOJ roster"
+
 
