@@ -145,3 +145,66 @@ def test_a7_static_scan_zero_default_beats_in_production():
                 violations.append(f"{py_file}: found {len(matches)} occurrences of 'default_beats'")
 
     assert not violations, "Production code contains default_beats! Violations:\n" + "\n".join(violations)
+
+
+def test_a8_director_plan_spatial_decomposition_and_kinematics(tmp_path):
+    """A8: Verifies that director_plan exports decomposed objects, kinematic actions, and Omni/Flow I2V prompts."""
+    from app.services.unified_vox_director import build_unified_director_plan
+
+    test_ep = tmp_path / "JP_EP9999_clinic_insolvency"
+    test_ep.mkdir()
+
+    spoken = [
+        {"text": "2026年1月から9月、医療機関の倒産は59件に達しました。", "duration_sec": 4.5, "beat_index": 1},
+        {"text": "診療所が消える背景には、公定価格と2か月の入金遅延があります。", "duration_sec": 5.0, "beat_index": 2},
+    ]
+
+    result = build_unified_director_plan(spoken, test_ep, style_preset="vox_forensic_paper")
+    scenes = result.get("scenes", [])
+    assert len(scenes) == 2
+
+    for sc in scenes:
+        # 1. Physical Object Decomposition
+        objs = sc.get("objects", [])
+        assert len(objs) >= 2, f"Scene {sc.get('scene_id')} must have at least 2 decomposed objects"
+        hero_obj = objs[0]
+        assert hero_obj.get("role") == "primary"
+        assert any("deckle" in attr for attr in hero_obj.get("attributes", []))
+        assert any("drop shadow" in attr for attr in hero_obj.get("attributes", []))
+
+        # 2. Kinematic Actions
+        acts = sc.get("actions", [])
+        assert len(acts) >= 1, f"Scene {sc.get('scene_id')} must have kinematics actions"
+        assert acts[0].get("subject")
+        assert acts[0].get("verb")
+        assert acts[0].get("motion")
+
+        # 3. Omni & Google Flow Prompts
+        assert sc.get("i2v_prompt_omni"), f"Scene {sc.get('scene_id')} missing i2v_prompt_omni"
+        assert sc.get("i2v_prompt_google_flow"), f"Scene {sc.get('scene_id')} missing i2v_prompt_google_flow"
+        omni_prompt_low = sc["i2v_prompt_omni"].lower()
+        assert "paper" in omni_prompt_low and "cutout" in omni_prompt_low
+
+
+def test_a9_healthcare_roster_zero_jgb_bonds_leak():
+    """A9: Verifies topic-anchored healthcare roster contains clinical assets and 0 JGB bond leaks (Rule 128)."""
+    from app.services.unified_vox_director import _generate_topic_anchored_roster_fallback
+
+    topic = "医療機関 倒産 過去最多59件"
+    claims = [
+        "Tokyo Shoko Research recorded 59 medical institution bankruptcies nationwide.",
+        "Straight liquidation accounted for over 97% of clinic failures.",
+        "Reimbursement payments from the Social Insurance Fund take 2 months.",
+    ]
+    bgs, fgs = _generate_topic_anchored_roster_fallback(topic, "JP", ["59件"], claims)
+
+    # Must contain authentic clinical assets
+    assert "bg_clinic_waiting_room" in bgs or "bg_clinic_director_examination_room" in bgs
+    assert any("clinic" in k or "receipt" in k or "medical" in k or "doctor" in k for k in fgs)
+
+    # Must have 0 JGB sovereign debt leaks
+    for bg_key in bgs:
+        assert "jgb" not in bg_key.lower() and "boj" not in bg_key.lower(), f"Leak detected: {bg_key} in healthcare topic!"
+    for fg_key in fgs:
+        assert "jgb" not in fg_key.lower() and "boj" not in fg_key.lower(), f"Leak detected: {fg_key} in healthcare topic!"
+
