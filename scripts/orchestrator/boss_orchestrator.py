@@ -2232,16 +2232,16 @@ def collect_raw_forensic_packet(
     Strictly conforms to Rule 118 (Zero-Mock), Rule 121 (Verification Protocol), and Zero-Narrative Injection.
     In incremental delta mode (is_delta=True), routes to targeted delta verification.
     """
-    if is_delta:
-        logger.info("[FORENSIC] Incremental delta mode active: collecting targeted delta forensic packet...")
-        return _collect_generic_forensic_packet(commit_range, task_id)
-
     p_type = (packet_type or "").lower()
     tid = (task_id or "").upper()
     if p_type == "vox" or ("VOX" in tid):
         return _collect_vox_forensic_packet(commit_range, task_id)
     if p_type in ("trend", "quota", "market") or any(k in tid for k in ["TREND", "B1", "MARKET", "QUOTA"]):
         return _collect_trend_forensic_packet(commit_range, task_id)
+
+    if is_delta:
+        logger.info("[FORENSIC] Incremental delta mode active: collecting targeted delta forensic packet...")
+        return _collect_generic_forensic_packet(commit_range, task_id)
 
     eff_range = _resolve_default_range(commit_range)
     try:
