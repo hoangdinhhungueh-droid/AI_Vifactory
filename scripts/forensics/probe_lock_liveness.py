@@ -62,8 +62,9 @@ def validate_lock_metadata(data: Dict[str, Any], lock_path: Path) -> Tuple[str, 
         raise ValueError(f"Lock file {lock_path} invalid token format: '{token}'")
 
     # Verify token-holder identity reflects owner scope and PID
+    scope_base = owner.split(".")[0]
     sanitized_scope = owner.replace(".", "_")
-    if sanitized_scope not in token or str(pid) not in token:
+    if (scope_base not in token and sanitized_scope not in token) or str(pid) not in token:
         raise ValueError(f"Token '{token}' does not authenticate matching owner scope '{owner}' and PID {pid}")
 
     created_at_str = str(data["created_at"]).strip()
