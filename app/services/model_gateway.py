@@ -32,9 +32,17 @@ class ModelGatewayError(Exception):
     pass
 
 
+class TokenBudgetExceeded(ModelGatewayError):
+    """Raised when request payload exceeds safety token ceiling to prevent credit exhaustion."""
+    pass
+
+
 class AllProvidersFailed(ModelGatewayError):
     """Raised when primary and all fallback providers fail."""
     pass
+
+
+MAX_ABSOLUTE_INPUT_CEILING = 60000
 
 
 class ModelGateway:
@@ -175,17 +183,32 @@ class ModelGateway:
             raise ModelGatewayError("HHTECH_API_KEY not configured")
         
         # Pre-Flight Token Sanitizer & Hard Ceiling Guard (Anti-Bloat Law per vf-pipeline-teamwork)
-        est_tokens = (len(prompt) + len(system_prompt or "")) // 4
+        # Conservative factor 2.5 accounts for dense code, Vietnamese unicode, and markdown overhead
+        est_tokens = int((len(prompt) + len(system_prompt or "")) / 2.5)
         max_ceiling = int(os.getenv("HHTECH_MAX_INPUT_TOKENS_CEILING", "20000"))
         allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT") == "1"
-        if est_tokens > max_ceiling and not allow_massive and not image_base64:
-            err_msg = (
-                f"Token Bloat Guard: Input text payload estimate ({est_tokens} tokens) "
-                f"exceeds {max_ceiling} safety ceiling for model {model}. "
-                f"Aborting call to prevent credit exhaustion. Use AST/compact diff or set ALLOW_MASSIVE_LLM_CONTEXT=1."
-            )
-            logger.error(f"🛑 [TOKEN BLOAT BLOCKED] {err_msg}")
-            raise ModelGatewayError(err_msg)
+        if est_tokens > max_ceiling and not image_base64:
+            if not allow_massive:
+                err_msg = (
+                    f"Token Bloat Guard: Input text payload estimate ({est_tokens} tokens) "
+                    f"exceeds {max_ceiling} safety ceiling for model {model}. "
+                    f"Aborting call to prevent credit exhaustion. Use AST/compact diff or set ALLOW_MASSIVE_LLM_CONTEXT=1."
+                )
+                logger.error(f"🛑 [TOKEN BLOAT BLOCKED] {err_msg}")
+                raise TokenBudgetExceeded(err_msg)
+            elif est_tokens > MAX_ABSOLUTE_INPUT_CEILING:
+                err_msg = (
+                    f"Hard Absolute Ceiling Violated: Input text payload estimate ({est_tokens} tokens) "
+                    f"exceeds absolute {MAX_ABSOLUTE_INPUT_CEILING} ceiling for model {model}. "
+                    f"Override aborted to protect account budget."
+                )
+                logger.critical(f"🚨 [ABSOLUTE CEILING BLOCKED] {err_msg}")
+                raise TokenBudgetExceeded(err_msg)
+            else:
+                logger.warning(
+                    f"⚠️ [MASSIVE CONTEXT AUDIT] Allowed override with ~{est_tokens} tokens "
+                    f"(Model: {model}, Ceiling: {max_ceiling}, Absolute: {MAX_ABSOLUTE_INPUT_CEILING})."
+                )
 
         headers = {
             "Authorization": f"Bearer {self.hhtech_key}",

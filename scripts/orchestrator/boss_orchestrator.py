@@ -407,7 +407,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
                     vps_client = FastVPSClient()
                 logger.info(f"[harness] Executing on VPS: {clean_cmd[:80]}...")
                 t0 = time.time()
-                r = vps_client.run_command(clean_cmd, timeout=min(timeout, 120))
+                r = vps_client.run_command(clean_cmd, timeout=timeout)
                 elapsed = time.time() - t0
                 code = r.get("exit_code", 1) if isinstance(r, dict) else 1
                 out = (r.get("stdout", "") + "\n" + r.get("stderr", "")).strip() if isinstance(r, dict) else str(r)
@@ -494,8 +494,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     )
 
     # 5. Full Non-Integration Pytest Suites: Vox + Codemap + Trend Caps + Adversarial Ghost + Contracts + Render Timeout + CI Neighbor Tester (Boss Item 9, 11 & 12)
-    code_pytest_vox, out_pytest_vox = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox -v")
-    code_pytest_ci_unit, out_pytest_ci_unit = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest -v tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py")
+    code_pytest_vox, out_pytest_vox = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/vox -v", timeout=300)
+    code_pytest_ci_unit, out_pytest_ci_unit = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest -v tests/unit/ tests/test_ghost_scan_adversarial.py tests/test_zero_semantic_bias.py tests/codemap/ tests/test_contracts.py tests/test_render_timeout_policy.py tests/test_v7_feedback_loop.py tests/test_real_env_sync_guard.py", timeout=300)
     code_pytest_codemap, out_pytest_codemap = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/codemap -v")
     code_pytest_trend, out_pytest_trend = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_trend_caps_and_gates.py -v")
     code_pytest_ghost, out_pytest_ghost = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/test_ghost_scan_adversarial.py -v")
