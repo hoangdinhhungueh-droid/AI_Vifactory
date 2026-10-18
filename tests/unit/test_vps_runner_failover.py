@@ -26,6 +26,13 @@ def test_vps_endpoints_configuration_and_failover_order():
 
 def test_fast_vps_client_initialization_with_custom_endpoint():
     """Verifies that FastVPSClient can be targeted to either primary or secondary endpoint."""
+    # Ensure test environment has credentials populated for initialization check
+    for ep in ENDPOINTS:
+        if not ep.get("cf_id"):
+            ep["cf_id"] = "test_cf_client_id"
+        if not ep.get("cf_secret"):
+            ep["cf_secret"] = "test_cf_client_secret"
+
     client_0 = FastVPSClient(endpoint_idx=0)
     assert client_0.endpoint_idx == 0
     assert client_0.ep["name"] == ENDPOINTS[0]["name"]
