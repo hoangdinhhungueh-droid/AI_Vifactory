@@ -61,7 +61,7 @@ ENDPOINTS = [
 ]
 
 class FastVPSClient:
-    def __init__(self, endpoint_idx=0):
+    def __init__(self, endpoint_idx=0, auto_connect=True):
         self.endpoint_idx = endpoint_idx
         self.ep = ENDPOINTS[self.endpoint_idx]
         self.url = self.ep["url"]
@@ -83,7 +83,8 @@ class FastVPSClient:
         self.ctx = ssl.create_default_context()
         self.ctx.check_hostname = False
         self.ctx.verify_mode = ssl.CERT_NONE
-        self.init_session()
+        if auto_connect:
+            self.init_session()
 
     def _headers(self):
         h = {

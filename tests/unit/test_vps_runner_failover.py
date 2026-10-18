@@ -35,10 +35,10 @@ def test_fast_vps_client_initialization_with_custom_endpoint():
         if not ep.get("token"):
             ep["token"] = "test_bearer_token"
 
-    client_0 = FastVPSClient(endpoint_idx=0)
+    client_0 = FastVPSClient(endpoint_idx=0, auto_connect=False)
     assert client_0.endpoint_idx == 0
     assert client_0.ep["name"] == ENDPOINTS[0]["name"]
 
-    client_1 = FastVPSClient(endpoint_idx=1)
+    client_1 = FastVPSClient(endpoint_idx=1, auto_connect=False)
     assert client_1.endpoint_idx == 1
     assert client_1.ep["name"] == ENDPOINTS[1]["name"]
