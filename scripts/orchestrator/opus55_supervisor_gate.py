@@ -237,9 +237,12 @@ def extract_compact_git_diff(
 
         for f_name, f_lines in file_chunks:
             fn_lower = f_name.lower()
-            if any(k in fn_lower for k in [".json", ".md", ".txt", ".lock", ".png", ".svg", ".yml", ".yaml"]) and not fn_lower.endswith(".py"):
+            if (
+                any(k in fn_lower for k in [".md", ".txt", ".lock", ".png", ".svg", ".yml", ".yaml"])
+                or (fn_lower.endswith(".json") and not any(k in fn_lower for k in ["visual_rosters", "ast_ratchet", "contracts"]))
+            ) and not fn_lower.endswith(".py"):
                 tier_4.append((f_name, f_lines))
-            elif any(k in fn_lower for k in ["app/services/", "core/", "app/main.py", "stages/"]):
+            elif any(k in fn_lower for k in ["app/services/", "core/", "app/main.py", "stages/", "visual_rosters.json", "ast_ratchet_baseline.json"]):
                 tier_1.append((f_name, f_lines))
             elif any(k in fn_lower for k in ["scripts/orchestrator/", "scripts/"]):
                 tier_2.append((f_name, f_lines))
@@ -248,19 +251,22 @@ def extract_compact_git_diff(
             else:
                 tier_2.append((f_name, f_lines))
 
+        allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT", "").strip() in ("1", "true", "yes")
+        eff_max_lines = 1500 if allow_massive else max_lines
+
         # Process prioritized files
         ordered_chunks = tier_1 + tier_2 + tier_3
         meaningful_lines: List[str] = []
 
         for f_name, chunk_lines in ordered_chunks:
-            if len(meaningful_lines) >= max_lines:
+            if len(meaningful_lines) >= eff_max_lines:
                 break
 
             file_lines_added = 0
-            max_per_file = 45 if f_name in [c[0] for c in tier_1] else 25
+            max_per_file = 150 if allow_massive else (45 if f_name in [c[0] for c in tier_1] else 25)
 
             for line in chunk_lines:
-                if len(meaningful_lines) >= max_lines:
+                if len(meaningful_lines) >= eff_max_lines:
                     break
                 if len(line) > 300:
                     continue  # Skip long blobs/base64
@@ -284,8 +290,8 @@ def extract_compact_git_diff(
             if len(tier_4) > 15:
                 meaningful_lines.append(f"# ... and {len(tier_4) - 15} additional static config/data files verified.")
 
-        if len(meaningful_lines) >= max_lines:
-            meaningful_lines.append("\n... [High-Density Semantic Diff Truncation: 12,000-token budget ceiling enforced; complete 100% file manifest retained in Diff Stat above]")
+        if len(meaningful_lines) >= eff_max_lines:
+            meaningful_lines.append("\n... [High-Density Semantic Diff Truncation: token budget ceiling enforced; complete 100% file manifest retained in Diff Stat above]")
 
         compact_diff = "\n".join(meaningful_lines)
         return diff_stat, compact_diff

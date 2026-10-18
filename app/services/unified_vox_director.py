@@ -45,14 +45,19 @@ FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06", "ac
 
 _TAXONOMY_CACHE: Optional[Dict[str, Any]] = None
 
-def _load_visual_taxonomy() -> Dict[str, Any]:
+def _reset_taxonomy_cache() -> None:
+    """Helper for testing and dynamic reloading of visual taxonomy."""
+    global _TAXONOMY_CACHE
+    _TAXONOMY_CACHE = None
+
+def _load_visual_taxonomy(custom_path: Optional[Path] = None) -> Dict[str, Any]:
     """Loads external taxonomy config (Rule 128 & 132 SoT).
-    Fails closed if taxonomy file is missing or corrupted.
+    Fails closed if taxonomy file is missing, empty, or schema is corrupted.
     """
     global _TAXONOMY_CACHE
-    if _TAXONOMY_CACHE is not None:
+    if custom_path is None and _TAXONOMY_CACHE is not None:
         return _TAXONOMY_CACHE
-    tax_path = ROOT_DIR / "config" / "taxonomies" / "visual_rosters.json"
+    tax_path = custom_path or (ROOT_DIR / "config" / "taxonomies" / "visual_rosters.json")
     if not tax_path.exists():
         raise FileNotFoundError(f"[unified_vox_director] Critical SoT failure: visual taxonomy file not found: {tax_path}")
     try:
@@ -60,8 +65,16 @@ def _load_visual_taxonomy() -> Dict[str, Any]:
             data = json.load(f)
             if not isinstance(data, dict) or not data:
                 raise ValueError(f"Taxonomy root must be a non-empty JSON object: {tax_path}")
-            _TAXONOMY_CACHE = data
-            return _TAXONOMY_CACHE
+            if "domains" not in data or not isinstance(data["domains"], dict) or not data["domains"]:
+                raise ValueError(f"Taxonomy root must contain a non-empty 'domains' mapping: {tax_path}")
+            for d_name, d_val in data["domains"].items():
+                if not isinstance(d_val, dict):
+                    raise ValueError(f"Domain '{d_name}' must be a dict: {tax_path}")
+                if "markets" not in d_val or not isinstance(d_val["markets"], dict):
+                    raise ValueError(f"Domain '{d_name}' missing 'markets' mapping: {tax_path}")
+            if custom_path is None:
+                _TAXONOMY_CACHE = data
+            return data
     except Exception as _e:
         logger.error(f"[unified_vox_director] Fail-closed: corrupted visual taxonomy file {tax_path}: {_e}")
         raise

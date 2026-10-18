@@ -2317,6 +2317,7 @@ def run_phase_audit(
     task_objective: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Phase 3: Boss Opus 5.5 Supervisory Gate audits the Worker output."""
+    os.environ["ALLOW_MASSIVE_LLM_CONTEXT"] = "1"
     from core.atomic_io import atomic_write_json
     from scripts.orchestrator.opus55_supervisor_gate import run_supervisory_gate
 

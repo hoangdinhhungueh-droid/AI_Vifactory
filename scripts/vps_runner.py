@@ -61,9 +61,10 @@ ENDPOINTS = [
 ]
 
 class FastVPSClient:
-    def __init__(self, endpoint_idx=0, auto_connect=True):
+    def __init__(self, endpoint_idx=0, auto_connect=True, endpoints=None):
         self.endpoint_idx = endpoint_idx
-        self.ep = ENDPOINTS[self.endpoint_idx]
+        self.endpoints = endpoints if endpoints is not None else ENDPOINTS
+        self.ep = self.endpoints[self.endpoint_idx]
         self.url = self.ep["url"]
         self.token = self.ep["token"]
         if not self.ep.get("cf_id") or not self.ep.get("cf_secret"):
@@ -105,8 +106,8 @@ class FastVPSClient:
         self.session_id = None
 
     def switch_endpoint(self):
-        self.endpoint_idx = (self.endpoint_idx + 1) % len(ENDPOINTS)
-        self.ep = ENDPOINTS[self.endpoint_idx]
+        self.endpoint_idx = (self.endpoint_idx + 1) % len(self.endpoints)
+        self.ep = self.endpoints[self.endpoint_idx]
         self.url = self.ep["url"]
         self.token = self.ep["token"]
         self.session_id = None

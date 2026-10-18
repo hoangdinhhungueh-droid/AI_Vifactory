@@ -25,20 +25,30 @@ def test_vps_endpoints_configuration_and_failover_order():
 
 
 def test_fast_vps_client_initialization_with_custom_endpoint():
-    """Verifies that FastVPSClient can be targeted to either primary or secondary endpoint."""
-    # Ensure test environment has credentials populated for initialization check
-    for ep in ENDPOINTS:
-        if not ep.get("cf_id"):
-            ep["cf_id"] = "test_cf_client_id"
-        if not ep.get("cf_secret"):
-            ep["cf_secret"] = "test_cf_client_secret"
-        if not ep.get("token"):
-            ep["token"] = "test_bearer_token"
+    """Verifies that FastVPSClient can be targeted to either primary or secondary endpoint using isolated fixtures."""
+    isolated_endpoints = [
+        {
+            "name": "isolated_primary",
+            "url": "https://mcp-primary.test.internal/mcp",
+            "token": "tok_pri_abc123",
+            "cf_id": "cf_id_primary",
+            "cf_secret": "cf_sec_primary",
+        },
+        {
+            "name": "isolated_secondary",
+            "url": "https://mcp-secondary.test.internal/mcp",
+            "token": "tok_sec_xyz789",
+            "cf_id": "cf_id_secondary",
+            "cf_secret": "cf_sec_secondary",
+        },
+    ]
 
-    client_0 = FastVPSClient(endpoint_idx=0, auto_connect=False)
+    client_0 = FastVPSClient(endpoint_idx=0, auto_connect=False, endpoints=isolated_endpoints)
     assert client_0.endpoint_idx == 0
-    assert client_0.ep["name"] == ENDPOINTS[0]["name"]
+    assert client_0.ep["name"] == "isolated_primary"
+    assert client_0.url == "https://mcp-primary.test.internal/mcp"
 
-    client_1 = FastVPSClient(endpoint_idx=1, auto_connect=False)
-    assert client_1.endpoint_idx == 1
-    assert client_1.ep["name"] == ENDPOINTS[1]["name"]
+    client_0.switch_endpoint()
+    assert client_0.endpoint_idx == 1
+    assert client_0.ep["name"] == "isolated_secondary"
+    assert client_0.url == "https://mcp-secondary.test.internal/mcp"
