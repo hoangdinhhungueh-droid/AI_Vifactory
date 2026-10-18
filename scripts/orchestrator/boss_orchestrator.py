@@ -46,7 +46,7 @@ except Exception as _sec_init_err:
     logger.debug(f"Secure logging init notice: {_sec_init_err}")
 
 DEFAULT_HHTECH_URL = os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1")
-DEFAULT_BOSS_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
+DEFAULT_BOSS_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "gpt-6.1-sol")
 DEFAULT_247_PRIMARY_MODEL = "claude-v4.1-flash"
 DEFAULT_247_FALLBACK_MODEL = "claude-6-luna"
 PASSING_SCORE_THRESHOLD = 10.0

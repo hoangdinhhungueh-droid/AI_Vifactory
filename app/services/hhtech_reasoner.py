@@ -237,20 +237,20 @@ def call_gpt6_astra(
         logger.warning(f"[hhtech] Prompt length {len(prompt)} exceeds 150k chars (40k tokens), pruning to 120k to avoid token overflow.")
         prompt = prompt[:120_000]
 
-    # Tier 1: Primary gpt-6-astra with claude-opus-5-5 fallback
+    # Tier 1: Primary gpt-6.1-sol with claude-sonnet-5 fallback
     try:
         result = gateway.call_llm(
             prompt=prompt,
-            model="gpt-6-astra",
+            model="gpt-6.1-sol",
             system_prompt=system_prompt,
             max_tokens=max_tokens,
             temperature=temperature,
             timeout=timeout,
-            fallback="claude-opus-5-5"
+            fallback="claude-sonnet-5"
         )
         return result.strip()
     except Exception as e_t1:
-        logger.warning(f"[hhtech] Primary Tier 1 (gpt-6-astra / claude-opus-5-5) failed ({e_t1}), falling back to claude-sonnet-5...")
+        logger.warning(f"[hhtech] Primary Tier 1 (gpt-6.1-sol / claude-sonnet-5) failed ({e_t1}), falling back to claude-sonnet-5...")
 
     # Tier 2: Final Fallback to claude-sonnet-5 (or claude-3-5-sonnet-20241022)
     try:

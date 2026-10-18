@@ -30,7 +30,7 @@ logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [P
 logger = logging.getLogger("hhtech_planner")
 
 DEFAULT_HHTECH_URL = os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1")
-DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
+DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "gpt-6.1-sol")
 FALLBACK_MODELS = ["claude-sonnet-5", "claude-3-5-sonnet-20241022"]
 
 FOUR_PILLARS_PROMPT = """
