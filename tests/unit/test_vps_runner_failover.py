@@ -32,6 +32,8 @@ def test_fast_vps_client_initialization_with_custom_endpoint():
             ep["cf_id"] = "test_cf_client_id"
         if not ep.get("cf_secret"):
             ep["cf_secret"] = "test_cf_client_secret"
+        if not ep.get("token"):
+            ep["token"] = "test_bearer_token"
 
     client_0 = FastVPSClient(endpoint_idx=0)
     assert client_0.endpoint_idx == 0
