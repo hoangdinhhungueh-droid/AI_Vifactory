@@ -168,8 +168,8 @@ def _populate_env_from_secrets() -> None:
                             v = v.strip().strip('"').strip("'")
                             if k and k not in os.environ:
                                 os.environ[k] = v
-            except Exception:
-                pass
+            except (OSError, UnicodeDecodeError) as _io_err:
+                _logger.warning("Failed reading secret environment file %s: %s", p, _io_err)
 
 _populate_env_from_secrets()
 VF_API_TOKEN = os.getenv("VF_API_TOKEN", "").strip()
