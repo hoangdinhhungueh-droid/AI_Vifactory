@@ -16,10 +16,13 @@ from core.config import RunContext
 from core.contracts.stages import Provenance, Scene, Shot, StageArtifact, StageID
 from core.gates import emit_artifact, validate_artifact
 from tools.codemap.runtime import pipeline_stage
+from vox.planner import plan_scenes_from_script
 
 logger = logging.getLogger("s05_director_plan")
 
 STAGE: StageID = StageID.S5_DIRECTOR_PLAN
+
+__all__ = ["STAGE", "run", "build_vox_scene_prompts", "plan_scenes_from_script"]
 
 
 def build_vox_scene_prompts(
