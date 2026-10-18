@@ -2254,6 +2254,68 @@ def build_unified_director_plan(
             }
         }
 
+        # Physical Object Decomposition & Kinematics for Omni Video Effects (Rule 128 & AVF-VOX-001)
+        hero_title = (fg_roster.get(assigned_fg) or {}).get("title") or scene_obj.get("headline") or f"Tactile evidentiary document representing beat {beat_idx}"
+        bg_title = (bg_roster.get(bg_key) or {}).get("title") or "Aged Cream Newsprint Desk #F4F1EA"
+        sc_headline = scene_obj.get("headline") or f"BEAT {beat_idx:02d}"
+
+        scene_obj["objects"] = [
+            {
+                "id": f"o{idx+1}_1",
+                "name": hero_title,
+                "attributes": ["tactile paper cutout", "2-4px deckle edge", "soft drop shadow"],
+                "role": "primary"
+            },
+            {
+                "id": f"o{idx+1}_2",
+                "name": "crimson forensic seal and brass anchor pin",
+                "attributes": ["crimson wax imprint", "brass patina pin"],
+                "role": "secondary"
+            },
+            {
+                "id": f"o{idx+1}_3",
+                "name": bg_title,
+                "attributes": ["#F4F1EA", "vintage print halftone grid", "creased archival paper"],
+                "role": "backdrop"
+            }
+        ]
+
+        scene_obj["actions"] = [
+            {
+                "subject": f"o{idx+1}_1",
+                "verb": "slides_in",
+                "target": "center_stage",
+                "motion": "smooth_slide_left_to_right" if fg_side == "left" else "smooth_slide_right_to_left",
+                "intensity": "low",
+                "role": "primary"
+            },
+            {
+                "subject": f"o{idx+1}_2",
+                "verb": "stamps",
+                "target": f"o{idx+1}_1",
+                "motion": "downward_impact",
+                "intensity": "high",
+                "role": "secondary"
+            }
+        ]
+
+        scene_obj["i2v_prompt_omni"] = (
+            f"Tactile paper cutout animation in signature Vox documentary style. "
+            f"Animate composition: {hero_title} on {bg_title}. "
+            f"Hero cutout slides in smoothly from {'left' if fg_side == 'left' else 'right'} edge, crimson verification stamp impacts firmly at 1.8s, "
+            f"holding locked spatial anchor with subtle paper micro-breathing <= 2px. "
+            f"Static top-down camera, zero camera drift."
+        )
+
+        scene_obj["i2v_prompt_google_flow"] = (
+            f"Editorial paper cutout animation in Vox documentary style. "
+            f"Animate completed composition: {hero_title} on {bg_title}. "
+            f"0.0-2.0s: Tactile entry of bold geometric paper shapes and headline '{sc_headline}'. "
+            f"2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges. "
+            f"7.0-10.0s: Spatial anchor locked, subtle micro-shadow breathing <= 2px, zero drift. "
+            f"Camera: Completely static top-down desk view, crisp focus, no 3D pan or tilt."
+        )
+
         scenes.append(scene_obj)
 
     # 1.5. Compile Stateful Investigation Boards (3-4 scenes per Board, capping hard_cut <= 15%)
@@ -2505,6 +2567,8 @@ def main():
         "vox_collages": vox_collages,
         "animation_tiers": animation_tiers,
         "universal_video_prompt": UNIVERSAL_VOX_ANIMATION_PROMPT,
+        "omni_i2v_prompts": {f"sc_{idx+1:03d}": sc.get("i2v_prompt_omni") for idx, sc in enumerate(scenes)},
+        "flow_i2v_prompts": {f"sc_{idx+1:03d}": sc.get("i2v_prompt_google_flow") for idx, sc in enumerate(scenes)},
         "thumbnails": {}
     }
     pf_path = ep_dir / "prompts_forge.json"

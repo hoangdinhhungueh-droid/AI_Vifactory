@@ -1,0 +1,126 @@
+{
+  "task_id": "1792304389",
+  "round": 2,
+  "is_delta_audit": false,
+  "invariance_certificate": "N/A (Full Monolithic Baseline Audit)",
+  "last_audit_head": "27b84eb89849b523961681519a5a01977d362e3a",
+  "timestamp": "2026-10-18T08:04:24Z",
+  "verdict": "REVISE_REQUIRED",
+  "score": 6.2,
+  "passing_threshold": 10.0,
+  "supervisor_model": "claude-opus-5-5",
+  "tokens_consumed": 5816,
+  "summary": "The increment cannot be approved because the headline verification matrix contradicts the raw telemetry beneath it. The matrix claims 'AST Scanner: PASS (0 Critical / 0 High Defects)', but Section 16 lists more than 40 HIGH-severity RULE_139_SILENT_EXCEPT_PASS findings. Several of those findings sit in modules modified in this range: scripts/orchestrator/runner.py (lines 538, 593, 627, 673, 675), scripts/vf_insight_cards.py (270, 307, 312), scripts/watch_github_ci.py (20) and scripts/run_vox_automated_pipeline.py (164, 193). The Zero-Mock scan exited with code 1 (2 matches) and the matrix omits it. The Rule 126 headline hash 5be57f74... does not appear anywhere in the raw parity evidence, which reports content hash 2f71aff0... instead. 'git ls-files -z | sha256sum' only hashes path names, so it cannot support a 'bit-for-bit' content claim. The valid parity proof is the matching HEAD (27b84eb), matching tree object (be8089a), clean 'git diff' and empty porcelain, and that proof does hold. The 'Single Pipeline Truth: 9/9 unique, 0 shadow pipelines' verdict is contradicted by the tracked tree: stages/s01-s11 (including s09_voice_tts, s10_render and s11_qc) and orchestrator/run_pipeline.py remain tracked, are actively modified here, and overlap roles owned by vox.tts, vox.assemble and vox.qa.gates. Two new files were also added under legacy/. Several diffs replace 'except: pass' with broad 'except Exception' blocks that log at debug or warning level, or with silent fallback lambdas. That satisfies the AST pattern but leaves the same Rule 139 symptom in place. In cost_ledger.py and artifact_sync.py it silently degrades cost accounting and backups. Large parts of the telemetry (127k chars, including pytest pass summaries, Windows job logs and the bodies of daily_market_lock.py and alert_cooldown.py) are condensed. As a result, the core concurrency claims (msvcrt/fcntl primitives, stale-lock reclamation, aliveness checks) and the 396-test pass count cannot be verified from the evidence supplied. The CI run URL is not bound to HEAD SHA 27b84eb in any presented output. The diff range 2456870^..HEAD spans at least four task IDs and more than 160 files, the conventional-commit list is empty, and no blast-radius analysis is presented for the shared core modules core/paths.py and core/atomic_io.py.",
+  "revisions_needed": [
+    "Reconcile the AST gate. Make HIGH findings blocking (non-zero exit) for every file touched in the increment, remediate the findings in runner.py, vf_insight_cards.py, watch_github_ci.py and run_vox_automated_pipeline.py, and set max_allowed equal to the current entry count (221 or lower) so the ratchet is genuinely zero-buffer.",
+    "Regenerate the executive matrix from raw gate outputs. Remove the 'Alibaba OCR Gate' line from AST reporting and either reproduce or drop the 5be57f74 hash.",
+    "Resolve the Zero-Mock scan exit code 1. Either add an explicit, documented allow-rule for environment-variable injection in tests or remove the monkeypatch. Document which test doubles are permitted and confirm synthetic_alignment_helper.py is never used for Rule 120 acceptance evidence.",
+    "Rule 125: remove or quarantine stages/s01-s11 and orchestrator/run_pipeline.py, or formally declare them non-pipeline with no overlapping roles. Extend legacy_inventory.py to detect competing implementations outside vox/ (for example any TTS, render or QA entrypoint). Remove the newly added legacy/clean_state_vps.py and legacy/deploy_token_watchdog.py, or move live code into a canonical package.",
+    "beat_tts_engine.py: replace the function-local guarded import and the lambda fallback with a top-level 'from vox.planner import sanitize_narration_line' and remove the 'except Exception' fallback. Compute the sanitized value once per element.",
+    "artifact_sync.py: make the gdrive_backup import top-level and surface backup failure as an explicit failed status in the response or propagate the exception. Do not report sync success when the backup did not run.",
+    "cost_ledger.py: narrow the handlers to OSError and json errors, log at ERROR, and propagate or count write failures so budget enforcement fails closed.",
+    "daily_market_lock.py: provide line-cited evidence of (a) atomic stale-lock reclamation, via rename-to-tombstone and then O_EXCL retry rather than unlink and recreate, (b) a Windows-safe aliveness check that does not use os.kill(pid, 0), and (c) PID-reuse protection that records process start time. Add a multi-process test where N reclaimers race on a stale lock.",
+    "alert_cooldown.py: show the msvcrt/fcntl lock implementation with line citations, add a multi-process cooldown race test (the current N=50 test is thread-only), document the fail-open quarantine policy against daily_market_lock's fail-closed policy, and show that cleanup_corrupt_quarantines deletes only exact-prefix, age-bounded files.",
+    "Supply raw CI evidence: job logs or junit XML with pytest summary lines for both platforms, and the run's head_sha proven equal to 27b84eb (for example from 'gh run view 39001202105 --json headSha,conclusion,jobs').",
+    "Extend the Windows CI job beyond the 91 lock tests to at least the core/ and app/services/ suites that touch filesystem, path or atomic-rename behavior.",
+    "Confirm in ci.yml that the CD deploy job 'needs' both test jobs, and show the deployed VPS SHA after the deploy.",
+    "app/main.py: provide the route table and the auth dependency showing that every non-health route, including /metrics and /api/v1/llm, requires VF_API_TOKEN via hmac.compare_digest, and that error responses do not leak exception text. Include the diffs for app/utils/security.py and app/log_redact.py.",
+    "Rule 137 review of scripts/forensics/dispose_retatrutide_residue.py: show exact-path targeting with no wildcards and dry-run by default, or remove it if it was single-use. Rename it generically if it is retained (Rule 128).",
+    "Rules 124 and 138: scope the audit to this task's commits only, list the conventional commits in the range, and provide blast-radius or code-graph output for the core/paths.py, core/atomic_io.py and core/net_utils.py changes.",
+    "Rules 120, 122 and 135: attach ffprobe output (duration, streams, integrated LUFS and true peak), QA gate output for the golden render, and chapter-to-rendered-duration reconciliation for any vox pipeline claim in this increment.",
+    "Provide the raw Ruff output with the pyproject.toml rule selection, and confirm whether E731 and PIE790 are enabled."
+  ],
+  "component_reviews": [
+    {
+      "component": "AST Scanner / config/ast_ratchet_baseline.json (Rule 139 gate)",
+      "status": "DEFECT",
+      "analysis": "The scanner exited with code 0 while emitting dozens of HIGH findings. The gate is therefore either non-blocking on HIGH severity or exits 0 because findings are grandfathered by the ratchet baseline. The baseline holds 221 entries against max_allowed=227. A ceiling 6 above the current count is a buffer, so it is not a 'strict zero-buffer monotonic ceiling'. A 221-entry baseline also means 221 known Rule 139 violations remain, which is incompatible with the '0 High Defects' headline. Touched files still carry findings, so the ratchet is not being tightened on the modules this increment modifies. The trailing 'AST Scanner Status: Alibaba OCR Gate: 0 Critical / 0 High Defects' label belongs to a different gate (OCR) and cannot be cited as AST evidence."
+    },
+    {
+      "component": "Zero-Mock Compliance Scan (Rule 118) / tests/helpers/synthetic_alignment_helper.py",
+      "status": "WARN",
+      "analysis": "The scan exited with code 1, MOCK_SCAN_MATCHES_COUNT=2, both in tests/vox/test_single_pipeline_truth.py via monkeypatch.setenv('VF_API_TOKEN', ...). Injecting an environment variable is configuration rather than synthetic data, so it is defensible. However, the gate result must then be reconciled through an explicit allow-rule or a scanner refinement, not left failing and omitted from the matrix. The newly added tests/helpers/synthetic_alignment_helper.py is named as a synthetic alignment source. Its use in the 'Hermetic Tests' CI job needs to be scoped to unit tests. Rule 120 Whisper alignment acceptance must be evidenced against real Whisper output, not synthetic timestamps. The 211 test-double references across tests/unit/ have no classification of which are permitted."
+    },
+    {
+      "component": "Three-Way Physical Parity (Rule 126)",
+      "status": "WARN",
+      "analysis": "Verified from the raw output: local HEAD, origin/main and VPS HEAD all equal 27b84eb89849b523961681519a5a01977d362e3a. The tree object be8089a0 matches on both sides. VPS 'git diff' exits 0, and local porcelain is empty. The tree-object match is a sufficient content-parity proof for tracked files. The headline value 5be57f74... is not reproduced in any raw output, and the raw content hash is 2f71aff0..., so the matrix is internally inconsistent. 'git ls-files -z | sha256sum' covers path names only, so it should not be presented as bit-for-bit evidence. The VPS porcelain renders as '[  ]' with interior whitespace, while local renders as '[]'. Byte-exact capture (for example, the byte length of the --porcelain=v1 output) would remove ambiguity. The GitHub leg of the parity is unproven because no presented output ties CI run 39001202105 to head_sha 27b84eb. The root-cause write-up for the Round 14 '??' glob expansion is sound, and the quoting fix is the correct remediation."
+    },
+    {
+      "component": "Single Pipeline Truth: scripts/legacy_inventory.py, stages/*, orchestrator/run_pipeline.py, legacy/*",
+      "status": "DEFECT",
+      "analysis": "The inventory reports 'Shadow Pipelines: 0' and a single entrypoint, vox.pipeline:run_pipeline. The tracked core module list it prints contradicts this. It includes stages/s01_ideation through s11_qc, a complete numbered stage pipeline whose s09_voice_tts, s10_render and s11_qc overlap the voice_tts, video_assembly and qa_gates roles. Those modules are actively modified in this range (s03 +111, s05 +256, s09 +82, s10 +159, s11 +55), and orchestrator/run_pipeline.py is also modified. app/services/beat_tts_engine.py is a third TTS path. The scanner appears to check role-to-module uniqueness only within vox/ rather than detecting competing implementations elsewhere, which makes the check non-falsifiable. The increment adds legacy/clean_state_vps.py (+48) and legacy/deploy_token_watchdog.py (+102). Adding new code to a legacy directory is a Rule 125 ghost-remnant pattern, regardless of the ghost scanner reporting canonical code as decoupled from legacy/. The 2456870 purge of app/pipeline/* and app/routes/* is clean."
+    },
+    {
+      "component": "app/services/daily_market_lock.py (new, 1078 lines)",
+      "status": "WARN",
+      "analysis": "The visible header describes a sound design: O_CREAT|O_EXCL acquisition, PID+UUID holder verification before mutation, a CORRUPT_FAIL_CLOSED seal, and a distinct COMMITTED_PENDING_RENDER state. The implementation body is condensed, so the following cannot be verified and are common failure points. (1) Stale-lock reclamation: if a dead-holder lock is unlinked and then re-created, two reclaimers can both pass the aliveness check and race. Reclamation must be atomic, for example by renaming the stale file to a unique tombstone and then retrying O_EXCL. (2) Windows aliveness: os.kill(pid, 0) on Windows maps to CTRL_C_EVENT and is not a safe probe. OpenProcess with GetExitCodeProcess, or psutil, is required. (3) PID reuse: aliveness keyed on PID alone can treat a recycled PID as a live holder. The lock should record the process start time alongside the PID. (4) Rule 134/128: the hard-coded market set (EN, VN, JA, KO), the 06:00 VN off-hours boundary and the >= 8.0 viability threshold must be sourced from a single config constant and parity-tested. N=16 process contention evidence is cited, but only as a PASS line without raw output."
+    },
+    {
+      "component": "app/services/alert_cooldown.py (new, 481 lines)",
+      "status": "WARN",
+      "analysis": "The design layers an intraprocess threading.Lock over an interprocess lock, with a LockTimeoutError fail-closed path, which is correct. AlertSendDecision preserves tuple unpacking for backward compatibility. Two inconsistencies stand out. Mandate item 4 declares fail-closed locking while item 5 declares fail-open quarantine on corrupt state. Fail-open is defensible for operator alert delivery, but the asymmetry with daily_market_lock's CORRUPT_FAIL_CLOSED should be documented as an intentional policy and covered by a test. LockTimeoutError has both a docstring and a redundant 'pass' (PIE790). The msvcrt/fcntl primitives are not visible. If msvcrt.locking is used, the locked byte range and the LK_NBLCK retry loop need review because msvcrt locks are region-based and non-blocking variants raise immediately. cleanup_corrupt_quarantines performs deletion, so it needs a Rule 137 review confirming it removes only '*.corrupt.<ts>' files matched by exact prefix and age, with no wildcard unlinking. The N=50 thread test covers intraprocess contention only. A multi-process cooldown race also needs evidence."
+    },
+    {
+      "component": "app/services/beat_tts_engine.py",
+      "status": "DEFECT",
+      "analysis": "'except Exception: t = raw_t' around a module import silently degrades narration sanitization, which Rule 131/136 output quality depends on. An ImportError in vox.planner would ship speaker tags and beat headers into TTS audio with no signal. The fallback 'sanitize_narration_line = lambda s: s.strip()' is a zero-symptom patch (Rule 139). It is also lambda assignment (E731, part of Ruff's default E7 set), which conflicts with the 'Ruff: all checks passed' claim unless E731 is explicitly ignored in pyproject.toml. The list comprehension calls sanitize_narration_line twice per element. The function-local import also introduces an undeclared app.services -> vox dependency that should be a top-level import so that failures surface at load time (Rule 138)."
+    },
+    {
+      "component": "app/services/artifact_sync.py",
+      "status": "DEFECT",
+      "analysis": "Replacing the bare-except title parsing with structured .get() access is a real improvement. Moving the gdrive_backup import inside 'try: ... except Exception: logger.warning(\"Notice during gdrive backup\")' converts both ImportError and backup failure into a warning. The sync endpoint then reports success while no off-site backup exists. This is a Rule 137 data-safety regression and a Rule 139 symptom patch. Backup failure must propagate or set an explicit failed status in the response and ledger."
+    },
+    {
+      "component": "app/services/cost_ledger.py",
+      "status": "DEFECT",
+      "analysis": "Changing 'except Exception: pass' to 'except Exception: logger.debug(...)' in record() and breakdown_between() clears the AST pattern without fixing anything. A failed cost write is still invisible at default log levels, and budget enforcement (audit_reports/07_budget_enforcement_test.md) reads this ledger. Silent under-counting defeats the budget gate. Exceptions should be narrowed to OSError, logged at ERROR, and propagated or counted so that enforcement can fail closed. The VF_COST_DIR override is now resolved per call, which is a reasonable change for test isolation."
+    },
+    {
+      "component": "app/services/build_remotion_props.py",
+      "status": "PASS",
+      "analysis": "Broad 'except Exception: pass' blocks were narrowed to specific types ((OSError, json.JSONDecodeError, KeyError) and (ValueError, TypeError, AttributeError)) with warning-level logging. This is the correct Rule 139 remediation pattern and should be applied to the cost_ledger and artifact_sync changes. The new 'from typing import Any, Dict, List, Optional' line is only clean under F401 if all four names are used. Ruff is reported clean, but the raw Ruff output was not supplied."
+    },
+    {
+      "component": "app/main.py (1083-line rewrite)",
+      "status": "WARN",
+      "analysis": "The previous version exposed unauthenticated /api/v1/llm, a direct LLM proxy, and /api/v1/diag, which leaked str(e). The VF_API_TOKEN usage in tests suggests token auth was added, but the new route table and auth dependency are condensed. Evidence is required that every non-health route (including /metrics and /api/v1/llm) enforces the token, that the comparison is constant-time (hmac.compare_digest), and that the error responses no longer leak exception text. The changes to app/utils/security.py and app/log_redact.py are security-sensitive and their diffs are not shown."
+    },
+    {
+      "component": "CI/CD evidence: .github/workflows/ci.yml, run 39001202105",
+      "status": "WARN",
+      "analysis": "The three jobs are reported successful, but no raw job logs, junit XML or pytest summary lines are present in the visible evidence. The 396 figure (305 Linux + 91 Windows) is asserted, not demonstrated. The Windows job runs only a 91-test lock/cooldown subset, while the approval criterion requires all suites to pass on both platforms. Cross-platform code such as core/paths.py and core/atomic_io.py (where os.replace semantics differ on Windows) needs coverage beyond the lock tests. The CD job deployed to the Hetzner VPS from this run, so the gating order (deploy only after both test jobs) must be confirmed in ci.yml, and the deployed SHA must equal 27b84eb."
+    },
+    {
+      "component": "scripts/forensics/* (9 new probe scripts, including dispose_retatrutide_residue.py)",
+      "status": "WARN",
+      "analysis": "dispose_retatrutide_residue.py is a deletion tool named for a specific content entity. It needs a Rule 137 review for exact-path targeting, no glob or rmtree wildcards, and dry-run by default. Its entity-specific naming also conflicts with Rule 128. If it was a one-time cleanup, it should not remain tracked, and keeping it is a Rule 119/125 concern. scripts/test_cost_enforcement.py is a test living in scripts/ and carries an AST finding. scripts/login_acc07.py is an account-specific script. Both should be reviewed for removal or relocation."
+    },
+    {
+      "component": "Increment scope and provenance (Rules 124, 138)",
+      "status": "DEFECT",
+      "analysis": "The audited range 2456870^..HEAD bundles AVF-VOX-001, TASK_1792069373, TASK_1792222602 and TASK_1792304389. It includes heavy churn in unrelated services (telegram_buttons, trend_gate_ai, grounding_layer_b15, hhtech_reasoner, each above 1100 lines, and boss_orchestrator at +2397). The 'CONVENTIONAL COMMITS IN RANGE' section is empty, so atomicity cannot be assessed. No code-graph or blast-radius output is presented for the shared core changes (core/paths.py +243, new core/atomic_io.py, core/net_utils.py, core/contracts/b2_b3_contract.py). The fifteen committed audit JSON/MD artifacts and the audit_reports/*.md files mix process records into the source tree."
+    },
+    {
+      "component": "Media pipeline verification (Rules 120, 122, 135)",
+      "status": "WARN",
+      "analysis": "The evidence header promises ffprobe telemetry, and scripts/forensics/probe_golden_ffprobe.py exists, but no ffprobe output, loudness measurement, alpha-edge measurement or chapter-to-duration reconciliation is present in the visible evidence. The vox/ modules are tracked and in scope through commit 2456870, so render-level proof is required before any claim about the vox pipeline is accepted."
+    }
+  ],
+  "observations": [
+    "The matrix headline ('0 Critical / 0 High') and the raw Section 16 output (more than 40 HIGH findings) directly contradict each other. Headline matrices must be generated from raw gate output, not written by hand.",
+    "Several Rule 139 'fixes' convert 'except: pass' into 'except Exception: logger.debug/warning(...)' or into fallback lambdas. This clears the AST pattern but does not change behavior, and the AST scanner should be extended to flag broad Exception handlers that only log at debug or warning level and then continue.",
+    "Tree-object equality (be8089a) together with a clean 'git diff' and empty porcelain is a valid tracked-content parity proof. The ls-files hash is a path-list hash and is redundant at best.",
+    "The Round 14 root-cause diagnosis (unquoted '??' globbing to db/) is correct, and the remediation (quoting plus --porcelain=v1 --untracked-files=all) is appropriate.",
+    "The 2456870 purge of app/pipeline/* and app/routes/{produce,run}_episode_route.py is clean and correctly removes the legacy HTTP surface.",
+    "build_remotion_props.py shows the correct exception-narrowing pattern, and it should be applied to cost_ledger.py, artifact_sync.py and beat_tts_engine.py.",
+    "Approximately 127k characters of telemetry were condensed. Every claim depending on condensed content (test pass counts, Windows logs, lock implementation bodies, contention probe output, Ruff output) is unverified rather than confirmed.",
+    "Gitignored quarantine directories do not exist on the VPS, which is consistent with the ghost scan's residue result."
+  ],
+  "adherence_matrix": {
+    "iron_laws_compliance": "NON_COMPLIANT",
+    "four_pillars_status": "PARTIALLY_VERIFIED",
+    "zero_ghost_cleanliness": "NOT_VERIFIED"
+  },
+  "audit_file": "C:\\Users\\hunghd2\\Documents\\antigravity\\AI Video Factory\\specs\\boss_audits\\1792304389_audit_round_2.json"
+}

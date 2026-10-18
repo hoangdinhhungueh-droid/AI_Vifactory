@@ -294,6 +294,24 @@ def run(ctx: RunContext) -> StageArtifact:
     )
 
     emit_artifact(artifact, ctx.paths)
+
+    # Synchronize director_plan.json to episode directory for Remotion & downstream consumers
+    import os
+    ep_candidates = [
+        Path(os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")) / ctx.run_id,
+        ctx.paths.repo_root / "episodes" / ctx.run_id,
+        ctx.paths.repo_root / "workspace" / ctx.run_id,
+    ]
+    for ep_dir in ep_candidates:
+        if ep_dir.exists():
+            try:
+                dp_file = ep_dir / "director_plan.json"
+                with open(dp_file, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, indent=2, ensure_ascii=False)
+                logger.info(f"[s05_director_plan] Synchronized director_plan.json to {dp_file}")
+            except Exception as _sync_err:
+                logger.warning(f"[s05_director_plan] Notice syncing director_plan.json to {ep_dir}: {_sync_err}")
+
     return artifact
 
 
