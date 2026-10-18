@@ -70,8 +70,12 @@ def _load_visual_taxonomy(custom_path: Optional[Path] = None) -> Dict[str, Any]:
             for d_name, d_val in data["domains"].items():
                 if not isinstance(d_val, dict):
                     raise ValueError(f"Domain '{d_name}' must be a dict: {tax_path}")
-                if "markets" not in d_val or not isinstance(d_val["markets"], dict):
-                    raise ValueError(f"Domain '{d_name}' missing 'markets' mapping: {tax_path}")
+                if "keywords_cjk" not in d_val or not isinstance(d_val["keywords_cjk"], list) or not d_val["keywords_cjk"]:
+                    raise ValueError(f"Domain '{d_name}' missing non-empty 'keywords_cjk' list: {tax_path}")
+                if "keywords_en_regex" not in d_val or not isinstance(d_val["keywords_en_regex"], str) or not d_val["keywords_en_regex"]:
+                    raise ValueError(f"Domain '{d_name}' missing valid 'keywords_en_regex' string: {tax_path}")
+                if "markets" not in d_val or not isinstance(d_val["markets"], dict) or not d_val["markets"]:
+                    raise ValueError(f"Domain '{d_name}' missing non-empty 'markets' mapping: {tax_path}")
                 for mkt_name, mkt_val in d_val["markets"].items():
                     if not isinstance(mkt_val, dict):
                         raise ValueError(f"Market '{mkt_name}' in domain '{d_name}' must be a dict: {tax_path}")
@@ -83,13 +87,22 @@ def _load_visual_taxonomy(custom_path: Optional[Path] = None) -> Dict[str, Any]:
                         for item_k, item_v in r_map.items():
                             if not isinstance(item_v, dict):
                                 raise ValueError(f"Item '{item_k}' in {r_type} must be a dict: {tax_path}")
-                            if not isinstance(item_v.get("title"), str) or not item_v["title"]:
+                            if not isinstance(item_v.get("title"), str) or not item_v["title"].strip():
                                 raise ValueError(f"Item '{item_k}' in {r_type} missing valid 'title': {tax_path}")
-                            if not isinstance(item_v.get("description"), str) or not item_v["description"]:
+                            if not isinstance(item_v.get("description"), str) or not item_v["description"].strip():
                                 raise ValueError(f"Item '{item_k}' in {r_type} missing valid 'description': {tax_path}")
                             beats = item_v.get("beats")
-                            if not isinstance(beats, list) or not beats or not all(isinstance(b, int) for b in beats):
-                                raise ValueError(f"Item '{item_k}' in {r_type} invalid 'beats' array: {tax_path}")
+                            if not isinstance(beats, list) or not beats or not all(isinstance(b, int) and 1 <= b <= 5 for b in beats):
+                                raise ValueError(f"Item '{item_k}' in {r_type} invalid 'beats' array (must be list of ints 1..5): {tax_path}")
+                            if r_type == "fg_roster":
+                                if not isinstance(item_v.get("role"), str) or not item_v["role"].strip():
+                                    raise ValueError(f"FG item '{item_k}' missing valid 'role' string: {tax_path}")
+                                fg_type = item_v.get("type")
+                                if not isinstance(fg_type, str) or fg_type not in ("character", "document", "data_metric", "artifact"):
+                                    raise ValueError(f"FG item '{item_k}' invalid 'type': {fg_type} (expected character|document|data_metric|artifact): {tax_path}")
+                                kw = item_v.get("keywords")
+                                if not isinstance(kw, list) or not kw or not all(isinstance(k, str) and k.strip() for k in kw):
+                                    raise ValueError(f"FG item '{item_k}' invalid 'keywords' list (must be non-empty list of strings): {tax_path}")
             if custom_path is None:
                 _TAXONOMY_CACHE = data
             return data
