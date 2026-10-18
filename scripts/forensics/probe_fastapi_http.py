@@ -32,13 +32,18 @@ def resolve_token() -> str:
                         val = line.split("=", 1)[1].strip().strip('"').strip("'")
                         if val:
                             return val
-            except (OSError, UnicodeDecodeError):
+            except (OSError, UnicodeDecodeError) as e:
+                sys.stderr.write(f"[probe_fastapi_http] Notice: unable to read {sp}: {e}\n")
                 continue
     return ""
 
 
 def main() -> int:
-    base_url = os.getenv("VF_API_BASE_URL", "http://127.0.0.1:8000")
+    base_url = os.getenv("VF_API_BASE_URL", "").strip()
+    if not base_url:
+        print("CRITICAL: VF_API_BASE_URL is mandatory and missing from environment (fail-closed, Rule 118 & 121).", file=sys.stderr)
+        return 1
+
     token = resolve_token()
     if not token:
         print("CRITICAL: VF_API_TOKEN not found in environment or secrets file.", file=sys.stderr)

@@ -749,7 +749,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     )
 
     # 9. VPS FastAPI HTTP 200 Runtime Probes & Security Gating (Rule 121 & Rule 139)
-    code_http, out_http = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py")
+    run_on_vps("pm2 restart vf-api && sleep 2")
+    code_http, out_http = run_on_vps("VF_API_BASE_URL=http://127.0.0.1:8000 python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py")
     code_auth, out_auth = run_on_vps(
         "echo '=== 1. PORT 8000 LOCALHOST LOOPBACK BIND ===' && (ss -ltnp | grep 8000 || echo 'No external 8000 bind') && "
         "echo '=== 2. ZERO LISTENERS ON HOST PORTS 80 & 443 ===' && (ss -tulpn | grep -E ':80 |:443 ' || echo 'ZERO LISTENERS ON HOST PORTS 80 & 443 (VERIFIED: ports 80/443 completely closed on host)') && "

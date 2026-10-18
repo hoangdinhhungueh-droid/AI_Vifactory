@@ -319,7 +319,6 @@ def extract_compact_git_diff(
 
         compact_diff = "\n".join(meaningful_lines)
         return diff_stat, compact_diff
-        return diff_stat, compact_diff
     except Exception as e:
         logger.warning(f"Failed to extract git diff: {e}")
         return "N/A", "Git diff extraction unavailable."
