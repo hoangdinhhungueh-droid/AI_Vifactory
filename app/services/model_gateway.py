@@ -164,16 +164,29 @@ class ModelGateway:
         self,
         prompt: str,
         model: str,
-        system_prompt: Optional[str],
-        max_tokens: int,
-        temperature: float,
-        timeout: float,
+        system_prompt: Optional[str] = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+        timeout: float = 120.0,
         image_base64: Optional[str] = None
     ) -> str:
         """Call HHTech API (primary provider) with automatic retry on streaming ReadTimeout."""
         if not self.hhtech_key:
             raise ModelGatewayError("HHTECH_API_KEY not configured")
         
+        # Pre-Flight Token Sanitizer & Hard Ceiling Guard (Anti-Bloat Law per vf-pipeline-teamwork)
+        est_tokens = (len(prompt) + len(system_prompt or "")) // 4
+        max_ceiling = int(os.getenv("HHTECH_MAX_INPUT_TOKENS_CEILING", "20000"))
+        allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT") == "1"
+        if est_tokens > max_ceiling and not allow_massive and not image_base64:
+            err_msg = (
+                f"Token Bloat Guard: Input text payload estimate ({est_tokens} tokens) "
+                f"exceeds {max_ceiling} safety ceiling for model {model}. "
+                f"Aborting call to prevent credit exhaustion. Use AST/compact diff or set ALLOW_MASSIVE_LLM_CONTEXT=1."
+            )
+            logger.error(f"🛑 [TOKEN BLOAT BLOCKED] {err_msg}")
+            raise ModelGatewayError(err_msg)
+
         headers = {
             "Authorization": f"Bearer {self.hhtech_key}",
             "Content-Type": "application/json"

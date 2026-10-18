@@ -23,22 +23,145 @@ logger = logging.getLogger("s05_director_plan")
 STAGE: StageID = StageID.S5_DIRECTOR_PLAN
 
 
+def build_vox_scene_prompts(
+    scene: Scene,
+    idx: int,
+    total_scenes: int,
+    prev_scene: Optional[Scene] = None
+) -> Dict[str, Any]:
+    """Decomposes scene into rich Vox Physical Objects, Kinematics, Omni and Google Flow I2V Prompts."""
+    headline = scene.headline or f"BEAT {idx+1:02d}"
+    color = scene.color_accent or "Vox Yellow #F2C230 & Navy #1B2B4A"
+    hero_obj = scene.visual_metaphor or f"Tactile paper document representing beat {idx+1:02d}"
+
+    # Pick deterministic camera movement
+    camera_move = CANONICAL_CAMERA_MOVES[idx % len(CANONICAL_CAMERA_MOVES)]
+
+    # 1. Physical Objects Breakdown
+    objects = [
+        {
+            "id": f"o{idx+1}_1",
+            "name": hero_obj,
+            "attributes": ["tactile paper cutout", "2-4px deckle edge", "soft drop shadow"],
+            "role": "primary"
+        },
+        {
+            "id": f"o{idx+1}_2",
+            "name": "crimson forensic seal and brass anchor pin",
+            "attributes": ["crimson wax imprint", "brass patina pin"],
+            "role": "secondary"
+        },
+        {
+            "id": f"o{idx+1}_3",
+            "name": "aged cream newsprint desk backdrop",
+            "attributes": ["#F4F1EA", "vintage print halftone grid", "creased archival paper"],
+            "role": "backdrop"
+        }
+    ]
+
+    # 2. Kinematics Actions Breakdown
+    actions = [
+        {
+            "subject": f"o{idx+1}_1",
+            "verb": "slides_in",
+            "target": "center_stage",
+            "motion": "smooth_slide_left_to_right",
+            "intensity": "low",
+            "role": "primary"
+        },
+        {
+            "subject": f"o{idx+1}_2",
+            "verb": "stamps",
+            "target": f"o{idx+1}_1",
+            "motion": "downward_impact",
+            "intensity": "high",
+            "role": "secondary"
+        }
+    ]
+
+    # 3. Kinematic Motion Track
+    motion_track = {
+        "entry_action": f"0.0-2.0s: Tactile entry of {hero_obj} sliding into center stage with soft paper drop shadow.",
+        "assembly_step": "2.0-7.0s: Crimson seal stamps firmly onto the document; paper cutouts assemble and lock into spatial anchor.",
+        "spatial_anchor": "Center-left quadrant of canvas, permanently locked as anchor for subsequent scene.",
+        "camera_rule": "Completely static top-down desk view, crisp focus, zero 3D camera pan/tilt."
+    }
+
+    # 4. Graphic Typography
+    graphic_typo = {
+        "headline": headline,
+        "english_tag": "FORENSIC EVIDENCE",
+        "color_bar": color,
+        "position": "Top-left quadrant, occupying 25% negative space"
+    }
+
+    # 5. Visual Continuity Link
+    continuity_link = (
+        f"Object o{idx+1}_1 remains locked on the newsprint desk; "
+        f"Scene {idx+2 if idx+1 < total_scenes else 'Outro'} physically builds upon this exact foundation."
+    )
+
+    # 6. 5-Layer Image Prompt (Master Prompt: vox_b3_director_image_prompt.md)
+    image_prompt = (
+        f"Editorial investigative documentary frame in signature VOX paper-cut collage style. "
+        f"[Layer 1: Aged Cream Newsprint Desk #F4F1EA with subtle print halftone grid] -> "
+        f"[Layer 2: bold flat geometric color block in {color}] -> "
+        f"[Layer 3: negative space reserved for large bold editorial typography '{headline}', occupying 25% of frame] -> "
+        f"[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge and realistic soft drop shadow: {hero_obj}. "
+        f"Interacting elements: crimson forensic seal stamp and brass pin] -> "
+        f"[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration]. "
+        f"Strictly locked color palette: Vox Yellow #F2C230, Terracotta #C85A32, Navy #1B2B4A on Off-white Cream #F4F1EA. "
+        f"Clear object-assembly composition, strong editorial hierarchy, tactile paper craft. "
+        f"Negative prompt: no clutter, no unnecessary objects, no glossy 3D rendering, no photorealistic background, "
+        f"no oversaturated rainbow colors, maintain clean premium VOX editorial collage."
+    )
+
+    # 7. Omni I2V Prompt (Action-centric, motion-first)
+    i2v_omni = (
+        f"Tactile paper cutout animation in signature Vox documentary style. "
+        f"Animate composition: {hero_obj} on Aged Cream Paper #F4F1EA desk. "
+        f"Hero cutout slides in smoothly from left edge, crimson verification stamp impacts firmly at 3.0s, "
+        f"holding locked spatial anchor with subtle paper micro-breathing <= 2px. "
+        f"Static top-down camera, zero camera drift."
+    )
+
+    # 8. Google Flow Veo Fast I2V Prompt (Universal Prompt 3)
+    i2v_google_flow = (
+        f"Editorial paper cutout animation in Vox documentary style. "
+        f"Animate completed composition: {hero_obj} on Cream Paper #F4F1EA background. "
+        f"0.0-2.0s: Tactile entry of bold geometric paper shapes and headline '{headline}'. "
+        f"2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges. "
+        f"7.0-10.0s: Spatial anchor locked, subtle micro-shadow breathing <= 2px, zero drift. "
+        f"Camera: Completely static top-down desk view, crisp focus, no 3D pan or tilt. "
+        f"Color Palette: {color} on muted paper texture."
+    )
+
+    return {
+        "canvas_workspace": "Aged Cream Newsprint Desk #F4F1EA with subtle print halftone grid",
+        "hero_cutout_object": hero_obj,
+        "interacting_objects": ["crimson forensic seal stamp", "brass anchor pin"],
+        "motion_track_and_assembly": motion_track,
+        "graphic_typography": graphic_typo,
+        "visual_continuity_link_to_next": continuity_link,
+        "objects": objects,
+        "actions": actions,
+        "camera_move": camera_move,
+        "image_prompt": image_prompt,
+        "i2v_prompt_omni": i2v_omni,
+        "i2v_prompt_google_flow": i2v_google_flow,
+    }
+
+
 def build_universal_video_prompt(scene: Scene) -> str:
     """Encodes Prompt 3 from Made by AI Playbook: 0-7s layer-by-layer, 7-10s hold micro-motion."""
-    hero_obj = scene.visual_metaphor or "Tactile paper cutout elements"
-    color = scene.color_accent or "Vox Yellow #F2C230 and Navy #1B2B4A"
-    headline = scene.headline or "EDITORIAL FOCUS"
-
-    parts = [
-        "Editorial paper cutout animation in Vox documentary style.",
-        f"Animate completed composition: {hero_obj} on Cream Paper #F4F1EA background.",
-        f"0.0-2.0s: Tactile entry of bold geometric paper shapes and headline '{headline}'.",
-        "2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges.",
-        "7.0-10.0s: Spatial anchor locked, subtle micro-shadow breathing <= 2px, zero drift.",
-        "Camera: Completely static top-down desk view, crisp focus, no 3D pan or tilt.",
-        f"Color Palette: {color} on muted paper texture."
-    ]
-    return " ".join(parts)
+    return scene.i2v_prompt_google_flow or (
+        f"Editorial paper cutout animation in Vox documentary style. "
+        f"Animate completed composition: {scene.visual_metaphor or 'Tactile paper elements'} on Cream Paper #F4F1EA background. "
+        f"0.0-2.0s: Tactile entry of bold geometric paper shapes and headline '{scene.headline or 'EDITORIAL FOCUS'}'. "
+        f"2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges. "
+        f"7.0-10.0s: Spatial anchor locked, subtle micro-shadow breathing <= 2px, zero drift. "
+        f"Camera: Completely static top-down desk view, crisp focus, no 3D pan or tilt."
+    )
 
 
 @pipeline_stage(
@@ -54,7 +177,7 @@ def build_universal_video_prompt(scene: Scene) -> str:
     verify_cmds=["python -m orchestrator.run_pipeline --only s05_director_plan --profile e2e_min"]
 )
 def run(ctx: RunContext) -> StageArtifact:
-    """Executes Stage S5: Director Plan & Prompts Forge."""
+    """Executes Stage S5: Director Plan & Prompts Forge with Vox Kinematics."""
     start_ts = time.time()
 
     # Read and validate S3 script artifact schema (Rule 121, Rule 139)
@@ -68,47 +191,51 @@ def run(ctx: RunContext) -> StageArtifact:
     except Exception as parse_err:
         raise RuntimeError(f"Failed to parse S3 script artifact JSON at {s3_artifact_path}: {parse_err}") from parse_err
 
-    try:
-        s3_artifact = validate_artifact(StageID.S3_SCRIPT, s3_raw)
-        raw_scenes = s3_artifact.payload.get("scenes", [])
-        script_text = s3_artifact.payload.get("script_text", "")
-    except Exception as v_err:
-        if isinstance(s3_raw, dict) and "payload" in s3_raw:
-            logger.warning(f"[s05_director_plan] S3 artifact failed strict boundary validation ({v_err}), falling back to direct payload: {s3_raw.get('payload', {}).keys()}")
-            raw_scenes = s3_raw.get("payload", {}).get("scenes", [])
-            script_text = s3_raw.get("payload", {}).get("script_text", "")
-        else:
-            raise
-
-    # Ground scenes with canonical vox.planner engine (Rule 125 & 139)
-    if script_text:
-        try:
-            vox_plan = plan_scenes_from_script(script_text)
-            if vox_plan and vox_plan.scenes and not raw_scenes:
-                raw_scenes = [{"scene_id": f"SC_{sc.idx:02d}", "visual_metaphor": sc.bg_prompt, "headline": sc.narration[:30]} for sc in vox_plan.scenes]
-        except (ValueError, TypeError, KeyError, AttributeError, RuntimeError) as plan_err:
-            if not raw_scenes:
-                logger.critical(f"[s05_director_plan] Canonical vox planning failed on script_text with no raw scenes (fail-closed): {plan_err}")
-                raise RuntimeError(f"Stage S05 failed closed: vox.planner error with empty raw_scenes: {plan_err}") from plan_err
-            logger.warning(f"[s05_director_plan] Fallback vox planning skipped: {plan_err}")
+    s3_artifact = validate_artifact(StageID.S3_SCRIPT, s3_raw)
+    raw_scenes = s3_artifact.payload.get("scenes", [])
+    b2_source_path = s3_artifact.payload.get("b2_source_path", "")
+    b2_source_sha256 = s3_artifact.payload.get("b2_source_sha256", "")
 
     if not raw_scenes:
-        logger.critical("[s05_director_plan] No scenes available in S3 artifact or vox.planner output (fail-closed)")
-        raise RuntimeError("Stage S05 failed closed: no scenes found in S3 artifact or vox.planner output")
+        logger.critical("[s05_director_plan] No scenes available in S3 artifact (fail-closed)")
+        raise RuntimeError("Stage S05 failed closed: no scenes found in S3 artifact")
+
+    # Load master prompt sha256 for cryptographic provenance
+    master_prompt_path = ctx.paths.repo_root / "config" / "prompts" / "vox_b3_director_image_prompt.md"
+    prompt_sha256 = ""
+    if master_prompt_path.exists():
+        import hashlib
+        prompt_sha256 = hashlib.sha256(master_prompt_path.read_bytes()).hexdigest()
 
     acc_pool = ctx.config.video_generation.account_pool or ["acc_01"]
+    total_sc = len(raw_scenes)
     scenes: List[Scene] = []
+    prev_scene: Optional[Scene] = None
 
     for idx, sc_dict in enumerate(raw_scenes):
         scene = Scene.model_validate(sc_dict)
-        shot_id = f"sc_{idx+1:02d}_sh_01"
-        uv_prompt = build_universal_video_prompt(scene)
         slot = acc_pool[idx % len(acc_pool)]
+        shot_id = f"sc_{idx+1:02d}_sh_01"
+
+        # Decompose into full Vox Object-Assembly Kinematics
+        vox_meta = build_vox_scene_prompts(scene, idx=idx, total_scenes=total_sc, prev_scene=prev_scene)
+        scene.canvas_workspace = vox_meta["canvas_workspace"]
+        scene.hero_cutout_object = vox_meta["hero_cutout_object"]
+        scene.interacting_objects = vox_meta["interacting_objects"]
+        scene.motion_track_and_assembly = vox_meta["motion_track_and_assembly"]
+        scene.graphic_typography = vox_meta["graphic_typography"]
+        scene.visual_continuity_link_to_next = vox_meta["visual_continuity_link_to_next"]
+        scene.objects = vox_meta["objects"]
+        scene.actions = vox_meta["actions"]
+        scene.camera_move = vox_meta["camera_move"]
+        scene.image_prompt = vox_meta["image_prompt"]
+        scene.i2v_prompt_omni = vox_meta["i2v_prompt_omni"]
+        scene.i2v_prompt_google_flow = vox_meta["i2v_prompt_google_flow"]
 
         shot = Shot(
             shot_id=shot_id,
             scene_id=scene.scene_id,
-            visual_prompt=uv_prompt,
+            visual_prompt=vox_meta["i2v_prompt_google_flow"],
             negative_prompt="photorealistic, 3d render, glossy, blurry, chaotic motion, camera shake",
             seed_image=f"composite_{scene.scene_id.lower()}.png",
             duration_sec=ctx.config.video_generation.duration_per_clip_sec,
@@ -117,16 +244,27 @@ def run(ctx: RunContext) -> StageArtifact:
         )
         scene.shots = [shot]
         scenes.append(scene)
+        prev_scene = scene
 
     payload = {
         "task_id": ctx.run_id,
+        "format": "VOX_CONTINUOUS_OBJECT_ASSEMBLY_COLLAGE",
         "total_scenes": len(scenes),
         "account_slots_used": acc_pool,
+        "source": {
+            "b2_path": b2_source_path,
+            "b2_sha256": b2_source_sha256
+        },
+        "prompt": {
+            "path": str(master_prompt_path),
+            "sha256": prompt_sha256
+        },
         "scenes": [s.model_dump() for s in scenes]
     }
 
     prov = Provenance(
         generator="stages.s05_director_plan",
+        prompt_id=prompt_sha256[:16] if prompt_sha256 else None,
         latency_sec=round(time.time() - start_ts, 2)
     )
 

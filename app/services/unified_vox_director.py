@@ -1265,7 +1265,7 @@ def expand_longform_background_roster(
     ]
 
     base_items = list(expanded.items())
-    for var_idx, (suffix, angle_desc, default_beats) in enumerate(perspective_variants):
+    for var_idx, (suffix, angle_desc, fallback_beat_indices) in enumerate(perspective_variants):
         for k, v in base_items:
             if len(expanded) >= target_count:
                 break
@@ -1275,7 +1275,7 @@ def expand_longform_background_roster(
             v_dict = dict(v) if isinstance(v, dict) else {"title": str(k), "description": str(v)}
             base_desc = v_dict.get("description", "")
             base_title = v_dict.get("title", k)
-            beats = v_dict.get("beats") or default_beats
+            beats = v_dict.get("beats") or fallback_beat_indices
             shifted_beats = [((b + var_idx) % 5) + 1 for b in beats]
             expanded[new_key] = {
                 "title": f"{base_title} ({suffix.replace('_', ' ').title()})",

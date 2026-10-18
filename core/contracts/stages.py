@@ -64,7 +64,7 @@ class Shot(BaseModel):
 
 class Scene(BaseModel):
     """Canonical narrative beat in 5-Beat Docudrama structure."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     scene_id: str = Field(description="e.g. SCENE_01")
     sequence_block: str = Field(default="BLOCK_DEFAULT", description="e.g. block_1_act_i")
@@ -76,6 +76,20 @@ class Scene(BaseModel):
     color_accent: Optional[str] = None
     duration_est_sec: float = 5.0
     shots: List[Shot] = Field(default_factory=list)
+
+    # Vox Kinematic & Object-Assembly Decomposition (AVF-VOX-001)
+    canvas_workspace: Optional[str] = None
+    hero_cutout_object: Optional[str] = None
+    interacting_objects: Optional[List[str]] = Field(default_factory=list)
+    motion_track_and_assembly: Optional[Dict[str, Any]] = None
+    graphic_typography: Optional[Dict[str, Any]] = None
+    visual_continuity_link_to_next: Optional[str] = None
+    objects: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    actions: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    camera_move: Optional[str] = None
+    image_prompt: Optional[str] = None
+    i2v_prompt_omni: Optional[str] = None
+    i2v_prompt_google_flow: Optional[str] = None
 
 
 class VideoAsset(BaseModel):

@@ -1,0 +1,135 @@
+{
+  "task_id": "1792304389",
+  "round": 1,
+  "is_delta_audit": false,
+  "invariance_certificate": "N/A (Full Monolithic Baseline Audit)",
+  "last_audit_head": "0a07fe6d98fe55c7caef85a7759e96706a15d991",
+  "timestamp": "2026-10-18T06:49:28Z",
+  "verdict": "REVISE_REQUIRED",
+  "score": 3.5,
+  "passing_threshold": 10.0,
+  "supervisor_model": "claude-opus-5-5",
+  "tokens_consumed": 5352,
+  "summary": "The Executive Forensic Verification Matrix is contradicted by the raw telemetry attached to the same submission on at least six independent points, so it cannot be accepted as Rule 121 evidence. (1) Parity: the matrix asserts bit-for-bit identity, but the raw content hashes differ: local is b4ef417f…a36 and the VPS is 0c2f1984…b44. The matrix's parity method, `git ls-files -z | sha256sum`, hashes only the path list and cannot prove content parity. (2) Cleanliness: the matrix claims 100% clean trees with empty porcelain brackets on both hosts. Raw porcelain shows 9 staged entries on local Windows, including an AM file. The VPS shows 4 unstaged modifications and 5 untracked files, and `git diff` exits 1. (3) Ghost scan: the matrix claims zero remnants, but the raw scanner reports 3 violations: 2 untracked canonical files and 1 abandoned lock file older than 5 minutes at /var/vf/locks/alert_cooldown.json.lock. (4) Zero-mock gate: it exits 1 with 2 matches. (5) AST scan: the matrix claims 0 High findings, but the raw scanner lists dozens of HIGH RULE_139_SILENT_EXCEPT_PASS findings. One of them is in a file introduced by this increment (scripts/verify_b2_b3.py:23). The scanner still exits 0, so the gate is non-enforcing. (6) Ratchet: it is described as a 'strict zero-buffer monotonic ceiling', yet it runs at 221 entries against a ceiling of 227, a 6-entry buffer. The increment's actual payload is uncommitted: the B2→B3 contract, the s03/s05 stage edits, the unified_vox_director change and the new test. HEAD 0a07fe6 equals origin/main, so CI run 39001202105 validated a tree that does not contain the changes under review. The CD job also deployed to a VPS whose working tree has diverged. The increment also introduces two parallel copies of the B2→B3 contract module, contracts/ and core/contracts/, which breaks Rule 125 single truth. Several new exception-handling paths downgrade failures to fallbacks or debug-level logs, which is the symptom patching Rule 139 prohibits. Windows CI logs, lock-contention probe output and the job-level CI telemetry fall inside the 127,738-char condensed section. Those claims are therefore asserted rather than evidenced.",
+  "revisions_needed": [
+    "Commit the increment atomically (contract module, s03/s05/stages.py/unified_vox_director.py edits, test, plan) on a feature branch, push it, and attach the CI run for that SHA with raw job logs showing the pytest summary lines for Linux and Windows.",
+    "Remove the duplicate B2→B3 contract and keep a single canonical module (recommended: core/contracts/b2_b3_contract.py). Update all imports and show the grep output proving no references remain to the deleted path.",
+    "Delete scripts/verify_b2_b3.py or convert it into a pytest test under tests/. Eliminate the silent except/pass at line 23 either way.",
+    "Restage tests/test_b2_b3_handoff.py so the committed version matches disk (resolve the AM state), and include its pytest output.",
+    "Re-establish the VPS through git only (pull the pushed commit). Then provide `git status --porcelain=v1 --untracked-files=all` with empty output and `git diff --quiet; echo $?` returning 0 on both hosts.",
+    "Replace the parity method with a content-sensitive hash and show identical values from local and VPS raw output.",
+    "Resolve the stale /var/vf/locks/alert_cooldown.json.lock: fix the alert_cooldown release or cleanup path and add a test, or document the persistent-sentinel design and update the ghost scanner. Rerun ghost_scan.py showing 0 violations and exit code 0.",
+    "Make the zero-mock gate pass: add a reviewed allowlist for monkeypatch.setenv config injection or refactor test_single_pipeline_truth.py. Classify the 211 test-double references against Rule 118.",
+    "Make the AST scanner exit non-zero on new HIGH findings, set the ratchet max_allowed to the current count with zero buffer, and fail on any finding in files added by the increment.",
+    "beat_tts_engine.py: import sanitize_narration_line at module level, and remove the `except Exception` and lambda fallbacks that silently emit unsanitized narration.",
+    "cost_ledger.py: raise the failure logging from DEBUG to WARNING or ERROR. artifact_sync.py: surface gdrive backup failure in the response or fail the request, per the documented requirement.",
+    "Confirm there is no F401 for the new typing imports in build_remotion_props.py and composite_generator.py, and attach raw `ruff check` output for the touched files.",
+    "Provide un-condensed raw stdout and exit codes for scripts/forensics/probe_adversarial_lock_contention.py (N=16 process mutex, N=50 cooldown) on both Linux and Windows.",
+    "Provide a Rule 138 blast-radius artifact (importers and callers) for the core/contracts/stages.py modification, and justify the canonical status of stages/* alongside vox.pipeline.",
+    "Regenerate the Executive Forensic Verification Matrix mechanically from the raw outputs so that summary claims cannot diverge from evidence."
+  ],
+  "component_reviews": [
+    {
+      "component": "Three-Way Physical Parity (Rule 126) / git provenance",
+      "status": "DEFECT",
+      "analysis": "HEAD SHA (0a07fe6) and tree hash (6e55a8bd) match across local, VPS and origin. The working-tree content hashes diverge, however: local is b4ef417f… and the VPS is 0c2f1984…. Local has the increment staged but not committed (M/A/AM). The VPS carries the same changes as unstaged modifications plus untracked files, which indicates out-of-band file transfer rather than git propagation. The executive parity hash 5be57f74… comes from `git ls-files -z | sha256sum`. That hashes only the tracked path list, so it is structurally incapable of detecting content drift. Content parity is therefore not established."
+    },
+    {
+      "component": "Working tree cleanliness (Rule 119 / Rule 121)",
+      "status": "DEFECT",
+      "analysis": "The 'Root Cause Diagnosis' states that both hosts now report empty porcelain brackets. The raw output in the same section is non-empty on both hosts, and VPS `git diff` exits 1. The globbing fix (quoting plus --porcelain=v1 --untracked-files=all) is sound as a capture technique. However, the claim it supports is false for the evidence actually captured."
+    },
+    {
+      "component": "GitHub Actions CI run 39001202105 (Rule 121 / 126)",
+      "status": "DEFECT",
+      "analysis": "CI conclusion=success applies to commit 0a07fe6. That commit does not contain contracts/b2_b3_contract.py, core/contracts/b2_b3_contract.py, scripts/verify_b2_b3.py, tests/test_b2_b3_handoff.py, or the s03/s05/stages.py/unified_vox_director.py modifications. The green run therefore says nothing about the increment under review. No raw job logs or job-level test counts are present in the preserved evidence, so the 305/91 split cannot be checked against CI output. 'Optional CD: Automated Zero-Downtime Deploy' reporting success while the VPS tree is dirty also needs explanation. Either the deploy does not reset the tree, or it deployed something other than what is on disk."
+    },
+    {
+      "component": "contracts/b2_b3_contract.py + core/contracts/b2_b3_contract.py",
+      "status": "DEFECT",
+      "analysis": "Two new modules with the same name are introduced in parallel package roots. This is a Rule 125 single-truth violation: consumers can bind to different copies and the two can drift. The ghost scanner flags only the core/contracts copy as untracked canonical. Pick one canonical location (core/contracts/ matches the existing core/contracts/stages.py), delete the other, and verify all imports resolve to it. Rule 138 blast-radius evidence is missing for the change to the shared core/contracts/stages.py."
+    },
+    {
+      "component": "scripts/verify_b2_b3.py",
+      "status": "DEFECT",
+      "analysis": "This is a new file in the increment and it contains a HIGH RULE_139_SILENT_EXCEPT_PASS at line 23. It is untracked on the VPS and flagged by the ghost scanner. Its name suggests an ad-hoc verification script, which falls under Rule 119 (no scratch scripts in the repo). The logic should either become a pytest test under tests/ or be removed."
+    },
+    {
+      "component": "tests/test_b2_b3_handoff.py",
+      "status": "DEFECT",
+      "analysis": "Its local status is AM: staged, then modified again after staging. The staged blob is therefore not the version on disk. It has not run in CI, and no pytest output for it is present in the preserved evidence. There is no proof this test passes on either platform."
+    },
+    {
+      "component": "tools/ghost_scan.py execution",
+      "status": "DEFECT",
+      "analysis": "The raw output reports '❌ FOUND 3 GHOST / BYPASS VIOLATION(S)' and contradicts the matrix claim of 'ZERO GHOST REMNANTS DETECTED (Exit code 0)'. The scanner's exit code is not shown in the raw block. The stale /var/vf/locks/alert_cooldown.json.lock is also material: it points to either a lock-lifecycle defect in alert_cooldown.py, such as a lock file not removed on release or crash, or a scanner policy that conflicts with the lock design. If persistent lock files are intentional, as with flock/msvcrt on a sentinel, the scanner must be taught that. Otherwise the release path needs fixing and a test."
+    },
+    {
+      "component": "Zero-mock scan (Rule 118)",
+      "status": "WARN",
+      "analysis": "The scan exits 1 with 2 matches in tests/vox/test_single_pipeline_truth.py, both monkeypatch.setenv for VF_API_TOKEN. Injecting test configuration through the environment is arguably legitimate and is not synthetic telemetry. Even so, the gate as defined fails, and a failing gate cannot be reported as a pass. Either add an explicit, reviewed allowlist entry for env-config injection or refactor the test. The separate count of 211 test-double references across tests/unit and tests/test_*.py has no classification, so Rule 118 compliance for those suites is unverified."
+    },
+    {
+      "component": "AST scanner / config/ast_ratchet_baseline.json (Rule 139)",
+      "status": "DEFECT",
+      "analysis": "The raw scanner emits a large set of HIGH silent-except-pass findings across scripts/orchestrator/*, scripts/render_twolayer_*, scripts/post_sync_cleanup.py, scripts/vf_insight_cards.py and others, yet it exits 0. The summary line 'Alibaba OCR Gate: 0 Critical / 0 High Defects' contradicts this and appears mislabeled. The ratchet runs at 221 against a ceiling of 227, which leaves room for 6 new violations; that is not zero-buffer. A 1,336-line baseline file committed in this range grandfathers existing debt. That is acceptable as a ratchet mechanism, but new files must not add entries, and verify_b2_b3.py does. Set max_allowed equal to the current count and fail the gate on any new-file finding."
+    },
+    {
+      "component": "app/services/beat_tts_engine.py",
+      "status": "DEFECT",
+      "analysis": "The new code uses `try: from vox.planner import sanitize_narration_line … except Exception: t = raw_t` and a lambda fallback with the same shape. A broken vox.planner import, or any exception raised inside sanitize_narration_line, silently produces unsanitized narration with no log. That is a Rule 139 symptom patch on a single-pipeline dependency that should never be absent. Import at module top level, let import failure be fatal, and let sanitizer exceptions propagate or be logged at error level."
+    },
+    {
+      "component": "app/services/artifact_sync.py",
+      "status": "WARN",
+      "analysis": "Replacing bare except/pass on the Notion property parsing with explicit .get() traversal is a real improvement. The gdrive backup, however, is now wrapped in `except Exception` and logged at warning level as a 'Notice'. A backup failure is downgraded to a non-event, and the caller receives success. If backup is optional, document that and surface it in the response payload. If it is required, fail the request."
+    },
+    {
+      "component": "app/services/cost_ledger.py",
+      "status": "WARN",
+      "analysis": "`except Exception` on record() and breakdown_between() now logs at DEBUG level, which is invisible under normal production log levels and therefore effectively silent. Cost ledger write failures undermine budget enforcement, so log at WARNING or ERROR at minimum. Making VF_COST_DIR resolve at call time is a sound testability change."
+    },
+    {
+      "component": "app/services/build_remotion_props.py",
+      "status": "WARN",
+      "analysis": "Narrowing bare except/pass to typed exceptions with warnings is correct Rule 139 remediation. The added `from typing import Any, Dict, List, Optional` is not visibly used in the shown hunks. Ruff's pass claim cannot be cross-checked against the condensed diff, so confirm there is no F401. The same applies to `from typing import Optional` in composite_generator.py."
+    },
+    {
+      "component": "app/services/alert_cooldown.py",
+      "status": "WARN",
+      "analysis": "The visible design is reasonable: an intraprocess threading.Lock plus inter-process locking, LockTimeoutError for fail-closed acquisition, atomic_write_json, and last_sent recorded only after dispatch or reservation. The fail-open quarantine on a corrupt state file is a deliberate and defensible choice for alert delivery. It contrasts with daily_market_lock's fail-closed policy and should be documented as intentional. The msvcrt/fcntl implementation and release path are in the condensed section and cannot be audited. The ghost scanner's stale-lock finding is the only runtime evidence available, and it is negative. The N=50 thread cooldown probe output is not present in the raw evidence."
+    },
+    {
+      "component": "app/services/daily_market_lock.py",
+      "status": "WARN",
+      "analysis": "The header describes a sound state machine: O_CREAT|O_EXCL acquisition, a CORRUPT_FAIL_CLOSED seal, PID+UUID holder verification before mutation, and a distinct COMMITTED_PENDING_RENDER state. The implementation (1,078 lines) is almost entirely condensed, so holder verification, PID-aliveness checks (including PID reuse on Windows) and EXHAUSTED_OFFHOURS TTL handling at the 06:00 VN boundary cannot be verified. The N=16 process race result is asserted only."
+    },
+    {
+      "component": "Single pipeline truth (Rule 125) / legacy purge",
+      "status": "WARN",
+      "analysis": "The legacy app/pipeline/* and legacy routes are properly removed in commit 2456870, and the inventory scanner reports 9/9 canonical roles mapping to vox.*. However, the tracked stages/s01–s11 modules coexist with the vox pipeline, and this increment modifies s03 and s05. The relationship between stages/* and vox.pipeline as canonical needs explicit justification, or stages/* is a second pipeline. The legacy/clean_state_vps.py and legacy/deploy_token_watchdog.py files added in this range are tracked dead code and are in tension with a zero-ghost policy."
+    },
+    {
+      "component": "Scope / Rule 138 blast radius",
+      "status": "WARN",
+      "analysis": "The reviewed diff range 2456870^..HEAD bundles many prior tasks, including 800+ line rewrites of shared services and core/paths.py. It also adds core/atomic_io.py and core/net_utils.py. No code-graph or blast-radius artifact is present for these shared core modules. The increment-specific delta for task 1792304389 is effectively the uncommitted file set, and none of it has CI or graph evidence."
+    }
+  ],
+  "observations": [
+    "The executive summary and the raw telemetry in the same submission disagree on parity, cleanliness, ghost scan, mock scan, AST findings and ratchet buffer. The summary layer should be generated from raw outputs, not authored separately.",
+    "`git ls-files -z | sha256sum` proves only path-list equality. Content parity needs `git rev-parse HEAD^{tree}` on a clean tree, or a hash over `git ls-files -z | xargs -0 sha256sum` that includes working-tree contents.",
+    "HEAD == origin/main == VPS HEAD, but the increment is uncommitted everywhere, so every git- and CI-based proof in this package predates the change.",
+    "VPS untracked and modified files mirror local staged files, which implies the changes reached the VPS outside git. That sync channel bypasses CI and CD.",
+    "The AST scanner exits 0 while emitting HIGH findings, so it cannot function as a gate.",
+    "Ratchet headroom of 6 (221 against 227) allows regressions without failing CI.",
+    "Windows matrix logs, lock-contention probe stdout and CI job logs are missing from the preserved evidence because of condensation. Their pass claims are unverified.",
+    "The positive Rule 139 remediations in build_remotion_props.py and artifact_sync.py (bare except replaced by typed exceptions with logging) are real and should continue.",
+    "The 305 + 91 = 396 test totals are arithmetically consistent, but no raw pytest summary lines are present for either matrix."
+  ],
+  "adherence_matrix": {
+    "iron_laws_compliance": "NON_COMPLIANT",
+    "four_pillars_status": "UNVERIFIED",
+    "zero_ghost_cleanliness": "FAILED"
+  },
+  "audit_file": "C:\\Users\\hunghd2\\Documents\\antigravity\\AI Video Factory\\specs\\boss_audits\\1792304389_audit_round_1.json"
+}
