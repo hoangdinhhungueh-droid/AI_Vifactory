@@ -14,7 +14,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 MAX_HEALTH_BODY_BYTES = 65536  # 64 KB safety bound against trickling or unbounded payloads
 READINESS_OVERALL_BUDGET_SEC = 25.0
@@ -32,17 +32,39 @@ def check_health(
     call_deadline = call_start + timeout_sec
     req = urllib.request.Request(url, headers={"User-Agent": "VF-HealthProbe/1.0"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+        rem_connect = call_deadline - time.monotonic()
+        if rem_connect <= 0:
+            return False, f"Initial deadline exhausted before connection ({timeout_sec}s budget)"
+
+        with urllib.request.urlopen(req, timeout=rem_connect) as resp:
             if resp.status != 200:
                 return False, f"HTTP status {resp.status}"
+
+            sock = None
+            try:
+                sock = getattr(resp.fp.raw, "_sock", None)
+            except Exception:
+                sock = None
 
             chunks = []
             total_read = 0
             chunk_size = 4096
             while True:
+                rem_read = call_deadline - time.monotonic()
+                if rem_read <= 0:
+                    return False, f"Total body read duration exceeded timeout of {timeout_sec}s"
+
+                if sock is not None:
+                    try:
+                        sock.settimeout(max(0.001, rem_read))
+                    except Exception:
+                        pass
+
+                chunk = resp.read(chunk_size)
+
                 if time.monotonic() >= call_deadline:
                     return False, f"Total body read duration exceeded timeout of {timeout_sec}s"
-                chunk = resp.read(chunk_size)
+
                 if not chunk:
                     break
                 total_read += len(chunk)
@@ -135,31 +157,45 @@ def verify_pm2_process_state(
         return False, f"PM2 inspection failure: {type(exc).__name__}: {exc}"
 
 
-def main() -> int:
+def run_service_readiness_probe(
+    restart_fn: Optional[Callable[[float], Tuple[int, str]]] = None,
+    poll_fn: Optional[Callable[[float], Tuple[bool, str]]] = None,
+    inspect_fn: Optional[Callable[[float], Tuple[bool, str]]] = None,
+    status_fn: Optional[Callable[[float], Tuple[int, str]]] = None,
+    budget_sec: float = READINESS_OVERALL_BUDGET_SEC,
+) -> int:
+    """Executes the 5-phase fail-closed readiness probe bounded by budget_sec.
+    Supports dependency injection of phase runners for exhaustive deterministic testing without test doubles.
+    """
     print("--- VF-API PM2 RESTART & HEALTH POLLING PROBE ---")
     overall_start_mono = time.monotonic()
-    overall_deadline = overall_start_mono + READINESS_OVERALL_BUDGET_SEC
+    overall_deadline = overall_start_mono + budget_sec
 
     # 1. PM2 Restart step under overall budget
     now = time.monotonic()
     if now >= overall_deadline:
-        print(f"❌ FAIL: Overall budget exhausted before PM2 restart ({now - overall_start_mono:.2f}s >= {READINESS_OVERALL_BUDGET_SEC}s)", file=sys.stderr)
+        print(f"❌ FAIL: Overall budget exhausted before PM2 restart ({now - overall_start_mono:.2f}s >= {budget_sec}s)", file=sys.stderr)
         return 1
     rem_restart = overall_deadline - now
-    try:
-        res_restart = subprocess.run(
-            ["pm2", "restart", "vf-api"],
-            capture_output=True,
-            text=True,
-            timeout=min(10.0, rem_restart),
-            check=False,
-        )
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
-        print(f"❌ FAIL: PM2 restart execution failed ({type(exc).__name__}): {exc}", file=sys.stderr)
-        return 1
+    if restart_fn is not None:
+        code_restart, out_restart = restart_fn(rem_restart)
+    else:
+        try:
+            res_restart = subprocess.run(
+                ["pm2", "restart", "vf-api"],
+                capture_output=True,
+                text=True,
+                timeout=min(10.0, rem_restart),
+                check=False,
+            )
+            code_restart = res_restart.returncode
+            out_restart = res_restart.stderr.strip()
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+            print(f"❌ FAIL: PM2 restart execution failed ({type(exc).__name__}): {exc}", file=sys.stderr)
+            return 1
 
-    if res_restart.returncode != 0:
-        print(f"❌ FAIL: PM2 restart returned exit code {res_restart.returncode}: {res_restart.stderr.strip()}", file=sys.stderr)
+    if code_restart != 0:
+        print(f"❌ FAIL: PM2 restart returned exit code {code_restart}: {out_restart}", file=sys.stderr)
         return 1
 
     # 2. HTTP Polling step under overall budget
@@ -177,7 +213,10 @@ def main() -> int:
         http_timeout = min(2.0, remaining)
         if http_timeout <= 0.05:
             break
-        ok, diag = check_health(timeout_sec=http_timeout)
+        if poll_fn is not None:
+            ok, diag = poll_fn(http_timeout)
+        else:
+            ok, diag = check_health(timeout_sec=http_timeout)
         last_diag = diag or ""
         if ok:
             online = True
@@ -188,7 +227,7 @@ def main() -> int:
     if not online:
         elapsed = round(time.monotonic() - overall_start_mono, 2)
         print(
-            f"❌ FAIL: vf-api failed readiness predicate within {READINESS_OVERALL_BUDGET_SEC}s budget "
+            f"❌ FAIL: vf-api failed readiness predicate within {budget_sec}s budget "
             f"({elapsed}s elapsed, last error: {last_diag})",
             file=sys.stderr,
         )
@@ -197,11 +236,15 @@ def main() -> int:
     # 3. PM2 Process State Inspection step under overall budget
     now = time.monotonic()
     if now >= overall_deadline:
-        print(f"❌ FAIL: Overall budget exhausted before PM2 inspection ({now - overall_start_mono:.2f}s >= {READINESS_OVERALL_BUDGET_SEC}s)", file=sys.stderr)
+        print(f"❌ FAIL: Overall budget exhausted before PM2 inspection ({now - overall_start_mono:.2f}s >= {budget_sec}s)", file=sys.stderr)
         return 1
     rem_inspect = overall_deadline - now
 
-    pm2_ok, pm2_msg = verify_pm2_process_state("vf-api", timeout_sec=min(5.0, rem_inspect))
+    if inspect_fn is not None:
+        pm2_ok, pm2_msg = inspect_fn(rem_inspect)
+    else:
+        pm2_ok, pm2_msg = verify_pm2_process_state("vf-api", timeout_sec=min(5.0, rem_inspect))
+
     if not pm2_ok:
         print(f"❌ FAIL: PM2 post-polling process state validation failed: {pm2_msg}", file=sys.stderr)
         return 1
@@ -210,35 +253,45 @@ def main() -> int:
     # 4. Final PM2 Status step under overall budget
     now = time.monotonic()
     if now >= overall_deadline:
-        print(f"❌ FAIL: Overall budget exhausted before final pm2 status command ({now - overall_start_mono:.2f}s >= {READINESS_OVERALL_BUDGET_SEC}s)", file=sys.stderr)
+        print(f"❌ FAIL: Overall budget exhausted before final pm2 status command ({now - overall_start_mono:.2f}s >= {budget_sec}s)", file=sys.stderr)
         return 1
     rem_status = overall_deadline - now
 
-    try:
-        res_status = subprocess.run(
-            ["pm2", "status", "vf-api"],
-            capture_output=True,
-            text=True,
-            timeout=min(5.0, rem_status),
-            check=False,
-        )
-        if res_status.returncode != 0:
-            print(f"❌ FAIL: pm2 status returned exit code {res_status.returncode}: {res_status.stderr.strip()}", file=sys.stderr)
+    if status_fn is not None:
+        code_status, out_status = status_fn(rem_status)
+    else:
+        try:
+            res_status = subprocess.run(
+                ["pm2", "status", "vf-api"],
+                capture_output=True,
+                text=True,
+                timeout=min(5.0, rem_status),
+                check=False,
+            )
+            code_status = res_status.returncode
+            out_status = res_status.stdout if code_status == 0 else res_status.stderr
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+            print(f"❌ FAIL: pm2 status execution failed ({type(exc).__name__}): {exc}", file=sys.stderr)
             return 1
-        print(res_status.stdout)
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
-        print(f"❌ FAIL: pm2 status execution failed ({type(exc).__name__}): {exc}", file=sys.stderr)
+
+    if code_status != 0:
+        print(f"❌ FAIL: pm2 status returned exit code {code_status}: {out_status.strip()}", file=sys.stderr)
         return 1
+    print(out_status)
 
     # 5. Final unrounded monotonic budget verification
     finish_mono = time.monotonic()
     if finish_mono > overall_deadline:
-        print(f"❌ FAIL: Overall readiness budget exceeded ({finish_mono - overall_start_mono:.3f}s > {READINESS_OVERALL_BUDGET_SEC}s)", file=sys.stderr)
+        print(f"❌ FAIL: Overall readiness budget exceeded ({finish_mono - overall_start_mono:.3f}s > {budget_sec}s)", file=sys.stderr)
         return 1
 
     total_elapsed = round(finish_mono - overall_start_mono, 2)
-    print(f"✅ SERVICE READINESS PROBE PASSED: Completed in {total_elapsed}s (within {READINESS_OVERALL_BUDGET_SEC}s budget)")
+    print(f"✅ SERVICE READINESS PROBE PASSED: Completed in {total_elapsed}s (within {budget_sec}s budget)")
     return 0
+
+
+def main() -> int:
+    return run_service_readiness_probe()
 
 
 if __name__ == "__main__":

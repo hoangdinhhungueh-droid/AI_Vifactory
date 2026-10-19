@@ -559,6 +559,10 @@ def parse_and_validate_junit_metrics(
                 raise ValueError(
                     f"collected_count ({collected_count}) is less than total executed tests ({total_tests}) in {source_label}"
                 )
+            if deselected_count is not None and total_deselected > 0 and deselected_count != total_deselected:
+                raise ValueError(
+                    f"XML-derived deselected count ({total_deselected}) does not match producer deselected count ({deselected_count}) in {source_label}"
+                )
             effective_desel = deselected_count if deselected_count is not None else total_deselected
             if total_tests + effective_desel != collected_count:
                 raise ValueError(
@@ -639,14 +643,51 @@ MANDATORY_MANIFEST_DIGESTS: Set[str] = {
 
 def parse_zero_mock_probe_output(output: str) -> int:
     """Strictly parses zero-mock compliance probe output, rejecting missing, duplicate, conflicting,
-    or malformed summaries, and requiring an explicit successful terminal record (Rule 118 & Rule 121).
+    or malformed summaries, and requiring an explicit successful terminal record in permitted terminal position (Rule 118 & Rule 121).
     """
     if not output or "FAIL" in output or "Traceback" in output:
         raise ValueError(f"Zero-mock probe output contains failure indicators or is empty: {output[:300]}")
 
     terminal_marker = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
-    if terminal_marker not in output:
+    if output.count(terminal_marker) == 0:
         raise ValueError(f"Missing explicit successful terminal record '{terminal_marker}' in probe output")
+    elif output.count(terminal_marker) > 1:
+        raise ValueError(
+            f"Expected exactly 1 terminal marker '{terminal_marker}' in probe output, found {output.count(terminal_marker)}"
+        )
+
+    # Validate terminal marker position: only border or empty lines permitted after terminal record
+    lines = [line.strip() for line in output.strip().splitlines() if line.strip()]
+    if not lines:
+        raise ValueError("Zero-mock probe output is empty after stripping")
+
+    terminal_idx = -1
+    for idx, l in enumerate(lines):
+        if terminal_marker in l:
+            terminal_idx = idx
+            break
+
+    if terminal_idx == -1:
+        raise ValueError(f"Missing explicit successful terminal record '{terminal_marker}' in probe output")
+
+    trailing_lines = lines[terminal_idx + 1 :]
+    for tl in trailing_lines:
+        if not (all(c == "=" for c in tl) or not tl):
+            raise ValueError(f"Trailing invalid or truncated content detected after terminal record: {tl!r}")
+
+    # Reject malformed extra summary records
+    raw_actual_count = len(re.findall(r"Actual Counted Total", output, re.IGNORECASE))
+    if raw_actual_count != 1:
+        raise ValueError(
+            f"Expected exactly 1 'Actual Counted Total' summary, got {raw_actual_count} "
+            f"(duplicate or missing summary records are strictly rejected)"
+        )
+    raw_calc_count = len(re.findall(r"Calculated Reconciled Total", output, re.IGNORECASE))
+    if raw_calc_count != 1:
+        raise ValueError(
+            f"Expected exactly 1 'Calculated Reconciled Total' summary, got {raw_calc_count} "
+            f"(duplicate or missing summary records are strictly rejected)"
+        )
 
     counted_matches = re.findall(r"Actual Counted Total \(tests/unit/\):\s+(\d+)\s+references", output)
     reconciled_matches = re.findall(r"Calculated Reconciled Total \(tests/unit/\):\s+(\d+)\s+references", output)
@@ -726,6 +767,30 @@ def aggregate_manifest(
             if not hex_64_pattern.match(d_val):
                 raise ValueError(f"Artifact digest '{d_name}' must be a 64-char hex SHA256 digest, got {d_val!r}")
 
+    # Validate provenance between artifact_digests and git identity
+    if digests.get("head_commit_sha") != git_head:
+        raise ValueError(
+            f"Provenance mismatch: artifact_digests['head_commit_sha'] ({digests.get('head_commit_sha')!r}) != git_head ({git_head!r})"
+        )
+    if digests.get("tree_sha") != git_tree:
+        raise ValueError(
+            f"Provenance mismatch: artifact_digests['tree_sha'] ({digests.get('tree_sha')!r}) != git_tree ({git_tree!r})"
+        )
+
+    # Cross-check per-probe hashes with bundle digests
+    if "linux_focused_pytest" in probes_dict:
+        p_xml_sha = probes_dict["linux_focused_pytest"].get("xml_sha256")
+        if p_xml_sha and digests.get("linux_junit_xml_sha256") != p_xml_sha:
+            raise ValueError(
+                f"Digest mismatch for linux_junit_xml_sha256: {digests.get('linux_junit_xml_sha256')!r} != {p_xml_sha!r} (Rule 121)"
+            )
+    if "windows_focused_pytest" in probes_dict:
+        p_xml_sha = probes_dict["windows_focused_pytest"].get("xml_sha256")
+        if p_xml_sha and digests.get("windows_junit_xml_sha256") != p_xml_sha:
+            raise ValueError(
+                f"Digest mismatch for windows_junit_xml_sha256: {digests.get('windows_junit_xml_sha256')!r} != {p_xml_sha!r} (Rule 121)"
+            )
+
     # Validate gate-specific predicates and reject contradictory statuses
     all_probes_pass = True
     for p_name, p_data in probes_dict.items():
@@ -742,37 +807,45 @@ def aggregate_manifest(
 
         p_verdict = p_data.get("verdict")
 
-        # Contradictory status rejection: verdict PASS but nonzero exit_code
-        if p_verdict == "PASS" and p_exit != 0:
+        # Strict typed integer check: reject False, None, or string exit codes
+        is_valid_zero_exit = (type(p_exit) is int and p_exit == 0)
+
+        # Contradictory status rejection: verdict PASS but nonzero/non-integer exit_code
+        if p_verdict == "PASS" and not is_valid_zero_exit:
             raise ValueError(
-                f"Contradictory probe state for '{p_name}': verdict declared 'PASS' but exit_code is {p_exit!r}"
+                f"Contradictory probe state for '{p_name}': verdict declared 'PASS' but exit_code is {p_exit!r} (type={type(p_exit).__name__})"
             )
 
-        if p_verdict != "PASS" or p_exit != 0:
+        if p_verdict != "PASS" or not is_valid_zero_exit:
             all_probes_pass = False
 
         # Gate-specific predicate checks
         if p_name == "zero_mock_forensic_audit":
             z_count = p_data.get("zero_mock_count")
-            z_expected = p_data.get("expected_count", 229)
-            if z_count != z_expected:
+            if type(z_count) is not int or z_count != 229:
                 all_probes_pass = False
 
         elif p_name == "github_actions_ci":
             run_id = p_data.get("run_id")
             conclusion = p_data.get("conclusion")
-            if run_id is None or conclusion != "success":
+            status = p_data.get("status", "completed")
+            if run_id is None or conclusion != "success" or status != "completed":
                 all_probes_pass = False
 
         elif p_name == "whole_packet_secret_scan":
-            findings = p_data.get("findings_count", 0)
-            if findings != 0:
+            findings = p_data.get("findings_count")
+            if type(findings) is not int or findings != 0:
                 all_probes_pass = False
 
         elif p_name == "junit_negative_test_matrix":
             lnx_ec = p_data.get("linux_exit_code", p_exit)
             win_ec = p_data.get("windows_exit_code", p_exit)
-            if lnx_ec != 0 or win_ec != 0:
+            if type(lnx_ec) is not int or lnx_ec != 0 or type(win_ec) is not int or win_ec != 0:
+                all_probes_pass = False
+
+        elif p_name in ("linux_focused_pytest", "windows_focused_pytest"):
+            test_cnt = p_data.get("test_count")
+            if type(test_cnt) is not int or test_cnt < 52:
                 all_probes_pass = False
 
     manifest_ts = datetime.now(timezone.utc).isoformat()
@@ -984,19 +1057,23 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     # Parse collected count and deselected count strictly from execution output (NO hardcoded fallback)
     import re
-    lnx_col_m = re.search(r"collected (\d+) items", out_focused_taxonomy)
-    win_col_m = re.search(r"collected (\d+) items", out_focused_win)
-    if not lnx_col_m:
-        raise RuntimeError(f"Missing collection count from Linux pytest execution output:\n{out_focused_taxonomy[:500]}")
-    if not win_col_m:
-        raise RuntimeError(f"Missing collection count from Windows pytest execution output:\n{out_focused_win[:500]}")
-    lnx_collected_count = int(lnx_col_m.group(1))
-    win_collected_count = int(win_col_m.group(1))
+    lnx_col_matches = re.findall(r"collected (\d+) items", out_focused_taxonomy)
+    win_col_matches = re.findall(r"collected (\d+) items", out_focused_win)
+    if len(lnx_col_matches) != 1:
+        raise RuntimeError(f"Expected exactly 1 collection record from Linux pytest execution output, got {len(lnx_col_matches)}:\n{out_focused_taxonomy[:500]}")
+    if len(win_col_matches) != 1:
+        raise RuntimeError(f"Expected exactly 1 collection record from Windows pytest execution output, got {len(win_col_matches)}:\n{out_focused_win[:500]}")
+    lnx_collected_count = int(lnx_col_matches[0])
+    win_collected_count = int(win_col_matches[0])
 
-    lnx_desel_m = re.search(r"(\d+) deselected", out_focused_taxonomy)
-    win_desel_m = re.search(r"(\d+) deselected", out_focused_win)
-    lnx_deselected_count = int(lnx_desel_m.group(1)) if lnx_desel_m else 0
-    win_deselected_count = int(win_desel_m.group(1)) if win_desel_m else 0
+    lnx_desel_matches = re.findall(r"(\d+) deselected", out_focused_taxonomy)
+    win_desel_matches = re.findall(r"(\d+) deselected", out_focused_win)
+    if len(lnx_desel_matches) > 1:
+        raise RuntimeError(f"Contradictory multiple deselection records in Linux pytest output: {lnx_desel_matches}")
+    if len(win_desel_matches) > 1:
+        raise RuntimeError(f"Contradictory multiple deselection records in Windows pytest output: {win_desel_matches}")
+    lnx_deselected_count = int(lnx_desel_matches[0]) if len(lnx_desel_matches) == 1 else 0
+    win_deselected_count = int(win_desel_matches[0]) if len(win_desel_matches) == 1 else 0
 
     lnx_junit_parsed_ok = False
     win_junit_parsed_ok = False
@@ -1849,6 +1926,11 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "secret_scan_scope_sha256": sec_digest,
     }
 
+    if commit_range and ".." in commit_range:
+        inc_delta_base = commit_range.split("..")[0].strip()
+    else:
+        inc_delta_base = "ca1ac040cf1146718e6349fc26e76034dda9ef52"
+
     manifest_dict = aggregate_manifest(
         probes_dict=probes_dict,
         git_head=git_head,
@@ -1856,7 +1938,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         task_id=task_id or "TASK_1792314467",
         target_episode="JP_TEMP_59",
         cumulative_base_commit_sha="517b082e6d623253b20e0ffb304c86bf4cffef07",
-        incremental_delta_base_sha="2bbe9732cf10db78a8db2948680c036bbacc9adb",
+        incremental_delta_base_sha=inc_delta_base,
         artifact_digests=artifact_digests_dict,
     )
     audits_dir = ROOT_DIR / "specs" / "boss_audits"
@@ -1876,7 +1958,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"Target Task ID:               {task_id or 'TASK_1792314467'}\n"
         f"Target Episode:               JP_TEMP_59\n"
         f"Cumulative Base Commit SHA:   517b082e6d623253b20e0ffb304c86bf4cffef07\n"
-        f"Incremental Delta Base SHA:   2bbe9732cf10db78a8db2948680c036bbacc9adb\n"
+        f"Incremental Delta Base SHA:   {inc_delta_base}\n"
         f"HEAD Commit SHA:              {git_head}\n"
         f"Local Tree SHA:               {git_tree}\n"
         f"Manifest Artifact Path:       specs/boss_audits/{task_id or 'TASK_1792314467'}_manifest.json\n"
@@ -1898,7 +1980,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"- Zero-Mock Forensic Audit:      exit code {code_mock} ({mock_verdict}, dynamically parsed {parsed_zero_mock_count}/229 references verified)\n"
         f"- Linux Focused Pytest (52/52):  exit code {code_focused_taxonomy} ({lnx_test_verdict}, XML SHA256: {lnx_junit_sha})\n"
         f"- Windows Focused Pytest (52/52): exit code {code_focused_win} ({win_test_verdict}, XML SHA256: {win_junit_sha})\n"
-        f"- JUnit Negative Test Matrix:    exit codes {code_junit_val_lnx}/{code_junit_val_win} ({'PASS' if code_junit_val_lnx == 0 and code_junit_val_win == 0 else 'FAIL'}, 20/20 negative & aggregation tests)\n"
+        f"- JUnit Negative Test Matrix:    exit codes {code_junit_val_lnx}/{code_junit_val_win} ({'PASS' if code_junit_val_lnx == 0 and code_junit_val_win == 0 else 'FAIL'}, 47/47 negative & manifest aggregation tests)\n"
         f"- Ruff Linting (Linux/Windows):  exit codes {code_ruff_changed}/{code_ruff_win} ({'PASS' if code_ruff_changed == 0 and code_ruff_win == 0 else 'FAIL'}, 0 defects)\n"
         f"- Service Readiness Probe:       exit code {code_pm2} ({'PASS' if code_pm2 == 0 else 'FAIL'}, PM2 restarted and HTTP 200 polled)\n"
         f"- FastAPI HTTP 200 Probes:       exit code {code_http} ({'PASS' if code_http == 0 else 'FAIL'}, positive, negative SHA, unauthenticated PASS)\n"

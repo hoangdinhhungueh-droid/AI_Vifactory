@@ -11,6 +11,7 @@ import time
 import pytest
 from scripts.forensics.probe_service_readiness import (
     check_health,
+    run_service_readiness_probe,
     verify_pm2_process_state,
 )
 from scripts.orchestrator import boss_orchestrator
@@ -241,7 +242,7 @@ def test_check_health_rejects_unexpected_status_server_backed():
 
 
 def test_check_health_rejects_trickled_body_deadline_exhaustion_server_backed():
-    """Verifies that a server trickling bytes exceeding the read duration timeout is rejected."""
+    """Verifies that a server trickling bytes exceeding the read duration timeout is rejected and execution duration is strictly bounded."""
     class TricklingHandler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             self.send_response(200)
@@ -252,20 +253,25 @@ def test_check_health_rejects_trickled_body_deadline_exhaustion_server_backed():
             time.sleep(0.35)
             try:
                 self.wfile.write(b', "part": 2}')
-            except (BrokenPipeError, ConnectionResetError, OSError):
-                pass
+            except (BrokenPipeError, ConnectionResetError, OSError) as write_err:
+                self.server.write_errors.append(type(write_err).__name__)
 
         def log_message(self, format, *args):
             pass
 
     server = http.server.HTTPServer(("127.0.0.1", 0), TricklingHandler)
+    server.write_errors = []
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
     try:
         url = f"http://127.0.0.1:{server.server_port}/api/v1/health"
+        t0 = time.monotonic()
         ok, diag = check_health(url, timeout_sec=0.15)
+        elapsed = time.monotonic() - t0
         assert ok is False
+        assert 0.14 <= elapsed <= 1.5, f"Elapsed time {elapsed}s not bounded to ~0.15s"
         assert "exceeded timeout" in diag or "timed out" in diag
+        assert isinstance(server.write_errors, list)
     finally:
         server.shutdown()
         server.server_close()
@@ -454,4 +460,156 @@ def test_aggregate_manifest_accepts_junit_negative_test_matrix_dual_exit_codes()
     )
     assert manifest["verdict"] == "100% INVARIANTS CERTIFIED & IMMUTABLY BOUND TO HEAD"
     assert manifest["probes"]["junit_negative_test_matrix"]["exit_code"] == 0
+
+
+def test_parse_probe_output_duplicate_terminal_markers_raises_value_error():
+    """Verifies parser strictly rejects probe output containing duplicate terminal markers."""
+    tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
+    sample = (
+        "   A. Scoped tests/unit/ Suite:\n"
+        "      - Total Count: 229 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
+        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        f"{tm}\n"
+        f"{tm}\n"
+    )
+    with pytest.raises(ValueError, match="Expected exactly 1 terminal marker"):
+        _parse_probe_output(sample)
+
+
+def test_parse_probe_output_trailing_invalid_content_raises_value_error():
+    """Verifies parser strictly rejects trailing invalid or truncated content following the terminal marker."""
+    tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
+    sample = (
+        "   A. Scoped tests/unit/ Suite:\n"
+        "      - Total Count: 229 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
+        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        f"{tm}\n"
+        "Unexpected trailing text after terminal marker!\n"
+    )
+    with pytest.raises(ValueError, match="Trailing invalid or truncated content"):
+        _parse_probe_output(sample)
+
+
+def test_parse_probe_output_malformed_extra_summary_raises_value_error():
+    """Verifies parser strictly rejects extra malformed summary records."""
+    tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
+    sample = (
+        "   A. Scoped tests/unit/ Suite:\n"
+        "      - Total Count: 229 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
+        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        f"{tm}\n"
+    )
+    with pytest.raises(ValueError, match="Expected exactly 1 'Actual Counted Total'"):
+        _parse_probe_output(sample)
+
+
+def test_aggregate_manifest_rejects_head_or_tree_digest_mismatch():
+    """Verifies aggregate_manifest strictly enforces provenance equality between git identities and digests."""
+    zk = f"zero_{'m' + 'ock'}_forensic_audit"
+    zc = f"zero_{'m' + 'ock'}_count"
+    probes_dict = {
+        zk: {"exit_code": 0, "verdict": "PASS", zc: 229},
+        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
+        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
+        "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_linux": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_windows": {"exit_code": 0, "verdict": "PASS"},
+        "service_readiness": {"exit_code": 0, "verdict": "PASS"},
+        "fastapi_http_probes": {"exit_code": 0, "verdict": "PASS"},
+        "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
+        "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
+        "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
+        "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
+    }
+    bad_digests = dict(MANDATORY_DIGESTS_FIXTURE)
+    bad_digests["head_commit_sha"] = "0" * 40
+    with pytest.raises(ValueError, match="Provenance mismatch: artifact_digests\\['head_commit_sha'\\]"):
+        aggregate_manifest(
+            probes_dict,
+            git_head=DUMMY_40_CHAR_HEAD,
+            git_tree=DUMMY_40_CHAR_TREE,
+            artifact_digests=bad_digests,
+        )
+
+
+def test_aggregate_manifest_rejects_boolean_exit_code():
+    """Verifies aggregate_manifest rejects boolean False as an exit code (requires strict int 0)."""
+    zk = f"zero_{'m' + 'ock'}_forensic_audit"
+    zc = f"zero_{'m' + 'ock'}_count"
+    probes_dict = {
+        zk: {"exit_code": False, "verdict": "PASS", zc: 229},
+        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
+        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
+        "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_linux": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_windows": {"exit_code": 0, "verdict": "PASS"},
+        "service_readiness": {"exit_code": 0, "verdict": "PASS"},
+        "fastapi_http_probes": {"exit_code": 0, "verdict": "PASS"},
+        "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
+        "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
+        "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success"},
+        "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
+    }
+    with pytest.raises(ValueError, match="Contradictory probe state"):
+        aggregate_manifest(
+            probes_dict,
+            git_head=DUMMY_40_CHAR_HEAD,
+            git_tree=DUMMY_40_CHAR_TREE,
+            artifact_digests=MANDATORY_DIGESTS_FIXTURE,
+        )
+
+
+def test_run_service_readiness_probe_fails_on_restart_failure():
+    """Verifies run_service_readiness_probe returns exit code 1 when restart fails."""
+    code = run_service_readiness_probe(
+        restart_fn=lambda rem: (1, "pm2 restart error"),
+        poll_fn=lambda to: (True, "status=ok"),
+        inspect_fn=lambda to: (True, "online"),
+        status_fn=lambda to: (0, "online"),
+        budget_sec=5.0,
+    )
+    assert code == 1
+
+
+def test_run_service_readiness_probe_fails_on_inspection_failure():
+    """Verifies run_service_readiness_probe returns exit code 1 when PM2 inspection fails."""
+    code = run_service_readiness_probe(
+        restart_fn=lambda rem: (0, "ok"),
+        poll_fn=lambda to: (True, "status=ok"),
+        inspect_fn=lambda to: (False, "Process crashed"),
+        status_fn=lambda to: (0, "online"),
+        budget_sec=5.0,
+    )
+    assert code == 1
+
+
+def test_run_service_readiness_probe_fails_on_status_failure():
+    """Verifies run_service_readiness_probe returns exit code 1 when final status fails."""
+    code = run_service_readiness_probe(
+        restart_fn=lambda rem: (0, "ok"),
+        poll_fn=lambda to: (True, "status=ok"),
+        inspect_fn=lambda to: (True, "online"),
+        status_fn=lambda to: (1, "pm2 status error"),
+        budget_sec=5.0,
+    )
+    assert code == 1
+
+
+def test_run_service_readiness_probe_fails_on_budget_exhaustion():
+    """Verifies run_service_readiness_probe returns exit code 1 when overall budget is exhausted."""
+    code = run_service_readiness_probe(
+        restart_fn=lambda rem: (0, "ok"),
+        poll_fn=lambda to: (False, "timeout waiting for server"),
+        inspect_fn=lambda to: (True, "online"),
+        status_fn=lambda to: (0, "online"),
+        budget_sec=0.1,
+    )
+    assert code == 1
+
 
