@@ -164,3 +164,17 @@ def test_probe_main_inspect_mode_clean_state_when_no_locks(tmp_path: Path):
 
     code = probe_main(["--inspect", "--locks-dir", str(fake_var)])
     assert code == 0
+
+
+def test_probe_main_inspect_mode_ignores_advisory_mutex_locks(tmp_path: Path):
+    """Verifies that persistent advisory files like alert_cooldown.json.lock or .mutex are ignored."""
+    fake_var = tmp_path / "var" / "vf" / "locks"
+    fake_var.mkdir(parents=True)
+
+    # Write persistent advisory file with non-JSON content
+    (fake_var / "alert_cooldown.json.lock").write_text("PID: 12345\nACQUIRED: 2026-10-18T23:00:00+00:00\n", encoding="utf-8")
+    (fake_var / ".disposal_operation.mutex").write_text("", encoding="utf-8")
+
+    code = probe_main(["--inspect", "--locks-dir", str(fake_var)])
+    assert code == 0
+

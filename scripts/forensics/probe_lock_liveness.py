@@ -312,8 +312,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     if active_lock.exists():
         candidate_locks.append(active_lock)
     else:
-        for p in locks_dir.glob("*.lock"):
-            if not p.name.startswith(".") and p.is_file():
+        for p in sorted(locks_dir.glob("*.lock")):
+            if p.name.startswith(".") or not p.is_file():
+                continue
+            # Exclude advisory locks for state files (e.g. *.json.lock, *.mutex)
+            if p.name.endswith(".json.lock") or p.name.endswith(".mutex"):
+                continue
+            scope_name = p.name[:-5] if p.name.endswith(".lock") else p.name
+            if SCOPE_REGEX.match(scope_name):
                 candidate_locks.append(p)
 
     if not candidate_locks:
@@ -331,7 +337,10 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     # Read and authenticate lock metadata
     raw_text = target_lock.read_text(encoding="utf-8")
-    data = json.loads(raw_text)
+    try:
+        data = json.loads(raw_text)
+    except Exception as _json_err:
+        raise ValueError(f"Corrupted lock structure (invalid JSON) in {target_lock}: {_json_err}") from _json_err
     owner, token, created_at, pid = validate_lock_metadata(data, target_lock)
     current_sha = compute_file_sha256(target_lock)
 
