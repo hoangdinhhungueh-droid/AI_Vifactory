@@ -1,16 +1,23 @@
 # tests/unit/test_junit_validator.py
 """Unit tests for JUnit XML strict metric parsing and exact scope validation (Rule 121 & Rule 139).
 Tests positive cases, negative cases, stale reports, malformed XML, duplicate tests,
-and missing age without using any test doubles.
+missing age, and exact class identity verification without using any test doubles.
 """
 
 import pytest
-from scripts.orchestrator.boss_orchestrator import _parse_junit_metrics, EXPECTED_FOCUSED_TESTCASES
+from scripts.orchestrator.boss_orchestrator import (
+    EXPECTED_FOCUSED_TESTCASES,
+    EXPECTED_TESTCASE_TO_CLASS,
+    _parse_junit_metrics,
+)
 
 
-def _build_xml(testcase_names, failures=0, errors=0, skipped=0, deselected=0, module="tests.unit.test_visual_taxonomy_and_regex"):
+def _build_xml(testcase_names, failures=0, errors=0, skipped=0, deselected=0):
     total = len(testcase_names)
-    tc_tags = "".join(f'<testcase classname="{module}" name="{name}" time="0.01" />' for name in testcase_names)
+    tc_tags = "".join(
+        f'<testcase classname="{EXPECTED_TESTCASE_TO_CLASS.get(name, "tests.unit.test_visual_taxonomy_and_regex")}" name="{name}" time="0.01" />'
+        for name in testcase_names
+    )
     return (
         f'<?xml version="1.0" encoding="utf-8"?>'
         f'<testsuite name="pytest" tests="{total}" failures="{failures}" errors="{errors}" '
@@ -22,17 +29,11 @@ def _build_xml(testcase_names, failures=0, errors=0, skipped=0, deselected=0, mo
 
 def test_positive_exact_expected_scope_passes():
     """Verifies that an XML report containing the exact 52 expected testcases passes with 0 failures."""
-    # Build complete 52-test XML
     tc_list = sorted(list(EXPECTED_FOCUSED_TESTCASES))
-    tc_tags = []
-    for name in tc_list:
-        if "taxonomy" in name or "cjk" in name or "english" in name or "roster" in name or "financial" in name or "consumer" in name:
-            mod = "tests.unit.test_visual_taxonomy_and_regex"
-        elif "vps" in name or "failover" in name:
-            mod = "tests.unit.test_vps_runner_failover"
-        else:
-            mod = "tests.unit.test_lock_liveness_probe"
-        tc_tags.append(f'<testcase classname="{mod}" name="{name}" time="0.01" />')
+    tc_tags = [
+        f'<testcase classname="{EXPECTED_TESTCASE_TO_CLASS[name]}" name="{name}" time="0.01" />'
+        for name in tc_list
+    ]
 
     xml = (
         f'<?xml version="1.0" encoding="utf-8"?>'
@@ -106,3 +107,24 @@ def test_missing_testcase_fails_closed():
     xml = _build_xml(tc_list)
     with pytest.raises(RuntimeError, match="JUnit report missing 12 expected testcase"):
         _parse_junit_metrics(xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=40)
+
+
+def test_testcase_class_mismatch_fails_closed():
+    """Verifies that an unexpected or lookalike classname for a known testcase raises RuntimeError."""
+    tc_list = sorted(list(EXPECTED_FOCUSED_TESTCASES))
+    tc_tags = []
+    for name in tc_list:
+        mod = EXPECTED_TESTCASE_TO_CLASS[name]
+        # Sabotage first testcase with a lookalike classname
+        if name == tc_list[0]:
+            mod = mod + "_shadow"
+        tc_tags.append(f'<testcase classname="{mod}" name="{name}" time="0.01" />')
+
+    xml = (
+        f'<?xml version="1.0" encoding="utf-8"?>'
+        f'<testsuite name="pytest" tests="{len(tc_list)}" failures="0" errors="0" skipped="0" deselected="0" time="1.0">'
+        f'{"".join(tc_tags)}'
+        f'</testsuite>'
+    )
+    with pytest.raises(RuntimeError, match="class mismatch in Linux VPS"):
+        _parse_junit_metrics(xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=52)

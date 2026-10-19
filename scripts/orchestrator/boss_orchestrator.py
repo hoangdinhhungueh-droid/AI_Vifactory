@@ -364,63 +364,65 @@ def run_phase_plan(task_description: str, task_id: Optional[str] = None, dry_run
 
 import xml.etree.ElementTree as ET
 
-EXPECTED_FOCUSED_TESTCASES: Set[str] = {
+EXPECTED_TESTCASE_TO_CLASS: Dict[str, str] = {
     # test_visual_taxonomy_and_regex.py (16)
-    "test_production_visual_taxonomy_structure_and_schema",
-    "test_taxonomy_missing_file_fails_closed",
-    "test_taxonomy_malformed_json_fails_closed",
-    "test_taxonomy_empty_or_non_dict_fails_closed",
-    "test_taxonomy_missing_domains_or_markets_fails_closed",
-    "test_taxonomy_malformed_nested_structures_fails_closed",
-    "test_taxonomy_domain_level_schema_fails_closed",
-    "test_taxonomy_precompiled_regex",
-    "test_consumer_fails_closed_when_taxonomy_domain_missing",
-    "test_taxonomy_cache_isolation_between_custom_and_default_paths",
-    "test_financial_domain_resolution_from_configuration",
-    "test_consumer_fails_closed_when_market_missing",
-    "test_consumer_fails_closed_when_topic_unmatched",
-    "test_cjk_keyword_boundaries_and_near_misses",
-    "test_english_regex_boundaries_prefixes_slugs_and_suffixes",
-    "test_generate_topic_anchored_roster_end_to_end_healthcare",
+    "test_production_visual_taxonomy_structure_and_schema": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_taxonomy_missing_file_fails_closed": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_taxonomy_malformed_json_fails_closed": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_taxonomy_empty_or_non_dict_fails_closed": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_taxonomy_missing_domains_or_markets_fails_closed": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_taxonomy_malformed_nested_structures_fails_closed": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_taxonomy_domain_level_schema_fails_closed": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_taxonomy_precompiled_regex": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_consumer_fails_closed_when_taxonomy_domain_missing": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_taxonomy_cache_isolation_between_custom_and_default_paths": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_financial_domain_resolution_from_configuration": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_consumer_fails_closed_when_market_missing": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_consumer_fails_closed_when_topic_unmatched": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_cjk_keyword_boundaries_and_near_misses": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_english_regex_boundaries_prefixes_slugs_and_suffixes": "tests.unit.test_visual_taxonomy_and_regex",
+    "test_generate_topic_anchored_roster_end_to_end_healthcare": "tests.unit.test_visual_taxonomy_and_regex",
     # test_lock_liveness_probe.py (33)
-    "test_validate_lock_metadata_valid",
-    "test_validate_lock_metadata_rejects_boolean_pid",
-    "test_validate_lock_metadata_rejects_non_integral_pid",
-    "test_validate_lock_metadata_requires_timezone_aware_timestamp",
-    "test_validate_lock_metadata_mismatched_token_holder",
-    "test_check_pid_liveness_current_process_and_nonexistent",
-    "test_atomic_safe_archive_same_filesystem_and_collision_safe",
-    "test_acquire_disposal_mutex_contention",
-    "test_acquire_disposal_mutex_unlock_failure_raises",
-    "test_probe_main_inspect_mode_clean_state_when_no_locks",
-    "test_probe_main_inspect_mode_ignores_advisory_mutex_locks",
-    "test_check_pid_liveness_detects_pid_reuse",
-    "test_check_pid_liveness_invalid_created_at_fails_closed",
-    "test_atomic_safe_archive_retries_on_destination_collision",
-    "test_atomic_safe_archive_fails_on_source_sha_mismatch",
-    "test_atomic_safe_archive_fails_on_cross_device",
-    "test_atomic_safe_archive_source_replacement_inode_race_detection",
-    "test_atomic_safe_archive_destination_fsync_failure_rollback",
-    "test_check_pid_liveness_fail_closed_on_indeterminate_or_permission",
-    "test_get_posix_proc_starttime_parses_field_22",
-    "test_get_posix_proc_starttime_clk_tck_unavailable_fails_closed",
-    "test_concurrent_archival_race_of_same_source",
-    "test_atomic_safe_archive_physical_source_replacement",
-    "test_atomic_safe_archive_source_directory_fsync_failure",
-    "test_acquire_disposal_mutex_descriptor_closure_on_body_failure",
-    "test_acquire_disposal_mutex_descriptor_closure_on_acquisition_failure",
-    "test_acquire_disposal_mutex_descriptor_closure_on_unlock_failure",
-    "test_multiprocess_archival_race_under_mutex",
-    "test_probe_main_indeterminate_at_initial_inspection_causes_zero_mutation",
-    "test_probe_main_indeterminate_at_mutex_revalidation_causes_zero_mutation",
-    "test_atomic_safe_archive_copy_fallback_failure_rollback",
-    "test_atomic_safe_archive_destination_rollback_reporting",
-    "test_atomic_safe_archive_destination_collision_exhaustion",
+    "test_validate_lock_metadata_valid": "tests.unit.test_lock_liveness_probe",
+    "test_validate_lock_metadata_rejects_boolean_pid": "tests.unit.test_lock_liveness_probe",
+    "test_validate_lock_metadata_rejects_non_integral_pid": "tests.unit.test_lock_liveness_probe",
+    "test_validate_lock_metadata_requires_timezone_aware_timestamp": "tests.unit.test_lock_liveness_probe",
+    "test_validate_lock_metadata_mismatched_token_holder": "tests.unit.test_lock_liveness_probe",
+    "test_check_pid_liveness_current_process_and_nonexistent": "tests.unit.test_lock_liveness_probe",
+    "test_atomic_safe_archive_same_filesystem_and_collision_safe": "tests.unit.test_lock_liveness_probe",
+    "test_acquire_disposal_mutex_contention": "tests.unit.test_lock_liveness_probe",
+    "test_acquire_disposal_mutex_unlock_failure_raises": "tests.unit.test_lock_liveness_probe",
+    "test_probe_main_inspect_mode_clean_state_when_no_locks": "tests.unit.test_lock_liveness_probe",
+    "test_probe_main_inspect_mode_ignores_advisory_mutex_locks": "tests.unit.test_lock_liveness_probe",
+    "test_check_pid_liveness_detects_pid_reuse": "tests.unit.test_lock_liveness_probe",
+    "test_check_pid_liveness_invalid_created_at_fails_closed": "tests.unit.test_lock_liveness_probe",
+    "test_atomic_safe_archive_retries_on_destination_collision": "tests.unit.test_lock_liveness_probe",
+    "test_atomic_safe_archive_fails_on_source_sha_mismatch": "tests.unit.test_lock_liveness_probe",
+    "test_atomic_safe_archive_fails_on_cross_device": "tests.unit.test_lock_liveness_probe",
+    "test_atomic_safe_archive_source_replacement_inode_race_detection": "tests.unit.test_lock_liveness_probe",
+    "test_atomic_safe_archive_destination_fsync_failure_rollback": "tests.unit.test_lock_liveness_probe",
+    "test_check_pid_liveness_fail_closed_on_indeterminate_or_permission": "tests.unit.test_lock_liveness_probe",
+    "test_get_posix_proc_starttime_parses_field_22": "tests.unit.test_lock_liveness_probe",
+    "test_get_posix_proc_starttime_clk_tck_unavailable_fails_closed": "tests.unit.test_lock_liveness_probe",
+    "test_concurrent_archival_race_of_same_source": "tests.unit.test_lock_liveness_probe",
+    "test_atomic_safe_archive_physical_source_replacement": "tests.unit.test_lock_liveness_probe",
+    "test_atomic_safe_archive_source_directory_fsync_failure": "tests.unit.test_lock_liveness_probe",
+    "test_acquire_disposal_mutex_descriptor_closure_on_body_failure": "tests.unit.test_lock_liveness_probe",
+    "test_acquire_disposal_mutex_descriptor_closure_on_acquisition_failure": "tests.unit.test_lock_liveness_probe",
+    "test_acquire_disposal_mutex_descriptor_closure_on_unlock_failure": "tests.unit.test_lock_liveness_probe",
+    "test_multiprocess_archival_race_under_mutex": "tests.unit.test_lock_liveness_probe",
+    "test_probe_main_indeterminate_at_initial_inspection_causes_zero_mutation": "tests.unit.test_lock_liveness_probe",
+    "test_probe_main_indeterminate_at_mutex_revalidation_causes_zero_mutation": "tests.unit.test_lock_liveness_probe",
+    "test_atomic_safe_archive_copy_fallback_failure_rollback": "tests.unit.test_lock_liveness_probe",
+    "test_atomic_safe_archive_destination_rollback_reporting": "tests.unit.test_lock_liveness_probe",
+    "test_atomic_safe_archive_destination_collision_exhaustion": "tests.unit.test_lock_liveness_probe",
     # test_vps_runner_failover.py (3)
-    "test_vps_endpoints_configuration_and_failover_order",
-    "test_fast_vps_client_initialization_with_custom_endpoint",
-    "test_fast_vps_client_real_failover_and_recovery",
+    "test_vps_endpoints_configuration_and_failover_order": "tests.unit.test_vps_runner_failover",
+    "test_fast_vps_client_initialization_with_custom_endpoint": "tests.unit.test_vps_runner_failover",
+    "test_fast_vps_client_real_failover_and_recovery": "tests.unit.test_vps_runner_failover",
 }
+
+EXPECTED_FOCUSED_TESTCASES: Set[str] = set(EXPECTED_TESTCASE_TO_CLASS.keys())
 
 
 def parse_and_validate_junit_metrics(
@@ -487,8 +489,6 @@ def parse_and_validate_junit_metrics(
         # Exact testcase identity, uniqueness, and canonical class validation
         expected_tests = expected_exact_testcases or EXPECTED_FOCUSED_TESTCASES
         seen_test_names = set()
-        actual_testcases = []
-        allowed_modules = ("test_visual_taxonomy_and_regex", "test_lock_liveness_probe", "test_vps_runner_failover")
         for tc in root.iter("testcase"):
             t_name = tc.attrib.get("name", "").strip()
             t_cls = tc.attrib.get("classname", "").strip()
@@ -497,10 +497,14 @@ def parse_and_validate_junit_metrics(
             if t_name in seen_test_names:
                 raise ValueError(f"Duplicate testcase '{t_name}' detected in {source_label}")
             seen_test_names.add(t_name)
-            actual_testcases.append((t_name, t_cls))
 
-            if not any(mod in t_cls for mod in allowed_modules):
-                raise ValueError(f"Unexpected testcase class '{t_cls}' for test '{t_name}' in {source_label}")
+            if t_name in EXPECTED_TESTCASE_TO_CLASS:
+                expected_cls = EXPECTED_TESTCASE_TO_CLASS[t_name]
+                if t_cls != expected_cls:
+                    raise ValueError(
+                        f"Testcase '{t_name}' class mismatch in {source_label}: "
+                        f"expected exact '{expected_cls}', got '{t_cls}'"
+                    )
 
         missing_tests = expected_tests - seen_test_names
         unexpected_tests = seen_test_names - expected_tests
@@ -962,9 +966,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     # 9. VPS FastAPI HTTP 200 Runtime Probes & Security Gating (Rule 121 & Rule 139)
     code_pm2, out_pm2 = run_on_vps(
-        "pm2 restart vf-api && online=0; for i in {1..25}; do "
-        "if curl -sf http://127.0.0.1:8000/api/v1/health | grep -q 'ok'; then echo 'VF_API_ONLINE'; online=1; break; fi; "
-        "sleep 1; done; if [ $online -ne 1 ]; then echo 'VF_API_FAILED_TO_START_WITHIN_BUDGET'; exit 1; fi && pm2 status vf-api"
+        "python3 /root/video_factory/scripts/forensics/probe_service_readiness.py"
     )
     code_neg_url, out_neg_url = run_on_vps(
         "VF_API_BASE_URL='' python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py"
@@ -1374,6 +1376,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "windows_focused_pytest": {"exit_code": code_focused_win, "verdict": win_test_verdict, "xml_sha256": win_junit_sha, "test_count": win_tests},
         "ruff_linting_linux": {"exit_code": code_ruff_changed, "verdict": "PASS" if code_ruff_changed == 0 else "FAIL"},
         "ruff_linting_windows": {"exit_code": code_ruff_win, "verdict": "PASS" if code_ruff_win == 0 else "FAIL"},
+        "service_readiness": {"exit_code": code_pm2, "verdict": "PASS" if code_pm2 == 0 else "FAIL"},
         "fastapi_http_probes": {"exit_code": code_http, "verdict": "PASS" if code_http == 0 else "FAIL"},
         "lock_liveness_probe": {"exit_code": code_lock_inspect, "verdict": "PASS" if code_lock_inspect == 0 else "FAIL"},
         "ghost_hunter_scan": {"exit_code": code_ghost_live, "verdict": "PASS" if code_ghost_live == 0 else "FAIL"},
@@ -1425,6 +1428,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"- Linux Focused Pytest (52/52):  exit code {code_focused_taxonomy} ({lnx_test_verdict}, XML SHA256: {lnx_junit_sha})\n"
         f"- Windows Focused Pytest (52/52): exit code {code_focused_win} ({win_test_verdict}, XML SHA256: {win_junit_sha})\n"
         f"- Ruff Linting (Linux/Windows):  exit codes {code_ruff_changed}/{code_ruff_win} ({'PASS' if code_ruff_changed == 0 and code_ruff_win == 0 else 'FAIL'}, 0 defects)\n"
+        f"- Service Readiness Probe:       exit code {code_pm2} ({'PASS' if code_pm2 == 0 else 'FAIL'}, PM2 restarted and HTTP 200 polled)\n"
         f"- FastAPI HTTP 200 Probes:       exit code {code_http} ({'PASS' if code_http == 0 else 'FAIL'}, positive, negative SHA, unauthenticated PASS)\n"
         f"- Lock Liveness & Safe Disposal: exit code {code_lock_inspect} ({'PASS' if code_lock_inspect == 0 else 'FAIL'}, INSPECT read-only PASS)\n"
         f"- Ghost Hunter Scan:             {ghost_scan_verdict}\n"
