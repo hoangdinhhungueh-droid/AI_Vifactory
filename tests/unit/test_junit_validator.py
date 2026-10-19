@@ -222,5 +222,69 @@ def test_outcome_child_mismatch_declared_zero_has_child_failure_fails_closed():
         f'{"".join(tc_tags)}'
         f'</testsuite>'
     )
-    with pytest.raises(RuntimeError, match="Declared failure count \\(0\\) does not match physical <failure> element count \\(1\\)"):
+    with pytest.raises(RuntimeError, match=r"Suite 'pytest' declared failures=0 != physical <failure> count=1"):
         _parse_junit_metrics(xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=52)
+
+
+def test_valid_numeric_collection_inconsistency_fails_closed():
+    """Verifies that when collected_count (60) does not match tests (52) + deselected (5), validation fails."""
+    tc_list = sorted(list(EXPECTED_FOCUSED_TESTCASES))
+    tc_tags = [
+        f'<testcase classname="{EXPECTED_TESTCASE_TO_CLASS[name]}" name="{name}" time="0.01" />'
+        for name in tc_list
+    ]
+    xml = (
+        f'<?xml version="1.0" encoding="utf-8"?>'
+        f'<testsuite name="pytest" tests="52" failures="0" errors="0" skipped="0" deselected="5">'
+        f'{"".join(tc_tags)}'
+        f'</testsuite>'
+    )
+    with pytest.raises(RuntimeError, match="Inconsistent selection/deselection accounting"):
+        _parse_junit_metrics(xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=52, collected_count=60)
+
+
+def test_per_suite_cardinality_mismatch_fails_closed():
+    """Verifies that per-suite cardinality mismatch raises RuntimeError even when global total matches."""
+    xml = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<testsuites>'
+        '<testsuite name="suite1" tests="3" failures="0" errors="0" skipped="0">'
+        '<testcase name="t1" classname="tests.unit.test_visual_taxonomy_and_regex" />'
+        '<testcase name="t2" classname="tests.unit.test_visual_taxonomy_and_regex" />'
+        '</testsuite>'
+        '<testsuite name="suite2" tests="1" failures="0" errors="0" skipped="0">'
+        '<testcase name="t3" classname="tests.unit.test_visual_taxonomy_and_regex" />'
+        '<testcase name="t4" classname="tests.unit.test_visual_taxonomy_and_regex" />'
+        '</testsuite>'
+        '</testsuites>'
+    )
+    with pytest.raises(RuntimeError, match="Suite 'suite1' declared tests=3 does not match physical testcases=2"):
+        _parse_junit_metrics(xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=1)
+
+
+def test_per_suite_outcome_arithmetic_mismatch_fails_closed():
+    """Verifies that per-suite declared failures != physical failure tags in that suite raises RuntimeError."""
+    xml = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<testsuites>'
+        '<testsuite name="suite1" tests="1" failures="2" errors="0" skipped="0">'
+        '<testcase name="t1" classname="tests.unit.test_visual_taxonomy_and_regex">'
+        '<failure message="error">trace</failure>'
+        '</testcase>'
+        '</testsuite>'
+        '</testsuites>'
+    )
+    with pytest.raises(RuntimeError, match="Suite 'suite1' declared failures=2 != physical <failure> count=1"):
+        _parse_junit_metrics(xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=1)
+
+
+def test_missing_required_count_attribute_fails_closed():
+    """Verifies that missing required attribute on <testsuite> (e.g. missing 'errors') raises RuntimeError."""
+    xml = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<testsuite name="pytest" tests="1" failures="0" skipped="0">'
+        '<testcase name="t1" classname="tests.unit.test_visual_taxonomy_and_regex" />'
+        '</testsuite>'
+    )
+    with pytest.raises(RuntimeError, match="Required attribute 'errors' missing on <testsuite>"):
+        _parse_junit_metrics(xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=1)
