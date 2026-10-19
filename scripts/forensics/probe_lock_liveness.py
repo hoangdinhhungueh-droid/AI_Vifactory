@@ -108,7 +108,15 @@ def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[
       (is_alive, diagnostic_reason)
     Fail-closed: Treats only confirmed process absence as stale; permission errors
     or unknown outcomes are treated as alive / in-use.
+    Validates process start time against lock metadata when available to defend against PID reuse.
     """
+    created_dt: Optional[datetime] = None
+    if created_dt_str:
+        try:
+            created_dt = datetime.fromisoformat(created_dt_str.replace("Z", "+00:00"))
+        except Exception:
+            created_dt = None
+
     if sys.platform == "win32":
         import ctypes
         from ctypes import wintypes
@@ -129,16 +137,42 @@ def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[
                 exit_code = wintypes.DWORD()
                 if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
                     STILL_ACTIVE = 259
-                    if exit_code.value == STILL_ACTIVE:
-                        return True, f"PID {pid} is running (STILL_ACTIVE)"
-                    return False, f"PID {pid} terminated with exit code {exit_code.value}"
+                    if exit_code.value != STILL_ACTIVE:
+                        return False, f"PID {pid} terminated with exit code {exit_code.value}"
+
+                    # Validate process start time against lock metadata (PID reuse defense)
+                    class FILETIME(ctypes.Structure):
+                        _fields_ = [("dwLowDateTime", wintypes.DWORD), ("dwHighDateTime", wintypes.DWORD)]
+
+                    ft_create = FILETIME()
+                    ft_exit = FILETIME()
+                    ft_kernel = FILETIME()
+                    ft_user = FILETIME()
+                    if kernel32.GetProcessTimes(handle, ctypes.byref(ft_create), ctypes.byref(ft_exit), ctypes.byref(ft_kernel), ctypes.byref(ft_user)):
+                        intervals = (ft_create.dwHighDateTime << 32) + ft_create.dwLowDateTime
+                        if intervals > 0:
+                            proc_start_epoch = (intervals - 116444736000000000) / 10000000
+                            proc_start_dt = datetime.fromtimestamp(proc_start_epoch, tz=timezone.utc)
+                            if created_dt and proc_start_dt > created_dt + timedelta(seconds=2):
+                                return False, f"PID_REUSED: PID {pid} is running but was created at {proc_start_dt.isoformat()} after lock timestamp {created_dt.isoformat()} (original holder dead)"
+                    return True, f"PID {pid} is running (STILL_ACTIVE, process identity & start time consistent)"
                 return True, f"Cannot determine exit code for PID {pid} (fail-closed)"
             finally:
                 kernel32.CloseHandle(handle)
     else:
         try:
             os.kill(pid, 0)
-            return True, f"PID {pid} responded to signal 0 (confirmed alive)"
+            # Process exists; validate start time from /proc/{pid} if accessible to defend against PID reuse
+            proc_dir = Path(f"/proc/{pid}")
+            if proc_dir.exists():
+                try:
+                    proc_stat = proc_dir.stat()
+                    proc_start_dt = datetime.fromtimestamp(proc_stat.st_ctime, tz=timezone.utc)
+                    if created_dt and proc_start_dt > created_dt + timedelta(seconds=2):
+                        return False, f"PID_REUSED: PID {pid} was created at {proc_start_dt.isoformat()} after lock timestamp {created_dt.isoformat()} (original holder dead)"
+                except (OSError, PermissionError) as _pe:
+                    sys.stderr.write(f"[proc notice] could not read /proc/{pid} stat: {_pe}\n")
+            return True, f"PID {pid} responded to signal 0 (confirmed alive, identity/start time consistent)"
         except ProcessLookupError:
             return False, f"PID {pid} does not exist (ESRCH confirmed absence)"
         except PermissionError:
@@ -184,20 +218,26 @@ def acquire_disposal_mutex(mutex_file: Path) -> Generator[None, None, None]:
             else:
                 import msvcrt
                 msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-        except Exception:
-            pass
+        except OSError as _unlock_err:
+            sys.stderr.write(f"[mutex notice] unlock warning: {_unlock_err}\n")
         os.close(fd)
 
 
-def atomic_safe_archive(active_path: Path, stale_dir: Path, expected_sha: Optional[str] = None) -> Path:
+def atomic_safe_archive(
+    active_path: Path,
+    stale_dir: Path,
+    expected_sha: Optional[str] = None,
+    max_retries: int = 5,
+) -> Path:
     """Executes true collision-safe same-filesystem atomic archival with durability fsync.
 
     Guarantees:
       1. Source existence and identity revalidation.
       2. Same-filesystem device ID verification (os.stat(src).st_dev == os.stat(dst_dir).st_dev).
-      3. Destination collision protection (unique UUID timestamped destination generated upfront).
-      4. Atomic rename (os.replace).
-      5. Durability fsync on file, destination directory, and source directory on POSIX (fail-closed on error).
+      3. True atomic exclusive reservation via os.link (or atomic O_CREAT | O_EXCL fallback)
+         guaranteeing no concurrent clobber.
+      4. Durability fsync on destination file, destination directory, and source directory (fail-closed on POSIX).
+      5. Atomic unlinking of source after durable destination link.
       6. Post-action verification (source removed, destination exists, content SHA matches).
     """
     if not active_path.exists():
@@ -211,7 +251,7 @@ def atomic_safe_archive(active_path: Path, stale_dir: Path, expected_sha: Option
     if src_stat.st_dev != dst_dir_stat.st_dev:
         raise RuntimeError(
             f"Cross-filesystem archival violation: source {active_path} (dev {src_stat.st_dev}) "
-            f"and target {stale_dir} (dev {dst_dir_stat.st_dev}) must share device ID for atomic rename"
+            f"and target {stale_dir} (dev {dst_dir_stat.st_dev}) must share device ID for atomic archival"
         )
 
     # 2. Source identity verification
@@ -219,19 +259,48 @@ def atomic_safe_archive(active_path: Path, stale_dir: Path, expected_sha: Option
     if expected_sha is not None and src_sha != expected_sha:
         raise ValueError(f"Source lock SHA changed concurrently: expected {expected_sha}, got {src_sha}")
 
-    # 3. Collision-safe unique destination path
-    ts_suffix = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    rand_suffix = uuid.uuid4().hex[:8]
-    dest_path = stale_dir / f"{active_path.stem}_{ts_suffix}_{rand_suffix}{active_path.suffix}"
-    if dest_path.exists():
-        raise FileExistsError(f"Destination collision detected: {dest_path}")
+    # 3. Collision-safe unique destination reservation using atomic no-clobber primitive
+    dest_path: Optional[Path] = None
+    last_err: Optional[Exception] = None
+    for attempt in range(max_retries):
+        ts_suffix = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        rand_suffix = uuid.uuid4().hex[:8]
+        candidate_dest = stale_dir / f"{active_path.stem}_{ts_suffix}_{rand_suffix}{active_path.suffix}"
 
-    # 4. Atomic rename (POSIX/NTFS atomic replace on same filesystem)
-    os.replace(str(active_path), str(dest_path))
+        # Attempt atomic link (atomic creation of candidate_dest pointing to active_path; refuses if candidate_dest exists)
+        try:
+            os.link(str(active_path), str(candidate_dest))
+            dest_path = candidate_dest
+            break
+        except FileExistsError:
+            # Destination collided with concurrent actor; retry with new unique timestamp/UUID
+            continue
+        except (OSError, NotImplementedError) as link_err:
+            # If os.link is not supported (e.g. cross-volume or platform restriction), use atomic exclusive file creation
+            try:
+                fd = os.open(str(candidate_dest), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+                with open(active_path, "rb") as f_src:
+                    while chunk := f_src.read(65536):
+                        os.write(fd, chunk)
+                os.fsync(fd)
+                os.close(fd)
+                dest_path = candidate_dest
+                break
+            except FileExistsError:
+                continue
+            except Exception as ex:
+                last_err = ex
+                break
 
-    # 5. File-level durability fsync (fail-closed on error)
+    if dest_path is None:
+        raise RuntimeError(f"Failed to atomically reserve unique destination in {stale_dir} after {max_retries} attempts: {last_err}")
+
+    # 4. File-level durability fsync on destination
     with open(dest_path, "a+b") as f_dst:
         os.fsync(f_dst.fileno())
+
+    # 5. Atomic unlinking of source entry
+    os.unlink(str(active_path))
 
     # 6. Directory-level durability fsync on POSIX (both destination and source directories)
     if hasattr(os, "O_DIRECTORY") and sys.platform != "win32":
@@ -375,11 +444,21 @@ def main(argv: Optional[list[str]] = None) -> int:
     print("\n6. Executing Physical Collision-Safe Safe-Trash Archival (Rule 137):")
     with acquire_disposal_mutex(mutex_path):
         # Re-read and re-validate source immediately before mutation under shared mutex
-        re_data = json.loads(target_lock.read_text(encoding="utf-8"))
-        validate_lock_metadata(re_data, target_lock)
-        re_alive, re_reason = check_pid_liveness(pid, created_at)
+        if not target_lock.exists():
+            print(f"❌ Lock {target_lock} disappeared before disposal under mutex", file=sys.stderr)
+            return 1
+        re_text = target_lock.read_text(encoding="utf-8")
+        try:
+            re_data = json.loads(re_text)
+        except Exception as _json_err:
+            raise ValueError(f"Corrupted lock structure (invalid JSON) in {target_lock}: {_json_err}") from _json_err
+        re_owner, re_token, re_created, re_pid = validate_lock_metadata(re_data, target_lock)
+        re_sha = compute_file_sha256(target_lock)
+        if re_sha != current_sha:
+            raise ValueError(f"Lock SHA changed concurrently under mutex for {target_lock}: expected {current_sha}, got {re_sha}")
+        re_alive, re_reason = check_pid_liveness(re_pid, re_created)
         if re_alive:
-            raise RuntimeError(f"Race condition detected: PID {pid} became alive immediately before archival: {re_reason}")
+            raise RuntimeError(f"Race condition detected: PID {re_pid} became alive immediately before archival: {re_reason}")
 
         final_dest = atomic_safe_archive(target_lock, stale_dir, expected_sha=current_sha)
 

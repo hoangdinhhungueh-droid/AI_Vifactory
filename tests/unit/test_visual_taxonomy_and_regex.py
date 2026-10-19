@@ -269,6 +269,7 @@ def test_consumer_fails_closed_when_taxonomy_domain_missing(tmp_path: Path):
             key_metrics=[],
             claims=[],
             domain="healthcare",
+            taxonomy_path=energy_tax,
         )
     assert "Requested domain 'healthcare' is not configured in visual taxonomy" in str(exc.value)
 
@@ -278,6 +279,106 @@ def test_consumer_fails_closed_when_taxonomy_domain_missing(tmp_path: Path):
     assert "Taxonomy missing required domain 'healthcare'" in str(exc_load.value)
 
     _reset_taxonomy_cache()
+
+
+def test_taxonomy_cache_isolation_between_custom_and_default_paths(tmp_path: Path):
+    """Rule 128, 132 & Boss Item 21: Custom taxonomy loads do not poison or overwrite the global default cache."""
+    custom_tax = tmp_path / "isolated_rosters.json"
+    custom_tax.write_text(json.dumps({
+        "version": "1.0.0",
+        "domains": {
+            "aerospace": {
+                "keywords_cjk": ["航空", "宇宙"],
+                "keywords_en_regex": r"(aerospace|satellite|rocket)",
+                "markets": {
+                    "JP": {
+                        "bg_roster": {"bg_launchpad": VALID_BG_ITEM},
+                        "fg_roster": {"fg_flight_director": VALID_FG_ITEM},
+                    }
+                }
+            }
+        }
+    }), encoding="utf-8")
+
+    _reset_taxonomy_cache()
+    # 1. Load custom taxonomy
+    custom_data = _load_visual_taxonomy(custom_path=custom_tax)
+    assert "aerospace" in custom_data["domains"]
+    assert "healthcare" not in custom_data["domains"]
+
+    # 2. Load default taxonomy without resetting cache - must NOT be poisoned by custom_tax
+    default_data = _load_visual_taxonomy()
+    assert "healthcare" in default_data["domains"]
+    assert "aerospace" not in default_data["domains"]
+
+    # 3. generate_topic_anchored_roster with default path resolves healthcare successfully
+    bg_r, fg_r = generate_topic_anchored_roster(
+        topic="医療機関 倒産 過去最多59件",
+        market="JP",
+        key_metrics=[],
+        claims=[]
+    )
+    assert "bg_clinic_waiting_room" in bg_r
+
+
+def test_financial_domain_resolution_from_configuration():
+    """Rule 128, 132 & Boss Item 22: Financial topic resolution is driven by visual_rosters.json, not hardcoded code."""
+    _reset_taxonomy_cache()
+    bg_r, fg_r = generate_topic_anchored_roster(
+        topic="Sovereign Debt Liquidity Wall",
+        market="JP",
+        key_metrics=["1.5%"],
+        claims=["BOJ adjusts yield curve"]
+    )
+    assert isinstance(bg_r, dict)
+    assert isinstance(fg_r, dict)
+    assert "bg_boj_market_operations_floor" in bg_r
+    assert len(bg_r) >= 18
+    assert len(fg_r) >= 22
+
+
+def test_consumer_fails_closed_when_market_missing(tmp_path: Path):
+    """Rule 128: Consumer fails closed when domain exists but target market and fallbacks are absent."""
+    no_kr_tax = tmp_path / "no_kr_rosters.json"
+    no_kr_tax.write_text(json.dumps({
+        "version": "1.0.0",
+        "domains": {
+            "specialized": {
+                "keywords_cjk": ["特化"],
+                "keywords_en_regex": r"(specialized)",
+                "markets": {
+                    "DE": {
+                        "bg_roster": {"bg_lab": VALID_BG_ITEM},
+                        "fg_roster": {"fg_tech": VALID_FG_ITEM},
+                    }
+                }
+            }
+        }
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc:
+        generate_topic_anchored_roster(
+            topic="specialized research facility",
+            market="KR",
+            key_metrics=[],
+            claims=[],
+            domain="specialized",
+            taxonomy_path=no_kr_tax
+        )
+    assert "has no roster for market 'KR'" in str(exc.value)
+
+
+def test_consumer_fails_closed_when_topic_unmatched():
+    """Rule 128 & 132: Asserts ValueError when topic does not match any configured domain (no fallback)."""
+    _reset_taxonomy_cache()
+    with pytest.raises(ValueError) as exc:
+        generate_topic_anchored_roster(
+            topic="completely unrelated topic about pottery and ceramics in ancient mesopotamia",
+            market="EN",
+            key_metrics=[],
+            claims=[]
+        )
+    assert "does not match any configured domain in visual taxonomy" in str(exc.value)
 
 
 def test_cjk_keyword_boundaries_and_near_misses():

@@ -8,7 +8,6 @@ Rule 127 (Runtime Execution Gate), and Boss Round 8 Item 22.
 from __future__ import annotations
 
 import collections
-import os
 from pathlib import Path
 import subprocess
 import sys

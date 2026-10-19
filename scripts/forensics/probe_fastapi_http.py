@@ -46,16 +46,7 @@ def main() -> int:
 
     expected_sha = os.getenv("EXPECTED_GIT_SHA", "").strip()
     if not expected_sha:
-        try:
-            import subprocess
-            res = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False)
-            if res.returncode == 0 and res.stdout.strip():
-                expected_sha = res.stdout.strip()
-        except Exception:
-            pass
-
-    if not expected_sha:
-        print("CRITICAL: EXPECTED_GIT_SHA is mandatory and could not be determined from environment or git (fail-closed, Rule 118 & 121).", file=sys.stderr)
+        print("CRITICAL: EXPECTED_GIT_SHA environment variable is mandatory and missing (fail-closed, Rule 118 & 121).", file=sys.stderr)
         return 1
 
     token = resolve_token()
@@ -98,10 +89,10 @@ def main() -> int:
                     sha = h_json.get("git_sha", "MISSING")
                     if sha == "MISSING" or not sha:
                         failures.append(f"Auth GET {ep} missing git_sha in response payload: {body}")
-                    elif sha != expected_sha and not sha.startswith(expected_sha) and not expected_sha.startswith(sha):
-                        failures.append(f"Auth GET {ep} git_sha mismatch: expected {expected_sha}, got {sha}")
+                    elif sha != expected_sha:
+                        failures.append(f"Auth GET {ep} git_sha mismatch: expected exact '{expected_sha}', got '{sha}'")
                     else:
-                        print(f"  [PASS] {ep:20} -> HTTP 200 OK | git_sha={sha} (matches EXPECTED_GIT_SHA: {expected_sha[:12]})")
+                        print(f"  [PASS] {ep:20} -> HTTP 200 OK | git_sha={sha} (exact match with EXPECTED_GIT_SHA)")
                 elif ep == "/metrics":
                     print(f"  [PASS] {ep:20} -> HTTP 200 OK | Prometheus metrics ({len(body)} bytes)")
                 else:
@@ -184,10 +175,10 @@ def main() -> int:
                     sha = h_json.get("git_sha", "MISSING")
                     if sha == "MISSING" or not sha:
                         failures.append(f"Public GET {ep} missing git_sha in response payload: {body}")
-                    elif sha != expected_sha and not sha.startswith(expected_sha) and not expected_sha.startswith(sha):
-                        failures.append(f"Public GET {ep} git_sha mismatch: expected {expected_sha}, got {sha}")
+                    elif sha != expected_sha:
+                        failures.append(f"Public GET {ep} git_sha mismatch: expected exact '{expected_sha}', got '{sha}'")
                     else:
-                        print(f"  [PASS] Public {method:4} {ep:22} -> HTTP 200 OK | git_sha={sha} (matches EXPECTED_GIT_SHA: {expected_sha[:12]})")
+                        print(f"  [PASS] Public {method:4} {ep:22} -> HTTP 200 OK | git_sha={sha} (exact match with EXPECTED_GIT_SHA)")
                 else:
                     print(f"  [PASS] Public {method:4} {ep:22} -> HTTP 200 OK (Public Discovery Endpoint)")
             else:

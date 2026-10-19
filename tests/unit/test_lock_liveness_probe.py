@@ -5,8 +5,7 @@ Comprehensive unit tests for process liveness and lock disposal verification pro
 Complies with Rule 118, Rule 125, Rule 137, and Boss Round 8 Items 15-18.
 """
 
-from datetime import datetime, timezone, timedelta
-import json
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import pytest
@@ -177,4 +176,121 @@ def test_probe_main_inspect_mode_ignores_advisory_mutex_locks(tmp_path: Path):
 
     code = probe_main(["--inspect", "--locks-dir", str(fake_var)])
     assert code == 0
+
+
+def test_check_pid_liveness_detects_pid_reuse():
+    """Boss Round 9 Item 18: Verifies PID_REUSED detection when process creation timestamp is after lock acquisition."""
+    my_pid = os.getpid()
+    # A lock timestamp far in the past (e.g. 2024-01-01) is guaranteed to be older than the current running test process
+    past_ts = "2024-01-01T00:00:00+00:00"
+    is_alive, reason = check_pid_liveness(my_pid, created_dt_str=past_ts)
+    assert is_alive is False, f"Expected PID reuse detection, got is_alive={is_alive}, reason={reason}"
+    assert "PID_REUSED" in reason
+    assert "original holder dead" in reason
+
+    # Conversely, a lock timestamp of NOW matches process start time (or is after it), confirming alive
+    now_ts = datetime.now(timezone.utc).isoformat()
+    is_alive_now, reason_now = check_pid_liveness(my_pid, created_dt_str=now_ts)
+    assert is_alive_now is True
+    assert "STILL_ACTIVE" in reason_now or "confirmed alive" in reason_now
+
+
+def test_atomic_safe_archive_retries_on_destination_collision(tmp_path: Path):
+    """Boss Round 9 Item 17: Verifies destination collision handling with unique destination retry."""
+    import uuid
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    content = '{"owner": "JP_TEMP_59.b3b4"}'
+    active_lock.write_text(content, encoding="utf-8")
+
+    first_uuid = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    second_uuid = uuid.UUID("22222222-2222-2222-2222-222222222222")
+    uuid_calls = [first_uuid, second_uuid]
+
+    orig_uuid4 = uuid.uuid4
+
+    def deterministic_uuid4():
+        if uuid_calls:
+            return uuid_calls.pop(0)
+        return uuid.UUID("33333333-3333-3333-3333-333333333333")
+
+    uuid.uuid4 = deterministic_uuid4
+    try:
+        now_ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        collided_path = stale_dir / f"{active_lock.stem}_{now_ts}_{first_uuid.hex[:8]}{active_lock.suffix}"
+        collided_path.write_text("pre-existing collision file", encoding="utf-8")
+
+        dest = atomic_safe_archive(active_lock, stale_dir)
+        assert dest.exists()
+        assert dest != collided_path
+        assert not active_lock.exists()
+        assert dest.read_text(encoding="utf-8") == content
+    finally:
+        uuid.uuid4 = orig_uuid4
+
+
+def test_atomic_safe_archive_fails_on_source_sha_mismatch(tmp_path: Path):
+    """Boss Round 9 Item 20: Fails closed when expected SHA does not match current source SHA."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    active_lock.write_text('{"owner": "JP_TEMP_59.b3b4"}', encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc:
+        atomic_safe_archive(active_lock, stale_dir, expected_sha="0000000000000000000000000000000000000000000000000000000000000000")
+    assert "Source lock SHA changed concurrently" in str(exc.value)
+
+
+def test_atomic_safe_archive_fails_on_cross_device(tmp_path: Path):
+    """Boss Round 9 Item 17: Fails closed when source and destination are on different filesystem devices."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    active_lock.write_text('{"owner": "JP_TEMP_59.b3b4"}', encoding="utf-8")
+
+    real_stat = os.stat
+
+    def alternate_dev_stat(path, *args, **kwargs):
+        st = real_stat(path, *args, **kwargs)
+        if str(path) == str(stale_dir):
+            import collections
+            StatResult = collections.namedtuple("CustomStat", ["st_dev", "st_mode", "st_ino", "st_nlink", "st_uid", "st_gid", "st_size", "st_atime", "st_mtime", "st_ctime"])
+            return StatResult(st.st_dev + 9999, st.st_mode, st.st_ino, st.st_nlink, st.st_uid, st.st_gid, st.st_size, st.st_atime, st.st_mtime, st.st_ctime)
+        return st
+
+    os.stat = alternate_dev_stat
+    try:
+        with pytest.raises(RuntimeError) as exc:
+            atomic_safe_archive(active_lock, stale_dir)
+        assert "Cross-filesystem archival violation" in str(exc.value)
+    finally:
+        os.stat = real_stat
+
+
+def test_check_pid_liveness_fail_closed_on_indeterminate_or_permission():
+    """Boss Round 9 Item 18: Liveness fails closed on permission error or indeterminate outcomes."""
+    if sys.platform != "win32":
+        orig_kill = os.kill
+
+        def perm_denied_kill(pid, sig):
+            raise PermissionError("Operation not permitted")
+
+        os.kill = perm_denied_kill
+        try:
+            is_alive, reason = check_pid_liveness(12345)
+            assert is_alive is True
+            assert "EPERM permission denied - fail-closed" in reason
+        finally:
+            os.kill = orig_kill
+
 

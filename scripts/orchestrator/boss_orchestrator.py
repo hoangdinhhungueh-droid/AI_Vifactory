@@ -449,14 +449,16 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_quarantine_dirs, out_quarantine_dirs = run_on_vps("ls -la /root/video_factory/archive /root/video_factory/.trash /root/video_factory/.safe_trash /root/video_factory/temp_test /root/video_factory/active_candidate 2>&1 || true")
     code_inv_explicit, out_inv_explicit = run_on_vps("python3 /root/video_factory/scripts/legacy_inventory.py")
     code_retained, out_retained = run_on_vps("git -C /root/video_factory ls-files 'vox/*.py' 'stages/*.py' 'app/main.py' 'app/services/trend_engine_b1.py' 'app/services/daily_market_lock.py' 'app/services/unified_vox_director.py'")
-    code_lock_provenance, out_lock_provenance = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_lock_liveness.py --inspect")
+    code_lock_inspect, out_lock_inspect = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_lock_liveness.py --inspect")
+    code_lock_dispose, out_lock_dispose = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_lock_liveness.py --dispose")
     evidence_blocks.append(
         f"### [3. SINGLE PIPELINE TRUTH & LEGACY CODEBASE PURGE (Rule 125)]\n"
         f"Legacy Purge Commit: 2456870 (feat(vox): implement single unified vox pipeline with tactile object decomposition and purge legacy pipeline)\n"
         f"Git Show Diffstat (2456870):\n{out_commit_show}\n\n"
         f"tools/ghost_scan.py Git Tree Provenance:\n{out_ghost_ls}\n\n"
         f"tools/ghost_scan.py Live VPS Execution Output (Boss Item 3):\n{out_ghost_live}\n\n"
-        f"Lock Disposal & Process Liveness Verification (Boss Item 4 - Exit Code {code_lock_provenance}):\n{out_lock_provenance}\n\n"
+        f"Lock Inspection (ReadOnly Mode - Exit Code {code_lock_inspect}):\n{out_lock_inspect}\n\n"
+        f"Lock Disposal Execution (Dispose Mode - Exit Code {code_lock_dispose}):\n{out_lock_dispose}\n\n"
         f"Gitignored Quarantine Paths Audit (archive, .trash, .safe_trash, temp_test, active_candidate):\n{out_quarantine_dirs}\n\n"
         f"legacy_inventory.json Git Tracking Status (EMPTY = untracked): [{out_inv_tracked}]\n"
         f"legacy_inventory.json Git Status (ignored in .gitignore): [{out_git_status_inv}]\n\n"
@@ -472,14 +474,20 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_mock, out_mock = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_zero_mock.py")
     code_collect, out_collect = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest --collect-only -q tests/vox/")
     code_focused_taxonomy, out_focused_taxonomy = run_on_vps(
-        "cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_visual_taxonomy_and_regex.py tests/unit/test_lock_liveness_probe.py tests/unit/test_vps_runner_failover.py -v"
+        "cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_visual_taxonomy_and_regex.py tests/unit/test_lock_liveness_probe.py tests/unit/test_vps_runner_failover.py -v --junitxml=/tmp/pytest_focused.xml"
     )
+    code_junit_xml, out_junit_xml = run_on_vps("cat /tmp/pytest_focused.xml")
+    code_ruff_changed, out_ruff_changed = run_on_vps("ruff check --select F821,F401 app/services/unified_vox_director.py scripts/forensics/probe_fastapi_http.py scripts/forensics/probe_lock_liveness.py scripts/forensics/probe_zero_mock.py tests/unit/test_visual_taxonomy_and_regex.py tests/unit/test_lock_liveness_probe.py")
     evidence_blocks.append(
         f"### [4. ZERO-MOCK COMPLIANCE & STATIC COMPILATION (Rule 118 & 127 - Boss Items 1, 2, 7 & 22)]\n"
         f"py_compile Exit Code: {code_compile}\nOutput:\n{out_compile}\n\n"
         f"Authoritative Zero-Mock Forensic Audit & Count Reconciliation Probe (Exit Code: {code_mock}):\n{out_mock}\n\n"
-        f"--- RAW FOCUSED SUITE EXECUTION: 24/24 PASS (VISUAL TAXONOMY, LOCK LIVENESS & VPS FAILOVER - Exit Code {code_focused_taxonomy}) ---\n"
+        f"--- RAW FOCUSED SUITE EXECUTION (VISUAL TAXONOMY, LOCK LIVENESS & VPS FAILOVER - Exit Code {code_focused_taxonomy}) ---\n"
         f"{out_focused_taxonomy}\n\n"
+        f"--- FOCUSED SUITE LINUX JUNIT XML (Exit Code: {code_junit_xml}) ---\n"
+        f"{out_junit_xml}\n\n"
+        f"--- RUFF F821 / F401 LINTING ON CHANGED SCOPE (Exit Code: {code_ruff_changed}) ---\n"
+        f"{out_ruff_changed}\n\n"
         f"--- PYTEST COLLECTION ON tests/vox/ (Exit Code: {code_collect}) ---\n"
         f"{out_collect}\n"
     )
@@ -703,10 +711,10 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     # 9. VPS FastAPI HTTP 200 Runtime Probes & Security Gating (Rule 121 & Rule 139)
     code_pm2, out_pm2 = run_on_vps("pm2 restart vf-api && sleep 2 && pm2 show vf-api")
     code_neg_url, out_neg_url = run_on_vps(
-        "VF_API_BASE_URL='' python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py 2>&1 || true"
+        "VF_API_BASE_URL='' python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py"
     )
     code_neg_sha, out_neg_sha = run_on_vps(
-        "EXPECTED_GIT_SHA=0000000000000000000000000000000000000000 VF_API_BASE_URL=http://127.0.0.1:8000 python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py 2>&1 || true"
+        "EXPECTED_GIT_SHA=0000000000000000000000000000000000000000 VF_API_BASE_URL=http://127.0.0.1:8000 python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py"
     )
     code_http, out_http = run_on_vps(
         "EXPECTED_GIT_SHA=$(git -C /root/video_factory rev-parse HEAD) VF_API_BASE_URL=http://127.0.0.1:8000 python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py"
