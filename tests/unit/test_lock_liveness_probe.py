@@ -6,12 +6,14 @@ Complies with Rule 118, Rule 125, Rule 137, and Boss Round 10 Requirements.
 Zero synthetic doubles: strictly uses deterministic attribute stubs.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import errno
 import os
 from pathlib import Path
 import pytest
 import sys
+import threading
 
 from scripts.forensics.probe_lock_liveness import (
     validate_lock_metadata,
@@ -386,7 +388,7 @@ def test_atomic_safe_archive_destination_fsync_failure_rollback(tmp_path: Path):
     try:
         with pytest.raises(RuntimeError) as exc:
             atomic_safe_archive(active_lock, stale_dir)
-        assert "Destination fsync failed (rollback performed)" in str(exc.value)
+        assert "Destination fsync failed (verified rollback performed)" in str(exc.value)
         # Source lock must still exist intact after failure rollback
         assert active_lock.exists()
         assert active_lock.read_text(encoding="utf-8") == content
@@ -439,8 +441,6 @@ def test_check_pid_liveness_fail_closed_on_indeterminate_or_permission():
 
 def test_get_posix_proc_starttime_parses_field_22(tmp_path: Path):
     """Boss Round 10 Item 17: Validates Linux /proc/<pid>/stat field 22 starttime parsing."""
-    # Synthetic stat line: field 1: 12345, field 2: (python worker process)
-    # followed by state S, ppid ... field 22 is 85000 clock ticks
     stat_line = "12345 (python worker process) S 1 12345 12345 0 0 4194304 100 0 0 0 10 5 0 0 20 0 1 0 85000 1000 200"
     pid_dir = tmp_path / "12345"
     pid_dir.mkdir()
@@ -451,16 +451,48 @@ def test_get_posix_proc_starttime_parses_field_22(tmp_path: Path):
     system_stat_file = tmp_path / "stat"
     system_stat_file.write_text(system_stat, encoding="utf-8")
 
-    dt, reason = get_posix_proc_starttime(12345, proc_root=str(tmp_path))
-    assert dt is not None, f"Expected parsed starttime, got {reason}"
-    assert reason == "OK"
-    # btime=1700000000, ticks=85000, clk_tck=100 -> 1700000850.0
-    expected_epoch = 1700000000 + (85000 / 100.0)
-    assert dt.timestamp() == expected_epoch
+    if sys.platform == "win32":
+        dt, reason = get_posix_proc_starttime(12345, proc_root=str(tmp_path))
+        assert dt is None
+        assert "SC_CLK_TCK unavailable" in reason
+    else:
+        dt, reason = get_posix_proc_starttime(12345, proc_root=str(tmp_path))
+        assert dt is not None, f"Expected parsed starttime, got {reason}"
+        assert reason == "OK"
+        clk_tck = os.sysconf(os.sysconf_names["SC_CLK_TCK"])
+        expected_epoch = 1700000000 + (85000 / float(clk_tck))
+        assert dt.timestamp() == expected_epoch
+
+
+def test_get_posix_proc_starttime_clk_tck_unavailable_fails_closed(tmp_path: Path):
+    """Boss Round 11: If SC_CLK_TCK is unavailable or <= 0, fails closed with indeterminate."""
+    stat_line = "12345 (proc) S 1 12345 12345 0 0 4194304 100 0 0 0 10 5 0 0 20 0 1 0 85000 1000 200"
+    pid_dir = tmp_path / "12345"
+    pid_dir.mkdir()
+    (pid_dir / "stat").write_text(stat_line, encoding="utf-8")
+    (tmp_path / "stat").write_text("btime 1700000000\n", encoding="utf-8")
+
+    if sys.platform != "win32":
+        orig_sysconf = os.sysconf
+
+        def failing_sysconf(name):
+            return 0  # Invalid tick rate <= 0
+
+        os.sysconf = failing_sysconf
+        try:
+            dt, reason = get_posix_proc_starttime(12345, proc_root=str(tmp_path))
+            assert dt is None
+            assert "INDETERMINATE: SC_CLK_TCK unavailable" in reason
+        finally:
+            os.sysconf = orig_sysconf
+    else:
+        dt, reason = get_posix_proc_starttime(12345, proc_root=str(tmp_path))
+        assert dt is None
+        assert "INDETERMINATE: SC_CLK_TCK unavailable" in reason
 
 
 def test_concurrent_archival_race_of_same_source(tmp_path: Path):
-    """Boss Round 10 Item 19: Concurrent archival of the same source handles the race cleanly."""
+    """Boss Round 11: Genuine overlapping concurrent archival of same source using ThreadPoolExecutor and Barrier."""
     locks_dir = tmp_path / "locks"
     locks_dir.mkdir()
     stale_dir = locks_dir / "_stale"
@@ -470,11 +502,211 @@ def test_concurrent_archival_race_of_same_source(tmp_path: Path):
     content = '{"owner": "JP_TEMP_59.b3b4"}'
     active_lock.write_text(content, encoding="utf-8")
 
-    # First archival succeeds
-    dest_1 = atomic_safe_archive(active_lock, stale_dir)
-    assert dest_1.exists()
-    assert not active_lock.exists()
+    barrier = threading.Barrier(2)
+    results = []
+    errors = []
 
-    # Second archival immediately raises FileNotFoundError (source already unlinked by winner)
-    with pytest.raises(FileNotFoundError):
-        atomic_safe_archive(active_lock, stale_dir)
+    def racer_task():
+        barrier.wait()
+        try:
+            dest = atomic_safe_archive(active_lock, stale_dir)
+            results.append(dest)
+        except Exception as exc:
+            errors.append(exc)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        f1 = executor.submit(racer_task)
+        f2 = executor.submit(racer_task)
+        f1.result()
+        f2.result()
+
+    # The race must resolve safely: source is guaranteed gone, and all destinations valid
+    assert not active_lock.exists()
+    assert len(results) >= 1
+    assert len(results) + len(errors) == 2
+    for dest in results:
+        assert dest.exists()
+        assert dest.read_text(encoding="utf-8") == content
+    for err in errors:
+        assert isinstance(err, (FileNotFoundError, RuntimeError, PermissionError, OSError))
+
+
+def test_atomic_safe_archive_physical_source_replacement(tmp_path: Path):
+    """Boss Round 11: True physical file replacement where source file is unlinked and recreated on disk."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    content = '{"owner": "JP_TEMP_59.b3b4", "version": 1}'
+    active_lock.write_text(content, encoding="utf-8")
+
+    orig_fsync = os.fsync
+    replaced = [False]
+
+    def intercepting_fsync(fd):
+        if not replaced[0]:
+            replaced[0] = True
+            # Physically unlink and recreate source file on disk with different content
+            active_lock.unlink()
+            active_lock.write_text('{"owner": "JP_TEMP_59.b3b4", "version": 2, "replaced": true}', encoding="utf-8")
+        return orig_fsync(fd)
+
+    os.fsync = intercepting_fsync
+    try:
+        with pytest.raises((RuntimeError, ValueError)) as exc:
+            atomic_safe_archive(active_lock, stale_dir)
+        err_msg = str(exc.value)
+        assert "Source replacement detected" in err_msg or "Source content changed" in err_msg
+        # Active lock must exist on disk with the new replaced content
+        assert active_lock.exists()
+        assert 'version": 2' in active_lock.read_text(encoding="utf-8")
+    finally:
+        os.fsync = orig_fsync
+
+
+def test_atomic_safe_archive_source_directory_fsync_failure(tmp_path: Path):
+    """Boss Round 11: Validates failure handling when source directory fsync fails on POSIX."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    content = '{"owner": "JP_TEMP_59.b3b4"}'
+    active_lock.write_text(content, encoding="utf-8")
+
+    if sys.platform == "win32":
+        # On Windows, O_DIRECTORY is not supported, atomic_safe_archive completes safely
+        dest = atomic_safe_archive(active_lock, stale_dir)
+        assert dest.exists()
+        assert not active_lock.exists()
+    else:
+        orig_fsync = os.fsync
+        call_count = [0]
+
+        def failing_src_dir_fsync(fd):
+            call_count[0] += 1
+            # 1st fsync is file-level dst fsync, 2nd is dst dir fsync, 3rd is src dir fsync
+            if call_count[0] == 3:
+                raise OSError(errno.EIO, "Source directory fsync failed")
+            return orig_fsync(fd)
+
+        os.fsync = failing_src_dir_fsync
+        try:
+            with pytest.raises(OSError) as exc:
+                atomic_safe_archive(active_lock, stale_dir)
+            assert "Source directory fsync failed" in str(exc.value)
+        finally:
+            os.fsync = orig_fsync
+
+
+def test_acquire_disposal_mutex_descriptor_closure_on_body_failure(tmp_path: Path):
+    """Boss Round 11: Verifies file descriptor is closed when the context body raises an exception."""
+    mutex_file = tmp_path / ".disposal_operation.mutex"
+    captured_fds = []
+    orig_open = os.open
+
+    def tracking_open(*args, **kwargs):
+        fd = orig_open(*args, **kwargs)
+        if str(mutex_file) in str(args[0]):
+            captured_fds.append(fd)
+        return fd
+
+    os.open = tracking_open
+    try:
+        with pytest.raises(ValueError) as exc:
+            with acquire_disposal_mutex(mutex_file):
+                raise ValueError("Injected body error")
+        assert "Injected body error" in str(exc.value)
+        assert len(captured_fds) == 1
+        with pytest.raises(OSError) as stat_exc:
+            os.fstat(captured_fds[0])
+        assert stat_exc.value.errno == errno.EBADF
+    finally:
+        os.open = orig_open
+
+
+def test_acquire_disposal_mutex_descriptor_closure_on_acquisition_failure(tmp_path: Path):
+    """Boss Round 11: Verifies file descriptor is closed when lock acquisition fails under contention."""
+    mutex_file = tmp_path / ".disposal_operation.mutex"
+    captured_fds = []
+    orig_open = os.open
+
+    def tracking_open(*args, **kwargs):
+        fd = orig_open(*args, **kwargs)
+        if str(mutex_file) in str(args[0]):
+            captured_fds.append(fd)
+        return fd
+
+    with acquire_disposal_mutex(mutex_file):
+        os.open = tracking_open
+        try:
+            with pytest.raises(RuntimeError) as exc:
+                with acquire_disposal_mutex(mutex_file):
+                    pass
+            assert "currently held by another process" in str(exc.value)
+            assert len(captured_fds) == 1
+            with pytest.raises(OSError) as stat_exc:
+                os.fstat(captured_fds[0])
+            assert stat_exc.value.errno == errno.EBADF
+        finally:
+            os.open = orig_open
+
+
+def test_acquire_disposal_mutex_descriptor_closure_on_unlock_failure(tmp_path: Path):
+    """Boss Round 11: Verifies file descriptor is closed even when unlocking raises a critical error."""
+    mutex_file = tmp_path / ".disposal_operation.mutex"
+    captured_fds = []
+    orig_open = os.open
+
+    def tracking_open(*args, **kwargs):
+        fd = orig_open(*args, **kwargs)
+        if str(mutex_file) in str(args[0]):
+            captured_fds.append(fd)
+        return fd
+
+    os.open = tracking_open
+    try:
+        if sys.platform != "win32":
+            import fcntl
+            orig_flock = fcntl.flock
+
+            def faulty_flock(fd, op):
+                if op == fcntl.LOCK_UN:
+                    raise OSError(errno.EIO, "Unlock failed")
+                return orig_flock(fd, op)
+
+            fcntl.flock = faulty_flock
+            try:
+                with pytest.raises(RuntimeError) as exc:
+                    with acquire_disposal_mutex(mutex_file):
+                        pass
+                assert "Critical mutex unlock failure" in str(exc.value)
+            finally:
+                fcntl.flock = orig_flock
+        else:
+            import msvcrt
+            orig_locking = msvcrt.locking
+
+            def faulty_locking(fd, mode, nbytes):
+                if mode == msvcrt.LK_UNLCK:
+                    raise OSError(errno.EACCES, "Permission denied during unlock")
+                return orig_locking(fd, mode, nbytes)
+
+            msvcrt.locking = faulty_locking
+            try:
+                with pytest.raises(RuntimeError) as exc:
+                    with acquire_disposal_mutex(mutex_file):
+                        pass
+                assert "Critical mutex unlock failure" in str(exc.value)
+            finally:
+                msvcrt.locking = orig_locking
+
+        assert len(captured_fds) == 1
+        with pytest.raises(OSError) as stat_exc:
+            os.fstat(captured_fds[0])
+        assert stat_exc.value.errno == errno.EBADF
+    finally:
+        os.open = orig_open

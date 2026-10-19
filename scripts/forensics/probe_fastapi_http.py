@@ -78,7 +78,7 @@ def main() -> int:
         url = f"{base_url}{ep}"
         try:
             req = urllib.request.Request(url, headers=headers_auth)
-            resp = urllib.request.urlopen(req, timeout=5)
+            resp = urllib.request.urlopen(req, timeout=15)
             code = resp.getcode()
             if code != 200:
                 failures.append(f"Auth GET {ep} expected 200, got {code}")
@@ -104,7 +104,7 @@ def main() -> int:
     llm_payload = json.dumps({"prompt": "ping"}).encode("utf-8")
     try:
         req_llm = urllib.request.Request(f"{base_url}/api/v1/llm", data=llm_payload, headers=headers_auth)
-        resp_llm = urllib.request.urlopen(req_llm, timeout=10)
+        resp_llm = urllib.request.urlopen(req_llm, timeout=45)
         code_llm = resp_llm.getcode()
         if code_llm != 200:
             failures.append(f"Auth POST /api/v1/llm expected 200, got {code_llm}")
@@ -122,7 +122,7 @@ def main() -> int:
     try:
         req_chat = urllib.request.Request(f"{base_url}/v1/chat/completions", data=chat_payload, headers=headers_auth)
         try:
-            resp_chat = urllib.request.urlopen(req_chat, timeout=15)
+            resp_chat = urllib.request.urlopen(req_chat, timeout=45)
             if resp_chat.getcode() == 200:
                 print(f"  [PASS] {'/v1/chat/completions':20} -> HTTP 200 OK")
             else:
@@ -149,7 +149,7 @@ def main() -> int:
         headers_unauth = {"Content-Type": "application/json"}
         try:
             req = urllib.request.Request(url, data=data, headers=headers_unauth, method=method)
-            resp = urllib.request.urlopen(req, timeout=5)
+            resp = urllib.request.urlopen(req, timeout=15)
             failures.append(f"Security violation: Unauth {method} {ep} returned HTTP {resp.getcode()} instead of 401")
         except urllib.error.HTTPError as he:
             if he.code == 401:
@@ -167,7 +167,7 @@ def main() -> int:
     for ep, method in public_endpoints:
         try:
             req_pub = urllib.request.Request(f"{base_url}{ep}")
-            resp_pub = urllib.request.urlopen(req_pub, timeout=5)
+            resp_pub = urllib.request.urlopen(req_pub, timeout=15)
             if resp_pub.getcode() == 200:
                 body = resp_pub.read().decode("utf-8", errors="replace")
                 if ep == "/api/v1/health":

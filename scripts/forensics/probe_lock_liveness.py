@@ -86,7 +86,7 @@ def validate_lock_metadata(data: Dict[str, Any], lock_path: Path) -> Tuple[str, 
     try:
         norm_ts = created_at_str.replace("Z", "+00:00")
         created_dt = datetime.fromisoformat(norm_ts)
-    except Exception as e:
+    except (ValueError, TypeError) as e:
         raise ValueError(f"Lock file {lock_path} invalid ISO 8601 created_at '{created_at_str}': {e}")
 
     if created_dt.tzinfo is None:
@@ -132,10 +132,15 @@ def get_posix_proc_starttime(pid: int, proc_root: str = "/proc") -> Tuple[Option
     except ValueError as ve:
         return None, f"Invalid starttime field 22 in {stat_path}: {fields[19]}: {ve}"
 
+    clk_tck: Optional[int] = None
     try:
-        clk_tck = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", 100))
-    except (AttributeError, ValueError):
-        clk_tck = 100
+        if hasattr(os, "sysconf") and "SC_CLK_TCK" in os.sysconf_names:
+            clk_tck = os.sysconf(os.sysconf_names["SC_CLK_TCK"])
+    except (AttributeError, ValueError, OSError):
+        clk_tck = None
+
+    if clk_tck is None or clk_tck <= 0:
+        return None, "INDETERMINATE: SC_CLK_TCK unavailable (fail-closed)"
 
     system_stat_path = root_dir / "stat"
     btime = 0
@@ -172,7 +177,7 @@ def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[
             created_dt = datetime.fromisoformat(norm_ts)
             if created_dt.tzinfo is None:
                 raise ValueError(f"Lock timestamp '{created_dt_str}' must be timezone-aware")
-        except Exception as ts_err:
+        except (ValueError, TypeError) as ts_err:
             sys.stderr.write(f"[liveness error] invalid lock created_at '{created_dt_str}': {ts_err}\n")
             return None, f"INDETERMINATE: invalid created_at timestamp '{created_dt_str}': {ts_err} (fail-closed)"
 
@@ -239,10 +244,8 @@ def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[
             if created_dt and proc_start_dt > created_dt + timedelta(seconds=2):
                 return False, f"PID_REUSED: PID {pid} was created at {proc_start_dt.isoformat()} after lock timestamp {created_dt.isoformat()} (original holder dead)"
             return True, f"PID {pid} confirmed alive (Linux kernel start time {proc_start_dt.isoformat()} matches lock epoch)"
-        elif "Permission denied" in start_reason:
-            return None, f"INDETERMINATE: {start_reason} (fail-closed, cannot confirm identity)"
         else:
-            return True, f"PID {pid} responded to signal 0 ({start_reason})"
+            return None, f"INDETERMINATE: Cannot verify process start time ({start_reason}) (fail-closed)"
 
 
 def compute_file_sha256(path: Path) -> str:
@@ -272,18 +275,20 @@ def acquire_disposal_mutex(mutex_file: Path) -> Generator[None, None, None]:
     except (BlockingIOError, OSError, PermissionError) as lock_err:
         raise RuntimeError(f"Lock disposal mutex '{mutex_file}' is currently held by another process: {lock_err}") from lock_err
     finally:
-        if locked:
-            try:
-                if sys.platform != "win32":
-                    import fcntl
-                    fcntl.flock(fd, fcntl.LOCK_UN)
-                else:
-                    import msvcrt
-                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-            except OSError as _unlock_err:
-                sys.stderr.write(f"[mutex error] critical unlock failure on '{mutex_file}': {_unlock_err}\n")
-                raise RuntimeError(f"Critical mutex unlock failure on '{mutex_file}': {_unlock_err}") from _unlock_err
-        os.close(fd)
+        try:
+            if locked:
+                try:
+                    if sys.platform != "win32":
+                        import fcntl
+                        fcntl.flock(fd, fcntl.LOCK_UN)
+                    else:
+                        import msvcrt
+                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                except OSError as _unlock_err:
+                    sys.stderr.write(f"[mutex error] critical unlock failure on '{mutex_file}': {_unlock_err}\n")
+                    raise RuntimeError(f"Critical mutex unlock failure on '{mutex_file}': {_unlock_err}") from _unlock_err
+        finally:
+            os.close(fd)
 
 
 def atomic_safe_archive(
@@ -360,7 +365,12 @@ def atomic_safe_archive(
                 try:
                     with open(active_path, "rb") as f_src:
                         while chunk := f_src.read(65536):
-                            os.write(fd, chunk)
+                            written = 0
+                            while written < len(chunk):
+                                n = os.write(fd, chunk[written:])
+                                if n <= 0:
+                                    raise OSError("Zero or negative bytes written during copy fallback")
+                                written += n
                     os.fsync(fd)
                 finally:
                     os.close(fd)
@@ -376,11 +386,11 @@ def atomic_safe_archive(
                 break
             except FileExistsError:
                 continue
-            except Exception as ex:
+            except (OSError, RuntimeError, ValueError) as ex:
                 if candidate_dest.exists():
                     try:
                         os.unlink(str(candidate_dest))
-                    except Exception as _clean_err:
+                    except OSError as _clean_err:
                         sys.stderr.write(f"[cleanup notice] could not unlink candidate {candidate_dest}: {_clean_err}\n")
                 last_err = ex
                 break
@@ -392,13 +402,16 @@ def atomic_safe_archive(
     try:
         with open(dest_path, "a+b") as f_dst:
             os.fsync(f_dst.fileno())
-    except Exception as fsync_err:
+    except OSError as fsync_err:
+        rollback_ok = False
         if dest_path.exists():
             try:
                 os.unlink(str(dest_path))
-            except Exception as _clean_err:
+                rollback_ok = not dest_path.exists()
+            except OSError as _clean_err:
                 sys.stderr.write(f"[cleanup notice] could not unlink {dest_path}: {_clean_err}\n")
-        raise RuntimeError(f"Destination fsync failed (rollback performed): {fsync_err}") from fsync_err
+        status_msg = "verified rollback performed" if rollback_ok else "rollback failed or incomplete"
+        raise RuntimeError(f"Destination fsync failed ({status_msg}): {fsync_err}") from fsync_err
 
     # 5. Final source revalidation before unlink
     final_stat = active_path.stat()
@@ -521,7 +534,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     raw_text = target_lock.read_text(encoding="utf-8")
     try:
         data = json.loads(raw_text)
-    except Exception as _json_err:
+    except (json.JSONDecodeError, ValueError) as _json_err:
         raise ValueError(f"Corrupted lock structure (invalid JSON) in {target_lock}: {_json_err}") from _json_err
     owner, token, created_at, pid = validate_lock_metadata(data, target_lock)
     current_sha = compute_file_sha256(target_lock)
@@ -564,7 +577,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         re_text = target_lock.read_text(encoding="utf-8")
         try:
             re_data = json.loads(re_text)
-        except Exception as _json_err:
+        except (json.JSONDecodeError, ValueError) as _json_err:
             raise ValueError(f"Corrupted lock structure (invalid JSON) in {target_lock}: {_json_err}") from _json_err
         re_owner, re_token, re_created, re_pid = validate_lock_metadata(re_data, target_lock)
         re_sha = compute_file_sha256(target_lock)

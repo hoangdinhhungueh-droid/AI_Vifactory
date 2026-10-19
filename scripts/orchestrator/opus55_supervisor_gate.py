@@ -129,7 +129,7 @@ def condense_qa_telemetry(qa_summary: str, max_chars: int = 24000) -> str:
         return "QA Harness: Tests Passed, 0 Regressions"
 
     allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT", "").strip() in ("1", "true", "yes")
-    effective_max = 120000 if allow_massive else max_chars
+    effective_max = 80000 if allow_massive else max_chars
 
     # Under ALLOW_MASSIVE_LLM_CONTEXT, preserve full raw telemetry without any condensation
     if allow_massive and len(qa_summary) <= effective_max:
@@ -285,7 +285,7 @@ def extract_compact_git_diff(
                 tier_2.append((f_name, f_lines))
 
         allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT", "").strip() in ("1", "true", "yes")
-        eff_max_lines = 3000 if allow_massive else max_lines
+        eff_max_lines = 1500 if allow_massive else max_lines
 
         ordered_chunks = tier_1 + tier_2 + tier_3
         meaningful_lines: List[str] = []
@@ -295,7 +295,7 @@ def extract_compact_git_diff(
                 break
 
             file_lines_added = 0
-            max_per_file = 1000 if allow_massive else (45 if f_name in [c[0] for c in tier_1] else 25)
+            max_per_file = 500 if allow_massive else (45 if f_name in [c[0] for c in tier_1] else 25)
 
             for line in chunk_lines:
                 if len(meaningful_lines) >= eff_max_lines:

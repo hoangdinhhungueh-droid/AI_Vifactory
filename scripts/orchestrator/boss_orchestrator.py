@@ -450,11 +450,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_inv_explicit, out_inv_explicit = run_on_vps("python3 /root/video_factory/scripts/legacy_inventory.py")
     code_retained, out_retained = run_on_vps("git -C /root/video_factory ls-files 'vox/*.py' 'stages/*.py' 'app/main.py' 'app/services/trend_engine_b1.py' 'app/services/daily_market_lock.py' 'app/services/unified_vox_director.py'")
     code_lock_inspect, out_lock_inspect = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_lock_liveness.py --inspect")
-    code_lock_dispose, out_lock_dispose = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_lock_liveness.py --dispose")
     res_lock_inspect_win = subprocess.run([sys.executable, "scripts/forensics/probe_lock_liveness.py", "--inspect"], capture_output=True, text=True, cwd=str(ROOT_DIR), check=False)
-    res_lock_dispose_win = subprocess.run([sys.executable, "scripts/forensics/probe_lock_liveness.py", "--dispose"], capture_output=True, text=True, cwd=str(ROOT_DIR), check=False)
     out_lock_inspect_win = (res_lock_inspect_win.stdout + "\n" + res_lock_inspect_win.stderr).strip()
-    out_lock_dispose_win = (res_lock_dispose_win.stdout + "\n" + res_lock_dispose_win.stderr).strip()
 
     evidence_blocks.append(
         f"### [3. SINGLE PIPELINE TRUTH & LEGACY CODEBASE PURGE (Rule 125 & Boss Item 20)]\n"
@@ -462,12 +459,10 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"Git Show Diffstat (2456870):\n{out_commit_show}\n\n"
         f"tools/ghost_scan.py Git Tree Provenance:\n{out_ghost_ls}\n\n"
         f"tools/ghost_scan.py Live VPS Execution Output (Boss Item 3):\n{out_ghost_live}\n\n"
-        f"--- LINUX VPS LOCK LIVENESS & DISPOSAL PROBES ---\n"
+        f"--- LINUX VPS LOCK LIVENESS PROBE (READ-ONLY INSPECTION) ---\n"
         f"Lock Inspection (ReadOnly Mode - Exit Code {code_lock_inspect}):\n{out_lock_inspect}\n\n"
-        f"Lock Disposal Execution (Dispose Mode - Exit Code {code_lock_dispose}):\n{out_lock_dispose}\n\n"
-        f"--- WINDOWS LOCAL LOCK LIVENESS & DISPOSAL PROBES ---\n"
+        f"--- WINDOWS LOCAL LOCK LIVENESS PROBE (READ-ONLY INSPECTION) ---\n"
         f"Windows Lock Inspection (ReadOnly Mode - Exit Code {res_lock_inspect_win.returncode}):\n{out_lock_inspect_win}\n\n"
-        f"Windows Lock Disposal Execution (Dispose Mode - Exit Code {res_lock_dispose_win.returncode}):\n{out_lock_dispose_win}\n\n"
         f"Gitignored Quarantine Paths Audit (archive, .trash, .safe_trash, temp_test, active_candidate):\n{out_quarantine_dirs}\n\n"
         f"legacy_inventory.json Git Tracking Status (EMPTY = untracked): [{out_inv_tracked}]\n"
         f"legacy_inventory.json Git Status (ignored in .gitignore): [{out_git_status_inv}]\n\n"
@@ -499,6 +494,44 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     out_focused_win = (res_win_pytest.stdout + "\n" + res_win_pytest.stderr).strip()
     out_junit_xml_win = win_junit_path.read_text(encoding="utf-8") if win_junit_path.exists() else "NOT_FOUND"
 
+    import xml.etree.ElementTree as ET
+
+    def _parse_junit_metrics(xml_content: str, source_label: str) -> Tuple[int, int, int, int, int]:
+        """Dynamically parses JUnit XML string to extract (tests, passed, failures, errors, skipped)."""
+        if not xml_content or xml_content == "NOT_FOUND" or "<testsuite" not in xml_content:
+            raise RuntimeError(f"JUnit XML missing or invalid for {source_label} (fail-closed)")
+        try:
+            root = ET.fromstring(xml_content)
+            suites = [root] if root.tag == "testsuite" else (root.findall("testsuite") or [root])
+            total_tests = sum(int(s.attrib.get("tests", 0)) for s in suites)
+            total_failures = sum(int(s.attrib.get("failures", 0)) for s in suites)
+            total_errors = sum(int(s.attrib.get("errors", 0)) for s in suites)
+            total_skipped = sum(int(s.attrib.get("skipped", 0)) for s in suites)
+            total_passed = total_tests - total_failures - total_errors - total_skipped
+            return total_tests, total_passed, total_failures, total_errors, total_skipped
+        except Exception as _parse_err:
+            raise RuntimeError(f"Failed to dynamically parse JUnit XML for {source_label}: {_parse_err}") from _parse_err
+
+    try:
+        lnx_tests, lnx_passed, lnx_fails, lnx_errs, lnx_skips = _parse_junit_metrics(out_junit_xml, "Linux VPS")
+        win_tests, win_passed, win_fails, win_errs, win_skips = _parse_junit_metrics(out_junit_xml_win, "Windows Local")
+        comb_tests = lnx_tests + win_tests
+        comb_passed = lnx_passed + win_passed
+        lnx_rate = (lnx_passed / lnx_tests * 100.0) if lnx_tests > 0 else 0.0
+        win_rate = (win_passed / win_tests * 100.0) if win_tests > 0 else 0.0
+        comb_rate = (comb_passed / comb_tests * 100.0) if comb_tests > 0 else 0.0
+        arithmetic_proof = (
+            f"--- DUAL-PLATFORM (LINUX + WINDOWS) TEST ARITHMETIC RECONCILIATION PROOF (Boss Item 22) ---\n"
+            f"- Linux Scope:   {lnx_tests} selected | {lnx_passed} passed | {lnx_fails} failed | {lnx_skips} skipped | {lnx_errs} errors ({lnx_rate:.1f}% Pass)\n"
+            f"- Windows Scope: {win_tests} selected | {win_passed} passed | {win_fails} failed | {win_skips} skipped | {win_errs} errors ({win_rate:.1f}% Pass)\n"
+            f"- Combined Total: {comb_passed} / {comb_tests} PASS ({comb_rate:.1f}% Pass Rate across both operating systems)\n\n"
+        )
+    except Exception as _xml_ex:
+        arithmetic_proof = (
+            f"--- DUAL-PLATFORM (LINUX + WINDOWS) TEST ARITHMETIC RECONCILIATION PROOF (Boss Item 22) ---\n"
+            f"❌ FAIL: JUnit XML Parsing Failed (fail-closed, Rule 118): {_xml_ex}\n\n"
+        )
+
     res_win_ruff = subprocess.run(
         ["ruff", "check", "--select", "F821,F401", "app/services/unified_vox_director.py", "scripts/forensics/probe_fastapi_http.py", "scripts/forensics/probe_lock_liveness.py", "scripts/forensics/probe_zero_mock.py", "tests/unit/test_visual_taxonomy_and_regex.py", "tests/unit/test_lock_liveness_probe.py", "scripts/orchestrator/opus55_supervisor_gate.py", "scripts/orchestrator/boss_orchestrator.py"],
         capture_output=True, text=True, cwd=str(ROOT_DIR), check=False
@@ -518,10 +551,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"{out_focused_win}\n\n"
         f"--- FOCUSED SUITE WINDOWS JUNIT XML ---\n"
         f"{out_junit_xml_win}\n\n"
-        f"--- DUAL-PLATFORM (LINUX + WINDOWS) TEST ARITHMETIC RECONCILIATION PROOF (Boss Item 22) ---\n"
-        f"- Linux Scope:   40 selected | 40 passed | 0 failed | 0 skipped | 0 errors | 0 deselected (100.0% Pass)\n"
-        f"- Windows Scope: 40 selected | 40 passed | 0 failed | 0 skipped | 0 errors | 0 deselected (100.0% Pass)\n"
-        f"- Combined Total: 80 / 80 PASS (100.0% Pass Rate across both operating systems)\n\n"
+        f"{arithmetic_proof}"
         f"--- RUFF F821 / F401 LINTING ON CHANGED SCOPE (LINUX VPS - Exit Code: {code_ruff_changed}) ---\n"
         f"{out_ruff_changed}\n\n"
         f"--- RUFF F821 / F401 LINTING ON CHANGED SCOPE (WINDOWS LOCAL - Exit Code: {code_ruff_win}) ---\n"
@@ -755,7 +785,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "EXPECTED_GIT_SHA=0000000000000000000000000000000000000000 VF_API_BASE_URL=http://127.0.0.1:8000 python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py"
     )
     code_http, out_http = run_on_vps(
-        "EXPECTED_GIT_SHA=$(git -C /root/video_factory rev-parse HEAD) VF_API_BASE_URL=http://127.0.0.1:8000 python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py"
+        f"EXPECTED_GIT_SHA={git_head} VF_API_BASE_URL=http://127.0.0.1:8000 python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py"
     )
     code_auth, out_auth = run_on_vps(
         "echo '=== 1. PORT 8000 LOCALHOST LOOPBACK BIND ===' && (ss -ltnp | grep 8000 || echo 'No external 8000 bind') && "
