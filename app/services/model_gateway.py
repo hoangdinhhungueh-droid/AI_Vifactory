@@ -42,7 +42,19 @@ class AllProvidersFailed(ModelGatewayError):
     pass
 
 
-MAX_ABSOLUTE_INPUT_CEILING = int(os.getenv("HHTECH_MAX_ABSOLUTE_INPUT_CEILING", "120000"))
+def _get_max_absolute_input_ceiling() -> int:
+    """Bounded, validated absolute ceiling for massive context overrides (Rule 138/139).
+    Restricts safety ceiling strictly between 1,000 and 200,000 tokens.
+    """
+    raw = os.getenv("HHTECH_MAX_ABSOLUTE_INPUT_CEILING", "120000")
+    try:
+        val = int(raw)
+        return max(1000, min(val, 200000))
+    except (ValueError, TypeError):
+        return 120000
+
+
+MAX_ABSOLUTE_INPUT_CEILING = _get_max_absolute_input_ceiling()
 
 
 class ModelGateway:

@@ -92,11 +92,16 @@ def audit_codemap_ui() -> dict:
 
     import subprocess
     import time
-    git_sha = "unknown"
     try:
-        git_sha = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
-    except Exception:
-        pass
+        git_sha = subprocess.check_output(
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.PIPE,
+        ).strip()
+        if not git_sha or len(git_sha) != 40:
+            raise RuntimeError(f"Invalid git HEAD commit SHA resolved: '{git_sha}'")
+    except (subprocess.SubprocessError, OSError) as exc:
+        raise RuntimeError(f"Failed to resolve git HEAD commit SHA in {ROOT}: {exc}") from exc
 
     summary = {
         "status": "PASS" if not total_console_errors and not total_page_errors else "FAIL",

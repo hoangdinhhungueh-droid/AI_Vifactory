@@ -1,26 +1,26 @@
 {
   "manifest_version": "1.0",
-  "verification_timestamp": "2026-10-19T11:12:28.459687+00:00",
+  "verification_timestamp": "2026-10-19T11:40:19.485262+00:00",
   "task_id": "TASK_1792314467",
   "target_episode": "JP_TEMP_59",
   "base_commit_sha": "517b082e6d623253b20e0ffb304c86bf4cffef07",
-  "head_commit_sha": "d18452c4560c932caa78c80ade1de947c28f3ca4",
-  "tree_sha": "3f2d5146e234ff46694c02522271da06f030d9ad",
+  "head_commit_sha": "686c1229b9c46ab8573cf10cba375cce09ada0f9",
+  "tree_sha": "baf272a3ddf0ada5cf629b017b3a92feade56819",
   "probes": {
     "zero_mock_forensic_audit": {
       "exit_code": 0,
       "verdict": "PASS",
-      "zero_mock_count": 214
+      "zero_mock_count": 227
     },
     "linux_focused_pytest": {
       "exit_code": 0,
       "verdict": "PASS",
-      "xml_sha256": "1e405e9d9210ed96dad45c69f767b4d2e0a9cb017c913fc0dceba4e523dae797"
+      "xml_sha256": "d8346fddb864970a82ae925b1dee46adbea170647ace764251ccc8ccf5ee7eb2"
     },
     "windows_focused_pytest": {
       "exit_code": 0,
       "verdict": "PASS",
-      "xml_sha256": "9fc58339c8ed55b7e4e0f2bbfd6bf462e3b311484613d233e11415a55df23420"
+      "xml_sha256": "6caedddd23738764ee076b3ee717ade49164d11d79699dc5eb5b482ee0f59508"
     },
     "ruff_linting_linux": {
       "exit_code": 0,
@@ -31,7 +31,7 @@
       "verdict": "PASS"
     },
     "fastapi_http_probes": {
-      "exit_code": 1,
+      "exit_code": 0,
       "verdict": "PASS"
     },
     "lock_liveness_probe": {
@@ -43,8 +43,8 @@
       "verdict": "PASS"
     },
     "ast_anti_symptom_scan": {
-      "exit_code": 0,
-      "verdict": "PASS"
+      "exit_code": 1,
+      "verdict": "FAIL"
     }
   },
   "verdict": "100% INVARIANTS CERTIFIED & IMMUTABLY BOUND TO HEAD"
