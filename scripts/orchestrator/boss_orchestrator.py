@@ -733,6 +733,13 @@ def aggregate_manifest(
             raise ValueError(f"Probe data for '{p_name}' must be a dictionary, got {type(p_data).__name__}")
 
         p_exit = p_data.get("exit_code")
+        if p_exit is None and p_name == "junit_negative_test_matrix":
+            lnx_ec = p_data.get("linux_exit_code")
+            win_ec = p_data.get("windows_exit_code")
+            if lnx_ec is not None and win_ec is not None:
+                p_exit = 0 if (lnx_ec == 0 and win_ec == 0) else max(lnx_ec, win_ec)
+                p_data["exit_code"] = p_exit
+
         p_verdict = p_data.get("verdict")
 
         # Contradictory status rejection: verdict PASS but nonzero exit_code
@@ -1813,7 +1820,12 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         },
         "linux_focused_pytest": {"exit_code": code_focused_taxonomy, "verdict": lnx_test_verdict, "xml_sha256": lnx_junit_sha, "test_count": lnx_tests},
         "windows_focused_pytest": {"exit_code": code_focused_win, "verdict": win_test_verdict, "xml_sha256": win_junit_sha, "test_count": win_tests},
-        "junit_negative_test_matrix": {"linux_exit_code": code_junit_val_lnx, "windows_exit_code": code_junit_val_win, "verdict": "PASS" if code_junit_val_lnx == 0 and code_junit_val_win == 0 else "FAIL"},
+        "junit_negative_test_matrix": {
+            "exit_code": 0 if (code_junit_val_lnx == 0 and code_junit_val_win == 0) else max(code_junit_val_lnx, code_junit_val_win),
+            "linux_exit_code": code_junit_val_lnx,
+            "windows_exit_code": code_junit_val_win,
+            "verdict": "PASS" if code_junit_val_lnx == 0 and code_junit_val_win == 0 else "FAIL",
+        },
         "ruff_linting_linux": {"exit_code": code_ruff_changed, "verdict": "PASS" if code_ruff_changed == 0 else "FAIL"},
         "ruff_linting_windows": {"exit_code": code_ruff_win, "verdict": "PASS" if code_ruff_win == 0 else "FAIL"},
         "service_readiness": {"exit_code": code_pm2, "verdict": "PASS" if code_pm2 == 0 else "FAIL"},

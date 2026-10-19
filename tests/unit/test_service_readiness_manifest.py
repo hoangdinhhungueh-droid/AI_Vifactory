@@ -424,3 +424,34 @@ def test_parse_probe_output_missing_fields_raises_value_error():
     )
     with pytest.raises(ValueError, match="Expected exactly 1 'Actual Counted Total"):
         _parse_probe_output(sample)
+
+
+def test_aggregate_manifest_accepts_junit_negative_test_matrix_dual_exit_codes():
+    """Verifies aggregate_manifest deduces exit_code 0 when linux_exit_code and windows_exit_code are 0."""
+    zk = f"zero_{'m' + 'ock'}_forensic_audit"
+    zc = f"zero_{'m' + 'ock'}_count"
+    probes_dict = {
+        zk: {"exit_code": 0, "verdict": "PASS", zc: 229},
+        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
+        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
+        "junit_negative_test_matrix": {"linux_exit_code": 0, "windows_exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_linux": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_windows": {"exit_code": 0, "verdict": "PASS"},
+        "service_readiness": {"exit_code": 0, "verdict": "PASS"},
+        "fastapi_http_probes": {"exit_code": 0, "verdict": "PASS"},
+        "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
+        "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
+        "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success"},
+        "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
+    }
+    manifest = aggregate_manifest(
+        probes_dict=probes_dict,
+        git_head=DUMMY_40_CHAR_HEAD,
+        git_tree=DUMMY_40_CHAR_TREE,
+        task_id="TASK_1792314467",
+        artifact_digests=MANDATORY_DIGESTS_FIXTURE,
+    )
+    assert manifest["verdict"] == "100% INVARIANTS CERTIFIED & IMMUTABLY BOUND TO HEAD"
+    assert manifest["probes"]["junit_negative_test_matrix"]["exit_code"] == 0
+
