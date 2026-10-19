@@ -14,10 +14,6 @@ Modes:
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
-from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
-from enum import Enum
 import errno
 import hashlib
 import json
@@ -26,8 +22,12 @@ import re
 import subprocess
 import sys
 import uuid
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional, Generator
+from typing import Any, Dict, Generator, Optional, Tuple
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -526,7 +526,7 @@ def atomic_safe_archive(
         except FileExistsError:
             # Destination collided with concurrent actor; retry with new unique timestamp/UUID
             continue
-        except (OSError, NotImplementedError) as link_err:
+        except (OSError, NotImplementedError):
             # Fallback for environments lacking os.link (e.g. FAT32 or certain container mounts)
             try:
                 fd = os.open(str(candidate_dest), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)

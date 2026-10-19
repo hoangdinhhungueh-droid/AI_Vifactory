@@ -6,23 +6,26 @@ Complies with Rule 118, Rule 125, Rule 137, and Boss Round 10 Requirements.
 Zero synthetic doubles: strictly uses deterministic attribute stubs.
 """
 
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
 import errno
 import multiprocessing
 import os
-from pathlib import Path
-import pytest
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
 
 from scripts.forensics.probe_lock_liveness import (
-    validate_lock_metadata,
+    _mp_disposal_worker,
+    acquire_disposal_mutex,
+    atomic_safe_archive,
     check_pid_liveness,
     get_posix_proc_starttime,
-    atomic_safe_archive,
-    acquire_disposal_mutex,
-    _mp_disposal_worker,
+    validate_lock_metadata,
+)
+from scripts.forensics.probe_lock_liveness import (
     main as probe_main,
 )
 
