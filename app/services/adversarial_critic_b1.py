@@ -185,3 +185,115 @@ Interrogate whether this proposed angle truly satisfies the breaking search inte
 
     logger.info(f"[critic_gate] Audited '{candidate_term}' ({m_up}): Verdict={verdict} (Score: {score}/10) | Veto: {audit_result.get('veto_reason')}")
     return audit_result
+
+
+REPAIR_SYSTEM_PROMPT = """You are a Senior Investigative Documentary Editor and Narrative Strategist.
+A candidate topic for an 8-12 minute investigative documentary passed initial viability, but the Adversarial Critic Gate identified an alignment, timing, or search-intent flaw in the proposed angle.
+
+Your task:
+Directly address the Critic Gate's veto reason and reconstruct a sharp, compelling, single-sentence investigative angle that:
+1. Aligns 100% with viewer search intent and breaking news catalysts.
+2. Fixes the specific flaw highlighted by the Critic (e.g., naming the exact deadline/trigger, focusing on the imminent catalyst instead of stale background, clarifying institutional stakes).
+3. Follows the Rule 130 causal formula: <CATALYST_EVENT> -> <TRANSMISSION_MECHANISM> -> <CORE_SYSTEMIC_PARADOX>.
+
+Output ONLY valid JSON matching this schema:
+{
+  "repaired_angle": "<Single-sentence investigative angle in the native market language/English>",
+  "repair_rationale": "<1-2 sentence explanation of how the critic feedback was resolved>"
+}
+"""
+
+
+def repair_candidate_angle(
+    candidate_term: str,
+    original_angle: str,
+    veto_reason: str,
+    market: str = "EN",
+    news_catalysts: Optional[List[Dict[str, Any]]] = None,
+    rising_queries: Optional[List[str]] = None,
+    model: str = "gpt-6-astra",
+    fallback_model: str = "claude-sonnet-5-5",
+) -> str:
+    """Attempt a 1-shot self-repair of candidate viral angle based on Critic Gate veto feedback (Rule 124, 130)."""
+    from app.services.model_gateway import get_global_gateway
+    gateway = get_global_gateway()
+
+    m_up = (market or "EN").strip().upper()
+    news_text = "No recent breaking news headlines found."
+    if news_catalysts:
+        n_lines = []
+        for n in news_catalysts[:6]:
+            t = n.get("title", "").strip()
+            d = n.get("description", "").strip()
+            p = n.get("published_at", "").strip()
+            if t:
+                n_lines.append(f"  - [{p}] \"{t}\" ({d[:150]})")
+        if n_lines:
+            news_text = "\n".join(n_lines)
+
+    rising_text = ", ".join(rising_queries[:6]) if rising_queries else "None"
+
+    user_prompt = f"""[MARKET: {m_up}]
+CANDIDATE TERM: {candidate_term}
+ORIGINAL PROPOSED ANGLE: {original_angle}
+
+CRITIC GATE VETO REASON & DIRECT CRITIQUE:
+{veto_reason}
+
+RECENT BREAKING NEWS CATALYSTS:
+{news_text}
+
+VIEWER SEARCH INTENT / RISING QUERIES:
+{rising_text}
+
+TASK:
+Reconstruct a repaired single-sentence investigative angle that resolves the Critic's critique completely while staying grounded in verified events. Respond in valid JSON only.
+"""
+
+    chosen_model = model
+    try:
+        raw_res = gateway.call_llm(
+            prompt=user_prompt,
+            model=chosen_model,
+            system_prompt=REPAIR_SYSTEM_PROMPT,
+            max_tokens=600,
+            temperature=0.2,
+            timeout=45.0,
+            fallback=fallback_model,
+        )
+    except Exception as e:
+        logger.warning(f"[critic_repair] Primary repair model {chosen_model} failed: {e}. Trying fallback {fallback_model}...")
+        try:
+            raw_res = gateway.call_llm(
+                prompt=user_prompt,
+                model=fallback_model,
+                system_prompt=REPAIR_SYSTEM_PROMPT,
+                max_tokens=600,
+                temperature=0.2,
+                timeout=45.0,
+                fallback="gpt-6-astra",
+            )
+        except Exception as e2:
+            logger.error(f"[critic_repair] Fallback repair model {fallback_model} also failed: {e2}")
+            return original_angle
+
+    clean_json = raw_res.strip()
+    match_codeblock = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', raw_res)
+    if match_codeblock:
+        clean_json = match_codeblock.group(1).strip()
+    else:
+        match_obj = re.search(r'(\{[\s\S]*\})', raw_res)
+        if match_obj:
+            clean_json = match_obj.group(1).strip()
+
+    try:
+        data = json.loads(clean_json)
+        repaired = data.get("repaired_angle", "").strip()
+        if repaired and len(repaired) > 10:
+            logger.info(f"[critic_repair] Repaired angle for '{candidate_term}': '{repaired}' (Rationale: {data.get('repair_rationale')})")
+            return repaired
+    except Exception as parse_err:
+        logger.warning(f"[critic_repair] Failed to parse repair JSON: {parse_err}")
+
+    return original_angle
+

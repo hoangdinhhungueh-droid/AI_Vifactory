@@ -604,24 +604,34 @@ def fetch_live_trending_terms(market: str, custom_seed: str = None) -> list[dict
         v7_candidates.append(v_cand_obj)
 
     # Forensic Priority & Competitive Scoring Assembly:
-    # V7 candidates and forensic crisis anchors are prioritized
+    # Tier 1: V7 winning pool candidates (proven retention/CTR winners from B11)
+    # Tier 2: Breaking business & specialized news (google_news_live, specialized_rss_live) matching crisis anchors
+    # Tier 3: General trending searches & YouTube autocomplete matching crisis anchors
+    # Tier 4: Regular candidates
     all_raw = v7_candidates + gt_candidates + yt_candidates
     anchors = FORENSIC_ANCHORS.get(m_up, FORENSIC_ANCHORS["EN"])
 
-    forensic_priority = []
+    forensic_tier1 = []
+    forensic_tier2 = []
+    forensic_tier3 = []
     regular_cands = []
 
     for c in all_raw:
-        if c.get("source") == "v7_suggested_win":
-            forensic_priority.append(c)
+        c_src = c.get("source", "")
+        if c_src == "v7_suggested_win":
+            forensic_tier1.append(c)
             continue
         comb = f"{c.get('term', '')} {c.get('news_title', '')}".lower()
         if any(kw.lower() in comb for kw in anchors):
-            forensic_priority.append(c)
+            if c_src in LIVE_TRAFFIC_SOURCES or "specialized_rss" in c_src:
+                forensic_tier2.append(c)
+            else:
+                forensic_tier3.append(c)
         else:
             regular_cands.append(c)
 
-    # Put forensic/V7 priority first, followed by regular candidates
+    # Put tiered forensic/V7 priority first, followed by regular candidates
+    forensic_priority = forensic_tier1 + forensic_tier2 + forensic_tier3
     ordered_candidates = forensic_priority + regular_cands
 
     # Deduplicate against permanent topic history registry
@@ -990,7 +1000,8 @@ def forensic_pre_filter(candidate: dict, market: str) -> tuple[bool, str]:
 
     term = candidate.get("term", "").strip() or candidate.get("title", "").strip()
     term_lower = term.lower()
-    combined_text = f"{term_lower} {candidate.get('niche_brief', '').lower()} {candidate.get('angle', '').lower()} {candidate.get('title', '').lower()}"
+    news_title = (candidate.get("news_title") or "").strip().lower()
+    combined_text = f"{term_lower} {candidate.get('niche_brief', '').lower()} {candidate.get('angle', '').lower()} {candidate.get('title', '').lower()} {news_title}".strip()
     # Hard Safety Gate (Anti-Politics, Anti-Religion, Anti-Defamation - Rule 118 & Policy Safety)
     safety_forbidden_terms = [
         'election 2026', 'election', 'presidential race', 'vote for', 'vote against',
@@ -1342,9 +1353,62 @@ def discover_and_produce_market_trend(
                 c_score = float(critic_res.get("audit_score") or 0.0)
                 if c_verdict != "PASS" or c_score < 7.5:
                     veto_msg = critic_res.get("veto_reason") or "Failed adversarial trend alignment audit"
-                    print(f"  ❌ VETOED BY CRITIC GATE (Score: {c_score}/10): {veto_msg}")
-                    logger.warning(f"[{m_up}] Critic Gate VETOED '{term}': {veto_msg}")
-                    continue
+                    # B1.1 Angle Self-Repair (Rule 124, 130 & Rule 139): If score is near passing (>= 6.5), attempt 1-shot angle repair
+                    if c_score >= 6.5:
+                        print(f"  🔧 [B1.1 ANGLE REPAIR] Score {c_score}/10 is near threshold (7.5). Attempting 1-shot angle repair based on Critic feedback...")
+                        try:
+                            from app.services.adversarial_critic_b1 import repair_candidate_angle
+                            repaired_angle = repair_candidate_angle(
+                                candidate_term=term,
+                                original_angle=specific_angle,
+                                veto_reason=veto_msg,
+                                market=m_up,
+                                news_catalysts=recon_data.get("news_catalysts", []),
+                                rising_queries=rising_queries[:8],
+                                model="gpt-6-astra",
+                                fallback_model="claude-sonnet-5-5",
+                            )
+                            if repaired_angle and repaired_angle != specific_angle:
+                                print(f"  🔄 [B1.1 Re-Auditing Repaired Angle]: '{repaired_angle}'")
+                                rep_critic = audit_candidate_trend_alignment(
+                                    candidate_term=term,
+                                    specific_angle=repaired_angle,
+                                    niche_brief=f"Documentary on {term} and {repaired_angle}",
+                                    market=m_up,
+                                    news_catalysts=recon_data.get("news_catalysts", []),
+                                    rising_queries=rising_queries[:8],
+                                    traffic=str(c.get("approx_traffic", "")),
+                                    model="claude-opus-5-5",
+                                    fallback_model="gpt-6-astra",
+                                )
+                                rep_verdict = (rep_critic.get("verdict") or "FAIL").upper()
+                                rep_score = float(rep_critic.get("audit_score") or 0.0)
+                                if rep_verdict == "PASS" and rep_score >= 7.5:
+                                    print(f"  🎉 [B1.1 ANGLE REPAIR SUCCESS] New Score: {rep_score}/10. Angle repaired successfully!")
+                                    specific_angle = repaired_angle
+                                    c_score = rep_score
+                                    c_verdict = "PASS"
+                                    critic_res = rep_critic
+                                    if viability_passed_candidates:
+                                        viability_passed_candidates[-1]["angle"] = specific_angle
+                                else:
+                                    rep_veto = rep_critic.get("veto_reason") or "Repaired angle still failed critic gate"
+                                    print(f"  ❌ VETOED BY CRITIC GATE AFTER REPAIR (Score: {rep_score}/10): {rep_veto}")
+                                    logger.warning(f"[{m_up}] Critic Gate VETOED '{term}' after repair: {rep_veto}")
+                                    continue
+                            else:
+                                print(f"  ❌ VETOED BY CRITIC GATE (Score: {c_score}/10): {veto_msg}")
+                                logger.warning(f"[{m_up}] Critic Gate VETOED '{term}': {veto_msg}")
+                                continue
+                        except Exception as _rep_err:
+                            logger.warning(f"[{m_up}] B1.1 Angle repair exception: {_rep_err}")
+                            print(f"  ❌ VETOED BY CRITIC GATE (Score: {c_score}/10): {veto_msg}")
+                            logger.warning(f"[{m_up}] Critic Gate VETOED '{term}': {veto_msg}")
+                            continue
+                    else:
+                        print(f"  ❌ VETOED BY CRITIC GATE (Score: {c_score}/10): {veto_msg}")
+                        logger.warning(f"[{m_up}] Critic Gate VETOED '{term}': {veto_msg}")
+                        continue
                 print(f"  ✅ CRITIC GATE PASSED! Score: {c_score}/10 | Angle verified aligned with live trend.")
             except Exception as _critic_err:
                 logger.warning(f"[{m_up}] Critic Gate execution error for '{term}': {_critic_err}; fail-closed (rejecting candidate)")

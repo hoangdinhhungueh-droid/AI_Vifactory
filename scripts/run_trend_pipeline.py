@@ -106,13 +106,13 @@ def main():
         except (IndexError, ValueError):
             max_b2_attempts = MAX_B2_ATTEMPTS_DEFAULT
 
-    max_candidates = int(os.getenv("MAX_SCAN_CANDIDATES", "10"))
+    max_candidates = int(os.getenv("MAX_SCAN_CANDIDATES", "30"))
     if "--max-candidates" in args:
         idx = args.index("--max-candidates")
         try:
             max_candidates = int(args[idx + 1])
         except (IndexError, ValueError):
-            max_candidates = 10
+            max_candidates = 30
 
     # 1. Evaluate schedule based on Vietnam Timezone (UTC+7)
     schedule_info = get_market_schedule_info()
