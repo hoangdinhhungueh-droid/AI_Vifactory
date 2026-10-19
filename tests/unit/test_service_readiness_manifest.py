@@ -990,5 +990,47 @@ def test_run_service_readiness_probe_fails_on_final_completion_overrun():
     assert code == 1
 
 
+def test_run_service_readiness_probe_forcibly_bounds_blocking_cleanup():
+    """Verifies that a genuinely blocking cleanup callable cannot overrun the monotonic deadline unbounded,
+    and that the probe caller regains control and fails closed within the bounded budget.
+    """
+    def genuinely_blocking_cleanup(to):
+        time.sleep(5.0)
+        return (0, "clean")
+
+    start_mono = time.monotonic()
+    code = run_service_readiness_probe(
+        restart_fn=lambda rem: (0, "ok"),
+        poll_fn=lambda to: (True, "status=ok"),
+        inspect_fn=lambda to: (True, "online"),
+        status_fn=lambda to: (0, "online"),
+        cleanup_fn=genuinely_blocking_cleanup,
+        budget_sec=0.20,
+    )
+    elapsed = time.monotonic() - start_mono
+    assert code == 1, "Expected probe to fail closed on timed-out blocking cleanup"
+    assert elapsed < 0.45, f"Blocking cleanup took {elapsed}s; was not bounded by 0.20s budget"
+
+
+def test_run_service_readiness_probe_forcibly_bounds_blocking_restart():
+    """Verifies that a genuinely blocking restart callable cannot overrun the monotonic deadline unbounded."""
+    def genuinely_blocking_restart(to):
+        time.sleep(5.0)
+        return (0, "ok")
+
+    start_mono = time.monotonic()
+    code = run_service_readiness_probe(
+        restart_fn=genuinely_blocking_restart,
+        poll_fn=lambda to: (True, "status=ok"),
+        inspect_fn=lambda to: (True, "online"),
+        status_fn=lambda to: (0, "online"),
+        budget_sec=0.20,
+    )
+    elapsed = time.monotonic() - start_mono
+    assert code == 1, "Expected probe to fail closed on timed-out blocking restart"
+    assert elapsed < 0.45, f"Blocking restart took {elapsed}s; was not bounded by 0.20s budget"
+
+
+
 
 

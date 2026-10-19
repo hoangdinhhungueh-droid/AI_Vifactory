@@ -1,0 +1,1613 @@
+{
+  "scanner_engine": "scripts/forensics/probe_zero_mock.py",
+  "scanner_version": "v2.4",
+  "scanner_source_sha256": "cb98b73c586120886ebe1f688538e7b834384b7d6825ba252d47f05ff55826c0",
+  "reference_count": 229,
+  "expected_count": 229,
+  "status": "VERIFIED",
+  "references": [
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 257,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_permission_error_fails_immediately_without_spinning(temp_state_dir, mon"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 263,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_open_perm_error(*args, **kwargs):"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 266,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(os, \"open\", mock_open_perm_error)"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 333,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_send_telegram_broadcast_returns_truthy_on_success(monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 337,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import AsyncMock, MagicMock, patch"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 340,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"TELEGRAM_ENABLED\", \"1\")"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 341,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"VF_TG_BOT_TOKEN\", \"mock_bot_token_123\")"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 342,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"VF_TG_CHAT_ID\", \"mock_chat_id_456\")"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 344,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_resp = MagicMock()"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 345,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_resp.status_code = 200"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 346,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_resp.json.return_value = {\"ok\": True, \"result\": {\"message_id\": 789}}"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 348,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_client = AsyncMock()"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 349,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_client.post.return_value = mock_resp"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 350,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_client.__aenter__.return_value = mock_client"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 351,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_client.__aexit__.return_value = None"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 353,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with patch(\"httpx.AsyncClient\", return_value=mock_client):"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 359,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fail_resp = MagicMock()"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 360,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fail_resp.status_code = 500"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 361,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fail_resp.text = \"Internal Server Error\""
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 362,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fail_client = AsyncMock()"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 363,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fail_client.post.return_value = mock_fail_resp"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 364,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fail_client.__aenter__.return_value = mock_fail_client"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 365,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fail_client.__aexit__.return_value = None"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 367,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with patch(\"httpx.AsyncClient\", return_value=mock_fail_client):"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 375,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import patch"
+    },
+    {
+      "file": "tests/unit/test_alert_cooldown.py",
+      "line": 399,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import patch"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 81,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_align_fails_closed_without_whisper(sample_plan: ScenePlan, dummy_wav: P"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 84,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setitem(sys.modules, \"faster_whisper\", None)"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 108,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_adversarial_substitution_breaks_match_ratio(sample_plan: ScenePlan, dum"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 137,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_mod = types.ModuleType(\"faster_whisper\")"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 138,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_mod.WhisperModel = MockWhisperModel  # type: ignore[attr-defined]"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 139,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setitem(sys.modules, \"faster_whisper\", mock_mod)"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 145,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_adversarial_dropped_word_detected(sample_plan: ScenePlan, dummy_wav: Pa"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 170,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_mod = types.ModuleType(\"faster_whisper\")"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 171,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_mod.WhisperModel = MockWhisperModel  # type: ignore[attr-defined]"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 172,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setitem(sys.modules, \"faster_whisper\", mock_mod)"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 178,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_high_fidelity_alignment_succeeds(sample_plan: ScenePlan, dummy_wav: Pat"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 206,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_mod = types.ModuleType(\"faster_whisper\")"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 207,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_mod.WhisperModel = MockWhisperModel  # type: ignore[attr-defined]"
+    },
+    {
+      "file": "tests/unit/test_align_adversarial.py",
+      "line": 208,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setitem(sys.modules, \"faster_whisper\", mock_mod)"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 16,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def auth_client(monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 17,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"VF_API_TOKEN\", \"test_secret_token_12345\")"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 18,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"VF_ALLOW_UNAUTH_LOOPBACK\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 19,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"ALLOW_UNAUTHENTICATED_LOOPBACK\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 45,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_authenticated_request_accepted(auth_client, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 47,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import patch"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 69,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_testclient_not_in_loopback_allowlist(monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 71,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"VF_API_TOKEN\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 72,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"VF_ALLOW_UNAUTH_LOOPBACK\", \"1\")"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 80,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_loopback_ipc_backward_compatibility_when_token_configured(monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 83,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"VF_API_TOKEN\", \"production_secret_token\")"
+    },
+    {
+      "file": "tests/unit/test_api_auth_gating.py",
+      "line": 84,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"VF_ALLOW_UNAUTH_LOOPBACK\", \"1\")"
+    },
+    {
+      "file": "tests/unit/test_atomic_io.py",
+      "line": 24,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_atomic_write_json_durability_and_fsync(temp_dir, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_atomic_io.py",
+      "line": 32,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_fsync(fd):"
+    },
+    {
+      "file": "tests/unit/test_atomic_io.py",
+      "line": 36,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(os, \"fsync\", mock_fsync)"
+    },
+    {
+      "file": "tests/unit/test_atomic_io.py",
+      "line": 53,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_atomic_write_json_cleans_up_tmp_on_failure(temp_dir, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_b1_daily_guard_integration.py",
+      "line": 8,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import patch"
+    },
+    {
+      "file": "tests/unit/test_b1_daily_guard_integration.py",
+      "line": 43,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with patch(\"app.services.trend_engine_b1.fetch_live_trending_terms\") as mock_fet"
+    },
+    {
+      "file": "tests/unit/test_b1_daily_guard_integration.py",
+      "line": 46,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fetch.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_b1_daily_guard_integration.py",
+      "line": 52,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with patch(\"app.services.trend_engine_b1.fetch_live_trending_terms\", return_valu"
+    },
+    {
+      "file": "tests/unit/test_b1_daily_guard_integration.py",
+      "line": 55,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "assert mock_fetch.call_count == 1"
+    },
+    {
+      "file": "tests/unit/test_b1_daily_guard_integration.py",
+      "line": 61,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with patch(\"app.services.trend_engine_b1.fetch_live_trending_terms\", return_valu"
+    },
+    {
+      "file": "tests/unit/test_b1_daily_guard_integration.py",
+      "line": 66,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "assert mock_fetch.call_count == 1"
+    },
+    {
+      "file": "tests/unit/test_b1_daily_guard_integration.py",
+      "line": 80,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.telegram_buttons.send_telegram_broadcast\") as mock_tg:"
+    },
+    {
+      "file": "tests/unit/test_b1_daily_guard_integration.py",
+      "line": 85,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_tg.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_b3_handoff_contract.py",
+      "line": 15,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_b3_handoff_path_resolution_parity(tmp_path, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_b3_handoff_contract.py",
+      "line": 19,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"VF_EPISODES_DIR\", str(tmp_path / \"episodes\"))"
+    },
+    {
+      "file": "tests/unit/test_b3_handoff_contract.py",
+      "line": 47,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_runpaths_routes_all_canonical_episode_shapes(tmp_path, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_b3_handoff_contract.py",
+      "line": 49,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"VF_EPISODES_DIR\", str(tmp_path / \"episodes\"))"
+    },
+    {
+      "file": "tests/unit/test_b3_handoff_contract.py",
+      "line": 106,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_b3_failure_guard_fails_closed_without_release_lock(monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_b3_handoff_contract.py",
+      "line": 124,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(b1, \"release_lock\", fake_release)"
+    },
+    {
+      "file": "tests/unit/test_b3_handoff_contract.py",
+      "line": 125,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(b1, \"mark_exhausted_today\", fake_mark)"
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 10,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import MagicMock, patch"
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 70,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def test_ipv4_urlopen_uses_custom_opener(mock_build_opener):"
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 73,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_opener = MagicMock()"
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 74,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_response = MagicMock()"
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 75,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_response.read.return_value = b\"test payload\""
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 76,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_opener.open.return_value = mock_response"
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 77,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_build_opener.return_value = mock_opener"
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 81,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_build_opener.assert_called_once()"
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 83,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "args, _ = mock_build_opener.call_args"
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 88,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_vf_force_ipv4_toggle_behavior(monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 93,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"VF_FORCE_IPV4\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_core_net_utils.py",
+      "line": 100,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"VF_FORCE_IPV4\", \"1\")"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 10,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import patch, MagicMock"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 18,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "\"\"\"Returns candidate mock data sufficient to reach the Critic Gate stage.\"\"\""
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 49,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_reason, mock_b15, mock_viability, mock_facts, mock_recon,"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 50,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_catalyst, mock_prefilter, mock_fetch_terms, mock_acquire, dummy_candidate_c"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 55,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fetch_terms.return_value = dummy_candidate_context"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 56,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_viability.return_value = {"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 77,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_b15.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 78,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_reason.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 91,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_reason, mock_b15, mock_viability, mock_facts, mock_recon,"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 92,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_catalyst, mock_prefilter, mock_fetch_terms, mock_acquire, dummy_candidate_c"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 95,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fetch_terms.return_value = dummy_candidate_context"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 96,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_viability.return_value = {"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 117,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_b15.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 118,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_reason.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 133,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_b15.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 134,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_reason.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 147,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_reason, mock_b15, mock_viability, mock_facts, mock_recon,"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 148,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_catalyst, mock_prefilter, mock_fetch_terms, mock_acquire, dummy_candidate_c"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 151,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fetch_terms.return_value = dummy_candidate_context"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 152,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_viability.return_value = {"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 172,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_b15.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 173,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_reason.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 186,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_reason, mock_b15, mock_viability, mock_facts, mock_recon,"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 187,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_catalyst, mock_prefilter, mock_fetch_terms, mock_acquire, dummy_candidate_c"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 190,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_fetch_terms.return_value = dummy_candidate_context"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 191,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_viability.return_value = {"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 198,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_reason.return_value = {"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 204,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_b15.return_value = {\"competitor_narrative_anatomy\": {\"fatal_explanatory_vac"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 249,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_b15.assert_called_once()"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 250,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_reason.assert_called_once()"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 257,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_llm_response = json.dumps({"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 262,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with patch(\"app.services.model_gateway.get_global_gateway\") as mock_gw:"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 263,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_gateway_inst = MagicMock()"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 264,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_gateway_inst.call_llm.return_value = mock_llm_response"
+    },
+    {
+      "file": "tests/unit/test_critic_gate_fail_closed.py",
+      "line": 265,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_gw.return_value = mock_gateway_inst"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 133,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_force_flag_bypasses_lock(temp_state_dir, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 146,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "# With env var B1_FORCE_CRAWL=1 -> False (via monkeypatch per Boss Item 17)"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 147,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"B1_FORCE_CRAWL\", \"1\")"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 169,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "it should detect episode_dir_completed as a pure read check without mutating dis"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 296,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_incident_1_b3_crash_blocks_incident_2_re_crawl(temp_state_dir, monkeypa"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 307,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"VF_STATE_DIR\", str(temp_state_dir))"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 308,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"AVF_STATE_DIR\", str(temp_state_dir))"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 321,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(thr, \"REGISTRY_PATH\", str(hist_file))"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 354,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_held_lock_prevents_second_run_making_llm_calls(temp_state_dir, monkeypa"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 366,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_assess(*args, **kwargs):"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 371,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(\"app.services.trend_engine_b1.assess_keyword_video_viability"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 452,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_load_history_raises_fails_closed(temp_state_dir, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 458,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_broken_history(*args, **kwargs):"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 461,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(reg_mod, \"load_history\", mock_broken_history)"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 524,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_crawl_midstream_exception_releases_lock(temp_state_dir, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 533,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_failing_fetch(*args, **kwargs):"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 536,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(\"app.services.trend_engine_b1.fetch_live_trending_terms\", mo"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 547,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_non_timeout_cooldown_error_does_not_abort_quota_stamp(temp_state_dir, m"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 558,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_fetch(*args, **kwargs):"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 561,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(\"app.services.trend_engine_b1.fetch_live_trending_terms\", mo"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 564,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_broken_alert(*args, **kwargs):"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 567,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(ac, \"should_send_alert\", mock_broken_alert)"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 583,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "import unittest.mock as mock"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 593,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with mock.patch(\"os.write\", side_effect=broken_write):"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 606,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "import unittest.mock as mock"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 618,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with mock.patch(\"os.lseek\", side_effect=broken_lseek):"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 630,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_topic_history_registry_vn_day_boundary_attribution(temp_state_dir, monk"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 640,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(thr, \"REGISTRY_PATH\", str(hist_file))"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 641,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(thr, \"PENDING_DIR\", str(Path(temp_state_dir) / \"no_pending\")"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 686,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_exception_mid_crawl_releases_lock_in_finally(temp_state_dir, monkeypatc"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 690,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "import unittest.mock as mock"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 696,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with mock.patch(\"app.services.trend_engine_b1.fetch_live_trending_terms\", side_e"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 706,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_non_timeout_cooldown_error_preserves_quota_mark(temp_state_dir, monkeyp"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 710,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "import unittest.mock as mock"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 717,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with mock.patch(\"app.services.trend_engine_b1.fetch_live_trending_terms\", return"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 718,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with mock.patch(\"app.services.trend_engine_b1.forensic_pre_filter\", return_value"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 719,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with mock.patch(\"app.services.trend_engine_b1.should_send_alert\", side_effect=IO"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 817,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "import unittest.mock as mock"
+    },
+    {
+      "file": "tests/unit/test_daily_market_lock.py",
+      "line": 843,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "with mock.patch(\"app.services.alert_cooldown.is_pid_alive\", return_value=True):"
+    },
+    {
+      "file": "tests/unit/test_lock_timing_reconciliation.py",
+      "line": 12,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import patch"
+    },
+    {
+      "file": "tests/unit/test_s05_director_plan.py",
+      "line": 25,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_s05_context(tmp_path: Path) -> RunContext:"
+    },
+    {
+      "file": "tests/unit/test_s05_director_plan.py",
+      "line": 61,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def test_s05_director_plan_execution_and_s3_data_loading(mock_s05_context: RunCo"
+    },
+    {
+      "file": "tests/unit/test_s05_director_plan.py",
+      "line": 67,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "ctx = mock_s05_context"
+    },
+    {
+      "file": "tests/unit/test_s05_director_plan.py",
+      "line": 123,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def test_s05_director_plan_missing_s3_raises_file_not_found(mock_s05_context: Ru"
+    },
+    {
+      "file": "tests/unit/test_s05_director_plan.py",
+      "line": 125,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "ctx = mock_s05_context"
+    },
+    {
+      "file": "tests/unit/test_s05_fail_closed.py",
+      "line": 9,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import patch"
+    },
+    {
+      "file": "tests/unit/test_s10_render.py",
+      "line": 83,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_s10_render_reverifies_stale_mp4(tmp_path: Path, monkeypatch: pytest.Mon"
+    },
+    {
+      "file": "tests/unit/test_s10_render.py",
+      "line": 144,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_assemble(clips, audio, sub, target):"
+    },
+    {
+      "file": "tests/unit/test_s10_render.py",
+      "line": 149,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(\"stages.s10_render.assemble_final_video\", mock_assemble)"
+    },
+    {
+      "file": "tests/unit/test_s11_qc_gate.py",
+      "line": 23,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_s11_qc_fails_closed_on_gate_violation(tmp_path: Path, monkeypatch: pyte"
+    },
+    {
+      "file": "tests/unit/test_s11_qc_gate.py",
+      "line": 70,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_s11_qc_propagates_programming_errors_unconverted(tmp_path: Path, monkey"
+    },
+    {
+      "file": "tests/unit/test_s11_qc_gate.py",
+      "line": 110,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(\"stages.s11_qc.verify_final_video_gates\", _buggy_verify)"
+    },
+    {
+      "file": "tests/unit/test_service_readiness_manifest.py",
+      "line": 25,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "_parse_probe_output = boss_orchestrator.parse_zero_mock_probe_output"
+    },
+    {
+      "file": "tests/unit/test_service_readiness_manifest.py",
+      "line": 26,
+      "classification": "CLASS_D_PROBE_KEY_LITERAL",
+      "description": "Probe key literal in service readiness manifest test",
+      "code_snippet": "PROBE_KEY_ZERO_MOCK = \"zero_mock_forensic_audit\""
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 14,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import patch"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 28,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def force_crawl_for_caps_tests(monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 30,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setenv(\"B1_FORCE_CRAWL\", \"1\")"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 178,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import MagicMock"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 200,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"subprocess.run\") as mock_sub, \\"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 202,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.telegram_buttons.send_telegram_broadcast\") as mock_tele, \\"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 203,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.trend_engine_b1.commit_trend_task\") as mock_commit:"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 205,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_sub.return_value = MagicMock(returncode=1, stderr=\"Subprocess error in B3\")"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 211,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_commit.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 214,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "assert mock_tele.call_count == 1"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 215,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "broadcast_msg = mock_tele.call_args[0][0]"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 220,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "all_messages = [call_args[0][0] for call_args in mock_tele.call_args_list]"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 281,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_recon(term, *args, **kwargs):"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 286,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.trend_engine_b1.perform_direct_platform_recon\", side_effect="
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 319,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_eval(*args, **kwargs):"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 327,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.trend_engine_b1.assess_keyword_video_viability\", side_effect"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 341,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_market_exhausted_today_lock_and_cron_skip(tmp_path, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 347,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"B1_FORCE_CRAWL\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 387,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_b2_circuit_breaker_emits_exactly_one_telegram_alert(tmp_path, monkeypat"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 397,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"B1_FORCE_CRAWL\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 421,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.telegram_buttons.send_telegram_broadcast\", return_value=\"msg"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 422,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.trend_engine_b1.commit_trend_task\") as mock_commit:"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 434,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_commit.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 437,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "assert mock_tele.call_count == 1"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 438,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "broadcast_msg = mock_tele.call_args[0][0]"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 448,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_b2_exception_circuit_breaker_stamps_exhausted_today(tmp_path, monkeypat"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 458,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"B1_FORCE_CRAWL\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 482,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.telegram_buttons.send_telegram_broadcast\", return_value=\"msg"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 483,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.trend_engine_b1.commit_trend_task\") as mock_commit:"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 494,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_commit.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 495,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "assert mock_tele.call_count == 1"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 496,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "broadcast_msg = mock_tele.call_args[0][0]"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 505,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_custom_seed_empty_candidates_releases_lock(tmp_path, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 510,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"B1_FORCE_CRAWL\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 528,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_custom_seed_failure_releases_lock_in_finally(tmp_path, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 533,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"B1_FORCE_CRAWL\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 564,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_custom_seed_does_not_preempt_active_in_progress_lock(tmp_path, monkeypa"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 572,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"B1_FORCE_CRAWL\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 600,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_b2_story_verdict_fails_closed_when_not_pass(tmp_path, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 602,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import patch"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 605,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"B1_FORCE_CRAWL\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 627,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.trend_engine_b1.commit_trend_task\") as mock_commit:"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 635,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_commit.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 638,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_b21_fact_causal_audit_fails_closed_when_missing_or_score_low(tmp_path, "
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 641,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import patch"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 644,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"B1_FORCE_CRAWL\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 667,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.trend_engine_b1.commit_trend_task\") as mock_commit:"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 675,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_commit.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 696,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "patch(\"app.services.trend_engine_b1.commit_trend_task\") as mock_commit:"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 704,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "mock_commit.assert_not_called()"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 707,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_partial_scan_does_not_stamp_exhausted_today(tmp_path, monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 710,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "from unittest.mock import patch"
+    },
+    {
+      "file": "tests/unit/test_trend_caps_and_gates.py",
+      "line": 714,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.delenv(\"B1_FORCE_CRAWL\", raising=False)"
+    },
+    {
+      "file": "tests/unit/test_vps_runner_failover.py",
+      "line": 57,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "def test_fast_vps_client_real_failover_and_recovery(monkeypatch):"
+    },
+    {
+      "file": "tests/unit/test_vps_runner_failover.py",
+      "line": 90,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Isolated hermetic unit test double or identifier",
+      "code_snippet": "def mock_urlopen(req, *args, **kwargs):"
+    },
+    {
+      "file": "tests/unit/test_vps_runner_failover.py",
+      "line": 101,
+      "classification": "CLASS_F_HERMETIC_UNIT_FIXTURE",
+      "description": "Hermetic test parameter or environment fixture",
+      "code_snippet": "monkeypatch.setattr(urllib.request, \"urlopen\", mock_urlopen)"
+    }
+  ]
+}

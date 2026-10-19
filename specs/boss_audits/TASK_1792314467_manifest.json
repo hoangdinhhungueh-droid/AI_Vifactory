@@ -1,12 +1,12 @@
 {
   "manifest_version": "1.0",
-  "verification_timestamp": "2026-10-19T18:18:22.483894+00:00",
+  "verification_timestamp": "2026-10-19T19:49:36.065091+00:00",
   "task_id": "TASK_1792314467",
   "target_episode": "JP_TEMP_59",
   "cumulative_base_commit_sha": "517b082e6d623253b20e0ffb304c86bf4cffef07",
-  "incremental_delta_base_sha": "ddbede1ca741758118338f73040de3c56e032e50",
-  "head_commit_sha": "06666236b25052dc7ee42726a1a54465141f3ca1",
-  "tree_sha": "187f75ea8bd2e494214f263554830c8ac78dbc8a",
+  "incremental_delta_base_sha": "c1e24bc8cdb0053d80a092b926d1118ff96926d1",
+  "head_commit_sha": "e7f11f2ef810b5bf603c9fb4b717ef7b3fc7d6c5",
+  "tree_sha": "e69f2204a3bb45cbedb16713ad8572b07fc090a9",
   "probes": {
     "zero_mock_forensic_audit": {
       "exit_code": 0,
@@ -17,13 +17,13 @@
     "linux_focused_pytest": {
       "exit_code": 0,
       "verdict": "PASS",
-      "xml_sha256": "469fc0cbc118f0ea54849be23864d38f42c35a68d724261a0f60b3f4cafeaf3c",
+      "xml_sha256": "7f4f560e6858bd493a334ae79207ec20fa54f5637476d4471aa3716c2331346a",
       "test_count": 52
     },
     "windows_focused_pytest": {
       "exit_code": 0,
       "verdict": "PASS",
-      "xml_sha256": "14419c6d372600996f612d6068a4dc0157e4bfc3dfd0ceb40acca4e33ccd4519",
+      "xml_sha256": "0b2e0e9ae3adfa12f3c79af1f32d96e76e60154bd1f6063dc59c5ad310552f9f",
       "test_count": 52
     },
     "junit_negative_test_matrix": {
@@ -57,34 +57,36 @@
       "verdict": "PASS"
     },
     "ast_anti_symptom_scan": {
-      "exit_code": 1,
-      "verdict": "FAIL"
+      "exit_code": 0,
+      "verdict": "PASS"
     },
     "github_actions_ci": {
       "exit_code": 0,
       "verdict": "PASS",
-      "run_id": 39299544567,
+      "run_id": 39312294621,
       "conclusion": "success",
-      "html_url": "https://github.com/hoangdinhhungueh-droid/AI_Vifactory/actions/runs/39299544567"
+      "status": "completed",
+      "head_sha": "e7f11f2ef810b5bf603c9fb4b717ef7b3fc7d6c5",
+      "html_url": "https://github.com/hoangdinhhungueh-droid/AI_Vifactory/actions/runs/39312294621"
     },
     "whole_packet_secret_scan": {
       "exit_code": 0,
       "verdict": "PASS",
       "findings_count": 0,
-      "scope_sha256": "5e40994585a7133313907618aae2446f76f5b20d3142a392895023dbe12baec6",
+      "scope_sha256": "7bcc5ca50098b73e371b636fd43f2942097d814d83694c28b6e3c71c6849611f",
       "scanner_engine": "app.utils.security.verify_telemetry_cleanliness"
     }
   },
   "artifact_digests": {
-    "head_commit_sha": "06666236b25052dc7ee42726a1a54465141f3ca1",
-    "tree_sha": "187f75ea8bd2e494214f263554830c8ac78dbc8a",
-    "linux_junit_xml_sha256": "469fc0cbc118f0ea54849be23864d38f42c35a68d724261a0f60b3f4cafeaf3c",
-    "windows_junit_xml_sha256": "14419c6d372600996f612d6068a4dc0157e4bfc3dfd0ceb40acca4e33ccd4519",
+    "head_commit_sha": "e7f11f2ef810b5bf603c9fb4b717ef7b3fc7d6c5",
+    "tree_sha": "e69f2204a3bb45cbedb16713ad8572b07fc090a9",
+    "linux_junit_xml_sha256": "7f4f560e6858bd493a334ae79207ec20fa54f5637476d4471aa3716c2331346a",
+    "windows_junit_xml_sha256": "0b2e0e9ae3adfa12f3c79af1f32d96e76e60154bd1f6063dc59c5ad310552f9f",
     "zero_mock_probe_sha256": "0fb8ce15dacdd56a77ff28807fa85809e05ea5f82dd04ab701842c70c631ab01",
-    "service_readiness_probe_sha256": "a8bd78f91c9bd270d5b01199c2fecc42377128c8adb44935d82185a9fde30c4c",
-    "fastapi_http_probes_sha256": "dfb7b8842eda652f331af7202e48e163f005915471b774338b610a36105a2a1a",
-    "ast_scanner_sha256": "5b792de4d69fcda7fd36c33159e8387b1f50876d0abc3f50cb029fcb9b420593",
-    "secret_scan_scope_sha256": "5e40994585a7133313907618aae2446f76f5b20d3142a392895023dbe12baec6"
+    "service_readiness_probe_sha256": "716b9372c0c958806bfcf5310f2b90cff30ce657aaeec43fc9e969080279bde2",
+    "fastapi_http_probes_sha256": "9d78e0eb98b003bfb686749de82b5de5db103f645049a6a8dfa464344fd4d348",
+    "ast_scanner_sha256": "ae40ec645113bbbe0c0802eb85a54864e222a40ebb442933c1c39951390927e9",
+    "secret_scan_scope_sha256": "7bcc5ca50098b73e371b636fd43f2942097d814d83694c28b6e3c71c6849611f"
   },
-  "verdict": "FAIL: PROBE INTEGRITY DEFECT DETECTED"
+  "verdict": "100% INVARIANTS CERTIFIED & IMMUTABLY BOUND TO HEAD"
 }
