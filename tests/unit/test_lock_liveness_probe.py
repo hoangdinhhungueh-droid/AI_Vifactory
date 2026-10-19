@@ -334,19 +334,28 @@ def test_atomic_safe_archive_source_replacement_inode_race_detection(tmp_path: P
     active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
     active_lock.write_text('{"owner": "JP_TEMP_59.b3b4"}', encoding="utf-8")
 
+    import scripts.forensics.probe_lock_liveness as probe_mod
+
+    race_triggered = [False]
+    real_sha = probe_mod.compute_file_sha256
+
+    def race_sha(p):
+        res = real_sha(p)
+        if str(p) == str(active_lock):
+            race_triggered[0] = True
+        return res
+
     real_stat = Path.stat
-    call_count = [0]
 
     def replaced_inode_stat(self_path, *args, **kwargs):
         st = real_stat(self_path, *args, **kwargs)
-        if str(self_path) == str(active_lock):
-            call_count[0] += 1
-            if call_count[0] >= 2:
-                import collections
-                StatResult = collections.namedtuple("CustomStat", ["st_dev", "st_mode", "st_ino", "st_nlink", "st_uid", "st_gid", "st_size", "st_atime", "st_mtime", "st_ctime"])
-                return StatResult(st.st_dev, st.st_mode, st.st_ino + 100, st.st_nlink, st.st_uid, st.st_gid, st.st_size, st.st_atime, st.st_mtime, st.st_ctime)
+        if race_triggered[0] and str(self_path) == str(active_lock):
+            import collections
+            StatResult = collections.namedtuple("CustomStat", ["st_dev", "st_mode", "st_ino", "st_nlink", "st_uid", "st_gid", "st_size", "st_atime", "st_mtime", "st_ctime"])
+            return StatResult(st.st_dev, st.st_mode, st.st_ino + 100, st.st_nlink, st.st_uid, st.st_gid, st.st_size, st.st_atime, st.st_mtime, st.st_ctime)
         return st
 
+    probe_mod.compute_file_sha256 = race_sha
     Path.stat = replaced_inode_stat
     try:
         with pytest.raises(RuntimeError) as exc:
@@ -354,6 +363,7 @@ def test_atomic_safe_archive_source_replacement_inode_race_detection(tmp_path: P
         assert "Source replacement race detected: inode changed" in str(exc.value)
     finally:
         Path.stat = real_stat
+        probe_mod.compute_file_sha256 = real_sha
 
 
 def test_atomic_safe_archive_destination_fsync_failure_rollback(tmp_path: Path):
