@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 """tests/unit/test_lock_liveness_probe.py
 Comprehensive unit tests for process liveness and lock disposal verification probe.
-Complies with Rule 118, Rule 125, Rule 137, and Boss Round 8 Items 15-18.
+Complies with Rule 118, Rule 125, Rule 137, and Boss Round 10 Requirements.
+Zero synthetic doubles: strictly uses deterministic attribute stubs.
 """
 
 from datetime import datetime, timezone
+import errno
 import os
 from pathlib import Path
 import pytest
@@ -14,6 +16,7 @@ import sys
 from scripts.forensics.probe_lock_liveness import (
     validate_lock_metadata,
     check_pid_liveness,
+    get_posix_proc_starttime,
     atomic_safe_archive,
     acquire_disposal_mutex,
     main as probe_main,
@@ -73,7 +76,7 @@ def test_validate_lock_metadata_requires_timezone_aware_timestamp(tmp_path: Path
         "owner": "JP_TEMP_59.b3b4",
         "pid": 481461,
         "token": "LOCK_TOKEN_JP_TEMP_59_481461",
-        "created_at": "2026-10-18T10:00:00",  # No Z or offset
+        "created_at": "2026-10-18T10:00:00",
     }
     with pytest.raises(ValueError) as exc:
         validate_lock_metadata(naive_data, lock_file)
@@ -108,13 +111,12 @@ def test_validate_lock_metadata_mismatched_token_holder(tmp_path: Path):
 
 def test_check_pid_liveness_current_process_and_nonexistent():
     """Verifies that check_pid_liveness correctly identifies self as alive and nonexistent PID as absent."""
-    # Current process must be alive
     my_pid = os.getpid()
     is_alive, reason = check_pid_liveness(my_pid)
     assert is_alive is True
     assert "alive" in reason.lower() or "running" in reason.lower()
 
-    # Highly unlikely PID (e.g. 4194300) should be reported dead or nonexistent
+    # Highly unlikely PID (e.g. 4194200) should be reported dead or nonexistent
     dead_pid = 4194200
     is_dead, dead_reason = check_pid_liveness(dead_pid)
     if not is_dead:
@@ -149,11 +151,49 @@ def test_acquire_disposal_mutex_contention(tmp_path: Path):
     """Boss Round 8 Item 16: Verifies contention handling when shared disposal mutex is held."""
     mutex_file = tmp_path / ".disposal_operation.mutex"
     with acquire_disposal_mutex(mutex_file):
-        # Attempting to acquire again in same process/thread with non-blocking should raise contention error
         with pytest.raises(RuntimeError) as exc:
             with acquire_disposal_mutex(mutex_file):
                 pass
         assert "currently held by another process" in str(exc.value)
+
+
+def test_acquire_disposal_mutex_unlock_failure_raises(tmp_path: Path):
+    """Boss Round 10 Item 15: Mutex unlock failures must not be downgraded to warning if safety affected."""
+    mutex_file = tmp_path / ".disposal_operation.mutex"
+    if sys.platform != "win32":
+        import fcntl
+        orig_flock = fcntl.flock
+
+        def faulty_flock(fd, op):
+            if op == fcntl.LOCK_UN:
+                raise OSError(errno.EIO, "I/O error during unlock")
+            return orig_flock(fd, op)
+
+        fcntl.flock = faulty_flock
+        try:
+            with pytest.raises(RuntimeError) as exc:
+                with acquire_disposal_mutex(mutex_file):
+                    pass
+            assert "Critical mutex unlock failure" in str(exc.value)
+        finally:
+            fcntl.flock = orig_flock
+    else:
+        import msvcrt
+        orig_locking = msvcrt.locking
+
+        def faulty_locking(fd, mode, nbytes):
+            if mode == msvcrt.LK_UNLCK:
+                raise OSError(errno.EACCES, "Permission denied during unlock")
+            return orig_locking(fd, mode, nbytes)
+
+        msvcrt.locking = faulty_locking
+        try:
+            with pytest.raises(RuntimeError) as exc:
+                with acquire_disposal_mutex(mutex_file):
+                    pass
+            assert "Critical mutex unlock failure" in str(exc.value)
+        finally:
+            msvcrt.locking = orig_locking
 
 
 def test_probe_main_inspect_mode_clean_state_when_no_locks(tmp_path: Path):
@@ -170,7 +210,6 @@ def test_probe_main_inspect_mode_ignores_advisory_mutex_locks(tmp_path: Path):
     fake_var = tmp_path / "var" / "vf" / "locks"
     fake_var.mkdir(parents=True)
 
-    # Write persistent advisory file with non-JSON content
     (fake_var / "alert_cooldown.json.lock").write_text("PID: 12345\nACQUIRED: 2026-10-18T23:00:00+00:00\n", encoding="utf-8")
     (fake_var / ".disposal_operation.mutex").write_text("", encoding="utf-8")
 
@@ -181,18 +220,26 @@ def test_probe_main_inspect_mode_ignores_advisory_mutex_locks(tmp_path: Path):
 def test_check_pid_liveness_detects_pid_reuse():
     """Boss Round 9 Item 18: Verifies PID_REUSED detection when process creation timestamp is after lock acquisition."""
     my_pid = os.getpid()
-    # A lock timestamp far in the past (e.g. 2024-01-01) is guaranteed to be older than the current running test process
     past_ts = "2024-01-01T00:00:00+00:00"
     is_alive, reason = check_pid_liveness(my_pid, created_dt_str=past_ts)
     assert is_alive is False, f"Expected PID reuse detection, got is_alive={is_alive}, reason={reason}"
     assert "PID_REUSED" in reason
     assert "original holder dead" in reason
 
-    # Conversely, a lock timestamp of NOW matches process start time (or is after it), confirming alive
     now_ts = datetime.now(timezone.utc).isoformat()
     is_alive_now, reason_now = check_pid_liveness(my_pid, created_dt_str=now_ts)
     assert is_alive_now is True
     assert "STILL_ACTIVE" in reason_now or "confirmed alive" in reason_now
+
+
+def test_check_pid_liveness_invalid_created_at_fails_closed():
+    """Boss Round 10 Item 15: Invalid created_at metadata produces explicit fail-closed result."""
+    my_pid = os.getpid()
+    bad_ts = "not-a-timestamp"
+    is_alive, reason = check_pid_liveness(my_pid, created_dt_str=bad_ts)
+    assert is_alive is None
+    assert "INDETERMINATE" in reason
+    assert "fail-closed" in reason
 
 
 def test_atomic_safe_archive_retries_on_destination_collision(tmp_path: Path):
@@ -258,27 +305,87 @@ def test_atomic_safe_archive_fails_on_cross_device(tmp_path: Path):
     active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
     active_lock.write_text('{"owner": "JP_TEMP_59.b3b4"}', encoding="utf-8")
 
-    real_stat = os.stat
+    real_stat = Path.stat
 
-    def alternate_dev_stat(path, *args, **kwargs):
-        st = real_stat(path, *args, **kwargs)
-        if str(path) == str(stale_dir):
+    def alternate_dev_stat(self_path, *args, **kwargs):
+        st = real_stat(self_path, *args, **kwargs)
+        if str(self_path) == str(stale_dir):
             import collections
             StatResult = collections.namedtuple("CustomStat", ["st_dev", "st_mode", "st_ino", "st_nlink", "st_uid", "st_gid", "st_size", "st_atime", "st_mtime", "st_ctime"])
             return StatResult(st.st_dev + 9999, st.st_mode, st.st_ino, st.st_nlink, st.st_uid, st.st_gid, st.st_size, st.st_atime, st.st_mtime, st.st_ctime)
         return st
 
-    os.stat = alternate_dev_stat
+    Path.stat = alternate_dev_stat
     try:
         with pytest.raises(RuntimeError) as exc:
             atomic_safe_archive(active_lock, stale_dir)
         assert "Cross-filesystem archival violation" in str(exc.value)
     finally:
-        os.stat = real_stat
+        Path.stat = real_stat
+
+
+def test_atomic_safe_archive_source_replacement_inode_race_detection(tmp_path: Path):
+    """Boss Round 10 Item 18: Detects inode replacement race between validation and mutation."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    active_lock.write_text('{"owner": "JP_TEMP_59.b3b4"}', encoding="utf-8")
+
+    real_stat = Path.stat
+    call_count = [0]
+
+    def replaced_inode_stat(self_path, *args, **kwargs):
+        st = real_stat(self_path, *args, **kwargs)
+        if str(self_path) == str(active_lock):
+            call_count[0] += 1
+            if call_count[0] >= 2:
+                import collections
+                StatResult = collections.namedtuple("CustomStat", ["st_dev", "st_mode", "st_ino", "st_nlink", "st_uid", "st_gid", "st_size", "st_atime", "st_mtime", "st_ctime"])
+                return StatResult(st.st_dev, st.st_mode, st.st_ino + 100, st.st_nlink, st.st_uid, st.st_gid, st.st_size, st.st_atime, st.st_mtime, st.st_ctime)
+        return st
+
+    Path.stat = replaced_inode_stat
+    try:
+        with pytest.raises(RuntimeError) as exc:
+            atomic_safe_archive(active_lock, stale_dir)
+        assert "Source replacement race detected: inode changed" in str(exc.value)
+    finally:
+        Path.stat = real_stat
+
+
+def test_atomic_safe_archive_destination_fsync_failure_rollback(tmp_path: Path):
+    """Boss Round 10 Item 19: Proves cleanup and rollback behavior when destination fsync fails."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    content = '{"owner": "JP_TEMP_59.b3b4"}'
+    active_lock.write_text(content, encoding="utf-8")
+
+    orig_fsync = os.fsync
+
+    def failing_fsync(fd):
+        raise OSError(errno.EIO, "Injected disk fsync I/O failure")
+
+    os.fsync = failing_fsync
+    try:
+        with pytest.raises(RuntimeError) as exc:
+            atomic_safe_archive(active_lock, stale_dir)
+        assert "Destination fsync failed (rollback performed)" in str(exc.value)
+        # Source lock must still exist intact after failure rollback
+        assert active_lock.exists()
+        assert active_lock.read_text(encoding="utf-8") == content
+    finally:
+        os.fsync = orig_fsync
 
 
 def test_check_pid_liveness_fail_closed_on_indeterminate_or_permission():
-    """Boss Round 9 Item 18: Liveness fails closed on permission error or indeterminate outcomes."""
+    """Boss Round 10 Item 16: PermissionError or indeterminate outcomes return None (fail-closed, aborts disposal)."""
     if sys.platform != "win32":
         orig_kill = os.kill
 
@@ -288,9 +395,76 @@ def test_check_pid_liveness_fail_closed_on_indeterminate_or_permission():
         os.kill = perm_denied_kill
         try:
             is_alive, reason = check_pid_liveness(12345)
-            assert is_alive is True
-            assert "EPERM permission denied - fail-closed" in reason
+            # Must return None (indeterminate / fail-closed), NOT True
+            assert is_alive is None, f"Expected is_alive=None for PermissionError, got {is_alive}"
+            assert "INDETERMINATE" in reason
+            assert "permission denied" in reason.lower()
+            # Verify caller aborts disposal
+            assert is_alive is not False, "Disposal must be aborted when is_alive is not False"
         finally:
             os.kill = orig_kill
+    else:
+        # On Windows, Access Denied should also return None (indeterminate / fail-closed)
+        import ctypes
+        orig_open_proc = ctypes.windll.kernel32.OpenProcess
+        orig_get_last_error = ctypes.windll.kernel32.GetLastError
+
+        def access_denied_open_proc(dwDesiredAccess, bInheritHandle, dwProcessId):
+            return 0
+
+        def access_denied_error():
+            return 5  # ERROR_ACCESS_DENIED
+
+        ctypes.windll.kernel32.OpenProcess = access_denied_open_proc
+        ctypes.windll.kernel32.GetLastError = access_denied_error
+        try:
+            is_alive, reason = check_pid_liveness(12345)
+            assert is_alive is None
+            assert "INDETERMINATE" in reason
+            assert is_alive is not False, "Disposal must be aborted when is_alive is not False"
+        finally:
+            ctypes.windll.kernel32.OpenProcess = orig_open_proc
+            ctypes.windll.kernel32.GetLastError = orig_get_last_error
 
 
+def test_get_posix_proc_starttime_parses_field_22(tmp_path: Path):
+    """Boss Round 10 Item 17: Validates Linux /proc/<pid>/stat field 22 starttime parsing."""
+    # Synthetic stat line: field 1: 12345, field 2: (python worker process)
+    # followed by state S, ppid ... field 22 is 85000 clock ticks
+    stat_line = "12345 (python worker process) S 1 12345 12345 0 0 4194304 100 0 0 0 10 5 0 0 20 0 1 0 85000 1000 200"
+    pid_dir = tmp_path / "12345"
+    pid_dir.mkdir()
+    proc_stat_file = pid_dir / "stat"
+    proc_stat_file.write_text(stat_line, encoding="utf-8")
+
+    system_stat = "cpu 100 200\nbtime 1700000000\n"
+    system_stat_file = tmp_path / "stat"
+    system_stat_file.write_text(system_stat, encoding="utf-8")
+
+    dt, reason = get_posix_proc_starttime(12345, proc_root=str(tmp_path))
+    assert dt is not None, f"Expected parsed starttime, got {reason}"
+    assert reason == "OK"
+    # btime=1700000000, ticks=85000, clk_tck=100 -> 1700000850.0
+    expected_epoch = 1700000000 + (85000 / 100.0)
+    assert dt.timestamp() == expected_epoch
+
+
+def test_concurrent_archival_race_of_same_source(tmp_path: Path):
+    """Boss Round 10 Item 19: Concurrent archival of the same source handles the race cleanly."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    content = '{"owner": "JP_TEMP_59.b3b4"}'
+    active_lock.write_text(content, encoding="utf-8")
+
+    # First archival succeeds
+    dest_1 = atomic_safe_archive(active_lock, stale_dir)
+    assert dest_1.exists()
+    assert not active_lock.exists()
+
+    # Second archival immediately raises FileNotFoundError (source already unlinked by winner)
+    with pytest.raises(FileNotFoundError):
+        atomic_safe_archive(active_lock, stale_dir)

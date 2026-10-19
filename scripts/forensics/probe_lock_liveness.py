@@ -2,7 +2,7 @@
 """scripts/forensics/probe_lock_liveness.py
 Authoritative process liveness and safe lock disposal verification probe.
 Complies with Rule 118 (Zero-Mock), Rule 121 (Verification Protocol),
-Rule 125 (Zero-Ghost), Rule 137 (Safe-Trash Mandate), and Boss Round 8 Requirements.
+Rule 125 (Zero-Ghost), Rule 137 (Safe-Trash Mandate), and Boss Round 10 Requirements.
 
 Modes:
   --inspect (default): Read-only inspection of active locks and holder liveness.
@@ -101,21 +101,80 @@ def validate_lock_metadata(data: Dict[str, Any], lock_path: Path) -> Tuple[str, 
     return owner, token, created_at_str, pid
 
 
-def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[bool, str]:
+def get_posix_proc_starttime(pid: int, proc_root: str = "/proc") -> Tuple[Optional[datetime], str]:
+    """Parses Linux kernel starttime from /proc/<pid>/stat field 22.
+
+    Defends against PID reuse by extracting the exact process start tick count
+    and combining it with system boot time from /proc/stat per kernel spec.
+    """
+    root_dir = Path(proc_root)
+    stat_path = root_dir / str(pid) / "stat"
+    if not stat_path.exists():
+        return None, f"{stat_path} does not exist (process absent)"
+    try:
+        content = stat_path.read_text(encoding="utf-8", errors="replace")
+    except PermissionError as pe:
+        return None, f"Permission denied reading {stat_path}: {pe}"
+    except OSError as oe:
+        return None, f"OS error reading {stat_path}: {oe}"
+
+    r_idx = content.rfind(")")
+    if r_idx == -1:
+        return None, f"Corrupted {stat_path} format (missing ')') in {content[:40]}"
+    fields = content[r_idx + 2:].split()
+    # field 1: pid, field 2: (comm). fields[0] is field 3 (state).
+    # field 22 is fields[22 - 3] = fields[19]
+    if len(fields) <= 19:
+        return None, f"Truncated {stat_path}: only {len(fields)} fields after comm"
+
+    try:
+        starttime_ticks = int(fields[19])
+    except ValueError as ve:
+        return None, f"Invalid starttime field 22 in {stat_path}: {fields[19]}: {ve}"
+
+    try:
+        clk_tck = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", 100))
+    except (AttributeError, ValueError):
+        clk_tck = 100
+
+    system_stat_path = root_dir / "stat"
+    btime = 0
+    try:
+        with open(system_stat_path, "r", encoding="utf-8") as f_stat:
+            for line in f_stat:
+                if line.startswith("btime "):
+                    btime = int(line.split()[1])
+                    break
+    except (OSError, PermissionError, ValueError) as be:
+        return None, f"Could not read btime from {system_stat_path}: {be}"
+
+    if btime == 0:
+        return None, f"btime not found in {system_stat_path}"
+
+    proc_start_epoch = btime + (float(starttime_ticks) / float(clk_tck))
+    proc_start_dt = datetime.fromtimestamp(proc_start_epoch, tz=timezone.utc)
+    return proc_start_dt, "OK"
+
+
+def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[Optional[bool], str]:
     """Non-destructive, platform-appropriate process liveness check.
 
     Returns:
       (is_alive, diagnostic_reason)
-    Fail-closed: Treats only confirmed process absence as stale; permission errors
-    or unknown outcomes are treated as alive / in-use.
-    Validates process start time against lock metadata when available to defend against PID reuse.
+      - True:  Process is confirmed alive and running with matching identity/start-time.
+      - False: Process is confirmed absent / dead (safe to dispose).
+      - None:  Liveness is indeterminate (permission denied, metadata inaccessible). Fail-closed.
     """
     created_dt: Optional[datetime] = None
     if created_dt_str:
         try:
-            created_dt = datetime.fromisoformat(created_dt_str.replace("Z", "+00:00"))
-        except Exception:
-            created_dt = None
+            norm_ts = str(created_dt_str).strip().replace("Z", "+00:00")
+            created_dt = datetime.fromisoformat(norm_ts)
+            if created_dt.tzinfo is None:
+                raise ValueError(f"Lock timestamp '{created_dt_str}' must be timezone-aware")
+        except Exception as ts_err:
+            sys.stderr.write(f"[liveness error] invalid lock created_at '{created_dt_str}': {ts_err}\n")
+            return None, f"INDETERMINATE: invalid created_at timestamp '{created_dt_str}': {ts_err} (fail-closed)"
 
     if sys.platform == "win32":
         import ctypes
@@ -130,8 +189,8 @@ def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[
             if err == ERROR_INVALID_PARAMETER:
                 return False, f"PID {pid} not found (confirmed absence on Windows)"
             if err == 5:  # ERROR_ACCESS_DENIED
-                return True, f"PID {pid} exists (Access Denied - fail-closed)"
-            return True, f"OpenProcess({pid}) failed with error {err} (fail-closed)"
+                return None, f"INDETERMINATE: PID {pid} Access Denied (EPERM equivalent - fail-closed)"
+            return None, f"INDETERMINATE: OpenProcess({pid}) failed with error {err} (fail-closed)"
         else:
             try:
                 exit_code = wintypes.DWORD()
@@ -154,36 +213,36 @@ def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[
                             proc_start_epoch = (intervals - 116444736000000000) / 10000000
                             proc_start_dt = datetime.fromtimestamp(proc_start_epoch, tz=timezone.utc)
                             if created_dt and proc_start_dt > created_dt + timedelta(seconds=2):
-                                return False, f"PID_REUSED: PID {pid} is running but was created at {proc_start_dt.isoformat()} after lock timestamp {created_dt.isoformat()} (original holder dead)"
+                                return False, f"PID_REUSED: PID {pid} was created at {proc_start_dt.isoformat()} after lock timestamp {created_dt.isoformat()} (original holder dead)"
                     return True, f"PID {pid} is running (STILL_ACTIVE, process identity & start time consistent)"
-                return True, f"Cannot determine exit code for PID {pid} (fail-closed)"
+                return None, f"INDETERMINATE: Cannot determine exit code for PID {pid} (fail-closed)"
             finally:
                 kernel32.CloseHandle(handle)
     else:
         try:
             os.kill(pid, 0)
-            # Process exists; validate start time from /proc/{pid} if accessible to defend against PID reuse
-            proc_dir = Path(f"/proc/{pid}")
-            if proc_dir.exists():
-                try:
-                    proc_stat = proc_dir.stat()
-                    proc_start_dt = datetime.fromtimestamp(proc_stat.st_ctime, tz=timezone.utc)
-                    if created_dt and proc_start_dt > created_dt + timedelta(seconds=2):
-                        return False, f"PID_REUSED: PID {pid} was created at {proc_start_dt.isoformat()} after lock timestamp {created_dt.isoformat()} (original holder dead)"
-                except (OSError, PermissionError) as _pe:
-                    sys.stderr.write(f"[proc notice] could not read /proc/{pid} stat: {_pe}\n")
-            return True, f"PID {pid} responded to signal 0 (confirmed alive, identity/start time consistent)"
         except ProcessLookupError:
             return False, f"PID {pid} does not exist (ESRCH confirmed absence)"
         except PermissionError:
-            return True, f"PID {pid} exists (EPERM permission denied - fail-closed)"
+            return None, f"INDETERMINATE: EPERM permission denied for PID {pid} (fail-closed, cannot confirm dead)"
         except OSError as err:
             if err.errno == errno.ESRCH:
                 return False, f"PID {pid} does not exist (ESRCH confirmed absence)"
             elif err.errno == errno.EPERM:
-                return True, f"PID {pid} exists (EPERM permission denied - fail-closed)"
+                return None, f"INDETERMINATE: EPERM permission denied for PID {pid} (fail-closed, cannot confirm dead)"
             else:
-                return True, f"PID {pid} liveness indeterminate (OSError {err.errno} - fail-closed)"
+                return None, f"INDETERMINATE: OSError {err.errno} for PID {pid} (fail-closed, cannot confirm dead)"
+
+        # Process responded to signal 0. Validate start time from /proc/<pid>/stat field 22 to defend against PID reuse
+        proc_start_dt, start_reason = get_posix_proc_starttime(pid)
+        if proc_start_dt is not None:
+            if created_dt and proc_start_dt > created_dt + timedelta(seconds=2):
+                return False, f"PID_REUSED: PID {pid} was created at {proc_start_dt.isoformat()} after lock timestamp {created_dt.isoformat()} (original holder dead)"
+            return True, f"PID {pid} confirmed alive (Linux kernel start time {proc_start_dt.isoformat()} matches lock epoch)"
+        elif "Permission denied" in start_reason:
+            return None, f"INDETERMINATE: {start_reason} (fail-closed, cannot confirm identity)"
+        else:
+            return True, f"PID {pid} responded to signal 0 ({start_reason})"
 
 
 def compute_file_sha256(path: Path) -> str:
@@ -200,6 +259,7 @@ def acquire_disposal_mutex(mutex_file: Path) -> Generator[None, None, None]:
     """Shared advisory mutex for lock disposal operations (Boss Round 8 Item 17)."""
     mutex_file.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(mutex_file), os.O_CREAT | os.O_RDWR, 0o644)
+    locked = False
     try:
         if sys.platform != "win32":
             import fcntl
@@ -207,19 +267,22 @@ def acquire_disposal_mutex(mutex_file: Path) -> Generator[None, None, None]:
         else:
             import msvcrt
             msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        locked = True
         yield
     except (BlockingIOError, OSError, PermissionError) as lock_err:
         raise RuntimeError(f"Lock disposal mutex '{mutex_file}' is currently held by another process: {lock_err}") from lock_err
     finally:
-        try:
-            if sys.platform != "win32":
-                import fcntl
-                fcntl.flock(fd, fcntl.LOCK_UN)
-            else:
-                import msvcrt
-                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-        except OSError as _unlock_err:
-            sys.stderr.write(f"[mutex notice] unlock warning: {_unlock_err}\n")
+        if locked:
+            try:
+                if sys.platform != "win32":
+                    import fcntl
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                else:
+                    import msvcrt
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            except OSError as _unlock_err:
+                sys.stderr.write(f"[mutex error] critical unlock failure on '{mutex_file}': {_unlock_err}\n")
+                raise RuntimeError(f"Critical mutex unlock failure on '{mutex_file}': {_unlock_err}") from _unlock_err
         os.close(fd)
 
 
@@ -232,40 +295,55 @@ def atomic_safe_archive(
     """Executes true collision-safe same-filesystem atomic archival with durability fsync.
 
     Guarantees:
-      1. Source existence and identity revalidation.
-      2. Same-filesystem device ID verification (os.stat(src).st_dev == os.stat(dst_dir).st_dev).
+      1. Source existence, device ID, inode, and content SHA verification.
+      2. Same-filesystem device check (fail-closed on cross-device).
       3. True atomic exclusive reservation via os.link (or atomic O_CREAT | O_EXCL fallback)
          guaranteeing no concurrent clobber.
-      4. Durability fsync on destination file, destination directory, and source directory (fail-closed on POSIX).
-      5. Atomic unlinking of source after durable destination link.
-      6. Post-action verification (source removed, destination exists, content SHA matches).
+      4. Source identity revalidation (inode, dev, SHA) immediately before mutation and unlinking
+         to prevent source replacement race conditions.
+      5. Durability fsync on destination file, destination directory, and source directory (fail-closed on POSIX).
+      6. Rollback / cleanup on partial failure (unlinks candidate destination if source was not unlinked).
+      7. Post-action verification (source removed, destination exists, content SHA matches).
     """
     if not active_path.exists():
         raise FileNotFoundError(f"Source lock not found for archival: {active_path}")
 
     stale_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Same-filesystem device check (fail-closed)
-    src_stat = os.stat(str(active_path))
-    dst_dir_stat = os.stat(str(stale_dir))
-    if src_stat.st_dev != dst_dir_stat.st_dev:
+    # 1. Source stat, inode, device, and SHA verification
+    src_stat = active_path.stat()
+    src_ino = src_stat.st_ino
+    src_dev = src_stat.st_dev
+    dst_dir_stat = stale_dir.stat()
+
+    if src_dev != dst_dir_stat.st_dev:
         raise RuntimeError(
-            f"Cross-filesystem archival violation: source {active_path} (dev {src_stat.st_dev}) "
+            f"Cross-filesystem archival violation: source {active_path} (dev {src_dev}) "
             f"and target {stale_dir} (dev {dst_dir_stat.st_dev}) must share device ID for atomic archival"
         )
 
-    # 2. Source identity verification
     src_sha = compute_file_sha256(active_path)
     if expected_sha is not None and src_sha != expected_sha:
         raise ValueError(f"Source lock SHA changed concurrently: expected {expected_sha}, got {src_sha}")
 
-    # 3. Collision-safe unique destination reservation using atomic no-clobber primitive
     dest_path: Optional[Path] = None
     last_err: Optional[Exception] = None
+
     for attempt in range(max_retries):
         ts_suffix = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         rand_suffix = uuid.uuid4().hex[:8]
         candidate_dest = stale_dir / f"{active_path.stem}_{ts_suffix}_{rand_suffix}{active_path.suffix}"
+
+        # Re-verify source identity before reservation attempt
+        try:
+            curr_stat = active_path.stat()
+            if curr_stat.st_ino != src_ino or curr_stat.st_dev != src_dev:
+                raise RuntimeError(f"Source replacement race detected: inode changed {src_ino} -> {curr_stat.st_ino}")
+            curr_sha = compute_file_sha256(active_path)
+            if curr_sha != src_sha:
+                raise ValueError(f"Source replacement race detected: SHA changed {src_sha} -> {curr_sha}")
+        except FileNotFoundError as fnf:
+            raise RuntimeError(f"Source lock disappeared during archival attempt {attempt}: {fnf}") from fnf
 
         # Attempt atomic link (atomic creation of candidate_dest pointing to active_path; refuses if candidate_dest exists)
         try:
@@ -276,30 +354,64 @@ def atomic_safe_archive(
             # Destination collided with concurrent actor; retry with new unique timestamp/UUID
             continue
         except (OSError, NotImplementedError) as link_err:
-            # If os.link is not supported (e.g. cross-volume or platform restriction), use atomic exclusive file creation
+            # Fallback for environments lacking os.link (e.g. FAT32 or certain container mounts)
             try:
                 fd = os.open(str(candidate_dest), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-                with open(active_path, "rb") as f_src:
-                    while chunk := f_src.read(65536):
-                        os.write(fd, chunk)
-                os.fsync(fd)
-                os.close(fd)
+                try:
+                    with open(active_path, "rb") as f_src:
+                        while chunk := f_src.read(65536):
+                            os.write(fd, chunk)
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+
+                # Re-verify source integrity before accepting destination
+                post_stat = active_path.stat()
+                if post_stat.st_ino != src_ino or post_stat.st_dev != src_dev or compute_file_sha256(active_path) != src_sha:
+                    if candidate_dest.exists():
+                        os.unlink(str(candidate_dest))
+                    raise RuntimeError("Source replaced during copy fallback; destination discarded (rollback)")
+
                 dest_path = candidate_dest
                 break
             except FileExistsError:
                 continue
             except Exception as ex:
+                if candidate_dest.exists():
+                    try:
+                        os.unlink(str(candidate_dest))
+                    except Exception as _clean_err:
+                        sys.stderr.write(f"[cleanup notice] could not unlink candidate {candidate_dest}: {_clean_err}\n")
                 last_err = ex
                 break
 
     if dest_path is None:
         raise RuntimeError(f"Failed to atomically reserve unique destination in {stale_dir} after {max_retries} attempts: {last_err}")
 
-    # 4. File-level durability fsync on destination
-    with open(dest_path, "a+b") as f_dst:
-        os.fsync(f_dst.fileno())
+    # 4. File-level durability fsync on destination with rollback on failure
+    try:
+        with open(dest_path, "a+b") as f_dst:
+            os.fsync(f_dst.fileno())
+    except Exception as fsync_err:
+        if dest_path.exists():
+            try:
+                os.unlink(str(dest_path))
+            except Exception as _clean_err:
+                sys.stderr.write(f"[cleanup notice] could not unlink {dest_path}: {_clean_err}\n")
+        raise RuntimeError(f"Destination fsync failed (rollback performed): {fsync_err}") from fsync_err
 
-    # 5. Atomic unlinking of source entry
+    # 5. Final source revalidation before unlink
+    final_stat = active_path.stat()
+    if final_stat.st_ino != src_ino or final_stat.st_dev != src_dev:
+        if dest_path.exists():
+            os.unlink(str(dest_path))
+        raise RuntimeError(f"Source replacement detected immediately before unlink: {src_ino} != {final_stat.st_ino}")
+    if compute_file_sha256(active_path) != src_sha:
+        if dest_path.exists():
+            os.unlink(str(dest_path))
+        raise ValueError(f"Source content changed immediately before unlink: {src_sha} != {compute_file_sha256(active_path)}")
+
+    # Atomic unlinking of source entry
     os.unlink(str(active_path))
 
     # 6. Directory-level durability fsync on POSIX (both destination and source directories)
@@ -396,6 +508,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         print("   - STATUS: CLEAN (Zero active abandoned locks in locks directory)")
         print("   - Observation: No qualifying production lock exists to inspect or dispose.")
         print("   - Action: 0 synthetic records generated. Read-only clean state preserved.")
+        print("   - DISPOSAL OUTCOME: QUALIFYING_LOCK_ABSENT (0 locks disposed, 0 synthetic locks created, clean state verified)")
         print("======================================================================")
         print("✅ PROCESS LIVENESS & LOCK REPOSITORY CLEAN (Exit code 0)")
         print("======================================================================")
@@ -430,15 +543,16 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not is_dispose_mode:
         print("\n6. Inspection Summary (Read-Only Mode):")
         print("   - Mutation: None performed (read-only inspection by default).")
-        print(f"   - Lock Disposition: {'ACTIVE_PROCESS_RUNNING' if is_alive else 'ABANDONED_STALE_LOCK'}")
+        disposition = "ACTIVE_PROCESS_RUNNING" if is_alive is True else ("INDETERMINATE_FAIL_CLOSED" if is_alive is None else "ABANDONED_STALE_LOCK")
+        print(f"   - Lock Disposition: {disposition}")
         print("======================================================================")
         print("✅ PROCESS LIVENESS INSPECTION COMPLETED (Exit code 0)")
         print("======================================================================")
         return 0
 
-    # DISPOSE MODE: Must be confirmed dead and executed under mutex
-    if is_alive:
-        print(f"❌ Cannot dispose active lock {target_lock}: PID {pid} is running! ({liveness_reason})", file=sys.stderr)
+    # DISPOSE MODE: Must be confirmed dead (is_alive is strictly False)
+    if is_alive is not False:
+        print(f"❌ Cannot dispose active lock {target_lock}: PID {pid} is not confirmed dead! (status={is_alive}, reason: {liveness_reason})", file=sys.stderr)
         return 1
 
     print("\n6. Executing Physical Collision-Safe Safe-Trash Archival (Rule 137):")
@@ -457,8 +571,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         if re_sha != current_sha:
             raise ValueError(f"Lock SHA changed concurrently under mutex for {target_lock}: expected {current_sha}, got {re_sha}")
         re_alive, re_reason = check_pid_liveness(re_pid, re_created)
-        if re_alive:
-            raise RuntimeError(f"Race condition detected: PID {re_pid} became alive immediately before archival: {re_reason}")
+        if re_alive is not False:
+            raise RuntimeError(f"Race condition detected: PID {re_pid} is not confirmed dead immediately before archival: {re_reason}")
 
         final_dest = atomic_safe_archive(target_lock, stale_dir, expected_sha=current_sha)
 

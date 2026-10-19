@@ -128,6 +128,13 @@ def condense_qa_telemetry(qa_summary: str, max_chars: int = 24000) -> str:
     if not qa_summary:
         return "QA Harness: Tests Passed, 0 Regressions"
 
+    allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT", "").strip() in ("1", "true", "yes")
+    effective_max = 120000 if allow_massive else max_chars
+
+    # Under ALLOW_MASSIVE_LLM_CONTEXT, preserve full raw telemetry without any condensation
+    if allow_massive and len(qa_summary) <= effective_max:
+        return qa_summary
+
     lines = qa_summary.splitlines()
     condensed_lines = []
     consecutive_passed = 0
@@ -147,13 +154,11 @@ def condense_qa_telemetry(qa_summary: str, max_chars: int = 24000) -> str:
         condensed_lines.append(f"  ... [{consecutive_passed} individual unit/integration tests PASSED - line-by-line verbosity condensed] ...")
 
     text = "\n".join(condensed_lines)
-    allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT", "").strip() in ("1", "true", "yes")
-    effective_max = 50000 if allow_massive else max_chars
 
     if len(text) <= effective_max:
         return text
 
-    # Section-aware budget allocation: guarantees ALL sections (1..12) are preserved
+    # Section-aware budget allocation: guarantees ALL sections (1..15) are preserved
     sections = re.split(r"(?=### \[\d+\.)", text)
     if len(sections) <= 1:
         head_len = int(effective_max * 0.6)
@@ -181,7 +186,10 @@ def condense_qa_telemetry(qa_summary: str, max_chars: int = 24000) -> str:
     if len(res) > effective_max:
         final_sections = []
         for s in compacted_sections:
-            if len(s) > 3500:
+            sec_h = s.splitlines()[0] if s.splitlines() else ""
+            # Strictly protect critical forensic proof sections from intermediate truncation
+            is_exempt = any(k in sec_h for k in ["[1.", "[2.", "[3.", "[4.", "[6.", "[7.", "[8.", "[9.", "[10.", "[11.", "[13.", "[14.", "[15."])
+            if not is_exempt and len(s) > 3500:
                 s_lines = s.splitlines()
                 final_sections.append("\n".join(s_lines[:30]) + f"\n... [{len(s_lines)-45} intermediate lines condensed] ...\n" + "\n".join(s_lines[-15:]))
             else:
@@ -277,7 +285,7 @@ def extract_compact_git_diff(
                 tier_2.append((f_name, f_lines))
 
         allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT", "").strip() in ("1", "true", "yes")
-        eff_max_lines = 1000 if allow_massive else max_lines
+        eff_max_lines = 3000 if allow_massive else max_lines
 
         ordered_chunks = tier_1 + tier_2 + tier_3
         meaningful_lines: List[str] = []
@@ -287,7 +295,7 @@ def extract_compact_git_diff(
                 break
 
             file_lines_added = 0
-            max_per_file = 160 if allow_massive else (45 if f_name in [c[0] for c in tier_1] else 25)
+            max_per_file = 1000 if allow_massive else (45 if f_name in [c[0] for c in tier_1] else 25)
 
             for line in chunk_lines:
                 if len(meaningful_lines) >= eff_max_lines:
