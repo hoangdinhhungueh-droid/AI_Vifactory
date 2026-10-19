@@ -741,7 +741,7 @@ def aggregate_manifest(
     git_tree: str,
     task_id: str = "TASK_1792314467",
     target_episode: str = "JP_TEMP_59",
-    cumulative_base_commit_sha: str = "517b082e6d623253b20e0ffb304c86bf4cffef07",
+    cumulative_base_commit_sha: str = "517b082ea9215affddc0d704fa7745fcd303c9bf",
     incremental_delta_base_sha: str = "2bbe9732cf10db78a8db2948680c036bbacc9adb",
     artifact_digests: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
@@ -988,8 +988,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_inv_explicit, out_inv_explicit = run_on_vps("python3 /root/video_factory/scripts/legacy_inventory.py")
     code_retained, out_retained = run_on_vps("git -C /root/video_factory ls-files 'vox/*.py' 'stages/*.py' 'app/main.py' 'app/services/trend_engine_b1.py' 'app/services/daily_market_lock.py' 'app/services/unified_vox_director.py'")
     code_lock_inspect, out_lock_inspect = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_lock_liveness.py --inspect")
-    res_lock_inspect_win = subprocess.run([sys.executable, "scripts/forensics/probe_lock_liveness.py", "--inspect"], capture_output=True, text=True, cwd=str(ROOT_DIR), check=False)
-    out_lock_inspect_win = (res_lock_inspect_win.stdout + "\n" + res_lock_inspect_win.stderr).strip()
+    res_lock_inspect_win = subprocess.run([sys.executable, "scripts/forensics/probe_lock_liveness.py", "--inspect"], capture_output=True, encoding="utf-8", errors="replace", cwd=str(ROOT_DIR), check=False)
+    out_lock_inspect_win = ((res_lock_inspect_win.stdout or "") + "\n" + (res_lock_inspect_win.stderr or "")).strip()
 
     code_lock_ls, out_lock_ls = run_on_vps("ls -la /var/vf/locks")
     code_lock_durability, out_lock_durability = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_lock_liveness_probe.py -v")
@@ -1051,9 +1051,9 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     mock_verdict = "PASS" if code_mock == 0 and parsed_zero_mock_count == 229 else "FAIL"
 
     code_junit_val_lnx, out_junit_val_lnx = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_junit_validator.py tests/unit/test_service_readiness_manifest.py -v")
-    res_junit_val_win = subprocess.run([sys.executable, "-m", "pytest", "tests/unit/test_junit_validator.py", "tests/unit/test_service_readiness_manifest.py", "-v"], capture_output=True, text=True, cwd=str(ROOT_DIR), check=False)
+    res_junit_val_win = subprocess.run([sys.executable, "-m", "pytest", "tests/unit/test_junit_validator.py", "tests/unit/test_service_readiness_manifest.py", "-v"], capture_output=True, encoding="utf-8", errors="replace", cwd=str(ROOT_DIR), check=False)
     code_junit_val_win = res_junit_val_win.returncode
-    out_junit_val_win = (res_junit_val_win.stdout + "\n" + res_junit_val_win.stderr).strip()
+    out_junit_val_win = ((res_junit_val_win.stdout or "") + "\n" + (res_junit_val_win.stderr or "")).strip()
 
     import re
     val_cnt_matches_lnx = re.findall(r"(\d+) passed", out_junit_val_lnx)
@@ -1097,10 +1097,10 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     win_junit_path.parent.mkdir(parents=True, exist_ok=True)
     res_win_pytest = subprocess.run(
         [sys.executable, "-m", "pytest", "tests/unit/test_visual_taxonomy_and_regex.py", "tests/unit/test_lock_liveness_probe.py", "tests/unit/test_vps_runner_failover.py", "-v", f"--junitxml={win_junit_path}"],
-        capture_output=True, text=True, cwd=str(ROOT_DIR), check=False
+        capture_output=True, encoding="utf-8", errors="replace", cwd=str(ROOT_DIR), check=False
     )
     code_focused_win = res_win_pytest.returncode
-    raw_win_out = (res_win_pytest.stdout + "\n" + res_win_pytest.stderr).strip()
+    raw_win_out = ((res_win_pytest.stdout or "") + "\n" + (res_win_pytest.stderr or "")).strip()
     win_cols = re.findall(r"collected (\d+) items", raw_win_out)
     win_desels = re.findall(r"(\d+) deselected", raw_win_out)
     if len(win_cols) != 1:
@@ -1206,10 +1206,10 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     res_win_ruff = subprocess.run(
         ["ruff", "check", "--select", "F821,F401", "app/services/unified_vox_director.py", "scripts/forensics/probe_fastapi_http.py", "scripts/forensics/probe_lock_liveness.py", "scripts/forensics/probe_zero_mock.py", "tests/unit/test_visual_taxonomy_and_regex.py", "tests/unit/test_lock_liveness_probe.py", "scripts/orchestrator/opus55_supervisor_gate.py", "scripts/orchestrator/boss_orchestrator.py"],
-        capture_output=True, text=True, cwd=str(ROOT_DIR), check=False
+        capture_output=True, encoding="utf-8", errors="replace", cwd=str(ROOT_DIR), check=False
     )
     code_ruff_win = res_win_ruff.returncode
-    out_ruff_win = (res_win_ruff.stdout + "\n" + res_win_ruff.stderr).strip()
+    out_ruff_win = ((res_win_ruff.stdout or "") + "\n" + (res_win_ruff.stderr or "")).strip()
 
     zero_mock_provenance = (
         f"--- ZERO-MOCK ARITHMETIC PROVENANCE & DISCREPANCY RECONCILIATION PROOF (Boss Round 18 Item 1 & 2, Round 23 Item 5) ---\n"
@@ -1704,16 +1704,16 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     # 12. Atomic Git Commits Log & Commit Separation Documentation
     git_log_res = subprocess.run(
         ["git", "-C", str(ROOT_DIR), "log", "--format=%h %s", "2456870^..HEAD"],
-        capture_output=True, text=True, check=False
+        capture_output=True, encoding="utf-8", errors="replace", check=False
     )
     git_full_log = subprocess.run(
         ["git", "-C", str(ROOT_DIR), "log", "--format=%h - %an: %s%n%b", "2456870^..HEAD"],
-        capture_output=True, text=True, check=False
+        capture_output=True, encoding="utf-8", errors="replace", check=False
     )
     evidence_blocks.append(
         f"### [12. ATOMIC CONVENTIONAL COMMITS LOG (2456870^..HEAD)]\n"
-        f"Summary Log:\n{git_log_res.stdout.strip()}\n\n"
-        f"Detailed Commit Log:\n{git_full_log.stdout.strip()}\n"
+        f"Summary Log:\n{(git_log_res.stdout or '').strip()}\n\n"
+        f"Detailed Commit Log:\n{(git_full_log.stdout or '').strip()}\n"
     )
 
     # 13. Core Vox, Stages & App/Main.py Untruncated Per-File Diffs & Source Trace (Rule 125, 127, 128 & Boss Item 2 & 7)
@@ -1826,8 +1826,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "\""
     )
     code_mg_suite, out_mg_suite = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_model_gateway_ceiling.py -v")
-    res_mg_suite_win = subprocess.run([sys.executable, "-m", "pytest", "tests/unit/test_model_gateway_ceiling.py", "-v"], capture_output=True, text=True, cwd=str(ROOT_DIR), check=False)
-    out_mg_suite_win = (res_mg_suite_win.stdout + "\n" + res_mg_suite_win.stderr).strip()
+    res_mg_suite_win = subprocess.run([sys.executable, "-m", "pytest", "tests/unit/test_model_gateway_ceiling.py", "-v"], capture_output=True, encoding="utf-8", errors="replace", cwd=str(ROOT_DIR), check=False)
+    out_mg_suite_win = ((res_mg_suite_win.stdout or "") + "\n" + (res_mg_suite_win.stderr or "")).strip()
 
     evidence_blocks.append(
         f"### [15. MECHANICAL PER-FILE SCOPE JUSTIFICATION MAP ({effective_range} - Boss Item 13)]\n"
@@ -2040,7 +2040,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         git_tree=git_tree,
         task_id=task_id or "TASK_1792314467",
         target_episode="JP_TEMP_59",
-        cumulative_base_commit_sha="517b082e6d623253b20e0ffb304c86bf4cffef07",
+        cumulative_base_commit_sha="517b082ea9215affddc0d704fa7745fcd303c9bf",
         incremental_delta_base_sha=inc_delta_base,
         artifact_digests=artifact_digests_dict,
     )
@@ -2061,15 +2061,36 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     # 1. Incremental Patch
     inc_patch_file = bundle_dir / "incremental.patch"
-    inc_res = subprocess.run(["git", "-C", str(ROOT_DIR), "diff-tree", "-p", git_head], capture_output=True, text=True, check=False)
-    if not inc_res.stdout.strip():
-        inc_res = subprocess.run(["git", "-C", str(ROOT_DIR), "diff", f"{git_head}~1..{git_head}"], capture_output=True, text=True, check=False)
-    inc_patch_file.write_text(inc_res.stdout, encoding="utf-8")
+    inc_res = subprocess.run(
+        ["git", "-C", str(ROOT_DIR), "diff-tree", "-p", git_head],
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    inc_stdout = inc_res.stdout or ""
+    if not inc_stdout.strip():
+        inc_res = subprocess.run(
+            ["git", "-C", str(ROOT_DIR), "diff", f"{git_head}~1..{git_head}"],
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        inc_stdout = inc_res.stdout or ""
+    inc_patch_file.write_text(inc_stdout, encoding="utf-8")
 
     # 2. Cumulative Patch
     cum_patch_file = bundle_dir / "cumulative.patch"
-    cum_res = subprocess.run(["git", "-C", str(ROOT_DIR), "diff", f"517b082e6d623253b20e0ffb304c86bf4cffef07..{git_head}"], capture_output=True, text=True, check=False)
-    cum_patch_file.write_text(cum_res.stdout, encoding="utf-8")
+    cum_res = subprocess.run(
+        ["git", "-C", str(ROOT_DIR), "diff", f"517b082ea9215affddc0d704fa7745fcd303c9bf..{git_head}"],
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    cum_stdout = cum_res.stdout or ""
+    cum_patch_file.write_text(cum_stdout, encoding="utf-8")
 
     # 3. Linux JUnit XML
     (bundle_dir / "linux_focused_junit.xml").write_text(out_junit_xml, encoding="utf-8")
@@ -2127,7 +2148,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"Verification Timestamp:       {manifest_ts}\n"
         f"Target Task ID:               {task_id or 'TASK_1792314467'}\n"
         f"Target Episode:               JP_TEMP_59\n"
-        f"Cumulative Base Commit SHA:   517b082e6d623253b20e0ffb304c86bf4cffef07\n"
+        f"Cumulative Base Commit SHA:   517b082ea9215affddc0d704fa7745fcd303c9bf\n"
         f"Incremental Delta Base SHA:   {inc_delta_base}\n"
         f"HEAD Commit SHA:              {git_head}\n"
         f"Local Tree SHA:               {git_tree}\n"
