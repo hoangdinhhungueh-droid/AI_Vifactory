@@ -662,8 +662,8 @@ def parse_zero_mock_probe_output(output: str) -> int:
         raise ValueError("Zero-mock probe output is empty after stripping")
 
     terminal_idx = -1
-    for idx, l in enumerate(lines):
-        if terminal_marker in l:
+    for idx, line_item in enumerate(lines):
+        if terminal_marker in line_item:
             terminal_idx = idx
             break
 
