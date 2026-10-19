@@ -44,6 +44,20 @@ def main() -> int:
         print("CRITICAL: VF_API_BASE_URL is mandatory and missing from environment (fail-closed, Rule 118 & 121).", file=sys.stderr)
         return 1
 
+    expected_sha = os.getenv("EXPECTED_GIT_SHA", "").strip()
+    if not expected_sha:
+        try:
+            import subprocess
+            res = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False)
+            if res.returncode == 0 and res.stdout.strip():
+                expected_sha = res.stdout.strip()
+        except Exception:
+            pass
+
+    if not expected_sha:
+        print("CRITICAL: EXPECTED_GIT_SHA is mandatory and could not be determined from environment or git (fail-closed, Rule 118 & 121).", file=sys.stderr)
+        return 1
+
     token = resolve_token()
     if not token:
         print("CRITICAL: VF_API_TOKEN not found in environment or secrets file.", file=sys.stderr)
@@ -57,6 +71,7 @@ def main() -> int:
 
     print("======================================================================")
     print("🔒 FASTAPI AUTHENTICATED RUNTIME ENDPOINT PROBES (Rule 121)")
+    print(f"   Expected Audited Git SHA: {expected_sha}")
     print("======================================================================")
 
     # 1. Authenticated GET endpoints (must all return HTTP 200)
@@ -81,7 +96,12 @@ def main() -> int:
                 if ep == "/api/v1/health":
                     h_json = json.loads(body)
                     sha = h_json.get("git_sha", "MISSING")
-                    print(f"  [PASS] {ep:20} -> HTTP 200 OK | git_sha={sha}")
+                    if sha == "MISSING" or not sha:
+                        failures.append(f"Auth GET {ep} missing git_sha in response payload: {body}")
+                    elif sha != expected_sha and not sha.startswith(expected_sha) and not expected_sha.startswith(sha):
+                        failures.append(f"Auth GET {ep} git_sha mismatch: expected {expected_sha}, got {sha}")
+                    else:
+                        print(f"  [PASS] {ep:20} -> HTTP 200 OK | git_sha={sha} (matches EXPECTED_GIT_SHA: {expected_sha[:12]})")
                 elif ep == "/metrics":
                     print(f"  [PASS] {ep:20} -> HTTP 200 OK | Prometheus metrics ({len(body)} bytes)")
                 else:
@@ -158,7 +178,18 @@ def main() -> int:
             req_pub = urllib.request.Request(f"{base_url}{ep}")
             resp_pub = urllib.request.urlopen(req_pub, timeout=5)
             if resp_pub.getcode() == 200:
-                print(f"  [PASS] Public {method:4} {ep:22} -> HTTP 200 OK (Public Discovery Endpoint)")
+                body = resp_pub.read().decode("utf-8", errors="replace")
+                if ep == "/api/v1/health":
+                    h_json = json.loads(body)
+                    sha = h_json.get("git_sha", "MISSING")
+                    if sha == "MISSING" or not sha:
+                        failures.append(f"Public GET {ep} missing git_sha in response payload: {body}")
+                    elif sha != expected_sha and not sha.startswith(expected_sha) and not expected_sha.startswith(sha):
+                        failures.append(f"Public GET {ep} git_sha mismatch: expected {expected_sha}, got {sha}")
+                    else:
+                        print(f"  [PASS] Public {method:4} {ep:22} -> HTTP 200 OK | git_sha={sha} (matches EXPECTED_GIT_SHA: {expected_sha[:12]})")
+                else:
+                    print(f"  [PASS] Public {method:4} {ep:22} -> HTTP 200 OK (Public Discovery Endpoint)")
             else:
                 failures.append(f"Public {method} {ep} expected 200, got HTTP {resp_pub.getcode()}")
         except Exception as e:

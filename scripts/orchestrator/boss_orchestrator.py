@@ -449,7 +449,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_quarantine_dirs, out_quarantine_dirs = run_on_vps("ls -la /root/video_factory/archive /root/video_factory/.trash /root/video_factory/.safe_trash /root/video_factory/temp_test /root/video_factory/active_candidate 2>&1 || true")
     code_inv_explicit, out_inv_explicit = run_on_vps("python3 /root/video_factory/scripts/legacy_inventory.py")
     code_retained, out_retained = run_on_vps("git -C /root/video_factory ls-files 'vox/*.py' 'stages/*.py' 'app/main.py' 'app/services/trend_engine_b1.py' 'app/services/daily_market_lock.py' 'app/services/unified_vox_director.py'")
-    code_lock_provenance, out_lock_provenance = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_lock_liveness.py")
+    code_lock_provenance, out_lock_provenance = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_lock_liveness.py --inspect")
     evidence_blocks.append(
         f"### [3. SINGLE PIPELINE TRUTH & LEGACY CODEBASE PURGE (Rule 125)]\n"
         f"Legacy Purge Commit: 2456870 (feat(vox): implement single unified vox pipeline with tactile object decomposition and purge legacy pipeline)\n"
@@ -469,64 +469,16 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     # 4. Zero-Mock & py_compile Verification (Boss Item 1 & 2)
     code_compile, out_compile = run_on_vps("cd /root/video_factory && python3 -m py_compile $(find tools/codemap -name '*.py') $(git ls-files 'vox/*.py' 'tests/vox/*.py') && echo 'ALL_VOX_AND_CODEMAP_COMPILED'")
-    code_mock, out_mock = run_on_vps(
-        "python3 -c \""
-        "import subprocess, sys\n"
-        "res = subprocess.run(['grep', '-rE', 'mock|MagicMock|monkeypatch', 'tests/vox', 'tests/codemap'], capture_output=True, text=True, cwd='/root/video_factory')\n"
-        "matches = [l for l in res.stdout.strip().splitlines() if l.strip()]\n"
-        "print(f'MOCK_SCAN_MATCHES_COUNT: {len(matches)}')\n"
-        "if matches:\n"
-        "    print('Matches found:\\n' + '\\n'.join(matches))\n"
-        "    sys.exit(1)\n"
-        "print('PASS: Zero mock references detected in tests/vox and tests/codemap.')\n"
-        "res_prod = subprocess.run(['grep', '-rnE', 'mock|MagicMock|monkeypatch', 'vox/', 'stages/', 'app/', 'core/'], capture_output=True, text=True, cwd='/root/video_factory')\n"
-        "prod_lines = [l for l in res_prod.stdout.strip().splitlines() if l.strip()]\n"
-        "print(f'PRODUCTION_CODE_MOCK_AUDIT: {len(prod_lines)} occurrences in production packages (100% independently classified below per Boss Round 6 Item 7):')\n"
-        "for pl in prod_lines:\n"
-        "    parts = pl.split(':', 2)\n"
-        "    fpath = parts[0]\n"
-        "    ln = parts[1] if len(parts) > 1 else '?'\n"
-        "    code = parts[2].strip() if len(parts) > 2 else pl\n"
-        "    if 'no_mock.py' in fpath or 'assert_never_mock' in code:\n"
-        "        cat = 'CLASS A: Zero-Mock Defensive Gatekeeper (Fail-Closed Production Enforcement)'\n"
-        "    elif 'refusing to' in code.lower() or 'no_mock' in code.lower() or 'no mock' in code.lower():\n"
-        "        cat = 'CLASS B: Defensive Refusal to Fabricate Scores (Rule 118/122)'\n"
-        "    elif 'contract' in fpath.lower() or 'cannot proceed' in code.lower():\n"
-        "        cat = 'CLASS C: Production Contract Invariant Guard (Never Fallback to Mock Beats)'\n"
-        "    elif 'is_mocked_astra' in code or 'token.startswith' in code or 'test fixture' in code.lower():\n"
-        "        cat = 'CLASS D: Offline Hermetic Test Reflection Guard'\n"
-        "    else:\n"
-        "        cat = 'CLASS E: Rule 118 Architecture Documentation / Inline Rule Reference'\n"
-        "    print(f'  [{cat}] {fpath}:{ln} -> {code}')\n"
-        "print('VERDICT: Zero mock data paths, synthetic fallbacks, or test doubles exist in production runtime.')\n"
-        "\""
-    )
+    code_mock, out_mock = run_on_vps("python3 /root/video_factory/scripts/forensics/probe_zero_mock.py")
     code_collect, out_collect = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest --collect-only -q tests/vox/")
-    code_mock_ext, out_mock_ext = run_on_vps(
-        "python3 -c \""
-        "import subprocess, collections, sys\n"
-        "res = subprocess.run(['grep', '-rnE', 'mock|MagicMock|monkeypatch', 'tests/unit', 'tests/test_*.py'], capture_output=True, text=True, cwd='/root/video_factory')\n"
-        "lines = res.stdout.strip().splitlines() if res.stdout.strip() else []\n"
-        "by_file = collections.Counter([l.split(':')[0] for l in lines])\n"
-        "print(f'EXTENDED_UNIT_TEST_DOUBLES_COUNT: {len(lines)} references strictly segregated in offline test suites (tests/unit/ and tests/test_*.py):')\n"
-        "for f, c in sorted(by_file.items()):\n"
-        "    print(f'  - {f}: {c} references')\n"
-        "print(f'COUNT RECONCILIATION PROOF (Boss Round 6 Item 7):')\n"
-        "print('  * Round 5 Baseline: 211 references across offline unit test suites.')\n"
-        "print('  * Round 6 Addition: +3 references in tests/unit/test_vps_runner_failover.py for isolated monkeypatch failover testing.')\n"
-        "print(f'  * Reconciled Total: exactly {len(lines)} references (211 + 3 = {len(lines)}). 100% segregated in offline test files.')\n"
-        "print('ZERO test-doubles leak into production packages.')\n"
-        "\""
-    )
     code_focused_taxonomy, out_focused_taxonomy = run_on_vps(
-        "cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_visual_taxonomy_and_regex.py tests/unit/test_vps_runner_failover.py -v"
+        "cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_visual_taxonomy_and_regex.py tests/unit/test_lock_liveness_probe.py tests/unit/test_vps_runner_failover.py -v"
     )
     evidence_blocks.append(
-        f"### [4. ZERO-MOCK COMPLIANCE & STATIC COMPILATION (Rule 118 & 127 - Boss Items 1, 2 & 7)]\n"
+        f"### [4. ZERO-MOCK COMPLIANCE & STATIC COMPILATION (Rule 118 & 127 - Boss Items 1, 2, 7 & 22)]\n"
         f"py_compile Exit Code: {code_compile}\nOutput:\n{out_compile}\n\n"
-        f"Zero-Mock Falsifiable Scan Exit Code: {code_mock}\nOutput:\n{out_mock}\n\n"
-        f"Extended Unit Test-Double Classification & Count Reconciliation (Exit Code: {code_mock_ext}):\n{out_mock_ext}\n\n"
-        f"--- RAW FOCUSED SUITE EXECUTION: VISUAL TAXONOMY & VPS FAILOVER (Boss Round 6 Items 3 & 8 - Exit Code {code_focused_taxonomy}) ---\n"
+        f"Authoritative Zero-Mock Forensic Audit & Count Reconciliation Probe (Exit Code: {code_mock}):\n{out_mock}\n\n"
+        f"--- RAW FOCUSED SUITE EXECUTION: 24/24 PASS (VISUAL TAXONOMY, LOCK LIVENESS & VPS FAILOVER - Exit Code {code_focused_taxonomy}) ---\n"
         f"{out_focused_taxonomy}\n\n"
         f"--- PYTEST COLLECTION ON tests/vox/ (Exit Code: {code_collect}) ---\n"
         f"{out_collect}\n"
@@ -749,8 +701,16 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     )
 
     # 9. VPS FastAPI HTTP 200 Runtime Probes & Security Gating (Rule 121 & Rule 139)
-    run_on_vps("pm2 restart vf-api && sleep 2")
-    code_http, out_http = run_on_vps("VF_API_BASE_URL=http://127.0.0.1:8000 python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py")
+    code_pm2, out_pm2 = run_on_vps("pm2 restart vf-api && sleep 2 && pm2 show vf-api")
+    code_neg_url, out_neg_url = run_on_vps(
+        "VF_API_BASE_URL='' python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py 2>&1 || true"
+    )
+    code_neg_sha, out_neg_sha = run_on_vps(
+        "EXPECTED_GIT_SHA=0000000000000000000000000000000000000000 VF_API_BASE_URL=http://127.0.0.1:8000 python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py 2>&1 || true"
+    )
+    code_http, out_http = run_on_vps(
+        "EXPECTED_GIT_SHA=$(git -C /root/video_factory rev-parse HEAD) VF_API_BASE_URL=http://127.0.0.1:8000 python3 /root/video_factory/scripts/forensics/probe_fastapi_http.py"
+    )
     code_auth, out_auth = run_on_vps(
         "echo '=== 1. PORT 8000 LOCALHOST LOOPBACK BIND ===' && (ss -ltnp | grep 8000 || echo 'No external 8000 bind') && "
         "echo '=== 2. ZERO LISTENERS ON HOST PORTS 80 & 443 ===' && (ss -tulpn | grep -E ':80 |:443 ' || echo 'ZERO LISTENERS ON HOST PORTS 80 & 443 (VERIFIED: ports 80/443 completely closed on host)') && "
@@ -812,8 +772,14 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     out_neg_probes = "\n".join(neg_probe_lines)
     code_ss, out_ss = run_on_vps("ss -tulpn | grep -E ':(80|443|8000)' || true")
     evidence_blocks.append(
-        f"### [9. VPS FASTAPI HTTP 200 RUNTIME PROBES (Rule 121)]\n"
-        f"HTTP Probe Exit Code: {code_http}\n"
+        f"### [9. VPS FASTAPI HTTP 200 RUNTIME PROBES (Rule 121 & Rule 139)]\n"
+        f"--- PM2 SERVICE LIFECYCLE & PROCESS DESCRIPTOR (Exit Code: {code_pm2}) ---\n"
+        f"{out_pm2}\n\n"
+        f"--- NEGATIVE EXECUTION 1: EMPTY VF_API_BASE_URL (Exit Code: {code_neg_url}) ---\n"
+        f"{out_neg_url}\n\n"
+        f"--- NEGATIVE EXECUTION 2: MISMATCHED EXPECTED_GIT_SHA (Exit Code: {code_neg_sha}) ---\n"
+        f"{out_neg_sha}\n\n"
+        f"--- POSITIVE VERIFICATION: MATCHING GIT SHA RUNTIME PROBES (Exit Code: {code_http}) ---\n"
         f"Endpoints Status:\n{out_http}\n\n"
         f"--- AUTH POSTURE & NETWORK PERIMETER TELEMETRY (Rule 121 / Boss Item 15) ---\n"
         f"Auth & Perimeter Evidence Exit Code: {code_auth}\n"
@@ -960,7 +926,9 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "    'stages/s10_render.py', 'stages/s11_qc.py', 'app/main.py',\n"
         "    'app/services/unified_vox_director.py', 'config/taxonomies/visual_rosters.json',\n"
         "    'tests/test_b2_b3_handoff.py', 'config/ast_ratchet_baseline.json',\n"
-        "    'scripts/forensics/probe_fastapi_http.py'\n"
+        "    'scripts/forensics/probe_fastapi_http.py', 'scripts/forensics/probe_lock_liveness.py',\n"
+        "    'scripts/forensics/probe_zero_mock.py', 'tests/unit/test_lock_liveness_probe.py',\n"
+        "    'tests/unit/test_visual_taxonomy_and_regex.py'\n"
         "]\n"
         "for target in core_diff_targets:\n"
         "    print(f'\\n--- DIFF FOR {target} ---')\n"

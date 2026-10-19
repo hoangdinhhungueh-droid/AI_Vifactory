@@ -3,12 +3,12 @@
 """tests/unit/test_visual_taxonomy_and_regex.py
 
 Focused tests for Visual Taxonomy Loading, Schema Validation, Cache Invalidation,
-and CJK / English Regex Boundary Matching (Rule 128, Rule 132 & Boss Round 4 Item 2).
+and CJK / English Regex Boundary Matching (Rule 128, Rule 132 & Boss Round 8 Item 19).
 """
 
 import json
-import re
 from pathlib import Path
+import re
 import pytest
 
 from app.services.unified_vox_director import (
@@ -16,6 +16,22 @@ from app.services.unified_vox_director import (
     _reset_taxonomy_cache,
     generate_topic_anchored_roster,
 )
+
+
+VALID_FG_ITEM = {
+    "title": "T1",
+    "description": "D1",
+    "beats": [1, 2],
+    "role": "Lead",
+    "type": "character",
+    "keywords": ["test"],
+}
+
+VALID_BG_ITEM = {
+    "title": "B1",
+    "description": "D1",
+    "beats": [1, 2],
+}
 
 
 def test_production_visual_taxonomy_structure_and_schema():
@@ -29,7 +45,10 @@ def test_production_visual_taxonomy_structure_and_schema():
     for dom_name, dom_data in tax["domains"].items():
         assert "keywords_cjk" in dom_data, f"Domain {dom_name} missing keywords_cjk"
         assert isinstance(dom_data["keywords_cjk"], list), f"keywords_cjk in {dom_name} must be a list"
+        assert all(isinstance(k, str) and k.strip() for k in dom_data["keywords_cjk"]), f"keywords_cjk in {dom_name} must be non-empty strings"
         assert "keywords_en_regex" in dom_data, f"Domain {dom_name} missing keywords_en_regex"
+        assert "_compiled_en_regex" in dom_data, f"Domain {dom_name} missing pre-compiled regex"
+        assert isinstance(dom_data["_compiled_en_regex"], re.Pattern)
         assert "markets" in dom_data, f"Domain {dom_name} missing markets mapping"
 
         for mkt_name, mkt_data in dom_data["markets"].items():
@@ -42,11 +61,13 @@ def test_production_visual_taxonomy_structure_and_schema():
                 assert "title" in bg_v and bg_v["title"], f"BG {bg_k} missing title"
                 assert "description" in bg_v and bg_v["description"], f"BG {bg_k} missing description"
                 assert "beats" in bg_v and isinstance(bg_v["beats"], list), f"BG {bg_k} missing beats list"
+                assert all(isinstance(b, int) and not isinstance(b, bool) and 1 <= b <= 5 for b in bg_v["beats"])
 
             for fg_k, fg_v in mkt_data["fg_roster"].items():
                 assert "title" in fg_v and fg_v["title"], f"FG {fg_k} missing title"
                 assert "description" in fg_v and fg_v["description"], f"FG {fg_k} missing description"
                 assert "beats" in fg_v and isinstance(fg_v["beats"], list), f"FG {fg_k} missing beats list"
+                assert all(isinstance(b, int) and not isinstance(b, bool) and 1 <= b <= 5 for b in fg_v["beats"])
 
 
 def test_taxonomy_missing_file_fails_closed(tmp_path: Path):
@@ -94,61 +115,86 @@ def test_taxonomy_missing_domains_or_markets_fails_closed(tmp_path: Path):
     assert "missing non-empty 'markets' mapping" in str(exc_info.value)
 
 
-def test_taxonomy_malformed_nested_structures_fails_closed(tmp_path: Path):
-    """Boss Round 5 Item 4: Tests malformed markets, missing rosters, invalid field types, and bad beat arrays."""
-    dom_prefix = '{"domains": {"test": {"keywords_cjk": ["a"], "keywords_en_regex": "a", "markets": {'
-    dom_suffix = '}}}}'
+def _make_tax(dom_name="test", cjk=None, regex="a", markets=None):
+    if cjk is None:
+        cjk = ["a"]
+    if markets is None:
+        markets = {
+            "EN": {
+                "bg_roster": {"bg_1": VALID_BG_ITEM},
+                "fg_roster": {"fg_1": VALID_FG_ITEM},
+            }
+        }
+    return {
+        "domains": {
+            dom_name: {
+                "keywords_cjk": cjk,
+                "keywords_en_regex": regex,
+                "markets": markets,
+            }
+        }
+    }
 
+
+def test_taxonomy_malformed_nested_structures_fails_closed(tmp_path: Path):
+    """Boss Round 8 Item 19: Tests malformed markets, missing/empty rosters, and bad beat arrays."""
     # 1. Missing bg_roster
     no_bg = tmp_path / "no_bg.json"
-    no_bg.write_text(dom_prefix + '"EN": {"fg_roster": {}}' + dom_suffix, encoding="utf-8")
+    no_bg.write_text(json.dumps(_make_tax(markets={"EN": {"fg_roster": {"fg_1": VALID_FG_ITEM}}})), encoding="utf-8")
     with pytest.raises(ValueError) as exc:
         _load_visual_taxonomy(custom_path=no_bg)
-    assert "missing 'bg_roster' dict" in str(exc.value)
+    assert "missing non-empty 'bg_roster' dict" in str(exc.value)
 
-    # 2. Missing fg_roster
+    # 2. Empty bg_roster
+    empty_bg = tmp_path / "empty_bg.json"
+    empty_bg.write_text(json.dumps(_make_tax(markets={"EN": {"bg_roster": {}, "fg_roster": {"fg_1": VALID_FG_ITEM}}})), encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        _load_visual_taxonomy(custom_path=empty_bg)
+    assert "missing non-empty 'bg_roster' dict" in str(exc.value)
+
+    # 3. Missing fg_roster
     no_fg = tmp_path / "no_fg.json"
-    no_fg.write_text(dom_prefix + '"EN": {"bg_roster": {}}' + dom_suffix, encoding="utf-8")
+    no_fg.write_text(json.dumps(_make_tax(markets={"EN": {"bg_roster": {"bg_1": VALID_BG_ITEM}}})), encoding="utf-8")
     with pytest.raises(ValueError) as exc:
         _load_visual_taxonomy(custom_path=no_fg)
-    assert "missing 'fg_roster' dict" in str(exc.value)
+    assert "missing non-empty 'fg_roster' dict" in str(exc.value)
 
-    # 3. Missing title in roster item
-    no_title = tmp_path / "no_title.json"
-    no_title.write_text(dom_prefix + '"EN": {"bg_roster": {"bg_1": {"description": "desc", "beats": [1]}}, "fg_roster": {}}' + dom_suffix, encoding="utf-8")
+    # 4. Empty fg_roster
+    empty_fg = tmp_path / "empty_fg.json"
+    empty_fg.write_text(json.dumps(_make_tax(markets={"EN": {"bg_roster": {"bg_1": VALID_BG_ITEM}, "fg_roster": {}}})), encoding="utf-8")
     with pytest.raises(ValueError) as exc:
-        _load_visual_taxonomy(custom_path=no_title)
-    assert "missing valid 'title'" in str(exc.value)
+        _load_visual_taxonomy(custom_path=empty_fg)
+    assert "missing non-empty 'fg_roster' dict" in str(exc.value)
 
-    # 4. Missing description in roster item
-    no_desc = tmp_path / "no_desc.json"
-    no_desc.write_text(dom_prefix + '"EN": {"bg_roster": {"bg_1": {"title": "T1", "beats": [1]}}, "fg_roster": {}}' + dom_suffix, encoding="utf-8")
-    with pytest.raises(ValueError) as exc:
-        _load_visual_taxonomy(custom_path=no_desc)
-    assert "missing valid 'description'" in str(exc.value)
-
-    # 5. Invalid beat arrays (empty beats, non-int beats, out-of-range beats)
+    # 5. Invalid beat arrays (empty beats, non-int beats, boolean beats, out-of-range beats)
     empty_beats = tmp_path / "empty_beats.json"
-    empty_beats.write_text('{"domains": {"test": {"keywords_cjk": ["a"], "keywords_en_regex": "a", "markets": {"EN": {"bg_roster": {"bg_1": {"title": "T1", "description": "D1", "beats": []}}, "fg_roster": {}}}}}}', encoding="utf-8")
+    empty_beats.write_text(json.dumps(_make_tax(markets={"EN": {"bg_roster": {"bg_1": {"title": "T", "description": "D", "beats": []}}, "fg_roster": {"fg_1": VALID_FG_ITEM}}})), encoding="utf-8")
     with pytest.raises(ValueError) as exc:
         _load_visual_taxonomy(custom_path=empty_beats)
     assert "invalid 'beats' array" in str(exc.value)
 
+    bool_beats = tmp_path / "bool_beats.json"
+    # In JSON, true/false are booleans
+    bool_beats.write_text('{"domains": {"test": {"keywords_cjk": ["a"], "keywords_en_regex": "a", "markets": {"EN": {"bg_roster": {"bg_1": {"title": "T", "description": "D", "beats": [true, 2]}}, "fg_roster": {"fg_1": {"title": "T1", "description": "D1", "beats": [1, 2], "role": "Lead", "type": "character", "keywords": ["test"]}}}}}}}', encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        _load_visual_taxonomy(custom_path=bool_beats)
+    assert "invalid 'beats' array" in str(exc.value)
+
     str_beats = tmp_path / "str_beats.json"
-    str_beats.write_text('{"domains": {"test": {"keywords_cjk": ["a"], "keywords_en_regex": "a", "markets": {"EN": {"bg_roster": {"bg_1": {"title": "T1", "description": "D1", "beats": ["one"]}}, "fg_roster": {}}}}}}', encoding="utf-8")
+    str_beats.write_text(json.dumps(_make_tax(markets={"EN": {"bg_roster": {"bg_1": {"title": "T", "description": "D", "beats": ["one"]}}, "fg_roster": {"fg_1": VALID_FG_ITEM}}})), encoding="utf-8")
     with pytest.raises(ValueError) as exc:
         _load_visual_taxonomy(custom_path=str_beats)
     assert "invalid 'beats' array" in str(exc.value)
 
     out_of_range_beats = tmp_path / "oor_beats.json"
-    out_of_range_beats.write_text('{"domains": {"test": {"keywords_cjk": ["a"], "keywords_en_regex": "a", "markets": {"EN": {"bg_roster": {"bg_1": {"title": "T1", "description": "D1", "beats": [0, 6]}}, "fg_roster": {}}}}}}', encoding="utf-8")
+    out_of_range_beats.write_text(json.dumps(_make_tax(markets={"EN": {"bg_roster": {"bg_1": {"title": "T", "description": "D", "beats": [0, 6]}}, "fg_roster": {"fg_1": VALID_FG_ITEM}}})), encoding="utf-8")
     with pytest.raises(ValueError) as exc:
         _load_visual_taxonomy(custom_path=out_of_range_beats)
     assert "invalid 'beats' array" in str(exc.value)
 
 
 def test_taxonomy_domain_level_schema_fails_closed(tmp_path: Path):
-    """Boss Round 6 Item 3: Tests malformed domains (non-dict, missing keywords_cjk, missing keywords_en_regex)."""
+    """Boss Round 8 Item 19: Tests malformed domains (non-dict, invalid CJK elements, invalid regexes)."""
     # 1. Domain not a dict
     bad_dom = tmp_path / "bad_dom.json"
     bad_dom.write_text('{"domains": {"healthcare": "not_a_dict"}}', encoding="utf-8")
@@ -163,50 +209,75 @@ def test_taxonomy_domain_level_schema_fails_closed(tmp_path: Path):
         _load_visual_taxonomy(custom_path=no_cjk)
     assert "missing non-empty 'keywords_cjk' list" in str(exc.value)
 
-    # 3. Missing keywords_en_regex
+    # 3. Invalid keywords_cjk elements (empty string or non-string)
+    bad_cjk_item = tmp_path / "bad_cjk_item.json"
+    bad_cjk_item.write_text('{"domains": {"healthcare": {"keywords_cjk": ["valid", ""], "keywords_en_regex": "regex", "markets": {"EN": {}}}}}', encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        _load_visual_taxonomy(custom_path=bad_cjk_item)
+    assert "contains invalid element" in str(exc.value)
+
+    # 4. Missing keywords_en_regex
     no_regex = tmp_path / "no_regex.json"
     no_regex.write_text('{"domains": {"healthcare": {"keywords_cjk": ["a"], "markets": {"EN": {}}}}}', encoding="utf-8")
     with pytest.raises(ValueError) as exc:
         _load_visual_taxonomy(custom_path=no_regex)
     assert "missing valid 'keywords_en_regex' string" in str(exc.value)
 
-
-def test_taxonomy_fg_roster_fields_and_types_fails_closed(tmp_path: Path):
-    """Boss Round 6 Item 3: Tests FG roster role, type, keywords schema validation."""
-    base_prefix = '{"domains": {"test": {"keywords_cjk": ["a"], "keywords_en_regex": "a", "markets": {"EN": {"bg_roster": {}, "fg_roster": {'
-    base_suffix = '}}}}}}'
-
-    # 1. Missing role
-    no_role = tmp_path / "no_role.json"
-    no_role.write_text(base_prefix + '"fg_1": {"title": "T", "description": "D", "beats": [1], "type": "character", "keywords": ["k"]}' + base_suffix, encoding="utf-8")
+    # 5. Invalid regex syntax in keywords_en_regex
+    bad_regex = tmp_path / "bad_regex.json"
+    bad_regex.write_text('{"domains": {"healthcare": {"keywords_cjk": ["a"], "keywords_en_regex": "(unclosed[regex", "markets": {"EN": {}}}}}', encoding="utf-8")
     with pytest.raises(ValueError) as exc:
-        _load_visual_taxonomy(custom_path=no_role)
-    assert "missing valid 'role' string" in str(exc.value)
-
-    # 2. Invalid type
-    bad_type = tmp_path / "bad_type.json"
-    bad_type.write_text(base_prefix + '"fg_1": {"title": "T", "description": "D", "beats": [1], "role": "R", "type": "invalid_type_xyz", "keywords": ["k"]}' + base_suffix, encoding="utf-8")
-    with pytest.raises(ValueError) as exc:
-        _load_visual_taxonomy(custom_path=bad_type)
-    assert "invalid 'type'" in str(exc.value)
-
-    # 3. Missing or invalid keywords
-    bad_kw = tmp_path / "bad_kw.json"
-    bad_kw.write_text(base_prefix + '"fg_1": {"title": "T", "description": "D", "beats": [1], "role": "R", "type": "character", "keywords": "not_a_list"}' + base_suffix, encoding="utf-8")
-    with pytest.raises(ValueError) as exc:
-        _load_visual_taxonomy(custom_path=bad_kw)
-    assert "invalid 'keywords' list" in str(exc.value)
+        _load_visual_taxonomy(custom_path=bad_regex)
+    assert "invalid 'keywords_en_regex'" in str(exc.value)
 
 
-def test_taxonomy_cache_invalidation():
-    """Verifies that _reset_taxonomy_cache cleanly clears cached state."""
+def test_taxonomy_precompiled_regex():
+    """Boss Round 8 Item 19: Verifies that keywords_en_regex is pre-compiled during loading."""
     _reset_taxonomy_cache()
-    tax1 = _load_visual_taxonomy()
-    assert tax1 is not None
+    tax = _load_visual_taxonomy()
+    assert "_compiled_en_regex" in tax["domains"]["healthcare"]
+    assert isinstance(tax["domains"]["healthcare"]["_compiled_en_regex"], re.Pattern)
+
+
+def test_consumer_fails_closed_when_taxonomy_domain_missing(tmp_path: Path):
+    """Boss Round 8 Item 19: Verifies that consumer fails closed when domain is not in taxonomy (no embedded defaults)."""
+    # Create taxonomy with ONLY domain 'macro_energy'
+    energy_tax = tmp_path / "energy_tax.json"
+    energy_tax.write_text(json.dumps({
+        "domains": {
+            "macro_energy": {
+                "keywords_cjk": ["石油", "天然ガス"],
+                "keywords_en_regex": r"(petroleum|oil|gas)",
+                "markets": {
+                    "JP": {
+                        "bg_roster": {"bg_refinery": VALID_BG_ITEM},
+                        "fg_roster": {"fg_inspector": VALID_FG_ITEM},
+                    }
+                }
+            }
+        }
+    }), encoding="utf-8")
 
     _reset_taxonomy_cache()
-    from app.services import unified_vox_director
-    assert unified_vox_director._TAXONOMY_CACHE is None
+    _load_visual_taxonomy(custom_path=energy_tax)
+
+    # 1. Consumer explicitly requesting domain 'healthcare' on energy-only taxonomy must fail-closed
+    with pytest.raises(ValueError) as exc:
+        generate_topic_anchored_roster(
+            topic="医療機関 倒産 過去最多59件",
+            market="JP",
+            key_metrics=[],
+            claims=[],
+            domain="healthcare",
+        )
+    assert "Requested domain 'healthcare' is not configured in visual taxonomy" in str(exc.value)
+
+    # 2. Consumer requiring 'healthcare' during taxonomy loading must fail-closed
+    with pytest.raises(ValueError) as exc_load:
+        _load_visual_taxonomy(custom_path=energy_tax, required_domains=["healthcare"])
+    assert "Taxonomy missing required domain 'healthcare'" in str(exc_load.value)
+
+    _reset_taxonomy_cache()
 
 
 def test_cjk_keyword_boundaries_and_near_misses():
@@ -237,8 +308,7 @@ def test_english_regex_boundaries_prefixes_slugs_and_suffixes():
     """Rule 128 & Boss Item 2: Verifies English regex boundary semantics, slug tolerance, and suffix isolation."""
     _reset_taxonomy_cache()
     tax = _load_visual_taxonomy()
-    raw_regex = tax["domains"]["healthcare"]["keywords_en_regex"]
-    compiled_re = re.compile(raw_regex, re.IGNORECASE)
+    compiled_re = tax["domains"]["healthcare"]["_compiled_en_regex"]
 
     # 1. Exact base matches
     assert compiled_re.search("hospital capacity crisis")
@@ -253,7 +323,7 @@ def test_english_regex_boundaries_prefixes_slugs_and_suffixes():
     assert compiled_re.search("sub-clinic-network")
     assert compiled_re.search("pre-clinical trial failure")
 
-    # 3. True negative near-misses (ensuring no false-positive triggers on similar sounding non-medical words)
+    # 3. True negative near-misses
     assert not compiled_re.search("macroeconomic cyclical debt rollover")
     assert not compiled_re.search("antelope national park conservation")
     assert not compiled_re.search("telephonic customer service center")

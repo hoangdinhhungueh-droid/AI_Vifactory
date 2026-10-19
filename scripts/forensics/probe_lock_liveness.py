@@ -2,40 +2,51 @@
 """scripts/forensics/probe_lock_liveness.py
 Authoritative process liveness and safe lock disposal verification probe.
 Complies with Rule 118 (Zero-Mock), Rule 121 (Verification Protocol),
-Rule 125 (Zero-Ghost), Rule 137 (Safe-Trash Mandate), and Boss Round 6 Requirements.
+Rule 125 (Zero-Ghost), Rule 137 (Safe-Trash Mandate), and Boss Round 8 Requirements.
+
+Modes:
+  --inspect (default): Read-only inspection of active locks and holder liveness.
+                       Never creates, restores, or mutates any lock.
+  --dispose:           Explicitly authorized disposal of an existing abandoned lock
+                       under a shared mutex with atomic collision-safe archival.
 """
 
+from __future__ import annotations
+
+import argparse
+from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
+import errno
 import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import uuid
+from pathlib import Path
+from typing import Dict, Any, Tuple, Optional, Generator
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-import uuid
-from pathlib import Path
-from typing import Dict, Any, Tuple
 
 
 SCOPE_REGEX = re.compile(r"^[A-Z]{2}_[A-Za-z0-9_]+\.[a-z0-9_]+$")
-TOKEN_REGEX = re.compile(r"^LOCK_TOKEN_[A-Za-z0-9_]+_\d+$")
+TOKEN_REGEX = re.compile(r"^LOCK_TOKEN_([A-Za-z0-9_]+)_(\d+)$")
 
 
 def validate_lock_metadata(data: Dict[str, Any], lock_path: Path) -> Tuple[str, str, str, int]:
-    """Authenticates lock metadata with fail-closed boundary enforcement (Boss Round 6 Item 4).
+    """Authenticates lock metadata with fail-closed boundary enforcement.
 
     Validates:
       1. Dict root structure.
       2. Required fields: owner, token, created_at, pid.
       3. Owner scope pattern (e.g. JP_TEMP_59.b3b4).
-      4. Cryptographic token format embedding owner scope and PID.
-      5. Strict ISO 8601 created_at timestamp and plausibility (not in future, valid year).
-      6. Strict integer PID > 0.
+      4. Strict integer PID > 0 (rejects booleans and non-integers).
+      5. Structural token-holder validation extracting exact scope and PID.
+      6. Strict ISO 8601 created_at timestamp with mandatory timezone awareness.
     """
     if not isinstance(data, dict):
         raise ValueError(f"Corrupted lock structure (not a dict): {lock_path}")
@@ -49,23 +60,27 @@ def validate_lock_metadata(data: Dict[str, Any], lock_path: Path) -> Tuple[str, 
     if not SCOPE_REGEX.match(owner):
         raise ValueError(f"Lock file {lock_path} invalid owner scope format: '{owner}'")
 
-    try:
-        raw_pid = data["pid"]
-        pid = int(raw_pid)
-        if pid <= 0:
-            raise ValueError(f"PID must be positive integer, got: {pid}")
-    except (ValueError, TypeError) as e:
-        raise ValueError(f"Lock file {lock_path} invalid integer PID '{data.get('pid')}': {e}")
+    raw_pid = data["pid"]
+    if isinstance(raw_pid, bool) or not isinstance(raw_pid, int):
+        raise ValueError(f"Lock file {lock_path} invalid PID: must be strict integer, got type {type(raw_pid).__name__}: {raw_pid!r}")
+    if raw_pid <= 0:
+        raise ValueError(f"Lock file {lock_path} PID must be positive integer, got: {raw_pid}")
+    pid = raw_pid
 
     token = str(data["token"]).strip()
-    if not TOKEN_REGEX.match(token):
+    tok_match = TOKEN_REGEX.match(token)
+    if not tok_match:
         raise ValueError(f"Lock file {lock_path} invalid token format: '{token}'")
 
-    # Verify token-holder identity reflects owner scope and PID
+    token_scope = tok_match.group(1)
+    token_pid = int(tok_match.group(2))
+
     scope_base = owner.split(".")[0]
     sanitized_scope = owner.replace(".", "_")
-    if (scope_base not in token and sanitized_scope not in token) or str(pid) not in token:
-        raise ValueError(f"Token '{token}' does not authenticate matching owner scope '{owner}' and PID {pid}")
+    if token_scope not in (scope_base, sanitized_scope):
+        raise ValueError(f"Token scope '{token_scope}' does not match owner scope '{owner}'")
+    if token_pid != pid:
+        raise ValueError(f"Token PID {token_pid} does not match lock PID {pid}")
 
     created_at_str = str(data["created_at"]).strip()
     try:
@@ -74,6 +89,9 @@ def validate_lock_metadata(data: Dict[str, Any], lock_path: Path) -> Tuple[str, 
     except Exception as e:
         raise ValueError(f"Lock file {lock_path} invalid ISO 8601 created_at '{created_at_str}': {e}")
 
+    if created_dt.tzinfo is None:
+        raise ValueError(f"Lock file {lock_path} created_at '{created_at_str}' must be timezone-aware (fail-closed)")
+
     now_utc = datetime.now(timezone.utc)
     if created_dt > now_utc + timedelta(minutes=5):
         raise ValueError(f"Lock timestamp '{created_at_str}' is in the future relative to UTC clock")
@@ -81,6 +99,57 @@ def validate_lock_metadata(data: Dict[str, Any], lock_path: Path) -> Tuple[str, 
         raise ValueError(f"Lock timestamp '{created_at_str}' year is implausible (< 2024)")
 
     return owner, token, created_at_str, pid
+
+
+def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[bool, str]:
+    """Non-destructive, platform-appropriate process liveness check.
+
+    Returns:
+      (is_alive, diagnostic_reason)
+    Fail-closed: Treats only confirmed process absence as stale; permission errors
+    or unknown outcomes are treated as alive / in-use.
+    """
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        SYNCHRONIZE = 0x00100000
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, False, wintypes.DWORD(pid))
+        if handle == 0:
+            err = kernel32.GetLastError()
+            ERROR_INVALID_PARAMETER = 87
+            if err == ERROR_INVALID_PARAMETER:
+                return False, f"PID {pid} not found (confirmed absence on Windows)"
+            if err == 5:  # ERROR_ACCESS_DENIED
+                return True, f"PID {pid} exists (Access Denied - fail-closed)"
+            return True, f"OpenProcess({pid}) failed with error {err} (fail-closed)"
+        else:
+            try:
+                exit_code = wintypes.DWORD()
+                if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                    STILL_ACTIVE = 259
+                    if exit_code.value == STILL_ACTIVE:
+                        return True, f"PID {pid} is running (STILL_ACTIVE)"
+                    return False, f"PID {pid} terminated with exit code {exit_code.value}"
+                return True, f"Cannot determine exit code for PID {pid} (fail-closed)"
+            finally:
+                kernel32.CloseHandle(handle)
+    else:
+        try:
+            os.kill(pid, 0)
+            return True, f"PID {pid} responded to signal 0 (confirmed alive)"
+        except ProcessLookupError:
+            return False, f"PID {pid} does not exist (ESRCH confirmed absence)"
+        except PermissionError:
+            return True, f"PID {pid} exists (EPERM permission denied - fail-closed)"
+        except OSError as err:
+            if err.errno == errno.ESRCH:
+                return False, f"PID {pid} does not exist (ESRCH confirmed absence)"
+            elif err.errno == errno.EPERM:
+                return True, f"PID {pid} exists (EPERM permission denied - fail-closed)"
+            else:
+                return True, f"PID {pid} liveness indeterminate (OSError {err.errno} - fail-closed)"
 
 
 def compute_file_sha256(path: Path) -> str:
@@ -92,51 +161,95 @@ def compute_file_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def atomic_safe_archive(active_path: Path, stale_dir: Path) -> Path:
-    """Executes collision-safe same-filesystem atomic archival with durability fsync (Boss Round 6 Item 5).
+@contextmanager
+def acquire_disposal_mutex(mutex_file: Path) -> Generator[None, None, None]:
+    """Shared advisory mutex for lock disposal operations (Boss Round 8 Item 17)."""
+    mutex_file.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(mutex_file), os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        if sys.platform != "win32":
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        else:
+            import msvcrt
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        yield
+    except (BlockingIOError, OSError, PermissionError) as lock_err:
+        raise RuntimeError(f"Lock disposal mutex '{mutex_file}' is currently held by another process: {lock_err}") from lock_err
+    finally:
+        try:
+            if sys.platform != "win32":
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            else:
+                import msvcrt
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        except Exception:
+            pass
+        os.close(fd)
+
+
+def atomic_safe_archive(active_path: Path, stale_dir: Path, expected_sha: Optional[str] = None) -> Path:
+    """Executes true collision-safe same-filesystem atomic archival with durability fsync.
 
     Guarantees:
-      1. Destination collision protection (unique timestamped suffix on conflict).
-      2. Same-filesystem atomic rename (os.replace).
-      3. File durability fsync.
-      4. Parent directory durability fsync on POSIX.
-      5. Post-action verification (source removed, destination exists, content SHA matches).
+      1. Source existence and identity revalidation.
+      2. Same-filesystem device ID verification (os.stat(src).st_dev == os.stat(dst_dir).st_dev).
+      3. Destination collision protection (unique UUID timestamped destination generated upfront).
+      4. Atomic rename (os.replace).
+      5. Durability fsync on file, destination directory, and source directory on POSIX (fail-closed on error).
+      6. Post-action verification (source removed, destination exists, content SHA matches).
     """
     if not active_path.exists():
         raise FileNotFoundError(f"Source lock not found for archival: {active_path}")
 
     stale_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Same-filesystem device check (fail-closed)
+    src_stat = os.stat(str(active_path))
+    dst_dir_stat = os.stat(str(stale_dir))
+    if src_stat.st_dev != dst_dir_stat.st_dev:
+        raise RuntimeError(
+            f"Cross-filesystem archival violation: source {active_path} (dev {src_stat.st_dev}) "
+            f"and target {stale_dir} (dev {dst_dir_stat.st_dev}) must share device ID for atomic rename"
+        )
+
+    # 2. Source identity verification
     src_sha = compute_file_sha256(active_path)
+    if expected_sha is not None and src_sha != expected_sha:
+        raise ValueError(f"Source lock SHA changed concurrently: expected {expected_sha}, got {src_sha}")
 
-    # Collision protection: determine safe destination path
-    dest_path = stale_dir / active_path.name
+    # 3. Collision-safe unique destination path
+    ts_suffix = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    rand_suffix = uuid.uuid4().hex[:8]
+    dest_path = stale_dir / f"{active_path.stem}_{ts_suffix}_{rand_suffix}{active_path.suffix}"
     if dest_path.exists():
-        ts_suffix = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        rand_suffix = uuid.uuid4().hex[:6]
-        dest_path = stale_dir / f"{active_path.stem}_{ts_suffix}_{rand_suffix}{active_path.suffix}"
+        raise FileExistsError(f"Destination collision detected: {dest_path}")
 
-    # Atomic rename (POSIX/NTFS atomic replace on same filesystem)
+    # 4. Atomic rename (POSIX/NTFS atomic replace on same filesystem)
     os.replace(str(active_path), str(dest_path))
 
-    # File-level durability fsync
-    try:
-        with open(dest_path, "a+b") as f_dst:
-            os.fsync(f_dst.fileno())
-    except (OSError, IOError) as _fs_err:
-        sys.stderr.write(f"[durability notice] file fsync skipped: {_fs_err}\n")
+    # 5. File-level durability fsync (fail-closed on error)
+    with open(dest_path, "a+b") as f_dst:
+        os.fsync(f_dst.fileno())
 
-    # Directory-level durability fsync on POSIX
-    if hasattr(os, "O_DIRECTORY"):
+    # 6. Directory-level durability fsync on POSIX (both destination and source directories)
+    if hasattr(os, "O_DIRECTORY") and sys.platform != "win32":
+        # Destination directory fsync
+        dst_fd = os.open(str(stale_dir), os.O_RDONLY | os.O_DIRECTORY)
         try:
-            dir_fd = os.open(str(stale_dir), os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-            try:
-                os.fsync(dir_fd)
-            finally:
-                os.close(dir_fd)
-        except Exception as _dir_err:
-            sys.stderr.write(f"[durability notice] directory fsync skipped: {_dir_err}\n")
+            os.fsync(dst_fd)
+        finally:
+            os.close(dst_fd)
 
-    # Post-action verification
+        # Source directory fsync (since directory entry was unlinked)
+        src_fd = os.open(str(active_path.parent), os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(src_fd)
+        finally:
+            os.close(src_fd)
+
+    # 7. Post-action verification
     if active_path.exists():
         raise RuntimeError(f"Post-action failure: source {active_path} still exists after archival")
     if not dest_path.exists():
@@ -148,69 +261,126 @@ def atomic_safe_archive(active_path: Path, stale_dir: Path) -> Path:
     return dest_path
 
 
-def main() -> int:
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Process liveness and safe lock disposal verification probe (Rule 118 & Rule 137)."
+    )
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--inspect",
+        action="store_true",
+        default=True,
+        help="Read-only inspection of active production locks and holder liveness (default).",
+    )
+    group.add_argument(
+        "--dispose",
+        action="store_true",
+        help="Explicitly authorized disposal of an existing abandoned production lock.",
+    )
+    parser.add_argument(
+        "--locks-dir",
+        type=str,
+        default=None,
+        help="Custom path to locks directory (defaults to /var/vf/locks or fallback).",
+    )
+    args = parser.parse_args(argv)
+
+    is_dispose_mode = bool(args.dispose)
+
     print("======================================================================")
     print("🔒 PROCESS LIVENESS & SAFE LOCK DISPOSAL VERIFICATION (Rule 125 & 137)")
+    print(f"   Mode: {'DISPOSE (Explicitly Authorized)' if is_dispose_mode else 'INSPECT (Read-Only By Default)'}")
     print("======================================================================")
 
-    locks_dir = Path("/var/vf/locks") if Path("/var/vf/locks").exists() else Path(__file__).resolve().parent.parent.parent / "var" / "vf" / "locks"
+    if args.locks_dir:
+        locks_dir = Path(args.locks_dir)
+    elif Path("/var/vf/locks").exists():
+        locks_dir = Path("/var/vf/locks")
+    else:
+        locks_dir = Path(__file__).resolve().parent.parent.parent / "var" / "vf" / "locks"
     locks_dir.mkdir(parents=True, exist_ok=True)
     stale_dir = locks_dir / "_stale"
     stale_dir.mkdir(parents=True, exist_ok=True)
-
-    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
-    archived_lock = stale_dir / "JP_TEMP_59.b3b4.lock"
+    mutex_path = locks_dir / ".disposal_operation.mutex"
 
     print(f"1. Target locks directory: {locks_dir}")
     print(f"2. Safe stale directory:   {stale_dir}")
 
-    # Stage production active lock if currently archived, ensuring real physical disposal action
-    if archived_lock.exists() and not active_lock.exists():
-        os.replace(str(archived_lock), str(active_lock))
+    # Locate active production locks
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    candidate_locks = []
+    if active_lock.exists():
+        candidate_locks.append(active_lock)
+    else:
+        for p in locks_dir.glob("*.lock"):
+            if not p.name.startswith(".") and p.is_file():
+                candidate_locks.append(p)
 
-    if not active_lock.exists():
-        prod_meta = {
-            "owner": "JP_TEMP_59.b3b4",
-            "pid": 481461,
-            "token": "LOCK_TOKEN_JP_TEMP_59_481461",
-            "created_at": "2026-10-18T10:00:00Z"
-        }
-        active_lock.write_text(json.dumps(prod_meta, indent=2), encoding="utf-8")
+    if not candidate_locks:
+        print("\n3. Active production lock path: None found")
+        print("   - STATUS: CLEAN (Zero active abandoned locks in locks directory)")
+        print("   - Observation: No qualifying production lock exists to inspect or dispose.")
+        print("   - Action: 0 synthetic records generated. Read-only clean state preserved.")
+        print("======================================================================")
+        print("✅ PROCESS LIVENESS & LOCK REPOSITORY CLEAN (Exit code 0)")
+        print("======================================================================")
+        return 0
 
-    print(f"3. Active production lock path: {active_lock} (Exists: {active_lock.exists()})")
+    target_lock = candidate_locks[0]
+    print(f"\n3. Active production lock path: {target_lock} (Exists: True)")
 
-    # Authenticate metadata of real production lock
-    active_data = json.loads(active_lock.read_text(encoding="utf-8"))
-    owner, token, created_at, pid = validate_lock_metadata(active_data, active_lock)
-    print("4. Authenticated Metadata Verification of Production Active Lock:")
-    print(f"   - Lock Path:    {active_lock}")
-    print(f"   - Scope Owner:  {owner} (Matches pattern: AUTHENTICATED)")
-    print(f"   - Token Holder: {token} (Cryptographic holder format: AUTHENTICATED)")
-    print(f"   - Created At:   {created_at} (Valid ISO 8601: AUTHENTICATED)")
-    print(f"   - Target PID:   {pid} (Positive integer: AUTHENTICATED)")
+    # Read and authenticate lock metadata
+    raw_text = target_lock.read_text(encoding="utf-8")
+    data = json.loads(raw_text)
+    owner, token, created_at, pid = validate_lock_metadata(data, target_lock)
+    current_sha = compute_file_sha256(target_lock)
 
-    # Real process liveness validation on production PID
-    is_alive = False
-    try:
-        os.kill(pid, 0)
-        is_alive = True
-    except (OSError, ProcessLookupError):
-        is_alive = False
+    print("4. Structural Metadata Validation:")
+    print(f"   - Lock Path:      {target_lock}")
+    print(f"   - Scope Owner:    {owner} (Matches scope pattern: VALID)")
+    print(f"   - Token Holder:   {token} (Structural token format: VALID)")
+    print(f"   - Created At:     {created_at} (Timezone-aware ISO 8601: VALID)")
+    print(f"   - Target PID:     {pid} (Strict integer: VALID)")
+    print(f"   - Current SHA256: {current_sha}")
 
-    print(f"5. Process Liveness Validation os.kill({pid}, 0): ALIVE={is_alive} (Abandoned production lock confirmed)")
+    # Non-destructive process liveness validation
+    is_alive, liveness_reason = check_pid_liveness(pid, created_at)
+    print("5. Process Liveness Validation:")
+    print(f"   - PID Check:      PID {pid}")
+    print(f"   - Status:         ALIVE={is_alive} ({liveness_reason})")
+
+    if not is_dispose_mode:
+        print("\n6. Inspection Summary (Read-Only Mode):")
+        print("   - Mutation: None performed (read-only inspection by default).")
+        print(f"   - Lock Disposition: {'ACTIVE_PROCESS_RUNNING' if is_alive else 'ABANDONED_STALE_LOCK'}")
+        print("======================================================================")
+        print("✅ PROCESS LIVENESS INSPECTION COMPLETED (Exit code 0)")
+        print("======================================================================")
+        return 0
+
+    # DISPOSE MODE: Must be confirmed dead and executed under mutex
     if is_alive:
-        raise RuntimeError(f"Cannot dispose active lock {active_lock}: PID {pid} is currently running!")
+        print(f"❌ Cannot dispose active lock {target_lock}: PID {pid} is running! ({liveness_reason})", file=sys.stderr)
+        return 1
 
-    # Execute collision-safe atomic archival on real production lock
-    print("6. Executing Physical Collision-Safe Safe-Trash Archival (Rule 137):")
-    final_dest = atomic_safe_archive(active_lock, stale_dir)
-    print(f"   - Atomic safe archival completed: {active_lock} -> {final_dest}")
-    print(f"   - Source Exists:      {active_lock.exists()} (VERIFIED: False)")
+    print("\n6. Executing Physical Collision-Safe Safe-Trash Archival (Rule 137):")
+    with acquire_disposal_mutex(mutex_path):
+        # Re-read and re-validate source immediately before mutation under shared mutex
+        re_data = json.loads(target_lock.read_text(encoding="utf-8"))
+        validate_lock_metadata(re_data, target_lock)
+        re_alive, re_reason = check_pid_liveness(pid, created_at)
+        if re_alive:
+            raise RuntimeError(f"Race condition detected: PID {pid} became alive immediately before archival: {re_reason}")
+
+        final_dest = atomic_safe_archive(target_lock, stale_dir, expected_sha=current_sha)
+
+    print(f"   - Atomic safe archival completed: {target_lock} -> {final_dest}")
+    print(f"   - Source Exists:      {target_lock.exists()} (VERIFIED: False)")
     print(f"   - Destination Exists: {final_dest.exists()} (VERIFIED: True)")
     print(f"   - Destination SHA256: {compute_file_sha256(final_dest)}")
     print("   - Status: Collision-safe same-filesystem archival & durability fsync verified (Rule 137)")
 
-    # Step 3: Post-disposal ghost scan
+    # Post-disposal ghost scan gate
     ghost_script = Path("/root/video_factory/tools/ghost_scan.py")
     if not ghost_script.exists():
         ghost_script = Path(__file__).resolve().parent.parent.parent / "tools" / "ghost_scan.py"
@@ -224,7 +394,7 @@ def main() -> int:
         text=True,
         encoding="utf-8",
         errors="replace",
-        check=False
+        check=False,
     )
     if res.stdout:
         print(res.stdout.strip())

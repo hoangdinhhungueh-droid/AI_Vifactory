@@ -50,12 +50,16 @@ def _reset_taxonomy_cache() -> None:
     global _TAXONOMY_CACHE
     _TAXONOMY_CACHE = None
 
-def _load_visual_taxonomy(custom_path: Optional[Path] = None) -> Dict[str, Any]:
+def _load_visual_taxonomy(
+    custom_path: Optional[Path] = None,
+    required_domains: Optional[list[str]] = None
+) -> Dict[str, Any]:
     """Loads external taxonomy config (Rule 128 & 132 SoT).
-    Fails closed if taxonomy file is missing, empty, or schema is corrupted.
+    Fails closed if taxonomy file is missing, empty, schema is corrupted,
+    or required domains specified by consumers are missing.
     """
     global _TAXONOMY_CACHE
-    if custom_path is None and _TAXONOMY_CACHE is not None:
+    if custom_path is None and required_domains is None and _TAXONOMY_CACHE is not None:
         return _TAXONOMY_CACHE
     tax_path = custom_path or (ROOT_DIR / "config" / "taxonomies" / "visual_rosters.json")
     if not tax_path.exists():
@@ -67,22 +71,33 @@ def _load_visual_taxonomy(custom_path: Optional[Path] = None) -> Dict[str, Any]:
                 raise ValueError(f"Taxonomy root must be a non-empty JSON object: {tax_path}")
             if "domains" not in data or not isinstance(data["domains"], dict) or not data["domains"]:
                 raise ValueError(f"Taxonomy root must contain a non-empty 'domains' mapping: {tax_path}")
+            if required_domains:
+                for req_d in required_domains:
+                    if req_d not in data["domains"]:
+                        raise ValueError(f"Taxonomy missing required domain '{req_d}' expected by consumer: {tax_path}")
             for d_name, d_val in data["domains"].items():
                 if not isinstance(d_val, dict):
                     raise ValueError(f"Domain '{d_name}' must be a dict: {tax_path}")
                 if "keywords_cjk" not in d_val or not isinstance(d_val["keywords_cjk"], list) or not d_val["keywords_cjk"]:
                     raise ValueError(f"Domain '{d_name}' missing non-empty 'keywords_cjk' list: {tax_path}")
-                if "keywords_en_regex" not in d_val or not isinstance(d_val["keywords_en_regex"], str) or not d_val["keywords_en_regex"]:
+                for kw in d_val["keywords_cjk"]:
+                    if not isinstance(kw, str) or not kw.strip():
+                        raise ValueError(f"Domain '{d_name}' keywords_cjk contains invalid element {kw!r} (must be non-empty string): {tax_path}")
+                if "keywords_en_regex" not in d_val or not isinstance(d_val["keywords_en_regex"], str) or not d_val["keywords_en_regex"].strip():
                     raise ValueError(f"Domain '{d_name}' missing valid 'keywords_en_regex' string: {tax_path}")
+                try:
+                    d_val["_compiled_en_regex"] = re.compile(d_val["keywords_en_regex"], re.IGNORECASE)
+                except re.error as re_err:
+                    raise ValueError(f"Domain '{d_name}' invalid 'keywords_en_regex' {d_val['keywords_en_regex']!r}: {re_err}")
                 if "markets" not in d_val or not isinstance(d_val["markets"], dict) or not d_val["markets"]:
                     raise ValueError(f"Domain '{d_name}' missing non-empty 'markets' mapping: {tax_path}")
                 for mkt_name, mkt_val in d_val["markets"].items():
                     if not isinstance(mkt_val, dict):
                         raise ValueError(f"Market '{mkt_name}' in domain '{d_name}' must be a dict: {tax_path}")
-                    if "bg_roster" not in mkt_val or not isinstance(mkt_val["bg_roster"], dict):
-                        raise ValueError(f"Market '{mkt_name}' in domain '{d_name}' missing 'bg_roster' dict: {tax_path}")
-                    if "fg_roster" not in mkt_val or not isinstance(mkt_val["fg_roster"], dict):
-                        raise ValueError(f"Market '{mkt_name}' in domain '{d_name}' missing 'fg_roster' dict: {tax_path}")
+                    if "bg_roster" not in mkt_val or not isinstance(mkt_val["bg_roster"], dict) or not mkt_val["bg_roster"]:
+                        raise ValueError(f"Market '{mkt_name}' in domain '{d_name}' missing non-empty 'bg_roster' dict: {tax_path}")
+                    if "fg_roster" not in mkt_val or not isinstance(mkt_val["fg_roster"], dict) or not mkt_val["fg_roster"]:
+                        raise ValueError(f"Market '{mkt_name}' in domain '{d_name}' missing non-empty 'fg_roster' dict: {tax_path}")
                     for r_type, r_map in [("bg_roster", mkt_val["bg_roster"]), ("fg_roster", mkt_val["fg_roster"])]:
                         for item_k, item_v in r_map.items():
                             if not isinstance(item_v, dict):
@@ -92,7 +107,7 @@ def _load_visual_taxonomy(custom_path: Optional[Path] = None) -> Dict[str, Any]:
                             if not isinstance(item_v.get("description"), str) or not item_v["description"].strip():
                                 raise ValueError(f"Item '{item_k}' in {r_type} missing valid 'description': {tax_path}")
                             beats = item_v.get("beats")
-                            if not isinstance(beats, list) or not beats or not all(isinstance(b, int) and 1 <= b <= 5 for b in beats):
+                            if not isinstance(beats, list) or not beats or not all(isinstance(b, int) and not isinstance(b, bool) and 1 <= b <= 5 for b in beats):
                                 raise ValueError(f"Item '{item_k}' in {r_type} invalid 'beats' array (must be list of ints 1..5): {tax_path}")
                             if r_type == "fg_roster":
                                 if not isinstance(item_v.get("role"), str) or not item_v["role"].strip():
@@ -103,8 +118,7 @@ def _load_visual_taxonomy(custom_path: Optional[Path] = None) -> Dict[str, Any]:
                                 kw = item_v.get("keywords")
                                 if not isinstance(kw, list) or not kw or not all(isinstance(k, str) and k.strip() for k in kw):
                                     raise ValueError(f"FG item '{item_k}' invalid 'keywords' list (must be non-empty list of strings): {tax_path}")
-            if custom_path is None:
-                _TAXONOMY_CACHE = data
+            _TAXONOMY_CACHE = data
             return data
     except Exception as _e:
         logger.error(f"[unified_vox_director] Fail-closed: corrupted visual taxonomy file {tax_path}: {_e}")
@@ -114,7 +128,9 @@ def generate_topic_anchored_roster(
     topic: str,
     market: str,
     key_metrics: list,
-    claims: list
+    claims: list,
+    domain: Optional[str] = None,
+    taxonomy_path: Optional[Path] = None,
 ) -> tuple:
     """Rule 128 & Rule 132: Topic-Anchored Deterministic Visual Roster.
     Generates rich, fully differentiated environmental BGs and tactile evidentiary FGs tailored
@@ -132,28 +148,43 @@ def generate_topic_anchored_roster(
     else:
         metric_highlight = "FORENSIC QUANTITATIVE RECORD // AUDIT FINDING"
 
-    # 1. Healthcare / Clinical Domain Taxonomy Matching (CJK prefix/containment & English regex)
-    taxonomy = _load_visual_taxonomy()
-    domains = taxonomy.get("domains", {})
-    hc_domain = domains.get("healthcare", {})
-    hc_cjk = hc_domain.get("keywords_cjk", [
-        "医療", "クリニック", "病院", "歯科", "診療所", "医師", "患者", "レセプト", "薬局", "医薬品", "閉院", "病床", "中医協", "診療報酬"
-    ])
-    hc_en_regex = hc_domain.get(
-        "keywords_en_regex",
-        r"(?<![a-z])(clinic|hospital|doctor|dental|pharmac|medic|healthcare|physician|patient|prescription|reimbursement)"
-    )
+    # 1. Configuration-Driven Domain Taxonomy Matching (Rule 128 & Rule 132 SoT)
+    taxonomy = _load_visual_taxonomy(custom_path=taxonomy_path)
+    domains = taxonomy.get("domains")
+    if not isinstance(domains, dict) or not domains:
+        raise ValueError(f"Taxonomy root must contain a non-empty 'domains' mapping (fail-closed, Rule 128)")
 
-    is_healthcare = any(kw in topic_low for kw in hc_cjk) or bool(re.search(hc_en_regex, topic_low, re.IGNORECASE))
+    matched_domain = None
+    matched_domain_name = None
 
-    if is_healthcare:
-        hc_markets = hc_domain.get("markets", {})
-        m_key = "JP" if m_up in ["JP", "JA"] else m_up
-        market_data = hc_markets.get(m_key) or hc_markets.get("JP") or {}
+    if domain:
+        if domain not in domains:
+            raise ValueError(f"Requested domain '{domain}' is not configured in visual taxonomy (fail-closed, Rule 128)")
+        matched_domain = domains[domain]
+        matched_domain_name = domain
+    else:
+        for dom_name, dom_cfg in domains.items():
+            cjk_kws = dom_cfg.get("keywords_cjk", [])
+            compiled_re = dom_cfg.get("_compiled_en_regex")
+            if compiled_re is None:
+                compiled_re = re.compile(dom_cfg["keywords_en_regex"], re.IGNORECASE)
+
+            if any(kw in topic_low for kw in cjk_kws) or bool(compiled_re.search(topic_low)):
+                matched_domain = dom_cfg
+                matched_domain_name = dom_name
+                break
+
+    if matched_domain is not None:
+        markets = matched_domain.get("markets", {})
+        m_key = "JP" if m_up in ["JP", "JA"] else ("KR" if m_up in ["KR", "KO"] else m_up)
+        market_data = markets.get(m_key) or markets.get("EN") or markets.get("JP")
+        if not market_data:
+            raise ValueError(f"Configured domain '{matched_domain_name}' has no roster for market '{m_up}' (fail-closed, Rule 128)")
         bg_roster = market_data.get("bg_roster")
         fg_roster = market_data.get("fg_roster")
         if bg_roster and fg_roster:
             return bg_roster, fg_roster
+        raise ValueError(f"Market '{m_key}' in domain '{matched_domain_name}' missing required rosters (fail-closed, Rule 128)")
 
     pat = r'(?i)\b(debts?|bonds?|yields?|rates?|banks?|dollars?|currency|currencies|rollover|finances?|financial|gdp|imf|fed|treasury|inflation|credits?|365|trillions?|securities|deficits?|채무|국채|금리|国債)\b'
     is_financial = bool(re.search(pat, topic_low))
