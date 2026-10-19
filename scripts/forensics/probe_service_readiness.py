@@ -42,9 +42,14 @@ def check_health(
 
             sock = None
             try:
-                sock = getattr(resp.fp.raw, "_sock", None)
-            except Exception:
-                sock = None
+                fp = getattr(resp, "fp", None)
+                raw = getattr(fp, "raw", None)
+                sock = getattr(raw, "_sock", None)
+            except AttributeError as attr_err:
+                return False, f"Unable to establish socket deadline enforcement: {attr_err}"
+
+            if sock is None:
+                return False, "Unable to establish socket deadline enforcement: underlying socket not accessible"
 
             chunks = []
             total_read = 0
@@ -54,11 +59,10 @@ def check_health(
                 if rem_read <= 0:
                     return False, f"Total body read duration exceeded timeout of {timeout_sec}s"
 
-                if sock is not None:
-                    try:
-                        sock.settimeout(max(0.001, rem_read))
-                    except Exception:
-                        pass
+                try:
+                    sock.settimeout(max(0.001, rem_read))
+                except (OSError, ValueError) as settimeout_err:
+                    return False, f"Failed to enforce dynamic socket deadline: {settimeout_err}"
 
                 chunk = resp.read(chunk_size)
 
@@ -165,7 +169,7 @@ def run_service_readiness_probe(
     budget_sec: float = READINESS_OVERALL_BUDGET_SEC,
 ) -> int:
     """Executes the 5-phase fail-closed readiness probe bounded by budget_sec.
-    Supports dependency injection of phase runners for exhaustive deterministic testing without test doubles.
+    Supports dependency injection of phase callables for hermetic lifecycle validation.
     """
     print("--- VF-API PM2 RESTART & HEALTH POLLING PROBE ---")
     overall_start_mono = time.monotonic()

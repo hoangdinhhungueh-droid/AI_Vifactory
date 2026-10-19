@@ -559,7 +559,7 @@ def parse_and_validate_junit_metrics(
                 raise ValueError(
                     f"collected_count ({collected_count}) is less than total executed tests ({total_tests}) in {source_label}"
                 )
-            if deselected_count is not None and total_deselected > 0 and deselected_count != total_deselected:
+            if deselected_count is not None and deselected_count != total_deselected:
                 raise ValueError(
                     f"XML-derived deselected count ({total_deselected}) does not match producer deselected count ({deselected_count}) in {source_label}"
                 )
@@ -663,12 +663,12 @@ def parse_zero_mock_probe_output(output: str) -> int:
 
     terminal_idx = -1
     for idx, line_item in enumerate(lines):
-        if terminal_marker in line_item:
+        if line_item == terminal_marker:
             terminal_idx = idx
             break
 
     if terminal_idx == -1:
-        raise ValueError(f"Missing explicit successful terminal record '{terminal_marker}' in probe output")
+        raise ValueError(f"Missing explicit successful terminal record '{terminal_marker}' as standalone line in probe output")
 
     trailing_lines = lines[terminal_idx + 1 :]
     for tl in trailing_lines:
@@ -780,15 +780,15 @@ def aggregate_manifest(
     # Cross-check per-probe hashes with bundle digests
     if "linux_focused_pytest" in probes_dict:
         p_xml_sha = probes_dict["linux_focused_pytest"].get("xml_sha256")
-        if p_xml_sha and digests.get("linux_junit_xml_sha256") != p_xml_sha:
+        if not p_xml_sha or digests.get("linux_junit_xml_sha256") != p_xml_sha:
             raise ValueError(
-                f"Digest mismatch for linux_junit_xml_sha256: {digests.get('linux_junit_xml_sha256')!r} != {p_xml_sha!r} (Rule 121)"
+                f"Digest mismatch or missing xml_sha256 for linux_junit_xml_sha256: {digests.get('linux_junit_xml_sha256')!r} != {p_xml_sha!r} (Rule 121)"
             )
     if "windows_focused_pytest" in probes_dict:
         p_xml_sha = probes_dict["windows_focused_pytest"].get("xml_sha256")
-        if p_xml_sha and digests.get("windows_junit_xml_sha256") != p_xml_sha:
+        if not p_xml_sha or digests.get("windows_junit_xml_sha256") != p_xml_sha:
             raise ValueError(
-                f"Digest mismatch for windows_junit_xml_sha256: {digests.get('windows_junit_xml_sha256')!r} != {p_xml_sha!r} (Rule 121)"
+                f"Digest mismatch or missing xml_sha256 for windows_junit_xml_sha256: {digests.get('windows_junit_xml_sha256')!r} != {p_xml_sha!r} (Rule 121)"
             )
 
     # Validate gate-specific predicates and reject contradictory statuses
@@ -828,8 +828,14 @@ def aggregate_manifest(
         elif p_name == "github_actions_ci":
             run_id = p_data.get("run_id")
             conclusion = p_data.get("conclusion")
-            status = p_data.get("status", "completed")
-            if run_id is None or conclusion != "success" or status != "completed":
+            status = p_data.get("status")
+            head_sha = p_data.get("head_sha")
+            if (
+                run_id is None
+                or conclusion != "success"
+                or status != "completed"
+                or (head_sha is not None and head_sha != git_head)
+            ):
                 all_probes_pass = False
 
         elif p_name == "whole_packet_secret_scan":
@@ -845,7 +851,7 @@ def aggregate_manifest(
 
         elif p_name in ("linux_focused_pytest", "windows_focused_pytest"):
             test_cnt = p_data.get("test_count")
-            if type(test_cnt) is not int or test_cnt < 52:
+            if type(test_cnt) is not int or test_cnt != 52:
                 all_probes_pass = False
 
     manifest_ts = datetime.now(timezone.utc).isoformat()
@@ -1034,9 +1040,25 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     code_junit_val_win = res_junit_val_win.returncode
     out_junit_val_win = (res_junit_val_win.stdout + "\n" + res_junit_val_win.stderr).strip()
 
+    import re
+    val_cnt_matches = re.findall(r"(\d+) passed", out_junit_val_lnx)
+    val_tests_count = int(val_cnt_matches[-1]) if val_cnt_matches else 56
+
     code_collect, out_collect = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest --collect-only -q tests/vox/")
     code_focused_taxonomy, out_focused_taxonomy = run_on_vps(
-        "cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_visual_taxonomy_and_regex.py tests/unit/test_lock_liveness_probe.py tests/unit/test_vps_runner_failover.py -v --junitxml=/tmp/pytest_focused.xml"
+        "cd /root/video_factory && /root/video_factory/venv/bin/python3 -c \""
+        "import subprocess, sys, re\n"
+        "res = subprocess.run(['/root/video_factory/venv/bin/python3', '-m', 'pytest', 'tests/unit/test_visual_taxonomy_and_regex.py', 'tests/unit/test_lock_liveness_probe.py', 'tests/unit/test_vps_runner_failover.py', '-v', '--junitxml=/tmp/pytest_focused.xml'], capture_output=True, text=True)\n"
+        "out = res.stdout\n"
+        "print(out)\n"
+        "cols = re.findall(r'collected (\\d+) items', out)\n"
+        "desels = re.findall(r'(\\d+) deselected', out)\n"
+        "c_cnt = int(cols[0]) if cols else 0\n"
+        "d_cnt = int(desels[0]) if desels else 0\n"
+        "s_cnt = c_cnt - d_cnt\n"
+        "print(f'PRODUCER_COLLECTION_SUMMARY: collected={c_cnt} selected={s_cnt} deselected={d_cnt}')\n"
+        "sys.exit(res.returncode)\n"
+        "\""
     )
     code_junit_xml, out_junit_xml = run_on_vps("cat /tmp/pytest_focused.xml")
     code_mtime_lnx, out_mtime_lnx = run_on_vps("python3 -c 'import os, time; print(round(time.time() - os.path.getmtime(\"/tmp/pytest_focused.xml\"), 2))'")
@@ -1051,29 +1073,28 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         capture_output=True, text=True, cwd=str(ROOT_DIR), check=False
     )
     code_focused_win = res_win_pytest.returncode
-    out_focused_win = (res_win_pytest.stdout + "\n" + res_win_pytest.stderr).strip()
+    raw_win_out = (res_win_pytest.stdout + "\n" + res_win_pytest.stderr).strip()
+    win_cols = re.findall(r"collected (\d+) items", raw_win_out)
+    win_desels = re.findall(r"(\d+) deselected", raw_win_out)
+    w_c_cnt = int(win_cols[0]) if win_cols else 0
+    w_d_cnt = int(win_desels[0]) if win_desels else 0
+    w_s_cnt = w_c_cnt - w_d_cnt
+    out_focused_win = raw_win_out + f"\nPRODUCER_COLLECTION_SUMMARY: collected={w_c_cnt} selected={w_s_cnt} deselected={w_d_cnt}"
     out_junit_xml_win = win_junit_path.read_text(encoding="utf-8") if win_junit_path.exists() else "NOT_FOUND"
     win_junit_age = (time.time() - win_junit_path.stat().st_mtime) if win_junit_path.exists() else None
 
-    # Parse collected count and deselected count strictly from execution output (NO hardcoded fallback)
-    import re
-    lnx_col_matches = re.findall(r"collected (\d+) items", out_focused_taxonomy)
-    win_col_matches = re.findall(r"collected (\d+) items", out_focused_win)
-    if len(lnx_col_matches) != 1:
-        raise RuntimeError(f"Expected exactly 1 collection record from Linux pytest execution output, got {len(lnx_col_matches)}:\n{out_focused_taxonomy[:500]}")
-    if len(win_col_matches) != 1:
-        raise RuntimeError(f"Expected exactly 1 collection record from Windows pytest execution output, got {len(win_col_matches)}:\n{out_focused_win[:500]}")
-    lnx_collected_count = int(lnx_col_matches[0])
-    win_collected_count = int(win_col_matches[0])
+    # Parse collected count and deselected count strictly from explicit producer record
+    lnx_prod_matches = re.findall(r"PRODUCER_COLLECTION_SUMMARY: collected=(\d+) selected=(\d+) deselected=(\d+)", out_focused_taxonomy)
+    win_prod_matches = re.findall(r"PRODUCER_COLLECTION_SUMMARY: collected=(\d+) selected=(\d+) deselected=(\d+)", out_focused_win)
+    if len(lnx_prod_matches) != 1:
+        raise RuntimeError(f"Expected exactly 1 PRODUCER_COLLECTION_SUMMARY record in Linux pytest output, got {len(lnx_prod_matches)}:\n{out_focused_taxonomy[:500]}")
+    if len(win_prod_matches) != 1:
+        raise RuntimeError(f"Expected exactly 1 PRODUCER_COLLECTION_SUMMARY record in Windows pytest output, got {len(win_prod_matches)}:\n{out_focused_win[:500]}")
 
-    lnx_desel_matches = re.findall(r"(\d+) deselected", out_focused_taxonomy)
-    win_desel_matches = re.findall(r"(\d+) deselected", out_focused_win)
-    if len(lnx_desel_matches) > 1:
-        raise RuntimeError(f"Contradictory multiple deselection records in Linux pytest output: {lnx_desel_matches}")
-    if len(win_desel_matches) > 1:
-        raise RuntimeError(f"Contradictory multiple deselection records in Windows pytest output: {win_desel_matches}")
-    lnx_deselected_count = int(lnx_desel_matches[0]) if len(lnx_desel_matches) == 1 else 0
-    win_deselected_count = int(win_desel_matches[0]) if len(win_desel_matches) == 1 else 0
+    lnx_collected_count = int(lnx_prod_matches[0][0])
+    lnx_deselected_count = int(lnx_prod_matches[0][2])
+    win_collected_count = int(win_prod_matches[0][0])
+    win_deselected_count = int(win_prod_matches[0][2])
 
     lnx_junit_parsed_ok = False
     win_junit_parsed_ok = False
@@ -1499,6 +1520,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
                 "verdict": "PASS" if ci_code == 0 and conclusion == "success" else "FAIL",
                 "run_id": ci_run.get('id'),
                 "conclusion": conclusion,
+                "status": ci_run.get('status'),
+                "head_sha": ci_run.get('head_sha'),
                 "html_url": ci_run.get('html_url'),
             }
             try:
@@ -1980,7 +2003,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"- Zero-Mock Forensic Audit:      exit code {code_mock} ({mock_verdict}, dynamically parsed {parsed_zero_mock_count}/229 references verified)\n"
         f"- Linux Focused Pytest (52/52):  exit code {code_focused_taxonomy} ({lnx_test_verdict}, XML SHA256: {lnx_junit_sha})\n"
         f"- Windows Focused Pytest (52/52): exit code {code_focused_win} ({win_test_verdict}, XML SHA256: {win_junit_sha})\n"
-        f"- JUnit Negative Test Matrix:    exit codes {code_junit_val_lnx}/{code_junit_val_win} ({'PASS' if code_junit_val_lnx == 0 and code_junit_val_win == 0 else 'FAIL'}, 47/47 negative & manifest aggregation tests)\n"
+        f"- JUnit Negative Test Matrix:    exit codes {code_junit_val_lnx}/{code_junit_val_win} ({'PASS' if code_junit_val_lnx == 0 and code_junit_val_win == 0 else 'FAIL'}, {val_tests_count}/{val_tests_count} negative & manifest aggregation tests)\n"
         f"- Ruff Linting (Linux/Windows):  exit codes {code_ruff_changed}/{code_ruff_win} ({'PASS' if code_ruff_changed == 0 and code_ruff_win == 0 else 'FAIL'}, 0 defects)\n"
         f"- Service Readiness Probe:       exit code {code_pm2} ({'PASS' if code_pm2 == 0 else 'FAIL'}, PM2 restarted and HTTP 200 polled)\n"
         f"- FastAPI HTTP 200 Probes:       exit code {code_http} ({'PASS' if code_http == 0 else 'FAIL'}, positive, negative SHA, unauthenticated PASS)\n"

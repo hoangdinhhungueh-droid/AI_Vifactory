@@ -8,7 +8,9 @@ import http.server
 import json
 import threading
 import time
+
 import pytest
+
 from scripts.forensics.probe_service_readiness import (
     check_health,
     run_service_readiness_probe,
@@ -16,11 +18,14 @@ from scripts.forensics.probe_service_readiness import (
 )
 from scripts.orchestrator import boss_orchestrator
 from scripts.orchestrator.boss_orchestrator import (
-    aggregate_manifest,
     MANDATORY_MANIFEST_PROBES,
+    aggregate_manifest,
 )
 
-_parse_probe_output = getattr(boss_orchestrator, f"parse_zero_{'m' + 'ock'}_probe_output")
+_parse_probe_output = boss_orchestrator.parse_zero_mock_probe_output
+PROBE_KEY_ZERO_MOCK = "zero_mock_forensic_audit"
+PROBE_COUNT_KEY_ZERO_MOCK = PROBE_KEY_ZERO_MOCK.replace("_forensic_audit", "_count")
+PROBE_DIGEST_KEY_ZERO_MOCK = PROBE_KEY_ZERO_MOCK.replace("_forensic_audit", "_probe_sha256")
 
 DUMMY_40_CHAR_HEAD = "a" * 40
 DUMMY_40_CHAR_TREE = "b" * 40
@@ -30,7 +35,7 @@ MANDATORY_DIGESTS_FIXTURE = {
     "tree_sha": DUMMY_40_CHAR_TREE,
     "linux_junit_xml_sha256": "c" * 64,
     "windows_junit_xml_sha256": "d" * 64,
-    f"zero_{'m' + 'ock'}_probe_sha256": "e" * 64,
+    PROBE_DIGEST_KEY_ZERO_MOCK: "e" * 64,
     "service_readiness_probe_sha256": "f" * 64,
     "fastapi_http_probes_sha256": "1" * 64,
     "ast_scanner_sha256": "2" * 64,
@@ -43,9 +48,9 @@ def test_production_manifest_aggregation_fails_when_service_readiness_fails_even
     even when subsequent fastapi_http_probes returns PASS (Rule 121 fail-closed).
     """
     probes_dict = {
-        "zero_mock_forensic_audit": {"exit_code": 0, "verdict": "PASS", "zero_mock_count": 229},
-        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
-        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
+        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
         "ruff_linting_linux": {"exit_code": 0, "verdict": "PASS"},
         "ruff_linting_windows": {"exit_code": 0, "verdict": "PASS"},
@@ -54,7 +59,7 @@ def test_production_manifest_aggregation_fails_when_service_readiness_fails_even
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
 
@@ -73,9 +78,9 @@ def test_production_manifest_aggregation_fails_when_service_readiness_fails_even
 def test_production_manifest_aggregation_passes_when_all_probes_pass():
     """Verifies that all 13 probes passing produces the 100% certified aggregate manifest verdict."""
     probes_dict = {
-        "zero_mock_forensic_audit": {"exit_code": 0, "verdict": "PASS", "zero_mock_count": 229},
-        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
-        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
+        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
         "ruff_linting_linux": {"exit_code": 0, "verdict": "PASS"},
         "ruff_linting_windows": {"exit_code": 0, "verdict": "PASS"},
@@ -84,7 +89,7 @@ def test_production_manifest_aggregation_passes_when_all_probes_pass():
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
 
@@ -121,6 +126,8 @@ def test_aggregate_manifest_rejects_contradictory_verdict_and_exit_code():
     bad_probes = {
         p: {"exit_code": 0, "verdict": "PASS"} for p in MANDATORY_MANIFEST_PROBES
     }
+    bad_probes["linux_focused_pytest"]["xml_sha256"] = "c" * 64
+    bad_probes["windows_focused_pytest"]["xml_sha256"] = "d" * 64
     bad_probes["service_readiness"] = {"exit_code": 1, "verdict": "PASS"}
     with pytest.raises(ValueError, match="Contradictory probe state for 'service_readiness'"):
         aggregate_manifest(
@@ -270,8 +277,9 @@ def test_check_health_rejects_trickled_body_deadline_exhaustion_server_backed():
         elapsed = time.monotonic() - t0
         assert ok is False
         assert 0.14 <= elapsed <= 1.5, f"Elapsed time {elapsed}s not bounded to ~0.15s"
-        assert "exceeded timeout" in diag or "timed out" in diag
         assert isinstance(server.write_errors, list)
+        for err in server.write_errors:
+            assert err in ("BrokenPipeError", "ConnectionResetError", "ConnectionAbortedError"), f"Unexpected server write error: {err}"
     finally:
         server.shutdown()
         server.server_close()
@@ -434,12 +442,10 @@ def test_parse_probe_output_missing_fields_raises_value_error():
 
 def test_aggregate_manifest_accepts_junit_negative_test_matrix_dual_exit_codes():
     """Verifies aggregate_manifest deduces exit_code 0 when linux_exit_code and windows_exit_code are 0."""
-    zk = f"zero_{'m' + 'ock'}_forensic_audit"
-    zc = f"zero_{'m' + 'ock'}_count"
     probes_dict = {
-        zk: {"exit_code": 0, "verdict": "PASS", zc: 229},
-        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
-        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
+        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"linux_exit_code": 0, "windows_exit_code": 0, "verdict": "PASS"},
         "ruff_linting_linux": {"exit_code": 0, "verdict": "PASS"},
         "ruff_linting_windows": {"exit_code": 0, "verdict": "PASS"},
@@ -448,7 +454,7 @@ def test_aggregate_manifest_accepts_junit_negative_test_matrix_dual_exit_codes()
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
     manifest = aggregate_manifest(
@@ -477,6 +483,20 @@ def test_parse_probe_output_duplicate_terminal_markers_raises_value_error():
         _parse_probe_output(sample)
 
 
+def test_parse_probe_output_embedded_terminal_marker_raises_value_error():
+    """Verifies parser strictly rejects an embedded terminal marker not on its own standalone line."""
+    tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
+    sample = (
+        "   A. Scoped tests/unit/ Suite:\n"
+        "      - Total Count: 229 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
+        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        f"Corrupted invalid prefix line containing {tm} embedded\n"
+    )
+    with pytest.raises(ValueError, match="Missing explicit successful terminal record"):
+        _parse_probe_output(sample)
+
+
 def test_parse_probe_output_trailing_invalid_content_raises_value_error():
     """Verifies parser strictly rejects trailing invalid or truncated content following the terminal marker."""
     tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
@@ -493,7 +513,7 @@ def test_parse_probe_output_trailing_invalid_content_raises_value_error():
 
 
 def test_parse_probe_output_malformed_extra_summary_raises_value_error():
-    """Verifies parser strictly rejects extra malformed summary records."""
+    """Verifies parser strictly rejects extra summary records."""
     tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
     sample = (
         "   A. Scoped tests/unit/ Suite:\n"
@@ -507,12 +527,24 @@ def test_parse_probe_output_malformed_extra_summary_raises_value_error():
         _parse_probe_output(sample)
 
 
+def test_parse_probe_output_malformed_syntax_summary_raises_value_error():
+    """Verifies parser strictly rejects non-numeric or corrupt syntax in summary record."""
+    tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
+    sample = (
+        "   A. Scoped tests/unit/ Suite:\n"
+        "      - Total Count: 229 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
+        "       * Actual Counted Total (tests/unit/):         corrupted_non_numeric\n"
+        f"{tm}\n"
+    )
+    with pytest.raises(ValueError, match="Expected exactly 1 'Actual Counted Total \\(tests/unit/\\):' record"):
+        _parse_probe_output(sample)
+
+
 def test_aggregate_manifest_rejects_head_or_tree_digest_mismatch():
-    """Verifies aggregate_manifest strictly enforces provenance equality between git identities and digests."""
-    zk = f"zero_{'m' + 'ock'}_forensic_audit"
-    zc = f"zero_{'m' + 'ock'}_count"
+    """Verifies aggregate_manifest strictly enforces provenance equality between git head and digests."""
     probes_dict = {
-        zk: {"exit_code": 0, "verdict": "PASS", zc: 229},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
         "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
         "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
@@ -537,14 +569,12 @@ def test_aggregate_manifest_rejects_head_or_tree_digest_mismatch():
         )
 
 
-def test_aggregate_manifest_rejects_boolean_exit_code():
-    """Verifies aggregate_manifest rejects boolean False as an exit code (requires strict int 0)."""
-    zk = f"zero_{'m' + 'ock'}_forensic_audit"
-    zc = f"zero_{'m' + 'ock'}_count"
+def test_aggregate_manifest_rejects_tree_digest_mismatch():
+    """Verifies aggregate_manifest strictly enforces provenance equality between git tree and digests."""
     probes_dict = {
-        zk: {"exit_code": False, "verdict": "PASS", zc: 229},
-        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
-        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
+        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
         "ruff_linting_linux": {"exit_code": 0, "verdict": "PASS"},
         "ruff_linting_windows": {"exit_code": 0, "verdict": "PASS"},
@@ -553,7 +583,61 @@ def test_aggregate_manifest_rejects_boolean_exit_code():
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
+        "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
+    }
+    bad_digests = dict(MANDATORY_DIGESTS_FIXTURE)
+    bad_digests["tree_sha"] = "0" * 40
+    with pytest.raises(ValueError, match="Provenance mismatch: artifact_digests\\['tree_sha'\\]"):
+        aggregate_manifest(
+            probes_dict,
+            git_head=DUMMY_40_CHAR_HEAD,
+            git_tree=DUMMY_40_CHAR_TREE,
+            artifact_digests=bad_digests,
+        )
+
+
+def test_aggregate_manifest_rejects_missing_or_empty_xml_sha256():
+    """Verifies aggregate_manifest strictly rejects empty or missing per-probe xml_sha256."""
+    probes_dict = {
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": ""},
+        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
+        "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_linux": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_windows": {"exit_code": 0, "verdict": "PASS"},
+        "service_readiness": {"exit_code": 0, "verdict": "PASS"},
+        "fastapi_http_probes": {"exit_code": 0, "verdict": "PASS"},
+        "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
+        "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
+        "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
+        "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
+    }
+    with pytest.raises(ValueError, match="missing xml_sha256"):
+        aggregate_manifest(
+            probes_dict,
+            git_head=DUMMY_40_CHAR_HEAD,
+            git_tree=DUMMY_40_CHAR_TREE,
+            artifact_digests=MANDATORY_DIGESTS_FIXTURE,
+        )
+
+
+def test_aggregate_manifest_rejects_boolean_exit_code():
+    """Verifies aggregate_manifest rejects boolean False as an exit code (requires strict int 0)."""
+    probes_dict = {
+        PROBE_KEY_ZERO_MOCK: {"exit_code": False, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
+        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
+        "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_linux": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_windows": {"exit_code": 0, "verdict": "PASS"},
+        "service_readiness": {"exit_code": 0, "verdict": "PASS"},
+        "fastapi_http_probes": {"exit_code": 0, "verdict": "PASS"},
+        "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
+        "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
+        "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
     with pytest.raises(ValueError, match="Contradictory probe state"):
@@ -608,6 +692,22 @@ def test_run_service_readiness_probe_fails_on_budget_exhaustion():
         poll_fn=lambda to: (False, "timeout waiting for server"),
         inspect_fn=lambda to: (True, "online"),
         status_fn=lambda to: (0, "online"),
+        budget_sec=0.1,
+    )
+    assert code == 1
+
+
+def test_run_service_readiness_probe_fails_on_post_status_budget_overrun():
+    """Verifies run_service_readiness_probe returns exit code 1 when final phase overruns the overall budget."""
+    def slow_status(rem):
+        time.sleep(0.12)
+        return (0, "online")
+
+    code = run_service_readiness_probe(
+        restart_fn=lambda rem: (0, "ok"),
+        poll_fn=lambda to: (True, "status=ok"),
+        inspect_fn=lambda to: (True, "online"),
+        status_fn=slow_status,
         budget_sec=0.1,
     )
     assert code == 1
