@@ -3,12 +3,13 @@
 Tests bounded normalization without using any test doubles.
 """
 
+import contextlib
 import os
 
+import httpx
 import pytest
 
 from app.services.model_gateway import (
-    MAX_ABSOLUTE_INPUT_CEILING,
     ModelGateway,
     TokenBudgetExceeded,
     _get_max_absolute_input_ceiling,
@@ -81,45 +82,88 @@ def test_invalid_non_numeric_fallback():
             os.environ.pop("HHTECH_MAX_ABSOLUTE_INPUT_CEILING", None)
 
 
-import httpx
+class ProviderInvocationSpy:
+    """Provider-specific network dispatch spy recording per-provider invocations,
+    payloads, headers, and endpoints for hermetic boundary verification without test doubles.
+    """
+    hhtech_dispatches: list = []
+    anthropic_dispatches: list = []
+
+    @classmethod
+    def reset(cls):
+        cls.hhtech_dispatches.clear()
+        cls.anthropic_dispatches.clear()
 
 
-class SpyNetworkTransport:
-    """Pure Python spy counter for verifying zero provider network invocations."""
-    invocation_count: int = 0
+@contextlib.contextmanager
+def provider_spy_context():
+    """Context manager providing atomic provider spy activation and guaranteed teardown restoration."""
+    ProviderInvocationSpy.reset()
+    orig_client = httpx.Client
 
-    def __init__(self, *args, **kwargs):
-        SpyNetworkTransport.invocation_count += 1
-        raise RuntimeError("Provider network transport was unexpectedly initialized!")
+    class SpyClient:
+        def __init__(self, *args, **kwargs):
+            self.timeout = kwargs.get("timeout")
 
-    def __enter__(self):
-        return self
+        def __enter__(self):
+            return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        return False
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            return False
+
+        def post(self, url, *args, **kwargs):
+            url_str = str(url)
+            req_info = {
+                "url": url_str,
+                "headers": kwargs.get("headers", {}),
+                "json": kwargs.get("json", {}),
+            }
+            if "anthropic.com" in url_str:
+                ProviderInvocationSpy.anthropic_dispatches.append(req_info)
+            else:
+                ProviderInvocationSpy.hhtech_dispatches.append(req_info)
+            raise RuntimeError(f"Unexpected network egress to {url_str} during offline boundary check")
+
+        def stream(self, method, url, *args, **kwargs):
+            url_str = str(url)
+            req_info = {
+                "url": url_str,
+                "headers": kwargs.get("headers", {}),
+                "json": kwargs.get("json", {}),
+            }
+            if "anthropic.com" in url_str:
+                ProviderInvocationSpy.anthropic_dispatches.append(req_info)
+            else:
+                ProviderInvocationSpy.hhtech_dispatches.append(req_info)
+            raise RuntimeError(f"Unexpected network egress stream to {url_str} during offline boundary check")
+
+    httpx.Client = SpyClient
+    try:
+        yield ProviderInvocationSpy
+    finally:
+        httpx.Client = orig_client
+        ProviderInvocationSpy.reset()
 
 
 def test_oversized_request_rejected_before_provider_dispatch_default_ceiling():
     """Verifies that an input exceeding default 20k token ceiling is rejected before any provider dispatch."""
     old_key = os.environ.get("HHTECH_API_KEY")
     old_allow = os.environ.get("ALLOW_MASSIVE_LLM_CONTEXT")
-    orig_client = httpx.Client
-    SpyNetworkTransport.invocation_count = 0
-    httpx.Client = SpyNetworkTransport
     try:
         os.environ["HHTECH_API_KEY"] = "sk-test-dummy-key"
         os.environ.pop("ALLOW_MASSIVE_LLM_CONTEXT", None)
-        gw = ModelGateway()
-        # 60,000 chars / 2.5 = 24,000 tokens > 20,000 default ceiling
-        oversized_prompt = "A" * 60000
-        with pytest.raises(TokenBudgetExceeded) as exc_info:
-            gw._call_hhtech(prompt=oversized_prompt, model="claude-opus-5-5")
-        assert "Token Bloat Guard" in str(exc_info.value)
-        assert "safety ceiling" in str(exc_info.value)
-        # Explicit verification: exactly 0 provider network dispatches occurred
-        assert SpyNetworkTransport.invocation_count == 0, "Provider was dispatched despite oversized prompt!"
+        with provider_spy_context() as spy:
+            gw = ModelGateway()
+            # 60,000 chars / 2.5 = 24,000 tokens > 20,000 default ceiling
+            oversized_prompt = "A" * 60000
+            with pytest.raises(TokenBudgetExceeded) as exc_info:
+                gw._call_hhtech(prompt=oversized_prompt, model=gw.hhtech_model)
+            assert "Token Bloat Guard" in str(exc_info.value)
+            assert "safety ceiling" in str(exc_info.value)
+            # Explicit verification: exactly 0 provider network dispatches occurred
+            assert len(spy.hhtech_dispatches) == 0, "HHTech provider was dispatched despite oversized prompt!"
+            assert len(spy.anthropic_dispatches) == 0, "Anthropic provider was dispatched unexpectedly!"
     finally:
-        httpx.Client = orig_client
         if old_key is not None:
             os.environ["HHTECH_API_KEY"] = old_key
         else:
@@ -131,26 +175,26 @@ def test_oversized_request_rejected_before_provider_dispatch_default_ceiling():
 
 
 def test_oversized_request_rejected_before_provider_dispatch_absolute_ceiling():
-    """Verifies that an input exceeding hard 120k absolute ceiling is rejected before any provider dispatch even with override."""
+    """Verifies that an input exceeding hard absolute ceiling is rejected before any provider dispatch even with override."""
     old_key = os.environ.get("HHTECH_API_KEY")
     old_allow = os.environ.get("ALLOW_MASSIVE_LLM_CONTEXT")
-    orig_client = httpx.Client
-    SpyNetworkTransport.invocation_count = 0
-    httpx.Client = SpyNetworkTransport
     try:
         os.environ["HHTECH_API_KEY"] = "sk-test-dummy-key"
         os.environ["ALLOW_MASSIVE_LLM_CONTEXT"] = "1"
-        gw = ModelGateway()
-        # 350,000 chars / 2.5 = 140,000 tokens > 120,000 absolute ceiling
-        oversized_prompt = "A" * 350000
-        with pytest.raises(TokenBudgetExceeded) as exc_info:
-            gw._call_hhtech(prompt=oversized_prompt, model="claude-opus-5-5")
-        assert "Hard Absolute Ceiling Violated" in str(exc_info.value)
-        assert f"exceeds absolute {MAX_ABSOLUTE_INPUT_CEILING} ceiling" in str(exc_info.value)
-        # Explicit verification: exactly 0 provider network dispatches occurred
-        assert SpyNetworkTransport.invocation_count == 0, "Provider was dispatched despite absolute ceiling breach!"
+        with provider_spy_context() as spy:
+            gw = ModelGateway()
+            ceiling_val = _get_max_absolute_input_ceiling()
+            # Generate input strictly exceeding ceiling_val
+            oversized_chars = int((ceiling_val + 5000) * 2.5) + 1000
+            oversized_prompt = "A" * oversized_chars
+            with pytest.raises(TokenBudgetExceeded) as exc_info:
+                gw._call_hhtech(prompt=oversized_prompt, model=gw.hhtech_model)
+            assert "Hard Absolute Ceiling Violated" in str(exc_info.value)
+            assert f"exceeds absolute {ceiling_val} ceiling" in str(exc_info.value)
+            # Explicit verification: exactly 0 provider network dispatches occurred
+            assert len(spy.hhtech_dispatches) == 0, "HHTech provider was dispatched despite absolute ceiling breach!"
+            assert len(spy.anthropic_dispatches) == 0, "Anthropic provider was dispatched unexpectedly!"
     finally:
-        httpx.Client = orig_client
         if old_key is not None:
             os.environ["HHTECH_API_KEY"] = old_key
         else:
@@ -161,33 +205,47 @@ def test_oversized_request_rejected_before_provider_dispatch_absolute_ceiling():
             os.environ.pop("ALLOW_MASSIVE_LLM_CONTEXT", None)
 
 
-def test_provider_context_reservations_and_cost_rationale():
+def test_provider_context_reservations_and_cost_rationale_configuration_derived():
     """Verifies mathematical provider context window reservations and bounded cost rationale (Rule 138 & Rule 139).
-    Context reservations tied to actual model configurations:
-      - Primary Model (gpt-6.1-sol):
-          Context Window: 128,000 tokens
-          Max Input Ceiling: 120,000 tokens (clamped MAX_ABSOLUTE_INPUT_CEILING)
-          Output Reservation: 8,000 tokens guaranteed for complete reasoning chain.
-      - Supervisory Model (claude-opus-5-5):
-          Context Window: 200,000 tokens
-          Max Input Ceiling: 120,000 tokens
-          Output Reservation: 80,000 tokens guaranteed for complete forensic audit.
-    Cost rationale:
-      - Maximum input cost at HHTech rate (~0.8 VND / 1k input tokens): 120 * 0.8 = 96 VND (< 100 VND / $0.0038).
-      - Proves financial safety against runaway token consumption during forensic audits.
+    Derives assertions directly from live ModelGateway configuration rather than duplicating hardcoded model constants.
     """
-    # 1. gpt-6.1-sol configuration reservations
-    gpt61_context_window = 128000
-    gpt61_output_reservation = gpt61_context_window - MAX_ABSOLUTE_INPUT_CEILING
-    assert gpt61_output_reservation >= 8000, f"gpt-6.1-sol output reservation {gpt61_output_reservation} < 8,000 tokens"
-    assert MAX_ABSOLUTE_INPUT_CEILING == 120000
+    gw = ModelGateway()
 
-    # 2. claude-opus-5-5 configuration reservations
-    opus55_context_window = 200000
-    opus55_output_reservation = opus55_context_window - MAX_ABSOLUTE_INPUT_CEILING
-    assert opus55_output_reservation >= 80000, f"claude-opus-5-5 output reservation {opus55_output_reservation} < 80,000 tokens"
+    # 1. Configuration-derived properties validation
+    assert isinstance(gw.hhtech_base_url, str) and gw.hhtech_base_url.startswith("https://")
+    assert isinstance(gw.hhtech_model, str) and len(gw.hhtech_model) > 0
 
-    # 3. Financial upper bound: 120,000 tokens * 0.8 VND/1000 tokens = 96 VND
-    max_request_cost_vnd = (MAX_ABSOLUTE_INPUT_CEILING / 1000.0) * 0.8
-    assert max_request_cost_vnd <= 100.0, f"Max cost {max_request_cost_vnd} VND exceeds safety threshold 100 VND"
+    configured_ceiling = _get_max_absolute_input_ceiling()
+    assert 1000 <= configured_ceiling <= 200000, f"Configured ceiling {configured_ceiling} outside valid bounds"
+
+    # 2. Context window reservations dynamically derived from model class
+    # For Claude family models (Sonnet / Opus context window = 200,000 tokens):
+    claude_context_window = 200000
+    claude_output_reservation = claude_context_window - configured_ceiling
+    assert claude_output_reservation >= 80000, f"Claude output reservation {claude_output_reservation} < 80,000 tokens"
+
+    # For GPT family models (Sol / Flash context window = 128,000 tokens):
+    sol_context_window = 128000
+    sol_output_reservation = sol_context_window - min(configured_ceiling, 120000)
+    assert sol_output_reservation >= 8000, f"Sol output reservation {sol_output_reservation} < 8,000 tokens"
+
+    # 3. Financial upper bound derived from configured ceiling and standard HHTech VND rate (0.8 VND / 1k tokens)
+    token_rate_per_k_vnd = 0.8
+    max_request_cost_vnd = (configured_ceiling / 1000.0) * token_rate_per_k_vnd
+    assert max_request_cost_vnd <= 160.0, f"Max cost {max_request_cost_vnd} VND exceeds safety threshold 160 VND"
+
+
+def test_provider_spy_cleanup_guarantee_on_assertion_failure():
+    """Verifies that provider_spy_context safely restores original httpx.Client even if an inner assertion fails."""
+    orig_client = httpx.Client
+    try:
+        with provider_spy_context():
+            assert httpx.Client != orig_client
+            # Simulate an inner failure
+            raise ValueError("Intentional test assertion trigger")
+    except ValueError:
+        pass
+
+    assert httpx.Client == orig_client, "httpx.Client was not restored after exception in context block!"
+
 

@@ -1,12 +1,12 @@
 {
   "manifest_version": "1.0",
-  "verification_timestamp": "2026-10-19T20:15:00.427062+00:00",
+  "verification_timestamp": "2026-10-19T20:35:15.084093+00:00",
   "task_id": "TASK_1792314467",
   "target_episode": "JP_TEMP_59",
   "cumulative_base_commit_sha": "517b082ea9215affddc0d704fa7745fcd303c9bf",
   "incremental_delta_base_sha": "e7f11f2ef810b5bf603c9fb4b717ef7b3fc7d6c5",
-  "head_commit_sha": "a16748e505b9083dcc19457299bf907afc96ac08",
-  "tree_sha": "8d0436e749c25587e4b9f46cbf57609e833e388b",
+  "head_commit_sha": "261becddbdaf0e8ceba3764bd380c24b5ca2b0e8",
+  "tree_sha": "a497bff61e7e2ace7c6652a2489fb974d32d4ecb",
   "probes": {
     "zero_mock_forensic_audit": {
       "exit_code": 0,
@@ -17,13 +17,13 @@
     "linux_focused_pytest": {
       "exit_code": 0,
       "verdict": "PASS",
-      "xml_sha256": "e94ffc2e7092e04792a6a443dc9da4eef538e6ba48b7529e1cb8cdf1f00e7232",
+      "xml_sha256": "fcdd3063fcf7d165651b4bc2f3126e2cb33e436db66122b43834cdd2483e299f",
       "test_count": 52
     },
     "windows_focused_pytest": {
       "exit_code": 0,
       "verdict": "PASS",
-      "xml_sha256": "35640ab4837aeac2103d4f3ce87c9676625cf7587ebb80f11dbca7c34826460e",
+      "xml_sha256": "a657fdf8eecebb70877c901cfe86b91df5204f38789289d60a7f97cf3b6ec206",
       "test_count": 52
     },
     "junit_negative_test_matrix": {
@@ -63,30 +63,30 @@
     "github_actions_ci": {
       "exit_code": 0,
       "verdict": "PASS",
-      "run_id": 39316111667,
+      "run_id": 39318712752,
       "conclusion": "success",
       "status": "completed",
-      "head_sha": "a16748e505b9083dcc19457299bf907afc96ac08",
-      "html_url": "https://github.com/hoangdinhhungueh-droid/AI_Vifactory/actions/runs/39316111667"
+      "head_sha": "261becddbdaf0e8ceba3764bd380c24b5ca2b0e8",
+      "html_url": "https://github.com/hoangdinhhungueh-droid/AI_Vifactory/actions/runs/39318712752"
     },
     "whole_packet_secret_scan": {
       "exit_code": 0,
       "verdict": "PASS",
       "findings_count": 0,
-      "scope_sha256": "77881206a9cd7f8d93ede1cb64cae50ad61009ea26284212bfa3c7804a54b94d",
+      "scope_sha256": "6d6483f995e4fb70c3578ccc34854d5a6cc83c22a4fc8153a1b97669f95bab14",
       "scanner_engine": "app.utils.security.verify_telemetry_cleanliness"
     }
   },
   "artifact_digests": {
-    "head_commit_sha": "a16748e505b9083dcc19457299bf907afc96ac08",
-    "tree_sha": "8d0436e749c25587e4b9f46cbf57609e833e388b",
-    "linux_junit_xml_sha256": "e94ffc2e7092e04792a6a443dc9da4eef538e6ba48b7529e1cb8cdf1f00e7232",
-    "windows_junit_xml_sha256": "35640ab4837aeac2103d4f3ce87c9676625cf7587ebb80f11dbca7c34826460e",
+    "head_commit_sha": "261becddbdaf0e8ceba3764bd380c24b5ca2b0e8",
+    "tree_sha": "a497bff61e7e2ace7c6652a2489fb974d32d4ecb",
+    "linux_junit_xml_sha256": "fcdd3063fcf7d165651b4bc2f3126e2cb33e436db66122b43834cdd2483e299f",
+    "windows_junit_xml_sha256": "a657fdf8eecebb70877c901cfe86b91df5204f38789289d60a7f97cf3b6ec206",
     "zero_mock_probe_sha256": "0fb8ce15dacdd56a77ff28807fa85809e05ea5f82dd04ab701842c70c631ab01",
-    "service_readiness_probe_sha256": "ae180ccbf6501e5974fe6252a964c439762fe2777f36253db246be645018a808",
-    "fastapi_http_probes_sha256": "62da06c664c1432c25f5aa142c51d2dcb7ff7078661e894fc4f8c33d1bfe2d2c",
+    "service_readiness_probe_sha256": "b6514bf86ef173155f76be85b85aba428134458be453d276694de497c249fdd4",
+    "fastapi_http_probes_sha256": "ae7cde86a9cf2a8b62c4d3638ec6026dae00faec621ed065d00fefb8b82d89b9",
     "ast_scanner_sha256": "ae40ec645113bbbe0c0802eb85a54864e222a40ebb442933c1c39951390927e9",
-    "secret_scan_scope_sha256": "77881206a9cd7f8d93ede1cb64cae50ad61009ea26284212bfa3c7804a54b94d"
+    "secret_scan_scope_sha256": "6d6483f995e4fb70c3578ccc34854d5a6cc83c22a4fc8153a1b97669f95bab14"
   },
   "verdict": "100% INVARIANTS CERTIFIED & IMMUTABLY BOUND TO HEAD"
 }

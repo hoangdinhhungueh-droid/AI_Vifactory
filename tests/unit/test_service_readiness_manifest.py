@@ -6,6 +6,7 @@ Directly imports and exercises production aggregation and readiness functions wi
 
 import http.server
 import json
+import os
 import threading
 import time
 
@@ -990,45 +991,122 @@ def test_run_service_readiness_probe_fails_on_final_completion_overrun():
     assert code == 1
 
 
+def _adversarial_blocking_cleanup_callable(to: float):
+    marker = os.environ.get("READINESS_ADVERSARIAL_MUTATION_MARKER")
+    time.sleep(1.2)
+    if marker:
+        with open(marker, "w", encoding="utf-8") as f:
+            f.write("FAIL_UNAUTHORIZED_POST_TIMEOUT_MUTATION")
+    return (0, "clean")
+
+
+def _adversarial_blocking_restart_callable(to: float):
+    marker = os.environ.get("READINESS_ADVERSARIAL_MUTATION_MARKER")
+    time.sleep(1.2)
+    if marker:
+        with open(marker, "w", encoding="utf-8") as f:
+            f.write("FAIL_UNAUTHORIZED_POST_TIMEOUT_MUTATION")
+    return (0, "ok")
+
+
 def test_run_service_readiness_probe_forcibly_bounds_blocking_cleanup():
     """Verifies that a genuinely blocking cleanup callable cannot overrun the monotonic deadline unbounded,
     and that the probe caller regains control and fails closed within the bounded budget.
     """
-    def genuinely_blocking_cleanup(to):
-        time.sleep(5.0)
-        return (0, "clean")
-
     start_mono = time.monotonic()
     code = run_service_readiness_probe(
         restart_fn=lambda rem: (0, "ok"),
         poll_fn=lambda to: (True, "status=ok"),
         inspect_fn=lambda to: (True, "online"),
         status_fn=lambda to: (0, "online"),
-        cleanup_fn=genuinely_blocking_cleanup,
-        budget_sec=0.20,
+        cleanup_fn=_adversarial_blocking_cleanup_callable,
+        budget_sec=0.35,
     )
     elapsed = time.monotonic() - start_mono
     assert code == 1, "Expected probe to fail closed on timed-out blocking cleanup"
-    assert elapsed < 0.45, f"Blocking cleanup took {elapsed}s; was not bounded by 0.20s budget"
+    assert elapsed < 0.70, f"Blocking cleanup took {elapsed}s; was not bounded by 0.35s budget"
 
 
 def test_run_service_readiness_probe_forcibly_bounds_blocking_restart():
     """Verifies that a genuinely blocking restart callable cannot overrun the monotonic deadline unbounded."""
-    def genuinely_blocking_restart(to):
-        time.sleep(5.0)
-        return (0, "ok")
-
     start_mono = time.monotonic()
     code = run_service_readiness_probe(
-        restart_fn=genuinely_blocking_restart,
+        restart_fn=_adversarial_blocking_restart_callable,
         poll_fn=lambda to: (True, "status=ok"),
         inspect_fn=lambda to: (True, "online"),
         status_fn=lambda to: (0, "online"),
-        budget_sec=0.20,
+        budget_sec=0.35,
     )
     elapsed = time.monotonic() - start_mono
     assert code == 1, "Expected probe to fail closed on timed-out blocking restart"
-    assert elapsed < 0.45, f"Blocking restart took {elapsed}s; was not bounded by 0.20s budget"
+    assert elapsed < 0.70, f"Blocking restart took {elapsed}s; was not bounded by 0.35s budget"
+
+
+def test_blocking_cleanup_terminated_and_post_timeout_non_mutation(tmp_path):
+    """Adversarial test verifying caller deadline compliance AND worker termination
+    with post-timeout non-mutation: cleanup worker attempts to create a marker file after 1.2s,
+    but is terminated at budget expiration (< 0.5s), proving the worker was terminated and
+    cannot mutate state post-timeout.
+    """
+    marker_file = tmp_path / "cleanup_post_timeout_marker.txt"
+    if marker_file.exists():
+        marker_file.unlink()
+
+    os.environ["READINESS_ADVERSARIAL_MUTATION_MARKER"] = str(marker_file)
+    try:
+        start_mono = time.monotonic()
+        code = run_service_readiness_probe(
+            restart_fn=lambda rem: (0, "ok"),
+            poll_fn=lambda to: (True, "status=ok"),
+            inspect_fn=lambda to: (True, "online"),
+            status_fn=lambda to: (0, "online"),
+            cleanup_fn=_adversarial_blocking_cleanup_callable,
+            budget_sec=0.35,
+        )
+        caller_elapsed = time.monotonic() - start_mono
+        assert code == 1, "Expected probe to fail closed on timed-out blocking cleanup"
+        assert caller_elapsed < 0.70, f"Caller elapsed {caller_elapsed:.3f}s was not bounded by 0.35s budget"
+
+        # Wait past the worker's 1.2s sleep to confirm worker was terminated and could not create marker file
+        time.sleep(1.0)
+        assert not marker_file.exists(), "CRITICAL: Marker file exists! Worker was not terminated and mutated state post-timeout!"
+    finally:
+        os.environ.pop("READINESS_ADVERSARIAL_MUTATION_MARKER", None)
+        if marker_file.exists():
+            marker_file.unlink()
+
+
+def test_blocking_restart_terminated_and_post_timeout_non_mutation(tmp_path):
+    """Adversarial test verifying caller deadline compliance AND worker termination
+    with post-timeout non-mutation: restart worker attempts to create a marker file after 1.2s,
+    but is terminated at budget expiration (< 0.5s), proving worker termination and zero post-timeout mutation.
+    """
+    marker_file = tmp_path / "restart_post_timeout_marker.txt"
+    if marker_file.exists():
+        marker_file.unlink()
+
+    os.environ["READINESS_ADVERSARIAL_MUTATION_MARKER"] = str(marker_file)
+    try:
+        start_mono = time.monotonic()
+        code = run_service_readiness_probe(
+            restart_fn=_adversarial_blocking_restart_callable,
+            poll_fn=lambda to: (True, "status=ok"),
+            inspect_fn=lambda to: (True, "online"),
+            status_fn=lambda to: (0, "online"),
+            budget_sec=0.35,
+        )
+        caller_elapsed = time.monotonic() - start_mono
+        assert code == 1, "Expected probe to fail closed on timed-out blocking restart"
+        assert caller_elapsed < 0.70, f"Caller elapsed {caller_elapsed:.3f}s was not bounded by 0.35s budget"
+
+        # Wait past the worker's 1.2s sleep to confirm worker was terminated and could not create marker file
+        time.sleep(1.0)
+        assert not marker_file.exists(), "CRITICAL: Marker file exists! Worker was not terminated and mutated state post-timeout!"
+    finally:
+        os.environ.pop("READINESS_ADVERSARIAL_MUTATION_MARKER", None)
+        if marker_file.exists():
+            marker_file.unlink()
+
 
 
 

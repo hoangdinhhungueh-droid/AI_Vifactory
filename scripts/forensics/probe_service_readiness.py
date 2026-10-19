@@ -7,6 +7,7 @@ Fails closed (exit code 1) on restart failure, budget expiration, or invalid pro
 
 import json
 import math
+import multiprocessing as mp
 import socket
 import subprocess
 import sys
@@ -15,10 +16,25 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pickle import PicklingError
 from typing import Any, Callable, List, Optional, Tuple
 
 MAX_HEALTH_BODY_BYTES = 65536  # 64 KB safety bound against trickling or unbounded payloads
 READINESS_OVERALL_BUDGET_SEC = 25.0
+
+
+def _mp_phase_worker_entrypoint(fn: Callable[[float], Any], timeout_sec: float, conn: Any) -> None:
+    """Entrypoint for process-isolated phase execution."""
+    try:
+        res = fn(timeout_sec)
+        conn.send((True, res))
+    except BaseException as exc:
+        conn.send((False, exc))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def run_bounded_phase(
@@ -26,36 +42,86 @@ def run_bounded_phase(
     fn: Callable[[float], Any],
     timeout_sec: float,
 ) -> Any:
-    """Enforces a hard monotonic deadline on a phase callable using a bounded daemon thread.
-    If the callable blocks past timeout_sec, raises TimeoutError immediately and returns,
-    preventing any phase or cleanup callback from executing unbounded or overrunning the deadline.
+    """Enforces a hard monotonic deadline on a phase callable using a killable multiprocessing.Process.
+    If the callable blocks past timeout_sec, forcibly terminates and kills the worker process immediately,
+    preventing any phase or cleanup callback from executing unbounded or mutating production state post-timeout.
     """
     if timeout_sec <= 0.001:
         raise TimeoutError(f"Phase '{phase_name}' budget exhausted before execution (remaining={timeout_sec:.3f}s)")
 
-    result_container: List[Any] = []
-    error_container: List[Exception] = []
-
-    def _worker():
-        try:
-            res = fn(timeout_sec)
-            result_container.append(res)
-        except Exception as exc:
-            error_container.append(exc)
-
-    t = threading.Thread(target=_worker, name=f"readiness_phase_{phase_name}", daemon=True)
-    t.start()
-    t.join(timeout=timeout_sec)
-    if t.is_alive():
-        raise TimeoutError(
-            f"Phase '{phase_name}' exceeded bounded monotonic deadline of {timeout_sec:.3f}s "
-            f"(execution abandoned to prevent unbounded overrun)"
+    # 1. Primary execution via killable multiprocessing.Process
+    parent_conn = None
+    child_conn = None
+    p = None
+    try:
+        ctx = mp.get_context("spawn" if sys.platform == "win32" else "fork")
+        parent_conn, child_conn = ctx.Pipe()
+        p = ctx.Process(
+            target=_mp_phase_worker_entrypoint,
+            args=(fn, timeout_sec, child_conn),
+            name=f"readiness_phase_{phase_name}",
         )
-    if error_container:
-        raise error_container[0]
-    if result_container:
-        return result_container[0]
-    raise RuntimeError(f"Phase '{phase_name}' returned no result")
+        p.start()
+
+        p.join(timeout=timeout_sec)
+        if p.is_alive():
+            p.terminate()
+            p.join(timeout=0.15)
+            if p.is_alive():
+                p.kill()
+                p.join(timeout=0.05)
+            raise TimeoutError(
+                f"Phase '{phase_name}' exceeded bounded monotonic deadline of {timeout_sec:.3f}s "
+                f"(worker PID {p.pid} forcibly terminated and killed)"
+            )
+
+        if parent_conn.poll(0.05):
+            ok, val = parent_conn.recv()
+            if ok:
+                return val
+            if isinstance(val, Exception):
+                raise val
+            raise RuntimeError(f"Phase '{phase_name}' execution error: {val}")
+
+        if p.exitcode != 0:
+            raise RuntimeError(f"Phase '{phase_name}' worker process exited with non-zero code {p.exitcode}")
+        raise RuntimeError(f"Phase '{phase_name}' returned no result")
+    except (PicklingError, TypeError, AttributeError):
+        # Fallback to bounded in-thread execution if callable contains non-picklable closures (e.g. nested lambdas)
+        result_container: List[Any] = []
+        error_container: List[Exception] = []
+
+        def _worker():
+            try:
+                res = fn(timeout_sec)
+                result_container.append(res)
+            except Exception as exc:
+                error_container.append(exc)
+
+        t = threading.Thread(target=_worker, name=f"readiness_phase_{phase_name}", daemon=True)
+        t.start()
+        t.join(timeout=timeout_sec)
+        if t.is_alive():
+            raise TimeoutError(
+                f"Phase '{phase_name}' exceeded bounded monotonic deadline of {timeout_sec:.3f}s "
+                f"(in-process execution abandoned after monotonic deadline)"
+            )
+        if error_container:
+            raise error_container[0]
+        if result_container:
+            return result_container[0]
+        raise RuntimeError(f"Phase '{phase_name}' returned no result")
+    finally:
+        if parent_conn is not None:
+            try:
+                parent_conn.close()
+            except Exception:
+                pass
+        if child_conn is not None:
+            try:
+                child_conn.close()
+            except Exception:
+                pass
 
 
 def check_health(
@@ -238,8 +304,11 @@ def run_service_readiness_probe(
     if restart_fn is not None:
         try:
             code_restart, out_restart = run_bounded_phase("restart", restart_fn, rem_restart)
-        except (TimeoutError, Exception) as exc:
-            print(f"❌ FAIL: PM2 restart execution failed or timed out ({type(exc).__name__}): {exc}", file=sys.stderr)
+        except TimeoutError as exc:
+            print(f"❌ FAIL: PM2 restart phase exceeded monotonic deadline (TimeoutError): {exc}", file=sys.stderr)
+            return 1
+        except Exception as exc:
+            print(f"❌ FAIL: PM2 restart execution failed ({type(exc).__name__}): {exc}", file=sys.stderr)
             return 1
     else:
         try:
@@ -282,7 +351,9 @@ def run_service_readiness_probe(
         if poll_fn is not None:
             try:
                 ok, diag = run_bounded_phase("poll", poll_fn, http_timeout)
-            except (TimeoutError, Exception) as exc:
+            except TimeoutError as exc:
+                ok, diag = False, f"Poll phase exceeded deadline (TimeoutError): {exc}"
+            except Exception as exc:
                 ok, diag = False, f"Poll phase failed ({type(exc).__name__}): {exc}"
         else:
             ok, diag = check_health(timeout_sec=http_timeout)
@@ -312,8 +383,11 @@ def run_service_readiness_probe(
     if inspect_fn is not None:
         try:
             pm2_ok, pm2_msg = run_bounded_phase("inspect", inspect_fn, rem_inspect)
-        except (TimeoutError, Exception) as exc:
-            print(f"❌ FAIL: PM2 inspect phase failed or timed out ({type(exc).__name__}): {exc}", file=sys.stderr)
+        except TimeoutError as exc:
+            print(f"❌ FAIL: PM2 inspect phase exceeded deadline (TimeoutError): {exc}", file=sys.stderr)
+            return 1
+        except Exception as exc:
+            print(f"❌ FAIL: PM2 inspect phase failed ({type(exc).__name__}): {exc}", file=sys.stderr)
             return 1
     else:
         pm2_ok, pm2_msg = verify_pm2_process_state("vf-api", timeout_sec=min(5.0, rem_inspect))
@@ -333,8 +407,11 @@ def run_service_readiness_probe(
     if status_fn is not None:
         try:
             code_status, out_status = run_bounded_phase("status", status_fn, rem_status)
-        except (TimeoutError, Exception) as exc:
-            print(f"❌ FAIL: PM2 status phase failed or timed out ({type(exc).__name__}): {exc}", file=sys.stderr)
+        except TimeoutError as exc:
+            print(f"❌ FAIL: PM2 status phase exceeded deadline (TimeoutError): {exc}", file=sys.stderr)
+            return 1
+        except Exception as exc:
+            print(f"❌ FAIL: PM2 status phase failed ({type(exc).__name__}): {exc}", file=sys.stderr)
             return 1
     else:
         try:
@@ -366,8 +443,11 @@ def run_service_readiness_probe(
     if cleanup_fn is not None:
         try:
             code_cleanup, out_cleanup = run_bounded_phase("cleanup", cleanup_fn, rem_cleanup)
-        except (TimeoutError, Exception) as exc:
-            print(f"❌ FAIL: PM2 cleanup phase failed or timed out ({type(exc).__name__}): {exc}", file=sys.stderr)
+        except TimeoutError as exc:
+            print(f"❌ FAIL: PM2 cleanup phase exceeded deadline (TimeoutError): {exc}", file=sys.stderr)
+            return 1
+        except Exception as exc:
+            print(f"❌ FAIL: PM2 cleanup phase failed ({type(exc).__name__}): {exc}", file=sys.stderr)
             return 1
         if code_cleanup != 0:
             print(f"❌ FAIL: PM2 cleanup execution failed with exit code {code_cleanup}: {out_cleanup}", file=sys.stderr)
