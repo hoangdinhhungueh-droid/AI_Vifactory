@@ -131,8 +131,8 @@ def condense_qa_telemetry(qa_summary: str, max_chars: int = 24000) -> str:
     allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT", "").strip() in ("1", "true", "yes")
     effective_max = 80000 if allow_massive else max_chars
 
-    # Under ALLOW_MASSIVE_LLM_CONTEXT, preserve full raw telemetry without any condensation
-    if allow_massive and len(qa_summary) <= effective_max:
+    # Under ALLOW_MASSIVE_LLM_CONTEXT, preserve full raw telemetry without any condensation or truncation markers
+    if allow_massive:
         return qa_summary
 
     lines = qa_summary.splitlines()
@@ -379,16 +379,15 @@ def build_anti_bloat_digest(
     tok_count = estimate_tokens(serialized)
 
     allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT", "").strip() in ("1", "true", "yes")
-    effective_ceiling = 45000 if allow_massive else MAX_SUPERVISOR_INPUT_TOKENS
-    if tok_count > effective_ceiling:
-        logger.info(f"Digest tokens ({tok_count}) exceeds ceiling ({effective_ceiling}). Activating secondary compaction...")
+    if not allow_massive and tok_count > MAX_SUPERVISOR_INPUT_TOKENS:
+        logger.info(f"Digest tokens ({tok_count}) exceeds ceiling ({MAX_SUPERVISOR_INPUT_TOKENS}). Activating secondary compaction...")
         diff_lines = digest["compact_diff"].splitlines()
-        digest["compact_diff"] = "\n".join(diff_lines[:500]) + f"\n... [Secondary Anti-Bloat Truncation Active at {effective_ceiling} tokens limit]"
+        digest["compact_diff"] = "\n".join(diff_lines[:250]) + f"\n... [Secondary Anti-Bloat Truncation Active at {MAX_SUPERVISOR_INPUT_TOKENS} tokens limit]"
 
         # Secondary telemetry compaction if still over limit
         tok_count = estimate_tokens(json.dumps(digest, ensure_ascii=False))
-        if tok_count > effective_ceiling:
-            digest["qa_summary"] = condense_qa_telemetry(digest["qa_summary"], max_chars=40000)
+        if tok_count > MAX_SUPERVISOR_INPUT_TOKENS:
+            digest["qa_summary"] = condense_qa_telemetry(digest["qa_summary"], max_chars=12000)
 
     digest["estimated_tokens"] = estimate_tokens(json.dumps(digest, ensure_ascii=False))
     return digest

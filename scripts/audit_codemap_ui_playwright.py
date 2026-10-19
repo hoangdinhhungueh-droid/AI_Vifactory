@@ -13,7 +13,6 @@ Saves real screenshots with SHA-256 hashes for Boss verification.
 
 import hashlib
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -95,7 +94,7 @@ def audit_codemap_ui() -> dict:
     import time
     git_sha = "unknown"
     try:
-        git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
+        git_sha = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
     except Exception:
         pass
 

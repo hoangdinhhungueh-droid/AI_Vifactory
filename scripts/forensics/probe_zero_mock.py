@@ -199,20 +199,22 @@ def main() -> int:
     print("\n   C. Mathematical Count Reconciliation Proof (Boss Round 6 Item 7 & Round 8 Item 22):")
     legacy_baseline = 211
     failover_addition = 3  # in tests/unit/test_vps_runner_failover.py for isolated network failover tests
-    expected_reconciled = legacy_baseline + failover_addition
+    repair_addition = 13  # in tests/unit/test_critic_gate_fail_closed.py for 1-shot angle repair
+    expected_reconciled = legacy_baseline + failover_addition + repair_addition
 
     print(f"       * Round 5 Approved Baseline (tests/unit/):   {legacy_baseline} references")
     print(f"       * Round 6 Failover Addition (tests/unit/):   +{failover_addition} references (in test_vps_runner_failover.py)")
+    print(f"       * Round 13 Angle Repair Addition (tests/unit/): +{repair_addition} references (in test_critic_gate_fail_closed.py)")
     print(f"       * Calculated Reconciled Total (tests/unit/):  {expected_reconciled} references")
     print(f"       * Actual Counted Total (tests/unit/):         {total_unit} references")
 
     if total_unit != expected_reconciled:
-        print(f"❌ FAIL: tests/unit/ count mismatch! Expected {expected_reconciled} (211 + 3), found {total_unit}", file=sys.stderr)
+        print(f"❌ FAIL: tests/unit/ count mismatch! Expected {expected_reconciled} (211 + 3 + 13), found {total_unit}", file=sys.stderr)
         return 1
 
     assert total_unit == expected_reconciled, f"tests/unit count mismatch: {total_unit} != {expected_reconciled}"
     assert total_all == total_unit + total_root
-    print(f"   ✅ tests/unit/ ARITHMETIC PROOF PASSED: {legacy_baseline} + {failover_addition} = {total_unit} (100% matched)")
+    print(f"   ✅ tests/unit/ ARITHMETIC PROOF PASSED: {legacy_baseline} + {failover_addition} + {repair_addition} = {total_unit} (100% matched)")
     print(f"   ✅ COMPLETE OFFLINE TEST REPOSITORY PROOF: {total_unit} (unit) + {total_root} (legacy) = {total_all} references")
     print("   ✅ ZERO test doubles leak into production runtime.")
 

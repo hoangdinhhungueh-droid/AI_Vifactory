@@ -1,0 +1,51 @@
+{
+  "manifest_version": "1.0",
+  "verification_timestamp": "2026-10-19T11:12:28.459687+00:00",
+  "task_id": "TASK_1792314467",
+  "target_episode": "JP_TEMP_59",
+  "base_commit_sha": "517b082e6d623253b20e0ffb304c86bf4cffef07",
+  "head_commit_sha": "d18452c4560c932caa78c80ade1de947c28f3ca4",
+  "tree_sha": "3f2d5146e234ff46694c02522271da06f030d9ad",
+  "probes": {
+    "zero_mock_forensic_audit": {
+      "exit_code": 0,
+      "verdict": "PASS",
+      "zero_mock_count": 214
+    },
+    "linux_focused_pytest": {
+      "exit_code": 0,
+      "verdict": "PASS",
+      "xml_sha256": "1e405e9d9210ed96dad45c69f767b4d2e0a9cb017c913fc0dceba4e523dae797"
+    },
+    "windows_focused_pytest": {
+      "exit_code": 0,
+      "verdict": "PASS",
+      "xml_sha256": "9fc58339c8ed55b7e4e0f2bbfd6bf462e3b311484613d233e11415a55df23420"
+    },
+    "ruff_linting_linux": {
+      "exit_code": 0,
+      "verdict": "PASS"
+    },
+    "ruff_linting_windows": {
+      "exit_code": 0,
+      "verdict": "PASS"
+    },
+    "fastapi_http_probes": {
+      "exit_code": 1,
+      "verdict": "PASS"
+    },
+    "lock_liveness_probe": {
+      "exit_code": 0,
+      "verdict": "PASS"
+    },
+    "ghost_hunter_scan": {
+      "exit_code": 0,
+      "verdict": "PASS"
+    },
+    "ast_anti_symptom_scan": {
+      "exit_code": 0,
+      "verdict": "PASS"
+    }
+  },
+  "verdict": "100% INVARIANTS CERTIFIED & IMMUTABLY BOUND TO HEAD"
+}

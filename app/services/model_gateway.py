@@ -15,7 +15,7 @@ import httpx
 from typing import Optional, Dict, Any, List
 from enum import Enum
 
-from app.services.cost_tracker import get_global_tracker, CostCapExceededError
+from app.services.cost_tracker import get_global_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class AllProvidersFailed(ModelGatewayError):
     pass
 
 
-MAX_ABSOLUTE_INPUT_CEILING = 60000
+MAX_ABSOLUTE_INPUT_CEILING = int(os.getenv("HHTECH_MAX_ABSOLUTE_INPUT_CEILING", "120000"))
 
 
 class ModelGateway:
