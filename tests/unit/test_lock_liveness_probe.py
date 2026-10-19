@@ -9,6 +9,7 @@ Zero synthetic doubles: strictly uses deterministic attribute stubs.
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import errno
+import multiprocessing
 import os
 from pathlib import Path
 import pytest
@@ -21,6 +22,7 @@ from scripts.forensics.probe_lock_liveness import (
     get_posix_proc_starttime,
     atomic_safe_archive,
     acquire_disposal_mutex,
+    _mp_disposal_worker,
     main as probe_main,
 )
 
@@ -710,3 +712,228 @@ def test_acquire_disposal_mutex_descriptor_closure_on_unlock_failure(tmp_path: P
         assert stat_exc.value.errno == errno.EBADF
     finally:
         os.open = orig_open
+
+
+def test_multiprocess_archival_race_under_mutex(tmp_path: Path):
+    """Proves cross-process mutual exclusion during concurrent archival using multiprocessing.Process and Barrier."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+    mutex_file = locks_dir / ".disposal_operation.mutex"
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    content = '{"owner": "JP_TEMP_59.b3b4"}'
+    active_lock.write_text(content, encoding="utf-8")
+
+    ctx = multiprocessing.get_context("spawn" if sys.platform == "win32" else "fork")
+    barrier = ctx.Barrier(2)
+    results_queue = ctx.Queue()
+
+    p1 = ctx.Process(target=_mp_disposal_worker, args=(str(mutex_file), str(active_lock), str(stale_dir), barrier, results_queue))
+    p2 = ctx.Process(target=_mp_disposal_worker, args=(str(mutex_file), str(active_lock), str(stale_dir), barrier, results_queue))
+
+    p1.start()
+    p2.start()
+    p1.join(timeout=15)
+    p2.join(timeout=15)
+
+    outputs = []
+    while not results_queue.empty():
+        outputs.append(results_queue.get_nowait())
+
+    assert len(outputs) == 2
+    successes = [out for out in outputs if out[0] == "SUCCESS"]
+    errors = [out for out in outputs if out[0] == "ERROR"]
+
+    assert len(successes) == 1, f"Expected exactly 1 success, got {len(successes)}: {outputs}"
+    assert len(errors) == 1, f"Expected exactly 1 error, got {len(errors)}: {outputs}"
+    assert not active_lock.exists()
+    archived_files = list(stale_dir.glob("JP_TEMP_59.b3b4_*.lock"))
+    assert len(archived_files) == 1
+    assert archived_files[0].read_text(encoding="utf-8") == content
+
+
+def test_probe_main_indeterminate_at_initial_inspection_causes_zero_mutation(tmp_path: Path):
+    """Proves that LivenessStatus.INDETERMINATE at initial inspection causes zero mutation."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    content = '{"owner": "JP_TEMP_59.b3b4", "pid": 999999, "token": "LOCK_TOKEN_JP_TEMP_59_999999", "created_at": "2026-10-18T10:00:00+00:00"}'
+    active_lock.write_text(content, encoding="utf-8")
+
+    import scripts.forensics.probe_lock_liveness as probe_mod
+    orig_check = probe_mod.check_pid_liveness
+
+    def indeterminate_check(pid, created_dt_str=None):
+        return probe_mod.LivenessResult(
+            status=probe_mod.LivenessStatus.INDETERMINATE,
+            is_alive=None,
+            proc_start=None,
+            diagnostic="EPERM permission denied",
+        )
+
+    probe_mod.check_pid_liveness = indeterminate_check
+    try:
+        exit_code = probe_main(["--dispose", f"--locks-dir={locks_dir}"])
+        assert exit_code == 1
+        assert active_lock.exists(), "Source lock must NOT be modified or deleted"
+        assert active_lock.read_text(encoding="utf-8") == content
+        assert len(list(stale_dir.iterdir())) == 0, "Destination stale dir must remain empty"
+    finally:
+        probe_mod.check_pid_liveness = orig_check
+
+
+def test_probe_main_indeterminate_at_mutex_revalidation_causes_zero_mutation(tmp_path: Path):
+    """Proves that LivenessStatus.INDETERMINATE at mutex-held revalidation causes zero mutation."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    content = '{"owner": "JP_TEMP_59.b3b4", "pid": 999999, "token": "LOCK_TOKEN_JP_TEMP_59_999999", "created_at": "2026-10-18T10:00:00+00:00"}'
+    active_lock.write_text(content, encoding="utf-8")
+
+    import scripts.forensics.probe_lock_liveness as probe_mod
+    orig_check = probe_mod.check_pid_liveness
+    invocation = [0]
+
+    def dynamic_check(pid, created_dt_str=None):
+        invocation[0] += 1
+        if invocation[0] == 1:
+            return probe_mod.LivenessResult(
+                status=probe_mod.LivenessStatus.CONFIRMED_DEAD,
+                is_alive=False,
+                proc_start=None,
+                diagnostic="PID confirmed absent",
+            )
+        return probe_mod.LivenessResult(
+            status=probe_mod.LivenessStatus.INDETERMINATE,
+            is_alive=None,
+            proc_start=None,
+            diagnostic="EPERM permission denied under mutex",
+        )
+
+    probe_mod.check_pid_liveness = dynamic_check
+    try:
+        with pytest.raises(RuntimeError) as exc:
+            probe_main(["--dispose", f"--locks-dir={locks_dir}"])
+        assert "Race condition detected" in str(exc.value)
+        assert "INDETERMINATE" in str(exc.value)
+        assert active_lock.exists(), "Source lock must NOT be modified or deleted"
+        assert active_lock.read_text(encoding="utf-8") == content
+        assert len(list(stale_dir.iterdir())) == 0, "Destination stale dir must remain empty"
+    finally:
+        probe_mod.check_pid_liveness = orig_check
+
+
+def test_atomic_safe_archive_copy_fallback_failure_rollback(tmp_path: Path):
+    """Verifies that copy fallback cleans up destination and leaves source intact on I/O write error."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    content = '{"owner": "JP_TEMP_59.b3b4", "data": "payload"}'
+    active_lock.write_text(content, encoding="utf-8")
+
+    orig_link = os.link
+    orig_write = os.write
+
+    def fail_link(src, dst):
+        raise NotImplementedError("Link unsupported")
+
+    def fail_write(fd, data):
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    os.link = fail_link
+    os.write = fail_write
+    try:
+        with pytest.raises((RuntimeError, OSError)) as exc:
+            atomic_safe_archive(active_lock, stale_dir)
+        assert "No space left on device" in str(exc.value)
+        assert active_lock.exists()
+        assert active_lock.read_text(encoding="utf-8") == content
+        assert len(list(stale_dir.iterdir())) == 0
+    finally:
+        os.link = orig_link
+        os.write = orig_write
+
+
+def test_atomic_safe_archive_destination_rollback_reporting(tmp_path: Path):
+    """Verifies explicit rollback reporting: 'verified rollback performed' on clean removal vs 'rollback failed or incomplete'."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    content = '{"owner": "JP_TEMP_59.b3b4"}'
+    active_lock.write_text(content, encoding="utf-8")
+
+    orig_fsync = os.fsync
+    orig_unlink = os.unlink
+
+    def fail_fsync(fd):
+        raise OSError(errno.EIO, "fsync write failure")
+
+    # Case 1: fsync fails, unlinking destination succeeds -> reports 'verified rollback performed'
+    os.fsync = fail_fsync
+    try:
+        with pytest.raises(RuntimeError) as exc:
+            atomic_safe_archive(active_lock, stale_dir)
+        assert "verified rollback performed" in str(exc.value)
+        assert active_lock.exists()
+        assert len(list(stale_dir.iterdir())) == 0
+    finally:
+        os.fsync = orig_fsync
+
+    # Case 2: fsync fails and unlinking destination also fails -> reports 'rollback failed or incomplete'
+    def fail_unlink(path):
+        if str(stale_dir) in str(path):
+            raise OSError(errno.EACCES, "unlink access denied")
+        return orig_unlink(path)
+
+    os.fsync = fail_fsync
+    os.unlink = fail_unlink
+    try:
+        with pytest.raises(RuntimeError) as exc:
+            atomic_safe_archive(active_lock, stale_dir)
+        assert "rollback failed or incomplete" in str(exc.value)
+        assert active_lock.exists()
+    finally:
+        os.fsync = orig_fsync
+        os.unlink = orig_unlink
+
+
+def test_atomic_safe_archive_destination_collision_exhaustion(tmp_path: Path):
+    """Verifies that persistent destination collisions exhaust max_retries and fail-closed without mutating source."""
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    stale_dir = locks_dir / "_stale"
+    stale_dir.mkdir()
+
+    active_lock = locks_dir / "JP_TEMP_59.b3b4.lock"
+    content = '{"owner": "JP_TEMP_59.b3b4"}'
+    active_lock.write_text(content, encoding="utf-8")
+
+    orig_link = os.link
+
+    def always_colliding_link(src, dst):
+        raise FileExistsError(errno.EEXIST, "File already exists")
+
+    os.link = always_colliding_link
+    try:
+        with pytest.raises(RuntimeError) as exc:
+            atomic_safe_archive(active_lock, stale_dir, max_retries=3)
+        assert "Failed to atomically reserve unique destination" in str(exc.value)
+        assert "after 3 attempts" in str(exc.value)
+        assert active_lock.exists()
+        assert active_lock.read_text(encoding="utf-8") == content
+    finally:
+        os.link = orig_link

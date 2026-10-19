@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
+from enum import Enum
 import errno
 import hashlib
 import json
@@ -31,6 +33,44 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+
+class ProcStartStatus(str, Enum):
+    VERIFIED = "VERIFIED"
+    NOT_FOUND = "NOT_FOUND"
+    MALFORMED = "MALFORMED"
+    INACCESSIBLE = "INACCESSIBLE"
+    INDETERMINATE = "INDETERMINATE"
+
+
+@dataclass(frozen=True)
+class ProcStartResult:
+    status: ProcStartStatus
+    start_time: Optional[datetime]
+    diagnostic: str
+
+    def __iter__(self):
+        yield self.start_time
+        yield self.diagnostic
+
+
+class LivenessStatus(str, Enum):
+    VERIFIED_ALIVE = "VERIFIED_ALIVE"
+    CONFIRMED_DEAD = "CONFIRMED_DEAD"
+    PID_REUSED = "PID_REUSED"
+    INDETERMINATE = "INDETERMINATE"
+
+
+@dataclass(frozen=True)
+class LivenessResult:
+    status: LivenessStatus
+    is_alive: Optional[bool]
+    proc_start: Optional[ProcStartResult]
+    diagnostic: str
+
+    def __iter__(self):
+        yield self.is_alive
+        yield self.diagnostic
 
 
 SCOPE_REGEX = re.compile(r"^[A-Z]{2}_[A-Za-z0-9_]+\.[a-z0-9_]+$")
@@ -101,36 +141,59 @@ def validate_lock_metadata(data: Dict[str, Any], lock_path: Path) -> Tuple[str, 
     return owner, token, created_at_str, pid
 
 
-def get_posix_proc_starttime(pid: int, proc_root: str = "/proc") -> Tuple[Optional[datetime], str]:
+def get_posix_proc_starttime(pid: int, proc_root: str = "/proc") -> ProcStartResult:
     """Parses Linux kernel starttime from /proc/<pid>/stat field 22.
 
     Defends against PID reuse by extracting the exact process start tick count
     and combining it with system boot time from /proc/stat per kernel spec.
+    Returns typed ProcStartResult with fail-closed status.
     """
     root_dir = Path(proc_root)
     stat_path = root_dir / str(pid) / "stat"
     if not stat_path.exists():
-        return None, f"{stat_path} does not exist (process absent)"
+        return ProcStartResult(
+            status=ProcStartStatus.NOT_FOUND,
+            start_time=None,
+            diagnostic=f"{stat_path} does not exist (process absent)",
+        )
     try:
         content = stat_path.read_text(encoding="utf-8", errors="replace")
     except PermissionError as pe:
-        return None, f"Permission denied reading {stat_path}: {pe}"
+        return ProcStartResult(
+            status=ProcStartStatus.INACCESSIBLE,
+            start_time=None,
+            diagnostic=f"Permission denied reading {stat_path}: {pe}",
+        )
     except OSError as oe:
-        return None, f"OS error reading {stat_path}: {oe}"
+        return ProcStartResult(
+            status=ProcStartStatus.INACCESSIBLE,
+            start_time=None,
+            diagnostic=f"OS error reading {stat_path}: {oe}",
+        )
 
     r_idx = content.rfind(")")
     if r_idx == -1:
-        return None, f"Corrupted {stat_path} format (missing ')') in {content[:40]}"
+        return ProcStartResult(
+            status=ProcStartStatus.MALFORMED,
+            start_time=None,
+            diagnostic=f"Corrupted {stat_path} format (missing ')') in {content[:40]}",
+        )
     fields = content[r_idx + 2:].split()
-    # field 1: pid, field 2: (comm). fields[0] is field 3 (state).
-    # field 22 is fields[22 - 3] = fields[19]
     if len(fields) <= 19:
-        return None, f"Truncated {stat_path}: only {len(fields)} fields after comm"
+        return ProcStartResult(
+            status=ProcStartStatus.MALFORMED,
+            start_time=None,
+            diagnostic=f"Truncated {stat_path}: only {len(fields)} fields after comm",
+        )
 
     try:
         starttime_ticks = int(fields[19])
     except ValueError as ve:
-        return None, f"Invalid starttime field 22 in {stat_path}: {fields[19]}: {ve}"
+        return ProcStartResult(
+            status=ProcStartStatus.MALFORMED,
+            start_time=None,
+            diagnostic=f"Invalid starttime field 22 in {stat_path}: {fields[19]}: {ve}",
+        )
 
     clk_tck: Optional[int] = None
     try:
@@ -140,7 +203,11 @@ def get_posix_proc_starttime(pid: int, proc_root: str = "/proc") -> Tuple[Option
         clk_tck = None
 
     if clk_tck is None or clk_tck <= 0:
-        return None, "INDETERMINATE: SC_CLK_TCK unavailable (fail-closed)"
+        return ProcStartResult(
+            status=ProcStartStatus.INDETERMINATE,
+            start_time=None,
+            diagnostic="INDETERMINATE: SC_CLK_TCK unavailable (fail-closed)",
+        )
 
     system_stat_path = root_dir / "stat"
     btime = 0
@@ -151,24 +218,33 @@ def get_posix_proc_starttime(pid: int, proc_root: str = "/proc") -> Tuple[Option
                     btime = int(line.split()[1])
                     break
     except (OSError, PermissionError, ValueError) as be:
-        return None, f"Could not read btime from {system_stat_path}: {be}"
+        return ProcStartResult(
+            status=ProcStartStatus.INDETERMINATE,
+            start_time=None,
+            diagnostic=f"Could not read btime from {system_stat_path}: {be}",
+        )
 
     if btime == 0:
-        return None, f"btime not found in {system_stat_path}"
+        return ProcStartResult(
+            status=ProcStartStatus.INDETERMINATE,
+            start_time=None,
+            diagnostic=f"btime not found in {system_stat_path}",
+        )
 
     proc_start_epoch = btime + (float(starttime_ticks) / float(clk_tck))
     proc_start_dt = datetime.fromtimestamp(proc_start_epoch, tz=timezone.utc)
-    return proc_start_dt, "OK"
+    return ProcStartResult(
+        status=ProcStartStatus.VERIFIED,
+        start_time=proc_start_dt,
+        diagnostic="OK",
+    )
 
 
-def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[Optional[bool], str]:
+def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> LivenessResult:
     """Non-destructive, platform-appropriate process liveness check.
 
-    Returns:
-      (is_alive, diagnostic_reason)
-      - True:  Process is confirmed alive and running with matching identity/start-time.
-      - False: Process is confirmed absent / dead (safe to dispose).
-      - None:  Liveness is indeterminate (permission denied, metadata inaccessible). Fail-closed.
+    Returns typed LivenessResult containing explicit LivenessStatus enum,
+    is_alive flag (True, False, or None), and typed diagnostic metadata.
     """
     created_dt: Optional[datetime] = None
     if created_dt_str:
@@ -179,7 +255,12 @@ def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[
                 raise ValueError(f"Lock timestamp '{created_dt_str}' must be timezone-aware")
         except (ValueError, TypeError) as ts_err:
             sys.stderr.write(f"[liveness error] invalid lock created_at '{created_dt_str}': {ts_err}\n")
-            return None, f"INDETERMINATE: invalid created_at timestamp '{created_dt_str}': {ts_err} (fail-closed)"
+            return LivenessResult(
+                status=LivenessStatus.INDETERMINATE,
+                is_alive=None,
+                proc_start=None,
+                diagnostic=f"INDETERMINATE: invalid created_at timestamp '{created_dt_str}': {ts_err} (fail-closed)",
+            )
 
     if sys.platform == "win32":
         import ctypes
@@ -192,17 +273,37 @@ def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[
             err = kernel32.GetLastError()
             ERROR_INVALID_PARAMETER = 87
             if err == ERROR_INVALID_PARAMETER:
-                return False, f"PID {pid} not found (confirmed absence on Windows)"
+                return LivenessResult(
+                    status=LivenessStatus.CONFIRMED_DEAD,
+                    is_alive=False,
+                    proc_start=None,
+                    diagnostic=f"PID {pid} not found (confirmed absence on Windows)",
+                )
             if err == 5:  # ERROR_ACCESS_DENIED
-                return None, f"INDETERMINATE: PID {pid} Access Denied (EPERM equivalent - fail-closed)"
-            return None, f"INDETERMINATE: OpenProcess({pid}) failed with error {err} (fail-closed)"
+                return LivenessResult(
+                    status=LivenessStatus.INDETERMINATE,
+                    is_alive=None,
+                    proc_start=None,
+                    diagnostic=f"INDETERMINATE: PID {pid} Access Denied (EPERM equivalent - fail-closed)",
+                )
+            return LivenessResult(
+                status=LivenessStatus.INDETERMINATE,
+                is_alive=None,
+                proc_start=None,
+                diagnostic=f"INDETERMINATE: OpenProcess({pid}) failed with error {err} (fail-closed)",
+            )
         else:
             try:
                 exit_code = wintypes.DWORD()
                 if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
                     STILL_ACTIVE = 259
                     if exit_code.value != STILL_ACTIVE:
-                        return False, f"PID {pid} terminated with exit code {exit_code.value}"
+                        return LivenessResult(
+                            status=LivenessStatus.CONFIRMED_DEAD,
+                            is_alive=False,
+                            proc_start=None,
+                            diagnostic=f"PID {pid} terminated with exit code {exit_code.value}",
+                        )
 
                     # Validate process start time against lock metadata (PID reuse defense)
                     class FILETIME(ctypes.Structure):
@@ -217,35 +318,102 @@ def check_pid_liveness(pid: int, created_dt_str: Optional[str] = None) -> Tuple[
                         if intervals > 0:
                             proc_start_epoch = (intervals - 116444736000000000) / 10000000
                             proc_start_dt = datetime.fromtimestamp(proc_start_epoch, tz=timezone.utc)
+                            proc_start_res = ProcStartResult(
+                                status=ProcStartStatus.VERIFIED,
+                                start_time=proc_start_dt,
+                                diagnostic="Windows GetProcessTimes verified",
+                            )
                             if created_dt and proc_start_dt > created_dt + timedelta(seconds=2):
-                                return False, f"PID_REUSED: PID {pid} was created at {proc_start_dt.isoformat()} after lock timestamp {created_dt.isoformat()} (original holder dead)"
-                    return True, f"PID {pid} is running (STILL_ACTIVE, process identity & start time consistent)"
-                return None, f"INDETERMINATE: Cannot determine exit code for PID {pid} (fail-closed)"
+                                return LivenessResult(
+                                    status=LivenessStatus.PID_REUSED,
+                                    is_alive=False,
+                                    proc_start=proc_start_res,
+                                    diagnostic=f"PID_REUSED: PID {pid} was created at {proc_start_dt.isoformat()} after lock timestamp {created_dt.isoformat()} (original holder dead)",
+                                )
+                            return LivenessResult(
+                                status=LivenessStatus.VERIFIED_ALIVE,
+                                is_alive=True,
+                                proc_start=proc_start_res,
+                                diagnostic=f"PID {pid} is running (STILL_ACTIVE, process identity & start time consistent)",
+                            )
+                    return LivenessResult(
+                        status=LivenessStatus.VERIFIED_ALIVE,
+                        is_alive=True,
+                        proc_start=None,
+                        diagnostic=f"PID {pid} is running (STILL_ACTIVE)",
+                    )
+                return LivenessResult(
+                    status=LivenessStatus.INDETERMINATE,
+                    is_alive=None,
+                    proc_start=None,
+                    diagnostic=f"INDETERMINATE: Cannot determine exit code for PID {pid} (fail-closed)",
+                )
             finally:
                 kernel32.CloseHandle(handle)
     else:
         try:
             os.kill(pid, 0)
         except ProcessLookupError:
-            return False, f"PID {pid} does not exist (ESRCH confirmed absence)"
-        except PermissionError:
-            return None, f"INDETERMINATE: EPERM permission denied for PID {pid} (fail-closed, cannot confirm dead)"
+            return LivenessResult(
+                status=LivenessStatus.CONFIRMED_DEAD,
+                is_alive=False,
+                proc_start=ProcStartResult(status=ProcStartStatus.NOT_FOUND, start_time=None, diagnostic="ProcessLookupError"),
+                diagnostic=f"PID {pid} does not exist (ESRCH confirmed absence)",
+            )
+        except PermissionError as pe:
+            return LivenessResult(
+                status=LivenessStatus.INDETERMINATE,
+                is_alive=None,
+                proc_start=ProcStartResult(status=ProcStartStatus.INACCESSIBLE, start_time=None, diagnostic=str(pe)),
+                diagnostic=f"INDETERMINATE: EPERM permission denied for PID {pid} (fail-closed, cannot confirm dead)",
+            )
         except OSError as err:
             if err.errno == errno.ESRCH:
-                return False, f"PID {pid} does not exist (ESRCH confirmed absence)"
+                return LivenessResult(
+                    status=LivenessStatus.CONFIRMED_DEAD,
+                    is_alive=False,
+                    proc_start=ProcStartResult(status=ProcStartStatus.NOT_FOUND, start_time=None, diagnostic=str(err)),
+                    diagnostic=f"PID {pid} does not exist (ESRCH confirmed absence)",
+                )
             elif err.errno == errno.EPERM:
-                return None, f"INDETERMINATE: EPERM permission denied for PID {pid} (fail-closed, cannot confirm dead)"
+                return LivenessResult(
+                    status=LivenessStatus.INDETERMINATE,
+                    is_alive=None,
+                    proc_start=ProcStartResult(status=ProcStartStatus.INACCESSIBLE, start_time=None, diagnostic=str(err)),
+                    diagnostic=f"INDETERMINATE: EPERM permission denied for PID {pid} (fail-closed, cannot confirm dead)",
+                )
             else:
-                return None, f"INDETERMINATE: OSError {err.errno} for PID {pid} (fail-closed, cannot confirm dead)"
+                return LivenessResult(
+                    status=LivenessStatus.INDETERMINATE,
+                    is_alive=None,
+                    proc_start=None,
+                    diagnostic=f"INDETERMINATE: OSError {err.errno} for PID {pid} (fail-closed, cannot confirm dead)",
+                )
 
         # Process responded to signal 0. Validate start time from /proc/<pid>/stat field 22 to defend against PID reuse
-        proc_start_dt, start_reason = get_posix_proc_starttime(pid)
-        if proc_start_dt is not None:
-            if created_dt and proc_start_dt > created_dt + timedelta(seconds=2):
-                return False, f"PID_REUSED: PID {pid} was created at {proc_start_dt.isoformat()} after lock timestamp {created_dt.isoformat()} (original holder dead)"
-            return True, f"PID {pid} confirmed alive (Linux kernel start time {proc_start_dt.isoformat()} matches lock epoch)"
+        start_res = get_posix_proc_starttime(pid)
+        if start_res.status == ProcStartStatus.VERIFIED:
+            proc_start_dt = start_res.start_time
+            if created_dt and proc_start_dt and proc_start_dt > created_dt + timedelta(seconds=2):
+                return LivenessResult(
+                    status=LivenessStatus.PID_REUSED,
+                    is_alive=False,
+                    proc_start=start_res,
+                    diagnostic=f"PID_REUSED: PID {pid} was created at {proc_start_dt.isoformat()} after lock timestamp {created_dt.isoformat()} (original holder dead)",
+                )
+            return LivenessResult(
+                status=LivenessStatus.VERIFIED_ALIVE,
+                is_alive=True,
+                proc_start=start_res,
+                diagnostic=f"PID {pid} confirmed alive (Linux kernel start time {proc_start_dt.isoformat() if proc_start_dt else 'N/A'} matches lock epoch)",
+            )
         else:
-            return None, f"INDETERMINATE: Cannot verify process start time ({start_reason}) (fail-closed)"
+            return LivenessResult(
+                status=LivenessStatus.INDETERMINATE,
+                is_alive=None,
+                proc_start=start_res,
+                diagnostic=f"INDETERMINATE: Process start time verification status '{start_res.status.value}': {start_res.diagnostic} (fail-closed)",
+            )
 
 
 def compute_file_sha256(path: Path) -> str:
@@ -455,6 +623,17 @@ def atomic_safe_archive(
     return dest_path
 
 
+def _mp_disposal_worker(mutex_file: str, lock_file: str, stale_dir: str, barrier: Any, results_queue: Any) -> None:
+    """Multiprocessing worker helper for cross-process mutex contention and race validation."""
+    try:
+        barrier.wait(timeout=10)
+        with acquire_disposal_mutex(Path(mutex_file)):
+            dest = atomic_safe_archive(Path(lock_file), Path(stale_dir))
+            results_queue.put(("SUCCESS", str(dest)))
+    except Exception as exc:
+        results_queue.put(("ERROR", type(exc).__name__, str(exc)))
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Process liveness and safe lock disposal verification probe (Rule 118 & Rule 137)."
@@ -548,24 +727,28 @@ def main(argv: Optional[list[str]] = None) -> int:
     print(f"   - Current SHA256: {current_sha}")
 
     # Non-destructive process liveness validation
-    is_alive, liveness_reason = check_pid_liveness(pid, created_at)
+    liveness = check_pid_liveness(pid, created_at)
     print("5. Process Liveness Validation:")
     print(f"   - PID Check:      PID {pid}")
-    print(f"   - Status:         ALIVE={is_alive} ({liveness_reason})")
+    print(f"   - Status:         STATUS={liveness.status.value} ALIVE={liveness.is_alive} ({liveness.diagnostic})")
 
     if not is_dispose_mode:
         print("\n6. Inspection Summary (Read-Only Mode):")
         print("   - Mutation: None performed (read-only inspection by default).")
-        disposition = "ACTIVE_PROCESS_RUNNING" if is_alive is True else ("INDETERMINATE_FAIL_CLOSED" if is_alive is None else "ABANDONED_STALE_LOCK")
+        disposition = (
+            "ACTIVE_PROCESS_RUNNING"
+            if liveness.status == LivenessStatus.VERIFIED_ALIVE
+            else ("ABANDONED_STALE_LOCK" if liveness.status in (LivenessStatus.CONFIRMED_DEAD, LivenessStatus.PID_REUSED) else "INDETERMINATE_FAIL_CLOSED")
+        )
         print(f"   - Lock Disposition: {disposition}")
         print("======================================================================")
         print("✅ PROCESS LIVENESS INSPECTION COMPLETED (Exit code 0)")
         print("======================================================================")
         return 0
 
-    # DISPOSE MODE: Must be confirmed dead (is_alive is strictly False)
-    if is_alive is not False:
-        print(f"❌ Cannot dispose active lock {target_lock}: PID {pid} is not confirmed dead! (status={is_alive}, reason: {liveness_reason})", file=sys.stderr)
+    # DISPOSE MODE: Must be confirmed dead or PID reused (fail-closed on INDETERMINATE or ALIVE)
+    if liveness.status not in (LivenessStatus.CONFIRMED_DEAD, LivenessStatus.PID_REUSED) or liveness.is_alive is not False:
+        print(f"❌ Cannot dispose active lock {target_lock}: PID {pid} is not confirmed dead! (status={liveness.status.value}, is_alive={liveness.is_alive}, diagnostic: {liveness.diagnostic})", file=sys.stderr)
         return 1
 
     print("\n6. Executing Physical Collision-Safe Safe-Trash Archival (Rule 137):")
@@ -583,9 +766,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         re_sha = compute_file_sha256(target_lock)
         if re_sha != current_sha:
             raise ValueError(f"Lock SHA changed concurrently under mutex for {target_lock}: expected {current_sha}, got {re_sha}")
-        re_alive, re_reason = check_pid_liveness(re_pid, re_created)
-        if re_alive is not False:
-            raise RuntimeError(f"Race condition detected: PID {re_pid} is not confirmed dead immediately before archival: {re_reason}")
+        re_liveness = check_pid_liveness(re_pid, re_created)
+        if re_liveness.status not in (LivenessStatus.CONFIRMED_DEAD, LivenessStatus.PID_REUSED) or re_liveness.is_alive is not False:
+            raise RuntimeError(f"Race condition detected: PID {re_pid} is not confirmed dead immediately before archival: status={re_liveness.status.value}, {re_liveness.diagnostic}")
 
         final_dest = atomic_safe_archive(target_lock, stale_dir, expected_sha=current_sha)
 

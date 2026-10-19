@@ -81,6 +81,39 @@ def mask_exception_text(exception_text: str) -> str:
     return exception_text
 
 
+def redact_telemetry_secrets(text: str) -> str:
+    """Eliminates plaintext secret and token exposure across evidence blocks and logs.
+    Redacts tokens, API keys, Bearer auth, Notion secrets, and sensitive environment assignments.
+    """
+    if not text:
+        return text
+
+    # 1. Standard masking for URLs and exceptions
+    text = mask_sensitive_url(mask_exception_text(text))
+
+    # 2. Redact Bearer tokens in headers or strings
+    text = re.sub(
+        r'(?i)(Bearer\s+)[A-Za-z0-9_\-\.]{15,}',
+        r'\1[REDACTED_BEARER_TOKEN]',
+        text
+    )
+
+    # 3. Redact common secret/token assignments in env vars, JSON, or configs
+    sensitive_keys = (
+        r'MCP_BEARER_TOKEN|NOTION_TOKEN|HHTECH_API_KEY|GEMINI_API_KEY|'
+        r'CLOUDFLARE_API_TOKEN|CF_API_TOKEN|YOUTUBE_API_KEY|GITHUB_TOKEN|'
+        r'OPENAI_API_KEY|ANTHROPIC_API_KEY|SECRET_KEY|API_KEY|API_SECRET'
+    )
+    pattern = rf'(?i)(["\']?(?:{sensitive_keys})["\']?\s*[:=]\s*["\']?)([^"\'\s,;\\}}]+)(["\']?)'
+    text = re.sub(pattern, r'\1[REDACTED_SECRET]\3', text)
+
+    # 4. Notion token prefixes: secret_... or ntn_...
+    text = re.sub(r'secret_[A-Za-z0-9]{30,}', '[REDACTED_NOTION_TOKEN]', text)
+    text = re.sub(r'ntn_[A-Za-z0-9]{30,}', '[REDACTED_NOTION_TOKEN]', text)
+
+    return text
+
+
 class SensitiveDataFilter(logging.Filter):
     """Logging filter that automatically redacts Telegram bot tokens, presigned URLs, and secrets."""
     def filter(self, record: logging.LogRecord) -> bool:
