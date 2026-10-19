@@ -1,32 +1,45 @@
 {
   "manifest_version": "1.0",
-  "verification_timestamp": "2026-10-19T11:40:19.485262+00:00",
+  "verification_timestamp": "2026-10-19T16:29:07.066860+00:00",
   "task_id": "TASK_1792314467",
   "target_episode": "JP_TEMP_59",
-  "base_commit_sha": "517b082e6d623253b20e0ffb304c86bf4cffef07",
-  "head_commit_sha": "686c1229b9c46ab8573cf10cba375cce09ada0f9",
-  "tree_sha": "baf272a3ddf0ada5cf629b017b3a92feade56819",
+  "cumulative_base_commit_sha": "517b082e6d623253b20e0ffb304c86bf4cffef07",
+  "incremental_delta_base_sha": "2bbe9732cf10db78a8db2948680c036bbacc9adb",
+  "head_commit_sha": "ca1ac040cf1146718e6349fc26e76034dda9ef52",
+  "tree_sha": "f860fa93f3617ffa6dd837486ae238516ee06ba0",
   "probes": {
     "zero_mock_forensic_audit": {
       "exit_code": 0,
       "verdict": "PASS",
-      "zero_mock_count": 227
+      "zero_mock_count": 229,
+      "expected_count": 229
     },
     "linux_focused_pytest": {
       "exit_code": 0,
       "verdict": "PASS",
-      "xml_sha256": "d8346fddb864970a82ae925b1dee46adbea170647ace764251ccc8ccf5ee7eb2"
+      "xml_sha256": "0de8231df7b8c06ae8e8b7fec12e10b9badd02d0551a5ec5d9c985df9e08f7ae",
+      "test_count": 52
     },
     "windows_focused_pytest": {
       "exit_code": 0,
       "verdict": "PASS",
-      "xml_sha256": "6caedddd23738764ee076b3ee717ade49164d11d79699dc5eb5b482ee0f59508"
+      "xml_sha256": "cb5f6070a3954036b553a8c6f66bc9bee649f8f3a8beb65263861526d9f50051",
+      "test_count": 52
+    },
+    "junit_negative_test_matrix": {
+      "linux_exit_code": 0,
+      "windows_exit_code": 0,
+      "verdict": "PASS"
     },
     "ruff_linting_linux": {
       "exit_code": 0,
       "verdict": "PASS"
     },
     "ruff_linting_windows": {
+      "exit_code": 0,
+      "verdict": "PASS"
+    },
+    "service_readiness": {
       "exit_code": 0,
       "verdict": "PASS"
     },
@@ -43,9 +56,34 @@
       "verdict": "PASS"
     },
     "ast_anti_symptom_scan": {
-      "exit_code": 1,
-      "verdict": "FAIL"
+      "exit_code": 0,
+      "verdict": "PASS"
+    },
+    "github_actions_ci": {
+      "exit_code": 0,
+      "verdict": "PASS",
+      "run_id": 39281242565,
+      "conclusion": "success",
+      "html_url": "https://github.com/hoangdinhhungueh-droid/AI_Vifactory/actions/runs/39281242565"
+    },
+    "whole_packet_secret_scan": {
+      "exit_code": 0,
+      "verdict": "PASS",
+      "findings_count": 0,
+      "scope_sha256": "36e1b98a972ad13a4ab447bc7780361062e0baf25180dd758b4689afcde43712",
+      "scanner_engine": "app.utils.security.verify_telemetry_cleanliness"
     }
+  },
+  "artifact_digests": {
+    "head_commit_sha": "ca1ac040cf1146718e6349fc26e76034dda9ef52",
+    "tree_sha": "f860fa93f3617ffa6dd837486ae238516ee06ba0",
+    "linux_junit_xml_sha256": "0de8231df7b8c06ae8e8b7fec12e10b9badd02d0551a5ec5d9c985df9e08f7ae",
+    "windows_junit_xml_sha256": "cb5f6070a3954036b553a8c6f66bc9bee649f8f3a8beb65263861526d9f50051",
+    "zero_mock_probe_sha256": "0fb8ce15dacdd56a77ff28807fa85809e05ea5f82dd04ab701842c70c631ab01",
+    "service_readiness_probe_sha256": "dd390134f14453ddd21a107524f00fd3d803a2f728280d26db193ab206cf896d",
+    "fastapi_http_probes_sha256": "bde4597e5f9cad1ddebb6aea19d43844282152f850acca0b5f96e15b282e3102",
+    "ast_scanner_sha256": "ae40ec645113bbbe0c0802eb85a54864e222a40ebb442933c1c39951390927e9",
+    "secret_scan_scope_sha256": "36e1b98a972ad13a4ab447bc7780361062e0baf25180dd758b4689afcde43712"
   },
   "verdict": "100% INVARIANTS CERTIFIED & IMMUTABLY BOUND TO HEAD"
 }

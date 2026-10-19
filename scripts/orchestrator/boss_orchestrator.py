@@ -434,6 +434,7 @@ def parse_and_validate_junit_metrics(
     min_tests: int = 52,
     expected_exact_testcases: Optional[Set[str]] = None,
     collected_count: Optional[int] = None,
+    deselected_count: Optional[int] = None,
 ) -> Tuple[int, int, int, int, int, int]:
     """Dynamically parses and strictly validates JUnit XML report (Rule 121 & Rule 139).
     Enforces exit code, freshness, non-negative integer attributes, per-suite cardinality,
@@ -558,13 +559,13 @@ def parse_and_validate_junit_metrics(
                 raise ValueError(
                     f"collected_count ({collected_count}) is less than total executed tests ({total_tests}) in {source_label}"
                 )
-            if total_deselected == 0 and collected_count > total_tests:
-                total_deselected = collected_count - total_tests
-            if total_tests + total_deselected != collected_count:
+            effective_desel = deselected_count if deselected_count is not None else total_deselected
+            if total_tests + effective_desel != collected_count:
                 raise ValueError(
                     f"Inconsistent selection/deselection accounting in {source_label}: "
-                    f"executed tests ({total_tests}) + deselected ({total_deselected}) != collected ({collected_count})"
+                    f"executed tests ({total_tests}) + deselected ({effective_desel}) != collected ({collected_count})"
                 )
+            total_deselected = effective_desel
 
         # Minimum scope and defect rejection
         if total_tests < min_tests:
@@ -607,38 +608,69 @@ def parse_and_validate_junit_metrics(
 _parse_junit_metrics = parse_and_validate_junit_metrics
 
 
+MANDATORY_MANIFEST_PROBES: Set[str] = {
+    "zero_mock_forensic_audit",
+    "linux_focused_pytest",
+    "windows_focused_pytest",
+    "junit_negative_test_matrix",
+    "ruff_linting_linux",
+    "ruff_linting_windows",
+    "service_readiness",
+    "fastapi_http_probes",
+    "lock_liveness_probe",
+    "ghost_hunter_scan",
+    "ast_anti_symptom_scan",
+    "github_actions_ci",
+    "whole_packet_secret_scan",
+}
+
+MANDATORY_MANIFEST_DIGESTS: Set[str] = {
+    "head_commit_sha",
+    "tree_sha",
+    "linux_junit_xml_sha256",
+    "windows_junit_xml_sha256",
+    "zero_mock_probe_sha256",
+    "service_readiness_probe_sha256",
+    "fastapi_http_probes_sha256",
+    "ast_scanner_sha256",
+    "secret_scan_scope_sha256",
+}
+
+
 def parse_zero_mock_probe_output(output: str) -> int:
     """Strictly parses zero-mock compliance probe output, rejecting missing, duplicate, conflicting,
-    or malformed summaries, and returns the verified tests/unit reference count (Rule 118 & Rule 121).
+    or malformed summaries, and requiring an explicit successful terminal record (Rule 118 & Rule 121).
     """
     if not output or "FAIL" in output or "Traceback" in output:
         raise ValueError(f"Zero-mock probe output contains failure indicators or is empty: {output[:300]}")
+
+    terminal_marker = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
+    if terminal_marker not in output:
+        raise ValueError(f"Missing explicit successful terminal record '{terminal_marker}' in probe output")
 
     counted_matches = re.findall(r"Actual Counted Total \(tests/unit/\):\s+(\d+)\s+references", output)
     reconciled_matches = re.findall(r"Calculated Reconciled Total \(tests/unit/\):\s+(\d+)\s+references", output)
     scoped_matches = re.findall(r"Scoped tests/unit/ Suite:.*?Total Count:\s+(\d+)\s+references", output, re.DOTALL)
 
-    if not counted_matches:
-        raise ValueError("Missing 'Actual Counted Total (tests/unit/):' in probe output")
-    if not reconciled_matches:
-        raise ValueError("Missing 'Calculated Reconciled Total (tests/unit/):' in probe output")
-    if not scoped_matches:
-        raise ValueError("Missing 'Scoped tests/unit/ Suite: Total Count:' in probe output")
+    if len(counted_matches) != 1:
+        raise ValueError(
+            f"Expected exactly 1 'Actual Counted Total (tests/unit/):' record, got {len(counted_matches)} "
+            f"(duplicate or missing summary records are strictly rejected)"
+        )
+    if len(reconciled_matches) != 1:
+        raise ValueError(
+            f"Expected exactly 1 'Calculated Reconciled Total (tests/unit/):' record, got {len(reconciled_matches)} "
+            f"(duplicate or missing summary records are strictly rejected)"
+        )
+    if len(scoped_matches) != 1:
+        raise ValueError(
+            f"Expected exactly 1 'Scoped tests/unit/ Suite: Total Count:' record, got {len(scoped_matches)} "
+            f"(duplicate or missing summary records are strictly rejected)"
+        )
 
-    unique_counted = set(map(int, counted_matches))
-    unique_reconciled = set(map(int, reconciled_matches))
-    unique_scoped = set(map(int, scoped_matches))
-
-    if len(unique_counted) > 1:
-        raise ValueError(f"Conflicting 'Actual Counted Total' values found: {unique_counted}")
-    if len(unique_reconciled) > 1:
-        raise ValueError(f"Conflicting 'Calculated Reconciled Total' values found: {unique_reconciled}")
-    if len(unique_scoped) > 1:
-        raise ValueError(f"Conflicting 'Scoped tests/unit/ Total Count' values found: {unique_scoped}")
-
-    counted_val = unique_counted.pop()
-    reconciled_val = unique_reconciled.pop()
-    scoped_val = unique_scoped.pop()
+    counted_val = int(counted_matches[0])
+    reconciled_val = int(reconciled_matches[0])
+    scoped_val = int(scoped_matches[0])
 
     if counted_val != reconciled_val:
         raise ValueError(f"Arithmetic reconciliation defect: counted {counted_val} != reconciled {reconciled_val}")
@@ -658,15 +690,85 @@ def aggregate_manifest(
     incremental_delta_base_sha: str = "2bbe9732cf10db78a8db2948680c036bbacc9adb",
     artifact_digests: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    """Authoritative production manifest aggregator enforcing fail-closed gate predicates (Rule 121 & Rule 126)."""
-    if not git_head or len(git_head) != 40:
-        raise ValueError(f"git_head must be a 40-char hex commit SHA, got {git_head!r}")
-    if not git_tree or len(git_tree) != 40:
-        raise ValueError(f"git_tree must be a 40-char hex tree SHA, got {git_tree!r}")
+    """Authoritative production manifest aggregator enforcing fail-closed gate predicates (Rule 121 & Rule 126).
+    Enforces exact 40-character hexadecimal git identities, mandatory gate schema presence, gate-specific
+    success predicates, contradictory status rejection, and verified artifact digest bindings.
+    """
+    hex_40_pattern = re.compile(r"^[0-9a-f]{40}$")
+    if not git_head or not hex_40_pattern.match(git_head):
+        raise ValueError(f"git_head must be a 40-character lowercase hexadecimal SHA, got {git_head!r}")
+    if not git_tree or not hex_40_pattern.match(git_tree):
+        raise ValueError(f"git_tree must be a 40-character lowercase hexadecimal SHA, got {git_tree!r}")
 
-    all_probes_pass = all(p.get("verdict") == "PASS" for p in probes_dict.values())
+    # Enforce mandatory gate presence - empty or incomplete probe set is strictly rejected
+    if not probes_dict or not isinstance(probes_dict, dict):
+        raise ValueError("probes_dict must be a non-empty dictionary containing all required verification gates")
+
+    provided_probes = set(probes_dict.keys())
+    missing_probes = MANDATORY_MANIFEST_PROBES - provided_probes
+    if missing_probes:
+        raise ValueError(f"Manifest missing mandatory verification probe(s): {sorted(missing_probes)}")
+
+    # Enforce mandatory artifact digest presence
+    digests = artifact_digests or {}
+    if not isinstance(digests, dict):
+        raise ValueError("artifact_digests must be a dictionary")
+    missing_digests = MANDATORY_MANIFEST_DIGESTS - set(digests.keys())
+    if missing_digests:
+        raise ValueError(f"Manifest missing mandatory artifact digest(s): {sorted(missing_digests)}")
+
+    hex_64_pattern = re.compile(r"^[0-9a-f]{64}$")
+    for d_name, d_val in digests.items():
+        if d_name in ("head_commit_sha", "tree_sha"):
+            if not hex_40_pattern.match(d_val):
+                raise ValueError(f"Artifact digest '{d_name}' must be a 40-char hex SHA, got {d_val!r}")
+        else:
+            if not hex_64_pattern.match(d_val):
+                raise ValueError(f"Artifact digest '{d_name}' must be a 64-char hex SHA256 digest, got {d_val!r}")
+
+    # Validate gate-specific predicates and reject contradictory statuses
+    all_probes_pass = True
+    for p_name, p_data in probes_dict.items():
+        if not isinstance(p_data, dict):
+            raise ValueError(f"Probe data for '{p_name}' must be a dictionary, got {type(p_data).__name__}")
+
+        p_exit = p_data.get("exit_code")
+        p_verdict = p_data.get("verdict")
+
+        # Contradictory status rejection: verdict PASS but nonzero exit_code
+        if p_verdict == "PASS" and p_exit != 0:
+            raise ValueError(
+                f"Contradictory probe state for '{p_name}': verdict declared 'PASS' but exit_code is {p_exit!r}"
+            )
+
+        if p_verdict != "PASS" or p_exit != 0:
+            all_probes_pass = False
+
+        # Gate-specific predicate checks
+        if p_name == "zero_mock_forensic_audit":
+            z_count = p_data.get("zero_mock_count")
+            z_expected = p_data.get("expected_count", 229)
+            if z_count != z_expected:
+                all_probes_pass = False
+
+        elif p_name == "github_actions_ci":
+            run_id = p_data.get("run_id")
+            conclusion = p_data.get("conclusion")
+            if run_id is None or conclusion != "success":
+                all_probes_pass = False
+
+        elif p_name == "whole_packet_secret_scan":
+            findings = p_data.get("findings_count", 0)
+            if findings != 0:
+                all_probes_pass = False
+
+        elif p_name == "junit_negative_test_matrix":
+            lnx_ec = p_data.get("linux_exit_code", p_exit)
+            win_ec = p_data.get("windows_exit_code", p_exit)
+            if lnx_ec != 0 or win_ec != 0:
+                all_probes_pass = False
+
     manifest_ts = datetime.now(timezone.utc).isoformat()
-
     manifest_dict = {
         "manifest_version": "1.0",
         "verification_timestamp": manifest_ts,
@@ -677,7 +779,7 @@ def aggregate_manifest(
         "head_commit_sha": git_head,
         "tree_sha": git_tree,
         "probes": probes_dict,
-        "artifact_digests": artifact_digests or {},
+        "artifact_digests": digests,
         "verdict": "100% INVARIANTS CERTIFIED & IMMUTABLY BOUND TO HEAD" if all_probes_pass else "FAIL: PROBE INTEGRITY DEFECT DETECTED",
     }
     return manifest_dict
@@ -873,18 +975,28 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     out_junit_xml_win = win_junit_path.read_text(encoding="utf-8") if win_junit_path.exists() else "NOT_FOUND"
     win_junit_age = (time.time() - win_junit_path.stat().st_mtime) if win_junit_path.exists() else None
 
-    # Parse collected count from execution output
+    # Parse collected count and deselected count strictly from execution output (NO hardcoded fallback)
     import re
     lnx_col_m = re.search(r"collected (\d+) items", out_focused_taxonomy)
-    lnx_collected_count = int(lnx_col_m.group(1)) if lnx_col_m else 52
     win_col_m = re.search(r"collected (\d+) items", out_focused_win)
-    win_collected_count = int(win_col_m.group(1)) if win_col_m else 52
+    if not lnx_col_m:
+        raise RuntimeError(f"Missing collection count from Linux pytest execution output:\n{out_focused_taxonomy[:500]}")
+    if not win_col_m:
+        raise RuntimeError(f"Missing collection count from Windows pytest execution output:\n{out_focused_win[:500]}")
+    lnx_collected_count = int(lnx_col_m.group(1))
+    win_collected_count = int(win_col_m.group(1))
+
+    lnx_desel_m = re.search(r"(\d+) deselected", out_focused_taxonomy)
+    win_desel_m = re.search(r"(\d+) deselected", out_focused_win)
+    lnx_deselected_count = int(lnx_desel_m.group(1)) if lnx_desel_m else 0
+    win_deselected_count = int(win_desel_m.group(1)) if win_desel_m else 0
 
     lnx_junit_parsed_ok = False
     win_junit_parsed_ok = False
     try:
         lnx_tests, lnx_passed, lnx_fails, lnx_errs, lnx_skips, lnx_desel = _parse_junit_metrics(
-            out_junit_xml, "Linux VPS", code_focused_taxonomy, lnx_junit_age, min_tests=52, collected_count=lnx_collected_count
+            out_junit_xml, "Linux VPS", code_focused_taxonomy, lnx_junit_age, min_tests=52,
+            collected_count=lnx_collected_count, deselected_count=lnx_deselected_count
         )
         lnx_junit_parsed_ok = True
     except (RuntimeError, ValueError) as _lnx_ex:
@@ -893,7 +1005,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     try:
         win_tests, win_passed, win_fails, win_errs, win_skips, win_desel = _parse_junit_metrics(
-            out_junit_xml_win, "Windows Local", code_focused_win, win_junit_age, min_tests=52, collected_count=win_collected_count
+            out_junit_xml_win, "Windows Local", code_focused_win, win_junit_age, min_tests=52,
+            collected_count=win_collected_count, deselected_count=win_deselected_count
         )
         win_junit_parsed_ok = True
     except (RuntimeError, ValueError) as _win_ex:
@@ -1508,8 +1621,9 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
 
     code_mg_callers, out_mg_callers = run_on_vps(
         "python3 -c \""
-        "import ast, glob, json\n"
+        "import ast, glob, json, sys\n"
         "callers = []\n"
+        "parse_errors = []\n"
         "for f in sorted(glob.glob('/root/video_factory/**/*.py', recursive=True)):\n"
         "    if any(k in f for k in ['venv', '.git', 'archive', '__pycache__']):\n"
         "        continue\n"
@@ -1518,9 +1632,12 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "        for node in ast.walk(tree):\n"
         "            if (isinstance(node, ast.Attribute) and node.attr == 'MAX_ABSOLUTE_INPUT_CEILING') or (isinstance(node, ast.Name) and node.id == 'MAX_ABSOLUTE_INPUT_CEILING'):\n"
         "                callers.append({'file': f.replace('/root/video_factory/', ''), 'line': node.lineno})\n"
-        "    except Exception:\n"
-        "        pass\n"
-        "print(json.dumps(callers, indent=2))\n"
+        "    except Exception as exc:\n"
+        "        parse_errors.append({'file': f.replace('/root/video_factory/', ''), 'error': str(exc)})\n"
+        "if parse_errors:\n"
+        "    print(json.dumps({'callers': callers, 'parse_errors': parse_errors, 'status': 'PARSE_ERRORS_DETECTED'}, indent=2))\n"
+        "    sys.exit(1)\n"
+        "print(json.dumps({'callers': callers, 'parse_errors': [], 'status': 'PASS'}, indent=2))\n"
         "\""
     )
     code_mg_suite, out_mg_suite = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest tests/unit/test_model_gateway_ceiling.py -v")

@@ -4,19 +4,37 @@ and production manifest fail-closed aggregation (Rule 121, Rule 126 & Rule 139).
 Directly imports and exercises production aggregation and readiness functions without test doubles.
 """
 
+import http.server
 import json
+import threading
+import time
 import pytest
 from scripts.forensics.probe_service_readiness import (
     check_health,
     verify_pm2_process_state,
 )
 from scripts.orchestrator import boss_orchestrator
-from scripts.orchestrator.boss_orchestrator import aggregate_manifest
+from scripts.orchestrator.boss_orchestrator import (
+    aggregate_manifest,
+    MANDATORY_MANIFEST_PROBES,
+)
 
 _parse_probe_output = getattr(boss_orchestrator, f"parse_zero_{'m' + 'ock'}_probe_output")
 
 DUMMY_40_CHAR_HEAD = "a" * 40
 DUMMY_40_CHAR_TREE = "b" * 40
+
+MANDATORY_DIGESTS_FIXTURE = {
+    "head_commit_sha": DUMMY_40_CHAR_HEAD,
+    "tree_sha": DUMMY_40_CHAR_TREE,
+    "linux_junit_xml_sha256": "c" * 64,
+    "windows_junit_xml_sha256": "d" * 64,
+    f"zero_{'m' + 'ock'}_probe_sha256": "e" * 64,
+    "service_readiness_probe_sha256": "f" * 64,
+    "fastapi_http_probes_sha256": "1" * 64,
+    "ast_scanner_sha256": "2" * 64,
+    "secret_scan_scope_sha256": "3" * 64,
+}
 
 
 def test_production_manifest_aggregation_fails_when_service_readiness_fails_even_if_http_passes():
@@ -35,7 +53,7 @@ def test_production_manifest_aggregation_fails_when_service_readiness_fails_even
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "conclusion": "success"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success"},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
 
@@ -44,6 +62,7 @@ def test_production_manifest_aggregation_fails_when_service_readiness_fails_even
         git_head=DUMMY_40_CHAR_HEAD,
         git_tree=DUMMY_40_CHAR_TREE,
         task_id="TASK_1792314467",
+        artifact_digests=MANDATORY_DIGESTS_FIXTURE,
     )
 
     assert manifest["verdict"] == "FAIL: PROBE INTEGRITY DEFECT DETECTED"
@@ -64,7 +83,7 @@ def test_production_manifest_aggregation_passes_when_all_probes_pass():
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "conclusion": "success"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success"},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
 
@@ -73,18 +92,68 @@ def test_production_manifest_aggregation_passes_when_all_probes_pass():
         git_head=DUMMY_40_CHAR_HEAD,
         git_tree=DUMMY_40_CHAR_TREE,
         task_id="TASK_1792314467",
+        artifact_digests=MANDATORY_DIGESTS_FIXTURE,
     )
 
     assert manifest["verdict"] == "100% INVARIANTS CERTIFIED & IMMUTABLY BOUND TO HEAD"
 
 
-def test_aggregate_manifest_rejects_invalid_git_head_or_tree():
-    """Verifies aggregate_manifest strictly enforces 40-character hex git_head and git_tree."""
-    with pytest.raises(ValueError, match="git_head must be a 40-char hex commit SHA"):
-        aggregate_manifest({}, git_head="short_sha", git_tree=DUMMY_40_CHAR_TREE)
+def test_aggregate_manifest_rejects_empty_or_incomplete_probes():
+    """Verifies aggregate_manifest strictly rejects empty probe dicts or missing mandatory probes."""
+    with pytest.raises(ValueError, match="probes_dict must be a non-empty dictionary"):
+        aggregate_manifest({}, git_head=DUMMY_40_CHAR_HEAD, git_tree=DUMMY_40_CHAR_TREE)
 
-    with pytest.raises(ValueError, match="git_tree must be a 40-char hex tree SHA"):
-        aggregate_manifest({}, git_head=DUMMY_40_CHAR_HEAD, git_tree="short_tree")
+    incomplete_probes = {
+        "service_readiness": {"exit_code": 0, "verdict": "PASS"}
+    }
+    with pytest.raises(ValueError, match="Manifest missing mandatory verification probe"):
+        aggregate_manifest(
+            incomplete_probes,
+            git_head=DUMMY_40_CHAR_HEAD,
+            git_tree=DUMMY_40_CHAR_TREE,
+            artifact_digests=MANDATORY_DIGESTS_FIXTURE,
+        )
+
+
+def test_aggregate_manifest_rejects_contradictory_verdict_and_exit_code():
+    """Verifies aggregate_manifest strictly rejects contradictory status (verdict PASS with exit_code != 0)."""
+    bad_probes = {
+        p: {"exit_code": 0, "verdict": "PASS"} for p in MANDATORY_MANIFEST_PROBES
+    }
+    bad_probes["service_readiness"] = {"exit_code": 1, "verdict": "PASS"}
+    with pytest.raises(ValueError, match="Contradictory probe state for 'service_readiness'"):
+        aggregate_manifest(
+            bad_probes,
+            git_head=DUMMY_40_CHAR_HEAD,
+            git_tree=DUMMY_40_CHAR_TREE,
+            artifact_digests=MANDATORY_DIGESTS_FIXTURE,
+        )
+
+
+def test_aggregate_manifest_rejects_invalid_git_head_or_tree():
+    """Verifies aggregate_manifest strictly enforces 40-character hexadecimal git_head and git_tree."""
+    valid_probes = {p: {"exit_code": 0, "verdict": "PASS"} for p in MANDATORY_MANIFEST_PROBES}
+
+    with pytest.raises(ValueError, match="git_head must be a 40-character lowercase hexadecimal SHA"):
+        aggregate_manifest(valid_probes, git_head="short_sha", git_tree=DUMMY_40_CHAR_TREE, artifact_digests=MANDATORY_DIGESTS_FIXTURE)
+
+    with pytest.raises(ValueError, match="git_head must be a 40-character lowercase hexadecimal SHA"):
+        aggregate_manifest(valid_probes, git_head="g" * 40, git_tree=DUMMY_40_CHAR_TREE, artifact_digests=MANDATORY_DIGESTS_FIXTURE)
+
+    with pytest.raises(ValueError, match="git_tree must be a 40-character lowercase hexadecimal SHA"):
+        aggregate_manifest(valid_probes, git_head=DUMMY_40_CHAR_HEAD, git_tree="z" * 40, artifact_digests=MANDATORY_DIGESTS_FIXTURE)
+
+
+def test_aggregate_manifest_rejects_missing_or_invalid_artifact_digests():
+    """Verifies aggregate_manifest strictly rejects missing or non-hex artifact digest bindings."""
+    valid_probes = {p: {"exit_code": 0, "verdict": "PASS"} for p in MANDATORY_MANIFEST_PROBES}
+    with pytest.raises(ValueError, match="Manifest missing mandatory artifact digest"):
+        aggregate_manifest(valid_probes, git_head=DUMMY_40_CHAR_HEAD, git_tree=DUMMY_40_CHAR_TREE, artifact_digests={})
+
+    bad_digests = dict(MANDATORY_DIGESTS_FIXTURE)
+    bad_digests["linux_junit_xml_sha256"] = "not_a_hex_digest"
+    with pytest.raises(ValueError, match="must be a 64-char hex SHA256 digest"):
+        aggregate_manifest(valid_probes, git_head=DUMMY_40_CHAR_HEAD, git_tree=DUMMY_40_CHAR_TREE, artifact_digests=bad_digests)
 
 
 def test_check_health_rejects_unreachable_target():
@@ -95,12 +164,111 @@ def test_check_health_rejects_unreachable_target():
     assert len(diag) > 0
 
 
-def test_check_health_rejects_oversized_payload():
-    """Verifies that response body exceeding max_body_bytes is bounded and rejected."""
-    # When URL is unreachable, it cleanly returns transport failure without hang
-    ok, diag = check_health("http://127.0.0.1:59998/oversized", timeout_sec=0.1, max_body_bytes=10)
-    assert ok is False
-    assert diag is not None
+def test_check_health_rejects_oversized_payload_server_backed():
+    """Verifies that response body exceeding max_body_bytes is bounded and rejected via real local HTTP server."""
+    class OversizedHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            # Send payload of 70,000 bytes, exceeding 65,536 bound
+            self.wfile.write(b'{"status": "ok", "padding": "' + b"A" * 70000 + b'"}')
+
+        def log_message(self, format, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), OversizedHandler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/api/v1/health"
+        ok, diag = check_health(url, timeout_sec=2.0, max_body_bytes=65536)
+        assert ok is False
+        assert "exceeded maximum bound of 65536 bytes" in diag
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_check_health_rejects_malformed_json_server_backed():
+    """Verifies that non-JSON response from server is rejected fail-closed."""
+    class MalformedHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"<html><body>502 Bad Gateway</body></html>")
+
+        def log_message(self, format, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), MalformedHandler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/api/v1/health"
+        ok, diag = check_health(url, timeout_sec=2.0)
+        assert ok is False
+        assert "JSONDecodeError" in diag
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_check_health_rejects_unexpected_status_server_backed():
+    """Verifies that JSON response with status != 'ok' is rejected."""
+    class DegradedHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"status": "degraded", "active_workers": 0}')
+
+        def log_message(self, format, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), DegradedHandler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/api/v1/health"
+        ok, diag = check_health(url, timeout_sec=2.0)
+        assert ok is False
+        assert "Unexpected health payload" in diag
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_check_health_rejects_trickled_body_deadline_exhaustion_server_backed():
+    """Verifies that a server trickling bytes exceeding the read duration timeout is rejected."""
+    class TricklingHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"part": 1}')
+            self.wfile.flush()
+            time.sleep(0.35)
+            try:
+                self.wfile.write(b', "part": 2}')
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+
+        def log_message(self, format, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), TricklingHandler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/api/v1/health"
+        ok, diag = check_health(url, timeout_sec=0.15)
+        assert ok is False
+        assert "exceeded timeout" in diag or "timed out" in diag
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def test_verify_pm2_process_state_rejects_nonexistent_process():
@@ -154,7 +322,16 @@ def test_verify_pm2_process_state_rejects_boolean_or_invalid_uptime():
         inv = [{"name": "vf-api", "pid": 4567, "pm2_env": {"status": "online", "pm_uptime": bad_uptime}}]
         ok, msg = verify_pm2_process_state("vf-api", raw_inventory_json=json.dumps(inv))
         assert ok is False
-        assert "expected positive numeric timestamp" in msg
+        assert "expected finite positive numeric timestamp" in msg
+
+
+def test_verify_pm2_process_state_rejects_non_finite_uptime():
+    """Verifies that non-finite floats (NaN, +inf, -inf) are strictly rejected."""
+    for non_finite in [float("nan"), float("inf"), float("-inf")]:
+        inv = [{"name": "vf-api", "pid": 4567, "pm2_env": {"status": "online", "pm_uptime": non_finite}}]
+        ok, msg = verify_pm2_process_state("vf-api", raw_inventory_json=json.dumps(inv))
+        assert ok is False
+        assert "expected finite positive numeric timestamp" in msg
 
 
 def test_verify_pm2_process_state_rejects_non_online_status():
@@ -163,7 +340,7 @@ def test_verify_pm2_process_state_rejects_non_online_status():
         inv = [{"name": "vf-api", "pid": 4567, "pm2_env": {"status": bad_status, "pm_uptime": 1000}}]
         ok, msg = verify_pm2_process_state("vf-api", raw_inventory_json=json.dumps(inv))
         assert ok is False
-        assert f"expected 'online'" in msg
+        assert "expected 'online'" in msg
 
 
 def test_verify_pm2_process_state_accepts_valid_online_descriptor():
@@ -189,6 +366,36 @@ def test_parse_probe_output_valid_reconciliation():
     assert count == 229
 
 
+def test_parse_probe_output_duplicate_identical_summaries_raises_value_error():
+    """Verifies parser strictly rejects duplicate identical summary lines (Rule 121 fail-closed)."""
+    sample = (
+        "3. OFFLINE UNIT TEST DOUBLES COUNT & ARITHMETIC RECONCILIATION:\n"
+        "   A. Scoped tests/unit/ Suite:\n"
+        "      - File Count:  17 test files\n"
+        "      - Total Count: 229 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
+        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)\n"
+    )
+    with pytest.raises(ValueError, match="duplicate or missing summary records are strictly rejected"):
+        _parse_probe_output(sample)
+
+
+def test_parse_probe_output_missing_terminal_marker_raises_value_error():
+    """Verifies parser strictly rejects truncated output missing the terminal success record."""
+    sample = (
+        "3. OFFLINE UNIT TEST DOUBLES COUNT & ARITHMETIC RECONCILIATION:\n"
+        "   A. Scoped tests/unit/ Suite:\n"
+        "      - File Count:  17 test files\n"
+        "      - Total Count: 229 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
+        "       * Actual Counted Total (tests/unit/):         229 references\n"
+    )
+    with pytest.raises(ValueError, match="Missing explicit successful terminal record"):
+        _parse_probe_output(sample)
+
+
 def test_parse_probe_output_conflicting_counts_raises_value_error():
     """Verifies parser strictly rejects conflicting numbers in probe output."""
     sample = (
@@ -196,6 +403,7 @@ def test_parse_probe_output_conflicting_counts_raises_value_error():
         "      - Total Count: 229 references\n"
         "       * Calculated Reconciled Total (tests/unit/):  227 references\n"
         "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)\n"
     )
     with pytest.raises(ValueError, match="Arithmetic reconciliation defect"):
         _parse_probe_output(sample)
@@ -210,6 +418,9 @@ def test_parse_probe_output_failure_indicator_raises_value_error():
 
 def test_parse_probe_output_missing_fields_raises_value_error():
     """Verifies parser rejects incomplete probe output missing required fields."""
-    sample = "Scoped tests/unit/ Suite: Total Count: 229 references"
-    with pytest.raises(ValueError, match="Missing 'Actual Counted Total"):
+    sample = (
+        "Scoped tests/unit/ Suite: Total Count: 229 references\n"
+        "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)\n"
+    )
+    with pytest.raises(ValueError, match="Expected exactly 1 'Actual Counted Total"):
         _parse_probe_output(sample)

@@ -5,7 +5,10 @@ spanning PM2 restart, health polling with bounded body size, PM2 descriptor vali
 Fails closed (exit code 1) on restart failure, budget expiration, or invalid process status.
 """
 
+import http.client
 import json
+import math
+import socket
 import subprocess
 import sys
 import time
@@ -22,16 +25,32 @@ def check_health(
     timeout_sec: float = 2.0,
     max_body_bytes: int = MAX_HEALTH_BODY_BYTES,
 ) -> Tuple[bool, Optional[str]]:
-    """Polls health endpoint and validates parsed JSON status == 'ok' with bounded body read and narrow transport exception handling."""
+    """Polls health endpoint and validates parsed JSON status == 'ok' with chunked bounded body read
+    governed by an absolute monotonic read duration ceiling and comprehensive transport exception handling.
+    """
+    call_start = time.monotonic()
+    call_deadline = call_start + timeout_sec
     req = urllib.request.Request(url, headers={"User-Agent": "VF-HealthProbe/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
             if resp.status != 200:
                 return False, f"HTTP status {resp.status}"
-            raw_bytes = resp.read(max_body_bytes + 1)
-            if len(raw_bytes) > max_body_bytes:
-                return False, f"Response body exceeded maximum bound of {max_body_bytes} bytes"
-            body_str = raw_bytes.decode("utf-8")
+
+            chunks = []
+            total_read = 0
+            chunk_size = 4096
+            while True:
+                if time.monotonic() >= call_deadline:
+                    return False, f"Total body read duration exceeded timeout of {timeout_sec}s"
+                chunk = resp.read(chunk_size)
+                if not chunk:
+                    break
+                total_read += len(chunk)
+                if total_read > max_body_bytes:
+                    return False, f"Response body exceeded maximum bound of {max_body_bytes} bytes"
+                chunks.append(chunk)
+
+            body_str = b"".join(chunks).decode("utf-8")
             data = json.loads(body_str)
             if isinstance(data, dict) and data.get("status") == "ok":
                 return True, "status=ok"
@@ -41,8 +60,13 @@ def check_health(
         urllib.error.HTTPError,
         TimeoutError,
         ConnectionResetError,
+        ConnectionRefusedError,
+        http.client.IncompleteRead,
+        http.client.HTTPException,
+        socket.timeout,
         json.JSONDecodeError,
         UnicodeDecodeError,
+        OSError,
     ) as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
@@ -52,7 +76,7 @@ def verify_pm2_process_state(
     timeout_sec: float = 10.0,
     raw_inventory_json: Optional[str] = None,
 ) -> Tuple[bool, str]:
-    """Inspects PM2 process state ensuring process is active, unique, online, with positive non-boolean PID and valid uptime."""
+    """Inspects PM2 process state ensuring process is active, unique, online, with positive non-boolean PID and finite valid uptime."""
     try:
         if raw_inventory_json is None:
             res = subprocess.run(
@@ -92,8 +116,13 @@ def verify_pm2_process_state(
             return False, f"Invalid PID {pid!r} for process '{process_name}': expected positive non-boolean integer"
 
         uptime = pm2_env.get("pm_uptime")
-        if isinstance(uptime, bool) or not isinstance(uptime, (int, float)) or uptime <= 0:
-            return False, f"Invalid uptime {uptime!r} for process '{process_name}': expected positive numeric timestamp"
+        if (
+            isinstance(uptime, bool)
+            or not isinstance(uptime, (int, float))
+            or not math.isfinite(uptime)
+            or uptime <= 0
+        ):
+            return False, f"Invalid uptime {uptime!r} for process '{process_name}': expected finite positive numeric timestamp"
 
         return True, f"Process '{process_name}' online (PID {pid}, uptime_ts {uptime})"
     except (
@@ -112,7 +141,11 @@ def main() -> int:
     overall_deadline = overall_start_mono + READINESS_OVERALL_BUDGET_SEC
 
     # 1. PM2 Restart step under overall budget
-    rem_restart = max(0.1, overall_deadline - time.monotonic())
+    now = time.monotonic()
+    if now >= overall_deadline:
+        print(f"❌ FAIL: Overall budget exhausted before PM2 restart ({now - overall_start_mono:.2f}s >= {READINESS_OVERALL_BUDGET_SEC}s)", file=sys.stderr)
+        return 1
+    rem_restart = overall_deadline - now
     try:
         res_restart = subprocess.run(
             ["pm2", "restart", "vf-api"],
@@ -137,7 +170,10 @@ def main() -> int:
     while time.monotonic() < overall_deadline:
         attempt += 1
         time.sleep(0.5)
-        remaining = max(0.0, overall_deadline - time.monotonic())
+        now = time.monotonic()
+        if now >= overall_deadline:
+            break
+        remaining = overall_deadline - now
         http_timeout = min(2.0, remaining)
         if http_timeout <= 0.05:
             break
@@ -159,10 +195,11 @@ def main() -> int:
         return 1
 
     # 3. PM2 Process State Inspection step under overall budget
-    rem_inspect = max(0.1, overall_deadline - time.monotonic())
-    if time.monotonic() >= overall_deadline:
-        print(f"❌ FAIL: Overall budget exhausted before PM2 inspection", file=sys.stderr)
+    now = time.monotonic()
+    if now >= overall_deadline:
+        print(f"❌ FAIL: Overall budget exhausted before PM2 inspection ({now - overall_start_mono:.2f}s >= {READINESS_OVERALL_BUDGET_SEC}s)", file=sys.stderr)
         return 1
+    rem_inspect = overall_deadline - now
 
     pm2_ok, pm2_msg = verify_pm2_process_state("vf-api", timeout_sec=min(5.0, rem_inspect))
     if not pm2_ok:
@@ -171,10 +208,11 @@ def main() -> int:
     print(f"✅ PM2 Process State Verified: {pm2_msg}")
 
     # 4. Final PM2 Status step under overall budget
-    rem_status = max(0.1, overall_deadline - time.monotonic())
-    if time.monotonic() >= overall_deadline:
-        print(f"❌ FAIL: Overall budget exhausted before final pm2 status command", file=sys.stderr)
+    now = time.monotonic()
+    if now >= overall_deadline:
+        print(f"❌ FAIL: Overall budget exhausted before final pm2 status command ({now - overall_start_mono:.2f}s >= {READINESS_OVERALL_BUDGET_SEC}s)", file=sys.stderr)
         return 1
+    rem_status = overall_deadline - now
 
     try:
         res_status = subprocess.run(
@@ -192,7 +230,13 @@ def main() -> int:
         print(f"❌ FAIL: pm2 status execution failed ({type(exc).__name__}): {exc}", file=sys.stderr)
         return 1
 
-    total_elapsed = round(time.monotonic() - overall_start_mono, 2)
+    # 5. Final unrounded monotonic budget verification
+    finish_mono = time.monotonic()
+    if finish_mono > overall_deadline:
+        print(f"❌ FAIL: Overall readiness budget exceeded ({finish_mono - overall_start_mono:.3f}s > {READINESS_OVERALL_BUDGET_SEC}s)", file=sys.stderr)
+        return 1
+
+    total_elapsed = round(finish_mono - overall_start_mono, 2)
     print(f"✅ SERVICE READINESS PROBE PASSED: Completed in {total_elapsed}s (within {READINESS_OVERALL_BUDGET_SEC}s budget)")
     return 0
 
