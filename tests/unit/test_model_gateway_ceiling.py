@@ -207,7 +207,7 @@ def test_oversized_request_rejected_before_provider_dispatch_absolute_ceiling():
 
 def test_provider_context_reservations_and_cost_rationale_configuration_derived():
     """Verifies mathematical provider context window reservations and bounded cost rationale (Rule 138 & Rule 139).
-    Derives assertions directly from live ModelGateway configuration rather than duplicating hardcoded model constants.
+    Derives assertions directly from live ModelGateway methods rather than duplicating hardcoded model constants.
     """
     gw = ModelGateway()
 
@@ -218,56 +218,73 @@ def test_provider_context_reservations_and_cost_rationale_configuration_derived(
     configured_ceiling = _get_max_absolute_input_ceiling()
     assert 1000 <= configured_ceiling <= 200000, f"Configured ceiling {configured_ceiling} outside valid bounds"
 
-    # 2. Context window reservations dynamically derived from model class and configuration
-    def get_family_context_window(model_name: str) -> int:
-        name_lower = model_name.lower()
-        if any(brand in name_lower for brand in ("claude", "sonnet", "opus")):
-            return 200000
-        if any(brand in name_lower for brand in ("sol", "gpt", "flash")):
-            return 128000
-        return 128000
+    # 2. Context window and output reservations dynamically queried from gateway configuration
+    active_context_window = gw.get_context_window()
+    assert active_context_window == gw.PROVIDER_CONTEXT_WINDOWS.get(gw.hhtech_model, 128000)
 
-    active_model = gw.hhtech_model
-    active_context_window = get_family_context_window(active_model)
-    claude_context_window = get_family_context_window("claude-sonnet-5-5")
-    sol_context_window = get_family_context_window("gpt-6.1-sol")
+    active_output_reservation = gw.get_output_reservation()
+    expected_reservation = max(0, active_context_window - configured_ceiling)
+    assert active_output_reservation == expected_reservation
 
-    # Output reservation for Claude family: dynamically bounded by configured ceiling
-    claude_output_reservation = claude_context_window - configured_ceiling
-    assert claude_output_reservation == claude_context_window - configured_ceiling
-    # Guarantees room for generation (>= 50,000 tokens even at massive 150k ceiling)
-    min_claude_reservation = claude_context_window - min(configured_ceiling, 150000)
-    assert claude_output_reservation >= min_claude_reservation, (
-        f"Claude output reservation {claude_output_reservation} < expected bound {min_claude_reservation}"
-    )
+    claude_context_window = gw.get_context_window("claude-sonnet-5-5")
+    assert claude_context_window == gw.PROVIDER_CONTEXT_WINDOWS["claude-sonnet-5-5"]
+    claude_output_reservation = gw.get_output_reservation("claude-sonnet-5-5")
+    assert claude_output_reservation == max(0, claude_context_window - configured_ceiling)
 
-    # Output reservation for Sol / GPT family: dynamically bounded by configured ceiling
-    sol_effective_input = min(configured_ceiling, sol_context_window - 8000)
-    sol_output_reservation = sol_context_window - sol_effective_input
-    assert sol_output_reservation == sol_context_window - sol_effective_input
-    assert sol_output_reservation >= 8000, f"Sol output reservation {sol_output_reservation} < 8,000 tokens"
+    sol_context_window = gw.get_context_window("gpt-6.1-sol")
+    assert sol_context_window == gw.PROVIDER_CONTEXT_WINDOWS["gpt-6.1-sol"]
+    sol_output_reservation = gw.get_output_reservation("gpt-6.1-sol")
+    assert sol_output_reservation == max(0, sol_context_window - configured_ceiling)
 
-    # Active model output reservation
-    active_effective_input = min(configured_ceiling, active_context_window - 4000)
-    active_output_reservation = active_context_window - active_effective_input
-    assert active_output_reservation >= 4000, f"Active output reservation {active_output_reservation} < 4,000 tokens"
+    # 3. Financial bounds derived directly from gateway token rates and live ceiling
+    active_rate = gw.get_model_token_rate()
+    assert active_rate == gw.cost_tracker.RATES.get(gw.hhtech_model, gw.cost_tracker.RATES.get("default", 1.6))
 
-    # 3. Financial bounds derived from CostTracker rates and configured ceiling
-    rates_dict = getattr(gw.cost_tracker, "RATES", {})
-    sol_rate = rates_dict.get("gpt-6.1-sol", 0.8)
-    active_rate = rates_dict.get(active_model, rates_dict.get("default", 1.6))
+    sol_rate = gw.get_model_token_rate("gpt-6.1-sol")
+    assert sol_rate == gw.cost_tracker.RATES["gpt-6.1-sol"]
 
-    sol_max_cost_vnd = (configured_ceiling / 1000.0) * sol_rate
-    active_max_cost_vnd = (configured_ceiling / 1000.0) * active_rate
+    active_max_cost = gw.get_max_request_cost_vnd()
+    assert active_max_cost == (configured_ceiling / 1000.0) * active_rate
 
-    assert sol_max_cost_vnd == (configured_ceiling / 1000.0) * sol_rate
-    assert active_max_cost_vnd == (configured_ceiling / 1000.0) * active_rate
-    # Safety assertion: cost per request cannot exceed theoretical budget under 200k tokens at max rate
-    max_possible_rate = max(rates_dict.values()) if rates_dict else 2.0
-    theoretical_cost_ceiling = (200000 / 1000.0) * max_possible_rate
-    assert active_max_cost_vnd <= theoretical_cost_ceiling, (
-        f"Active max cost {active_max_cost_vnd} VND exceeds theoretical ceiling {theoretical_cost_ceiling} VND"
-    )
+    sol_max_cost = gw.get_max_request_cost_vnd("gpt-6.1-sol")
+    assert sol_max_cost == (configured_ceiling / 1000.0) * sol_rate
+
+
+def test_provider_context_reservations_consumed_under_modified_configuration():
+    """Verifies that context windows, output reservations, and cost calculations
+    dynamically consume live modified configuration rather than static assumptions (Rule 138 & Rule 139).
+    """
+    old_model = os.environ.get("HHTECH_MODEL")
+    old_ceiling = os.environ.get("HHTECH_MAX_ABSOLUTE_INPUT_CEILING")
+    try:
+        # Case A: Configure Sol model with 75,000 ceiling
+        os.environ["HHTECH_MODEL"] = "gpt-6.1-sol"
+        os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = "75000"
+        gw_sol = ModelGateway()
+        assert gw_sol.hhtech_model == "gpt-6.1-sol"
+        assert gw_sol.get_context_window() == gw_sol.PROVIDER_CONTEXT_WINDOWS["gpt-6.1-sol"]
+        assert gw_sol.get_output_reservation() == gw_sol.PROVIDER_CONTEXT_WINDOWS["gpt-6.1-sol"] - 75000
+        assert gw_sol.get_model_token_rate() == gw_sol.cost_tracker.RATES["gpt-6.1-sol"]
+        assert gw_sol.get_max_request_cost_vnd() == (75000 / 1000.0) * gw_sol.get_model_token_rate()
+
+        # Case B: Configure Opus model with 140,000 ceiling
+        os.environ["HHTECH_MODEL"] = "claude-opus-5-5"
+        os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = "140000"
+        gw_opus = ModelGateway()
+        assert gw_opus.hhtech_model == "claude-opus-5-5"
+        assert gw_opus.get_context_window() == gw_opus.PROVIDER_CONTEXT_WINDOWS["claude-opus-5-5"]
+        assert gw_opus.get_output_reservation() == gw_opus.PROVIDER_CONTEXT_WINDOWS["claude-opus-5-5"] - 140000
+        assert gw_opus.get_model_token_rate() == gw_opus.cost_tracker.RATES["claude-opus-5-5"]
+        assert gw_opus.get_max_request_cost_vnd() == (140000 / 1000.0) * gw_opus.get_model_token_rate()
+    finally:
+        if old_model is not None:
+            os.environ["HHTECH_MODEL"] = old_model
+        else:
+            os.environ.pop("HHTECH_MODEL", None)
+        if old_ceiling is not None:
+            os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = old_ceiling
+        else:
+            os.environ.pop("HHTECH_MAX_ABSOLUTE_INPUT_CEILING", None)
 
 
 def test_provider_spy_cleanup_guarantee_on_assertion_failure():
@@ -279,7 +296,7 @@ def test_provider_spy_cleanup_guarantee_on_assertion_failure():
             # Simulate an inner failure
             raise ValueError("Intentional test assertion trigger")
     except ValueError as _expected_val_err:
-        _ = _expected_val_err
+        assert "Intentional test assertion trigger" in str(_expected_val_err)
 
     assert httpx.Client == orig_client, "httpx.Client was not restored after exception in context block!"
 

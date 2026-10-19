@@ -68,6 +68,44 @@ class ModelGateway:
     - Request/response logging
     """
     
+    PROVIDER_CONTEXT_WINDOWS: Dict[str, int] = {
+        "claude-sonnet-5-5": 200000,
+        "claude-opus-5-5": 200000,
+        "claude-opus-5": 200000,
+        "claude-sonnet-5": 200000,
+        "claude-3.5-sonnet": 200000,
+        "claude-3-opus": 200000,
+        "gpt-6.1-sol": 128000,
+        "gpt-6-astra": 128000,
+        "gpt-5-sol": 128000,
+        "kimi-k3": 200000,
+    }
+
+    def get_context_window(self, model: Optional[str] = None) -> int:
+        """Returns the total provider context window size in tokens for the model."""
+        target_model = model or self.hhtech_model
+        return self.PROVIDER_CONTEXT_WINDOWS.get(target_model, 128000)
+
+    def get_output_reservation(self, model: Optional[str] = None) -> int:
+        """Derives the reserved token headroom for output generation based on live ceiling."""
+        target_model = model or self.hhtech_model
+        ctx_win = self.get_context_window(target_model)
+        ceiling = _get_max_absolute_input_ceiling()
+        return max(0, ctx_win - ceiling)
+
+    def get_model_token_rate(self, model: Optional[str] = None) -> float:
+        """Derives the VND rate per 1,000 tokens for the configured model from CostTracker."""
+        target_model = model or self.hhtech_model
+        rates = getattr(self.cost_tracker, "RATES", {})
+        return rates.get(target_model, rates.get("default", 1.6))
+
+    def get_max_request_cost_vnd(self, model: Optional[str] = None) -> float:
+        """Calculates theoretical maximum VND cost for a single request under live ceiling."""
+        target_model = model or self.hhtech_model
+        ceiling = _get_max_absolute_input_ceiling()
+        rate = self.get_model_token_rate(target_model)
+        return (ceiling / 1000.0) * rate
+
     def __init__(self, cost_tracker=None):
         """
         Initialize model gateway.

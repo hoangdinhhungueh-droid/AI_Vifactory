@@ -8,6 +8,7 @@ Fails closed (exit code 1) on restart failure, budget expiration, or invalid pro
 import json
 import math
 import multiprocessing as mp
+import os
 import pickle
 import socket
 import subprocess
@@ -34,7 +35,9 @@ def _mp_phase_worker_entrypoint(fn: Callable[[float], Any], timeout_sec: float, 
         try:
             conn.close()
         except Exception as _close_err:
-            _ = _close_err
+            sys.stderr.write(
+                f"[READINESS_CLEANUP_NOTICE] Worker PID {os.getpid()} non-fatal conn close failure: {_close_err} (disposition: non-fatal resource release)\n"
+            )
 
 
 def run_bounded_phase(
@@ -107,12 +110,16 @@ def run_bounded_phase(
             try:
                 parent_conn.close()
             except Exception as _parent_close_err:
-                _ = _parent_close_err
+                sys.stderr.write(
+                    f"[READINESS_CLEANUP_NOTICE] Phase '{phase_name}' non-fatal parent pipe close failure: {_parent_close_err} (disposition: non-fatal resource release)\n"
+                )
         if child_conn is not None:
             try:
                 child_conn.close()
             except Exception as _child_close_err:
-                _ = _child_close_err
+                sys.stderr.write(
+                    f"[READINESS_CLEANUP_NOTICE] Phase '{phase_name}' non-fatal child pipe close failure: {_child_close_err} (disposition: non-fatal resource release)\n"
+                )
         if p is not None:
             try:
                 if p.is_alive():
@@ -123,7 +130,9 @@ def run_bounded_phase(
                         p.join(timeout=0.05)
                 p.close()
             except Exception as _proc_close_err:
-                _ = _proc_close_err
+                sys.stderr.write(
+                    f"[READINESS_CLEANUP_NOTICE] Phase '{phase_name}' non-fatal worker process close failure (PID {getattr(p, 'pid', 'unknown')}): {_proc_close_err} (disposition: non-fatal resource release)\n"
+                )
 
 
 def check_health(
