@@ -59,7 +59,7 @@ def test_production_manifest_aggregation_fails_when_service_readiness_fails_even
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed", "head_sha": DUMMY_40_CHAR_HEAD},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
 
@@ -89,7 +89,7 @@ def test_production_manifest_aggregation_passes_when_all_probes_pass():
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed", "head_sha": DUMMY_40_CHAR_HEAD},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
 
@@ -259,8 +259,11 @@ def test_check_health_rejects_trickled_body_deadline_exhaustion_server_backed():
             self.wfile.flush()
             time.sleep(0.35)
             try:
-                self.wfile.write(b', "part": 2}')
-            except (BrokenPipeError, ConnectionResetError, OSError) as write_err:
+                for _ in range(10):
+                    self.wfile.write(b', "part": 2}')
+                    self.wfile.flush()
+                    time.sleep(0.05)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError) as write_err:
                 self.server.write_errors.append(type(write_err).__name__)
 
         def log_message(self, format, *args):
@@ -277,9 +280,53 @@ def test_check_health_rejects_trickled_body_deadline_exhaustion_server_backed():
         elapsed = time.monotonic() - t0
         assert ok is False
         assert 0.14 <= elapsed <= 1.5, f"Elapsed time {elapsed}s not bounded to ~0.15s"
-        assert isinstance(server.write_errors, list)
+        assert diag is not None
+        assert "exceeded timeout" in diag or "timed out" in diag
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline and not server.write_errors:
+            time.sleep(0.05)
+        assert len(server.write_errors) > 0, "Server did not detect client socket disconnect"
         for err in server.write_errors:
             assert err in ("BrokenPipeError", "ConnectionResetError", "ConnectionAbortedError"), f"Unexpected server write error: {err}"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_check_health_continuous_sub_timeout_trickle_deadline_exhaustion_server_backed():
+    """Verifies that a server continuously trickling sub-timeout chunks is bounded and rejected by the monotonic deadline."""
+    class ChunkedTrickleHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.protocol_version = "HTTP/1.1"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            try:
+                for _ in range(15):
+                    self.wfile.write(b"1\r\n \r\n")
+                    self.wfile.flush()
+                    time.sleep(0.03)
+                self.wfile.write(b"0\r\n\r\n")
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+                pass
+
+        def log_message(self, format, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), ChunkedTrickleHandler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/api/v1/health"
+        t0 = time.monotonic()
+        ok, diag = check_health(url, timeout_sec=0.12)
+        elapsed = time.monotonic() - t0
+        assert ok is False
+        assert 0.11 <= elapsed <= 0.35, f"Elapsed time {elapsed}s not bounded to [0.11, 0.35]"
+        assert diag is not None
+        assert "exceeded timeout" in diag or "timed out" in diag
     finally:
         server.shutdown()
         server.server_close()
@@ -454,7 +501,7 @@ def test_aggregate_manifest_accepts_junit_negative_test_matrix_dual_exit_codes()
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed", "head_sha": DUMMY_40_CHAR_HEAD},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
     manifest = aggregate_manifest(
@@ -555,7 +602,7 @@ def test_aggregate_manifest_rejects_head_or_tree_digest_mismatch():
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed", "head_sha": DUMMY_40_CHAR_HEAD},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
     bad_digests = dict(MANDATORY_DIGESTS_FIXTURE)
@@ -583,7 +630,7 @@ def test_aggregate_manifest_rejects_tree_digest_mismatch():
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed", "head_sha": DUMMY_40_CHAR_HEAD},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
     bad_digests = dict(MANDATORY_DIGESTS_FIXTURE)
@@ -611,7 +658,7 @@ def test_aggregate_manifest_rejects_missing_or_empty_xml_sha256():
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed", "head_sha": DUMMY_40_CHAR_HEAD},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
     with pytest.raises(ValueError, match="missing xml_sha256"):
@@ -637,7 +684,7 @@ def test_aggregate_manifest_rejects_boolean_exit_code():
         "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
         "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
         "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
-        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed", "head_sha": DUMMY_40_CHAR_HEAD},
         "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
     }
     with pytest.raises(ValueError, match="Contradictory probe state"):
@@ -711,5 +758,143 @@ def test_run_service_readiness_probe_fails_on_post_status_budget_overrun():
         budget_sec=0.1,
     )
     assert code == 1
+
+
+def test_run_service_readiness_probe_fails_on_restart_phase_overrun():
+    """Verifies run_service_readiness_probe returns exit code 1 when restart phase overruns the overall budget."""
+    def slow_restart(rem):
+        time.sleep(0.12)
+        return (0, "ok")
+
+    code = run_service_readiness_probe(
+        restart_fn=slow_restart,
+        poll_fn=lambda to: (True, "status=ok"),
+        inspect_fn=lambda to: (True, "online"),
+        status_fn=lambda to: (0, "online"),
+        budget_sec=0.1,
+    )
+    assert code == 1
+
+
+def test_run_service_readiness_probe_fails_on_poll_phase_overrun():
+    """Verifies run_service_readiness_probe returns exit code 1 when poll phase overruns the overall budget."""
+    def slow_poll(to):
+        time.sleep(0.12)
+        return (True, "status=ok")
+
+    code = run_service_readiness_probe(
+        restart_fn=lambda rem: (0, "ok"),
+        poll_fn=slow_poll,
+        inspect_fn=lambda to: (True, "online"),
+        status_fn=lambda to: (0, "online"),
+        budget_sec=0.1,
+    )
+    assert code == 1
+
+
+def test_run_service_readiness_probe_fails_on_inspect_phase_overrun():
+    """Verifies run_service_readiness_probe returns exit code 1 when PM2 inspect phase overruns the overall budget."""
+    def slow_inspect(to):
+        time.sleep(0.12)
+        return (True, "online")
+
+    code = run_service_readiness_probe(
+        restart_fn=lambda rem: (0, "ok"),
+        poll_fn=lambda to: (True, "status=ok"),
+        inspect_fn=slow_inspect,
+        status_fn=lambda to: (0, "online"),
+        budget_sec=0.1,
+    )
+    assert code == 1
+
+
+def test_aggregate_manifest_rejects_missing_ci_head():
+    """Verifies aggregate_manifest strictly marks FAIL when github_actions_ci omits head_sha."""
+    probes_dict = {
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
+        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
+        "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_linux": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_windows": {"exit_code": 0, "verdict": "PASS"},
+        "service_readiness": {"exit_code": 0, "verdict": "PASS"},
+        "fastapi_http_probes": {"exit_code": 0, "verdict": "PASS"},
+        "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
+        "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
+        "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed"},
+        "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
+    }
+    manifest = aggregate_manifest(
+        probes_dict,
+        git_head=DUMMY_40_CHAR_HEAD,
+        git_tree=DUMMY_40_CHAR_TREE,
+        artifact_digests=MANDATORY_DIGESTS_FIXTURE,
+    )
+    assert manifest["verdict"] == "FAIL: PROBE INTEGRITY DEFECT DETECTED"
+
+
+def test_aggregate_manifest_rejects_mismatched_ci_head():
+    """Verifies aggregate_manifest strictly marks FAIL when github_actions_ci head_sha does not match git_head."""
+    probes_dict = {
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
+        "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
+        "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_linux": {"exit_code": 0, "verdict": "PASS"},
+        "ruff_linting_windows": {"exit_code": 0, "verdict": "PASS"},
+        "service_readiness": {"exit_code": 0, "verdict": "PASS"},
+        "fastapi_http_probes": {"exit_code": 0, "verdict": "PASS"},
+        "lock_liveness_probe": {"exit_code": 0, "verdict": "PASS"},
+        "ghost_hunter_scan": {"exit_code": 0, "verdict": "PASS"},
+        "ast_anti_symptom_scan": {"exit_code": 0, "verdict": "PASS"},
+        "github_actions_ci": {"exit_code": 0, "verdict": "PASS", "run_id": 12345, "conclusion": "success", "status": "completed", "head_sha": "0" * 40},
+        "whole_packet_secret_scan": {"exit_code": 0, "verdict": "PASS", "findings_count": 0},
+    }
+    manifest = aggregate_manifest(
+        probes_dict,
+        git_head=DUMMY_40_CHAR_HEAD,
+        git_tree=DUMMY_40_CHAR_TREE,
+        artifact_digests=MANDATORY_DIGESTS_FIXTURE,
+    )
+    assert manifest["verdict"] == "FAIL: PROBE INTEGRITY DEFECT DETECTED"
+
+
+def test_parse_probe_output_embedded_marker_with_valid_terminal_raises_value_error():
+    """Verifies parser strictly rejects probe output having both embedded marker and valid terminal marker."""
+    tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
+    sample = (
+        "   A. Scoped tests/unit/ Suite:\n"
+        "      - Total Count: 229 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
+        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        f"Corrupted embedded marker line: {tm}\n"
+        f"{tm}\n"
+    )
+    with pytest.raises(ValueError, match="Expected exactly 1 terminal marker"):
+        _parse_probe_output(sample)
+
+
+def test_parse_probe_output_truncated_at_sections_raises_value_error():
+    """Verifies parser strictly rejects truncated outputs at various pipeline section boundaries."""
+    s1 = "1. SCANNING CORE TEST SUITES:\n"
+    with pytest.raises(ValueError):
+        _parse_probe_output(s1)
+
+    s2 = (
+        "1. SCANNING CORE TEST SUITES:\n"
+        "   - Core Matches Count: 0\n"
+        "2. SCANNING PRODUCTION PACKAGES:\n"
+    )
+    with pytest.raises(ValueError):
+        _parse_probe_output(s2)
+
+    s3 = (
+        "3. OFFLINE TEST RECONCILIATION:\n"
+        "   - Total Count: 229 references\n"
+    )
+    with pytest.raises(ValueError):
+        _parse_probe_output(s3)
+
 
 

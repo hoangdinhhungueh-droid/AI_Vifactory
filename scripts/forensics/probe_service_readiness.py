@@ -26,7 +26,7 @@ def check_health(
     max_body_bytes: int = MAX_HEALTH_BODY_BYTES,
 ) -> Tuple[bool, Optional[str]]:
     """Polls health endpoint and validates parsed JSON status == 'ok' with chunked bounded body read
-    governed by an absolute monotonic read duration ceiling and comprehensive transport exception handling.
+    governed by an absolute monotonic deadline covering connection, headers, and body read with standard transport handling.
     """
     call_start = time.monotonic()
     call_deadline = call_start + timeout_sec
@@ -40,31 +40,15 @@ def check_health(
             if resp.status != 200:
                 return False, f"HTTP status {resp.status}"
 
-            sock = None
-            try:
-                fp = getattr(resp, "fp", None)
-                raw = getattr(fp, "raw", None)
-                sock = getattr(raw, "_sock", None)
-            except AttributeError as attr_err:
-                return False, f"Unable to establish socket deadline enforcement: {attr_err}"
-
-            if sock is None:
-                return False, "Unable to establish socket deadline enforcement: underlying socket not accessible"
-
             chunks = []
             total_read = 0
             chunk_size = 4096
+            read_fn = getattr(resp, "read1", resp.read)
             while True:
-                rem_read = call_deadline - time.monotonic()
-                if rem_read <= 0:
+                if time.monotonic() >= call_deadline:
                     return False, f"Total body read duration exceeded timeout of {timeout_sec}s"
 
-                try:
-                    sock.settimeout(max(0.001, rem_read))
-                except (OSError, ValueError) as settimeout_err:
-                    return False, f"Failed to enforce dynamic socket deadline: {settimeout_err}"
-
-                chunk = resp.read(chunk_size)
+                chunk = read_fn(chunk_size)
 
                 if time.monotonic() >= call_deadline:
                     return False, f"Total body read duration exceeded timeout of {timeout_sec}s"

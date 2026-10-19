@@ -4,6 +4,7 @@ Tests complete positive and negative validation matrices without using any test 
 """
 
 import pytest
+
 from scripts.orchestrator.boss_orchestrator import (
     EXPECTED_FOCUSED_TESTCASES,
     EXPECTED_TESTCASE_TO_CLASS,
@@ -168,9 +169,9 @@ def test_declared_to_element_cardinality_mismatch_fails_closed():
 def test_malformed_numeric_count_fails_closed():
     """Verifies that non-numeric attribute strings on <testsuite> raise RuntimeError."""
     xml = (
-        f'<?xml version="1.0" encoding="utf-8"?>'
-        f'<testsuite name="pytest" tests="not_a_number" failures="0" errors="0" skipped="0">'
-        f'</testsuite>'
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<testsuite name="pytest" tests="not_a_number" failures="0" errors="0" skipped="0">'
+        '</testsuite>'
     )
     with pytest.raises(RuntimeError, match="must be a non-negative integer string"):
         _parse_junit_metrics(xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=52)
@@ -179,9 +180,9 @@ def test_malformed_numeric_count_fails_closed():
 def test_negative_numeric_count_fails_closed():
     """Verifies that negative integer strings (e.g. -5) raise RuntimeError."""
     xml = (
-        f'<?xml version="1.0" encoding="utf-8"?>'
-        f'<testsuite name="pytest" tests="-52" failures="0" errors="0" skipped="0">'
-        f'</testsuite>'
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<testsuite name="pytest" tests="-52" failures="0" errors="0" skipped="0">'
+        '</testsuite>'
     )
     with pytest.raises(RuntimeError, match="must be a non-negative integer string"):
         _parse_junit_metrics(xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=52)
@@ -288,3 +289,67 @@ def test_missing_required_count_attribute_fails_closed():
     )
     with pytest.raises(RuntimeError, match="Required attribute 'errors' missing on <testsuite>"):
         _parse_junit_metrics(xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=1)
+
+
+def test_valid_selected_count_passes():
+    """Verifies that valid selected_count matching executed tests and collection arithmetic passes."""
+    tc_list = sorted(list(EXPECTED_FOCUSED_TESTCASES))
+    tc_tags = [
+        f'<testcase classname="{EXPECTED_TESTCASE_TO_CLASS[name]}" name="{name}" time="0.01" />'
+        for name in tc_list
+    ]
+    xml = (
+        f'<?xml version="1.0" encoding="utf-8"?>'
+        f'<testsuite name="pytest" tests="{len(tc_list)}" failures="0" errors="0" skipped="0" deselected="0" time="1.0">'
+        f'{"".join(tc_tags)}'
+        f'</testsuite>'
+    )
+    tests, passed, fails, errs, skips, desel = _parse_junit_metrics(
+        xml, "Test Suite", exit_code=0, age_seconds=10.0, min_tests=52,
+        collected_count=52, deselected_count=0, selected_count=52,
+    )
+    assert tests == 52
+    assert passed == 52
+    assert desel == 0
+
+
+def test_inconsistent_selected_count_fails_closed():
+    """Verifies that selected_count not matching executed test count raises RuntimeError fail-closed."""
+    tc_list = sorted(list(EXPECTED_FOCUSED_TESTCASES))
+    tc_tags = [
+        f'<testcase classname="{EXPECTED_TESTCASE_TO_CLASS[name]}" name="{name}" time="0.01" />'
+        for name in tc_list
+    ]
+    xml = (
+        f'<?xml version="1.0" encoding="utf-8"?>'
+        f'<testsuite name="pytest" tests="{len(tc_list)}" failures="0" errors="0" skipped="0" deselected="0" time="1.0">'
+        f'{"".join(tc_tags)}'
+        f'</testsuite>'
+    )
+    with pytest.raises(RuntimeError, match="Executed tests \\(52\\) does not match producer selected count \\(50\\)"):
+        _parse_junit_metrics(
+            xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=52,
+            collected_count=52, deselected_count=0, selected_count=50,
+        )
+
+
+def test_inconsistent_selection_arithmetic_fails_closed():
+    """Verifies that selected_count != (collected_count - deselected_count) raises RuntimeError."""
+    tc_list = sorted(list(EXPECTED_FOCUSED_TESTCASES))
+    tc_tags = [
+        f'<testcase classname="{EXPECTED_TESTCASE_TO_CLASS[name]}" name="{name}" time="0.01" />'
+        for name in tc_list
+    ]
+    xml = (
+        f'<?xml version="1.0" encoding="utf-8"?>'
+        f'<testsuite name="pytest" tests="{len(tc_list)}" failures="0" errors="0" skipped="0" deselected="5" time="1.0">'
+        f'{"".join(tc_tags)}'
+        f'</testsuite>'
+    )
+    # total_tests=52, but selected_count=52 != collected(60) - deselected(5) = 55
+    with pytest.raises(RuntimeError, match="Inconsistent selection accounting"):
+        _parse_junit_metrics(
+            xml, "Linux VPS", exit_code=0, age_seconds=5.0, min_tests=52,
+            collected_count=60, deselected_count=5, selected_count=52,
+        )
+

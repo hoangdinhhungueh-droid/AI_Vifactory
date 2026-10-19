@@ -435,6 +435,7 @@ def parse_and_validate_junit_metrics(
     expected_exact_testcases: Optional[Set[str]] = None,
     collected_count: Optional[int] = None,
     deselected_count: Optional[int] = None,
+    selected_count: Optional[int] = None,
 ) -> Tuple[int, int, int, int, int, int]:
     """Dynamically parses and strictly validates JUnit XML report (Rule 121 & Rule 139).
     Enforces exit code, freshness, non-negative integer attributes, per-suite cardinality,
@@ -552,6 +553,14 @@ def parse_and_validate_junit_metrics(
             )
 
         # Explicit collection, selection, and deselection accounting
+        if selected_count is not None:
+            if not isinstance(selected_count, int) or selected_count < 0:
+                raise ValueError(f"selected_count must be a non-negative integer, got {selected_count!r}")
+            if total_tests != selected_count:
+                raise ValueError(
+                    f"Executed tests ({total_tests}) does not match producer selected count ({selected_count}) in {source_label}"
+                )
+
         if collected_count is not None:
             if not isinstance(collected_count, int) or collected_count < 0:
                 raise ValueError(f"collected_count must be a non-negative integer, got {collected_count!r}")
@@ -564,6 +573,11 @@ def parse_and_validate_junit_metrics(
                     f"XML-derived deselected count ({total_deselected}) does not match producer deselected count ({deselected_count}) in {source_label}"
                 )
             effective_desel = deselected_count if deselected_count is not None else total_deselected
+            if selected_count is not None and selected_count != (collected_count - effective_desel):
+                raise ValueError(
+                    f"Inconsistent selection accounting in {source_label}: "
+                    f"selected ({selected_count}) != collected ({collected_count}) - deselected ({effective_desel})"
+                )
             if total_tests + effective_desel != collected_count:
                 raise ValueError(
                     f"Inconsistent selection/deselection accounting in {source_label}: "
@@ -834,7 +848,8 @@ def aggregate_manifest(
                 run_id is None
                 or conclusion != "success"
                 or status != "completed"
-                or (head_sha is not None and head_sha != git_head)
+                or head_sha is None
+                or head_sha != git_head
             ):
                 all_probes_pass = False
 
@@ -1041,8 +1056,14 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     out_junit_val_win = (res_junit_val_win.stdout + "\n" + res_junit_val_win.stderr).strip()
 
     import re
-    val_cnt_matches = re.findall(r"(\d+) passed", out_junit_val_lnx)
-    val_tests_count = int(val_cnt_matches[-1]) if val_cnt_matches else 56
+    val_cnt_matches_lnx = re.findall(r"(\d+) passed", out_junit_val_lnx)
+    val_cnt_matches_win = re.findall(r"(\d+) passed", out_junit_val_win)
+    if not val_cnt_matches_lnx:
+        raise RuntimeError(f"Could not extract passed test count from Linux JUnit validator output:\n{out_junit_val_lnx[:400]}")
+    if not val_cnt_matches_win:
+        raise RuntimeError(f"Could not extract passed test count from Windows JUnit validator output:\n{out_junit_val_win[:400]}")
+    val_tests_count_lnx = int(val_cnt_matches_lnx[-1])
+    val_tests_count_win = int(val_cnt_matches_win[-1])
 
     code_collect, out_collect = run_on_vps("cd /root/video_factory && /root/video_factory/venv/bin/python3 -m pytest --collect-only -q tests/vox/")
     code_focused_taxonomy, out_focused_taxonomy = run_on_vps(
@@ -1053,9 +1074,15 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "print(out)\n"
         "cols = re.findall(r'collected (\\d+) items', out)\n"
         "desels = re.findall(r'(\\d+) deselected', out)\n"
-        "c_cnt = int(cols[0]) if cols else 0\n"
+        "if len(cols) != 1:\n"
+        "    raise RuntimeError(f'Expected exactly 1 collection record in Linux pytest output, found {len(cols)}')\n"
+        "if len(desels) > 1:\n"
+        "    raise RuntimeError(f'Expected at most 1 deselected record in Linux pytest output, found {len(desels)}')\n"
+        "c_cnt = int(cols[0])\n"
         "d_cnt = int(desels[0]) if desels else 0\n"
         "s_cnt = c_cnt - d_cnt\n"
+        "if c_cnt <= 0 or s_cnt <= 0:\n"
+        "    raise RuntimeError(f'Invalid Linux pytest collection counts: collected={c_cnt}, selected={s_cnt}')\n"
         "print(f'PRODUCER_COLLECTION_SUMMARY: collected={c_cnt} selected={s_cnt} deselected={d_cnt}')\n"
         "sys.exit(res.returncode)\n"
         "\""
@@ -1076,9 +1103,15 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     raw_win_out = (res_win_pytest.stdout + "\n" + res_win_pytest.stderr).strip()
     win_cols = re.findall(r"collected (\d+) items", raw_win_out)
     win_desels = re.findall(r"(\d+) deselected", raw_win_out)
-    w_c_cnt = int(win_cols[0]) if win_cols else 0
+    if len(win_cols) != 1:
+        raise RuntimeError(f"Expected exactly 1 collection record in Windows pytest output, found {len(win_cols)}")
+    if len(win_desels) > 1:
+        raise RuntimeError(f"Expected at most 1 deselected record in Windows pytest output, found {len(win_desels)}")
+    w_c_cnt = int(win_cols[0])
     w_d_cnt = int(win_desels[0]) if win_desels else 0
     w_s_cnt = w_c_cnt - w_d_cnt
+    if w_c_cnt <= 0 or w_s_cnt <= 0:
+        raise RuntimeError(f"Invalid Windows pytest collection counts: collected={w_c_cnt}, selected={w_s_cnt}")
     out_focused_win = raw_win_out + f"\nPRODUCER_COLLECTION_SUMMARY: collected={w_c_cnt} selected={w_s_cnt} deselected={w_d_cnt}"
     out_junit_xml_win = win_junit_path.read_text(encoding="utf-8") if win_junit_path.exists() else "NOT_FOUND"
     win_junit_age = (time.time() - win_junit_path.stat().st_mtime) if win_junit_path.exists() else None
@@ -1092,16 +1125,24 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         raise RuntimeError(f"Expected exactly 1 PRODUCER_COLLECTION_SUMMARY record in Windows pytest output, got {len(win_prod_matches)}:\n{out_focused_win[:500]}")
 
     lnx_collected_count = int(lnx_prod_matches[0][0])
+    lnx_selected_count = int(lnx_prod_matches[0][1])
     lnx_deselected_count = int(lnx_prod_matches[0][2])
+    if lnx_selected_count != (lnx_collected_count - lnx_deselected_count):
+        raise RuntimeError(f"Inconsistent selection count in Linux producer summary: {lnx_selected_count} != {lnx_collected_count} - {lnx_deselected_count}")
+
     win_collected_count = int(win_prod_matches[0][0])
+    win_selected_count = int(win_prod_matches[0][1])
     win_deselected_count = int(win_prod_matches[0][2])
+    if win_selected_count != (win_collected_count - win_deselected_count):
+        raise RuntimeError(f"Inconsistent selection count in Windows producer summary: {win_selected_count} != {win_collected_count} - {win_deselected_count}")
 
     lnx_junit_parsed_ok = False
     win_junit_parsed_ok = False
     try:
         lnx_tests, lnx_passed, lnx_fails, lnx_errs, lnx_skips, lnx_desel = _parse_junit_metrics(
             out_junit_xml, "Linux VPS", code_focused_taxonomy, lnx_junit_age, min_tests=52,
-            collected_count=lnx_collected_count, deselected_count=lnx_deselected_count
+            collected_count=lnx_collected_count, deselected_count=lnx_deselected_count,
+            selected_count=lnx_selected_count,
         )
         lnx_junit_parsed_ok = True
     except (RuntimeError, ValueError) as _lnx_ex:
@@ -1111,7 +1152,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     try:
         win_tests, win_passed, win_fails, win_errs, win_skips, win_desel = _parse_junit_metrics(
             out_junit_xml_win, "Windows Local", code_focused_win, win_junit_age, min_tests=52,
-            collected_count=win_collected_count, deselected_count=win_deselected_count
+            collected_count=win_collected_count, deselected_count=win_deselected_count,
+            selected_count=win_selected_count,
         )
         win_junit_parsed_ok = True
     except (RuntimeError, ValueError) as _win_ex:
@@ -2003,7 +2045,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         f"- Zero-Mock Forensic Audit:      exit code {code_mock} ({mock_verdict}, dynamically parsed {parsed_zero_mock_count}/229 references verified)\n"
         f"- Linux Focused Pytest (52/52):  exit code {code_focused_taxonomy} ({lnx_test_verdict}, XML SHA256: {lnx_junit_sha})\n"
         f"- Windows Focused Pytest (52/52): exit code {code_focused_win} ({win_test_verdict}, XML SHA256: {win_junit_sha})\n"
-        f"- JUnit Negative Test Matrix:    exit codes {code_junit_val_lnx}/{code_junit_val_win} ({'PASS' if code_junit_val_lnx == 0 and code_junit_val_win == 0 else 'FAIL'}, {val_tests_count}/{val_tests_count} negative & manifest aggregation tests)\n"
+        f"- JUnit Negative Test Matrix:    exit codes {code_junit_val_lnx}/{code_junit_val_win} ({'PASS' if code_junit_val_lnx == 0 and code_junit_val_win == 0 else 'FAIL'}, {val_tests_count_lnx}/{val_tests_count_win} negative & manifest aggregation tests)\n"
         f"- Ruff Linting (Linux/Windows):  exit codes {code_ruff_changed}/{code_ruff_win} ({'PASS' if code_ruff_changed == 0 and code_ruff_win == 0 else 'FAIL'}, 0 defects)\n"
         f"- Service Readiness Probe:       exit code {code_pm2} ({'PASS' if code_pm2 == 0 else 'FAIL'}, PM2 restarted and HTTP 200 polled)\n"
         f"- FastAPI HTTP 200 Probes:       exit code {code_http} ({'PASS' if code_http == 0 else 'FAIL'}, positive, negative SHA, unauthenticated PASS)\n"
