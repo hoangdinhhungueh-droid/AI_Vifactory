@@ -184,7 +184,10 @@ def scan_state_dir_residues() -> list[str]:
             elif ".corrupt." in name:
                 residue_errors.append(f"[STATE DIR RESIDUE] Quarantined corrupt state requiring remediation: {p}")
             elif name.endswith(".lock"):
-                # Flag if lock file has been abandoned for more than 5 minutes
+                # Exclude advisory locks for state files (e.g. *.json.lock, *.mutex) matching probe_lock_liveness.py
+                if name.endswith(".json.lock") or name.endswith(".mutex") or name.startswith("."):
+                    continue
+                # Flag if pipeline stage lock file has been abandoned for more than 5 minutes
                 try:
                     import time
                     mtime = os.path.getmtime(p)

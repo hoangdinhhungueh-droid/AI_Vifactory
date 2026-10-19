@@ -379,15 +379,16 @@ def build_anti_bloat_digest(
     tok_count = estimate_tokens(serialized)
 
     allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT", "").strip() in ("1", "true", "yes")
-    if tok_count > MAX_SUPERVISOR_INPUT_TOKENS and not allow_massive:
-        logger.info(f"Digest tokens ({tok_count}) exceeds ceiling ({MAX_SUPERVISOR_INPUT_TOKENS}). Activating secondary compaction...")
+    effective_ceiling = 45000 if allow_massive else MAX_SUPERVISOR_INPUT_TOKENS
+    if tok_count > effective_ceiling:
+        logger.info(f"Digest tokens ({tok_count}) exceeds ceiling ({effective_ceiling}). Activating secondary compaction...")
         diff_lines = digest["compact_diff"].splitlines()
-        digest["compact_diff"] = "\n".join(diff_lines[:250]) + f"\n... [Secondary Anti-Bloat Truncation Active at {MAX_SUPERVISOR_INPUT_TOKENS} tokens limit]"
+        digest["compact_diff"] = "\n".join(diff_lines[:500]) + f"\n... [Secondary Anti-Bloat Truncation Active at {effective_ceiling} tokens limit]"
 
         # Secondary telemetry compaction if still over limit
         tok_count = estimate_tokens(json.dumps(digest, ensure_ascii=False))
-        if tok_count > MAX_SUPERVISOR_INPUT_TOKENS:
-            digest["qa_summary"] = condense_qa_telemetry(digest["qa_summary"], max_chars=12000)
+        if tok_count > effective_ceiling:
+            digest["qa_summary"] = condense_qa_telemetry(digest["qa_summary"], max_chars=40000)
 
     digest["estimated_tokens"] = estimate_tokens(json.dumps(digest, ensure_ascii=False))
     return digest

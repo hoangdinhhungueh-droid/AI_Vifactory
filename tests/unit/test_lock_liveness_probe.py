@@ -741,9 +741,10 @@ def test_multiprocess_archival_race_under_mutex(tmp_path: Path):
     p1.join(timeout=15)
     p2.join(timeout=15)
 
-    outputs = []
-    while not results_queue.empty():
-        outputs.append(results_queue.get_nowait())
+    assert p1.exitcode == 0, f"Worker process 1 terminated with non-zero exit code: {p1.exitcode}"
+    assert p2.exitcode == 0, f"Worker process 2 terminated with non-zero exit code: {p2.exitcode}"
+
+    outputs = [results_queue.get(timeout=5) for _ in range(2)]
 
     assert len(outputs) == 2
     successes = [out for out in outputs if out[0] == "SUCCESS"]

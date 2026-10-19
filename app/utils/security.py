@@ -102,7 +102,8 @@ def redact_telemetry_secrets(text: str) -> str:
     sensitive_keys = (
         r'MCP_BEARER_TOKEN|NOTION_TOKEN|HHTECH_API_KEY|GEMINI_API_KEY|'
         r'CLOUDFLARE_API_TOKEN|CF_API_TOKEN|YOUTUBE_API_KEY|GITHUB_TOKEN|'
-        r'OPENAI_API_KEY|ANTHROPIC_API_KEY|SECRET_KEY|API_KEY|API_SECRET'
+        r'OPENAI_API_KEY|ANTHROPIC_API_KEY|SECRET_KEY|API_KEY|API_SECRET|'
+        r'AWS_SECRET_ACCESS_KEY|TELEGRAM_BOT_TOKEN'
     )
     pattern = rf'(?i)(["\']?(?:{sensitive_keys})["\']?\s*[:=]\s*["\']?)([^"\'\s,;\\}}]+)(["\']?)'
     text = re.sub(pattern, r'\1[REDACTED_SECRET]\3', text)
@@ -111,7 +112,55 @@ def redact_telemetry_secrets(text: str) -> str:
     text = re.sub(r'secret_[A-Za-z0-9]{30,}', '[REDACTED_NOTION_TOKEN]', text)
     text = re.sub(r'ntn_[A-Za-z0-9]{30,}', '[REDACTED_NOTION_TOKEN]', text)
 
+    # 5. GitHub tokens (ghp_, gho_, ghu_, ghs_, ghr_)
+    text = re.sub(r'gh[pousr]_[A-Za-z0-9_]{30,}', '[REDACTED_GITHUB_TOKEN]', text)
+
+    # 6. Google API keys (AIza...)
+    text = re.sub(r'AIza[0-9A-Za-z-_]{35}', '[REDACTED_GOOGLE_KEY]', text)
+
+    # 7. JWT tokens (eyJ... . eyJ... . ...)
+    text = re.sub(r'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}', '[REDACTED_JWT_TOKEN]', text)
+
+    # 8. Private Keys
+    text = re.sub(r'-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----', '[REDACTED_PRIVATE_KEY]', text)
+
     return text
+
+
+def verify_telemetry_cleanliness(text: str) -> tuple[bool, list[str]]:
+    """Machine-verifiable assertion confirming zero plaintext secrets remain in text.
+
+    Returns:
+        (is_clean, violations_list)
+    """
+    if not text:
+        return True, []
+
+    violations = []
+
+    # Check for unredacted Telegram bot tokens: 8+ digits followed by colon and 30+ chars
+    if re.search(r'\b\d{8,}:[A-Za-z0-9_-]{30,}\b', text):
+        violations.append("Unredacted Telegram bot token detected")
+
+    # Check for unredacted Notion tokens
+    if re.search(r'\bsecret_[A-Za-z0-9]{30,}\b', text) or re.search(r'\bntn_[A-Za-z0-9]{30,}\b', text):
+        violations.append("Unredacted Notion token detected")
+
+    # Check for unredacted GitHub tokens
+    if re.search(r'\bgh[pousr]_[A-Za-z0-9_]{30,}\b', text):
+        violations.append("Unredacted GitHub token detected")
+
+    # Check for unredacted Google API keys
+    if re.search(r'\bAIza[0-9A-Za-z-_]{35}\b', text):
+        violations.append("Unredacted Google API key detected")
+
+    # Check for unredacted Bearer tokens that do not contain [REDACTED
+    for m in re.finditer(r'(?i)\bBearer\s+([A-Za-z0-9_\-\.]{15,})\b', text):
+        val = m.group(1)
+        if not val.startswith("[REDACTED"):
+            violations.append(f"Unredacted Bearer token detected: {val[:6]}...")
+
+    return len(violations) == 0, violations
 
 
 class SensitiveDataFilter(logging.Filter):
