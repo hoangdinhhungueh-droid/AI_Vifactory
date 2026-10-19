@@ -2062,8 +2062,8 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         if old_bf.is_file():
             try:
                 old_bf.unlink()
-            except Exception:
-                pass
+            except OSError as _unlink_err:
+                logger.debug(f"Bundle file cleanup notice: {_unlink_err}")
 
     # 1. Incremental Patch
     inc_patch_file = bundle_dir / "incremental.patch"

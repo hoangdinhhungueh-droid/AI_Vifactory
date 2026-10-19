@@ -14,6 +14,7 @@ import pytest
 
 from scripts.forensics.probe_service_readiness import (
     check_health,
+    run_bounded_phase,
     run_service_readiness_probe,
     verify_pm2_process_state,
 )
@@ -757,13 +758,79 @@ def test_aggregate_manifest_rejects_boolean_exit_code():
         )
 
 
+def _dummy_restart_ok(rem: float):
+    return (0, "ok")
+
+
+def _dummy_restart_err(rem: float):
+    return (1, "pm2 restart error")
+
+
+def _dummy_poll_ok(to: float):
+    return (True, "status=ok")
+
+
+def _dummy_poll_fail(to: float):
+    return (False, "timeout waiting for server")
+
+
+def _dummy_inspect_ok(to: float):
+    return (True, "online")
+
+
+def _dummy_inspect_crash(to: float):
+    return (False, "Process crashed")
+
+
+def _dummy_status_ok(to: float):
+    return (0, "online")
+
+
+def _dummy_status_err(to: float):
+    return (1, "pm2 status error")
+
+
+def _dummy_cleanup_ok(rem: float):
+    return (0, "clean")
+
+
+def _slow_status_callable(rem: float):
+    time.sleep(0.12)
+    return (0, "online")
+
+
+def _slow_restart_callable(rem: float):
+    time.sleep(0.12)
+    return (0, "ok")
+
+
+def _slow_poll_callable(to: float):
+    time.sleep(0.12)
+    return (True, "status=ok")
+
+
+def _slow_inspect_callable(to: float):
+    time.sleep(0.12)
+    return (True, "online")
+
+
+def _slow_cleanup_callable(to: float):
+    time.sleep(0.12)
+    return (0, "clean")
+
+
+def _slow_status_just_under_callable(to: float):
+    time.sleep(0.11)
+    return (0, "online")
+
+
 def test_run_service_readiness_probe_fails_on_restart_failure():
     """Verifies run_service_readiness_probe returns exit code 1 when restart fails."""
     code = run_service_readiness_probe(
-        restart_fn=lambda rem: (1, "pm2 restart error"),
-        poll_fn=lambda to: (True, "status=ok"),
-        inspect_fn=lambda to: (True, "online"),
-        status_fn=lambda to: (0, "online"),
+        restart_fn=_dummy_restart_err,
+        poll_fn=_dummy_poll_ok,
+        inspect_fn=_dummy_inspect_ok,
+        status_fn=_dummy_status_ok,
         budget_sec=5.0,
     )
     assert code == 1
@@ -772,10 +839,10 @@ def test_run_service_readiness_probe_fails_on_restart_failure():
 def test_run_service_readiness_probe_fails_on_inspection_failure():
     """Verifies run_service_readiness_probe returns exit code 1 when PM2 inspection fails."""
     code = run_service_readiness_probe(
-        restart_fn=lambda rem: (0, "ok"),
-        poll_fn=lambda to: (True, "status=ok"),
-        inspect_fn=lambda to: (False, "Process crashed"),
-        status_fn=lambda to: (0, "online"),
+        restart_fn=_dummy_restart_ok,
+        poll_fn=_dummy_poll_ok,
+        inspect_fn=_dummy_inspect_crash,
+        status_fn=_dummy_status_ok,
         budget_sec=5.0,
     )
     assert code == 1
@@ -784,10 +851,10 @@ def test_run_service_readiness_probe_fails_on_inspection_failure():
 def test_run_service_readiness_probe_fails_on_status_failure():
     """Verifies run_service_readiness_probe returns exit code 1 when final status fails."""
     code = run_service_readiness_probe(
-        restart_fn=lambda rem: (0, "ok"),
-        poll_fn=lambda to: (True, "status=ok"),
-        inspect_fn=lambda to: (True, "online"),
-        status_fn=lambda to: (1, "pm2 status error"),
+        restart_fn=_dummy_restart_ok,
+        poll_fn=_dummy_poll_ok,
+        inspect_fn=_dummy_inspect_ok,
+        status_fn=_dummy_status_err,
         budget_sec=5.0,
     )
     assert code == 1
@@ -796,10 +863,10 @@ def test_run_service_readiness_probe_fails_on_status_failure():
 def test_run_service_readiness_probe_fails_on_budget_exhaustion():
     """Verifies run_service_readiness_probe returns exit code 1 when overall budget is exhausted."""
     code = run_service_readiness_probe(
-        restart_fn=lambda rem: (0, "ok"),
-        poll_fn=lambda to: (False, "timeout waiting for server"),
-        inspect_fn=lambda to: (True, "online"),
-        status_fn=lambda to: (0, "online"),
+        restart_fn=_dummy_restart_ok,
+        poll_fn=_dummy_poll_fail,
+        inspect_fn=_dummy_inspect_ok,
+        status_fn=_dummy_status_ok,
         budget_sec=0.1,
     )
     assert code == 1
@@ -807,15 +874,11 @@ def test_run_service_readiness_probe_fails_on_budget_exhaustion():
 
 def test_run_service_readiness_probe_fails_on_post_status_budget_overrun():
     """Verifies run_service_readiness_probe returns exit code 1 when final phase overruns the overall budget."""
-    def slow_status(rem):
-        time.sleep(0.12)
-        return (0, "online")
-
     code = run_service_readiness_probe(
-        restart_fn=lambda rem: (0, "ok"),
-        poll_fn=lambda to: (True, "status=ok"),
-        inspect_fn=lambda to: (True, "online"),
-        status_fn=slow_status,
+        restart_fn=_dummy_restart_ok,
+        poll_fn=_dummy_poll_ok,
+        inspect_fn=_dummy_inspect_ok,
+        status_fn=_slow_status_callable,
         budget_sec=0.1,
     )
     assert code == 1
@@ -823,15 +886,11 @@ def test_run_service_readiness_probe_fails_on_post_status_budget_overrun():
 
 def test_run_service_readiness_probe_fails_on_restart_phase_overrun():
     """Verifies run_service_readiness_probe returns exit code 1 when restart phase overruns the overall budget."""
-    def slow_restart(rem):
-        time.sleep(0.12)
-        return (0, "ok")
-
     code = run_service_readiness_probe(
-        restart_fn=slow_restart,
-        poll_fn=lambda to: (True, "status=ok"),
-        inspect_fn=lambda to: (True, "online"),
-        status_fn=lambda to: (0, "online"),
+        restart_fn=_slow_restart_callable,
+        poll_fn=_dummy_poll_ok,
+        inspect_fn=_dummy_inspect_ok,
+        status_fn=_dummy_status_ok,
         budget_sec=0.1,
     )
     assert code == 1
@@ -839,15 +898,11 @@ def test_run_service_readiness_probe_fails_on_restart_phase_overrun():
 
 def test_run_service_readiness_probe_fails_on_poll_phase_overrun():
     """Verifies run_service_readiness_probe returns exit code 1 when poll phase overruns the overall budget."""
-    def slow_poll(to):
-        time.sleep(0.12)
-        return (True, "status=ok")
-
     code = run_service_readiness_probe(
-        restart_fn=lambda rem: (0, "ok"),
-        poll_fn=slow_poll,
-        inspect_fn=lambda to: (True, "online"),
-        status_fn=lambda to: (0, "online"),
+        restart_fn=_dummy_restart_ok,
+        poll_fn=_slow_poll_callable,
+        inspect_fn=_dummy_inspect_ok,
+        status_fn=_dummy_status_ok,
         budget_sec=0.1,
     )
     assert code == 1
@@ -855,15 +910,11 @@ def test_run_service_readiness_probe_fails_on_poll_phase_overrun():
 
 def test_run_service_readiness_probe_fails_on_inspect_phase_overrun():
     """Verifies run_service_readiness_probe returns exit code 1 when PM2 inspect phase overruns the overall budget."""
-    def slow_inspect(to):
-        time.sleep(0.12)
-        return (True, "online")
-
     code = run_service_readiness_probe(
-        restart_fn=lambda rem: (0, "ok"),
-        poll_fn=lambda to: (True, "status=ok"),
-        inspect_fn=slow_inspect,
-        status_fn=lambda to: (0, "online"),
+        restart_fn=_dummy_restart_ok,
+        poll_fn=_dummy_poll_ok,
+        inspect_fn=_slow_inspect_callable,
+        status_fn=_dummy_status_ok,
         budget_sec=0.1,
     )
     assert code == 1
@@ -960,16 +1011,12 @@ def test_parse_probe_output_truncated_at_sections_raises_value_error():
 
 def test_run_service_readiness_probe_fails_on_cleanup_phase_overrun():
     """Verifies run_service_readiness_probe returns exit code 1 when cleanup phase overruns the overall budget."""
-    def slow_cleanup(to):
-        time.sleep(0.12)
-        return (0, "clean")
-
     code = run_service_readiness_probe(
-        restart_fn=lambda rem: (0, "ok"),
-        poll_fn=lambda to: (True, "status=ok"),
-        inspect_fn=lambda to: (True, "online"),
-        status_fn=lambda to: (0, "online"),
-        cleanup_fn=slow_cleanup,
+        restart_fn=_dummy_restart_ok,
+        poll_fn=_dummy_poll_ok,
+        inspect_fn=_dummy_inspect_ok,
+        status_fn=_dummy_status_ok,
+        cleanup_fn=_slow_cleanup_callable,
         budget_sec=0.1,
     )
     assert code == 1
@@ -977,15 +1024,11 @@ def test_run_service_readiness_probe_fails_on_cleanup_phase_overrun():
 
 def test_run_service_readiness_probe_fails_on_final_completion_overrun():
     """Verifies run_service_readiness_probe returns exit code 1 when execution exhausts budget right before completion verification."""
-    def slow_status_just_under(to):
-        time.sleep(0.11)
-        return (0, "online")
-
     code = run_service_readiness_probe(
-        restart_fn=lambda rem: (0, "ok"),
-        poll_fn=lambda to: (True, "status=ok"),
-        inspect_fn=lambda to: (True, "online"),
-        status_fn=slow_status_just_under,
+        restart_fn=_dummy_restart_ok,
+        poll_fn=_dummy_poll_ok,
+        inspect_fn=_dummy_inspect_ok,
+        status_fn=_slow_status_just_under_callable,
         budget_sec=0.1,
     )
     assert code == 1
@@ -1015,10 +1058,10 @@ def test_run_service_readiness_probe_forcibly_bounds_blocking_cleanup():
     """
     start_mono = time.monotonic()
     code = run_service_readiness_probe(
-        restart_fn=lambda rem: (0, "ok"),
-        poll_fn=lambda to: (True, "status=ok"),
-        inspect_fn=lambda to: (True, "online"),
-        status_fn=lambda to: (0, "online"),
+        restart_fn=_dummy_restart_ok,
+        poll_fn=_dummy_poll_ok,
+        inspect_fn=_dummy_inspect_ok,
+        status_fn=_dummy_status_ok,
         cleanup_fn=_adversarial_blocking_cleanup_callable,
         budget_sec=0.35,
     )
@@ -1032,9 +1075,9 @@ def test_run_service_readiness_probe_forcibly_bounds_blocking_restart():
     start_mono = time.monotonic()
     code = run_service_readiness_probe(
         restart_fn=_adversarial_blocking_restart_callable,
-        poll_fn=lambda to: (True, "status=ok"),
-        inspect_fn=lambda to: (True, "online"),
-        status_fn=lambda to: (0, "online"),
+        poll_fn=_dummy_poll_ok,
+        inspect_fn=_dummy_inspect_ok,
+        status_fn=_dummy_status_ok,
         budget_sec=0.35,
     )
     elapsed = time.monotonic() - start_mono
@@ -1056,10 +1099,10 @@ def test_blocking_cleanup_terminated_and_post_timeout_non_mutation(tmp_path):
     try:
         start_mono = time.monotonic()
         code = run_service_readiness_probe(
-            restart_fn=lambda rem: (0, "ok"),
-            poll_fn=lambda to: (True, "status=ok"),
-            inspect_fn=lambda to: (True, "online"),
-            status_fn=lambda to: (0, "online"),
+            restart_fn=_dummy_restart_ok,
+            poll_fn=_dummy_poll_ok,
+            inspect_fn=_dummy_inspect_ok,
+            status_fn=_dummy_status_ok,
             cleanup_fn=_adversarial_blocking_cleanup_callable,
             budget_sec=0.35,
         )
@@ -1090,9 +1133,9 @@ def test_blocking_restart_terminated_and_post_timeout_non_mutation(tmp_path):
         start_mono = time.monotonic()
         code = run_service_readiness_probe(
             restart_fn=_adversarial_blocking_restart_callable,
-            poll_fn=lambda to: (True, "status=ok"),
-            inspect_fn=lambda to: (True, "online"),
-            status_fn=lambda to: (0, "online"),
+            poll_fn=_dummy_poll_ok,
+            inspect_fn=_dummy_inspect_ok,
+            status_fn=_dummy_status_ok,
             budget_sec=0.35,
         )
         caller_elapsed = time.monotonic() - start_mono
@@ -1106,6 +1149,43 @@ def test_blocking_restart_terminated_and_post_timeout_non_mutation(tmp_path):
         os.environ.pop("READINESS_ADVERSARIAL_MUTATION_MARKER", None)
         if marker_file.exists():
             marker_file.unlink()
+
+
+def test_non_picklable_callable_fails_closed_immediately_without_worker_or_mutation(tmp_path):
+    """Adversarial test verifying that a non-picklable callable (e.g. closure/local function)
+    fails closed immediately (< 0.2s deadline compliance) via TypeError without spawning any
+    daemon thread or unmonitored background worker, guaranteeing zero post-timeout mutation.
+    """
+    marker_file = tmp_path / "non_picklable_mutation_marker.txt"
+    if marker_file.exists():
+        marker_file.unlink()
+
+    def _local_unpicklable_closure(timeout_sec: float):
+        time.sleep(0.5)
+        with open(marker_file, "w", encoding="utf-8") as f:
+            f.write("FAIL_UNAUTHORIZED_MUTATION")
+        return (0, "corrupted")
+
+    start_mono = time.monotonic()
+    with pytest.raises(TypeError, match="not process-safe/picklable"):
+        run_bounded_phase("test_closure", _local_unpicklable_closure, 0.35)
+    elapsed = time.monotonic() - start_mono
+    assert elapsed < 0.20, f"Callable validation exceeded budget: {elapsed:.3f}s"
+
+    start_mono2 = time.monotonic()
+    code = run_service_readiness_probe(
+        restart_fn=_local_unpicklable_closure,
+        poll_fn=_dummy_poll_ok,
+        inspect_fn=_dummy_inspect_ok,
+        status_fn=_dummy_status_ok,
+        budget_sec=0.35,
+    )
+    elapsed2 = time.monotonic() - start_mono2
+    assert code == 1, "Expected run_service_readiness_probe to fail closed on unpicklable callable"
+    assert elapsed2 < 0.20, f"Probe fail-closed exceeded budget: {elapsed2:.3f}s"
+
+    time.sleep(0.7)
+    assert not marker_file.exists(), "CRITICAL: Marker file exists! Unpicklable worker ran in background thread post-timeout!"
 
 
 

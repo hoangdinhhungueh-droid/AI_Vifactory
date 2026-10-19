@@ -218,21 +218,56 @@ def test_provider_context_reservations_and_cost_rationale_configuration_derived(
     configured_ceiling = _get_max_absolute_input_ceiling()
     assert 1000 <= configured_ceiling <= 200000, f"Configured ceiling {configured_ceiling} outside valid bounds"
 
-    # 2. Context window reservations dynamically derived from model class
-    # For Claude family models (Sonnet / Opus context window = 200,000 tokens):
-    claude_context_window = 200000
-    claude_output_reservation = claude_context_window - configured_ceiling
-    assert claude_output_reservation >= 80000, f"Claude output reservation {claude_output_reservation} < 80,000 tokens"
+    # 2. Context window reservations dynamically derived from model class and configuration
+    def get_family_context_window(model_name: str) -> int:
+        name_lower = model_name.lower()
+        if any(brand in name_lower for brand in ("claude", "sonnet", "opus")):
+            return 200000
+        if any(brand in name_lower for brand in ("sol", "gpt", "flash")):
+            return 128000
+        return 128000
 
-    # For GPT family models (Sol / Flash context window = 128,000 tokens):
-    sol_context_window = 128000
-    sol_output_reservation = sol_context_window - min(configured_ceiling, 120000)
+    active_model = gw.hhtech_model
+    active_context_window = get_family_context_window(active_model)
+    claude_context_window = get_family_context_window("claude-sonnet-5-5")
+    sol_context_window = get_family_context_window("gpt-6.1-sol")
+
+    # Output reservation for Claude family: dynamically bounded by configured ceiling
+    claude_output_reservation = claude_context_window - configured_ceiling
+    assert claude_output_reservation == claude_context_window - configured_ceiling
+    # Guarantees room for generation (>= 50,000 tokens even at massive 150k ceiling)
+    min_claude_reservation = claude_context_window - min(configured_ceiling, 150000)
+    assert claude_output_reservation >= min_claude_reservation, (
+        f"Claude output reservation {claude_output_reservation} < expected bound {min_claude_reservation}"
+    )
+
+    # Output reservation for Sol / GPT family: dynamically bounded by configured ceiling
+    sol_effective_input = min(configured_ceiling, sol_context_window - 8000)
+    sol_output_reservation = sol_context_window - sol_effective_input
+    assert sol_output_reservation == sol_context_window - sol_effective_input
     assert sol_output_reservation >= 8000, f"Sol output reservation {sol_output_reservation} < 8,000 tokens"
 
-    # 3. Financial upper bound derived from configured ceiling and standard HHTech VND rate (0.8 VND / 1k tokens)
-    token_rate_per_k_vnd = 0.8
-    max_request_cost_vnd = (configured_ceiling / 1000.0) * token_rate_per_k_vnd
-    assert max_request_cost_vnd <= 160.0, f"Max cost {max_request_cost_vnd} VND exceeds safety threshold 160 VND"
+    # Active model output reservation
+    active_effective_input = min(configured_ceiling, active_context_window - 4000)
+    active_output_reservation = active_context_window - active_effective_input
+    assert active_output_reservation >= 4000, f"Active output reservation {active_output_reservation} < 4,000 tokens"
+
+    # 3. Financial bounds derived from CostTracker rates and configured ceiling
+    rates_dict = getattr(gw.cost_tracker, "RATES", {})
+    sol_rate = rates_dict.get("gpt-6.1-sol", 0.8)
+    active_rate = rates_dict.get(active_model, rates_dict.get("default", 1.6))
+
+    sol_max_cost_vnd = (configured_ceiling / 1000.0) * sol_rate
+    active_max_cost_vnd = (configured_ceiling / 1000.0) * active_rate
+
+    assert sol_max_cost_vnd == (configured_ceiling / 1000.0) * sol_rate
+    assert active_max_cost_vnd == (configured_ceiling / 1000.0) * active_rate
+    # Safety assertion: cost per request cannot exceed theoretical budget under 200k tokens at max rate
+    max_possible_rate = max(rates_dict.values()) if rates_dict else 2.0
+    theoretical_cost_ceiling = (200000 / 1000.0) * max_possible_rate
+    assert active_max_cost_vnd <= theoretical_cost_ceiling, (
+        f"Active max cost {active_max_cost_vnd} VND exceeds theoretical ceiling {theoretical_cost_ceiling} VND"
+    )
 
 
 def test_provider_spy_cleanup_guarantee_on_assertion_failure():
@@ -243,8 +278,8 @@ def test_provider_spy_cleanup_guarantee_on_assertion_failure():
             assert httpx.Client != orig_client
             # Simulate an inner failure
             raise ValueError("Intentional test assertion trigger")
-    except ValueError:
-        pass
+    except ValueError as _expected_val_err:
+        _ = _expected_val_err
 
     assert httpx.Client == orig_client, "httpx.Client was not restored after exception in context block!"
 

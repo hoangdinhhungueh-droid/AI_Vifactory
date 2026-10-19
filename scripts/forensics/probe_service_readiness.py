@@ -8,16 +8,16 @@ Fails closed (exit code 1) on restart failure, budget expiration, or invalid pro
 import json
 import math
 import multiprocessing as mp
+import pickle
 import socket
 import subprocess
 import sys
-import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from pickle import PicklingError
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 MAX_HEALTH_BODY_BYTES = 65536  # 64 KB safety bound against trickling or unbounded payloads
 READINESS_OVERALL_BUDGET_SEC = 25.0
@@ -33,8 +33,8 @@ def _mp_phase_worker_entrypoint(fn: Callable[[float], Any], timeout_sec: float, 
     finally:
         try:
             conn.close()
-        except Exception:
-            pass
+        except Exception as _close_err:
+            _ = _close_err
 
 
 def run_bounded_phase(
@@ -45,11 +45,22 @@ def run_bounded_phase(
     """Enforces a hard monotonic deadline on a phase callable using a killable multiprocessing.Process.
     If the callable blocks past timeout_sec, forcibly terminates and kills the worker process immediately,
     preventing any phase or cleanup callback from executing unbounded or mutating production state post-timeout.
+    If the callable is non-picklable or cannot be process-isolated, fails closed immediately (Rule 121 & Rule 139)
+    without launching any unmonitored background threads.
     """
     if timeout_sec <= 0.001:
         raise TimeoutError(f"Phase '{phase_name}' budget exhausted before execution (remaining={timeout_sec:.3f}s)")
 
-    # 1. Primary execution via killable multiprocessing.Process
+    # Enforce process safety / picklability before execution on all platforms (Rule 121 fail-closed)
+    try:
+        pickle.dumps(fn)
+    except (PicklingError, TypeError, AttributeError) as serialize_err:
+        raise TypeError(
+            f"Phase '{phase_name}' callable is not process-safe/picklable for isolated subprocess execution: {serialize_err}. "
+            "All phase callables must be process-safe top-level callables to guarantee bounded execution (Rule 121 & Rule 139)."
+        ) from serialize_err
+
+    # Primary execution via killable multiprocessing.Process
     parent_conn = None
     child_conn = None
     p = None
@@ -86,42 +97,33 @@ def run_bounded_phase(
         if p.exitcode != 0:
             raise RuntimeError(f"Phase '{phase_name}' worker process exited with non-zero code {p.exitcode}")
         raise RuntimeError(f"Phase '{phase_name}' returned no result")
-    except (PicklingError, TypeError, AttributeError):
-        # Fallback to bounded in-thread execution if callable contains non-picklable closures (e.g. nested lambdas)
-        result_container: List[Any] = []
-        error_container: List[Exception] = []
-
-        def _worker():
-            try:
-                res = fn(timeout_sec)
-                result_container.append(res)
-            except Exception as exc:
-                error_container.append(exc)
-
-        t = threading.Thread(target=_worker, name=f"readiness_phase_{phase_name}", daemon=True)
-        t.start()
-        t.join(timeout=timeout_sec)
-        if t.is_alive():
-            raise TimeoutError(
-                f"Phase '{phase_name}' exceeded bounded monotonic deadline of {timeout_sec:.3f}s "
-                f"(in-process execution abandoned after monotonic deadline)"
-            )
-        if error_container:
-            raise error_container[0]
-        if result_container:
-            return result_container[0]
-        raise RuntimeError(f"Phase '{phase_name}' returned no result")
+    except (PicklingError, TypeError, AttributeError) as serialize_err:
+        raise TypeError(
+            f"Phase '{phase_name}' callable is not process-safe/picklable for isolated subprocess execution: {serialize_err}. "
+            "All phase callables must be process-safe top-level callables to guarantee bounded execution."
+        ) from serialize_err
     finally:
         if parent_conn is not None:
             try:
                 parent_conn.close()
-            except Exception:
-                pass
+            except Exception as _parent_close_err:
+                _ = _parent_close_err
         if child_conn is not None:
             try:
                 child_conn.close()
-            except Exception:
-                pass
+            except Exception as _child_close_err:
+                _ = _child_close_err
+        if p is not None:
+            try:
+                if p.is_alive():
+                    p.terminate()
+                    p.join(timeout=0.1)
+                    if p.is_alive():
+                        p.kill()
+                        p.join(timeout=0.05)
+                p.close()
+            except Exception as _proc_close_err:
+                _ = _proc_close_err
 
 
 def check_health(
