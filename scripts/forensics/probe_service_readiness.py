@@ -5,7 +5,6 @@ spanning PM2 restart, health polling with bounded body size, PM2 descriptor vali
 Fails closed (exit code 1) on restart failure, budget expiration, or invalid process status.
 """
 
-import http.client
 import json
 import math
 import socket
@@ -13,6 +12,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Callable, Optional, Tuple
 
@@ -25,55 +25,85 @@ def check_health(
     timeout_sec: float = 2.0,
     max_body_bytes: int = MAX_HEALTH_BODY_BYTES,
 ) -> Tuple[bool, Optional[str]]:
-    """Polls health endpoint and validates parsed JSON status == 'ok' with chunked bounded body read
-    governed by an absolute monotonic deadline covering connection, headers, and body read with standard transport handling.
+    """Polls health endpoint and validates parsed JSON status == 'ok' using standard socket transport
+    governed by an absolute monotonic deadline covering connection, headers, and body read.
+    Dynamically applies remaining monotonic deadline to every blocking operation.
     """
     call_start = time.monotonic()
     call_deadline = call_start + timeout_sec
-    req = urllib.request.Request(url, headers={"User-Agent": "VF-HealthProbe/1.0"})
+    parsed = urllib.parse.urlsplit(url)
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+
     try:
         rem_connect = call_deadline - time.monotonic()
         if rem_connect <= 0:
             return False, f"Initial deadline exhausted before connection ({timeout_sec}s budget)"
 
-        with urllib.request.urlopen(req, timeout=rem_connect) as resp:
-            if resp.status != 200:
-                return False, f"HTTP status {resp.status}"
+        sock = socket.create_connection((host, port), timeout=rem_connect)
+        with sock:
+            # Send HTTP request with Connection: close
+            rem_send = call_deadline - time.monotonic()
+            if rem_send <= 0:
+                return False, f"Deadline exhausted before request transmission ({timeout_sec}s budget)"
+            sock.settimeout(rem_send)
+            req_data = (
+                f"GET {path} HTTP/1.1\r\n"
+                f"Host: {host}:{port}\r\n"
+                f"User-Agent: VF-HealthProbe/1.0\r\n"
+                f"Connection: close\r\n\r\n"
+            ).encode("utf-8")
+            sock.sendall(req_data)
 
-            chunks = []
-            total_read = 0
-            chunk_size = 4096
-            read_fn = getattr(resp, "read1", resp.read)
+            # Read response chunks under monotonic deadline
+            raw_chunks = []
+            total_bytes = 0
             while True:
-                if time.monotonic() >= call_deadline:
+                rem_read = call_deadline - time.monotonic()
+                if rem_read <= 0:
                     return False, f"Total body read duration exceeded timeout of {timeout_sec}s"
-
-                chunk = read_fn(chunk_size)
-
-                if time.monotonic() >= call_deadline:
-                    return False, f"Total body read duration exceeded timeout of {timeout_sec}s"
-
+                sock.settimeout(rem_read)
+                chunk = sock.recv(4096)
                 if not chunk:
                     break
-                total_read += len(chunk)
-                if total_read > max_body_bytes:
+                total_bytes += len(chunk)
+                if total_bytes > max_body_bytes:
                     return False, f"Response body exceeded maximum bound of {max_body_bytes} bytes"
-                chunks.append(chunk)
+                raw_chunks.append(chunk)
 
-            body_str = b"".join(chunks).decode("utf-8")
+            raw_bytes = b"".join(raw_chunks)
+            if not raw_bytes:
+                return False, "Empty HTTP response from server"
+
+            header_bytes, sep, body_bytes = raw_bytes.partition(b"\r\n\r\n")
+            if not sep:
+                return False, "Malformed HTTP response: missing header/body separator"
+
+            lines = header_bytes.split(b"\r\n")
+            status_line = lines[0].decode("latin-1", errors="replace")
+            status_parts = status_line.split(" ", 2)
+            if len(status_parts) < 2 or not status_parts[1].isdigit():
+                return False, f"Malformed HTTP status line: {status_line}"
+
+            status_code = int(status_parts[1])
+            if status_code != 200:
+                return False, f"HTTP status {status_code}"
+
+            body_str = body_bytes.decode("utf-8")
             data = json.loads(body_str)
             if isinstance(data, dict) and data.get("status") == "ok":
                 return True, "status=ok"
             return False, f"Unexpected health payload: {data}"
     except (
-        urllib.error.URLError,
-        urllib.error.HTTPError,
         TimeoutError,
+        socket.timeout,
         ConnectionResetError,
         ConnectionRefusedError,
-        http.client.IncompleteRead,
-        http.client.HTTPException,
-        socket.timeout,
+        ConnectionAbortedError,
+        BrokenPipeError,
         json.JSONDecodeError,
         UnicodeDecodeError,
         OSError,
@@ -150,10 +180,12 @@ def run_service_readiness_probe(
     poll_fn: Optional[Callable[[float], Tuple[bool, str]]] = None,
     inspect_fn: Optional[Callable[[float], Tuple[bool, str]]] = None,
     status_fn: Optional[Callable[[float], Tuple[int, str]]] = None,
+    cleanup_fn: Optional[Callable[[float], Tuple[int, str]]] = None,
     budget_sec: float = READINESS_OVERALL_BUDGET_SEC,
 ) -> int:
-    """Executes the 5-phase fail-closed readiness probe bounded by budget_sec.
+    """Executes the 6-phase fail-closed readiness probe bounded by budget_sec.
     Supports dependency injection of phase callables for hermetic lifecycle validation.
+    Phases: 1. Restart, 2. Polling, 3. Inspect, 4. Status, 5. Cleanup, 6. Final monotonic completion.
     """
     print("--- VF-API PM2 RESTART & HEALTH POLLING PROBE ---")
     overall_start_mono = time.monotonic()
@@ -267,10 +299,23 @@ def run_service_readiness_probe(
         return 1
     print(out_status)
 
-    # 5. Final unrounded monotonic budget verification
+    # 5. Optional PM2/Readiness Cleanup step under overall budget
+    now = time.monotonic()
+    if now >= overall_deadline:
+        print(f"❌ FAIL: Overall budget exhausted before cleanup ({now - overall_start_mono:.2f}s >= {budget_sec}s)", file=sys.stderr)
+        return 1
+    rem_cleanup = overall_deadline - now
+
+    if cleanup_fn is not None:
+        code_cleanup, out_cleanup = cleanup_fn(rem_cleanup)
+        if code_cleanup != 0:
+            print(f"❌ FAIL: PM2 cleanup execution failed with exit code {code_cleanup}: {out_cleanup}", file=sys.stderr)
+            return 1
+
+    # 6. Final unrounded monotonic budget verification across entire probe and completion
     finish_mono = time.monotonic()
     if finish_mono > overall_deadline:
-        print(f"❌ FAIL: Overall readiness budget exceeded ({finish_mono - overall_start_mono:.3f}s > {budget_sec}s)", file=sys.stderr)
+        print(f"❌ FAIL: Overall readiness budget exceeded at completion ({finish_mono - overall_start_mono:.3f}s > {budget_sec}s)", file=sys.stderr)
         return 1
 
     total_elapsed = round(finish_mono - overall_start_mono, 2)

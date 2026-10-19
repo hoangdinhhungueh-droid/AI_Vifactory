@@ -178,14 +178,17 @@ def test_check_health_rejects_oversized_payload_server_backed():
         def do_GET(self):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Connection", "close")
             self.end_headers()
             # Send payload of 70,000 bytes, exceeding 65,536 bound
             self.wfile.write(b'{"status": "ok", "padding": "' + b"A" * 70000 + b'"}')
 
         def log_message(self, format, *args):
-            pass
+            if hasattr(self.server, "access_logs"):
+                self.server.access_logs.append(format % args)
 
     server = http.server.HTTPServer(("127.0.0.1", 0), OversizedHandler)
+    server.access_logs = []
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
     try:
@@ -204,13 +207,16 @@ def test_check_health_rejects_malformed_json_server_backed():
         def do_GET(self):
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(b"<html><body>502 Bad Gateway</body></html>")
 
         def log_message(self, format, *args):
-            pass
+            if hasattr(self.server, "access_logs"):
+                self.server.access_logs.append(format % args)
 
     server = http.server.HTTPServer(("127.0.0.1", 0), MalformedHandler)
+    server.access_logs = []
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
     try:
@@ -229,13 +235,16 @@ def test_check_health_rejects_unexpected_status_server_backed():
         def do_GET(self):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(b'{"status": "degraded", "active_workers": 0}')
 
         def log_message(self, format, *args):
-            pass
+            if hasattr(self.server, "access_logs"):
+                self.server.access_logs.append(format % args)
 
     server = http.server.HTTPServer(("127.0.0.1", 0), DegradedHandler)
+    server.access_logs = []
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
     try:
@@ -254,6 +263,7 @@ def test_check_health_rejects_trickled_body_deadline_exhaustion_server_backed():
         def do_GET(self):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(b'{"part": 1}')
             self.wfile.flush()
@@ -267,9 +277,11 @@ def test_check_health_rejects_trickled_body_deadline_exhaustion_server_backed():
                 self.server.write_errors.append(type(write_err).__name__)
 
         def log_message(self, format, *args):
-            pass
+            if hasattr(self.server, "access_logs"):
+                self.server.access_logs.append(format % args)
 
     server = http.server.HTTPServer(("127.0.0.1", 0), TricklingHandler)
+    server.access_logs = []
     server.write_errors = []
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
@@ -301,6 +313,7 @@ def test_check_health_continuous_sub_timeout_trickle_deadline_exhaustion_server_
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Transfer-Encoding", "chunked")
+            self.send_header("Connection", "close")
             self.end_headers()
             try:
                 for _ in range(15):
@@ -309,13 +322,17 @@ def test_check_health_continuous_sub_timeout_trickle_deadline_exhaustion_server_
                     time.sleep(0.03)
                 self.wfile.write(b"0\r\n\r\n")
                 self.wfile.flush()
-            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
-                pass
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError) as write_err:
+                if hasattr(self.server, "write_errors"):
+                    self.server.write_errors.append(type(write_err).__name__)
 
         def log_message(self, format, *args):
-            pass
+            if hasattr(self.server, "access_logs"):
+                self.server.access_logs.append(format % args)
 
     server = http.server.HTTPServer(("127.0.0.1", 0), ChunkedTrickleHandler)
+    server.access_logs = []
+    server.write_errors = []
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
     try:
@@ -327,6 +344,49 @@ def test_check_health_continuous_sub_timeout_trickle_deadline_exhaustion_server_
         assert 0.11 <= elapsed <= 0.35, f"Elapsed time {elapsed}s not bounded to [0.11, 0.35]"
         assert diag is not None
         assert "exceeded timeout" in diag or "timed out" in diag
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_check_health_single_blocking_read_deadline_exhaustion_server_backed():
+    """Verifies that a server which stalls indefinitely on a single body chunk is bounded and rejected by the monotonic deadline."""
+    class SingleBlockingReadHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", "100")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(b'{"status": ')
+            self.wfile.flush()
+            # Stalls for 2.0s without sending remaining body
+            time.sleep(2.0)
+            try:
+                self.wfile.write(b'"ok"}')
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError) as write_err:
+                if hasattr(self.server, "write_errors"):
+                    self.server.write_errors.append(type(write_err).__name__)
+
+        def log_message(self, format, *args):
+            if hasattr(self.server, "access_logs"):
+                self.server.access_logs.append(format % args)
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), SingleBlockingReadHandler)
+    server.access_logs = []
+    server.write_errors = []
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/api/v1/health"
+        t0 = time.monotonic()
+        ok, diag = check_health(url, timeout_sec=0.15)
+        elapsed = time.monotonic() - t0
+        assert ok is False
+        assert 0.14 <= elapsed <= 0.40, f"Elapsed time {elapsed}s not bounded to ~0.15s"
+        assert diag is not None
+        assert "exceeded timeout" in diag or "timed out" in diag or "TimeoutError" in diag
     finally:
         server.shutdown()
         server.server_close()
@@ -895,6 +955,40 @@ def test_parse_probe_output_truncated_at_sections_raises_value_error():
     )
     with pytest.raises(ValueError):
         _parse_probe_output(s3)
+
+
+def test_run_service_readiness_probe_fails_on_cleanup_phase_overrun():
+    """Verifies run_service_readiness_probe returns exit code 1 when cleanup phase overruns the overall budget."""
+    def slow_cleanup(to):
+        time.sleep(0.12)
+        return (0, "clean")
+
+    code = run_service_readiness_probe(
+        restart_fn=lambda rem: (0, "ok"),
+        poll_fn=lambda to: (True, "status=ok"),
+        inspect_fn=lambda to: (True, "online"),
+        status_fn=lambda to: (0, "online"),
+        cleanup_fn=slow_cleanup,
+        budget_sec=0.1,
+    )
+    assert code == 1
+
+
+def test_run_service_readiness_probe_fails_on_final_completion_overrun():
+    """Verifies run_service_readiness_probe returns exit code 1 when execution exhausts budget right before completion verification."""
+    def slow_status_just_under(to):
+        time.sleep(0.11)
+        return (0, "online")
+
+    code = run_service_readiness_probe(
+        restart_fn=lambda rem: (0, "ok"),
+        poll_fn=lambda to: (True, "status=ok"),
+        inspect_fn=lambda to: (True, "online"),
+        status_fn=slow_status_just_under,
+        budget_sec=0.1,
+    )
+    assert code == 1
+
 
 
 

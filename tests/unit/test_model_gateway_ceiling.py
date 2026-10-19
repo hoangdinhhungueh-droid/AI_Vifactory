@@ -4,7 +4,15 @@ Tests bounded normalization without using any test doubles.
 """
 
 import os
-from app.services.model_gateway import _get_max_absolute_input_ceiling
+
+import pytest
+
+from app.services.model_gateway import (
+    MAX_ABSOLUTE_INPUT_CEILING,
+    ModelGateway,
+    TokenBudgetExceeded,
+    _get_max_absolute_input_ceiling,
+)
 
 
 def test_default_ceiling_when_env_unset():
@@ -71,3 +79,74 @@ def test_invalid_non_numeric_fallback():
             os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = old_val
         else:
             os.environ.pop("HHTECH_MAX_ABSOLUTE_INPUT_CEILING", None)
+
+
+def test_oversized_request_rejected_before_provider_dispatch_default_ceiling():
+    """Verifies that an input exceeding default 20k token ceiling is rejected before any provider dispatch."""
+    old_key = os.environ.get("HHTECH_API_KEY")
+    old_allow = os.environ.get("ALLOW_MASSIVE_LLM_CONTEXT")
+    try:
+        os.environ["HHTECH_API_KEY"] = "sk-test-dummy-key"
+        os.environ.pop("ALLOW_MASSIVE_LLM_CONTEXT", None)
+        gw = ModelGateway()
+        # 60,000 chars / 2.5 = 24,000 tokens > 20,000 default ceiling
+        oversized_prompt = "A" * 60000
+        with pytest.raises(TokenBudgetExceeded) as exc_info:
+            gw._call_hhtech(prompt=oversized_prompt, model="claude-opus-5-5")
+        assert "Token Bloat Guard" in str(exc_info.value)
+        assert "safety ceiling" in str(exc_info.value)
+    finally:
+        if old_key is not None:
+            os.environ["HHTECH_API_KEY"] = old_key
+        else:
+            os.environ.pop("HHTECH_API_KEY", None)
+        if old_allow is not None:
+            os.environ["ALLOW_MASSIVE_LLM_CONTEXT"] = old_allow
+        else:
+            os.environ.pop("ALLOW_MASSIVE_LLM_CONTEXT", None)
+
+
+def test_oversized_request_rejected_before_provider_dispatch_absolute_ceiling():
+    """Verifies that an input exceeding hard 120k absolute ceiling is rejected before any provider dispatch even with override."""
+    old_key = os.environ.get("HHTECH_API_KEY")
+    old_allow = os.environ.get("ALLOW_MASSIVE_LLM_CONTEXT")
+    try:
+        os.environ["HHTECH_API_KEY"] = "sk-test-dummy-key"
+        os.environ["ALLOW_MASSIVE_LLM_CONTEXT"] = "1"
+        gw = ModelGateway()
+        # 350,000 chars / 2.5 = 140,000 tokens > 120,000 absolute ceiling
+        oversized_prompt = "A" * 350000
+        with pytest.raises(TokenBudgetExceeded) as exc_info:
+            gw._call_hhtech(prompt=oversized_prompt, model="claude-opus-5-5")
+        assert "Hard Absolute Ceiling Violated" in str(exc_info.value)
+        assert f"exceeds absolute {MAX_ABSOLUTE_INPUT_CEILING} ceiling" in str(exc_info.value)
+    finally:
+        if old_key is not None:
+            os.environ["HHTECH_API_KEY"] = old_key
+        else:
+            os.environ.pop("HHTECH_API_KEY", None)
+        if old_allow is not None:
+            os.environ["ALLOW_MASSIVE_LLM_CONTEXT"] = old_allow
+        else:
+            os.environ.pop("ALLOW_MASSIVE_LLM_CONTEXT", None)
+
+
+def test_provider_context_reservations_and_cost_rationale():
+    """Verifies mathematical provider context window reservations and bounded cost rationale (Rule 138 & Rule 139).
+    Context reservation:
+      - Provider Context Window: 128,000 tokens (gpt-6.1-sol / claude-opus-5-5).
+      - Max Input Ceiling: 120,000 tokens (MAX_ABSOLUTE_INPUT_CEILING).
+      - Minimum Output Reservation: 8,000 tokens guaranteed for model generation.
+    Cost rationale:
+      - Maximum input cost at HHTech rate (~0.8 VND / 1k input tokens): 120 * 0.8 = 96 VND (< 100 VND / $0.0038).
+      - Proves financial safety against runaway token consumption during forensic audits.
+    """
+    provider_context_window = 128000
+    guaranteed_output_reservation = provider_context_window - MAX_ABSOLUTE_INPUT_CEILING
+    assert guaranteed_output_reservation >= 8000, f"Output reservation {guaranteed_output_reservation} < 8,000 tokens"
+    assert MAX_ABSOLUTE_INPUT_CEILING == 120000
+
+    # Financial upper bound: 120,000 tokens * 0.8 VND/1000 tokens = 96 VND
+    max_request_cost_vnd = (MAX_ABSOLUTE_INPUT_CEILING / 1000.0) * 0.8
+    assert max_request_cost_vnd <= 100.0, f"Max cost {max_request_cost_vnd} VND exceeds safety threshold 100 VND"
+
