@@ -7,15 +7,13 @@ Rule 128: Zero Semantic Bias. Dynamically matches scene era, architecture, and l
 Rule 446: English Production Bridge for all visual generation prompts.
 """
 
-import os
-import sys
 import json
-import re
-import requests
 import logging
+import os
+import re
+import sys
 from dataclasses import dataclass
-from typing import Dict, Any, List, Optional, Tuple
-from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +38,7 @@ _load_env()
 
 from app.services.hhtech_reasoner import call_gpt6_astra
 from app.services.model_gateway import get_global_gateway
-from app.services.skill_loader import (
-    get_b35_strategic_rules,
-    get_cinematic_tokens_dictionary
-)
+from app.services.skill_loader import get_b35_strategic_rules, get_cinematic_tokens_dictionary
 
 sys.path.insert(0, "/root/video_factory/scripts")
 import ag_notion_bridge as _bridge
@@ -67,7 +62,7 @@ def resolve_cinematic_tokens(tokens: list | None) -> dict:
     """
     dict_data = get_cinematic_tokens_dictionary()
     token_map = {t["token"]: t for t in dict_data.get("tokens", [])}
-    
+
     res = {
         "camera_directives": [],
         "lighting_directives": [],
@@ -76,7 +71,7 @@ def resolve_cinematic_tokens(tokens: list | None) -> dict:
     }
     if not tokens or not isinstance(tokens, list):
         return res
-        
+
     for tok in tokens:
         if not isinstance(tok, str):
             continue
@@ -114,11 +109,11 @@ def resolve_cinematic_tokens(tokens: list | None) -> dict:
             res["lighting_directives"].append(directive)
         elif cat in ("style_vfx", "transition", "vox_graphic") and directive and directive not in res["vfx_directives"]:
             res["vfx_directives"].append(directive)
-            
+
         r_fx = info.get("remotion_fx")
         if r_fx and r_fx not in res["remotion_fx"]:
             res["remotion_fx"].append(r_fx)
-            
+
     return res
 
 
@@ -356,7 +351,7 @@ def apply_semantic_numeral_rewrites(text: str) -> str:
     so meaning survives while preventing raw digits from baking into images."""
     if not text:
         return ""
-    
+
     # 1. Historical decades, centuries, and period years
     text = re.sub(r"\b1950s\b", "nineteen-fifties era", text, flags=re.IGNORECASE)
     text = re.sub(r"\b1960s\b", "nineteen-sixties era", text, flags=re.IGNORECASE)
@@ -410,19 +405,19 @@ def lint_visual_prompt(prompt: str, strict: bool = False, is_prop: bool = True, 
     """
     if not prompt:
         return LintResult(ok=True, violations=[], prompt="", negative=NEGATIVE_R137)
-    
+
     # 0. Apply semantic rewrites first so conceptual terms survive without digits
     prompt = apply_semantic_numeral_rewrites(prompt)
-    
+
     # 1. Protect allowlisted technical tokens
     scrubbed = R137_ALLOWLIST.sub(" ", prompt)
-    
+
     # 2. Check for banned violations
     violations: List[Tuple[str, str]] = []
     for cat, rx in R137_BANNED.items():
         for m in rx.finditer(scrubbed):
             violations.append((cat, m.group(0)))
-            
+
     # 3. Clean and inject blank template if document nouns present (ONLY for raw evidence props that lack hygiene, NEVER environments, characters, or already-hygienic prompts)
     fixed = prompt
     # Remove quoted strings that might contain fake text
@@ -439,7 +434,7 @@ def lint_visual_prompt(prompt: str, strict: bool = False, is_prop: bool = True, 
     if not strict and is_prop and not is_non_doc_obj and DOC_NOUNS.search(fixed) and not already_hygienic and "unfilled documentary folio" not in fixed and "unfilled template" not in fixed:
         clean_prefix = re.sub(r"(?:\.|\,)?\s*\bFlat\b(?:\.|\,)?\s*$", "", fixed.strip(), flags=re.IGNORECASE).rstrip(". ,")
         fixed = f"{clean_prefix}, {BLANK_TEMPLATE}"
-    
+
     # Protect aspect ratios and cinematographic tokens before stripping numeric amounts
     aspect_masks = {
         "16:9": "__ASPECT_RATIO_16_9__",
@@ -471,11 +466,11 @@ def lint_visual_prompt(prompt: str, strict: bool = False, is_prop: bool = True, 
     fixed = re.sub(r"(?:\.|\,)?\s*\bFlat\b(?:\.|\,)?\s*$", "", fixed.strip(), flags=re.IGNORECASE)
     fixed = re.sub(r"\bEra\s*\.?\s*", "", fixed, flags=re.IGNORECASE)
     fixed = re.sub(r"\s{2,}", " ", fixed)
-    
+
     # Ensure closing directive is present
     if R137_CLOSING_DIRECTIVE not in fixed:
         fixed = f"{fixed.rstrip('. ')}. {R137_CLOSING_DIRECTIVE}"
-        
+
     ok = len(violations) == 0 if strict else True
     return LintResult(ok=ok, violations=violations, prompt=fixed, negative=NEGATIVE_R137)
 
@@ -591,7 +586,7 @@ def resolve_background_anchor(bg_key: str, p: str, market: str, prof: dict) -> t
     Prevents forcing 'corporate headquarters' on cathedrals, courthouses, outdoor scenes, or archives.
     Accurately distinguishes exterior facades from interior chambers to prevent conflicting cues.
     """
-    m = (market or "EN").upper().strip()
+    _m = (market or "EN").upper().strip()
     combined = f"{bg_key} {p}".lower()
     base_anchor = prof.get("bg_anchor", "Authentic contemporary setting, classic and modern architecture, high-contrast chiaroscuro lighting")
     base_negs = prof.get("bg_negatives", "")
@@ -1443,9 +1438,9 @@ def _sanitize_foreground_prompt(prompt: str, fg_key: str = "", is_byzantine: boo
     # Rule 134 Adversarial Invariant: Ensure non-local foreign characters in JP market NEVER leak salaryman or hanko into positive prompt
     if any(k in f"{fg_key} {prompt}".lower() for k in ["chinese", "china", "foreign_worker", "supplier", "regional_worker"]):
         pos_part = p.split("[STRICT NEGATIVE PROMPT]")[0] if "[STRICT NEGATIVE PROMPT]" in p else p
-        assert "salaryman" not in pos_part.lower(), f"❌ Market Anchor Bias detected: Chinese character positive prompt contains 'salaryman'!"
-        assert "hanko" not in pos_part.lower(), f"❌ Market Anchor Bias detected: Chinese character positive prompt contains 'hanko'!"
-        assert "sha-sho" not in pos_part.lower(), f"❌ Market Anchor Bias detected: Chinese character positive prompt contains 'sha-sho'!"
+        assert "salaryman" not in pos_part.lower(), "❌ Market Anchor Bias detected: Chinese character positive prompt contains 'salaryman'!"
+        assert "hanko" not in pos_part.lower(), "❌ Market Anchor Bias detected: Chinese character positive prompt contains 'hanko'!"
+        assert "sha-sho" not in pos_part.lower(), "❌ Market Anchor Bias detected: Chinese character positive prompt contains 'sha-sho'!"
 
     return p
 
@@ -1577,7 +1572,7 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
         pos, neg = p, ""
 
     pos_clean = strip_negative_leakage_from_positive(pos).strip()
-    
+
     # Strip uppercase bracketed tags from positive prompt so they don't leak as header tokens
     pos_clean = re.sub(r"\[[A-Z\s&_/-]+\]", "", pos_clean).strip()
 
@@ -1594,7 +1589,7 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     pos_clean = re.sub(r"\bembossed\s+(?:generic\s+circular\s+geometric\s+)?(?:judicial\s+|court\s+clerk\s+)?(?:blind-stamp\s+impression\s+circle|filing\s+blind-stamp|binding\s+strip)\b", "plain flat tinted binding band", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\b(?:printed|embossed)\b", "clean unwritten", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\btwelve\s+division\s+intervals\b", "uniform unmarked tick strokes, blank dial face, no numerals", pos_clean, flags=re.IGNORECASE)
-    
+
     # Text-priming functional nouns -> physical non-text descriptors
     pos_clean = re.sub(r"\bpastoral\s+letter\s+folio\b", "bound plain folio with ruled grid", pos_clean, flags=re.IGNORECASE)
     pos_clean = re.sub(r"\bspreadsheet\s+folio\b", "accounting binder with blank columnar grid", pos_clean, flags=re.IGNORECASE)
@@ -1641,7 +1636,7 @@ def split_prompt_channels(p: str, default_layout: str = "subject-left") -> dict:
     # Rule 128 / Opus 5.5 Directive 1 & 4: Purge key-adjacent colors from negatives of #FF00FF chroma cutouts
     is_chroma_asset = "#ff00ff" in pos.lower() or "magenta" in pos.lower()
     BARE_CHROMA = {"magenta", "#ff00ff", "pink", "fuchsia", "purple", "amaranth"} if is_chroma_asset else {"#ff00ff"}
-    
+
     raw_neg_tokens = [t.strip() for t in neg_clean.split(",") if t.strip()]
     # Ensure evidence negatives include seal, stamp, emblem, crest, numerals, digits
     if is_chroma_asset:
@@ -1891,10 +1886,10 @@ def _synthesize_thumbnail_prompts(story_title: str, seo_data: dict = None, marke
 
     raw_title_a = (seo_data.get("title_a") if seo_data else "") or story_title or ""
     clean_title_a = re.sub(r"[\r\n]+", " ", raw_title_a).split("|")[0].strip()[:80]
-    
+
     raw_title_b = (seo_data.get("title_b") if seo_data else "") or ""
     clean_title_b = re.sub(r"[\r\n]+", " ", raw_title_b).split("|")[0].strip()[:80]
-    
+
     raw_angle = ((seo_data.get("specific_viral_angle") if seo_data else "") or "").strip()
     angle_sents = [s.strip() for s in re.split(r"[.\n\r。|！？!?]+", raw_angle) if s.strip()]
     first_sent = angle_sents[0] if angle_sents else ""
@@ -1935,10 +1930,10 @@ def generate_scene_prompts(
     """
     Calls HHTech GPT-6-Astra via dedicated reasoner to generate high-fidelity image prompts
     for paired Backgrounds (16:9) and Foregrounds (1:1).
-    
+
     Preserves scene-level pairing (background_reuse_key, foreground_reuse_key) to ensure
     Background and Foreground are semantically unified in era, lighting, and narrative context.
-    
+
     Enforces Rule 116, Rule 122 & Rule 435 (non-photorealistic stylized graphic novel FG on #FF00FF).
     Enforces Market Ethnicity & Architectural Conformance (Anti-Western bias on Asian topics).
     Eradicates all hardcoded relics and dynamically adapts to the scene era (Rule 128).
@@ -2243,8 +2238,8 @@ def generate_scene_prompts(
             animation_tiers[vox_key] = "HERO_AI_VIDEO_6S" if idx == 0 else "TACTILE_STOPMOTION_STILL"
 
     from app.services.vox_automated_director import (
-        VOX_PAPER_MATERIALS_LIBRARY,
         DIORAMA_STYLE_BLOCKS,
+        VOX_PAPER_MATERIALS_LIBRARY,
     )
 
     result = {
@@ -2282,12 +2277,6 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
     if not token:
         logger.warning("[prompt_forge] No Notion token found, skipping Notion sync.")
         return
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Notion-Version": "2022-06-28",
-        "Content-Type": "application/json"
-    }
 
     resolved = _bridge.resolve_episode_prompt_db(episode_id, task_id=task_id)
     if resolved.get("error"):
@@ -2447,19 +2436,44 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
 
 def extract_episode_master_asset_registry(director_plan: Dict[str, Any]) -> Dict[str, Any]:
     """Rule 128 & Rule 132: Extracts or canonicalizes the bounded Master Asset Registry (18-24 items).
-    Groms and unifies tactile objects, paper cutouts, and props into immutable production assets.
+    Grooms and unifies tactile objects, paper cutouts, and props into immutable production assets.
+    Enforces contract validation (Rule 121, Rule 139) with fail-closed error handling.
     """
+    if not isinstance(director_plan, dict):
+        raise TypeError(f"[prompt_forge] Expected director_plan to be a dict, got {type(director_plan).__name__}")
+
     if "asset_registry" in director_plan and isinstance(director_plan["asset_registry"], dict):
         reg = director_plan["asset_registry"]
-        if "items" in reg and len(reg["items"]) >= 18:
-            return reg
+        from core.contracts.stages import AssetRegistry
+        try:
+            validated = AssetRegistry.model_validate(reg)
+            if 18 <= len(validated.items) <= 24:
+                return validated.model_dump()
+        except Exception as val_err:
+            logger.info(f"[prompt_forge] Embedded asset_registry did not fully pass contract validation: {val_err}. Rebuilding canonical registry.")
 
     from core.contracts.stages import Scene
     from stages.s05_director_plan import build_master_asset_registry
 
-    scenes_raw = director_plan.get("scenes", [])
-    scenes = [Scene.model_validate(s) for s in scenes_raw]
-    proj_id = director_plan.get("project_id") or director_plan.get("episode_id") or "EPISODE"
-    reg = build_master_asset_registry(proj_id, scenes)
-    return reg.model_dump()
+    scenes_raw = director_plan.get("scenes") or []
+    if not isinstance(scenes_raw, list):
+        raise ValueError(f"[prompt_forge] Invalid scenes in director_plan: expected list, got {type(scenes_raw).__name__}")
+
+    scenes = []
+    for idx, s in enumerate(scenes_raw):
+        if isinstance(s, dict):
+            scenes.append(Scene.model_validate(s))
+        elif isinstance(s, Scene):
+            scenes.append(s)
+        else:
+            raise TypeError(f"[prompt_forge] Scene at index {idx} has invalid type {type(s).__name__}")
+
+    proj_id = (
+        director_plan.get("project_id")
+        or director_plan.get("episode_id")
+        or director_plan.get("task_id")
+        or "EPISODE_CANONICAL"
+    )
+    reg_obj = build_master_asset_registry(proj_id, scenes)
+    return reg_obj.model_dump()
 

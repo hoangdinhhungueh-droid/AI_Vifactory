@@ -10,21 +10,21 @@ from __future__ import annotations
 import json
 import logging
 import os
-from pathlib import Path
 import re
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from core.config import RunContext
 from core.contracts.stages import (
+    AssetRegistry,
+    AssetRegistryItem,
+    Chunk,
     Provenance,
     Scene,
     Shot,
     StageArtifact,
     StageID,
-    Chunk,
-    AssetRegistryItem,
-    AssetRegistry
 )
 from core.gates import emit_artifact, validate_artifact
 from tools.codemap.runtime import pipeline_stage
@@ -258,11 +258,12 @@ def partition_timeline_into_chunks(
     max_chunk_duration: float = 48.0
 ) -> List[Chunk]:
     """Partitions documentary timeline into coherent 24-48s Sequence Block chunks.
-    
+
     Invariants:
-    - No gaps, no overlaps.
+    - No gaps, no overlaps. 100% timeline coverage.
     - Shots and scenes fall on strict scene boundaries.
-    - If total timeline is short (e.g. test fixtures), single chunk covers all.
+    - Every multi-scene chunk satisfies 24-48 second bounds (or single complete timeline exception if total <= 24s).
+    - Trailing undersized chunks (< 24s) are rebalanced into the preceding chunk.
     """
     if not scenes:
         return []
@@ -290,9 +291,17 @@ def partition_timeline_into_chunks(
 
     for i, sc in enumerate(scenes):
         dur = float(sc.duration_est_sec or 5.0)
-        is_last = (i == len(scenes) - 1)
+        remaining_scenes = scenes[i + 1:]
+        remaining_dur = sum(float(s.duration_est_sec or 5.0) for s in remaining_scenes)
 
-        if current_scenes and (accumulated_dur + dur > max_chunk_duration or (accumulated_dur >= target_chunk_duration and not is_last)):
+        should_split = False
+        if current_scenes:
+            if accumulated_dur + dur > max_chunk_duration:
+                should_split = True
+            elif accumulated_dur >= target_chunk_duration and remaining_dur >= min_chunk_duration:
+                should_split = True
+
+        if should_split:
             chunk_end_s = chunk_start_s + accumulated_dur
             c_shot_ids = [shot.shot_id for s in current_scenes for shot in s.shots]
             c_scene_ids = [s.scene_id for s in current_scenes]
@@ -315,20 +324,30 @@ def partition_timeline_into_chunks(
             accumulated_dur += dur
 
     if current_scenes:
-        chunk_end_s = chunk_start_s + accumulated_dur
-        c_shot_ids = [shot.shot_id for s in current_scenes for shot in s.shots]
-        c_scene_ids = [s.scene_id for s in current_scenes]
-        chunks.append(
-            Chunk(
-                chunk_id=f"chunk_{len(chunks)+1:03d}",
-                start_s=round(chunk_start_s, 2),
-                end_s=round(chunk_end_s, 2),
-                duration_s=round(accumulated_dur, 2),
-                shot_ids=c_shot_ids,
-                scene_ids=c_scene_ids,
-                boundary_reason="scene_boundary"
+        if chunks and accumulated_dur < min_chunk_duration:
+            last_c = chunks[-1]
+            last_c.end_s = round(chunk_start_s + accumulated_dur, 2)
+            last_c.duration_s = round(last_c.end_s - last_c.start_s, 2)
+            for sc in current_scenes:
+                last_c.scene_ids.append(sc.scene_id)
+                for shot in sc.shots:
+                    last_c.shot_ids.append(shot.shot_id)
+            last_c.boundary_reason = "rebalanced_final_chunk"
+        else:
+            chunk_end_s = chunk_start_s + accumulated_dur
+            c_shot_ids = [shot.shot_id for s in current_scenes for shot in s.shots]
+            c_scene_ids = [s.scene_id for s in current_scenes]
+            chunks.append(
+                Chunk(
+                    chunk_id=f"chunk_{len(chunks)+1:03d}",
+                    start_s=round(chunk_start_s, 2),
+                    end_s=round(chunk_end_s, 2),
+                    duration_s=round(accumulated_dur, 2),
+                    shot_ids=c_shot_ids,
+                    scene_ids=c_scene_ids,
+                    boundary_reason="scene_boundary"
+                )
             )
-        )
 
     return chunks
 
@@ -466,7 +485,7 @@ CANONICAL_DOCUMENTARY_PROPS: List[Dict[str, Any]] = [
 
 def build_master_asset_registry(project_id: str, scenes: List[Scene]) -> AssetRegistry:
     """Builds a bounded Master Asset Registry of 18-24 items for 8-10 min documentary.
-    
+
     Guarantees:
     - 18 <= len(items) <= 24
     - Stable immutable asset IDs
@@ -571,7 +590,8 @@ def build_master_asset_registry(project_id: str, scenes: List[Scene]) -> AssetRe
 
 BANNED_EMOTIONAL_ADJECTIVES = [
     r"\bdramatic\b", r"\bepic\b", r"\bscary\b", r"\bbreathtaking\b",
-    r"\binsane\b", r"\bshocking\b", r"\bawesome\b", r"\bhorrific\b"
+    r"\binsane\b", r"\bshocking\b", r"\bawesome\b", r"\bhorrific\b",
+    r"\bheartbreaking\b", r"\btragic\b", r"\bunbelievable\b", r"\bmindblowing\b", r"\bstunning\b"
 ]
 
 
@@ -587,6 +607,13 @@ def validate_and_sanitize_director_plan(payload: Dict[str, Any]) -> Dict[str, An
             sc.get("image_prompt", ""),
             sc.get("i2v_prompt_google_flow", "")
         ]
+        for sh in sc.get("shots", []):
+            if isinstance(sh, dict):
+                prompt_texts.extend([
+                    sh.get("visual_prompt", ""),
+                    sh.get("i2v_prompt_google_flow", ""),
+                    sh.get("camera_movement", "")
+                ])
         combined = " ".join(prompt_texts).lower()
         for pat in BANNED_EMOTIONAL_ADJECTIVES:
             if re.search(pat, combined):
@@ -750,10 +777,13 @@ def run(ctx: RunContext) -> StageArtifact:
         "scenes": [s.model_dump() for s in scenes]
     }
 
-    # Run semantic linter & invariants audit
+    # Run semantic linter & invariants audit (Fail-Closed per Rule 118, 121, 139)
     linter_result = validate_and_sanitize_director_plan(payload)
     if not linter_result["ok"]:
-        logger.warning(f"[s05_director_plan] Semantic linter noticed {len(linter_result['violations'])} items: {linter_result['violations']}")
+        raise ValueError(
+            f"[s05_director_plan] Production plan failed semantic linter with {len(linter_result['violations'])} "
+            f"violation(s): {linter_result['violations']}"
+        )
 
     prov = Provenance(
         generator="stages.s05_director_plan",

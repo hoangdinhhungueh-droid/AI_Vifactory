@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 import subprocess
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from core.config import RunContext
@@ -27,7 +27,7 @@ STAGE: StageID = StageID.S8_VIDEO_GEN
 
 def validate_frame_chain_dag(frame_chain: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Validates that start-frame chaining conforms to a strict Directed Acyclic Graph (DAG).
-    
+
     Invariants:
     - No self-reference (previous_shot_id != shot_id).
     - No cycles in chaining graph.
@@ -94,7 +94,7 @@ def validate_frame_chain_dag(frame_chain: List[Dict[str, Any]]) -> Dict[str, Any
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S8: Google Flow I2V Generation with Start-Frame Chaining."""
     start_ts = time.time()
-    
+
     # Read S5 Director Plan
     s5_path = ctx.paths.artifact_file(StageID.S5_DIRECTOR_PLAN.value)
     s5_data = json.loads(s5_path.read_text(encoding="utf-8"))
@@ -105,24 +105,35 @@ def run(ctx: RunContext) -> StageArtifact:
     video_map: Dict[str, Path] = {}
 
     for idx, sc in enumerate(scenes):
-        sc_id = sc.get("scene_id", f"SCENE_{idx+1:02d}")
-        shot_id = f"sc_{sc_id.lower()}_sh_01"
+        sc_id = sc.get("scene_id") or f"SCENE_{idx+1:02d}"
         target_video = ctx.paths.video_clip_path(sc_id)
         slot = "acc_01"
 
-        shot_meta = sc.get("shots", [{}])[0] if sc.get("shots") else {}
-        if shot_meta.get("shot_id"):
-            shot_id = shot_meta["shot_id"]
+        shots_list = sc.get("shots") or []
+        shot_meta = shots_list[0] if (isinstance(shots_list, list) and shots_list) else {}
+        shot_id = shot_meta.get("shot_id") or f"sc_{sc_id.lower()}_sh_01"
         if shot_meta.get("account_slot"):
             slot = shot_meta["account_slot"]
 
         uses_chained_start = bool(shot_meta.get("uses_previous_end_frame", False) and idx > 0)
-        prev_shot_id = shot_meta.get("previous_shot_id") or (scenes[idx-1].get("shots", [{}])[0].get("shot_id") if idx > 0 and scenes[idx-1].get("shots") else None)
+        prev_shot_id = None
+        if idx > 0:
+            prev_sc = scenes[idx - 1]
+            prev_shots = prev_sc.get("shots") or []
+            if prev_shots and isinstance(prev_shots, list):
+                prev_shot_id = prev_shots[0].get("shot_id")
+            if not prev_shot_id:
+                prev_sc_id = prev_sc.get("scene_id") or f"SCENE_{idx:02d}"
+                prev_shot_id = f"sc_{prev_sc_id.lower()}_sh_01"
+        if shot_meta.get("previous_shot_id"):
+            prev_shot_id = shot_meta["previous_shot_id"]
 
         from vox.ffmpeg_utils import get_ffmpeg_binary
         ffmpeg_bin = get_ffmpeg_binary()
         seed_img = ctx.paths.seed_image_path(sc_id)
         active_seed_img = seed_img
+        chained_fallback_used = False
+        chained_fallback_reason = None
 
         # Start-Frame Chaining: Extract last frame from preceding video if chained
         if uses_chained_start and prev_shot_id and prev_shot_id in video_map:
@@ -139,18 +150,30 @@ def run(ctx: RunContext) -> StageArtifact:
                     subprocess.run(cmd, capture_output=True, check=True)
                     if chained_frame_path.exists() and chained_frame_path.stat().st_size > 0:
                         active_seed_img = chained_frame_path
-                except Exception:
+                    else:
+                        raise RuntimeError(f"FFmpeg extracted 0-byte frame for shot {shot_id}")
+                except (subprocess.CalledProcessError, RuntimeError, OSError, FileNotFoundError) as extraction_err:
+                    logger.warning(
+                        f"[s08_video_gen] Chained start-frame extraction failed for shot='{shot_id}' "
+                        f"from prev_clip='{prev_clip}': {extraction_err}. "
+                        f"Recording auditable fallback to canonical seed image: {seed_img}"
+                    )
                     active_seed_img = seed_img
+                    chained_fallback_used = True
+                    chained_fallback_reason = str(extraction_err)
 
-        # Record into frame_chain DAG manifest
+        # Record into frame_chain DAG manifest (Rule 118, 121, 139)
+        is_chained_effective = (uses_chained_start and active_seed_img != seed_img and active_seed_img.exists())
         frame_chain.append({
             "frame_id": shot_meta.get("start_frame_id") or f"frame_{shot_id}_start",
             "shot_id": shot_id,
             "scene_id": sc_id,
-            "kind": "chained" if (uses_chained_start and active_seed_img != seed_img) else "source",
+            "kind": "chained" if is_chained_effective else "source",
             "source_uri": str(active_seed_img) if active_seed_img.exists() else None,
             "previous_shot_id": prev_shot_id if uses_chained_start else None,
-            "previous_frame_id": f"frame_{prev_shot_id}_end" if (uses_chained_start and prev_shot_id) else None
+            "previous_frame_id": f"frame_{prev_shot_id}_end" if (uses_chained_start and prev_shot_id) else None,
+            "fallback_used": chained_fallback_used,
+            "fallback_reason": chained_fallback_reason,
         })
 
         # 1. Idempotency Check: if clip already exists and has valid size
@@ -205,10 +228,13 @@ def run(ctx: RunContext) -> StageArtifact:
         video_assets.append(asset.model_dump())
         video_map[shot_id] = target_video
 
-    # Validate DAG invariants
+    # Validate DAG invariants (Fail-closed per Rule 118, 121, 139)
     dag_audit = validate_frame_chain_dag(frame_chain)
     if not dag_audit["ok"]:
-        logger.warning(f"[s08_video_gen] DAG validation notice: {dag_audit['violations']}")
+        raise ValueError(
+            f"[s08_video_gen] Frame-chain DAG validation failed closed with {len(dag_audit['violations'])} violation(s): "
+            f"{dag_audit['violations']}"
+        )
 
     payload = {
         "task_id": ctx.run_id,

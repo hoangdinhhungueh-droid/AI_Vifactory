@@ -19,7 +19,6 @@ from stages.s05_director_plan import (
 from stages.s08_video_gen import validate_frame_chain_dag
 
 
-
 def test_sequence_block_chunking_long_timeline():
     """Verify an 8-10 minute documentary (~540s) partitions into 10-15 sequence blocks."""
     # Create 90 scenes of 6.0s each = 540.0s
@@ -192,3 +191,108 @@ def test_build_vox_scene_prompts_kinematics():
     assert "[Timeline Kinematics:" in flow_prompt
     assert "[Pacing:" in flow_prompt
     assert "[Constraints:" in flow_prompt
+
+
+def test_chunking_bounds_invariant_and_final_chunk_rebalancing():
+    """Verify that every nontrivial chunk strictly satisfies 24-48s bounds and trailing scenes rebalance."""
+    # Test case 1: 70s timeline (14 scenes x 5.0s) -> should yield 2 balanced chunks ~35s each, both in [24, 48]
+    scenes_70s = [
+        Scene(
+            scene_id=f"SCENE_{i+1:02d}",
+            narration=f"Fact statement {i+1}",
+            duration_est_sec=5.0,
+            shots=[Shot(shot_id=f"sc_{i+1:02d}_sh_01", scene_id=f"SCENE_{i+1:02d}", visual_prompt="Test")]
+        )
+        for i in range(14)
+    ]
+    chunks_70 = partition_timeline_into_chunks(scenes_70s)
+    assert len(chunks_70) >= 2
+    for c in chunks_70:
+        assert 24.0 <= c.duration_s <= 48.0, f"Chunk {c.chunk_id} duration {c.duration_s} violates [24.0, 48.0]"
+
+    # Test case 2: 50s timeline (10 scenes x 5.0s) -> should rebalance trailing 14s into first chunk
+    scenes_50s = scenes_70s[:10]
+    chunks_50 = partition_timeline_into_chunks(scenes_50s)
+    for c in chunks_50:
+        assert 24.0 <= c.duration_s <= 50.0
+        assert c.duration_s >= 24.0, f"Chunk {c.chunk_id} under min bound"
+
+
+def test_invalid_frame_chain_dag_fails_closed():
+    """Verify that cycle and forward-reference DAGs fail validation with explicit violations."""
+    # Cycle DAG
+    cyclic_dag = [
+        {"shot_id": "shot_01", "kind": "chained", "previous_shot_id": "shot_03"},
+        {"shot_id": "shot_02", "kind": "chained", "previous_shot_id": "shot_01"},
+        {"shot_id": "shot_03", "kind": "chained", "previous_shot_id": "shot_02"},
+    ]
+    audit = validate_frame_chain_dag(cyclic_dag)
+    assert audit["ok"] is False
+    assert len(audit["violations"]) > 0
+
+    # Self-reference DAG
+    self_ref_dag = [
+        {"shot_id": "shot_01", "kind": "chained", "previous_shot_id": "shot_01"}
+    ]
+    audit_self = validate_frame_chain_dag(self_ref_dag)
+    assert audit_self["ok"] is False
+
+
+def test_s05_semantic_linter_fails_closed():
+    """Verify semantic linter strictly catches banned emotional adjectives and non-canonical camera directives."""
+    bad_plan = {
+        "scenes": [
+            {
+                "scene_id": "SCENE_01",
+                "shots": [{"visual_prompt": "A heartbreaking tragedy occurred here in the city."}],
+                "camera_directive": "STATIC_OVERHEAD"
+            }
+        ],
+        "asset_registry": {"items": [{"asset_id": f"asset_{i}"} for i in range(18)]},
+        "chunks": [{"chunk_id": "chunk_001"}]
+    }
+    result = validate_and_sanitize_director_plan(bad_plan)
+    assert result["ok"] is False
+    assert any("banned emotional adjective" in v for v in result["violations"])
+
+    # Non-canonical camera directive
+    bad_camera_plan = {
+        "scenes": [
+            {
+                "scene_id": "SCENE_01",
+                "shots": [{"visual_prompt": "Clean forensic financial ledger."}],
+                "camera_directive": "WILD_SHAKY_CAM"
+            }
+        ],
+        "asset_registry": {"items": [{"asset_id": f"asset_{i}"} for i in range(18)]},
+        "chunks": [{"chunk_id": "chunk_001"}]
+    }
+    cam_result = validate_and_sanitize_director_plan(bad_camera_plan)
+    assert cam_result["ok"] is False
+    assert any("non-canonical camera directive" in v for v in cam_result["violations"])
+
+
+def test_extract_episode_master_asset_registry_contract_validation():
+    """Verify prompt_forge.extract_episode_master_asset_registry enforces type safety and fail-closed contracts."""
+    import pytest
+
+    from app.services.prompt_forge import extract_episode_master_asset_registry
+
+    # 1. Non-dict plan raises TypeError
+    with pytest.raises(TypeError, match="Expected director_plan to be a dict"):
+        extract_episode_master_asset_registry("invalid_string_plan")  # type: ignore
+
+    # 2. Non-list scenes raises ValueError
+    with pytest.raises(ValueError, match="Invalid scenes in director_plan"):
+        extract_episode_master_asset_registry({"scenes": "not_a_list"})
+
+    # 3. Invalid scene element raises TypeError
+    with pytest.raises(TypeError, match="Scene at index 0 has invalid type"):
+        extract_episode_master_asset_registry({"scenes": [12345]})
+
+    # 4. Valid empty scenes produces canonical 18-item registry
+    valid_plan = {"scenes": [], "project_id": "EP_TEST_001"}
+    reg = extract_episode_master_asset_registry(valid_plan)
+    assert "items" in reg
+    assert 18 <= len(reg["items"]) <= 24
+    assert all("asset_id" in item for item in reg["items"])
