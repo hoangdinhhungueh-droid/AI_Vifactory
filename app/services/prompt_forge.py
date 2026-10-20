@@ -2449,10 +2449,10 @@ def extract_episode_master_asset_registry(director_plan: Dict[str, Any]) -> Dict
             validated = AssetRegistry.model_validate(reg)
             if 18 <= len(validated.items) <= 24:
                 return validated.model_dump()
-        except Exception as val_err:
-            logger.info(f"[prompt_forge] Embedded asset_registry did not fully pass contract validation: {val_err}. Rebuilding canonical registry.")
+        except (ValueError, TypeError, KeyError) as val_err:
+            logger.info(f"[prompt_forge] Embedded asset_registry schema mismatch: {val_err}. Rebuilding canonical registry.")
 
-    from core.contracts.stages import Scene
+    from core.contracts.stages import AssetRegistry, Scene
     from stages.s05_director_plan import build_master_asset_registry
 
     scenes_raw = director_plan.get("scenes") or []
@@ -2475,5 +2475,6 @@ def extract_episode_master_asset_registry(director_plan: Dict[str, Any]) -> Dict
         or "EPISODE_CANONICAL"
     )
     reg_obj = build_master_asset_registry(proj_id, scenes)
-    return reg_obj.model_dump()
+    rebuilt_validated = AssetRegistry.model_validate(reg_obj.model_dump())
+    return rebuilt_validated.model_dump()
 

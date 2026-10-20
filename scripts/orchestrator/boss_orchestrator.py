@@ -3473,10 +3473,23 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
 
     # 3. Authoritative AST Rule 139 Deterministic Anti-Symptom Scanner (Rule 139)
     ast_probe_script = ROOT_DIR / "scripts" / "forensics" / "probe_ast_rule139.py"
-    ast_probe_code = 0
-    ast_probe_out = ""
     if ast_probe_script.exists():
         ast_probe_code, ast_probe_out = _safe_run([sys.executable, str(ast_probe_script)])
+    else:
+        ast_probe_code = 1
+        ast_probe_out = '{"critical_count": 1, "high_count": 0, "verdict": "FAIL: probe_ast_rule139.py not found"}'
+
+    ast_parsed: Dict[str, Any] = {}
+    try:
+        ast_parsed = json.loads(ast_probe_out)
+    except Exception as _json_parse_err:
+        logger.warning(f"[boss_orchestrator] Could not decode AST probe output: {_json_parse_err}")
+        ast_parsed = {"critical_count": 1, "high_count": 0, "verdict": f"JSON parse error: {_json_parse_err}"}
+
+    ast_critical = ast_parsed.get("critical_count", 0)
+    ast_high = ast_parsed.get("high_count", 0)
+    ast_allowed = ast_parsed.get("allowed_legacy_count", 0)
+    ast_scanned = ast_parsed.get("scanned_files", 0)
 
     ocr_defects = []
     import ast
@@ -3498,16 +3511,18 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
         except Exception as ex:
             ocr_defects.append(f"{py_f}: CRITICAL: AST parse error: {ex}")
 
-    ocr_verdict = "PASS (0 Critical / 0 High Defects)" if (ast_probe_code == 0 and not ocr_defects) else f"DEFECTS DETECTED ({len(ocr_defects)})"
+    ocr_pass = (ast_probe_code == 0 and ast_critical == 0 and ast_high == 0 and not ocr_defects)
+    ocr_verdict = "PASS (0 Critical / 0 High Defects)" if ocr_pass else f"DEFECTS DETECTED (Critical={ast_critical}, High={ast_high}, Diff Defects={len(ocr_defects)})"
     evidence_blocks.append(
         f"### [3. AUTHORITATIVE RULE 139 AST SCANNER & ALIBABA OCR REPORT (Rule 139)]\n"
         f"Scanner Command:     python scripts/forensics/probe_ast_rule139.py\n"
         f"Evaluated Commit SHA:{git_head}\n"
         f"Scanner Exit Code:   {ast_probe_code}\n"
-        f"Baseline Allowed:    220 (Reconciled in config/ast_ratchet_baseline.json)\n"
-        f"Current Critical:    0\n"
-        f"Current High:        0\n"
-        f"Delta Defects:       0\n"
+        f"Scanned Files Count: {ast_scanned}\n"
+        f"Baseline Allowed:    {ast_allowed} (Reconciled in config/ast_ratchet_baseline.json)\n"
+        f"Current Critical:    {ast_critical}\n"
+        f"Current High:        {ast_high}\n"
+        f"Delta Defects:       {len(ocr_defects)}\n"
         f"Overall Verdict:     {ocr_verdict}\n"
         f"Authoritative Scanner JSON Output:\n{ast_probe_out.strip()}\n"
         f"Delta Diff AST Quality Verification:\n" +
@@ -3601,10 +3616,10 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
         f"Windows Platform Test Summary:  {win_summary}\n"
         f"Linux VPS Platform Exit Code:    {lnx_test_code}\n"
         f"Linux VPS Platform Test Summary: {lnx_summary}\n\n"
-        f"--- WINDOWS TEST EXECUTION SUMMARY ---\n{pytest_out[-2500:]}\n\n"
-        f"--- LINUX VPS TEST EXECUTION SUMMARY ---\n{lnx_test_out[-2500:]}\n\n"
+        f"--- WINDOWS TEST EXECUTION COMPLETE STDOUT ---\n{pytest_out}\n\n"
+        f"--- LINUX VPS TEST EXECUTION COMPLETE STDOUT ---\n{lnx_test_out}\n\n"
         f"--- ADVERSARIAL CONCURRENCY & AUTH IPC PROBE (Exit Code: {lock_code}) ---\n"
-        f"{lock_out[:1800]}\n"
+        f"{lock_out}\n"
     )
 
     # 6. Three-Way Physical Tree Parity & Git Provenance (Rule 126)
@@ -3695,30 +3710,33 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
     )
 
     # 8. Zero-Mock Data Compliance (Rule 118)
-    mock_code = 0
-    mock_out = ""
     mock_script = ROOT_DIR / "scripts" / "forensics" / "probe_zero_mock.py"
     if mock_script.exists():
         mock_code, mock_out = _safe_run([sys.executable, str(mock_script)])
+    else:
+        mock_code = 1
+        mock_out = "FAIL: probe_zero_mock.py script missing."
 
-    parsed_matches_count = 0
+    parsed_occurrences = -1
     for line_item in mock_out.splitlines():
         if "Production Code Occurrences:" in line_item:
             try:
-                parsed_matches_count = int(line_item.split(":")[-1].strip())
-            except Exception:
-                pass
-    zero_mock_leak = "VERIFIED ZERO MOCK LEAKS IN PRODUCTION" if mock_code == 0 else "FAIL"
+                parsed_occurrences = int(line_item.split(":")[-1].strip())
+            except (ValueError, IndexError) as parse_err:
+                logger.warning(f"[boss_orchestrator] Could not parse occurrence count: {parse_err}")
+                parsed_occurrences = -1
+
+    zero_leak_verified = (mock_code == 0 and "ZERO mock data paths, synthetic fallbacks, or test doubles exist" in mock_out)
+    zero_mock_status = "PASS (Zero Mock Leaks in Production Runtime)" if zero_leak_verified else "FAIL (Mock Leaks Detected or Probe Failed)"
 
     evidence_blocks.append(
         f"### [8. ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE (Rule 118)]\n"
         f"Scanner Command:         python scripts/forensics/probe_zero_mock.py\n"
         f"Evaluated Commit SHA:    {git_head}\n"
-        f"Exit Code:               {mock_code}\n"
+        f"Probe Exit Code:         {mock_code}\n"
         f"Production Leaks Count:  0\n"
-        f"Production Guards Count: {parsed_matches_count} (Independently classified CLASS A-E)\n"
-        f"MOCK_SCAN_MATCHES_COUNT: 0 (Strict Production Invariant)\n"
-        f"Status:                  {zero_mock_leak}\n"
+        f"Production Guards Count: {parsed_occurrences} (Independently classified CLASS A-E)\n"
+        f"Probe Status Verdict:    {zero_mock_status}\n"
         f"Raw Output:\n{mock_out.strip()}\n"
     )
 

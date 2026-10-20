@@ -210,12 +210,46 @@ def test_chunking_bounds_invariant_and_final_chunk_rebalancing():
     for c in chunks_70:
         assert 24.0 <= c.duration_s <= 48.0, f"Chunk {c.chunk_id} duration {c.duration_s} violates [24.0, 48.0]"
 
-    # Test case 2: 50s timeline (10 scenes x 5.0s) -> should rebalance trailing 14s into first chunk
+    # Test case 2: 50s timeline (10 scenes x 5.0s) -> should yield 2 balanced chunks of 25.0s each in [24, 48]
     scenes_50s = scenes_70s[:10]
     chunks_50 = partition_timeline_into_chunks(scenes_50s)
+    assert len(chunks_50) == 2
     for c in chunks_50:
-        assert 24.0 <= c.duration_s <= 50.0
-        assert c.duration_s >= 24.0, f"Chunk {c.chunk_id} under min bound"
+        assert 24.0 <= c.duration_s <= 48.0, f"Chunk {c.chunk_id} duration {c.duration_s} violates [24.0, 48.0]"
+        assert c.duration_s == 25.0
+
+    # Test case 3: Boss Adversarial [20, 20, 10] -> verifies no chunk exceeds 48.0s and rebalancing works
+    scenes_adv = [
+        Scene(scene_id="SCENE_01", narration="A", duration_est_sec=20.0, shots=[Shot(shot_id="sh_1", scene_id="SCENE_01", visual_prompt="test")]),
+        Scene(scene_id="SCENE_02", narration="B", duration_est_sec=20.0, shots=[Shot(shot_id="sh_2", scene_id="SCENE_02", visual_prompt="test")]),
+        Scene(scene_id="SCENE_03", narration="C", duration_est_sec=10.0, shots=[Shot(shot_id="sh_3", scene_id="SCENE_03", visual_prompt="test")]),
+    ]
+    chunks_adv = partition_timeline_into_chunks(scenes_adv)
+    assert len(chunks_adv) == 2
+    for c in chunks_adv:
+        assert c.duration_s <= 48.0, f"Chunk {c.chunk_id} exceeded hard upper bound 48s: {c.duration_s}"
+    assert chunks_adv[0].duration_s == 20.0
+    assert chunks_adv[0].boundary_reason == "discrete_scene_bound_exception"
+    assert chunks_adv[1].duration_s == 30.0
+    assert 24.0 <= chunks_adv[1].duration_s <= 48.0
+
+    # Test case 4: Exact 48s boundary (8 scenes x 6.0s)
+    scenes_48s = [
+        Scene(scene_id=f"SCENE_{i+1:02d}", narration=f"Exact {i+1}", duration_est_sec=6.0, shots=[Shot(shot_id=f"sh_{i+1}", scene_id=f"SCENE_{i+1:02d}", visual_prompt="test")])
+        for i in range(8)
+    ]
+    chunks_48 = partition_timeline_into_chunks(scenes_48s)
+    assert len(chunks_48) == 1
+    assert chunks_48[0].duration_s == 48.0
+
+    # Test case 5: Oversized single scene (60s)
+    scenes_over = [
+        Scene(scene_id="SCENE_OVER", narration="Long continuous shot", duration_est_sec=60.0, shots=[Shot(shot_id="sh_over", scene_id="SCENE_OVER", visual_prompt="test")])
+    ]
+    chunks_over = partition_timeline_into_chunks(scenes_over)
+    assert len(chunks_over) == 1
+    assert chunks_over[0].duration_s == 60.0
+    assert chunks_over[0].boundary_reason == "oversized_single_scene_exception"
 
 
 def test_invalid_frame_chain_dag_fails_closed():
@@ -296,3 +330,61 @@ def test_extract_episode_master_asset_registry_contract_validation():
     assert "items" in reg
     assert 18 <= len(reg["items"]) <= 24
     assert all("asset_id" in item for item in reg["items"])
+
+
+def test_s08_defensive_initialization_and_provenance_consistency(tmp_path):
+    """Verify s08 defensively handles empty scenes, absent shots, missing seeds, and ensures provenance consistency."""
+    from core.config import RunContext, load_profile
+    from core.paths import resolve_run_paths
+    from core.run_manifest import RunManifest
+    from stages import s08_video_gen
+
+    run_id = "test_run_s08_defensive"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    cfg = load_profile("e2e_min")
+    manifest = RunManifest.create_new(run_id, profile="e2e_min")
+    ctx = RunContext(
+        run_id=run_id,
+        paths=paths,
+        manifest=manifest,
+        config=cfg,
+        force=True,
+        dry_run=False,
+    )
+
+    # 1. Test empty scenes list
+    s5_artifact_path = paths.artifact_file("s05_director_plan")
+    s5_artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    import json
+    s5_artifact_path.write_text(json.dumps({"payload": {"scenes": []}}), encoding="utf-8")
+
+    art = s08_video_gen.run(ctx)
+    assert art.status == "ok"
+    assert art.payload["total_clips"] == 0
+    assert len(art.payload["frame_chain"]) == 0
+
+    # 2. Test malformed scene metadata and provenance consistency
+    malformed_scenes = [
+        {"scene_id": "SCENE_01", "shots": []},
+        {"scene_id": "SCENE_02", "shots": [{"uses_previous_end_frame": True}]},
+        {"scene_id": "SCENE_03", "shots": [{"uses_previous_end_frame": True, "previous_shot_id": "nonexistent_shot"}]},
+    ]
+    s5_artifact_path.write_text(json.dumps({"payload": {"scenes": malformed_scenes}}), encoding="utf-8")
+    art2 = s08_video_gen.run(ctx)
+    assert art2.status == "ok"
+    fc = art2.payload["frame_chain"]
+    assert len(fc) == 3
+    # First scene defaults shot_id cleanly
+    assert fc[0]["shot_id"] == "sc_scene_01_sh_01"
+    assert fc[0]["kind"] == "source"
+    assert fc[0]["seed_usable"] is False
+
+    # Second scene chains successfully from SCENE_01 clip
+    assert fc[1]["kind"] == "chained"
+    assert fc[1]["previous_shot_id"] == "sc_scene_01_sh_01"
+    assert fc[1]["previous_frame_id"] == "frame_sc_scene_01_sh_01_end"
+
+    # Third scene fallback provenance consistency: when previous clip does not exist, kind is source and references are None
+    assert fc[2]["kind"] == "source"
+    assert fc[2]["previous_frame_id"] is None
+    assert fc[2]["previous_shot_id"] is None

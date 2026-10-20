@@ -105,33 +105,36 @@ def run(ctx: RunContext) -> StageArtifact:
     video_map: Dict[str, Path] = {}
 
     for idx, sc in enumerate(scenes):
-        sc_id = sc.get("scene_id") or f"SCENE_{idx+1:02d}"
+        sc_dict = sc if isinstance(sc, dict) else {}
+        raw_sc_id = sc_dict.get("scene_id")
+        sc_id = str(raw_sc_id) if raw_sc_id else f"SCENE_{idx+1:02d}"
         target_video = ctx.paths.video_clip_path(sc_id)
         slot = "acc_01"
 
-        shots_list = sc.get("shots") or []
-        shot_meta = shots_list[0] if (isinstance(shots_list, list) and shots_list) else {}
-        shot_id = shot_meta.get("shot_id") or f"sc_{sc_id.lower()}_sh_01"
-        if shot_meta.get("account_slot"):
-            slot = shot_meta["account_slot"]
+        shots_list = sc_dict.get("shots") or []
+        first_shot = shots_list[0] if (isinstance(shots_list, list) and shots_list and isinstance(shots_list[0], dict)) else {}
+        shot_id = str(first_shot.get("shot_id") or f"sc_{sc_id.lower()}_sh_01")
+        if first_shot.get("account_slot"):
+            slot = str(first_shot["account_slot"])
 
-        uses_chained_start = bool(shot_meta.get("uses_previous_end_frame", False) and idx > 0)
+        uses_chained_start = bool(first_shot.get("uses_previous_end_frame", False) and idx > 0)
         prev_shot_id = None
         if idx > 0:
-            prev_sc = scenes[idx - 1]
+            prev_sc = scenes[idx - 1] if isinstance(scenes[idx - 1], dict) else {}
             prev_shots = prev_sc.get("shots") or []
-            if prev_shots and isinstance(prev_shots, list):
+            if prev_shots and isinstance(prev_shots, list) and isinstance(prev_shots[0], dict):
                 prev_shot_id = prev_shots[0].get("shot_id")
             if not prev_shot_id:
-                prev_sc_id = prev_sc.get("scene_id") or f"SCENE_{idx:02d}"
+                prev_sc_id = str(prev_sc.get("scene_id") or f"SCENE_{idx:02d}")
                 prev_shot_id = f"sc_{prev_sc_id.lower()}_sh_01"
-        if shot_meta.get("previous_shot_id"):
-            prev_shot_id = shot_meta["previous_shot_id"]
+        if first_shot.get("previous_shot_id"):
+            prev_shot_id = str(first_shot["previous_shot_id"])
 
         from vox.ffmpeg_utils import get_ffmpeg_binary
         ffmpeg_bin = get_ffmpeg_binary()
         seed_img = ctx.paths.seed_image_path(sc_id)
         active_seed_img = seed_img
+        seed_usable = (seed_img.exists() and seed_img.stat().st_size > 0)
         chained_fallback_used = False
         chained_fallback_reason = None
 
@@ -162,18 +165,19 @@ def run(ctx: RunContext) -> StageArtifact:
                     chained_fallback_used = True
                     chained_fallback_reason = str(extraction_err)
 
-        # Record into frame_chain DAG manifest (Rule 118, 121, 139)
-        is_chained_effective = (uses_chained_start and active_seed_img != seed_img and active_seed_img.exists())
+        # Record into frame_chain DAG manifest with strict provenance consistency (Rule 118, 121, 139)
+        is_chained_effective = bool(uses_chained_start and active_seed_img != seed_img and active_seed_img.exists())
         frame_chain.append({
-            "frame_id": shot_meta.get("start_frame_id") or f"frame_{shot_id}_start",
+            "frame_id": str(first_shot.get("start_frame_id") or f"frame_{shot_id}_start"),
             "shot_id": shot_id,
             "scene_id": sc_id,
             "kind": "chained" if is_chained_effective else "source",
             "source_uri": str(active_seed_img) if active_seed_img.exists() else None,
-            "previous_shot_id": prev_shot_id if uses_chained_start else None,
-            "previous_frame_id": f"frame_{prev_shot_id}_end" if (uses_chained_start and prev_shot_id) else None,
+            "previous_shot_id": prev_shot_id if is_chained_effective else None,
+            "previous_frame_id": f"frame_{prev_shot_id}_end" if (is_chained_effective and prev_shot_id) else None,
             "fallback_used": chained_fallback_used,
             "fallback_reason": chained_fallback_reason,
+            "seed_usable": seed_usable,
         })
 
         # 1. Idempotency Check: if clip already exists and has valid size

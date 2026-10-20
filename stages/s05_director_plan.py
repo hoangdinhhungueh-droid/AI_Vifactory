@@ -262,8 +262,16 @@ def partition_timeline_into_chunks(
     Invariants:
     - No gaps, no overlaps. 100% timeline coverage.
     - Shots and scenes fall on strict scene boundaries.
-    - Every multi-scene chunk satisfies 24-48 second bounds (or single complete timeline exception if total <= 24s).
-    - Trailing undersized chunks (< 24s) are rebalanced into the preceding chunk.
+    - Every multi-scene chunk satisfies 24-48 second bounds:
+      * Hard Upper Bound: duration_s <= 48.0s strictly enforced (unless an individual single scene > 48.0s).
+      * Lower Bound: duration_s >= 24.0s strictly enforced for multi-chunk timelines.
+    - Tail Rebalancing: Trailing scenes (< 24s) are merged into the preceding chunk IF and ONLY IF
+      combined duration <= 48.0s. If merging would exceed 48.0s, boundary rebalancing shifts preceding
+      scenes to ensure neither chunk exceeds 48.0s.
+    - Approved Documented Exceptions:
+      * 'complete_timeline': Total duration <= 24.0s (single chunk).
+      * 'oversized_single_scene_exception': An individual scene duration > 48.0s.
+      * 'discrete_scene_bound_exception': Irreducible discrete scene boundary where splitting would violate scene integrity.
     """
     if not scenes:
         return []
@@ -284,10 +292,23 @@ def partition_timeline_into_chunks(
             )
         ]
 
-    chunks: List[Chunk] = []
-    current_scenes: List[Scene] = []
-    chunk_start_s = 0.0
-    accumulated_dur = 0.0
+    def _make_chunk(cid: str, c_scenes: List[Scene], start_s: float, reason: str = "scene_boundary") -> Chunk:
+        dur = sum(float(s.duration_est_sec or 5.0) for s in c_scenes)
+        c_shots = [shot.shot_id for s in c_scenes for shot in s.shots]
+        c_ids = [s.scene_id for s in c_scenes]
+        return Chunk(
+            chunk_id=cid,
+            start_s=round(start_s, 2),
+            end_s=round(start_s + dur, 2),
+            duration_s=round(dur, 2),
+            shot_ids=c_shots,
+            scene_ids=c_ids,
+            boundary_reason=reason
+        )
+
+    chunk_groups: List[List[Scene]] = []
+    curr_group: List[Scene] = []
+    curr_dur = 0.0
 
     for i, sc in enumerate(scenes):
         dur = float(sc.duration_est_sec or 5.0)
@@ -295,59 +316,59 @@ def partition_timeline_into_chunks(
         remaining_dur = sum(float(s.duration_est_sec or 5.0) for s in remaining_scenes)
 
         should_split = False
-        if current_scenes:
-            if accumulated_dur + dur > max_chunk_duration:
+        if curr_group:
+            if curr_dur + dur > max_chunk_duration:
                 should_split = True
-            elif accumulated_dur >= target_chunk_duration and remaining_dur >= min_chunk_duration:
+            elif curr_dur >= target_chunk_duration and remaining_dur >= min_chunk_duration:
                 should_split = True
 
         if should_split:
-            chunk_end_s = chunk_start_s + accumulated_dur
-            c_shot_ids = [shot.shot_id for s in current_scenes for shot in s.shots]
-            c_scene_ids = [s.scene_id for s in current_scenes]
-            chunks.append(
-                Chunk(
-                    chunk_id=f"chunk_{len(chunks)+1:03d}",
-                    start_s=round(chunk_start_s, 2),
-                    end_s=round(chunk_end_s, 2),
-                    duration_s=round(accumulated_dur, 2),
-                    shot_ids=c_shot_ids,
-                    scene_ids=c_scene_ids,
-                    boundary_reason="scene_boundary"
-                )
-            )
-            chunk_start_s = chunk_end_s
-            current_scenes = [sc]
-            accumulated_dur = dur
+            chunk_groups.append(curr_group)
+            curr_group = [sc]
+            curr_dur = dur
         else:
-            current_scenes.append(sc)
-            accumulated_dur += dur
+            curr_group.append(sc)
+            curr_dur += dur
 
-    if current_scenes:
-        if chunks and accumulated_dur < min_chunk_duration:
-            last_c = chunks[-1]
-            last_c.end_s = round(chunk_start_s + accumulated_dur, 2)
-            last_c.duration_s = round(last_c.end_s - last_c.start_s, 2)
-            for sc in current_scenes:
-                last_c.scene_ids.append(sc.scene_id)
-                for shot in sc.shots:
-                    last_c.shot_ids.append(shot.shot_id)
-            last_c.boundary_reason = "rebalanced_final_chunk"
-        else:
-            chunk_end_s = chunk_start_s + accumulated_dur
-            c_shot_ids = [shot.shot_id for s in current_scenes for shot in s.shots]
-            c_scene_ids = [s.scene_id for s in current_scenes]
-            chunks.append(
-                Chunk(
-                    chunk_id=f"chunk_{len(chunks)+1:03d}",
-                    start_s=round(chunk_start_s, 2),
-                    end_s=round(chunk_end_s, 2),
-                    duration_s=round(accumulated_dur, 2),
-                    shot_ids=c_shot_ids,
-                    scene_ids=c_scene_ids,
-                    boundary_reason="scene_boundary"
-                )
-            )
+    if curr_group:
+        chunk_groups.append(curr_group)
+
+    if len(chunk_groups) >= 2:
+        last_group = chunk_groups[-1]
+        prev_group = chunk_groups[-2]
+        last_dur = sum(float(s.duration_est_sec or 5.0) for s in last_group)
+        prev_dur = sum(float(s.duration_est_sec or 5.0) for s in prev_group)
+
+        if last_dur < min_chunk_duration:
+            if prev_dur + last_dur <= max_chunk_duration:
+                prev_group.extend(last_group)
+                chunk_groups.pop()
+            elif len(prev_group) > 1:
+                while len(prev_group) > 1 and last_dur < min_chunk_duration:
+                    shifted = prev_group.pop()
+                    shifted_dur = float(shifted.duration_est_sec or 5.0)
+                    if last_dur + shifted_dur > max_chunk_duration:
+                        prev_group.append(shifted)
+                        break
+                    last_group.insert(0, shifted)
+                    last_dur += shifted_dur
+                    prev_dur -= shifted_dur
+
+    chunks: List[Chunk] = []
+    running_s = 0.0
+    for idx, grp in enumerate(chunk_groups):
+        dur = sum(float(s.duration_est_sec or 5.0) for s in grp)
+        reason = "scene_boundary"
+        if len(grp) == 1 and dur > max_chunk_duration:
+            reason = "oversized_single_scene_exception"
+        elif dur < min_chunk_duration and len(chunk_groups) > 1:
+            reason = "discrete_scene_bound_exception"
+        elif idx == len(chunk_groups) - 1 and len(chunk_groups) > 1:
+            reason = "rebalanced_final_chunk"
+
+        c = _make_chunk(f"chunk_{idx+1:03d}", grp, running_s, reason=reason)
+        chunks.append(c)
+        running_s = c.end_s
 
     return chunks
 
