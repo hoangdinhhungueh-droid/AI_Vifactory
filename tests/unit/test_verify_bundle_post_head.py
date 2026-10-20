@@ -244,7 +244,7 @@ def test_verify_bundle_rejects_path_traversal(tmp_path: Path):
 def test_verify_bundle_rejects_symlink_artifact(tmp_path: Path):
     """Verifies fail-closed rejection when a bundle artifact is a symlink."""
     fix = _create_valid_hermetic_fixture(tmp_path, "TASK_TEST")
-    real_target = tmp_path / "real_external.txt"
+    real_target = tmp_path.parent / "real_external.txt"
     real_target.write_bytes(b"external data")
 
     symlink_path = fix["bundle_dir"] / "symlink_artifact.bin"
