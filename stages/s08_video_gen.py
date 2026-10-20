@@ -8,16 +8,19 @@ Enforces Circuit Breaker, failover quota rotation, and asset preservation.
 
 from __future__ import annotations
 
-import time
 import json
-import subprocess
+import logging
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+import subprocess
+import time
+from typing import Any, Dict, List, Optional
 
-from core.contracts.stages import StageID, StageArtifact, Provenance, VideoAsset
 from core.config import RunContext
-from core.gates import require_input, emit_artifact, compute_file_sha256
+from core.contracts.stages import Provenance, StageArtifact, StageID, VideoAsset
+from core.gates import compute_file_sha256, emit_artifact
 from tools.codemap.runtime import pipeline_stage
+
+logger = logging.getLogger("s08_video_gen")
 
 STAGE: StageID = StageID.S8_VIDEO_GEN
 

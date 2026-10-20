@@ -9,18 +9,15 @@ Unit tests verifying the Vox Studio 8-10 minute upgrade features:
 - End-to-end S5 Director Plan v2 contract compliance
 """
 
-import pytest
-from core.contracts.stages import Scene, Shot, Chunk, AssetRegistry
+from core.contracts.stages import AssetRegistry, Scene, Shot
 from stages.s05_director_plan import (
-    partition_timeline_into_chunks,
     build_master_asset_registry,
-    validate_and_sanitize_director_plan,
     build_vox_scene_prompts,
-    run as run_s05
+    partition_timeline_into_chunks,
+    validate_and_sanitize_director_plan,
 )
 from stages.s08_video_gen import validate_frame_chain_dag
-from core.config import RunContext
-from core.contracts.stages import StageID
+
 
 
 def test_sequence_block_chunking_long_timeline():
