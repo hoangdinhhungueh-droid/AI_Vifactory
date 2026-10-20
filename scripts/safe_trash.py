@@ -2,12 +2,16 @@
 """
 Safe Trash Utility (Windows & Linux)
 Moves files or directories to the system Recycle Bin / Trash instead of permanent deletion.
-Prevents unrecoverable data loss.
+Prevents unrecoverable data loss under Rule 137 (Anti-Destructive Action Iron Law).
 """
 
 import os
+import re
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
+from typing import List, Optional, Tuple, Union
 
 FORBIDDEN_ZONES = {
     "/", "/root", "/home", "/etc", "/var", "/usr", "/bin", "/boot", "/sys", "/proc",
@@ -15,13 +19,33 @@ FORBIDDEN_ZONES = {
 }
 
 
-def validate_safe_disposal_target(path: str) -> tuple[bool, str]:
+def _get_default_allowed_roots() -> List[Path]:
+    """Computes explicitly approved quarantine, scratch, and workspace roots."""
+    roots: List[Path] = [
+        Path(__file__).resolve().parent.parent,  # Workspace / Repo root
+        Path(tempfile.gettempdir()).resolve(),   # System temp / scratch
+    ]
+    if os.name != "nt":
+        tmp_p = Path("/tmp")
+        if tmp_p.exists():
+            roots.append(tmp_p.resolve())
+        vf_var = Path("/var/vf")
+        if vf_var.exists():
+            roots.append(vf_var.resolve())
+    return roots
+
+
+def validate_safe_disposal_target(
+    path: str,
+    allowed_roots: Optional[List[Union[str, Path]]] = None,
+) -> Tuple[bool, str]:
     """Validates that a path is safe to dispose, enforcing Rule 137 (Anti-Destructive Action).
 
     Guarantees:
     - Rejects wildcards (*, ?).
-    - Rejects root directories and system-level forbidden zones.
-    - Resolves traversal attacks (../).
+    - Rejects root directories, drive roots, and system-level forbidden zones.
+    - Resolves traversal attacks (../) and symlinks via canonical Path.resolve().
+    - Restricts disposal strictly to approved quarantine, scratch, or workspace roots.
     """
     if not path or not isinstance(path, str):
         return False, "Target path must be a non-empty string"
@@ -33,38 +57,62 @@ def validate_safe_disposal_target(path: str) -> tuple[bool, str]:
     if "*" in stripped or "?" in stripped:
         return False, f"SECURITY ERROR: Wildcard deletion is strictly forbidden: '{path}'"
 
-    # Normalize separators for cross-platform checking
+    # Normalize separators for pattern checking
     norm_raw = stripped.replace("\\", "/").rstrip("/")
     if not norm_raw or stripped in {"/", "\\", "\\\\"}:
         return False, f"SECURITY ERROR: Cannot trash drive root or forbidden zone: '{path}'"
 
-    import re
     if re.match(r"^[a-zA-Z]:[\\/]?$", stripped):
         return False, f"SECURITY ERROR: Cannot trash drive root or forbidden zone: '{path}'"
 
     norm_lower = norm_raw.lower()
     for fz in ["/etc", "/var", "/usr", "/bin", "/boot", "/sys", "/proc", "/", "/root", "/home", "c:/windows", "c:/program files"]:
-        if norm_lower == fz or norm_lower.startswith(fz + "/"):
+        if norm_lower == fz or (norm_lower.startswith(fz + "/") and fz not in ["/var", "/root"]):
             return False, f"SECURITY ERROR: Target is located in forbidden system root: '{path}'"
 
-    abs_path = os.path.abspath(stripped)
-    clean_norm = abs_path.rstrip("\\/").lower()
+    # Canonical resolution (resolves relative traversal .. and follows symlinks)
+    try:
+        raw_p = Path(stripped)
+        resolved_p = raw_p.resolve()
+    except (ValueError, RuntimeError, OSError) as res_err:
+        return False, f"SECURITY ERROR: Path resolution failed: {res_err}"
+
+    clean_norm = str(resolved_p).rstrip("\\/").lower()
 
     # Check drive root (e.g. C:\ or /)
     if len(clean_norm) <= 3 or clean_norm in FORBIDDEN_ZONES:
-        return False, f"SECURITY ERROR: Cannot trash drive root or forbidden zone: '{abs_path}'"
+        return False, f"SECURITY ERROR: Cannot trash drive root or forbidden zone: '{resolved_p}'"
 
     for fz in FORBIDDEN_ZONES:
-        if clean_norm == fz or clean_norm.startswith(fz + "\\") or clean_norm.startswith(fz + "/"):
-            # If it's directly inside a forbidden system root without workspace isolation
-            if fz in ["/etc", "/var", "/usr", "/bin", "/boot", "/sys", "/proc", "c:\\windows", "c:\\program files"]:
-                return False, f"SECURITY ERROR: Target is located in forbidden system root: '{abs_path}'"
+        if clean_norm == fz:
+            return False, f"SECURITY ERROR: Target is forbidden root: '{resolved_p}'"
+        if clean_norm.startswith(fz + "\\") or clean_norm.startswith(fz + "/"):
+            if fz in ["/etc", "/usr", "/bin", "/boot", "/sys", "/proc", "c:\\windows", "c:\\program files"]:
+                return False, f"SECURITY ERROR: Target is located in forbidden system root: '{resolved_p}'"
+
+    # Enforce strictly approved quarantine / scratch / workspace roots
+    effective_roots = [Path(r).resolve() for r in (allowed_roots or _get_default_allowed_roots())]
+
+    within_approved = False
+    for app_root in effective_roots:
+        try:
+            resolved_p.relative_to(app_root)
+            # Rejection if target IS the root itself (cannot delete the root)
+            if resolved_p == app_root:
+                return False, f"SECURITY ERROR: Cannot trash entire approved root directory: '{resolved_p}'"
+            within_approved = True
+            break
+        except (ValueError, RuntimeError):
+            continue
+
+    if not within_approved:
+        return False, f"SECURITY ERROR: Target path '{path}' resolves to '{resolved_p}' which is outside approved disposal roots"
 
     return True, "Target path is valid for safe disposal"
 
 
-def move_to_trash_windows(path: str) -> bool:
-    is_valid, msg = validate_safe_disposal_target(path)
+def move_to_trash_windows(path: str, allowed_roots: Optional[List[Union[str, Path]]] = None) -> bool:
+    is_valid, msg = validate_safe_disposal_target(path, allowed_roots=allowed_roots)
     if not is_valid:
         print(msg)
         return False
@@ -91,8 +139,9 @@ def move_to_trash_windows(path: str) -> bool:
         print(f"Failed to move to Recycle Bin: {res.stderr}")
         return False
 
-def move_to_trash_linux(path: str) -> bool:
-    is_valid, msg = validate_safe_disposal_target(path)
+
+def move_to_trash_linux(path: str, allowed_roots: Optional[List[Union[str, Path]]] = None) -> bool:
+    is_valid, msg = validate_safe_disposal_target(path, allowed_roots=allowed_roots)
     if not is_valid:
         print(msg)
         return False
@@ -117,11 +166,13 @@ def move_to_trash_linux(path: str) -> bool:
     print(f"Moved to fallback trash: {dest}")
     return True
 
-def safe_trash(path: str) -> bool:
+
+def safe_trash(path: str, allowed_roots: Optional[List[Union[str, Path]]] = None) -> bool:
     if os.name == "nt":
-        return move_to_trash_windows(path)
+        return move_to_trash_windows(path, allowed_roots=allowed_roots)
     else:
-        return move_to_trash_linux(path)
+        return move_to_trash_linux(path, allowed_roots=allowed_roots)
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

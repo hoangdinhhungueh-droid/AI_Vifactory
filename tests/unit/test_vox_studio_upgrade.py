@@ -585,33 +585,57 @@ def test_chunk_partition_property_and_adversarial_matrix():
                 assert c.duration_s <= 48.0
 
 
-def test_safe_disposal_negative_boundary_and_wildcard_attacks():
-    """Verify safe disposal rejects wildcard attacks, root paths, traversal attempts, and system directories per Rule 137."""
+def test_safe_disposal_negative_boundary_and_wildcard_attacks(tmp_path):
+    """Verify safe disposal strictly rejects wildcard attacks, root paths, traversal attempts, boundary escapes, and system directories per Rule 137."""
     from scripts.safe_trash import safe_trash, validate_safe_disposal_target
 
-    # 1. Wildcard attacks must be rejected
+    # 1. Wildcard attacks must be rejected unconditionally
     for wild in ["*.py", "test_*.log", "/tmp/*", "C:\\temp\\*.*", "dir/?"]:
         ok, msg = validate_safe_disposal_target(wild)
-        assert not ok
+        assert not ok, f"Wildcard attack was unexpectedly accepted: {wild}"
         assert "Wildcard deletion is strictly forbidden" in msg
         assert safe_trash(wild) is False
 
-    # 2. Drive root attacks must be rejected
-    for root_path in ["C:\\", "c:/", "D:\\", "/", "\\"]:
+    # 2. Drive root attacks must be rejected unconditionally
+    for root_path in ["C:\\", "c:/", "D:\\", "/", "\\", "\\\\"]:
         ok, msg = validate_safe_disposal_target(root_path)
-        assert not ok
+        assert not ok, f"Drive root attack was unexpectedly accepted: {root_path}"
         assert "Cannot trash drive root or forbidden zone" in msg
 
-    # 3. System directories must be rejected
-    for sys_dir in ["/etc", "/var", "/usr", "/bin", "C:\\Windows", "C:\\Program Files"]:
+    # 3. System directories must be rejected unconditionally
+    for sys_dir in ["/etc", "/var", "/usr", "/bin", "C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)"]:
         ok, msg = validate_safe_disposal_target(sys_dir)
-        assert not ok
-        assert "forbidden" in msg.lower()
+        assert not ok, f"System directory was unexpectedly accepted: {sys_dir}"
+        assert "forbidden" in msg.lower() or "outside approved" in msg.lower()
 
-    # 4. Traversal attacks targeting forbidden roots must be rejected
-    traversals = ["../../../../etc/passwd", "..\\..\\..\\Windows\\System32"]
+    # 4. Traversal attacks targeting forbidden roots must be rejected unconditionally (Rule 137)
+    traversals = ["../../../../etc/passwd", "..\\..\\..\\Windows\\System32", "../../../../root/.ssh"]
     for trav in traversals:
         ok, msg = validate_safe_disposal_target(trav)
-        if not ok:
-            assert "forbidden" in msg.lower() or "drive root" in msg.lower()
+        assert not ok, f"Traversal attack was unexpectedly accepted: {trav}"
+        assert "forbidden" in msg.lower() or "drive root" in msg.lower() or "outside approved" in msg.lower()
+
+    # 5. Boundary escape & sibling-prefix attacks against approved root
+    fake_quarantine = tmp_path / "approved_quarantine"
+    fake_quarantine.mkdir()
+    sibling_evil = tmp_path / "approved_quarantine_evil"
+    sibling_evil.mkdir()
+
+    # Sibling prefix should be rejected when target root is approved_quarantine
+    ok, msg = validate_safe_disposal_target(str(sibling_evil / "file.txt"), allowed_roots=[fake_quarantine])
+    assert not ok
+    assert "outside approved disposal roots" in msg
+
+    # Trashing the approved root itself must be rejected
+    ok, msg = validate_safe_disposal_target(str(fake_quarantine), allowed_roots=[fake_quarantine])
+    assert not ok
+    assert "Cannot trash entire approved root directory" in msg
+
+    # Valid disposal inside approved root must be accepted
+    safe_target = fake_quarantine / "scratch_candidate.log"
+    safe_target.write_text("temporary log", encoding="utf-8")
+    ok, msg = validate_safe_disposal_target(str(safe_target), allowed_roots=[fake_quarantine])
+    assert ok
+    assert "valid for safe disposal" in msg
+
 
