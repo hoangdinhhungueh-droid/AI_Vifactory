@@ -262,6 +262,7 @@ def verify_final_video_gates(
             f"differs from audio {expected_duration:.3f}s by {dur_diff:.3f}s > 0.05s"
         )
 
+    unique_moves = 0
     # 4. Camera variety checks (if ScenePlan is provided)
     if plan and plan.scenes:
         moves = [s.camera for s in plan.scenes]
