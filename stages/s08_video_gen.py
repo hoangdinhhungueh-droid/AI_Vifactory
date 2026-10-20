@@ -105,43 +105,71 @@ def run(ctx: RunContext) -> StageArtifact:
     video_map: Dict[str, Path] = {}
 
     for idx, sc in enumerate(scenes):
-        sc_dict = sc if isinstance(sc, dict) else {}
-        raw_sc_id = sc_dict.get("scene_id")
-        sc_id = str(raw_sc_id) if raw_sc_id else f"SCENE_{idx+1:02d}"
+        if not isinstance(sc, dict):
+            raise ValueError(f"[s08_video_gen] Malformed scene record at index {idx}: expected dict, got {type(sc).__name__}")
+        raw_sc_id = sc.get("scene_id")
+        if not raw_sc_id or not isinstance(raw_sc_id, str) or not raw_sc_id.strip():
+            raise ValueError(f"[s08_video_gen] Scene at index {idx} missing valid scene_id: {raw_sc_id}")
+        sc_id = str(raw_sc_id).strip()
         target_video = ctx.paths.video_clip_path(sc_id)
         slot = "acc_01"
 
-        shots_list = sc_dict.get("shots") or []
-        first_shot = shots_list[0] if (isinstance(shots_list, list) and shots_list and isinstance(shots_list[0], dict)) else {}
-        shot_id = str(first_shot.get("shot_id") or f"sc_{sc_id.lower()}_sh_01")
+        shots_list = sc.get("shots")
+        if not isinstance(shots_list, list) or not shots_list:
+            raise ValueError(f"[s08_video_gen] Scene '{sc_id}' has empty or invalid shots list")
+        first_shot = shots_list[0]
+        if not isinstance(first_shot, dict):
+            raise ValueError(f"[s08_video_gen] Scene '{sc_id}' shot 0 is not a dict")
+        raw_shot_id = first_shot.get("shot_id")
+        if not raw_shot_id or not isinstance(raw_shot_id, str) or not raw_shot_id.strip():
+            raise ValueError(f"[s08_video_gen] Scene '{sc_id}' shot 0 missing valid shot_id")
+        shot_id = str(raw_shot_id).strip()
         if first_shot.get("account_slot"):
             slot = str(first_shot["account_slot"])
 
-        uses_chained_start = bool(first_shot.get("uses_previous_end_frame", False) and idx > 0)
+        uses_chained_start = bool(first_shot.get("uses_previous_end_frame", False))
+        if uses_chained_start and idx == 0:
+            raise ValueError(f"[s08_video_gen] First scene '{sc_id}' cannot specify uses_previous_end_frame=True (no preceding scene)")
+
         prev_shot_id = None
-        if idx > 0:
-            prev_sc = scenes[idx - 1] if isinstance(scenes[idx - 1], dict) else {}
-            prev_shots = prev_sc.get("shots") or []
-            if prev_shots and isinstance(prev_shots, list) and isinstance(prev_shots[0], dict):
-                prev_shot_id = prev_shots[0].get("shot_id")
-            if not prev_shot_id:
-                prev_sc_id = str(prev_sc.get("scene_id") or f"SCENE_{idx:02d}")
-                prev_shot_id = f"sc_{prev_sc_id.lower()}_sh_01"
-        if first_shot.get("previous_shot_id"):
-            prev_shot_id = str(first_shot["previous_shot_id"])
+        if uses_chained_start:
+            if first_shot.get("previous_shot_id"):
+                prev_shot_id = str(first_shot["previous_shot_id"])
+            else:
+                prev_sc = scenes[idx - 1] if isinstance(scenes[idx - 1], dict) else {}
+                prev_shots = prev_sc.get("shots", [])
+                if prev_shots and isinstance(prev_shots, list) and isinstance(prev_shots[0], dict):
+                    prev_shot_id = prev_shots[0].get("shot_id")
+                if not prev_shot_id:
+                    raise ValueError(f"[s08_video_gen] Scene '{sc_id}' requested chained start, but previous scene has no valid shot_id")
+            if prev_shot_id not in video_map:
+                raise ValueError(f"[s08_video_gen] Scene '{sc_id}' references previous_shot_id='{prev_shot_id}' which does not exist in preceding video map")
 
         from vox.ffmpeg_utils import get_ffmpeg_binary
         ffmpeg_bin = get_ffmpeg_binary()
         seed_img = ctx.paths.seed_image_path(sc_id)
         active_seed_img = seed_img
-        seed_usable = (seed_img.exists() and seed_img.stat().st_size > 0)
+        seed_usable = bool(seed_img.exists() and seed_img.stat().st_size > 0)
         chained_fallback_used = False
         chained_fallback_reason = None
 
         # Start-Frame Chaining: Extract last frame from preceding video if chained
         if uses_chained_start and prev_shot_id and prev_shot_id in video_map:
             prev_clip = video_map[prev_shot_id]
-            if prev_clip.exists() and prev_clip.stat().st_size > 1000:
+            if not prev_clip.exists() or prev_clip.stat().st_size < 1000:
+                if not seed_usable:
+                    raise RuntimeError(
+                        f"[s08_video_gen] Preceding video clip for shot='{shot_id}' missing or corrupted: '{prev_clip}', "
+                        f"and fallback seed image '{seed_img}' is missing or empty (usable={seed_usable})"
+                    )
+                logger.warning(
+                    f"[s08_video_gen] Preceding video clip missing/corrupted for shot='{shot_id}': '{prev_clip}'. "
+                    f"Auditable fallback to usable seed image: '{seed_img}'"
+                )
+                active_seed_img = seed_img
+                chained_fallback_used = True
+                chained_fallback_reason = f"Preceding clip '{prev_clip}' missing or corrupted"
+            else:
                 chained_dir = ctx.paths.root / "chained_frames"
                 chained_dir.mkdir(parents=True, exist_ok=True)
                 chained_frame_path = chained_dir / f"{shot_id}_start.png"
@@ -150,12 +178,16 @@ def run(ctx: RunContext) -> StageArtifact:
                         ffmpeg_bin, "-y", "-sseof", "-0.1", "-i", str(prev_clip),
                         "-update", "1", "-q:v", "1", str(chained_frame_path)
                     ]
-                    subprocess.run(cmd, capture_output=True, check=True)
-                    if chained_frame_path.exists() and chained_frame_path.stat().st_size > 0:
-                        active_seed_img = chained_frame_path
-                    else:
-                        raise RuntimeError(f"FFmpeg extracted 0-byte frame for shot {shot_id}")
-                except (subprocess.CalledProcessError, RuntimeError, OSError, FileNotFoundError) as extraction_err:
+                    subprocess.run(cmd, capture_output=True, check=True, timeout=15)
+                    if not chained_frame_path.exists() or chained_frame_path.stat().st_size == 0:
+                        raise RuntimeError(f"FFmpeg extracted 0-byte or missing frame for shot {shot_id} from {prev_clip}")
+                    active_seed_img = chained_frame_path
+                except (subprocess.CalledProcessError, subprocess.TimeoutExpired, RuntimeError, OSError, FileNotFoundError) as extraction_err:
+                    if not seed_usable:
+                        raise RuntimeError(
+                            f"[s08_video_gen] Chained extraction failed for shot='{shot_id}' from prev_clip='{prev_clip}': {extraction_err}, "
+                            f"and fallback seed image '{seed_img}' is unusable (usable={seed_usable}). Fails closed per Rule 118 & 121."
+                        )
                     logger.warning(
                         f"[s08_video_gen] Chained start-frame extraction failed for shot='{shot_id}' "
                         f"from prev_clip='{prev_clip}': {extraction_err}. "
@@ -189,7 +221,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 ctx.paths.root / "blocks" / sc.get("sequence_block", "block_1_act_i").lower() / "videos" / f"clip_{sc_id.lower()}.mp4"
             ]
             found = next((p for p in legacy_cands if p.exists() and p.stat().st_size > 10000), None)
-            if found:
+            if found and found.resolve() != target_video.resolve():
                 import shutil
                 shutil.copy2(str(found), str(target_video))
             else:
@@ -201,7 +233,7 @@ def run(ctx: RunContext) -> StageArtifact:
                             "-c:v", "libx264", "-t", str(dur), "-pix_fmt", "yuv420p",
                             "-vf", "scale=1920:1080", str(target_video)
                         ]
-                        subprocess.run(cmd, capture_output=True, check=True)
+                        subprocess.run(cmd, capture_output=True, check=True, timeout=15)
                     except Exception as _ff_err:
                         target_video.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
                 else:
@@ -212,7 +244,7 @@ def run(ctx: RunContext) -> StageArtifact:
                             "-c:v", "libx264", "-pix_fmt", "yuv420p",
                             str(target_video)
                         ]
-                        subprocess.run(cmd, capture_output=True, check=True)
+                        subprocess.run(cmd, capture_output=True, check=True, timeout=15)
                     except Exception as _ff_err:
                         target_video.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
 

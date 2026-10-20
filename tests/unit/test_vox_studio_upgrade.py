@@ -332,14 +332,16 @@ def test_extract_episode_master_asset_registry_contract_validation():
     assert all("asset_id" in item for item in reg["items"])
 
 
-def test_s08_defensive_initialization_and_provenance_consistency(tmp_path):
-    """Verify s08 defensively handles empty scenes, absent shots, missing seeds, and ensures provenance consistency."""
+def test_s08_empty_scenes_list_returns_empty_artifact(tmp_path):
+    """Verify s08 cleanly returns empty artifact when director plan has 0 scenes."""
+    import json
+
     from core.config import RunContext, load_profile
     from core.paths import resolve_run_paths
     from core.run_manifest import RunManifest
     from stages import s08_video_gen
 
-    run_id = "test_run_s08_defensive"
+    run_id = "test_run_s08_empty"
     paths = resolve_run_paths(run_id, repo_root=tmp_path)
     cfg = load_profile("e2e_min")
     manifest = RunManifest.create_new(run_id, profile="e2e_min")
@@ -352,10 +354,8 @@ def test_s08_defensive_initialization_and_provenance_consistency(tmp_path):
         dry_run=False,
     )
 
-    # 1. Test empty scenes list
     s5_artifact_path = paths.artifact_file("s05_director_plan")
     s5_artifact_path.parent.mkdir(parents=True, exist_ok=True)
-    import json
     s5_artifact_path.write_text(json.dumps({"payload": {"scenes": []}}), encoding="utf-8")
 
     art = s08_video_gen.run(ctx)
@@ -363,28 +363,255 @@ def test_s08_defensive_initialization_and_provenance_consistency(tmp_path):
     assert art.payload["total_clips"] == 0
     assert len(art.payload["frame_chain"]) == 0
 
-    # 2. Test malformed scene metadata and provenance consistency
-    malformed_scenes = [
-        {"scene_id": "SCENE_01", "shots": []},
-        {"scene_id": "SCENE_02", "shots": [{"uses_previous_end_frame": True}]},
-        {"scene_id": "SCENE_03", "shots": [{"uses_previous_end_frame": True, "previous_shot_id": "nonexistent_shot"}]},
+
+def test_s08_malformed_metadata_fails_closed(tmp_path):
+    """Verify s08 strictly fails closed with ValueError on malformed scenes or invalid chaining."""
+    import json
+
+    import pytest
+
+    from core.config import RunContext, load_profile
+    from core.paths import resolve_run_paths
+    from core.run_manifest import RunManifest
+    from stages import s08_video_gen
+
+    run_id = "test_run_s08_malformed"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    cfg = load_profile("e2e_min")
+    manifest = RunManifest.create_new(run_id, profile="e2e_min")
+    ctx = RunContext(
+        run_id=run_id,
+        paths=paths,
+        manifest=manifest,
+        config=cfg,
+        force=True,
+        dry_run=False,
+    )
+    s5_artifact_path = paths.artifact_file("s05_director_plan")
+    s5_artifact_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1. Non-dict scene record
+    s5_artifact_path.write_text(json.dumps({"payload": {"scenes": ["malformed_string"]}}), encoding="utf-8")
+    with pytest.raises(ValueError, match="Malformed scene record at index 0"):
+        s08_video_gen.run(ctx)
+
+    # 2. Missing scene_id
+    s5_artifact_path.write_text(json.dumps({"payload": {"scenes": [{"shots": [{"shot_id": "sh_1"}]}]}}), encoding="utf-8")
+    with pytest.raises(ValueError, match="missing valid scene_id"):
+        s08_video_gen.run(ctx)
+
+    # 3. Empty shots list
+    s5_artifact_path.write_text(json.dumps({"payload": {"scenes": [{"scene_id": "SCENE_01", "shots": []}]}}), encoding="utf-8")
+    with pytest.raises(ValueError, match="empty or invalid shots list"):
+        s08_video_gen.run(ctx)
+
+    # 4. Shot 0 missing shot_id
+    s5_artifact_path.write_text(json.dumps({"payload": {"scenes": [{"scene_id": "SCENE_01", "shots": [{"account_slot": "acc_01"}]}]}}), encoding="utf-8")
+    with pytest.raises(ValueError, match="missing valid shot_id"):
+        s08_video_gen.run(ctx)
+
+    # 5. First scene specifies uses_previous_end_frame=True
+    s5_artifact_path.write_text(json.dumps({"payload": {"scenes": [{"scene_id": "SCENE_01", "shots": [{"shot_id": "sh_1", "uses_previous_end_frame": True}]}]}}), encoding="utf-8")
+    with pytest.raises(ValueError, match="First scene 'SCENE_01' cannot specify uses_previous_end_frame=True"):
+        s08_video_gen.run(ctx)
+
+    # 6. Chained shot references unknown previous_shot_id
+    valid_sc1 = {"scene_id": "SCENE_01", "shots": [{"shot_id": "sh_1"}]}
+    bad_sc2 = {"scene_id": "SCENE_02", "shots": [{"shot_id": "sh_2", "uses_previous_end_frame": True, "previous_shot_id": "unknown_shot"}]}
+    s5_artifact_path.write_text(json.dumps({"payload": {"scenes": [valid_sc1, bad_sc2]}}), encoding="utf-8")
+    with pytest.raises(ValueError, match="references previous_shot_id='unknown_shot' which does not exist"):
+        s08_video_gen.run(ctx)
+
+
+def test_s08_ffmpeg_extraction_and_fallback_contract(tmp_path, monkeypatch):
+    """Verify s08 start-frame chaining contract: extraction success, observable fallback, and fail-closed when seed is missing."""
+    import json
+    import subprocess
+
+    import pytest
+
+    from core.config import RunContext, load_profile
+    from core.paths import resolve_run_paths
+    from core.run_manifest import RunManifest
+    from stages import s08_video_gen
+
+    run_id = "test_run_s08_chaining"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    cfg = load_profile("e2e_min")
+    manifest = RunManifest.create_new(run_id, profile="e2e_min")
+    ctx = RunContext(
+        run_id=run_id,
+        paths=paths,
+        manifest=manifest,
+        config=cfg,
+        force=True,
+        dry_run=False,
+    )
+    s5_artifact_path = paths.artifact_file("s05_director_plan")
+    s5_artifact_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1. Successful chaining when preceding clip is generated
+    scenes = [
+        {"scene_id": "SCENE_01", "shots": [{"shot_id": "sc_01_sh_01"}]},
+        {"scene_id": "SCENE_02", "shots": [{"shot_id": "sc_02_sh_01", "uses_previous_end_frame": True}]},
     ]
-    s5_artifact_path.write_text(json.dumps({"payload": {"scenes": malformed_scenes}}), encoding="utf-8")
-    art2 = s08_video_gen.run(ctx)
-    assert art2.status == "ok"
-    fc = art2.payload["frame_chain"]
-    assert len(fc) == 3
-    # First scene defaults shot_id cleanly
-    assert fc[0]["shot_id"] == "sc_scene_01_sh_01"
+    s5_artifact_path.write_text(json.dumps({"payload": {"scenes": scenes}}), encoding="utf-8")
+    art = s08_video_gen.run(ctx)
+    assert art.status == "ok"
+    fc = art.payload["frame_chain"]
+    assert len(fc) == 2
     assert fc[0]["kind"] == "source"
-    assert fc[0]["seed_usable"] is False
-
-    # Second scene chains successfully from SCENE_01 clip
     assert fc[1]["kind"] == "chained"
-    assert fc[1]["previous_shot_id"] == "sc_scene_01_sh_01"
-    assert fc[1]["previous_frame_id"] == "frame_sc_scene_01_sh_01_end"
+    assert fc[1]["previous_shot_id"] == "sc_01_sh_01"
+    assert fc[1]["previous_frame_id"] == "frame_sc_01_sh_01_end"
 
-    # Third scene fallback provenance consistency: when previous clip does not exist, kind is source and references are None
-    assert fc[2]["kind"] == "source"
-    assert fc[2]["previous_frame_id"] is None
-    assert fc[2]["previous_shot_id"] is None
+    # Simulate extraction failure for chained frame
+    orig_run = subprocess.run
+
+    def fail_chained_extraction(cmd, *args, **kwargs):
+        if any("_start.png" in str(arg) for arg in cmd):
+            raise subprocess.CalledProcessError(1, cmd, stderr=b"Simulated corrupted video stream error")
+        return orig_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", fail_chained_extraction)
+
+    # 2. Corrupted preceding clip / extraction failure + Missing seed -> Raises RuntimeError (fail closed per Rule 118 & 121)
+    with pytest.raises(RuntimeError, match="Chained extraction failed for shot='sc_02_sh_01'.*and fallback seed image.*is unusable"):
+        s08_video_gen.run(ctx)
+
+    # 3. Corrupted preceding clip / extraction failure + Usable seed -> Validated auditable fallback
+    from PIL import Image
+    seed_02 = paths.seed_image_path("SCENE_02")
+    seed_02.parent.mkdir(parents=True, exist_ok=True)
+    img_fallback = Image.new("RGB", (64, 64), color="red")
+    img_fallback.save(seed_02)
+    art_fallback = s08_video_gen.run(ctx)
+    assert art_fallback.status == "ok"
+    fc2 = art_fallback.payload["frame_chain"]
+    assert fc2[1]["kind"] == "source"
+    assert fc2[1]["fallback_used"] is True
+    assert fc2[1]["seed_usable"] is True
+    assert fc2[1]["previous_shot_id"] is None
+    assert fc2[1]["previous_frame_id"] is None
+
+
+def test_chunk_partition_property_and_adversarial_matrix():
+    """Verify sequence block chunking across property invariants, exact boundaries, irregular durations, and short/oversized timelines."""
+    import random
+
+    import pytest
+
+    from core.contracts.stages import Scene, Shot
+    from stages.s05_director_plan import partition_timeline_into_chunks
+
+    # A. Adversarial: Irregular durations
+    durations = [7.5, 12.3, 15.2, 9.0, 11.0, 18.0, 8.5]
+    scenes = [
+        Scene(
+            scene_id=f"SC_{i:02d}",
+            narration="Test narration for irregular duration scene",
+            duration_est_sec=dur,
+            shots=[Shot(shot_id=f"sh_{i:02d}", scene_id=f"SC_{i:02d}", visual_prompt="Tactile paper cutout", duration_sec=dur)]
+        )
+        for i, dur in enumerate(durations)
+    ]
+    chunks = partition_timeline_into_chunks(scenes, target_chunk_duration=36.0, min_chunk_duration=24.0, max_chunk_duration=48.0)
+    assert len(chunks) >= 2
+    # Total duration preservation (0 duration loss)
+    assert sum(c.duration_s for c in chunks) == pytest.approx(sum(durations), 0.01)
+    # Continuity: no gaps, no overlaps
+    assert chunks[0].start_s == 0.0
+    for i in range(len(chunks) - 1):
+        assert chunks[i].end_s == pytest.approx(chunks[i + 1].start_s, 0.01)
+    assert chunks[-1].end_s == pytest.approx(sum(durations), 0.01)
+
+    # B. Adversarial: Exact 24s and 48s boundaries
+    exact_durs = [24.0, 24.0, 48.0, 24.0, 48.0]
+    scenes_exact = [
+        Scene(
+            scene_id=f"SC_EX_{i}",
+            narration="Test narration for exact boundary scene",
+            duration_est_sec=dur,
+            shots=[Shot(shot_id=f"sh_ex_{i}", scene_id=f"SC_EX_{i}", visual_prompt="Tactile paper cutout", duration_sec=dur)]
+        )
+        for i, dur in enumerate(exact_durs)
+    ]
+    chunks_exact = partition_timeline_into_chunks(scenes_exact)
+    assert all(c.duration_s <= 48.0 for c in chunks_exact)
+    assert sum(c.duration_s for c in chunks_exact) == pytest.approx(sum(exact_durs), 0.01)
+
+    # C. Adversarial: Short complete timeline (< 24s)
+    short_scenes = [
+        Scene(scene_id="SC_S1", narration="Short scene 1", duration_est_sec=8.0, shots=[Shot(shot_id="sh_s1", scene_id="SC_S1", visual_prompt="Tactile paper cutout", duration_sec=8.0)]),
+        Scene(scene_id="SC_S2", narration="Short scene 2", duration_est_sec=9.0, shots=[Shot(shot_id="sh_s2", scene_id="SC_S2", visual_prompt="Tactile paper cutout", duration_sec=9.0)]),
+    ]
+    chunks_short = partition_timeline_into_chunks(short_scenes)
+    assert len(chunks_short) == 1
+    assert chunks_short[0].boundary_reason == "complete_timeline"
+    assert chunks_short[0].duration_s == 17.0
+
+    # D. Adversarial: Oversized single scenes (> 48s)
+    mixed_oversized = [
+        Scene(scene_id="SC_O1", narration="Normal scene 1", duration_est_sec=15.0, shots=[Shot(shot_id="sh_o1", scene_id="SC_O1", visual_prompt="Tactile paper cutout", duration_sec=15.0)]),
+        Scene(scene_id="SC_O2", narration="Oversized scene 2", duration_est_sec=65.0, shots=[Shot(shot_id="sh_o2", scene_id="SC_O2", visual_prompt="Tactile paper cutout", duration_sec=65.0)]),
+        Scene(scene_id="SC_O3", narration="Normal scene 3", duration_est_sec=20.0, shots=[Shot(shot_id="sh_o3", scene_id="SC_O3", visual_prompt="Tactile paper cutout", duration_sec=20.0)]),
+    ]
+    chunks_over = partition_timeline_into_chunks(mixed_oversized)
+    assert any(c.boundary_reason == "oversized_single_scene_exception" for c in chunks_over)
+    assert sum(c.duration_s for c in chunks_over) == pytest.approx(100.0, 0.01)
+
+    # E. Property Invariant Test across 20 randomized timelines
+    rng = random.Random(42)
+    for _ in range(20):
+        rand_count = rng.randint(4, 25)
+        rand_durs = [round(rng.uniform(4.0, 16.0), 1) for _ in range(rand_count)]
+        rand_scenes = [
+            Scene(
+                scene_id=f"R_SC_{j}",
+                narration="Randomized timeline test scene",
+                duration_est_sec=d,
+                shots=[Shot(shot_id=f"r_sh_{j}", scene_id=f"R_SC_{j}", visual_prompt="Tactile paper cutout", duration_sec=d)]
+            )
+            for j, d in enumerate(rand_durs)
+        ]
+        r_chunks = partition_timeline_into_chunks(rand_scenes)
+        assert sum(c.duration_s for c in r_chunks) == pytest.approx(sum(rand_durs), 0.01)
+        assert r_chunks[0].start_s == 0.0
+        for k in range(len(r_chunks) - 1):
+            assert r_chunks[k].end_s == pytest.approx(r_chunks[k + 1].start_s, 0.01)
+        # All multi-scene chunks satisfy <= 48.0s
+        for c in r_chunks:
+            if len(c.scene_ids) > 1:
+                assert c.duration_s <= 48.0
+
+
+def test_safe_disposal_negative_boundary_and_wildcard_attacks():
+    """Verify safe disposal rejects wildcard attacks, root paths, traversal attempts, and system directories per Rule 137."""
+    from scripts.safe_trash import safe_trash, validate_safe_disposal_target
+
+    # 1. Wildcard attacks must be rejected
+    for wild in ["*.py", "test_*.log", "/tmp/*", "C:\\temp\\*.*", "dir/?"]:
+        ok, msg = validate_safe_disposal_target(wild)
+        assert not ok
+        assert "Wildcard deletion is strictly forbidden" in msg
+        assert safe_trash(wild) is False
+
+    # 2. Drive root attacks must be rejected
+    for root_path in ["C:\\", "c:/", "D:\\", "/", "\\"]:
+        ok, msg = validate_safe_disposal_target(root_path)
+        assert not ok
+        assert "Cannot trash drive root or forbidden zone" in msg
+
+    # 3. System directories must be rejected
+    for sys_dir in ["/etc", "/var", "/usr", "/bin", "C:\\Windows", "C:\\Program Files"]:
+        ok, msg = validate_safe_disposal_target(sys_dir)
+        assert not ok
+        assert "forbidden" in msg.lower()
+
+    # 4. Traversal attacks targeting forbidden roots must be rejected
+    traversals = ["../../../../etc/passwd", "..\\..\\..\\Windows\\System32"]
+    for trav in traversals:
+        ok, msg = validate_safe_disposal_target(trav)
+        if not ok:
+            assert "forbidden" in msg.lower() or "drive root" in msg.lower()
+
