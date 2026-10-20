@@ -66,8 +66,8 @@ def validate_safe_disposal_target(
         return False, f"SECURITY ERROR: Cannot trash drive root or forbidden zone: '{path}'"
 
     norm_lower = norm_raw.lower()
-    for fz in ["/etc", "/var", "/usr", "/bin", "/boot", "/sys", "/proc", "/", "/root", "/home", "c:/windows", "c:/program files"]:
-        if norm_lower == fz or (norm_lower.startswith(fz + "/") and fz not in ["/var", "/root"]):
+    for fz in ["/etc", "/var", "/usr", "/bin", "/boot", "/sys", "/proc", "/", "/root", "/home", "c:/windows", "c:/program files", "c:/program files (x86)"]:
+        if norm_lower == fz or norm_lower.startswith(fz + "/") or norm_lower.startswith("c:/program files"):
             return False, f"SECURITY ERROR: Target is located in forbidden system root: '{path}'"
 
     # Canonical resolution (resolves relative traversal .. and follows symlinks)
