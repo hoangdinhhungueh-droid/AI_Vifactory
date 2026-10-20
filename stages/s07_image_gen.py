@@ -7,14 +7,14 @@ Implements Stage Shape Standard. Generates or verifies authentic composite seed 
 
 from __future__ import annotations
 
-import time
 import json
+import time
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
-from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.config import RunContext
-from core.gates import require_input, emit_artifact, compute_file_sha256
+from core.contracts.stages import Provenance, StageArtifact, StageID
+from core.gates import compute_file_sha256, emit_artifact
 from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S7_IMAGE_GEN
@@ -35,7 +35,7 @@ STAGE: StageID = StageID.S7_IMAGE_GEN
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S7: Composite Image Generation."""
     start_ts = time.time()
-    
+
     # Read S5 Director Plan
     s5_path = ctx.paths.artifact_file(StageID.S5_DIRECTOR_PLAN.value)
     s5_data = json.loads(s5_path.read_text(encoding="utf-8"))
@@ -56,13 +56,13 @@ def run(ctx: RunContext) -> StageArtifact:
                 Path(r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets") / ctx.run_id / f"composite_{sc_id}.png",
             ]
             found = next((p for p in legacy_cands if p.exists() and p.stat().st_size > 1024), None)
-            if found:
+            if found and found.resolve() != target_img.resolve():
                 import shutil
                 shutil.copy2(str(found), str(target_img))
-            else:
+            elif not target_img.exists() or (found is None and not target_img.exists()):
                 # Create authentic editorial placeholder frame via PIL if not dry_run
                 try:
-                    from PIL import Image, ImageDraw, ImageFont
+                    from PIL import Image, ImageDraw
                     img = Image.new("RGB", (1920, 1080), color="#F4F1EA")
                     draw = ImageDraw.Draw(img)
                     # Draw subtle geometric accent shapes in Vox Yellow
