@@ -3,7 +3,6 @@
 Unit tests for the Autonomous Vox Director Engine (Rule 118, 120, 128, 132).
 """
 
-import pytest
 from app.services.vox_automated_director import VoxAutomatedDirector
 
 
@@ -183,10 +182,7 @@ def test_build_diorama_video_prompts_cl3_formula():
 
 
 def test_low_token_36_and_omni_48_budget_modes():
-    from app.services.unified_vox_director import (
-        select_dynamic_hero_indices,
-        inject_speech_timestamp_cue
-    )
+    from app.services.unified_vox_director import inject_speech_timestamp_cue, select_dynamic_hero_indices
 
     sents = [
         {"index": i, "text": f"Sentence {i} reveals a $500 million crisis and sudden collapse in the vault.", "duration_sec": 6.0}
@@ -210,8 +206,9 @@ def test_low_token_36_and_omni_48_budget_modes():
 def test_production_b2_hg2_s45_handoff_parity(tmp_path, monkeypatch):
     """Verify live production B2 -> HG1 -> B3.5 -> HG2 -> S4.5 handoff preserves all Vox & CL3 upgrades."""
     import json
-    from app.services.story_gate import score_story
+
     from app.services.build_remotion_props import build_remotion_props_data
+    from app.services.story_gate import score_story
 
     monkeypatch.setattr("app.services.hhtech_reasoner.call_gpt6_astra", lambda *a, **kw: "")
     monkeypatch.setenv("DISABLE_LLM_TIMELINE_DIRECTOR", "1")
@@ -293,6 +290,7 @@ def test_production_b2_hg2_s45_handoff_parity(tmp_path, monkeypatch):
 def test_round3_beat_phase_and_layout_anti_collision(tmp_path, monkeypatch):
     """Verify 30+ sentence beats do not collide with 5-Beat act phases or poison layout variants/heroPosition."""
     import json
+
     from app.services.build_remotion_props import build_remotion_props_data
     from scripts.orchestrator.adversarial_director_gate import auto_repair_props
 
@@ -399,9 +397,10 @@ def test_round3_beat_phase_and_layout_anti_collision(tmp_path, monkeypatch):
 def test_round3_part2_midstream_and_chapter_sync_integrity(tmp_path, monkeypatch):
     """Verify Round 3 Part 2 fixes across editorial_briefing_generator, timeline_editor_agent, and seo_package_forge."""
     import json
-    from app.services.editorial_briefing_generator import select_climax_scenes, prune_and_localize_scenes
-    from app.services.timeline_editor_agent import audit_and_optimize_timeline
+
+    from app.services.editorial_briefing_generator import prune_and_localize_scenes, select_climax_scenes
     from app.services.seo_package_forge import sync_exact_chapters_from_remotion
+    from app.services.timeline_editor_agent import audit_and_optimize_timeline
 
     monkeypatch.setenv("DISABLE_LLM_TIMELINE_DIRECTOR", "1")
 

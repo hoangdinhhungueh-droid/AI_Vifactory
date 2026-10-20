@@ -3592,9 +3592,9 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
         import hashlib
         local_ls_z_hash = hashlib.sha256(ls_z_res.stdout).hexdigest()
         vps_ls_z = ""
-        for l in vps_raw.splitlines():
-            if "VPS ls-files -z | sha256sum:" in l:
-                vps_ls_z = l.split(":")[-1].strip().split()[0]
+        for line_item in vps_raw.splitlines():
+            if "VPS ls-files -z | sha256sum:" in line_item:
+                vps_ls_z = line_item.split(":")[-1].strip().split()[0]
         parity_verdict = (
             f"100% BIT-FOR-BIT IDENTICAL: {local_ls_z_hash} (Rule 126 VERIFIED, Exit Code 0)"
             if (vps_ls_z and vps_ls_z == local_ls_z_hash) else
@@ -3719,7 +3719,7 @@ def collect_raw_forensic_packet(
             capture_output=True, text=True, check=False
         )
         files_touched = diff_res.stdout.splitlines()
-        if any(k in f for k in ["trend_engine", "daily_market_lock"]):
+        if any(any(k in ft for k in ["trend_engine", "daily_market_lock"]) for ft in files_touched):
             return _collect_trend_forensic_packet(commit_range, task_id)
     except Exception as _diff_err:
         logger.debug(f"Diff inspection notice: {_diff_err}")
