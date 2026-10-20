@@ -169,13 +169,31 @@ def run(ctx: RunContext) -> StageArtifact:
     sz = final_mp4.stat().st_size if final_mp4.exists() else 0
     sha = compute_file_sha256(final_mp4) if final_mp4.exists() else "none"
 
+    actual_frames = render_props.duration_in_frames
+    actual_fps = fps
+    if final_mp4.exists():
+        try:
+            from vox.qa.gates import probe_media_file
+            p_info = probe_media_file(final_mp4)
+            v_st = next((s for s in p_info.get("streams", []) if s.get("codec_type") == "video"), None)
+            if v_st and int(v_st.get("nb_frames", 0)) > 0:
+                actual_frames = int(v_st["nb_frames"])
+                r_fps_str = v_st.get("r_frame_rate", f"{fps}/1")
+                if "/" in r_fps_str:
+                    num, den = map(float, r_fps_str.split("/"))
+                    actual_fps = num / max(1.0, den)
+                elif r_fps_str:
+                    actual_fps = float(r_fps_str)
+        except Exception as _probe_ex:
+            logger.debug(f"[s10_render] Media probe exception: {_probe_ex}")
+
     payload = {
         "task_id": ctx.run_id,
         "final_video_path": str(final_mp4),
         "remotion_props_file": str(props_file),
         "total_scenes_rendered": len(scene_props),
-        "duration_in_frames": render_props.duration_in_frames,
-        "fps": fps,
+        "duration_in_frames": actual_frames,
+        "fps": actual_fps,
         "size_bytes": sz,
         "sha256": sha
     }
