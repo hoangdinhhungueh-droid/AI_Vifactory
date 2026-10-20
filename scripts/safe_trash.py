@@ -26,14 +26,28 @@ def validate_safe_disposal_target(path: str) -> tuple[bool, str]:
     if not path or not isinstance(path, str):
         return False, "Target path must be a non-empty string"
 
-    if "*" in path or "?" in path:
+    stripped = path.strip()
+    if not stripped:
+        return False, "Target path cannot be empty"
+
+    if "*" in stripped or "?" in stripped:
         return False, f"SECURITY ERROR: Wildcard deletion is strictly forbidden: '{path}'"
 
-    path_norm = path.replace("\\", "/").rstrip("/").lower()
-    if path_norm in {"/etc", "/var", "/usr", "/bin", "/boot", "/sys", "/proc", "/", "/root", "/home"}:
-        return False, f"SECURITY ERROR: Target is located in forbidden system root: '{path}'"
+    # Normalize separators for cross-platform checking
+    norm_raw = stripped.replace("\\", "/").rstrip("/")
+    if not norm_raw or stripped in {"/", "\\", "\\\\"}:
+        return False, f"SECURITY ERROR: Cannot trash drive root or forbidden zone: '{path}'"
 
-    abs_path = os.path.abspath(path)
+    import re
+    if re.match(r"^[a-zA-Z]:[\\/]?$", stripped):
+        return False, f"SECURITY ERROR: Cannot trash drive root or forbidden zone: '{path}'"
+
+    norm_lower = norm_raw.lower()
+    for fz in ["/etc", "/var", "/usr", "/bin", "/boot", "/sys", "/proc", "/", "/root", "/home", "c:/windows", "c:/program files"]:
+        if norm_lower == fz or norm_lower.startswith(fz + "/"):
+            return False, f"SECURITY ERROR: Target is located in forbidden system root: '{path}'"
+
+    abs_path = os.path.abspath(stripped)
     clean_norm = abs_path.rstrip("\\/").lower()
 
     # Check drive root (e.g. C:\ or /)
