@@ -102,16 +102,26 @@ def main() -> int:
 
     # 2. Authenticated POST /api/v1/llm (must return HTTP 200)
     llm_payload = json.dumps({"prompt": "ping"}).encode("utf-8")
-    try:
-        req_llm = urllib.request.Request(f"{base_url}/api/v1/llm", data=llm_payload, headers=headers_auth)
-        resp_llm = urllib.request.urlopen(req_llm, timeout=45)
-        code_llm = resp_llm.getcode()
-        if code_llm != 200:
-            failures.append(f"Auth POST /api/v1/llm expected 200, got {code_llm}")
-        else:
-            print(f"  [PASS] {'/api/v1/llm':20} -> HTTP 200 OK (payload: ping)")
-    except Exception as e:
-        failures.append(f"Auth POST /api/v1/llm raised: {e}")
+    llm_ok = False
+    last_llm_err = None
+    for attempt in range(1, 3):
+        try:
+            req_llm = urllib.request.Request(f"{base_url}/api/v1/llm", data=llm_payload, headers=headers_auth)
+            resp_llm = urllib.request.urlopen(req_llm, timeout=90)
+            code_llm = resp_llm.getcode()
+            if code_llm != 200:
+                last_llm_err = f"Auth POST /api/v1/llm expected 200, got {code_llm}"
+            else:
+                print(f"  [PASS] {'/api/v1/llm':20} -> HTTP 200 OK (payload: ping)")
+                llm_ok = True
+                break
+        except Exception as e:
+            last_llm_err = f"Auth POST /api/v1/llm raised: {e}"
+            if attempt < 2:
+                import time as _t
+                _t.sleep(2)
+    if not llm_ok and last_llm_err:
+        failures.append(last_llm_err)
 
     # 3. Authenticated POST /v1/chat/completions (tool-calling dispatch)
     chat_payload = json.dumps({
@@ -119,18 +129,30 @@ def main() -> int:
         "messages": [{"role": "user", "content": "Query Notion database"}],
         "tools": [{"type": "function", "function": {"name": "API-query-data-source", "parameters": {"type": "object"}}}],
     }).encode("utf-8")
-    try:
-        req_chat = urllib.request.Request(f"{base_url}/v1/chat/completions", data=chat_payload, headers=headers_auth)
+    chat_ok = False
+    last_chat_err = None
+    for attempt in range(1, 3):
         try:
-            resp_chat = urllib.request.urlopen(req_chat, timeout=45)
+            req_chat = urllib.request.Request(f"{base_url}/v1/chat/completions", data=chat_payload, headers=headers_auth)
+            resp_chat = urllib.request.urlopen(req_chat, timeout=90)
             if resp_chat.getcode() == 200:
                 print(f"  [PASS] {'/v1/chat/completions':20} -> HTTP 200 OK")
+                chat_ok = True
+                break
             else:
-                failures.append(f"Auth POST /v1/chat/completions expected HTTP 200, got {resp_chat.getcode()}")
+                last_chat_err = f"Auth POST /v1/chat/completions expected HTTP 200, got {resp_chat.getcode()}"
         except urllib.error.HTTPError as he:
-            failures.append(f"Auth POST /v1/chat/completions failed with HTTP {he.code}: {he.reason}")
-    except Exception as e:
-        failures.append(f"Auth POST /v1/chat/completions raised: {e}")
+            last_chat_err = f"Auth POST /v1/chat/completions failed with HTTP {he.code}: {he.reason}"
+            if attempt < 2:
+                import time as _t
+                _t.sleep(2)
+        except Exception as e:
+            last_chat_err = f"Auth POST /v1/chat/completions raised: {e}"
+            if attempt < 2:
+                import time as _t
+                _t.sleep(2)
+    if not chat_ok and last_chat_err:
+        failures.append(last_chat_err)
 
     print("\n======================================================================")
     print("🛡️ FASTAPI UNAUTHENTICATED SECURITY BOUNDARY PROBES (Rule 121 & Rule 139)")

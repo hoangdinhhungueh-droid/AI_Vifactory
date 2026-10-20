@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -68,6 +69,24 @@ def _run_git_cmd(repo_root: Path, args: List[str]) -> Tuple[int, str]:
         check=False,
     )
     return res.returncode, res.stdout.strip()
+
+
+def _is_symlink_or_reparse(path: Path) -> bool:
+    """Detects whether path is a POSIX symlink or NTFS reparse point/junction (Rule 121 & Rule 137)."""
+    if path.is_symlink():
+        return True
+    try:
+        st = os.lstat(str(path))
+        if getattr(st, "st_reparse_tag", 0) != 0 or stat.S_ISLNK(st.st_mode):
+            return True
+    except (OSError, ValueError):
+        pass
+    try:
+        os.readlink(str(path))
+        return True
+    except (OSError, ValueError):
+        pass
+    return False
 
 
 def verify_bundle_and_attest(
@@ -208,10 +227,10 @@ def verify_bundle_and_attest(
             raise RuntimeError(f"Invalid or missing size_bytes for {art_name}: {expected_bytes!r}")
 
         art_path = bundle_dir / art_name
+        if _is_symlink_or_reparse(art_path):
+            raise RuntimeError(f"Symlink rejected for bundle artifact: {art_name}")
         if not art_path.is_file():
             raise RuntimeError(f"Bundle artifact missing from disk: {art_name}")
-        if art_path.is_symlink():
-            raise RuntimeError(f"Symlink rejected for bundle artifact: {art_name}")
 
         actual_sha = _compute_sha256(art_path)
         actual_bytes = art_path.stat().st_size
@@ -230,7 +249,7 @@ def verify_bundle_and_attest(
     # Enforce exact allowed coverage and reject rogue physical entries
     allowed_bundle_files = set(files_inventory.keys()) | {"bundle_manifest.json", "post_head_attestation.json"}
     for entry in bundle_dir.iterdir():
-        if entry.is_symlink():
+        if _is_symlink_or_reparse(entry):
             raise RuntimeError(f"Symlink rejected in bundle directory: {entry.name}")
         if entry.is_dir():
             raise RuntimeError(f"Unexpected subdirectory rejected in bundle directory: {entry.name}")
