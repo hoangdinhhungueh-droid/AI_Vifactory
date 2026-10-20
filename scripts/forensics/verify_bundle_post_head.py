@@ -80,12 +80,12 @@ def _is_symlink_or_reparse(path: Path) -> bool:
         if getattr(st, "st_reparse_tag", 0) != 0 or stat.S_ISLNK(st.st_mode):
             return True
     except (OSError, ValueError):
-        pass
+        return False
     try:
-        os.readlink(str(path))
-        return True
+        target = os.readlink(str(path))
+        return bool(target)
     except (OSError, ValueError):
-        pass
+        return False
     return False
 
 
