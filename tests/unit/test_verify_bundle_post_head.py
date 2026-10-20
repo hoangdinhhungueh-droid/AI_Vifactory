@@ -247,14 +247,15 @@ def test_verify_bundle_rejects_symlink_artifact(tmp_path: Path):
     real_target = tmp_path.parent / "real_external.txt"
     real_target.write_bytes(b"external data")
 
-    symlink_path = fix["bundle_dir"] / "symlink_artifact.bin"
+    symlink_path = fix["bundle_dir"] / "ast_scanner_source.py"
+    symlink_path.unlink()
     try:
         symlink_path.symlink_to(real_target)
     except (OSError, NotImplementedError) as sym_err:
         pytest.skip(f"PLATFORM LIMITATION: Symlink creation not permitted on this platform ({sym_err})")
 
     payload = fix["bundle_manifest_payload"]
-    payload["files"]["symlink_artifact.bin"] = {
+    payload["files"]["ast_scanner_source.py"] = {
         "sha256": hashlib.sha256(b"external data").hexdigest(),
         "size_bytes": len(b"external data"),
     }
