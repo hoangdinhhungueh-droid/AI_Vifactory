@@ -50,7 +50,7 @@ class Provenance(BaseModel):
 
 class Shot(BaseModel):
     """Atomic video generation unit passed to Google Flow (I2V / T2V)."""
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     shot_id: str = Field(description="e.g. sc_01_sh_01")
     scene_id: str = Field(description="e.g. SCENE_01")
