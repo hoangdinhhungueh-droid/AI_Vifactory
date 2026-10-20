@@ -10,6 +10,7 @@ import httpx
 import pytest
 
 from app.services.model_gateway import (
+    AllProvidersFailed,
     ModelGateway,
     TokenBudgetExceeded,
     _get_max_absolute_input_ceiling,
@@ -370,5 +371,79 @@ def test_provider_spy_cleanup_guarantee_on_assertion_failure():
         assert "Intentional test assertion trigger" in str(_expected_val_err)
 
     assert httpx.Client == orig_client, "httpx.Client was not restored after exception in context block!"
+
+
+def test_call_llm_preflight_budget_gating_exercised():
+    """Verifies that call_llm exercises get_max_request_cost_vnd and get_max_input_cost_vnd for live budget gating (Boss Round 29 Item 3)."""
+    from app.services.cost_tracker import CostTracker
+
+    class BoundedCostTracker(CostTracker):
+        def __init__(self, remaining_budget: float):
+            self.cap_vnd = None
+            self.costs = {}
+            self._rem = remaining_budget
+
+        def get_remaining_budget(self) -> float:
+            return self._rem
+
+    # 1. Exhausted budget: must fail closed before calling provider
+    gw_tight = ModelGateway(cost_tracker=BoundedCostTracker(remaining_budget=0.001))
+    target_model = gw_tight.hhtech_model
+    expected_req_cost = gw_tight.get_max_request_cost_vnd(target_model, max_output_tokens=2048)
+    expected_inp_cost = gw_tight.get_max_input_cost_vnd(target_model)
+    assert expected_req_cost > 0.001
+    assert expected_inp_cost > 0
+
+    with pytest.raises(TokenBudgetExceeded) as exc_info:
+        gw_tight.call_llm(prompt="Budget gating test prompt", model=target_model, max_tokens=2048)
+
+    assert "Projected request cost" in str(exc_info.value)
+    assert "exceeds remaining budget" in str(exc_info.value)
+
+    # 2. Generous budget: pre-flight check succeeds and reaches provider dispatch
+    old_key = os.environ.get("HHTECH_API_KEY")
+    try:
+        os.environ["HHTECH_API_KEY"] = "sk-test-dummy-key"
+        gw_generous = ModelGateway(cost_tracker=BoundedCostTracker(remaining_budget=1000000.0))
+        with provider_spy_context() as spy:
+            try:
+                gw_generous.call_llm(prompt="Budget sufficient prompt", model=target_model, max_tokens=2048)
+            except RuntimeError as egress_err:
+                assert "Unexpected network egress" in str(egress_err)
+            assert len(spy.hhtech_dispatches) == 1
+            assert spy.hhtech_dispatches[0]["json"]["model"] == target_model
+    finally:
+        if old_key is not None:
+            os.environ["HHTECH_API_KEY"] = old_key
+        else:
+            os.environ.pop("HHTECH_API_KEY", None)
+
+
+def test_call_llm_fallback_budget_gating_exercised():
+    """Verifies that fallback path in call_llm also exercises budget estimation gating for fallback model."""
+    from app.services.cost_tracker import CostTracker
+
+    class FallbackLimitingCostTracker(CostTracker):
+        def __init__(self):
+            self.cap_vnd = None
+            self.costs = {}
+            self.call_count = 0
+
+        def get_remaining_budget(self) -> float:
+            self.call_count += 1
+            # Primary model passes (call 1), but when fallback is evaluated (call 2), budget is 0
+            return 1000000.0 if self.call_count <= 1 else 0.0001
+
+    gw = ModelGateway(cost_tracker=FallbackLimitingCostTracker())
+    # Primary _call_hhtech will fail, triggering fallback budget evaluation
+    with pytest.raises(AllProvidersFailed) as exc_info:
+        gw.call_llm(
+            prompt="Trigger fallback",
+            model="gpt-6.1-sol",
+            fallback="claude-sonnet-5",
+            max_tokens=2048
+        )
+    assert "Fallback projected request cost" in str(exc_info.value)
+    assert "exceeds remaining budget" in str(exc_info.value)
 
 

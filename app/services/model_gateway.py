@@ -222,6 +222,20 @@ class ModelGateway:
         """
         model = model or self.hhtech_model
 
+        # Live budget estimation gating (Boss Round 29 Punchlist Item 3)
+        proj_req_cost = self.get_max_request_cost_vnd(model=model, max_output_tokens=max_tokens)
+        proj_inp_cost = self.get_max_input_cost_vnd(model=model)
+        remaining_budget = self.get_remaining_budget()
+        if proj_req_cost > remaining_budget:
+            raise TokenBudgetExceeded(
+                f"Projected request cost {proj_req_cost:.2f} VND (input ceiling: {proj_inp_cost:.2f} VND) "
+                f"exceeds remaining budget {remaining_budget:.2f} VND for model '{model}'"
+            )
+        logger.debug(
+            f"[GATEWAY] Budget pre-check passed: proj_req_cost={proj_req_cost:.2f} VND, "
+            f"proj_inp_cost={proj_inp_cost:.2f} VND, remaining_budget={remaining_budget:.2f} VND"
+        )
+
         # Try primary provider
         try:
             logger.info(f"[GATEWAY] Calling primary model: {model}")
@@ -242,6 +256,14 @@ class ModelGateway:
             if fallback:
                 try:
                     logger.info(f"[GATEWAY] Trying fallback model: {fallback}")
+                    fb_req_cost = self.get_max_request_cost_vnd(model=fallback, max_output_tokens=max_tokens)
+                    fb_inp_cost = self.get_max_input_cost_vnd(model=fallback)
+                    rem_budget = self.get_remaining_budget()
+                    if fb_req_cost > rem_budget:
+                        raise TokenBudgetExceeded(
+                            f"Fallback projected request cost {fb_req_cost:.2f} VND (input ceiling: {fb_inp_cost:.2f} VND) "
+                            f"exceeds remaining budget {rem_budget:.2f} VND for fallback model '{fallback}'"
+                        )
                     response = self._call_fallback_llm(
                         prompt=prompt,
                         model=fallback,
