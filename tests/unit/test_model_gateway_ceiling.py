@@ -435,15 +435,16 @@ def test_call_llm_fallback_budget_gating_exercised():
             return 1000000.0 if self.call_count <= 1 else 0.0001
 
     gw = ModelGateway(cost_tracker=FallbackLimitingCostTracker())
-    # Primary _call_hhtech will fail, triggering fallback budget evaluation
-    with pytest.raises(AllProvidersFailed) as exc_info:
-        gw.call_llm(
-            prompt="Trigger fallback",
-            model="gpt-6.1-sol",
-            fallback="claude-sonnet-5",
-            max_tokens=2048
-        )
-    assert "Fallback projected request cost" in str(exc_info.value)
-    assert "exceeds remaining budget" in str(exc_info.value)
+    # Provider spy intercepts primary dispatch, triggering fallback budget evaluation
+    with provider_spy_context():
+        with pytest.raises(AllProvidersFailed) as exc_info:
+            gw.call_llm(
+                prompt="Trigger fallback",
+                model="gpt-6.1-sol",
+                fallback="claude-sonnet-5",
+                max_tokens=2048
+            )
+        assert "Fallback projected request cost" in str(exc_info.value)
+        assert "exceeds remaining budget" in str(exc_info.value)
 
 
