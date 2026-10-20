@@ -1995,12 +1995,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     manifest_file = audits_dir / f"{task_id or 'TASK_1792314467'}_manifest.json"
     manifest_json_str = json.dumps(manifest_dict, indent=2)
     manifest_bytes = manifest_json_str.encode("utf-8")
-    manifest_file.write_bytes(manifest_bytes)
     manifest_file_sha = hashlib.sha256(manifest_bytes).hexdigest()
-    manifest_readback_bytes = manifest_file.read_bytes()
-    manifest_readback_sha = hashlib.sha256(manifest_readback_bytes).hexdigest()
-    if manifest_readback_sha != manifest_file_sha:
-        raise RuntimeError(f"Manifest readback SHA mismatch: {manifest_readback_sha} != {manifest_file_sha}")
 
     # Physical Evidence Bundle Assembly & Executable Hash Verification (Boss Round 24 Item 3 & Round 25 Item 3/4)
     bundle_dir = audits_dir / f"{task_id or 'TASK_1792314467'}_evidence_bundle"
@@ -2198,8 +2193,12 @@ curl -s -H "Authorization: Bearer ${{GITHUB_TOKEN:-}}" "https://api.github.com/r
         "verified": True
     }, indent=2).encode("utf-8"))
 
-    # 15. Manifest copy into bundle
-    (bundle_dir / "manifest.json").write_bytes(manifest_bytes)
+    # 15. Manifest copy into bundle (Tier 2 post-HEAD artifact in git-ignored bundle)
+    bundle_manifest_copy = bundle_dir / "manifest.json"
+    bundle_manifest_copy.write_bytes(manifest_bytes)
+    bundle_manifest_copy_sha = hashlib.sha256(bundle_manifest_copy.read_bytes()).hexdigest()
+    if bundle_manifest_copy_sha != manifest_file_sha:
+        raise RuntimeError(f"Bundle manifest readback SHA mismatch: {bundle_manifest_copy_sha} != {manifest_file_sha}")
 
     # 16. Finalize Bundle Manifest (records all pre-attestation artifacts)
     bundle_files_pre = sorted([f for f in bundle_dir.glob("*") if f.is_file() and f.name not in ("bundle_manifest.json", "post_head_attestation.json")])
