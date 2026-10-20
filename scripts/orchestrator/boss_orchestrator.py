@@ -2303,7 +2303,7 @@ curl -s -H "Authorization: Bearer ${{GITHUB_TOKEN:-}}" "https://api.github.com/r
         f"Local Tree SHA:               {git_tree}\n"
         f"Manifest Artifact Path:       specs/boss_audits/{task_id or 'TASK_1792314467'}_manifest.json\n"
         f"Manifest Artifact SHA256:     {manifest_file_sha}\n"
-        f"Manifest Readback Validation: {manifest_readback_sha} (Verified: byte-for-byte exact)\n\n"
+        f"Manifest Readback Validation: {bundle_manifest_copy_sha} (Verified: byte-for-byte exact)\n\n"
         f"--- DUAL-TIER MANIFEST ARCHITECTURAL STANDARD (ADR-MANIFEST-PROVENANCE-001 / Boss Round 29 Items 1 & 2) ---\n"
         f"- Formal Specification:       specs/boss_audits/MANIFEST_PROVENANCE_SPEC.md (Committed Architecture Decision Record)\n"
         f"- Architectural Design:       Two-tier verification lifecycle resolving the Git Observer Effect without circular mutation.\n"
