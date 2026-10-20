@@ -311,7 +311,7 @@ def test_round3_beat_phase_and_layout_anti_collision(tmp_path, monkeypatch):
     prompts_manifest = director.forge_image_prompts(
         beats=beats,
         theme="newsprint-editorial",
-        topic="Sovereign Vault Discrepancy",
+        topic="Sovereign Treasury Vault Discrepancy",
         story_text=script_text,
     )
     assert len(prompts_manifest) == 30
