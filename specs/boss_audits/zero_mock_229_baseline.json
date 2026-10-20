@@ -1609,5 +1609,256 @@
       "description": "Hermetic test parameter or environment fixture",
       "code_snippet": "monkeypatch.setattr(urllib.request, \"urlopen\", mock_urlopen)"
     }
+  ],
+  "production_occurrences_count": 31,
+  "production_occurrences": [
+    {
+      "index": 1,
+      "file": "app/services/b5_visual_gate.py",
+      "line": 71,
+      "classification": "CLASS E: Rule 118 Architecture Documentation / Inline Rule Reference",
+      "code": "# Fast technical pre-checks (zero mock, rule 122)",
+      "disposition": "Docstring or architectural note documenting zero-mock policy or explain testability without runtime impact."
+    },
+    {
+      "index": 2,
+      "file": "app/services/b5_visual_gate.py",
+      "line": 169,
+      "classification": "CLASS B: Defensive Refusal to Fabricate Scores (Rule 118 & Rule 122)",
+      "code": "\"reasoning\": f\"Vision LLM audit call failed: {exc}. Refusing to fabricate mock scores.\",",
+      "disposition": "Refuses to synthesize scores when vision models or API gateways are offline; fails closed."
+    },
+    {
+      "index": 3,
+      "file": "app/services/b5_visual_gate.py",
+      "line": 175,
+      "classification": "CLASS B: Defensive Refusal to Fabricate Scores (Rule 118 & Rule 122)",
+      "code": "logger.error(\"[b5_visual_gate] ModelGateway unavailable; refusing to generate mock score\")",
+      "disposition": "Refuses to synthesize scores when vision models or API gateways are offline; fails closed."
+    },
+    {
+      "index": 4,
+      "file": "app/services/b5_visual_gate.py",
+      "line": 188,
+      "classification": "CLASS B: Defensive Refusal to Fabricate Scores (Rule 118 & Rule 122)",
+      "code": "\"reasoning\": \"ModelGateway unavailable; no mock visual scores permitted.\",",
+      "disposition": "Refuses to synthesize scores when vision models or API gateways are offline; fails closed."
+    },
+    {
+      "index": 5,
+      "file": "app/services/build_remotion_props.py",
+      "line": 159,
+      "classification": "CLASS E: Rule 118 Architecture Documentation / Inline Rule Reference",
+      "code": "# Rule 118: No number found in narration -> DO NOT emit mock counter",
+      "disposition": "Docstring or architectural note documenting zero-mock policy or explain testability without runtime impact."
+    },
+    {
+      "index": 6,
+      "file": "app/services/prompt_forge.py",
+      "line": 2044,
+      "classification": "CLASS D: Offline Hermetic Test Reflection & Boundary Guard",
+      "code": "is_mocked_astra = hasattr(call_gpt6_astra, \"_mock_name\") or \"Mock\" in type(call_gpt6_astra).__name__",
+      "disposition": "Control-flow inspection detecting test fixtures in offline runs or protecting live Telegram from test tokens."
+    },
+    {
+      "index": 7,
+      "file": "app/services/prompt_forge.py",
+      "line": 2053,
+      "classification": "CLASS D: Offline Hermetic Test Reflection & Boundary Guard",
+      "code": "if is_mocked_astra:",
+      "disposition": "Control-flow inspection detecting test fixtures in offline runs or protecting live Telegram from test tokens."
+    },
+    {
+      "index": 8,
+      "file": "app/services/quant_profile.py",
+      "line": 8,
+      "classification": "CLASS E: Rule 118 Architecture Documentation / Inline Rule Reference",
+      "code": "- ZERO episode-specific literals or mock fallbacks.",
+      "disposition": "Docstring or architectural note documenting zero-mock policy or explain testability without runtime impact."
+    },
+    {
+      "index": 9,
+      "file": "app/services/telegram_actions.py",
+      "line": 15,
+      "classification": "CLASS E: Rule 118 Architecture Documentation / Inline Rule Reference",
+      "code": "Network helpers are module-level so tests can monkeypatch them.",
+      "disposition": "Docstring or architectural note documenting zero-mock policy or explain testability without runtime impact."
+    },
+    {
+      "index": 10,
+      "file": "app/services/telegram_buttons.py",
+      "line": 66,
+      "classification": "CLASS E: Rule 118 Architecture Documentation / Inline Rule Reference",
+      "code": "# Allow mock credentials in unit tests",
+      "disposition": "Docstring or architectural note documenting zero-mock policy or explain testability without runtime impact."
+    },
+    {
+      "index": 11,
+      "file": "app/services/telegram_buttons.py",
+      "line": 67,
+      "classification": "CLASS D: Offline Hermetic Test Reflection & Boundary Guard",
+      "code": "if token.startswith(\"mock_\") or token.startswith(\"test_\"):",
+      "disposition": "Control-flow inspection detecting test fixtures in offline runs or protecting live Telegram from test tokens."
+    },
+    {
+      "index": 12,
+      "file": "app/services/telegram_buttons.py",
+      "line": 185,
+      "classification": "CLASS E: Rule 118 Architecture Documentation / Inline Rule Reference",
+      "code": "# Never broadcast test markets or mock test errors to live Telegram (Rule 123)",
+      "disposition": "Docstring or architectural note documenting zero-mock policy or explain testability without runtime impact."
+    },
+    {
+      "index": 13,
+      "file": "app/services/topic_history_registry.py",
+      "line": 27,
+      "classification": "CLASS E: Rule 118 Architecture Documentation / Inline Rule Reference",
+      "code": "# Module-level defaults are None so paths resolve lazily; tests may monkeypatch REGISTRY_PATH",
+      "disposition": "Docstring or architectural note documenting zero-mock policy or explain testability without runtime impact."
+    },
+    {
+      "index": 14,
+      "file": "app/services/video_audit_runner.py",
+      "line": 110,
+      "classification": "CLASS B: Defensive Refusal to Fabricate Scores (Rule 118 & Rule 122)",
+      "code": "err_msg = \"HHTECH_API_KEY not found; refusing to generate mock visual audit score (Rule 118 & Rule 122).\"",
+      "disposition": "Refuses to synthesize scores when vision models or API gateways are offline; fails closed."
+    },
+    {
+      "index": 15,
+      "file": "app/services/video_audit_runner.py",
+      "line": 115,
+      "classification": "CLASS B: Defensive Refusal to Fabricate Scores (Rule 118 & Rule 122)",
+      "code": "\"method\": \"error_no_mock\",",
+      "disposition": "Refuses to synthesize scores when vision models or API gateways are offline; fails closed."
+    },
+    {
+      "index": 16,
+      "file": "app/services/video_audit_runner.py",
+      "line": 188,
+      "classification": "CLASS B: Defensive Refusal to Fabricate Scores (Rule 118 & Rule 122)",
+      "code": "\"method\": \"error_no_mock\",",
+      "disposition": "Refuses to synthesize scores when vision models or API gateways are offline; fails closed."
+    },
+    {
+      "index": 17,
+      "file": "app/services/vox_continuous_director_engine.py",
+      "line": 6,
+      "classification": "CLASS E: Rule 118 Architecture Documentation / Inline Rule Reference",
+      "code": "- Rule 118: Zero-mock data, factual script decomposition.",
+      "disposition": "Docstring or architectural note documenting zero-mock policy or explain testability without runtime impact."
+    },
+    {
+      "index": 18,
+      "file": "core/contracts/b2_b3_contract.py",
+      "line": 7,
+      "classification": "CLASS C: Production Contract Invariant Guard (Never Fallback to Mock Beats)",
+      "code": "Never falls back to hardcoded mock beats.",
+      "disposition": "Strict invariant check ensuring pipeline halts rather than using dummy or synthetic beat data."
+    },
+    {
+      "index": 19,
+      "file": "core/contracts/b2_b3_contract.py",
+      "line": 28,
+      "classification": "CLASS C: Production Contract Invariant Guard (Never Fallback to Mock Beats)",
+      "code": "Rule 118 & Rule 125: Strictly fail-closed. Never silently fallback to mock beats.",
+      "disposition": "Strict invariant check ensuring pipeline halts rather than using dummy or synthetic beat data."
+    },
+    {
+      "index": 20,
+      "file": "core/contracts/b2_b3_contract.py",
+      "line": 256,
+      "classification": "CLASS C: Production Contract Invariant Guard (Never Fallback to Mock Beats)",
+      "code": "f\"Pipeline cannot proceed with mock data.\"",
+      "disposition": "Strict invariant check ensuring pipeline halts rather than using dummy or synthetic beat data."
+    },
+    {
+      "index": 21,
+      "file": "core/net_utils.py",
+      "line": 3,
+      "classification": "CLASS E: Rule 118 Architecture Documentation / Inline Rule Reference",
+      "code": "Eliminates process-global monkeypatching of socket.getaddrinfo by binding connections",
+      "disposition": "Docstring or architectural note documenting zero-mock policy or explain testability without runtime impact."
+    },
+    {
+      "index": 22,
+      "file": "core/no_mock.py",
+      "line": 3,
+      "classification": "CLASS A: Zero-Mock Defensive Gatekeeper (Fail-Closed Production Enforcement)",
+      "code": "\"\"\"core/no_mock.py \u2014 Zero-Mock Gatekeeper (Rule 118 & Rule 127).",
+      "disposition": "Enforces MockDataNotAllowedError when any synthetic or mock path is reached in production."
+    },
+    {
+      "index": 23,
+      "file": "core/no_mock.py",
+      "line": 13,
+      "classification": "CLASS A: Zero-Mock Defensive Gatekeeper (Fail-Closed Production Enforcement)",
+      "code": "\"\"\"Raised when mock data or synthetic paths are reached in production.\"\"\"",
+      "disposition": "Enforces MockDataNotAllowedError when any synthetic or mock path is reached in production."
+    },
+    {
+      "index": 24,
+      "file": "core/no_mock.py",
+      "line": 17,
+      "classification": "CLASS A: Zero-Mock Defensive Gatekeeper (Fail-Closed Production Enforcement)",
+      "code": "def is_mock_allowed() -> bool:",
+      "disposition": "Enforces MockDataNotAllowedError when any synthetic or mock path is reached in production."
+    },
+    {
+      "index": 25,
+      "file": "core/no_mock.py",
+      "line": 18,
+      "classification": "CLASS A: Zero-Mock Defensive Gatekeeper (Fail-Closed Production Enforcement)",
+      "code": "\"\"\"Checks whether mock data is explicitly enabled for unit tests.\"\"\"",
+      "disposition": "Enforces MockDataNotAllowedError when any synthetic or mock path is reached in production."
+    },
+    {
+      "index": 26,
+      "file": "core/no_mock.py",
+      "line": 24,
+      "classification": "CLASS A: Zero-Mock Defensive Gatekeeper (Fail-Closed Production Enforcement)",
+      "code": "if not is_mock_allowed():",
+      "disposition": "Enforces MockDataNotAllowedError when any synthetic or mock path is reached in production."
+    },
+    {
+      "index": 27,
+      "file": "core/no_mock.py",
+      "line": 26,
+      "classification": "CLASS A: Zero-Mock Defensive Gatekeeper (Fail-Closed Production Enforcement)",
+      "code": "# If in test mode, we allow mock, but if production unset:",
+      "disposition": "Enforces MockDataNotAllowedError when any synthetic or mock path is reached in production."
+    },
+    {
+      "index": 28,
+      "file": "core/no_mock.py",
+      "line": 28,
+      "classification": "CLASS A: Zero-Mock Defensive Gatekeeper (Fail-Closed Production Enforcement)",
+      "code": "# If someone tries to return mock data in production:",
+      "disposition": "Enforces MockDataNotAllowedError when any synthetic or mock path is reached in production."
+    },
+    {
+      "index": 29,
+      "file": "core/no_mock.py",
+      "line": 31,
+      "classification": "CLASS A: Zero-Mock Defensive Gatekeeper (Fail-Closed Production Enforcement)",
+      "code": "def assert_never_mock(context: str) -> None:",
+      "disposition": "Enforces MockDataNotAllowedError when any synthetic or mock path is reached in production."
+    },
+    {
+      "index": 30,
+      "file": "core/no_mock.py",
+      "line": 32,
+      "classification": "CLASS A: Zero-Mock Defensive Gatekeeper (Fail-Closed Production Enforcement)",
+      "code": "\"\"\"Guarantees mock data is NEVER used in production.\"\"\"",
+      "disposition": "Enforces MockDataNotAllowedError when any synthetic or mock path is reached in production."
+    },
+    {
+      "index": 31,
+      "file": "stages/s05_director_plan.py",
+      "line": 200,
+      "classification": "CLASS E: Rule 118 Architecture Documentation / Inline Rule Reference",
+      "code": "# Auto-envelope partial mock payloads from legacy unit test fixtures",
+      "disposition": "Docstring or architectural note documenting zero-mock policy or explain testability without runtime impact."
+    }
   ]
 }

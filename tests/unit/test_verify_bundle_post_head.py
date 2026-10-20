@@ -241,7 +241,7 @@ def test_verify_bundle_rejects_path_traversal(tmp_path: Path):
     assert "Path traversal or invalid path detected" in str(exc_info.value)
 
 
-def test_verify_bundle_rejects_symlink_artifact(tmp_path: Path):
+def test_verify_bundle_rejects_symlink_artifact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Verifies fail-closed rejection when a bundle artifact is a symlink."""
     fix = _create_valid_hermetic_fixture(tmp_path, "TASK_TEST")
     real_target = tmp_path.parent / "real_external.txt"
@@ -251,8 +251,19 @@ def test_verify_bundle_rejects_symlink_artifact(tmp_path: Path):
     symlink_path.unlink()
     try:
         symlink_path.symlink_to(real_target)
-    except (OSError, NotImplementedError) as sym_err:
-        pytest.skip(f"PLATFORM LIMITATION: Symlink creation not permitted on this platform ({sym_err})")
+    except (OSError, NotImplementedError):
+        # On Windows without SeCreateSymbolicLinkPrivilege, create file and monkeypatch
+        # Path.is_symlink specifically for this bundle artifact to physically exercise
+        # the verifier's symlink-escape rejection logic without platform skipping.
+        symlink_path.write_bytes(b"external data")
+        orig_is_symlink = Path.is_symlink
+
+        def _mock_is_symlink(self: Path) -> bool:
+            if self.name == "ast_scanner_source.py" and str(self).startswith(str(fix["bundle_dir"])):
+                return True
+            return orig_is_symlink(self)
+
+        monkeypatch.setattr(Path, "is_symlink", _mock_is_symlink)
 
     payload = fix["bundle_manifest_payload"]
     payload["files"]["ast_scanner_source.py"] = {
