@@ -17,15 +17,36 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-REQUIRED_BUNDLE_ARTIFACTS = {
+REQUIRED_BUNDLE_ARTIFACTS: Set[str] = {
     "manifest.json",
     "incremental.patch",
     "cumulative.patch",
     "ast_scanner_source.py",
     "ast_scanner_version_and_metadata.json",
     "ast_scanner_raw_output.json",
+}
+
+ALLOWED_BUNDLE_ARTIFACTS: Set[str] = {
+    "ast_scanner_raw_output.json",
+    "ast_scanner_source.py",
+    "ast_scanner_version_and_metadata.json",
+    "ci_jobs_steps_logs.json",
+    "ci_raw_run.json",
+    "credential_rotation_records.json",
+    "cumulative.patch",
+    "executable_hashes.json",
+    "incremental.patch",
+    "lifecycle_inventories.json",
+    "linux_focused_junit.xml",
+    "manifest.json",
+    "retrieval_commands.sh",
+    "scanner_raw_output.txt",
+    "scanner_source_hash_and_version.json",
+    "scanner_source_probe_zero_mock.py",
+    "windows_focused_junit.xml",
+    "zero_mock_229_baseline.json",
 }
 
 
@@ -52,6 +73,7 @@ def _run_git_cmd(repo_root: Path, args: List[str]) -> Tuple[int, str]:
 def verify_bundle_and_attest(
     repo_root: Path,
     task_id: str = "TASK_1792314467",
+    allowed_artifacts: Optional[Set[str]] = None,
 ) -> Dict[str, Any]:
     """Independently verifies evidence bundle artifacts and generates post-HEAD attestation.
 
@@ -113,6 +135,8 @@ def verify_bundle_and_attest(
         bundle_manifest_data_parsed = json.loads(bundle_manifest_copy_bytes.decode("utf-8"))
     except Exception as exc:
         raise RuntimeError(f"Failed to parse bundle manifest copy JSON: {exc}") from exc
+    if not isinstance(bundle_manifest_data_parsed, dict):
+        raise RuntimeError("Bundle manifest copy must be a JSON object")
 
     manifest_head = bundle_manifest_data_parsed.get("head_commit_sha")
     manifest_tree = bundle_manifest_data_parsed.get("tree_sha")
@@ -134,25 +158,44 @@ def verify_bundle_and_attest(
         bundle_manifest_data = json.loads(bundle_manifest_file.read_bytes().decode("utf-8"))
     except Exception as exc:
         raise RuntimeError(f"Failed to parse bundle_manifest.json: {exc}") from exc
+    if not isinstance(bundle_manifest_data, dict):
+        raise RuntimeError("bundle_manifest.json must be a JSON object")
 
     files_inventory = bundle_manifest_data.get("files") if isinstance(bundle_manifest_data.get("files"), dict) else bundle_manifest_data
     if not isinstance(files_inventory, dict) or not files_inventory:
         raise RuntimeError("bundle_manifest.json contains missing or empty files inventory")
+
+    # Reject path traversal and invalid naming across all inventory keys before checking allowed set
+    for art_name in files_inventory.keys():
+        if not isinstance(art_name, str) or not art_name.strip():
+            raise RuntimeError(f"Invalid artifact name in inventory: {art_name!r}")
+        if ".." in art_name or "/" in art_name or "\\" in art_name or Path(art_name).is_absolute():
+            raise RuntimeError(f"Path traversal or invalid path detected in artifact name: {art_name!r}")
 
     # Enforce mandatory required bundle artifacts
     missing_required = REQUIRED_BUNDLE_ARTIFACTS - set(files_inventory.keys())
     if missing_required:
         raise RuntimeError(f"Missing mandatory bundle artifact(s) in inventory: {sorted(missing_required)}")
 
+    # Enforce allowed artifact set (reject unexpected rogue inventory entries)
+    effective_allowed = allowed_artifacts if allowed_artifacts is not None else ALLOWED_BUNDLE_ARTIFACTS
+    unexpected_inventory_keys = set(files_inventory.keys()) - effective_allowed
+    if unexpected_inventory_keys:
+        raise RuntimeError(f"Unexpected unapproved artifact(s) in inventory: {sorted(unexpected_inventory_keys)}")
+
+    # For production task TASK_1792314467 with default allowed set, enforce exact 18-artifact coverage
+    if task_id == "TASK_1792314467" and allowed_artifacts is None:
+        missing_production = ALLOWED_BUNDLE_ARTIFACTS - set(files_inventory.keys())
+        if missing_production:
+            raise RuntimeError(f"Missing production delivered artifact(s) in inventory: {sorted(missing_production)}")
+        if len(files_inventory) != len(ALLOWED_BUNDLE_ARTIFACTS):
+            raise RuntimeError(
+                f"Production bundle inventory count mismatch: expected {len(ALLOWED_BUNDLE_ARTIFACTS)} artifacts, "
+                f"got {len(files_inventory)}"
+            )
+
     verified_artifacts: Dict[str, Dict[str, Any]] = {}
     for art_name, art_meta in files_inventory.items():
-        if not isinstance(art_name, str) or not art_name.strip():
-            raise RuntimeError(f"Invalid artifact name in inventory: {art_name!r}")
-
-        # Path traversal and symlink escape rejection
-        if ".." in art_name or "/" in art_name or "\\" in art_name or Path(art_name).is_absolute():
-            raise RuntimeError(f"Path traversal or invalid path detected in artifact name: {art_name!r}")
-
         if not isinstance(art_meta, dict):
             raise RuntimeError(f"Invalid non-dictionary metadata for artifact {art_name}")
 
@@ -184,12 +227,17 @@ def verify_bundle_and_attest(
             "verified": True,
         }
 
-    # Enforce exact allowed coverage (reject unlisted extra files)
+    # Enforce exact allowed coverage and reject rogue physical entries
     allowed_bundle_files = set(files_inventory.keys()) | {"bundle_manifest.json", "post_head_attestation.json"}
-    physical_bundle_files = {p.name for p in bundle_dir.iterdir() if p.is_file()}
-    unlisted_files = physical_bundle_files - allowed_bundle_files
-    if unlisted_files:
-        raise RuntimeError(f"Unlisted extra file(s) found in bundle directory: {sorted(unlisted_files)}")
+    for entry in bundle_dir.iterdir():
+        if entry.is_symlink():
+            raise RuntimeError(f"Symlink rejected in bundle directory: {entry.name}")
+        if entry.is_dir():
+            raise RuntimeError(f"Unexpected subdirectory rejected in bundle directory: {entry.name}")
+        if not entry.is_file():
+            raise RuntimeError(f"Non-file filesystem entry rejected in bundle directory: {entry.name}")
+        if entry.name not in allowed_bundle_files:
+            raise RuntimeError(f"Unlisted extra file(s) found in bundle directory: {entry.name}")
 
     # 7. Generate structurally independent post_head_attestation.json atomically
     attestation_file = bundle_dir / "post_head_attestation.json"

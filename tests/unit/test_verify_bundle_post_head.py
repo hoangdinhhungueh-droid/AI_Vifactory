@@ -250,8 +250,8 @@ def test_verify_bundle_rejects_symlink_artifact(tmp_path: Path):
     symlink_path = fix["bundle_dir"] / "symlink_artifact.bin"
     try:
         symlink_path.symlink_to(real_target)
-    except (OSError, NotImplementedError):
-        pytest.skip("Symlink creation not supported in this environment")
+    except (OSError, NotImplementedError) as sym_err:
+        pytest.skip(f"PLATFORM LIMITATION: Symlink creation not permitted on this platform ({sym_err})")
 
     payload = fix["bundle_manifest_payload"]
     payload["files"]["symlink_artifact.bin"] = {
@@ -263,6 +263,52 @@ def test_verify_bundle_rejects_symlink_artifact(tmp_path: Path):
     with pytest.raises(RuntimeError) as exc_info:
         verify_bundle_and_attest(repo_root=tmp_path, task_id="TASK_TEST")
     assert "Symlink rejected" in str(exc_info.value)
+
+
+def test_verify_bundle_rejects_unexpected_inventory_key(tmp_path: Path):
+    """Verifies fail-closed rejection when bundle_manifest.json contains an unapproved inventory key."""
+    fix = _create_valid_hermetic_fixture(tmp_path, "TASK_TEST")
+    payload = fix["bundle_manifest_payload"]
+    payload["files"]["unapproved_rogue_artifact.json"] = {
+        "sha256": "0" * 64,
+        "size_bytes": 100,
+    }
+    fix["bundle_manifest_file"].write_bytes(json.dumps(payload, indent=2).encode("utf-8"))
+
+    with pytest.raises(RuntimeError) as exc_info:
+        verify_bundle_and_attest(repo_root=tmp_path, task_id="TASK_TEST")
+    assert "Unexpected unapproved artifact(s) in inventory" in str(exc_info.value)
+
+
+def test_verify_bundle_rejects_malformed_top_level_json_array(tmp_path: Path):
+    """Verifies fail-closed rejection when bundle_manifest.json is a JSON array instead of an object."""
+    fix = _create_valid_hermetic_fixture(tmp_path, "TASK_TEST")
+    fix["bundle_manifest_file"].write_bytes(b"[1, 2, 3]")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        verify_bundle_and_attest(repo_root=tmp_path, task_id="TASK_TEST")
+    assert "bundle_manifest.json must be a JSON object" in str(exc_info.value)
+
+
+def test_verify_bundle_rejects_malformed_manifest_copy(tmp_path: Path):
+    """Verifies fail-closed rejection when manifest.json copy in bundle is not a JSON object."""
+    fix = _create_valid_hermetic_fixture(tmp_path, "TASK_TEST")
+    (fix["bundle_dir"] / "manifest.json").write_bytes(b'["not", "a", "dict"]')
+
+    with pytest.raises(RuntimeError) as exc_info:
+        verify_bundle_and_attest(repo_root=tmp_path, task_id="TASK_TEST")
+    assert "Bundle manifest copy must be a JSON object" in str(exc_info.value)
+
+
+def test_verify_bundle_rejects_unexpected_subdirectory(tmp_path: Path):
+    """Verifies fail-closed rejection when an unexpected subdirectory is present in bundle directory."""
+    fix = _create_valid_hermetic_fixture(tmp_path, "TASK_TEST")
+    rogue_dir = fix["bundle_dir"] / "rogue_subdir"
+    rogue_dir.mkdir()
+
+    with pytest.raises(RuntimeError) as exc_info:
+        verify_bundle_and_attest(repo_root=tmp_path, task_id="TASK_TEST")
+    assert "Unexpected subdirectory rejected in bundle directory" in str(exc_info.value)
 
 
 def test_verify_bundle_rejects_missing_required_artifact(tmp_path: Path):

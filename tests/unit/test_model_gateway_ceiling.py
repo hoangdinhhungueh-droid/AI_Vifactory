@@ -386,23 +386,27 @@ def test_call_llm_preflight_budget_gating_exercised():
         def get_remaining_budget(self) -> float:
             return self._rem
 
-    # 1. Exhausted budget: must fail closed before calling provider
-    gw_tight = ModelGateway(cost_tracker=BoundedCostTracker(remaining_budget=0.001))
-    target_model = gw_tight.hhtech_model
-    expected_req_cost = gw_tight.get_max_request_cost_vnd(target_model, max_output_tokens=2048)
-    expected_inp_cost = gw_tight.get_max_input_cost_vnd(target_model)
-    assert expected_req_cost > 0.001
-    assert expected_inp_cost > 0
-
-    with pytest.raises(TokenBudgetExceeded) as exc_info:
-        gw_tight.call_llm(prompt="Budget gating test prompt", model=target_model, max_tokens=2048)
-
-    assert "Projected request cost" in str(exc_info.value)
-    assert "exceeds remaining budget" in str(exc_info.value)
-
-    # 2. Generous budget: pre-flight check succeeds and reaches provider dispatch
+    old_ceiling = os.environ.get("HHTECH_MAX_ABSOLUTE_INPUT_CEILING")
     old_key = os.environ.get("HHTECH_API_KEY")
     try:
+        # Isolate ceiling below model context window to guarantee hermetic test execution
+        os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = "100000"
+
+        # 1. Exhausted budget: must fail closed before calling provider
+        gw_tight = ModelGateway(cost_tracker=BoundedCostTracker(remaining_budget=0.001))
+        target_model = gw_tight.hhtech_model
+        expected_req_cost = gw_tight.get_max_request_cost_vnd(target_model, max_output_tokens=2048)
+        expected_inp_cost = gw_tight.get_max_input_cost_vnd(target_model)
+        assert expected_req_cost > 0.001
+        assert expected_inp_cost > 0
+
+        with pytest.raises(TokenBudgetExceeded) as exc_info:
+            gw_tight.call_llm(prompt="Budget gating test prompt", model=target_model, max_tokens=2048)
+
+        assert "Projected request cost" in str(exc_info.value)
+        assert "exceeds remaining budget" in str(exc_info.value)
+
+        # 2. Generous budget: pre-flight check succeeds and reaches provider dispatch
         os.environ["HHTECH_API_KEY"] = "sk-test-dummy-key"
         gw_generous = ModelGateway(cost_tracker=BoundedCostTracker(remaining_budget=1000000.0))
         with provider_spy_context() as spy:
@@ -417,6 +421,10 @@ def test_call_llm_preflight_budget_gating_exercised():
             os.environ["HHTECH_API_KEY"] = old_key
         else:
             os.environ.pop("HHTECH_API_KEY", None)
+        if old_ceiling is not None:
+            os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = old_ceiling
+        else:
+            os.environ.pop("HHTECH_MAX_ABSOLUTE_INPUT_CEILING", None)
 
 
 def test_call_llm_fallback_budget_gating_exercised():
@@ -434,17 +442,26 @@ def test_call_llm_fallback_budget_gating_exercised():
             # Primary model passes (call 1), but when fallback is evaluated (call 2), budget is 0
             return 1000000.0 if self.call_count <= 1 else 0.0001
 
-    gw = ModelGateway(cost_tracker=FallbackLimitingCostTracker())
-    # Provider spy intercepts primary dispatch, triggering fallback budget evaluation
-    with provider_spy_context():
-        with pytest.raises(AllProvidersFailed) as exc_info:
-            gw.call_llm(
-                prompt="Trigger fallback",
-                model="gpt-6.1-sol",
-                fallback="claude-sonnet-5",
-                max_tokens=2048
-            )
-        assert "Fallback projected request cost" in str(exc_info.value)
-        assert "exceeds remaining budget" in str(exc_info.value)
+    old_ceiling = os.environ.get("HHTECH_MAX_ABSOLUTE_INPUT_CEILING")
+    try:
+        # Isolate ceiling below gpt-6.1-sol context window (128k) to exercise budget gating logic hermetically
+        os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = "100000"
+        gw = ModelGateway(cost_tracker=FallbackLimitingCostTracker())
+        # Provider spy intercepts primary dispatch, triggering fallback budget evaluation
+        with provider_spy_context():
+            with pytest.raises(AllProvidersFailed) as exc_info:
+                gw.call_llm(
+                    prompt="Trigger fallback",
+                    model="gpt-6.1-sol",
+                    fallback="claude-sonnet-5",
+                    max_tokens=2048,
+                )
+            assert "Fallback projected request cost" in str(exc_info.value)
+            assert "exceeds remaining budget" in str(exc_info.value)
+    finally:
+        if old_ceiling is not None:
+            os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = old_ceiling
+        else:
+            os.environ.pop("HHTECH_MAX_ABSOLUTE_INPUT_CEILING", None)
 
 
