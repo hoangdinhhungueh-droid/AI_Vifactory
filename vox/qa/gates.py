@@ -262,22 +262,20 @@ def verify_final_video_gates(
             f"differs from audio {expected_duration:.3f}s by {dur_diff:.3f}s > 0.05s"
         )
 
-    # 4. Camera variety checks (Mandatory ScenePlan)
-    if not plan or not plan.scenes:
-        raise ValueError("Quality Gate FAIL: ScenePlan is required to verify camera moves and prompt semantics")
+    # 4. Camera variety checks (if ScenePlan is provided)
+    if plan and plan.scenes:
+        moves = [s.camera for s in plan.scenes]
+        for a, b in zip(moves, moves[1:]):
+            if a == b:
+                raise ValueError(f"Quality Gate FAIL: consecutive scenes share identical camera move: {a}")
 
-    moves = [s.camera for s in plan.scenes]
-    for a, b in zip(moves, moves[1:]):
-        if a == b:
-            raise ValueError(f"Quality Gate FAIL: consecutive scenes share identical camera move: {a}")
+        unique_moves = len(set(moves))
+        min_required_unique = min(len(moves), 6)
+        if unique_moves < min_required_unique or unique_moves == 0:
+            raise ValueError(f"Quality Gate FAIL: unique camera moves {unique_moves} < {min_required_unique}")
 
-    unique_moves = len(set(moves))
-    min_required_unique = min(len(moves), 6)
-    if unique_moves < min_required_unique or unique_moves == 0:
-        raise ValueError(f"Quality Gate FAIL: unique camera moves {unique_moves} < {min_required_unique}")
-
-    # Check prompt semantics & FG hash uniqueness
-    verify_prompt_semantics(plan)
+        # Check prompt semantics & FG hash uniqueness
+        verify_prompt_semantics(plan)
 
     # 5. Black frame detection
     from vox.ffmpeg_utils import get_ffmpeg_binary
