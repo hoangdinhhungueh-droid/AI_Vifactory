@@ -24,7 +24,37 @@ MAX_HEALTH_BODY_BYTES = 65536  # 64 KB safety bound against trickling or unbound
 READINESS_OVERALL_BUDGET_SEC = 25.0
 
 
-def _mp_phase_worker_entrypoint(fn: Callable[[float], Any], timeout_sec: float, conn: Any) -> None:
+CLEANUP_FAILURE_RECORDS: list = []
+
+
+def record_cleanup_event(
+    phase: str,
+    resource: str,
+    disposition: str,
+    safety_rationale: str,
+    exc: Optional[BaseException] = None,
+    parent_pid: Optional[int] = None,
+    worker_pid: Optional[int] = None,
+) -> dict:
+    """Records a machine-readable structured diagnostic event for cleanup operations."""
+    event = {
+        "event_type": "READINESS_CLEANUP_DIAGNOSTIC",
+        "phase": phase,
+        "parent_pid": parent_pid or os.getpid(),
+        "worker_pid": worker_pid,
+        "resource": resource,
+        "disposition": disposition,
+        "safety_rationale": safety_rationale,
+        "exception_type": type(exc).__name__ if exc else None,
+        "exception_message": str(exc) if exc else None,
+        "timestamp_monotonic": time.monotonic(),
+    }
+    CLEANUP_FAILURE_RECORDS.append(event)
+    sys.stderr.write(f"[READINESS_STRUCTURED_CLEANUP] {json.dumps(event)}\n")
+    return event
+
+
+def _mp_phase_worker_entrypoint(phase_name: str, fn: Callable[[float], Any], timeout_sec: float, conn: Any) -> None:
     """Entrypoint for process-isolated phase execution."""
     try:
         res = fn(timeout_sec)
@@ -35,8 +65,14 @@ def _mp_phase_worker_entrypoint(fn: Callable[[float], Any], timeout_sec: float, 
         try:
             conn.close()
         except Exception as _close_err:
-            sys.stderr.write(
-                f"[READINESS_CLEANUP_NOTICE] Worker PID {os.getpid()} non-fatal conn close failure: {_close_err} (disposition: non-fatal resource release)\n"
+            record_cleanup_event(
+                phase=phase_name,
+                resource="worker_pipe_connection",
+                disposition="SAFE_NON_FATAL_RESOURCE_RELEASE",
+                safety_rationale="Worker process terminates immediately following this finally block; OS kernel automatically reclaims all process file descriptors.",
+                exc=_close_err,
+                parent_pid=getattr(os, "getppid", lambda: None)(),
+                worker_pid=os.getpid(),
             )
 
 
@@ -72,7 +108,7 @@ def run_bounded_phase(
         parent_conn, child_conn = ctx.Pipe()
         p = ctx.Process(
             target=_mp_phase_worker_entrypoint,
-            args=(fn, timeout_sec, child_conn),
+            args=(phase_name, fn, timeout_sec, child_conn),
             name=f"readiness_phase_{phase_name}",
         )
         p.start()
@@ -84,6 +120,19 @@ def run_bounded_phase(
             if p.is_alive():
                 p.kill()
                 p.join(timeout=0.05)
+            if p.is_alive():
+                record_cleanup_event(
+                    phase=phase_name,
+                    resource="worker_process",
+                    disposition="UNSAFE_CLEANUP_FAILURE",
+                    safety_rationale="Unterminated worker process leaks execution context and violates process isolation.",
+                    exc=RuntimeError(f"Worker PID {p.pid} remained alive after kill"),
+                    parent_pid=os.getpid(),
+                    worker_pid=p.pid,
+                )
+                raise RuntimeError(
+                    f"Unsafe cleanup failure: Worker process PID {p.pid} in phase '{phase_name}' remained alive after kill"
+                )
             raise TimeoutError(
                 f"Phase '{phase_name}' exceeded bounded monotonic deadline of {timeout_sec:.3f}s "
                 f"(worker PID {p.pid} forcibly terminated and killed)"
@@ -110,15 +159,27 @@ def run_bounded_phase(
             try:
                 parent_conn.close()
             except Exception as _parent_close_err:
-                sys.stderr.write(
-                    f"[READINESS_CLEANUP_NOTICE] Phase '{phase_name}' non-fatal parent pipe close failure: {_parent_close_err} (disposition: non-fatal resource release)\n"
+                record_cleanup_event(
+                    phase=phase_name,
+                    resource="parent_pipe_connection",
+                    disposition="SAFE_NON_FATAL_RESOURCE_RELEASE",
+                    safety_rationale="Phase execution boundary complete; parent pipe descriptor released by Python garbage collection and OS socket layer without lingering handles.",
+                    exc=_parent_close_err,
+                    parent_pid=os.getpid(),
+                    worker_pid=getattr(p, "pid", None),
                 )
         if child_conn is not None:
             try:
                 child_conn.close()
             except Exception as _child_close_err:
-                sys.stderr.write(
-                    f"[READINESS_CLEANUP_NOTICE] Phase '{phase_name}' non-fatal child pipe close failure: {_child_close_err} (disposition: non-fatal resource release)\n"
+                record_cleanup_event(
+                    phase=phase_name,
+                    resource="child_pipe_connection",
+                    disposition="SAFE_NON_FATAL_RESOURCE_RELEASE",
+                    safety_rationale="Duplicate child pipe endpoint in parent closed; isolated worker has independent handle, ensuring no shared memory corruption.",
+                    exc=_child_close_err,
+                    parent_pid=os.getpid(),
+                    worker_pid=getattr(p, "pid", None),
                 )
         if p is not None:
             try:
@@ -130,8 +191,14 @@ def run_bounded_phase(
                         p.join(timeout=0.05)
                 p.close()
             except Exception as _proc_close_err:
-                sys.stderr.write(
-                    f"[READINESS_CLEANUP_NOTICE] Phase '{phase_name}' non-fatal worker process close failure (PID {getattr(p, 'pid', 'unknown')}): {_proc_close_err} (disposition: non-fatal resource release)\n"
+                record_cleanup_event(
+                    phase=phase_name,
+                    resource="worker_process_handle",
+                    disposition="SAFE_NON_FATAL_RESOURCE_RELEASE",
+                    safety_rationale="Worker process termination already verified; failure only affects local multiprocessing process handle disposal.",
+                    exc=_proc_close_err,
+                    parent_pid=os.getpid(),
+                    worker_pid=getattr(p, "pid", None),
                 )
 
 

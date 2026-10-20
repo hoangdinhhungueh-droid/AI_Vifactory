@@ -207,7 +207,7 @@ def test_oversized_request_rejected_before_provider_dispatch_absolute_ceiling():
 
 def test_provider_context_reservations_and_cost_rationale_configuration_derived():
     """Verifies mathematical provider context window reservations and bounded cost rationale (Rule 138 & Rule 139).
-    Derives assertions directly from live ModelGateway methods rather than duplicating hardcoded model constants.
+    Discovers supported models and validated settings directly from authoritative gateway configuration.
     """
     gw = ModelGateway()
 
@@ -218,65 +218,136 @@ def test_provider_context_reservations_and_cost_rationale_configuration_derived(
     configured_ceiling = _get_max_absolute_input_ceiling()
     assert 1000 <= configured_ceiling <= 200000, f"Configured ceiling {configured_ceiling} outside valid bounds"
 
-    # 2. Context window and output reservations dynamically queried from gateway configuration
-    active_context_window = gw.get_context_window()
-    assert active_context_window == gw.PROVIDER_CONTEXT_WINDOWS.get(gw.hhtech_model, 128000)
+    # 2. Dynamically iterate over all authoritatively registered provider models
+    registered_models = list(gw.PROVIDER_CONTEXT_WINDOWS.keys())
+    assert len(registered_models) > 0, "No models registered in PROVIDER_CONTEXT_WINDOWS"
 
-    active_output_reservation = gw.get_output_reservation()
-    expected_reservation = max(0, active_context_window - configured_ceiling)
-    assert active_output_reservation == expected_reservation
+    rates = getattr(gw.cost_tracker, "RATES", {})
+    for m in registered_models:
+        ctx_win = gw.get_context_window(m)
+        assert ctx_win == gw.PROVIDER_CONTEXT_WINDOWS[m]
+        assert ctx_win > 0
 
-    claude_context_window = gw.get_context_window("claude-sonnet-5-5")
-    assert claude_context_window == gw.PROVIDER_CONTEXT_WINDOWS["claude-sonnet-5-5"]
-    claude_output_reservation = gw.get_output_reservation("claude-sonnet-5-5")
-    assert claude_output_reservation == max(0, claude_context_window - configured_ceiling)
+        # If configured ceiling fits inside context window, output reservation is justified
+        if configured_ceiling < ctx_win:
+            expected_headroom = ctx_win - configured_ceiling
+            assert gw.get_output_reservation(m) == expected_headroom
 
-    sol_context_window = gw.get_context_window("gpt-6.1-sol")
-    assert sol_context_window == gw.PROVIDER_CONTEXT_WINDOWS["gpt-6.1-sol"]
-    sol_output_reservation = gw.get_output_reservation("gpt-6.1-sol")
-    assert sol_output_reservation == max(0, sol_context_window - configured_ceiling)
+        if m in rates:
+            rate = gw.get_model_token_rate(m)
+            assert rate == rates[m]
+            if configured_ceiling < ctx_win:
+                expected_max_cost = ((configured_ceiling + (ctx_win - configured_ceiling)) / 1000.0) * rate
+                assert gw.get_max_request_cost_vnd(m) == expected_max_cost
+                assert gw.get_max_input_cost_vnd(m) == (configured_ceiling / 1000.0) * rate
 
-    # 3. Financial bounds derived directly from gateway token rates and live ceiling
-    active_rate = gw.get_model_token_rate()
-    assert active_rate == gw.cost_tracker.RATES.get(gw.hhtech_model, gw.cost_tracker.RATES.get("default", 1.6))
+    # 3. Fail-closed: unsupported models and missing pricing must raise ModelGatewayError
+    with pytest.raises(Exception) as exc_unsupported:
+        gw.get_context_window("completely_unsupported_model_identifier")
+    assert "Unsupported model" in str(exc_unsupported.value)
 
-    sol_rate = gw.get_model_token_rate("gpt-6.1-sol")
-    assert sol_rate == gw.cost_tracker.RATES["gpt-6.1-sol"]
-
-    active_max_cost = gw.get_max_request_cost_vnd()
-    assert active_max_cost == (configured_ceiling / 1000.0) * active_rate
-
-    sol_max_cost = gw.get_max_request_cost_vnd("gpt-6.1-sol")
-    assert sol_max_cost == (configured_ceiling / 1000.0) * sol_rate
+    with pytest.raises(Exception) as exc_pricing:
+        gw.get_model_token_rate("model_missing_pricing_configuration")
+    assert "Missing pricing configuration" in str(exc_pricing.value)
 
 
-def test_provider_context_reservations_consumed_under_modified_configuration():
-    """Verifies that context windows, output reservations, and cost calculations
-    dynamically consume live modified configuration rather than static assumptions (Rule 138 & Rule 139).
+def test_incompatible_configuration_fails_closed():
+    """Verifies that an incompatible configuration where input ceiling >= context window
+    fails closed immediately rather than reporting zero or negative reservation.
     """
+    gw = ModelGateway()
+    # Discover a model with known context window
+    smallest_model = min(gw.PROVIDER_CONTEXT_WINDOWS.keys(), key=lambda m: gw.PROVIDER_CONTEXT_WINDOWS[m])
+    min_ctx = gw.PROVIDER_CONTEXT_WINDOWS[smallest_model]
+
+    old_ceiling = os.environ.get("HHTECH_MAX_ABSOLUTE_INPUT_CEILING")
+    try:
+        # Set absolute ceiling exceeding the model context window
+        os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = str(min_ctx + 5000)
+        with pytest.raises(Exception) as exc_incomp:
+            gw.get_output_reservation(smallest_model)
+        assert "Incompatible configuration" in str(exc_incomp.value)
+        assert "must be strictly less than" in str(exc_incomp.value)
+    finally:
+        if old_ceiling is not None:
+            os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = old_ceiling
+        else:
+            os.environ.pop("HHTECH_MAX_ABSOLUTE_INPUT_CEILING", None)
+
+
+def test_provider_dispatch_enforces_context_and_output_reservation_default_config():
+    """Verifies that provider dispatch inspects and enforces context window headroom
+    and captures correct model and output reservations in provider payload.
+    """
+    old_key = os.environ.get("HHTECH_API_KEY")
+    try:
+        os.environ["HHTECH_API_KEY"] = "sk-test-dummy-key"
+        gw = ModelGateway()
+        active_model = gw.hhtech_model
+        ctx_win = gw.get_context_window(active_model)
+
+        with provider_spy_context() as spy:
+            # 1. Normal valid request: payload contains expected model, max_tokens, and messages
+            valid_prompt = "A" * 1000  # 400 tokens
+            requested_output = 2048
+            try:
+                gw._call_hhtech(prompt=valid_prompt, model=active_model, max_tokens=requested_output)
+            except RuntimeError as spy_err:
+                # Spy deliberately intercepts egress post-payload capture
+                assert "Unexpected network egress" in str(spy_err)
+
+            assert len(spy.hhtech_dispatches) == 1
+            captured_payload = spy.hhtech_dispatches[0]["json"]
+            assert captured_payload["model"] == active_model
+            assert captured_payload["max_tokens"] == requested_output
+            assert len(captured_payload["messages"]) >= 1
+
+        # 2. Exceeding context window: input + output reservation > context window fails before egress
+        with provider_spy_context() as spy:
+            excessive_output = ctx_win + 1000
+            with pytest.raises(TokenBudgetExceeded) as exc_budget:
+                gw._call_hhtech(prompt="A" * 500, model=active_model, max_tokens=excessive_output)
+            assert "Context Window Exceeded" in str(exc_budget.value)
+            assert len(spy.hhtech_dispatches) == 0, "Network egress occurred despite exceeding context window!"
+    finally:
+        if old_key is not None:
+            os.environ["HHTECH_API_KEY"] = old_key
+        else:
+            os.environ.pop("HHTECH_API_KEY", None)
+
+
+def test_provider_dispatch_enforces_modified_configuration_and_payload_inspection():
+    """Verifies that modifying configuration alters provider dispatch payload and admission decision."""
+    old_key = os.environ.get("HHTECH_API_KEY")
     old_model = os.environ.get("HHTECH_MODEL")
     old_ceiling = os.environ.get("HHTECH_MAX_ABSOLUTE_INPUT_CEILING")
     try:
-        # Case A: Configure Sol model with 75,000 ceiling
-        os.environ["HHTECH_MODEL"] = "gpt-6.1-sol"
-        os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = "75000"
-        gw_sol = ModelGateway()
-        assert gw_sol.hhtech_model == "gpt-6.1-sol"
-        assert gw_sol.get_context_window() == gw_sol.PROVIDER_CONTEXT_WINDOWS["gpt-6.1-sol"]
-        assert gw_sol.get_output_reservation() == gw_sol.PROVIDER_CONTEXT_WINDOWS["gpt-6.1-sol"] - 75000
-        assert gw_sol.get_model_token_rate() == gw_sol.cost_tracker.RATES["gpt-6.1-sol"]
-        assert gw_sol.get_max_request_cost_vnd() == (75000 / 1000.0) * gw_sol.get_model_token_rate()
+        os.environ["HHTECH_API_KEY"] = "sk-test-dummy-key"
+        # Discover an alternate model from authoritative configuration
+        gw_temp = ModelGateway()
+        alternate_model = [m for m in gw_temp.PROVIDER_CONTEXT_WINDOWS.keys() if m != gw_temp.hhtech_model][0]
+        os.environ["HHTECH_MODEL"] = alternate_model
+        os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = "50000"
 
-        # Case B: Configure Opus model with 140,000 ceiling
-        os.environ["HHTECH_MODEL"] = "claude-opus-5-5"
-        os.environ["HHTECH_MAX_ABSOLUTE_INPUT_CEILING"] = "140000"
-        gw_opus = ModelGateway()
-        assert gw_opus.hhtech_model == "claude-opus-5-5"
-        assert gw_opus.get_context_window() == gw_opus.PROVIDER_CONTEXT_WINDOWS["claude-opus-5-5"]
-        assert gw_opus.get_output_reservation() == gw_opus.PROVIDER_CONTEXT_WINDOWS["claude-opus-5-5"] - 140000
-        assert gw_opus.get_model_token_rate() == gw_opus.cost_tracker.RATES["claude-opus-5-5"]
-        assert gw_opus.get_max_request_cost_vnd() == (140000 / 1000.0) * gw_opus.get_model_token_rate()
+        gw_mod = ModelGateway()
+        assert gw_mod.hhtech_model == alternate_model
+
+        with provider_spy_context() as spy:
+            custom_output_tokens = 1024
+            try:
+                gw_mod._call_hhtech(prompt="Test modified configuration", model=alternate_model, max_tokens=custom_output_tokens)
+            except RuntimeError as spy_err:
+                assert "Unexpected network egress" in str(spy_err)
+
+            assert len(spy.hhtech_dispatches) == 1
+            captured_payload = spy.hhtech_dispatches[0]["json"]
+            assert captured_payload["model"] == alternate_model
+            assert captured_payload["max_tokens"] == custom_output_tokens
     finally:
+        if old_key is not None:
+            os.environ["HHTECH_API_KEY"] = old_key
+        else:
+            os.environ.pop("HHTECH_API_KEY", None)
         if old_model is not None:
             os.environ["HHTECH_MODEL"] = old_model
         else:

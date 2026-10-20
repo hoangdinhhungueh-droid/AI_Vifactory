@@ -8,12 +8,13 @@ Centralizes all model API calls with:
   - Unified error handling
 """
 
-import os
 import json
 import logging
-import httpx
-from typing import Optional, Dict, Any, List
+import os
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import httpx
 
 from app.services.cost_tracker import get_global_tracker
 
@@ -60,14 +61,14 @@ MAX_ABSOLUTE_INPUT_CEILING = _get_max_absolute_input_ceiling()
 class ModelGateway:
     """
     Centralized gateway for all model API calls.
-    
+
     Features:
     - Cost tracking and telemetry
     - Automatic fallback to secondary providers
     - Standardized error handling
     - Request/response logging
     """
-    
+
     PROVIDER_CONTEXT_WINDOWS: Dict[str, int] = {
         "claude-sonnet-5-5": 200000,
         "claude-opus-5-5": 200000,
@@ -82,25 +83,68 @@ class ModelGateway:
     }
 
     def get_context_window(self, model: Optional[str] = None) -> int:
-        """Returns the total provider context window size in tokens for the model."""
+        """Returns the total provider context window size in tokens for the model.
+        Fails closed (Rule 121 / Rule 139) if model is unknown or unsupported.
+        """
         target_model = model or self.hhtech_model
-        return self.PROVIDER_CONTEXT_WINDOWS.get(target_model, 128000)
+        if target_model not in self.PROVIDER_CONTEXT_WINDOWS:
+            raise ModelGatewayError(
+                f"Unsupported model '{target_model}': not registered in PROVIDER_CONTEXT_WINDOWS. "
+                f"Supported models: {sorted(self.PROVIDER_CONTEXT_WINDOWS.keys())}"
+            )
+        return self.PROVIDER_CONTEXT_WINDOWS[target_model]
 
-    def get_output_reservation(self, model: Optional[str] = None) -> int:
-        """Derives the reserved token headroom for output generation based on live ceiling."""
+    def get_output_reservation(self, model: Optional[str] = None, requested_max_tokens: Optional[int] = None) -> int:
+        """Derives and validates reserved token headroom for output generation under live ceiling.
+        If requested_max_tokens is specified, validates that it fits within available headroom.
+        Fails closed if ceiling is incompatible with context window (ceiling >= ctx_win).
+        """
         target_model = model or self.hhtech_model
         ctx_win = self.get_context_window(target_model)
         ceiling = _get_max_absolute_input_ceiling()
-        return max(0, ctx_win - ceiling)
+        if ceiling >= ctx_win:
+            raise ModelGatewayError(
+                f"Incompatible configuration for '{target_model}': absolute input ceiling ({ceiling}) "
+                f"must be strictly less than model context window ({ctx_win})."
+            )
+        available_headroom = ctx_win - ceiling
+        if requested_max_tokens is not None:
+            if requested_max_tokens <= 0:
+                raise ModelGatewayError(f"requested_max_tokens must be positive, got {requested_max_tokens}")
+            if requested_max_tokens > available_headroom:
+                raise ModelGatewayError(
+                    f"Requested output tokens ({requested_max_tokens}) exceeds available headroom "
+                    f"({available_headroom}) under ceiling {ceiling} for model '{target_model}' (ctx: {ctx_win})."
+                )
+            return requested_max_tokens
+        return available_headroom
 
     def get_model_token_rate(self, model: Optional[str] = None) -> float:
-        """Derives the VND rate per 1,000 tokens for the configured model from CostTracker."""
+        """Derives the VND rate per 1,000 tokens for the configured model from CostTracker.
+        Fails closed if the model is not registered in CostTracker.RATES.
+        """
         target_model = model or self.hhtech_model
         rates = getattr(self.cost_tracker, "RATES", {})
-        return rates.get(target_model, rates.get("default", 1.6))
+        if target_model not in rates:
+            raise ModelGatewayError(
+                f"Missing pricing configuration: model '{target_model}' is not registered in CostTracker.RATES. "
+                f"Configured models: {sorted(rates.keys())}"
+            )
+        return rates[target_model]
 
-    def get_max_request_cost_vnd(self, model: Optional[str] = None) -> float:
-        """Calculates theoretical maximum VND cost for a single request under live ceiling."""
+    def get_max_request_cost_vnd(self, model: Optional[str] = None, max_output_tokens: Optional[int] = None) -> float:
+        """Calculates justified maximum theoretical VND cost for a single request under live ceiling
+        including both maximum input ceiling tokens and output reservation headroom.
+        """
+        target_model = model or self.hhtech_model
+        ceiling = _get_max_absolute_input_ceiling()
+        output_res = self.get_output_reservation(target_model, requested_max_tokens=max_output_tokens)
+        total_tokens = ceiling + output_res
+        rate = self.get_model_token_rate(target_model)
+        return (total_tokens / 1000.0) * rate
+
+    def get_max_input_cost_vnd(self, model: Optional[str] = None) -> float:
+        """Calculates theoretical maximum VND cost for the input portion alone under live ceiling."""
         target_model = model or self.hhtech_model
         ceiling = _get_max_absolute_input_ceiling()
         rate = self.get_model_token_rate(target_model)
@@ -109,25 +153,25 @@ class ModelGateway:
     def __init__(self, cost_tracker=None):
         """
         Initialize model gateway.
-        
+
         Args:
             cost_tracker: Optional CostTracker instance (uses global if None)
         """
         self.cost_tracker = cost_tracker or get_global_tracker()
         self._load_config()
-    
+
     def _load_config(self):
         """Load API keys and configuration from environment."""
         self.hhtech_key = os.getenv("HHTECH_API_KEY", "")
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
         self.hhtech_base_url = os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1")
         self.hhtech_model = os.getenv("HHTECH_MODEL", "claude-sonnet-5-5")
-        
+
         # Load from secrets file if env vars not set or key is masked/invalid
         is_invalid_key = not self.hhtech_key or any(ord(c) > 127 for c in self.hhtech_key) or "••" in self.hhtech_key
         if is_invalid_key:
             self._try_load_secrets()
-    
+
     def _try_load_secrets(self):
         """Try loading secrets from /root/secrets/.env file."""
         try:
@@ -147,7 +191,7 @@ class ModelGateway:
                                 os.environ["ANTHROPIC_API_KEY"] = key
         except Exception as e:
             logger.warning(f"[GATEWAY] Could not load secrets file: {e}")
-    
+
     def call_llm(
         self,
         prompt: str,
@@ -160,7 +204,7 @@ class ModelGateway:
     ) -> str:
         """
         Call LLM with automatic fallback and cost tracking.
-        
+
         Args:
             prompt: User prompt text
             model: Model identifier (default: claude-sonnet-5-5)
@@ -169,15 +213,15 @@ class ModelGateway:
             temperature: Sampling temperature
             timeout: Request timeout in seconds
             fallback: Optional fallback model (e.g., "claude-3.5-sonnet")
-        
+
         Returns:
             Generated text response
-        
+
         Raises:
             AllProvidersFailed: If primary and all fallbacks fail
         """
         model = model or self.hhtech_model
-        
+
         # Try primary provider
         try:
             logger.info(f"[GATEWAY] Calling primary model: {model}")
@@ -190,10 +234,10 @@ class ModelGateway:
                 timeout=timeout
             )
             return response
-        
+
         except Exception as e:
             logger.warning(f"[GATEWAY] Primary model {model} failed: {e}")
-            
+
             # Try fallback if configured
             if fallback:
                 try:
@@ -207,7 +251,7 @@ class ModelGateway:
                         timeout=timeout
                     )
                     return response
-                
+
                 except Exception as fallback_error:
                     logger.error(f"[GATEWAY] Fallback model {fallback} also failed: {fallback_error}")
                     raise AllProvidersFailed(
@@ -217,7 +261,7 @@ class ModelGateway:
             else:
                 # No fallback configured, re-raise original error
                 raise
-    
+
     def _call_hhtech(
         self,
         prompt: str,
@@ -231,10 +275,25 @@ class ModelGateway:
         """Call HHTech API (primary provider) with automatic retry on streaming ReadTimeout."""
         if not self.hhtech_key:
             raise ModelGatewayError("HHTECH_API_KEY not configured")
-        
-        # Pre-Flight Token Sanitizer & Hard Ceiling Guard (Anti-Bloat Law per vf-pipeline-teamwork)
+
+        # 1. Authoritative Model & Context Window Validation (Fail-Closed)
+        ctx_win = self.get_context_window(model)
+
+        # 2. Pre-Flight Token Sanitizer & Hard Ceiling Guard (Anti-Bloat Law per vf-pipeline-teamwork)
         # Conservative factor 2.5 accounts for dense code, Vietnamese unicode, and markdown overhead
         est_tokens = int((len(prompt) + len(system_prompt or "")) / 2.5)
+
+        # 3. Enforce combined input + requested output reservation within model context window
+        combined_tokens = est_tokens + max_tokens
+        if combined_tokens > ctx_win:
+            err_msg = (
+                f"Context Window Exceeded: Combined input estimate ({est_tokens} tokens) + "
+                f"requested output ({max_tokens} tokens) = {combined_tokens} tokens "
+                f"exceeds model '{model}' context window of {ctx_win} tokens."
+            )
+            logger.error(f"🛑 [CONTEXT EXCEEDED BLOCKED] {err_msg}")
+            raise TokenBudgetExceeded(err_msg)
+
         max_ceiling = int(os.getenv("HHTECH_MAX_INPUT_TOKENS_CEILING", "20000"))
         allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT") == "1"
         if est_tokens > max_ceiling and not image_base64:
@@ -266,11 +325,11 @@ class ModelGateway:
         }
         if "claude" in model.lower():
             headers["anthropic-beta"] = "prompt-caching-2024-07-31"
-        
+
         messages: List[Dict[str, Any]] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        
+
         if image_base64:
             user_content: List[Dict[str, Any]] = [
                 {"type": "text", "text": prompt},
@@ -284,7 +343,7 @@ class ModelGateway:
             messages.append({"role": "user", "content": user_content})
         else:
             messages.append({"role": "user", "content": prompt})
-        
+
         payload = {
             "model": model,
             "messages": messages,
@@ -293,19 +352,19 @@ class ModelGateway:
         }
         if not model.startswith("kimi"):
             payload["temperature"] = temperature
-        
+
         max_retries = 3
         last_error = None
         result = ""
         total_tokens = 0
-        
+
         for attempt in range(1, max_retries + 1):
             try:
                 full_content: List[str] = []
                 full_reasoning: List[str] = []
                 total_tokens = 0
                 timeout_config = httpx.Timeout(timeout=timeout, connect=30.0, read=timeout, write=30.0, pool=30.0)
-                
+
                 with httpx.Client(timeout=timeout_config) as client:
                     with client.stream(
                         "POST",
@@ -318,7 +377,7 @@ class ModelGateway:
                             raise ModelGatewayError(
                                 f"HHTech API returned HTTP {response.status_code}: {error_body}"
                             )
-                        
+
                         for line in response.iter_lines():
                             line = line.strip()
                             if line.startswith("data: "):
@@ -345,7 +404,7 @@ class ModelGateway:
                                             logger.info(f"[GATEWAY] Prompt cache hit! {cached_tokens}/{usage.get('prompt_tokens', 0)} tokens served from cache.")
                                 except Exception as e:
                                     logger.debug(f"[GATEWAY] Stream parse error: {e}")
-                
+
                 result = "".join(full_content)
                 if not result.strip() and full_reasoning:
                     result = "".join(full_reasoning)
@@ -365,19 +424,19 @@ class ModelGateway:
                     time.sleep(attempt * 3.0)
                 else:
                     raise last_error
-        
+
         # Estimate tokens if not provided (rough: 1 token ≈ 4 chars)
         if total_tokens == 0:
             total_tokens = (len(prompt) + len(result)) // 4
-        
+
         # Record cost AFTER successful call (passive telemetry)
         try:
             self.cost_tracker.record(model, total_tokens, is_image=False)
         except Exception as e:
             logger.debug(f"[GATEWAY] Cost tracking record info: {e}")
-        
+
         return result
-    
+
     def _call_fallback_llm(
         self,
         prompt: str,
@@ -417,7 +476,7 @@ class ModelGateway:
             )
         else:
             raise ModelGatewayError(f"No configured provider available for fallback model: {model}")
-    
+
     def _call_anthropic(
         self,
         prompt: str,
@@ -430,46 +489,61 @@ class ModelGateway:
         """Call Anthropic API."""
         if not self.anthropic_key:
             raise ModelGatewayError("ANTHROPIC_API_KEY not configured for fallback")
-        
+
+        # 1. Authoritative Model & Context Window Validation (Fail-Closed)
+        ctx_win = self.get_context_window(model)
+
+        # 2. Pre-Flight Token Sanitizer & Context Headroom Guard
+        est_tokens = int((len(prompt) + len(system_prompt or "")) / 2.5)
+        combined_tokens = est_tokens + max_tokens
+        if combined_tokens > ctx_win:
+            err_msg = (
+                f"Context Window Exceeded: Combined input estimate ({est_tokens} tokens) + "
+                f"requested output ({max_tokens} tokens) = {combined_tokens} tokens "
+                f"exceeds model '{model}' context window of {ctx_win} tokens."
+            )
+            logger.error(f"🛑 [CONTEXT EXCEEDED BLOCKED] {err_msg}")
+            raise TokenBudgetExceeded(err_msg)
+
         headers = {
             "x-api-key": self.anthropic_key,
             "anthropic-version": "2023-06-01",
             "anthropic-beta": "prompt-caching-2024-07-31",
             "Content-Type": "application/json"
         }
-        
+
         payload: Dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
             "temperature": temperature,
             "messages": [{"role": "user", "content": prompt}]
         }
-        
+
         if system_prompt:
             payload["system"] = system_prompt
-        
+
         with httpx.Client(timeout=timeout) as client:
             response = client.post(
                 "https://api.anthropic.com/v1/messages",
                 json=payload,
                 headers=headers
             )
-            
+
             if response.status_code != 200:
                 raise ModelGatewayError(
                     f"Anthropic API returned HTTP {response.status_code}: {response.text}"
                 )
-            
+
             data = response.json()
             content = data.get("content", [{}])[0].get("text", "")
             usage = data.get("usage", {})
             total_tokens = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
-            
+
             # Record cost
             self.cost_tracker.record(model, total_tokens, is_image=False)
-            
+
             return content
-    
+
     def call_vision(
         self,
         prompt: str,
@@ -483,7 +557,7 @@ class ModelGateway:
     ) -> str:
         """
         Call multimodal LLM with an image (base64) and text prompt.
-        
+
         Args:
             prompt: Text prompt / evaluation instructions
             image_base64: Base64-encoded JPEG/PNG image data
@@ -493,7 +567,7 @@ class ModelGateway:
             temperature: Sampling temperature
             timeout: Request timeout in seconds
             fallback: Optional fallback model (e.g., "claude-sonnet-5")
-            
+
         Returns:
             Generated text analysis / critique
         """
@@ -523,7 +597,7 @@ class ModelGateway:
                     image_base64=image_base64
                 )
             raise
-    
+
     def call_image(
         self,
         prompt: str,
@@ -534,17 +608,17 @@ class ModelGateway:
     ) -> bytes:
         """
         Call image generation model with fallback.
-        
+
         Args:
             prompt: Image description prompt
             model: Model identifier (default: imagen3)
             size: Image size (e.g., "1024x1024")
             count: Number of images to generate
             fallback: Optional fallback model
-        
+
         Returns:
             Image bytes (or first image if count > 1)
-        
+
         Raises:
             AllProvidersFailed: If primary and all fallbacks fail
         """
@@ -554,15 +628,15 @@ class ModelGateway:
             "Image generation through gateway not yet implemented. "
             "Use existing image_gen.py for now."
         )
-    
+
     def get_cost_report(self, month: Optional[str] = None) -> Dict[str, float]:
         """Get cost breakdown for a month."""
         return self.cost_tracker.monthly_report(month)
-    
+
     def get_remaining_budget(self) -> float:
         """Get remaining budget for current month."""
         return self.cost_tracker.get_remaining_budget()
-    
+
     def get_budget_usage_pct(self) -> float:
         """Get budget usage percentage."""
         return self.cost_tracker.get_budget_usage_pct()
