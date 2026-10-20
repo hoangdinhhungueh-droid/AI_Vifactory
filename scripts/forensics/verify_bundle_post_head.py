@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 """scripts/forensics/verify_bundle_post_head.py — Standalone Post-HEAD Evidence Verifier.
 
-Rule 121, Rule 126 & Boss Round 29 Punchlist Item 2 Compliance:
+Rule 121, Rule 126 & Boss Round 29/30 Punchlist Compliance:
 Executes as an INDEPENDENT external process invoked after evidence bundle finalization.
 Re-reads and re-hashes all finalized artifacts directly from disk, verifies two-tier
 manifest identity, checks git tree provenance, confirms git-ignore encapsulation,
+verifies working-tree cleanliness, strictly rejects path traversal and unlisted files,
 and cryptographically generates the authoritative post_head_attestation.json artifact.
 """
 
@@ -18,9 +19,18 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+REQUIRED_BUNDLE_ARTIFACTS = {
+    "manifest.json",
+    "incremental.patch",
+    "cumulative.patch",
+    "ast_scanner_source.py",
+    "ast_scanner_version_and_metadata.json",
+    "ast_scanner_raw_output.json",
+}
+
 
 def _compute_sha256(file_path: Path) -> str:
-    """Computes SHA-256 digest of a physical file."""
+    """Computes SHA-256 digest of a physical file directly from disk bytes."""
     h = hashlib.sha256()
     with open(file_path, "rb") as f:
         while chunk := f.read(65536):
@@ -53,7 +63,7 @@ def verify_bundle_and_attest(
     bundle_manifest_file = bundle_dir / "bundle_manifest.json"
     bundle_manifest_copy = bundle_dir / "manifest.json"
 
-    # 1. Verify existence of root manifest and bundle directory
+    # 1. Verify existence of root manifest, bundle directory, and bundle manifests
     if not root_manifest_file.is_file():
         raise RuntimeError(f"Root manifest not found at {root_manifest_file}")
     if not bundle_dir.is_dir():
@@ -63,7 +73,7 @@ def verify_bundle_and_attest(
     if not bundle_manifest_copy.is_file():
         raise RuntimeError(f"Bundle manifest copy not found at {bundle_manifest_copy}")
 
-    # 2. Query independent Git provenance
+    # 2. Query independent Git provenance and verify committed baseline in HEAD
     code_head, git_head = _run_git_cmd(repo_root, ["rev-parse", "HEAD"])
     if code_head != 0 or len(git_head) != 40:
         raise RuntimeError(f"Failed to query valid Git HEAD SHA: code {code_head}, got {git_head!r}")
@@ -76,52 +86,97 @@ def verify_bundle_and_attest(
         repo_root,
         ["rev-parse", f"{git_head}:specs/boss_audits/{task_id}_manifest.json"],
     )
-    if code_blob != 0:
-        committed_manifest_blob_sha = "UNCOMMITTED_PRE_AUDIT_BASELINE"
-
-    # 3. Check git check-ignore status of evidence bundle
-    rel_bundle = bundle_dir.relative_to(repo_root).as_posix()
-    code_ignore, out_ignore = _run_git_cmd(repo_root, ["check-ignore", rel_bundle])
-    bundle_is_ignored = (code_ignore == 0 and bool(out_ignore))
-
-    # 4. Independent re-hashing of root manifest and bundle manifest copy
-    root_manifest_sha = _compute_sha256(root_manifest_file)
-    bundle_manifest_copy_sha = _compute_sha256(bundle_manifest_copy)
-    if root_manifest_sha != bundle_manifest_copy_sha:
+    if code_blob != 0 or len(committed_manifest_blob_sha) != 40:
         raise RuntimeError(
-            f"Bit-for-bit parity mismatch between root manifest ({root_manifest_sha}) "
-            f"and bundle manifest copy ({bundle_manifest_copy_sha})"
+            f"Committed manifest baseline not found in git HEAD ({git_head}): "
+            f"specs/boss_audits/{task_id}_manifest.json (exit {code_blob}, output: {committed_manifest_blob_sha!r})"
         )
 
-    # 5. Parse and validate root manifest contents
-    root_manifest_data = json.loads(root_manifest_file.read_text(encoding="utf-8"))
-    manifest_head = root_manifest_data.get("head_commit_sha")
-    manifest_tree = root_manifest_data.get("tree_sha")
-    manifest_timestamp = root_manifest_data.get("verification_timestamp")
+    # 3. Check working tree cleanliness (Rule 126: clean porcelain guarantee)
+    code_status, out_status = _run_git_cmd(repo_root, ["status", "--porcelain"])
+    if code_status != 0:
+        raise RuntimeError(f"Failed to check git status: exit code {code_status}")
+    if out_status.strip():
+        raise RuntimeError(f"Working tree is dirty, expected clean porcelain per Rule 126:\n{out_status}")
 
-    # 6. Independent re-hashing of every artifact recorded in bundle_manifest.json
-    bundle_manifest_data = json.loads(bundle_manifest_file.read_text(encoding="utf-8"))
+    # 4. Check git check-ignore status of evidence bundle
+    rel_bundle = bundle_dir.relative_to(repo_root).as_posix() + "/"
+    code_ignore, out_ignore = _run_git_cmd(repo_root, ["check-ignore", rel_bundle])
+    bundle_is_ignored = (code_ignore == 0 and bool(out_ignore.strip()))
+    if not bundle_is_ignored:
+        raise RuntimeError(f"Bundle directory {rel_bundle} is NOT git-ignored by repository rules (exit {code_ignore})")
+
+    # 5. Parse and validate post-HEAD bundle manifest provenance against live Git state
+    bundle_manifest_copy_bytes = bundle_manifest_copy.read_bytes()
+    bundle_manifest_copy_sha = hashlib.sha256(bundle_manifest_copy_bytes).hexdigest()
+    try:
+        bundle_manifest_data_parsed = json.loads(bundle_manifest_copy_bytes.decode("utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"Failed to parse bundle manifest copy JSON: {exc}") from exc
+
+    manifest_head = bundle_manifest_data_parsed.get("head_commit_sha")
+    manifest_tree = bundle_manifest_data_parsed.get("tree_sha")
+    manifest_timestamp = bundle_manifest_data_parsed.get("verification_timestamp")
+    manifest_task_id = bundle_manifest_data_parsed.get("task_id")
+    manifest_episode = bundle_manifest_data_parsed.get("target_episode")
+
+    if manifest_head != git_head:
+        raise RuntimeError(f"Manifest head_commit_sha ({manifest_head}) does not match git HEAD ({git_head})")
+    if manifest_tree != git_tree:
+        raise RuntimeError(f"Manifest tree_sha ({manifest_tree}) does not match git tree ({git_tree})")
+    if manifest_task_id != task_id:
+        raise RuntimeError(f"Manifest task_id ({manifest_task_id}) does not match expected ({task_id})")
+    if manifest_episode != "JP_TEMP_59":
+        raise RuntimeError(f"Manifest target_episode ({manifest_episode}) does not match 'JP_TEMP_59'")
+
+    # 6. Independent re-hashing and strict inventory validation
+    try:
+        bundle_manifest_data = json.loads(bundle_manifest_file.read_bytes().decode("utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"Failed to parse bundle_manifest.json: {exc}") from exc
+
     files_inventory = bundle_manifest_data.get("files") if isinstance(bundle_manifest_data.get("files"), dict) else bundle_manifest_data
+    if not isinstance(files_inventory, dict) or not files_inventory:
+        raise RuntimeError("bundle_manifest.json contains missing or empty files inventory")
+
+    # Enforce mandatory required bundle artifacts
+    missing_required = REQUIRED_BUNDLE_ARTIFACTS - set(files_inventory.keys())
+    if missing_required:
+        raise RuntimeError(f"Missing mandatory bundle artifact(s) in inventory: {sorted(missing_required)}")
+
     verified_artifacts: Dict[str, Dict[str, Any]] = {}
-    mismatches: List[str] = []
-
     for art_name, art_meta in files_inventory.items():
-        if not isinstance(art_meta, dict):
-            continue
-        art_path = bundle_dir / art_name
-        if not art_path.is_file():
-            mismatches.append(f"Missing bundle artifact: {art_name}")
-            continue
+        if not isinstance(art_name, str) or not art_name.strip():
+            raise RuntimeError(f"Invalid artifact name in inventory: {art_name!r}")
 
-        actual_sha = _compute_sha256(art_path)
-        actual_bytes = art_path.stat().st_size
+        # Path traversal and symlink escape rejection
+        if ".." in art_name or "/" in art_name or "\\" in art_name or Path(art_name).is_absolute():
+            raise RuntimeError(f"Path traversal or invalid path detected in artifact name: {art_name!r}")
+
+        if not isinstance(art_meta, dict):
+            raise RuntimeError(f"Invalid non-dictionary metadata for artifact {art_name}")
+
         expected_sha = art_meta.get("sha256")
         expected_bytes = art_meta.get("size_bytes", art_meta.get("bytes"))
 
+        if not expected_sha or not isinstance(expected_sha, str) or len(expected_sha) != 64:
+            raise RuntimeError(f"Invalid or missing sha256 for {art_name}: {expected_sha!r}")
+        if expected_bytes is None or not isinstance(expected_bytes, int) or expected_bytes < 0:
+            raise RuntimeError(f"Invalid or missing size_bytes for {art_name}: {expected_bytes!r}")
+
+        art_path = bundle_dir / art_name
+        if not art_path.is_file():
+            raise RuntimeError(f"Bundle artifact missing from disk: {art_name}")
+        if art_path.is_symlink():
+            raise RuntimeError(f"Symlink rejected for bundle artifact: {art_name}")
+
+        actual_sha = _compute_sha256(art_path)
+        actual_bytes = art_path.stat().st_size
+
         if actual_sha != expected_sha:
-            mismatches.append(f"SHA256 mismatch for {art_name}: expected {expected_sha}, got {actual_sha}")
+            raise RuntimeError(f"SHA256 mismatch for {art_name}: expected {expected_sha}, got {actual_sha}")
         if actual_bytes != expected_bytes:
-            mismatches.append(f"Byte size mismatch for {art_name}: expected {expected_bytes}, got {actual_bytes}")
+            raise RuntimeError(f"Byte size mismatch for {art_name}: expected {expected_bytes}, got {actual_bytes}")
 
         verified_artifacts[art_name] = {
             "sha256": actual_sha,
@@ -129,11 +184,16 @@ def verify_bundle_and_attest(
             "verified": True,
         }
 
-    if mismatches:
-        raise RuntimeError(f"Bundle integrity verification failed with {len(mismatches)} error(s): {mismatches}")
+    # Enforce exact allowed coverage (reject unlisted extra files)
+    allowed_bundle_files = set(files_inventory.keys()) | {"bundle_manifest.json", "post_head_attestation.json"}
+    physical_bundle_files = {p.name for p in bundle_dir.iterdir() if p.is_file()}
+    unlisted_files = physical_bundle_files - allowed_bundle_files
+    if unlisted_files:
+        raise RuntimeError(f"Unlisted extra file(s) found in bundle directory: {sorted(unlisted_files)}")
 
-    # 7. Generate structurally independent post_head_attestation.json
+    # 7. Generate structurally independent post_head_attestation.json atomically
     attestation_file = bundle_dir / "post_head_attestation.json"
+    root_manifest_sha = _compute_sha256(root_manifest_file)
     attestation_record = {
         "attestation_type": "STRUCTURALLY_INDEPENDENT_POST_HEAD_ATTESTATION",
         "verifier_engine": "scripts/forensics/verify_bundle_post_head.py",
@@ -148,13 +208,15 @@ def verify_bundle_and_attest(
         "manifest_head_sha": manifest_head,
         "manifest_tree_sha": manifest_tree,
         "committed_manifest_blob_sha": committed_manifest_blob_sha,
-        "live_bundle_manifest_sha256": root_manifest_sha,
+        "committed_manifest_disk_sha256": root_manifest_sha,
+        "live_bundle_manifest_sha256": bundle_manifest_copy_sha,
         "timestamp": manifest_timestamp,
         "verification_authority": "scripts/forensics/verify_bundle_post_head.py",
         "bundle_git_ignored": bundle_is_ignored,
+        "working_tree_clean": True,
         "verified_artifacts_count": len(verified_artifacts),
         "total_bundle_bytes": sum(a["bytes"] for a in verified_artifacts.values()),
-        "parity_status": "100% BIT_FOR_BIT MATCHING",
+        "parity_status": "100% BIT_FOR_BIT MATCHING ACROSS BUNDLE ARTIFACTS",
         "snapshot_provenance": (
             "Verified by standalone verifier subprocess: committed manifest blob inside git HEAD represents the "
             "pre-audit immutable test contract; live manifest inside the gitignored evidence bundle represents the "
@@ -163,9 +225,12 @@ def verify_bundle_and_attest(
         "verdict": "PASS: CRYPTOGRAPHICALLY ATTESTED BY INDEPENDENT PROCESS",
     }
 
-    attestation_json_str = json.dumps(attestation_record, indent=2)
-    attestation_file.write_text(attestation_json_str, encoding="utf-8")
-    attestation_sha = hashlib.sha256(attestation_json_str.encode("utf-8")).hexdigest()
+    attestation_bytes = json.dumps(attestation_record, indent=2).encode("utf-8")
+    tmp_attestation = bundle_dir / f".tmp_post_head_attestation_{os.getpid()}.json"
+    tmp_attestation.write_bytes(attestation_bytes)
+    tmp_attestation.replace(attestation_file)
+
+    attestation_sha = _compute_sha256(attestation_file)
 
     return {
         "status": "PASS",
@@ -173,11 +238,14 @@ def verify_bundle_and_attest(
         "head_commit_sha": git_head,
         "local_tree_sha": git_tree,
         "committed_manifest_blob_sha": committed_manifest_blob_sha,
-        "live_bundle_manifest_sha256": root_manifest_sha,
+        "live_bundle_manifest_sha256": bundle_manifest_copy_sha,
         "attestation_file": str(attestation_file),
         "attestation_sha256": attestation_sha,
         "verified_artifacts_count": len(verified_artifacts),
+        "total_bundle_bytes": sum(a["bytes"] for a in verified_artifacts.values()),
         "bundle_git_ignored": bundle_is_ignored,
+        "verifier_process_id": os.getpid(),
+        "verifier_parent_pid": os.getppid(),
         "verdict": "PASS (0 Discrepancies / 100% Verified)",
     }
 

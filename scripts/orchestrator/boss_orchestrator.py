@@ -1994,10 +1994,11 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
     audits_dir.mkdir(parents=True, exist_ok=True)
     manifest_file = audits_dir / f"{task_id or 'TASK_1792314467'}_manifest.json"
     manifest_json_str = json.dumps(manifest_dict, indent=2)
-    manifest_file.write_text(manifest_json_str, encoding="utf-8")
-    manifest_file_sha = hashlib.sha256(manifest_json_str.encode("utf-8")).hexdigest()
-    manifest_readback = manifest_file.read_text(encoding="utf-8")
-    manifest_readback_sha = hashlib.sha256(manifest_readback.encode("utf-8")).hexdigest()
+    manifest_bytes = manifest_json_str.encode("utf-8")
+    manifest_file.write_bytes(manifest_bytes)
+    manifest_file_sha = hashlib.sha256(manifest_bytes).hexdigest()
+    manifest_readback_bytes = manifest_file.read_bytes()
+    manifest_readback_sha = hashlib.sha256(manifest_readback_bytes).hexdigest()
     if manifest_readback_sha != manifest_file_sha:
         raise RuntimeError(f"Manifest readback SHA mismatch: {manifest_readback_sha} != {manifest_file_sha}")
 
@@ -2030,7 +2031,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
             check=False,
         )
         inc_stdout = inc_res.stdout or ""
-    inc_patch_file.write_text(inc_stdout, encoding="utf-8")
+    inc_patch_file.write_bytes(inc_stdout.encode("utf-8"))
 
     # 2. Cumulative Patch
     cum_patch_file = bundle_dir / "cumulative.patch"
@@ -2042,16 +2043,16 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         check=False,
     )
     cum_stdout = cum_res.stdout or ""
-    cum_patch_file.write_text(cum_stdout, encoding="utf-8")
+    cum_patch_file.write_bytes(cum_stdout.encode("utf-8"))
 
     # 3. Linux JUnit XML
-    (bundle_dir / "linux_focused_junit.xml").write_text(out_junit_xml, encoding="utf-8")
+    (bundle_dir / "linux_focused_junit.xml").write_bytes(out_junit_xml.encode("utf-8"))
 
     # 4. Windows JUnit XML
-    (bundle_dir / "windows_focused_junit.xml").write_text(out_junit_xml_win, encoding="utf-8")
+    (bundle_dir / "windows_focused_junit.xml").write_bytes(out_junit_xml_win.encode("utf-8"))
 
     # 5. Raw CI Run Object
-    (bundle_dir / "ci_raw_run.json").write_text(ci_run_full_json if 'ci_run_full_json' in locals() else json.dumps(ci_probe_result, indent=2), encoding="utf-8")
+    (bundle_dir / "ci_raw_run.json").write_bytes((ci_run_full_json if 'ci_run_full_json' in locals() else json.dumps(ci_probe_result, indent=2)).encode("utf-8"))
 
     # 6. Raw CI Jobs, Steps and Logs Object
     ci_jobs_payload = j_data if 'j_data' in locals() else {
@@ -2060,30 +2061,30 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "status": ci_probe_result.get("status"),
         "jobs": jobs_list if 'jobs_list' in locals() else []
     }
-    (bundle_dir / "ci_jobs_steps_logs.json").write_text(json.dumps(ci_jobs_payload, indent=2), encoding="utf-8")
+    (bundle_dir / "ci_jobs_steps_logs.json").write_bytes(json.dumps(ci_jobs_payload, indent=2).encode("utf-8"))
 
     # 7. Credential rotation records
     cred_rec_file = audits_dir / "credential_rotation_records.json"
     if cred_rec_file.exists():
-        (bundle_dir / "credential_rotation_records.json").write_text(cred_rec_file.read_text(encoding="utf-8"), encoding="utf-8")
+        (bundle_dir / "credential_rotation_records.json").write_bytes(cred_rec_file.read_bytes())
     else:
-        (bundle_dir / "credential_rotation_records.json").write_text(json.dumps({"rotation_status": "COMPLETED", "task_id": task_id}, indent=2), encoding="utf-8")
+        (bundle_dir / "credential_rotation_records.json").write_bytes(json.dumps({"rotation_status": "COMPLETED", "task_id": task_id}, indent=2).encode("utf-8"))
 
     # 8. Zero Mock 229 Baseline
     zero_mock_file = audits_dir / "zero_mock_229_baseline.json"
     if zero_mock_file.exists():
-        (bundle_dir / "zero_mock_229_baseline.json").write_text(zero_mock_file.read_text(encoding="utf-8"), encoding="utf-8")
+        (bundle_dir / "zero_mock_229_baseline.json").write_bytes(zero_mock_file.read_bytes())
     else:
-        (bundle_dir / "zero_mock_229_baseline.json").write_text(json.dumps({"baseline_count": 229, "rule": "Rule 118"}, indent=2), encoding="utf-8")
+        (bundle_dir / "zero_mock_229_baseline.json").write_bytes(json.dumps({"baseline_count": 229, "rule": "Rule 118"}, indent=2).encode("utf-8"))
 
     # 9. Scanner source code (probe_zero_mock.py)
     scanner_py_path = ROOT_DIR / "scripts" / "forensics" / "probe_zero_mock.py"
     scanner_py_text = scanner_py_path.read_text(encoding="utf-8") if scanner_py_path.exists() else ""
-    (bundle_dir / "scanner_source_probe_zero_mock.py").write_text(scanner_py_text, encoding="utf-8")
+    (bundle_dir / "scanner_source_probe_zero_mock.py").write_bytes(scanner_py_text.encode("utf-8"))
 
     # 10. Scanner source hash and version metadata
     scanner_py_sha = hashlib.sha256(scanner_py_text.encode("utf-8")).hexdigest()
-    (bundle_dir / "scanner_source_hash_and_version.json").write_text(json.dumps({
+    (bundle_dir / "scanner_source_hash_and_version.json").write_bytes(json.dumps({
         "scanner_name": "probe_zero_mock.py",
         "scanner_version": "2.1.0",
         "scanner_path": "scripts/forensics/probe_zero_mock.py",
@@ -2091,19 +2092,19 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "scanner_bytes": len(scanner_py_text.encode("utf-8")),
         "python_version": sys.version,
         "verified_rules": ["Rule 118", "Rule 121", "Boss Round 8 Item 22"]
-    }, indent=2), encoding="utf-8")
+    }, indent=2).encode("utf-8"))
 
     # 11. Scanner raw output text
-    (bundle_dir / "scanner_raw_output.txt").write_text(out_mock, encoding="utf-8")
+    (bundle_dir / "scanner_raw_output.txt").write_bytes(out_mock.encode("utf-8"))
 
     # 11b. AST Scanner source code (scripts/forensics/probe_ast_rule139.py)
     ast_scanner_path = ROOT_DIR / "scripts" / "forensics" / "probe_ast_rule139.py"
     ast_scanner_text = ast_scanner_path.read_text(encoding="utf-8") if ast_scanner_path.exists() else ""
     ast_scanner_sha = hashlib.sha256(ast_scanner_text.encode("utf-8")).hexdigest()
-    (bundle_dir / "ast_scanner_source.py").write_text(ast_scanner_text, encoding="utf-8")
+    (bundle_dir / "ast_scanner_source.py").write_bytes(ast_scanner_text.encode("utf-8"))
 
     # 11c. AST Scanner version and metadata
-    (bundle_dir / "ast_scanner_version_and_metadata.json").write_text(json.dumps({
+    (bundle_dir / "ast_scanner_version_and_metadata.json").write_bytes(json.dumps({
         "scanner_name": "probe_ast_rule139.py",
         "scanner_version": "2.2.0",
         "scanner_path": "scripts/forensics/probe_ast_rule139.py",
@@ -2112,10 +2113,10 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
         "verified_rules": ["Rule 121", "Rule 139", "Boss Round 28 Item 5"],
         "exit_code": code_ocr,
         "defects_count": 0,
-    }, indent=2), encoding="utf-8")
+    }, indent=2).encode("utf-8"))
 
     # 11d. AST Scanner raw execution output
-    (bundle_dir / "ast_scanner_raw_output.json").write_text(out_ocr, encoding="utf-8")
+    (bundle_dir / "ast_scanner_raw_output.json").write_bytes(out_ocr.encode("utf-8"))
 
     # 12. Lifecycle Inventories (All 15 integration exclusions with explicit identities, unit test files, runtime states)
     (bundle_dir / "lifecycle_inventories.json").write_text(json.dumps({
@@ -2188,17 +2189,17 @@ curl -s -H "Authorization: Bearer ${{GITHUB_TOKEN:-}}" "https://api.github.com/r
 """, encoding="utf-8")
 
     # 14. Executable hashes
-    (bundle_dir / "executable_hashes.json").write_text(json.dumps({
+    (bundle_dir / "executable_hashes.json").write_bytes(json.dumps({
         "python_executable": sys.executable,
         "python_version": sys.version,
         "platform": sys.platform,
         "node_type": "hybrid_windows_local_linux_vps",
         "hash_algorithm": "sha256",
         "verified": True
-    }, indent=2), encoding="utf-8")
+    }, indent=2).encode("utf-8"))
 
     # 15. Manifest copy into bundle
-    (bundle_dir / "manifest.json").write_text(manifest_json_str, encoding="utf-8")
+    (bundle_dir / "manifest.json").write_bytes(manifest_bytes)
 
     # 16. Finalize Bundle Manifest (records all pre-attestation artifacts)
     bundle_files_pre = sorted([f for f in bundle_dir.glob("*") if f.is_file() and f.name not in ("bundle_manifest.json", "post_head_attestation.json")])
@@ -2219,7 +2220,7 @@ curl -s -H "Authorization: Bearer ${{GITHUB_TOKEN:-}}" "https://api.github.com/r
         "files_count": len(bundle_inventory),
         "files": bundle_inventory
     }, indent=2)
-    (bundle_dir / "bundle_manifest.json").write_text(bundle_manifest_json, encoding="utf-8")
+    (bundle_dir / "bundle_manifest.json").write_bytes(bundle_manifest_json.encode("utf-8"))
 
     # 17. Structurally Independent Post-HEAD Verification & Attestation (Boss Round 29 Item 2)
     verifier_script = ROOT_DIR / "scripts" / "forensics" / "verify_bundle_post_head.py"
@@ -2238,9 +2239,38 @@ curl -s -H "Authorization: Bearer ${{GITHUB_TOKEN:-}}" "https://api.github.com/r
     logger.info(f"Standalone Post-HEAD Verifier passed (exit code 0): {out_verifier}")
     try:
         verifier_json = json.loads(out_verifier)
-    except Exception:
-        verifier_json = {"verdict": "PASS"}
-    committed_manifest_blob_sha = verifier_json.get("committed_manifest_blob_sha", "UNCOMMITTED_PRE_AUDIT_BASELINE")
+    except Exception as _json_err:
+        raise RuntimeError(f"Failed to parse verifier output JSON: {_json_err}\nRaw output: {out_verifier}")
+
+    required_verifier_fields = {
+        "status",
+        "task_id",
+        "head_commit_sha",
+        "local_tree_sha",
+        "committed_manifest_blob_sha",
+        "live_bundle_manifest_sha256",
+        "attestation_file",
+        "attestation_sha256",
+        "verified_artifacts_count",
+        "total_bundle_bytes",
+        "bundle_git_ignored",
+        "verifier_process_id",
+        "verifier_parent_pid",
+        "verdict",
+    }
+    missing_fields = required_verifier_fields - set(verifier_json.keys())
+    if missing_fields:
+        raise RuntimeError(f"Verifier output missing required fields: {sorted(missing_fields)}")
+
+    if verifier_json.get("status") != "PASS":
+        raise RuntimeError(f"Verifier reported non-PASS status: {verifier_json.get('status')}")
+    if not verifier_json.get("bundle_git_ignored"):
+        raise RuntimeError("Verifier reported bundle is not git-ignored")
+    if not isinstance(verifier_json.get("verifier_process_id"), int) or verifier_json["verifier_process_id"] <= 0:
+        raise RuntimeError(f"Invalid verifier_process_id: {verifier_json.get('verifier_process_id')}")
+    if not isinstance(verifier_json.get("verifier_parent_pid"), int) or verifier_json["verifier_parent_pid"] <= 0:
+        raise RuntimeError(f"Invalid verifier_parent_pid: {verifier_json.get('verifier_parent_pid')}")
+    committed_manifest_blob_sha = verifier_json["committed_manifest_blob_sha"]
 
     # 18. Authenticated Secret Scan & Verification Lines over 100% of Bundle Files (INCLUDING bundle_manifest.json)
     bundle_files = sorted([f for f in bundle_dir.glob("*") if f.is_file()])
