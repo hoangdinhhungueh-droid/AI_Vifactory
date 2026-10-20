@@ -2443,3 +2443,23 @@ def push_prompts_to_notion(prompts_data: dict, episode_id: str, task_id: str = N
                 logger.info(f"[prompt_forge] Transitioned Story Library [{episode_id}] status to 'Produced'")
     except Exception as _st_err:
         logger.warning(f"[prompt_forge] Notice updating downstream Notion statuses: {_st_err}")
+
+
+def extract_episode_master_asset_registry(director_plan: Dict[str, Any]) -> Dict[str, Any]:
+    """Rule 128 & Rule 132: Extracts or canonicalizes the bounded Master Asset Registry (18-24 items).
+    Groms and unifies tactile objects, paper cutouts, and props into immutable production assets.
+    """
+    if "asset_registry" in director_plan and isinstance(director_plan["asset_registry"], dict):
+        reg = director_plan["asset_registry"]
+        if "items" in reg and len(reg["items"]) >= 18:
+            return reg
+
+    from core.contracts.stages import Scene
+    from stages.s05_director_plan import build_master_asset_registry
+
+    scenes_raw = director_plan.get("scenes", [])
+    scenes = [Scene.model_validate(s) for s in scenes_raw]
+    proj_id = director_plan.get("project_id") or director_plan.get("episode_id") or "EPISODE"
+    reg = build_master_asset_registry(proj_id, scenes)
+    return reg.model_dump()
+

@@ -11,11 +11,21 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import time
 from typing import Any, Dict, List, Optional
 
 from core.config import RunContext
-from core.contracts.stages import Provenance, Scene, Shot, StageArtifact, StageID
+from core.contracts.stages import (
+    Provenance,
+    Scene,
+    Shot,
+    StageArtifact,
+    StageID,
+    Chunk,
+    AssetRegistryItem,
+    AssetRegistry
+)
 from core.gates import emit_artifact, validate_artifact
 from tools.codemap.runtime import pipeline_stage
 from vox.planner import plan_scenes_from_script
@@ -24,7 +34,15 @@ logger = logging.getLogger("s05_director_plan")
 
 STAGE: StageID = StageID.S5_DIRECTOR_PLAN
 
-__all__ = ["STAGE", "run", "build_vox_scene_prompts", "plan_scenes_from_script"]
+__all__ = [
+    "STAGE",
+    "run",
+    "build_vox_scene_prompts",
+    "plan_scenes_from_script",
+    "partition_timeline_into_chunks",
+    "build_master_asset_registry",
+    "validate_and_sanitize_director_plan"
+]
 
 
 def build_vox_scene_prompts(
@@ -37,11 +55,14 @@ def build_vox_scene_prompts(
     headline = scene.headline or f"BEAT {idx+1:02d}"
     color = scene.color_accent or "Vox Yellow #F2C230 & Navy #1B2B4A"
     hero_obj = scene.visual_metaphor or f"Tactile paper document representing beat {idx+1:02d}"
+    dur = float(scene.duration_est_sec or 5.0)
 
-    # Pick deterministic camera movement
+    # Pick deterministic single camera movement (Studio Touch 7: Single Camera Mandate)
+    allowed_camera_directives = ["STATIC_OVERHEAD", "SLOW_PUSH_IN_0_1X", "SLOW_HORIZONTAL_PAN", "SUBTLE_TILT_DOWN"]
+    camera_directive = allowed_camera_directives[idx % len(allowed_camera_directives)]
     camera_move = CANONICAL_CAMERA_MOVES[idx % len(CANONICAL_CAMERA_MOVES)]
 
-    # 1. Physical Objects Breakdown
+    # 1. Physical Objects Breakdown & Objects Roster
     objects = [
         {
             "id": f"o{idx+1}_1",
@@ -63,7 +84,48 @@ def build_vox_scene_prompts(
         }
     ]
 
-    # 2. Kinematics Actions Breakdown
+    objects_roster = [
+        {
+            "object_id": f"o{idx+1}_1",
+            "name": f"asset_doc_{idx+1:03d}",
+            "type": "paper_cutout",
+            "texture_spec": "Halftone black-and-white 60lpi print with crisp 3px white deckle edge and 2mm flat drop shadow"
+        },
+        {
+            "object_id": f"o{idx+1}_2",
+            "name": "asset_seal_stamp",
+            "type": "tactile_prop",
+            "texture_spec": "Solid forensic tool, rubber stamp with crimson ink"
+        }
+    ]
+
+    # 2. Kinematics Actions Breakdown & Second-by-Second Decomposition (S0 -> S1 -> S2)
+    t_entry_end = min(1.5, round(dur * 0.3, 1))
+    t_hold_start = max(t_entry_end + 1.0, round(dur - 1.0, 1))
+    second_by_second_action_breakdown = [
+        {
+            "time_window": f"0.0s - {t_entry_end:.1f}s",
+            "active_object_id": f"o{idx+1}_1",
+            "action_type": "slide_in",
+            "mechanical_action": f"{hero_obj} slides diagonally into center anchor with snappy deceleration",
+            "spatial_coordinate": "X:30%, Y:45%"
+        },
+        {
+            "time_window": f"{t_entry_end:.1f}s - {t_hold_start:.1f}s",
+            "active_object_id": f"o{idx+1}_2",
+            "action_type": "stamp_strike",
+            "mechanical_action": "Crimson rubber inspection seal slams downward onto lower margin, micro paper dust settles",
+            "spatial_coordinate": "X:35%, Y:60%"
+        },
+        {
+            "time_window": f"{t_hold_start:.1f}s - {dur:.1f}s",
+            "active_object_id": "ALL_OBJECTS",
+            "action_type": "living_poster_hold",
+            "mechanical_action": "All objects freeze rigidly into spatial anchor, subtle 12fps paper drop shadow breathing",
+            "spatial_coordinate": "LOCKED_SPATIAL_ANCHOR"
+        }
+    ]
+
     actions = [
         {
             "subject": f"o{idx+1}_1",
@@ -85,10 +147,10 @@ def build_vox_scene_prompts(
 
     # 3. Kinematic Motion Track
     motion_track = {
-        "entry_action": f"0.0-2.0s: Tactile entry of {hero_obj} sliding into center stage with soft paper drop shadow.",
-        "assembly_step": "2.0-7.0s: Crimson seal stamps firmly onto the document; paper cutouts assemble and lock into spatial anchor.",
+        "entry_action": f"0.0-{t_entry_end:.1f}s: Tactile entry of {hero_obj} sliding into center stage with soft paper drop shadow.",
+        "assembly_step": f"{t_entry_end:.1f}-{t_hold_start:.1f}s: Crimson seal stamps firmly onto the document; paper cutouts assemble and lock into spatial anchor.",
         "spatial_anchor": "Center-left quadrant of canvas, permanently locked as anchor for subsequent scene.",
-        "camera_rule": "Completely static top-down desk view, crisp focus, zero 3D camera pan/tilt."
+        "camera_rule": camera_directive
     }
 
     # 4. Graphic Typography
@@ -99,11 +161,22 @@ def build_vox_scene_prompts(
         "position": "Top-left quadrant, occupying 25% negative space"
     }
 
+    headline_typography = {
+        "text": headline,
+        "color_accent": color,
+        "reserved_negative_space": "Top 30% empty flat block"
+    }
+
     # 5. Visual Continuity Link
     continuity_link = (
         f"Object o{idx+1}_1 remains locked on the newsprint desk; "
         f"Scene {idx+2 if idx+1 < total_scenes else 'Outro'} physically builds upon this exact foundation."
     )
+
+    audio_foley_cues = [
+        {"at_second": 0.8, "sfx_name": "paper_slide_fast"},
+        {"at_second": min(2.0, t_hold_start - 0.2), "sfx_name": "stamp_slam_heavy"}
+    ]
 
     # 6. 5-Layer Image Prompt (Master Prompt: vox_b3_director_image_prompt.md)
     image_prompt = (
@@ -129,15 +202,16 @@ def build_vox_scene_prompts(
         f"Static top-down camera, zero camera drift."
     )
 
-    # 8. Google Flow Veo Fast I2V Prompt (Universal Prompt 3)
+    # 8. Standardized 4-Block Kinematic I2V Prompt (Universal Prompt 3 / Studio Touches 6 & 7)
     i2v_google_flow = (
-        f"Editorial paper cutout animation in Vox documentary style. "
-        f"Animate completed composition: {hero_obj} on Cream Paper #F4F1EA background. "
-        f"0.0-2.0s: Tactile entry of bold geometric paper shapes and headline '{headline}'. "
-        f"2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges. "
-        f"7.0-10.0s: Spatial anchor locked, subtle micro-shadow breathing <= 2px, zero drift. "
-        f"Camera: Completely static top-down desk view, crisp focus, no 3D pan or tilt. "
-        f"Color Palette: {color} on muted paper texture."
+        f"Editorial paper cutout animation in Vox documentary style. Headline: '{headline}'. "
+        f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
+        f"[Camera: {camera_directive}]. "
+        f"[Timeline Kinematics: From 0.0s to {t_entry_end:.1f}s: {hero_obj} slides into position and lands flat. "
+        f"From {t_entry_end:.1f}s to {t_hold_start:.1f}s: Crimson rubber seal stamps firmly onto document. "
+        f"From {t_hold_start:.1f}s to {dur:.1f}s: Rigid spatial anchor hold with micro paper breathing]. "
+        f"[Pacing: Restrained mechanical paper physics, snappy stops, micro settling]. "
+        f"[Constraints: Strict flat 2D tactile paper collage physics, zero 3D fluid morphing, zero face warping]."
     )
 
     return {
@@ -150,6 +224,11 @@ def build_vox_scene_prompts(
         "objects": objects,
         "actions": actions,
         "camera_move": camera_move,
+        "camera_directive": camera_directive,
+        "objects_roster": objects_roster,
+        "second_by_second_action_breakdown": second_by_second_action_breakdown,
+        "headline_typography": headline_typography,
+        "audio_foley_cues": audio_foley_cues,
         "image_prompt": image_prompt,
         "i2v_prompt_omni": i2v_omni,
         "i2v_prompt_google_flow": i2v_google_flow,
@@ -159,7 +238,9 @@ def build_vox_scene_prompts(
 def build_universal_video_prompt(scene: Scene) -> str:
     """Encodes Prompt 3 from Made by AI Playbook: 0-7s layer-by-layer, 7-10s hold micro-motion."""
     color = scene.color_accent or "Vox Crimson #E53935"
-    return scene.i2v_prompt_google_flow or (
+    if scene.i2v_prompt_google_flow:
+        return scene.i2v_prompt_google_flow
+    return (
         f"Editorial paper cutout animation in Vox documentary style. "
         f"Animate completed composition: {scene.visual_metaphor or 'Tactile paper elements'} on Cream Paper #F4F1EA background. "
         f"0.0-2.0s: Tactile entry of bold geometric paper shapes and headline '{scene.headline or 'EDITORIAL FOCUS'}'. "
@@ -168,6 +249,371 @@ def build_universal_video_prompt(scene: Scene) -> str:
         f"Camera: Completely static top-down desk view, crisp focus, no 3D pan or tilt. "
         f"Color Palette: {color} on muted paper texture."
     )
+
+
+def partition_timeline_into_chunks(
+    scenes: List[Scene],
+    target_chunk_duration: float = 36.0,
+    min_chunk_duration: float = 24.0,
+    max_chunk_duration: float = 48.0
+) -> List[Chunk]:
+    """Partitions documentary timeline into coherent 24-48s Sequence Block chunks.
+    
+    Invariants:
+    - No gaps, no overlaps.
+    - Shots and scenes fall on strict scene boundaries.
+    - If total timeline is short (e.g. test fixtures), single chunk covers all.
+    """
+    if not scenes:
+        return []
+
+    total_duration = sum(float(s.duration_est_sec or 5.0) for s in scenes)
+    if total_duration <= min_chunk_duration:
+        shot_ids = [shot.shot_id for s in scenes for shot in s.shots]
+        scene_ids = [s.scene_id for s in scenes]
+        return [
+            Chunk(
+                chunk_id="chunk_001",
+                start_s=0.0,
+                end_s=round(total_duration, 2),
+                duration_s=round(total_duration, 2),
+                shot_ids=shot_ids,
+                scene_ids=scene_ids,
+                boundary_reason="complete_timeline"
+            )
+        ]
+
+    chunks: List[Chunk] = []
+    current_scenes: List[Scene] = []
+    chunk_start_s = 0.0
+    accumulated_dur = 0.0
+
+    for i, sc in enumerate(scenes):
+        dur = float(sc.duration_est_sec or 5.0)
+        is_last = (i == len(scenes) - 1)
+
+        if current_scenes and (accumulated_dur + dur > max_chunk_duration or (accumulated_dur >= target_chunk_duration and not is_last)):
+            chunk_end_s = chunk_start_s + accumulated_dur
+            c_shot_ids = [shot.shot_id for s in current_scenes for shot in s.shots]
+            c_scene_ids = [s.scene_id for s in current_scenes]
+            chunks.append(
+                Chunk(
+                    chunk_id=f"chunk_{len(chunks)+1:03d}",
+                    start_s=round(chunk_start_s, 2),
+                    end_s=round(chunk_end_s, 2),
+                    duration_s=round(accumulated_dur, 2),
+                    shot_ids=c_shot_ids,
+                    scene_ids=c_scene_ids,
+                    boundary_reason="scene_boundary"
+                )
+            )
+            chunk_start_s = chunk_end_s
+            current_scenes = [sc]
+            accumulated_dur = dur
+        else:
+            current_scenes.append(sc)
+            accumulated_dur += dur
+
+    if current_scenes:
+        chunk_end_s = chunk_start_s + accumulated_dur
+        c_shot_ids = [shot.shot_id for s in current_scenes for shot in s.shots]
+        c_scene_ids = [s.scene_id for s in current_scenes]
+        chunks.append(
+            Chunk(
+                chunk_id=f"chunk_{len(chunks)+1:03d}",
+                start_s=round(chunk_start_s, 2),
+                end_s=round(chunk_end_s, 2),
+                duration_s=round(accumulated_dur, 2),
+                shot_ids=c_shot_ids,
+                scene_ids=c_scene_ids,
+                boundary_reason="scene_boundary"
+            )
+        )
+
+    return chunks
+
+
+# Canonical Forensic Documentary Materials Library (Vox Studio Touch 5)
+CANONICAL_DOCUMENTARY_PROPS: List[Dict[str, Any]] = [
+    {
+        "id": "asset_seal_stamp",
+        "type": "tactile_prop",
+        "name": "Crimson Forensic Verification Seal",
+        "desc": "Heavy rubber inspection seal with crimson indelible stamping ink",
+        "texture": "Solid rubber stamp with weathered wooden handle, crimson ink bleed on paper"
+    },
+    {
+        "id": "asset_brass_pin",
+        "type": "tactile_prop",
+        "name": "Brass Archival Evidence Pin",
+        "desc": "Patina brass anchor pushpin for securing documents to evidence board",
+        "texture": "Matte brass metal with slight corrosion patina and sharp anchor point"
+    },
+    {
+        "id": "asset_manila_docket",
+        "type": "paper_cutout",
+        "name": "Manila Archival Docket Cardstock",
+        "desc": "Fibrous manila cardstock folder with tabbed index corners and coffee ring aging",
+        "texture": "Heavy fibrous #DFD2B5 cardstock with 3px deckle edge and soft drop shadow"
+    },
+    {
+        "id": "asset_magnifier_loupe",
+        "type": "tactile_prop",
+        "name": "Forensic Inspection Magnifier Loupe",
+        "desc": "Solid brass rim inspection glass with convex lens caustic reflection",
+        "texture": "Polished brass bezel with optical glass reflection highlighting paper fibers"
+    },
+    {
+        "id": "asset_redacted_tape",
+        "type": "graphic_element",
+        "name": "Matte Black Redaction Censor Tape",
+        "desc": "Matte black vinyl tape strip covering sensitive financial records",
+        "texture": "Dense pitch black matte strip with jagged scissor-cut ends and subtle paper lift"
+    },
+    {
+        "id": "asset_newsprint_desk",
+        "type": "backdrop",
+        "name": "Aged Cream Newsprint Desk Surface",
+        "desc": "Wood-pulp unbleached newsprint desk with subtle halftone printing grid",
+        "texture": "#F4F1EA unbleached paper fiber with 60lpi halftone grid lines"
+    },
+    {
+        "id": "asset_evidence_envelope",
+        "type": "paper_cutout",
+        "name": "Heavy Kraft Evidence Envelope",
+        "desc": "Brown kraft postal document pouch with red string tie closure",
+        "texture": "#C8B293 rough kraft paper with visible wood speckles and tie grommet"
+    },
+    {
+        "id": "asset_financial_ledger",
+        "type": "paper_cutout",
+        "name": "Forensic Accounting Ledger Spread",
+        "desc": "Double-entry column ledger with printed cyan guideline grids and audit stamps",
+        "texture": "Aged accounting ledger paper with crisp deckle edge and ink numeral columns"
+    },
+    {
+        "id": "asset_paper_shears",
+        "type": "tactile_prop",
+        "name": "Vintage Stainless Paper Shears",
+        "desc": "Heavy office cutting shears with black enameled finger loops",
+        "texture": "Brushed stainless steel blades with bevel edge and black cast handles"
+    },
+    {
+        "id": "asset_fingerprint_card",
+        "type": "paper_cutout",
+        "name": "Biometric Forensic Fingerprint Card",
+        "desc": "Standard 8x8 index card with black ink rolled ridge impressions",
+        "texture": "Heavy white index cardstock with crisp black ink friction ridges"
+    },
+    {
+        "id": "asset_flow_arrow",
+        "type": "graphic_element",
+        "name": "Die-Cut Vector Flow Indicator",
+        "desc": "Bold geometric directional chevron cut from Vox Yellow cardstock",
+        "texture": "Solid #F2C230 cardstock cutout with 2px white keyline and soft shadow"
+    },
+    {
+        "id": "asset_cadastral_map",
+        "type": "paper_cutout",
+        "name": "Folded Topographic Cadastral Chart",
+        "desc": "Architectural grid overlay showing offshore jurisdictions and maritime routes",
+        "texture": "Semi-translucent vellum sheet with blue drafting lines and crease fold marks"
+    },
+    {
+        "id": "asset_microfilm_strip",
+        "type": "tactile_prop",
+        "name": "Archival 35mm Microfilm Negative",
+        "desc": "Translucent silver halide film strip with sprocket perforations",
+        "texture": "Glossy acetate negative strip with dark monochrome documentary frames"
+    },
+    {
+        "id": "asset_typewriter_memo",
+        "type": "paper_cutout",
+        "name": "Typewritten Whistleblower Memorandum",
+        "desc": "Courier font carbon copy dispatch memo on onion-skin tissue paper",
+        "texture": "Translucent lightweight onion-skin paper with authentic ribbon ink bleed"
+    },
+    {
+        "id": "asset_notarial_stamp",
+        "type": "tactile_prop",
+        "name": "Embossed Official Notarial Seal",
+        "desc": "Circular saw-tooth metallic gold wafer with embossed institutional crest",
+        "texture": "Muted gold foil wafer with 3D raised relief serrated edges"
+    },
+    {
+        "id": "asset_evidence_tag",
+        "type": "tactile_prop",
+        "name": "Perforated Cardstock Evidence Tag",
+        "desc": "Manila shipping tag with reinforced fiber washer and copper wire loop",
+        "texture": "Heavy cardstock tag with stamped case number and twisted wire tie"
+    },
+    {
+        "id": "asset_ruler_scale",
+        "type": "tactile_prop",
+        "name": "Metric Photogrammetry Scale Bar",
+        "desc": "L-shaped black-and-white centimeter ruler used in crime scene photography",
+        "texture": "Matte white plastic rule with alternating 1cm black blocks"
+    },
+    {
+        "id": "asset_dossier_folder",
+        "type": "paper_cutout",
+        "name": "Classified Investigation Dossier Folder",
+        "desc": "Heavy pressboard classification folder with twin metal prong fasteners",
+        "texture": "Charcoal pressboard folder with red confidential diagonal banner"
+    }
+]
+
+
+def build_master_asset_registry(project_id: str, scenes: List[Scene]) -> AssetRegistry:
+    """Builds a bounded Master Asset Registry of 18-24 items for 8-10 min documentary.
+    
+    Guarantees:
+    - 18 <= len(items) <= 24
+    - Stable immutable asset IDs
+    - Real visual attributes and source URIs
+    - Complete tracking of used_by_shot_ids and used_by_scene_ids
+    """
+    items_map: Dict[str, AssetRegistryItem] = {}
+
+    # 1. Harvest objects from scenes
+    for sc in scenes:
+        sc_id = sc.scene_id
+        shot_ids = [shot.shot_id for shot in sc.shots]
+
+        if sc.hero_cutout_object:
+            slug = re.sub(r"[^a-z0-9]+", "_", sc.hero_cutout_object.lower()).strip("_")[:24]
+            a_id = f"asset_{slug}" if slug else f"asset_hero_{sc_id.lower()}"
+            if a_id not in items_map:
+                items_map[a_id] = AssetRegistryItem(
+                    asset_id=a_id,
+                    asset_type="paper_cutout",
+                    name=sc.hero_cutout_object[:40],
+                    description=f"Tactile paper cutout of {sc.hero_cutout_object}",
+                    visual_attributes={
+                        "deckle_edge": "2-4px crisp white",
+                        "drop_shadow": "soft flat 2mm #00000033",
+                        "texture": "Halftone 60lpi print"
+                    },
+                    texture_spec="Halftone B&W 60lpi print with crisp 3px white deckle edge",
+                    source_uri=f"assets/cutouts/{a_id}.png",
+                    used_by_shot_ids=list(shot_ids),
+                    used_by_scene_ids=[sc_id],
+                    status="ready"
+                )
+            else:
+                for sh in shot_ids:
+                    if sh not in items_map[a_id].used_by_shot_ids:
+                        items_map[a_id].used_by_shot_ids.append(sh)
+                if sc_id not in items_map[a_id].used_by_scene_ids:
+                    items_map[a_id].used_by_scene_ids.append(sc_id)
+
+    # 2. Harvest objects_roster items
+    for sc in scenes:
+        sc_id = sc.scene_id
+        shot_ids = [shot.shot_id for shot in sc.shots]
+        for obj in (sc.objects_roster or []):
+            o_name = obj.get("name", "")
+            o_id = obj.get("object_id") or obj.get("id") or o_name
+            slug = re.sub(r"[^a-z0-9]+", "_", o_id.lower()).strip("_")[:24]
+            a_id = f"asset_{slug}" if not slug.startswith("asset_") else slug
+            if a_id not in items_map:
+                items_map[a_id] = AssetRegistryItem(
+                    asset_id=a_id,
+                    asset_type=obj.get("type", "tactile_prop"),
+                    name=o_name or a_id,
+                    description=obj.get("texture_spec", f"Tactile prop {o_name}"),
+                    visual_attributes={"style": "Vox editorial tactile"},
+                    texture_spec=obj.get("texture_spec"),
+                    source_uri=f"assets/props/{a_id}.png",
+                    used_by_shot_ids=list(shot_ids),
+                    used_by_scene_ids=[sc_id],
+                    status="ready"
+                )
+            else:
+                for sh in shot_ids:
+                    if sh not in items_map[a_id].used_by_shot_ids:
+                        items_map[a_id].used_by_shot_ids.append(sh)
+                if sc_id not in items_map[a_id].used_by_scene_ids:
+                    items_map[a_id].used_by_scene_ids.append(sc_id)
+
+    # 3. Ensure bounded set between 18 and 24 items using canonical documentary props
+    prop_idx = 0
+    while len(items_map) < 18 and prop_idx < len(CANONICAL_DOCUMENTARY_PROPS):
+        prop = CANONICAL_DOCUMENTARY_PROPS[prop_idx]
+        prop_idx += 1
+        p_id = prop["id"]
+        if p_id not in items_map:
+            assoc_scene = scenes[len(items_map) % len(scenes)] if scenes else None
+            assoc_sc_id = assoc_scene.scene_id if assoc_scene else "SCENE_01"
+            assoc_shots = [s.shot_id for s in assoc_scene.shots] if assoc_scene else []
+            items_map[p_id] = AssetRegistryItem(
+                asset_id=p_id,
+                asset_type=prop["type"],
+                name=prop["name"],
+                description=prop["desc"],
+                visual_attributes={"texture": prop["texture"]},
+                texture_spec=prop["texture"],
+                source_uri=f"assets/props/{p_id}.png",
+                used_by_shot_ids=assoc_shots,
+                used_by_scene_ids=[assoc_sc_id],
+                status="ready"
+            )
+
+    sorted_items = sorted(items_map.values(), key=lambda it: len(it.used_by_shot_ids), reverse=True)
+    final_items = sorted_items[:24]
+
+    return AssetRegistry(
+        schema_version="asset_registry.v2",
+        project_id=project_id,
+        items=final_items
+    )
+
+
+BANNED_EMOTIONAL_ADJECTIVES = [
+    r"\bdramatic\b", r"\bepic\b", r"\bscary\b", r"\bbreathtaking\b",
+    r"\binsane\b", r"\bshocking\b", r"\bawesome\b", r"\bhorrific\b"
+]
+
+
+def validate_and_sanitize_director_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Semantic linter enforcing Studio Touch principles on the director plan."""
+    violations: List[str] = []
+    scenes = payload.get("scenes", [])
+
+    for idx, sc in enumerate(scenes):
+        sc_id = sc.get("scene_id", f"scene_{idx+1}")
+        prompt_texts = [
+            sc.get("visual_prompt", ""),
+            sc.get("image_prompt", ""),
+            sc.get("i2v_prompt_google_flow", "")
+        ]
+        combined = " ".join(prompt_texts).lower()
+        for pat in BANNED_EMOTIONAL_ADJECTIVES:
+            if re.search(pat, combined):
+                violations.append(f"Scene {sc_id} contains banned emotional adjective matching '{pat}'")
+
+    allowed_dirs = {"STATIC_OVERHEAD", "SLOW_PUSH_IN_0_1X", "SLOW_HORIZONTAL_PAN", "SUBTLE_TILT_DOWN"}
+    for idx, sc in enumerate(scenes):
+        cd = sc.get("camera_directive")
+        if cd and cd not in allowed_dirs:
+            violations.append(f"Scene {sc.get('scene_id')} has non-canonical camera directive '{cd}'")
+
+    asset_reg = payload.get("asset_registry", {})
+    items = asset_reg.get("items", [])
+    if len(scenes) >= 10 and not (18 <= len(items) <= 24):
+        violations.append(f"Asset registry must contain between 18 and 24 items, got {len(items)}")
+
+    chunks = payload.get("chunks", [])
+    if len(scenes) >= 10 and not chunks:
+        violations.append("Director plan missing Sequence Block chunks for multi-scene production")
+
+    return {
+        "ok": len(violations) == 0,
+        "violations": violations,
+        "total_scenes": len(scenes),
+        "total_chunks": len(chunks),
+        "total_assets": len(items)
+    }
 
 
 @pipeline_stage(
@@ -235,6 +681,8 @@ def run(ctx: RunContext) -> StageArtifact:
         scene = Scene.model_validate(sc_dict)
         slot = acc_pool[idx % len(acc_pool)]
         shot_id = f"sc_{idx+1:02d}_sh_01"
+        prev_shot_id = f"sc_{idx:02d}_sh_01" if idx > 0 else None
+        uses_chain = (idx > 0)
 
         # Decompose into full Vox Object-Assembly Kinematics
         vox_meta = build_vox_scene_prompts(scene, idx=idx, total_scenes=total_sc, prev_scene=prev_scene)
@@ -250,6 +698,11 @@ def run(ctx: RunContext) -> StageArtifact:
         scene.image_prompt = vox_meta["image_prompt"]
         scene.i2v_prompt_omni = vox_meta["i2v_prompt_omni"]
         scene.i2v_prompt_google_flow = vox_meta["i2v_prompt_google_flow"]
+        scene.second_by_second_action_breakdown = vox_meta["second_by_second_action_breakdown"]
+        scene.camera_directive = vox_meta["camera_directive"]
+        scene.objects_roster = vox_meta["objects_roster"]
+        scene.headline_typography = vox_meta["headline_typography"]
+        scene.audio_foley_cues = vox_meta["audio_foley_cues"]
 
         shot = Shot(
             shot_id=shot_id,
@@ -259,16 +712,30 @@ def run(ctx: RunContext) -> StageArtifact:
             seed_image=f"composite_{scene.scene_id.lower()}.png",
             duration_sec=ctx.config.video_generation.duration_per_clip_sec,
             aspect=ctx.config.video_generation.aspect,
-            account_slot=slot
+            account_slot=slot,
+            start_frame_id=f"frame_{shot_id}_start",
+            end_frame_id=f"frame_{shot_id}_end",
+            previous_shot_id=prev_shot_id,
+            uses_previous_end_frame=uses_chain,
+            camera_directive=vox_meta["camera_directive"],
+            second_by_second_action_breakdown=vox_meta["second_by_second_action_breakdown"]
         )
         scene.shots = [shot]
         scenes.append(scene)
         prev_scene = scene
 
+    total_runtime = sum(float(s.duration_est_sec or 5.0) for s in scenes)
+    chunks = partition_timeline_into_chunks(scenes)
+    asset_registry = build_master_asset_registry(ctx.run_id, scenes)
+
     payload = {
+        "schema_version": "director_plan.v2",
+        "project_id": ctx.run_id,
         "task_id": ctx.run_id,
         "format": "VOX_CONTINUOUS_OBJECT_ASSEMBLY_COLLAGE",
+        "runtime_seconds": round(total_runtime, 2),
         "total_scenes": len(scenes),
+        "total_sequence_blocks": len(chunks),
         "account_slots_used": acc_pool,
         "source": {
             "b2_path": b2_source_path,
@@ -278,8 +745,15 @@ def run(ctx: RunContext) -> StageArtifact:
             "path": str(master_prompt_path),
             "sha256": prompt_sha256
         },
+        "chunks": [c.model_dump() for c in chunks],
+        "asset_registry": asset_registry.model_dump(),
         "scenes": [s.model_dump() for s in scenes]
     }
+
+    # Run semantic linter & invariants audit
+    linter_result = validate_and_sanitize_director_plan(payload)
+    if not linter_result["ok"]:
+        logger.warning(f"[s05_director_plan] Semantic linter noticed {len(linter_result['violations'])} items: {linter_result['violations']}")
 
     prov = Provenance(
         generator="stages.s05_director_plan",

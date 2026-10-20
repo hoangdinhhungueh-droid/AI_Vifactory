@@ -75,18 +75,48 @@ Every image prompt must be constructed with 5 explicit layered brackets:
 `Negative prompt: no clutter, no unnecessary objects, no excessive icons, no visual noise, no random decorations, no fantasy elements, no sci-fi elements, no anime, no cartoon style, no CGI look, no glossy 3D rendering, no photorealistic background, no oversaturated rainbow colors, no poor composition, no distorted anatomy, no watermark, no logos, maintain a clean premium VOX-style editorial collage with layered paper textures and documentary-quality composition.`
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 STEP 4: OUTPUT JSON SCHEMA (`director_plan.json`)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 STEP 4: OUTPUT JSON SCHEMA (`director_plan.json` v2)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 The final output must strictly conform to this JSON schema:
 
 ```json
 {
+  "schema_version": "director_plan.v2",
+  "project_id": "<MARKET>_EP<XXXX>_<slug>",
   "episode_id": "<MARKET>_EP<XXXX>_<slug>",
   "title": "<Episode Title>",
   "market": "<EN|KR|JA|VN>",
   "format": "VOX_CONTINUOUS_OBJECT_ASSEMBLY_COLLAGE",
+  "runtime_seconds": 540.0,
   "total_scenes": 90,
   "total_sequence_blocks": 12,
+  "chunks": [
+    {
+      "chunk_id": "chunk_001",
+      "start_s": 0.0,
+      "end_s": 36.0,
+      "duration_s": 36.0,
+      "shot_ids": ["sc_01_sh_01", "sc_02_sh_01"],
+      "scene_ids": ["SCENE_01", "SCENE_02"],
+      "boundary_reason": "scene_boundary"
+    }
+  ],
+  "asset_registry": {
+    "schema_version": "asset_registry.v2",
+    "project_id": "<MARKET>_EP<XXXX>_<slug>",
+    "items": [
+      {
+        "asset_id": "asset_doc_001",
+        "asset_type": "paper_cutout",
+        "name": "Audit Balance Sheet",
+        "texture_spec": "Halftone B&W 60lpi print with crisp 3px white deckle edge",
+        "source_uri": "assets/cutouts/asset_doc_001.png",
+        "used_by_shot_ids": ["sc_01_sh_01"],
+        "status": "ready"
+      }
+    ]
+  },
   "scenes": [
     {
       "scene_id": "SCENE_01",
@@ -101,6 +131,53 @@ The final output must strictly conform to this JSON schema:
       "canvas_workspace": "Aged Cream Newsprint Desk #F4F1EA with subtle print halftone grid",
       "hero_cutout_object": "<Primary paper cutout with white deckle edge>",
       "interacting_objects": ["<Prop 1>", "<Prop 2>"],
+      "camera_directive": "STATIC_OVERHEAD",
+      "objects_roster": [
+        {
+          "object_id": "o1_1",
+          "name": "asset_doc_001",
+          "type": "paper_cutout",
+          "texture_spec": "Halftone B&W 60lpi print with crisp 3px white deckle edge and 2mm flat drop shadow"
+        },
+        {
+          "object_id": "o1_2",
+          "name": "asset_seal_stamp",
+          "type": "tactile_prop",
+          "texture_spec": "Solid forensic inspection rubber stamp with crimson ink"
+        }
+      ],
+      "second_by_second_action_breakdown": [
+        {
+          "time_window": "0.0s - 1.5s",
+          "active_object_id": "o1_1",
+          "action_type": "slide_in",
+          "mechanical_action": "<Hero cutout slides in diagonally into center anchor with snappy stop>",
+          "spatial_coordinate": "X:30%, Y:45%"
+        },
+        {
+          "time_window": "1.5s - 4.0s",
+          "active_object_id": "o1_2",
+          "action_type": "stamp_strike",
+          "mechanical_action": "<Crimson rubber inspection seal impacts firmly onto lower margin>",
+          "spatial_coordinate": "X:35%, Y:60%"
+        },
+        {
+          "time_window": "4.0s - 5.0s",
+          "active_object_id": "ALL_OBJECTS",
+          "action_type": "living_poster_hold",
+          "mechanical_action": "<All objects lock into rigid spatial anchor with micro paper shadow breathing <= 2px>",
+          "spatial_coordinate": "LOCKED_SPATIAL_ANCHOR"
+        }
+      ],
+      "headline_typography": {
+        "text": "<Native text>",
+        "color_accent": "<Hex color>",
+        "reserved_negative_space": "Top 30% empty flat block"
+      },
+      "audio_foley_cues": [
+        {"at_second": 0.8, "sfx_name": "paper_slide_fast"},
+        {"at_second": 2.0, "sfx_name": "stamp_slam_heavy"}
+      ],
       "motion_track_and_assembly": {
         "entry_action": "0.0-2.0s: <How it slides/drops in>",
         "assembly_step": "2.0-4.0s: <How it stamps/connects>",
@@ -115,8 +192,29 @@ The final output must strictly conform to this JSON schema:
       },
       "visual_continuity_link_to_next": "<How this object serves as anchor for the next scene>",
       "color_accent": "<Hex color>",
-      "image_prompt": "<Full 5-layer prompt with negative prompt suffix>"
+      "image_prompt": "<Full 5-layer prompt with negative prompt suffix>",
+      "i2v_prompt_google_flow": "Editorial paper cutout animation in Vox documentary style. Headline: '<headline>'. IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: [Camera: STATIC_OVERHEAD]. [Timeline Kinematics: From 0.0s to 1.5s: ... slides into position. From 1.5s to 4.0s: ... stamps firmly. From 4.0s to 5.0s: Rigid spatial anchor hold with micro paper breathing]. [Pacing: Restrained mechanical paper physics, snappy stops, micro settling]. [Constraints: Strict flat 2D tactile paper collage physics, zero 3D fluid morphing, zero face warping]."
     }
   ]
 }
 ```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛡️ STEP 5: STUDIO 7-TOUCH SEMANTIC LINTER RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. **ZERO EMOTIONAL ADJECTIVES**:
+   - BANNED: `dramatic`, `epic`, `scary`, `breathtaking`, `insane`, `shocking`, `awesome`, `horrific`.
+   - USE ONLY: Mechanical, physical, and geometric verbs: `slides`, `stamps`, `folds`, `snaps`, `shears`, `anchors`, `rotates 15 degrees`, `locks flat`.
+2. **SINGLE CAMERA DIRECTIVE MANDATE**:
+   - Exactly ONE canonical camera directive per scene chosen from:
+     • `STATIC_OVERHEAD`: 100% fixed top-down desk perspective.
+     • `SLOW_PUSH_IN_0_1X`: Subtle 0.1x push-in over scene duration.
+     • `SLOW_HORIZONTAL_PAN`: Restrained linear 2D pan left-to-right.
+     • `SUBTLE_TILT_DOWN`: Subtle vertical top-to-margin tilt.
+   - BANNED: Complex multi-axis camera moves (orbiting, spinning, rapid dolly zooms).
+3. **BOUNDED ASSET REGISTRY**:
+   - Master Asset Registry contains strictly between **18 and 24 Unique Items** per 8-10 min episode.
+   - All scenes accumulate and re-anchor from this bounded set.
+4. **LIVING POSTER HOLD**:
+   - Final 1.0–2.0s of every scene MUST enter `living_poster_hold` (zero camera drift, micro paper shadow breathing <= 2px).
+

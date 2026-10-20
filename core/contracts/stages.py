@@ -50,7 +50,7 @@ class Provenance(BaseModel):
 
 class Shot(BaseModel):
     """Atomic video generation unit passed to Google Flow (I2V / T2V)."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     shot_id: str = Field(description="e.g. sc_01_sh_01")
     scene_id: str = Field(description="e.g. SCENE_01")
@@ -60,6 +60,12 @@ class Shot(BaseModel):
     duration_sec: float = 10.0
     aspect: Literal["16:9", "9:16", "1:1"] = "16:9"
     account_slot: Optional[str] = Field(default=None, description="acc_01 .. acc_07")
+    start_frame_id: Optional[str] = None
+    end_frame_id: Optional[str] = None
+    previous_shot_id: Optional[str] = None
+    uses_previous_end_frame: bool = False
+    camera_directive: Optional[str] = None
+    second_by_second_action_breakdown: Optional[List[Dict[str, Any]]] = None
 
 
 class Scene(BaseModel):
@@ -90,6 +96,50 @@ class Scene(BaseModel):
     image_prompt: Optional[str] = None
     i2v_prompt_omni: Optional[str] = None
     i2v_prompt_google_flow: Optional[str] = None
+    second_by_second_action_breakdown: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    camera_directive: Optional[str] = None
+    objects_roster: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    headline_typography: Optional[Dict[str, Any]] = None
+    audio_foley_cues: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+
+
+class Chunk(BaseModel):
+    """Thematic Sequence Block Partition for 8-10 minute documentary."""
+    model_config = ConfigDict(extra="ignore")
+
+    chunk_id: str
+    start_s: float
+    end_s: float
+    duration_s: float
+    shot_ids: List[str] = Field(default_factory=list)
+    scene_ids: List[str] = Field(default_factory=list)
+    boundary_reason: str = "scene_boundary"
+
+
+class AssetRegistryItem(BaseModel):
+    """Canonical Unique Asset item (18-24 bounded set per episode)."""
+    model_config = ConfigDict(extra="ignore")
+
+    asset_id: str
+    asset_type: str
+    name: str
+    description: str = ""
+    visual_attributes: Dict[str, Any] = Field(default_factory=dict)
+    texture_spec: Optional[str] = None
+    source_uri: Optional[str] = None
+    chroma_prompt: Optional[str] = None
+    used_by_shot_ids: List[str] = Field(default_factory=list)
+    used_by_scene_ids: List[str] = Field(default_factory=list)
+    status: str = "ready"
+
+
+class AssetRegistry(BaseModel):
+    """Master Asset Registry for 8-10 minute documentary (18-24 items)."""
+    model_config = ConfigDict(extra="ignore")
+
+    schema_version: str = "asset_registry.v2"
+    project_id: str
+    items: List[AssetRegistryItem] = Field(default_factory=list)
 
 
 class VideoAsset(BaseModel):

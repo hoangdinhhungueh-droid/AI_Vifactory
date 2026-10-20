@@ -1109,3 +1109,31 @@ class VoxAutomatedDirector:
             prompts.append(thumb_prompt)
 
         return prompts
+
+
+def chunk_script_into_sequence_blocks(
+    scenes_or_sentences: List[Dict[str, Any]],
+    target_duration_sec: float = 36.0,
+    min_duration_sec: float = 24.0,
+    max_duration_sec: float = 48.0
+) -> List[Dict[str, Any]]:
+    """Chunks 8-10 minute script into 10-14 Thematic Sequence Blocks to avoid LLM token overflow."""
+    from core.contracts.stages import Scene
+    from stages.s05_director_plan import partition_timeline_into_chunks
+
+    scenes = []
+    for s in scenes_or_sentences:
+        if isinstance(s, dict):
+            scenes.append(Scene.model_validate({
+                "scene_id": s.get("scene_id") or s.get("id") or f"SC_{len(scenes)+1:02d}",
+                "narration": s.get("narration") or s.get("sentence") or s.get("text") or "Narration",
+                "duration_est_sec": float(s.get("duration_est_sec") or s.get("duration_sec") or 5.0)
+            }))
+    chunks = partition_timeline_into_chunks(
+        scenes,
+        target_chunk_duration=target_duration_sec,
+        min_chunk_duration=min_duration_sec,
+        max_chunk_duration=max_duration_sec
+    )
+    return [c.model_dump() for c in chunks]
+
