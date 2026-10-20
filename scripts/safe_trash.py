@@ -71,8 +71,9 @@ def validate_safe_disposal_target(
             return False, f"SECURITY ERROR: Target is located in forbidden system root: '{path}'"
 
     # Canonical resolution (resolves relative traversal .. and follows symlinks)
+    # Normalize backslashes to forward slashes across platforms so traversals are evaluated properly
     try:
-        raw_p = Path(stripped)
+        raw_p = Path(stripped.replace("\\", "/"))
         resolved_p = raw_p.resolve()
     except (ValueError, RuntimeError, OSError) as res_err:
         return False, f"SECURITY ERROR: Path resolution failed: {res_err}"
