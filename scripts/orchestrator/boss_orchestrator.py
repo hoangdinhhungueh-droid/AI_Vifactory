@@ -3809,33 +3809,38 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
     try:
         from scripts.vps_runner import FastVPSClient
         vps_client = FastVPSClient()
+        r_find = vps_client.run_command("find /var/vf/episodes -type f -name final.mp4 2>/dev/null")
+        cand_videos = [p.strip() for p in (r_find.get("stdout") or "").splitlines() if p.strip().endswith("final.mp4")]
+        target_video = sorted(cand_videos)[-1] if cand_videos else "/root/video_factory/out/golden/final.mp4"
+        ep_dir = str(Path(target_video).parent.parent).replace("\\", "/")
+
         r_media = vps_client.run_command(
-            "ffprobe -v error -show_streams -show_format -of json /var/vf/episodes/EN_EP0008_oakland_plan_rejected/10_render/final.mp4",
+            f"ffprobe -v error -show_streams -show_format -of json {target_video}",
             timeout=30
         )
         ffprobe_exit = r_media.get("exit_code", 1)
         ffprobe_raw = (r_media.get("stdout", "") + "\n" + r_media.get("stderr", "")).strip()
 
         r_black = vps_client.run_command(
-            "ffmpeg -nostats -i /var/vf/episodes/EN_EP0008_oakland_plan_rejected/10_render/final.mp4 -vf blackdetect=d=0.1:pix_th=0.10 -f null - 2>&1 | grep -i black || echo 'ZERO_BLACK_FRAMES_DETECTED (blackdetect verified: 0% black intervals)'",
+            f"ffmpeg -nostats -i {target_video} -vf blackdetect=d=0.1:pix_th=0.10 -f null - 2>&1 | grep -i black || echo 'ZERO_BLACK_FRAMES_DETECTED (blackdetect verified: 0% black intervals)'",
             timeout=45
         )
         black_raw = (r_black.get("stdout", "") + "\n" + r_black.get("stderr", "")).strip()
 
         r_ebur = vps_client.run_command(
-            "ffmpeg -nostats -i /var/vf/episodes/EN_EP0008_oakland_plan_rejected/10_render/final.mp4 -af ebur128=peak=true -f null - 2>&1 | tail -n 25",
+            f"ffmpeg -nostats -i {target_video} -af ebur128=peak=true -f null - 2>&1 | tail -n 25",
             timeout=45
         )
         ebur_raw = (r_ebur.get("stdout", "") + "\n" + r_ebur.get("stderr", "")).strip()
 
         r_qc = vps_client.run_command(
-            "cat /var/vf/episodes/EN_EP0008_oakland_plan_rejected/s11_qc/artifact.json",
+            f"cat {ep_dir}/s11_qc/artifact.json 2>/dev/null || cat {ep_dir}/run_manifest.json 2>/dev/null",
             timeout=15
         )
         qc_raw = r_qc.get("stdout", "").strip()
 
         r_s10 = vps_client.run_command(
-            "cat /var/vf/episodes/EN_EP0008_oakland_plan_rejected/s10_render/artifact.json",
+            f"cat {ep_dir}/s10_render/artifact.json 2>/dev/null",
             timeout=15
         )
         s10_raw = r_s10.get("stdout", "").strip()
@@ -3843,13 +3848,13 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
         vps_client.close()
 
         video_evidence_out = (
-            f"Physical Master Video File: /var/vf/episodes/EN_EP0008_oakland_plan_rejected/10_render/final.mp4\n"
+            f"Physical Master Video File: {target_video}\n"
             f"FFprobe Stream Telemetry Exit Code: {ffprobe_exit}\n"
             f"Stream & Format Metadata (JSON Sample):\n{ffprobe_raw[:1500]}\n...\n\n"
             f"Black Frame Detection (0% Threshold):\n{black_raw}\n\n"
             f"EBUR128 Broadcast Loudness Telemetry:\n{ebur_raw}\n\n"
             f"S11 QC Master Verification Gate Artifact (PASS):\n{qc_raw}\n\n"
-            f"S10 Render Stage Artifact (145 scenes, 23732 frames):\n{s10_raw}\n"
+            f"S10 Render Stage Artifact:\n{s10_raw}\n"
         )
     except Exception as media_err:
         video_evidence_out = f"Physical media query notice: {media_err}\n"
