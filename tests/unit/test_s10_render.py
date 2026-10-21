@@ -141,12 +141,12 @@ def test_s10_render_reverifies_stale_mp4(tmp_path: Path, monkeypatch: pytest.Mon
 
     assembly_called = False
 
-    def mock_assemble(clips, audio, sub, target):
+    def fake_assemble(clips, audio, sub, target):
         nonlocal assembly_called
         assembly_called = True
         target.write_bytes(b"X" * 1500)
 
-    monkeypatch.setattr("stages.s10_render.assemble_final_video", mock_assemble)
+    monkeypatch.setattr("stages.s10_render.assemble_final_video", fake_assemble)
     monkeypatch.setattr("vox.qa.gates.probe_media_file", lambda p: {
         "streams": [{"codec_type": "video", "codec_name": "h264", "nb_frames": 60, "r_frame_rate": "30/1"}],
         "format": {"duration": "2.0"}

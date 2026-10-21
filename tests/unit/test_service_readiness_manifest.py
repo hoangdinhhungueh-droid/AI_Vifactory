@@ -50,7 +50,7 @@ def test_production_manifest_aggregation_fails_when_service_readiness_fails_even
     even when subsequent fastapi_http_probes returns PASS (Rule 121 fail-closed).
     """
     probes_dict = {
-        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 231},
         "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
         "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
@@ -80,7 +80,7 @@ def test_production_manifest_aggregation_fails_when_service_readiness_fails_even
 def test_production_manifest_aggregation_passes_when_all_probes_pass():
     """Verifies that all 13 probes passing produces the 100% certified aggregate manifest verdict."""
     probes_dict = {
-        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 231},
         "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
         "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
@@ -480,13 +480,13 @@ def test_parse_probe_output_valid_reconciliation():
         "3. OFFLINE UNIT TEST DOUBLES COUNT & ARITHMETIC RECONCILIATION:\n"
         "   A. Scoped tests/unit/ Suite:\n"
         "      - File Count:  17 test files\n"
-        "      - Total Count: 229 references\n"
-        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
-        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "      - Total Count: 231 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  231 references\n"
+        "       * Actual Counted Total (tests/unit/):         231 references\n"
         "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)\n"
     )
     count = _parse_probe_output(sample)
-    assert count == 229
+    assert count == 231
 
 
 def test_parse_probe_output_duplicate_identical_summaries_raises_value_error():
@@ -495,10 +495,10 @@ def test_parse_probe_output_duplicate_identical_summaries_raises_value_error():
         "3. OFFLINE UNIT TEST DOUBLES COUNT & ARITHMETIC RECONCILIATION:\n"
         "   A. Scoped tests/unit/ Suite:\n"
         "      - File Count:  17 test files\n"
-        "      - Total Count: 229 references\n"
-        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
-        "       * Actual Counted Total (tests/unit/):         229 references\n"
-        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "      - Total Count: 231 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  231 references\n"
+        "       * Actual Counted Total (tests/unit/):         231 references\n"
+        "       * Actual Counted Total (tests/unit/):         231 references\n"
         "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)\n"
     )
     with pytest.raises(ValueError, match="duplicate or missing summary records are strictly rejected"):
@@ -511,9 +511,9 @@ def test_parse_probe_output_missing_terminal_marker_raises_value_error():
         "3. OFFLINE UNIT TEST DOUBLES COUNT & ARITHMETIC RECONCILIATION:\n"
         "   A. Scoped tests/unit/ Suite:\n"
         "      - File Count:  17 test files\n"
-        "      - Total Count: 229 references\n"
-        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
-        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "      - Total Count: 231 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  231 references\n"
+        "       * Actual Counted Total (tests/unit/):         231 references\n"
     )
     with pytest.raises(ValueError, match="Missing explicit successful terminal record"):
         _parse_probe_output(sample)
@@ -523,9 +523,9 @@ def test_parse_probe_output_conflicting_counts_raises_value_error():
     """Verifies parser strictly rejects conflicting numbers in probe output."""
     sample = (
         "   A. Scoped tests/unit/ Suite:\n"
-        "      - Total Count: 229 references\n"
+        "      - Total Count: 231 references\n"
         "       * Calculated Reconciled Total (tests/unit/):  227 references\n"
-        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "       * Actual Counted Total (tests/unit/):         231 references\n"
         "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)\n"
     )
     with pytest.raises(ValueError, match="Arithmetic reconciliation defect"):
@@ -534,7 +534,7 @@ def test_parse_probe_output_conflicting_counts_raises_value_error():
 
 def test_parse_probe_output_failure_indicator_raises_value_error():
     """Verifies parser rejects output with failure banner or error indications."""
-    sample = "❌ FAIL: tests/unit/ count mismatch! Actual Counted Total (tests/unit/): 229 references"
+    sample = "❌ FAIL: tests/unit/ count mismatch! Actual Counted Total (tests/unit/): 231 references"
     with pytest.raises(ValueError, match="contains failure indicators"):
         _parse_probe_output(sample)
 
@@ -542,7 +542,7 @@ def test_parse_probe_output_failure_indicator_raises_value_error():
 def test_parse_probe_output_missing_fields_raises_value_error():
     """Verifies parser rejects incomplete probe output missing required fields."""
     sample = (
-        "Scoped tests/unit/ Suite: Total Count: 229 references\n"
+        "Scoped tests/unit/ Suite: Total Count: 231 references\n"
         "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)\n"
     )
     with pytest.raises(ValueError, match="Expected exactly 1 'Actual Counted Total"):
@@ -552,7 +552,7 @@ def test_parse_probe_output_missing_fields_raises_value_error():
 def test_aggregate_manifest_accepts_junit_negative_test_matrix_dual_exit_codes():
     """Verifies aggregate_manifest deduces exit_code 0 when linux_exit_code and windows_exit_code are 0."""
     probes_dict = {
-        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 231},
         "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
         "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"linux_exit_code": 0, "windows_exit_code": 0, "verdict": "PASS"},
@@ -582,9 +582,9 @@ def test_parse_probe_output_duplicate_terminal_markers_raises_value_error():
     tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
     sample = (
         "   A. Scoped tests/unit/ Suite:\n"
-        "      - Total Count: 229 references\n"
-        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
-        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "      - Total Count: 231 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  231 references\n"
+        "       * Actual Counted Total (tests/unit/):         231 references\n"
         f"{tm}\n"
         f"{tm}\n"
     )
@@ -597,9 +597,9 @@ def test_parse_probe_output_embedded_terminal_marker_raises_value_error():
     tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
     sample = (
         "   A. Scoped tests/unit/ Suite:\n"
-        "      - Total Count: 229 references\n"
-        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
-        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "      - Total Count: 231 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  231 references\n"
+        "       * Actual Counted Total (tests/unit/):         231 references\n"
         f"Corrupted invalid prefix line containing {tm} embedded\n"
     )
     with pytest.raises(ValueError, match="Missing explicit successful terminal record"):
@@ -611,9 +611,9 @@ def test_parse_probe_output_trailing_invalid_content_raises_value_error():
     tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
     sample = (
         "   A. Scoped tests/unit/ Suite:\n"
-        "      - Total Count: 229 references\n"
-        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
-        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "      - Total Count: 231 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  231 references\n"
+        "       * Actual Counted Total (tests/unit/):         231 references\n"
         f"{tm}\n"
         "Unexpected trailing text after terminal marker!\n"
     )
@@ -626,10 +626,10 @@ def test_parse_probe_output_malformed_extra_summary_raises_value_error():
     tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
     sample = (
         "   A. Scoped tests/unit/ Suite:\n"
-        "      - Total Count: 229 references\n"
-        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
-        "       * Actual Counted Total (tests/unit/):         229 references\n"
-        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "      - Total Count: 231 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  231 references\n"
+        "       * Actual Counted Total (tests/unit/):         231 references\n"
+        "       * Actual Counted Total (tests/unit/):         231 references\n"
         f"{tm}\n"
     )
     with pytest.raises(ValueError, match="Expected exactly 1 'Actual Counted Total'"):
@@ -641,8 +641,8 @@ def test_parse_probe_output_malformed_syntax_summary_raises_value_error():
     tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
     sample = (
         "   A. Scoped tests/unit/ Suite:\n"
-        "      - Total Count: 229 references\n"
-        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
+        "      - Total Count: 231 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  231 references\n"
         "       * Actual Counted Total (tests/unit/):         corrupted_non_numeric\n"
         f"{tm}\n"
     )
@@ -653,7 +653,7 @@ def test_parse_probe_output_malformed_syntax_summary_raises_value_error():
 def test_aggregate_manifest_rejects_head_or_tree_digest_mismatch():
     """Verifies aggregate_manifest strictly enforces provenance equality between git head and digests."""
     probes_dict = {
-        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 231},
         "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
         "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
@@ -681,7 +681,7 @@ def test_aggregate_manifest_rejects_head_or_tree_digest_mismatch():
 def test_aggregate_manifest_rejects_tree_digest_mismatch():
     """Verifies aggregate_manifest strictly enforces provenance equality between git tree and digests."""
     probes_dict = {
-        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 231},
         "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
         "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
@@ -709,7 +709,7 @@ def test_aggregate_manifest_rejects_tree_digest_mismatch():
 def test_aggregate_manifest_rejects_missing_or_empty_xml_sha256():
     """Verifies aggregate_manifest strictly rejects empty or missing per-probe xml_sha256."""
     probes_dict = {
-        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 231},
         "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": ""},
         "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
@@ -735,7 +735,7 @@ def test_aggregate_manifest_rejects_missing_or_empty_xml_sha256():
 def test_aggregate_manifest_rejects_boolean_exit_code():
     """Verifies aggregate_manifest rejects boolean False as an exit code (requires strict int 0)."""
     probes_dict = {
-        PROBE_KEY_ZERO_MOCK: {"exit_code": False, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": False, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 231},
         "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
         "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
@@ -923,7 +923,7 @@ def test_run_service_readiness_probe_fails_on_inspect_phase_overrun():
 def test_aggregate_manifest_rejects_missing_ci_head():
     """Verifies aggregate_manifest strictly marks FAIL when github_actions_ci omits head_sha."""
     probes_dict = {
-        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 231},
         "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
         "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
@@ -949,7 +949,7 @@ def test_aggregate_manifest_rejects_missing_ci_head():
 def test_aggregate_manifest_rejects_mismatched_ci_head():
     """Verifies aggregate_manifest strictly marks FAIL when github_actions_ci head_sha does not match git_head."""
     probes_dict = {
-        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 229},
+        PROBE_KEY_ZERO_MOCK: {"exit_code": 0, "verdict": "PASS", PROBE_COUNT_KEY_ZERO_MOCK: 231},
         "linux_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "c" * 64},
         "windows_focused_pytest": {"exit_code": 0, "verdict": "PASS", "test_count": 52, "xml_sha256": "d" * 64},
         "junit_negative_test_matrix": {"exit_code": 0, "verdict": "PASS"},
@@ -977,9 +977,9 @@ def test_parse_probe_output_embedded_marker_with_valid_terminal_raises_value_err
     tm = "✅ ZERO-MOCK COMPLIANCE & RECONCILIATION PROBE PASSED (Exit code 0)"
     sample = (
         "   A. Scoped tests/unit/ Suite:\n"
-        "      - Total Count: 229 references\n"
-        "       * Calculated Reconciled Total (tests/unit/):  229 references\n"
-        "       * Actual Counted Total (tests/unit/):         229 references\n"
+        "      - Total Count: 231 references\n"
+        "       * Calculated Reconciled Total (tests/unit/):  231 references\n"
+        "       * Actual Counted Total (tests/unit/):         231 references\n"
         f"Corrupted embedded marker line: {tm}\n"
         f"{tm}\n"
     )
@@ -1003,7 +1003,7 @@ def test_parse_probe_output_truncated_at_sections_raises_value_error():
 
     s3 = (
         "3. OFFLINE TEST RECONCILIATION:\n"
-        "   - Total Count: 229 references\n"
+        "   - Total Count: 231 references\n"
     )
     with pytest.raises(ValueError):
         _parse_probe_output(s3)
