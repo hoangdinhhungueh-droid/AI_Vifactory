@@ -288,7 +288,8 @@ def move_to_trash_linux(path: str, allowed_roots: Optional[List[Union[str, Path]
         dest_fd = os.open(trash_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
 
         # Perform atomic descriptor-relative move (renameat) without closing handles
-        if hasattr(os, "rename") and "src_dir_fd" in os.rename.__code__.co_varnames:
+        supports_rename_fd = hasattr(os, "supports_dir_fd") and (os.rename in os.supports_dir_fd)
+        if supports_rename_fd:
             os.rename(base_name, dest_name, src_dir_fd=parent_fd, dst_dir_fd=dest_fd)
             print(f"Successfully moved to Linux Trash via atomic descriptor-relative rename: {abs_path}")
             return True
