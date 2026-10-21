@@ -10,7 +10,9 @@ Unit tests verifying the Vox Studio 8-10 minute upgrade features:
 """
 
 from pathlib import Path
+
 import pytest
+
 from core.contracts.stages import AssetRegistry, Scene, Shot
 from stages.s05_director_plan import (
     build_master_asset_registry,
@@ -724,7 +726,6 @@ def test_ast_rule139_scanner_contract_validation_fails_closed():
 def test_vox_qa_gates_fails_closed_when_scene_plan_absent_or_empty(tmp_path):
     """Verify that vox.qa.gates.verify_final_video_gates fails closed when ScenePlan is None or empty (Rule 139 & Boss Item 12)."""
     from vox.qa.gates import verify_final_video_gates
-    from vox.schemas import ScenePlan
 
     dummy_mp4 = tmp_path / "test.mp4"
     dummy_mp4.write_bytes(b"dummy")
@@ -734,7 +735,6 @@ def test_vox_qa_gates_fails_closed_when_scene_plan_absent_or_empty(tmp_path):
         # Monkeypatch probe_media_file to return minimal valid streams
         import vox.qa.gates as vq
         orig_probe = vq.probe_media_file
-        orig_loudness = vq.measure_ebur128_loudness
 
         def fake_probe(p):
             return {

@@ -7,6 +7,8 @@ Implements Stage Shape Standard. Performs forensic verification on final rendere
 
 from __future__ import annotations
 
+import json
+import logging
 import time
 from pathlib import Path
 
@@ -16,6 +18,7 @@ from core.gates import emit_artifact, require_input
 from tools.codemap.runtime import pipeline_stage
 from vox.qa.gates import QAGateFailureError, verify_final_video_gates
 
+logger = logging.getLogger("s11_qc")
 STAGE: StageID = StageID.S11_QC
 
 
@@ -56,7 +59,7 @@ def run(ctx: RunContext) -> StageArtifact:
     props_path_str = s10_art.payload.get("remotion_props_file")
     if props_path_str and Path(props_path_str).exists():
         try:
-            from vox.schemas import ScenePlan, SceneProps
+            from vox.schemas import ScenePlan
             props_data = json.loads(Path(props_path_str).read_text(encoding="utf-8"))
             sc_list = props_data.get("scenes", [])
             if sc_list:

@@ -3661,8 +3661,9 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
     vps_status_out = "VPS Parity: Local execution mode."
     vps_code: Any = "WAIVED"
     try:
-        from scripts.vps_runner import FastVPSClient
         import hashlib
+
+        from scripts.vps_runner import FastVPSClient
 
         # Check Local Porcelain Status
         local_dirty_res = subprocess.run(["git", "-C", str(ROOT_DIR), "status", "--porcelain"], capture_output=True, text=True, check=False)
@@ -3747,6 +3748,7 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
             f"Three-Way Bit-for-Bit Parity Verdict: {parity_verdict}\n"
             f"Local Windows Tree SHA:                {local_tree_sha}\n"
             f"Linux VPS Tree SHA:                    {vps_tree_sha}\n"
+            f"Local Tracked Index Hash (-s):          {local_index_hash}\n"
             f"Local Deterministic Content Manifest:  {local_content_manifest_sha} ({local_tracked_count} files)\n"
             f"Linux Deterministic Content Manifest:  {vps_manifest_sha}\n"
             f"Local Working Tree Clean:              {local_porcelain_clean}\n"
