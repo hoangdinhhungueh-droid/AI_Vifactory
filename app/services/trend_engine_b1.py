@@ -787,16 +787,15 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
     task_id = str(topic_data.get("task_id", "")).strip()
 
     # 1. Gate Order Integrity Guard (Rule 125 & Anti-Ghost Out-of-Order Gate Violation)
-    # Human Gate 1 can ONLY be dispatched BEFORE B3/Gate 2. If B3 is already done or HG2 dispatched, BLOCK!
+    # Human Gate 1 can ONLY be dispatched BEFORE B4 image generation has started.
     if task_id:
         ep_dir = resolve_episodes_dir(ensure_dir=False)
-        plan_file = ep_dir / task_id / "director_plan.json"
-        audit_file = ep_dir / task_id / "visual_convergence_audit.json"
-        if plan_file.exists() or audit_file.exists():
+        seeds_dir = ep_dir / task_id / "composite_seeds"
+        if seeds_dir.exists() and any(seeds_dir.glob("*.png")):
             logger.warning(
                 f"[trend_engine] GATE ORDER VIOLATION BLOCKED: Refusing to dispatch Human Gate 1 for {task_id} "
-                f"because B3 Director Plan / HG2 visual convergence already exists ({plan_file})! "
-                f"Human Gate 1 MUST NEVER be dispatched after Human Gate 2."
+                f"because B4 image generation already commenced! "
+                f"Human Gate 1 MUST NEVER be dispatched after B4 starts."
             )
             return
 
@@ -1734,7 +1733,7 @@ def discover_and_produce_market_trend(
                     "--run-id",
                     str(temp_task_id),
                     "--to",
-                    "s05_director_plan",
+                    "s06_critic_visual",
                 ]
                 sub_env = os.environ.copy()
                 sub_env["PYTHONPATH"] = f"{_PROJECT_ROOT}{os.pathsep}{sub_env.get('PYTHONPATH', '')}".strip(os.pathsep)

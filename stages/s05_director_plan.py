@@ -725,12 +725,41 @@ def run(ctx: RunContext) -> StageArtifact:
     scenes: List[Scene] = []
     prev_scene: Optional[Scene] = None
 
+    # Dynamic Master Prompt 2 Vox Storyboard via Claude Opus 5.5 / Fallback Astra 6
+    market = "JA" if "JP_" in ctx.run_id else ("KO" if "KR_" in ctx.run_id else ("VI" if "VN_" in ctx.run_id else "EN"))
+    sentences = [sc_dict.get("narration", "") for sc_dict in raw_scenes if isinstance(sc_dict, dict) and sc_dict.get("narration")]
+    story_text = "\n".join(sentences)
+
+    planned_storyboard = []
+    try:
+        from app.services.claude_vox_director import ClaudeVoxDirector
+        director = ClaudeVoxDirector()
+        planned_storyboard = director.plan_storyboard(
+            story_text=story_text,
+            market=market,
+            sentences_override=sentences
+        )
+    except Exception as dir_err:
+        logger.warning(f"[s05_director_plan] ClaudeVoxDirector notice: {dir_err}")
+
     for idx, sc_dict in enumerate(raw_scenes):
         scene = Scene.model_validate(sc_dict)
         slot = acc_pool[idx % len(acc_pool)]
         shot_id = f"sc_{idx+1:02d}_sh_01"
         prev_shot_id = f"sc_{idx:02d}_sh_01" if idx > 0 else None
         uses_chain = (idx > 0)
+
+        # Enrich with Opus 5.5 planned exhibits if available
+        if planned_storyboard and idx < len(planned_storyboard):
+            item = planned_storyboard[idx]
+            if item.get("editorial_title") and (not scene.headline or scene.headline.startswith("BEAT ")):
+                scene.headline = item["editorial_title"]
+            if item.get("visual_metaphor") and (not scene.visual_metaphor or "Tactile editorial evidence" in scene.visual_metaphor):
+                scene.visual_metaphor = item["visual_metaphor"]
+            if item.get("main_subject_cutout", {}).get("label"):
+                scene.hero_cutout_object = item["main_subject_cutout"]["label"]
+            if item.get("supporting_exhibits"):
+                scene.interacting_objects = [ex.get("label") for ex in item["supporting_exhibits"] if ex.get("label")]
 
         # Decompose into full Vox Object-Assembly Kinematics
         vox_meta = build_vox_scene_prompts(scene, idx=idx, total_scenes=total_sc, prev_scene=prev_scene)
@@ -835,6 +864,29 @@ def run(ctx: RunContext) -> StageArtifact:
                 with open(dp_file, "w", encoding="utf-8") as f:
                     json.dump(payload, f, indent=2, ensure_ascii=False)
                 logger.info(f"[s05_director_plan] Synchronized director_plan.json to {dp_file}")
+
+                # Synchronize dp_plan.json and canonical prompts_forge.json for Remotion, B4 & DACL
+                with open(ep_dir / "dp_plan.json", "w", encoding="utf-8") as f:
+                    json.dump({"episode_id": ctx.run_id, "scenes": payload.get("scenes", [])}, f, indent=2, ensure_ascii=False)
+
+                prompts_manifest = {
+                    "episode_id": ctx.run_id,
+                    "market": market,
+                    "total_scenes": len(scenes),
+                    "backgrounds": {s.scene_id: s.image_prompt for s in scenes},
+                    "foregrounds": {s.scene_id: s.hero_cutout_object for s in scenes},
+                    "vox_collages": {s.scene_id: s.image_prompt for s in scenes},
+                    "universal_video_prompt": build_universal_video_prompt(scenes[0]) if scenes else "",
+                    "omni_i2v_prompts": {s.scene_id: s.i2v_prompt_omni for s in scenes},
+                    "flow_i2v_prompts": {s.scene_id: s.i2v_prompt_google_flow for s in scenes},
+                    "thumbnails": {}
+                }
+                pf_file = ep_dir / "prompts_forge.json"
+                with open(pf_file, "w", encoding="utf-8") as f:
+                    json.dump(prompts_manifest, f, indent=2, ensure_ascii=False)
+                with open(ep_dir / "prompts.json", "w", encoding="utf-8") as f:
+                    json.dump(prompts_manifest, f, indent=2, ensure_ascii=False)
+                logger.info(f"[s05_director_plan] Synchronized prompts_forge.json to {pf_file}")
             except Exception as _sync_err:
                 logger.warning(f"[s05_director_plan] Notice syncing director_plan.json to {ep_dir}: {_sync_err}")
 

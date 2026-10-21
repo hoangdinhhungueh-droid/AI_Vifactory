@@ -67,13 +67,23 @@ def run(ctx: RunContext) -> StageArtifact:
             block_slug = "act_v_living_warning"
             role = "payoff"
 
+        try:
+            from app.services.claude_vox_director import _extract_sentence_exhibits
+            exhibits = _extract_sentence_exhibits(b.text, idx)
+            headline_text = exhibits.get("editorial_title") or f"BEAT {idx:02d}"
+            hero_label = exhibits.get("hero_label") or b.text[:30]
+            metaphor_text = f"Tactile archival exhibit: {hero_label}"
+        except Exception:
+            headline_text = f"BEAT {idx:02d}"
+            metaphor_text = f"Tactile editorial evidence for beat {idx:02d}"
+
         all_scenes.append(Scene(
             scene_id=f"SCENE_{idx:02d}",
             sequence_block=f"block_{idx}_{block_slug}",
             beat_role=role,
             narration=b.text,
-            headline=f"BEAT {idx:02d}",
-            visual_metaphor=f"Tactile editorial evidence for beat {idx:02d}",
+            headline=headline_text,
+            visual_metaphor=metaphor_text,
             color_accent="Vox Yellow #F2C230 & Navy #1B2B4A",
             duration_est_sec=6.0
         ))
