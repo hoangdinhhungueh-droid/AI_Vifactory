@@ -61,12 +61,19 @@ def run(ctx: RunContext) -> StageArtifact:
     target_art_file = ctx.paths.artifact_file(STAGE.value) if hasattr(ctx, "paths") and hasattr(ctx.paths, "artifact_file") else None
     try:
         return _run_stage_s10_internal(ctx, start_ts)
-    except Exception:
+    except Exception as render_err:
         if target_art_file and target_art_file.exists():
             try:
                 target_art_file.unlink()
             except OSError as unlink_err:
                 logger.debug(f"[s10_render] Failure artifact unlink notice: {unlink_err}")
+            if target_art_file.exists():
+                try:
+                    target_art_file.write_text(json.dumps({"status": "failed", "stage": STAGE.value, "error": str(render_err)}), encoding="utf-8")
+                except OSError as write_err:
+                    logger.debug(f"[s10_render] Failure artifact overwrite notice: {write_err}")
+                if target_art_file.exists():
+                    raise RuntimeError(f"Stage S10 fail-closed: Unable to unlink or invalidate stale artifact at '{target_art_file}'") from render_err
         raise
 
 def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:

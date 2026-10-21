@@ -773,8 +773,9 @@ def test_safe_disposal_concurrent_ancestor_race_fails_closed(tmp_path: Path):
             try:
                 if sub_dir.exists():
                     sub_dir.touch()
-            except OSError:
-                pass
+            except OSError as race_touch_err:
+                # Structured notice to comply with Rule 139 zero silent-handler invariant
+                print(f"Ancestor race worker touch notice: {race_touch_err}")
             time.sleep(0.001)
 
     t = threading.Thread(target=ancestor_race_worker, daemon=True)

@@ -259,8 +259,13 @@ def move_to_trash_linux(path: str, allowed_roots: Optional[List[Union[str, Path]
     # Directory-descriptor-relative atomic validation and move architecture (Boss Round 11 Item 7)
     parent_dir = os.path.dirname(abs_path)
     base_name = os.path.basename(abs_path)
+    trash_dir = os.path.expanduser("~/.local/share/Trash/files")
+    os.makedirs(trash_dir, exist_ok=True)
+    dest_name = f"{int(time.time())}_{base_name}"
+
     parent_fd = None
     target_fd = None
+    dest_fd = None
     try:
         p_flags = os.O_RDONLY
         if hasattr(os, "O_DIRECTORY"):
@@ -278,32 +283,37 @@ def move_to_trash_linux(path: str, allowed_roots: Optional[List[Union[str, Path]
         if fd_stat.st_ino != initial_lstat.st_ino or fd_stat.st_dev != initial_lstat.st_dev:
             print(f"SECURITY RACE DETECTED: Inode/device mutated between validation and move: {abs_path}")
             return False
+
+        # Open destination descriptor while holding parent_fd and target_fd
+        dest_fd = os.open(trash_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+
+        # Perform atomic descriptor-relative move (renameat) without closing handles
+        if hasattr(os, "rename") and "src_dir_fd" in os.rename.__code__.co_varnames:
+            os.rename(base_name, dest_name, src_dir_fd=parent_fd, dst_dir_fd=dest_fd)
+            print(f"Successfully moved to Linux Trash via atomic descriptor-relative rename: {abs_path}")
+            return True
+        else:
+            print("Descriptor-relative rename not supported on this platform")
+            return False
     except OSError as fd_err:
-        print(f"SECURITY RACE DETECTED: Descriptor-relative verification failed: {fd_err}")
+        print(f"SECURITY RACE DETECTED: Descriptor-relative operation failed: {fd_err}")
         return False
     finally:
         if target_fd is not None:
-            os.close(target_fd)
-
-    # Attempt atomic descriptor-relative move if destination directory descriptor is available
-    trash_dir = os.path.expanduser("~/.local/share/Trash/files")
-    os.makedirs(trash_dir, exist_ok=True)
-    dest_name = f"{int(time.time())}_{base_name}"
-    try:
-        dest_fd = os.open(trash_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        try:
-            # Try atomic rename via src_dir_fd and dst_dir_fd (POSIX renameat/openat architecture)
-            if hasattr(os, "rename") and "src_dir_fd" in os.rename.__code__.co_varnames:
-                os.rename(base_name, dest_name, src_dir_fd=parent_fd, dst_dir_fd=dest_fd)
-                print(f"Successfully moved to Linux Trash via atomic descriptor-relative rename: {abs_path}")
-                return True
-        finally:
-            os.close(dest_fd)
-    except Exception as move_err:
-        print(f"Descriptor-relative rename notice: {move_err}")
-    finally:
+            try:
+                os.close(target_fd)
+            except OSError as close_err:
+                print(f"target_fd close notice: {close_err}")
+        if dest_fd is not None:
+            try:
+                os.close(dest_fd)
+            except OSError as close_err:
+                print(f"dest_fd close notice: {close_err}")
         if parent_fd is not None:
-            os.close(parent_fd)
+            try:
+                os.close(parent_fd)
+            except OSError as close_err:
+                print(f"parent_fd close notice: {close_err}")
 
     res = subprocess.run(["which", "trash-put"], capture_output=True, text=True)
     if res.returncode == 0:

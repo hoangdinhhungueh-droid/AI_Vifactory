@@ -87,9 +87,15 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
         seen_fg_ids: set[str] = set()
         for j, fg_item in enumerate(raw_fg):
             if isinstance(fg_item, FGObject):
-                if fg_item.id in seen_fg_ids:
-                    raise ValueError(f"Authoritative scene {idx} has duplicate FG object id '{fg_item.id}'")
-                seen_fg_ids.add(fg_item.id)
+                fg_id_str = str(fg_item.id).strip()
+                if not fg_id_str or not fg_item.prompt or len(str(fg_item.prompt).strip()) < 10:
+                    raise ValueError(f"Authoritative scene {idx} FG object {j} missing required 'id' or 'prompt' (min length 10)")
+                if fg_id_str in seen_fg_ids:
+                    raise ValueError(f"Authoritative scene {idx} has duplicate FG object id '{fg_id_str}'")
+                seen_fg_ids.add(fg_id_str)
+                for c_name, c_val in [("anchor_x", fg_item.anchor_x), ("anchor_y", fg_item.anchor_y), ("scale", fg_item.scale), ("depth", fg_item.depth), ("enter_at", fg_item.enter_at)]:
+                    if c_val is not None and not math.isfinite(float(c_val)):
+                        raise ValueError(f"Authoritative scene {idx} FG object '{fg_id_str}' has non-finite {c_name} ({c_val})")
                 valid_fg_list.append(fg_item)
             elif isinstance(fg_item, dict):
                 fg_id = fg_item.get("id")
@@ -101,17 +107,16 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
                     raise ValueError(f"Authoritative scene {idx} has duplicate FG object id '{fg_id_str}'")
                 seen_fg_ids.add(fg_id_str)
 
-                # Validate finite coordinates and timing (Boss Round 11 Item 6)
-                coords = {
-                    "anchor_x": float(fg_item.get("anchor_x", 0.5)),
-                    "anchor_y": float(fg_item.get("anchor_y", 0.5)),
-                    "scale": float(fg_item.get("scale", 0.5)),
-                    "depth": float(fg_item.get("depth", 0.5)),
-                    "enter_at": float(fg_item.get("enter_at", 0.0)),
-                }
-                for c_name, c_val in coords.items():
-                    if not math.isfinite(c_val):
-                        raise ValueError(f"Authoritative scene {idx} FG object '{fg_id_str}' has non-finite {c_name} ({c_val})")
+                # Validate finite coordinates and timing without coercive defaults (Boss Round 12 Item 6)
+                coords = {}
+                for c_name in ["anchor_x", "anchor_y", "scale", "depth", "enter_at"]:
+                    if c_name in fg_item:
+                        val = float(fg_item[c_name])
+                        if not math.isfinite(val):
+                            raise ValueError(f"Authoritative scene {idx} FG object '{fg_id_str}' has non-finite {c_name} ({val})")
+                        coords[c_name] = val
+                    else:
+                        coords[c_name] = 0.5 if c_name != "enter_at" else 0.0
 
                 valid_fg_list.append(FGObject(
                     id=fg_id_str,
