@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import time
 from pathlib import Path
 from typing import List
@@ -179,24 +180,75 @@ def run(ctx: RunContext) -> StageArtifact:
     if not v_st:
         raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' has no valid video stream")
 
-    v_nb_frames = int(v_st.get("nb_frames", 0))
+    # Strict rate parsing: require finite positive measured rate, valid denominator, no silent intended fallback
+    r_fps_str = v_st.get("r_frame_rate")
+    if not r_fps_str or not isinstance(r_fps_str, str):
+        raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' missing required 'r_frame_rate' telemetry")
+
+    r_fps_str = r_fps_str.strip()
+    try:
+        if "/" in r_fps_str:
+            num_str, den_str = r_fps_str.split("/", 1)
+            num = float(num_str)
+            den = float(den_str)
+            if den <= 0.0 or not math.isfinite(num) or not math.isfinite(den):
+                raise ValueError(f"Non-positive or non-finite rational components in '{r_fps_str}'")
+            actual_fps = num / den
+        else:
+            actual_fps = float(r_fps_str)
+    except Exception as rate_err:
+        raise ValueError(f"Stage S10 fail-closed: Invalid r_frame_rate '{r_fps_str}': {rate_err}")
+
+    if not math.isfinite(actual_fps) or actual_fps <= 0.0:
+        raise ValueError(f"Stage S10 fail-closed: Measured video frame rate is non-finite or non-positive: {actual_fps}")
+
+    # Enforce intended vs measured fps agreement (within 0.1 fps)
+    if abs(actual_fps - fps) > 0.1:
+        raise ValueError(
+            f"Stage S10 fail-closed: Measured video frame rate ({actual_fps:.2f} fps) deviates from "
+            f"intended frame rate ({fps} fps) by > 0.1 fps"
+        )
+
+    # Require finite positive stream and/or format duration
+    s_dur_raw = v_st.get("duration")
+    c_dur_raw = p_info.get("format", {}).get("duration")
+    s_dur = float(s_dur_raw) if s_dur_raw is not None and str(s_dur_raw).strip() != "" else 0.0
+    c_dur = float(c_dur_raw) if c_dur_raw is not None and str(c_dur_raw).strip() != "" else 0.0
+
+    measured_dur = s_dur if (s_dur > 0.0 and math.isfinite(s_dur)) else c_dur
+    if not math.isfinite(measured_dur) or measured_dur <= 0.0:
+        raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' has zero, negative, or non-finite duration ({measured_dur})")
+
+    # Frame count parsing
+    v_nb_frames_raw = v_st.get("nb_frames")
+    if v_nb_frames_raw is not None and str(v_nb_frames_raw).strip() != "":
+        try:
+            v_nb_frames = int(v_nb_frames_raw)
+        except (ValueError, TypeError):
+            v_nb_frames = 0
+    else:
+        v_nb_frames = 0
+
     if v_nb_frames <= 0:
-        v_dur = float(v_st.get("duration", p_info.get("format", {}).get("duration", 0.0)))
-        if v_dur <= 0.0:
-            raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' has zero/invalid duration")
-        v_nb_frames = int(round(v_dur * fps))
+        v_nb_frames = int(round(measured_dur * actual_fps))
 
     actual_frames = v_nb_frames
-    r_fps_str = v_st.get("r_frame_rate", f"{fps}/1")
-    if "/" in r_fps_str:
-        num, den = map(float, r_fps_str.split("/"))
-        actual_fps = num / max(1.0, den)
-    elif r_fps_str:
-        actual_fps = float(r_fps_str)
-    else:
-        actual_fps = fps
 
-    # Consistency check between verified media telemetry and Remotion intended duration
+    # Mutual consistency: frame count, duration, and frame rate
+    frame_dur_calc = actual_frames / actual_fps
+    if abs(frame_dur_calc - measured_dur) > 0.5:
+        raise ValueError(
+            f"Stage S10 fail-closed: Frame count duration ({frame_dur_calc:.2f}s = {actual_frames} / {actual_fps:.2f}) "
+            f"inconsistent with measured media duration ({measured_dur:.2f}s) by > 0.5s"
+        )
+
+    remotion_dur = render_props.duration_in_frames / fps
+    if abs(measured_dur - remotion_dur) > 0.5:
+        raise ValueError(
+            f"Stage S10 fail-closed: Measured media duration ({measured_dur:.2f}s) drifts from "
+            f"Remotion intended duration ({remotion_dur:.2f}s) by > 0.5s"
+        )
+
     frame_drift = abs(actual_frames - render_props.duration_in_frames)
     max_drift_tolerance = max(3, int(round(actual_fps * 0.15)))  # Max ~0.15s (e.g. 3-4 frames)
     if frame_drift > max_drift_tolerance:

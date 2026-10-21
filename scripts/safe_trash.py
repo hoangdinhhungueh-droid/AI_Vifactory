@@ -77,8 +77,15 @@ def validate_safe_disposal_target(
         return False, f"SECURITY ERROR: Cannot trash drive root or forbidden zone: '{path}'"
 
     norm_lower = norm_raw.lower()
+    approved_var_subpaths = {"/var/vf/quarantine", "/var/vf/scratch"}
     for fz in ["/etc", "/var", "/usr", "/bin", "/boot", "/sys", "/proc", "/", "/root", "/home", "c:/windows", "c:/program files", "c:/program files (x86)"]:
-        if norm_lower == fz or norm_lower.startswith(fz + "/") or norm_lower.startswith("c:/program files"):
+        if fz == "/var":
+            if norm_lower == "/var":
+                return False, f"SECURITY ERROR: Target is located in forbidden system root: '{path}'"
+            if norm_lower.startswith("/var/"):
+                if not any(norm_lower == sp or norm_lower.startswith(sp + "/") for sp in approved_var_subpaths):
+                    return False, f"SECURITY ERROR: Target is located in forbidden system root: '{path}'"
+        elif norm_lower == fz or norm_lower.startswith(fz + "/") or norm_lower.startswith("c:/program files"):
             return False, f"SECURITY ERROR: Target is located in forbidden system root: '{path}'"
 
     # Canonical resolution (resolves relative traversal .. and follows symlinks)
@@ -103,7 +110,12 @@ def validate_safe_disposal_target(
                 return False, f"SECURITY ERROR: Target is located in forbidden system root: '{resolved_p}'"
 
     # Enforce strictly approved quarantine / scratch / workspace roots
-    effective_roots = [Path(r).resolve() for r in (allowed_roots or _get_default_allowed_roots())]
+    if allowed_roots is not None:
+        effective_roots = [Path(r).resolve() for r in allowed_roots]
+        if not effective_roots:
+            return False, "SECURITY ERROR: Allowed roots list is explicitly empty (deny-all policy)"
+    else:
+        effective_roots = _get_default_allowed_roots()
 
     within_approved = False
     for app_root in effective_roots:
@@ -134,6 +146,12 @@ def move_to_trash_windows(path: str, allowed_roots: Optional[List[Union[str, Pat
         print(f"Error: Path does not exist: {abs_path}")
         return False
 
+    # Second-phase check on canonical realpath to prevent symlink race
+    is_valid_real, msg_real = validate_safe_disposal_target(os.path.realpath(abs_path), allowed_roots=allowed_roots)
+    if not is_valid_real:
+        print(f"SECURITY RACE DETECTED: {msg_real}")
+        return False
+
     ps_cmd = f"""
     Add-Type -AssemblyName Microsoft.VisualBasic
     $target = [System.IO.Path]::GetFullPath('{abs_path}')
@@ -161,6 +179,12 @@ def move_to_trash_linux(path: str, allowed_roots: Optional[List[Union[str, Path]
     abs_path = os.path.abspath(path)
     if not os.path.exists(abs_path):
         print(f"Error: Path does not exist: {abs_path}")
+        return False
+
+    # Second-phase check on canonical realpath to prevent symlink race
+    is_valid_real, msg_real = validate_safe_disposal_target(os.path.realpath(abs_path), allowed_roots=allowed_roots)
+    if not is_valid_real:
+        print(f"SECURITY RACE DETECTED: {msg_real}")
         return False
 
     res = subprocess.run(["which", "trash-put"], capture_output=True, text=True)

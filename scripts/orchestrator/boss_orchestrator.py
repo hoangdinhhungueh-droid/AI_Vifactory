@@ -747,19 +747,47 @@ REQUIRED_AST_FIELDS: Set[str] = {
     "defects",
 }
 
+RECOGNIZED_AST_VERDICTS: Set[str] = {
+    "PASS (0 Critical / 0 High)",
+    "DEFECTS_DETECTED",
+}
+
+RECOGNIZED_AST_SEVERITIES: Set[str] = {"CRITICAL", "HIGH"}
+
+KNOWN_TEXT_EXTENSIONS: Set[str] = {
+    ".py", ".json", ".md", ".txt", ".yml", ".yaml", ".toml", ".sh",
+    ".bat", ".cmd", ".ps1", ".ts", ".tsx", ".js", ".jsx", ".css",
+    ".html", ".sql", ".env", ".gitignore", ".gitattributes", ".xml",
+}
+
+
+def is_text_file(path: Path, raw_bytes: bytes) -> bool:
+    """Deterministically identifies text files for cross-platform newline normalization."""
+    if path.suffix.lower() in KNOWN_TEXT_EXTENSIONS or path.name in {".gitignore", ".gitattributes", "Makefile", "Dockerfile"}:
+        return True
+    chunk = raw_bytes[:8192]
+    return b"\x00" not in chunk
+
 
 def validate_ast_scanner_contract(raw_output: str, exit_code: int = 0) -> Dict[str, Any]:
     """Authoritative production AST scanner contract validator (Rule 121 & Rule 139).
 
-    Enforces fail-closed schema integrity:
+    Enforces strict fail-closed schema integrity:
     - Nonzero exit codes fail closed immediately.
     - Missing/empty output fails closed.
     - Malformed JSON strings fail closed.
     - Non-dict JSON objects fail closed.
     - Missing required schema fields fail closed.
-    - Non-integer or negative count fields fail closed.
-    - Non-string verdict or non-list defects fail closed.
-    - Contradictory states (verdict claiming PASS when critical > 0, high > 0, or exit_code != 0) fail closed.
+    - Scanner identity must be 'probe_ast_rule139.py' and version must be valid semantic version string.
+    - scanned_files must be positive integer (> 0).
+    - Counts (critical_count, high_count, allowed_legacy_count) must be non-negative ints.
+    - verdict must be strictly one of RECOGNIZED_AST_VERDICTS: 'PASS (0 Critical / 0 High)' or 'DEFECTS_DETECTED'.
+    - defects must be a list of valid defect objects: {'file': str, 'line': int >= 1, 'severity': str in {'CRITICAL', 'HIGH'}}.
+    - Defect count reconciliation:
+        * critical_count must strictly equal number of defects with severity == 'CRITICAL'
+        * high_count must strictly equal number of defects with severity == 'HIGH'
+        * If critical_count == 0 and high_count == 0 and exit_code == 0: verdict must be 'PASS (0 Critical / 0 High)' and defects must be empty
+        * If critical_count > 0 or high_count > 0 or exit_code != 0: verdict must be 'DEFECTS_DETECTED' and defects must be non-empty
     """
     if exit_code != 0:
         raise ValueError(f"Scanner process failed with nonzero exit code: {exit_code}")
@@ -779,24 +807,68 @@ def validate_ast_scanner_contract(raw_output: str, exit_code: int = 0) -> Dict[s
     if missing_fields:
         raise ValueError(f"Scanner output missing required fields: {missing_fields}")
 
-    for int_f in ["critical_count", "high_count", "allowed_legacy_count", "scanned_files"]:
+    scanner_name = data.get("scanner_name")
+    if scanner_name != "probe_ast_rule139.py":
+        raise ValueError(f"Unrecognized scanner identity: expected 'probe_ast_rule139.py', got {scanner_name!r}")
+
+    scanner_version = data.get("scanner_version")
+    if not isinstance(scanner_version, str) or not re.match(r"^\d+\.\d+\.\d+$", scanner_version):
+        raise ValueError(f"Invalid scanner version string: {scanner_version!r}")
+
+    scanned_files = data.get("scanned_files")
+    if type(scanned_files) is not int or scanned_files <= 0:
+        raise ValueError(f"scanned_files must be a positive integer, got {scanned_files!r}")
+
+    for int_f in ["critical_count", "high_count", "allowed_legacy_count"]:
         val = data.get(int_f)
         if type(val) is not int or val < 0:
             raise ValueError(f"Field '{int_f}' must be non-negative int, got {val!r}")
 
+    crit_count = data["critical_count"]
+    high_count = data["high_count"]
+
     verdict = data.get("verdict")
     if not isinstance(verdict, str):
         raise ValueError(f"Field 'verdict' must be string, got {type(verdict).__name__}")
+    if verdict not in RECOGNIZED_AST_VERDICTS:
+        raise ValueError(f"Unrecognized AST verdict {verdict!r}; must be one of {sorted(RECOGNIZED_AST_VERDICTS)}")
 
     defects = data.get("defects")
     if not isinstance(defects, list):
         raise ValueError(f"Field 'defects' must be list, got {type(defects).__name__}")
 
-    if "PASS" in verdict and (data["critical_count"] > 0 or data["high_count"] > 0 or exit_code != 0):
-        raise ValueError(
-            f"Contradictory state: verdict={verdict} but critical={data['critical_count']}, "
-            f"high={data['high_count']}, exit_code={exit_code}"
-        )
+    actual_crit = 0
+    actual_high = 0
+    for idx, d in enumerate(defects):
+        if not isinstance(d, dict):
+            raise ValueError(f"Defect entry #{idx} is not an object: {d!r}")
+        if "file" not in d or not isinstance(d["file"], str) or not d["file"].strip():
+            raise ValueError(f"Defect entry #{idx} missing valid 'file' attribute")
+        if "line" not in d or type(d["line"]) is not int or d["line"] < 1:
+            raise ValueError(f"Defect entry #{idx} invalid 'line' attribute: {d.get('line')!r}")
+        sev = d.get("severity")
+        if sev not in RECOGNIZED_AST_SEVERITIES:
+            raise ValueError(f"Defect entry #{idx} invalid 'severity': {sev!r}")
+        if sev == "CRITICAL":
+            actual_crit += 1
+        elif sev == "HIGH":
+            actual_high += 1
+
+    if actual_crit != crit_count:
+        raise ValueError(f"Critical count reconciliation defect: reported {crit_count} != counted {actual_crit}")
+    if actual_high != high_count:
+        raise ValueError(f"High count reconciliation defect: reported {high_count} != counted {actual_high}")
+
+    if crit_count == 0 and high_count == 0:
+        if verdict != "PASS (0 Critical / 0 High)":
+            raise ValueError(f"Contradictory state: zero defects reported but verdict={verdict!r}")
+        if len(defects) != 0:
+            raise ValueError(f"Contradictory state: zero defects reported but defects list contains {len(defects)} items")
+    else:
+        if verdict != "DEFECTS_DETECTED":
+            raise ValueError(f"Contradictory state: defects detected (crit={crit_count}, high={high_count}) but verdict={verdict!r}")
+        if len(defects) == 0:
+            raise ValueError("Contradictory state: non-zero defect count but defects list is empty")
 
     return data
 
@@ -805,29 +877,59 @@ def compute_tracked_content_manifest(repo_dir: Path) -> Tuple[str, int, str]:
     """Computes a deterministic cross-platform normalized content manifest for all tracked files in git.
 
     Guarantees 100% bit-for-bit parity across Windows Local and Linux VPS:
-    - Normalizes file path separators to '/'
-    - Sorts tracked paths lexicographically
-    - Normalizes text line endings (CRLF -> LF) so OS checkout differences do not cause false divergences
-    - Computes per-file SHA256 and overall manifest SHA256
+    - Enforces checked Git exit (fails closed on nonzero).
+    - Uses NUL-delimited path extraction ('git ls-files -z') to prevent line-wrapping or whitespace truncation.
+    - Handles symlinks explicitly by hashing their normalized link target reference.
+    - Applies text-aware line-ending normalization (CRLF -> LF) strictly to text files, preserving binary files unmodified.
+    - Normalizes file path separators to '/' and sorts paths lexicographically.
+    - Computes per-file SHA256 and overall manifest SHA256.
     """
     res = subprocess.run(
-        ["git", "-C", str(repo_dir), "ls-files"],
+        ["git", "-C", str(repo_dir), "ls-files", "-z"],
         capture_output=True,
-        text=True,
         check=False,
     )
-    tracked_files = res.stdout.splitlines()
+    if res.returncode != 0:
+        err_msg = res.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"git ls-files -z failed with exit code {res.returncode}: {err_msg}")
+
+    raw_tracked = res.stdout.split(b"\x00")
     manifest_entries: List[str] = []
-    for rel_f in sorted(tracked_files):
-        norm_rel = rel_f.replace("\\", "/").strip()
-        if not norm_rel:
+
+    for raw_p in sorted(raw_tracked):
+        if not raw_p:
             continue
-        full_f = repo_dir / norm_rel
-        if full_f.is_file():
+        rel_f = raw_p.decode("utf-8", errors="replace").replace("\\", "/").strip()
+        if not rel_f:
+            continue
+        full_f = repo_dir / rel_f
+        if not full_f.exists() and not full_f.is_symlink():
+            raise FileNotFoundError(f"Tracked git file missing on disk: {rel_f}")
+
+        if full_f.is_symlink():
+            link_target = str(os.readlink(full_f)).replace("\\", "/")
+            f_sha = hashlib.sha256(f"SYMLINK:{link_target}".encode("utf-8")).hexdigest()
+        elif full_f.is_file():
             raw_bytes = full_f.read_bytes()
-            norm_bytes = raw_bytes.replace(b"\r\n", b"\n")
+            if is_text_file(full_f, raw_bytes):
+                norm_bytes = raw_bytes.replace(b"\r\n", b"\n")
+            else:
+                norm_bytes = raw_bytes
             f_sha = hashlib.sha256(norm_bytes).hexdigest()
-            manifest_entries.append(f"{f_sha}  {norm_rel}")
+        elif full_f.is_dir():
+            sub_head = subprocess.run(
+                ["git", "-C", str(full_f), "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            sub_sha = sub_head.stdout.strip() if sub_head.returncode == 0 else "SUBMODULE_UNINITIALIZED"
+            f_sha = hashlib.sha256(f"SUBMODULE:{sub_sha}".encode("utf-8")).hexdigest()
+        else:
+            raise RuntimeError(f"Unsupported tracked file mode: {full_f}")
+
+        manifest_entries.append(f"{f_sha}  {rel_f}")
+
     manifest_text = "\n".join(manifest_entries) + "\n"
     manifest_sha = hashlib.sha256(manifest_text.encode("utf-8")).hexdigest()
     return manifest_sha, len(manifest_entries), manifest_text
@@ -3765,22 +3867,13 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
             "echo 'VPS Index Hash (-s): ' $(git -C /root/video_factory ls-files -s | sha256sum) && "
             "echo 'VPS Porcelain Status: [' \"$(git -C /root/video_factory status --porcelain)\" ']' && "
             "python3 -c \""
-            "import subprocess, hashlib, os\n"
-            "tracked = subprocess.check_output(['git', '-C', '/root/video_factory', 'ls-files'], text=True).splitlines()\n"
-            "entries = []\n"
-            "for f in sorted(tracked):\n"
-            "    norm_f = f.replace('\\\\\\\\', '/').strip()\n"
-            "    if not norm_f:\n"
-            "        continue\n"
-            "    p = os.path.join('/root/video_factory', norm_f)\n"
-            "    if os.path.isfile(p):\n"
-            "        raw = open(p, 'rb').read()\n"
-            "        norm_b = raw.replace(b'\\r\\n', b'\\n')\n"
-            "        h = hashlib.sha256(norm_b).hexdigest()\n"
-            "        entries.append(f'{h}  {norm_f}')\n"
-            "m = '\\n'.join(entries) + '\\n'\n"
-            "print('VPS File-Content Manifest SHA256:', hashlib.sha256(m.encode('utf-8')).hexdigest())\n"
-            "print('VPS Tracked Files Count:', len(entries))\n"
+            "import sys\n"
+            "sys.path.insert(0, '/root/video_factory')\n"
+            "from scripts.orchestrator.boss_orchestrator import compute_tracked_content_manifest\n"
+            "from pathlib import Path\n"
+            "sha, count, _ = compute_tracked_content_manifest(Path('/root/video_factory'))\n"
+            "print('VPS File-Content Manifest SHA256:', sha)\n"
+            "print('VPS Tracked Files Count:', count)\n"
             "\"",
             timeout=30,
         )
@@ -3807,6 +3900,8 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
             and local_porcelain_clean
             and vps_porcelain_clean
         )
+        if not is_parity_clean:
+            vps_code = 1
         parity_verdict = (
             f"100% BIT-FOR-BIT CRYPTOGRAPHIC TRACKED CONTENT PARITY VERIFIED (Tree: {local_tree_sha}, Per-File Content Manifest SHA256: {local_content_manifest_sha})"
             if is_parity_clean else
@@ -3916,56 +4011,85 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
     # 9. Authentic Physical Rendered Media Evidence & Master Video QC Gates (Rule 120, 121, 135)
     video_evidence_out = ""
     ffprobe_exit: Any = "WAIVED"
+    black_exit: Any = 1
+    ebur_exit: Any = 1
     try:
         from scripts.vps_runner import FastVPSClient
         vps_client = FastVPSClient()
         r_find = vps_client.run_command("find /var/vf/episodes -type f -name final.mp4 2>/dev/null")
         cand_videos = [p.strip() for p in (r_find.get("stdout") or "").splitlines() if p.strip().endswith("final.mp4")]
-        target_video = sorted(cand_videos)[-1] if cand_videos else "/root/video_factory/out/golden/final.mp4"
+        if not cand_videos:
+            raise FileNotFoundError("No rendered master video (final.mp4) found on VPS")
+        target_video = sorted(cand_videos)[-1]
         ep_dir = str(Path(target_video).parent.parent).replace("\\", "/")
+        ep_name = Path(ep_dir).name
+        market_code = ep_name.split("_")[0] if "_" in ep_name else "EN"
+        quoted_video = shlex.quote(target_video)
 
         r_media = vps_client.run_command(
-            f"ffprobe -v error -show_streams -show_format -of json {target_video}",
+            f"ffprobe -v error -show_streams -show_format -of json {quoted_video}",
             timeout=30
         )
         ffprobe_exit = r_media.get("exit_code", 1)
         ffprobe_raw = (r_media.get("stdout", "") + "\n" + r_media.get("stderr", "")).strip()
 
+        verified_dur = 540.0
+        try:
+            p_json = json.loads(r_media.get("stdout", "{}"))
+            verified_dur = float(p_json.get("format", {}).get("duration", 540.0))
+        except Exception:
+            verified_dur = 540.0
+
         r_black = vps_client.run_command(
-            f"ffmpeg -nostats -i {target_video} -vf blackdetect=d=0.1:pix_th=0.10 -f null - 2>&1 | grep -i black || echo 'ZERO_BLACK_FRAMES_DETECTED (blackdetect verified: 0% black intervals)'",
+            f"ffmpeg -nostats -i {quoted_video} -vf \"blackdetect=d=0.1:pix_th=0.10\" -f null -",
             timeout=45
         )
-        black_raw = (r_black.get("stdout", "") + "\n" + r_black.get("stderr", "")).strip()
+        black_exit = r_black.get("exit_code", 1)
+        black_output = (r_black.get("stdout", "") + "\n" + r_black.get("stderr", "")).strip()
+        black_lines = [line for line in black_output.splitlines() if "black_start" in line or "black_duration" in line]
+        if black_exit == 0:
+            if not black_lines:
+                black_summary = "ZERO_BLACK_FRAMES_DETECTED (blackdetect verified: 0 black intervals, exit code 0)"
+            else:
+                black_summary = f"BLACK_INTERVALS_DETECTED: {len(black_lines)} intervals:\n" + "\n".join(black_lines[:5])
+        else:
+            black_summary = f"FAIL: ffmpeg blackdetect failed with exit code {black_exit}"
 
         r_ebur = vps_client.run_command(
-            f"ffmpeg -nostats -i {target_video} -af ebur128=peak=true -f null - 2>&1 | tail -n 25",
+            f"ffmpeg -nostats -i {quoted_video} -af ebur128=peak=true -f null -",
             timeout=45
         )
-        ebur_raw = (r_ebur.get("stdout", "") + "\n" + r_ebur.get("stderr", "")).strip()
+        ebur_exit = r_ebur.get("exit_code", 1)
+        ebur_output = (r_ebur.get("stdout", "") + "\n" + r_ebur.get("stderr", "")).strip()
+        if ebur_exit == 0:
+            if "Summary:" in ebur_output:
+                ebur_summary = ebur_output[ebur_output.index("Summary:"):]
+            else:
+                ebur_summary = "\n".join(ebur_output.splitlines()[-20:])
+        else:
+            ebur_summary = f"FAIL: ffmpeg ebur128 failed with exit code {ebur_exit}"
 
         r_qc = vps_client.run_command(
-            f"cat {ep_dir}/s11_qc/artifact.json 2>/dev/null || cat {ep_dir}/run_manifest.json 2>/dev/null",
+            f"cat {shlex.quote(ep_dir)}/s11_qc/artifact.json 2>/dev/null || cat {shlex.quote(ep_dir)}/run_manifest.json 2>/dev/null",
             timeout=15
         )
         qc_raw = r_qc.get("stdout", "").strip()
 
         r_s10 = vps_client.run_command(
-            f"cat {ep_dir}/s10_render/artifact.json 2>/dev/null",
+            f"cat {shlex.quote(ep_dir)}/s10_render/artifact.json 2>/dev/null",
             timeout=15
         )
         s10_raw = r_s10.get("stdout", "").strip()
-
-        ep_name = Path(ep_dir).name
-        market_code = ep_name.split("_")[0] if "_" in ep_name else "EN"
 
         r_chap = vps_client.run_command(
             f"python3 -c \""
             f"import sys; sys.path.insert(0, '/root/video_factory'); "
             f"from app.services.seo_package_forge import sync_exact_chapters_from_remotion; "
-            f"ch = sync_exact_chapters_from_remotion(task_id='{ep_name}', market='{market_code}', title='{ep_name}', remotion_props_path='{ep_dir}/remotion_props.json', total_duration_s=540.0); "
+            f"ch = sync_exact_chapters_from_remotion(task_id='{ep_name}', market='{market_code}', title='{ep_name}', remotion_props_path='{ep_dir}/remotion_props.json', total_duration_s={verified_dur}); "
             f"print('\\n'.join(ch))\"",
             timeout=20
         )
+        chap_exit = r_chap.get("exit_code", 1)
         chap_raw = r_chap.get("stdout", "").strip()
 
         r_srt = vps_client.run_command(
@@ -3980,6 +4104,7 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
             f"\"",
             timeout=15
         )
+        srt_exit = r_srt.get("exit_code", 1)
         srt_raw = r_srt.get("stdout", "").strip()
 
         vps_client.close()
@@ -3988,12 +4113,12 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
             f"Physical Master Video File: {target_video}\n"
             f"FFprobe Stream Telemetry Exit Code: {ffprobe_exit}\n"
             f"Stream & Format Metadata (Full Uncut ffprobe JSON):\n{ffprobe_raw}\n\n"
-            f"Remotion-Anchored YouTube Chapter Markers (Rule 135 Compliant: 00:00 start, >= 3 chapters, frame-synchronized):\n{chap_raw}\n\n"
-            f"Word-Level Subtitle Synchronization Telemetry (Rule 120 Compliant):\n{srt_raw}\n\n"
-            f"Black Frame Detection (0% Threshold):\n{black_raw}\n\n"
-            f"EBUR128 Broadcast Loudness Telemetry:\n{ebur_raw}\n\n"
-            f"S11 QC Master Verification Gate Artifact (PASS):\n{qc_raw}\n\n"
-            f"S10 Render Stage Artifact:\n{s10_raw}\n"
+            f"Remotion-Anchored YouTube Chapter Markers (Exit Code: {chap_exit}, Verified Duration: {verified_dur}s):\n{chap_raw}\n\n"
+            f"Word-Level Subtitle Synchronization Telemetry (Exit Code: {srt_exit}):\n{srt_raw}\n\n"
+            f"Black Frame Detection (Exit Code: {black_exit}):\n{black_summary}\n\n"
+            f"EBUR128 Broadcast Loudness Telemetry (Exit Code: {ebur_exit}):\n{ebur_summary}\n\n"
+            f"S11 QC Master Verification Gate Artifact (Exit Code: {r_qc.get('exit_code', 1)}):\n{qc_raw}\n\n"
+            f"S10 Render Stage Artifact (Exit Code: {r_s10.get('exit_code', 1)}):\n{s10_raw}\n"
         )
     except Exception as media_err:
         video_evidence_out = f"Physical media query notice: {media_err}\n"
@@ -4013,6 +4138,8 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
         "pytest_code": pytest_code,
         "smoke_gate_code": "WAIVED",
         "ffprobe_code": ffprobe_exit,
+        "black_detect_code": black_exit,
+        "ebur_code": ebur_exit,
     }
 
 

@@ -649,7 +649,31 @@ def test_safe_disposal_negative_boundary_and_wildcard_attacks(tmp_path):
         assert not ok, f"Production source file was unexpectedly allowed for disposal: {src_file}"
         assert "outside approved disposal roots" in msg or "forbidden" in msg.lower()
 
-    # 7. Symlink & Junction escape attack: symlink/junction inside approved quarantine pointing outside
+    # 7. Explicit empty allowlist must fail-closed as deny-all
+    ok, msg = validate_safe_disposal_target(str(fake_quarantine / "file.txt"), allowed_roots=[])
+    assert not ok
+    assert "Allowed roots list is explicitly empty" in msg
+
+    # 8. Reconcile /var/vf allowroots with lexical prohibitions
+    ok, msg = validate_safe_disposal_target("/var/vf/quarantine/artifact.json", allowed_roots=[Path("/var/vf/quarantine")])
+    assert ok
+    ok, msg = validate_safe_disposal_target("/var/evil_root/hack.txt", allowed_roots=[Path("/var/vf/quarantine")])
+    assert not ok
+    assert "forbidden system root" in msg
+
+    # 9. Physical proof: rejected targets cannot be deleted or moved (physical non-destruction guarantee)
+    protected_file = tmp_path / "protected_target.txt"
+    protected_file.write_text("DO_NOT_DELETE_INTEGRITY_CHECK", encoding="utf-8")
+    assert safe_trash(str(protected_file), allowed_roots=[fake_quarantine]) is False
+    assert protected_file.exists() is True
+    assert protected_file.read_text(encoding="utf-8") == "DO_NOT_DELETE_INTEGRITY_CHECK"
+
+
+def test_safe_disposal_symlink_escape_attack(tmp_path):
+    """Separate standalone test for symlink & junction escape attacks: symlink pointing outside approved roots (Rule 137)."""
+    from scripts.safe_trash import safe_trash, validate_safe_disposal_target
+    fake_quarantine = tmp_path / "quarantine_root"
+    fake_quarantine.mkdir(exist_ok=True)
     symlink_target_dir = tmp_path / "secret_outside_dir"
     symlink_target_dir.mkdir(exist_ok=True)
     outside_secret = symlink_target_dir / "secret_data.txt"
@@ -658,7 +682,6 @@ def test_safe_disposal_negative_boundary_and_wildcard_attacks(tmp_path):
 
     link_created = False
     if os.name == "nt":
-        # Windows directory junction (mklink /J) works without elevated privileges
         j_res = subprocess.run(
             ["cmd", "/c", "mklink", "/J", str(evil_link), str(symlink_target_dir)],
             capture_output=True,
@@ -684,17 +707,9 @@ def test_safe_disposal_negative_boundary_and_wildcard_attacks(tmp_path):
         ok, msg = validate_safe_disposal_target(str(evil_link), allowed_roots=[fake_quarantine])
         assert not ok, "Symlink escaping quarantine was unexpectedly accepted"
         assert "outside approved disposal roots" in msg
-        # Negative physical proof: safe_trash MUST reject trashing symlink pointing outside
         assert safe_trash(str(evil_link), allowed_roots=[fake_quarantine]) is False
         assert outside_secret.exists() is True, "Target file outside quarantine was unexpectedly destroyed!"
         assert outside_secret.read_text(encoding="utf-8") == "DO_NOT_LEAK_CONFIDENTIAL"
-
-    # 8. Physical proof: rejected targets cannot be deleted or moved (physical non-destruction guarantee)
-    protected_file = tmp_path / "protected_target.txt"
-    protected_file.write_text("DO_NOT_DELETE_INTEGRITY_CHECK", encoding="utf-8")
-    assert safe_trash(str(protected_file), allowed_roots=[fake_quarantine]) is False
-    assert protected_file.exists() is True
-    assert protected_file.read_text(encoding="utf-8") == "DO_NOT_DELETE_INTEGRITY_CHECK"
 
 
 def test_ast_rule139_scanner_contract_validation_fails_closed():
@@ -753,14 +768,14 @@ def test_ast_rule139_scanner_contract_validation_fails_closed():
     # 9. Invalid defects type (non-list)
     with pytest.raises(ValueError, match="Field 'defects' must be list"):
         validate_ast_scanner_contract(
-            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": "none"}',
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS (0 Critical / 0 High)", "defects": "none"}',
             exit_code=0,
         )
 
     # 10. Contradictory state (verdict claims PASS but critical > 0)
     with pytest.raises(ValueError, match="Contradictory state"):
         validate_ast_scanner_contract(
-            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 2, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS (0 Critical / 0 High)", "defects": []}',
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 2, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS (0 Critical / 0 High)", "defects": [{"file": "a.py", "line": 1, "severity": "CRITICAL"}, {"file": "b.py", "line": 2, "severity": "CRITICAL"}]}',
             exit_code=0,
         )
 
@@ -771,6 +786,69 @@ def test_ast_rule139_scanner_contract_validation_fails_closed():
     assert parsed["high_count"] == 0
     assert parsed["verdict"] == "PASS (0 Critical / 0 High)"
     assert parsed["scanned_files"] == 142
+
+    # 12. Unrecognized scanner identity
+    with pytest.raises(ValueError, match="Unrecognized scanner identity"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "other_scanner.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS (0 Critical / 0 High)", "defects": []}',
+            exit_code=0,
+        )
+
+    # 13. Invalid scanner version (not semantic version)
+    with pytest.raises(ValueError, match="Invalid scanner version string"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "v2.2-beta", "scanned_files": 10, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS (0 Critical / 0 High)", "defects": []}',
+            exit_code=0,
+        )
+
+    # 14. Non-positive scanned_files
+    with pytest.raises(ValueError, match="scanned_files must be a positive integer"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 0, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS (0 Critical / 0 High)", "defects": []}',
+            exit_code=0,
+        )
+
+    # 15. Unrecognized verdict string
+    with pytest.raises(ValueError, match="Unrecognized AST verdict"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": "UNKNOWN_VERDICT", "defects": []}',
+            exit_code=0,
+        )
+
+    # 16. Defect item is not an object
+    with pytest.raises(ValueError, match="Defect entry #0 is not an object"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 1, "high_count": 0, "allowed_legacy_count": 220, "verdict": "DEFECTS_DETECTED", "defects": ["not_a_dict"]}',
+            exit_code=0,
+        )
+
+    # 17. Defect item missing valid 'file' attribute
+    with pytest.raises(ValueError, match="missing valid 'file' attribute"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 1, "high_count": 0, "allowed_legacy_count": 220, "verdict": "DEFECTS_DETECTED", "defects": [{"file": "", "line": 5, "severity": "CRITICAL"}]}',
+            exit_code=0,
+        )
+
+    # 18. Defect item invalid 'line' attribute
+    with pytest.raises(ValueError, match="invalid 'line' attribute"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 1, "high_count": 0, "allowed_legacy_count": 220, "verdict": "DEFECTS_DETECTED", "defects": [{"file": "app/bad.py", "line": 0, "severity": "CRITICAL"}]}',
+            exit_code=0,
+        )
+
+    # 19. Defect item invalid 'severity' attribute
+    with pytest.raises(ValueError, match="invalid 'severity'"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 1, "high_count": 0, "allowed_legacy_count": 220, "verdict": "DEFECTS_DETECTED", "defects": [{"file": "app/bad.py", "line": 5, "severity": "LOW"}]}',
+            exit_code=0,
+        )
+
+    # 20. Count reconciliation defect (reported critical count != counted critical defects)
+    with pytest.raises(ValueError, match="Critical count reconciliation defect"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 2, "high_count": 0, "allowed_legacy_count": 220, "verdict": "DEFECTS_DETECTED", "defects": [{"file": "app/bad.py", "line": 5, "severity": "CRITICAL"}]}',
+            exit_code=0,
+        )
 
 
 def test_vox_qa_gates_fails_closed_when_scene_plan_absent_or_empty(tmp_path):
@@ -822,3 +900,132 @@ def test_vox_qa_gates_fails_closed_when_scene_plan_absent_or_empty(tmp_path):
             vq.probe_media_file = orig_probe
 
 
+
+
+def test_s10_render_media_probe_fails_closed(tmp_path: Path):
+    """Verify that Stage S10 render media verification fails closed on malformed, missing, nonfinite, or contradictory probe telemetry (Rule 121, 139 & Boss Round 8 Item 5)."""
+    import json
+
+    import stages.s10_render as s10_mod
+    import vox.qa.gates as vq
+    from core.config import RunContext, load_profile
+    from core.contracts.stages import StageID
+    from core.paths import resolve_run_paths
+    from core.run_manifest import RunManifest
+
+    run_id = "test_s10_media_probe_failures"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    paths.final_render_dir.mkdir(parents=True, exist_ok=True)
+
+    clip0 = tmp_path / "clip0.mp4"
+    clip0.write_bytes(b"A" * 200)
+
+    s8_artifact = {
+        "run_id": run_id,
+        "stage": StageID.S8_VIDEO_GEN.value,
+        "status": "ok",
+        "payload": {
+            "clips": [
+                {"scene_id": "SCENE_01", "file_path": str(clip0), "duration_sec": 2.0},
+            ]
+        },
+        "provenance": {"generator": "stages.s8_video_gen"},
+    }
+    s8_file = paths.artifact_file(StageID.S8_VIDEO_GEN.value)
+    s8_file.parent.mkdir(parents=True, exist_ok=True)
+    s8_file.write_text(json.dumps(s8_artifact), encoding="utf-8")
+
+    audio_file = tmp_path / "narration.wav"
+    audio_file.write_bytes(b"C" * 500)
+    sub_file = tmp_path / "subtitles.ass"
+    sub_file.write_text("[Script Info]\nTitle: Test", encoding="utf-8")
+
+    s9_artifact = {
+        "run_id": run_id,
+        "stage": StageID.S9_VOICE_TTS.value,
+        "status": "ok",
+        "payload": {
+            "audio_file": str(audio_file),
+            "subtitles_file": str(sub_file),
+            "subtitles": []
+        },
+        "provenance": {"generator": "stages.s9_voice_tts"},
+    }
+    s9_file = paths.artifact_file(StageID.S9_VOICE_TTS.value)
+    s9_file.parent.mkdir(parents=True, exist_ok=True)
+    s9_file.write_text(json.dumps(s9_artifact), encoding="utf-8")
+
+    cfg = load_profile("e2e_min")
+    manifest = RunManifest.create_new(run_id, profile="e2e_min")
+    ctx = RunContext(
+        run_id=run_id,
+        paths=paths,
+        manifest=manifest,
+        config=cfg,
+        force=True,
+        dry_run=False,
+    )
+
+    def fake_assemble(clips, audio, sub, target):
+        target.write_bytes(b"X" * 1500)
+
+    orig_assemble = s10_mod.assemble_final_video
+    orig_probe = vq.probe_media_file
+    try:
+        s10_mod.assemble_final_video = fake_assemble
+
+        # 1. Missing video stream
+        vq.probe_media_file = lambda p: {"streams": [{"codec_type": "audio"}], "format": {"duration": "2.0"}}
+        with pytest.raises(ValueError, match="has no valid video stream"):
+            s10_mod.run(ctx)
+
+        # 2. Missing r_frame_rate
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "nb_frames": 60, "duration": "2.0"}],
+            "format": {"duration": "2.0"}
+        }
+        with pytest.raises(ValueError, match="missing required 'r_frame_rate' telemetry"):
+            s10_mod.run(ctx)
+
+        # 3. Invalid rational in r_frame_rate (zero denominator)
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "nb_frames": 60, "duration": "2.0", "r_frame_rate": "30/0"}],
+            "format": {"duration": "2.0"}
+        }
+        with pytest.raises(ValueError, match="Invalid r_frame_rate"):
+            s10_mod.run(ctx)
+
+        # 4. Measured fps drifts from intended fps (> 0.1)
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "nb_frames": 50, "duration": "2.0", "r_frame_rate": "25/1"}],
+            "format": {"duration": "2.0"}
+        }
+        with pytest.raises(ValueError, match="deviates from intended frame rate"):
+            s10_mod.run(ctx)
+
+        # 5. Non-finite / zero duration
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "nb_frames": 60, "duration": "0.0", "r_frame_rate": "30/1"}],
+            "format": {"duration": "0.0"}
+        }
+        with pytest.raises(ValueError, match="zero, negative, or non-finite duration"):
+            s10_mod.run(ctx)
+
+        # 6. Mutual consistency: frame count duration inconsistent with measured duration (> 0.5s)
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "nb_frames": 60, "duration": "5.0", "r_frame_rate": "30/1"}],
+            "format": {"duration": "5.0"}
+        }
+        with pytest.raises(ValueError, match="inconsistent with measured media duration"):
+            s10_mod.run(ctx)
+
+        # 7. Remotion duration drift (> 0.5s)
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "nb_frames": 300, "duration": "10.0", "r_frame_rate": "30/1"}],
+            "format": {"duration": "10.0"}
+        }
+        with pytest.raises(ValueError, match="drifts from Remotion intended duration"):
+            s10_mod.run(ctx)
+    finally:
+        s10_mod.assemble_final_video = orig_assemble
+        vq.probe_media_file = orig_probe
