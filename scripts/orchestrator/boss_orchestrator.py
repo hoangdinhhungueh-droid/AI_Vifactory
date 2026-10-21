@@ -4033,8 +4033,8 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
                     cand = f"/var/vf/episodes/{bound_ep}/10_render/final.mp4"
                     if vps_client.run_command(f"test -f {shlex.quote(cand)}").get("exit_code") == 0:
                         task_bound_video = cand
-            except Exception:
-                pass
+            except Exception as _st_err:
+                logger.debug(f"[boss_orchestrator] Could not load task state '{task_state_path}': {_st_err}")
 
         if task_bound_video:
             target_video = task_bound_video
