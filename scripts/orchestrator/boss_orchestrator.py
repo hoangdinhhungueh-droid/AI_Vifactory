@@ -910,7 +910,7 @@ def compute_tracked_content_manifest(repo_dir: Union[str, Path]) -> Tuple[str, i
         parts = meta.decode("ascii", errors="replace").split(" ")
         if len(parts) < 3:
             continue
-        mode, obj_sha, stage = parts[0], parts[1], parts[2]
+        mode, obj_sha, _stage = parts[0], parts[1], parts[2]
         rel_path_str = path_bytes.decode("utf-8", errors="replace").replace("\\", "/").lstrip("/")
         parsed_items.append((rel_path_str, mode, obj_sha, path_bytes))
 
