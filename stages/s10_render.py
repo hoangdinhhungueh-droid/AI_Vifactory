@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import subprocess
 import time
 from pathlib import Path
 from typing import List
@@ -55,8 +56,20 @@ STAGE: StageID = StageID.S10_RENDER
     verify_cmds=["python -m orchestrator.run_pipeline --only s10_render --profile e2e_min"]
 )
 def run(ctx: RunContext) -> StageArtifact:
-    """Executes Stage S10: Remotion Master Video Render."""
+    """Executes Stage S10: Remotion Master Video Render with fail-closed failure invalidation."""
     start_ts = time.time()
+    target_art_file = ctx.paths.artifact_file(STAGE.value) if hasattr(ctx, "paths") and hasattr(ctx.paths, "artifact_file") else None
+    try:
+        return _run_stage_s10_internal(ctx, start_ts)
+    except Exception:
+        if target_art_file and target_art_file.exists():
+            try:
+                target_art_file.unlink()
+            except OSError as unlink_err:
+                logger.debug(f"[s10_render] Failure artifact unlink notice: {unlink_err}")
+        raise
+
+def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
 
     # 1. Read S8 (Video clips) & S9 (Voice audio)
     s8_path = ctx.paths.artifact_file(StageID.S8_VIDEO_GEN.value)
@@ -262,32 +275,41 @@ def run(ctx: RunContext) -> StageArtifact:
     if actual_frames <= 0:
         raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' has non-positive nb_frames ({actual_frames})")
 
-    # Secondary physical packet-count verification (Boss Round 10 Item 4)
+    # Mandatory secondary physical packet-count verification (Boss Round 10 Item 4 & Round 11 Item 5)
     packet_frames_raw = v_st.get("nb_read_packets")
-    if packet_frames_raw is None and final_mp4.exists():
+    if packet_frames_raw is None:
+        if not final_mp4.exists():
+            raise FileNotFoundError(f"Stage S10 fail-closed: Final video '{final_mp4}' missing for packet count verification")
+        pkt_cmd = [
+            "ffprobe", "-v", "error", "-select_streams", "v:0",
+            "-count_packets", "-show_entries", "stream=nb_read_packets",
+            "-of", "json", str(final_mp4)
+        ]
         try:
-            pkt_cmd = [
-                "ffprobe", "-v", "error", "-select_streams", "v:0",
-                "-count_packets", "-show_entries", "stream=nb_read_packets",
-                "-of", "json", str(final_mp4)
-            ]
             pkt_res = subprocess.run(pkt_cmd, capture_output=True, text=True, check=True, timeout=30.0)
             pkt_data = json.loads(pkt_res.stdout)
             st_list = pkt_data.get("streams", [])
-            if st_list:
-                packet_frames_raw = st_list[0].get("nb_read_packets")
+            if not st_list or "nb_read_packets" not in st_list[0]:
+                raise ValueError("ffprobe output missing stream nb_read_packets field")
+            packet_frames_raw = st_list[0].get("nb_read_packets")
         except Exception as pkt_err:
-            logger.debug(f"[s10_render] Secondary packet count probe notice: {pkt_err}")
+            raise ValueError(f"Stage S10 fail-closed: Mandatory secondary packet-count ffprobe failed: {pkt_err}") from pkt_err
 
-    if packet_frames_raw is not None and str(packet_frames_raw).strip() != "":
-        try:
-            packet_frames = int(packet_frames_raw)
-            if abs(actual_frames - packet_frames) > 1:
-                raise ValueError(
-                    f"Stage S10 fail-closed: Stream nb_frames ({actual_frames}) contradicts independently verified physical packet count ({packet_frames})"
-                )
-        except (ValueError, TypeError) as parse_pkt_err:
-            raise ValueError(f"Stage S10 fail-closed: Malformed secondary packet count ({packet_frames_raw!r}): {parse_pkt_err}")
+    if packet_frames_raw is None or str(packet_frames_raw).strip() == "":
+        raise ValueError(f"Stage S10 fail-closed: Mandatory secondary packet-count unavailable for '{final_mp4}'")
+
+    try:
+        packet_frames = int(packet_frames_raw)
+    except (ValueError, TypeError) as parse_pkt_err:
+        raise ValueError(f"Stage S10 fail-closed: Malformed secondary packet count ({packet_frames_raw!r}): {parse_pkt_err}") from parse_pkt_err
+
+    if packet_frames <= 0:
+        raise ValueError(f"Stage S10 fail-closed: Non-positive secondary packet count ({packet_frames}) in '{final_mp4}'")
+
+    if abs(actual_frames - packet_frames) > 1:
+        raise ValueError(
+            f"Stage S10 fail-closed: Stream nb_frames ({actual_frames}) contradicts independently verified physical packet count ({packet_frames})"
+        )
 
     # Mutual consistency: frame count, duration, and frame rate
     frame_dur_calc = actual_frames / actual_fps

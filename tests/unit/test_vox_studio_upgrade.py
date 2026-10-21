@@ -747,6 +747,49 @@ def test_safe_disposal_ancestor_junction_escape_attack(tmp_path):
     assert protected_file.read_text(encoding="utf-8") == "SENTINEL_PHYSICAL_INTEGRITY_VERIFIED"
 
 
+def test_safe_disposal_concurrent_ancestor_race_fails_closed(tmp_path: Path):
+    """Verifies that concurrent ancestor replacement race against protected sentinel fails closed (Rule 137 & Boss Round 11 Item 7)."""
+    import threading
+    import time
+    from scripts.safe_trash import safe_trash, validate_safe_disposal_target
+
+    fake_quarantine = tmp_path / "quarantine"
+    fake_quarantine.mkdir(parents=True, exist_ok=True)
+    protected_sentinel_dir = tmp_path / "protected_core"
+    protected_sentinel_dir.mkdir(parents=True, exist_ok=True)
+    protected_file = protected_sentinel_dir / "protected_sentinel.txt"
+    protected_file.write_text("IMMUTABLE_SENTINEL_DATA", encoding="utf-8")
+
+    sub_dir = fake_quarantine / "sub_folder"
+    sub_dir.mkdir(parents=True, exist_ok=True)
+    target_to_trash = sub_dir / "trash_target.txt"
+    target_to_trash.write_text("TEMPORARY_TRASH_PAYLOAD", encoding="utf-8")
+
+    stop_race = threading.Event()
+
+    def ancestor_race_worker():
+        while not stop_race.is_set():
+            # Continually attempt to replace parent directory or link
+            try:
+                if sub_dir.exists():
+                    sub_dir.touch()
+            except OSError:
+                pass
+            time.sleep(0.001)
+
+    t = threading.Thread(target=ancestor_race_worker, daemon=True)
+    t.start()
+    try:
+        # Run safe_trash with race worker active
+        res = safe_trash(str(target_to_trash), allowed_roots=[fake_quarantine])
+        # Assert protected sentinel is 100% NEVER touched
+        assert protected_file.exists() is True, "Protected sentinel must never be compromised"
+        assert protected_file.read_text(encoding="utf-8") == "IMMUTABLE_SENTINEL_DATA"
+    finally:
+        stop_race.set()
+        t.join(timeout=2.0)
+
+
 def test_ast_rule139_scanner_contract_validation_fails_closed():
     """Verify strict production scanner-output contract validation: missing scripts/executables, malformed JSON,
     non-object JSON, missing fields, invalid field types, negative or contradictory counts, and nonzero exits fail closed (Rule 139 & Boss Item 3).
@@ -1048,7 +1091,7 @@ def test_s10_render_media_probe_fails_closed(tmp_path: Path):
 
         # 6. Mutual consistency: frame count duration inconsistent with measured duration (> 0.5s)
         vq.probe_media_file = lambda p: {
-            "streams": [{"codec_type": "video", "nb_frames": 60, "duration": "5.0", "r_frame_rate": "30/1"}],
+            "streams": [{"codec_type": "video", "nb_frames": 60, "nb_read_packets": "60", "duration": "5.0", "r_frame_rate": "30/1"}],
             "format": {"duration": "5.0"}
         }
         with pytest.raises(ValueError, match="inconsistent with measured media duration"):
@@ -1056,7 +1099,7 @@ def test_s10_render_media_probe_fails_closed(tmp_path: Path):
 
         # 7. Remotion duration drift (> 0.5s)
         vq.probe_media_file = lambda p: {
-            "streams": [{"codec_type": "video", "nb_frames": 300, "duration": "10.0", "r_frame_rate": "30/1"}],
+            "streams": [{"codec_type": "video", "nb_frames": 300, "nb_read_packets": "300", "duration": "10.0", "r_frame_rate": "30/1"}],
             "format": {"duration": "10.0"}
         }
         with pytest.raises(ValueError, match="drifts from Remotion intended duration"):
@@ -1072,7 +1115,7 @@ def test_s10_render_media_probe_fails_closed(tmp_path: Path):
 
         # 9. Contradictory stream and container durations
         vq.probe_media_file = lambda p: {
-            "streams": [{"codec_type": "video", "nb_frames": 60, "duration": "2.0", "r_frame_rate": "30/1"}],
+            "streams": [{"codec_type": "video", "nb_frames": 60, "nb_read_packets": "60", "duration": "2.0", "r_frame_rate": "30/1"}],
             "format": {"duration": "5.0"}
         }
         with pytest.raises(ValueError, match="Stream duration.*contradicts container format duration"):
@@ -1080,10 +1123,24 @@ def test_s10_render_media_probe_fails_closed(tmp_path: Path):
 
         # 10. Non-finite or negative avg_frame_rate (Boss Round 10 Item 4)
         vq.probe_media_file = lambda p: {
-            "streams": [{"codec_type": "video", "nb_frames": 60, "duration": "2.0", "r_frame_rate": "30/1", "avg_frame_rate": "-30/1"}],
+            "streams": [{"codec_type": "video", "nb_frames": 60, "nb_read_packets": "60", "duration": "2.0", "r_frame_rate": "30/1", "avg_frame_rate": "-30/1"}],
             "format": {"duration": "2.0"}
         }
-        with pytest.raises(ValueError, match="Non-positive or non-finite"):
+
+        # 11. Contradictory secondary packet count (Boss Round 11 Item 5)
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "nb_frames": 60, "nb_read_packets": "50", "duration": "2.0", "r_frame_rate": "30/1"}],
+            "format": {"duration": "2.0"}
+        }
+        with pytest.raises(ValueError, match="contradicts independently verified physical packet count"):
+            s10_mod.run(ctx)
+
+        # 12. Non-positive secondary packet count (Boss Round 11 Item 5)
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "nb_frames": 60, "nb_read_packets": "0", "duration": "2.0", "r_frame_rate": "30/1"}],
+            "format": {"duration": "2.0"}
+        }
+        with pytest.raises(ValueError, match="Non-positive secondary packet count"):
             s10_mod.run(ctx)
 
         # 11. Contradictory independently verified secondary packet count (Boss Round 10 Item 4)

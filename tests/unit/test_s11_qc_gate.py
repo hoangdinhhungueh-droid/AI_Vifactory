@@ -51,7 +51,8 @@ def test_s11_qc_fails_closed_on_gate_violation(tmp_path: Path, monkeypatch: pyte
     local_dp = paths.root / "director_plan.json"
     local_dp.parent.mkdir(parents=True, exist_ok=True)
     local_dp.write_text(json.dumps({
-        "title": "Test Plan",
+        "title": "Crisis Investigation Report",
+        "episode_id": run_id,
         "scenes": [{
             "idx": 0,
             "narration": "Authoritative test narration for scene 0",
@@ -111,7 +112,8 @@ def test_s11_qc_propagates_programming_errors_unconverted(tmp_path: Path, monkey
     local_dp = paths.root / "director_plan.json"
     local_dp.parent.mkdir(parents=True, exist_ok=True)
     local_dp.write_text(json.dumps({
-        "title": "Test Plan",
+        "title": "Crisis Investigation Report",
+        "episode_id": run_id,
         "scenes": [{
             "idx": 0,
             "narration": "Authoritative test narration for scene 0",
@@ -284,7 +286,8 @@ def test_s11_qc_fails_closed_on_missing_narration_or_bg_prompt(tmp_path: Path) -
     local_dp = paths.root / "director_plan.json"
     local_dp.parent.mkdir(parents=True, exist_ok=True)
     local_dp.write_text(json.dumps({
-        "title": "Test Plan",
+        "title": "Crisis Investigation Report",
+        "episode_id": run_id,
         "scenes": [{
             "idx": 0,
             "narration": "",
@@ -303,7 +306,8 @@ def test_s11_qc_fails_closed_on_missing_narration_or_bg_prompt(tmp_path: Path) -
 
     # 2. Too short bg_prompt (< 10 chars)
     local_dp.write_text(json.dumps({
-        "title": "Test Plan",
+        "title": "Crisis Investigation Report",
+        "episode_id": run_id,
         "scenes": [{
             "idx": 0,
             "narration": "Authoritative valid narration text",
@@ -338,7 +342,8 @@ def test_s11_qc_fails_closed_on_invalid_camera_or_empty_fg(tmp_path: Path) -> No
     local_dp = paths.root / "director_plan.json"
     local_dp.parent.mkdir(parents=True, exist_ok=True)
     local_dp.write_text(json.dumps({
-        "title": "Test Plan",
+        "title": "Crisis Investigation Report",
+        "episode_id": run_id,
         "scenes": [{
             "idx": 0,
             "narration": "Authoritative valid narration text",
@@ -357,7 +362,8 @@ def test_s11_qc_fails_closed_on_invalid_camera_or_empty_fg(tmp_path: Path) -> No
 
     # 2. Empty FG list
     local_dp.write_text(json.dumps({
-        "title": "Test Plan",
+        "title": "Crisis Investigation Report",
+        "episode_id": run_id,
         "scenes": [{
             "idx": 0,
             "narration": "Authoritative valid narration text",
@@ -406,5 +412,88 @@ def test_s11_qc_fails_closed_on_run_id_mismatch(tmp_path: Path) -> None:
         run_id=run_id, paths=paths, manifest=RunManifest.create_new(run_id, profile="e2e_min"),
         config=load_profile("e2e_min"), force=True, dry_run=False,
     )
-    with pytest.raises(ValueError, match="contradicts expected run identity"):
+    with pytest.raises(ValueError, match="must be non-empty and match expected run identity"):
+        run_s11_qc(ctx)
+
+
+def test_s11_qc_fails_closed_on_synthetic_title_or_duplicate_scenes(tmp_path: Path) -> None:
+    """Verifies S11 strictly rejects synthetic 'Plan ...' title, duplicate scene indices, duplicate FG IDs."""
+    run_id = "test_qc_advanced_fail_closed"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    paths.final_render_dir.mkdir(parents=True, exist_ok=True)
+    valid_mp4 = paths.final_render_dir / "final.mp4"
+    valid_mp4.write_bytes(b"dummy_mp4_bytes")
+
+    s10_art_file = paths.artifact_file(StageID.S10_RENDER.value)
+    s10_art_file.parent.mkdir(parents=True, exist_ok=True)
+    s10_art_file.write_text(json.dumps({
+        "run_id": run_id, "stage": StageID.S10_RENDER.value, "status": "ok",
+        "payload": {"task_id": run_id, "final_video_path": str(valid_mp4), "fps": 30.0, "duration_in_frames": 150},
+        "provenance": {"generator": "stages.s10_render"},
+    }), encoding="utf-8")
+
+    local_dp = paths.root / "director_plan.json"
+    local_dp.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1. Synthetic title starting with 'Plan '
+    local_dp.write_text(json.dumps({
+        "title": f"Plan {run_id}",
+        "episode_id": run_id,
+        "scenes": [{"idx": 0, "narration": "Valid text here", "bg_prompt": "Long archival background prompt", "fg": [{"id": "fg1", "prompt": "Long fg prompt here"}], "camera": "push_in"}]
+    }), encoding="utf-8")
+    ctx = RunContext(run_id=run_id, paths=paths, manifest=RunManifest.create_new(run_id, profile="e2e_min"), config=load_profile("e2e_min"), force=True, dry_run=False)
+    with pytest.raises(ValueError, match="synthetic 'Plan ...' default is strictly prohibited"):
+        run_s11_qc(ctx)
+
+    # 2. Duplicate scene indices
+    local_dp.write_text(json.dumps({
+        "title": "Authoritative Document Investigation",
+        "episode_id": run_id,
+        "scenes": [
+            {"idx": 0, "narration": "Scene 0 narration", "bg_prompt": "Archival prompt 000000000", "fg": [{"id": "fg1", "prompt": "FG element prompt 000"}], "camera": "push_in"},
+            {"idx": 0, "narration": "Duplicate scene 0", "bg_prompt": "Archival prompt 000000001", "fg": [{"id": "fg2", "prompt": "FG element prompt 001"}], "camera": "pan_left"},
+        ]
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="Duplicate scene index 0"):
+        run_s11_qc(ctx)
+
+    # 3. Duplicate foreground IDs in same scene
+    local_dp.write_text(json.dumps({
+        "title": "Authoritative Document Investigation",
+        "episode_id": run_id,
+        "scenes": [
+            {"idx": 0, "narration": "Scene 0 narration", "bg_prompt": "Archival prompt 000000000", "fg": [
+                {"id": "fg_dup", "prompt": "FG element prompt 000"},
+                {"id": "fg_dup", "prompt": "FG element prompt 001"}
+            ], "camera": "push_in"},
+        ]
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate FG object id 'fg_dup'"):
+        run_s11_qc(ctx)
+
+    # 4. Foreground objects count > 3 (no coercive truncation)
+    local_dp.write_text(json.dumps({
+        "title": "Authoritative Document Investigation",
+        "episode_id": run_id,
+        "scenes": [
+            {"idx": 0, "narration": "Scene 0 narration", "bg_prompt": "Archival prompt 000000000", "fg": [
+                {"id": "fg1", "prompt": "FG element prompt 001"},
+                {"id": "fg2", "prompt": "FG element prompt 002"},
+                {"id": "fg3", "prompt": "FG element prompt 003"},
+                {"id": "fg4", "prompt": "FG element prompt 004"}
+            ], "camera": "push_in"},
+        ]
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="must be <= 3 without coercive truncation"):
+        run_s11_qc(ctx)
+
+    # 5. Contradictory scene timing (end <= start)
+    local_dp.write_text(json.dumps({
+        "title": "Authoritative Document Investigation",
+        "episode_id": run_id,
+        "scenes": [
+            {"idx": 0, "narration": "Scene 0 narration", "bg_prompt": "Archival prompt 000000000", "fg": [{"id": "fg1", "prompt": "FG element prompt 001"}], "camera": "push_in", "start": 5.0, "end": 2.0},
+        ]
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"contradictory timing: end \(2.0\) <= start \(5.0\)"):
         run_s11_qc(ctx)

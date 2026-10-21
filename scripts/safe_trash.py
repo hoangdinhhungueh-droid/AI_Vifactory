@@ -1,3 +1,4 @@
+import time
 #!/usr/bin/env python3
 """
 Safe Trash Utility (Windows & Linux)
@@ -255,23 +256,54 @@ def move_to_trash_linux(path: str, allowed_roots: Optional[List[Union[str, Path]
         print(f"SECURITY RACE DETECTED: {msg_real}")
         return False
 
-    # Post-validation race verification using O_NOFOLLOW file descriptor
+    # Directory-descriptor-relative atomic validation and move architecture (Boss Round 11 Item 7)
+    parent_dir = os.path.dirname(abs_path)
+    base_name = os.path.basename(abs_path)
+    parent_fd = None
+    target_fd = None
     try:
-        flags = os.O_RDONLY
+        p_flags = os.O_RDONLY
+        if hasattr(os, "O_DIRECTORY"):
+            p_flags |= os.O_DIRECTORY
         if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
-        fd = os.open(abs_path, flags)
-        try:
-            fd_stat = os.fstat(fd)
-            if fd_stat.st_ino != initial_lstat.st_ino or fd_stat.st_dev != initial_lstat.st_dev:
-                print(f"SECURITY RACE DETECTED: Inode/device mutated between validation and move: {abs_path}")
-                return False
-        finally:
-            os.close(fd)
-    except OSError as fd_err:
-        if is_reparse_or_symlink(abs_path):
-            print(f"SECURITY RACE DETECTED: Path became a symlink: {fd_err}")
+            p_flags |= os.O_NOFOLLOW
+        parent_fd = os.open(parent_dir, p_flags)
+
+        t_flags = os.O_RDONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            t_flags |= os.O_NOFOLLOW
+        target_fd = os.open(base_name, t_flags, dir_fd=parent_fd)
+
+        fd_stat = os.fstat(target_fd)
+        if fd_stat.st_ino != initial_lstat.st_ino or fd_stat.st_dev != initial_lstat.st_dev:
+            print(f"SECURITY RACE DETECTED: Inode/device mutated between validation and move: {abs_path}")
             return False
+    except OSError as fd_err:
+        print(f"SECURITY RACE DETECTED: Descriptor-relative verification failed: {fd_err}")
+        return False
+    finally:
+        if target_fd is not None:
+            os.close(target_fd)
+
+    # Attempt atomic descriptor-relative move if destination directory descriptor is available
+    trash_dir = os.path.expanduser("~/.local/share/Trash/files")
+    os.makedirs(trash_dir, exist_ok=True)
+    dest_name = f"{int(time.time())}_{base_name}"
+    try:
+        dest_fd = os.open(trash_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            # Try atomic rename via src_dir_fd and dst_dir_fd (POSIX renameat/openat architecture)
+            if hasattr(os, "rename") and "src_dir_fd" in os.rename.__code__.co_varnames:
+                os.rename(base_name, dest_name, src_dir_fd=parent_fd, dst_dir_fd=dest_fd)
+                print(f"Successfully moved to Linux Trash via atomic descriptor-relative rename: {abs_path}")
+                return True
+        finally:
+            os.close(dest_fd)
+    except Exception as move_err:
+        print(f"Descriptor-relative rename notice: {move_err}")
+    finally:
+        if parent_fd is not None:
+            os.close(parent_fd)
 
     res = subprocess.run(["which", "trash-put"], capture_output=True, text=True)
     if res.returncode == 0:
@@ -280,10 +312,8 @@ def move_to_trash_linux(path: str, allowed_roots: Optional[List[Union[str, Path]
             print(f"Successfully moved to Linux Trash via trash-put: {abs_path}")
             return True
 
-    trash_dir = os.path.expanduser("~/.local/share/Trash/files")
-    os.makedirs(trash_dir, exist_ok=True)
     import shutil
-    dest = os.path.join(trash_dir, os.path.basename(abs_path))
+    dest = os.path.join(trash_dir, dest_name)
     shutil.move(abs_path, dest)
     print(f"Moved to fallback trash: {dest}")
     return True

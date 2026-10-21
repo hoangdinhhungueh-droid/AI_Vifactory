@@ -24,15 +24,24 @@ STAGE: StageID = StageID.S11_QC
 
 
 def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: str) -> Any:
-    """Strictly validates authoritative scene data into ScenePlan without synthetic coercion (Boss Round 10 Item 5)."""
+    """Strictly validates authoritative scene data into ScenePlan without synthetic coercion (Boss Round 10 Item 5 & Round 11 Item 6)."""
+    import math
     from vox.schemas import CameraMove, FGObject, Scene, ScenePlan
 
-    # Validate task/episode binding if declared in plan
+    # Validate explicit title (zero synthetic "Plan {expected_run_id}" coercion - Boss Round 11 Item 6)
+    title = data.get("title")
+    if not title or not isinstance(title, str) or not title.strip() or title.strip().startswith("Plan "):
+        raise ValueError(
+            f"Stage S11 fail-closed: Authoritative plan missing valid explicit 'title' "
+            f"(got {title!r}; synthetic 'Plan ...' default is strictly prohibited)"
+        )
+
+    # Validate mandatory task/episode binding (Boss Round 11 Item 6)
     declared_id = data.get("episode_id") or data.get("run_id") or data.get("task_id")
-    if declared_id and str(declared_id).strip() != str(expected_run_id).strip():
+    if not declared_id or str(declared_id).strip() != str(expected_run_id).strip():
         raise ValueError(
             f"Stage S11 fail-closed: Authoritative plan declared identity '{declared_id}' "
-            f"contradicts expected run identity '{expected_run_id}'"
+            f"must be non-empty and match expected run identity '{expected_run_id}'"
         )
 
     sc_list = data.get("scenes", [])
@@ -40,8 +49,14 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
         raise ValueError("Empty or non-list scenes declared in authoritative plan data")
 
     validated_scenes: list[Scene] = []
+    seen_indices: set[int] = set()
+    prev_end: float | None = None
+
     for i, s in enumerate(sc_list):
         if isinstance(s, Scene):
+            if s.idx in seen_indices:
+                raise ValueError(f"Stage S11 fail-closed: Duplicate scene index {s.idx} in authoritative plan")
+            seen_indices.add(s.idx)
             validated_scenes.append(s)
             continue
         if not isinstance(s, dict):
@@ -50,6 +65,9 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
         idx = s.get("idx", s.get("scene_index"))
         if idx is None or not isinstance(idx, int) or idx < 0:
             raise ValueError(f"Authoritative scene {i} missing valid non-negative integer 'idx'")
+        if idx in seen_indices:
+            raise ValueError(f"Stage S11 fail-closed: Duplicate scene index {idx} in authoritative plan")
+        seen_indices.add(idx)
 
         narration = s.get("narration", s.get("narration_text", s.get("text")))
         if not narration or not isinstance(narration, str) or not narration.strip():
@@ -62,24 +80,47 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
         raw_fg = s.get("fg", s.get("fg_image", s.get("foreground")))
         if not raw_fg or not isinstance(raw_fg, list) or len(raw_fg) == 0:
             raise ValueError(f"Authoritative scene {idx} missing required 'fg' objects list (min 1 object)")
+        if len(raw_fg) > 3:
+            raise ValueError(f"Authoritative scene {idx} has {len(raw_fg)} foreground objects (must be <= 3 without coercive truncation)")
 
         valid_fg_list: list[FGObject] = []
+        seen_fg_ids: set[str] = set()
         for j, fg_item in enumerate(raw_fg):
             if isinstance(fg_item, FGObject):
+                if fg_item.id in seen_fg_ids:
+                    raise ValueError(f"Authoritative scene {idx} has duplicate FG object id '{fg_item.id}'")
+                seen_fg_ids.add(fg_item.id)
                 valid_fg_list.append(fg_item)
             elif isinstance(fg_item, dict):
                 fg_id = fg_item.get("id")
                 fg_prompt = fg_item.get("prompt")
                 if not fg_id or not fg_prompt or len(str(fg_prompt).strip()) < 10:
                     raise ValueError(f"Authoritative scene {idx} FG object {j} missing required 'id' or 'prompt' (min length 10)")
+                fg_id_str = str(fg_id).strip()
+                if fg_id_str in seen_fg_ids:
+                    raise ValueError(f"Authoritative scene {idx} has duplicate FG object id '{fg_id_str}'")
+                seen_fg_ids.add(fg_id_str)
+
+                # Validate finite coordinates and timing (Boss Round 11 Item 6)
+                coords = {
+                    "anchor_x": float(fg_item.get("anchor_x", 0.5)),
+                    "anchor_y": float(fg_item.get("anchor_y", 0.5)),
+                    "scale": float(fg_item.get("scale", 0.5)),
+                    "depth": float(fg_item.get("depth", 0.5)),
+                    "enter_at": float(fg_item.get("enter_at", 0.0)),
+                }
+                for c_name, c_val in coords.items():
+                    if not math.isfinite(c_val):
+                        raise ValueError(f"Authoritative scene {idx} FG object '{fg_id_str}' has non-finite {c_name} ({c_val})")
+
                 valid_fg_list.append(FGObject(
-                    id=str(fg_id),
+                    id=fg_id_str,
                     prompt=str(fg_prompt).strip(),
-                    anchor_x=float(fg_item.get("anchor_x", 0.5)),
-                    anchor_y=float(fg_item.get("anchor_y", 0.5)),
-                    scale=float(fg_item.get("scale", 0.5)),
-                    depth=float(fg_item.get("depth", 0.5)),
-                    enter_at=float(fg_item.get("enter_at", 0.0)),
+                    anchor_x=coords["anchor_x"],
+                    anchor_y=coords["anchor_y"],
+                    scale=coords["scale"],
+                    depth=coords["depth"],
+                    enter_at=coords["enter_at"],
                 ))
             else:
                 raise ValueError(f"Authoritative scene {idx} FG object {j} is not a valid dictionary or FGObject")
@@ -92,20 +133,43 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
         except ValueError:
             raise ValueError(f"Authoritative scene {idx} has invalid camera move '{raw_cam}' (must be one of 12 canonical CameraMove values)")
 
+        start_val = None
+        end_val = None
+        if s.get("start") is not None:
+            start_val = float(s["start"])
+            if not math.isfinite(start_val) or start_val < 0.0:
+                raise ValueError(f"Authoritative scene {idx} has non-finite or negative start time: {start_val}")
+        if s.get("end") is not None:
+            end_val = float(s["end"])
+            if not math.isfinite(end_val) or end_val <= 0.0:
+                raise ValueError(f"Authoritative scene {idx} has non-finite or non-positive end time: {end_val}")
+        if start_val is not None and end_val is not None:
+            if end_val <= start_val:
+                raise ValueError(f"Authoritative scene {idx} has contradictory timing: end ({end_val}) <= start ({start_val})")
+            if prev_end is not None and start_val < prev_end - 0.1:
+                raise ValueError(f"Authoritative scene {idx} timing contradicts previous scene: start ({start_val}) overlaps before prev_end ({prev_end})")
+            prev_end = end_val
+
         validated_scenes.append(Scene(
             idx=idx,
             narration=narration.strip(),
             bg_prompt=bg_prompt.strip(),
-            fg=valid_fg_list[:3],
+            fg=valid_fg_list,
             camera=cam_enum,
-            start=float(s["start"]) if s.get("start") is not None else None,
-            end=float(s["end"]) if s.get("end") is not None else None,
+            start=start_val,
+            end=end_val,
         ))
 
+    audio_dur = None
+    if data.get("audio_duration") is not None:
+        audio_dur = float(data["audio_duration"])
+        if not math.isfinite(audio_dur) or audio_dur <= 0.0:
+            raise ValueError(f"Authoritative plan has non-finite or non-positive audio_duration: {audio_dur}")
+
     return ScenePlan(
-        title=str(data.get("title", f"Plan {expected_run_id}")),
+        title=title.strip(),
         scenes=validated_scenes,
-        audio_duration=float(data["audio_duration"]) if data.get("audio_duration") is not None else None,
+        audio_duration=audio_dur,
     )
 
 
