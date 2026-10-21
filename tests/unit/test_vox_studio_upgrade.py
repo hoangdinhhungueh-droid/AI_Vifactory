@@ -9,6 +9,8 @@ Unit tests verifying the Vox Studio 8-10 minute upgrade features:
 - End-to-end S5 Director Plan v2 contract compliance
 """
 
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -647,17 +649,45 @@ def test_safe_disposal_negative_boundary_and_wildcard_attacks(tmp_path):
         assert not ok, f"Production source file was unexpectedly allowed for disposal: {src_file}"
         assert "outside approved disposal roots" in msg or "forbidden" in msg.lower()
 
-    # 7. Symlink escape attack: symlink inside approved quarantine pointing outside
-    symlink_target = tmp_path / "secret_data.txt"
-    symlink_target.write_text("confidential", encoding="utf-8")
+    # 7. Symlink & Junction escape attack: symlink/junction inside approved quarantine pointing outside
+    symlink_target_dir = tmp_path / "secret_outside_dir"
+    symlink_target_dir.mkdir(exist_ok=True)
+    outside_secret = symlink_target_dir / "secret_data.txt"
+    outside_secret.write_text("DO_NOT_LEAK_CONFIDENTIAL", encoding="utf-8")
     evil_link = fake_quarantine / "link_to_secret"
-    try:
-        evil_link.symlink_to(symlink_target)
+
+    link_created = False
+    if os.name == "nt":
+        # Windows directory junction (mklink /J) works without elevated privileges
+        j_res = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(evil_link), str(symlink_target_dir)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if j_res.returncode == 0:
+            link_created = True
+        else:
+            try:
+                os.symlink(str(symlink_target_dir), str(evil_link), target_is_directory=True)
+                link_created = True
+            except (OSError, NotImplementedError) as _symlink_err:
+                pytest.skip(f"OS environment does not permit symlink or junction creation: {_symlink_err}")
+    else:
+        try:
+            evil_link.symlink_to(symlink_target_dir)
+            link_created = True
+        except (OSError, NotImplementedError) as _symlink_err:
+            pytest.skip(f"OS environment does not permit symlink creation: {_symlink_err}")
+
+    if link_created:
         ok, msg = validate_safe_disposal_target(str(evil_link), allowed_roots=[fake_quarantine])
         assert not ok, "Symlink escaping quarantine was unexpectedly accepted"
         assert "outside approved disposal roots" in msg
-    except (OSError, NotImplementedError):
-        pass  # Skip if unprivileged Windows symlink creation is restricted
+        # Negative physical proof: safe_trash MUST reject trashing symlink pointing outside
+        assert safe_trash(str(evil_link), allowed_roots=[fake_quarantine]) is False
+        assert outside_secret.exists() is True, "Target file outside quarantine was unexpectedly destroyed!"
+        assert outside_secret.read_text(encoding="utf-8") == "DO_NOT_LEAK_CONFIDENTIAL"
 
     # 8. Physical proof: rejected targets cannot be deleted or moved (physical non-destruction guarantee)
     protected_file = tmp_path / "protected_target.txt"
@@ -668,59 +698,79 @@ def test_safe_disposal_negative_boundary_and_wildcard_attacks(tmp_path):
 
 
 def test_ast_rule139_scanner_contract_validation_fails_closed():
-    """Verify strict scanner-output contract validation: missing scripts, malformed JSON, non-object JSON,
-    missing fields, invalid field types, negative or contradictory counts, and nonzero exits fail closed (Rule 139 & Boss Item 2).
+    """Verify strict production scanner-output contract validation: missing scripts/executables, malformed JSON,
+    non-object JSON, missing fields, invalid field types, negative or contradictory counts, and nonzero exits fail closed (Rule 139 & Boss Item 3).
     """
-    import json
-    required_ast_fields = {"scanner_name", "scanner_version", "scanned_files", "critical_count", "high_count", "allowed_legacy_count", "verdict", "defects"}
+    from scripts.orchestrator.boss_orchestrator import validate_ast_scanner_contract
 
-    def validate_scanner_output(raw_output: str, exit_code: int) -> dict:
-        """Mirroring orchestrator contract validation logic."""
-        if exit_code != 0:
-            raise ValueError(f"Scanner process failed with nonzero exit code: {exit_code}")
-        try:
-            data = json.loads(raw_output)
-        except Exception as e:
-            raise ValueError(f"Scanner emitted malformed JSON: {e}")
-        if not isinstance(data, dict):
-            raise ValueError(f"Scanner emitted non-object JSON: got {type(data).__name__}")
-        missing = required_ast_fields - set(data.keys())
-        if missing:
-            raise ValueError(f"Scanner output missing required fields: {missing}")
-        for int_f in ["critical_count", "high_count", "allowed_legacy_count", "scanned_files"]:
-            val = data.get(int_f)
-            if type(val) is not int or val < 0:
-                raise ValueError(f"Field '{int_f}' must be non-negative int, got {val!r}")
-        verdict = data.get("verdict")
-        if not isinstance(verdict, str):
-            raise ValueError(f"Field 'verdict' must be string, got {type(verdict).__name__}")
-        if "PASS" in verdict and (data["critical_count"] > 0 or data["high_count"] > 0 or exit_code != 0):
-            raise ValueError(f"Contradictory state: verdict={verdict} but critical={data['critical_count']}, high={data['high_count']}")
-        return data
-
-    # 1. Nonzero exit code
+    # 1. Nonzero exit code (exercises process failure & missing executable paths)
     with pytest.raises(ValueError, match="nonzero exit code: 1"):
-        validate_scanner_output('{"scanner_name": "ast", "scanner_version": "1.0", "scanned_files": 10, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": []}', exit_code=1)
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": []}',
+            exit_code=1,
+        )
 
-    # 2. Malformed JSON
+    # 2. Missing executable / empty output
+    with pytest.raises(ValueError, match="Scanner emitted empty output"):
+        validate_ast_scanner_contract("", exit_code=0)
+
+    # 3. Malformed JSON
     with pytest.raises(ValueError, match="malformed JSON"):
-        validate_scanner_output('{broken_json', exit_code=0)
+        validate_ast_scanner_contract("{broken_json", exit_code=0)
 
-    # 3. Non-object JSON
+    # 4. Non-object JSON (array instead of dict)
     with pytest.raises(ValueError, match="non-object JSON"):
-        validate_scanner_output('["array", "of", "items"]', exit_code=0)
+        validate_ast_scanner_contract('["array", "of", "items"]', exit_code=0)
 
-    # 4. Missing required field
+    # 5. Missing required field (critical_count omitted)
     with pytest.raises(ValueError, match="missing required fields.*critical_count"):
-        validate_scanner_output('{"scanner_name": "ast", "scanner_version": "1.0", "scanned_files": 10, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": []}', exit_code=0)
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": []}',
+            exit_code=0,
+        )
 
-    # 5. Invalid field type
+    # 6. Invalid field type (non-integer count)
     with pytest.raises(ValueError, match="must be non-negative int"):
-        validate_scanner_output('{"scanner_name": "ast", "scanner_version": "1.0", "scanned_files": 10, "critical_count": "zero", "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": []}', exit_code=0)
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": "zero", "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": []}',
+            exit_code=0,
+        )
 
-    # 6. Contradictory state (verdict PASS with critical > 0)
+    # 7. Invalid field type (negative integer count)
+    with pytest.raises(ValueError, match="must be non-negative int"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": -1, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": []}',
+            exit_code=0,
+        )
+
+    # 8. Invalid verdict type (non-string)
+    with pytest.raises(ValueError, match="Field 'verdict' must be string"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": 100, "defects": []}',
+            exit_code=0,
+        )
+
+    # 9. Invalid defects type (non-list)
+    with pytest.raises(ValueError, match="Field 'defects' must be list"):
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": "none"}',
+            exit_code=0,
+        )
+
+    # 10. Contradictory state (verdict claims PASS but critical > 0)
     with pytest.raises(ValueError, match="Contradictory state"):
-        validate_scanner_output('{"scanner_name": "ast", "scanner_version": "1.0", "scanned_files": 10, "critical_count": 2, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS (0 Critical / 0 High)", "defects": []}', exit_code=0)
+        validate_ast_scanner_contract(
+            '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 10, "critical_count": 2, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS (0 Critical / 0 High)", "defects": []}',
+            exit_code=0,
+        )
+
+    # 11. Authoritative valid contract parsing passes cleanly
+    valid_payload = '{"scanner_name": "probe_ast_rule139.py", "scanner_version": "2.2.0", "scanned_files": 142, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS (0 Critical / 0 High)", "defects": []}'
+    parsed = validate_ast_scanner_contract(valid_payload, exit_code=0)
+    assert parsed["critical_count"] == 0
+    assert parsed["high_count"] == 0
+    assert parsed["verdict"] == "PASS (0 Critical / 0 High)"
+    assert parsed["scanned_files"] == 142
 
 
 def test_vox_qa_gates_fails_closed_when_scene_plan_absent_or_empty(tmp_path):
