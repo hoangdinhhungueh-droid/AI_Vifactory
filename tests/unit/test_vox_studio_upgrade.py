@@ -1008,7 +1008,7 @@ def test_s10_render_media_probe_fails_closed(tmp_path: Path):
             "streams": [{"codec_type": "video", "nb_frames": 60, "duration": "0.0", "r_frame_rate": "30/1"}],
             "format": {"duration": "0.0"}
         }
-        with pytest.raises(ValueError, match="zero, negative, or non-finite duration"):
+        with pytest.raises(ValueError, match="non-positive or non-finite duration"):
             s10_mod.run(ctx)
 
         # 6. Mutual consistency: frame count duration inconsistent with measured duration (> 0.5s)
@@ -1025,6 +1025,22 @@ def test_s10_render_media_probe_fails_closed(tmp_path: Path):
             "format": {"duration": "10.0"}
         }
         with pytest.raises(ValueError, match="drifts from Remotion intended duration"):
+            s10_mod.run(ctx)
+
+        # 8. Missing required nb_frames stream metadata (zero synthesis)
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "duration": "2.0", "r_frame_rate": "30/1"}],
+            "format": {"duration": "2.0"}
+        }
+        with pytest.raises(ValueError, match="missing required 'nb_frames' stream metadata"):
+            s10_mod.run(ctx)
+
+        # 9. Contradictory stream and container durations
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "nb_frames": 60, "duration": "2.0", "r_frame_rate": "30/1"}],
+            "format": {"duration": "5.0"}
+        }
+        with pytest.raises(ValueError, match="Stream duration.*contradicts container format duration"):
             s10_mod.run(ctx)
     finally:
         s10_mod.assemble_final_video = orig_assemble

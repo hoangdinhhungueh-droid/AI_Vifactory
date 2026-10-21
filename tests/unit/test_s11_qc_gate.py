@@ -47,6 +47,14 @@ def test_s11_qc_fails_closed_on_gate_violation(tmp_path: Path, monkeypatch: pyte
     s10_art_file.parent.mkdir(parents=True, exist_ok=True)
     s10_art_file.write_text(json.dumps(s10_artifact), encoding="utf-8")
 
+    # Authoritative task-local plan (Rule 128 & Boss Item 6)
+    local_dp = paths.root / "director_plan.json"
+    local_dp.parent.mkdir(parents=True, exist_ok=True)
+    local_dp.write_text(json.dumps({
+        "title": "Test Plan",
+        "scenes": [{"scene_id": "sc_01", "duration_in_frames": 150, "camera_move": "zoom_in"}]
+    }), encoding="utf-8")
+
     cfg = load_profile("e2e_min")
     manifest = RunManifest.create_new(run_id, profile="e2e_min")
     ctx = RunContext(
@@ -91,6 +99,14 @@ def test_s11_qc_propagates_programming_errors_unconverted(tmp_path: Path, monkey
     s10_art_file = paths.artifact_file(StageID.S10_RENDER.value)
     s10_art_file.parent.mkdir(parents=True, exist_ok=True)
     s10_art_file.write_text(json.dumps(s10_artifact), encoding="utf-8")
+
+    # Authoritative task-local plan (Rule 128 & Boss Item 6)
+    local_dp = paths.root / "director_plan.json"
+    local_dp.parent.mkdir(parents=True, exist_ok=True)
+    local_dp.write_text(json.dumps({
+        "title": "Test Plan",
+        "scenes": [{"scene_id": "sc_01", "duration_in_frames": 150, "camera_move": "zoom_in"}]
+    }), encoding="utf-8")
 
     cfg = load_profile("e2e_min")
     manifest = RunManifest.create_new(run_id, profile="e2e_min")
@@ -153,3 +169,80 @@ def test_s11_qc_fails_closed_when_duration_in_frames_missing(tmp_path: Path) -> 
     with pytest.raises(ValueError, match="Stage S11 requires positive duration_in_frames"):
         run_s11_qc(ctx)
 
+
+
+def test_s11_qc_fails_closed_on_malformed_authoritative_plan(tmp_path: Path) -> None:
+    """Verifies that S11 fails closed with ValueError when authoritative plan is missing or malformed (Rule 128 & Boss Item 6)."""
+    run_id = "test_qc_malformed_plan"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    paths.final_render_dir.mkdir(parents=True, exist_ok=True)
+
+    valid_mp4 = paths.final_render_dir / "final.mp4"
+    valid_mp4.write_bytes(b"dummy_mp4_bytes")
+
+    # 1. Missing both remotion_props_file and local director_plan
+    s10_art_file = paths.artifact_file(StageID.S10_RENDER.value)
+    s10_art_file.parent.mkdir(parents=True, exist_ok=True)
+    s10_art_file.write_text(json.dumps({
+        "run_id": run_id,
+        "stage": StageID.S10_RENDER.value,
+        "status": "ok",
+        "payload": {
+            "task_id": run_id,
+            "final_video_path": str(valid_mp4),
+            "fps": 30.0,
+            "duration_in_frames": 150,
+        },
+        "provenance": {"generator": "stages.s10_render"},
+    }), encoding="utf-8")
+
+    ctx = RunContext(
+        run_id=run_id,
+        paths=paths,
+        manifest=RunManifest.create_new(run_id, profile="e2e_min"),
+        config=load_profile("e2e_min"),
+        force=True,
+        dry_run=False,
+    )
+
+    with pytest.raises(ValueError, match="No authoritative ScenePlan found"):
+        run_s11_qc(ctx)
+
+    # 2. Malformed remotion_props_file (broken JSON)
+    bad_props = paths.root / "broken_props.json"
+    bad_props.write_text("{broken_json", encoding="utf-8")
+    s10_art_file.write_text(json.dumps({
+        "run_id": run_id,
+        "stage": StageID.S10_RENDER.value,
+        "status": "ok",
+        "payload": {
+            "task_id": run_id,
+            "final_video_path": str(valid_mp4),
+            "fps": 30.0,
+            "duration_in_frames": 150,
+            "remotion_props_file": str(bad_props),
+        },
+        "provenance": {"generator": "stages.s10_render"},
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Malformed authoritative remotion_props_file"):
+        run_s11_qc(ctx)
+
+    # 3. Empty scenes in local director_plan
+    local_dp = paths.root / "director_plan.json"
+    local_dp.write_text(json.dumps({"title": "Empty", "scenes": []}), encoding="utf-8")
+    s10_art_file.write_text(json.dumps({
+        "run_id": run_id,
+        "stage": StageID.S10_RENDER.value,
+        "status": "ok",
+        "payload": {
+            "task_id": run_id,
+            "final_video_path": str(valid_mp4),
+            "fps": 30.0,
+            "duration_in_frames": 150,
+        },
+        "provenance": {"generator": "stages.s10_render"},
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Empty scenes list in run-local director_plan"):
+        run_s11_qc(ctx)

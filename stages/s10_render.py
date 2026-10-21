@@ -202,6 +202,22 @@ def run(ctx: RunContext) -> StageArtifact:
     if not math.isfinite(actual_fps) or actual_fps <= 0.0:
         raise ValueError(f"Stage S10 fail-closed: Measured video frame rate is non-finite or non-positive: {actual_fps}")
 
+    # Reconcile r_frame_rate with avg_frame_rate if present
+    avg_fps_str = v_st.get("avg_frame_rate")
+    if avg_fps_str and isinstance(avg_fps_str, str) and avg_fps_str.strip() not in ("", "0/0"):
+        try:
+            if "/" in avg_fps_str:
+                a_num, a_den = map(float, avg_fps_str.split("/", 1))
+                avg_fps = a_num / a_den if a_den > 0.0 else actual_fps
+            else:
+                avg_fps = float(avg_fps_str)
+            if math.isfinite(avg_fps) and avg_fps > 0.0 and abs(actual_fps - avg_fps) > 0.1:
+                raise ValueError(
+                    f"Stage S10 fail-closed: Video r_frame_rate ({actual_fps:.2f}) contradicts avg_frame_rate ({avg_fps:.2f}) by > 0.1 fps"
+                )
+        except (ValueError, ZeroDivisionError) as avg_err:
+            raise ValueError(f"Stage S10 fail-closed: Malformed avg_frame_rate '{avg_fps_str}': {avg_err}")
+
     # Enforce intended vs measured fps agreement (within 0.1 fps)
     if abs(actual_fps - fps) > 0.1:
         raise ValueError(
@@ -209,37 +225,45 @@ def run(ctx: RunContext) -> StageArtifact:
             f"intended frame rate ({fps} fps) by > 0.1 fps"
         )
 
-    # Require finite positive stream and/or format duration
+    # Require finite positive stream AND container format duration with cross-reconciliation
     s_dur_raw = v_st.get("duration")
     c_dur_raw = p_info.get("format", {}).get("duration")
-    s_dur = float(s_dur_raw) if s_dur_raw is not None and str(s_dur_raw).strip() != "" else 0.0
-    c_dur = float(c_dur_raw) if c_dur_raw is not None and str(c_dur_raw).strip() != "" else 0.0
+    if s_dur_raw is None or str(s_dur_raw).strip() == "":
+        raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' missing required stream duration")
+    if c_dur_raw is None or str(c_dur_raw).strip() == "":
+        raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' missing required container format duration")
+    try:
+        s_dur = float(s_dur_raw)
+        c_dur = float(c_dur_raw)
+    except (ValueError, TypeError) as dur_err:
+        raise ValueError(f"Stage S10 fail-closed: Non-numeric duration in '{final_mp4}': {dur_err}")
 
-    measured_dur = s_dur if (s_dur > 0.0 and math.isfinite(s_dur)) else c_dur
-    if not math.isfinite(measured_dur) or measured_dur <= 0.0:
-        raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' has zero, negative, or non-finite duration ({measured_dur})")
+    if not math.isfinite(s_dur) or s_dur <= 0.0 or not math.isfinite(c_dur) or c_dur <= 0.0:
+        raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' has non-positive or non-finite duration (stream={s_dur}, container={c_dur})")
 
-    # Frame count parsing
+    if abs(s_dur - c_dur) > 0.2:
+        raise ValueError(
+            f"Stage S10 fail-closed: Stream duration ({s_dur:.3f}s) contradicts container format duration ({c_dur:.3f}s) by > 0.2s"
+        )
+    measured_dur = s_dur
+
+    # Strictly require verified positive frame count in video stream (zero synthetic fallback)
     v_nb_frames_raw = v_st.get("nb_frames")
-    if v_nb_frames_raw is not None and str(v_nb_frames_raw).strip() != "":
-        try:
-            v_nb_frames = int(v_nb_frames_raw)
-        except (ValueError, TypeError):
-            v_nb_frames = 0
-    else:
-        v_nb_frames = 0
-
-    if v_nb_frames <= 0:
-        v_nb_frames = int(round(measured_dur * actual_fps))
-
-    actual_frames = v_nb_frames
+    if v_nb_frames_raw is None or str(v_nb_frames_raw).strip() == "":
+        raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' missing required 'nb_frames' stream metadata")
+    try:
+        actual_frames = int(v_nb_frames_raw)
+    except (ValueError, TypeError) as frame_err:
+        raise ValueError(f"Stage S10 fail-closed: Malformed 'nb_frames' ({v_nb_frames_raw!r}) in '{final_mp4}': {frame_err}")
+    if actual_frames <= 0:
+        raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' has non-positive nb_frames ({actual_frames})")
 
     # Mutual consistency: frame count, duration, and frame rate
     frame_dur_calc = actual_frames / actual_fps
-    if abs(frame_dur_calc - measured_dur) > 0.5:
+    if abs(frame_dur_calc - measured_dur) > 0.2:
         raise ValueError(
             f"Stage S10 fail-closed: Frame count duration ({frame_dur_calc:.2f}s = {actual_frames} / {actual_fps:.2f}) "
-            f"inconsistent with measured media duration ({measured_dur:.2f}s) by > 0.5s"
+            f"inconsistent with measured media duration ({measured_dur:.2f}s) by > 0.2s"
         )
 
     remotion_dur = render_props.duration_in_frames / fps

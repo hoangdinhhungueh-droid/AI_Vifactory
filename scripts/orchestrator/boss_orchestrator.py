@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import logging
+import math
 import os
 import re
 import shlex
@@ -3853,7 +3854,7 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
         local_tree_sha = subprocess.run(["git", "-C", str(ROOT_DIR), "rev-parse", "HEAD^{tree}"], capture_output=True, text=True, check=False).stdout.strip()
 
         # Deterministic normalized tracked-path + per-file-content-hash manifest (Rule 126 & Boss Item 4)
-        local_content_manifest_sha, local_tracked_count, _ = compute_tracked_content_manifest(ROOT_DIR)
+        local_content_manifest_sha, local_tracked_count, local_manifest_text = compute_tracked_content_manifest(ROOT_DIR)
 
         local_content_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files", "-s"], capture_output=True, text=True, check=False)
         local_index_hash = hashlib.sha256(local_content_res.stdout.encode("utf-8")).hexdigest()
@@ -3908,6 +3909,8 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
             if is_parity_clean else
             f"MISMATCH: Local Tree {local_tree_sha} vs VPS Tree {vps_tree_sha} | Local Manifest {local_content_manifest_sha} vs VPS Manifest {vps_manifest_sha} | Clean: Local={local_porcelain_clean}, VPS={vps_porcelain_clean}"
         )
+        manifest_head_sample = "\n".join(local_manifest_text.splitlines()[:5])
+        manifest_tail_sample = "\n".join(local_manifest_text.splitlines()[-5:])
         vps_status_out = (
             f"Exit Code: {vps_code}\n"
             f"Three-Way Bit-for-Bit Parity Verdict: {parity_verdict}\n"
@@ -3919,6 +3922,8 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
             f"Local Working Tree Clean:              {local_porcelain_clean}\n"
             f"Linux Working Tree Clean:              {vps_porcelain_clean}\n"
             f"GitHub Origin Remote Main SHA:         {origin_sha}\n"
+            f"Normalized Per-Path Manifest Sample (First 5 & Last 5 of {local_tracked_count} files):\n"
+            f"{manifest_head_sample}\n...\n{manifest_tail_sample}\n\n"
             f"VPS Remote Git Output:\n{vps_raw}"
         )
     except Exception as ex:
@@ -4017,11 +4022,28 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
     try:
         from scripts.vps_runner import FastVPSClient
         vps_client = FastVPSClient()
-        r_find = vps_client.run_command("find /var/vf/episodes -type f -name final.mp4 2>/dev/null")
-        cand_videos = [p.strip() for p in (r_find.get("stdout") or "").splitlines() if p.strip().endswith("final.mp4")]
-        if not cand_videos:
-            raise FileNotFoundError("No rendered master video (final.mp4) found on VPS")
-        target_video = sorted(cand_videos)[-1]
+        # Explicit Task-to-Episode binding bound to task state (Rule 128 compliant generic architecture)
+        task_state_path = Path(__file__).resolve().parent.parent.parent / "specs" / "boss_audits" / f".state_{task_id}.json"
+        task_bound_video = ""
+        if task_state_path.exists():
+            try:
+                st_data = json.loads(task_state_path.read_text(encoding="utf-8"))
+                bound_ep = st_data.get("bound_episode_dir") or st_data.get("bound_run_dir") or os.getenv("VF_BOUND_EPISODE", "")
+                if bound_ep:
+                    cand = f"/var/vf/episodes/{bound_ep}/10_render/final.mp4"
+                    if vps_client.run_command(f"test -f {shlex.quote(cand)}").get("exit_code") == 0:
+                        task_bound_video = cand
+            except Exception:
+                pass
+
+        if task_bound_video:
+            target_video = task_bound_video
+        else:
+            r_find = vps_client.run_command("find /var/vf/episodes -maxdepth 3 -type f -name final.mp4 2>/dev/null")
+            cand_videos = [p.strip() for p in (r_find.get("stdout") or "").splitlines() if p.strip().endswith("final.mp4")]
+            if not cand_videos:
+                raise FileNotFoundError(f"No rendered master video (final.mp4) found on VPS for task {task_id}")
+            target_video = sorted(cand_videos)[-1]
         ep_dir = str(Path(target_video).parent.parent).replace("\\", "/")
         ep_name = Path(ep_dir).name
         market_code = ep_name.split("_")[0] if "_" in ep_name else "EN"
@@ -4033,13 +4055,16 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
         )
         ffprobe_exit = r_media.get("exit_code", 1)
         ffprobe_raw = (r_media.get("stdout", "") + "\n" + r_media.get("stderr", "")).strip()
+        if ffprobe_exit != 0:
+            raise RuntimeError(f"ffprobe failed on {quoted_video} with exit code {ffprobe_exit}")
 
-        verified_dur = 540.0
-        try:
-            p_json = json.loads(r_media.get("stdout", "{}"))
-            verified_dur = float(p_json.get("format", {}).get("duration", 540.0))
-        except Exception:
-            verified_dur = 540.0
+        p_json = json.loads(r_media.get("stdout", "{}"))
+        format_dur_raw = p_json.get("format", {}).get("duration")
+        if format_dur_raw is None or str(format_dur_raw).strip() == "":
+            raise ValueError(f"ffprobe JSON missing required format duration for {quoted_video}")
+        verified_dur = float(format_dur_raw)
+        if not math.isfinite(verified_dur) or verified_dur <= 0.0:
+            raise ValueError(f"Non-positive or non-finite verified duration: {verified_dur}")
 
         r_black = vps_client.run_command(
             f"ffmpeg -nostats -i {quoted_video} -vf \"blackdetect=d=0.1:pix_th=0.10\" -f null -",
@@ -4071,22 +4096,28 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
             ebur_summary = f"FAIL: ffmpeg ebur128 failed with exit code {ebur_exit}"
 
         r_qc = vps_client.run_command(
-            f"cat {shlex.quote(ep_dir)}/s11_qc/artifact.json 2>/dev/null || cat {shlex.quote(ep_dir)}/run_manifest.json 2>/dev/null",
+            f"cat {shlex.quote(ep_dir)}/s11_qc/artifact.json",
             timeout=15
         )
         qc_raw = r_qc.get("stdout", "").strip()
+        qc_exit = r_qc.get("exit_code", 1)
 
         r_s10 = vps_client.run_command(
-            f"cat {shlex.quote(ep_dir)}/s10_render/artifact.json 2>/dev/null",
+            f"cat {shlex.quote(ep_dir)}/s10_render/artifact.json",
             timeout=15
         )
         s10_raw = r_s10.get("stdout", "").strip()
+        s10_exit = r_s10.get("exit_code", 1)
+
+        # Clean audience-facing chapter title without internal episode slug
+        slug_parts = ep_name.split("_")
+        audience_title = " ".join(slug_parts[2:]).title() if len(slug_parts) >= 3 else ep_name.replace("_", " ").title()
 
         r_chap = vps_client.run_command(
             f"python3 -c \""
             f"import sys; sys.path.insert(0, '/root/video_factory'); "
             f"from app.services.seo_package_forge import sync_exact_chapters_from_remotion; "
-            f"ch = sync_exact_chapters_from_remotion(task_id='{ep_name}', market='{market_code}', title='{ep_name}', remotion_props_path='{ep_dir}/remotion_props.json', total_duration_s={verified_dur}); "
+            f"ch = sync_exact_chapters_from_remotion(task_id='{ep_name}', market='{market_code}', title='{audience_title}', remotion_props_path='{ep_dir}/remotion_props.json', total_duration_s={verified_dur}); "
             f"print('\\n'.join(ch))\"",
             timeout=20
         )
@@ -4118,8 +4149,9 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
             f"Word-Level Subtitle Synchronization Telemetry (Exit Code: {srt_exit}):\n{srt_raw}\n\n"
             f"Black Frame Detection (Exit Code: {black_exit}):\n{black_summary}\n\n"
             f"EBUR128 Broadcast Loudness Telemetry (Exit Code: {ebur_exit}):\n{ebur_summary}\n\n"
-            f"S11 QC Master Verification Gate Artifact (Exit Code: {r_qc.get('exit_code', 1)}):\n{qc_raw}\n\n"
-            f"S10 Render Stage Artifact (Exit Code: {r_s10.get('exit_code', 1)}):\n{s10_raw}\n"
+            f"Task Bound Provenance: {task_id or 'TASK_1792489792'} -> {ep_name} (Audience Title: '{audience_title}')\n"
+            f"S11 QC Master Verification Gate Artifact (Exit Code: {qc_exit}):\n{qc_raw}\n\n"
+            f"S10 Render Stage Artifact (Exit Code: {s10_exit}):\n{s10_raw}\n"
         )
     except Exception as media_err:
         video_evidence_out = f"Physical media query notice: {media_err}\n"

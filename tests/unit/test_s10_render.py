@@ -148,7 +148,7 @@ def test_s10_render_reverifies_stale_mp4(tmp_path: Path, monkeypatch: pytest.Mon
 
     monkeypatch.setattr("stages.s10_render.assemble_final_video", fake_assemble)
     monkeypatch.setattr("vox.qa.gates.probe_media_file", lambda p: {
-        "streams": [{"codec_type": "video", "codec_name": "h264", "nb_frames": 60, "r_frame_rate": "30/1"}],
+        "streams": [{"codec_type": "video", "codec_name": "h264", "nb_frames": 60, "r_frame_rate": "30/1", "duration": "2.0"}],
         "format": {"duration": "2.0"}
     })
 

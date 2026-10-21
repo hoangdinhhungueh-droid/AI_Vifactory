@@ -13,11 +13,11 @@ Features:
 - Dedicated getters: get_central_skills(), get_content_engine_rules(), get_media_production_rules(), get_all_skills_bundle()
 - Backward-compatible get_skill_rules() alias
 """
+import json
+import logging
 import os
 import sys
-import logging
 import time
-import json
 from pathlib import Path
 
 _REPO_ROOT = str(Path(__file__).resolve().parents[2])
@@ -88,7 +88,7 @@ def _parse_block_markdown(block: dict) -> str:
     btype = block.get("type", "")
     texts = block.get(btype, {}).get("rich_text", [])
     text = "".join(t.get("plain_text", "") for t in texts).strip()
-    
+
     if btype == "heading_1":
         return f"\n# {text}\n"
     elif btype == "heading_2":
@@ -170,7 +170,12 @@ def _load_snapshot() -> dict:
 
 
 def _save_snapshot(hub_key: str, content: str):
-    """Save content to the local snapshot file for offline fallback."""
+    """Save content to the local snapshot file for offline fallback.
+    Only mutates disk if explicitly enabled via VF_SYNC_SNAPSHOT=1 to prevent
+    dirtying tracked git working tree during runtime loading.
+    """
+    if os.getenv("VF_SYNC_SNAPSHOT", "0").lower() not in ("1", "true"):
+        return
     try:
         SNAPSHOT_FILE.parent.mkdir(parents=True, exist_ok=True)
         data = _load_snapshot()
@@ -254,7 +259,7 @@ def _fallback_for_hub(hub_key: str) -> str:
 
     if hub_key == "central" and LEGACY_SNAPSHOT_FILE.exists():
         try:
-            logger.info(f"[skill_loader] Using legacy markdown snapshot for central skills")
+            logger.info("[skill_loader] Using legacy markdown snapshot for central skills")
             return LEGACY_SNAPSHOT_FILE.read_text(encoding="utf-8")
         except Exception as _ex:
             logger.debug(f"Legacy snapshot read notice: {_ex}")
@@ -289,7 +294,7 @@ def _fallback_for_hub(hub_key: str) -> str:
 
 def get_central_skills(force_refresh: bool = False) -> str:
     """Get Rules 113-121 and Core Editorial Principles from Central Skill AI page.
-    
+
     Target: CENTRAL_SKILL_PAGE_ID ('ac901989-2400-827e-bda2-8175dabdcf13')
     """
     global _cache
@@ -333,7 +338,7 @@ def get_central_skills(force_refresh: bool = False) -> str:
 
 def get_content_engine_rules(force_refresh: bool = False) -> str:
     """Get 5-Act narrative structure, pacing, and loop discipline from Content Engine Hub.
-    
+
     Target: CONTENT_ENGINE_PAGE_ID ('9bb01989-2400-82c0-9ed4-01f19c7ee23f')
     """
     global _cache
@@ -374,7 +379,7 @@ def get_content_engine_rules(force_refresh: bool = False) -> str:
 
 def get_media_production_rules(force_refresh: bool = False) -> str:
     """Get 2-Layer composition, visual art direction, and chroma keying rules from Media Production Hub.
-    
+
     Target: MEDIA_PRODUCTION_PAGE_ID ('69e01989-2400-82fe-9352-81d562f63a8b')
     """
     global _cache
@@ -629,7 +634,7 @@ def get_b11_self_learning_rules(force_refresh: bool = False) -> str:
         lines = _fetch_blocks_recursive(SELF_LEARNING_PAGE_ID, depth=0, max_depth=1)
         if not lines:
             return ""
-        filtered = [l for l in lines if len(l.strip()) > 15]
+        filtered = [line for line in lines if len(line.strip()) > 15]
         text = chr(10).join(filtered[:25]).strip()
         if text:
             _cache["self_learning"] = {"data": text, "expiration": now + CACHE_TTL_SECONDS, "source": "NOTION_LIVE"}
@@ -646,7 +651,7 @@ def get_b2_editorial_skills(force_refresh: bool = False) -> str:
     """
     base_editorial = fetch_prompt_module("b2_editorial", force_refresh=force_refresh)
     b11_lessons = get_b11_self_learning_rules(force_refresh=force_refresh)
-    
+
     b11_section = ""
     if b11_lessons:
         b11_section = (

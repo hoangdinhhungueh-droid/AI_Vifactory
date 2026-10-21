@@ -118,6 +118,7 @@ def validate_safe_disposal_target(
         effective_roots = _get_default_allowed_roots()
 
     within_approved = False
+    matching_root: Optional[Path] = None
     for app_root in effective_roots:
         try:
             resolved_p.relative_to(app_root)
@@ -125,12 +126,24 @@ def validate_safe_disposal_target(
             if resolved_p == app_root:
                 return False, f"SECURITY ERROR: Cannot trash entire approved root directory: '{resolved_p}'"
             within_approved = True
+            matching_root = app_root
             break
         except (ValueError, RuntimeError):
             continue
 
-    if not within_approved:
+    if not within_approved or matching_root is None:
         return False, f"SECURITY ERROR: Target path '{path}' resolves to '{resolved_p}' which is outside approved disposal roots"
+
+    # Coordinated ancestor-swap & symlink chain verification (Rule 137 & Boss Item 7):
+    # Verify that every intermediate directory from matching_root down to target does not escape approved root
+    curr = resolved_p
+    while curr != matching_root and curr != curr.parent:
+        if curr.is_symlink():
+            try:
+                curr.resolve().relative_to(matching_root)
+            except (ValueError, RuntimeError):
+                return False, f"SECURITY ERROR: Ancestor path component '{curr}' is a symlink pointing outside approved root: '{curr.resolve()}'"
+        curr = curr.parent
 
     return True, "Target path is valid for safe disposal"
 
