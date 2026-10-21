@@ -3955,11 +3955,14 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
         )
         s10_raw = r_s10.get("stdout", "").strip()
 
+        ep_name = Path(ep_dir).name
+        market_code = ep_name.split("_")[0] if "_" in ep_name else "EN"
+
         r_chap = vps_client.run_command(
             f"python3 -c \""
             f"import sys; sys.path.insert(0, '/root/video_factory'); "
             f"from app.services.seo_package_forge import sync_exact_chapters_from_remotion; "
-            f"ch = sync_exact_chapters_from_remotion(task_id='EN_EP0008_oakland_plan_rejected', market='EN', title='Oakland Diocese Plan Rejected', remotion_props_path='{ep_dir}/remotion_props.json', total_duration_s=540.0); "
+            f"ch = sync_exact_chapters_from_remotion(task_id='{ep_name}', market='{market_code}', title='{ep_name}', remotion_props_path='{ep_dir}/remotion_props.json', total_duration_s=540.0); "
             f"print('\\n'.join(ch))\"",
             timeout=20
         )
