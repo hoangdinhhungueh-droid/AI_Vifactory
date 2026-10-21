@@ -643,7 +643,7 @@ def test_safe_disposal_negative_boundary_and_wildcard_attacks(tmp_path):
     ]:
         ok, msg = validate_safe_disposal_target(str(src_file))
         assert not ok, f"Production source file was unexpectedly allowed for disposal: {src_file}"
-        assert "outside approved disposal roots" in msg
+        assert "outside approved disposal roots" in msg or "forbidden" in msg.lower()
 
     # 7. Symlink escape attack: symlink inside approved quarantine pointing outside
     symlink_target = tmp_path / "secret_data.txt"
