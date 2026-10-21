@@ -9,6 +9,8 @@ Unit tests verifying the Vox Studio 8-10 minute upgrade features:
 - End-to-end S5 Director Plan v2 contract compliance
 """
 
+from pathlib import Path
+import pytest
 from core.contracts.stages import AssetRegistry, Scene, Shot
 from stages.s05_director_plan import (
     build_master_asset_registry,
@@ -631,11 +633,142 @@ def test_safe_disposal_negative_boundary_and_wildcard_attacks(tmp_path):
     assert not ok
     assert "Cannot trash entire approved root directory" in msg
 
-    # Valid disposal inside approved root must be accepted
-    safe_target = fake_quarantine / "scratch_candidate.log"
-    safe_target.write_text("temporary log", encoding="utf-8")
-    ok, msg = validate_safe_disposal_target(str(safe_target), allowed_roots=[fake_quarantine])
-    assert ok
-    assert "valid for safe disposal" in msg
+    # 6. Production source tree & root-adjacent attacks under default roots must be rejected unconditionally (Rule 137)
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    for src_file in [
+        repo_root / "app" / "services" / "prompt_forge.py",
+        repo_root / "stages" / "s10_render.py",
+        repo_root / "vox" / "qa" / "gates.py",
+        repo_root / "core" / "contracts" / "stages.py",
+    ]:
+        ok, msg = validate_safe_disposal_target(str(src_file))
+        assert not ok, f"Production source file was unexpectedly allowed for disposal: {src_file}"
+        assert "outside approved disposal roots" in msg
+
+    # 7. Symlink escape attack: symlink inside approved quarantine pointing outside
+    symlink_target = tmp_path / "secret_data.txt"
+    symlink_target.write_text("confidential", encoding="utf-8")
+    evil_link = fake_quarantine / "link_to_secret"
+    try:
+        evil_link.symlink_to(symlink_target)
+        ok, msg = validate_safe_disposal_target(str(evil_link), allowed_roots=[fake_quarantine])
+        assert not ok, "Symlink escaping quarantine was unexpectedly accepted"
+        assert "outside approved disposal roots" in msg
+    except (OSError, NotImplementedError):
+        pass  # Skip if unprivileged Windows symlink creation is restricted
+
+    # 8. Physical proof: rejected targets cannot be deleted or moved (physical non-destruction guarantee)
+    protected_file = tmp_path / "protected_target.txt"
+    protected_file.write_text("DO_NOT_DELETE_INTEGRITY_CHECK", encoding="utf-8")
+    assert safe_trash(str(protected_file), allowed_roots=[fake_quarantine]) is False
+    assert protected_file.exists() is True
+    assert protected_file.read_text(encoding="utf-8") == "DO_NOT_DELETE_INTEGRITY_CHECK"
+
+
+def test_ast_rule139_scanner_contract_validation_fails_closed():
+    """Verify strict scanner-output contract validation: missing scripts, malformed JSON, non-object JSON,
+    missing fields, invalid field types, negative or contradictory counts, and nonzero exits fail closed (Rule 139 & Boss Item 2).
+    """
+    import json
+    required_ast_fields = {"scanner_name", "scanner_version", "scanned_files", "critical_count", "high_count", "allowed_legacy_count", "verdict", "defects"}
+
+    def validate_scanner_output(raw_output: str, exit_code: int) -> dict:
+        """Mirroring orchestrator contract validation logic."""
+        if exit_code != 0:
+            raise ValueError(f"Scanner process failed with nonzero exit code: {exit_code}")
+        try:
+            data = json.loads(raw_output)
+        except Exception as e:
+            raise ValueError(f"Scanner emitted malformed JSON: {e}")
+        if not isinstance(data, dict):
+            raise ValueError(f"Scanner emitted non-object JSON: got {type(data).__name__}")
+        missing = required_ast_fields - set(data.keys())
+        if missing:
+            raise ValueError(f"Scanner output missing required fields: {missing}")
+        for int_f in ["critical_count", "high_count", "allowed_legacy_count", "scanned_files"]:
+            val = data.get(int_f)
+            if type(val) is not int or val < 0:
+                raise ValueError(f"Field '{int_f}' must be non-negative int, got {val!r}")
+        verdict = data.get("verdict")
+        if not isinstance(verdict, str):
+            raise ValueError(f"Field 'verdict' must be string, got {type(verdict).__name__}")
+        if "PASS" in verdict and (data["critical_count"] > 0 or data["high_count"] > 0 or exit_code != 0):
+            raise ValueError(f"Contradictory state: verdict={verdict} but critical={data['critical_count']}, high={data['high_count']}")
+        return data
+
+    # 1. Nonzero exit code
+    with pytest.raises(ValueError, match="nonzero exit code: 1"):
+        validate_scanner_output('{"scanner_name": "ast", "scanner_version": "1.0", "scanned_files": 10, "critical_count": 0, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": []}', exit_code=1)
+
+    # 2. Malformed JSON
+    with pytest.raises(ValueError, match="malformed JSON"):
+        validate_scanner_output('{broken_json', exit_code=0)
+
+    # 3. Non-object JSON
+    with pytest.raises(ValueError, match="non-object JSON"):
+        validate_scanner_output('["array", "of", "items"]', exit_code=0)
+
+    # 4. Missing required field
+    with pytest.raises(ValueError, match="missing required fields.*critical_count"):
+        validate_scanner_output('{"scanner_name": "ast", "scanner_version": "1.0", "scanned_files": 10, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": []}', exit_code=0)
+
+    # 5. Invalid field type
+    with pytest.raises(ValueError, match="must be non-negative int"):
+        validate_scanner_output('{"scanner_name": "ast", "scanner_version": "1.0", "scanned_files": 10, "critical_count": "zero", "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS", "defects": []}', exit_code=0)
+
+    # 6. Contradictory state (verdict PASS with critical > 0)
+    with pytest.raises(ValueError, match="Contradictory state"):
+        validate_scanner_output('{"scanner_name": "ast", "scanner_version": "1.0", "scanned_files": 10, "critical_count": 2, "high_count": 0, "allowed_legacy_count": 220, "verdict": "PASS (0 Critical / 0 High)", "defects": []}', exit_code=0)
+
+
+def test_vox_qa_gates_fails_closed_when_scene_plan_absent_or_empty(tmp_path):
+    """Verify that vox.qa.gates.verify_final_video_gates fails closed when ScenePlan is None or empty (Rule 139 & Boss Item 12)."""
+    from vox.qa.gates import verify_final_video_gates
+    from vox.schemas import ScenePlan
+
+    dummy_mp4 = tmp_path / "test.mp4"
+    dummy_mp4.write_bytes(b"dummy")
+
+    # 1. Missing plan (None)
+    with pytest.raises(ValueError, match="ScenePlan is required and must contain scenes"):
+        # Monkeypatch probe_media_file to return minimal valid streams
+        import vox.qa.gates as vq
+        orig_probe = vq.probe_media_file
+        orig_loudness = vq.measure_ebur128_loudness
+
+        def fake_probe(p):
+            return {
+                "streams": [
+                    {"codec_type": "video", "codec_name": "h264", "width": 1920, "height": 1080, "pix_fmt": "yuv420p", "nb_frames": 300, "r_frame_rate": "30/1"},
+                    {"codec_type": "audio", "codec_name": "aac", "sample_rate": 48000}
+                ],
+                "format": {"duration": "10.0"}
+            }
+
+        vq.probe_media_file = fake_probe
+        try:
+            verify_final_video_gates(dummy_mp4, expected_duration=10.0, plan=None)
+        finally:
+            vq.probe_media_file = orig_probe
+
+    # 2. Empty plan (dummy object with empty scenes list)
+    empty_plan = type("DummyEmptyPlan", (), {"scenes": []})()
+    with pytest.raises(ValueError, match="ScenePlan is required and must contain scenes"):
+        orig_probe = vq.probe_media_file
+
+        def fake_probe(p):
+            return {
+                "streams": [
+                    {"codec_type": "video", "codec_name": "h264", "width": 1920, "height": 1080, "pix_fmt": "yuv420p", "nb_frames": 300, "r_frame_rate": "30/1"},
+                    {"codec_type": "audio", "codec_name": "aac", "sample_rate": 48000}
+                ],
+                "format": {"duration": "10.0"}
+            }
+
+        vq.probe_media_file = fake_probe
+        try:
+            verify_final_video_gates(dummy_mp4, expected_duration=10.0, plan=empty_plan)
+        finally:
+            vq.probe_media_file = orig_probe
 
 

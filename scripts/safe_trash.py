@@ -20,19 +20,30 @@ FORBIDDEN_ZONES = {
 
 
 def _get_default_allowed_roots() -> List[Path]:
-    """Computes explicitly approved quarantine, scratch, and workspace roots."""
-    roots: List[Path] = [
-        Path(__file__).resolve().parent.parent,  # Workspace / Repo root
-        Path(tempfile.gettempdir()).resolve(),   # System temp / scratch
+    """Computes explicitly approved quarantine and scratch subdirectories.
+
+    Under Rule 137, safe disposal is restricted strictly to designated quarantine,
+    scratch, or temporary artifact subdirectories. The entire repository root,
+    production source tree, and system roots are strictly FORBIDDEN.
+    """
+    repo_root = Path(__file__).resolve().parent.parent
+    approved: List[Path] = [
+        (repo_root / ".trash").resolve(),
+        (repo_root / "tmp").resolve(),
+        (repo_root / "scratch").resolve(),
+        (repo_root / ".system_generated").resolve(),
     ]
+
+    sys_temp = Path(tempfile.gettempdir()).resolve()
+    approved.append((sys_temp / "quarantine").resolve())
+    approved.append((sys_temp / "vf_scratch").resolve())
+
     if os.name != "nt":
-        tmp_p = Path("/tmp")
-        if tmp_p.exists():
-            roots.append(tmp_p.resolve())
-        vf_var = Path("/var/vf")
-        if vf_var.exists():
-            roots.append(vf_var.resolve())
-    return roots
+        approved.append(Path("/tmp/vf_quarantine").resolve())
+        approved.append(Path("/tmp/vf_scratch").resolve())
+        approved.append(Path("/var/vf/quarantine").resolve())
+        approved.append(Path("/var/vf/scratch").resolve())
+    return approved
 
 
 def validate_safe_disposal_target(

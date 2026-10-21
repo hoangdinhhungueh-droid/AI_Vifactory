@@ -51,9 +51,41 @@ def run(ctx: RunContext) -> StageArtifact:
         raise ValueError(f"Stage S11 requires positive duration_in_frames in S10 artifact payload, got: {frames}")
     expected_dur = frames / fps
 
+    # Reconstruct ScenePlan for camera variety and prompt semantics verification (Rule 125 & 139)
+    plan = None
+    props_path_str = s10_art.payload.get("remotion_props_file")
+    if props_path_str and Path(props_path_str).exists():
+        try:
+            from vox.schemas import ScenePlan, SceneProps
+            props_data = json.loads(Path(props_path_str).read_text(encoding="utf-8"))
+            sc_list = props_data.get("scenes", [])
+            if sc_list:
+                plan = ScenePlan(
+                    title=props_data.get("title", f"Plan {ctx.run_id}"),
+                    scenes=sc_list
+                )
+        except Exception as _p_err:
+            logger.debug(f"[s11_qc] Could not reconstruct plan from remotion_props: {_p_err}")
+
+    if not plan:
+        for dp_cand in [ctx.paths.root / "director_plan.json", getattr(ctx.paths, "repo_root", ctx.paths.root.parent) / "director_plan.json"]:
+            if dp_cand.exists():
+                try:
+                    from vox.schemas import ScenePlan
+                    dp_data = json.loads(dp_cand.read_text(encoding="utf-8"))
+                    sc_list = dp_data.get("scenes", [])
+                    if sc_list:
+                        plan = ScenePlan(
+                            title=dp_data.get("title", f"Plan {ctx.run_id}"),
+                            scenes=sc_list
+                        )
+                        break
+                except Exception as _dp_err:
+                    logger.debug(f"[s11_qc] Could not reconstruct plan from {dp_cand}: {_dp_err}")
+
     try:
         # Delegate directly to canonical vox.qa.gates for forensic verification (Rule 125 & 139)
-        gate_res = verify_final_video_gates(p, expected_duration=expected_dur)
+        gate_res = verify_final_video_gates(p, expected_duration=expected_dur, plan=plan)
         qc_details.update(gate_res)
         qc_details["gates_verified"] = True
         gate_passed = True

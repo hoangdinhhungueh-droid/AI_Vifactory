@@ -836,7 +836,7 @@ def aggregate_manifest(
         # Gate-specific predicate checks
         if p_name == "zero_mock_forensic_audit":
             z_count = p_data.get("zero_mock_count")
-            if type(z_count) is not int or z_count not in (229, 231):
+            if type(z_count) is not int or z_count != 231:
                 all_probes_pass = False
 
         elif p_name == "github_actions_ci":
@@ -2115,7 +2115,7 @@ def _collect_vox_forensic_packet(commit_range: Optional[str] = None, task_id: Op
             "exit_code": code_mock,
             "verdict": mock_verdict,
             "zero_mock_count": parsed_zero_mock_count,
-            "expected_count": 229,
+            "expected_count": 231,
         },
         "linux_focused_pytest": {"exit_code": code_focused_taxonomy, "verdict": lnx_test_verdict, "xml_sha256": lnx_junit_sha, "test_count": lnx_tests},
         "windows_focused_pytest": {"exit_code": code_focused_win, "verdict": win_test_verdict, "xml_sha256": win_junit_sha, "test_count": win_tests},
@@ -3502,7 +3502,10 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
         ast_high = ast_parsed["high_count"]
         ast_allowed = ast_parsed["allowed_legacy_count"]
         ast_scanned = ast_parsed["scanned_files"]
-        ast_verdict = str(ast_parsed["verdict"])
+        raw_verdict = ast_parsed.get("verdict")
+        if not isinstance(raw_verdict, str):
+            raise ValueError(f"AST scanner output field 'verdict' must be string, got {type(raw_verdict).__name__}")
+        ast_verdict = raw_verdict
         if ast_probe_code != 0:
             ast_critical = max(1, ast_critical)
             ast_verdict = f"FAIL (Nonzero Exit Code {ast_probe_code})"
@@ -3659,12 +3662,31 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
     vps_code: Any = "WAIVED"
     try:
         from scripts.vps_runner import FastVPSClient
-        local_tree_sha = subprocess.run(["git", "-C", str(ROOT_DIR), "rev-parse", "HEAD^{tree}"], capture_output=True, text=True, check=False).stdout.strip()
-        local_content_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files", "-s"], capture_output=True, text=True, check=False)
         import hashlib
-        local_content_hash = hashlib.sha256(local_content_res.stdout.encode("utf-8")).hexdigest()
-        local_path_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files", "-z"], capture_output=True, check=False)
-        local_path_hash = hashlib.sha256(local_path_res.stdout).hexdigest()
+
+        # Check Local Porcelain Status
+        local_dirty_res = subprocess.run(["git", "-C", str(ROOT_DIR), "status", "--porcelain"], capture_output=True, text=True, check=False)
+        local_dirty_status = local_dirty_res.stdout.strip()
+        local_tree_sha = subprocess.run(["git", "-C", str(ROOT_DIR), "rev-parse", "HEAD^{tree}"], capture_output=True, text=True, check=False).stdout.strip()
+
+        # Deterministic normalized tracked-path + per-file-content-hash manifest (Rule 126 & Boss Item 4)
+        local_files = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files"], capture_output=True, text=True, check=False).stdout.splitlines()
+        local_manifest_entries = []
+        for rel_f in sorted(local_files):
+            norm_rel = rel_f.replace("\\", "/").strip()
+            if not norm_rel:
+                continue
+            full_f = ROOT_DIR / norm_rel
+            if full_f.is_file():
+                f_sha = hashlib.sha256(full_f.read_bytes()).hexdigest()
+                local_manifest_entries.append(f"{f_sha}  {norm_rel}")
+        local_manifest_text = "\n".join(local_manifest_entries) + "\n"
+        local_content_manifest_sha = hashlib.sha256(local_manifest_text.encode("utf-8")).hexdigest()
+        local_tracked_count = len(local_manifest_entries)
+
+        local_content_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-files", "-s"], capture_output=True, text=True, check=False)
+        local_index_hash = hashlib.sha256(local_content_res.stdout.encode("utf-8")).hexdigest()
+
         origin_res = subprocess.run(["git", "-C", str(ROOT_DIR), "ls-remote", "origin", "main"], capture_output=True, text=True, check=False)
         origin_sha = origin_res.stdout.strip().split()[0] if origin_res.stdout.strip() else "UNKNOWN"
 
@@ -3672,47 +3694,64 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
         r = vps_client.run_command(
             "echo 'VPS HEAD: ' $(git -C /root/video_factory rev-parse HEAD) && "
             "echo 'VPS Tree SHA: ' $(git -C /root/video_factory rev-parse 'HEAD^{tree}') && "
-            "echo 'VPS Content Hash (-s): ' $(git -C /root/video_factory ls-files -s | sha256sum) && "
-            "echo 'VPS Path Hash (-z): ' $(git -C /root/video_factory ls-files -z | sha256sum) && "
-            "echo 'VPS Porcelain Status: [' \"$(git -C /root/video_factory status --porcelain)\" ']'",
-            timeout=15,
+            "echo 'VPS Index Hash (-s): ' $(git -C /root/video_factory ls-files -s | sha256sum) && "
+            "echo 'VPS Porcelain Status: [' \"$(git -C /root/video_factory status --porcelain)\" ']' && "
+            "python3 -c \""
+            "import subprocess, hashlib, os\n"
+            "tracked = subprocess.check_output(['git', '-C', '/root/video_factory', 'ls-files'], text=True).splitlines()\n"
+            "entries = []\n"
+            "for f in sorted(tracked):\n"
+            "    norm_f = f.replace('\\\\\\\\', '/').strip()\n"
+            "    if not norm_f:\n"
+            "        continue\n"
+            "    p = os.path.join('/root/video_factory', norm_f)\n"
+            "    if os.path.isfile(p):\n"
+            "        h = hashlib.sha256(open(p, 'rb').read()).hexdigest()\n"
+            "        entries.append(f'{h}  {norm_f}')\n"
+            "m = '\\n'.join(entries) + '\\n'\n"
+            "print('VPS File-Content Manifest SHA256:', hashlib.sha256(m.encode('utf-8')).hexdigest())\n"
+            "print('VPS Tracked Files Count:', len(entries))\n"
+            "\"",
+            timeout=30,
         )
         vps_client.close()
         vps_code = r.get("exit_code", 1)
         vps_raw = (r.get("stdout", "") + "\n" + r.get("stderr", "")).strip()
 
         vps_tree_sha = ""
-        vps_content_hash = ""
-        vps_path_hash = ""
+        vps_manifest_sha = ""
+        vps_porcelain_clean = False
         for line_item in vps_raw.splitlines():
             if "VPS Tree SHA:" in line_item:
                 vps_tree_sha = line_item.split(":")[-1].strip()
-            elif "VPS Content Hash (-s):" in line_item:
-                vps_content_hash = line_item.split(":")[-1].strip().split()[0]
-            elif "VPS Path Hash (-z):" in line_item:
-                vps_path_hash = line_item.split(":")[-1].strip().split()[0]
+            elif "VPS File-Content Manifest SHA256:" in line_item:
+                vps_manifest_sha = line_item.split(":")[-1].strip()
+            elif "VPS Porcelain Status: [  ]" in line_item or "VPS Porcelain Status: []" in line_item:
+                vps_porcelain_clean = True
 
+        local_porcelain_clean = (local_dirty_status == "")
         is_parity_clean = (
             local_tree_sha == vps_tree_sha
-            and local_content_hash == vps_content_hash
-            and local_path_hash == vps_path_hash
+            and local_content_manifest_sha == vps_manifest_sha
             and vps_code == 0
+            and local_porcelain_clean
+            and vps_porcelain_clean
         )
         parity_verdict = (
-            f"100% BIT-FOR-BIT CRYPTOGRAPHIC TRACKED CONTENT PARITY VERIFIED (Tree: {local_tree_sha}, Content -s SHA256: {local_content_hash})"
+            f"100% BIT-FOR-BIT CRYPTOGRAPHIC TRACKED CONTENT PARITY VERIFIED (Tree: {local_tree_sha}, Per-File Content Manifest SHA256: {local_content_manifest_sha})"
             if is_parity_clean else
-            f"MISMATCH: Local Tree {local_tree_sha} vs VPS Tree {vps_tree_sha} | Local Content {local_content_hash} vs VPS Content {vps_content_hash}"
+            f"MISMATCH: Local Tree {local_tree_sha} vs VPS Tree {vps_tree_sha} | Local Manifest {local_content_manifest_sha} vs VPS Manifest {vps_manifest_sha} | Clean: Local={local_porcelain_clean}, VPS={vps_porcelain_clean}"
         )
         vps_status_out = (
             f"Exit Code: {vps_code}\n"
             f"Three-Way Bit-for-Bit Parity Verdict: {parity_verdict}\n"
-            f"Local Windows Tree SHA:          {local_tree_sha}\n"
-            f"Linux VPS Tree SHA:              {vps_tree_sha}\n"
-            f"Local Tracked Content Hash (-s): {local_content_hash}\n"
-            f"Linux Tracked Content Hash (-s): {vps_content_hash}\n"
-            f"Local Tracked Path Hash (-z):    {local_path_hash}\n"
-            f"Linux Tracked Path Hash (-z):    {vps_path_hash}\n"
-            f"GitHub Origin Remote Main SHA:   {origin_sha}\n"
+            f"Local Windows Tree SHA:                {local_tree_sha}\n"
+            f"Linux VPS Tree SHA:                    {vps_tree_sha}\n"
+            f"Local Deterministic Content Manifest:  {local_content_manifest_sha} ({local_tracked_count} files)\n"
+            f"Linux Deterministic Content Manifest:  {vps_manifest_sha}\n"
+            f"Local Working Tree Clean:              {local_porcelain_clean}\n"
+            f"Linux Working Tree Clean:              {vps_porcelain_clean}\n"
+            f"GitHub Origin Remote Main SHA:         {origin_sha}\n"
             f"VPS Remote Git Output:\n{vps_raw}"
         )
     except Exception as ex:

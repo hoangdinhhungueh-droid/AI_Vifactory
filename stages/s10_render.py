@@ -169,23 +169,42 @@ def run(ctx: RunContext) -> StageArtifact:
     sz = final_mp4.stat().st_size if final_mp4.exists() else 0
     sha = compute_file_sha256(final_mp4) if final_mp4.exists() else "none"
 
-    actual_frames = render_props.duration_in_frames
-    actual_fps = fps
-    if final_mp4.exists():
-        try:
-            from vox.qa.gates import probe_media_file
-            p_info = probe_media_file(final_mp4)
-            v_st = next((s for s in p_info.get("streams", []) if s.get("codec_type") == "video"), None)
-            if v_st and int(v_st.get("nb_frames", 0)) > 0:
-                actual_frames = int(v_st["nb_frames"])
-                r_fps_str = v_st.get("r_frame_rate", f"{fps}/1")
-                if "/" in r_fps_str:
-                    num, den = map(float, r_fps_str.split("/"))
-                    actual_fps = num / max(1.0, den)
-                elif r_fps_str:
-                    actual_fps = float(r_fps_str)
-        except Exception as _probe_ex:
-            logger.debug(f"[s10_render] Media probe exception: {_probe_ex}")
+    # Fail-closed forensic media verification (Rule 121, 125, 139 & Boss Round 6 Item 11)
+    if not final_mp4.exists() or final_mp4.stat().st_size < 1000:
+        raise FileNotFoundError(f"Stage S10 fail-closed: Master video missing or invalid at {final_mp4}")
+
+    from vox.qa.gates import probe_media_file
+    p_info = probe_media_file(final_mp4)
+    v_st = next((s for s in p_info.get("streams", []) if s.get("codec_type") == "video"), None)
+    if not v_st:
+        raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' has no valid video stream")
+
+    v_nb_frames = int(v_st.get("nb_frames", 0))
+    if v_nb_frames <= 0:
+        v_dur = float(v_st.get("duration", p_info.get("format", {}).get("duration", 0.0)))
+        if v_dur <= 0.0:
+            raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' has zero/invalid duration")
+        v_nb_frames = int(round(v_dur * fps))
+
+    actual_frames = v_nb_frames
+    r_fps_str = v_st.get("r_frame_rate", f"{fps}/1")
+    if "/" in r_fps_str:
+        num, den = map(float, r_fps_str.split("/"))
+        actual_fps = num / max(1.0, den)
+    elif r_fps_str:
+        actual_fps = float(r_fps_str)
+    else:
+        actual_fps = fps
+
+    # Consistency check between verified media telemetry and Remotion intended duration
+    frame_drift = abs(actual_frames - render_props.duration_in_frames)
+    max_drift_tolerance = max(3, int(round(actual_fps * 0.15)))  # Max ~0.15s (e.g. 3-4 frames)
+    if frame_drift > max_drift_tolerance:
+        raise ValueError(
+            f"Stage S10 fail-closed: verified media frame count ({actual_frames}) drifts from "
+            f"Remotion intended frames ({render_props.duration_in_frames}) by {frame_drift} frames "
+            f"(tolerance ceiling: {max_drift_tolerance} frames)"
+        )
 
     payload = {
         "task_id": ctx.run_id,
