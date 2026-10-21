@@ -150,7 +150,10 @@ def execute_pipeline(
             sha_new = compute_file_sha256(art_path) if art_path.exists() else "none"
             manifest.mark(stage, "done", artifact_sha256=sha_new)
             manifest.save_atomic(paths)
-            print(f"   ✅ PASS (Artifact emitted: {art_path.name})")
+            try:
+                print(f"   ✅ PASS (Artifact emitted: {art_path.name})")
+            except (BrokenPipeError, OSError):
+                pass
 
         except GateError as ge:
             manifest.mark(stage, "failed", error=str(ge))
