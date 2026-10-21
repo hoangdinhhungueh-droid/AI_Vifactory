@@ -873,7 +873,7 @@ def validate_ast_scanner_contract(raw_output: str, exit_code: int = 0) -> Dict[s
     return data
 
 
-def compute_tracked_content_manifest(repo_dir: Path) -> Tuple[str, int, str]:
+def compute_tracked_content_manifest(repo_dir: Union[str, Path]) -> Tuple[str, int, str]:
     """Computes a deterministic cross-platform normalized content manifest for all tracked files in git.
 
     Guarantees 100% bit-for-bit parity across Windows Local and Linux VPS:
@@ -884,6 +884,7 @@ def compute_tracked_content_manifest(repo_dir: Path) -> Tuple[str, int, str]:
     - Normalizes file path separators to '/' and sorts paths lexicographically.
     - Computes per-file SHA256 and overall manifest SHA256.
     """
+    repo_dir = Path(repo_dir).resolve()
     res = subprocess.run(
         ["git", "-C", str(repo_dir), "ls-files", "-z"],
         capture_output=True,
