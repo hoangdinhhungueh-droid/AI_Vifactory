@@ -5,13 +5,31 @@ Moves files or directories to the system Recycle Bin / Trash instead of permanen
 Prevents unrecoverable data loss under Rule 137 (Anti-Destructive Action Iron Law).
 """
 
+import logging
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
+
+logger = logging.getLogger("vf.safe_trash")
+
+def is_reparse_or_symlink(p: Union[str, Path]) -> bool:
+    """Accurately detects symlinks on Linux and both symlinks and NTFS directory junctions/reparse-points on Windows (Boss Round 10 Item 6)."""
+    try:
+        st = os.lstat(str(p))
+        if stat.S_ISLNK(st.st_mode):
+            return True
+        if os.name == "nt":
+            attrs = getattr(st, "st_file_attributes", 0)
+            if attrs & 0x400:  # stat.FILE_ATTRIBUTE_REPARSE_POINT (0x400)
+                return True
+    except (OSError, ValueError) as _st_err:
+        logger.debug(f"lstat notice: {_st_err}")
+    return False
 
 FORBIDDEN_ZONES = {
     "/", "/root", "/home", "/etc", "/var", "/usr", "/bin", "/boot", "/sys", "/proc",
@@ -134,11 +152,26 @@ def validate_safe_disposal_target(
     if not within_approved or matching_root is None:
         return False, f"SECURITY ERROR: Target path '{path}' resolves to '{resolved_p}' which is outside approved disposal roots"
 
-    # Coordinated ancestor-swap & symlink chain verification (Rule 137 & Boss Item 7):
-    # Verify that every intermediate directory from matching_root down to target does not escape approved root
+    # Coordinated ancestor-swap & symlink/junction chain verification (Rule 137 & Boss Round 10 Item 6):
+    # Verify that neither target nor any intermediate directory from matching_root down to target escapes approved root.
+    if is_reparse_or_symlink(raw_p):
+        try:
+            raw_p.resolve().relative_to(matching_root)
+        except (ValueError, RuntimeError):
+            return False, f"SECURITY ERROR: Target '{raw_p}' is a symlink/reparse-point pointing outside approved root: '{raw_p.resolve()}'"
+
+    ancestor = raw_p if raw_p.is_dir() else raw_p.parent
+    while ancestor != matching_root and ancestor != ancestor.parent:
+        if is_reparse_or_symlink(ancestor):
+            try:
+                ancestor.resolve().relative_to(matching_root)
+            except (ValueError, RuntimeError):
+                return False, f"SECURITY ERROR: Ancestor path component '{ancestor}' is a symlink/reparse-point pointing outside approved root: '{ancestor.resolve()}'"
+        ancestor = ancestor.parent
+
     curr = resolved_p
     while curr != matching_root and curr != curr.parent:
-        if curr.is_symlink():
+        if is_reparse_or_symlink(curr):
             try:
                 curr.resolve().relative_to(matching_root)
             except (ValueError, RuntimeError):
@@ -159,11 +192,26 @@ def move_to_trash_windows(path: str, allowed_roots: Optional[List[Union[str, Pat
         print(f"Error: Path does not exist: {abs_path}")
         return False
 
+    # Pre-move physical handle/stat verification to eliminate TOCTOU check-then-use race (Boss Round 10 Item 6)
+    try:
+        initial_lstat = os.lstat(abs_path)
+    except (OSError, ValueError) as stat_err:
+        print(f"SECURITY RACE DETECTED: Unable to stat target: {stat_err}")
+        return False
+
     # Second-phase check on canonical realpath to prevent symlink race
     is_valid_real, msg_real = validate_safe_disposal_target(os.path.realpath(abs_path), allowed_roots=allowed_roots)
     if not is_valid_real:
         print(f"SECURITY RACE DETECTED: {msg_real}")
         return False
+
+    # Validate target has not mutated into an escaping reparse-point / junction
+    if is_reparse_or_symlink(abs_path):
+        real_target = Path(abs_path).resolve()
+        ok_target, _ = validate_safe_disposal_target(str(real_target), allowed_roots=allowed_roots)
+        if not ok_target:
+            print(f"SECURITY RACE DETECTED: Target mutated into an escaping reparse-point link: {abs_path}")
+            return False
 
     ps_cmd = f"""
     Add-Type -AssemblyName Microsoft.VisualBasic
@@ -194,11 +242,36 @@ def move_to_trash_linux(path: str, allowed_roots: Optional[List[Union[str, Path]
         print(f"Error: Path does not exist: {abs_path}")
         return False
 
+    # Pre-move physical handle/stat verification to eliminate TOCTOU check-then-use race (Boss Round 10 Item 6)
+    try:
+        initial_lstat = os.lstat(abs_path)
+    except (OSError, ValueError) as stat_err:
+        print(f"SECURITY RACE DETECTED: Unable to stat target: {stat_err}")
+        return False
+
     # Second-phase check on canonical realpath to prevent symlink race
     is_valid_real, msg_real = validate_safe_disposal_target(os.path.realpath(abs_path), allowed_roots=allowed_roots)
     if not is_valid_real:
         print(f"SECURITY RACE DETECTED: {msg_real}")
         return False
+
+    # Post-validation race verification using O_NOFOLLOW file descriptor
+    try:
+        flags = os.O_RDONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(abs_path, flags)
+        try:
+            fd_stat = os.fstat(fd)
+            if fd_stat.st_ino != initial_lstat.st_ino or fd_stat.st_dev != initial_lstat.st_dev:
+                print(f"SECURITY RACE DETECTED: Inode/device mutated between validation and move: {abs_path}")
+                return False
+        finally:
+            os.close(fd)
+    except OSError as fd_err:
+        if is_reparse_or_symlink(abs_path):
+            print(f"SECURITY RACE DETECTED: Path became a symlink: {fd_err}")
+            return False
 
     res = subprocess.run(["which", "trash-put"], capture_output=True, text=True)
     if res.returncode == 0:

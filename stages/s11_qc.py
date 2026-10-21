@@ -23,137 +23,88 @@ logger = logging.getLogger("s11_qc")
 STAGE: StageID = StageID.S11_QC
 
 
-def _coerce_scene_plan(data: dict[str, Any], run_id: str) -> Any:
-    """Coerces arbitrary scene data or Remotion render props into a canonical ScenePlan."""
+def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: str) -> Any:
+    """Strictly validates authoritative scene data into ScenePlan without synthetic coercion (Boss Round 10 Item 5)."""
     from vox.schemas import CameraMove, FGObject, Scene, ScenePlan
+
+    # Validate task/episode binding if declared in plan
+    declared_id = data.get("episode_id") or data.get("run_id") or data.get("task_id")
+    if declared_id and str(declared_id).strip() != str(expected_run_id).strip():
+        raise ValueError(
+            f"Stage S11 fail-closed: Authoritative plan declared identity '{declared_id}' "
+            f"contradicts expected run identity '{expected_run_id}'"
+        )
 
     sc_list = data.get("scenes", [])
     if not sc_list or not isinstance(sc_list, list):
-        raise ValueError("Empty or non-list scenes declared in plan data")
+        raise ValueError("Empty or non-list scenes declared in authoritative plan data")
 
-    adapted_scenes: list[Scene] = []
-    canonical_moves = [
-        CameraMove.PUSH_IN,
-        CameraMove.STATIC_BREATH,
-        CameraMove.PULL_OUT,
-        CameraMove.PAN_LEFT,
-        CameraMove.PAN_RIGHT,
-        CameraMove.TILT_UP,
-        CameraMove.TILT_DOWN,
-        CameraMove.KEN_BURNS_TL_BR,
-        CameraMove.KEN_BURNS_BR_TL,
-        CameraMove.PARALLAX_LEFT,
-        CameraMove.PARALLAX_RIGHT,
-        CameraMove.ROLL_PUSH,
-    ]
-
+    validated_scenes: list[Scene] = []
     for i, s in enumerate(sc_list):
         if isinstance(s, Scene):
-            adapted_scenes.append(s)
+            validated_scenes.append(s)
             continue
         if not isinstance(s, dict):
-            raise ValueError(f"Scene entry {i} is not a valid dictionary: {s}")
+            raise ValueError(f"Authoritative scene entry {i} is not a valid dictionary: {s}")
 
-        idx = int(s.get("idx", s.get("scene_index", i)))
-        narration = str(s.get("narration", s.get("narration_text", s.get("text", f"Scene {idx} narrative commentary"))))
-        if not narration.strip():
-            narration = f"Scene {idx} narrative commentary"
+        idx = s.get("idx", s.get("scene_index"))
+        if idx is None or not isinstance(idx, int) or idx < 0:
+            raise ValueError(f"Authoritative scene {i} missing valid non-negative integer 'idx'")
 
-        bg_prompt = str(s.get("bg_prompt", s.get("bg_image", s.get("background", f"atmospheric editorial scene {idx} background workspace"))))
-        if len(bg_prompt) < 10:
-            bg_prompt = f"atmospheric editorial background {bg_prompt} textured composition"
+        narration = s.get("narration", s.get("narration_text", s.get("text")))
+        if not narration or not isinstance(narration, str) or not narration.strip():
+            raise ValueError(f"Authoritative scene {idx} missing required non-empty 'narration'")
 
-        raw_fg = s.get("fg", s.get("fg_image", s.get("foreground", None)))
-        adapted_fg: list[FGObject] = []
-        if isinstance(raw_fg, list) and len(raw_fg) > 0:
-            for j, fg_item in enumerate(raw_fg):
-                if isinstance(fg_item, FGObject):
-                    adapted_fg.append(fg_item)
-                elif isinstance(fg_item, dict):
-                    prompt_str = str(fg_item.get("prompt", f"tactile archival document cutout element {idx}_{j}"))
-                    if len(prompt_str) < 10:
-                        prompt_str = f"tactile archival cutout element {prompt_str} forensic"
-                    adapted_fg.append(FGObject(
-                        id=str(fg_item.get("id", f"fg_{idx}_{j}")),
-                        prompt=prompt_str,
-                        anchor_x=float(fg_item.get("anchor_x", 0.5)),
-                        anchor_y=float(fg_item.get("anchor_y", 0.5)),
-                        scale=float(fg_item.get("scale", 0.5)),
-                        depth=float(fg_item.get("depth", 0.5)),
-                        enter_at=float(fg_item.get("enter_at", 0.0)),
-                    ))
-                elif isinstance(fg_item, str):
-                    prompt_str = fg_item if len(fg_item) >= 10 else f"tactile forensic object {fg_item} specimen"
-                    adapted_fg.append(FGObject(
-                        id=f"fg_{idx}_{j}",
-                        prompt=prompt_str,
-                        anchor_x=0.5,
-                        anchor_y=0.5,
-                        scale=0.5,
-                        depth=0.5,
-                        enter_at=0.0,
-                    ))
-        elif isinstance(raw_fg, str) and raw_fg.strip():
-            prompt_str = raw_fg if len(raw_fg) >= 10 else f"tactile forensic object {raw_fg} specimen"
-            adapted_fg.append(FGObject(
-                id=f"fg_{idx}_0",
-                prompt=prompt_str,
-                anchor_x=0.5,
-                anchor_y=0.5,
-                scale=0.5,
-                depth=0.5,
-                enter_at=0.0,
-            ))
-        else:
-            adapted_fg.append(FGObject(
-                id=f"fg_{idx}_0",
-                prompt=f"tactile archival document cutout element {idx} forensic",
-                anchor_x=0.5,
-                anchor_y=0.5,
-                scale=0.5,
-                depth=0.5,
-                enter_at=0.0,
-            ))
+        bg_prompt = s.get("bg_prompt", s.get("bg_image", s.get("background")))
+        if not bg_prompt or not isinstance(bg_prompt, str) or len(bg_prompt.strip()) < 10:
+            raise ValueError(f"Authoritative scene {idx} missing required 'bg_prompt' (min length 10)")
+
+        raw_fg = s.get("fg", s.get("fg_image", s.get("foreground")))
+        if not raw_fg or not isinstance(raw_fg, list) or len(raw_fg) == 0:
+            raise ValueError(f"Authoritative scene {idx} missing required 'fg' objects list (min 1 object)")
+
+        valid_fg_list: list[FGObject] = []
+        for j, fg_item in enumerate(raw_fg):
+            if isinstance(fg_item, FGObject):
+                valid_fg_list.append(fg_item)
+            elif isinstance(fg_item, dict):
+                fg_id = fg_item.get("id")
+                fg_prompt = fg_item.get("prompt")
+                if not fg_id or not fg_prompt or len(str(fg_prompt).strip()) < 10:
+                    raise ValueError(f"Authoritative scene {idx} FG object {j} missing required 'id' or 'prompt' (min length 10)")
+                valid_fg_list.append(FGObject(
+                    id=str(fg_id),
+                    prompt=str(fg_prompt).strip(),
+                    anchor_x=float(fg_item.get("anchor_x", 0.5)),
+                    anchor_y=float(fg_item.get("anchor_y", 0.5)),
+                    scale=float(fg_item.get("scale", 0.5)),
+                    depth=float(fg_item.get("depth", 0.5)),
+                    enter_at=float(fg_item.get("enter_at", 0.0)),
+                ))
+            else:
+                raise ValueError(f"Authoritative scene {idx} FG object {j} is not a valid dictionary or FGObject")
 
         raw_cam = str(s.get("camera", s.get("camera_move", ""))).strip().lower()
-        cam_map = {
-            "zoom_in": CameraMove.PUSH_IN,
-            "push_in": CameraMove.PUSH_IN,
-            "zoom_out": CameraMove.PULL_OUT,
-            "pull_out": CameraMove.PULL_OUT,
-            "static": CameraMove.STATIC_BREATH,
-            "static_breath": CameraMove.STATIC_BREATH,
-            "pan_left": CameraMove.PAN_LEFT,
-            "pan_right": CameraMove.PAN_RIGHT,
-            "tilt_up": CameraMove.TILT_UP,
-            "tilt_down": CameraMove.TILT_DOWN,
-            "ken_burns_tl_br": CameraMove.KEN_BURNS_TL_BR,
-            "ken_burns_br_tl": CameraMove.KEN_BURNS_BR_TL,
-            "parallax_left": CameraMove.PARALLAX_LEFT,
-            "parallax_right": CameraMove.PARALLAX_RIGHT,
-            "roll_push": CameraMove.ROLL_PUSH,
-        }
-        resolved_cam = cam_map.get(raw_cam)
-        if not resolved_cam:
-            resolved_cam = canonical_moves[i % len(canonical_moves)]
+        if not raw_cam:
+            raise ValueError(f"Authoritative scene {idx} missing required 'camera' move")
+        try:
+            cam_enum = CameraMove(raw_cam)
+        except ValueError:
+            raise ValueError(f"Authoritative scene {idx} has invalid camera move '{raw_cam}' (must be one of 12 canonical CameraMove values)")
 
-        if adapted_scenes and adapted_scenes[-1].camera == resolved_cam:
-            next_idx = (canonical_moves.index(resolved_cam) + 1) % len(canonical_moves)
-            resolved_cam = canonical_moves[next_idx]
-
-        adapted_scenes.append(Scene(
+        validated_scenes.append(Scene(
             idx=idx,
-            narration=narration,
-            bg_prompt=bg_prompt,
-            fg=adapted_fg[:3],
-            camera=resolved_cam,
+            narration=narration.strip(),
+            bg_prompt=bg_prompt.strip(),
+            fg=valid_fg_list[:3],
+            camera=cam_enum,
             start=float(s["start"]) if s.get("start") is not None else None,
             end=float(s["end"]) if s.get("end") is not None else None,
         ))
 
     return ScenePlan(
-        title=str(data.get("title", f"Plan {run_id}")),
-        scenes=adapted_scenes,
+        title=str(data.get("title", f"Plan {expected_run_id}")),
+        scenes=validated_scenes,
         audio_duration=float(data["audio_duration"]) if data.get("audio_duration") is not None else None,
     )
 
@@ -202,7 +153,7 @@ def run(ctx: RunContext) -> StageArtifact:
             sc_list = props_data.get("scenes", [])
             if not sc_list:
                 raise ValueError(f"Empty scenes list in remotion_props_file: {props_path}")
-            plan = _coerce_scene_plan(props_data, ctx.run_id)
+            plan = _validate_authoritative_scene_plan(props_data, ctx.run_id)
         except Exception as p_err:
             raise ValueError(f"Stage S11 fail-closed: Malformed authoritative remotion_props_file '{props_path}': {p_err}")
     else:
@@ -214,7 +165,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 sc_list = dp_data.get("scenes", [])
                 if not sc_list:
                     raise ValueError(f"Empty scenes list in run-local director_plan: {local_dp}")
-                plan = _coerce_scene_plan(dp_data, ctx.run_id)
+                plan = _validate_authoritative_scene_plan(dp_data, ctx.run_id)
             except Exception as dp_err:
                 raise ValueError(f"Stage S11 fail-closed: Malformed run-local director_plan '{local_dp}': {dp_err}")
         else:

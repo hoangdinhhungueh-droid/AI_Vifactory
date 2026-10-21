@@ -670,7 +670,7 @@ def test_safe_disposal_negative_boundary_and_wildcard_attacks(tmp_path):
 
 
 def test_safe_disposal_symlink_escape_attack(tmp_path):
-    """Separate standalone test for symlink & junction escape attacks: symlink pointing outside approved roots (Rule 137)."""
+    """Separate standalone test for symlink & junction escape attacks without skipping (Rule 137 & Boss Round 10 Item 6)."""
     from scripts.safe_trash import safe_trash, validate_safe_disposal_target
     fake_quarantine = tmp_path / "quarantine_root"
     fake_quarantine.mkdir(exist_ok=True)
@@ -691,25 +691,60 @@ def test_safe_disposal_symlink_escape_attack(tmp_path):
         if j_res.returncode == 0:
             link_created = True
         else:
-            try:
-                os.symlink(str(symlink_target_dir), str(evil_link), target_is_directory=True)
-                link_created = True
-            except (OSError, NotImplementedError) as _symlink_err:
-                pytest.skip(f"OS environment does not permit symlink or junction creation: {_symlink_err}")
-    else:
-        try:
-            evil_link.symlink_to(symlink_target_dir)
+            os.symlink(str(symlink_target_dir), str(evil_link), target_is_directory=True)
             link_created = True
-        except (OSError, NotImplementedError) as _symlink_err:
-            pytest.skip(f"OS environment does not permit symlink creation: {_symlink_err}")
+    else:
+        evil_link.symlink_to(symlink_target_dir)
+        link_created = True
 
-    if link_created:
-        ok, msg = validate_safe_disposal_target(str(evil_link), allowed_roots=[fake_quarantine])
-        assert not ok, "Symlink escaping quarantine was unexpectedly accepted"
-        assert "outside approved disposal roots" in msg
-        assert safe_trash(str(evil_link), allowed_roots=[fake_quarantine]) is False
-        assert outside_secret.exists() is True, "Target file outside quarantine was unexpectedly destroyed!"
-        assert outside_secret.read_text(encoding="utf-8") == "DO_NOT_LEAK_CONFIDENTIAL"
+    assert link_created is True, "Must create physical symlink or junction for escape attack verification"
+    ok, msg = validate_safe_disposal_target(str(evil_link), allowed_roots=[fake_quarantine])
+    assert not ok, "Symlink escaping quarantine was unexpectedly accepted"
+    assert "outside approved disposal roots" in msg
+    assert safe_trash(str(evil_link), allowed_roots=[fake_quarantine]) is False
+    assert outside_secret.exists() is True, "Target file outside quarantine was unexpectedly destroyed!"
+    assert outside_secret.read_text(encoding="utf-8") == "DO_NOT_LEAK_CONFIDENTIAL"
+
+
+def test_safe_disposal_ancestor_junction_escape_attack(tmp_path):
+    """Verifies ancestor junction/symlink replacement attack fails closed and preserves protected targets (Boss Round 10 Item 6)."""
+    from scripts.safe_trash import safe_trash, validate_safe_disposal_target
+    fake_quarantine = tmp_path / "quarantine_root_anc"
+    fake_quarantine.mkdir(exist_ok=True)
+    protected_sentinel_dir = tmp_path / "protected_sentinel_dir"
+    protected_sentinel_dir.mkdir(exist_ok=True)
+    protected_file = protected_sentinel_dir / "sentinel.txt"
+    protected_file.write_text("SENTINEL_PHYSICAL_INTEGRITY_VERIFIED", encoding="utf-8")
+
+    # Intermediate ancestor inside quarantine pointing outside to protected sentinel dir
+    ancestor_link = fake_quarantine / "ancestor_link"
+    link_created = False
+    if os.name == "nt":
+        j_res = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(ancestor_link), str(protected_sentinel_dir)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if j_res.returncode == 0:
+            link_created = True
+        else:
+            os.symlink(str(protected_sentinel_dir), str(ancestor_link), target_is_directory=True)
+            link_created = True
+    else:
+        ancestor_link.symlink_to(protected_sentinel_dir)
+        link_created = True
+
+    assert link_created is True, "Ancestor link must be physically created"
+
+    # Attack target is child of the escaping ancestor
+    attack_target = ancestor_link / "sentinel.txt"
+    ok, msg = validate_safe_disposal_target(str(attack_target), allowed_roots=[fake_quarantine])
+    assert not ok, "Target through escaping ancestor link must be rejected"
+    assert "outside approved disposal roots" in msg or "symlink/reparse-point" in msg
+    assert safe_trash(str(attack_target), allowed_roots=[fake_quarantine]) is False
+    assert protected_file.exists() is True
+    assert protected_file.read_text(encoding="utf-8") == "SENTINEL_PHYSICAL_INTEGRITY_VERIFIED"
 
 
 def test_ast_rule139_scanner_contract_validation_fails_closed():
@@ -1042,6 +1077,26 @@ def test_s10_render_media_probe_fails_closed(tmp_path: Path):
         }
         with pytest.raises(ValueError, match="Stream duration.*contradicts container format duration"):
             s10_mod.run(ctx)
+
+        # 10. Non-finite or negative avg_frame_rate (Boss Round 10 Item 4)
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "nb_frames": 60, "duration": "2.0", "r_frame_rate": "30/1", "avg_frame_rate": "-30/1"}],
+            "format": {"duration": "2.0"}
+        }
+        with pytest.raises(ValueError, match="Non-positive or non-finite"):
+            s10_mod.run(ctx)
+
+        # 11. Contradictory independently verified secondary packet count (Boss Round 10 Item 4)
+        vq.probe_media_file = lambda p: {
+            "streams": [{"codec_type": "video", "nb_frames": 60, "duration": "2.0", "r_frame_rate": "30/1", "nb_read_packets": 120}],
+            "format": {"duration": "2.0"}
+        }
+        with pytest.raises(ValueError, match="contradicts independently verified physical packet count"):
+            s10_mod.run(ctx)
+
+        # Assert no success artifact exists after S10 fail-closed
+        art_path = ctx.paths.artifact_file(s10_mod.STAGE.value)
+        assert not art_path.exists(), "Stage S10 must not publish success artifact on failure"
     finally:
         s10_mod.assemble_final_video = orig_assemble
         vq.probe_media_file = orig_probe

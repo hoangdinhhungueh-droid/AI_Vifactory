@@ -52,7 +52,14 @@ def test_s11_qc_fails_closed_on_gate_violation(tmp_path: Path, monkeypatch: pyte
     local_dp.parent.mkdir(parents=True, exist_ok=True)
     local_dp.write_text(json.dumps({
         "title": "Test Plan",
-        "scenes": [{"scene_id": "sc_01", "duration_in_frames": 150, "camera_move": "zoom_in"}]
+        "scenes": [{
+            "idx": 0,
+            "narration": "Authoritative test narration for scene 0",
+            "bg_prompt": "Detailed archival workspace newsprint background",
+            "fg": [{"id": "fg_0_0", "prompt": "Tactile forensic document specimen element"}],
+            "camera": "push_in",
+            "duration_in_frames": 150,
+        }]
     }), encoding="utf-8")
 
     cfg = load_profile("e2e_min")
@@ -105,7 +112,14 @@ def test_s11_qc_propagates_programming_errors_unconverted(tmp_path: Path, monkey
     local_dp.parent.mkdir(parents=True, exist_ok=True)
     local_dp.write_text(json.dumps({
         "title": "Test Plan",
-        "scenes": [{"scene_id": "sc_01", "duration_in_frames": 150, "camera_move": "zoom_in"}]
+        "scenes": [{
+            "idx": 0,
+            "narration": "Authoritative test narration for scene 0",
+            "bg_prompt": "Detailed archival workspace newsprint background",
+            "fg": [{"id": "fg_0_0", "prompt": "Tactile forensic document specimen element"}],
+            "camera": "push_in",
+            "duration_in_frames": 150,
+        }]
     }), encoding="utf-8")
 
     cfg = load_profile("e2e_min")
@@ -245,4 +259,152 @@ def test_s11_qc_fails_closed_on_malformed_authoritative_plan(tmp_path: Path) -> 
     }), encoding="utf-8")
 
     with pytest.raises(ValueError, match="Empty scenes list in run-local director_plan"):
+        run_s11_qc(ctx)
+
+
+def test_s11_qc_fails_closed_on_missing_narration_or_bg_prompt(tmp_path: Path) -> None:
+    """Verifies S11 fails closed when narration is missing or bg_prompt is under 10 chars."""
+    run_id = "test_qc_narration_bg"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    paths.final_render_dir.mkdir(parents=True, exist_ok=True)
+    valid_mp4 = paths.final_render_dir / "final.mp4"
+    valid_mp4.write_bytes(b"dummy_mp4_bytes")
+
+    s10_art_file = paths.artifact_file(StageID.S10_RENDER.value)
+    s10_art_file.parent.mkdir(parents=True, exist_ok=True)
+    s10_art_file.write_text(json.dumps({
+        "run_id": run_id,
+        "stage": StageID.S10_RENDER.value,
+        "status": "ok",
+        "payload": {"task_id": run_id, "final_video_path": str(valid_mp4), "fps": 30.0, "duration_in_frames": 150},
+        "provenance": {"generator": "stages.s10_render"},
+    }), encoding="utf-8")
+
+    # 1. Missing narration
+    local_dp = paths.root / "director_plan.json"
+    local_dp.parent.mkdir(parents=True, exist_ok=True)
+    local_dp.write_text(json.dumps({
+        "title": "Test Plan",
+        "scenes": [{
+            "idx": 0,
+            "narration": "",
+            "bg_prompt": "Detailed archival workspace newsprint background",
+            "fg": [{"id": "fg_0_0", "prompt": "Tactile forensic document specimen element"}],
+            "camera": "push_in",
+        }]
+    }), encoding="utf-8")
+
+    ctx = RunContext(
+        run_id=run_id, paths=paths, manifest=RunManifest.create_new(run_id, profile="e2e_min"),
+        config=load_profile("e2e_min"), force=True, dry_run=False,
+    )
+    with pytest.raises(ValueError, match="missing required non-empty 'narration'"):
+        run_s11_qc(ctx)
+
+    # 2. Too short bg_prompt (< 10 chars)
+    local_dp.write_text(json.dumps({
+        "title": "Test Plan",
+        "scenes": [{
+            "idx": 0,
+            "narration": "Authoritative valid narration text",
+            "bg_prompt": "short",
+            "fg": [{"id": "fg_0_0", "prompt": "Tactile forensic document specimen element"}],
+            "camera": "push_in",
+        }]
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="missing required 'bg_prompt'"):
+        run_s11_qc(ctx)
+
+
+def test_s11_qc_fails_closed_on_invalid_camera_or_empty_fg(tmp_path: Path) -> None:
+    """Verifies S11 fails closed on invalid camera move enum or empty FG list."""
+    run_id = "test_qc_camera_fg"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    paths.final_render_dir.mkdir(parents=True, exist_ok=True)
+    valid_mp4 = paths.final_render_dir / "final.mp4"
+    valid_mp4.write_bytes(b"dummy_mp4_bytes")
+
+    s10_art_file = paths.artifact_file(StageID.S10_RENDER.value)
+    s10_art_file.parent.mkdir(parents=True, exist_ok=True)
+    s10_art_file.write_text(json.dumps({
+        "run_id": run_id,
+        "stage": StageID.S10_RENDER.value,
+        "status": "ok",
+        "payload": {"task_id": run_id, "final_video_path": str(valid_mp4), "fps": 30.0, "duration_in_frames": 150},
+        "provenance": {"generator": "stages.s10_render"},
+    }), encoding="utf-8")
+
+    # 1. Invalid camera move
+    local_dp = paths.root / "director_plan.json"
+    local_dp.parent.mkdir(parents=True, exist_ok=True)
+    local_dp.write_text(json.dumps({
+        "title": "Test Plan",
+        "scenes": [{
+            "idx": 0,
+            "narration": "Authoritative valid narration text",
+            "bg_prompt": "Detailed archival workspace newsprint background",
+            "fg": [{"id": "fg_0_0", "prompt": "Tactile forensic document specimen element"}],
+            "camera": "hyperspace_jump_invalid",
+        }]
+    }), encoding="utf-8")
+
+    ctx = RunContext(
+        run_id=run_id, paths=paths, manifest=RunManifest.create_new(run_id, profile="e2e_min"),
+        config=load_profile("e2e_min"), force=True, dry_run=False,
+    )
+    with pytest.raises(ValueError, match="has invalid camera move 'hyperspace_jump_invalid'"):
+        run_s11_qc(ctx)
+
+    # 2. Empty FG list
+    local_dp.write_text(json.dumps({
+        "title": "Test Plan",
+        "scenes": [{
+            "idx": 0,
+            "narration": "Authoritative valid narration text",
+            "bg_prompt": "Detailed archival workspace newsprint background",
+            "fg": [],
+            "camera": "push_in",
+        }]
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="missing required 'fg' objects list"):
+        run_s11_qc(ctx)
+
+
+def test_s11_qc_fails_closed_on_run_id_mismatch(tmp_path: Path) -> None:
+    """Verifies S11 fails closed when declared plan identity contradicts expected run identity."""
+    run_id = "test_qc_identity_expected"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    paths.final_render_dir.mkdir(parents=True, exist_ok=True)
+    valid_mp4 = paths.final_render_dir / "final.mp4"
+    valid_mp4.write_bytes(b"dummy_mp4_bytes")
+
+    s10_art_file = paths.artifact_file(StageID.S10_RENDER.value)
+    s10_art_file.parent.mkdir(parents=True, exist_ok=True)
+    s10_art_file.write_text(json.dumps({
+        "run_id": run_id,
+        "stage": StageID.S10_RENDER.value,
+        "status": "ok",
+        "payload": {"task_id": run_id, "final_video_path": str(valid_mp4), "fps": 30.0, "duration_in_frames": 150},
+        "provenance": {"generator": "stages.s10_render"},
+    }), encoding="utf-8")
+
+    local_dp = paths.root / "director_plan.json"
+    local_dp.parent.mkdir(parents=True, exist_ok=True)
+    local_dp.write_text(json.dumps({
+        "title": "Test Plan",
+        "episode_id": "CONTRADICTORY_OTHER_RUN_ID",
+        "scenes": [{
+            "idx": 0,
+            "narration": "Authoritative valid narration text",
+            "bg_prompt": "Detailed archival workspace newsprint background",
+            "fg": [{"id": "fg_0_0", "prompt": "Tactile forensic document specimen element"}],
+            "camera": "push_in",
+        }]
+    }), encoding="utf-8")
+
+    ctx = RunContext(
+        run_id=run_id, paths=paths, manifest=RunManifest.create_new(run_id, profile="e2e_min"),
+        config=load_profile("e2e_min"), force=True, dry_run=False,
+    )
+    with pytest.raises(ValueError, match="contradicts expected run identity"):
         run_s11_qc(ctx)

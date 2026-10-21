@@ -202,21 +202,25 @@ def run(ctx: RunContext) -> StageArtifact:
     if not math.isfinite(actual_fps) or actual_fps <= 0.0:
         raise ValueError(f"Stage S10 fail-closed: Measured video frame rate is non-finite or non-positive: {actual_fps}")
 
-    # Reconcile r_frame_rate with avg_frame_rate if present
+    # Reconcile r_frame_rate with avg_frame_rate if present (Boss Round 10 Item 4)
     avg_fps_str = v_st.get("avg_frame_rate")
     if avg_fps_str and isinstance(avg_fps_str, str) and avg_fps_str.strip() not in ("", "0/0"):
         try:
             if "/" in avg_fps_str:
                 a_num, a_den = map(float, avg_fps_str.split("/", 1))
-                avg_fps = a_num / a_den if a_den > 0.0 else actual_fps
+                if not math.isfinite(a_num) or not math.isfinite(a_den) or a_den <= 0.0:
+                    raise ValueError(f"Non-positive or non-finite rational components in '{avg_fps_str}'")
+                avg_fps = a_num / a_den
             else:
                 avg_fps = float(avg_fps_str)
-            if math.isfinite(avg_fps) and avg_fps > 0.0 and abs(actual_fps - avg_fps) > 0.1:
+            if not math.isfinite(avg_fps) or avg_fps <= 0.0:
+                raise ValueError(f"Non-positive or non-finite avg_frame_rate: {avg_fps}")
+            if abs(actual_fps - avg_fps) > 0.1:
                 raise ValueError(
                     f"Stage S10 fail-closed: Video r_frame_rate ({actual_fps:.2f}) contradicts avg_frame_rate ({avg_fps:.2f}) by > 0.1 fps"
                 )
         except (ValueError, ZeroDivisionError) as avg_err:
-            raise ValueError(f"Stage S10 fail-closed: Malformed avg_frame_rate '{avg_fps_str}': {avg_err}")
+            raise ValueError(f"Stage S10 fail-closed: Malformed or non-finite avg_frame_rate '{avg_fps_str}': {avg_err}")
 
     # Enforce intended vs measured fps agreement (within 0.1 fps)
     if abs(actual_fps - fps) > 0.1:
@@ -257,6 +261,33 @@ def run(ctx: RunContext) -> StageArtifact:
         raise ValueError(f"Stage S10 fail-closed: Malformed 'nb_frames' ({v_nb_frames_raw!r}) in '{final_mp4}': {frame_err}")
     if actual_frames <= 0:
         raise ValueError(f"Stage S10 fail-closed: Master video '{final_mp4}' has non-positive nb_frames ({actual_frames})")
+
+    # Secondary physical packet-count verification (Boss Round 10 Item 4)
+    packet_frames_raw = v_st.get("nb_read_packets")
+    if packet_frames_raw is None and final_mp4.exists():
+        try:
+            pkt_cmd = [
+                "ffprobe", "-v", "error", "-select_streams", "v:0",
+                "-count_packets", "-show_entries", "stream=nb_read_packets",
+                "-of", "json", str(final_mp4)
+            ]
+            pkt_res = subprocess.run(pkt_cmd, capture_output=True, text=True, check=True, timeout=30.0)
+            pkt_data = json.loads(pkt_res.stdout)
+            st_list = pkt_data.get("streams", [])
+            if st_list:
+                packet_frames_raw = st_list[0].get("nb_read_packets")
+        except Exception as pkt_err:
+            logger.debug(f"[s10_render] Secondary packet count probe notice: {pkt_err}")
+
+    if packet_frames_raw is not None and str(packet_frames_raw).strip() != "":
+        try:
+            packet_frames = int(packet_frames_raw)
+            if abs(actual_frames - packet_frames) > 1:
+                raise ValueError(
+                    f"Stage S10 fail-closed: Stream nb_frames ({actual_frames}) contradicts independently verified physical packet count ({packet_frames})"
+                )
+        except (ValueError, TypeError) as parse_pkt_err:
+            raise ValueError(f"Stage S10 fail-closed: Malformed secondary packet count ({packet_frames_raw!r}): {parse_pkt_err}")
 
     # Mutual consistency: frame count, duration, and frame rate
     frame_dur_calc = actual_frames / actual_fps
