@@ -654,3 +654,7 @@ def run_b36_visual_convergence(
         "director_plan": current_dplan,
         "prompts_data": current_prompts
     }
+
+
+# Canonical alias for stage runners
+run_visual_convergence_gate = run_b36_visual_convergence

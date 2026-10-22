@@ -142,28 +142,29 @@ def run(ctx: RunContext) -> StageArtifact:
     else:
         # Live DACL Adversarial Convergence Gate
         try:
-            from app.services.b36_visual_convergence import run_visual_convergence_gate
+            from app.services.b36_visual_convergence import run_b36_visual_convergence
             logger.info(f"[s06_critic_visual] Executing Live DACL Visual Convergence Loop for {ctx.run_id}...")
-            audit_res = run_visual_convergence_gate(
+            audit_res = run_b36_visual_convergence(
                 episode_id=ctx.run_id,
                 director_plan=s5_art.payload,
                 prompts_data=prompts_data,
                 market=market,
                 max_rounds=ctx.config.limits.critic_max_rounds
             )
-            score = float(audit_res.get("audit_score", 9.0))
-            is_pass = audit_res.get("verdict") == "PASS" or score >= 8.0
+            score = float(audit_res.get("final_score") or audit_res.get("audit_score", 9.0))
+            is_pass = audit_res.get("converged", False) or score >= 8.0 or audit_res.get("verdict") == "PASS"
             verdict = "pass" if is_pass else "revise"
-            feedback = audit_res.get("feedback", ["Visual convergence evaluated."])
+            feedback = audit_res.get("feedback") or [f"DACL Visual convergence completed with score {score:.1f}/10."]
 
             if not is_pass:
                 raise GateError(
+                    STAGE,
                     f"Visual Critic Council rejected storyboard with score {score:.1f}/10 (< 8.0)",
-                    details={"feedback": feedback, "verdict": verdict}
+                    details={"feedback": feedback, "verdict": verdict, "score": score}
                 )
 
             decision = CouncilDecision(
-                round_number=int(audit_res.get("round", 1)),
+                round_number=int(audit_res.get("rounds_count") or audit_res.get("round", 1)),
                 max_rounds=ctx.config.limits.critic_max_rounds,
                 verdict=verdict,
                 aggregate_score=score,
@@ -182,7 +183,7 @@ def run(ctx: RunContext) -> StageArtifact:
             raise
         except Exception as live_err:
             logger.exception(f"[s06_critic_visual] DACL loop error: {live_err}")
-            raise GateError(f"Stage S06 Visual Critic Council failed: {live_err}")
+            raise GateError(STAGE, f"Stage S06 Visual Critic Council failed: {live_err}")
 
     payload = decision.model_dump()
 
