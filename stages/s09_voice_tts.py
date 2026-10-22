@@ -92,8 +92,12 @@ def run(ctx: RunContext) -> StageArtifact:
             tts_success = False
             try:
                 import edge_tts
+                import concurrent.futures
                 communicate = edge_tts.Communicate(text_to_speak, voice)
-                asyncio.run(communicate.save(str(audio_file)))
+                def _run_tts():
+                    asyncio.run(communicate.save(str(audio_file)))
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    pool.submit(_run_tts).result(timeout=180)
                 if audio_file.exists() and audio_file.stat().st_size > 1000:
                     tts_success = True
             except Exception as _tts_err:

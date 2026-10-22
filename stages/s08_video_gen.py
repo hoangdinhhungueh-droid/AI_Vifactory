@@ -231,7 +231,8 @@ def run(ctx: RunContext) -> StageArtifact:
                         cmd = [
                             ffmpeg_bin, "-y", "-loop", "1", "-i", str(active_seed_img),
                             "-c:v", "libx264", "-t", str(dur), "-pix_fmt", "yuv420p",
-                            "-vf", "scale=1920:1080", str(target_video)
+                            "-r", str(ctx.config.render.fps),
+                            "-vf", f"scale=1920:1080,fps={ctx.config.render.fps}", str(target_video)
                         ]
                         subprocess.run(cmd, capture_output=True, check=True, timeout=15)
                     except Exception as _ff_err:
