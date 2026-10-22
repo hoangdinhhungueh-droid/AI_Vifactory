@@ -44,8 +44,8 @@ PROFILES = {
     },
     'acc_03': {
         'path': PROFILES_BASE_DIR / 'acc_03',
-        'email': 'hoangdinhhung.mm@gmail.com',
-        'name': 'Đình Hưng Hoàng'
+        'email': 'hunghoangdinh2308@gmail.com',
+        'name': 'Hung Hoang'
     },
     'acc_04': {
         'path': PROFILES_BASE_DIR / 'acc_04',

@@ -62,7 +62,10 @@ def execute_pipeline(
     dry_run: bool = False,
     force: bool = False,
     topic: Optional[str] = None,
+    profile: Optional[str] = None,
 ) -> int:
+    if profile is not None:
+        profile_name = profile
     """Main execution engine loop over all 11 stages."""
     print("=" * 75)
     print("🎬 AI VIDEO FACTORY — MASTER PIPELINE ORCHESTRATOR 2.0")

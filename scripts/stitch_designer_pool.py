@@ -32,8 +32,8 @@ ACCOUNT_POOL = [
     },
     {
         "id": "acc_03",
-        "email": "hoangdinhhung.mm@gmail.com",
-        "name": "Đình Hưng Hoàng",
+        "email": "hunghoangdinh2308@gmail.com",
+        "name": "Hung Hoang",
         "profile_dir": r"C:\Users\hunghd2\.gemini\profiles\acc_03",
         "status": "configured"
     },

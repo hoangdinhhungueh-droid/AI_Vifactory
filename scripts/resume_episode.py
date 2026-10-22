@@ -54,9 +54,24 @@ def _visual_terms(b):
 
 async def _render(episode_id: str, brain: dict, story_text: str):
     from orchestrator.run_pipeline import execute_pipeline
-    exit_code = execute_pipeline(profile="prod", run_id=episode_id, from_stage="s09")
+    exit_code = execute_pipeline(profile_name="prod", run_id=episode_id, from_stage="s07")
     if exit_code != 0:
         raise RuntimeError(f"Pipeline failed with exit code {exit_code}")
+
+    # Bridge outputs for downstream continue_after_images / sweep compatibility (Rule 125 & 126)
+    out_dir = Path("/var/vf/episodes") / episode_id
+    render_final = out_dir / "10_render" / "final.mp4"
+    legacy_final = out_dir / "final_169.mp4"
+    if render_final.exists() and not legacy_final.exists():
+        import shutil
+        shutil.copy2(str(render_final), str(legacy_final))
+
+    voice_audio = out_dir / "audio" / "voice_narration.mp3"
+    legacy_audio = out_dir / "tts_out.mp3"
+    if voice_audio.exists() and not legacy_audio.exists():
+        import shutil
+        shutil.copy2(str(voice_audio), str(legacy_audio))
+
     return {"status": "ok", "episode_id": episode_id}
 
 

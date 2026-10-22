@@ -53,7 +53,13 @@ def run(ctx: RunContext) -> StageArtifact:
             legacy_cands = [
                 ctx.paths.root / "composite_seeds" / f"composite_{sc_id.lower()}.png",
                 ctx.paths.root / "composite_seeds" / f"composite_{sc_id}.png",
+                ctx.paths.root / "composite_seeds" / f"{sc_id}.png",
+                ctx.paths.root / "images" / f"{sc_id}.png",
+                ctx.paths.root / "images" / f"composite_{sc_id}.png",
+                ctx.paths.root / "assets" / f"{sc_id}.png",
+                ctx.paths.root / "assets" / f"composite_{sc_id}.png",
                 Path(r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets") / ctx.run_id / f"composite_{sc_id}.png",
+                Path(r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets") / ctx.run_id / f"{sc_id}.png",
             ]
             found = next((p for p in legacy_cands if p.exists() and p.stat().st_size > 1024), None)
             if found and found.resolve() != target_img.resolve():

@@ -1059,6 +1059,10 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                         seed_dir.mkdir(parents=True, exist_ok=True)
                         import shutil
                         shutil.copy2(local_png, seed_dir / f"{key}.png")
+                        if key.startswith("composite_"):
+                            raw_key = key.replace("composite_", "")
+                            shutil.copy2(local_png, seed_dir / f"{raw_key}.png")
+                            shutil.copy2(local_png, Path(local_episode_dir) / f"{raw_key}.png")
                     except Exception as copy_err:
                         pass
                 
