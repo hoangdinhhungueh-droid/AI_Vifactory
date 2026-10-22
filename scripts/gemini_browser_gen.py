@@ -765,7 +765,7 @@ def create_images_ready_marker(episode_id, total_count, pass_count):
     }
     marker_str = json.dumps(marker, indent=2)
     marker_path = f"/var/vf/episodes/{episode_id}/images_ready.json"
-    client.call_tool("write_file", {"path": marker_path, "content": marker_str, "confirm": True})
+    client.run_command(f"""python3 -c "import json; open('{marker_path}', 'w').write({repr(marker_str)})" """)
     print(f"🔔 Đã tạo marker B5->B6: {marker_path} (Tự động kích hoạt image_ready_watcher trên VPS) ✅")
 
 
