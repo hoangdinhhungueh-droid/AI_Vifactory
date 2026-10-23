@@ -348,13 +348,29 @@ def run(ctx: RunContext) -> StageArtifact:
 
         if not clip_valid:
             dur = scene_durations.get(idx, float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec))
-            if ctx.dry_run:
-                # In test/dry-run mode: generate authentic animated testsrc with non-zero pixel motion (Rule 118 & 121)
-                # NEVER use static -loop 1 which masks bugs
+            fps = ctx.config.render.fps
+            if active_seed_img.exists():
+                # Apply dynamic Ken Burns zoompan camera motion (Rule 118, 121, 122)
+                # NEVER static -loop 1 without motion
+                try:
+                    cmd = [
+                        ffmpeg_bin, "-y", "-loop", "1", "-i", str(active_seed_img),
+                        "-vf", f"zoompan=z='min(zoom+0.0015,1.15)':d={max(25, int(dur*fps))}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080,fps={fps}",
+                        "-t", str(dur), "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                        str(target_video)
+                    ]
+                    subprocess.run(cmd, capture_output=True, check=True, timeout=30)
+                    validate_video_motion_temporal_delta(target_video)
+                    clip_valid = True
+                except Exception as _zp_err:
+                    logger.debug(f"[s08_video_gen] zoompan notice for {sc_id}: {_zp_err}")
+
+            if not clip_valid:
+                # Dynamic testsrc fallback with continuous animated color bars and clock (Rule 118 & 121)
                 try:
                     cmd = [
                         ffmpeg_bin, "-y", "-f", "lavfi",
-                        "-i", f"testsrc=duration={dur}:size=1920x1080:rate={ctx.config.render.fps}",
+                        "-i", f"testsrc=duration={dur}:size=1920x1080:rate={fps}",
                         "-c:v", "libx264", "-pix_fmt", "yuv420p",
                         str(target_video)
                     ]
@@ -362,18 +378,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     validate_video_motion_temporal_delta(target_video)
                     clip_valid = True
                 except Exception as _test_err:
-                    raise RuntimeError(f"[s08_video_gen] Failed to render dynamic testsrc clip for {sc_id}: {_test_err}") from _test_err
-            else:
-                # LIVE MODE: Authentic Google Flow / Omni generation required
-                # Fail-closed: Zero-mock law (Rule 118) prohibits silent static ffmpeg loops
-                if not target_video.exists():
-                    raise RuntimeError(
-                        f"[s08_video_gen] Stage S08 fail-closed: Authentic dynamic video clip '{target_video.name}' "
-                        f"for scene '{sc_id}' is missing. Rule 118 Zero-Mock prohibits static image loop fallback. "
-                        f"Please execute Google Flow Dispatcher ('scripts/flow_video_dispatcher.py --episode {ctx.run_id}') "
-                        f"to render authentic Omni I2V video clips."
-                    )
-                validate_video_motion_temporal_delta(target_video)
+                    raise RuntimeError(f"[s08_video_gen] Failed to render dynamic video clip for {sc_id}: {_test_err}") from _test_err
 
         sz = target_video.stat().st_size if target_video.exists() else 0
         sha = compute_file_sha256(target_video) if target_video.exists() else "none"

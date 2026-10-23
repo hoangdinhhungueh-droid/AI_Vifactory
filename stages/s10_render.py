@@ -175,9 +175,9 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
 
         if invalid_clip_indices:
             raise MissingClipsError(
-                f"Stage S10 requires all declared S8 video clips to be valid dynamic videos (>100B, non-static). "
-                f"Found {len(invalid_clip_indices)} invalid or static freeze-frame clip(s) at index/indices {invalid_clip_indices} "
-                f"(declared: {len(clips)}, valid: {len(clip_paths)}). Violates Rule 118, 121, 122."
+                f"Stage S10 requires all declared S8 video clips to be valid and >100B. "
+                f"Found {len(invalid_clip_indices)} invalid clip(s) at index/indices {invalid_clip_indices} "
+                f"(declared: {len(clips)}, valid: {len(clip_paths)})"
             )
 
         if not audio_file or not Path(audio_file).exists() or Path(audio_file).stat().st_size < 100:
