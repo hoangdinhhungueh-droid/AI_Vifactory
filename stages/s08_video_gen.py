@@ -104,6 +104,35 @@ def run(ctx: RunContext) -> StageArtifact:
     frame_chain: List[Dict[str, Any]] = []
     video_map: Dict[str, Path] = {}
 
+    # Calculate adaptive scene durations based on audio narration or text length (Rule 120/135)
+    s9_path = ctx.paths.artifact_file(StageID.S9_VOICE_TTS.value)
+    audio_dur = 0.0
+    if s9_path.exists():
+        try:
+            s9_data = json.loads(s9_path.read_text(encoding="utf-8"))
+            audio_dur = float(s9_data.get("payload", {}).get("total_duration_sec", 0.0))
+        except Exception:
+            pass
+
+    if audio_dur <= 0.0 and (ctx.paths.audio_dir / "voice_narration.mp3").exists():
+        try:
+            from vox.qa.gates import probe_media_file
+            a_info = probe_media_file(ctx.paths.audio_dir / "voice_narration.mp3")
+            audio_dur = float(a_info.get("format", {}).get("duration", "0"))
+        except Exception:
+            pass
+
+    total_scenes = len(scenes)
+    scene_durations: Dict[int, float] = {}
+    if audio_dur > 0 and total_scenes > 0:
+        weights = [max(len(sc.get("narration", "")), 5) for sc in scenes]
+        total_w = sum(weights)
+        for i, w in enumerate(weights):
+            scene_durations[i] = round(audio_dur * (w / total_w), 3)
+    else:
+        for i, sc in enumerate(scenes):
+            scene_durations[i] = float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec)
+
     for idx, sc in enumerate(scenes):
         if not isinstance(sc, dict):
             raise ValueError(f"[s08_video_gen] Malformed scene record at index {idx}: expected dict, got {type(sc).__name__}")
@@ -225,7 +254,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 import shutil
                 shutil.copy2(str(found), str(target_video))
             else:
-                dur = ctx.config.video_generation.duration_per_clip_sec
+                dur = scene_durations.get(idx, float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec))
                 if active_seed_img.exists():
                     try:
                         cmd = [
@@ -257,7 +286,7 @@ def run(ctx: RunContext) -> StageArtifact:
             scene_id=sc_id,
             file_path=str(target_video),
             account_slot=slot,
-            duration_sec=ctx.config.video_generation.duration_per_clip_sec,
+            duration_sec=scene_durations.get(idx, float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec)),
             size_bytes=sz,
             sha256=sha,
             verified=True
