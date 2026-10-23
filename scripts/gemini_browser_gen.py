@@ -342,8 +342,8 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
             clean_p = prompt_text.strip()
             clean_p = re.sub(r'\[(STYLE MANDATE|MARKET & ETHNIC ANCHOR|MARKET & ENVIRONMENT ANCHOR|ERA ANCHOR|STRICT NEGATIVE PROMPT|TECHNICAL:[^\]]*)\]', '', clean_p, flags=re.IGNORECASE).strip()
             clean_p = re.sub(r'\s+', ' ', clean_p)
-            if not clean_p.lower().startswith("generate an image") and not clean_p.lower().startswith("draw"):
-                full_prompt = f"Draw: {clean_p}"
+            if not clean_p.lower().startswith("generate an image") and not clean_p.lower().startswith("tạo hình ảnh"):
+                full_prompt = f"Tạo hình ảnh: {clean_p}"
             else:
                 full_prompt = clean_p
             input_box.fill(full_prompt)
@@ -374,7 +374,9 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
                     'div.markdown:has-text("can\'t generate images"), '
                     'div.markdown:has-text("unable to generate"), '
                     'div.markdown:has-text("I cannot create images"), '
-                    'message-content:has-text("cannot directly generate")'
+                    'div.markdown:has-text("hard time fulfilling"), '
+                    'message-content:has-text("cannot directly generate"), '
+                    'message-content:has-text("hard time fulfilling")'
                 )
                 if refusal:
                     print("⚠️ Phát hiện Gemini trả về text từ chối thay vì sinh ảnh. Fast-fail aborting ngay để retry!")
@@ -1108,6 +1110,7 @@ if __name__ == "__main__":
     parser.add_argument("--pacing", type=int, default=3, help="Thời gian giãn cách giữa các prompt (giây)")
     parser.add_argument("--force", action="store_true", help="Sinh lại toàn bộ ngay cả khi đã có file cục bộ")
     parser.add_argument("--limit", type=int, default=0, help="Giới hạn số ảnh cần sinh (0: toàn bộ)")
+    parser.add_argument("--scenes", type=str, default="", help="Danh sách scenes (SCENE_01,SCENE_04,...)")
     parser.add_argument("--no-auto-handoff", action="store_true", help="Tắt tự động trigger B6 render sau khi xong B4/B5 (mặc định B6 tự động kích hoạt)")
     args = parser.parse_args()
     
@@ -1133,7 +1136,12 @@ if __name__ == "__main__":
             clean_ep = clean_ep[5:].strip()
         
         items = fetch_prompts_from_vps(clean_ep)
-        if args.limit > 0:
+        if args.scenes:
+            target_keys = set(f"composite_{s.strip().upper()}" for s in args.scenes.split(",") if s.strip())
+            target_raw = set(s.strip().upper() for s in args.scenes.split(",") if s.strip())
+            items = [it for it in items if it.get("reuse_key", "").upper() in target_keys or it.get("reuse_key", "").upper().replace("COMPOSITE_", "") in target_raw]
+            print(f"🎯 Đã lọc theo danh sách scenes: {len(items)} prompts ({args.scenes})!")
+        elif args.limit > 0:
             items = items[:args.limit]
             print(f"🎯 Đã giới hạn sinh {args.limit} ảnh đầu tiên theo tham số --limit!")
         print(f"📋 Đã nạp thành công {len(items)} prompts cho episode {clean_ep}")

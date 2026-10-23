@@ -154,6 +154,22 @@
       5. *Điểm Thẩm Định B5 (Rule 122 Score)*: Độ phân giải 2560x1440, HSV clean, black frame %, text-free %, Điểm B5 (e.g., 9.8/10), trạng thái `APPROVED`.
     - **Bảo Chứng Đường Dẫn Thư Viện HTML**: Bắt buộc đính kèm link mở trực tiếp file `review_gallery.html` (`[review_gallery.html](file:///...)`) để User duyệt toàn bộ 100% ảnh trực quan.
 
+24. **RULE 142 (Anti-Generic-AI-Visual & Forensic Journalistic Decomposition Mandate)**:
+    - **Cấm Tuyệt Đối Hình Tượng AI Mockup Vô Hồn (Zero-Generic-AI Mandate)**:
+      CẤM TUYỆT ĐỐI tầng đạo diễn B3 và prompt nạp vào sinh ra các hình tượng AI sáo rỗng vô hồn: thanh tìm kiếm mockup trắng trơn không ngữ cảnh, thẻ đánh số rỗng `01`, `02`, `03` thiếu thực thể vật lý, bàn họp doanh nhân stock photo, biểu đồ mũi tên bay lơ lửng, hoặc căn phòng 3D CGI bóng bẩy.
+    - **Quy Chuẩn Chuyển Thể Pháp Y Báo Chí Điều Tra Vox (Vox Forensic Journalistic Standard)**:
+      Mọi ý niệm kịch bản bắt buộc phải được Đạo Diễn chuyển thể dưới lăng kính **Bàn Giám Định Chứng Cứ Pháp Y Của Cơ Quan Điều Tra (Forensic Evidence Dossier Desk)** đặt trên nền giấy báo cũ ngả vàng `#F4F1EA`:
+      + *Tấn công mạng / Phishing*: Bản in thư thương mại Nhật Bản kính ngữ Keigo trang trọng (`「拝啓 貴社ますますご清栄のこととお慶び申し上げます...」`) dán nhãn đỏ cảnh báo Trojan, ổ cứng máy chủ kim loại cổ điển bị khóa chặt bởi ổ khóa đồng mini đè lên bản sao kê dữ liệu khách hàng bị bôi đen bằng bút dạ đen (redacted ledger), băng giấy in teletype Dark Web hiển thị tin nhắn tống tiền `¥500,000,000` kèm thẻ đếm ngược `72:00:00`.
+      + *Tìm kiếm / Xu hướng bùng nổ*: Bảng điều khiển phân tích an ninh mạng JPCERT hoặc retro search console hiển thị trực tiếp dòng truy vấn tiếng Nhật cụ thể (`「サイバー攻撃 日本語の壁」`), vệt bút dạ quang vàng neon gạch chân dứt khoát, 3 thẻ xu hướng cảnh báo đỏ với biểu đồ cột dốc đứng thể hiện tỷ lệ đột biến (`+1,240%`, `+860%`), văn bản khuyến cáo khẩn cấp có mộc đỏ.
+      + *Xúc tác thể chế / Nhân vật*: Tập hồ sơ điều tra rò rỉ có logo đài truyền hình bản địa (TV Asahi), ảnh chân dung chuyên gia halftone đen trắng, con dấu mộc đỏ khổng lồ (`「10倍」/ 10X EFFICIENCY`), con dấu triện cá nhân Hanko của CEO bị gạch chéo vô hiệu.
+
+25. **RULE 143 (Mandatory Clickable Video Demo Audit Table & Anti-Duplicate Dispatch Gate)**:
+    - **Cấm Báo Cáo Video Bằng Miệng (Zero-Verbal-Video-Reporting Mandate)**:
+      Sau khi hoàn thành sinh video demo hoặc full luồng: BẮT BUỘC xuất bảng nghiệm thu pháp y trực quan gồm: Scene ID, Clickable Video Link file:// (`[clip_scene_XX.mp4](file:///...)`), Clickable Mid-frame Preview (`[clip_scene_XX_mid.png](file:///...)`), Đạo cụ xúc giác thực tế, Động học 4 thì I2V, Thời lượng thực tế (s), Dung lượng file (KB), và Điểm thẩm định thị giác B5/V1.
+    - **Chốt Chặn Chống Trùng Lặp Video (Anti-Duplicate Dispatch Gate)**:
+      Trước khi nghiệm thu, bắt buộc kiểm tra hash SHA-256 và visual fingerprint giữa các clip. Nếu 2 clip có kích thước giống nhau hoặc visual frame trùng khớp (như sự cố Scene 01 bị ghi đè thành Scene 08), hệ thống phải VETO lập tức, cấm báo cáo PASS và tự động chạy lại scene bị thiếu.
+    - **Bảo Chứng Thư Viện Video Tương Tác**: Bắt buộc tạo và đính kèm link mở trực tiếp file `demo_video_gallery.html` (`[demo_video_gallery.html](file:///...)`) có trình phát video HTML5 xem trước toàn bộ clips.
+
 ---
 
 ## 🗺️ II. MA TRẬN ĐỊNH TUYẾN KỸ NĂNG (PROGRESSIVE DISCLOSURE)

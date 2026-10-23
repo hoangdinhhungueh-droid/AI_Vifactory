@@ -196,6 +196,16 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             back_btn.click()
             time.sleep(1)
 
+        # Clear any lingering ingredient chips in the prompt box
+        chips = page.locator("button[aria-label*='Xóa' i], button[aria-label*='Remove' i], button[aria-label*='Delete' i], .ingredient-chip button, [data-icon='close']").all()
+        for chip in chips:
+            try:
+                if chip.is_visible():
+                    chip.click(force=True)
+                    time.sleep(0.3)
+            except Exception:
+                pass
+
         if seed_img.exists():
             print(f"      🖼️ Đang nạp ảnh Seed: {seed_img.name}...")
             # Check if "I agree" dialog is currently open
@@ -251,8 +261,14 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             return False
 
         prompt_box.click(force=True)
+        time.sleep(0.3)
+        prompt_box.press("Control+A")
+        prompt_box.press("Backspace")
+        time.sleep(0.3)
         prompt_box.fill(prompt_text)
         time.sleep(1)
+        initial_tiles_count = page.locator("flow-video-tile").count()
+        print(f"      📊 Số tiles hiện có trước khi tạo: {initial_tiles_count}")
 
         start_gen = page.locator("button[aria-label*='Bắt đầu tạo'], button[aria-label*='Start generation' i], button:has-text('arrow_forward')").first
         if start_gen.count() == 0 or not start_gen.is_visible():
@@ -399,7 +415,7 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         print(f"      ❌ Lỗi khi sinh video {scene_id}: {e}")
         return False
 
-def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: Path, headless: bool = False, model_target: str = "omni") -> dict:
+def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: Path, headless: bool = False, model_target: str = "omni", force: bool = False) -> dict:
     """Xử lý toàn bộ các clip được giao cho 1 tài khoản."""
     acc_info = PROFILES[acc_key]
     profile_dir = acc_info['path']
@@ -477,11 +493,11 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
 
         for clip in clips:
             out_file = out_dir / clip["output_filename"]
-            if out_file.exists() and out_file.stat().st_size > 200000:
+            if not force and out_file.exists() and out_file.stat().st_size > 200000:
                 print(f"\n   ⏩ [BỎ QUA] {clip['output_filename']} đã tồn tại hợp lệ ({out_file.stat().st_size:,} bytes)")
                 results[clip["scene_id"]] = True
                 continue
-            elif out_file.exists() and out_file.stat().st_size == 0:
+            elif out_file.exists():
                 try:
                     out_file.unlink()
                 except Exception:
@@ -505,6 +521,7 @@ def main():
     parser.add_argument("--headless", action="store_true", default=False, help="Chạy ngầm browser (chú ý: Google Flow có thể chặn bot khi headless)")
     parser.add_argument("--headed", action="store_false", dest="headless", help="Mở giao diện browser trực quan (mặc định)")
     parser.add_argument("--model", choices=["omni", "veo"], default="omni", help="Mô hình video: omni (Omni 1.1 Flash) hoặc veo (Veo 3.1 - Fast)")
+    parser.add_argument("--force", action="store_true", default=False, help="Sinh lại clip ngay cả khi file đã tồn tại")
     args = parser.parse_args()
 
     episode_dir = ROOT_DIR / "episodes" / args.episode
@@ -559,7 +576,7 @@ def main():
             print(f"⚠️ Không có clip nào được gán cho {acc}")
             continue
 
-        res = dispatch_for_account(acc, clips, out_dir, episode_dir, headless=args.headless, model_target=args.model)
+        res = dispatch_for_account(acc, clips, out_dir, episode_dir, headless=args.headless, model_target=args.model, force=args.force)
         for s_id, ok in res.items():
             total_processed += 1
             if ok:
