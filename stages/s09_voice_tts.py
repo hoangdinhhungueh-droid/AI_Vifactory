@@ -118,6 +118,68 @@ def run(ctx: RunContext) -> StageArtifact:
                     # Minimal valid silent MP3 frame stream
                     audio_file.write_bytes(b"\xff\xfb\x90\x44" + b"\x00" * 8192)
 
+    # Probe real audio duration to align subtitles and total_duration_sec accurately (Rule 120, 135)
+    real_audio_dur = 0.0
+    if audio_file.exists() and audio_file.stat().st_size > 100:
+        try:
+            from vox.qa.gates import probe_media_file
+            a_info = probe_media_file(audio_file)
+            real_audio_dur = float(a_info.get("format", {}).get("duration", "0"))
+        except Exception as _p_err:
+            logger.debug("[s09_voice_tts] audio probe notice: %s", _p_err)
+
+    actual_total_dur = real_audio_dur if real_audio_dur > 0.0 else max(curr_time, 5.0)
+
+    # Build scene-aligned subtitles and word timestamps across the full duration
+    subtitles = []
+    ass_events = []
+    weights = [max(len(sc.get("narration", "")), 5) for sc in scenes] if scenes else []
+    total_w = sum(weights) if weights else 1
+    sc_start = 0.0
+
+    def _to_ass_time(sec: float) -> str:
+        sec = max(0.0, float(sec))
+        h = int(sec // 3600)
+        m = int((sec % 3600) // 60)
+        s = int(sec % 60)
+        cs = int(round((sec - int(sec)) * 100))
+        if cs >= 100:
+            cs = 0
+            s += 1
+        return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+    if scenes and any(isinstance(sc, dict) for sc in scenes):
+        for idx, sc in enumerate(scenes):
+            w = weights[idx] if idx < len(weights) else 5
+            sc_dur = actual_total_dur * (w / total_w)
+            sc_end = sc_start + sc_dur
+            if idx == len(scenes) - 1:
+                sc_end = actual_total_dur
+            narr = sc.get("narration", "").strip() if isinstance(sc, dict) else ""
+            if narr:
+                ass_events.append(f"Dialogue: 0,{_to_ass_time(sc_start)},{_to_ass_time(sc_end)},Default,,0,0,0,,{narr}")
+                sc_words = narr.split() if " " in narr else [narr]
+                w_step = (sc_end - sc_start) / max(1, len(sc_words))
+                for widx, sw in enumerate(sc_words):
+                    w_s = sc_start + widx * w_step
+                    w_e = w_s + w_step
+                    subtitles.append(KaraokeWord(word=sw, start=round(w_s, 3), end=round(w_e, 3)).model_dump())
+            sc_start = sc_end
+    else:
+        # Fallback to word-level chunking
+        words_per_event = 6
+        for i in range(0, max(1, len(words)), words_per_event):
+            chunk = words[i:i + words_per_event]
+            if not chunk:
+                break
+            chunk_start = (i / max(1, len(words))) * actual_total_dur
+            chunk_end = (min(i + words_per_event, len(words)) / max(1, len(words))) * actual_total_dur
+            chunk_text = " ".join(chunk)
+            ass_events.append(f"Dialogue: 0,{_to_ass_time(chunk_start)},{_to_ass_time(chunk_end)},Default,,0,0,0,,{chunk_text}")
+
+    if not ass_events:
+        ass_events.append("Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,AI Video Factory")
+
     subtitles_file.write_text(json.dumps(subtitles, indent=2, ensure_ascii=False), encoding="utf-8")
 
     # Generate broadcast-compliant ASS subtitle file for S10 Assembly & libass burning
@@ -139,37 +201,14 @@ def run(ctx: RunContext) -> StageArtifact:
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
     ]
-    words_per_event = 6
-    for i in range(0, max(1, len(subtitles)), words_per_event):
-        chunk = subtitles[i:i + words_per_event]
-        if not chunk:
-            break
-        s_start = chunk[0].get("start", 0.0)
-        s_end = chunk[-1].get("end", s_start + 1.0)
-        chunk_text = " ".join(w.get("word", "") for w in chunk)
-
-        def _to_ass_time(sec: float) -> str:
-            sec = max(0.0, float(sec))
-            h = int(sec // 3600)
-            m = int((sec % 3600) // 60)
-            s = int(sec % 60)
-            cs = int(round((sec - int(sec)) * 100))
-            if cs >= 100:
-                cs = 0
-                s += 1
-            return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
-
-        ass_lines.append(f"Dialogue: 0,{_to_ass_time(s_start)},{_to_ass_time(s_end)},Default,,0,0,0,,{chunk_text}")
-
-    if not subtitles:
-        ass_lines.append("Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,AI Video Factory")
+    ass_lines.extend(ass_events)
     ass_file.write_text("\n".join(ass_lines), encoding="utf-8")
 
     payload = {
         "task_id": ctx.run_id,
         "audio_file": str(audio_file),
         "total_words": len(subtitles),
-        "total_duration_sec": curr_time,
+        "total_duration_sec": round(actual_total_dur, 3),
         "subtitles_file": str(ass_file),
         "word_timestamps_file": str(subtitles_file),
         "subtitles": subtitles

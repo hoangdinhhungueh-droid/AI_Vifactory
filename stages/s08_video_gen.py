@@ -107,18 +107,24 @@ def run(ctx: RunContext) -> StageArtifact:
     # Calculate adaptive scene durations based on audio narration (Rule 120/135)
     s9_path = ctx.paths.artifact_file(StageID.S9_VOICE_TTS.value)
     audio_dur = 0.0
-    if s9_path.exists():
-        try:
-            s9_data = json.loads(s9_path.read_text(encoding="utf-8"))
-            audio_dur = float(s9_data.get("payload", {}).get("total_duration_sec", 0.0))
-        except Exception:
-            pass
-
-    if audio_dur <= 0.0 and (ctx.paths.audio_dir / "voice_narration.mp3").exists():
+    if (ctx.paths.audio_dir / "voice_narration.mp3").exists():
         try:
             from vox.qa.gates import probe_media_file
             a_info = probe_media_file(ctx.paths.audio_dir / "voice_narration.mp3")
             audio_dur = float(a_info.get("format", {}).get("duration", "0"))
+        except Exception:
+            pass
+
+    if audio_dur <= 0.0 and s9_path.exists():
+        try:
+            s9_data = json.loads(s9_path.read_text(encoding="utf-8"))
+            audio_f = s9_data.get("payload", {}).get("audio_file")
+            if audio_f and Path(audio_f).exists():
+                from vox.qa.gates import probe_media_file
+                a_info = probe_media_file(Path(audio_f))
+                audio_dur = float(a_info.get("format", {}).get("duration", "0"))
+            if audio_dur <= 0.0:
+                audio_dur = float(s9_data.get("payload", {}).get("total_duration_sec", 0.0))
         except Exception:
             pass
 
@@ -130,6 +136,10 @@ def run(ctx: RunContext) -> StageArtifact:
         total_w = sum(weights)
         for i, w in enumerate(weights):
             scene_durations[i] = round(audio_dur * (w / total_w), 3)
+        clip_sum = sum(scene_durations.values())
+        diff = round(audio_dur - clip_sum, 3)
+        if abs(diff) > 0.0:
+            scene_durations[total_scenes - 1] = round(scene_durations[total_scenes - 1] + diff, 3)
     elif all_dicts:
         for i, sc in enumerate(scenes):
             scene_durations[i] = float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec)
