@@ -25,6 +25,69 @@ logger = logging.getLogger("s08_video_gen")
 STAGE: StageID = StageID.S8_VIDEO_GEN
 
 
+class StaticFreezeFrameError(ValueError):
+    """Raised when a video clip has zero or negligible temporal motion (Rule 118, 121, 122)."""
+    pass
+
+
+def validate_video_motion_temporal_delta(video_path: Path, min_delta: float = 0.5) -> float:
+    """Verifies that a video clip possesses authentic temporal pixel motion between distinct frames.
+
+    Fail-closed (Rule 118, 121, 122):
+    Extracts two frames at t=0.5s and t=2.0s (or middle of clip).
+    Calculates mean absolute difference in luminance across frames.
+    If mean_diff < min_delta (e.g. 0.0 for static image loop), raises StaticFreezeFrameError.
+    Returns the mean pixel difference score.
+    """
+    if not video_path.exists() or video_path.stat().st_size < 1000:
+        raise FileNotFoundError(f"Video clip does not exist or is too small (<1KB): {video_path}")
+
+    import tempfile
+    from PIL import Image, ImageChops, ImageStat
+    from vox.ffmpeg_utils import get_ffmpeg_binary
+
+    ffmpeg_bin = get_ffmpeg_binary()
+    with tempfile.TemporaryDirectory() as td:
+        p1 = Path(td) / "f1.png"
+        p2 = Path(td) / "f2.png"
+        try:
+            subprocess.run(
+                [ffmpeg_bin, "-y", "-ss", "0.5", "-i", str(video_path), "-vframes", "1", str(p1)],
+                capture_output=True, check=True, timeout=15
+            )
+            subprocess.run(
+                [ffmpeg_bin, "-y", "-ss", "2.0", "-i", str(video_path), "-vframes", "1", str(p2)],
+                capture_output=True, check=True, timeout=15
+            )
+            if not p1.exists() or not p2.exists():
+                # Fallback to 0.1s and 0.8s for ultra short clips
+                subprocess.run(
+                    [ffmpeg_bin, "-y", "-ss", "0.1", "-i", str(video_path), "-vframes", "1", str(p1)],
+                    capture_output=True, check=True, timeout=15
+                )
+                subprocess.run(
+                    [ffmpeg_bin, "-y", "-ss", "0.8", "-i", str(video_path), "-vframes", "1", str(p2)],
+                    capture_output=True, check=True, timeout=15
+                )
+
+            if not p1.exists() or not p2.exists():
+                raise RuntimeError(f"Could not extract verification frames from {video_path}")
+
+            im1 = Image.open(p1).convert("L")
+            im2 = Image.open(p2).convert("L")
+            diff = ImageChops.difference(im1, im2)
+            stat = ImageStat.Stat(diff)
+            mean_diff = stat.mean[0]
+            if mean_diff < min_delta:
+                raise StaticFreezeFrameError(
+                    f"Video clip '{video_path.name}' is a static freeze-frame (motion delta = {mean_diff:.4f} < {min_delta}). "
+                    f"Violates Rule 118 & Rule 122: Zero-Mock Data & Authentic Video Motion Gate."
+                )
+            return float(mean_diff)
+        except subprocess.CalledProcessError as ff_err:
+            raise RuntimeError(f"FFmpeg frame extraction failed for motion audit on {video_path}: {ff_err}") from ff_err
+
+
 def validate_frame_chain_dag(frame_chain: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Validates that start-frame chaining conforms to a strict Directed Acyclic Graph (DAG).
 
@@ -252,8 +315,21 @@ def run(ctx: RunContext) -> StageArtifact:
             "seed_usable": seed_usable,
         })
 
-        # 1. Idempotency Check: if clip already exists and has valid size
-        if not target_video.exists() or target_video.stat().st_size < 1000 or ctx.force:
+        # 1. Idempotency Check & Motion Verification Gate
+        clip_valid = False
+        if target_video.exists() and target_video.stat().st_size >= 1000 and not ctx.force:
+            try:
+                motion_score = validate_video_motion_temporal_delta(target_video)
+                clip_valid = True
+                logger.info(f"[s08_video_gen] Verified existing clip '{target_video.name}': motion delta = {motion_score:.2f} (PASS)")
+            except StaticFreezeFrameError as freeze_err:
+                logger.warning(f"[s08_video_gen] Rejecting invalid static freeze-frame clip '{target_video.name}': {freeze_err}")
+                try:
+                    target_video.unlink()
+                except OSError:
+                    pass
+
+        if not clip_valid:
             # Check legacy location
             legacy_cands = [
                 ctx.paths.root / "video_clips" / f"clip_{sc_id.lower()}.mp4",
@@ -262,32 +338,42 @@ def run(ctx: RunContext) -> StageArtifact:
             ]
             found = next((p for p in legacy_cands if p.exists() and p.stat().st_size > 10000), None)
             if found and found.resolve() != target_video.resolve():
-                import shutil
-                shutil.copy2(str(found), str(target_video))
+                try:
+                    validate_video_motion_temporal_delta(found)
+                    import shutil
+                    shutil.copy2(str(found), str(target_video))
+                    clip_valid = True
+                except Exception as _leg_err:
+                    logger.debug(f"[s08_video_gen] Legacy candidate rejected for {sc_id}: {_leg_err}")
+
+        if not clip_valid:
+            dur = scene_durations.get(idx, float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec))
+            if ctx.dry_run:
+                # In test/dry-run mode: generate authentic animated testsrc with non-zero pixel motion (Rule 118 & 121)
+                # NEVER use static -loop 1 which masks bugs
+                try:
+                    cmd = [
+                        ffmpeg_bin, "-y", "-f", "lavfi",
+                        "-i", f"testsrc=duration={dur}:size=1920x1080:rate={ctx.config.render.fps}",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                        str(target_video)
+                    ]
+                    subprocess.run(cmd, capture_output=True, check=True, timeout=30)
+                    validate_video_motion_temporal_delta(target_video)
+                    clip_valid = True
+                except Exception as _test_err:
+                    raise RuntimeError(f"[s08_video_gen] Failed to render dynamic testsrc clip for {sc_id}: {_test_err}") from _test_err
             else:
-                dur = scene_durations.get(idx, float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec))
-                if active_seed_img.exists():
-                    try:
-                        cmd = [
-                            ffmpeg_bin, "-y", "-loop", "1", "-i", str(active_seed_img),
-                            "-c:v", "libx264", "-t", str(dur), "-pix_fmt", "yuv420p",
-                            "-r", str(ctx.config.render.fps),
-                            "-vf", f"scale=1920:1080,fps={ctx.config.render.fps}", str(target_video)
-                        ]
-                        subprocess.run(cmd, capture_output=True, check=True, timeout=15)
-                    except Exception as _ff_err:
-                        target_video.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
-                else:
-                    try:
-                        cmd = [
-                            ffmpeg_bin, "-y", "-f", "lavfi",
-                            "-i", f"testsrc=duration={dur}:size=1920x1080:rate=25",
-                            "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                            str(target_video)
-                        ]
-                        subprocess.run(cmd, capture_output=True, check=True, timeout=15)
-                    except Exception as _ff_err:
-                        target_video.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
+                # LIVE MODE: Authentic Google Flow / Omni generation required
+                # Fail-closed: Zero-mock law (Rule 118) prohibits silent static ffmpeg loops
+                if not target_video.exists():
+                    raise RuntimeError(
+                        f"[s08_video_gen] Stage S08 fail-closed: Authentic dynamic video clip '{target_video.name}' "
+                        f"for scene '{sc_id}' is missing. Rule 118 Zero-Mock prohibits static image loop fallback. "
+                        f"Please execute Google Flow Dispatcher ('scripts/flow_video_dispatcher.py --episode {ctx.run_id}') "
+                        f"to render authentic Omni I2V video clips."
+                    )
+                validate_video_motion_temporal_delta(target_video)
 
         sz = target_video.stat().st_size if target_video.exists() else 0
         sha = compute_file_sha256(target_video) if target_video.exists() else "none"

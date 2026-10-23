@@ -264,8 +264,24 @@ def main():
         except OSError:
             shutil.copy2(str(s10_final), str(master))
 
+    # Rule 121 & 122: Temporal Motion Audit on existing master video
+    is_master_dynamic = False
     if master.exists() and master.stat().st_size > 10000000:
-        _log("Master video already rendered and verified at %s (%.1f MB). Skipping B4-B7 render." %
+        try:
+            from stages.s08_video_gen import validate_video_motion_temporal_delta
+            motion_score = validate_video_motion_temporal_delta(master)
+            _log("Existing master video verified dynamic (motion delta = %.2f > 0.5)" % motion_score)
+            is_master_dynamic = True
+        except Exception as _m_err:
+            _log("Existing master video at %s failed motion audit (%s). Purging static file to force fresh render." % (master, _m_err))
+            try:
+                master.unlink()
+            except OSError:
+                pass
+            is_master_dynamic = False
+
+    if is_master_dynamic:
+        _log("Master video already rendered and verified dynamic at %s (%.1f MB). Skipping B4-B7 render." %
              (master, master.stat().st_size / 1048576.0))
         render_ok = True
     else:

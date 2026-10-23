@@ -41,8 +41,62 @@ __all__ = [
     "plan_scenes_from_script",
     "partition_timeline_into_chunks",
     "build_master_asset_registry",
-    "validate_and_sanitize_director_plan"
+    "validate_and_sanitize_director_plan",
+    "generate_7acc_flow_manifest",
+    "FLOW_ACCOUNTS"
 ]
+
+FLOW_ACCOUNTS: List[str] = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06", "acc_07"]
+
+
+def generate_7acc_flow_manifest(target_dir: Path, episode_id: str, scenes: List[Any]) -> Dict[str, Any]:
+    """Generates canonical flow_video_manifest.json for Google Flow (Veo 3.1 / Omni 1.1 Flash)
+    with guaranteed round-robin rotation across 7 accounts (Rule 125, 128, 132).
+    """
+    clips = []
+    for idx, s in enumerate(scenes):
+        slot = FLOW_ACCOUNTS[idx % len(FLOW_ACCOUNTS)]
+        sc_id = getattr(s, "scene_id", None) or (s.get("scene_id") if isinstance(s, dict) else f"SCENE_{idx+1:02d}")
+        out_fn = f"clip_{sc_id.lower()}.mp4"
+        i2v_prompt = (
+            getattr(s, "i2v_prompt_omni", None)
+            or getattr(s, "i2v_prompt_google_flow", None)
+            or (s.get("i2v_prompt_omni") if isinstance(s, dict) else "")
+            or (s.get("i2v_prompt_google_flow") if isinstance(s, dict) else "")
+            or ""
+        )
+        dur = float(
+            getattr(s, "duration_est_sec", None)
+            or (s.get("duration_est_sec") if isinstance(s, dict) else 5.0)
+            or 5.0
+        )
+        hero = getattr(s, "hero_cutout_object", None) or (s.get("hero_cutout_object") if isinstance(s, dict) else "")
+        cam = getattr(s, "camera_directive", None) or (s.get("camera_directive") if isinstance(s, dict) else "STATIC_OVERHEAD")
+
+        clips.append({
+            "scene_id": sc_id,
+            "clip_index": idx + 1,
+            "flow_slot": slot,
+            "output_filename": out_fn,
+            "prompt": i2v_prompt,
+            "duration_sec": dur,
+            "hero_cutout_object": hero,
+            "camera_directive": cam
+        })
+
+    manifest = {
+        "episode_id": episode_id,
+        "format": "FLOW_VEO_7_ACCOUNT_DISPATCH",
+        "total_clips": len(clips),
+        "accounts_used": FLOW_ACCOUNTS,
+        "clips": clips
+    }
+    target_dir.mkdir(parents=True, exist_ok=True)
+    man_path = target_dir / "flow_video_manifest.json"
+    with open(man_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2, ensure_ascii=False)
+    logger.info(f"[s05_director_plan] Generated flow_video_manifest.json ({len(clips)} clips) -> {man_path}")
+    return manifest
 
 
 def build_vox_scene_prompts(
@@ -851,6 +905,12 @@ def run(ctx: RunContext) -> StageArtifact:
 
     emit_artifact(artifact, ctx.paths)
 
+    # Automatically generate flow_video_manifest.json for Google Flow / Omni 7-account dispatch (Rule 125 & 128)
+    try:
+        generate_7acc_flow_manifest(ctx.paths.root, ctx.run_id, scenes)
+    except Exception as _man_err:
+        logger.warning(f"[s05_director_plan] Notice generating workspace flow_video_manifest.json: {_man_err}")
+
     # Synchronize director_plan.json to episode directory for Remotion & downstream consumers
     ep_candidates = [
         Path(os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")) / ctx.run_id,
@@ -864,6 +924,9 @@ def run(ctx: RunContext) -> StageArtifact:
                 with open(dp_file, "w", encoding="utf-8") as f:
                     json.dump(payload, f, indent=2, ensure_ascii=False)
                 logger.info(f"[s05_director_plan] Synchronized director_plan.json to {dp_file}")
+
+                # Automatically generate and synchronize flow_video_manifest.json to episode directory
+                generate_7acc_flow_manifest(ep_dir, ctx.run_id, scenes)
 
                 # Synchronize dp_plan.json and canonical prompts_forge.json for Remotion, B4 & DACL
                 with open(ep_dir / "dp_plan.json", "w", encoding="utf-8") as f:

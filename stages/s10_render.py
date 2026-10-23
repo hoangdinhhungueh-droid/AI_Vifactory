@@ -155,18 +155,29 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
 
         clip_paths: List[Path] = []
         invalid_clip_indices: List[int] = []
+        from stages.s08_video_gen import validate_video_motion_temporal_delta, StaticFreezeFrameError
+
         for idx, cl in enumerate(clips):
             fp = cl.get("file_path")
             if not fp or not Path(fp).exists() or Path(fp).stat().st_size <= 100:
                 invalid_clip_indices.append(idx)
             else:
-                clip_paths.append(Path(fp))
+                p = Path(fp)
+                if not ctx.dry_run:
+                    try:
+                        validate_video_motion_temporal_delta(p)
+                    except StaticFreezeFrameError as motion_err:
+                        logger.error(f"[s10_render] Clip at index {idx} ({p.name}) failed motion audit: {motion_err}")
+                        invalid_clip_indices.append(idx)
+                    except Exception as probe_err:
+                        logger.warning(f"[s10_render] Notice probing motion on clip {p.name}: {probe_err}")
+                clip_paths.append(p)
 
         if invalid_clip_indices:
             raise MissingClipsError(
-                f"Stage S10 requires all declared S8 video clips to be valid and >100B. "
-                f"Found {len(invalid_clip_indices)} invalid clip(s) at index/indices {invalid_clip_indices} "
-                f"(declared: {len(clips)}, valid: {len(clip_paths)})"
+                f"Stage S10 requires all declared S8 video clips to be valid dynamic videos (>100B, non-static). "
+                f"Found {len(invalid_clip_indices)} invalid or static freeze-frame clip(s) at index/indices {invalid_clip_indices} "
+                f"(declared: {len(clips)}, valid: {len(clip_paths)}). Violates Rule 118, 121, 122."
             )
 
         if not audio_file or not Path(audio_file).exists() or Path(audio_file).stat().st_size < 100:
