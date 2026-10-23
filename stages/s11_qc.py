@@ -316,7 +316,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 for idx, sc in enumerate(sc_list):
                     sc_id = str(sc.get("scene_id", "")).lower()
                     dp_sc = dp_by_id.get(sc_id) or (dp_scenes[idx] if idx < len(dp_scenes) else {})
-                    for field in ["narration", "bg_prompt", "fg_prompt", "hero_cutout_object", "camera", "camera_move", "fg"]:
+                    for field in ["narration", "bg_prompt", "image_prompt", "fg_prompt", "hero_cutout_object", "foreground_prompt", "visual_metaphor", "camera", "camera_move", "camera_movement", "fg"]:
                         if field not in sc and field in dp_sc:
                             sc[field] = dp_sc[field]
 
