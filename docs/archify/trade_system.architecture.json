@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Quantitative Trading System — Codemap & Real-time Execution Engine",
+    "output": "trade_system.html",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "binance_ws", "type": "external", "label": "Binance WebSocket", "sublabel": "Kline + Depth L2 + Trades", "pos": [40, 280], "size": [150, 65], "tag": "data_feed" },
+    { "id": "market_buffer", "type": "backend", "label": "Market Ingestion Engine", "sublabel": "Candle Parser & RingBuffer", "pos": [240, 280], "size": [160, 65], "tag": "core/feed/stream.py" },
+    { "id": "smc_detector", "type": "backend", "label": "SMC & Structure Detector", "sublabel": "MSS/BOS, FVG, Liquidity", "pos": [460, 180], "size": [170, 65], "tag": "core/quant/smc.py" },
+    { "id": "multi_tf_align", "type": "backend", "label": "MTF Trend Alignment", "sublabel": "15m Entry / 1h / 4h Macro", "pos": [460, 380], "size": [170, 65], "tag": "core/quant/mtf.py" },
+    { "id": "signal_synthesizer", "type": "backend", "label": "Quant Signal Engine", "sublabel": "Displacement & Validation", "pos": [680, 280], "size": [170, 65], "tag": "core/strategy/signal.py" },
+    { "id": "risk_gate", "type": "security", "label": "Anti-Wipe Risk Gate", "sublabel": "Daily DD, Circuit Breaker", "pos": [900, 280], "size": [170, 65], "tag": "core/risk/iron_law.py" },
+    { "id": "order_router", "type": "backend", "label": "Smart Execution Router", "sublabel": "Signed HMAC-SHA256 API", "pos": [1120, 180], "size": [160, 65], "tag": "core/execution/router.py" },
+    { "id": "binance_rest", "type": "external", "label": "Binance Futures API", "sublabel": "Signed Order Endpoints", "pos": [1330, 180], "size": [150, 65], "tag": "fapi.binance.com" },
+    { "id": "position_tracker", "type": "database", "label": "Position State Machine", "sublabel": "Live PnL & Trailing SL", "pos": [1120, 380], "size": [160, 65], "tag": "core/engine/position.py" },
+    { "id": "alert_telemetry", "type": "cloud", "label": "Telegram Telemetry", "sublabel": "Instant Alert & PnL Cards", "pos": [1330, 380], "size": [150, 65], "tag": "core/notify/telegram.py" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Real-time Quantitative Edge Engine", "wraps": ["market_buffer", "smc_detector", "multi_tf_align", "signal_synthesizer"], "pad": 16 },
+    { "kind": "security-group", "label": "Capital Preservation & Risk Containment Boundary", "wraps": ["risk_gate"], "pad": 14 },
+    { "kind": "region", "label": "Execution & Portfolio Lifecycle Boundary", "wraps": ["order_router", "position_tracker"], "pad": 16 }
+  ],
+  "connections": [
+    { "from": "binance_ws", "to": "market_buffer", "label": "WSS Tick / Kline", "variant": "emphasis" },
+    { "from": "market_buffer", "to": "smc_detector", "label": "15m Candles", "route": "orthogonal-h" },
+    { "from": "market_buffer", "to": "multi_tf_align", "label": "1h/4h Higher Timeframe", "route": "orthogonal-h" },
+    { "from": "smc_detector", "to": "signal_synthesizer", "label": "FVG / BOS Candidates", "variant": "emphasis" },
+    { "from": "multi_tf_align", "to": "signal_synthesizer", "label": "Trend Filter Alignment", "variant": "emphasis" },
+    { "from": "signal_synthesizer", "to": "risk_gate", "label": "Actionable Setup (Kelly)", "variant": "emphasis" },
+    { "from": "risk_gate", "to": "order_router", "label": "Approved Order Spec", "variant": "security", "route": "orthogonal-h" },
+    { "from": "order_router", "to": "binance_rest", "label": "POST /fapi/v1/order", "variant": "security" },
+    { "from": "binance_rest", "to": "position_tracker", "label": "Fill Receipts & OrderID", "variant": "emphasis", "fromSide": "bottom", "toSide": "top" },
+    { "from": "position_tracker", "to": "alert_telemetry", "label": "PnL & Trade Broadcast", "variant": "emphasis" },
+    { "from": "position_tracker", "to": "risk_gate", "label": "Account Equity Telemetry", "variant": "dashed", "fromSide": "bottom", "toSide": "bottom", "via": [[1200, 480], [985, 480]] }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Anti-Sycophancy & Capital Defense (Iron Law)",
+      "items": [
+        "Kỷ luật tư duy sạch: Đứng ngoài khi thị trường Chop/Range là bảo vệ vốn tối cao",
+        "Cấm FOMO: Không vào lệnh khi thiếu Displacement hoặc FVG hồi chuẩn",
+        "Zero-Mock: 100% tài sản & lệnh truy vấn từ Signed API thực, cấm dùng mock balance"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "SMC Quant Rules",
+      "items": [
+        "Primary Catalyst (Tin tức/Dòng tiền lớn) vs Transmission Mechanism",
+        "Displacement nến thân dài phá vỡ vùng tích lũy (BOS) kèm Volume đột biến",
+        "Fair Value Gap (FVG) kiểm định lại vùng Discount trước khi mở vị thế"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Execution Precision",
+      "items": [
+        "Order Router tự động tính toán R:R tối thiểu 1:2.5 và Dynamic Trailing Stop",
+        "Signed HMAC-SHA256 kết nối Binance Futures qua endpoint bảo mật",
+        "Telegram Telemetry truyền hình ảnh và trạng thái khớp lệnh thời gian thực"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AI Video Factory — 11-Stage Production Pipeline Codemap",
+    "output": "vf_pipeline.html",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "b1_trend", "type": "frontend", "label": "B1: Trend Recon", "sublabel": "Google Trends RSS", "pos": [40, 180], "size": [160, 65], "tag": "app/services/trend_recon.py" },
+    { "id": "b15_youtube", "type": "frontend", "label": "B1.5: YouTube Recon", "sublabel": "Competitor Gap & CTR", "pos": [40, 380], "size": [160, 65], "tag": "app/services/youtube_recon.py" },
+    { "id": "b2_script", "type": "backend", "label": "B2: 5-Beat Editorial", "sublabel": "Hollywood Docudrama", "pos": [280, 180], "size": [170, 65], "tag": "app/services/editorial_engine.py" },
+    { "id": "b26_audio", "type": "backend", "label": "B2.6: Audio Spine", "sublabel": "Edge-TTS + Whisper", "pos": [280, 380], "size": [170, 65], "tag": "app/services/beat_tts_engine.py" },
+    { "id": "b3_director", "type": "cloud", "label": "B3: Dynamic Director", "sublabel": "Layer 1 BG + Layer 2 FG", "pos": [530, 150], "size": [170, 65], "tag": "app/services/dynamic_director.py" },
+    { "id": "b4_image", "type": "cloud", "label": "B4: Visual Gen (Gemini)", "sublabel": "Editorial Graphic Novel", "pos": [530, 270], "size": [170, 65], "tag": "app/services/web_gemini_client.py" },
+    { "id": "b5_chroma", "type": "security", "label": "B5: Chroma HSV Audit", "sublabel": "Clean Alpha Isolation", "pos": [530, 390], "size": [170, 65], "tag": "app/services/chroma_keyer.py" },
+    { "id": "b6_remotion", "type": "backend", "label": "B6: Remotion Engine", "sublabel": "Deterministic CPU Render", "pos": [780, 220], "size": [170, 65], "tag": "remotion/src/index.tsx" },
+    { "id": "b7_ducking", "type": "backend", "label": "B7: Cinematic BGM", "sublabel": "Sidechain Dynamic Ducking", "pos": [780, 340], "size": [170, 65], "tag": "app/services/audio_ducking.py" },
+    { "id": "b8_qa", "type": "security", "label": "B8/B9: Forensic QA", "sublabel": "Rule 122 Visual Audit", "pos": [1030, 220], "size": [160, 65], "tag": "app/services/qa_auditor.py" },
+    { "id": "b10_youtube", "type": "cloud", "label": "B10: YouTube Upload", "sublabel": "Remotion Chapters Sync", "pos": [1030, 340], "size": [160, 65], "tag": "app/services/youtube_uploader.py" },
+    { "id": "b11_feedback", "type": "database", "label": "B11: 48h Retention", "sublabel": "Dreaming Loop to B2", "pos": [1260, 280], "size": [160, 65], "tag": "app/services/feedback_loop.py" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Stage 1: Discovery & Research", "wraps": ["b1_trend", "b15_youtube"], "pad": 16 },
+    { "kind": "region", "label": "Stage 2: Script & Hollywood Audio Spine", "wraps": ["b2_script", "b26_audio"], "pad": 16 },
+    { "kind": "region", "label": "Stage 3: Dynamic Visual Production", "wraps": ["b3_director", "b4_image", "b5_chroma"], "pad": 16 },
+    { "kind": "security-group", "label": "Stage 4: Remotion Render Pipeline", "wraps": ["b6_remotion", "b7_ducking"], "pad": 16 },
+    { "kind": "region", "label": "Stage 5: Quality Assurance & YouTube", "wraps": ["b8_qa", "b10_youtube"], "pad": 16 }
+  ],
+  "connections": [
+    { "from": "b1_trend", "to": "b2_script", "label": "Trend Candidate", "variant": "emphasis" },
+    { "from": "b15_youtube", "to": "b2_script", "label": "Audience Gap", "route": "orthogonal-h" },
+    { "from": "b2_script", "to": "b26_audio", "label": "5-Beat Cue", "route": "straight" },
+    { "from": "b2_script", "to": "b3_director", "label": "Shot List", "variant": "emphasis" },
+    { "from": "b3_director", "to": "b4_image", "label": "FG/BG Prompts", "route": "straight" },
+    { "from": "b4_image", "to": "b5_chroma", "label": "Raw Frames", "route": "straight" },
+    { "from": "b26_audio", "to": "b7_ducking", "label": "Spine Audio", "variant": "emphasis" },
+    { "from": "b5_chroma", "to": "b6_remotion", "label": "Isolated Alpha", "variant": "emphasis" },
+    { "from": "b7_ducking", "to": "b6_remotion", "label": "Sidechain BGM", "route": "straight" },
+    { "from": "b6_remotion", "to": "b8_qa", "label": "Master MP4", "variant": "security" },
+    { "from": "b8_qa", "to": "b10_youtube", "label": "PASS Gate", "variant": "emphasis", "route": "straight" },
+    { "from": "b10_youtube", "to": "b11_feedback", "label": "Video Telemetry", "variant": "dashed" },
+    { "from": "b11_feedback", "to": "b2_script", "label": "Feedback Dreaming Loop", "variant": "security", "fromSide": "top", "toSide": "top", "via": [[1340, 80], [365, 80]] }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Pipeline Ground Truth (Iron Laws)",
+      "items": [
+        "Remotion Rendered Timeline là chân lý duy nhất cho YouTube Chapters (Rule 135)",
+        "Tách nền Chroma Key HSV #FF00FF không lem viền (Rule 122 & 436)",
+        "Hollywood Audio Spine đồng bộ Karaoke từng từ theo millisecond (Rule 120)"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Module Source Code Map",
+      "items": [
+        "B1-B1.5: app/services/trend_recon.py, youtube_recon.py",
+        "B2-B2.6: app/services/editorial_engine.py, beat_tts_engine.py",
+        "B3-B5: app/services/dynamic_director.py, chroma_keyer.py",
+        "B6-B11: remotion/src/index.tsx, qa_auditor.py, feedback_loop.py"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Zero-False-Success Enforcement",
+      "items": [
+        "Rule 118: Zero-Mock Data & Ask-Before-Deviating",
+        "Rule 125: Single Pipeline Version & Zero-Ghost Remnant",
+        "Rule 126: Three-Way Physical Sync (VPS ⇄ GitHub ⇄ Local)"
+      ]
+    }
+  ]
+}
