@@ -132,7 +132,6 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
     is_valid_existing = False
     if final_mp4.exists() and not ctx.force:
         try:
-            import subprocess
             probe_cmd = [
                 "ffprobe", "-v", "error", "-show_streams", "-show_format",
                 "-of", "json", str(final_mp4)
