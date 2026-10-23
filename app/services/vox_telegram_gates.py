@@ -85,6 +85,22 @@ def build_hg3_message(episode_id: str, image_count: int, gallery_path: str) -> s
 ⚡ <i>Hành động:</i> Mở Gallery kiểm tra ảnh. Nếu ưng ý, dán lệnh trên để Google Flow 7 acc tạo clip demo Act I!"""
 
 
+def build_demo_video_ready_message(episode_id: str, demo_count: int, gallery_path: str) -> str:
+    return f"""🎬 <b>[DEMO VIDEO REVIEW] ACT I ({demo_count} CLIPS) ĐÃ XONG — DUYỆT TRƯỚC KHI CHẠY FULL</b>
+
+📺 <b>Episode:</b> <code>{episode_id}</code>
+🎥 <b>Quy mô demo:</b> Act I · <b>{demo_count} Clips</b> (1280x720 @ 24fps, H.264, 8.0s/clip)
+🔍 <b>Interactive Gallery:</b> <code>{gallery_path}</code>
+⚡ <b>Động học Rule 140:</b> Khế ước 4 thì (S1: Entry ➔ S2: Stamp/Impact ➔ S3: Growth ➔ S4: Hold)
+
+📋 <b>Lệnh Antigravity để DUYỆT VÀ CHẠY FULL TOÀN BỘ 72 CLIPS:</b>
+<pre>
+/vox:video --episode {episode_id} --mode full
+</pre>
+
+⚡ <i>Hành động:</i> Xem bảng báo cáo & gallery demo video. Nếu ưng ý, dán lệnh trên để kích hoạt 7 tài khoản Google Flow sinh toàn bộ 72 clip còn lại!"""
+
+
 def build_hg4_message(episode_id: str, video_count: int, runtime_s: float) -> str:
     return f"""🎬 <b>[HUMAN GATE 4 - MỚI] FULL VIDEO CLIPS HOÀN TẤT — DUYỆT RAW VIDEO TRƯỚC KHI RENDER</b>
 
@@ -135,6 +151,12 @@ async def send_gate_notification(gate_number: int, episode_id: str, **kwargs) ->
             kwargs.get("image_count", 72), 
             kwargs.get("gallery_path", f"episodes/{episode_id}/review_gallery.html")
         )
+    elif gate_number in (35, 301, 31):  # Demo Video Review Gate
+        text = build_demo_video_ready_message(
+            episode_id,
+            kwargs.get("demo_count", 8),
+            kwargs.get("gallery_path", f"episodes/{episode_id}/demo_video_gallery.html")
+        )
     elif gate_number == 4:
         text = build_hg4_message(
             episode_id, 
@@ -166,7 +188,7 @@ def send_gate_sync(gate_number: int, episode_id: str, **kwargs) -> bool:
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Gửi thông báo Telegram cho Human Gates")
-    parser.add_argument("--gate", type=int, required=True, choices=[1, 2, 3, 4, 5], help="Cổng kiểm soát 1-5")
+    parser.add_argument("--gate", type=int, required=True, choices=[1, 2, 3, 4, 5, 35], help="Cổng kiểm soát 1-5 (35: Demo Video Review)")
     parser.add_argument("--episode", type=str, required=True, help="Episode ID")
     parser.add_argument("--beats", type=int, default=72)
     parser.add_argument("--blocks", type=int, default=12)
