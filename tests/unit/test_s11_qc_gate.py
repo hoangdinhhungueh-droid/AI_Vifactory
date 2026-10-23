@@ -497,3 +497,93 @@ def test_s11_qc_fails_closed_on_synthetic_title_or_duplicate_scenes(tmp_path: Pa
     }), encoding="utf-8")
     with pytest.raises(ValueError, match=r"contradictory timing: end \(2.0\) <= start \(5.0\)"):
         run_s11_qc(ctx)
+
+
+def test_s11_qc_hydrates_bare_remotion_props_from_director_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies S11 seamlessly hydrates bare RemotionRenderProps from director_plan and brain_input."""
+    run_id = "test_qc_bare_props_hydration"
+    paths = resolve_run_paths(run_id, repo_root=tmp_path)
+    paths.final_render_dir.mkdir(parents=True, exist_ok=True)
+    valid_mp4 = paths.final_render_dir / "final.mp4"
+    valid_mp4.write_bytes(b"dummy_mp4_bytes")
+
+    # 1. Bare remotion_props.json (as emitted by Remotion renderer)
+    bare_props_file = paths.root / "remotion_props.json"
+    bare_props_file.parent.mkdir(parents=True, exist_ok=True)
+    bare_props_file.write_text(json.dumps({
+        "episode_id": run_id,
+        "title": f"Episode {run_id}",
+        "fps": 30.0,
+        "duration_in_frames": 150,
+        "scenes": [{
+            "scene_id": "SCENE_01",
+            "duration_in_frames": 150,
+            "video_clip_path": str(paths.root / "clip_01.mp4"),
+        }]
+    }), encoding="utf-8")
+
+    # 2. S10 artifact pointing to bare_props_file
+    s10_art_file = paths.artifact_file(StageID.S10_RENDER.value)
+    s10_art_file.parent.mkdir(parents=True, exist_ok=True)
+    s10_art_file.write_text(json.dumps({
+        "run_id": run_id,
+        "stage": StageID.S10_RENDER.value,
+        "status": "ok",
+        "payload": {
+            "task_id": run_id,
+            "final_video_path": str(valid_mp4),
+            "fps": 30.0,
+            "duration_in_frames": 150,
+            "remotion_props_file": str(bare_props_file),
+        },
+        "provenance": {"generator": "stages.s10_render"},
+    }), encoding="utf-8")
+
+    # 3. Authoritative director_plan.json
+    local_dp = paths.root / "director_plan.json"
+    local_dp.write_text(json.dumps({
+        "project_id": run_id,
+        "scenes": [{
+            "scene_id": "SCENE_01",
+            "narration": "Authoritative test narration for scene 1",
+            "bg_prompt": "Detailed archival workspace newsprint background",
+            "fg_prompt": "Tactile forensic document specimen element",
+            "camera_move": "slow_push_in",
+        }]
+    }), encoding="utf-8")
+
+    # 4. brain_input.json providing authentic title
+    bi_file = paths.root / "brain_input.json"
+    bi_file.write_text(json.dumps({
+        "title_a": "Authentic Grounded Forensic Documentary",
+        "topic": "Forensic Documentary",
+    }), encoding="utf-8")
+
+    ctx = RunContext(
+        run_id=run_id,
+        paths=paths,
+        manifest=RunManifest.create_new(run_id, profile="e2e_min"),
+        config=load_profile("e2e_min"),
+        force=True,
+        dry_run=False,
+    )
+
+    # Monkeypatch verify_final_video_gates to simulate successful forensic gates pass
+    def _mock_verify(mp4_path, expected_duration, plan):
+        assert plan is not None
+        assert plan.title == "Authentic Grounded Forensic Documentary"
+        assert len(plan.scenes) == 1
+        assert plan.scenes[0].idx == 0
+        assert plan.scenes[0].narration == "Authoritative test narration for scene 1"
+        assert plan.scenes[0].camera.value == "push_in"
+        assert len(plan.scenes[0].fg) == 1
+        return {"status": "PASS", "mock": True}
+
+    monkeypatch.setattr("stages.s11_qc.verify_final_video_gates", _mock_verify)
+
+    artifact = run_s11_qc(ctx)
+
+    assert artifact.payload["qc_verdict"] == "PASS"
+    assert artifact.payload["integrity_verified"] is True
+    assert artifact.status == "ok"
+    assert "successfully verified" in artifact.payload["message"]

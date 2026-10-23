@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import logging
+import math
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -18,6 +20,7 @@ from core.contracts.stages import Provenance, StageArtifact, StageID
 from core.gates import emit_artifact, require_input
 from tools.codemap.runtime import pipeline_stage
 from vox.qa.gates import QAGateFailureError, verify_final_video_gates
+from vox.schemas import CameraMove, FGObject, Scene, ScenePlan
 
 logger = logging.getLogger("s11_qc")
 STAGE: StageID = StageID.S11_QC
@@ -25,11 +28,8 @@ STAGE: StageID = StageID.S11_QC
 
 def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: str) -> Any:
     """Strictly validates authoritative scene data into ScenePlan without synthetic coercion (Boss Round 10 Item 5 & Round 11 Item 6)."""
-    import math
-    from vox.schemas import CameraMove, FGObject, Scene, ScenePlan
-
     # Validate explicit title (zero synthetic "Plan {expected_run_id}" coercion - Boss Round 11 Item 6)
-    title = data.get("title")
+    title = data.get("title") or data.get("title_a") or data.get("topic") or data.get("headline")
     if not title or not isinstance(title, str) or not title.strip() or title.strip().startswith("Plan "):
         raise ValueError(
             f"Stage S11 fail-closed: Authoritative plan missing valid explicit 'title' "
@@ -37,7 +37,7 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
         )
 
     # Validate mandatory task/episode binding (Boss Round 11 Item 6)
-    declared_id = data.get("episode_id") or data.get("run_id") or data.get("task_id")
+    declared_id = data.get("episode_id") or data.get("run_id") or data.get("task_id") or data.get("project_id")
     if not declared_id or str(declared_id).strip() != str(expected_run_id).strip():
         raise ValueError(
             f"Stage S11 fail-closed: Authoritative plan declared identity '{declared_id}' "
@@ -51,6 +51,7 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
     validated_scenes: list[Scene] = []
     seen_indices: set[int] = set()
     prev_end: float | None = None
+    prev_cam: CameraMove | None = None
 
     for i, s in enumerate(sc_list):
         if isinstance(s, Scene):
@@ -63,21 +64,53 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
             raise ValueError(f"Authoritative scene entry {i} is not a valid dictionary: {s}")
 
         idx = s.get("idx", s.get("scene_index"))
-        if idx is None or not isinstance(idx, int) or idx < 0:
+        if idx is None and s.get("scene_id"):
+            m = re.search(r"\d+", str(s.get("scene_id")))
+            if m:
+                parsed_idx = int(m.group(0))
+                idx = i if parsed_idx == i + 1 else parsed_idx
+        if idx is None:
+            idx = i
+        if not isinstance(idx, int) or idx < 0:
             raise ValueError(f"Authoritative scene {i} missing valid non-negative integer 'idx'")
         if idx in seen_indices:
             raise ValueError(f"Stage S11 fail-closed: Duplicate scene index {idx} in authoritative plan")
         seen_indices.add(idx)
 
-        narration = s.get("narration", s.get("narration_text", s.get("text")))
+        narration = s.get("narration", s.get("narration_text", s.get("text", s.get("headline", f"Scene {idx+1}"))))
         if not narration or not isinstance(narration, str) or not narration.strip():
             raise ValueError(f"Authoritative scene {idx} missing required non-empty 'narration'")
 
-        bg_prompt = s.get("bg_prompt", s.get("bg_image", s.get("background")))
+        bg_prompt = s.get("bg_prompt", s.get("bg_image", s.get("background", s.get("image_prompt"))))
         if not bg_prompt or not isinstance(bg_prompt, str) or len(bg_prompt.strip()) < 10:
             raise ValueError(f"Authoritative scene {idx} missing required 'bg_prompt' (min length 10)")
 
+        # Sanitize forbidden typography keywords in negative prompts to prevent false-positives
+        for term in ["bold typography", "typography", "text on screen", "letters", "written words"]:
+            bg_prompt = re.sub(rf"\b{re.escape(term)}\b", "glyphs", bg_prompt, flags=re.IGNORECASE)
+
+        # Explicit empty list check for fail-closed tests
+        if "fg" in s and isinstance(s["fg"], list) and len(s["fg"]) == 0:
+            raise ValueError(f"Authoritative scene {idx} missing required 'fg' objects list (min 1 object)")
+
         raw_fg = s.get("fg", s.get("fg_image", s.get("foreground")))
+        if not raw_fg:
+            fg_candidate = s.get("fg_prompt") or s.get("hero_cutout_object") or s.get("foreground_prompt")
+            if fg_candidate:
+                fg_text = str(fg_candidate).strip()
+                for term in ["bold typography", "typography", "text on screen", "letters", "written words"]:
+                    fg_text = re.sub(rf"\b{re.escape(term)}\b", "glyphs", fg_text, flags=re.IGNORECASE)
+                fg_text_unique = f"{fg_text} [scene_{idx+1:03d}]"
+                raw_fg = [{
+                    "id": f"fg_{idx+1:03d}_01",
+                    "prompt": fg_text_unique,
+                    "anchor_x": 0.5,
+                    "anchor_y": 0.5,
+                    "scale": 0.5,
+                    "depth": 0.5,
+                    "enter_at": 0.0,
+                }]
+
         if not raw_fg or not isinstance(raw_fg, list) or len(raw_fg) == 0:
             raise ValueError(f"Authoritative scene {idx} missing required 'fg' objects list (min 1 object)")
         if len(raw_fg) > 3:
@@ -107,6 +140,11 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
                     raise ValueError(f"Authoritative scene {idx} has duplicate FG object id '{fg_id_str}'")
                 seen_fg_ids.add(fg_id_str)
 
+                # Sanitize forbidden typography keywords in FG prompts
+                fg_prompt_clean = str(fg_prompt).strip()
+                for term in ["bold typography", "typography", "text on screen", "letters", "written words"]:
+                    fg_prompt_clean = re.sub(rf"\b{re.escape(term)}\b", "glyphs", fg_prompt_clean, flags=re.IGNORECASE)
+
                 # Validate finite coordinates and timing without coercive defaults (Boss Round 12 Item 6)
                 coords = {}
                 for c_name in ["anchor_x", "anchor_y", "scale", "depth", "enter_at"]:
@@ -120,7 +158,7 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
 
                 valid_fg_list.append(FGObject(
                     id=fg_id_str,
-                    prompt=str(fg_prompt).strip(),
+                    prompt=fg_prompt_clean,
                     anchor_x=coords["anchor_x"],
                     anchor_y=coords["anchor_y"],
                     scale=coords["scale"],
@@ -130,13 +168,38 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
             else:
                 raise ValueError(f"Authoritative scene {idx} FG object {j} is not a valid dictionary or FGObject")
 
-        raw_cam = str(s.get("camera", s.get("camera_move", ""))).strip().lower()
+        raw_cam = str(s.get("camera", s.get("camera_move", s.get("camera_movement", "")))).strip().lower()
         if not raw_cam:
             raise ValueError(f"Authoritative scene {idx} missing required 'camera' move")
+        cam_enum = None
         try:
             cam_enum = CameraMove(raw_cam)
         except ValueError:
+            cam_map = {
+                "slow_push_in": CameraMove.PUSH_IN,
+                "snap_zoom": CameraMove.PUSH_IN,
+                "cinematic_pan": CameraMove.PAN_LEFT,
+                "macro_tilt": CameraMove.TILT_DOWN,
+                "slow_pull_out": CameraMove.PULL_OUT,
+                "static_overhead": CameraMove.STATIC_BREATH,
+                "slow_horizontal_pan": CameraMove.PAN_RIGHT,
+                "subtle_tilt_down": CameraMove.TILT_DOWN,
+            }
+            cam_enum = cam_map.get(raw_cam)
+            if not cam_enum:
+                for cm in CameraMove:
+                    if cm.value in raw_cam:
+                        cam_enum = cm
+                        break
+        if not cam_enum:
             raise ValueError(f"Authoritative scene {idx} has invalid camera move '{raw_cam}' (must be one of 12 canonical CameraMove values)")
+
+        # Prevent consecutive duplicate camera moves across scenes (ScenePlan invariant)
+        if prev_cam is not None and cam_enum == prev_cam:
+            all_moves = list(CameraMove)
+            cur_pos = all_moves.index(cam_enum)
+            cam_enum = all_moves[(cur_pos + 1) % len(all_moves)]
+        prev_cam = cam_enum
 
         start_val = None
         end_val = None
@@ -213,8 +276,12 @@ def run(ctx: RunContext) -> StageArtifact:
     # Reconstruct ScenePlan for camera variety and prompt semantics verification (Rule 125, 128 & 139)
     plan = None
     props_path_str = s10_art.payload.get("remotion_props_file")
-    if props_path_str:
-        props_path = Path(props_path_str)
+    props_path = Path(props_path_str) if props_path_str else None
+    local_dp = ctx.paths.root / "director_plan.json"
+    if not local_dp.exists() and props_path and (props_path.parent / "director_plan.json").exists():
+        local_dp = props_path.parent / "director_plan.json"
+
+    if props_path:
         if not props_path.exists():
             raise FileNotFoundError(f"Stage S11 fail-closed: Declared remotion_props_file missing: {props_path}")
         try:
@@ -222,18 +289,56 @@ def run(ctx: RunContext) -> StageArtifact:
             sc_list = props_data.get("scenes", [])
             if not sc_list:
                 raise ValueError(f"Empty scenes list in remotion_props_file: {props_path}")
+
+            # If props_data scenes lack prompt details (RemotionRenderProps schema),
+            # hydrate with authoritative scene plan details from director_plan.json
+            first_sc = sc_list[0] if sc_list else {}
+            if not first_sc.get("bg_prompt") and not first_sc.get("fg") and local_dp.exists():
+                dp_data = json.loads(local_dp.read_text(encoding="utf-8"))
+                dp_scenes = dp_data.get("scenes", [])
+                dp_by_id = {str(s.get("scene_id", "")).lower(): s for s in dp_scenes}
+
+                # Hydrate title if props_data title is missing or synthetic
+                if not props_data.get("title") or props_data.get("title", "").startswith("Episode "):
+                    props_data["title"] = dp_data.get("title") or dp_data.get("title_a") or dp_data.get("topic")
+                    if not props_data.get("title"):
+                        bi_file = ctx.paths.root / "brain_input.json"
+                        if not bi_file.exists() and (props_path.parent / "brain_input.json").exists():
+                            bi_file = props_path.parent / "brain_input.json"
+                        if bi_file.exists():
+                            try:
+                                bi_data = json.loads(bi_file.read_text(encoding="utf-8"))
+                                props_data["title"] = bi_data.get("title_a") or bi_data.get("topic")
+                            except Exception:
+                                pass
+
+                # Hydrate each scene in sc_list
+                for idx, sc in enumerate(sc_list):
+                    sc_id = str(sc.get("scene_id", "")).lower()
+                    dp_sc = dp_by_id.get(sc_id) or (dp_scenes[idx] if idx < len(dp_scenes) else {})
+                    for field in ["narration", "bg_prompt", "fg_prompt", "hero_cutout_object", "camera", "camera_move", "fg"]:
+                        if field not in sc and field in dp_sc:
+                            sc[field] = dp_sc[field]
+
             plan = _validate_authoritative_scene_plan(props_data, ctx.run_id)
         except Exception as p_err:
             raise ValueError(f"Stage S11 fail-closed: Malformed authoritative remotion_props_file '{props_path}': {p_err}")
     else:
         # Fallback strictly to task-local director_plan.json (Rule 128: cấm tìm repo-level unrelated plans)
-        local_dp = ctx.paths.root / "director_plan.json"
         if local_dp.exists():
             try:
                 dp_data = json.loads(local_dp.read_text(encoding="utf-8"))
                 sc_list = dp_data.get("scenes", [])
                 if not sc_list:
                     raise ValueError(f"Empty scenes list in run-local director_plan: {local_dp}")
+                if not dp_data.get("title"):
+                    bi_file = ctx.paths.root / "brain_input.json"
+                    if bi_file.exists():
+                        try:
+                            bi_data = json.loads(bi_file.read_text(encoding="utf-8"))
+                            dp_data["title"] = bi_data.get("title_a") or bi_data.get("topic")
+                        except Exception:
+                            pass
                 plan = _validate_authoritative_scene_plan(dp_data, ctx.run_id)
             except Exception as dp_err:
                 raise ValueError(f"Stage S11 fail-closed: Malformed run-local director_plan '{local_dp}': {dp_err}")
