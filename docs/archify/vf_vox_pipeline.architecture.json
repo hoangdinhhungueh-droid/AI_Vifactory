@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AI Video Factory — Real VPS vs Intended Vox Continuous Architecture",
+    "output": "vf_vox_pipeline.html",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "vps_b1", "type": "frontend", "label": "B1: Trend Recon", "sublabel": "Google Trends RSS", "pos": [50, 120], "size": [160, 65], "tag": "trend_engine_b1.py" },
+    { "id": "vps_b2", "type": "backend", "label": "B2: Story Engine", "sublabel": "5-Act Japanese Script", "pos": [320, 120], "size": [160, 65], "tag": "story.txt (3,042 chars)" },
+    { "id": "vps_b3_broken", "type": "security", "label": "B3: S05 Broken Director", "sublabel": "153 scenes cookie-cutter", "pos": [590, 120], "size": [170, 65], "tag": "s05_director_plan.py" },
+    { "id": "vps_b4_broken", "type": "security", "label": "B4: S07 Monolithic Seeds", "sublabel": "153 flat composite PNGs", "pos": [870, 120], "size": [170, 65], "tag": "s07_image_gen.py" },
+    { "id": "vps_b6_broken", "type": "security", "label": "B6: S08 Freeze Backdoor", "sublabel": "ffmpeg -loop 1 (551s static)", "pos": [1150, 120], "size": [170, 65], "tag": "s08_video_gen.py" },
+    { "id": "vps_yt_broken", "type": "cloud", "label": "B10: Premature Upload", "sublabel": "GI8pS7141Gs frozen video", "pos": [1430, 120], "size": [160, 65], "tag": "s10_render.py" },
+
+    { "id": "vox_b2", "type": "backend", "label": "B2: 5-Beat Docudrama", "sublabel": "551.93s Timing Baseline", "pos": [50, 360], "size": [160, 65], "tag": "23 Paragraphs" },
+    { "id": "vox_b3", "type": "cloud", "label": "B3: Vox Director Plan", "sublabel": "24 Scenes (Prompt 2 + S1..S4)", "pos": [320, 360], "size": [170, 65], "tag": "b3_director_prompt.md" },
+    { "id": "vox_critic", "type": "security", "label": "Critic Council Gate", "sublabel": "Astra 6 + Opus 5.5", "pos": [590, 360], "size": [170, 65], "tag": "vox_critic_council.py" },
+    { "id": "vox_hg1", "type": "frontend", "label": "HUMAN GATE 1", "sublabel": "Review 24-Scene Table", "pos": [870, 360], "size": [160, 65], "tag": "review_table" },
+    { "id": "vox_b4", "type": "cloud", "label": "B4: Gemini Web QHD", "sublabel": "FULL 24 Seed Images", "pos": [1150, 360], "size": [170, 65], "tag": "Playwright Multi-Profile" },
+    { "id": "vox_hg2", "type": "frontend", "label": "HUMAN GATE 2", "sublabel": "Review 24-Image Gallery", "pos": [1430, 360], "size": [160, 65], "tag": "Gallery Audit PASS" },
+
+    { "id": "vox_b6_demo", "type": "cloud", "label": "B6: Flow Video Demo", "sublabel": "5 Clips (Act I Hook)", "pos": [590, 520], "size": [170, 65], "tag": "flow_video_dispatcher.py" },
+    { "id": "vox_hg3", "type": "frontend", "label": "HUMAN GATE 3 (Demo)", "sublabel": "User Approves Video Quality", "pos": [870, 520], "size": [170, 65], "tag": "Thumb-up / OK Gate" },
+    { "id": "vox_b6_full", "type": "cloud", "label": "B6: Google Flow Full", "sublabel": "19 Remaining Clips", "pos": [1150, 520], "size": [170, 65], "tag": "7-Acc Quota Rotation" },
+    { "id": "vox_b7_remotion", "type": "backend", "label": "B7: Remotion Master VPS", "sublabel": "Whisper Karaoke + BGM", "pos": [1430, 520], "size": [170, 65], "tag": "remotion/src/index.tsx" }
+  ],
+  "boundaries": [
+    { "kind": "security-group", "label": "LỖI LỆCH: LUỒNG VPS CŨ TỰ ĐỘNG CHẠY SAI HẠ LẦNG", "wraps": ["vps_b1", "vps_b2", "vps_b3_broken", "vps_b4_broken", "vps_b6_broken", "vps_yt_broken"], "pad": 16 },
+    { "kind": "region", "label": "KIẾN TRÚC MỚI CHUẨN VOX: CONTINUOUS TACTILE FLOW VỚI 3 HUMAN GATES", "wraps": ["vox_b2", "vox_b3", "vox_critic", "vox_hg1", "vox_b4", "vox_hg2", "vox_b6_demo", "vox_hg3", "vox_b6_full", "vox_b7_remotion"], "pad": 16 }
+  ],
+  "connections": [
+    { "from": "vps_b1", "to": "vps_b2", "label": "Raw Topic", "route": "straight" },
+    { "from": "vps_b2", "to": "vps_b3_broken", "label": "153 Sentences", "variant": "dashed" },
+    { "from": "vps_b3_broken", "to": "vps_b4_broken", "label": "Regex Prompt", "variant": "dashed" },
+    { "from": "vps_b4_broken", "to": "vps_b6_broken", "label": "Flat Composite", "variant": "dashed" },
+    { "from": "vps_b6_broken", "to": "vps_yt_broken", "label": "Bypass Omni", "variant": "dashed" },
+
+    { "from": "vox_b2", "to": "vox_b3", "label": "23 Paragraphs", "variant": "emphasis", "route": "straight" },
+    { "from": "vox_b3", "to": "vox_critic", "label": "24 Scenes Plan", "variant": "emphasis", "route": "straight" },
+    { "from": "vox_critic", "to": "vox_hg1", "label": "PASS > 7.5", "variant": "security", "route": "straight" },
+    { "from": "vox_hg1", "to": "vox_b4", "label": "User Approval", "variant": "emphasis", "route": "straight" },
+    { "from": "vox_b4", "to": "vox_hg2", "label": "24 QHD Seeds", "variant": "emphasis", "route": "straight" },
+    { "from": "vox_hg2", "to": "vox_b6_demo", "label": "5 Demo Scenes", "variant": "emphasis" },
+    { "from": "vox_b6_demo", "to": "vox_hg3", "label": "5 Demo MP4", "variant": "security", "route": "straight" },
+    { "from": "vox_hg3", "to": "vox_b6_full", "label": "User gõ OK", "variant": "emphasis", "route": "straight" },
+    { "from": "vox_b6_full", "to": "vox_b7_remotion", "label": "24 Video Clips", "variant": "emphasis", "route": "straight" }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "4 Điểm Lệch Cốt Tử Giữa VPS vs Mong Muốn",
+      "items": [
+        "Lệch 1 (B3): Băm 153 câu thoại -> 153 scenes máy móc. Khắc phục: Gom 23 đoạn -> 24 Scenes chuẩn.",
+        "Lệch 2 (B4): Sinh ảnh phẳng gộp không có Human Gate. Khắc phục: Sinh FULL 24 ảnh + Duyệt Gallery.",
+        "Lệch 3 (B6): Lệnh lậu ffmpeg -loop 1 làm video chết 551s. Khắc phục: 7 Acc Google Flow Omni/Veo.",
+        "Lệch 4 (Gate): Thiếu Human Gate demo. Khắc phục: Demo 5 clips Act I -> User duyệt mới chạy Full."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Kỷ Luật & Tiêu Chuẩn Thực Thi Chuẩn Vox",
+      "items": [
+        "Prompt 2 (B3): 5 Layer Brackets, 2-4 màu Vox Palette, viền xé 2-4px deckle edge.",
+        "Prompt 3 (B6): Static Camera, chuỗi hành động S1 trượt, S2 dập dấu, S3 neo spatial anchor.",
+        "Rule 135: Mốc YouTube Chapters trích xuất frame-lock từ remotion_props.json."
+      ]
+    }
+  ]
+}
