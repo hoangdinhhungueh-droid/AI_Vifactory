@@ -47,6 +47,21 @@ if str(ROOT_DIR) not in sys.path:
 
 def extract_dynamic_motion_steps(scene: Dict[str, Any]) -> List[Dict[str, str]]:
     """Trích xuất các bước hành động dynamic (S1..Sn) từ scene mà không bị ép khuôn 4S."""
+    # 0. Ưu tiên kinematics_4_phases từ Director Plan Rule 140
+    if "kinematics_4_phases" in scene and isinstance(scene["kinematics_4_phases"], dict):
+        k4 = scene["kinematics_4_phases"]
+        steps = []
+        if k4.get("s1_entry"):
+            steps.append({"step": "1", "timing": "0.0-2.0s", "action": k4["s1_entry"]})
+        if k4.get("s2_impact"):
+            steps.append({"step": "2", "timing": "2.0-4.5s", "action": k4["s2_impact"]})
+        if k4.get("s3_vector_growth"):
+            steps.append({"step": "3", "timing": "4.5-6.0s", "action": k4["s3_vector_growth"]})
+        if k4.get("s4_spatial_hold"):
+            steps.append({"step": "4", "timing": "6.0-8.0s", "action": k4["s4_spatial_hold"]})
+        if steps:
+            return steps
+
     # 1. Ưu tiên dynamic_motion_beats nếu đã có trong schema mới
     if "dynamic_motion_beats" in scene and isinstance(scene["dynamic_motion_beats"], list) and len(scene["dynamic_motion_beats"]) > 0:
         steps = []
@@ -194,7 +209,7 @@ def setup_block_directory_structure(episode_id: str) -> Dict[str, Any]:
     clips = []
     for idx, s in enumerate(scenes):
         sc_id = s.get("scene_id", f"SCENE_{idx+1:02d}")
-        prompt = s.get("i2v_prompt") or build_universal_video_prompt(s)
+        prompt = s.get("flow_video_prompt") or s.get("i2v_prompt") or build_universal_video_prompt(s)
         clips.append({
             "scene_id": sc_id,
             "clip_index": idx + 1,
@@ -853,12 +868,19 @@ def main():
     parser.add_argument("--approve-gate", action="store_true", help="Bí danh của --trigger-video (phê duyệt cổng dừng)")
     parser.add_argument("--auto-approve", action="store_true", help="Tự động duyệt Human Gate không cần dừng chờ")
     parser.add_argument("--force", action="store_true", help="Sinh lại toàn bộ ảnh và video ngay cả khi đã có sẵn file cục bộ")
+    parser.add_argument("--mode", choices=["demo", "full"], default="full", help="Chế độ sinh: demo (Act I, 8 clip) hoặc full (toàn bộ)")
     parser.add_argument("--model", choices=["omni", "veo"], default="omni", help="Mô hình video: omni (Omni 1.1 Flash) hoặc veo (Veo 3.1 - Fast)")
     args = parser.parse_args()
 
     clean_ep = args.episode.strip().strip("'\"")
     if clean_ep.lower().startswith("task:"):
         clean_ep = clean_ep[5:].strip()
+
+    if args.mode == "demo":
+        if args.limit_scenes == 0:
+            args.limit_scenes = 8
+        args.trigger_video = True
+        print("🎯 [DEMO MODE ACT I] Tự động duyệt Human Gate 3 và giới hạn 8 clips đầu tiên (SCENE_01 -> SCENE_08)!")
 
     print("\n" + "#" * 75)
     print(f"🎬 MASTER 1-COMMAND VOX MEDIA PIPELINE — EPISODE: {clean_ep}")

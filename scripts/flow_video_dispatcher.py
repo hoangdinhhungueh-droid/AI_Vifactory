@@ -21,8 +21,8 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 try:
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
+    sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 except Exception:
     pass
 
@@ -70,25 +70,35 @@ PROFILES = {
 }
 
 def dismiss_dialogs(page):
-    """Đóng các popup chào mừng, điều khoản nếu xuất hiện."""
-    for _ in range(3):
-        for name in ["Next", "Tiếp theo", "Continue", "Tiếp tục", "Get started", "Bắt đầu", "Accept", "Chấp nhận", "Got it", "Đã hiểu", "Dismiss", "Bỏ qua", "Close", "Đóng", "I agree", "Tôi đồng ý", "Allow", "Cho phép"]:
+    """Đóng các popup chào mừng, điều khoản nếu xuất hiện với khả năng tự cuộn mat-dialog."""
+    for _ in range(5):
+        try:
+            page.evaluate('''() => {
+                const el = document.querySelector('mat-dialog-container, [role="dialog"], .cdk-overlay-container');
+                if (el) {
+                    const scrollables = el.querySelectorAll('*');
+                    for (let s of scrollables) {
+                        if (s.scrollHeight > s.clientHeight) {
+                            s.scrollTop = s.scrollHeight;
+                        }
+                    }
+                }
+            }''')
+        except Exception:
+            pass
+
+        for name in ["Tiếp tục", "Continue", "Tiếp theo", "Next", "Get started", "Bắt đầu", "Accept", "Chấp nhận", "Got it", "Đã hiểu", "Hoàn tất", "Xong", "Done", "Dismiss", "Bỏ qua", "Close", "Đóng", "I agree", "Tôi đồng ý", "Allow", "Cho phép"]:
             btn = page.get_by_role("button", name=name)
-            if btn.count() > 0 and btn.first.is_visible():
+            if btn.count() > 0 and btn.first.is_visible() and not btn.first.is_disabled():
                 try:
-                    if btn.first.is_enabled():
-                        btn.first.click()
-                        time.sleep(1)
+                    btn.first.click(force=True)
+                    time.sleep(1)
                 except Exception:
                     pass
 
-        scroll_target = page.locator(".scroll-end-target")
-        if scroll_target.count() > 0:
-            try:
-                scroll_target.first.scroll_into_view_if_needed(timeout=2000)
-            except Exception:
-                pass
-            time.sleep(1)
+        if page.locator(".cdk-overlay-backdrop").count() > 0:
+            page.keyboard.press("Escape")
+            time.sleep(0.5)
 
 def configure_flow_agent_settings(page, model_target: str = "omni") -> bool:
     """Cấu hình mặc định tác nhân theo chuẩn Agent Eye (Mắt thần):
@@ -304,14 +314,17 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             return False
 
         time.sleep(3)
-        # Mở video player qua video option ở sidebar phải hoặc video tile trên canvas
-        vid_opt = page.locator("flow-a2ui-video-option, .media-wrapper").first
-        if vid_opt.count() > 0 and vid_opt.is_visible():
-            vid_opt.click(force=True)
+        # Mở video player bằng cách click vào flow-video-tile mới nhất trên canvas
+        vid_tile = page.locator("flow-video-tile").last
+        if vid_tile.count() > 0 and vid_tile.is_visible():
+            vid_tile.click(force=True)
         else:
-            # Fallback: click tọa độ video tile trên canvas
-            page.mouse.click(240, 180)
-        time.sleep(3)
+            vid_opt = page.locator("flow-a2ui-video-option, .media-wrapper").first
+            if vid_opt.count() > 0 and vid_opt.is_visible():
+                vid_opt.click(force=True)
+            else:
+                page.mouse.click(240, 180)
+        time.sleep(2.5)
 
         dl_btn = page.locator("button[aria-label*='Tải nội dung nghe nhìn xuống'], button[aria-label*='Tải xuống'], button[aria-label*='Download' i], button:has-text('download')").first
         if dl_btn.count() == 0 or not dl_btn.is_visible():
@@ -321,7 +334,9 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         dl_btn.click(force=True)
         time.sleep(1.5)
 
-        opt_720 = page.locator(".cdk-overlay-container").get_by_text("720p").first
+        opt_720 = page.locator(".cdk-overlay-container button:has-text('720p'), .cdk-overlay-container button:has-text('1080p')").first
+        if opt_720.count() == 0:
+            opt_720 = page.locator(".cdk-overlay-container").get_by_text("720p").first
         if opt_720.count() == 0:
             opt_720 = page.locator("div, button, span, [role='menuitem']").filter(has_text=re.compile(r'(720p|1080p)', re.I)).last
 
@@ -329,47 +344,44 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             print("      ❌ Không thấy tùy chọn 720p/1080p!")
             return False
 
-        # Thử bắt sự kiện tải xuống của Playwright trước
+        # Thử bắt sự kiện tải xuống của Playwright hoặc theo dõi file tải qua CDP
         downloaded = None
         try:
-            with page.expect_download(timeout=12000) as dl_info:
+            with page.expect_download(timeout=35000) as dl_info:
                 opt_720.click(force=True)
             pw_dl = dl_info.value
             pw_dl.save_as(str(out_file))
-            print(f"      ✅ Tải thành công {out_file.name} ({out_file.stat().st_size:,} bytes)")
-            # Đóng player trở về canvas
-            for sel in ["button:has-text('Xong')", "button:has-text('Done')", "button:has-text('arrow_back')", "button[aria-label*='Back' i]"]:
-                btn = page.locator(sel).first
-                if btn.count() > 0 and btn.is_visible():
-                    try:
-                        btn.click(force=True)
-                        time.sleep(1)
+        except Exception as dl_err:
+            print(f"      ⚠️ Lỗi tải file qua expect_download: {dl_err}")
+
+        # Kiểm tra nếu out_file hợp lệ (> 100KB); nếu chưa, quét tìm file vừa tải qua CDP trong out_dir
+        time.sleep(2)
+        if not out_file.exists() or out_file.stat().st_size < 100000:
+            for _ in range(30):
+                time.sleep(2)
+                cr = list(out_file.parent.glob("*.crdownload"))
+                if cr:
+                    continue
+                for f in out_file.parent.glob("*.mp4"):
+                    if not f.name.startswith("clip_") and (time.time() - f.stat().st_mtime < 120) and f.stat().st_size > 200000:
+                        downloaded = f
                         break
+                if downloaded:
+                    break
+
+            if downloaded:
+                import shutil
+                if out_file.exists() and out_file.stat().st_size < 100000:
+                    try:
+                        out_file.unlink()
                     except Exception:
                         pass
-            return True
-        except Exception:
-            # Fallback sang quét thư mục download của trình duyệt
-            pass
+                shutil.move(str(downloaded), str(out_file))
 
-        for _ in range(40):
-            time.sleep(2)
-            cr = list(out_file.parent.glob("*.crdownload"))
-            if cr:
-                continue
-            for f in out_file.parent.glob("*.mp4"):
-                if f.name != out_file.name and (time.time() - f.stat().st_mtime < 60) and f.stat().st_size > 200000:
-                    downloaded = f
-                    break
-            if downloaded:
-                break
-
-        if downloaded:
-            import shutil
-            if downloaded.resolve() != out_file.resolve():
-                shutil.copy2(str(downloaded), str(out_file))
+        if out_file.exists() and out_file.stat().st_size > 200000:
             print(f"      ✅ Tải thành công {out_file.name} ({out_file.stat().st_size:,} bytes)")
-            for sel in ["button:has-text('Xong')", "button:has-text('Done')", "button:has-text('arrow_back')", "button[aria-label*='Back' i]"]:
+            # Đóng player trở về canvas
+            for sel in ["button:has-text('Xong')", "button:has-text('Done')", "button:has-text('arrow_back')", "button[aria-label*='Back' i]", "button[aria-label*='Đã chỉnh sửa xong cảnh']"]:
                 btn = page.locator(sel).first
                 if btn.count() > 0 and btn.is_visible():
                     try:
@@ -380,7 +392,7 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                         pass
             return True
         else:
-            print("      ❌ Không phát hiện file tải về trong thư mục!")
+            print(f"      ❌ Tải thất bại hoặc file rỗng ({out_file.name})!")
             return False
 
     except Exception as e:
@@ -427,11 +439,13 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
 
         if "/project/" not in page.url:
             print("   Chờ giao diện trang chủ sẵn sàng...")
+            dismiss_dialogs(page)
             try:
                 page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')", timeout=25000)
             except Exception:
                 pass
             time.sleep(2)
+            dismiss_dialogs(page)
 
             # Tìm project chuyên biệt của episode hoặc tạo project mới sạch sẽ
             ep_id = episode_dir.name
@@ -439,17 +453,17 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
             ep_cards = page.locator(".project-card, [data-project-id]").filter(has_text=re.compile(f"({ep_id}|{ep_short})", re.I)).all()
             if ep_cards:
                 print(f"   Mở project chuyên biệt {ep_id} ({len(ep_cards)} found)...")
-                ep_cards[0].click()
+                ep_cards[0].click(force=True)
             else:
                 new_btn = page.locator("button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')").first
                 if new_btn.count() > 0 and new_btn.is_visible():
                     print("   Tạo project mới sạch sẽ cho episode qua nút New project / Dự án mới...")
-                    new_btn.click()
+                    new_btn.click(force=True)
                 else:
                     cards = page.locator(".project-card, [data-project-id], a[href*='/project/']").all()
                     if cards:
                         print(f"   Mở project có sẵn ({len(cards)} cards)...")
-                        cards[0].click()
+                        cards[0].click(force=True)
                     else:
                         print("   Click New project / Dự án mới bằng text...")
                         page.get_by_text(re.compile(r'(New project|Dự án mới|Start Creating|Bắt đầu tạo)', re.I)).first.click(force=True)
@@ -487,6 +501,7 @@ def main():
     parser.add_argument("--acc", default="all", help="acc_01 to acc_07 or all")
     parser.add_argument("--limit", type=int, default=0, help="Limit total number of clips to generate (0 for unlimited)")
     parser.add_argument("--scenes", default="", help="Comma-separated scene IDs to generate (e.g. SCENE_01,SCENE_02)")
+    parser.add_argument("--mode", choices=["demo", "full"], default="full", help="demo: sinh 8 clips Act I, full: toàn bộ clips")
     parser.add_argument("--headless", action="store_true", default=False, help="Chạy ngầm browser (chú ý: Google Flow có thể chặn bot khi headless)")
     parser.add_argument("--headed", action="store_false", dest="headless", help="Mở giao diện browser trực quan (mặc định)")
     parser.add_argument("--model", choices=["omni", "veo"], default="omni", help="Mô hình video: omni (Omni 1.1 Flash) hoặc veo (Veo 3.1 - Fast)")
@@ -511,6 +526,9 @@ def main():
         target_sids = set(s.strip().upper() for s in args.scenes.split(",") if s.strip())
         all_clips = [c for c in all_clips if c.get("scene_id", "").upper() in target_sids]
         print(f"🎯 Đã lọc theo danh sách scenes: {len(all_clips)} clips")
+    elif args.mode == "demo" and args.limit == 0:
+        all_clips = all_clips[:8]
+        print(f"🎯 [DEMO MODE ACT I] Tự động giới hạn 8 clips đầu tiên (SCENE_01 -> SCENE_08)!")
     elif args.limit > 0:
         all_clips = all_clips[:args.limit]
         print(f"🎯 Đã giới hạn tổng cộng {len(all_clips)} clips đầu tiên!")
