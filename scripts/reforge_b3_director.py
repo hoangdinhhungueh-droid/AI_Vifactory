@@ -939,6 +939,7 @@ BEATS_METADATA = [
 ]
 
 def generate_director_plan(episode_id: str = "JP_EP0003_japan_ai_ransom_economy") -> tuple:
+    """Tạo Director Plan 72 Beats chuẩn Rule 140."""
     scenes = []
     prompts_forge = []
     
@@ -949,6 +950,7 @@ def generate_director_plan(episode_id: str = "JP_EP0003_japan_ai_ransom_economy"
         scene_id = f"SCENE_{i:02d}"
         seq_block = f"{block['block_id']}_{block['title'].replace(' ', '_').replace(':', '')}"
         
+        # 5-Layer Image Prompt
         image_prompt = (
             f"Editorial investigative documentary frame in signature VOX paper-cut collage style. "
             f"[Layer 1: {block['canvas_workspace']}] -> "
@@ -962,6 +964,7 @@ def generate_director_plan(episode_id: str = "JP_EP0003_japan_ai_ransom_economy"
             f"no clutter, no unnecessary objects, no 3D photorealistic rooms, no anime, no cartoon, no CGI glossy look, maintain clean premium VOX editorial collage."
         )
         
+        # Google Flow I2V Prompt
         i2v_prompt = (
             f"Editorial paper cutout animation in Vox documentary style. Headline: '{meta['title']}'. "
             f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: [Camera: STATIC_OVERHEAD]. "
