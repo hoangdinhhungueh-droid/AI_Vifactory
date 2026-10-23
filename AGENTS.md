@@ -142,6 +142,18 @@
       CẤM TUYỆT ĐỐI kéo 1 scene dài 20–28s chỉ với 1 clip video ngắn khiến video bị lặp loop hoặc đứng yên như ảnh tĩnh.
       Mỗi Beat thị giác bắt buộc có thời lượng chuẩn từ **5.0 đến 8.0 giây** (trùng khớp với thời lượng clip I2V của mô hình AI). Toàn bộ video dài (8–10 phút) được chia thành **10–12 Sequence Blocks** (mỗi block ~45–50s chung một không gian bàn) chứa **~70–75 Beats thị giác liên hoàn**, bảo đảm nhịp độ tài liệu Vox dồn dập, liên tục có chuyển động cơ học mới.
 
+23. **RULE 141 (Mandatory Concrete Visual Audit Table & Clickable Forensic Evidence Gate)**:
+    - **Cấm Tuyệt Đối Báo Cáo Xuông (Zero-Vague-Reporting Mandate)**:
+      Khi báo cáo kết quả sinh ảnh B4/B5, thẩm định thị giác hoặc qua cổng Human Gate 3 (hay bất kỳ cổng nghiệm thu ảnh/video nào): CẤM TUYỆT ĐỐI chỉ thông báo số lượng chung chung (*"đã sinh xong 72 ảnh"*, *"kết luận TECH_PASS"*).
+    - **Bắt Buộc Bảng Thẩm Định Thực Chứng Kèm Link Click Mở Xem Ảnh Trực Tiếp (Clickable Evidence Table)**:
+      Mọi báo cáo nghiệm thu B4/B5 bắt buộc phải trình bày bảng Forensic Visual Report Table trích xuất tối thiểu 4–6 cảnh đại diện cho các Blocks, với đầy đủ 5 trường thông tin:
+      1. *Scene ID & Block*: Tên cảnh và block phân loại (ví dụ: `SCENE_01` · `BLOCK_01`).
+      2. *Clickable File Link*: Markdown link chuẩn file:// (`[composite_SCENE_XX.png](file:///c:/.../composite_SCENE_XX.png)`) cho phép User click chuột mở xem trực tiếp ảnh thật full resolution trên máy tính.
+      3. *Vật Thể Xúc Giác & Đạo Cụ (Rule 140 Objects)*: Đạo cụ bàn tài liệu cụ thể (Hồ sơ gấp mép, triện đỏ Hanko, thước cặp caliper, kéo kim loại, USB khóa cứng, cọc tiền giấy...).
+      4. *Phân Rã Động Học 4 Thì ($S_1 \rightarrow S_4$)*: Chi tiết từng thì động học I2V ($S_1$: Entry/Drop ➔ $S_2$: Impact/Stamp ➔ $S_3$: Vector/Growth ➔ $S_4$: Hold $\le 2\text{px}$).
+      5. *Điểm Thẩm Định B5 (Rule 122 Score)*: Độ phân giải 2560x1440, HSV clean, black frame %, text-free %, Điểm B5 (e.g., 9.8/10), trạng thái `APPROVED`.
+    - **Bảo Chứng Đường Dẫn Thư Viện HTML**: Bắt buộc đính kèm link mở trực tiếp file `review_gallery.html` (`[review_gallery.html](file:///...)`) để User duyệt toàn bộ 100% ảnh trực quan.
+
 ---
 
 ## 🗺️ II. MA TRẬN ĐỊNH TUYẾN KỸ NĂNG (PROGRESSIVE DISCLOSURE)
