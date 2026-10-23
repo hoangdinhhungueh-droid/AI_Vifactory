@@ -41,6 +41,8 @@ except Exception as _ex:
     logger.debug("Stream reconfigure notice: %s", _ex)
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 
 def extract_dynamic_motion_steps(scene: Dict[str, Any]) -> List[Dict[str, str]]:
@@ -623,8 +625,8 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
             <div class="stat-badge">Kết luận kỹ thuật: <b style="color: #10b981;">{verdict}</b></div>
         </div>
         <div class="trigger-box">
-            <span>🚀 Lệnh kích hoạt sinh video khi bạn đồng ý:</span>
-            <code>python scripts/trigger_video_generation.py --episode {episode_id} --limit-blocks 1</code>
+            <span>🚀 Lệnh kích hoạt sinh video DEMO Act I khi bạn đồng ý:</span>
+            <code>/vox:video --episode {episode_id} --mode demo</code>
         </div>
     </div>
     <div class="table-card">
@@ -766,10 +768,9 @@ def evaluate_human_gate(
 
     # Tạm dừng an toàn và thông báo lệnh trigger
     print("\n⏸️ [PIPELINE ĐÃ TẠM DỪNG AN TOÀN TRƯỚC BƯỚC SINH VIDEO]")
-    print("Khi bạn đã kiểm tra ảnh xong và sẵn sàng chạy video, hãy gõ 1 trong các lệnh trigger sau:")
-    print(f"👉 python scripts/run_vox_media_pipeline.py --episode {episode_id} --trigger-video")
-    print("hoặc dùng lệnh tắt chuyên dụng:")
-    print(f"👉 python scripts/trigger_video_generation.py --episode {episode_id}")
+    print("Khi bạn đã kiểm tra ảnh xong và sẵn sàng chạy video demo Act I, hãy gõ lệnh trigger sau:")
+    print(f"👉 /vox:video --episode {episode_id} --mode demo")
+    print(f"(Hoặc: python scripts/flow_video_dispatcher.py --episode {episode_id} --limit 10)")
     print("=" * 75 + "\n")
     return False
 
@@ -901,8 +902,16 @@ def main():
         # Nếu đang ở stage video hoặc được gọi với trigger-video, đối soát nhanh tài sản hiện có
         audit_summary = perform_b5_visual_audit(clean_ep, block_manifest, limit=total_scenes_to_run)
 
-    # Nếu chỉ chạy stage image thì kết thúc tại đây
+    # Nếu chỉ chạy stage image thì kết thúc tại đây và bắn Telegram Human Gate 3
     if args.stage == "image":
+        try:
+            from app.services.vox_telegram_gates import send_gate_sync
+            gallery_rel = f"episodes/{clean_ep}/review_gallery.html"
+            total_img = audit_summary.get("total_images", len(scenes_info) if 'scenes_info' in locals() else 72)
+            print(f"\n📡 [Human Gate 3] Gửi thông báo Telegram duyệt ảnh seed ({total_img} ảnh)...")
+            send_gate_sync(3, clean_ep, image_count=total_img, gallery_path=gallery_rel)
+        except Exception as tg_err:
+            print(f"⚠️ [Telegram Notice Notice]: {tg_err}")
         print_pipeline_summary(clean_ep, block_manifest)
         return
 

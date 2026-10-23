@@ -172,6 +172,7 @@ if __name__ == "__main__":
     parser.add_argument("--blocks", type=int, default=12)
     parser.add_argument("--runtime", type=float, default=551.93)
     parser.add_argument("--objects", type=int, default=150)
+    parser.add_argument("--images", "--image-count", type=int, default=72)
     parser.add_argument("--gallery", type=str, default="")
     parser.add_argument("--youtube", type=str, default="")
     args = parser.parse_args()
@@ -183,6 +184,7 @@ if __name__ == "__main__":
         total_blocks=args.blocks, 
         runtime_s=args.runtime, 
         objects_count=args.objects,
+        image_count=getattr(args, "images", 72),
         gallery_path=args.gallery,
         youtube_url=args.youtube
     )

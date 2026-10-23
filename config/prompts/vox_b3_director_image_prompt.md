@@ -16,6 +16,16 @@ Your mission is to transform an entire documentary script into a **CONTINUOUS OB
    - **Visual Continuity Link**: The object from Scene N is the literal physical launchpad or foundation for Scene N+1. Objects do not vanish; they accumulate, transform, get stamped, or get connected by red vector threads.
 3. **STATIC CAMERA, DYNAMIC ASSEMBLY**:
    - In Vox documentary motion design, 85%+ of motion comes from the **tactile objects moving and snapping on the desk**, NOT from wild 3D camera spinning. The camera remains top-down static or restrained 2D drift.
+4. **RULE 140: ABSTRACT-TO-TACTILE OBJECT DECOMPOSITION GRAMMAR**:
+   - **NEVER FEED ABSTRACT CONCEPTS TO IMAGE / VIDEO ENGINES**:
+     Never write prompts with abstract narrative sentences (e.g. "Company A approves transaction faster with AI", "Market suffers severe recession", "Regulators close loophole").
+   - **MANDATORY TACTILE DECOMPOSITION**:
+     Every sentence must be decomposed into tangible forensic desk exhibits and mechanical I2V actions:
+     * *Example*: Instead of "A approves contract...", decompose into:
+       - Image prompt objects: Crisp corporate contract folio with fold crease, circular crimson Hanko wax seal, brass paperclip.
+       - I2V kinematics prompt: `0.0s-2.0s: Contract folio slides into center-left anchor. 2.0s-4.0s: Crimson Hanko seal impacts firmly onto lower margin with micro ink bleed. 4.0s-5.5s: Bold green upward vector arrow sprouts from seal. 5.5s-7.0s: Rigid living poster spatial anchor hold with micro paper shadow breathing <= 2px.`
+   - **STRICT PACING CEILING (5.0s - 8.0s PER BEAT / ANTI-FREEZE MANDATE)**:
+     Never assign a scene 20–28s. A 10s sentence already contains multiple micro-actions. Every visual beat must be calibrated to **5.0 – 8.0 seconds** matching the native video clip length of Google Flow / Veo / Omni, avoiding any freeze-frame or loop artifacts.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📐 STEP 1: SCRIPT INGESTION & SEQUENCE BLOCK PARTITIONING

@@ -124,6 +124,24 @@
     - **Cấm Sửa Triệu Chứng Bằng Try-Except Rỗng**: Khi gặp bug, CẤM TUYỆT ĐỐI bọc `try: ... except: pass` để che giấu lỗi runtime. BẮT BUỘC áp dụng quy trình 4 pha (Isolate $\rightarrow$ Graph Trace $\rightarrow$ Root-Cause Fix $\rightarrow$ Anti-Regression Verify), truy vết đúng call chain để giải quyết tận gốc nguyên nhân.
     - **Chốt Chặn Kiểm Toán OCR Bắt Buộc**: Mọi đoạn code mới hoặc bản vá bug bắt buộc phải đạt `VERDICT: PASS (0 Critical / 0 High)` từ cổng kiểm toán tất định Alibaba Open Code Review trước khi đóng task.
 
+22. **RULE 140 (Tactile Object Decomposition & Vox Micro-Beat Kinematics Mandate)**:
+    - **Cấm Tuyệt Đối Đưa Khái Niệm Trừu Tượng Vào Prompt Ảnh/Video**:
+      CẤM TUYỆT ĐỐI viết prompt cho tầng sinh ảnh và video bằng câu chuyện trừu tượng (như "chính phủ phê duyệt dự án", "nền kinh tế sụp đổ", "công ty gia tăng lợi nhuận").
+    - **Bộ Chuyển Dịch Bắt Buộc: Ý Niệm Trừu Tượng $\rightarrow$ Vật Thể Xúc Giác & Đạo Cụ (Abstract-to-Tactile Grammar)**:
+      Mọi ý niệm kịch bản bắt buộc phải được đạo diễn phân rã thành các thực thể vật lý cụ thể trên mặt bàn xúc giác (Aged Newsprint Paper Desk #F4F1EA):
+      + *Hành động thể chế / pháp lý*: Hồ sơ hợp đồng gấp mép, triện đỏ cá nhân Hanko, mộc sáp niêm phong, kéo cắt giấy kim loại, ghim bấm đồng.
+      + *Chỉ số kinh tế / tài chính*: Thước cặp caliper bằng đồng đo đạc, vệt bút dạ quang vàng neon gạch số, thước đo độ, biểu đồ đường vẽ dốc đứng, cọc tiền giấy thắt đai.
+      + *Dòng chảy thế lực / liên kết*: Sợi chỉ đỏ nối ghim (red evidence string), ống đồng dẫn mực rỉ, mũi tên vector nét đứt.
+    - **Khế Ước Động Học 4 Thì I2V ($S_1 \rightarrow S_4$) Cho Mỗi Video Clip Duy Nhất (6.0s – 8.0s)**:
+      Trong mỗi scene/beat thị giác, 1 ảnh seed composition duy nhất chứa 2–4 vật thể được nạp vào mô hình AI Video (Google Flow / Veo / Omni) với chỉ đạo động học phân thì tuần tự:
+      + *Thì 1 ($S_1$: Entry / Drop-in, 0.0s – 2.0s)*: Vật thể chính (hồ sơ, thẻ, văn bản) trượt hoặc rơi xuống mặt bàn với độ nảy nhẹ.
+      + *Thì 2 ($S_2$: Mechanical Impact / Stamp / Cut, 2.0s – 4.5s)*: Đạo cụ tương tác (con dấu, kéo, thước cặp) giáng xuống hoặc tác động cơ học trực tiếp (đóng dấu đanh thép, cắt rời, ghim chặt).
+      + *Thì 3 ($S_3$: Vector / Growth, 4.5s – 6.0s)*: Mũi tên vươn lên, mực loang, vệt highlight dạ quang sáng bừng kết nối ý niệm.
+      + *Thì 4 ($S_4$: Living Poster Spatial Hold, 6.0s – 8.0s)*: Khóa cứng 100% tọa độ mọi vật thể (Spatial Anchor). CẤM camera quay 3D, CẤM vật thể trôi dạt vô định. Chỉ duy trì vi rung giấy 12fps stop-motion jitter và nhịp thở bóng đổ $\le 2\text{px}$.
+    - **Trần Nhịp Độ Pacing & Chống Đóng Băng Khung Hình (Anti-Monotony & Anti-Freeze Pacing)**:
+      CẤM TUYỆT ĐỐI kéo 1 scene dài 20–28s chỉ với 1 clip video ngắn khiến video bị lặp loop hoặc đứng yên như ảnh tĩnh.
+      Mỗi Beat thị giác bắt buộc có thời lượng chuẩn từ **5.0 đến 8.0 giây** (trùng khớp với thời lượng clip I2V của mô hình AI). Toàn bộ video dài (8–10 phút) được chia thành **10–12 Sequence Blocks** (mỗi block ~45–50s chung một không gian bàn) chứa **~70–75 Beats thị giác liên hoàn**, bảo đảm nhịp độ tài liệu Vox dồn dập, liên tục có chuyển động cơ học mới.
+
 ---
 
 ## 🗺️ II. MA TRẬN ĐỊNH TUYẾN KỸ NĂNG (PROGRESSIVE DISCLOSURE)
@@ -147,7 +165,7 @@ Thay vì nạp toàn bộ pipeline vào context ban đầu, Agent kích hoạt S
 | **System Health & Report** (`make health`, `make report`) | Giám sát 7 trục đa nền tảng (DB, Redis, RAM, Workers, Ghost Code), xuất Markdown & HTML Dashboard | `scripts/health-check.py`, `system_health_reporter.py` | Rule 119, 125, Zero-Mock Telemetry |
 | **Vibe Memory Governance** (`make memory`) | Kiểm định tính toàn vẹn bộ nhớ dài hạn dự án (`ROADMAP.md`, `CHANGELOG.md`, `specs/`), ngăn ngừa Amnesia | `scripts/orchestrator/memory_governor.py`, `.agents/hooks.json` | Rule 124 (Memory Anchoring & Atomic Commit) |
 | **Teamwork Pipeline** (`/vf-pipeline-teamwork`) | Hội Đồng Multi-Agent Harness (Architect, Builder, QA Test Harness, Adversarial Auditor) + **Opus 5.5 Anti-Bloat Supervisory Gate** ($\le 10,000$ in / $\le 5,000$ out) | Skill `vf-pipeline-teamwork` & `scripts/orchestrator/` | Rule 118, 119, 121, 124, 125, 126, 127, 128, 129, 134, 138, 139 |
-| **Vox Pipeline Orchestrator** (`/vox-pipeline`, `/vox:b3`, `/vox:video`) | Hợp nhất Kịch bản B2 → Director B3 (Critic Council Astra 6/Opus 5.5) → Sinh ảnh B4/B5 → Google Flow 7-Acc B6 → Remotion B7 | Skill `vox-pipeline-agent` & `config/prompts/vox_b3_*.md` | Rule 118, 126, 132, 133 (Decoupled Prompts, Zero-Cross-Episode Leak) |
+| **Vox Pipeline Orchestrator** (`/vox-pipeline`, `/vox:b3`, `/vox:video`) | Hợp nhất Kịch bản B2 → Director B3 (Critic Council Astra 6/Opus 5.5) → Sinh ảnh B4/B5 → Google Flow 7-Acc B6 → Remotion B7 | Skill `vox-pipeline-agent` & `config/prompts/vox_b3_*.md` | Rule 118, 126, 132, 133, 140 (Tactile Object Decomposition & Micro-Beat Pacing) |
 | **SDLC Enterprise Delivery** (`/sdlc-enterprise-reporter`) | Enterprise Delivery Engine 14 giai đoạn, 8-Pha Verification, 2-Job CI/CD, Snapshot Rollback, RTM, Playwright Audit | Skill `sdlc-enterprise-reporter` | Rule 121, 126, Zero-Hardcoding, Memory Governance |
 
 ---
