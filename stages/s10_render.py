@@ -93,16 +93,6 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
     scene_props: List[SceneRenderProp] = []
     total_frames = 0
 
-    # Probe audio duration to calibrate exact total frames (Rule 120/135)
-    audio_dur = 0.0
-    if audio_file and Path(audio_file).exists():
-        try:
-            from vox.qa.gates import probe_media_file
-            a_info = probe_media_file(Path(audio_file))
-            audio_dur = float(a_info.get("format", {}).get("duration", "0"))
-        except Exception:
-            pass
-
     for cl in clips:
         sc_id = cl.get("scene_id", "SCENE_01")
         dur_sec = cl.get("duration_sec", 6.0)
@@ -119,14 +109,6 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
             audio_path=audio_file,
             subtitles=sc_words
         ))
-
-    # Align total frames with exact audio duration to eliminate drift
-    if audio_dur > 0 and scene_props:
-        target_total_frames = int(round(audio_dur * fps))
-        if total_frames != target_total_frames:
-            diff = target_total_frames - total_frames
-            scene_props[-1].duration_in_frames += diff
-            total_frames = target_total_frames
 
     # Assemble RemotionRenderProps
     render_props = RemotionRenderProps(

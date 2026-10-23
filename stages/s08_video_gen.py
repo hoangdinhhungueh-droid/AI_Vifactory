@@ -104,7 +104,7 @@ def run(ctx: RunContext) -> StageArtifact:
     frame_chain: List[Dict[str, Any]] = []
     video_map: Dict[str, Path] = {}
 
-    # Calculate adaptive scene durations based on audio narration or text length (Rule 120/135)
+    # Calculate adaptive scene durations based on audio narration (Rule 120/135)
     s9_path = ctx.paths.artifact_file(StageID.S9_VOICE_TTS.value)
     audio_dur = 0.0
     if s9_path.exists():
@@ -124,12 +124,13 @@ def run(ctx: RunContext) -> StageArtifact:
 
     total_scenes = len(scenes)
     scene_durations: Dict[int, float] = {}
-    if audio_dur > 0 and total_scenes > 0:
+    all_dicts = bool(scenes and all(isinstance(s, dict) for s in scenes))
+    if audio_dur > 0 and total_scenes > 0 and all_dicts:
         weights = [max(len(sc.get("narration", "")), 5) for sc in scenes]
         total_w = sum(weights)
         for i, w in enumerate(weights):
             scene_durations[i] = round(audio_dur * (w / total_w), 3)
-    else:
+    elif all_dicts:
         for i, sc in enumerate(scenes):
             scene_durations[i] = float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec)
 
