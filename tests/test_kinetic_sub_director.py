@@ -197,16 +197,17 @@ def test_kinetic_coordinates_and_dead_stop_holds():
 
     prompt = build_kinetic_causal_i2v_prompt(plan)
 
-    # 1. Toạ độ 2D chuẩn xác
-    assert "(X:52%, Y:42%)" in prompt
-    assert "(X:68%, Y:42%)" in prompt
-    assert "(X:42%, Y:65%)" in prompt
-    assert "[X:58%-84%, Y:38%-68%]" in prompt
+    # 1. Toạ độ 2D chuẩn xác sinh động học theo layout
+    layout = plan["spatial_layout"]
+    assert layout["initial_pos"] in prompt
+    assert layout["target_contact_pos"] in prompt
+    assert layout["dock_pin_pos"] in prompt
+    assert layout["bounding_box_bounds"] in prompt
 
     # 2. Điểm dừng hình (Snap-stop freeze holds)
     assert "Snap-stop freeze holds completely still" in prompt
     assert "Unified cluster freeze holds motionless" in prompt
 
     # 3. Liên kết vật lý hợp nhất (Unified physical cluster)
-    assert "docks flush against the hero tool base at coordinate (X:42%, Y:65%)" in prompt
+    assert f"docks flush against the hero tool base at coordinate {layout['dock_pin_pos']}" in prompt
     assert "locking all objects into a single unified physical cluster" in prompt

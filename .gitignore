@@ -114,10 +114,11 @@ tests/unit/test_agq_fleet.py
 # Boss audit runtime state and visual audit reports
 specs/boss_audits/.state_*.json
 specs/boss_audits/visual_audit_report.json
-specs/boss_audits/TASK_*_audit_round_*.json
+specs/boss_audits/*audit_round_*.json
 specs/boss_audits/*.txt
 specs/boss_audits/*_evidence_bundle/
 
 
 
 archify_repo/
+demo_audit_frames/

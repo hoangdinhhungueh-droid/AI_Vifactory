@@ -141,6 +141,65 @@ class DynamicMicroBeat:
     camera_micro_move: Optional[str] = None
 
 
+def _is_cjk_char(char: str) -> bool:
+    """Kiểm tra ký tự thuộc hệ chữ CJK (Hán tự, Hiragana, Katakana, Hangul)."""
+    return (
+        '\u4e00' <= char <= '\u9fff'
+        or '\u3040' <= char <= '\u30ff'
+        or '\uac00' <= char <= '\ud7af'
+    )
+
+
+def _match_keyword(kw: str, text: str) -> bool:
+    """Khớp từ khóa thông minh có word boundary cho tiếng Việt / Latinh, tránh false positive (Rule 120, 128)."""
+    if any(_is_cjk_char(c) for c in kw):
+        return kw in text
+    pattern = r'(?<!\w)' + re.escape(kw) + r'(?!\w)'
+    return bool(re.search(pattern, text, re.IGNORECASE))
+
+
+@dataclass
+class KineticSpatialLayout:
+    """Toạ độ không gian 2D động học được tính toán động theo phân cảnh (Rule 128, 132)."""
+    initial_pos: str          # e.g. "(X:52%, Y:42%)"
+    target_contact_pos: str   # e.g. "(X:68%, Y:42%)"
+    dock_pin_pos: str         # e.g. "(X:42%, Y:65%)"
+    bounding_box_bounds: str  # e.g. "[X:58%-84%, Y:38%-68%]"
+
+
+def compute_kinetic_spatial_layout(scene_id: str) -> KineticSpatialLayout:
+    """Tính toán toạ độ không gian 2D chuẩn hóa động học phân rã theo scene_id (Rule 128, 132).
+    Loại bỏ hardcode toạ độ tĩnh bất biến, bảo đảm mỗi phân cảnh có bố cục đồ họa chuyên biệt.
+    """
+    seed = sum(ord(c) for c in scene_id) if scene_id else 0
+    variant = seed % 3
+
+    if variant == 0:
+        # Layout A: Center-Right Inspection (Default forensic audit focus)
+        return KineticSpatialLayout(
+            initial_pos="(X:52%, Y:42%)",
+            target_contact_pos="(X:68%, Y:42%)",
+            dock_pin_pos="(X:42%, Y:65%)",
+            bounding_box_bounds="[X:58%-84%, Y:38%-68%]"
+        )
+    elif variant == 1:
+        # Layout B: Center-Left Verification Focus
+        return KineticSpatialLayout(
+            initial_pos="(X:48%, Y:42%)",
+            target_contact_pos="(X:32%, Y:42%)",
+            dock_pin_pos="(X:58%, Y:65%)",
+            bounding_box_bounds="[X:18%-46%, Y:38%-68%]"
+        )
+    else:
+        # Layout C: Vertical Center Alignment Focus
+        return KineticSpatialLayout(
+            initial_pos="(X:50%, Y:36%)",
+            target_contact_pos="(X:50%, Y:56%)",
+            dock_pin_pos="(X:38%, Y:72%)",
+            bounding_box_bounds="[X:36%-64%, Y:46%-74%]"
+        )
+
+
 class SemanticClauseMapper:
     """Bộ phân rã ngữ nghĩa câu thoại tự động thành chuỗi vi nhịp động học."""
 
@@ -170,8 +229,8 @@ class SemanticClauseMapper:
         ]
         has_causal = any(m in s_clean for m in causal_markers)
 
-        # Đếm số lượng con số hoặc tỷ lệ %
-        has_metrics = bool(re.search(r"\d+([,\.]\d+)?\s*(%|tỷ|triệu|b|m|k|円|won|usd|yen|gbp|eur)?", s_clean))
+        # Đếm số lượng con số hoặc tỷ lệ % (Rule 120 / Rule 128: regex lượng hóa chuẩn xác)
+        has_metrics = bool(re.search(r"\b\d+([,\.]\d+)?\s*(%|tỷ|triệu|trieu|ty|billion|million|percent|b|m|k|円|won|usd|yen|gbp|eur)\b|\b\d{2,}\b", s_clean))
 
         # Đếm từ nhấn mạnh / tiêu điểm
         emphasis_markers = [
@@ -203,7 +262,7 @@ class SemanticClauseMapper:
         matched: List[Tuple[KineticFamily, int]] = []
 
         for family, keywords in TAXONOMY_KEYWORDS.items():
-            count = sum(1 for kw in keywords if kw in s_clean)
+            count = sum(1 for kw in keywords if _match_keyword(kw, s_clean))
             if count > 0:
                 matched.append((family, count))
 
@@ -262,13 +321,21 @@ def generate_scene_sub_director_plan(
     hero_cutout_object: str,
     interacting_objects: List[str],
     duration_sec: Optional[float] = None,
-    market: str = "EN"
+    market: str = "EN",
+    whisper_words: Optional[List[Dict[str, Any]]] = None
 ) -> Dict[str, Any]:
     """Sinh toàn diện Khung Đạo Diễn Vi Cảnh (Scene Sub-Director Plan) chuẩn hóa cho mọi Episode."""
-    if duration_sec is None or float(duration_sec) <= 0.0:
+    # Xác định thời lượng cảnh (Rule 120 / Rule 135: ưu tiên Whisper word-level timestamps thật nếu có)
+    if whisper_words and len(whisper_words) > 0:
+        w_start = float(whisper_words[0].get("start", 0.0))
+        w_end = float(whisper_words[-1].get("end", 0.0))
+        dur = round(max(2.5, min(10.0, w_end - w_start)), 2)
+    elif duration_sec is None or float(duration_sec) <= 0.0:
         dur = estimate_speech_duration(sentence, market)
     else:
         dur = round(max(2.5, min(10.0, float(duration_sec))), 2)
+
+    layout = compute_kinetic_spatial_layout(scene_id)
 
     raw_beat_count = SemanticClauseMapper.calculate_beat_count(sentence)
     # Beat Count Governor: Giới hạn số vi nhịp theo ngân sách thời gian thực tế
@@ -334,7 +401,7 @@ def generate_scene_sub_director_plan(
     # 2. Xây dựng Cặp Tương Tác Nhân Quả (Kinetic Couplings)
     couplings = []
 
-    # Cặp K1: Tool 1 tác động lên Anchor với TỐC ĐỘ SNAPPY VOX STOP-MOTION & TOẠ ĐỘ CHUẨN XÁC
+    # Cặp K1: Tool 1 tác động lên Anchor với TỐC ĐỘ SNAPPY VOX STOP-MOTION & TOẠ ĐỘ ĐỘNG (Rule 128, 132)
     fam1 = dominant_families[0] if dominant_families else KineticFamily.H2_CONSTRAINT
     if fam1 == KineticFamily.H2_CONSTRAINT:
         c1 = KineticCoupling(
@@ -342,8 +409,8 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="snaps in a high-velocity 0.4s slide from initial coordinate (X:52%, Y:42%) and locks jaws shut precisely onto target coordinate (X:68%, Y:42%) of",
-            contact_point="critical data row at (X:68%, Y:42%)",
+            action_verb=f"snaps in a high-velocity 0.4s slide from initial coordinate {layout.initial_pos} and locks jaws shut precisely onto target coordinate {layout.target_contact_pos} of",
+            contact_point=f"critical data row at {layout.target_contact_pos}",
             physical_reaction="vernier scale aligns precisely with grid ticks, locking coordinate measurement into an instant mechanical dead stop at 1.0s, holding completely still",
             secondary_reaction={"object": "desk_surface", "reaction": "subtle mechanical micro-vibration"},
             residue="metric baseline ticks permanently marked"
@@ -354,8 +421,8 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="strikes down in a rapid 2-frame snap onto coordinate (X:65%, Y:38%) of",
-            contact_point="header verification zone at (X:65%, Y:38%)",
+            action_verb=f"strikes down in a rapid 2-frame snap onto coordinate {layout.target_contact_pos} of",
+            contact_point=f"header verification zone at {layout.target_contact_pos}",
             physical_reaction="crisp crimson stamp imprint locks onto newsprint with sharp vector borders, stopping dead in place at 1.0s",
             secondary_reaction={"object": "desk_surface", "reaction": "adjacent paper cutouts settle in 1 frame"},
             residue="deep crimson verification seal stamped"
@@ -366,9 +433,9 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="slices across coordinate line (X:45% to X:80%, Y:40%) in a swift 0.4s cut of",
-            contact_point="perforated margin coordinate (X:80%, Y:40%)",
-            physical_reaction="clean vertical mask separation cleanly reveals the underlying archival graphic layer, stopping dead at (X:80%, Y:40%) at 1.0s",
+            action_verb=f"slices across coordinate line ({layout.initial_pos} to {layout.target_contact_pos}) in a swift 0.4s cut of",
+            contact_point=f"perforated margin coordinate {layout.target_contact_pos}",
+            physical_reaction=f"clean vertical mask separation cleanly reveals the underlying archival graphic layer, stopping dead at {layout.target_contact_pos} at 1.0s",
             secondary_reaction={"object": "obj_anchor", "reaction": "exposes lower archival layer"},
             residue="sharp cut edge with visible paper fibers"
         )
@@ -378,8 +445,8 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="snaps rigidly into position on coordinate (X:65%, Y:50%) in a fast 0.4s step of",
-            contact_point="center focal area at (X:65%, Y:50%)",
+            action_verb=f"snaps rigidly into position on coordinate {layout.target_contact_pos} in a fast 0.4s step of",
+            contact_point=f"center focal area at {layout.target_contact_pos}",
             physical_reaction="graphic layout locks firmly into alignment grid with zero drift at 1.0s",
             residue="clear mechanical indentation"
         )
@@ -393,8 +460,8 @@ def generate_scene_sub_director_plan(
             family=fam2,
             source_obj_id="obj_tool2",
             target_obj_id="obj_anchor",
-            action_verb="originates directly from contact coordinate (X:68%, Y:42%), wiping in a rapid 0.4s horizontal vector reveal across coordinate bounds [X:58%-84%, Y:38%-68%] of",
-            contact_point="highlighted anomaly coordinate [X:58%-84%, Y:38%-68%]",
+            action_verb=f"originates directly from contact coordinate {layout.target_contact_pos}, wiping in a rapid 0.4s horizontal vector reveal across coordinate bounds {layout.bounding_box_bounds} of",
+            contact_point=f"highlighted anomaly coordinate {layout.bounding_box_bounds}",
             physical_reaction="neon yellow highlight box illuminates key typography with crisp editorial contrast, locking dead still at 1.6s",
             residue="striking translucent yellow neon stripe"
         )
@@ -404,8 +471,8 @@ def generate_scene_sub_director_plan(
             family=fam2,
             source_obj_id="obj_tool2",
             target_obj_id="obj_tool1",
-            action_verb="originates from contact coordinate (X:68%, Y:42%), snapping a straight dashed vector thread in 0.4s connecting directly to anchor pin at (X:42%, Y:65%) of",
-            contact_point="caliper anchor pin at (X:42%, Y:65%)",
+            action_verb=f"originates from contact coordinate {layout.target_contact_pos}, snapping a straight dashed vector thread in 0.4s connecting directly to anchor pin at {layout.dock_pin_pos} of",
+            contact_point=f"caliper anchor pin at {layout.dock_pin_pos}",
             physical_reaction="crimson evidence vector line snaps between pin coordinates, locking forensic link into a single unified cluster at 1.6s",
             residue="taut red evidence vector linking data to source"
         )
@@ -415,8 +482,8 @@ def generate_scene_sub_director_plan(
             family=fam2,
             source_obj_id="obj_tool2",
             target_obj_id="obj_tool1",
-            action_verb="docks flush against the hero tool base at coordinate (X:42%, Y:65%) in a rapid 0.5s snap, while contact coordinate (X:68%, Y:42%) triggers a sharp dashed bounding box [X:58%-84%, Y:38%-68%] in an instant 2-frame pop on",
-            contact_point="hero tool anchor pin at (X:42%, Y:65%)",
+            action_verb=f"docks flush against the hero tool base at coordinate {layout.dock_pin_pos} in a rapid 0.5s snap, while contact coordinate {layout.target_contact_pos} triggers a sharp dashed bounding box {layout.bounding_box_bounds} in an instant 2-frame pop on",
+            contact_point=f"hero tool anchor pin at {layout.dock_pin_pos}",
             physical_reaction="sharp dashed bounding box snaps around target data, locking all objects into a single unified physical cluster with a complete dead-stop freeze from 1.6s",
             residue="permanent forensic framing box"
         )
@@ -447,7 +514,7 @@ def generate_scene_sub_director_plan(
                 phase="P1_SETUP",
                 time_window=f"0.0s - {t_p1_end:.1f}s",
                 coupling_id=None,
-                action_description=f"The {anchor_label} and {actor1_label} rest flat at initial coordinates (X:52%, Y:42%), holding dead still with subtle 12fps paper jitter",
+                action_description=f"The {anchor_label} and {actor1_label} rest flat at initial coordinates {layout.initial_pos}, holding dead still with subtle 12fps paper jitter",
                 handoff_to="B2"
             ),
             DynamicMicroBeat(
@@ -472,7 +539,7 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=f"{t_snap2:.1f}s - {dur:.1f}s",
                 coupling_id=None,
-                action_description=f"All objects permanently locked in rigid unified spatial anchor at final coordinate (X:68%, Y:42%) for the remaining {dur - t_snap2:.1f}s to cut, organic 12fps paper stop-motion jitter, zero static freeze to cut",
+                action_description=f"All objects permanently locked in rigid unified spatial anchor at final coordinate {layout.target_contact_pos} for the remaining {dur - t_snap2:.1f}s to cut, organic 12fps paper stop-motion jitter, zero static freeze to cut",
                 handoff_to=None
             )
         ]
@@ -663,6 +730,7 @@ def generate_scene_sub_director_plan(
         "scene_duration_sec": dur,
         "calculated_beat_count": len(micro_beats),
         "dominant_kinetic_families": [f.value for f in dominant_families],
+        "spatial_layout": asdict(layout),
         "foundation_phases": {
             "p1_setup_sec": [0.0, t_p1_end],
             "p2_tension_sec": [t_p1_end, t_p2_end],
