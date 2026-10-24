@@ -47,7 +47,20 @@ if str(ROOT_DIR) not in sys.path:
 
 def extract_dynamic_motion_steps(scene: Dict[str, Any]) -> List[Dict[str, str]]:
     """Trích xuất các bước hành động dynamic (S1..Sn) từ scene mà không bị ép khuôn 4S."""
-    # 0. Ưu tiên kinematics_4_phases từ Director Plan Rule 140
+    # 0. Ưu tiên scene_sub_director_plan từ Rule 140 v3 (Causal Kinetic Coupling)
+    if "scene_sub_director_plan" in scene and isinstance(scene["scene_sub_director_plan"], dict):
+        beats = scene["scene_sub_director_plan"].get("dynamic_micro_beats", [])
+        if beats:
+            steps = []
+            for idx, b in enumerate(beats):
+                steps.append({
+                    "step": str(idx + 1),
+                    "timing": b.get("time_window", f"{idx*1.5:.1f}-{(idx+1)*1.5:.1f}s"),
+                    "action": b.get("action_description", "")
+                })
+            return steps
+
+    # 1. Fallback kinematics_4_phases từ Director Plan Rule 140 v1
     if "kinematics_4_phases" in scene and isinstance(scene["kinematics_4_phases"], dict):
         k4 = scene["kinematics_4_phases"]
         steps = []
@@ -108,9 +121,37 @@ def extract_dynamic_motion_steps(scene: Dict[str, Any]) -> List[Dict[str, str]]:
 
 
 def build_universal_video_prompt(scene: Dict[str, Any]) -> str:
-    """Xây dựng Universal Video Prompt (Mode 1 / Prompt 3 từ Made by AI Playbook).
-    Hỗ trợ phân rã động linh hoạt S1..Sn theo nhịp truyện thực tế.
+    """Xây dựng Universal Video Prompt (Rule 140 v3: Causal Compound Verb Syntax).
+    Tự động áp dụng Object-to-Object Kinetic Coupling và Semantic Clause Mapping.
+    Áp dụng phổ quát cho mọi Episode và mọi Market (Rule 128 & 132).
     """
+    try:
+        from app.services.kinetic_sub_director import (
+            generate_scene_sub_director_plan,
+            build_kinetic_causal_i2v_prompt
+        )
+
+        sub_plan = scene.get("scene_sub_director_plan")
+        if not sub_plan or not isinstance(sub_plan, dict) or not sub_plan.get("kinetic_couplings"):
+            sentence = scene.get("sentence") or scene.get("spoken_sentence") or scene.get("core_idea") or ""
+            hero_obj = scene.get("hero_cutout_object") or scene.get("visual_metaphor") or ""
+            interacting = scene.get("interacting_objects") or []
+            dur = float(scene.get("duration_s") or scene.get("duration_sec") or scene.get("duration_est_sec") or 8.0)
+            market = scene.get("market") or "EN"
+            sub_plan = generate_scene_sub_director_plan(
+                scene_id=scene.get("scene_id", "SCENE_01"),
+                sentence=sentence,
+                hero_cutout_object=hero_obj,
+                interacting_objects=interacting,
+                duration_sec=dur,
+                market=market
+            )
+            scene["scene_sub_director_plan"] = sub_plan
+
+        cam = scene.get("camera_directive") or scene.get("motion_track_and_assembly", {}).get("camera_rule", "")
+        return build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=cam)
+    except Exception as ex:
+        logger.warning(f"[build_universal_video_prompt] Fallback to legacy builder due to: {ex}")
     hero_obj = scene.get("hero_cutout_object", "")
     motion = scene.get("motion_track_and_assembly", {})
     spatial = motion.get("spatial_anchor", "") if isinstance(motion, dict) else ""

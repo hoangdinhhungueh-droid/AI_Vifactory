@@ -18,6 +18,13 @@ import re
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from app.services.kinetic_sub_director import (
+    generate_scene_sub_director_plan,
+    build_kinetic_causal_i2v_prompt,
+)
 
 # 12 THEMATIC SEQUENCE BLOCKS FOR JP_EP0003
 BLOCKS_CONFIG = [
@@ -964,17 +971,16 @@ def generate_director_plan(episode_id: str = "JP_EP0003_japan_ai_ransom_economy"
             f"no clutter, no unnecessary objects, no 3D photorealistic rooms, no anime, no cartoon, no CGI glossy look, maintain clean premium VOX editorial collage."
         )
         
-        # Google Flow I2V Prompt
-        i2v_prompt = (
-            f"Editorial paper cutout animation in Vox documentary style. Headline: '{meta['title']}'. "
-            f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: [Camera: STATIC_OVERHEAD]. "
-            f"[Timeline Kinematics: From 0.0s to 2.0s: {meta['s1']} "
-            f"From 2.0s to 4.5s: {meta['s2']} "
-            f"From 4.5s to 6.0s: {meta['s3']} "
-            f"From 6.0s to 8.0s: {meta['s4']}]. "
-            f"[Pacing: Restrained mechanical paper physics, snappy stops, micro settling]. "
-            f"[Constraints: Strict flat 2D tactile paper collage physics, zero 3D fluid morphing, zero face warping]."
+        # Rule 140 v3: Causal Kinetic Coupling & Narrative Sub-Director Plan
+        sub_plan = generate_scene_sub_director_plan(
+            scene_id=scene_id,
+            sentence=meta["ja"],
+            hero_cutout_object=meta["hero"],
+            interacting_objects=meta["props"],
+            duration_sec=round(meta["end"] - meta["start"], 2),
+            market="JA"
         )
+        i2v_prompt = build_kinetic_causal_i2v_prompt(sub_plan)
         
         scene_data = {
             "scene_id": scene_id,
@@ -992,6 +998,7 @@ def generate_director_plan(episode_id: str = "JP_EP0003_japan_ai_ransom_economy"
             "theme_color": block["theme_color"],
             "hero_cutout_object": meta["hero"],
             "interacting_objects": meta["props"],
+            "scene_sub_director_plan": sub_plan,
             "kinematics_4_phases": {
                 "s1_entry": meta["s1"],
                 "s2_impact": meta["s2"],

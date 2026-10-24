@@ -52,6 +52,8 @@ def test_load_master_prompt_2_structure():
 
 def test_claude_vox_director_fallback_sizing_and_invariants():
     director = ClaudeVoxDirector()
+    assert director.primary_model == "claude-sonnet-5-5"
+    assert director.fallback_model == "gpt-6.1-sol"
     mock_gateway = MagicMock()
     # Simulate network timeout or 503 error on gateway
     mock_gateway.call_llm.side_effect = Exception("HTTP 503 Service Unavailable")

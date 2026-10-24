@@ -63,6 +63,7 @@ def generate_7acc_flow_manifest(target_dir: Path, episode_id: str, scenes: List[
             or getattr(s, "i2v_prompt_google_flow", None)
             or (s.get("i2v_prompt_omni") if isinstance(s, dict) else "")
             or (s.get("i2v_prompt_google_flow") if isinstance(s, dict) else "")
+            or (s.get("flow_video_prompt") if isinstance(s, dict) else "")
             or ""
         )
         dur = float(
@@ -247,26 +248,42 @@ def build_vox_scene_prompts(
         f"no oversaturated rainbow colors, maintain clean premium VOX editorial collage."
     )
 
-    # 7. Omni I2V Prompt (Action-centric, motion-first)
-    i2v_omni = (
-        f"Tactile paper cutout animation in signature Vox documentary style. "
-        f"Animate composition: {hero_obj} on Aged Cream Paper #F4F1EA desk. "
-        f"Hero cutout slides in smoothly from left edge, crimson verification stamp impacts firmly at 3.0s, "
-        f"holding locked spatial anchor with subtle paper micro-breathing <= 2px. "
-        f"Static top-down camera, zero camera drift."
-    )
-
-    # 8. Standardized 4-Block Kinematic I2V Prompt (Universal Prompt 3 / Studio Touches 6 & 7)
-    i2v_google_flow = (
-        f"Editorial paper cutout animation in Vox documentary style. Headline: '{headline}'. "
-        f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
-        f"[Camera: {camera_directive}]. "
-        f"[Timeline Kinematics: From 0.0s to {t_entry_end:.1f}s: {hero_obj} slides into position and lands flat. "
-        f"From {t_entry_end:.1f}s to {t_hold_start:.1f}s: Crimson rubber seal stamps firmly onto document. "
-        f"From {t_hold_start:.1f}s to {dur:.1f}s: Rigid spatial anchor hold with micro paper breathing]. "
-        f"[Pacing: Restrained mechanical paper physics, snappy stops, micro settling]. "
-        f"[Constraints: Strict flat 2D tactile paper collage physics, zero 3D fluid morphing, zero face warping]."
-    )
+    # 7. Sub-Director Plan & Causal Compound Verb Prompts (Rule 140 v3)
+    try:
+        from app.services.kinetic_sub_director import (
+            generate_scene_sub_director_plan,
+            build_kinetic_causal_i2v_prompt
+        )
+        sub_plan = generate_scene_sub_director_plan(
+            scene_id=getattr(scene, "scene_id", f"SCENE_{idx+1:02d}"),
+            sentence=getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or headline,
+            hero_cutout_object=hero_obj,
+            interacting_objects=["crimson forensic seal stamp", "brass anchor pin"],
+            duration_sec=dur,
+            market=getattr(scene, "market", "EN") or "EN"
+        )
+        i2v_google_flow = build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=camera_directive)
+        i2v_omni = i2v_google_flow
+    except Exception as _k_err:
+        logger.warning(f"[build_vox_scene_prompts] Kinetic sub-director fallback notice: {_k_err}")
+        sub_plan = {}
+        i2v_omni = (
+            f"Tactile paper cutout animation in signature Vox documentary style. "
+            f"Animate composition: {hero_obj} on Aged Cream Paper #F4F1EA desk. "
+            f"Hero cutout slides in smoothly from left edge, crimson verification stamp impacts firmly at 3.0s, "
+            f"holding locked spatial anchor with subtle paper micro-breathing <= 2px. "
+            f"Static top-down camera, zero camera drift."
+        )
+        i2v_google_flow = (
+            f"Editorial paper cutout animation in Vox documentary style. Headline: '{headline}'. "
+            f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
+            f"[Camera: {camera_directive}]. "
+            f"[Timeline Kinematics: From 0.0s to {t_entry_end:.1f}s: {hero_obj} slides into position and lands flat. "
+            f"From {t_entry_end:.1f}s to {t_hold_start:.1f}s: Crimson rubber seal stamps firmly onto document. "
+            f"From {t_hold_start:.1f}s to {dur:.1f}s: Rigid spatial anchor hold with micro paper breathing]. "
+            f"[Pacing: Restrained mechanical paper physics, snappy stops, micro settling]. "
+            f"[Constraints: Strict flat 2D tactile paper collage physics, zero 3D fluid morphing, zero face warping]."
+        )
 
     return {
         "canvas_workspace": "Aged Cream Newsprint Desk #F4F1EA with subtle print halftone grid",
@@ -286,14 +303,31 @@ def build_vox_scene_prompts(
         "image_prompt": image_prompt,
         "i2v_prompt_omni": i2v_omni,
         "i2v_prompt_google_flow": i2v_google_flow,
+        "scene_sub_director_plan": sub_plan,
     }
 
 
 def build_universal_video_prompt(scene: Scene) -> str:
-    """Encodes Prompt 3 from Made by AI Playbook: 0-7s layer-by-layer, 7-10s hold micro-motion."""
+    """Encodes Causal Compound Video Prompt (Rule 140 v3 / Made by AI Playbook)."""
     color = scene.color_accent or "Vox Crimson #E53935"
     if scene.i2v_prompt_google_flow:
         return scene.i2v_prompt_google_flow
+    try:
+        from app.services.kinetic_sub_director import (
+            generate_scene_sub_director_plan,
+            build_kinetic_causal_i2v_prompt
+        )
+        sub_plan = generate_scene_sub_director_plan(
+            scene_id=getattr(scene, "scene_id", "SCENE_01"),
+            sentence=getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or getattr(scene, "headline", ""),
+            hero_cutout_object=getattr(scene, "visual_metaphor", "") or getattr(scene, "hero_cutout_object", ""),
+            interacting_objects=["tactile measurement tool", "crimson verification seal"],
+            duration_sec=float(getattr(scene, "duration_est_sec", 8.0) or 8.0),
+            market=getattr(scene, "market", "EN") or "EN"
+        )
+        return build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=getattr(scene, "camera_directive", ""))
+    except Exception as _ex:
+        logger.warning(f"[build_universal_video_prompt] Fallback notice: {_ex}")
     return (
         f"Editorial paper cutout animation in Vox documentary style. "
         f"Animate completed composition: {scene.visual_metaphor or 'Tactile paper elements'} on Cream Paper #F4F1EA background. "
@@ -779,7 +813,7 @@ def run(ctx: RunContext) -> StageArtifact:
     scenes: List[Scene] = []
     prev_scene: Optional[Scene] = None
 
-    # Dynamic Master Prompt 2 Vox Storyboard via Claude Opus 5.5 / Fallback Astra 6
+    # Dynamic Master Prompt 2 Vox Storyboard via Claude Sonnet 5.5 / Fallback GPT-6.1-Sol
     market = "JA" if "JP_" in ctx.run_id else ("KO" if "KR_" in ctx.run_id else ("VI" if "VN_" in ctx.run_id else "EN"))
     sentences = [sc_dict.get("narration", "") for sc_dict in raw_scenes if isinstance(sc_dict, dict) and sc_dict.get("narration")]
     story_text = "\n".join(sentences)
@@ -803,7 +837,7 @@ def run(ctx: RunContext) -> StageArtifact:
         prev_shot_id = f"sc_{idx:02d}_sh_01" if idx > 0 else None
         uses_chain = (idx > 0)
 
-        # Enrich with Opus 5.5 planned exhibits if available
+        # Enrich with Claude Sonnet 5.5 planned exhibits if available
         if planned_storyboard and idx < len(planned_storyboard):
             item = planned_storyboard[idx]
             if item.get("editorial_title") and (not scene.headline or scene.headline.startswith("BEAT ")):

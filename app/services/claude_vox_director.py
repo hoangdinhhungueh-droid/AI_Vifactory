@@ -10,7 +10,7 @@ Transforms continuous narrative story.txt into an exact, object-anchored visual 
 3. Concrete Physical Exhibits: Anchors to tangible documents, chips, contracts, tickers, and ledgers
    directly mentioned in each sentence, isolated on pure solid white (#FFFFFF) for clean alpha cutout.
 4. Delicate VOX Proportions: Hero cutout 20-22% width, supporting exhibits 14-18% width, 65%+ negative space.
-5. Model Gateway Routing with Fallback: Primary = claude-opus-5-5, Fallback = gpt-6-astra.
+5. Model Gateway Routing with Fallback: Primary = claude-sonnet-5-5, Fallback = gpt-6.1-sol.
 """
 
 from __future__ import annotations
@@ -211,7 +211,7 @@ def _extract_sentence_exhibits(sentence: str, sc_idx: int) -> Dict[str, Any]:
 class ClaudeVoxDirector:
     """Master Sentence-by-Sentence VOX Director Engine with Automatic Model Gateway Fallback."""
 
-    def __init__(self, model: str = "claude-opus-5-5", fallback_model: str = "gpt-6-astra"):
+    def __init__(self, model: str = "claude-sonnet-5-5", fallback_model: str = "gpt-6.1-sol"):
         self.primary_model = model
         self.fallback_model = fallback_model
         self.system_prompt = load_master_prompt_2()

@@ -246,7 +246,7 @@ class VoxAutomatedDirector:
         gateway: Optional[Any] = None
     ) -> List[Dict[str, Any]]:
         """Sentence-by-Sentence Master Prompt 2 Storyboard Director via ClaudeVoxDirector.
-        Rules 118, 128, 130 Compliant: Dynamic, token-safe, Claude Opus 5.5 + GPT-6-Astra fallback.
+        Rules 118, 128, 130 Compliant: Dynamic, token-safe, Claude Sonnet 5.5 + GPT-6.1-Sol fallback.
         """
         from app.services.claude_vox_director import ClaudeVoxDirector
         director = ClaudeVoxDirector()

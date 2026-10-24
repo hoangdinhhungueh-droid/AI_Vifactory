@@ -124,23 +124,26 @@
     - **Cấm Sửa Triệu Chứng Bằng Try-Except Rỗng**: Khi gặp bug, CẤM TUYỆT ĐỐI bọc `try: ... except: pass` để che giấu lỗi runtime. BẮT BUỘC áp dụng quy trình 4 pha (Isolate $\rightarrow$ Graph Trace $\rightarrow$ Root-Cause Fix $\rightarrow$ Anti-Regression Verify), truy vết đúng call chain để giải quyết tận gốc nguyên nhân.
     - **Chốt Chặn Kiểm Toán OCR Bắt Buộc**: Mọi đoạn code mới hoặc bản vá bug bắt buộc phải đạt `VERDICT: PASS (0 Critical / 0 High)` từ cổng kiểm toán tất định Alibaba Open Code Review trước khi đóng task.
 
-22. **RULE 140 (Tactile Object Decomposition & Vox Micro-Beat Kinematics Mandate)**:
-    - **Cấm Tuyệt Đối Đưa Khái Niệm Trừu Tượng Vào Prompt Ảnh/Video**:
-      CẤM TUYỆT ĐỐI viết prompt cho tầng sinh ảnh và video bằng câu chuyện trừu tượng (như "chính phủ phê duyệt dự án", "nền kinh tế sụp đổ", "công ty gia tăng lợi nhuận").
-    - **Bộ Chuyển Dịch Bắt Buộc: Ý Niệm Trừu Tượng $\rightarrow$ Vật Thể Xúc Giác & Đạo Cụ (Abstract-to-Tactile Grammar)**:
-      Mọi ý niệm kịch bản bắt buộc phải được đạo diễn phân rã thành các thực thể vật lý cụ thể trên mặt bàn xúc giác (Aged Newsprint Paper Desk #F4F1EA):
-      + *Hành động thể chế / pháp lý*: Hồ sơ hợp đồng gấp mép, triện đỏ cá nhân Hanko, mộc sáp niêm phong, kéo cắt giấy kim loại, ghim bấm đồng.
-      + *Chỉ số kinh tế / tài chính*: Thước cặp caliper bằng đồng đo đạc, vệt bút dạ quang vàng neon gạch số, thước đo độ, biểu đồ đường vẽ dốc đứng, cọc tiền giấy thắt đai.
-      + *Dòng chảy thế lực / liên kết*: Sợi chỉ đỏ nối ghim (red evidence string), ống đồng dẫn mực rỉ, mũi tên vector nét đứt.
-    - **Khế Ước Động Học 4 Thì I2V ($S_1 \rightarrow S_4$) Cho Mỗi Video Clip Duy Nhất (6.0s – 8.0s)**:
-      Trong mỗi scene/beat thị giác, 1 ảnh seed composition duy nhất chứa 2–4 vật thể được nạp vào mô hình AI Video (Google Flow / Veo / Omni) với chỉ đạo động học phân thì tuần tự:
-      + *Thì 1 ($S_1$: Entry / Drop-in, 0.0s – 2.0s)*: Vật thể chính (hồ sơ, thẻ, văn bản) trượt hoặc rơi xuống mặt bàn với độ nảy nhẹ.
-      + *Thì 2 ($S_2$: Mechanical Impact / Stamp / Cut, 2.0s – 4.5s)*: Đạo cụ tương tác (con dấu, kéo, thước cặp) giáng xuống hoặc tác động cơ học trực tiếp (đóng dấu đanh thép, cắt rời, ghim chặt).
-      + *Thì 3 ($S_3$: Vector / Growth, 4.5s – 6.0s)*: Mũi tên vươn lên, mực loang, vệt highlight dạ quang sáng bừng kết nối ý niệm.
-      + *Thì 4 ($S_4$: Living Poster Spatial Hold, 6.0s – 8.0s)*: Khóa cứng 100% tọa độ mọi vật thể (Spatial Anchor). CẤM camera quay 3D, CẤM vật thể trôi dạt vô định. Chỉ duy trì vi rung giấy 12fps stop-motion jitter và nhịp thở bóng đổ $\le 2\text{px}$.
-    - **Trần Nhịp Độ Pacing & Chống Đóng Băng Khung Hình (Anti-Monotony & Anti-Freeze Pacing)**:
-      CẤM TUYỆT ĐỐI kéo 1 scene dài 20–28s chỉ với 1 clip video ngắn khiến video bị lặp loop hoặc đứng yên như ảnh tĩnh.
-      Mỗi Beat thị giác bắt buộc có thời lượng chuẩn từ **5.0 đến 8.0 giây** (trùng khớp với thời lượng clip I2V của mô hình AI). Toàn bộ video dài (8–10 phút) được chia thành **10–12 Sequence Blocks** (mỗi block ~45–50s chung một không gian bàn) chứa **~70–75 Beats thị giác liên hoàn**, bảo đảm nhịp độ tài liệu Vox dồn dập, liên tục có chuyển động cơ học mới.
+22. **RULE 140 (Object-to-Object Kinetic Coupling & Narrative Sub-Director Mandate - Vox Engine v3)**:
+    - **Cấm Tuyệt Đối Đưa Khái Niệm Trừu Tượng & Slideshow Vô Hồn Vào Prompt**:
+      CẤM TUYỆT ĐỐI viết prompt cho tầng sinh ảnh và video bằng câu chuyện trừu tượng hoặc liệt kê các object xuất hiện rời rạc độc lập (Layer 1 rơi, Layer 2 trượt vào, camera đứng yên) gây cảm giác slideshow vô hồn.
+    - **Bộ Chuyển Dịch Xúc Giác & Phân Loại 7 Họ Tương Tác Nhân Quả (Kinetic Coupling Taxonomy $H_1 \rightarrow H_7$)**:
+      Mọi ý niệm kịch bản bắt buộc phải được chuyển thể thành tương tác cơ học vật lý có điểm chạm (Contact Dynamics) và để lại tồn dư (Residue) trên mặt bàn giấy báo cũ (#F4F1EA):
+      + *$H_1$ (Impact / Percussion)*: Con dấu mộc đỏ / khối chì dập mạnh $\rightarrow$ giấy lún, mực loang, chồng tài liệu bên cạnh nảy 1-2 frame, camera giật nhẹ.
+      + *$H_2$ (Constraint / Clamp)*: Thước cặp caliper / compa / kẹp giấy kẹp siết mục tiêu $\rightarrow$ mép giấy nhăn, vạch vernier giật quá đà rồi khóa số đo.
+      + *$H_3$ (Sever / Cut / Tear)*: Kéo kim loại / dao trổ cắt xé $\rightarrow$ mảnh giấy nhỏ tách rời rơi xoay có độ nảy, để lộ lớp chứng cứ tầng dưới.
+      + *$H_4$ (Tether / Tension)*: Ghim đồng cắm phập, sợi chỉ đỏ (red evidence yarn) kéo căng $\rightarrow$ hai đối tượng bị kéo nghiêng về nhau, chỉ rung dao động tắt dần.
+      + *$H_5$ (Optical / Refraction)*: Kính lúp trượt qua $\rightarrow$ vùng chữ bên dưới phóng to $1.4\times$, méo cong rìa (barrel distortion), lộ chữ in nhỏ li ti.
+      + *$H_6$ (Mark / Ink Transfer)*: Bút dạ quang neon quét $\rightarrow$ thớ giấy thấm mực và bừng sáng phát quang neon, kích hoạt xung sáng chạy dọc đường dẫn.
+      + *$H_7$ (Displace / Unfold)*: Lực xô đẩy ma sát $\rightarrow$ chồng ảnh xòe quạt, bản đồ bung mở nếp gấp (pop-up unfold).
+    - **Khung Scene Sub-Director Plan Nở Từ 4 Thì Gốc Ra 4..7 Micro-Beats Linh Hoạt (Narration-Driven)**:
+      Bám sát 4 Thì Gốc ($P_1$: Setup $\rightarrow$ $P_2$: Mechanical Tension $\rightarrow$ $P_3$: Causal Escalation $\rightarrow$ $P_4$: Living Hold 12fps). Tự động phân tích câu voiceover qua `SemanticClauseMapper` để nở thành 4 đến 7 micro-beats:
+      + Câu đơn giản (1 mệnh đề): Nở 4 - 5 beats.
+      + Câu phức hợp (2-3 vế, có từ nối "nhưng", "tuy nhiên", "khiến cho", con số định lượng): Nở 6 - 7 beats.
+      + **Luật Chuyển Giao Nhân Quả (Causal Handoff Law)**: Target hoặc Tồn dư của Beat $n$ BẮT BUỘC phải là Source hoặc Target của Beat $n+1$. Chuỗi chuyển động là một dây xích khép kín.
+    - **Cú Pháp Động Từ Liên Hợp Nhân Quả Trong Prompt I2V**:
+      BẮT BUỘC sử dụng cú pháp: `[SOURCE] + [contact_verb] + [TARGET], causing [TARGET] to [physical_reaction], leaving [residue].`
+      Tuyệt đối không liệt kê rời rạc. Duy trì vi rung stop-motion 12fps (on twos) và nhịp thở bóng đổ $\le 2\text{px}$ đến tận cut chuyển cảnh. CẤM ĐÓNG BĂNG KHUNG HÌNH (freeze frame).
 
 23. **RULE 141 (Mandatory Concrete Visual Audit Table & Clickable Forensic Evidence Gate)**:
     - **Cấm Tuyệt Đối Báo Cáo Xuông (Zero-Vague-Reporting Mandate)**:

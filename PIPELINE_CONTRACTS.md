@@ -230,7 +230,21 @@
         "forensic_overlay": "<evidence_3d_prop | document_highlight | tactical_map | kinetic_counter | evidence_board | causal_flowchart | null>",
         "setting_description": "<ENVIRONMENT_DESCRIPTION_ENGLISH: Detailed setting and era background>",
         "character_description": "<CHARACTER_DESCRIPTION_ENGLISH: Detailed subject appearance, clothing, mood>",
-        "visual_action": "<VISUAL_ACTION_ENGLISH: Subject pose and dynamic interaction>"
+        "visual_action": "<VISUAL_ACTION_ENGLISH: Subject pose and dynamic interaction>",
+        "scene_sub_director_plan": {
+          "schema_version": "scene_sub_director_plan.v3",
+          "calculated_beat_count": "<INTEGER: 4-7>",
+          "dominant_kinetic_families": ["<H1_IMPACT | H2_CONSTRAINT | H3_SEVER | H4_TETHER | H5_OPTICAL | H6_MARK | H7_DISPLACE>"],
+          "object_roster": [
+            { "id": "<STRING>", "label": "<STRING>", "material": "<STRING>", "mass_class": "<STRING>", "z_index": "<INTEGER: 1-5>", "role": "<STRING>" }
+          ],
+          "kinetic_couplings": [
+            { "id": "<STRING>", "family": "<STRING>", "source_obj_id": "<STRING>", "target_obj_id": "<STRING>", "action_verb": "<STRING>", "contact_point": "<STRING>", "physical_reaction": "<STRING>", "residue": "<STRING>" }
+          ],
+          "dynamic_micro_beats": [
+            { "beat_id": "<STRING>", "phase": "<STRING>", "time_window": "<STRING>", "coupling_id": "<STRING|null>", "action_description": "<STRING>", "handoff_to": "<STRING|null>" }
+          ]
+        }
       }
     ]
   }
