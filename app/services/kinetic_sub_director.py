@@ -342,9 +342,9 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="clamps down firmly onto",
+            action_verb="slides along strict measurement axis to lock onto",
             contact_point="critical data row",
-            physical_reaction="paper edges crinkle under metallic pressure as vernier scale locks data ticks",
+            physical_reaction="vernier scale aligns precisely with grid ticks, locking coordinate measurement",
             secondary_reaction={"object": "desk_surface", "reaction": "subtle mechanical micro-vibration"},
             residue="metric baseline ticks permanently marked"
         )
@@ -354,10 +354,10 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="slams down with high velocity onto",
+            action_verb="snaps down flat in 2 frames onto",
             contact_point="header verification zone",
-            physical_reaction="paper fibers indent, red ink bleeds cleanly into aged newsprint",
-            secondary_reaction={"object": "desk_surface", "reaction": "adjacent paper cutouts jump 1-2 frames"},
+            physical_reaction="crisp crimson stamp imprint locks onto newsprint with sharp vector borders",
+            secondary_reaction={"object": "desk_surface", "reaction": "adjacent paper cutouts settle in 1 frame"},
             residue="deep crimson verification seal stamped"
         )
     elif fam1 == KineticFamily.H3_SEVER:
@@ -366,11 +366,11 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="slices cleanly across",
+            action_verb="slides linearly across",
             contact_point="perforated margin",
-            physical_reaction="paper strip severs, spins half-turn, and lands with light bounce",
+            physical_reaction="clean vertical mask separation cleanly reveals the underlying archival graphic layer",
             secondary_reaction={"object": "obj_anchor", "reaction": "exposes lower archival layer"},
-            residue="jagged cut edge with visible paper fibers"
+            residue="sharp cut edge with visible paper fibers"
         )
     else:
         c1 = KineticCoupling(
@@ -378,9 +378,9 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="engages directly with",
+            action_verb="snaps rigidly into position on",
             contact_point="center focal area",
-            physical_reaction="paper flexes as tool locks into position",
+            physical_reaction="graphic layout locks firmly into alignment grid",
             residue="clear mechanical indentation"
         )
     couplings.append(c1)
@@ -393,9 +393,9 @@ def generate_scene_sub_director_plan(
             family=fam2,
             source_obj_id="obj_tool2",
             target_obj_id="obj_anchor",
-            action_verb="sweeps glowing neon dye across",
+            action_verb="wipes in a straight horizontal linear reveal across",
             contact_point="highlighted anomaly row",
-            physical_reaction="text beneath absorbs neon pigment and illuminates brightly",
+            physical_reaction="neon yellow highlight box illuminates key typography with crisp editorial contrast",
             residue="striking translucent yellow neon stripe"
         )
     elif fam2 == KineticFamily.H4_TETHER:
@@ -404,9 +404,9 @@ def generate_scene_sub_director_plan(
             family=fam2,
             source_obj_id="obj_tool2",
             target_obj_id="obj_tool1",
-            action_verb="pulls taut between brass pins connecting to",
+            action_verb="traces a straight dashed vector line connecting to",
             contact_point="caliper anchor pin",
-            physical_reaction="crimson thread vibrates under tension then damps into rigid vector line",
+            physical_reaction="crimson evidence vector line snaps between pin coordinates, locking forensic link",
             residue="taut red evidence vector linking data to source"
         )
     else:
@@ -415,9 +415,9 @@ def generate_scene_sub_director_plan(
             family=fam2,
             source_obj_id="obj_tool2",
             target_obj_id="obj_anchor",
-            action_verb="deploys alongside",
+            action_verb="slides in with 2D planar precision alongside",
             contact_point="boundary perimeter",
-            physical_reaction="flashing dashed boundary rectangle confirms forensic audit",
+            physical_reaction="sharp dashed bounding box snaps around target data, framing forensic audit",
             residue="permanent forensic framing box"
         )
     couplings.append(c2)
@@ -719,14 +719,16 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
     chain_str = " ".join(steps_text)
 
     prompt = (
-        f"Tactile paper collage stop-motion animation, animated on twos, authentic handcrafted jitter, "
-        f"warm aged cream newsprint desk (#F4F1EA), soft directional physical drop shadows. "
+        f"Forensic documentary motion graphics, tactile stop-motion editorial layout, animated on twos, "
+        f"12fps posterize-time stop-motion feel, graphic layout assembly, snappy infographic motion, "
+        f"crisp editorial typography on aged newsprint desk (#F4F1EA), soft directional physical drop shadows. "
         f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
+        f"[Style: Rigid documentary motion design, zero cartoon puppet motion, zero organic wobbling]. "
         f"[Camera: {cam_directive_detected}]. "
         f"[Timeline Kinematics: [KINETIC CAUSAL CHAIN]: {chain_str}]. "
-        f"[Pacing: Restrained mechanical paper physics, snappy stops, micro settling]. "
-        f"[Constraints: [PHYSICAL CONSTRAINTS]: Every movement is directly caused by physical contact with an interacting tool. "
-        f"Zero independent drifting, zero 3D fluid morphing, all objects locked in 12fps paper stop-motion hold to the cut]."
+        f"[Motion Design: Snappy 2D graphic reveals, rigid planar cutouts, linear slides, mechanical snap-down]. "
+        f"[Constraints: [PHYSICAL CONSTRAINTS]: Every element is a rigid 2D planar cutout with clean cast shadows. "
+        f"Zero independent drifting, zero 3D fluid morphing, all graphics locked in 12fps paper stop-motion hold to the cut]."
     )
 
     return prompt.strip()

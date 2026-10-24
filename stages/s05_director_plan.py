@@ -333,7 +333,7 @@ def build_universal_video_prompt(scene: Scene) -> str:
     except Exception as _ex:
         logger.warning(f"[build_universal_video_prompt] Fallback notice: {_ex}")
     return (
-        f"Editorial paper cutout animation in Vox documentary style. "
+        f"Forensic documentary motion graphics, tactile stop-motion editorial layout. "
         f"Animate completed composition: {scene.visual_metaphor or 'Tactile paper elements'} on Cream Paper #F4F1EA background. "
         f"0.0-2.0s: Tactile entry of bold geometric paper shapes and headline '{scene.headline or 'EDITORIAL FOCUS'}'. "
         f"2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges. "

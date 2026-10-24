@@ -107,7 +107,8 @@ def test_build_kinetic_causal_i2v_prompt_syntax():
     # Cú pháp liên hợp bắt buộc có "causing"
     assert "causing" in prompt
     # Bắt buộc có các ràng buộc vật lý
-    assert "Tactile paper collage" in prompt
+    assert "Forensic documentary motion graphics" in prompt
+    assert "tactile stop-motion" in prompt
     assert "[KINETIC CAUSAL CHAIN]:" in prompt
     assert "Zero independent drifting" in prompt
     assert "12fps paper stop-motion" in prompt
