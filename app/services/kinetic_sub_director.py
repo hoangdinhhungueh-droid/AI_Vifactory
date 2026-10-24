@@ -292,10 +292,10 @@ def generate_scene_sub_director_plan(
     is_hero_tool = any(k in hero_clean.lower() for k in tool_keywords)
     is_inter1_doc = any(k in inter1.lower() for k in doc_keywords)
 
-    if is_hero_tool and is_inter1_doc:
-        anchor_label = inter1
+    if is_hero_tool:
         actor1_label = hero_clean
         actor1_material = "solid_metal" if "caliper" in hero_clean.lower() or "scissors" in hero_clean.lower() else "wood_rubber"
+        anchor_label = inter1 if is_inter1_doc else "forensic accounting ledger document"
         anchor_material = "aged_newsprint_paper"
     else:
         anchor_label = hero_clean

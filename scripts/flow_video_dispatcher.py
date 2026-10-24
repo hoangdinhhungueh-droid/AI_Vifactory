@@ -196,6 +196,18 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             back_btn.click()
             time.sleep(1)
 
+        # 1. Tìm ô nhập prompt và dọn dẹp sạch sẽ TRƯỚC KHI nạp ảnh seed (Rule 118, 121)
+        prompt_box = page.locator("div.ProseMirror, [contenteditable='true']").first
+        if prompt_box.count() == 0:
+            print("      ❌ Không tìm thấy ô nhập prompt!")
+            return False
+
+        prompt_box.click(force=True)
+        time.sleep(0.3)
+        prompt_box.press("Control+A")
+        prompt_box.press("Backspace")
+        time.sleep(0.3)
+
         # Clear any lingering ingredient chips in the prompt box
         chips = page.locator("button[aria-label*='Xóa' i], button[aria-label*='Remove' i], button[aria-label*='Delete' i], .ingredient-chip button, [data-icon='close']").all()
         for chip in chips:
@@ -206,8 +218,14 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             except Exception:
                 pass
 
+        # 2. Điền Prompt Text vào ô câu lệnh trước (TRÁNH Control+A xóa mất chip ảnh sau này)
+        prompt_box.click(force=True)
+        prompt_box.fill(prompt_text)
+        time.sleep(1)
+
+        # 3. Nạp ảnh Seed cho chế độ Image-to-Video (I2V)
         if seed_img.exists():
-            print(f"      🖼️ Đang nạp ảnh Seed: {seed_img.name}...")
+            print(f"      🖼️ Đang nạp ảnh Seed I2V: {seed_img.name}...")
             # Check if "I agree" dialog is currently open
             agree_btn = page.locator("button:has-text('Tôi đồng ý'), button:has-text('I agree')").first
             if agree_btn.count() > 0 and agree_btn.is_visible():
@@ -255,18 +273,37 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                             add_to_prompt.click(force=True)
                             time.sleep(2)
 
-        prompt_box = page.locator("div.ProseMirror, [contenteditable='true']").first
-        if prompt_box.count() == 0:
-            print("      ❌ Không tìm thấy ô nhập prompt!")
-            return False
+            # 4. Chốt chặn kiểm toán I2V (Fail-Closed Gate): Đảm bảo Ingredient Chip TỒN TẠI
+            chip_attached = False
+            for _ in range(8):
+                chips_now = page.locator(".ingredient-chip, [role='listitem'] button, .media-ingredient, [aria-label*='Xóa' i], [aria-label*='Remove' i]").all()
+                if any(c.is_visible() for c in chips_now):
+                    chip_attached = True
+                    break
+                time.sleep(0.8)
 
-        prompt_box.click(force=True)
-        time.sleep(0.3)
-        prompt_box.press("Control+A")
-        prompt_box.press("Backspace")
-        time.sleep(0.3)
-        prompt_box.fill(prompt_text)
-        time.sleep(1)
+            debug_dir = episode_dir / "debug_flow"
+            debug_dir.mkdir(parents=True, exist_ok=True)
+
+            if chip_attached:
+                print(f"      ✅ [XÁC THỰC I2V THÀNH CÔNG] Chip ảnh seed '{seed_img.name}' đã gắn vào prompt box!")
+            else:
+                print(f"      ❌ [FAIL-CLOSED] Không phát hiện chip ảnh seed '{seed_img.name}' trong prompt box! Hủy lệnh để tránh sinh video T2V mù.")
+                page.screenshot(path=str(debug_dir / f"fail_chip_{scene_id}.png"))
+                return False
+
+            # Đảm bảo prompt text không bị mất sau khi chèn chip
+            box_text = prompt_box.text_content() or ""
+            if prompt_text[:30] not in box_text:
+                print("      ℹ️ Bổ sung lại prompt text phía sau chip ảnh...")
+                prompt_box.click(force=True)
+                page.keyboard.press("End")
+                page.keyboard.type(f" {prompt_text}")
+                time.sleep(1)
+
+            # Chụp ảnh bằng chứng prompt box đã sẵn sàng trước khi bấm Start
+            page.screenshot(path=str(debug_dir / f"prompt_verified_{scene_id}.png"))
+
         initial_tiles_count = page.locator("flow-video-tile").count()
         print(f"      📊 Số tiles hiện có trước khi tạo: {initial_tiles_count}")
 
