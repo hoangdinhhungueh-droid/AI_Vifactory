@@ -288,8 +288,8 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
 
             # 4. Chốt chặn kiểm toán I2V (Fail-Closed Gate): Đảm bảo Ingredient Chip TỒN TẠI
             chip_attached = False
-            for _ in range(8):
-                chips_now = page.locator(".ingredient-chip, [role='listitem'] button, .media-ingredient, [aria-label*='Xóa' i], [aria-label*='Remove' i]").all()
+            for _ in range(10):
+                chips_now = page.locator("button:has-text('expand_content'), button:has-text('close'), .expand-button, flow-image-tile").all()
                 if any(c.is_visible() for c in chips_now):
                     chip_attached = True
                     break
