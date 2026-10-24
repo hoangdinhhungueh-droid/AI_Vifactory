@@ -6,6 +6,9 @@ import base64
 import argparse
 import urllib.request
 import ssl
+import logging
+
+logger = logging.getLogger("gemini_browser_gen")
 from pathlib import Path
 from io import BytesIO
 
@@ -26,8 +29,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 USER_DATA_DIR = os.environ.get("GEMINI_BROWSER_PROFILE", r"C:\Users\hunghd2\.gemini\browser_profile")
 try:
     os.makedirs(USER_DATA_DIR, exist_ok=True)
-except Exception:
-    pass
+except Exception as _mk_err:
+    logger.debug(f"Could not create user data dir: {_mk_err}")
 
 # Embedded Self-Contained MCP Client for VPS Communications
 VPS_URL = "https://ag.vifactory.com/mcp"
@@ -85,10 +88,10 @@ class DirectMCPClient:
                 try:
                     notif_payload = {"jsonrpc": "2.0", "method": "notifications/initialized"}
                     req_notif = urllib.request.Request(self.url, data=json.dumps(notif_payload).encode(), headers=self._headers(), method="POST")
-                    with urllib.request.urlopen(req_notif, timeout=10, context=self.ctx) as _:
-                        pass
-                except Exception:
-                    pass
+                    with urllib.request.urlopen(req_notif, timeout=10, context=self.ctx) as _resp:
+                        _notif_bytes = _resp.read()
+                except Exception as _notif_err:
+                    logger.debug(f"MCP notification notice: {_notif_err}")
                 print(f"📡 MCP Session initialized: {self.session_id}")
                 return
             except Exception as e:
@@ -224,7 +227,7 @@ def fetch_prompts_from_vps(episode_id):
                     print(f"📋 [Vox Director Plan VPS] Đã nạp thành công {len(items)} prompts từ VPS director_plan.json!")
                     return items
     except Exception as e:
-        pass
+        logger.debug(f"Failed to load director plan from VPS: {e}")
 
     local_prompts_file = os.path.join(local_episode_dir, "prompts_forge.json")
     
@@ -330,7 +333,7 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
                         time.sleep(0.4)
                         print("🎨 [1-Shot Mode] Đã kích hoạt chế độ 'Tạo hình ảnh' trực tiếp qua menu công cụ!")
             except Exception as _e_tool:
-                pass
+                logger.debug(f"Menu tool click notice: {_e_tool}")
             
             # Xóa nội dung cũ nếu có
             page.keyboard.press("Control+A")
@@ -790,8 +793,8 @@ def verify_director_plan_binding(episode_id, items, local_dir):
         try:
             with open(dplan_file, "r", encoding="utf-8") as f:
                 dplan = json.load(f)
-        except Exception:
-            pass
+        except Exception as _dplan_err:
+            logger.debug(f"Could not load local dplan: {_dplan_err}")
     if not dplan:
         try:
             vps_eval_code = f"""python3 -c '
@@ -826,8 +829,8 @@ except Exception as e:
                         "registered_fg_count": len(registered_fgs),
                         "unregistered_keys": unregistered
                     }
-        except Exception:
-            pass
+        except Exception as _vps_probe_err:
+            logger.debug(f"Could not query vps dplan: {_vps_probe_err}")
 
     if not dplan:
         return {"status": "SKIPPED", "reason": "director_plan.json not available for validation", "unregistered_keys": []}
@@ -1041,8 +1044,8 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                                     print(f"🧹 Clean & Retry: Xóa {key}.png lỗi và sinh lại ngay tại chỗ...")
                                     try:
                                         os.remove(local_png)
-                                    except Exception:
-                                        pass
+                                    except Exception as _rm_err:
+                                        logger.warning(f"Could not remove failed image {local_png}: {_rm_err}")
                                     time.sleep(3)
                                 else:
                                     print(f"❌ [Max Retries Reached] {key} không pass sau {MAX_INPLACE_RETRIES} lần thử.")
@@ -1066,7 +1069,7 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                             shutil.copy2(local_png, seed_dir / f"{raw_key}.png")
                             shutil.copy2(local_png, Path(local_episode_dir) / f"{raw_key}.png")
                     except Exception as copy_err:
-                        pass
+                        logger.warning(f"Failed to copy composite seeds for {key}: {copy_err}")
                 
                 if idx < len(prompt_items):
                     print(f"⏳ Giãn cách {pacing_sec}s giữa các prompt theo Rule 436 (Rate Pacing)...")

@@ -17,14 +17,17 @@ import json
 import re
 import argparse
 import hashlib
+import logging
+
+logger = logging.getLogger("flow_video_dispatcher")
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
-except Exception:
-    pass
+except Exception as _reconf_err:
+    logger.debug(f"stdout reconfigure notice: {_reconf_err}")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 PROFILES_BASE_DIR = Path(r"C:\Users\hunghd2\.gemini\profiles")
@@ -84,8 +87,8 @@ def dismiss_dialogs(page):
                     }
                 }
             }''')
-        except Exception:
-            pass
+        except Exception as _eval_err:
+            logger.debug(f"Dismiss dialog evaluate notice: {_eval_err}")
 
         for name in ["Tiếp tục", "Continue", "Tiếp theo", "Next", "Get started", "Bắt đầu", "Accept", "Chấp nhận", "Got it", "Đã hiểu", "Hoàn tất", "Xong", "Done", "Dismiss", "Bỏ qua", "Close", "Đóng", "I agree", "Tôi đồng ý", "Allow", "Cho phép"]:
             btn = page.get_by_role("button", name=name)
@@ -93,8 +96,8 @@ def dismiss_dialogs(page):
                 try:
                     btn.first.click(force=True)
                     time.sleep(1)
-                except Exception:
-                    pass
+                except Exception as _btn_err:
+                    logger.debug(f"Dismiss button click notice: {_btn_err}")
 
         if page.locator(".cdk-overlay-backdrop").count() > 0:
             page.keyboard.press("Escape")
@@ -215,8 +218,8 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                 if chip.is_visible():
                     chip.click(force=True)
                     time.sleep(0.3)
-            except Exception:
-                pass
+            except Exception as _chip_err:
+                logger.debug(f"Chip removal notice: {_chip_err}")
 
         # 2. Điền Prompt Text vào ô câu lệnh trước (TRÁNH Control+A xóa mất chip ảnh sau này)
         prompt_box.click(force=True)
@@ -267,15 +270,15 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     if target_asset.count() > 0 and target_asset.is_visible():
                         try:
                             target_asset.click(force=True)
-                        except Exception:
-                            pass
+                        except Exception as _clk_err:
+                            logger.debug(f"Target asset click notice: {_clk_err}")
                     else:
                         first_asset = page.locator(".asset-item, [role='listitem'], .cdk-drag, mat-list-item").first
                         if first_asset.count() > 0 and first_asset.is_visible():
                             try:
                                 first_asset.click(force=True)
-                            except Exception:
-                                pass
+                            except Exception as _first_clk_err:
+                                logger.debug(f"First asset click notice: {_first_clk_err}")
 
                     time.sleep(1)
                     add_btn = page.locator("button:has-text('Thêm vào câu lệnh'), button:has-text('Add to prompt')").first
@@ -351,8 +354,8 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                         approved = True
                         time.sleep(2)
                         break
-                    except Exception:
-                        pass
+                    except Exception as _appr_err:
+                        logger.debug(f"Approval click notice: {_appr_err}")
             if approved:
                 break
 
@@ -440,8 +443,8 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                 if out_file.exists() and out_file.stat().st_size < 100000:
                     try:
                         out_file.unlink()
-                    except Exception:
-                        pass
+                    except Exception as _unl_err:
+                        logger.debug(f"Out file unlink notice: {_unl_err}")
                 shutil.move(str(downloaded), str(out_file))
 
         if out_file.exists() and out_file.stat().st_size > 200000:
@@ -457,8 +460,8 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                         btn.click(force=True)
                         time.sleep(1)
                         break
-                    except Exception:
-                        pass
+                    except Exception as _dl_btn_err:
+                        logger.debug(f"Download button click notice: {_dl_btn_err}")
             return True
         else:
             print(f"      ❌ Tải thất bại hoặc file rỗng ({out_file.name})!")
@@ -511,8 +514,8 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
             dismiss_dialogs(page)
             try:
                 page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')", timeout=25000)
-            except Exception:
-                pass
+            except Exception as _sel_err:
+                logger.debug(f"Project selector wait notice: {_sel_err}")
             time.sleep(2)
             dismiss_dialogs(page)
 
@@ -552,8 +555,8 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
                 dismiss_dialogs(page)
                 try:
                     page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')", timeout=25000)
-                except Exception:
-                    pass
+                except Exception as _sel_err:
+                    logger.debug(f"Retry project selector wait notice: {_sel_err}")
                 time.sleep(2)
                 dismiss_dialogs(page)
                 new_btn = page.locator("button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')").first
@@ -572,8 +575,8 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
             elif out_file.exists():
                 try:
                     out_file.unlink()
-                except Exception:
-                    pass
+                except Exception as _unl_err:
+                    logger.debug(f"Unlink out_file notice: {_unl_err}")
 
             success = generate_and_download_clip(page, clip, out_file, episode_dir)
             results[clip["scene_id"]] = success

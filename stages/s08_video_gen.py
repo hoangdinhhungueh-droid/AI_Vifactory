@@ -175,8 +175,8 @@ def run(ctx: RunContext) -> StageArtifact:
             from vox.qa.gates import probe_media_file
             a_info = probe_media_file(ctx.paths.audio_dir / "voice_narration.mp3")
             audio_dur = float(a_info.get("format", {}).get("duration", "0"))
-        except Exception:
-            pass
+        except Exception as _probe_err:
+            logger.debug(f"Could not probe audio narration duration: {_probe_err}")
 
     if audio_dur <= 0.0 and s9_path.exists():
         try:
@@ -188,8 +188,8 @@ def run(ctx: RunContext) -> StageArtifact:
                 audio_dur = float(a_info.get("format", {}).get("duration", "0"))
             if audio_dur <= 0.0:
                 audio_dur = float(s9_data.get("payload", {}).get("total_duration_sec", 0.0))
-        except Exception:
-            pass
+        except Exception as _probe_err:
+            logger.debug(f"Could not probe audio narration duration: {_probe_err}")
 
     total_scenes = len(scenes)
     scene_durations: Dict[int, float] = {}
@@ -326,8 +326,8 @@ def run(ctx: RunContext) -> StageArtifact:
                 logger.warning(f"[s08_video_gen] Rejecting invalid static freeze-frame clip '{target_video.name}': {freeze_err}")
                 try:
                     target_video.unlink()
-                except OSError:
-                    pass
+                except OSError as _unl_err:
+                    logger.debug(f"Failed to unlink invalid freeze clip {target_video}: {_unl_err}")
 
         if not clip_valid:
             # Check legacy location

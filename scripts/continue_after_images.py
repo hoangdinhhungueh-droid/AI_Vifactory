@@ -276,8 +276,8 @@ def main():
             _log("Existing master video at %s failed motion audit (%s). Purging static file to force fresh render." % (master, _m_err))
             try:
                 master.unlink()
-            except OSError:
-                pass
+            except OSError as _unl_err:
+                _log("Notice: failed to unlink invalid master video %s: %s" % (master, _unl_err))
             is_master_dynamic = False
 
     if is_master_dynamic:
