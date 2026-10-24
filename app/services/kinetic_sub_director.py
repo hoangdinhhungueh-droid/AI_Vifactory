@@ -599,10 +599,12 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
     prompt = (
         f"Tactile paper collage stop-motion animation, animated on twos, authentic handcrafted jitter, "
         f"warm aged cream newsprint desk (#F4F1EA), soft directional physical drop shadows. "
-        f"[CAMERA]: {cam_directive_detected}. "
-        f"[KINETIC CAUSAL CHAIN]: {chain_str} "
-        f"[PHYSICAL CONSTRAINTS]: Every movement is directly caused by physical contact with an interacting tool. "
-        f"Zero independent drifting, zero 3D fluid morphing, all objects locked in 12fps paper stop-motion hold to the cut."
+        f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
+        f"[Camera: {cam_directive_detected}]. "
+        f"[Timeline Kinematics: [KINETIC CAUSAL CHAIN]: {chain_str}]. "
+        f"[Pacing: Restrained mechanical paper physics, snappy stops, micro settling]. "
+        f"[Constraints: [PHYSICAL CONSTRAINTS]: Every movement is directly caused by physical contact with an interacting tool. "
+        f"Zero independent drifting, zero 3D fluid morphing, all objects locked in 12fps paper stop-motion hold to the cut]."
     )
 
     return prompt.strip()
