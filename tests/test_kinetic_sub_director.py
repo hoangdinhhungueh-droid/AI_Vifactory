@@ -179,3 +179,34 @@ def test_dynamic_pacing_timeline_flexibility():
     )
     assert 2.5 <= plan_auto["scene_duration_sec"] <= 10.0
 
+
+
+def test_kinetic_coordinates_and_dead_stop_holds():
+    """Kiểm tra toạ độ 2D chuẩn xác, điểm dừng hình (snap-stop freeze) và liên kết cụm vật lý."""
+    plan = generate_scene_sub_director_plan(
+        scene_id="SCENE_02",
+        sentence="この数字は市場全体で測定されたものではありません。",
+        hero_cutout_object="Vintage mechanical brass caliper measuring tool with engraved metric scales",
+        interacting_objects=[
+            "Unverified survey ledger sheet with question marks",
+            "Muted gray paper bookmark"
+        ],
+        duration_sec=7.7,
+        market="JA"
+    )
+
+    prompt = build_kinetic_causal_i2v_prompt(plan)
+
+    # 1. Toạ độ 2D chuẩn xác
+    assert "(X:52%, Y:42%)" in prompt
+    assert "(X:68%, Y:42%)" in prompt
+    assert "(X:42%, Y:65%)" in prompt
+    assert "[X:58%-84%, Y:38%-68%]" in prompt
+
+    # 2. Điểm dừng hình (Snap-stop freeze holds)
+    assert "Snap-stop freeze holds completely still" in prompt
+    assert "Unified cluster freeze holds motionless" in prompt
+
+    # 3. Liên kết vật lý hợp nhất (Unified physical cluster)
+    assert "docks flush against the hero tool base at coordinate (X:42%, Y:65%)" in prompt
+    assert "locking all objects into a single unified physical cluster" in prompt

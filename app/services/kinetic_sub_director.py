@@ -334,7 +334,7 @@ def generate_scene_sub_director_plan(
     # 2. Xây dựng Cặp Tương Tác Nhân Quả (Kinetic Couplings)
     couplings = []
 
-    # Cặp K1: Tool 1 tác động lên Anchor
+    # Cặp K1: Tool 1 tác động lên Anchor với TOẠ ĐỘ & ĐIỂM DỪNG HÌNH CHUẨN XÁC
     fam1 = dominant_families[0] if dominant_families else KineticFamily.H2_CONSTRAINT
     if fam1 == KineticFamily.H2_CONSTRAINT:
         c1 = KineticCoupling(
@@ -342,9 +342,9 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="slides along strict measurement axis to lock onto",
-            contact_point="critical data row",
-            physical_reaction="vernier scale aligns precisely with grid ticks, locking coordinate measurement",
+            action_verb="slides horizontally from initial coordinate (X:52%, Y:42%) and snaps jaws shut precisely onto target coordinate (X:68%, Y:42%) of",
+            contact_point="critical data row at (X:68%, Y:42%)",
+            physical_reaction="vernier scale aligns precisely with grid ticks, locking coordinate measurement into an instant mechanical snap-stop, holding completely still until 4.2s",
             secondary_reaction={"object": "desk_surface", "reaction": "subtle mechanical micro-vibration"},
             residue="metric baseline ticks permanently marked"
         )
@@ -354,9 +354,9 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="snaps down flat in 2 frames onto",
-            contact_point="header verification zone",
-            physical_reaction="crisp crimson stamp imprint locks onto newsprint with sharp vector borders",
+            action_verb="snaps down flat in 2 frames onto coordinate (X:65%, Y:38%) of",
+            contact_point="header verification zone at (X:65%, Y:38%)",
+            physical_reaction="crisp crimson stamp imprint locks onto newsprint with sharp vector borders, stopping dead in place",
             secondary_reaction={"object": "desk_surface", "reaction": "adjacent paper cutouts settle in 1 frame"},
             residue="deep crimson verification seal stamped"
         )
@@ -366,9 +366,9 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="slides linearly across",
-            contact_point="perforated margin",
-            physical_reaction="clean vertical mask separation cleanly reveals the underlying archival graphic layer",
+            action_verb="slides linearly across coordinate line (X:45% to X:80%, Y:40%) of",
+            contact_point="perforated margin coordinate (X:80%, Y:40%)",
+            physical_reaction="clean vertical mask separation cleanly reveals the underlying archival graphic layer, stopping dead at (X:80%, Y:40%)",
             secondary_reaction={"object": "obj_anchor", "reaction": "exposes lower archival layer"},
             residue="sharp cut edge with visible paper fibers"
         )
@@ -378,14 +378,14 @@ def generate_scene_sub_director_plan(
             family=fam1,
             source_obj_id="obj_tool1",
             target_obj_id="obj_anchor",
-            action_verb="snaps rigidly into position on",
-            contact_point="center focal area",
-            physical_reaction="graphic layout locks firmly into alignment grid",
+            action_verb="snaps rigidly into position on coordinate (X:65%, Y:50%) of",
+            contact_point="center focal area at (X:65%, Y:50%)",
+            physical_reaction="graphic layout locks firmly into alignment grid with zero drift",
             residue="clear mechanical indentation"
         )
     couplings.append(c1)
 
-    # Cặp K2: Tool 2 phản ứng hoặc nối từ Tool 1 / Anchor (Bảo đảm Causal Handoff)
+    # Cặp K2: Tool 2 KẾT NỐI TRỰC TIẾP TỪ TOOL 1 & ANCHOR (Triệt tiêu tính rời rạc, tạo Unified Physical Cluster)
     fam2 = dominant_families[1] if len(dominant_families) > 1 else KineticFamily.H6_MARK
     if fam2 == KineticFamily.H6_MARK:
         c2 = KineticCoupling(
@@ -393,9 +393,9 @@ def generate_scene_sub_director_plan(
             family=fam2,
             source_obj_id="obj_tool2",
             target_obj_id="obj_anchor",
-            action_verb="wipes in a straight horizontal linear reveal across",
-            contact_point="highlighted anomaly row",
-            physical_reaction="neon yellow highlight box illuminates key typography with crisp editorial contrast",
+            action_verb="originates directly from contact coordinate (X:68%, Y:42%), wiping in a straight horizontal vector reveal across coordinate bounds [X:58%-84%, Y:38%-68%] of",
+            contact_point="highlighted anomaly coordinate [X:58%-84%, Y:38%-68%]",
+            physical_reaction="neon yellow highlight box illuminates key typography with crisp editorial contrast, locking dead still",
             residue="striking translucent yellow neon stripe"
         )
     elif fam2 == KineticFamily.H4_TETHER:
@@ -404,9 +404,9 @@ def generate_scene_sub_director_plan(
             family=fam2,
             source_obj_id="obj_tool2",
             target_obj_id="obj_tool1",
-            action_verb="traces a straight dashed vector line connecting to",
-            contact_point="caliper anchor pin",
-            physical_reaction="crimson evidence vector line snaps between pin coordinates, locking forensic link",
+            action_verb="originates from contact coordinate (X:68%, Y:42%), snapping a straight dashed vector thread connecting directly to anchor pin at (X:42%, Y:65%) of",
+            contact_point="caliper anchor pin at (X:42%, Y:65%)",
+            physical_reaction="crimson evidence vector line snaps between pin coordinates, locking forensic link into a single unified cluster",
             residue="taut red evidence vector linking data to source"
         )
     else:
@@ -414,10 +414,10 @@ def generate_scene_sub_director_plan(
             id="K2",
             family=fam2,
             source_obj_id="obj_tool2",
-            target_obj_id="obj_anchor",
-            action_verb="slides in with 2D planar precision alongside",
-            contact_point="boundary perimeter",
-            physical_reaction="sharp dashed bounding box snaps around target data, framing forensic audit",
+            target_obj_id="obj_tool1",
+            action_verb="slides in and docks flush against the hero tool base at coordinate (X:42%, Y:65%), while contact coordinate (X:68%, Y:42%) triggers a sharp dashed bounding box [X:58%-84%, Y:38%-68%] on",
+            contact_point="hero tool anchor pin at (X:42%, Y:65%)",
+            physical_reaction="sharp dashed bounding box snaps around target data, locking all objects into a single unified physical cluster with a complete dead-stop freeze",
             residue="permanent forensic framing box"
         )
     couplings.append(c2)
@@ -440,33 +440,37 @@ def generate_scene_sub_director_plan(
     active_span = t_p3_end - t_p1_end
 
     if beat_count <= 4:
-        # Nhịp 4 bước chuẩn
-        t_mid = round(t_p1_end + active_span * 0.55, 1)
-        t_p2_end = t_mid
+        # Nhịp 4 bước chuẩn hóa: Setup -> Fast Slide to Snap Stop 1 -> Causal Dock to Snap Stop 2 -> Unified Living Hold
+        t_p1_end = min(1.2, round(dur * 0.16, 1))
+        t_snap1 = round(t_p1_end + 1.2, 1)  # Điểm dừng hình 1 (e.g. 2.4s)
+        t_snap2 = round(t_snap1 + 1.8, 1)  # Điểm dừng hình 2 (e.g. 4.2s)
+        t_p3_end = max(t_snap2, round(dur * 0.58, 1))
+        t_p2_end = t_snap1
+
         micro_beats = [
             DynamicMicroBeat(
                 beat_id="B1",
                 phase="P1_SETUP",
                 time_window=f"0.0s - {t_p1_end:.1f}s",
                 coupling_id=None,
-                action_description=f"{anchor_label} rests flat on #F4F1EA desk, edges quivering with 12fps paper jitter",
+                action_description=f"The {anchor_label} and {actor1_label} rest flat at initial coordinates (X:52%, Y:42%), holding dead still with subtle 12fps paper jitter",
                 handoff_to="B2"
             ),
             DynamicMicroBeat(
                 beat_id="B2",
                 phase="P2_TENSION",
-                time_window=f"{t_p1_end:.1f}s - {t_mid:.1f}s",
+                time_window=f"{t_p1_end:.1f}s - {t_snap1:.1f}s",
                 coupling_id="K1",
-                action_description=f"{actor1_label} {c1.action_verb} {anchor_label}, causing {c1.physical_reaction}",
+                action_description=f"The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.1f}s",
                 handoff_to="B3",
-                camera_micro_move="subtle punch-in zoom 1.0x to 1.25x tracking contact point"
+                camera_micro_move="subtle punch-in zoom 1.0x to 1.15x tracking contact point"
             ),
             DynamicMicroBeat(
                 beat_id="B3",
                 phase="P3_ESCALATION",
-                time_window=f"{t_mid:.1f}s - {t_p3_end:.1f}s",
+                time_window=f"{t_snap1:.1f}s - {t_p3_end:.1f}s",
                 coupling_id="K2",
-                action_description=f"{inter2} {c2.action_verb} {anchor_label}, causing {c2.physical_reaction}",
+                action_description=f"Direct kinetic trigger from contact coordinate: the {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_p3_end:.1f}s",
                 handoff_to="B4"
             ),
             DynamicMicroBeat(
@@ -474,7 +478,7 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=f"{t_p3_end:.1f}s - {dur:.1f}s",
                 coupling_id=None,
-                action_description="All objects permanently locked in spatial anchor, organic 12fps paper stop-motion jitter, zero static freeze",
+                action_description=f"All objects permanently locked in rigid unified spatial anchor at final coordinate (X:68%, Y:42%), organic 12fps paper stop-motion jitter, zero static freeze to cut",
                 handoff_to=None
             )
         ]
@@ -700,7 +704,9 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
         if cam_move and "punch-in" in cam_move:
             cam_directive_detected = "Dynamic crash-zoom punch-in from 1.0x to 1.35x tracking inspection point"
 
-        if c_id and c_id in couplings:
+        if action and "causing" in action:
+            steps_text.append(f"{t_win}: {action.rstrip('.')}.")
+        elif c_id and c_id in couplings:
             c = couplings[c_id]
             src_lbl = roster.get(c["source_obj_id"], c["source_obj_id"])
             tgt_lbl = roster.get(c["target_obj_id"], c["target_obj_id"])
@@ -710,11 +716,11 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
 
             # Cú pháp liên hợp nhân quả chuẩn: [SOURCE] [verb] [TARGET], causing [reaction], leaving [residue]
             clause = f"{t_win}: The {src_lbl} {verb} the {tgt_lbl}, causing {reaction}"
-            if residue:
+            if residue and "leaving" not in reaction:
                 clause += f", leaving {residue}"
-            steps_text.append(clause + ".")
+            steps_text.append(clause.rstrip(".") + ".")
         else:
-            steps_text.append(f"{t_win}: {action}.")
+            steps_text.append(f"{t_win}: {action.rstrip('.')}.")
 
     chain_str = " ".join(steps_text)
 
