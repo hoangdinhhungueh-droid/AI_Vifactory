@@ -106,7 +106,8 @@ def test_universal_video_prompt_builder():
         duration_est_sec=5.0,
     )
     prompt = build_universal_video_prompt(sc)
-    assert "Editorial paper cutout animation in Vox documentary style." in prompt
-    assert "BANKRUPTCY CRASH" in prompt
-    assert "Camera: Completely static top-down desk view" in prompt
+    assert "Tactile paper collage stop-motion animation" in prompt
+    assert "[KINETIC CAUSAL CHAIN]" in prompt
+    assert "[PHYSICAL CONSTRAINTS]" in prompt
+    assert "Stamping paper docket" in prompt
 

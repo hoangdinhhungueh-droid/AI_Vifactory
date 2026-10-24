@@ -68,7 +68,9 @@ def generate_7acc_flow_manifest(target_dir: Path, episode_id: str, scenes: List[
         )
         dur = float(
             getattr(s, "duration_est_sec", None)
-            or (s.get("duration_est_sec") if isinstance(s, dict) else 5.0)
+            or (s.get("duration_s") if isinstance(s, dict) else None)
+            or (s.get("duration_sec") if isinstance(s, dict) else None)
+            or (s.get("duration_est_sec") if isinstance(s, dict) else None)
             or 5.0
         )
         hero = getattr(s, "hero_cutout_object", None) or (s.get("hero_cutout_object") if isinstance(s, dict) else "")
