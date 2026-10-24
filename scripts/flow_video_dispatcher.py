@@ -397,6 +397,9 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         if out_file.exists() and out_file.stat().st_size > 200000:
             print(f"      ✅ Tải thành công {out_file.name} ({out_file.stat().st_size:,} bytes)")
             # Đóng player trở về canvas
+            for _ in range(3):
+                page.keyboard.press("Escape")
+                time.sleep(0.3)
             for sel in ["button:has-text('Xong')", "button:has-text('Done')", "button:has-text('arrow_back')", "button[aria-label*='Back' i]", "button[aria-label*='Đã chỉnh sửa xong cảnh']"]:
                 btn = page.locator(sel).first
                 if btn.count() > 0 and btn.is_visible():
@@ -491,8 +494,27 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
 
         configure_flow_agent_settings(page, model_target=model_target)
 
-        for clip in clips:
+        for i_clip, clip in enumerate(clips):
             out_file = out_dir / clip["output_filename"]
+            if i_clip > 0:
+                print(f"\n   🔄 [CLIP TIẾP THEO {clip['scene_id']}] Mở project mới sạch sẽ cho tài khoản...")
+                page.goto("https://flow.google.com/?pli=1", wait_until="domcontentloaded", timeout=45000)
+                dismiss_dialogs(page)
+                try:
+                    page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')", timeout=25000)
+                except Exception:
+                    pass
+                time.sleep(2)
+                dismiss_dialogs(page)
+                new_btn = page.locator("button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')").first
+                if new_btn.count() > 0 and new_btn.is_visible():
+                    new_btn.click(force=True)
+                else:
+                    page.get_by_text(re.compile(r'(New project|Dự án mới|Start Creating|Bắt đầu tạo)', re.I)).first.click(force=True)
+                page.wait_for_selector("div.ProseMirror, [contenteditable='true']", timeout=30000)
+                time.sleep(3)
+                dismiss_dialogs(page)
+                configure_flow_agent_settings(page, model_target=model_target)
             if not force and out_file.exists() and out_file.stat().st_size > 200000:
                 print(f"\n   ⏩ [BỎ QUA] {clip['output_filename']} đã tồn tại hợp lệ ({out_file.stat().st_size:,} bytes)")
                 results[clip["scene_id"]] = True
