@@ -110,7 +110,13 @@ def build_vox_scene_prompts(
     headline = scene.headline or f"BEAT {idx+1:02d}"
     color = scene.color_accent or "Vox Yellow #F2C230 & Navy #1B2B4A"
     hero_obj = scene.visual_metaphor or f"Tactile paper document representing beat {idx+1:02d}"
-    dur = float(scene.duration_est_sec or 5.0)
+    sentence_text = getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or getattr(scene, "narration", "") or headline
+    market_str = getattr(scene, "market", "EN") or "EN"
+    if scene.duration_est_sec and float(scene.duration_est_sec) > 0.0:
+        dur = float(scene.duration_est_sec)
+    else:
+        from app.services.kinetic_sub_director import estimate_speech_duration
+        dur = estimate_speech_duration(sentence_text, market=market_str)
 
     # Pick deterministic single camera movement (Studio Touch 7: Single Camera Mandate)
     allowed_camera_directives = ["STATIC_OVERHEAD", "SLOW_PUSH_IN_0_1X", "SLOW_HORIZONTAL_PAN", "SUBTLE_TILT_DOWN"]
@@ -311,12 +317,14 @@ def build_universal_video_prompt(scene: Scene) -> str:
         return scene.i2v_prompt_google_flow
     try:
         from app.services.kinetic_sub_director import build_kinetic_causal_i2v_prompt, generate_scene_sub_director_plan
+        sentence_str = getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or getattr(scene, "narration", "") or getattr(scene, "headline", "")
+        raw_dur = getattr(scene, "duration_est_sec", None)
         sub_plan = generate_scene_sub_director_plan(
             scene_id=getattr(scene, "scene_id", "SCENE_01"),
-            sentence=getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or getattr(scene, "headline", ""),
+            sentence=sentence_str,
             hero_cutout_object=getattr(scene, "visual_metaphor", "") or getattr(scene, "hero_cutout_object", ""),
             interacting_objects=["tactile measurement tool", "crimson verification seal"],
-            duration_sec=float(getattr(scene, "duration_est_sec", 8.0) or 8.0),
+            duration_sec=float(raw_dur) if raw_dur else None,
             market=getattr(scene, "market", "EN") or "EN"
         )
         return build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=getattr(scene, "camera_directive", ""))

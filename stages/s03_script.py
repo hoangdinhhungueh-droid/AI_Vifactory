@@ -77,6 +77,9 @@ def run(ctx: RunContext) -> StageArtifact:
             headline_text = f"BEAT {idx:02d}"
             metaphor_text = f"Tactile editorial evidence for beat {idx:02d}"
 
+        from app.services.kinetic_sub_director import estimate_speech_duration
+        est_dur = estimate_speech_duration(b.text, market=market)
+
         all_scenes.append(Scene(
             scene_id=f"SCENE_{idx:02d}",
             sequence_block=f"block_{idx}_{block_slug}",
@@ -85,7 +88,7 @@ def run(ctx: RunContext) -> StageArtifact:
             headline=headline_text,
             visual_metaphor=metaphor_text,
             color_accent="Vox Yellow #F2C230 & Navy #1B2B4A",
-            duration_est_sec=6.0
+            duration_est_sec=est_dur
         ))
 
     # Apply limits from profile if specified (e.g. e2e_min limits to 1 scene)

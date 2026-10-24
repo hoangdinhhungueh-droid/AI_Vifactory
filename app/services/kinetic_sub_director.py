@@ -228,16 +228,57 @@ class SemanticClauseMapper:
         return detected
 
 
+def estimate_speech_duration(sentence: str, market: str = "EN") -> float:
+    """Ước tính thời lượng nói (giây) của câu thoại dựa trên ngôn ngữ và số từ/ký tự.
+    Tuân thủ trần an toàn [2.5s, 10.0s] theo kỷ luật nhịp điệu tài liệu điều tra VOX.
+    """
+    if not sentence or not sentence.strip():
+        return 5.0
+
+    s = sentence.strip()
+    m = (market or "EN").upper()
+
+    if m in ["JA", "JP", "KO", "KR"]:
+        # Ngôn ngữ tượng hình / âm tiết: trung bình 5.5 ký tự / giây (bỏ qua khoảng trắng)
+        char_count = len(re.sub(r"\s+", "", s))
+        raw_dur = char_count / 5.5
+    elif m in ["VN", "VI"]:
+        # Tiếng Việt: trung bình ~3.5 từ / giây (đơn âm tiết)
+        words = s.split()
+        raw_dur = len(words) / 3.5
+    else:
+        # Tiếng Anh và ngôn ngữ Latin: trung bình ~2.8 từ / giây (~160 wpm)
+        words = s.split()
+        raw_dur = len(words) / 2.8
+
+    # Kẹp chặt trong dải an toàn [2.5s, 10.0s]
+    dur = round(max(2.5, min(10.0, raw_dur)), 2)
+    return dur
+
+
 def generate_scene_sub_director_plan(
     scene_id: str,
     sentence: str,
     hero_cutout_object: str,
     interacting_objects: List[str],
-    duration_sec: float = 8.0,
+    duration_sec: Optional[float] = None,
     market: str = "EN"
 ) -> Dict[str, Any]:
     """Sinh toàn diện Khung Đạo Diễn Vi Cảnh (Scene Sub-Director Plan) chuẩn hóa cho mọi Episode."""
-    beat_count = SemanticClauseMapper.calculate_beat_count(sentence)
+    if duration_sec is None or float(duration_sec) <= 0.0:
+        dur = estimate_speech_duration(sentence, market)
+    else:
+        dur = round(max(2.5, min(10.0, float(duration_sec))), 2)
+
+    raw_beat_count = SemanticClauseMapper.calculate_beat_count(sentence)
+    # Beat Count Governor: Giới hạn số vi nhịp theo ngân sách thời gian thực tế
+    if dur < 4.0:
+        beat_count = 4
+    elif dur < 6.5:
+        beat_count = min(5, raw_beat_count)
+    else:
+        beat_count = raw_beat_count
+
     dominant_families = SemanticClauseMapper.detect_dominant_families(sentence)
 
     hero_clean = (hero_cutout_object or "primary forensic document").split(" on ")[0].strip()
@@ -381,17 +422,27 @@ def generate_scene_sub_director_plan(
         )
     couplings.append(c2)
 
-    # 3. Phân Rã Dãy Micro-Beats Linh Hoạt (Từ 4 đến 7 bước)
-    dur = float(duration_sec or 8.0)
+    # 3. Phân Rã Dãy Micro-Beats Linh Hoạt (Từ 4 đến 7 bước) theo Ngân Sách Thời Gian Thực
     micro_beats = []
 
-    # Ngân sách thời gian theo 4 Thì Gốc
-    t_p1_end = min(1.5, round(dur * 0.2, 1))
-    t_p2_end = min(3.8, round(dur * 0.5, 1))
-    t_p3_end = min(dur - 1.2, round(dur * 0.85, 1))
+    # Ngân sách thời gian theo 4 Thì Gốc tỷ lệ thuận với dur
+    # P1 (Setup): ~18% (kẹp [0.8s, 1.8s])
+    t_p1_end = round(max(0.8, min(1.8, dur * 0.18)), 1)
+    # P4 (Living Hold): tối thiểu 0.8s để giữ nhịp stop-motion
+    hold_len = round(max(0.8, min(1.8, dur * 0.18)), 1)
+    t_p3_end = round(dur - hold_len, 1)
+
+    # Bảo đảm khoảng giữa (Active Span) tối thiểu 1.0s
+    if t_p3_end <= t_p1_end + 0.9:
+        t_p1_end = 0.8
+        t_p3_end = round(max(t_p1_end + 1.0, dur - 0.8), 1)
+
+    active_span = t_p3_end - t_p1_end
 
     if beat_count <= 4:
         # Nhịp 4 bước chuẩn
+        t_mid = round(t_p1_end + active_span * 0.55, 1)
+        t_p2_end = t_mid
         micro_beats = [
             DynamicMicroBeat(
                 beat_id="B1",
@@ -404,7 +455,7 @@ def generate_scene_sub_director_plan(
             DynamicMicroBeat(
                 beat_id="B2",
                 phase="P2_TENSION",
-                time_window=f"{t_p1_end:.1f}s - {t_p2_end:.1f}s",
+                time_window=f"{t_p1_end:.1f}s - {t_mid:.1f}s",
                 coupling_id="K1",
                 action_description=f"{actor1_label} {c1.action_verb} {anchor_label}, causing {c1.physical_reaction}",
                 handoff_to="B3",
@@ -413,7 +464,7 @@ def generate_scene_sub_director_plan(
             DynamicMicroBeat(
                 beat_id="B3",
                 phase="P3_ESCALATION",
-                time_window=f"{t_p2_end:.1f}s - {t_p3_end:.1f}s",
+                time_window=f"{t_mid:.1f}s - {t_p3_end:.1f}s",
                 coupling_id="K2",
                 action_description=f"{inter2} {c2.action_verb} {anchor_label}, causing {c2.physical_reaction}",
                 handoff_to="B4"
@@ -429,9 +480,10 @@ def generate_scene_sub_director_plan(
         ]
     elif beat_count == 5:
         # Nhịp 5 bước
-        t_step = (t_p3_end - t_p1_end) / 3.0
+        t_step = active_span / 3.0
         t2 = round(t_p1_end + t_step, 1)
         t3 = round(t_p1_end + 2 * t_step, 1)
+        t_p2_end = t3
         micro_beats = [
             DynamicMicroBeat(
                 beat_id="B1",
@@ -475,12 +527,13 @@ def generate_scene_sub_director_plan(
                 handoff_to=None
             )
         ]
-    else:
-        # Nhịp 6..7 bước linh hoạt cho câu phức
-        t_sub_step = (t_p3_end - t_p1_end) / 4.0
+    elif beat_count == 6:
+        # Nhịp 6 bước linh hoạt
+        t_sub_step = active_span / 4.0
         t2 = round(t_p1_end + t_sub_step, 1)
         t3 = round(t_p1_end + 2 * t_sub_step, 1)
         t4 = round(t_p1_end + 3 * t_sub_step, 1)
+        t_p2_end = t3
 
         micro_beats = [
             DynamicMicroBeat(
@@ -533,10 +586,79 @@ def generate_scene_sub_director_plan(
                 handoff_to=None
             )
         ]
+    else:
+        # Nhịp 7 bước tối đa cho câu phức / cao trào
+        t_sub_step = active_span / 5.0
+        t2 = round(t_p1_end + t_sub_step, 1)
+        t3 = round(t_p1_end + 2 * t_sub_step, 1)
+        t4 = round(t_p1_end + 3 * t_sub_step, 1)
+        t5 = round(t_p1_end + 4 * t_sub_step, 1)
+        t_p2_end = t3
+
+        micro_beats = [
+            DynamicMicroBeat(
+                beat_id="B1",
+                phase="P1_SETUP",
+                time_window=f"0.0s - {t_p1_end:.1f}s",
+                coupling_id=None,
+                action_description=f"{anchor_label} snap-drops onto desk #F4F1EA, edges vibrating with stop-motion jitter",
+                handoff_to="B2"
+            ),
+            DynamicMicroBeat(
+                beat_id="B2",
+                phase="P2_TENSION",
+                time_window=f"{t_p1_end:.1f}s - {t2:.1f}s",
+                coupling_id="K1",
+                action_description=f"{actor1_label} enters frame with crisp paper deceleration and aligns with {anchor_label}",
+                handoff_to="B3"
+            ),
+            DynamicMicroBeat(
+                beat_id="B3",
+                phase="P2_TENSION",
+                time_window=f"{t2:.1f}s - {t3:.1f}s",
+                coupling_id="K1",
+                action_description=f"{actor1_label} {c1.action_verb} {anchor_label}, causing {c1.physical_reaction}",
+                handoff_to="B4",
+                camera_micro_move="camera punch-in zoom 1.0x to 1.35x tracking contact point"
+            ),
+            DynamicMicroBeat(
+                beat_id="B4",
+                phase="P2_TENSION",
+                time_window=f"{t3:.1f}s - {t4:.1f}s",
+                coupling_id="K1",
+                action_description=f"Mechanical settling permanently leaves {c1.residue}",
+                handoff_to="B5"
+            ),
+            DynamicMicroBeat(
+                beat_id="B5",
+                phase="P3_ESCALATION",
+                time_window=f"{t4:.1f}s - {t5:.1f}s",
+                coupling_id="K2",
+                action_description=f"{inter2} {c2.action_verb} {anchor_label}, causing {c2.physical_reaction}",
+                handoff_to="B6"
+            ),
+            DynamicMicroBeat(
+                beat_id="B6",
+                phase="P3_ESCALATION",
+                time_window=f"{t5:.1f}s - {t_p3_end:.1f}s",
+                coupling_id="K2",
+                action_description=f"Action solidifies, leaving {c2.residue}",
+                handoff_to="B7"
+            ),
+            DynamicMicroBeat(
+                beat_id="B7",
+                phase="P4_LIVING_HOLD",
+                time_window=f"{t_p3_end:.1f}s - {dur:.1f}s",
+                coupling_id=None,
+                action_description="All objects locked in spatial anchor, organic 12fps paper stop-motion jitter, zero static freeze to cut",
+                handoff_to=None
+            )
+        ]
 
     plan = {
         "schema_version": "scene_sub_director_plan.v3",
         "scene_id": scene_id,
+        "scene_duration_sec": dur,
         "calculated_beat_count": len(micro_beats),
         "dominant_kinetic_families": [f.value for f in dominant_families],
         "foundation_phases": {

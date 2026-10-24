@@ -132,7 +132,8 @@ def build_universal_video_prompt(scene: Dict[str, Any]) -> str:
             sentence = scene.get("sentence") or scene.get("spoken_sentence") or scene.get("core_idea") or ""
             hero_obj = scene.get("hero_cutout_object") or scene.get("visual_metaphor") or ""
             interacting = scene.get("interacting_objects") or []
-            dur = float(scene.get("duration_s") or scene.get("duration_sec") or scene.get("duration_est_sec") or 8.0)
+            raw_dur = scene.get("duration_s") or scene.get("duration_sec") or scene.get("duration_est_sec")
+            dur = float(raw_dur) if raw_dur else None
             market = scene.get("market") or "EN"
             sub_plan = generate_scene_sub_director_plan(
                 scene_id=scene.get("scene_id", "SCENE_01"),

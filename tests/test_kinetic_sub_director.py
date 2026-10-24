@@ -13,6 +13,7 @@ from app.services.kinetic_sub_director import (
     KineticFamily,
     SemanticClauseMapper,
     build_kinetic_causal_i2v_prompt,
+    estimate_speech_duration,
     generate_scene_sub_director_plan,
 )
 
@@ -110,3 +111,70 @@ def test_build_kinetic_causal_i2v_prompt_syntax():
     assert "[KINETIC CAUSAL CHAIN]:" in prompt
     assert "Zero independent drifting" in prompt
     assert "12fps paper stop-motion" in prompt
+
+
+def test_estimate_speech_duration_multilingual():
+    """Kiểm tra hàm ước tính thời lượng câu thoại đa ngôn ngữ và giới hạn [2.5s, 10.0s]."""
+    # 1. Câu tiếng Nhật ngắn (11 ký tự -> ~2.0s raw -> clamped to 2.5s)
+    ja_short = "契約が成立した。"
+    assert estimate_speech_duration(ja_short, market="JA") == 2.5
+
+    # 2. Câu tiếng Nhật vừa (33 ký tự -> 33 / 5.5 = 6.0s)
+    ja_mid = "この数字は市場全体で測定されたものではなく、推計値に過ぎません。"
+    dur_ja = estimate_speech_duration(ja_mid, market="JA")
+    assert 5.5 <= dur_ja <= 6.5
+
+    # 3. Câu tiếng Anh vừa (12 từ -> 12 / 2.8 = 4.29s)
+    en_mid = "The forensic auditor discovered missing ledger records inside the classified intelligence archive."
+    assert 4.0 <= estimate_speech_duration(en_mid, market="EN") <= 5.0
+
+    # 4. Câu cực dài vượt trần (>10s) -> Bắt buộc bị kẹp về đúng 10.0s
+    long_sentence = "This is an extremely long investigative sentence designed to exceed the normal bounds of documentary narration " * 3
+    assert estimate_speech_duration(long_sentence, market="EN") == 10.0
+
+
+def test_dynamic_pacing_timeline_flexibility():
+    """Kiểm tra vi nhịp và timeline co giãn linh hoạt theo độ dài câu thoại thay vì cố định 8s."""
+    # 1. Phân cảnh ngắn (3.2s) -> Beat Count Governor khóa về 4 bước, kết thúc đúng 3.2s
+    plan_short = generate_scene_sub_director_plan(
+        scene_id="SC_SHORT",
+        sentence="だますメールを書く。",
+        hero_cutout_object="Phishing email draft",
+        interacting_objects=["Fountain pen nib"],
+        duration_sec=3.2,
+        market="JA"
+    )
+    assert plan_short["scene_duration_sec"] == 3.2
+    assert plan_short["calculated_beat_count"] == 4
+    beats_short = plan_short["dynamic_micro_beats"]
+    assert beats_short[-1]["time_window"].endswith("3.2s")
+    prompt_short = build_kinetic_causal_i2v_prompt(plan_short)
+    assert "3.2s:" in prompt_short
+
+    # 2. Phân cảnh dài (9.5s) với câu phức -> Nở 6-7 bước, kết thúc đúng 9.5s
+    plan_long = generate_scene_sub_director_plan(
+        scene_id="SC_LONG",
+        sentence="In 2024, the corporation spent 4 billion dollars on security, but only 2 percent reached actual frontline defenses.",
+        hero_cutout_object="Corporate financial ledger",
+        interacting_objects=["Heavy steel shears", "Red evidence yarn"],
+        duration_sec=9.5,
+        market="EN"
+    )
+    assert plan_long["scene_duration_sec"] == 9.5
+    assert plan_long["calculated_beat_count"] >= 5
+    beats_long = plan_long["dynamic_micro_beats"]
+    assert beats_long[-1]["time_window"].endswith("9.5s")
+    prompt_long = build_kinetic_causal_i2v_prompt(plan_long)
+    assert "9.5s:" in prompt_long
+
+    # 3. Phân cảnh không truyền duration_sec -> Tự động suy ra từ độ dài câu thoại
+    plan_auto = generate_scene_sub_director_plan(
+        scene_id="SC_AUTO",
+        sentence="The confidential archive remained sealed inside the vault.",
+        hero_cutout_object="Confidential archive box",
+        interacting_objects=["Brass key"],
+        duration_sec=None,
+        market="EN"
+    )
+    assert 2.5 <= plan_auto["scene_duration_sec"] <= 10.0
+
