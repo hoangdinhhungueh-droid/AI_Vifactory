@@ -254,24 +254,37 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     except Exception as e:
                         print(f"      ⚠️ Lỗi file chooser: {e}")
 
-                agree_btn = page.locator("button:has-text('Tôi đồng ý'), button:has-text('I agree')").first
-                if agree_btn.count() > 0 and agree_btn.is_visible():
-                    agree_btn.click(force=True)
-                    time.sleep(2)
-
-                add_to_prompt = page.locator("button:has-text('Thêm vào câu lệnh'), button:has-text('Add to prompt')").first
-                if add_to_prompt.count() > 0 and add_to_prompt.is_visible():
-                    add_to_prompt.click(force=True)
-                    time.sleep(2)
-                else:
-                    first_asset = page.locator(".asset-item, [role='listitem'], .cdk-drag").first
-                    if first_asset.count() > 0 and first_asset.is_visible():
-                        first_asset.click(force=True)
+                # Chờ file hoàn tất xử lý, click chọn asset và chờ nút Thêm vào câu lệnh enabled (Rule 118, 121)
+                asset_added = False
+                for wait_i in range(20):
+                    agree_btn = page.locator("button:has-text('Tôi đồng ý'), button:has-text('I agree')").first
+                    if agree_btn.count() > 0 and agree_btn.is_visible():
+                        agree_btn.click(force=True)
                         time.sleep(1)
-                        add_to_prompt = page.locator("button:has-text('Thêm vào câu lệnh'), button:has-text('Add to prompt')").first
-                        if add_to_prompt.count() > 0 and add_to_prompt.is_visible():
-                            add_to_prompt.click(force=True)
-                            time.sleep(2)
+
+                    # Click chọn asset vừa tải lên
+                    target_asset = page.locator(f"text={seed_img.name[:16]}").first
+                    if target_asset.count() > 0 and target_asset.is_visible():
+                        try:
+                            target_asset.click(force=True)
+                        except Exception:
+                            pass
+                    else:
+                        first_asset = page.locator(".asset-item, [role='listitem'], .cdk-drag, mat-list-item").first
+                        if first_asset.count() > 0 and first_asset.is_visible():
+                            try:
+                                first_asset.click(force=True)
+                            except Exception:
+                                pass
+
+                    time.sleep(1)
+                    add_btn = page.locator("button:has-text('Thêm vào câu lệnh'), button:has-text('Add to prompt')").first
+                    if add_btn.count() > 0 and add_btn.is_visible() and add_btn.is_enabled():
+                        print(f"      ✅ Nút 'Thêm vào câu lệnh' đã sẵn sàng sau {wait_i+1}s! Đang chèn chip ảnh...")
+                        add_btn.click(force=True)
+                        time.sleep(2)
+                        asset_added = True
+                        break
 
             # 4. Chốt chặn kiểm toán I2V (Fail-Closed Gate): Đảm bảo Ingredient Chip TỒN TẠI
             chip_attached = False
