@@ -11,10 +11,8 @@ Enforces RULE 140:
 
 from __future__ import annotations
 
-import os
-import sys
 import json
-import re
+import sys
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -22,8 +20,8 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.services.kinetic_sub_director import (
-    generate_scene_sub_director_plan,
     build_kinetic_causal_i2v_prompt,
+    generate_scene_sub_director_plan,
 )
 
 # 12 THEMATIC SEQUENCE BLOCKS FOR JP_EP0003
@@ -949,14 +947,14 @@ def generate_director_plan(episode_id: str = "JP_EP0003_japan_ai_ransom_economy"
     """Tạo Director Plan 72 Beats chuẩn Rule 140."""
     scenes = []
     prompts_forge = []
-    
+
     for i, meta in enumerate(BEATS_METADATA, start=1):
         block_idx = (i - 1) // 6
         block = BLOCKS_CONFIG[min(block_idx, len(BLOCKS_CONFIG) - 1)]
-        
+
         scene_id = f"SCENE_{i:02d}"
         seq_block = f"{block['block_id']}_{block['title'].replace(' ', '_').replace(':', '')}"
-        
+
         # 5-Layer Image Prompt
         image_prompt = (
             f"Editorial investigative documentary frame in signature VOX paper-cut collage style. "
@@ -970,7 +968,7 @@ def generate_director_plan(episode_id: str = "JP_EP0003_japan_ai_ransom_economy"
             f"Negative prompt: no typography, no letters, no text, no captions, no sub-titles, no watermarks, no labels, no words, "
             f"no clutter, no unnecessary objects, no 3D photorealistic rooms, no anime, no cartoon, no CGI glossy look, maintain clean premium VOX editorial collage."
         )
-        
+
         # Rule 140 v3: Causal Kinetic Coupling & Narrative Sub-Director Plan
         sub_plan = generate_scene_sub_director_plan(
             scene_id=scene_id,
@@ -981,7 +979,7 @@ def generate_director_plan(episode_id: str = "JP_EP0003_japan_ai_ransom_economy"
             market="JA"
         )
         i2v_prompt = build_kinetic_causal_i2v_prompt(sub_plan)
-        
+
         scene_data = {
             "scene_id": scene_id,
             "beat_id": f"BEAT_{i:02d}",
@@ -1009,7 +1007,7 @@ def generate_director_plan(episode_id: str = "JP_EP0003_japan_ai_ransom_economy"
             "flow_video_prompt": i2v_prompt
         }
         scenes.append(scene_data)
-        
+
         prompts_forge.append({
             "scene_id": scene_id,
             "beat_id": f"BEAT_{i:02d}",
@@ -1017,7 +1015,7 @@ def generate_director_plan(episode_id: str = "JP_EP0003_japan_ai_ransom_economy"
             "image_prompt": image_prompt,
             "flow_video_prompt": i2v_prompt
         })
-        
+
     director_plan = {
         "schema_version": "director_plan.v2",
         "rule_compliance": ["RULE_118", "RULE_120", "RULE_122", "RULE_126", "RULE_136", "RULE_140"],
@@ -1032,29 +1030,29 @@ def generate_director_plan(episode_id: str = "JP_EP0003_japan_ai_ransom_economy"
         "blocks": BLOCKS_CONFIG,
         "scenes": scenes
     }
-    
+
     return director_plan, prompts_forge
 
 
 def main():
     episode_id = "JP_EP0003_japan_ai_ransom_economy"
     plan, prompts = generate_director_plan(episode_id)
-    
+
     ep_dir = ROOT_DIR / "episodes" / episode_id
     if not ep_dir.exists():
         ep_dir = Path("/var/vf/episodes") / episode_id
     ep_dir.mkdir(parents=True, exist_ok=True)
-    
+
     plan_path = ep_dir / "director_plan.json"
     prompts_path = ep_dir / "prompts.json"
-    
+
     with open(plan_path, "w", encoding="utf-8") as f:
         json.dump(plan, f, ensure_ascii=False, indent=2)
-        
+
     with open(prompts_path, "w", encoding="utf-8") as f:
         json.dump(prompts, f, ensure_ascii=False, indent=2)
-        
-    print(f"Reforged Director Plan successfully:")
+
+    print("Reforged Director Plan successfully:")
     print(f"- Total Beats: {plan['total_beats']}")
     print(f"- Total Blocks: {plan['total_sequence_blocks']}")
     print(f"- Audio Duration: {plan['audio_runtime_seconds']}s")

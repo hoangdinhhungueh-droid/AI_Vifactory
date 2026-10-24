@@ -9,12 +9,11 @@ Enforces:
 - Rule 140 v3: Kinetic Coupling Taxonomy & Causal Compound Verb Prompts.
 """
 
-import pytest
 from app.services.kinetic_sub_director import (
     KineticFamily,
     SemanticClauseMapper,
+    build_kinetic_causal_i2v_prompt,
     generate_scene_sub_director_plan,
-    build_kinetic_causal_i2v_prompt
 )
 
 

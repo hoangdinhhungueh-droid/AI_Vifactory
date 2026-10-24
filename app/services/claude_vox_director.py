@@ -15,13 +15,13 @@ Transforms continuous narrative story.txt into an exact, object-anchored visual 
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import re
 import sys
-import json
-import logging
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("vf.claude_vox_director")
 

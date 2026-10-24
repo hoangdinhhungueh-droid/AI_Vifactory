@@ -49,13 +49,10 @@ def test_build_universal_video_prompt():
         headline="LIQUIDITY CONTRACTION",
     )
     prompt = build_universal_video_prompt(sc)
-    assert "Editorial paper cutout animation in Vox documentary style." in prompt
+    assert "Tactile paper collage stop-motion animation" in prompt
     assert "Tactile brass vault key" in prompt
-    assert "Vox Crimson #E53935" in prompt
-    assert "LIQUIDITY CONTRACTION" in prompt
-    assert "0.0-2.0s:" in prompt
-    assert "2.0-7.0s:" in prompt
-    assert "7.0-10.0s:" in prompt
+    assert "KINETIC CAUSAL CHAIN" in prompt
+    assert "PHYSICAL CONSTRAINTS" in prompt
 
 
 def test_s05_director_plan_execution_and_s3_data_loading(mock_s05_context: RunContext):
@@ -110,8 +107,8 @@ def test_s05_director_plan_execution_and_s3_data_loading(mock_s05_context: RunCo
     assert sc1["scene_id"] == "SC_01"
     assert len(sc1["shots"]) == 1
     shot1 = sc1["shots"][0]
-    assert "Editorial paper cutout animation in Vox documentary style" in shot1["visual_prompt"]
-    assert "LIQUIDITY CRISIS" in shot1["visual_prompt"]
+    assert "Tactile paper collage stop-motion animation" in shot1["visual_prompt"]
+    assert "Tactile paper balance sheet burning" in shot1["visual_prompt"]
 
     # 4. Artifact written to disk
     out_artifact_path = ctx.paths.artifact_file(StageID.S5_DIRECTOR_PLAN.value)

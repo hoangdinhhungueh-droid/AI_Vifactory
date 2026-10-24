@@ -12,7 +12,7 @@ Enforces:
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -576,7 +576,7 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
         cam_move = b.get("camera_micro_move")
 
         if cam_move and "punch-in" in cam_move:
-            cam_directive_detected = f"Dynamic crash-zoom punch-in from 1.0x to 1.35x tracking inspection point"
+            cam_directive_detected = "Dynamic crash-zoom punch-in from 1.0x to 1.35x tracking inspection point"
 
         if c_id and c_id in couplings:
             c = couplings[c_id]

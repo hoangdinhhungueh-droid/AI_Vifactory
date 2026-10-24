@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import re
 import shutil
 import subprocess
@@ -126,10 +125,7 @@ def build_universal_video_prompt(scene: Dict[str, Any]) -> str:
     Áp dụng phổ quát cho mọi Episode và mọi Market (Rule 128 & 132).
     """
     try:
-        from app.services.kinetic_sub_director import (
-            generate_scene_sub_director_plan,
-            build_kinetic_causal_i2v_prompt
-        )
+        from app.services.kinetic_sub_director import build_kinetic_causal_i2v_prompt, generate_scene_sub_director_plan
 
         sub_plan = scene.get("scene_sub_director_plan")
         if not sub_plan or not isinstance(sub_plan, dict) or not sub_plan.get("kinetic_couplings"):
@@ -361,8 +357,8 @@ def perform_b5_visual_audit(episode_id: str, block_manifest: Dict[str, Any], lim
     print("=" * 88)
 
     try:
-        from PIL import Image
         import numpy as np
+        from PIL import Image
     except ImportError:
         Image = None
         np = None
@@ -449,7 +445,7 @@ def perform_b5_visual_audit(episode_id: str, block_manifest: Dict[str, Any], lim
                     res_str = f"{w}x{h}"
                     ratio = round(w / h, 2) if h > 0 else 0.0
                     aspect_str = f"{ratio}:1"
-                    
+
                     # Tiêu chuẩn: 16:9 (ratio 1.70 - 1.85) và tối thiểu 1920x1080
                     res_pass = (w >= 1920 and h >= 1080)
                     ratio_pass = (1.70 <= ratio <= 1.85)
@@ -970,7 +966,7 @@ def main():
         try:
             from app.services.vox_telegram_gates import send_gate_sync
             gallery_rel = f"episodes/{clean_ep}/review_gallery.html"
-            total_img = audit_summary.get("total_images", len(scenes_info) if 'scenes_info' in locals() else 72)
+            total_img = audit_summary.get("total_images", 72)
             print(f"\n📡 [Human Gate 3] Gửi thông báo Telegram duyệt ảnh seed ({total_img} ảnh)...")
             send_gate_sync(3, clean_ep, image_count=total_img, gallery_path=gallery_rel)
         except Exception as tg_err:

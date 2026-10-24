@@ -250,10 +250,7 @@ def build_vox_scene_prompts(
 
     # 7. Sub-Director Plan & Causal Compound Verb Prompts (Rule 140 v3)
     try:
-        from app.services.kinetic_sub_director import (
-            generate_scene_sub_director_plan,
-            build_kinetic_causal_i2v_prompt
-        )
+        from app.services.kinetic_sub_director import build_kinetic_causal_i2v_prompt, generate_scene_sub_director_plan
         sub_plan = generate_scene_sub_director_plan(
             scene_id=getattr(scene, "scene_id", f"SCENE_{idx+1:02d}"),
             sentence=getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or headline,
@@ -313,10 +310,7 @@ def build_universal_video_prompt(scene: Scene) -> str:
     if scene.i2v_prompt_google_flow:
         return scene.i2v_prompt_google_flow
     try:
-        from app.services.kinetic_sub_director import (
-            generate_scene_sub_director_plan,
-            build_kinetic_causal_i2v_prompt
-        )
+        from app.services.kinetic_sub_director import build_kinetic_causal_i2v_prompt, generate_scene_sub_director_plan
         sub_plan = generate_scene_sub_director_plan(
             scene_id=getattr(scene, "scene_id", "SCENE_01"),
             sentence=getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or getattr(scene, "headline", ""),
