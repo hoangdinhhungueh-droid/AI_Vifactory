@@ -192,7 +192,7 @@ def test_build_vox_scene_prompts_kinematics():
 
     # Check kinetic causal prompt (Rule 140 v3)
     flow_prompt = vox_meta["i2v_prompt_google_flow"]
-    assert "Tactile paper collage stop-motion animation" in flow_prompt
+    assert "Forensic documentary motion graphics" in flow_prompt
     assert "[Camera:" in flow_prompt
     assert "[KINETIC CAUSAL CHAIN]:" in flow_prompt
     assert "[PHYSICAL CONSTRAINTS]:" in flow_prompt
