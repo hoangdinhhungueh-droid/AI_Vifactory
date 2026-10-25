@@ -783,19 +783,6 @@ def run(ctx: RunContext) -> StageArtifact:
     except Exception as parse_err:
         raise RuntimeError(f"Failed to parse S3 script artifact JSON at {s3_artifact_path}: {parse_err}") from parse_err
 
-    # Auto-envelope partial mock payloads from legacy unit test fixtures
-    if isinstance(s3_raw, dict) and ("run_id" not in s3_raw or "stage" not in s3_raw):
-        s3_raw = {
-            "schema_version": "1.0.0",
-            "run_id": ctx.run_id,
-            "stage": StageID.S3_SCRIPT.value,
-            "status": s3_raw.get("status", "ok"),
-            "payload": s3_raw.get("payload", s3_raw),
-            "provenance": s3_raw.get("provenance") or Provenance(
-                generator="test_adapter",
-            ).model_dump(mode="json")
-        }
-
     s3_artifact = validate_artifact(StageID.S3_SCRIPT, s3_raw)
     raw_scenes = s3_artifact.payload.get("scenes", [])
     b2_source_path = s3_artifact.payload.get("b2_source_path", "")

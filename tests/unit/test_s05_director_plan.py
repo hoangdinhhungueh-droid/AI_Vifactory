@@ -66,7 +66,13 @@ def test_s05_director_plan_execution_and_s3_data_loading(mock_s05_context: RunCo
     s3_path.parent.mkdir(parents=True, exist_ok=True)
 
     s3_payload = {
+        "schema_version": "1.0.0",
+        "run_id": ctx.run_id,
+        "stage": StageID.S3_SCRIPT.value,
         "status": "ok",
+        "provenance": {
+            "generator": "test_s05_director_plan",
+        },
         "payload": {
             "script_text": "The 2008 financial crisis crippled the commercial paper market.",
             "scenes": [
