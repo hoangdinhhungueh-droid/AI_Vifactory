@@ -316,8 +316,8 @@ def run(ctx: RunContext) -> StageArtifact:
                             try:
                                 bi_data = json.loads(bi_file.read_text(encoding="utf-8"))
                                 props_data["title"] = bi_data.get("title_a") or bi_data.get("topic")
-                            except Exception as _bi_err:
-                                logger.debug(f"Could not extract title from brain_input.json: {_bi_err}")
+                            except (OSError, json.JSONDecodeError, KeyError) as _bi_err:
+                                logger.warning(f"Failed to extract title from brain_input.json: {_bi_err}")
 
                 # Hydrate each scene in sc_list
                 for idx, sc in enumerate(sc_list):
@@ -344,8 +344,8 @@ def run(ctx: RunContext) -> StageArtifact:
                         try:
                             bi_data = json.loads(bi_file.read_text(encoding="utf-8"))
                             dp_data["title"] = bi_data.get("title_a") or bi_data.get("topic")
-                        except Exception as _bi_err:
-                            logger.debug(f"Could not extract title from local brain_input.json: {_bi_err}")
+                        except (OSError, json.JSONDecodeError, KeyError) as _bi_err:
+                            logger.warning(f"Failed to extract title from local brain_input.json: {_bi_err}")
                 plan = _validate_authoritative_scene_plan(dp_data, ctx.run_id)
             except Exception as dp_err:
                 raise ValueError(f"Stage S11 fail-closed: Malformed run-local director_plan '{local_dp}': {dp_err}")

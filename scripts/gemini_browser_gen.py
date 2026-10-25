@@ -89,7 +89,7 @@ class DirectMCPClient:
                     notif_payload = {"jsonrpc": "2.0", "method": "notifications/initialized"}
                     req_notif = urllib.request.Request(self.url, data=json.dumps(notif_payload).encode(), headers=self._headers(), method="POST")
                     with urllib.request.urlopen(req_notif, timeout=10, context=self.ctx) as _resp:
-                        _notif_bytes = _resp.read()
+                        _resp.read()
                 except Exception as _notif_err:
                     logger.debug(f"MCP notification notice: {_notif_err}")
                 print(f"📡 MCP Session initialized: {self.session_id}")
@@ -227,7 +227,7 @@ def fetch_prompts_from_vps(episode_id):
                     print(f"📋 [Vox Director Plan VPS] Đã nạp thành công {len(items)} prompts từ VPS director_plan.json!")
                     return items
     except Exception as e:
-        logger.debug(f"Failed to load director plan from VPS: {e}")
+        logger.warning(f"Failed to load director plan from VPS: {e}")
 
     local_prompts_file = os.path.join(local_episode_dir, "prompts_forge.json")
     
@@ -793,8 +793,8 @@ def verify_director_plan_binding(episode_id, items, local_dir):
         try:
             with open(dplan_file, "r", encoding="utf-8") as f:
                 dplan = json.load(f)
-        except Exception as _dplan_err:
-            logger.debug(f"Could not load local dplan: {_dplan_err}")
+        except (OSError, json.JSONDecodeError) as _dplan_err:
+            logger.warning(f"Could not load local director_plan.json: {_dplan_err}")
     if not dplan:
         try:
             vps_eval_code = f"""python3 -c '
@@ -829,8 +829,8 @@ except Exception as e:
                         "registered_fg_count": len(registered_fgs),
                         "unregistered_keys": unregistered
                     }
-        except Exception as _vps_probe_err:
-            logger.debug(f"Could not query vps dplan: {_vps_probe_err}")
+        except (OSError, json.JSONDecodeError, RuntimeError) as _vps_probe_err:
+            logger.warning(f"Could not query VPS director_plan.json: {_vps_probe_err}")
 
     if not dplan:
         return {"status": "SKIPPED", "reason": "director_plan.json not available for validation", "unregistered_keys": []}

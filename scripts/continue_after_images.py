@@ -120,8 +120,8 @@ def _run_stage(stage, argv, episode_id, timeout, notify_on_error=False):
                 os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
                 time.sleep(2)
                 os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except Exception:
-                pass
+            except (ProcessLookupError, OSError) as _kill_err:
+                _log("Notice: timeout killpg failed: %s" % _kill_err)
         msg = "%s TIMEOUT after %ss" % (stage, timeout)
         _log("FAILED " + msg)
         _write_state(episode_id, stage=stage, status="failed", error=msg,
@@ -135,8 +135,8 @@ def _run_stage(stage, argv, episode_id, timeout, notify_on_error=False):
         if proc:
             try:
                 os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except Exception:
-                pass
+            except (ProcessLookupError, OSError) as _kill_err:
+                _log("Notice: exception killpg failed: %s" % _kill_err)
         msg = "%s crashed (%s: %s)" % (stage, type(exc).__name__, exc)
         _log("FAILED " + msg)
         _write_state(episode_id, stage=stage, status="failed", error=msg)
@@ -149,8 +149,8 @@ def _run_stage(stage, argv, episode_id, timeout, notify_on_error=False):
         if proc and proc.poll() is None:
             try:
                 os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except Exception:
-                pass
+            except (ProcessLookupError, OSError) as _kill_err:
+                _log("Notice: finally killpg failed: %s" % _kill_err)
 
     elapsed = round(time.time() - started, 1)
     if rc != 0:

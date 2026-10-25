@@ -20,6 +20,8 @@ import hashlib
 import logging
 
 logger = logging.getLogger("flow_video_dispatcher")
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [FLOW_DISPATCH] %(message)s")
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -443,8 +445,8 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                 if out_file.exists() and out_file.stat().st_size < 100000:
                     try:
                         out_file.unlink()
-                    except Exception as _unl_err:
-                        logger.debug(f"Out file unlink notice: {_unl_err}")
+                    except OSError as _unl_err:
+                        logger.warning(f"Failed to unlink existing output file {out_file}: {_unl_err}")
                 shutil.move(str(downloaded), str(out_file))
 
         if out_file.exists() and out_file.stat().st_size > 200000:
@@ -575,8 +577,8 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
             elif out_file.exists():
                 try:
                     out_file.unlink()
-                except Exception as _unl_err:
-                    logger.debug(f"Unlink out_file notice: {_unl_err}")
+                except OSError as _unl_err:
+                    logger.warning(f"Failed to unlink existing output file {out_file}: {_unl_err}")
 
             success = generate_and_download_clip(page, clip, out_file, episode_dir)
             results[clip["scene_id"]] = success

@@ -142,11 +142,17 @@ class DynamicMicroBeat:
 
 
 def _is_cjk_char(char: str) -> bool:
-    """Kiểm tra ký tự thuộc hệ chữ CJK (Hán tự, Hiragana, Katakana, Hangul)."""
+    """Kiểm tra ký tự thuộc hệ chữ CJK (Hán tự, Ext-A, Hiragana, Katakana, Halfwidth Katakana, Hangul, Hangul Jamo)."""
+    cp = ord(char)
     return (
-        '\u4e00' <= char <= '\u9fff'
-        or '\u3040' <= char <= '\u30ff'
-        or '\uac00' <= char <= '\ud7af'
+        0x4E00 <= cp <= 0x9FFF      # CJK Unified Ideographs
+        or 0x3400 <= cp <= 0x4DBF  # CJK Extension A
+        or 0x3040 <= cp <= 0x309F  # Hiragana
+        or 0x30A0 <= cp <= 0x30FF  # Katakana
+        or 0xFF66 <= cp <= 0xFF9F  # Halfwidth Katakana
+        or 0xAC00 <= cp <= 0xD7AF  # Hangul Syllables
+        or 0x1100 <= cp <= 0x11FF  # Hangul Jamo
+        or 0x3130 <= cp <= 0x318F  # Hangul Compatibility Jamo
     )
 
 
@@ -167,15 +173,23 @@ class KineticSpatialLayout:
     bounding_box_bounds: str  # e.g. "[X:58%-84%, Y:38%-68%]"
 
 
-def compute_kinetic_spatial_layout(scene_id: str) -> KineticSpatialLayout:
-    """Tính toán toạ độ không gian 2D chuẩn hóa động học phân rã theo scene_id (Rule 128, 132).
-    Loại bỏ hardcode toạ độ tĩnh bất biến, bảo đảm mỗi phân cảnh có bố cục đồ họa chuyên biệt.
+def compute_kinetic_spatial_layout(scene_id: str, family: Optional[KineticFamily] = None) -> KineticSpatialLayout:
+    """Tính toán toạ độ không gian 2D chuẩn hóa động học phân rã theo scene_id và họ tương tác (Rule 128, 132).
+    Sử dụng băm đa thức nguyên tố kết hợp họ tương tác để loại bỏ xung đột anagram (scene_01 vs scene_10),
+    bảo đảm toạ độ tiếp xúc target_contact_pos luôn nằm trọn bên trong bounding box.
     """
-    seed = sum(ord(c) for c in scene_id) if scene_id else 0
-    variant = seed % 3
+    clean_id = (scene_id or "SCENE_01").lower().strip()
+    # Prime polynomial rolling hash tránh hoàn toàn va chạm anagram
+    p_hash = 0
+    for char in clean_id:
+        p_hash = (p_hash * 31 + ord(char)) & 0xFFFFFFFF
+
+    fam_val = family.value if family else "H2_CONSTRAINT"
+    fam_code = ord(fam_val[1]) if len(fam_val) > 1 and fam_val[1].isdigit() else 2
+    variant = (p_hash + fam_code) % 3
 
     if variant == 0:
-        # Layout A: Center-Right Inspection (Default forensic audit focus)
+        # Layout A: Center-Right Forensic Focal Point (Target Contact: 68%, 42% inside bounds [58%-84%, 38%-68%])
         return KineticSpatialLayout(
             initial_pos="(X:52%, Y:42%)",
             target_contact_pos="(X:68%, Y:42%)",
@@ -183,7 +197,7 @@ def compute_kinetic_spatial_layout(scene_id: str) -> KineticSpatialLayout:
             bounding_box_bounds="[X:58%-84%, Y:38%-68%]"
         )
     elif variant == 1:
-        # Layout B: Center-Left Verification Focus
+        # Layout B: Center-Left Verification Focus (Target Contact: 32%, 42% inside bounds [18%-46%, 38%-68%])
         return KineticSpatialLayout(
             initial_pos="(X:48%, Y:42%)",
             target_contact_pos="(X:32%, Y:42%)",
@@ -191,7 +205,7 @@ def compute_kinetic_spatial_layout(scene_id: str) -> KineticSpatialLayout:
             bounding_box_bounds="[X:18%-46%, Y:38%-68%]"
         )
     else:
-        # Layout C: Vertical Center Alignment Focus
+        # Layout C: Vertical Center Alignment Focus (Target Contact: 50%, 56% inside bounds [36%-64%, 46%-74%])
         return KineticSpatialLayout(
             initial_pos="(X:50%, Y:36%)",
             target_contact_pos="(X:50%, Y:56%)",
@@ -218,7 +232,7 @@ class SemanticClauseMapper:
             "しかし", "だが", "けれども", "ところが", "対して",
             "하지만", "그러나", "그럼에도", "반면에"
         ]
-        has_contrast = any(m in s_clean for m in contrast_markers)
+        has_contrast = any(_match_keyword(m, s_clean) for m in contrast_markers)
 
         # Đếm liên từ nhân quả / hệ quả (causal / consequence)
         causal_markers = [
@@ -227,10 +241,10 @@ class SemanticClauseMapper:
             "したがって", "そのため", "により", "引き起こす",
             "때문에", "따라서", "이로 인해", "초래하다"
         ]
-        has_causal = any(m in s_clean for m in causal_markers)
+        has_causal = any(_match_keyword(m, s_clean) for m in causal_markers)
 
-        # Đếm số lượng con số hoặc tỷ lệ % (Rule 120 / Rule 128: regex lượng hóa chuẩn xác)
-        has_metrics = bool(re.search(r"\b\d+([,\.]\d+)?\s*(%|tỷ|triệu|trieu|ty|billion|million|percent|b|m|k|円|won|usd|yen|gbp|eur)\b|\b\d{2,}\b", s_clean))
+        # Đếm số lượng con số hoặc tỷ lệ % (Rule 120 / Rule 128: regex lượng hóa chuẩn xác đa thị trường kể cả CJK và đơn vị viết liền)
+        has_metrics = bool(re.search(r"(?<!\d)\d+([,\.]\d+)?\s*(%|tỷ|triệu|trieu|ty|billion|million|percent|b|m|k|円|won|usd|yen|gbp|eur)|(?<!\d)\d{2,}(?!\d)", s_clean, re.IGNORECASE))
 
         # Đếm từ nhấn mạnh / tiêu điểm
         emphasis_markers = [
@@ -239,7 +253,7 @@ class SemanticClauseMapper:
             "唯一", "わずか", "急増", "異常",
             "오직", "단지", "급증", "이상"
         ]
-        has_emphasis = any(m in s_clean for m in emphasis_markers)
+        has_emphasis = any(_match_keyword(m, s_clean) for m in emphasis_markers)
 
         # Công thức: Gốc 4 thì + bonus mệnh đề phức
         score = 4
@@ -325,17 +339,29 @@ def generate_scene_sub_director_plan(
     whisper_words: Optional[List[Dict[str, Any]]] = None
 ) -> Dict[str, Any]:
     """Sinh toàn diện Khung Đạo Diễn Vi Cảnh (Scene Sub-Director Plan) chuẩn hóa cho mọi Episode."""
-    # Xác định thời lượng cảnh (Rule 120 / Rule 135: ưu tiên Whisper word-level timestamps thật nếu có)
-    if whisper_words and len(whisper_words) > 0:
-        w_start = float(whisper_words[0].get("start", 0.0))
-        w_end = float(whisper_words[-1].get("end", 0.0))
-        dur = round(max(2.5, min(10.0, w_end - w_start)), 2)
+    # Rule 120 & 135: Tích hợp Word-level Timestamps từ Whisper (nếu có) để tính toán nhịp độ thực tế
+    if whisper_words is not None:
+        if not isinstance(whisper_words, list) or len(whisper_words) == 0:
+            raise ValueError("Whisper integration fail-closed (Rule 120): whisper_words must be a non-empty list of dicts.")
+        for idx, w in enumerate(whisper_words):
+            if not isinstance(w, dict) or "start" not in w or "end" not in w or w["start"] is None or w["end"] is None:
+                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} missing valid 'start'/'end' timestamps: {w!r}")
+            if float(w["end"]) < float(w["start"]) or float(w["start"]) < 0.0:
+                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} has inverted or negative timestamps: start={w['start']}, end={w['end']}")
+        w_start = float(whisper_words[0]["start"])
+        w_end = float(whisper_words[-1]["end"])
+        measured_dur = round(w_end - w_start, 2)
+        if measured_dur <= 0.0:
+            raise ValueError(f"Whisper integration fail-closed (Rule 120): Total speech duration must be positive, got {measured_dur}s")
+        # Rule 120/135: Measured speech duration is authentic; do NOT artificially truncate/clamp to 10.0s!
+        dur = max(1.5, measured_dur)
     elif duration_sec is None or float(duration_sec) <= 0.0:
         dur = estimate_speech_duration(sentence, market)
     else:
-        dur = round(max(2.5, min(10.0, float(duration_sec))), 2)
+        dur = round(max(2.5, float(duration_sec)), 2)
 
-    layout = compute_kinetic_spatial_layout(scene_id)
+    dominant_families = SemanticClauseMapper.detect_dominant_families(sentence)
+    layout = compute_kinetic_spatial_layout(scene_id, family=dominant_families[0] if dominant_families else None)
 
     raw_beat_count = SemanticClauseMapper.calculate_beat_count(sentence)
     # Beat Count Governor: Giới hạn số vi nhịp theo ngân sách thời gian thực tế
@@ -345,8 +371,6 @@ def generate_scene_sub_director_plan(
         beat_count = min(5, raw_beat_count)
     else:
         beat_count = raw_beat_count
-
-    dominant_families = SemanticClauseMapper.detect_dominant_families(sentence)
 
     hero_clean = (hero_cutout_object or "primary forensic document").split(" on ")[0].strip()
     inter1 = interacting_objects[0] if interacting_objects else "heavy brass caliper"

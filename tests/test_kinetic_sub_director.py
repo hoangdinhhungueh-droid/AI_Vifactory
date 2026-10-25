@@ -211,3 +211,128 @@ def test_kinetic_coordinates_and_dead_stop_holds():
     # 3. Liên kết vật lý hợp nhất (Unified physical cluster)
     assert f"docks flush against the hero tool base at coordinate {layout['dock_pin_pos']}" in prompt
     assert "locking all objects into a single unified physical cluster" in prompt
+
+
+def test_has_metrics_cross_market_comprehensive():
+    """Kiểm tra regex lượng hóa đa thị trường (Rule 120, 128): đơn vị % lẻ, CJK liền kề, tiền tệ JP/VN/EN."""
+    assert SemanticClauseMapper.calculate_beat_count("Chỉ 5% lưu lượng được kiểm tra.") >= 5
+    assert SemanticClauseMapper.calculate_beat_count("5% of the total dataset was corrupted.") >= 5
+    assert SemanticClauseMapper.calculate_beat_count("売上は30%減少し、深刻な打撃を受けた。") >= 5
+    assert SemanticClauseMapper.calculate_beat_count("価格は5円です。") >= 5
+    assert SemanticClauseMapper.calculate_beat_count("Doanh thu giảm 5 tỷ đồng trong quý trước.") >= 5
+    assert SemanticClauseMapper.calculate_beat_count("The company invested 5 billion dollars into security.") >= 5
+    # Negative cases: không có metric hay đơn vị lượng hóa
+    assert SemanticClauseMapper.calculate_beat_count("This is a narrative sentence without any figures.") == 4
+    assert SemanticClauseMapper.calculate_beat_count("Step 1 was executed without anomalies.") == 4
+
+
+def test_cjk_character_ranges():
+    """Kiểm tra độ phủ ký tự CJK (Hán tự, CJK Ext-A, Hiragana, Katakana, Halfwidth Katakana, Hangul, Hangul Jamo)."""
+    from app.services.kinetic_sub_director import _is_cjk_char
+    # CJK Unified Ideographs
+    assert _is_cjk_char("\u4e00") is True
+    # CJK Extension A
+    assert _is_cjk_char("\u3400") is True
+    # Hiragana
+    assert _is_cjk_char("\u3042") is True
+    # Katakana
+    assert _is_cjk_char("\u30a2") is True
+    # Halfwidth Katakana
+    assert _is_cjk_char("\uff66") is True
+    # Hangul Syllables
+    assert _is_cjk_char("\uac00") is True
+    # Hangul Jamo
+    assert _is_cjk_char("\u1100") is True
+    # Non-CJK characters
+    assert _is_cjk_char("A") is False
+    assert _is_cjk_char("7") is False
+    assert _is_cjk_char(" ") is False
+    assert _is_cjk_char("%") is False
+
+
+def test_whisper_word_timestamps_validation_and_no_clamp():
+    """Kiểm tra tích hợp Whisper word-level timestamps (Rule 120, 135): fail-closed & không kẹp 10.0s."""
+    import pytest
+
+    # 1. Đo lường chính xác không bị kẹp 10s đối với câu thoại dài thực tế 12.8s
+    valid_words = [
+        {"word": "In", "start": 0.2, "end": 0.5},
+        {"word": "conclusion", "start": 12.0, "end": 13.0}
+    ]
+    plan = generate_scene_sub_director_plan(
+        scene_id="SC_WHISPER_LONG",
+        sentence="A very long sentence measured by Whisper.",
+        hero_cutout_object="Audit Document",
+        interacting_objects=["Brass caliper", "Red marker"],
+        whisper_words=valid_words
+    )
+    assert plan["scene_duration_sec"] == 12.8  # 13.0 - 0.2 = 12.8s, không bị kẹp về 10s!
+
+    # 2. Fail closed khi whisper_words rỗng
+    with pytest.raises(ValueError, match="non-empty list"):
+        generate_scene_sub_director_plan(
+            scene_id="SC_FAIL_EMPTY",
+            sentence="Test sentence.",
+            hero_cutout_object="Doc",
+            interacting_objects=["Tool"],
+            whisper_words=[]
+        )
+
+    # 3. Fail closed khi thiếu trường start hoặc end
+    with pytest.raises(ValueError, match="missing valid"):
+        generate_scene_sub_director_plan(
+            scene_id="SC_FAIL_MISSING",
+            sentence="Test sentence.",
+            hero_cutout_object="Doc",
+            interacting_objects=["Tool"],
+            whisper_words=[{"word": "bad", "start": 0.0}]
+        )
+
+    # 4. Fail closed khi timestamp đảo ngược
+    with pytest.raises(ValueError, match="inverted or negative"):
+        generate_scene_sub_director_plan(
+            scene_id="SC_FAIL_INVERTED",
+            sentence="Test sentence.",
+            hero_cutout_object="Doc",
+            interacting_objects=["Tool"],
+            whisper_words=[{"word": "bad", "start": 5.0, "end": 3.0}]
+        )
+
+
+def test_spatial_layout_derivation_invariants():
+    """Kiểm tra bất biến hình học: target_contact_pos luôn nằm bên trong bounding_box_bounds."""
+    import re
+    from app.services.kinetic_sub_director import compute_kinetic_spatial_layout, KineticFamily
+
+    for scene_id in ["SCENE_01", "SCENE_02", "SCENE_03", "SCENE_10", "SCENE_01_ALT"]:
+        for fam in [KineticFamily.H1_IMPACT, KineticFamily.H2_CONSTRAINT, KineticFamily.H3_SEVER]:
+            layout = compute_kinetic_spatial_layout(scene_id, family=fam)
+            
+            # Trích xuất toạ độ target (X:T_X%, Y:T_Y%)
+            m_target = re.search(r"\(X:(\d+)%,\s*Y:(\d+)%\)", layout.target_contact_pos)
+            assert m_target, f"Invalid target format: {layout.target_contact_pos}"
+            tx, ty = int(m_target.group(1)), int(m_target.group(2))
+
+            # Trích xuất bounding box [X:minX%-maxX%, Y:minY%-maxY%]
+            m_box = re.search(r"\[X:(\d+)%-(\d+)%,\s*Y:(\d+)%-(\d+)%\]", layout.bounding_box_bounds)
+            assert m_box, f"Invalid bounding box format: {layout.bounding_box_bounds}"
+            min_x, max_x = int(m_box.group(1)), int(m_box.group(2))
+            min_y, max_y = int(m_box.group(3)), int(m_box.group(4))
+
+            # Bất biến hình học: Điểm chạm phải nằm trọn trong khung bounding box
+            assert min_x <= tx <= max_x, f"Target X={tx}% is outside [{min_x}%, {max_x}%] in {scene_id}"
+            assert min_y <= ty <= max_y, f"Target Y={ty}% is outside [{min_y}%, {max_y}%] in {scene_id}"
+
+
+def test_match_keyword_word_boundaries():
+    """Kiểm tra khớp từ khóa word boundary tiếng Việt/Latinh và CJK."""
+    from app.services.kinetic_sub_director import _match_keyword
+
+    # 1. Tiếng Việt: 'chi' khớp độc lập, không khớp bên trong 'machine', 'children'
+    assert _match_keyword("chi", "Doanh nghiệp chi 4 tỷ đồng.") is True
+    assert _match_keyword("chi", "Hệ thống machine learning hoạt động.") is False
+    assert _match_keyword("chi", "Children playing outside.") is False
+
+    # 2. CJK: Khớp chuỗi không cần khoảng trắng
+    assert _match_keyword("ハイライト", "重要項目をハイライトする。") is True
+    assert _match_keyword("警告", "異常事態の警告を発令した。") is True
