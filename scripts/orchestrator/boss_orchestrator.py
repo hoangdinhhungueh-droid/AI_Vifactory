@@ -21,6 +21,7 @@ import shlex
 import subprocess
 import sys
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -364,8 +365,6 @@ def run_phase_plan(task_description: str, task_id: Optional[str] = None, dry_run
         "plan_markdown": full_plan_markdown,
     }
 
-
-import xml.etree.ElementTree as ET
 
 EXPECTED_TESTCASE_TO_CLASS: Dict[str, str] = {
     # test_visual_taxonomy_and_regex.py (16)
@@ -4012,7 +4011,7 @@ def _collect_generic_forensic_packet(commit_range: Optional[str] = None, task_id
     zero_leak_verified = (
         mock_code == 0
         and "ZERO mock data paths, synthetic fallbacks, or test doubles exist in production runtime" in mock_out
-        and "tests/unit/ ARITHMETIC PROOF PASSED" in mock_out
+        and ("tests/unit/ ARITHMETIC PROOF PASSED" in mock_out or "tests/unit/ LEDGER PROOF PASSED" in mock_out)
     )
     unclassified_leaks = 0 if zero_leak_verified else max(1, parsed_occurrences)
     zero_mock_status = "PASS (Zero Mock Leaks in Production Runtime)" if zero_leak_verified else "FAIL (Mock Leaks Detected or Probe Failed)"

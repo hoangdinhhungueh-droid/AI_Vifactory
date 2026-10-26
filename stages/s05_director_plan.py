@@ -334,7 +334,7 @@ def build_universal_video_prompt(scene: Scene) -> str:
             hero_cutout_object=getattr(scene, "visual_metaphor", "") or getattr(scene, "hero_cutout_object", ""),
             interacting_objects=["tactile measurement tool", "crimson verification seal"],
             duration_sec=float(raw_dur) if raw_dur else None,
-            market=resolve_canonical_market(market_raw=getattr(scene, "market", None) or "EN"),
+            market=resolve_canonical_market(market_raw=getattr(scene, "market", None)),
             whisper_words=getattr(scene, "whisper_words", None),
             bounding_box=getattr(scene, "bounding_box", None) or getattr(scene, "focal_region", None),
             object_roles=getattr(scene, "object_roles", None)
@@ -836,6 +836,7 @@ def run(ctx: RunContext) -> StageArtifact:
 
     for idx, sc_dict in enumerate(raw_scenes):
         scene = Scene.model_validate(sc_dict)
+        scene.market = market
         slot = acc_pool[idx % len(acc_pool)]
         shot_id = f"sc_{idx+1:02d}_sh_01"
         prev_shot_id = f"sc_{idx:02d}_sh_01" if idx > 0 else None
@@ -853,14 +854,12 @@ def run(ctx: RunContext) -> StageArtifact:
             if item.get("supporting_exhibits"):
                 scene.interacting_objects = [ex.get("label") for ex in item["supporting_exhibits"] if ex.get("label")]
 
-        # Populate BoundingBox & Object Roles for Kinematic Targeting (Rule 128, 132)
+        # Populate BoundingBox from storyboard if available (Rule 118: zero mock data)
         if not scene.bounding_box:
             from core.contracts.stages import BoundingBox
             if planned_storyboard and idx < len(planned_storyboard) and planned_storyboard[idx].get("main_subject_cutout", {}).get("bounding_box"):
                 bbox_raw = planned_storyboard[idx]["main_subject_cutout"]["bounding_box"]
                 scene.bounding_box = BoundingBox.model_validate(bbox_raw)
-            else:
-                scene.bounding_box = BoundingBox(x_min=58.0, x_max=84.0, y_min=38.0, y_max=68.0)
 
         # Check if whisper alignment exists in audio_dir or root
         if not scene.whisper_words:
@@ -873,17 +872,16 @@ def run(ctx: RunContext) -> StageArtifact:
                     with open(whisper_path, "r", encoding="utf-8") as wf:
                         w_data = json.load(wf)
                         for seg in (w_data if isinstance(w_data, list) else w_data.get("segments", [])):
-                            if seg.get("scene_id") == scene.scene_id or seg.get("beat_index") == idx:
+                            if seg.get("scene_id") == scene.scene_id:
                                 scene.whisper_words = [WhisperWord.model_validate(w) for w in seg.get("words", [])]
                                 break
                 except (OSError, json.JSONDecodeError, ValueError) as _w_err:
-                    logger.debug(f"[s05] Could not load whisper_segments: {_w_err}")
+                    logger.warning(f"[s05] Failed loading whisper_segments from {whisper_path}: {_w_err}")
 
-        scene.object_roles = {
-            f"o{idx+1}_1": "primary_anchor",
-            f"o{idx+1}_2": "interactive_tool",
-            f"o{idx+1}_3": "backdrop"
-        }
+        # Populate Object Roles from storyboard if present (Rule 118: zero placeholder defaults)
+        if not scene.object_roles:
+            if planned_storyboard and idx < len(planned_storyboard) and planned_storyboard[idx].get("object_roles"):
+                scene.object_roles = planned_storyboard[idx]["object_roles"]
 
         # Decompose into full Vox Object-Assembly Kinematics
         vox_meta = build_vox_scene_prompts(scene, idx=idx, total_scenes=total_sc, prev_scene=prev_scene, market=market)

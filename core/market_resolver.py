@@ -9,7 +9,7 @@ Enforces canonical market set: {"EN", "JA", "KR", "VN"}.
 
 from __future__ import annotations
 
-from typing import Any, Optional, Set
+from typing import Any, Optional, Set, Union
 
 CANONICAL_MARKETS: Set[str] = {"EN", "JA", "KR", "VN"}
 
@@ -33,23 +33,32 @@ _CANONICAL_MARKET_ALIASES: dict[str, str] = {
 
 
 def resolve_canonical_market(
-    ctx: Optional[Any] = None,
-    market_raw: Optional[str] = None
+    market_raw: Optional[Union[str, Any]] = None,
+    *,
+    ctx: Optional[Any] = None
 ) -> str:
     """Strictly resolves canonical market ('EN', 'JA', 'KR', 'VN') from manifest or config.
 
     Fail-closed (Rule 118, 128, 134):
-    1. If market_raw is provided explicitly, validate and normalize it.
-    2. Otherwise, check ctx.manifest.market (or ctx.manifest dict).
-    3. If still absent, check ctx.config.market (or ctx.config dict).
-    4. If absent in both, raise ValueError (no run_id heuristics, no silent default).
-    5. Normalizes aliases (JP -> JA, KO -> KR, VI -> VN) to canonical {"EN", "JA", "KR", "VN"}.
+    1. If market_raw is provided explicitly as str, validate and normalize it.
+    2. If first arg is a context (has manifest/config), use it as ctx.
+    3. Check ctx.manifest.market (or ctx.manifest dict).
+    4. If still absent, check ctx.config.market (or ctx.config dict).
+    5. If absent in both, raise ValueError (no run_id heuristics, no silent default).
+    6. Normalizes aliases (JP -> JA, KO -> KR, VI -> VN) to canonical {"EN", "JA", "KR", "VN"}.
     """
-    candidate: Optional[str] = market_raw
+    effective_ctx = ctx
+    candidate: Optional[str] = None
 
-    if not candidate and ctx is not None:
+    if market_raw is not None:
+        if hasattr(market_raw, "manifest") or hasattr(market_raw, "config"):
+            effective_ctx = market_raw
+        elif isinstance(market_raw, str):
+            candidate = market_raw
+
+    if not candidate and effective_ctx is not None:
         # 1. Check ctx.manifest
-        manifest = getattr(ctx, "manifest", None)
+        manifest = getattr(effective_ctx, "manifest", None)
         if manifest is not None:
             candidate = getattr(manifest, "market", None)
             if not candidate and isinstance(manifest, dict):
@@ -57,7 +66,7 @@ def resolve_canonical_market(
 
         # 2. Check ctx.config
         if not candidate:
-            config = getattr(ctx, "config", None)
+            config = getattr(effective_ctx, "config", None)
             if config is not None:
                 candidate = getattr(config, "market", None)
                 if not candidate and isinstance(config, dict):

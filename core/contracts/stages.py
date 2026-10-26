@@ -51,7 +51,7 @@ class Provenance(BaseModel):
 
 class WhisperWord(BaseModel):
     """Word-level Whisper timestamp contract with strict validation (Rule 120, 135)."""
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     word: str
     start: float = Field(ge=0.0, description="Word start timestamp in seconds")
@@ -69,7 +69,7 @@ class WhisperWord(BaseModel):
 
 class BoundingBox(BaseModel):
     """Spatial 2D bounding box percentage coordinates (0.0 to 100.0) for kinematic targeting (Rule 128, 132)."""
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     x_min: float = Field(ge=0.0, le=100.0)
     x_max: float = Field(ge=0.0, le=100.0)
@@ -115,7 +115,7 @@ class Scene(BaseModel):
     sequence_block: str = Field(default="BLOCK_DEFAULT", description="e.g. block_1_act_i")
     beat_role: Literal["hook", "context", "tension", "reveal", "payoff", "outro"] = "context"
     narration: str = Field(description="Final voiceover narration text")
-    market: str = Field(default="EN", description="Canonical market code: EN, JA, KR, VN (Rule 128, 134)")
+    market: Optional[str] = Field(default=None, description="Canonical market code: EN, JA, KR, VN (Rule 128, 134)")
     core_idea: Optional[str] = None
     headline: Optional[str] = Field(default=None, description="1-4 word editorial headline")
     visual_metaphor: Optional[str] = None
@@ -144,6 +144,19 @@ class Scene(BaseModel):
     whisper_words: Optional[List[WhisperWord]] = Field(default=None, description="Whisper word-level timestamps (Rule 120)")
     bounding_box: Optional[BoundingBox] = Field(default=None, description="Spatial bounding box for kinematic targeting")
     object_roles: Optional[Dict[str, str]] = Field(default=None, description="Mapping of object IDs to semantic roles")
+
+    @model_validator(mode="after")
+    def validate_whisper_sequence(self) -> "Scene":
+        if self.whisper_words:
+            for i in range(len(self.whisper_words)):
+                if i > 0:
+                    prev_w = self.whisper_words[i - 1]
+                    curr_w = self.whisper_words[i]
+                    if curr_w.start < prev_w.start:
+                        raise ValueError(f"Scene whisper_words non-monotonic: word {i} start ({curr_w.start}) < word {i-1} start ({prev_w.start})")
+                    if curr_w.start < prev_w.end - 1e-3:
+                        raise ValueError(f"Scene whisper_words overlapping: word {i} start ({curr_w.start}) < word {i-1} end ({prev_w.end})")
+        return self
 
 
 class Chunk(BaseModel):

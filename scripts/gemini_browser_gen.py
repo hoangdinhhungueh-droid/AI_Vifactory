@@ -10,6 +10,14 @@ import time
 import urllib.request
 from pathlib import Path
 
+import numpy as np
+from PIL import Image, ImageFilter
+
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    sync_playwright = None
+
 logger = logging.getLogger("gemini_browser_gen")
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -17,16 +25,8 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
-try:
-    from playwright.sync_api import sync_playwright
-except ImportError:
-    sync_playwright = None
-
-import numpy as np
-from PIL import Image, ImageFilter
-
 ROOT_DIR = Path(__file__).resolve().parent.parent
-USER_DATA_DIR = os.environ.get("GEMINI_BROWSER_PROFILE", r"C:\Users\hunghd2\.gemini\browser_profile")
+USER_DATA_DIR = os.environ.get("GEMINI_BROWSER_PROFILE", str(Path.home() / ".gemini" / "browser_profile"))
 try:
     os.makedirs(USER_DATA_DIR, exist_ok=True)
 except OSError as _mk_err:
@@ -729,7 +729,7 @@ os.makedirs(unpacked, exist_ok=True)
 try:
     with tarfile.open(tar_path, "r:gz") as tar:
         tar.extractall(unpacked)
-except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
+except (tarfile.TarError, OSError) as e:
     print(f"ERROR: Corrupted archive extraction: {{e}}")
     sys.exit(2)
 
@@ -805,7 +805,7 @@ try:
     bgs = [s.get("bg_reuse_key") for s in d.get("scenes", []) if s.get("bg_reuse_key")]
     fgs = [s.get("fg_reuse_key") for s in d.get("scenes", []) if s.get("fg_reuse_key")]
     print(json.dumps({{"bgs": list(set(bgs)), "fgs": list(set(fgs))}}))
-except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
+except (OSError, json.JSONDecodeError) as e:
     print(json.dumps({{"error": str(e)}}))
 '"""
             res = client.run_command(vps_eval_code)

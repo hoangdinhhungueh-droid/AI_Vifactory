@@ -629,3 +629,130 @@ def test_whisper_fail_closed_when_words_fewer_than_four():
             whisper_words=too_few_words
         )
 
+
+
+def test_has_metrics_prefix_currency_and_structural_negatives():
+    """Kiểm tra tiền tố tiền tệ ($5, £3, €7), lookbehinds anchored (keep 20, deep 50) và năm niên đại (Boss Round 5)."""
+    # 1. Positives
+    assert SemanticClauseMapper.has_metrics("$5") is True
+    assert SemanticClauseMapper.has_metrics("£3") is True
+    assert SemanticClauseMapper.has_metrics("€7") is True
+    assert SemanticClauseMapper.has_metrics("$100") is True
+    assert SemanticClauseMapper.has_metrics("keep 20 staff members active") is True
+    assert SemanticClauseMapper.has_metrics("deep 50 meter exploration") is True
+    assert SemanticClauseMapper.has_metrics("100 typesetting templates") is True
+
+    # 2. Negatives
+    assert SemanticClauseMapper.has_metrics("Step 10") is False
+    assert SemanticClauseMapper.has_metrics("Step  10") is False
+    assert SemanticClauseMapper.has_metrics("Step #10") is False
+    assert SemanticClauseMapper.has_metrics("Episode 02") is False
+    assert SemanticClauseMapper.has_metrics("Year 1999") is False
+    assert SemanticClauseMapper.has_metrics("in 1999") is False
+    assert SemanticClauseMapper.has_metrics("năm 2008") is False
+    assert SemanticClauseMapper.has_metrics("1999") is False
+    assert SemanticClauseMapper.has_metrics("2024") is False
+
+
+def test_invalid_presets_config_schema_validation(tmp_path):
+    """Kiểm tra _load_kinetic_presets fail-closed trên JSON hỏng hoặc thiếu key bắt buộc (Boss Round 5)."""
+    import json
+    from app.services.kinetic_sub_director import _load_kinetic_presets
+
+    # 1. Invalid JSON syntax
+    bad_json = tmp_path / "bad.json"
+    bad_json.write_text("{broken_json: true", encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid JSON"):
+        _load_kinetic_presets(str(bad_json))
+
+    # 2. Missing layout key
+    no_layout = tmp_path / "no_layout.json"
+    no_layout.write_text(json.dumps({
+        "layouts": {"vertical": {}},
+        "spatial_keywords": {"vertical": [], "center_left": []},
+        "prose_templates": {"K1": {"DEFAULT": {}}, "K2": {"DEFAULT": {}}}
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="missing layout 'center_right'"):
+        _load_kinetic_presets(str(no_layout))
+
+    # 3. Missing K1.DEFAULT key
+    no_k1_default = tmp_path / "no_k1_default.json"
+    no_k1_default.write_text(json.dumps({
+        "layouts": {
+            "center_right": {"initial_pos": "a", "target_contact_pos": "b", "dock_pin_pos": "c", "bounding_box_bounds": "d", "vector_reveal_direction": "e"},
+            "center_left": {"initial_pos": "a", "target_contact_pos": "b", "dock_pin_pos": "c", "bounding_box_bounds": "d", "vector_reveal_direction": "e"},
+            "vertical": {"initial_pos": "a", "target_contact_pos": "b", "dock_pin_pos": "c", "bounding_box_bounds": "d", "vector_reveal_direction": "e"}
+        },
+        "spatial_keywords": {"vertical": [], "center_left": []},
+        "prose_templates": {"K1": {}, "K2": {"DEFAULT": {}}}
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="missing 'K1.DEFAULT'"):
+        _load_kinetic_presets(str(no_k1_default))
+
+
+def test_whisper_clause_aligned_boundaries_exact():
+    """Kiểm tra Whisper windowing khớp chính xác ranh giới câu con mà không ngắt rời cụm vị ngữ (Boss Round 5)."""
+    seven_words = [
+        {"word": "When", "start": 0.2, "end": 0.4},
+        {"word": "the", "start": 0.4, "end": 0.6},
+        {"word": "regulator", "start": 0.6, "end": 1.1},
+        {"word": "clamped", "start": 1.1, "end": 1.5},
+        {"word": "down,", "start": 1.5, "end": 1.9},
+        {"word": "liquidity", "start": 1.9, "end": 2.5},
+        {"word": "evaporated", "start": 2.5, "end": 3.1},
+    ]
+    plan = generate_scene_sub_director_plan(
+        scene_id="SC_EXACT_CLAUSE",
+        sentence="When the regulator clamped down, liquidity evaporated.",
+        hero_cutout_object="Doc",
+        interacting_objects=["Tool", "Thread"],
+        whisper_words=seven_words
+    )
+    beats = plan["dynamic_micro_beats"]
+    assert len(beats) == 4
+    # 'clamped down,' phải đi liền với nhau tại Beat 3, không bị ngắt đôi
+    assert beats[2]["vo_keyword"] == "clamped down,"
+    assert beats[3]["vo_keyword"] == "liquidity evaporated"
+    # Time window Beat 3 phải kết thúc tại word end của 'down,' (1.9 - 0.2 = 1.700s)
+    assert beats[2]["time_window"].endswith("1.700s")
+
+
+def test_whisper_word_and_bounding_box_models():
+    """Kiểm tra khế ước Pydantic WhisperWord và BoundingBox với extra='forbid' và validation (Boss Round 5)."""
+    from core.contracts.stages import WhisperWord, BoundingBox, Scene
+    from pydantic import ValidationError
+
+    # 1. Extra fields rejected (extra='forbid')
+    with pytest.raises(ValidationError):
+        WhisperWord(word="test", start=1.0, end=2.0, unknown_extra_field=True)
+
+    with pytest.raises(ValidationError):
+        BoundingBox(x_min=10, x_max=50, y_min=20, y_max=60, left=10)
+
+    # 2. Inverted and non-monotonic word rejected
+    with pytest.raises(ValueError, match="cannot precede start"):
+        WhisperWord(word="bad", start=2.5, end=1.0)
+
+    # 3. Scene whisper_words non-monotonic validator
+    w1 = WhisperWord(word="first", start=1.0, end=2.0)
+    w2_bad = WhisperWord(word="second", start=0.5, end=1.5)
+    with pytest.raises(ValueError, match="non-monotonic"):
+        Scene(scene_id="SC_BAD_MONO", narration="text", whisper_words=[w1, w2_bad])
+
+
+def test_spatial_layout_full_canvas_bbox_fails_closed():
+    """Kiểm tra fail-closed khi bounding box bao trọn màn hình không còn chỗ đặt ngoài (Boss Round 5)."""
+    with pytest.raises(ValueError, match="Bounding box spans full canvas"):
+        compute_kinetic_spatial_layout(
+            "SC_FULL_CANVAS",
+            bounding_box={"x_min": 1.0, "x_max": 99.0, "y_min": 1.0, "y_max": 99.0}
+        )
+
+
+def test_unknown_layout_type_fails_closed():
+    """Kiểm tra fail-closed khi truyền layout_type không tồn tại (Boss Round 5)."""
+    with pytest.raises(ValueError, match="Unknown kinetic layout type"):
+        compute_kinetic_spatial_layout(
+            "SC_UNKNOWN_TYPE",
+            layout_type="diagonal_spiral"
+        )

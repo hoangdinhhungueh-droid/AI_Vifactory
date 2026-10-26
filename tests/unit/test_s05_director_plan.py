@@ -27,7 +27,8 @@ def mock_s05_context(tmp_path: Path) -> RunContext:
     run_id = "TEST_EP0099_s05_unit"
     paths = resolve_run_paths(run_id, repo_root=tmp_path)
     cfg = load_profile("e2e_min")
-    manifest = RunManifest.create_new(run_id, profile="e2e_min")
+    cfg.market = "EN"
+    manifest = RunManifest.create_new(run_id, profile="e2e_min", market="EN")
     return RunContext(
         run_id=run_id,
         paths=paths,
@@ -47,6 +48,7 @@ def test_build_universal_video_prompt():
         visual_metaphor="Tactile brass vault key",
         color_accent="Vox Crimson #E53935",
         headline="LIQUIDITY CONTRACTION",
+        market="EN",
     )
     prompt = build_universal_video_prompt(sc)
     assert "Forensic documentary motion graphics" in prompt

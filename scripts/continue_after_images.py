@@ -286,15 +286,24 @@ def main():
     if is_master_dynamic:
         _log("Master video already rendered and verified dynamic at %s (%.1f MB). Skipping B4-B7 render." %
              (master, master.stat().st_size / 1048576.0))
-        _render_ok = True
+        render_ok = True
     else:
-        _render_ok = _run_stage("B4-B7 render (resume_episode)",
+        render_ok = _run_stage("B4-B7 render (resume_episode)",
                                [sys.executable, "scripts/resume_episode.py",
                                 "--episode-id", episode_id],
                                episode_id, effective_render_timeout,
                                notify_on_error=False)
 
     master = ep_dir / "final_169.mp4"
+    if not render_ok and not (master.exists() and master.stat().st_size > 0):
+        # Check self-healing mux bridge before failing
+        silent_video = ep_dir / "twolayer_silent.mp4"
+        if not (silent_video.exists() and silent_video.stat().st_size > 10000000):
+            msg = f"render stage failed and master video missing for {episode_id}"
+            _log("FATAL " + msg)
+            _write_state(episode_id, stage="render-verify", status="failed", error=msg)
+            return 3
+
     if not master.exists() or master.stat().st_size == 0:
         # Self-Healing Mux Bridge: If twolayer_silent.mp4 exists, mux it immediately
         silent_video = ep_dir / "twolayer_silent.mp4"

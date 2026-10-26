@@ -111,5 +111,24 @@
         "residue": "permanent forensic framing box"
       }
     }
-  }
+  },
+  "metric_exclude_suffixes": [
+    "bước",
+    "mẹo",
+    "kế\\s+hoạch",
+    "단계",
+    "가지",
+    "minutes",
+    "minute",
+    "points",
+    "point",
+    "types",
+    "type",
+    "steps",
+    "step",
+    "bugs",
+    "bug",
+    "members",
+    "member"
+  ]
 }

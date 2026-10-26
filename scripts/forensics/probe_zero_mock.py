@@ -274,8 +274,9 @@ def main() -> int:
     if qa_summary_json.exists():
         try:
             qa_data = json.loads(qa_summary_json.read_text(encoding="utf-8"))
-        except Exception:
-            qa_data = {}
+        except (OSError, json.JSONDecodeError) as _qa_err:
+            print(f"❌ FAIL: qa_summary.json exists but is corrupt: {_qa_err}", file=sys.stderr)
+            return 1
     qa_data["MOCK_SCAN_MATCHES_COUNT"] = total_unit
     qa_data["LEGACY_MOCK_SCAN_MATCHES_COUNT"] = total_root
     qa_data["TREE_HASH"] = tree_hash
@@ -283,9 +284,10 @@ def main() -> int:
     try:
         qa_summary_json.write_text(json.dumps(qa_data, indent=2), encoding="utf-8")
     except OSError as _w_err:
-        print(f"Warning: could not write qa_summary.json: {_w_err}", file=sys.stderr)
+        print(f"❌ FAIL: could not write qa_summary.json: {_w_err}", file=sys.stderr)
+        return 1
 
-    print(f"   ✅ tests/unit/ LEDGER PROOF PASSED: {total_unit} matches derived from {len(UNIT_TEST_MOCK_ALLOWLIST)} committed baselines.")
+    print(f"   ✅ tests/unit/ ARITHMETIC PROOF PASSED (LEDGER PROOF): {total_unit} matches derived from {len(UNIT_TEST_MOCK_ALLOWLIST)} committed baselines.")
     print(f"   ✅ tests/test_*.py LEDGER PROOF PASSED: {total_root} matches derived from {len(LEGACY_TEST_MOCK_ALLOWLIST)} committed baselines.")
     print(f"   ✅ COMPLETE OFFLINE TEST REPOSITORY PROOF: {total_unit} (unit) + {total_root} (legacy) = {total_all} references")
     print(f"   MOCK_SCAN_MATCHES_COUNT={total_unit}")

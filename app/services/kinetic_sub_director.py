@@ -34,17 +34,19 @@ logger = logging.getLogger("kinetic_sub_director")
 # ('5 bước', '3 mẹo', '2 kế hoạch', '5 단계', '3 가지', '3 minutes', '4 types') must not trigger metric classification.
 # Trailing Unicode letter guard: (?![^\W\d_]) ensures that single-letter and short unit abbreviations
 # ('b', 'm', 'k', 'ty') followed by letters with Vietnamese/Unicode diacritics are strictly rejected.
+_METRIC_PREFIX_CURRENCY = r"[$€£¥₫]\s*\d+(?:[,\.]\d+)?"
 _METRIC_UNITS = (
     r"(?:%|円|원|[$€£¥₫]|"
     r"(?:tỷ|triệu|nghìn|ngàn|billion|million|thousand|percent|pct|won|usd|yen|gbp|eur|ty|b|m|k)"
     r"(?![^\W\d_]))"
 )
 _METRIC_EXCLUDE_SUFFIX = (
-    r"(?!\s*(?:bước|mẹo|kế\s+hoạch|단계|가지|minutes|minute|points|point|types|type|steps|step|bugs|bug|members|member))"
+    r"(?!\s*(?:bước|mẹo|kế\s+hoạch|단계|가지|minutes|minute|points|point|types|type|steps|step|bugs|bug|members|member)\b)"
 )
 _METRIC_PATTERN = (
-    rf"(?<!\d)\d+(?:[,\.]\d+)?\s*{_METRIC_UNITS}"
-    rf"|(?<![a-zA-Z0-9_])(?<!step\s)(?<!ep\s)(?<!episode\s)(?<!year\s)\d{{2,}}(?!\d){_METRIC_EXCLUDE_SUFFIX}"
+    rf"{_METRIC_PREFIX_CURRENCY}"
+    rf"|(?<!\d)\d+(?:[,\.]\d+)?\s*{_METRIC_UNITS}"
+    rf"|(?<![^\W\d_])(?<!\d)(?<!\bstep\s)(?<!\bstep\s\s)(?<!\bstep\s#)(?<!\bep\s)(?<!\bep\s#)(?<!\bepisode\s)(?<!\byear\s)(?<!\bnăm\s)(?<!\bin\s)(?!(?:19[5-9]\d|20[0-4]\d)\b)\d{{2,}}(?!\d){_METRIC_EXCLUDE_SUFFIX}"
 )
 _METRIC_RE = re.compile(_METRIC_PATTERN, re.IGNORECASE)
 
@@ -84,25 +86,25 @@ TAXONOMY_KEYWORDS: Dict[KineticFamily, List[str]] = {
     ],
     KineticFamily.H3_SEVER: [
         # VN
-        "cắt", "xé", "chia cắt", "loại bỏ", "tách rời", "phá vỡ", "rạch", "bãi bỏ",
+        "cắt", "xé", "chia cắt", "loại bỏ", "tách rời", "phá vỡ", "rạch", "bãi bỏ", "giảm",
         # EN
-        "cut", "tear", "sever", "split", "remove", "separate", "break", "slice", "perforate",
+        "cut", "tear", "sever", "split", "remove", "separate", "slice", "perforate", "reduce",
         # JA
-        "切断", "破断", "分割", "分離", "撤廃", "切り離す", "削除", "スライス",
+        "切断", "破断", "分割", "分離", "撤廃", "切り離す", "削除", "スライス", "削減",
         # KR
-        "절단", "분리", "분할", "철폐", "가르다", "삭제", "찢다", "제거"
+        "절단", "분리", "분할", "철폐", "가르다", "삭제", "찢다", "제거", "삭감"
     ],
     KineticFamily.H4_TETHER: [
         # VN
         "nối", "liên kết", "ghim", "dây", "ràng buộc", "kết nối", "móc nối", "mạng lưới",
         # EN
-        "connect", "link", "pin", "tether", "bind", "string", "network", "tie", "attach",
+        "connect", "link", "pin", "tether", "bind", "network", "attach",
         # JA
         "連結", "接続", "ピン", "束縛", "糸", "ネットワーク", "結びつける", "固定",
         # KR
         "연결", "접속", "핀", "결속", "실", "네트워크", "묶다", "고정"
     ],
-    KineticFamily.H5_OPTICAL: [
+KineticFamily.H5_OPTICAL: [
         # VN
         "phát hiện", "tìm kiếm", "che giấu", "lộ", "ẩn", "soi", "phơi bày", "điều tra",
         # EN
@@ -254,7 +256,8 @@ def _load_kinetic_presets(config_path: Optional[str] = None) -> Dict[str, Any]:
         if sk not in spatial_kw or not isinstance(spatial_kw[sk], list):
             raise ValueError(f"Invalid kinetic presets config: spatial_keywords missing list '{sk}'")
 
-    return data
+    import copy
+    return copy.deepcopy(data)
 
 
 @dataclass
@@ -318,12 +321,16 @@ def compute_kinetic_spatial_layout(
             raise ValueError(f"Bounding box x_max ({x_max}) must be strictly greater than x_min ({x_min})")
         if y_max <= y_min:
             raise ValueError(f"Bounding box y_max ({y_max}) must be strictly greater than y_min ({y_min})")
+        if (x_max - x_min) >= 95.0 and (y_max - y_min) >= 95.0:
+            raise ValueError("Bounding box spans full canvas [0-100%]; no exterior initial/dock placement possible")
 
         x_c = round((x_min + x_max) / 2.0)
         y_c = round((y_min + y_max) / 2.0)
 
         # Allow center_left selection in bbox path
-        if layout_type and layout_type in presets:
+        if layout_type:
+            if layout_type not in presets:
+                raise ValueError(f"Unknown kinetic layout type: '{layout_type}'. Allowed layouts: {sorted(presets.keys())}")
             l_type = layout_type
         elif (y_max - y_min) > (x_max - x_min):
             l_type = "vertical"
@@ -352,10 +359,10 @@ def compute_kinetic_spatial_layout(
             dock_y = round(min(90.0, y_max + 15.0))
 
         # Strict geometric invariant check: initial_pos and dock_pin_pos must NOT lie inside bounding box
-        assert not (x_min <= init_x <= x_max and y_min <= init_y <= y_max), \
-            f"initial_pos ({init_x}, {init_y}) must lie outside target box [{x_min}-{x_max}, {y_min}-{y_max}]"
-        assert not (x_min <= dock_x <= x_max and y_min <= dock_y <= y_max), \
-            f"dock_pin_pos ({dock_x}, {dock_y}) must lie outside target box [{x_min}-{x_max}, {y_min}-{y_max}]"
+        if x_min <= init_x <= x_max and y_min <= init_y <= y_max:
+            raise ValueError(f"Geometric contract error: initial_pos ({init_x}, {init_y}) must lie outside target box [{x_min}-{x_max}, {y_min}-{y_max}]")
+        if x_min <= dock_x <= x_max and y_min <= dock_y <= y_max:
+            raise ValueError(f"Geometric contract error: dock_pin_pos ({dock_x}, {dock_y}) must lie outside target box [{x_min}-{x_max}, {y_min}-{y_max}]")
 
         return KineticSpatialLayout(
             initial_pos=f"(X:{init_x}%, Y:{init_y}%)",
@@ -374,8 +381,8 @@ def compute_kinetic_spatial_layout(
         inter_str = " ".join(interacting_objects or []).lower()
         combined_context = f"{roles_str} {hero_str} {inter_str}".strip()
 
-        vertical_keywords = presets_cfg.get("spatial_keywords", {}).get("vertical", [])
-        left_keywords = presets_cfg.get("spatial_keywords", {}).get("center_left", [])
+        vertical_keywords = presets_cfg["spatial_keywords"]["vertical"]
+        left_keywords = presets_cfg["spatial_keywords"]["center_left"]
 
         if any(_match_keyword(vk, combined_context) for vk in vertical_keywords) or family == KineticFamily.H1_IMPACT:
             target_type = "vertical"
@@ -384,6 +391,8 @@ def compute_kinetic_spatial_layout(
         else:
             target_type = "center_right"
 
+    if target_type not in presets:
+        raise ValueError(f"Unknown kinetic layout type: '{target_type}'. Allowed layouts: {sorted(presets.keys())}")
     preset = presets[target_type]
     return KineticSpatialLayout(
         initial_pos=preset["initial_pos"],
@@ -494,23 +503,97 @@ class SemanticClauseMapper:
 
 
 def estimate_speech_duration(sentence: str, market: str = "EN") -> float:
-    """Ước tính thời lượng nói (giây) theo tốc độ chuẩn tài liệu đa thị trường (Rule 128)."""
+    """Ước tính thời lượng nói (giây) theo tốc độ chuẩn tài liệu đa thị trường (Rule 128, 134)."""
     if not sentence or not sentence.strip():
-        return 3.0
+        return 5.0
 
+    from core.market_resolver import resolve_canonical_market
+    canon_market = resolve_canonical_market(market_raw=market)
     s = sentence.strip()
-    m = (market or "EN").upper()
 
-    if m == "JA":
-        dur = len(s) / 5.5
-    elif m == "KR":
-        dur = len(s) / 4.8
-    elif m == "VN":
+    if canon_market == "JA":
+        s_chars = re.sub(r"\s+", "", s)
+        dur = len(s_chars) / 5.5
+    elif canon_market == "KR":
+        s_chars = re.sub(r"\s+", "", s)
+        dur = len(s_chars) / 4.8
+    elif canon_market == "VN":
         dur = len(s.split()) / 3.2
     else:
         dur = len(s.split()) / 2.8
 
     return max(2.5, min(10.0, round(dur, 2)))
+
+
+def _compute_clause_aligned_word_spans(words: List[Dict[str, Any]], beat_count: int) -> List[Tuple[int, int]]:
+    """Phân rã chuỗi từ Whisper thành các nhịp câu con liên kết chặt chẽ (Rule 120, 140).
+    Ưu tiên tuyệt đối các ranh giới dấu câu (phẩy, chấm, gạch ngang) và từ nối,
+    ngăn chặn triệt để hiện tượng ngắt đôi cụm từ vị ngữ hoặc phân rã tùy tiện.
+    """
+    n_words = len(words)
+    if n_words < beat_count:
+        raise ValueError(f"Whisper integration fail-closed (Rule 120): Word count ({n_words}) is less than required micro-beat count ({beat_count})")
+    if beat_count == 1:
+        return [(0, n_words)]
+
+    punct_re = re.compile(r"[,;:!?—\.\u3001\u3002]$")
+    connectives = {
+        "when", "but", "however", "because", "although", "causing", "leading", "as", "and",
+        "nhưng", "vì", "do", "khi", "tuy", "khiến", "làm", "dẫn"
+    }
+    weight_map = {}
+    for i in range(n_words - 1):
+        w_curr = words[i].get("word", "").strip()
+        w_next = words[i+1].get("word", "").strip().lower()
+        score = 1.0
+        if punct_re.search(w_curr):
+            score += 100.0
+        if w_next in connectives:
+            score += 40.0
+        weight_map[i + 1] = score
+
+    num_splits = beat_count - 1
+    from itertools import combinations
+    ideal_span = n_words / beat_count
+    best_combo = None
+    best_score = -1e9
+
+    candidate_splits = range(1, n_words)
+    import math
+    comb_count = math.comb(len(candidate_splits), num_splits)
+    if comb_count <= 25000:
+        for combo in combinations(candidate_splits, num_splits):
+            total_score = 0.0
+            prev = 0
+            for s in combo:
+                total_score += weight_map.get(s, 1.0) * 10.0
+                span_len = s - prev
+                total_score -= abs(span_len - ideal_span) * 2.0
+                prev = s
+            span_len = n_words - prev
+            total_score -= abs(span_len - ideal_span) * 2.0
+            if total_score > best_score:
+                best_score = total_score
+                best_combo = combo
+    else:
+        # Score-guided selection for large word counts
+        sorted_pts = sorted(candidate_splits, key=lambda idx: weight_map.get(idx, 1.0), reverse=True)
+        selected = []
+        for pt in sorted_pts:
+            if len(selected) == num_splits:
+                break
+            if all(abs(pt - s) >= 1 for s in selected):
+                selected.append(pt)
+        while len(selected) < num_splits:
+            for pt in range(1, n_words):
+                if pt not in selected:
+                    selected.append(pt)
+                    if len(selected) == num_splits:
+                        break
+        best_combo = tuple(sorted(selected))
+
+    slices = [0] + list(best_combo) + [n_words]
+    return [(slices[b], slices[b+1]) for b in range(beat_count)]
 
 
 def generate_scene_sub_director_plan(
@@ -598,16 +681,13 @@ def generate_scene_sub_director_plan(
     else:
         beat_count = raw_beat_count
 
-    # Fail closed if whisper words count is less than required micro-beat count
+    # Fail closed if whisper words count is less than required micro-beat count (Rule 120, 131)
     if validated_whisper is not None:
         if len(validated_whisper) < beat_count:
-            if len(validated_whisper) >= 4:
-                beat_count = len(validated_whisper)
-            else:
-                raise ValueError(
-                    f"Whisper integration fail-closed (Rule 120): Word count ({len(validated_whisper)}) "
-                    f"is less than required micro-beat count ({beat_count})"
-                )
+            raise ValueError(
+                f"Whisper integration fail-closed (Rule 120): Word count ({len(validated_whisper)}) "
+                f"is less than required micro-beat count ({beat_count})"
+            )
 
     hero_clean = (hero_cutout_object or "primary forensic document").split(" on ")[0].strip()
     inter1 = interacting_objects[0] if interacting_objects else "heavy brass caliper"
@@ -661,45 +741,35 @@ def generate_scene_sub_director_plan(
     # 2. Phân rã Micro-Beat Windows trực tiếp từ Whisper Word Timestamps (Rule 120, 135)
     whisper_windows: Optional[List[Tuple[float, float, str]]] = None
     if validated_whisper:
-        n_words = len(validated_whisper)
         whisper_windows = []
 
-        slice_indices = [0]
-        for b_i in range(1, beat_count):
-            split_idx = int(round(b_i * n_words / beat_count))
-            split_idx = max(slice_indices[-1] + 1, min(n_words - (beat_count - b_i), split_idx))
-            slice_indices.append(split_idx)
-        slice_indices.append(n_words)
-
+        clause_spans = _compute_clause_aligned_word_spans(validated_whisper, beat_count)
         cur_start = 0.000
         for b_i in range(beat_count):
-            s_idx = slice_indices[b_i]
-            e_idx = slice_indices[b_i + 1]
+            s_idx, e_idx = clause_spans[b_i]
             seg_words = validated_whisper[s_idx:e_idx]
             seg_text = " ".join(w["word"] for w in seg_words).strip()
 
-            if b_i == 0:
-                seg_start = 0.000
-            else:
-                seg_start = cur_start
+            seg_start = 0.000 if b_i == 0 else cur_start
 
             if b_i == beat_count - 1:
                 seg_end = dur
             else:
-                raw_end = round(seg_words[-1]["end"] - w_start, 3)
-                min_remaining = 0.050 * (beat_count - 1 - b_i)
-                seg_end = min(dur - min_remaining, max(seg_start + 0.050, raw_end))
+                seg_end = round(seg_words[-1]["end"] - w_start, 3)
+                if seg_end <= seg_start:
+                    seg_end = round(seg_start + 0.010, 3)
+                if seg_end >= dur:
+                    seg_end = round(dur - 0.010 * (beat_count - 1 - b_i), 3)
 
             whisper_windows.append((seg_start, seg_end, seg_text))
             cur_start = seg_end
 
-        # Strict contiguity and non-overlapping assertions (Rule 120)
+        # Strict contiguity and non-overlapping validation (Rule 120, 139)
         for i in range(len(whisper_windows)):
-            assert whisper_windows[i][0] < whisper_windows[i][1], f"Beat {i} start must precede end: {whisper_windows[i]}"
-            if i > 0:
-                assert abs(whisper_windows[i][0] - whisper_windows[i-1][1]) < 1e-4, \
-                    f"Beat {i} start ({whisper_windows[i][0]}) must equal Beat {i-1} end ({whisper_windows[i-1][1]})"
-
+            if whisper_windows[i][0] >= whisper_windows[i][1]:
+                raise ValueError(f"Whisper window {i} invalid: start ({whisper_windows[i][0]}) must precede end ({whisper_windows[i][1]})")
+            if i > 0 and abs(whisper_windows[i][0] - whisper_windows[i-1][1]) > 1e-4:
+                raise ValueError(f"Whisper windows non-contiguous at beat {i}: previous end {whisper_windows[i-1][1]} != current start {whisper_windows[i][0]}")
     # 3. Đồng bộ hóa Phase Markers & Dead-Stop Timings (Rule 120, 140)
     t_p1_end = whisper_windows[0][1] if whisper_windows else min(0.6, round(dur * 0.1, 3))
     active_span = dur - t_p1_end
@@ -800,7 +870,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b2,
                 coupling_id="K1",
-                action_description=f"High-velocity snap burst in 0.4s (steep acceleration on twos / 12fps): The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
+                action_description=f"High-velocity snap burst in {round(whisper_windows[1][1] - whisper_windows[1][0], 2) if whisper_windows else 0.4:.1f}s (steep acceleration on twos / 12fps): The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
                 handoff_to="B3",
                 camera_micro_move="subtle punch-in zoom 1.0x to 1.15x tracking contact point",
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
@@ -810,7 +880,7 @@ def generate_scene_sub_director_plan(
                 phase="P3_ESCALATION",
                 time_window=win_b3,
                 coupling_id="K2",
-                action_description=f"Direct kinetic trigger: in a rapid 0.6s burst, the {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.3f}s",
+                action_description=f"Direct kinetic trigger: in a rapid {round(whisper_windows[2][1] - whisper_windows[2][0], 2) if whisper_windows else 0.6:.1f}s burst, the {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.3f}s",
                 handoff_to="B4",
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
             ),
@@ -846,7 +916,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b2,
                 coupling_id="K1",
-                action_description=f"High-velocity snap burst in 0.4s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}",
+                action_description=f"High-velocity snap burst in {round(whisper_windows[1][1] - whisper_windows[1][0], 2) if whisper_windows else 0.4:.1f}s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}",
                 handoff_to="B3",
                 camera_micro_move="camera crash-zoom punch-in 1.3x tracking contact point",
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
@@ -865,7 +935,7 @@ def generate_scene_sub_director_plan(
                 phase="P3_ESCALATION",
                 time_window=win_b4,
                 coupling_id="K2",
-                action_description=f"Direct kinetic trigger: in a rapid 0.5s burst, the {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}",
+                action_description=f"Direct kinetic trigger: in a rapid {round(whisper_windows[3][1] - whisper_windows[3][0], 2) if whisper_windows else 0.5:.1f}s burst, the {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}",
                 handoff_to="B5",
                 vo_keyword=whisper_windows[3][2] if whisper_windows else None
             ),

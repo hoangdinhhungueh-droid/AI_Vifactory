@@ -177,9 +177,10 @@ def test_build_vox_scene_prompts_kinematics():
         narration="The balance sheet revealed a hidden debt.",
         headline="HIDDEN DEBT",
         visual_metaphor="Audited financial ledger with red seal",
-        duration_est_sec=5.0
+        duration_est_sec=5.0,
+        market="EN"
     )
-    vox_meta = build_vox_scene_prompts(scene, idx=0, total_scenes=1)
+    vox_meta = build_vox_scene_prompts(scene, idx=0, total_scenes=1, market="EN")
 
     assert "second_by_second_action_breakdown" in vox_meta
     breakdown = vox_meta["second_by_second_action_breakdown"]

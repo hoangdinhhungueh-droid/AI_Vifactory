@@ -56,7 +56,7 @@ class PipelineConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     pipeline_version: str = "2.0.0"
-    market: Optional[str] = "EN"
+    market: Optional[str] = None
     limits: LimitsConfig
     video_generation: VideoGenConfig
     voice: VoiceConfig
