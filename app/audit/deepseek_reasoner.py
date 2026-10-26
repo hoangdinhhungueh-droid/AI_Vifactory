@@ -115,6 +115,8 @@ def call_deepseek_reasoner(
                 "Content-Type": "application/json",
                 "User-Agent": HHTECH_UA,
             }
+            proxy_url = os.getenv("HHTECH_PROXY", "socks5h://127.0.0.1:40000")
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             for r_model in ["deepseek-reasoner", "deepseek-r1", "deepseek-v3"]:
                 payload = {
                     "model": r_model,
@@ -122,7 +124,7 @@ def call_deepseek_reasoner(
                     "max_tokens": 3000,
                     "temperature": 0.2,
                 }
-                resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+                resp = requests.post(url, headers=headers, json=payload, proxies=proxies, timeout=timeout)
                 if resp.status_code == 200:
                     data = resp.json()
                     choice = data.get("choices", [{}])[0].get("message", {})

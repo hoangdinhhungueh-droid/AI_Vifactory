@@ -159,27 +159,32 @@ def call_vision_audit_llm(frames: list[Path], topic_title: str) -> dict:
         "temperature": 0.2
     }
 
-    req = urllib.request.Request(
-        f"{HHTECH_BASE}/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        },
-        method="POST"
-    )
+    import requests as _requests
+    proxy_url = os.getenv("HHTECH_PROXY", "socks5h://127.0.0.1:40000")
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
 
     try:
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            raw_text = data["choices"][0]["message"]["content"].strip()
-            # Clean markdown formatting if present
-            if raw_text.startswith("```"):
-                raw_text = re.sub(r"^```[a-zA-Z]*\n?", "", raw_text)
-                raw_text = re.sub(r"\n?```$", "", raw_text).strip()
-            result = json.loads(raw_text)
-            result["method"] = f"llm_vision_{HHTECH_MODEL}"
-            return result
+        resp = _requests.post(
+            f"{HHTECH_BASE}/chat/completions",
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            proxies=proxies,
+            timeout=45,
+        )
+        if resp.status_code != 200:
+            raise RuntimeError(f"HHTech API error {resp.status_code}: {resp.text[:200]}")
+        data = resp.json()
+        raw_text = data["choices"][0]["message"]["content"].strip()
+        # Clean markdown formatting if present
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```[a-zA-Z]*\n?", "", raw_text)
+            raw_text = re.sub(r"\n?```$", "", raw_text).strip()
+        result = json.loads(raw_text)
+        result["method"] = f"llm_vision_{HHTECH_MODEL}"
+        return result
     except Exception as e:
         logger.error(f"[AUDIT] Vision LLM request failed: {e}")
         return {

@@ -223,14 +223,18 @@ def call_hhtech_gpt56(api_key, prompt):
         "Content-Type": "application/json",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Antigravity/2.0"
     }
+    import requests as _requests
+    proxy_url = os.getenv("HHTECH_PROXY", "socks5h://127.0.0.1:40000")
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
     t0 = time.time()
-    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
-    with urllib.request.urlopen(req, timeout=90) as resp:
-        elapsed = time.time() - t0
-        data = json.loads(resp.read().decode("utf-8"))
-        usage = data.get("usage", {})
-        content = data["choices"][0]["message"]["content"]
-        return content, usage, elapsed
+    resp = _requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=90)
+    elapsed = time.time() - t0
+    if resp.status_code != 200:
+        raise RuntimeError(f"HHTech API error {resp.status_code}: {resp.text[:200]}")
+    data = resp.json()
+    usage = data.get("usage", {})
+    content = data["choices"][0]["message"]["content"]
+    return content, usage, elapsed
 
 def notion_api(token, endpoint, method="GET", payload=None):
     url = f"https://api.notion.com/v1/{endpoint}"

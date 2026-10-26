@@ -567,6 +567,12 @@ async def oai_chat_completions(request: Request):
         payload["model"] = up["model"]
         payload["stream"] = False
 
+        proxies = None
+        if "hhtech" in up.get("base", "") or "hhtech" in up.get("name", ""):
+            proxy_url = os.getenv("HHTECH_PROXY", "socks5h://127.0.0.1:40000")
+            if proxy_url:
+                proxies = {"http": proxy_url, "https": proxy_url}
+
         try:
             r = _rq.post(
                 f"{up['base']}/chat/completions",
@@ -575,7 +581,9 @@ async def oai_chat_completions(request: Request):
                     "Content-Type": "application/json",
                     "User-Agent": _BROWSER_UA,
                 },
-                json=payload, timeout=300,
+                json=payload,
+                proxies=proxies,
+                timeout=300,
             )
             if r.status_code >= 400:
                 last_err = f"{up['name']} {r.status_code}: {r.text[:800]}"

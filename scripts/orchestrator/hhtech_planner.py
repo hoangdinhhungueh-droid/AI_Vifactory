@@ -155,7 +155,7 @@ def call_opus55_direct(
 
     try:
         import httpx
-        with httpx.Client(timeout=httpx.Timeout(timeout=timeout, connect=30.0, read=timeout, write=30.0)) as client:
+        with httpx.Client(proxy=os.getenv('HHTECH_PROXY', 'socks5://127.0.0.1:40000'), timeout=httpx.Timeout(timeout=timeout, connect=30.0, read=timeout, write=30.0)) as client:
             with client.stream("POST", url, json=payload, headers=headers) as resp:
                 if resp.status_code != 200:
                     err_body = resp.read().decode("utf-8", errors="replace")

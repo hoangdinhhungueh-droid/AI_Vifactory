@@ -166,7 +166,7 @@ Provide an in-depth review in Vietnamese covering:
             "max_tokens": 3000,
             "stream": False
         }
-        with httpx.Client(timeout=300.0) as client:
+        with httpx.Client(proxy=os.getenv('HHTECH_PROXY', 'socks5://127.0.0.1:40000'), timeout=300.0) as client:
             resp = client.post(f"{gw.hhtech_base_url}/chat/completions", json=payload_opus, headers=headers)
             if resp.status_code == 200:
                 opus_resp_text = resp.json()["choices"][0]["message"]["content"]
@@ -220,7 +220,7 @@ Write your adversarial cross-examination (Đối chất) in Vietnamese:
             "max_tokens": 3000,
             "stream": False
         }
-        with httpx.Client(timeout=300.0) as client:
+        with httpx.Client(proxy=os.getenv('HHTECH_PROXY', 'socks5://127.0.0.1:40000'), timeout=300.0) as client:
             resp = client.post(f"{gw.hhtech_base_url}/chat/completions", json=payload_astra, headers=headers)
             if resp.status_code == 200:
                 astra_resp_text = resp.json()["choices"][0]["message"]["content"]

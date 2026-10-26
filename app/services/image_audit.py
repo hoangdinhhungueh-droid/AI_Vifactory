@@ -438,19 +438,25 @@ def audit_image_hhtech(image_bytes: bytes, prompt: str, layer: str | None = None
             {"type": "image_url", "image_url": {"url": "data:image/png;base64," + b64}},
         ]}],
     }
-    req = urllib.request.Request(
-        HHTECH_BASE + "/chat/completions",
-        data=json.dumps(body).encode(),
-        headers={"Authorization": "Bearer " + _hhtech_key(),
-                 "Content-Type": "application/json",
-                 "User-Agent": HHTECH_UA},
-    )
+    import requests as _requests
+    proxy_url = os.getenv("HHTECH_PROXY", "socks5h://127.0.0.1:40000")
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
     _LAST_CALL[0] = time.time()
     try:
-        with urllib.request.urlopen(req, timeout=180) as r:
-            data = json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"hhtech HTTP {e.code}: {e.read().decode(errors='replace')[:300]}")
+        r = _requests.post(
+            HHTECH_BASE + "/chat/completions",
+            json=body,
+            headers={"Authorization": "Bearer " + _hhtech_key(),
+                     "Content-Type": "application/json",
+                     "User-Agent": HHTECH_UA},
+            proxies=proxies,
+            timeout=180,
+        )
+        if r.status_code != 200:
+            raise RuntimeError(f"hhtech HTTP {r.status_code}: {r.text[:300]}")
+        data = r.json()
+    except Exception as e:
+        raise RuntimeError(f"hhtech call error: {e}")
     usage = data.get("usage", {}) or {}
     text = (data.get("choices", [{}])[0].get("message", {}).get("content") or "")
     text = text.replace("```json", "").replace("```", "").strip()

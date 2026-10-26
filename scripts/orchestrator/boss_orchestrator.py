@@ -174,7 +174,8 @@ def call_hhtech_llm(
 
     try:
         import httpx
-        with httpx.Client(timeout=httpx.Timeout(timeout=180.0, connect=30.0, read=180.0, write=30.0)) as client:
+        proxy_url = os.getenv("HHTECH_PROXY", "socks5://127.0.0.1:40000")
+        with httpx.Client(proxy=proxy_url, timeout=httpx.Timeout(timeout=180.0, connect=30.0, read=180.0, write=30.0)) as client:
             with client.stream("POST", url, json=payload, headers=headers) as resp:
                 if resp.status_code != 200:
                     err_body = resp.read().decode("utf-8", errors="replace")

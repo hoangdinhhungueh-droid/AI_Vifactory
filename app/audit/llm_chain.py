@@ -71,6 +71,8 @@ def call_llm(prompt: str, system: str = "", timeout: int = 15):
     key = _hhtech_key()
     if key:
         try:
+            proxy_url = os.getenv("HHTECH_PROXY", "socks5h://127.0.0.1:40000")
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             resp = requests.post(
                 HHTECH_BASE + "/chat/completions",
                 headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
@@ -78,6 +80,7 @@ def call_llm(prompt: str, system: str = "", timeout: int = 15):
                 json={"messages": messages,
                       "model": os.environ.get("AUDIT_TEXT_FALLBACK_MODEL", "deepseek-v4-flash"),
                       "max_tokens": 500, "temperature": 0.3},
+                proxies=proxies,
                 timeout=max(timeout, 45))
             if resp.status_code == 200:
                 content = _extract(resp)
