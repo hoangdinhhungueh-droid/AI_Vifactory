@@ -15,10 +15,20 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 import httpx
+import socket
 
 from app.services.cost_tracker import get_global_tracker
 
 logger = logging.getLogger(__name__)
+
+
+def _is_local_proxy_running(port: int = 40000) -> bool:
+    """Checks if local SOCKS5 proxy (e.g. Cloudflare WARP proxy mode) is listening."""
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+            return True
+    except OSError:
+        return False
 
 
 class ModelType(Enum):
@@ -395,6 +405,10 @@ class ModelGateway:
         result = ""
         total_tokens = 0
 
+        proxy_url = os.getenv("HHTECH_PROXY")
+        if not proxy_url and _is_local_proxy_running(40000):
+            proxy_url = "socks5://127.0.0.1:40000"
+
         for attempt in range(1, max_retries + 1):
             try:
                 full_content: List[str] = []
@@ -402,7 +416,7 @@ class ModelGateway:
                 total_tokens = 0
                 timeout_config = httpx.Timeout(timeout=timeout, connect=30.0, read=timeout, write=30.0, pool=30.0)
 
-                with httpx.Client(timeout=timeout_config) as client:
+                with httpx.Client(timeout=timeout_config, proxy=proxy_url) as client:
                     with client.stream(
                         "POST",
                         f"{self.hhtech_base_url}/chat/completions",
