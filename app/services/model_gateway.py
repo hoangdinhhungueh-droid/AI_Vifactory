@@ -341,7 +341,7 @@ class ModelGateway:
             logger.error(f"🛑 [CONTEXT EXCEEDED BLOCKED] {err_msg}")
             raise TokenBudgetExceeded(err_msg)
 
-        max_ceiling = int(os.getenv("HHTECH_MAX_INPUT_TOKENS_CEILING", "20000"))
+        max_ceiling = int(os.getenv("HHTECH_MAX_INPUT_TOKENS_CEILING", "35000"))
         allow_massive = os.getenv("ALLOW_MASSIVE_LLM_CONTEXT") == "1"
         if est_tokens > max_ceiling and not image_base64:
             if not allow_massive:
