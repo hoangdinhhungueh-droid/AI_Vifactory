@@ -28,22 +28,17 @@ import re
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from app.services.director_planner_b3 import detect_forensic_overlay, resolve_market_redacted_terms
+from app.services.quant_profile import ProfileStatus, extract_episode_quantitative_profile
+from app.services.sfx_registry import get_sfx_filename, is_valid_sfx
 from app.services.text_to_number_parser import parse_spoken_number
 from app.services.timeline_editor_agent import audit_and_optimize_timeline
-from app.services.sfx_registry import CANONICAL_SFX_REGISTRY, is_valid_sfx, get_sfx_filename
-from app.services.quant_profile import (
-    extract_episode_quantitative_profile,
-    ProfileStatus,
-    ValueKind
-)
-from app.services.jurisdiction_router import resolve_jurisdiction
 
 logger = logging.getLogger("vf.build_remotion_props")
 
@@ -1394,7 +1389,7 @@ def build_remotion_props_data(
                 if calc_dur is not None and calc_dur > 0.1:
                     dur_sec = calc_dur
 
-        dur_frames = max(15, round(dur_sec * fps))
+        _dur_frames = max(15, round(dur_sec * fps))
 
         # Alternate Left / Right position
         default_pos = "left" if (i % 2 == 0) else "right"
@@ -1907,6 +1902,9 @@ def build_remotion_props_data(
             "yarns": (motion_meta["radiating_connections"] or s.get("yarns") or s.get("radiatingConnections") or []) if is_collage_variant else [],
             "supportingCutouts": (motion_meta["supporting_cutouts"] or s.get("supportingCutouts") or []) if is_collage_variant else [],
             "editorialHeadline": scene_headline,
+            # Kinetic Sub-Director Plan (Rule 140 / Vox Engine v3)
+            "scene_sub_director_plan": s.get("scene_sub_director_plan") or s.get("sceneSubDirectorPlan"),
+            "sceneSubDirectorPlan": s.get("scene_sub_director_plan") or s.get("sceneSubDirectorPlan"),
         })
 
     if missing:
@@ -1958,8 +1956,8 @@ def build_remotion_props_data(
     try:
         from app.services.editorial_briefing_generator import (
             extract_market_from_episode_id,
+            generate_editorial_briefing,
             prune_and_localize_scenes,
-            generate_editorial_briefing
         )
         m_code = extract_market_from_episode_id(episode_id)
         out_dir = os.path.dirname(os.path.abspath(brain_input_path))

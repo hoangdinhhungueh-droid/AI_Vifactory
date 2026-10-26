@@ -1059,11 +1059,17 @@ export const TwoLayerScene = (props) => {
 // opacity/zoom animation) -- only the transition itself fades.
 const BACKGROUND_TRANSITION_FRAMES = 15;
 
+export const getSceneDurationFrames = (s: any, defaultFrames = 1): number => {
+  if (!s) return defaultFrames;
+  const raw = s.durationInFrames ?? s.duration_in_frames ?? (s.durationSec ? s.durationSec * 30 : null);
+  return Math.max(1, Math.round(Number(raw) || defaultFrames));
+};
+
 const buildBackgroundSegments = (scenes, fadeFrames) => {
   const raw = [];
   let cursor = 0;
   scenes.forEach((s) => {
-    const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
+    const dur = getSceneDurationFrames(s);
     const src = s.background || null;
     const paperTheme =
       s.papercraft_theme ||
@@ -1193,7 +1199,7 @@ const buildForegroundSegments = (scenes, defaultFadeFrames) => {
   const raw = [];
   let cursor = 0;
   scenes.forEach((s, i) => {
-    const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
+    const dur = getSceneDurationFrames(s);
     const bgId = bgIds[i];
     const explicitFg = s.primary_hero?.src || s.foreground || null;
     const motionPath = s.primary_hero?.motion_path || s.motion_path || s.motionPath || null;
@@ -1323,7 +1329,7 @@ const buildOverlaySegments = (scenes: any[]) => {
   const raw: any[] = [];
   let cursor = 0;
   scenes.forEach((s, idx) => {
-    const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
+    const dur = getSceneDurationFrames(s);
     const key = computeOverlayKey(s, idx);
     const last = raw[raw.length - 1];
     const effectiveOv = key ? (s.forensicOverlay || s.forensic_overlay) : null;
@@ -1433,7 +1439,7 @@ const TopProgressBar = ({ scenes, currentFrame, totalFrames }) => {
   let cursor = 0;
   let currentSceneIdx = 0;
   for (let i = 0; i < scenes.length; i++) {
-    const dur = Math.max(1, Math.round(scenes[i].durationInFrames || 1));
+    const dur = getSceneDurationFrames(scenes[i]);
     if (safeFrame >= cursor && safeFrame < cursor + dur) {
       currentSceneIdx = i;
       break;
@@ -2103,7 +2109,7 @@ export const getCurrentSceneInfo = (scenes: any[], globalFrame: number) => {
   let acc = 0;
   for (let i = 0; i < scenes.length; i++) {
     const s = scenes[i];
-    const dur = Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1));
+    const dur = getSceneDurationFrames(s);
     if (globalFrame >= acc && globalFrame < acc + dur) {
       return {
         scene: s,
@@ -2116,7 +2122,7 @@ export const getCurrentSceneInfo = (scenes: any[], globalFrame: number) => {
   }
   if (scenes.length > 0) {
     const last = scenes[scenes.length - 1];
-    const dur = Math.max(1, Math.round(last.durationInFrames ? last.durationInFrames : 1));
+    const dur = getSceneDurationFrames(last);
     return {
       scene: last,
       index: scenes.length - 1,
@@ -2193,7 +2199,7 @@ export const LivingMicroLifeLayer: React.FC<{ frame: number }> = ({ frame }) => 
 };
 
 const totalSceneFrames = (scenes) =>
-  (scenes || []).reduce((sum, s) => sum + Math.max(1, Math.round(s.durationInFrames ? s.durationInFrames : 1)), 0);
+  (scenes || []).reduce((sum, s) => sum + getSceneDurationFrames(s), 0);
 
 /**
  * Master TwoLayerEpisode Container Component (Rule 125 Single Truth).
@@ -2232,16 +2238,7 @@ export const TwoLayerEpisode: React.FC<{
   const sceneSequences = React.useMemo(() => {
     let cursor = 0;
     return scenes.map((s, idx) => {
-      const dur = Math.max(
-        1,
-        Math.round(
-          s.durationInFrames
-            ? s.durationInFrames
-            : s.durationSec
-            ? s.durationSec * (cfg.fps || 30)
-            : 150
-        )
-      );
+      const dur = getSceneDurationFrames(s, 150);
       const from = cursor;
       cursor += dur;
 
