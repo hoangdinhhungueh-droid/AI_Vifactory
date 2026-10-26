@@ -175,7 +175,7 @@ def run(ctx: RunContext) -> StageArtifact:
             from vox.qa.gates import probe_media_file
             a_info = probe_media_file(ctx.paths.audio_dir / "voice_narration.mp3")
             audio_dur = float(a_info.get("format", {}).get("duration", "0"))
-        except (OSError, KeyError, ValueError) as _probe_err:
+        except (OSError, KeyError, ValueError, subprocess.SubprocessError) as _probe_err:
             logger.warning(f"Audio narration probe failed; falling back to estimation: {_probe_err}")
 
     if audio_dur <= 0.0 and s9_path.exists():
@@ -188,7 +188,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 audio_dur = float(a_info.get("format", {}).get("duration", "0"))
             if audio_dur <= 0.0:
                 audio_dur = float(s9_data.get("payload", {}).get("total_duration_sec", 0.0))
-        except (OSError, KeyError, ValueError) as _probe_err:
+        except (OSError, KeyError, ValueError, subprocess.SubprocessError) as _probe_err:
             logger.warning(f"Audio narration probe failed; falling back to estimation: {_probe_err}")
 
     total_scenes = len(scenes)

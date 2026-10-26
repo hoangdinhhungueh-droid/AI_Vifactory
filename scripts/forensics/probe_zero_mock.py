@@ -196,32 +196,112 @@ def main() -> int:
     print(f"      - File Count:  {len(by_file_root)} test files")
     print(f"      - Total Count: {total_root} references")
 
-    print("\n   C. Mathematical Count Reconciliation Proof (Boss Round 6 Item 7, Round 8 Item 22, Round 18 Item 1, Round 23 Reconciliation):")
-    legacy_baseline = 211
-    failover_addition = 3  # in tests/unit/test_vps_runner_failover.py for isolated network failover tests
-    repair_addition = 13  # in tests/unit/test_critic_gate_fail_closed.py for 1-shot angle repair
-    readiness_manifest_addition = 2  # in tests/unit/test_service_readiness_manifest.py for manifest aggregation probe keys
-    vox_studio_addition = 2  # in tests/unit/test_vox_studio_upgrade.py for offline hermetic DAG chaining and fallback tests
-    atomic_io_addition = 4  # in tests/unit/test_atomic_io.py for crash-safe atomic write fsync and cleanup tests
-    expected_reconciled = legacy_baseline + failover_addition + repair_addition + readiness_manifest_addition + vox_studio_addition + atomic_io_addition
+    UNIT_TEST_MOCK_ALLOWLIST = {
+        "tests/unit/test_alert_cooldown.py": 26,
+        "tests/unit/test_align_adversarial.py": 14,
+        "tests/unit/test_api_auth_gating.py": 12,
+        "tests/unit/test_atomic_io.py": 4,
+        "tests/unit/test_b1_daily_guard_integration.py": 9,
+        "tests/unit/test_b3_handoff_contract.py": 7,
+        "tests/unit/test_core_net_utils.py": 12,
+        "tests/unit/test_critic_gate_fail_closed.py": 35,
+        "tests/unit/test_daily_market_lock.py": 39,
+        "tests/unit/test_lock_timing_reconciliation.py": 1,
+        "tests/unit/test_s05_director_plan.py": 5,
+        "tests/unit/test_s05_fail_closed.py": 1,
+        "tests/unit/test_s10_render.py": 3,
+        "tests/unit/test_s11_qc_gate.py": 7,
+        "tests/unit/test_service_readiness_manifest.py": 2,
+        "tests/unit/test_trend_caps_and_gates.py": 53,
+        "tests/unit/test_vox_studio_upgrade.py": 2,
+        "tests/unit/test_vps_runner_failover.py": 3,
+    }
 
-    print(f"       * Round 5 Approved Baseline (tests/unit/):   {legacy_baseline} references")
-    print(f"       * Round 6 Failover Addition (tests/unit/):   +{failover_addition} references (in test_vps_runner_failover.py)")
-    print(f"       * Round 13 Angle Repair Addition (tests/unit/): +{repair_addition} references (in test_critic_gate_fail_closed.py)")
-    print(f"       * Round 18 Manifest Addition (tests/unit/):  +{readiness_manifest_addition} references (in test_service_readiness_manifest.py)")
-    print(f"       * Round 24 Vox Studio 7-Touch Addition (tests/unit/): +{vox_studio_addition} references (in test_vox_studio_upgrade.py)")
-    print(f"       * Round 25 Atomic IO Addition (tests/unit/): +{atomic_io_addition} references (in test_atomic_io.py)")
-    print(f"       * Calculated Reconciled Total (tests/unit/):  {expected_reconciled} references")
-    print(f"       * Actual Counted Total (tests/unit/):         {total_unit} references")
+    LEGACY_TEST_MOCK_ALLOWLIST = {
+        "tests/test_adversarial_round3.py": 11,
+        "tests/test_auto_post_render.py": 1,
+        "tests/test_b15_seo_package_forge.py": 1,
+        "tests/test_b15_traffic_bridge.py": 4,
+        "tests/test_b2_b3_handoff.py": 7,
+        "tests/test_b2_task_id_parsing.py": 3,
+        "tests/test_b35_b4_bridge.py": 9,
+        "tests/test_b36_visual_convergence.py": 10,
+        "tests/test_breakout_seo_continuity.py": 4,
+        "tests/test_build_remotion_props.py": 2,
+        "tests/test_claude_vox_director.py": 8,
+        "tests/test_competitor_recon_b15.py": 3,
+        "tests/test_cross_channel_promoter.py": 31,
+        "tests/test_dual_model_convergence.py": 3,
+        "tests/test_e2e_pipeline.py": 1,
+        "tests/test_editorial_briefing_generator.py": 13,
+        "tests/test_gate1_order_guard.py": 10,
+        "tests/test_gates_manifest.py": 3,
+        "tests/test_ghost_scan_adversarial.py": 14,
+        "tests/test_hollywood_audio_anchor.py": 4,
+        "tests/test_midscene_adapter.py": 24,
+        "tests/test_model_gateway_preflight.py": 32,
+        "tests/test_prompt_forge.py": 13,
+        "tests/test_quant_profile.py": 1,
+        "tests/test_telegram_gate1_hg1.py": 23,
+        "tests/test_text_to_number_parser.py": 2,
+        "tests/test_timeline_editor_agent.py": 10,
+        "tests/test_v7_feedback_loop.py": 17,
+        "tests/test_vox_automated_director.py": 8,
+        "tests/test_vox_continuous_director_engine.py": 12,
+        "tests/test_vox_critic_council.py": 2,
+    }
 
-    if total_unit != expected_reconciled:
-        print(f"❌ FAIL: tests/unit/ count mismatch! Expected {expected_reconciled} (211 + 3 + 13 + 2 + {vox_studio_addition} + {atomic_io_addition}), found {total_unit}", file=sys.stderr)
+    print("\n   C. Mathematical Count Reconciliation Proof (Derived from Committed Per-File Baselines):")
+    expected_unit = sum(UNIT_TEST_MOCK_ALLOWLIST.values())
+    expected_root = sum(LEGACY_TEST_MOCK_ALLOWLIST.values())
+    expected_all = expected_unit + expected_root
+
+    print(f"       * Committed Baseline (tests/unit/):          {expected_unit} references across {len(UNIT_TEST_MOCK_ALLOWLIST)} files")
+    print(f"       * Actual Counted Total (tests/unit/):        {total_unit} references across {len(by_file_unit)} files")
+    print(f"       * Committed Baseline (tests/test_*.py):      {expected_root} references across {len(LEGACY_TEST_MOCK_ALLOWLIST)} files")
+    print(f"       * Actual Counted Total (tests/test_*.py):    {total_root} references across {len(by_file_root)} files")
+
+    # Audit per-file discrepancies in unit tests
+    unit_diffs = []
+    for fpath, exp in UNIT_TEST_MOCK_ALLOWLIST.items():
+        act = by_file_unit.get(fpath, 0)
+        if act != exp:
+            unit_diffs.append(f"{fpath}: expected {exp}, got {act}")
+    for fpath, act in by_file_unit.items():
+        if fpath not in UNIT_TEST_MOCK_ALLOWLIST:
+            unit_diffs.append(f"{fpath}: unexpected file with {act} references")
+
+    if unit_diffs:
+        print(f"❌ FAIL: tests/unit/ per-file mismatch:\n" + "\n".join(f"     - {d}" for d in unit_diffs), file=sys.stderr)
         return 1
 
-    assert total_unit == expected_reconciled, f"tests/unit count mismatch: {total_unit} != {expected_reconciled}"
-    assert total_all == total_unit + total_root
-    print(f"   ✅ tests/unit/ ARITHMETIC PROOF PASSED: {legacy_baseline} + {failover_addition} + {repair_addition} + {readiness_manifest_addition} + {vox_studio_addition} + {atomic_io_addition} = {total_unit} (100% matched)")
+    # Audit per-file discrepancies in legacy tests
+    root_diffs = []
+    for fpath, exp in LEGACY_TEST_MOCK_ALLOWLIST.items():
+        act = by_file_root.get(fpath, 0)
+        if act != exp:
+            root_diffs.append(f"{fpath}: expected {exp}, got {act}")
+    for fpath, act in by_file_root.items():
+        if fpath not in LEGACY_TEST_MOCK_ALLOWLIST:
+            root_diffs.append(f"{fpath}: unexpected file with {act} references")
+
+    if root_diffs:
+        print(f"❌ FAIL: tests/test_*.py per-file mismatch:\n" + "\n".join(f"     - {d}" for d in root_diffs), file=sys.stderr)
+        return 1
+
+    assert total_unit == expected_unit, f"tests/unit count mismatch: {total_unit} != {expected_unit}"
+    assert total_root == expected_root, f"tests/test_*.py count mismatch: {total_root} != {expected_root}"
+    assert total_all == expected_all, f"total repository count mismatch: {total_all} != {expected_all}"
+
+    tree_res = subprocess.run(["git", "rev-parse", "HEAD^{tree}"], cwd=str(repo_root), capture_output=True, text=True, check=False)
+    tree_hash = tree_res.stdout.strip() if tree_res.returncode == 0 else "UNKNOWN"
+
+    print(f"   ✅ tests/unit/ LEDGER PROOF PASSED: {total_unit} matches derived from {len(UNIT_TEST_MOCK_ALLOWLIST)} committed baselines.")
+    print(f"   ✅ tests/test_*.py LEDGER PROOF PASSED: {total_root} matches derived from {len(LEGACY_TEST_MOCK_ALLOWLIST)} committed baselines.")
     print(f"   ✅ COMPLETE OFFLINE TEST REPOSITORY PROOF: {total_unit} (unit) + {total_root} (legacy) = {total_all} references")
+    print(f"   MOCK_SCAN_MATCHES_COUNT={total_unit}")
+    print(f"   LEGACY_MOCK_SCAN_MATCHES_COUNT={total_root}")
+    print(f"   TREE_HASH={tree_hash}")
     print("   ✅ ZERO test doubles leak into production runtime.")
 
     print("\n======================================================================")

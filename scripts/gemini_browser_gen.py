@@ -6,6 +6,7 @@ import base64
 import argparse
 import urllib.request
 import ssl
+import subprocess
 import logging
 
 logger = logging.getLogger("gemini_browser_gen")
@@ -203,8 +204,8 @@ def fetch_prompts_from_vps(episode_id):
                 if items:
                     print(f"📋 [Vox Director Plan] Đã nạp thành công {len(items)} prompts từ local director_plan.json!")
                     return items
-        except Exception as e:
-            print(f"⚠️ Lỗi đọc local director_plan.json: {e}")
+        except (OSError, json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Lỗi đọc local director_plan.json: {e}")
 
     # Fallback kiểm tra director_plan.json trên VPS
     try:
@@ -226,7 +227,7 @@ def fetch_prompts_from_vps(episode_id):
                 if items:
                     print(f"📋 [Vox Director Plan VPS] Đã nạp thành công {len(items)} prompts từ VPS director_plan.json!")
                     return items
-    except Exception as e:
+    except (OSError, json.JSONDecodeError, KeyError, RuntimeError, subprocess.SubprocessError) as e:
         logger.warning(f"Failed to load director plan from VPS: {e}")
 
     local_prompts_file = os.path.join(local_episode_dir, "prompts_forge.json")
@@ -236,7 +237,8 @@ def fetch_prompts_from_vps(episode_id):
         try:
             with open(local_prompts_file, "r", encoding="utf-8") as f:
                 d = json.load(f)
-        except Exception:
+        except (OSError, json.JSONDecodeError) as _pf_err:
+            logger.debug(f"Failed to load local prompts_forge.json: {_pf_err}")
             d = None
             
     if not d:
@@ -829,7 +831,7 @@ except Exception as e:
                         "registered_fg_count": len(registered_fgs),
                         "unregistered_keys": unregistered
                     }
-        except (OSError, json.JSONDecodeError, RuntimeError) as _vps_probe_err:
+        except (OSError, json.JSONDecodeError, KeyError, RuntimeError, subprocess.SubprocessError) as _vps_probe_err:
             logger.warning(f"Could not query VPS director_plan.json: {_vps_probe_err}")
 
     if not dplan:
@@ -1106,6 +1108,7 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
             browser.close()
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [GEMINI_GEN] %(message)s")
     parser = argparse.ArgumentParser(description="Gemini Browser Automation Image Generator")
     parser.add_argument("--episode", type=str, default=None, help="Episode ID (ví dụ: EN_EP0001_...)")
     parser.add_argument("--test", action="store_true", help="Chạy thử 1 ảnh mẫu PNG")

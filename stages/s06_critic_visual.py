@@ -50,7 +50,11 @@ def run(ctx: RunContext) -> StageArtifact:
     s5_art = require_input(STAGE, ctx.paths)
     scenes = s5_art.payload.get("scenes", [])
 
-    market = "JA" if "JP_" in ctx.run_id else ("KO" if "KR_" in ctx.run_id else ("VI" if "VN_" in ctx.run_id else "EN"))
+    market = (
+        getattr(getattr(ctx, "config", None), "market", None)
+        or getattr(getattr(ctx, "manifest", None), "market", None)
+        or ("JA" if "JP_" in ctx.run_id else ("KO" if "KR_" in ctx.run_id else ("VI" if "VN_" in ctx.run_id else "EN")))
+    )
 
     # Resolve canonical episode directory
     canonical_dirs = [

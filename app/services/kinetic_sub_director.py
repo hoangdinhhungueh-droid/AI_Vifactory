@@ -4,16 +4,22 @@ r"""app/services/kinetic_sub_director.py — Object-to-Object Kinetic Coupling &
 
 Enforces:
 - Rule 128: Generic Contract Pattern (supports any market: EN, JA, KR, VN without hardcoding).
-- Rule 132: Pure Transmission Engine (decoupled logic, no hardcoded episode scripts).
+- Rule 132: Pure Transmission Engine (decoupled logic, no hardcoded episode scripts; presets in config).
 - Rule 140 v3: Object-to-Object Kinetic Coupling Taxonomy ($H_1 \rightarrow H_7$),
   Semantic Clause Mapping ($4 \le N \le 7$ micro-beats), and Causal Compound Verb Prompt Syntax.
 """
 
 from __future__ import annotations
 
-import re
+import json
+import logging
+import math
 from dataclasses import asdict, dataclass
 from enum import Enum
+from pathlib import Path
+import re
+
+logger = logging.getLogger('kinetic_sub_director')
 from typing import Any, Dict, List, Optional, Tuple
 
 
@@ -142,7 +148,7 @@ class DynamicMicroBeat:
 
 
 def _is_cjk_char(char: str) -> bool:
-    """Kiểm tra ký tự thuộc hệ chữ CJK (Hán tự, Ext-A, Hiragana, Katakana, Halfwidth Katakana, Hangul, Hangul Jamo)."""
+    """Kiểm tra ký tự thuộc hệ chữ CJK (Hán tự, Ext-A, Hiragana, Katakana, Halfwidth Katakana, Hangul, Hangul Jamo, Compatibility Jamo)."""
     cp = ord(char)
     return (
         0x4E00 <= cp <= 0x9FFF      # CJK Unified Ideographs
@@ -164,6 +170,43 @@ def _match_keyword(kw: str, text: str) -> bool:
     return bool(re.search(pattern, text, re.IGNORECASE))
 
 
+def _load_kinetic_presets() -> Dict[str, Any]:
+    """Nạp layout presets và prose templates từ config/kinetic_layout_presets.json (Rule 132)."""
+    cfg_path = Path(__file__).resolve().parent.parent.parent / "config" / "kinetic_layout_presets.json"
+    if cfg_path.exists():
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError) as _cfg_err:
+            logger.warning("Could not load kinetic presets from %s: %s", cfg_path, _cfg_err)
+    # Fallback an toàn nếu config chưa được nạp
+    return {
+        "layouts": {
+            "center_right": {
+                "initial_pos": "(X:52%, Y:42%)",
+                "target_contact_pos": "(X:68%, Y:42%)",
+                "dock_pin_pos": "(X:42%, Y:65%)",
+                "bounding_box_bounds": "[X:58%-84%, Y:38%-68%]",
+                "vector_reveal_direction": "horizontal",
+            },
+            "center_left": {
+                "initial_pos": "(X:48%, Y:42%)",
+                "target_contact_pos": "(X:32%, Y:42%)",
+                "dock_pin_pos": "(X:58%, Y:65%)",
+                "bounding_box_bounds": "[X:18%-46%, Y:38%-68%]",
+                "vector_reveal_direction": "horizontal",
+            },
+            "vertical": {
+                "initial_pos": "(X:50%, Y:36%)",
+                "target_contact_pos": "(X:50%, Y:56%)",
+                "dock_pin_pos": "(X:38%, Y:72%)",
+                "bounding_box_bounds": "[X:36%-64%, Y:46%-74%]",
+                "vector_reveal_direction": "vertical",
+            }
+        }
+    }
+
+
 @dataclass
 class KineticSpatialLayout:
     """Toạ độ không gian 2D động học được tính toán động theo phân cảnh (Rule 128, 132)."""
@@ -171,51 +214,107 @@ class KineticSpatialLayout:
     target_contact_pos: str   # e.g. "(X:68%, Y:42%)"
     dock_pin_pos: str         # e.g. "(X:42%, Y:65%)"
     bounding_box_bounds: str  # e.g. "[X:58%-84%, Y:38%-68%]"
+    layout_type: str = "center_right"
+    vector_reveal_direction: str = "horizontal"
 
 
-def compute_kinetic_spatial_layout(scene_id: str, family: Optional[KineticFamily] = None) -> KineticSpatialLayout:
-    """Tính toán toạ độ không gian 2D chuẩn hóa động học phân rã theo scene_id và họ tương tác (Rule 128, 132).
-    Sử dụng băm đa thức nguyên tố kết hợp họ tương tác để loại bỏ xung đột anagram (scene_01 vs scene_10),
-    bảo đảm toạ độ tiếp xúc target_contact_pos luôn nằm trọn bên trong bounding box.
+def compute_kinetic_spatial_layout(
+    scene_id: str,
+    family: Optional[KineticFamily] = None,
+    bounding_box: Optional[Dict[str, Any]] = None,
+    object_roles: Optional[Dict[str, str]] = None,
+    hero_cutout_object: Optional[str] = None,
+    interacting_objects: Optional[List[str]] = None,
+    layout_type: Optional[str] = None
+) -> KineticSpatialLayout:
+    """Tính toán toạ độ không gian 2D chuẩn hóa động học phân rã theo scene data (Rule 128, 132).
+    Fail-closed trên scene_id rỗng (Rules 118/139).
+    Toạ độ tiếp xúc target_contact_pos được tính toán trực tiếp từ bounding_box hoặc object roles,
+    bảo đảm luôn nằm trọn bên trong bounding box.
     """
-    clean_id = (scene_id or "SCENE_01").lower().strip()
-    # Prime polynomial rolling hash tránh hoàn toàn va chạm anagram
-    p_hash = 0
-    for char in clean_id:
-        p_hash = (p_hash * 31 + ord(char)) & 0xFFFFFFFF
+    if not scene_id or not isinstance(scene_id, str) or not scene_id.strip():
+        raise ValueError("compute_kinetic_spatial_layout fail-closed (Rule 118/139): scene_id cannot be empty")
 
-    fam_val = family.value if family else "H2_CONSTRAINT"
-    fam_code = ord(fam_val[1]) if len(fam_val) > 1 and fam_val[1].isdigit() else 2
-    variant = (p_hash + fam_code) % 3
+    clean_id = scene_id.lower().strip()
+    presets_cfg = _load_kinetic_presets()
+    presets = presets_cfg.get("layouts", {})
 
-    if variant == 0:
-        # Layout A: Center-Right Forensic Focal Point (Target Contact: 68%, 42% inside bounds [58%-84%, 38%-68%])
+    # 1. Nếu bounding_box được cung cấp tường minh từ scene plan
+    if bounding_box and isinstance(bounding_box, dict):
+        x_min = int(bounding_box.get("x_min", bounding_box.get("left", 58)))
+        x_max = int(bounding_box.get("x_max", bounding_box.get("right", x_min + bounding_box.get("width", 26))))
+        y_min = int(bounding_box.get("y_min", bounding_box.get("top", 38)))
+        y_max = int(bounding_box.get("y_max", bounding_box.get("bottom", y_min + bounding_box.get("height", 30))))
+        x_c = round((x_min + x_max) / 2)
+        y_c = round((y_min + y_max) / 2)
+
+        l_type = layout_type or ("vertical" if (y_max - y_min) > (x_max - x_min) else "center_right")
+        vec_dir = "vertical" if l_type == "vertical" else "horizontal"
+
+        if l_type == "vertical":
+            init_pos = f"(X:{x_c}%, Y:{max(10, y_min - 15)}%)"
+            dock_pos = f"(X:{max(10, x_min - 10)}%, Y:{min(90, y_max + 12)}%)"
+        elif l_type == "center_left":
+            init_pos = f"(X:{min(90, x_max + 16)}%, Y:{y_c}%)"
+            dock_pos = f"(X:{min(90, x_max + 20)}%, Y:{min(90, y_max + 15)}%)"
+        else:
+            init_pos = f"(X:{max(10, x_min - 16)}%, Y:{y_c}%)"
+            dock_pos = f"(X:{max(10, x_min - 20)}%, Y:{min(90, y_max + 15)}%)"
+
         return KineticSpatialLayout(
-            initial_pos="(X:52%, Y:42%)",
-            target_contact_pos="(X:68%, Y:42%)",
-            dock_pin_pos="(X:42%, Y:65%)",
-            bounding_box_bounds="[X:58%-84%, Y:38%-68%]"
+            initial_pos=init_pos,
+            target_contact_pos=f"(X:{x_c}%, Y:{y_c}%)",
+            dock_pin_pos=dock_pos,
+            bounding_box_bounds=f"[X:{x_min}%-{x_max}%, Y:{y_min}%-{y_max}%]",
+            layout_type=l_type,
+            vector_reveal_direction=vec_dir
         )
-    elif variant == 1:
-        # Layout B: Center-Left Verification Focus (Target Contact: 32%, 42% inside bounds [18%-46%, 38%-68%])
-        return KineticSpatialLayout(
-            initial_pos="(X:48%, Y:42%)",
-            target_contact_pos="(X:32%, Y:42%)",
-            dock_pin_pos="(X:58%, Y:65%)",
-            bounding_box_bounds="[X:18%-46%, Y:38%-68%]"
-        )
-    else:
-        # Layout C: Vertical Center Alignment Focus (Target Contact: 50%, 56% inside bounds [36%-64%, 46%-74%])
-        return KineticSpatialLayout(
-            initial_pos="(X:50%, Y:36%)",
-            target_contact_pos="(X:50%, Y:56%)",
-            dock_pin_pos="(X:38%, Y:72%)",
-            bounding_box_bounds="[X:36%-64%, Y:46%-74%]"
-        )
+
+    # 2. Suy diễn layout_type từ object roles & semantic cues của scene
+    target_type = layout_type
+    if not target_type:
+        roles_str = " ".join((object_roles or {}).values()).lower()
+        hero_str = (hero_cutout_object or "").lower()
+        inter_str = " ".join(interacting_objects or []).lower()
+        combined_context = f"{roles_str} {hero_str} {inter_str}"
+
+        vertical_keywords = ["vertical", "column", "timeline", "stamp", "seal", "knife", "shears", "top_down", "drop"]
+        left_keywords = ["left", "source", "origin", "counterpart", "audit", "input", "baseline"]
+
+        if any(vk in combined_context for vk in vertical_keywords) or family == KineticFamily.H1_IMPACT:
+            target_type = "vertical"
+        elif any(lk in combined_context for lk in left_keywords) or "left" in clean_id:
+            target_type = "center_left"
+        else:
+            target_type = "center_right"
+
+    preset = presets.get(target_type, presets.get("center_right", {}))
+    return KineticSpatialLayout(
+        initial_pos=preset.get("initial_pos", "(X:52%, Y:42%)"),
+        target_contact_pos=preset.get("target_contact_pos", "(X:68%, Y:42%)"),
+        dock_pin_pos=preset.get("dock_pin_pos", "(X:42%, Y:65%)"),
+        bounding_box_bounds=preset.get("bounding_box_bounds", "[X:58%-84%, Y:38%-68%]"),
+        layout_type=target_type,
+        vector_reveal_direction=preset.get("vector_reveal_direction", "horizontal")
+    )
 
 
 class SemanticClauseMapper:
     """Bộ phân rã ngữ nghĩa câu thoại tự động thành chuỗi vi nhịp động học."""
+
+    @staticmethod
+    def has_metrics(sentence: str) -> bool:
+        """Kiểm tra câu thoại có chứa số liệu, phần trăm hoặc đơn vị định lượng chuẩn xác đa thị trường (Rule 120, 128).
+        Bảo đảm trailing non-letter guard để loại bỏ hoàn toàn false positives (e.g. '3 minutes', '2 key points', '4 types', '5 bugs', '1 member').
+        """
+        if not sentence:
+            return False
+        s_clean = sentence.strip()
+        pattern = (
+            r"(?<!\d)\d+([,\.]\d+)?\s*(?:%|円|tỷ|triệu|trieu|(?:billion|million|percent|won|usd|yen|gbp|eur|ty|b|m|k)(?![a-zA-Z]))"
+            r"|(?<!\d)\d{2,}(?!\d)"
+        )
+        return bool(re.search(pattern, s_clean, re.IGNORECASE))
 
     @staticmethod
     def calculate_beat_count(sentence: str) -> int:
@@ -243,8 +342,8 @@ class SemanticClauseMapper:
         ]
         has_causal = any(_match_keyword(m, s_clean) for m in causal_markers)
 
-        # Đếm số lượng con số hoặc tỷ lệ % (Rule 120 / Rule 128: regex lượng hóa chuẩn xác đa thị trường kể cả CJK và đơn vị viết liền)
-        has_metrics = bool(re.search(r"(?<!\d)\d+([,\.]\d+)?\s*(%|tỷ|triệu|trieu|ty|billion|million|percent|b|m|k|円|won|usd|yen|gbp|eur)|(?<!\d)\d{2,}(?!\d)", s_clean, re.IGNORECASE))
+        # Đếm số lượng con số hoặc tỷ lệ % với trailing non-letter guard chuẩn xác đa thị trường
+        has_metrics = SemanticClauseMapper.has_metrics(s_clean)
 
         # Đếm từ nhấn mạnh / tiêu điểm
         emphasis_markers = [
@@ -336,32 +435,61 @@ def generate_scene_sub_director_plan(
     interacting_objects: List[str],
     duration_sec: Optional[float] = None,
     market: str = "EN",
-    whisper_words: Optional[List[Dict[str, Any]]] = None
+    whisper_words: Optional[List[Dict[str, Any]]] = None,
+    bounding_box: Optional[Dict[str, Any]] = None,
+    object_roles: Optional[Dict[str, str]] = None,
+    layout_type: Optional[str] = None
 ) -> Dict[str, Any]:
     """Sinh toàn diện Khung Đạo Diễn Vi Cảnh (Scene Sub-Director Plan) chuẩn hóa cho mọi Episode."""
+    if not scene_id or not isinstance(scene_id, str) or not scene_id.strip():
+        raise ValueError("generate_scene_sub_director_plan fail-closed (Rule 118/139): scene_id cannot be empty")
+
     # Rule 120 & 135: Tích hợp Word-level Timestamps từ Whisper (nếu có) để tính toán nhịp độ thực tế
+    w_start = 0.0
     if whisper_words is not None:
         if not isinstance(whisper_words, list) or len(whisper_words) == 0:
             raise ValueError("Whisper integration fail-closed (Rule 120): whisper_words must be a non-empty list of dicts.")
+        last_end = -1.0
         for idx, w in enumerate(whisper_words):
             if not isinstance(w, dict) or "start" not in w or "end" not in w or w["start"] is None or w["end"] is None:
                 raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} missing valid 'start'/'end' timestamps: {w!r}")
-            if float(w["end"]) < float(w["start"]) or float(w["start"]) < 0.0:
-                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} has inverted or negative timestamps: start={w['start']}, end={w['end']}")
+            if isinstance(w["start"], bool) or isinstance(w["end"], bool):
+                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} timestamps cannot be boolean: {w!r}")
+            try:
+                s_val = float(w["start"])
+                e_val = float(w["end"])
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} has invalid non-numeric timestamps: {w!r}") from exc
+            if math.isnan(s_val) or math.isnan(e_val) or math.isinf(s_val) or math.isinf(e_val):
+                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} timestamp is NaN or Inf: start={s_val}, end={e_val}")
+            if s_val < 0.0 or e_val < s_val:
+                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} has negative or inverted timestamps: start={s_val}, end={e_val}")
+            if s_val < last_end - 1e-4:
+                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} start timestamp ({s_val}s) is non-monotonic (earlier than preceding end {last_end}s)")
+            last_end = e_val
+
         w_start = float(whisper_words[0]["start"])
         w_end = float(whisper_words[-1]["end"])
         measured_dur = round(w_end - w_start, 2)
         if measured_dur <= 0.0:
             raise ValueError(f"Whisper integration fail-closed (Rule 120): Total speech duration must be positive, got {measured_dur}s")
-        # Rule 120/135: Measured speech duration is authentic; do NOT artificially truncate/clamp to 10.0s!
-        dur = max(1.5, measured_dur)
+        # Rule 120/135: Measured speech duration is authentic; do NOT artificially truncate/clamp!
+        dur = measured_dur
     elif duration_sec is None or float(duration_sec) <= 0.0:
         dur = estimate_speech_duration(sentence, market)
     else:
         dur = round(max(2.5, float(duration_sec)), 2)
 
     dominant_families = SemanticClauseMapper.detect_dominant_families(sentence)
-    layout = compute_kinetic_spatial_layout(scene_id, family=dominant_families[0] if dominant_families else None)
+    layout = compute_kinetic_spatial_layout(
+        scene_id=scene_id,
+        family=dominant_families[0] if dominant_families else None,
+        bounding_box=bounding_box,
+        object_roles=object_roles,
+        hero_cutout_object=hero_cutout_object,
+        interacting_objects=interacting_objects,
+        layout_type=layout_type
+    )
 
     raw_beat_count = SemanticClauseMapper.calculate_beat_count(sentence)
     # Beat Count Governor: Giới hạn số vi nhịp theo ngân sách thời gian thực tế
@@ -422,200 +550,197 @@ def generate_scene_sub_director_plan(
         )
     ]
 
-    # 2. Xây dựng Cặp Tương Tác Nhân Quả (Kinetic Couplings)
-    couplings = []
+    # 2. Xây dựng Cặp Tương Tác Nhân Quả từ Cấu Hình Khách Quan (Rule 132)
+    presets_cfg = _load_kinetic_presets()
+    prose_cfg = presets_cfg.get("prose_templates", {})
+    k1_templates = prose_cfg.get("K1", {})
+    k2_templates = prose_cfg.get("K2", {})
 
-    # Cặp K1: Tool 1 tác động lên Anchor với TỐC ĐỘ SNAPPY VOX STOP-MOTION & TOẠ ĐỘ ĐỘNG (Rule 128, 132)
+    couplings = []
     fam1 = dominant_families[0] if dominant_families else KineticFamily.H2_CONSTRAINT
-    if fam1 == KineticFamily.H2_CONSTRAINT:
-        c1 = KineticCoupling(
-            id="K1",
-            family=fam1,
-            source_obj_id="obj_tool1",
-            target_obj_id="obj_anchor",
-            action_verb=f"snaps in a high-velocity 0.4s slide from initial coordinate {layout.initial_pos} and locks jaws shut precisely onto target coordinate {layout.target_contact_pos} of",
-            contact_point=f"critical data row at {layout.target_contact_pos}",
-            physical_reaction="vernier scale aligns precisely with grid ticks, locking coordinate measurement into an instant mechanical dead stop at 1.0s, holding completely still",
-            secondary_reaction={"object": "desk_surface", "reaction": "subtle mechanical micro-vibration"},
-            residue="metric baseline ticks permanently marked"
-        )
-    elif fam1 == KineticFamily.H1_IMPACT:
-        c1 = KineticCoupling(
-            id="K1",
-            family=fam1,
-            source_obj_id="obj_tool1",
-            target_obj_id="obj_anchor",
-            action_verb=f"strikes down in a rapid 2-frame snap onto coordinate {layout.target_contact_pos} of",
-            contact_point=f"header verification zone at {layout.target_contact_pos}",
-            physical_reaction="crisp crimson stamp imprint locks onto newsprint with sharp vector borders, stopping dead in place at 1.0s",
-            secondary_reaction={"object": "desk_surface", "reaction": "adjacent paper cutouts settle in 1 frame"},
-            residue="deep crimson verification seal stamped"
-        )
-    elif fam1 == KineticFamily.H3_SEVER:
-        c1 = KineticCoupling(
-            id="K1",
-            family=fam1,
-            source_obj_id="obj_tool1",
-            target_obj_id="obj_anchor",
-            action_verb=f"slices across coordinate line ({layout.initial_pos} to {layout.target_contact_pos}) in a swift 0.4s cut of",
-            contact_point=f"perforated margin coordinate {layout.target_contact_pos}",
-            physical_reaction=f"clean vertical mask separation cleanly reveals the underlying archival graphic layer, stopping dead at {layout.target_contact_pos} at 1.0s",
-            secondary_reaction={"object": "obj_anchor", "reaction": "exposes lower archival layer"},
-            residue="sharp cut edge with visible paper fibers"
-        )
-    else:
-        c1 = KineticCoupling(
-            id="K1",
-            family=fam1,
-            source_obj_id="obj_tool1",
-            target_obj_id="obj_anchor",
-            action_verb=f"snaps rigidly into position on coordinate {layout.target_contact_pos} in a fast 0.4s step of",
-            contact_point=f"center focal area at {layout.target_contact_pos}",
-            physical_reaction="graphic layout locks firmly into alignment grid with zero drift at 1.0s",
-            residue="clear mechanical indentation"
-        )
+    fam1_key = fam1.value if fam1.value in k1_templates else "DEFAULT"
+    t1 = k1_templates.get(fam1_key, k1_templates.get("DEFAULT", {}))
+
+    fmt_kwargs = {
+        "initial_pos": layout.initial_pos,
+        "target_contact_pos": layout.target_contact_pos,
+        "dock_pin_pos": layout.dock_pin_pos,
+        "bounding_box_bounds": layout.bounding_box_bounds,
+        "vector_reveal_direction": layout.vector_reveal_direction
+    }
+
+    c1 = KineticCoupling(
+        id="K1",
+        family=fam1,
+        source_obj_id="obj_tool1",
+        target_obj_id="obj_anchor",
+        action_verb=t1.get("action_verb", "").format(**fmt_kwargs),
+        contact_point=t1.get("contact_point", "").format(**fmt_kwargs),
+        physical_reaction=t1.get("physical_reaction", "").format(**fmt_kwargs),
+        secondary_reaction=t1.get("secondary_reaction"),
+        residue=t1.get("residue", "")
+    )
     couplings.append(c1)
 
-    # Cặp K2: Tool 2 KẾT NỐI TRỰC TIẾP TỪ TOOL 1 & ANCHOR (Triệt tiêu tính rời rạc, tạo Unified Physical Cluster)
     fam2 = dominant_families[1] if len(dominant_families) > 1 else KineticFamily.H6_MARK
-    if fam2 == KineticFamily.H6_MARK:
-        c2 = KineticCoupling(
-            id="K2",
-            family=fam2,
-            source_obj_id="obj_tool2",
-            target_obj_id="obj_anchor",
-            action_verb=f"originates directly from contact coordinate {layout.target_contact_pos}, wiping in a rapid 0.4s horizontal vector reveal across coordinate bounds {layout.bounding_box_bounds} of",
-            contact_point=f"highlighted anomaly coordinate {layout.bounding_box_bounds}",
-            physical_reaction="neon yellow highlight box illuminates key typography with crisp editorial contrast, locking dead still at 1.6s",
-            residue="striking translucent yellow neon stripe"
-        )
-    elif fam2 == KineticFamily.H4_TETHER:
-        c2 = KineticCoupling(
-            id="K2",
-            family=fam2,
-            source_obj_id="obj_tool2",
-            target_obj_id="obj_tool1",
-            action_verb=f"originates from contact coordinate {layout.target_contact_pos}, snapping a straight dashed vector thread in 0.4s connecting directly to anchor pin at {layout.dock_pin_pos} of",
-            contact_point=f"caliper anchor pin at {layout.dock_pin_pos}",
-            physical_reaction="crimson evidence vector line snaps between pin coordinates, locking forensic link into a single unified cluster at 1.6s",
-            residue="taut red evidence vector linking data to source"
-        )
-    else:
-        c2 = KineticCoupling(
-            id="K2",
-            family=fam2,
-            source_obj_id="obj_tool2",
-            target_obj_id="obj_tool1",
-            action_verb=f"docks flush against the hero tool base at coordinate {layout.dock_pin_pos} in a rapid 0.5s snap, while contact coordinate {layout.target_contact_pos} triggers a sharp dashed bounding box {layout.bounding_box_bounds} in an instant 2-frame pop on",
-            contact_point=f"hero tool anchor pin at {layout.dock_pin_pos}",
-            physical_reaction="sharp dashed bounding box snaps around target data, locking all objects into a single unified physical cluster with a complete dead-stop freeze from 1.6s",
-            residue="permanent forensic framing box"
-        )
+    fam2_key = fam2.value if fam2.value in k2_templates else "DEFAULT"
+    t2 = k2_templates.get(fam2_key, k2_templates.get("DEFAULT", {}))
+
+    c2 = KineticCoupling(
+        id="K2",
+        family=fam2,
+        source_obj_id="obj_tool2",
+        target_obj_id="obj_anchor" if fam2 == KineticFamily.H6_MARK else "obj_tool1",
+        action_verb=t2.get("action_verb", "").format(**fmt_kwargs),
+        contact_point=t2.get("contact_point", "").format(**fmt_kwargs),
+        physical_reaction=t2.get("physical_reaction", "").format(**fmt_kwargs),
+        residue=t2.get("residue", "")
+    )
     couplings.append(c2)
 
-    # 3. Phân Rã Dãy Micro-Beats Linh Hoạt (Từ 4 đến 7 bước) theo Tốc Độ Snappy Vox Stop-Motion
+    # 3. Phân Rã Dãy Micro-Beats Linh Hoạt
     micro_beats = []
 
-    # Ngân sách thời gian theo 4 Thì Gốc: Setup ngắn -> Active Snap Bursts dứt khoát -> Massive Living Hold
+    # Ngân sách thời gian
     t_p1_end = min(0.6, round(dur * 0.1, 1))
     t_p3_end = round(max(t_p1_end + 1.2, min(dur - 0.8, dur * 0.45)), 1)
     active_span = t_p3_end - t_p1_end
 
+    # Nếu whisper_words có sẵn, tính toán micro-beat windows trực tiếp từ word timestamps
+    whisper_windows: Optional[List[Tuple[float, float, str]]] = None
+    if whisper_words:
+        n_words = len(whisper_words)
+        whisper_windows = []
+        for b_i in range(beat_count):
+            if n_words >= beat_count:
+                start_idx = min(n_words - 1, max(0, int(b_i * n_words / beat_count)))
+                end_idx = min(n_words - 1, max(start_idx, int((b_i + 1) * n_words / beat_count) - 1))
+                w_seg_start = round(float(whisper_words[start_idx]["start"]) - w_start, 2)
+                w_seg_end = round(float(whisper_words[end_idx]["end"]) - w_start, 2)
+                seg_text = " ".join(str(whisper_words[k].get("word", "")) for k in range(start_idx, end_idx + 1)).strip()
+            else:
+                w_seg_start = round(b_i * dur / beat_count, 2)
+                w_seg_end = round((b_i + 1) * dur / beat_count, 2)
+                word_idx = min(n_words - 1, int(b_i * n_words / beat_count))
+                seg_text = str(whisper_words[word_idx].get("word", "")).strip()
+
+            if b_i == 0:
+                w_seg_start = 0.0
+            if b_i == beat_count - 1:
+                w_seg_end = dur
+            whisper_windows.append((w_seg_start, max(w_seg_start + 0.1, w_seg_end), seg_text))
+
     if beat_count <= 4:
-        # Nhịp 4 bước siêu dứt khoát chuẩn Vox Stop-Motion:
-        # B1: Setup (0.0s - 0.6s)
-        # B2: High-Velocity Snap Slide (0.6s - 1.0s, 0.4s burst!)
-        # B3: Causal Snap Dock & Pop (1.0s - 1.6s, 0.6s burst!)
-        # B4: Unified Dead-Stop Living Hold (1.6s - {dur}s, massive frozen hold with 12fps texture!)
-        t_snap1 = round(t_p1_end + 0.4, 1)   # e.g. 1.0s
-        t_snap2 = round(t_snap1 + 0.6, 1)   # e.g. 1.6s
-        t_p2_end = t_snap1
-        t_p3_end = t_snap2
+        # Nhịp 4 bước chuẩn Vox Stop-Motion
+        t_snap1 = round(t_p1_end + 0.4, 1)
+        t_snap2 = round(t_snap1 + 0.6, 1)
+        p2_end = t_snap1
+        p3_end = t_snap2
+
+        win_b1 = f"{whisper_windows[0][0]:.1f}s - {whisper_windows[0][1]:.1f}s" if whisper_windows else f"0.0s - {t_p1_end:.1f}s"
+        win_b2 = f"{whisper_windows[1][0]:.1f}s - {whisper_windows[1][1]:.1f}s" if whisper_windows else f"{t_p1_end:.1f}s - {t_snap1:.1f}s"
+        win_b3 = f"{whisper_windows[2][0]:.1f}s - {whisper_windows[2][1]:.1f}s" if whisper_windows else f"{t_snap1:.1f}s - {t_snap2:.1f}s"
+        win_b4 = f"{whisper_windows[3][0]:.1f}s - {whisper_windows[3][1]:.1f}s" if whisper_windows else f"{t_snap2:.1f}s - {dur:.1f}s"
 
         micro_beats = [
             DynamicMicroBeat(
                 beat_id="B1",
                 phase="P1_SETUP",
-                time_window=f"0.0s - {t_p1_end:.1f}s",
+                time_window=win_b1,
                 coupling_id=None,
                 action_description=f"The {anchor_label} and {actor1_label} rest flat at initial coordinates {layout.initial_pos}, holding dead still with subtle 12fps paper jitter",
-                handoff_to="B2"
+                handoff_to="B2",
+                vo_keyword=whisper_windows[0][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B2",
                 phase="P2_TENSION",
-                time_window=f"{t_p1_end:.1f}s - {t_snap1:.1f}s",
+                time_window=win_b2,
                 coupling_id="K1",
                 action_description=f"High-velocity snap burst in 0.4s (steep acceleration on twos / 12fps): The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.1f}s",
                 handoff_to="B3",
-                camera_micro_move="subtle punch-in zoom 1.0x to 1.15x tracking contact point"
+                camera_micro_move="subtle punch-in zoom 1.0x to 1.15x tracking contact point",
+                vo_keyword=whisper_windows[1][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B3",
                 phase="P3_ESCALATION",
-                time_window=f"{t_snap1:.1f}s - {t_snap2:.1f}s",
+                time_window=win_b3,
                 coupling_id="K2",
                 action_description=f"Direct kinetic trigger: in a rapid 0.6s burst, the {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.1f}s",
-                handoff_to="B4"
+                handoff_to="B4",
+                vo_keyword=whisper_windows[2][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B4",
                 phase="P4_LIVING_HOLD",
-                time_window=f"{t_snap2:.1f}s - {dur:.1f}s",
+                time_window=win_b4,
                 coupling_id=None,
                 action_description=f"All objects permanently locked in rigid unified spatial anchor at final coordinate {layout.target_contact_pos} for the remaining {dur - t_snap2:.1f}s to cut, organic 12fps paper stop-motion jitter, zero static freeze to cut",
-                handoff_to=None
+                handoff_to=None,
+                vo_keyword=whisper_windows[3][2] if whisper_windows else None
             )
         ]
     elif beat_count == 5:
-        # Nhịp 5 bước: Setup -> Snap 1 -> Dead-Stop Hold -> Snap 2 -> Massive Living Hold
+        # Nhịp 5 bước
         t_snap1 = round(t_p1_end + 0.4, 1)
         t_hold1 = round(t_snap1 + 0.8, 1)
         t_snap2 = round(t_hold1 + 0.5, 1)
-        t_p2_end = t_hold1
-        t_p3_end = t_snap2
+        p2_end = t_hold1
+        p3_end = t_snap2
+
+        win_b1 = f"{whisper_windows[0][0]:.1f}s - {whisper_windows[0][1]:.1f}s" if whisper_windows else f"0.0s - {t_p1_end:.1f}s"
+        win_b2 = f"{whisper_windows[1][0]:.1f}s - {whisper_windows[1][1]:.1f}s" if whisper_windows else f"{t_p1_end:.1f}s - {t_snap1:.1f}s"
+        win_b3 = f"{whisper_windows[2][0]:.1f}s - {whisper_windows[2][1]:.1f}s" if whisper_windows else f"{t_snap1:.1f}s - {t_hold1:.1f}s"
+        win_b4 = f"{whisper_windows[3][0]:.1f}s - {whisper_windows[3][1]:.1f}s" if whisper_windows else f"{t_hold1:.1f}s - {t_snap2:.1f}s"
+        win_b5 = f"{whisper_windows[4][0]:.1f}s - {whisper_windows[4][1]:.1f}s" if whisper_windows else f"{t_snap2:.1f}s - {dur:.1f}s"
 
         micro_beats = [
             DynamicMicroBeat(
                 beat_id="B1",
                 phase="P1_SETUP",
-                time_window=f"0.0s - {t_p1_end:.1f}s",
+                time_window=win_b1,
                 coupling_id=None,
                 action_description=f"The {anchor_label} drops onto newsprint desk with subtle tactile bounce",
-                handoff_to="B2"
+                handoff_to="B2",
+                vo_keyword=whisper_windows[0][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B2",
                 phase="P2_TENSION",
-                time_window=f"{t_p1_end:.1f}s - {t_snap1:.1f}s",
+                time_window=win_b2,
                 coupling_id="K1",
                 action_description=f"High-velocity snap burst in 0.4s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}",
                 handoff_to="B3",
-                camera_micro_move="camera crash-zoom punch-in 1.3x tracking contact point"
+                camera_micro_move="camera crash-zoom punch-in 1.3x tracking contact point",
+                vo_keyword=whisper_windows[1][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B3",
                 phase="P2_TENSION",
-                time_window=f"{t_snap1:.1f}s - {t_hold1:.1f}s",
+                time_window=win_b3,
                 coupling_id="K1",
                 action_description=f"Pressure from {actor1_label} holds completely motionless in dead stop, causing {c1.physical_reaction}, leaving {c1.residue}",
-                handoff_to="B4"
+                handoff_to="B4",
+                vo_keyword=whisper_windows[2][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B4",
                 phase="P3_ESCALATION",
-                time_window=f"{t_hold1:.1f}s - {t_snap2:.1f}s",
+                time_window=win_b4,
                 coupling_id="K2",
                 action_description=f"Direct kinetic trigger: in a rapid 0.5s burst, the {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}",
-                handoff_to="B5"
+                handoff_to="B5",
+                vo_keyword=whisper_windows[3][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B5",
                 phase="P4_LIVING_HOLD",
-                time_window=f"{t_snap2:.1f}s - {dur:.1f}s",
+                time_window=win_b5,
                 coupling_id=None,
                 action_description=f"All objects permanently locked in spatial anchor for remaining {dur - t_snap2:.1f}s, 12fps paper stop-motion texture, zero static freeze to cut",
-                handoff_to=None
+                handoff_to=None,
+                vo_keyword=whisper_windows[4][2] if whisper_windows else None
             )
         ]
     elif beat_count == 6:
@@ -624,58 +749,71 @@ def generate_scene_sub_director_plan(
         t2 = round(t_p1_end + t_sub_step, 1)
         t3 = round(t2 + t_sub_step, 1)
         t4 = round(t3 + t_sub_step, 1)
-        t_p2_end = t3
-        t_p3_end = round(t4 + t_sub_step, 1)
+        p2_end = t3
+        p3_end = round(t4 + t_sub_step, 1)
+
+        win_b1 = f"{whisper_windows[0][0]:.1f}s - {whisper_windows[0][1]:.1f}s" if whisper_windows else f"0.0s - {t_p1_end:.1f}s"
+        win_b2 = f"{whisper_windows[1][0]:.1f}s - {whisper_windows[1][1]:.1f}s" if whisper_windows else f"{t_p1_end:.1f}s - {t2:.1f}s"
+        win_b3 = f"{whisper_windows[2][0]:.1f}s - {whisper_windows[2][1]:.1f}s" if whisper_windows else f"{t2:.1f}s - {t3:.1f}s"
+        win_b4 = f"{whisper_windows[3][0]:.1f}s - {whisper_windows[3][1]:.1f}s" if whisper_windows else f"{t3:.1f}s - {t4:.1f}s"
+        win_b5 = f"{whisper_windows[4][0]:.1f}s - {whisper_windows[4][1]:.1f}s" if whisper_windows else f"{t4:.1f}s - {p3_end:.1f}s"
+        win_b6 = f"{whisper_windows[5][0]:.1f}s - {whisper_windows[5][1]:.1f}s" if whisper_windows else f"{p3_end:.1f}s - {dur:.1f}s"
 
         micro_beats = [
             DynamicMicroBeat(
                 beat_id="B1",
                 phase="P1_SETUP",
-                time_window=f"0.0s - {t_p1_end:.1f}s",
+                time_window=win_b1,
                 coupling_id=None,
                 action_description=f"{anchor_label} snap-drops onto desk #F4F1EA, edges vibrating with stop-motion jitter",
-                handoff_to="B2"
+                handoff_to="B2",
+                vo_keyword=whisper_windows[0][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B2",
                 phase="P2_TENSION",
-                time_window=f"{t_p1_end:.1f}s - {t2:.1f}s",
+                time_window=win_b2,
                 coupling_id="K1",
                 action_description=f"High-velocity snap burst: {actor1_label} {c1.action_verb} {anchor_label}",
-                handoff_to="B3"
+                handoff_to="B3",
+                vo_keyword=whisper_windows[1][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B3",
                 phase="P2_TENSION",
-                time_window=f"{t2:.1f}s - {t3:.1f}s",
+                time_window=win_b3,
                 coupling_id="K1",
                 action_description=f"Mechanical impact causes {c1.physical_reaction}, leaving {c1.residue}",
                 handoff_to="B4",
-                camera_micro_move="camera punch-in zoom 1.0x to 1.35x tracking inspection point"
+                camera_micro_move="camera punch-in zoom 1.0x to 1.35x tracking inspection point",
+                vo_keyword=whisper_windows[2][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B4",
                 phase="P3_ESCALATION",
-                time_window=f"{t3:.1f}s - {t4:.1f}s",
+                time_window=win_b4,
                 coupling_id="K2",
                 action_description=f"Action on {anchor_label} immediately triggers {inter2} to {c2.action_verb} {anchor_label}",
-                handoff_to="B5"
+                handoff_to="B5",
+                vo_keyword=whisper_windows[3][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B5",
                 phase="P3_ESCALATION",
-                time_window=f"{t4:.1f}s - {t_p3_end:.1f}s",
+                time_window=win_b5,
                 coupling_id="K2",
                 action_description=f"{c2.physical_reaction}, leaving {c2.residue}",
-                handoff_to="B6"
+                handoff_to="B6",
+                vo_keyword=whisper_windows[4][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B6",
                 phase="P4_LIVING_HOLD",
-                time_window=f"{t_p3_end:.1f}s - {dur:.1f}s",
+                time_window=win_b6,
                 coupling_id=None,
-                action_description=f"All objects locked in spatial anchor for remaining {dur - t_p3_end:.1f}s, organic 12fps paper stop-motion jitter, zero static freeze to cut",
-                handoff_to=None
+                action_description=f"All objects locked in spatial anchor for remaining {dur - p3_end:.1f}s, organic 12fps paper stop-motion jitter, zero static freeze to cut",
+                handoff_to=None,
+                vo_keyword=whisper_windows[5][2] if whisper_windows else None
             )
         ]
     else:
@@ -685,66 +823,81 @@ def generate_scene_sub_director_plan(
         t3 = round(t2 + t_sub_step, 1)
         t4 = round(t3 + t_sub_step, 1)
         t5 = round(t4 + t_sub_step, 1)
-        t_p2_end = t3
-        t_p3_end = round(t5 + t_sub_step, 1)
+        p2_end = t3
+        p3_end = round(t5 + t_sub_step, 1)
+
+        win_b1 = f"{whisper_windows[0][0]:.1f}s - {whisper_windows[0][1]:.1f}s" if whisper_windows else f"0.0s - {t_p1_end:.1f}s"
+        win_b2 = f"{whisper_windows[1][0]:.1f}s - {whisper_windows[1][1]:.1f}s" if whisper_windows else f"{t_p1_end:.1f}s - {t2:.1f}s"
+        win_b3 = f"{whisper_windows[2][0]:.1f}s - {whisper_windows[2][1]:.1f}s" if whisper_windows else f"{t2:.1f}s - {t3:.1f}s"
+        win_b4 = f"{whisper_windows[3][0]:.1f}s - {whisper_windows[3][1]:.1f}s" if whisper_windows else f"{t3:.1f}s - {t4:.1f}s"
+        win_b5 = f"{whisper_windows[4][0]:.1f}s - {whisper_windows[4][1]:.1f}s" if whisper_windows else f"{t4:.1f}s - {t5:.1f}s"
+        win_b6 = f"{whisper_windows[5][0]:.1f}s - {whisper_windows[5][1]:.1f}s" if whisper_windows else f"{t5:.1f}s - {p3_end:.1f}s"
+        win_b7 = f"{whisper_windows[6][0]:.1f}s - {whisper_windows[6][1]:.1f}s" if whisper_windows else f"{p3_end:.1f}s - {dur:.1f}s"
 
         micro_beats = [
             DynamicMicroBeat(
                 beat_id="B1",
                 phase="P1_SETUP",
-                time_window=f"0.0s - {t_p1_end:.1f}s",
+                time_window=win_b1,
                 coupling_id=None,
                 action_description=f"{anchor_label} snap-drops onto desk #F4F1EA, edges vibrating with stop-motion jitter",
-                handoff_to="B2"
+                handoff_to="B2",
+                vo_keyword=whisper_windows[0][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B2",
                 phase="P2_TENSION",
-                time_window=f"{t_p1_end:.1f}s - {t2:.1f}s",
+                time_window=win_b2,
                 coupling_id="K1",
                 action_description=f"{actor1_label} enters frame with crisp paper deceleration and aligns with {anchor_label}",
-                handoff_to="B3"
+                handoff_to="B3",
+                vo_keyword=whisper_windows[1][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B3",
                 phase="P2_TENSION",
-                time_window=f"{t2:.1f}s - {t3:.1f}s",
+                time_window=win_b3,
                 coupling_id="K1",
                 action_description=f"{actor1_label} {c1.action_verb} {anchor_label}, causing {c1.physical_reaction}",
                 handoff_to="B4",
-                camera_micro_move="camera punch-in zoom 1.0x to 1.35x tracking contact point"
+                camera_micro_move="camera punch-in zoom 1.0x to 1.35x tracking contact point",
+                vo_keyword=whisper_windows[2][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B4",
                 phase="P2_TENSION",
-                time_window=f"{t3:.1f}s - {t4:.1f}s",
+                time_window=win_b4,
                 coupling_id="K1",
                 action_description=f"Mechanical settling permanently leaves {c1.residue}",
-                handoff_to="B5"
+                handoff_to="B5",
+                vo_keyword=whisper_windows[3][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B5",
                 phase="P3_ESCALATION",
-                time_window=f"{t4:.1f}s - {t5:.1f}s",
+                time_window=win_b5,
                 coupling_id="K2",
                 action_description=f"{inter2} {c2.action_verb} {anchor_label}, causing {c2.physical_reaction}",
-                handoff_to="B6"
+                handoff_to="B6",
+                vo_keyword=whisper_windows[4][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B6",
                 phase="P3_ESCALATION",
-                time_window=f"{t5:.1f}s - {t_p3_end:.1f}s",
+                time_window=win_b6,
                 coupling_id="K2",
                 action_description=f"Action solidifies, leaving {c2.residue}",
-                handoff_to="B7"
+                handoff_to="B7",
+                vo_keyword=whisper_windows[5][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
                 beat_id="B7",
                 phase="P4_LIVING_HOLD",
-                time_window=f"{t_p3_end:.1f}s - {dur:.1f}s",
+                time_window=win_b7,
                 coupling_id=None,
                 action_description="All objects locked in spatial anchor, organic 12fps paper stop-motion jitter, zero static freeze to cut",
-                handoff_to=None
+                handoff_to=None,
+                vo_keyword=whisper_windows[6][2] if whisper_windows else None
             )
         ]
 
@@ -757,9 +910,9 @@ def generate_scene_sub_director_plan(
         "spatial_layout": asdict(layout),
         "foundation_phases": {
             "p1_setup_sec": [0.0, t_p1_end],
-            "p2_tension_sec": [t_p1_end, t_p2_end],
-            "p3_escalation_sec": [t_p2_end, t_p3_end],
-            "p4_living_hold_sec": [t_p3_end, dur]
+            "p2_tension_sec": [t_p1_end, p2_end],
+            "p3_escalation_sec": [p2_end, p3_end],
+            "p4_living_hold_sec": [p3_end, dur]
         },
         "object_roster": [asdict(o) for o in roster],
         "kinetic_couplings": [asdict(c) for c in couplings],

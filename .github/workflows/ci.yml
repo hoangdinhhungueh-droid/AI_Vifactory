@@ -53,6 +53,12 @@ jobs:
       - name: Rule 128 & Rule 132 Zero Semantic Bias Linter Gate
         run: pytest -v tests/test_zero_semantic_bias.py
 
+      - name: Rule 118 Zero-Mock Compliance & Test-Double Reconciliation Gate
+        run: python scripts/forensics/probe_zero_mock.py
+
+      - name: Rule 139 Live AST Exception Handling & Ratchet Scanner Gate
+        run: python scripts/forensics/probe_ast_rule139.py
+
       - name: Rule 139 AST Ratchet Monotonic Boundary Check (Rule 125, 139 & Boss Round 15 Strict Zero-Buffer Gate)
         shell: bash
         run: |

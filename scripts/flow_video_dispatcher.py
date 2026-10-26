@@ -20,8 +20,6 @@ import hashlib
 import logging
 
 logger = logging.getLogger("flow_video_dispatcher")
-if not logger.handlers:
-    logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [FLOW_DISPATCH] %(message)s")
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -664,4 +662,5 @@ def main():
     print("=" * 70)
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [FLOW_DISPATCH] %(message)s")
     main()

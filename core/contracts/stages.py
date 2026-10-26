@@ -101,6 +101,9 @@ class Scene(BaseModel):
     objects_roster: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     headline_typography: Optional[Dict[str, Any]] = None
     audio_foley_cues: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    whisper_words: Optional[List[Dict[str, Any]]] = Field(default=None, description="Whisper word-level timestamps (Rule 120)")
+    bounding_box: Optional[Dict[str, Any]] = Field(default=None, description="Spatial bounding box for kinematic targeting")
+    object_roles: Optional[Dict[str, str]] = Field(default=None, description="Mapping of object IDs to semantic roles")
 
 
 class Chunk(BaseModel):

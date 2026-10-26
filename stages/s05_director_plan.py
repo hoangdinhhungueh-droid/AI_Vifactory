@@ -106,7 +106,8 @@ def build_vox_scene_prompts(
     scene: Scene,
     idx: int,
     total_scenes: int,
-    prev_scene: Optional[Scene] = None
+    prev_scene: Optional[Scene] = None,
+    market: Optional[str] = None
 ) -> Dict[str, Any]:
     """Decomposes scene into rich Vox Physical Objects, Kinematics, Omni and Google Flow I2V Prompts."""
     headline = scene.headline or f"BEAT {idx+1:02d}"
@@ -259,13 +260,17 @@ def build_vox_scene_prompts(
     # 7. Sub-Director Plan & Causal Compound Verb Prompts (Rule 140 v3)
     try:
         from app.services.kinetic_sub_director import build_kinetic_causal_i2v_prompt, generate_scene_sub_director_plan
+        resolved_market = market or getattr(scene, "market", None) or "EN"
         sub_plan = generate_scene_sub_director_plan(
             scene_id=getattr(scene, "scene_id", f"SCENE_{idx+1:02d}"),
             sentence=getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or headline,
             hero_cutout_object=hero_obj,
             interacting_objects=["crimson forensic seal stamp", "brass anchor pin"],
             duration_sec=dur,
-            market=getattr(scene, "market", "EN") or "EN"
+            market=resolved_market,
+            whisper_words=getattr(scene, "whisper_words", None),
+            bounding_box=getattr(scene, "bounding_box", None) or getattr(scene, "focal_region", None),
+            object_roles=getattr(scene, "object_roles", None)
         )
         i2v_google_flow = build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=camera_directive)
         i2v_omni = i2v_google_flow
@@ -327,7 +332,10 @@ def build_universal_video_prompt(scene: Scene) -> str:
             hero_cutout_object=getattr(scene, "visual_metaphor", "") or getattr(scene, "hero_cutout_object", ""),
             interacting_objects=["tactile measurement tool", "crimson verification seal"],
             duration_sec=float(raw_dur) if raw_dur else None,
-            market=getattr(scene, "market", "EN") or "EN"
+            market=getattr(scene, "market", "EN") or "EN",
+            whisper_words=getattr(scene, "whisper_words", None),
+            bounding_box=getattr(scene, "bounding_box", None) or getattr(scene, "focal_region", None),
+            object_roles=getattr(scene, "object_roles", None)
         )
         return build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=getattr(scene, "camera_directive", ""))
     except Exception as _ex:
@@ -805,7 +813,11 @@ def run(ctx: RunContext) -> StageArtifact:
     prev_scene: Optional[Scene] = None
 
     # Dynamic Master Prompt 2 Vox Storyboard via Claude Sonnet 5.5 / Fallback GPT-6.1-Sol
-    market = "JA" if "JP_" in ctx.run_id else ("KO" if "KR_" in ctx.run_id else ("VI" if "VN_" in ctx.run_id else "EN"))
+    market = (
+        getattr(getattr(ctx, "config", None), "market", None)
+        or getattr(getattr(ctx, "manifest", None), "market", None)
+        or ("JA" if "JP_" in ctx.run_id else ("KO" if "KR_" in ctx.run_id else ("VI" if "VN_" in ctx.run_id else "EN")))
+    )
     sentences = [sc_dict.get("narration", "") for sc_dict in raw_scenes if isinstance(sc_dict, dict) and sc_dict.get("narration")]
     story_text = "\n".join(sentences)
 
@@ -841,7 +853,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 scene.interacting_objects = [ex.get("label") for ex in item["supporting_exhibits"] if ex.get("label")]
 
         # Decompose into full Vox Object-Assembly Kinematics
-        vox_meta = build_vox_scene_prompts(scene, idx=idx, total_scenes=total_sc, prev_scene=prev_scene)
+        vox_meta = build_vox_scene_prompts(scene, idx=idx, total_scenes=total_sc, prev_scene=prev_scene, market=market)
         scene.canvas_workspace = vox_meta["canvas_workspace"]
         scene.hero_cutout_object = vox_meta["hero_cutout_object"]
         scene.interacting_objects = vox_meta["interacting_objects"]
