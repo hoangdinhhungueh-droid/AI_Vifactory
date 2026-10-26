@@ -283,6 +283,7 @@ def main():
                 _log("Notice: failed to unlink invalid master video %s: %s" % (master, _unl_err))
             is_master_dynamic = False
 
+    render_started = time.time()
     if is_master_dynamic:
         _log("Master video already rendered and verified dynamic at %s (%.1f MB). Skipping B4-B7 render." %
              (master, master.stat().st_size / 1048576.0))
@@ -295,34 +296,24 @@ def main():
                                notify_on_error=False)
 
     master = ep_dir / "final_169.mp4"
-    if not render_ok and not (master.exists() and master.stat().st_size > 0):
+    if not render_ok:
         # Check self-healing mux bridge before failing
         silent_video = ep_dir / "twolayer_silent.mp4"
-        if not (silent_video.exists() and silent_video.stat().st_size > 10000000):
-            msg = f"render stage failed and master video missing for {episode_id}"
-            _log("FATAL " + msg)
-            _write_state(episode_id, stage="render-verify", status="failed", error=msg)
-            return 3
-
-    if not master.exists() or master.stat().st_size == 0:
-        # Self-Healing Mux Bridge: If twolayer_silent.mp4 exists, mux it immediately
-        silent_video = ep_dir / "twolayer_silent.mp4"
-        if silent_video.exists() and silent_video.stat().st_size > 10000000:
-            _log("Self-Healing Mux Bridge: twolayer_silent.mp4 found (%.1f MB). Running mux_master_episode.py..."
-                 % (silent_video.stat().st_size / 1048576.0))
+        if silent_video.exists() and silent_video.stat().st_size > 0:
+            _log("Self-Healing Mux Bridge: twolayer_silent.mp4 found. Running mux_master_episode.py...")
             mux_ok = _run_stage("S7 Muxing (mux_master_episode)",
                                 [sys.executable, "scripts/mux_master_episode.py",
                                  "--episode-id", episode_id],
                                 episode_id, 300,
                                 notify_on_error=False)
-            if mux_ok and master.exists() and master.stat().st_size > 0:
-                _log("Self-Healing Mux Bridge succeeded -> master video ready: %s" % master)
+            if mux_ok and master.exists() and master.stat().st_size > 0 and master.stat().st_mtime >= render_started:
+                _log("Self-Healing Mux Bridge succeeded with fresh master: %s" % master)
+                render_ok = True
 
-    if not master.exists() or master.stat().st_size == 0:
-        msg = "render failed and master %s is missing/empty after self-healing" % master
+    if not render_ok or not master.exists() or master.stat().st_size == 0 or (not is_master_dynamic and master.stat().st_mtime < render_started):
+        msg = f"Render stage failed closed for {episode_id}: render_ok={render_ok}, master_exists={master.exists()}"
         _log("FATAL " + msg)
         _write_state(episode_id, stage="render-verify", status="failed", error=msg)
-        _log("Suppressed Telegram error alert for render-verify; LLM orchestrator handles VPS auto-debugging")
         return 3
     _log("master present: %s (%.1f MB)" % (master, master.stat().st_size / 1048576.0))
 

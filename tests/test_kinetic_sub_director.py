@@ -756,3 +756,64 @@ def test_unknown_layout_type_fails_closed():
             "SC_UNKNOWN_TYPE",
             layout_type="diagonal_spiral"
         )
+
+
+def test_kinetic_presets_immutability_and_additional_schema_checks(tmp_path):
+    """Kiểm tra caller isolation và các key bắt buộc K2.DEFAULT / spatial_keywords (Boss Round 6)."""
+    import json
+    from app.services.kinetic_sub_director import _load_kinetic_presets
+
+    # 1. Caller isolation: caller mutation does not pollute subsequent calls
+    presets1 = _load_kinetic_presets()
+    presets1["layouts"]["center_right"] = "MUTATED"
+    presets2 = _load_kinetic_presets()
+    assert presets2["layouts"]["center_right"] != "MUTATED"
+    assert isinstance(presets2["layouts"]["center_right"], dict)
+
+    # 2. Missing K2.DEFAULT template
+    cfg_file = tmp_path / "missing_k2.json"
+    cfg_file.write_text(json.dumps({
+        "layouts": {
+            "center_right": {"initial_pos": "a", "target_contact_pos": "b", "dock_pin_pos": "c", "bounding_box_bounds": "d", "vector_reveal_direction": "e"},
+            "center_left": {"initial_pos": "a", "target_contact_pos": "b", "dock_pin_pos": "c", "bounding_box_bounds": "d", "vector_reveal_direction": "e"},
+            "vertical": {"initial_pos": "a", "target_contact_pos": "b", "dock_pin_pos": "c", "bounding_box_bounds": "d", "vector_reveal_direction": "e"}
+        },
+        "spatial_keywords": {"vertical": [], "center_left": []},
+        "prose_templates": {
+            "K1": {"DEFAULT": {"action_verb": "a", "contact_point": "b", "physical_reaction": "c", "residue": "d"}},
+            "K2": {}
+        }
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="missing 'K2.DEFAULT'"):
+        _load_kinetic_presets(str(cfg_file))
+
+    # 3. Missing spatial_keywords list
+    cfg_file2 = tmp_path / "missing_sk.json"
+    cfg_file2.write_text(json.dumps({
+        "layouts": {
+            "center_right": {"initial_pos": "a", "target_contact_pos": "b", "dock_pin_pos": "c", "bounding_box_bounds": "d", "vector_reveal_direction": "e"},
+            "center_left": {"initial_pos": "a", "target_contact_pos": "b", "dock_pin_pos": "c", "bounding_box_bounds": "d", "vector_reveal_direction": "e"},
+            "vertical": {"initial_pos": "a", "target_contact_pos": "b", "dock_pin_pos": "c", "bounding_box_bounds": "d", "vector_reveal_direction": "e"}
+        },
+        "spatial_keywords": {"vertical": []},
+        "prose_templates": {
+            "K1": {"DEFAULT": {"action_verb": "a", "contact_point": "b", "physical_reaction": "c", "residue": "d"}},
+            "K2": {"DEFAULT": {"action_verb": "a", "contact_point": "b", "physical_reaction": "c", "residue": "d"}}
+        }
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="spatial_keywords missing list 'center_left'"):
+        _load_kinetic_presets(str(cfg_file2))
+
+
+def test_has_metrics_korean_won_and_us_dollar():
+    """Kiểm tra đồng Won (₩) và US$ được nhận diện đúng là metrics (Boss Round 6)."""
+    assert SemanticClauseMapper.has_metrics("Chi phí lên đến ₩50000 cho mỗi giao dịch.") is True
+    assert SemanticClauseMapper.has_metrics("Mức phạt ₩ 1000000 áp dụng ngay.") is True
+    assert SemanticClauseMapper.has_metrics("Target valuation reached US$100 million.") is True
+
+
+def test_estimate_speech_duration_fail_closed_on_none_market():
+    """Kiểm tra estimate_speech_duration fail-closed khi market=None (Boss Round 6)."""
+    with pytest.raises(ValueError, match="No market specified"):
+        estimate_speech_duration("This is a sentence", market=None)
+    assert estimate_speech_duration("This is a sentence", market="EN") >= 2.5

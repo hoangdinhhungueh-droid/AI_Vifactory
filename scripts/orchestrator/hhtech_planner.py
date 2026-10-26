@@ -172,11 +172,11 @@ def call_opus55_direct(
                             chunk = d.get("choices", [{}])[0].get("delta", {}).get("content", "")
                             if chunk:
                                 full_chunks.append(chunk)
-                        except Exception:
-                            pass
+                        except (json.JSONDecodeError, KeyError, IndexError) as _chunk_err:
+                            logger.debug(f"HHTech stream parse chunk notice: {_chunk_err}")
                 return "".join(full_chunks).strip()
-    except ImportError:
-        pass
+    except ImportError as _imp_err:
+        logger.debug(f"httpx not available for stream, falling back to urllib: {_imp_err}")
 
     import urllib.error
     import urllib.request

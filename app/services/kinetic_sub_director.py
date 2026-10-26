@@ -34,9 +34,9 @@ logger = logging.getLogger("kinetic_sub_director")
 # ('5 bước', '3 mẹo', '2 kế hoạch', '5 단계', '3 가지', '3 minutes', '4 types') must not trigger metric classification.
 # Trailing Unicode letter guard: (?![^\W\d_]) ensures that single-letter and short unit abbreviations
 # ('b', 'm', 'k', 'ty') followed by letters with Vietnamese/Unicode diacritics are strictly rejected.
-_METRIC_PREFIX_CURRENCY = r"[$€£¥₫]\s*\d+(?:[,\.]\d+)?"
+_METRIC_PREFIX_CURRENCY = r"(?:US\$|[$€£¥₫₩])\s*\d+(?:[,\.]\d+)?"
 _METRIC_UNITS = (
-    r"(?:%|円|원|[$€£¥₫]|"
+    r"(?:%|円|원|[$€£¥₫₩]|"
     r"(?:tỷ|triệu|nghìn|ngàn|billion|million|thousand|percent|pct|won|usd|yen|gbp|eur|ty|b|m|k)"
     r"(?![^\W\d_]))"
 )
@@ -104,7 +104,7 @@ TAXONOMY_KEYWORDS: Dict[KineticFamily, List[str]] = {
         # KR
         "연결", "접속", "핀", "결속", "실", "네트워크", "묶다", "고정"
     ],
-KineticFamily.H5_OPTICAL: [
+    KineticFamily.H5_OPTICAL: [
         # VN
         "phát hiện", "tìm kiếm", "che giấu", "lộ", "ẩn", "soi", "phơi bày", "điều tra",
         # EN
@@ -198,20 +198,10 @@ def _match_keyword(kw: str, text: str) -> bool:
     return bool(re.search(pattern, text, re.IGNORECASE))
 
 
-@lru_cache(maxsize=4)
-def _load_kinetic_presets(config_path: Optional[str] = None) -> Dict[str, Any]:
-    """Nạp và kiểm định nghiêm ngặt layout presets và prose templates từ config/kinetic_layout_presets.json (Rule 132, 134).
-
-    Fail-closed (Rule 118, 125, 134, 139):
-    - File không tồn tại -> raise FileNotFoundError.
-    - File JSON lỗi cú pháp hoặc thiếu keys bắt buộc -> raise ValueError.
-    - Tuyệt đối cấm fallback open dạng hardcoded dict.
-    """
-    if config_path is not None:
-        cfg_path = Path(config_path)
-    else:
-        cfg_path = Path(__file__).resolve().parent.parent.parent / "config" / "kinetic_layout_presets.json"
-
+@lru_cache(maxsize=8)
+def _get_cached_raw_presets(cfg_path_str: str) -> Dict[str, Any]:
+    """Tải và thẩm định khế ước config động học từ disk với fail-closed (Rule 118, 125, 134, 139)."""
+    cfg_path = Path(cfg_path_str)
     if not cfg_path.exists():
         raise FileNotFoundError(f"Kinetic layout presets config missing at: {cfg_path}")
 
@@ -256,8 +246,24 @@ def _load_kinetic_presets(config_path: Optional[str] = None) -> Dict[str, Any]:
         if sk not in spatial_kw or not isinstance(spatial_kw[sk], list):
             raise ValueError(f"Invalid kinetic presets config: spatial_keywords missing list '{sk}'")
 
+    return data
+
+
+def _load_kinetic_presets(config_path: Optional[str] = None) -> Dict[str, Any]:
+    """Tải khế ước config động học từ disk với deepcopy bảo chứng tại call site (Boss Round 6).
+
+    _get_cached_raw_presets lưu trữ raw validated dict trong lru_cache;
+    _load_kinetic_presets trả về deepcopy mới độc lập tại call site,
+    đảm bảo caller mutation không bao giờ làm ô nhiễm bộ đệm cache.
+    """
+    if config_path is not None:
+        cfg_path = Path(config_path).resolve()
+    else:
+        cfg_path = (Path(__file__).resolve().parent.parent.parent / "config" / "kinetic_layout_presets.json").resolve()
+
+    raw_data = _get_cached_raw_presets(str(cfg_path))
     import copy
-    return copy.deepcopy(data)
+    return copy.deepcopy(raw_data)
 
 
 @dataclass
@@ -502,7 +508,7 @@ class SemanticClauseMapper:
         return detected
 
 
-def estimate_speech_duration(sentence: str, market: str = "EN") -> float:
+def estimate_speech_duration(sentence: str, market: Optional[str] = None) -> float:
     """Ước tính thời lượng nói (giây) theo tốc độ chuẩn tài liệu đa thị trường (Rule 128, 134)."""
     if not sentence or not sentence.strip():
         return 5.0
@@ -757,9 +763,9 @@ def generate_scene_sub_director_plan(
             else:
                 seg_end = round(seg_words[-1]["end"] - w_start, 3)
                 if seg_end <= seg_start:
-                    seg_end = round(seg_start + 0.010, 3)
+                    raise ValueError(f"Whisper word end timestamp non-monotonic at beat {b_i}: seg_end ({seg_end:.3f}s) <= seg_start ({seg_start:.3f}s)")
                 if seg_end >= dur:
-                    seg_end = round(dur - 0.010 * (beat_count - 1 - b_i), 3)
+                    raise ValueError(f"Whisper word end timestamp exceeds duration at beat {b_i}: seg_end ({seg_end:.3f}s) >= duration ({dur:.3f}s)")
 
             whisper_windows.append((seg_start, seg_end, seg_text))
             cur_start = seg_end

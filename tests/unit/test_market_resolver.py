@@ -70,6 +70,13 @@ def test_market_resolver_invalid_code_raises_value_error():
             resolve_canonical_market(bad)
 
 
+def test_market_resolver_invalid_type_raises_type_error():
+    """Fail-closed on invalid argument types with TypeError (Boss Round 6)."""
+    for bad_type in [123, 45.6, ["EN"], {"foo": "bar"}, True]:
+        with pytest.raises(TypeError, match="invalid market_raw type"):
+            resolve_canonical_market(bad_type)
+
+
 def test_market_resolver_precedence(tmp_path):
     """Precedence: explicit market_raw > manifest > config."""
     paths = resolve_run_paths("test_run_prec", repo_root=tmp_path)

@@ -32,7 +32,7 @@ def audit_and_evaluate_asset(
     asset_key: str,
     prompt: str = "",
     criteria: Optional[Dict[str, Any]] = None,
-    market: str = "EN",
+    market: Optional[str] = None,
     model_override: Optional[str] = None,
     timeout: float = 25.0
 ) -> Dict[str, Any]:
@@ -40,7 +40,7 @@ def audit_and_evaluate_asset(
     
     Returns structured audit verdict:
     {
-        "status": "APPROVED" | "RETRY_REQUIRED",
+        "status": "APPROVED" | "RETRY_REQUIRED" | "AUDIT_FAILED",
         "final_score": float (0.0 - 10.0),
         "scores": {
             "ui_artifacts": float,
@@ -85,7 +85,7 @@ def audit_and_evaluate_asset(
         from app.services.model_gateway import get_global_gateway
         gateway = get_global_gateway()
     except Exception as e:
-        logger.info("[b5_visual_gate] ModelGateway unavailable (%s), using programmatic heuristic gate", e)
+        logger.info("[b5_visual_gate] ModelGateway unavailable (%s), refusing to fabricate visual scores", e)
         gateway = None
 
     model = model_override or os.getenv("VISUAL_AUDIT_MODEL", "claude-opus-5-5")
@@ -113,11 +113,14 @@ def audit_and_evaluate_asset(
             "}"
         )
 
+        from core.market_resolver import resolve_canonical_market
+        canon_market = resolve_canonical_market(market_raw=market)
+
         user_content = {
             "asset_key": asset_key,
             "asset_type": "foreground" if is_fg else "background",
             "is_character": is_char,
-            "target_market": market.upper(),
+            "target_market": canon_market.upper(),
             "generation_prompt": prompt[:600],
             "acceptance_criteria": crit
         }
@@ -135,7 +138,13 @@ def audit_and_evaluate_asset(
             cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE)
             parsed = json.loads(cleaned)
 
-            final_sc = float(parsed.get("final_score", 8.5))
+            if "final_score" not in parsed:
+                raise ValueError("Parsed visual audit JSON missing required key 'final_score'")
+            for axis in ("ui_artifacts", "alpha_integrity", "style_conformance", "market_context"):
+                if axis not in parsed:
+                    raise ValueError(f"Parsed visual audit JSON missing required axis key '{axis}'")
+
+            final_sc = float(parsed["final_score"])
             requires_retry = final_sc < 8.0
             verdict_status = "APPROVED" if not requires_retry else "RETRY_REQUIRED"
 
@@ -143,10 +152,10 @@ def audit_and_evaluate_asset(
                 "status": verdict_status,
                 "final_score": round(final_sc, 2),
                 "scores": {
-                    "ui_artifacts": float(parsed.get("ui_artifacts", final_sc)),
-                    "alpha_integrity": float(parsed.get("alpha_integrity", final_sc)),
-                    "style_conformance": float(parsed.get("style_conformance", final_sc)),
-                    "market_context": float(parsed.get("market_context", final_sc))
+                    "ui_artifacts": float(parsed["ui_artifacts"]),
+                    "alpha_integrity": float(parsed["alpha_integrity"]),
+                    "style_conformance": float(parsed["style_conformance"]),
+                    "market_context": float(parsed["market_context"])
                 },
                 "reasoning": parsed.get("reasoning", "Opus 5.5 visual evaluation complete."),
                 "corrective_directive": parsed.get("corrective_directive", ""),

@@ -51,10 +51,15 @@ def resolve_canonical_market(
     candidate: Optional[str] = None
 
     if market_raw is not None:
-        if hasattr(market_raw, "manifest") or hasattr(market_raw, "config"):
-            effective_ctx = market_raw
-        elif isinstance(market_raw, str):
+        if isinstance(market_raw, str):
             candidate = market_raw
+        elif hasattr(market_raw, "manifest") or hasattr(market_raw, "config"):
+            effective_ctx = market_raw
+        else:
+            raise TypeError(
+                f"resolve_canonical_market fail-closed: invalid market_raw type '{type(market_raw).__name__}'. "
+                f"Expected str, RunContext, or None (Rule 118, 128, 134)."
+            )
 
     if not candidate and effective_ctx is not None:
         # 1. Check ctx.manifest

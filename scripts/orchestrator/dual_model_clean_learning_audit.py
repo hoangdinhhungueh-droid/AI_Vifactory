@@ -9,22 +9,30 @@ Goal: Revise VF Pipeline towards "Học Sạch" (Clean Generalized Learning)
       instead of Hardcoding (Rule 128, 132, 136).
 """
 
+import io
+import logging
 import sys
-import os
-import json
 import time
 from pathlib import Path
 
+logger = logging.getLogger("dual_model_audit")
+
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(ROOT_DIR))
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
-try:
-    sys.stdout.reconfigure(encoding='utf-8')
-    sys.stderr.reconfigure(encoding='utf-8')
-except Exception:
-    pass
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except (AttributeError, io.UnsupportedOperation) as _reconf_err:
+        logger.debug(f"stdout reconfigure notice: {_reconf_err}")
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8')
+    except (AttributeError, io.UnsupportedOperation) as _reconf_err:
+        logger.debug(f"stderr reconfigure notice: {_reconf_err}")
 
-from app.services.model_gateway import get_global_gateway
+from app.services.model_gateway import get_global_gateway  # noqa: E402
 
 def main():
     print("=" * 70)
