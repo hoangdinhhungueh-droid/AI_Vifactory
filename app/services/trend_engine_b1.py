@@ -1732,12 +1732,16 @@ def discover_and_produce_market_trend(
                     "prod",
                     "--run-id",
                     str(temp_task_id),
+                    "--market",
+                    str(m_up),
                     "--to",
                     "s06_critic_visual",
                 ]
                 sub_env = os.environ.copy()
                 sub_env["PYTHONPATH"] = f"{_PROJECT_ROOT}{os.pathsep}{sub_env.get('PYTHONPATH', '')}".strip(os.pathsep)
                 sub_env["VF_EPISODES_DIR"] = str(resolve_episodes_dir(ensure_dir=True))
+                sub_env["VF_MARKET"] = str(m_up)
+                sub_env["MARKET"] = str(m_up)
                 try:
                     proc = subprocess.run(cmd, cwd=str(_PROJECT_ROOT), env=sub_env, capture_output=True, text=True, timeout=b3_timeout)
                     res_code = proc.returncode

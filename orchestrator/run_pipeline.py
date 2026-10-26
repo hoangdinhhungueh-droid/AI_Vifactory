@@ -63,6 +63,7 @@ def execute_pipeline(
     force: bool = False,
     topic: Optional[str] = None,
     profile: Optional[str] = None,
+    market: Optional[str] = None,
 ) -> int:
     if profile is not None:
         profile_name = profile
@@ -88,6 +89,16 @@ def execute_pipeline(
 
     # 2. Load or Create Manifest State Machine
     manifest = RunManifest.load_or_create(paths, profile=config.name)
+    from core.market_resolver import resolve_canonical_market
+
+    raw_m = market or os.getenv("VF_MARKET") or os.getenv("MARKET")
+    if raw_m:
+        canonical_m = resolve_canonical_market(raw_m)
+        manifest.market = canonical_m
+        if config is not None:
+            config.market = canonical_m
+        manifest.save_atomic(paths)
+
     ctx = RunContext(
         run_id=effective_run_id,
         paths=paths,
@@ -193,6 +204,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Fast execution simulation without external API calls")
     parser.add_argument("--force", action="store_true", help="Force re-generation of all artifacts ignoring cache")
     parser.add_argument("--topic", default=None, help="Optional topic seed string")
+    parser.add_argument("--market", default=None, help="Canonical market (EN, JA, KR, VN)")
 
     args = parser.parse_args()
 
@@ -205,6 +217,7 @@ def main():
         dry_run=args.dry_run,
         force=args.force,
         topic=args.topic,
+        market=args.market,
     )
     sys.exit(exit_code)
 
