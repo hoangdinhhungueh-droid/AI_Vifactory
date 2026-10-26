@@ -40,7 +40,7 @@ if str(ROOT_DIR) not in sys.path:
 MAX_SUPERVISOR_INPUT_TOKENS = 12000
 MAX_SUPERVISOR_OUTPUT_TOKENS = 5000
 TARGET_DIFF_MAX_LINES = 450
-DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "gpt-6.1-sol")
+DEFAULT_PLANNER_MODEL = "gpt-6.1-sol"
 
 SUPERVISOR_SYSTEM_PROMPT = """You are an expert Principal Software Architect and Systems Auditor performing an authoritative technical code review and audit for the AI Video Factory production codebase.
 Your responsibility is to perform an evidence-based technical evaluation of implementation increments based on raw physical telemetry, Git diffs, test suite results, and CI logs.
@@ -491,8 +491,15 @@ def call_opus55_supervisor(
     digest: Dict[str, Any],
     dry_run: bool = False,
     model: str = DEFAULT_PLANNER_MODEL,
+    is_supreme: bool = False,
 ) -> Dict[str, Any]:
     """Invokes Opus 5.5 via HHTech API to obtain authoritative supervision verdict."""
+    if "opus" in str(model).lower() and not is_supreme and os.getenv("ALLOW_SUPREME_OPUS55_CALL") != "1":
+        logger.warning(
+            f"🚨 [SUPREME OPUS 5.5 LOCK ENFORCED] Model '{model}' blocked in call_opus55_supervisor without is_supreme=True. "
+            f"Safely routing routine audit to primary 'gpt-6.1-sol' to protect token budget and quota."
+        )
+        model = "gpt-6.1-sol"
     if dry_run:
         logger.info("Dry-run mode: Emitting simulated Opus 5.5 PASS verdict.")
         component_reviews = [
@@ -598,6 +605,7 @@ Return STRICT JSON ONLY conforming to the specified schema, without any conversa
             primary_model=model,
             max_tokens=MAX_SUPERVISOR_OUTPUT_TOKENS,
             timeout=180.0,
+            is_supreme=is_supreme,
         )
 
         # Persist raw response for audit traceability
@@ -882,8 +890,16 @@ def run_supervisory_gate(
     invariance_certificate: Optional[str] = None,
     previous_revisions: Optional[List[str]] = None,
     passed_components: Optional[List[str]] = None,
+    is_supreme: bool = False,
 ) -> Dict[str, Any]:
     """High-level entrypoint for Opus 5.5 Anti-Bloat Supervisory Gate."""
+    if "opus" in str(model).lower() and not is_supreme and os.getenv("ALLOW_SUPREME_OPUS55_CALL") != "1":
+        logger.warning(
+            f"🚨 [SUPREME OPUS 5.5 LOCK ENFORCED] Model '{model}' requested without --supreme authorization. "
+            f"Safely routing routine audit to primary 'gpt-6.1-sol' to protect token budget and quota."
+        )
+        model = "gpt-6.1-sol"
+
     digest = build_anti_bloat_digest(
         task_id=task_id,
         task_objective=task_objective,
@@ -901,6 +917,7 @@ def run_supervisory_gate(
         digest=digest,
         dry_run=dry_run,
         model=model,
+        is_supreme=is_supreme,
     )
     return {
         "digest": digest,

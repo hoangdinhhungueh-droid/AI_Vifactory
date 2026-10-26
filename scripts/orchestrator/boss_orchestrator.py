@@ -58,11 +58,30 @@ except Exception as _sec_init_err:
         raise RuntimeError(f"Critical Security Boundary Failure: verify_telemetry_cleanliness is unavailable ({_sec_err_msg}) - fail closed.")
 
 DEFAULT_HHTECH_URL = os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1")
-DEFAULT_BOSS_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "gpt-6.1-sol")
+DEFAULT_ROUTINE_AUDIT_MODEL = "gpt-6.1-sol"
+DEFAULT_SUPREME_BOSS_MODEL = "claude-opus-5-5"
+DEFAULT_BOSS_MODEL = DEFAULT_ROUTINE_AUDIT_MODEL
 DEFAULT_247_PRIMARY_MODEL = "claude-v4.1-flash"
 DEFAULT_247_FALLBACK_MODEL = "claude-6-luna"
 PASSING_SCORE_THRESHOLD = 10.0
 MAX_SELF_HEALING_ITERATIONS = 2
+
+def resolve_audit_model(is_supreme: bool = False, requested_model: Optional[str] = None) -> str:
+    """Enforces Supreme Opus 5.5 Lock:
+    - claude-opus-5-5 is strictly locked to single Supreme Sign-off (is_supreme=True).
+    - Routine audits (Round 1-n, loop-step, test gates) MUST use gpt-6.1-sol or claude-sonnet-5.
+    - If claude-opus-5-5 is requested without is_supreme=True, it fails closed to gpt-6.1-sol.
+    """
+    raw_model = requested_model or os.getenv("HHTECH_PLANNER_MODEL") or DEFAULT_ROUTINE_AUDIT_MODEL
+    if "opus" in raw_model.lower():
+        if not is_supreme and os.getenv("ALLOW_SUPREME_OPUS55_CALL") != "1":
+            logger.warning(
+                f"🚨 [SUPREME OPUS 5.5 LOCK ENFORCED] Model '{raw_model}' is locked for routine/loop-step audits. "
+                f"Opus 5.5 consumes ~92,000+ proxy overhead tokens and is strictly restricted to Supreme Final Sign-off. "
+                f"Safely routing routine audit to primary '{DEFAULT_ROUTINE_AUDIT_MODEL}' (cost: ~800 credit/1M vs 40,000 credit/1M)."
+            )
+            return DEFAULT_ROUTINE_AUDIT_MODEL
+    return raw_model
 
 BOSS_SYSTEM_PROMPT = """You are Claude Opus 5.5, Supreme System Architect & Master Strategic Planner for AI Video Factory.
 Your responsibility is to brainstorm, analyze, and produce an authoritative, actionable IMPLEMENTATION PLAN for the user's task.
@@ -4497,8 +4516,9 @@ def run_phase_audit(
     round_num: int = 1,
     packet_type: Optional[str] = None,
     task_objective: Optional[str] = None,
+    is_supreme: bool = False,
 ) -> Dict[str, Any]:
-    """Phase 3: Boss Opus 5.5 Supervisory Gate audits the Worker output."""
+    """Phase 3: Boss Supervisory Gate audits the Worker output."""
     os.environ["ALLOW_MASSIVE_LLM_CONTEXT"] = "1"
     from core.atomic_io import atomic_write_json
     from scripts.orchestrator.opus55_supervisor_gate import run_supervisory_gate
@@ -4540,19 +4560,21 @@ def run_phase_audit(
             if ("VOX" in effective_task_id.upper() and "TASK_1792489792" not in effective_task_id) else
             f"Supervisory Audit on {effective_task_id} Control Plane & Production Hardening Increment (Zero-Compromise 10/10 Mandate)"
         )
-    logger.info("Connecting to Opus 5.5 Supervisory Gate via HHTech API...")
+    audit_model = resolve_audit_model(is_supreme=is_supreme)
+    logger.info(f"Connecting to Supervisory Gate via HHTech API (Model: {audit_model}, Supreme: {is_supreme})...")
     gate_res = run_supervisory_gate(
         task_id=effective_task_id,
         task_objective=task_obj,
         commit_range=effective_commit_range,
         qa_summary=forensic_packet["raw_evidence"],
         dry_run=dry_run,
-        model=DEFAULT_BOSS_MODEL,
+        model=audit_model,
         is_delta_audit=is_delta,
         round_num=round_num,
         invariance_certificate=invariance_cert,
         previous_revisions=prev_revs,
         passed_components=passed_comps,
+        is_supreme=is_supreme,
     )
 
     supervision = gate_res.get("supervision", {})
@@ -4594,7 +4616,7 @@ def run_phase_audit(
         "verdict": "APPROVED" if passed else "REVISE_REQUIRED",
         "score": score,
         "passing_threshold": PASSING_SCORE_THRESHOLD,
-        "supervisor_model": supervision.get("supervisor_model", DEFAULT_BOSS_MODEL),
+        "supervisor_model": supervision.get("supervisor_model", audit_model),
         "tokens_consumed": supervision.get("tokens_consumed", 0),
         "summary": supervision.get("summary", ""),
         "revisions_needed": supervision.get("revisions_needed", []),
@@ -4624,7 +4646,7 @@ def run_phase_audit(
         "observations": supervision.get("observations", []),
         "adherence_matrix": supervision.get("adherence_matrix", {}),
         "tokens_consumed": supervision.get("tokens_consumed", 0),
-        "supervisor_model": supervision.get("supervisor_model", DEFAULT_BOSS_MODEL),
+        "supervisor_model": supervision.get("supervisor_model", audit_model),
         "audit_file": str(audit_file),
         "raw_forensic_packet": forensic_packet,
     }
@@ -4667,6 +4689,7 @@ def run_phase_loop_step(
     commit_range: Optional[str] = None,
     dry_run: bool = False,
     json_output: bool = False,
+    is_supreme: bool = False,
 ) -> int:
     """Executes one step in the Autonomous Self-Healing Loop.
     Returns:
@@ -4695,6 +4718,7 @@ def run_phase_loop_step(
         task_id=effective_task_id,
         dry_run=dry_run,
         round_num=cur_round,
+        is_supreme=is_supreme,
     )
 
     verdict = audit_res.get("verdict", "REVISE_REQUIRED")
@@ -4865,6 +4889,7 @@ def main():
     parser.add_argument("--packet", choices=["auto", "trend", "vox", "generic"], default="auto", help="Forensic packet type")
     parser.add_argument("--task-objective", default=None, help="Explicit task objective override for supervisory audit")
     parser.add_argument("--round-num", type=int, default=1, help="Supervisory audit round number")
+    parser.add_argument("--supreme", action="store_true", help="Authorize single Supreme Sign-off with claude-opus-5-5 (Phase 4 final gate only)")
     parser.add_argument("--dry-run", action="store_true", help="Execute in dry-run mode without external API calls")
     parser.add_argument("--json-output", action="store_true", help="Emit structured machine-readable JSON output")
 
@@ -4901,6 +4926,7 @@ def main():
             round_num=args.round_num,
             packet_type=args.packet,
             task_objective=args.task_objective,
+            is_supreme=args.supreme,
         )
         if args.json_output:
             print(json.dumps(res, indent=2, ensure_ascii=False))
@@ -4910,7 +4936,7 @@ def main():
             print("=" * 70)
             print(f"Verdict:             {res['verdict']}")
             print(f"Score:               {res['score']} / 10.0 (Passing Threshold: {res['passing_threshold']})")
-            print(f"Supervisor Model:    {res.get('supervisor_model', DEFAULT_BOSS_MODEL)}")
+            print(f"Supervisor Model:    {res.get('supervisor_model', DEFAULT_ROUTINE_AUDIT_MODEL)}")
             print(f"Audit Artifact:      {res.get('audit_file', 'N/A')}")
             print(f"Summary:             {res['summary']}")
             if res.get("revisions_needed"):
@@ -4926,6 +4952,7 @@ def main():
             commit_range=args.commit_range,
             dry_run=args.dry_run,
             json_output=args.json_output,
+            is_supreme=args.supreme,
         )
         sys.exit(ret)
 

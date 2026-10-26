@@ -30,7 +30,7 @@ logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [P
 logger = logging.getLogger("hhtech_planner")
 
 DEFAULT_HHTECH_URL = os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1")
-DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "gpt-6.1-sol")
+DEFAULT_PLANNER_MODEL = "gpt-6.1-sol"
 FALLBACK_MODELS = ["claude-sonnet-5-5", "claude-sonnet-5", "kimi-k3"]
 
 FOUR_PILLARS_PROMPT = """
@@ -101,8 +101,16 @@ def call_opus55_direct(
     timeout: float = 180.0,
     api_key: Optional[str] = None,
     base_url: str = DEFAULT_HHTECH_URL,
+    is_supreme: bool = False,
 ) -> str:
     """Performs call to HHTech API for Opus 5.5, preferring model_gateway with streaming."""
+    if "opus" in str(model).lower() and not is_supreme and os.getenv("ALLOW_SUPREME_OPUS55_CALL") != "1":
+        logger.warning(
+            f"🚨 [SUPREME OPUS 5.5 LOCK ENFORCED] Direct call to '{model}' blocked without is_supreme=True. "
+            f"Routing to 'gpt-6.1-sol' to protect token budget and quota."
+        )
+        model = "gpt-6.1-sol"
+
     if system_prompt and ("Supervisor" in system_prompt or "Audit" in system_prompt or "JSON" in system_prompt):
         sys_content = system_prompt
     else:
@@ -207,8 +215,16 @@ def call_opus55_with_fallbacks(
     primary_model: str = DEFAULT_PLANNER_MODEL,
     max_tokens: int = 750,
     timeout: float = 180.0,
+    is_supreme: bool = False,
 ) -> str:
     """Tries primary Opus 5.5, then cascades down fallback models."""
+    if "opus" in str(primary_model).lower() and not is_supreme and os.getenv("ALLOW_SUPREME_OPUS55_CALL") != "1":
+        logger.warning(
+            f"🚨 [SUPREME OPUS 5.5 LOCK ENFORCED] Primary model '{primary_model}' blocked without is_supreme=True. "
+            f"Routing primary to 'gpt-6.1-sol'."
+        )
+        primary_model = "gpt-6.1-sol"
+
     models_to_try = [primary_model] + [m for m in FALLBACK_MODELS if m != primary_model]
     last_error = None
 
@@ -221,6 +237,7 @@ def call_opus55_with_fallbacks(
                 model=model_name,
                 max_tokens=max_tokens,
                 timeout=timeout,
+                is_supreme=is_supreme,
             )
         except Exception as e:
             last_error = e

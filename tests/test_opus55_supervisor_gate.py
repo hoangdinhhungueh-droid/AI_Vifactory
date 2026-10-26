@@ -173,3 +173,21 @@ class TestOpus55SupervisorGate:
         for pc in passed_comps:
             assert pc in reviewed_comps
         assert any("Incremental delta audit verified" in obs for obs in res["observations"])
+
+    def test_supreme_opus55_lock_enforcement(self, monkeypatch):
+        from scripts.orchestrator.boss_orchestrator import resolve_audit_model
+
+        # 1. Without --supreme and env pointing to Opus -> Must fallback to gpt-6.1-sol
+        monkeypatch.setenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
+        monkeypatch.delenv("ALLOW_SUPREME_OPUS55_CALL", raising=False)
+        m_routine = resolve_audit_model(is_supreme=False)
+        assert m_routine == "gpt-6.1-sol"
+
+        # 2. With is_supreme=True -> Authorized
+        m_supreme = resolve_audit_model(is_supreme=True)
+        assert m_supreme == "claude-opus-5-5"
+
+        # 3. Direct call_opus55_supervisor dry-run without is_supreme -> model safely downgraded
+        digest = {"task_id": "TEST_LOCK", "task_objective": "Test lock"}
+        gate_res = call_opus55_supervisor(digest, dry_run=True, model="claude-opus-5-5", is_supreme=False)
+        assert "gpt-6.1-sol" in gate_res["supervisor_model"]
