@@ -3,8 +3,10 @@
 r"""app/services/kinetic_sub_director.py — Object-to-Object Kinetic Coupling & Narrative Sub-Director Engine.
 
 Enforces:
+- Rule 120: Whisper Word-level Timestamps (millisecond sync, contiguous non-overlapping windows).
 - Rule 128: Generic Contract Pattern (supports any market: EN, JA, KR, VN without hardcoding).
 - Rule 132: Pure Transmission Engine (decoupled logic, no hardcoded episode scripts; presets in config).
+- Rule 134: Single Canonical Truth & Exact Parity.
 - Rule 140 v3: Object-to-Object Kinetic Coupling Taxonomy ($H_1 \rightarrow H_7$),
   Semantic Clause Mapping ($4 \le N \le 7$ micro-beats), and Causal Compound Verb Prompt Syntax.
 """
@@ -14,13 +16,37 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 from dataclasses import asdict, dataclass
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
-import re
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-logger = logging.getLogger('kinetic_sub_director')
-from typing import Any, Dict, List, Optional, Tuple
+logger = logging.getLogger("kinetic_sub_director")
+
+# ==============================================================================
+# AUTHORITATIVE METRIC PREDICATE REGEX (PRECOMPILED)
+# ==============================================================================
+# Documented Decision on bare \d{2,} branch (Boss Round 4 Item 1):
+# Standalone integers >= 2 digits (e.g. "50", "100") reflect quantitative scale in docudramas,
+# but structural identifiers ("Step 10", "Episode 02", "Year 1999") and non-metric count nouns
+# ('5 bước', '3 mẹo', '2 kế hoạch', '5 단계', '3 가지', '3 minutes', '4 types') must not trigger metric classification.
+# Trailing Unicode letter guard: (?![^\W\d_]) ensures that single-letter and short unit abbreviations
+# ('b', 'm', 'k', 'ty') followed by letters with Vietnamese/Unicode diacritics are strictly rejected.
+_METRIC_UNITS = (
+    r"(?:%|円|원|[$€£¥₫]|"
+    r"(?:tỷ|triệu|nghìn|ngàn|billion|million|thousand|percent|pct|won|usd|yen|gbp|eur|ty|b|m|k)"
+    r"(?![^\W\d_]))"
+)
+_METRIC_EXCLUDE_SUFFIX = (
+    r"(?!\s*(?:bước|mẹo|kế\s+hoạch|단계|가지|minutes|minute|points|point|types|type|steps|step|bugs|bug|members|member))"
+)
+_METRIC_PATTERN = (
+    rf"(?<!\d)\d+(?:[,\.]\d+)?\s*{_METRIC_UNITS}"
+    rf"|(?<![a-zA-Z0-9_])(?<!step\s)(?<!ep\s)(?<!episode\s)(?<!year\s)\d{{2,}}(?!\d){_METRIC_EXCLUDE_SUFFIX}"
+)
+_METRIC_RE = re.compile(_METRIC_PATTERN, re.IGNORECASE)
 
 
 class KineticFamily(str, Enum):
@@ -58,23 +84,23 @@ TAXONOMY_KEYWORDS: Dict[KineticFamily, List[str]] = {
     ],
     KineticFamily.H3_SEVER: [
         # VN
-        "cắt", "giảm", "tách", "chia", "xé", "chỉ còn", "rút gọn", "phân đoạn",
+        "cắt", "xé", "chia cắt", "loại bỏ", "tách rời", "phá vỡ", "rạch", "bãi bỏ",
         # EN
-        "cut", "sever", "slice", "split", "tear", "reduce", "strip", "separate",
+        "cut", "tear", "sever", "split", "remove", "separate", "break", "slice", "perforate",
         # JA
-        "切断", "削減", "分離", "分割", "裂く", "切り離す", "縮小",
+        "切断", "破断", "分割", "分離", "撤廃", "切り離す", "削除", "スライス",
         # KR
-        "절단", "삭감", "분리", "분할", "찢다", "떼어내다", "축소"
+        "절단", "분리", "분할", "철폐", "가르다", "삭제", "찢다", "제거"
     ],
     KineticFamily.H4_TETHER: [
         # VN
-        "nối", "kết nối", "liên quan", "dây", "chảy về", "đứng sau", "mạng lưới",
+        "nối", "liên kết", "ghim", "dây", "ràng buộc", "kết nối", "móc nối", "mạng lưới",
         # EN
-        "connect", "link", "tether", "thread", "wire", "flow", "behind", "network",
+        "connect", "link", "pin", "tether", "bind", "string", "network", "tie", "attach",
         # JA
-        "接続", "連鎖", "関連", "糸", "背後", "ネットワーク", "結ぶ",
+        "連結", "接続", "ピン", "束縛", "糸", "ネットワーク", "結びつける", "固定",
         # KR
-        "연결", "연관", "실", "배후", "네트워크", "묶다", "이어지다"
+        "연결", "접속", "핀", "결속", "실", "네트워크", "묶다", "고정"
     ],
     KineticFamily.H5_OPTICAL: [
         # VN
@@ -139,7 +165,7 @@ class DynamicMicroBeat:
     """Từng micro-beat động học phân rã theo câu thoại."""
     beat_id: str
     phase: str             # P1_SETUP, P2_TENSION, P3_ESCALATION, P4_LIVING_HOLD
-    time_window: str       # e.g. "0.0s - 1.5s"
+    time_window: str       # e.g. "0.000s - 0.400s"
     coupling_id: Optional[str]
     action_description: str
     handoff_to: Optional[str]
@@ -166,45 +192,69 @@ def _match_keyword(kw: str, text: str) -> bool:
     """Khớp từ khóa thông minh có word boundary cho tiếng Việt / Latinh, tránh false positive (Rule 120, 128)."""
     if any(_is_cjk_char(c) for c in kw):
         return kw in text
-    pattern = r'(?<!\w)' + re.escape(kw) + r'(?!\w)'
+    pattern = r"(?<!\w)" + re.escape(kw) + r"(?!\w)"
     return bool(re.search(pattern, text, re.IGNORECASE))
 
 
-def _load_kinetic_presets() -> Dict[str, Any]:
-    """Nạp layout presets và prose templates từ config/kinetic_layout_presets.json (Rule 132)."""
-    cfg_path = Path(__file__).resolve().parent.parent.parent / "config" / "kinetic_layout_presets.json"
-    if cfg_path.exists():
-        try:
-            with open(cfg_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (OSError, json.JSONDecodeError) as _cfg_err:
-            logger.warning("Could not load kinetic presets from %s: %s", cfg_path, _cfg_err)
-    # Fallback an toàn nếu config chưa được nạp
-    return {
-        "layouts": {
-            "center_right": {
-                "initial_pos": "(X:52%, Y:42%)",
-                "target_contact_pos": "(X:68%, Y:42%)",
-                "dock_pin_pos": "(X:42%, Y:65%)",
-                "bounding_box_bounds": "[X:58%-84%, Y:38%-68%]",
-                "vector_reveal_direction": "horizontal",
-            },
-            "center_left": {
-                "initial_pos": "(X:48%, Y:42%)",
-                "target_contact_pos": "(X:32%, Y:42%)",
-                "dock_pin_pos": "(X:58%, Y:65%)",
-                "bounding_box_bounds": "[X:18%-46%, Y:38%-68%]",
-                "vector_reveal_direction": "horizontal",
-            },
-            "vertical": {
-                "initial_pos": "(X:50%, Y:36%)",
-                "target_contact_pos": "(X:50%, Y:56%)",
-                "dock_pin_pos": "(X:38%, Y:72%)",
-                "bounding_box_bounds": "[X:36%-64%, Y:46%-74%]",
-                "vector_reveal_direction": "vertical",
-            }
-        }
-    }
+@lru_cache(maxsize=4)
+def _load_kinetic_presets(config_path: Optional[str] = None) -> Dict[str, Any]:
+    """Nạp và kiểm định nghiêm ngặt layout presets và prose templates từ config/kinetic_layout_presets.json (Rule 132, 134).
+
+    Fail-closed (Rule 118, 125, 134, 139):
+    - File không tồn tại -> raise FileNotFoundError.
+    - File JSON lỗi cú pháp hoặc thiếu keys bắt buộc -> raise ValueError.
+    - Tuyệt đối cấm fallback open dạng hardcoded dict.
+    """
+    if config_path is not None:
+        cfg_path = Path(config_path)
+    else:
+        cfg_path = Path(__file__).resolve().parent.parent.parent / "config" / "kinetic_layout_presets.json"
+
+    if not cfg_path.exists():
+        raise FileNotFoundError(f"Kinetic layout presets config missing at: {cfg_path}")
+
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as _cfg_err:
+        raise ValueError(f"Kinetic layout presets config at {cfg_path} is invalid JSON: {_cfg_err}") from _cfg_err
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid kinetic presets config at {cfg_path}: root must be a dict")
+
+    # Validate required top-level keys
+    for req_top in ("layouts", "spatial_keywords", "prose_templates"):
+        if req_top not in data or not isinstance(data[req_top], dict):
+            raise ValueError(f"Invalid kinetic presets config at {cfg_path}: missing required dict key '{req_top}'")
+
+    # Validate layouts
+    required_layouts = ("center_right", "center_left", "vertical")
+    layout_keys = ("initial_pos", "target_contact_pos", "dock_pin_pos", "bounding_box_bounds", "vector_reveal_direction")
+    for l_name in required_layouts:
+        if l_name not in data["layouts"]:
+            raise ValueError(f"Invalid kinetic presets config: missing layout '{l_name}'")
+        l_dict = data["layouts"][l_name]
+        for k in layout_keys:
+            if k not in l_dict or not isinstance(l_dict[k], str) or not l_dict[k].strip():
+                raise ValueError(f"Invalid kinetic presets config: layout '{l_name}' missing key '{k}'")
+
+    # Validate prose templates
+    prose = data["prose_templates"]
+    for k_group in ("K1", "K2"):
+        if k_group not in prose or "DEFAULT" not in prose[k_group]:
+            raise ValueError(f"Invalid kinetic presets config: missing '{k_group}.DEFAULT' prose template")
+        d_tpl = prose[k_group]["DEFAULT"]
+        for p_key in ("action_verb", "contact_point", "physical_reaction", "residue"):
+            if p_key not in d_tpl:
+                raise ValueError(f"Invalid kinetic presets config: '{k_group}.DEFAULT' missing key '{p_key}'")
+
+    # Validate spatial_keywords
+    spatial_kw = data["spatial_keywords"]
+    for sk in ("vertical", "center_left"):
+        if sk not in spatial_kw or not isinstance(spatial_kw[sk], list):
+            raise ValueError(f"Invalid kinetic presets config: spatial_keywords missing list '{sk}'")
+
+    return data
 
 
 @dataclass
@@ -221,81 +271,127 @@ class KineticSpatialLayout:
 def compute_kinetic_spatial_layout(
     scene_id: str,
     family: Optional[KineticFamily] = None,
-    bounding_box: Optional[Dict[str, Any]] = None,
+    bounding_box: Optional[Union[Dict[str, Any], Any]] = None,
     object_roles: Optional[Dict[str, str]] = None,
     hero_cutout_object: Optional[str] = None,
     interacting_objects: Optional[List[str]] = None,
-    layout_type: Optional[str] = None
+    layout_type: Optional[str] = None,
+    config_path: Optional[str] = None
 ) -> KineticSpatialLayout:
     """Tính toán toạ độ không gian 2D chuẩn hóa động học phân rã theo scene data (Rule 128, 132).
+
     Fail-closed trên scene_id rỗng (Rules 118/139).
     Toạ độ tiếp xúc target_contact_pos được tính toán trực tiếp từ bounding_box hoặc object roles,
-    bảo đảm luôn nằm trọn bên trong bounding box.
+    bảo đảm luôn nằm trọn bên trong bounding box, trong khi initial_pos và dock_pin_pos nằm bên ngoài.
     """
     if not scene_id or not isinstance(scene_id, str) or not scene_id.strip():
         raise ValueError("compute_kinetic_spatial_layout fail-closed (Rule 118/139): scene_id cannot be empty")
 
-    clean_id = scene_id.lower().strip()
-    presets_cfg = _load_kinetic_presets()
-    presets = presets_cfg.get("layouts", {})
+    presets_cfg = _load_kinetic_presets(config_path)
+    presets = presets_cfg["layouts"]
 
-    # 1. Nếu bounding_box được cung cấp tường minh từ scene plan
-    if bounding_box and isinstance(bounding_box, dict):
-        x_min = int(bounding_box.get("x_min", bounding_box.get("left", 58)))
-        x_max = int(bounding_box.get("x_max", bounding_box.get("right", x_min + bounding_box.get("width", 26))))
-        y_min = int(bounding_box.get("y_min", bounding_box.get("top", 38)))
-        y_max = int(bounding_box.get("y_max", bounding_box.get("bottom", y_min + bounding_box.get("height", 30))))
-        x_c = round((x_min + x_max) / 2)
-        y_c = round((y_min + y_max) / 2)
+    # 1. Nếu bounding_box được cung cấp
+    if bounding_box is not None:
+        if hasattr(bounding_box, "model_dump"):
+            b_dict = bounding_box.model_dump()
+        elif isinstance(bounding_box, dict):
+            b_dict = bounding_box
+        else:
+            raise ValueError(f"Invalid bounding_box type: {type(bounding_box)}. Expected dict or BoundingBox model.")
 
-        l_type = layout_type or ("vertical" if (y_max - y_min) > (x_max - x_min) else "center_right")
+        # Require explicit bounding box keys
+        x_min_raw = b_dict.get("x_min", b_dict.get("left"))
+        x_max_raw = b_dict.get("x_max", b_dict.get("right"))
+        y_min_raw = b_dict.get("y_min", b_dict.get("top"))
+        y_max_raw = b_dict.get("y_max", b_dict.get("bottom"))
+
+        for name, val in [("x_min", x_min_raw), ("x_max", x_max_raw), ("y_min", y_min_raw), ("y_max", y_max_raw)]:
+            if val is None or isinstance(val, bool) or not isinstance(val, (int, float)):
+                raise ValueError(f"Bounding box coordinate '{name}' must be finite numeric value, got {val!r}")
+            if math.isnan(val) or math.isinf(val):
+                raise ValueError(f"Bounding box coordinate '{name}' cannot be NaN or Inf")
+            if not (0.0 <= val <= 100.0):
+                raise ValueError(f"Bounding box coordinate '{name}' must be in percentage range [0.0, 100.0], got {val}")
+
+        x_min, x_max, y_min, y_max = float(x_min_raw), float(x_max_raw), float(y_min_raw), float(y_max_raw)
+        if x_max <= x_min:
+            raise ValueError(f"Bounding box x_max ({x_max}) must be strictly greater than x_min ({x_min})")
+        if y_max <= y_min:
+            raise ValueError(f"Bounding box y_max ({y_max}) must be strictly greater than y_min ({y_min})")
+
+        x_c = round((x_min + x_max) / 2.0)
+        y_c = round((y_min + y_max) / 2.0)
+
+        # Allow center_left selection in bbox path
+        if layout_type and layout_type in presets:
+            l_type = layout_type
+        elif (y_max - y_min) > (x_max - x_min):
+            l_type = "vertical"
+        elif x_c < 50.0:
+            l_type = "center_left"
+        else:
+            l_type = "center_right"
+
         vec_dir = "vertical" if l_type == "vertical" else "horizontal"
 
+        # Enforce initial_pos and dock_pin_pos lie strictly outside target box [x_min, x_max] x [y_min, y_max]
         if l_type == "vertical":
-            init_pos = f"(X:{x_c}%, Y:{max(10, y_min - 15)}%)"
-            dock_pos = f"(X:{max(10, x_min - 10)}%, Y:{min(90, y_max + 12)}%)"
+            init_x = x_c
+            init_y = round(max(5.0, y_min - 15.0) if y_min >= 18.0 else min(95.0, y_max + 15.0))
+            dock_x = round(max(5.0, x_min - 10.0) if x_min >= 15.0 else min(95.0, x_max + 10.0))
+            dock_y = round(min(95.0, y_max + 12.0) if init_y < y_min else max(5.0, y_min - 12.0))
         elif l_type == "center_left":
-            init_pos = f"(X:{min(90, x_max + 16)}%, Y:{y_c}%)"
-            dock_pos = f"(X:{min(90, x_max + 20)}%, Y:{min(90, y_max + 15)}%)"
+            init_x = round(min(95.0, x_max + 16.0) if x_max <= 80.0 else max(5.0, x_min - 16.0))
+            init_y = y_c
+            dock_x = round(min(95.0, x_max + 20.0) if init_x > x_max else max(5.0, x_min - 20.0))
+            dock_y = round(min(90.0, y_max + 15.0))
         else:
-            init_pos = f"(X:{max(10, x_min - 16)}%, Y:{y_c}%)"
-            dock_pos = f"(X:{max(10, x_min - 20)}%, Y:{min(90, y_max + 15)}%)"
+            init_x = round(max(5.0, x_min - 16.0) if x_min >= 20.0 else min(95.0, x_max + 16.0))
+            init_y = y_c
+            dock_x = round(max(5.0, x_min - 20.0) if init_x < x_min else min(95.0, x_max + 20.0))
+            dock_y = round(min(90.0, y_max + 15.0))
+
+        # Strict geometric invariant check: initial_pos and dock_pin_pos must NOT lie inside bounding box
+        assert not (x_min <= init_x <= x_max and y_min <= init_y <= y_max), \
+            f"initial_pos ({init_x}, {init_y}) must lie outside target box [{x_min}-{x_max}, {y_min}-{y_max}]"
+        assert not (x_min <= dock_x <= x_max and y_min <= dock_y <= y_max), \
+            f"dock_pin_pos ({dock_x}, {dock_y}) must lie outside target box [{x_min}-{x_max}, {y_min}-{y_max}]"
 
         return KineticSpatialLayout(
-            initial_pos=init_pos,
+            initial_pos=f"(X:{init_x}%, Y:{init_y}%)",
             target_contact_pos=f"(X:{x_c}%, Y:{y_c}%)",
-            dock_pin_pos=dock_pos,
-            bounding_box_bounds=f"[X:{x_min}%-{x_max}%, Y:{y_min}%-{y_max}%]",
+            dock_pin_pos=f"(X:{dock_x}%, Y:{dock_y}%)",
+            bounding_box_bounds=f"[X:{int(x_min)}%-{int(x_max)}%, Y:{int(y_min)}%-{int(y_max)}%]",
             layout_type=l_type,
             vector_reveal_direction=vec_dir
         )
 
-    # 2. Suy diễn layout_type từ object roles & semantic cues của scene
+    # 2. Suy diễn layout_type từ object roles & semantic cues của scene (không dùng scene_id text)
     target_type = layout_type
     if not target_type:
         roles_str = " ".join((object_roles or {}).values()).lower()
         hero_str = (hero_cutout_object or "").lower()
         inter_str = " ".join(interacting_objects or []).lower()
-        combined_context = f"{roles_str} {hero_str} {inter_str}"
+        combined_context = f"{roles_str} {hero_str} {inter_str}".strip()
 
-        vertical_keywords = ["vertical", "column", "timeline", "stamp", "seal", "knife", "shears", "top_down", "drop"]
-        left_keywords = ["left", "source", "origin", "counterpart", "audit", "input", "baseline"]
+        vertical_keywords = presets_cfg.get("spatial_keywords", {}).get("vertical", [])
+        left_keywords = presets_cfg.get("spatial_keywords", {}).get("center_left", [])
 
-        if any(vk in combined_context for vk in vertical_keywords) or family == KineticFamily.H1_IMPACT:
+        if any(_match_keyword(vk, combined_context) for vk in vertical_keywords) or family == KineticFamily.H1_IMPACT:
             target_type = "vertical"
-        elif any(lk in combined_context for lk in left_keywords) or "left" in clean_id:
+        elif any(_match_keyword(lk, combined_context) for lk in left_keywords):
             target_type = "center_left"
         else:
             target_type = "center_right"
 
-    preset = presets.get(target_type, presets.get("center_right", {}))
+    preset = presets[target_type]
     return KineticSpatialLayout(
-        initial_pos=preset.get("initial_pos", "(X:52%, Y:42%)"),
-        target_contact_pos=preset.get("target_contact_pos", "(X:68%, Y:42%)"),
-        dock_pin_pos=preset.get("dock_pin_pos", "(X:42%, Y:65%)"),
-        bounding_box_bounds=preset.get("bounding_box_bounds", "[X:58%-84%, Y:38%-68%]"),
+        initial_pos=preset["initial_pos"],
+        target_contact_pos=preset["target_contact_pos"],
+        dock_pin_pos=preset["dock_pin_pos"],
+        bounding_box_bounds=preset["bounding_box_bounds"],
         layout_type=target_type,
-        vector_reveal_direction=preset.get("vector_reveal_direction", "horizontal")
+        vector_reveal_direction=preset["vector_reveal_direction"]
     )
 
 
@@ -304,17 +400,14 @@ class SemanticClauseMapper:
 
     @staticmethod
     def has_metrics(sentence: str) -> bool:
-        """Kiểm tra câu thoại có chứa số liệu, phần trăm hoặc đơn vị định lượng chuẩn xác đa thị trường (Rule 120, 128).
-        Bảo đảm trailing non-letter guard để loại bỏ hoàn toàn false positives (e.g. '3 minutes', '2 key points', '4 types', '5 bugs', '1 member').
+        r"""Kiểm tra câu thoại có chứa số liệu, phần trăm hoặc đơn vị định lượng chuẩn xác đa thị trường (Rule 120, 128).
+
+        Sử dụng precompiled regex _METRIC_RE với Unicode-letter lookahead (?![^\W\d_])
+        để loại bỏ hoàn toàn các false positives tiếng Việt / Hàn / Anh ('5 bước', '3 mẹo', '2 kế hoạch', '5 단계', '3 minutes').
         """
-        if not sentence:
+        if not sentence or not isinstance(sentence, str):
             return False
-        s_clean = sentence.strip()
-        pattern = (
-            r"(?<!\d)\d+([,\.]\d+)?\s*(?:%|円|tỷ|triệu|trieu|(?:billion|million|percent|won|usd|yen|gbp|eur|ty|b|m|k)(?![a-zA-Z]))"
-            r"|(?<!\d)\d{2,}(?!\d)"
-        )
-        return bool(re.search(pattern, s_clean, re.IGNORECASE))
+        return bool(_METRIC_RE.search(sentence.strip()))
 
     @staticmethod
     def calculate_beat_count(sentence: str) -> int:
@@ -343,7 +436,7 @@ class SemanticClauseMapper:
         has_causal = any(_match_keyword(m, s_clean) for m in causal_markers)
 
         # Đếm số lượng con số hoặc tỷ lệ % với trailing non-letter guard chuẩn xác đa thị trường
-        has_metrics = SemanticClauseMapper.has_metrics(s_clean)
+        metrics_present = SemanticClauseMapper.has_metrics(s_clean)
 
         # Đếm từ nhấn mạnh / tiêu điểm
         emphasis_markers = [
@@ -360,7 +453,7 @@ class SemanticClauseMapper:
             score += 1
         if has_causal:
             score += 1
-        if has_metrics or has_emphasis:
+        if metrics_present or has_emphasis:
             score += 1
 
         return max(4, min(7, score))
@@ -401,31 +494,23 @@ class SemanticClauseMapper:
 
 
 def estimate_speech_duration(sentence: str, market: str = "EN") -> float:
-    """Ước tính thời lượng nói (giây) của câu thoại dựa trên ngôn ngữ và số từ/ký tự.
-    Tuân thủ trần an toàn [2.5s, 10.0s] theo kỷ luật nhịp điệu tài liệu điều tra VOX.
-    """
+    """Ước tính thời lượng nói (giây) theo tốc độ chuẩn tài liệu đa thị trường (Rule 128)."""
     if not sentence or not sentence.strip():
-        return 5.0
+        return 3.0
 
     s = sentence.strip()
     m = (market or "EN").upper()
 
-    if m in ["JA", "JP", "KO", "KR"]:
-        # Ngôn ngữ tượng hình / âm tiết: trung bình 5.5 ký tự / giây (bỏ qua khoảng trắng)
-        char_count = len(re.sub(r"\s+", "", s))
-        raw_dur = char_count / 5.5
-    elif m in ["VN", "VI"]:
-        # Tiếng Việt: trung bình ~3.5 từ / giây (đơn âm tiết)
-        words = s.split()
-        raw_dur = len(words) / 3.5
+    if m == "JA":
+        dur = len(s) / 5.5
+    elif m == "KR":
+        dur = len(s) / 4.8
+    elif m == "VN":
+        dur = len(s.split()) / 3.2
     else:
-        # Tiếng Anh và ngôn ngữ Latin: trung bình ~2.8 từ / giây (~160 wpm)
-        words = s.split()
-        raw_dur = len(words) / 2.8
+        dur = len(s.split()) / 2.8
 
-    # Kẹp chặt trong dải an toàn [2.5s, 10.0s]
-    dur = round(max(2.5, min(10.0, raw_dur)), 2)
-    return dur
+    return max(2.5, min(10.0, round(dur, 2)))
 
 
 def generate_scene_sub_director_plan(
@@ -435,22 +520,35 @@ def generate_scene_sub_director_plan(
     interacting_objects: List[str],
     duration_sec: Optional[float] = None,
     market: str = "EN",
-    whisper_words: Optional[List[Dict[str, Any]]] = None,
-    bounding_box: Optional[Dict[str, Any]] = None,
+    whisper_words: Optional[List[Union[Dict[str, Any], Any]]] = None,
+    bounding_box: Optional[Union[Dict[str, Any], Any]] = None,
     object_roles: Optional[Dict[str, str]] = None,
-    layout_type: Optional[str] = None
+    layout_type: Optional[str] = None,
+    config_path: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Sinh toàn diện Khung Đạo Diễn Vi Cảnh (Scene Sub-Director Plan) chuẩn hóa cho mọi Episode."""
+    """Sinh toàn diện Khung Đạo Diễn Vi Cảnh (Scene Sub-Director Plan) chuẩn hóa cho mọi Episode.
+
+    Conforms to:
+    - Rule 120: Word-level Whisper timestamps integration (millisecond precision, contiguous non-overlapping windows).
+    - Rule 128: Generic Contract Architecture across all markets.
+    - Rule 132: Pure Transmission Engine (presets in config/kinetic_layout_presets.json).
+    - Rule 134: Single Canonical Truth.
+    """
     if not scene_id or not isinstance(scene_id, str) or not scene_id.strip():
         raise ValueError("generate_scene_sub_director_plan fail-closed (Rule 118/139): scene_id cannot be empty")
 
-    # Rule 120 & 135: Tích hợp Word-level Timestamps từ Whisper (nếu có) để tính toán nhịp độ thực tế
     w_start = 0.0
+    validated_whisper: Optional[List[Dict[str, Any]]] = None
+
     if whisper_words is not None:
         if not isinstance(whisper_words, list) or len(whisper_words) == 0:
-            raise ValueError("Whisper integration fail-closed (Rule 120): whisper_words must be a non-empty list of dicts.")
+            raise ValueError("Whisper integration fail-closed (Rule 120): whisper_words must be a non-empty list.")
+
         last_end = -1.0
+        validated_whisper = []
         for idx, w in enumerate(whisper_words):
+            if hasattr(w, "model_dump"):
+                w = w.model_dump()
             if not isinstance(w, dict) or "start" not in w or "end" not in w or w["start"] is None or w["end"] is None:
                 raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} missing valid 'start'/'end' timestamps: {w!r}")
             if isinstance(w["start"], bool) or isinstance(w["end"], bool):
@@ -467,18 +565,18 @@ def generate_scene_sub_director_plan(
             if s_val < last_end - 1e-4:
                 raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} start timestamp ({s_val}s) is non-monotonic (earlier than preceding end {last_end}s)")
             last_end = e_val
+            validated_whisper.append({"word": str(w.get("word", "")), "start": s_val, "end": e_val})
 
-        w_start = float(whisper_words[0]["start"])
-        w_end = float(whisper_words[-1]["end"])
-        measured_dur = round(w_end - w_start, 2)
-        if measured_dur <= 0.0:
-            raise ValueError(f"Whisper integration fail-closed (Rule 120): Total speech duration must be positive, got {measured_dur}s")
-        # Rule 120/135: Measured speech duration is authentic; do NOT artificially truncate/clamp!
+        w_start = validated_whisper[0]["start"]
+        w_end = validated_whisper[-1]["end"]
+        measured_dur = round(w_end - w_start, 3)
+        if measured_dur < 0.5:
+            raise ValueError(f"Whisper integration fail-closed (Rule 120): Total speech duration ({measured_dur}s) is below minimum threshold (0.5s)")
         dur = measured_dur
     elif duration_sec is None or float(duration_sec) <= 0.0:
         dur = estimate_speech_duration(sentence, market)
     else:
-        dur = round(max(2.5, float(duration_sec)), 2)
+        dur = round(max(2.5, float(duration_sec)), 3)
 
     dominant_families = SemanticClauseMapper.detect_dominant_families(sentence)
     layout = compute_kinetic_spatial_layout(
@@ -488,11 +586,11 @@ def generate_scene_sub_director_plan(
         object_roles=object_roles,
         hero_cutout_object=hero_cutout_object,
         interacting_objects=interacting_objects,
-        layout_type=layout_type
+        layout_type=layout_type,
+        config_path=config_path
     )
 
     raw_beat_count = SemanticClauseMapper.calculate_beat_count(sentence)
-    # Beat Count Governor: Giới hạn số vi nhịp theo ngân sách thời gian thực tế
     if dur < 4.0:
         beat_count = 4
     elif dur < 6.5:
@@ -500,11 +598,21 @@ def generate_scene_sub_director_plan(
     else:
         beat_count = raw_beat_count
 
+    # Fail closed if whisper words count is less than required micro-beat count
+    if validated_whisper is not None:
+        if len(validated_whisper) < beat_count:
+            if len(validated_whisper) >= 4:
+                beat_count = len(validated_whisper)
+            else:
+                raise ValueError(
+                    f"Whisper integration fail-closed (Rule 120): Word count ({len(validated_whisper)}) "
+                    f"is less than required micro-beat count ({beat_count})"
+                )
+
     hero_clean = (hero_cutout_object or "primary forensic document").split(" on ")[0].strip()
     inter1 = interacting_objects[0] if interacting_objects else "heavy brass caliper"
     inter2 = interacting_objects[1] if len(interacting_objects) > 1 else "red evidence thread"
 
-    # Nhận diện vai trò vật lý: Đạo cụ tác động (Tool Actor) vs Mặt nền tài liệu (Document Target)
     tool_keywords = ["caliper", "scissors", "stamp", "marker", "highlighter", "loupe", "glass", "pen", "knife", "pin", "ruler", "shears"]
     doc_keywords = ["ledger", "sheet", "document", "paper", "contract", "dossier", "card", "report", "photo", "chart", "page", "envelope", "file"]
 
@@ -550,33 +658,103 @@ def generate_scene_sub_director_plan(
         )
     ]
 
-    # 2. Xây dựng Cặp Tương Tác Nhân Quả từ Cấu Hình Khách Quan (Rule 132)
-    presets_cfg = _load_kinetic_presets()
-    prose_cfg = presets_cfg.get("prose_templates", {})
-    k1_templates = prose_cfg.get("K1", {})
-    k2_templates = prose_cfg.get("K2", {})
+    # 2. Phân rã Micro-Beat Windows trực tiếp từ Whisper Word Timestamps (Rule 120, 135)
+    whisper_windows: Optional[List[Tuple[float, float, str]]] = None
+    if validated_whisper:
+        n_words = len(validated_whisper)
+        whisper_windows = []
 
-    couplings = []
-    fam1 = dominant_families[0] if dominant_families else KineticFamily.H2_CONSTRAINT
-    fam1_key = fam1.value if fam1.value in k1_templates else "DEFAULT"
-    t1 = k1_templates.get(fam1_key, k1_templates.get("DEFAULT", {}))
+        slice_indices = [0]
+        for b_i in range(1, beat_count):
+            split_idx = int(round(b_i * n_words / beat_count))
+            split_idx = max(slice_indices[-1] + 1, min(n_words - (beat_count - b_i), split_idx))
+            slice_indices.append(split_idx)
+        slice_indices.append(n_words)
+
+        cur_start = 0.000
+        for b_i in range(beat_count):
+            s_idx = slice_indices[b_i]
+            e_idx = slice_indices[b_i + 1]
+            seg_words = validated_whisper[s_idx:e_idx]
+            seg_text = " ".join(w["word"] for w in seg_words).strip()
+
+            if b_i == 0:
+                seg_start = 0.000
+            else:
+                seg_start = cur_start
+
+            if b_i == beat_count - 1:
+                seg_end = dur
+            else:
+                raw_end = round(seg_words[-1]["end"] - w_start, 3)
+                min_remaining = 0.050 * (beat_count - 1 - b_i)
+                seg_end = min(dur - min_remaining, max(seg_start + 0.050, raw_end))
+
+            whisper_windows.append((seg_start, seg_end, seg_text))
+            cur_start = seg_end
+
+        # Strict contiguity and non-overlapping assertions (Rule 120)
+        for i in range(len(whisper_windows)):
+            assert whisper_windows[i][0] < whisper_windows[i][1], f"Beat {i} start must precede end: {whisper_windows[i]}"
+            if i > 0:
+                assert abs(whisper_windows[i][0] - whisper_windows[i-1][1]) < 1e-4, \
+                    f"Beat {i} start ({whisper_windows[i][0]}) must equal Beat {i-1} end ({whisper_windows[i-1][1]})"
+
+    # 3. Đồng bộ hóa Phase Markers & Dead-Stop Timings (Rule 120, 140)
+    t_p1_end = whisper_windows[0][1] if whisper_windows else min(0.6, round(dur * 0.1, 3))
+    active_span = dur - t_p1_end
+
+    if beat_count <= 4:
+        t_snap1 = whisper_windows[1][1] if whisper_windows else round(t_p1_end + 0.4, 3)
+        t_snap2 = whisper_windows[2][1] if whisper_windows else round(t_snap1 + 0.6, 3)
+        p2_end = t_snap1
+        p3_end = t_snap2
+    elif beat_count == 5:
+        t_snap1 = whisper_windows[1][1] if whisper_windows else round(t_p1_end + 0.4, 3)
+        t_hold1 = whisper_windows[2][1] if whisper_windows else round(t_snap1 + 0.8, 3)
+        t_snap2 = whisper_windows[3][1] if whisper_windows else round(t_hold1 + 0.5, 3)
+        p2_end = t_hold1
+        p3_end = t_snap2
+    elif beat_count == 6:
+        p2_end = whisper_windows[2][1] if whisper_windows else round(t_p1_end + active_span * 0.4, 3)
+        p3_end = whisper_windows[4][1] if whisper_windows else round(t_p1_end + active_span * 0.8, 3)
+        t_snap1 = p2_end
+        t_snap2 = p3_end
+    else:
+        p2_end = whisper_windows[3][1] if whisper_windows else round(t_p1_end + active_span * 0.5, 3)
+        p3_end = whisper_windows[5][1] if whisper_windows else round(t_p1_end + active_span * 0.85, 3)
+        t_snap1 = p2_end
+        t_snap2 = p3_end
+
+    # 4. Xây dựng Cặp Tương Tác Nhân Quả từ Cấu Hình Khách Quan (Rule 132)
+    presets_cfg = _load_kinetic_presets(config_path)
+    prose_cfg = presets_cfg["prose_templates"]
+    k1_templates = prose_cfg["K1"]
+    k2_templates = prose_cfg["K2"]
 
     fmt_kwargs = {
         "initial_pos": layout.initial_pos,
         "target_contact_pos": layout.target_contact_pos,
         "dock_pin_pos": layout.dock_pin_pos,
         "bounding_box_bounds": layout.bounding_box_bounds,
-        "vector_reveal_direction": layout.vector_reveal_direction
+        "vector_reveal_direction": layout.vector_reveal_direction,
+        "k1_dead_stop": f"{p2_end:.3f}s",
+        "k2_dead_stop": f"{p3_end:.3f}s",
     }
+
+    couplings = []
+    fam1 = dominant_families[0] if dominant_families else KineticFamily.H2_CONSTRAINT
+    fam1_key = fam1.value if fam1.value in k1_templates else "DEFAULT"
+    t1 = k1_templates.get(fam1_key, k1_templates["DEFAULT"])
 
     c1 = KineticCoupling(
         id="K1",
         family=fam1,
         source_obj_id="obj_tool1",
         target_obj_id="obj_anchor",
-        action_verb=t1.get("action_verb", "").format(**fmt_kwargs),
-        contact_point=t1.get("contact_point", "").format(**fmt_kwargs),
-        physical_reaction=t1.get("physical_reaction", "").format(**fmt_kwargs),
+        action_verb=t1["action_verb"].format(**fmt_kwargs),
+        contact_point=t1["contact_point"].format(**fmt_kwargs),
+        physical_reaction=t1["physical_reaction"].format(**fmt_kwargs),
         secondary_reaction=t1.get("secondary_reaction"),
         residue=t1.get("residue", "")
     )
@@ -584,63 +762,28 @@ def generate_scene_sub_director_plan(
 
     fam2 = dominant_families[1] if len(dominant_families) > 1 else KineticFamily.H6_MARK
     fam2_key = fam2.value if fam2.value in k2_templates else "DEFAULT"
-    t2 = k2_templates.get(fam2_key, k2_templates.get("DEFAULT", {}))
+    t2 = k2_templates.get(fam2_key, k2_templates["DEFAULT"])
 
     c2 = KineticCoupling(
         id="K2",
         family=fam2,
         source_obj_id="obj_tool2",
         target_obj_id="obj_anchor" if fam2 == KineticFamily.H6_MARK else "obj_tool1",
-        action_verb=t2.get("action_verb", "").format(**fmt_kwargs),
-        contact_point=t2.get("contact_point", "").format(**fmt_kwargs),
-        physical_reaction=t2.get("physical_reaction", "").format(**fmt_kwargs),
+        action_verb=t2["action_verb"].format(**fmt_kwargs),
+        contact_point=t2["contact_point"].format(**fmt_kwargs),
+        physical_reaction=t2["physical_reaction"].format(**fmt_kwargs),
         residue=t2.get("residue", "")
     )
     couplings.append(c2)
 
-    # 3. Phân Rã Dãy Micro-Beats Linh Hoạt
+    # 5. Phân Rã Dãy Micro-Beats Linh Hoạt
     micro_beats = []
 
-    # Ngân sách thời gian
-    t_p1_end = min(0.6, round(dur * 0.1, 1))
-    t_p3_end = round(max(t_p1_end + 1.2, min(dur - 0.8, dur * 0.45)), 1)
-    active_span = t_p3_end - t_p1_end
-
-    # Nếu whisper_words có sẵn, tính toán micro-beat windows trực tiếp từ word timestamps
-    whisper_windows: Optional[List[Tuple[float, float, str]]] = None
-    if whisper_words:
-        n_words = len(whisper_words)
-        whisper_windows = []
-        for b_i in range(beat_count):
-            if n_words >= beat_count:
-                start_idx = min(n_words - 1, max(0, int(b_i * n_words / beat_count)))
-                end_idx = min(n_words - 1, max(start_idx, int((b_i + 1) * n_words / beat_count) - 1))
-                w_seg_start = round(float(whisper_words[start_idx]["start"]) - w_start, 2)
-                w_seg_end = round(float(whisper_words[end_idx]["end"]) - w_start, 2)
-                seg_text = " ".join(str(whisper_words[k].get("word", "")) for k in range(start_idx, end_idx + 1)).strip()
-            else:
-                w_seg_start = round(b_i * dur / beat_count, 2)
-                w_seg_end = round((b_i + 1) * dur / beat_count, 2)
-                word_idx = min(n_words - 1, int(b_i * n_words / beat_count))
-                seg_text = str(whisper_words[word_idx].get("word", "")).strip()
-
-            if b_i == 0:
-                w_seg_start = 0.0
-            if b_i == beat_count - 1:
-                w_seg_end = dur
-            whisper_windows.append((w_seg_start, max(w_seg_start + 0.1, w_seg_end), seg_text))
-
     if beat_count <= 4:
-        # Nhịp 4 bước chuẩn Vox Stop-Motion
-        t_snap1 = round(t_p1_end + 0.4, 1)
-        t_snap2 = round(t_snap1 + 0.6, 1)
-        p2_end = t_snap1
-        p3_end = t_snap2
-
-        win_b1 = f"{whisper_windows[0][0]:.1f}s - {whisper_windows[0][1]:.1f}s" if whisper_windows else f"0.0s - {t_p1_end:.1f}s"
-        win_b2 = f"{whisper_windows[1][0]:.1f}s - {whisper_windows[1][1]:.1f}s" if whisper_windows else f"{t_p1_end:.1f}s - {t_snap1:.1f}s"
-        win_b3 = f"{whisper_windows[2][0]:.1f}s - {whisper_windows[2][1]:.1f}s" if whisper_windows else f"{t_snap1:.1f}s - {t_snap2:.1f}s"
-        win_b4 = f"{whisper_windows[3][0]:.1f}s - {whisper_windows[3][1]:.1f}s" if whisper_windows else f"{t_snap2:.1f}s - {dur:.1f}s"
+        win_b1 = f"{whisper_windows[0][0]:.3f}s - {whisper_windows[0][1]:.3f}s" if whisper_windows else f"0.000s - {t_p1_end:.3f}s"
+        win_b2 = f"{whisper_windows[1][0]:.3f}s - {whisper_windows[1][1]:.3f}s" if whisper_windows else f"{t_p1_end:.3f}s - {t_snap1:.3f}s"
+        win_b3 = f"{whisper_windows[2][0]:.3f}s - {whisper_windows[2][1]:.3f}s" if whisper_windows else f"{t_snap1:.3f}s - {t_snap2:.3f}s"
+        win_b4 = f"{whisper_windows[3][0]:.3f}s - {whisper_windows[3][1]:.3f}s" if whisper_windows else f"{t_snap2:.3f}s - {dur:.3f}s"
 
         micro_beats = [
             DynamicMicroBeat(
@@ -657,7 +800,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b2,
                 coupling_id="K1",
-                action_description=f"High-velocity snap burst in 0.4s (steep acceleration on twos / 12fps): The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.1f}s",
+                action_description=f"High-velocity snap burst in 0.4s (steep acceleration on twos / 12fps): The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
                 handoff_to="B3",
                 camera_micro_move="subtle punch-in zoom 1.0x to 1.15x tracking contact point",
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
@@ -667,7 +810,7 @@ def generate_scene_sub_director_plan(
                 phase="P3_ESCALATION",
                 time_window=win_b3,
                 coupling_id="K2",
-                action_description=f"Direct kinetic trigger: in a rapid 0.6s burst, the {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.1f}s",
+                action_description=f"Direct kinetic trigger: in a rapid 0.6s burst, the {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.3f}s",
                 handoff_to="B4",
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
             ),
@@ -676,24 +819,17 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=win_b4,
                 coupling_id=None,
-                action_description=f"All objects permanently locked in rigid unified spatial anchor at final coordinate {layout.target_contact_pos} for the remaining {dur - t_snap2:.1f}s to cut, organic 12fps paper stop-motion jitter, zero static freeze to cut",
+                action_description=f"All objects permanently locked in rigid unified spatial anchor at final coordinate {layout.target_contact_pos} for the remaining {dur - t_snap2:.3f}s to cut, organic 12fps paper stop-motion jitter, zero static freeze to cut",
                 handoff_to=None,
                 vo_keyword=whisper_windows[3][2] if whisper_windows else None
             )
         ]
     elif beat_count == 5:
-        # Nhịp 5 bước
-        t_snap1 = round(t_p1_end + 0.4, 1)
-        t_hold1 = round(t_snap1 + 0.8, 1)
-        t_snap2 = round(t_hold1 + 0.5, 1)
-        p2_end = t_hold1
-        p3_end = t_snap2
-
-        win_b1 = f"{whisper_windows[0][0]:.1f}s - {whisper_windows[0][1]:.1f}s" if whisper_windows else f"0.0s - {t_p1_end:.1f}s"
-        win_b2 = f"{whisper_windows[1][0]:.1f}s - {whisper_windows[1][1]:.1f}s" if whisper_windows else f"{t_p1_end:.1f}s - {t_snap1:.1f}s"
-        win_b3 = f"{whisper_windows[2][0]:.1f}s - {whisper_windows[2][1]:.1f}s" if whisper_windows else f"{t_snap1:.1f}s - {t_hold1:.1f}s"
-        win_b4 = f"{whisper_windows[3][0]:.1f}s - {whisper_windows[3][1]:.1f}s" if whisper_windows else f"{t_hold1:.1f}s - {t_snap2:.1f}s"
-        win_b5 = f"{whisper_windows[4][0]:.1f}s - {whisper_windows[4][1]:.1f}s" if whisper_windows else f"{t_snap2:.1f}s - {dur:.1f}s"
+        win_b1 = f"{whisper_windows[0][0]:.3f}s - {whisper_windows[0][1]:.3f}s" if whisper_windows else f"0.000s - {t_p1_end:.3f}s"
+        win_b2 = f"{whisper_windows[1][0]:.3f}s - {whisper_windows[1][1]:.3f}s" if whisper_windows else f"{t_p1_end:.3f}s - {t_snap1:.3f}s"
+        win_b3 = f"{whisper_windows[2][0]:.3f}s - {whisper_windows[2][1]:.3f}s" if whisper_windows else f"{t_snap1:.3f}s - {t_hold1:.3f}s"
+        win_b4 = f"{whisper_windows[3][0]:.3f}s - {whisper_windows[3][1]:.3f}s" if whisper_windows else f"{t_hold1:.3f}s - {t_snap2:.3f}s"
+        win_b5 = f"{whisper_windows[4][0]:.3f}s - {whisper_windows[4][1]:.3f}s" if whisper_windows else f"{t_snap2:.3f}s - {dur:.3f}s"
 
         micro_beats = [
             DynamicMicroBeat(
@@ -738,26 +874,22 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=win_b5,
                 coupling_id=None,
-                action_description=f"All objects permanently locked in spatial anchor for remaining {dur - t_snap2:.1f}s, 12fps paper stop-motion texture, zero static freeze to cut",
+                action_description=f"All objects permanently locked in spatial anchor for remaining {dur - t_snap2:.3f}s, 12fps paper stop-motion texture, zero static freeze to cut",
                 handoff_to=None,
                 vo_keyword=whisper_windows[4][2] if whisper_windows else None
             )
         ]
     elif beat_count == 6:
-        # Nhịp 6 bước linh hoạt
-        t_sub_step = min(0.5, round(active_span / 4.0, 1))
-        t2 = round(t_p1_end + t_sub_step, 1)
-        t3 = round(t2 + t_sub_step, 1)
-        t4 = round(t3 + t_sub_step, 1)
-        p2_end = t3
-        p3_end = round(t4 + t_sub_step, 1)
-
-        win_b1 = f"{whisper_windows[0][0]:.1f}s - {whisper_windows[0][1]:.1f}s" if whisper_windows else f"0.0s - {t_p1_end:.1f}s"
-        win_b2 = f"{whisper_windows[1][0]:.1f}s - {whisper_windows[1][1]:.1f}s" if whisper_windows else f"{t_p1_end:.1f}s - {t2:.1f}s"
-        win_b3 = f"{whisper_windows[2][0]:.1f}s - {whisper_windows[2][1]:.1f}s" if whisper_windows else f"{t2:.1f}s - {t3:.1f}s"
-        win_b4 = f"{whisper_windows[3][0]:.1f}s - {whisper_windows[3][1]:.1f}s" if whisper_windows else f"{t3:.1f}s - {t4:.1f}s"
-        win_b5 = f"{whisper_windows[4][0]:.1f}s - {whisper_windows[4][1]:.1f}s" if whisper_windows else f"{t4:.1f}s - {p3_end:.1f}s"
-        win_b6 = f"{whisper_windows[5][0]:.1f}s - {whisper_windows[5][1]:.1f}s" if whisper_windows else f"{p3_end:.1f}s - {dur:.1f}s"
+        t2 = round(t_p1_end + active_span * 0.20, 3)
+        t3 = round(t_p1_end + active_span * 0.40, 3)
+        t4 = round(t_p1_end + active_span * 0.60, 3)
+        t5 = round(t_p1_end + active_span * 0.80, 3)
+        win_b1 = f"{whisper_windows[0][0]:.3f}s - {whisper_windows[0][1]:.3f}s" if whisper_windows else f"0.000s - {t_p1_end:.3f}s"
+        win_b2 = f"{whisper_windows[1][0]:.3f}s - {whisper_windows[1][1]:.3f}s" if whisper_windows else f"{t_p1_end:.3f}s - {t2:.3f}s"
+        win_b3 = f"{whisper_windows[2][0]:.3f}s - {whisper_windows[2][1]:.3f}s" if whisper_windows else f"{t2:.3f}s - {t3:.3f}s"
+        win_b4 = f"{whisper_windows[3][0]:.3f}s - {whisper_windows[3][1]:.3f}s" if whisper_windows else f"{t3:.3f}s - {t4:.3f}s"
+        win_b5 = f"{whisper_windows[4][0]:.3f}s - {whisper_windows[4][1]:.3f}s" if whisper_windows else f"{t4:.3f}s - {t5:.3f}s"
+        win_b6 = f"{whisper_windows[5][0]:.3f}s - {whisper_windows[5][1]:.3f}s" if whisper_windows else f"{t5:.3f}s - {dur:.3f}s"
 
         micro_beats = [
             DynamicMicroBeat(
@@ -811,28 +943,24 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=win_b6,
                 coupling_id=None,
-                action_description=f"All objects locked in spatial anchor for remaining {dur - p3_end:.1f}s, organic 12fps paper stop-motion jitter, zero static freeze to cut",
+                action_description=f"All objects locked in spatial anchor for remaining {dur - p3_end:.3f}s, organic 12fps paper stop-motion jitter, zero static freeze to cut",
                 handoff_to=None,
                 vo_keyword=whisper_windows[5][2] if whisper_windows else None
             )
         ]
     else:
-        # Nhịp 7 bước tối đa cho câu phức / cao trào
-        t_sub_step = min(0.4, round(active_span / 5.0, 1))
-        t2 = round(t_p1_end + t_sub_step, 1)
-        t3 = round(t2 + t_sub_step, 1)
-        t4 = round(t3 + t_sub_step, 1)
-        t5 = round(t4 + t_sub_step, 1)
-        p2_end = t3
-        p3_end = round(t5 + t_sub_step, 1)
-
-        win_b1 = f"{whisper_windows[0][0]:.1f}s - {whisper_windows[0][1]:.1f}s" if whisper_windows else f"0.0s - {t_p1_end:.1f}s"
-        win_b2 = f"{whisper_windows[1][0]:.1f}s - {whisper_windows[1][1]:.1f}s" if whisper_windows else f"{t_p1_end:.1f}s - {t2:.1f}s"
-        win_b3 = f"{whisper_windows[2][0]:.1f}s - {whisper_windows[2][1]:.1f}s" if whisper_windows else f"{t2:.1f}s - {t3:.1f}s"
-        win_b4 = f"{whisper_windows[3][0]:.1f}s - {whisper_windows[3][1]:.1f}s" if whisper_windows else f"{t3:.1f}s - {t4:.1f}s"
-        win_b5 = f"{whisper_windows[4][0]:.1f}s - {whisper_windows[4][1]:.1f}s" if whisper_windows else f"{t4:.1f}s - {t5:.1f}s"
-        win_b6 = f"{whisper_windows[5][0]:.1f}s - {whisper_windows[5][1]:.1f}s" if whisper_windows else f"{t5:.1f}s - {p3_end:.1f}s"
-        win_b7 = f"{whisper_windows[6][0]:.1f}s - {whisper_windows[6][1]:.1f}s" if whisper_windows else f"{p3_end:.1f}s - {dur:.1f}s"
+        t2 = round(t_p1_end + active_span * 0.16, 3)
+        t3 = round(t_p1_end + active_span * 0.33, 3)
+        t4 = round(t_p1_end + active_span * 0.50, 3)
+        t5 = round(t_p1_end + active_span * 0.67, 3)
+        t6 = round(t_p1_end + active_span * 0.84, 3)
+        win_b1 = f"{whisper_windows[0][0]:.3f}s - {whisper_windows[0][1]:.3f}s" if whisper_windows else f"0.000s - {t_p1_end:.3f}s"
+        win_b2 = f"{whisper_windows[1][0]:.3f}s - {whisper_windows[1][1]:.3f}s" if whisper_windows else f"{t_p1_end:.3f}s - {t2:.3f}s"
+        win_b3 = f"{whisper_windows[2][0]:.3f}s - {whisper_windows[2][1]:.3f}s" if whisper_windows else f"{t2:.3f}s - {t3:.3f}s"
+        win_b4 = f"{whisper_windows[3][0]:.3f}s - {whisper_windows[3][1]:.3f}s" if whisper_windows else f"{t3:.3f}s - {t4:.3f}s"
+        win_b5 = f"{whisper_windows[4][0]:.3f}s - {whisper_windows[4][1]:.3f}s" if whisper_windows else f"{t4:.3f}s - {t5:.3f}s"
+        win_b6 = f"{whisper_windows[5][0]:.3f}s - {whisper_windows[5][1]:.3f}s" if whisper_windows else f"{t5:.3f}s - {t6:.3f}s"
+        win_b7 = f"{whisper_windows[6][0]:.3f}s - {whisper_windows[6][1]:.3f}s" if whisper_windows else f"{t6:.3f}s - {dur:.3f}s"
 
         micro_beats = [
             DynamicMicroBeat(
@@ -909,7 +1037,7 @@ def generate_scene_sub_director_plan(
         "dominant_kinetic_families": [f.value for f in dominant_families],
         "spatial_layout": asdict(layout),
         "foundation_phases": {
-            "p1_setup_sec": [0.0, t_p1_end],
+            "p1_setup_sec": [whisper_windows[0][0] if whisper_windows else 0.0, t_p1_end],
             "p2_tension_sec": [t_p1_end, p2_end],
             "p3_escalation_sec": [p2_end, p3_end],
             "p4_living_hold_sec": [p3_end, dur]
@@ -929,6 +1057,7 @@ def generate_scene_sub_director_plan(
 
 def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: str = "") -> str:
     """Xây dựng Universal I2V Prompt theo Cú Pháp Động Từ Chuyển Động Liên Hợp Nhân Quả.
+
     Ép mô hình AI (Google Flow / Omni / Veo) render tương tác vật lý thay vì trôi độc lập.
     """
     roster = {o["id"]: o["label"] for o in sub_plan.get("object_roster", [])}

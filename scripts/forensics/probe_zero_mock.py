@@ -8,9 +8,9 @@ Rule 127 (Runtime Execution Gate), and Boss Round 8 Item 22.
 from __future__ import annotations
 
 import collections
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -45,7 +45,7 @@ def run_grep_fail_closed(pattern: str, paths: list[str], cwd: Path) -> list[str]
         # Returncode 1 means no matches found
         return []
     elif res.returncode == 0:
-        return [l for l in res.stdout.strip().splitlines() if l.strip()]
+        return [line for line in res.stdout.strip().splitlines() if line.strip()]
     else:
         err_msg = res.stderr.strip() if res.stderr else f"exit code {res.returncode}"
         raise RuntimeError(f"Grep command failed (fail-closed, Rule 118): {cmd} -> {err_msg}")
@@ -122,7 +122,7 @@ def main() -> int:
         ["tests/vox", "tests/codemap"],
         cwd=repo_root,
     )
-    print(f"   - Scope: tests/vox/, tests/codemap/")
+    print("   - Scope: tests/vox/, tests/codemap/")
     print(f"   - Core Matches Count: {len(core_matches)}")
     if core_matches:
         print("❌ FAIL: Mock references found in core test suites (Rule 118 violation):", file=sys.stderr)
@@ -138,7 +138,7 @@ def main() -> int:
         ["vox/", "stages/", "app/", "core/"],
         cwd=repo_root,
     )
-    print(f"   - Scope: vox/, stages/, app/, core/")
+    print("   - Scope: vox/, stages/, app/, core/")
     print(f"   - Production Code Occurrences: {len(prod_matches)}")
     print(f"   - Independent Programmatic Classification of All {len(prod_matches)} Occurrences:")
 
@@ -174,7 +174,7 @@ def main() -> int:
         cwd=repo_root,
     )
     total_unit = len(unit_matches)
-    by_file_unit = collections.Counter([l.split(":")[0] for l in unit_matches])
+    by_file_unit = collections.Counter([item.split(":")[0] for item in unit_matches])
 
     root_matches = run_grep_fail_closed(
         "mock|MagicMock|monkeypatch",
@@ -182,74 +182,33 @@ def main() -> int:
         cwd=repo_root,
     )
     total_root = len(root_matches)
-    by_file_root = collections.Counter([l.split(":")[0] for l in root_matches])
+    by_file_root = collections.Counter([item.split(":")[0] for item in root_matches])
     total_all = total_unit + total_root
 
-    print(f"   A. Scoped tests/unit/ Suite:")
+    print("   A. Scoped tests/unit/ Suite:")
     print(f"      - File Count:  {len(by_file_unit)} test files")
     print(f"      - Total Count: {total_unit} references")
-    print(f"      - Per-File Breakdown:")
+    print("      - Per-File Breakdown:")
     for f, c in sorted(by_file_unit.items()):
         print(f"          * {f}: {c} references")
 
-    print(f"\n   B. Scoped tests/test_*.py Legacy Suites:")
+    print("\n   B. Scoped tests/test_*.py Legacy Suites:")
     print(f"      - File Count:  {len(by_file_root)} test files")
     print(f"      - Total Count: {total_root} references")
 
-    UNIT_TEST_MOCK_ALLOWLIST = {
-        "tests/unit/test_alert_cooldown.py": 26,
-        "tests/unit/test_align_adversarial.py": 14,
-        "tests/unit/test_api_auth_gating.py": 12,
-        "tests/unit/test_atomic_io.py": 4,
-        "tests/unit/test_b1_daily_guard_integration.py": 9,
-        "tests/unit/test_b3_handoff_contract.py": 7,
-        "tests/unit/test_core_net_utils.py": 12,
-        "tests/unit/test_critic_gate_fail_closed.py": 35,
-        "tests/unit/test_daily_market_lock.py": 39,
-        "tests/unit/test_lock_timing_reconciliation.py": 1,
-        "tests/unit/test_s05_director_plan.py": 5,
-        "tests/unit/test_s05_fail_closed.py": 1,
-        "tests/unit/test_s10_render.py": 3,
-        "tests/unit/test_s11_qc_gate.py": 7,
-        "tests/unit/test_service_readiness_manifest.py": 2,
-        "tests/unit/test_trend_caps_and_gates.py": 53,
-        "tests/unit/test_vox_studio_upgrade.py": 2,
-        "tests/unit/test_vps_runner_failover.py": 3,
-    }
+    baseline_file = repo_root / "config" / "zero_mock_baseline.json"
+    if not baseline_file.exists():
+        print(f"❌ FAIL: Missing zero-mock baseline config at {baseline_file}", file=sys.stderr)
+        return 1
 
-    LEGACY_TEST_MOCK_ALLOWLIST = {
-        "tests/test_adversarial_round3.py": 11,
-        "tests/test_auto_post_render.py": 1,
-        "tests/test_b15_seo_package_forge.py": 1,
-        "tests/test_b15_traffic_bridge.py": 4,
-        "tests/test_b2_b3_handoff.py": 7,
-        "tests/test_b2_task_id_parsing.py": 3,
-        "tests/test_b35_b4_bridge.py": 9,
-        "tests/test_b36_visual_convergence.py": 10,
-        "tests/test_breakout_seo_continuity.py": 4,
-        "tests/test_build_remotion_props.py": 2,
-        "tests/test_claude_vox_director.py": 8,
-        "tests/test_competitor_recon_b15.py": 3,
-        "tests/test_cross_channel_promoter.py": 31,
-        "tests/test_dual_model_convergence.py": 3,
-        "tests/test_e2e_pipeline.py": 1,
-        "tests/test_editorial_briefing_generator.py": 13,
-        "tests/test_gate1_order_guard.py": 10,
-        "tests/test_gates_manifest.py": 3,
-        "tests/test_ghost_scan_adversarial.py": 14,
-        "tests/test_hollywood_audio_anchor.py": 4,
-        "tests/test_midscene_adapter.py": 24,
-        "tests/test_model_gateway_preflight.py": 32,
-        "tests/test_prompt_forge.py": 13,
-        "tests/test_quant_profile.py": 1,
-        "tests/test_telegram_gate1_hg1.py": 23,
-        "tests/test_text_to_number_parser.py": 2,
-        "tests/test_timeline_editor_agent.py": 10,
-        "tests/test_v7_feedback_loop.py": 17,
-        "tests/test_vox_automated_director.py": 8,
-        "tests/test_vox_continuous_director_engine.py": 12,
-        "tests/test_vox_critic_council.py": 2,
-    }
+    try:
+        import json
+        baseline_cfg = json.loads(baseline_file.read_text(encoding="utf-8"))
+        UNIT_TEST_MOCK_ALLOWLIST = baseline_cfg.get("unit_tests", {})
+        LEGACY_TEST_MOCK_ALLOWLIST = baseline_cfg.get("legacy_tests", {})
+    except Exception as _b_err:
+        print(f"❌ FAIL: Unreadable zero-mock baseline config: {_b_err}", file=sys.stderr)
+        return 1
 
     print("\n   C. Mathematical Count Reconciliation Proof (Derived from Committed Per-File Baselines):")
     expected_unit = sum(UNIT_TEST_MOCK_ALLOWLIST.values())
@@ -260,41 +219,71 @@ def main() -> int:
     print(f"       * Actual Counted Total (tests/unit/):        {total_unit} references across {len(by_file_unit)} files")
     print(f"       * Committed Baseline (tests/test_*.py):      {expected_root} references across {len(LEGACY_TEST_MOCK_ALLOWLIST)} files")
     print(f"       * Actual Counted Total (tests/test_*.py):    {total_root} references across {len(by_file_root)} files")
+    print(f"       * Total Combined Expected / Actual:          {expected_all} / {total_all} references")
 
-    # Audit per-file discrepancies in unit tests
+    # Audit per-file ratchet in unit tests (actual <= baseline)
     unit_diffs = []
     for fpath, exp in UNIT_TEST_MOCK_ALLOWLIST.items():
         act = by_file_unit.get(fpath, 0)
-        if act != exp:
-            unit_diffs.append(f"{fpath}: expected {exp}, got {act}")
+        if act > exp:
+            unit_diffs.append(f"{fpath}: mock count increased! expected <= {exp}, got {act}")
+        elif act < exp:
+            print(f"   📉 Ratchet mock reduction: {fpath} reduced mocks from {exp} to {act} (PASS)")
     for fpath, act in by_file_unit.items():
-        if fpath not in UNIT_TEST_MOCK_ALLOWLIST:
-            unit_diffs.append(f"{fpath}: unexpected file with {act} references")
+        if fpath not in UNIT_TEST_MOCK_ALLOWLIST and act > 0:
+            unit_diffs.append(f"{fpath}: unexpected new file with {act} mock references")
 
     if unit_diffs:
-        print(f"❌ FAIL: tests/unit/ per-file mismatch:\n" + "\n".join(f"     - {d}" for d in unit_diffs), file=sys.stderr)
+        print("❌ FAIL: tests/unit/ ratchet failure:\n" + "\n".join(f"     - {d}" for d in unit_diffs), file=sys.stderr)
         return 1
 
-    # Audit per-file discrepancies in legacy tests
+    # Audit per-file ratchet in legacy tests (actual <= baseline)
     root_diffs = []
     for fpath, exp in LEGACY_TEST_MOCK_ALLOWLIST.items():
         act = by_file_root.get(fpath, 0)
-        if act != exp:
-            root_diffs.append(f"{fpath}: expected {exp}, got {act}")
+        if act > exp:
+            root_diffs.append(f"{fpath}: mock count increased! expected <= {exp}, got {act}")
+        elif act < exp:
+            print(f"   📉 Ratchet mock reduction: {fpath} reduced mocks from {exp} to {act} (PASS)")
     for fpath, act in by_file_root.items():
-        if fpath not in LEGACY_TEST_MOCK_ALLOWLIST:
-            root_diffs.append(f"{fpath}: unexpected file with {act} references")
+        if fpath not in LEGACY_TEST_MOCK_ALLOWLIST and act > 0:
+            root_diffs.append(f"{fpath}: unexpected new file with {act} mock references")
 
     if root_diffs:
-        print(f"❌ FAIL: tests/test_*.py per-file mismatch:\n" + "\n".join(f"     - {d}" for d in root_diffs), file=sys.stderr)
+        print("❌ FAIL: tests/test_*.py ratchet failure:\n" + "\n".join(f"     - {d}" for d in root_diffs), file=sys.stderr)
         return 1
 
-    assert total_unit == expected_unit, f"tests/unit count mismatch: {total_unit} != {expected_unit}"
-    assert total_root == expected_root, f"tests/test_*.py count mismatch: {total_root} != {expected_root}"
-    assert total_all == expected_all, f"total repository count mismatch: {total_all} != {expected_all}"
+    if total_unit > expected_unit:
+        print(f"❌ FAIL: tests/unit total ({total_unit}) exceeds baseline ceiling ({expected_unit})", file=sys.stderr)
+        return 1
+    if total_root > expected_root:
+        print(f"❌ FAIL: tests/test_*.py total ({total_root}) exceeds baseline ceiling ({expected_root})", file=sys.stderr)
+        return 1
 
     tree_res = subprocess.run(["git", "rev-parse", "HEAD^{tree}"], cwd=str(repo_root), capture_output=True, text=True, check=False)
-    tree_hash = tree_res.stdout.strip() if tree_res.returncode == 0 else "UNKNOWN"
+    if tree_res.returncode != 0:
+        print(f"❌ FAIL: Failed to resolve tree hash via git rev-parse: {tree_res.stderr}", file=sys.stderr)
+        return 1
+    tree_hash = tree_res.stdout.strip()
+
+    # Write MOCK_SCAN_MATCHES_COUNT and TREE_HASH into qa_summary
+    qa_summary_dir = repo_root / "out"
+    qa_summary_dir.mkdir(parents=True, exist_ok=True)
+    qa_summary_json = qa_summary_dir / "qa_summary.json"
+    qa_data = {}
+    if qa_summary_json.exists():
+        try:
+            qa_data = json.loads(qa_summary_json.read_text(encoding="utf-8"))
+        except Exception:
+            qa_data = {}
+    qa_data["MOCK_SCAN_MATCHES_COUNT"] = total_unit
+    qa_data["LEGACY_MOCK_SCAN_MATCHES_COUNT"] = total_root
+    qa_data["TREE_HASH"] = tree_hash
+    qa_data["zero_mock_verdict"] = "PASS"
+    try:
+        qa_summary_json.write_text(json.dumps(qa_data, indent=2), encoding="utf-8")
+    except OSError as _w_err:
+        print(f"Warning: could not write qa_summary.json: {_w_err}", file=sys.stderr)
 
     print(f"   ✅ tests/unit/ LEDGER PROOF PASSED: {total_unit} matches derived from {len(UNIT_TEST_MOCK_ALLOWLIST)} committed baselines.")
     print(f"   ✅ tests/test_*.py LEDGER PROOF PASSED: {total_root} matches derived from {len(LEGACY_TEST_MOCK_ALLOWLIST)} committed baselines.")

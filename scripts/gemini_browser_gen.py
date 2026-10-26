@@ -1,17 +1,16 @@
-import os
-import sys
-import time
-import json
-import base64
 import argparse
-import urllib.request
+import base64
+import json
+import logging
+import os
 import ssl
 import subprocess
-import logging
+import sys
+import time
+import urllib.request
+from pathlib import Path
 
 logger = logging.getLogger("gemini_browser_gen")
-from pathlib import Path
-from io import BytesIO
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
@@ -23,14 +22,14 @@ try:
 except ImportError:
     sync_playwright = None
 
-from PIL import Image, ImageFilter
 import numpy as np
+from PIL import Image, ImageFilter
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 USER_DATA_DIR = os.environ.get("GEMINI_BROWSER_PROFILE", r"C:\Users\hunghd2\.gemini\browser_profile")
 try:
     os.makedirs(USER_DATA_DIR, exist_ok=True)
-except Exception as _mk_err:
+except OSError as _mk_err:
     logger.debug(f"Could not create user data dir: {_mk_err}")
 
 # Embedded Self-Contained MCP Client for VPS Communications
@@ -84,7 +83,7 @@ class DirectMCPClient:
                 )
                 with urllib.request.urlopen(req, timeout=30, context=self.ctx) as resp:
                     self.session_id = resp.headers.get("mcp-session-id")
-                
+
                 # Send notifications/initialized
                 try:
                     notif_payload = {"jsonrpc": "2.0", "method": "notifications/initialized"}
@@ -95,7 +94,7 @@ class DirectMCPClient:
                     logger.debug(f"MCP notification notice: {_notif_err}")
                 print(f"📡 MCP Session initialized: {self.session_id}")
                 return
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
                 print(f"⚠️ [MCP Init Warning attempt {attempt+1}/3]: {e}")
                 time.sleep(1)
 
@@ -132,7 +131,7 @@ class DirectMCPClient:
                                     return content[0].get("text")
                             return res
                 return {}
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
                 print(f"⚠️ [MCP Call Warning attempt {attempt+1}/{retries}]: {e}")
                 time.sleep(1)
                 self.init_session()
@@ -154,17 +153,17 @@ def check_gemini_session(page):
     """Kiểm tra trạng thái đăng nhập Gemini Web."""
     print("🌐 Đang kết nối tới https://gemini.google.com/app...")
     page.goto("https://gemini.google.com/app", wait_until="domcontentloaded")
-    
+
     input_box = None
     for _ in range(15):
         input_box = page.query_selector('div[role="textbox"], div[contenteditable="true"], textarea')
         if input_box and input_box.is_visible():
             break
         time.sleep(1)
-    
+
     sign_in_btn = page.query_selector('a[href*="ServiceLogin"], a[href*="InteractiveLogin"], button:has-text("Sign in"), button:has-text("Đăng nhập")')
     user_avatar = page.query_selector('a[href*="SignOutOptions"], a[aria-label*="Google Account"], a[aria-label*="Tài khoản Google"], [data-test-id="user-avatar"]')
-    
+
     if sign_in_btn and not user_avatar and not input_box:
         print("\n" + "!"*70)
         print("❌ CHƯA ĐĂNG NHẬP GOOGLE PRO TRÊN TRÌNH DUYỆT!")
@@ -172,11 +171,11 @@ def check_gemini_session(page):
         print("👉 Bấm 'Sign in' để hoàn tất đăng nhập tài khoản Google Pro.")
         print("!"*70 + "\n")
         return None
-        
+
     if input_box:
         print("✅ Đã kết nối phiên đăng nhập Gemini Pro thành công!")
         return input_box
-        
+
     return None
 
 def fetch_prompts_from_vps(episode_id):
@@ -231,7 +230,7 @@ def fetch_prompts_from_vps(episode_id):
         logger.warning(f"Failed to load director plan from VPS: {e}")
 
     local_prompts_file = os.path.join(local_episode_dir, "prompts_forge.json")
-    
+
     d = None
     if os.path.exists(local_prompts_file) and os.path.getsize(local_prompts_file) > 100:
         try:
@@ -240,7 +239,7 @@ def fetch_prompts_from_vps(episode_id):
         except (OSError, json.JSONDecodeError) as _pf_err:
             logger.debug(f"Failed to load local prompts_forge.json: {_pf_err}")
             d = None
-            
+
     if not d:
         vps_path = f"/var/vf/episodes/{episode_id}/prompts_forge.json"
         # High-performance chunked gzip transfer (Rule 126 Parity)
@@ -263,7 +262,7 @@ def fetch_prompts_from_vps(episode_id):
         with open(local_prompts_file, "wb") as f:
             f.write(raw_bytes)
         d = json.loads(raw_bytes.decode("utf-8"))
-        
+
     items = []
     for k, p in d.get("backgrounds", {}).items():
         prompt_text = p if isinstance(p, str) else p.get("prompt", "")
@@ -272,7 +271,7 @@ def fetch_prompts_from_vps(episode_id):
             "layer_type": "Background",
             "prompt": f"{prompt_text} [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]"
         })
-        
+
     for k, p in d.get("foregrounds", {}).items():
         prompt_text = p if isinstance(p, str) else p.get("prompt", "")
         items.append({
@@ -280,7 +279,7 @@ def fetch_prompts_from_vps(episode_id):
             "layer_type": "Foreground",
             "prompt": f"{prompt_text} [TECHNICAL: Generate with pure #FF00FF magenta background, clean chroma key cutout, 1:1 aspect ratio, sharp silhouette, no borders.]"
         })
-        
+
     thumbs = d.get("thumbnails", {})
     if thumbs:
         for k, p in thumbs.items():
@@ -299,7 +298,7 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
     for attempt in range(1, max_retries + 1):
         try:
             print(f"\n📝 [Prompt (Lần {attempt}/{max_retries})]: {prompt_text[:90]}...")
-            
+
             # Đảm bảo trang sạch / New Chat để tránh lẫn ảnh cũ
             try:
                 new_chat_btn = page.query_selector('a[href="/app"], [aria-label*="New chat"], [aria-label*="Cuộc trò chuyện mới"], button:has-text("New chat")')
@@ -312,7 +311,7 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
             except Exception:
                 page.goto("https://gemini.google.com/app", wait_until="domcontentloaded")
                 time.sleep(3)
-            
+
             # 1. Tìm ô nhập
             input_box = page.wait_for_selector('div[role="textbox"], div[contenteditable="true"], textarea', timeout=30000)
             input_box.click()
@@ -336,12 +335,12 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
                         print("🎨 [1-Shot Mode] Đã kích hoạt chế độ 'Tạo hình ảnh' trực tiếp qua menu công cụ!")
             except Exception as _e_tool:
                 logger.debug(f"Menu tool click notice: {_e_tool}")
-            
+
             # Xóa nội dung cũ nếu có
             page.keyboard.press("Control+A")
             page.keyboard.press("Backspace")
             time.sleep(0.2)
-            
+
             # Khử nhiễu các thẻ meta lập trình [STYLE MANDATE], [ERA ANCHOR] để Imagen 3 không bị hiểu nhầm là prompt crafting
             import re
             clean_p = prompt_text.strip()
@@ -354,20 +353,20 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
             input_box.fill(full_prompt)
             time.sleep(0.5)
 
-            
+
             # 2. Gửi lệnh: Thử bấm nút Send hoặc gõ Enter
             send_btn = page.query_selector('button[aria-label*="Send"], button[aria-label*="Gửi"], [data-test-id="send-button"]')
             if send_btn and send_btn.is_enabled():
                 send_btn.click()
             else:
                 page.keyboard.press("Enter")
-                
+
             print(f"⏳ Đã gửi lệnh. Đang chờ Gemini Imagen 3 render [{layer_type}] (Timeout: {timeout_sec}s)...")
-            
+
             # 3. Chờ ảnh mới xuất hiện
             start_time = time.time()
             saved = False
-            
+
             while time.time() - start_time < timeout_sec:
                 time.sleep(2)
 
@@ -388,17 +387,17 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
                     break
 
                 images = page.query_selector_all('img[src*="googleusercontent.com"], img[src*="blob:"], img.generated-image, img')
-                
+
                 for img in reversed(images):
                     try:
                         box = img.bounding_box()
                         if box and box["width"] > 250 and box["height"] > 200:
                             print(f"🎯 Đã bắt được ảnh kết quả mới ({int(box['width'])}x{int(box['height'])})!")
-                            
+
                             # Cuộn ảnh vào tầm nhìn
                             img.scroll_into_view_if_needed()
                             time.sleep(0.5)
-                            
+
                             # Trích xuất dữ liệu nhị phân nguyên bản (raw binary Base64) trực tiếp từ DOM
                             # TUYỆT ĐỐI KHÔNG dùng img.screenshot() để tránh dính thanh công cụ UI của Gemini Web
                             b64_data = page.evaluate('''async (img) => {
@@ -424,15 +423,15 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
                                     return canvas.toDataURL("image/png").split(",")[1];
                                 }
                             }''', img)
-                            
+
                             if not b64_data:
                                 print("⚠️ Không trích xuất được base64 từ thẻ img, thử thẻ khác...")
                                 continue
-                                
+
                             raw_bytes = base64.b64decode(b64_data)
                             with open(output_png_path, "wb") as f:
                                 f.write(raw_bytes)
-                            
+
                             # Local Post-processing & Standardizing resolution
                             with Image.open(output_png_path) as im:
                                 if layer_type in ("Background", "Thumbnail"):
@@ -449,51 +448,51 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
                                     # Thuật toán HSV Chroma Key chuyên nghiệp: KHÔNG BAO GIỜ XÓA MÀU TRẮNG (Bảo toàn 100% áo trắng, cổ cồn, cà vạt)
                                     im_rgb = im.convert("RGB")
                                     im_hsv = im_rgb.convert("HSV")
-                                    
+
                                     rgb_arr = np.array(im_rgb, dtype=np.float32)
                                     hsv_arr = np.array(im_hsv, dtype=np.float32)
-                                    
+
                                     r, g, b = rgb_arr[:, :, 0], rgb_arr[:, :, 1], rgb_arr[:, :, 2]
                                     h, s, v = hsv_arr[:, :, 0], hsv_arr[:, :, 1], hsv_arr[:, :, 2]
-                                    
+
                                     # Magenta trong PIL HSV: H ~ 185..240, S cao (S >= 55), V rõ (V >= 45)
                                     # Màu trắng có Saturation cực thấp (S < 35) nên HOÀN TOÀN KHÔNG BỊ TRÙNG
                                     is_magenta_hsv = (h >= 185) & (h <= 240) & (s >= 55) & (v >= 45)
                                     is_magenta_rgb = (r > 90) & (b > 70) & (r > g + 25) & (b > g + 20)
                                     is_bg = is_magenta_hsv & is_magenta_rgb
-                                    
+
                                     # Khởi tạo alpha mask: Background = 0 (trong suốt), Foreground = 255 (giữ nguyên)
                                     alpha = np.where(is_bg, 0, 255).astype(np.uint8)
-                                    
+
                                     # Làm mịn biên (Feathering) với GaussianBlur radius 0.7 để viền cutout không bị răng cưa
                                     mask_img = Image.fromarray(alpha, mode="L")
                                     mask_feathered = mask_img.filter(ImageFilter.GaussianBlur(radius=0.7))
-                                    
+
                                     cutout = im_rgb.convert("RGBA")
                                     cutout.putalpha(mask_feathered)
-                                    
+
                                     if cutout.size != (2048, 2048):
                                         cutout = cutout.resize((2048, 2048), Image.Resampling.LANCZOS)
                                     cutout.save(output_png_path, format="PNG")
                                     print(f"💾 Đã chuẩn hóa Foreground 2048x2048 Transparent PNG (HSV Keying, White Collars Preserved): {output_png_path} ✅")
-                                    
+
                             saved = True
                             break
-                    except Exception as e:
+                    except (OSError, json.JSONDecodeError, KeyError, ValueError):
                         continue
-                        
+
                 if saved:
                     break
-                    
+
             if saved:
                 return output_png_path
-                
+
             print(f"⚠️ Hết thời gian chờ {timeout_sec}s ở lần thử {attempt}. Đang chuẩn bị thử lại...")
             time.sleep(3)
         except Exception as err:
             print(f"⚠️ Lỗi ở lần thử {attempt}: {err}")
             time.sleep(3)
-            
+
     debug_dir = r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets\debug"
     os.makedirs(debug_dir, exist_ok=True)
     debug_shot = os.path.join(debug_dir, f"debug_timeout_{int(time.time())}.png")
@@ -509,19 +508,19 @@ def audit_single_image(img_path, layer_type):
         dim = im.size
         fmt = im.format or "PNG"
         mode = im.mode
-        
+
         # 1. Dimension check
         if layer_type in ("Background", "Thumbnail"):
             dim_ok = (dim == (2560, 1440))
         else:  # Foreground
             dim_ok = (dim == (2048, 2048))
-            
+
         # 2. Black frame check (Luma < 12)
         gray = im.convert("L")
         gray_arr = np.array(gray)
         black_pct = float(np.mean(gray_arr < 12) * 100)
         not_black = (black_pct < 90.0)
-        
+
         # 3. FG Transparency & Magenta Chroma Key leakage check
         trans_ok = True
         trans_pct = 0.0
@@ -535,7 +534,7 @@ def audit_single_image(img_path, layer_type):
                 trans_pct = float(np.mean(alpha < 10) * 100)  # Area cutout
                 # Rule 116/435: Isolated character cutout should have 10% to 88% transparent area
                 trans_ok = (10.0 <= trans_pct <= 88.0)
-                
+
                 # Check for unkeyed magenta fringe (#FF00FF residual)
                 r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
                 visible_mask = alpha > 50
@@ -547,13 +546,13 @@ def audit_single_image(img_path, layer_type):
                 no_magenta_fringe = (magenta_leak_pct < 0.2)
         else:
             no_magenta_fringe = True
-            
+
         is_pass = dim_ok and not_black and trans_ok and (no_magenta_fringe if layer_type == "Foreground" else True)
-        
+
         notes = f"Empirical pixel audit: dim={dim[0]}x{dim[1]}, black={round(black_pct, 2)}%"
         if layer_type == "Foreground":
             notes += f", alpha={round(trans_pct, 2)}%, magenta_leak={round(magenta_leak_pct, 3)}%"
-        
+
         metrics = {
             "dimensions": f"{dim[0]}x{dim[1]}",
             "format": fmt,
@@ -576,14 +575,14 @@ def audit_single_image(img_path, layer_type):
 def upload_png_to_vps(key, local_path, episode_id, layer_type="Background"):
     """Upload ảnh PNG đơn lẻ lên VPS với số liệu audit thực nghiệm (Rule 118 Zero-Mock)."""
     client.run_command(f"mkdir -p /tmp/vf /var/vf/episodes/{episode_id}/assets /var/vf/episodes/{episode_id}/images /var/vf/episodes/{episode_id}/thumbnails /var/vf/episodes/{episode_id}/audits")
-    
+
     with open(local_path, "rb") as f:
         data = f.read()
-        
+
     b64 = base64.b64encode(data).decode("ascii")
     CHUNK_SIZE = 256 * 1024  # 256KB (Safe for Cloudflare body limit)
     chunks = [b64[i:i+CHUNK_SIZE] for i in range(0, len(b64), CHUNK_SIZE)]
-    
+
     for idx, chunk in enumerate(chunks):
         tmp_path = f"/tmp/vf/{key}_{idx:04d}.b64"
         write_ok = False
@@ -595,13 +594,13 @@ def upload_png_to_vps(key, local_path, episode_id, layer_type="Background"):
             time.sleep(1)
         if not write_ok:
             raise RuntimeError(f"Lỗi ghi chunk {idx+1}/{len(chunks)} vào {tmp_path} sau 3 lần thử")
-        
+
     target_raw_png = f"/var/vf/episodes/{episode_id}/assets/{key}.png"
     target_img_png = f"/var/vf/episodes/{episode_id}/images/{key}.png"
     target_trans_png = f"/var/vf/episodes/{episode_id}/assets/{key}_transparent.png"
     target_thumb_png = f"/var/vf/episodes/{episode_id}/thumbnails/{key}.png"
     target_audit_json = f"/var/vf/episodes/{episode_id}/audits/{key}_audit.json"
-    
+
     is_pass, metrics = audit_single_image(local_path, layer_type)
     audit_data = {
         "reuse_key": key,
@@ -613,7 +612,7 @@ def upload_png_to_vps(key, local_path, episode_id, layer_type="Background"):
                  (f", alpha={metrics['transparency_pct']}%, magenta_leak={metrics['magenta_leak_pct']}%" if layer_type == "Foreground" else "")
     }
     audit_data_str = json.dumps(audit_data, indent=2, ensure_ascii=False)
-    
+
     if layer_type == "Foreground":
         py_cmd = f"""python3 -c '
 import os, json
@@ -665,29 +664,28 @@ def upload_batch_archive_to_vps(episode_id, prompt_items, local_dir, audit_repor
     truyền tải nguyên tử lên VPS giải nén triệt tiêu rớt mạng / MCP timeout (Rule 125 & 126).
     """
     import tarfile
-    import shutil
-    
+
     print(f"\n📦 [Batch Archive] Đang đóng gói toàn bộ assets cho episode {episode_id}...")
     tar_filename = f"assets_{episode_id}.tar.gz"
     local_tar_path = os.path.join(local_dir, tar_filename)
-    
+
     # Pack all .png and .json files
     with tarfile.open(local_tar_path, "w:gz") as tar:
         for f in os.listdir(local_dir):
             if (f.endswith(".png") or f.endswith(".json")) and f != tar_filename:
                 tar.add(os.path.join(local_dir, f), arcname=f)
-                
+
     tar_size = os.path.getsize(local_tar_path)
     print(f"📦 Đã tạo archive: {local_tar_path} ({tar_size:,} bytes). Đang truyền tải lên VPS...")
-    
+
     with open(local_tar_path, "rb") as f:
         tar_bytes = f.read()
     b64_str = base64.b64encode(tar_bytes).decode("ascii")
-    
+
     CHUNK_SIZE = 256 * 1024  # 256KB (Safe for Cloudflare body limit)
     chunks = [b64_str[i:i+CHUNK_SIZE] for i in range(0, len(b64_str), CHUNK_SIZE)]
     client.run_command(f"mkdir -p /tmp/vf && rm -f /tmp/vf/vf_arch_{episode_id}_*.b64")
-    
+
     print(f"📦 Bắt đầu truyền tải {len(chunks)} chunks (256KB/chunk) lên VPS...")
     for idx, chunk in enumerate(chunks):
         tmp_path = f"/tmp/vf/vf_arch_{episode_id}_{idx:05d}.b64"
@@ -704,7 +702,7 @@ def upload_batch_archive_to_vps(episode_id, prompt_items, local_dir, audit_repor
 
         if (idx + 1) % 10 == 0 or (idx + 1) == len(chunks):
             print(f"  ⬆️ Uploaded chunk {idx+1}/{len(chunks)} ({int((idx+1)/len(chunks)*100)}%)")
-            
+
     unpack_cmd = f"""python3 -c '
 import os, tarfile, shutil, sys
 
@@ -731,7 +729,7 @@ os.makedirs(unpacked, exist_ok=True)
 try:
     with tarfile.open(tar_path, "r:gz") as tar:
         tar.extractall(unpacked)
-except Exception as e:
+except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
     print(f"ERROR: Corrupted archive extraction: {{e}}")
     sys.exit(2)
 
@@ -778,7 +776,7 @@ def create_images_ready_marker(episode_id, total_count, pass_count):
 
 def sync_to_notion(episode_id):
     """Đồng bộ toàn bộ assets lên Notion Image Asset Library DB."""
-    print(f"\n📊 Đang đồng bộ kết quả lên Notion Image Asset Library DB...")
+    print("\n📊 Đang đồng bộ kết quả lên Notion Image Asset Library DB...")
     cmd = f"python3 /root/video_factory/scripts/sync_images_to_notion.py {episode_id}"
     res = client.run_command(cmd)
     print("Notion Sync Log:")
@@ -807,7 +805,7 @@ try:
     bgs = [s.get("bg_reuse_key") for s in d.get("scenes", []) if s.get("bg_reuse_key")]
     fgs = [s.get("fg_reuse_key") for s in d.get("scenes", []) if s.get("fg_reuse_key")]
     print(json.dumps({{"bgs": list(set(bgs)), "fgs": list(set(fgs))}}))
-except Exception as e:
+except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
     print(json.dumps({{"error": str(e)}}))
 '"""
             res = client.run_command(vps_eval_code)
@@ -869,7 +867,7 @@ def run_b5_audit(episode_id, items, local_dir):
     print(f"\n🔍 [B5 Forensic Visual Audit] Đang thẩm định chất lượng toàn bộ {len(items)} ảnh...")
     audit_results = []
     pass_count = 0
-    
+
     # Verify Director Plan Binding
     dp_binding = verify_director_plan_binding(episode_id, items, local_dir)
     print(f"🎬 [B5 Director Binding] Status: {dp_binding.get('status')} (Unregistered: {len(dp_binding.get('unregistered_keys', []))})")
@@ -878,7 +876,7 @@ def run_b5_audit(episode_id, items, local_dir):
         key = item["reuse_key"]
         layer = item.get("layer_type", "Background")
         local_png = os.path.join(local_dir, f"{key}.png")
-        
+
         if not os.path.exists(local_png) or os.path.getsize(local_png) == 0:
             audit_results.append({
                 "reuse_key": key,
@@ -887,7 +885,7 @@ def run_b5_audit(episode_id, items, local_dir):
                 "status": "File missing or 0 bytes"
             })
             continue
-            
+
         try:
             is_pass, metrics = audit_single_image(local_png, layer)
             if is_pass:
@@ -897,7 +895,7 @@ def run_b5_audit(episode_id, items, local_dir):
             else:
                 verdict = "Needs_Review"
                 status = "Technical Check Failed"
-                
+
             single_audit = {
                 "reuse_key": key,
                 "layer_type": layer,
@@ -925,16 +923,16 @@ def run_b5_audit(episode_id, items, local_dir):
             }
             with open(os.path.join(local_dir, f"{key}_audit.json"), "w", encoding="utf-8") as af:
                 json.dump(single_audit, af, indent=2, ensure_ascii=False)
-                
+
             audit_results.append(single_audit)
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
             audit_results.append({
                 "reuse_key": key,
                 "layer_type": layer,
                 "verdict": "ERROR",
                 "status": str(e)
             })
-            
+
     overall_verdict = "TECH_PASS" if pass_count == len(items) else "CONDITIONAL_PASS" if pass_count / len(items) >= 0.8 else "FAIL"
     report = {
         "episode_id": episode_id,
@@ -945,11 +943,11 @@ def run_b5_audit(episode_id, items, local_dir):
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "items": audit_results
     }
-    
+
     local_report_path = os.path.join(local_dir, "b5_audit_report.json")
     with open(local_report_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
-        
+
     print(f"📊 [B5 Audit] Báo cáo lưu tại: b5_audit_report.json | Verdict: {overall_verdict} ({pass_count}/{len(items)} Approved)")
     return report
 
@@ -964,7 +962,7 @@ def trigger_b6_handoff(episode_id):
     res = client.run_command(cmd)
     print(f"✅ B6-B10 background task spawned! Exit={res.get('exit_code')}")
     print(f"📄 Log file: {log_file}")
-    
+
     time.sleep(2)
     check_res = client.run_command(f"ps aux | grep continue_after_images | grep {episode_id}")
     print("Running process check:")
@@ -974,10 +972,10 @@ def trigger_b6_handoff(episode_id):
 def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3, force=False, auto_handoff=False):
     """Chạy toàn bộ quy trình sinh ảnh bằng Chrome Web Automation (PNG 100%)."""
     print(f"\n🎬 BẮT ĐẦU GENERATE ẢNH CHO EPISODE: {episode_id} ({len(prompt_items)} items) [CHUẨN 100% PNG]")
-    
+
     local_episode_dir = os.path.join(r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets", episode_id)
     os.makedirs(local_episode_dir, exist_ok=True)
-    
+
     with sync_playwright() as p:
         browser = p.chromium.launch_persistent_context(
             user_data_dir=USER_DATA_DIR,
@@ -987,21 +985,21 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
             no_viewport=True
         )
         page = browser.pages[0] if browser.pages else browser.new_page()
-        
+
         try:
             input_box = check_gemini_session(page)
             if not input_box:
                 print("❌ Dừng pipeline vì chưa có phiên đăng nhập Google Pro.")
                 return False
-                
+
             for idx, item in enumerate(prompt_items, 1):
                 key = item["reuse_key"]
                 prompt = item["prompt"]
                 layer = item.get("layer_type", "Background")
-                
+
                 local_png = os.path.join(local_episode_dir, f"{key}.png")
                 print(f"\n[{idx}/{len(prompt_items)}] Đang xử lý: {key} ({layer})...")
-                
+
                 # Check if local image already exists and passes B5 audit
                 if not force and os.path.exists(local_png) and os.path.getsize(local_png) > 10240:
                     try:
@@ -1011,16 +1009,16 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                             continue
                         else:
                             print(f"⚠️ {key}.png có sẵn nhưng KHÔNG đạt B5 Audit ({metrics.get('notes')}). Tiến hành sinh lại tại chỗ...")
-                    except Exception as e:
+                    except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
                         print(f"⚠️ Kiểm tra file có sẵn lỗi: {e}. Sẽ sinh lại...")
-                
+
                 # IN-PLACE AUDIT & AUTO-REGENERATE LOOP (Max 3 attempts per image)
                 MAX_INPLACE_RETRIES = 3
                 image_passed = False
                 for attempt in range(1, MAX_INPLACE_RETRIES + 1):
                     if attempt > 1:
                         print(f"🔄 [In-Place Retry {attempt}/{MAX_INPLACE_RETRIES}] Sinh lại tại chỗ cho {key}...")
-                    
+
                     try:
                         generate_single_image_png(page, prompt, local_png, layer_type=layer, timeout_sec=120)
                     except Exception as gen_err:
@@ -1057,7 +1055,7 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                         print(f"⚠️ File {key}.png không tồn tại hoặc rỗng sau khi sinh.")
                         if attempt < MAX_INPLACE_RETRIES:
                             time.sleep(3)
-                
+
                 # Local storage only during generation (Atomic Batch Archive at end per Rule 119/125)
                 if image_passed and os.path.exists(local_png):
                     print(f"💾 [Local Cache] Ảnh {key}.png sẵn sàng ({layer}). Sẽ đóng gói nguyên tử gửi VPS sau khi hoàn tất.")
@@ -1072,37 +1070,37 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                             shutil.copy2(local_png, Path(local_episode_dir) / f"{raw_key}.png")
                     except Exception as copy_err:
                         logger.warning(f"Failed to copy composite seeds for {key}: {copy_err}")
-                
+
                 if idx < len(prompt_items):
                     print(f"⏳ Giãn cách {pacing_sec}s giữa các prompt theo Rule 436 (Rate Pacing)...")
                     time.sleep(pacing_sec)
-                
+
             print(f"\n🎉 HOÀN THÀNH TOÀN BỘ {len(prompt_items)} ẢNH PNG CHO EPISODE {episode_id}!")
-            
+
             # B5 Visual Audit (chạy trước để sinh đầy đủ *_audit.json và b5_audit_report.json)
             audit_report = run_b5_audit(episode_id, prompt_items, local_episode_dir)
-            
+
             # Batch Archive Upload nguyên tử lên VPS (Rule 125 & 126)
             try:
                 upload_batch_archive_to_vps(episode_id, prompt_items, local_episode_dir, audit_report)
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
                 print(f"⚠️ Warning: Batch archive upload gặp sự cố ({e}). Assets đơn lẻ đã được đẩy trong vòng lặp.")
-            
+
             # Rule 120/132: Asset storage decoupled - Binary chunks bypass Notion, directly on VPS -> R2 -> GDrive
-            print(f"\n📊 [Storage Decoupled] Bypassing Notion Image Library sync. Assets directly preserved on VPS/Drive.")
-            
+            print("\n📊 [Storage Decoupled] Bypassing Notion Image Library sync. Assets directly preserved on VPS/Drive.")
+
             # B6 Trigger & Marker nếu Technical Audit đạt yêu cầu
             if audit_report.get("overall_verdict") in ("TECH_PASS", "CONDITIONAL_PASS"):
                 create_images_ready_marker(episode_id, len(prompt_items), audit_report.get("approved_count", 0))
                 if auto_handoff:
                     trigger_b6_handoff(episode_id)
                 else:
-                    print(f"\n📌 [Rule 122 Mandate] Toàn bộ assets và audit đã được đồng bộ lên VPS an toàn.")
+                    print("\n📌 [Rule 122 Mandate] Toàn bộ assets và audit đã được đồng bộ lên VPS an toàn.")
                     print(f"📊 Kết quả Technical Audit: {audit_report.get('overall_verdict')} ({audit_report.get('approved_count')}/{len(prompt_items)} Approved).")
-                    print(f"🔔 Đã ghi nhận images_ready.json. Antigravity Agent có thể kiểm tra visual audit bằng view_file trước khi chạy B6 Render Master!")
+                    print("🔔 Đã ghi nhận images_ready.json. Antigravity Agent có thể kiểm tra visual audit bằng view_file trước khi chạy B6 Render Master!")
             else:
                 print(f"\n❌ [B5 Visual Audit FAIL] Chỉ đạt {audit_report.get('approved_count')}/{len(prompt_items)} ảnh. Chưa kích hoạt marker images_ready.json.")
-                
+
             return True
         finally:
             browser.close()
@@ -1119,7 +1117,7 @@ if __name__ == "__main__":
     parser.add_argument("--scenes", type=str, default="", help="Danh sách scenes (SCENE_01,SCENE_04,...)")
     parser.add_argument("--no-auto-handoff", action="store_true", help="Tắt tự động trigger B6 render sau khi xong B4/B5 (mặc định B6 tự động kích hoạt)")
     args = parser.parse_args()
-    
+
     # Auto handoff mặc định bật theo Rule 437 trừ khi truyền --no-auto-handoff
     auto_handoff = not args.no_auto_handoff
 
@@ -1135,12 +1133,12 @@ if __name__ == "__main__":
             print("❌ LỖI (Rule 128): Thiếu tham số --episode <EPISODE_ID>! Bắt buộc truyền ID tường minh, cấm fallback mặc định.")
             parser.print_help()
             sys.exit(1)
-        
+
         # Làm sạch episode_id nếu user paste dạng task:ID hoặc dính dấu ngoặc/nháy
         clean_ep = args.episode.strip().strip("'\"")
         if clean_ep.lower().startswith("task:"):
             clean_ep = clean_ep[5:].strip()
-        
+
         items = fetch_prompts_from_vps(clean_ep)
         if args.scenes:
             target_keys = set(f"composite_{s.strip().upper()}" for s in args.scenes.split(",") if s.strip())

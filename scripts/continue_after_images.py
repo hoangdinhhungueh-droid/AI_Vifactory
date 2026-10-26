@@ -35,15 +35,15 @@ the poller (and a human) can see exactly where the leg is.
 import argparse
 import asyncio
 import json
+import logging
 import os
 import subprocess
-import logging
 import sys
-
-logger = logging.getLogger('continue_after_images')
 import time
 import traceback
 from pathlib import Path
+
+logger = logging.getLogger('continue_after_images')
 
 REPO = "/root/video_factory"
 EPISODES = Path("/var/vf/episodes")
@@ -72,7 +72,7 @@ def _load_env():
 
 
 def _log(msg):
-    print("[%s] %s" % (time.strftime("%Y-%m-%dT%H:%M:%S"), msg), flush=True)
+    logger.info(msg)
 
 
 def _state_path(episode_id):
@@ -286,9 +286,9 @@ def main():
     if is_master_dynamic:
         _log("Master video already rendered and verified dynamic at %s (%.1f MB). Skipping B4-B7 render." %
              (master, master.stat().st_size / 1048576.0))
-        render_ok = True
+        _render_ok = True
     else:
-        render_ok = _run_stage("B4-B7 render (resume_episode)",
+        _render_ok = _run_stage("B4-B7 render (resume_episode)",
                                [sys.executable, "scripts/resume_episode.py",
                                 "--episode-id", episode_id],
                                episode_id, effective_render_timeout,

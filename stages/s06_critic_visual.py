@@ -14,7 +14,6 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List
 
 from core.config import RunContext
 from core.contracts.stages import (
@@ -50,11 +49,8 @@ def run(ctx: RunContext) -> StageArtifact:
     s5_art = require_input(STAGE, ctx.paths)
     scenes = s5_art.payload.get("scenes", [])
 
-    market = (
-        getattr(getattr(ctx, "config", None), "market", None)
-        or getattr(getattr(ctx, "manifest", None), "market", None)
-        or ("JA" if "JP_" in ctx.run_id else ("KO" if "KR_" in ctx.run_id else ("VI" if "VN_" in ctx.run_id else "EN")))
-    )
+    from core.market_resolver import resolve_canonical_market
+    market = resolve_canonical_market(ctx=ctx)
 
     # Resolve canonical episode directory
     canonical_dirs = [

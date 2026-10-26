@@ -11,12 +11,13 @@ import datetime
 import logging
 from pathlib import Path
 from typing import Dict, Literal, Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
+from core.contracts.stages import SCHEMA_VERSION, StageID
 from core.paths import RunPaths
-from core.contracts.stages import StageID, SCHEMA_VERSION
 
 
 class StageState(BaseModel):
@@ -40,14 +41,15 @@ class RunManifest(BaseModel):
     schema_version: str = SCHEMA_VERSION
     profile: str = "prod"
     pipeline_version: str = "2.0.0"
+    market: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
     stages: Dict[StageID, StageState] = Field(default_factory=dict)
 
     @classmethod
-    def create_new(cls, run_id: str, profile: str = "prod") -> RunManifest:
+    def create_new(cls, run_id: str, profile: str = "prod", market: Optional[str] = None) -> RunManifest:
         """Creates a fresh manifest with all 11 stages initialized to 'pending'."""
-        manifest = cls(run_id=run_id, profile=profile)
+        manifest = cls(run_id=run_id, profile=profile, market=market)
         for stage in StageID:
             manifest.stages[stage] = StageState(stage=stage, status="pending")
         return manifest

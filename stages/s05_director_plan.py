@@ -260,7 +260,8 @@ def build_vox_scene_prompts(
     # 7. Sub-Director Plan & Causal Compound Verb Prompts (Rule 140 v3)
     try:
         from app.services.kinetic_sub_director import build_kinetic_causal_i2v_prompt, generate_scene_sub_director_plan
-        resolved_market = market or getattr(scene, "market", None) or "EN"
+        from core.market_resolver import resolve_canonical_market
+        resolved_market = resolve_canonical_market(market_raw=market or getattr(scene, "market", None))
         sub_plan = generate_scene_sub_director_plan(
             scene_id=getattr(scene, "scene_id", f"SCENE_{idx+1:02d}"),
             sentence=getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or headline,
@@ -324,6 +325,7 @@ def build_universal_video_prompt(scene: Scene) -> str:
         return scene.i2v_prompt_google_flow
     try:
         from app.services.kinetic_sub_director import build_kinetic_causal_i2v_prompt, generate_scene_sub_director_plan
+        from core.market_resolver import resolve_canonical_market
         sentence_str = getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or getattr(scene, "narration", "") or getattr(scene, "headline", "")
         raw_dur = getattr(scene, "duration_est_sec", None)
         sub_plan = generate_scene_sub_director_plan(
@@ -332,7 +334,7 @@ def build_universal_video_prompt(scene: Scene) -> str:
             hero_cutout_object=getattr(scene, "visual_metaphor", "") or getattr(scene, "hero_cutout_object", ""),
             interacting_objects=["tactile measurement tool", "crimson verification seal"],
             duration_sec=float(raw_dur) if raw_dur else None,
-            market=getattr(scene, "market", "EN") or "EN",
+            market=resolve_canonical_market(market_raw=getattr(scene, "market", None) or "EN"),
             whisper_words=getattr(scene, "whisper_words", None),
             bounding_box=getattr(scene, "bounding_box", None) or getattr(scene, "focal_region", None),
             object_roles=getattr(scene, "object_roles", None)
@@ -813,15 +815,13 @@ def run(ctx: RunContext) -> StageArtifact:
     prev_scene: Optional[Scene] = None
 
     # Dynamic Master Prompt 2 Vox Storyboard via Claude Sonnet 5.5 / Fallback GPT-6.1-Sol
-    market = (
-        getattr(getattr(ctx, "config", None), "market", None)
-        or getattr(getattr(ctx, "manifest", None), "market", None)
-        or ("JA" if "JP_" in ctx.run_id else ("KO" if "KR_" in ctx.run_id else ("VI" if "VN_" in ctx.run_id else "EN")))
-    )
+    from core.market_resolver import resolve_canonical_market
+    market = resolve_canonical_market(ctx=ctx)
     sentences = [sc_dict.get("narration", "") for sc_dict in raw_scenes if isinstance(sc_dict, dict) and sc_dict.get("narration")]
     story_text = "\n".join(sentences)
 
     planned_storyboard = []
+    director_status = "ok"
     try:
         from app.services.claude_vox_director import ClaudeVoxDirector
         director = ClaudeVoxDirector()
@@ -832,6 +832,7 @@ def run(ctx: RunContext) -> StageArtifact:
         )
     except Exception as dir_err:
         logger.warning(f"[s05_director_plan] ClaudeVoxDirector notice: {dir_err}")
+        director_status = "degraded"
 
     for idx, sc_dict in enumerate(raw_scenes):
         scene = Scene.model_validate(sc_dict)
@@ -851,6 +852,38 @@ def run(ctx: RunContext) -> StageArtifact:
                 scene.hero_cutout_object = item["main_subject_cutout"]["label"]
             if item.get("supporting_exhibits"):
                 scene.interacting_objects = [ex.get("label") for ex in item["supporting_exhibits"] if ex.get("label")]
+
+        # Populate BoundingBox & Object Roles for Kinematic Targeting (Rule 128, 132)
+        if not scene.bounding_box:
+            from core.contracts.stages import BoundingBox
+            if planned_storyboard and idx < len(planned_storyboard) and planned_storyboard[idx].get("main_subject_cutout", {}).get("bounding_box"):
+                bbox_raw = planned_storyboard[idx]["main_subject_cutout"]["bounding_box"]
+                scene.bounding_box = BoundingBox.model_validate(bbox_raw)
+            else:
+                scene.bounding_box = BoundingBox(x_min=58.0, x_max=84.0, y_min=38.0, y_max=68.0)
+
+        # Check if whisper alignment exists in audio_dir or root
+        if not scene.whisper_words:
+            from core.contracts.stages import WhisperWord
+            whisper_path = ctx.paths.audio_dir / "whisper_segments.json"
+            if not whisper_path.exists():
+                whisper_path = ctx.paths.root / "whisper_segments.json"
+            if whisper_path.exists():
+                try:
+                    with open(whisper_path, "r", encoding="utf-8") as wf:
+                        w_data = json.load(wf)
+                        for seg in (w_data if isinstance(w_data, list) else w_data.get("segments", [])):
+                            if seg.get("scene_id") == scene.scene_id or seg.get("beat_index") == idx:
+                                scene.whisper_words = [WhisperWord.model_validate(w) for w in seg.get("words", [])]
+                                break
+                except (OSError, json.JSONDecodeError, ValueError) as _w_err:
+                    logger.debug(f"[s05] Could not load whisper_segments: {_w_err}")
+
+        scene.object_roles = {
+            f"o{idx+1}_1": "primary_anchor",
+            f"o{idx+1}_2": "interactive_tool",
+            f"o{idx+1}_3": "backdrop"
+        }
 
         # Decompose into full Vox Object-Assembly Kinematics
         vox_meta = build_vox_scene_prompts(scene, idx=idx, total_scenes=total_sc, prev_scene=prev_scene, market=market)
@@ -904,6 +937,7 @@ def run(ctx: RunContext) -> StageArtifact:
         "runtime_seconds": round(total_runtime, 2),
         "total_scenes": len(scenes),
         "total_sequence_blocks": len(chunks),
+        "director_status": director_status,
         "account_slots_used": acc_pool,
         "source": {
             "b2_path": b2_source_path,
@@ -983,8 +1017,6 @@ def run(ctx: RunContext) -> StageArtifact:
                 }
                 pf_file = ep_dir / "prompts_forge.json"
                 with open(pf_file, "w", encoding="utf-8") as f:
-                    json.dump(prompts_manifest, f, indent=2, ensure_ascii=False)
-                with open(ep_dir / "prompts.json", "w", encoding="utf-8") as f:
                     json.dump(prompts_manifest, f, indent=2, ensure_ascii=False)
                 logger.info(f"[s05_director_plan] Synchronized prompts_forge.json to {pf_file}")
             except Exception as _sync_err:

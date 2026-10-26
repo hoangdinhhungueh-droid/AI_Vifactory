@@ -8,9 +8,9 @@ Eliminates scattered os.getenv calls across stage modules.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import List, Literal, Optional
+
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -56,6 +56,7 @@ class PipelineConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     pipeline_version: str = "2.0.0"
+    market: Optional[str] = "EN"
     limits: LimitsConfig
     video_generation: VideoGenConfig
     voice: VoiceConfig

@@ -1,5 +1,5 @@
 {
-  "schema_version": "kinetic_layout_presets.v1",
+  "schema_version": "kinetic_layout_presets.v2",
   "layouts": {
     "center_right": {
       "initial_pos": "(X:52%, Y:42%)",
@@ -26,12 +26,34 @@
       "description": "Vertical Center Alignment Focus with vertical vector reveal"
     }
   },
+  "spatial_keywords": {
+    "vertical": [
+      "vertical",
+      "column",
+      "timeline",
+      "stamp",
+      "seal",
+      "knife",
+      "shears",
+      "top_down",
+      "drop"
+    ],
+    "center_left": [
+      "left",
+      "source",
+      "origin",
+      "counterpart",
+      "audit",
+      "input",
+      "baseline"
+    ]
+  },
   "prose_templates": {
     "K1": {
       "H2_CONSTRAINT": {
         "action_verb": "snaps in a high-velocity 0.4s slide from initial coordinate {initial_pos} and locks jaws shut precisely onto target coordinate {target_contact_pos} of",
         "contact_point": "critical data row at {target_contact_pos}",
-        "physical_reaction": "vernier scale aligns precisely with grid ticks, locking coordinate measurement into an instant mechanical dead stop at 1.0s, holding completely still",
+        "physical_reaction": "vernier scale aligns precisely with grid ticks, locking coordinate measurement into an instant mechanical dead stop at {k1_dead_stop}, holding completely still",
         "secondary_reaction": {
           "object": "desk_surface",
           "reaction": "subtle mechanical micro-vibration"
@@ -41,7 +63,7 @@
       "H1_IMPACT": {
         "action_verb": "strikes down in a rapid 2-frame snap onto coordinate {target_contact_pos} of",
         "contact_point": "header verification zone at {target_contact_pos}",
-        "physical_reaction": "crisp crimson stamp imprint locks onto newsprint with sharp vector borders, stopping dead in place at 1.0s",
+        "physical_reaction": "crisp crimson stamp imprint locks onto newsprint with sharp vector borders, stopping dead in place at {k1_dead_stop}",
         "secondary_reaction": {
           "object": "desk_surface",
           "reaction": "adjacent paper cutouts settle in 1 frame"
@@ -51,7 +73,7 @@
       "H3_SEVER": {
         "action_verb": "slices across coordinate line ({initial_pos} to {target_contact_pos}) in a swift 0.4s cut of",
         "contact_point": "perforated margin coordinate {target_contact_pos}",
-        "physical_reaction": "clean {vector_reveal_direction} mask separation cleanly reveals the underlying archival graphic layer, stopping dead at {target_contact_pos} at 1.0s",
+        "physical_reaction": "clean {vector_reveal_direction} mask separation cleanly reveals the underlying archival graphic layer, stopping dead at {target_contact_pos} at {k1_dead_stop}",
         "secondary_reaction": {
           "object": "obj_anchor",
           "reaction": "exposes lower archival layer"
@@ -61,7 +83,11 @@
       "DEFAULT": {
         "action_verb": "snaps rigidly into position on coordinate {target_contact_pos} in a fast 0.4s step of",
         "contact_point": "center focal area at {target_contact_pos}",
-        "physical_reaction": "graphic layout locks firmly into alignment grid with zero drift at 1.0s",
+        "physical_reaction": "graphic layout locks firmly into alignment grid with zero drift at {k1_dead_stop}",
+        "secondary_reaction": {
+          "object": "desk_surface",
+          "reaction": "settles into resting position"
+        },
         "residue": "clear mechanical indentation"
       }
     },
@@ -69,19 +95,19 @@
       "H6_MARK": {
         "action_verb": "originates directly from contact coordinate {target_contact_pos}, wiping in a rapid 0.4s {vector_reveal_direction} vector reveal across coordinate bounds {bounding_box_bounds} of",
         "contact_point": "highlighted anomaly coordinate {bounding_box_bounds}",
-        "physical_reaction": "neon yellow highlight box illuminates key typography with crisp editorial contrast, locking dead still at 1.6s",
+        "physical_reaction": "neon yellow highlight box illuminates key typography with crisp editorial contrast, locking dead still at {k2_dead_stop}",
         "residue": "striking translucent yellow neon stripe"
       },
       "H4_TETHER": {
         "action_verb": "originates from contact coordinate {target_contact_pos}, snapping a straight dashed vector thread in 0.4s connecting directly to anchor pin at {dock_pin_pos} of",
         "contact_point": "caliper anchor pin at {dock_pin_pos}",
-        "physical_reaction": "crimson evidence vector line snaps between pin coordinates, locking forensic link into a single unified cluster at 1.6s",
+        "physical_reaction": "crimson evidence vector line snaps between pin coordinates, locking forensic link into a single unified cluster at {k2_dead_stop}",
         "residue": "taut red evidence vector linking data to source"
       },
       "DEFAULT": {
         "action_verb": "docks flush against the hero tool base at coordinate {dock_pin_pos} in a rapid 0.5s snap, while contact coordinate {target_contact_pos} triggers a sharp dashed bounding box {bounding_box_bounds} in an instant 2-frame pop on",
         "contact_point": "hero tool anchor pin at {dock_pin_pos}",
-        "physical_reaction": "sharp dashed bounding box snaps around target data, locking all objects into a single unified physical cluster with a complete dead-stop freeze from 1.6s",
+        "physical_reaction": "sharp dashed bounding box snaps around target data, locking all objects into a single unified physical cluster with a complete dead-stop freeze from {k2_dead_stop}",
         "residue": "permanent forensic framing box"
       }
     }

@@ -9,10 +9,11 @@ Standardizes the single canonical vocabulary: Scene (narrative) ⊃ Shot (genera
 from __future__ import annotations
 
 import datetime
+import math
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, Dict, List, Literal, Optional
 
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SCHEMA_VERSION = "1.0.0"
 
@@ -48,6 +49,44 @@ class Provenance(BaseModel):
 # CANONICAL GENERATION OBJECTS
 # ==============================================================================
 
+class WhisperWord(BaseModel):
+    """Word-level Whisper timestamp contract with strict validation (Rule 120, 135)."""
+    model_config = ConfigDict(extra="ignore")
+
+    word: str
+    start: float = Field(ge=0.0, description="Word start timestamp in seconds")
+    end: float = Field(ge=0.0, description="Word end timestamp in seconds")
+    probability: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def validate_monotonic_word(self) -> "WhisperWord":
+        if math.isnan(self.start) or math.isnan(self.end) or math.isinf(self.start) or math.isinf(self.end):
+            raise ValueError("WhisperWord timestamps cannot be NaN or Inf")
+        if self.end < self.start:
+            raise ValueError(f"WhisperWord end ({self.end}) cannot precede start ({self.start})")
+        return self
+
+
+class BoundingBox(BaseModel):
+    """Spatial 2D bounding box percentage coordinates (0.0 to 100.0) for kinematic targeting (Rule 128, 132)."""
+    model_config = ConfigDict(extra="ignore")
+
+    x_min: float = Field(ge=0.0, le=100.0)
+    x_max: float = Field(ge=0.0, le=100.0)
+    y_min: float = Field(ge=0.0, le=100.0)
+    y_max: float = Field(ge=0.0, le=100.0)
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> "BoundingBox":
+        if math.isnan(self.x_min) or math.isnan(self.x_max) or math.isnan(self.y_min) or math.isnan(self.y_max):
+            raise ValueError("BoundingBox coordinates cannot be NaN")
+        if self.x_max <= self.x_min:
+            raise ValueError(f"x_max ({self.x_max}) must be strictly greater than x_min ({self.x_min})")
+        if self.y_max <= self.y_min:
+            raise ValueError(f"y_max ({self.y_max}) must be strictly greater than y_min ({self.y_min})")
+        return self
+
+
 class Shot(BaseModel):
     """Atomic video generation unit passed to Google Flow (I2V / T2V)."""
     model_config = ConfigDict(extra="forbid")
@@ -76,6 +115,7 @@ class Scene(BaseModel):
     sequence_block: str = Field(default="BLOCK_DEFAULT", description="e.g. block_1_act_i")
     beat_role: Literal["hook", "context", "tension", "reveal", "payoff", "outro"] = "context"
     narration: str = Field(description="Final voiceover narration text")
+    market: str = Field(default="EN", description="Canonical market code: EN, JA, KR, VN (Rule 128, 134)")
     core_idea: Optional[str] = None
     headline: Optional[str] = Field(default=None, description="1-4 word editorial headline")
     visual_metaphor: Optional[str] = None
@@ -101,8 +141,8 @@ class Scene(BaseModel):
     objects_roster: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     headline_typography: Optional[Dict[str, Any]] = None
     audio_foley_cues: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
-    whisper_words: Optional[List[Dict[str, Any]]] = Field(default=None, description="Whisper word-level timestamps (Rule 120)")
-    bounding_box: Optional[Dict[str, Any]] = Field(default=None, description="Spatial bounding box for kinematic targeting")
+    whisper_words: Optional[List[WhisperWord]] = Field(default=None, description="Whisper word-level timestamps (Rule 120)")
+    bounding_box: Optional[BoundingBox] = Field(default=None, description="Spatial bounding box for kinematic targeting")
     object_roles: Optional[Dict[str, str]] = Field(default=None, description="Mapping of object IDs to semantic roles")
 
 

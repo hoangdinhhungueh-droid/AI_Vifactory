@@ -43,7 +43,9 @@ def validate_video_motion_temporal_delta(video_path: Path, min_delta: float = 0.
         raise FileNotFoundError(f"Video clip does not exist or is too small (<1KB): {video_path}")
 
     import tempfile
+
     from PIL import Image, ImageChops, ImageStat
+
     from vox.ffmpeg_utils import get_ffmpeg_binary
 
     ffmpeg_bin = get_ffmpeg_binary()

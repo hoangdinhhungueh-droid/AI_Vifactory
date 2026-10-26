@@ -14,12 +14,12 @@ import pytest
 from app.services.kinetic_sub_director import (
     KineticFamily,
     SemanticClauseMapper,
+    _is_cjk_char,
+    _match_keyword,
     build_kinetic_causal_i2v_prompt,
     compute_kinetic_spatial_layout,
     estimate_speech_duration,
     generate_scene_sub_director_plan,
-    _is_cjk_char,
-    _match_keyword,
 )
 
 
@@ -153,9 +153,9 @@ def test_dynamic_pacing_timeline_flexibility():
     assert plan_short["scene_duration_sec"] == 3.2
     assert plan_short["calculated_beat_count"] == 4
     beats_short = plan_short["dynamic_micro_beats"]
-    assert beats_short[-1]["time_window"].endswith("3.2s")
+    assert beats_short[-1]["time_window"].endswith("3.200s")
     prompt_short = build_kinetic_causal_i2v_prompt(plan_short)
-    assert "3.2s:" in prompt_short
+    assert "3.200s:" in prompt_short
 
     # 2. Phân cảnh dài (9.5s) với câu phức -> Nở 6-7 bước, kết thúc đúng 9.5s
     plan_long = generate_scene_sub_director_plan(
@@ -169,9 +169,9 @@ def test_dynamic_pacing_timeline_flexibility():
     assert plan_long["scene_duration_sec"] == 9.5
     assert plan_long["calculated_beat_count"] >= 5
     beats_long = plan_long["dynamic_micro_beats"]
-    assert beats_long[-1]["time_window"].endswith("9.5s")
+    assert beats_long[-1]["time_window"].endswith("9.500s")
     prompt_long = build_kinetic_causal_i2v_prompt(plan_long)
-    assert "9.5s:" in prompt_long
+    assert "9.500s:" in prompt_long
 
     # 3. Phân cảnh không truyền duration_sec -> Tự động suy ra từ độ dài câu thoại
     plan_auto = generate_scene_sub_director_plan(
@@ -243,7 +243,7 @@ def test_has_metrics_predicate_positives_and_negatives():
     assert SemanticClauseMapper.has_metrics("500 usd") is True
     assert SemanticClauseMapper.has_metrics("10 won") is True
 
-    # 2. Negatives (Bắt buộc False - Trailing non-letter guard)
+    # 2. Negatives (Bắt buộc False - Trailing Unicode non-letter guard & structural exclusions)
     assert SemanticClauseMapper.has_metrics("3 minutes") is False
     assert SemanticClauseMapper.has_metrics("The meeting lasted 3 minutes.") is False
     assert SemanticClauseMapper.has_metrics("2 key points") is False
@@ -256,6 +256,25 @@ def test_has_metrics_predicate_positives_and_negatives():
     assert SemanticClauseMapper.has_metrics("Only 1 member attended the session.") is False
     assert SemanticClauseMapper.has_metrics("Step 1 was executed without anomalies.") is False
     assert SemanticClauseMapper.has_metrics("Narrative text with zero metrics.") is False
+
+    # Vietnamese-market negative cases with trailing Unicode-letter diacritics
+    assert SemanticClauseMapper.has_metrics("Chúng tôi thực hiện 5 bước kiểm tra.") is False
+    assert SemanticClauseMapper.has_metrics("5 bước") is False
+    assert SemanticClauseMapper.has_metrics("Có 3 mẹo để tối ưu hóa.") is False
+    assert SemanticClauseMapper.has_metrics("3 mẹo") is False
+    assert SemanticClauseMapper.has_metrics("Chính phủ công bố 2 kế hoạch ứng phó.") is False
+    assert SemanticClauseMapper.has_metrics("2 kế hoạch") is False
+
+    # Korean-market negative cases
+    assert SemanticClauseMapper.has_metrics("5 단계 절차를 따릅니다.") is False
+    assert SemanticClauseMapper.has_metrics("5 단계") is False
+    assert SemanticClauseMapper.has_metrics("3 가지 핵심 요소를 분석했습니다.") is False
+    assert SemanticClauseMapper.has_metrics("3 가지") is False
+
+    # Structural sequence & year identifiers (documented decision on bare \d{2,})
+    assert SemanticClauseMapper.has_metrics("Step 10") is False
+    assert SemanticClauseMapper.has_metrics("Episode 02") is False
+    assert SemanticClauseMapper.has_metrics("Year 1999") is False
 
 
 def test_has_metrics_cross_market_comprehensive():
@@ -302,8 +321,10 @@ def test_whisper_word_timestamps_validation_and_no_clamp():
     """Kiểm tra tích hợp Whisper word-level timestamps (Rule 120, 135): fail-closed & không kẹp 10.0s."""
     # 1. Đo lường chính xác không bị kẹp 10s đối với câu thoại dài thực tế 12.8s
     valid_words = [
-        {"word": "In", "start": 0.2, "end": 0.5},
-        {"word": "conclusion", "start": 12.0, "end": 13.0}
+        {"word": "In", "start": 0.200, "end": 0.500},
+        {"word": "a", "start": 0.500, "end": 1.000},
+        {"word": "final", "start": 1.000, "end": 2.000},
+        {"word": "conclusion", "start": 12.000, "end": 13.000}
     ]
     plan = generate_scene_sub_director_plan(
         scene_id="SC_WHISPER_LONG",
@@ -387,14 +408,14 @@ def test_whisper_word_timestamps_validation_and_no_clamp():
 
 
 def test_whisper_drives_per_micro_beat_time_windows():
-    """Kiểm tra Whisper word timestamps phân rã chính xác các time window từng micro-beat và không bị kẹp 1.5s (Boss Item 17)."""
+    """Kiểm tra Whisper word timestamps phân rã chính xác các time window từng micro-beat với độ chính xác mili-giây (Boss Round 4 Item 4)."""
     words = [
-        {"word": "Step", "start": 0.0, "end": 0.2},
-        {"word": "one", "start": 0.2, "end": 0.4},
-        {"word": "begins", "start": 0.4, "end": 0.6},
-        {"word": "now", "start": 0.6, "end": 0.8}
+        {"word": "Step", "start": 0.000, "end": 0.200},
+        {"word": "one", "start": 0.200, "end": 0.400},
+        {"word": "begins", "start": 0.400, "end": 0.600},
+        {"word": "now", "start": 0.600, "end": 0.800}
     ]
-    # Measured duration is 0.8s (without artificial 1.5s clamp)
+    # Measured duration is 0.800s (without artificial 1.5s clamp)
     plan = generate_scene_sub_director_plan(
         scene_id="SC_WHISPER_BEATS",
         sentence="Step one begins now.",
@@ -402,12 +423,18 @@ def test_whisper_drives_per_micro_beat_time_windows():
         interacting_objects=["Vernier caliper", "Thread"],
         whisper_words=words
     )
-    assert plan["scene_duration_sec"] == 0.8
+    assert plan["scene_duration_sec"] == 0.800
     beats = plan["dynamic_micro_beats"]
     assert len(beats) == 4
-    # Time windows are derived directly from the word sequence
-    assert beats[0]["vo_keyword"] is not None
-    assert beats[-1]["time_window"].endswith("0.8s")
+    # Assert every beat's EXACT start and end with millisecond precision
+    assert beats[0]["time_window"] == "0.000s - 0.200s"
+    assert beats[1]["time_window"] == "0.200s - 0.400s"
+    assert beats[2]["time_window"] == "0.400s - 0.600s"
+    assert beats[3]["time_window"] == "0.600s - 0.800s"
+    assert beats[0]["vo_keyword"] == "Step"
+    assert beats[1]["vo_keyword"] == "one"
+    assert beats[2]["vo_keyword"] == "begins"
+    assert beats[3]["vo_keyword"] == "now"
 
 
 def test_compute_kinetic_spatial_layout_empty_scene_id_fails_closed():
@@ -474,3 +501,131 @@ def test_match_keyword_word_boundaries():
     # 2. CJK: Khớp chuỗi không cần khoảng trắng
     assert _match_keyword("ハイライト", "重要項目をハイライトする。") is True
     assert _match_keyword("警告", "異常事態の警告を発令した。") is True
+
+
+def test_whisper_clause_aligned_windows_uneven_word_counts():
+    """Kiểm tra Whisper windowing với số lượng từ không đều (7 từ chia cho 4 beats), đảm bảo liền mạch, không chồng lấn (Boss Round 4 Item 4)."""
+    words = [
+        {"word": "When", "start": 0.000, "end": 0.300},
+        {"word": "the", "start": 0.300, "end": 0.500},
+        {"word": "regulator", "start": 0.500, "end": 1.200},
+        {"word": "clamped", "start": 1.200, "end": 1.700},
+        {"word": "down,", "start": 1.700, "end": 2.100},
+        {"word": "all", "start": 2.100, "end": 2.500},
+        {"word": "froze.", "start": 2.500, "end": 3.000},
+    ]
+    plan = generate_scene_sub_director_plan(
+        scene_id="SC_UNEVEN_WORDS",
+        sentence="When the regulator clamped down, all froze.",
+        hero_cutout_object="Regulator card",
+        interacting_objects=["Caliper", "Thread"],
+        whisper_words=words
+    )
+    assert plan["scene_duration_sec"] == 3.000
+    beats = plan["dynamic_micro_beats"]
+    assert len(beats) == 4
+
+    # Phải bắt đầu đúng 0.000s và kết thúc đúng 3.000s
+    assert beats[0]["time_window"].startswith("0.000s")
+    assert beats[-1]["time_window"].endswith("3.000s")
+
+    # Kiểm tra tính liên tục và không chồng lấn giữa các beat
+    import re
+    windows = []
+    for b in beats:
+        m = re.match(r"(\d+\.\d+)s\s*-\s*(\d+\.\d+)s", b["time_window"])
+        assert m, f"Invalid time window format: {b['time_window']}"
+        s_val, e_val = float(m.group(1)), float(m.group(2))
+        assert s_val < e_val, f"Beat start must precede end: {b['time_window']}"
+        windows.append((s_val, e_val))
+
+    for idx in range(1, len(windows)):
+        assert abs(windows[idx][0] - windows[idx-1][1]) < 1e-4, \
+            f"Beat {idx} start ({windows[idx][0]}) must equal Beat {idx-1} end ({windows[idx-1][1]})"
+
+
+def test_center_left_layout_from_bounding_box_and_roles():
+    """Kiểm tra chọn layout center_left từ bounding box (x_c < 50) và object roles (Boss Round 4 Item 3, Item 5)."""
+    # 1. Bbox nằm ở nửa trái khung hình (x_c = 28 < 50, x_span = 35 > y_span = 20)
+    bbox_left = {"x_min": 10.0, "x_max": 45.0, "y_min": 35.0, "y_max": 55.0}
+    layout_bbox = compute_kinetic_spatial_layout("SC_LEFT_BBOX", bounding_box=bbox_left)
+    assert layout_bbox.layout_type == "center_left"
+    assert layout_bbox.target_contact_pos == "(X:28%, Y:45%)"
+    assert layout_bbox.vector_reveal_direction == "horizontal"
+
+    # initial_pos và dock_pin_pos bắt buộc nằm ngoài bounding box [10-45, 35-55]
+    import re
+    m_init = re.search(r"\(X:(\d+)%,\s*Y:(\d+)%\)", layout_bbox.initial_pos)
+    assert m_init
+    init_x, init_y = int(m_init.group(1)), int(m_init.group(2))
+    assert not (10 <= init_x <= 45 and 35 <= init_y <= 55), f"initial_pos {layout_bbox.initial_pos} inside bbox!"
+
+    m_dock = re.search(r"\(X:(\d+)%,\s*Y:(\d+)%\)", layout_bbox.dock_pin_pos)
+    assert m_dock
+    dock_x, dock_y = int(m_dock.group(1)), int(m_dock.group(2))
+    assert not (10 <= dock_x <= 45 and 35 <= dock_y <= 55), f"dock_pin_pos {layout_bbox.dock_pin_pos} inside bbox!"
+
+    # 2. Suy diễn từ object roles chứa 'baseline' / 'counterpart'
+    layout_role = compute_kinetic_spatial_layout(
+        "SC_ROLE_LEFT",
+        object_roles={"primary_tool": "audit counterpart verification", "ledger": "baseline input"}
+    )
+    assert layout_role.layout_type == "center_left"
+
+
+def test_invalid_and_inverted_bounding_box_fails_closed():
+    """Kiểm tra fail-closed khi bounding box đảo ngược, phi số hoặc ngoài phạm vi (Boss Round 4 Item 3, Item 5)."""
+    # 1. Inverted x coordinates (x_max <= x_min)
+    with pytest.raises(ValueError, match="must be strictly greater than x_min"):
+        compute_kinetic_spatial_layout("SC_INV_X", bounding_box={"x_min": 80, "x_max": 20, "y_min": 30, "y_max": 60})
+
+    # 2. Inverted y coordinates (y_max <= y_min)
+    with pytest.raises(ValueError, match="must be strictly greater than y_min"):
+        compute_kinetic_spatial_layout("SC_INV_Y", bounding_box={"x_min": 20, "x_max": 80, "y_min": 70, "y_max": 30})
+
+    # 3. NaN coordinates
+    with pytest.raises(ValueError, match="cannot be NaN or Inf"):
+        compute_kinetic_spatial_layout("SC_NAN", bounding_box={"x_min": float("nan"), "x_max": 80, "y_min": 20, "y_max": 60})
+
+    # 4. Out of range coordinates
+    with pytest.raises(ValueError, match="percentage range"):
+        compute_kinetic_spatial_layout("SC_OOR", bounding_box={"x_min": -5, "x_max": 80, "y_min": 20, "y_max": 60})
+
+
+def test_substring_false_triggers_prevented():
+    """Kiểm tra loại bỏ hoàn toàn substring false triggers ('timestamp', 'dropdown', 'leftover') (Boss Round 4 Item 3, Item 5)."""
+    # Không để 'stamp' kích hoạt trong 'timestamp'
+    # Không để 'drop' kích hoạt trong 'dropdown'
+    # Không để 'left' kích hoạt trong 'leftover'
+    layout = compute_kinetic_spatial_layout(
+        scene_id="SC_CLEAN_SUBSTRING",
+        hero_cutout_object="an archived timestamp dropdown menu leftover on desk",
+        interacting_objects=["generic pointer"]
+    )
+    # Vì các từ khóa trên không khớp word boundary, layout mặc định chuẩn là center_right
+    assert layout.layout_type == "center_right"
+
+
+def test_missing_and_invalid_presets_config_fails_closed():
+    """Kiểm tra _load_kinetic_presets fail-closed khi config bị thiếu hoặc lỗi (Boss Round 4 Item 2, Item 5)."""
+    from app.services.kinetic_sub_director import _load_kinetic_presets
+
+    with pytest.raises(FileNotFoundError, match="missing at"):
+        _load_kinetic_presets("non_existent_presets_file_12345.json")
+
+
+def test_whisper_fail_closed_when_words_fewer_than_four():
+    """Kiểm tra fail-closed khi whisper_words có ít hơn 4 từ (Boss Round 4 Item 4)."""
+    too_few_words = [
+        {"word": "Only", "start": 0.0, "end": 0.3},
+        {"word": "two", "start": 0.3, "end": 0.6}
+    ]
+    with pytest.raises(ValueError, match="less than required micro-beat count"):
+        generate_scene_sub_director_plan(
+            scene_id="SC_TOO_FEW_WORDS",
+            sentence="Only two words.",
+            hero_cutout_object="Doc",
+            interacting_objects=["Tool"],
+            whisper_words=too_few_words
+        )
+
