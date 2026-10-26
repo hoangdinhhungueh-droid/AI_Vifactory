@@ -113,7 +113,7 @@ Hãy tiến hành một phiên mổ xẻ chuyên sâu, trung thực, không bao 
     opus_resp = gw.call_llm(
         prompt=opus_prompt,
         model="claude-opus-5-5",
-        fallback="claude-3-5-sonnet",
+        fallback="claude-sonnet-5-5",
         max_tokens=3500,
         temperature=0.3,
         timeout=180.0
@@ -146,7 +146,7 @@ Nhiệm vụ của bạn: ĐỐI CHẤT THẲNG THẮN với Claude Opus 5.5, b�
     astra_resp = gw.call_llm(
         prompt=astra_prompt,
         model="gpt-6-astra",
-        fallback="gpt-4o",
+        fallback="gpt-6.1-sol",
         max_tokens=3500,
         temperature=0.2,
         timeout=180.0

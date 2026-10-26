@@ -132,7 +132,7 @@ def evaluate_with_council(contact_sheet_path: Path, episode_id: str) -> dict:
         image_base64=img_b64,
         model="claude-opus-5-5",
         system_prompt="You are Senior Film Director Claude Opus 5.5 conducting visual audit of video pilot.",
-        fallback="claude-3-5-sonnet-20241022"
+        fallback="claude-sonnet-5-5"
     )
     
     print("🧠 [Hội Đồng Thị Giác] Đang chất vấn GPT-6-Astra...")
@@ -141,7 +141,7 @@ def evaluate_with_council(contact_sheet_path: Path, episode_id: str) -> dict:
         image_base64=img_b64,
         model="gpt-6-astra",
         system_prompt="You are Cinematography & Physics Supervisor GPT-6-Astra conducting visual audit of video pilot.",
-        fallback="gpt-4o"
+        fallback="gpt-6.1-sol"
     )
     
     # Parse responses

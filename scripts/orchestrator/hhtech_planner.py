@@ -8,7 +8,7 @@ Serves as the Strategic Planning Brain (Phase 0: /plan + /grill-me) for:
 
 Key Capabilities:
   1. Primary Model: claude-opus-5-5 via HHTech API (https://hhtechapi.com/v1)
-  2. Multi-tier Fallback: claude-sonnet-5 -> claude-3-5-sonnet-20241022
+  2. Multi-tier Fallback: claude-sonnet-5-5 -> claude-sonnet-5 -> kimi-k3
   3. Hybrid Execution: Direct API call if key available locally/VPS, or auto-route via VPS runner from Windows
   4. 4 Mandatory Technical Pillars Enforced:
      - CI/CD Quality Gates
@@ -31,7 +31,7 @@ logger = logging.getLogger("hhtech_planner")
 
 DEFAULT_HHTECH_URL = os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1")
 DEFAULT_PLANNER_MODEL = os.getenv("HHTECH_PLANNER_MODEL", "gpt-6.1-sol")
-FALLBACK_MODELS = ["claude-sonnet-5", "claude-3-5-sonnet-20241022"]
+FALLBACK_MODELS = ["claude-sonnet-5-5", "claude-sonnet-5", "kimi-k3"]
 
 FOUR_PILLARS_PROMPT = """
 You are the Principal Solution Architect & Master Strategic Planner.

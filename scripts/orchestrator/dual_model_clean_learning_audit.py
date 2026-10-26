@@ -84,7 +84,7 @@ Format your response in structured Markdown with clear headings."""
         opus_response = gw.call_llm(
             prompt=opus_prompt,
             model="claude-opus-5-5",
-            fallback="claude-3-5-sonnet",
+            fallback="claude-sonnet-5-5",
             max_tokens=3000,
             temperature=0.3
         )

@@ -11,6 +11,7 @@ import pytest
 
 from app.services.model_gateway import (
     AllProvidersFailed,
+    ModelGatewayError,
     ModelGateway,
     TokenBudgetExceeded,
     _get_max_absolute_input_ceiling,
@@ -465,3 +466,33 @@ def test_call_llm_fallback_budget_gating_exercised():
             os.environ.pop("HHTECH_MAX_ABSOLUTE_INPUT_CEILING", None)
 
 
+
+def test_model_alias_resolution_and_fallback_resilience():
+    """Validates that legacy model aliases and 24/7 drone models resolve safely (Rule 125 & Rule 134)."""
+    gw = ModelGateway()
+    # 1. Alias mappings resolve to canonical supported models
+    assert gw.resolve_model_name("claude-3-5-sonnet-20241022") == "claude-3.5-sonnet"
+    assert gw.resolve_model_name("claude-3-5-sonnet") == "claude-3.5-sonnet"
+    assert gw.resolve_model_name("gpt-4o") == "gpt-6.1-sol"
+    assert gw.resolve_model_name("gpt-5.5") == "gpt-6.1-sol"
+
+    # 2. Context windows and rates are accessible without raising UnsupportedModel
+    alias_models = [
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-sonnet",
+        "claude-haiku-4.5",
+        "gpt-4o",
+        "gpt-5.5",
+        "claude-v4.1-flash",
+        "claude-6-luna",
+    ]
+    for model_name in alias_models:
+        ctx = gw.get_context_window(model_name)
+        assert ctx >= 128000
+        rate = gw.get_model_token_rate(model_name)
+        assert rate > 0
+
+    # 3. Completely unknown models must fail closed
+    with pytest.raises(ModelGatewayError) as exc_info:
+        gw.get_context_window("completely_unknown_rogue_model")
+    assert "Unsupported model 'completely_unknown_rogue_model'" in str(exc_info.value)

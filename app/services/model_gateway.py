@@ -80,13 +80,28 @@ class ModelGateway:
         "gpt-6-astra": 128000,
         "gpt-5-sol": 128000,
         "kimi-k3": 200000,
+        "claude-v4.1-flash": 128000,
+        "claude-6-luna": 128000,
+        "claude-haiku-4.5": 200000,
     }
+
+    MODEL_ALIASES: Dict[str, str] = {
+        "claude-3-5-sonnet-20241022": "claude-3.5-sonnet",
+        "claude-3-5-sonnet": "claude-3.5-sonnet",
+        "gpt-4o": "gpt-6.1-sol",
+        "gpt-5.5": "gpt-6.1-sol",
+    }
+
+    def resolve_model_name(self, model: Optional[str] = None) -> str:
+        """Resolves model aliases and returns canonical model identifier."""
+        target = model or self.hhtech_model
+        return self.MODEL_ALIASES.get(target, target)
 
     def get_context_window(self, model: Optional[str] = None) -> int:
         """Returns the total provider context window size in tokens for the model.
         Fails closed (Rule 121 / Rule 139) if model is unknown or unsupported.
         """
-        target_model = model or self.hhtech_model
+        target_model = self.resolve_model_name(model)
         if target_model not in self.PROVIDER_CONTEXT_WINDOWS:
             raise ModelGatewayError(
                 f"Unsupported model '{target_model}': not registered in PROVIDER_CONTEXT_WINDOWS. "
@@ -99,7 +114,7 @@ class ModelGateway:
         If requested_max_tokens is specified, validates that it fits within available headroom.
         Fails closed if ceiling is incompatible with context window (ceiling >= ctx_win).
         """
-        target_model = model or self.hhtech_model
+        target_model = self.resolve_model_name(model)
         ctx_win = self.get_context_window(target_model)
         ceiling = _get_max_absolute_input_ceiling()
         if ceiling >= ctx_win:
@@ -123,7 +138,7 @@ class ModelGateway:
         """Derives the VND rate per 1,000 tokens for the configured model from CostTracker.
         Fails closed if the model is not registered in CostTracker.RATES.
         """
-        target_model = model or self.hhtech_model
+        target_model = self.resolve_model_name(model)
         rates = getattr(self.cost_tracker, "RATES", {})
         if target_model not in rates:
             raise ModelGatewayError(
@@ -136,7 +151,7 @@ class ModelGateway:
         """Calculates justified maximum theoretical VND cost for a single request under live ceiling
         including both maximum input ceiling tokens and output reservation headroom.
         """
-        target_model = model or self.hhtech_model
+        target_model = self.resolve_model_name(model)
         ceiling = _get_max_absolute_input_ceiling()
         output_res = self.get_output_reservation(target_model, requested_max_tokens=max_output_tokens)
         total_tokens = ceiling + output_res
@@ -145,7 +160,7 @@ class ModelGateway:
 
     def get_max_input_cost_vnd(self, model: Optional[str] = None) -> float:
         """Calculates theoretical maximum VND cost for the input portion alone under live ceiling."""
-        target_model = model or self.hhtech_model
+        target_model = self.resolve_model_name(model)
         ceiling = _get_max_absolute_input_ceiling()
         rate = self.get_model_token_rate(target_model)
         return (ceiling / 1000.0) * rate
@@ -266,7 +281,7 @@ class ModelGateway:
                         )
                     response = self._call_fallback_llm(
                         prompt=prompt,
-                        model=fallback,
+                        model=self.resolve_model_name(fallback),
                         system_prompt=system_prompt,
                         max_tokens=max_tokens,
                         temperature=temperature,
@@ -593,7 +608,7 @@ class ModelGateway:
         Returns:
             Generated text analysis / critique
         """
-        model = model or "gpt-6.1-sol"
+        model = self.resolve_model_name(model or "gpt-6.1-sol")
         try:
             logger.info(f"[GATEWAY] Calling vision model: {model}")
             return self._call_hhtech(
@@ -611,7 +626,7 @@ class ModelGateway:
                 logger.info(f"[GATEWAY] Trying fallback vision model: {fallback}")
                 return self._call_hhtech(
                     prompt=prompt,
-                    model=fallback,
+                    model=self.resolve_model_name(fallback),
                     system_prompt=system_prompt,
                     max_tokens=max_tokens,
                     temperature=temperature,

@@ -48,6 +48,9 @@ class CostTracker:
         "claude-3.5-sonnet": 1600.0,
         "claude-3-opus": 2000.0,
         "kimi-k3": 1600.0,
+        "claude-v4.1-flash": 400.0,
+        "claude-6-luna": 400.0,
+        "claude-haiku-4.5": 1600.0,
         "default": 1600.0,
     }
 
@@ -64,6 +67,9 @@ class CostTracker:
         "claude-3.5-sonnet": 1.6,      # 1.600 VND / 1M tokens
         "claude-3-opus": 2.0,          # 2.000 VND / 1M tokens
         "kimi-k3": 1.6,                # 1.600 VND / 1M tokens
+        "claude-v4.1-flash": 0.4,      # 400 VND / 1M tokens (Boss 24/7 Drone)
+        "claude-6-luna": 0.4,          # 400 VND / 1M tokens (Boss 24/7 Drone)
+        "claude-haiku-4.5": 1.6,       # 1.600 VND / 1M tokens (Vision audit fallback)
         
         # Image models (VND per image)
         "imagen3": 5000.0,             # ~$0.20/image * 25000 VND/USD

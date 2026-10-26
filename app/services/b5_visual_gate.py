@@ -89,7 +89,7 @@ def audit_and_evaluate_asset(
         gateway = None
 
     model = model_override or os.getenv("VISUAL_AUDIT_MODEL", "claude-opus-5-5")
-    fallback_model = os.getenv("VISUAL_AUDIT_FALLBACK_MODEL", "claude-haiku-4.5")
+    fallback_model = os.getenv("VISUAL_AUDIT_FALLBACK_MODEL", "claude-sonnet-5")
 
     # If Model Gateway is active, invoke Showrunner Vision Audit
     if gateway:

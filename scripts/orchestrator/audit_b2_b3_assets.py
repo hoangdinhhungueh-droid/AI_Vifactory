@@ -499,7 +499,7 @@ Return a structured adversarial audit report.
     astra_response = gw.call_llm(
         prompt=astra_prompt,
         model="gpt-6-astra",
-        fallback="gpt-5.5",
+        fallback="gpt-6.1-sol",
         system_prompt="You are GPT-6-Astra, Adversarial Forensic Auditor. Rigorous, adversarial, zero sugar-coating.",
         max_tokens=4000,
         temperature=0.2,

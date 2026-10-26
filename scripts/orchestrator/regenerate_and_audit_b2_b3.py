@@ -236,7 +236,7 @@ Nhiệm vụ: Thẩm định toàn diện các asset B2/B3 vừa được sinh m
         opus_resp = gw.call_llm(
             prompt=opus_prompt,
             model="claude-opus-5-5",
-            fallback="claude-3-5-sonnet",
+            fallback="claude-sonnet-5-5",
             max_tokens=3000,
             temperature=0.3,
             timeout=180.0
@@ -275,7 +275,7 @@ Nhiệm vụ: ĐỐI CHẤT LẠNH LÙNG, KHÔNG THIÊN KIẾN (Zero-Sycophancy)
         astra_resp = gw.call_llm(
             prompt=astra_prompt,
             model="gpt-6-astra",
-            fallback="gpt-4o",
+            fallback="gpt-6.1-sol",
             max_tokens=3000,
             temperature=0.2,
             timeout=180.0
