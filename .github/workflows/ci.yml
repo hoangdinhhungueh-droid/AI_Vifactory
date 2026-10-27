@@ -23,9 +23,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
       
       - name: Install system dependencies (ffmpeg & OCR)
+        timeout-minutes: 3
         run: |
+          sudo systemctl stop unattended-upgrades 2>/dev/null || true
           sudo DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="20" || true
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg tesseract-ocr || true
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -o DPkg::Lock::Timeout=30 -o Acquire::Retries=3 -o Acquire::http::Timeout="20" --no-install-recommends ffmpeg tesseract-ocr || true
 
       - name: Install dependencies
         run: |
