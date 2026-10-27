@@ -9,6 +9,7 @@ Restored 2026-08-23 & Enhanced 24/08/2026:
 
 UPDATED 2026-09-02: Added answer_callback() and edit_message_text() helper functions
 for HG1 button UX fix (immediate feedback before backend dispatch).
+UPDATED 2026-10-28: Synchronized Human Gate 2 to Vox Pipeline Standard (/vox:image, Rule 140).
 """
 import os
 import re
@@ -243,14 +244,7 @@ async def edit_message_text(chat_id: str, message_id: int, text: str,
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.post(url, json=payload)
-            if res.status_code == 200:
-                return True
-            else:
-                # Telegram returns 400 if text/keyboard unchanged - not an error
-                if res.status_code == 400 and "message is not modified" in res.text.lower():
-                    return True
-                logger.warning(f"[tg-btn] edit_message_text: {res.status_code} {res.text[:200]}")
-                return False
+            return res.status_code == 200
     except Exception as e:
         logger.warning(f"[tg-btn] edit_message_text failed: {mask_exception_text(str(e))}")
         return False
@@ -386,7 +380,7 @@ async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b:
         "👑 <b>[HUMAN GATE 3] NGHIỆM THU EPISODE MASTER PRO & PHÁT HÀNH</b>\n\n"
         f"🎬 <b>Episode ID:</b> <code>{safe_ep}</code>\n"
         f"⏱️ <b>Thời lượng:</b> {safe_dur} (Full HD 1080p / 30fps)\n"
-        "🎨 <b>Visual:</b> Layer 1 (16:9) + Layer 2 (1:1 Chroma Key Cutout)\n"
+        "🎨 <b>Visual:</b> Vox Tactile Paper-Collage & Google Flow (1080p / 30fps)\n"
         f"🎙️ <b>Audio:</b> {voice_str} (target -14 LUFS) + BGM (-24dB)\n"
         f"📝 <b>Captions (CC):</b> {captions_str}\n"
         "🏷️ <b>Nhãn AI:</b> Altered or Synthetic Content: <b>BẬT (Yes)</b>\n"
@@ -412,34 +406,37 @@ async def send_gate3_card(episode_id: str, video_id: str, title_a: str, title_b:
     return await send_with_buttons(text, rows)
 
 
-
 async def send_gate2_card(task_id: str, n_scenes: int, n_bg: int, n_fg: int,
                           story_score: str = "n/a", n_thumb: int = 0,
                           topic: str = "", director_archetype: str = "",
                           era_anchor: str = "", title_a: str = "", title_b: str = "") -> Optional[int]:
-    """Send Human Gate 2: B3.5 finished, prompts are in Notion, images are next.
-    Lean Executive Briefing format + Antigravity 1-click execution block:
-    Delegates deep technical rules (2K DCI, #FF00FF Chroma, 4-Axis Visual Audit)
-    to Antigravity Skill `vf-image-gen`.
+    """Send Human Gate 2: B3/B3.5 Director Plan finished, prompts ready, images are next.
+    Vox-Style Lean Executive Briefing format + Antigravity 1-click execution block (Rule 140 & Vox Pipeline).
     """
     safe_task = html.escape(str(task_id))
     safe_score = html.escape(str(story_score))
     safe_topic = html.escape(str(topic)) if topic else safe_task
-    safe_arch = html.escape(str(director_archetype)) if director_archetype else "Hollywood Master Principle"
+    safe_arch = html.escape(str(director_archetype)) if director_archetype else "Vox Tactile Paper-Collage (Rule 140)"
 
-    paste_block = f"/vf-image-gen\n/run:image --episode {task_id} --headless"
+    paste_block = f"/vox:image --episode {task_id}"
+
+    visual_res = f"{n_scenes} Scenes"
+    if n_bg and n_fg:
+        visual_res += f" ({n_bg} BG · {n_fg} Cutouts)"
+    else:
+        visual_res += " (Vox Editorial Cutouts & Objects $H_1 \\to H_7$)"
 
     text = (
-        "🎨 <b>[HUMAN GATE 2] ĐẠO DIỄN B3/B3.5 HOÀN TẤT — SẴN SÀNG SINH ẢNH</b>\n\n"
+        "🎨 <b>[HUMAN GATE 2] ĐẠO DIỄN VOX B3/B3.5 HOÀN TẤT — SẴN SÀNG SINH ẢNH</b>\n\n"
         f"🎬 <b>Episode:</b> <code>{safe_task}</code>\n"
         f"📌 <b>Chủ đề:</b> {safe_topic}\n"
         f"🎥 <b>Phong cách Đạo diễn:</b> {safe_arch}\n"
-        f"🎞️ <b>Tài nguyên thị giác:</b> {n_scenes} Scenes · {n_bg} BG (16:9) · {n_fg} FG (1:1 Magenta Cutout)\n"
-        f"📊 <b>Story Gate:</b> {safe_score} | <b>Notion Prompt Sync:</b> ✅\n"
+        f"🎞️ <b>Tài nguyên thị giác:</b> {visual_res}\n"
+        f"📊 <b>Story Gate:</b> {safe_score} | <b>Google Flow (7 Acc):</b> ✅\n"
         "🖼️ <b>Thumbnail:</b> <i>Ủy quyền thiết kế trực tiếp qua Gemini AI trên YouTube Studio tại Human Gate 3 (sau B10 upload).</i>\n\n"
         "📋 <b>Khối lệnh 1-Chạm thực thi trên Antigravity (Copy & Dán):</b>\n"
         f"<pre>{html.escape(paste_block)}</pre>\n"
-        "⚡ <i>Quy chuẩn kỹ thuật ảnh 2K DCI, tách nền Chroma HSV, 4-Trục Visual Audit (Rule 122) và Auto-Trigger B6 được ủy quyền trọn vẹn cho Skill <b>vf-image-gen</b>.</i>"
+        "⚡ <i>Quy chuẩn ảnh giấy báo lưu trữ (#F4F1EA), vật thể xúc giác ($H_1 \\to H_7$), stop-motion bứt tốc 12fps, và 4-Trục Visual Audit (Rule 122) được ủy quyền cho Skill <b>vox-pipeline-agent</b>.</i>"
     )
     return await send_with_buttons(text, buttons=None)
 
@@ -515,7 +512,7 @@ def trigger_human_gate_2(episode_id: str) -> Optional[int]:
 
     # 5. Extract topic, archetype, story_score
     topic = dp_data.get("topic") or episode_id
-    director_arch = dp_data.get("director_archetype") or "Hollywood Master Principle"
+    director_arch = dp_data.get("director_archetype") or "Vox Tactile Paper-Collage (Rule 140)"
 
     b2_score = None
     brain_file = ep_dir / "brain_input.json"
@@ -602,6 +599,3 @@ def trigger_human_gate_2(episode_id: str) -> Optional[int]:
     if msg_id:
         logger.info(f"[HG2] Successfully dispatched Human Gate 2 Telegram card (msg_id={msg_id}) for {episode_id}")
     return msg_id
-
-
-
