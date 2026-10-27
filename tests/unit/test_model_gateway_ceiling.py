@@ -148,7 +148,7 @@ def provider_spy_context():
 
 
 def test_oversized_request_rejected_before_provider_dispatch_default_ceiling():
-    """Verifies that an input exceeding default 20k token ceiling is rejected before any provider dispatch."""
+    """Verifies that an input exceeding default 35k token ceiling is rejected before any provider dispatch."""
     old_key = os.environ.get("HHTECH_API_KEY")
     old_allow = os.environ.get("ALLOW_MASSIVE_LLM_CONTEXT")
     try:
@@ -156,8 +156,8 @@ def test_oversized_request_rejected_before_provider_dispatch_default_ceiling():
         os.environ.pop("ALLOW_MASSIVE_LLM_CONTEXT", None)
         with provider_spy_context() as spy:
             gw = ModelGateway()
-            # 60,000 chars / 2.5 = 24,000 tokens > 20,000 default ceiling
-            oversized_prompt = "A" * 60000
+            # 90,000 chars / 2.5 = 36,000 tokens > 35,000 default ceiling
+            oversized_prompt = "A" * 90000
             with pytest.raises(TokenBudgetExceeded) as exc_info:
                 gw._call_hhtech(prompt=oversized_prompt, model=gw.hhtech_model)
             assert "Token Bloat Guard" in str(exc_info.value)

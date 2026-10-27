@@ -335,7 +335,7 @@ def test_llm_viability_calls_stop_at_max_viability_llm_evals(tmp_path):
             state_dir=str(tmp_path),
         )
         assert len(produced) == 0
-        assert llm_eval_count <= MAX_VIABILITY_LLM_EVALS_DEFAULT == 6
+        assert llm_eval_count <= MAX_VIABILITY_LLM_EVALS_DEFAULT == 10
 
 
 def test_market_exhausted_today_lock_and_cron_skip(tmp_path, monkeypatch):
