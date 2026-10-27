@@ -644,29 +644,61 @@ def adversarial_audit_spoken_script(spoken_data: dict, market: str = "EN", topic
 
 
 def deterministic_tighten_spoken_script(spoken_data: dict, market: str = "EN") -> dict:
-    """Deterministic sentence tightening: trim filler words and enforce <= 15m duration."""
+    """Deterministic sentence tightening: trim filler words and enforce <= 15m duration (Rule 120/128)."""
     mkt = market.upper()
     is_cjk = mkt in ("KR", "JP", "ZH")
     sentences = spoken_data.get("sentences", [])
     tightened_sents = []
-    full_lines = []
+
+    # High-impact linguistic replacements that preserve 100% of factual entities, metrics, dates, and causes
+    _KR_REPLACEMENTS = [
+        (r"그렇기 때문에\s*", "따라서 "),
+        (r"이러한 상황 속에서\s*", "이때 "),
+        (r"알려진 바에 따르면\s*", "보도에 따르면 "),
+        (r"확인할 수 있었습니다", "확인됐습니다"),
+        (r"살펴볼 필요가 있습니다", "살펴봐야 합니다"),
+        (r"진행되고 있었습니다", "진행됐습니다"),
+        (r"나타나고 있습니다", "나타납니다"),
+        (r"말하고 있었습니다", "말했습니다"),
+        (r"드러나게 되었습니다", "드러났습니다"),
+        (r"판단하고 있었습니다", "판단했습니다"),
+        (r"이루어지고 있었습니다", "이뤄졌습니다"),
+        (r"생각할 수 있습니다", "생각됩니다"),
+        (r"주목할 만한 사실은\s*", "주목할 점은 "),
+        (r"이것은 매우 중요한\s*", "중요한 "),
+    ]
+    _JP_REPLACEMENTS = [
+        (r"ということが明らかになりました", "と判明しました"),
+        (r"このような状況の中で\s*", "この時 "),
+        (r"行われていました", "行われました"),
+        (r"確認することができました", "確認されました"),
+        (r"考えることができます", "考えられます"),
+        (r"伝えられています", "報じられています"),
+        (r"指摘されています", "指摘がある"),
+    ]
+    _EN_REPLACEMENTS = [
+        (r"(?i)\bin order to\b", "to"),
+        (r"(?i)\bat the same time that\b", "while"),
+        (r"(?i)\bdue to the fact that\b", "because"),
+        (r"(?i)\bit is important to note that\b", "notably,"),
+        (r"(?i)\bas a matter of fact,?\b", "in fact,"),
+        (r"(?i)\bin the process of\b", "during"),
+    ]
+
+    replacements = _KR_REPLACEMENTS if mkt == "KR" else (_JP_REPLACEMENTS if mkt == "JP" else _EN_REPLACEMENTS)
+
     for s in sentences:
         txt = s.get("text", "").strip()
-        if is_cjk and len(txt) > 38:
-            parts = re.split(r'([,;，、])', txt)
-            if len(parts) >= 3 and len(parts[0]) > 10:
-                txt = parts[0].strip() + (parts[1] if len(parts) > 1 else "") + " " + "".join(parts[2:]).strip()
-        elif not is_cjk and len(txt.split()) > 18:
-            parts = re.split(r'([,;—])\s*', txt)
-            if len(parts) >= 3 and len(parts[0].split()) > 6:
-                txt = parts[0].strip() + ", " + "".join(parts[2:]).strip()
+        for pat, rep in replacements:
+            txt = re.sub(pat, rep, txt)
+        # Collapse multiple whitespace
+        txt = re.sub(r"\s+", " ", txt).strip()
         tightened_sents.append({
             "sentence_id": s.get("sentence_id"),
             "beat_index": s.get("beat_index", 1),
             "text": txt,
             "karaoke_highlights": s.get("karaoke_highlights", [])
         })
-        full_lines.append(txt)
 
     joined = _reconcile_spoken_script(tightened_sents, "", mkt)
     est = round(len(joined) / 280.0, 1) if is_cjk else round(len(joined.split()) / 150.0, 1)
@@ -888,24 +920,27 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
     if mkt == "JP":
         check7_mandate = (
             "• Check 7 (5-Act Architectural Cues - Japanese Native Vocabulary):\n"
-            "   - Act I (Hook/Shock): 衝撃, 崩壊, 消失, 最初, 危機, and questions '?' or '？'.\n"
-            "   - Act II (The False Narrative): 報道, 公式見解, 神話, 誤解, 背景, 歴史, オフィシャル.\n"
-            "   - Act III (Systemic Blindspot): 死角, 疑惑, 欠陥, 内部, 記録, しかし, だが, 亀裂.\n"
-            "   - Act IV (The Smoking Gun): 決定打, 証拠, 判決, 責任, 破綻, 暴露, 調査, 処分.\n"
-            "   - Act V (The Modern Mirror): 警告, 教訓, 現代, 今日, 遺産, 課題, 結論.\n"
+            "   - Act I (Hook/Shock): 衝撃, 崩壊, 消失, 最初, 危機, 矛盾, and questions '?' or '？'.\n"
+            "   - Act II (The False Narrative): 報道, 公式見解, 神話, 誤解, 背景, 歴史, オフィシャル, 見せかけ, 広報, 主張.\n"
+            "   - Act III (Systemic Blindspot): 死角, 疑惑, 欠陥, 内部, 記録, しかし, だが, 亀裂, 落とし穴, 抜け穴.\n"
+            "   - Act IV (The Smoking Gun): 決定打, 証拠, 判決, 責任, 破綻, 暴露, 調査, 処分, 黒幕, 真犯人, 追及, 利得.\n"
+            "   - Act V (The Modern Mirror): 警告, 教訓, 現代, 今日, 遺産, 課題, 結論, 鏡, 再来, 制度.\n"
             "• Check 8 & 9 (Open & Close Curiosity Loops - Japanese Vocabulary):\n"
-            "   - Open loops in each Act using: 果たして, 疑問, なぜ, 本当の理由は, だろうか (~2 per Act).\n"
-            "   - Close loops in each Act using: その理由は, 答えは, 結局, こうして, 明らかになったのは, まさに (~2 per Act).\n"
+            "   - Open loops in each Act using: 果たして, 疑問, なぜ, どうして, 何が, 誰が, 本当の理由は, だろうか (~2 per Act).\n"
+            "   - Close loops in each Act using: その理由は, 答えは, 結局, こうして, 明らかになったのは, まさに, 判明した (~2 per Act).\n"
             "   CRITICAL LINGUISTIC PURITY (RULE 120 & RULE 128): 100% Japanese prose. STRICTLY FORBIDDEN: Do NOT write raw English words ('collapse', 'shock', 'disappear', 'official story', 'red herring', 'paper trail', 'only') in Japanese prose; translate them into native Japanese!"
         )
     elif mkt == "KR":
         check7_mandate = (
             "• Check 7 (5-Act Architectural Cues - Korean Native Vocabulary):\n"
-            "   - Act I (Hook/Shock): 충격, 붕괴, 위험, 의문, and questions '?'.\n"
-            "   - Act II (The False Narrative): 보도, 언론, 오해, 통념, 배경, 역사.\n"
-            "   - Act III (Systemic Blindspot): 사각지대, 맹점, 의혹, 내부, 계약, 그러나.\n"
-            "   - Act IV (The Smoking Gun): 스모킹건, 결정적, 증거, 판결, 책임, 폭로, 단속.\n"
-            "   - Act V (The Modern Mirror): 경고, 교훈, 현대, 오늘날, 과제, 결론, 유산.\n"
+            "   - Act I (Hook/Shock): 충격, 붕괴, 위험, 모순, 의문, 참사, 폭락, 적발, 제재, and questions '?'.\n"
+            "   - Act II (The False Narrative): 보도, 언론, 오해, 통념, 배경, 역사, 헤드라인, 공식, 발표, 홍보, 주장, 미끼.\n"
+            "   - Act III (Systemic Blindspot): 사각지대, 맹점, 의혹, 내부, 문건, 계약, 조항, 장부, 감사, 추적, 그러나, 하지만.\n"
+            "   - Act IV (The Smoking Gun): 스모킹건, 결정적, 증거, 진범, 배후, 실체, 판결, 책임, 폭로, 단속, 시정명령, 위반.\n"
+            "   - Act V (The Modern Mirror): 경고, 거울, 교훈, 현대, 오늘날, 되풀이, 반복, 과제, 결론, 유산, 제도, 안전망.\n"
+            "• Check 8 & 9 (Open & Close Curiosity Loops - Korean Vocabulary):\n"
+            "   - Open loops in each Act using: 과연, 의문, 어째서, 왜, 어떻게, 무엇이, 진짜 이유는, 진짜 질문은, 숨겨진 (~2 per Act).\n"
+            "   - Close loops in each Act using: 그 이유는, 결국, 답은, 분명한 것은, 확실한 것은, 드러난 사실은, 밝혀진 것은, 때문이다 (~2 per Act).\n"
             "   CRITICAL LINGUISTIC PURITY (RULE 120 & RULE 128): 100% Korean prose. STRICTLY FORBIDDEN: Do NOT write raw English words in Korean prose!"
         )
     else:
@@ -915,7 +950,8 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             "   - Act II (The False Narrative): 'official story', 'narrative', 'headline', 'myth', 'red herring'.\n"
             "   - Act III (Systemic Blindspot): 'paper trail', 'blindspot', 'loophole', 'leak', 'memo', 'forensic'.\n"
             "   - Act IV (The Smoking Gun): 'smoking gun', 'culprit', 'exposed', 'unmasked', 'profited'.\n"
-            "   - Act V (The Modern Mirror): 'mirror', 'warning', 'modern', 'today', 'lesson', 'verdict'."
+            "   - Act V (The Modern Mirror): 'mirror', 'warning', 'modern', 'today', 'lesson', 'verdict'.\n"
+            "• Check 8 & 9 (Open & Close Curiosity Loops): Plant questions with '?' and resolve with 'that is why', 'the answer', 'which is how'."
         )
 
     if mkt == "KR":
@@ -995,6 +1031,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
         f"• PATTERN INTERRUPT (ACT III): Include at least one sharp, punchy sentence of 2 to 6 words maximum in Act III to reset viewer focus.\n"
         f"• ZERO AI CLICHES: 100% elimination of banned phrases ('in a world where', 'little did they know', 'double-edged sword', 'at the end of the day').{slop_redlines_mandate}\n\n"
         f"{editorial_skills}\n\n"
+        f"{check7_mandate}\n\n"
         f"SPECIFIC CASE CONTEXT:\n"
         f"• Subject / Case: {topic}\n"
         f"• Specific Viral Angle: {viral_angle}\n"
@@ -1123,6 +1160,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             f"5-Arc Narrative: {story_arcs}\n"
             f"Content Theme: {theme}\n"
             f"Breakout Search Queries to prioritize in Act I: {', '.join(breakout_queries)}\n\n"
+            f"{check7_mandate}\n\n"
             f"{grounding_block}\n\n" if grounding_block else ""
             f"{competitor_context}"
             f"{feedback_block}"

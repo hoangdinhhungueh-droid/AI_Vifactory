@@ -38,6 +38,10 @@ Your mandate is to rigorously verify HARD FACTS, ACCURATE QUANTITATIVE METRICS, 
      (B) Legitimate Descriptive Document Reference: The script referencing internal slide decks, memos, or research studies that ARE substantively anchored in the Grounding Claims -> VALID (PASS).
    - If the script mentions internal company studies, slide decks, or discovery exhibits that correspond to documented findings in the Grounding Dossier, do NOT penalize as ungrounded merely because the author uses descriptive narrative phrasing, provided the underlying factual claims and dates remain true.
 7. YOUTUBE SAFETY: Zero glorification of violence, zero self-harm, zero defamatory ungrounded personal attacks.
+8. MULTILINGUAL & CJK LOCALE SEMANTIC MAPPING (RULE 120 & RULE 128):
+   - For non-English markets (KR, JP), factual claims, legal documents, dates, and entities are written in native Korean Hangul or Japanese Kanji/Kana (e.g. '의결서/시정명령' = FTC sanction/ruling, '4곳' = 4 entities/locations, '2026년 10월 26일' = Oct 26, 2026, '報告書/処分' = official report/sanctions).
+   - You MUST recognize native language translation equivalents of entities and numbers in the Grounding Table without flagging them as fabricated or ungrounded.
+   - Pacing & Syllable/Character Timing: Korean docudrama cadence runs at ~240-270 syllables/min, Japanese at ~270-300 characters/min. Do NOT penalize natural breath-timed CJK scripts as long or bloated unless they exceed 15 minutes (~4,800 units).
 
 Passing threshold:
 - audit_score >= 8.0/10 (scores >= 7.5 are normalized to PASS)

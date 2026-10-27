@@ -292,8 +292,9 @@ Output ONLY the patched Act(s), formatted with standard headers (e.g. '=== ACT I
         last_sg_score = sg_score
         current_meta = re_audit
 
-        # Convergence Condition: Fact Score >= 7.5 AND Story Gate >= 10/12 AND Length Valid
-        converged = (re_verdict == "PASS" or re_score >= 7.5) and (sg_score >= 10) and is_length_valid
+        # Convergence Condition (Rule 125 & 127 Parity): Fact Score >= 7.5 AND Story Gate Verdict PASS (or >= 11/13) AND Length Valid
+        sg_verdict = story_audit.get("verdict", "FAIL")
+        converged = (re_verdict == "PASS" or re_score >= 7.5) and (sg_verdict == "PASS" or sg_score >= 11) and is_length_valid
 
         if converged:
             re_audit["verdict"] = "PASS"

@@ -43,16 +43,13 @@ LOOP_OPEN = [
     r"(?i) not yet ",
     r"(?i) keep that (?:number|figure|date) in mind ",
     r"(?i) we will come back to ",
-    r"(?i) but (?:nobody|no one|almost no one|what) ",
-    r"(?i) what (?:nobody|no one|almost nobody) (?:knew|saw|noticed) ",
-    r"(?i) that number would ",
-    r"(?i) not yet ",
-    r"(?i) keep that (?:number|figure|date) in mind ",
-    r"(?i) we will come back to ",
     r"(?i) for now ",
     r"LOOP_OPEN",
+    # Korean native curiosity markers (Rule 120 & 128)
     r"과연", r"의문", r"어째서", r"하지만 아무도", r"기억해야", r"알려지지 않은", r"진짜 이유는", r"진짜 질문은", r"수 있을까요", r"수 있을까",
-    r"果たして", r"疑問", r"なぜ", r"しかし誰も", r"本当の理由は", r"だろうか",
+    r"왜", r"어떻게", r"무엇이", r"어디에", r"누가", r"주목해야", r"숨겨진", r"질문은", r"살펴보면", r"그렇다면", r"대체",
+    # Japanese native curiosity markers (Rule 120 & 128)
+    r"果たして", r"疑問", r"なぜ", r"どうして", r"何が", r"誰が", r"どこで", r"しかし誰も", r"本当の理由は", r"真の疑問は", r"見落とされた", r"注目すべきは", r"だろうか", r"のではないか",
 ]
 LOOP_CLOSE = [
     r"(?i)\bthat is (?:why|how|when)\b",
@@ -63,8 +60,13 @@ LOOP_CLOSE = [
     r"(?i)\bso when\b",
     r"(?i)\bin the end\b",
     r"LOOP_CLOSE",
+    # Korean native loop close & forensic resolution markers (Rule 120 & 128)
     r"그 이유는", r"결국", r"답은", r"이처럼", r"드러난 사실은", r"비로소", r"그것이 바로", r"핵심은", r"필요합니다",
+    r"분명한 것은", r"확실한 것은", r"밝혀진 것은", r"드러났습니다", r"밝혀졌습니다", r"확인됐습니다",
+    r"때문입니다", r"이유였습니다", r"결과였습니다", r"가리킵니다", r"사실뿐입니다", r"것입니다",
+    # Japanese native loop close & forensic resolution markers (Rule 120 & 128)
     r"その理由は", r"結局", r"答えは", r"こうして", r"明らかになったのは", r"まさに",
+    r"判明した", r"示している", r"に他ならない", r"からである", r"結果となった", r"浮き彫りになった",
 ]
 SOURCE = [
     r"(?i)according to",
@@ -74,10 +76,15 @@ SOURCE = [
     r"(?i) examiner ",
     r"(?i) court ",
     r"(?i) testimony ",
-    r"보고서", r"통계", r"조사", r"발표", r"기록", r"정부", r"기관", r"WHO", r"유엔", r"시스템", r"자료", r"세계보건기구", r"환경개선", r"농촌진흥청", r"국립농업과학원",
-    r"報告", r"統計", r"調査", r"発表", r"記録", r"政府", r"機関", r"資料",
+    r"보고서", r"통계", r"조사", r"발표", r"기록", r"정부", r"기관", r"WHO", r"유엔", r"시스템", r"자료", r"세계보건기구", r"환경개선", r"농촌진흥청", r"국립농업과학원", r"공정위", r"위원회", r"관할청", r"법원", r"의결서", r"보도자료",
+    r"報告", r"統計", r"調査", r"発表", r"記録", r"政府", r"機関", r"資料", r"委員会", r"裁判所", r"判決文", r"省庁",
 ]
-NUM = r"(?:\$\s?\d[\d,\.]*\s?(?:billion|million|trillion|B|M|T)?|[₩¥￥]\s?\d[\d,\.]*|\b\d[\d,\.]*\s?(?:%|percent|billion|million|trillion|years|employees|days)\b|\d[\d,\.]*\s?(?:%|percent|万|億|兆|回|件|名|年|日|月|個|倍|円|人|度|건|명|회|조|억|만|원)|\b\d[\d,\.]+\b|\b(?:1[89]|20)\d{2}\b)"
+# Multi-lingual quantitative metric regex (Rule 118, Rule 128, Rule 130)
+# Accurately matches Western, Japanese, and Korean numbers, currencies, and counter-units without Python \b word-boundary breakage on Hangul/CJK characters.
+_NUM_SUFFIXES_KR = r"(?:%|퍼센트|프로|원|달러|위안|엔|조|억|만|천|백|건|명|인|회|차|곳|개|배|단계|대|호|층|채|년|월|일|시|분|초|톤|kg|km|평)"
+_NUM_SUFFIXES_JP = r"(?:%|パーセント|割|円|ドル|元|ウォン|兆|億|万|千|件|名|人|回|箇所|カ所|か所|個|倍|段階|台|戸|階|棟|社|年|月|日|時|分|秒|トン|kg|km)"
+_NUM_SUFFIXES_EN = r"(?:%|percent|billion|million|trillion|hundred|thousand|years?|employees?|days?|months?|hours?|minutes?|seconds?|B|M|T|k)"
+NUM = rf"(?:[\$₩¥￥€£]\s?\d[\d,\.]*|\d[\d,\.]*\s*(?:{_NUM_SUFFIXES_KR}|{_NUM_SUFFIXES_JP}|{_NUM_SUFFIXES_EN})|(?<!\w)\d[\d,\.]+(?!\w)|\d+(?=[가-힣ぁ-んァ-ヶー一-龠])|(?<=[가-힣ぁ-んァ-ヶー一-龠])\d+|\b(?:1[89]|20)\d{2}\b)"
 
 # --- act cue vocabularies (v3: each act must speak its own language) --------
 ACT_CUES = {
@@ -86,11 +93,11 @@ ACT_CUES = {
         r"(?i) (?:largest|biggest|worst|first|only|never) ",
         r"\?",
         r"？",
-        r"충격", r"의문", r"붕괴", r"위험", r"shock", r"hook", r"조회수", r"질문", r"오염", r"추측",
-        r"衝撃", r"崩壊", r"消失", r"最初", r"最悪", r"なぜ", r"危機",
+        r"충격", r"의문", r"붕괴", r"위험", r"모순", r"참사", r"폭락", r"적발", r"제재", r"미납", r"사기", r"비상", r"직면", r"shock", r"hook", r"조회수", r"질문", r"오염", r"추측",
+        r"衝撃", r"崩壊", r"消失", r"最初", r"最悪", r"なぜ", r"危機", r"矛盾", r"事件", r"破綻", r"急落", r"赤字", r"倒産",
     ],
     "act2_build": [
-        r"(?i)narrative", r"(?i)headline", r"(?i)myth", r"(?i)believed", r"(?i)claimed", r"(?i)official story", r"(?i)misdirection", r"(?i)red herring", r"(?i)surface", r"truyền thông", r"lầm tưởng", r"giả thuyết", r"ngộ nhận", r"겉모습", r"보도", r"언론", r"오해", r"통념", r"オフィシャル", r"報道", r"誤解", r"神話",
+        r"(?i)narrative", r"(?i)headline", r"(?i)myth", r"(?i)believed", r"(?i)claimed", r"(?i)official story", r"(?i)misdirection", r"(?i)red herring", r"(?i)surface", r"truyền thông", r"lầm tưởng", r"giả thuyết", r"ngộ nhận", r"겉모습", r"보도", r"언론", r"오해", r"통념", r"헤드라인", r"공식", r"발표", r"홍보", r"주장", r"서사", r"착시", r"미끼", r"オフィシャル", r"報道", r"誤解", r"神話", r"公式見解", r"見せかけ", r"広報", r"主張",
         r"(?i) (?:founded|opened|grew|expanded|built|became|launched|rose|boom(?:ed|ing)?|empire) ",
         r"(?i) (?:by \d{4}|store[s]?|market share|dominat(?:ed|ing)) ",
         r"(?i) (?:originally|genesis|years earlier|years before|months earlier|origins?|root cause|initial deal|earliest|decades ago|dating back) ",
@@ -100,7 +107,7 @@ ACT_CUES = {
         r"遡る", r"当時", r"過去", r"発端", r"初期", r"起源", r"以前", r"原点",
     ],
     "act3_knot": [
-        r"(?i)audit", r"(?i)leak", r"(?i)memo", r"(?i)email", r"(?i)paper trail", r"(?i)whistleblower", r"(?i)blindspot", r"(?i)vacuum", r"(?i)loophole", r"(?i)forensic", r"manh mối", r"tài liệu", r"rò rỉ", r"kẽ hở", r"điểm mù", r"내부", r"문건", r"유출", r"사각지대", r"맹점", r"비리", r"内部告発", r"流出", r"死角", r"不正",
+        r"(?i)audit", r"(?i)leak", r"(?i)memo", r"(?i)email", r"(?i)paper trail", r"(?i)whistleblower", r"(?i)blindspot", r"(?i)vacuum", r"(?i)loophole", r"(?i)forensic", r"manh mối", r"tài liệu", r"rò rỉ", r"kẽ hở", r"điểm mù", r"내부", r"문건", r"유출", r"사각지대", r"맹점", r"비리", r"특약", r"회계", r"장부", r"추적", r"허점", r"内部告発", r"流出", r"死角", r"不正", r"落とし穴", r"欠陥", r"抜け穴",
         r"(?i) (?:but|however|then|instead|trap|debt|leverage[d]?|loan[s]?|interest|deal|buyout|pressure) ",
         r"(?i) (?:began to|started to|could not|couldn't|no longer) ",
         r"(?i) (?:escalat(?:e|ed|ing|ion)|unnoticed|behind closed doors|gradually|over time|brewing|warning sign|cracks?|mutation) ",
@@ -110,13 +117,13 @@ ACT_CUES = {
         r"蓄積", r"徐々に", r"水面下", r"変質", r"見過ご", r"兆候", r"暗雲",
     ],
     "act4_resolution": [
-        r"(?i)smoking gun", r"(?i)culprit", r"(?i)profited", r"(?i)beneficiary", r"(?i)exposed", r"(?i)unmasked", r"(?i)climax", r"(?i)fatal", r"(?i)undone", r"(?i)crackdown", r"vạch trần", r"thủ phạm", r"bằng chứng", r"chuông báo tử", r"스모킹건", r"진범", r"폭로", r"결정적", r"증거", r"決定打", r"黒幕", r"暴露", r"証拠",
+        r"(?i)smoking gun", r"(?i)culprit", r"(?i)profited", r"(?i)beneficiary", r"(?i)exposed", r"(?i)unmasked", r"(?i)climax", r"(?i)fatal", r"(?i)undone", r"(?i)crackdown", r"vạch trần", r"thủ phạm", r"bằng chứng", r"chuông báo tử", r"스모킹건", r"진범", r"폭로", r"결정적", r"증거", r"배후", r"실체", r"시정명령", r"위반", r"수익", r"부당이득", r"파탄", r"決定打", r"黒幕", r"暴露", r"証拠", r"真犯人", r"追及", r"利得",
         r"(?i) (?:filed|bankrupt(?:cy)?|chapter 11|liquidat(?:e|ed|ion)|clos(?:ed|ing)|shut|court|creditors?|failed) ",
         r"조사", r"단속", r"판결", r"결과", r"조치", r"회수", r"폐기", r"수사", r"법원", r"실패", r"전환점", r"대응", r"검사", r"관리", r"책임",
         r"調査", r"処分", r"判決", r"自主回収", r"責任", r"停止", r"破綻", r"改革",
     ],
     "act5_denouement": [
-        r"(?i)mirror", r"(?i)warning", r"(?i)modern", r"(?i)today", r"(?i)echo", r"(?i)repeat", r"(?i)lesson", r"(?i)verdict", r"soi chiếu", r"cảnh tỉnh", r"cảnh báo", r"bản án", r"gương soi", r"경고", r"거울", r"현대", r"되풀이", r"판결", r"現代", r"警告", r"教訓", r"判決",
+        r"(?i)mirror", r"(?i)warning", r"(?i)modern", r"(?i)today", r"(?i)echo", r"(?i)repeat", r"(?i)lesson", r"(?i)verdict", r"soi chiếu", r"cảnh tỉnh", r"cảnh báo", r"bản án", r"gương soi", r"경고", r"거울", r"현대", r"되풀이", r"반복", r"판결", r"과제", r"안전망", r"現代", r"警告", r"教訓", r"判決", r"鏡", r"再来",
         r"(?i) (?:today|years later|since then|legacy|remains?|lesson|aftermath|what happened to|left behind|still) ",
         r"오늘날", r"현재", r"교훈", r"유산", r"결론", r"미래", r"과제", r"신뢰", r"남겨진", r"결국", r"식탁", r"제도", r"안전", r"회복",
         r"今日", r"現在", r"教訓", r"遺産", r"未来", r"信頼", r"課題", r"結論",

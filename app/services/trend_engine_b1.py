@@ -1066,7 +1066,7 @@ def _parse_env_int(var_name: str, default: int, min_val: int = 1) -> int:
 
 MAX_B2_ATTEMPTS_DEFAULT = _parse_env_int("MAX_B2_ATTEMPTS_PER_RUN", 2, min_val=1)
 MAX_SCAN_CANDIDATES_DEFAULT = _parse_env_int("MAX_SCAN_CANDIDATES", 10, min_val=1)
-MAX_VIABILITY_LLM_EVALS_DEFAULT = _parse_env_int("MAX_VIABILITY_LLM_EVALS", 6, min_val=1)
+MAX_VIABILITY_LLM_EVALS_DEFAULT = _parse_env_int("MAX_VIABILITY_LLM_EVALS", 10, min_val=1)
 
 
 def check_evidence_catalyst_gate(

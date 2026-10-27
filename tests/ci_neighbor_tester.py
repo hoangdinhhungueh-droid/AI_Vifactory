@@ -374,6 +374,26 @@ def test_block2_story_contract() -> bool:
         logger.info(f"  ✅ Story Gate Score on Production Script: {score_val}/{max_score} (Words: {words}) | Verdict: {verdict}")
         assert verdict == "PASS" or score_val >= 8, f"Production script failed gate: {score_res.get('fix_hints')}"
 
+        # 5. Multilingual Story Gate Verification (Rule 128 / Rule 134: KR & JP counters and cues)
+        kr_sample = (
+            "=== ACT I ===\n"
+            "2026년 10월 26일, 공정거래위원회가 4곳의 시행사에 시정명령을 내리며 30%라는 수치가 공개됐습니다. "
+            "이것은 단순한 우연이었을까요? 대체 무슨 일이 일어난 것일까요?\n\n"
+            "=== ACT II ===\n"
+            "언론 보도와 공식 발표는 마감 임박이라는 헤드라인을 쏟아냈습니다. 당시 대중은 이를 믿었습니다.\n\n"
+            "=== ACT III ===\n"
+            "그러나 내부 문건과 사각지대 속에서 균열이 시작됐습니다. 장부는 침묵했습니다.\n\n"
+            "=== ACT IV ===\n"
+            "스모킹건은 결정적 증거로 드러났습니다. 판결과 단속이 이어졌습니다.\n\n"
+            "=== ACT V ===\n"
+            "오늘날 이 사건은 현대 사회에 남겨진 엄중한 경고이자 교훈입니다. 결국 진실은 밝혀졌습니다."
+        )
+        kr_res = score_story(kr_sample)
+        assert kr_res.get("numbers_found", 0) >= 4, f"Expected KR numbers found >= 4, got {kr_res.get('numbers_found')}"
+        assert kr_res.get("open_loop_markers", 0) >= 2, f"Expected KR open loop markers >= 2, got {kr_res.get('open_loop_markers')}"
+        assert kr_res.get("close_markers", 0) >= 1, f"Expected KR close markers >= 1, got {kr_res.get('close_markers')}"
+        logger.info(f"  ✅ Multilingual Story Gate KR Cues Verified: nums={kr_res['numbers_found']}, open_loops={kr_res['open_loop_markers']}, close_markers={kr_res['close_markers']}")
+
         return True
     except Exception as e:
         import traceback
