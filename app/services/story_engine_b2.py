@@ -285,8 +285,8 @@ def load_grounding_intel(
                     g_data = json_lib.load(gf)
                     if g_data:
                         break
-            except Exception as _seo_err:
-                logger.debug(f"[story_engine] Notice reading pre-computed seo_package from {sp_path}: {_seo_err}")
+            except Exception as _g_err:
+                logger.debug(f"[story_engine] Notice reading grounding intel from {p}: {_g_err}")
 
     if not g_data and topic:
         # Attempt JIT Grounding Research

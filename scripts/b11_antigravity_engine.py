@@ -90,8 +90,8 @@ def load_secrets():
                             v = parts[1].strip().strip('"').strip("'")
                             if k and k not in secrets:
                                 secrets[k] = v
-            except Exception as _ana_err:
-                logger.debug(f"[b11] Notice retrieving video analytics for {v_id}: {_ana_err}")
+            except Exception as _sec_err:
+                logger.debug(f"[b11] Notice reading secrets: {_sec_err}")
                 
     for k, v in os.environ.items():
         if k not in secrets:
