@@ -546,8 +546,8 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
         if json_match:
             try:
                 parsed = json.loads(json_match.group(1).strip())
-            except Exception:
-                pass
+            except Exception as _e_match:
+                logger.debug(f"[story_engine] Spoken adaptation json regex fallback: {_e_match}")
         if not parsed:
             cleaned = raw_res.strip()
             if cleaned.startswith("```json"):
@@ -558,8 +558,8 @@ def adapt_master_spoken_script(full_script: str, market: str = "EN", topic: str 
                 cleaned = cleaned[:-3]
             try:
                 parsed = json.loads(cleaned.strip())
-            except Exception:
-                pass
+            except Exception as _e_clean:
+                logger.debug(f"[story_engine] Spoken adaptation json clean fallback: {_e_clean}")
 
     if not parsed or not isinstance(parsed, dict) or not parsed.get("sentences") or len(parsed.get("sentences", [])) < 80:
         logger.warning(f"[story_engine] Spoken VO adaptation parsing failed or too short ({len(parsed.get('sentences', [])) if parsed else 0} sents). Running deterministic sentence splitting fallback.")
@@ -744,6 +744,7 @@ def deterministic_tighten_spoken_script(spoken_data: dict, market: str = "EN") -
             is_disclaimer = any(k in txt for k in ["제공된 보도 자료", "확인되지 않습니다", "단정하지 않습니다", "추측으로 채우지", "보도만으로 특정"]) if mkt == "KR" else (
                 any(k in txt for k in ["報道資料には", "確認されていません", "断定しません", "推測で埋める"]) if mkt == "JP" else any(k in txt for k in ["cannot be confirmed", "not specified in reports", "we do not conclude"])
             )
+            # Keep the FIRST disclaimer for reporting integrity, but prune 2nd+ repeats if no facts/numbers
             if is_disclaimer and not has_fact_marker.search(txt):
                 disclaimer_hits += 1
                 if disclaimer_hits > 1:
@@ -782,6 +783,7 @@ def prune_and_tighten_spoken_script(spoken_data: dict, market: str = "EN", topic
 
     use_llm = os.getenv("USE_LLM_PRUNING", "false").lower() in ("true", "1", "yes")
 
+    # If deterministic pass brought it under ceiling and safe duration, return immediately!
     if t_units <= max_ceiling and t_est <= 14.8 and not use_llm:
         logger.info(f"[story_engine] Deterministic tightening succeeded: {t_units} units, est={t_est}m for {topic} ({mkt})")
         return tightened
@@ -1118,7 +1120,6 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
         f"• ZERO AI CLICHES: 100% elimination of banned phrases ('in a world where', 'little did they know', 'double-edged sword', 'at the end of the day').{slop_redlines_mandate}\n\n"
         f"{editorial_skills}\n\n"
         f"{check7_mandate}\n\n"
-            f"{cjk_anti_bloat}\n\n"
         f"SPECIFIC CASE CONTEXT:\n"
         f"• Subject / Case: {topic}\n"
         f"• Specific Viral Angle: {viral_angle}\n"
@@ -1271,6 +1272,7 @@ CRITICAL HOOK INSTRUCTION: You MUST open Act I by immediately using or adapting 
             f"Content Theme: {theme}\n"
             f"Breakout Search Queries to prioritize in Act I: {', '.join(breakout_queries)}\n\n"
             f"{check7_mandate}\n\n"
+            f"{cjk_anti_bloat}\n\n"
             f"{grounding_block}\n\n" if grounding_block else ""
             f"{competitor_context}"
             f"{feedback_block}"
