@@ -229,6 +229,8 @@ export interface Scene {
     digital_glitch?: boolean;
     high_contrast?: boolean;
   };
+  scene_sub_director_plan?: Record<string, any>;
+  sceneSubDirectorPlan?: Record<string, any>;
 }
 
 export interface SceneMap {

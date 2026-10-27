@@ -301,10 +301,10 @@ def compute_kinetic_spatial_layout(
 
     # 1. Nếu bounding_box được cung cấp
     if bounding_box is not None:
-        if hasattr(bounding_box, "model_dump"):
-            b_dict = bounding_box.model_dump()
-        elif isinstance(bounding_box, dict):
+        if isinstance(bounding_box, dict):
             b_dict = bounding_box
+        elif hasattr(bounding_box, "model_dump"):
+            b_dict = getattr(bounding_box, "model_dump")()
         else:
             raise ValueError(f"Invalid bounding_box type: {type(bounding_box)}. Expected dict or BoundingBox model.")
 
@@ -322,6 +322,7 @@ def compute_kinetic_spatial_layout(
             if not (0.0 <= val <= 100.0):
                 raise ValueError(f"Bounding box coordinate '{name}' must be in percentage range [0.0, 100.0], got {val}")
 
+        assert x_min_raw is not None and x_max_raw is not None and y_min_raw is not None and y_max_raw is not None
         x_min, x_max, y_min, y_max = float(x_min_raw), float(x_max_raw), float(y_min_raw), float(y_max_raw)
         if x_max <= x_min:
             raise ValueError(f"Bounding box x_max ({x_max}) must be strictly greater than x_min ({x_min})")
@@ -598,7 +599,7 @@ def _compute_clause_aligned_word_spans(words: List[Dict[str, Any]], beat_count: 
                         break
         best_combo = tuple(sorted(selected))
 
-    slices = [0] + list(best_combo) + [n_words]
+    slices = [0] + list(best_combo or ()) + [n_words]
     return [(slices[b], slices[b+1]) for b in range(beat_count)]
 
 
@@ -636,17 +637,21 @@ def generate_scene_sub_director_plan(
         last_end = -1.0
         validated_whisper = []
         for idx, w in enumerate(whisper_words):
-            if hasattr(w, "model_dump"):
-                w = w.model_dump()
-            if not isinstance(w, dict) or "start" not in w or "end" not in w or w["start"] is None or w["end"] is None:
-                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} missing valid 'start'/'end' timestamps: {w!r}")
-            if isinstance(w["start"], bool) or isinstance(w["end"], bool):
-                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} timestamps cannot be boolean: {w!r}")
+            if isinstance(w, dict):
+                w_dict = w
+            elif hasattr(w, "model_dump"):
+                w_dict = getattr(w, "model_dump")()
+            else:
+                w_dict = w
+            if not isinstance(w_dict, dict) or "start" not in w_dict or "end" not in w_dict or w_dict["start"] is None or w_dict["end"] is None:
+                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} missing valid 'start'/'end' timestamps: {w_dict!r}")
+            if isinstance(w_dict["start"], bool) or isinstance(w_dict["end"], bool):
+                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} timestamps cannot be boolean: {w_dict!r}")
             try:
-                s_val = float(w["start"])
-                e_val = float(w["end"])
+                s_val = float(w_dict["start"])
+                e_val = float(w_dict["end"])
             except (ValueError, TypeError) as exc:
-                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} has invalid non-numeric timestamps: {w!r}") from exc
+                raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} has invalid non-numeric timestamps: {w_dict!r}") from exc
             if math.isnan(s_val) or math.isnan(e_val) or math.isinf(s_val) or math.isinf(e_val):
                 raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} timestamp is NaN or Inf: start={s_val}, end={e_val}")
             if s_val < 0.0 or e_val < s_val:
@@ -654,7 +659,7 @@ def generate_scene_sub_director_plan(
             if s_val < last_end - 1e-4:
                 raise ValueError(f"Whisper integration fail-closed (Rule 120): Word #{idx} start timestamp ({s_val}s) is non-monotonic (earlier than preceding end {last_end}s)")
             last_end = e_val
-            validated_whisper.append({"word": str(w.get("word", "")), "start": s_val, "end": e_val})
+            validated_whisper.append({"word": str(w_dict.get("word", "")), "start": s_val, "end": e_val})
 
         w_start = validated_whisper[0]["start"]
         w_end = validated_whisper[-1]["end"]
@@ -779,6 +784,10 @@ def generate_scene_sub_director_plan(
     # 3. Đồng bộ hóa Phase Markers & Dead-Stop Timings (Rule 120, 140)
     t_p1_end = whisper_windows[0][1] if whisper_windows else min(0.6, round(dur * 0.1, 3))
     active_span = dur - t_p1_end
+
+    t_snap1: float = 0.0
+    t_snap2: float = 0.0
+    t_hold1: float = 0.0
 
     if beat_count <= 4:
         t_snap1 = whisper_windows[1][1] if whisper_windows else round(t_p1_end + 0.4, 3)

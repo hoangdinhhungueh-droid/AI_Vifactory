@@ -94,7 +94,7 @@ def _synthesize_beat_scenes(
     character_ensemble: list[dict],
     cam_moves: list[str],
     start_sc_counter: int,
-    beat_spoken_sents: list[dict] = None
+    beat_spoken_sents: Optional[list[dict]] = None
 ) -> tuple[list[dict], int]:
     """Synthesize deterministic scenes for a single beat, strictly anchored 1:1 to spoken sentences."""
     b_num = b_idx + 1
@@ -221,9 +221,9 @@ def _synthesize_deterministic_director_plan(
     episode_id: str,
     story_beats: list[dict],
     archetype: dict,
-    dynamic_context: dict = None,
-    character_ensemble: list[dict] = None,
-    spoken_sentences: list = None
+    dynamic_context: Optional[dict] = None,
+    character_ensemble: Optional[list[dict]] = None,
+    spoken_sentences: Optional[list] = None
 ) -> dict:
     """Robust fallback scene breakdown with dynamic character ensemble and authentic narrative context."""
     if not dynamic_context:
@@ -283,10 +283,10 @@ def _synthesize_deterministic_director_plan(
 
 def generate_director_plan(
     episode_id: str,
-    story_text: str = None,
-    spoken_sentences: list = None,
-    intel_card: dict = None,
-    metadata: dict = None,
+    story_text: Optional[str] = None,
+    spoken_sentences: Optional[list] = None,
+    intel_card: Optional[dict] = None,
+    metadata: Optional[dict] = None,
     skip_notion: bool = False,
     run_downstream: bool = True
 ) -> dict:

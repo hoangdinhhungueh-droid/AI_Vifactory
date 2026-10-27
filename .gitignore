@@ -23,6 +23,7 @@ env/
 .venv/
 
 # IDE & OS
+.serena/
 .vscode/*
 !.vscode/tasks.json
 .idea/

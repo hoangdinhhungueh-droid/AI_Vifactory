@@ -436,7 +436,7 @@ def expand_longform_background_roster(
             base_desc = v_dict.get("description", "")
             base_title = v_dict.get("title", k)
             beats = v_dict.get("beats") or fallback_beat_indices
-            shifted_beats = [((b + var_idx) % 5) + 1 for b in beats]
+            shifted_beats = [((int(b) + var_idx) % 5) + 1 for b in beats]
             expanded[new_key] = {
                 "title": f"{base_title} ({suffix.replace('_', ' ').title()})",
                 "description": f"{base_desc} Framed from {angle_desc}.",
@@ -1126,9 +1126,10 @@ def build_unified_director_plan(
     last_char_scene = -99
     prev_bg_key = None
     distinct_sent_beats = {
-        int(s.get("beat_phase") or s.get("beat_index"))
+        int(val)
         for s in spoken_sentences
-        if isinstance(s.get("beat_phase") or s.get("beat_index"), int)
+        for val in [s.get("beat_phase") or s.get("beat_index")]
+        if isinstance(val, (int, str)) and str(val).isdigit()
     }
     sent_beats_degenerate = (len(spoken_sentences) >= 5 and len(distinct_sent_beats) <= 1) or (max(distinct_sent_beats, default=1) > 5)
 
@@ -1442,7 +1443,8 @@ def build_unified_director_plan(
         }
 
         # Physical Object Decomposition & Kinematics for Omni Video Effects (Rule 128 & AVF-VOX-001)
-        hero_title = (fg_roster.get(assigned_fg) or {}).get("title") or scene_obj.get("headline") or f"Tactile evidentiary document representing beat {beat_idx}"
+        hero_entry = fg_roster.get(assigned_fg) if assigned_fg else None
+        hero_title = (hero_entry.get("title") if hero_entry else None) or scene_obj.get("headline") or f"Tactile evidentiary document representing beat {beat_idx}"
         bg_title = (bg_roster.get(bg_key) or {}).get("title") or "Aged Cream Newsprint Desk #F4F1EA"
         sc_headline = scene_obj.get("headline") or f"BEAT {beat_idx:02d}"
 
