@@ -285,8 +285,8 @@ def load_grounding_intel(
                     g_data = json_lib.load(gf)
                     if g_data:
                         break
-            except Exception:
-                pass
+            except Exception as _seo_err:
+                logger.debug(f"[story_engine] Notice reading pre-computed seo_package from {sp_path}: {_seo_err}")
 
     if not g_data and topic:
         # Attempt JIT Grounding Research
@@ -841,8 +841,8 @@ def generate_5_arc_story(task_id: str, custom_meta: dict | None = None, force: b
                     seo_pkg = json.load(sf)
                     if seo_pkg:
                         break
-            except Exception:
-                pass
+            except Exception as _seo_err:
+                logger.debug(f"[story_engine] Notice reading pre-computed seo_package from {sp_path}: {_seo_err}")
     if not seo_pkg and isinstance(meta.get("seo_package"), dict):
         seo_pkg = meta["seo_package"]
 

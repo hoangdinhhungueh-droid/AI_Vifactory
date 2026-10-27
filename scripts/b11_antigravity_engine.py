@@ -90,8 +90,8 @@ def load_secrets():
                             v = parts[1].strip().strip('"').strip("'")
                             if k and k not in secrets:
                                 secrets[k] = v
-            except Exception:
-                pass
+            except Exception as _ana_err:
+                logger.debug(f"[b11] Notice retrieving video analytics for {v_id}: {_ana_err}")
                 
     for k, v in os.environ.items():
         if k not in secrets:
@@ -308,8 +308,8 @@ def fetch_all_channel_videos(access_token, market="EN"):
                 if rows:
                     watch_min = rows[0][2]
                     avd_sec = rows[0][3]
-            except Exception:
-                pass
+            except Exception as _ana_err:
+                logger.debug(f"[b11] Notice retrieving video analytics: {_ana_err}")
                 
         video_data.append({
             "id": v_id,
