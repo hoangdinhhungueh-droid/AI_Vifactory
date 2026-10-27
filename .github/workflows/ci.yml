@@ -24,8 +24,8 @@ jobs:
       
       - name: Install system dependencies (ffmpeg & OCR)
         run: |
-          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="20" || true
-          sudo apt-get install -y --no-install-recommends ffmpeg tesseract-ocr
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="20" || true
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg tesseract-ocr || true
 
       - name: Install dependencies
         run: |
