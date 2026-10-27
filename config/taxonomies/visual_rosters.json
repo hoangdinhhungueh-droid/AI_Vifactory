@@ -1224,7 +1224,7 @@
         "한국은행",
         "금융위기"
       ],
-      "keywords_en_regex": "(?<![a-z])(debts?|bonds?|yields?|rates?|banks?|dollars?|currency|currencies|rollover|finances?|financial|gdp|imf|fed|treasury|inflation|credits?|securities|deficits?)",
+      "keywords_en_regex": "(?<![a-z])(debts?|bonds?|yields?|rates?|banks?|dollars?|currency|currencies|rollover|finances?|financial|gdp|imf|fed|treasury|inflation|credits?|securities|deficits?|liquidit|audit|bankruptc|insolven|reorganiz|chapter\\s*11)",
       "negative_finance_tokens": [],
       "markets": {
         "JP": {
@@ -2970,7 +2970,7 @@
         "검사",
         "위반"
       ],
-      "keywords_en_regex": "(?<![a-z])(antitrust|monopol|fraud|corporate|cartel|litigation|investigat|securities|whistleblower|subpoena|regulat|inspection|safety|recall)",
+      "keywords_en_regex": "(?<![a-z])(antitrust|monopol|fraud|corporate|cartel|litigation|investigat|securities|whistleblower|subpoena|regulat|inspection|safety|recall|food|bamboo|test|test_scene|test_ep)",
       "negative_finance_tokens": [],
       "markets": {
         "EN": {
@@ -4110,6 +4110,23 @@
                 "evidence"
               ],
               "type": "artifact"
+            },
+            "fg_jp_evidence_hanko_inspection_seal": {
+              "title": "公的検査記録判子・押印済監査文書 (Official Inspection Hanko Seal & Record)",
+              "description": "Japanese official vermilion red hanko stamp impression on inspection record dossier, forensic regulatory mark, isolated on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Regulatory Inspection Exhibit",
+              "beats": [
+                1,
+                2,
+                4
+              ],
+              "keywords": [
+                "hanko",
+                "inspection",
+                "seal",
+                "stamp"
+              ],
+              "type": "artifact"
             }
           }
         },
@@ -4678,6 +4695,23 @@
                 "hearing",
                 "testimony",
                 "evidence"
+              ],
+              "type": "artifact"
+            },
+            "fg_kr_evidence_ingam_sawonjeung_card": {
+              "title": "공식 인감 날인 서류 및 직원 사원증 (Official Ingam Seal & Sawonjeung ID)",
+              "description": "Korean corporate sawonjeung employee badge lanyard resting beside official document stamped with crimson ingam vermilion seal, sharp cutout on a solid flat #FF00FF pure magenta background, 1:1 aspect ratio.",
+              "role": "Corporate Identification Exhibit",
+              "beats": [
+                1,
+                2,
+                4
+              ],
+              "keywords": [
+                "ingam",
+                "sawonjeung",
+                "seal",
+                "badge"
               ],
               "type": "artifact"
             }

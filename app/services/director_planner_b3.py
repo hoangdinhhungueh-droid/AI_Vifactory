@@ -127,6 +127,30 @@ def _synthesize_beat_scenes(
             dur_frames = sent.get("duration_frames") or int(round(sent.get("duration_sec", 6.0) * 30))
             dur_sec = sent.get("duration_sec") or round(dur_frames / 30.0, 2)
 
+            sub_plan = {}
+            kinetic_prompt = ""
+            try:
+                from app.services.kinetic_sub_director import (
+                    build_kinetic_causal_i2v_prompt,
+                    generate_scene_sub_director_plan,
+                )
+                from core.market_resolver import resolve_canonical_market
+
+                mkt_code = episode_id.split("_")[0] if "_" in episode_id else "EN"
+                resolved_mkt = resolve_canonical_market(market_raw=mkt_code)
+                sub_plan = generate_scene_sub_director_plan(
+                    scene_id=sc_id,
+                    sentence=sc_text,
+                    hero_cutout_object=char_role if fg_k else f"Evidence document for {b_name}",
+                    interacting_objects=["crimson forensic seal stamp", "brass precision caliper"],
+                    duration_sec=dur_sec,
+                    market=resolved_mkt,
+                    whisper_words=sent.get("words") or sent.get("subtitles"),
+                )
+                kinetic_prompt = build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=cam_move)
+            except (ValueError, TypeError, KeyError, ImportError) as _k_err:
+                logger.debug(f"[director_planner_b3] Kinetic sub-director notice: {_k_err}")
+
             forensic_overlay = detect_forensic_overlay(sc_text)
             stat_card = detect_stat_card(sc_text)
             stamp_badge = detect_stamp_badge(sc_text)
@@ -161,7 +185,10 @@ def _synthesize_beat_scenes(
                 "foreground_reuse_key": fg_k,
                 "fg_position": fg_pos if fg_k else None,
                 "safe_zone": "bottom 20% clear for subtitles",
-                "cinematic_tokens": validate_cinematic_tokens(None, sc_text)
+                "cinematic_tokens": validate_cinematic_tokens(None, sc_text),
+                "scene_sub_director_plan": sub_plan,
+                "flow_video_prompt": kinetic_prompt or bg_desc,
+                "i2v_prompt_google_flow": kinetic_prompt or bg_desc,
             })
             sc_counter += 1
     else:

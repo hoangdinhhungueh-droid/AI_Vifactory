@@ -98,6 +98,40 @@ Output JSON matching this exact structure:
 
     director_data = json.loads(cleaned)
 
+    # Enrich with Kinetic Sub-Director Plan (Rule 140 / Vox Engine v3)
+    try:
+        from app.services.kinetic_sub_director import (
+            build_kinetic_causal_i2v_prompt,
+            generate_scene_sub_director_plan,
+        )
+        from core.market_resolver import resolve_canonical_market
+
+        mkt = script_data.get("market") or (episode_id.split("_")[0] if "_" in episode_id else "EN")
+        resolved_mkt = resolve_canonical_market(market_raw=mkt)
+        for sc in director_data.get("scenes", []):
+            sc_id = sc.get("scene_id", "SCENE_01")
+            sc_text = sc.get("sentence", "") or sc.get("narration", "") or sc.get("core_idea", "")
+            sc_hero = sc.get("visual_metaphor", "") or sc.get("editorial_title", "")
+            raw_dur = sc.get("duration_sec") or sc.get("duration_est_sec") or 5.0
+            sub_plan = generate_scene_sub_director_plan(
+                scene_id=sc_id,
+                sentence=sc_text,
+                hero_cutout_object=sc_hero,
+                interacting_objects=["crimson forensic seal stamp", "brass precision caliper"],
+                duration_sec=float(raw_dur),
+                market=resolved_mkt,
+            )
+            i2v_p = build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=sc.get("camera_directive", "STATIC_OVERHEAD"))
+            sc["scene_sub_director_plan"] = sub_plan
+            sc["flow_video_prompt"] = i2v_p
+            sc["i2v_prompt_google_flow"] = i2v_p
+            sc["i2v_prompt_omni"] = i2v_p
+
+        from stages.s05_director_plan import generate_7acc_flow_manifest
+        generate_7acc_flow_manifest(episode_dir, episode_id, director_data.get("scenes", []))
+    except (ValueError, TypeError, KeyError, ImportError) as _ex:
+        logger.warning(f"Kinetic sub-director enrichment notice: {_ex}")
+
     # Lưu director_plan.json
     out_file = episode_dir / "director_plan.json"
     with open(out_file, "w", encoding="utf-8") as f:

@@ -1206,6 +1206,32 @@ def build_unified_director_plan(
         seed_title = fg_roster[fg_key]["title"] if fg_key else bg_roster[bg_key]["title"]
         setting_desc = bg_roster[bg_key]["title"]
 
+        # Kinetic Sub-Director Plan (Rule 140 / Vox Engine v3)
+        sub_plan = {}
+        kinetic_i2v_prompt = ""
+        try:
+            from app.services.kinetic_sub_director import (
+                build_kinetic_causal_i2v_prompt,
+                generate_scene_sub_director_plan,
+            )
+            from core.market_resolver import resolve_canonical_market
+
+            resolved_market = resolve_canonical_market(market_raw=mkt)
+            scene_whisper_words = sent.get("words") or sent.get("subtitles") if isinstance(sent, dict) else None
+
+            sub_plan = generate_scene_sub_director_plan(
+                scene_id=f"sc{idx:03d}",
+                sentence=narr or seed_title,
+                hero_cutout_object=seed_title,
+                interacting_objects=["crimson forensic seal stamp", "brass precision caliper"],
+                duration_sec=dur_sec,
+                market=resolved_market,
+                whisper_words=scene_whisper_words,
+            )
+            kinetic_i2v_prompt = build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=cam_move)
+        except (ValueError, TypeError, KeyError, ImportError) as _k_err:
+            logger.warning("[unified_vox_director] Kinetic sub-director notice: %s", _k_err)
+
         is_hero_video = idx in dynamic_hero_indices
         if is_hero_video:
             flow_slot = FLOW_ACCOUNTS[hero_count % len(FLOW_ACCOUNTS)]
@@ -1240,10 +1266,11 @@ def build_unified_director_plan(
                 "transition_out": transition_choice,
                 "audio_cue": foleys,
                 "text_overlay": None,
-                "final_veo_prompt": veo_prompt,
+                "final_veo_prompt": kinetic_i2v_prompt or veo_prompt,
                 "bg_key": bg_key,
                 "fg_key": fg_key,
-                "prompt": veo_prompt,
+                "prompt": kinetic_i2v_prompt or veo_prompt,
+                "scene_sub_director_plan": sub_plan,
                 "foleys_audio": foleys,
                 "output_filename": f"hero_video_sc{idx:03d}.mp4"
             }
@@ -1459,22 +1486,24 @@ def build_unified_director_plan(
             }
         ]
 
-        scene_obj["i2v_prompt_omni"] = (
+        scene_obj["scene_sub_director_plan"] = sub_plan
+        scene_obj["flow_video_prompt"] = kinetic_i2v_prompt or (
+            f"Editorial paper cutout animation in Vox documentary style. Headline: '{sc_headline}'. "
+            f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
+            f"[Camera: {cam_move}]. "
+            f"Animate completed composition: {hero_title} on {bg_title}. "
+            f"0.0-2.0s: Tactile entry of bold geometric paper shapes. "
+            f"2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges. "
+            f"7.0-10.0s: Spatial anchor locked, subtle micro-shadow breathing <= 2px, zero drift."
+        )
+        scene_obj["i2v_prompt_omni"] = kinetic_i2v_prompt or (
             f"Tactile paper cutout animation in signature Vox documentary style. "
             f"Animate composition: {hero_title} on {bg_title}. "
             f"Hero cutout slides in smoothly from {'left' if fg_side == 'left' else 'right'} edge, crimson verification stamp impacts firmly at 1.8s, "
             f"holding locked spatial anchor with subtle paper micro-breathing <= 2px. "
             f"Static top-down camera, zero camera drift."
         )
-
-        scene_obj["i2v_prompt_google_flow"] = (
-            f"Editorial paper cutout animation in Vox documentary style. "
-            f"Animate completed composition: {hero_title} on {bg_title}. "
-            f"0.0-2.0s: Tactile entry of bold geometric paper shapes and headline '{sc_headline}'. "
-            f"2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges. "
-            f"7.0-10.0s: Spatial anchor locked, subtle micro-shadow breathing <= 2px, zero drift. "
-            f"Camera: Completely static top-down desk view, crisp focus, no 3D pan or tilt."
-        )
+        scene_obj["i2v_prompt_google_flow"] = kinetic_i2v_prompt or scene_obj["flow_video_prompt"]
 
         scenes.append(scene_obj)
 
@@ -1521,7 +1550,9 @@ def build_unified_director_plan(
                 "highlight_word": sc.get("highlight_word"),
                 "category": sc.get("category"),
                 "subtext": sc.get("subtext"),
-                "accent_color": sc.get("accent_color")
+                "accent_color": sc.get("accent_color"),
+                "scene_sub_director_plan": sc.get("scene_sub_director_plan"),
+                "flow_video_prompt": sc.get("flow_video_prompt") or sc.get("i2v_prompt_google_flow"),
             }
             for sc in scenes
         ]

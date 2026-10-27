@@ -778,6 +778,31 @@ class VoxAutomatedDirector:
             is_collage = (layout_variant == "paper_collage")
             fg_pos = "left" if (idx0 % 2 == 0) else "right"
 
+            # Kinetic Sub-Director Plan (Rule 140 / Vox Engine v3)
+            sub_plan = {}
+            kinetic_prompt = ""
+            try:
+                from app.services.kinetic_sub_director import (
+                    build_kinetic_causal_i2v_prompt,
+                    generate_scene_sub_director_plan,
+                )
+                from core.market_resolver import resolve_canonical_market
+
+                resolved_mkt = resolve_canonical_market(market_raw=self.market)
+                dur_s = float(round(duration_frames / self.fps, 2))
+                sub_plan = generate_scene_sub_director_plan(
+                    scene_id=f"scene_{b_idx:02d}",
+                    sentence=b.get("narration", "") or headline,
+                    hero_cutout_object=hero_label,
+                    interacting_objects=["crimson forensic seal stamp", "brass precision caliper"],
+                    duration_sec=dur_s,
+                    market=resolved_mkt,
+                    whisper_words=b.get("whisper_words") or b.get("words"),
+                )
+                kinetic_prompt = build_kinetic_causal_i2v_prompt(sub_plan)
+            except (ValueError, TypeError, KeyError, ImportError) as _k_err:
+                logger.debug(f"[vox_automated_director] Kinetic sub-director notice: {_k_err}")
+
             scene_entry = {
                 "id": f"scene_{b_idx:02d}",
                 "beat_index": b_idx,
@@ -802,6 +827,8 @@ class VoxAutomatedDirector:
                 "paper_material": paper_mat,
                 "diorama_style_block": b.get("diorama_style_block", "FLAT_PARALLAX"),
                 "video_prompt": b.get("video_prompt", ""),
+                "flow_video_prompt": kinetic_prompt or b.get("video_prompt", ""),
+                "scene_sub_director_plan": sub_plan,
                 "speech_timestamp_cue": b.get("speech_timestamp_cue", ""),
                 "named_escalation_beat": b.get("named_escalation_beat", ""),
                 "routed_video_model": b.get("routed_video_model", video_engine_mode),

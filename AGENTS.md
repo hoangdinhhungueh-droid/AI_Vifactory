@@ -141,9 +141,24 @@
       + Câu đơn giản (1 mệnh đề): Nở 4 - 5 beats.
       + Câu phức hợp (2-3 vế, có từ nối "nhưng", "tuy nhiên", "khiến cho", con số định lượng): Nở 6 - 7 beats.
       + **Luật Chuyển Giao Nhân Quả (Causal Handoff Law)**: Target hoặc Tồn dư của Beat $n$ BẮT BUỘC phải là Source hoặc Target của Beat $n+1$. Chuỗi chuyển động là một dây xích khép kín.
-    - **Cú Pháp Động Từ Liên Hợp Nhân Quả Trong Prompt I2V**:
+    - **Tốc Độ Stop-Motion Bứt Tốc (Snappy Stop-Motion Physics $\le 0.4s$ & Anti-Slowdown Invariant)**:
+      + Mọi cử động xuất hiện, va chạm, dập dấu, kéo thước, cắt xé BẮT BUỘC bứt tốc dứt khoát trong $0.2s - 0.4s$ ($6 - 12\text{ frames}$ ở 30fps) với gia tốc nhảy cóc (step motion curve).
+      + **Khóa Cứng Bất Động (Dead-Stop Hold)**: Ngay sau va chạm, vật thể BẮT BUỘC đứng im bất động 100% tại chỗ cho đến hết thì hoặc cut chuyển cảnh, CHỈ duy trì vi rung bóng đổ/thớ giấy $\le 2\text{px}$ ở 12fps ("on twos").
+      + **Cấm Kéo Dãn Tuyến Tính Chậm Đều (Anti-Slowdown)**: CẤM TUYỆT ĐỐI kéo dãn chuyển động chậm chạp dàn trải đều qua suốt 5–8s khiến video trông như một screensaver trôi nổi vô hồn.
+    - **Đồng Bộ Tuyệt Đối Với Whisper Word Timestamps ($0\text{ms}$ Drift Invariant)**:
+      + Mốc thời gian của từng Micro-Beat và Layer Remotion BẮT BUỘC neo cứng vào từ phát âm thực tế trong Voiceover (`whisper_word_timestamps`).
+      + CẤM nén, giãn, scale hoặc clamp giả tạo làm sai lệch phụ đề, âm thanh và chuyển động thị giác. Độ trôi lệch (drift) tối đa cho phép là $0\text{ms}$.
+    - **Cú Pháp Động Từ Liên Hợp Nhân Quả Trong Prompt I2V (Causal Compound Verb Syntax)**:
       BẮT BUỘC sử dụng cú pháp: `[SOURCE] + [contact_verb] + [TARGET], causing [TARGET] to [physical_reaction], leaving [residue].`
       Tuyệt đối không liệt kê rời rạc. Duy trì vi rung stop-motion 12fps (on twos) và nhịp thở bóng đổ $\le 2\text{px}$ đến tận cut chuyển cảnh. CẤM ĐÓNG BĂNG KHUNG HÌNH (freeze frame).
+    - **Kỷ Luật Triển Khai Toàn Diện Trên Luồng Gốc (Root Pipeline Deployment Mandate)**:
+      + Toàn bộ logic phân rã động học xúc giác $H_1 \rightarrow H_7$, 4..7 micro-beats và cú pháp prompt liên hợp BẮT BUỘC phải được nạp và thực thi trực tiếp trên tất cả các module Đạo diễn gốc của hệ thống:
+        * `stages/s05_director_plan.py`
+        * `app/services/unified_vox_director.py`
+        * `app/services/director_planner_b3.py`
+        * `app/services/vox_automated_director.py`
+        * `scripts/generate_vox_b3_director.py`
+      + Mọi output Scene ở tầng Đạo Diễn luồng chính BẮT BUỘC phải chứa `scene_sub_director_plan` (schema v3) và `flow_video_prompt`. CẤM TUYỆT ĐỐI để bất kỳ luồng chạy nào bỏ qua (bypass) hoặc chỉ sinh kịch bản thô thiếu kế hoạch phân rã cơ học xúc giác.
 
 23. **RULE 141 (Mandatory Concrete Visual Audit Table & Clickable Forensic Evidence Gate)**:
     - **Cấm Tuyệt Đối Báo Cáo Xuông (Zero-Vague-Reporting Mandate)**:

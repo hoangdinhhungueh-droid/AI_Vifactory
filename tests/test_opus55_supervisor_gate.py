@@ -174,20 +174,33 @@ class TestOpus55SupervisorGate:
             assert pc in reviewed_comps
         assert any("Incremental delta audit verified" in obs for obs in res["observations"])
 
-    def test_supreme_opus55_lock_enforcement(self, monkeypatch):
+    def test_supreme_opus55_lock_enforcement(self):
+        import os
         from scripts.orchestrator.boss_orchestrator import resolve_audit_model
 
-        # 1. Without --supreme and env pointing to Opus -> Must fallback to gpt-6.1-sol
-        monkeypatch.setenv("HHTECH_PLANNER_MODEL", "claude-opus-5-5")
-        monkeypatch.delenv("ALLOW_SUPREME_OPUS55_CALL", raising=False)
-        m_routine = resolve_audit_model(is_supreme=False)
-        assert m_routine == "gpt-6.1-sol"
+        orig_model = os.environ.get("HHTECH_PLANNER_MODEL")
+        orig_allow = os.environ.get("ALLOW_SUPREME_OPUS55_CALL")
+        try:
+            # 1. Without --supreme and env pointing to Opus -> Must fallback to gpt-6.1-sol
+            os.environ["HHTECH_PLANNER_MODEL"] = "claude-opus-5-5"
+            os.environ.pop("ALLOW_SUPREME_OPUS55_CALL", None)
+            m_routine = resolve_audit_model(is_supreme=False)
+            assert m_routine == "gpt-6.1-sol"
 
-        # 2. With is_supreme=True -> Authorized
-        m_supreme = resolve_audit_model(is_supreme=True)
-        assert m_supreme == "claude-opus-5-5"
+            # 2. With is_supreme=True -> Authorized
+            m_supreme = resolve_audit_model(is_supreme=True)
+            assert m_supreme == "claude-opus-5-5"
 
-        # 3. Direct call_opus55_supervisor dry-run without is_supreme -> model safely downgraded
-        digest = {"task_id": "TEST_LOCK", "task_objective": "Test lock"}
-        gate_res = call_opus55_supervisor(digest, dry_run=True, model="claude-opus-5-5", is_supreme=False)
-        assert "gpt-6.1-sol" in gate_res["supervisor_model"]
+            # 3. Direct call_opus55_supervisor dry-run without is_supreme -> model safely downgraded
+            digest = {"task_id": "TEST_LOCK", "task_objective": "Test lock"}
+            gate_res = call_opus55_supervisor(digest, dry_run=True, model="claude-opus-5-5", is_supreme=False)
+            assert "gpt-6.1-sol" in gate_res["supervisor_model"]
+        finally:
+            if orig_model is not None:
+                os.environ["HHTECH_PLANNER_MODEL"] = orig_model
+            else:
+                os.environ.pop("HHTECH_PLANNER_MODEL", None)
+            if orig_allow is not None:
+                os.environ["ALLOW_SUPREME_OPUS55_CALL"] = orig_allow
+            else:
+                os.environ.pop("ALLOW_SUPREME_OPUS55_CALL", None)
