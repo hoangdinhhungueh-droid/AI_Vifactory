@@ -8,8 +8,11 @@ Metadata preservation: reads existing_brain and produces prompts_forge.json thro
 Enforces audio spine integrity: _is_valid_audio_spine.
 """
 
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger("vf.director_planner_b3")
 
 from stages.s05_director_plan import (
     CANONICAL_BEATS,
