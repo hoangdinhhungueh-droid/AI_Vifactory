@@ -695,12 +695,23 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
             raise
         except Exception as err:
             print(f"⚠️ Lỗi ở lần thử {attempt}: {err}")
+            is_closed = False
+            try:
+                is_closed = (page is None) or page.is_closed() or ("closed" in str(err).lower())
+            except Exception:
+                is_closed = True
+            if is_closed:
+                raise RuntimeError(f"Target page, context or browser has been closed: {err}")
             time.sleep(3)
 
     debug_dir = r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets\debug"
     os.makedirs(debug_dir, exist_ok=True)
     debug_shot = os.path.join(debug_dir, f"debug_timeout_{int(time.time())}.png")
-    page.screenshot(path=debug_shot)
+    try:
+        if page and not page.is_closed():
+            page.screenshot(path=debug_shot)
+    except Exception:
+        pass
     raise RuntimeError(f"❌ Không lưu được ảnh từ Gemini Web sau {max_retries} lần thử. Screenshot: {debug_shot}")
 
 def audit_single_image(img_path, layer_type):
@@ -1285,6 +1296,43 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                             continue
                     except Exception as gen_err:
                         print(f"❌ Lỗi sinh ảnh {key} (lần {attempt}): {gen_err}")
+                        is_browser_closed = False
+                        try:
+                            is_browser_closed = (page is None) or page.is_closed() or ("closed" in str(gen_err).lower())
+                        except Exception:
+                            is_browser_closed = True
+
+                        if is_browser_closed:
+                            print(f"⚠️ Trình duyệt hoặc trang bị đóng/mất kết nối. Đang tự động hồi sinh phiên {current_acc_id}...")
+                            try:
+                                open_account_context(current_acc_id)
+                                time.sleep(2)
+                                continue
+                            except QuotaExhaustedError as qe:
+                                print(f"⚠️ {current_acc_id} cạn quota khi hồi sinh: {qe}")
+                                acc_idx += 1
+                                if acc_idx >= len(accounts_order):
+                                    print("❌ Toàn bộ 7 tài khoản trong hạm đội đều đã đạt hạn mức!")
+                                    break
+                                current_acc_id = accounts_order[acc_idx]
+                                try:
+                                    open_account_context(current_acc_id)
+                                    continue
+                                except Exception:
+                                    pass
+                            except Exception as reconnect_err:
+                                print(f"⚠️ Không thể kết nối lại {current_acc_id}: {reconnect_err}. Thử chuyển sang tài khoản tiếp theo...")
+                                acc_idx += 1
+                                if acc_idx >= len(accounts_order):
+                                    print("❌ Toàn bộ tài khoản trong hạm đội đều lỗi!")
+                                    break
+                                current_acc_id = accounts_order[acc_idx]
+                                try:
+                                    open_account_context(current_acc_id)
+                                    continue
+                                except Exception:
+                                    pass
+
                         if attempt < MAX_INPLACE_RETRIES:
                             time.sleep(3)
                             attempt += 1
