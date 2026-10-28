@@ -342,11 +342,12 @@ def sync_assets_to_blocks_and_flat(episode_id: str, block_manifest: Dict[str, An
                     shutil.copy2(str(found_vid), str(dest_flat_vid))
 
 
-def run_stage_images(episode_id: str, limit: int = 0, headless: bool = False, pacing: int = 4, force: bool = False) -> bool:
+def run_stage_images(episode_id: str, limit: int = 0, headless: bool = False, pacing: int = 4, force: bool = False, acc: str = "all") -> bool:
     """Thực thi sinh ảnh qua gemini_browser_gen.py."""
     print("\n" + "=" * 75)
     print("🎨 [BƯỚC 4: SINH ẢNH SEED CHUẨN VOX CONTINUOUS]")
     print(f"   Episode: {episode_id}")
+    print(f"   Tài khoản: {acc}")
     print(f"   Giới hạn: {limit if limit > 0 else 'Toàn bộ'} ảnh")
     print(f"   Headless: {headless} | Pacing: {pacing}s | Force: {force}")
     print("=" * 75)
@@ -356,6 +357,7 @@ def run_stage_images(episode_id: str, limit: int = 0, headless: bool = False, pa
         str(ROOT_DIR / "scripts" / "gemini_browser_gen.py"),
         "--episode", episode_id,
         "--pacing", str(pacing),
+        "--acc", acc,
         "--no-auto-handoff"
     ]
     if limit > 0:
@@ -972,7 +974,8 @@ def main():
             limit=total_scenes_to_run,
             headless=args.headless,
             pacing=args.pacing,
-            force=args.force
+            force=args.force,
+            acc=args.acc
         )
         sync_assets_to_blocks_and_flat(clean_ep, block_manifest)
         audit_summary = perform_b5_visual_audit(clean_ep, block_manifest, limit=total_scenes_to_run)

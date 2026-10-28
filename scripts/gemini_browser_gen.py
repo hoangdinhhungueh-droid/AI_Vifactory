@@ -26,7 +26,59 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-USER_DATA_DIR = os.environ.get("GEMINI_BROWSER_PROFILE", str(Path.home() / ".gemini" / "browser_profile"))
+PROFILES_BASE_DIR = Path.home() / ".gemini" / "profiles"
+DEFAULT_IMAGE_PROFILE_DIR = Path.home() / ".gemini" / "browser_profile"
+
+FLEET_PROFILES = {
+    'acc_01': {
+        'id': 'acc_01',
+        'path': DEFAULT_IMAGE_PROFILE_DIR,
+        'email': 'hoangdinhhung.ueh@gmail.com',
+        'name': 'Hưng Hoàng Đình'
+    },
+    'acc_02': {
+        'id': 'acc_02',
+        'path': PROFILES_BASE_DIR / 'acc_02',
+        'email': 'dinhhung111995@gmail.com',
+        'name': 'Hung Dinh'
+    },
+    'acc_03': {
+        'id': 'acc_03',
+        'path': PROFILES_BASE_DIR / 'acc_03',
+        'email': 'hunghoangdinh2308@gmail.com',
+        'name': 'Hung Hoang'
+    },
+    'acc_04': {
+        'id': 'acc_04',
+        'path': PROFILES_BASE_DIR / 'acc_04',
+        'email': 'wmpexpansion@gmail.com',
+        'name': 'Expansion WMP'
+    },
+    'acc_05': {
+        'id': 'acc_05',
+        'path': PROFILES_BASE_DIR / 'acc_05',
+        'email': 'untoldstorieskr@gmail.com',
+        'name': 'Hưng Hoàng'
+    },
+    'acc_06': {
+        'id': 'acc_06',
+        'path': PROFILES_BASE_DIR / 'acc_06',
+        'email': 'untoldstoriesjp@gmail.com',
+        'name': 'Hung Hoang'
+    },
+    'acc_07': {
+        'id': 'acc_07',
+        'path': PROFILES_BASE_DIR / 'acc_07',
+        'email': 'hunghoangdinh090@gmail.com',
+        'name': 'Hung Hoang Dinh'
+    }
+}
+
+class QuotaExhaustedError(RuntimeError):
+    """Exception raised when Imagen 3 generation quota limit is reached or cooling down."""
+    pass
+
+USER_DATA_DIR = os.environ.get("GEMINI_BROWSER_PROFILE", str(DEFAULT_IMAGE_PROFILE_DIR))
 try:
     os.makedirs(USER_DATA_DIR, exist_ok=True)
 except OSError as _mk_err:
@@ -149,13 +201,112 @@ try:
 except Exception as _ce:
     client = DirectMCPClient()
 
-def check_gemini_session(page):
-    """Kiểm tra trạng thái đăng nhập Gemini Web."""
-    print("🌐 Đang kết nối tới https://gemini.google.com/app...")
+def dismiss_gemini_popups(page):
+    """Đóng các popup chào mừng, lưu ý hoặc overlay gây cản trở tương tác."""
+    try:
+        # 1. Thử click trực tiếp các button phổ biến qua Playwright locator với force=True
+        for btn_text in ["Tôi hiểu", "Đã hiểu", "Tôi đồng ý", "Tiếp tục", "Bắt đầu", "Got it", "I understand", "Continue", "Accept", "Dismiss", "Close", "Đóng"]:
+            try:
+                locator = page.locator(f"button:has-text('{btn_text}'), [role='button']:has-text('{btn_text}')")
+                if locator.count() > 0 and locator.first.is_visible():
+                    locator.first.click(force=True)
+                    time.sleep(0.3)
+            except Exception:
+                pass
+
+        # 2. Quét sâu qua JavaScript DOM evaluate
+        page.evaluate('''() => {
+            const targets = [
+                "tôi hiểu", "đã hiểu", "hiểu", "tôi đã hiểu",
+                "tiếp tục", "continue", "tiếp theo", "next",
+                "got it", "xong", "done", "đóng", "close",
+                "tôi đồng ý", "i agree", "bỏ qua", "dismiss",
+                "chấp nhận", "accept", "understand", "i understand"
+            ];
+            const btns = Array.from(document.querySelectorAll('button, [role="button"], a'));
+            for (let b of btns) {
+                const t = (b.innerText || b.getAttribute('aria-label') || "").trim().toLowerCase();
+                if (targets.some(target => t === target || t.includes(target))) {
+                    try { b.click(); } catch(e) {}
+                }
+            }
+            const backdrops = document.querySelectorAll('.cdk-overlay-backdrop, mat-dialog-container, [role="dialog"], chat-app-announcement-banners, bot-banner, .announcement-banner-container, chat-app-banners');
+            for (let bd of backdrops) {
+                try { bd.remove(); } catch(e) {}
+            }
+        }''')
+    except Exception as e:
+        logger.debug(f"Popup dismiss notice: {e}")
+
+def detect_quota_exhausted(page) -> tuple[bool, str]:
+    """Phát hiện chủ động hạn mức Imagen 3 bị cạn trong 1-2 giây qua DOM & Text."""
+    try:
+        res = page.evaluate('''() => {
+            const body = document.body ? document.body.innerText : "";
+            const patterns = [
+                { reg: /as soon as your limit resets/i, msg: "as soon as your limit resets" },
+                { reg: /I can create more images as soon as your limit resets/i, msg: "I can create more images as soon as your limit resets" },
+                { reg: /Hạn mức của bạn sẽ được đặt lại/i, msg: "Hạn mức của bạn sẽ được đặt lại" },
+                { reg: /Your limit will reset/i, msg: "Your limit will reset" },
+                { reg: /reached your (?:image )?limit/i, msg: "reached your image limit" },
+                { reg: /Check your usage in Settings/i, msg: "Check your usage in Settings" },
+                { reg: /Gói thuê bao Google AI Pro của bạn đã kết thúc/i, msg: "Subscription ended" },
+                { reg: /đã đạt đến hạn mức/i, msg: "đã đạt đến hạn mức" },
+                { reg: /đã đạt hạn mức/i, msg: "đã đạt hạn mức" },
+                { reg: /limit resets/i, msg: "limit resets" }
+            ];
+            for (const p of patterns) {
+                if (p.reg.test(body)) {
+                    return { hit: true, msg: p.msg };
+                }
+            }
+            return { hit: false, msg: "" };
+        }''')
+        if res and res.get("hit"):
+            return True, res.get("msg", "Quota limit detected")
+    except Exception as e:
+        logger.debug(f"detect_quota_exhausted notice: {e}")
+    return False, ""
+
+def get_fleet_accounts(start_acc="all") -> list[str]:
+    """Trả về thứ tự các tài khoản trong hạm đội 7 acc để xoay vòng, ưu tiên các tài khoản READY."""
+    all_keys = list(FLEET_PROFILES.keys())
+    if start_acc and start_acc != "all" and start_acc in FLEET_PROFILES:
+        idx = all_keys.index(start_acc)
+        return all_keys[idx:] + all_keys[:idx]
+
+    # Đọc trạng thái từ antigravity_quota_fleet.json nếu có
+    fleet_json = Path.home() / ".gemini" / "antigravity_quota_fleet.json"
+    if fleet_json.exists():
+        try:
+            with open(fleet_json, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            rec = data.get("recommended_next_acc")
+            accs = data.get("accounts", {})
+            ready_accs = [k for k, v in accs.items() if v.get("status") == "READY" and k in FLEET_PROFILES]
+            cooling_accs = [k for k, v in accs.items() if v.get("status") != "READY" and k in FLEET_PROFILES]
+            if "acc_06" in ready_accs:
+                ready_accs.remove("acc_06")
+                cooling_accs.append("acc_06")
+            verified_priority = ["acc_03", "acc_04", "acc_07", "acc_05", "acc_02"]
+            top_accs = [a for a in verified_priority if a in ready_accs]
+            other_ready = [a for a in ready_accs if a not in top_accs]
+            ordered = top_accs + other_ready + [k for k in all_keys if k not in ready_accs and k not in cooling_accs] + cooling_accs
+            return ordered
+        except Exception as _fe:
+            logger.debug(f"Fleet JSON parse notice: {_fe}")
+    return all_keys
+
+def check_gemini_session(page, acc_name=""):
+    """Kiểm tra trạng thái đăng nhập Gemini Web và phát hiện sớm quota."""
+    label = f"[{acc_name}] " if acc_name else ""
+    print(f"🌐 {label}Đang kết nối tới https://gemini.google.com/app...")
     page.goto("https://gemini.google.com/app", wait_until="domcontentloaded")
+    dismiss_gemini_popups(page)
 
     input_box = None
     for _ in range(15):
+        dismiss_gemini_popups(page)
         input_box = page.query_selector('div[role="textbox"], div[contenteditable="true"], textarea')
         if input_box and input_box.is_visible():
             break
@@ -166,14 +317,20 @@ def check_gemini_session(page):
 
     if sign_in_btn and not user_avatar and not input_box:
         print("\n" + "!"*70)
-        print("❌ CHƯA ĐĂNG NHẬP GOOGLE PRO TRÊN TRÌNH DUYỆT!")
+        print(f"❌ {label}CHƯA ĐĂNG NHẬP GOOGLE PRO TRÊN TRÌNH DUYỆT!")
         print(r"👉 Vui lòng mở tiện ích trên Desktop: C:\Users\hunghd2\Desktop\AI VF\Mo_Gemini_DangNhap.bat")
         print("👉 Bấm 'Sign in' để hoàn tất đăng nhập tài khoản Google Pro.")
         print("!"*70 + "\n")
         return None
 
+    # Kiểm tra chủ động xem tài khoản có đang ở trạng thái chạm trần quota hay không
+    quota_hit, reason = detect_quota_exhausted(page)
+    if quota_hit:
+        print(f"⚠️ {label}Phát hiện tài khoản chạm trần Quota ngay khi mở trang: '{reason}'")
+        raise QuotaExhaustedError(f"{label}Quota exhausted: {reason}")
+
     if input_box:
-        print("✅ Đã kết nối phiên đăng nhập Gemini Pro thành công!")
+        print(f"✅ {label}Đã kết nối phiên đăng nhập Gemini Pro thành công!")
         return input_box
 
     return None
@@ -323,13 +480,14 @@ def fetch_prompts_from_vps(episode_id):
         print("ℹ️ [B4 Image Gen] Thumbnails decoupled to YouTube Studio Native Gemini Designer at HG3 (0 thumbnails in pipeline).")
     return items
 
-def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Background", timeout_sec=120, max_retries=2):
+def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Background", timeout_sec=180, max_retries=2):
     """Gửi prompt lên Gemini Web và lưu kết quả dưới định dạng .PNG chuẩn 2K DCI với cơ chế retry tự động."""
     for attempt in range(1, max_retries + 1):
         try:
             print(f"\n📝 [Prompt (Lần {attempt}/{max_retries})]: {prompt_text[:90]}...")
 
             # Đảm bảo trang sạch / New Chat để tránh lẫn ảnh cũ
+            dismiss_gemini_popups(page)
             try:
                 new_chat_btn = page.query_selector('a[href="/app"], [aria-label*="New chat"], [aria-label*="Cuộc trò chuyện mới"], button:has-text("New chat")')
                 if new_chat_btn:
@@ -341,6 +499,13 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
             except Exception:
                 page.goto("https://gemini.google.com/app", wait_until="domcontentloaded")
                 time.sleep(3)
+            dismiss_gemini_popups(page)
+
+            # Pre-check Quota: Nếu tài khoản đã hết quota từ trước, không cần gõ prompt làm gì
+            quota_hit, quota_reason = detect_quota_exhausted(page)
+            if quota_hit:
+                print(f"⚠️ [PRE-CHECK QUOTA HIT] Phát hiện Gemini cạn hạn mức tạo ảnh: '{quota_reason}'!")
+                raise QuotaExhaustedError(f"Imagen 3 Quota Limit Hit (Pre-check): {quota_reason}")
 
             # 1. Tìm ô nhập
             input_box = page.wait_for_selector('div[role="textbox"], div[contenteditable="true"], textarea', timeout=30000)
@@ -399,8 +564,15 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
 
             while time.time() - start_time < timeout_sec:
                 time.sleep(2)
+                dismiss_gemini_popups(page)
 
-                # Early Refusal Fast-Fail: Bắt text từ chối ngay trong 5s thay vì chờ mù 120s
+                # 1. Proactive Quota Detection Fast-Fail: Bắt ngay trong 2-4s thay vì chờ 120s timeout
+                quota_hit, quota_reason = detect_quota_exhausted(page)
+                if quota_hit:
+                    print(f"⚠️ [PROACTIVE QUOTA HIT] Phát hiện Gemini cạn hạn mức tạo ảnh: '{quota_reason}'! Kích hoạt xoay vòng tài khoản...")
+                    raise QuotaExhaustedError(f"Imagen 3 Quota Limit Hit: {quota_reason}")
+
+                # 2. Early Refusal Fast-Fail: Bắt text từ chối ngay trong 5s thay vì chờ mù 120s
                 refusal = page.query_selector(
                     'div.markdown:has-text("cannot directly generate"), '
                     'div.markdown:has-text("không thể trực tiếp tạo"), '
@@ -519,6 +691,8 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
 
             print(f"⚠️ Hết thời gian chờ {timeout_sec}s ở lần thử {attempt}. Đang chuẩn bị thử lại...")
             time.sleep(3)
+        except QuotaExhaustedError:
+            raise
         except Exception as err:
             print(f"⚠️ Lỗi ở lần thử {attempt}: {err}")
             time.sleep(3)
@@ -999,36 +1173,76 @@ def trigger_b6_handoff(episode_id):
     print(check_res.get("stdout"))
 
 
-def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3, force=False, auto_handoff=False):
-    """Chạy toàn bộ quy trình sinh ảnh bằng Chrome Web Automation (PNG 100%)."""
+def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3, force=False, auto_handoff=False, initial_acc="all"):
+    """Chạy toàn bộ quy trình sinh ảnh bằng Chrome Web Automation (PNG 100%) với hạm đội 7 acc tự động xoay vòng."""
     print(f"\n🎬 BẮT ĐẦU GENERATE ẢNH CHO EPISODE: {episode_id} ({len(prompt_items)} items) [CHUẨN 100% PNG]")
 
     local_episode_dir = os.path.join(r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets", episode_id)
     os.makedirs(local_episode_dir, exist_ok=True)
 
+    accounts_order = get_fleet_accounts(initial_acc)
+    print(f"🚀 [Fleet Management] Thứ tự ưu tiên hạm đội 7 tài khoản: {', '.join(accounts_order)}")
+
+    acc_idx = 0
+    current_acc_id = accounts_order[acc_idx]
+
     with sync_playwright() as p:
-        browser = p.chromium.launch_persistent_context(
-            user_data_dir=USER_DATA_DIR,
-            channel="chrome",
-            headless=headless,
-            args=["--start-maximized", "--disable-blink-features=AutomationControlled"],
-            no_viewport=True
-        )
-        page = browser.pages[0] if browser.pages else browser.new_page()
+        browser = None
+        page = None
+
+        def open_account_context(acc_id):
+            nonlocal browser, page
+            if browser:
+                try:
+                    browser.close()
+                except Exception as _bce:
+                    logger.debug(f"Close context notice: {_bce}")
+                time.sleep(1)
+
+            acc_info = FLEET_PROFILES.get(acc_id, {})
+            profile_dir = acc_info.get("path") or DEFAULT_IMAGE_PROFILE_DIR
+            os.makedirs(profile_dir, exist_ok=True)
+            print(f"\n🔑 [Fleet Switch] Đang kích hoạt tài khoản: {acc_id} ({acc_info.get('email', 'N/A')} - {acc_info.get('name', 'N/A')})")
+            print(f"📂 Profile dir: {profile_dir}")
+
+            browser = p.chromium.launch_persistent_context(
+                user_data_dir=str(profile_dir),
+                channel="chrome",
+                headless=headless,
+                args=["--start-maximized", "--disable-blink-features=AutomationControlled"],
+                no_viewport=True
+            )
+            page = browser.pages[0] if browser.pages else browser.new_page()
+            input_box = check_gemini_session(page, acc_name=acc_id)
+            if not input_box:
+                raise RuntimeError(f"Chưa có phiên đăng nhập trên {acc_id}")
+            return page
+
+        # Mở tài khoản đầu tiên
+        while acc_idx < len(accounts_order):
+            try:
+                current_acc_id = accounts_order[acc_idx]
+                open_account_context(current_acc_id)
+                break
+            except QuotaExhaustedError as qe:
+                print(f"⚠️ {current_acc_id} đang hết quota: {qe}. Chuyển sang tài khoản tiếp theo...")
+                acc_idx += 1
+            except Exception as ex:
+                print(f"⚠️ Lỗi khởi tạo {current_acc_id}: {ex}. Thử tài khoản tiếp theo...")
+                acc_idx += 1
+
+        if not page or acc_idx >= len(accounts_order):
+            print("❌ Toàn bộ tài khoản trong hạm đội đều không thể kết nối hoặc hết quota!")
+            return False
 
         try:
-            input_box = check_gemini_session(page)
-            if not input_box:
-                print("❌ Dừng pipeline vì chưa có phiên đăng nhập Google Pro.")
-                return False
-
             for idx, item in enumerate(prompt_items, 1):
                 key = item["reuse_key"]
                 prompt = item["prompt"]
                 layer = item.get("layer_type", "Background")
 
                 local_png = os.path.join(local_episode_dir, f"{key}.png")
-                print(f"\n[{idx}/{len(prompt_items)}] Đang xử lý: {key} ({layer})...")
+                print(f"\n[{idx}/{len(prompt_items)}] Đang xử lý: {key} ({layer}) [Acc: {current_acc_id}]...")
 
                 # Check if local image already exists and passes B5 audit
                 if not force and os.path.exists(local_png) and os.path.getsize(local_png) > 10240:
@@ -1042,21 +1256,41 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                     except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
                         print(f"⚠️ Kiểm tra file có sẵn lỗi: {e}. Sẽ sinh lại...")
 
-                # IN-PLACE AUDIT & AUTO-REGENERATE LOOP (Max 3 attempts per image)
+                # IN-PLACE AUDIT & AUTO-REGENERATE LOOP WITH FLEET ROTATION
                 MAX_INPLACE_RETRIES = 3
                 image_passed = False
-                for attempt in range(1, MAX_INPLACE_RETRIES + 1):
+                attempt = 1
+
+                while attempt <= MAX_INPLACE_RETRIES:
                     if attempt > 1:
                         print(f"🔄 [In-Place Retry {attempt}/{MAX_INPLACE_RETRIES}] Sinh lại tại chỗ cho {key}...")
 
                     try:
-                        generate_single_image_png(page, prompt, local_png, layer_type=layer, timeout_sec=120)
+                        generate_single_image_png(page, prompt, local_png, layer_type=layer, timeout_sec=180)
+                    except QuotaExhaustedError as qe:
+                        print(f"\n🚨 [QUOTA EXHAUSTED] {current_acc_id} đạt giới hạn: {qe}")
+                        acc_idx += 1
+                        if acc_idx >= len(accounts_order):
+                            print("❌ Toàn bộ 7 tài khoản trong hạm đội đều đã đạt hạn mức!")
+                            break
+                        next_acc_id = accounts_order[acc_idx]
+                        print(f"🔄 Đang tự động chuyển từ {current_acc_id} -> {next_acc_id} để tiếp tục {key}...")
+                        try:
+                            current_acc_id = next_acc_id
+                            open_account_context(current_acc_id)
+                            # Không tăng attempt khi switch acc vì lỗi do quota acc cũ
+                            continue
+                        except Exception as switch_err:
+                            print(f"⚠️ Lỗi switch sang {next_acc_id}: {switch_err}")
+                            continue
                     except Exception as gen_err:
                         print(f"❌ Lỗi sinh ảnh {key} (lần {attempt}): {gen_err}")
                         if attempt < MAX_INPLACE_RETRIES:
                             time.sleep(3)
+                            attempt += 1
                             continue
                         else:
+                            attempt += 1
                             break
 
                     # Immediate In-Place B5 Forensic Audit (Checklist + HSV)
@@ -1086,7 +1320,9 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                         if attempt < MAX_INPLACE_RETRIES:
                             time.sleep(3)
 
-                # Local storage only during generation (Atomic Batch Archive at end per Rule 119/125)
+                    attempt += 1
+
+                # Local storage only during generation
                 if image_passed and os.path.exists(local_png):
                     print(f"💾 [Local Cache] Ảnh {key}.png sẵn sàng ({layer}). Sẽ đóng gói nguyên tử gửi VPS sau khi hoàn tất.")
                     try:
@@ -1133,12 +1369,17 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
 
             return True
         finally:
-            browser.close()
+            if browser:
+                try:
+                    browser.close()
+                except Exception as _bce:
+                    logger.debug(f"Browser close notice: {_bce}")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [GEMINI_GEN] %(message)s")
     parser = argparse.ArgumentParser(description="Gemini Browser Automation Image Generator")
     parser.add_argument("--episode", type=str, default=None, help="Episode ID (ví dụ: EN_EP0001_...)")
+    parser.add_argument("--acc", type=str, default="all", help="Tài khoản Google Pro (acc_01 đến acc_07 hoặc all)")
     parser.add_argument("--test", action="store_true", help="Chạy thử 1 ảnh mẫu PNG")
     parser.add_argument("--headless", action="store_true", help="Chạy không hiện cửa sổ")
     parser.add_argument("--pacing", type=int, default=3, help="Thời gian giãn cách giữa các prompt (giây)")
@@ -1157,7 +1398,7 @@ if __name__ == "__main__":
             "prompt": "A cinematic dramatic wide shot of a 1960s Wall Street office with volumetric sunlight beams and glowing ticker displays, photorealistic 8k, 16:9 aspect ratio [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]",
             "layer_type": "Background"
         }]
-        run_browser_pipeline("test_run", test_items, headless=args.headless, pacing_sec=5, force=args.force, auto_handoff=auto_handoff)
+        run_browser_pipeline("test_run", test_items, headless=args.headless, pacing_sec=5, force=args.force, auto_handoff=auto_handoff, initial_acc=args.acc)
     else:
         if not args.episode:
             print("❌ LỖI (Rule 128): Thiếu tham số --episode <EPISODE_ID>! Bắt buộc truyền ID tường minh, cấm fallback mặc định.")
@@ -1179,4 +1420,4 @@ if __name__ == "__main__":
             items = items[:args.limit]
             print(f"🎯 Đã giới hạn sinh {args.limit} ảnh đầu tiên theo tham số --limit!")
         print(f"📋 Đã nạp thành công {len(items)} prompts cho episode {clean_ep}")
-        run_browser_pipeline(clean_ep, items, headless=args.headless, pacing_sec=args.pacing, force=args.force, auto_handoff=auto_handoff)
+        run_browser_pipeline(clean_ep, items, headless=args.headless, pacing_sec=args.pacing, force=args.force, auto_handoff=auto_handoff, initial_acc=args.acc)
