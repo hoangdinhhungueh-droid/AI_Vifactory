@@ -199,10 +199,30 @@ def setup_block_directory_structure(episode_id: str) -> Dict[str, Any]:
     scenes = plan.get("scenes", [])
     blocks_map: Dict[str, List[Dict[str, Any]]] = {}
 
+    pf_file = episode_dir / "prompts_forge.json"
+    pf_bgs: Dict[str, str] = {}
+    if pf_file.exists():
+        try:
+            with open(pf_file, "r", encoding="utf-8") as f:
+                pf_data = json.load(f)
+            raw_bgs = pf_data.get("backgrounds", {})
+            if isinstance(raw_bgs, dict):
+                pf_bgs = {k: (v if isinstance(v, str) else v.get("prompt", "")) for k, v in raw_bgs.items()}
+        except Exception as _ex:
+            logger.debug("Could not load prompts_forge.json for bg sync: %s", _ex)
+
     plan_updated = False
     for s in scenes:
+        sc_id = s.get("scene_id", "")
         b_name = s.get("sequence_block", "BLOCK_DEFAULT").lower().strip()
         blocks_map.setdefault(b_name, []).append(s)
+
+        # Đồng bộ image_prompt và bg_prompt chuẩn Rule 140 từ prompts_forge nếu có
+        if sc_id in pf_bgs and pf_bgs[sc_id] and s.get("image_prompt") != pf_bgs[sc_id]:
+            s["image_prompt"] = pf_bgs[sc_id]
+            s["bg_prompt"] = pf_bgs[sc_id]
+            plan_updated = True
+
         # Nạp Universal Video Prompt vào scene trong director_plan.json nếu chưa có
         if not s.get("i2v_prompt") or not s.get("video_prompt"):
             uv_prompt = build_universal_video_prompt(s)
@@ -213,7 +233,7 @@ def setup_block_directory_structure(episode_id: str) -> Dict[str, Any]:
     if plan_updated:
         with open(plan_file, "w", encoding="utf-8") as f:
             json.dump(plan, f, indent=2, ensure_ascii=False)
-        print(f"📄 Đã đồng bộ i2v_prompt (Universal Video Prompt) vào {len(scenes)} cảnh trong director_plan.json.")
+        print(f"📄 Đã đồng bộ i2v_prompt & image_prompt (Vox Rule 140) vào {len(scenes)} cảnh trong director_plan.json.")
 
     block_manifest = {
         "episode_id": episode_id,

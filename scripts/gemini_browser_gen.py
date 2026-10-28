@@ -183,6 +183,22 @@ def fetch_prompts_from_vps(episode_id):
     local_episode_dir = os.path.join(r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets", episode_id)
     os.makedirs(local_episode_dir, exist_ok=True)
 
+    # Đảm bảo copy prompts_forge.json từ workspace vào local_episode_dir nếu chưa có
+    ws_pf = ROOT_DIR / "episodes" / episode_id / "prompts_forge.json"
+    local_prompts_file = os.path.join(local_episode_dir, "prompts_forge.json")
+    pf_bgs = {}
+    if ws_pf.exists():
+        try:
+            import shutil
+            shutil.copy2(str(ws_pf), local_prompts_file)
+            with open(ws_pf, "r", encoding="utf-8") as _pff:
+                _pfd = json.load(_pff)
+                raw_b = _pfd.get("backgrounds", {})
+                if isinstance(raw_b, dict):
+                    pf_bgs = {k: (v if isinstance(v, str) else v.get("prompt", "")) for k, v in raw_b.items()}
+        except Exception as _cpe:
+            logger.debug("Copy prompts_forge.json notice: %s", _cpe)
+
     # 1. Ưu tiên đọc director_plan.json từ local (Chuẩn Vox Continuous Object-Assembly)
     local_dp = ROOT_DIR / "episodes" / episode_id / "director_plan.json"
     if local_dp.exists():
@@ -191,17 +207,31 @@ def fetch_prompts_from_vps(episode_id):
                 dp = json.load(f)
             if "scenes" in dp:
                 items = []
+                dp_modified = False
                 for s in dp.get("scenes", []):
                     s_id = s.get("scene_id", "")
                     prompt = s.get("image_prompt", "")
+                    # Nếu prompts_forge có prompt Rule 140 Vox chuẩn, ưu tiên đồng bộ
+                    if s_id in pf_bgs and pf_bgs[s_id]:
+                        if prompt != pf_bgs[s_id]:
+                            prompt = pf_bgs[s_id]
+                            s["image_prompt"] = prompt
+                            s["bg_prompt"] = prompt
+                            dp_modified = True
                     if prompt:
                         items.append({
                             "reuse_key": f"composite_{s_id}",
                             "layer_type": "Background",
                             "prompt": f"{prompt} [TECHNICAL: Generate at 2560x1440 resolution (16:9 aspect ratio, 2K DCI). Do not upscale or downscale.]"
                         })
+                if dp_modified:
+                    try:
+                        with open(local_dp, "w", encoding="utf-8") as f:
+                            json.dump(dp, f, indent=2, ensure_ascii=False)
+                    except Exception as _we:
+                        logger.debug("Could not write back synchronized director_plan.json: %s", _we)
                 if items:
-                    print(f"📋 [Vox Director Plan] Đã nạp thành công {len(items)} prompts từ local director_plan.json!")
+                    print(f"📋 [Vox Director Plan] Đã nạp thành công {len(items)} prompts từ local director_plan.json (Rule 140 Parity)!")
                     return items
         except (OSError, json.JSONDecodeError, KeyError) as e:
             logger.warning(f"Lỗi đọc local director_plan.json: {e}")
