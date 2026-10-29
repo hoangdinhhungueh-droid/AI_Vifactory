@@ -128,8 +128,24 @@ def build_universal_video_prompt(scene: Dict[str, Any]) -> str:
         from app.services.kinetic_sub_director import build_kinetic_causal_i2v_prompt, generate_scene_sub_director_plan
 
         sub_plan = scene.get("scene_sub_director_plan")
-        if not sub_plan or not isinstance(sub_plan, dict) or not sub_plan.get("kinetic_couplings"):
-            sentence = scene.get("sentence") or scene.get("spoken_sentence") or scene.get("core_idea") or ""
+        has_generic = False
+        if sub_plan and isinstance(sub_plan, dict):
+            roster = sub_plan.get("object_roster", [])
+            has_generic = any(
+                any(b in str(o.get("label", "")).lower() for b in ["crimson forensic seal stamp", "brass anchor pin"])
+                for o in roster
+            )
+
+        if not sub_plan or not isinstance(sub_plan, dict) or not sub_plan.get("kinetic_couplings") or has_generic:
+            sentence = (
+                scene.get("sentence")
+                or scene.get("narration")
+                or scene.get("narration_text")
+                or scene.get("spoken_sentence")
+                or scene.get("core_idea")
+                or scene.get("headline")
+                or ""
+            )
             hero_obj = scene.get("hero_cutout_object") or scene.get("visual_metaphor") or ""
             interacting = scene.get("interacting_objects") or []
             raw_dur = scene.get("duration_s") or scene.get("duration_sec") or scene.get("duration_est_sec")
@@ -144,6 +160,7 @@ def build_universal_video_prompt(scene: Dict[str, Any]) -> str:
                 market=market
             )
             scene["scene_sub_director_plan"] = sub_plan
+            scene["interacting_objects"] = [o["label"] for o in sub_plan.get("object_roster", []) if o.get("role") != "primary_anchor"]
 
         cam = scene.get("camera_directive") or scene.get("motion_track_and_assembly", {}).get("camera_rule", "")
         return build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=cam)
@@ -224,10 +241,12 @@ def setup_block_directory_structure(episode_id: str) -> Dict[str, Any]:
             plan_updated = True
 
         # Nạp Universal Video Prompt vào scene trong director_plan.json nếu chưa có
-        if not s.get("i2v_prompt") or not s.get("video_prompt"):
+        has_generic_prompt = "crimson forensic seal stamp" in str(s.get("flow_video_prompt", "")) or "crimson forensic seal stamp" in str(s.get("i2v_prompt", ""))
+        if not s.get("i2v_prompt") or not s.get("video_prompt") or has_generic_prompt:
             uv_prompt = build_universal_video_prompt(s)
             s["i2v_prompt"] = uv_prompt
             s["video_prompt"] = uv_prompt
+            s["flow_video_prompt"] = uv_prompt
             plan_updated = True
 
     if plan_updated:

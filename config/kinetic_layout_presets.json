@@ -80,6 +80,46 @@
         },
         "residue": "sharp cut edge with visible paper fibers"
       },
+      "H4_TETHER": {
+        "action_verb": "drives brass anchor pin into coordinate {target_contact_pos} in a snappy 0.3s strike, anchoring taut red evidence yarn across coordinate line ({initial_pos} to {target_contact_pos}) onto",
+        "contact_point": "evidence nexus coordinate {target_contact_pos}",
+        "physical_reaction": "red evidence yarn pulls taut between pins with sharp micro-vibration, locking forensic link into rigid stop at {k1_dead_stop}",
+        "secondary_reaction": {
+          "object": "desk_surface",
+          "reaction": "pin embeds into paper grain"
+        },
+        "residue": "taut red evidence thread anchored"
+      },
+      "H5_OPTICAL": {
+        "action_verb": "glides from initial coordinate {initial_pos} directly over coordinate {target_contact_pos} in a precise 0.4s slide of",
+        "contact_point": "investigative inspection zone at {target_contact_pos}",
+        "physical_reaction": "convex optical lens magnifies tiny background text by 1.4x with authentic barrel distortion, locking crisp focal clarity at {k1_dead_stop}",
+        "secondary_reaction": {
+          "object": "desk_surface",
+          "reaction": "circular lens shadow sharpens"
+        },
+        "residue": "magnified forensic inspection zone revealed"
+      },
+      "H6_MARK": {
+        "action_verb": "swipes in a high-velocity 0.3s stroke from coordinate {initial_pos} across target line {target_contact_pos} of",
+        "contact_point": "critical text row at {target_contact_pos}",
+        "physical_reaction": "translucent neon highlight band soaks instantly into newsprint grain, stopping dead in place at {k1_dead_stop}",
+        "secondary_reaction": {
+          "object": "desk_surface",
+          "reaction": "highlighted text pops forward"
+        },
+        "residue": "vibrant fluorescent highlighter band"
+      },
+      "H7_DISPLACE": {
+        "action_verb": "pushes outward in a rapid 0.4s friction slide, unfolding along {vector_reveal_direction} crease line onto coordinate {target_contact_pos} of",
+        "contact_point": "folded archival document margin at {target_contact_pos}",
+        "physical_reaction": "accordion paper pleats snap open to reveal layered architectural diagrams, stopping dead at {k1_dead_stop}",
+        "secondary_reaction": {
+          "object": "desk_surface",
+          "reaction": "unfolded sheets fan out with subtle paper flutter"
+        },
+        "residue": "fanned-out multi-page investigative cluster"
+      },
       "DEFAULT": {
         "action_verb": "snaps rigidly into position on coordinate {target_contact_pos} in a fast 0.4s step of",
         "contact_point": "center focal area at {target_contact_pos}",

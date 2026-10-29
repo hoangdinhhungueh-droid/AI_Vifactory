@@ -117,12 +117,13 @@ Output JSON matching this exact structure:
                 scene_id=sc_id,
                 sentence=sc_text,
                 hero_cutout_object=sc_hero,
-                interacting_objects=["crimson forensic seal stamp", "brass precision caliper"],
+                interacting_objects=sc.get("interacting_objects"),
                 duration_sec=float(raw_dur),
                 market=resolved_mkt,
             )
             i2v_p = build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=sc.get("camera_directive", "STATIC_OVERHEAD"))
             sc["scene_sub_director_plan"] = sub_plan
+            sc["interacting_objects"] = [o["label"] for o in sub_plan.get("object_roster", []) if o.get("role") != "primary_anchor"]
             sc["flow_video_prompt"] = i2v_p
             sc["i2v_prompt_google_flow"] = i2v_p
             sc["i2v_prompt_omni"] = i2v_p

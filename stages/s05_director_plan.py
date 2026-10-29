@@ -249,7 +249,7 @@ def build_vox_scene_prompts(
         f"[Layer 2: bold flat geometric color block in {color}] -> "
         f"[Layer 3: negative space reserved for large bold editorial typography '{headline}', occupying 25% of frame] -> "
         f"[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge and realistic soft drop shadow: {hero_obj}. "
-        f"Interacting elements: crimson forensic seal stamp and brass pin] -> "
+        f"Interacting elements: dynamic tactile editorial investigation props] -> "
         f"[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration]. "
         f"Strictly locked color palette: Vox Yellow #F2C230, Terracotta #C85A32, Navy #1B2B4A on Off-white Cream #F4F1EA. "
         f"Clear object-assembly composition, strong editorial hierarchy, tactile paper craft. "
@@ -266,7 +266,7 @@ def build_vox_scene_prompts(
             scene_id=getattr(scene, "scene_id", f"SCENE_{idx+1:02d}"),
             sentence=getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or headline,
             hero_cutout_object=hero_obj,
-            interacting_objects=["crimson forensic seal stamp", "brass anchor pin"],
+            interacting_objects=getattr(scene, "interacting_objects", None),
             duration_sec=dur,
             market=resolved_market,
             whisper_words=getattr(scene, "whisper_words", None),
@@ -296,10 +296,12 @@ def build_vox_scene_prompts(
             f"[Constraints: Strict flat 2D tactile paper collage physics, zero 3D fluid morphing, zero face warping]."
         )
 
+    resolved_interacting = [o["label"] for o in sub_plan.get("object_roster", []) if o.get("role") != "primary_anchor"] if sub_plan else ["tactile investigation tool", "forensic verification prop"]
+
     return {
         "canvas_workspace": "Aged Cream Newsprint Desk #F4F1EA with subtle print halftone grid",
         "hero_cutout_object": hero_obj,
-        "interacting_objects": ["crimson forensic seal stamp", "brass anchor pin"],
+        "interacting_objects": resolved_interacting,
         "motion_track_and_assembly": motion_track,
         "graphic_typography": graphic_typo,
         "visual_continuity_link_to_next": continuity_link,
@@ -332,7 +334,7 @@ def build_universal_video_prompt(scene: Scene) -> str:
             scene_id=getattr(scene, "scene_id", "SCENE_01"),
             sentence=sentence_str,
             hero_cutout_object=getattr(scene, "visual_metaphor", "") or getattr(scene, "hero_cutout_object", ""),
-            interacting_objects=["tactile measurement tool", "crimson verification seal"],
+            interacting_objects=getattr(scene, "interacting_objects", None),
             duration_sec=float(raw_dur) if raw_dur else None,
             market=resolve_canonical_market(market_raw=getattr(scene, "market", None)),
             whisper_words=getattr(scene, "whisper_words", None),

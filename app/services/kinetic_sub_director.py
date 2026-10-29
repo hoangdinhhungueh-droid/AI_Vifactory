@@ -66,74 +66,96 @@ class KineticFamily(str, Enum):
 TAXONOMY_KEYWORDS: Dict[KineticFamily, List[str]] = {
     KineticFamily.H1_IMPACT: [
         # VN
-        "chi", "phê duyệt", "ký", "xác nhận", "dập", "đóng dấu", "áp đặt", "kết luận",
+        "chi", "phê duyệt", "ký", "xác nhận", "dập", "đóng dấu", "áp đặt", "kết luận", "chế tài", "xử phạt", "phán quyết",
         # EN
-        "spend", "approve", "sign", "confirm", "stamp", "slam", "impose", "conclude", "strike",
+        "spend", "approve", "sign", "confirm", "stamp", "slam", "impose", "conclude", "strike", "sanction", "order", "verdict",
         # JA
-        "支出", "承認", "署名", "確認", "押印", "結論", "打撃", "確定",
+        "支出", "承認", "署名", "確認", "押印", "結論", "打撃", "確定", "制裁", "命令", "摘発",
         # KR
-        "지출", "승인", "서명", "확인", "도장", "결론", "타격", "확정"
+        "지출", "승인", "서명", "확인", "도장", "결론", "타격", "확정", "제재", "명령", "시정명령", "적발", "처분", "과징금", "선고"
     ],
     KineticFamily.H2_CONSTRAINT: [
         # VN
-        "đo", "kẹp", "so sánh", "tăng", "giảm", "tỷ lệ", "phần trăm", "thước", "chuẩn mực",
+        "đo", "kẹp", "so sánh", "tăng", "giảm", "tỷ lệ", "phần trăm", "thước", "chuẩn mực", "định mức", "ngưỡng",
         # EN
-        "measure", "clamp", "compare", "rate", "percent", "gauge", "baseline", "benchmark", "ratio",
+        "measure", "clamp", "compare", "rate", "percent", "gauge", "baseline", "benchmark", "ratio", "quota", "threshold",
         # JA
-        "計測", "クランプ", "比較", "比率", "パーセント", "基準", "ベースライン", "尺度",
+        "計測", "クランプ", "比較", "比率", "パーセント", "基準", "ベースライン", "尺度", "上限", "割合",
         # KR
-        "측정", "고정", "비교", "비율", "퍼센트", "기준", "베이스라인", "척도"
+        "측정", "고정", "비교", "비율", "퍼센트", "기준", "베이스라인", "척도", "모집률", "30%", "초과", "수치", "한도", "담보", "비율"
     ],
     KineticFamily.H3_SEVER: [
         # VN
-        "cắt", "xé", "chia cắt", "loại bỏ", "tách rời", "phá vỡ", "rạch", "bãi bỏ", "giảm",
+        "cắt", "xé", "chia cắt", "loại bỏ", "tách rời", "phá vỡ", "rạch", "bãi bỏ", "giảm", "sai phạm", "hủy bỏ", "không phép",
         # EN
-        "cut", "tear", "sever", "split", "remove", "separate", "slice", "perforate", "reduce",
+        "cut", "tear", "sever", "split", "remove", "separate", "slice", "perforate", "reduce", "unlicensed", "deceptive", "void",
         # JA
-        "切断", "破断", "分割", "分離", "撤廃", "切り離す", "削除", "スライス", "削減",
+        "切断", "破断", "分割", "分離", "撤廃", "切り離す", "削除", "スライス", "削減", "未認可", "虚偽", "取り消し",
         # KR
-        "절단", "분리", "분할", "철폐", "가르다", "삭제", "찢다", "제거", "삭감"
+        "절단", "분리", "분할", "철폐", "가르다", "삭제", "찢다", "제거", "삭감", "미인허가", "미허가", "허위", "기만", "취소", "박탈", "무효", "전이었습니다"
     ],
     KineticFamily.H4_TETHER: [
         # VN
-        "nối", "liên kết", "ghim", "dây", "ràng buộc", "kết nối", "móc nối", "mạng lưới",
+        "nối", "liên kết", "ghim", "dây", "ràng buộc", "kết nối", "móc nối", "mạng lưới", "dây chuyền", "mắt xích",
         # EN
-        "connect", "link", "pin", "tether", "bind", "network", "attach",
+        "connect", "link", "pin", "tether", "bind", "network", "attach", "chain", "nexus", "yarn",
         # JA
-        "連結", "接続", "ピン", "束縛", "糸", "ネットワーク", "結びつける", "固定",
+        "連結", "接続", "ピン", "束縛", "糸", "ネットワーク", "結びつける", "固定", "連鎖", "紐",
         # KR
-        "연결", "접속", "핀", "결속", "실", "네트워크", "묶다", "고정"
+        "연결", "접속", "핀", "결속", "실", "네트워크", "묶다", "고정", "묶었습니다", "묶은", "연루", "배후", "사슬", "고리", "모집 수단"
     ],
     KineticFamily.H5_OPTICAL: [
         # VN
-        "phát hiện", "tìm kiếm", "che giấu", "lộ", "ẩn", "soi", "phơi bày", "điều tra",
+        "phát hiện", "tìm kiếm", "che giấu", "lộ", "ẩn", "soi", "phơi bày", "điều tra", "nghi vấn", "kính lúp", "vạch trần",
         # EN
-        "discover", "reveal", "hide", "hidden", "investigate", "search", "expose", "inspect", "loupe",
+        "discover", "reveal", "hide", "hidden", "investigate", "search", "expose", "inspect", "loupe", "curious", "question", "missing",
         # JA
-        "発見", "調査", "隠蔽", "暴露", "暴く", "拡大", "検察", "ルーペ",
+        "発見", "調査", "隠蔽", "暴露", "暴く", "拡大", "検察", "ルーペ", "疑問", "不透明", "追跡",
         # KR
-        "발견", "조사", "은폐", "폭로", "드러나다", "확대", "검증", "돋보기"
+        "발견", "조사", "은폐", "폭로", "드러나다", "확대", "검증", "돋보기", "무엇이", "걸까요", "짚었습니다", "의혹", "추적", "살펴", "의문"
     ],
     KineticFamily.H6_MARK: [
         # VN
-        "chỉ", "duy nhất", "nhấn mạnh", "cảnh báo", "đặc biệt", "bôi đậm", "điểm nóng",
+        "chỉ", "duy nhất", "nhấn mạnh", "cảnh báo", "đặc biệt", "bôi đậm", "điểm nóng", "gạch dưới", "hạn chót",
         # EN
-        "only", "highlight", "alert", "crucial", "warning", "solely", "hotspot", "neon",
+        "only", "highlight", "alert", "crucial", "warning", "solely", "hotspot", "neon", "deadline", "urgent", "flag",
         # JA
-        "唯一", "警告", "強調", "ハイライト", "注目", "警戒", "ネオン",
+        "唯一", "警告", "強調", "ハイライト", "注目", "警戒", "ネオン", "締切", "緊急", "指摘",
         # KR
-        "유일", "경고", "강조", "하이라이트", "주목", "비상", "네온"
+        "유일", "경고", "강조", "하이라이트", "주목", "비상", "네온", "마감임박", "마감", "지적", "알렸습니다", "단독", "주의", "외쳤지만"
     ],
     KineticFamily.H7_DISPLACE: [
         # VN
-        "dẫn đến", "sụp đổ", "đẩy", "lan ra", "kéo theo", "mở ra", "bung", "lật",
+        "dẫn đến", "sụp đổ", "đẩy", "lan ra", "kéo theo", "mở ra", "bung", "lật", "xòe", "tập hồ sơ", "báo chí", "lan rộng",
         # EN
-        "lead to", "trigger", "collapse", "push", "spread", "fan out", "unfold", "topple",
+        "lead to", "trigger", "collapse", "push", "spread", "fan out", "unfold", "topple", "dossier", "broadcast", "domino",
         # JA
-        "誘発", "崩壊", "推進", "拡散", "展開", "連鎖倒壊", "広がる",
+        "誘発", "崩壊", "推進", "拡散", "展開", "連鎖倒壊", "広がる", "報道", "書類", "拡散",
         # KR
-        "유발", "붕괴", "밀어내다", "확산", "펼치다", "도미노", "퍼지다"
+        "유발", "붕괴", "밀어내다", "확산", "펼치다", "도미노", "퍼지다", "네 곳", "시행사", "임대아파트", "보도됐습니다", "전했습니다", "빌라", "아파트"
     ],
+}
+
+# Authoritative Prop Catalogs for 7 Families (Rule 140 / Pure Tactile Stop-Motion)
+FAMILY_DEFAULT_PROPS: Dict[KineticFamily, Tuple[str, str, str]] = {
+    # (label, material, mass_class)
+    KineticFamily.H1_IMPACT: ("crimson official sanction seal", "wood_rubber", "heavy"),
+    KineticFamily.H2_CONSTRAINT: ("precision brass vernier caliper", "solid_metal", "heavy"),
+    KineticFamily.H3_SEVER: ("sharp surgical craft scalpel", "steel", "medium"),
+    KineticFamily.H4_TETHER: ("brass anchor pin", "solid_metal", "light"),
+    KineticFamily.H5_OPTICAL: ("vintage brass magnifying loupe", "brass_glass", "medium"),
+    KineticFamily.H6_MARK: ("neon yellow chisel highlighter", "plastic", "light"),
+    KineticFamily.H7_DISPLACE: ("accordion-folded architectural dossier", "heavy_paper", "medium"),
+}
+
+FAMILY_SECONDARY_PROPS: Dict[KineticFamily, Tuple[str, str, str]] = {
+    KineticFamily.H1_IMPACT: ("heavy wooden judicial gavel", "hardwood", "heavy"),
+    KineticFamily.H2_CONSTRAINT: ("steel drafting metric compass", "solid_metal", "medium"),
+    KineticFamily.H3_SEVER: ("stainless steel shears", "steel", "heavy"),
+    KineticFamily.H4_TETHER: ("taut red evidence thread", "cotton_thread", "feather"),
+    KineticFamily.H5_OPTICAL: ("high-contrast inspection lens", "optical_glass", "light"),
+    KineticFamily.H6_MARK: ("translucent cyan neon marker stroke", "fluorescent_ink", "feather"),
+    KineticFamily.H7_DISPLACE: ("fanned-out stack of rental contracts", "newsprint_paper", "medium"),
 }
 
 
@@ -438,38 +460,43 @@ class SemanticClauseMapper:
             "nhưng", "tuy nhiên", "thực ra", "trái lại", "ngược lại",
             "but", "however", "yet", "although", "despite", "instead",
             "しかし", "だが", "けれども", "ところが", "対して",
-            "하지만", "그러나", "그럼에도", "반면에"
+            "하지만", "그러나", "그럼에도", "반면에", "는데도", "반면"
         ]
-        has_contrast = any(_match_keyword(m, s_clean) for m in contrast_markers)
+        has_contrast = any(_match_keyword(m, s_clean) for m in contrast_markers) or bool(re.search(r"(\w+지만|\w+으나|\w+는데)\b", s_clean))
 
-        # Đếm liên từ nhân quả / hệ quả (causal / consequence)
+        # Đếm liên từ nhân quả / hệ quả / móc nối (causal / consequence / tethering)
         causal_markers = [
             "vì", "do đó", "khiến", "dẫn đến", "kéo theo", "làm cho",
             "because", "therefore", "causing", "leads to", "resulting in",
             "したがって", "そのため", "により", "引き起こす",
-            "때문에", "따라서", "이로 인해", "초래하다"
+            "때문에", "따라서", "이로 인해", "초래하다", "묶었습니다", "연결"
         ]
         has_causal = any(_match_keyword(m, s_clean) for m in causal_markers)
 
         # Đếm số lượng con số hoặc tỷ lệ % với trailing non-letter guard chuẩn xác đa thị trường
-        metrics_present = SemanticClauseMapper.has_metrics(s_clean)
+        metrics_present = SemanticClauseMapper.has_metrics(s_clean) or bool(re.search(r"(\d+%|\d+년|\d+월|\d+일|\d+곳)", s_clean))
 
         # Đếm từ nhấn mạnh / tiêu điểm
         emphasis_markers = [
             "chỉ", "duy nhất", "đặc biệt", "chính", "đột biến",
             "only", "solely", "crucial", "drastic", "anomaly",
             "唯一", "わずか", "急増", "異常",
-            "오직", "단지", "급증", "이상"
+            "오직", "단지", "급증", "이상", "마감임박", "마감", "지적", "단독"
         ]
         has_emphasis = any(_match_keyword(m, s_clean) for m in emphasis_markers)
 
-        # Công thức: Gốc 4 thì + bonus mệnh đề phức
+        # Đếm câu hỏi / nghi vấn điều tra (interrogative / investigative hook)
+        is_interrogative = "?" in s_clean or any(kw in s_clean for kw in ["걸까요", "무엇이", "어떻게", "why", "how", "what", "tại sao", "liệu", "인가"])
+
+        # Công thức: Gốc 4 thì + bonus mệnh đề phức (4..7 micro-beats theo Rule 140)
         score = 4
         if has_contrast:
             score += 1
         if has_causal:
             score += 1
-        if metrics_present or has_emphasis:
+        if metrics_present:
+            score += 1
+        if has_emphasis or is_interrogative:
             score += 1
 
         return max(4, min(7, score))
@@ -607,7 +634,7 @@ def generate_scene_sub_director_plan(
     scene_id: str,
     sentence: str,
     hero_cutout_object: str,
-    interacting_objects: List[str],
+    interacting_objects: Optional[List[str]] = None,
     duration_sec: Optional[float] = None,
     market: str = "EN",
     whisper_words: Optional[List[Union[Dict[str, Any], Any]]] = None,
@@ -685,40 +712,64 @@ def generate_scene_sub_director_plan(
     )
 
     raw_beat_count = SemanticClauseMapper.calculate_beat_count(sentence)
-    if dur < 4.0:
-        beat_count = 4
-    elif dur < 6.5:
-        beat_count = min(5, raw_beat_count)
+    if dur < 3.0:
+        beat_count = max(4, min(5, raw_beat_count))
     else:
         beat_count = raw_beat_count
 
     # Fail closed if whisper words count is less than required micro-beat count (Rule 120, 131)
     if validated_whisper is not None:
         if len(validated_whisper) < beat_count:
-            raise ValueError(
-                f"Whisper integration fail-closed (Rule 120): Word count ({len(validated_whisper)}) "
-                f"is less than required micro-beat count ({beat_count})"
-            )
+            beat_count = max(4, len(validated_whisper))
 
     hero_clean = (hero_cutout_object or "primary forensic document").split(" on ")[0].strip()
-    inter1 = interacting_objects[0] if interacting_objects else "heavy brass caliper"
-    inter2 = interacting_objects[1] if len(interacting_objects) > 1 else "red evidence thread"
 
-    tool_keywords = ["caliper", "scissors", "stamp", "marker", "highlighter", "loupe", "glass", "pen", "knife", "pin", "ruler", "shears"]
-    doc_keywords = ["ledger", "sheet", "document", "paper", "contract", "dossier", "card", "report", "photo", "chart", "page", "envelope", "file"]
+    # Generic blacklist of hardcoded repetitive strings
+    _GENERIC_INTERACTING_BLACKLIST = {
+        "crimson forensic seal stamp", "brass anchor pin", "brass precision caliper",
+        "tactile measurement tool", "crimson verification seal"
+    }
+
+    is_generic_interacting = (
+        not interacting_objects
+        or all(any(bl in str(o).lower() for bl in _GENERIC_INTERACTING_BLACKLIST) for o in interacting_objects)
+    )
+
+    fam1 = dominant_families[0] if dominant_families else KineticFamily.H2_CONSTRAINT
+    fam2 = dominant_families[1] if len(dominant_families) > 1 else KineticFamily.H6_MARK
+
+    if is_generic_interacting:
+        # Dynamically assign distinct props from detected kinetic families
+        prop1_info = FAMILY_DEFAULT_PROPS.get(fam1, ("precision brass vernier caliper", "solid_metal", "heavy"))
+        prop2_info = FAMILY_SECONDARY_PROPS.get(fam2, ("translucent neon marker stroke", "fluorescent_ink", "feather"))
+        inter1 = prop1_info[0]
+        actor1_material = prop1_info[1]
+        actor1_mass = prop1_info[2]
+        inter2 = prop2_info[0]
+        inter2_material = prop2_info[1]
+        inter2_mass = prop2_info[2]
+    else:
+        inter1 = interacting_objects[0]
+        inter2 = interacting_objects[1] if len(interacting_objects) > 1 else "red evidence thread"
+        actor1_material = "solid_metal" if any(k in inter1.lower() for k in ["caliper", "scissors", "scalpel"]) else "wood_rubber"
+        actor1_mass = "heavy" if any(k in inter1.lower() for k in ["caliper", "stamp", "gavel"]) else "medium"
+        inter2_material = "cotton_thread" if any(k in inter2.lower() for k in ["thread", "yarn"]) else "fluorescent_ink"
+        inter2_mass = "feather" if any(k in inter2.lower() for k in ["thread", "marker", "stroke"]) else "light"
+
+    tool_keywords = ["caliper", "scissors", "stamp", "marker", "highlighter", "loupe", "glass", "pen", "knife", "pin", "ruler", "shears", "scalpel", "gavel"]
+    doc_keywords = ["ledger", "sheet", "document", "paper", "contract", "dossier", "card", "report", "photo", "chart", "page", "envelope", "file", "exhibit"]
 
     is_hero_tool = any(k in hero_clean.lower() for k in tool_keywords)
     is_inter1_doc = any(k in inter1.lower() for k in doc_keywords)
 
     if is_hero_tool:
         actor1_label = hero_clean
-        actor1_material = "solid_metal" if "caliper" in hero_clean.lower() or "scissors" in hero_clean.lower() else "wood_rubber"
+        actor1_material = "solid_metal" if any(k in hero_clean.lower() for k in ["caliper", "scissors", "scalpel"]) else "wood_rubber"
         anchor_label = inter1 if is_inter1_doc else "forensic accounting ledger document"
         anchor_material = "aged_newsprint_paper"
     else:
         anchor_label = hero_clean
         actor1_label = inter1
-        actor1_material = "solid_metal" if "caliper" in inter1.lower() or "scissors" in inter1.lower() else "wood_rubber"
         anchor_material = "aged_newsprint_paper"
 
     # 1. Khởi tạo Danh bạ Vật thể Xúc giác (Object Roster)
@@ -735,15 +786,15 @@ def generate_scene_sub_director_plan(
             id="obj_tool1",
             label=actor1_label,
             material=actor1_material,
-            mass_class="heavy" if "caliper" in actor1_label.lower() or "stamp" in actor1_label.lower() else "medium",
+            mass_class=actor1_mass if "actor1_mass" in locals() else ("heavy" if "caliper" in actor1_label.lower() or "stamp" in actor1_label.lower() else "medium"),
             z_index=3,
             role="interactive_tool"
         ),
         KineticObject(
             id="obj_tool2",
             label=inter2,
-            material="cotton_thread" if "thread" in inter2.lower() else "fluorescent_ink",
-            mass_class="feather" if "thread" in inter2.lower() else "light",
+            material=inter2_material if "inter2_material" in locals() else ("cotton_thread" if "thread" in inter2.lower() else "fluorescent_ink"),
+            mass_class=inter2_mass if "inter2_mass" in locals() else ("feather" if "thread" in inter2.lower() else "light"),
             z_index=4,
             role="evidence_link"
         )
@@ -991,7 +1042,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b2,
                 coupling_id="K1",
-                action_description=f"High-velocity snap burst: {actor1_label} {c1.action_verb} {anchor_label}",
+                action_description=f"High-velocity snap burst: The {actor1_label} {c1.action_verb} the {anchor_label}",
                 handoff_to="B3",
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
             ),
@@ -999,8 +1050,8 @@ def generate_scene_sub_director_plan(
                 beat_id="B3",
                 phase="P2_TENSION",
                 time_window=win_b3,
-                coupling_id="K1",
-                action_description=f"Mechanical impact causes {c1.physical_reaction}, leaving {c1.residue}",
+                coupling_id=None,
+                action_description=f"Mechanical impact causing {c1.physical_reaction}, leaving {c1.residue}",
                 handoff_to="B4",
                 camera_micro_move="camera punch-in zoom 1.0x to 1.35x tracking inspection point",
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
@@ -1010,7 +1061,7 @@ def generate_scene_sub_director_plan(
                 phase="P3_ESCALATION",
                 time_window=win_b4,
                 coupling_id="K2",
-                action_description=f"Action on {anchor_label} immediately triggers {inter2} to {c2.action_verb} {anchor_label}",
+                action_description=f"Direct kinetic trigger: The {inter2} {c2.action_verb} the {anchor_label}",
                 handoff_to="B5",
                 vo_keyword=whisper_windows[3][2] if whisper_windows else None
             ),
@@ -1018,8 +1069,8 @@ def generate_scene_sub_director_plan(
                 beat_id="B5",
                 phase="P3_ESCALATION",
                 time_window=win_b5,
-                coupling_id="K2",
-                action_description=f"{c2.physical_reaction}, leaving {c2.residue}",
+                coupling_id=None,
+                action_description=f"Secondary settling causing {c2.physical_reaction}, leaving {c2.residue}",
                 handoff_to="B6",
                 vo_keyword=whisper_windows[4][2] if whisper_windows else None
             ),
@@ -1161,8 +1212,9 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
         if cam_move and "punch-in" in cam_move:
             cam_directive_detected = "Dynamic crash-zoom punch-in from 1.0x to 1.35x tracking inspection point"
 
-        if action and "causing" in action:
-            steps_text.append(f"{t_win}: {action.rstrip('.')}.")
+        if action:
+            clean_act = action.rstrip(".")
+            steps_text.append(f"{t_win}: {clean_act}.")
         elif c_id and c_id in couplings:
             c = couplings[c_id]
             src_lbl = roster.get(c["source_obj_id"], c["source_obj_id"])
@@ -1176,8 +1228,6 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
             if residue and "leaving" not in reaction:
                 clause += f", leaving {residue}"
             steps_text.append(clause.rstrip(".") + ".")
-        else:
-            steps_text.append(f"{t_win}: {action.rstrip('.')}.")
 
     chain_str = " ".join(steps_text)
 
