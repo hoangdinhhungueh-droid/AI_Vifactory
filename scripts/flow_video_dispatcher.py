@@ -36,7 +36,7 @@ ARTIFACT_DIR = Path(r"C:\Users\hunghd2\.gemini\antigravity\brain\4a063bf3-98ec-4
 
 PROFILES = {
     'acc_01': {
-        'path': IMAGE_PROFILE_DIR,
+        'path': (PROFILES_BASE_DIR / 'acc_01') if (PROFILES_BASE_DIR / 'acc_01').exists() else IMAGE_PROFILE_DIR,
         'email': 'hoangdinhhung.ueh@gmail.com',
         'name': 'Hưng Hoàng Đình'
     },
@@ -508,6 +508,11 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
 
         print("1. Điều hướng vào Google Flow...")
         page.goto("https://flow.google.com/?pli=1", wait_until="domcontentloaded", timeout=45000)
+        time.sleep(2)
+
+        if "/about" in page.url or "signin" in page.url or "accounts.google.com" in page.url:
+            print(f"   ❌ Tài khoản [{acc_key.upper()}] chưa đăng nhập Google Flow ({page.url})! Tự động chuyển giao clips cho tài khoản khác.")
+            return {"_status": "NOT_LOGGED_IN", "_unprocessed": clips}
 
         if "/project/" not in page.url:
             print("   Chờ giao diện trang chủ sẵn sàng...")
@@ -538,10 +543,18 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
                         cards[0].click(force=True)
                     else:
                         print("   Click New project / Dự án mới bằng text...")
-                        page.get_by_text(re.compile(r'(New project|Dự án mới|Start Creating|Bắt đầu tạo)', re.I)).first.click(force=True)
+                        try:
+                            page.get_by_text(re.compile(r'(New project|Dự án mới|Start Creating|Bắt đầu tạo)', re.I)).first.click(force=True, timeout=8000)
+                        except Exception as _btn_err:
+                            print(f"   ⚠️ Không tìm thấy nút tạo project ({_btn_err}). Chuyển giao clips!")
+                            return {"_status": "NO_PROJECT_BTN", "_unprocessed": clips}
 
         print("   Đợi canvas và prompt editor tải xong...")
-        page.wait_for_selector("div.ProseMirror, [contenteditable='true']", timeout=30000)
+        try:
+            page.wait_for_selector("div.ProseMirror, [contenteditable='true']", timeout=20000)
+        except Exception as _canvas_err:
+            print(f"   ⚠️ Không vào được canvas Google Flow ({_canvas_err}). Chuyển giao clips!")
+            return {"_status": "CANVAS_TIMEOUT", "_unprocessed": clips}
         time.sleep(3)
         dismiss_dialogs(page)
 
@@ -630,32 +643,56 @@ def main():
     print(f"📦 Tổng số clips xử lý: {len(all_clips)}")
     print(f"📁 Thư mục lưu trữ: {out_dir}")
 
-    # Phân bổ clips theo flow_slot, tự động cân bằng round-robin qua 7 tài khoản (acc_01 đến acc_07)
-    available_accs = list(PROFILES.keys())
+    # Phân bổ clips theo flow_slot, ưu tiên hạm đội tài khoản đã xác thực đăng nhập Flow
+    verified_order = ['acc_03', 'acc_02', 'acc_04', 'acc_05', 'acc_06', 'acc_07', 'acc_01']
+    available_accs = [a for a in verified_order if a in PROFILES]
     clips_by_acc = {acc: [] for acc in available_accs}
     for i, c in enumerate(all_clips):
         slot = c.get("flow_slot")
         if not slot or slot not in PROFILES:
             slot = available_accs[i % len(available_accs)]
             c["flow_slot"] = slot
-        clips_by_acc[slot].append(c)
+        clips_by_acc.setdefault(slot, []).append(c)
 
     target_accs = available_accs if args.acc == "all" else [args.acc]
 
     total_success = 0
     total_processed = 0
+    unprocessed_queue = []
 
     for acc in target_accs:
         clips = clips_by_acc.get(acc, [])
+        if unprocessed_queue:
+            print(f"🔄 [Auto-Fallback] Chuyển giao {len(unprocessed_queue)} clips từ tài khoản trước sang {acc}...")
+            clips = list(unprocessed_queue) + clips
+            unprocessed_queue = []
         if not clips:
             print(f"⚠️ Không có clip nào được gán cho {acc}")
             continue
 
         res = dispatch_for_account(acc, clips, out_dir, episode_dir, headless=args.headless, model_target=args.model, force=args.force)
+        if res.get("_status") in ("NOT_LOGGED_IN", "NO_PROJECT_BTN", "CANVAS_TIMEOUT"):
+            unprocessed_queue.extend(res.get("_unprocessed", []))
+            continue
         for s_id, ok in res.items():
+            if s_id.startswith("_"):
+                continue
             total_processed += 1
             if ok:
                 total_success += 1
+
+    if unprocessed_queue:
+        for fallback_acc in ['acc_03', 'acc_02', 'acc_04', 'acc_05', 'acc_06']:
+            if fallback_acc in target_accs:
+                print(f"🔄 [Auto-Fallback] Thử xử lý {len(unprocessed_queue)} clips còn tồn đọng trên {fallback_acc}...")
+                res = dispatch_for_account(fallback_acc, unprocessed_queue, out_dir, episode_dir, headless=args.headless, model_target=args.model, force=args.force)
+                for s_id, ok in res.items():
+                    if s_id.startswith("_"):
+                        continue
+                    total_processed += 1
+                    if ok:
+                        total_success += 1
+                break
 
     print("\n" + "=" * 70)
     print(f"📊 KẾT QUẢ ĐIỀU PHỐI SINH VIDEO: {total_success}/{total_processed} clips thành công!")
