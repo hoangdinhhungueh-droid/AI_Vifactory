@@ -612,6 +612,19 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
         </tr>"""
         table_rows.append(row)
 
+        vid_rel_path = f"blocks/{b_name}/videos/clip_{sc_id.lower()}.mp4"
+        vid_file = episode_dir / "blocks" / b_name / "videos" / f"clip_{sc_id.lower()}.mp4"
+        if not vid_file.exists():
+            vid_file = episode_dir / "video_clips" / f"clip_{sc_id.lower()}.mp4"
+            vid_rel_path = f"video_clips/clip_{sc_id.lower()}.mp4"
+        has_video = vid_file.exists() and vid_file.stat().st_size > 100000
+
+        video_player_html = f'''
+        <div class="video-player-box" style="margin-top: 10px; border-radius: 8px; overflow: hidden; border: 1px solid #38bdf8;">
+            <div style="background: #0284c7; color: white; padding: 4px 8px; font-size: 11px; font-weight: bold;">🎥 VIDEO CLIP GOOGLE FLOW (16:9 • 720p)</div>
+            <video controls preload="metadata" style="width: 100%; display: block;" src="{vid_rel_path}"></video>
+        </div>''' if has_video else ""
+
         card = f"""
         <div class="card">
             <div class="img-wrapper">
@@ -620,6 +633,7 @@ def generate_html_review_gallery(episode_id: str, block_manifest: Dict[str, Any]
                 </a>
                 <span class="badge" style="background: {badge_color};">{badge_text}</span>
             </div>
+            {video_player_html}
             <div class="content">
                 <div class="meta">
                     <span class="scene-id">{sc_id}</span>
