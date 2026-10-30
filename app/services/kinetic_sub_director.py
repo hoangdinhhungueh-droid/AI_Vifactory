@@ -1454,13 +1454,16 @@ def build_natural_kinetic_i2v_prompt(
     camera_directive: Optional[str] = None,
     **kwargs: Any
 ) -> str:
-    """Builds a 100% Cartesian-Free, Natural Kinetic I2V Prompt conforming to Vox Engine v3 (Rule 140).
+    """Builds a 100% Cartesian-Free, Natural Kinetic I2V Prompt conforming to Vox Engine v3 and CL3 Paper Diorama standard (Rule 140).
 
-    Structure:
-    [CAMERA & ENVIRONMENT]: Top-down macro flat-lay perspective on aged archival newsprint (#F4F1EA) under warm 3200K tungsten lighting.
-    [ACTION PHASE (0.2s - 0.4s)]: A <tool> <action_verb> the <anchor_document>.
-    [PHYSICAL REACTION & RESIDUE]: <physical_reaction>, leaving <tactile_residue>.
+    Synthesizes CL3 Vox Video System with Vox Engine v3:
+    [STYLE SYSTEM]: CL3 Paper Diorama (Deep Diorama / Flat Parallax) with aged-newsprint (#F4F1EA), halftone cutouts, print grain.
+    [CAMERA & ENVIRONMENT]: Top-down or cinematic perspective with committed camera actor and mandatory Settle on out-point.
+    [ACTION PHASE (0.2s - 0.4s)]: Snappy mechanical strike (H1->H7) with overshoot.
+    [PHYSICAL REACTION & RESIDUE]: Contact dynamics leaving tactile residue (crimp, stamp ink, tear, caliper dent).
     [HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze.
+    [AUDIO]: Tactile sound design mirroring action, no music, no narration.
+    [AVOID]: Strict negative constraints killing flat 2D and glossy 3D CG.
     """
     sentence = ""
     resolved_market = market
@@ -1477,12 +1480,169 @@ def build_natural_kinetic_i2v_prompt(
 
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
     ev = extract_evidence_for_sentence(sentence, market=resolved_market, scene_id=sc_id)
-    resolved_camera = cam or ev.camera_directive
+    base_cam = cam or ev.camera_directive
+
+    # Ensure mandatory CL3 out-point 'Settle on...' is present
+    settle_target = ev.hero_anchor_prop
+    if "settle" not in base_cam.lower():
+        resolved_camera = f"{base_cam.rstrip('.')}. Settle on the {settle_target} in sharp focus"
+    else:
+        resolved_camera = base_cam
+
+    style_mode = kwargs.get("style_mode", "deep_diorama")
+    if style_mode == "flat_parallax":
+        style_header = (
+            "[STYLE SYSTEM - FLAT PARALLAX]: Aged-newsprint paper collage (#F4F1EA), desaturated archival palette "
+            "with one hot red accent (#D62E1F), halftone black-and-white cutout people with rough white keylines "
+            "and offset accent strokes, authentic print grain. True paper diorama parallax, never glossy 3D."
+        )
+        avoid_block = (
+            "[AVOID]: no glossy CG 3D, no plastic specular shine, no lens flares, no camera cuts within clip, "
+            "no full-color midground portraits, no warped or gibberish text, no invented logos, no music, no narration."
+        )
+    else:
+        style_header = (
+            "[STYLE SYSTEM - DEEP DIORAMA]: Deep 3D paper diorama with aged-print collage textures (#F4F1EA / #C9BB9C), "
+            "halftone black-and-white cutouts with rough keylines and offset strokes (#D62E1F), giant stat numbers, print grain. "
+            "Physical layers separated in real space, shallow depth of field, foreground elements crossing close to lens."
+        )
+        avoid_block = (
+            "[AVOID]: no flat single-plane composition, no static locked-off camera, no glossy plastic CG, "
+            "no full-color portraits, no warped gibberish text, no invented logos, no music, no voice-over."
+        )
+
+    # Tactile sound design matching the interacting tool
+    tool_lower = ev.interacting_tool_prop.lower()
+    if "caliper" in tool_lower or "vernier" in tool_lower:
+        audio_sfx = "vernier metal slide, crisp cardstock crimp, ticker clicks, low newsroom hum"
+    elif "seal" in tool_lower or "stamp" in tool_lower:
+        audio_sfx = "heavy wooden thud, paper compression crack, oily ink squelch, room tone"
+    elif "shear" in tool_lower or "scissor" in tool_lower or "cut" in tool_lower:
+        audio_sfx = "clean shear slice, fiber tearing rip, paper flutter, quiet room tone"
+    elif "yarn" in tool_lower or "thread" in tool_lower or "string" in tool_lower:
+        audio_sfx = "pushpin wooden tap, string tension twang, taut hum, room tone"
+    elif "clip" in tool_lower or "clamp" in tool_lower:
+        audio_sfx = "steel spring snap, cardstock crimp crunch, placement click, low hum"
+    else:
+        audio_sfx = "crisp paper snap, mechanical placement click, low archival newsroom hum"
 
     prompt = (
+        f"{style_header}\n"
         f"[CAMERA & ENVIRONMENT]: {resolved_camera}.\n"
         f"[ACTION PHASE (0.2s - 0.4s)]: The {ev.interacting_tool_prop} {ev.tactile_action_verb} the {ev.hero_anchor_prop}.\n"
         f"[PHYSICAL REACTION & RESIDUE]: {ev.physical_reaction.capitalize()}, leaving {ev.tactile_residue}.\n"
-        f"[HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze."
+        f"[HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze.\n"
+        f"[AUDIO]: {audio_sfx} — sound design only, no music, no narration.\n"
+        f"{avoid_block}"
     )
     return prompt.strip()
+
+
+def build_cl3_paper_diorama_prompt(
+    sub_plan_or_sentence: Union[Dict[str, Any], str],
+    market: str = "EN",
+    scene_id: Optional[str] = None,
+    style_mode: str = "deep_diorama",
+    **kwargs: Any
+) -> str:
+    """Builds a pure CL3 Canonical 4-Block Paper Diorama Prompt ([STYLE BLOCK] -> SHOT -> AUDIO -> AVOID).
+
+    Conforms 100% to CL3 Vox Videos specification:
+    - Block 1: STYLE BLOCK (verbatim choice of Flat Parallax, Deep Diorama, or Locked Stage).
+    - Block 2: SHOT: Background -> MG -> FG -> Kinetic Action -> Camera with Settle.
+    - Block 3: AUDIO: Sound design only, no music, no narration.
+    - Block 4: AVOID: Matching negative prompt block.
+    """
+    sentence = ""
+    resolved_market = market
+    sc_id = scene_id
+    if isinstance(sub_plan_or_sentence, dict):
+        sentence = sub_plan_or_sentence.get("sentence") or sub_plan_or_sentence.get("headline") or ""
+        sc_id = sub_plan_or_sentence.get("scene_id") or scene_id
+        resolved_market = sub_plan_or_sentence.get("market") or market
+    else:
+        sentence = str(sub_plan_or_sentence)
+
+    from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
+    ev = extract_evidence_for_sentence(sentence, market=resolved_market, scene_id=sc_id)
+
+    # 1. Style Block
+    if style_mode == "flat_parallax":
+        style_block = (
+            "Use the attached style sheet as the strict visual system — match its aged-newsprint collage surface (#F4F1EA), "
+            "desaturated archival palette with one hot accent (#D62E1F), condensed headline caps with giant stat numbers, "
+            "halftone black-and-white cutout people with rough white keylines and offset accent strokes, and its print-grain finish. "
+            "Do NOT copy the sheet's layout; it defines the language, not the composition. Layers sit at distinct depths like a paper diorama — "
+            "true parallax, never glossy 3D. Backgrounds are muted archival fields, varying per clip within this palette. "
+            "ALERT WASH means the whole frame floods toward the hot accent tone. Motion: spring pop-ups with overshoot within 0.2s - 0.4s, "
+            "staggered entrances, ticking counters, underline swipes; one slow camera move per clip. Audio: sound design only — "
+            "paper pops, thwips, stamps, ticks, low newsroom hum. No music. No voice-over. Preserves bottom 20% vertical safe zone."
+        )
+        avoid_block = (
+            "AVOID: no glossy CG 3D, no plastic specular shine, no lens flares, no camera cuts within the clip, "
+            "no full-color midground portraits (people stay halftone black-and-white), no warped or gibberish text, "
+            "no invented logos, no watermarks, no simultaneous entrances, no music, no soundtrack, no voice-over, no narration, no lyrics"
+        )
+    elif style_mode == "locked_stage":
+        style_block = (
+            "Documentary cutout-collage stage: a locked, muted archival map/texture background that never changes (#F4F1EA). "
+            "Midground: black-and-white halftone cutouts with a rough white keyline and an offset red marker stroke behind each. "
+            "Foreground: structures, props, and big stat numbers in full color. Condensed bold headline caps; numbers rendered huge, "
+            "as physical hero characters. Desaturated palette plus one hot red accent (#D62E1F), secondary mustard (#D9A441). "
+            "Spring pop-ups with slight overshoot, staggered entrances, counters ticking up, red underline swipes. Locked into 12fps living hold on twos. "
+            "Camera: subtle slow drift only, never cuts, ending with a precise settle. Audio: sound design only. No music, no narration."
+        )
+        avoid_block = (
+            "AVOID: no flat single-plane composition, no glossy CG 3D, no full-color midground portraits, no warped text, "
+            "no invented logos, no watermarks, no music, no voice-over, no narration"
+        )
+    else:  # deep_diorama
+        style_block = (
+            "Use the attached style sheet for materials only — aged-print collage textures (#F4F1EA / #C9BB9C), "
+            "halftone black-and-white cutout people with rough keylines and offset accent strokes, giant stat numbers, authentic print grain. "
+            "Do NOT copy the sheet's layout or its flatness: every clip is a deep 3D paper diorama — cutouts are physical layers separated in real space, "
+            "strong shallow depth of field, foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, "
+            "dives, whips, racks focus — one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's palette. "
+            "ALERT WASH means the entire frame floods to the hot accent tone (#D62E1F) in one beat. Motion: mechanical spring strikes <= 0.4s with overshoot, "
+            "staggered entrances, contact dynamics leaving physical residue, locking into 12fps living texture hold on twos. "
+            "Audio: sound design only — paper pops, whooshes, stamps, ticks. No music. No voice-over. Preserves bottom 20% vertical safe zone."
+        )
+        avoid_block = (
+            "AVOID: no flat single-plane composition, no static locked-off camera, no glossy plastic CG (depth stays papercraft), "
+            "no full-color midground portraits (people stay halftone black-and-white), no warped or gibberish text, no invented logos, "
+            "no watermarks, no music, no soundtrack, no voice-over, no narration, no lyrics"
+        )
+
+    # 2. SHOT Component Assembly
+    bg_field = f"Background: aged archival {ev.archetype.lower().replace('_', ' ')} paper background tilted in perspective, far out of focus."
+    mg_cutout = f"MG: halftone black-and-white cutout exhibit of {ev.hero_anchor_prop} entering at distinct depth with rough white deckle border and offset ink stroke."
+    fg_data = f"FG: {ev.interacting_tool_prop} positioned at foreground depth, crossing close to the lens."
+    action_text = f"Action: The {ev.interacting_tool_prop} snaps briskly in 0.3s and {ev.tactile_action_verb} the document, {ev.physical_reaction}, leaving {ev.tactile_residue}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+    camera_line = f"Camera: {ev.camera_directive.rstrip('.')}. Settle on the {ev.hero_anchor_prop} in sharp focus."
+
+    shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}\n{action_text}\n{camera_line}"
+
+    # 3. Audio Component
+    tool_lower = ev.interacting_tool_prop.lower()
+    if "caliper" in tool_lower or "vernier" in tool_lower:
+        audio_sfx = "vernier metal slide, cardstock crimp, ticker clicks, low newsroom hum"
+    elif "seal" in tool_lower or "stamp" in tool_lower:
+        audio_sfx = "heavy wooden thud, paper compression crack, oily ink squelch, room tone"
+    elif "shear" in tool_lower or "cut" in tool_lower:
+        audio_sfx = "clean shear slice, fiber tearing rip, paper flutter, quiet room tone"
+    elif "yarn" in tool_lower or "thread" in tool_lower:
+        audio_sfx = "pushpin wooden tap, string tension twang, taut hum, room tone"
+    elif "clip" in tool_lower or "clamp" in tool_lower:
+        audio_sfx = "steel spring snap, cardstock crimp crunch, placement click, low hum"
+    else:
+        audio_sfx = "crisp paper snap, mechanical placement click, low archival newsroom hum"
+
+    audio_block = f"AUDIO: {audio_sfx} — sound design only, no music, no narration."
+
+    full_prompt = (
+        f"{style_block}\n\n"
+        f"{shot_block}\n\n"
+        f"{audio_block}\n\n"
+        f"{avoid_block}"
+    )
+    return full_prompt.strip()

@@ -1,66 +1,52 @@
-# MASTER PROMPT: VOX-STYLE EDITORIAL MOTION & ANIMATION (B6 FLOW VIDEO ENGINE)
+# 🏛️ CANONICAL VOX VIDEO PROMPT ENGINE (B6 FLOW VIDEO & REMOTION PIPELINE)
 
-You are an elite Editorial Motion Designer, VOX-style animation director, documentary motion graphics expert, paper collage animator, and AI video prompt engineer.
+> **QUY CHUẨN ĐẠO DIỄN CHUYỂN ĐỘNG VÀ SINH VIDEO I2V VOX ENGINE V3.**  
+> Tích hợp 100% chuẩn mực từ **CL3 Vox Video System** (`config/prompts/cl3_vox_engine/video_prompts_system.md`).  
+> Ràng buộc trực tiếp các dịch vụ sinh video qua Google Flow (Veo 3.1 - Fast / Omni 1.1 Flash) và Remotion VPS.
 
-Your task is to transform completed VOX-style editorial images into premium documentary animations.
-The animation must preserve the original composition exactly.
-DO NOT redesign the image. DO NOT add new objects. DO NOT change the layout.
-The animation should feel as if an editor is assembling the illustration piece by piece.
+---
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODE 1: UNIVERSAL SINGLE-IMAGE ANIMATION PROMPT (PROMPT 3)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## 🧭 I. BỐ CỤC KHẮC CỐT GHI TÂM (CANONICAL 4-BLOCK PROMPT STRUCTURE)
 
-ANIMATION DURATION:
-Total duration: Exactly 10 seconds (or 5-8s depending on pacing)
-0–7 seconds: Build the composition layer by layer.
-7–10 seconds: Composition is complete. Only subtle secondary micro-motion is allowed while every element remains fixed in its original position.
+Mọi prompt video I2V truyền vào mô hình sinh video BẮT BUỘC tuân thủ đúng 4 khối:
+1. `[STYLE BLOCK]` (Khối phong cách cố định: Flat Parallax, Deep Diorama, hoặc Locked Stage).
+2. `SHOT:` (Khối 5 nhịp: Background, Midground, Foreground, Kinetic Contact Dynamics, Camera Move kết thúc bằng Settle).
+3. `AUDIO:` (Thiết kế âm thanh xúc giác, không nhạc nền, không lồng tiếng).
+4. `AVOID:` (Bộ lọc loại bỏ 3D CGI bóng bẩy, text rác, chuyển cảnh đột ngột).
 
-MOST IMPORTANT RULE:
-Every object becomes permanently locked after it appears.
-Nothing should drift. Nothing should slide away. Nothing should float around. Nothing should reposition itself.
-Every element remains anchored exactly where it was placed.
+---
 
-LAYER BUILD ORDER:
-Reveal the illustration one element at a time:
-Background paper ↓ Large geometric shape ↓ Main subject ↓ Supporting object ↓ Second supporting object ↓ Icons ↓ Map / Graph ↓ Lines ↓ Texture ↓ Final emphasis.
-Each layer enters individually. Never reveal multiple major objects simultaneously.
+## 🎬 II. 3 CHẾ ĐỘ PHONG CÁCH (THE 3 STYLE BLOCKS)
 
-ENTRY ANIMATIONS:
-Use only subtle editorial animations:
-Paper slide, paper drop, soft pop, small fade, gentle scale from 95% to 100%, paper unfold, mask reveal, simple wipe, small rotation (less than 3°), short paper placement bounce.
-Never use dramatic 3D motion.
+### 1. Chế độ A: Flat Parallax (Tài liệu điều tra & Dữ liệu kiểm toán)
+Dành cho các phân cảnh phân tích chứng từ, bóc tách dòng tiền, đọc báo cáo tài chính.
+- Máy quay trôi chậm $\le 2\%$, góc nhìn trực diện hoặc nghiêng nhẹ.
+- Các lớp giấy tách lớp rõ ràng, thị sai (parallax) tự nhiên, không 3D giả tạo.
 
-CAMERA:
-Camera must remain completely static.
-No zoom, no pan, no tilt, no orbit, no handheld movement, no shake, no cinematic camera moves.
-The illustration itself tells the story.
+### 2. Chế độ B: Deep Diorama (Điện ảnh, Khủng hoảng & Bước ngoặt kịch tính)
+Dành cho cảnh mở màn (Hook 0-60s), phát hiện ngòi nổ, và đại cảnh phơi bày sự thật (Smoking Gun).
+- Máy quay là một diễn viên (Camera is an actor): Lướt giữa các tầng giấy, bổ nhào (dive), xoay góc (orbit), hoặc lia nhanh (whip) với 1 chuyển động duy nhất.
+- Chiều sâu trường ảnh hẹp (shallow depth of field), vật thể tiền cảnh lướt sát ống kính.
 
-MOVEMENT AFTER APPEARING (MICRO-ANIMATION):
-Once an object has entered, it remains perfectly fixed.
-Only extremely subtle idle motion is allowed:
-- Maximum movement: 2–5 pixels
-- Maximum rotation: 1–2°
-- Maximum scale pulse: 1–2%
-- Maximum opacity pulse: 5%
-Examples: Tiny flag flutter, very slight smoke movement, light dust particles, soft glow pulse, small coin sparkle, tiny paper vibration, slow blinking light, micro shadow breathing.
+### 3. Chế độ C: Locked Stage (Sân khấu giấy cố định)
+Dành cho các phân cảnh đối thoại nhân vật hoặc tranh luận thể chế.
+- Mặt bàn nền khóa cứng (#F4F1EA), máy quay tĩnh hoặc vi trôi rất nhẹ.
+- Chuyển động tập trung 100% vào việc đưa đạo cụ, thước kẹp, con dấu và thẻ số liệu khổng lồ vào vị trí.
 
-DO NOT:
-No camera movement, no object drifting, no flying objects, no spinning elements, no excessive parallax, no explosions, no morphing, no warping, no stretching, no cartoon effects, no flashy transitions, no unnecessary motion.
+---
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODE 2: MULTI-IMAGE TRANSITION ANIMATION PROMPT (PROMPT 4)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## ⚡ III. 7 HỌ ĐỘNG LỰC HỌC CƠ HỌC ($H_1 \to H_7$) VÀ NHỊP THỜI GIAN
 
-For scenes requiring seamless stitching between 2 sequential paper collage compositions:
-Total Duration: 10 seconds.
-- 0.0–3.0s: Image 1 layer-by-layer assembly.
-- 3.0–5.0s: Hold Image 1 with micro-motion, prepare transition.
-- 5.0–8.0s: Image 2 layer-by-layer reveal matching composition rhythm.
-- 8.0–10.0s: Hold Image 2 with subtle life-like movement.
+1. **Bứt tốc tức thì ($\le 0.4\text{s}$)**: Mọi thao tác dập dấu, kẹp thước, cắt giấy, cắm ghim BẮT BUỘC diễn ra dứt khoát trong $0.2\text{s} - 0.4\text{s}$ kèm độ nảy cơ học (overshoot).
+2. **Khóa cứng điểm đỗ (Dead-Stop Hold)**: Ngay sau va chạm, vật thể đứng im bất động tại tọa độ va chạm. CẤM kéo dài chuyển động chậm chạp lê thê suốt 5–8s.
+3. **Thớ giấy sống 12fps (Living Hold on Twos)**: Trong suốt thời gian giữ khung hình, duy trì vi rung thớ giấy báo và nhịp thở bóng đổ $\le 2\text{px}$ ở 12fps.
+4. **Điểm đỗ máy quay bắt buộc (`Settle on...`)**: Mọi cú máy BẮT BUỘC kết thúc bằng câu lệnh `Settle on [target] in sharp focus`.
 
-TRANSITIONS BETWEEN IMAGES:
-- Seamless paper wipe following the direction of the composition.
-- Fast editorial push zoom into matching object or shape match (circles, maps, charts).
-- Parallax paper-slide transition with minimal movement.
-- Subtle ASMR sound design (paper rustle, card placement, delicate whooshes).
+---
+
+## 📄 IV. THAM CHIẾU HỆ THỐNG GỐC
+
+- Tài liệu hướng dẫn chi tiết T2I: `config/prompts/cl3_vox_engine/image_prompts_system.md`
+- Tài liệu hướng dẫn chi tiết I2V: `config/prompts/cl3_vox_engine/video_prompts_system.md`
+- Bảng màu & Phong cách chuẩn: `config/prompts/cl3_vox_engine/(Optional) Reference Image Prompt.txt`
+- Hình mẫu phong cách trực quan: `config/prompts/cl3_vox_engine/Example Style Reference.png`

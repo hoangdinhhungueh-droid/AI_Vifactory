@@ -1,0 +1,25 @@
+MASTER STYLE SHEET - Vox Style visual system, one 16:9 reference board. A single polished art-direction sheet defining the visual language for a documentary-collage explainer series. Editorial grid, consistent margins, section labels. Baked-in typography is intentional here (this is a style guide).
+
+
+SURFACE & MOOD: aged archival paper / muted map texture field, visible grain and print texture. Mood: newsroom-serious, layered, tactile, slightly retro.
+
+
+TYPE SPECIMEN PANEL: H1 sample "THE DEAL" in condensed bold headline caps; a huge stat number sample "$123" treated as a hero character; small annotation label sample "Fig. 3 - Trade Route". Typography aligned, sharp, no warped letters.
+
+
+PALETTE STRIP: labeled swatches - Archival Tan #C9BB9C, Ink Black #1A1A1A, Halftone Gray #8C8C8C, Hot Red #D62E1F, Mustard #D9A441. Red is reserved for strokes, underlines, and arrows; mustard is secondary accent only.
+
+
+COMPONENT ZOO PANEL: a black-and-white halftone cutout of a generic figure with a rough white keyline and an offset red stroke behind it; a torn-paper edge; a big red stat counter card; a map pin marker; an underline swipe in red beneath a headline word; an archival photo card with a thin white border. All share one construction logic: halftone texture, offset stroke pop.
+
+
+MINI-SCENE PANEL: 3 small example frames - (a) two halftone figures on the stage with a stat counter between them, (b) a map with a pin and a red underline swipe beneath a caption, (c) an archival photo card with a torn edge beside a mustard label. Same lighting and finish throughout.
+
+
+MOTION THUMBNAILS: 4 tiny storyboard frames with arrows only: cutout springs up with slight overshoot / counter ticks upward / red underline swipes beneath a word / camera holds a slow 2% drift across the stage.
+
+
+One panel shows THE STAGE: the persistent background world every clip lives on - a muted archival map/texture field, empty, pre-lit, evenly toned, ready for cutouts and stat cards to enter and exit. No midground elements present in this panel.
+
+
+FINISH: print grain, halftone dot texture, torn-paper edges, matte finish, no glossy 3D, no lens flares. No watermarks, no lorem ipsum, no unrelated logos, no random gibberish text - every visible word is one of the samples above.
