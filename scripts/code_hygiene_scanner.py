@@ -8,10 +8,13 @@ Scans for:
 """
 
 import ast
+import logging
 import os
 import re
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Fix Windows console UTF-8 output
 if sys.platform == "win32":
@@ -36,8 +39,8 @@ def scan_file_for_secrets(file_path: Path):
             for pattern, desc in SECRET_PATTERNS:
                 if re.search(pattern, line, re.IGNORECASE):
                     findings.append((line_no, desc, line.strip()[:80]))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Could not read %s: %s", file_path, exc)
     return findings
 
 class ComplexityVisitor(ast.NodeVisitor):
@@ -66,8 +69,8 @@ def scan_file_for_complexity(file_path: Path, max_complexity: int = 15):
         for func_name, lineno, comp in visitor.functions:
             if comp > max_complexity:
                 findings.append((lineno, func_name, comp))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Could not read %s: %s", file_path, exc)
     return findings
 
 def run_audit(target_dirs):
