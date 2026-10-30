@@ -32,7 +32,65 @@ except Exception as _reconf_err:
 ROOT_DIR = Path(__file__).resolve().parent.parent
 PROFILES_BASE_DIR = Path(r"C:\Users\hunghd2\.gemini\profiles")
 IMAGE_PROFILE_DIR = Path(r"C:\Users\hunghd2\.gemini\browser_profile")
-ARTIFACT_DIR = Path(r"C:\Users\hunghd2\.gemini\antigravity\brain\4a063bf3-98ec-418c-8ad5-fdc8863e5879")
+
+class FlowQuotaExhaustedError(RuntimeError):
+    """Exception raised when Google Flow video generation credits/quota is exhausted."""
+    pass
+
+
+def detect_flow_quota_exhausted(page) -> tuple[bool, str]:
+    """Phát hiện chủ động hạn mức credit Google Flow bị cạn trong 1-2 giây qua DOM & Text."""
+    try:
+        res = page.evaluate('''() => {
+            const body = document.body ? document.body.innerText : "";
+            const patterns = [
+                { reg: /insufficient credits/i, msg: "Insufficient credits" },
+                { reg: /not enough credits/i, msg: "Not enough credits" },
+                { reg: /out of credits/i, msg: "Out of credits" },
+                { reg: /credit limit reached/i, msg: "Credit limit reached" },
+                { reg: /reached your (?:credit )?limit/i, msg: "Reached credit limit" },
+                { reg: /0 credits remaining/i, msg: "0 credits remaining" },
+                { reg: /upgrade to get more credits/i, msg: "Upgrade to get more credits" },
+                { reg: /credit balance is too low/i, msg: "Credit balance too low" },
+                { reg: /kh(?:ô|o)ng đ(?:ủ|u) t(?:í|i)n d(?:ụ|u)ng/i, msg: "Không đủ tín dụng" },
+                { reg: /h(?:ế|e)t t(?:í|i)n d(?:ụ|u)ng/i, msg: "Hết tín dụng" },
+                { reg: /h(?:ế|e)t l(?:ượ|uo)t t(?:ạ|a)o/i, msg: "Hết lượt tạo" },
+                { reg: /đ(?:ã|a) đ(?:ạ|a)t gi(?:ớ|o)i h(?:ạ|a)n/i, msg: "Đã đạt giới hạn" },
+                { reg: /s(?:ố|o) d(?:ư|u) t(?:í|i)n d(?:ụ|u)ng kh(?:ô|o)ng đ(?:ủ|u)/i, msg: "Số dư tín dụng không đủ" },
+                { reg: /n(?:â|a)ng c(?:ấ|a)p đ(?:ể|e) c(?:ó|o) th(?:ê|e)m t(?:í|i)n d(?:ụ|u)ng/i, msg: "Nâng cấp để có thêm tín dụng" },
+                { reg: /크레딧 부족/i, msg: "크레딧 부족" },
+                { reg: /크레딧이 부족합니다/i, msg: "크레딧이 부족합니다" },
+                { reg: /한도에 도달했습니다/i, msg: "한도에 도달했습니다" }
+            ];
+            for (const p of patterns) {
+                if (p.reg.test(body)) {
+                    return { hit: true, msg: p.msg };
+                }
+            }
+            return { hit: false, msg: "" };
+        }''')
+        if res and res.get("hit"):
+            return True, res.get("msg", "Flow quota exhausted")
+    except Exception as e:
+        logger.debug(f"detect_flow_quota_exhausted notice: {e}")
+    return False, ""
+
+
+def get_seed_image_path(episode_dir: Path, scene_id: str) -> Path:
+    """Tìm kiếm ảnh composite seed theo thứ tự ưu tiên các thư mục chuẩn (Rule 128 Generic Contract)."""
+    candidates = [
+        episode_dir / "composite_seeds" / f"composite_{scene_id}.png",
+        episode_dir / "images" / f"composite_{scene_id}.png",
+        ROOT_DIR / "episodes" / episode_dir.name / "composite_seeds" / f"composite_{scene_id}.png",
+    ]
+    blocks_dir = episode_dir / "blocks"
+    if blocks_dir.exists():
+        for blk in blocks_dir.glob("block_*"):
+            candidates.append(blk / "images" / f"composite_{scene_id}.png")
+    for c in candidates:
+        if c.exists() and c.stat().st_size > 10000:
+            return c
+    return episode_dir / "composite_seeds" / f"composite_{scene_id}.png"
 
 PROFILES = {
     'acc_01': {
@@ -184,11 +242,7 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
     print(f"\n   🎬 [BẮT ĐẦU CLIP I2V] {scene_id} -> {output_filename}")
     print(f"      Prompt: \"{prompt_text[:120]}...\"")
 
-    seed_img = episode_dir / "composite_seeds" / f"composite_{scene_id}.png"
-    if not seed_img.exists():
-        brain_seed = ARTIFACT_DIR / f"composite_{scene_id}.png"
-        if brain_seed.exists():
-            seed_img = brain_seed
+    seed_img = get_seed_image_path(episode_dir, scene_id)
 
     try:
         done_btn = page.locator("button[aria-label*='Done' i], button[aria-label*='Xong' i], button:has-text('Done'), button:has-text('Xong'), button:has-text('Hoàn tất')").first
@@ -325,8 +379,20 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         initial_tiles_count = page.locator("flow-video-tile").count()
         print(f"      📊 Số tiles hiện có trước khi tạo: {initial_tiles_count}")
 
+        # Kiểm tra chủ động cạn Quota TRƯỚC KHI bấm Start
+        is_exhausted, quota_msg = detect_flow_quota_exhausted(page)
+        if is_exhausted:
+            page.screenshot(path=str(debug_dir / f"quota_exhausted_{scene_id}.png"))
+            print(f"      🛑 [QUOTA EXHAUSTED] Google Flow báo cạn credit trước khi bấm Tạo: {quota_msg}")
+            raise FlowQuotaExhaustedError(f"Pre-generation quota exhausted: {quota_msg}")
+
         start_gen = page.locator("button[aria-label*='Bắt đầu tạo'], button[aria-label*='Start generation' i], button:has-text('arrow_forward')").first
         if start_gen.count() == 0 or not start_gen.is_visible():
+            is_exhausted, quota_msg = detect_flow_quota_exhausted(page)
+            if is_exhausted:
+                page.screenshot(path=str(debug_dir / f"quota_exhausted_{scene_id}.png"))
+                print(f"      🛑 [QUOTA EXHAUSTED] Không thấy nút tạo do hết credit: {quota_msg}")
+                raise FlowQuotaExhaustedError(f"Missing start button due to quota: {quota_msg}")
             print("      ❌ Không tìm thấy nút Start generation!")
             return False
 
@@ -339,6 +405,12 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         approved = False
         for _ in range(15):
             time.sleep(2)
+            is_exhausted, quota_msg = detect_flow_quota_exhausted(page)
+            if is_exhausted:
+                page.screenshot(path=str(debug_dir / f"quota_exhausted_{scene_id}.png"))
+                print(f"      🛑 [QUOTA EXHAUSTED] Google Flow báo cạn credit tại dialog phê duyệt: {quota_msg}")
+                raise FlowQuotaExhaustedError(f"Approval dialog quota exhausted: {quota_msg}")
+
             for sel in [
                 "[aria-label*='Luôn phê duyệt']",
                 "[aria-label*='Always approve']",
@@ -374,12 +446,25 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             stop_btn = page.locator("button:has-text('Stop'), button[aria-label*='Stop']").first
             is_generating = (stop_btn.count() > 0 and stop_btn.is_visible())
 
-            # Kiem tra nhanh loi Safety Policy tu Google Flow
+            # Kiem tra nhanh loi Safety Policy hoac Quota tu Google Flow
             err_box = page.locator("text='Không thành công', text='Không thể tạo video', text='Failed to generate'").first
             if err_box.count() > 0 and err_box.is_visible():
+                is_exhausted, quota_msg = detect_flow_quota_exhausted(page)
+                if is_exhausted:
+                    page.screenshot(path=str(debug_dir / f"quota_exhausted_{scene_id}.png"))
+                    print(f"\n      🛑 [QUOTA EXHAUSTED] Google Flow báo cạn credit trong quá trình tạo: {quota_msg}")
+                    raise FlowQuotaExhaustedError(f"Generation error card quota exhausted: {quota_msg}")
+
                 page.screenshot(path=str(debug_dir / f"policy_error_{scene_id}.png"))
                 print(f"\n      ❌ Google Flow từ chối câu lệnh (Safety Policy Filter)! Đã lưu: policy_error_{scene_id}.png")
                 return False
+
+            if elapsed % 12 == 0 and elapsed > 0:
+                is_exhausted, quota_msg = detect_flow_quota_exhausted(page)
+                if is_exhausted:
+                    page.screenshot(path=str(debug_dir / f"quota_exhausted_{scene_id}.png"))
+                    print(f"\n      🛑 [QUOTA EXHAUSTED] Google Flow báo cạn credit: {quota_msg}")
+                    raise FlowQuotaExhaustedError(f"Periodic check quota exhausted: {quota_msg}")
 
             if rendering_cards:
                 cur_pct = rendering_cards[0]
@@ -507,6 +592,8 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             print(f"      ❌ Tải thất bại hoặc file rỗng ({out_file.name})!")
             return False
 
+    except FlowQuotaExhaustedError:
+        raise
     except Exception as e:
         print(f"      ❌ Lỗi khi sinh video {scene_id}: {e}")
         return False
@@ -631,8 +718,14 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
                 except OSError as _unl_err:
                     logger.warning(f"Failed to unlink existing output file {out_file}: {_unl_err}")
 
-            success = generate_and_download_clip(page, clip, out_file, episode_dir)
-            results[clip["scene_id"]] = success
+            try:
+                success = generate_and_download_clip(page, clip, out_file, episode_dir)
+                results[clip["scene_id"]] = success
+            except FlowQuotaExhaustedError as qe:
+                print(f"\n   🛑 [QUOTA EXHAUSTED] Tài khoản [{acc_key.upper()}] cạn credit: {qe}")
+                remaining = clips[i_clip:]
+                browser.close()
+                return {"_status": "QUOTA_EXHAUSTED", "_unprocessed": remaining, "_exhausted_acc": acc_key, **results}
             time.sleep(3)
 
         browser.close()
@@ -683,62 +776,103 @@ def main():
     print(f"📦 Tổng số clips xử lý: {len(all_clips)}")
     print(f"📁 Thư mục lưu trữ: {out_dir}")
 
-    # Phân bổ clips theo flow_slot, ưu tiên hạm đội tài khoản đã xác thực đăng nhập Flow
+    # Thứ tự hạm đội ưu tiên đã xác thực đăng nhập Google Flow
     verified_order = ['acc_03', 'acc_02', 'acc_04', 'acc_05', 'acc_06', 'acc_07', 'acc_01']
     available_accs = [a for a in verified_order if a in PROFILES]
+
+    # Nếu user chỉ định --acc cụ thể, tài khoản đó sẽ đi đầu tiên, sau đó tự động xoay qua các tài khoản còn lại
     if args.acc != "all" and args.acc in PROFILES:
-        target_accs = [args.acc]
-        clips_by_acc = {args.acc: all_clips}
+        fleet_order = [args.acc] + [a for a in available_accs if a != args.acc]
     else:
-        target_accs = available_accs
-        clips_by_acc = {acc: [] for acc in available_accs}
-        for i, c in enumerate(all_clips):
-            slot = c.get("flow_slot")
-            if not slot or slot not in PROFILES:
-                slot = available_accs[i % len(available_accs)]
-                c["flow_slot"] = slot
-            clips_by_acc.setdefault(slot, []).append(c)
+        fleet_order = list(available_accs)
 
-    total_success = 0
-    total_processed = 0
-    unprocessed_queue = []
+    # Hàng đợi công việc động (Dynamic Work Queue)
+    pending_queue = list(all_clips)
+    exhausted_accs = set()
+    offline_accs = set()
+    total_requested = len(all_clips)
+    completed_clips = set()
+    acc_idx = 0
 
-    for acc in target_accs:
-        clips = clips_by_acc.get(acc, [])
-        if unprocessed_queue:
-            print(f"🔄 [Auto-Fallback] Chuyển giao {len(unprocessed_queue)} clips từ tài khoản trước sang {acc}...")
-            clips = list(unprocessed_queue) + clips
-            unprocessed_queue = []
-        if not clips:
-            print(f"⚠️ Không có clip nào được gán cho {acc}")
+    print("\n" + "=" * 70)
+    print(f"🚀 [DYNAMIC FLEET RUNNER] Bắt đầu điều phối {total_requested} clips với {len(fleet_order)} tài khoản:")
+    print(f"   Thứ tự xoay vòng: {' -> '.join(fleet_order)}")
+    print("=" * 70)
+
+    while pending_queue and acc_idx < len(fleet_order):
+        current_acc = fleet_order[acc_idx]
+
+        if current_acc in exhausted_accs or current_acc in offline_accs:
+            acc_idx += 1
             continue
 
-        res = dispatch_for_account(acc, clips, out_dir, episode_dir, headless=args.headless, model_target=args.model, force=args.force)
-        if res.get("_status") in ("NOT_LOGGED_IN", "NO_PROJECT_BTN", "CANVAS_TIMEOUT"):
-            unprocessed_queue.extend(res.get("_unprocessed", []))
-            continue
+        # Lọc các clip chưa có file hoặc file hỏng
+        clips_to_process = []
+        for c in pending_queue:
+            out_file = out_dir / c["output_filename"]
+            if not args.force and out_file.exists() and out_file.stat().st_size > 200000:
+                completed_clips.add(c["scene_id"])
+            else:
+                clips_to_process.append(c)
+
+        if not clips_to_process:
+            print(f"\n🎉 Toàn bộ {total_requested} clips đã hoàn tất thành công trên đĩa!")
+            break
+
+        print(f"\n▶️ [TÀI KHOẢN HIỆN TẠI]: {current_acc.upper()} đang nhận {len(clips_to_process)} clips...")
+        res = dispatch_for_account(
+            current_acc,
+            clips_to_process,
+            out_dir,
+            episode_dir,
+            headless=args.headless,
+            model_target=args.model,
+            force=args.force
+        )
+
+        status = res.get("_status")
+
+        # Ghi nhận kết quả thành công
         for s_id, ok in res.items():
-            if s_id.startswith("_"):
-                continue
-            total_processed += 1
-            if ok:
-                total_success += 1
+            if not s_id.startswith("_") and ok:
+                completed_clips.add(s_id)
 
-    if unprocessed_queue:
-        for fallback_acc in ['acc_03', 'acc_02', 'acc_04', 'acc_05', 'acc_06']:
-            if fallback_acc in target_accs:
-                print(f"🔄 [Auto-Fallback] Thử xử lý {len(unprocessed_queue)} clips còn tồn đọng trên {fallback_acc}...")
-                res = dispatch_for_account(fallback_acc, unprocessed_queue, out_dir, episode_dir, headless=args.headless, model_target=args.model, force=args.force)
-                for s_id, ok in res.items():
-                    if s_id.startswith("_"):
-                        continue
-                    total_processed += 1
-                    if ok:
-                        total_success += 1
+        # Cập nhật lại hàng đợi
+        pending_queue = [c for c in all_clips if c["scene_id"] not in completed_clips]
+
+        if status == "QUOTA_EXHAUSTED":
+            exhausted_accs.add(current_acc)
+            acc_idx += 1
+            if acc_idx < len(fleet_order):
+                next_acc = fleet_order[acc_idx]
+                print(f"\n⚠️ [AUTO-ROTATION] Tài khoản [{current_acc.upper()}] đã cạn credit.")
+                print(f"🔄 Tự động chuyển giao {len(pending_queue)} clips còn lại sang [{next_acc.upper()}]...")
+            else:
+                print(f"\n🛑 Toàn bộ các tài khoản trong hạm đội đã cạn hạn mức hoặc không khả dụng!")
+                break
+        elif status in ("NOT_LOGGED_IN", "NO_PROJECT_BTN", "CANVAS_TIMEOUT"):
+            offline_accs.add(current_acc)
+            acc_idx += 1
+            if acc_idx < len(fleet_order):
+                next_acc = fleet_order[acc_idx]
+                print(f"\n⚠️ [AUTO-FALLBACK] Tài khoản [{current_acc.upper()}] gặp lỗi phiên ({status}).")
+                print(f"🔄 Tự động chuyển giao {len(pending_queue)} clips sang [{next_acc.upper()}]...")
+            else:
+                print(f"\n🛑 Không còn tài khoản nào khả dụng trong hạm đội!")
+                break
+        else:
+            # Tài khoản hiện tại đã xử lý xong hoặc gặp lỗi đơn lẻ không phải quota
+            if pending_queue:
+                acc_idx += 1
+                if acc_idx < len(fleet_order):
+                    print(f"🔄 Còn {len(pending_queue)} clips chưa xong. Tiếp tục chuyển sang tài khoản kế tiếp [{fleet_order[acc_idx].upper()}]...")
+            else:
                 break
 
     print("\n" + "=" * 70)
-    print(f"📊 KẾT QUẢ ĐIỀU PHỐI SINH VIDEO: {total_success}/{total_processed} clips thành công!")
+    print(f"📊 KẾT QUẢ ĐIỀU PHỐI HẠM ĐỘI: {len(completed_clips)}/{total_requested} clips thành công!")
+    if pending_queue:
+        print(f"⚠️ Còn tồn đọng {len(pending_queue)} clips: {[c['scene_id'] for c in pending_queue]}")
     print("=" * 70)
 
 if __name__ == "__main__":
