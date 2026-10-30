@@ -211,8 +211,8 @@ def dismiss_gemini_popups(page):
                 if locator.count() > 0 and locator.first.is_visible():
                     locator.first.click(force=True)
                     time.sleep(0.3)
-            except Exception:
-                pass
+            except Exception as _dlg_err:
+                logger.debug(f"[dismiss_dialogs] Button click skipped: {_dlg_err}")
 
         # 2. Quét sâu qua JavaScript DOM evaluate
         page.evaluate('''() => {
@@ -710,8 +710,8 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
     try:
         if page and not page.is_closed():
             page.screenshot(path=debug_shot)
-    except Exception:
-        pass
+    except Exception as _shot_err:
+        logger.debug(f"[download_canvas_image] Screenshot capture notice: {_shot_err}")
     raise RuntimeError(f"❌ Không lưu được ảnh từ Gemini Web sau {max_retries} lần thử. Screenshot: {debug_shot}")
 
 def audit_single_image(img_path, layer_type):
@@ -1318,8 +1318,8 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                                 try:
                                     open_account_context(current_acc_id)
                                     continue
-                                except Exception:
-                                    pass
+                                except Exception as _ctx_err:
+                                    logger.debug(f"[browser_gen] Account context error: {_ctx_err}")
                             except Exception as reconnect_err:
                                 print(f"⚠️ Không thể kết nối lại {current_acc_id}: {reconnect_err}. Thử chuyển sang tài khoản tiếp theo...")
                                 acc_idx += 1
@@ -1330,8 +1330,8 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                                 try:
                                     open_account_context(current_acc_id)
                                     continue
-                                except Exception:
-                                    pass
+                                except Exception as _ctx_err2:
+                                    logger.debug(f"[browser_gen] Account switch context error: {_ctx_err2}")
 
                         if attempt < MAX_INPLACE_RETRIES:
                             time.sleep(3)

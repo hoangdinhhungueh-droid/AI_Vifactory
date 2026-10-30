@@ -568,8 +568,8 @@ class ClaudeVoxDirector:
                 if p_trim.startswith("[") and p_trim.endswith("]"):
                     try:
                         return json.loads(p_trim)
-                    except Exception:
-                        pass
+                    except Exception as _json_err:
+                        logger.debug(f"[claude_vox_director] JSON block decode retry: {_json_err}")
 
         start = cleaned.find("[")
         end = cleaned.rfind("]")

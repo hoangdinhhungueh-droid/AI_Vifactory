@@ -51,10 +51,10 @@ def test_build_universal_video_prompt():
         market="EN",
     )
     prompt = build_universal_video_prompt(sc)
-    assert "Forensic documentary motion graphics" in prompt
-    assert "Tactile brass vault key" in prompt
-    assert "KINETIC CAUSAL CHAIN" in prompt
-    assert "PHYSICAL CONSTRAINTS" in prompt
+    assert "[CAMERA & ENVIRONMENT]:" in prompt
+    assert "[ACTION PHASE (0.2s - 0.4s)]:" in prompt
+    assert "[HOLD & LIVING TEXTURE]:" in prompt
+    assert "12fps (on twos)" in prompt
 
 
 def test_s05_director_plan_execution_and_s3_data_loading(mock_s05_context: RunContext):
@@ -115,8 +115,8 @@ def test_s05_director_plan_execution_and_s3_data_loading(mock_s05_context: RunCo
     assert sc1["scene_id"] == "SC_01"
     assert len(sc1["shots"]) == 1
     shot1 = sc1["shots"][0]
-    assert "Forensic documentary motion graphics" in shot1["visual_prompt"]
-    assert "Tactile paper balance sheet burning" in shot1["visual_prompt"]
+    assert "[ACTION PHASE" in shot1["visual_prompt"]
+    assert "[HOLD & LIVING TEXTURE]:" in shot1["visual_prompt"]
 
     # 4. Artifact written to disk
     out_artifact_path = ctx.paths.artifact_file(StageID.S5_DIRECTOR_PLAN.value)
