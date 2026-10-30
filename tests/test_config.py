@@ -15,7 +15,7 @@ class TestConfig(unittest.TestCase):
     def test_load_prod_profile(self):
         cfg = load_profile("prod")
         self.assertEqual(cfg.name, "prod")
-        self.assertEqual(len(cfg.video_generation.account_pool), 7)
+        self.assertEqual(len(cfg.video_generation.account_pool), 6)
         self.assertEqual(cfg.render.fps, 30)
 
     def test_load_e2e_min_profile(self):

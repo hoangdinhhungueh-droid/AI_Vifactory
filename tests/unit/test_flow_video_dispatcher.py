@@ -59,9 +59,10 @@ def test_get_seed_image_path_resolution(tmp_path):
 
 
 def test_fleet_profiles_integrity():
-    """Ensures all 7 profiles are properly registered."""
-    for i in range(1, 8):
+    """Ensures active profiles are properly registered (excluding dropped pro acc_06)."""
+    for i in [1, 2, 3, 4, 5, 7]:
         acc_key = f"acc_{i:02d}"
         assert acc_key in PROFILES
         assert "email" in PROFILES[acc_key]
         assert "path" in PROFILES[acc_key]
+    assert "acc_06" not in PROFILES
