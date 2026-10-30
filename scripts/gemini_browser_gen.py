@@ -480,16 +480,16 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
             # Đảm bảo trang sạch / New Chat để tránh lẫn ảnh cũ
             dismiss_gemini_popups(page)
             try:
-                new_chat_btn = page.query_selector('a[href="/app"], [aria-label*="New chat"], [aria-label*="Cuộc trò chuyện mới"], button:has-text("New chat")')
-                if new_chat_btn:
+                new_chat_btn = page.query_selector('[aria-label*="New chat"], [aria-label*="Cuộc trò chuyện mới"], [data-test-id="new-chat-button"], button:has-text("New chat"), button:has-text("Cuộc trò chuyện mới")')
+                if new_chat_btn and new_chat_btn.is_visible():
                     new_chat_btn.click()
-                    time.sleep(2)
+                    time.sleep(1.5)
                 else:
                     page.goto("https://gemini.google.com/app", wait_until="domcontentloaded")
-                    time.sleep(3)
+                    time.sleep(2)
             except Exception:
                 page.goto("https://gemini.google.com/app", wait_until="domcontentloaded")
-                time.sleep(3)
+                time.sleep(2)
             dismiss_gemini_popups(page)
 
             # Pre-check Quota: Nếu tài khoản đã hết quota từ trước, không cần gõ prompt làm gì
@@ -503,47 +503,26 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
             input_box.click()
             time.sleep(0.3)
 
-            # Đính kèm ảnh mẫu tham chiếu Style Reference (Rule 140 & CL3 Kim Chỉ Nam)
-            style_ref_path = ROOT_DIR / "config" / "prompts" / "cl3_vox_engine" / "Example Style Reference.png"
-            if style_ref_path.exists():
-                try:
-                    file_input = page.query_selector('input[type="file"]')
-                    if file_input:
-                        file_input.set_input_files(str(style_ref_path))
-                        print(f"📎 [Style Reference] Đã đính kèm ảnh mẫu '{style_ref_path.name}' vào Gemini chat!")
-                        time.sleep(1.5)
-                except Exception as _attach_err:
-                    logger.debug(f"Attachment notice: {_attach_err}")
-
-            # Khóa cứng chế độ Imagen 3 qua menu "+" (Tạo hình ảnh) để 1 phát ăn ngay, triệt tiêu text2text refusal
-            try:
-                plus_btn = page.query_selector('button[aria-label*="Thêm"], button[aria-label*="Add"], button[aria-label*="Công cụ"], button[aria-label*="Tools"], button[aria-label*="Tải lên"], button[aria-label*="Upload"]')
-                if not plus_btn:
-                    # Tìm button đầu tiên bên trái trong khung nhập
-                    container = input_box.evaluate_handle("el => el.closest('form') || el.closest('div[class*=\"input\"]') || el.parentElement.parentElement")
-                    if container:
-                        plus_btn = container.query_selector('button')
-                if plus_btn:
-                    plus_btn.click()
-                    time.sleep(0.4)
-                    img_tool = page.query_selector('[role="menuitem"]:has-text("Tạo hình ảnh"), [role="menuitem"]:has-text("Create image"), button:has-text("Tạo hình ảnh"), button:has-text("Create image"), div:has-text("Tạo hình ảnh"), [aria-label*="Tạo hình ảnh"]')
-                    if img_tool:
-                        img_tool.click()
-                        time.sleep(0.4)
-                        print("🎨 [1-Shot Mode] Đã kích hoạt chế độ 'Tạo hình ảnh' trực tiếp qua menu công cụ!")
-            except Exception as _e_tool:
-                logger.debug(f"Menu tool click notice: {_e_tool}")
-
             # Xóa nội dung cũ nếu có
             page.keyboard.press("Control+A")
             page.keyboard.press("Backspace")
             time.sleep(0.2)
 
-            # Khử nhiễu các thẻ meta lập trình [STYLE MANDATE], [ERA ANCHOR] để Imagen 3 không bị hiểu nhầm là prompt crafting
+            # Khử nhiễu các thẻ meta lập trình, video kinematics và audio directives để Imagen 3 không bị hiểu nhầm là Veo video
             import re
             clean_p = prompt_text.strip()
             clean_p = re.sub(r'\[(STYLE MANDATE|MARKET & ETHNIC ANCHOR|MARKET & ENVIRONMENT ANCHOR|ERA ANCHOR|STRICT NEGATIVE PROMPT|TECHNICAL:[^\]]*)\]', '', clean_p, flags=re.IGNORECASE).strip()
-            clean_p = re.sub(r'\s+', ' ', clean_p)
+            # Khử các câu lệnh video/âm thanh gây router Gemini Web chuyển nhầm sang Google Veo
+            clean_p = re.sub(r'Audio:\s*sound design only[^\.\n]*[\.\n]?', '', clean_p, flags=re.IGNORECASE)
+            clean_p = re.sub(r'The camera is an actor:[^\.\n]*[\.\n]?', '', clean_p, flags=re.IGNORECASE)
+            clean_p = re.sub(r'Camera:\s*[^\n]+', '', clean_p, flags=re.IGNORECASE)
+            clean_p = re.sub(r'Motion:\s*[^\n]+', '', clean_p, flags=re.IGNORECASE)
+            clean_p = re.sub(r'Action:\s*The\s+[^\n]+', '', clean_p, flags=re.IGNORECASE)
+            clean_p = re.sub(r'^(Tactile\s+archival\s+exhibit|Tactile\s+exhibit):\s*', '', clean_p, flags=re.IGNORECASE)
+            # Khử thương hiệu / trademark vi phạm bộ lọc bản quyền Google Imagen 3
+            clean_p = re.sub(r'\b(Binance|バイナンス|바이낸스)\b', '大手暗号資産取引所', clean_p, flags=re.IGNORECASE)
+            clean_p = re.sub(r'\b(Coinbase|コインベース|코인베이스)\b', '暗号資産取引所', clean_p, flags=re.IGNORECASE)
+            clean_p = re.sub(r'\s+', ' ', clean_p).strip()
             if not clean_p.lower().startswith("generate an image") and not clean_p.lower().startswith("tạo hình ảnh"):
                 full_prompt = f"Tạo hình ảnh: {clean_p}"
             else:
@@ -1271,7 +1250,7 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                         print(f"⚠️ Kiểm tra file có sẵn lỗi: {e}. Sẽ sinh lại...")
 
                 # IN-PLACE AUDIT & AUTO-REGENERATE LOOP WITH FLEET ROTATION
-                MAX_INPLACE_RETRIES = 3
+                MAX_INPLACE_RETRIES = 1
                 image_passed = False
                 attempt = 1
 
@@ -1341,6 +1320,18 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                             attempt += 1
                             continue
                         else:
+                            # Account failed after all attempts - failover to next account in fleet!
+                            acc_idx += 1
+                            if acc_idx < len(accounts_order):
+                                next_acc_id = accounts_order[acc_idx]
+                                print(f"\n🔄 [Fleet Failover] {key} không thành công trên {current_acc_id}. Tự động chuyển hạm đội sang: {next_acc_id}...")
+                                try:
+                                    current_acc_id = next_acc_id
+                                    open_account_context(current_acc_id)
+                                    attempt = 1
+                                    continue
+                                except Exception as switch_err:
+                                    print(f"⚠️ Lỗi switch sang {next_acc_id}: {switch_err}")
                             attempt += 1
                             break
 

@@ -1550,6 +1550,31 @@ CANONICAL_BACKGROUNDS = [
 ]
 
 
+def sanitize_prompt_for_imagen3(text: str) -> str:
+    """Sanitizes text for Google Imagen 3 (T2I), stripping English artifact prefixes and trademark trigger brands."""
+    if not text:
+        return ""
+    # 1. Strip English exhibit label prefixes (Rule 122 Parity)
+    s = re.sub(r'^(Tactile\s+archival\s+exhibit|Tactile\s+exhibit):\s*', '', text, flags=re.IGNORECASE)
+
+    # 2. Anonymize brand and trademark entity names that trigger Google Imagen 3 safety/trademark refusal
+    replacements = [
+        (r'\b(Binance|バイナンス|바이낸스)\b', '大手暗号資産取引所'),
+        (r'\b(Coinbase|コインベース|코인베이스)\b', '暗号資産取引所'),
+        (r'\b(FTX)\b', '破綻した暗号資産取引所'),
+        (r'\b(Tether|テザー|테더)\b', 'ステーブルコイン発行企業'),
+        (r'\b(Apple|アップル|애플)\b', '大手テクノロジー企業'),
+        (r'\b(Google|グーグル|구글)\b', '大手検索エンジン企業'),
+        (r'\b(Microsoft|マイクロソフト|마이크로소프트)\b', '大手ソフトウェア企業'),
+        (r'\b(Tesla|テスラ|테슬라)\b', '大手電気自動車メーカー'),
+        (r'\b(Nvidia|エヌビディア|엔ビディア)\b', '大手半導体企業'),
+        (r'\b(OpenAI|オープンAI|오픈AI)\b', '大手AI研究所'),
+    ]
+    for pat, repl in replacements:
+        s = re.sub(pat, repl, s, flags=re.IGNORECASE)
+    return s.strip()
+
+
 def build_cl3_paper_diorama_prompt(
     sub_plan_or_sentence: Union[Dict[str, Any], str],
     market: str = "EN",
@@ -1633,15 +1658,17 @@ def build_cl3_paper_diorama_prompt(
             sc_idx = int(m_sc.group(1)) - 1
     bg_choice = CANONICAL_BACKGROUNDS[sc_idx % len(CANONICAL_BACKGROUNDS)]
     bg_field = f"Background: {bg_choice}."
-    mg_cutout = f"MG: halftone black-and-white cutout exhibit of {ev.hero_anchor_prop} entering at distinct depth with rough white deckle border and offset ink stroke."
-    fg_data = f"FG: {ev.interacting_tool_prop} positioned at foreground depth, crossing close to the lens."
-    action_text = f"Action: The {ev.interacting_tool_prop} snaps briskly in 0.3s and {ev.tactile_action_verb} the document, {ev.physical_reaction}, leaving {ev.tactile_residue}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
-    camera_line = f"Camera: {ev.camera_directive.rstrip('.')}. Settle on the {ev.hero_anchor_prop} in sharp focus."
+    clean_hero = sanitize_prompt_for_imagen3(ev.hero_anchor_prop)
+    clean_tool = sanitize_prompt_for_imagen3(ev.interacting_tool_prop)
+    mg_cutout = f"MG: halftone black-and-white cutout exhibit of {clean_hero} entering at distinct depth with rough white deckle border and offset ink stroke."
+    fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
+    action_text = f"Action: The {clean_tool} snaps briskly in 0.3s and {ev.tactile_action_verb} the document, {ev.physical_reaction}, leaving {ev.tactile_residue}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+    camera_line = f"Camera: {ev.camera_directive.rstrip('.')}. Settle on the {clean_hero} in sharp focus."
 
     shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}\n{action_text}\n{camera_line}"
 
     # 3. Audio Component
-    tool_lower = ev.interacting_tool_prop.lower()
+    tool_lower = clean_tool.lower()
     if "caliper" in tool_lower or "vernier" in tool_lower:
         audio_sfx = "vernier metal slide, cardstock crimp, ticker clicks, low newsroom hum"
     elif "seal" in tool_lower or "stamp" in tool_lower:
@@ -1674,11 +1701,11 @@ def build_cl3_paper_diorama_image_prompt(
     interacting_tool_override: Optional[str] = None,
     **kwargs: Any
 ) -> str:
-    """Builds a pure CL3 Canonical 2-Block Paper Diorama Image Prompt ([STYLE BLOCK] -> SHOT:).
+    """Builds a pure CL3 Canonical 2-Block Paper Diorama Still Image Prompt ([STYLE BLOCK] -> SHOT:).
 
-    Conforms 100% to CL3 Vox Videos specification (image_prompts_system.md):
-    - Block 1: STYLE BLOCK (verbatim from canonical specification)
-    - Block 2: SHOT: Background -> MG -> FG -> Action -> Camera with Settle
+    Conforms 100% to CL3 Vox Videos specification for still seed generation:
+    - Block 1: STYLE BLOCK (Paper diorama materials, depth, print textures, 0% video/kinematics/audio words)
+    - Block 2: SHOT: Background -> MG -> FG (clean props, zero trademark refusal)
     """
     sentence = ""
     resolved_market = market
@@ -1693,19 +1720,17 @@ def build_cl3_paper_diorama_image_prompt(
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
     ev = extract_evidence_for_sentence(sentence, market=resolved_market, scene_id=sc_id)
 
-    hero_prop = hero_object_override or ev.hero_anchor_prop
-    tool_prop = interacting_tool_override or ev.interacting_tool_prop
+    raw_hero = hero_object_override or ev.hero_anchor_prop
+    raw_tool = interacting_tool_override or ev.interacting_tool_prop
+    clean_hero = sanitize_prompt_for_imagen3(raw_hero)
+    clean_tool = sanitize_prompt_for_imagen3(raw_tool)
 
     style_block = (
-        "Use the attached style sheet for materials only – aged-print collage textures on aged archival newsprint (#F4F1EA / #C9BB9C), "
-        "halftone black-and-white cutout people with rough white keylines and offset ink accent strokes (#D62E1F red, #D9A441 mustard), "
-        "giant stat numbers rendered as physical hero characters, and authentic print grain. Do NOT copy the sheet's layout or its flatness: "
-        "every scene is a deep 3D paper diorama – cutouts are physical layers separated in real space, strong shallow depth of field, "
-        "foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, dives, whips, racks focus – "
-        "one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's muted archival palette "
-        "(#F4F1EA newsprint, #C9BB9C tan, #1A1A1A ink black, #8C8C8C halftone gray). ALERT WASH means the entire frame floods to the hot accent tone (#D62E1F) "
-        "in one decisive beat. Motion: mechanical spring pop-ups with slight overshoot, staggered entrances, ticking counters, tactile paper contact residue. "
-        "Audio: sound design only – paper pops, whooshes, stamps, ticks, newsroom hum. No music. No voice-over. Preserves bottom 20% vertical safe zone for subtitles."
+        "Deep 3D paper diorama with aged-print collage textures on aged archival newsprint (#F4F1EA / #C9BB9C), "
+        "halftone black-and-white cutout people and objects with rough white deckle keylines and offset ink accent strokes (#D62E1F red, #D9A441 mustard), "
+        "giant stat numbers rendered as physical hero characters, and authentic print grain. Physical layers separated in real space, "
+        "strong shallow depth of field, foreground elements crossing close to the lens. All cutouts sit on physical stands across distinct focal planes. "
+        "Preserves bottom 20% vertical safe zone for subtitles."
     )
 
     sc_idx = 0
@@ -1715,14 +1740,12 @@ def build_cl3_paper_diorama_image_prompt(
             sc_idx = int(m_sc.group(1)) - 1
     bg_choice = CANONICAL_BACKGROUNDS[sc_idx % len(CANONICAL_BACKGROUNDS)]
     bg_field = f"Background: {bg_choice}."
-    mg_cutout = f"MG: high-contrast halftone black-and-white cutout of {hero_prop} with rough white deckle keylines and offset ink accent stroke (#D62E1F)."
+    mg_cutout = f"MG: high-contrast halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset ink accent stroke (#D62E1F)."
     if getattr(ev.archetype, 'value', str(ev.archetype)) == "quantitative_metric":
-        fg_data = f"FG: {tool_prop} and giant stat numbers rendered as physical hero characters crossing close to the lens."
+        fg_data = f"FG: {clean_tool} and giant stat numbers rendered as physical hero characters crossing close to the lens."
     else:
-        fg_data = f"FG: {tool_prop} positioned at foreground depth, crossing close to the lens."
-    action_line = f"Action: The {tool_prop} snaps briskly and {ev.tactile_action_verb} the document, {ev.physical_reaction}, leaving {ev.tactile_residue}."
-    camera_line = f"Camera: {ev.camera_directive.rstrip('.')}. Settle on the {hero_prop} in sharp focus."
+        fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
 
-    shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}\n{action_line}\n{camera_line}"
+    shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}"
     return f"{style_block}\n\n{shot_block}".strip()
 

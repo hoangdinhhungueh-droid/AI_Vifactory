@@ -235,11 +235,11 @@ def configure_flow_agent_settings(page, model_target: str = "omni") -> bool:
 
 def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Path) -> bool:
     """Thực thi sinh 1 video clip qua Image-to-Video (I2V) và tải về máy qua CDP."""
-    raw_prompt = clip["prompt"]
+    raw_prompt = clip.get("prompt") or clip.get("video_prompt") or ""
     scene_id = clip["scene_id"]
     debug_dir = episode_dir / "debug_flow"
     debug_dir.mkdir(parents=True, exist_ok=True)
-    output_filename = clip["output_filename"]
+    output_filename = clip.get("output_filename") or f"clip_{scene_id.lower()}.mp4"
     prompt_text = raw_prompt
 
     print(f"\n   🎬 [BẮT ĐẦU CLIP I2V] {scene_id} -> {output_filename}")
@@ -657,7 +657,7 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
             print("   Chờ giao diện trang chủ sẵn sàng...")
             dismiss_dialogs(page)
             try:
-                page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')", timeout=25000)
+                page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), [role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')", timeout=25000)
             except Exception as _sel_err:
                 logger.debug(f"Project selector wait notice: {_sel_err}")
             time.sleep(2)
@@ -671,7 +671,7 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
                 print(f"   Mở project chuyên biệt {ep_id} ({len(ep_cards)} found)...")
                 ep_cards[0].click(force=True)
             else:
-                new_btn = page.locator("button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')").first
+                new_btn = page.locator("button:has-text('New project'), button:has-text('Dự án mới'), [role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')").first
                 if new_btn.count() > 0 and new_btn.is_visible():
                     print("   Tạo project mới sạch sẽ cho episode qua nút New project / Dự án mới...")
                     new_btn.click(force=True)
@@ -700,18 +700,18 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
         configure_flow_agent_settings(page, model_target=model_target)
 
         for i_clip, clip in enumerate(clips):
-            out_file = out_dir / clip["output_filename"]
+            out_file = out_dir / (clip.get("output_filename") or f"clip_{clip.get('scene_id', '').lower()}.mp4")
             if i_clip > 0:
                 print(f"\n   🔄 [CLIP TIẾP THEO {clip['scene_id']}] Mở project mới sạch sẽ cho tài khoản...")
                 page.goto("https://flow.google.com/?pli=1", wait_until="domcontentloaded", timeout=45000)
                 dismiss_dialogs(page)
                 try:
-                    page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')", timeout=25000)
+                    page.wait_for_selector(".project-card, [data-project-id], a[href*='/project/'], button:has-text('New project'), button:has-text('Dự án mới'), [role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')", timeout=25000)
                 except Exception as _sel_err:
                     logger.debug(f"Retry project selector wait notice: {_sel_err}")
                 time.sleep(2)
                 dismiss_dialogs(page)
-                new_btn = page.locator("button:has-text('New project'), button:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')").first
+                new_btn = page.locator("button:has-text('New project'), button:has-text('Dự án mới'), [role='button']:has-text('New project'), [role='button']:has-text('Dự án mới'), button:has-text('Start Creating'), button:has-text('Bắt đầu tạo')").first
                 if new_btn.count() > 0 and new_btn.is_visible():
                     new_btn.click(force=True)
                 else:
@@ -721,7 +721,7 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
                 dismiss_dialogs(page)
                 configure_flow_agent_settings(page, model_target=model_target)
             if not force and out_file.exists() and out_file.stat().st_size > 200000:
-                print(f"\n   ⏩ [BỎ QUA] {clip['output_filename']} đã tồn tại hợp lệ ({out_file.stat().st_size:,} bytes)")
+                print(f"\n   ⏩ [BỎ QUA] {(clip.get('output_filename') or f"clip_{clip.get('scene_id', '').lower()}.mp4")} đã tồn tại hợp lệ ({out_file.stat().st_size:,} bytes)")
                 results[clip["scene_id"]] = True
                 continue
             elif out_file.exists():
@@ -825,7 +825,7 @@ def main():
         # Lọc các clip chưa có file hoặc file hỏng
         clips_to_process = []
         for c in pending_queue:
-            out_file = out_dir / c["output_filename"]
+            out_file = out_dir / (c.get("output_filename") or f"clip_{c.get('scene_id', '').lower()}.mp4")
             if not args.force and out_file.exists() and out_file.stat().st_size > 200000:
                 completed_clips.add(c["scene_id"])
             else:
