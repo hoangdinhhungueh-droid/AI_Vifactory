@@ -26,9 +26,42 @@ logger = logging.getLogger("s11_qc")
 STAGE: StageID = StageID.S11_QC
 
 
-def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: str) -> Any:
-    """Strictly validates authoritative scene data into ScenePlan without synthetic coercion (Boss Round 10 Item 5 & Round 11 Item 6)."""
-    # Validate explicit title (zero synthetic "Plan {expected_run_id}" coercion - Boss Round 11 Item 6)
+CAMERA_ALIAS_MAP: dict[str, CameraMove] = {
+    "slow_push_in": CameraMove.PUSH_IN,
+    "snap_zoom": CameraMove.PUSH_IN,
+    "cinematic_pan": CameraMove.PAN_LEFT,
+    "macro_tilt": CameraMove.TILT_DOWN,
+    "slow_pull_out": CameraMove.PULL_OUT,
+    "handheld_shake": CameraMove.STATIC_BREATH,
+    "dolly_zoom": CameraMove.ROLL_PUSH,
+    "focus_breathe_push": CameraMove.PUSH_IN,
+    "continuous_drift": CameraMove.KEN_BURNS_TL_BR,
+    "seamless_whip_pan": CameraMove.PAN_RIGHT,
+    "macro_orbit": CameraMove.PARALLAX_LEFT,
+    "whip_zoom": CameraMove.KEN_BURNS_BR_TL,
+    "static_overhead": CameraMove.STATIC_BREATH,
+    "slow_horizontal_pan": CameraMove.PAN_RIGHT,
+    "subtle_tilt_down": CameraMove.TILT_DOWN,
+}
+
+_FORBIDDEN_TYPOGRAPHY_TERMS: list[str] = [
+    "bold typography",
+    "typography",
+    "text on screen",
+    "letters",
+    "written words",
+]
+
+
+def _sanitize_typography_keywords(text: str) -> str:
+    """Sanitizes forbidden typography keywords in prompts to prevent false-positives."""
+    for term in _FORBIDDEN_TYPOGRAPHY_TERMS:
+        text = re.sub(rf"\b{re.escape(term)}\b", "glyphs", text, flags=re.IGNORECASE)
+    return text
+
+
+def _validate_plan_identity_and_title(data: dict[str, Any], expected_run_id: str) -> str:
+    """Validates explicit title and mandatory task/episode identity binding (Boss Round 11 Item 6)."""
     title = data.get("title") or data.get("title_a") or data.get("topic") or data.get("headline")
     if not title or not isinstance(title, str) or not title.strip() or title.strip().startswith("Plan "):
         raise ValueError(
@@ -36,13 +69,225 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
             f"(got {title!r}; synthetic 'Plan ...' default is strictly prohibited)"
         )
 
-    # Validate mandatory task/episode binding (Boss Round 11 Item 6)
     declared_id = data.get("episode_id") or data.get("run_id") or data.get("task_id") or data.get("project_id")
     if not declared_id or str(declared_id).strip() != str(expected_run_id).strip():
         raise ValueError(
             f"Stage S11 fail-closed: Authoritative plan declared identity '{declared_id}' "
             f"must be non-empty and match expected run identity '{expected_run_id}'"
         )
+    return title.strip()
+
+
+def _parse_scene_index(s: dict[str, Any], pos: int) -> int:
+    """Extracts and validates non-negative integer scene index."""
+    idx = s.get("idx", s.get("scene_index"))
+    if idx is None and s.get("scene_id"):
+        m = re.search(r"\d+", str(s.get("scene_id")))
+        if m:
+            parsed_idx = int(m.group(0))
+            idx = pos if parsed_idx == pos + 1 else parsed_idx
+    if idx is None:
+        idx = pos
+    if not isinstance(idx, int) or idx < 0:
+        raise ValueError(f"Authoritative scene {pos} missing valid non-negative integer 'idx'")
+    return idx
+
+
+def _extract_raw_fg_candidates(s: dict[str, Any], idx: int) -> list[Any]:
+    """Extracts raw foreground objects list with fallback single-FG synthesis when eligible."""
+    if "fg" in s and isinstance(s["fg"], list) and len(s["fg"]) == 0:
+        raise ValueError(f"Authoritative scene {idx} missing required 'fg' objects list (min 1 object)")
+
+    raw_fg = s.get("fg", s.get("fg_image", s.get("foreground")))
+    if not raw_fg:
+        fg_candidate = s.get("fg_prompt") or s.get("hero_cutout_object") or s.get("foreground_prompt")
+        if fg_candidate:
+            fg_text = _sanitize_typography_keywords(str(fg_candidate).strip())
+            fg_text_unique = f"{fg_text} [scene_{idx+1:03d}]"
+            raw_fg = [{
+                "id": f"fg_{idx+1:03d}_01",
+                "prompt": fg_text_unique,
+                "anchor_x": 0.5,
+                "anchor_y": 0.5,
+                "scale": 0.5,
+                "depth": 0.5,
+                "enter_at": 0.0,
+            }]
+
+    if not raw_fg or not isinstance(raw_fg, list) or len(raw_fg) == 0:
+        raise ValueError(f"Authoritative scene {idx} missing required 'fg' objects list (min 1 object)")
+    if len(raw_fg) > 3:
+        raise ValueError(f"Authoritative scene {idx} has {len(raw_fg)} foreground objects (must be <= 3 without coercive truncation)")
+    return raw_fg
+
+
+def _validate_fg_object_instance(fg_item: FGObject, idx: int, j: int, seen_fg_ids: set[str]) -> FGObject:
+    """Validates an existing FGObject instance for non-empty ID, prompt, and finite coordinates."""
+    fg_id_str = str(fg_item.id).strip()
+    if not fg_id_str or not fg_item.prompt or len(str(fg_item.prompt).strip()) < 10:
+        raise ValueError(f"Authoritative scene {idx} FG object {j} missing required 'id' or 'prompt' (min length 10)")
+    if fg_id_str in seen_fg_ids:
+        raise ValueError(f"Authoritative scene {idx} has duplicate FG object id '{fg_id_str}'")
+    seen_fg_ids.add(fg_id_str)
+    for c_name, c_val in [
+        ("anchor_x", fg_item.anchor_x),
+        ("anchor_y", fg_item.anchor_y),
+        ("scale", fg_item.scale),
+        ("depth", fg_item.depth),
+        ("enter_at", fg_item.enter_at),
+    ]:
+        if c_val is not None and not math.isfinite(float(c_val)):
+            raise ValueError(f"Authoritative scene {idx} FG object '{fg_id_str}' has non-finite {c_name} ({c_val})")
+    return fg_item
+
+
+def _validate_fg_object_dict(fg_item: dict[str, Any], idx: int, j: int, seen_fg_ids: set[str]) -> FGObject:
+    """Validates and instantiates an FGObject from dictionary representation."""
+    fg_id = fg_item.get("id")
+    fg_prompt = fg_item.get("prompt")
+    if not fg_id or not fg_prompt or len(str(fg_prompt).strip()) < 10:
+        raise ValueError(f"Authoritative scene {idx} FG object {j} missing required 'id' or 'prompt' (min length 10)")
+    fg_id_str = str(fg_id).strip()
+    if fg_id_str in seen_fg_ids:
+        raise ValueError(f"Authoritative scene {idx} has duplicate FG object id '{fg_id_str}'")
+    seen_fg_ids.add(fg_id_str)
+
+    fg_prompt_clean = _sanitize_typography_keywords(str(fg_prompt).strip())
+
+    coords = {}
+    for c_name in ["anchor_x", "anchor_y", "scale", "depth", "enter_at"]:
+        if c_name in fg_item:
+            val = float(fg_item[c_name])
+            if not math.isfinite(val):
+                raise ValueError(f"Authoritative scene {idx} FG object '{fg_id_str}' has non-finite {c_name} ({val})")
+            coords[c_name] = val
+        else:
+            coords[c_name] = 0.5 if c_name != "enter_at" else 0.0
+
+    return FGObject(
+        id=fg_id_str,
+        prompt=fg_prompt_clean,
+        anchor_x=coords["anchor_x"],
+        anchor_y=coords["anchor_y"],
+        scale=coords["scale"],
+        depth=coords["depth"],
+        enter_at=coords["enter_at"],
+    )
+
+
+def _validate_single_fg_object(fg_item: Any, idx: int, j: int, seen_fg_ids: set[str]) -> FGObject:
+    """Validates individual FGObject or dictionary entry with strict finite coordinates."""
+    if isinstance(fg_item, FGObject):
+        return _validate_fg_object_instance(fg_item, idx, j, seen_fg_ids)
+    if isinstance(fg_item, dict):
+        return _validate_fg_object_dict(fg_item, idx, j, seen_fg_ids)
+    raise ValueError(f"Authoritative scene {idx} FG object {j} is not a valid dictionary or FGObject")
+
+
+def _validate_scene_fg_objects(s: dict[str, Any], idx: int) -> list[FGObject]:
+    """Validates and constructs the list of FGObject instances for a scene."""
+    raw_fg = _extract_raw_fg_candidates(s, idx)
+    valid_fg_list: list[FGObject] = []
+    seen_fg_ids: set[str] = set()
+    for j, fg_item in enumerate(raw_fg):
+        valid_fg_list.append(_validate_single_fg_object(fg_item, idx, j, seen_fg_ids))
+    return valid_fg_list
+
+
+def _resolve_scene_camera_move(s: dict[str, Any], idx: int, prev_cam: CameraMove | None) -> CameraMove:
+    """Resolves and validates scene camera movement with anti-consecutive duplicate rotation."""
+    raw_cam = str(s.get("camera", s.get("camera_move", s.get("camera_movement", "")))).strip().lower()
+    if not raw_cam:
+        raise ValueError(f"Authoritative scene {idx} missing required 'camera' move")
+
+    cam_enum: CameraMove | None = None
+    try:
+        cam_enum = CameraMove(raw_cam)
+    except ValueError:
+        cam_enum = CAMERA_ALIAS_MAP.get(raw_cam)
+        if not cam_enum:
+            for cm in CameraMove:
+                if cm.value in raw_cam:
+                    cam_enum = cm
+                    break
+    if not cam_enum:
+        raise ValueError(f"Authoritative scene {idx} has invalid camera move '{raw_cam}' (must be one of 12 canonical CameraMove values)")
+
+    # Prevent consecutive duplicate camera moves across scenes (ScenePlan invariant)
+    if prev_cam is not None and cam_enum == prev_cam:
+        all_moves = list(CameraMove)
+        cur_pos = all_moves.index(cam_enum)
+        cam_enum = all_moves[(cur_pos + 1) % len(all_moves)]
+
+    return cam_enum
+
+
+def _validate_scene_timing(
+    s: dict[str, Any], idx: int, prev_end: float | None
+) -> tuple[float | None, float | None, float | None]:
+    """Validates start/end timestamps and prevents overlapping inconsistencies."""
+    start_val = None
+    end_val = None
+    if s.get("start") is not None:
+        start_val = float(s["start"])
+        if not math.isfinite(start_val) or start_val < 0.0:
+            raise ValueError(f"Authoritative scene {idx} has non-finite or negative start time: {start_val}")
+    if s.get("end") is not None:
+        end_val = float(s["end"])
+        if not math.isfinite(end_val) or end_val <= 0.0:
+            raise ValueError(f"Authoritative scene {idx} has non-finite or non-positive end time: {end_val}")
+
+    if start_val is not None and end_val is not None:
+        if end_val <= start_val:
+            raise ValueError(f"Authoritative scene {idx} has contradictory timing: end ({end_val}) <= start ({start_val})")
+        if prev_end is not None and start_val < prev_end - 0.1:
+            raise ValueError(f"Authoritative scene {idx} timing contradicts previous scene: start ({start_val}) overlaps before prev_end ({prev_end})")
+        return start_val, end_val, end_val
+
+    return start_val, end_val, prev_end
+
+
+def _validate_dict_scene_entry(
+    s: dict[str, Any],
+    pos: int,
+    seen_indices: set[int],
+    prev_cam: CameraMove | None,
+    prev_end: float | None,
+) -> tuple[Scene, CameraMove, float | None]:
+    """Validates a single scene dictionary and constructs its Scene model."""
+    idx = _parse_scene_index(s, pos)
+    if idx in seen_indices:
+        raise ValueError(f"Stage S11 fail-closed: Duplicate scene index {idx} in authoritative plan")
+    seen_indices.add(idx)
+
+    narration = s.get("narration", s.get("narration_text", s.get("text", s.get("headline", f"Scene {idx+1}"))))
+    if not narration or not isinstance(narration, str) or not narration.strip():
+        raise ValueError(f"Authoritative scene {idx} missing required non-empty 'narration'")
+
+    bg_prompt = s.get("bg_prompt", s.get("bg_image", s.get("background", s.get("image_prompt"))))
+    if not bg_prompt or not isinstance(bg_prompt, str) or len(bg_prompt.strip()) < 10:
+        raise ValueError(f"Authoritative scene {idx} missing required 'bg_prompt' (min length 10)")
+
+    bg_prompt = _sanitize_typography_keywords(bg_prompt)
+    valid_fg_list = _validate_scene_fg_objects(s, idx)
+    cam_enum = _resolve_scene_camera_move(s, idx, prev_cam)
+    start_val, end_val, new_prev_end = _validate_scene_timing(s, idx, prev_end)
+
+    scene = Scene(
+        idx=idx,
+        narration=narration.strip(),
+        bg_prompt=bg_prompt.strip(),
+        fg=valid_fg_list,
+        camera=cam_enum,
+        start=start_val,
+        end=end_val,
+    )
+    return scene, cam_enum, new_prev_end
+
+
+def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: str) -> Any:
+    """Strictly validates authoritative scene data into ScenePlan without synthetic coercion (Boss Round 10 Item 5 & Round 11 Item 6)."""
+    title = _validate_plan_identity_and_title(data, expected_run_id)
 
     sc_list = data.get("scenes", [])
     if not sc_list or not isinstance(sc_list, list):
@@ -63,177 +308,8 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
         if not isinstance(s, dict):
             raise ValueError(f"Authoritative scene entry {i} is not a valid dictionary: {s}")
 
-        idx = s.get("idx", s.get("scene_index"))
-        if idx is None and s.get("scene_id"):
-            m = re.search(r"\d+", str(s.get("scene_id")))
-            if m:
-                parsed_idx = int(m.group(0))
-                idx = i if parsed_idx == i + 1 else parsed_idx
-        if idx is None:
-            idx = i
-        if not isinstance(idx, int) or idx < 0:
-            raise ValueError(f"Authoritative scene {i} missing valid non-negative integer 'idx'")
-        if idx in seen_indices:
-            raise ValueError(f"Stage S11 fail-closed: Duplicate scene index {idx} in authoritative plan")
-        seen_indices.add(idx)
-
-        narration = s.get("narration", s.get("narration_text", s.get("text", s.get("headline", f"Scene {idx+1}"))))
-        if not narration or not isinstance(narration, str) or not narration.strip():
-            raise ValueError(f"Authoritative scene {idx} missing required non-empty 'narration'")
-
-        bg_prompt = s.get("bg_prompt", s.get("bg_image", s.get("background", s.get("image_prompt"))))
-        if not bg_prompt or not isinstance(bg_prompt, str) or len(bg_prompt.strip()) < 10:
-            raise ValueError(f"Authoritative scene {idx} missing required 'bg_prompt' (min length 10)")
-
-        # Sanitize forbidden typography keywords in negative prompts to prevent false-positives
-        for term in ["bold typography", "typography", "text on screen", "letters", "written words"]:
-            bg_prompt = re.sub(rf"\b{re.escape(term)}\b", "glyphs", bg_prompt, flags=re.IGNORECASE)
-
-        # Explicit empty list check for fail-closed tests
-        if "fg" in s and isinstance(s["fg"], list) and len(s["fg"]) == 0:
-            raise ValueError(f"Authoritative scene {idx} missing required 'fg' objects list (min 1 object)")
-
-        raw_fg = s.get("fg", s.get("fg_image", s.get("foreground")))
-        if not raw_fg:
-            fg_candidate = s.get("fg_prompt") or s.get("hero_cutout_object") or s.get("foreground_prompt")
-            if fg_candidate:
-                fg_text = str(fg_candidate).strip()
-                for term in ["bold typography", "typography", "text on screen", "letters", "written words"]:
-                    fg_text = re.sub(rf"\b{re.escape(term)}\b", "glyphs", fg_text, flags=re.IGNORECASE)
-                fg_text_unique = f"{fg_text} [scene_{idx+1:03d}]"
-                raw_fg = [{
-                    "id": f"fg_{idx+1:03d}_01",
-                    "prompt": fg_text_unique,
-                    "anchor_x": 0.5,
-                    "anchor_y": 0.5,
-                    "scale": 0.5,
-                    "depth": 0.5,
-                    "enter_at": 0.0,
-                }]
-
-        if not raw_fg or not isinstance(raw_fg, list) or len(raw_fg) == 0:
-            raise ValueError(f"Authoritative scene {idx} missing required 'fg' objects list (min 1 object)")
-        if len(raw_fg) > 3:
-            raise ValueError(f"Authoritative scene {idx} has {len(raw_fg)} foreground objects (must be <= 3 without coercive truncation)")
-
-        valid_fg_list: list[FGObject] = []
-        seen_fg_ids: set[str] = set()
-        for j, fg_item in enumerate(raw_fg):
-            if isinstance(fg_item, FGObject):
-                fg_id_str = str(fg_item.id).strip()
-                if not fg_id_str or not fg_item.prompt or len(str(fg_item.prompt).strip()) < 10:
-                    raise ValueError(f"Authoritative scene {idx} FG object {j} missing required 'id' or 'prompt' (min length 10)")
-                if fg_id_str in seen_fg_ids:
-                    raise ValueError(f"Authoritative scene {idx} has duplicate FG object id '{fg_id_str}'")
-                seen_fg_ids.add(fg_id_str)
-                for c_name, c_val in [("anchor_x", fg_item.anchor_x), ("anchor_y", fg_item.anchor_y), ("scale", fg_item.scale), ("depth", fg_item.depth), ("enter_at", fg_item.enter_at)]:
-                    if c_val is not None and not math.isfinite(float(c_val)):
-                        raise ValueError(f"Authoritative scene {idx} FG object '{fg_id_str}' has non-finite {c_name} ({c_val})")
-                valid_fg_list.append(fg_item)
-            elif isinstance(fg_item, dict):
-                fg_id = fg_item.get("id")
-                fg_prompt = fg_item.get("prompt")
-                if not fg_id or not fg_prompt or len(str(fg_prompt).strip()) < 10:
-                    raise ValueError(f"Authoritative scene {idx} FG object {j} missing required 'id' or 'prompt' (min length 10)")
-                fg_id_str = str(fg_id).strip()
-                if fg_id_str in seen_fg_ids:
-                    raise ValueError(f"Authoritative scene {idx} has duplicate FG object id '{fg_id_str}'")
-                seen_fg_ids.add(fg_id_str)
-
-                # Sanitize forbidden typography keywords in FG prompts
-                fg_prompt_clean = str(fg_prompt).strip()
-                for term in ["bold typography", "typography", "text on screen", "letters", "written words"]:
-                    fg_prompt_clean = re.sub(rf"\b{re.escape(term)}\b", "glyphs", fg_prompt_clean, flags=re.IGNORECASE)
-
-                # Validate finite coordinates and timing without coercive defaults (Boss Round 12 Item 6)
-                coords = {}
-                for c_name in ["anchor_x", "anchor_y", "scale", "depth", "enter_at"]:
-                    if c_name in fg_item:
-                        val = float(fg_item[c_name])
-                        if not math.isfinite(val):
-                            raise ValueError(f"Authoritative scene {idx} FG object '{fg_id_str}' has non-finite {c_name} ({val})")
-                        coords[c_name] = val
-                    else:
-                        coords[c_name] = 0.5 if c_name != "enter_at" else 0.0
-
-                valid_fg_list.append(FGObject(
-                    id=fg_id_str,
-                    prompt=fg_prompt_clean,
-                    anchor_x=coords["anchor_x"],
-                    anchor_y=coords["anchor_y"],
-                    scale=coords["scale"],
-                    depth=coords["depth"],
-                    enter_at=coords["enter_at"],
-                ))
-            else:
-                raise ValueError(f"Authoritative scene {idx} FG object {j} is not a valid dictionary or FGObject")
-
-        raw_cam = str(s.get("camera", s.get("camera_move", s.get("camera_movement", "")))).strip().lower()
-        if not raw_cam:
-            raise ValueError(f"Authoritative scene {idx} missing required 'camera' move")
-        cam_enum = None
-        try:
-            cam_enum = CameraMove(raw_cam)
-        except ValueError:
-            cam_map = {
-                "slow_push_in": CameraMove.PUSH_IN,
-                "snap_zoom": CameraMove.PUSH_IN,
-                "cinematic_pan": CameraMove.PAN_LEFT,
-                "macro_tilt": CameraMove.TILT_DOWN,
-                "slow_pull_out": CameraMove.PULL_OUT,
-                "handheld_shake": CameraMove.STATIC_BREATH,
-                "dolly_zoom": CameraMove.ROLL_PUSH,
-                "focus_breathe_push": CameraMove.PUSH_IN,
-                "continuous_drift": CameraMove.KEN_BURNS_TL_BR,
-                "seamless_whip_pan": CameraMove.PAN_RIGHT,
-                "macro_orbit": CameraMove.PARALLAX_LEFT,
-                "whip_zoom": CameraMove.KEN_BURNS_BR_TL,
-                "static_overhead": CameraMove.STATIC_BREATH,
-                "slow_horizontal_pan": CameraMove.PAN_RIGHT,
-                "subtle_tilt_down": CameraMove.TILT_DOWN,
-            }
-            cam_enum = cam_map.get(raw_cam)
-            if not cam_enum:
-                for cm in CameraMove:
-                    if cm.value in raw_cam:
-                        cam_enum = cm
-                        break
-        if not cam_enum:
-            raise ValueError(f"Authoritative scene {idx} has invalid camera move '{raw_cam}' (must be one of 12 canonical CameraMove values)")
-
-        # Prevent consecutive duplicate camera moves across scenes (ScenePlan invariant)
-        if prev_cam is not None and cam_enum == prev_cam:
-            all_moves = list(CameraMove)
-            cur_pos = all_moves.index(cam_enum)
-            cam_enum = all_moves[(cur_pos + 1) % len(all_moves)]
-        prev_cam = cam_enum
-
-        start_val = None
-        end_val = None
-        if s.get("start") is not None:
-            start_val = float(s["start"])
-            if not math.isfinite(start_val) or start_val < 0.0:
-                raise ValueError(f"Authoritative scene {idx} has non-finite or negative start time: {start_val}")
-        if s.get("end") is not None:
-            end_val = float(s["end"])
-            if not math.isfinite(end_val) or end_val <= 0.0:
-                raise ValueError(f"Authoritative scene {idx} has non-finite or non-positive end time: {end_val}")
-        if start_val is not None and end_val is not None:
-            if end_val <= start_val:
-                raise ValueError(f"Authoritative scene {idx} has contradictory timing: end ({end_val}) <= start ({start_val})")
-            if prev_end is not None and start_val < prev_end - 0.1:
-                raise ValueError(f"Authoritative scene {idx} timing contradicts previous scene: start ({start_val}) overlaps before prev_end ({prev_end})")
-            prev_end = end_val
-
-        validated_scenes.append(Scene(
-            idx=idx,
-            narration=narration.strip(),
-            bg_prompt=bg_prompt.strip(),
-            fg=valid_fg_list,
-            camera=cam_enum,
-            start=start_val,
-            end=end_val,
-        ))
+        scene, prev_cam, prev_end = _validate_dict_scene_entry(s, i, seen_indices, prev_cam, prev_end)
+        validated_scenes.append(scene)
 
     audio_dur = None
     if data.get("audio_duration") is not None:
@@ -242,7 +318,7 @@ def _validate_authoritative_scene_plan(data: dict[str, Any], expected_run_id: st
             raise ValueError(f"Authoritative plan has non-finite or non-positive audio_duration: {audio_dur}")
 
     return ScenePlan(
-        title=title.strip(),
+        title=title,
         scenes=validated_scenes,
         audio_duration=audio_dur,
     )

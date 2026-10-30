@@ -143,6 +143,190 @@ def _build_dynamic_chapters(
         ]
 
 
+def sanitize_chapter_label(label: str, market_code: str = "EN") -> str:
+    """Purge sensitive judicial/criminal terms without cross-market language pollution (Rule 128/135)."""
+    jp_banned = r'(起訴状記録|起訴事実認定|刑事摘発|司法審査|起訴|刑事|摘発|容疑者)'
+    kr_banned = r'(기소장|공소장|형사\s*적발|사법\s*심사|기소|형사|적발|용의자|검찰)'
+    en_banned = r'(GRAND JURY|INDICTMENT|PROSECUTOR|CRIMINAL)'
+
+    # Japanese keywords -> 検査・行政指導
+    res = re.sub(jp_banned, '検査・行政指導', label)
+    # Korean keywords -> 행정 조사
+    res = re.sub(kr_banned, '행정 조사', res)
+    # English keywords -> REGULATORY INQUIRY (or market native if chapter is in CJK)
+    m_code = (market_code or "EN").upper()
+    if m_code in ("JP", "JA") and re.search(r'[\u3040-\u30ff\u4e00-\u9fff]', res):
+        res = re.sub(en_banned, '検査・行政指導', res, flags=re.IGNORECASE)
+    elif m_code in ("KR", "KO") and re.search(r'[\uac00-\ud7a3]', res):
+        res = re.sub(en_banned, '행정 조사', res, flags=re.IGNORECASE)
+    else:
+        res = re.sub(en_banned, 'REGULATORY INQUIRY', res, flags=re.IGNORECASE)
+    return res
+
+
+# Backward compatibility alias
+_sanitize_chapter_label = sanitize_chapter_label
+
+
+def _resolve_remotion_props_path(
+    task_id: str = "",
+    ep_dir_path: str | None = None,
+    remotion_props_path: str | None = None,
+) -> str | None:
+    """Locate manifest.json or remotion_props.json from candidate directories (Rule 125/135)."""
+    candidates = []
+    if ep_dir_path:
+        candidates.append(os.path.join(ep_dir_path, "manifest.json"))
+    if task_id:
+        ep_dir = _episodes_base() / task_id
+        candidates.append(str(ep_dir / "manifest.json"))
+    if remotion_props_path:
+        candidates.append(str(remotion_props_path))
+    if ep_dir_path:
+        candidates.append(os.path.join(ep_dir_path, "remotion_props.json"))
+    if task_id and (str(task_id).endswith(".json") or os.path.isfile(str(task_id))):
+        candidates.insert(0, str(task_id))
+    if task_id:
+        ep_dir = _episodes_base() / task_id
+        candidates.append(str(ep_dir / "remotion_props.json"))
+
+    for cand in candidates:
+        if os.path.exists(cand):
+            return cand
+    return None
+
+
+def _extract_canonical_beat_key(
+    s: dict[str, Any],
+    idx: int,
+    total_scenes: int,
+    is_degenerate_beat: bool,
+) -> str:
+    """Extract canonical beat key from scene dictionary, with degenerate fallback."""
+    speaker_tag = str(s.get("speakerTag") or "")
+    beat_val = s.get("beat_phase") or s.get("beat_index") or s.get("beat")
+    act_title = str(s.get("actTitle") or "")
+
+    if not is_degenerate_beat and beat_val is not None:
+        try:
+            b_int = int(beat_val)
+            if 1 <= b_int <= 5:
+                return f"BEAT {b_int}"
+        except (ValueError, TypeError) as _ve:
+            logger.debug("Non-integer beat_val %r in scene %s: %s", beat_val, idx, _ve)
+
+    if is_degenerate_beat:
+        pct = (idx + 1) / max(1, total_scenes)
+        b_auto = 1 if pct <= 0.15 else (2 if pct <= 0.40 else (3 if pct <= 0.65 else (4 if pct <= 0.85 else 5)))
+        return f"BEAT {b_auto}"
+
+    beat_match = re.search(r'\b(BEAT\s*\d+|ACT\s*[IVXLCDM]+)\b', f"{speaker_tag} {beat_val or ''} {act_title}", re.IGNORECASE)
+    if beat_match:
+        return re.sub(r'\s+', ' ', beat_match.group(1).upper()).strip()
+    if beat_val:
+        return f"BEAT {beat_val}"
+    return act_title or f"SCENE_{idx}"
+
+
+def _thin_timestamps_to_cap(timestamps: list[int], max_count: int = 16) -> list[int]:
+    """Drops chapters with smallest gaps from predecessor until len <= max_count (preserving 00:00)."""
+    ts = list(timestamps)
+    while len(ts) > max_count:
+        min_gap_idx = 1
+        min_gap = ts[1] - ts[0]
+        for g_i in range(2, len(ts)):
+            gap = ts[g_i] - ts[g_i - 1]
+            if gap < min_gap:
+                min_gap = gap
+                min_gap_idx = g_i
+        ts.pop(min_gap_idx)
+    return ts
+
+
+def _parse_remotion_scene_timestamps(scenes: list[dict[str, Any]], fps: float) -> tuple[list[int], float]:
+    """Parses scenes list into exact timestamps matching 10s minimum gap and thinned <= 16 chapters."""
+    if not scenes:
+        return [], 0.0
+
+    is_vox_manifest = any("start" in sc for sc in scenes if isinstance(sc, dict))
+    current_frame = 0
+    last_beat_key = None
+    distinct_beats = {
+        int(sc.get("beat_phase") or sc.get("beat_index") or sc.get("beat"))
+        for sc in scenes
+        if str(sc.get("beat_phase") or sc.get("beat_index") or sc.get("beat") or "").isdigit()
+    }
+    is_degenerate_beat = (
+        (len(scenes) >= 5 and len(distinct_beats) == 1)
+        or (max(distinct_beats, default=1) > 5)
+    )
+
+    exact_timestamps: list[int] = []
+    for idx, s in enumerate(scenes):
+        current_beat_key = _extract_canonical_beat_key(s, idx, len(scenes), is_degenerate_beat)
+
+        if is_vox_manifest and "start" in s:
+            sec = int(float(s["start"]))
+            dur = int(round((float(s.get("end", s["start"])) - float(s["start"])) * fps))
+        else:
+            dur = int(s.get("durationInFrames") or 0)
+            sec = int(current_frame / fps)
+
+        if current_beat_key != last_beat_key or idx == 0:
+            if not exact_timestamps:
+                exact_timestamps.append(0)
+                last_beat_key = current_beat_key
+            elif sec >= exact_timestamps[-1] + 10:
+                exact_timestamps.append(sec)
+                last_beat_key = current_beat_key
+
+        current_frame += dur
+
+    exact_timestamps = _thin_timestamps_to_cap(exact_timestamps, max_count=16)
+    total_dur_s = (current_frame / fps) if current_frame > 0 else 0.0
+    return exact_timestamps, total_dur_s
+
+
+def _format_chapter_sec(sec: int) -> str:
+    """Formats seconds into MM:SS YouTube timestamp."""
+    return f"{sec // 60:02d}:{sec % 60:02d}"
+
+
+def _format_synced_chapters(
+    exact_timestamps: list[int],
+    existing_chapters: list | None,
+    title: str,
+    market: str,
+    target_keyword: str,
+    total_duration_s: float,
+) -> list[str]:
+    """Matches exact timestamps to cleaned titles from existing chapters or dynamic fallbacks."""
+    if existing_chapters and isinstance(existing_chapters, list):
+        clean_titles = []
+        for ch in existing_chapters:
+            ch_str = str(ch).strip()
+            title_clean = re.sub(r'^\d{1,2}:\d{2}(?::\d{2})?\s*[-:]?\s*', '', ch_str).strip()
+            if title_clean:
+                title_clean = sanitize_chapter_label(title_clean, market)
+                clean_titles.append(title_clean)
+
+        if len(clean_titles) >= len(exact_timestamps):
+            return [f"{_format_chapter_sec(exact_timestamps[i])} - {clean_titles[i]}" for i in range(len(exact_timestamps))]
+        if len(clean_titles) >= 3:
+            n = min(len(clean_titles), len(exact_timestamps))
+            return [f"{_format_chapter_sec(exact_timestamps[i])} - {clean_titles[i]}" for i in range(n)]
+
+    fallback_chapters = _build_dynamic_chapters(
+        title or "Investigation", market, target_keyword or title, total_duration_s=total_duration_s
+    )
+    clean_fallback_titles = [
+        sanitize_chapter_label(re.sub(r'^\d{1,2}:\d{2}\s*[-:]?\s*', '', c).strip(), market)
+        for c in fallback_chapters
+    ]
+    n = min(len(clean_fallback_titles), len(exact_timestamps))
+    return [f"{_format_chapter_sec(exact_timestamps[i])} - {clean_fallback_titles[i]}" for i in range(n)]
+
+
 def sync_exact_chapters_from_remotion(
     task_id: str = "",
     market: str = "EN",
@@ -154,6 +338,7 @@ def sync_exact_chapters_from_remotion(
     remotion_props_path: str = None,
 ) -> list[str]:
     """Rule 135: Synchronize YouTube chapters with exact frame-accurate timestamps from remotion_props.json.
+
     Ground-Truth Video Timeline:
       1. First chapter is always 00:00.
       2. Timestamps match the actual rendered video timeline (current_frame / fps).
@@ -164,55 +349,8 @@ def sync_exact_chapters_from_remotion(
     if existing_chapters and isinstance(existing_chapters, str):
         existing_chapters = [line.strip() for line in existing_chapters.splitlines() if line.strip()]
 
-    def _sanitize_chapter_label(label: str, market_code: str = "EN") -> str:
-        """Purge sensitive judicial/criminal terms without cross-market language pollution (Rule 128/135)."""
-        jp_banned = r'(起訴状記録|起訴事実認定|刑事摘発|司法審査|起訴|刑事|摘発|容疑者)'
-        kr_banned = r'(기소장|공소장|형사\s*적발|사법\s*심사|기소|형사|적발|용의자|검찰)'
-        en_banned = r'(GRAND JURY|INDICTMENT|PROSECUTOR|CRIMINAL)'
-
-        # Japanese keywords -> 検査・行政指導
-        res = re.sub(jp_banned, '検査・行政指導', label)
-        # Korean keywords -> 행정 조사
-        res = re.sub(kr_banned, '행정 조사', res)
-        # English keywords -> REGULATORY INQUIRY (or market native if chapter is in CJK)
-        m_code = (market_code or "EN").upper()
-        if m_code in ("JP", "JA") and re.search(r'[\u3040-\u30ff\u4e00-\u9fff]', res):
-            res = re.sub(en_banned, '検査・行政指導', res, flags=re.IGNORECASE)
-        elif m_code in ("KR", "KO") and re.search(r'[\uac00-\ud7a3]', res):
-            res = re.sub(en_banned, '행정 조사', res, flags=re.IGNORECASE)
-        else:
-            res = re.sub(en_banned, 'REGULATORY INQUIRY', res, flags=re.IGNORECASE)
-        return res
-
-    # 1. Locate remotion_props.json
-    candidates = []
-    # Prioritize Vox canonical pipeline manifest (Rule 125 Single Truth & Rule 135)
-    if ep_dir_path:
-        candidates.append(os.path.join(ep_dir_path, "manifest.json"))
-    if task_id:
-        ep_dir = _episodes_base() / task_id
-        candidates.extend([
-            str(ep_dir / "manifest.json"),
-        ])
-    if remotion_props_path:
-        candidates.append(str(remotion_props_path))
-    if ep_dir_path:
-        candidates.append(os.path.join(ep_dir_path, "remotion_props.json"))
-    if task_id and (str(task_id).endswith(".json") or os.path.isfile(str(task_id))):
-        candidates.insert(0, str(task_id))
-    if task_id:
-        ep_dir = _episodes_base() / task_id
-        candidates.extend([
-            str(ep_dir / "remotion_props.json"),
-        ])
-
-    remotion_path = None
-    for cand in candidates:
-        if os.path.exists(cand):
-            remotion_path = cand
-            break
-
-    exact_timestamps = []
+    remotion_path = _resolve_remotion_props_path(task_id, ep_dir_path, remotion_props_path)
+    exact_timestamps: list[int] = []
     total_dur_s = float(total_duration_s or 720.0)
 
     if remotion_path:
@@ -221,112 +359,19 @@ def sync_exact_chapters_from_remotion(
                 rdata = json.load(rf)
             scenes = rdata.get("scenes", [])
             fps = float(rdata.get("fps") or 30.0)
-            is_vox_manifest = any("start" in sc for sc in scenes if isinstance(sc, dict))
-            if scenes:
-                current_frame = 0
-                last_beat_key = None
-                distinct_beats = {
-                    int(sc.get("beat_phase") or sc.get("beat_index") or sc.get("beat"))
-                    for sc in scenes
-                    if str(sc.get("beat_phase") or sc.get("beat_index") or sc.get("beat") or "").isdigit()
-                }
-                is_degenerate_beat = (
-                    (len(scenes) >= 5 and len(distinct_beats) == 1)
-                    or (max(distinct_beats, default=1) > 5)
-                )
-
-                for idx, s in enumerate(scenes):
-                    speaker_tag = str(s.get("speakerTag") or "")
-                    beat_val = s.get("beat_phase") or s.get("beat_index") or s.get("beat")
-                    act_title = str(s.get("actTitle") or "")
-
-                    # Extract canonical beat key (prioritize integer beat_phase 1..5 so character speakerTags don't trigger false chapter splits)
-                    current_beat_key = None
-                    if not is_degenerate_beat and beat_val is not None:
-                        try:
-                            b_int = int(beat_val)
-                            if 1 <= b_int <= 5:
-                                current_beat_key = f"BEAT {b_int}"
-                        except (ValueError, TypeError) as _ve:
-                            logger.debug("Non-integer beat_val %r in scene %s: %s", beat_val, idx, _ve)
-                    if not current_beat_key and is_degenerate_beat:
-                        pct = (idx + 1) / max(1, len(scenes))
-                        b_auto = 1 if pct <= 0.15 else (2 if pct <= 0.40 else (3 if pct <= 0.65 else (4 if pct <= 0.85 else 5)))
-                        current_beat_key = f"BEAT {b_auto}"
-                    if not current_beat_key:
-                        beat_match = re.search(r'\b(BEAT\s*\d+|ACT\s*[IVXLCDM]+)\b', f"{speaker_tag} {beat_val or ''} {act_title}", re.IGNORECASE)
-                        if beat_match:
-                            current_beat_key = re.sub(r'\s+', ' ', beat_match.group(1).upper()).strip()
-                        elif beat_val:
-                            current_beat_key = f"BEAT {beat_val}"
-                        else:
-                            current_beat_key = act_title or f"SCENE_{idx}"
-
-                    if is_vox_manifest and "start" in s:
-                        sec = int(float(s["start"]))
-                        dur = int(round((float(s.get("end", s["start"])) - float(s["start"])) * fps))
-                    else:
-                        dur = int(s.get("durationInFrames") or 0)
-                        sec = int(current_frame / fps)
-
-                    if current_beat_key != last_beat_key or idx == 0:
-                        # Ensure YouTube constraint: chapters at least 10s apart (Rule 135)
-                        if not exact_timestamps:
-                            exact_timestamps.append(0)
-                            last_beat_key = current_beat_key
-                        elif sec >= exact_timestamps[-1] + 10:
-                            exact_timestamps.append(sec)
-                            last_beat_key = current_beat_key
-
-                    current_frame += dur
-
-                # If still over 16 chapters, thin out by merging closest chapters
-                while len(exact_timestamps) > 16:
-                    # Drop the chapter with the smallest gap from its predecessor (skip 00:00)
-                    min_gap_idx = 1
-                    min_gap = exact_timestamps[1] - exact_timestamps[0]
-                    for g_i in range(2, len(exact_timestamps)):
-                        gap = exact_timestamps[g_i] - exact_timestamps[g_i - 1]
-                        if gap < min_gap:
-                            min_gap = gap
-                            min_gap_idx = g_i
-                    exact_timestamps.pop(min_gap_idx)
-
-                if current_frame > 0:
-                    total_dur_s = current_frame / fps
+            parsed_ts, parsed_dur = _parse_remotion_scene_timestamps(scenes, fps)
+            if parsed_ts:
+                exact_timestamps = parsed_ts
+            if parsed_dur > 0:
+                total_dur_s = parsed_dur
         except Exception as e:
             logger.warning("[seo_package_forge] Error reading remotion_props: %s", e)
 
-    def _fmt(sec: int) -> str:
-        mm = sec // 60
-        ss = sec % 60
-        return f"{mm:02d}:{ss:02d}"
-
-    # 2. If we got exact timestamps (at least 3 chapters for valid YouTube chapters)
     if len(exact_timestamps) >= 3:
-        if existing_chapters and isinstance(existing_chapters, list):
-            clean_titles = []
-            for ch in existing_chapters:
-                ch_str = str(ch).strip()
-                title_clean = re.sub(r'^\d{1,2}:\d{2}(?::\d{2})?\s*[-:]?\s*', '', ch_str).strip()
-                if title_clean:
-                    title_clean = _sanitize_chapter_label(title_clean, m)
-                    clean_titles.append(title_clean)
+        return _format_synced_chapters(exact_timestamps, existing_chapters, title, m, target_keyword, total_dur_s)
 
-            if len(clean_titles) >= len(exact_timestamps):
-                return [f"{_fmt(exact_timestamps[i])} - {clean_titles[i]}" for i in range(len(exact_timestamps))]
-            elif len(clean_titles) >= 3:
-                n = min(len(clean_titles), len(exact_timestamps))
-                return [f"{_fmt(exact_timestamps[i])} - {clean_titles[i]}" for i in range(n)]
-
-        fallback_chapters = _build_dynamic_chapters(title or "Investigation", m, target_keyword or title, total_duration_s=total_dur_s)
-        clean_fallback_titles = [_sanitize_chapter_label(re.sub(r'^\d{1,2}:\d{2}\s*[-:]?\s*', '', c).strip(), m) for c in fallback_chapters]
-        n = min(len(clean_fallback_titles), len(exact_timestamps))
-        return [f"{_fmt(exact_timestamps[i])} - {clean_fallback_titles[i]}" for i in range(n)]
-
-    # 3. Fallback: remotion_props.json not found or fewer than 3 scenes -> use proportional dynamic chapters
     if existing_chapters and len(existing_chapters) >= 3:
-        return [_sanitize_chapter_label(str(c).strip(), m) for c in existing_chapters if str(c).strip()]
+        return [sanitize_chapter_label(str(c).strip(), m) for c in existing_chapters if str(c).strip()]
     return _build_dynamic_chapters(title or "Investigation", m, target_keyword or title, total_duration_s=total_dur_s)
 
 
