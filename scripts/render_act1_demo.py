@@ -26,8 +26,8 @@ from pathlib import Path
 try:
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
-except Exception:
-    pass
+except Exception as _reconf_err:
+    logger.debug(f"stdout reconfigure notice: {_reconf_err}")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
