@@ -122,7 +122,8 @@ def build_vox_scene_prompts(
         dur = estimate_calibrated_speech_duration(sentence_text, market=market_str)
 
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
-    evidence = extract_evidence_for_sentence(sentence_text, market=market_str)
+    sc_id_str = getattr(scene, "scene_id", f"SCENE_{idx+1:02d}")
+    evidence = extract_evidence_for_sentence(sentence_text, market=market_str, scene_id=sc_id_str)
     hero_obj = scene.visual_metaphor or evidence.hero_anchor_prop
     tool_prop = evidence.interacting_tool_prop
     desk_surface = "Aged archival cream newsprint #F4F1EA"

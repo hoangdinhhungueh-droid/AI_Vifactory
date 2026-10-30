@@ -224,7 +224,7 @@ def dismiss_gemini_popups(page):
                     try { b.click(); } catch(e) {}
                 }
             }
-            const backdrops = document.querySelectorAll('.cdk-overlay-backdrop, mat-dialog-container, [role="dialog"], chat-app-announcement-banners, bot-banner, .announcement-banner-container, chat-app-banners');
+            const backdrops = document.querySelectorAll('.cdk-overlay-backdrop, mat-dialog-container, [role="dialog"], chat-app-announcement-banners, bot-banner, .announcement-banner-container, chat-app-banners, iframe[src*="consent.google.com"]');
             for (let bd of backdrops) {
                 try { bd.remove(); } catch(e) {}
             }
@@ -275,7 +275,7 @@ def get_fleet_accounts(start_acc="all") -> list[str]:
         try:
             with open(fleet_json, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            rec = data.get("recommended_next_acc")
+            _rec = data.get("recommended_next_acc")
             accs = data.get("accounts", {})
             ready_accs = [k for k, v in accs.items() if v.get("status") == "READY" and k in FLEET_PROFILES]
             cooling_accs = [k for k, v in accs.items() if v.get("status") != "READY" and k in FLEET_PROFILES]
@@ -502,6 +502,18 @@ def generate_single_image_png(page, prompt_text, output_png_path, layer_type="Ba
             input_box = page.wait_for_selector('div[role="textbox"], div[contenteditable="true"], textarea', timeout=30000)
             input_box.click()
             time.sleep(0.3)
+
+            # Đính kèm ảnh mẫu tham chiếu Style Reference (Rule 140 & CL3 Kim Chỉ Nam)
+            style_ref_path = ROOT_DIR / "config" / "prompts" / "cl3_vox_engine" / "Example Style Reference.png"
+            if style_ref_path.exists():
+                try:
+                    file_input = page.query_selector('input[type="file"]')
+                    if file_input:
+                        file_input.set_input_files(str(style_ref_path))
+                        print(f"📎 [Style Reference] Đã đính kèm ảnh mẫu '{style_ref_path.name}' vào Gemini chat!")
+                        time.sleep(1.5)
+                except Exception as _attach_err:
+                    logger.debug(f"Attachment notice: {_attach_err}")
 
             # Khóa cứng chế độ Imagen 3 qua menu "+" (Tạo hình ảnh) để 1 phát ăn ngay, triệt tiêu text2text refusal
             try:

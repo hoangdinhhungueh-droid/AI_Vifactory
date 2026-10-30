@@ -1536,6 +1536,20 @@ def build_natural_kinetic_i2v_prompt(
     return prompt.strip()
 
 
+CANONICAL_BACKGROUNDS = [
+    "faded world map tilted in perspective, far out of focus",
+    "torn financial ledger page with metric columns tilted away, deep out of focus",
+    "newspaper column wall with aged deckle borders, receding into soft blur",
+    "architectural blueprint grid under warm 3200K tungsten wash, far out of focus",
+    "engraved stock chart with faded metric coordinate lines receding in perspective",
+    "circuit trace print on fibrous cream parchment tilted in deep perspective",
+    "topographic elevation survey map on aged cream cardstock (#F4F1EA), soft background",
+    "shipping manifest table with hand-annotated clearance marks tilted away",
+    "index-card wall stacked at staggered depths, receding into blur",
+    "passport stamp field with authentic regional ink cancellations, blurred at depth"
+]
+
+
 def build_cl3_paper_diorama_prompt(
     sub_plan_or_sentence: Union[Dict[str, Any], str],
     market: str = "EN",
@@ -1611,8 +1625,14 @@ def build_cl3_paper_diorama_prompt(
             "no watermarks, no music, no soundtrack, no voice-over, no narration, no lyrics"
         )
 
-    # 2. SHOT Component Assembly
-    bg_field = f"Background: aged archival {ev.archetype.lower().replace('_', ' ')} paper background tilted in perspective, far out of focus."
+    # 2. SHOT Component Assembly (Rule 6: Background changes per clip from canonical slot menu)
+    sc_idx = 0
+    if sc_id:
+        m_sc = re.search(r"(\d+)", str(sc_id))
+        if m_sc:
+            sc_idx = int(m_sc.group(1)) - 1
+    bg_choice = CANONICAL_BACKGROUNDS[sc_idx % len(CANONICAL_BACKGROUNDS)]
+    bg_field = f"Background: {bg_choice}."
     mg_cutout = f"MG: halftone black-and-white cutout exhibit of {ev.hero_anchor_prop} entering at distinct depth with rough white deckle border and offset ink stroke."
     fg_data = f"FG: {ev.interacting_tool_prop} positioned at foreground depth, crossing close to the lens."
     action_text = f"Action: The {ev.interacting_tool_prop} snaps briskly in 0.3s and {ev.tactile_action_verb} the document, {ev.physical_reaction}, leaving {ev.tactile_residue}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
@@ -1688,9 +1708,18 @@ def build_cl3_paper_diorama_image_prompt(
         "Audio: sound design only – paper pops, whooshes, stamps, ticks, newsroom hum. No music. No voice-over. Preserves bottom 20% vertical safe zone for subtitles."
     )
 
-    bg_field = f"Background: aged archival {ev.archetype.lower().replace('_', ' ')} paper surface tilted in perspective, receding into soft blur."
+    sc_idx = 0
+    if sc_id:
+        m_sc = re.search(r"(\d+)", str(sc_id))
+        if m_sc:
+            sc_idx = int(m_sc.group(1)) - 1
+    bg_choice = CANONICAL_BACKGROUNDS[sc_idx % len(CANONICAL_BACKGROUNDS)]
+    bg_field = f"Background: {bg_choice}."
     mg_cutout = f"MG: high-contrast halftone black-and-white cutout of {hero_prop} with rough white deckle keylines and offset ink accent stroke (#D62E1F)."
-    fg_data = f"FG: {tool_prop} and giant stat numbers rendered as physical hero characters crossing close to the lens."
+    if getattr(ev.archetype, 'value', str(ev.archetype)) == "quantitative_metric":
+        fg_data = f"FG: {tool_prop} and giant stat numbers rendered as physical hero characters crossing close to the lens."
+    else:
+        fg_data = f"FG: {tool_prop} positioned at foreground depth, crossing close to the lens."
     action_line = f"Action: The {tool_prop} snaps briskly and {ev.tactile_action_verb} the document, {ev.physical_reaction}, leaving {ev.tactile_residue}."
     camera_line = f"Camera: {ev.camera_directive.rstrip('.')}. Settle on the {hero_prop} in sharp focus."
 
