@@ -57,11 +57,21 @@ STAGE_PROMPT_MAP: Dict[str, Path] = {
     "s07_image_gen": PROMPTS_DIR / "vox_b3_director_image_prompt.md",
     "b3_vox_director": PROMPTS_DIR / "vox_b3_director_image_prompt.md",
     "vox_director": PROMPTS_DIR / "vox_b3_director_image_prompt.md",
+    "b3_director": PROMPTS_DIR / "b3_director_prompt.md",
+    "b3": PROMPTS_DIR / "b3_director_prompt.md",
 
     "s08_video_gen": PROMPTS_DIR / "vox_b6_flow_video_prompt.md",
     "s08": PROMPTS_DIR / "vox_b6_flow_video_prompt.md",
     "b6_flow_motion": PROMPTS_DIR / "vox_b6_flow_video_prompt.md",
     "flow_motion": PROMPTS_DIR / "vox_b6_flow_video_prompt.md",
+
+    # CL3 Vox Engine Paper Diorama Master Architecture (Kim Chỉ Nam)
+    "cl3_t2i": PROMPTS_DIR / "cl3_vox_engine" / "image_prompts_system.md",
+    "cl3_image": PROMPTS_DIR / "cl3_vox_engine" / "image_prompts_system.md",
+    "cl3_i2v": PROMPTS_DIR / "cl3_vox_engine" / "video_prompts_system.md",
+    "cl3_video": PROMPTS_DIR / "cl3_vox_engine" / "video_prompts_system.md",
+    "t2i_kim_chi_nam": PROMPTS_DIR / "cl3_vox_engine" / "image_prompts_system.md",
+    "i2v_kim_chi_nam": PROMPTS_DIR / "cl3_vox_engine" / "video_prompts_system.md",
 
     "s10_render": PROMPTS_DIR / "seo_package_prompt.md",
     "s11_qc": PROMPTS_DIR / "seo_package_prompt.md",
@@ -347,3 +357,14 @@ def get_stage_prompt(stage_name: str, market: str = "EN", max_chars: int = DEFAU
 def lookup_cinematic_token(token: str) -> Optional[Dict[str, Any]]:
     """Convenience functional interface for cinematic token lookup."""
     return get_skill_gateway().token_lookup.lookup(token)
+
+
+def get_cl3_t2i_prompt(max_chars: int = DEFAULT_MAX_CHARS) -> str:
+    """Convenience interface for CL3 Paper Diorama T2I Master Architecture prompt."""
+    return get_skill_gateway().get_stage_prompt(stage_name="cl3_t2i", max_chars=max_chars, extra_instincts=False)
+
+
+def get_cl3_i2v_prompt(max_chars: int = DEFAULT_MAX_CHARS) -> str:
+    """Convenience interface for CL3 Paper Diorama I2V Master Architecture prompt."""
+    return get_skill_gateway().get_stage_prompt(stage_name="cl3_i2v", max_chars=max_chars, extra_instincts=False)
+

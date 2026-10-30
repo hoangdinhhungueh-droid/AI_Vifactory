@@ -63,6 +63,8 @@ PROMPT_LOCAL_FILES = {
     "b3_director": ROOT_DIR / "config" / "prompts" / "b3_director_prompt.md",
     "b35_visual": ROOT_DIR / "config" / "prompts" / "b35_visual_rules.md",
     "b10_seo": ROOT_DIR / "config" / "prompts" / "seo_package_prompt.md",
+    "cl3_t2i": ROOT_DIR / "config" / "prompts" / "cl3_vox_engine" / "image_prompts_system.md",
+    "cl3_i2v": ROOT_DIR / "config" / "prompts" / "cl3_vox_engine" / "video_prompts_system.md",
 }
 
 # In-memory multi-hub cache state
@@ -550,20 +552,42 @@ def get_visual_strategic_rules() -> str:
 
 
 def get_b3_strategic_rules(force_refresh: bool = False) -> str:
-    """Hollywood Art Direction & Scene Breakdown rules for B3 Director Planner loaded from Notion SoT."""
+    """Canonical Vox Director & Kinetic Storyboard rules for B3 Director Planner loaded from Notion SoT / CL3 Master System."""
     content = fetch_prompt_module("b3_director", force_refresh=force_refresh)
     if content:
         return content
     return (
-        "=== NOTION SOT HOLLYWOOD ART DIRECTION RULES (RULES 116, 120, 128, 130, 131, 445, 446) ===\n"
-        "1. ROLE: Hollywood Master Visual Director across 130-160 scenes (~6-7s/scene).\n"
-        "2. FINCHER-STYLE RAPID-FIRE HOOK (0-60s): 12-15 scenes across Paradox (0-15s), Metric Shock (15-35s), Contract (35-60s).\n"
-        "3. CORE INVESTIGATIVE PACING: 25-35 words/scene, 1-2 complete sentences ending with '.', '!', '?'.\n"
-        "4. 12 CAMERA MOVEMENTS: slow_push_in, snap_zoom, cinematic_pan, macro_tilt, handheld_shake, dolly_zoom, etc.\n"
-        "5. LOCATION CONTINUITY: 3-4 anchors per Beat (~15-20 total clusters).\n"
-        "6. FORENSIC OVERLAYS: redacted_doc, radar_map, financial_chart, surveillance_crt.\n"
-        "7. VOX TACTILE COLLAGE: 16:9 composite frame, aged parchment, matte board, halftone cutouts, verdict stamps."
+        "=== CANONICAL VOX DIRECTOR RULES (RULES 120, 122, 128, 140, 141 - CL3 MASTER SYSTEM) ===\n"
+        "1. ROLE: Vox Master Art Director & Kinetic Storyboard Director across 5 Beats.\n"
+        "2. CL3 PAPER DIORAMA ARCHITECTURE: Multi-layered 3D papercraft, aged newsprint (#F4F1EA), halftone cutouts, deckle edges.\n"
+        "3. 7 KINETIC INTERACTION FAMILIES (H1->H7): Snappy mechanical strike <= 0.4s with overshoot, dead-stop hold on twos.\n"
+        "4. ZERO CARTESIAN COORDINATES: Natural physical staging, zero raw percentages (X:50%, Y:36%).\n"
+        "5. COMMITTED CAMERA ACTOR: Exactly one camera movement per scene, ending with mandatory 'Settle on [target]'.\n"
+        "6. SUBTITLE SAFE ZONE: Preserves bottom 20% vertical safe zone for Remotion karaoke 0ms drift.\n"
+        "7. AUDIO SFX COUPLING: Tactile Foley matching contact dynamics, sound design only, no music, no voice-over."
     )
+
+
+def get_cl3_t2i_rules(force_refresh: bool = False) -> str:
+    """CL3 Paper Diorama T2I Master Architecture rules loaded dynamically from Notion SoT or local file."""
+    content = fetch_prompt_module("cl3_t2i", force_refresh=force_refresh)
+    if content:
+        return content
+    local_p = PROMPT_LOCAL_FILES.get("cl3_t2i")
+    if local_p and local_p.exists():
+        return local_p.read_text(encoding="utf-8")
+    return ""
+
+
+def get_cl3_i2v_rules(force_refresh: bool = False) -> str:
+    """CL3 Paper Diorama I2V Master Architecture rules loaded dynamically from Notion SoT or local file."""
+    content = fetch_prompt_module("cl3_i2v", force_refresh=force_refresh)
+    if content:
+        return content
+    local_p = PROMPT_LOCAL_FILES.get("cl3_i2v")
+    if local_p and local_p.exists():
+        return local_p.read_text(encoding="utf-8")
+    return ""
 
 
 def get_b10_seo_rules(force_refresh: bool = False) -> str:

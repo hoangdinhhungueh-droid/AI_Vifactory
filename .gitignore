@@ -61,7 +61,8 @@ logs/
 locks/
 var/
 n8n-data/
-data/
+data/*
+!data/notion_audit/
 db/*.log
 db/*.on
 db/*.pid
@@ -123,3 +124,4 @@ specs/boss_audits/*_evidence_bundle/
 
 archify_repo/
 demo_audit_frames/
+.archive_legacy/

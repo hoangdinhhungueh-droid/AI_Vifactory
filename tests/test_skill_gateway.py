@@ -17,6 +17,8 @@ from core.skill_gateway import (
     get_skill_gateway,
     get_stage_prompt,
     lookup_cinematic_token,
+    get_cl3_t2i_prompt,
+    get_cl3_i2v_prompt,
     DEFAULT_MAX_CHARS,
 )
 
@@ -106,3 +108,33 @@ def test_gateway_telemetry():
     assert tel["requests"] == 2
     assert tel["cache_hits"] >= 1
     assert tel["cinematic_tokens_indexed"] > 0
+
+
+def test_cl3_kim_chi_nam_prompts():
+    """Validates the CL3 Paper Diorama Kim Chỉ Nam Master Architecture integration."""
+    # Test skill_gateway CL3 prompt interfaces
+    t2i_prompt = get_cl3_t2i_prompt()
+    assert len(t2i_prompt) > 500
+    assert "CL3 CANONICAL PROMPT ENGINE" in t2i_prompt or "PAPER DIORAMA" in t2i_prompt
+    assert "STYLE BLOCK" in t2i_prompt
+
+    i2v_prompt = get_cl3_i2v_prompt()
+    assert len(i2v_prompt) > 500
+    assert "CL3 CANONICAL PROMPT ENGINE" in i2v_prompt or "PAPER DIORAMA" in i2v_prompt
+    assert "STYLE BLOCK" in i2v_prompt
+    assert "AUDIO:" in i2v_prompt
+    assert "AVOID:" in i2v_prompt
+
+    # Test skill_loader CL3 rules interfaces
+    from app.services.skill_loader import get_cl3_t2i_rules, get_cl3_i2v_rules, get_b3_strategic_rules
+    t2i_rules = get_cl3_t2i_rules()
+    assert len(t2i_rules) > 500
+    assert "CL3" in t2i_rules or "PAPER DIORAMA" in t2i_rules
+
+    i2v_rules = get_cl3_i2v_rules()
+    assert len(i2v_rules) > 500
+    assert "CL3" in i2v_rules or "PAPER DIORAMA" in i2v_rules
+
+    b3_rules = get_b3_strategic_rules()
+    assert len(b3_rules) > 500
+    assert "CL3" in b3_rules or "VOX DIRECTOR" in b3_rules
