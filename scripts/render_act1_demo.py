@@ -12,15 +12,15 @@ Combines the 8 newly generated Vox Engine v3 video clips with:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import math
-import os
 import re
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] %(message)s")
+logger = logging.getLogger("act1_demo_render")
 
 # UTF-8 stdout configuration for Windows
 try:
@@ -33,9 +33,6 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
 from vox.ffmpeg_utils import get_ffmpeg_binary
-
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] %(message)s")
-logger = logging.getLogger("act1_demo_render")
 
 EPISODE_ID = "KR_EP0003_kftc_rental_fraud"
 EPISODE_DIR = ROOT_DIR / "episodes" / EPISODE_ID
@@ -353,7 +350,7 @@ def assemble_and_render_master_video(scenes: list[dict], ass_path: Path, out_dir
     ]
     subprocess.run(final_cmd, capture_output=True, check=True)
 
-    print(f"\n🎉 [HOÀN TẤT THÀNH CÔNG] Video Demo Act I đã xuất xưởng:")
+    print("\n🎉 [HOÀN TẤT THÀNH CÔNG] Video Demo Act I đã xuất xưởng:")
     print(f"   📁 File: {final_output_mp4}")
     print(f"   📦 Kích thước: {final_output_mp4.stat().st_size / (1024*1024):.2f} MB")
 
@@ -378,7 +375,8 @@ def main():
     build_ass_subtitles(scenes_aligned, ass_path)
 
     # 4. Master Video Assembly & Render
-    final_mp4 = assemble_and_render_master_video(scenes_aligned, ass_path, OUT_DIR)
+    final_output = assemble_and_render_master_video(scenes_aligned, ass_path, OUT_DIR)
+    logger.info(f"Rendered demo output verified at: {final_output}")
 
     elapsed = time.time() - start_time
     print(f"\n⏱️ Tổng thời gian hoàn tất: {elapsed:.1f}s")
