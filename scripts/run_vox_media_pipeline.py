@@ -283,7 +283,7 @@ def setup_block_directory_structure(episode_id: str) -> Dict[str, Any]:
 
     # Đảm bảo flow_video_manifest.json luôn sẵn sàng cho bước sinh Video (Ưu tiên các acc đã xác thực đăng nhập Flow)
     flow_manifest_path = episode_dir / "flow_video_manifest.json"
-    acc_list = ["acc_03", "acc_02", "acc_04", "acc_05", "acc_06", "acc_07"]
+    acc_list = ["acc_03", "acc_02", "acc_04", "acc_05", "acc_07"]
     clips = []
     for idx, s in enumerate(scenes):
         sc_id = s.get("scene_id", f"SCENE_{idx+1:02d}")

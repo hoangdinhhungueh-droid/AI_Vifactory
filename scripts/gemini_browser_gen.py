@@ -60,12 +60,6 @@ FLEET_PROFILES = {
         'email': 'untoldstorieskr@gmail.com',
         'name': 'Hưng Hoàng'
     },
-    'acc_06': {
-        'id': 'acc_06',
-        'path': PROFILES_BASE_DIR / 'acc_06',
-        'email': 'untoldstoriesjp@gmail.com',
-        'name': 'Hung Hoang'
-    },
     'acc_07': {
         'id': 'acc_07',
         'path': PROFILES_BASE_DIR / 'acc_07',
@@ -285,9 +279,6 @@ def get_fleet_accounts(start_acc="all") -> list[str]:
             accs = data.get("accounts", {})
             ready_accs = [k for k, v in accs.items() if v.get("status") == "READY" and k in FLEET_PROFILES]
             cooling_accs = [k for k, v in accs.items() if v.get("status") != "READY" and k in FLEET_PROFILES]
-            if "acc_06" in ready_accs:
-                ready_accs.remove("acc_06")
-                cooling_accs.append("acc_06")
             verified_priority = ["acc_03", "acc_04", "acc_07", "acc_05", "acc_02"]
             top_accs = [a for a in verified_priority if a in ready_accs]
             other_ready = [a for a in ready_accs if a not in top_accs]

@@ -28,7 +28,7 @@ logging.basicConfig(level=logging.INFO, format="[%(asctime)s][%(levelname)s] %(m
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
 # 7 Confirmed Physical Accounts for Google Flow Veo 3.1 Fast rotation
-FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06", "acc_07"]
+FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_07"]
 
 # Signature Vox Color Palette
 VOX_PALETTE = {

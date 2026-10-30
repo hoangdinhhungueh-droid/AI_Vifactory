@@ -121,11 +121,6 @@ PROFILES = {
         'email': 'untoldstorieskr@gmail.com',
         'name': 'Hưng Hoàng'
     },
-    'acc_06': {
-        'path': PROFILES_BASE_DIR / 'acc_06',
-        'email': 'untoldstoriesjp@gmail.com',
-        'name': 'Hung Hoang'
-    },
     'acc_07': {
         'path': PROFILES_BASE_DIR / 'acc_07',
         'email': 'hunghoangdinh090@gmail.com',
@@ -783,7 +778,7 @@ def main():
     print(f"📁 Thư mục lưu trữ: {out_dir}")
 
     # Thứ tự hạm đội ưu tiên đã xác thực đăng nhập Google Flow
-    verified_order = ['acc_03', 'acc_02', 'acc_04', 'acc_05', 'acc_06', 'acc_07', 'acc_01']
+    verified_order = ['acc_03', 'acc_02', 'acc_04', 'acc_05', 'acc_07', 'acc_01']
     available_accs = [a for a in verified_order if a in PROFILES]
 
     # Nếu user chỉ định --acc cụ thể, tài khoản đó sẽ đi đầu tiên, sau đó tự động xoay qua các tài khoản còn lại

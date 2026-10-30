@@ -52,13 +52,6 @@ ACCOUNT_POOL = [
         "status": "configured"
     },
     {
-        "id": "acc_06",
-        "email": "untoldstoriesjp@gmail.com",
-        "name": "Hung Hoang",
-        "profile_dir": r"C:\Users\hunghd2\.gemini\profiles\acc_06",
-        "status": "configured"
-    },
-    {
         "id": "acc_07",
         "email": "hunghoangdinh090@gmail.com",
         "name": "Hung Hoang Dinh",

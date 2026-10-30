@@ -37,7 +37,7 @@ if str(ROOT_DIR) not in sys.path:
 from app.services.prompt_forge import _sanitize_background_prompt, _sanitize_foreground_prompt
 from app.services.sfx_registry import get_canonical_sfx_list, is_valid_sfx, resolve_semantic_foley
 
-FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06", "acc_07"]
+FLOW_ACCOUNTS = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_07"]
 
 # ============================================================================
 # DYNAMIC VISUAL ROSTER GENERATOR (RULE 128 - ZERO SEMANTIC BIAS)

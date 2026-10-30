@@ -46,7 +46,7 @@ __all__ = [
     "FLOW_ACCOUNTS"
 ]
 
-FLOW_ACCOUNTS: List[str] = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06", "acc_07"]
+FLOW_ACCOUNTS: List[str] = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_07"]
 
 
 def generate_7acc_flow_manifest(target_dir: Path, episode_id: str, scenes: List[Any]) -> Dict[str, Any]:

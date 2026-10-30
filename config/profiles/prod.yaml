@@ -11,7 +11,7 @@ video_generation:
   model: "omni"            # omni (Omni 1.1 Flash) or veo (Veo 3.1 Fast)
   aspect: "16:9"
   duration_per_clip_sec: 10.0
-  account_pool: ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_06", "acc_07"]
+  account_pool: ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_07"]
   circuit_breaker_threshold: 7  # If all 7 accounts fail, stop and save checkpoint
 
 voice:

@@ -41,11 +41,11 @@ class TestTemporalMotionGate(unittest.TestCase):
         manifest = generate_7acc_flow_manifest(self.tmp_dir, "TEST_EP0001", scenes)
         self.assertEqual(manifest["total_clips"], 15)
         self.assertEqual(manifest["accounts_used"], FLOW_ACCOUNTS)
-        self.assertEqual(len(FLOW_ACCOUNTS), 7)
+        self.assertEqual(len(FLOW_ACCOUNTS), 6)
 
         # Check round-robin distribution
         for idx, clip in enumerate(manifest["clips"]):
-            expected_slot = FLOW_ACCOUNTS[idx % 7]
+            expected_slot = FLOW_ACCOUNTS[idx % len(FLOW_ACCOUNTS)]
             self.assertEqual(clip["flow_slot"], expected_slot)
             self.assertEqual(clip["output_filename"], f"clip_scene_{idx+1:02d}.mp4")
 

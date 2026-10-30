@@ -51,10 +51,10 @@ def mock_episode_dir(tmp_path):
     return ep_dir
 
 
-def test_flow_accounts_has_7_accounts():
-    """Verify that FLOW_ACCOUNTS contains exactly 7 accounts (acc_01 to acc_07)."""
-    assert len(FLOW_ACCOUNTS) == 7
-    expected = [f"acc_{i:02d}" for i in range(1, 8)]
+def test_flow_accounts_has_6_accounts():
+    """Verify that FLOW_ACCOUNTS contains active accounts (excluding disabled acc_06)."""
+    assert len(FLOW_ACCOUNTS) == 6
+    expected = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_07"]
     assert FLOW_ACCOUNTS == expected
 
 
