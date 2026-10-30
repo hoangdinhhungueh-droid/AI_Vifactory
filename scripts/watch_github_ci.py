@@ -76,6 +76,10 @@ def fetch_run_for_commit(repo: str, token: str, commit_sha: str, opener):
             runs = data.get("workflow_runs", [])
             for r in runs:
                 head = r.get("head_sha", "")
+                if (head.startswith(commit_sha) or commit_sha.startswith(head[:7])) and r.get("name") == "CI/CD Pipeline":
+                    return r
+            for r in runs:
+                head = r.get("head_sha", "")
                 if head.startswith(commit_sha) or commit_sha.startswith(head[:7]):
                     return r
             return None
