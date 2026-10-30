@@ -1280,7 +1280,7 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                         print(f"🔄 [In-Place Retry {attempt}/{MAX_INPLACE_RETRIES}] Sinh lại tại chỗ cho {key}...")
 
                     try:
-                        generate_single_image_png(page, prompt, local_png, layer_type=layer, timeout_sec=180)
+                        generate_single_image_png(page, prompt, local_png, layer_type=layer, timeout_sec=100)
                     except QuotaExhaustedError as qe:
                         print(f"\n🚨 [QUOTA EXHAUSTED] {current_acc_id} đạt giới hạn: {qe}")
                         acc_idx += 1
@@ -1372,6 +1372,19 @@ def run_browser_pipeline(episode_id, prompt_items, headless=False, pacing_sec=3,
                             time.sleep(3)
 
                     attempt += 1
+                    if attempt > MAX_INPLACE_RETRIES and not image_passed:
+                        # Tự động xoay sang tài khoản tiếp theo trong hạm đội nếu tài khoản hiện tại bị treo/timeout
+                        acc_idx += 1
+                        if acc_idx < len(accounts_order):
+                            next_acc_id = accounts_order[acc_idx]
+                            print(f"\n🔄 [Fleet Failover] {key} không hoàn thành trên {current_acc_id} sau {MAX_INPLACE_RETRIES} lần thử. Tự động chuyển hạm đội sang: {next_acc_id}...")
+                            try:
+                                current_acc_id = next_acc_id
+                                open_account_context(current_acc_id)
+                                attempt = 1
+                                continue
+                            except Exception as switch_err:
+                                print(f"⚠️ Lỗi switch sang {next_acc_id}: {switch_err}")
 
                 # Local storage only during generation
                 if image_passed and os.path.exists(local_png):

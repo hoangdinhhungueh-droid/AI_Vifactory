@@ -424,7 +424,7 @@ class ClaudeVoxDirector:
         visual_metaphor = str(
             raw_sc.get("visual_metaphor")
             or raw_sc.get("Visual Metaphor")
-            or f"Tactile archival exhibit cutout for {editorial_title}"
+            or editorial_title
         )
 
         raw_hero = (
@@ -599,7 +599,7 @@ class ClaudeVoxDirector:
                 "sentence": sent,
                 "core_idea": f"Evidentiary audit of {title}",
                 "editorial_title": title,
-                "visual_metaphor": f"Archival forensic exhibit cutout for {title}",
+                "visual_metaphor": title,
                 "main_subject_cutout": {
                     "name": f"fg_hero_{sc_idx:02d}_{slug}",
                     "label": extracted["hero_label"],

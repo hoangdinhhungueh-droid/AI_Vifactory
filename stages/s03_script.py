@@ -72,10 +72,10 @@ def run(ctx: RunContext) -> StageArtifact:
             exhibits = _extract_sentence_exhibits(b.text, idx)
             headline_text = exhibits.get("editorial_title") or f"BEAT {idx:02d}"
             hero_label = exhibits.get("hero_label") or b.text[:30]
-            metaphor_text = f"Tactile archival exhibit: {hero_label}"
+            metaphor_text = hero_label
         except Exception:
             headline_text = f"BEAT {idx:02d}"
-            metaphor_text = f"Tactile editorial evidence for beat {idx:02d}"
+            metaphor_text = f"BEAT_{idx:02d}"
 
         from app.services.kinetic_sub_director import estimate_speech_duration
         est_dur = estimate_speech_duration(b.text, market=market)
