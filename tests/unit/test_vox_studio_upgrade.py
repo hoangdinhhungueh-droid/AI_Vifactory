@@ -191,12 +191,12 @@ def test_build_vox_scene_prompts_kinematics():
     # Check single camera directive
     assert vox_meta["camera_directive"] in ["STATIC_OVERHEAD", "SLOW_PUSH_IN_0_1X", "SLOW_HORIZONTAL_PAN", "SUBTLE_TILT_DOWN"]
 
-    # Check kinetic causal prompt (Rule 140 v3)
+    # Check natural kinetic prompt (Rule 140 v3 / Vox Engine v3)
     flow_prompt = vox_meta["i2v_prompt_google_flow"]
-    assert "Forensic documentary motion graphics" in flow_prompt
-    assert "[Camera:" in flow_prompt
-    assert "[KINETIC CAUSAL CHAIN]:" in flow_prompt
-    assert "[PHYSICAL CONSTRAINTS]:" in flow_prompt
+    assert "[CAMERA & ENVIRONMENT]:" in flow_prompt
+    assert "[ACTION PHASE" in flow_prompt
+    assert "[HOLD & LIVING TEXTURE]:" in flow_prompt
+    assert "12fps (on twos)" in flow_prompt
 
 
 def test_chunking_bounds_invariant_and_final_chunk_rebalancing():

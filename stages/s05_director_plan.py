@@ -342,7 +342,14 @@ def build_universal_video_prompt(scene: Scene) -> str:
     except Exception as _ex:
         logger.warning(f"[build_universal_video_prompt] Fallback notice: {_ex}")
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
-    ev = extract_evidence_for_sentence(scene.sentence or scene.headline or "investigation", market=getattr(scene, "market", "EN"))
+    sentence_val = (
+        getattr(scene, "narration", "")
+        or getattr(scene, "narration_text", "")
+        or getattr(scene, "headline", "")
+        or "investigation"
+    )
+    market_val = getattr(scene, "market", None) or "EN"
+    ev = extract_evidence_for_sentence(sentence_val, market=market_val)
     return (
         f"[CAMERA & ENVIRONMENT]: Static top-down desk view on Cream Paper #F4F1EA.\n"
         f"[ACTION PHASE (0.2s - 0.4s)]: The {ev.interacting_tool_prop} {ev.tactile_action_verb} {ev.hero_anchor_prop}.\n"
