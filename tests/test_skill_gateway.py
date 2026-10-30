@@ -135,6 +135,7 @@ def test_cl3_kim_chi_nam_prompts():
     assert len(i2v_rules) > 500
     assert "CL3" in i2v_rules or "PAPER DIORAMA" in i2v_rules
 
-    b3_rules = get_b3_strategic_rules()
-    assert len(b3_rules) > 500
-    assert "CL3" in b3_rules or "VOX DIRECTOR" in b3_rules
+    # Test skill_gateway stage prompt for b3_director
+    b3_prompt = get_stage_prompt("b3_director")
+    assert len(b3_prompt) > 500
+    assert "CL3" in b3_prompt or "VOX DIRECTOR" in b3_prompt
