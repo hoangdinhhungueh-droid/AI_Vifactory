@@ -248,24 +248,38 @@ def build_vox_scene_prompts(
         {"at_second": min(2.0, max(0.9, t_hold_start - 0.2)), "sfx_name": evidence.sound_foley}
     ]
 
-    # 6. 5-Layer Image Prompt (Master Prompt: vox_b3_director_image_prompt.md)
-    image_prompt = (
-        f"Editorial investigative documentary frame in signature VOX paper-cut collage style. "
-        f"[Layer 1: Aged Cream Newsprint Desk #F4F1EA with subtle print halftone grid] -> "
-        f"[Layer 2: bold flat geometric color block in {color}] -> "
-        f"[Layer 3: negative space reserved for large bold editorial typography '{headline}', occupying 25% of frame] -> "
-        f"[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge and realistic soft drop shadow: {hero_obj}. "
-        f"Interacting elements: {tool_prop}] -> "
-        f"[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration]. "
-        f"Strictly locked color palette: Vox Yellow #F2C230, Terracotta #C85A32, Navy #1B2B4A on Off-white Cream #F4F1EA. "
-        f"Clear object-assembly composition, strong editorial hierarchy, tactile paper craft. "
-        f"Negative prompt: no clutter, no unnecessary objects, no glossy 3D rendering, no photorealistic background, "
-        f"no oversaturated rainbow colors, maintain clean premium VOX editorial collage."
-    )
-
-    # 7. Sub-Director Plan & Causal Compound Verb Prompts (Rule 140 v3)
+    # 6. Canonical CL3 2-Block Image Prompt (config/prompts/cl3_vox_engine/image_prompts_system.md)
     try:
-        from app.services.kinetic_sub_director import build_natural_kinetic_i2v_prompt, generate_scene_sub_director_plan
+        from app.services.kinetic_sub_director import build_cl3_paper_diorama_image_prompt
+        image_prompt = build_cl3_paper_diorama_image_prompt(
+            sentence_text,
+            market=market_str,
+            scene_id=getattr(scene, "scene_id", f"SCENE_{idx+1:02d}"),
+            hero_object_override=hero_obj,
+            interacting_tool_override=tool_prop,
+        )
+    except Exception as _img_err:
+        logger.warning(f"[build_vox_scene_prompts] CL3 image prompt fallback notice: {_img_err}")
+        image_prompt = (
+            f"Editorial investigative documentary frame in signature VOX paper-cut collage style. "
+            f"[Layer 1: Aged Cream Newsprint Desk #F4F1EA with subtle print halftone grid] -> "
+            f"[Layer 2: bold flat geometric color block in {color}] -> "
+            f"[Layer 3: negative space reserved for large bold editorial typography '{headline}', occupying 25% of frame] -> "
+            f"[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge and realistic soft drop shadow: {hero_obj}. "
+            f"Interacting elements: {tool_prop}] -> "
+            f"[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration]. "
+            f"Strictly locked color palette: Vox Yellow #F2C230, Terracotta #C85A32, Navy #1B2B4A on Off-white Cream #F4F1EA. "
+            f"Clear object-assembly composition, strong editorial hierarchy, tactile paper craft. "
+            f"Negative prompt: no clutter, no unnecessary objects, no glossy 3D rendering, no photorealistic background, "
+            f"no oversaturated rainbow colors, maintain clean premium VOX editorial collage."
+        )
+
+    # 7. Sub-Director Plan & Canonical CL3 4-Block Video Prompts (Rule 140 & video_prompts_system.md)
+    try:
+        from app.services.kinetic_sub_director import (
+            build_cl3_paper_diorama_prompt,
+            generate_scene_sub_director_plan,
+        )
         from core.market_resolver import resolve_canonical_market
         resolved_market = resolve_canonical_market(market_raw=market or getattr(scene, "market", None))
         sub_plan = generate_scene_sub_director_plan(
@@ -279,7 +293,7 @@ def build_vox_scene_prompts(
             bounding_box=getattr(scene, "bounding_box", None) or getattr(scene, "focal_region", None),
             object_roles=getattr(scene, "object_roles", None)
         )
-        i2v_google_flow = build_natural_kinetic_i2v_prompt(sub_plan, market=resolved_market, camera_directive=camera_directive)
+        i2v_google_flow = build_cl3_paper_diorama_prompt(sub_plan, market=resolved_market, style_mode="deep_diorama")
         i2v_omni = i2v_google_flow
     except Exception as _k_err:
         logger.warning(f"[build_vox_scene_prompts] Kinetic sub-director fallback notice: {_k_err}")
@@ -318,11 +332,10 @@ def build_vox_scene_prompts(
 
 def build_universal_video_prompt(scene: Scene) -> str:
     """Encodes Natural Kinetic Video Prompt (Rule 140 v3 / Made by AI Playbook)."""
-    color = scene.color_accent or "Vox Crimson #E53935"
     if scene.i2v_prompt_google_flow:
         return scene.i2v_prompt_google_flow
     try:
-        from app.services.kinetic_sub_director import build_natural_kinetic_i2v_prompt, generate_scene_sub_director_plan
+        from app.services.kinetic_sub_director import build_cl3_paper_diorama_prompt, generate_scene_sub_director_plan
         from core.market_resolver import resolve_canonical_market
         sentence_str = getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or getattr(scene, "narration", "") or getattr(scene, "headline", "")
         raw_dur = getattr(scene, "duration_est_sec", None)
@@ -338,7 +351,7 @@ def build_universal_video_prompt(scene: Scene) -> str:
             bounding_box=getattr(scene, "bounding_box", None) or getattr(scene, "focal_region", None),
             object_roles=getattr(scene, "object_roles", None)
         )
-        return build_natural_kinetic_i2v_prompt(sub_plan, market=res_market, camera_directive=getattr(scene, "camera_directive", ""))
+        return build_cl3_paper_diorama_prompt(sub_plan, market=res_market, style_mode="deep_diorama")
     except Exception as _ex:
         logger.warning(f"[build_universal_video_prompt] Fallback notice: {_ex}")
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence

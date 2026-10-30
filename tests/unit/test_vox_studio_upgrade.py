@@ -191,12 +191,12 @@ def test_build_vox_scene_prompts_kinematics():
     # Check single camera directive
     assert vox_meta["camera_directive"] in ["STATIC_OVERHEAD", "SLOW_PUSH_IN_0_1X", "SLOW_HORIZONTAL_PAN", "SUBTLE_TILT_DOWN"]
 
-    # Check natural kinetic prompt (Rule 140 v3 / Vox Engine v3)
+    # Check canonical CL3 4-Block paper diorama prompt (Rule 140 v3 / CL3)
     flow_prompt = vox_meta["i2v_prompt_google_flow"]
-    assert "[CAMERA & ENVIRONMENT]:" in flow_prompt
-    assert "[ACTION PHASE" in flow_prompt
-    assert "[HOLD & LIVING TEXTURE]:" in flow_prompt
-    assert "12fps (on twos)" in flow_prompt
+    assert "SHOT:" in flow_prompt
+    assert "AUDIO:" in flow_prompt
+    assert "AVOID:" in flow_prompt
+    assert "12fps" in flow_prompt
 
 
 def test_chunking_bounds_invariant_and_final_chunk_rebalancing():
@@ -751,7 +751,8 @@ def test_safe_disposal_concurrent_ancestor_race_fails_closed(tmp_path: Path):
     """Verifies that concurrent ancestor replacement race against protected sentinel fails closed (Rule 137 & Boss Round 11 Item 7)."""
     import threading
     import time
-    from scripts.safe_trash import safe_trash, validate_safe_disposal_target
+
+    from scripts.safe_trash import safe_trash
 
     fake_quarantine = tmp_path / "quarantine"
     fake_quarantine.mkdir(parents=True, exist_ok=True)
@@ -782,7 +783,7 @@ def test_safe_disposal_concurrent_ancestor_race_fails_closed(tmp_path: Path):
     t.start()
     try:
         # Run safe_trash with race worker active
-        res = safe_trash(str(target_to_trash), allowed_roots=[fake_quarantine])
+        safe_trash(str(target_to_trash), allowed_roots=[fake_quarantine])
         # Assert protected sentinel is 100% NEVER touched
         assert protected_file.exists() is True, "Protected sentinel must never be compromised"
         assert protected_file.read_text(encoding="utf-8") == "IMMUTABLE_SENTINEL_DATA"
