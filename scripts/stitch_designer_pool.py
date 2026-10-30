@@ -11,7 +11,10 @@ import sys
 import time
 import json
 import argparse
+import logging
 from pathlib import Path
+
+logger = logging.getLogger("stitch_designer_pool")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
@@ -209,8 +212,8 @@ def run_stitch_design(prompt: str, output_dir: str = "reports/stitch_designs/lat
                 print(f"  ⚠️ Error with {acc['id']}: {e}. Trying next account in pool...")
                 try:
                     context.close()
-                except Exception:
-                    pass
+                except Exception as _close_err:
+                    logger.debug(f"Context close notice: {_close_err}")
 
     print("❌ All accounts in pool failed or exhausted daily limits.")
     return False
