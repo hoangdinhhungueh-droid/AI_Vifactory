@@ -112,14 +112,20 @@ def build_vox_scene_prompts(
     """Decomposes scene into rich Vox Physical Objects, Kinematics, Omni and Google Flow I2V Prompts."""
     headline = scene.headline or f"BEAT {idx+1:02d}"
     color = scene.color_accent or "Vox Yellow #F2C230 & Navy #1B2B4A"
-    hero_obj = scene.visual_metaphor or f"Tactile paper document representing beat {idx+1:02d}"
     sentence_text = getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or getattr(scene, "narration", "") or headline
-    market_str = getattr(scene, "market", "EN") or "EN"
+    market_str = market or getattr(scene, "market", "EN") or "EN"
+
     if scene.duration_est_sec and float(scene.duration_est_sec) > 0.0:
         dur = float(scene.duration_est_sec)
     else:
-        from app.services.kinetic_sub_director import estimate_speech_duration
-        dur = estimate_speech_duration(sentence_text, market=market_str)
+        from core.pacing_budgeter import estimate_calibrated_speech_duration
+        dur = estimate_calibrated_speech_duration(sentence_text, market=market_str)
+
+    from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
+    evidence = extract_evidence_for_sentence(sentence_text, market=market_str)
+    hero_obj = scene.visual_metaphor or evidence.hero_anchor_prop
+    tool_prop = evidence.interacting_tool_prop
+    desk_surface = "Aged archival cream newsprint #F4F1EA"
 
     # Pick deterministic single camera movement (Studio Touch 7: Single Camera Mandate)
     allowed_camera_directives = ["STATIC_OVERHEAD", "SLOW_PUSH_IN_0_1X", "SLOW_HORIZONTAL_PAN", "SUBTLE_TILT_DOWN"]
@@ -136,14 +142,14 @@ def build_vox_scene_prompts(
         },
         {
             "id": f"o{idx+1}_2",
-            "name": "crimson forensic seal and brass anchor pin",
-            "attributes": ["crimson wax imprint", "brass patina pin"],
+            "name": tool_prop,
+            "attributes": ["tactile documentary prop", "forensic inspection artifact"],
             "role": "secondary"
         },
         {
             "id": f"o{idx+1}_3",
-            "name": "aged cream newsprint desk backdrop",
-            "attributes": ["#F4F1EA", "vintage print halftone grid", "creased archival paper"],
+            "name": f"aged desk backdrop ({desk_surface})",
+            "attributes": [desk_surface, "vintage print halftone grid", "creased archival paper"],
             "role": "backdrop"
         }
     ]
@@ -157,9 +163,9 @@ def build_vox_scene_prompts(
         },
         {
             "object_id": f"o{idx+1}_2",
-            "name": "asset_seal_stamp",
-            "type": "tactile_prop",
-            "texture_spec": "Solid forensic tool, rubber stamp with crimson ink"
+            "name": f"asset_tool_{str(getattr(evidence.archetype, 'value', evidence.archetype)).lower()}",
+            "type": "investigative_tool",
+            "texture_spec": f"Tactile {tool_prop} with sharp edge contrast and documentary lighting"
         }
     ]
 
@@ -177,8 +183,8 @@ def build_vox_scene_prompts(
         {
             "time_window": f"{t_entry_end:.1f}s - {t_hold_start:.1f}s",
             "active_object_id": f"o{idx+1}_2",
-            "action_type": "stamp_strike",
-            "mechanical_action": "Crimson rubber inspection seal slams downward onto lower margin, micro paper dust settles",
+            "action_type": str(getattr(evidence.dominant_family, 'value', evidence.dominant_family)).lower(),
+            "mechanical_action": f"Tactile {tool_prop} {evidence.tactile_action_verb} {hero_obj}, causing {evidence.physical_reaction}",
             "spatial_coordinate": "X:35%, Y:60%"
         },
         {
@@ -201,10 +207,10 @@ def build_vox_scene_prompts(
         },
         {
             "subject": f"o{idx+1}_2",
-            "verb": "stamps",
+            "verb": evidence.tactile_action_verb.split()[0] if evidence.tactile_action_verb else "interacts",
             "target": f"o{idx+1}_1",
-            "motion": "downward_impact",
-            "intensity": "high",
+            "motion": "tactile_interaction",
+            "intensity": "medium",
             "role": "secondary"
         }
     ]
@@ -212,7 +218,7 @@ def build_vox_scene_prompts(
     # 3. Kinematic Motion Track
     motion_track = {
         "entry_action": f"0.0-{t_entry_end:.1f}s: Tactile entry of {hero_obj} sliding into center stage with soft paper drop shadow.",
-        "assembly_step": f"{t_entry_end:.1f}-{t_hold_start:.1f}s: Crimson seal stamps firmly onto the document; paper cutouts assemble and lock into spatial anchor.",
+        "assembly_step": f"{t_entry_end:.1f}-{t_hold_start:.1f}s: {tool_prop} interacts with document; leaving {evidence.tactile_residue}.",
         "spatial_anchor": "Center-left quadrant of canvas, permanently locked as anchor for subsequent scene.",
         "camera_rule": camera_directive
     }
@@ -239,7 +245,7 @@ def build_vox_scene_prompts(
 
     audio_foley_cues = [
         {"at_second": 0.8, "sfx_name": "paper_slide_fast"},
-        {"at_second": min(2.0, t_hold_start - 0.2), "sfx_name": "stamp_slam_heavy"}
+        {"at_second": min(2.0, max(0.9, t_hold_start - 0.2)), "sfx_name": evidence.sound_foley}
     ]
 
     # 6. 5-Layer Image Prompt (Master Prompt: vox_b3_director_image_prompt.md)
@@ -249,7 +255,7 @@ def build_vox_scene_prompts(
         f"[Layer 2: bold flat geometric color block in {color}] -> "
         f"[Layer 3: negative space reserved for large bold editorial typography '{headline}', occupying 25% of frame] -> "
         f"[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge and realistic soft drop shadow: {hero_obj}. "
-        f"Interacting elements: dynamic tactile editorial investigation props] -> "
+        f"Interacting elements: {tool_prop}] -> "
         f"[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration]. "
         f"Strictly locked color palette: Vox Yellow #F2C230, Terracotta #C85A32, Navy #1B2B4A on Off-white Cream #F4F1EA. "
         f"Clear object-assembly composition, strong editorial hierarchy, tactile paper craft. "
@@ -259,7 +265,7 @@ def build_vox_scene_prompts(
 
     # 7. Sub-Director Plan & Causal Compound Verb Prompts (Rule 140 v3)
     try:
-        from app.services.kinetic_sub_director import build_kinetic_causal_i2v_prompt, generate_scene_sub_director_plan
+        from app.services.kinetic_sub_director import build_natural_kinetic_i2v_prompt, generate_scene_sub_director_plan
         from core.market_resolver import resolve_canonical_market
         resolved_market = resolve_canonical_market(market_raw=market or getattr(scene, "market", None))
         sub_plan = generate_scene_sub_director_plan(
@@ -273,28 +279,18 @@ def build_vox_scene_prompts(
             bounding_box=getattr(scene, "bounding_box", None) or getattr(scene, "focal_region", None),
             object_roles=getattr(scene, "object_roles", None)
         )
-        i2v_google_flow = build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=camera_directive)
+        i2v_google_flow = build_natural_kinetic_i2v_prompt(sub_plan, market=resolved_market, camera_directive=camera_directive)
         i2v_omni = i2v_google_flow
     except Exception as _k_err:
         logger.warning(f"[build_vox_scene_prompts] Kinetic sub-director fallback notice: {_k_err}")
         sub_plan = {}
         i2v_omni = (
-            f"Tactile paper cutout animation in signature Vox documentary style. "
-            f"Animate composition: {hero_obj} on Aged Cream Paper #F4F1EA desk. "
-            f"Hero cutout slides in smoothly from left edge, crimson verification stamp impacts firmly at 3.0s, "
-            f"holding locked spatial anchor with subtle paper micro-breathing <= 2px. "
-            f"Static top-down camera, zero camera drift."
+            f"[CAMERA & ENVIRONMENT]: {camera_directive} on Aged Cream Paper #F4F1EA desk.\n"
+            f"[ACTION PHASE (0.2s - 0.4s)]: The {tool_prop} {evidence.tactile_action_verb} {hero_obj}.\n"
+            f"[PHYSICAL REACTION & RESIDUE]: {evidence.physical_reaction.capitalize()}, leaving {evidence.tactile_residue}.\n"
+            f"[HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze."
         )
-        i2v_google_flow = (
-            f"Editorial paper cutout animation in Vox documentary style. Headline: '{headline}'. "
-            f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
-            f"[Camera: {camera_directive}]. "
-            f"[Timeline Kinematics: From 0.0s to {t_entry_end:.1f}s: {hero_obj} slides into position and lands flat. "
-            f"From {t_entry_end:.1f}s to {t_hold_start:.1f}s: Crimson rubber seal stamps firmly onto document. "
-            f"From {t_hold_start:.1f}s to {dur:.1f}s: Rigid spatial anchor hold with micro paper breathing]. "
-            f"[Pacing: Restrained mechanical paper physics, snappy stops, micro settling]. "
-            f"[Constraints: Strict flat 2D tactile paper collage physics, zero 3D fluid morphing, zero face warping]."
-        )
+        i2v_google_flow = i2v_omni
 
     resolved_interacting = [o["label"] for o in sub_plan.get("object_roster", []) if o.get("role") != "primary_anchor"] if sub_plan else ["tactile investigation tool", "forensic verification prop"]
 
@@ -321,37 +317,37 @@ def build_vox_scene_prompts(
 
 
 def build_universal_video_prompt(scene: Scene) -> str:
-    """Encodes Causal Compound Video Prompt (Rule 140 v3 / Made by AI Playbook)."""
+    """Encodes Natural Kinetic Video Prompt (Rule 140 v3 / Made by AI Playbook)."""
     color = scene.color_accent or "Vox Crimson #E53935"
     if scene.i2v_prompt_google_flow:
         return scene.i2v_prompt_google_flow
     try:
-        from app.services.kinetic_sub_director import build_kinetic_causal_i2v_prompt, generate_scene_sub_director_plan
+        from app.services.kinetic_sub_director import build_natural_kinetic_i2v_prompt, generate_scene_sub_director_plan
         from core.market_resolver import resolve_canonical_market
         sentence_str = getattr(scene, "narration_text", "") or getattr(scene, "sentence", "") or getattr(scene, "narration", "") or getattr(scene, "headline", "")
         raw_dur = getattr(scene, "duration_est_sec", None)
+        res_market = resolve_canonical_market(market_raw=getattr(scene, "market", None))
         sub_plan = generate_scene_sub_director_plan(
             scene_id=getattr(scene, "scene_id", "SCENE_01"),
             sentence=sentence_str,
             hero_cutout_object=getattr(scene, "visual_metaphor", "") or getattr(scene, "hero_cutout_object", ""),
             interacting_objects=getattr(scene, "interacting_objects", None),
             duration_sec=float(raw_dur) if raw_dur else None,
-            market=resolve_canonical_market(market_raw=getattr(scene, "market", None)),
+            market=res_market,
             whisper_words=getattr(scene, "whisper_words", None),
             bounding_box=getattr(scene, "bounding_box", None) or getattr(scene, "focal_region", None),
             object_roles=getattr(scene, "object_roles", None)
         )
-        return build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=getattr(scene, "camera_directive", ""))
+        return build_natural_kinetic_i2v_prompt(sub_plan, market=res_market, camera_directive=getattr(scene, "camera_directive", ""))
     except Exception as _ex:
         logger.warning(f"[build_universal_video_prompt] Fallback notice: {_ex}")
+    from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
+    ev = extract_evidence_for_sentence(scene.sentence or scene.headline or "investigation", market=getattr(scene, "market", "EN"))
     return (
-        f"Forensic documentary motion graphics, tactile stop-motion editorial layout. "
-        f"Animate completed composition: {scene.visual_metaphor or 'Tactile paper elements'} on Cream Paper #F4F1EA background. "
-        f"0.0-2.0s: Tactile entry of bold geometric paper shapes and headline '{scene.headline or 'EDITORIAL FOCUS'}'. "
-        f"2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges. "
-        f"7.0-10.0s: Spatial anchor locked, subtle micro-shadow breathing <= 2px, zero drift. "
-        f"Camera: Completely static top-down desk view, crisp focus, no 3D pan or tilt. "
-        f"Color Palette: {color} on muted paper texture."
+        f"[CAMERA & ENVIRONMENT]: Static top-down desk view on Cream Paper #F4F1EA.\n"
+        f"[ACTION PHASE (0.2s - 0.4s)]: The {ev.interacting_tool_prop} {ev.tactile_action_verb} {ev.hero_anchor_prop}.\n"
+        f"[PHYSICAL REACTION & RESIDUE]: {ev.physical_reaction.capitalize()}, leaving {ev.tactile_residue}.\n"
+        f"[HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze."
     )
 
 

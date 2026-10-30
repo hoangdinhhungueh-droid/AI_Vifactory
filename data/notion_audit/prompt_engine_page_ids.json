@@ -2,7 +2,85 @@
   "hub_id": "3f801989-2400-81c5-9459-f75fc00f24a1",
   "hub_name": "🎬 Video Factory Prompt Engine Hub",
   "created_at": "2026-10-13 14:05:30",
+  "updated_at": "2026-10-30 12:45:00",
   "parent_hub_id": "9bb01989-2400-82c0-9ed4-01f19c7ee23f",
+  "hubs": {
+    "hub_1_content": {
+      "name": "Content Engine Hub",
+      "pages": {
+        "b1_strategy": {
+          "page_id": "3f801989-2400-8157-96f9-cd29c62cd7b1",
+          "title": "B1: Trend & Causal Strategy Rules",
+          "icon": "🔍",
+          "module": "trend_engine_b1 / hhtech_reasoner",
+          "target_file": "config/prompts/b1_strategic_rules.md"
+        },
+        "b2_editorial": {
+          "page_id": "3f801989-2400-818a-adf1-c5f7cc3da7ed",
+          "title": "B2: 10X 5-Beat Docudrama Storytelling Prompt",
+          "icon": "✍️",
+          "module": "story_engine_b2",
+          "target_file": "config/prompts/b2_editorial_prompt.md"
+        }
+      }
+    },
+    "hub_2_media": {
+      "name": "Media Production Hub",
+      "pages": {
+        "b3_vox_director": {
+          "page_id": "3f801989-2400-81c9-bdb0-c4dc60b43988",
+          "title": "B3: Vox Engine v3 Director & Tactile Paper Collage",
+          "icon": "🎬",
+          "module": "unified_vox_director / s05_director_plan",
+          "target_file": "config/prompts/vox_b3_director_image_prompt.md"
+        },
+        "b6_flow_motion": {
+          "page_id": "3f801989-2400-81e3-8cc6-c9bb0bb4650c",
+          "title": "B6: Flow Video Stop-Motion Kinetic Prompt",
+          "icon": "🎞️",
+          "module": "prompt_forge / s08_video_gen",
+          "target_file": "config/prompts/vox_b6_flow_video_prompt.md"
+        }
+      }
+    },
+    "hub_3_distribution": {
+      "name": "Distribution Hub",
+      "pages": {
+        "b10_seo": {
+          "page_id": "3f801989-2400-8172-8655-cc3cd462cbef",
+          "title": "B10: YouTube SEO Packaging & Chapters Metadata",
+          "icon": "📦",
+          "module": "seo_package_forge / seo_metadata",
+          "target_file": "config/prompts/seo_package_prompt.md"
+        }
+      }
+    },
+    "hub_4_instincts": {
+      "name": "Active Instinct Memory Vault",
+      "pages": {
+        "active_instincts": {
+          "page_id": "83cbd0d0-03af-4a60-a765-682a3c5a0a5d",
+          "title": "Active Instinct Memory Vault (5 Slots)",
+          "icon": "🧠",
+          "module": "b11_analytics / orchestrator",
+          "target_file": "config/active_instincts.json"
+        }
+      }
+    },
+    "archive_legacy": {
+      "name": "Archive & Legacy Vault",
+      "pages": {
+        "b3_director_hollywood": {
+          "title": "B3: Hollywood 3D Director (Archived)",
+          "target_file": "config/prompts/archive/b3_director_hollywood_legacy.md"
+        },
+        "b35_visual_magenta": {
+          "title": "B3.5: Magenta Visual Rules (Archived)",
+          "target_file": "config/prompts/archive/b35_visual_rules_magenta_legacy.md"
+        }
+      }
+    }
+  },
   "pages": {
     "b1_strategy": {
       "page_id": "3f801989-2400-8157-96f9-cd29c62cd7b1",
@@ -20,17 +98,17 @@
     },
     "b3_director": {
       "page_id": "3f801989-2400-81c9-bdb0-c4dc60b43988",
-      "title": "B3: Hollywood Master Visual Director & Storyboard Prompt",
+      "title": "B3: Vox Engine v3 Director & Tactile Paper Collage",
       "icon": "🎬",
-      "module": "director_planner_b3",
-      "target_file": "config/prompts/b3_director_prompt.md"
+      "module": "unified_vox_director / s05_director_plan",
+      "target_file": "config/prompts/vox_b3_director_image_prompt.md"
     },
     "b35_visual": {
       "page_id": "3f801989-2400-81e3-8cc6-c9bb0bb4650c",
-      "title": "B3.5: Visual Prompt Forge & DACL Rules",
-      "icon": "🎨",
-      "module": "prompt_forge / b36_visual_convergence",
-      "target_file": "config/prompts/b35_visual_rules.md"
+      "title": "B6: Flow Video Stop-Motion Kinetic Prompt",
+      "icon": "🎞️",
+      "module": "prompt_forge / s08_video_gen",
+      "target_file": "config/prompts/vox_b6_flow_video_prompt.md"
     },
     "b10_seo": {
       "page_id": "3f801989-2400-8172-8655-cc3cd462cbef",

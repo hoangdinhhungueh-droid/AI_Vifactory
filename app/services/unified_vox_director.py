@@ -1212,24 +1212,26 @@ def build_unified_director_plan(
         kinetic_i2v_prompt = ""
         try:
             from app.services.kinetic_sub_director import (
-                build_kinetic_causal_i2v_prompt,
+                build_natural_kinetic_i2v_prompt,
                 generate_scene_sub_director_plan,
             )
             from core.market_resolver import resolve_canonical_market
+            from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
 
             resolved_market = resolve_canonical_market(market_raw=mkt)
             scene_whisper_words = sent.get("words") or sent.get("subtitles") if isinstance(sent, dict) else None
+            ev = extract_evidence_for_sentence(narr or seed_title, market=resolved_market, scene_id=f"sc{idx:03d}")
 
             sub_plan = generate_scene_sub_director_plan(
                 scene_id=f"sc{idx:03d}",
                 sentence=narr or seed_title,
                 hero_cutout_object=seed_title,
-                interacting_objects=["crimson forensic seal stamp", "brass precision caliper"],
+                interacting_objects=[ev.interacting_tool_prop],
                 duration_sec=dur_sec,
                 market=resolved_market,
                 whisper_words=scene_whisper_words,
             )
-            kinetic_i2v_prompt = build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=cam_move)
+            kinetic_i2v_prompt = build_natural_kinetic_i2v_prompt(sub_plan, market=resolved_market, camera_directive=cam_move)
         except (ValueError, TypeError, KeyError, ImportError) as _k_err:
             logger.warning("[unified_vox_director] Kinetic sub-director notice: %s", _k_err)
 
@@ -1489,23 +1491,15 @@ def build_unified_director_plan(
         ]
 
         scene_obj["scene_sub_director_plan"] = sub_plan
-        scene_obj["flow_video_prompt"] = kinetic_i2v_prompt or (
-            f"Editorial paper cutout animation in Vox documentary style. Headline: '{sc_headline}'. "
-            f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
-            f"[Camera: {cam_move}]. "
-            f"Animate completed composition: {hero_title} on {bg_title}. "
-            f"0.0-2.0s: Tactile entry of bold geometric paper shapes. "
-            f"2.0-7.0s: Main cutout elements assemble smoothly with layered drop shadows and deckle white edges. "
-            f"7.0-10.0s: Spatial anchor locked, subtle micro-shadow breathing <= 2px, zero drift."
+        fallback_prompt = (
+            f"[CAMERA & ENVIRONMENT]: {cam_move} on Aged Cream Paper #F4F1EA desk.\n"
+            f"[ACTION PHASE (0.2s - 0.4s)]: The tactile investigative tool interacts with {hero_title}.\n"
+            f"[PHYSICAL REACTION & RESIDUE]: Planar cutout anchors firmly into composition, leaving subtle tactile imprint.\n"
+            f"[HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze."
         )
-        scene_obj["i2v_prompt_omni"] = kinetic_i2v_prompt or (
-            f"Tactile paper cutout animation in signature Vox documentary style. "
-            f"Animate composition: {hero_title} on {bg_title}. "
-            f"Hero cutout slides in smoothly from {'left' if fg_side == 'left' else 'right'} edge, crimson verification stamp impacts firmly at 1.8s, "
-            f"holding locked spatial anchor with subtle paper micro-breathing <= 2px. "
-            f"Static top-down camera, zero camera drift."
-        )
-        scene_obj["i2v_prompt_google_flow"] = kinetic_i2v_prompt or scene_obj["flow_video_prompt"]
+        scene_obj["flow_video_prompt"] = kinetic_i2v_prompt or fallback_prompt
+        scene_obj["i2v_prompt_omni"] = kinetic_i2v_prompt or fallback_prompt
+        scene_obj["i2v_prompt_google_flow"] = kinetic_i2v_prompt or fallback_prompt
 
         scenes.append(scene_obj)
 

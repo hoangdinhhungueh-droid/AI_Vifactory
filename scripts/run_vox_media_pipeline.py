@@ -125,7 +125,7 @@ def build_universal_video_prompt(scene: Dict[str, Any]) -> str:
     Áp dụng phổ quát cho mọi Episode và mọi Market (Rule 128 & 132).
     """
     try:
-        from app.services.kinetic_sub_director import build_kinetic_causal_i2v_prompt, generate_scene_sub_director_plan
+        from app.services.kinetic_sub_director import build_natural_kinetic_i2v_prompt, generate_scene_sub_director_plan
 
         sub_plan = scene.get("scene_sub_director_plan")
         has_generic = False
@@ -163,7 +163,8 @@ def build_universal_video_prompt(scene: Dict[str, Any]) -> str:
             scene["interacting_objects"] = [o["label"] for o in sub_plan.get("object_roster", []) if o.get("role") != "primary_anchor"]
 
         cam = scene.get("camera_directive") or scene.get("motion_track_and_assembly", {}).get("camera_rule", "")
-        return build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=cam)
+        market_val = scene.get("market") or "EN"
+        return build_natural_kinetic_i2v_prompt(sub_plan, market=market_val, camera_directive=cam)
     except Exception as ex:
         logger.warning(f"[build_universal_video_prompt] Fallback to legacy builder due to: {ex}")
     hero_obj = scene.get("hero_cutout_object", "")

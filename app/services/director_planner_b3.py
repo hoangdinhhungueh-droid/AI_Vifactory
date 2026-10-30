@@ -134,23 +134,25 @@ def _synthesize_beat_scenes(
             kinetic_prompt = ""
             try:
                 from app.services.kinetic_sub_director import (
-                    build_kinetic_causal_i2v_prompt,
+                    build_natural_kinetic_i2v_prompt,
                     generate_scene_sub_director_plan,
                 )
                 from core.market_resolver import resolve_canonical_market
+                from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
 
                 mkt_code = episode_id.split("_")[0] if "_" in episode_id else "EN"
                 resolved_mkt = resolve_canonical_market(market_raw=mkt_code)
+                ev = extract_evidence_for_sentence(sc_text, market=resolved_mkt, scene_id=sc_id)
                 sub_plan = generate_scene_sub_director_plan(
                     scene_id=sc_id,
                     sentence=sc_text,
                     hero_cutout_object=char_role if fg_k else f"Evidence document for {b_name}",
-                    interacting_objects=["crimson forensic seal stamp", "brass precision caliper"],
+                    interacting_objects=[ev.interacting_tool_prop],
                     duration_sec=dur_sec,
                     market=resolved_mkt,
                     whisper_words=sent.get("words") or sent.get("subtitles"),
                 )
-                kinetic_prompt = build_kinetic_causal_i2v_prompt(sub_plan, camera_directive=cam_move)
+                kinetic_prompt = build_natural_kinetic_i2v_prompt(sub_plan, market=resolved_mkt, camera_directive=cam_move)
             except (ValueError, TypeError, KeyError, ImportError) as _k_err:
                 logger.debug(f"[director_planner_b3] Kinetic sub-director notice: {_k_err}")
 

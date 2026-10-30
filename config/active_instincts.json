@@ -1,0 +1,64 @@
+{
+  "version": "2.0.0",
+  "max_slots": 5,
+  "updated_at": "2026-10-30T05:58:47.880491+00:00",
+  "slots": [
+    {
+      "slot_id": 1,
+      "target_stage": "s03_script",
+      "rule_code": "INSTINCT_COLD_STRIKE_METRIC_FIRST",
+      "parameter_patch": {
+        "first_metric_max_word_offset": 8
+      },
+      "rationale": "Observed retention at 15s (58.2%) < 65.0%; frontloading metric in cold strike.",
+      "applied_count": 12,
+      "last_triggered": "2026-10-30T05:58:47.877996+00:00"
+    },
+    {
+      "slot_id": 2,
+      "target_stage": "s04_pacing",
+      "rule_code": "INSTINCT_KR_NEWS_TEMPO_CALIBRATION",
+      "parameter_patch": {
+        "ko_speech_rate": 5.85
+      },
+      "rationale": "Observed subtitle timing drift (140ms) > 100ms; recalibrating speech tempo.",
+      "applied_count": 8,
+      "last_triggered": "2026-10-30T05:58:47.880484+00:00"
+    },
+    {
+      "slot_id": 3,
+      "target_stage": "s05_director",
+      "rule_code": "INSTINCT_ARCHETYPE_SANCTION_STAMP_HOLD",
+      "parameter_patch": {
+        "living_texture_fps": 12,
+        "max_dead_freeze_sec": 0.4
+      },
+      "rationale": "Causal handoff H1 must maintain living paper grain flutter at 12fps",
+      "applied_count": 15,
+      "last_triggered": "2026-10-30T10:30:00Z"
+    },
+    {
+      "slot_id": 4,
+      "target_stage": "s11_seo",
+      "rule_code": "INSTINCT_THUMBNAIL_TEXT_AREA_RATIO",
+      "parameter_patch": {
+        "min_text_area_pct": 42
+      },
+      "rationale": "Mobile view CTR increases by 18% when title text occupies >= 42%",
+      "applied_count": 6,
+      "last_triggered": "2026-10-28T12:00:00Z"
+    },
+    {
+      "slot_id": 5,
+      "target_stage": "s05_director",
+      "rule_code": "INSTINCT_ANTI_CARTESIAN_COORDINATE_IN_I2V",
+      "parameter_patch": {
+        "ban_cartesian_regex": true,
+        "enforce_kinetic_verbs": true
+      },
+      "rationale": "Video diffusion models hallucinate on (X,Y) coordinates; require natural verbs",
+      "applied_count": 22,
+      "last_triggered": "2026-10-30T11:00:00Z"
+    }
+  ]
+}

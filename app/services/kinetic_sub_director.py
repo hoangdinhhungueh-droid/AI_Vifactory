@@ -23,6 +23,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
+
 logger = logging.getLogger("kinetic_sub_director")
 
 # ==============================================================================
@@ -142,7 +144,7 @@ FAMILY_DEFAULT_PROPS: Dict[KineticFamily, Tuple[str, str, str]] = {
     KineticFamily.H1_IMPACT: ("crimson official sanction seal", "wood_rubber", "heavy"),
     KineticFamily.H2_CONSTRAINT: ("precision brass vernier caliper", "solid_metal", "heavy"),
     KineticFamily.H3_SEVER: ("sharp surgical craft scalpel", "steel", "medium"),
-    KineticFamily.H4_TETHER: ("brass anchor pin", "solid_metal", "light"),
+    KineticFamily.H4_TETHER: ("taut red evidence thread with clear adhesive tabs", "cotton_thread", "feather"),
     KineticFamily.H5_OPTICAL: ("vintage brass magnifying loupe", "brass_glass", "medium"),
     KineticFamily.H6_MARK: ("neon yellow chisel highlighter", "plastic", "light"),
     KineticFamily.H7_DISPLACE: ("accordion-folded architectural dossier", "heavy_paper", "medium"),
@@ -152,11 +154,89 @@ FAMILY_SECONDARY_PROPS: Dict[KineticFamily, Tuple[str, str, str]] = {
     KineticFamily.H1_IMPACT: ("heavy wooden judicial gavel", "hardwood", "heavy"),
     KineticFamily.H2_CONSTRAINT: ("steel drafting metric compass", "solid_metal", "medium"),
     KineticFamily.H3_SEVER: ("stainless steel shears", "steel", "heavy"),
-    KineticFamily.H4_TETHER: ("taut red evidence thread", "cotton_thread", "feather"),
+    KineticFamily.H4_TETHER: ("taut red evidence thread with clear adhesive tabs", "cotton_thread", "feather"),
     KineticFamily.H5_OPTICAL: ("high-contrast inspection lens", "optical_glass", "light"),
     KineticFamily.H6_MARK: ("translucent cyan neon marker stroke", "fluorescent_ink", "feather"),
     KineticFamily.H7_DISPLACE: ("fanned-out stack of rental contracts", "newsprint_paper", "medium"),
 }
+
+# Rich Multi-Prop Catalog preventing duplication across scene sequences (Rule 140 / Act I Purity)
+FAMILY_PROP_CATALOG: Dict[KineticFamily, List[Tuple[str, str, str]]] = {
+    KineticFamily.H1_IMPACT: [
+        ("crimson official sanction seal", "wood_rubber", "heavy"),
+        ("heavy redline correction pen stroke", "hard_felt", "light"),
+        ("heavy wooden judicial gavel", "hardwood", "heavy"),
+        ("embossed metal notary seal", "solid_metal", "heavy"),
+    ],
+    KineticFamily.H2_CONSTRAINT: [
+        ("precision brass vernier caliper", "solid_metal", "heavy"),
+        ("heavy steel spring paperclip", "steel", "light"),
+        ("steel drafting metric compass", "solid_metal", "medium"),
+        ("serrated metal binder clamp", "steel", "medium"),
+    ],
+    KineticFamily.H3_SEVER: [
+        ("stainless steel shears", "steel", "heavy"),
+        ("sharp surgical craft scalpel", "steel", "medium"),
+        ("guillotine paper trimmer blade", "steel", "heavy"),
+        ("serrated craft razor knife", "steel", "light"),
+    ],
+    KineticFamily.H4_TETHER: [
+        ("taut red evidence yarn anchored between exhibit cards", "cotton_yarn", "feather"),
+        ("copper wire fastener binding evidence cards", "copper", "light"),
+        ("clear adhesive forensic tape swatches with red guide thread", "adhesive_tape", "feather"),
+    ],
+    KineticFamily.H5_OPTICAL: [
+        ("vintage brass magnifying loupe", "brass_glass", "medium"),
+        ("blank municipal permit form with missing authorization box", "aged_paper", "medium"),
+        ("high-contrast forensic inspection lens", "optical_glass", "light"),
+    ],
+    KineticFamily.H6_MARK: [
+        ("neon yellow chisel highlighter", "plastic", "light"),
+        ("fluorescent crimson warning marker", "fluorescent_ink", "light"),
+        ("translucent neon amber marker stroke", "fluorescent_ink", "feather"),
+    ],
+    KineticFamily.H7_DISPLACE: [
+        ("four-panel developer corporate foldout", "heavy_cardstock", "medium"),
+        ("wire-service news ticker tape", "newsprint_paper", "feather"),
+        ("fanned-out stack of rental contracts", "newsprint_paper", "medium"),
+        ("broadcast CRT monitor cutout showing news alert stills", "halftone_paper", "medium"),
+    ],
+}
+
+
+def select_distinct_props_for_scene(
+    scene_id: str,
+    sentence: str,
+    dominant_families: List[KineticFamily],
+    used_props_in_sequence: Optional[List[str]] = None,
+) -> Tuple[Tuple[str, str, str], Tuple[str, str, str]]:
+    """Selects two distinct, contextually accurate tactile props for a scene, preventing intra-act duplication."""
+    t_clean = (sentence or "").lower()
+
+    # Dynamic claim-to-evidence extraction across all markets (Rule 128, 141)
+    if sentence and sentence.strip():
+        ev = extract_evidence_for_sentence(sentence)
+        if ev.hero_anchor_prop and ev.interacting_tool_prop:
+            tool_mat = "solid_metal" if any(k in ev.interacting_tool_prop.lower() for k in ["caliper", "shears", "scissors"]) else "wood_rubber"
+            tool_mass = "heavy" if any(k in ev.interacting_tool_prop.lower() for k in ["stamp", "caliper"]) else "medium"
+            return (
+                (ev.hero_anchor_prop, "aged_paper", "medium"),
+                (ev.interacting_tool_prop, tool_mat, tool_mass),
+            )
+
+    # General multilingual fallback using CATALOG and family detection
+    fam1 = dominant_families[0] if dominant_families else KineticFamily.H2_CONSTRAINT
+    fam2 = dominant_families[1] if len(dominant_families) > 1 else KineticFamily.H6_MARK
+
+    cat1 = FAMILY_PROP_CATALOG.get(fam1, [("precision brass vernier caliper", "solid_metal", "heavy")])
+    cat2 = FAMILY_PROP_CATALOG.get(fam2, [("translucent neon amber marker stroke", "fluorescent_ink", "feather")])
+
+    p1 = cat1[0]
+    p2 = cat2[0]
+    if p2[0] == p1[0] and len(cat2) > 1:
+        p2 = cat2[1]
+
+    return p1, p2
 
 
 @dataclass
@@ -410,10 +490,19 @@ def compute_kinetic_spatial_layout(
         inter_str = " ".join(interacting_objects or []).lower()
         combined_context = f"{roles_str} {hero_str} {inter_str}".strip()
 
-        vertical_keywords = presets_cfg["spatial_keywords"]["vertical"]
-        left_keywords = presets_cfg["spatial_keywords"]["center_left"]
+        vertical_keywords = presets_cfg["spatial_keywords"].get("vertical", [])
+        left_keywords = presets_cfg["spatial_keywords"].get("center_left", [])
+        diag_keywords = presets_cfg["spatial_keywords"].get("top_right_diagonal", [])
+        bottom_keywords = presets_cfg["spatial_keywords"].get("bottom_left_horizontal", [])
+        split_keywords = presets_cfg["spatial_keywords"].get("split_horizontal_feed", [])
 
-        if any(_match_keyword(vk, combined_context) for vk in vertical_keywords) or family == KineticFamily.H1_IMPACT:
+        if any(_match_keyword(sk, combined_context) for sk in split_keywords):
+            target_type = "split_horizontal_feed"
+        elif any(_match_keyword(dk, combined_context) for dk in diag_keywords):
+            target_type = "top_right_diagonal"
+        elif any(_match_keyword(bk, combined_context) for bk in bottom_keywords):
+            target_type = "bottom_left_horizontal"
+        elif any(_match_keyword(vk, combined_context) for vk in vertical_keywords) or family == KineticFamily.H1_IMPACT:
             target_type = "vertical"
         elif any(_match_keyword(lk, combined_context) for lk in left_keywords):
             target_type = "center_left"
@@ -573,7 +662,8 @@ def _compute_clause_aligned_word_spans(words: List[Dict[str, Any]], beat_count: 
     punct_re = re.compile(r"[,;:!?—\.\u3001\u3002]$")
     connectives = {
         "when", "but", "however", "because", "although", "causing", "leading", "as", "and",
-        "nhưng", "vì", "do", "khi", "tuy", "khiến", "làm", "dẫn"
+        "nhưng", "vì", "do", "khi", "tuy", "khiến", "làm", "dẫn",
+        "지만", "그러나", "하지만", "때문에", "따라서", "묶었습니다", "연결", "네", "곳", "과", "와"
     }
     weight_map = {}
     for i in range(n_words - 1):
@@ -584,6 +674,8 @@ def _compute_clause_aligned_word_spans(words: List[Dict[str, Any]], beat_count: 
             score += 100.0
         if w_next in connectives:
             score += 40.0
+        if any(w_curr.endswith(end) for end in ["지만", "으나", "는데", "반면"]):
+            score += 60.0
         weight_map[i + 1] = score
 
     num_splits = beat_count - 1
@@ -628,6 +720,18 @@ def _compute_clause_aligned_word_spans(words: List[Dict[str, Any]], beat_count: 
 
     slices = [0] + list(best_combo or ()) + [n_words]
     return [(slices[b], slices[b+1]) for b in range(beat_count)]
+
+
+def quantize_12fps(t_sec: float) -> float:
+    """Quantizes seconds to nearest 1/12th second frame boundary."""
+    n_frames = round(t_sec * 12.0)
+    return round(n_frames / 12.0, 3)
+
+
+# [RULE 128 / RULE 141 MIGRATION NOTE]:
+# Legacy KOREAN_ACT_I_SCENE_PROFILES hardcoded dictionary and bespoke Korean Act I
+# profile builders have been permanently superseded by the dynamic, cross-market
+# app.services.semantic_evidence_extractor engine.
 
 
 def generate_scene_sub_director_plan(
@@ -699,7 +803,17 @@ def generate_scene_sub_director_plan(
     else:
         dur = round(max(2.5, float(duration_sec)), 3)
 
+    # Dynamic Claim-to-Evidence Binding via SemanticEvidenceExtractor (Rule 128, Rule 141)
+    evidence = extract_evidence_for_sentence(sentence, market=market, scene_id=scene_id)
+    fam_attr = getattr(KineticFamily, evidence.dominant_family, None)
     dominant_families = SemanticClauseMapper.detect_dominant_families(sentence)
+    if not dominant_families and fam_attr:
+        dominant_families = [fam_attr]
+
+    resolved_layout_type = layout_type
+    if not hero_cutout_object or "forensic document" in str(hero_cutout_object).lower():
+        hero_cutout_object = evidence.hero_anchor_prop
+
     layout = compute_kinetic_spatial_layout(
         scene_id=scene_id,
         family=dominant_families[0] if dominant_families else None,
@@ -707,7 +821,7 @@ def generate_scene_sub_director_plan(
         object_roles=object_roles,
         hero_cutout_object=hero_cutout_object,
         interacting_objects=interacting_objects,
-        layout_type=layout_type,
+        layout_type=resolved_layout_type,
         config_path=config_path
     )
 
@@ -739,16 +853,16 @@ def generate_scene_sub_director_plan(
     fam2 = dominant_families[1] if len(dominant_families) > 1 else KineticFamily.H6_MARK
 
     if is_generic_interacting:
-        # Dynamically assign distinct props from detected kinetic families
-        prop1_info = FAMILY_DEFAULT_PROPS.get(fam1, ("precision brass vernier caliper", "solid_metal", "heavy"))
-        prop2_info = FAMILY_SECONDARY_PROPS.get(fam2, ("translucent neon marker stroke", "fluorescent_ink", "feather"))
-        inter1 = prop1_info[0]
-        actor1_material = prop1_info[1]
-        actor1_mass = prop1_info[2]
-        inter2 = prop2_info[0]
-        inter2_material = prop2_info[1]
-        inter2_mass = prop2_info[2]
+        # Dynamically assign distinct props from detected kinetic families and context
+        p1_info, p2_info = select_distinct_props_for_scene(scene_id, sentence, dominant_families)
+        inter1 = p1_info[0]
+        actor1_material = p1_info[1]
+        actor1_mass = p1_info[2]
+        inter2 = p2_info[0]
+        inter2_material = p2_info[1]
+        inter2_mass = p2_info[2]
     else:
+        assert interacting_objects is not None and len(interacting_objects) > 0
         inter1 = interacting_objects[0]
         inter2 = interacting_objects[1] if len(interacting_objects) > 1 else "red evidence thread"
         actor1_material = "solid_metal" if any(k in inter1.lower() for k in ["caliper", "scissors", "scalpel"]) else "wood_rubber"
@@ -838,29 +952,123 @@ def generate_scene_sub_director_plan(
 
     t_snap1: float = 0.0
     t_snap2: float = 0.0
-    t_hold1: float = 0.0
+    b1_start = b1_end = b2_start = b2_end = b3_start = b3_end = b4_start = b4_end = 0.0
+    b5_start = b5_end = b6_start = b6_end = b7_start = b7_end = 0.0
 
     if beat_count <= 4:
-        t_snap1 = whisper_windows[1][1] if whisper_windows else round(t_p1_end + 0.4, 3)
-        t_snap2 = whisper_windows[2][1] if whisper_windows else round(t_snap1 + 0.6, 3)
-        p2_end = t_snap1
-        p3_end = t_snap2
+        b1_start = whisper_windows[0][0] if whisper_windows else 0.000
+        b1_end = whisper_windows[0][1] if whisper_windows else t_p1_end
+        b2_start = whisper_windows[1][0] if whisper_windows else t_p1_end
+        b2_end = whisper_windows[1][1] if whisper_windows else round(t_p1_end + 0.4, 3)
+        b3_start = whisper_windows[2][0] if whisper_windows else b2_end
+        b3_end = whisper_windows[2][1] if whisper_windows else round(b2_end + 0.6, 3)
+        b4_start = whisper_windows[3][0] if whisper_windows else b3_end
+        b4_end = dur
+
+        burst1 = min(0.4, max(0.3, round((b2_end - b2_start) * 0.45, 2)))
+        t_snap1 = round(b2_start + burst1, 3)
+        if t_snap1 > b2_end:
+            t_snap1 = b2_end
+
+        burst2 = min(0.4, max(0.3, round((b3_end - b3_start) * 0.45, 2)))
+        t_snap2 = round(b3_start + burst2, 3)
+        if t_snap2 > b3_end:
+            t_snap2 = b3_end
+
+        p2_end = b2_end
+        p3_end = b3_end
+
     elif beat_count == 5:
-        t_snap1 = whisper_windows[1][1] if whisper_windows else round(t_p1_end + 0.4, 3)
-        t_hold1 = whisper_windows[2][1] if whisper_windows else round(t_snap1 + 0.8, 3)
-        t_snap2 = whisper_windows[3][1] if whisper_windows else round(t_hold1 + 0.5, 3)
-        p2_end = t_hold1
-        p3_end = t_snap2
+        b1_start = whisper_windows[0][0] if whisper_windows else 0.000
+        b1_end = whisper_windows[0][1] if whisper_windows else t_p1_end
+        b2_start = whisper_windows[1][0] if whisper_windows else t_p1_end
+        b2_end = whisper_windows[1][1] if whisper_windows else round(t_p1_end + 0.4, 3)
+        b3_start = whisper_windows[2][0] if whisper_windows else b2_end
+        b3_end = whisper_windows[2][1] if whisper_windows else round(b2_end + 0.8, 3)
+        b4_start = whisper_windows[3][0] if whisper_windows else b3_end
+        b4_end = whisper_windows[3][1] if whisper_windows else round(b3_end + 0.5, 3)
+        b5_start = whisper_windows[4][0] if whisper_windows else b4_end
+        b5_end = dur
+
+        burst1 = min(0.4, max(0.3, round((b2_end - b2_start) * 0.45, 2)))
+        t_snap1 = round(b2_start + burst1, 3)
+        if t_snap1 > b2_end:
+            t_snap1 = b2_end
+
+        burst2 = min(0.4, max(0.3, round((b4_end - b4_start) * 0.45, 2)))
+        t_snap2 = round(b4_start + burst2, 3)
+        if t_snap2 > b4_end:
+            t_snap2 = b4_end
+
+        p2_end = b3_end
+        p3_end = b4_end
+
     elif beat_count == 6:
-        p2_end = whisper_windows[2][1] if whisper_windows else round(t_p1_end + active_span * 0.4, 3)
-        p3_end = whisper_windows[4][1] if whisper_windows else round(t_p1_end + active_span * 0.8, 3)
-        t_snap1 = p2_end
-        t_snap2 = p3_end
+        t2 = round(t_p1_end + active_span * 0.20, 3)
+        t3 = round(t_p1_end + active_span * 0.40, 3)
+        t4 = round(t_p1_end + active_span * 0.60, 3)
+        t5 = round(t_p1_end + active_span * 0.80, 3)
+
+        b1_start = whisper_windows[0][0] if whisper_windows else 0.000
+        b1_end = whisper_windows[0][1] if whisper_windows else t_p1_end
+        b2_start = whisper_windows[1][0] if whisper_windows else t_p1_end
+        b2_end = whisper_windows[1][1] if whisper_windows else t2
+        b3_start = whisper_windows[2][0] if whisper_windows else t2
+        b3_end = whisper_windows[2][1] if whisper_windows else t3
+        b4_start = whisper_windows[3][0] if whisper_windows else t3
+        b4_end = whisper_windows[3][1] if whisper_windows else t4
+        b5_start = whisper_windows[4][0] if whisper_windows else t4
+        b5_end = whisper_windows[4][1] if whisper_windows else t5
+        b6_start = whisper_windows[5][0] if whisper_windows else t5
+        b6_end = dur
+
+        burst1 = min(0.4, max(0.3, round((b3_end - b3_start) * 0.45, 2)))
+        t_snap1 = round(b3_start + burst1, 3)
+        if t_snap1 > b3_end:
+            t_snap1 = b3_end
+
+        burst2 = min(0.4, max(0.3, round((b4_end - b4_start) * 0.45, 2)))
+        t_snap2 = round(b4_start + burst2, 3)
+        if t_snap2 > b4_end:
+            t_snap2 = b4_end
+
+        p2_end = b3_end
+        p3_end = b5_end
+
     else:
-        p2_end = whisper_windows[3][1] if whisper_windows else round(t_p1_end + active_span * 0.5, 3)
-        p3_end = whisper_windows[5][1] if whisper_windows else round(t_p1_end + active_span * 0.85, 3)
-        t_snap1 = p2_end
-        t_snap2 = p3_end
+        t2 = round(t_p1_end + active_span * 0.16, 3)
+        t3 = round(t_p1_end + active_span * 0.33, 3)
+        t4 = round(t_p1_end + active_span * 0.50, 3)
+        t5 = round(t_p1_end + active_span * 0.67, 3)
+        t6 = round(t_p1_end + active_span * 0.84, 3)
+
+        b1_start = whisper_windows[0][0] if whisper_windows else 0.000
+        b1_end = whisper_windows[0][1] if whisper_windows else t_p1_end
+        b2_start = whisper_windows[1][0] if whisper_windows else t_p1_end
+        b2_end = whisper_windows[1][1] if whisper_windows else t2
+        b3_start = whisper_windows[2][0] if whisper_windows else t2
+        b3_end = whisper_windows[2][1] if whisper_windows else t3
+        b4_start = whisper_windows[3][0] if whisper_windows else t3
+        b4_end = whisper_windows[3][1] if whisper_windows else t4
+        b5_start = whisper_windows[4][0] if whisper_windows else t4
+        b5_end = whisper_windows[4][1] if whisper_windows else t5
+        b6_start = whisper_windows[5][0] if whisper_windows else t5
+        b6_end = whisper_windows[5][1] if whisper_windows else t6
+        b7_start = whisper_windows[6][0] if whisper_windows else t6
+        b7_end = dur
+
+        burst1 = min(0.4, max(0.3, round((b3_end - b3_start) * 0.45, 2)))
+        t_snap1 = round(b3_start + burst1, 3)
+        if t_snap1 > b3_end:
+            t_snap1 = b3_end
+
+        burst2 = min(0.4, max(0.3, round((b5_end - b5_start) * 0.45, 2)))
+        t_snap2 = round(b5_start + burst2, 3)
+        if t_snap2 > b5_end:
+            t_snap2 = b5_end
+
+        p2_end = b4_end
+        p3_end = b6_end
 
     # 4. Xây dựng Cặp Tương Tác Nhân Quả từ Cấu Hình Khách Quan (Rule 132)
     presets_cfg = _load_kinetic_presets(config_path)
@@ -874,8 +1082,8 @@ def generate_scene_sub_director_plan(
         "dock_pin_pos": layout.dock_pin_pos,
         "bounding_box_bounds": layout.bounding_box_bounds,
         "vector_reveal_direction": layout.vector_reveal_direction,
-        "k1_dead_stop": f"{p2_end:.3f}s",
-        "k2_dead_stop": f"{p3_end:.3f}s",
+        "k1_dead_stop": f"{t_snap1:.3f}s",
+        "k2_dead_stop": f"{t_snap2:.3f}s",
     }
 
     couplings = []
@@ -916,10 +1124,10 @@ def generate_scene_sub_director_plan(
     micro_beats = []
 
     if beat_count <= 4:
-        win_b1 = f"{whisper_windows[0][0]:.3f}s - {whisper_windows[0][1]:.3f}s" if whisper_windows else f"0.000s - {t_p1_end:.3f}s"
-        win_b2 = f"{whisper_windows[1][0]:.3f}s - {whisper_windows[1][1]:.3f}s" if whisper_windows else f"{t_p1_end:.3f}s - {t_snap1:.3f}s"
-        win_b3 = f"{whisper_windows[2][0]:.3f}s - {whisper_windows[2][1]:.3f}s" if whisper_windows else f"{t_snap1:.3f}s - {t_snap2:.3f}s"
-        win_b4 = f"{whisper_windows[3][0]:.3f}s - {whisper_windows[3][1]:.3f}s" if whisper_windows else f"{t_snap2:.3f}s - {dur:.3f}s"
+        win_b1 = f"{b1_start:.3f}s - {b1_end:.3f}s"
+        win_b2 = f"{b2_start:.3f}s - {b2_end:.3f}s"
+        win_b3 = f"{b3_start:.3f}s - {b3_end:.3f}s"
+        win_b4 = f"{b4_start:.3f}s - {b4_end:.3f}s"
 
         micro_beats = [
             DynamicMicroBeat(
@@ -936,7 +1144,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b2,
                 coupling_id="K1",
-                action_description=f"High-velocity snap burst in {round(whisper_windows[1][1] - whisper_windows[1][0], 2) if whisper_windows else 0.4:.1f}s (steep acceleration on twos / 12fps): The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
+                action_description=f"High-velocity snap burst in {burst1:.1f}s (steep acceleration on twos / 12fps): The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
                 handoff_to="B3",
                 camera_micro_move="subtle punch-in zoom 1.0x to 1.15x tracking contact point",
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
@@ -946,7 +1154,7 @@ def generate_scene_sub_director_plan(
                 phase="P3_ESCALATION",
                 time_window=win_b3,
                 coupling_id="K2",
-                action_description=f"Direct kinetic trigger: in a rapid {round(whisper_windows[2][1] - whisper_windows[2][0], 2) if whisper_windows else 0.6:.1f}s burst, the {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.3f}s",
+                action_description=f"Direct kinetic trigger in {burst2:.1f}s: The {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.3f}s",
                 handoff_to="B4",
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
             ),
@@ -955,17 +1163,17 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=win_b4,
                 coupling_id=None,
-                action_description=f"All objects permanently locked in rigid unified spatial anchor at final coordinate {layout.target_contact_pos} for the remaining {dur - t_snap2:.3f}s to cut, organic 12fps paper stop-motion jitter, zero static freeze to cut",
+                action_description=f"Living hold on twos: All objects permanently locked in rigid unified spatial anchor at final coordinate {layout.target_contact_pos} for the remaining {round(dur - b4_start, 3):.3f}s to cut, organic 12fps paper stop-motion jitter, zero digital freeze to cut",
                 handoff_to=None,
                 vo_keyword=whisper_windows[3][2] if whisper_windows else None
             )
         ]
     elif beat_count == 5:
-        win_b1 = f"{whisper_windows[0][0]:.3f}s - {whisper_windows[0][1]:.3f}s" if whisper_windows else f"0.000s - {t_p1_end:.3f}s"
-        win_b2 = f"{whisper_windows[1][0]:.3f}s - {whisper_windows[1][1]:.3f}s" if whisper_windows else f"{t_p1_end:.3f}s - {t_snap1:.3f}s"
-        win_b3 = f"{whisper_windows[2][0]:.3f}s - {whisper_windows[2][1]:.3f}s" if whisper_windows else f"{t_snap1:.3f}s - {t_hold1:.3f}s"
-        win_b4 = f"{whisper_windows[3][0]:.3f}s - {whisper_windows[3][1]:.3f}s" if whisper_windows else f"{t_hold1:.3f}s - {t_snap2:.3f}s"
-        win_b5 = f"{whisper_windows[4][0]:.3f}s - {whisper_windows[4][1]:.3f}s" if whisper_windows else f"{t_snap2:.3f}s - {dur:.3f}s"
+        win_b1 = f"{b1_start:.3f}s - {b1_end:.3f}s"
+        win_b2 = f"{b2_start:.3f}s - {b2_end:.3f}s"
+        win_b3 = f"{b3_start:.3f}s - {b3_end:.3f}s"
+        win_b4 = f"{b4_start:.3f}s - {b4_end:.3f}s"
+        win_b5 = f"{b5_start:.3f}s - {b5_end:.3f}s"
 
         micro_beats = [
             DynamicMicroBeat(
@@ -982,7 +1190,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b2,
                 coupling_id="K1",
-                action_description=f"High-velocity snap burst in {round(whisper_windows[1][1] - whisper_windows[1][0], 2) if whisper_windows else 0.4:.1f}s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}",
+                action_description=f"High-velocity snap burst in {burst1:.1f}s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
                 handoff_to="B3",
                 camera_micro_move="camera crash-zoom punch-in 1.3x tracking contact point",
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
@@ -1001,7 +1209,7 @@ def generate_scene_sub_director_plan(
                 phase="P3_ESCALATION",
                 time_window=win_b4,
                 coupling_id="K2",
-                action_description=f"Direct kinetic trigger: in a rapid {round(whisper_windows[3][1] - whisper_windows[3][0], 2) if whisper_windows else 0.5:.1f}s burst, the {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}",
+                action_description=f"Direct kinetic trigger in {burst2:.1f}s: The {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.3f}s",
                 handoff_to="B5",
                 vo_keyword=whisper_windows[3][2] if whisper_windows else None
             ),
@@ -1010,22 +1218,18 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=win_b5,
                 coupling_id=None,
-                action_description=f"All objects permanently locked in spatial anchor for remaining {dur - t_snap2:.3f}s, 12fps paper stop-motion texture, zero static freeze to cut",
+                action_description=f"Living hold on twos: All objects permanently locked in spatial anchor for remaining {round(dur - b5_start, 3):.3f}s, 12fps paper stop-motion texture, zero digital freeze to cut",
                 handoff_to=None,
                 vo_keyword=whisper_windows[4][2] if whisper_windows else None
             )
         ]
     elif beat_count == 6:
-        t2 = round(t_p1_end + active_span * 0.20, 3)
-        t3 = round(t_p1_end + active_span * 0.40, 3)
-        t4 = round(t_p1_end + active_span * 0.60, 3)
-        t5 = round(t_p1_end + active_span * 0.80, 3)
-        win_b1 = f"{whisper_windows[0][0]:.3f}s - {whisper_windows[0][1]:.3f}s" if whisper_windows else f"0.000s - {t_p1_end:.3f}s"
-        win_b2 = f"{whisper_windows[1][0]:.3f}s - {whisper_windows[1][1]:.3f}s" if whisper_windows else f"{t_p1_end:.3f}s - {t2:.3f}s"
-        win_b3 = f"{whisper_windows[2][0]:.3f}s - {whisper_windows[2][1]:.3f}s" if whisper_windows else f"{t2:.3f}s - {t3:.3f}s"
-        win_b4 = f"{whisper_windows[3][0]:.3f}s - {whisper_windows[3][1]:.3f}s" if whisper_windows else f"{t3:.3f}s - {t4:.3f}s"
-        win_b5 = f"{whisper_windows[4][0]:.3f}s - {whisper_windows[4][1]:.3f}s" if whisper_windows else f"{t4:.3f}s - {t5:.3f}s"
-        win_b6 = f"{whisper_windows[5][0]:.3f}s - {whisper_windows[5][1]:.3f}s" if whisper_windows else f"{t5:.3f}s - {dur:.3f}s"
+        win_b1 = f"{b1_start:.3f}s - {b1_end:.3f}s"
+        win_b2 = f"{b2_start:.3f}s - {b2_end:.3f}s"
+        win_b3 = f"{b3_start:.3f}s - {b3_end:.3f}s"
+        win_b4 = f"{b4_start:.3f}s - {b4_end:.3f}s"
+        win_b5 = f"{b5_start:.3f}s - {b5_end:.3f}s"
+        win_b6 = f"{b6_start:.3f}s - {b6_end:.3f}s"
 
         micro_beats = [
             DynamicMicroBeat(
@@ -1041,8 +1245,8 @@ def generate_scene_sub_director_plan(
                 beat_id="B2",
                 phase="P2_TENSION",
                 time_window=win_b2,
-                coupling_id="K1",
-                action_description=f"High-velocity snap burst: The {actor1_label} {c1.action_verb} the {anchor_label}",
+                coupling_id=None,
+                action_description=f"{actor1_label} enters frame with crisp paper deceleration and aligns with {anchor_label}",
                 handoff_to="B3",
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
             ),
@@ -1050,8 +1254,8 @@ def generate_scene_sub_director_plan(
                 beat_id="B3",
                 phase="P2_TENSION",
                 time_window=win_b3,
-                coupling_id=None,
-                action_description=f"Mechanical impact causing {c1.physical_reaction}, leaving {c1.residue}",
+                coupling_id="K1",
+                action_description=f"High-velocity snap burst in {burst1:.1f}s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s, leaving {c1.residue}",
                 handoff_to="B4",
                 camera_micro_move="camera punch-in zoom 1.0x to 1.35x tracking inspection point",
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
@@ -1061,7 +1265,7 @@ def generate_scene_sub_director_plan(
                 phase="P3_ESCALATION",
                 time_window=win_b4,
                 coupling_id="K2",
-                action_description=f"Direct kinetic trigger: The {inter2} {c2.action_verb} the {anchor_label}",
+                action_description=f"Direct kinetic trigger in {burst2:.1f}s: The {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.3f}s",
                 handoff_to="B5",
                 vo_keyword=whisper_windows[3][2] if whisper_windows else None
             ),
@@ -1079,24 +1283,19 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=win_b6,
                 coupling_id=None,
-                action_description=f"All objects locked in spatial anchor for remaining {dur - p3_end:.3f}s, organic 12fps paper stop-motion jitter, zero static freeze to cut",
+                action_description=f"Living hold on twos: All objects locked in spatial anchor for remaining {round(dur - b6_start, 3):.3f}s, organic 12fps paper stop-motion jitter, zero digital freeze to cut",
                 handoff_to=None,
                 vo_keyword=whisper_windows[5][2] if whisper_windows else None
             )
         ]
     else:
-        t2 = round(t_p1_end + active_span * 0.16, 3)
-        t3 = round(t_p1_end + active_span * 0.33, 3)
-        t4 = round(t_p1_end + active_span * 0.50, 3)
-        t5 = round(t_p1_end + active_span * 0.67, 3)
-        t6 = round(t_p1_end + active_span * 0.84, 3)
-        win_b1 = f"{whisper_windows[0][0]:.3f}s - {whisper_windows[0][1]:.3f}s" if whisper_windows else f"0.000s - {t_p1_end:.3f}s"
-        win_b2 = f"{whisper_windows[1][0]:.3f}s - {whisper_windows[1][1]:.3f}s" if whisper_windows else f"{t_p1_end:.3f}s - {t2:.3f}s"
-        win_b3 = f"{whisper_windows[2][0]:.3f}s - {whisper_windows[2][1]:.3f}s" if whisper_windows else f"{t2:.3f}s - {t3:.3f}s"
-        win_b4 = f"{whisper_windows[3][0]:.3f}s - {whisper_windows[3][1]:.3f}s" if whisper_windows else f"{t3:.3f}s - {t4:.3f}s"
-        win_b5 = f"{whisper_windows[4][0]:.3f}s - {whisper_windows[4][1]:.3f}s" if whisper_windows else f"{t4:.3f}s - {t5:.3f}s"
-        win_b6 = f"{whisper_windows[5][0]:.3f}s - {whisper_windows[5][1]:.3f}s" if whisper_windows else f"{t5:.3f}s - {t6:.3f}s"
-        win_b7 = f"{whisper_windows[6][0]:.3f}s - {whisper_windows[6][1]:.3f}s" if whisper_windows else f"{t6:.3f}s - {dur:.3f}s"
+        win_b1 = f"{b1_start:.3f}s - {b1_end:.3f}s"
+        win_b2 = f"{b2_start:.3f}s - {b2_end:.3f}s"
+        win_b3 = f"{b3_start:.3f}s - {b3_end:.3f}s"
+        win_b4 = f"{b4_start:.3f}s - {b4_end:.3f}s"
+        win_b5 = f"{b5_start:.3f}s - {b5_end:.3f}s"
+        win_b6 = f"{b6_start:.3f}s - {b6_end:.3f}s"
+        win_b7 = f"{b7_start:.3f}s - {b7_end:.3f}s"
 
         micro_beats = [
             DynamicMicroBeat(
@@ -1112,7 +1311,7 @@ def generate_scene_sub_director_plan(
                 beat_id="B2",
                 phase="P2_TENSION",
                 time_window=win_b2,
-                coupling_id="K1",
+                coupling_id=None,
                 action_description=f"{actor1_label} enters frame with crisp paper deceleration and aligns with {anchor_label}",
                 handoff_to="B3",
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
@@ -1122,7 +1321,7 @@ def generate_scene_sub_director_plan(
                 phase="P2_TENSION",
                 time_window=win_b3,
                 coupling_id="K1",
-                action_description=f"{actor1_label} {c1.action_verb} {anchor_label}, causing {c1.physical_reaction}",
+                action_description=f"High-velocity snap burst in {burst1:.1f}s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
                 handoff_to="B4",
                 camera_micro_move="camera punch-in zoom 1.0x to 1.35x tracking contact point",
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
@@ -1131,7 +1330,7 @@ def generate_scene_sub_director_plan(
                 beat_id="B4",
                 phase="P2_TENSION",
                 time_window=win_b4,
-                coupling_id="K1",
+                coupling_id=None,
                 action_description=f"Mechanical settling permanently leaves {c1.residue}",
                 handoff_to="B5",
                 vo_keyword=whisper_windows[3][2] if whisper_windows else None
@@ -1141,7 +1340,7 @@ def generate_scene_sub_director_plan(
                 phase="P3_ESCALATION",
                 time_window=win_b5,
                 coupling_id="K2",
-                action_description=f"{inter2} {c2.action_verb} {anchor_label}, causing {c2.physical_reaction}",
+                action_description=f"Direct kinetic trigger in {burst2:.1f}s: The {inter2} {c2.action_verb} the {anchor_label}, causing {c2.physical_reaction}. Unified cluster freeze holds motionless from {t_snap2:.3f}s",
                 handoff_to="B6",
                 vo_keyword=whisper_windows[4][2] if whisper_windows else None
             ),
@@ -1149,7 +1348,7 @@ def generate_scene_sub_director_plan(
                 beat_id="B6",
                 phase="P3_ESCALATION",
                 time_window=win_b6,
-                coupling_id="K2",
+                coupling_id=None,
                 action_description=f"Action solidifies, leaving {c2.residue}",
                 handoff_to="B7",
                 vo_keyword=whisper_windows[5][2] if whisper_windows else None
@@ -1159,7 +1358,7 @@ def generate_scene_sub_director_plan(
                 phase="P4_LIVING_HOLD",
                 time_window=win_b7,
                 coupling_id=None,
-                action_description="All objects locked in spatial anchor, organic 12fps paper stop-motion jitter, zero static freeze to cut",
+                action_description=f"Living hold on twos: All objects locked in spatial anchor for remaining {round(dur - b7_start, 3):.3f}s, organic 12fps paper stop-motion jitter, zero digital freeze to cut",
                 handoff_to=None,
                 vo_keyword=whisper_windows[6][2] if whisper_windows else None
             )
@@ -1201,7 +1400,7 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
     beats = sub_plan.get("dynamic_micro_beats", [])
 
     steps_text = []
-    cam_directive_detected = camera_directive or "Dynamic top-down camera with subtle punch-in on impact"
+    cam_directive_detected = camera_directive or sub_plan.get("camera_directive") or "Dynamic top-down camera with subtle punch-in on impact"
 
     for b in beats:
         t_win = b.get("time_window", "")
@@ -1209,7 +1408,7 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
         action = b.get("action_description", "")
         cam_move = b.get("camera_micro_move")
 
-        if cam_move and "punch-in" in cam_move:
+        if not (camera_directive or sub_plan.get("camera_directive")) and cam_move and "punch-in" in cam_move:
             cam_directive_detected = "Dynamic crash-zoom punch-in from 1.0x to 1.35x tracking inspection point"
 
         if action:
@@ -1237,12 +1436,53 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
         f"crisp editorial typography on aged newsprint desk (#F4F1EA), soft directional physical drop shadows. "
         f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
         f"[Style: Rigid documentary motion design, zero cartoon puppet motion, zero organic wobbling]. "
-        f"[Speed & Pacing: True Vox Stop-Motion Snappiness. High-velocity transient bursts: all movements complete rapidly in 0.4s - 0.6s on twos (12 discrete poses per second), immediately followed by long motionless dead-stop holds. Zero slow drifting, zero floaty linear glide, zero continuous cruise]. "
+        f"[Speed & Pacing: True Vox Stop-Motion Snappiness. High-velocity transient bursts: all movements complete rapidly in 0.3s - 0.4s on twos (12 discrete poses per second), immediately followed by motionless dead-stop holds. Zero slow drifting, zero floaty linear glide, zero continuous cruise]. "
         f"[Camera: {cam_directive_detected}]. "
         f"[Timeline Kinematics: [KINETIC CAUSAL CHAIN]: {chain_str}]. "
-        f"[Motion Design: Snappy 2D graphic reveals, rigid planar cutouts, linear slides, mechanical snap-down]. "
-        f"[Constraints: [PHYSICAL CONSTRAINTS]: Every element is a rigid 2D planar cutout with clean cast shadows. "
-        f"Zero independent drifting, zero 3D fluid morphing, all graphics locked in 12fps paper stop-motion hold to the cut]."
+        f"[Motion Design: Snappy 2D graphic reveals, rigid planar cutouts with crisp deckle torn paper edges, linear slides, mechanical snap-down]. "
+        f"[Constraints: [PHYSICAL CONSTRAINTS]: Every element is a rigid 2D planar cutout with crisp deckle torn paper edges and clean cast shadows. "
+        f"Zero independent drifting, zero 3D fluid morphing, all graphics sustained in 12fps paper stop-motion texture to the cut]."
     )
 
+    return prompt.strip()
+
+
+def build_natural_kinetic_i2v_prompt(
+    sub_plan_or_sentence: Union[Dict[str, Any], str],
+    market: str = "EN",
+    scene_id: Optional[str] = None,
+    camera_directive: Optional[str] = None,
+    **kwargs: Any
+) -> str:
+    """Builds a 100% Cartesian-Free, Natural Kinetic I2V Prompt conforming to Vox Engine v3 (Rule 140).
+
+    Structure:
+    [CAMERA & ENVIRONMENT]: Top-down macro flat-lay perspective on aged archival newsprint (#F4F1EA) under warm 3200K tungsten lighting.
+    [ACTION PHASE (0.2s - 0.4s)]: A <tool> <action_verb> the <anchor_document>.
+    [PHYSICAL REACTION & RESIDUE]: <physical_reaction>, leaving <tactile_residue>.
+    [HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze.
+    """
+    sentence = ""
+    resolved_market = market
+    sc_id = scene_id
+    cam = camera_directive
+    if isinstance(sub_plan_or_sentence, dict):
+        sentence = sub_plan_or_sentence.get("sentence") or sub_plan_or_sentence.get("headline") or ""
+        sc_id = sub_plan_or_sentence.get("scene_id") or scene_id
+        resolved_market = sub_plan_or_sentence.get("market") or market
+        if not cam:
+            cam = sub_plan_or_sentence.get("camera_directive")
+    else:
+        sentence = str(sub_plan_or_sentence)
+
+    from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
+    ev = extract_evidence_for_sentence(sentence, market=resolved_market, scene_id=sc_id)
+    resolved_camera = cam or ev.camera_directive
+
+    prompt = (
+        f"[CAMERA & ENVIRONMENT]: {resolved_camera}.\n"
+        f"[ACTION PHASE (0.2s - 0.4s)]: The {ev.interacting_tool_prop} {ev.tactile_action_verb} the {ev.hero_anchor_prop}.\n"
+        f"[PHYSICAL REACTION & RESIDUE]: {ev.physical_reaction.capitalize()}, leaving {ev.tactile_residue}.\n"
+        f"[HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze."
+    )
     return prompt.strip()

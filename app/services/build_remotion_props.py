@@ -1913,22 +1913,26 @@ def build_remotion_props_data(
         print("ERROR: no scenes produced (brain_input has no usable scenes, or all were skipped)", file=sys.stderr)
         return {}
 
-    # Proportional scaling to match narration audio if video duration is shorter than audio
-    audio_path = os.path.join(os.path.dirname(brain_input_path), "tts_out.mp3")
-    if os.path.exists(audio_path):
-        try:
-            import subprocess as _sub
-            probe = _sub.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path], stdout=_sub.PIPE, text=True)
-            adur = float(probe.stdout.strip())
-            total_frames = sum(sc["durationInFrames"] for sc in scenes_out)
-            total_vdur = total_frames / fps
-            if adur > 0 and total_vdur < adur * 0.97:
-                scale = (adur + 0.5) / total_vdur
-                for sc in scenes_out:
-                    sc["durationInFrames"] = max(1, round(sc["durationInFrames"] * scale))
-                print(f"DURATION_SCALED: scaled {total_vdur:.1f}s -> {adur:.1f}s to match audio ({scale:.2f}x)")
-        except Exception as _e_dur:
-            print(f"DEBUG: duration probe fallback: {_e_dur}")
+    # Proportional scaling to match narration audio (Only allowed if NO whisper word subtitles exist, Rule 120/140 0ms drift)
+    has_whisper_subtitles = any(sc.get("subtitles") for sc in scenes_out)
+    if not has_whisper_subtitles:
+        audio_path = os.path.join(os.path.dirname(brain_input_path), "tts_out.mp3")
+        if os.path.exists(audio_path):
+            try:
+                import subprocess as _sub
+                probe = _sub.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_path], stdout=_sub.PIPE, text=True)
+                adur = float(probe.stdout.strip())
+                total_frames = sum(sc["durationInFrames"] for sc in scenes_out)
+                total_vdur = total_frames / fps
+                if adur > 0 and total_vdur < adur * 0.97:
+                    scale = (adur + 0.5) / total_vdur
+                    for sc in scenes_out:
+                        sc["durationInFrames"] = max(1, round(sc["durationInFrames"] * scale))
+                    print(f"DURATION_SCALED: scaled {total_vdur:.1f}s -> {adur:.1f}s to match audio ({scale:.2f}x)")
+            except Exception as _e_dur:
+                print(f"DEBUG: duration probe fallback: {_e_dur}")
+    else:
+        print("DURATION_SCALE_SKIPPED: Preserving exact 0ms drift from Whisper word timestamps (Rule 120 & 140)")
 
     # AI Senior Post-Production Editor Gate (Pacing, Word-locked punches, Monotony breaker)
     try:
