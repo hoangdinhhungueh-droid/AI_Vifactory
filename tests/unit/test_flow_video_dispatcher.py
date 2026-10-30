@@ -4,7 +4,6 @@
 
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock
 
 from scripts.flow_video_dispatcher import (
     FlowQuotaExhaustedError,
@@ -14,21 +13,27 @@ from scripts.flow_video_dispatcher import (
 )
 
 
+class StubPage:
+    """Pure duck-typed browser page stub for quota detection testing."""
+    def __init__(self, hit: bool = False, msg: str = ""):
+        self._result = {"hit": hit, "msg": msg}
+
+    def evaluate(self, script: str):
+        return self._result
+
+
 def test_detect_flow_quota_exhausted_positive():
     """Verifies that detect_flow_quota_exhausted detects various quota exhaustion texts in DOM."""
-    mock_page = MagicMock()
-    # Mock evaluate returning hit for "insufficient credits"
-    mock_page.evaluate.return_value = {"hit": True, "msg": "Insufficient credits"}
-    hit, msg = detect_flow_quota_exhausted(mock_page)
+    stub = StubPage(hit=True, msg="Insufficient credits")
+    hit, msg = detect_flow_quota_exhausted(stub)
     assert hit is True
     assert msg == "Insufficient credits"
 
 
 def test_detect_flow_quota_exhausted_negative():
     """Verifies that detect_flow_quota_exhausted returns False when DOM is clean."""
-    mock_page = MagicMock()
-    mock_page.evaluate.return_value = {"hit": False, "msg": ""}
-    hit, msg = detect_flow_quota_exhausted(mock_page)
+    stub = StubPage(hit=False, msg="")
+    hit, msg = detect_flow_quota_exhausted(stub)
     assert hit is False
     assert msg == ""
 
