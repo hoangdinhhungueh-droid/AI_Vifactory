@@ -21,7 +21,10 @@ import logging
 
 logger = logging.getLogger("flow_video_dispatcher")
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    sync_playwright = None
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
@@ -606,6 +609,9 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
     print(f"👤 TÀI KHOẢN [{acc_key.upper()}]: {acc_info['email']}")
     print(f"   Số clip cần sinh: {len(clips)}")
     print("=" * 70)
+
+    if sync_playwright is None:
+        raise RuntimeError("Playwright is not installed in this environment.")
 
     results = {}
     with sync_playwright() as p:
