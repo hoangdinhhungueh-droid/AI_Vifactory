@@ -9,7 +9,8 @@ from scripts.flow_video_dispatcher import (
     FlowQuotaExhaustedError,
     detect_flow_quota_exhausted,
     get_seed_image_path,
-    PROFILES
+    PROFILES,
+    DISABLED_ACCOUNTS
 )
 
 
@@ -66,3 +67,5 @@ def test_fleet_profiles_integrity():
         assert "email" in PROFILES[acc_key]
         assert "path" in PROFILES[acc_key]
     assert "acc_06" not in PROFILES
+    assert "acc_06" in DISABLED_ACCOUNTS
+    assert "hết gói pro" in DISABLED_ACCOUNTS["acc_06"].lower()

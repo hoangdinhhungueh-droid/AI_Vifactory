@@ -36,6 +36,11 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 PROFILES_BASE_DIR = Path(r"C:\Users\hunghd2\.gemini\profiles")
 IMAGE_PROFILE_DIR = Path(r"C:\Users\hunghd2\.gemini\browser_profile")
 
+# Danh sách tài khoản vô hiệu hóa / hết hạn Pro (Loại bỏ 100% khỏi vòng xoay để chống kẹt)
+DISABLED_ACCOUNTS = {
+    'acc_06': 'Hết gói Pro / Đã tắt khỏi vòng xoay để chống kẹt hệ thống'
+}
+
 class FlowQuotaExhaustedError(RuntimeError):
     """Exception raised when Google Flow video generation credits/quota is exhausted."""
     pass
@@ -598,6 +603,12 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
 
 def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: Path, headless: bool = False, model_target: str = "omni", force: bool = False) -> dict:
     """Xử lý toàn bộ các clip được giao cho 1 tài khoản."""
+    if acc_key in DISABLED_ACCOUNTS or acc_key not in PROFILES:
+        reason = DISABLED_ACCOUNTS.get(acc_key, "Tài khoản không tồn tại trong danh mục PROFILES khả dụng")
+        print(f"\n⚠️ [BỎ QUA KHẨN CẤP] Tài khoản [{acc_key.upper()}] bị vô hiệu hóa ({reason})!")
+        print(f"🔄 Tự động chuyển giao {len(clips)} clips cho tài khoản kế tiếp...")
+        return {"_status": "DISABLED_ACCOUNT", "_unprocessed": clips}
+
     acc_info = PROFILES[acc_key]
     profile_dir = acc_info['path']
     print("\n" + "=" * 70)
@@ -777,12 +788,16 @@ def main():
     print(f"📦 Tổng số clips xử lý: {len(all_clips)}")
     print(f"📁 Thư mục lưu trữ: {out_dir}")
 
-    # Thứ tự hạm đội ưu tiên đã xác thực đăng nhập Google Flow
+    # Thứ tự hạm đội ưu tiên đã xác thực đăng nhập Google Flow (chỉ giữ 6 tài khoản còn gói Pro)
     verified_order = ['acc_03', 'acc_02', 'acc_04', 'acc_05', 'acc_07', 'acc_01']
-    available_accs = [a for a in verified_order if a in PROFILES]
+    available_accs = [a for a in verified_order if a in PROFILES and a not in DISABLED_ACCOUNTS]
 
-    # Nếu user chỉ định --acc cụ thể, tài khoản đó sẽ đi đầu tiên, sau đó tự động xoay qua các tài khoản còn lại
-    if args.acc != "all" and args.acc in PROFILES:
+    # Nếu user chỉ định --acc cụ thể: kiểm tra tài khoản có bị vô hiệu hóa / hết Pro không
+    if args.acc in DISABLED_ACCOUNTS:
+        print(f"\n⚠️ [CHÚ Ý] Tài khoản [{args.acc}] đã bị vô hiệu hóa ({DISABLED_ACCOUNTS[args.acc]}).")
+        print(f"🔄 Tự động loại bỏ và dùng hạm đội 6 tài khoản khả dụng: {' -> '.join(available_accs)}")
+        fleet_order = list(available_accs)
+    elif args.acc != "all" and args.acc in PROFILES:
         fleet_order = [args.acc] + [a for a in available_accs if a != args.acc]
     else:
         fleet_order = list(available_accs)
@@ -851,7 +866,7 @@ def main():
             else:
                 print(f"\n🛑 Toàn bộ các tài khoản trong hạm đội đã cạn hạn mức hoặc không khả dụng!")
                 break
-        elif status in ("NOT_LOGGED_IN", "NO_PROJECT_BTN", "CANVAS_TIMEOUT"):
+        elif status in ("NOT_LOGGED_IN", "NO_PROJECT_BTN", "CANVAS_TIMEOUT", "DISABLED_ACCOUNT"):
             offline_accs.add(current_acc)
             acc_idx += 1
             if acc_idx < len(fleet_order):
