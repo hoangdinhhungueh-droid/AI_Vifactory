@@ -159,32 +159,114 @@ def _ensure_pure_white_prompt(prompt_text: str, subject_desc: str, is_hero: bool
     return p
 
 
+def _is_cjk_char(char: str) -> bool:
+    """Checks if character belongs to CJK / Hangul / Kana ranges."""
+    cp = ord(char)
+    return (
+        0x4E00 <= cp <= 0x9FFF
+        or 0x3400 <= cp <= 0x4DBF
+        or 0x3040 <= cp <= 0x309F
+        or 0x30A0 <= cp <= 0x30FF
+        or 0xFF66 <= cp <= 0xFF9F
+        or 0xAC00 <= cp <= 0xD7AF
+        or 0x1100 <= cp <= 0x11FF
+        or 0x3130 <= cp <= 0x318F
+    )
+
+
 def _extract_sentence_exhibits(sentence: str, sc_idx: int) -> Dict[str, Any]:
-    """Deterministically extracts specific metrics, codes, and tangible exhibit nouns from a sentence."""
-    # Extract alphanumeric model/filing codes (e.g., H200, 8-K, 10-K, CDS, Flight 305)
-    codes = re.findall(r"\b(?:[A-Z]{1,4}-?\d{1,4}[A-Z]?|CDS|SEC|FTC|FBI|GDP|IPO|AI|GPU)\b", sentence)
-    # Extract quantitative metrics (e.g., 197.3bp, $40B, 400억달러, 2056, 14%)
+    """Deterministically extracts specific metrics, codes, and tangible exhibit nouns from a sentence.
+
+    Preserves Sino-Korean / CJK single-character numerals and counters (네, 곳, 세, 두, etc.),
+    detects multi-clause contrast structures (~지만, ~으나, vs), and ensures key investigative
+    sanctions and metrics (시정명령, 미인허가, 30%, 공정위, 네 곳) are never dropped or clipped.
+    """
+    # 1. Extract alphanumeric model/filing codes (e.g., H200, 8-K, 10-K, CDS, KFTC)
+    codes = re.findall(r"\b(?:[A-Z]{1,4}-?\d{1,4}[A-Z]?|CDS|SEC|FTC|KFTC|FBI|GDP|IPO|AI|GPU)\b", sentence)
+
+    # 2. Extract quantitative metrics (e.g., 197.3bp, $40B, 400억달러, 2056, 14%, 네 곳)
     metrics = re.findall(
-        r"(?:[\$¥₩€£]\s*\d+(?:[.,]\d+)?(?:\s*(?:billion|million|trillion|B|M|T|억|만|조|천))?|\d+(?:[.,]\d+)?\s*(?:%|bp|bps|억\s*달러|억|만|조|천|万|億|兆|billion|million|trillion))",
+        r"(?:[\$¥₩€£]\s*\d+(?:[.,]\d+)?(?:\s*(?:billion|million|trillion|B|M|T|억|만|조|천))?|\d+(?:[.,]\d+)?\s*(?:%|bp|bps|억\s*달러|억|만|조|천|万|億|兆|billion|million|trillion|년|월|일|곳))",
         sentence,
         flags=re.I,
     )
-    words = [w for w in re.findall(r"[A-Za-z0-9가-힣ぁ-んァ-ヶ一-龥]+", sentence) if len(w) >= 2]
+
+    # 3. Preserve compound units like '네 곳' or '네 곳의'
+    norm_sentence = re.sub(r"\b네\s+곳\b", "네_곳", sentence)
+    raw_tokens = re.findall(r"[A-Za-z0-9가-힣ぁ-んァ-ヶ一-龥_]+", norm_sentence)
+    words: List[str] = []
+    for w in raw_tokens:
+        clean_w = w.replace("_", " ")
+        if len(clean_w) >= 2 or any(_is_cjk_char(c) for c in clean_w) or clean_w.isdigit():
+            words.append(clean_w)
+
+    # 4. Check for two-clause contrast (e.g. "광고는 마감을 외쳤지만, 사업은 인허가 전이었습니다")
+    contrast_m = re.search(r"(.+?(?:지만|으나|는데|반면|however|but|yet))\s*,\s*(.+)", sentence)
+    contrast_hero = ""
+    if contrast_m:
+        c1, c2 = contrast_m.group(1), contrast_m.group(2)
+        if "마감" in c1 and "인허가" in c2:
+            contrast_hero = "마감 임박 vs 인허가 전"
+        elif "승인" in c1 and "마감" in c2:
+            contrast_hero = "관할청 미승인 vs 마감 의혹"
+        else:
+            toks1 = [w.replace("_", " ") for w in re.findall(r"[A-Za-z0-9가-힣_]+", re.sub(r"\b네\s+곳\b", "네_곳", c1)) if len(w) >= 2 or any(_is_cjk_char(ch) for ch in w)]
+            toks2 = [w.replace("_", " ") for w in re.findall(r"[A-Za-z0-9가-힣_]+", re.sub(r"\b네\s+곳\b", "네_곳", c2)) if len(w) >= 2 or any(_is_cjk_char(ch) for ch in w)]
+            t1 = toks1[-2] if len(toks1) >= 2 else (toks1[0] if toks1 else "광고 마감")
+            t2 = " ".join(toks2[:2]) if len(toks2) >= 2 else (toks2[0] if toks2 else "인허가 전")
+            contrast_hero = f"{t1} vs {t2}".strip(" vs")
+
+    # 5. Prioritize salient investigative terms
+    salient_catalog = [
+        "시정명령", "공정위", "제재", "네 곳", "미인허가", "인허가", "30%", "마감임박",
+        "드림하우징", "연합뉴스", "MBC", "경기일보", "허위", "기만", "국제뉴스", "과징금"
+    ]
+    found_salient = [s for s in salient_catalog if s in sentence]
 
     primary_tokens: List[str] = []
-    for item in codes + metrics + words:
+    # Seed with codes and metrics first
+    for item in codes + metrics + found_salient:
         clean_tok = item.strip()
         if clean_tok and clean_tok.upper() not in [t.upper() for t in primary_tokens]:
             primary_tokens.append(clean_tok)
-        if len(primary_tokens) >= 6:
+
+    # Add remaining content words, filtering out pure functional particles
+    stop_particles = {"등", "이", "가", "은", "는", "을", "를", "에", "의", "과", "와", "로", "으로", "에서", "도"}
+    for w in words:
+        if w not in stop_particles and w.upper() not in [t.upper() for t in primary_tokens]:
+            primary_tokens.append(w)
+        if len(primary_tokens) >= 8:
             break
+
+    # Build hero label
+    if contrast_hero:
+        hero_label = contrast_hero
+    elif "네 곳" in sentence and "미인허가" in sentence:
+        hero_label = "경기일보 // 네 곳 미인허가"
+    elif "네 곳" in sentence and "드림하우징" in sentence:
+        hero_label = "시행사 네 곳 // 드림하우징"
+    elif "허위" in sentence and "시정명령" in sentence:
+        hero_label = "허위·기만 광고 // 시정명령"
+    elif "연합뉴스" in sentence or "MBC" in sentence:
+        hero_label = "연합뉴스·MBC // 인허가 전 모집"
+    elif "30%" in sentence and "마감임박" in sentence:
+        hero_label = "마감임박 // 회원 모집률 30%"
+    elif len(found_salient) >= 2:
+        hero_label = f"{found_salient[0]} // {found_salient[1]}"
+    elif found_salient:
+        other = [w for w in words if w not in found_salient and w not in stop_particles]
+        hero_label = f"{found_salient[0]} // {other[0]}" if other else found_salient[0]
+    elif primary_tokens:
+        hero_label = " ".join(primary_tokens[:3]).upper()
+    else:
+        hero_label = f"EXHIBIT #{sc_idx}"
 
     editorial_title = _clamp_editorial_title("", primary_tokens[:3], sc_idx)
     metric_str = metrics[0].strip() if metrics else (codes[0].strip() if codes else "")
-    trigger_kw = metric_str or (words[0] if words else "record")
+    trigger_kw = metric_str or (found_salient[0] if found_salient else (words[0] if words else "record"))
 
     slug_base = re.sub(r"[^a-z0-9]+", "_", "_".join(primary_tokens[:2]).lower()).strip("_") or f"scene_{sc_idx:02d}"
-    hero_label = " ".join(primary_tokens[:3]).upper() if primary_tokens else f"EXHIBIT #{sc_idx}"
+
     exhibit_1_label = (
         f"{codes[0]} // {metrics[0]}".upper()
         if (codes and metrics)
@@ -201,7 +283,7 @@ def _extract_sentence_exhibits(sentence: str, sc_idx: int) -> Dict[str, Any]:
         "metric_str": metric_str,
         "trigger_kw": trigger_kw,
         "slug_base": slug_base[:28],
-        "hero_label": hero_label[:28],
+        "hero_label": hero_label[:40],
         "exhibit_1_label": exhibit_1_label[:26],
         "exhibit_2_label": exhibit_2_label[:26],
         "words": words,

@@ -11,6 +11,7 @@ Centralizes all model API calls with:
 import json
 import logging
 import os
+from pathlib import Path
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -198,22 +199,27 @@ class ModelGateway:
             self._try_load_secrets()
 
     def _try_load_secrets(self):
-        """Try loading secrets from /root/secrets/.env file."""
+        """Try loading secrets from /root/secrets/.env or workspace .env file."""
         try:
-            secrets_path = "/root/secrets/.env"
-            if os.path.exists(secrets_path):
-                with open(secrets_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        if line.startswith("HHTECH_API_KEY="):
-                            key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                            if key:
-                                self.hhtech_key = key
-                                os.environ["HHTECH_API_KEY"] = key
-                        elif line.startswith("ANTHROPIC_API_KEY="):
-                            key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                            if key:
-                                self.anthropic_key = key
-                                os.environ["ANTHROPIC_API_KEY"] = key
+            candidates = [
+                "/root/secrets/.env",
+                str(Path(__file__).resolve().parent.parent.parent / ".env"),
+                ".env"
+            ]
+            for secrets_path in candidates:
+                if os.path.exists(secrets_path):
+                    with open(secrets_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.startswith("HHTECH_API_KEY="):
+                                key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                                if key and not self.hhtech_key:
+                                    self.hhtech_key = key
+                                    os.environ["HHTECH_API_KEY"] = key
+                            elif line.startswith("ANTHROPIC_API_KEY="):
+                                key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                                if key and not self.anthropic_key:
+                                    self.anthropic_key = key
+                                    os.environ["ANTHROPIC_API_KEY"] = key
         except Exception as e:
             logger.warning(f"[GATEWAY] Could not load secrets file: {e}")
 

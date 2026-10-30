@@ -176,6 +176,8 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
     """Thực thi sinh 1 video clip qua Image-to-Video (I2V) và tải về máy qua CDP."""
     raw_prompt = clip["prompt"]
     scene_id = clip["scene_id"]
+    debug_dir = episode_dir / "debug_flow"
+    debug_dir.mkdir(parents=True, exist_ok=True)
     output_filename = clip["output_filename"]
     prompt_text = raw_prompt
 
@@ -331,6 +333,7 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         start_gen.click(force=True)
         print("      🚀 Đã bấm Start generation. Đang chờ Veo 3.1 sinh video...")
         time.sleep(3)
+        page.screenshot(path=str(debug_dir / f"started_{scene_id}.png"))
 
         # Chờ dialog phê duyệt tín dụng (có thể mất 3-8s server phản hồi)
         approved = False
@@ -362,42 +365,79 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         max_wait_sec = 240
         start_time = time.time()
         completed = False
+        dl_btn = None
 
         while time.time() - start_time < max_wait_sec:
+            elapsed = int(time.time() - start_time)
             pcts = page.locator("text=/%$/").all()
             rendering_cards = [p.inner_text().strip() for p in pcts if "%" in p.inner_text()]
             stop_btn = page.locator("button:has-text('Stop'), button[aria-label*='Stop']").first
             is_generating = (stop_btn.count() > 0 and stop_btn.is_visible())
 
+            # Kiem tra nhanh loi Safety Policy tu Google Flow
+            err_box = page.locator("text='Không thành công', text='Không thể tạo video', text='Failed to generate'").first
+            if err_box.count() > 0 and err_box.is_visible():
+                page.screenshot(path=str(debug_dir / f"policy_error_{scene_id}.png"))
+                print(f"\n      ❌ Google Flow từ chối câu lệnh (Safety Policy Filter)! Đã lưu: policy_error_{scene_id}.png")
+                return False
+
             if rendering_cards:
-                print(f"      ⏳ Tiến độ: {rendering_cards[0]} ({int(time.time() - start_time)}s)", end="\r", flush=True)
-            elif not is_generating and time.time() - start_time > 20:
-                completed = True
-                print(f"\n      ✨ Video đã render xong trong {int(time.time() - start_time)}s!")
-                break
+                cur_pct = rendering_cards[0]
+                print(f"      ⏳ Tiến độ: {cur_pct} ({elapsed}s)", end="\r", flush=True)
+                if "100%" in cur_pct and elapsed >= 30:
+                    print(f"\n      ✨ Thấy 100% tại {elapsed}s! Đợi 4s hoàn tất...")
+                    time.sleep(4)
+                    completed = True
+                    break
+            elif is_generating:
+                print(f"      ⏳ Đang sinh video ({elapsed}s)...", end="\r", flush=True)
+            elif elapsed >= 35:
+                # Sau 35s, probe tile để kiểm tra nút Download đã sẵn sàng chưa
+                vid_tile = page.locator("flow-video-tile").last
+                if vid_tile.count() > 0 and vid_tile.is_visible():
+                    tile_text = vid_tile.inner_text()
+                    if "%" not in tile_text and "generating" not in tile_text.lower():
+                        vid_tile.click(force=True)
+                        time.sleep(2)
+                        probe_btn = page.locator("button[aria-label*='Tải nội dung nghe nhìn xuống'], button[aria-label*='Tải xuống'], button[aria-label*='Download' i], button:has-text('download'), button[aria-label*='다운로드'], button:has(mat-icon:has-text('download')), button:has(mat-icon:has-text('file_download'))").first
+                        if probe_btn.count() > 0 and probe_btn.is_visible():
+                            completed = True
+                            dl_btn = probe_btn
+                            print(f"\n      ✨ Video đã render xong và nút Download sẵn sàng sau {elapsed}s!")
+                            break
+                        else:
+                            page.keyboard.press("Escape")
+                            time.sleep(1)
 
             time.sleep(4)
 
         if not completed:
-            print(f"\n      ⚠️ Quá thời gian chờ {max_wait_sec}s.")
+            page.screenshot(path=str(debug_dir / f"timeout_{scene_id}.png"))
+            print(f"\n      ⚠️ Quá thời gian chờ {max_wait_sec}s. Đã lưu screenshot: timeout_{scene_id}.png")
             return False
 
-        time.sleep(3)
-        # Mở video player bằng cách click vào flow-video-tile mới nhất trên canvas
-        vid_tile = page.locator("flow-video-tile").last
-        if vid_tile.count() > 0 and vid_tile.is_visible():
-            vid_tile.click(force=True)
-        else:
-            vid_opt = page.locator("flow-a2ui-video-option, .media-wrapper").first
-            if vid_opt.count() > 0 and vid_opt.is_visible():
-                vid_opt.click(force=True)
+        time.sleep(2)
+        if not dl_btn or dl_btn.count() == 0 or not dl_btn.is_visible():
+            vid_tile = page.locator("flow-video-tile").last
+            if vid_tile.count() > 0 and vid_tile.is_visible():
+                vid_tile.click(force=True)
             else:
-                page.mouse.click(240, 180)
-        time.sleep(2.5)
+                vid_opt = page.locator("flow-a2ui-video-option, .media-wrapper").first
+                if vid_opt.count() > 0 and vid_opt.is_visible():
+                    vid_opt.click(force=True)
+                else:
+                    page.mouse.click(240, 180)
+            time.sleep(2.5)
 
-        dl_btn = page.locator("button[aria-label*='Tải nội dung nghe nhìn xuống'], button[aria-label*='Tải xuống'], button[aria-label*='Download' i], button:has-text('download')").first
-        if dl_btn.count() == 0 or not dl_btn.is_visible():
-            print("      ❌ Không tìm thấy nút Download media trong player!")
+            for _ in range(6):
+                dl_btn = page.locator("button[aria-label*='Tải nội dung nghe nhìn xuống'], button[aria-label*='Tải xuống'], button[aria-label*='Download' i], button:has-text('download'), button[aria-label*='다운로드'], button:has(mat-icon:has-text('download')), button:has(mat-icon:has-text('file_download'))").first
+                if dl_btn.count() > 0 and dl_btn.is_visible():
+                    break
+                time.sleep(1)
+
+        if not dl_btn or dl_btn.count() == 0 or not dl_btn.is_visible():
+            page.screenshot(path=str(debug_dir / f"missing_dl_{scene_id}.png"))
+            print("      ❌ Không tìm thấy nút Download media trong player! Đã lưu screenshot: missing_dl_{scene_id}.png")
             return False
 
         dl_btn.click(force=True)
@@ -646,15 +686,18 @@ def main():
     # Phân bổ clips theo flow_slot, ưu tiên hạm đội tài khoản đã xác thực đăng nhập Flow
     verified_order = ['acc_03', 'acc_02', 'acc_04', 'acc_05', 'acc_06', 'acc_07', 'acc_01']
     available_accs = [a for a in verified_order if a in PROFILES]
-    clips_by_acc = {acc: [] for acc in available_accs}
-    for i, c in enumerate(all_clips):
-        slot = c.get("flow_slot")
-        if not slot or slot not in PROFILES:
-            slot = available_accs[i % len(available_accs)]
-            c["flow_slot"] = slot
-        clips_by_acc.setdefault(slot, []).append(c)
-
-    target_accs = available_accs if args.acc == "all" else [args.acc]
+    if args.acc != "all" and args.acc in PROFILES:
+        target_accs = [args.acc]
+        clips_by_acc = {args.acc: all_clips}
+    else:
+        target_accs = available_accs
+        clips_by_acc = {acc: [] for acc in available_accs}
+        for i, c in enumerate(all_clips):
+            slot = c.get("flow_slot")
+            if not slot or slot not in PROFILES:
+                slot = available_accs[i % len(available_accs)]
+                c["flow_slot"] = slot
+            clips_by_acc.setdefault(slot, []).append(c)
 
     total_success = 0
     total_processed = 0

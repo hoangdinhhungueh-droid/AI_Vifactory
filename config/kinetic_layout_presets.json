@@ -1,5 +1,5 @@
 {
-  "schema_version": "kinetic_layout_presets.v2",
+  "schema_version": "kinetic_layout_presets.v3",
   "layouts": {
     "center_right": {
       "initial_pos": "(X:52%, Y:42%)",
@@ -24,6 +24,30 @@
       "bounding_box_bounds": "[X:36%-64%, Y:46%-74%]",
       "vector_reveal_direction": "vertical",
       "description": "Vertical Center Alignment Focus with vertical vector reveal"
+    },
+    "top_right_diagonal": {
+      "initial_pos": "(X:38%, Y:28%)",
+      "target_contact_pos": "(X:64%, Y:36%)",
+      "dock_pin_pos": "(X:28%, Y:62%)",
+      "bounding_box_bounds": "[X:52%-76%, Y:28%-52%]",
+      "vector_reveal_direction": "diagonal",
+      "description": "Top-Right Diagonal Inspection Focus with diagonal vector reveal"
+    },
+    "bottom_left_horizontal": {
+      "initial_pos": "(X:62%, Y:66%)",
+      "target_contact_pos": "(X:36%, Y:66%)",
+      "dock_pin_pos": "(X:68%, Y:38%)",
+      "bounding_box_bounds": "[X:22%-50%, Y:56%-76%]",
+      "vector_reveal_direction": "horizontal",
+      "description": "Bottom-Left Baseline Verification with horizontal vector reveal"
+    },
+    "split_horizontal_feed": {
+      "initial_pos": "(X:24%, Y:72%)",
+      "target_contact_pos": "(X:76%, Y:72%)",
+      "dock_pin_pos": "(X:50%, Y:34%)",
+      "bounding_box_bounds": "[X:20%-80%, Y:64%-80%]",
+      "vector_reveal_direction": "horizontal",
+      "description": "Split Horizontal Feed across bottom banner with top-center dock"
     }
   },
   "spatial_keywords": {
@@ -46,6 +70,28 @@
       "audit",
       "input",
       "baseline"
+    ],
+    "top_right_diagonal": [
+      "diagonal",
+      "inspect",
+      "loupe",
+      "magnify",
+      "missing_seal",
+      "permit"
+    ],
+    "bottom_left_horizontal": [
+      "bottom_baseline",
+      "horizontal_axis",
+      "lower_banner"
+    ],
+    "split_horizontal_feed": [
+      "ticker",
+      "news",
+      "broadcast",
+      "feed",
+      "report",
+      "wire",
+      "banner"
     ]
   },
   "prose_templates": {
@@ -81,12 +127,12 @@
         "residue": "sharp cut edge with visible paper fibers"
       },
       "H4_TETHER": {
-        "action_verb": "drives brass anchor pin into coordinate {target_contact_pos} in a snappy 0.3s strike, anchoring taut red evidence yarn across coordinate line ({initial_pos} to {target_contact_pos}) onto",
+        "action_verb": "stretches taut red evidence yarn across coordinate line ({initial_pos} to {target_contact_pos}) in a snappy 3-frame pull (0.250s), anchoring evidence thread with clear forensic adhesive tabs onto",
         "contact_point": "evidence nexus coordinate {target_contact_pos}",
-        "physical_reaction": "red evidence yarn pulls taut between pins with sharp micro-vibration, locking forensic link into rigid stop at {k1_dead_stop}",
+        "physical_reaction": "red evidence yarn pulls taut between anchor points with sharp 12fps micro-vibration, locking forensic link into rigid stop at {k1_dead_stop}",
         "secondary_reaction": {
           "object": "desk_surface",
-          "reaction": "pin embeds into paper grain"
+          "reaction": "clear adhesive tab seals into paper grain"
         },
         "residue": "taut red evidence thread anchored"
       },
@@ -132,20 +178,50 @@
       }
     },
     "K2": {
+      "H1_IMPACT": {
+        "action_verb": "docks flush against the hero tool base at coordinate {dock_pin_pos} in a rapid 0.4s snap framing coordinate bounds {bounding_box_bounds} on",
+        "contact_point": "secondary verification margin at {dock_pin_pos}",
+        "physical_reaction": "crimson inked sanction mark stamps firmly into newsprint, locking all objects into a single unified physical cluster with a complete dead-stop freeze from {k2_dead_stop}",
+        "residue": "deep crimson sanction imprint embossed"
+      },
+      "H2_CONSTRAINT": {
+        "action_verb": "clamps precisely onto coordinate {dock_pin_pos} in a fast 0.4s slide enclosing coordinate bounds {bounding_box_bounds} against",
+        "contact_point": "clamping margin at {dock_pin_pos}",
+        "physical_reaction": "heavy steel jaws crimp paper edges, locking all objects into a rigid physical cluster at {k2_dead_stop}",
+        "residue": "firm mechanical clamp indentation"
+      },
+      "H3_SEVER": {
+        "action_verb": "slices through coordinate line ({dock_pin_pos} to {target_contact_pos}) in a swift 3-frame cut (0.250s) of",
+        "contact_point": "unauthorized tag margin at {target_contact_pos}",
+        "physical_reaction": "sheared paper scrap cleanly detaches and drops downward, exposing underlying evidence layer at {k2_dead_stop}",
+        "residue": "clean sheared paper edge with exposed inner fibers"
+      },
+      "H4_TETHER": {
+        "action_verb": "snaps a taut crimson evidence yarn across coordinate vector ({target_contact_pos} to {dock_pin_pos}) in a sharp 3-frame pull (0.250s) onto",
+        "contact_point": "evidence anchor tab at {dock_pin_pos}",
+        "physical_reaction": "red evidence yarn pulls taut between anchor tabs with authentic 12fps micro-vibration, locking forensic link into rigid stop at {k2_dead_stop}",
+        "residue": "taut red evidence thread anchored across documents"
+      },
+      "H5_OPTICAL": {
+        "action_verb": "glides into secondary inspection position over coordinate {dock_pin_pos} in a smooth 0.4s slide across",
+        "contact_point": "fine print authorization box at {dock_pin_pos}",
+        "physical_reaction": "optical lens magnifies missing permit clause by 1.4x with authentic barrel distortion, locking crisp focal clarity at {k2_dead_stop}",
+        "residue": "magnified focal inspection zone highlighted"
+      },
       "H6_MARK": {
         "action_verb": "originates directly from contact coordinate {target_contact_pos}, wiping in a rapid 0.4s {vector_reveal_direction} vector reveal across coordinate bounds {bounding_box_bounds} of",
         "contact_point": "highlighted anomaly coordinate {bounding_box_bounds}",
-        "physical_reaction": "neon yellow highlight box illuminates key typography with crisp editorial contrast, locking dead still at {k2_dead_stop}",
-        "residue": "striking translucent yellow neon stripe"
+        "physical_reaction": "neon highlight band illuminates key typography with crisp editorial contrast, locking dead still at {k2_dead_stop}",
+        "residue": "striking translucent neon stripe"
       },
-      "H4_TETHER": {
-        "action_verb": "originates from contact coordinate {target_contact_pos}, snapping a straight dashed vector thread in 0.4s connecting directly to anchor pin at {dock_pin_pos} of",
-        "contact_point": "caliper anchor pin at {dock_pin_pos}",
-        "physical_reaction": "crimson evidence vector line snaps between pin coordinates, locking forensic link into a single unified cluster at {k2_dead_stop}",
-        "residue": "taut red evidence vector linking data to source"
+      "H7_DISPLACE": {
+        "action_verb": "feeds across frame along {vector_reveal_direction} vector to coordinate {dock_pin_pos} in a rapid 0.4s paper slide across",
+        "contact_point": "journalistic evidence banner at {dock_pin_pos}",
+        "physical_reaction": "printed newsprint layer unfolds with paper flutter, locking secondary report into position at {k2_dead_stop}",
+        "residue": "fanned-out multi-page investigative clipping"
       },
       "DEFAULT": {
-        "action_verb": "docks flush against the hero tool base at coordinate {dock_pin_pos} in a rapid 0.5s snap, while contact coordinate {target_contact_pos} triggers a sharp dashed bounding box {bounding_box_bounds} in an instant 2-frame pop on",
+        "action_verb": "settles into fixed mechanical alignment at coordinate {dock_pin_pos} in a snappy 0.3s step against",
         "contact_point": "hero tool anchor pin at {dock_pin_pos}",
         "physical_reaction": "sharp dashed bounding box snaps around target data, locking all objects into a single unified physical cluster with a complete dead-stop freeze from {k2_dead_stop}",
         "residue": "permanent forensic framing box"
