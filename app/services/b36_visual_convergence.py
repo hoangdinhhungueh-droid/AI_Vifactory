@@ -12,16 +12,16 @@ Key Invariants:
   4. Market Spoken Language Mandate: Ensures narration matches episode target locale (JP/KR/EN/VN).
 """
 
+import json
+import logging
 import os
 import re
-import json
 import time
-import logging
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from app.services.model_gateway import get_global_gateway
-from app.services.prompt_forge import lint_visual_prompt, NEGATIVE_R137, R137_CLOSING_DIRECTIVE
+from app.services.prompt_forge import lint_visual_prompt
 
 logger = logging.getLogger("b36_visual_convergence")
 
@@ -40,10 +40,9 @@ Audit against 6 Core Criteria:
 3. RULE 122 & 435 CEL-SHADED FG:
    - Pure flat #FF00FF magenta chroma key isolation, 1:1 aspect ratio, waist-up three-quarter angle dynamic action framing with clear silhouette and zero edge clipping.
    - Zero photorealistic human faces/skin; zero white/gray halos; zero cutoffs.
-4. BACKGROUND (BG) STYLE CONFORMANCE:
-   - Backgrounds MUST be 2D stylized graphic novel editorial illustrations (2560x1440 QHD, 16:9).
-   - STRICTLY FORBIDDEN: attempting to generate photorealistic imagery, '8k photographic' style, raw briefing notes, pipe characters, or missing text negatives.
-   - (NOTE: Negative prompt directives such as 'no photorealistic faces', 'non-photorealistic 2D graphic novel' are explicitly required and encouraged to prevent photorealism).
+4. VISUAL & STYLE CONFORMANCE (CL3 VOX PAPER DIORAMA - Rule 120, 122, 140, 141):
+   - Visual prompts MUST adhere strictly to the canonical CL3 Paper Diorama master architecture: deep 3D paper diorama with layered cutouts separated in real space, aged-print collage textures on archival newsprint (#F4F1EA / #C9BB9C), halftone B&W cutout figures with rough deckle borders and offset ink accent strokes (#D62E1F red, #D9A441 mustard), tactile mechanical interaction and camera parallax with shallow depth of field.
+   - STRICTLY FORBIDDEN: flat 2D single-plane compositions, glossy 3D CG video game looks, photorealistic human portraits, or flat slideshow stock graphics.
    - (Thumbnails are decoupled to YouTube Studio Native Gemini Designer at Human Gate 3).
 5. PROMPT HYGIENE:
    - 0% dangling fragments (e.g. 'isolated on a,').
@@ -408,7 +407,10 @@ def run_b36_visual_convergence(
     def _apply_scene_patch_to_prompts(sc_obj: dict, ps_obj: dict):
         bg_k = sc_obj.get("bg_reuse_key") or sc_obj.get("background_reuse_key")
         fg_k = sc_obj.get("fg_reuse_key") or sc_obj.get("foreground_reuse_key")
-        if bg_k and ps_obj.get("bg_prompt"):
+        cur_p = sc_obj.get("image_prompt", "") or ""
+        # Preserve canonical CL3 Paper Diorama prompt architecture from accidental legacy regression
+        is_canonical_cl3 = "Use the attached style sheet" in cur_p and "deep 3D paper diorama" in cur_p
+        if bg_k and ps_obj.get("bg_prompt") and not is_canonical_cl3:
             res_bg = lint_visual_prompt(str(ps_obj["bg_prompt"]), strict=False)
             sc_obj["bg_prompt"] = res_bg.prompt
             sc_obj["image_prompt"] = res_bg.prompt
