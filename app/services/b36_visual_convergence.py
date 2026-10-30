@@ -179,11 +179,12 @@ def run_b36_visual_convergence(
     if director_plan is None and ep_dir:
         for fname in ["director_plan.json", "dp_plan.json"]:
             try:
-                if (ep_dir / fname).exists():
-                    director_plan = json.loads((ep_dir / fname).read_text(encoding="utf-8"))
+                target_f = ep_dir / fname
+                if target_f.exists():
+                    director_plan = json.loads(target_f.read_text(encoding="utf-8"))
                     break
-            except Exception:
-                pass
+            except (OSError, json.JSONDecodeError) as e:
+                logger.debug("Failed loading %s: %s", fname, e)
     if director_plan is None:
         director_plan = {"topic": episode_id, "scenes": []}
 
@@ -193,27 +194,30 @@ def run_b36_visual_convergence(
     if prompts_data is None and ep_dir:
         for fname in ["prompts_forge.json", "prompts.json"]:
             try:
-                if (ep_dir / fname).exists():
-                    prompts_data = json.loads((ep_dir / fname).read_text(encoding="utf-8"))
+                target_f = ep_dir / fname
+                if target_f.exists():
+                    prompts_data = json.loads(target_f.read_text(encoding="utf-8"))
                     break
-            except Exception:
-                pass
+            except (OSError, json.JSONDecodeError) as e:
+                logger.debug("Failed loading %s: %s", fname, e)
     if prompts_data is None:
         prompts_data = {"backgrounds": {}, "foregrounds": {}, "thumbnails": {}}
 
     if not story_text and ep_dir:
         try:
-            if (ep_dir / "story.txt").exists():
-                story_text = (ep_dir / "story.txt").read_text(encoding="utf-8")
-        except Exception:
-            pass
+            story_path = ep_dir / "story.txt"
+            if story_path.exists():
+                story_text = story_path.read_text(encoding="utf-8")
+        except OSError as e:
+            logger.debug("Failed loading story.txt: %s", e)
 
     if grounding_intel is None and ep_dir:
         try:
-            if (ep_dir / "grounding_intel.json").exists():
-                grounding_intel = json.loads((ep_dir / "grounding_intel.json").read_text(encoding="utf-8"))
-        except Exception:
-            pass
+            intel_path = ep_dir / "grounding_intel.json"
+            if intel_path.exists():
+                grounding_intel = json.loads(intel_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            logger.debug("Failed loading grounding_intel.json: %s", e)
     if grounding_intel is None:
         grounding_intel = {}
 
