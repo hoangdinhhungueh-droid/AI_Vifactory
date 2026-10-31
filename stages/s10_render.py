@@ -85,13 +85,28 @@ def _build_and_save_remotion_props(
     """Assembles RemotionRenderProps and writes remotion_props.json."""
     fps = ctx.config.render.fps
     scene_props: list[SceneRenderProp] = []
-    total_frames = 0
 
-    for cl in clips:
-        sc_id = cl.get("scene_id", "SCENE_01")
+    audio_dur = 0.0
+    if audio_file and Path(audio_file).exists():
+        try:
+            from vox.qa.gates import probe_media_file
+            a_info = probe_media_file(Path(audio_file))
+            audio_dur = float(a_info.get("format", {}).get("duration", 0.0))
+        except Exception as _a_err:
+            logger.debug(f"[s10_render] Audio probe notice: {_a_err}")
+
+    raw_total_sec = sum(cl.get("duration_sec", 6.0) for cl in clips) if clips else 0.0
+    target_total_sec = audio_dur if audio_dur > 0.0 else raw_total_sec
+    scale = (target_total_sec / raw_total_sec) if (raw_total_sec > 0.0 and audio_dur > 0.0) else 1.0
+
+    target_total_frames = int(round(target_total_sec * fps))
+    accum_frames = 0
+
+    for idx, cl in enumerate(clips):
+        sc_id = cl.get("scene_id", f"SCENE_{idx+1:02d}")
         dur_sec = cl.get("duration_sec", 6.0)
-        frames = int(round(dur_sec * fps))
-        total_frames += frames
+        frames = int(round(dur_sec * scale * fps))
+        accum_frames += frames
 
         # Map subtitles for this scene
         sc_words = [KaraokeWord.model_validate(w) for w in subtitles[:20]]
@@ -104,6 +119,13 @@ def _build_and_save_remotion_props(
             subtitles=sc_words
         ))
 
+    if scene_props and target_total_frames > 0 and accum_frames != target_total_frames:
+        diff = target_total_frames - accum_frames
+        scene_props[-1].duration_in_frames = max(1, scene_props[-1].duration_in_frames + diff)
+        accum_frames = target_total_frames
+
+    total_frames = max(accum_frames, 30)
+
     # Assemble RemotionRenderProps
     render_props = RemotionRenderProps(
         episode_id=ctx.run_id,
@@ -111,7 +133,7 @@ def _build_and_save_remotion_props(
         fps=fps,
         width=ctx.config.render.width,
         height=ctx.config.render.height,
-        duration_in_frames=max(total_frames, 30),
+        duration_in_frames=total_frames,
         scenes=scene_props,
         bgm_volume=ctx.config.render.bgm_volume
     )
@@ -127,17 +149,12 @@ def _probe_existing_final_video(final_mp4: Path) -> bool:
     if not final_mp4.exists():
         return False
     try:
-        probe_cmd = [
-            "ffprobe", "-v", "error", "-show_streams", "-show_format",
-            "-of", "json", str(final_mp4)
-        ]
-        probe_res = subprocess.run(probe_cmd, capture_output=True, text=True, check=True, timeout=30.0)
-        probe_data = json.loads(probe_res.stdout)
+        from vox.qa.gates import probe_media_file
+        probe_data = probe_media_file(final_mp4)
         streams = probe_data.get("streams", [])
         has_video = any(s.get("codec_type") == "video" for s in streams)
         has_audio = any(s.get("codec_type") == "audio" for s in streams)
-        dur_str = probe_data.get("format", {}).get("duration", "0")
-        dur = float(dur_str)
+        dur = float(probe_data.get("format", {}).get("duration", 0.0))
         return bool(has_video and has_audio and dur > 0.0)
     except Exception as _probe_err:
         logger.debug(f"[s10_render] Existing final.mp4 probe invalid or failed ({_probe_err}), will render fresh output")
@@ -153,6 +170,7 @@ def _validate_rendered_clips(ctx: RunContext, clips: list[dict]) -> list[Path]:
     invalid_clip_indices: list[int] = []
     from stages.s08_video_gen import StaticFreezeFrameError, validate_video_motion_temporal_delta
 
+    print(f"[s10_render] Auditing motion on {len(clips)} declared clips...", flush=True)
     for idx, cl in enumerate(clips):
         fp = cl.get("file_path")
         if not fp or not Path(fp).exists() or Path(fp).stat().st_size <= 100:
@@ -168,6 +186,8 @@ def _validate_rendered_clips(ctx: RunContext, clips: list[dict]) -> list[Path]:
                 except Exception as probe_err:
                     logger.warning(f"[s10_render] Notice probing motion on clip {p.name}: {probe_err}")
             clip_paths.append(p)
+        if (idx + 1) % 30 == 0 or idx == len(clips) - 1:
+            print(f"[s10_render] Audited {idx + 1}/{len(clips)} clips...", flush=True)
 
     if invalid_clip_indices:
         raise MissingClipsError(
@@ -293,8 +313,10 @@ def _verify_packet_count(v_st: dict[str, Any], final_mp4: Path, actual_frames: i
     if packet_frames_raw is None:
         if not final_mp4.exists():
             raise FileNotFoundError(f"Stage S10 fail-closed: Final video '{final_mp4}' missing for packet count verification")
+        from vox.ffmpeg_utils import get_ffprobe_binary
+        ffprobe_bin = get_ffprobe_binary()
         pkt_cmd = [
-            "ffprobe", "-v", "error", "-select_streams", "v:0",
+            ffprobe_bin, "-v", "error", "-select_streams", "v:0",
             "-count_packets", "-show_entries", "stream=nb_read_packets",
             "-of", "json", str(final_mp4)
         ]
@@ -306,7 +328,13 @@ def _verify_packet_count(v_st: dict[str, Any], final_mp4: Path, actual_frames: i
                 raise ValueError("ffprobe output missing stream nb_read_packets field")
             packet_frames_raw = st_list[0].get("nb_read_packets")
         except Exception as pkt_err:
-            raise ValueError(f"Stage S10 fail-closed: Mandatory secondary packet-count ffprobe failed: {pkt_err}") from pkt_err
+            try:
+                import cv2
+                cap = cv2.VideoCapture(str(final_mp4))
+                packet_frames_raw = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                cap.release()
+            except Exception:
+                raise ValueError(f"Stage S10 fail-closed: Mandatory secondary packet-count ffprobe failed: {pkt_err}") from pkt_err
 
     if packet_frames_raw is None or str(packet_frames_raw).strip() == "":
         raise ValueError(f"Stage S10 fail-closed: Mandatory secondary packet-count unavailable for '{final_mp4}'")

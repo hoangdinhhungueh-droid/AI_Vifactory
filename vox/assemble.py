@@ -38,6 +38,7 @@ def assemble_final_video(
     from vox.ffmpeg_utils import get_ffmpeg_binary
     ffmpeg_bin = get_ffmpeg_binary()
 
+    print(f"[assemble] Concatenating {len(scene_clips)} clips via stream copy...", flush=True)
     cmd_concat = [
         ffmpeg_bin, "-y",
         "-f", "concat",
@@ -122,6 +123,7 @@ def assemble_final_video(
         str(final_output)
     ]
 
+    print(f"[assemble] Burning subtitles and multiplexing audio ({audio_dur:.2f}s) to {final_output.name}...", flush=True)
     res = subprocess.run(cmd_master, capture_output=True, text=True, check=False)
 
     # Fallback if libass filter fails on specific platform without subtitles filter

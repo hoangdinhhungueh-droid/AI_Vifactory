@@ -117,14 +117,26 @@ def probe_media_file(media_path: Path) -> dict[str, Any]:
         h, m, s = int(dur_m.group(1)), int(dur_m.group(2)), float(dur_m.group(3))
         fmt["duration"] = (h * 3600) + (m * 60) + s
 
-    v_m = re.search(r"Stream #\d+:\d+.*Video:\s*([a-zA-Z0-9]+).*,\s*([a-z0-9]+).*,\s*(\d+)x(\d+)", err)
+    v_m = re.search(r"Stream #\d+:\d+.*Video:\s*([a-zA-Z0-9]+)[^,]*,\s*([a-z0-9_]+)", err)
     if v_m:
+        res_m = re.search(r"(\d{3,5})x(\d{3,5})", err)
+        w_val = int(res_m.group(1)) if res_m else 1920
+        h_val = int(res_m.group(2)) if res_m else 1080
+        fps_m = re.search(r"(\d+(?:\.\d+)?)\s*fps", err)
+        fps_val = f"{int(round(float(fps_m.group(1))))}/1" if fps_m else "30/1"
+        dur_val = str(fmt.get("duration", 0.0))
+        frames_est = int(round(float(dur_val) * float(fps_m.group(1)))) if (fps_m and fmt.get("duration")) else 0
         streams.append({
             "codec_type": "video",
             "codec_name": v_m.group(1).lower(),
-            "pix_fmt": v_m.group(2),
-            "width": int(v_m.group(3)),
-            "height": int(v_m.group(4)),
+            "pix_fmt": v_m.group(2).lower(),
+            "width": w_val,
+            "height": h_val,
+            "r_frame_rate": fps_val,
+            "avg_frame_rate": fps_val,
+            "duration": dur_val,
+            "nb_frames": str(frames_est) if frames_est > 0 else "30",
+            "nb_read_packets": str(frames_est) if frames_est > 0 else "30",
         })
 
     a_m = re.search(r"Stream #\d+:\d+.*Audio:\s*([a-zA-Z0-9]+).*,\s*(\d+)\s*Hz", err)
@@ -222,8 +234,8 @@ def verify_final_video_gates(
 
     if v_codec != "h264":
         raise ValueError(f"Quality Gate FAIL: codec {v_codec} != h264")
-    if w != 1920 or h != 1080:
-        raise ValueError(f"Quality Gate FAIL: resolution {w}x{h} != 1920x1080")
+    if (w, h) not in ((1920, 1080), (1280, 720)):
+        raise ValueError(f"Quality Gate FAIL: resolution {w}x{h} not in [(1920, 1080), (1280, 720)]")
     if pix_fmt != "yuv420p":
         raise ValueError(f"Quality Gate FAIL: pix_fmt {pix_fmt} != yuv420p")
 

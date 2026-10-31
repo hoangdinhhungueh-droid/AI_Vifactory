@@ -394,6 +394,18 @@ def run(ctx: RunContext) -> StageArtifact:
                                 props_data["title"] = bi_data.get("title_a") or bi_data.get("topic")
                             except (OSError, json.JSONDecodeError, KeyError) as _bi_err:
                                 logger.warning(f"Failed to extract title from brain_input.json: {_bi_err}")
+                    if not props_data.get("title"):
+                        seo_file = ctx.paths.root / "seo_package.json"
+                        if not seo_file.exists() and (props_path.parent / "seo_package.json").exists():
+                            seo_file = props_path.parent / "seo_package.json"
+                        if seo_file.exists():
+                            try:
+                                seo_data = json.loads(seo_file.read_text(encoding="utf-8"))
+                                props_data["title"] = seo_data.get("title_a") or seo_data.get("title") or seo_data.get("topic")
+                            except Exception as _seo_err:
+                                logger.warning(f"Failed to extract title from seo_package.json: {_seo_err}")
+                    if not props_data.get("title"):
+                        props_data["title"] = ctx.run_id
 
                 # Hydrate each scene in sc_list
                 for idx, sc in enumerate(sc_list):
@@ -422,6 +434,18 @@ def run(ctx: RunContext) -> StageArtifact:
                             dp_data["title"] = bi_data.get("title_a") or bi_data.get("topic")
                         except (OSError, json.JSONDecodeError, KeyError) as _bi_err:
                             logger.warning(f"Failed to extract title from local brain_input.json: {_bi_err}")
+                    if not dp_data.get("title"):
+                        seo_file = ctx.paths.root / "seo_package.json"
+                        if seo_file.exists():
+                            try:
+                                seo_data = json.loads(seo_file.read_text(encoding="utf-8"))
+                                dp_data["title"] = seo_data.get("title_a") or seo_data.get("title") or seo_data.get("topic")
+                            except Exception as _seo_err:
+                                logger.warning(f"Failed to extract title from seo_package.json: {_seo_err}")
+                    if not dp_data.get("title"):
+                        dp_data["title"] = ctx.run_id
+                if not dp_data.get("episode_id") and not dp_data.get("run_id"):
+                    dp_data["episode_id"] = ctx.run_id
                 plan = _validate_authoritative_scene_plan(dp_data, ctx.run_id)
             except Exception as dp_err:
                 raise ValueError(f"Stage S11 fail-closed: Malformed run-local director_plan '{local_dp}': {dp_err}")
