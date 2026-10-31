@@ -312,8 +312,9 @@ def verify_final_video_gates(
         blur_variances = []
 
         import io
-        from PIL import Image
+
         import numpy as np
+        from PIL import Image
 
         for sample_t in sample_timestamps:
             cmd_f = [

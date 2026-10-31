@@ -5,7 +5,6 @@ Prohibits dispatching fake/unverified Human Gate 3 cards without actual YouTube 
 Redirects callers strictly to canonical: scripts/execute_b10_auto_seo_upload_gate2.py
 """
 
-import sys
 
 def main():
     raise RuntimeError(
