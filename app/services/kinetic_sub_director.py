@@ -1624,12 +1624,12 @@ def build_cl3_paper_diorama_prompt(
     ev = extract_evidence_for_sentence(sentence, market=resolved_market, scene_id=sc_id)
     reg = get_template_registry()
 
-    # 1. Style Block from Markdown (Rule 132)
-    style_block = reg.get_style_block(style_mode=style_mode, trace=trace)
-
-    # 2. Camera Directive Resolution (Hierarchy of Precedence: Scene Plan > Generic ev)
+    # 1. Camera Directive Resolution (Hierarchy of Precedence: Scene Plan > Generic ev)
     effective_camera_name = plan_camera or ev.camera_directive
     cam_pos_line, _, _, forbidden_in_shot = reg.resolve_camera_directive(effective_camera_name, trace=trace)
+
+    # 2. Style Block from Markdown conditioned by camera (Rule 132 & Rule 140)
+    style_block = reg.get_style_block(style_mode=style_mode, camera_directive=effective_camera_name, trace=trace)
 
     # 3. Avoid Block from avoid_base.md dynamically tailored to camera (Rule 120/128)
     avoid_block = reg.resolve_avoid_block(effective_camera_name, trace=trace)

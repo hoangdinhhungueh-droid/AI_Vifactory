@@ -106,8 +106,17 @@ class TemplateRegistry:
         content = _read_template_cached(str(p), file_hash)
         return content, file_hash
 
-    def get_style_block(self, style_mode: str = "deep_diorama", trace: Optional[PromptTrace] = None) -> str:
-        """Retrieves verbatim Style Block for video prompts from Markdown."""
+    def get_style_block(
+        self,
+        style_mode: str = "deep_diorama",
+        camera_directive: Optional[str] = None,
+        trace: Optional[PromptTrace] = None
+    ) -> str:
+        """Retrieves verbatim Style Block for video prompts from Markdown.
+
+        If camera_directive indicates a static overhead camera ('STATIC_OVERHEAD'),
+        conditions the global camera instruction so it does not contradict static overhead.
+        """
         mode_filename_map = {
             "deep_diorama": "style_deep_diorama.md",
             "flat_parallax": "style_flat_parallax.md",
@@ -118,6 +127,13 @@ class TemplateRegistry:
         if trace is not None:
             trace.template_files[filename] = f_hash
             trace.style_mode = style_mode
+
+        if camera_directive and "STATIC_OVERHEAD" in str(camera_directive).upper():
+            # Harmonize global camera instruction with static overhead perspective
+            content = content.replace(
+                "The camera is an actor: it flies between layers, orbits, dives, whips, racks focus — one committed cinematic move per clip.",
+                "The camera remains locked in a disciplined overhead perspective: perfectly static — all dynamic motion comes strictly from tactile physical papercraft elements snapping and sliding across the tabletop diorama."
+            )
         return content
 
     def get_t2i_style_block(self, trace: Optional[PromptTrace] = None) -> str:

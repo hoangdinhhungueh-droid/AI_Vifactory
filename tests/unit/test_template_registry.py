@@ -114,3 +114,36 @@ def test_build_cl3_paper_diorama_prompt_scene3_zero_calipers():
     assert "vernier" not in prompt.lower()
     assert "Slow horizontal pan from left to right" in prompt
     assert "spill continuously" in prompt
+
+
+def test_style_block_conditioned_for_static_overhead():
+    """Asserts that global style block is conditioned for STATIC_OVERHEAD to eliminate conflict."""
+    reg = get_template_registry()
+    static_style = reg.get_style_block(camera_directive="STATIC_OVERHEAD")
+    assert "disciplined overhead perspective: perfectly static" in static_style
+    assert "The camera is an actor" not in static_style
+
+    moving_style = reg.get_style_block(camera_directive="SLOW_PUSH_IN_0_1X")
+    assert "The camera is an actor" in moving_style
+
+
+def test_scene4_zero_english_nikkei():
+    """Asserts that SCENE_04 has zero English '(Nikkei)' and zero fake seals."""
+    from app.services.kinetic_sub_director import build_cl3_paper_diorama_prompt
+    scene4 = {
+        "scene_id": "SCENE_04",
+        "sentence": "日本経済新聞などのメディアも一斉に報じた。",
+        "camera_directive": "SUBTLE_TILT_DOWN",
+        "hero_cutout_object": "broadsheet frontpage clipping of 日本経済新聞 with editorial newsprint texture and headline column layout",
+        "interacting_objects": "editorial hands setting the broadsheet frontpage clipping cleanly onto the investigation folio",
+        "tactile_action_verb": "sets the broadsheet frontpage clipping down onto the dossier surface",
+        "physical_reaction": "newsprint settles flat with subtle deckle edge flutter under warm tungsten wash",
+        "tactile_residue": "authoritative broadsheet frontpage clipping resting atop the evidence stack",
+        "market": "JP",
+    }
+    prompt = build_cl3_paper_diorama_prompt(scene4, market="JP")
+    assert "(Nikkei)" not in prompt
+    assert "docket" not in prompt.lower()
+    assert "wax seal" not in prompt.lower()
+    assert "日本経済新聞" in prompt
+

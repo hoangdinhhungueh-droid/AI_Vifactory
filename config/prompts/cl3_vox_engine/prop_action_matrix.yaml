@@ -46,7 +46,7 @@ actions:
 
   news_report:
     allowed_hero:
-      - "broadsheet frontpage clipping of 日本経済新聞 (Nikkei) with editorial column layout"
+      - "broadsheet frontpage clipping of 日本経済新聞 with editorial column layout"
       - "investigative newspaper frontpage dossier clipping"
     allowed_tools:
       - "editorial reporter hands setting the broadsheet frontpage clipping cleanly onto the investigation folio"
