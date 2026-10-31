@@ -81,19 +81,20 @@ def _build_and_save_remotion_props(
     clips: list[dict],
     audio_file: str,
     subtitles: list,
+    audio_duration_sec: float = 0.0,
 ) -> tuple[RemotionRenderProps, Path, list[SceneRenderProp]]:
     """Assembles RemotionRenderProps and writes remotion_props.json."""
     fps = ctx.config.render.fps
     scene_props: list[SceneRenderProp] = []
 
-    audio_dur = 0.0
-    if audio_file and Path(audio_file).exists():
+    audio_dur = float(audio_duration_sec) if audio_duration_sec and audio_duration_sec > 0.0 else 0.0
+    if audio_dur <= 0.0 and audio_file and Path(audio_file).exists():
         try:
-            from vox.qa.gates import probe_media_file
-            a_info = probe_media_file(Path(audio_file))
-            audio_dur = float(a_info.get("format", {}).get("duration", 0.0))
-        except Exception as _a_err:
-            logger.debug(f"[s10_render] Audio probe notice: {_a_err}")
+            import wave
+            with wave.open(str(audio_file), "rb") as wf:
+                audio_dur = wf.getnframes() / float(wf.getframerate())
+        except Exception:
+            pass
 
     raw_total_sec = sum(cl.get("duration_sec", 6.0) for cl in clips) if clips else 0.0
     target_total_sec = audio_dur if audio_dur > 0.0 else raw_total_sec
@@ -412,7 +413,8 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
     audio_file = s9_data.get("payload", {}).get("audio_file", "")
     subtitles = s9_data.get("payload", {}).get("subtitles", [])
 
-    render_props, props_file, scene_props = _build_and_save_remotion_props(ctx, clips, audio_file, subtitles)
+    audio_duration_sec = float(s9_data.get("payload", {}).get("total_duration_sec") or 0.0)
+    render_props, props_file, scene_props = _build_and_save_remotion_props(ctx, clips, audio_file, subtitles, audio_duration_sec=audio_duration_sec)
 
     # Render target final.mp4
     final_mp4 = ctx.paths.final_render_dir / "final.mp4"
