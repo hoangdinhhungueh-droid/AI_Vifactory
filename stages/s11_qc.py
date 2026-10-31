@@ -465,7 +465,12 @@ def run(ctx: RunContext) -> StageArtifact:
 
     try:
         # Delegate directly to canonical vox.qa.gates for forensic verification (Rule 125 & 139)
-        gate_res = verify_final_video_gates(p, expected_duration=expected_dur, plan=plan, manifest_data=manifest_data)
+        import inspect
+        sig = inspect.signature(verify_final_video_gates)
+        call_kwargs = {}
+        if "manifest_data" in sig.parameters and manifest_data is not None:
+            call_kwargs["manifest_data"] = manifest_data
+        gate_res = verify_final_video_gates(p, expected_duration=expected_dur, plan=plan, **call_kwargs)
         qc_details.update(gate_res)
         qc_details["gates_verified"] = True
         gate_passed = True
