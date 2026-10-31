@@ -117,14 +117,18 @@ def test_build_cl3_paper_diorama_prompt_scene3_zero_calipers():
 
 
 def test_style_block_conditioned_for_static_overhead():
-    """Asserts that global style block is conditioned for STATIC_OVERHEAD to eliminate conflict."""
+    """Asserts that global style block is conditioned for specific camera directives to eliminate conflict."""
     reg = get_template_registry()
     static_style = reg.get_style_block(camera_directive="STATIC_OVERHEAD")
     assert "disciplined overhead perspective: perfectly static" in static_style
     assert "The camera is an actor" not in static_style
 
-    moving_style = reg.get_style_block(camera_directive="SLOW_PUSH_IN_0_1X")
-    assert "The camera is an actor" in moving_style
+    push_style = reg.get_style_block(camera_directive="SLOW_PUSH_IN_0_1X")
+    assert "slow continuous push-in" in push_style
+    assert "The camera is an actor" not in push_style
+
+    default_style = reg.get_style_block(camera_directive=None)
+    assert "The camera is an actor" in default_style
 
 
 def test_scene4_zero_english_nikkei():

@@ -171,7 +171,7 @@ VOX_THEMATIC_ARCHETYPES = {
             ),
             (
                 "A formal judicial ruling scroll with gold foil official seal stamp",
-                ["A crisp red-line strike-through annotation across the disputed claims", "A wooden verification caliper measuring the legal margin"],
+                ["A crisp red-line strike-through annotation across the disputed claims", "A wooden verification ruler measuring the legal margin"],
                 VOX_PALETTE["charcoal"]
             ),
             (
@@ -186,7 +186,7 @@ VOX_THEMATIC_ARCHETYPES = {
         "variants": [
             (
                 "A towering vertical skyscraper built from stacked paper ledger pages and currency bundles",
-                ["A measurement caliper clamping the total height", "A bold Vox Yellow #F2C230 highlight circle"],
+                ["An archival binding clamp securing the total height", "A bold Vox Yellow #F2C230 highlight circle"],
                 VOX_PALETTE["yellow"]
             ),
             (
@@ -410,7 +410,7 @@ def synthesize_motion_track(
     })
 
     # S2: First Interacting Element Assembly
-    inter1 = interacting[0] if interacting else "tactile measurement caliper"
+    inter1 = interacting[0] if interacting else "tactile document binder clamp"
     t2_start = t1_end
     t2_end = min(3.8, round(duration_sec * 0.7, 1)) if len(interacting) > 1 else duration_sec
     beats.append({

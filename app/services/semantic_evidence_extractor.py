@@ -7,7 +7,7 @@ cross-market semantic classification across 5 Forensic Archetypes:
 1. LegalSanctionArchetype: Regulatory decisions, vermilion sanction stamps, penalty orders (H1 Impact).
 2. CorporateEntityArchetype: Developer dossiers, business registrations, corporate foldouts (H2 Clamp / H7 Unfold).
 3. ParadoxClaimArchetype: False promotional ads stamped 'REVOKED/FRAUDULENT' (H3 Tear / H1 Reject).
-4. QuantitativeMetricArchetype: Financial balance sheets, vernier calipers, metric discrepancy pins (H2 Caliper).
+4. QuantitativeMetricArchetype: Financial balance sheets, binder clamps, metric discrepancy pins (H2 Constraint).
 5. InvestigativeMediaArchetype: Teletype ticker, news broadcast headlines, optical magnifying glass (H5 Optical / H6 Ink).
 
 Conforms to:
@@ -100,7 +100,7 @@ _METRIC_REGEX = re.compile(r"(\d+(\.\d+)?\s*(%|percent|billion|million|\$|₩|�
 # ---------------------------------------------------------------------------
 # Dynamic Forensic Variant Catalogues (CL3 Kim Chỉ Nam Paper Diorama Standard)
 # Derived from config/prompts/cl3_vox_engine/image-prompts.md & video-prompts.md.
-# Eliminates hardcoded tools (e.g. vernier calipers) by rotating across rich
+# Eliminates hardcoded tools (e.g. single-prop bias, calipers) by rotating across rich
 # tangible props, connective actions, and camera movements.
 # ---------------------------------------------------------------------------
 
@@ -132,18 +132,18 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
             camera_directive="Top-down orbit a quarter turn, focus racking along the path",
             sound_foley="coin_chips_sliding_and_arrow_swish",
         ),
-        # Variant 2: Precision Caliper (one of multiple options, not hardcoded on every metric)
+        # Variant 2: Audited Financial Ledger & Crimson Binding Clamp (H2 Constraint)
         ExtractedEvidence(
             archetype=ForensicArchetype.QUANTITATIVE_METRIC,
             dominant_family="H2_CONSTRAINT",
             hero_anchor_prop="financial ledger balance column and audited valuation schedule on fibrous ledger paper",
-            interacting_tool_prop="machined brass vernier caliper with engraved millimeter gradations",
-            tactile_action_verb="slides horizontally into the metric column, tightening its precision jaws firmly around the flagged figure on",
-            physical_reaction="caliper tips pinch the margin of the financial metric, vernier scale settling instantly with zero drift",
-            tactile_residue="twin pinpoint caliper score dents bracketing the verified quantitative metric figure",
+            interacting_tool_prop="archival brass document binding clamp and crimson index indicator tabs",
+            tactile_action_verb="snaps firmly over the top margin of the audited valuation schedule on",
+            physical_reaction="the brass binder clamp bites cleanly into the paper margin, locking the quantitative balance column into place with zero drift",
+            tactile_residue="crimped paper indentation and a polished brass binding clamp holding the audited metric exhibit",
             layout_type="split_horizontal_feed",
-            camera_directive="Top-down macro perspective focused on the calibrated vernier jaw measurement",
-            sound_foley="caliper_vernier_metal_click_slide",
+            camera_directive="Top-down macro perspective focused on the locked balance metric column",
+            sound_foley="metallic_binder_clip_spring_snap",
         ),
         # Variant 3: Tiered Staggered Ledger Cards & Red Underline Swipe
         ExtractedEvidence(

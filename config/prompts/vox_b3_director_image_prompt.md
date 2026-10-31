@@ -52,7 +52,7 @@ For every micro-scene (duration 4.0 – 6.0 seconds), extract and define:
 5. `core_idea`: 1–3 words capturing the conceptual essence (e.g., "THE ZERO BILL", "PAPER SHEARS", "OFFSHORE PIPELINE")
 6. `canvas_workspace`: Persistent tactile workspace that remains constant throughout the entire Sequence Block (e.g., `Aged Cream Newsprint Desk #F4F1EA with subtle print halftone grid`).
 7. `hero_cutout_object`: The primary tactile paper cutout subject introduced or active in this scene. Must have a crisp 2-4px white deckle edge and realistic soft drop shadow.
-8. `interacting_objects`: 1 to 3 supporting tactile elements (e.g., crimson wax stamp, giant paper shears, caliper measuring tool, red vector thread, dashed flow arrow, currency bundle).
+8. `interacting_objects`: 1 to 3 supporting tactile elements (e.g., crimson wax stamp, giant paper shears, document binder clamp, red vector thread, dashed flow arrow, currency bundle).
 9. `motion_track_and_assembly`:
    • `entry_action`: (0.0-2.0s) How the hero object enters (slides from top, drops flat with paper snap, folds open).
    • `assembly_step`: (2.0-4.5s) How it locks into place or interacts (stamped with crimson seal, cut in half, connected to adjacent object).

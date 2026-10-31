@@ -42,8 +42,8 @@ Một đoạn văn liền mạch 2–5 câu, bắt buộc chứa đủ 5 thành 
 | :--- | :--- | :--- |
 | **1. Background** | Thiết lập trường sâu hậu cảnh | `Background: a faded world map tilted in perspective, far out of focus.` |
 | **2. MG (Midground)** | Chủ thể cắt dán nhân vật/hồ sơ | `MG: halftone cutout of [CHARACTER] and unpermitted lease dossier enter at staggered depths.` |
-| **3. FG (Foreground)** | Đạo cụ cơ học $H_1 \to H_7$ / Số liệu | `FG: giant stat number "$42.8M" (giant number) and machined brass vernier caliper (interacting tool).` |
-| **4. Kinetic Action** | Va chạm cơ học bứt tốc $\le 0.4\text{s}$ | `The caliper jaws slide briskly and clamp tightly around the metric, crimping cardstock edges, leaving twin pinpoint score dents.` |
+| **3. FG (Foreground)** | Đạo cụ cơ học $H_1 \to H_7$ / Số liệu | `FG: giant stat number "$42.8M" (giant number) and archival brass document clamp (interacting tool).` |
+| **4. Kinetic Action** | Va chạm cơ học bứt tốc $\le 0.4\text{s}$ | `The brass binder clamp slides briskly and snaps tightly over the metric margin, crimping cardstock edges, leaving a sharp crimp indentation.` |
 | **5. Camera & Settle** | Một cú máy duy nhất + Điểm đỗ | `Camera pushes in through the paper gap, focus racking front to back. Settle on the verified metric figure in sharp focus.` |
 
 ### Thư Viện Cú Máy Chuẩn (Chỉ chọn ĐÚNG 1 cú máy):
@@ -66,7 +66,7 @@ Một đoạn văn liền mạch 2–5 câu, bắt buộc chứa đủ 5 thành 
 - **Cú máy Dive / Bổ nhào**: `submerge whoosh, deep pressure hum, paper flutter`
 - **Cú máy Whip / Lia nhanh**: `whip whoosh, crisp paper snap, mechanical click`
 - **Va chạm Stamp / Dập dấu ($H_1$)**: `heavy wooden thud, paper compression crack, oily ink squelch`
-- **Kẹp Caliper / Siết kẹp ($H_2$)**: `vernier metal slide, steel spring snap, cardstock crimp crunch`
+- **Kẹp tài liệu / Siết kẹp ($H_2$)**: `steel spring snap, metallic clamp click, cardstock crimp crunch`
 - **Cắt xé Dao / Kéo ($H_3$)**: `clean shear slice, fiber tearing rip, falling paper flutter`
 - **Sợi chỉ đỏ căng ($H_4$)**: `pushpin wooden tap, string tension twang, taut hum`
 - **Kính lúp lướt ($H_5$)**: `smooth glass glide, brass friction rub, optical focus chime`
@@ -95,11 +95,11 @@ Use the attached style sheet for materials only — aged-print collage textures 
 SHOT:
 Background: a torn financial ledger page with verified quantitative metric columns tilted away in soft focus.
 MG: halftone cutout of the regulatory investigator entering from left, white deckle border with offset red ink stroke.
-FG: giant stat number "$42.8M" (giant number) and machined brass vernier caliper (interacting tool) stacked at distinct depths.
-Action: The caliper jaws slide briskly in 0.3s and clamp tightly around the flagged figure, crimping cardstock edges, leaving twin pinpoint score dents. All elements lock into dead-stop hold with 12fps living paper grain vibration.
-Camera: pushes in through the paper gap beside the number, focus racking from caliper jaws to the investigator's eyes. Settle on the verified metric figure in sharp focus.
+FG: giant stat number "$42.8M" (giant number) and archival brass document clamp (interacting tool) stacked at distinct depths.
+Action: The brass binder clamp slides briskly in 0.3s and snaps tightly over the flagged figure, crimping cardstock edges, leaving a sharp crimp indentation. All elements lock into dead-stop hold with 12fps living paper grain vibration.
+Camera: pushes in through the paper gap beside the number, focus racking from brass clamp to the investigator's eyes. Settle on the verified metric figure in sharp focus.
 
-AUDIO: vernier metal slide, crisp cardstock crimp, ticker click, low archival room tone — sound design only, no music, no narration.
+AUDIO: steel spring snap, crisp cardstock crimp, placement click, low archival room tone — sound design only, no music, no narration.
 
 AVOID: no flat single-plane composition, no static locked-off camera, no glossy plastic CG, no full-color portraits, no warped gibberish text, no invented logos, no watermarks, no music, no voice-over.
 ```

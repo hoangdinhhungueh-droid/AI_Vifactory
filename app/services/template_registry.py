@@ -128,12 +128,29 @@ class TemplateRegistry:
             trace.template_files[filename] = f_hash
             trace.style_mode = style_mode
 
-        if camera_directive and "STATIC_OVERHEAD" in str(camera_directive).upper():
-            # Harmonize global camera instruction with static overhead perspective
-            content = content.replace(
-                "The camera is an actor: it flies between layers, orbits, dives, whips, racks focus — one committed cinematic move per clip.",
-                "The camera remains locked in a disciplined overhead perspective: perfectly static — all dynamic motion comes strictly from tactile physical papercraft elements snapping and sliding across the tabletop diorama."
-            )
+        if camera_directive:
+            cam_str = str(camera_directive).upper()
+            generic_cam_sentence = "The camera is an actor: it flies between layers, orbits, dives, whips, racks focus — one committed cinematic move per clip."
+            if "STATIC_OVERHEAD" in cam_str:
+                content = content.replace(
+                    generic_cam_sentence,
+                    "The camera remains locked in a disciplined overhead perspective: perfectly static — all dynamic motion comes strictly from tactile physical papercraft elements snapping and sliding across the tabletop diorama."
+                )
+            elif "SLOW_PUSH_IN" in cam_str:
+                content = content.replace(
+                    generic_cam_sentence,
+                    "The camera performs one disciplined, deliberate move: a slow continuous push-in — smoothly gliding forward through papercraft depth without sudden whips, dives, or orbits."
+                )
+            elif "SLOW_HORIZONTAL_PAN" in cam_str:
+                content = content.replace(
+                    generic_cam_sentence,
+                    "The camera performs one disciplined, deliberate move: a slow continuous horizontal pan tracking along the evidence outflow path — smoothly traversing the tabletop diorama."
+                )
+            elif "SUBTLE_TILT_DOWN" in cam_str:
+                content = content.replace(
+                    generic_cam_sentence,
+                    "The camera performs one disciplined, deliberate move: a subtle continuous tilt down from the headline banner onto the newsprint text without sudden whips or orbits."
+                )
         return content
 
     def get_t2i_style_block(self, trace: Optional[PromptTrace] = None) -> str:

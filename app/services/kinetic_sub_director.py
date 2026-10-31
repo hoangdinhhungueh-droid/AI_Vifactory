@@ -142,7 +142,7 @@ TAXONOMY_KEYWORDS: Dict[KineticFamily, List[str]] = {
 FAMILY_DEFAULT_PROPS: Dict[KineticFamily, Tuple[str, str, str]] = {
     # (label, material, mass_class)
     KineticFamily.H1_IMPACT: ("crimson official sanction seal", "wood_rubber", "heavy"),
-    KineticFamily.H2_CONSTRAINT: ("precision brass vernier caliper", "solid_metal", "heavy"),
+    KineticFamily.H2_CONSTRAINT: ("archival brass document clamp", "solid_metal", "medium"),
     KineticFamily.H3_SEVER: ("sharp surgical craft scalpel", "steel", "medium"),
     KineticFamily.H4_TETHER: ("taut red evidence thread with clear adhesive tabs", "cotton_thread", "feather"),
     KineticFamily.H5_OPTICAL: ("vintage brass magnifying loupe", "brass_glass", "medium"),
@@ -169,7 +169,7 @@ FAMILY_PROP_CATALOG: Dict[KineticFamily, List[Tuple[str, str, str]]] = {
         ("embossed metal notary seal", "solid_metal", "heavy"),
     ],
     KineticFamily.H2_CONSTRAINT: [
-        ("precision brass vernier caliper", "solid_metal", "heavy"),
+        ("archival brass document clamp", "solid_metal", "medium"),
         ("heavy steel spring paperclip", "steel", "light"),
         ("steel drafting metric compass", "solid_metal", "medium"),
         ("serrated metal binder clamp", "steel", "medium"),
@@ -226,7 +226,7 @@ def select_distinct_props_for_scene(
     fam1 = dominant_families[0] if dominant_families else KineticFamily.H2_CONSTRAINT
     fam2 = dominant_families[1] if len(dominant_families) > 1 else KineticFamily.H6_MARK
 
-    cat1 = FAMILY_PROP_CATALOG.get(fam1, [("precision brass vernier caliper", "solid_metal", "heavy")])
+    cat1 = FAMILY_PROP_CATALOG.get(fam1, [("archival brass document clamp", "solid_metal", "medium")])
     cat2 = FAMILY_PROP_CATALOG.get(fam2, [("translucent neon amber marker stroke", "fluorescent_ink", "feather")])
 
     p1 = cat1[0]

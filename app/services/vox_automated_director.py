@@ -794,7 +794,7 @@ class VoxAutomatedDirector:
                     scene_id=f"scene_{b_idx:02d}",
                     sentence=b.get("narration", "") or headline,
                     hero_cutout_object=hero_label,
-                    interacting_objects=["crimson forensic seal stamp", "brass precision caliper"],
+                    interacting_objects=None,
                     duration_sec=dur_s,
                     market=resolved_mkt,
                     whisper_words=b.get("whisper_words") or b.get("words"),

@@ -73,7 +73,7 @@ Settle [Điểm dừng khung hình cuối cùng].
 - **Midground (MG)**: Nhân vật cắt dán bán sắc đen trắng (Halftone B&W Cutout Figures) với đường viền cắt thô (rough white deckle keyline) và nét bóng mực đỏ/vàng lệch sau lưng (`offset stroke pop`).
 - **Foreground (FG)**: 
   - Thẻ số liệu khổng lồ: `giant stat number [TEXT] (giant number)`
-  - Thước cặp cơ khí chính xác: `machined brass vernier caliper (interacting tool)`
+  - Kẹp tài liệu bằng đồng: `precision archival brass document clamp (interacting tool)`
   - Dấu mộc điều tra đỏ thắm: `turned-wood vermilion docket seal stamp (interacting tool)`
   - Kẹp lò xo thép công nghiệp: `blackened steel spring clamp (interacting tool)`
   - Dao trổ / Kéo biên tập: `machined steel editorial shears (interacting tool)`
@@ -83,7 +83,7 @@ Settle [Điểm dừng khung hình cuối cùng].
 
 ### C. 7 Họ Tương Tác Cơ Học ($H_1 \to H_7$ Kinetic Couplings):
 1. **$H_1$ (Impact / Percussion)**: Con dấu dập mạnh $\to$ Giấy lún, mực loang nhẹ, camera giật 1 frame.
-2. **$H_2$ (Constraint / Clamp)**: Thước cặp hoặc kẹp giấy siết mục tiêu $\to$ Mép cardstock nhăn, vạch đo khóa cứng.
+2. **$H_2$ (Constraint / Clamp)**: Kẹp tài liệu hoặc chốt giữ siết mép giấy $\to$ Mép cardstock nhăn, chốt khóa cứng.
 3. **$H_3$ (Sever / Cut / Tear)**: Kéo kim loại cắt xé $\to$ Mảnh giấy tách rời làm lộ chứng cứ tầng bên dưới.
 4. **$H_4$ (Tether / Tension)**: Sợi chỉ đỏ kéo căng giữa 2 ghim đồng $\to$ Hai đối tượng bị kéo nghiêng về nhau.
 5. **$H_5$ (Optical / Refraction)**: Kính lúp trượt qua $\to$ Phóng đại $1.4\times$, méo cong rìa barrel distortion.
@@ -98,7 +98,7 @@ Settle [Điểm dừng khung hình cuối cùng].
 - `pushes in smoothly through a torn aperture`
 - `pulls back to reveal the expanding diorama`
 - `cranes upward over the stacked dossier`
-- `racks focus sharply from foreground caliper to background figure`
+- `racks focus sharply from foreground clamp to background figure`
 
 ### E. Settle (Điểm kết thúc bắt buộc):
 - `Settle on the giant stat number.`
