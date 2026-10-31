@@ -93,8 +93,8 @@ def _build_and_save_remotion_props(
             import wave
             with wave.open(str(audio_file), "rb") as wf:
                 audio_dur = wf.getnframes() / float(wf.getframerate())
-        except Exception:
-            pass
+        except (wave.Error, EOFError, OSError) as _wave_err:
+            logger.debug(f"[s10_render] Wave duration probe skipped: {_wave_err}")
 
     raw_total_sec = sum(cl.get("duration_sec", 6.0) for cl in clips) if clips else 0.0
     target_total_sec = audio_dur if audio_dur > 0.0 else raw_total_sec
