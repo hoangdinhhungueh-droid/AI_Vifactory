@@ -1,0 +1,54 @@
+STATIC_OVERHEAD:
+  positive: "Camera: Locked overhead perspective, perfectly static. All motion comes strictly from tactile objects."
+  strip_from_avoid:
+    - "no static locked-off camera"
+  forbidden_in_shot:
+    - "whip"
+    - "orbit"
+    - "crane"
+    - "dive"
+  camera_is_actor: false
+
+SLOW_PUSH_IN_0_1X:
+  positive: "Camera: Slow continuous push-in at 0.1x speed straight toward the hero document."
+  add_to_avoid:
+    - "no static locked-off camera"
+  forbidden_in_shot:
+    - "orbit"
+    - "whip"
+    - "crane"
+  camera_is_actor: true
+
+SLOW_HORIZONTAL_PAN:
+  positive: "Camera: Slow horizontal pan from left to right, tracking smoothly along the evidence outflow path."
+  add_to_avoid:
+    - "no static locked-off camera"
+  forbidden_in_shot:
+    - "top-down settle"
+    - "orbit"
+    - "crane"
+    - "whip"
+  camera_is_actor: true
+
+SUBTLE_TILT_DOWN:
+  positive: "Camera: Subtle tilt down from the newspaper header directly onto the verified report body text."
+  add_to_avoid:
+    - "no static locked-off camera"
+  forbidden_in_shot:
+    - "crane up"
+    - "upward crane"
+    - "orbit"
+    - "whip"
+  camera_is_actor: true
+
+ORBIT_QUARTER_TURN:
+  positive: "Camera: Orbits the diorama a crisp quarter turn, focus racking front to back."
+  add_to_avoid:
+    - "no static locked-off camera"
+  camera_is_actor: true
+
+WHIP_LEFT_TO_RIGHT:
+  positive: "Camera: Whips decisively left to right past the near cards, focus racking along the layer depth."
+  add_to_avoid:
+    - "no static locked-off camera"
+  camera_is_actor: true

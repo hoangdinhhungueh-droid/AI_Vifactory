@@ -1536,21 +1536,21 @@ def build_natural_kinetic_i2v_prompt(
     return prompt.strip()
 
 
-CANONICAL_BACKGROUNDS = [
-    "faded world map tilted in perspective, far out of focus",
-    "torn financial ledger page with metric columns tilted away, deep out of focus",
-    "newspaper column wall with aged deckle borders, receding into soft blur",
-    "architectural blueprint grid under warm 3200K tungsten wash, far out of focus",
-    "engraved stock chart with faded metric coordinate lines receding in perspective",
-    "circuit trace print on fibrous cream parchment tilted in deep perspective",
-    "topographic elevation survey map on aged cream cardstock (#F4F1EA), soft background",
-    "shipping manifest table with hand-annotated clearance marks tilted away",
-    "index-card wall stacked at staggered depths, receding into blur",
-    "passport stamp field with authentic regional ink cancellations, blurred at depth"
-]
+def _get_canonical_backgrounds() -> list[str]:
+    from app.services.template_registry import get_template_registry
+    return get_template_registry().get_canonical_backgrounds()
 
 
-def sanitize_prompt_for_imagen3(text: str) -> str:
+# Kept for backward compatibility but backed by TemplateRegistry
+CANONICAL_BACKGROUNDS = _get_canonical_backgrounds()
+
+
+def sanitize_prompt_for_imagen3(text: Any) -> str:
+    if not text:
+        return ""
+    if isinstance(text, list):
+        text = ", ".join(str(t) for t in text)
+    text = str(text)
     """Sanitizes text for Google Imagen 3 (T2I), stripping English artifact prefixes and trademark trigger brands."""
     if not text:
         return ""
@@ -1565,7 +1565,7 @@ def sanitize_prompt_for_imagen3(text: str) -> str:
         (r'\b(Tether|テザー|테더)\b', 'ステーブルコイン発行企業'),
         (r'\b(Apple|アップル|애플)\b', '大手テクノロジー企業'),
         (r'\b(Google|グーグル|구글)\b', '大手検索エンジン企業'),
-        (r'\b(Microsoft|マイクロソフト|마이크로소프트)\b', '大手ソフトウェア企業'),
+        (r'\b(Microsoft|マイクロソフト|마이크로소フト)\b', '大手ソフトウェア企業'),
         (r'\b(Tesla|テスラ|테슬라)\b', '大手電気自動車メーカー'),
         (r'\b(Nvidia|エヌビディア|엔ビディア)\b', '大手半導体企業'),
         (r'\b(OpenAI|オープンAI|오픈AI)\b', '大手AI研究所'),
@@ -1580,94 +1580,96 @@ def build_cl3_paper_diorama_prompt(
     market: str = "EN",
     scene_id: Optional[str] = None,
     style_mode: str = "deep_diorama",
+    trace: Optional[Any] = None,
     **kwargs: Any
 ) -> str:
     """Builds a pure CL3 Canonical 4-Block Paper Diorama Prompt ([STYLE BLOCK] -> SHOT -> AUDIO -> AVOID).
 
-    Conforms 100% to CL3 Vox Videos specification:
-    - Block 1: STYLE BLOCK (verbatim choice of Flat Parallax, Deep Diorama, or Locked Stage).
+    Conforms 100% to CL3 Vox Videos specification & Rule 132 Decoupled Engine:
+    - Block 1: STYLE BLOCK (loaded dynamically via TemplateRegistry from Markdown).
     - Block 2: SHOT: Background -> MG -> FG -> Kinetic Action -> Camera with Settle.
+               Hierarchy of Precedence: scene camera_directive in sub_plan overrides generic taxonomy!
     - Block 3: AUDIO: Sound design only, no music, no narration.
-    - Block 4: AVOID: Matching negative prompt block.
+    - Block 4: AVOID: Avoid block loaded from avoid_base.md and dynamically tailored to camera directive.
     """
     sentence = ""
     resolved_market = market
     sc_id = scene_id
+    plan_camera = None
+    plan_hero = None
+    plan_action = None
+    plan_tool = None
+    plan_verb = None
+    plan_reaction = None
+    plan_residue = None
+
     if isinstance(sub_plan_or_sentence, dict):
         sentence = sub_plan_or_sentence.get("sentence") or sub_plan_or_sentence.get("headline") or ""
         sc_id = sub_plan_or_sentence.get("scene_id") or scene_id
         resolved_market = sub_plan_or_sentence.get("market") or market
+        # Hierarchy of Precedence (Boss Opus 5.5 Phase 2): Director Plan takes absolute precedence!
+        plan_camera = sub_plan_or_sentence.get("camera_directive") or sub_plan_or_sentence.get("camera_movement")
+        plan_hero = sub_plan_or_sentence.get("hero_cutout_object")
+        plan_action = sub_plan_or_sentence.get("action_type") or sub_plan_or_sentence.get("tactile_action")
+        plan_tool = sub_plan_or_sentence.get("interacting_tool") or sub_plan_or_sentence.get("interacting_objects")
+        plan_verb = sub_plan_or_sentence.get("tactile_action_verb")
+        plan_reaction = sub_plan_or_sentence.get("physical_reaction")
+        plan_residue = sub_plan_or_sentence.get("tactile_residue")
     else:
         sentence = str(sub_plan_or_sentence)
 
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
+    from app.services.template_registry import get_template_registry
+
     ev = extract_evidence_for_sentence(sentence, market=resolved_market, scene_id=sc_id)
+    reg = get_template_registry()
 
-    # 1. Style Block
-    if style_mode == "flat_parallax":
-        style_block = (
-            "Use the attached style sheet as the strict visual system — match its aged-newsprint collage surface (#F4F1EA), "
-            "desaturated archival palette with one hot accent (#D62E1F), condensed headline caps with giant stat numbers, "
-            "halftone black-and-white cutout people with rough white keylines and offset accent strokes, and its print-grain finish. "
-            "Do NOT copy the sheet's layout; it defines the language, not the composition. Layers sit at distinct depths like a paper diorama — "
-            "true parallax, never glossy 3D. Backgrounds are muted archival fields, varying per clip within this palette. "
-            "ALERT WASH means the whole frame floods toward the hot accent tone. Motion: spring pop-ups with overshoot within 0.2s - 0.4s, "
-            "staggered entrances, ticking counters, underline swipes; one slow camera move per clip. Audio: sound design only — "
-            "paper pops, thwips, stamps, ticks, low newsroom hum. No music. No voice-over. Preserves bottom 20% vertical safe zone."
-        )
-        avoid_block = (
-            "AVOID: no glossy CG 3D, no plastic specular shine, no lens flares, no camera cuts within the clip, "
-            "no full-color midground portraits (people stay halftone black-and-white), no warped or gibberish text, "
-            "no invented logos, no watermarks, no simultaneous entrances, no music, no soundtrack, no voice-over, no narration, no lyrics"
-        )
-    elif style_mode == "locked_stage":
-        style_block = (
-            "Documentary cutout-collage stage: a locked, muted archival map/texture background that never changes (#F4F1EA). "
-            "Midground: black-and-white halftone cutouts with a rough white keyline and an offset red marker stroke behind each. "
-            "Foreground: structures, props, and big stat numbers in full color. Condensed bold headline caps; numbers rendered huge, "
-            "as physical hero characters. Desaturated palette plus one hot red accent (#D62E1F), secondary mustard (#D9A441). "
-            "Spring pop-ups with slight overshoot, staggered entrances, counters ticking up, red underline swipes. Locked into 12fps living hold on twos. "
-            "Camera: subtle slow drift only, never cuts, ending with a precise settle. Audio: sound design only. No music, no narration."
-        )
-        avoid_block = (
-            "AVOID: no flat single-plane composition, no glossy CG 3D, no full-color midground portraits, no warped text, "
-            "no invented logos, no watermarks, no music, no voice-over, no narration"
-        )
-    else:  # deep_diorama
-        style_block = (
-            "Use the attached style sheet for materials only — aged-print collage textures (#F4F1EA / #C9BB9C), "
-            "halftone black-and-white cutout people with rough keylines and offset accent strokes, giant stat numbers, authentic print grain. "
-            "Do NOT copy the sheet's layout or its flatness: every clip is a deep 3D paper diorama — cutouts are physical layers separated in real space, "
-            "strong shallow depth of field, foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, "
-            "dives, whips, racks focus — one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's palette. "
-            "ALERT WASH means the entire frame floods to the hot accent tone (#D62E1F) in one beat. Motion: mechanical spring strikes <= 0.4s with overshoot, "
-            "staggered entrances, contact dynamics leaving physical residue, locking into 12fps living texture hold on twos. "
-            "Audio: sound design only — paper pops, whooshes, stamps, ticks. No music. No voice-over. Preserves bottom 20% vertical safe zone."
-        )
-        avoid_block = (
-            "AVOID: no flat single-plane composition, no static locked-off camera, no glossy plastic CG (depth stays papercraft), "
-            "no full-color midground portraits (people stay halftone black-and-white), no warped or gibberish text, no invented logos, "
-            "no watermarks, no music, no soundtrack, no voice-over, no narration, no lyrics"
-        )
+    # 1. Style Block from Markdown (Rule 132)
+    style_block = reg.get_style_block(style_mode=style_mode, trace=trace)
 
-    # 2. SHOT Component Assembly (Rule 6: Background changes per clip from canonical slot menu)
+    # 2. Camera Directive Resolution (Hierarchy of Precedence: Scene Plan > Generic ev)
+    effective_camera_name = plan_camera or ev.camera_directive
+    cam_pos_line, _, _, forbidden_in_shot = reg.resolve_camera_directive(effective_camera_name, trace=trace)
+
+    # 3. Avoid Block from avoid_base.md dynamically tailored to camera (Rule 120/128)
+    avoid_block = reg.resolve_avoid_block(effective_camera_name, trace=trace)
+
+    # 4. Canonical Background from JSON
+    canonical_bgs = reg.get_canonical_backgrounds(trace=trace)
     sc_idx = 0
     if sc_id:
         m_sc = re.search(r"(\d+)", str(sc_id))
         if m_sc:
             sc_idx = int(m_sc.group(1)) - 1
-    bg_choice = CANONICAL_BACKGROUNDS[sc_idx % len(CANONICAL_BACKGROUNDS)]
+    bg_choice = canonical_bgs[sc_idx % len(canonical_bgs)]
     bg_field = f"Background: {bg_choice}."
-    clean_hero = sanitize_prompt_for_imagen3(ev.hero_anchor_prop)
-    clean_tool = sanitize_prompt_for_imagen3(ev.interacting_tool_prop)
+
+    # 5. Hero Prop & Tool Resolution with Semantic Compatibility
+    raw_hero = plan_hero or ev.hero_anchor_prop
+    raw_tool = plan_tool or ev.interacting_tool_prop
+    clean_hero = sanitize_prompt_for_imagen3(raw_hero)
+    clean_tool = sanitize_prompt_for_imagen3(raw_tool)
+
     mg_cutout = f"MG: halftone black-and-white cutout exhibit of {clean_hero} entering at distinct depth with rough white deckle border and offset ink stroke."
     fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
-    action_text = f"Action: The {clean_tool} snaps briskly in 0.3s and {ev.tactile_action_verb} the document, {ev.physical_reaction}, leaving {ev.tactile_residue}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
-    camera_line = f"Camera: {ev.camera_directive.rstrip('.')}. Settle on the {clean_hero} in sharp focus."
+
+    action_verb = plan_verb or ev.tactile_action_verb
+    phys_react = plan_reaction or ev.physical_reaction
+    tac_res = plan_residue or ev.tactile_residue
+    action_text = f"Action: The {clean_tool} snaps briskly in 0.3s and {action_verb} the document, {phys_react}, leaving {tac_res}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+    camera_line = f"{cam_pos_line.rstrip('.')}. Settle on the {clean_hero} in sharp focus."
+
+    # Validate against forbidden camera words in shot text (e.g. no whip when static overhead)
+    for f_term in forbidden_in_shot:
+        action_text = re.sub(r'\b' + re.escape(f_term) + r'\b', 'moves', action_text, flags=re.IGNORECASE)
 
     shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}\n{action_text}\n{camera_line}"
 
-    # 3. Audio Component
+    # Semantic Compatibility check
+    effective_action_type = plan_action or getattr(ev.archetype, 'value', str(ev.archetype))
+    reg.validate_prop_action_compatibility(effective_action_type, clean_hero, clean_tool, shot_block)
+
+    # 6. Audio Component from prop matrix or sound design
     tool_lower = clean_tool.lower()
     if "caliper" in tool_lower or "vernier" in tool_lower:
         audio_sfx = "vernier metal slide, cardstock crimp, ticker clicks, low newsroom hum"
@@ -1679,6 +1681,10 @@ def build_cl3_paper_diorama_prompt(
         audio_sfx = "pushpin wooden tap, string tension twang, taut hum, room tone"
     elif "clip" in tool_lower or "clamp" in tool_lower:
         audio_sfx = "steel spring snap, cardstock crimp crunch, placement click, low hum"
+    elif "outflow" in tool_lower or "drain" in tool_lower or "token" in tool_lower:
+        audio_sfx = "paper tokens cascading flutter, disclosure slip slide, low archival room tone"
+    elif "broadsheet" in tool_lower or "newspaper" in tool_lower or "nikkei" in tool_lower:
+        audio_sfx = "broadsheet paper rustle, gentle folio placement tap, newsroom hum"
     else:
         audio_sfx = "crisp paper snap, mechanical placement click, low archival newsroom hum"
 
@@ -1699,46 +1705,50 @@ def build_cl3_paper_diorama_image_prompt(
     scene_id: Optional[str] = None,
     hero_object_override: Optional[str] = None,
     interacting_tool_override: Optional[str] = None,
+    trace: Optional[Any] = None,
     **kwargs: Any
 ) -> str:
     """Builds a pure CL3 Canonical 2-Block Paper Diorama Still Image Prompt ([STYLE BLOCK] -> SHOT:).
 
-    Conforms 100% to CL3 Vox Videos specification for still seed generation:
-    - Block 1: STYLE BLOCK (Paper diorama materials, depth, print textures, 0% video/kinematics/audio words)
+    Conforms 100% to CL3 Vox Videos specification & Rule 132 Decoupled Engine for still seed generation:
+    - Block 1: STYLE BLOCK (loaded dynamically via TemplateRegistry from t2i_style.md)
     - Block 2: SHOT: Background -> MG -> FG (clean props, zero trademark refusal)
     """
     sentence = ""
     resolved_market = market
     sc_id = scene_id
+    plan_hero = None
+    plan_tool = None
+
     if isinstance(sub_plan_or_sentence, dict):
         sentence = sub_plan_or_sentence.get("sentence") or sub_plan_or_sentence.get("headline") or ""
         sc_id = sub_plan_or_sentence.get("scene_id") or scene_id
         resolved_market = sub_plan_or_sentence.get("market") or market
+        plan_hero = sub_plan_or_sentence.get("hero_cutout_object")
+        plan_tool = sub_plan_or_sentence.get("interacting_tool") or sub_plan_or_sentence.get("interacting_objects")
     else:
         sentence = str(sub_plan_or_sentence)
 
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
-    ev = extract_evidence_for_sentence(sentence, market=resolved_market, scene_id=sc_id)
+    from app.services.template_registry import get_template_registry
 
-    raw_hero = hero_object_override or ev.hero_anchor_prop
-    raw_tool = interacting_tool_override or ev.interacting_tool_prop
+    ev = extract_evidence_for_sentence(sentence, market=resolved_market, scene_id=sc_id)
+    reg = get_template_registry()
+
+    style_block = reg.get_t2i_style_block(trace=trace)
+    canonical_bgs = reg.get_canonical_backgrounds(trace=trace)
+
+    raw_hero = hero_object_override or plan_hero or ev.hero_anchor_prop
+    raw_tool = interacting_tool_override or plan_tool or ev.interacting_tool_prop
     clean_hero = sanitize_prompt_for_imagen3(raw_hero)
     clean_tool = sanitize_prompt_for_imagen3(raw_tool)
-
-    style_block = (
-        "Deep 3D paper diorama with aged-print collage textures on aged archival newsprint (#F4F1EA / #C9BB9C), "
-        "halftone black-and-white cutout people and objects with rough white deckle keylines and offset ink accent strokes (#D62E1F red, #D9A441 mustard), "
-        "giant stat numbers rendered as physical hero characters, and authentic print grain. Physical layers separated in real space, "
-        "strong shallow depth of field, foreground elements crossing close to the lens. All cutouts sit on physical stands across distinct focal planes. "
-        "Preserves bottom 20% vertical safe zone for subtitles."
-    )
 
     sc_idx = 0
     if sc_id:
         m_sc = re.search(r"(\d+)", str(sc_id))
         if m_sc:
             sc_idx = int(m_sc.group(1)) - 1
-    bg_choice = CANONICAL_BACKGROUNDS[sc_idx % len(CANONICAL_BACKGROUNDS)]
+    bg_choice = canonical_bgs[sc_idx % len(canonical_bgs)]
     bg_field = f"Background: {bg_choice}."
     mg_cutout = f"MG: high-contrast halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset ink accent stroke (#D62E1F)."
     if getattr(ev.archetype, 'value', str(ev.archetype)) == "quantitative_metric":
@@ -1748,4 +1758,3 @@ def build_cl3_paper_diorama_image_prompt(
 
     shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}"
     return f"{style_block}\n\n{shot_block}".strip()
-

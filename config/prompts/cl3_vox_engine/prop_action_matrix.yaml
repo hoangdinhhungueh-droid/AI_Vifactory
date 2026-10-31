@@ -1,0 +1,62 @@
+# Compatibility Matrix: Actions & Archetypes to Tactile Props (Rule 140 & Boss Opus 5.5 Spec)
+
+actions:
+  date_anchor:
+    allowed_hero:
+      - "archival date card and investigative newspaper broadsheet clipping"
+      - "typeset calendar date placard on aged cardstock"
+    allowed_tools:
+      - "editorial fingers placing the date placard cleanly into the desktop evidence groove"
+      - "brass alignment guide pinning the date card"
+    forbidden_tools:
+      - "caliper"
+      - "vernier"
+      - "complex yarn network"
+    default_audio: "crisp paper slot click, archival dust puff, quiet room tone"
+
+  capital_boundary:
+    allowed_hero:
+      - "financial ledger balance sheet and bounded asset vault card with stacks of paper token chips"
+      - "audited financial ledger statement"
+    allowed_tools:
+      - "embossed stat number tab and directional red routing card pushing against the asset boundary"
+      - "thick red directional route arrow and metallic coin tokens"
+    forbidden_tools:
+      - "caliper"
+      - "closed-loop circuit"
+    default_audio: "paper token slide, cardstock crimp, heavy ledger thud, quiet room tone"
+
+  drain_outflow:
+    allowed_hero:
+      - "breached crypto asset ledger boundary with paper token chips spilling continuously outward"
+      - "unsealed digital asset balance box with paper tokens flowing past the margin"
+    allowed_tools:
+      - "official disclosure announcement slip sliding into the frame"
+      - "open vault boundary flange directing the continuous outflow"
+    forbidden_tools:
+      - "caliper"
+      - "vernier"
+      - "micrometer"
+      - "measuring jaws"
+    forbidden_terms:
+      - "verified quantitative metric"
+      - "audited valuation schedule"
+      - "caliper score dents"
+    default_audio: "paper tokens cascading flutter, disclosure slip slide, low archival room tone"
+
+  news_report:
+    allowed_hero:
+      - "broadsheet frontpage clipping of 日本経済新聞 (Nikkei) with editorial column layout"
+      - "investigative newspaper frontpage dossier clipping"
+    allowed_tools:
+      - "editorial reporter hands setting the broadsheet frontpage clipping cleanly onto the investigation folio"
+      - "newsprint alignment tab"
+    forbidden_tools:
+      - "official investigation seal"
+      - "court sanction stamp"
+      - "government penalty order"
+    forbidden_terms:
+      - "official investigation stamp"
+      - "vermilion docket seal"
+      - "government seal"
+    default_audio: "broadsheet paper rustle, gentle folio placement tap, newsroom hum"
