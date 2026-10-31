@@ -303,6 +303,75 @@ def verify_final_video_gates(
     if black_count > 0:
         raise ValueError(f"Quality Gate FAIL: detected {black_count} black sections in video")
 
+    # 5b. Computer Vision Content Integrity: SMPTE Broadcast Color Bars & Degenerate Blur Gate (Rule 118, 121, 122)
+    # Detects unauthorized fallback testsrc clips (SMPTE color bars) and extreme unreadable optical fog.
+    if act_dur > 0.0:
+        sample_count = max(5, min(12, int(act_dur / 30.0)))
+        sample_timestamps = [round(act_dur * (i + 1) / (sample_count + 1), 2) for i in range(sample_count)]
+        color_bar_timestamps = []
+        blur_variances = []
+
+        import io
+        from PIL import Image
+        import numpy as np
+
+        for sample_t in sample_timestamps:
+            cmd_f = [
+                get_ffmpeg_binary(), "-y", "-ss", str(sample_t), "-i", str(final_mp4),
+                "-vframes", "1", "-f", "image2pipe", "-vcodec", "png", "-"
+            ]
+            try:
+                proc = subprocess.run(cmd_f, capture_output=True, check=True, timeout=15)
+                f_img = Image.open(io.BytesIO(proc.stdout)).convert("RGB")
+            except Exception as _fe:
+                logger.debug(f"[verify_final_video_gates] Frame probe error at {sample_t}s: {_fe}")
+                continue
+
+            arr = np.array(f_img)
+            mid_y = f_img.size[1] // 2
+            # 1. SMPTE Color Bar Check: Detect pure primary/secondary broadcast bars
+            is_cb = False
+            for y_off in (-20, 0, 20):
+                y_idx = max(0, min(f_img.size[1] - 1, mid_y + y_off))
+                row = arr[y_idx, :]
+                has_magenta = bool(np.any((row[:, 0] > 200) & (row[:, 1] < 60) & (row[:, 2] > 200)))
+                has_blue = bool(np.any((row[:, 0] < 60) & (row[:, 1] < 60) & (row[:, 2] > 200)))
+                has_yellow = bool(np.any((row[:, 0] > 200) & (row[:, 1] > 200) & (row[:, 2] < 60)))
+                has_green = bool(np.any((row[:, 0] < 60) & (row[:, 1] > 200) & (row[:, 2] < 60)))
+                has_cyan = bool(np.any((row[:, 0] < 60) & (row[:, 1] > 200) & (row[:, 2] > 200)))
+                if sum([has_magenta, has_blue, has_yellow, has_green, has_cyan]) >= 3:
+                    is_cb = True
+                    break
+
+            if is_cb:
+                color_bar_timestamps.append(sample_t)
+
+            # 2. Content Blur Check: Exclude bottom 20% subtitle zone
+            gray = np.array(f_img.convert("L"), dtype=np.float64)
+            h_img = gray.shape[0]
+            content_gray = gray[:int(h_img * 0.8), :]
+            lap = (
+                np.roll(content_gray, 1, axis=0) + np.roll(content_gray, -1, axis=0) +
+                np.roll(content_gray, 1, axis=1) + np.roll(content_gray, -1, axis=1) - 4 * content_gray
+            )
+            c_var = float(np.var(lap[1:-1, 1:-1]))
+            blur_variances.append(c_var)
+
+        if color_bar_timestamps:
+            raise ValueError(
+                f"Quality Gate FAIL: SMPTE test pattern / broadcast color bars detected in final video at {color_bar_timestamps}s "
+                f"(Rule 118 & 122 breach: fallback corrupt clip leak)"
+            )
+
+        # Extreme optical blur check: only fails if video duration > 30s and >80% of samples are pure unreadable fog (< 5.0)
+        if act_dur > 30.0 and blur_variances:
+            severe_blur = sum(1 for v in blur_variances if v < 5.0)
+            if severe_blur / len(blur_variances) > 0.8:
+                raise ValueError(
+                    f"Quality Gate FAIL: Extreme optical blur / unreadable fog detected across {severe_blur}/{len(blur_variances)} "
+                    f"sampled frames (content Laplacian variance < 5.0, Rule 122 Axis 3 breach)"
+                )
+
     # 6. EBUR128 / AES TD1004 broadcast loudness compliance
     # Standard: EBU R128 / AES TD1004 / EBU Tech 3343 Online Streaming Standard:
     # Target: -16.0 LUFS ± 1.0 LU tolerance (range [-17.0, -15.0] LUFS)

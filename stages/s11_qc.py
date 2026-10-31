@@ -455,9 +455,17 @@ def run(ctx: RunContext) -> StageArtifact:
     if not plan or not plan.scenes:
         raise ValueError(f"Stage S11 fail-closed: ScenePlan is empty or invalid for run '{ctx.run_id}'")
 
+    manifest_data = None
+    rm_path = ctx.paths.root / "run_manifest.json"
+    if rm_path.exists():
+        try:
+            manifest_data = json.loads(rm_path.read_text(encoding="utf-8"))
+        except Exception as _rm_err:
+            logger.debug(f"[s11_qc] run_manifest read notice: {_rm_err}")
+
     try:
         # Delegate directly to canonical vox.qa.gates for forensic verification (Rule 125 & 139)
-        gate_res = verify_final_video_gates(p, expected_duration=expected_dur, plan=plan)
+        gate_res = verify_final_video_gates(p, expected_duration=expected_dur, plan=plan, manifest_data=manifest_data)
         qc_details.update(gate_res)
         qc_details["gates_verified"] = True
         gate_passed = True

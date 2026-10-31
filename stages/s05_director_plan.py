@@ -1193,7 +1193,7 @@ def resolve_market_redacted_terms(market: str = "EN") -> List[str]:
     if m in ("EN", "US", "UK"):
         return ["CONFIDENTIAL", "UNVERIFIED", "RESTRICTED", "CLASSIFIED"]
     elif m == "JP":
-        return ["CONFIDENTIAL", "UNVERIFIED", "不適切", "不正"]
+        return ["極秘", "機密", "未確認", "非公開", "不適切", "不正"]
     elif m == "KR":
         return ["기밀", "미확인", "부적절", "위반"]
     return ["CONFIDENTIAL", "UNVERIFIED", "RESTRICTED"]
