@@ -72,7 +72,7 @@ def resolve_audit_model(is_supreme: bool = False, requested_model: Optional[str]
     - Routine audits (Round 1-n, loop-step, test gates) MUST use gpt-6.1-sol or claude-sonnet-5.
     - If claude-opus-5-5 is requested without is_supreme=True, it fails closed to gpt-6.1-sol.
     """
-    raw_model = requested_model or os.getenv("HHTECH_PLANNER_MODEL") or DEFAULT_ROUTINE_AUDIT_MODEL
+    raw_model = requested_model or os.getenv("HHTECH_PLANNER_MODEL") or (DEFAULT_SUPREME_BOSS_MODEL if is_supreme else DEFAULT_ROUTINE_AUDIT_MODEL)
     if "opus" in raw_model.lower():
         if not is_supreme and os.getenv("ALLOW_SUPREME_OPUS55_CALL") != "1":
             logger.warning(
@@ -185,45 +185,33 @@ def call_hhtech_llm(
         "messages": messages,
         "max_tokens": max_tokens,
         "temperature": temperature,
-        "stream": True,
     }
 
     start_ts = time.time()
-    logger.info(f"Connecting to HHTech API [POST {url}] using model='{model}' (streaming enabled)...")
+    logger.info(f"Connecting to HHTech API [POST {url}] using model='{model}'...")
 
     try:
         import httpx
-        proxy_url = os.getenv("HHTECH_PROXY", "socks5://127.0.0.1:40000")
-        with httpx.Client(proxy=proxy_url, timeout=httpx.Timeout(timeout=180.0, connect=30.0, read=180.0, write=30.0)) as client:
-            with client.stream("POST", url, json=payload, headers=headers) as resp:
-                if resp.status_code != 200:
-                    err_body = resp.read().decode("utf-8", errors="replace")
-                    raise RuntimeError(f"HHTech API error HTTP {resp.status_code}: {err_body}")
-                full_chunks = []
-                for line in resp.iter_lines():
-                    line = line.strip()
-                    if line.startswith("data: "):
-                        data_str = line[6:]
-                        if data_str == "[DONE]":
-                            break
-                        try:
-                            d = json.loads(data_str)
-                            chunk = d.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                            if chunk:
-                                full_chunks.append(chunk)
-                        except Exception as _chunk_err:
-                            logger.debug(f"Stream chunk parse notice: {_chunk_err}")
-                content = "".join(full_chunks).strip()
-                latency = round(time.time() - start_ts, 2)
-                logger.info(f"HHTech API response HTTP {resp.status_code} ({latency}s) — Content length: {len(content)} chars")
-                return {
-                    "success": True,
-                    "status_code": resp.status_code,
-                    "model": model,
-                    "content": content,
-                    "latency_sec": latency,
-                    "usage": {"total_tokens": len(content.split())},
-                }
+        proxy_url = os.getenv("HHTECH_PROXY", "").strip()
+        proxy_kwargs = {"proxy": proxy_url} if (proxy_url and proxy_url.lower() not in ("direct", "none", "false")) else {}
+        with httpx.Client(**proxy_kwargs, timeout=httpx.Timeout(timeout=180.0, connect=30.0, read=180.0, write=30.0)) as client:
+            resp = client.post(url, json=payload, headers=headers)
+            if resp.status_code != 200:
+                err_body = resp.text
+                raise RuntimeError(f"HHTech API error HTTP {resp.status_code}: {err_body}")
+            data = resp.json()
+            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            usage = data.get("usage", {})
+            latency = round(time.time() - start_ts, 2)
+            logger.info(f"HHTech API response HTTP {resp.status_code} ({latency}s) — Total Tokens: {usage.get('total_tokens', len(content.split()))}")
+            return {
+                "success": True,
+                "status_code": resp.status_code,
+                "model": model,
+                "content": content.strip(),
+                "latency_sec": latency,
+                "usage": usage,
+            }
     except ImportError as _imp_err:
         logger.debug(f"Optional httpx not installed, falling back to urllib: {_imp_err}")
 
@@ -296,18 +284,24 @@ def resolve_codemap_gps_telemetry(task_description: str) -> str:
         try:
             with open(video_codemap, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            stages = [s.get("id") for s in data.get("stages", []) if s.get("id")]
-            return (
-                f"### [AI VIDEO FACTORY CODE MAP GPS DETECTED (Rule 138)]\n"
-                f"- Total Pipeline Stages: {len(stages)} ({', '.join(stages)})\n"
-                f"- Handoff Verification: Consult .codemap/codemap.json to prevent contract drift.\n"
-            )
+            stages = data.get("stages", [])
+            lines = [
+                "### [AI VIDEO FACTORY CODE MAP GPS DETECTED (Rule 138 & Serena AST)]",
+                f"- Total Pipeline Stages: {len(stages)}",
+                "- Canonical Stage Chain & File GPS:",
+            ]
+            for s in stages:
+                ref = s.get("ref", {})
+                lines.append(f"  * [{s.get('id')}] {s.get('name')}: {ref.get('file', 'N/A')} (L{ref.get('line_start')}-L{ref.get('line_end')}) -> Artifacts: {', '.join(s.get('artifacts', []))}")
+            lines.append("- Visual & Kinetic Engine Assets: config/prompts/cl3_vox_engine/, app/services/unified_vox_director.py, app/services/kinetic_sub_director.py (H1-H7 physics, 0ms drift)")
+            lines.append("- Orchestrator Core: orchestrator.run_pipeline (python -m orchestrator.run_pipeline)")
+            return "\n".join(lines) + "\n"
         except (json.JSONDecodeError, OSError) as e:
             logger.warning(f"Error reading video codemap: {e}")
             return f"[Video Code Map Read Error: {e}]\n"
     return ""
 
-def run_phase_plan(task_description: str, task_id: Optional[str] = None, dry_run: bool = False) -> Dict[str, Any]:
+def run_phase_plan(task_description: str, task_id: Optional[str] = None, dry_run: bool = False, is_supreme: bool = False) -> Dict[str, Any]:
     """Phase 1: Boss Opus 5.5 Brainstorms and generates authoritative spec."""
     venue_analysis = analyze_task_venue(task_description)
     codemap_telemetry = resolve_codemap_gps_telemetry(task_description)
@@ -343,10 +337,11 @@ def run_phase_plan(task_description: str, task_id: Optional[str] = None, dry_run
         f"Please produce the authoritative IMPLEMENTATION PLAN according to your system prompt."
     )
 
+    planner_model = resolve_audit_model(is_supreme=is_supreme) if is_supreme else (os.getenv("HHTECH_PLANNER_MODEL") or DEFAULT_BOSS_MODEL)
     result = call_hhtech_llm(
         prompt=user_prompt,
         system_prompt=BOSS_SYSTEM_PROMPT,
-        model=DEFAULT_BOSS_MODEL,
+        model=planner_model,
         max_tokens=3500,
         temperature=0.3,
     )
@@ -4899,7 +4894,7 @@ def main():
         if not args.task:
             print("Error: --task description is required for plan phase.", file=sys.stderr)
             sys.exit(1)
-        res = run_phase_plan(task_description=args.task, task_id=args.task_id, dry_run=args.dry_run)
+        res = run_phase_plan(task_description=args.task, task_id=args.task_id, dry_run=args.dry_run, is_supreme=args.supreme)
         if args.json_output:
             print(json.dumps(res, indent=2, ensure_ascii=False))
         else:

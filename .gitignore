@@ -124,4 +124,5 @@ specs/boss_audits/*_evidence_bundle/
 
 archify_repo/
 demo_audit_frames/
+docs/archify/audit_frames/
 .archive_legacy/

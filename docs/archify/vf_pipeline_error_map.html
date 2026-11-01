@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Video Factory â€” Codemap PhÃ¢n TÃ­ch Lá»—i ToÃ n Diá»‡n & BÃ¡o CÃ¡o PhÃ¡p Y Frame-by-Frame</title>
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #121826;
+            --bg-card: #1a2236;
+            --bg-card-hover: #222d47;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-red: #ef4444;
+            --accent-red-glow: rgba(239, 68, 68, 0.3);
+            --accent-amber: #f59e0b;
+            --accent-emerald: #10b981;
+            --accent-cyan: #06b6d4;
+            --accent-indigo: #6366f1;
+            --border-color: #2e3a59;
+            --border-highlight: #475569;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-card: #f1f5f9;
+            --bg-card-hover: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --accent-red: #dc2626;
+            --accent-red-glow: rgba(220, 38, 38, 0.2);
+            --accent-amber: #d97706;
+            --accent-emerald: #059669;
+            --accent-cyan: #0891b2;
+            --accent-indigo: #4f46e5;
+            --border-color: #cbd5e1;
+            --border-highlight: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .badge-fail {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+            border: 1px solid var(--accent-red);
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 var(--accent-red-glow); }
+            50% { box-shadow: 0 0 0 8px var(--accent-red-glow); }
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background-color: var(--bg-card-hover);
+            border-color: var(--border-highlight);
+        }
+
+        .nav-tabs {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            padding: 0 32px;
+            gap: 24px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--text-secondary);
+            padding: 14px 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-indigo);
+            border-bottom-color: var(--accent-indigo);
+        }
+
+        main {
+            padding: 32px;
+            flex: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* SVG CODEMAP STYLES */
+        .codemap-container {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 32px;
+        }
+
+        .codemap-legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 16px;
+            font-size: 12px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .dot-green { background-color: var(--accent-emerald); }
+        .dot-amber { background-color: var(--accent-amber); }
+        .dot-red { background-color: var(--accent-red); box-shadow: 0 0 8px var(--accent-red); }
+        .dot-blue { background-color: var(--accent-cyan); }
+
+        .svg-canvas-wrapper {
+            width: 100%;
+            height: 580px;
+            overflow: auto;
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            background: radial-gradient(circle, var(--bg-card) 1px, transparent 1px);
+            background-size: 24px 24px;
+            cursor: grab;
+        }
+
+        /* SUMMARY CARDS */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .card.card-danger {
+            border-left: 4px solid var(--accent-red);
+        }
+
+        .card.card-warning {
+            border-left: 4px solid var(--accent-amber);
+        }
+
+        .card.card-success {
+            border-left: 4px solid var(--accent-emerald);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .card-body {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .card-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .badge-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+        .badge-amber { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); }
+        .badge-green { background: rgba(16, 185, 129, 0.2); color: var(--accent-emerald); }
+
+        /* FRAME MATRIX STYLES */
+        .matrix-filters {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .filter-btn.active {
+            background-color: var(--accent-indigo);
+            color: white;
+            border-color: var(--accent-indigo);
+        }
+
+        .frames-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .frame-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s, border-color 0.2s;
+            cursor: pointer;
+        }
+
+        .frame-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--border-highlight);
+        }
+
+        .frame-card.sev-critical {
+            border: 2px solid var(--accent-red);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+        }
+
+        .frame-card.sev-high {
+            border: 1px solid var(--accent-amber);
+        }
+
+        .frame-thumb-box {
+            position: relative;
+            width: 100%;
+            height: 160px;
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        .frame-thumb-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .frame-time-badge {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: monospace;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .frame-sev-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .frame-info {
+            padding: 12px 14px;
+        }
+
+        .frame-scene {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .frame-defects {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .frame-defects li {
+            margin-left: 16px;
+            margin-top: 4px;
+        }
+
+        /* MODAL STYLES */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            max-width: 900px;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-img {
+            width: 100%;
+            max-height: 520px;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .code-box {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            color: #38bdf8;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-title">
+            <h2>AI Video Factory â€” Codemap Soi Luá»“ng Lá»—i & BÃ¡o CÃ¡o PhÃ¡p Y 15s</h2>
+            <span class="badge-fail">VIDEO Lá»–I 100% â€” PIPELINE KHáº¨N Cáº¤P</span>
+        </div>
+        <div class="header-actions">
+            <button class="btn" onclick="toggleTheme()">â˜€ï¸/ðŸŒ™ Äá»•i Giao Diá»‡n</button>
+            <a href="https://youtu.be/final_master_render" target="_blank" class="btn" style="color: var(--accent-red); border-color: var(--accent-red);">âš ï¸ Fake Link B10 (404)</a>
+        </div>
+    </header>
+
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('tab-codemap')">1. Codemap Kiáº¿n TrÃºc & 4 Äiá»ƒm Äá»©t GÃ£y</button>
+        <button class="tab-btn" onclick="switchTab('tab-matrix')">2. Ma Tráº­n 40 Frame PhÃ¡p Y (000s - 585s)</button>
+        <button class="tab-btn" onclick="switchTab('tab-rootcause')">3. BÃ³c TÃ¡ch NguyÃªn NhÃ¢n Gá»‘c (First-Principles)</button>
+        <button class="tab-btn" onclick="switchTab('tab-remediation')">4. Káº¿ Hoáº¡ch Clean-Code 5 Trá»¥c (Refactoring DAG)</button>
+    </div>
+
+    <main>
+        <!-- TAB 1: CODEMAP -->
+        <div id="tab-codemap" class="tab-content active">
+            <div class="summary-grid">
+                <div class="card card-danger">
+                    <div class="card-header">
+                        <span class="card-title">Junction 1: S03/S05 Prompt Engine</span>
+                        <span class="card-badge badge-red">CRITICAL</span>
+                    </div>
+                    <div class="card-body">
+                        BÄƒm nhá» thÃ nh 145 micro-scenes; dÃ­nh tá»« khÃ³a tiáº¿ng Anh Latinh trÃªn táº­p Nháº­t (Rule 122); zoom cáº­n cáº£nh vÃ o máº£ng trá»‘ng gÃ¢y 180s blur má» má»‹t.
+                    </div>
+                </div>
+
+                <div class="card card-danger">
+                    <div class="card-header">
+                        <span class="card-title">Junction 2: S08 Video Gen Backdoor</span>
+                        <span class="card-badge badge-red">VETO BREACH</span>
+                    </div>
+                    <div class="card-body">
+                        DÃ²ng 375 <code>lavfi testsrc</code> tá»± Ã½ sinh dÃ£i sá»c mÃ u SMPTE khi clip lá»—i. LÃ m nhiá»…m Ä‘á»™c 59 frame xÃ­ch (sc_100 â†’ sc_145).
+                    </div>
+                </div>
+
+                <div class="card card-danger">
+                    <div class="card-header">
+                        <span class="card-title">Junction 3: S11 QC Muá»¡ KhÃ¡nh Kiá»‡t</span>
+                        <span class="card-badge badge-red">BLIND GATE</span>
+                    </div>
+                    <div class="card-body">
+                        Bá» qua <code>manifest_data</code>; chá»‰ kiá»ƒm tra codec h264 & thá»i lÆ°á»£ng; khÃ´ng cÃ³ CV filter kiá»ƒm tra mÃ u sá»c SMPTE vÃ  Ä‘á»™ blur Laplacian.
+                    </div>
+                </div>
+
+                <div class="card card-danger">
+                    <div class="card-header">
+                        <span class="card-title">Junction 4: B10 & Telegram Gate</span>
+                        <span class="card-badge badge-red">DISCONNECTED</span>
+                    </div>
+                    <div class="card-body">
+                        Cháº¡y trÃªn Windows thiáº¿u OAuth token VPS Hetzner; sinh link giáº£ máº¡o <code>youtu.be/final_master_render</code> vÃ  gá»­i qua Telegram.
+                    </div>
+                </div>
+            </div>
+
+            <div class="codemap-container">
+                <div class="codemap-legend">
+                    <div class="legend-item"><div class="legend-dot dot-green"></div><span>Stage Hoáº¡t Äá»™ng ÄÃºng</span></div>
+                    <div class="legend-item"><div class="legend-dot dot-amber"></div><span>Stage CÃ³ Táº¡p Cháº¥t / Cáº£nh BÃ¡o</span></div>
+                    <div class="legend-item"><div class="legend-dot dot-red"></div><span>Stage Äá»©t GÃ£y Cá»‘t Tá»­ (Failure Point)</span></div>
+                    <div class="legend-item"><div class="legend-dot dot-blue"></div><span>HHand-off NgoÃ i Luá»“ng (Hetzner VPS / Telegram)</span></div>
+                </div>
+
+                <div class="svg-canvas-wrapper">
+                    <svg width="1500" height="520" viewBox="0 0 1500 520" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="grad-red" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#ef4444" stop-opacity="0.2"/>
+                                <stop offset="100%" stop-color="#b91c1c" stop-opacity="0.4"/>
+                            </linearGradient>
+                            <linearGradient id="grad-green" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#10b981" stop-opacity="0.2"/>
+                                <stop offset="100%" stop-color="#047857" stop-opacity="0.4"/>
+                            </linearGradient>
+                            <linearGradient id="grad-amber" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.2"/>
+                                <stop offset="100%" stop-color="#b45309" stop-opacity="0.4"/>
+                            </linearGradient>
+                            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+                            </marker>
+                            <marker id="arrow-red" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444"/>
+                            </marker>
+                        </defs>
+
+                        <!-- PIPELINE NODES -->
+                        <!-- S01 -->
+                        <g transform="translate(30, 80)">
+                            <rect width="140" height="70" rx="8" fill="url(#grad-green)" stroke="#10b981" stroke-width="1.5"/>
+                            <text x="70" y="28" fill="#f1f5f9" font-size="13" font-weight="bold" text-anchor="middle">S01: Ideation</text>
+                            <text x="70" y="48" fill="#94a3b8" font-size="11" text-anchor="middle">Google Trends RSS</text>
+                            <circle cx="125" cy="15" r="5" fill="#10b981"/>
+                        </g>
+
+                        <!-- S02 -->
+                        <g transform="translate(210, 80)">
+                            <rect width="140" height="70" rx="8" fill="url(#grad-green)" stroke="#10b981" stroke-width="1.5"/>
+                            <text x="70" y="28" fill="#f1f5f9" font-size="13" font-weight="bold" text-anchor="middle">S02: Research</text>
+                            <text x="70" y="48" fill="#94a3b8" font-size="11" text-anchor="middle">Grounding Data</text>
+                            <circle cx="125" cy="15" r="5" fill="#10b981"/>
+                        </g>
+
+                        <!-- S03 -->
+                        <g transform="translate(390, 80)">
+                            <rect width="150" height="70" rx="8" fill="url(#grad-amber)" stroke="#f59e0b" stroke-width="1.5"/>
+                            <text x="75" y="28" fill="#f1f5f9" font-size="13" font-weight="bold" text-anchor="middle">S03: Script B2</text>
+                            <text x="75" y="48" fill="#f59e0b" font-size="11" text-anchor="middle">Lá»t tiáº¿ng Anh / Typo</text>
+                            <circle cx="135" cy="15" r="5" fill="#f59e0b"/>
+                        </g>
+
+                        <!-- S05: FAILURE 1 -->
+                        <g transform="translate(580, 80)">
+                            <rect width="170" height="85" rx="8" fill="url(#grad-red)" stroke="#ef4444" stroke-width="2.5"/>
+                            <text x="85" y="26" fill="#f1f5f9" font-size="13" font-weight="bold" text-anchor="middle">S05: Director Plan</text>
+                            <text x="85" y="44" fill="#ef4444" font-size="11" font-weight="bold" text-anchor="middle">âš ï¸ JUNCTION 1</text>
+                            <text x="85" y="62" fill="#94a3b8" font-size="10" text-anchor="middle">145 scenes, zoom blur</text>
+                            <circle cx="155" cy="15" r="6" fill="#ef4444"/>
+                        </g>
+
+                        <!-- S07 -->
+                        <g transform="translate(790, 80)">
+                            <rect width="150" height="70" rx="8" fill="url(#grad-amber)" stroke="#f59e0b" stroke-width="1.5"/>
+                            <text x="75" y="28" fill="#f1f5f9" font-size="13" font-weight="bold" text-anchor="middle">S07: Image Gen</text>
+                            <text x="75" y="48" fill="#94a3b8" font-size="11" text-anchor="middle">Chá»¯ Kanji bá»‹a Ä‘áº·t</text>
+                            <circle cx="135" cy="15" r="5" fill="#f59e0b"/>
+                        </g>
+
+                        <!-- S08: FAILURE 2 -->
+                        <g transform="translate(980, 80)">
+                            <rect width="190" height="85" rx="8" fill="url(#grad-red)" stroke="#ef4444" stroke-width="3"/>
+                            <text x="95" y="26" fill="#f1f5f9" font-size="13" font-weight="bold" text-anchor="middle">S08: Video Gen</text>
+                            <text x="95" y="44" fill="#ef4444" font-size="11" font-weight="bold" text-anchor="middle">ðŸš¨ JUNCTION 2 (L375)</text>
+                            <text x="95" y="62" fill="#fca5a5" font-size="10" text-anchor="middle">lavfi testsrc SMPTE bars</text>
+                            <circle cx="175" cy="15" r="6" fill="#ef4444"/>
+                        </g>
+
+                        <!-- S09 -->
+                        <g transform="translate(580, 240)">
+                            <rect width="160" height="70" rx="8" fill="url(#grad-green)" stroke="#10b981" stroke-width="1.5"/>
+                            <text x="80" y="28" fill="#f1f5f9" font-size="13" font-weight="bold" text-anchor="middle">S09: Voice TTS</text>
+                            <text x="80" y="48" fill="#94a3b8" font-size="11" text-anchor="middle">Edge-TTS & Whisper</text>
+                            <circle cx="145" cy="15" r="5" fill="#10b981"/>
+                        </g>
+
+                        <!-- S10 -->
+                        <g transform="translate(800, 240)">
+                            <rect width="170" height="70" rx="8" fill="url(#grad-red)" stroke="#ef4444" stroke-width="1.5"/>
+                            <text x="85" y="28" fill="#f1f5f9" font-size="13" font-weight="bold" text-anchor="middle">S10: Remotion Render</text>
+                            <text x="85" y="48" fill="#fca5a5" font-size="11" text-anchor="middle">GhÃ©p 59 clip color bar</text>
+                            <circle cx="155" cy="15" r="5" fill="#ef4444"/>
+                        </g>
+
+                        <!-- S11: FAILURE 3 -->
+                        <g transform="translate(1030, 240)">
+                            <rect width="180" height="85" rx="8" fill="url(#grad-red)" stroke="#ef4444" stroke-width="3"/>
+                            <text x="90" y="26" fill="#f1f5f9" font-size="13" font-weight="bold" text-anchor="middle">S11: QC Gate</text>
+                            <text x="90" y="44" fill="#ef4444" font-size="11" font-weight="bold" text-anchor="middle">ðŸš¨ JUNCTION 3</text>
+                            <text x="90" y="62" fill="#fca5a5" font-size="10" text-anchor="middle">MÃ¹ color bar / blur â†’ PASS</text>
+                            <circle cx="165" cy="15" r="6" fill="#ef4444"/>
+                        </g>
+
+                        <!-- B10: FAILURE 4 -->
+                        <g transform="translate(1260, 240)">
+                            <rect width="180" height="85" rx="8" fill="url(#grad-red)" stroke="#ef4444" stroke-width="3"/>
+                            <text x="90" y="26" fill="#f1f5f9" font-size="13" font-weight="bold" text-anchor="middle">B10: YouTube Uploader</text>
+                            <text x="90" y="44" fill="#ef4444" font-size="11" font-weight="bold" text-anchor="middle">ðŸš¨ JUNCTION 4</text>
+                            <text x="90" y="62" fill="#fca5a5" font-size="10" text-anchor="middle">Fake Link â†’ Telegram</text>
+                            <circle cx="165" cy="15" r="6" fill="#ef4444"/>
+                        </g>
+
+                        <!-- CONNECTING ARROWS -->
+                        <line x1="170" y1="115" x2="205" y2="115" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+                        <line x1="350" y1="115" x2="385" y2="115" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+                        <line x1="540" y1="115" x2="575" y2="115" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow)"/>
+                        <line x1="750" y1="115" x2="785" y2="115" stroke="#ef4444" stroke-width="2" marker-end="url(#arrow-red)"/>
+                        <line x1="940" y1="115" x2="975" y2="115" stroke="#ef4444" stroke-width="2" marker-end="url(#arrow-red)"/>
+
+                        <!-- Downward from S08 & S09 to S10 -->
+                        <path d="M 1075 165 L 1075 200 L 885 200 L 885 235" fill="none" stroke="#ef4444" stroke-width="2" marker-end="url(#arrow-red)"/>
+                        <line x1="740" y1="275" x2="795" y2="275" stroke="#10b981" stroke-width="2" marker-end="url(#arrow)"/>
+                        <line x1="970" y1="275" x2="1025" y2="275" stroke="#ef4444" stroke-width="2" marker-end="url(#arrow-red)"/>
+                        <line x1="1210" y1="275" x2="1255" y2="275" stroke="#ef4444" stroke-width="2" marker-end="url(#arrow-red)"/>
+
+                        <!-- CALLOUT LABELS -->
+                        <g transform="translate(980, 15)">
+                            <rect width="210" height="30" rx="4" fill="#ef4444"/>
+                            <text x="105" y="20" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle">59 Framed Poisoned (SMPTE)</text>
+                        </g>
+                        <line x1="1075" y1="45" x2="1075" y2="75" stroke="#ef4444" stroke-dasharray="3,3" stroke-width="2"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: FRAME MATRIX -->
+        <div id="tab-matrix" class="tab-content">
+            <div class="matrix-filters">
+                <button class="filter-btn active" onclick="filterFrames('all')">Táº¥t cáº£ (40 Frames)</button>
+                <button class="filter-btn" onclick="filterFrames('critical')">🚨 SMPTE Color Bars</button>
+                <button class="filter-btn" onclick="filterFrames('high')">⚠️ Extreme Blur / Chá»¯ Lá»—i</button>
+            </div>
+
+            <div class="frames-grid" id="framesGrid">
+
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_000s.png', '0s | SCENE_01', '155.1', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_000s.png" alt="Frame 0s" loading="lazy">
+                        <span class="frame-time-badge">000s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_01</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 155.1</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Tiếng Anh Latinh trên tập tiếng Nhật ('ARCHIVAL INVESTIGATIVE BROADSHEET') - Vi phạm Rule 122</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_015s.png', '15s | SCENE_05', '66.82', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_015s.png" alt="Frame 15s" loading="lazy">
+                        <span class="frame-time-badge">015s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_05</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 66.8</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Chữ Kanji bịa đặt vô nghĩa ('約1兆兆円' - 1 triệu tỷ tỷ Yên) và tiếng Anh 'Audited Financial Statement'</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_030s.png', '30s | SCENE_09', '252.33', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_030s.png" alt="Frame 30s" loading="lazy">
+                        <span class="frame-time-badge">030s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_09</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 252.3</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Khung hình tĩnh, thiếu động học xúc giác Vox Engine v3</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_045s.png', '45s | SCENE_14', '100.12', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_045s.png" alt="Frame 45s" loading="lazy">
+                        <span class="frame-time-badge">045s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_14</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 100.1</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Chữ tiếng Nhật vô nghĩa ('本を四EVS年月日かた', '地でE7高裁汁き民史')</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_060s.png', '60s | SCENE_16', '77.59', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_060s.png" alt="Frame 60s" loading="lazy">
+                        <span class="frame-time-badge">060s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_16</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 77.6</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Chữ tiếng Nhật vô nghĩa ('本を四EVS年月日かた', '地でE7高裁汁き民史')</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_075s.png', '75s | SCENE_21', '32.58', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_075s.png" alt="Frame 75s" loading="lazy">
+                        <span class="frame-time-badge">075s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_21</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 32.6</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cận cảnh liên tục vào cùng 1 tiêu đề báo giả lập, chữ vỡ nét mờ mịt</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_090s.png', '90s | SCENE_24', '32.65', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_090s.png" alt="Frame 90s" loading="lazy">
+                        <span class="frame-time-badge">090s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_24</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 32.6</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cận cảnh liên tục vào cùng 1 tiêu đề báo giả lập, chữ vỡ nét mờ mịt</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_105s.png', '105s | SCENE_30', '62.83', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_105s.png" alt="Frame 105s" loading="lazy">
+                        <span class="frame-time-badge">105s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_30</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 62.8</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cận cảnh liên tục vào cùng 1 tiêu đề báo giả lập, chữ vỡ nét mờ mịt</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_120s.png', '120s | SCENE_33', '79.95', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_120s.png" alt="Frame 120s" loading="lazy">
+                        <span class="frame-time-badge">120s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_33</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 80.0</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cận cảnh liên tục vào cùng 1 tiêu đề báo giả lập, chữ vỡ nét mờ mịt</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_135s.png', '135s | SCENE_36', '23.57', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_135s.png" alt="Frame 135s" loading="lazy">
+                        <span class="frame-time-badge">135s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_36</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 23.6</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Khung hình tĩnh, thiếu động học xúc giác Vox Engine v3</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_150s.png', '150s | SCENE_39', '71.24', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_150s.png" alt="Frame 150s" loading="lazy">
+                        <span class="frame-time-badge">150s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_39</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 71.2</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_165s.png', '165s | SCENE_43', '57.34', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_165s.png" alt="Frame 165s" loading="lazy">
+                        <span class="frame-time-badge">165s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_43</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 57.3</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_180s.png', '180s | SCENE_48', '58.46', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_180s.png" alt="Frame 180s" loading="lazy">
+                        <span class="frame-time-badge">180s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_48</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 58.5</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_195s.png', '195s | SCENE_52', '42.12', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_195s.png" alt="Frame 195s" loading="lazy">
+                        <span class="frame-time-badge">195s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_52</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 42.1</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_210s.png', '210s | SCENE_56', '72.78', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_210s.png" alt="Frame 210s" loading="lazy">
+                        <span class="frame-time-badge">210s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_56</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 72.8</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_225s.png', '225s | SCENE_59', '64.4', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_225s.png" alt="Frame 225s" loading="lazy">
+                        <span class="frame-time-badge">225s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_59</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 64.4</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_240s.png', '240s | SCENE_63', '38.26', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_240s.png" alt="Frame 240s" loading="lazy">
+                        <span class="frame-time-badge">240s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_63</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 38.3</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_255s.png', '255s | SCENE_67', '88.35', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_255s.png" alt="Frame 255s" loading="lazy">
+                        <span class="frame-time-badge">255s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_67</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 88.3</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_270s.png', '270s | SCENE_70', '74.96', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_270s.png" alt="Frame 270s" loading="lazy">
+                        <span class="frame-time-badge">270s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_70</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 75.0</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_285s.png', '285s | SCENE_73', '61.55', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_285s.png" alt="Frame 285s" loading="lazy">
+                        <span class="frame-time-badge">285s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_73</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 61.5</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_300s.png', '300s | SCENE_77', '84.76', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_300s.png" alt="Frame 300s" loading="lazy">
+                        <span class="frame-time-badge">300s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_77</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 84.8</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_315s.png', '315s | SCENE_81', '99.34', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_315s.png" alt="Frame 315s" loading="lazy">
+                        <span class="frame-time-badge">315s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_81</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 99.3</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-high" data-severity="high" onclick="openModal('frame_330s.png', '330s | SCENE_83', '88.32', 'HIGH')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_330s.png" alt="Frame 330s" loading="lazy">
+                        <span class="frame-time-badge">330s</span>
+                        <span class="frame-sev-badge badge-amber">HIGH</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_83</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 88.3</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Camera zoom cực đại vào vùng giấy trống tạo thành mảng sương mù màu nâu/xám vô hồn (Blur Mush)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_345s.png', '345s | SCENE_87', '91.46', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_345s.png" alt="Frame 345s" loading="lazy">
+                        <span class="frame-time-badge">345s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_87</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 91.5</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Khung hình tĩnh, thiếu động học xúc giác Vox Engine v3</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_360s.png', '360s | SCENE_90', '79.4', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_360s.png" alt="Frame 360s" loading="lazy">
+                        <span class="frame-time-badge">360s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_90</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 79.4</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Khung hình tĩnh, thiếu động học xúc giác Vox Engine v3</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-critical" data-severity="critical" onclick="openModal('frame_375s.png', '375s | SCENE_93', '75.4', 'CRITICAL')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_375s.png" alt="Frame 375s" loading="lazy">
+                        <span class="frame-time-badge">375s</span>
+                        <span class="frame-sev-badge badge-red">CRITICAL</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_93</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 75.4</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>🚨 DẢI SỌC MÀU KIỂM THỬ SMPTE TEST PATTERN (Lỗi tử thần do fallback lavfi testsrc tại s08)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-critical" data-severity="critical" onclick="openModal('frame_390s.png', '390s | SCENE_98', '57.59', 'CRITICAL')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_390s.png" alt="Frame 390s" loading="lazy">
+                        <span class="frame-time-badge">390s</span>
+                        <span class="frame-sev-badge badge-red">CRITICAL</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_98</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 57.6</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>🚨 DẢI SỌC MÀU KIỂM THỬ SMPTE TEST PATTERN (Lỗi tử thần do fallback lavfi testsrc tại s08)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_405s.png', '405s | SCENE_101', '73.12', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_405s.png" alt="Frame 405s" loading="lazy">
+                        <span class="frame-time-badge">405s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_101</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 73.1</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Khung hình tĩnh, thiếu động học xúc giác Vox Engine v3</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-critical" data-severity="critical" onclick="openModal('frame_420s.png', '420s | SCENE_104', '21.2', 'CRITICAL')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_420s.png" alt="Frame 420s" loading="lazy">
+                        <span class="frame-time-badge">420s</span>
+                        <span class="frame-sev-badge badge-red">CRITICAL</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_104</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 21.2</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>🚨 DẢI SỌC MÀU KIỂM THỬ SMPTE TEST PATTERN (Lỗi tử thần do fallback lavfi testsrc tại s08)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-critical" data-severity="critical" onclick="openModal('frame_435s.png', '435s | SCENE_108', '47.21', 'CRITICAL')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_435s.png" alt="Frame 435s" loading="lazy">
+                        <span class="frame-time-badge">435s</span>
+                        <span class="frame-sev-badge badge-red">CRITICAL</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_108</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 47.2</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>🚨 DẢI SỌC MÀU KIỂM THỬ SMPTE TEST PATTERN (Lỗi tử thần do fallback lavfi testsrc tại s08)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-critical" data-severity="critical" onclick="openModal('frame_450s.png', '450s | SCENE_112', '65.45', 'CRITICAL')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_450s.png" alt="Frame 450s" loading="lazy">
+                        <span class="frame-time-badge">450s</span>
+                        <span class="frame-sev-badge badge-red">CRITICAL</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_112</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 65.5</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>🚨 DẢI SỌC MÀU KIỂM THỬ SMPTE TEST PATTERN (Lỗi tử thần do fallback lavfi testsrc tại s08)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_465s.png', '465s | SCENE_116', '71.05', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_465s.png" alt="Frame 465s" loading="lazy">
+                        <span class="frame-time-badge">465s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_116</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 71.0</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Khung hình tĩnh, thiếu động học xúc giác Vox Engine v3</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_480s.png', '480s | SCENE_119', '67.45', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_480s.png" alt="Frame 480s" loading="lazy">
+                        <span class="frame-time-badge">480s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_119</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 67.5</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Khung hình tĩnh, thiếu động học xúc giác Vox Engine v3</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-critical" data-severity="critical" onclick="openModal('frame_495s.png', '495s | SCENE_123', '94.72', 'CRITICAL')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_495s.png" alt="Frame 495s" loading="lazy">
+                        <span class="frame-time-badge">495s</span>
+                        <span class="frame-sev-badge badge-red">CRITICAL</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_123</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 94.7</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>🚨 DẢI SỌC MÀU KIỂM THỬ SMPTE TEST PATTERN (Lỗi tử thần do fallback lavfi testsrc tại s08)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_510s.png', '510s | SCENE_126', '78.95', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_510s.png" alt="Frame 510s" loading="lazy">
+                        <span class="frame-time-badge">510s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_126</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 79.0</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Khung hình tĩnh, thiếu động học xúc giác Vox Engine v3</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_525s.png', '525s | SCENE_130', '50.57', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_525s.png" alt="Frame 525s" loading="lazy">
+                        <span class="frame-time-badge">525s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_130</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 50.6</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Khung hình tĩnh, thiếu động học xúc giác Vox Engine v3</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-critical" data-severity="critical" onclick="openModal('frame_540s.png', '540s | SCENE_132', '85.59', 'CRITICAL')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_540s.png" alt="Frame 540s" loading="lazy">
+                        <span class="frame-time-badge">540s</span>
+                        <span class="frame-sev-badge badge-red">CRITICAL</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_132</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 85.6</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>🚨 DẢI SỌC MÀU KIỂM THỬ SMPTE TEST PATTERN (Lỗi tử thần do fallback lavfi testsrc tại s08)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-critical" data-severity="critical" onclick="openModal('frame_555s.png', '555s | SCENE_136', '43.76', 'CRITICAL')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_555s.png" alt="Frame 555s" loading="lazy">
+                        <span class="frame-time-badge">555s</span>
+                        <span class="frame-sev-badge badge-red">CRITICAL</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_136</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 43.8</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>🚨 DẢI SỌC MÀU KIỂM THỬ SMPTE TEST PATTERN (Lỗi tử thần do fallback lavfi testsrc tại s08)</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_570s.png', '570s | SCENE_140', '66.72', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_570s.png" alt="Frame 570s" loading="lazy">
+                        <span class="frame-time-badge">570s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_140</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 66.7</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Khung hình tĩnh, thiếu động học xúc giác Vox Engine v3</li>
+                        </ul>
+                    </div>
+                </div>
+    
+                <div class="frame-card sev-medium" data-severity="medium" onclick="openModal('frame_585s.png', '585s | SCENE_143', '64.36', 'MEDIUM')">
+                    <div class="frame-thumb-box">
+                        <img src="audit_frames/frame_585s.png" alt="Frame 585s" loading="lazy">
+                        <span class="frame-time-badge">585s</span>
+                        <span class="frame-sev-badge badge-green">MEDIUM</span>
+                    </div>
+                    <div class="frame-info">
+                        <div class="frame-scene">
+                            <span>SCENE_143</span>
+                            <span style="font-family: monospace; font-size: 11px;">Blur: 64.4</span>
+                        </div>
+                        <ul class="frame-defects">
+                            <li>Khung hình tĩnh, thiếu động học xúc giác Vox Engine v3</li>
+                        </ul>
+                    </div>
+                </div>
+    
+            </div>
+        </div>
+
+        <!-- TAB 3: ROOT CAUSE -->
+        <div id="tab-rootcause" class="tab-content">
+            <div class="card card-danger" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <span class="card-title">1. PhÃ¢n TÃ­ch Smoking Gun: Fallback 'lavfi testsrc' Táº¡i s08_video_gen.py</span>
+                    <span class="card-badge badge-red">VI PHáº M RULE 118 & 121</span>
+                </div>
+                <div class="card-body">
+                    <p>Khi má»™t video clip gáº·p lá»—i khÃ´ng táº¡o Ä‘Æ°á»£c (<code>not clip_valid</code>), Ä‘oáº¡n code táº¡i dÃ²ng 371-377 cá»§a <code>stages/s08_video_gen.py</code> Ä‘Ã£ tá»± Ã½ gá»i lá»‡nh ffmpeg sinh video test dÃ£i sá»c mÃ u:</p>
+                    <div class="code-box">
+# stages/s08_video_gen.py:371-377
+if not clip_valid:
+    cmd = [
+        ffmpeg_bin, "-y", "-f", "lavfi",
+        "-i", f"testsrc=duration={dur}:size=1920x1080:rate={fps}",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        str(target_video)
+    ]
+                    </div>
+                    <p><strong>Há»‡ quáº£ liÃªn hoÃ n (Cascading Poisoning)</strong>: Clip sinh ra lÃ  video sá»c mÃ u SMPTE cÃ³ dung lÆ°á»£ng nhá» (83KB). Khi cÃ¡c phÃ¢n cáº£nh tiáº¿p theo (tá»« <code>sc_100</code> Ä‘áº¿n <code>sc_145</code>) kÃ©o start frame tá»« end frame cá»§a clip trÆ°á»›c, toÃ n bá»™ <strong>59 phÃ¢n cáº£nh liÃªn tiáº¿p bá»‹ nhiá»…m Ä‘á»™c hÃ¬nh áº£nh sá»c mÃ u SMPTE</strong>!</p>
+                </div>
+            </div>
+
+            <div class="card card-danger" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <span class="card-title">2. LÃ´-há»•ng S11 Forensic QC Gate: KhÃ´ng Kiá»ƒm Tra Laplacian Blur & Color Bars</span>
+                    <span class="card-badge badge-red">Lá»–I KIá»‚M TOÃN</span>
+                </div>
+                <div class="card-body">
+                    <p><code>stages/s11_qc.py</code> chá»‰ gá»i <code>verify_final_video_gates</code> vá»›i codec h264, LUFS audio vÃ  <code>blackdetect</code>. VÃ¬ video SMPTE testsrc cÃ³ Ä‘á»§ mÃ u vÃ  khÃ´ng pháº£i mÃ u Ä‘en, nÃªn <code>blackdetect</code> khÃ´ng báº¯t Ä‘Æ°á»£c. HÆ¡n ná»¯a, tham sá»‘ <code>manifest_data</code> bá»‹ bá» qua (None), dáº«n Ä‘áº¿n toÃ n bá»™ logic kiá»ƒm tra Rule 122 bá»‹ bypass hoÃ n toÃ n.</p>
+                </div>
+            </div>
+
+            <div class="card card-danger">
+                <div class="card-header">
+                    <span class="card-title">3. Äá»©t GÃ£y B10 & Telegram Gate: Cháº¡y Sai MÃ´i TrÆ°á»ng Local Windows</span>
+                    <span class="card-badge badge-red">TOKEN ISOLATION</span>
+                </div>
+                <div class="card-body">
+                    <p>B10 YouTube OAuth Tokens lÆ°u táº¡i Hetzner VPS (<code>/root/secrets/.env</code>). Agent trÆ°á»›c Ä‘Ã³ Ä‘Ã£ gá»i script dispatch ngay trÃªn Windows mÃ  khÃ´ng upload lÃªn YouTube, tá»± sinh chuá»—i fake link <code>https://youtu.be/final_master_render</code> vÃ  bº¯n vÃ o Telegram cá»§a User gÃ¢y cáº£m giÃ¡c bÃ¡o cÃ¡o lÃ¡o.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: REMEDIATION -->
+        <div id="tab-remediation" class="tab-content">
+            <div class="summary-grid">
+                <div class="card card-success">
+                    <div class="card-header">
+                        <span class="card-title">Trá»¥c 1: CÃ´ Láº­p TÃ n DÆ° (Quarantine)</span>
+                        <span class="card-badge badge-green">PHASE 1</span>
+                    </div>
+                    <div class="card-body">
+                        Di chuyá»ƒn toÃ n bá»™ 145 clip cÅ© vÃ  file <code>final.mp4</code> hCircle cá»§a <code>JP_EP0006</code> vÃ o thÆ° má»¥c <code>.archive_legacy/</code>, xÃ³a sáº¡ch cache chain frames bá»‹ nhiá»…m Ä‘á»™c.
+                    </div>
+                </div>
+
+                <div class="card card-success">
+                    <div class="card-header">
+                        <span class="card-title">Trá»¥c 2: Äáº¡i Pháº«u AST s08_video_gen.py</span>
+                        <span class="card-badge badge-green">PHASE 2</span>
+                    </div>
+                    <div class="card-body">
+                        XÃ³a bá» triá»‡t Ä‘á»ƒ lá»‡nh <code>lavfi testsrc</code>. Khi gáº·p lá»—i video generation, Báº®T BUá»˜C raise <code>RuntimeError</code> (fail-closed) tuÃ¢n thá»§ 100% Rule 118 & Rule 121, tuyá»‡t Ä‘á»‘i cáº¥m tá»± sinh clip giáº£ láº­p.
+                    </div>
+                </div>
+
+                <div class="card card-success">
+                    <div class="card-header">
+                        <span class="card-title">Trá»¥c 3: NÃ¢ng Cáº¥p S11 Computer Vision QC</span>
+                        <span class="card-badge badge-green">PHASE 3</span>
+                    </div>
+                    <div class="card-body">
+                        Bá»• sung thuáº­t toÃ¡n phÃ¡t hiá»‡n sá»c mÃ u SMPTE (báº£o hÃ²a RGB thuáº§n khiáº¿t) vÃ  phÃ¡t hiá»‡n Extreme Blur (Laplacian variance < 15.0) trÃªn cÃ¡c frame máº«u 15s. Video lá»—i sáº½ bá»‹ VETO ngay táº¡i S11.
+                    </div>
+                </div>
+
+                <div class="card card-success">
+                    <div class="card-header">
+                        <span class="card-title">Trá»¥c 4: Äá»“ng Bá»™ 3 Chiá»u & Cháº¡y Chuáº©n Vox v3</span>
+                        <span class="card-badge badge-green">PHASE 4</span>
+                    </div>
+                    <div class="card-body">
+                        Äá»“ng bá»™ code lÃªn Hetzner VPS & GitHub; cháº¡y pipeline sinh láº¡i qua 7 tÃ i khoáº£n Google Flow Omni/Veo theo quy chuáº©n Vox Engine v3 (24 Scenes chuáº©n thay vÃ¬ 145 micro-scenes).
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL POPUP -->
+    <div id="frameModal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <img id="modalImg" class="modal-img" src="" alt="Frame Preview">
+            <div class="modal-body">
+                <h3 id="modalTitle" style="margin-bottom: 8px;">Frame Title</h3>
+                <p id="modalMetrics" style="color: var(--text-secondary); font-size: 13px; margin-bottom: 12px;"></p>
+                <button class="btn" onclick="closeModalDirect()">ÄÃ³ng</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            document.documentElement.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function filterFrames(severity) {
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const cards = document.querySelectorAll('.frame-card');
+            cards.forEach(card => {
+                if (severity === 'all' || card.getAttribute('data-severity') === severity) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function openModal(imgFile, title, blur, sev) {
+            document.getElementById('modalImg').src = 'audit_frames/' + imgFile;
+            document.getElementById('modalTitle').innerText = title + ' (' + sev + ')';
+            document.getElementById('modalMetrics').innerText = 'Laplacian Blur Score: ' + blur;
+            document.getElementById('frameModal').classList.add('active');
+        }
+
+        function closeModal(e) {
+            document.getElementById('frameModal').classList.remove('active');
+        }
+
+        function closeModalDirect() {
+            document.getElementById('frameModal').classList.remove('active');
+        }
+    </script>
+</body>
+</html>
