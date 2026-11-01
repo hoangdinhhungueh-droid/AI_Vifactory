@@ -1,16 +1,16 @@
 {
   "(Optional) Reference Image Prompt.txt": "ad884c684ca436e26ce5ede71fd5455e1846274864420c42b4bcd765ace34694",
+  "Example Style Reference.png": "3859296ad3faa1848114f5a9b8f2bdf50819ca15f41bd105667ba9ca37b3f03b",
   "avoid_base.md": "e93bf21ce3a2e0064f867b77e8f30daf59e9abbc140a89f66b84b8d082b04a10",
   "camera_directives.yaml": "a153ce0caf36ad2c6d794bb4096508695ed942cc822afcbd6b5968006520356c",
-  "canonical_backgrounds.json": "6cf92f3e53762a320059b629d7b722955acbca412398caa240e9509dcca8866d",
-  "Example Style Reference.png": "3859296ad3faa1848114f5a9b8f2bdf50819ca15f41bd105667ba9ca37b3f03b",
+  "canonical_backgrounds.json": "0e42c11841f2a8f1f21c25201e565d1f618301e6261533b191e3f195599aba54",
   "image-prompts.md": "19dd2e2f5d2217459a03908f7c3069b7940b452e9d63b4dad7ef983a89d4f6b0",
-  "image_prompts_system.md": "5c85c993fc038c87b369dc2da5abaee8d89dc02aa75f3e3b489a1da00086b753",
+  "image_prompts_system.md": "0819b263c772c0d88da6fffa290a0fb226b6021c7cb8ed32dcfdbc419ebada1f",
   "prop_action_matrix.yaml": "554ce9f35a6ae47bed26a1381736aa0045c2982e01917387a3e85ee7dcbcd274",
-  "style_deep_diorama.md": "86d7bb42986bc8b0ab1bc62ea6a112a0fd1ce60d3c24ae18a30153692875701b",
-  "style_flat_parallax.md": "a5657e83dc5b496e644275f3329775fc300bd35e83b4d3a6aa6486b69efb7f55",
-  "style_locked_stage.md": "3ca937a2c77e5b104ac1da5b9fdcffd9f418779f5d3e8369b50ba1d56874c1ec",
-  "t2i_style.md": "c1dbb3953acc7669628d7765820a7bef1e935404036adbb838ef176105f248e2",
+  "style_deep_diorama.md": "45f8c7279e8eb938f4b082ff57e70b41bc090deb17cc2290be0b160c12546985",
+  "style_flat_parallax.md": "c368ca2e6ce93017e6a75de7f6c133c5bbbe2cdc98a77f663fa2e063dcce7882",
+  "style_locked_stage.md": "02853b8a8912c334bcf08f8c2ea05446d77311eb345b13a8acdc4bfba67cc034",
+  "t2i_style.md": "6cd024273aeb9dfc0c11cf220500c6336395786cc29c401a8f15d7df8214b0bb",
   "video-prompts.md": "7b15bc4d4b83b42e7f7d185d7a8134220507d1a2c3711187420817441ff0be0b",
-  "video_prompts_system.md": "a2e7db6e57ba60c3ba5ee7cc035500342b0f645c7b11850a298741a8d518a58e"
+  "video_prompts_system.md": "e7a6cfd905dbde664b7d07f895c7aeca58657c0992b9dd3984c8e10a693d0362"
 }

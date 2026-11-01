@@ -1785,5 +1785,5 @@ def build_cl3_paper_diorama_image_prompt(
     res = re.sub(r'#[0-9a-fA-F]{6}\b', '', res)
     res = re.sub(r'\(\s*\)', '', res)
     # Strip any lingering "safe zone" or "subtitles" to prevent Imagen from drawing subtitle words
-    res = re.sub(r'Preserves?\s+bottom\s+\d+%\s+vertical\s+safe\s+zone(\s+for\s+subtitles)?\.?', 'Keep bottom 20% of the surface completely empty, plain bare desk wood only. No text, no objects, no cards in the bottom fifth.', res, flags=re.IGNORECASE)
+    res = re.sub(r'Preserves?\s+bottom\s+\d+%\s+(?:vertical\s+)?safe\s+zone(\s+for\s+subtitles)?\.?', 'Keep bottom 20% of the surface completely empty, plain bare desk wood only. No text, no objects, no cards in the bottom fifth.', res, flags=re.IGNORECASE)
     return re.sub(r'\s+', ' ', res).strip()

@@ -12,6 +12,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 from PIL import Image, ImageDraw
 
@@ -23,7 +24,7 @@ if hasattr(sys.stdout, "reconfigure"):
 from app.services.model_gateway import get_global_gateway
 from vox.ffmpeg_utils import get_ffmpeg_binary
 
-def get_rubric_prompt(duration_sec: float = 30.0, scope_desc: str = None) -> str:
+def get_rubric_prompt(duration_sec: float = 30.0, scope_desc: Optional[str] = None) -> str:
     if scope_desc is None:
         if duration_sec > 60:
             scope_desc = f"3-minute pilot (Act I & II, {duration_sec:.1f}s runtime)"
@@ -82,7 +83,13 @@ Respond with a strictly valid JSON object matching this schema:
 
 VOX_RUBRIC_PROMPT = get_rubric_prompt(30.0)
 
-def extract_frames_and_build_contact_sheet(video_path: Path, out_dir: Path, num_frames=16, duration_sec=30.0, output_name: str = None) -> Path:
+def extract_frames_and_build_contact_sheet(
+    video_path: Path,
+    out_dir: Path,
+    num_frames: int = 16,
+    duration_sec: float = 30.0,
+    output_name: Optional[str] = None
+) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     frames_dir = out_dir / "extracted_frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
@@ -140,7 +147,12 @@ def extract_frames_and_build_contact_sheet(video_path: Path, out_dir: Path, num_
     print(f"📸 Contact Sheet 4x4 created at: {contact_sheet_path}")
     return contact_sheet_path
 
-def evaluate_with_council(contact_sheet_path: Path, episode_id: str, duration_sec: float = 30.0, scope_desc: str = None) -> dict:
+def evaluate_with_council(
+    contact_sheet_path: Path,
+    episode_id: str,
+    duration_sec: float = 30.0,
+    scope_desc: Optional[str] = None
+) -> Dict[str, Any]:
     gateway = get_global_gateway()
 
     # Read image base64
@@ -206,12 +218,12 @@ def evaluate_with_council(contact_sheet_path: Path, episode_id: str, duration_se
     # Generate Markdown summary report
     md_report_path = contact_sheet_path.parent / "visual_critic_council_audit.md"
     md_lines = [
-        f"# 🏛️ Multimodal Visual Critic Council Audit Report",
+        "# 🏛️ Multimodal Visual Critic Council Audit Report",
         f"**Episode**: `{episode_id}`  ",
         f"**Duration Evaluated**: {duration_sec:.2f}s  ",
         f"**Council Status**: `{'PASS / APPROVED' if council_pass else 'REVISION_REQUIRED'}`  ",
         f"**Average Score**: **{avg_score}/10**  \n",
-        f"## 1. Claude Opus 5.5 Verdict",
+        "## 1. Claude Opus 5.5 Verdict",
         f"- **Overall Score**: **{opus_score}/10** ({opus_json.get('verdict', 'N/A')})",
         f"- **Cinematic Motion & Physics**: {opus_json.get('axis_scores', {}).get('cinematic_motion_physics', 'N/A')}/10",
         f"- **Tactile Paper Aesthetics**: {opus_json.get('axis_scores', {}).get('tactile_paper_aesthetics', 'N/A')}/10",
@@ -220,7 +232,7 @@ def evaluate_with_council(contact_sheet_path: Path, episode_id: str, duration_se
         f"- **Strengths**: {', '.join(opus_json.get('strengths', []))}",
         f"- **Critical Flaws**: {', '.join(opus_json.get('critical_flaws', []))}",
         f"- **Actionable Patch Instructions**: {opus_json.get('actionable_patch_instructions', 'N/A')}\n",
-        f"## 2. GPT-6-Astra Verdict",
+        "## 2. GPT-6-Astra Verdict",
         f"- **Overall Score**: **{astra_score}/10** ({astra_json.get('verdict', 'N/A')})",
         f"- **Cinematic Motion & Physics**: {astra_json.get('axis_scores', {}).get('cinematic_motion_physics', 'N/A')}/10",
         f"- **Tactile Paper Aesthetics**: {astra_json.get('axis_scores', {}).get('tactile_paper_aesthetics', 'N/A')}/10",

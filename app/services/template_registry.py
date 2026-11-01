@@ -93,9 +93,6 @@ class TemplateRegistry:
         self.template_dir = template_dir or TEMPLATE_DIR
         if not self.template_dir.exists():
             raise TemplateNotFoundError(f"Template directory does not exist: {self.template_dir}")
-        self._manifest_cache: Optional[Dict[str, str]] = None
-        self._camera_directives_cache: Optional[Dict[str, Any]] = None
-        self._prop_action_matrix_cache: Optional[Dict[str, Any]] = None
 
     def read_template(self, filename: str) -> Tuple[str, str]:
         """Reads a template file by name. Returns (content, sha256).

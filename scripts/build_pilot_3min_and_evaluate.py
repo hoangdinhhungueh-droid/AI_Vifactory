@@ -289,8 +289,7 @@ def build_pilot_3min(episode_id: str = "JP_EP0006_crypto_exchange_heist", force_
         }
     }
     verify_final_video_gates(pilot_video, expected_duration=target_dur, plan=authoritative_plan, manifest_data=manifest_data)
-    print("✅ [PILOT] All S11 Computer Vision Quality Gates PASSED (0 SMPTE bars, duration OK, loudness OK)!")
-    print("✅ [PILOT] All S11 Computer Vision Quality Gates PASSED (0 SMPTE bars, duration OK, sync OK)!")
+    print("✅ [PILOT] All S11 Computer Vision Quality Gates PASSED (0 SMPTE bars, duration OK, loudness OK, sync OK)!")
 
     # Step F: Extract 16-Frame Contact Sheet
     print("📸 [PILOT] Extracting 16-frame 4x4 Contact Sheet for Visual Critic Council...")

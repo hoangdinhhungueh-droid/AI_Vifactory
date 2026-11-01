@@ -54,7 +54,7 @@ except Exception as _sec_init_err:
     def redact_telemetry_secrets(text: str) -> str:
         raise RuntimeError(f"Critical Security Boundary Failure: redact_telemetry_secrets is unavailable ({_sec_err_msg}) - fail closed.")
 
-    def verify_telemetry_cleanliness(text: str):
+    def verify_telemetry_cleanliness(text: str) -> Tuple[bool, List[str]]:
         raise RuntimeError(f"Critical Security Boundary Failure: verify_telemetry_cleanliness is unavailable ({_sec_err_msg}) - fail closed.")
 
 DEFAULT_HHTECH_URL = os.getenv("HHTECH_BASE_URL", "https://hhtechapi.com/v1")

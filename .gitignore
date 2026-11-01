@@ -63,6 +63,9 @@ var/
 n8n-data/
 data/*
 !data/notion_audit/
+data/notion_audit/*
+!data/notion_audit/skills_snapshot.json
+!data/notion_audit/prompt_engine_page_ids.json
 db/*.log
 db/*.on
 db/*.pid
