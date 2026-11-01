@@ -52,6 +52,7 @@ class ExtractedEvidence:
     layout_type: str
     camera_directive: str
     sound_foley: str
+    extracted_metric: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -112,8 +113,8 @@ _KEYWORD_TAXONOMY: Dict[ForensicArchetype, Dict[str, List[str]]] = {
     },
 }
 
-# Metric Regex Pattern for quantitative detection (includes full-width ％, 円, 億, 兆, ドル)
-_METRIC_REGEX = re.compile(r"(\d+(\.\d+)?\s*(%|％|percent|billion|million|\$|₩|€|£|円|ドル|ウォン|원|억|조|tỷ|triệu|兆|億))", re.IGNORECASE)
+# Metric Regex Pattern for quantitative detection (includes full-width ％, 兆円, 億円, 兆ドル, 億ドル, 円, ドル, etc.)
+_METRIC_REGEX = re.compile(r"(\d+(\.\d+)?\s*(%|％|percent|billion|million|\$|₩|€|£|兆円|億円|兆ドル|億ドル|円|ドル|ウォン|원|억|조|tỷ|triệu|兆|億))", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------------
@@ -125,15 +126,15 @@ _METRIC_REGEX = re.compile(r"(\d+(\.\d+)?\s*(%|％|percent|billion|million|\$|�
 
 _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
     ForensicArchetype.QUANTITATIVE_METRIC: [
-        # Variant 0: Stat Hero Plate & Ticking Counter
+        # Variant 0: Financial Table & Mechanical Counter Wheels
         ExtractedEvidence(
             archetype=ForensicArchetype.QUANTITATIVE_METRIC,
             dominant_family="H2_CONSTRAINT",
-            hero_anchor_prop="bold crimson stat counter card and mechanical ticker gauge on aged fibrous paper",
-            interacting_tool_prop="mechanical ticker counter wheels and embossed stat number plate",
+            hero_anchor_prop="aged financial ledger statement and mechanical ticker gauge on fibrous paper",
+            interacting_tool_prop="mechanical ticker counter wheels and embossed metric indicator plate",
             tactile_action_verb="drops in close to the lens, counter ticking up from base figure with mechanical overshoot beside",
             physical_reaction="mechanical counter wheels spin and lock firmly on the verified figure, cardstock settling with tactile paper pop",
-            tactile_residue="embossed crimson stat counter plate locked firmly in place with cast shadow",
+            tactile_residue="embossed crimson metric indicator plate locked firmly in place with cast shadow",
             layout_type="center_stage",
             camera_directive="Top-down push-in through the gap beside the stat number, racking focus to the hero card",
             sound_foley="ticker_counter_overshoot_snap",
@@ -209,7 +210,7 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
         ExtractedEvidence(
             archetype=ForensicArchetype.INVESTIGATIVE_MEDIA,
             dominant_family="H6_MARK",
-            hero_anchor_prop="teletype news wire clipping and streaming diagonal ticker tape strips on fibrous newsprint",
+            hero_anchor_prop="printed news article clipping and diagonal paper banner strips on aged newsprint",
             interacting_tool_prop="fluorescent neon amber highlighter rule and streaming ticker tape",
             tactile_action_verb="sweeps briskly across the investigative column, laying down a vibrant translucent stroke over",
             physical_reaction="paper fibers absorb the neon ink, text blooming with vibrant glow against the aged newsprint",
@@ -222,8 +223,8 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
         ExtractedEvidence(
             archetype=ForensicArchetype.INVESTIGATIVE_MEDIA,
             dominant_family="H1_IMPACT",
-            hero_anchor_prop="investigative dossier folder with labeled index tabs and deckle clipping exhibits",
-            interacting_tool_prop="turned-wood docket seal stamp and labeled folder tabs",
+            hero_anchor_prop="investigative dossier folder with colored document tabs and deckle clipping exhibits",
+            interacting_tool_prop="turned-wood docket seal stamp and colored document tabs",
             tactile_action_verb="slams down at foreground depth with an impact dust puff onto",
             physical_reaction="paper fibers visibly indent under the percussion, registering an official investigation stamp",
             tactile_residue="indelible circular crimson seal impression with subtle ink bleed into paper grain",
@@ -264,7 +265,7 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
             archetype=ForensicArchetype.CORPORATE_ENTITY,
             dominant_family="H7_DISPLACE",
             hero_anchor_prop="accordion-folded corporate organization chart on fibrous parchment cardstock",
-            interacting_tool_prop="accordion fold creases and corporate hierarchy label tags",
+            interacting_tool_prop="accordion fold creases and division divider cards",
             tactile_action_verb="fans out across the desk surface under friction, unfolding layers of",
             physical_reaction="creases unfold revealing institutional hierarchy tiers with crisp paper pops",
             tactile_residue="crisp accordion paper fold lines resting in deep perspective",
@@ -278,7 +279,7 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
         ExtractedEvidence(
             archetype=ForensicArchetype.PARADOX_CLAIM,
             dominant_family="H3_SEVER",
-            hero_anchor_prop="glossy marketing promotional flyer with exaggerated urgency claims, laid over unpermitted underlying lease agreements",
+            hero_anchor_prop="promotional marketing booklet laid over underlying legal lease agreements on aged cardstock",
             interacting_tool_prop="machined steel editorial shears",
             tactile_action_verb="slices decisively in a crisp mechanical cut across",
             physical_reaction="the glossy top layer curls open and separates with paper edge curl, exposing the unpermitted underlying reality beneath",
@@ -287,12 +288,12 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
             camera_directive="Pushes in through the torn incision, focus racking from cut edges to the exposed layer",
             sound_foley="shears_paper_shearing_rip",
         ),
-        # Variant 1: Heavy REJECTED Strike Stamp & ALERT WASH
+        # Variant 1: Heavy Seal Stamp & ALERT WASH
         ExtractedEvidence(
             archetype=ForensicArchetype.PARADOX_CLAIM,
             dominant_family="H1_IMPACT",
-            hero_anchor_prop="disputed promotional advertisement clipping on aged newsprint with contradictory fine print",
-            interacting_tool_prop="heavy crimson REJECTED strike stamp and alert wash tone",
+            hero_anchor_prop="promotional newsprint clipping with fine print footnotes",
+            interacting_tool_prop="heavy crimson circular seal stamp and alert wash tone",
             tactile_action_verb="slams diagonally across the contradictory claim, triggering an ALERT WASH on",
             physical_reaction="entire frame floods to hot crimson accent tone on the decisive strike, indelible red strike mark registering",
             tactile_residue="heavy crimson diagonal ink strike-through bar with distressed print edges",
@@ -304,7 +305,7 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
         ExtractedEvidence(
             archetype=ForensicArchetype.PARADOX_CLAIM,
             dominant_family="H4_TETHER",
-            hero_anchor_prop="two juxtaposed contradictory statement cards pinned side-by-side with deckle edges",
+            hero_anchor_prop="two juxtaposed paper statement documents pinned side-by-side with deckle edges",
             interacting_tool_prop="brass pushpins and criss-crossing red evidence yarn",
             tactile_action_verb="snaps taut linking conflicting statements with taut thread across",
             physical_reaction="red yarn vibrates under tension, pulling contradictory documents toward each other in sharp relief",
@@ -319,7 +320,7 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
         ExtractedEvidence(
             archetype=ForensicArchetype.LEGAL_SANCTION,
             dominant_family="H1_IMPACT",
-            hero_anchor_prop="official regulatory sanction docket and enforcement decree clipping with hand-torn deckle borders on aged cream newsprint",
+            hero_anchor_prop="official regulatory decree document with hand-torn deckle borders on aged cream parchment",
             interacting_tool_prop="heavy turned-wood vermilion docket seal stamp carved with mirrored official sanction seal glyphs",
             tactile_action_verb="drops briskly from top-center frame, striking down with a firm mechanical thud onto",
             physical_reaction="paper fibers visibly indent under the percussion as vermilion oily ink registers a bold official regulatory seal mark",
@@ -346,10 +347,10 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
             archetype=ForensicArchetype.LEGAL_SANCTION,
             dominant_family="H2_CONSTRAINT",
             hero_anchor_prop="frozen commercial account register and asset seizure order on fibrous cardstock",
-            interacting_tool_prop="heavy brass padlock clasp and enforcement boundary tape",
+            interacting_tool_prop="heavy brass padlock clasp and diagonal yellow caution tape",
             tactile_action_verb="clamps down across the frozen asset register, securing the margins of",
             physical_reaction="padlock shackle clicks shut, locking the document bundle with zero drift",
-            tactile_residue="heavy brass padlock and boundary tape locking the frozen asset docket",
+            tactile_residue="heavy brass padlock and yellow caution tape locking the frozen asset docket",
             layout_type="center_left",
             camera_directive="Orbits a quarter turn over the locked docket, racking focus front to back",
             sound_foley="metallic_padlock_click_shut",
@@ -429,7 +430,24 @@ class SemanticEvidenceExtractor:
             import hashlib
             variant_idx = int(hashlib.md5(sentence.encode("utf-8")).hexdigest(), 16)
 
-        return variants[variant_idx % len(variants)]
+        # Extract explicit quantitative metric from narration if present (Rule 130 / Rule 141)
+        metric_match = _METRIC_REGEX.search(sentence)
+        extracted_metric = metric_match.group(0).strip() if metric_match else None
+
+        base_variant = variants[variant_idx % len(variants)]
+        return ExtractedEvidence(
+            archetype=base_variant.archetype,
+            dominant_family=base_variant.dominant_family,
+            hero_anchor_prop=base_variant.hero_anchor_prop,
+            interacting_tool_prop=base_variant.interacting_tool_prop,
+            tactile_action_verb=base_variant.tactile_action_verb,
+            physical_reaction=base_variant.physical_reaction,
+            tactile_residue=base_variant.tactile_residue,
+            layout_type=base_variant.layout_type,
+            camera_directive=base_variant.camera_directive,
+            sound_foley=base_variant.sound_foley,
+            extracted_metric=extracted_metric,
+        )
 
 
 # Global singleton instance

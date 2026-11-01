@@ -1573,7 +1573,22 @@ def sanitize_prompt_for_imagen3(text: Any) -> str:
     for pat, repl in replacements:
         s = re.sub(pat, repl, s, flags=re.IGNORECASE)
 
-    # 3. Strip raw hex color tokens (Rule 122 & Rule 140 Anti-Token-Leak) to prevent Imagen rendering hex codes as text
+    # 3. Strip internal taxonomy meta-labels to prevent Imagen 3 drawing prompt tags as text (Rule 122 / Critic Council Audit)
+    meta_replacements = [
+        (r'\bstat counter cards?\b', 'aged cardstock table'),
+        (r'\bcontradictory statement cards?\b', 'torn paper document exhibits'),
+        (r'\benforcement boundary tape\b', 'yellow caution tape'),
+        (r'\bglossy marketing promotional flyer\b', 'promotional paper sheet'),
+        (r'\bdisputed promotional advertisement\b', 'newsprint clipping'),
+        (r'\bofficial regulatory sanction docket and enforcement decree clipping\b', 'official legal decree on aged parchment'),
+        (r'\blabeled index tabs\b', 'colored document tabs'),
+        (r'\bteletype news wire clipping\b', 'printed news column clipping'),
+        (r'\bREJECTED stamp\b', 'red circular seal stamp'),
+    ]
+    for pat, repl in meta_replacements:
+        s = re.sub(pat, repl, s, flags=re.IGNORECASE)
+
+    # 4. Strip raw hex color tokens (Rule 122 & Rule 140 Anti-Token-Leak) to prevent Imagen rendering hex codes as text
     s = re.sub(r'#[0-9a-fA-F]{6}\b', '', s)
     s = re.sub(r'\(\s*\)', '', s)
     s = re.sub(r'\s+', ' ', s)
@@ -1756,13 +1771,16 @@ def build_cl3_paper_diorama_image_prompt(
     bg_choice = canonical_bgs[sc_idx % len(canonical_bgs)]
     bg_field = f"Background: {bg_choice}."
     mg_cutout = f"MG: high-contrast halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset crimson ink accent stroke."
-    if getattr(ev.archetype, 'value', str(ev.archetype)) == "quantitative_metric":
-        fg_data = f"FG: {clean_tool} and giant stat numbers rendered as physical hero characters crossing close to the lens."
+    if ev.extracted_metric:
+        fg_data = f"FG: {clean_tool} and a large tactile paper cutout number '{ev.extracted_metric}' cut from heavy cardstock crossing close to the lens."
+    elif getattr(ev.archetype, 'value', str(ev.archetype)) == "quantitative_metric":
+        fg_data = f"FG: {clean_tool} and tactile accounting figures embossed onto cardstock crossing close to the lens."
     else:
         fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
 
     shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}"
-    res = f"{style_block}\n\n{shot_block}".strip()
+    text_control = "TEXT CONTROL: No placeholder words, no English labels, no garbled text, no fake headlines. Paper documents feature soft, authentic, illegible printed texture only."
+    res = f"{style_block}\n\n{shot_block}\n\n{text_control}".strip()
     # Strip any remaining hex code tokens to prevent Imagen literal text hallucination
     res = re.sub(r'#[0-9a-fA-F]{6}\b', '', res)
     res = re.sub(r'\(\s*\)', '', res)
