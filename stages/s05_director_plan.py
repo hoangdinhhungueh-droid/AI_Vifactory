@@ -124,9 +124,20 @@ def build_vox_scene_prompts(
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
     sc_id_str = getattr(scene, "scene_id", f"SCENE_{idx+1:02d}")
     evidence = extract_evidence_for_sentence(sentence_text, market=market_str, scene_id=sc_id_str)
-    hero_obj = scene.visual_metaphor or evidence.hero_anchor_prop
+    
+    # Rule 141 (Claim-to-Evidence Binding): Ignore visual_metaphor if it's merely a sentence/narration copy
+    raw_metaphor = getattr(scene, "visual_metaphor", "") or ""
+    is_narration_copy = (
+        raw_metaphor and (
+            raw_metaphor.strip() == sentence_text.strip()
+            or raw_metaphor.strip() == headline.strip()
+            or raw_metaphor.strip() == getattr(scene, "narration", "").strip()
+            or "Tactile editorial evidence" in raw_metaphor
+        )
+    )
+    hero_obj = evidence.hero_anchor_prop if (is_narration_copy or not raw_metaphor) else raw_metaphor
     tool_prop = evidence.interacting_tool_prop
-    desk_surface = "Aged archival cream newsprint #F4F1EA"
+    desk_surface = "Aged archival cream newsprint"
 
     # Pick deterministic single camera movement (Studio Touch 7: Single Camera Mandate)
     allowed_camera_directives = ["STATIC_OVERHEAD", "SLOW_PUSH_IN_0_1X", "SLOW_HORIZONTAL_PAN", "SUBTLE_TILT_DOWN"]
@@ -263,13 +274,13 @@ def build_vox_scene_prompts(
         logger.warning(f"[build_vox_scene_prompts] CL3 image prompt fallback notice: {_img_err}")
         image_prompt = (
             f"Editorial investigative documentary frame in signature VOX paper-cut collage style. "
-            f"[Layer 1: Aged Cream Newsprint Desk #F4F1EA with subtle print halftone grid] -> "
+            f"[Layer 1: Aged Cream Newsprint Desk with subtle print halftone grid] -> "
             f"[Layer 2: bold flat geometric color block in {color}] -> "
             f"[Layer 3: negative space reserved for large bold editorial typography '{headline}', occupying 25% of frame] -> "
             f"[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge and realistic soft drop shadow: {hero_obj}. "
             f"Interacting elements: {tool_prop}] -> "
             f"[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration]. "
-            f"Strictly locked color palette: Vox Yellow #F2C230, Terracotta #C85A32, Navy #1B2B4A on Off-white Cream #F4F1EA. "
+            f"Strictly locked color palette: Vox Yellow #F2C230, Terracotta #C85A32, Navy #1B2B4A on Off-white Cream. "
             f"Clear object-assembly composition, strong editorial hierarchy, tactile paper craft. "
             f"Negative prompt: no clutter, no unnecessary objects, no glossy 3D rendering, no photorealistic background, "
             f"no oversaturated rainbow colors, maintain clean premium VOX editorial collage."
@@ -300,7 +311,7 @@ def build_vox_scene_prompts(
         logger.warning(f"[build_vox_scene_prompts] Kinetic sub-director fallback notice: {_k_err}")
         sub_plan = {}
         i2v_omni = (
-            f"[CAMERA & ENVIRONMENT]: {camera_directive} on Aged Cream Paper #F4F1EA desk.\n"
+            f"[CAMERA & ENVIRONMENT]: {camera_directive} on Aged Cream Paper desk.\n"
             f"[ACTION PHASE (0.2s - 0.4s)]: The {tool_prop} {evidence.tactile_action_verb} {hero_obj}.\n"
             f"[PHYSICAL REACTION & RESIDUE]: {evidence.physical_reaction.capitalize()}, leaving {evidence.tactile_residue}.\n"
             f"[HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze."
@@ -310,7 +321,7 @@ def build_vox_scene_prompts(
     resolved_interacting = [o["label"] for o in sub_plan.get("object_roster", []) if o.get("role") != "primary_anchor"] if sub_plan else ["tactile investigation tool", "forensic verification prop"]
 
     return {
-        "canvas_workspace": "Aged Cream Newsprint Desk #F4F1EA with subtle print halftone grid",
+        "canvas_workspace": "Aged Cream Newsprint Desk with subtle print halftone grid",
         "hero_cutout_object": hero_obj,
         "interacting_objects": resolved_interacting,
         "motion_track_and_assembly": motion_track,
@@ -365,7 +376,7 @@ def build_universal_video_prompt(scene: Scene) -> str:
     market_val = getattr(scene, "market", None) or "EN"
     ev = extract_evidence_for_sentence(sentence_val, market=market_val)
     return (
-        f"[CAMERA & ENVIRONMENT]: Static top-down desk view on Cream Paper #F4F1EA.\n"
+        f"[CAMERA & ENVIRONMENT]: Static top-down desk view on Aged Cream Paper.\n"
         f"[ACTION PHASE (0.2s - 0.4s)]: The {ev.interacting_tool_prop} {ev.tactile_action_verb} {ev.hero_anchor_prop}.\n"
         f"[PHYSICAL REACTION & RESIDUE]: {ev.physical_reaction.capitalize()}, leaving {ev.tactile_residue}.\n"
         f"[HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze."
@@ -536,7 +547,7 @@ CANONICAL_DOCUMENTARY_PROPS: List[Dict[str, Any]] = [
         "type": "backdrop",
         "name": "Aged Cream Newsprint Desk Surface",
         "desc": "Wood-pulp unbleached newsprint desk with subtle halftone printing grid",
-        "texture": "#F4F1EA unbleached paper fiber with 60lpi halftone grid lines"
+        "texture": "Unbleached aged cream paper fiber with 60lpi halftone grid lines"
     },
     {
         "id": "asset_evidence_envelope",
@@ -859,7 +870,12 @@ def run(ctx: RunContext) -> StageArtifact:
         slot = acc_pool[idx % len(acc_pool)]
         shot_id = f"sc_{idx+1:02d}_sh_01"
         prev_shot_id = f"sc_{idx:02d}_sh_01" if idx > 0 else None
-        uses_chain = (idx > 0)
+        
+        # Anti-Infinite-Zoom & Discrete Diorama Exhibit Mandate (Rule 140 & CL3 Vox Standard):
+        # Every scene represents a discrete editorial diorama exhibit on the desk.
+        # Inter-scene transitions MUST start from their own clean composite seed frame (uses_previous_end_frame=False)
+        # to guarantee distinct exhibits, prevent compression degeneration, and eliminate infinite optical zoom stalls.
+        uses_chain = False
 
         # Enrich with Claude Sonnet 5.5 planned exhibits if available
         if planned_storyboard and idx < len(planned_storyboard):

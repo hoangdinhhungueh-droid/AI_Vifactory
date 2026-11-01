@@ -9,15 +9,18 @@ Exportable to JSON Schema and Zod type in remotion/src/generated/props.ts.
 from __future__ import annotations
 
 from typing import List, Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class KaraokeWord(BaseModel):
     """Word-level timestamp for Remotion karaoke subtitles."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
     word: str
     start: float  # In seconds
     end: float    # In seconds
+    start_ms: Optional[float] = None
+    end_ms: Optional[float] = None
 
 
 class SceneRenderProp(BaseModel):

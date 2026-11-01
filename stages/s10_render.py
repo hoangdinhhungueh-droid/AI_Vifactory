@@ -102,15 +102,32 @@ def _build_and_save_remotion_props(
 
     target_total_frames = int(round(target_total_sec * fps))
     accum_frames = 0
+    cur_sec = 0.0
 
     for idx, cl in enumerate(clips):
         sc_id = cl.get("scene_id", f"SCENE_{idx+1:02d}")
         dur_sec = cl.get("duration_sec", 6.0)
         frames = int(round(dur_sec * scale * fps))
+        sc_start_sec = cur_sec
+        sc_end_sec = cur_sec + (frames / fps if fps > 0 else dur_sec)
+        cur_sec = sc_end_sec
         accum_frames += frames
 
-        # Map subtitles for this scene
-        sc_words = [KaraokeWord.model_validate(w) for w in subtitles[:20]]
+        # Map subtitles for this scene with exact relative timestamps (Rule 120 & 135)
+        sc_words: list[KaraokeWord] = []
+        for w in subtitles:
+            w_start = float(w.get("start", 0.0))
+            w_end = float(w.get("end", 0.0))
+            if w_end > sc_start_sec and w_start < sc_end_sec:
+                rel_start = max(0.0, w_start - sc_start_sec)
+                rel_end = max(rel_start + 0.05, w_end - sc_start_sec)
+                sc_words.append(KaraokeWord(
+                    word=str(w.get("word", "")),
+                    start=round(rel_start, 3),
+                    end=round(rel_end, 3),
+                    start_ms=round(rel_start * 1000.0, 1),
+                    end_ms=round(rel_end * 1000.0, 1),
+                ))
 
         scene_props.append(SceneRenderProp(
             scene_id=sc_id,

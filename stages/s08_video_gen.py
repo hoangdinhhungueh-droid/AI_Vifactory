@@ -352,12 +352,39 @@ def run(ctx: RunContext) -> StageArtifact:
             dur = scene_durations.get(idx, float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec))
             fps = ctx.config.render.fps
             if active_seed_img.exists():
-                # Apply dynamic Ken Burns zoompan camera motion (Rule 118, 121, 122)
-                # NEVER static -loop 1 without motion
+                # Apply dynamic Vox camera motion (Rule 118, 121, 122, 140)
+                # NEVER static -loop 1 without motion, never monotonous infinite center zoom
                 try:
+                    cam_dir = sc.get("camera_directive", "STATIC_OVERHEAD")
+                    tot_frames = max(25, int(dur * fps))
+                    if cam_dir == "SLOW_HORIZONTAL_PAN":
+                        # Pan left-to-right at gentle 1.06 zoom
+                        filter_expr = (
+                            f"zoompan=z=1.06:d={tot_frames}:"
+                            f"x='(iw-iw/zoom)*(on/{tot_frames})':y='(ih-ih/zoom)/2':s=1920x1080,fps={fps}"
+                        )
+                    elif cam_dir == "SUBTLE_TILT_DOWN":
+                        # Tilt down from top to bottom at gentle 1.06 zoom
+                        filter_expr = (
+                            f"zoompan=z=1.06:d={tot_frames}:"
+                            f"x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*(on/{tot_frames})':s=1920x1080,fps={fps}"
+                        )
+                    elif cam_dir == "SLOW_PUSH_IN_0_1X":
+                        # Subtle push-in (up to 1.08 max)
+                        filter_expr = (
+                            f"zoompan=z='min(1.0 + 0.08*(on/{tot_frames}), 1.08)':d={tot_frames}:"
+                            f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080,fps={fps}"
+                        )
+                    else:
+                        # STATIC_OVERHEAD: Subtle living texture drift (1.03x max drift)
+                        filter_expr = (
+                            f"zoompan=z='min(1.0 + 0.03*(on/{tot_frames}), 1.03)':d={tot_frames}:"
+                            f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080,fps={fps}"
+                        )
+
                     cmd = [
                         ffmpeg_bin, "-y", "-loop", "1", "-i", str(active_seed_img),
-                        "-vf", f"zoompan=z='min(zoom+0.0015,1.15)':d={max(25, int(dur*fps))}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080,fps={fps}",
+                        "-vf", filter_expr,
                         "-t", str(dur), "-c:v", "libx264", "-pix_fmt", "yuv420p",
                         str(target_video)
                     ]

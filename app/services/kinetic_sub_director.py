@@ -1572,6 +1572,11 @@ def sanitize_prompt_for_imagen3(text: Any) -> str:
     ]
     for pat, repl in replacements:
         s = re.sub(pat, repl, s, flags=re.IGNORECASE)
+
+    # 3. Strip raw hex color tokens (Rule 122 & Rule 140 Anti-Token-Leak) to prevent Imagen rendering hex codes as text
+    s = re.sub(r'#[0-9a-fA-F]{6}\b', '', s)
+    s = re.sub(r'\(\s*\)', '', s)
+    s = re.sub(r'\s+', ' ', s)
     return s.strip()
 
 
@@ -1750,11 +1755,15 @@ def build_cl3_paper_diorama_image_prompt(
             sc_idx = int(m_sc.group(1)) - 1
     bg_choice = canonical_bgs[sc_idx % len(canonical_bgs)]
     bg_field = f"Background: {bg_choice}."
-    mg_cutout = f"MG: high-contrast halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset ink accent stroke (#D62E1F)."
+    mg_cutout = f"MG: high-contrast halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset crimson ink accent stroke."
     if getattr(ev.archetype, 'value', str(ev.archetype)) == "quantitative_metric":
         fg_data = f"FG: {clean_tool} and giant stat numbers rendered as physical hero characters crossing close to the lens."
     else:
         fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
 
     shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}"
-    return f"{style_block}\n\n{shot_block}".strip()
+    res = f"{style_block}\n\n{shot_block}".strip()
+    # Strip any remaining hex code tokens to prevent Imagen literal text hallucination
+    res = re.sub(r'#[0-9a-fA-F]{6}\b', '', res)
+    res = re.sub(r'\(\s*\)', '', res)
+    return re.sub(r'\s+', ' ', res).strip()

@@ -501,15 +501,20 @@ export const TwoLayerScene = (props) => {
 
   if (hasExactSubtitles && subtitles && subtitles.length > 0) {
     const currentMs = (frame / (cfg.fps || 30)) * 1000;
+    const getStartMs = (item: any) =>
+      item.start_ms !== undefined ? item.start_ms : item.start !== undefined ? item.start * 1000 : 0;
+    const getEndMs = (item: any) =>
+      item.end_ms !== undefined ? item.end_ms : item.end !== undefined ? item.end * 1000 : 0;
+
     activeGlobalWordIdx = (subtitles as any[]).findIndex(
-      (item) => currentMs >= item.start_ms && currentMs < item.end_ms
+      (item) => currentMs >= getStartMs(item) && currentMs < getEndMs(item)
     );
     if (activeGlobalWordIdx === -1) {
       const lastWord = subtitles[subtitles.length - 1];
-      if (currentMs >= lastWord.end_ms) {
+      if (currentMs >= getEndMs(lastWord)) {
         activeGlobalWordIdx = subtitles.length - 1;
       } else {
-        activeGlobalWordIdx = (subtitles as any[]).findIndex((item) => currentMs < item.start_ms);
+        activeGlobalWordIdx = (subtitles as any[]).findIndex((item) => currentMs < getStartMs(item));
         if (activeGlobalWordIdx > 0) {
           activeGlobalWordIdx -= 1;
         } else if (activeGlobalWordIdx === -1) {

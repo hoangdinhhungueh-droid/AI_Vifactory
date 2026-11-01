@@ -63,38 +63,57 @@ class ExtractedEvidence:
 _KEYWORD_TAXONOMY: Dict[ForensicArchetype, Dict[str, List[str]]] = {
     ForensicArchetype.LEGAL_SANCTION: {
         "KR": ["공정위", "제재", "시정명령", "과징금", "처분", "의결", "법원", "기소", "불법", "벌금", "수사"],
-        "JA": ["公正取引", "制裁", "是正命令", "課徴金", "処分", "議決", "裁判所", "起訴", "違法", "罰金"],
-        "EN": ["sanction", "regulator", "penalty", "ruling", "ftc", "sec", "doj", "order", "court", "illegal", "prosecutor", "violation"],
-        "VN": ["xử phạt", "đình chỉ", "thanh tra", "vi phạm", "án phạt", "tòa án", "cơ quan điều tra", "sai phạm", "pháp luật"],
+        "JA": [
+            "公正取引", "制裁", "是正命令", "課徴金", "処分", "議決", "裁判所", "起訴", "違法", "罰金",
+            "侵入", "突破", "署名権限", "秘密鍵", "送金システム", "不正アクセス", "端末", "ワークステーション",
+            "凍結", "入出金停止", "押収", "立件", "容疑", "流出", "盗難"
+        ],
+        "EN": ["sanction", "regulator", "penalty", "ruling", "ftc", "sec", "doj", "order", "court", "illegal", "prosecutor", "violation", "breach", "hack", "freeze", "key"],
+        "VN": ["xử phạt", "đình chỉ", "thanh tra", "vi phạm", "án phạt", "tòa án", "cơ quan điều tra", "sai phạm", "pháp luật", "đột nhập", "đóng băng"],
     },
     ForensicArchetype.CORPORATE_ENTITY: {
-        "KR": ["시행사", "드림하우징", "시공사", "법인", "기업", "지분", "합작", "계약서", "임대", "주식회사"],
-        "JA": ["施工会社", "デベロッパー", "法人", "企業", "持分", "契約書", "賃貸", "株式会社", "合弁"],
-        "EN": ["developer", "firm", "corporation", "subsidiary", "contract", "lease", "entity", "syndicate", "shareholder", "license"],
-        "VN": ["chủ đầu tư", "doanh nghiệp", "công ty", "tập đoàn", "hợp đồng", "dự án", "thuê nhà", "pháp nhân"],
+        "KR": ["시행사", "드림하우징", "시공사", "법인", "기업", "지分", "합작", "계약서", "임대", "주식회사"],
+        "JA": [
+            "施工会社", "デベロッパー", "法人", "企業", "持分", "契約書", "賃貸", "株式会社", "合弁",
+            "バイナンス", "取引所", "社名", "safu", "緊急基金", "準備金", "誕生", "プラットフォーム",
+            "ブロックチェーン", "現物", "設立", "組織"
+        ],
+        "EN": ["developer", "firm", "corporation", "subsidiary", "contract", "lease", "entity", "syndicate", "shareholder", "license", "exchange", "fund", "safu", "founded"],
+        "VN": ["chủ đầu tư", "doanh nghiệp", "công ty", "tập đoàn", "hợp đồng", "dự án", "thuê nhà", "pháp nhân", "sàn giao dịch", "quỹ"],
     },
     ForensicArchetype.PARADOX_CLAIM: {
         "KR": ["마감임박", "광고", "외쳤지만", "승인도 없는데", "허위", "기만", "무엇이 마감", "과장", "선착순", "홍보"],
-        "JA": ["締め切り", "広告", "宣伝", "承認なし", "虚偽", "誇大", "先着順", "勧誘"],
-        "EN": ["hurry", "closing soon", "advertisement", "claimed", "unapproved", "false", "misleading", "deceptive", "paradox", "pitch"],
-        "VN": ["cháy hàng", "sắp hết hạn", "quảng cáo", "gian dối", "chưa cấp phép", "lừa dối", "thổi phồng", "rao bán"],
+        "JA": [
+            "締め切り", "広告", "宣伝", "承認なし", "虚偽", "誇大", "先着順", "勧誘",
+            "出金ボタン", "押せません", "矛盾", "平常のまま", "消失", "信頼が崩壊", "なぜ", "一点を突破",
+            "神話", "裏側では", "破綻", "問い", "前提"
+        ],
+        "EN": ["hurry", "closing soon", "advertisement", "claimed", "unapproved", "false", "misleading", "deceptive", "paradox", "pitch", "cannot", "disabled", "collapse", "myth"],
+        "VN": ["cháy hàng", "sắp hết hạn", "quảng cáo", "gian dối", "chưa cấp phép", "lừa dối", "thổi phồng", "rao bán", "mâu thuẫn", "sụp đổ", "nghịch lý"],
     },
     ForensicArchetype.QUANTITATIVE_METRIC: {
         "KR": ["%", "원", "억", "조", "모집률", "투자금", "묶었습니다", "손실", "비율", "수익률", "30%", "자금"],
-        "JA": ["%", "円", "億", "兆", "募集率", "投資金", "損失", "比率", "利回り", "資金"],
-        "EN": ["%", "$", "billion", "million", "rate", "loss", "deposit", "ratio", "percent", "capital", "shares"],
-        "VN": ["%", "đồng", "tỷ", "triệu", "tỷ lệ", "tiền gửi", "thua lỗ", "lãi suất", "vốn", "tiền cọc"],
+        "JA": [
+            "%", "％", "円", "億", "兆", "ドル", "募集率", "投資金", "損失", "比率", "利回り", "資金",
+            "1兆円", "65億ドル", "4700億円", "50％", "10％", "数字", "金額", "取引量", "規模", "残高", "補償", "全額"
+        ],
+        "EN": ["%", "$", "billion", "million", "rate", "loss", "deposit", "ratio", "percent", "capital", "shares", "amount", "volume", "reserve"],
+        "VN": ["%", "đồng", "tỷ", "triệu", "tỷ lệ", "tiền gửi", "thua lỗ", "lãi suất", "vốn", "tiền cọc", "quy mô", "doanh số"],
     },
     ForensicArchetype.INVESTIGATIVE_MEDIA: {
         "KR": ["보도", "언론", "경기일보", "연합뉴스", "mbc", "kbs", "sbs", "기사", "폭로", "단독", "심층", "고발"],
-        "JA": ["報道", "ニュース", "新聞", "メディア", "暴露", "特報", "独自", "告発"],
-        "EN": ["report", "news", "investigation", "broadsheet", "press", "wire", "exposé", "headline", "journal", "leak"],
+        "JA": [
+            "報道", "ニュース", "新聞", "メディア", "暴露", "特報", "独自", "告発",
+            "日本経済新聞", "ロイター", "コインデスク", "イオライト", "各社報道", "日経",
+            "公表", "疑惑", "北朝鮮", "ハッカー", "ハッキング", "検索", "発表"
+        ],
+        "EN": ["report", "news", "investigation", "broadsheet", "press", "wire", "exposé", "headline", "journal", "leak", "reuters", "coindesk", "bloomberg"],
         "VN": ["báo chí", "truyền thông", "tin tức", "phóng sự", "điều tra", "vạch trần", "báo đài", "tiêu điểm"],
     },
 }
 
-# Metric Regex Pattern for quantitative detection
-_METRIC_REGEX = re.compile(r"(\d+(\.\d+)?\s*(%|percent|billion|million|\$|₩|€|£|원|억|조|tỷ|triệu))", re.IGNORECASE)
+# Metric Regex Pattern for quantitative detection (includes full-width ％, 円, 億, 兆, ドル)
+_METRIC_REGEX = re.compile(r"(\d+(\.\d+)?\s*(%|％|percent|billion|million|\$|₩|€|£|円|ドル|ウォン|원|억|조|tỷ|triệu|兆|億))", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------------
@@ -180,10 +199,10 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
             hero_anchor_prop="archival investigative disclosure broadsheet with high-density editorial teletype columns",
             interacting_tool_prop="heavy brass-rimmed optical magnifying loupe with convex glass lens and knurled handle",
             tactile_action_verb="glides smoothly across the investigative broadsheet, locking in sharp focus directly over the disclosure headline of",
-            physical_reaction="headline text beneath the lens magnifies 1.35x with barrel edge distortion, illuminating fine-print investigative evidence",
+            physical_reaction="tactile glass lens highlights and focuses cleanly on the headline text with subtle optical refraction, revealing fine-print investigative evidence",
             tactile_residue="circular cast optical shadow ring framing the highlighted investigative revelation",
             layout_type="center_left",
-            camera_directive="Top-down orthographic overview on continuous cream mat (#F4F1EA) under warm 3200K tungsten lighting",
+            camera_directive="Top-down steady overhead frame under warm 3200K tungsten lighting",
             sound_foley="heavy_glass_lens_slide_on_paper",
         ),
         # Variant 2: Fluorescent Neon Highlighter & Streaming Ticker Tape
@@ -275,7 +294,7 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
             hero_anchor_prop="disputed promotional advertisement clipping on aged newsprint with contradictory fine print",
             interacting_tool_prop="heavy crimson REJECTED strike stamp and alert wash tone",
             tactile_action_verb="slams diagonally across the contradictory claim, triggering an ALERT WASH on",
-            physical_reaction="entire frame floods to hot accent tone (#D62E1F) on the decisive strike, indelible red strike mark registering",
+            physical_reaction="entire frame floods to hot crimson accent tone on the decisive strike, indelible red strike mark registering",
             tactile_residue="heavy crimson diagonal ink strike-through bar with distressed print edges",
             layout_type="center_stage",
             camera_directive="Dives from above, landing hard on the strike impact",
@@ -300,13 +319,13 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
         ExtractedEvidence(
             archetype=ForensicArchetype.LEGAL_SANCTION,
             dominant_family="H1_IMPACT",
-            hero_anchor_prop="official regulatory sanction docket and enforcement decree clipping with hand-torn deckle borders on aged cream newsprint (#F4F1EA)",
+            hero_anchor_prop="official regulatory sanction docket and enforcement decree clipping with hand-torn deckle borders on aged cream newsprint",
             interacting_tool_prop="heavy turned-wood vermilion docket seal stamp carved with mirrored official sanction seal glyphs",
             tactile_action_verb="drops briskly from top-center frame, striking down with a firm mechanical thud onto",
             physical_reaction="paper fibers visibly indent under the percussion as vermilion oily ink registers a bold official regulatory seal mark",
-            tactile_residue="indelible circular vermilion official sanction seal impression with subtle ink bleed into paper thớ",
+            tactile_residue="indelible circular vermilion official sanction seal impression with subtle ink bleed into paper grain",
             layout_type="vertical",
-            camera_directive="Top-down orthographic perspective over aged paper desk (#F4F1EA), subtle 1-frame camera shudder on impact",
+            camera_directive="Top-down orthographic perspective over aged paper desk, subtle 1-frame camera shudder on impact",
             sound_foley="heavy_wooden_stamp_thud_paper_rebound",
         ),
         # Variant 1: Formal Judicial Ruling Scroll & Red Ribbon
@@ -389,13 +408,13 @@ class SemanticEvidenceExtractor:
             return ExtractedEvidence(
                 archetype=archetype,
                 dominant_family="H5_OPTICAL",
-                hero_anchor_prop="archival investigative document exhibit on aged newsprint (#F4F1EA)",
+                hero_anchor_prop="archival investigative document exhibit on aged newsprint",
                 interacting_tool_prop="red directional ink marker stroke",
                 tactile_action_verb="sweeps cleanly across",
                 physical_reaction="text highlights with authentic print grain",
                 tactile_residue="crimson underline mark",
                 layout_type="center_stage",
-                camera_directive="Top-down slow push-in on continuous cream mat (#F4F1EA)",
+                camera_directive="Top-down slow push-in on continuous cream mat",
                 sound_foley="crisp_paper_snap",
             )
 
