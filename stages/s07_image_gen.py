@@ -122,7 +122,7 @@ def run(ctx: RunContext) -> StageArtifact:
         raise GateError(
             STAGE,
             f"Missing authentic composite seed images for {len(missing_scenes)} scene(s): {missing_scenes}. "
-            f"Found {len(images_generated)}/{len(scenes)} valid images. Zero-Mock Mandate (Rule 118 & 121): "
+            f"Found {len(images_generated)}/{len(scenes)} valid images. Refusing to proceed with missing authentic images (Rule 118 & 121): "
             f"authentic illustrations required in production. Prompts saved to '{bulk_prompts_file}'. "
             f"Please generate authentic images via Antigravity UI / Skill /vf-image-gen and place them in "
             f"'{ctx.paths.composite_seeds_dir}' before resuming.",

@@ -10,9 +10,12 @@ Assembles rendered scene clips into the final broadcast video:
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 from pathlib import Path
+
+logger = logging.getLogger("vox.assemble")
 
 
 def assemble_final_video(
@@ -150,7 +153,7 @@ def assemble_final_video(
         try:
             if p.exists():
                 p.unlink(missing_ok=True)
-        except OSError:
-            pass
+        except OSError as _clean_err:
+            logger.debug(f"[vox_assemble] Could not unlink temp file {p}: {_clean_err}")
 
     return final_output

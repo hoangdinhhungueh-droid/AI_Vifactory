@@ -9,7 +9,7 @@ Validates:
   - Gate 4: --pilot generates 30s demo video, contact sheet, and emits full master render command.
   - Gate 5: Master render QC passes and uploads unlisted to YouTube.
   - --auto: Unattended mode runs all stages end-to-end without pausing.
-  - S07 Zero-Mock: Fails closed in live production when images are missing.
+  - S07 Authentic-Only: Fails closed in live production when images are missing.
 """
 
 from __future__ import annotations
@@ -224,7 +224,7 @@ def test_unattended_auto_mode_runs_end_to_end(tmp_path: Path):
         assert art.exists(), f"Stage {stage.value} was skipped in auto mode: missing {art}"
 
 
-def test_s07_zero_mock_fails_closed_in_production(tmp_path: Path):
+def test_s07_authentic_images_fails_closed_in_production(tmp_path: Path):
     """Rule 118 & 121: S07 must fail closed when authentic seed images are missing in live prod."""
     run_id = "RUN_TEST_S07_FAIL_CLOSED"
     paths = resolve_run_paths(run_id, repo_root=REPO_ROOT)

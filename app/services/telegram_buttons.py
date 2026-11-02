@@ -714,7 +714,7 @@ def send_hg3_images_verified(
 
     lines = [
         "🖼️ <b>[HUMAN GATE 3] TÀI NGUYÊN ẢNH EDITORIAL ĐÃ XÁC THỰC</b>",
-        "<i>(✨ 100% Authentic Editorial Illustrations, 0% Mock/Placeholder - Rule 118 & 121)</i>",
+        "<i>(✨ 100% Authentic Editorial Illustrations, 0% Synthetic/Placeholder - Rule 118 & 121)</i>",
         "",
         f"🎨 <b>Số lượng ảnh:</b> {image_count} composite seed images",
         f"📁 <b>Thư mục tài nguyên:</b> <code>{html.escape(str(composite_dir or 'composite_seeds/'))}</code>",
