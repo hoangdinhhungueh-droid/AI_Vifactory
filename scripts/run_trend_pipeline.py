@@ -114,6 +114,11 @@ def main():
         except (IndexError, ValueError):
             max_candidates = 30
 
+    preset = os.getenv("VF_PRESET") or "story_forensic"
+    if "--preset" in args:
+        idx = args.index("--preset")
+        preset = args[idx + 1] if idx + 1 < len(args) else "story_forensic"
+
     # 1. Evaluate schedule based on Vietnam Timezone (UTC+7)
     schedule_info = get_market_schedule_info()
 
@@ -193,7 +198,8 @@ def main():
             custom_seed=custom_term,
             auto_produce=auto_produce,
             max_scan_candidates=max_candidates,
-            max_b2_attempts=max_b2_attempts
+            max_b2_attempts=max_b2_attempts,
+            preset=preset,
         )
         results["approved_topics"].extend(topics)
     else:
@@ -205,6 +211,7 @@ def main():
                     auto_produce=auto_produce,
                     max_scan_candidates=max_candidates,
                     max_b2_attempts=max_b2_attempts,
+                    preset=preset,
                 )
                 results["approved_topics"].extend(topics)
             except Exception as e:

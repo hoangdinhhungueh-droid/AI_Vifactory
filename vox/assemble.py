@@ -10,6 +10,7 @@ Assembles rendered scene clips into the final broadcast video:
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -113,7 +114,7 @@ def assemble_final_video(
         "-c:v", "libx264",
         "-r", "30",
         "-pix_fmt", "yuv420p",
-        "-preset", "veryfast",
+        "-preset", "ultrafast" if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("VF_TEST_MODE") == "1" else "veryfast",
         "-b:v", "3500k",
         "-c:a", "aac",
         "-b:a", "192k",
@@ -144,10 +145,12 @@ def assemble_final_video(
         ]
         subprocess.run(cmd_master_fallback, capture_output=True, check=True)
 
-    # Cleanup temp concat
-    if temp_concat_video.exists():
-        temp_concat_video.unlink(missing_ok=True)
-    if concat_list_file.exists():
-        concat_list_file.unlink(missing_ok=True)
+    # Cleanup temp concat safely (absorb Windows transient file locks)
+    for p in (temp_concat_video, concat_list_file):
+        try:
+            if p.exists():
+                p.unlink(missing_ok=True)
+        except OSError:
+            pass
 
     return final_output

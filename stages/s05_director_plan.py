@@ -1088,6 +1088,18 @@ def run(ctx: RunContext) -> StageArtifact:
                 with open(pf_file, "w", encoding="utf-8") as f:
                     json.dump(prompts_manifest, f, indent=2, ensure_ascii=False)
                 logger.info(f"[s05_director_plan] Synchronized prompts_forge.json to {pf_file}")
+
+                # Emit human-readable bulk_image_prompts.txt for Gate 2/Gate 3
+                bulk_lines = [f"# Bulk Image Prompts for {ctx.run_id} (Market: {market})", ""]
+                for s in scenes:
+                    bulk_lines.append(f"=== {s.scene_id} // {s.headline} ===")
+                    bulk_lines.append(f"Target File: composite_{s.scene_id.lower()}.png")
+                    bulk_lines.append(f"Narration: {getattr(s, 'narration', '')}")
+                    bulk_lines.append(f"Prompt:\n{s.image_prompt.strip()}")
+                    bulk_lines.append("")
+                (ep_dir / "bulk_image_prompts.txt").write_text("\n".join(bulk_lines), encoding="utf-8")
+                if ctx.paths.composite_seeds_dir.exists():
+                    (ctx.paths.composite_seeds_dir / "prompts.txt").write_text("\n".join(bulk_lines), encoding="utf-8")
             except Exception as _sync_err:
                 logger.warning(f"[s05_director_plan] Notice syncing director_plan.json to {ep_dir}: {_sync_err}")
 

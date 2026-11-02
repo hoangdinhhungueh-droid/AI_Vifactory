@@ -14,7 +14,7 @@ from typing import Any, Dict, List
 
 from core.config import RunContext
 from core.contracts.stages import Provenance, StageArtifact, StageID
-from core.gates import compute_file_sha256, emit_artifact
+from core.gates import compute_file_sha256, emit_artifact, GateError
 from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S7_IMAGE_GEN
@@ -48,7 +48,25 @@ def run(ctx: RunContext) -> StageArtifact:
         if prefix_file.exists():
             style_prefix = prefix_file.read_text(encoding="utf-8").strip()
 
+    # Ensure bulk_image_prompts.txt is always emitted for Human Gate 2 / Gate 3
+    bulk_prompts_file = ctx.paths.root / "bulk_image_prompts.txt"
+    bulk_lines = [f"# Bulk Image Prompts for Run: {ctx.run_id}", ""]
+    for sc in scenes:
+        sc_id = sc.get("scene_id", "SCENE_01")
+        headline = sc.get("headline", "")
+        p_text = sc.get("image_prompt") or sc.get("visual_prompt") or sc.get("narration", "")
+        bulk_lines.append(f"=== {sc_id} // {headline} ===")
+        bulk_lines.append(f"Target: composite_{sc_id.lower()}.png")
+        bulk_lines.append(f"Narration: {sc.get('narration', '')}")
+        bulk_lines.append(f"Prompt:\n{p_text.strip()}")
+        bulk_lines.append("")
+    bulk_prompts_file.write_text("\n".join(bulk_lines), encoding="utf-8")
+    if ctx.paths.composite_seeds_dir.exists():
+        (ctx.paths.composite_seeds_dir / "prompts.txt").write_text("\n".join(bulk_lines), encoding="utf-8")
+
     images_generated: List[Dict[str, Any]] = []
+    missing_scenes: List[str] = []
+    is_hermetic_test = bool(ctx.dry_run or (ctx.config and ctx.config.name == "e2e_min"))
 
     for sc in scenes:
         sc_id = sc.get("scene_id", "SCENE_01")
@@ -72,30 +90,44 @@ def run(ctx: RunContext) -> StageArtifact:
             if found and found.resolve() != target_img.resolve():
                 import shutil
                 shutil.copy2(str(found), str(target_img))
-            elif not target_img.exists() or (found is None and not target_img.exists()):
-                # Create authentic editorial placeholder frame via PIL if not dry_run
-                try:
-                    from PIL import Image, ImageDraw
-                    bg_color = "#F4F1EA" if is_story else "#F4F1EA"
-                    border_color = "#D62E1F" if is_story else "#F2C230"
-                    img = Image.new("RGB", (1920, 1080), color=bg_color)
-                    draw = ImageDraw.Draw(img)
-                    # Draw subtle geometric accent shapes in border color
-                    draw.rectangle([100, 100, 1820, 980], outline=border_color, width=4)
-                    draw.text((150, 150), f"{sc_id} // {sc.get('headline', 'EDITORIAL FOCUS')}", fill="#1B2B4A")
-                    draw.text((150, 220), sc.get("narration", "")[:120], fill="#334155")
-                    img.save(str(target_img), format="PNG")
-                except Exception:
-                    # Write minimal valid PNG header if PIL unavailable
-                    target_img.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 2048)
+            elif not target_img.exists():
+                if is_hermetic_test:
+                    # Create editorial placeholder frame via PIL ONLY for hermetic unit tests
+                    try:
+                        from PIL import Image, ImageDraw
+                        bg_color = "#F4F1EA"
+                        border_color = "#D62E1F" if is_story else "#F2C230"
+                        img = Image.new("RGB", (1920, 1080), color=bg_color)
+                        draw = ImageDraw.Draw(img)
+                        draw.rectangle([100, 100, 1820, 980], outline=border_color, width=4)
+                        draw.text((150, 150), f"{sc_id} // {sc.get('headline', 'EDITORIAL FOCUS')}", fill="#1B2B4A")
+                        draw.text((150, 220), sc.get("narration", "")[:120], fill="#334155")
+                        img.save(str(target_img), format="PNG")
+                    except Exception:
+                        target_img.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 2048)
+                else:
+                    # In Production: ZERO-MOCK MANDATE (Rule 118 & 121)
+                    missing_scenes.append(sc_id)
 
-        sha = compute_file_sha256(target_img) if target_img.exists() else "none"
-        images_generated.append({
-            "scene_id": sc_id,
-            "file_path": str(target_img),
-            "size_bytes": target_img.stat().st_size if target_img.exists() else 0,
-            "sha256": sha
-        })
+        if target_img.exists():
+            sha = compute_file_sha256(target_img)
+            images_generated.append({
+                "scene_id": sc_id,
+                "file_path": str(target_img),
+                "size_bytes": target_img.stat().st_size,
+                "sha256": sha
+            })
+
+    if missing_scenes:
+        raise GateError(
+            STAGE,
+            f"Missing authentic composite seed images for {len(missing_scenes)} scene(s): {missing_scenes}. "
+            f"Found {len(images_generated)}/{len(scenes)} valid images. Zero-Mock Mandate (Rule 118 & 121): "
+            f"authentic illustrations required in production. Prompts saved to '{bulk_prompts_file}'. "
+            f"Please generate authentic images via Antigravity UI / Skill /vf-image-gen and place them in "
+            f"'{ctx.paths.composite_seeds_dir}' before resuming.",
+            details={"missing_scenes": missing_scenes, "prompts_file": str(bulk_prompts_file)}
+        )
 
     payload = {
         "task_id": ctx.run_id,

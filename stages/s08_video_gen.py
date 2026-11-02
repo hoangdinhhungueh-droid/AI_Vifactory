@@ -408,7 +408,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     cmd = [
                         ffmpeg_bin, "-y", "-loop", "1", "-i", str(active_seed_img),
                         "-vf", filter_expr,
-                        "-t", str(dur), "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                        "-t", str(dur), "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
                         str(target_video)
                     ]
                     subprocess.run(cmd, capture_output=True, check=True, timeout=30)
@@ -429,7 +429,7 @@ def run(ctx: RunContext) -> StageArtifact:
                         cmd = [
                             ffmpeg_bin, "-y", "-f", "lavfi",
                             "-i", f"testsrc=duration={dur}:size=1920x1080:rate={fps}",
-                            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                            "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
                             str(target_video)
                         ]
                         subprocess.run(cmd, capture_output=True, check=True, timeout=30)

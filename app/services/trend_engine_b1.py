@@ -1122,6 +1122,7 @@ def discover_and_produce_market_trend(
         auto_produce = bool(kwargs.pop("auto_commit"))
     if "max_candidates" in kwargs:
         max_scan_candidates = int(kwargs.pop("max_candidates"))
+    preset = kwargs.pop("preset", None) or os.getenv("VF_PRESET") or "story_forensic"
 
     m_up = (market or "EN").upper()
     now = get_vn_now()
@@ -1744,6 +1745,8 @@ def discover_and_produce_market_trend(
                     str(temp_task_id),
                     "--market",
                     str(m_up),
+                    "--preset",
+                    str(preset),
                     "--to",
                     "s06_critic_visual",
                 ]

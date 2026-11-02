@@ -40,79 +40,97 @@ def _build_grounded_story_beats(
             return claims[idx].claim.strip().rstrip(".")
         return f"Documented evidentiary findings confirm critical structural liabilities regarding {topic}"
 
-    # Build Beat 1: Hook (0-20s, ~65 words)
+    # Build Beat 1: Hook (0-20s, ~75 words)
     b1_lines = [
         StorySceneLine(
             line_id="B1_L01",
-            text=f"In an acute market crisis, {topic} triggered an institutional reckoning as billions in market valuation evaporated.",
+            text=f"In an acute market crisis, {topic} triggered an institutional reckoning as billions in market valuation evaporated almost overnight.",
             claim_ids=[_cid(0), _cid(1)],
             visual_hook="stamp",
         ),
         StorySceneLine(
             line_id="B1_L02",
-            text=f"Beneath the surface lay a precarious commercial architecture: {_claim_text(0)}.",
+            text=f"Beneath the official surface lay an increasingly precarious commercial architecture: {_claim_text(0)}.",
             claim_ids=[_cid(0)],
             visual_hook="ruler_measure",
         ),
         StorySceneLine(
             line_id="B1_L03",
-            text=f"What was hailed as market leadership transformed into an existential forensic inquiry: {_claim_text(1)}.",
+            text=f"What was hailed across mainstream financial press as market leadership suddenly transformed into an existential forensic inquiry: {_claim_text(1)}.",
             claim_ids=[_cid(1)],
             visual_hook="red_thread",
         ),
+        StorySceneLine(
+            line_id="B1_L04",
+            text="Investigators immediately confronted the core paradox: how did systemic vulnerabilities compound in plain sight before regulatory examiners intervened?",
+            claim_ids=[_cid(0), _cid(1)],
+            visual_hook="magnifier",
+        ),
     ]
 
-    # Build Beat 2: Setup (~40s, ~85 words)
+    # Build Beat 2: Setup (~40s, ~90 words)
     b2_lines = [
         StorySceneLine(
             line_id="B2_L01",
-            text="Prior to the unraveling, corporate leadership projected an unassailable commercial trajectory.",
+            text="Prior to the unraveling, corporate leadership projected an unassailable commercial trajectory, assuring institutional shareholders that competitive moats remained robust.",
             claim_ids=[_cid(0)],
             visual_hook="cutout",
         ),
         StorySceneLine(
             line_id="B2_L02",
-            text=f"Official regulatory disclosures documented that {_claim_text(1)}.",
+            text=f"Official regulatory disclosures documented foundational structures that appeared standard on the surface: {_claim_text(1)}.",
             claim_ids=[_cid(1)],
             visual_hook="compass_arc",
         ),
         StorySceneLine(
             line_id="B2_L03",
-            text=f"Financial commentators praised the performance, highlighting that {_claim_text(2)}.",
+            text=f"Financial commentators repeatedly praised quarterly earnings momentum, emphasizing that {_claim_text(2)}.",
             claim_ids=[_cid(2)],
             visual_hook="cutout",
         ),
+        StorySceneLine(
+            line_id="B2_L04",
+            text="Yet internal filings told a starkly different story, masking mounting operational friction behind optimistic public press statements and non-GAAP disclosures.",
+            claim_ids=[_cid(0), _cid(2)],
+            visual_hook="red_thread",
+        ),
     ]
 
-    # Build Beat 3: Scheme / Mechanism (~80s, ~140 words)
+    # Build Beat 3: Scheme / Mechanism (~80s, ~165 words)
     b3_lines = [
         StorySceneLine(
             line_id="B3_L01",
-            text=f"Beneath public enthusiasm, examiners surfaced hidden dependencies on third-party algorithmic distribution: {_claim_text(1)}.",
+            text=f"Beneath public enthusiasm, forensic examiners surfaced hidden dependencies on external commercial distribution: {_claim_text(1)}.",
             claim_ids=[_cid(1)],
             visual_hook="red_thread",
         ),
         StorySceneLine(
             line_id="B3_L02",
-            text=f"Commercial ledgers revealed the scale of counterparty agreements: {_claim_text(2)}.",
+            text=f"Commercial ledgers and audited filings revealed the unprecedented scale of counterparty exposure: {_claim_text(2)}.",
             claim_ids=[_cid(2)],
             visual_hook="stamp",
         ),
         StorySceneLine(
             line_id="B3_L03",
-            text=f"Operational data indicated systemic friction across counterparties, confirming that {_claim_text(3)}.",
+            text=f"Operational data indicated systemic friction across critical counterparties, confirming that {_claim_text(3)}.",
             claim_ids=[_cid(3)],
             visual_hook="magnifier",
         ),
         StorySceneLine(
             line_id="B3_L04",
-            text="This commercial architecture created an acute paradox: aggressive short-term monetization accelerated long-term platform vulnerability.",
+            text="This commercial architecture created an acute structural paradox: aggressive short-term monetization accelerated long-term platform vulnerability and governance risks.",
             claim_ids=[_cid(0), _cid(3)],
             visual_hook="ruler_measure",
         ),
+        StorySceneLine(
+            line_id="B3_L05",
+            text="By the time supervisory bodies initiated inquiry, the transmission mechanism had already locked capital reserves into unsustainable counterparty obligations.",
+            claim_ids=[_cid(1), _cid(3)],
+            visual_hook="highlighter",
+        ),
     ]
 
-    # Build Beat 4: Crack / Unraveling (~60s, ~110 words)
+    # Build Beat 4: Crack / Unraveling (~60s, ~135 words)
     b4_lines = [
         StorySceneLine(
             line_id="B4_L01",
@@ -122,34 +140,46 @@ def _build_grounded_story_beats(
         ),
         StorySceneLine(
             line_id="B4_L02",
-            text=f"Formal filings confirmed mounting friction: {_claim_text(5)}, alongside {_claim_text(6)}.",
+            text=f"Formal court filings confirmed mounting structural friction across key stakeholders: {_claim_text(5)}, alongside {_claim_text(6)}.",
             claim_ids=[_cid(5), _cid(6)],
             visual_hook="highlighter",
         ),
         StorySceneLine(
             line_id="B4_L03",
-            text="As market participants scrutinized the threat of automated summaries diverting web traffic, capital flight triggered an unprecedented valuation plunge.",
+            text="As market participants scrutinized the threat of automated disruption diverting fundamental cash flows, capital flight triggered an unprecedented valuation plunge.",
             claim_ids=[_cid(2), _cid(5)],
             visual_hook="scissors_cut",
         ),
+        StorySceneLine(
+            line_id="B4_L04",
+            text="Whistleblower reports and internal memoranda leaked to major newsrooms, stripping away the final layer of executive deniability as panic swept institutional trading desks.",
+            claim_ids=[_cid(4), _cid(6)],
+            visual_hook="stamp",
+        ),
     ]
 
-    # Build Beat 5: Aftermath (~40s, ~80 words)
+    # Build Beat 5: Aftermath (~40s, ~95 words)
     b5_lines = [
         StorySceneLine(
             line_id="B5_L01",
-            text="The collapse obliterated billions in stakeholder equity, serving as an unsparing warning on operational dependencies.",
+            text="The collapse obliterated billions in stakeholder equity, serving as an unsparing warning on unchecked operational dependencies and regulatory arbitrage.",
             claim_ids=[_cid(0), _cid(3)],
             visual_hook="stamp",
         ),
         StorySceneLine(
             line_id="B5_L02",
-            text=f"High-stakes regulatory inquiries followed, confirming that {_claim_text(len(claims) - 1)}.",
+            text=f"High-stakes regulatory inquiries and civil enforcement followed swiftly, confirming that {_claim_text(len(claims) - 1)}.",
             claim_ids=[_cid(len(claims) - 1)],
             visual_hook="scissors_cut",
         ),
         StorySceneLine(
             line_id="B5_L03",
+            text=f"Sanctions, executive resignations, and comprehensive structural mandates permanently reshaped the institutional landscape surrounding {topic}.",
+            claim_ids=[_cid(2), _cid(len(claims) - 1)],
+            visual_hook="cutout",
+        ),
+        StorySceneLine(
+            line_id="B5_L04",
             text="For international markets, the conclusion is inescapable: no commercial narrative can permanently defy verified accounting ledgers and organic audience retention.",
             claim_ids=[_cid(2), _cid(len(claims) - 1)],
             visual_hook="red_thread",
@@ -157,11 +187,11 @@ def _build_grounded_story_beats(
     ]
 
     raw_beats = [
-        ("B1_hook", 19.2, b1_lines),
-        ("B2_setup", 40.8, b2_lines),
-        ("B3_scheme", 79.2, b3_lines),
+        ("B1_hook", 24.0, b1_lines),
+        ("B2_setup", 36.0, b2_lines),
+        ("B3_scheme", 72.0, b3_lines),
         ("B4_crack", 60.0, b4_lines),
-        ("B5_aftermath", 40.8, b5_lines),
+        ("B5_aftermath", 48.0, b5_lines),
     ]
 
     for _, _, lines in raw_beats:
