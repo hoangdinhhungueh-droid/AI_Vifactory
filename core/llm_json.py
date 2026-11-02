@@ -63,8 +63,8 @@ def parse_llm_json(raw_text: str) -> Union[Dict[str, Any], List[Any]]:
     # Attempt 1: Direct parse
     try:
         return json.loads(target_str)
-    except Exception:
-        pass
+    except (json.JSONDecodeError, ValueError) as _err1:
+        logger.debug("[llm_json] Direct parse unviable: %s", _err1)
 
     # Attempt 2: Trailing comma elimination loop
     repaired = target_str
@@ -76,16 +76,16 @@ def parse_llm_json(raw_text: str) -> Union[Dict[str, Any], List[Any]]:
 
     try:
         return json.loads(repaired)
-    except Exception:
-        pass
+    except (json.JSONDecodeError, ValueError) as _err2:
+        logger.debug("[llm_json] Trailing comma repair unviable: %s", _err2)
 
     # Attempt 3: Strip C/C++ style comments
     repaired_no_comments = re.sub(r'//.*?\n', '\n', repaired)
     repaired_no_comments = re.sub(r'/\*.*?\*/', '', repaired_no_comments, flags=re.DOTALL)
     try:
         return json.loads(repaired_no_comments)
-    except Exception:
-        pass
+    except (json.JSONDecodeError, ValueError) as _err3:
+        logger.debug("[llm_json] Comment strip repair unviable: %s", _err3)
 
     # Attempt 4: Fix unclosed brackets from truncation
     open_curlies = repaired_no_comments.count("{") - repaired_no_comments.count("}")
@@ -97,8 +97,8 @@ def parse_llm_json(raw_text: str) -> Union[Dict[str, Any], List[Any]]:
         fixed_closing = fixed_closing + ("]" * max(0, open_squares)) + ("}" * max(0, open_curlies))
         try:
             return json.loads(fixed_closing)
-        except Exception:
-            pass
+        except (json.JSONDecodeError, ValueError) as _err4:
+            logger.debug("[llm_json] Bracket balance repair unviable: %s", _err4)
 
     # Final attempt: raise standard error with context
     return json.loads(repaired)
