@@ -205,16 +205,17 @@ def run(ctx: RunContext) -> StageArtifact:
     s2_art = require_input(STAGE, ctx.paths)
     topic = s2_art.payload.get("topic", "Corporate Monopoly Inquest")
 
+    from core.market_resolver import resolve_canonical_market
+    market = resolve_canonical_market(ctx=ctx)
     is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
-    market = "JA" if "JP_" in ctx.run_id else ("KO" if "KR_" in ctx.run_id else ("VI" if "VN_" in ctx.run_id else "EN"))
 
     if is_story:
         from app.schemas.story_contracts import EvidenceClaim, StorySceneLine, StoryScriptBeat, StoryScriptPayload
+        from core.llm_json import parse_llm_json
         evidence_raw = s2_art.payload.get("evidence_ledger", [])
         evidence_ledger = [EvidenceClaim.model_validate(c) if isinstance(c, dict) else c for c in evidence_raw]
 
         import json
-        import re
 
         prompt_file = ctx.paths.repo_root / "config" / "prompts" / "story_forensic" / "s03_script.md"
         system_prompt = prompt_file.read_text(encoding="utf-8") if prompt_file.is_file() else ""
@@ -254,19 +255,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     temperature=0.3,
                     fallback="claude-sonnet-5-5"
                 )
-                cleaned = raw_response.strip()
-                if "```json" in cleaned:
-                    cleaned = cleaned.split("```json", 1)[1].split("```", 1)[0].strip()
-                elif "```" in cleaned:
-                    cleaned = cleaned.split("```", 1)[1].split("```", 1)[0].strip()
-                start_b = cleaned.find("{")
-                end_b = cleaned.rfind("}")
-                target_json_str = cleaned[start_b:end_b + 1] if (start_b != -1 and end_b != -1 and end_b > start_b) else cleaned
-                try:
-                    parsed_json = json.loads(target_json_str)
-                except Exception as _json_parse_err:
-                    repaired = re.sub(r',\s*([\]}])', r'\1', target_json_str)
-                    parsed_json = json.loads(repaired)
+                parsed_json = parse_llm_json(raw_response)
 
                 llm_beats = []
                 total_llm_words = 0
@@ -316,12 +305,20 @@ def run(ctx: RunContext) -> StageArtifact:
                     total_llm_words += sum(len(line_elem.text.split()) for line_elem in lines_data)
                     llm_beats.append((b_id, target_dur, lines_data))
 
-                if len(llm_beats) >= 5 and 450 <= total_llm_words <= 750:
+                w_min = 450
+                w_max = 750
+                if hasattr(ctx, "preset") and ctx.preset:
+                    nb = getattr(ctx.preset, "narration", None)
+                    if nb and hasattr(nb, "word_budget"):
+                        w_min = getattr(nb.word_budget, "min", 450)
+                        w_max = getattr(nb.word_budget, "max", 750)
+
+                if len(llm_beats) >= 5 and w_min <= total_llm_words <= w_max:
                     raw_beats = llm_beats
                     logger.info(f"[S03_SCRIPT] Live LLM successfully generated {len(llm_beats)} beats, {total_llm_words} words.")
                 else:
                     logger.warning(
-                        f"[S03_SCRIPT] LLM output out of word budget window ({total_llm_words} words, {len(llm_beats)} beats). "
+                        f"[S03_SCRIPT] LLM output out of word budget window ({total_llm_words} words, window: {w_min}-{w_max}, {len(llm_beats)} beats). "
                         "Falling back to evidence-ledger grounded generator."
                     )
             except Exception as _llm_err:

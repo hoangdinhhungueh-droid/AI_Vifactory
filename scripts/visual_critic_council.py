@@ -259,7 +259,7 @@ def main():
     out_dir = Path(args.out_dir) if args.out_dir else vid_path.parent / "visual_audit"
     cs_path = extract_frames_and_build_contact_sheet(vid_path, out_dir, num_frames=16, duration_sec=args.duration)
 
-    verdict = evaluate_with_council(cs_path, args.episode)
+    verdict = evaluate_with_council(cs_path, args.episode, duration_sec=args.duration)
 
     report_file = out_dir / "visual_critic_council_verdict.json"
     with open(report_file, "w", encoding="utf-8") as f:

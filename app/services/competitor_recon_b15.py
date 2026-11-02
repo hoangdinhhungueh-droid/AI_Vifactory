@@ -897,9 +897,10 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
     Uses Astra 6 / Opus 5 (fallback Kimi K3 / Sonnet 5) with token overflow protection.
     Supports both story_forensic (3-5 min 5-beat) and macro_legacy (12-15 min deep-dive) presets.
     """
+    preset_name = getattr(preset, "name", str(preset or "")).lower()
     is_story = bool(
-        preset == "story_forensic"
-        or "story" in str(preset or "").lower()
+        preset_name == "story_forensic"
+        or "story" in preset_name
         or niche in ("corporate_scandal", "business_heist", "geopolitical_anomaly", "story_forensic")
     )
 

@@ -39,21 +39,14 @@ def run(ctx: RunContext) -> StageArtifact:
         topic_slug = ctx.run_id.lower().replace("run_", "").replace("ep_", "")
         topic_name = topic_slug.replace("_", " ").title() or "Global Antitrust Paradigm Shift"
 
-    market = "EN"
-    if "kr" in topic_name.lower() or "_kr" in ctx.run_id.lower():
-        market = "KR"
-    elif "jp" in topic_name.lower() or "_jp" in ctx.run_id.lower():
-        market = "JP"
-    elif "vn" in topic_name.lower() or "_vn" in ctx.run_id.lower():
-        market = "VN"
+    from core.market_resolver import resolve_canonical_market
+    market = resolve_canonical_market(ctx=ctx)
 
     is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
 
     if is_story:
-        import json
-        import re
-
         from app.schemas.story_contracts import Antagonist, SourceSeed, StoryIdeationPayload, StoryScore
+        from core.llm_json import parse_llm_json
 
         prompt_file = ctx.paths.repo_root / "config" / "prompts" / "story_forensic" / "s01_ideation.md"
         system_prompt = prompt_file.read_text(encoding="utf-8") if prompt_file.is_file() else ""
@@ -106,19 +99,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     temperature=0.5,
                     fallback="claude-v4.1-flash"
                 )
-                cleaned = raw_response.strip()
-                if "```json" in cleaned:
-                    cleaned = cleaned.split("```json", 1)[1].split("```", 1)[0].strip()
-                elif "```" in cleaned:
-                    cleaned = cleaned.split("```", 1)[1].split("```", 1)[0].strip()
-                start_b = cleaned.find("{")
-                end_b = cleaned.rfind("}")
-                target_str = cleaned[start_b:end_b + 1] if (start_b != -1 and end_b != -1 and end_b > start_b) else cleaned
-                try:
-                    parsed_json = json.loads(target_str)
-                except Exception:
-                    repaired = re.sub(r',\s*([\]}])', r'\1', target_str)
-                    parsed_json = json.loads(repaired)
+                parsed_json = parse_llm_json(raw_response)
 
                 generic = _build_generic_story_ideation()
 
