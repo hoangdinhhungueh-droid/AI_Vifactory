@@ -171,13 +171,23 @@ def _build_grounded_story_beats(
                 if claim:
                     st = getattr(claim, "legal_status", "fact")
                     if st == "charged":
-                        req_charged = ["allegedly", "according to the indictment", "charged with", "accused of"]
+                        req_charged = [
+                            "allegedly", "according to the indictment", "according to the complaint",
+                            "in the complaint", "complaint alleges", "charged with", "accused of",
+                            "sued for", "court filing", "lawsuit"
+                        ]
                         if not any(w in ln.text.lower() for w in req_charged):
-                            ln.text = f"Allegedly, according to the indictment, {ln.text}"
+                            prefix = "According to court filings,"
+                            first_char = ln.text[:1].lower() if ln.text else ""
+                            rest = ln.text[1:] if len(ln.text) > 1 else ""
+                            ln.text = f"{prefix} {first_char}{rest}"
                     elif st == "alleged":
                         req_alleged = ["allegedly", "alleged", "claimed", "purported", "according to"]
                         if not any(w in ln.text.lower() for w in req_alleged):
-                            ln.text = f"According to regulatory filings, {ln.text}"
+                            prefix = "According to regulatory filings,"
+                            first_char = ln.text[:1].lower() if ln.text else ""
+                            rest = ln.text[1:] if len(ln.text) > 1 else ""
+                            ln.text = f"{prefix} {first_char}{rest}"
                     elif st == "settled":
                         req_settled = ["settled without admitting wrongdoing", "settled", "agreed to pay without admitting fault"]
                         if not any(w in ln.text.lower() for w in req_settled):
@@ -279,13 +289,23 @@ def run(ctx: RunContext) -> StageArtifact:
                             if claim:
                                 st = getattr(claim, "legal_status", "fact")
                                 if st == "charged":
-                                    req_charged = ["allegedly", "according to the indictment", "charged with", "accused of"]
+                                    req_charged = [
+                                        "allegedly", "according to the indictment", "according to the complaint",
+                                        "in the complaint", "complaint alleges", "charged with", "accused of",
+                                        "sued for", "court filing", "lawsuit"
+                                    ]
                                     if not any(w in text.lower() for w in req_charged):
-                                        text = f"Allegedly, according to the indictment, {text}"
+                                        prefix = "According to court filings,"
+                                        first_char = text[:1].lower() if text else ""
+                                        rest = text[1:] if len(text) > 1 else ""
+                                        text = f"{prefix} {first_char}{rest}"
                                 elif st == "alleged":
                                     req_alleged = ["allegedly", "alleged", "claimed", "purported", "according to"]
                                     if not any(w in text.lower() for w in req_alleged):
-                                        text = f"According to regulatory filings, {text}"
+                                        prefix = "According to regulatory filings,"
+                                        first_char = text[:1].lower() if text else ""
+                                        rest = text[1:] if len(text) > 1 else ""
+                                        text = f"{prefix} {first_char}{rest}"
                                 elif st == "settled":
                                     req_settled = ["settled without admitting wrongdoing", "settled", "agreed to pay without admitting fault"]
                                     if not any(w in text.lower() for w in req_settled):

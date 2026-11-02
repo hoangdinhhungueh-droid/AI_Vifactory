@@ -50,8 +50,13 @@ legal:
     charged:
       - "allegedly"
       - "according to the indictment"
+      - "according to the complaint"
+      - "in the complaint"
+      - "complaint alleges"
       - "charged with"
       - "accused of"
+      - "sued for"
+      - "court filing"
     alleged:
       - "allegedly"
       - "alleged"

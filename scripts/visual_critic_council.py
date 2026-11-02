@@ -12,6 +12,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+import re
 from typing import Any, Dict, Optional
 
 from PIL import Image, ImageDraw
@@ -23,6 +24,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 from app.services.model_gateway import get_global_gateway
+from core.llm_json import parse_llm_json
 from vox.ffmpeg_utils import get_ffmpeg_binary
 
 
@@ -163,7 +165,7 @@ def evaluate_with_council(
         prompt=prompt,
         image_base64=img_b64,
         model="claude-opus-5-5",
-        system_prompt="You are Senior Film Director Claude Opus 5.5 conducting visual audit of video pilot.",
+        system_prompt="You are Senior Film Director Claude Opus 5.5 conducting visual audit of video pilot. You MUST respond with ONLY a valid JSON object matching the requested schema. Do not output conversational text or markdown headings outside JSON.",
         fallback="claude-sonnet-5-5"
     )
 
@@ -172,21 +174,32 @@ def evaluate_with_council(
         prompt=prompt,
         image_base64=img_b64,
         model="gpt-6-astra",
-        system_prompt="You are Cinematography & Physics Supervisor GPT-6-Astra conducting visual audit of video pilot.",
+        system_prompt="You are Cinematography & Physics Supervisor GPT-6-Astra conducting visual audit of video pilot. You MUST respond with ONLY a valid JSON object matching the requested schema. Do not output conversational text or markdown headings outside JSON.",
         fallback="gpt-6.1-sol"
     )
 
     # Parse responses
     def parse_json(raw: str):
         try:
-            cleaned = raw.strip()
-            if "```json" in cleaned:
-                cleaned = cleaned.split("```json", 1)[1].split("```", 1)[0].strip()
-            elif "```" in cleaned:
-                cleaned = cleaned.split("```", 1)[1].split("```", 1)[0].strip()
-            return json.loads(cleaned)
-        except Exception:
-            return {"raw": raw, "overall_score": 5.0, "verdict": "FAIL", "critical_flaws": ["Unparseable JSON"]}
+            data = parse_llm_json(raw)
+            if isinstance(data, dict):
+                if "overall_score" in data:
+                    return data
+                for k in ("verdict", "score", "axis_scores"):
+                    if k in data:
+                        return data
+        except (ValueError, json.JSONDecodeError, TypeError, AttributeError) as _parse_err:
+            print(f"DEBUG: council parse_llm_json error: {_parse_err}", file=sys.stderr)
+        m_score = re.search(r'"overall_score"\s*:\s*([0-9.]+)', raw)
+        m_verdict = re.search(r'"verdict"\s*:\s*"([^"]+)"', raw)
+        if m_score:
+            try:
+                sc = float(m_score.group(1))
+                vd = m_verdict.group(1) if m_verdict else ("PASS" if sc >= 8.0 else "FAIL")
+                return {"raw": raw, "overall_score": sc, "verdict": vd}
+            except (ValueError, TypeError) as _num_err:
+                print(f"DEBUG: council score float conversion error: {_num_err}", file=sys.stderr)
+        return {"raw": raw, "overall_score": 5.0, "verdict": "FAIL", "critical_flaws": ["Unparseable JSON"]}
 
     opus_json = parse_json(opus_resp)
     astra_json = parse_json(astra_resp)
