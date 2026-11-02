@@ -222,8 +222,8 @@ def run(ctx: RunContext) -> StageArtifact:
         calculated_wpm = round((total_w / (measured_duration_s / 60.0)), 1)
         try:
             ctx.preset.narration.wpm_estimate = calculated_wpm
-        except Exception:
-            pass
+        except Exception as _wpm_err:
+            logger.debug(f"[s09_voice_tts] Could not update preset wpm_estimate: {_wpm_err}")
 
     payload = {
         "task_id": ctx.run_id,
