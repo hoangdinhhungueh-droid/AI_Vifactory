@@ -70,4 +70,4 @@ legal:
   min_independent_sources: 3
 tts:
   voice: "en-US-ChristopherNeural"
-  rate: "+0%"
+  rate: "+15%"

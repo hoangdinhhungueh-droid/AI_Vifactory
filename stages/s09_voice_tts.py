@@ -93,10 +93,13 @@ def run(ctx: RunContext) -> StageArtifact:
 
             text_to_speak = full_text if full_text else "AI Video Factory master video narration."
             tts_success = False
+            rate_opt = "+0%"
+            if ctx.preset and getattr(ctx.preset, "tts", None) and getattr(ctx.preset.tts, "rate", None):
+                rate_opt = ctx.preset.tts.rate
             try:
                 import edge_tts
                 import concurrent.futures
-                communicate = edge_tts.Communicate(text_to_speak, voice)
+                communicate = edge_tts.Communicate(text_to_speak, voice, rate=rate_opt)
                 def _run_tts():
                     asyncio.run(communicate.save(str(audio_file)))
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
@@ -130,6 +133,31 @@ def run(ctx: RunContext) -> StageArtifact:
             real_audio_dur = float(a_info.get("format", {}).get("duration", "0"))
         except Exception as _p_err:
             logger.debug("[s09_voice_tts] audio probe notice: %s", _p_err)
+
+    # Dynamic duration conformer for preset window compliance (Rule 120, 135)
+    is_min_profile = bool((ctx.config.name == "e2e_min" and ctx.config.limits.max_scenes == 1) or ctx.dry_run)
+    if not is_min_profile and ctx.preset and getattr(ctx.preset, "duration_window_s", None) and real_audio_dur > 0:
+        d_min = ctx.preset.duration_window_s.min
+        d_max = ctx.preset.duration_window_s.max
+        if real_audio_dur > d_max and (real_audio_dur / d_max) <= 1.30:
+            from vox.ffmpeg_utils import get_ffmpeg_binary
+            ffmpeg_bin = get_ffmpeg_binary()
+            target_dur = min(d_max - 2.0, max(d_min + 5.0, getattr(ctx.preset.duration_window_s, "target", (d_min + d_max) / 2.0)))
+            speed_factor = round(real_audio_dur / target_dur, 3)
+            conformed_audio = audio_file.with_name("voice_narration_conformed.mp3")
+            try:
+                subprocess.run(
+                    [ffmpeg_bin, "-y", "-i", str(audio_file), "-filter:a", f"atempo={speed_factor}", str(conformed_audio)],
+                    capture_output=True, check=True
+                )
+                if conformed_audio.exists() and conformed_audio.stat().st_size > 100:
+                    conformed_audio.replace(audio_file)
+                    from vox.qa.gates import probe_media_file
+                    a_info = probe_media_file(audio_file)
+                    real_audio_dur = float(a_info.get("format", {}).get("duration", "0"))
+                    logger.info(f"[s09_voice_tts] Conformed audio duration to {real_audio_dur:.2f}s (speed factor {speed_factor}) to satisfy preset [{d_min}s, {d_max}s]")
+            except Exception as _conf_err:
+                logger.warning(f"[s09_voice_tts] Audio duration conformer notice: {_conf_err}")
 
     actual_total_dur = real_audio_dur if real_audio_dur > 0.0 else max(curr_time, 5.0)
 
