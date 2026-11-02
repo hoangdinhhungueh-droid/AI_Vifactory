@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -239,9 +240,9 @@ def test_s07_authentic_images_fails_closed_in_production(tmp_path: Path):
         for p in paths.composite_seeds_dir.glob("*.png"):
             p.unlink()
 
+    import stages.s07_image_gen as s07
     from core.config import RunContext, load_profile
     from core.run_manifest import RunManifest
-    import stages.s07_image_gen as s07
 
     config = load_profile("prod", repo_root=REPO_ROOT)
     manifest = RunManifest.load_or_create(paths, profile="prod")
@@ -260,3 +261,92 @@ def test_s07_authentic_images_fails_closed_in_production(tmp_path: Path):
     assert "Missing authentic composite seed images" in str(exc_info.value)
     # Prompts file must have been emitted so user can generate them
     assert (paths.root / "bulk_image_prompts.txt").exists()
+
+
+def test_human_gate_1_with_only_flag(tmp_path: Path):
+    """Gate 1: Verifies --only s01_ideation pauses at Gate 1 and dispatches notification."""
+    run_id = "RUN_TEST_HG1_ONLY"
+    paths = resolve_run_paths(run_id, repo_root=REPO_ROOT)
+    import shutil
+    if paths.root.exists():
+        shutil.rmtree(paths.root, ignore_errors=True)
+
+    exit_code = execute_pipeline(
+        profile_name="prod",
+        run_id=run_id,
+        dry_run=True,
+        human_gates=True,
+        only_stage="s01_ideation",
+        preset="story_forensic",
+        topic="Semiconductor Subsidy Collusion",
+    )
+    assert exit_code == 0, f"Expected exit code 0 on Gate 1 pause, got {exit_code}"
+    assert paths.artifact_file(StageID.S1_IDEATION.value).exists()
+    assert not paths.artifact_file(StageID.S2_RESEARCH.value).exists()
+
+
+def test_human_gate_2_with_only_flag(tmp_path: Path):
+    """Gate 2: Verifies --only s04_critic_script pauses at Gate 2 after script generation."""
+    run_id = "RUN_TEST_HG2_ONLY"
+    paths = resolve_run_paths(run_id, repo_root=REPO_ROOT)
+    import shutil
+    if paths.root.exists():
+        shutil.rmtree(paths.root, ignore_errors=True)
+
+    # First run S01 -> S03
+    execute_pipeline(
+        profile_name="prod",
+        run_id=run_id,
+        dry_run=True,
+        auto=True,
+        to_stage="s03_script",
+        preset="story_forensic",
+        topic="Sovereign Debt Concealment",
+    )
+
+    # Now execute S04 with --only
+    exit_code = execute_pipeline(
+        profile_name="prod",
+        run_id=run_id,
+        dry_run=True,
+        human_gates=True,
+        only_stage="s04_critic_script",
+        preset="story_forensic",
+    )
+    assert exit_code == 0, f"Expected exit code 0 on Gate 2 pause, got {exit_code}"
+    assert paths.artifact_file(StageID.S4_CRITIC_SCRIPT.value).exists()
+    assert not paths.artifact_file(StageID.S5_DIRECTOR_PLAN.value).exists()
+
+
+def test_human_gate_3_with_only_flag(tmp_path: Path):
+    """Gate 3: Verifies --only s07_image_gen pauses at Gate 3 after image verification."""
+    run_id = "RUN_TEST_HG3_ONLY"
+    paths = resolve_run_paths(run_id, repo_root=REPO_ROOT)
+    import shutil
+    if paths.root.exists():
+        shutil.rmtree(paths.root, ignore_errors=True)
+
+    # First run S01 -> S06
+    execute_pipeline(
+        profile_name="prod",
+        run_id=run_id,
+        dry_run=True,
+        auto=True,
+        to_stage="s06_critic_visual",
+        preset="story_forensic",
+        topic="Autonomous Algorithmic Cartel",
+    )
+
+    # Now execute S07 with --only in dry_run (generates valid test frames)
+    exit_code = execute_pipeline(
+        profile_name="prod",
+        run_id=run_id,
+        dry_run=True,
+        human_gates=True,
+        only_stage="s07_image_gen",
+        preset="story_forensic",
+    )
+    assert exit_code == 0, f"Expected exit code 0 on Gate 3 pause, got {exit_code}"
+    assert paths.artifact_file(StageID.S7_IMAGE_GEN.value).exists()
+    assert not paths.artifact_file(StageID.S8_VIDEO_GEN.value).exists()
+

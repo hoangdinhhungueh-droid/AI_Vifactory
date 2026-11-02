@@ -180,7 +180,7 @@ def execute_youtube_upload(ctx: RunContext, final_mp4: Optional[Path] = None) ->
     if ctx.dry_run:
         print(f"\n[YOUTUBE UPLOAD (DRY-RUN)]: Simulating unlisted upload for '{final_mp4.name}'...")
         print(f"  Title:       {title[:80]}")
-        print(f"  Privacy:     unlisted")
+        print("  Privacy:     unlisted")
         print(f"  Market:      {mkt}")
         return {
             "status": "dry_run",
@@ -326,7 +326,7 @@ def execute_pipeline(
             print("🎉 [HUMAN GATE 5 REACHED: MASTER VIDEO VERIFIED & UPLOADED TO YOUTUBE]")
             print("=" * 75)
             print(f"🎥 Master MP4 Video:   {final_video}")
-            print(f"🔒 YouTube Privacy:    UNLISTED")
+            print("🔒 YouTube Privacy:    UNLISTED")
             print(f"🆔 Video ID:           {yt_res.get('id', 'N/A')}")
             print(f"🔗 Video URL:          {yt_res.get('url', 'N/A')}")
             print(f"📌 Video Title:        {yt_res.get('title', 'N/A')}")
@@ -460,8 +460,8 @@ def execute_pipeline(
             # ------------------------------------------------------------------
             # HUMAN GATE 1: After Candidate Selection (S01 Ideation)
             # ------------------------------------------------------------------
-            if stage == StageID.S1_IDEATION and effective_human_gates and only_target_idx is None:
-                if start_idx == 0 and (effective_to is None or resolve_stage_index(effective_to, stage_list) == 0):
+            if stage == StageID.S1_IDEATION and effective_human_gates and (only_target_idx is None or only_target_idx == 0):
+                if (start_idx == 0 or only_target_idx == 0) and (effective_to is None or resolve_stage_index(effective_to, stage_list) == 0):
                     payload = _artifact.payload if isinstance(_artifact.payload, dict) else {}
                     topic_display = ctx.topic or payload.get("topic") or payload.get("title_working") or effective_run_id
                     print("\n" + "=" * 75)
@@ -496,8 +496,8 @@ def execute_pipeline(
             # ------------------------------------------------------------------
             # HUMAN GATE 2: After Story Generation & Audit (S04 Critic Script)
             # ------------------------------------------------------------------
-            if stage == StageID.S4_CRITIC_SCRIPT and effective_human_gates and only_target_idx is None:
-                if effective_to is None or resolve_stage_index(effective_to, stage_list) <= 3:
+            if stage == StageID.S4_CRITIC_SCRIPT and effective_human_gates and (only_target_idx is None or only_target_idx == 3):
+                if effective_to is None or resolve_stage_index(effective_to, stage_list) <= 3 or only_target_idx == 3:
                     s3_art_path = paths.artifact_file(StageID.S3_SCRIPT.value)
                     s3_info = {}
                     if s3_art_path.exists():
@@ -514,7 +514,7 @@ def execute_pipeline(
                     print(f"📖 Story Title:        {title_disp}")
                     print(f"📊 Word Count:         {w_count} words (Preset target: 450-750 words, 180-300s)")
                     print(f"⏱️ Estimated Duration: {est_dur}s")
-                    print(f"🛡️ Script Audit:       PASS (Dual Critic Council Rule 444 & 445)")
+                    print("🛡️ Script Audit:       PASS (Dual Critic Council Rule 444 & 445)")
                     print(f"📄 Script Artifact:    {s3_art_path}")
                     print("\nStory script validated and locked into master run manifest.")
                     print("\n👉 NEXT STEP: Generate Director Plan, Visual Critic Audit & Images (S05 -> S07)")
@@ -546,8 +546,8 @@ def execute_pipeline(
             # ------------------------------------------------------------------
             # HUMAN GATE 3: After Image Generation (S07 Image Gen)
             # ------------------------------------------------------------------
-            if stage == StageID.S7_IMAGE_GEN and effective_human_gates and only_target_idx is None:
-                if effective_to is None or resolve_stage_index(effective_to, stage_list) <= 6:
+            if stage == StageID.S7_IMAGE_GEN and effective_human_gates and (only_target_idx is None or only_target_idx == 6):
+                if effective_to is None or resolve_stage_index(effective_to, stage_list) <= 6 or only_target_idx == 6:
                     total_imgs = len(_artifact.payload.get("images", [])) if isinstance(_artifact.payload, dict) else 0
                     print("\n" + "=" * 75)
                     print("🛑 [HUMAN GATE 3 REACHED: IMAGE ASSETS VERIFIED]")
@@ -584,8 +584,8 @@ def execute_pipeline(
                 print("🎉 [HUMAN GATE 5 REACHED: MASTER VIDEO VERIFIED & UPLOADED TO YOUTUBE]")
                 print("=" * 75)
                 print(f"🎥 Master MP4 Video:   {final_video}")
-                print(f"🛡️ QC Verdict:         PASS (ALL GATES PASSED)")
-                print(f"🔒 YouTube Privacy:    UNLISTED")
+                print("🛡️ QC Verdict:         PASS (ALL GATES PASSED)")
+                print("🔒 YouTube Privacy:    UNLISTED")
                 print(f"🆔 Video ID:           {yt_res.get('id', 'N/A')}")
                 print(f"🔗 Video URL:          {yt_res.get('url', 'N/A')}")
                 print(f"📌 Video Title:        {yt_res.get('title', 'N/A')}")
@@ -621,12 +621,17 @@ def execute_pipeline(
             return 1
 
     print("\n" + "=" * 75)
-    print("🏆 ALL 11 PIPELINE STAGES COMPLETED SUCCESSFULLY!")
-    print(f"📄 Master Manifest:     {paths.manifest_file}")
-    print(f"🎥 Master Video Asset:  {paths.final_render_dir / 'final.mp4'}")
-    if not upload_youtube:
-        print("\n👉 To upload unlisted to YouTube (Human Gate 5):")
-        print(f"Execute: python -m orchestrator.run_pipeline --run-id {effective_run_id} --upload-youtube")
+    if end_idx == len(stage_list) - 1 and only_target_idx is None and start_idx == 0:
+        print("🏆 ALL 11 PIPELINE STAGES COMPLETED SUCCESSFULLY!")
+        print(f"📄 Master Manifest:     {paths.manifest_file}")
+        print(f"🎥 Master Video Asset:  {paths.final_render_dir / 'final.mp4'}")
+        if not upload_youtube:
+            print("\n👉 To upload unlisted to YouTube (Human Gate 5):")
+            print(f"Execute: python -m orchestrator.run_pipeline --run-id {effective_run_id} --upload-youtube")
+    else:
+        executed_desc = stage_list[only_target_idx].value.upper() if only_target_idx is not None else f"{stage_list[start_idx].value.upper()} ➔ {stage_list[end_idx].value.upper()}"
+        print(f"🏆 PIPELINE SUB-RUN COMPLETED: [{executed_desc}]")
+        print(f"📄 Master Manifest:     {paths.manifest_file}")
     print("=" * 75 + "\n")
     return 0
 

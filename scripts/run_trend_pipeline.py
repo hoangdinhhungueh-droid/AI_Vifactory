@@ -30,9 +30,25 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 # Ensure project root in sys.path
-sys.path.insert(0, "/root/video_factory")
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+if "/root/video_factory" not in sys.path:
+    sys.path.insert(0, "/root/video_factory")
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception as _rc_err:
+        logging.getLogger("run_trend_pipeline").debug(f"Stdout reconfigure notice: {_rc_err}")
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception as _rc_err:
+        logging.getLogger("run_trend_pipeline").debug(f"Stderr reconfigure notice: {_rc_err}")
 
 def _load_system_secrets():
     """Ensure all secrets from /root/secrets/.env are loaded into os.environ for cron execution."""
@@ -81,6 +97,7 @@ def main():
     is_dry_run = "--dry-run" in args
     force_all = "--force-all-markets" in args
     force_crawl = "--force" in args or "--force-crawl" in args or os.getenv("B1_FORCE_CRAWL") == "1"
+    is_auto = "--auto" in args or os.getenv("VF_AUTO") == "1"
     if force_crawl:
         os.environ["B1_FORCE_CRAWL"] = "1"
 
@@ -200,6 +217,7 @@ def main():
             max_scan_candidates=max_candidates,
             max_b2_attempts=max_b2_attempts,
             preset=preset,
+            auto=is_auto,
         )
         results["approved_topics"].extend(topics)
     else:
@@ -212,6 +230,7 @@ def main():
                     max_scan_candidates=max_candidates,
                     max_b2_attempts=max_b2_attempts,
                     preset=preset,
+                    auto=is_auto,
                 )
                 results["approved_topics"].extend(topics)
             except Exception as e:
@@ -241,7 +260,8 @@ def main():
         print(f"   Angle: '{t.get('specific_viral_angle')}'")
         print(f"   Blue Ocean Gap: {t.get('competitor_differentiation_gap')}")
         print(f"   Task ID: {t.get('task_id')}")
-        print("   Status: Human Gate 1 & Human Gate 2 dispatched.")
+        status_disp = "Human Gate 1 dispatched (Waiting for operator approval: S02->S04)." if preset == "story_forensic" else "Human Gate 1 & Human Gate 2 dispatched."
+        print(f"   Status: {status_disp}")
 
 
 

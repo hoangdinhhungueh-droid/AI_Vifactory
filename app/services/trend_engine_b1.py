@@ -1568,6 +1568,125 @@ def discover_and_produce_market_trend(
             with open(temp_task_file, "w", encoding="utf-8") as tf:
                 json.dump(t_obj, tf, ensure_ascii=False, indent=2)
 
+            if preset == "story_forensic":
+                # ==================================================================
+                # CANONICAL PIPELINE 2.0 (VOX ENGINE V3) HUMAN GATE 1 WORKFLOW
+                # Candidate selection is complete (B1/S01).
+                # Authoritative Gate 1: Pause after candidate selection & notify human.
+                # Do NOT execute legacy B2 (story_engine_b2 12-15 min docudrama) in cron!
+                # ==================================================================
+                task_id = commit_trend_task(t_obj)
+                t_obj["task_id"] = task_id
+                print(f"  💾 Officially Committed Task ID: {task_id}")
+
+                comp_ok = mark_completed(
+                    m_up,
+                    task_id,
+                    extra_metadata={"topic": native_topic, "slug": t_obj.get("task_slug"), "preset": preset},
+                    state_dir=state_dir,
+                    now=now,
+                    lock_token=lock_token,
+                    owner_pid=os.getpid(),
+                )
+                if comp_ok:
+                    is_terminal_stamped = True
+                    logger.info(f"[{m_up}] Authoritative daily lock marked COMPLETED for {task_id}")
+
+                # Migrate temp episode and pending task files to canonical task_id
+                ep_base = resolve_episodes_dir(ensure_dir=True)
+                try:
+                    temp_p = ep_base / temp_task_id
+                    canon_p = ep_base / task_id
+                    if temp_p.exists():
+                        canon_p.mkdir(parents=True, exist_ok=True)
+                        for f_item in temp_p.iterdir():
+                            dest_file = canon_p / f_item.name
+                            try:
+                                if f_item.is_file():
+                                    shutil.copy2(f_item, dest_file)
+                                elif f_item.is_dir():
+                                    shutil.copytree(f_item, dest_file, dirs_exist_ok=True)
+                            except Exception as _cp_err:
+                                logger.warning(f"Could not copy {f_item} to {dest_file}: {_cp_err}")
+                        try:
+                            shutil.rmtree(temp_p)
+                        except Exception as _rm_err:
+                            logger.warning(f"Could not remove temp folder {temp_p}: {_rm_err}")
+                except Exception as _mig_err:
+                    logger.debug(f"Artifact migration notice: {_mig_err}")
+
+                canon_task_file = os.path.join(pending_dir, f"{task_id}.json")
+                with open(canon_task_file, "w", encoding="utf-8") as tf:
+                    json.dump(t_obj, tf, ensure_ascii=False, indent=2)
+                if os.path.exists(temp_task_file):
+                    try:
+                        os.remove(temp_task_file)
+                    except OSError as _rm_err:
+                        logger.debug(f"[{task_id}] Notice removing temp task file {temp_task_file}: {_rm_err}")
+
+                committed_tasks.append(task_id)
+                produced_topics.append(t_obj)
+
+                # Dispatch Stage S01 Ideation and Human Gate 1 via Orchestrator
+                is_auto_full = bool(kwargs.get("auto") or "--auto" in sys.argv or os.getenv("VF_AUTO") == "1")
+                if is_auto_full:
+                    print(f"  ⚙️ [ORCHESTRATOR AUTO] Launching unattended full pipeline for {task_id}...")
+                    orch_cmd = [
+                        sys.executable,
+                        "-m",
+                        "orchestrator.run_pipeline",
+                        "--profile", "prod",
+                        "--run-id", str(task_id),
+                        "--market", str(m_up),
+                        "--preset", str(preset),
+                        "--topic", str(native_topic),
+                        "--auto",
+                    ]
+                else:
+                    print(f"  🛑 [HUMAN GATE 1] Executing S01 Ideation and pausing at Gate 1 for {task_id}...")
+                    orch_cmd = [
+                        sys.executable,
+                        "-m",
+                        "orchestrator.run_pipeline",
+                        "--profile", "prod",
+                        "--run-id", str(task_id),
+                        "--market", str(m_up),
+                        "--preset", str(preset),
+                        "--topic", str(native_topic),
+                        "--to", "s01_ideation",
+                        "--human-gates",
+                    ]
+
+                sub_env = os.environ.copy()
+                sub_env["PYTHONPATH"] = f"{_PROJECT_ROOT}{os.pathsep}{sub_env.get('PYTHONPATH', '')}".strip(os.pathsep)
+                sub_env["VF_EPISODES_DIR"] = str(resolve_episodes_dir(ensure_dir=True))
+                sub_env["VF_MARKET"] = str(m_up)
+                sub_env["MARKET"] = str(m_up)
+                b3_timeout = _parse_env_int("B3_PIPELINE_TIMEOUT", 1800, min_val=60)
+                try:
+                    proc = subprocess.run(
+                        orch_cmd,
+                        cwd=str(_PROJECT_ROOT),
+                        env=sub_env,
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        timeout=b3_timeout,
+                    )
+                    if proc.stdout:
+                        print(proc.stdout)
+                    if proc.returncode != 0:
+                        if proc.stderr:
+                            print(proc.stderr, file=sys.stderr)
+                        logger.error(f"[{task_id}] Orchestrator returned {proc.returncode}:\n{proc.stderr}")
+                    else:
+                        print("  🎉 [HUMAN GATE 1 DISPATCHED] Candidate locked and Gate 1 notification sent to Telegram.")
+                except Exception as _p_err:
+                    logger.error(f"[{task_id}] Failed to dispatch Orchestrator S01: {_p_err}")
+
+                break
+
             # 6. Generate B2 5-Beat Investigative Docudrama Script
             b2_attempts_count += 1
             print(f"  ⚙️ [B2 Attempt {b2_attempts_count}/{max_b2_attempts}] Generating 12-15 min docudrama script for {temp_task_id} via HHTech Reasoner...")
@@ -1756,7 +1875,16 @@ def discover_and_produce_market_trend(
                 sub_env["VF_MARKET"] = str(m_up)
                 sub_env["MARKET"] = str(m_up)
                 try:
-                    proc = subprocess.run(cmd, cwd=str(_PROJECT_ROOT), env=sub_env, capture_output=True, text=True, timeout=b3_timeout)
+                    proc = subprocess.run(
+                        cmd,
+                        cwd=str(_PROJECT_ROOT),
+                        env=sub_env,
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        timeout=b3_timeout,
+                    )
                     res_code = proc.returncode
                     if res_code != 0:
                         stderr_tail = "\n".join(proc.stderr.strip().splitlines()[-15:]) if proc.stderr else "No stderr emitted."
