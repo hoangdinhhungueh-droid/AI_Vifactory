@@ -42,19 +42,19 @@ DEFAULT_MCP2_TOKEN = os.getenv("VPS_MCP2_TOKEN")
 DEFAULT_CF_ID = os.getenv("CF_ACCESS_CLIENT_ID")
 DEFAULT_CF_SECRET = os.getenv("CF_ACCESS_CLIENT_SECRET")
 
-# Primary endpoint is MCP2 (index 0), secondary fallback is AG (index 1)
+# Primary endpoint is AG (index 0), secondary fallback is MCP2 (index 1)
 ENDPOINTS = [
-    {
-        "name": "mcp2",
-        "url": DEFAULT_MCP2_URL,
-        "token": DEFAULT_MCP2_TOKEN,
-        "cf_id": DEFAULT_CF_ID,
-        "cf_secret": DEFAULT_CF_SECRET
-    },
     {
         "name": "ag",
         "url": DEFAULT_AG_URL,
         "token": DEFAULT_AG_TOKEN,
+        "cf_id": DEFAULT_CF_ID,
+        "cf_secret": DEFAULT_CF_SECRET
+    },
+    {
+        "name": "mcp2",
+        "url": DEFAULT_MCP2_URL,
+        "token": DEFAULT_MCP2_TOKEN,
         "cf_id": DEFAULT_CF_ID,
         "cf_secret": DEFAULT_CF_SECRET
     }
@@ -136,7 +136,7 @@ class FastVPSClient:
                     headers=self._headers(),
                     method="POST"
                 )
-                with urllib.request.urlopen(req, timeout=30, context=self.ctx) as resp:
+                with urllib.request.urlopen(req, timeout=10, context=self.ctx) as resp:
                     self.session_id = resp.headers.get("mcp-session-id")
 
                 if self.session_id:
