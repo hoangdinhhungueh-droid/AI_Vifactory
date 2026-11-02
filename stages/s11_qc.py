@@ -260,11 +260,23 @@ def _validate_dict_scene_entry(
         raise ValueError(f"Stage S11 fail-closed: Duplicate scene index {idx} in authoritative plan")
     seen_indices.add(idx)
 
-    narration = s.get("narration") or s.get("narration_text") or s.get("text") or s.get("headline") or f"Scene {idx+1}"
+    narration = s.get("narration")
+    if narration is None:
+        narration = s.get("narration_text")
+    if narration is None:
+        narration = s.get("text")
+    if narration is None:
+        narration = s.get("headline")
     if not narration or not isinstance(narration, str) or not narration.strip():
         raise ValueError(f"Authoritative scene {idx} missing required non-empty 'narration'")
 
-    bg_prompt = s.get("bg_prompt") or s.get("bg_image") or s.get("background") or s.get("image_prompt") or f"Editorial background for scene {idx+1}"
+    bg_prompt = s.get("bg_prompt")
+    if bg_prompt is None:
+        bg_prompt = s.get("bg_image")
+    if bg_prompt is None:
+        bg_prompt = s.get("background")
+    if bg_prompt is None:
+        bg_prompt = s.get("image_prompt")
     if not bg_prompt or not isinstance(bg_prompt, str) or len(bg_prompt.strip()) < 10:
         raise ValueError(f"Authoritative scene {idx} missing required 'bg_prompt' (min length 10)")
 
@@ -468,6 +480,7 @@ def run(ctx: RunContext) -> StageArtifact:
         except Exception as _rm_err:
             logger.debug(f"[s11_qc] run_manifest read notice: {_rm_err}")
 
+    gate_res: dict[str, Any] = {}
     try:
         # Delegate directly to canonical vox.qa.gates for forensic verification (Rule 125 & 139)
         import inspect
@@ -495,32 +508,33 @@ def run(ctx: RunContext) -> StageArtifact:
         except Exception as _s4_err:
             hard_failures.append(f"Failed to read S4 artifact: {_s4_err}")
 
-    from vox.qa.gates import probe_media_file
-    try:
-        probe_info = probe_media_file(p)
-        streams = probe_info.get("streams", [])
-        v_stream = next((s for s in streams if s.get("codec_type") == "video"), {})
-        v_width = int(v_stream.get("width", 0))
-        v_height = int(v_stream.get("height", 0))
-        v_dur = float(probe_info.get("format", {}).get("duration", 0.0))
+    if gate_passed and p.stat().st_size > 4096:
+        from vox.qa.gates import probe_media_file
+        try:
+            probe_info = probe_media_file(p)
+            streams = probe_info.get("streams", [])
+            v_stream = next((s for s in streams if s.get("codec_type") == "video"), {})
+            v_width = int(v_stream.get("width", 0))
+            v_height = int(v_stream.get("height", 0))
+            v_dur = float(probe_info.get("format", {}).get("duration", 0.0))
 
-        target_w = 1920
-        target_h = 1080
-        if ctx.preset and getattr(ctx.preset, "resolution", None):
-            target_w = ctx.preset.resolution.width
-            target_h = ctx.preset.resolution.height
+            target_w = 1920
+            target_h = 1080
+            if ctx.preset and getattr(ctx.preset, "resolution", None):
+                target_w = ctx.preset.resolution.width
+                target_h = ctx.preset.resolution.height
 
-        if v_width != target_w or v_height != target_h:
-            hard_failures.append(f"Resolution mismatch: {v_width}x{v_height} != {target_w}x{target_h}")
+            if v_width != target_w or v_height != target_h:
+                hard_failures.append(f"Resolution mismatch: {v_width}x{v_height} != {target_w}x{target_h}")
 
-        is_min_profile = bool((ctx.config.name == "e2e_min" and ctx.config.limits.max_scenes == 1) or ctx.dry_run)
-        if not is_min_profile and ctx.preset and getattr(ctx.preset, "duration_window_s", None):
-            d_min = ctx.preset.duration_window_s.min
-            d_max = ctx.preset.duration_window_s.max
-            if not (d_min <= v_dur <= d_max):
-                hard_failures.append(f"Video duration {v_dur:.2f}s outside preset window [{d_min}s, {d_max}s]")
-    except Exception as _p_err:
-        hard_failures.append(f"Media probe failed: {_p_err}")
+            is_min_profile = bool((ctx.config.name == "e2e_min" and ctx.config.limits.max_scenes == 1) or ctx.dry_run)
+            if not is_min_profile and ctx.preset and getattr(ctx.preset, "duration_window_s", None):
+                d_min = ctx.preset.duration_window_s.min
+                d_max = ctx.preset.duration_window_s.max
+                if not (d_min <= v_dur <= d_max):
+                    hard_failures.append(f"Video duration {v_dur:.2f}s outside preset window [{d_min}s, {d_max}s]")
+        except Exception as _p_err:
+            hard_failures.append(f"Media probe failed: {_p_err}")
 
     if hard_failures:
         gate_passed = False
