@@ -892,11 +892,19 @@ def prune_forensic_context(
 def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
                                selected: List[Dict], top_comments: List[Dict],
                                niche: str = "General",
-                               tri_buckets: Optional[Dict[str, List[Dict]]] = None) -> Dict:
+                               tri_buckets: Optional[Dict[str, List[Dict]]] = None,
+                               preset: Optional[str] = None) -> Dict:
     """
     Two-Pass Competitor Recon Reasoning via Multi-Tier LLM (Lead Forensic Story Analyst).
     Uses Astra 6 / Opus 5 (fallback Kimi K3 / Sonnet 5) with token overflow protection.
+    Supports both story_forensic (3-5 min 5-beat) and macro_legacy (12-15 min deep-dive) presets.
     """
+    is_story = bool(
+        preset == "story_forensic"
+        or "story" in str(preset or "").lower()
+        or niche in ("corporate_scandal", "business_heist", "geopolitical_anomaly", "story_forensic")
+    )
+
     try:
         bench_text, comm_text = prune_forensic_context(
             target_keyword, market, niche, selected, top_comments, tri_buckets
@@ -909,6 +917,17 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
             "Return ONLY a valid JSON object with the exact keys described."
         )
 
+        if is_story:
+            act_breakdown_desc = "Summary of narrative arcs and storyline beats used by competitors (e.g. 5-beat or 3-act arcs, hooks, pacing)"
+            pivot_angle_desc = (
+                "Our master investigative angle for a 3-5 minute forensic docudrama (5-beat structure: "
+                "B1 Hook 0-20s, B2 Setup, B3 Scheme forensic mechanics, B4 Crack/Whistleblower, B5 Reckoning & Systemic Warning) "
+                "that answers audience frustrations and exposes the root causes without mentioning competitor channels"
+            )
+        else:
+            act_breakdown_desc = "Summary of narrative arcs and storyline beats used by competitors (e.g. Act 1 Hook, Act 2 Conflict, Act 3 Climax)"
+            pivot_angle_desc = "Our master investigative angle for a 12-15 minute deep-dive that answers audience frustrations and exposes the root causes without mentioning competitor channels"
+
         user_prompt = (
             f"Topic / Subject: {target_keyword} (Market: {market.upper()}, Niche: {niche})\n\n"
             f"=== TOP VIRAL COMPETITOR BENCHMARKS (OUTLIERS & ALL-TIME) ===\n{bench_text}\n\n"
@@ -916,7 +935,7 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
             "Perform deep structural and audience sentiment analysis. Pay special attention to UNANSWERED QUESTIONS to pinpoint the fatal explanatory vacuum.\n"
             "Provide a JSON response with:\n"
             "{\n"
-            '  "competitor_act_breakdown": "Summary of narrative arcs and storyline beats used by competitors (e.g. Act 1 Hook, Act 2 Conflict, Act 3 Climax)",\n'
+            f'  "competitor_act_breakdown": "{act_breakdown_desc}",\n'
             '  "competitor_secret_sauce": "What made these videos gain high velocity and views (hook style, pacing, emotional trigger)",\n'
             '  "audience_core_frustrations": [\n'
             '    "Frustration / Unanswered question 1 with context from top comments",\n'
@@ -924,7 +943,7 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
             '    "Frustration / Unanswered question 3"\n'
             '  ],\n'
             '  "fatal_explanatory_vacuum": "The critical systemic, institutional, financial, or forensic blindspot that competitors completely ignored or glossed over",\n'
-            '  "our_10x_pivot_angle": "Our master investigative angle for a 12-15 minute deep-dive that answers audience frustrations and exposes the root causes without mentioning competitor channels",\n'
+            f'  "our_10x_pivot_angle": "{pivot_angle_desc}",\n'
             '  "transposition_opportunities": {\n'
             '    "proven_structural_vehicle": "The underlying psychological format/hook structure that made rivals succeed (e.g. Unit Economics of Operating an Elite Facility, True Cost of Luxury Illusion)",\n'
             '    "recommended_target_niches": [\n'
@@ -942,7 +961,7 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
             "Output ONLY valid JSON:"
         )
 
-        logger.info("[b15.reasoning] Invoking Multi-Tier Forensic LLM for Two-Pass Competitor Anatomy...")
+        logger.info("[b15.reasoning] Invoking Multi-Tier Forensic LLM for Two-Pass Competitor Anatomy (is_story=%s)...", is_story)
         raw_resp = call_recon_forensic_llm(user_prompt, system_prompt=sys_prompt, max_tokens=2000, timeout=120.0)
 
         m = re.search(r'\{.*\}', raw_resp, re.DOTALL)
@@ -956,6 +975,11 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
         logger.error("[b15.reasoning] Two-Pass competitor reasoning failed: %s", e)
 
     # Safe deterministic fallback adhering to investigative docudrama standards
+    fallback_angle = (
+        f"Independent 3-5 minute 5-beat forensic docudrama uncovering the hidden systemic mechanisms behind {target_keyword}."
+        if is_story
+        else f"Independent investigative documentary uncovering the hidden systemic mechanisms behind {target_keyword}."
+    )
     return {
         "competitor_act_breakdown": "Competitors focused on sensational surface events without institutional depth.",
         "competitor_secret_sauce": "Fast-paced hooks and high sensationalism.",
@@ -965,7 +989,7 @@ def analyze_competitor_anatomy(task_id: str, target_keyword: str, market: str,
             "What systemic changes were made after the scandal?"
         ],
         "fatal_explanatory_vacuum": "Lack of forensic paper trail and regulatory failure mechanisms.",
-        "our_10x_pivot_angle": f"Independent investigative documentary uncovering the hidden systemic mechanisms behind {target_keyword}.",
+        "our_10x_pivot_angle": fallback_angle,
         "transposition_opportunities": {
             "proven_structural_vehicle": "Forensic systemic breakdown of institutional vulnerabilities",
             "recommended_target_niches": [
@@ -1186,7 +1210,8 @@ def sync_card_to_notion(task_id: str, card: dict) -> bool:
 
 def run_b15(task_id: str, target_keyword: str, niche: str = "General",
             use_cache: bool = True, market: Optional[str] = None,
-            anchor_video_id: Optional[str] = None) -> Optional[Dict]:
+            anchor_video_id: Optional[str] = None,
+            preset: Optional[str] = None) -> Optional[Dict]:
     """
     Main Orchestrator for B1.5 Two-Pass Competitor Recon:
       Pass 1: Collect candidates, details, transcripts, comments, and thumbnails.
@@ -1195,7 +1220,7 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
     """
     load_env()
     market = (market or market_of(task_id)).lower()
-    logger.info("[b15] Initiating recon for task=%s keyword=%r market=%s anchor=%s", task_id, target_keyword, market, anchor_video_id)
+    logger.info("[b15] Initiating recon for task=%s keyword=%r market=%s anchor=%s preset=%s", task_id, target_keyword, market, anchor_video_id, preset)
 
     # 1. Candidate search with cache support
     cache_path = CACHE_DIR / f"{task_id}.json"
@@ -1212,7 +1237,7 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
 
         if not candidates:
             logger.warning("[b15] No candidates found for keyword %r (quota exhausted or zero matches). Activating resilient fallback recon card.", target_keyword)
-            anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, [], [], niche)
+            anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, [], [], niche, preset=preset)
             card = build_intel_card(task_id, target_keyword, niche, market, [], [], quota,
                                     competitor_narrative_anatomy=anatomy, raw_comments=[])
             for target_dir in [EPISODE_DIR / task_id, Path("/root/video_factory/episodes") / task_id]:
@@ -1306,7 +1331,7 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
 
     # 4. Deep Forensic Anatomy via Multi-Tier LLM (Pass 2) ⭐
     tri_buckets = filter_comment_tri_buckets(all_raw_comments)
-    anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, selected, top_comments, niche, tri_buckets=tri_buckets)
+    anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, selected, top_comments, niche, tri_buckets=tri_buckets, preset=preset)
 
     # 5. Assemble Intel Card (Pass 3)
     card = build_intel_card(task_id, target_keyword, niche, market, selected, all_gaps[:12], quota,

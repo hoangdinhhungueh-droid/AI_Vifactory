@@ -210,6 +210,7 @@ class VideoAsset(BaseModel):
     size_bytes: int
     sha256: str
     verified: bool = True
+    render_mode: Optional[str] = "veo"
 
 
 # ==============================================================================

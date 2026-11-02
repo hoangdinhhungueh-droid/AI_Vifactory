@@ -1,0 +1,51 @@
+name: macro_legacy
+aspect_ratio: "16:9"
+market: "EN"
+resolution:
+  width: 1920
+  height: 1080
+duration_window_s:
+  min: 480
+  max: 720
+  target: 600
+narration:
+  wpm_estimate: 140
+  word_budget:
+    min: 1100
+    max: 1700
+beats:
+  - id: B1_hook
+    share: 0.15
+    intent: "Macroeconomic catalyst and systemic stakes."
+  - id: B2_context
+    share: 0.25
+    intent: "Historical framework and institutional background."
+  - id: B3_tension
+    share: 0.25
+    intent: "Structural market friction and monetary policy collision."
+  - id: B4_reveal
+    share: 0.20
+    intent: "Forensic breakdown of systemic divergence."
+  - id: B5_payoff
+    share: 0.15
+    intent: "Global economic implications and living market warning."
+retention:
+  pattern_interrupt_max_gap_s: 45
+  max_consecutive_same_h_family: 3
+visual:
+  palette:
+    paper: "#F4F1EA"
+  tactile_props:
+    - newspaper_cutout
+    - stamp
+    - compass
+    - ruler
+  shot_avg_s: 6.0
+  veo_share_max: 0.30
+  forbid_photoreal_real_persons: false
+legal:
+  required_status_language: {}
+  min_independent_sources: 2
+tts:
+  voice: "en-US-ChristopherNeural"
+  rate: "+0%"

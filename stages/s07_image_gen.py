@@ -41,6 +41,13 @@ def run(ctx: RunContext) -> StageArtifact:
     s5_data = json.loads(s5_path.read_text(encoding="utf-8"))
     scenes = s5_data.get("payload", {}).get("scenes", [])
 
+    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
+    style_prefix = ""
+    if is_story:
+        prefix_file = ctx.paths.repo_root / "config" / "prompts" / "story_forensic" / "s07_image_style_prefix.md"
+        if prefix_file.exists():
+            style_prefix = prefix_file.read_text(encoding="utf-8").strip()
+
     images_generated: List[Dict[str, Any]] = []
 
     for sc in scenes:
@@ -69,10 +76,12 @@ def run(ctx: RunContext) -> StageArtifact:
                 # Create authentic editorial placeholder frame via PIL if not dry_run
                 try:
                     from PIL import Image, ImageDraw
-                    img = Image.new("RGB", (1920, 1080), color="#F4F1EA")
+                    bg_color = "#F4F1EA" if is_story else "#F4F1EA"
+                    border_color = "#D62E1F" if is_story else "#F2C230"
+                    img = Image.new("RGB", (1920, 1080), color=bg_color)
                     draw = ImageDraw.Draw(img)
-                    # Draw subtle geometric accent shapes in Vox Yellow
-                    draw.rectangle([100, 100, 1820, 980], outline="#F2C230", width=4)
+                    # Draw subtle geometric accent shapes in border color
+                    draw.rectangle([100, 100, 1820, 980], outline=border_color, width=4)
                     draw.text((150, 150), f"{sc_id} // {sc.get('headline', 'EDITORIAL FOCUS')}", fill="#1B2B4A")
                     draw.text((150, 220), sc.get("narration", "")[:120], fill="#334155")
                     img.save(str(target_img), format="PNG")
@@ -92,6 +101,8 @@ def run(ctx: RunContext) -> StageArtifact:
         "task_id": ctx.run_id,
         "total_images": len(images_generated),
         "composite_seeds_dir": str(ctx.paths.composite_seeds_dir),
+        "aspect_ratio": "16:9",
+        "style_prefix": style_prefix if is_story else None,
         "images": images_generated
     }
 

@@ -9,7 +9,7 @@ Eliminates scattered os.getenv calls across stage modules.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -73,6 +73,9 @@ class RunContext(BaseModel):
     config: PipelineConfig
     force: bool = False
     dry_run: bool = False
+    preset: Optional[Any] = None
+    topic: Optional[str] = None
+    max_veo_shots: Optional[int] = None
 
 
 def load_profile(profile_name: str = "prod", repo_root: Optional[Path] = None) -> PipelineConfig:

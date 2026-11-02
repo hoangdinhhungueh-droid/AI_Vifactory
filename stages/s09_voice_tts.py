@@ -79,14 +79,17 @@ def run(ctx: RunContext) -> StageArtifact:
             shutil.copy2(str(legacy_audio), str(audio_file))
         else:
             # Generate real voice audio using Edge-TTS live
-            voice = ctx.config.voice.voice_en
-            m_low = market.lower()
-            if m_low in ("ja", "jp"):
-                voice = ctx.config.voice.voice_jp
-            elif m_low in ("ko", "kr"):
-                voice = ctx.config.voice.voice_kr
-            elif m_low in ("vi", "vn"):
-                voice = ctx.config.voice.voice_vn
+            if ctx.preset and getattr(ctx.preset, "tts", None) and getattr(ctx.preset.tts, "voice", None):
+                voice = ctx.preset.tts.voice
+            else:
+                voice = ctx.config.voice.voice_en
+                m_low = market.lower()
+                if m_low in ("ja", "jp"):
+                    voice = ctx.config.voice.voice_jp
+                elif m_low in ("ko", "kr"):
+                    voice = ctx.config.voice.voice_kr
+                elif m_low in ("vi", "vn"):
+                    voice = ctx.config.voice.voice_vn
 
             text_to_speak = full_text if full_text else "AI Video Factory master video narration."
             tts_success = False
@@ -204,11 +207,30 @@ def run(ctx: RunContext) -> StageArtifact:
     ass_lines.extend(ass_events)
     ass_file.write_text("\n".join(ass_lines), encoding="utf-8")
 
+    measured_duration_s = round(actual_total_dur, 3)
+    is_min_profile = bool((ctx.config.name == "e2e_min" and ctx.config.limits.max_scenes == 1) or ctx.dry_run)
+    if not is_min_profile and ctx.preset and getattr(ctx.preset, "duration_window_s", None):
+        d_min = ctx.preset.duration_window_s.min
+        d_max = ctx.preset.duration_window_s.max
+        if not (d_min <= measured_duration_s <= d_max):
+            raise ValueError(
+                f"[s09_voice_tts] Measured audio duration {measured_duration_s}s is outside preset window [{d_min}s, {d_max}s]."
+            )
+
+    if ctx.preset and getattr(ctx.preset, "narration", None) and measured_duration_s > 0:
+        total_w = len(subtitles) or len(words)
+        calculated_wpm = round((total_w / (measured_duration_s / 60.0)), 1)
+        try:
+            ctx.preset.narration.wpm_estimate = calculated_wpm
+        except Exception:
+            pass
+
     payload = {
         "task_id": ctx.run_id,
         "audio_file": str(audio_file),
         "total_words": len(subtitles),
-        "total_duration_sec": round(actual_total_dur, 3),
+        "total_duration_sec": measured_duration_s,
+        "measured_duration_s": measured_duration_s,
         "subtitles_file": str(ass_file),
         "word_timestamps_file": str(subtitles_file),
         "subtitles": subtitles

@@ -82,6 +82,7 @@ def _build_and_save_remotion_props(
     audio_file: str,
     subtitles: list,
     audio_duration_sec: float = 0.0,
+    scene_narrations: Optional[dict[str, str]] = None,
 ) -> tuple[RemotionRenderProps, Path, list[SceneRenderProp]]:
     """Assembles RemotionRenderProps and writes remotion_props.json."""
     fps = ctx.config.render.fps
@@ -129,12 +130,20 @@ def _build_and_save_remotion_props(
                     end_ms=round(rel_end * 1000.0, 1),
                 ))
 
+        sc_narration = None
+        if scene_narrations:
+            sc_narration = scene_narrations.get(sc_id) or scene_narrations.get(str(idx + 1))
+        if not sc_narration and cl.get("narration"):
+            sc_narration = cl.get("narration")
+
         scene_props.append(SceneRenderProp(
             scene_id=sc_id,
             duration_in_frames=frames,
             video_clip_path=cl.get("file_path", ""),
             audio_path=audio_file,
-            subtitles=sc_words
+            subtitles=sc_words,
+            render_mode=cl.get("render_mode", "veo"),
+            narration=sc_narration,
         ))
 
     if scene_props and target_total_frames > 0 and accum_frames != target_total_frames:
@@ -144,16 +153,26 @@ def _build_and_save_remotion_props(
 
     total_frames = max(accum_frames, 30)
 
+    target_w = 1920
+    target_h = 1080
+    if ctx.preset and getattr(ctx.preset, "resolution", None):
+        target_w = ctx.preset.resolution.width
+        target_h = ctx.preset.resolution.height
+    elif ctx.config and getattr(ctx.config, "render", None):
+        target_w = ctx.config.render.width
+        target_h = ctx.config.render.height
+
     # Assemble RemotionRenderProps
     render_props = RemotionRenderProps(
         episode_id=ctx.run_id,
         title=f"Episode {ctx.run_id}",
         fps=fps,
-        width=ctx.config.render.width,
-        height=ctx.config.render.height,
+        width=target_w,
+        height=target_h,
         duration_in_frames=total_frames,
         scenes=scene_props,
-        bgm_volume=ctx.config.render.bgm_volume
+        bgm_volume=ctx.config.render.bgm_volume,
+        preset=getattr(ctx.preset, "name", None) if ctx.preset else None,
     )
 
     # Save props file for Remotion
@@ -431,7 +450,35 @@ def _run_stage_s10_internal(ctx: RunContext, start_ts: float) -> StageArtifact:
     subtitles = s9_data.get("payload", {}).get("subtitles", [])
 
     audio_duration_sec = float(s9_data.get("payload", {}).get("total_duration_sec") or 0.0)
-    render_props, props_file, scene_props = _build_and_save_remotion_props(ctx, clips, audio_file, subtitles, audio_duration_sec=audio_duration_sec)
+    
+    # Extract scene narrations from S5 (or S3 fallback)
+    scene_narrations: dict[str, str] = {}
+    s5_path = ctx.paths.artifact_file(StageID.S5_DIRECTOR_PLAN.value)
+    if s5_path.exists():
+        try:
+            s5_data = json.loads(s5_path.read_text(encoding="utf-8"))
+            s5_scenes = s5_data.get("payload", {}).get("scenes", [])
+            for sc in s5_scenes:
+                if isinstance(sc, dict) and sc.get("scene_id") and sc.get("narration"):
+                    scene_narrations[sc["scene_id"]] = sc["narration"]
+        except Exception as _s5_err:
+            logger.debug(f"[s10_render] Notice extracting narrations from s5: {_s5_err}")
+
+    if not scene_narrations:
+        s3_path = ctx.paths.artifact_file(StageID.S3_SCRIPT.value)
+        if s3_path.exists():
+            try:
+                s3_data = json.loads(s3_path.read_text(encoding="utf-8"))
+                s3_scenes = s3_data.get("payload", {}).get("scenes", [])
+                for sc in s3_scenes:
+                    if isinstance(sc, dict) and sc.get("scene_id") and sc.get("narration"):
+                        scene_narrations[sc["scene_id"]] = sc["narration"]
+            except Exception as _s3_err:
+                logger.debug(f"[s10_render] Notice extracting narrations from s3: {_s3_err}")
+
+    render_props, props_file, scene_props = _build_and_save_remotion_props(
+        ctx, clips, audio_file, subtitles, audio_duration_sec=audio_duration_sec, scene_narrations=scene_narrations
+    )
 
     # Render target final.mp4
     final_mp4 = ctx.paths.final_render_dir / "final.mp4"

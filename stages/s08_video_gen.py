@@ -164,6 +164,10 @@ def run(ctx: RunContext) -> StageArtifact:
     s5_path = ctx.paths.artifact_file(StageID.S5_DIRECTOR_PLAN.value)
     s5_data = json.loads(s5_path.read_text(encoding="utf-8"))
     scenes = s5_data.get("payload", {}).get("scenes", [])
+    story_shots = s5_data.get("payload", {}).get("story_shots", [])
+    story_shot_map = {s.get("shot_id"): s for s in story_shots if isinstance(s, dict)}
+    veo_shots_count = 0
+    max_veo = getattr(ctx, "max_veo_shots", None)
 
     video_assets: List[Dict[str, Any]] = []
     frame_chain: List[Dict[str, Any]] = []
@@ -231,6 +235,25 @@ def run(ctx: RunContext) -> StageArtifact:
         shot_id = str(raw_shot_id).strip()
         if first_shot.get("account_slot"):
             slot = str(first_shot["account_slot"])
+
+        # Determine render_mode from story_shots if present
+        shot_render_mode = "veo"
+        matching_story_shot = None
+        if story_shots:
+            if idx < len(story_shots):
+                matching_story_shot = story_shots[idx]
+            elif shot_id in story_shot_map:
+                matching_story_shot = story_shot_map[shot_id]
+        if matching_story_shot:
+            shot_render_mode = matching_story_shot.get("render_mode") or "veo"
+
+        # Quota cap enforcement
+        if shot_render_mode == "veo":
+            if max_veo is not None and veo_shots_count >= max_veo:
+                logger.info(f"[s08_video_gen] Shot '{shot_id}' throttled from veo to vox_native (max_veo_shots={max_veo} reached)")
+                shot_render_mode = "vox_native"
+            else:
+                veo_shots_count += 1
 
         uses_chained_start = bool(first_shot.get("uses_previous_end_frame", False))
         if uses_chained_start and idx == 0:
@@ -434,7 +457,8 @@ def run(ctx: RunContext) -> StageArtifact:
             duration_sec=scene_durations.get(idx, float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec)),
             size_bytes=sz,
             sha256=sha,
-            verified=True
+            verified=True,
+            render_mode=shot_render_mode,
         )
         video_assets.append(asset.model_dump())
         video_map[shot_id] = target_video
@@ -450,6 +474,8 @@ def run(ctx: RunContext) -> StageArtifact:
     payload = {
         "task_id": ctx.run_id,
         "total_clips": len(video_assets),
+        "total_veo_shots": veo_shots_count,
+        "total_vox_native_shots": len(video_assets) - veo_shots_count,
         "video_clips_dir": str(ctx.paths.video_clips_dir),
         "clips": video_assets,
         "frame_chain": frame_chain,

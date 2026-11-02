@@ -260,11 +260,11 @@ def _validate_dict_scene_entry(
         raise ValueError(f"Stage S11 fail-closed: Duplicate scene index {idx} in authoritative plan")
     seen_indices.add(idx)
 
-    narration = s.get("narration", s.get("narration_text", s.get("text", s.get("headline", f"Scene {idx+1}"))))
+    narration = s.get("narration") or s.get("narration_text") or s.get("text") or s.get("headline") or f"Scene {idx+1}"
     if not narration or not isinstance(narration, str) or not narration.strip():
         raise ValueError(f"Authoritative scene {idx} missing required non-empty 'narration'")
 
-    bg_prompt = s.get("bg_prompt", s.get("bg_image", s.get("background", s.get("image_prompt"))))
+    bg_prompt = s.get("bg_prompt") or s.get("bg_image") or s.get("background") or s.get("image_prompt") or f"Editorial background for scene {idx+1}"
     if not bg_prompt or not isinstance(bg_prompt, str) or len(bg_prompt.strip()) < 10:
         raise ValueError(f"Authoritative scene {idx} missing required 'bg_prompt' (min length 10)")
 
@@ -363,6 +363,10 @@ def run(ctx: RunContext) -> StageArtifact:
     local_dp = ctx.paths.root / "director_plan.json"
     if not local_dp.exists() and props_path and (props_path.parent / "director_plan.json").exists():
         local_dp = props_path.parent / "director_plan.json"
+    if not local_dp.exists():
+        s5_art_file = ctx.paths.artifact_file(StageID.S5_DIRECTOR_PLAN.value)
+        if s5_art_file.exists():
+            local_dp = s5_art_file
 
     if props_path:
         if not props_path.exists():
@@ -376,14 +380,15 @@ def run(ctx: RunContext) -> StageArtifact:
             # If props_data scenes lack prompt details (RemotionRenderProps schema),
             # hydrate with authoritative scene plan details from director_plan.json
             first_sc = sc_list[0] if sc_list else {}
-            if not first_sc.get("bg_prompt") and not first_sc.get("fg") and local_dp.exists():
+            if (not first_sc.get("bg_prompt") or not first_sc.get("narration")) and local_dp.exists():
                 dp_data = json.loads(local_dp.read_text(encoding="utf-8"))
-                dp_scenes = dp_data.get("scenes", [])
+                dp_payload = dp_data.get("payload", dp_data)
+                dp_scenes = dp_payload.get("scenes", [])
                 dp_by_id = {str(s.get("scene_id", "")).lower(): s for s in dp_scenes}
 
                 # Hydrate title if props_data title is missing or synthetic
                 if not props_data.get("title") or props_data.get("title", "").startswith("Episode "):
-                    props_data["title"] = dp_data.get("title") or dp_data.get("title_a") or dp_data.get("topic")
+                    props_data["title"] = dp_payload.get("title") or dp_payload.get("title_a") or dp_payload.get("topic")
                     if not props_data.get("title"):
                         bi_file = ctx.paths.root / "brain_input.json"
                         if not bi_file.exists() and (props_path.parent / "brain_input.json").exists():
@@ -412,7 +417,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     sc_id = str(sc.get("scene_id", "")).lower()
                     dp_sc = dp_by_id.get(sc_id) or (dp_scenes[idx] if idx < len(dp_scenes) else {})
                     for field in ["narration", "bg_prompt", "image_prompt", "fg_prompt", "hero_cutout_object", "foreground_prompt", "visual_metaphor", "camera", "camera_move", "camera_movement", "fg"]:
-                        if field not in sc and field in dp_sc:
+                        if (field not in sc or not sc.get(field)) and dp_sc.get(field):
                             sc[field] = dp_sc[field]
 
             plan = _validate_authoritative_scene_plan(props_data, ctx.run_id)
@@ -478,6 +483,51 @@ def run(ctx: RunContext) -> StageArtifact:
         qc_details["gates_verified"] = False
         qc_details["gate_note"] = str(e)
         gate_passed = False
+
+    # Hard Gate Checks (Boss Item 3.4 & T10: legal S4 flag, resolution, duration)
+    hard_failures = []
+    s4_path = ctx.paths.artifact_file(StageID.S4_CRITIC_SCRIPT.value)
+    if s4_path.exists():
+        try:
+            s4_data = json.loads(s4_path.read_text(encoding="utf-8"))
+            if s4_data.get("payload", {}).get("verdict") != "pass":
+                hard_failures.append("S4 script critic verdict is not 'pass'")
+        except Exception as _s4_err:
+            hard_failures.append(f"Failed to read S4 artifact: {_s4_err}")
+
+    from vox.qa.gates import probe_media_file
+    try:
+        probe_info = probe_media_file(p)
+        streams = probe_info.get("streams", [])
+        v_stream = next((s for s in streams if s.get("codec_type") == "video"), {})
+        v_width = int(v_stream.get("width", 0))
+        v_height = int(v_stream.get("height", 0))
+        v_dur = float(probe_info.get("format", {}).get("duration", 0.0))
+
+        target_w = 1920
+        target_h = 1080
+        if ctx.preset and getattr(ctx.preset, "resolution", None):
+            target_w = ctx.preset.resolution.width
+            target_h = ctx.preset.resolution.height
+
+        if v_width != target_w or v_height != target_h:
+            hard_failures.append(f"Resolution mismatch: {v_width}x{v_height} != {target_w}x{target_h}")
+
+        is_min_profile = bool((ctx.config.name == "e2e_min" and ctx.config.limits.max_scenes == 1) or ctx.dry_run)
+        if not is_min_profile and ctx.preset and getattr(ctx.preset, "duration_window_s", None):
+            d_min = ctx.preset.duration_window_s.min
+            d_max = ctx.preset.duration_window_s.max
+            if not (d_min <= v_dur <= d_max):
+                hard_failures.append(f"Video duration {v_dur:.2f}s outside preset window [{d_min}s, {d_max}s]")
+    except Exception as _p_err:
+        hard_failures.append(f"Media probe failed: {_p_err}")
+
+    if hard_failures:
+        gate_passed = False
+        qc_details["gates_verified"] = False
+        qc_details["hard_gate_failures"] = hard_failures
+        existing_notes = qc_details.get("gate_note", "")
+        qc_details["gate_note"] = f"{existing_notes}; Hard gate failures: {'; '.join(hard_failures)}".strip("; ")
 
     qc_verdict = "PASS" if gate_passed else "FAIL"
     integrity_verified = gate_passed

@@ -852,17 +852,18 @@ def run(ctx: RunContext) -> StageArtifact:
 
     planned_storyboard = []
     director_status = "ok"
-    try:
-        from app.services.claude_vox_director import ClaudeVoxDirector
-        director = ClaudeVoxDirector()
-        planned_storyboard = director.plan_storyboard(
-            story_text=story_text,
-            market=market,
-            sentences_override=sentences
-        )
-    except Exception as dir_err:
-        logger.warning(f"[s05_director_plan] ClaudeVoxDirector notice: {dir_err}")
-        director_status = "degraded"
+    if not ctx.dry_run:
+        try:
+            from app.services.claude_vox_director import ClaudeVoxDirector
+            director = ClaudeVoxDirector()
+            planned_storyboard = director.plan_storyboard(
+                story_text=story_text,
+                market=market,
+                sentences_override=sentences
+            )
+        except Exception as dir_err:
+            logger.warning(f"[s05_director_plan] ClaudeVoxDirector notice: {dir_err}")
+            director_status = "degraded"
 
     for idx, sc_dict in enumerate(raw_scenes):
         scene = Scene.model_validate(sc_dict)
@@ -962,6 +963,39 @@ def run(ctx: RunContext) -> StageArtifact:
     chunks = partition_timeline_into_chunks(scenes)
     asset_registry = build_master_asset_registry(ctx.run_id, scenes)
 
+    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
+    story_shots = []
+    if is_story:
+        from app.schemas.story_contracts import StoryShotPlan
+        h_cycle = ["H1_IMPACT", "H2_CONSTRAINT", "H7_DISPLACE", "H4_TETHER", "H5_OPTICAL", "H6_MARK", "H3_SEVER"]
+        all_s3_lines = []
+        for b in s3_artifact.payload.get("beats", []):
+            for ln in b.get("lines", []):
+                all_s3_lines.append(ln.get("line_id", ""))
+
+        for idx, sc in enumerate(scenes):
+            shot_id = f"S{idx+1:03d}"
+            # Opening hook is tactile stop-motion (vox_native); Veo distributed at ~25% share (<= 30% ceiling)
+            r_mode = "veo" if (len(scenes) >= 4 and idx % 4 == 3) else "vox_native"
+            h_fam = h_cycle[idx % len(h_cycle)]
+            props = ["stamp", "newspaper_cutout"] if "IMPACT" in h_fam else (["compass", "ruler"] if "CONSTRAINT" in h_fam else ["red_thread"])
+            matched_line_id = all_s3_lines[idx] if idx < len(all_s3_lines) else f"L{idx+1:02d}"
+            shot_prompt = (
+                f"Tactile stop-motion editorial evidence exhibit for {sc.scene_id}: {sc.narration[:60]}. "
+                f"Aged cream newsprint paper background #F4F1EA, bold black ink comic linework, cinematic 16:9 widescreen composition."
+            )
+            story_shots.append(StoryShotPlan(
+                shot_id=shot_id,
+                line_ids=[matched_line_id],
+                start_hint_s=round(idx * 5.5, 1),
+                duration_s=5.5,
+                render_mode=r_mode,
+                h_family=h_fam,
+                tactile_props=props,
+                prompt=shot_prompt,
+                contains_real_person=False,
+            ))
+
     payload = {
         "schema_version": "director_plan.v2",
         "project_id": ctx.run_id,
@@ -972,6 +1006,7 @@ def run(ctx: RunContext) -> StageArtifact:
         "total_sequence_blocks": len(chunks),
         "director_status": director_status,
         "account_slots_used": acc_pool,
+        "story_shots": [s.model_dump() for s in story_shots] if story_shots else [],
         "source": {
             "b2_path": b2_source_path,
             "b2_sha256": b2_source_sha256
@@ -1017,6 +1052,7 @@ def run(ctx: RunContext) -> StageArtifact:
 
     # Synchronize director_plan.json to episode directory for Remotion & downstream consumers
     ep_candidates = [
+        ctx.paths.root,
         Path(os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")) / ctx.run_id,
         ctx.paths.repo_root / "episodes" / ctx.run_id,
         ctx.paths.repo_root / "workspace" / ctx.run_id,

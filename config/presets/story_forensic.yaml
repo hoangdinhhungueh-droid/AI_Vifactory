@@ -1,0 +1,68 @@
+name: story_forensic
+aspect_ratio: "16:9"
+market: "EN"
+resolution:
+  width: 1920
+  height: 1080
+duration_window_s:
+  min: 180
+  max: 300
+  target: 240
+narration:
+  wpm_estimate: 150
+  word_budget:
+    min: 450
+    max: 750
+beats:
+  - id: B1_hook
+    share: 0.08
+    intent: "Mở bằng khoảnh khắc sụp đổ hoặc con số gây sốc. Đặt câu hỏi trung tâm."
+  - id: B2_setup
+    share: 0.17
+    intent: "Nhân vật, công ty, bối cảnh trước scandal."
+  - id: B3_scheme
+    share: 0.33
+    intent: "Giải phẫu cơ chế gian lận từng bước, có số liệu."
+  - id: B4_crack
+    share: 0.25
+    intent: "Ai phát hiện, bằng cách nào, mọi thứ vỡ ra ra sao."
+  - id: B5_aftermath
+    share: 0.17
+    intent: "Phán quyết, thiệt hại, bài học. Trả lời câu hỏi mở đầu."
+retention:
+  pattern_interrupt_max_gap_s: 30
+  max_consecutive_same_h_family: 2
+visual:
+  palette:
+    paper: "#F4F1EA"
+  tactile_props:
+    - newspaper_cutout
+    - stamp
+    - compass
+    - ruler
+    - red_thread
+  shot_avg_s: 5.5
+  veo_share_max: 0.30
+  forbid_photoreal_real_persons: true
+legal:
+  required_status_language:
+    convicted: []
+    charged:
+      - "allegedly"
+      - "according to the indictment"
+      - "charged with"
+      - "accused of"
+    alleged:
+      - "allegedly"
+      - "alleged"
+      - "claimed"
+      - "purported"
+      - "according to"
+    settled:
+      - "settled without admitting wrongdoing"
+      - "settled"
+      - "agreed to pay without admitting fault"
+  min_independent_sources: 3
+tts:
+  voice: "en-US-ChristopherNeural"
+  rate: "+0%"

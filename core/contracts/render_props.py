@@ -34,6 +34,10 @@ class SceneRenderProp(BaseModel):
     headline: Optional[str] = None
     bilingual_headline: Optional[str] = None
     color_accent: Optional[str] = None
+    render_mode: Optional[str] = "veo"
+    h_family: Optional[str] = None
+    tactile_props: List[str] = Field(default_factory=list)
+    narration: Optional[str] = None
 
 
 class RemotionRenderProps(BaseModel):
@@ -49,3 +53,4 @@ class RemotionRenderProps(BaseModel):
     bgm_path: Optional[str] = None
     bgm_volume: float = 0.15
     audio_spine_path: Optional[str] = None
+    preset: Optional[str] = None

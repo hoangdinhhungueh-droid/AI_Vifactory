@@ -38,12 +38,6 @@ You are given a 16-Frame Contact Sheet (4x4 grid) sampled chronologically across
 
 Carefully evaluate the visual output across 4 Canonical Axes (Score each 0.0 to 10.0):
 
-[EVALUATION GUIDANCE FOR 16-FRAME CONTACT SHEET]:
-- You are auditing a 16-frame contact sheet sampled chronologically from a fully rendered 170.87s MP4 video composed of 44 continuous scene clips with burned EBU R128 audio and synchronized Whisper subtitles.
-- S11 CV Gate Telemetry: All 44 scene clips have passed automated Computer Vision verification with measured temporal motion deltas (12.2 to 49.3 pixel shift per second), confirming continuous organic camera motion (directional pans, tilts, dolly push-ins) and zero static freeze-frames.
-- Evaluating 'Cinematic Motion & Physics' on contact sheet: Assess visible multi-planar diorama depth, genuine foreground/midground/background separation, perspective lines, shallow depth of field, and camera trajectory variety across frames. Do NOT apply an automatic score penalty or ceiling simply because the video is presented as a 16-frame contact sheet representation.
-- Evaluating 'Editing Pacing & Synergy' on contact sheet: Assess visual rhythm progression across the narrative arc (investigative wide setups, rapid key theft inserts, macro data escalation), motif coherence with narration subtitles, and visual information density.
-
 1. **Cinematic Motion & Physics Realism (30% weight)**:
    - Is there genuine spatial depth, dynamic camera movement (dolly, push-in, tracking, subtle tilt/pan), and fluid physics?
    - Or does it look like a flat, static, robotic 2D PowerPoint slideshow with cheap CSS transforms?
@@ -200,10 +194,10 @@ def evaluate_with_council(
     avg_score = round((opus_score + astra_score) / 2.0, 2)
 
     # Documentary Council Pass Threshold:
-    # - GPT-6-Astra (Cinematography & Physics Supervisor): >= 7.5
-    # - Claude Opus 5.5 (Docudrama Editorial Director): >= 7.0 (Opus standard passing threshold)
-    # - Council Average Score: >= 7.5
-    council_pass = (opus_score >= 7.0 and astra_score >= 7.5 and avg_score >= 7.5)
+    # - GPT-6-Astra (Cinematography & Physics Supervisor): >= 8.0
+    # - Claude Opus 5.5 (Docudrama Editorial Director): >= 8.0
+    # - Council Average Score: >= 8.0
+    council_pass = (opus_score >= 8.0 and astra_score >= 8.0 and avg_score >= 8.0)
 
     report = {
         "episode_id": episode_id,

@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -54,6 +55,41 @@ STAGE_MODULES = {
 }
 
 
+def resolve_stage_index(token: Optional[str], stage_list: List[StageID]) -> Optional[int]:
+    """Resolves CLI stage identifier (e.g. 's1', 's01', 's01_ideation', 'ideation', '1') to stage_list index."""
+    if not token or not str(token).strip():
+        return None
+    raw = str(token).strip().lower()
+
+    # Numeric index (1-based: '1' -> 0)
+    if raw.isdigit():
+        num = int(raw)
+        if 1 <= num <= len(stage_list):
+            return num - 1
+
+    # Shorthand s1..s9 -> s01..s09
+    m = re.match(r"^s(\d)$", raw)
+    if m:
+        raw = f"s0{m.group(1)}"
+
+    # 1. Exact match on enum value or name
+    for i, s in enumerate(stage_list):
+        if raw == s.value.lower() or raw == s.name.lower():
+            return i
+
+    # 2. Prefix match on stage value (e.g. 's01', 's02', 's10')
+    for i, s in enumerate(stage_list):
+        if s.value.lower().startswith(raw):
+            return i
+
+    # 3. Substring match on stage value (e.g. 'ideation', 'research', 'critic_script')
+    for i, s in enumerate(stage_list):
+        if raw in s.value.lower():
+            return i
+
+    return None
+
+
 def execute_pipeline(
     profile_name: str = "prod",
     run_id: Optional[str] = None,
@@ -65,40 +101,55 @@ def execute_pipeline(
     topic: Optional[str] = None,
     profile: Optional[str] = None,
     market: Optional[str] = None,
+    preset: Optional[str] = None,
+    stop_after: Optional[str] = None,
+    max_veo_shots: Optional[int] = None,
 ) -> int:
     if profile is not None:
         profile_name = profile
+    effective_to = to_stage or stop_after
     """Main execution engine loop over all 11 stages."""
     print("=" * 75)
     print("🎬 AI VIDEO FACTORY — MASTER PIPELINE ORCHESTRATOR 2.0")
     print("=" * 75)
 
-    # 1. Resolve Configuration & Paths
+    # 1. Resolve Configuration, Presets & Paths
     config = load_profile(profile_name, repo_root=ROOT_DIR)
+
+    from app.services.preset_loader import load_preset
+    preset_name = preset or os.getenv("VF_PRESET") or "macro_legacy"
+    loaded_preset = None
+    try:
+        loaded_preset = load_preset(preset_name, repo_root=ROOT_DIR)
+    except Exception as _pe:
+        print(f"⚠️ Notice: could not load preset '{preset_name}': {_pe}")
+
     if run_id:
         paths = resolve_run_paths(run_id, repo_root=ROOT_DIR)
     else:
-        prefix = f"RUN_{topic.lower().replace(' ', '_')[:30]}" if topic else "RUN"
+        clean_prefix = re.sub(r"[^a-zA-Z0-9_-]+", "_", topic.lower()).strip("_")[:30] if topic else ""
+        prefix = f"RUN_{clean_prefix}" if clean_prefix else "RUN"
         paths = new_run_paths(prefix=prefix, repo_root=ROOT_DIR)
 
     effective_run_id = paths.run_id
     print(f"📌 Run ID:             {effective_run_id}")
     print(f"⚙️ Profile:            {config.name} (v{config.pipeline_version})")
+    print(f"🧭 Preset:             {preset_name}")
     print(f"📁 Workspace Root:     {paths.root}")
     print(f"🚦 Mode:               {'DRY-RUN' if dry_run else 'LIVE EXECUTION'}")
     print("-" * 75)
 
     # 2. Load or Create Manifest State Machine
     manifest = RunManifest.load_or_create(paths, profile=config.name)
+    manifest.preset = preset_name
     from core.market_resolver import resolve_canonical_market
 
-    raw_m = market or os.getenv("VF_MARKET") or os.getenv("MARKET")
-    if raw_m:
-        canonical_m = resolve_canonical_market(raw_m)
-        manifest.market = canonical_m
-        if config is not None:
-            config.market = canonical_m
-        manifest.save_atomic(paths)
+    raw_m = market or os.getenv("VF_MARKET") or os.getenv("MARKET") or getattr(loaded_preset, "market", "EN") or "EN"
+    canonical_m = resolve_canonical_market(raw_m)
+    manifest.market = canonical_m
+    if config is not None:
+        config.market = canonical_m
+    manifest.save_atomic(paths)
 
     ctx = RunContext(
         run_id=effective_run_id,
@@ -106,35 +157,46 @@ def execute_pipeline(
         manifest=manifest,
         config=config,
         force=force,
-        dry_run=dry_run
+        dry_run=dry_run,
+        preset=loaded_preset,
+        topic=topic,
+        max_veo_shots=max_veo_shots,
     )
 
     stage_list = list(StageID)
     start_idx = 0
     if from_stage:
-        clean_from = from_stage.lower()
-        matched = next((i for i, s in enumerate(stage_list) if clean_from in s.value), None)
-        if matched is not None:
-            start_idx = matched
+        resolved_from = resolve_stage_index(from_stage, stage_list)
+        if resolved_from is None:
+            print(f"❌ [CONFIGURATION ERROR]: Unknown --from stage '{from_stage}'. Available: {[s.value for s in stage_list]}")
+            return 1
+        start_idx = resolved_from
 
     end_idx = len(stage_list) - 1
-    if to_stage:
-        clean_to = to_stage.lower()
-        matched_to = next((i for i, s in enumerate(stage_list) if clean_to in s.value), None)
-        if matched_to is not None:
-            end_idx = matched_to
+    if effective_to:
+        resolved_to = resolve_stage_index(effective_to, stage_list)
+        if resolved_to is None:
+            print(f"❌ [CONFIGURATION ERROR]: Unknown target stage '{effective_to}'. Available: {[s.value for s in stage_list]}")
+            return 1
+        end_idx = resolved_to
+
+    only_target_idx = None
+    if only_stage:
+        only_target_idx = resolve_stage_index(only_stage, stage_list)
+        if only_target_idx is None:
+            print(f"❌ [CONFIGURATION ERROR]: Unknown --only stage '{only_stage}'. Available: {[s.value for s in stage_list]}")
+            return 1
 
     # 3. Stage Execution Loop
     for idx, stage in enumerate(stage_list):
-        if idx < start_idx:
-            continue
-        if idx > end_idx:
-            break
-
-        if only_stage:
-            clean_only = only_stage.lower()
-            if clean_only not in stage.value:
+        if only_target_idx is not None:
+            if idx != only_target_idx:
                 continue
+        else:
+            if idx < start_idx:
+                continue
+            if idx > end_idx:
+                break
 
         stage_name = stage.value
         mod_name = STAGE_MODULES.get(stage)
@@ -161,6 +223,13 @@ def execute_pipeline(
         try:
             stage_mod = importlib.import_module(mod_name)
             _artifact = stage_mod.run(ctx)
+
+            if isinstance(_artifact.payload, dict) and _artifact.payload.get("verdict") in ("fail", "rejected"):
+                raise GateError(
+                    stage,
+                    f"Stage '{stage_name}' critic audit rejected artifact with verdict '{_artifact.payload.get('verdict')}'",
+                    details=_artifact.payload.get("violations") or {}
+                )
 
             sha_new = compute_file_sha256(art_path) if art_path.exists() else "none"
             manifest.mark(stage, "done", artifact_sha256=sha_new)
@@ -201,11 +270,14 @@ def main():
     parser.add_argument("--run-id", default=None, help="Optional existing Run ID or Episode ID to resume")
     parser.add_argument("--from", dest="from_stage", default=None, help="Resume execution starting from specified stage")
     parser.add_argument("--to", dest="to_stage", default=None, help="Stop execution after specified stage")
+    parser.add_argument("--stop-after", dest="stop_after", default=None, help="Alias for --to: stop execution after specified stage")
     parser.add_argument("--only", dest="only_stage", default=None, help="Execute only the specified stage")
     parser.add_argument("--dry-run", action="store_true", help="Fast execution simulation without external API calls")
     parser.add_argument("--force", action="store_true", help="Force re-generation of all artifacts ignoring cache")
     parser.add_argument("--topic", default=None, help="Optional topic seed string")
     parser.add_argument("--market", default=None, help="Canonical market (EN, JA, KR, VN)")
+    parser.add_argument("--preset", default="macro_legacy", help="Pipeline track preset (e.g. story_forensic, macro_legacy)")
+    parser.add_argument("--max-veo-shots", type=int, default=None, help="Maximum number of Veo shots to generate (quota management)")
 
     args = parser.parse_args()
 
@@ -213,12 +285,15 @@ def main():
         profile_name=args.profile,
         run_id=args.run_id,
         from_stage=args.from_stage,
-        to_stage=args.to_stage,
+        to_stage=args.to_stage or args.stop_after,
         only_stage=args.only_stage,
         dry_run=args.dry_run,
         force=args.force,
         topic=args.topic,
         market=args.market,
+        preset=args.preset,
+        stop_after=args.stop_after,
+        max_veo_shots=args.max_veo_shots,
     )
     sys.exit(exit_code)
 
