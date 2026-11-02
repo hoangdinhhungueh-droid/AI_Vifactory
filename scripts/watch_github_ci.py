@@ -140,38 +140,38 @@ def watch_ci(repo: str, token: str, commit_sha: str, timeout_sec: int = 600, pol
             html_url = run.get("html_url")
             elapsed = int(time.time() - start_time)
 
-            print(f"[{elapsed:03d}s] Run ID {run_id} | Status: {status} | Conclusion: {conclusion}")
+            print(f"[{elapsed:03d}s] Run ID {run_id} | Status: {status} | Conclusion: {conclusion}", flush=True)
 
             if status == "completed":
-                print(f"\n🎯 Workflow completed in {elapsed}s with conclusion: {conclusion.upper()}")
-                print(f"   Run URL: {html_url}")
+                print(f"\n🎯 Workflow completed in {elapsed}s with conclusion: {conclusion.upper()}", flush=True)
+                print(f"   Run URL: {html_url}", flush=True)
 
                 if conclusion == "success":
-                    print("✅ GITHUB ACTIONS CI PASSED! (Three-Way Physical Sync Verified)")
+                    print("✅ GITHUB ACTIONS CI PASSED! (Three-Way Physical Sync Verified)", flush=True)
                     return 0
                 else:
-                    print(f"❌ GITHUB ACTIONS CI FAILED ({conclusion})!")
+                    print(f"❌ GITHUB ACTIONS CI FAILED ({conclusion})!", flush=True)
                     # Fetch jobs and pinpoint failure
                     jobs = fetch_job_details(repo, token, run_id, opener)
                     for j in jobs:
-                        print(f"   Job '{j['name']}': {j.get('conclusion')}")
+                        print(f"   Job '{j['name']}': {j.get('conclusion')}", flush=True)
                         for s in j.get("steps", []):
                             if s.get("conclusion") == "failure":
-                                print(f"     -> Failed Step: {s['name']}")
+                                print(f"     -> Failed Step: {s['name']}", flush=True)
                         if j.get("conclusion") == "failure":
                             log_text = fetch_failed_log(repo, token, j["id"], opener)
                             lines = log_text.splitlines()
                             err_lines = [l for l in lines if "FAILED" in l or "ERROR" in l or "Error" in l]
-                            print("\n--- FAILURE LOG SNIPPET ---")
+                            print("\n--- FAILURE LOG SNIPPET ---", flush=True)
                             for el in err_lines[:20]:
-                                print(" ", el)
+                                print(" ", el, flush=True)
                     return 1
         else:
             elapsed = int(time.time() - start_time)
             waited_for_run += poll_interval
-            print(f"[{elapsed:03d}s] Waiting for GitHub Actions workflow to trigger on commit {commit_sha[:7]}...")
+            print(f"[{elapsed:03d}s] Waiting for GitHub Actions workflow to trigger on commit {commit_sha[:7]}...", flush=True)
             if waited_for_run > 60:
-                print(f"[watch_github_ci] Warning: No workflow run picked up after {waited_for_run}s.")
+                print(f"[watch_github_ci] Warning: No workflow run picked up after {waited_for_run}s.", flush=True)
 
         time.sleep(poll_interval)
 
