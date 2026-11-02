@@ -1298,7 +1298,7 @@ def run_b15(task_id: str, target_keyword: str, niche: str = "General",
             c.setdefault("transcript", {"status": "unavailable", "text": None, "source": None})
             c.setdefault("thumbnail_path", None)
     if not selected:
-        anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, [], [], niche)
+        anatomy = analyze_competitor_anatomy(task_id, target_keyword, market, [], [], niche, preset=preset)
         card = build_intel_card(task_id, target_keyword, niche, market, [], [], quota,
                                 competitor_narrative_anatomy=anatomy, raw_comments=[])
         for target_dir in [EPISODE_DIR / task_id, Path("/root/video_factory/episodes") / task_id]:
