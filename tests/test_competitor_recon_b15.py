@@ -452,10 +452,13 @@ class TestRelativeTimeAndZeroQuotaResilience:
 
 class TestStoryForensicCompetitorRecon:
     def test_story_forensic_fallback_angle(self):
-        from unittest.mock import patch
-        from app.services.competitor_recon_b15 import analyze_competitor_anatomy
-        with patch("app.services.competitor_recon_b15.call_recon_forensic_llm", side_effect=Exception("offline")):
-            res = analyze_competitor_anatomy(
+        import app.services.competitor_recon_b15 as b15_mod
+        orig = getattr(b15_mod, "call_recon_forensic_llm", None)
+        def _offline(*args, **kwargs):
+            raise RuntimeError("offline")
+        b15_mod.call_recon_forensic_llm = _offline
+        try:
+            res = b15_mod.analyze_competitor_anatomy(
                 task_id="en-test-01",
                 target_keyword="Enron Accounting Scandal",
                 market="en",
@@ -466,12 +469,18 @@ class TestStoryForensicCompetitorRecon:
             )
             assert "3-5 minute" in res["our_10x_pivot_angle"]
             assert "5-beat" in res["our_10x_pivot_angle"]
+        finally:
+            if orig is not None:
+                b15_mod.call_recon_forensic_llm = orig
 
     def test_macro_legacy_fallback_angle(self):
-        from unittest.mock import patch
-        from app.services.competitor_recon_b15 import analyze_competitor_anatomy
-        with patch("app.services.competitor_recon_b15.call_recon_forensic_llm", side_effect=Exception("offline")):
-            res = analyze_competitor_anatomy(
+        import app.services.competitor_recon_b15 as b15_mod
+        orig = getattr(b15_mod, "call_recon_forensic_llm", None)
+        def _offline(*args, **kwargs):
+            raise RuntimeError("offline")
+        b15_mod.call_recon_forensic_llm = _offline
+        try:
+            res = b15_mod.analyze_competitor_anatomy(
                 task_id="en-test-02",
                 target_keyword="Global Liquidity Deficit",
                 market="en",
@@ -481,6 +490,9 @@ class TestStoryForensicCompetitorRecon:
                 preset="macro_legacy"
             )
             assert "investigative" in res["our_10x_pivot_angle"]
+        finally:
+            if orig is not None:
+                b15_mod.call_recon_forensic_llm = orig
 
 
 

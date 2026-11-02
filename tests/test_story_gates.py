@@ -106,7 +106,7 @@ def test_s04_adversarial_catches_unqualified_allegation(tmp_path):
         topic="Adversarial Legal Test",
     )
 
-    # Seed mock S3 script with an unqualified allegation citing C005 (alleged)
+    # Seed fixture S3 script with an unqualified allegation citing C005 (alleged)
     s3_dir = paths.stage_dir("s03_script")
     s3_dir.mkdir(parents=True, exist_ok=True)
     s3_payload = {
