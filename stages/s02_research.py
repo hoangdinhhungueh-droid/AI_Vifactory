@@ -137,16 +137,29 @@ def run(ctx: RunContext) -> StageArtifact:
             try:
                 from app.services.model_gateway import get_global_gateway
                 gateway = get_global_gateway()
+                w_title = s1_art.payload.get("title_working") or topic
+                c_quest = s1_art.payload.get("central_question") or f"Core structural mechanisms and liabilities underlying {topic}."
+                s_summary = s1_art.payload.get("scheme_mechanism_summary") or f"Commercial agreements, regulatory dependencies, and valuation volatility surrounding {topic}."
+                antag_obj = s1_art.payload.get("antagonist") or {}
+                if isinstance(antag_obj, dict):
+                    antag_name = antag_obj.get("name")
+                elif hasattr(antag_obj, "name"):
+                    antag_name = getattr(antag_obj, "name", None)
+                else:
+                    antag_name = None
+                if not antag_name:
+                    antag_name = topic.split()[0] if topic else "Corporate Target"
+
                 user_prompt = (
                     f"Topic: {topic}\n"
-                    f"Working Title: {s1_art.payload.get('title_working', topic)}\n"
-                    f"Central Investigative Paradox: {s1_art.payload.get('central_question', '')}\n"
-                    f"Antagonist: {json.dumps(s1_art.payload.get('antagonist', {}), ensure_ascii=False)}\n"
-                    f"Scheme Summary: {s1_art.payload.get('scheme_mechanism_summary', '')}\n"
+                    f"Working Title: {w_title}\n"
+                    f"Central Investigative Paradox: {c_quest}\n"
+                    f"Antagonist: {json.dumps({'name': antag_name, 'type': 'company'}, ensure_ascii=False)}\n"
+                    f"Scheme Summary: {s_summary}\n"
                     f"Source Seeds: {json.dumps(s1_art.payload.get('source_seeds', []), ensure_ascii=False)}\n\n"
                     "Extract and compile an exhaustive, timestamped evidence_ledger (minimum 6-8 claims: C001, C002, ...) and chronological timeline strictly adhering to the schema.\n"
                     "Ensure every claim has a valid legal_status ('convicted' | 'charged' | 'alleged' | 'settled' | 'fact') and confidence ('high' | 'medium').\n"
-                    "Output ONLY valid JSON."
+                    "Start response immediately with { and end with }. Output ONLY valid JSON with NO conversational preamble."
                 )
                 raw_response = gateway.call_llm(
                     prompt=user_prompt,
@@ -161,8 +174,9 @@ def run(ctx: RunContext) -> StageArtifact:
                     cleaned = cleaned.split("```json", 1)[1].split("```", 1)[0].strip()
                 elif "```" in cleaned:
                     cleaned = cleaned.split("```", 1)[1].split("```", 1)[0].strip()
-                m = re.search(r"(\{[\s\S]*\})", cleaned)
-                target_str = m.group(1) if m else cleaned
+                start_b = cleaned.find("{")
+                end_b = cleaned.rfind("}")
+                target_str = cleaned[start_b:end_b + 1] if (start_b != -1 and end_b != -1 and end_b > start_b) else cleaned
                 try:
                     parsed_json = json.loads(target_str)
                 except Exception:
@@ -212,7 +226,7 @@ def run(ctx: RunContext) -> StageArtifact:
         s1_scheme = s1_art.payload.get("scheme_mechanism_summary") or f"Systemic mechanisms and operational dependencies underlying {topic}."
         central_q = s1_art.payload.get("central_question") or f"Core investigative paradox regarding {topic}."
         antagonist_data = s1_art.payload.get("antagonist") or {}
-        antagonist_name = antagonist_data.get("name") if isinstance(antagonist_data, dict) else (getattr(antagonist_data, "name", None) or topic.split()[0])
+        antagonist_name = (antagonist_data.get("name") if isinstance(antagonist_data, dict) else getattr(antagonist_data, "name", None)) or (topic.split()[0] if topic else "Corporate Target")
 
         story_research = StoryResearchPayload(
             preset="story_forensic",

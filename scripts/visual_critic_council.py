@@ -12,17 +12,19 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from PIL import Image, ImageDraw
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT_DIR))
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 from app.services.model_gateway import get_global_gateway
 from vox.ffmpeg_utils import get_ffmpeg_binary
+
 
 def get_rubric_prompt(duration_sec: float = 30.0, scope_desc: Optional[str] = None) -> str:
     if scope_desc is None:

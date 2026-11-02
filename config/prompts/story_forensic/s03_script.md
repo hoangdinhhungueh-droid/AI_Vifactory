@@ -53,4 +53,8 @@ Produce pure valid JSON matching the following contract:
   ]
 }
 ```
+CRITICAL FORMAT MANDATE:
+Start your response IMMEDIATELY with the character `{` and end with `}`.
 Return ONLY valid JSON.
+DO NOT include ANY thinking text, internal monologue, planning, or conversational preamble before or after the JSON.
+

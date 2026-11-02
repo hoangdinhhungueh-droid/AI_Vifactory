@@ -226,10 +226,13 @@ def run(ctx: RunContext) -> StageArtifact:
             try:
                 from app.services.model_gateway import get_global_gateway
                 gateway = get_global_gateway()
+                w_title = s2_art.payload.get("title_working") or s2_art.payload.get("topic") or topic
+                c_quest = s2_art.payload.get("central_question") or f"How did structural agreements and institutional dependencies trigger the crisis in {topic}?"
+
                 user_prompt = (
                     f"Topic: {topic}\n"
-                    f"Working Title: {s2_art.payload.get('title_working', topic)}\n"
-                    f"Central Question: {s2_art.payload.get('central_question', '')}\n"
+                    f"Working Title: {w_title}\n"
+                    f"Central Question: {c_quest}\n"
                     f"Evidence Ledger:\n{json.dumps(s2_art.payload.get('evidence_ledger', []), indent=2, ensure_ascii=False)}\n\n"
                     f"Timeline:\n{json.dumps(s2_art.payload.get('timeline', []), indent=2, ensure_ascii=False)}\n\n"
                     "Word Budget: 500 to 650 words (min 450, max 750 words). Target Duration: 240 seconds (min 180s, max 300s).\n"
@@ -239,24 +242,26 @@ def run(ctx: RunContext) -> StageArtifact:
                     "2. When citing claims with legal_status 'alleged' or 'charged', you MUST use explicit qualifying words: 'allegedly', 'according to the complaint', or 'prosecutors claimed'.\n"
                     "3. When citing claims with legal_status 'settled', you MUST state 'settled without admitting wrongdoing'.\n"
                     "4. When citing claims with legal_status 'convicted', direct conviction language is allowed.\n"
-                    "5. Every line must have a visual_hook: 'stamp', 'ruler_measure', 'compass_arc', 'cutout', 'red_thread', 'magnifier', 'scissors_cut', or 'highlighter'.\n"
-                    "Output ONLY valid JSON."
+                    "5. Every line must have a visual_hook: 'stamp', 'ruler_measure', 'compass_arc', 'cutout', 'red_thread', 'magnifier', 'scissors_cut', or 'highlighter'.\n\n"
+                    "CRITICAL FORMAT MANDATE:\n"
+                    "Start response immediately with { and end with }. Output ONLY valid JSON adhering to schema with NO conversational preamble or thinking."
                 )
                 raw_response = gateway.call_llm(
                     prompt=user_prompt,
-                    model="claude-sonnet-5-5",
+                    model="gpt-6.1-sol",
                     system_prompt=system_prompt,
                     max_tokens=4000,
-                    temperature=0.7,
-                    fallback="claude-v4.1-flash"
+                    temperature=0.3,
+                    fallback="claude-sonnet-5-5"
                 )
                 cleaned = raw_response.strip()
                 if "```json" in cleaned:
                     cleaned = cleaned.split("```json", 1)[1].split("```", 1)[0].strip()
                 elif "```" in cleaned:
                     cleaned = cleaned.split("```", 1)[1].split("```", 1)[0].strip()
-                m = re.search(r"(\{[\s\S]*\})", cleaned)
-                target_json_str = m.group(1) if m else cleaned
+                start_b = cleaned.find("{")
+                end_b = cleaned.rfind("}")
+                target_json_str = cleaned[start_b:end_b + 1] if (start_b != -1 and end_b != -1 and end_b > start_b) else cleaned
                 try:
                     parsed_json = json.loads(target_json_str)
                 except Exception as _json_parse_err:
@@ -265,16 +270,17 @@ def run(ctx: RunContext) -> StageArtifact:
 
                 llm_beats = []
                 total_llm_words = 0
-                for beat_data in parsed_json.get("beats", []):
-                    b_id = beat_data.get("beat_id", "B1_hook")
-                    target_dur = float(beat_data.get("target_duration_s") or (
+                for idx, beat_data in enumerate(parsed_json.get("beats", []), start=1):
+                    b_id = beat_data.get("beat_id") or beat_data.get("id") or f"B{idx}_beat"
+                    target_dur = float(beat_data.get("target_duration_s") or beat_data.get("duration_seconds") or (
                         19.2 if "B1" in b_id else (40.8 if "B2" in b_id else (79.2 if "B3" in b_id else (60.0 if "B4" in b_id else 40.8)))
                     ))
                     lines_data = []
-                    for ln in beat_data.get("lines", []):
+                    raw_lines = beat_data.get("lines", [])
+                    for l_idx, ln in enumerate(raw_lines, start=1):
                         c_ids = ln.get("claim_ids") or []
                         if not c_ids and evidence_ledger:
-                            c_ids = [evidence_ledger[0].claim_id]
+                            c_ids = [evidence_ledger[min(idx - 1, len(evidence_ledger) - 1)].claim_id]
                         text = ln.get("text", "")
                         for cid in c_ids:
                             claim = evidence_map.get(cid)
@@ -293,17 +299,26 @@ def run(ctx: RunContext) -> StageArtifact:
                                     if not any(w in text.lower() for w in req_settled):
                                         text = f"{text} (settled without admitting wrongdoing)"
 
+                        v_hook = ln.get("visual_hook")
+                        if not v_hook:
+                            v_obj = beat_data.get("visual", {})
+                            if isinstance(v_obj, dict) and v_obj.get("techniques"):
+                                v_hook = v_obj["techniques"][0]
+                            else:
+                                v_hook = "stamp"
+
                         lines_data.append(StorySceneLine(
-                            line_id=ln.get("line_id", f"{b_id}_L01"),
+                            line_id=ln.get("line_id", f"{b_id}_L{l_idx:02d}"),
                             text=text,
                             claim_ids=c_ids,
-                            visual_hook=ln.get("visual_hook") or "stamp"
+                            visual_hook=v_hook
                         ))
                     total_llm_words += sum(len(line_elem.text.split()) for line_elem in lines_data)
                     llm_beats.append((b_id, target_dur, lines_data))
 
                 if len(llm_beats) >= 5 and 450 <= total_llm_words <= 750:
                     raw_beats = llm_beats
+                    logger.info(f"[S03_SCRIPT] Live LLM successfully generated {len(llm_beats)} beats, {total_llm_words} words.")
                 else:
                     logger.warning(
                         f"[S03_SCRIPT] LLM output out of word budget window ({total_llm_words} words, {len(llm_beats)} beats). "
