@@ -161,8 +161,8 @@ class QuotaTracker:
             if data.get("date") == self.date:
                 self.spent = int(data.get("spent", 0))
                 self.exhausted = bool(data.get("exhausted", False))
-        except (OSError, ValueError, TypeError):
-            pass
+        except (OSError, ValueError, TypeError) as _load_err:
+            logger.debug("[b15] could not load quota state: %s", _load_err)
 
     def mark_exhausted(self) -> None:
         self.exhausted = True
@@ -205,8 +205,8 @@ def _api_get(endpoint: str, params: Dict, quota: QuotaTracker) -> Optional[Dict]
         if hasattr(e, "read"):
             try:
                 detail = e.read().decode("utf-8", "replace")[:200]
-            except Exception:
-                pass
+            except Exception as _detail_err:
+                logger.debug("[b15] could not decode error detail: %s", _detail_err)
         logger.error("[b15] %s failed: %s %s", endpoint, e, detail)
         if "429" in str(e) or "quotaExceeded" in detail or "RESOURCE_EXHAUSTED" in detail:
             quota.mark_exhausted()
