@@ -8,11 +8,11 @@ Implements Stage Shape Standard. Extracts factual grounding factsheet and narrat
 from __future__ import annotations
 
 import time
-from typing import Dict, Any
+from typing import Any, Dict, List, Tuple
 
-from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.config import RunContext
-from core.gates import require_input, emit_artifact
+from core.contracts.stages import Provenance, StageArtifact, StageID
+from core.gates import emit_artifact, require_input
 from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S2_RESEARCH
@@ -42,8 +42,8 @@ def run(ctx: RunContext) -> StageArtifact:
     if is_story:
         import json
         import re
-        from pathlib import Path
-        from app.schemas.story_contracts import StoryResearchPayload, EvidenceClaim, TimelineEvent
+
+        from app.schemas.story_contracts import EvidenceClaim, StoryResearchPayload, TimelineEvent
 
         prompt_file = ctx.paths.repo_root / "config" / "prompts" / "story_forensic" / "s02_research.md"
         system_prompt = prompt_file.read_text(encoding="utf-8") if prompt_file.is_file() else ""
@@ -123,10 +123,10 @@ def run(ctx: RunContext) -> StageArtifact:
                 TimelineEvent(date="2024-02-15", event=f"Initial filings and disclosures registered for {topic_name}.", claim_ids=["C001"]),
                 TimelineEvent(date="2024-03-01", event=f"Major commercial agreements and data frameworks enacted by {antagonist_name}.", claim_ids=["C002"]),
                 TimelineEvent(date="2024-05-20", event=f"Market reaction and trading volatility accelerate surrounding {topic_name}.", claim_ids=["C003"]),
-                TimelineEvent(date="2024-08-10", event=f"Supervisory inquiries initiated regarding operational dependencies.", claim_ids=["C004"]),
-                TimelineEvent(date="2024-11-15", event=f"Civil complaints allege unlawful circumvention and unauthorized scraping.", claim_ids=["C005"]),
-                TimelineEvent(date="2025-01-20", event=f"Federal court dockets document breach-of-contract charges.", claim_ids=["C006"]),
-                TimelineEvent(date="2025-06-30", event=f"Final enforcement decrees, settlements, and institutional reforms concluded.", claim_ids=["C007"]),
+                TimelineEvent(date="2024-08-10", event="Supervisory inquiries initiated regarding operational dependencies.", claim_ids=["C004"]),
+                TimelineEvent(date="2024-11-15", event="Civil complaints allege unlawful circumvention and unauthorized scraping.", claim_ids=["C005"]),
+                TimelineEvent(date="2025-01-20", event="Federal court dockets document breach-of-contract charges.", claim_ids=["C006"]),
+                TimelineEvent(date="2025-06-30", event="Final enforcement decrees, settlements, and institutional reforms concluded.", claim_ids=["C007"]),
             ]
             return claims, events
 

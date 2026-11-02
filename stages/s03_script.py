@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import List, Dict, Any, Tuple
+from typing import Any, Dict, List, Tuple
 
 from core.config import RunContext
 from core.contracts.stages import Provenance, Scene, StageArtifact, StageID
@@ -66,7 +66,7 @@ def _build_grounded_story_beats(
     b2_lines = [
         StorySceneLine(
             line_id="B2_L01",
-            text=f"Prior to the unraveling, corporate leadership projected an unassailable commercial trajectory across global markets.",
+            text="Prior to the unraveling, corporate leadership projected an unassailable commercial trajectory across global markets.",
             claim_ids=[_cid(0)],
             visual_hook="cutout",
         ),
@@ -84,7 +84,7 @@ def _build_grounded_story_beats(
         ),
         StorySceneLine(
             line_id="B2_L04",
-            text=f"Institutional asset managers aggressively committed capital across portfolios, thoroughly convinced that core operational moats and proprietary user archives would withstand shifting search dynamics and emerging competitive pressures.",
+            text="Institutional asset managers aggressively committed capital across portfolios, thoroughly convinced that core operational moats and proprietary user archives would withstand shifting search dynamics and emerging competitive pressures.",
             claim_ids=[_cid(3)],
             visual_hook="ruler_measure",
         ),
@@ -94,7 +94,7 @@ def _build_grounded_story_beats(
     b3_lines = [
         StorySceneLine(
             line_id="B3_L01",
-            text=f"Beneath the widespread public enthusiasm, investigative financial examiners surfaced deep systemic vulnerabilities in the underlying operating model, revealing hidden dependencies on third-party algorithmic distribution.",
+            text="Beneath the widespread public enthusiasm, investigative financial examiners surfaced deep systemic vulnerabilities in the underlying operating model, revealing hidden dependencies on third-party algorithmic distribution.",
             claim_ids=[_cid(2)],
             visual_hook="red_thread",
         ),
@@ -124,13 +124,13 @@ def _build_grounded_story_beats(
         ),
         StorySceneLine(
             line_id="B3_L06",
-            text=f"This commercial architecture created an acute structural paradox: aggressive short-term monetization through data licensing agreements accelerated long-term platform vulnerability by empowering automated alternative discovery systems.",
+            text="This commercial architecture created an acute structural paradox: aggressive short-term monetization through data licensing agreements accelerated long-term platform vulnerability by empowering automated alternative discovery systems.",
             claim_ids=[_cid(0), _cid(4)],
             visual_hook="red_thread",
         ),
         StorySceneLine(
             line_id="B3_L07",
-            text=f"When market counterparties adjusted operational protocols, foundational cash flows and referral web traffic began experiencing immediate disruption.",
+            text="When market counterparties adjusted operational protocols, foundational cash flows and referral web traffic began experiencing immediate disruption.",
             claim_ids=[_cid(1), _cid(3)],
             visual_hook="stamp",
         ),
@@ -140,7 +140,7 @@ def _build_grounded_story_beats(
     b4_lines = [
         StorySceneLine(
             line_id="B4_L01",
-            text=f"The institutional fault lines erupted into public view when formal legal actions and whistleblower warnings reached regulatory tribunals.",
+            text="The institutional fault lines erupted into public view when formal legal actions and whistleblower warnings reached regulatory tribunals.",
             claim_ids=[_cid(4)],
             visual_hook="magnifier",
         ),
@@ -158,13 +158,13 @@ def _build_grounded_story_beats(
         ),
         StorySceneLine(
             line_id="B4_L04",
-            text=f"As investment committees and market participants scrutinized the catastrophic risk of automated search summaries diverting foundational web traffic, intense panic quickly rippled through institutional trading desks.",
+            text="As investment committees and market participants scrutinized the catastrophic risk of automated search summaries diverting foundational web traffic, intense panic quickly rippled through institutional trading desks.",
             claim_ids=[_cid(2), _cid(5)],
             visual_hook="scissors_cut",
         ),
         StorySceneLine(
             line_id="B4_L05",
-            text=f"Capital flight accelerated relentlessly through the order book, culminating in an unprecedented valuation collapse that shattered investor confidence across the board.",
+            text="Capital flight accelerated relentlessly through the order book, culminating in an unprecedented valuation collapse that shattered investor confidence across the board.",
             claim_ids=[_cid(3), _cid(6)],
             visual_hook="scissors_cut",
         ),
@@ -174,7 +174,7 @@ def _build_grounded_story_beats(
     b5_lines = [
         StorySceneLine(
             line_id="B5_L01",
-            text=f"The dramatic collapse obliterated billions in stakeholder equity, serving as an unsparing evidentiary warning on the fragility of operational dependencies.",
+            text="The dramatic collapse obliterated billions in stakeholder equity, serving as an unsparing evidentiary warning on the fragility of operational dependencies.",
             claim_ids=[_cid(0), _cid(3)],
             visual_hook="stamp",
         ),
@@ -186,13 +186,13 @@ def _build_grounded_story_beats(
         ),
         StorySceneLine(
             line_id="B5_L03",
-            text=f"Corporate executives now confront a chilling operational reality: complex contractual engineering cannot insulate a platform when underlying fundamentals break down.",
+            text="Corporate executives now confront a chilling operational reality: complex contractual engineering cannot insulate a platform when underlying fundamentals break down.",
             claim_ids=[_cid(1), _cid(4)],
             visual_hook="stamp",
         ),
         StorySceneLine(
             line_id="B5_L04",
-            text=f"For international financial markets, the forensic conclusion is inescapable: no commercial data licensing narrative can permanently defy the cold reality of verified accounting ledgers and organic audience retention.",
+            text="For international financial markets, the forensic conclusion is inescapable: no commercial data licensing narrative can permanently defy the cold reality of verified accounting ledgers and organic audience retention.",
             claim_ids=[_cid(2), _cid(5)],
             visual_hook="red_thread",
         ),
@@ -251,13 +251,12 @@ def run(ctx: RunContext) -> StageArtifact:
     market = "JA" if "JP_" in ctx.run_id else ("KO" if "KR_" in ctx.run_id else ("VI" if "VN_" in ctx.run_id else "EN"))
 
     if is_story:
-        from app.schemas.story_contracts import StoryScriptPayload, StoryScriptBeat, StorySceneLine, EvidenceClaim
+        from app.schemas.story_contracts import EvidenceClaim, StorySceneLine, StoryScriptBeat, StoryScriptPayload
         evidence_raw = s2_art.payload.get("evidence_ledger", [])
         evidence_ledger = [EvidenceClaim.model_validate(c) if isinstance(c, dict) else c for c in evidence_raw]
 
         import json
         import re
-        from pathlib import Path
 
         prompt_file = ctx.paths.repo_root / "config" / "prompts" / "story_forensic" / "s03_script.md"
         system_prompt = prompt_file.read_text(encoding="utf-8") if prompt_file.is_file() else ""
@@ -342,7 +341,7 @@ def run(ctx: RunContext) -> StageArtifact:
                             claim_ids=c_ids,
                             visual_hook=ln.get("visual_hook") or "stamp"
                         ))
-                    total_llm_words += sum(len(l.text.split()) for l in lines_data)
+                    total_llm_words += sum(len(line_elem.text.split()) for line_elem in lines_data)
                     llm_beats.append((b_id, target_dur, lines_data))
 
                 if len(llm_beats) >= 5 and 450 <= total_llm_words <= 750:
@@ -419,7 +418,7 @@ def run(ctx: RunContext) -> StageArtifact:
 
     else:
         # Strict B2 Spoken Script Ingestion (Rule 118 Zero-Mock & Rule 125 Single Pipeline)
-        from core.contracts.b2_b3_contract import load_spoken_script, B2ContractError
+        from core.contracts.b2_b3_contract import B2ContractError, load_spoken_script
 
         try:
             spoken_script = load_spoken_script(ctx.paths.root, episode_id=ctx.run_id, market=market)

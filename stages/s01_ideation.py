@@ -8,11 +8,10 @@ Implements Stage Shape Standard. Discovers live high-potential editorial topics.
 from __future__ import annotations
 
 import time
-from typing import Dict, Any
 
-from core.contracts.stages import StageID, StageArtifact, Provenance
 from core.config import RunContext
-from core.gates import require_input, emit_artifact
+from core.contracts.stages import Provenance, StageArtifact, StageID
+from core.gates import emit_artifact
 from tools.codemap.runtime import pipeline_stage
 
 STAGE: StageID = StageID.S1_IDEATION
@@ -33,7 +32,7 @@ STAGE: StageID = StageID.S1_IDEATION
 def run(ctx: RunContext) -> StageArtifact:
     """Executes Stage S1: Trend Discovery."""
     start_ts = time.time()
-    
+
     # Topic resolution
     topic_name = ctx.topic
     if not topic_name:
@@ -53,8 +52,8 @@ def run(ctx: RunContext) -> StageArtifact:
     if is_story:
         import json
         import re
-        from pathlib import Path
-        from app.schemas.story_contracts import StoryIdeationPayload, Antagonist, SourceSeed, StoryScore
+
+        from app.schemas.story_contracts import Antagonist, SourceSeed, StoryIdeationPayload, StoryScore
 
         prompt_file = ctx.paths.repo_root / "config" / "prompts" / "story_forensic" / "s01_ideation.md"
         system_prompt = prompt_file.read_text(encoding="utf-8") if prompt_file.is_file() else ""

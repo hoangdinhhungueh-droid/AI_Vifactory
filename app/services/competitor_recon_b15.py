@@ -18,9 +18,7 @@ import json
 import logging
 import os
 import re
-import subprocess
 import sys
-import tempfile
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -1117,7 +1115,7 @@ def sync_card_to_notion(task_id: str, card: dict) -> bool:
         if anatomy.get("fatal_explanatory_vacuum"):
             lines.append(f"⚠️ COMPETITOR BLINDSPOT:\n{anatomy['fatal_explanatory_vacuum']}\n")
         if card.get("ai_slop_redlines"):
-            lines.append(f"🚫 AI-SLOP REDLINES:")
+            lines.append("🚫 AI-SLOP REDLINES:")
             for slop in card["ai_slop_redlines"][:2]:
                 lines.append(f"• {slop}")
             lines.append("")
@@ -1131,7 +1129,7 @@ def sync_card_to_notion(task_id: str, card: dict) -> bool:
             lines.append(f"• [{ch}] {ti} | {vw:,} views ({vpd:,}/d)")
 
         if anatomy.get("audience_core_frustrations"):
-            lines.append(f"\nAudience Core Frustrations:")
+            lines.append("\nAudience Core Frustrations:")
             for f_item in anatomy["audience_core_frustrations"][:4]:
                 lines.append(f'• {f_item}')
         elif gaps:
