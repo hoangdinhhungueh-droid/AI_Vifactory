@@ -19,7 +19,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -116,20 +116,24 @@ def execute_pipeline(
     # 1. Resolve Configuration, Presets & Paths
     config = load_profile(profile_name, repo_root=ROOT_DIR)
 
-    from app.services.preset_loader import load_preset
-    preset_name = preset or os.getenv("VF_PRESET") or "macro_legacy"
-    loaded_preset = None
-    try:
-        loaded_preset = load_preset(preset_name, repo_root=ROOT_DIR)
-    except Exception as _pe:
-        print(f"⚠️ Notice: could not load preset '{preset_name}': {_pe}")
-
     if run_id:
         paths = resolve_run_paths(run_id, repo_root=ROOT_DIR)
     else:
         clean_prefix = re.sub(r"[^a-zA-Z0-9_-]+", "_", topic.lower()).strip("_")[:30] if topic else ""
         prefix = f"RUN_{clean_prefix}" if clean_prefix else "RUN"
         paths = new_run_paths(prefix=prefix, repo_root=ROOT_DIR)
+
+    # 2. Load or Create Manifest State Machine
+    manifest = RunManifest.load_or_create(paths, profile=config.name)
+    preset_name = preset or getattr(manifest, "preset", None) or os.getenv("VF_PRESET") or "macro_legacy"
+    manifest.preset = preset_name
+
+    from app.services.preset_loader import load_preset
+    loaded_preset = None
+    try:
+        loaded_preset = load_preset(preset_name, repo_root=ROOT_DIR)
+    except Exception as _pe:
+        print(f"⚠️ Notice: could not load preset '{preset_name}': {_pe}")
 
     effective_run_id = paths.run_id
     print(f"📌 Run ID:             {effective_run_id}")
@@ -138,10 +142,6 @@ def execute_pipeline(
     print(f"📁 Workspace Root:     {paths.root}")
     print(f"🚦 Mode:               {'DRY-RUN' if dry_run else 'LIVE EXECUTION'}")
     print("-" * 75)
-
-    # 2. Load or Create Manifest State Machine
-    manifest = RunManifest.load_or_create(paths, profile=config.name)
-    manifest.preset = preset_name
     from core.market_resolver import resolve_canonical_market
 
     raw_m = market or os.getenv("VF_MARKET") or os.getenv("MARKET") or getattr(loaded_preset, "market", "EN") or "EN"

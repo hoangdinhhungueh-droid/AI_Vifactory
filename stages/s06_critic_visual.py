@@ -51,7 +51,7 @@ def run(ctx: RunContext) -> StageArtifact:
 
     is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
     if is_story:
-        from app.schemas.story_contracts import StoryVisualCriticPayload, StoryVisualCriticGates
+        from app.schemas.story_contracts import StoryVisualCriticGates, StoryVisualCriticPayload
 
         story_shots = s5_art.payload.get("story_shots", [])
         if not story_shots:
@@ -148,7 +148,6 @@ def run(ctx: RunContext) -> StageArtifact:
         emit_artifact(artifact, ctx.paths)
 
         if not all_gates_pass:
-            from core.gates import GateError
             raise GateError(
                 STAGE,
                 f"Stage S06 Visual Critic rejected visual plan with {len(violations)} violation(s). Verdict='fail'",

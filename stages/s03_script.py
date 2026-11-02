@@ -40,160 +40,118 @@ def _build_grounded_story_beats(
             return claims[idx].claim.strip().rstrip(".")
         return f"Documented evidentiary findings confirm critical structural liabilities regarding {topic}"
 
-    # Build Beat 1: Hook (0-20s, ~50 words)
+    # Build Beat 1: Hook (0-20s, ~65 words)
     b1_lines = [
         StorySceneLine(
             line_id="B1_L01",
-            text=f"In an unprecedented corporate crisis that stunned financial markets, {topic} triggered an acute institutional reckoning as billions in valuation evaporated.",
+            text=f"In an acute market crisis, {topic} triggered an institutional reckoning as billions in market valuation evaporated.",
             claim_ids=[_cid(0), _cid(1)],
             visual_hook="stamp",
         ),
         StorySceneLine(
             line_id="B1_L02",
-            text=f"Beneath the surface lay a precarious architecture of contractual agreements and operational vulnerabilities: {_claim_text(0)}.",
+            text=f"Beneath the surface lay a precarious commercial architecture: {_claim_text(0)}.",
             claim_ids=[_cid(0)],
             visual_hook="ruler_measure",
         ),
         StorySceneLine(
             line_id="B1_L03",
-            text=f"What had been celebrated as sustainable market leadership suddenly transformed into an existential forensic inquiry under intense scrutiny: {_claim_text(1)}.",
+            text=f"What was hailed as market leadership transformed into an existential forensic inquiry: {_claim_text(1)}.",
             claim_ids=[_cid(1)],
             visual_hook="red_thread",
         ),
     ]
 
-    # Build Beat 2: Setup (~40s, ~110 words)
+    # Build Beat 2: Setup (~40s, ~85 words)
     b2_lines = [
         StorySceneLine(
             line_id="B2_L01",
-            text="Prior to the unraveling, corporate leadership projected an unassailable commercial trajectory across global markets.",
+            text="Prior to the unraveling, corporate leadership projected an unassailable commercial trajectory.",
             claim_ids=[_cid(0)],
             visual_hook="cutout",
         ),
         StorySceneLine(
             line_id="B2_L02",
-            text=f"Official corporate disclosures and regulatory filings reinforced institutional perceptions of high-velocity growth, documenting that {_claim_text(1)}.",
+            text=f"Official regulatory disclosures documented that {_claim_text(1)}.",
             claim_ids=[_cid(1)],
             visual_hook="compass_arc",
         ),
         StorySceneLine(
             line_id="B2_L03",
-            text=f"Market analysts and prominent financial commentators consistently praised the underlying performance, highlighting that {_claim_text(2)}.",
+            text=f"Financial commentators praised the performance, highlighting that {_claim_text(2)}.",
             claim_ids=[_cid(2)],
             visual_hook="cutout",
         ),
-        StorySceneLine(
-            line_id="B2_L04",
-            text="Institutional asset managers aggressively committed capital across portfolios, thoroughly convinced that core operational moats and proprietary user archives would withstand shifting search dynamics and emerging competitive pressures.",
-            claim_ids=[_cid(3)],
-            visual_hook="ruler_measure",
-        ),
     ]
 
-    # Build Beat 3: Scheme / Mechanism (~80s, ~200 words)
+    # Build Beat 3: Scheme / Mechanism (~80s, ~140 words)
     b3_lines = [
         StorySceneLine(
             line_id="B3_L01",
-            text="Beneath the widespread public enthusiasm, investigative financial examiners surfaced deep systemic vulnerabilities in the underlying operating model, revealing hidden dependencies on third-party algorithmic distribution.",
-            claim_ids=[_cid(2)],
+            text=f"Beneath public enthusiasm, examiners surfaced hidden dependencies on third-party algorithmic distribution: {_claim_text(1)}.",
+            claim_ids=[_cid(1)],
             visual_hook="red_thread",
         ),
         StorySceneLine(
             line_id="B3_L02",
-            text=f"According to regulatory filings, commercial agreements concentrated critical cash flows and dependencies into specific channels: {_claim_text(1)}.",
-            claim_ids=[_cid(1)],
+            text=f"Commercial ledgers revealed the scale of counterparty agreements: {_claim_text(2)}.",
+            claim_ids=[_cid(2)],
             visual_hook="stamp",
         ),
         StorySceneLine(
             line_id="B3_L03",
-            text=f"Financial ledgers and investigative reporting revealed the scale of counterparty agreements: {_claim_text(2)}.",
-            claim_ids=[_cid(2)],
+            text=f"Operational data indicated systemic friction across counterparties, confirming that {_claim_text(3)}.",
+            claim_ids=[_cid(3)],
             visual_hook="magnifier",
         ),
         StorySceneLine(
             line_id="B3_L04",
-            text=f"Simultaneously, operational data indicated mounting systemic friction across counterparties, establishing that {_claim_text(3)}.",
-            claim_ids=[_cid(3)],
-            visual_hook="highlighter",
-        ),
-        StorySceneLine(
-            line_id="B3_L05",
-            text=f"Corporate archives and technical audits confirmed that {_claim_text(4)}.",
-            claim_ids=[_cid(4)],
+            text="This commercial architecture created an acute paradox: aggressive short-term monetization accelerated long-term platform vulnerability.",
+            claim_ids=[_cid(0), _cid(3)],
             visual_hook="ruler_measure",
-        ),
-        StorySceneLine(
-            line_id="B3_L06",
-            text="This commercial architecture created an acute structural paradox: aggressive short-term monetization through data licensing agreements accelerated long-term platform vulnerability by empowering automated alternative discovery systems.",
-            claim_ids=[_cid(0), _cid(4)],
-            visual_hook="red_thread",
-        ),
-        StorySceneLine(
-            line_id="B3_L07",
-            text="When market counterparties adjusted operational protocols, foundational cash flows and referral web traffic began experiencing immediate disruption.",
-            claim_ids=[_cid(1), _cid(3)],
-            visual_hook="stamp",
         ),
     ]
 
-    # Build Beat 4: Crack / Unraveling (~60s, ~140 words)
+    # Build Beat 4: Crack / Unraveling (~60s, ~110 words)
     b4_lines = [
         StorySceneLine(
             line_id="B4_L01",
-            text="The institutional fault lines erupted into public view when formal legal actions and whistleblower warnings reached regulatory tribunals.",
+            text=f"Institutional fault lines erupted when formal warnings reached regulatory tribunals, establishing that {_claim_text(4)}.",
             claim_ids=[_cid(4)],
             visual_hook="magnifier",
         ),
         StorySceneLine(
             line_id="B4_L02",
-            text=f"According to formal court filings, legal examiners charged that {_claim_text(5)}.",
-            claim_ids=[_cid(5)],
+            text=f"Formal filings confirmed mounting friction: {_claim_text(5)}, alongside {_claim_text(6)}.",
+            claim_ids=[_cid(5), _cid(6)],
             visual_hook="highlighter",
         ),
         StorySceneLine(
             line_id="B4_L03",
-            text=f"Judicial dockets confirmed mounting litigation, documenting that {_claim_text(6)}.",
-            claim_ids=[_cid(6)],
-            visual_hook="ruler_measure",
-        ),
-        StorySceneLine(
-            line_id="B4_L04",
-            text="As investment committees and market participants scrutinized the catastrophic risk of automated search summaries diverting foundational web traffic, intense panic quickly rippled through institutional trading desks.",
+            text="As market participants scrutinized the threat of automated summaries diverting web traffic, capital flight triggered an unprecedented valuation plunge.",
             claim_ids=[_cid(2), _cid(5)],
-            visual_hook="scissors_cut",
-        ),
-        StorySceneLine(
-            line_id="B4_L05",
-            text="Capital flight accelerated relentlessly through the order book, culminating in an unprecedented valuation collapse that shattered investor confidence across the board.",
-            claim_ids=[_cid(3), _cid(6)],
             visual_hook="scissors_cut",
         ),
     ]
 
-    # Build Beat 5: Aftermath (~40s, ~100 words)
+    # Build Beat 5: Aftermath (~40s, ~80 words)
     b5_lines = [
         StorySceneLine(
             line_id="B5_L01",
-            text="The dramatic collapse obliterated billions in stakeholder equity, serving as an unsparing evidentiary warning on the fragility of operational dependencies.",
+            text="The collapse obliterated billions in stakeholder equity, serving as an unsparing warning on operational dependencies.",
             claim_ids=[_cid(0), _cid(3)],
             visual_hook="stamp",
         ),
         StorySceneLine(
             line_id="B5_L02",
-            text=f"High-stakes enforcement proceedings and regulatory inquiries followed, confirming that {_claim_text(len(claims) - 1)}.",
+            text=f"High-stakes regulatory inquiries followed, confirming that {_claim_text(len(claims) - 1)}.",
             claim_ids=[_cid(len(claims) - 1)],
             visual_hook="scissors_cut",
         ),
         StorySceneLine(
             line_id="B5_L03",
-            text="Corporate executives now confront a chilling operational reality: complex contractual engineering cannot insulate a platform when underlying fundamentals break down.",
-            claim_ids=[_cid(1), _cid(4)],
-            visual_hook="stamp",
-        ),
-        StorySceneLine(
-            line_id="B5_L04",
-            text="For international financial markets, the forensic conclusion is inescapable: no commercial data licensing narrative can permanently defy the cold reality of verified accounting ledgers and organic audience retention.",
-            claim_ids=[_cid(2), _cid(5)],
+            text="For international markets, the conclusion is inescapable: no commercial narrative can permanently defy verified accounting ledgers and organic audience retention.",
+            claim_ids=[_cid(2), _cid(len(claims) - 1)],
             visual_hook="red_thread",
         ),
     ]
