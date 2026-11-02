@@ -448,6 +448,10 @@ def trigger_human_gate_2(episode_id: str) -> Optional[int]:
     the standard Human Gate 2 Telegram card to the user.
     Safe for synchronous callers and threadpools.
     """
+    if "_TEMP_" in str(episode_id).upper():
+        logger.warning(f"[HG2 Guard] Refusing HG2 dispatch for temporary staging ID: {episode_id} (Rule 128: Canonical EP naming required)")
+        return None
+
     import asyncio
     from pathlib import Path
 

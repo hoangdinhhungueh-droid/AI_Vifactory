@@ -787,10 +787,20 @@ def send_pure_telegram_gate1_notification(topic_data: dict) -> None:
     task_id = str(topic_data.get("task_id", "")).strip()
 
     # 1. Gate Order Integrity Guard (Rule 125 & Anti-Ghost Out-of-Order Gate Violation)
-    # Human Gate 1 can ONLY be dispatched BEFORE B4 image generation has started.
+    # Human Gate 1 can ONLY be dispatched BEFORE B3 director plan and B4 image generation have started.
     if task_id:
         ep_dir = resolve_episodes_dir(ensure_dir=False)
-        seeds_dir = ep_dir / task_id / "composite_seeds"
+        ep_path = ep_dir / task_id
+        dp_file = ep_path / "director_plan.json"
+        if os.path.exists(str(dp_file)):
+            logger.warning(
+                f"[trend_engine] GATE ORDER VIOLATION BLOCKED: Refusing to dispatch Human Gate 1 for {task_id} "
+                f"because B3 director plan already exists! "
+                f"Human Gate 1 MUST NEVER be dispatched after B3 starts."
+            )
+            return
+
+        seeds_dir = ep_path / "composite_seeds"
         if seeds_dir.exists() and any(seeds_dir.glob("*.png")):
             logger.warning(
                 f"[trend_engine] GATE ORDER VIOLATION BLOCKED: Refusing to dispatch Human Gate 1 for {task_id} "
@@ -1715,136 +1725,13 @@ def discover_and_produce_market_trend(
             t_obj["fact_audit_model"] = fact_audit.get("auditor_model", "GPT-6-Astra")
             t_obj["fact_audit_passed"] = True
 
-            # 8. Downstream Pipeline Execution (B3 Hollywood Director Plan & B3.5 Prompt Forge)
-            # Rule 125 & Rule 126 Single Pipeline State: Task is officially committed ONLY after B3 succeeds.
-            res_code = 0
-            b3_timeout = _parse_env_int("B3_PIPELINE_TIMEOUT", 1800, min_val=60)
-
-            if auto_produce:
-                # We already hold the authoritative IN_PROGRESS lock acquired at the beginning of the crawl
-                # (Rule 125 & Boss Item 17: removed redundant acquire_in_progress call)
-                print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for {temp_task_id} (profile=prod, timeout={b3_timeout}s)...")
-                cmd = [
-                    sys.executable,
-                    "-m",
-                    "orchestrator.run_pipeline",
-                    "--profile",
-                    "prod",
-                    "--run-id",
-                    str(temp_task_id),
-                    "--market",
-                    str(m_up),
-                    "--to",
-                    "s06_critic_visual",
-                ]
-                sub_env = os.environ.copy()
-                sub_env["PYTHONPATH"] = f"{_PROJECT_ROOT}{os.pathsep}{sub_env.get('PYTHONPATH', '')}".strip(os.pathsep)
-                sub_env["VF_EPISODES_DIR"] = str(resolve_episodes_dir(ensure_dir=True))
-                sub_env["VF_MARKET"] = str(m_up)
-                sub_env["MARKET"] = str(m_up)
-                try:
-                    proc = subprocess.run(cmd, cwd=str(_PROJECT_ROOT), env=sub_env, capture_output=True, text=True, timeout=b3_timeout)
-                    res_code = proc.returncode
-                    if res_code != 0:
-                        stderr_tail = "\n".join(proc.stderr.strip().splitlines()[-15:]) if proc.stderr else "No stderr emitted."
-                        logger.error(f"[{temp_task_id}] Downstream pipeline stopped at stage with exit code {res_code}:\n{stderr_tail}")
-                except subprocess.TimeoutExpired:
-                    res_code = 124
-                    logger.error(f"[{temp_task_id}] Downstream pipeline timed out after {b3_timeout}s.")
-                except Exception as prod_err:
-                    res_code = 1
-                    logger.exception(f"[{temp_task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}")
-
-                if res_code != 0:
-                    # B3 failed: Stamp EXHAUSTED_TODAY with reason="b3_downstream_failure" to prevent automated retry storms (Boss Item 18/19).
-                    # Operator can override using --force or B1_FORCE_CRAWL=1 once downstream issue is resolved.
-                    mark_ok = mark_exhausted_today(
-                        market=m_up,
-                        scan_count=idx,
-                        state_dir=state_dir,
-                        now=now,
-                        extra_metadata={
-                            "reason": "b3_downstream_failure",
-                            "failed_task_id": temp_task_id,
-                            "b3_exit_code": res_code,
-                        },
-                        lock_token=lock_token,
-                        owner_pid=os.getpid(),
-                    )
-                    if not mark_ok:
-                        time.sleep(0.5)
-                        mark_ok = mark_exhausted_today(
-                            market=m_up,
-                            scan_count=idx,
-                            state_dir=state_dir,
-                            now=now,
-                            extra_metadata={
-                                "reason": "b3_downstream_failure",
-                                "failed_task_id": temp_task_id,
-                                "b3_exit_code": res_code,
-                                "retry": 1,
-                            },
-                            lock_token=lock_token,
-                            owner_pid=os.getpid(),
-                        )
-
-                    if mark_ok:
-                        is_terminal_stamped = True
-                        logger.info(f"[{m_up}] Stamped EXHAUSTED_TODAY lock after B3 failure (task={temp_task_id})")
-                    else:
-                        # Fail-closed: DO NOT call release_lock (prevents automated retry storms).
-                        # Leave IN_PROGRESS until stale expiry, and do NOT set is_terminal_stamped.
-                        logger.critical(
-                            f"[{m_up}] FAIL-CLOSED: Failed to persist EXHAUSTED_TODAY lock after B3 failure. "
-                            f"Leaving IN_PROGRESS lock in place to prevent retry storm until stale expiry."
-                        )
-
-                    # B3 failed: Do NOT commit task. Emit exactly ONE terminal failure message with recovery command.
-                    fail_msg = (
-                        f"🚨 <b>[VF PIPELINE B3 FAILED - RULE 118] [OPERATOR INTERVENTION REQUIRED]</b>\n"
-                        f"Market: <code>{m_up}</code> | Candidate: <code>{term}</code> (Temp: <code>{temp_task_id}</code>)\n"
-                        f"B3 Downstream Director Plan execution failed with exit code {res_code}.\n"
-                        f"🛑 <b>Hành động:</b> 0 topics committed. Daily quota locked to prevent retry storms.\n"
-                        f"🔧 <b>Khắc phục:</b> Sửa lỗi hạ nguồn và chạy lại với <code>--force</code> hoặc <code>B1_FORCE_CRAWL=1</code>."
-                    )
-                    print(f"\n{fail_msg}\n")
-                    logger.error(f"[{m_up}] Task {temp_task_id} B3 failed (exit code {res_code}). Emitted single terminal failure alert.")
-                    _send_guarded_alert("b3_downstream_failure", m_up, fail_msg, state_dir=state_dir)
-                    terminal_alert_sent = True
-                    if os.path.exists(temp_task_file):
-                        try:
-                            os.remove(temp_task_file)
-                        except OSError as _rm_err:
-                            logger.debug(f"[{temp_task_id}] Notice cleaning temp pending task: {_rm_err}")
-                    t_dir = ep_base / temp_task_id
-                    if t_dir.exists():
-                        try:
-                            shutil.rmtree(t_dir, ignore_errors=True)
-                        except OSError as _rm_err:
-                            logger.debug(f"[{temp_task_id}] Notice cleaning temp episode dir {t_dir}: {_rm_err}")
-                    break
-
-            # 9. B3 SUCCEEDED (or auto_produce=False): NOW OFFICIALLY COMMIT TASK ID, SYNC NOTION, MIGRATE ARTIFACTS, & SEND SINGLE HG1 NOTIFICATION!
+            # 8. B2.1 PASSED: OFFICIALLY COMMIT CANONICAL TASK ID, SYNC NOTION, MIGRATE ARTIFACTS, & SEND HG1 NOTIFICATION
+            # Rule 125 & Rule 128: Canonical task ID is committed and Human Gate 1 is dispatched strictly BEFORE B3 starts!
             task_id = commit_trend_task(t_obj)
             t_obj["task_id"] = task_id
             print(f"  💾 Officially Committed Task ID: {task_id}")
-            # Mark daily market production as COMPLETED in authoritative lock (Boss Item 14 & 51e)
-            comp_ok = mark_completed(
-                m_up,
-                task_id,
-                extra_metadata={"topic": native_topic, "slug": t_obj.get("task_slug")},
-                state_dir=state_dir,
-                now=now,
-                lock_token=lock_token,
-                owner_pid=os.getpid(),
-            )
-            if comp_ok:
-                is_terminal_stamped = True
-                logger.info(f"[{m_up}] Authoritative daily lock marked COMPLETED for {task_id}")
-            else:
-                logger.warning(f"[{m_up}] Failed to mark daily lock COMPLETED for {task_id}")
 
-            # Migrate episode and pending task artifacts from temp_task_id to canonical task_id
+            # Migrate episode and pending task artifacts from temp_task_id to canonical task_id BEFORE B3
             ep_base = resolve_episodes_dir(ensure_dir=True)
             try:
                 temp_p = ep_base / temp_task_id
@@ -1899,9 +1786,118 @@ def discover_and_produce_market_trend(
                 logger.warning(f"[trend_engine] Notice migrating Story Library Task ID: {_m_err}")
 
             # Send EXACTLY ONE Pure Telegram Gate 1 Notification!
+            # Rule 125 & Rule 128: HG1 is dispatched strictly BEFORE B3 starts, under the canonical task ID!
             send_pure_telegram_gate1_notification(t_obj)
             committed_tasks.append(task_id)
             produced_topics.append(t_obj)
+
+            # 9. Downstream Pipeline Execution (B3 Hollywood Director Plan & B3.5 Prompt Forge)
+            # Rule 125 & Rule 126: Downstream B3 runs under the CANONICAL task ID
+            res_code = 0
+            b3_timeout = _parse_env_int("B3_PIPELINE_TIMEOUT", 1800, min_val=60)
+
+            if auto_produce:
+                print(f"  ⚙️ [B3/B3.5] Auto-producing Hollywood Director Plan & Scene Breakdown for canonical {task_id} (profile=prod, timeout={b3_timeout}s)...")
+                cmd = [
+                    sys.executable,
+                    "-m",
+                    "orchestrator.run_pipeline",
+                    "--profile",
+                    "prod",
+                    "--run-id",
+                    str(task_id),
+                    "--market",
+                    str(m_up),
+                    "--to",
+                    "s06_critic_visual",
+                ]
+                sub_env = os.environ.copy()
+                sub_env["PYTHONPATH"] = f"{_PROJECT_ROOT}{os.pathsep}{sub_env.get('PYTHONPATH', '')}".strip(os.pathsep)
+                sub_env["VF_EPISODES_DIR"] = str(resolve_episodes_dir(ensure_dir=True))
+                sub_env["VF_MARKET"] = str(m_up)
+                sub_env["MARKET"] = str(m_up)
+                try:
+                    proc = subprocess.run(cmd, cwd=str(_PROJECT_ROOT), env=sub_env, capture_output=True, text=True, timeout=b3_timeout)
+                    res_code = proc.returncode
+                    if res_code != 0:
+                        stderr_tail = "\n".join(proc.stderr.strip().splitlines()[-15:]) if proc.stderr else "No stderr emitted."
+                        logger.error(f"[{task_id}] Downstream pipeline stopped at stage with exit code {res_code}:\n{stderr_tail}")
+                except subprocess.TimeoutExpired:
+                    res_code = 124
+                    logger.error(f"[{task_id}] Downstream pipeline timed out after {b3_timeout}s.")
+                except Exception as prod_err:
+                    res_code = 1
+                    logger.exception(f"[{task_id}] CRITICAL RUNTIME ERROR in B3: {prod_err}")
+
+                if res_code != 0:
+                    mark_ok = mark_exhausted_today(
+                        market=m_up,
+                        scan_count=idx,
+                        state_dir=state_dir,
+                        now=now,
+                        extra_metadata={
+                            "reason": "b3_downstream_failure",
+                            "failed_task_id": task_id,
+                            "b3_exit_code": res_code,
+                        },
+                        lock_token=lock_token,
+                        owner_pid=os.getpid(),
+                    )
+                    if not mark_ok:
+                        time.sleep(0.5)
+                        mark_ok = mark_exhausted_today(
+                            market=m_up,
+                            scan_count=idx,
+                            state_dir=state_dir,
+                            now=now,
+                            extra_metadata={
+                                "reason": "b3_downstream_failure",
+                                "failed_task_id": task_id,
+                                "b3_exit_code": res_code,
+                                "retry": 1,
+                            },
+                            lock_token=lock_token,
+                            owner_pid=os.getpid(),
+                        )
+
+                    if mark_ok:
+                        is_terminal_stamped = True
+                        logger.info(f"[{m_up}] Stamped EXHAUSTED_TODAY lock after B3 failure (task={task_id})")
+                    else:
+                        logger.critical(
+                            f"[{m_up}] FAIL-CLOSED: Failed to persist EXHAUSTED_TODAY lock after B3 failure. "
+                            f"Leaving IN_PROGRESS lock in place to prevent retry storm until stale expiry."
+                        )
+
+                    fail_msg = (
+                        f"🚨 <b>[VF PIPELINE B3 FAILED - RULE 118] [OPERATOR INTERVENTION REQUIRED]</b>\n"
+                        f"Market: <code>{m_up}</code> | Task ID: <code>{task_id}</code>\n"
+                        f"B3 Downstream Director Plan execution failed with exit code {res_code}.\n"
+                        f"🛑 <b>Hành động:</b> Daily quota locked to prevent retry storms.\n"
+                        f"🔧 <b>Khắc phục:</b> Sửa lỗi hạ nguồn và chạy lại với <code>--force</code> hoặc <code>B1_FORCE_CRAWL=1</code>."
+                    )
+                    print(f"\n{fail_msg}\n")
+                    logger.error(f"[{m_up}] Task {task_id} B3 failed (exit code {res_code}). Emitted single terminal failure alert.")
+                    _send_guarded_alert("b3_downstream_failure", m_up, fail_msg, state_dir=state_dir)
+                    terminal_alert_sent = True
+                    break
+
+            # Mark daily market production as COMPLETED in authoritative lock
+            comp_ok = mark_completed(
+                m_up,
+                task_id,
+                extra_metadata={"topic": native_topic, "slug": t_obj.get("task_slug")},
+                state_dir=state_dir,
+                now=now,
+                lock_token=lock_token,
+                owner_pid=os.getpid(),
+            )
+            if comp_ok:
+                is_terminal_stamped = True
+                logger.info(f"[{m_up}] Authoritative daily lock marked COMPLETED for {task_id}")
+            else:
+                logger.warning(f"[{m_up}] Failed to mark daily lock COMPLETED for {task_id}")
+
             print(f"  🎉 [SUCCESS] Pipeline completed through B1 -> B1.5 -> B2 -> B2.1 -> B3 -> Gate 2 for {task_id}!")
             break
 

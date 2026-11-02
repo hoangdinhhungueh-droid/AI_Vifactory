@@ -91,3 +91,13 @@ def test_gate1_allowed_when_clean():
         call_msg = mock_send.call_args[0][0]
         assert "PASS (8.5/10)" in call_msg
         assert task_id in call_msg
+
+
+def test_hg2_blocked_for_temp_task_id():
+    """Rule 128: Human Gate 2 MUST NOT be dispatched for temporary staging IDs (e.g. EN_TEMP_*)."""
+    from app.services.telegram_buttons import trigger_human_gate_2
+
+    with patch("app.services.telegram_buttons.send_gate2_card") as mock_card:
+        res = trigger_human_gate_2("EN_TEMP_reddit-stock-plunges")
+        assert res is None, "HG2 was triggered for temporary staging task ID!"
+        assert not mock_card.called, "send_gate2_card was invoked for temporary staging ID!"

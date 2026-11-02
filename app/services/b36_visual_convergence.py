@@ -41,7 +41,7 @@ Audit against 6 Core Criteria:
    - Pure flat #FF00FF magenta chroma key isolation, 1:1 aspect ratio, waist-up three-quarter angle dynamic action framing with clear silhouette and zero edge clipping.
    - Zero photorealistic human faces/skin; zero white/gray halos; zero cutoffs.
 4. VISUAL & STYLE CONFORMANCE (CL3 VOX PAPER DIORAMA - Rule 120, 122, 140, 141):
-   - Visual prompts MUST adhere strictly to the canonical CL3 Paper Diorama master architecture: deep 3D paper diorama with layered cutouts separated in real space, aged-print collage textures on archival newsprint (#F4F1EA / #C9BB9C), halftone B&W cutout figures with rough deckle borders and offset ink accent strokes (#D62E1F red, #D9A441 mustard), tactile mechanical interaction and camera parallax with shallow depth of field.
+   - Visual prompts MUST adhere strictly to the canonical CL3 Paper Diorama master architecture: 16:9 widescreen (2560x1440) deep 3D paper diorama with layered cutouts separated in real space, aged-print collage textures on archival newsprint (#F4F1EA / #C9BB9C), halftone B&W cutout figures with rough deckle borders and offset ink accent strokes (#D62E1F red, #D9A441 mustard), tactile mechanical interaction and camera parallax with shallow depth of field.
    - STRICTLY FORBIDDEN: flat 2D single-plane compositions, glossy 3D CG video game looks, photorealistic human portraits, or flat slideshow stock graphics.
    - (Thumbnails are decoupled to YouTube Studio Native Gemini Designer at Human Gate 3).
 5. PROMPT HYGIENE:
@@ -629,6 +629,8 @@ def run_b36_visual_convergence(
     # Trigger Human Gate 2 Telegram Notification AFTER B3.5.1 convergence and file persistence (Rule 125)
     if episode_id.upper().startswith("TEST_"):
         logger.info(f"[B3.5.1 DACL] Skipping HG2 Telegram card for test episode: {episode_id}")
+    elif "_TEMP_" in episode_id.upper():
+        logger.warning(f"[B3.5.1 DACL] Skipping HG2 Telegram card for temporary staging ID: {episode_id} (Rule 125 & Rule 128)")
     elif converged:
         try:
             from app.services.telegram_buttons import trigger_human_gate_2
