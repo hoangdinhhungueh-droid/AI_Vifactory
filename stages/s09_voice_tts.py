@@ -139,11 +139,17 @@ def run(ctx: RunContext) -> StageArtifact:
     if not is_min_profile and ctx.preset and getattr(ctx.preset, "duration_window_s", None) and real_audio_dur > 0:
         d_min = ctx.preset.duration_window_s.min
         d_max = ctx.preset.duration_window_s.max
-        if real_audio_dur > d_max and (real_audio_dur / d_max) <= 1.30:
+        speed_factor = None
+        if real_audio_dur > d_max and (real_audio_dur / d_max) <= 1.35:
+            target_dur = max(d_min + 5.0, min(d_max - 2.0, getattr(ctx.preset.duration_window_s, "target", (d_min + d_max) / 2.0)))
+            speed_factor = round(real_audio_dur / target_dur, 3)
+        elif real_audio_dur < d_min and (real_audio_dur / d_min) >= 0.65:
+            target_dur = min(d_max - 5.0, max(d_min + 3.0, getattr(ctx.preset.duration_window_s, "target", (d_min + d_max) / 2.0)))
+            speed_factor = round(real_audio_dur / target_dur, 3)
+
+        if speed_factor and 0.5 <= speed_factor <= 2.0:
             from vox.ffmpeg_utils import get_ffmpeg_binary
             ffmpeg_bin = get_ffmpeg_binary()
-            target_dur = min(d_max - 2.0, max(d_min + 5.0, getattr(ctx.preset.duration_window_s, "target", (d_min + d_max) / 2.0)))
-            speed_factor = round(real_audio_dur / target_dur, 3)
             conformed_audio = audio_file.with_name("voice_narration_conformed.mp3")
             try:
                 subprocess.run(
@@ -194,7 +200,13 @@ def run(ctx: RunContext) -> StageArtifact:
                 for widx, sw in enumerate(sc_words):
                     w_s = sc_start + widx * w_step
                     w_e = w_s + w_step
-                    subtitles.append(KaraokeWord(word=sw, start=round(w_s, 3), end=round(w_e, 3)).model_dump())
+                    subtitles.append(KaraokeWord(
+                        word=sw,
+                        start=round(w_s, 3),
+                        end=round(w_e, 3),
+                        start_ms=round(w_s * 1000.0, 1),
+                        end_ms=round(w_e * 1000.0, 1),
+                    ).model_dump())
             sc_start = sc_end
     else:
         # Fallback to word-level chunking
@@ -207,6 +219,17 @@ def run(ctx: RunContext) -> StageArtifact:
             chunk_end = (min(i + words_per_event, len(words)) / max(1, len(words))) * actual_total_dur
             chunk_text = " ".join(chunk)
             ass_events.append(f"Dialogue: 0,{_to_ass_time(chunk_start)},{_to_ass_time(chunk_end)},Default,,0,0,0,,{chunk_text}")
+            w_step = (chunk_end - chunk_start) / max(1, len(chunk))
+            for widx, sw in enumerate(chunk):
+                w_s = chunk_start + widx * w_step
+                w_e = w_s + w_step
+                subtitles.append(KaraokeWord(
+                    word=sw,
+                    start=round(w_s, 3),
+                    end=round(w_e, 3),
+                    start_ms=round(w_s * 1000.0, 1),
+                    end_ms=round(w_e * 1000.0, 1),
+                ).model_dump())
 
     if not ass_events:
         ass_events.append("Dialogue: 0,0:00:00.00,0:00:05.00,Default,,0,0,0,,AI Video Factory")

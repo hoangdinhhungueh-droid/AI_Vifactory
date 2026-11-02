@@ -155,3 +155,45 @@ def test_backward_compatibility_with_existing_macro_run():
         script = StoryScriptPayload.model_validate(payload)
         assert len(script.scenes) == 1
         assert script.scenes[0]["scene_id"] == "SCENE_01"
+
+
+def test_s09_duration_conformer_speed_factors():
+    """Verifies bidirectional speed factor calculation for both > d_max and < d_min."""
+    d_min = 180.0
+    d_max = 300.0
+    target = 240.0
+
+    # Over duration (e.g. 330s) -> speed_factor > 1.0 (speed up)
+    real_over = 330.0
+    assert real_over > d_max and (real_over / d_max) <= 1.35
+    target_over = max(d_min + 5.0, min(d_max - 2.0, target))
+    speed_factor_over = round(real_over / target_over, 3)
+    assert 1.0 < speed_factor_over <= 2.0
+    conformed_dur_over = real_over / speed_factor_over
+    assert d_min <= conformed_dur_over <= d_max
+
+    # Under duration (e.g. 160s) -> speed_factor < 1.0 (slow down)
+    real_under = 160.0
+    assert real_under < d_min and (real_under / d_min) >= 0.65
+    target_under = min(d_max - 5.0, max(d_min + 3.0, target))
+    speed_factor_under = round(real_under / target_under, 3)
+    assert 0.5 <= speed_factor_under < 1.0
+    conformed_dur_under = real_under / speed_factor_under
+    assert d_min <= conformed_dur_under <= d_max
+
+
+def test_karaoke_word_schema_precision():
+    from core.contracts.render_props import KaraokeWord
+    kw = KaraokeWord(
+        word="test",
+        start=1.234,
+        end=1.567,
+        start_ms=1234.0,
+        end_ms=1567.0,
+    )
+    dump = kw.model_dump()
+    assert dump["word"] == "test"
+    assert dump["start"] == 1.234
+    assert dump["end"] == 1.567
+    assert dump["start_ms"] == 1234.0
+    assert dump["end_ms"] == 1567.0

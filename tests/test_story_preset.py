@@ -34,6 +34,7 @@ def test_load_story_forensic_preset():
     assert preset.visual.veo_share_max == 0.30
     assert preset.visual.forbid_photoreal_real_persons is True
     assert preset.tts.voice == "en-US-ChristopherNeural"
+    assert preset.tts.rate == "+15%"
 
     # Also test loading with extension and relative path
     preset_yaml = load_preset("story_forensic.yaml")
