@@ -39,10 +39,13 @@ def run(ctx: RunContext) -> StageArtifact:
         topic_slug = ctx.run_id.lower().replace("run_", "").replace("ep_", "")
         topic_name = topic_slug.replace("_", " ").title() or "Global Antitrust Paradigm Shift"
 
-    from core.market_resolver import resolve_canonical_market
-    market = resolve_canonical_market(ctx=ctx)
+    try:
+        from core.market_resolver import resolve_canonical_market
+        market = resolve_canonical_market(ctx=ctx)
+    except Exception:
+        market = "EN"
 
-    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
+    is_story = bool((getattr(ctx.preset, "name", ctx.preset) if ctx.preset else getattr(getattr(ctx, "manifest", None), "preset", None)) == "story_forensic")
 
     if is_story:
         from app.schemas.story_contracts import Antagonist, SourceSeed, StoryIdeationPayload, StoryScore
@@ -103,7 +106,7 @@ def run(ctx: RunContext) -> StageArtifact:
 
                 generic = _build_generic_story_ideation()
 
-                # If LLM attempted rejection or omitted critical fields, heal from generic baseline
+                # 1. Healing from generic baseline if critical fields are missing
                 if parsed_json.get("status") == "rejected" or not parsed_json.get("title_working") or not parsed_json.get("central_question"):
                     if not parsed_json.get("title_working"):
                         parsed_json["title_working"] = generic.title_working
@@ -113,10 +116,33 @@ def run(ctx: RunContext) -> StageArtifact:
                         parsed_json["scheme_mechanism_summary"] = generic.scheme_mechanism_summary
                     if not parsed_json.get("documented_outcome"):
                         parsed_json["documented_outcome"] = generic.documented_outcome
-                    if not parsed_json.get("source_seeds"):
-                        parsed_json["source_seeds"] = [s.model_dump() for s in generic.source_seeds]
                     if not parsed_json.get("money_at_stake_usd") or parsed_json.get("money_at_stake_usd") <= 0:
                         parsed_json["money_at_stake_usd"] = generic.money_at_stake_usd
+
+                # 2. Source seeds unconditional sanitization guard
+                raw_seeds = parsed_json.get("source_seeds")
+                clean_seeds = []
+                if isinstance(raw_seeds, list):
+                    for s in raw_seeds:
+                        if isinstance(s, dict) and s.get("url"):
+                            clean_seeds.append({
+                                "url": str(s.get("url")),
+                                "type": s.get("type") if s.get("type") in ("court", "regulator", "gov", "press") else "press"
+                            })
+                        elif isinstance(s, str) and (s.startswith("http://") or s.startswith("https://")):
+                            clean_seeds.append({"url": s, "type": "press"})
+                        elif isinstance(s, (list, tuple)):
+                            for item in s:
+                                if isinstance(item, str) and (item.startswith("http://") or item.startswith("https://")):
+                                    clean_seeds.append({"url": item, "type": "press"})
+                                elif isinstance(item, dict) and item.get("url"):
+                                    clean_seeds.append({
+                                        "url": str(item.get("url")),
+                                        "type": item.get("type") if item.get("type") in ("court", "regulator", "gov", "press") else "press"
+                                    })
+                if not clean_seeds:
+                    clean_seeds = [s.model_dump() for s in generic.source_seeds]
+                parsed_json["source_seeds"] = clean_seeds
 
                 # Antagonist resolution guard
                 antagonist = parsed_json.get("antagonist")

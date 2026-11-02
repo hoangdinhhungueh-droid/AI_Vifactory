@@ -205,9 +205,12 @@ def run(ctx: RunContext) -> StageArtifact:
     s2_art = require_input(STAGE, ctx.paths)
     topic = s2_art.payload.get("topic", "Corporate Monopoly Inquest")
 
-    from core.market_resolver import resolve_canonical_market
-    market = resolve_canonical_market(ctx=ctx)
-    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
+    try:
+        from core.market_resolver import resolve_canonical_market
+        market = resolve_canonical_market(ctx=ctx)
+    except Exception:
+        market = "EN"
+    is_story = bool((getattr(ctx.preset, "name", ctx.preset) if ctx.preset else getattr(getattr(ctx, "manifest", None), "preset", None)) == "story_forensic")
 
     if is_story:
         from app.schemas.story_contracts import EvidenceClaim, StorySceneLine, StoryScriptBeat, StoryScriptPayload

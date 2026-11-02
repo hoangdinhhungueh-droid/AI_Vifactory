@@ -37,7 +37,7 @@ def run(ctx: RunContext) -> StageArtifact:
     topic = s1_art.payload.get("topic", "Corporate Monopoly Inquest")
     market = s1_art.payload.get("market", "EN")
 
-    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
+    is_story = bool((getattr(ctx.preset, "name", ctx.preset) if ctx.preset else getattr(getattr(ctx, "manifest", None), "preset", None)) == "story_forensic")
 
     if is_story:
         import json
