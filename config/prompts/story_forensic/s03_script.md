@@ -7,7 +7,7 @@ Transform the verified `evidence_ledger` and `timeline` into an intense, cinemat
 Every Beat MUST be decomposed into snappy, 3-to-5 second lines (each line represents one distinct visual scene/shot, ~8 to 15 words):
 1. `B1_hook` (8% word budget / ~45-55 words, target 18-20s):
    - MUST contain 3 to 4 distinct lines (`B1_L01` to `B1_L04`), each 8 to 15 words (3.5 to 5.0 seconds). NEVER compress Beat 1 into a single sentence!
-   - Line 1 (`B1_L01`, visual_hook: "stat_hero"): Cold strike with decisive metric or explosive dollar/won figure.
+   - Line 1 (`B1_L01`, visual_hook: "stat_hero"): Cold strike with decisive metric or explosive financial/quantitative figure.
    - Line 2 (`B1_L02`, visual_hook: "stamp"): The red official sanction stamp or status verdict (e.g. UNVERIFIED).
    - Line 3 (`B1_L03`, visual_hook: "ruler_measure" or "cutout"): The core systemic paradox or statutory exemption clause.
    - Line 4 (`B1_L04`, visual_hook: "red_thread" or "compass_arc"): The calendar deadline and ticking clock framing the crisis.

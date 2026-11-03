@@ -41,7 +41,7 @@ def format_hg2_message(episode_id: str, scene_count: int, bg_count: int, fg_coun
 CONTEXT & CONSTRAINTS (Rule 435-437):
 Episode: {episode_id}
 Prompts: {prompts_path} ({total_prompts} reuse keys: BG+FG)
-  - layer_type: Background (16:9) or Foreground (1:1 chroma-key #FF00FF)
+  - layer_type: Background (16:9) or Foreground (1:1 cutout #FFFFFF)
   - Each reuse_key → one Antigravity /run:image request
 
 QUALITY RULES (Rule 435 – 2K Resolution):
@@ -55,7 +55,7 @@ TIMING RULES (Rule 436 – 45s Spacing):
 
 LAYER SPECIFICATIONS:
 - Background (16:9): cinematic, no people in close-up, documentary lighting
-- Foreground (1:1 chroma-key): solid #FF00FF magenta background, full body, clean cutout
+- Foreground (1:1 cutout): solid #FFFFFF white background, full body, clean cutout
 
 STORAGE & UPDATE:
 1. Save images: /var/vf/episodes/{episode_id}/assets/

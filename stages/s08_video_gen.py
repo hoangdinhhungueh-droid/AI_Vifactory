@@ -387,7 +387,7 @@ def run(ctx: RunContext) -> StageArtifact:
                 try:
                     cmd = [
                         ffmpeg_bin, "-y", "-f", "lavfi",
-                        "-i", f"testsrc=duration={dur}:size=1920x1080:rate={fps}",
+                        "-i", f"color=c=0xF4F1EA:s=1920x1080:d={dur}:r={fps},noise=alls=20:allf=t+u",
                         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
                         str(target_video)
                     ]

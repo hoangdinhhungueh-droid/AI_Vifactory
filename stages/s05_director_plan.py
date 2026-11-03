@@ -239,9 +239,10 @@ def build_vox_scene_prompts(
     }
 
     # 4. Graphic Typography
+    resolved_tag = headline.split("//")[-1].strip() if "//" in headline else (getattr(scene, "headline", "") or f"EXHIBIT {idx+1:02d}")
     graphic_typo = {
         "headline": headline,
-        "english_tag": "FORENSIC EVIDENCE",
+        "english_tag": resolved_tag,
         "color_bar": color,
         "position": "Top-left quadrant, occupying 25% negative space"
     }
@@ -968,7 +969,7 @@ def run(ctx: RunContext) -> StageArtifact:
     chunks = partition_timeline_into_chunks(scenes)
     asset_registry = build_master_asset_registry(ctx.run_id, scenes)
 
-    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
+    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") in ("story_forensic", "vox_narrative")) or bool(s3_artifact.payload.get("beats"))
     story_shots = []
     if is_story:
         from app.schemas.story_contracts import StoryShotPlan
@@ -985,8 +986,9 @@ def run(ctx: RunContext) -> StageArtifact:
             h_fam = h_cycle[idx % len(h_cycle)]
             props = ["stamp", "newspaper_cutout"] if "IMPACT" in h_fam else (["compass", "ruler"] if "CONSTRAINT" in h_fam else ["red_thread"])
             matched_line_id = all_s3_lines[idx] if idx < len(all_s3_lines) else f"L{idx+1:02d}"
+            clean_narration = (getattr(sc, "narration", "") or "")[:80].strip()
             shot_prompt = (
-                f"Tactile stop-motion editorial evidence exhibit for {sc.scene_id}: {sc.narration[:60]}. "
+                f"Authentic Vox CL3 tactile paper diorama illustrating: {clean_narration}. "
                 f"Deep 3D paper diorama on archival cream paper #F4F1EA and kraft cardstock #C9BB9C, "
                 f"halftone black-and-white 60lpi cutouts with offset crimson ink #D62E1F or mustard gold #D9A441 drop-shadows, "
                 f"tactile paper layers, deckle torn edges, cinematic 16:9 widescreen composition."

@@ -13,10 +13,13 @@ narration:
   word_budget:
     min: 450
     max: 750
+    target: 580
+    optimal_min: 520
+    optimal_max: 650
 beats:
   - id: B1_hook
     share: 0.08
-    intent: "Mở bằng khoảnh khắc sụp đổ hoặc con số gây sốc. Đặt câu hỏi trung tâm."
+    intent: "Cold strike with decisive metric or figure. Central systemic paradox and ticking deadline. 3-4 snappy micro-scenes (B1_L01 to B1_L04, 3.5-5.0s each, H1-H4)."
   - id: B2_setup
     share: 0.17
     intent: "Nhân vật, công ty, bối cảnh trước scandal."
@@ -40,11 +43,11 @@ visual:
     gold: "#D9A441"
     charcoal: "#1A1A1A"
   tactile_props:
-    - newspaper_cutout
-    - stamp
-    - compass
-    - ruler
+    - turned_wood_seal
+    - brass_caliper
     - red_thread
+    - stat_number
+    - newspaper_cutout
   shot_avg_s: 5.5
   veo_share_max: 0.30
   forbid_photoreal_real_persons: true

@@ -13,6 +13,9 @@ narration:
   word_budget:
     min: 450
     max: 750
+    target: 580
+    optimal_min: 520
+    optimal_max: 650
 beats:
   - id: B1_hook
     share: 0.08

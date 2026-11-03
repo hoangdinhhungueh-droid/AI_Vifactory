@@ -101,8 +101,8 @@ def build_and_evaluate_pilot(
             if ctx.dry_run or (ctx.config and ctx.config.name == "e2e_min"):
                 cmd = [
                     ffmpeg_bin, "-y", "-f", "lavfi",
-                    "-i", f"testsrc=duration={sc_dur}:size=1920x1080:rate={fps}",
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-i", f"color=c=0xF4F1EA:s=1920x1080:d={sc_dur}:r={fps},noise=alls=20:allf=t+u",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
                     str(target_clip)
                 ]
                 subprocess.run(cmd, capture_output=True, check=True, timeout=30)

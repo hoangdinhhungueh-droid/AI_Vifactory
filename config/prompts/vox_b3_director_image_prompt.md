@@ -153,7 +153,7 @@ The final output must strictly conform to this JSON schema:
           "object_id": "o1_2",
           "name": "asset_seal_stamp",
           "type": "tactile_prop",
-          "texture_spec": "Solid forensic inspection rubber stamp with crimson ink"
+          "texture_spec": "Turned-wood vermilion docket seal stamp with deep crimson #D62E1F ink"
         }
       ],
       "second_by_second_action_breakdown": [

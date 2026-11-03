@@ -23,7 +23,7 @@ Hệ thống đạo diễn hình ảnh vận hành dựa trên bộ 4 tài liệ
 2. **Khử quái thai từ khóa (Rule 128 & 141)**: CẤM gộp các công cụ không liên quan (như vừa con dấu vừa thước kẹp cùng xuất hiện vô lý). Mỗi phân cảnh chỉ kích hoạt đúng 1 cặp tương tác cơ học chính từ bảng Semantic Archetypes.
 3. **Bứt tốc va chạm $\le 0.4\text{s}$ & Khóa cứng điểm đỗ**: Hành động cơ học (dập dấu, siết kẹp, cắt giấy) diễn ra dứt khoát trong 0.2s - 0.4s và dừng bất động, chỉ duy trì vi rung thớ giấy 12fps (on twos) đến hết cảnh.
 4. **Một cú máy duy nhất kết thúc bằng `Settle on...`**: Mỗi clip video chỉ có 1 chuyển động máy quay duy nhất và BẮT BUỘC kết thúc bằng chỉ thị điểm đỗ (`Settle on [target]`).
-5. **Bảo tồn vùng an toàn phụ đề 20%**: Toàn bộ chủ thể quan trọng và số liệu khổng lồ phải nằm ở 80% phần trên của khung hình. Giữ nguyên 20% đáy màn hình là mặt bàn gỗ mộc phẳng hoàn toàn trống, tuyệt đối không có chữ hay vật thể để Remotion render phụ đề karaoke 0ms drift không bị va chạm.
+5. **Bảo tồn vùng an toàn phụ đề 20%**: Toàn bộ chủ thể quan trọng và số liệu khổng lồ phải nằm ở 80% phần trên của khung hình. Giữ nguyên 20% đáy màn hình là mặt bàn giấy báo cũ ngả vàng (#F4F1EA) phẳng hoàn toàn trống, tuyệt đối không có chữ hay vật thể để Remotion render phụ đề karaoke 0ms drift không bị va chạm.
 
 ---
 

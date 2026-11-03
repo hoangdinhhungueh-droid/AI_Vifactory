@@ -37,7 +37,8 @@ def run(ctx: RunContext) -> StageArtifact:
     topic = s1_art.payload.get("topic", "Corporate Monopoly Inquest")
     market = s1_art.payload.get("market", "EN")
 
-    is_story = bool((getattr(ctx.preset, "name", ctx.preset) if ctx.preset else getattr(getattr(ctx, "manifest", None), "preset", None)) == "story_forensic")
+    preset_raw = (getattr(ctx.preset, "name", ctx.preset) if ctx.preset else getattr(getattr(ctx, "manifest", None), "preset", None)) or "story_forensic"
+    is_story = bool(preset_raw in ("story_forensic", "vox_narrative"))
 
     if is_story:
         import json
@@ -217,7 +218,7 @@ def run(ctx: RunContext) -> StageArtifact:
         antagonist_name = (antagonist_data.get("name") if isinstance(antagonist_data, dict) else getattr(antagonist_data, "name", None)) or (topic.split()[0] if topic else "Corporate Target")
 
         story_research = StoryResearchPayload(
-            preset="story_forensic",
+            preset=preset_raw if preset_raw in ("story_forensic", "vox_narrative") else "story_forensic",
             topic=topic,
             evidence_ledger=ledger,
             timeline=timeline,

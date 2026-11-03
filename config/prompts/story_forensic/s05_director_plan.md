@@ -8,7 +8,7 @@ Translate each line of the approved script into sequential shots optimized for a
 - **Halftone Cutouts**: 60lpi black-and-white photographic cutouts with rough white deckle keylines and an offset ink accent stroke (crimson red `#D62E1F` or mustard gold `#D9A441`) behind each.
 - **Tactile Component Zoo**: Giant bold stat numbers cut from heavy red cardstock, turned-wood vermilion docket seal stamps, vintage brass vernier calipers, taut red evidence yarn, deckle torn edges.
 - **FORBIDDEN (Negative Bounds)**: STRICTLY forbid photorealism, stainless steel forensic tables, blue latex gloves, modern forensic markers, and police/CSI evidence tags. Depth stays papercraft; people stay halftone B&W.
-- **Action-Safe Subtitle Zone**: Keep the bottom 20% completely clear (bare desk wood only) for 0ms drift Remotion karaoke subtitles.
+- **Action-Safe Subtitle Zone**: Keep the bottom 20% completely clear (bare cream paper surface only) for 0ms drift Remotion karaoke subtitles.
 
 ## Shot Allocation & Dual-Engine Strategy
 - Target: 35 to 45 shots total (~5.5s average duration per shot).

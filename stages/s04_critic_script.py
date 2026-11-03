@@ -36,7 +36,7 @@ def run(ctx: RunContext) -> StageArtifact:
     s3_art = require_input(STAGE, ctx.paths)
     scenes = s3_art.payload.get("scenes", [])
 
-    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
+    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") in ("story_forensic", "vox_narrative"))
 
     if is_story:
         from app.schemas.story_contracts import StoryScriptCriticPayload, StoryScriptCriticGates, StoryCriticViolation
@@ -111,7 +111,7 @@ def run(ctx: RunContext) -> StageArtifact:
                                     "detail": f"Line '{line_id}' cites status '{st}' but misses required legal qualifier: {required_phrases}"
                                 })
 
-        # Gate 4: Hook within 20s
+        # Gate 4: Hook within 20s & 3-4 micro-scenes decomposition
         hook_ok = True
         if beats:
             b1 = beats[0]
@@ -121,6 +121,14 @@ def run(ctx: RunContext) -> StageArtifact:
                     "line_id": "B1",
                     "gate": "hook_within_20s",
                     "detail": f"Hook beat duration exceeds threshold: {b1.get('target_duration_s')}s > 25.0s"
+                })
+            b1_lines = b1.get("lines", [])
+            if not is_min_profile and len(beats) == 5 and len(b1_lines) < 3:
+                hook_ok = False
+                violations.append({
+                    "line_id": "B1",
+                    "gate": "hook_within_20s",
+                    "detail": f"Beat 1 Hook must be decomposed into 3 to 4 distinct snappy micro-scenes (found {len(b1_lines)})"
                 })
 
         # Gate 5: Pattern interrupt gap <= 30s

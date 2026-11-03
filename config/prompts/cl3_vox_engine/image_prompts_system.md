@@ -22,7 +22,7 @@ SHOT:          — Khối biến đổi theo từng phân cảnh, mô tả lớp
 
 ## 2. Khối Style Block Chuẩn Mực (The Canonical Style Block - Copy Verbatim)
 
-> Use the attached style sheet for materials only – aged-print collage textures on aged archival cream newsprint and tan kraft cardstock, halftone black-and-white cutout people with rough white keylines and offset ink accent strokes (crimson red, mustard gold), giant stat numbers rendered as physical hero characters, and authentic print grain. Do NOT copy the sheet's layout or its flatness: every scene is a deep 3D paper diorama – cutouts are physical layers separated in real space, strong shallow depth of field, foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, dives, whips, racks focus – one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's muted archival palette (cream newsprint, tan kraft, ink black, halftone gray). ALERT WASH means the entire frame floods to the hot crimson accent tone in one decisive beat. Motion: mechanical spring pop-ups with slight overshoot, staggered entrances, ticking counters, tactile paper contact residue. Audio: sound design only – paper pops, whooshes, stamps, ticks, newsroom hum. No music. No voice-over. Keep bottom 20% of the surface completely empty, plain bare desk wood only. No text, no objects, no cards in the bottom fifth.
+> Use the attached style sheet for materials only – aged-print collage textures on aged archival cream newsprint and tan kraft cardstock, halftone black-and-white cutout people with rough white keylines and offset ink accent strokes (crimson red, mustard gold), giant stat numbers rendered as physical hero characters, and authentic print grain. Do NOT copy the sheet's layout or its flatness: every scene is a deep 3D paper diorama – cutouts are physical layers separated in real space, strong shallow depth of field, foreground elements crossing close to the lens. The camera is an actor: it flies between layers, orbits, dives, whips, racks focus – one committed cinematic move per clip. Backgrounds change per clip, always within the sheet's muted archival palette (cream newsprint, tan kraft, ink black, halftone gray). ALERT WASH means the entire frame floods to the hot crimson accent tone in one decisive beat. Motion: mechanical spring pop-ups with slight overshoot, staggered entrances, ticking counters, tactile paper contact residue. Audio: sound design only – paper pops, whooshes, stamps, ticks, newsroom hum. No music. No voice-over. Keep bottom 20% of the surface completely empty, plain bare cream paper only. No text, no objects, no cards in the bottom fifth.
 
 ### Giải mã chức năng từng mệnh đề (Tại sao không được xóa):
 
@@ -37,7 +37,7 @@ SHOT:          — Khối biến đổi theo từng phân cảnh, mô tả lớp
 | `"ALERT WASH"` | Định danh nhịp kịch tính cao nhất: Nhuộm đỏ toàn cảnh khi phát hiện ngòi nổ khủng hoảng. |
 | `"springs with overshoot, staggered, ticking"` | Nhịp cử động stop-motion đặc trưng bứt tốc $\le 0.4\text{s}$, không trôi dạt. |
 | `"sound design only, no music, no VO"` | Khóa âm thanh sạch cho Remotion ráp SFX/TTS ở hậu kỳ. |
-| `"Keep bottom 20% empty, plain wood only"` | Bảo toàn khoảng trống hiển thị phụ đề karaoke 0ms drift mà không làm AI vẽ chữ phụ đề giả. |
+| `"Keep bottom 20% empty, plain cream paper only"` | Bảo toàn khoảng trống hiển thị phụ đề karaoke 0ms drift mà không làm AI vẽ chữ phụ đề giả. |
 
 ---
 

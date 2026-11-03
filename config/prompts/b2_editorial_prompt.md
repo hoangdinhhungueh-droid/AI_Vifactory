@@ -4,53 +4,55 @@
 ## 10X 5-BEAT INVESTIGATIVE DOCUDRAMA ARCHITECTURE (QUY CHUẨN ĐẶC TẢ NHỊP KỊCH BẢN X10)
 
 Genre: High-Stakes Non-Fiction Investigative Docudrama (Johnny Harris x Margin Call x Chernobyl Pacing).
-Target: 1,800 - 2,200 words across 5 structured Acts (~360-440 words / Act for EN; 3,200 - 3,600 Hangul syllables / ~1,050 - 1,250 eojeol for KR; 3,400 - 3,800 characters for JP). Total runtime: 12-15 minutes.
+Target: 450 - 750 words across 5 structured Acts (strictly 520 to 650 words, target 240 seconds runtime, 18-22 scenes/lines; ~1,050 - 1,250 eojeol for KR; ~1,400 characters for JP). Total runtime: 180 - 300 seconds (target 240s).
+(For optional macro deep-dive format when macro_legacy preset is explicitly requested: 1,800 - 2,200 words, 12-15 minutes).
 
-### 🥊 BEAT 1 / ACT I (0:00 - 3:00): THE IMPOSSIBLE CONTRADICTION & COLD STRIKE
+### 🥊 BEAT 1 / ACT I (0:00 - 0:20 / TARGET ~19s, ~50 words): THE IMPOSSIBLE CONTRADICTION & COLD STRIKE
 
 • Primary Objective: Capture cold mobile traffic within 5-10s (Rule 444) and directly satisfy viewer search intent (Rule 130).
+• Hook Architecture (Rule 140 / Rule 131): Decompose Beat 1 into 3 to 4 snappy micro-scenes (3.5s to 5.0s each) across tactile kinetic families H1 to H7. Never compress Beat 1 into a single monolithic scene!
 • Micro-Pacing Breakdown:
-1.1 Cold Strike (0:00 - 0:20): Sentence 1 MUST lead with a verified real-world event (Level 1 Primary Catalyst) and an exact quantitative figure (%, $, or metric) within 60 words. STRICTLY FORBIDDEN: Opening with 'Imagine...', 'In today's world...', or philosophical throat-clearing.
-1.2 Sensory/Structural Paradox (0:20 - 1:00): Clash two irreconcilable realities: the visible official surface (e.g. operational dashboards show normal activity, corporate headquarters announce record profits) vs. the invisible systemic failure (liquidity evaporating, legal safeguards suspended, contracts freezing).
-1.3 Ticking Clock & Human Stakes (1:00 - 2:00): Establish the ticking deadline and asymmetric exposure. Who is hemorrhaging capital or facing catastrophe right now?
-1.4 The Core Curiosity Lock & Micro-Cliffhanger 1 (2:00 - 3:00): Formulate the central investigative enigma: 'How did this catastrophe unfold in broad daylight under the watch of elite regulators/institutions?' End Act I on an alarming initial anomaly.
-• Mandatory Keywords & Signals: 'collapse', 'shock', 'disappear', 'first', 'only', and at least 2 explicit curiosity questions ('?').
+1.1 Cold Strike (0:00 - 0:05): Sentence 1 MUST lead with a verified real-world event (Level 1 Primary Catalyst) and an exact quantitative figure (%, $, or metric) within 8 to 15 words. STRICTLY FORBIDDEN: Opening with 'Imagine...', 'In today's world...', or philosophical throat-clearing.
+1.2 Sensory/Structural Paradox (0:05 - 0:10): Clash two irreconcilable realities: official surface claims vs. the documented systemic anomaly.
+1.3 Ticking Clock & Human Stakes (0:10 - 0:15): Establish the calendar deadline framing the operational crisis.
+1.4 The Core Curiosity Lock & Micro-Cliffhanger 1 (0:15 - 0:20): Formulate the central investigative enigma: 'How did this catastrophe unfold in broad daylight under the watch of elite institutions?'
+• Mandatory Keywords & Signals: 'collapse', 'shock', 'disappear', 'first', 'only', and at least 1 explicit curiosity question ('?').
 
-### 🎭 BEAT 2 / ACT II (3:00 - 6:00): THE FALSE NARRATIVE & MEDIA RED HERRING
+### 🎭 BEAT 2 / ACT II (0:20 - 1:00 / TARGET ~40s, ~100 words): THE FALSE NARRATIVE & MEDIA RED HERRING
 
-• Primary Objective: Dismantle the superficial official narrative and expose competitor blindspots.
+• Primary Objective: Dismantle the superficial official narrative and expose competitor blindspots across 3-4 scenes.
 • Micro-Pacing Breakdown:
-2.1 The Comforting Consensus (3:00 - 4:00): Reconstruct the mainstream media headlines and PR statements that lulled the public into a false sense of security.
-2.2 The Peripheral Fracture (4:00 - 5:00): Examine peripheral data that competitors ignored: quiet revisions in fine print, anomalous ledger transfers, off-balance-sheet notes, or unusual trading spikes.
-2.3 The Red Herring Unmasked & Micro-Cliffhanger 2 (5:00 - 6:00): Prove forensically why the popular scapegoat is wrong or merely a symptom. If the official story is a myth, what hidden machine is actually pulling the strings?
+2.1 The Comforting Consensus: Reconstruct mainstream PR statements and official metrics lulling observers into false security.
+2.2 The Peripheral Fracture: Examine peripheral data: quiet revisions in fine print, anomalous ledger transfers, or unusual spikes.
+2.3 The Red Herring Unmasked & Micro-Cliffhanger 2: Prove forensically why the popular scapegoat is merely a symptom.
 • Mandatory Keywords & Signals: 'official story', 'narrative', 'headline', 'myth', 'red herring', citing official reports/statements.
 
-### 📂 BEAT 3 / ACT III (6:00 - 9:30): THE SYSTEMIC BLINDSPOT & PAPER TRAIL
+### 📂 BEAT 3 / ACT III (1:00 - 2:15 / TARGET ~75s, ~190 words): THE SYSTEMIC BLINDSPOT & PAPER TRAIL
 
-• Primary Objective: Deep-dive into technical evidence, contract clauses, internal memos, and regulatory choke points.
+• Primary Objective: Deep-dive into technical evidence, contract clauses, internal memos, and regulatory choke points across 5-6 scenes.
 • Micro-Pacing Breakdown:
-3.1 Entering the Choke Point (6:00 - 7:00): Walk the viewer into the operational cockpit: specific legal sub-clauses (e.g. ISDA master terms, material adverse change clauses, margin covenants), risk algorithms, or board decisions.
-3.2 The Asymmetric Trap (7:00 - 8:00): Reveal how self-reinforcing mechanisms forced rational actors into collective disaster—not out of malice, but because automated rules left them no other choice.
-3.3 Pattern Interrupt Breaker (8:00 - 8:30): Insert a punchy, staccato sentence of 2 to 6 words maximum (e.g. 'The paper trail vanished.', 'Then came the audit.', 'No one was looking.') to freeze the narrative tempo before dropping the fatal leak.
-3.4 The Fatal Explanatory Vacuum & Micro-Cliffhanger 3 (8:30 - 9:30): Unearth the ignored early warning memo or confidential audit that predicted the exact failure months in advance.
+3.1 Entering the Choke Point: Walk the viewer into the operational cockpit: specific legal sub-clauses, margin covenants, or board decisions.
+3.2 The Asymmetric Trap: Reveal how self-reinforcing mechanisms forced rational actors into collective failure.
+3.3 Pattern Interrupt Breaker: Insert a punchy, staccato sentence of 2 to 6 words maximum (e.g. 'The paper trail vanished.', 'Then came the audit.', 'No one was looking.') to freeze the narrative tempo.
+3.4 The Fatal Explanatory Vacuum & Micro-Cliffhanger 3: Unearth the ignored early warning memo or confidential audit that predicted the exact failure.
 • Mandatory Keywords & Signals: 'paper trail', 'blindspot', 'loophole', 'leak', 'memo', 'forensic', plus exactly 1 pattern-interrupt short sentence (2-6 words).
 
-### ⚡ BEAT 4 / ACT IV (9:30 - 12:30): THE SMOKING GUN & ASYMMETRIC CLIMAX
+### ⚡ BEAT 4 / ACT IV (2:15 - 3:15 / TARGET ~60s, ~145 words): THE SMOKING GUN & ASYMMETRIC CLIMAX
 
-• Primary Objective: Deliver the irrefutable structural climax and unmask the true beneficiaries and systemic breaking point.
+• Primary Objective: Deliver the irrefutable structural climax and unmask the systemic breaking point across 4-5 scenes.
 • Micro-Pacing Breakdown:
-4.1 The Dam Breaks (9:30 - 10:30): The inevitable transmission from Level 1 catalyst to Level 2 institutional catastrophe completes: borrowing spreads spike 400%, liquidity evaporates, or default triggers fire simultaneously.
-4.2 The Smoking Gun Unmasked (10:30 - 11:30): Present the definitive document or data proof. Who anticipated the collapse? Who extracted asymmetric profit while the public or ordinary participants absorbed the loss?
-4.3 The Climax & Cascade (11:30 - 12:30): The dominoes finish falling. The regulatory or market verdict is rendered. The trap has irrevocably snapped shut.
+4.1 The Dam Breaks: The inevitable transmission from Level 1 catalyst to institutional consequence completes.
+4.2 The Smoking Gun Unmasked: Present the definitive document or data proof. Who anticipated the collapse? Who extracted asymmetric benefit?
+4.3 The Climax & Cascade: The regulatory or market verdict is rendered. The trap has irrevocably snapped shut.
 • Mandatory Keywords & Signals: 'smoking gun', 'culprit', 'exposed', 'unmasked', 'profited', closing loops with 'that is why', 'the answer', 'which is how'.
 
-### 🪞 BEAT 5 / ACT V (12:30 - 15:00): THE UNCOMFORTABLE MODERN MIRROR & LIVING WARNING
+### 🪞 BEAT 5 / ACT V (3:15 - 4:00 / TARGET ~45s, ~100 words): THE UNCOMFORTABLE MODERN MIRROR & LIVING WARNING
 
-• Primary Objective: Deliver closure (>=80% curiosity loops answered) and hold a chilling mirror up to the contemporary world.
+• Primary Objective: Deliver closure (>=80% curiosity loops answered) and hold a chilling mirror up to the contemporary world across 3-4 scenes.
 • Micro-Pacing Breakdown:
-5.1 The Systemic Verdict (12:30 - 13:30): Synthesize the entire causal chain into one unforgettable insight. Resolve remaining curiosity loops from Acts I-IV.
-5.2 The Living Contemporary Precedent (13:30 - 14:15): Reveal that this vulnerability did not end with this episode. Show the exact same mechanism operating today under a different corporate, financial, or geopolitical guise.
-5.3 The Final Living Warning (14:15 - 15:00): End with an unsettling, thought-provoking investigative takeaway that respects viewer intelligence. STRICTLY ZERO preachy moralizing or generic cliches ('in conclusion', 'time will tell', 'beacon of hope').
+5.1 The Systemic Verdict: Synthesize the entire causal chain into one unforgettable insight. Resolve remaining curiosity loops.
+5.2 The Living Contemporary Precedent: Reveal that this vulnerability did not end with this episode; show the mechanism operating today.
+5.3 The Final Living Warning & Echo Ending: End with an unsettling investigative takeaway that re-invokes the opening hook stake. STRICTLY ZERO preachy moralizing or generic cliches.
 • Mandatory Keywords & Signals: 'mirror', 'warning', 'modern', 'today', 'lesson', 'verdict', loop closure >= 80%.
 
 ## B2 10X EDITORIAL & INVESTIGATIVE CINEMATIC MANDATES

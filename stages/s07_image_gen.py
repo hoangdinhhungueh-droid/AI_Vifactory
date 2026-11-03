@@ -41,7 +41,7 @@ def run(ctx: RunContext) -> StageArtifact:
     s5_data = json.loads(s5_path.read_text(encoding="utf-8"))
     scenes = s5_data.get("payload", {}).get("scenes", [])
 
-    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
+    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") in ("story_forensic", "vox_narrative"))
     style_prefix = ""
     if is_story:
         prefix_file = ctx.paths.repo_root / "config" / "prompts" / "story_forensic" / "s07_image_style_prefix.md"

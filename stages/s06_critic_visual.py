@@ -49,7 +49,7 @@ def run(ctx: RunContext) -> StageArtifact:
     s5_art = require_input(STAGE, ctx.paths)
     scenes = s5_art.payload.get("scenes", [])
 
-    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") == "story_forensic")
+    is_story = bool(ctx.preset and getattr(ctx.preset, "name", "") in ("story_forensic", "vox_narrative"))
     if is_story:
         from app.schemas.story_contracts import StoryVisualCriticGates, StoryVisualCriticPayload
 

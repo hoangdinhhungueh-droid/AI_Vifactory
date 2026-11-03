@@ -1,16 +1,16 @@
 {
   "(Optional) Reference Image Prompt.txt": "ad884c684ca436e26ce5ede71fd5455e1846274864420c42b4bcd765ace34694",
   "Example Style Reference.png": "3859296ad3faa1848114f5a9b8f2bdf50819ca15f41bd105667ba9ca37b3f03b",
-  "avoid_base.md": "e93bf21ce3a2e0064f867b77e8f30daf59e9abbc140a89f66b84b8d082b04a10",
+  "avoid_base.md": "57db2d9e3bf44aa460265579da51a1e4bf09cedb3d4dd7150ae208ff78112e3a",
   "camera_directives.yaml": "a153ce0caf36ad2c6d794bb4096508695ed942cc822afcbd6b5968006520356c",
   "canonical_backgrounds.json": "0e42c11841f2a8f1f21c25201e565d1f618301e6261533b191e3f195599aba54",
   "image-prompts.md": "19dd2e2f5d2217459a03908f7c3069b7940b452e9d63b4dad7ef983a89d4f6b0",
-  "image_prompts_system.md": "0819b263c772c0d88da6fffa290a0fb226b6021c7cb8ed32dcfdbc419ebada1f",
+  "image_prompts_system.md": "4a274db783da6181c97946845f3ed1b0a9c597e10597c544a5b293bc3108a807",
   "prop_action_matrix.yaml": "554ce9f35a6ae47bed26a1381736aa0045c2982e01917387a3e85ee7dcbcd274",
-  "style_deep_diorama.md": "45f8c7279e8eb938f4b082ff57e70b41bc090deb17cc2290be0b160c12546985",
-  "style_flat_parallax.md": "c368ca2e6ce93017e6a75de7f6c133c5bbbe2cdc98a77f663fa2e063dcce7882",
+  "style_deep_diorama.md": "f76e9b9b77f681168e82a6b0046f61cd4a6108b40ee6c8d4ccaafa374e29b547",
+  "style_flat_parallax.md": "8b7cba8e73562c90c5b7504322e285249f6c0a973d5081561583af75bfb191cc",
   "style_locked_stage.md": "02853b8a8912c334bcf08f8c2ea05446d77311eb345b13a8acdc4bfba67cc034",
-  "t2i_style.md": "6cd024273aeb9dfc0c11cf220500c6336395786cc29c401a8f15d7df8214b0bb",
+  "t2i_style.md": "2777d32fb44d22acbce04b9c2f466a6f1ab7e2c584b7bd857eba5a42e7783cb0",
   "video-prompts.md": "7b15bc4d4b83b42e7f7d185d7a8134220507d1a2c3711187420817441ff0be0b",
-  "video_prompts_system.md": "e7a6cfd905dbde664b7d07f895c7aeca58657c0992b9dd3984c8e10a693d0362"
+  "video_prompts_system.md": "a3de03c9a063ff7876daab31020684e8296a87bfc153a3774a842f4d388aff6b"
 }

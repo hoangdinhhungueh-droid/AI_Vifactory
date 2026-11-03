@@ -123,8 +123,8 @@ def _synthesize_beat_scenes(
             fg_k = f"{episode_id.lower()}_fg_b{b_num}_char{char_idx}" if sc_counter % 3 != 0 else None
             fg_pos = "right" if sc_counter % 2 == 0 else "left"
 
-            bg_desc = f"Non-photorealistic 2D stylized editorial graphic novel background illustration, bold ink linework, cel-shading, wide 16:9 cinematic setting of {b_name}, {dynamic_context.get('physical_environment', '')}"
-            fg_desc = f"Stylized editorial graphic novel digital illustration of full-body {char_role} in {char_attire}, standing head-to-toe, {char_cues}, posture {char_state}, 1:1 aspect ratio, isolated on a solid flat #FF00FF pure magenta background, clean chroma-key cutout, sharp silhouette, no borders, no frames" if fg_k else None
+            bg_desc = f"Authentic Vox CL3 deep 3D paper diorama background on aged archival cream newsprint (#F4F1EA) and kraft cardstock (#C9BB9C), wide 16:9 cinematic setting of {b_name}, {dynamic_context.get('physical_environment', '')}"
+            fg_desc = f"High-contrast 60lpi halftone black-and-white cutout illustration of {char_role} in {char_attire}, standing head-to-toe, {char_cues}, posture {char_state}, 1:1 aspect ratio, rough white deckle torn-paper edge, offset crimson red (#D62E1F) ink accent stroke, isolated on a solid flat pure white #FFFFFF background, clean sharp silhouette, no borders, no frames" if fg_k else None
             cam_move = cam_moves[sc_counter % len(cam_moves)]
 
             dur_frames = sent.get("duration_frames") or int(round(sent.get("duration_sec", 6.0) * 30))

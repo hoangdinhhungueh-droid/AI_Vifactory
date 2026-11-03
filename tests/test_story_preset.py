@@ -56,9 +56,29 @@ def test_load_macro_legacy_preset():
     assert preset.visual.palette.paper == "#F4F1EA"
 
 
+def test_load_vox_narrative_preset():
+    preset = load_preset("vox_narrative")
+    assert preset.name == "vox_narrative"
+    assert preset.aspect_ratio == "16:9"
+    assert preset.resolution.width == 1920
+    assert preset.resolution.height == 1080
+    assert preset.duration_window_s.min == 180
+    assert preset.duration_window_s.max == 300
+    assert preset.duration_window_s.target == 240
+    assert preset.narration.word_budget.min == 450
+    assert preset.narration.word_budget.max == 750
+    assert len(preset.beats) == 5
+    total_share = sum(b.share for b in preset.beats)
+    assert abs(total_share - 1.0) < 1e-4
+    assert preset.visual.palette.paper == "#F4F1EA"
+    assert preset.visual.veo_share_max == 0.30
+    assert preset.visual.forbid_photoreal_real_persons is True
+
+
 def test_list_available_presets():
     presets = list_available_presets()
     assert "story_forensic" in presets
+    assert "vox_narrative" in presets
     assert "macro_legacy" in presets
 
 

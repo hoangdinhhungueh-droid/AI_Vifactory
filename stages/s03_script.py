@@ -251,7 +251,9 @@ def run(ctx: RunContext) -> StageArtifact:
         market = resolve_canonical_market(ctx=ctx)
     except Exception:
         market = "EN"
-    is_story = bool((getattr(ctx.preset, "name", ctx.preset) if ctx.preset else getattr(getattr(ctx, "manifest", None), "preset", None)) == "story_forensic")
+
+    preset_raw = (getattr(ctx.preset, "name", ctx.preset) if ctx.preset else getattr(getattr(ctx, "manifest", None), "preset", None)) or "story_forensic"
+    is_story = bool(preset_raw in ("story_forensic", "vox_narrative"))
 
     if is_story:
         from app.schemas.story_contracts import EvidenceClaim, StorySceneLine, StoryScriptBeat, StoryScriptPayload
@@ -367,12 +369,13 @@ def run(ctx: RunContext) -> StageArtifact:
                         w_min = getattr(nb.word_budget, "min", 450)
                         w_max = getattr(nb.word_budget, "max", 750)
 
-                if len(llm_beats) >= 5 and w_min <= total_llm_words <= w_max:
+                b1_has_micro_scenes = bool(llm_beats and len(llm_beats[0][2]) >= 3)
+                if len(llm_beats) >= 5 and w_min <= total_llm_words <= w_max and b1_has_micro_scenes:
                     raw_beats = llm_beats
-                    logger.info(f"[S03_SCRIPT] Live LLM successfully generated {len(llm_beats)} beats, {total_llm_words} words.")
+                    logger.info(f"[S03_SCRIPT] Live LLM successfully generated {len(llm_beats)} beats, {total_llm_words} words, {len(llm_beats[0][2])} Beat 1 micro-scenes.")
                 else:
                     logger.warning(
-                        f"[S03_SCRIPT] LLM output out of word budget window ({total_llm_words} words, window: {w_min}-{w_max}, {len(llm_beats)} beats). "
+                        f"[S03_SCRIPT] LLM output did not meet criteria ({total_llm_words} words, window: {w_min}-{w_max}, {len(llm_beats)} beats, b1_lines: {len(llm_beats[0][2]) if llm_beats else 0}). "
                         "Falling back to evidence-ledger grounded generator."
                     )
             except Exception as _llm_err:
@@ -447,7 +450,7 @@ def run(ctx: RunContext) -> StageArtifact:
         spoken_script_file.write_text(full_script_text, encoding="utf-8")
 
         story_payload = StoryScriptPayload(
-            preset="story_forensic",
+            preset=preset_raw if preset_raw in ("story_forensic", "vox_narrative") else "story_forensic",
             topic=topic,
             total_words=total_words,
             est_duration_s=est_duration,
@@ -511,10 +514,10 @@ def run(ctx: RunContext) -> StageArtifact:
                 raise
             default_texts = [
                 ("hook", "block_1_act_i", f"In late 2026, an unprecedented regulatory decision permanently overturned the status quo of {topic}."),
-                ("context", "block_2_act_i", "For years, the public narrative claimed complete compliance, while domestic operators bore a 100x tax disparity."),
-                ("tension", "block_3_act_ii", "A forensic examination of the contract paperwork reveals how 65% of domestic revenue was rerouted offshore."),
-                ("reveal", "block_4_act_iii", "The smoking gun was not hidden secrecy, but an institutional loophole encoded directly into legacy tax law."),
-                ("payoff", "block_5_act_iv", "This landmark ruling marks the beginning of an era where digital presence directly mandates fiscal accountability."),
+                ("context", "block_2_act_i", f"For years, public disclosures projected complete institutional compliance regarding {topic}, while counterparty exposures compounded silently."),
+                ("tension", "block_3_act_ii", f"A forensic examination of the contract paperwork reveals how critical operational revenues surrounding {topic} were redirected through offshore conduits."),
+                ("reveal", "block_4_act_iii", f"The smoking gun in {topic} was not hidden secrecy, but an institutional loophole encoded directly into legacy regulatory frameworks."),
+                ("payoff", "block_5_act_iv", f"This landmark ruling on {topic} marks the beginning of an era where operational transparency directly mandates structural accountability."),
             ]
             all_scenes = [
                 Scene(

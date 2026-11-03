@@ -242,7 +242,7 @@ AUTHENTIC_5_ACT_PACING_RULES = DOCUDRAMA_5BEAT_PACING_X10
 TWO_LAYER_VISUAL_RULES = """
 
 ## 2-Layer Visual Composition & Remotion Architecture (Rule 116 & Rule 435)
-• Layer 1 (Background 16:9 2K DCI 2560x1440): Wide-angle cinematic documentary environment, plain bare desk wood only in bottom 20% safe-zone, clear center-right negative space for foreground character overlay.
+• Layer 1 (Background 16:9 2K DCI 2560x1440): Wide-angle cinematic documentary environment, plain bare cream paper surface only in bottom 20% safe-zone, clear center-right negative space for foreground character overlay.
 • Layer 2 (Foreground 1:1 2048x2048): Stylized editorial graphic novel digital illustration, waist-up three-quarter angle action framing with active hands manipulating physical documentary prop and directional gaze, on solid #FF00FF pure magenta chroma key.
 • Remotion Safe-Zone Subtitle Container: Sole on-screen subtitle mechanism with millisecond karaoke sync. Redundant FFmpeg burning bypassed."""
 
@@ -563,7 +563,7 @@ def get_b3_strategic_rules(force_refresh: bool = False) -> str:
         "3. 7 KINETIC INTERACTION FAMILIES (H1->H7): Snappy mechanical strike <= 0.4s with overshoot, dead-stop hold on twos.\n"
         "4. ZERO CARTESIAN COORDINATES: Natural physical staging, zero raw percentages (X:50%, Y:36%).\n"
         "5. COMMITTED CAMERA ACTOR: Exactly one camera movement per scene, ending with mandatory 'Settle on [target]'.\n"
-        "6. SUBTITLE SAFE ZONE: Keep bottom 20% of the surface completely empty, plain bare desk wood only. No text, no objects, no cards in the bottom fifth.\n"
+        "6. SUBTITLE SAFE ZONE: Keep bottom 20% of the surface completely empty, plain bare cream paper only. No text, no objects, no cards in the bottom fifth.\n"
         "7. AUDIO SFX COUPLING: Tactile Foley matching contact dynamics, sound design only, no music, no voice-over."
     )
 

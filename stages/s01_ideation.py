@@ -45,7 +45,8 @@ def run(ctx: RunContext) -> StageArtifact:
     except Exception:
         market = "EN"
 
-    is_story = bool((getattr(ctx.preset, "name", ctx.preset) if ctx.preset else getattr(getattr(ctx, "manifest", None), "preset", None)) == "story_forensic")
+    preset_raw = (getattr(ctx.preset, "name", ctx.preset) if ctx.preset else getattr(getattr(ctx, "manifest", None), "preset", None)) or "story_forensic"
+    is_story = bool(preset_raw in ("story_forensic", "vox_narrative"))
 
     if is_story:
         from app.schemas.story_contracts import Antagonist, SourceSeed, StoryIdeationPayload, StoryScore
@@ -57,7 +58,7 @@ def run(ctx: RunContext) -> StageArtifact:
         def _build_generic_story_ideation() -> StoryIdeationPayload:
             first_word = topic_name.split()[0] if topic_name else "Corporate"
             return StoryIdeationPayload(
-                preset="story_forensic",
+                preset=preset_raw if preset_raw in ("story_forensic", "vox_narrative") else "story_forensic",
                 niche="corporate_scandal",
                 title_working=f"{topic_name}: The Forensic Breakdown",
                 central_question=f"What critical structural decisions and hidden institutional mechanisms triggered the crisis in {topic_name}?",
