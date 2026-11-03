@@ -69,3 +69,18 @@ def test_fleet_profiles_integrity():
     assert "acc_06" not in PROFILES
     assert "acc_06" in DISABLED_ACCOUNTS
     assert "hết gói pro" in DISABLED_ACCOUNTS["acc_06"].lower()
+
+
+def test_chip_detection_scoped_selectors():
+    """Rule 121: Verifies that global button:has-text('close') is NOT used in chip verification to prevent modal close button false positives."""
+    from pathlib import Path
+    import inspect
+    import scripts.flow_video_dispatcher as fvd
+
+    src = inspect.getsource(fvd.generate_and_download_clip)
+    # Ensure button:has-text('close') is not in the chip verification section
+    assert "chips_now = page.locator(\"button:has-text('expand_content'), button:has-text('close')" not in src
+    # Ensure scoped selector is present
+    assert "div.ProseMirror .ingredient-chip" in src
+    assert "fail_chip_" in src
+

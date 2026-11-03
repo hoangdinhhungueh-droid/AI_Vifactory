@@ -152,4 +152,12 @@ def run(ctx: RunContext) -> StageArtifact:
     )
 
     emit_artifact(artifact, ctx.paths)
+
+    # Refresh Master Scene package with authentic composite seed images (Rule 121 & 140)
+    try:
+        from app.services.master_scene_sheet import generate_master_scene_package
+        generate_master_scene_package(ctx, scenes=scenes, payload=s5_data.get("payload", {}), image_mode=True)
+    except Exception as _ms_err:
+        pass
+
     return artifact

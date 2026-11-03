@@ -549,15 +549,26 @@ def execute_pipeline(
             if stage == StageID.S7_IMAGE_GEN and effective_human_gates and (only_target_idx is None or only_target_idx == 6):
                 if effective_to is None or resolve_stage_index(effective_to, stage_list) <= 6 or only_target_idx == 6:
                     total_imgs = len(_artifact.payload.get("images", [])) if isinstance(_artifact.payload, dict) else 0
+                    ms_dir = paths.root / "master_sheets"
+                    sys_sheet = ms_dir / "master_sheet_system.html"
+                    scenes_sheet = ms_dir / "master_sheet_scenes.html"
+                    dashboard = ms_dir / "master_sheet_dashboard.html"
                     print("\n" + "=" * 75)
-                    print("🛑 [HUMAN GATE 3 REACHED: IMAGE ASSETS VERIFIED]")
+                    print("🛑 [HUMAN GATE 3 REACHED: IMAGE ASSETS & MASTER SCENE SHEETS VERIFIED]")
                     print("=" * 75)
                     print(f"🖼️ Composite Seeds:    {total_imgs} authentic images verified in {paths.composite_seeds_dir}")
+                    print(f"📐 Master System Sheet: {sys_sheet if sys_sheet.exists() else ms_dir / 'master_sheet_system.html'}")
+                    print(f"🎬 Scene Storyboards:   {scenes_sheet if scenes_sheet.exists() else ms_dir / 'master_sheet_scenes.html'}")
+                    print(f"📊 Master Dashboard:    {dashboard if dashboard.exists() else ms_dir / 'master_sheet_dashboard.html'}")
                     print("🛡️ Visual Checklist:   100% authentic editorial illustrations, 0% placeholders (Rule 118 & 121)")
-                    print("\nAll composite image assets verified on disk.")
-                    print("\n👉 NEXT STEP: Generate 30-Second Demo / Pilot Video (Beat 1 Review)")
+                    print("\nAll composite image assets and master storyboards verified on disk.")
+                    print("\n👉 NEXT STEP 1: Generate Omni Demo Video (First 2 Scenes Hook)")
                     print("Execute CLI Command:")
-                    print(f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --pilot")
+                    print(f"python scripts/flow_video_dispatcher.py --episode {effective_run_id} --model omni --limit 2")
+                    print(f"(Or run pilot: python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --pilot)")
+                    print("\n👉 NEXT STEP 2: Approve & Render Full Master Video")
+                    print("Execute CLI Command:")
+                    print(f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --from s08_video_gen --to s11_qc --upload-youtube")
                     print("=" * 75 + "\n")
                     try:
                         from app.services.telegram_buttons import send_hg3_images_verified

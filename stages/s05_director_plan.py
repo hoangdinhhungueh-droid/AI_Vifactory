@@ -1059,6 +1059,14 @@ def run(ctx: RunContext) -> StageArtifact:
     except Exception as _man_err:
         logger.warning(f"[s05_director_plan] Notice generating workspace flow_video_manifest.json: {_man_err}")
 
+    # Generate Vox Style Master Scene Package (System Master Sheet & Per-Scene Storyboards)
+    try:
+        from app.services.master_scene_sheet import generate_master_scene_package
+        scenes_dicts = [s.model_dump() for s in scenes]
+        generate_master_scene_package(ctx, scenes=scenes_dicts, payload=payload, image_mode=False)
+    except Exception as _ms_err:
+        logger.warning(f"[s05_director_plan] Notice generating master_scene_package: {_ms_err}")
+
     # Synchronize director_plan.json to episode directory for Remotion & downstream consumers
     ep_candidates = [
         ctx.paths.root,

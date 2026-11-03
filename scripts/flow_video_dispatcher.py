@@ -294,64 +294,110 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                 agree_btn.click(force=True)
                 time.sleep(1.5)
 
-            # Click add menu trigger để mở panel ingredients
-            trigger = page.locator(".add-menu-trigger, button[aria-label*='Thêm thành phần vào ô nhập câu lệnh'], button[aria-label*='Add ingredients to the prompt box'], button[aria-label*='Add ingredients']").first
-            if trigger.count() > 0 and trigger.is_visible():
-                trigger.click(force=True)
-                time.sleep(1.5)
+            # Native input[type="file"] handler (Root cause 1 fix: bypass fragile button clicks)
+            file_uploaded = False
+            file_input = page.locator('input[type="file"]').first
+            if file_input.count() > 0:
+                try:
+                    file_input.set_input_files(str(seed_img))
+                    print(f"      ✅ Đã tải file {seed_img.name} trực tiếp qua native input[type='file']!")
+                    file_uploaded = True
+                    time.sleep(2)
+                except Exception as _fi_err:
+                    logger.debug(f"Direct set_input_files error: {_fi_err}")
 
-            up_btn = page.locator(".sidebar-upload-btn, button:has(.upload-container), button:has-text('Tải nội dung nghe nhìn lên'), button:has-text('Upload media')").first
-            if up_btn.count() > 0 and up_btn.is_visible():
-                box = up_btn.bounding_box()
-                if box:
-                    cx = box['x'] + box['width'] / 2
-                    cy = box['y'] + box['height'] / 2
+            if not file_uploaded:
+                # Click add menu trigger để mở panel ingredients
+                trigger = page.locator(".add-menu-trigger, button[aria-label*='Thêm thành phần vào ô nhập câu lệnh'], button[aria-label*='Add ingredients to the prompt box'], button[aria-label*='Add ingredients'], button:has-text('add')").first
+                if trigger.count() > 0 and trigger.is_visible():
+                    trigger.click(force=True)
+                    time.sleep(1.5)
+
+                # Check if input[type="file"] appeared after opening menu
+                file_input = page.locator('input[type="file"]').first
+                if file_input.count() > 0:
                     try:
-                        with page.expect_file_chooser(timeout=10000) as fc_info:
-                            page.mouse.click(cx, cy)
-                        fc = fc_info.value
-                        fc.set_files(str(seed_img))
-                        print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser!")
-                        time.sleep(3)
-                    except Exception as e:
-                        print(f"      ⚠️ Lỗi file chooser: {e}")
-
-                # Chờ file hoàn tất xử lý, click chọn asset và chờ nút Thêm vào câu lệnh enabled (Rule 118, 121)
-                asset_added = False
-                for wait_i in range(20):
-                    agree_btn = page.locator("button:has-text('Tôi đồng ý'), button:has-text('I agree')").first
-                    if agree_btn.count() > 0 and agree_btn.is_visible():
-                        agree_btn.click(force=True)
-                        time.sleep(1)
-
-                    # Click chọn asset vừa tải lên
-                    target_asset = page.locator(f"text={seed_img.name[:16]}").first
-                    if target_asset.count() > 0 and target_asset.is_visible():
-                        try:
-                            target_asset.click(force=True)
-                        except Exception as _clk_err:
-                            logger.debug(f"Target asset click notice: {_clk_err}")
-                    else:
-                        first_asset = page.locator(".asset-item, [role='listitem'], .cdk-drag, mat-list-item").first
-                        if first_asset.count() > 0 and first_asset.is_visible():
-                            try:
-                                first_asset.click(force=True)
-                            except Exception as _first_clk_err:
-                                logger.debug(f"First asset click notice: {_first_clk_err}")
-
-                    time.sleep(1)
-                    add_btn = page.locator("button:has-text('Thêm vào câu lệnh'), button:has-text('Add to prompt')").first
-                    if add_btn.count() > 0 and add_btn.is_visible() and add_btn.is_enabled():
-                        print(f"      ✅ Nút 'Thêm vào câu lệnh' đã sẵn sàng sau {wait_i+1}s! Đang chèn chip ảnh...")
-                        add_btn.click(force=True)
+                        file_input.set_input_files(str(seed_img))
+                        print(f"      ✅ Đã tải file {seed_img.name} qua input[type='file'] sau khi mở menu!")
+                        file_uploaded = True
                         time.sleep(2)
-                        asset_added = True
-                        break
+                    except Exception as _fi_err:
+                        logger.debug(f"Menu set_input_files error: {_fi_err}")
 
-            # 4. Chốt chặn kiểm toán I2V (Fail-Closed Gate): Đảm bảo Ingredient Chip TỒN TẠI
+                if not file_uploaded:
+                    up_btn = page.locator(".sidebar-upload-btn, button:has(.upload-container), button:has-text('Tải nội dung nghe nhìn lên'), button:has-text('Upload media'), button:has-text('Tải tệp lên'), button:has-text('Upload files')").first
+                    if up_btn.count() > 0 and up_btn.is_visible():
+                        box = up_btn.bounding_box()
+                        if box:
+                            cx = box['x'] + box['width'] / 2
+                            cy = box['y'] + box['height'] / 2
+                            try:
+                                with page.expect_file_chooser(timeout=10000) as fc_info:
+                                    page.mouse.click(cx, cy)
+                                fc = fc_info.value
+                                fc.set_files(str(seed_img))
+                                print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser!")
+                                file_uploaded = True
+                                time.sleep(3)
+                            except Exception as e:
+                                print(f"      ⚠️ Lỗi file chooser: {e}")
+
+            # Chuyển tab sang 'Tệp tải lên' / 'Uploads' nếu cần
+            upload_tab = page.locator("button:has-text('Tệp tải lên'), [role='tab']:has-text('Tệp tải lên'), [role='tab']:has-text('Uploads'), button:has-text('Uploads')").first
+            if upload_tab.count() > 0 and upload_tab.is_visible():
+                try:
+                    upload_tab.click(force=True)
+                    time.sleep(1)
+                except Exception as _tab_err:
+                    logger.debug(f"Upload tab click notice: {_tab_err}")
+
+            # Chờ file hoàn tất xử lý, click chọn asset và chờ nút Thêm vào câu lệnh enabled (Rule 118, 121)
+            asset_added = False
+            for wait_i in range(25):
+                agree_btn = page.locator("button:has-text('Tôi đồng ý'), button:has-text('I agree')").first
+                if agree_btn.count() > 0 and agree_btn.is_visible():
+                    agree_btn.click(force=True)
+                    time.sleep(1)
+
+                # Click chọn asset vừa tải lên
+                target_asset = page.locator(f"text={seed_img.name[:16]}").first
+                if target_asset.count() > 0 and target_asset.is_visible():
+                    try:
+                        target_asset.click(force=True)
+                    except Exception as _clk_err:
+                        logger.debug(f"Target asset click notice: {_clk_err}")
+                else:
+                    first_asset = page.locator(".asset-item, [role='listitem'], .cdk-drag, mat-list-item, flow-asset-tile, .media-item").first
+                    if first_asset.count() > 0 and first_asset.is_visible():
+                        try:
+                            first_asset.click(force=True)
+                        except Exception as _first_clk_err:
+                            logger.debug(f"First asset click notice: {_first_clk_err}")
+
+                time.sleep(1)
+                add_btn = page.locator("button:has-text('Thêm vào câu lệnh'), button:has-text('Add to prompt')").first
+                if add_btn.count() > 0 and add_btn.is_visible() and add_btn.is_enabled():
+                    print(f"      ✅ Nút 'Thêm vào câu lệnh' đã sẵn sàng sau {wait_i+1}s! Đang chèn chip ảnh...")
+                    add_btn.click(force=True)
+                    time.sleep(2)
+                    asset_added = True
+                    break
+
+            # 4. Chốt chặn kiểm toán I2V (Fail-Closed Gate): Đảm bảo Ingredient Chip TỒN TẠI trong prompt box
+            # CẤM selector global button:has-text('close') vì gây false positive do nút 'x' của modal (Root cause 2)
             chip_attached = False
-            for _ in range(10):
-                chips_now = page.locator("button:has-text('expand_content'), button:has-text('close'), .expand-button, flow-image-tile").all()
+            for _ in range(12):
+                chips_now = page.locator(
+                    "div.ProseMirror .ingredient-chip, "
+                    "flow-prompt-input .ingredient-chip, "
+                    ".prompt-box .ingredient-chip, "
+                    "flow-image-tile, "
+                    ".ingredient-chip, "
+                    "div.ProseMirror button:has-text('expand_content'), "
+                    "flow-prompt-input button:has-text('expand_content'), "
+                    "div.ProseMirror .expand-button, "
+                    "flow-prompt-input .expand-button"
+                ).all()
                 if any(c.is_visible() for c in chips_now):
                     chip_attached = True
                     break
@@ -777,8 +823,8 @@ def main():
         all_clips = [c for c in all_clips if c.get("scene_id", "").upper() in target_sids]
         print(f"🎯 Đã lọc theo danh sách scenes: {len(all_clips)} clips")
     elif args.mode == "demo" and args.limit == 0:
-        all_clips = all_clips[:8]
-        print(f"🎯 [DEMO MODE ACT I] Tự động giới hạn 8 clips đầu tiên (SCENE_01 -> SCENE_08)!")
+        all_clips = all_clips[:2]
+        print(f"🎯 [DEMO MODE OMNI HOOK] Tự động giới hạn 2 clips đầu tiên (SCENE_01 -> SCENE_02)!")
     elif args.limit > 0:
         all_clips = all_clips[:args.limit]
         print(f"🎯 Đã giới hạn tổng cộng {len(all_clips)} clips đầu tiên!")
