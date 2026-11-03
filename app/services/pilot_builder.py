@@ -86,34 +86,19 @@ def build_and_evaluate_pilot(
         sc_dur = float(sc.get("duration_est_sec") or 5.5)
 
         if not target_clip.exists() or target_clip.stat().st_size < 1000:
-            # Locate seed image
-            seed_img = ctx.paths.seed_image_path(sc_id)
-            if not seed_img.exists():
-                for cand in [
-                    ctx.paths.root / "composite_seeds" / f"composite_{sc_id.lower()}.png",
-                    ctx.paths.root / "composite_seeds" / f"composite_{sc_id}.png",
-                    ctx.paths.root / "composite_seeds" / f"{sc_id}.png",
-                    ctx.paths.root / "images" / f"{sc_id}.png",
-                ]:
-                    if cand.exists() and cand.stat().st_size > 1024:
-                        seed_img = cand
-                        break
+            # Check video_clips or legacy candidates before raising error
+            legacy_cands = [
+                ctx.paths.root / "video_clips" / f"clip_{sc_id.lower()}.mp4",
+                ctx.paths.root / f"clip_{sc_id.lower()}.mp4",
+                ctx.paths.root / "blocks" / sc.get("sequence_block", "block_1_act_i").lower() / "videos" / f"clip_{sc_id.lower()}.mp4"
+            ]
+            found = next((p for p in legacy_cands if p.exists() and p.stat().st_size > 1000), None)
+            if found:
+                import shutil
+                shutil.copy2(str(found), str(target_clip))
 
-            tot_frames = max(25, int(sc_dur * fps))
-            if seed_img.exists():
-                # Generate dynamic camera motion clip (Rule 118, 122, 140)
-                filter_expr = (
-                    f"zoompan=z='min(1.0 + 0.05*(on/{tot_frames}), 1.05)':d={tot_frames}:"
-                    f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080,fps={fps}"
-                )
-                cmd = [
-                    ffmpeg_bin, "-y", "-loop", "1", "-i", str(seed_img),
-                    "-vf", filter_expr,
-                    "-t", str(sc_dur), "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                    str(target_clip)
-                ]
-                subprocess.run(cmd, capture_output=True, check=True, timeout=30)
-            elif ctx.dry_run or (ctx.config and ctx.config.name == "e2e_min"):
+        if not target_clip.exists() or target_clip.stat().st_size < 1000:
+            if ctx.dry_run or (ctx.config and ctx.config.name == "e2e_min"):
                 cmd = [
                     ffmpeg_bin, "-y", "-f", "lavfi",
                     "-i", f"testsrc=duration={sc_dur}:size=1920x1080:rate={fps}",
@@ -122,9 +107,13 @@ def build_and_evaluate_pilot(
                 ]
                 subprocess.run(cmd, capture_output=True, check=True, timeout=30)
             else:
+                # Rule 118, 121 & Anti-Destructive Iron Law:
+                # ZERO-MOCK MANDATE: Static image zoompan shortcuts are strictly eliminated.
                 raise RuntimeError(
-                    f"Missing seed image for {sc_id} at '{seed_img}'. "
-                    f"Place authentic image in composite_seeds before generating pilot."
+                    f"[pilot_builder] Authentic video clip missing for scene '{sc_id}' at '{target_clip}'. "
+                    f"FFmpeg static image shortcuts (zoompan) are strictly forbidden per Rule 118 & 121. "
+                    f"Please generate video clips first via: "
+                    f"'python scripts/flow_video_dispatcher.py --episode {ctx.run_id} --model omni'."
                 )
 
         pilot_clip_paths.append(target_clip)
@@ -199,17 +188,14 @@ def build_and_evaluate_pilot(
                 scope_desc=f"30-second Beat 1 pilot ({target_dur:.1f}s runtime)"
             )
         except Exception as eval_err:
-            logger.warning(f"Visual Critic Council API notice: {eval_err}")
+            logger.warning(f"Visual Critic Council API error: {eval_err}")
+            # Rule 118 & Truthful Reporting Iron Law: Never fabricate mock passing scores when evaluation fails
             eval_result = {
-                "verdict": "PASS",
-                "overall_score": 8.8,
-                "note": f"Live council call notice: {eval_err}",
-                "axis_scores": {
-                    "cinematic_motion_physics": 8.7,
-                    "tactile_paper_aesthetics": 8.9,
-                    "editing_pacing": 8.8,
-                    "typography_data_clarity": 8.8
-                }
+                "verdict": "UNVERIFIED",
+                "overall_score": None,
+                "error": str(eval_err),
+                "note": f"Visual Critic Council API call failed: {eval_err}. Transparent reporting per Truthful Reporting Iron Law.",
+                "axis_scores": None
             }
     else:
         print("⚡ [DRY-RUN] Visual Critic Council evaluation simulated (Score: 9.2 / 10).")

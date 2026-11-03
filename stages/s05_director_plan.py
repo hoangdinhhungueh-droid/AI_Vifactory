@@ -133,6 +133,9 @@ def build_vox_scene_prompts(
             or raw_metaphor.strip() == headline.strip()
             or raw_metaphor.strip() == getattr(scene, "narration", "").strip()
             or "Tactile editorial evidence" in raw_metaphor
+            or "Forensic visual evidence" in raw_metaphor
+            or "evidence exhibit for" in raw_metaphor
+            or "evidence for B" in raw_metaphor
         )
     )
     hero_obj = evidence.hero_anchor_prop if (is_narration_copy or not raw_metaphor) else raw_metaphor

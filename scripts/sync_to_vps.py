@@ -22,7 +22,13 @@ FILES_TO_SYNC = [
     "app/services/build_remotion_props.py",
     "app/services/unified_vox_director.py",
     "app/services/director_planner_b3.py",
+    "app/services/pilot_builder.py",
+    "stages/s03_script.py",
     "stages/s05_director_plan.py",
+    "stages/s08_video_gen.py",
+    "config/prompts/cl3_vox_engine/avoid_base.md",
+    "config/prompts/cl3_vox_engine/t2i_style.md",
+    "config/prompts/story_forensic/s03_script.md",
     "scripts/run_vox_media_pipeline.py",
     "config/prompts/b3_director_prompt.md",
     "config/prompts/b35_visual_rules.md",
@@ -107,7 +113,10 @@ def main():
         "/root/video_factory/app/services/build_remotion_props.py "
         "/root/video_factory/app/services/unified_vox_director.py "
         "/root/video_factory/app/services/director_planner_b3.py "
+        "/root/video_factory/app/services/pilot_builder.py "
+        "/root/video_factory/stages/s03_script.py "
         "/root/video_factory/stages/s05_director_plan.py "
+        "/root/video_factory/stages/s08_video_gen.py "
         "/root/video_factory/scripts/run_vox_media_pipeline.py"
     )
     comp_res = client.call_tool("run_command", {"command": compile_cmd})

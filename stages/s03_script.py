@@ -398,13 +398,35 @@ def run(ctx: RunContext) -> StageArtifact:
             ))
             for ln in lines:
                 role = "hook" if "B1" in beat_id else ("context" if "B2" in beat_id else ("tension" if "B3" in beat_id else ("reveal" if "B4" in beat_id else "payoff")))
+                vh = (getattr(ln, "visual_hook", "") or "").lower()
+                if "stat" in vh or "counter" in vh or "metric" in vh:
+                    v_meta = "giant bold red stat number card cut from heavy cardstock"
+                elif "stamp" in vh or "seal" in vh:
+                    v_meta = "heavy turned-wood official sanction seal stamp with vermilion ink"
+                elif "ruler" in vh or "caliper" in vh or "measure" in vh:
+                    v_meta = "vintage brass vernier caliper measuring an audited financial ledger"
+                elif "compass" in vh or "arc" in vh:
+                    v_meta = "nautical drafting compass drawing an arc across regional map"
+                elif "thread" in vh or "yarn" in vh:
+                    v_meta = "taut crimson evidence yarn pinned between document exhibits"
+                elif "magnifier" in vh or "lens" in vh:
+                    v_meta = "heavy brass magnifying lens focused on fine print contractual clause"
+                elif "scissor" in vh or "cut" in vh or "shear" in vh:
+                    v_meta = "vintage steel shears cutting through official bond certificate"
+                elif "highlight" in vh or "marker" in vh:
+                    v_meta = "neon yellow highlighter marker emphasizing critical legislative clause"
+                elif "cutout" in vh or "portrait" in vh:
+                    v_meta = "halftone black-and-white photographic cutout exhibit"
+                else:
+                    v_meta = "tactile investigative document clipping on aged archival parchment"
+
                 all_scenes.append(Scene(
                     scene_id=f"SCENE_{scene_idx:02d}",
                     sequence_block=f"block_{scene_idx}_{beat_id}",
                     beat_role=role,
                     narration=ln.text,
                     headline=f"{beat_id.upper()} // {ln.line_id}",
-                    visual_metaphor=f"Forensic visual evidence for {ln.line_id} ({ln.visual_hook})",
+                    visual_metaphor=v_meta,
                     color_accent="Vox Yellow #F2C230 & Navy #1B2B4A",
                     duration_est_sec=round(len(ln.text.split()) / 2.5, 1),
                 ))

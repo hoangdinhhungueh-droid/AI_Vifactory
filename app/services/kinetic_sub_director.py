@@ -1554,8 +1554,12 @@ def sanitize_prompt_for_imagen3(text: Any) -> str:
     """Sanitizes text for Google Imagen 3 (T2I), stripping English artifact prefixes and trademark trigger brands."""
     if not text:
         return ""
-    # 1. Strip English exhibit label prefixes (Rule 122 Parity)
+    # 1. Strip English exhibit label prefixes and internal pipeline identifiers (Rule 122 Parity & Clean Output)
     s = re.sub(r'^(Tactile\s+archival\s+exhibit|Tactile\s+exhibit):\s*', '', text, flags=re.IGNORECASE)
+    s = re.sub(r'\b(Forensic\s+visual\s+evidence\s+for|visual\s+evidence\s+for|evidence\s+exhibit\s+for|Tactile\s+stop-motion\s+editorial\s+evidence\s+exhibit\s+for)\s+[A-Za-z0-9_]+(?:\s*\([^)]*\))?:?\s*', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bB\d+_L\d+\b', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bSCENE_\d+\b', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'\b(EXHIBIT|CASE FILE|DOCKET NO\.)\b', '', s, flags=re.IGNORECASE)
 
     # 2. Anonymize brand and trademark entity names that trigger Google Imagen 3 safety/trademark refusal
     replacements = [
@@ -1592,7 +1596,10 @@ def sanitize_prompt_for_imagen3(text: Any) -> str:
     s = re.sub(r'#[0-9a-fA-F]{6}\b', '', s)
     s = re.sub(r'\(\s*\)', '', s)
     s = re.sub(r'\s+', ' ', s)
-    return s.strip()
+    res = s.strip()
+    if len(res) < 3:
+        return "archival investigative document clipping on aged paper"
+    return res
 
 
 def build_cl3_paper_diorama_prompt(
@@ -1780,7 +1787,8 @@ def build_cl3_paper_diorama_image_prompt(
 
     shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}"
     text_control = "TEXT CONTROL: No placeholder words, no English labels, no garbled text, no fake headlines. Paper documents feature soft, authentic, illegible printed texture only."
-    res = f"{style_block}\n\n{shot_block}\n\n{text_control}".strip()
+    avoid_block = reg.resolve_avoid_block("STATIC_OVERHEAD", trace=trace)
+    res = f"{style_block}\n\n{shot_block}\n\n{text_control}\n\n{avoid_block}".strip()
     # Strip any remaining hex code tokens to prevent Imagen literal text hallucination
     res = re.sub(r'#[0-9a-fA-F]{6}\b', '', res)
     res = re.sub(r'\(\s*\)', '', res)

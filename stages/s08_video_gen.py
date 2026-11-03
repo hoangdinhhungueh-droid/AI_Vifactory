@@ -374,77 +374,37 @@ def run(ctx: RunContext) -> StageArtifact:
         if not clip_valid:
             dur = scene_durations.get(idx, float(sc.get("duration_est_sec") or ctx.config.video_generation.duration_per_clip_sec))
             fps = ctx.config.render.fps
-            if active_seed_img.exists():
-                # Apply dynamic Vox camera motion (Rule 118, 121, 122, 140)
-                # NEVER static -loop 1 without motion, never monotonous infinite center zoom
-                try:
-                    cam_dir = sc.get("camera_directive", "STATIC_OVERHEAD")
-                    tot_frames = max(25, int(dur * fps))
-                    if cam_dir == "SLOW_HORIZONTAL_PAN":
-                        # Pan left-to-right at gentle 1.06 zoom
-                        filter_expr = (
-                            f"zoompan=z=1.06:d={tot_frames}:"
-                            f"x='(iw-iw/zoom)*(on/{tot_frames})':y='(ih-ih/zoom)/2':s=1920x1080,fps={fps}"
-                        )
-                    elif cam_dir == "SUBTLE_TILT_DOWN":
-                        # Tilt down from top to bottom at gentle 1.06 zoom
-                        filter_expr = (
-                            f"zoompan=z=1.06:d={tot_frames}:"
-                            f"x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*(on/{tot_frames})':s=1920x1080,fps={fps}"
-                        )
-                    elif cam_dir == "SLOW_PUSH_IN_0_1X":
-                        # Subtle push-in (up to 1.08 max)
-                        filter_expr = (
-                            f"zoompan=z='min(1.0 + 0.08*(on/{tot_frames}), 1.08)':d={tot_frames}:"
-                            f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080,fps={fps}"
-                        )
-                    else:
-                        # STATIC_OVERHEAD: Subtle living texture drift (1.03x max drift)
-                        filter_expr = (
-                            f"zoompan=z='min(1.0 + 0.03*(on/{tot_frames}), 1.03)':d={tot_frames}:"
-                            f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080,fps={fps}"
-                        )
 
+            # Rule 118, 121, 122 & Anti-Destructive Iron Law:
+            # ZERO-MOCK MANDATE: Static FFmpeg image zoompan fallback is strictly prohibited.
+            # Video clips must be authentically generated via Google Flow (Omni 1.1 Flash / Veo 3.1).
+            is_hermetic_test = (
+                getattr(ctx.config, "profile", None) == "e2e_min"
+                or getattr(ctx, "dry_run", False)
+                or str(ctx.run_id).startswith("test_")
+            )
+            if is_hermetic_test:
+                try:
                     cmd = [
-                        ffmpeg_bin, "-y", "-loop", "1", "-i", str(active_seed_img),
-                        "-vf", filter_expr,
-                        "-t", str(dur), "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                        ffmpeg_bin, "-y", "-f", "lavfi",
+                        "-i", f"testsrc=duration={dur}:size=1920x1080:rate={fps}",
+                        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
                         str(target_video)
                     ]
                     subprocess.run(cmd, capture_output=True, check=True, timeout=30)
                     validate_video_motion_temporal_delta(target_video)
                     clip_valid = True
-                except Exception as _zp_err:
-                    logger.debug(f"[s08_video_gen] zoompan notice for {sc_id}: {_zp_err}")
-
-            if not clip_valid:
-                # Rule 118 & 121: Synthetic testsrc is STRICTLY restricted to hermetic unit test runs (e2e_min/test_*)
-                is_hermetic_test = (
-                    getattr(ctx.config, "profile", None) == "e2e_min"
-                    or getattr(ctx, "dry_run", False)
-                    or str(ctx.run_id).startswith("test_")
+                except Exception as _test_err:
+                    raise RuntimeError(f"[s08_video_gen] Hermetic test clip generation failed for {sc_id}: {_test_err}") from _test_err
+            else:
+                # In production: Fail-closed when authentic I2V clip is absent
+                raise RuntimeError(
+                    f"[s08_video_gen] Video clip missing for scene '{sc_id}' at '{target_video}'. "
+                    f"FFmpeg static image shortcuts (zoompan) are strictly eliminated from the pipeline. "
+                    f"To generate authentic I2V video clips, execute: "
+                    f"'python scripts/flow_video_dispatcher.py --episode {ctx.run_id} --model omni' "
+                    f"per Rule 118 (Zero-Mock Data) & Rule 121 (Strict Verification Protocol)."
                 )
-                if is_hermetic_test:
-                    try:
-                        cmd = [
-                            ffmpeg_bin, "-y", "-f", "lavfi",
-                            "-i", f"testsrc=duration={dur}:size=1920x1080:rate={fps}",
-                            "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
-                            str(target_video)
-                        ]
-                        subprocess.run(cmd, capture_output=True, check=True, timeout=30)
-                        validate_video_motion_temporal_delta(target_video)
-                        clip_valid = True
-                    except Exception as _test_err:
-                        raise RuntimeError(f"[s08_video_gen] Hermetic test clip generation failed for {sc_id}: {_test_err}") from _test_err
-                else:
-                    # In production: ZERO-MOCK MANDATE (Rule 118 & 121)
-                    # Strictly fail closed: NEVER emit synthetic color bars or mock clips into production assets!
-                    raise RuntimeError(
-                        f"[s08_video_gen] Video generation failed for {sc_id}: no valid video clip exists, "
-                        f"and active seed image '{active_seed_img}' could not produce a valid moving clip. "
-                        f"Fails closed per Rule 118 and Rule 121 (Zero-Mock Data and Strict Verification)."
-                    )
 
         sz = target_video.stat().st_size if target_video.exists() else 0
         sha = compute_file_sha256(target_video) if target_video.exists() else "none"
