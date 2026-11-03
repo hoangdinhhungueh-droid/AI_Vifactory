@@ -8,6 +8,7 @@ Implements Stage Shape Standard. Generates or verifies authentic composite seed 
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Any, Dict, List
@@ -16,6 +17,8 @@ from core.config import RunContext
 from core.contracts.stages import Provenance, StageArtifact, StageID
 from core.gates import compute_file_sha256, emit_artifact, GateError
 from tools.codemap.runtime import pipeline_stage
+
+logger = logging.getLogger("s07_image_gen")
 
 STAGE: StageID = StageID.S7_IMAGE_GEN
 
@@ -158,6 +161,6 @@ def run(ctx: RunContext) -> StageArtifact:
         from app.services.master_scene_sheet import generate_master_scene_package
         generate_master_scene_package(ctx, scenes=scenes, payload=s5_data.get("payload", {}), image_mode=True)
     except Exception as _ms_err:
-        pass
+        logger.debug(f"[s07_image_gen] Notice refreshing master_scene_package: {_ms_err}")
 
     return artifact

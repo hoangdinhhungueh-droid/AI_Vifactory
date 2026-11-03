@@ -144,8 +144,8 @@ def _get_pil_fonts() -> Dict[str, Any]:
         if hasattr(f, "path") and f.path:
             try:
                 return ImageFont.truetype(f.path, size=size)
-            except Exception:
-                pass
+            except Exception as _f_err:
+                logger.debug(f"Font size loading notice for {font_key}: {_f_err}")
         return ImageFont.load_default()
 
     return {
