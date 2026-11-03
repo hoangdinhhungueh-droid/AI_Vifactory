@@ -1,4 +1,4 @@
-MASTER STYLE: Vox Style visual system for documentary-collage explainer series, inspired by aged archival newsprint collage.
+MASTER STYLE: Vox Style visual system for documentary-collage explainer series. Deep 3D paper diorama with aged-print collage textures on aged archival newsprint and kraft cardstock.
 Surface: Warm aged archival cream newsprint (#F4F1EA) and archival tan kraft (#C9BB9C) paper background with visible print grain and subtle engraved map line textures. Newsroom-serious, layered, tactile, slightly retro.
 Cutouts: High-contrast halftone black-and-white 60lpi photographic cutout elements with rough white deckle keylines and an offset ink accent stroke (crimson red #D62E1F or mustard gold #D9A441) behind each. All cutouts sit on distinct physical paper layers with flat drop-shadows.
 Components: Giant stat numbers cut from heavy red cardstock treated as hero characters; torn-paper edge ledger strips; typewriter annotation labels; red map pins and taut red evidence thread; heavy turned-wood vermilion docket seal stamp.
