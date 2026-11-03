@@ -37,8 +37,9 @@ def _build_grounded_story_beats(
 
     def _claim_text(idx: int) -> str:
         if idx < len(claims):
-            return claims[idx].claim.strip().rstrip(".")
-        return f"Documented evidentiary findings confirm critical structural liabilities regarding {topic}"
+            words = claims[idx].claim.strip().rstrip(".").split()
+            return " ".join(words[:14])
+        return f"documented evidentiary findings confirm critical structural liabilities regarding {topic}"
 
     # Build Beat 1: Hook (0-20s, ~75 words)
     b1_lines = [

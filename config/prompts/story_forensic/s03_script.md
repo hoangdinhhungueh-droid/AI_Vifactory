@@ -1,7 +1,7 @@
 # S03 5-Beat Forensic Docudrama Script Prompt (en-US)
 
 You are an award-winning investigative documentary writer and narrative showrunner.
-Transform the verified `evidence_ledger` and `timeline` into an intense, cinematic 3-to-5 minute (target 240 seconds, 450 to 750 words) English narration script.
+Transform the verified `evidence_ledger` and `timeline` into an intense, cinematic 3-to-5 minute (strictly 520 to 650 words, target 240 seconds, 18-21 lines) English narration script.
 
 ## 5-Beat Docudrama Architecture & Scene Pacing Rules
 Every Beat MUST be decomposed into snappy, 3-to-5 second lines (each line represents one distinct visual scene/shot, ~8 to 15 words):
