@@ -84,10 +84,14 @@ MOTION_THUMBNAIL_TYPES = [
 
 def resolve_scene_motion_thumbnail(scene: Dict[str, Any]) -> Dict[str, Any]:
     """Resolves which motion thumbnail archetype best matches the scene kinematics."""
-    narration = (scene.get("narration") or "").lower()
-    headline = (scene.get("headline") or "").lower()
-    h_fam = (scene.get("h_family") or "").upper()
-    act_breakdown = (scene.get("second_by_second_action_breakdown") or "").lower()
+    narration = str(scene.get("narration") or "").lower()
+    headline = str(scene.get("headline") or "").lower()
+    h_fam = str(scene.get("h_family") or "").upper()
+    raw_breakdown = scene.get("second_by_second_action_breakdown") or ""
+    if isinstance(raw_breakdown, list):
+        act_breakdown = " ".join(str(item) for item in raw_breakdown).lower()
+    else:
+        act_breakdown = str(raw_breakdown).lower()
 
     # Rule 1: Check for quantitative metrics/counter
     if any(k in narration or k in headline for k in ["$", "%", "tỷ", "triệu", "billion", "million", "counter", "con số", "usd"]):
@@ -1129,6 +1133,23 @@ def generate_master_scene_package(
     """
     start_ts = time.time()
     payload = payload or {}
+
+    # Support string run_id or arbitrary objects gracefully
+    if isinstance(ctx, str):
+        from core.paths import RunPaths
+        run_paths = RunPaths(ctx)
+        class _SimpleContext:
+            def __init__(self, run_id, paths):
+                self.run_id = run_id
+                self.paths = paths
+                self.topic = run_id
+                self.manifest = None
+        ctx = _SimpleContext(ctx, run_paths)
+    elif not hasattr(ctx, "paths"):
+        from core.paths import RunPaths
+        run_id = getattr(ctx, "run_id", "EPISODE")
+        setattr(ctx, "paths", RunPaths(run_id))
+
     out_dir = ctx.paths.root / "master_sheets"
     out_dir.mkdir(parents=True, exist_ok=True)
 
