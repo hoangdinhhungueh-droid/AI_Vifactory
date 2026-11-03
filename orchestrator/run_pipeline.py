@@ -578,6 +578,7 @@ def execute_pipeline(
                             preset=preset_name,
                             next_cmd=f"python -m orchestrator.run_pipeline --run-id {effective_run_id} --preset {preset_name} --pilot",
                             composite_dir=str(paths.composite_seeds_dir),
+                            master_sheet_dir=str(ms_dir),
                         )
                     except Exception as _tg_err:
                         logger.warning(f"[HG3] Telegram notification notice: {_tg_err}")

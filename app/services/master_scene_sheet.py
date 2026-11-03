@@ -387,19 +387,37 @@ def render_scene_contact_sheet_png(
     output_path: Path,
     image_dir: Optional[Path] = None,
     cols: int = 3,
-    rows: int = 2,
+    rows: Optional[int] = None,
     page_index: int = 0,
 ) -> Path:
     """Renders a visual Contact Sheet / Storyboard page of scenes with images and narration."""
     from PIL import Image, ImageDraw
 
-    w, h = 1920, 1080
+    w = 1920
     bg_color = VOX_PALETTE["cream_paper"]
     card_bg = "#FFFFFF"
     ink = VOX_PALETTE["ink_black"]
     hot_red = VOX_PALETTE["hot_red"]
     border_col = VOX_PALETTE["aged_border"]
     gray = VOX_PALETTE["halftone_gray"]
+
+    if rows is None:
+        effective_rows = max(1, math.ceil(len(scenes) / cols))
+        card_w = (w - 60 - (cols - 1) * 20) // cols
+        card_h = 480
+        h = max(1080, 100 + effective_rows * (card_h + 20) + 20)
+        page_scenes = scenes
+        start_i = 0
+        header_sub = f"ALL {len(scenes)} SCENES // COMPOSITE FRAMES, NARRATION & KINEMATICS"
+    else:
+        effective_rows = rows
+        per_page = cols * effective_rows
+        start_i = page_index * per_page
+        page_scenes = scenes[start_i:start_i + per_page]
+        h = 1080
+        card_w = (w - 60 - (cols - 1) * 20) // cols
+        card_h = (h - 110 - (effective_rows - 1) * 20) // effective_rows
+        header_sub = f"PAGE {page_index + 1} // COMPOSITE FRAMES, NARRATION & KINEMATICS"
 
     img = Image.new("RGB", (w, h), color=bg_color)
     draw = ImageDraw.Draw(img)
@@ -411,14 +429,7 @@ def render_scene_contact_sheet_png(
     # Top Header
     draw.rectangle([20, 20, w - 20, 75], fill=ink)
     draw.text((36, 28), "VOX SCENE MASTER STORYBOARD CONTACT SHEET", fill="#FFFFFF", font=fonts["title"])
-    draw.text((w - 28, 38), f"PAGE {page_index + 1} // COMPOSITE FRAMES, NARRATION & KINEMATICS", fill="#E2E8F0", font=fonts["body_bold"], anchor="ra")
-
-    per_page = cols * rows
-    start_i = page_index * per_page
-    page_scenes = scenes[start_i:start_i + per_page]
-
-    card_w = (w - 60 - (cols - 1) * 20) // cols
-    card_h = (h - 110 - (rows - 1) * 20) // rows
+    draw.text((w - 28, 38), header_sub, fill="#E2E8F0", font=fonts["body_bold"], anchor="ra")
 
     for idx, sc in enumerate(page_scenes):
         c = idx % cols
@@ -1148,7 +1159,7 @@ def generate_master_scene_package(
             output_path=scenes_png,
             image_dir=ctx.paths.composite_seeds_dir,
             cols=3,
-            rows=2,
+            rows=None,
             page_index=0,
         )
     except Exception as _sc_err:
@@ -1167,11 +1178,27 @@ def generate_master_scene_package(
         seeds_dir_rel="../composite_seeds",
     )
 
-    # Also emit master_sheet_scenes.html and master_sheet_system.html symlinks / copies for direct inspection
+    # Also emit master_sheet_scenes.html and master_sheet_system.html
     scenes_html = out_dir / "master_sheet_scenes.html"
     scenes_html.write_text(dashboard_html.read_text(encoding="utf-8"), encoding="utf-8")
+
+    # In master_sheet_system.html, activate the SYSTEM tab by default
     sys_html = out_dir / "master_sheet_system.html"
-    sys_html.write_text(dashboard_html.read_text(encoding="utf-8"), encoding="utf-8")
+    raw_dashboard = dashboard_html.read_text(encoding="utf-8")
+    sys_content = raw_dashboard.replace(
+        '<button class="tab-btn active" onclick="switchTab(\'tab-storyboard\')">',
+        '<button class="tab-btn" onclick="switchTab(\'tab-storyboard\')">'
+    ).replace(
+        '<button class="tab-btn" onclick="switchTab(\'tab-system\')">',
+        '<button class="tab-btn active" onclick="switchTab(\'tab-system\')">'
+    ).replace(
+        '<div id="tab-storyboard" class="tab-panel active">',
+        '<div id="tab-storyboard" class="tab-panel">'
+    ).replace(
+        '<div id="tab-system" class="tab-panel">',
+        '<div id="tab-system" class="tab-panel active">'
+    )
+    sys_html.write_text(sys_content, encoding="utf-8")
 
     manifest = {
         "episode_id": episode_id,

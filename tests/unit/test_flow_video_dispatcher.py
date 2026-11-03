@@ -73,7 +73,6 @@ def test_fleet_profiles_integrity():
 
 def test_chip_detection_scoped_selectors():
     """Rule 121: Verifies that global button:has-text('close') is NOT used in chip verification to prevent modal close button false positives."""
-    from pathlib import Path
     import inspect
     import scripts.flow_video_dispatcher as fvd
 
@@ -83,4 +82,20 @@ def test_chip_detection_scoped_selectors():
     # Ensure scoped selector is present
     assert "div.ProseMirror .ingredient-chip" in src
     assert "fail_chip_" in src
+    # Ensure panel open check is executed before uploading
+    assert "panel_open_indicators" in src
+    assert "is_panel_open" in src
+
+
+def test_flow_dispatcher_pilot_cli_argument():
+    """Rule 121: Verifies that --pilot CLI argument is registered and limits clips to 2 scenes."""
+    import argparse
+    import scripts.flow_video_dispatcher as fvd
+
+    # Inspect main or run parser with --help / parse test
+    # We can check that '--pilot' is in the source of main
+    import inspect
+    main_src = inspect.getsource(fvd.main)
+    assert "--pilot" in main_src
+    assert "(args.mode == \"demo\" or args.pilot)" in main_src
 

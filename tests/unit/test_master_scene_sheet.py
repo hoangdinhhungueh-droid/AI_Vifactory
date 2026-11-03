@@ -191,3 +191,37 @@ def test_generate_master_scene_package_full_flow(tmp_path):
     assert Path(manifest["files"]["master_sheet_system_html"]).exists()
     assert Path(manifest["files"]["master_sheet_system_png"]).exists()
     assert Path(manifest["files"]["master_sheet_scenes_png"]).exists()
+
+    # Verify that master_sheet_system.html has system tab active
+    sys_html_text = Path(manifest["files"]["master_sheet_system_html"]).read_text(encoding="utf-8")
+    assert '<div id="tab-system" class="tab-panel active">' in sys_html_text
+    assert '<button class="tab-btn active" onclick="switchTab(\'tab-system\')">' in sys_html_text
+
+
+def test_render_scene_contact_sheet_png_dynamic_all_scenes(tmp_path):
+    """Verifies that 12 scenes are all rendered dynamically without being silently cut off."""
+    from PIL import Image
+    out_png = tmp_path / "test_12_scenes.png"
+    scenes = [
+        {
+            "scene_id": f"SCENE_{i:02d}",
+            "headline": f"HEADLINE {i:02d}",
+            "duration_est_sec": 5.0 + i * 0.2,
+            "narration": f"Narration text for scene {i} explaining forensic trail.",
+            "hero_cutout_object": f"Hero object {i}",
+        }
+        for i in range(1, 13)
+    ]
+
+    rendered = render_scene_contact_sheet_png(
+        scenes=scenes,
+        output_path=out_png,
+        cols=3,
+        rows=None,  # Dynamic height for 4 rows
+    )
+    assert rendered.exists()
+    with Image.open(str(rendered)) as img:
+        assert img.width == 1920
+        # 4 rows * ~500px + header > 2000px
+        assert img.height >= 2000
+

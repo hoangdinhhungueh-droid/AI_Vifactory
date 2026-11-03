@@ -703,6 +703,7 @@ def send_hg3_images_verified(
     preset: str = "story_forensic",
     next_cmd: Optional[str] = None,
     composite_dir: Optional[str] = None,
+    master_sheet_dir: Optional[str] = None,
 ) -> Optional[int]:
     """Human Gate 3: Image generation completed and verified on disk (100% authentic illustrations).
     Emits notification with exact CLI command to create 30-second pilot demo video.
@@ -713,18 +714,22 @@ def send_hg3_images_verified(
     cmd = next_cmd or f"python -m orchestrator.run_pipeline --run-id {task_id} --preset {preset} --pilot"
 
     lines = [
-        "🖼️ <b>[HUMAN GATE 3] TÀI NGUYÊN ẢNH EDITORIAL ĐÃ XÁC THỰC</b>",
+        "🖼️ <b>[HUMAN GATE 3] TÀI NGUYÊN ẢNH EDITORIAL & MASTER SCENE SHEETS ĐÃ XÁC THỰC</b>",
         "<i>(✨ 100% Authentic Editorial Illustrations, 0% Synthetic/Placeholder - Rule 118 & 121)</i>",
         "",
         f"🎨 <b>Số lượng ảnh:</b> {image_count} composite seed images",
         f"📁 <b>Thư mục tài nguyên:</b> <code>{html.escape(str(composite_dir or 'composite_seeds/'))}</code>",
+    ]
+    if master_sheet_dir:
+        lines.append(f"📐 <b>Master Scene Sheets:</b> <code>{html.escape(str(master_sheet_dir))}</code>")
+    lines.extend([
         f"🛡️ <b>Visual Audit:</b> PASS (Phong cách Graphic Novel #F4F1EA, viền sắc nét, vật thể xúc giác $H_1 \\to H_7$)",
         f"🆔 <b>Run ID:</b> <code>{safe_task}</code>",
         "",
         "👉 <b>BƯỚC TIẾP THEO: Xuất Video Pilot Demo 30s (Beat 1 Hook) & Visual Critic Review</b>",
         "📋 <b>Lệnh thực thi (Copy & Dán):</b>",
         f"<pre>{html.escape(cmd)}</pre>",
-    ]
+    ])
     text = "\n".join(lines)
     return send_telegram_broadcast(text)
 

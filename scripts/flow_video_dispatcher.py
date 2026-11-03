@@ -294,7 +294,32 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                 agree_btn.click(force=True)
                 time.sleep(1.5)
 
-            # Native input[type="file"] handler (Root cause 1 fix: bypass fragile button clicks)
+            # 3.1. Đảm bảo panel ingredients được mở để hiển thị tab tải lên và danh sách asset
+            panel_open_indicators = page.locator(
+                "button:has-text('Tệp tải lên'), "
+                "[role='tab']:has-text('Tệp tải lên'), "
+                "[role='tab']:has-text('Uploads'), "
+                "button:has-text('Uploads'), "
+                "button:has-text('Thêm vào câu lệnh'), "
+                "button:has-text('Add to prompt'), "
+                ".add-menu-panel, .ingredient-drawer"
+            )
+            is_panel_open = any(i.is_visible() for i in panel_open_indicators.all() if panel_open_indicators.count() > 0)
+            if not is_panel_open:
+                trigger = page.locator(
+                    ".add-menu-trigger, "
+                    "button[aria-label*='Thêm thành phần vào ô nhập câu lệnh'], "
+                    "button[aria-label*='Add ingredients to the prompt box'], "
+                    "button[aria-label*='Add ingredients'], "
+                    "button[aria-label*='Thêm thành phần'], "
+                    "button:has-text('add'), "
+                    "[data-icon='add']"
+                ).first
+                if trigger.count() > 0 and trigger.is_visible():
+                    trigger.click(force=True)
+                    time.sleep(1.5)
+
+            # 3.2. Native input[type="file"] handler (Root cause 1 fix: bypass fragile button clicks)
             file_uploaded = False
             file_input = page.locator('input[type="file"]').first
             if file_input.count() > 0:
@@ -307,43 +332,38 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     logger.debug(f"Direct set_input_files error: {_fi_err}")
 
             if not file_uploaded:
-                # Click add menu trigger để mở panel ingredients
-                trigger = page.locator(".add-menu-trigger, button[aria-label*='Thêm thành phần vào ô nhập câu lệnh'], button[aria-label*='Add ingredients to the prompt box'], button[aria-label*='Add ingredients'], button:has-text('add')").first
-                if trigger.count() > 0 and trigger.is_visible():
-                    trigger.click(force=True)
-                    time.sleep(1.5)
+                up_btn = page.locator(
+                    ".sidebar-upload-btn, "
+                    "button:has(.upload-container), "
+                    "button:has-text('Tải nội dung nghe nhìn lên'), "
+                    "button:has-text('Upload media'), "
+                    "button:has-text('Tải tệp lên'), "
+                    "button:has-text('Upload files')"
+                ).first
+                if up_btn.count() > 0 and up_btn.is_visible():
+                    box = up_btn.bounding_box()
+                    if box:
+                        cx = box['x'] + box['width'] / 2
+                        cy = box['y'] + box['height'] / 2
+                        try:
+                            with page.expect_file_chooser(timeout=10000) as fc_info:
+                                page.mouse.click(cx, cy)
+                            fc = fc_info.value
+                            fc.set_files(str(seed_img))
+                            print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser!")
+                            file_uploaded = True
+                            time.sleep(3)
+                        except Exception as e:
+                            print(f"      ⚠️ Lỗi file chooser: {e}")
 
-                # Check if input[type="file"] appeared after opening menu
-                file_input = page.locator('input[type="file"]').first
-                if file_input.count() > 0:
-                    try:
-                        file_input.set_input_files(str(seed_img))
-                        print(f"      ✅ Đã tải file {seed_img.name} qua input[type='file'] sau khi mở menu!")
-                        file_uploaded = True
-                        time.sleep(2)
-                    except Exception as _fi_err:
-                        logger.debug(f"Menu set_input_files error: {_fi_err}")
-
-                if not file_uploaded:
-                    up_btn = page.locator(".sidebar-upload-btn, button:has(.upload-container), button:has-text('Tải nội dung nghe nhìn lên'), button:has-text('Upload media'), button:has-text('Tải tệp lên'), button:has-text('Upload files')").first
-                    if up_btn.count() > 0 and up_btn.is_visible():
-                        box = up_btn.bounding_box()
-                        if box:
-                            cx = box['x'] + box['width'] / 2
-                            cy = box['y'] + box['height'] / 2
-                            try:
-                                with page.expect_file_chooser(timeout=10000) as fc_info:
-                                    page.mouse.click(cx, cy)
-                                fc = fc_info.value
-                                fc.set_files(str(seed_img))
-                                print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser!")
-                                file_uploaded = True
-                                time.sleep(3)
-                            except Exception as e:
-                                print(f"      ⚠️ Lỗi file chooser: {e}")
-
-            # Chuyển tab sang 'Tệp tải lên' / 'Uploads' nếu cần
-            upload_tab = page.locator("button:has-text('Tệp tải lên'), [role='tab']:has-text('Tệp tải lên'), [role='tab']:has-text('Uploads'), button:has-text('Uploads')").first
+            # 3.3. Chuyển tab sang 'Tệp tải lên' / 'Uploads' nếu cần
+            upload_tab = page.locator(
+                "button:has-text('Tệp tải lên'), "
+                "[role='tab']:has-text('Tệp tải lên'), "
+                "[role='tab']:has-text('Uploads'), "
+                "button:has-text('Uploads'), "
+                "button:has-text('Tải lên')"
+            ).first
             if upload_tab.count() > 0 and upload_tab.is_visible():
                 try:
                     upload_tab.click(force=True)
@@ -391,8 +411,9 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     "div.ProseMirror .ingredient-chip, "
                     "flow-prompt-input .ingredient-chip, "
                     ".prompt-box .ingredient-chip, "
-                    "flow-image-tile, "
-                    ".ingredient-chip, "
+                    "[contenteditable='true'] .ingredient-chip, "
+                    "div.ProseMirror flow-image-tile, "
+                    "flow-prompt-input flow-image-tile, "
                     "div.ProseMirror button:has-text('expand_content'), "
                     "flow-prompt-input button:has-text('expand_content'), "
                     "div.ProseMirror .expand-button, "
@@ -796,7 +817,8 @@ def main():
     parser.add_argument("--acc", default="all", help="acc_01 to acc_07 or all")
     parser.add_argument("--limit", type=int, default=0, help="Limit total number of clips to generate (0 for unlimited)")
     parser.add_argument("--scenes", default="", help="Comma-separated scene IDs to generate (e.g. SCENE_01,SCENE_02)")
-    parser.add_argument("--mode", choices=["demo", "full"], default="full", help="demo: sinh 8 clips Act I, full: toàn bộ clips")
+    parser.add_argument("--mode", choices=["demo", "full"], default="full", help="demo: sinh 2 clips Omni hook (SCENE_01 -> SCENE_02), full: toàn bộ clips")
+    parser.add_argument("--pilot", action="store_true", default=False, help="Chế độ pilot Omni demo (tự động giới hạn 2 scenes đầu)")
     parser.add_argument("--headless", action="store_true", default=False, help="Chạy ngầm browser (chú ý: Google Flow có thể chặn bot khi headless)")
     parser.add_argument("--headed", action="store_false", dest="headless", help="Mở giao diện browser trực quan (mặc định)")
     parser.add_argument("--model", choices=["omni", "veo"], default="omni", help="Mô hình video: omni (Omni 1.1 Flash) hoặc veo (Veo 3.1 - Fast)")
@@ -822,7 +844,7 @@ def main():
         target_sids = set(s.strip().upper() for s in args.scenes.split(",") if s.strip())
         all_clips = [c for c in all_clips if c.get("scene_id", "").upper() in target_sids]
         print(f"🎯 Đã lọc theo danh sách scenes: {len(all_clips)} clips")
-    elif args.mode == "demo" and args.limit == 0:
+    elif (args.mode == "demo" or args.pilot) and args.limit == 0:
         all_clips = all_clips[:2]
         print(f"🎯 [DEMO MODE OMNI HOOK] Tự động giới hạn 2 clips đầu tiên (SCENE_01 -> SCENE_02)!")
     elif args.limit > 0:
