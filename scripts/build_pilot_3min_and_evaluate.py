@@ -150,53 +150,11 @@ def build_pilot_3min(episode_id: str = "JP_EP0006_crypto_exchange_heist", force_
             or c_path.stat().st_mtime < seed_path.stat().st_mtime
         )
         if needs_render:
-            dur = SCENE_DURATIONS_44[i - 1]
-            sc_meta = scenes_meta[i - 1] if (i - 1) < len(scenes_meta) else {}
-            cam_dir = sc_meta.get("camera_directive", "STATIC_OVERHEAD")
-
-            tot_frames = max(25, int(dur * fps))
-            if sc_id == "SCENE_38":
-                # Special framing for Scene 38: anchor right edge to preserve hero '50%' numeral completely inside action-safe area
-                filter_expr = (
-                    f"zoompan=z='min(1.0 + 0.05*(on/{tot_frames}), 1.05)':d={tot_frames}:"
-                    f"x='(iw-iw/zoom)':y='ih/2-(ih/zoom/2)':s=1920x1080,fps={fps}"
-                )
-            elif cam_dir == "SLOW_HORIZONTAL_PAN":
-                pan_x = f"(iw-iw/zoom)*(on/{tot_frames})" if (i % 2 == 1) else f"(iw-iw/zoom)*(1 - on/{tot_frames})"
-                filter_expr = (
-                    f"zoompan=z=1.14:d={tot_frames}:"
-                    f"x='{pan_x}':y='(ih-ih/zoom)/2':s=1920x1080,fps={fps}"
-                )
-            elif cam_dir == "SUBTLE_TILT_DOWN":
-                tilt_y = f"(ih-ih/zoom)*(on/{tot_frames})" if (i % 2 == 1) else f"(ih-ih/zoom)*(1 - on/{tot_frames})"
-                filter_expr = (
-                    f"zoompan=z=1.14:d={tot_frames}:"
-                    f"x='(iw-iw/zoom)/2':y='{tilt_y}':s=1920x1080,fps={fps}"
-                )
-            elif cam_dir == "SLOW_PUSH_IN_0_1X":
-                filter_expr = (
-                    f"zoompan=z='min(1.0 + 0.15*(on/{tot_frames}), 1.15)':d={tot_frames}:"
-                    f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080,fps={fps}"
-                )
-            else:
-                filter_expr = (
-                    f"zoompan=z='min(1.0 + 0.06*(on/{tot_frames}), 1.06)':d={tot_frames}:"
-                    f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080,fps={fps}"
-                )
-
-            cmd_clip = [
-                ffmpeg_bin, "-y",
-                "-loop", "1",
-                "-i", str(seed_path),
-                "-vf", filter_expr,
-                "-t", f"{dur:.3f}",
-                "-c:v", "libx264",
-                "-pix_fmt", "yuv420p",
-                str(c_path)
-            ]
-            subprocess.run(cmd_clip, capture_output=True, check=True)
-            delta_score = validate_video_motion_temporal_delta(c_path)
-            print(f"  🎬 [{i:02d}/{total_scenes}] Rendered {c_path.name} ({dur:.2f}s, {cam_dir}, motion={delta_score:.1f})")
+            raise RuntimeError(
+                f"[PILOT] Clip {c_path.name} is missing or out of date. Static FFmpeg image zoompan shortcuts "
+                f"are strictly eliminated from the pipeline per Rule 118 & 121. Enforce authentic video generation "
+                f"via Google Flow (Omni 1.1 Flash / Veo) or Remotion kinetic composition."
+            )
 
     # Step C: Concat Clips 1 to 44
     concat_list = out_dir / "concat_clips.txt"

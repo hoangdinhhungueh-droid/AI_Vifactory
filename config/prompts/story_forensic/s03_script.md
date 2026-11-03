@@ -37,7 +37,7 @@ Produce pure valid JSON matching the following contract:
 ```json
 {
   "preset": "story_forensic",
-  "topic": "Topic Name",
+  "topic": "<TOPIC_NAME>",
   "total_words": 580,
   "est_duration_s": 235.0,
   "beats": [
@@ -47,34 +47,37 @@ Produce pure valid JSON matching the following contract:
       "lines": [
         {
           "line_id": "B1_L01",
-          "text": "Six hundred twenty billion won in construction costs, allegedly added through a single change order.",
+          "text": "<Shock quantitative catalyst sentence introducing decisive metric or financial figure, 8 to 15 words>",
           "claim_ids": ["C001"],
           "visual_hook": "stat_hero"
         },
         {
           "line_id": "B1_L02",
-          "text": "Stamp that decisive figure UNVERIFIED: the public ledger contains no primary document confirming it.",
+          "text": "<Official verdict, sanction, or status stamp sentence evaluating verified evidence, 8 to 15 words>",
           "claim_ids": ["C001"],
           "visual_hook": "stamp"
         },
         {
           "line_id": "B1_L03",
-          "text": "The documented paradox lies underneath: an offshore airport granted a statutory exemption from standard fiscal review.",
+          "text": "<Documented systemic paradox or statutory contradiction sentence, 8 to 15 words>",
           "claim_ids": ["C002"],
           "visual_hook": "ruler_measure"
         },
         {
           "line_id": "B1_L04",
-          "text": "A fixed opening deadline framed the project years before construction pricing was finalized.",
+          "text": "<Ticking calendar deadline framing the operational crisis, 8 to 15 words>",
           "claim_ids": ["C002", "C003"],
           "visual_hook": "red_thread"
         }
       ],
-      "word_count": 21
+      "word_count": 50
     }
   ]
 }
 ```
+
+> [!NOTE] Rule 128 Generic Contract Architecture
+> All schemas, prompts, and templates are 100% generic across any market (`EN`, `VN`, `KO`, `JA`) and topic domain. Never hardcode episode-specific facts or currency names into system templates.
 CRITICAL FORMAT MANDATE:
 Start your response IMMEDIATELY with the character `{` and end with `}`.
 Return ONLY valid JSON.

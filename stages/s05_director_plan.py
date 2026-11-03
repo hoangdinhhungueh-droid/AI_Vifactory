@@ -276,17 +276,17 @@ def build_vox_scene_prompts(
     except Exception as _img_err:
         logger.warning(f"[build_vox_scene_prompts] CL3 image prompt fallback notice: {_img_err}")
         image_prompt = (
-            f"Editorial investigative documentary frame in signature VOX paper-cut collage style. "
-            f"[Layer 1: Aged Cream Newsprint Desk with subtle print halftone grid] -> "
+            f"Authentic Vox CL3 visual system editorial documentary frame in paper-cut collage style. "
+            f"[Layer 1: Deep 3D paper diorama on aged archival cream newsprint #F4F1EA and kraft cardstock #C9BB9C with subtle print halftone grid] -> "
             f"[Layer 2: bold flat geometric color block in {color}] -> "
             f"[Layer 3: negative space reserved for large bold editorial typography '{headline}', occupying 25% of frame] -> "
-            f"[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge and realistic soft drop shadow: {hero_obj}. "
+            f"[Layer 4: high-contrast 60lpi halftone black-and-white photographic cutout with crisp 2-4px white deckle edge and offset crimson red #D62E1F or mustard gold #D9A441 drop shadow: {hero_obj}. "
             f"Interacting elements: {tool_prop}] -> "
-            f"[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration]. "
-            f"Strictly locked color palette: Vox Yellow #F2C230, Terracotta #C85A32, Navy #1B2B4A on Off-white Cream. "
+            f"[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration, turned-wood vermilion seal stamps, vintage brass calipers, taut red evidence yarn]. "
+            f"Strictly locked color palette: crimson red #D62E1F, mustard gold #D9A441, charcoal #1A1A1A on cream #F4F1EA. "
             f"Clear object-assembly composition, strong editorial hierarchy, tactile paper craft. "
-            f"Negative prompt: no clutter, no unnecessary objects, no glossy 3D rendering, no photorealistic background, "
-            f"no oversaturated rainbow colors, maintain clean premium VOX editorial collage."
+            f"Negative prompt: no photorealism, no real photography, no stainless steel forensic tables, no blue latex gloves, no police evidence tags, "
+            f"no clutter, no unnecessary objects, no glossy 3D rendering, no oversaturated rainbow colors, maintain clean premium VOX editorial collage."
         )
 
     # 7. Sub-Director Plan & Canonical CL3 4-Block Video Prompts (Rule 140 & video_prompts_system.md)
@@ -314,10 +314,12 @@ def build_vox_scene_prompts(
         logger.warning(f"[build_vox_scene_prompts] Kinetic sub-director fallback notice: {_k_err}")
         sub_plan = {}
         i2v_omni = (
-            f"[CAMERA & ENVIRONMENT]: {camera_directive} on Aged Cream Paper desk.\n"
-            f"[ACTION PHASE (0.2s - 0.4s)]: The {tool_prop} {evidence.tactile_action_verb} {hero_obj}.\n"
+            f"[STYLE BLOCK]: Deep 3D paper diorama on archival cream newsprint #F4F1EA and kraft cardstock. Halftone B&W 60lpi cutouts with offset crimson red #D62E1F drop-shadows.\n"
+            f"[CAMERA & ENVIRONMENT]: {camera_directive} on Aged Cream Paper desk. Settle on the {hero_obj}.\n"
+            f"[ACTION PHASE (0.2s - 0.4s)]: The {tool_prop} snaps briskly in 0.3s and {evidence.tactile_action_verb} {hero_obj}.\n"
             f"[PHYSICAL REACTION & RESIDUE]: {evidence.physical_reaction.capitalize()}, leaving {evidence.tactile_residue}.\n"
-            f"[HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze."
+            f"[HOLD & LIVING TEXTURE]: All objects lock into dead-stop hold with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze.\n"
+            f"[AVOID]: no photorealism, no stainless steel forensic tables, no blue latex gloves, no police evidence tags, no music, no voice-over."
         )
         i2v_google_flow = i2v_omni
 
@@ -513,9 +515,9 @@ CANONICAL_DOCUMENTARY_PROPS: List[Dict[str, Any]] = [
     {
         "id": "asset_seal_stamp",
         "type": "tactile_prop",
-        "name": "Crimson Forensic Verification Seal",
-        "desc": "Heavy rubber inspection seal with crimson indelible stamping ink",
-        "texture": "Solid rubber stamp with weathered wooden handle, crimson ink bleed on paper"
+        "name": "Turned-Wood Vermilion Docket Seal Stamp",
+        "desc": "Heavy turned-wood handle seal stamp with vermilion indelible ink on paper",
+        "texture": "Turned-wood vermilion seal stamp with deep crimson #D62E1F ink imprint and paper dent"
     },
     {
         "id": "asset_brass_pin",
@@ -534,7 +536,7 @@ CANONICAL_DOCUMENTARY_PROPS: List[Dict[str, Any]] = [
     {
         "id": "asset_magnifier_loupe",
         "type": "tactile_prop",
-        "name": "Forensic Inspection Magnifier Loupe",
+        "name": "Vintage Brass Inspection Magnifier Loupe",
         "desc": "Solid brass rim inspection glass with convex lens caustic reflection",
         "texture": "Polished brass bezel with optical glass reflection highlighting paper fibers"
     },
@@ -548,16 +550,16 @@ CANONICAL_DOCUMENTARY_PROPS: List[Dict[str, Any]] = [
     {
         "id": "asset_newsprint_desk",
         "type": "backdrop",
-        "name": "Aged Cream Newsprint Desk Surface",
-        "desc": "Wood-pulp unbleached newsprint desk with subtle halftone printing grid",
+        "name": "Aged Archival Cream Newsprint Desk Surface",
+        "desc": "Wood-pulp unbleached newsprint desk #F4F1EA with subtle halftone printing grid",
         "texture": "Unbleached aged cream paper fiber with 60lpi halftone grid lines"
     },
     {
         "id": "asset_evidence_envelope",
         "type": "paper_cutout",
-        "name": "Heavy Kraft Evidence Envelope",
+        "name": "Heavy Tan Kraft Envelope #C9BB9C",
         "desc": "Brown kraft postal document pouch with red string tie closure",
-        "texture": "#C8B293 rough kraft paper with visible wood speckles and tie grommet"
+        "texture": "#C9BB9C rough kraft paper with visible wood speckles and tie grommet"
     },
     {
         "id": "asset_financial_ledger",
@@ -569,23 +571,23 @@ CANONICAL_DOCUMENTARY_PROPS: List[Dict[str, Any]] = [
     {
         "id": "asset_paper_shears",
         "type": "tactile_prop",
-        "name": "Vintage Stainless Paper Shears",
+        "name": "Vintage Paper Cutting Shears",
         "desc": "Heavy office cutting shears with black enameled finger loops",
-        "texture": "Brushed stainless steel blades with bevel edge and black cast handles"
+        "texture": "Beveled steel blades with black cast handles resting on paper surface"
     },
     {
-        "id": "asset_fingerprint_card",
+        "id": "asset_stat_number",
         "type": "paper_cutout",
-        "name": "Biometric Forensic Fingerprint Card",
-        "desc": "Standard 8x8 index card with black ink rolled ridge impressions",
-        "texture": "Heavy white index cardstock with crisp black ink friction ridges"
+        "name": "Giant Bold Stat Number Cutout",
+        "desc": "Giant stat numeral cut from heavy crimson red #D62E1F cardstock treated as hero exhibit",
+        "texture": "Heavy #D62E1F cardstock die-cut with crisp 3px white deckle edge and flat drop-shadow"
     },
     {
         "id": "asset_flow_arrow",
         "type": "graphic_element",
         "name": "Die-Cut Vector Flow Indicator",
-        "desc": "Bold geometric directional chevron cut from Vox Yellow cardstock",
-        "texture": "Solid #F2C230 cardstock cutout with 2px white keyline and soft shadow"
+        "desc": "Bold geometric directional chevron cut from mustard gold #D9A441 cardstock",
+        "texture": "Solid #D9A441 cardstock cutout with 2px white keyline and soft shadow"
     },
     {
         "id": "asset_cadastral_map",
@@ -613,21 +615,21 @@ CANONICAL_DOCUMENTARY_PROPS: List[Dict[str, Any]] = [
         "type": "tactile_prop",
         "name": "Embossed Official Notarial Seal",
         "desc": "Circular saw-tooth metallic gold wafer with embossed institutional crest",
-        "texture": "Muted gold foil wafer with 3D raised relief serrated edges"
+        "texture": "Mustard gold foil #D9A441 wafer with 3D raised relief serrated edges"
     },
     {
-        "id": "asset_evidence_tag",
+        "id": "asset_red_yarn",
         "type": "tactile_prop",
-        "name": "Perforated Cardstock Evidence Tag",
-        "desc": "Manila shipping tag with reinforced fiber washer and copper wire loop",
-        "texture": "Heavy cardstock tag with stamped case number and twisted wire tie"
+        "name": "Taut Red Evidence Yarn Strand",
+        "desc": "Taut red fibrous yarn stretched between copper pins on aged archival board",
+        "texture": "Vibrant crimson #D62E1F yarn under mechanical tension with micro vibration"
     },
     {
-        "id": "asset_ruler_scale",
+        "id": "asset_brass_caliper",
         "type": "tactile_prop",
-        "name": "Metric Photogrammetry Scale Bar",
-        "desc": "L-shaped black-and-white centimeter ruler used in crime scene photography",
-        "texture": "Matte white plastic rule with alternating 1cm black blocks"
+        "name": "Vintage Brass Vernier Caliper",
+        "desc": "Vintage brass vernier caliper measuring document margin and locking measurement",
+        "texture": "Aged brass vernier caliper with engraved scale marks and vernier lock"
     },
     {
         "id": "asset_dossier_folder",
@@ -985,7 +987,9 @@ def run(ctx: RunContext) -> StageArtifact:
             matched_line_id = all_s3_lines[idx] if idx < len(all_s3_lines) else f"L{idx+1:02d}"
             shot_prompt = (
                 f"Tactile stop-motion editorial evidence exhibit for {sc.scene_id}: {sc.narration[:60]}. "
-                f"Aged cream newsprint paper background #F4F1EA, bold black ink comic linework, cinematic 16:9 widescreen composition."
+                f"Deep 3D paper diorama on archival cream paper #F4F1EA and kraft cardstock #C9BB9C, "
+                f"halftone black-and-white 60lpi cutouts with offset crimson ink #D62E1F or mustard gold #D9A441 drop-shadows, "
+                f"tactile paper layers, deckle torn edges, cinematic 16:9 widescreen composition."
             )
             story_shots.append(StoryShotPlan(
                 shot_id=shot_id,

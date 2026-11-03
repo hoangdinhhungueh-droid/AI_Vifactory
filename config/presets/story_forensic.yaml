@@ -35,6 +35,10 @@ retention:
 visual:
   palette:
     paper: "#F4F1EA"
+    kraft: "#C9BB9C"
+    red: "#D62E1F"
+    gold: "#D9A441"
+    charcoal: "#1A1A1A"
   tactile_props:
     - newspaper_cutout
     - stamp

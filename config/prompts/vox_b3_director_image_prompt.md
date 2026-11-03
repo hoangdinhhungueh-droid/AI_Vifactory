@@ -78,11 +78,11 @@ Every image prompt must be constructed with 5 explicit layered brackets:
 `[Layer 3: negative space reserved for large bold editorial typography '<headline> // <english_tag>', occupying 25-35% of frame] -> `
 `[Layer 4: high-contrast tactile paper cutout subject with crisp 2-4px white deckle edge and realistic soft drop shadow: <hero_cutout_object>. Interacting elements: <interacting_objects>] -> `
 `[Layer 5: vintage print ink texture, natural paper grain, subtle fold creases, authentic newspaper print misregistration]. `
-`Strictly locked color palette: Vox Yellow #F2C230, Terracotta #C85A32, Navy #1B2B4A, Muted Gold #D4AF37 on Off-white Cream #F4F1EA. `
+`Strictly locked color palette: Crimson Red #D62E1F, Mustard Gold #D9A441, Charcoal #1A1A1A, Tan Kraft #C9BB9C on Archival Cream #F4F1EA. `
 `Clear object-assembly composition, strong editorial hierarchy, tactile paper craft.`
 
 **NEGATIVE PROMPT (MANDATORY SUFFIX)**:
-`Negative prompt: no clutter, no unnecessary objects, no excessive icons, no visual noise, no random decorations, no fantasy elements, no sci-fi elements, no anime, no cartoon style, no CGI look, no glossy 3D rendering, no photorealistic background, no oversaturated rainbow colors, no poor composition, no distorted anatomy, no watermark, no logos, maintain a clean premium VOX-style editorial collage with layered paper textures and documentary-quality composition.`
+`Negative prompt: no photorealism, no real photography, no stainless steel forensic tables, no blue latex gloves, no police evidence tags, no clutter, no unnecessary objects, no excessive icons, no visual noise, no random decorations, no fantasy elements, no sci-fi elements, no anime, no cartoon style, no CGI look, no glossy 3D rendering, no photorealistic background, no oversaturated rainbow colors, no poor composition, no distorted anatomy, no watermark, no logos, maintain a clean premium VOX-style editorial collage with layered paper textures and documentary-quality composition.`
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -125,20 +125,11 @@ def render_episode(episode_id, market="en"):
             
             scene_mp4 = ep_dir / f"sc_{i:03d}.mp4"
             if not scene_mp4.exists():
-                fg_x = "50" if sc.get("foreground_position", "left") == "left" else "1220"
-                cmd_sc = [
-                    "ffmpeg", "-y",
-                    "-loop", "1", "-t", f"{scene_duration:.2f}", "-i", str(bg_file),
-                    "-loop", "1", "-t", f"{scene_duration:.2f}", "-i", str(fg_file),
-                    "-filter_complex",
-                    f"[0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='min(zoom+0.0005,1.08)':d=1:s=1920x1080[bg];"
-                    f"[1:v]scale=650:650[fg];"
-                    f"[bg][fg]overlay={fg_x}:380[v]",
-                    "-map", "[v]",
-                    "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-r", "30",
-                    str(scene_mp4)
-                ]
-                subprocess.run(cmd_sc, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                raise RuntimeError(
+                    f"Scene video {scene_mp4} is missing. Static FFmpeg image shortcuts (zoompan) "
+                    f"are strictly eliminated from the pipeline per Rule 118 & 121. "
+                    f"Enforce authentic video clips from Google Flow / Veo / Omni or Remotion kinetic composition."
+                )
             f.write(f"file '{scene_mp4}'\n")
     
     print(f"Generated {total_scenes} scene segments ✅")

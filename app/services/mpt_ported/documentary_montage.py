@@ -149,28 +149,11 @@ async def _download(url: str, dest: str) -> str:
 
 async def _kenburns(img_path: str, out_path: str, dur: float,
                     aspect: str = None) -> str:
-    """Animate a still into a slow zoom/pan clip (archival documentary feel)."""
-    w, h = _kb_size(aspect)
-    fps = 30
-    frames = int(dur * fps)
-    vf = (
-        "scale=" + str(w * 2) + ":" + str(h * 2)
-        + ":force_original_aspect_ratio=increase,"
-        + "crop=" + str(w * 2) + ":" + str(h * 2) + ","
-        + "zoompan=z='min(zoom+0.0012,1.25)':d=" + str(frames)
-        + ":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-        + "s=" + str(w) + "x" + str(h) + ":fps=" + str(fps) + ","
-        + "format=yuv420p"
+    """Eliminated: Static image shortcuts (zoompan) are strictly forbidden."""
+    raise RuntimeError(
+        "FFmpeg static image shortcuts (zoompan) are strictly eliminated from the pipeline per Rule 118 & 121. "
+        "Enforce authentic video clips from Google Flow / Veo / Omni or Remotion kinetic composition."
     )
-    cmd = ["ffmpeg", "-y", "-loop", "1", "-i", img_path, "-vf", vf,
-           "-t", str(dur), "-c:v", "libx264", "-preset", "fast",
-           "-pix_fmt", "yuv420p", "-an", out_path]
-    proc = await asyncio.create_subprocess_exec(
-        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-    _, err = await proc.communicate()
-    if proc.returncode != 0:
-        raise RuntimeError("kenburns failed: " + err.decode()[-200:])
-    return out_path
 
 
 async def build_scene_montage(query: str, lang_code: str, episode_id: str,

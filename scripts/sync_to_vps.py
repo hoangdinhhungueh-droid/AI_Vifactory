@@ -17,23 +17,33 @@ FILES_TO_SYNC = [
     "core/pacing_budgeter.py",
     "core/instinct_manager.py",
     "config/active_instincts.json",
+    "config/presets/story_forensic.yaml",
+    "config/presets/vox_narrative.yaml",
+    "config/prompts/style-config.yaml",
+    "config/prompts/b2_editorial_prompt.md",
+    "config/prompts/b3_director_prompt.md",
+    "config/prompts/b35_visual_rules.md",
+    "config/prompts/vox_b3_director_image_prompt.md",
+    "config/prompts/cl3_vox_engine/avoid_base.md",
+    "config/prompts/cl3_vox_engine/t2i_style.md",
+    "config/prompts/story_forensic/s03_script.md",
+    "config/prompts/story_forensic/s05_director_plan.md",
+    "config/prompts/story_forensic/s07_image_style_prefix.md",
+    "config/prompts/archive/b3_director_hollywood_legacy.md",
+    "config/prompts/archive/b35_visual_rules_magenta_legacy.md",
     "app/services/semantic_evidence_extractor.py",
     "app/services/kinetic_sub_director.py",
     "app/services/build_remotion_props.py",
     "app/services/unified_vox_director.py",
     "app/services/director_planner_b3.py",
     "app/services/pilot_builder.py",
+    "app/services/mpt_ported/documentary_montage.py",
     "stages/s03_script.py",
     "stages/s05_director_plan.py",
     "stages/s08_video_gen.py",
-    "config/prompts/cl3_vox_engine/avoid_base.md",
-    "config/prompts/cl3_vox_engine/t2i_style.md",
-    "config/prompts/story_forensic/s03_script.md",
     "scripts/run_vox_media_pipeline.py",
-    "config/prompts/b3_director_prompt.md",
-    "config/prompts/b35_visual_rules.md",
-    "config/prompts/archive/b3_director_hollywood_legacy.md",
-    "config/prompts/archive/b35_visual_rules_magenta_legacy.md",
+    "scripts/build_pilot_3min_and_evaluate.py",
+    "scripts/render_episode_parameterized.py",
     "data/notion_audit/prompt_engine_page_ids.json",
     "tests/test_skill_gateway.py",
     "tests/test_pacing_budgeter.py",
@@ -114,10 +124,13 @@ def main():
         "/root/video_factory/app/services/unified_vox_director.py "
         "/root/video_factory/app/services/director_planner_b3.py "
         "/root/video_factory/app/services/pilot_builder.py "
+        "/root/video_factory/app/services/mpt_ported/documentary_montage.py "
         "/root/video_factory/stages/s03_script.py "
         "/root/video_factory/stages/s05_director_plan.py "
         "/root/video_factory/stages/s08_video_gen.py "
-        "/root/video_factory/scripts/run_vox_media_pipeline.py"
+        "/root/video_factory/scripts/run_vox_media_pipeline.py "
+        "/root/video_factory/scripts/build_pilot_3min_and_evaluate.py "
+        "/root/video_factory/scripts/render_episode_parameterized.py"
     )
     comp_res = client.call_tool("run_command", {"command": compile_cmd})
     print("Compile exit_code:", comp_res.get("exit_code"))

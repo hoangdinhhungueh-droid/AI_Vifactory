@@ -1,0 +1,77 @@
+name: vox_narrative
+aspect_ratio: "16:9"
+market: "EN"
+resolution:
+  width: 1920
+  height: 1080
+duration_window_s:
+  min: 180
+  max: 300
+  target: 240
+narration:
+  wpm_estimate: 150
+  word_budget:
+    min: 450
+    max: 750
+beats:
+  - id: B1_hook
+    share: 0.08
+    intent: "Cold strike with decisive metric or figure. Central systemic paradox and ticking deadline. 3-4 snappy micro-scenes."
+  - id: B2_setup
+    share: 0.17
+    intent: "Pre-crisis institutional facade, official metrics, and peripheral fractures."
+  - id: B3_scheme
+    share: 0.33
+    intent: "Forensic autopsy of financial plumbing, legal clauses, and accounting ledgers."
+  - id: B4_crack
+    share: 0.25
+    intent: "Whistleblower leaks, regulatory collision, and domino collapse."
+  - id: B5_aftermath
+    share: 0.17
+    intent: "Regulatory reckoning, lasting systemic lessons, and circular echo resolution."
+retention:
+  pattern_interrupt_max_gap_s: 30
+  max_consecutive_same_h_family: 2
+visual:
+  palette:
+    paper: "#F4F1EA"
+    kraft: "#C9BB9C"
+    red: "#D62E1F"
+    gold: "#D9A441"
+    charcoal: "#1A1A1A"
+  tactile_props:
+    - turned_wood_seal
+    - brass_caliper
+    - red_thread
+    - stat_number
+    - newspaper_cutout
+  shot_avg_s: 5.5
+  veo_share_max: 0.30
+  forbid_photoreal_real_persons: true
+legal:
+  required_status_language:
+    convicted: []
+    charged:
+      - "allegedly"
+      - "according to the indictment"
+      - "according to the complaint"
+      - "in the complaint"
+      - "complaint alleges"
+      - "charged with"
+      - "accused of"
+      - "sued for"
+      - "court filing"
+    alleged:
+      - "allegedly"
+      - "alleged"
+      - "claimed"
+      - "purported"
+      - "according to"
+    settled:
+      - "settled without admitting wrongdoing"
+      - "settled"
+      - "agreed to pay without admitting fault"
+  min_independent_sources: 3
+tts:
+  voice: "en-US-ChristopherNeural"
+  rate: "+15%"
