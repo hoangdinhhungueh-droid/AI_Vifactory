@@ -75,6 +75,11 @@ def generate_7acc_flow_manifest(target_dir: Path, episode_id: str, scenes: List[
         )
         hero = getattr(s, "hero_cutout_object", None) or (s.get("hero_cutout_object") if isinstance(s, dict) else "")
         cam = getattr(s, "camera_directive", None) or (s.get("camera_directive") if isinstance(s, dict) else "STATIC_OVERHEAD")
+        h_fam = (
+            getattr(s, "h_family", None)
+            or (s.get("h_family") if isinstance(s, dict) else "")
+            or ""
+        )
 
         clips.append({
             "scene_id": sc_id,
@@ -84,7 +89,8 @@ def generate_7acc_flow_manifest(target_dir: Path, episode_id: str, scenes: List[
             "prompt": i2v_prompt,
             "duration_sec": dur,
             "hero_cutout_object": hero,
-            "camera_directive": cam
+            "camera_directive": cam,
+            "h_family": h_fam,
         })
 
     manifest = {
@@ -119,7 +125,7 @@ def build_vox_scene_prompts(
         dur = float(scene.duration_est_sec)
     else:
         from core.pacing_budgeter import estimate_calibrated_speech_duration
-        dur = estimate_calibrated_speech_duration(sentence_text, market=market_str)
+        dur = estimate_calibrated_speech_duration(sentence_text, market=market_str, docudrama_tempo=True)
 
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
     sc_id_str = getattr(scene, "scene_id", f"SCENE_{idx+1:02d}")
@@ -978,7 +984,10 @@ def run(ctx: RunContext) -> StageArtifact:
     curr_dur = sum(float(s.duration_est_sec or 5.0) for s in scenes)
     current_wpm = calculate_wpm(total_words, curr_dur)
     if total_words > 0 and (current_wpm < 115.0 or current_wpm > 135.0 or abs(curr_dur - target_run_s) > 1.0):
-        calibrate_scene_durations_to_target(scenes, target_total_duration_sec=target_run_s)
+        calibrate_scene_durations_to_target(scenes, target_total_duration_sec=target_run_s, market=market)
+        for sc in scenes:
+            if hasattr(sc, "shots") and sc.shots:
+                sc.shots[0].duration_sec = float(sc.duration_est_sec or 5.0)
 
     total_runtime = sum(float(s.duration_est_sec or 5.0) for s in scenes)
     chunks = partition_timeline_into_chunks(scenes)

@@ -4,7 +4,7 @@ Standardizes length measurement, unit counting, and narration pacing estimation
 across all target markets in the AI Video Factory pipeline (EN, JP, KR, ZH):
 1. Latin / Spaced Languages (EN):
    - Unit = Words (whitespace / regex delimited).
-   - Speed = ~140-150 words per minute (WPM).
+   - Speed = ~115-135 words per minute (WPM).
 2. Japanese (JP):
    - Unit = Characters (no whitespace separation).
    - Speed = ~350-400 characters per minute (CPM).
@@ -17,7 +17,7 @@ across all target markets in the AI Video Factory pipeline (EN, JP, KR, ZH):
 """
 
 import re
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Optional
 
 # Unicode ranges
 CJK_REGEX = re.compile(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]')
@@ -181,4 +181,4 @@ def estimate_narration_seconds(text: str, market: str = "EN") -> float:
         return round(chars / 5.0, 2)
     else:
         words = get_word_count(text)
-        return round(words / 2.4, 2)
+        return round(words / 2.0833, 2)

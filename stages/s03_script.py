@@ -41,45 +41,45 @@ def _build_grounded_story_beats(
             return " ".join(words[:14])
         return f"documented evidentiary findings confirm critical structural liabilities regarding {topic}"
 
-    # Build Beat 1: Hook (0-20s, ~75 words)
+    # Build Beat 1: Hook (0-20s, ~40-45 words, 19.2s)
     b1_lines = [
         StorySceneLine(
             line_id="B1_L01",
-            text=f"In an acute market crisis, {topic} triggered an institutional reckoning as billions in market valuation evaporated almost overnight.",
+            text=f"In an acute market crisis, {topic} triggered an immediate valuation collapse as capital evaporated.",
             claim_ids=[_cid(0), _cid(1)],
             visual_hook="stamp",
         ),
         StorySceneLine(
             line_id="B1_L02",
-            text=f"Beneath the official surface lay an increasingly precarious commercial architecture: {_claim_text(0)}.",
+            text=f"Beneath the surface lay an acute vulnerability: {_claim_text(0)}.",
             claim_ids=[_cid(0)],
             visual_hook="ruler_measure",
         ),
         StorySceneLine(
             line_id="B1_L03",
-            text=f"What was hailed across mainstream financial press as market leadership suddenly transformed into an existential forensic inquiry: {_claim_text(1)}.",
+            text=f"What appeared as market leadership transformed into a forensic investigation: {_claim_text(1)}.",
             claim_ids=[_cid(1)],
             visual_hook="red_thread",
         ),
         StorySceneLine(
             line_id="B1_L04",
-            text="Investigators immediately confronted the core paradox: how did systemic vulnerabilities compound in plain sight before regulatory examiners intervened?",
+            text="Investigators confronted the core paradox: how did this vulnerability compound in plain sight before regulators intervened?",
             claim_ids=[_cid(0), _cid(1)],
             visual_hook="magnifier",
         ),
     ]
 
-    # Build Beat 2: Setup (~40s, ~90 words)
+    # Build Beat 2: Setup (~40s, ~85 words, 40.8s)
     b2_lines = [
         StorySceneLine(
             line_id="B2_L01",
-            text="Prior to the unraveling, corporate leadership projected an unassailable commercial trajectory, assuring institutional shareholders that competitive moats remained robust.",
+            text="Prior to the unraveling, corporate leadership projected an unassailable commercial trajectory, assuring shareholders that competitive moats and balance sheets remained thoroughly robust.",
             claim_ids=[_cid(0)],
             visual_hook="cutout",
         ),
         StorySceneLine(
             line_id="B2_L02",
-            text=f"Official regulatory disclosures documented foundational structures that appeared standard on the surface: {_claim_text(1)}.",
+            text=f"Official regulatory disclosures documented foundational operational structures that appeared standard on the surface: {_claim_text(1)}.",
             claim_ids=[_cid(1)],
             visual_hook="compass_arc",
         ),
@@ -97,7 +97,7 @@ def _build_grounded_story_beats(
         ),
     ]
 
-    # Build Beat 3: Scheme / Mechanism (~80s, ~165 words)
+    # Build Beat 3: Scheme / Mechanism (~80s, ~165 words, 79.2s)
     b3_lines = [
         StorySceneLine(
             line_id="B3_L01",
@@ -125,13 +125,25 @@ def _build_grounded_story_beats(
         ),
         StorySceneLine(
             line_id="B3_L05",
-            text="By the time supervisory bodies initiated inquiry, the transmission mechanism had already locked capital reserves into unsustainable counterparty obligations.",
+            text="Internal correspondence documented growing executive apprehension over uncollateralized guarantees, yet capital allocators continued doubling down on leveraged commitments without board approval.",
             claim_ids=[_cid(1), _cid(3)],
             visual_hook="highlighter",
         ),
+        StorySceneLine(
+            line_id="B3_L06",
+            text=f"By the time supervisory bodies initiated inquiry, the transmission mechanism had already locked capital reserves into unsustainable counterparty obligations: {_claim_text(4)}.",
+            claim_ids=[_cid(2), _cid(4)],
+            visual_hook="stamp",
+        ),
+        StorySceneLine(
+            line_id="B3_L07",
+            text="Forensic transaction tracing mapped circular cash conduits between shell subsidiaries designed to inflate operating revenues before compliance audits.",
+            claim_ids=[_cid(1), _cid(4)],
+            visual_hook="compass_arc",
+        ),
     ]
 
-    # Build Beat 4: Crack / Unraveling (~60s, ~135 words)
+    # Build Beat 4: Crack / Unraveling (~60s, ~125 words, 60.0s)
     b4_lines = [
         StorySceneLine(
             line_id="B4_L01",
@@ -147,23 +159,29 @@ def _build_grounded_story_beats(
         ),
         StorySceneLine(
             line_id="B4_L03",
-            text="As market participants scrutinized the threat of automated disruption diverting fundamental cash flows, capital flight triggered an unprecedented valuation plunge.",
+            text="As market participants scrutinized the threat of automated disruption diverting fundamental cash flows, institutional capital flight triggered an unprecedented valuation plunge across secondary debt markets.",
             claim_ids=[_cid(2), _cid(5)],
             visual_hook="scissors_cut",
         ),
         StorySceneLine(
             line_id="B4_L04",
-            text="Whistleblower reports and internal memoranda leaked to major newsrooms, stripping away the final layer of executive deniability as panic swept institutional trading desks.",
+            text="Whistleblower reports and internal memoranda leaked to major financial newsrooms, stripping away the final layer of executive deniability as panic swept trading desks.",
             claim_ids=[_cid(4), _cid(6)],
             visual_hook="stamp",
         ),
+        StorySceneLine(
+            line_id="B4_L05",
+            text="Emergency liquidity facilities were abruptly suspended when auditor sign-offs failed, forcing debt covenants into immediate technical default.",
+            claim_ids=[_cid(5), _cid(6)],
+            visual_hook="ruler_measure",
+        ),
     ]
 
-    # Build Beat 5: Aftermath (~40s, ~95 words)
+    # Build Beat 5: Aftermath (~40s, ~85 words, 40.8s)
     b5_lines = [
         StorySceneLine(
             line_id="B5_L01",
-            text="The collapse obliterated billions in stakeholder equity, serving as an unsparing warning on unchecked operational dependencies and regulatory arbitrage.",
+            text="The collapse obliterated billions in stakeholder equity, serving as an unsparing warning on unchecked operational dependencies and regulatory arbitrage across modern capital markets.",
             claim_ids=[_cid(0), _cid(3)],
             visual_hook="stamp",
         ),
@@ -181,7 +199,7 @@ def _build_grounded_story_beats(
         ),
         StorySceneLine(
             line_id="B5_L04",
-            text="For international markets, the conclusion is inescapable: no commercial narrative can permanently defy verified accounting ledgers and organic audience retention.",
+            text="For international markets, the conclusion is inescapable: no commercial narrative can permanently defy verified accounting ledgers and organic economic gravity.",
             claim_ids=[_cid(2), _cid(len(claims) - 1)],
             visual_hook="red_thread",
         ),
@@ -466,6 +484,9 @@ def run(ctx: RunContext) -> StageArtifact:
         # Apply limits from profile if specified (e.g. e2e_min limits to 1 scene)
         max_sc = ctx.config.limits.max_scenes
         scenes = all_scenes[:max_sc] if (max_sc > 0 and len(all_scenes) > max_sc) else all_scenes
+        if len(scenes) < len(all_scenes):
+            est_duration = round(sum(float(s.duration_est_sec) for s in scenes), 1)
+            total_words = sum(len(s.narration.split()) for s in scenes)
 
         full_script_text = "\n".join(s.narration for s in all_scenes)
 

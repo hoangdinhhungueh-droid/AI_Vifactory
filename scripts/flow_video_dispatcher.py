@@ -848,6 +848,7 @@ def main():
     parser.add_argument("--headed", action="store_false", dest="headless", help="Mở giao diện browser trực quan (mặc định)")
     parser.add_argument("--model", choices=["omni", "veo"], default="omni", help="Mô hình video: omni (Omni 1.1 Flash) hoặc veo (Veo 3.1 - Fast)")
     parser.add_argument("--force", action="store_true", default=False, help="Sinh lại clip ngay cả khi file đã tồn tại")
+    parser.add_argument("--dry-run", action="store_true", default=False, help="Kiểm tra preflight (manifest, seed images, profiles) mà không mở trình duyệt")
     args = parser.parse_args()
 
     episode_dir = ROOT_DIR / "episodes" / args.episode
@@ -880,6 +881,29 @@ def main():
     print(f"🤖 MODEL TARGET: {'Omni 1.1 Flash' if args.model == 'omni' else 'Veo 3.1 - Fast'}")
     print(f"📦 Tổng số clips xử lý: {len(all_clips)}")
     print(f"📁 Thư mục lưu trữ: {out_dir}")
+
+    if args.dry_run:
+        print("\n" + "=" * 70)
+        print("🔍 [PREFLIGHT DRY-RUN] Kiểm tra điều kiện thực thi:")
+        print(f"   Episode: {args.episode}")
+        print(f"   Model: {'Omni 1.1 Flash' if args.model == 'omni' else 'Veo 3.1 - Fast'}")
+        print(f"   Số clips cần sinh: {len(all_clips)}")
+        seed_errors = []
+        for c in all_clips:
+            sc_id = c.get("scene_id", "")
+            seed_p = get_seed_image_path(episode_dir, sc_id)
+            if not seed_p or not seed_p.exists() or seed_p.stat().st_size < 1000:
+                seed_errors.append(f"Scene {sc_id}: seed image missing at {seed_p}")
+            else:
+                print(f"   ✓ {sc_id} seed: {seed_p.name} ({seed_p.stat().st_size:,} bytes)")
+        if seed_errors:
+            print("\n❌ LỖI SEED IMAGES:")
+            for err in seed_errors:
+                print(f"   - {err}")
+            sys.exit(1)
+        print(f"\n✅ PREFLIGHT CHECK PASSED: 100% {len(all_clips)} seed images sẵn sàng cho Omni pilot!")
+        print("=" * 70 + "\n")
+        sys.exit(0)
 
     # Thứ tự hạm đội ưu tiên đã xác thực đăng nhập Google Flow (chỉ giữ 6 tài khoản còn gói Pro)
     verified_order = ['acc_03', 'acc_02', 'acc_04', 'acc_05', 'acc_07', 'acc_01']

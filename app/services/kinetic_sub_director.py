@@ -1681,9 +1681,10 @@ def build_cl3_paper_diorama_prompt(
     fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
 
     action_verb = plan_verb or ev.tactile_action_verb
-    phys_react = plan_reaction or ev.physical_reaction
-    tac_res = plan_residue or ev.tactile_residue
-    action_text = f"Action: The {clean_tool} snaps briskly in 0.3s and {action_verb} the document, {phys_react}, leaving {tac_res}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+    phys_react = (plan_reaction or ev.physical_reaction).strip()
+    tac_res = (plan_residue or ev.tactile_residue).strip()
+    causing_clause = phys_react if phys_react.lower().startswith("causing") else f"causing {phys_react}"
+    action_text = f"Action: The {clean_tool} snaps briskly in 0.3s and {action_verb} the document, {causing_clause}, leaving {tac_res}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
     camera_line = f"{cam_pos_line.rstrip('.')}. Settle on the {clean_hero} in sharp focus."
 
     # Validate against forbidden camera words in shot text (e.g. no whip when static overhead)

@@ -182,9 +182,9 @@ def test_clamp_narration_duration_to_pacing():
 
 def test_calibrate_scene_durations_to_target():
     scenes = [
-        {"scene_id": "SC_01", "narration": "In an acute market crisis, the collapse began with alarming speed."}, # 11 words
-        {"scene_id": "SC_02", "narration": "Regulatory examiners uncovered major anomalies across the primary accounting ledgers."}, # 9 words
-        {"scene_id": "SC_03", "narration": "Documented statutory exemptions allowed the consortium to proceed unhindered."}, # 8 words
+        {"scene_id": "SC_01", "narration": "In an acute market crisis, the collapse began with alarming speed."},  # 11 words
+        {"scene_id": "SC_02", "narration": "Regulatory examiners uncovered major anomalies across the primary accounting ledgers."},  # 9 words
+        {"scene_id": "SC_03", "narration": "Documented statutory exemptions allowed the consortium to proceed unhindered."},  # 8 words
     ]
     # Total words = 11 + 10 + 9 = 30 words
     # Calibrate to 14.4s (30 / 14.4 * 60 = 125.0 WPM)
@@ -193,3 +193,105 @@ def test_calibrate_scene_durations_to_target():
 
     dur_sum = sum(s["duration_est_sec"] for s in scenes)
     assert abs(dur_sum - 14.4) <= 0.1
+
+
+def test_calibrate_scene_durations_edge_cases_no_negative_durations():
+    # 1. 10 scenes with very short target duration (20.0s) -> must not produce negative or zero durations
+    scenes_short = [{"scene_id": f"SC_{i:02d}", "narration": "Short line."} for i in range(10)]
+    calibrate_scene_durations_to_target(scenes_short, target_total_duration_sec=20.0)
+    durs_short = [s["duration_est_sec"] for s in scenes_short]
+    assert all(d > 0.0 for d in durs_short), f"Found non-positive durations: {durs_short}"
+    assert abs(sum(durs_short) - 20.0) <= 0.1
+
+    # 2. 5 verbose scenes + 1 empty/zero-word scene
+    scenes_mixed = [{"scene_id": f"SC_{i:02d}", "narration": "Detailed investigative document statement with extensive claims. " * 5} for i in range(5)]
+    scenes_mixed.append({"scene_id": "SC_06", "narration": ""})
+    calibrate_scene_durations_to_target(scenes_mixed, target_total_duration_sec=25.0)
+    durs_mixed = [s["duration_est_sec"] for s in scenes_mixed]
+    assert all(d > 0.0 for d in durs_mixed), f"Found non-positive durations in mixed: {durs_mixed}"
+    assert abs(sum(durs_mixed) - 25.0) <= 0.1
+
+    # 3. All empty scenes
+    scenes_empty = [{"scene_id": f"SC_{i:02d}", "narration": ""} for i in range(4)]
+    calibrate_scene_durations_to_target(scenes_empty, target_total_duration_sec=10.0)
+    durs_empty = [s["duration_est_sec"] for s in scenes_empty]
+    assert all(d > 0.0 for d in durs_empty)
+    assert abs(sum(durs_empty) - 10.0) <= 0.1
+
+    # 4. Single scene
+    single_scene = [{"scene_id": "SC_01", "narration": "Single standalone scene narration."}]
+    calibrate_scene_durations_to_target(single_scene, target_total_duration_sec=12.0)
+    assert single_scene[0]["duration_est_sec"] == 12.0
+
+
+def test_calibrate_scene_durations_multilingual_cjk():
+    # Japanese scenes with non-whitespace text
+    jp_scenes = [
+        {"scene_id": "SC_01", "narration": "公正取引委員会は不正な不動産勧誘行為に対して公式な警告を発信しました。"},  # 36 chars
+        {"scene_id": "SC_02", "narration": "調査の結果複数の重大な法令違反が確認されました。"},  # 25 chars
+    ]
+    calibrate_scene_durations_to_target(jp_scenes, target_total_duration_sec=10.0, market="JP")
+    jp_durs = [s["duration_est_sec"] for s in jp_scenes]
+    assert all(d > 0.0 for d in jp_durs)
+    assert abs(sum(jp_durs) - 10.0) <= 0.1
+    # First scene has more chars than second, so duration should be larger
+    assert jp_durs[0] > jp_durs[1]
+
+
+def test_docudrama_speech_rate_and_tempo_flag():
+    from core.pacing_budgeter import DOCUDRAMA_SPEECH_RATES, DOCUDRAMA_WORDS_PER_SEC
+
+    assert DOCUDRAMA_SPEECH_RATES["EN"] == DOCUDRAMA_WORDS_PER_SEC
+    assert 2.0 <= DOCUDRAMA_SPEECH_RATES["EN"] <= 2.2
+
+    # Verify docudrama_tempo flag in estimate_calibrated_speech_duration
+    en_sentence = "The investigation revealed that developers collected deposits long before obtaining official construction and zoning approval from regulators."  # 17 words
+    # News tempo (3.2 wps): ~5.3s
+    dur_news = estimate_calibrated_speech_duration(en_sentence, "EN", docudrama_tempo=False)
+    assert 5.0 <= dur_news <= 5.5
+
+    # Docudrama tempo (2.0833 wps): 17 / 2.0833 = ~8.16s
+    dur_docudrama = estimate_calibrated_speech_duration(en_sentence, "EN", docudrama_tempo=True)
+    assert 8.0 <= dur_docudrama <= 8.5
+
+
+def test_fallback_story_beats_adhere_to_docudrama_pacing():
+    from types import SimpleNamespace
+
+    from stages.s03_script import _build_grounded_story_beats
+
+    claims = [
+        SimpleNamespace(
+            claim_id=f"C{i:03d}",
+            claim="Sample claim text for testing narrative generation in docudrama pipeline.",
+            legal_status="fact"
+        )
+        for i in range(10)
+    ]
+    beats = _build_grounded_story_beats("Gadeok Airport Cost Risk", claims, {c.claim_id: c for c in claims})
+    total_words = sum(sum(len(ln.text.split()) for ln in lines) for _, _, lines in beats)
+
+    # Must fall squarely inside docudrama bounds: 460-540 words, 115-135 WPM across 240s
+    assert 460 <= total_words <= 540, f"Fallback words {total_words} not in [460, 540]"
+    wpm = calculate_wpm(total_words, 240.0)
+    assert 115.0 <= wpm <= 135.0, f"Fallback WPM {wpm} not in [115.0, 135.0]"
+    assert is_docudrama_pacing_valid(total_words, 240.0) is True
+
+
+def test_cl3_paper_diorama_prompt_rule140_compound_causal_verb_syntax():
+    from app.services.kinetic_sub_director import build_cl3_paper_diorama_prompt
+
+    prompt = build_cl3_paper_diorama_prompt(
+        "The regulatory board uncovered secret escrow accounts holding billions in disputed sovereign bonds.",
+        market="EN",
+        scene_id="SCENE_01",
+    )
+    act_lines = [line for line in prompt.split("\n") if line.startswith("Action:")]
+    assert len(act_lines) == 1
+    act_line = act_lines[0]
+    assert "causing" in act_line, f"Prompt Action line missing 'causing' clause: {act_line}"
+    assert "leaving" in act_line, f"Prompt Action line missing 'leaving' clause: {act_line}"
+    assert "0.3s" in act_line, f"Prompt Action line missing snappy duration: {act_line}"
+    assert "dead-stop hold" in act_line, f"Prompt Action line missing dead-stop hold: {act_line}"
+
+

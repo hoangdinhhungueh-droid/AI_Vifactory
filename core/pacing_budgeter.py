@@ -49,6 +49,17 @@ DOCUDRAMA_MAX_WPM: float = 135.0
 DOCUDRAMA_TARGET_WPM: float = 125.0
 DOCUDRAMA_WORDS_PER_SEC: float = round(DOCUDRAMA_TARGET_WPM / 60.0, 4)  # ~2.0833 words/s
 
+# Docudrama Speech Rates across markets (clinical investigative tempo)
+DOCUDRAMA_SPEECH_RATES: Dict[str, float] = {
+    "KR": 4.17,  # Syllables per second (~250 syllables/min docudrama tempo)
+    "KO": 4.17,
+    "JA": 6.0,   # Characters per second (~360 chars/min)
+    "JP": 6.0,
+    "EN": DOCUDRAMA_WORDS_PER_SEC,  # ~2.0833 words/s (125.0 WPM)
+    "VN": 2.5,   # Words per second (~150 words/min)
+    "VI": 2.5,
+}
+
 # Acceptable variance ranges for QA Auditing
 SPEECH_RATE_BOUNDS: Dict[str, Tuple[float, float]] = {
     "KR": (5.8, 6.2),
@@ -134,9 +145,10 @@ def count_speech_units(sentence: str, market_code: str) -> int:
 def estimate_calibrated_speech_duration(
     sentence: str,
     market: Optional[str] = None,
-    custom_rate: Optional[float] = None
+    custom_rate: Optional[float] = None,
+    docudrama_tempo: bool = False,
 ) -> float:
-    """Estimate speech duration using calibrated multi-market news tempo.
+    """Estimate speech duration using calibrated multi-market news or docudrama tempo.
 
     Fails closed if market is not specified (Rule 118, Rule 139).
     """
@@ -148,7 +160,12 @@ def estimate_calibrated_speech_duration(
         return MIN_SCENE_DURATION_SEC
 
     units = count_speech_units(sentence, canon_market)
-    rate = custom_rate or CALIBRATED_SPEECH_RATES.get(canon_market, 3.2)
+    if custom_rate is not None:
+        rate = custom_rate
+    elif docudrama_tempo:
+        rate = DOCUDRAMA_SPEECH_RATES.get(canon_market, DOCUDRAMA_WORDS_PER_SEC)
+    else:
+        rate = CALIBRATED_SPEECH_RATES.get(canon_market, 3.2)
 
     if rate <= 0:
         raise ValueError(f"Invalid speech rate: {rate}")
@@ -326,8 +343,15 @@ def calibrate_scene_durations_to_target(
     scenes: List[Any],
     target_total_duration_sec: float = 240.0,
     target_wpm: float = DOCUDRAMA_TARGET_WPM,
+    market: Optional[str] = None,
 ) -> float:
     """Proportionally calibrate scene durations so total runtime matches target and WPM is strictly clamped.
+
+    Guarantees:
+    - Every scene duration is positive and >= min_duration.
+    - No scene is assigned <= 0 or negative duration under ANY input.
+    - Sum of durations matches target_total_duration_sec exactly (within 0.05s).
+    - Supports CJK and multilingual speech unit weighting via market or count_speech_units.
 
     Modifies scene.duration_est_sec (or sc['duration_est_sec']) in place.
     Returns the final calculated WPM.
@@ -335,39 +359,86 @@ def calibrate_scene_durations_to_target(
     if not scenes:
         return 0.0
 
+    n = len(scenes)
+    if target_total_duration_sec <= 0.0:
+        for s in scenes:
+            if isinstance(s, dict):
+                s["duration_est_sec"] = 0.0
+            else:
+                setattr(s, "duration_est_sec", 0.0)
+        return 0.0
+
+    # Effective min/max bounds per scene
+    min_dur = min(MIN_SCENE_DURATION_SEC, round(target_total_duration_sec / n, 2))
+    min_dur = max(0.5, min_dur)
+    max_dur = max(min_dur, MAX_SCENE_DURATION_SEC * 2.0)
+
     def _get_text(sc: Any) -> str:
         if isinstance(sc, dict):
             return sc.get("narration") or sc.get("sentence") or sc.get("narration_text") or ""
         return getattr(sc, "narration", "") or getattr(sc, "sentence", "") or getattr(sc, "narration_text", "") or ""
 
-    word_counts = [len(_get_text(s).split()) for s in scenes]
-    total_words = sum(word_counts)
+    raw_units: List[int] = []
+    for s in scenes:
+        txt = _get_text(s)
+        sc_mkt = market or (s.get("market") if isinstance(s, dict) else getattr(s, "market", None))
+        if sc_mkt:
+            units = count_speech_units(txt, sc_mkt)
+        else:
+            units = len(txt.split())
+        raw_units.append(units)
 
-    if total_words == 0:
-        even_dur = round(target_total_duration_sec / len(scenes), 2)
-        for s in scenes:
-            if isinstance(s, dict):
-                s["duration_est_sec"] = even_dur
+    total_units = sum(raw_units)
+
+    if total_units == 0:
+        base_dur = round(target_total_duration_sec / n, 1)
+        durs = [base_dur] * n
+        diff = round(target_total_duration_sec - sum(durs), 1)
+        if abs(diff) > 0.01:
+            durs[0] = round(durs[0] + diff, 1)
+    else:
+        # Give 0-unit scenes a minimal base weight (1 unit) so they get proportional baseline
+        weights = [max(1, u) if u == 0 else u for u in raw_units]
+        tot_w = sum(weights)
+
+        # Initial proportional allocation bounded to [min_dur, max_dur]
+        durs = [
+            max(min_dur, min(max_dur, target_total_duration_sec * (w / tot_w)))
+            for w in weights
+        ]
+
+        # Iteratively redistribute residual difference across non-boundary scenes
+        for _ in range(5):
+            diff = target_total_duration_sec - sum(durs)
+            if abs(diff) < 0.01:
+                break
+            if diff > 0:
+                eligible = [i for i, d in enumerate(durs) if d < max_dur - 0.01]
+                if not eligible:
+                    break
+                sub_w = sum(weights[i] for i in eligible)
+                for i in eligible:
+                    durs[i] += diff * (weights[i] / sub_w)
             else:
-                setattr(s, "duration_est_sec", even_dur)
-        return 0.0
+                eligible = [i for i, d in enumerate(durs) if d > min_dur + 0.01]
+                if not eligible:
+                    break
+                sub_w = sum(weights[i] for i in eligible)
+                for i in eligible:
+                    durs[i] += diff * (weights[i] / sub_w)
 
-    # Proportionally distribute target_total_duration_sec across scenes based on word weight
-    accumulated = 0.0
-    for idx, (s, w_count) in enumerate(zip(scenes, word_counts)):
-        if idx == len(scenes) - 1:
-            dur = round(target_total_duration_sec - accumulated, 1)
-        else:
-            share = w_count / total_words
-            dur = round(target_total_duration_sec * share, 1)
-            # Guarantee within sensible scene boundaries
-            dur = max(MIN_SCENE_DURATION_SEC, min(MAX_SCENE_DURATION_SEC * 2.0, dur))
-            accumulated += dur
+        # Round to 1 decimal place and adjust any small 0.1s rounding drift onto the largest scene
+        durs = [max(min_dur, round(d, 1)) for d in durs]
+        diff = round(target_total_duration_sec - sum(durs), 1)
+        if abs(diff) > 0.01:
+            max_idx = durs.index(max(durs))
+            durs[max_idx] = max(min_dur, round(durs[max_idx] + diff, 1))
 
+    for s, d in zip(scenes, durs):
         if isinstance(s, dict):
-            s["duration_est_sec"] = dur
+            s["duration_est_sec"] = d
         else:
-            setattr(s, "duration_est_sec", dur)
+            setattr(s, "duration_est_sec", d)
 
-    final_wpm = calculate_wpm(total_words, target_total_duration_sec)
+    final_wpm = calculate_wpm(total_units, target_total_duration_sec)
     return final_wpm

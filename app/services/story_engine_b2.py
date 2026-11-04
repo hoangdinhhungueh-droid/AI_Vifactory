@@ -448,7 +448,7 @@ def deterministic_split_spoken_script(full_script: str, market: str = "EN") -> d
             full_text_lines.append(s)
 
     joined_text = _reconcile_spoken_script(sentences, "", mkt)
-    est_mins = round(len(joined_text) / 280.0, 1) if is_cjk else round(len(joined_text.split()) / 150.0, 1)
+    est_mins = round(len(joined_text) / 280.0, 1) if is_cjk else round(len(joined_text.split()) / 125.0, 1)
     return {
         "total_estimated_minutes": est_mins,
         "spoken_script_text": joined_text,
@@ -756,7 +756,7 @@ def deterministic_tighten_spoken_script(spoken_data: dict, market: str = "EN") -
         tightened_sents = pruned_sents
         joined = _reconcile_spoken_script(tightened_sents, "", mkt)
 
-    est = round(len(joined) / 280.0, 1) if is_cjk else round(len(joined.split()) / 150.0, 1)
+    est = round(len(joined) / 280.0, 1) if is_cjk else round(len(joined.split()) / 125.0, 1)
     return {
         "total_estimated_minutes": est,
         "spoken_script_text": joined,

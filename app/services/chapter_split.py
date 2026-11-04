@@ -32,7 +32,7 @@ def _envi(n: str, d: int) -> int:
         return int(d)
 
 
-NARRATION_WPM = _envf("VF_NARRATION_WPM", 150.0)
+NARRATION_WPM = _envf("VF_NARRATION_WPM", 125.0)
 DEFAULT_TARGET = _envi("VF_TARGET_CHAPTERS", 0)  # 0 = auto
 WORDS_PER_CHAPTER = _envi("VF_WORDS_PER_CHAPTER", 180)
 MAX_TITLE = 55
