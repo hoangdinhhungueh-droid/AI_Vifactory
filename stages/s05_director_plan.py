@@ -965,7 +965,7 @@ def run(ctx: RunContext) -> StageArtifact:
         scenes.append(scene)
         prev_scene = scene
 
-    from core.pacing_budgeter import calibrate_scene_durations_to_target, calculate_wpm
+    from core.pacing_budgeter import calculate_wpm, calibrate_scene_durations_to_target
 
     target_run_s = 240.0
     if hasattr(ctx, "preset") and ctx.preset:

@@ -258,6 +258,7 @@ def run_programmatic_evaluation(data: Dict[str, Any]) -> Dict[str, Any]:
     verified_images = data["verified_images"]
     missing_images = data["missing_images"]
     spoken_script = data["spoken_script"]
+    total_dur = sum(float(sc.get("duration_est_sec") or 5.5) for sc in scenes)
 
     # 1. Visual Master Sheet Adherence
     images_ok = len(missing_images) == 0 and len(verified_images) == total_scenes

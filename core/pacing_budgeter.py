@@ -25,7 +25,7 @@ import logging
 import math
 import re
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.market_resolver import resolve_canonical_market
 
@@ -269,7 +269,7 @@ def calculate_word_budget_for_duration(
     target_wpm: float = DOCUDRAMA_TARGET_WPM,
 ) -> Dict[str, int]:
     """Calculate the strict word budget window for a target duration adhering to docudrama tempo (115-135 WPM).
-    
+
     For a standard 240.0s episode:
     - min: 460 words (115.0 WPM)
     - max: 540 words (135.0 WPM)
@@ -279,13 +279,13 @@ def calculate_word_budget_for_duration(
     """
     if duration_sec <= 0:
         raise ValueError(f"duration_sec must be positive, got {duration_sec}")
-    
+
     min_words = int(math.floor(duration_sec * (DOCUDRAMA_MIN_WPM / 60.0)))
     max_words = int(math.ceil(duration_sec * (DOCUDRAMA_MAX_WPM / 60.0)))
     target_words = int(round(duration_sec * (target_wpm / 60.0)))
     optimal_min = int(round(duration_sec * ((target_wpm - 5.0) / 60.0)))
     optimal_max = int(round(duration_sec * ((target_wpm + 5.0) / 60.0)))
-    
+
     return {
         "min": min_words,
         "max": max_words,
@@ -328,7 +328,7 @@ def calibrate_scene_durations_to_target(
     target_wpm: float = DOCUDRAMA_TARGET_WPM,
 ) -> float:
     """Proportionally calibrate scene durations so total runtime matches target and WPM is strictly clamped.
-    
+
     Modifies scene.duration_est_sec (or sc['duration_est_sec']) in place.
     Returns the final calculated WPM.
     """

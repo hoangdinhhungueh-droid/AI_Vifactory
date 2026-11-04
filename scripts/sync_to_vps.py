@@ -1,6 +1,4 @@
 import hashlib
-import json
-import os
 import sys
 from pathlib import Path
 
@@ -86,7 +84,7 @@ def sha256_text(text: str) -> str:
 
 
 def main():
-    print(f"=== Starting Three-Way Physical Sync to VPS (Rule 126) ===")
+    print("=== Starting Three-Way Physical Sync to VPS (Rule 126) ===")
     client = FastVPSClient()
     synced = []
     failed = []

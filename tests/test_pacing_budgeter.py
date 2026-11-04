@@ -15,23 +15,24 @@ Validates:
 """
 
 import pytest
+
 from core.pacing_budgeter import (
     CALIBRATED_SPEECH_RATES,
-    MIN_SCENE_DURATION_SEC,
-    MAX_SCENE_DURATION_SEC,
-    MAX_ACTION_SNAP_SEC,
-    DOCUDRAMA_MIN_WPM,
     DOCUDRAMA_MAX_WPM,
+    DOCUDRAMA_MIN_WPM,
     DOCUDRAMA_TARGET_WPM,
-    estimate_calibrated_speech_duration,
-    compute_scene_frame_budget,
-    generate_projected_frame_outline,
-    count_speech_units,
+    MAX_ACTION_SNAP_SEC,
+    MAX_SCENE_DURATION_SEC,
+    MIN_SCENE_DURATION_SEC,
     calculate_word_budget_for_duration,
     calculate_wpm,
-    is_docudrama_pacing_valid,
-    clamp_narration_duration_to_pacing,
     calibrate_scene_durations_to_target,
+    clamp_narration_duration_to_pacing,
+    compute_scene_frame_budget,
+    count_speech_units,
+    estimate_calibrated_speech_duration,
+    generate_projected_frame_outline,
+    is_docudrama_pacing_valid,
 )
 
 
