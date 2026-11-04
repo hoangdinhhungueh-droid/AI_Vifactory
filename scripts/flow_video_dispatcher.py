@@ -321,75 +321,65 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                 agree_btn.click(force=True)
                 time.sleep(1.5)
 
+            # Dismiss any stray header/profile overlay menu
+            stray_menu = page.locator(".cdk-overlay-pane:has-text('New collection'), .cdk-overlay-pane:has-text('Create character'), .cdk-overlay-pane:has-text('Bộ sưu tập mới')").first
+            if stray_menu.count() > 0 and stray_menu.is_visible():
+                page.keyboard.press("Escape")
+                time.sleep(0.5)
+
             # 3.1. Đảm bảo panel ingredients được mở để hiển thị tab tải lên và danh sách asset
             panel_open_indicators = page.locator(
-                "button:has-text('Tệp tải lên'), "
-                "[role='tab']:has-text('Tệp tải lên'), "
-                "[role='tab']:has-text('Uploads'), "
-                "button:has-text('Uploads'), "
-                "button:has-text('Thêm vào câu lệnh'), "
-                "button:has-text('Add to prompt'), "
-                ".add-menu-panel, .ingredient-drawer"
+                ".add-menu-panel, "
+                ".ingredient-drawer, "
+                "mat-bottom-sheet-container, "
+                ".cdk-overlay-pane:has-text('Tải lên'), "
+                ".cdk-overlay-pane:has-text('Upload')"
             )
             is_panel_open = any(i.is_visible() for i in panel_open_indicators.all() if panel_open_indicators.count() > 0)
             if not is_panel_open:
                 trigger = page.locator(
+                    "flow-prompt-input button[aria-label*='Thêm' i], "
+                    "flow-prompt-input button[aria-label*='Add' i], "
+                    "flow-prompt-input .add-menu-trigger, "
+                    "flow-prompt-input button:has([data-icon='add']), "
+                    "flow-prompt-input button:has(mat-icon:has-text('add')), "
+                    "div:has(> div.ProseMirror) button[aria-label*='Thêm' i], "
+                    "div:has(> div.ProseMirror) button[aria-label*='Add' i], "
+                    "div:has(> div.ProseMirror) .add-menu-trigger, "
+                    "div:has(> div.ProseMirror) button:has([data-icon='add']), "
                     ".add-menu-trigger, "
                     "button[aria-label*='Thêm thành phần vào ô nhập câu lệnh'], "
                     "button[aria-label*='Add ingredients to the prompt box'], "
                     "button[aria-label*='Add ingredients'], "
                     "button[aria-label*='Thêm thành phần'], "
-                    "button:has-text('add'), "
-                    "[data-icon='add']"
+                    "flow-prompt-input button"
                 ).first
                 if trigger.count() > 0 and trigger.is_visible():
                     trigger.click(force=True)
                     time.sleep(1.5)
 
-            # 3.2. Native input[type="file"] handler (Root cause 1 fix: bypass fragile button clicks)
-            file_uploaded = False
-            file_input = page.locator('input[type="file"]').first
-            if file_input.count() > 0:
-                try:
-                    file_input.set_input_files(str(seed_img))
-                    print(f"      ✅ Đã tải file {seed_img.name} trực tiếp qua native input[type='file']!")
-                    file_uploaded = True
-                    time.sleep(2)
-                except Exception as _fi_err:
-                    logger.debug(f"Direct set_input_files error: {_fi_err}")
+                for _ in range(5):
+                    if any(i.is_visible() for i in panel_open_indicators.all() if panel_open_indicators.count() > 0):
+                        is_panel_open = True
+                        break
+                    time.sleep(0.5)
 
-            if not file_uploaded:
-                up_btn = page.locator(
-                    ".sidebar-upload-btn, "
-                    "button:has(.upload-container), "
-                    "button:has-text('Tải nội dung nghe nhìn lên'), "
-                    "button:has-text('Upload media'), "
-                    "button:has-text('Tải tệp lên'), "
-                    "button:has-text('Upload files')"
-                ).first
-                if up_btn.count() > 0 and up_btn.is_visible():
-                    box = up_btn.bounding_box()
-                    if box:
-                        cx = box['x'] + box['width'] / 2
-                        cy = box['y'] + box['height'] / 2
-                        try:
-                            with page.expect_file_chooser(timeout=10000) as fc_info:
-                                page.mouse.click(cx, cy)
-                            fc = fc_info.value
-                            fc.set_files(str(seed_img))
-                            print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser!")
-                            file_uploaded = True
-                            time.sleep(3)
-                        except Exception as e:
-                            print(f"      ⚠️ Lỗi file chooser: {e}")
-
-            # 3.3. Chuyển tab sang 'Tệp tải lên' / 'Uploads' nếu cần
+            # 3.2. Chuyển tab sang 'Tệp tải lên' / 'Uploads' nếu cần
             upload_tab = page.locator(
-                "button:has-text('Tệp tải lên'), "
+                ".add-menu-panel button:has-text('Tệp tải lên'), "
+                ".add-menu-panel [role='tab']:has-text('Tệp tải lên'), "
+                ".add-menu-panel [role='tab']:has-text('Uploads'), "
+                ".add-menu-panel button:has-text('Uploads'), "
+                ".ingredient-drawer [role='tab']:has-text('Tệp tải lên'), "
+                ".ingredient-drawer [role='tab']:has-text('Uploads'), "
+                "mat-bottom-sheet-container [role='tab']:has-text('Tệp tải lên'), "
+                "mat-bottom-sheet-container [role='tab']:has-text('Uploads'), "
+                ".cdk-overlay-pane [role='tab']:has-text('Tệp tải lên'), "
+                ".cdk-overlay-pane [role='tab']:has-text('Uploads'), "
+                ".cdk-overlay-pane button:has-text('Tệp tải lên'), "
+                ".cdk-overlay-pane button:has-text('Uploads'), "
                 "[role='tab']:has-text('Tệp tải lên'), "
-                "[role='tab']:has-text('Uploads'), "
-                "button:has-text('Uploads'), "
-                "button:has-text('Tải lên')"
+                "[role='tab']:has-text('Uploads')"
             ).first
             if upload_tab.count() > 0 and upload_tab.is_visible():
                 try:
@@ -398,7 +388,63 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                 except Exception as _tab_err:
                     logger.debug(f"Upload tab click notice: {_tab_err}")
 
-            # Chờ file hoàn tất xử lý, click chọn asset và chờ nút Thêm vào câu lệnh enabled (Rule 118, 121)
+            # 3.3. Tải file seed qua FileChooser hoặc native input[type="file"]
+            file_uploaded = False
+            up_btn = page.locator(
+                ".add-menu-panel button:has-text('Tải tệp lên'), "
+                ".add-menu-panel button:has-text('Upload files'), "
+                ".ingredient-drawer button:has-text('Tải tệp lên'), "
+                ".ingredient-drawer button:has-text('Upload files'), "
+                "mat-bottom-sheet-container button:has-text('Tải tệp lên'), "
+                "mat-bottom-sheet-container button:has-text('Upload files'), "
+                ".cdk-overlay-pane button:has-text('Tải tệp lên'), "
+                ".cdk-overlay-pane button:has-text('Upload files'), "
+                ".cdk-overlay-pane button:has-text('Tải nội dung nghe nhìn lên'), "
+                ".cdk-overlay-pane button:has-text('Upload media'), "
+                "button:has-text('Tải tệp lên'), "
+                "button:has-text('Upload files'), "
+                "button:has-text('Tải nội dung nghe nhìn lên'), "
+                "button:has-text('Upload media'), "
+                ".sidebar-upload-btn, "
+                "button:has(.upload-container)"
+            ).first
+
+            if up_btn.count() > 0 and up_btn.is_visible():
+                try:
+                    with page.expect_file_chooser(timeout=8000) as fc_info:
+                        up_btn.click(force=True)
+                    fc = fc_info.value
+                    fc.set_files(str(seed_img))
+                    print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser!")
+                    file_uploaded = True
+                    time.sleep(2)
+                except Exception as e:
+                    logger.debug(f"FileChooser direct click notice: {e}")
+                    box = up_btn.bounding_box()
+                    if box:
+                        try:
+                            with page.expect_file_chooser(timeout=5000) as fc_info:
+                                page.mouse.click(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+                            fc = fc_info.value
+                            fc.set_files(str(seed_img))
+                            print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser (mouse click)!")
+                            file_uploaded = True
+                            time.sleep(2)
+                        except Exception as _mb_err:
+                            logger.debug(f"Mouse bounding box FileChooser notice: {_mb_err}")
+
+            if not file_uploaded:
+                file_input = page.locator('input[type="file"]').first
+                if file_input.count() > 0:
+                    try:
+                        file_input.set_input_files(str(seed_img))
+                        print(f"      ✅ Đã tải file {seed_img.name} trực tiếp qua native input[type='file']!")
+                        file_uploaded = True
+                        time.sleep(2)
+                    except Exception as _fi_err:
+                        logger.debug(f"Direct set_input_files error: {_fi_err}")
+
+            # 3.4. Chờ file hoàn tất xử lý, click chọn asset và chờ nút Thêm vào câu lệnh enabled (Rule 118, 121)
             for wait_i in range(25):
                 agree_btn = page.locator("button:has-text('Tôi đồng ý'), button:has-text('I agree')").first
                 if agree_btn.count() > 0 and agree_btn.is_visible():
@@ -413,7 +459,12 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     except Exception as _clk_err:
                         logger.debug(f"Target asset click notice: {_clk_err}")
                 else:
-                    first_asset = page.locator(".asset-item, [role='listitem'], .cdk-drag, mat-list-item, flow-asset-tile, .media-item").first
+                    first_asset = page.locator(
+                        ".add-menu-panel flow-asset-tile, "
+                        ".ingredient-drawer flow-asset-tile, "
+                        ".cdk-overlay-pane flow-asset-tile, "
+                        ".asset-item, [role='listitem'], .cdk-drag, mat-list-item, flow-asset-tile, .media-item, .ingredient-item"
+                    ).first
                     if first_asset.count() > 0 and first_asset.is_visible():
                         try:
                             first_asset.click(force=True)
@@ -431,7 +482,42 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             # 4. Chốt chặn kiểm toán I2V (Fail-Closed Gate): Đảm bảo Ingredient Chip TỒN TẠI trong prompt box
             # CẤM selector global button:has-text('close') vì gây false positive do nút 'x' của modal (Root cause 2)
             chip_attached = False
-            for _ in range(12):
+            for _ in range(15):
+                # 4.1. DOM check: Duyệt trực tiếp container bao quanh ProseMirror để phát hiện thumbnail ảnh seed
+                try:
+                    is_detected = page.evaluate("""
+                        () => {
+                            const pbox = document.querySelector('div.ProseMirror, [contenteditable="true"]');
+                            if (!pbox) return false;
+
+                            // 1. Kiểm tra bên trong ProseMirror
+                            if (pbox.querySelector('.ingredient-chip, [contenteditable="false"], flow-image-tile, img, [class*="chip"]')) {
+                                return true;
+                            }
+
+                            // 2. Kiểm tra container bao quanh prompt box (card / modal chứa chip và textarea)
+                            let parent = pbox.parentElement;
+                            for (let i = 0; i < 6 && parent; i++) {
+                                const nodes = parent.querySelectorAll('img, flow-image-tile, .ingredient-chip, [class*="chip"], [class*="thumbnail"], [style*="background-image"]');
+                                for (const n of nodes) {
+                                    const rect = n.getBoundingClientRect();
+                                    if (rect.width >= 20 && rect.height >= 20 && rect.top > 0) {
+                                        return true;
+                                    }
+                                }
+                                if (parent.tagName.toLowerCase() === 'body') break;
+                                parent = parent.parentElement;
+                            }
+                            return false;
+                        }
+                    """)
+                    if is_detected:
+                        chip_attached = True
+                        break
+                except Exception as _eval_err:
+                    logger.debug(f"Chip eval notice: {_eval_err}")
+
+                # 4.2. Playwright locators dự phòng cho chip trong ProseMirror hoặc container prompt box
                 chips_now = page.locator(
                     "div.ProseMirror .ingredient-chip, "
                     "flow-prompt-input .ingredient-chip, "
@@ -442,7 +528,12 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     "div.ProseMirror button:has-text('expand_content'), "
                     "flow-prompt-input button:has-text('expand_content'), "
                     "div.ProseMirror .expand-button, "
-                    "flow-prompt-input .expand-button"
+                    "flow-prompt-input .expand-button, "
+                    "div.ProseMirror [contenteditable='false'], "
+                    "div.ProseMirror img, "
+                    "xpath=//div[contains(@class, 'ProseMirror')]/preceding-sibling::*//img, "
+                    "xpath=//div[contains(@class, 'ProseMirror')]/parent::*/preceding-sibling::*//img, "
+                    "xpath=//div[contains(@class, 'ProseMirror')]/ancestor::div[.//button and not(self::body)][1]//img"
                 ).all()
                 if any(c.is_visible() for c in chips_now):
                     chip_attached = True
@@ -745,7 +836,13 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
             print(f"   ❌ Tài khoản [{acc_key.upper()}] chưa đăng nhập Google Flow ({page.url})! Tự động chuyển giao clips cho tài khoản khác.")
             return {"_status": "NOT_LOGGED_IN", "_unprocessed": clips}
 
-        if "/project/" not in page.url:
+        has_canvas = False
+        try:
+            has_canvas = page.locator("div.ProseMirror, [contenteditable='true']").first.is_visible()
+        except Exception:
+            pass
+
+        if "/project/" not in page.url and not has_canvas:
             print("   Chờ giao diện trang chủ sẵn sàng...")
             dismiss_dialogs(page)
             try:
@@ -906,7 +1003,7 @@ def main():
         sys.exit(0)
 
     # Thứ tự hạm đội ưu tiên đã xác thực đăng nhập Google Flow (chỉ giữ 6 tài khoản còn gói Pro)
-    verified_order = ['acc_03', 'acc_02', 'acc_04', 'acc_05', 'acc_07', 'acc_01']
+    verified_order = ['acc_04', 'acc_05', 'acc_02', 'acc_07', 'acc_03', 'acc_01']
     available_accs = [a for a in verified_order if a in PROFILES and a not in DISABLED_ACCOUNTS]
 
     # Nếu user chỉ định --acc cụ thể: kiểm tra tài khoản có bị vô hiệu hóa / hết Pro không

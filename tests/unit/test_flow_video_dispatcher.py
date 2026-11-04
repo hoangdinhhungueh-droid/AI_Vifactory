@@ -99,3 +99,27 @@ def test_flow_dispatcher_pilot_cli_argument():
     assert "--pilot" in main_src
     assert "(args.mode == \"demo\" or args.pilot)" in main_src
 
+
+def test_scoped_panel_and_trigger_selectors():
+    """Rule 121: Verifies panel indicators are strictly scoped to drawers and trigger targets prompt box."""
+    import inspect
+    import scripts.flow_video_dispatcher as fvd
+
+    src = inspect.getsource(fvd.generate_and_download_clip)
+    # Check scoped drawer indicators
+    assert ".add-menu-panel" in src
+    assert ".ingredient-drawer" in src
+    assert "mat-bottom-sheet-container" in src
+    assert ".cdk-overlay-pane:has-text('Tải lên')" in src
+    assert ".cdk-overlay-pane:has-text('Upload')" in src
+
+    # Ensure trigger button is scoped to prompt box
+    assert "flow-prompt-input button[aria-label*='Thêm' i]" in src
+    assert "flow-prompt-input button[aria-label*='Add' i]" in src
+    assert "flow-prompt-input button" in src
+
+    # Verify FileChooser expect_file_chooser is present
+    assert "expect_file_chooser" in src
+    assert "fc.set_files" in src
+
+
