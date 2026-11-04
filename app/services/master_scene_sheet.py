@@ -386,6 +386,86 @@ def render_master_system_sheet_png(
     return output_path
 
 
+def resolve_scene_image_path(
+    scene_id: str,
+    image_dir: Optional[Path] = None,
+    fallback_dirs: Optional[List[Path]] = None,
+    explicit_path: Optional[str | Path] = None,
+) -> Optional[Path]:
+    """Dynamically and robustly resolves the authentic seed image for a given scene.
+
+    Supports:
+    - Explicit image paths if valid and existing.
+    - Multiple candidate search directories (composite_seeds, images, assets, browser_assets).
+    - Case-insensitive matching across both Windows and Linux filesystems (ext4 parity).
+    - Variations: composite_{sc_id}.png/jpg, {sc_id}.png/jpg, zero-padded (SCENE_01 vs SCENE_1).
+    """
+    if explicit_path:
+        try:
+            ep = Path(explicit_path)
+            if ep.exists() and ep.is_file() and ep.stat().st_size > 1000:
+                return ep
+        except Exception:
+            pass
+
+    clean_id = str(scene_id).strip()
+    if not clean_id:
+        return None
+
+    # Build unique token variants
+    tokens = [clean_id]
+    m = re.search(r"(\d+)", clean_id)
+    if m:
+        num = int(m.group(1))
+        tokens.extend([f"SCENE_{num:02d}", f"SCENE_{num}", f"scene_{num:02d}", f"scene_{num}"])
+
+    cand_filenames: List[str] = []
+    seen = set()
+    for tok in tokens:
+        for ext in (".png", ".jpg", ".jpeg", ".PNG", ".JPG"):
+            for prefix in ("composite_", "COMPOSITE_", ""):
+                fn = f"{prefix}{tok}{ext}"
+                if fn not in seen:
+                    seen.add(fn)
+                    cand_filenames.append(fn)
+                fn_lower = f"{prefix}{tok.lower()}{ext}"
+                if fn_lower not in seen:
+                    seen.add(fn_lower)
+                    cand_filenames.append(fn_lower)
+                fn_upper = f"{prefix}{tok.upper()}{ext}"
+                if fn_upper not in seen:
+                    seen.add(fn_upper)
+                    cand_filenames.append(fn_upper)
+
+    # Gather search directories
+    search_dirs: List[Path] = []
+    if image_dir and Path(image_dir).exists():
+        search_dirs.append(Path(image_dir))
+    if fallback_dirs:
+        for fb in fallback_dirs:
+            if fb and Path(fb).exists() and Path(fb) not in search_dirs:
+                search_dirs.append(Path(fb))
+
+    # Fast direct lookup
+    for d in search_dirs:
+        for fn in cand_filenames:
+            cand_p = d / fn
+            if cand_p.exists() and cand_p.is_file() and cand_p.stat().st_size > 1000:
+                return cand_p.resolve()
+
+    # Case-insensitive filesystem scan for Linux ext4 parity
+    cand_lower_set = {fn.lower() for fn in cand_filenames}
+    for d in search_dirs:
+        try:
+            for entry in d.iterdir():
+                if entry.is_file() and entry.name.lower() in cand_lower_set and entry.stat().st_size > 1000:
+                    return entry.resolve()
+        except OSError:
+            continue
+
+    return None
+
+
 def render_scene_contact_sheet_png(
     scenes: List[Dict[str, Any]],
     output_path: Path,
@@ -462,14 +542,16 @@ def render_scene_contact_sheet_png(
         img_y = y1 + 44
 
         img_drawn = False
-        target_img_path = None
+        fallback_dirs = []
         if image_dir:
-            cands = [
-                image_dir / f"composite_{sc_id.lower()}.png",
-                image_dir / f"composite_{sc_id}.png",
-                image_dir / f"{sc_id}.png",
-            ]
-            target_img_path = next((p for p in cands if p.exists() and p.stat().st_size > 1000), None)
+            fallback_dirs.extend([image_dir.parent / "images", image_dir.parent / "assets"])
+        explicit_target = sc.get("image_path") or sc.get("seed_image") or sc.get("file_path")
+        target_img_path = resolve_scene_image_path(
+            scene_id=sc_id,
+            image_dir=image_dir,
+            fallback_dirs=fallback_dirs,
+            explicit_path=explicit_target,
+        )
 
         if target_img_path:
             try:
@@ -1172,13 +1254,54 @@ def generate_master_scene_package(
         logger.warning(f"Failed to render master_sheet_system.png: {_png_err}")
         sys_png = None
 
+    # Pre-resolve scene images dynamically across canonical and fallback directories
+    seeds_dir = ctx.paths.composite_seeds_dir if hasattr(ctx, "paths") and hasattr(ctx.paths, "composite_seeds_dir") else out_dir.parent / "composite_seeds"
+    search_dirs: List[Path] = [seeds_dir, out_dir.parent / "images", out_dir.parent / "assets"]
+    brain_browser_dir = Path.home() / ".gemini" / "antigravity" / "brain" / "browser_assets" / episode_id
+    if brain_browser_dir.exists():
+        search_dirs.append(brain_browser_dir)
+
+    image_paths_map: Dict[str, str] = {}
+    resolved_scenes: List[str] = []
+    missing_scenes: List[str] = []
+
+    for idx_sc, sc in enumerate(scenes):
+        sc_id = sc.get("scene_id") or f"SCENE_{idx_sc + 1:02d}"
+        explicit = sc.get("image_path") or sc.get("seed_image") or sc.get("file_path")
+        resolved = resolve_scene_image_path(
+            scene_id=sc_id,
+            image_dir=seeds_dir,
+            fallback_dirs=search_dirs,
+            explicit_path=explicit,
+        )
+        if resolved and resolved.exists():
+            resolved_scenes.append(sc_id)
+            # Ensure copy into composite_seeds if resolved from an alternate directory
+            if seeds_dir.exists() and resolved.parent.resolve() != seeds_dir.resolve():
+                target_copy = seeds_dir / f"composite_{sc_id.lower()}.png"
+                if not target_copy.exists() or target_copy.stat().st_size < 1000:
+                    try:
+                        import shutil
+                        shutil.copy2(str(resolved), str(target_copy))
+                        resolved = target_copy
+                    except Exception as _cpe:
+                        logger.debug(f"Copying resolved image to seeds_dir notice: {_cpe}")
+            try:
+                rel = resolved.relative_to(out_dir.parent)
+                image_paths_map[sc_id] = f"../{rel.as_posix()}"
+            except ValueError:
+                image_paths_map[sc_id] = resolved.as_posix()
+        else:
+            missing_scenes.append(sc_id)
+            image_paths_map[sc_id] = f"../composite_seeds/composite_{sc_id.lower()}.png"
+
     # 2. Scene Storyboard Contact Sheet (PNG)
     scenes_png = out_dir / "master_sheet_scenes.png"
     try:
         render_scene_contact_sheet_png(
             scenes=scenes,
             output_path=scenes_png,
-            image_dir=ctx.paths.composite_seeds_dir,
+            image_dir=seeds_dir,
             cols=3,
             rows=None,
             page_index=0,
@@ -1197,6 +1320,7 @@ def generate_master_scene_package(
         market=market,
         runtime_s=runtime_s,
         seeds_dir_rel="../composite_seeds",
+        image_paths_map=image_paths_map,
     )
 
     # Also emit master_sheet_scenes.html and master_sheet_system.html
@@ -1221,13 +1345,18 @@ def generate_master_scene_package(
     )
     sys_html.write_text(sys_content, encoding="utf-8")
 
+    effective_image_mode = bool(image_mode or (len(scenes) > 0 and len(missing_scenes) == 0))
+
     manifest = {
         "episode_id": episode_id,
         "episode_title": episode_title,
         "market": market,
         "total_scenes": len(scenes),
+        "available_images_count": len(resolved_scenes),
+        "missing_images_count": len(missing_scenes),
+        "missing_scenes": missing_scenes,
+        "image_mode": effective_image_mode,
         "runtime_seconds": runtime_s,
-        "image_mode": image_mode,
         "files": {
             "master_sheet_system_png": str(sys_png) if sys_png and sys_png.exists() else None,
             "master_sheet_scenes_png": str(scenes_png) if scenes_png and scenes_png.exists() else None,
@@ -1242,5 +1371,58 @@ def generate_master_scene_package(
 
     manifest_path = out_dir / "master_sheet_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-    logger.info(f"Master Scene Package generated successfully: {manifest_path}")
+    logger.info(f"Master Scene Package generated successfully: {manifest_path} (Images: {len(resolved_scenes)}/{len(scenes)})")
     return manifest
+
+
+if __name__ == "__main__":
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description="Master Scene & Master Sheet Generator")
+    parser.add_argument("--episode", type=str, required=True, help="Episode / Run ID (e.g. KR_EP0005_gadeok_cost_risk)")
+    parser.add_argument("--repo-root", type=str, default=None, help="Optional repo root path")
+    args = parser.parse_args()
+
+    repo_root = Path(args.repo_root) if args.repo_root else Path(__file__).resolve().parent.parent.parent
+    ep_id = args.episode.strip().strip("'\"")
+
+    from core.paths import resolve_run_paths
+    paths = resolve_run_paths(ep_id, repo_root=repo_root)
+
+    payload = {}
+    scenes = []
+    dp_candidates = [
+        paths.root / "director_plan.json",
+        paths.root / "s05_director_plan" / "artifact.json",
+        paths.root / "dp_plan.json",
+    ]
+    for c in dp_candidates:
+        if c.exists() and c.stat().st_size > 100:
+            try:
+                data = json.loads(c.read_text(encoding="utf-8"))
+                if "payload" in data:
+                    payload = data["payload"]
+                    scenes = payload.get("scenes", [])
+                elif "scenes" in data:
+                    payload = data
+                    scenes = data.get("scenes", [])
+                if scenes:
+                    break
+            except Exception as _e:
+                continue
+
+    if not scenes:
+        print(f"ERROR: No scenes found in director plan for {ep_id}")
+        sys.exit(1)
+
+    class _Context:
+        def __init__(self, run_id, paths, topic):
+            self.run_id = run_id
+            self.paths = paths
+            self.topic = topic
+            self.manifest = None
+
+    ctx = _Context(ep_id, paths, ep_id)
+    result = generate_master_scene_package(ctx, scenes=scenes, payload=payload, image_mode=True)
+    print(json.dumps(result, indent=2))

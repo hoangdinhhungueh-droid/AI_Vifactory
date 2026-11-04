@@ -225,3 +225,45 @@ def test_render_scene_contact_sheet_png_dynamic_all_scenes(tmp_path):
         # 4 rows * ~500px + header > 2000px
         assert img.height >= 2000
 
+
+def test_resolve_scene_image_path_variations_and_fallback(tmp_path):
+    """Rule 121 & 128: Verifies robust resolution of scene images across naming variations and dirs."""
+    from app.services.master_scene_sheet import resolve_scene_image_path
+
+    seeds_dir = tmp_path / "composite_seeds"
+    images_dir = tmp_path / "images"
+    seeds_dir.mkdir()
+    images_dir.mkdir()
+
+    # Create dummy dummy valid image files (>1000 bytes)
+    img_data = b"\x89PNG\r\n\x1a\n" + b"\x00" * 2048
+
+    # 1. Direct lowercase in seeds_dir
+    (seeds_dir / "composite_scene_01.png").write_bytes(img_data)
+    res1 = resolve_scene_image_path("SCENE_01", image_dir=seeds_dir)
+    assert res1 is not None
+    assert res1.name == "composite_scene_01.png"
+
+    # 2. Uppercase SCENE_02.png in seeds_dir (no 'composite_' prefix)
+    (seeds_dir / "SCENE_02.png").write_bytes(img_data)
+    res2 = resolve_scene_image_path("SCENE_02", image_dir=seeds_dir)
+    assert res2 is not None
+    assert res2.name == "SCENE_02.png"
+
+    # 3. Fallback directory (images_dir) for SCENE_03
+    (images_dir / "composite_SCENE_03.png").write_bytes(img_data)
+    res3 = resolve_scene_image_path("SCENE_03", image_dir=seeds_dir, fallback_dirs=[images_dir])
+    assert res3 is not None
+    assert res3.name == "composite_SCENE_03.png"
+
+    # 4. Explicit path override
+    explicit_p = tmp_path / "custom_location.png"
+    explicit_p.write_bytes(img_data)
+    res4 = resolve_scene_image_path("SCENE_04", image_dir=seeds_dir, explicit_path=explicit_p)
+    assert res4 == explicit_p
+
+    # 5. Missing scene returns None
+    res5 = resolve_scene_image_path("SCENE_99", image_dir=seeds_dir)
+    assert res5 is None
+
+
