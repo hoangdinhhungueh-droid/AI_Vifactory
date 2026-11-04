@@ -32,7 +32,7 @@ import math
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("master_scene_sheet")
 
@@ -94,7 +94,7 @@ def resolve_scene_motion_thumbnail(scene: Dict[str, Any]) -> Dict[str, Any]:
         act_breakdown = str(raw_breakdown).lower()
 
     # Rule 1: Check for quantitative metrics/counter
-    if any(k in narration or k in headline for k in ["$", "%", "tỷ", "triệu", "billion", "million", "counter", "con số", "usd"]):
+    if "H6_MARK" in h_fam or any(k in narration or k in headline for k in ["$", "%", "tỷ", "triệu", "billion", "million", "counter", "con số", "usd"]):
         return MOTION_THUMBNAIL_TYPES[1]  # Counter ticks upward
 
     # Rule 2: Check for maps/routes/underlines/stamps
@@ -311,7 +311,7 @@ def render_master_system_sheet_png(
 
     # Box E: MOTION THUMBNAILS (x: 1175 -> 1895)
     draw_box(1175, 395, 1895, 730, "MOTION THUMBNAILS")
-    m_w, m_h = 160, 245
+    m_w, _m_h = 160, 245
     m_start_x = 1195
     for idx, mt in enumerate(MOTION_THUMBNAIL_TYPES):
         mx = m_start_x + idx * (m_w + 20)
@@ -405,8 +405,8 @@ def resolve_scene_image_path(
             ep = Path(explicit_path)
             if ep.exists() and ep.is_file() and ep.stat().st_size > 1000:
                 return ep
-        except Exception:
-            pass
+        except (OSError, ValueError) as _path_err:
+            logger.debug(f"Explicit path invalid or inaccessible '{explicit_path}': {_path_err}")
 
     clean_id = str(scene_id).strip()
     if not clean_id:
