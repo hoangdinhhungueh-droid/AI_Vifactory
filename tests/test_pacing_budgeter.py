@@ -20,10 +20,18 @@ from core.pacing_budgeter import (
     MIN_SCENE_DURATION_SEC,
     MAX_SCENE_DURATION_SEC,
     MAX_ACTION_SNAP_SEC,
+    DOCUDRAMA_MIN_WPM,
+    DOCUDRAMA_MAX_WPM,
+    DOCUDRAMA_TARGET_WPM,
     estimate_calibrated_speech_duration,
     compute_scene_frame_budget,
     generate_projected_frame_outline,
     count_speech_units,
+    calculate_word_budget_for_duration,
+    calculate_wpm,
+    is_docudrama_pacing_valid,
+    clamp_narration_duration_to_pacing,
+    calibrate_scene_durations_to_target,
 )
 
 
@@ -111,3 +119,76 @@ def test_projected_frame_outline_contiguous_timeline():
     assert outline.scenes[0].start_frame_30fps == 0
     assert outline.scenes[1].start_frame_30fps == outline.scenes[0].end_frame_30fps
     assert outline.scenes[2].start_frame_30fps == outline.scenes[1].end_frame_30fps
+
+
+def test_docudrama_pacing_constants():
+    assert DOCUDRAMA_MIN_WPM == 115.0
+    assert DOCUDRAMA_MAX_WPM == 135.0
+    assert DOCUDRAMA_TARGET_WPM == 125.0
+
+
+def test_calculate_word_budget_for_duration():
+    # Standard 240s episode (4:00)
+    b240 = calculate_word_budget_for_duration(240.0)
+    assert b240["min"] == 460
+    assert b240["max"] == 540
+    assert b240["target"] == 500
+    assert b240["optimal_min"] == 480
+    assert b240["optimal_max"] == 520
+
+    # Macro 600s episode (10:00)
+    b600 = calculate_word_budget_for_duration(600.0)
+    assert b600["min"] == 1150
+    assert b600["max"] == 1350
+    assert b600["target"] == 1250
+
+
+def test_calculate_wpm_and_validation():
+    # 500 words across 240s = 125.0 WPM
+    assert calculate_wpm(500, 240.0) == 125.0
+    assert is_docudrama_pacing_valid(500, 240.0) is True
+
+    # 460 words across 240s = 115.0 WPM (lower bound PASS)
+    assert calculate_wpm(460, 240.0) == 115.0
+    assert is_docudrama_pacing_valid(460, 240.0) is True
+
+    # 540 words across 240s = 135.0 WPM (upper bound PASS)
+    assert calculate_wpm(540, 240.0) == 135.0
+    assert is_docudrama_pacing_valid(540, 240.0) is True
+
+    # 600 words across 240s = 150.0 WPM (exceeds ceiling FAIL)
+    assert calculate_wpm(600, 240.0) == 150.0
+    assert is_docudrama_pacing_valid(600, 240.0) is False
+
+    # 400 words across 240s = 100.0 WPM (below floor FAIL)
+    assert calculate_wpm(400, 240.0) == 100.0
+    assert is_docudrama_pacing_valid(400, 240.0) is False
+
+
+def test_clamp_narration_duration_to_pacing():
+    # 25 words at 125 WPM (2.0833 wps) -> 25 / 2.0833 = 12.0s clamped to max (10.0s)
+    dur = clamp_narration_duration_to_pacing(25, target_wpm=125.0, min_duration=2.5, max_duration=10.0)
+    assert dur == 10.0
+
+    # 10 words at 125 WPM (2.0833 wps) -> 10 / 2.0833 = 4.8s
+    dur10 = clamp_narration_duration_to_pacing(10, target_wpm=125.0)
+    assert 4.5 <= dur10 <= 5.0
+
+    # 2 words at 125 WPM -> 0.96s -> clamped to MIN_SCENE_DURATION_SEC (2.5s)
+    dur2 = clamp_narration_duration_to_pacing(2, target_wpm=125.0)
+    assert dur2 == 2.5
+
+
+def test_calibrate_scene_durations_to_target():
+    scenes = [
+        {"scene_id": "SC_01", "narration": "In an acute market crisis, the collapse began with alarming speed."}, # 11 words
+        {"scene_id": "SC_02", "narration": "Regulatory examiners uncovered major anomalies across the primary accounting ledgers."}, # 9 words
+        {"scene_id": "SC_03", "narration": "Documented statutory exemptions allowed the consortium to proceed unhindered."}, # 8 words
+    ]
+    # Total words = 11 + 10 + 9 = 30 words
+    # Calibrate to 14.4s (30 / 14.4 * 60 = 125.0 WPM)
+    wpm = calibrate_scene_durations_to_target(scenes, target_total_duration_sec=14.4, target_wpm=125.0)
+    assert 124.0 <= wpm <= 126.0
+
+    dur_sum = sum(s["duration_est_sec"] for s in scenes)
+    assert abs(dur_sum - 14.4) <= 0.1

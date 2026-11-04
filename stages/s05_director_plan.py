@@ -965,6 +965,21 @@ def run(ctx: RunContext) -> StageArtifact:
         scenes.append(scene)
         prev_scene = scene
 
+    from core.pacing_budgeter import calibrate_scene_durations_to_target, calculate_wpm
+
+    target_run_s = 240.0
+    if hasattr(ctx, "preset") and ctx.preset:
+        dw = getattr(ctx.preset, "duration_window_s", None)
+        if dw and hasattr(dw, "target"):
+            target_run_s = float(getattr(dw, "target", 240.0) or 240.0)
+
+    # Enforce exact docudrama pacing calibration if total duration drifts
+    total_words = sum(len((getattr(s, "narration", "") or "").split()) for s in scenes)
+    curr_dur = sum(float(s.duration_est_sec or 5.0) for s in scenes)
+    current_wpm = calculate_wpm(total_words, curr_dur)
+    if total_words > 0 and (current_wpm < 115.0 or current_wpm > 135.0 or abs(curr_dur - target_run_s) > 1.0):
+        calibrate_scene_durations_to_target(scenes, target_total_duration_sec=target_run_s)
+
     total_runtime = sum(float(s.duration_est_sec or 5.0) for s in scenes)
     chunks = partition_timeline_into_chunks(scenes)
     asset_registry = build_master_asset_registry(ctx.run_id, scenes)
@@ -979,11 +994,15 @@ def run(ctx: RunContext) -> StageArtifact:
             for ln in b.get("lines", []):
                 all_s3_lines.append(ln.get("line_id", ""))
 
+        accum_start_s = 0.0
         for idx, sc in enumerate(scenes):
             shot_id = f"S{idx+1:03d}"
             # Opening hook is tactile stop-motion (vox_native); Veo distributed at ~25% share (<= 30% ceiling)
             r_mode = "veo" if (len(scenes) >= 4 and idx % 4 == 3) else "vox_native"
             h_fam = h_cycle[idx % len(h_cycle)]
+            setattr(sc, "h_family", h_fam)
+            if hasattr(sc, "shots") and sc.shots:
+                setattr(sc.shots[0], "h_family", h_fam)
             props = ["stamp", "newspaper_cutout"] if "IMPACT" in h_fam else (["compass", "ruler"] if "CONSTRAINT" in h_fam else ["red_thread"])
             matched_line_id = all_s3_lines[idx] if idx < len(all_s3_lines) else f"L{idx+1:02d}"
             clean_narration = (getattr(sc, "narration", "") or "")[:80].strip()
@@ -993,17 +1012,19 @@ def run(ctx: RunContext) -> StageArtifact:
                 f"halftone black-and-white 60lpi cutouts with offset crimson ink #D62E1F or mustard gold #D9A441 drop-shadows, "
                 f"tactile paper layers, deckle torn edges, cinematic 16:9 widescreen composition."
             )
+            sc_dur = float(sc.duration_est_sec or 5.5)
             story_shots.append(StoryShotPlan(
                 shot_id=shot_id,
                 line_ids=[matched_line_id],
-                start_hint_s=round(idx * 5.5, 1),
-                duration_s=5.5,
+                start_hint_s=round(accum_start_s, 2),
+                duration_s=round(sc_dur, 2),
                 render_mode=r_mode,
                 h_family=h_fam,
                 tactile_props=props,
                 prompt=shot_prompt,
                 contains_real_person=False,
             ))
+            accum_start_s += sc_dur
 
     payload = {
         "schema_version": "director_plan.v2",

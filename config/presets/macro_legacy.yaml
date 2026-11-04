@@ -9,10 +9,11 @@ duration_window_s:
   max: 720
   target: 600
 narration:
-  wpm_estimate: 140
+  wpm_estimate: 125
   word_budget:
-    min: 1100
-    max: 1700
+    min: 1150
+    max: 1350
+    target: 1250
 beats:
   - id: B1_hook
     share: 0.15

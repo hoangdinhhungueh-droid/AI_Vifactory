@@ -55,7 +55,7 @@ class WordBudget(BaseModel):
 
 class NarrationConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    wpm_estimate: float = 150.0
+    wpm_estimate: float = 125.0
     word_budget: WordBudget
 
 

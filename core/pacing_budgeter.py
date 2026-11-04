@@ -42,6 +42,13 @@ CALIBRATED_SPEECH_RATES: Dict[str, float] = {
     "VI": 3.6,
 }
 
+# Docudrama Narrative Pacing Invariants (AVF-STAB-001 / Rule 128 / Rule 140)
+# Strict clinical docudrama tempo: 115 - 135 WPM (target: 125 WPM, 460 - 540 words for 240s runtime)
+DOCUDRAMA_MIN_WPM: float = 115.0
+DOCUDRAMA_MAX_WPM: float = 135.0
+DOCUDRAMA_TARGET_WPM: float = 125.0
+DOCUDRAMA_WORDS_PER_SEC: float = round(DOCUDRAMA_TARGET_WPM / 60.0, 4)  # ~2.0833 words/s
+
 # Acceptable variance ranges for QA Auditing
 SPEECH_RATE_BOUNDS: Dict[str, Tuple[float, float]] = {
     "KR": (5.8, 6.2),
@@ -255,3 +262,112 @@ def generate_projected_frame_outline(
         total_frames=total_frames,
         scenes=budgeted_scenes,
     )
+
+
+def calculate_word_budget_for_duration(
+    duration_sec: float,
+    target_wpm: float = DOCUDRAMA_TARGET_WPM,
+) -> Dict[str, int]:
+    """Calculate the strict word budget window for a target duration adhering to docudrama tempo (115-135 WPM).
+    
+    For a standard 240.0s episode:
+    - min: 460 words (115.0 WPM)
+    - max: 540 words (135.0 WPM)
+    - target: 500 words (125.0 WPM)
+    - optimal_min: 480 words (120.0 WPM)
+    - optimal_max: 520 words (130.0 WPM)
+    """
+    if duration_sec <= 0:
+        raise ValueError(f"duration_sec must be positive, got {duration_sec}")
+    
+    min_words = int(math.floor(duration_sec * (DOCUDRAMA_MIN_WPM / 60.0)))
+    max_words = int(math.ceil(duration_sec * (DOCUDRAMA_MAX_WPM / 60.0)))
+    target_words = int(round(duration_sec * (target_wpm / 60.0)))
+    optimal_min = int(round(duration_sec * ((target_wpm - 5.0) / 60.0)))
+    optimal_max = int(round(duration_sec * ((target_wpm + 5.0) / 60.0)))
+    
+    return {
+        "min": min_words,
+        "max": max_words,
+        "target": target_words,
+        "optimal_min": optimal_min,
+        "optimal_max": optimal_max,
+    }
+
+
+def calculate_wpm(word_count: int, duration_sec: float) -> float:
+    """Calculate words per minute (WPM)."""
+    if duration_sec <= 0:
+        return 0.0
+    return round((word_count / duration_sec) * 60.0, 2)
+
+
+def is_docudrama_pacing_valid(word_count: int, duration_sec: float) -> bool:
+    """Check if narrative pacing falls strictly within the docudrama ceiling [115.0, 135.0] WPM."""
+    wpm = calculate_wpm(word_count, duration_sec)
+    return DOCUDRAMA_MIN_WPM <= wpm <= DOCUDRAMA_MAX_WPM
+
+
+def clamp_narration_duration_to_pacing(
+    word_count: int,
+    target_wpm: float = DOCUDRAMA_TARGET_WPM,
+    min_duration: float = MIN_SCENE_DURATION_SEC,
+    max_duration: float = MAX_SCENE_DURATION_SEC,
+) -> float:
+    """Calculate scene duration from word count clamped to target WPM and scene bounds."""
+    wps = target_wpm / 60.0
+    if wps <= 0:
+        wps = DOCUDRAMA_WORDS_PER_SEC
+    raw_dur = word_count / wps
+    return max(min_duration, min(max_duration, round(raw_dur, 1)))
+
+
+def calibrate_scene_durations_to_target(
+    scenes: List[Any],
+    target_total_duration_sec: float = 240.0,
+    target_wpm: float = DOCUDRAMA_TARGET_WPM,
+) -> float:
+    """Proportionally calibrate scene durations so total runtime matches target and WPM is strictly clamped.
+    
+    Modifies scene.duration_est_sec (or sc['duration_est_sec']) in place.
+    Returns the final calculated WPM.
+    """
+    if not scenes:
+        return 0.0
+
+    def _get_text(sc: Any) -> str:
+        if isinstance(sc, dict):
+            return sc.get("narration") or sc.get("sentence") or sc.get("narration_text") or ""
+        return getattr(sc, "narration", "") or getattr(sc, "sentence", "") or getattr(sc, "narration_text", "") or ""
+
+    word_counts = [len(_get_text(s).split()) for s in scenes]
+    total_words = sum(word_counts)
+
+    if total_words == 0:
+        even_dur = round(target_total_duration_sec / len(scenes), 2)
+        for s in scenes:
+            if isinstance(s, dict):
+                s["duration_est_sec"] = even_dur
+            else:
+                setattr(s, "duration_est_sec", even_dur)
+        return 0.0
+
+    # Proportionally distribute target_total_duration_sec across scenes based on word weight
+    accumulated = 0.0
+    for idx, (s, w_count) in enumerate(zip(scenes, word_counts)):
+        if idx == len(scenes) - 1:
+            dur = round(target_total_duration_sec - accumulated, 1)
+        else:
+            share = w_count / total_words
+            dur = round(target_total_duration_sec * share, 1)
+            # Guarantee within sensible scene boundaries
+            dur = max(MIN_SCENE_DURATION_SEC, min(MAX_SCENE_DURATION_SEC * 2.0, dur))
+            accumulated += dur
+
+        if isinstance(s, dict):
+            s["duration_est_sec"] = dur
+        else:
+            setattr(s, "duration_est_sec", dur)
+
+    final_wpm = calculate_wpm(total_words, target_total_duration_sec)
+    return final_wpm

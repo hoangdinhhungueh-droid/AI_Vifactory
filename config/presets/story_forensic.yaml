@@ -9,13 +9,13 @@ duration_window_s:
   max: 300
   target: 240
 narration:
-  wpm_estimate: 150
+  wpm_estimate: 125
   word_budget:
-    min: 450
-    max: 750
-    target: 580
-    optimal_min: 520
-    optimal_max: 650
+    min: 460
+    max: 540
+    target: 500
+    optimal_min: 480
+    optimal_max: 520
 beats:
   - id: B1_hook
     share: 0.08
@@ -77,4 +77,4 @@ legal:
   min_independent_sources: 3
 tts:
   voice: "en-US-ChristopherNeural"
-  rate: "+15%"
+  rate: "+0%"

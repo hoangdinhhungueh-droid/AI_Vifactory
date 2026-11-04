@@ -4,10 +4,10 @@
 ## 10X 5-BEAT INVESTIGATIVE DOCUDRAMA ARCHITECTURE (QUY CHUẨN ĐẶC TẢ NHỊP KỊCH BẢN X10)
 
 Genre: High-Stakes Non-Fiction Investigative Docudrama (Johnny Harris x Margin Call x Chernobyl Pacing).
-Target: 450 - 750 words across 5 structured Acts (strictly 520 to 650 words, target 240 seconds runtime, 18-22 scenes/lines; ~1,050 - 1,250 eojeol for KR; ~1,400 characters for JP). Total runtime: 180 - 300 seconds (target 240s).
+Target: 460 - 540 words across 5 structured Acts (strictly 460 to 540 words, target 500 words for 240 seconds runtime at 115-135 WPM docudrama tempo, 18-22 scenes/lines; ~900 - 1,050 eojeol for KR; ~1,100 - 1,250 characters for JP). Total runtime: 180 - 300 seconds (target 240s).
 (For optional macro deep-dive format when macro_legacy preset is explicitly requested: 1,800 - 2,200 words, 12-15 minutes).
 
-### 🥊 BEAT 1 / ACT I (0:00 - 0:20 / TARGET ~19s, ~50 words): THE IMPOSSIBLE CONTRADICTION & COLD STRIKE
+### 🥊 BEAT 1 / ACT I (0:00 - 0:20 / TARGET ~19.2s, ~40 words): THE IMPOSSIBLE CONTRADICTION & COLD STRIKE
 
 • Primary Objective: Capture cold mobile traffic within 5-10s (Rule 444) and directly satisfy viewer search intent (Rule 130).
 • Hook Architecture (Rule 140 / Rule 131): Decompose Beat 1 into 3 to 4 snappy micro-scenes (3.5s to 5.0s each) across tactile kinetic families H1 to H7. Never compress Beat 1 into a single monolithic scene!
@@ -18,7 +18,7 @@ Target: 450 - 750 words across 5 structured Acts (strictly 520 to 650 words, tar
 1.4 The Core Curiosity Lock & Micro-Cliffhanger 1 (0:15 - 0:20): Formulate the central investigative enigma: 'How did this catastrophe unfold in broad daylight under the watch of elite institutions?'
 • Mandatory Keywords & Signals: 'collapse', 'shock', 'disappear', 'first', 'only', and at least 1 explicit curiosity question ('?').
 
-### 🎭 BEAT 2 / ACT II (0:20 - 1:00 / TARGET ~40s, ~100 words): THE FALSE NARRATIVE & MEDIA RED HERRING
+### 🎭 BEAT 2 / ACT II (0:20 - 1:00 / TARGET ~40.8s, ~85 words): THE FALSE NARRATIVE & MEDIA RED HERRING
 
 • Primary Objective: Dismantle the superficial official narrative and expose competitor blindspots across 3-4 scenes.
 • Micro-Pacing Breakdown:
@@ -27,7 +27,7 @@ Target: 450 - 750 words across 5 structured Acts (strictly 520 to 650 words, tar
 2.3 The Red Herring Unmasked & Micro-Cliffhanger 2: Prove forensically why the popular scapegoat is merely a symptom.
 • Mandatory Keywords & Signals: 'official story', 'narrative', 'headline', 'myth', 'red herring', citing official reports/statements.
 
-### 📂 BEAT 3 / ACT III (1:00 - 2:15 / TARGET ~75s, ~190 words): THE SYSTEMIC BLINDSPOT & PAPER TRAIL
+### 📂 BEAT 3 / ACT III (1:00 - 2:15 / TARGET ~79.2s, ~165 words): THE SYSTEMIC BLINDSPOT & PAPER TRAIL
 
 • Primary Objective: Deep-dive into technical evidence, contract clauses, internal memos, and regulatory choke points across 5-6 scenes.
 • Micro-Pacing Breakdown:
@@ -37,7 +37,7 @@ Target: 450 - 750 words across 5 structured Acts (strictly 520 to 650 words, tar
 3.4 The Fatal Explanatory Vacuum & Micro-Cliffhanger 3: Unearth the ignored early warning memo or confidential audit that predicted the exact failure.
 • Mandatory Keywords & Signals: 'paper trail', 'blindspot', 'loophole', 'leak', 'memo', 'forensic', plus exactly 1 pattern-interrupt short sentence (2-6 words).
 
-### ⚡ BEAT 4 / ACT IV (2:15 - 3:15 / TARGET ~60s, ~145 words): THE SMOKING GUN & ASYMMETRIC CLIMAX
+### ⚡ BEAT 4 / ACT IV (2:15 - 3:15 / TARGET ~60.0s, ~125 words): THE SMOKING GUN & ASYMMETRIC CLIMAX
 
 • Primary Objective: Deliver the irrefutable structural climax and unmask the systemic breaking point across 4-5 scenes.
 • Micro-Pacing Breakdown:
@@ -46,7 +46,7 @@ Target: 450 - 750 words across 5 structured Acts (strictly 520 to 650 words, tar
 4.3 The Climax & Cascade: The regulatory or market verdict is rendered. The trap has irrevocably snapped shut.
 • Mandatory Keywords & Signals: 'smoking gun', 'culprit', 'exposed', 'unmasked', 'profited', closing loops with 'that is why', 'the answer', 'which is how'.
 
-### 🪞 BEAT 5 / ACT V (3:15 - 4:00 / TARGET ~45s, ~100 words): THE UNCOMFORTABLE MODERN MIRROR & LIVING WARNING
+### 🪞 BEAT 5 / ACT V (3:15 - 4:00 / TARGET ~40.8s, ~85 words): THE UNCOMFORTABLE MODERN MIRROR & LIVING WARNING
 
 • Primary Objective: Deliver closure (>=80% curiosity loops answered) and hold a chilling mirror up to the contemporary world across 3-4 scenes.
 • Micro-Pacing Breakdown:

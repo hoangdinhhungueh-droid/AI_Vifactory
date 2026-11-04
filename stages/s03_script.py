@@ -188,11 +188,11 @@ def _build_grounded_story_beats(
     ]
 
     raw_beats = [
-        ("B1_hook", 24.0, b1_lines),
-        ("B2_setup", 36.0, b2_lines),
-        ("B3_scheme", 72.0, b3_lines),
+        ("B1_hook", 19.2, b1_lines),
+        ("B2_setup", 40.8, b2_lines),
+        ("B3_scheme", 79.2, b3_lines),
         ("B4_crack", 60.0, b4_lines),
-        ("B5_aftermath", 48.0, b5_lines),
+        ("B5_aftermath", 40.8, b5_lines),
     ]
 
     for _, _, lines in raw_beats:
@@ -281,9 +281,8 @@ def run(ctx: RunContext) -> StageArtifact:
                     f"Working Title: {w_title}\n"
                     f"Central Question: {c_quest}\n"
                     f"Evidence Ledger:\n{json.dumps(s2_art.payload.get('evidence_ledger', []), indent=2, ensure_ascii=False)}\n\n"
-                    f"Timeline:\n{json.dumps(s2_art.payload.get('timeline', []), indent=2, ensure_ascii=False)}\n\n"
-                    "Word Budget: 500 to 650 words (min 450, max 750 words). Target Duration: 240 seconds (min 180s, max 300s).\n"
-                    "Generate 5 beats: B1_hook (0-20s, target ~19s), B2_setup (target ~41s), B3_scheme (target ~79s), B4_crack (target ~60s), B5_aftermath (target ~41s).\n"
+                    "Word Budget: 460 to 540 words (target 500 words, strictly 115-135 WPM docudrama tempo). Target Duration: 240 seconds (min 180s, max 300s).\n"
+                    "Generate 5 beats: B1_hook (0-20s, target ~19.2s, ~40 words), B2_setup (target ~40.8s, ~85 words), B3_scheme (target ~79.2s, ~165 words), B4_crack (target ~60.0s, ~125 words), B5_aftermath (target ~40.8s, ~85 words).\n"
                     "CRITICAL CITATION & LEGAL RULES:\n"
                     "1. EVERY factual line MUST cite valid claim_ids from the evidence ledger (e.g. ['C001']).\n"
                     "2. When citing claims with legal_status 'alleged' or 'charged', you MUST use explicit qualifying words: 'allegedly', 'according to the complaint', or 'prosecutors claimed'.\n"
@@ -361,13 +360,13 @@ def run(ctx: RunContext) -> StageArtifact:
                     total_llm_words += sum(len(line_elem.text.split()) for line_elem in lines_data)
                     llm_beats.append((b_id, target_dur, lines_data))
 
-                w_min = 450
-                w_max = 750
+                w_min = 460
+                w_max = 540
                 if hasattr(ctx, "preset") and ctx.preset:
                     nb = getattr(ctx.preset, "narration", None)
                     if nb and hasattr(nb, "word_budget"):
-                        w_min = getattr(nb.word_budget, "min", 450)
-                        w_max = getattr(nb.word_budget, "max", 750)
+                        w_min = getattr(nb.word_budget, "min", 460)
+                        w_max = getattr(nb.word_budget, "max", 540)
 
                 b1_has_micro_scenes = bool(llm_beats and len(llm_beats[0][2]) >= 3)
                 if len(llm_beats) >= 5 and w_min <= total_llm_words <= w_max and b1_has_micro_scenes:
@@ -424,6 +423,14 @@ def run(ctx: RunContext) -> StageArtifact:
                 else:
                     v_meta = "tactile investigative document clipping on aged archival parchment"
 
+                target_wpm = 125.0
+                if hasattr(ctx, "preset") and ctx.preset:
+                    nb = getattr(ctx.preset, "narration", None)
+                    if nb and hasattr(nb, "wpm_estimate"):
+                        target_wpm = float(getattr(nb, "wpm_estimate", 125.0) or 125.0)
+                target_wpm = max(115.0, min(135.0, target_wpm))
+                words_per_sec = target_wpm / 60.0
+
                 all_scenes.append(Scene(
                     scene_id=f"SCENE_{scene_idx:02d}",
                     sequence_block=f"block_{scene_idx}_{beat_id}",
@@ -432,11 +439,29 @@ def run(ctx: RunContext) -> StageArtifact:
                     headline=f"{beat_id.upper()} // {ln.line_id}",
                     visual_metaphor=v_meta,
                     color_accent="Vox Yellow #F2C230 & Navy #1B2B4A",
-                    duration_est_sec=round(len(ln.text.split()) / 2.5, 1),
+                    duration_est_sec=round(len(ln.text.split()) / words_per_sec, 1),
                 ))
                 scene_idx += 1
 
-        est_duration = round(total_words / 2.5, 1)  # ~150 wpm = 2.5 words/sec
+        from core.pacing_budgeter import calibrate_scene_durations_to_target
+
+        target_run_s = 240.0
+        if hasattr(ctx, "preset") and ctx.preset:
+            dw = getattr(ctx.preset, "duration_window_s", None)
+            if dw and hasattr(dw, "target"):
+                target_run_s = float(getattr(dw, "target", 240.0) or 240.0)
+
+        # Proportionally calibrate scene durations so timeline matches target duration and WPM is strictly clamped
+        final_wpm = calibrate_scene_durations_to_target(
+            all_scenes,
+            target_total_duration_sec=target_run_s,
+            target_wpm=target_wpm,
+        )
+        est_duration = target_run_s
+        logger.info(
+            f"[S03_SCRIPT] Narration pacing auto-clamped: {total_words} words across {est_duration:.1f}s -> {final_wpm:.1f} WPM "
+            f"(docudrama ceiling [115.0, 135.0] WPM, target {target_wpm:.1f} WPM)."
+        )
 
         # Apply limits from profile if specified (e.g. e2e_min limits to 1 scene)
         max_sc = ctx.config.limits.max_scenes

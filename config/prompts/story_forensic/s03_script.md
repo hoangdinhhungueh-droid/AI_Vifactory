@@ -1,26 +1,26 @@
 # S03 5-Beat Forensic Docudrama Script Prompt (en-US)
 
 You are an award-winning investigative documentary writer and narrative showrunner.
-Transform the verified `evidence_ledger` and `timeline` into an intense, cinematic 3-to-5 minute (strictly 520 to 650 words, target 240 seconds, 18-21 lines) English narration script.
+Transform the verified `evidence_ledger` and `timeline` into an intense, cinematic 3-to-5 minute (strictly 460 to 540 words, target 500 words for 240 seconds runtime at 115-135 WPM docudrama tempo, 18-22 lines) English narration script.
 
 ## 5-Beat Docudrama Architecture & Scene Pacing Rules
 Every Beat MUST be decomposed into snappy, 3-to-5 second lines (each line represents one distinct visual scene/shot, ~8 to 15 words):
-1. `B1_hook` (8% word budget / ~45-55 words, target 18-20s):
+1. `B1_hook` (8% word budget / ~40 words, target ~19.2s):
    - MUST contain 3 to 4 distinct lines (`B1_L01` to `B1_L04`), each 8 to 15 words (3.5 to 5.0 seconds). NEVER compress Beat 1 into a single sentence!
    - Line 1 (`B1_L01`, visual_hook: "stat_hero"): Cold strike with decisive metric or explosive financial/quantitative figure.
    - Line 2 (`B1_L02`, visual_hook: "stamp"): The red official sanction stamp or status verdict (e.g. UNVERIFIED).
    - Line 3 (`B1_L03`, visual_hook: "ruler_measure" or "cutout"): The core systemic paradox or statutory exemption clause.
    - Line 4 (`B1_L04`, visual_hook: "red_thread" or "compass_arc"): The calendar deadline and ticking clock framing the crisis.
-2. `B2_setup` (17% word budget / ~100 words, target ~40s):
+2. `B2_setup` (17% word budget / ~85 words, target ~40.8s):
    - MUST contain 3 to 4 distinct lines (`B2_L01` to `B2_L04`), each 3.5 to 5.5 seconds.
    - The façade: Introduce the corporation/project before the crisis and the illusion of institutional prestige.
-3. `B3_scheme` (33% word budget / ~190 words, target ~75s):
+3. `B3_scheme` (33% word budget / ~165 words, target ~79.2s):
    - MUST contain 5 to 6 distinct lines (`B3_L01` to `B3_L06`), each 3.5 to 5.5 seconds.
    - The forensic autopsy: Step-by-step mechanical breakdown of the financial plumbing, contracts, and ledger records.
-4. `B4_crack` (25% word budget / ~145 words, target ~55s):
+4. `B4_crack` (25% word budget / ~125 words, target ~60.0s):
    - MUST contain 4 to 5 distinct lines (`B4_L01` to `B4_L05`), each 3.5 to 5.5 seconds.
    - The unraveling: Forensic audits, whistleblower revelations, and contradictory evidence.
-5. `B5_aftermath` (17% word budget / ~100 words, target ~40s):
+5. `B5_aftermath` (17% word budget / ~85 words, target ~40.8s):
    - MUST contain 3 to 4 distinct lines (`B5_L01` to `B5_L04`), each 3.5 to 5.5 seconds.
    - The reckoning: Regulatory consequences, enduring warning, and resolving the central question posed in B1.
 
@@ -38,8 +38,8 @@ Produce pure valid JSON matching the following contract:
 {
   "preset": "story_forensic",
   "topic": "<TOPIC_NAME>",
-  "total_words": 580,
-  "est_duration_s": 235.0,
+  "total_words": 500,
+  "est_duration_s": 240.0,
   "beats": [
     {
       "beat_id": "B1_hook",
