@@ -15,6 +15,7 @@ Follows Rule 118 (Zero-Mock Data), Rule 121 (Strict Verification), and Rule 128 
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import logging
 import os
@@ -32,8 +33,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-except Exception:
-    pass
+except (AttributeError, io.UnsupportedOperation) as _reconf_err:
+    logger.debug(f"Stdout reconfigure notice: {_reconf_err}")
 
 
 def _load_env_secrets(repo_root: Path) -> None:
