@@ -276,6 +276,28 @@ def run(ctx: RunContext) -> StageArtifact:
         from vox.ffmpeg_utils import get_ffmpeg_binary
         ffmpeg_bin = get_ffmpeg_binary()
         seed_img = ctx.paths.seed_image_path(sc_id)
+        if not seed_img.exists() or seed_img.stat().st_size <= 0:
+            try:
+                from app.services.master_scene_sheet import resolve_scene_image_path
+                first_shot = sc.get("shots", [{}])[0] if isinstance(sc.get("shots"), list) and len(sc.get("shots")) > 0 else {}
+                explicit_path = (
+                    sc.get("image_path")
+                    or sc.get("seed_image")
+                    or sc.get("file_path")
+                    or first_shot.get("seed_image")
+                    or first_shot.get("image_path")
+                )
+                resolved_seed = resolve_scene_image_path(
+                    scene_id=sc_id,
+                    image_dir=ctx.paths.composite_seeds_dir,
+                    fallback_dirs=[ctx.paths.root / "images", ctx.paths.root / "assets"],
+                    explicit_path=explicit_path,
+                )
+                if resolved_seed and resolved_seed.exists() and resolved_seed.stat().st_size > 0:
+                    seed_img = resolved_seed
+            except Exception as _r_err:
+                logger.debug(f"[s08_video_gen] Seed resolution notice for {sc_id}: {_r_err}")
+
         active_seed_img = seed_img
         seed_usable = bool(seed_img.exists() and seed_img.stat().st_size > 0)
         chained_fallback_used = False

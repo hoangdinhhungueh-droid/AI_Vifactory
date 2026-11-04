@@ -10,17 +10,16 @@ Tuân thủ:
 - Rule 126: Three-way physical sync (Local -> VPS).
 """
 
-import os
+import argparse
+import json
+import logging
+import re
 import sys
 import time
-import json
-import re
-import argparse
-import hashlib
-import logging
 
 logger = logging.getLogger("flow_video_dispatcher")
 from pathlib import Path
+
 try:
     from playwright.sync_api import sync_playwright
 except ImportError:
@@ -86,9 +85,37 @@ def detect_flow_quota_exhausted(page) -> tuple[bool, str]:
 
 def get_seed_image_path(episode_dir: Path, scene_id: str) -> Path:
     """Tìm kiếm ảnh composite seed theo thứ tự ưu tiên các thư mục chuẩn (Rule 128 Generic Contract)."""
+    try:
+        from app.services.master_scene_sheet import resolve_scene_image_path
+
+        fallback_dirs = [
+            episode_dir / "images",
+            episode_dir / "assets",
+            ROOT_DIR / "episodes" / episode_dir.name / "composite_seeds",
+            ROOT_DIR / "episodes" / episode_dir.name / "images",
+        ]
+        blocks_dir = episode_dir / "blocks"
+        if blocks_dir.exists():
+            for blk in blocks_dir.glob("block_*"):
+                fallback_dirs.append(blk / "images")
+
+        resolved = resolve_scene_image_path(
+            scene_id=scene_id,
+            image_dir=episode_dir / "composite_seeds",
+            fallback_dirs=fallback_dirs,
+        )
+        if resolved and resolved.exists() and resolved.stat().st_size > 1000:
+            return resolved
+    except (ImportError, OSError, ValueError) as _res_err:
+        logger.debug(f"resolve_scene_image_path notice in flow dispatcher: {_res_err}")
+
+    # Fallback direct candidates
     candidates = [
         episode_dir / "composite_seeds" / f"composite_{scene_id}.png",
+        episode_dir / "composite_seeds" / f"composite_{scene_id.lower()}.png",
+        episode_dir / "composite_seeds" / f"{scene_id}.png",
         episode_dir / "images" / f"composite_{scene_id}.png",
+        episode_dir / "images" / f"{scene_id}.png",
         ROOT_DIR / "episodes" / episode_dir.name / "composite_seeds" / f"composite_{scene_id}.png",
     ]
     blocks_dir = episode_dir / "blocks"
@@ -98,7 +125,7 @@ def get_seed_image_path(episode_dir: Path, scene_id: str) -> Path:
     for c in candidates:
         if c.exists() and c.stat().st_size > 10000:
             return c
-    return episode_dir / "composite_seeds" / f"composite_{scene_id}.png"
+    return episode_dir / "composite_seeds" / f"composite_{scene_id.lower()}.png"
 
 PROFILES = {
     'acc_01': {
@@ -372,7 +399,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     logger.debug(f"Upload tab click notice: {_tab_err}")
 
             # Chờ file hoàn tất xử lý, click chọn asset và chờ nút Thêm vào câu lệnh enabled (Rule 118, 121)
-            asset_added = False
             for wait_i in range(25):
                 agree_btn = page.locator("button:has-text('Tôi đồng ý'), button:has-text('I agree')").first
                 if agree_btn.count() > 0 and agree_btn.is_visible():
@@ -400,7 +426,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     print(f"      ✅ Nút 'Thêm vào câu lệnh' đã sẵn sàng sau {wait_i+1}s! Đang chèn chip ảnh...")
                     add_btn.click(force=True)
                     time.sleep(2)
-                    asset_added = True
                     break
 
             # 4. Chốt chặn kiểm toán I2V (Fail-Closed Gate): Đảm bảo Ingredient Chip TỒN TẠI trong prompt box
@@ -846,7 +871,7 @@ def main():
         print(f"🎯 Đã lọc theo danh sách scenes: {len(all_clips)} clips")
     elif (args.mode == "demo" or args.pilot) and args.limit == 0:
         all_clips = all_clips[:2]
-        print(f"🎯 [DEMO MODE OMNI HOOK] Tự động giới hạn 2 clips đầu tiên (SCENE_01 -> SCENE_02)!")
+        print("🎯 [DEMO MODE OMNI HOOK] Tự động giới hạn 2 clips đầu tiên (SCENE_01 -> SCENE_02)!")
     elif args.limit > 0:
         all_clips = all_clips[:args.limit]
         print(f"🎯 Đã giới hạn tổng cộng {len(all_clips)} clips đầu tiên!")
@@ -932,7 +957,7 @@ def main():
                 print(f"\n⚠️ [AUTO-ROTATION] Tài khoản [{current_acc.upper()}] đã cạn credit.")
                 print(f"🔄 Tự động chuyển giao {len(pending_queue)} clips còn lại sang [{next_acc.upper()}]...")
             else:
-                print(f"\n🛑 Toàn bộ các tài khoản trong hạm đội đã cạn hạn mức hoặc không khả dụng!")
+                print("\n🛑 Toàn bộ các tài khoản trong hạm đội đã cạn hạn mức hoặc không khả dụng!")
                 break
         elif status in ("NOT_LOGGED_IN", "NO_PROJECT_BTN", "CANVAS_TIMEOUT", "DISABLED_ACCOUNT"):
             offline_accs.add(current_acc)
@@ -942,7 +967,7 @@ def main():
                 print(f"\n⚠️ [AUTO-FALLBACK] Tài khoản [{current_acc.upper()}] gặp lỗi phiên ({status}).")
                 print(f"🔄 Tự động chuyển giao {len(pending_queue)} clips sang [{next_acc.upper()}]...")
             else:
-                print(f"\n🛑 Không còn tài khoản nào khả dụng trong hạm đội!")
+                print("\n🛑 Không còn tài khoản nào khả dụng trong hạm đội!")
                 break
         else:
             # Tài khoản hiện tại đã xử lý xong hoặc gặp lỗi đơn lẻ không phải quota

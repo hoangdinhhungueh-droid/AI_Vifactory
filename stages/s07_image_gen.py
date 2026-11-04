@@ -15,7 +15,7 @@ from typing import Any, Dict, List
 
 from core.config import RunContext
 from core.contracts.stages import Provenance, StageArtifact, StageID
-from core.gates import compute_file_sha256, emit_artifact, GateError
+from core.gates import GateError, compute_file_sha256, emit_artifact
 from tools.codemap.runtime import pipeline_stage
 
 logger = logging.getLogger("s07_image_gen")
@@ -75,24 +75,36 @@ def run(ctx: RunContext) -> StageArtifact:
         sc_id = sc.get("scene_id", "SCENE_01")
         target_img = ctx.paths.seed_image_path(sc_id)
 
-        # 1. Check if seed already exists
+        # 1. Check if seed already exists or resolve across candidate locations
         if not target_img.exists() or ctx.force:
-            # Check if an existing composite seed is in legacy locations
-            legacy_cands = [
-                ctx.paths.root / "composite_seeds" / f"composite_{sc_id.lower()}.png",
-                ctx.paths.root / "composite_seeds" / f"composite_{sc_id}.png",
-                ctx.paths.root / "composite_seeds" / f"{sc_id}.png",
-                ctx.paths.root / "images" / f"{sc_id}.png",
-                ctx.paths.root / "images" / f"composite_{sc_id}.png",
-                ctx.paths.root / "assets" / f"{sc_id}.png",
-                ctx.paths.root / "assets" / f"composite_{sc_id}.png",
-                Path(r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets") / ctx.run_id / f"composite_{sc_id}.png",
-                Path(r"C:\Users\hunghd2\.gemini\antigravity\brain\browser_assets") / ctx.run_id / f"{sc_id}.png",
+            from app.services.master_scene_sheet import resolve_scene_image_path
+
+            brain_browser_dir = Path.home() / ".gemini" / "antigravity" / "brain" / "browser_assets" / ctx.run_id
+            fallback_dirs = [
+                ctx.paths.root / "images",
+                ctx.paths.root / "assets",
             ]
-            found = next((p for p in legacy_cands if p.exists() and p.stat().st_size > 1024), None)
-            if found and found.resolve() != target_img.resolve():
-                import shutil
-                shutil.copy2(str(found), str(target_img))
+            if brain_browser_dir.exists():
+                fallback_dirs.append(brain_browser_dir)
+
+            first_shot = sc.get("shots", [{}])[0] if isinstance(sc.get("shots"), list) and len(sc.get("shots")) > 0 else {}
+            explicit_target = (
+                sc.get("image_path")
+                or sc.get("seed_image")
+                or sc.get("file_path")
+                or first_shot.get("seed_image")
+                or first_shot.get("image_path")
+            )
+            found = resolve_scene_image_path(
+                scene_id=sc_id,
+                image_dir=ctx.paths.composite_seeds_dir,
+                fallback_dirs=fallback_dirs,
+                explicit_path=explicit_target,
+            )
+            if found and found.exists() and found.stat().st_size > 1024:
+                if found.resolve() != target_img.resolve():
+                    import shutil
+                    shutil.copy2(str(found), str(target_img))
             elif not target_img.exists():
                 if is_hermetic_test:
                     # Create editorial placeholder frame via PIL ONLY for hermetic unit tests
@@ -132,13 +144,39 @@ def run(ctx: RunContext) -> StageArtifact:
             details={"missing_scenes": missing_scenes, "prompts_file": str(bulk_prompts_file)}
         )
 
+    # Refresh Master Scene package with authentic composite seed images (Rule 121 & 140)
+    master_sheet_manifest = None
+    try:
+        from app.services.master_scene_sheet import generate_master_scene_package
+        master_sheet_manifest = generate_master_scene_package(
+            ctx, scenes=scenes, payload=s5_data.get("payload", {}), image_mode=True
+        )
+        # Synchronize master_sheets to canonical episode directory if separate
+        import os
+        import shutil
+        ms_src = ctx.paths.root / "master_sheets"
+        if ms_src.exists():
+            ep_candidates = [
+                Path(os.getenv("VF_EPISODES_DIR", "/var/vf/episodes")) / ctx.run_id,
+                ctx.paths.repo_root / "episodes" / ctx.run_id,
+            ]
+            for ep_dir in ep_candidates:
+                if ep_dir.exists() and ep_dir.resolve() != ctx.paths.root.resolve():
+                    shutil.copytree(str(ms_src), str(ep_dir / "master_sheets"), dirs_exist_ok=True)
+    except Exception as _ms_err:
+        logger.debug(f"[s07_image_gen] Notice refreshing master_scene_package: {_ms_err}")
+
     payload = {
         "task_id": ctx.run_id,
         "total_images": len(images_generated),
         "composite_seeds_dir": str(ctx.paths.composite_seeds_dir),
         "aspect_ratio": "16:9",
         "style_prefix": style_prefix if is_story else None,
-        "images": images_generated
+        "images": images_generated,
+        "master_sheets": {
+            "dir": str(ctx.paths.root / "master_sheets"),
+            "manifest": master_sheet_manifest,
+        }
     }
 
     prov = Provenance(
@@ -155,12 +193,4 @@ def run(ctx: RunContext) -> StageArtifact:
     )
 
     emit_artifact(artifact, ctx.paths)
-
-    # Refresh Master Scene package with authentic composite seed images (Rule 121 & 140)
-    try:
-        from app.services.master_scene_sheet import generate_master_scene_package
-        generate_master_scene_package(ctx, scenes=scenes, payload=s5_data.get("payload", {}), image_mode=True)
-    except Exception as _ms_err:
-        logger.debug(f"[s07_image_gen] Notice refreshing master_scene_package: {_ms_err}")
-
     return artifact

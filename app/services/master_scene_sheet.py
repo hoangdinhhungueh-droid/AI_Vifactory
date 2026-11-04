@@ -545,7 +545,14 @@ def render_scene_contact_sheet_png(
         fallback_dirs = []
         if image_dir:
             fallback_dirs.extend([image_dir.parent / "images", image_dir.parent / "assets"])
-        explicit_target = sc.get("image_path") or sc.get("seed_image") or sc.get("file_path")
+        first_shot = sc.get("shots", [{}])[0] if isinstance(sc.get("shots"), list) and len(sc.get("shots")) > 0 else {}
+        explicit_target = (
+            sc.get("image_path")
+            or sc.get("seed_image")
+            or sc.get("file_path")
+            or first_shot.get("seed_image")
+            or first_shot.get("image_path")
+        )
         target_img_path = resolve_scene_image_path(
             scene_id=sc_id,
             image_dir=image_dir,
@@ -644,7 +651,15 @@ def generate_master_scene_dashboard_html(
         hero = sc.get("hero_cutout_object") or "Archival Character Cutout"
         props = sc.get("interacting_objects") or ["Torn paper ledger", "Red evidence marker"]
         props_str = ", ".join(props) if isinstance(props, list) else str(props)
-        omni_prompt = sc.get("i2v_prompt_omni") or sc.get("i2v_prompt_google_flow") or sc.get("image_prompt") or ""
+        first_shot = sc.get("shots", [{}])[0] if isinstance(sc.get("shots"), list) and len(sc.get("shots")) > 0 else {}
+        omni_prompt = (
+            sc.get("i2v_prompt_omni")
+            or sc.get("i2v_prompt_google_flow")
+            or sc.get("image_prompt")
+            or first_shot.get("visual_prompt")
+            or first_shot.get("prompt")
+            or ""
+        )
         stat_hero = extract_stat_hero_from_text(narration)
 
         # Image source logic: check image_paths_map or relative path
@@ -1267,7 +1282,14 @@ def generate_master_scene_package(
 
     for idx_sc, sc in enumerate(scenes):
         sc_id = sc.get("scene_id") or f"SCENE_{idx_sc + 1:02d}"
-        explicit = sc.get("image_path") or sc.get("seed_image") or sc.get("file_path")
+        first_shot = sc.get("shots", [{}])[0] if isinstance(sc.get("shots"), list) and len(sc.get("shots")) > 0 else {}
+        explicit = (
+            sc.get("image_path")
+            or sc.get("seed_image")
+            or sc.get("file_path")
+            or first_shot.get("seed_image")
+            or first_shot.get("image_path")
+        )
         resolved = resolve_scene_image_path(
             scene_id=sc_id,
             image_dir=seeds_dir,
@@ -1382,6 +1404,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Master Scene & Master Sheet Generator")
     parser.add_argument("--episode", type=str, required=True, help="Episode / Run ID (e.g. KR_EP0005_gadeok_cost_risk)")
     parser.add_argument("--repo-root", type=str, default=None, help="Optional repo root path")
+    parser.add_argument("--image-mode", action="store_true", default=True, help="Include composite seed images")
+    parser.add_argument("--no-image-mode", dest="image_mode", action="store_false", help="Render pre-production wireframe storyboards without images")
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root) if args.repo_root else Path(__file__).resolve().parent.parent.parent
@@ -1424,5 +1448,5 @@ if __name__ == "__main__":
             self.manifest = None
 
     ctx = _Context(ep_id, paths, ep_id)
-    result = generate_master_scene_package(ctx, scenes=scenes, payload=payload, image_mode=True)
+    result = generate_master_scene_package(ctx, scenes=scenes, payload=payload, image_mode=args.image_mode)
     print(json.dumps(result, indent=2))

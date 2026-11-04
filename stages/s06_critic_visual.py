@@ -134,6 +134,18 @@ def run(ctx: RunContext) -> StageArtifact:
             }
         ]
 
+        # Verify Master Scene Sheet availability from S05 (Rule 121 & 140)
+        ms_dir = ctx.paths.root / "master_sheets"
+        ms_manifest = ms_dir / "master_sheet_manifest.json"
+        ms_ok = ms_manifest.exists() and ms_manifest.stat().st_size > 50
+        payload["master_sheets_verified"] = ms_ok
+        if ms_ok:
+            payload["master_sheets"] = {
+                "dir": str(ms_dir),
+                "manifest_path": str(ms_manifest),
+                "dashboard_html": str(ms_dir / "master_sheet_dashboard.html"),
+            }
+
         prov = Provenance(
             generator="stages.s06_critic_visual",
             latency_sec=round(time.time() - start_ts, 2)
@@ -314,6 +326,18 @@ def run(ctx: RunContext) -> StageArtifact:
             raise GateError(STAGE, f"Stage S06 Visual Critic Council failed: {live_err}")
 
     payload = decision.model_dump()
+
+    # Verify Master Scene Sheet availability from S05 (Rule 121 & 140)
+    ms_dir = ctx.paths.root / "master_sheets"
+    ms_manifest = ms_dir / "master_sheet_manifest.json"
+    ms_ok = ms_manifest.exists() and ms_manifest.stat().st_size > 50
+    payload["master_sheets_verified"] = ms_ok
+    if ms_ok:
+        payload["master_sheets"] = {
+            "dir": str(ms_dir),
+            "manifest_path": str(ms_manifest),
+            "dashboard_html": str(ms_dir / "master_sheet_dashboard.html"),
+        }
 
     prov = Provenance(
         generator="stages.s06_critic_visual",

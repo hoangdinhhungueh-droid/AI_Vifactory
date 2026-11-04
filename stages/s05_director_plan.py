@@ -124,7 +124,7 @@ def build_vox_scene_prompts(
     from app.services.semantic_evidence_extractor import extract_evidence_for_sentence
     sc_id_str = getattr(scene, "scene_id", f"SCENE_{idx+1:02d}")
     evidence = extract_evidence_for_sentence(sentence_text, market=market_str, scene_id=sc_id_str)
-    
+
     # Rule 141 (Claim-to-Evidence Binding): Ignore visual_metaphor if it's merely a sentence/narration copy
     raw_metaphor = getattr(scene, "visual_metaphor", "") or ""
     is_narration_copy = (
@@ -877,7 +877,7 @@ def run(ctx: RunContext) -> StageArtifact:
         slot = acc_pool[idx % len(acc_pool)]
         shot_id = f"sc_{idx+1:02d}_sh_01"
         prev_shot_id = f"sc_{idx:02d}_sh_01" if idx > 0 else None
-        
+
         # Anti-Infinite-Zoom & Discrete Diorama Exhibit Mandate (Rule 140 & CL3 Vox Standard):
         # Every scene represents a discrete editorial diorama exhibit on the desk.
         # Inter-scene transitions MUST start from their own clean composite seed frame (uses_previous_end_frame=False)
@@ -1043,6 +1043,27 @@ def run(ctx: RunContext) -> StageArtifact:
         latency_sec=round(time.time() - start_ts, 2)
     )
 
+    # Automatically generate flow_video_manifest.json for Google Flow / Omni 7-account dispatch (Rule 125 & 128)
+    try:
+        generate_7acc_flow_manifest(ctx.paths.root, ctx.run_id, scenes)
+    except Exception as _man_err:
+        logger.warning(f"[s05_director_plan] Notice generating workspace flow_video_manifest.json: {_man_err}")
+
+    # Generate Vox Style Master Scene Package (System Master Sheet & Per-Scene Storyboards)
+    master_sheet_manifest = None
+    try:
+        from app.services.master_scene_sheet import generate_master_scene_package
+        scenes_dicts = [s.model_dump() for s in scenes]
+        master_sheet_manifest = generate_master_scene_package(ctx, scenes=scenes_dicts, payload=payload, image_mode=False)
+    except Exception as _ms_err:
+        logger.warning(f"[s05_director_plan] Notice generating master_scene_package: {_ms_err}")
+
+    if master_sheet_manifest:
+        payload["master_sheets"] = {
+            "dir": str(ctx.paths.root / "master_sheets"),
+            "manifest": master_sheet_manifest,
+        }
+
     artifact = StageArtifact(
         run_id=ctx.run_id,
         stage=STAGE,
@@ -1052,20 +1073,6 @@ def run(ctx: RunContext) -> StageArtifact:
     )
 
     emit_artifact(artifact, ctx.paths)
-
-    # Automatically generate flow_video_manifest.json for Google Flow / Omni 7-account dispatch (Rule 125 & 128)
-    try:
-        generate_7acc_flow_manifest(ctx.paths.root, ctx.run_id, scenes)
-    except Exception as _man_err:
-        logger.warning(f"[s05_director_plan] Notice generating workspace flow_video_manifest.json: {_man_err}")
-
-    # Generate Vox Style Master Scene Package (System Master Sheet & Per-Scene Storyboards)
-    try:
-        from app.services.master_scene_sheet import generate_master_scene_package
-        scenes_dicts = [s.model_dump() for s in scenes]
-        generate_master_scene_package(ctx, scenes=scenes_dicts, payload=payload, image_mode=False)
-    except Exception as _ms_err:
-        logger.warning(f"[s05_director_plan] Notice generating master_scene_package: {_ms_err}")
 
     # Synchronize director_plan.json to episode directory for Remotion & downstream consumers
     ep_candidates = [
@@ -1084,6 +1091,12 @@ def run(ctx: RunContext) -> StageArtifact:
 
                 # Automatically generate and synchronize flow_video_manifest.json to episode directory
                 generate_7acc_flow_manifest(ep_dir, ctx.run_id, scenes)
+
+                # Synchronize master_sheets directory to episode directory if separate
+                ms_src = ctx.paths.root / "master_sheets"
+                if ms_src.exists() and ep_dir.resolve() != ctx.paths.root.resolve():
+                    import shutil
+                    shutil.copytree(str(ms_src), str(ep_dir / "master_sheets"), dirs_exist_ok=True)
 
                 # Synchronize dp_plan.json and canonical prompts_forge.json for Remotion, B4 & DACL
                 with open(ep_dir / "dp_plan.json", "w", encoding="utf-8") as f:
