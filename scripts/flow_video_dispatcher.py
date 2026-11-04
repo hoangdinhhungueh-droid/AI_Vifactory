@@ -298,14 +298,25 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
         time.sleep(0.3)
 
         # Clear any lingering ingredient chips in the prompt box
-        chips = page.locator("button[aria-label*='Xóa' i], button[aria-label*='Remove' i], button[aria-label*='Delete' i], .ingredient-chip button, [data-icon='close']").all()
-        for chip in chips:
+        clear_btn = page.locator(
+            ".base-prompt-box button.clear-button, "
+            "flow-base-prompt-box button.clear-button, "
+            "button.clear-button, "
+            ".base-prompt-box button[aria-label*='Clear' i], "
+            ".base-prompt-box button[aria-label*='Xóa' i], "
+            ".base-prompt-box button[aria-label*='Remove' i], "
+            "button[aria-label*='Xóa' i], "
+            "button[aria-label*='Remove' i], "
+            "button[aria-label*='Delete' i], "
+            ".ingredient-chip button, "
+            "[data-icon='close']"
+        ).first
+        if clear_btn.count() > 0 and clear_btn.is_visible():
             try:
-                if chip.is_visible():
-                    chip.click(force=True)
-                    time.sleep(0.3)
+                clear_btn.click(force=True)
+                time.sleep(0.5)
             except Exception as _chip_err:
-                logger.debug(f"Chip removal notice: {_chip_err}")
+                logger.debug(f"Chip clear notice: {_chip_err}")
 
         # 2. Điền Prompt Text vào ô câu lệnh trước (TRÁNH Control+A xóa mất chip ảnh sau này)
         prompt_box.click(force=True)
@@ -329,6 +340,8 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
 
             # 3.1. Đảm bảo panel ingredients được mở để hiển thị tab tải lên và danh sách asset
             panel_open_indicators = page.locator(
+                ".cdk-overlay-pane:has(button.sidebar-upload-btn), "
+                ".cdk-overlay-pane:has(button.detail-add-to-prompt-btn), "
                 ".add-menu-panel, "
                 ".ingredient-drawer, "
                 "mat-bottom-sheet-container, "
@@ -338,6 +351,9 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
             is_panel_open = any(i.is_visible() for i in panel_open_indicators.all() if panel_open_indicators.count() > 0)
             if not is_panel_open:
                 trigger = page.locator(
+                    ".base-prompt-box button.add-menu-trigger, "
+                    "button.add-menu-trigger, "
+                    ".base-prompt-box button:has-text('add'), "
                     "flow-prompt-input button[aria-label*='Thêm' i], "
                     "flow-prompt-input button[aria-label*='Add' i], "
                     "flow-prompt-input .add-menu-trigger, "
@@ -347,7 +363,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     "div:has(> div.ProseMirror) button[aria-label*='Add' i], "
                     "div:has(> div.ProseMirror) .add-menu-trigger, "
                     "div:has(> div.ProseMirror) button:has([data-icon='add']), "
-                    ".add-menu-trigger, "
                     "button[aria-label*='Thêm thành phần vào ô nhập câu lệnh'], "
                     "button[aria-label*='Add ingredients to the prompt box'], "
                     "button[aria-label*='Add ingredients'], "
@@ -358,7 +373,7 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     trigger.click(force=True)
                     time.sleep(1.5)
 
-                for _ in range(5):
+                for _ in range(8):
                     if any(i.is_visible() for i in panel_open_indicators.all() if panel_open_indicators.count() > 0):
                         is_panel_open = True
                         break
@@ -366,6 +381,10 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
 
             # 3.2. Chuyển tab sang 'Tệp tải lên' / 'Uploads' nếu cần
             upload_tab = page.locator(
+                ".cdk-overlay-pane button:has-text('Tệp tải lên'), "
+                ".cdk-overlay-pane [role='tab']:has-text('Tệp tải lên'), "
+                ".cdk-overlay-pane [role='tab']:has-text('Uploads'), "
+                ".cdk-overlay-pane button:has-text('Uploads'), "
                 ".add-menu-panel button:has-text('Tệp tải lên'), "
                 ".add-menu-panel [role='tab']:has-text('Tệp tải lên'), "
                 ".add-menu-panel [role='tab']:has-text('Uploads'), "
@@ -374,10 +393,6 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                 ".ingredient-drawer [role='tab']:has-text('Uploads'), "
                 "mat-bottom-sheet-container [role='tab']:has-text('Tệp tải lên'), "
                 "mat-bottom-sheet-container [role='tab']:has-text('Uploads'), "
-                ".cdk-overlay-pane [role='tab']:has-text('Tệp tải lên'), "
-                ".cdk-overlay-pane [role='tab']:has-text('Uploads'), "
-                ".cdk-overlay-pane button:has-text('Tệp tải lên'), "
-                ".cdk-overlay-pane button:has-text('Uploads'), "
                 "[role='tab']:has-text('Tệp tải lên'), "
                 "[role='tab']:has-text('Uploads')"
             ).first
@@ -390,59 +405,71 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
 
             # 3.3. Tải file seed qua FileChooser hoặc native input[type="file"]
             file_uploaded = False
-            up_btn = page.locator(
-                ".add-menu-panel button:has-text('Tải tệp lên'), "
-                ".add-menu-panel button:has-text('Upload files'), "
-                ".ingredient-drawer button:has-text('Tải tệp lên'), "
-                ".ingredient-drawer button:has-text('Upload files'), "
-                "mat-bottom-sheet-container button:has-text('Tải tệp lên'), "
-                "mat-bottom-sheet-container button:has-text('Upload files'), "
-                ".cdk-overlay-pane button:has-text('Tải tệp lên'), "
-                ".cdk-overlay-pane button:has-text('Upload files'), "
-                ".cdk-overlay-pane button:has-text('Tải nội dung nghe nhìn lên'), "
-                ".cdk-overlay-pane button:has-text('Upload media'), "
-                "button:has-text('Tải tệp lên'), "
-                "button:has-text('Upload files'), "
-                "button:has-text('Tải nội dung nghe nhìn lên'), "
-                "button:has-text('Upload media'), "
-                ".sidebar-upload-btn, "
-                "button:has(.upload-container)"
+            # Kiểm tra xem asset đã có sẵn trong drawer hay chưa
+            existing_asset = page.locator(
+                f".cdk-overlay-pane button.asset-item:has-text('{seed_img.stem[:16]}'), "
+                f".cdk-overlay-pane button.asset-item:has-text('{seed_img.name[:16]}'), "
+                f"button.asset-item:has-text('{seed_img.stem[:16]}'), "
+                f"button.asset-item:has-text('{seed_img.name[:16]}')"
             ).first
+            if existing_asset.count() > 0 and existing_asset.is_visible():
+                print(f"      ℹ️ File {seed_img.name} đã có sẵn trong danh sách asset!")
+                file_uploaded = True
+            else:
+                up_btn = page.locator(
+                    ".cdk-overlay-pane button.sidebar-upload-btn, "
+                    ".cdk-overlay-pane button:has-text('Tải nội dung nghe nhìn lên'), "
+                    ".cdk-overlay-pane button:has-text('Upload media'), "
+                    ".add-menu-panel button:has-text('Tải tệp lên'), "
+                    ".add-menu-panel button:has-text('Upload files'), "
+                    ".ingredient-drawer button:has-text('Tải tệp lên'), "
+                    ".ingredient-drawer button:has-text('Upload files'), "
+                    "mat-bottom-sheet-container button:has-text('Tải tệp lên'), "
+                    "mat-bottom-sheet-container button:has-text('Upload files'), "
+                    ".cdk-overlay-pane button:has-text('Tải tệp lên'), "
+                    ".cdk-overlay-pane button:has-text('Upload files'), "
+                    "button:has-text('Tải tệp lên'), "
+                    "button:has-text('Upload files'), "
+                    "button:has-text('Tải nội dung nghe nhìn lên'), "
+                    "button:has-text('Upload media'), "
+                    ".sidebar-upload-btn, "
+                    "button:has(.upload-container)"
+                ).first
 
-            if up_btn.count() > 0 and up_btn.is_visible():
-                try:
-                    with page.expect_file_chooser(timeout=8000) as fc_info:
-                        up_btn.click(force=True)
-                    fc = fc_info.value
-                    fc.set_files(str(seed_img))
-                    print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser!")
-                    file_uploaded = True
-                    time.sleep(2)
-                except Exception as e:
-                    logger.debug(f"FileChooser direct click notice: {e}")
-                    box = up_btn.bounding_box()
-                    if box:
-                        try:
-                            with page.expect_file_chooser(timeout=5000) as fc_info:
-                                page.mouse.click(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
-                            fc = fc_info.value
-                            fc.set_files(str(seed_img))
-                            print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser (mouse click)!")
-                            file_uploaded = True
-                            time.sleep(2)
-                        except Exception as _mb_err:
-                            logger.debug(f"Mouse bounding box FileChooser notice: {_mb_err}")
-
-            if not file_uploaded:
-                file_input = page.locator('input[type="file"]').first
-                if file_input.count() > 0:
+                if up_btn.count() > 0 and up_btn.is_visible():
                     try:
-                        file_input.set_input_files(str(seed_img))
-                        print(f"      ✅ Đã tải file {seed_img.name} trực tiếp qua native input[type='file']!")
+                        with page.expect_file_chooser(timeout=8000) as fc_info:
+                            up_btn.click(force=True)
+                        fc = fc_info.value
+                        fc.set_files(str(seed_img))
+                        print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser!")
                         file_uploaded = True
                         time.sleep(2)
-                    except Exception as _fi_err:
-                        logger.debug(f"Direct set_input_files error: {_fi_err}")
+                    except Exception as e:
+                        logger.debug(f"FileChooser direct click notice: {e}")
+                        box = up_btn.bounding_box()
+                        if box:
+                            try:
+                                with page.expect_file_chooser(timeout=5000) as fc_info:
+                                    page.mouse.click(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+                                fc = fc_info.value
+                                fc.set_files(str(seed_img))
+                                print(f"      ✅ Đã tải file {seed_img.name} qua FileChooser (mouse click)!")
+                                file_uploaded = True
+                                time.sleep(2)
+                            except Exception as _mb_err:
+                                logger.debug(f"Mouse bounding box FileChooser notice: {_mb_err}")
+
+                if not file_uploaded:
+                    file_input = page.locator('input[type="file"]').first
+                    if file_input.count() > 0:
+                        try:
+                            file_input.set_input_files(str(seed_img))
+                            print(f"      ✅ Đã tải file {seed_img.name} trực tiếp qua native input[type='file']!")
+                            file_uploaded = True
+                            time.sleep(2)
+                        except Exception as _fi_err:
+                            logger.debug(f"Direct set_input_files error: {_fi_err}")
 
             # 3.4. Chờ file hoàn tất xử lý, click chọn asset và chờ nút Thêm vào câu lệnh enabled (Rule 118, 121)
             for wait_i in range(25):
@@ -452,7 +479,13 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     time.sleep(1)
 
                 # Click chọn asset vừa tải lên
-                target_asset = page.locator(f"text={seed_img.name[:16]}").first
+                target_asset = page.locator(
+                    f".cdk-overlay-pane button.asset-item:has-text('{seed_img.stem[:16]}'), "
+                    f".cdk-overlay-pane button.asset-item:has-text('{seed_img.name[:16]}'), "
+                    f"button.asset-item:has-text('{seed_img.stem[:16]}'), "
+                    f"button.asset-item:has-text('{seed_img.name[:16]}'), "
+                    f".cdk-overlay-pane :has-text('{seed_img.name[:16]}')"
+                ).first
                 if target_asset.count() > 0 and target_asset.is_visible():
                     try:
                         target_asset.click(force=True)
@@ -460,9 +493,10 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                         logger.debug(f"Target asset click notice: {_clk_err}")
                 else:
                     first_asset = page.locator(
+                        ".cdk-overlay-pane button.asset-item, "
+                        ".cdk-overlay-pane flow-asset-tile, "
                         ".add-menu-panel flow-asset-tile, "
                         ".ingredient-drawer flow-asset-tile, "
-                        ".cdk-overlay-pane flow-asset-tile, "
                         ".asset-item, [role='listitem'], .cdk-drag, mat-list-item, flow-asset-tile, .media-item, .ingredient-item"
                     ).first
                     if first_asset.count() > 0 and first_asset.is_visible():
@@ -472,7 +506,14 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                             logger.debug(f"First asset click notice: {_first_clk_err}")
 
                 time.sleep(1)
-                add_btn = page.locator("button:has-text('Thêm vào câu lệnh'), button:has-text('Add to prompt')").first
+                add_btn = page.locator(
+                    ".cdk-overlay-pane button.detail-add-to-prompt-btn, "
+                    ".cdk-overlay-pane button:has-text('Thêm vào câu lệnh'), "
+                    ".cdk-overlay-pane button:has-text('Add to prompt'), "
+                    "button.detail-add-to-prompt-btn, "
+                    "button:has-text('Thêm vào câu lệnh'), "
+                    "button:has-text('Add to prompt')"
+                ).first
                 if add_btn.count() > 0 and add_btn.is_visible() and add_btn.is_enabled():
                     print(f"      ✅ Nút 'Thêm vào câu lệnh' đã sẵn sàng sau {wait_i+1}s! Đang chèn chip ảnh...")
                     add_btn.click(force=True)
@@ -481,32 +522,29 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
 
             # 4. Chốt chặn kiểm toán I2V (Fail-Closed Gate): Đảm bảo Ingredient Chip TỒN TẠI trong prompt box
             # CẤM selector global button:has-text('close') vì gây false positive do nút 'x' của modal (Root cause 2)
+            # CẤM selector class-chip chung vì gây false positive do 'agent-mode-chip' (nút Tác nhân luôn có trong base-prompt-box)
             chip_attached = False
             for _ in range(15):
-                # 4.1. DOM check: Duyệt trực tiếp container bao quanh ProseMirror để phát hiện thumbnail ảnh seed
+                # 4.1. DOM check: Duyệt trực tiếp base-prompt-box để phát hiện flow-ingredient-chip hoặc img.chip-image
                 try:
                     is_detected = page.evaluate("""
                         () => {
-                            const pbox = document.querySelector('div.ProseMirror, [contenteditable="true"]');
-                            if (!pbox) return false;
+                            const baseBox = document.querySelector('flow-base-prompt-box, .base-prompt-box');
+                            if (!baseBox) return false;
 
-                            // 1. Kiểm tra bên trong ProseMirror
-                            if (pbox.querySelector('.ingredient-chip, [contenteditable="false"], flow-image-tile, img, [class*="chip"]')) {
-                                return true;
+                            // 1. Kiểm tra element chip đặc thù của Google Flow (chống false positive với agent-mode-chip)
+                            const chip = baseBox.querySelector('flow-ingredient-chip, flow-image-ingredient-chip, flow-ingredient-bar, .has-ingredient-bar, img.chip-image, button.chip-container');
+                            if (chip) {
+                                const rect = chip.getBoundingClientRect();
+                                if (rect.width >= 20 && rect.height >= 20 && rect.top > 0) {
+                                    return true;
+                                }
                             }
 
-                            // 2. Kiểm tra container bao quanh prompt box (card / modal chứa chip và textarea)
-                            let parent = pbox.parentElement;
-                            for (let i = 0; i < 6 && parent; i++) {
-                                const nodes = parent.querySelectorAll('img, flow-image-tile, .ingredient-chip, [class*="chip"], [class*="thumbnail"], [style*="background-image"]');
-                                for (const n of nodes) {
-                                    const rect = n.getBoundingClientRect();
-                                    if (rect.width >= 20 && rect.height >= 20 && rect.top > 0) {
-                                        return true;
-                                    }
-                                }
-                                if (parent.tagName.toLowerCase() === 'body') break;
-                                parent = parent.parentElement;
+                            // 2. Kiểm tra bên trong ProseMirror
+                            const pbox = document.querySelector('div.ProseMirror, [contenteditable="true"]');
+                            if (pbox && pbox.querySelector('flow-image-tile, img, .ingredient-chip')) {
+                                return true;
                             }
                             return false;
                         }
@@ -517,8 +555,16 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                 except Exception as _eval_err:
                     logger.debug(f"Chip eval notice: {_eval_err}")
 
-                # 4.2. Playwright locators dự phòng cho chip trong ProseMirror hoặc container prompt box
+                # 4.2. Playwright locators dự phòng cho chip trong base-prompt-box
                 chips_now = page.locator(
+                    ".base-prompt-box flow-ingredient-chip, "
+                    ".base-prompt-box flow-image-ingredient-chip, "
+                    ".base-prompt-box .reference-ingredient-chip, "
+                    ".base-prompt-box .prompt-ingredient-bar flow-ingredient-chip, "
+                    ".base-prompt-box .has-ingredient-bar, "
+                    ".base-prompt-box img.chip-image, "
+                    ".base-prompt-box button.chip-container, "
+                    "flow-base-prompt-box flow-ingredient-chip, "
                     "div.ProseMirror .ingredient-chip, "
                     "flow-prompt-input .ingredient-chip, "
                     ".prompt-box .ingredient-chip, "
@@ -528,12 +574,7 @@ def generate_and_download_clip(page, clip: dict, out_file: Path, episode_dir: Pa
                     "div.ProseMirror button:has-text('expand_content'), "
                     "flow-prompt-input button:has-text('expand_content'), "
                     "div.ProseMirror .expand-button, "
-                    "flow-prompt-input .expand-button, "
-                    "div.ProseMirror [contenteditable='false'], "
-                    "div.ProseMirror img, "
-                    "xpath=//div[contains(@class, 'ProseMirror')]/preceding-sibling::*//img, "
-                    "xpath=//div[contains(@class, 'ProseMirror')]/parent::*/preceding-sibling::*//img, "
-                    "xpath=//div[contains(@class, 'ProseMirror')]/ancestor::div[.//button and not(self::body)][1]//img"
+                    "flow-prompt-input .expand-button"
                 ).all()
                 if any(c.is_visible() for c in chips_now):
                     chip_attached = True

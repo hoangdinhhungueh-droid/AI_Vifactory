@@ -123,3 +123,18 @@ def test_scoped_panel_and_trigger_selectors():
     assert "fc.set_files" in src
 
 
+def test_chip_detection_anti_false_positive():
+    """Rule 121: Verifies that generic [class*='chip'] is excluded to avoid agent-mode-chip false positives, and flow-ingredient-chip is used."""
+    import inspect
+    import scripts.flow_video_dispatcher as fvd
+
+    src = inspect.getsource(fvd.generate_and_download_clip)
+    # Generic [class*="chip"] matches 'agent-mode-chip' (Tác nhân) - must be excluded from JS evaluation
+    assert '[class*="chip"]' not in src
+    # Flow-specific ingredient chip selectors must be present
+    assert "flow-ingredient-chip" in src
+    assert "flow-image-ingredient-chip" in src
+    assert "clear-button" in src
+    assert ".detail-add-to-prompt-btn" in src
+
+
