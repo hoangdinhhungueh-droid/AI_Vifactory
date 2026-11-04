@@ -839,8 +839,8 @@ def dispatch_for_account(acc_key: str, clips: list, out_dir: Path, episode_dir: 
         has_canvas = False
         try:
             has_canvas = page.locator("div.ProseMirror, [contenteditable='true']").first.is_visible()
-        except Exception:
-            pass
+        except Exception as _canvas_check_err:
+            logger.debug(f"Pre-check canvas visibility notice: {_canvas_check_err}")
 
         if "/project/" not in page.url and not has_canvas:
             print("   Chờ giao diện trang chủ sẵn sàng...")
