@@ -13,7 +13,7 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.config import RunContext
 from core.contracts.stages import (
@@ -47,6 +47,69 @@ __all__ = [
 ]
 
 FLOW_ACCOUNTS: List[str] = ["acc_01", "acc_02", "acc_03", "acc_04", "acc_05", "acc_07"]
+
+CANONICAL_DOCUMENTARY_CAMERA_DIRECTIVES: List[str] = [
+    "TOP_DOWN_TRACKING",
+    "RAKE_30_RACK_FOCUS",
+    "LATERAL_WHIP_PAN",
+    "DUTCH_FORENSIC_SNAP",
+    "ORBIT_ARC_15",
+    "SURFACE_MACRO_GLIDE"
+]
+
+CANONICAL_H_CYCLE: List[str] = [
+    "H7_DISPLACE",
+    "H1_IMPACT",
+    "H2_CONSTRAINT",
+    "H4_TETHER",
+    "H5_OPTICAL",
+    "H6_MARK",
+    "H3_SEVER"
+]
+
+
+class SceneKinematicHistory:
+    """Tracks scene kinematic states and enforces strict Anti-Repetition invariants (Rule 125, 140)."""
+
+    def __init__(self) -> None:
+        self.history: List[Dict[str, str]] = []
+        self.h_cycle = list(CANONICAL_H_CYCLE)
+        self.camera_pool = list(CANONICAL_DOCUMENTARY_CAMERA_DIRECTIVES)
+        self.h_to_cameras = {
+            "H1_IMPACT": ["RAKE_30_RACK_FOCUS", "DUTCH_FORENSIC_SNAP", "TOP_DOWN_TRACKING"],
+            "H2_CONSTRAINT": ["RAKE_30_RACK_FOCUS", "SURFACE_MACRO_GLIDE", "TOP_DOWN_TRACKING"],
+            "H3_SEVER": ["LATERAL_WHIP_PAN", "RAKE_30_RACK_FOCUS", "DUTCH_FORENSIC_SNAP"],
+            "H4_TETHER": ["LATERAL_WHIP_PAN", "TOP_DOWN_TRACKING", "ORBIT_ARC_15"],
+            "H5_OPTICAL": ["SURFACE_MACRO_GLIDE", "ORBIT_ARC_15", "RAKE_30_RACK_FOCUS"],
+            "H6_MARK": ["TOP_DOWN_TRACKING", "SURFACE_MACRO_GLIDE", "LATERAL_WHIP_PAN"],
+            "H7_DISPLACE": ["TOP_DOWN_TRACKING", "ORBIT_ARC_15", "RAKE_30_RACK_FOCUS"],
+        }
+
+    def allocate_next(self, idx: int, sentence: str = "", existing_h: Optional[str] = None) -> Tuple[str, str]:
+        last_h = self.history[-1]["h_family"] if self.history else None
+        last_cam = self.history[-1]["camera_directive"] if self.history else None
+        prev_cam = self.history[-2]["camera_directive"] if len(self.history) >= 2 else None
+
+        # 1. Determine H-family ensuring no two consecutive scenes share the same
+        if existing_h and existing_h != last_h:
+            h_fam = existing_h
+        else:
+            cand_h = self.h_cycle[idx % len(self.h_cycle)]
+            if cand_h == last_h:
+                cand_h = self.h_cycle[(idx + 1) % len(self.h_cycle)]
+            h_fam = cand_h
+
+        # 2. Select compatible camera directive with anti-repetition invariant
+        compatible_cams = self.h_to_cameras.get(h_fam, self.camera_pool)
+        filtered_cams = [c for c in compatible_cams if c != last_cam and c != prev_cam]
+        if not filtered_cams:
+            filtered_cams = [c for c in compatible_cams if c != last_cam]
+        if not filtered_cams:
+            filtered_cams = [c for c in self.camera_pool if c != last_cam]
+
+        chosen_cam = filtered_cams[idx % len(filtered_cams)]
+        self.history.append({"scene_index": str(idx), "h_family": h_fam, "camera_directive": chosen_cam})
+        return h_fam, chosen_cam
 
 
 def generate_7acc_flow_manifest(target_dir: Path, episode_id: str, scenes: List[Any]) -> Dict[str, Any]:
@@ -113,7 +176,9 @@ def build_vox_scene_prompts(
     idx: int,
     total_scenes: int,
     prev_scene: Optional[Scene] = None,
-    market: Optional[str] = None
+    market: Optional[str] = None,
+    camera_directive: Optional[str] = None,
+    h_family: Optional[str] = None
 ) -> Dict[str, Any]:
     """Decomposes scene into rich Vox Physical Objects, Kinematics, Omni and Google Flow I2V Prompts."""
     headline = scene.headline or f"BEAT {idx+1:02d}"
@@ -148,9 +213,18 @@ def build_vox_scene_prompts(
     tool_prop = evidence.interacting_tool_prop
     desk_surface = "Aged archival cream newsprint"
 
-    # Pick deterministic single camera movement (Studio Touch 7: Single Camera Mandate)
-    allowed_camera_directives = ["STATIC_OVERHEAD", "SLOW_PUSH_IN_0_1X", "SLOW_HORIZONTAL_PAN", "SUBTLE_TILT_DOWN"]
-    camera_directive = allowed_camera_directives[idx % len(allowed_camera_directives)]
+    # Pick dynamic documentary camera movement with anti-repetition (Rule 140)
+    resolved_camera_directive = (
+        camera_directive
+        or getattr(scene, "camera_directive", None)
+        or CANONICAL_DOCUMENTARY_CAMERA_DIRECTIVES[idx % len(CANONICAL_DOCUMENTARY_CAMERA_DIRECTIVES)]
+    )
+    resolved_h_family = (
+        h_family
+        or getattr(scene, "h_family", None)
+        or CANONICAL_H_CYCLE[idx % len(CANONICAL_H_CYCLE)]
+    )
+    camera_directive = resolved_camera_directive
     camera_move = CANONICAL_CAMERA_MOVES[idx % len(CANONICAL_CAMERA_MOVES)]
 
     # 1. Physical Objects Breakdown & Objects Roster
@@ -313,9 +387,15 @@ def build_vox_scene_prompts(
             market=resolved_market,
             whisper_words=getattr(scene, "whisper_words", None),
             bounding_box=getattr(scene, "bounding_box", None) or getattr(scene, "focal_region", None),
-            object_roles=getattr(scene, "object_roles", None)
+            object_roles=getattr(scene, "object_roles", None),
+            camera_directive=camera_directive
         )
-        i2v_google_flow = build_cl3_paper_diorama_prompt(sub_plan, market=resolved_market, style_mode="deep_diorama")
+        i2v_google_flow = build_cl3_paper_diorama_prompt(
+            sub_plan,
+            market=resolved_market,
+            style_mode="deep_diorama",
+            camera_directive=camera_directive
+        )
         i2v_omni = i2v_google_flow
     except Exception as _k_err:
         logger.warning(f"[build_vox_scene_prompts] Kinetic sub-director fallback notice: {_k_err}")
@@ -784,11 +864,24 @@ def validate_and_sanitize_director_plan(payload: Dict[str, Any]) -> Dict[str, An
             if re.search(pat, combined):
                 violations.append(f"Scene {sc_id} contains banned emotional adjective matching '{pat}'")
 
-    allowed_dirs = {"STATIC_OVERHEAD", "SLOW_PUSH_IN_0_1X", "SLOW_HORIZONTAL_PAN", "SUBTLE_TILT_DOWN"}
+        for boilerplate in [r"\bdrops and slams\b", r"\bdrops from above\b"]:
+            if re.search(boilerplate, combined):
+                violations.append(f"Scene {sc_id} contains banned kinetic boilerplate '{boilerplate}'")
+
+    allowed_dirs = {
+        "STATIC_OVERHEAD", "SLOW_PUSH_IN_0_1X", "SLOW_HORIZONTAL_PAN", "SUBTLE_TILT_DOWN",
+        "ORBIT_QUARTER_TURN", "WHIP_LEFT_TO_RIGHT",
+        "TOP_DOWN_TRACKING", "RAKE_30_RACK_FOCUS", "LATERAL_WHIP_PAN",
+        "DUTCH_FORENSIC_SNAP", "ORBIT_ARC_15", "SURFACE_MACRO_GLIDE"
+    }
     for idx, sc in enumerate(scenes):
         cd = sc.get("camera_directive")
         if cd and cd not in allowed_dirs:
             violations.append(f"Scene {sc.get('scene_id')} has non-canonical camera directive '{cd}'")
+        if idx > 0 and len(scenes) > 2:
+            prev_cd = scenes[idx - 1].get("camera_directive")
+            if cd and prev_cd and cd == prev_cd:
+                violations.append(f"Anti-repetition violation: Scene {sc.get('scene_id')} repeats camera directive '{cd}' from preceding scene")
 
     asset_reg = payload.get("asset_registry", {})
     items = asset_reg.get("items", [])
@@ -877,6 +970,8 @@ def run(ctx: RunContext) -> StageArtifact:
             logger.warning(f"[s05_director_plan] ClaudeVoxDirector notice: {dir_err}")
             director_status = "degraded"
 
+    kinematic_tracker = SceneKinematicHistory()
+
     for idx, sc_dict in enumerate(raw_scenes):
         scene = Scene.model_validate(sc_dict)
         scene.market = market
@@ -931,8 +1026,25 @@ def run(ctx: RunContext) -> StageArtifact:
             if planned_storyboard and idx < len(planned_storyboard) and planned_storyboard[idx].get("object_roles"):
                 scene.object_roles = planned_storyboard[idx]["object_roles"]
 
+        # Allocate dynamic H-family and documentary camera directive with anti-repetition (Rule 140)
+        h_fam, cam_dir = kinematic_tracker.allocate_next(
+            idx=idx,
+            sentence=getattr(scene, "narration", "") or getattr(scene, "sentence", "") or "",
+            existing_h=getattr(scene, "h_family", None)
+        )
+        scene.h_family = h_fam
+        scene.camera_directive = cam_dir
+
         # Decompose into full Vox Object-Assembly Kinematics
-        vox_meta = build_vox_scene_prompts(scene, idx=idx, total_scenes=total_sc, prev_scene=prev_scene, market=market)
+        vox_meta = build_vox_scene_prompts(
+            scene,
+            idx=idx,
+            total_scenes=total_sc,
+            prev_scene=prev_scene,
+            market=market,
+            camera_directive=cam_dir,
+            h_family=h_fam
+        )
         scene.canvas_workspace = vox_meta["canvas_workspace"]
         scene.hero_cutout_object = vox_meta["hero_cutout_object"]
         scene.interacting_objects = vox_meta["interacting_objects"]
@@ -1008,7 +1120,7 @@ def run(ctx: RunContext) -> StageArtifact:
             shot_id = f"S{idx+1:03d}"
             # Opening hook is tactile stop-motion (vox_native); Veo distributed at ~25% share (<= 30% ceiling)
             r_mode = "veo" if (len(scenes) >= 4 and idx % 4 == 3) else "vox_native"
-            h_fam = h_cycle[idx % len(h_cycle)]
+            h_fam = getattr(sc, "h_family", None) or h_cycle[idx % len(h_cycle)]
             setattr(sc, "h_family", h_fam)
             if hasattr(sc, "shots") and sc.shots:
                 setattr(sc.shots[0], "h_family", h_fam)

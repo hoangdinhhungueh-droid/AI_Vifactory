@@ -11,6 +11,7 @@ from scripts.vps_runner import FastVPSClient
 
 FILES_TO_SYNC = [
     "AGENTS.md",
+    "core/contracts/stages.py",
     "core/skill_gateway.py",
     "core/pacing_budgeter.py",
     "core/instinct_manager.py",
@@ -26,6 +27,7 @@ FILES_TO_SYNC = [
     "config/prompts/b35_visual_rules.md",
     "config/prompts/vox_b3_director_image_prompt.md",
     "config/prompts/cl3_vox_engine/avoid_base.md",
+    "config/prompts/cl3_vox_engine/camera_directives.yaml",
     "config/prompts/cl3_vox_engine/t2i_style.md",
     "config/prompts/cl3_vox_engine/style_deep_diorama.md",
     "config/prompts/cl3_vox_engine/style_flat_parallax.md",

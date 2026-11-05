@@ -732,6 +732,57 @@ def quantize_12fps(t_sec: float) -> float:
 # app.services.semantic_evidence_extractor engine.
 
 
+def _derive_camera_micro_move(camera_directive: Optional[str]) -> str:
+    """Derives tactile micro-movement phrase matching the assigned camera directive (Rule 140)."""
+    cam = (camera_directive or "").upper()
+    if "TOP_DOWN" in cam:
+        return "smooth 90-degree lateral tracking across document flow without zoom"
+    elif "RAKE" in cam:
+        return "low-angle rake with focus racking from foreground tool to midground exhibit"
+    elif "WHIP" in cam or "LATERAL" in cam:
+        return "rapid horizontal whip reframing momentum onto target exhibit"
+    elif "DUTCH" in cam:
+        return "tilted forensic Dutch snap settling firmly on contradictory clause"
+    elif "ORBIT" in cam:
+        return "subtle 15-degree orbital arc revealing 3D papercraft diorama layers"
+    elif "MACRO" in cam or "GLIDE" in cam:
+        return "macro surface glide skimming along paper grain and markings"
+    elif "STATIC" in cam:
+        return "locked-off perspective, camera holds dead still while objects move"
+    elif "TILT" in cam:
+        return "subtle vertical tilt down tracking evidentiary element"
+    elif "PAN" in cam:
+        return "slow horizontal pan following evidence outflow"
+    return "tactile documentary framing settling sharply on hero exhibit"
+
+
+def sanitize_tactile_action_verb(verb: str, tool: str, hero: str) -> str:
+    """Eliminates monotonous 'drops from above' or 'slams from above' boilerplate, enforcing dynamic tactile interactions."""
+    v = (verb or "").strip()
+    v_lower = v.lower()
+    t_lower = tool.lower()
+    h_lower = hero.lower()
+
+    if any(k in v_lower for k in ["drop", "slam", "fall"]):
+        if any(k in t_lower or k in h_lower for k in ["stamp", "seal"]):
+            return "strikes down firmly against"
+        elif any(k in t_lower or k in h_lower for k in ["caliper", "vernier", "clamp", "compass"]):
+            return "clamps and slides firmly along the margin of"
+        elif any(k in t_lower or k in h_lower for k in ["shear", "scissor"]):
+            return "shears cleanly across the edge of"
+        elif any(k in t_lower or k in h_lower for k in ["yarn", "thread", "pin"]):
+            return "pulls taut between anchor pins across"
+        elif any(k in t_lower or k in h_lower for k in ["loupe", "glass", "lens"]):
+            return "glides smoothly across"
+        elif any(k in t_lower or k in h_lower for k in ["highlighter", "marker", "pen"]):
+            return "sweeps across"
+        elif any(k in t_lower or k in h_lower for k in ["card", "number", "stat", "ledger", "blueprint", "map"]):
+            return "pop-up unfolds and locks onto"
+        return "engages briskly with"
+
+    return v
+
+
 def generate_scene_sub_director_plan(
     scene_id: str,
     sentence: str,
@@ -743,7 +794,8 @@ def generate_scene_sub_director_plan(
     bounding_box: Optional[Union[Dict[str, Any], Any]] = None,
     object_roles: Optional[Dict[str, str]] = None,
     layout_type: Optional[str] = None,
-    config_path: Optional[str] = None
+    config_path: Optional[str] = None,
+    camera_directive: Optional[str] = None
 ) -> Dict[str, Any]:
     """Sinh toàn diện Khung Đạo Diễn Vi Cảnh (Scene Sub-Director Plan) chuẩn hóa cho mọi Episode.
 
@@ -1120,6 +1172,7 @@ def generate_scene_sub_director_plan(
 
     # 5. Phân Rã Dãy Micro-Beats Linh Hoạt
     micro_beats = []
+    cam_move_desc = _derive_camera_micro_move(camera_directive)
 
     if beat_count <= 4:
         win_b1 = f"{b1_start:.3f}s - {b1_end:.3f}s"
@@ -1144,7 +1197,7 @@ def generate_scene_sub_director_plan(
                 coupling_id="K1",
                 action_description=f"High-velocity snap burst in {burst1:.1f}s (steep acceleration on twos / 12fps): The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
                 handoff_to="B3",
-                camera_micro_move="subtle punch-in zoom 1.0x to 1.15x tracking contact point",
+                camera_micro_move=cam_move_desc,
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
@@ -1190,7 +1243,7 @@ def generate_scene_sub_director_plan(
                 coupling_id="K1",
                 action_description=f"High-velocity snap burst in {burst1:.1f}s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
                 handoff_to="B3",
-                camera_micro_move="camera crash-zoom punch-in 1.3x tracking contact point",
+                camera_micro_move=cam_move_desc,
                 vo_keyword=whisper_windows[1][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
@@ -1255,7 +1308,7 @@ def generate_scene_sub_director_plan(
                 coupling_id="K1",
                 action_description=f"High-velocity snap burst in {burst1:.1f}s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s, leaving {c1.residue}",
                 handoff_to="B4",
-                camera_micro_move="camera punch-in zoom 1.0x to 1.35x tracking inspection point",
+                camera_micro_move=cam_move_desc,
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
@@ -1321,7 +1374,7 @@ def generate_scene_sub_director_plan(
                 coupling_id="K1",
                 action_description=f"High-velocity snap burst in {burst1:.1f}s: The {actor1_label} {c1.action_verb} the {anchor_label}, causing {c1.physical_reaction}. Snap-stop freeze holds completely still from {t_snap1:.3f}s",
                 handoff_to="B4",
-                camera_micro_move="camera punch-in zoom 1.0x to 1.35x tracking contact point",
+                camera_micro_move=cam_move_desc,
                 vo_keyword=whisper_windows[2][2] if whisper_windows else None
             ),
             DynamicMicroBeat(
@@ -1365,6 +1418,7 @@ def generate_scene_sub_director_plan(
     plan = {
         "schema_version": "scene_sub_director_plan.v3",
         "scene_id": scene_id,
+        "camera_directive": camera_directive or "TOP_DOWN_TRACKING",
         "scene_duration_sec": dur,
         "calculated_beat_count": len(micro_beats),
         "dominant_kinetic_families": [f.value for f in dominant_families],
@@ -1652,7 +1706,7 @@ def build_cl3_paper_diorama_prompt(
     reg = get_template_registry()
 
     # 1. Camera Directive Resolution (Hierarchy of Precedence: Scene Plan > Generic ev)
-    effective_camera_name = plan_camera or ev.camera_directive
+    effective_camera_name = kwargs.get("camera_directive") or plan_camera or ev.camera_directive
     cam_pos_line, _, _, forbidden_in_shot = reg.resolve_camera_directive(effective_camera_name, trace=trace)
 
     # 2. Style Block from Markdown conditioned by camera (Rule 132 & Rule 140)
@@ -1683,8 +1737,10 @@ def build_cl3_paper_diorama_prompt(
     action_verb = plan_verb or ev.tactile_action_verb
     phys_react = (plan_reaction or ev.physical_reaction).strip()
     tac_res = (plan_residue or ev.tactile_residue).strip()
+    clean_verb = sanitize_tactile_action_verb(action_verb, clean_tool, clean_hero)
+    prep = "" if re.search(r"\b(on|onto|against|across|beside|into|with|over|around|through|of)\s*$", clean_verb, flags=re.IGNORECASE) else " the"
     causing_clause = phys_react if phys_react.lower().startswith("causing") else f"causing {phys_react}"
-    action_text = f"Action: The {clean_tool} snaps briskly in 0.3s and {action_verb} the document, {causing_clause}, leaving {tac_res}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+    action_text = f"Action: The {clean_tool} snaps briskly in 0.3s and {clean_verb}{prep} {clean_hero}, {causing_clause}, leaving {tac_res}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
     camera_line = f"{cam_pos_line.rstrip('.')}. Settle on the {clean_hero} in sharp focus."
 
     # Validate against forbidden camera words in shot text (e.g. no whip when static overhead)

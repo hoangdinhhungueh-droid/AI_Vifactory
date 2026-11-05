@@ -52,3 +52,69 @@ WHIP_LEFT_TO_RIGHT:
   add_to_avoid:
     - "no static locked-off camera"
   camera_is_actor: true
+
+TOP_DOWN_TRACKING:
+  positive: "Camera: Overhead 90-degree flat-lay tracking smoothly across the archival desk surface, following the document flow without zoom."
+  strip_from_avoid:
+    - "no static locked-off camera"
+  forbidden_in_shot:
+    - "orbit"
+    - "crane"
+    - "push-in"
+    - "zoom"
+  camera_is_actor: true
+
+RAKE_30_RACK_FOCUS:
+  positive: "Camera: 30-degree low-angle rake skimming across the desk, racking focus from foreground tool to midground evidence ledger."
+  add_to_avoid:
+    - "no static locked-off camera"
+  forbidden_in_shot:
+    - "top-down"
+    - "overhead"
+    - "push-in"
+    - "zoom"
+  camera_is_actor: true
+
+LATERAL_WHIP_PAN:
+  positive: "Camera: Rapid lateral whip-pan from left to right past foreground layers, tracking momentum and settling crisply onto the target exhibit."
+  add_to_avoid:
+    - "no static locked-off camera"
+  forbidden_in_shot:
+    - "top-down settle"
+    - "crane"
+    - "orbit"
+    - "push-in"
+    - "zoom"
+  camera_is_actor: true
+
+DUTCH_FORENSIC_SNAP:
+  positive: "Camera: Tilted Dutch-angle forensic snap settling sharply on the contradictory clause, emphasizing institutional tension."
+  add_to_avoid:
+    - "no static locked-off camera"
+  forbidden_in_shot:
+    - "push-in"
+    - "orbit"
+    - "zoom"
+  camera_is_actor: true
+
+ORBIT_ARC_15:
+  positive: "Camera: Subtle 15-degree orbital arc around the layered paper diorama, showcasing 3D depth and paper deckle edges."
+  add_to_avoid:
+    - "no static locked-off camera"
+  forbidden_in_shot:
+    - "push-in"
+    - "whip"
+    - "zoom"
+  camera_is_actor: true
+
+SURFACE_MACRO_GLIDE:
+  positive: "Camera: Macro glide skimming barely above the aged newsprint paper grain, tracking the ink line and inspection markings."
+  add_to_avoid:
+    - "no static locked-off camera"
+  forbidden_in_shot:
+    - "top-down settle"
+    - "push-in"
+    - "orbit"
+    - "zoom"
+  camera_is_actor: true
+

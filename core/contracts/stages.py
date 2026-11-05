@@ -104,6 +104,7 @@ class Shot(BaseModel):
     previous_shot_id: Optional[str] = None
     uses_previous_end_frame: bool = False
     camera_directive: Optional[str] = None
+    h_family: Optional[str] = None
     second_by_second_action_breakdown: Optional[List[Dict[str, Any]]] = None
 
 
@@ -138,6 +139,7 @@ class Scene(BaseModel):
     i2v_prompt_google_flow: Optional[str] = None
     second_by_second_action_breakdown: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     camera_directive: Optional[str] = None
+    h_family: Optional[str] = None
     objects_roster: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     headline_typography: Optional[Dict[str, Any]] = None
     audio_foley_cues: Optional[List[Dict[str, Any]]] = Field(default_factory=list)

@@ -111,3 +111,34 @@ def test_universal_video_prompt_builder():
     assert "[HOLD & LIVING TEXTURE]:" in prompt
     assert "12fps (on twos)" in prompt
 
+
+def test_scene_kinematic_history_anti_repetition():
+    """Validates that SceneKinematicHistory strictly enforces non-repetition across scenes."""
+    from stages.s05_director_plan import SceneKinematicHistory, CANONICAL_DOCUMENTARY_CAMERA_DIRECTIVES
+
+    tracker = SceneKinematicHistory()
+    results = [tracker.allocate_next(i, f"Sentence {i}") for i in range(23)]
+
+    assert len(results) == 23
+    for i in range(1, 23):
+        prev_h, prev_cam = results[i - 1]
+        curr_h, curr_cam = results[i]
+        assert curr_h != prev_h, f"H-family repeated at scene {i}: {curr_h} == {prev_h}"
+        assert curr_cam != prev_cam, f"Camera repeated at scene {i}: {curr_cam} == {prev_cam}"
+        assert curr_cam in CANONICAL_DOCUMENTARY_CAMERA_DIRECTIVES
+
+
+def test_sanitize_tactile_action_verb():
+    """Validates that boilerplate 'drops and slams' phrases are transformed into tactile verbs."""
+    from app.services.kinetic_sub_director import sanitize_tactile_action_verb
+
+    v1 = sanitize_tactile_action_verb("drops and slams briskly in 0.3s onto the surface", "turned-wood seal stamp", "document")
+    assert "drops" not in v1.lower()
+    assert "slams" not in v1.lower()
+    assert "strikes" in v1.lower()
+
+    v2 = sanitize_tactile_action_verb("drops from above onto newsprint", "stat number card", "blueprint")
+    assert "drops" not in v2.lower()
+    assert "unfold" in v2.lower()
+
+

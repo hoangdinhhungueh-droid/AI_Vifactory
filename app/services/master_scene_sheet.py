@@ -53,59 +53,87 @@ VOX_PALETTE = {
 MOTION_THUMBNAIL_TYPES = [
     {
         "id": 1,
-        "code": "overshoot",
-        "title": "1 CUTOUT SPRINGS UP WITH OVERSHOOT",
-        "directive": "Spring motion curve with 12fps overshoot and settled dead-stop hold",
-        "h_family": "H1_IMPACT / H7_DISPLACE",
+        "code": "top_down_tracking",
+        "title": "1 POP-UP UNFOLD & 90° TRACKING",
+        "directive": "Accordion paper unfold in 0.3s followed by smooth 90° lateral tracking",
+        "h_family": "H7_DISPLACE / H6_MARK",
+        "camera": "TOP_DOWN_TRACKING",
     },
     {
         "id": 2,
-        "code": "counter_ticks",
-        "title": "2 COUNTER TICKS UPWARD",
-        "directive": "Rollup odometer tick countup, locking rigidly into place with red flash",
-        "h_family": "H1_IMPACT / H6_MARK",
+        "code": "rake_30_focus",
+        "title": "2 SEAL STAMP IMPACT & 30° RAKE FOCUS",
+        "directive": "Heavy seal stamp strikes with paper depression, racking focus to midground ledger",
+        "h_family": "H1_IMPACT / H2_CONSTRAINT",
+        "camera": "RAKE_30_RACK_FOCUS",
     },
     {
         "id": 3,
-        "code": "swipe_in",
-        "title": "3 RED UNDERLINE SWIPES IN",
-        "directive": "Sharp left-to-right neon crimson stroke swipe in 0.2s with ink bleed residue",
-        "h_family": "H6_MARK / H4_TETHER",
+        "code": "macro_glide",
+        "title": "3 CALIPER CLAMP & SURFACE MACRO GLIDE",
+        "directive": "Brass vernier caliper clamps document margin, camera gliding along paper grain",
+        "h_family": "H2_CONSTRAINT / H5_OPTICAL",
+        "camera": "SURFACE_MACRO_GLIDE",
     },
     {
         "id": 4,
-        "code": "camera_drift",
-        "title": "4 CAMERA HOLDS A SLOW 2% DRIFT",
-        "directive": "Subtle 2% camera drift across archival stage, maintaining alive desk tension",
-        "h_family": "H5_OPTICAL / H2_CONSTRAINT",
+        "code": "whip_pan",
+        "title": "4 RED YARN TENSION & LATERAL WHIP-PAN",
+        "directive": "Taut crimson evidence yarn snaps taut, rapid lateral whip-pan reframing momentum",
+        "h_family": "H4_TETHER / H3_SEVER",
+        "camera": "LATERAL_WHIP_PAN",
+    },
+    {
+        "id": 5,
+        "code": "orbit_arc",
+        "title": "5 OPTICAL LOUPE & 15° ORBIT ARC",
+        "directive": "Convex magnifying loupe reveals fine print under 15° orbital arc showcasing 3D depth",
+        "h_family": "H5_OPTICAL / H7_DISPLACE",
+        "camera": "ORBIT_ARC_15",
+    },
+    {
+        "id": 6,
+        "code": "dutch_snap",
+        "title": "6 PARADOX & DUTCH-ANGLE FORENSIC SNAP",
+        "directive": "Tilted Dutch-angle forensic snap settling sharply on contradictory clause",
+        "h_family": "H1_IMPACT / H6_MARK",
+        "camera": "DUTCH_FORENSIC_SNAP",
     },
 ]
 
 
 def resolve_scene_motion_thumbnail(scene: Dict[str, Any]) -> Dict[str, Any]:
     """Resolves which motion thumbnail archetype best matches the scene kinematics."""
-    narration = str(scene.get("narration") or "").lower()
-    headline = str(scene.get("headline") or "").lower()
+    cam = str(scene.get("camera_directive") or "").upper()
     h_fam = str(scene.get("h_family") or "").upper()
-    raw_breakdown = scene.get("second_by_second_action_breakdown") or ""
-    if isinstance(raw_breakdown, list):
-        act_breakdown = " ".join(str(item) for item in raw_breakdown).lower()
-    else:
-        act_breakdown = str(raw_breakdown).lower()
 
-    # Rule 1: Check for quantitative metrics/counter
-    if "H6_MARK" in h_fam or any(k in narration or k in headline for k in ["$", "%", "tỷ", "triệu", "billion", "million", "counter", "con số", "usd"]):
-        return MOTION_THUMBNAIL_TYPES[1]  # Counter ticks upward
+    if "TOP_DOWN" in cam:
+        return MOTION_THUMBNAIL_TYPES[0]
+    elif "RAKE" in cam:
+        return MOTION_THUMBNAIL_TYPES[1]
+    elif "MACRO" in cam or "GLIDE" in cam:
+        return MOTION_THUMBNAIL_TYPES[2]
+    elif "WHIP" in cam or "LATERAL" in cam:
+        return MOTION_THUMBNAIL_TYPES[3]
+    elif "ORBIT" in cam:
+        return MOTION_THUMBNAIL_TYPES[4]
+    elif "DUTCH" in cam:
+        return MOTION_THUMBNAIL_TYPES[5]
 
-    # Rule 2: Check for maps/routes/underlines/stamps
-    if any(k in narration or k in headline for k in ["bản đồ", "map", "tuyến đường", "route", "underlined", "kết luận", "chứng cứ"]):
-        return MOTION_THUMBNAIL_TYPES[2]  # Red underline swipes in
+    # Fallback to H-family mapping
+    if "H7" in h_fam:
+        return MOTION_THUMBNAIL_TYPES[0]
+    elif "H1" in h_fam:
+        return MOTION_THUMBNAIL_TYPES[1]
+    elif "H2" in h_fam:
+        return MOTION_THUMBNAIL_TYPES[2]
+    elif "H4" in h_fam or "H3" in h_fam:
+        return MOTION_THUMBNAIL_TYPES[3]
+    elif "H5" in h_fam:
+        return MOTION_THUMBNAIL_TYPES[4]
+    elif "H6" in h_fam:
+        return MOTION_THUMBNAIL_TYPES[5]
 
-    # Rule 3: Check for camera pan/overview
-    if any(k in act_breakdown or k in narration for k in ["drift", "pan", "overview", "toàn cảnh", "hold", "stage"]):
-        return MOTION_THUMBNAIL_TYPES[3]  # Camera holds a slow 2% drift
-
-    # Default: Cutout springs up with overshoot
     return MOTION_THUMBNAIL_TYPES[0]
 
 
@@ -667,6 +695,8 @@ def generate_master_scene_dashboard_html(
 
         stat_badge_html = f'<div class="stat-hero-badge">{stat_hero}</div>' if stat_hero else ""
 
+        cam_dir = sc.get("camera_directive") or mt.get("camera") or "TOP_DOWN_TRACKING"
+
         card_html = f"""
         <div class="scene-card" id="card_{sc_id.lower()}">
             <div class="scene-card-header">
@@ -689,6 +719,7 @@ def generate_master_scene_dashboard_html(
                 </div>
                 <div class="body-row meta-grid">
                     <div><span class="field-label">MOTION:</span> <span class="badge badge-motion">{mt['title']}</span></div>
+                    <div><span class="field-label">CAMERA:</span> <span class="badge badge-cam">{cam_dir}</span></div>
                     <div><span class="field-label">H-FAMILY:</span> <span class="badge badge-h">{h_family}</span></div>
                     <div><span class="field-label">HERO CUTOUT:</span> <span class="meta-val">{hero}</span></div>
                     <div><span class="field-label">PROPS:</span> <span class="meta-val">{props_str}</span></div>
@@ -996,6 +1027,7 @@ def generate_master_scene_dashboard_html(
         }}
         .badge-motion {{ background: #FEE2E2; color: var(--hot-red); }}
         .badge-h {{ background: #FEF3C7; color: #92400E; }}
+        .badge-cam {{ background: #E0E7FF; color: #1E3A8A; }}
 
         .prompt-accordion details {{
             background: #F8FAFC;
@@ -1152,27 +1184,37 @@ def generate_master_scene_dashboard_html(
 
         <!-- MOTION THUMBNAILS -->
         <div class="system-card" style="margin-top: 20px;">
-            <h2>MOTION THUMBNAIL SYSTEM (VOX CONTINUOUS TACTILE KINEMATICS)</h2>
+            <h2>MOTION THUMBNAIL SYSTEM (VOX CONTINUOUS TACTILE KINEMATICS & DOCUMENTARY CAMERAS)</h2>
             <div class="motion-grid">
                 <div class="motion-card">
                     <span class="motion-badge">MOTION 1</span>
-                    <div class="motion-title">CUTOUT SPRINGS UP WITH OVERSHOOT</div>
-                    <div class="motion-desc">Rapid 0.2s-0.4s entrance on twos (12fps) with slight overshoot then rigid dead-stop hold.</div>
+                    <div class="motion-title">POP-UP UNFOLD & 90° TRACKING</div>
+                    <div class="motion-desc">Accordion paper pop-up in 0.3s followed by smooth 90-degree lateral tracking across document flow.</div>
                 </div>
                 <div class="motion-card">
                     <span class="motion-badge">MOTION 2</span>
-                    <div class="motion-title">COUNTER TICKS UPWARD</div>
-                    <div class="motion-desc">Odometer rolling countup, locking into place with micro-vibration and neon crimson flash.</div>
+                    <div class="motion-title">SEAL STAMP IMPACT & 30° RAKE FOCUS</div>
+                    <div class="motion-desc">Heavy turned-wood seal stamp percussive strike with paper depression, racking focus to midground ledger.</div>
                 </div>
                 <div class="motion-card">
                     <span class="motion-badge">MOTION 3</span>
-                    <div class="motion-title">RED UNDERLINE SWIPES IN</div>
-                    <div class="motion-desc">Left-to-right evidence marker stroke with realistic ink bleed and paper fiber absorption.</div>
+                    <div class="motion-title">CALIPER CLAMP & SURFACE MACRO GLIDE</div>
+                    <div class="motion-desc">Brass vernier caliper clamps document margin, camera gliding along paper grain and inspection marks.</div>
                 </div>
                 <div class="motion-card">
                     <span class="motion-badge">MOTION 4</span>
-                    <div class="motion-title">CAMERA HOLDS A SLOW 2% DRIFT</div>
-                    <div class="motion-desc">Subtle continuous overhead table camera drift (2% scale) maintaining living tension.</div>
+                    <div class="motion-title">RED YARN TENSION & LATERAL WHIP-PAN</div>
+                    <div class="motion-desc">Taut crimson evidence yarn snaps taut between copper pins, rapid lateral whip-pan reframing momentum.</div>
+                </div>
+                <div class="motion-card">
+                    <span class="motion-badge">MOTION 5</span>
+                    <div class="motion-title">OPTICAL LOUPE & 15° ORBIT ARC</div>
+                    <div class="motion-desc">Convex magnifying loupe reveals fine print under 15-degree orbital arc showcasing 3D papercraft depth.</div>
+                </div>
+                <div class="motion-card">
+                    <span class="motion-badge">MOTION 6</span>
+                    <div class="motion-title">PARADOX & DUTCH-ANGLE FORENSIC SNAP</div>
+                    <div class="motion-desc">Tilted Dutch-angle forensic snap settling sharply on contradictory clause, emphasizing institutional tension.</div>
                 </div>
             </div>
         </div>
