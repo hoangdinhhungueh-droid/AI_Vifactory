@@ -82,8 +82,39 @@ def test_extract_stat_hero_from_text():
     # Korean Won (KRW, ₩, won)
     assert extract_stat_hero_from_text("Chi phí ước tính 620 billion won trong hồ sơ.") == "620B WON"
     assert extract_stat_hero_from_text("Dự án yêu cầu ₩620B vốn cam kết.") == "₩620B"
+    assert extract_stat_hero_from_text("Dự án trị giá ₩620 billion.") == "₩620B"
+    assert extract_stat_hero_from_text("₩620 billion won cần thiết.") == "₩620B"
     assert extract_stat_hero_from_text("Cơ chế 620-billion-won được ghi nhận.") == "620B WON"
     assert extract_stat_hero_from_text("Six hundred twenty billion won: allegedly.") == "620B WON"
+    assert extract_stat_hero_from_text("Chi phí 620 tỷ won.") == "620B WON"
+    assert extract_stat_hero_from_text("Chi phí 620 triệu won.") == "620M WON"
+    assert extract_stat_hero_from_text("Tổng vốn 620조원.") == "620조 WON"
+    assert extract_stat_hero_from_text("Khoản cam kết 620억원.") == "620억 WON"
+
+    # USD variations (with and without $)
+    assert extract_stat_hero_from_text("Dự án $123B.") == "$123B"
+    assert extract_stat_hero_from_text("Dự án $123 billion.") == "$123B"
+    assert extract_stat_hero_from_text("Dự án 123 billion USD.") == "$123B"
+    assert extract_stat_hero_from_text("Dự án 123B USD.") == "$123B"
+    assert extract_stat_hero_from_text("Dự án 123 billion dollars.") == "$123B"
+
+    # International Currencies: EUR, JPY, VND
+    assert extract_stat_hero_from_text("Khoản lỗ €500M của dự án.") == "€500M"
+    assert extract_stat_hero_from_text("Khoản lỗ €500 billion.") == "€500B"
+    assert extract_stat_hero_from_text("Tổng vốn 500 billion euros.") == "€500B"
+    assert extract_stat_hero_from_text("Tổng vốn 500 tỷ EUR.") == "€500B"
+    assert extract_stat_hero_from_text("Tổng vốn ¥123B tại Tokyo.") == "¥123B"
+    assert extract_stat_hero_from_text("Chi phí ¥123 billion.") == "¥123B"
+    assert extract_stat_hero_from_text("Chi phí 123 billion yen.") == "¥123B"
+    assert extract_stat_hero_from_text("Chi phí 123 tỷ yen.") == "¥123B"
+    assert extract_stat_hero_from_text("Doanh thu 123 tỷ đồng.") == "123B VND"
+    assert extract_stat_hero_from_text("Doanh thu 123 triệu VND.") == "123M VND"
+    assert extract_stat_hero_from_text("Chi phí 123k VND.") == "123K VND"
+
+    # Percentages
+    assert extract_stat_hero_from_text("Tăng trưởng 85 percent.") == "85%"
+    assert extract_stat_hero_from_text("Tăng trưởng 85 phần trăm.") == "85%"
+    assert extract_stat_hero_from_text("Tỷ lệ -12.5% sụt giảm.") == "-12.5%"
 
     # Prominent Milestone Years
     assert extract_stat_hero_from_text("Thời hạn khai trương ấn định năm 2029.") == "2029"
@@ -93,11 +124,8 @@ def test_extract_stat_hero_from_text():
     # Key timeframe metrics / durations
     assert extract_stat_hero_from_text("Cuộc bầu cử diễn ra sau six weeks.") == "6 WEEKS"
     assert extract_stat_hero_from_text("Khung thời gian cấp bách 48 hours.") == "48 HOURS"
-
-    # International Currencies: EUR, JPY, VND
-    assert extract_stat_hero_from_text("Khoản lỗ €500M của dự án.") == "€500M"
-    assert extract_stat_hero_from_text("Tổng vốn ¥123B tại Tokyo.") == "¥123B"
-    assert extract_stat_hero_from_text("Doanh thu 123 tỷ đồng.") == "123B VND"
+    assert extract_stat_hero_from_text("Thời gian 24 hrs.") == "24 HOURS"
+    assert extract_stat_hero_from_text("Thời gian 30 days.") == "30 DAYS"
 
 
 def test_render_master_system_sheet_png(tmp_path):
@@ -298,5 +326,54 @@ def test_resolve_scene_image_path_variations_and_fallback(tmp_path):
     # 5. Missing scene returns None
     res5 = resolve_scene_image_path("SCENE_99", image_dir=seeds_dir)
     assert res5 is None
+
+
+def test_manifest_stat_heroes_coverage(tmp_path):
+    """Rule 121 & 128: Verifies that master_sheet_manifest.json records stat_heroes_count and summary."""
+    import json
+    from app.services.master_scene_sheet import generate_master_scene_package
+
+    class DummyPaths:
+        def __init__(self, root: Path):
+            self.root = root
+            self.composite_seeds_dir = root / "composite_seeds"
+            self.composite_seeds_dir.mkdir(parents=True, exist_ok=True)
+
+    class DummyManifest:
+        market = "EN"
+
+    class DummyContext:
+        def __init__(self, root: Path):
+            self.run_id = "TEST_EP0001_mock"
+            self.topic = "Test Mock Episode"
+            self.paths = DummyPaths(root)
+            self.manifest = DummyManifest()
+
+    ctx = DummyContext(tmp_path)
+    scenes = [
+        {"scene_id": "SCENE_01", "narration": "Six hundred twenty billion won: allegedly.", "duration_est_sec": 5.5},
+        {"scene_id": "SCENE_02", "narration": "A 2029 opening target became the red thread.", "duration_est_sec": 6.0},
+        {"scene_id": "SCENE_03", "narration": "The official stamp reads UNVERIFIED.", "duration_est_sec": 5.0},
+        {"scene_id": "SCENE_04", "narration": "Passed just six weeks before the election.", "duration_est_sec": 5.5},
+    ]
+    manifest = generate_master_scene_package(
+        ctx=ctx,
+        scenes=scenes,
+        payload={},
+        image_mode=False,
+    )
+    assert manifest["stat_heroes_count"] == 3
+    assert manifest["stat_heroes"]["SCENE_01"] == "620B WON"
+    assert manifest["stat_heroes"]["SCENE_02"] == "2029"
+    assert manifest["stat_heroes"]["SCENE_03"] is None
+    assert manifest["stat_heroes"]["SCENE_04"] == "6 WEEKS"
+
+    # Also verify on-disk json
+    out_dir = tmp_path / "master_sheets"
+    on_disk = json.loads((out_dir / "master_sheet_manifest.json").read_text(encoding="utf-8"))
+    assert on_disk["stat_heroes_count"] == 3
+    assert on_disk["stat_heroes"]["SCENE_01"] == "620B WON"
+
+
 
 

@@ -162,6 +162,12 @@ def _words_to_num(text: str) -> Optional[int]:
                 current = 1
             current *= 100
             found_any = True
+        elif t == "thousand":
+            if current == 0:
+                current = 1
+            total += current * 1000
+            current = 0
+            found_any = True
         elif t == "and":
             continue
         else:
@@ -171,13 +177,29 @@ def _words_to_num(text: str) -> Optional[int]:
     return total + current
 
 
+def _normalize_stat_scale(scale_raw: Optional[str]) -> str:
+    """Normalizes currency/metric scale strings (e.g. 'billion', 'tỷ', 'm') to standard compact codes."""
+    if not scale_raw:
+        return ""
+    s = scale_raw.lower().strip()
+    if s in ("billion", "b", "tỷ", "ty"):
+        return "B"
+    if s in ("million", "m", "triệu", "trieu"):
+        return "M"
+    if s in ("trillion", "t", "nghìn tỷ", "nghin ty", "cho", "조"):
+        return "T"
+    if s in ("thousand", "k", "nghìn", "nghin"):
+        return "K"
+    return s[0].upper()
+
+
 def extract_stat_hero_from_text(text: str) -> Optional[str]:
     """Extracts prominent quantitative metric for STAT HERO display.
 
     Supports:
     - Currencies: Won (KRW, ₩, won), USD ($), EUR (€), VND (đồng, đ), JPY (¥, yen)
-    - Percentages: 85%, 12.5%
-    - Timeframe metrics: 48 hours, six weeks, 30 days, 10 years
+    - Percentages: 85%, 12.5%, 85 percent, 85 phần trăm
+    - Timeframe metrics: 48 hours, six weeks, 30 days, 10 years, 24 hrs
     - Milestone years: 2029, 2016, 2021, etc.
     """
     if not text or not isinstance(text, str):
@@ -186,43 +208,50 @@ def extract_stat_hero_from_text(text: str) -> Optional[str]:
     if not clean_text:
         return None
 
-    # 1. USD: Preserve legacy formats like "$123 tỷ", "$500M", "$123"
+    # 1. USD:
+    # 1a. Preserve legacy formats like "$123 tỷ"
     m_legacy = re.search(r"(\$\s*\d+(?:[,\.]\d+)?(?:\s*[BMKbmk]|(?:\s*(?:tỷ|triệu))))\b", clean_text, re.IGNORECASE)
     if m_legacy:
         return m_legacy.group(1).strip()
 
-    m_usd_word = re.search(r"\$\s*(\d+(?:[,\.]\d+)?)\s*(billion|million|trillion|b|m|k)\b", clean_text, re.IGNORECASE)
-    if m_usd_word:
-        val = m_usd_word.group(1)
-        scale = m_usd_word.group(2)[0].upper()
+    # 1b. Symbol $ followed by digits and optional scale
+    m_usd_sym = re.search(r"\$\s*(\d+(?:[,\.]\d+)?)\s*(billion|million|trillion|thousand|tỷ|triệu|b|m|k|t)?\b", clean_text, re.IGNORECASE)
+    if m_usd_sym:
+        val = m_usd_sym.group(1)
+        scale = _normalize_stat_scale(m_usd_sym.group(2))
         return f"${val}{scale}"
 
-    m_usd_simple = re.search(r"(\$\s*\d+(?:[,\.]\d+)?)\b", clean_text)
-    if m_usd_simple:
-        return m_usd_simple.group(1).replace(" ", "")
+    # 1c. Number followed by USD / dollars
+    m_usd_suffix = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(?:-| )?\s*(billion|million|trillion|thousand|tỷ|triệu|b|m|k|t)?\s*(?:-| )?\s*(?:usd|dollars?)\b", clean_text, re.IGNORECASE)
+    if m_usd_suffix:
+        val = m_usd_suffix.group(1)
+        scale = _normalize_stat_scale(m_usd_suffix.group(2))
+        return f"${val}{scale}"
 
-    # 2. Korean Won: ₩620B, 620 billion won, 620-billion-won, 620B KRW, Six hundred twenty billion won
-    m_won_sym = re.search(r"₩\s*(\d+(?:[,\.]\d+)?\s*[BMKTbmkt]?)\b", clean_text)
+    # 2. Korean Won:
+    # 2a. Symbol ₩ followed by digits and optional scale
+    m_won_sym = re.search(r"₩\s*(\d+(?:[,\.]\d+)?)\s*(billion|million|trillion|thousand|tỷ|triệu|b|m|k|t)?(?:\s*(?:won|krw))?\b", clean_text, re.IGNORECASE)
     if m_won_sym:
-        return f"₩{m_won_sym.group(1).strip().upper()}"
+        val = m_won_sym.group(1)
+        scale = _normalize_stat_scale(m_won_sym.group(2))
+        return f"₩{val}{scale}"
 
-    m_won = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(?:-| )?\s*(billion|million|trillion|b|m|t)?\s*(?:-| )?\s*(?:won|krw)\b", clean_text, re.IGNORECASE)
+    # 2b. Won / KRW suffix with digits
+    m_won = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(?:-| )?\s*(billion|million|trillion|thousand|tỷ|triệu|b|m|k|t)?\s*(?:-| )?\s*(?:won|krw)\b", clean_text, re.IGNORECASE)
     if m_won:
         val = m_won.group(1)
-        scale_raw = m_won.group(2)
-        if scale_raw:
-            scale = scale_raw[0].upper()
-            return f"{val}{scale} WON"
-        return f"{val} WON"
+        scale = _normalize_stat_scale(m_won.group(2))
+        return f"{val}{scale} WON" if scale else f"{val} WON"
 
-    m_won_words = re.search(r"\b((?:six|seven|eight|nine|ten|one|two|three|four|five|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|[\s-])+)\s+(billion|million|trillion)?\s*(?:-| )?\s*won\b", clean_text, re.IGNORECASE)
+    # 2c. Spoken English words for Won
+    m_won_words = re.search(r"\b((?:six|seven|eight|nine|ten|one|two|three|four|five|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|[\s-])+)\s+(billion|million|trillion)?\s*(?:-| )?\s*won\b", clean_text, re.IGNORECASE)
     if m_won_words:
         num = _words_to_num(m_won_words.group(1))
         if num is not None:
-            scale_raw = m_won_words.group(2)
-            scale = scale_raw[0].upper() if scale_raw else ""
+            scale = _normalize_stat_scale(m_won_words.group(2))
             return f"{num}{scale} WON" if scale else f"{num} WON"
 
+    # 2d. Korean native units: 조 (trillion), 억 (100 million)
     m_won_kr = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(조|억)?\s*원\b", clean_text)
     if m_won_kr:
         val = m_won_kr.group(1)
@@ -230,49 +259,49 @@ def extract_stat_hero_from_text(text: str) -> Optional[str]:
         return f"{val}{unit} WON"
 
     # 3. Euro (€, EUR)
-    m_eur_sym = re.search(r"€\s*(\d+(?:[,\.]\d+)?\s*[BMKTbmkt]?)\b", clean_text)
+    m_eur_sym = re.search(r"€\s*(\d+(?:[,\.]\d+)?)\s*(billion|million|trillion|thousand|tỷ|triệu|b|m|k|t)?(?:\s*(?:euros?|eur))?\b", clean_text, re.IGNORECASE)
     if m_eur_sym:
-        return f"€{m_eur_sym.group(1).strip().upper()}"
+        val = m_eur_sym.group(1)
+        scale = _normalize_stat_scale(m_eur_sym.group(2))
+        return f"€{val}{scale}"
 
-    m_eur = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(?:-| )?\s*(billion|million|trillion|b|m|t)?\s*(?:-| )?\s*(?:euros?|eur)\b", clean_text, re.IGNORECASE)
+    m_eur = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(?:-| )?\s*(billion|million|trillion|thousand|tỷ|triệu|b|m|k|t)?\s*(?:-| )?\s*(?:euros?|eur)\b", clean_text, re.IGNORECASE)
     if m_eur:
         val = m_eur.group(1)
-        scale_raw = m_eur.group(2)
-        if scale_raw:
-            return f"€{val}{scale_raw[0].upper()}"
-        return f"€{val}"
+        scale = _normalize_stat_scale(m_eur.group(2))
+        return f"€{val}{scale}"
 
     # 4. Japanese Yen (¥, JPY, yen)
-    m_yen_sym = re.search(r"¥\s*(\d+(?:[,\.]\d+)?\s*[BMKTbmkt]?)\b", clean_text)
+    m_yen_sym = re.search(r"¥\s*(\d+(?:[,\.]\d+)?)\s*(billion|million|trillion|thousand|tỷ|triệu|b|m|k|t)?(?:\s*(?:yen|jpy))?\b", clean_text, re.IGNORECASE)
     if m_yen_sym:
-        return f"¥{m_yen_sym.group(1).strip().upper()}"
+        val = m_yen_sym.group(1)
+        scale = _normalize_stat_scale(m_yen_sym.group(2))
+        return f"¥{val}{scale}"
 
-    m_yen = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(?:-| )?\s*(billion|million|trillion|b|m|t)?\s*(?:-| )?\s*(?:yen|jpy)\b", clean_text, re.IGNORECASE)
+    m_yen = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(?:-| )?\s*(billion|million|trillion|thousand|tỷ|triệu|b|m|k|t)?\s*(?:-| )?\s*(?:yen|jpy)\b", clean_text, re.IGNORECASE)
     if m_yen:
         val = m_yen.group(1)
-        scale_raw = m_yen.group(2)
-        if scale_raw:
-            return f"¥{val}{scale_raw[0].upper()}"
-        return f"¥{val}"
+        scale = _normalize_stat_scale(m_yen.group(2))
+        return f"¥{val}{scale}"
 
     # 5. Vietnamese Dong (đồng, đ, VND, VNĐ)
-    m_vnd = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(tỷ|triệu|ty|trieu|b|m)?\s*(?:đồng|đ|vnd|vnđ)\b", clean_text, re.IGNORECASE)
+    m_vnd = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(tỷ|triệu|nghìn|ty|trieu|nghin|billion|million|b|m|k)?\s*(?:đồng|đ|vnd|vnđ)\b", clean_text, re.IGNORECASE)
     if m_vnd:
         val = m_vnd.group(1)
-        scale = (m_vnd.group(2) or "").upper()
-        if scale in ["TỶ", "TY", "B"]:
-            return f"{val}B VND"
-        elif scale in ["TRIỆU", "TRIEU", "M"]:
-            return f"{val}M VND"
-        return f"{val} VND"
+        scale = _normalize_stat_scale(m_vnd.group(2))
+        return f"{val}{scale} VND" if scale else f"{val} VND"
 
     # 6. Percentages
     m_pct = re.search(r"([+-]?\d+(?:[,\.]\d+)?\s*%)", clean_text)
     if m_pct:
         return m_pct.group(1).replace(" ", "")
 
+    m_pct_word = re.search(r"\b([+-]?\d+(?:[,\.]\d+)?)\s*(?:percent|phần trăm|phan tram)\b", clean_text, re.IGNORECASE)
+    if m_pct_word:
+        return f"{m_pct_word.group(1)}%"
+
     # 7. Durations / Timeframe metrics
-    m_dur = re.search(r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|twenty-four|twenty four|thirty|forty-eight|forty eight|seventy-two|seventy two)\s+(hours?|hrs?|weeks?|days?|months?|years?|yrs?)\b", clean_text, re.IGNORECASE)
+    m_dur = re.search(r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|sixteen|twenty|twenty-four|twenty four|thirty|forty-eight|forty eight|seventy-two|seventy two)\s+(hours?|hrs?|weeks?|wks?|days?|months?|mos?|years?|yrs?)\b", clean_text, re.IGNORECASE)
     if m_dur:
         raw_num = m_dur.group(1)
         raw_unit = m_dur.group(2).lower()
@@ -284,11 +313,11 @@ def extract_stat_hero_from_text(text: str) -> Optional[str]:
 
         if "hour" in raw_unit or "hr" in raw_unit:
             unit_str = "HOURS"
-        elif "week" in raw_unit:
+        elif "week" in raw_unit or "wk" in raw_unit:
             unit_str = "WEEKS"
         elif "day" in raw_unit:
             unit_str = "DAYS"
-        elif "month" in raw_unit:
+        elif "month" in raw_unit or "mo" in raw_unit:
             unit_str = "MONTHS"
         elif "year" in raw_unit or "yr" in raw_unit:
             unit_str = "YEARS"
@@ -1592,6 +1621,13 @@ def generate_master_scene_package(
 
     effective_image_mode = bool(image_mode or (len(scenes) > 0 and len(missing_scenes) == 0))
 
+    # Compute Stat Hero manifest coverage
+    stat_heroes_summary: Dict[str, Optional[str]] = {}
+    for idx, sc in enumerate(scenes):
+        sc_id = sc.get("scene_id", f"SCENE_{idx+1:02d}")
+        stat_heroes_summary[sc_id] = extract_stat_hero_from_text(sc.get("narration") or "")
+    stat_heroes_count = sum(1 for v in stat_heroes_summary.values() if v is not None)
+
     manifest = {
         "episode_id": episode_id,
         "episode_title": episode_title,
@@ -1602,6 +1638,8 @@ def generate_master_scene_package(
         "missing_scenes": missing_scenes,
         "image_mode": effective_image_mode,
         "runtime_seconds": runtime_s,
+        "stat_heroes_count": stat_heroes_count,
+        "stat_heroes": stat_heroes_summary,
         "files": {
             "master_sheet_system_png": str(sys_png) if sys_png and sys_png.exists() else None,
             "master_sheet_scenes_png": str(scenes_png) if scenes_png and scenes_png.exists() else None,
