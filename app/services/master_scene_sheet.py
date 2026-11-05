@@ -137,11 +137,170 @@ def resolve_scene_motion_thumbnail(scene: Dict[str, Any]) -> Dict[str, Any]:
     return MOTION_THUMBNAIL_TYPES[0]
 
 
+_WORD_NUM_MAP: Dict[str, int] = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+    "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
+    "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
+    "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+}
+
+
+def _words_to_num(text: str) -> Optional[int]:
+    """Converts simple English number phrases like 'six', 'forty-eight', 'six hundred twenty' to int."""
+    tokens = text.lower().replace("-", " ").split()
+    total = 0
+    current = 0
+    found_any = False
+    for t in tokens:
+        if t in _WORD_NUM_MAP:
+            current += _WORD_NUM_MAP[t]
+            found_any = True
+        elif t == "hundred":
+            if current == 0:
+                current = 1
+            current *= 100
+            found_any = True
+        elif t == "and":
+            continue
+        else:
+            return None
+    if not found_any:
+        return None
+    return total + current
+
+
 def extract_stat_hero_from_text(text: str) -> Optional[str]:
-    """Extracts prominent quantitative metric for STAT HERO display ($123, 85%, etc.)."""
-    m = re.search(r"(\$\s*\d+(?:[,\.]\d+)?(?:\s*[BMKbmk]|(?:\s*(?:tỷ|triệu|billion|million)))?|\d+(?:[,\.]\d+)?\s*%)", text)
-    if m:
-        return m.group(1).strip()
+    """Extracts prominent quantitative metric for STAT HERO display.
+
+    Supports:
+    - Currencies: Won (KRW, ₩, won), USD ($), EUR (€), VND (đồng, đ), JPY (¥, yen)
+    - Percentages: 85%, 12.5%
+    - Timeframe metrics: 48 hours, six weeks, 30 days, 10 years
+    - Milestone years: 2029, 2016, 2021, etc.
+    """
+    if not text or not isinstance(text, str):
+        return None
+    clean_text = text.strip()
+    if not clean_text:
+        return None
+
+    # 1. USD: Preserve legacy formats like "$123 tỷ", "$500M", "$123"
+    m_legacy = re.search(r"(\$\s*\d+(?:[,\.]\d+)?(?:\s*[BMKbmk]|(?:\s*(?:tỷ|triệu))))\b", clean_text, re.IGNORECASE)
+    if m_legacy:
+        return m_legacy.group(1).strip()
+
+    m_usd_word = re.search(r"\$\s*(\d+(?:[,\.]\d+)?)\s*(billion|million|trillion|b|m|k)\b", clean_text, re.IGNORECASE)
+    if m_usd_word:
+        val = m_usd_word.group(1)
+        scale = m_usd_word.group(2)[0].upper()
+        return f"${val}{scale}"
+
+    m_usd_simple = re.search(r"(\$\s*\d+(?:[,\.]\d+)?)\b", clean_text)
+    if m_usd_simple:
+        return m_usd_simple.group(1).replace(" ", "")
+
+    # 2. Korean Won: ₩620B, 620 billion won, 620-billion-won, 620B KRW, Six hundred twenty billion won
+    m_won_sym = re.search(r"₩\s*(\d+(?:[,\.]\d+)?\s*[BMKTbmkt]?)\b", clean_text)
+    if m_won_sym:
+        return f"₩{m_won_sym.group(1).strip().upper()}"
+
+    m_won = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(?:-| )?\s*(billion|million|trillion|b|m|t)?\s*(?:-| )?\s*(?:won|krw)\b", clean_text, re.IGNORECASE)
+    if m_won:
+        val = m_won.group(1)
+        scale_raw = m_won.group(2)
+        if scale_raw:
+            scale = scale_raw[0].upper()
+            return f"{val}{scale} WON"
+        return f"{val} WON"
+
+    m_won_words = re.search(r"\b((?:six|seven|eight|nine|ten|one|two|three|four|five|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|[\s-])+)\s+(billion|million|trillion)?\s*(?:-| )?\s*won\b", clean_text, re.IGNORECASE)
+    if m_won_words:
+        num = _words_to_num(m_won_words.group(1))
+        if num is not None:
+            scale_raw = m_won_words.group(2)
+            scale = scale_raw[0].upper() if scale_raw else ""
+            return f"{num}{scale} WON" if scale else f"{num} WON"
+
+    m_won_kr = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(조|억)?\s*원\b", clean_text)
+    if m_won_kr:
+        val = m_won_kr.group(1)
+        unit = m_won_kr.group(2) or ""
+        return f"{val}{unit} WON"
+
+    # 3. Euro (€, EUR)
+    m_eur_sym = re.search(r"€\s*(\d+(?:[,\.]\d+)?\s*[BMKTbmkt]?)\b", clean_text)
+    if m_eur_sym:
+        return f"€{m_eur_sym.group(1).strip().upper()}"
+
+    m_eur = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(?:-| )?\s*(billion|million|trillion|b|m|t)?\s*(?:-| )?\s*(?:euros?|eur)\b", clean_text, re.IGNORECASE)
+    if m_eur:
+        val = m_eur.group(1)
+        scale_raw = m_eur.group(2)
+        if scale_raw:
+            return f"€{val}{scale_raw[0].upper()}"
+        return f"€{val}"
+
+    # 4. Japanese Yen (¥, JPY, yen)
+    m_yen_sym = re.search(r"¥\s*(\d+(?:[,\.]\d+)?\s*[BMKTbmkt]?)\b", clean_text)
+    if m_yen_sym:
+        return f"¥{m_yen_sym.group(1).strip().upper()}"
+
+    m_yen = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(?:-| )?\s*(billion|million|trillion|b|m|t)?\s*(?:-| )?\s*(?:yen|jpy)\b", clean_text, re.IGNORECASE)
+    if m_yen:
+        val = m_yen.group(1)
+        scale_raw = m_yen.group(2)
+        if scale_raw:
+            return f"¥{val}{scale_raw[0].upper()}"
+        return f"¥{val}"
+
+    # 5. Vietnamese Dong (đồng, đ, VND, VNĐ)
+    m_vnd = re.search(r"\b(\d+(?:[,\.]\d+)?)\s*(tỷ|triệu|ty|trieu|b|m)?\s*(?:đồng|đ|vnd|vnđ)\b", clean_text, re.IGNORECASE)
+    if m_vnd:
+        val = m_vnd.group(1)
+        scale = (m_vnd.group(2) or "").upper()
+        if scale in ["TỶ", "TY", "B"]:
+            return f"{val}B VND"
+        elif scale in ["TRIỆU", "TRIEU", "M"]:
+            return f"{val}M VND"
+        return f"{val} VND"
+
+    # 6. Percentages
+    m_pct = re.search(r"([+-]?\d+(?:[,\.]\d+)?\s*%)", clean_text)
+    if m_pct:
+        return m_pct.group(1).replace(" ", "")
+
+    # 7. Durations / Timeframe metrics
+    m_dur = re.search(r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|twenty-four|twenty four|thirty|forty-eight|forty eight|seventy-two|seventy two)\s+(hours?|hrs?|weeks?|days?|months?|years?|yrs?)\b", clean_text, re.IGNORECASE)
+    if m_dur:
+        raw_num = m_dur.group(1)
+        raw_unit = m_dur.group(2).lower()
+        if raw_num.isdigit():
+            num_val = raw_num
+        else:
+            parsed = _words_to_num(raw_num)
+            num_val = str(parsed) if parsed is not None else raw_num.upper()
+
+        if "hour" in raw_unit or "hr" in raw_unit:
+            unit_str = "HOURS"
+        elif "week" in raw_unit:
+            unit_str = "WEEKS"
+        elif "day" in raw_unit:
+            unit_str = "DAYS"
+        elif "month" in raw_unit:
+            unit_str = "MONTHS"
+        elif "year" in raw_unit or "yr" in raw_unit:
+            unit_str = "YEARS"
+        else:
+            unit_str = raw_unit.upper()
+        return f"{num_val} {unit_str}"
+
+    # 8. Milestone Years (4 digits 19xx or 20xx)
+    m_year = re.search(r"\b(19\d{2}|20\d{2})\b", clean_text)
+    if m_year:
+        return m_year.group(1)
+
     return None
 
 
@@ -598,16 +757,31 @@ def render_scene_contact_sheet_png(
             except Exception as _load_err:
                 logger.debug(f"Could not load image {target_img_path}: {_load_err}")
 
+        stat_hero = extract_stat_hero_from_text(sc.get("narration") or "")
+
         if not img_drawn:
             # Fallback stylized diorama frame
             draw.rectangle([img_x, img_y, img_x + img_w, img_y + img_h], fill="#F4F1EA", outline=border_col, width=1)
             hero = sc.get("hero_cutout_object") or "Archival Subject"
-            stat_hero = extract_stat_hero_from_text(sc.get("narration") or "")
-            if stat_hero:
-                draw.rectangle([img_x + 15, img_y + 15, img_x + 130, img_y + 65], fill=hot_red)
-                draw.text((img_x + 72, img_y + 40), stat_hero, fill="#FFFFFF", font=fonts["stat_medium"], anchor="mm")
             draw.text((img_x + img_w // 2, img_y + img_h // 2), f"[{hero.upper()[:24]}]", fill=ink, font=fonts["body_bold"], anchor="mm")
             draw.text((img_x + img_w // 2, img_y + img_h - 18), "AUTHENTIC SEED COMPOSITE PREVIEW", fill=gray, font=fonts["caption"], anchor="mm")
+
+        # Stat Hero Badge: prominent red badge rendered over top-left of preview image/diorama
+        if stat_hero:
+            font_stat = fonts.get("stat_medium") or fonts.get("body_bold")
+            try:
+                bbox = draw.textbbox((0, 0), stat_hero, font=font_stat)
+                bw = (bbox[2] - bbox[0]) + 24
+                bh = (bbox[3] - bbox[1]) + 16
+            except Exception:
+                bw = max(120, len(stat_hero) * 12 + 24)
+                bh = 40
+            bx1 = img_x + 12
+            by1 = img_y + 12
+            bx2 = bx1 + bw
+            by2 = by1 + bh
+            draw.rectangle([bx1, by1, bx2, by2], fill=hot_red)
+            draw.text(((bx1 + bx2) // 2, (by1 + by2) // 2), stat_hero, fill="#FFFFFF", font=font_stat, anchor="mm")
 
         # Narration Box
         narr_y = img_y + img_h + 10
@@ -705,9 +879,9 @@ def generate_master_scene_dashboard_html(
                 <span class="scene-dur">{dur:.1f}s</span>
             </div>
             <div class="scene-visual-wrapper">
+                {stat_badge_html}
                 <img src="{img_src}" alt="{sc_id} Composite" onerror="this.onerror=null; this.parentElement.classList.add('fallback-visual'); this.style.display='none';" />
                 <div class="visual-fallback-diorama">
-                    {stat_badge_html}
                     <div class="diorama-hero-label">[{hero.upper()}]</div>
                     <div class="diorama-subtext">Composite Seed Pending Render</div>
                 </div>
@@ -970,13 +1144,20 @@ def generate_master_scene_dashboard_html(
             display: flex;
         }}
         .stat-hero-badge {{
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 10;
             background: var(--hot-red);
             color: #FFFFFF;
             font-family: var(--font-headline);
-            font-size: 2.5rem;
-            padding: 4px 18px;
-            margin-bottom: 8px;
+            font-size: 1.6rem;
+            font-weight: bold;
+            padding: 4px 14px;
             border-radius: 2px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+            letter-spacing: 0.5px;
+            pointer-events: none;
         }}
         .diorama-hero-label {{
             font-family: var(--font-headline);

@@ -73,10 +73,31 @@ def test_resolve_scene_motion_thumbnail():
 
 def test_extract_stat_hero_from_text():
     """Verifies regex extraction of quantitative metrics for STAT HERO display."""
+    # Legacy USD & Percentage tests
     assert extract_stat_hero_from_text("Giá trị hợp đồng đạt $123 tỷ.") == "$123 tỷ"
     assert extract_stat_hero_from_text("Tăng trưởng vượt 85% chỉ số.") == "85%"
     assert extract_stat_hero_from_text("Chi phí $500M thất thoát.") == "$500M"
     assert extract_stat_hero_from_text("Không có con số nào ở đây.") is None
+
+    # Korean Won (KRW, ₩, won)
+    assert extract_stat_hero_from_text("Chi phí ước tính 620 billion won trong hồ sơ.") == "620B WON"
+    assert extract_stat_hero_from_text("Dự án yêu cầu ₩620B vốn cam kết.") == "₩620B"
+    assert extract_stat_hero_from_text("Cơ chế 620-billion-won được ghi nhận.") == "620B WON"
+    assert extract_stat_hero_from_text("Six hundred twenty billion won: allegedly.") == "620B WON"
+
+    # Prominent Milestone Years
+    assert extract_stat_hero_from_text("Thời hạn khai trương ấn định năm 2029.") == "2029"
+    assert extract_stat_hero_from_text("Năm 2016 chính phủ lựa chọn Gimhae.") == "2016"
+    assert extract_stat_hero_from_text("Đạo luật thông qua ngày 26 tháng 2 năm 2021.") == "2021"
+
+    # Key timeframe metrics / durations
+    assert extract_stat_hero_from_text("Cuộc bầu cử diễn ra sau six weeks.") == "6 WEEKS"
+    assert extract_stat_hero_from_text("Khung thời gian cấp bách 48 hours.") == "48 HOURS"
+
+    # International Currencies: EUR, JPY, VND
+    assert extract_stat_hero_from_text("Khoản lỗ €500M của dự án.") == "€500M"
+    assert extract_stat_hero_from_text("Tổng vốn ¥123B tại Tokyo.") == "¥123B"
+    assert extract_stat_hero_from_text("Doanh thu 123 tỷ đồng.") == "123B VND"
 
 
 def test_render_master_system_sheet_png(tmp_path):
