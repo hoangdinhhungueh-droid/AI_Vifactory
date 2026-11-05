@@ -344,8 +344,8 @@ def test_manifest_stat_heroes_coverage(tmp_path):
 
     class DummyContext:
         def __init__(self, root: Path):
-            self.run_id = "TEST_EP0001_mock"
-            self.topic = "Test Mock Episode"
+            self.run_id = "TEST_EP0001_sample"
+            self.topic = "Test Sample Episode"
             self.paths = DummyPaths(root)
             self.manifest = DummyManifest()
 
