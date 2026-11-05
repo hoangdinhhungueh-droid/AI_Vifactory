@@ -189,7 +189,18 @@ def test_build_vox_scene_prompts_kinematics():
     assert breakdown[-1]["action_type"] == "living_poster_hold"
 
     # Check single camera directive
-    assert vox_meta["camera_directive"] in ["STATIC_OVERHEAD", "SLOW_PUSH_IN_0_1X", "SLOW_HORIZONTAL_PAN", "SUBTLE_TILT_DOWN"]
+    assert vox_meta["camera_directive"] in [
+        "TOP_DOWN_TRACKING",
+        "RAKE_30_RACK_FOCUS",
+        "LATERAL_WHIP_PAN",
+        "DUTCH_FORENSIC_SNAP",
+        "ORBIT_ARC_15",
+        "SURFACE_MACRO_GLIDE",
+        "STATIC_OVERHEAD",
+        "SLOW_PUSH_IN_0_1X",
+        "SLOW_HORIZONTAL_PAN",
+        "SUBTLE_TILT_DOWN",
+    ]
 
     # Check canonical CL3 4-Block paper diorama prompt (Rule 140 v3 / CL3)
     flow_prompt = vox_meta["i2v_prompt_google_flow"]

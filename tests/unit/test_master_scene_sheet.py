@@ -27,36 +27,48 @@ def test_vox_palette_and_motion_constants():
     assert VOX_PALETTE["mustard"] == "#D9A441"
     assert VOX_PALETTE["cream_paper"] == "#F4F1EA"
 
-    assert len(MOTION_THUMBNAIL_TYPES) == 4
+    assert len(MOTION_THUMBNAIL_TYPES) == 6
     ids = [m["id"] for m in MOTION_THUMBNAIL_TYPES]
-    assert ids == [1, 2, 3, 4]
+    assert ids == [1, 2, 3, 4, 5, 6]
 
 
 def test_resolve_scene_motion_thumbnail():
     """Verifies that scene kinematics correctly resolve to motion thumbnail archetypes."""
-    # 1. Metric / Counter
-    sc_metric = {"narration": "Thiệt hại ước tính hơn $123 tỷ USD trong 48 giờ."}
-    mt_metric = resolve_scene_motion_thumbnail(sc_metric)
-    assert mt_metric["id"] == 2
-    assert "COUNTER" in mt_metric["title"]
+    # 1. Top-down tracking / H7 Displace
+    sc_top_down = {"camera_directive": "TOP_DOWN_TRACKING", "h_family": "H7_DISPLACE"}
+    mt_top_down = resolve_scene_motion_thumbnail(sc_top_down)
+    assert mt_top_down["id"] == 1
+    assert "90° TRACKING" in mt_top_down["title"]
 
-    # 2. Map / Route / Underline
-    sc_map = {"narration": "Toàn bộ hải trình và bản đồ di chuyển bị phát giác.", "headline": "Trade Route"}
-    mt_map = resolve_scene_motion_thumbnail(sc_map)
-    assert mt_map["id"] == 3
-    assert "RED UNDERLINE" in mt_map["title"]
+    # 2. Rake focus / H1 Impact
+    sc_rake = {"camera_directive": "RAKE_30_RACK_FOCUS", "h_family": "H1_IMPACT"}
+    mt_rake = resolve_scene_motion_thumbnail(sc_rake)
+    assert mt_rake["id"] == 2
+    assert "30° RAKE FOCUS" in mt_rake["title"]
 
-    # 3. Camera Drift
-    sc_drift = {"narration": "Toàn cảnh phòng điều hành sau cú sập.", "second_by_second_action_breakdown": "Slow camera drift 2% across diorama"}
-    mt_drift = resolve_scene_motion_thumbnail(sc_drift)
-    assert mt_drift["id"] == 4
-    assert "CAMERA HOLDS" in mt_drift["title"]
+    # 3. Surface macro glide / H2 Constraint
+    sc_macro = {"camera_directive": "SURFACE_MACRO_GLIDE", "h_family": "H2_CONSTRAINT"}
+    mt_macro = resolve_scene_motion_thumbnail(sc_macro)
+    assert mt_macro["id"] == 3
+    assert "MACRO GLIDE" in mt_macro["title"]
 
-    # 4. Default Cutout Spring
-    sc_hero = {"narration": "Nhân vật xuất hiện tại hiện trường với hồ sơ mật."}
-    mt_hero = resolve_scene_motion_thumbnail(sc_hero)
-    assert mt_hero["id"] == 1
-    assert "CUTOUT SPRINGS UP" in mt_hero["title"]
+    # 4. Lateral whip-pan / H4 Tether
+    sc_whip = {"camera_directive": "LATERAL_WHIP_PAN", "h_family": "H4_TETHER"}
+    mt_whip = resolve_scene_motion_thumbnail(sc_whip)
+    assert mt_whip["id"] == 4
+    assert "WHIP-PAN" in mt_whip["title"]
+
+    # 5. Orbit Arc / H5 Optical
+    sc_orbit = {"camera_directive": "ORBIT_ARC_15", "h_family": "H5_OPTICAL"}
+    mt_orbit = resolve_scene_motion_thumbnail(sc_orbit)
+    assert mt_orbit["id"] == 5
+    assert "ORBIT ARC" in mt_orbit["title"]
+
+    # 6. Dutch forensic snap / H6 Mark
+    sc_dutch = {"camera_directive": "DUTCH_FORENSIC_SNAP", "h_family": "H6_MARK"}
+    mt_dutch = resolve_scene_motion_thumbnail(sc_dutch)
+    assert mt_dutch["id"] == 6
+    assert "DUTCH-ANGLE" in mt_dutch["title"]
 
 
 def test_extract_stat_hero_from_text():
