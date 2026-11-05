@@ -42,8 +42,8 @@ CANONICAL_SFX_REGISTRY: Dict[str, Dict[str, Any]] = {
     "marker_stroke": {
         "filename": "marker_stroke.mp3",
         "category": "MARKER_GRAPHIC",
-        "description": "Felt tip highlighter pen squeak / investigative marker strike",
-        "keywords": ["marker", "highlight", "strike", "pen", "ink", "bút", "vạch", "형광펜", "마커", "蛍光ペン", "線"]
+        "description": "Archival crimson grease pencil underline / investigative score strike",
+        "keywords": ["marker", "pencil", "strike", "pen", "ink", "bút", "vạch", "연필", "마커", "鉛筆", "線"]
     },
     "node_pop": {
         "filename": "node_pop.mp3",

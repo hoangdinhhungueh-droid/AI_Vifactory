@@ -130,14 +130,14 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
         ExtractedEvidence(
             archetype=ForensicArchetype.QUANTITATIVE_METRIC,
             dominant_family="H2_CONSTRAINT",
-            hero_anchor_prop="aged financial ledger statement and mechanical ticker gauge on fibrous paper",
-            interacting_tool_prop="mechanical ticker counter wheels and embossed metric indicator plate",
+            hero_anchor_prop="aged financial ledger statement and analog mechanical counter on fibrous paper",
+            interacting_tool_prop="mechanical odometer counter wheels and embossed metric indicator plate",
             tactile_action_verb="drops in close to the lens, counter ticking up from base figure with mechanical overshoot beside",
             physical_reaction="mechanical counter wheels spin and lock firmly on the verified figure, cardstock settling with tactile paper pop",
             tactile_residue="embossed crimson metric indicator plate locked firmly in place with cast shadow",
             layout_type="center_stage",
             camera_directive="Top-down push-in through the gap beside the stat number, racking focus to the hero card",
-            sound_foley="ticker_counter_overshoot_snap",
+            sound_foley="counter_overshoot_snap",
         ),
         # Variant 1: Financial Route Loop & Coin Tokens
         ExtractedEvidence(

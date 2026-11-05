@@ -85,7 +85,8 @@
       "lower_banner"
     ],
     "split_horizontal_feed": [
-      "ticker",
+      "teletype_strip",
+      "dispatch_strip",
       "news",
       "broadcast",
       "feed",

@@ -775,7 +775,7 @@ def sanitize_tactile_action_verb(verb: str, tool: str, hero: str) -> str:
             return "pulls taut between anchor pins across"
         elif any(k in t_lower or k in h_lower for k in ["loupe", "glass", "lens"]):
             return "glides smoothly across"
-        elif any(k in t_lower or k in h_lower for k in ["highlighter", "marker", "pen"]):
+        elif any(k in t_lower or k in h_lower for k in ["pencil", "marker", "pen", "stylus"]):
             return "sweeps across"
         elif any(k in t_lower or k in h_lower for k in ["card", "number", "stat", "ledger", "blueprint", "map"]):
             return "pop-up unfolds and locks onto"
@@ -918,10 +918,10 @@ def generate_scene_sub_director_plan(
         inter2 = interacting_objects[1] if len(interacting_objects) > 1 else "red evidence thread"
         actor1_material = "solid_metal" if any(k in inter1.lower() for k in ["caliper", "scissors", "scalpel"]) else "wood_rubber"
         actor1_mass = "heavy" if any(k in inter1.lower() for k in ["caliper", "stamp", "gavel"]) else "medium"
-        inter2_material = "cotton_thread" if any(k in inter2.lower() for k in ["thread", "yarn"]) else "fluorescent_ink"
-        inter2_mass = "feather" if any(k in inter2.lower() for k in ["thread", "marker", "stroke"]) else "light"
+        inter2_material = "cotton_thread" if any(k in inter2.lower() for k in ["thread", "yarn"]) else ("crimson_graphite" if any(k in inter2.lower() for k in ["pencil", "graphite", "mark", "lead", "line", "stamp", "seal"]) else "aged_newsprint_paper")
+        inter2_mass = "feather" if any(k in inter2.lower() for k in ["thread", "marker", "stroke", "pencil"]) else "light"
 
-    tool_keywords = ["caliper", "scissors", "stamp", "marker", "highlighter", "loupe", "glass", "pen", "knife", "pin", "ruler", "shears", "scalpel", "gavel"]
+    tool_keywords = ["caliper", "scissors", "stamp", "pencil", "marker", "loupe", "glass", "pen", "knife", "pin", "ruler", "shears", "scalpel", "gavel", "stylus"]
     doc_keywords = ["ledger", "sheet", "document", "paper", "contract", "dossier", "card", "report", "photo", "chart", "page", "envelope", "file", "exhibit"]
 
     is_hero_tool = any(k in hero_clean.lower() for k in tool_keywords)
@@ -958,7 +958,7 @@ def generate_scene_sub_director_plan(
         KineticObject(
             id="obj_tool2",
             label=inter2,
-            material=inter2_material if "inter2_material" in locals() else ("cotton_thread" if "thread" in inter2.lower() else "fluorescent_ink"),
+            material=inter2_material if "inter2_material" in locals() else ("cotton_thread" if "thread" in inter2.lower() else "crimson_graphite"),
             mass_class=inter2_mass if "inter2_mass" in locals() else ("feather" if "thread" in inter2.lower() else "light"),
             z_index=4,
             role="evidence_link"
@@ -1572,7 +1572,7 @@ def build_natural_kinetic_i2v_prompt(
     # Tactile sound design matching the interacting tool
     tool_lower = ev.interacting_tool_prop.lower()
     if "caliper" in tool_lower or "vernier" in tool_lower:
-        audio_sfx = "vernier metal slide, crisp cardstock crimp, ticker clicks, low newsroom hum"
+        audio_sfx = "vernier metal slide, crisp cardstock crimp, ratchet clicks, low newsroom hum"
     elif "seal" in tool_lower or "stamp" in tool_lower:
         audio_sfx = "heavy wooden thud, paper compression crack, oily ink squelch, room tone"
     elif "shear" in tool_lower or "scissor" in tool_lower or "cut" in tool_lower:
@@ -1584,9 +1584,12 @@ def build_natural_kinetic_i2v_prompt(
     else:
         audio_sfx = "crisp paper snap, mechanical placement click, low archival newsroom hum"
 
+    focal_mandate = f"Strict single hero focal hierarchy on clean newsprint base (#F4F1EA). Exactly ONE primary evidentiary subject commands the composition, zero competing decorative clutter, zero ungrounded embellishments."
+
     prompt = (
         f"{style_header}\n"
         f"[CAMERA & ENVIRONMENT]: {resolved_camera}.\n"
+        f"[FOCAL HIERARCHY]: {focal_mandate}\n"
         f"[ACTION PHASE (0.2s - 0.4s)]: The {ev.interacting_tool_prop} {ev.tactile_action_verb} the {ev.hero_anchor_prop}.\n"
         f"[PHYSICAL REACTION & RESIDUE]: {ev.physical_reaction.capitalize()}, leaving {ev.tactile_residue}.\n"
         f"[HOLD & LIVING TEXTURE]: All objects hold firmly in place with subtle living paper grain flutter and micro shadow breathing at 12fps (on twos). Zero 3D camera drift, zero static freeze.\n"
@@ -1737,16 +1740,26 @@ def build_cl3_paper_diorama_prompt(
     clean_hero = sanitize_prompt_for_imagen3(raw_hero)
     clean_tool = sanitize_prompt_for_imagen3(raw_tool)
 
-    mg_cutout = f"MG: halftone black-and-white cutout exhibit of {clean_hero} entering at distinct depth with rough white deckle border and offset ink stroke."
+    mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout exhibit of {clean_hero} entering at distinct depth with rough white deckle border and offset ink stroke."
     fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
 
     action_verb = plan_verb or ev.tactile_action_verb
-    phys_react = (plan_reaction or ev.physical_reaction).strip()
-    tac_res = (plan_residue or ev.tactile_residue).strip()
-    clean_verb = sanitize_tactile_action_verb(action_verb, clean_tool, clean_hero)
-    prep = "" if re.search(r"\b(on|onto|against|across|beside|into|with|over|around|through|of)\s*$", clean_verb, flags=re.IGNORECASE) else " the"
-    causing_clause = phys_react if phys_react.lower().startswith("causing") else f"causing {phys_react}"
-    action_text = f"Action: The {clean_tool} snaps briskly in 0.3s and {clean_verb}{prep} {clean_hero}, {causing_clause}, leaving {tac_res}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
+    phys_react = (plan_reaction or ev.physical_reaction).strip().rstrip('.')
+    tac_res = (plan_residue or ev.tactile_residue).strip().rstrip('.')
+    clean_verb = sanitize_tactile_action_verb(action_verb, clean_tool, clean_hero).strip()
+    if re.search(r"\b(on|onto|against|across|beside|into|with|over|around|through|of)\s*$", clean_verb, flags=re.IGNORECASE):
+        connective = " "
+    else:
+        connective = " against " if any(w in clean_verb.lower() for w in ["stamp", "strike", "press", "slam"]) else " "
+    hero_target = clean_hero if clean_hero.lower().startswith(("the ", "a ", "an ")) else f"the {clean_hero}"
+    if phys_react.lower().startswith("causing"):
+        causing_clause = phys_react
+    elif any(phys_react.lower().startswith(p) for p in ["the ", "its ", "paper ", "document ", "ledger ", "surface "]):
+        causing_clause = f"causing {phys_react}"
+    else:
+        causing_clause = f"causing {hero_target} to {phys_react}"
+    leaving_clause = f", leaving {tac_res}" if tac_res and "leaving" not in causing_clause.lower() else ""
+    action_text = f"Action: The {clean_tool} snaps briskly in 0.3s (9 frames at 30fps) and {clean_verb}{connective}{hero_target}, {causing_clause}{leaving_clause}. Objects lock into dead-stop hold with subtle 12fps paper grain vibration."
     camera_line = f"{cam_pos_line.rstrip('.')}. Settle on the {clean_hero} in sharp focus."
 
     # Validate against forbidden camera words in shot text (e.g. no whip when static overhead)
@@ -1841,7 +1854,7 @@ def build_cl3_paper_diorama_image_prompt(
             sc_idx = int(m_sc.group(1)) - 1
     bg_choice = canonical_bgs[sc_idx % len(canonical_bgs)]
     bg_field = f"Background: {bg_choice}."
-    mg_cutout = f"MG: high-contrast halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset crimson ink accent stroke."
+    mg_cutout = f"MG: authentic 60lpi halftone black-and-white cutout of {clean_hero} with rough white deckle keylines and offset crimson ink accent stroke."
     if ev.extracted_metric:
         fg_data = f"FG: {clean_tool} and a large tactile paper cutout number '{ev.extracted_metric}' cut from heavy cardstock crossing close to the lens."
     elif getattr(ev.archetype, 'value', str(ev.archetype)) == "quantitative_metric":
@@ -1849,7 +1862,7 @@ def build_cl3_paper_diorama_image_prompt(
     else:
         fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
 
-    focal_mandate = f"Focal Hierarchy: Strict Single Primary Hero Object focal rule. Exactly ONE primary evidentiary subject ({clean_hero}) anchors the composition on clean archival diorama paper (#F4F1EA), with zero competing decorative clutter or stacked ungrounded props."
+    focal_mandate = f"Focal Hierarchy: Strict Single Primary Hero Object focal rule. Exactly ONE primary evidentiary subject ({clean_hero}) anchors the composition on clean archival cream diorama paper, with zero competing decorative clutter or stacked ungrounded props."
     shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{mg_cutout}\n{fg_data}"
     text_control = "TEXT CONTROL: No placeholder words, no English labels, no garbled text, no fake headlines. Paper documents feature soft, authentic, illegible printed texture only."
     avoid_block = reg.resolve_avoid_block("STATIC_OVERHEAD", trace=trace)

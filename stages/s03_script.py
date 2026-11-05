@@ -127,7 +127,7 @@ def _build_grounded_story_beats(
             line_id="B3_L05",
             text="Internal correspondence documented growing executive apprehension over uncollateralized guarantees, yet capital allocators continued doubling down on leveraged commitments without board approval.",
             claim_ids=[_cid(1), _cid(3)],
-            visual_hook="highlighter",
+            visual_hook="grease_pencil",
         ),
         StorySceneLine(
             line_id="B3_L06",
@@ -155,7 +155,7 @@ def _build_grounded_story_beats(
             line_id="B4_L02",
             text=f"Formal court filings confirmed mounting structural friction across key stakeholders: {_claim_text(5)}, alongside {_claim_text(6)}.",
             claim_ids=[_cid(5), _cid(6)],
-            visual_hook="highlighter",
+            visual_hook="grease_pencil",
         ),
         StorySceneLine(
             line_id="B4_L03",
@@ -306,7 +306,7 @@ def run(ctx: RunContext) -> StageArtifact:
                     "2. When citing claims with legal_status 'alleged' or 'charged', you MUST use explicit qualifying words: 'allegedly', 'according to the complaint', or 'prosecutors claimed'.\n"
                     "3. When citing claims with legal_status 'settled', you MUST state 'settled without admitting wrongdoing'.\n"
                     "4. When citing claims with legal_status 'convicted', direct conviction language is allowed.\n"
-                    "5. Every line must have a visual_hook: 'stamp', 'ruler_measure', 'compass_arc', 'cutout', 'red_thread', 'magnifier', 'scissors_cut', or 'highlighter'.\n\n"
+                    "5. Every line must have a visual_hook: 'stamp', 'ruler_measure', 'compass_arc', 'cutout', 'red_thread', 'magnifier', 'scissors_cut', or 'grease_pencil'.\n\n"
                     "CRITICAL FORMAT MANDATE:\n"
                     "Start response immediately with { and end with }. Output ONLY valid JSON adhering to schema with NO conversational preamble or thinking."
                 )
@@ -434,8 +434,8 @@ def run(ctx: RunContext) -> StageArtifact:
                     v_meta = "heavy brass magnifying lens focused on fine print contractual clause"
                 elif "scissor" in vh or "cut" in vh or "shear" in vh:
                     v_meta = "vintage steel shears cutting through official bond certificate"
-                elif "highlight" in vh or "marker" in vh:
-                    v_meta = "neon yellow highlighter marker emphasizing critical legislative clause"
+                elif "highlight" in vh or "marker" in vh or "pencil" in vh or "grease" in vh:
+                    v_meta = "archival crimson grease pencil underlining critical legislative clause"
                 elif "cutout" in vh or "portrait" in vh:
                     v_meta = "halftone black-and-white photographic cutout exhibit"
                 else:

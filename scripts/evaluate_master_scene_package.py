@@ -577,7 +577,7 @@ def main():
             "stat_hero": stat,
             "narration": narration,
             "causal_action_syntax": action_text,
-            "i2v_prompt_snippet": p[:450] + ("..." if len(p) > 450 else ""),
+            "i2v_prompt_snippet": p[:1500] + ("..." if len(p) > 1500 else ""),
         })
 
     payload_summary = {

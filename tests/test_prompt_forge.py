@@ -289,10 +289,12 @@ def test_opus_astra_audit_macro_remediations():
     assert "circa :" not in rectory_out
     assert "nineteen-seventies era" in rectory_out or "1970s" in rectory_out
 
-    # 4. Fluorescent yellow highlighter enforcement
+    # 4. Archival crimson grease pencil underline enforcement (decluttering / non-archival purge)
     judge_desc = "Federal bankruptcy judge examining a highlighted fee schedule on desk"
     judge_out = _sanitize_foreground_prompt(judge_desc, fg_key="fg_character_judge", market="EN")
-    assert "fluorescent yellow marker ink" in judge_out
+    assert "archival crimson grease pencil" in judge_out
+    assert "fluorescent" not in judge_out
+    assert "highlighter" not in judge_out
 
 
 def test_opus_astra_round2_audit_macro_remediations():

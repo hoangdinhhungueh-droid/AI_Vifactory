@@ -35,6 +35,7 @@ FILES_TO_SYNC = [
     "config/prompts/cl3_vox_engine/style_flat_parallax.md",
     "config/prompts/cl3_vox_engine/image_prompts_system.md",
     "config/prompts/cl3_vox_engine/video_prompts_system.md",
+    "config/prompts/cl3_vox_engine/canonical_backgrounds.json",
     "config/prompts/cl3_vox_engine/MANIFEST.json",
     "config/prompts/story_forensic/s03_script.md",
     "config/prompts/story_forensic/s05_director_plan.md",
@@ -46,6 +47,9 @@ FILES_TO_SYNC = [
     "app/services/semantic_evidence_extractor.py",
     "app/services/kinetic_sub_director.py",
     "app/services/vox_automated_director.py",
+    "app/services/prompt_forge.py",
+    "app/services/sfx_registry.py",
+    "config/taxonomies/visual_rosters.json",
     "scripts/compile_episode_from_notion.py",
     "app/services/build_remotion_props.py",
     "app/services/unified_vox_director.py",
@@ -82,6 +86,7 @@ FILES_TO_SYNC = [
     "tests/test_semantic_evidence_extractor.py",
     "tests/test_instinct_manager.py",
     "tests/test_caller_integration_and_drift.py",
+    "tests/test_prompt_forge.py",
     "docs/plans/2026-10-30-vox-v3-systemic-reform-plan.md",
 ]
 
