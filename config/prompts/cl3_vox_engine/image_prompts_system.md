@@ -79,7 +79,7 @@ Settle [Điểm dừng khung hình cuối cùng].
   - Dao trổ / Kéo biên tập: `machined steel editorial shears (interacting tool)`
   - Sợi chỉ đỏ điều tra: `red evidence yarn pinned taut between brass pushpins (tether)`
   - Kính lúp quang học: `brass magnifying loupe revealing micro-print text (optical)`
-  - Bút dạ quang phát sáng: `fluorescent neon highlighter rule (mark)`
+  - Bút chì sáp đỏ / Dấu kiểm chứng: `archival crimson graphite pencil / official registry seal (mark)`
 
 ### C. 7 Họ Tương Tác Cơ Học ($H_1 \to H_7$ Kinetic Couplings):
 1. **$H_1$ (Impact / Percussion)**: Con dấu dập mạnh $\to$ Giấy lún, mực loang nhẹ, camera giật 1 frame.
@@ -87,7 +87,7 @@ Settle [Điểm dừng khung hình cuối cùng].
 3. **$H_3$ (Sever / Cut / Tear)**: Kéo kim loại cắt xé $\to$ Mảnh giấy tách rời làm lộ chứng cứ tầng bên dưới.
 4. **$H_4$ (Tether / Tension)**: Sợi chỉ đỏ kéo căng giữa 2 ghim đồng $\to$ Hai đối tượng bị kéo nghiêng về nhau.
 5. **$H_5$ (Optical / Refraction)**: Kính lúp trượt qua $\to$ Phóng đại $1.4\times$, méo cong rìa barrel distortion.
-6. **$H_6$ (Mark / Ink Transfer)**: Bút dạ quang quét $\to$ Thớ giấy thấm mực và phát quang neon rực rỡ.
+6. **$H_6$ (Mark / Ink Transfer)**: Bút chì sáp đỏ kẻ đậm / Dấu kiểm chứng $\to$ Thớ giấy lún nhẹ, vệt sáp đỏ mờ lì ăn vào thớ báo cũ không phát quang giả tạo.
 7. **$H_7$ (Displace / Unfold)**: Lực đẩy ma sát $\to$ Chồng ảnh xòe quạt, tài liệu bung nếp gấp accordion.
 
 ### D. Camera Move (BẮT BUỘC chọn đúng MỘT chuyển động):

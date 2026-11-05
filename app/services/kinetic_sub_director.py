@@ -60,7 +60,7 @@ class KineticFamily(str, Enum):
     H3_SEVER = "H3_SEVER"            # Cắt xé & Phân tách (kéo, dao trổ -> tách rời, xoay rơi có độ nảy)
     H4_TETHER = "H4_TETHER"          # Dây căng & Neo giữ (ghim đồng, chỉ đỏ -> kéo căng, rung dao động tắt dần)
     H5_OPTICAL = "H5_OPTICAL"        # Khúc xạ quang học (kính lúp -> phóng to 1.4x, méo cong rìa, lộ chữ chìm)
-    H6_MARK = "H6_MARK"              # Quét mực & Xung dạ quang (bút neon -> thấm giấy, phát sáng, truyền xung data)
+    H6_MARK = "H6_MARK"              # Kẻ chì lưu trữ & Đóng dấu kiểm chứng (bút chì sáp đỏ / dấu kiểm chứng -> thớ giấy lún, vết sáp mờ)
     H7_DISPLACE = "H7_DISPLACE"      # Xô đẩy & Bung nếp gấp (ma sát trượt, pop-up unfold -> xòe quạt, mở lớp dưới)
 
 
@@ -120,11 +120,11 @@ TAXONOMY_KEYWORDS: Dict[KineticFamily, List[str]] = {
         # VN
         "chỉ", "duy nhất", "nhấn mạnh", "cảnh báo", "đặc biệt", "bôi đậm", "điểm nóng", "gạch dưới", "hạn chót",
         # EN
-        "only", "highlight", "alert", "crucial", "warning", "solely", "hotspot", "neon", "deadline", "urgent", "flag",
+        "only", "highlight", "alert", "crucial", "warning", "solely", "hotspot", "pencil", "deadline", "urgent", "flag", "redline",
         # JA
-        "唯一", "警告", "強調", "ハイライト", "注目", "警戒", "ネオン", "締切", "緊急", "指摘",
+        "唯一", "警告", "強調", "ハイライト", "注目", "警戒", "赤鉛筆", "締切", "緊急", "指摘", "朱線",
         # KR
-        "유일", "경고", "강조", "하이라이트", "주목", "비상", "네온", "마감임박", "마감", "지적", "알렸습니다", "단독", "주의", "외쳤지만"
+        "유일", "경고", "강조", "하이라이트", "주목", "비상", "적색연필", "마감임박", "마감", "지적", "알렸습니다", "단독", "주의", "외쳤지만", "밑줄"
     ],
     KineticFamily.H7_DISPLACE: [
         # VN
@@ -146,7 +146,7 @@ FAMILY_DEFAULT_PROPS: Dict[KineticFamily, Tuple[str, str, str]] = {
     KineticFamily.H3_SEVER: ("sharp surgical craft scalpel", "steel", "medium"),
     KineticFamily.H4_TETHER: ("taut red evidence thread with clear adhesive tabs", "cotton_thread", "feather"),
     KineticFamily.H5_OPTICAL: ("vintage brass magnifying loupe", "brass_glass", "medium"),
-    KineticFamily.H6_MARK: ("neon yellow chisel highlighter", "plastic", "light"),
+    KineticFamily.H6_MARK: ("archival crimson graphite pencil", "wood_graphite", "light"),
     KineticFamily.H7_DISPLACE: ("accordion-folded architectural dossier", "heavy_paper", "medium"),
 }
 
@@ -156,7 +156,7 @@ FAMILY_SECONDARY_PROPS: Dict[KineticFamily, Tuple[str, str, str]] = {
     KineticFamily.H3_SEVER: ("stainless steel shears", "steel", "heavy"),
     KineticFamily.H4_TETHER: ("taut red evidence thread with clear adhesive tabs", "cotton_thread", "feather"),
     KineticFamily.H5_OPTICAL: ("high-contrast inspection lens", "optical_glass", "light"),
-    KineticFamily.H6_MARK: ("translucent cyan neon marker stroke", "fluorescent_ink", "feather"),
+    KineticFamily.H6_MARK: ("official verification rubber stamp", "wood_rubber", "medium"),
     KineticFamily.H7_DISPLACE: ("fanned-out stack of rental contracts", "newsprint_paper", "medium"),
 }
 
@@ -191,13 +191,14 @@ FAMILY_PROP_CATALOG: Dict[KineticFamily, List[Tuple[str, str, str]]] = {
         ("high-contrast forensic inspection lens", "optical_glass", "light"),
     ],
     KineticFamily.H6_MARK: [
-        ("neon yellow chisel highlighter", "plastic", "light"),
-        ("fluorescent crimson warning marker", "fluorescent_ink", "light"),
-        ("translucent neon amber marker stroke", "fluorescent_ink", "feather"),
+        ("archival crimson graphite pencil", "wood_graphite", "light"),
+        ("red wax evidence seal", "wax_seal", "light"),
+        ("official verification rubber stamp", "wood_rubber", "medium"),
+        ("carbon draft transfer stylus", "metal_stylus", "light"),
     ],
     KineticFamily.H7_DISPLACE: [
         ("four-panel developer corporate foldout", "heavy_cardstock", "medium"),
-        ("wire-service news ticker tape", "newsprint_paper", "feather"),
+        ("printed teletype dispatch strip", "newsprint_paper", "feather"),
         ("fanned-out stack of rental contracts", "newsprint_paper", "medium"),
         ("broadcast CRT monitor cutout showing news alert stills", "halftone_paper", "medium"),
     ],
@@ -227,7 +228,7 @@ def select_distinct_props_for_scene(
     fam2 = dominant_families[1] if len(dominant_families) > 1 else KineticFamily.H6_MARK
 
     cat1 = FAMILY_PROP_CATALOG.get(fam1, [("archival brass document clamp", "solid_metal", "medium")])
-    cat2 = FAMILY_PROP_CATALOG.get(fam2, [("translucent neon amber marker stroke", "fluorescent_ink", "feather")])
+    cat2 = FAMILY_PROP_CATALOG.get(fam2, [("archival crimson graphite pencil", "wood_graphite", "light")])
 
     p1 = cat1[0]
     p2 = cat2[0]
@@ -1489,14 +1490,19 @@ def build_kinetic_causal_i2v_prompt(sub_plan: Dict[str, Any], camera_directive: 
         f"IMAGE-TO-VIDEO TECHNICAL DIRECTIVE: "
         f"[Style: Rigid documentary motion design, zero cartoon puppet motion, zero organic wobbling]. "
         f"[Speed & Pacing: True Vox Stop-Motion Snappiness. High-velocity transient bursts: all movements complete rapidly in 0.3s - 0.4s on twos (12 discrete poses per second), immediately followed by motionless dead-stop holds. Zero slow drifting, zero floaty linear glide, zero continuous cruise]. "
+        f"[Focal Hierarchy: Strict Single Primary Hero Object focus. Exactly ONE primary evidentiary subject commands the scene focal hierarchy. Clean archival diorama paper surface (#F4F1EA) with zero competing decorative clutter, zero gratuitous stacked props, zero ungrounded embellishments]. "
         f"[Camera: {cam_directive_detected}]. "
         f"[Timeline Kinematics: [KINETIC CAUSAL CHAIN]: {chain_str}]. "
         f"[Motion Design: Snappy 2D graphic reveals, rigid planar cutouts with crisp deckle torn paper edges, linear slides, mechanical snap-down]. "
         f"[Constraints: [PHYSICAL CONSTRAINTS]: Every element is a rigid 2D planar cutout with crisp deckle torn paper edges and clean cast shadows. "
-        f"Zero independent drifting, zero 3D fluid morphing, all graphics sustained in 12fps paper stop-motion texture to the cut]."
+        f"Strict single hero focal hierarchy on clean newsprint base (#F4F1EA). Zero independent drifting, zero 3D fluid morphing, zero competing decorative clutter, all graphics sustained in 12fps paper stop-motion texture to the cut]."
     )
 
     return prompt.strip()
+
+
+# Canonical alias for universal compatibility across callers and test suites
+build_kinetic_causal_i2v_prompt_syntax = build_kinetic_causal_i2v_prompt
 
 
 def build_natural_kinetic_i2v_prompt(
@@ -1747,7 +1753,8 @@ def build_cl3_paper_diorama_prompt(
     for f_term in forbidden_in_shot:
         action_text = re.sub(r'\b' + re.escape(f_term) + r'\b', 'moves', action_text, flags=re.IGNORECASE)
 
-    shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}\n{action_text}\n{camera_line}"
+    focal_mandate = f"Focal Hierarchy: Strict Single Primary Hero Object focal rule. Exactly ONE primary evidentiary subject ({clean_hero}) anchors the composition on clean archival diorama paper (#F4F1EA), with zero competing decorative clutter or stacked ungrounded props."
+    shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{mg_cutout}\n{fg_data}\n{action_text}\n{camera_line}"
 
     # Semantic Compatibility check
     effective_action_type = plan_action or getattr(ev.archetype, 'value', str(ev.archetype))
@@ -1756,7 +1763,7 @@ def build_cl3_paper_diorama_prompt(
     # 6. Audio Component from prop matrix or sound design
     tool_lower = clean_tool.lower()
     if "caliper" in tool_lower or "vernier" in tool_lower:
-        audio_sfx = "vernier metal slide, cardstock crimp, ticker clicks, low newsroom hum"
+        audio_sfx = "vernier metal slide, cardstock crimp, ratchet clicks, low newsroom hum"
     elif "seal" in tool_lower or "stamp" in tool_lower:
         audio_sfx = "heavy wooden thud, paper compression crack, oily ink squelch, room tone"
     elif "shear" in tool_lower or "cut" in tool_lower:
@@ -1842,7 +1849,8 @@ def build_cl3_paper_diorama_image_prompt(
     else:
         fg_data = f"FG: {clean_tool} positioned at foreground depth, crossing close to the lens."
 
-    shot_block = f"SHOT:\n{bg_field}\n{mg_cutout}\n{fg_data}"
+    focal_mandate = f"Focal Hierarchy: Strict Single Primary Hero Object focal rule. Exactly ONE primary evidentiary subject ({clean_hero}) anchors the composition on clean archival diorama paper (#F4F1EA), with zero competing decorative clutter or stacked ungrounded props."
+    shot_block = f"SHOT:\n{bg_field}\n{focal_mandate}\n{mg_cutout}\n{fg_data}"
     text_control = "TEXT CONTROL: No placeholder words, no English labels, no garbled text, no fake headlines. Paper documents feature soft, authentic, illegible printed texture only."
     avoid_block = reg.resolve_avoid_block("STATIC_OVERHEAD", trace=trace)
     res = f"{style_block}\n\n{shot_block}\n\n{text_control}\n\n{avoid_block}".strip()

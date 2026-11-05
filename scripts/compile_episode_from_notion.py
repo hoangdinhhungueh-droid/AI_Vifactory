@@ -678,7 +678,7 @@ def selftest():
         scene(0, "In 2001, Enron collapsed.", 6.0,
               "empty boardroom, long table, cream palette, flat vector"),
         scene(1, "This is the rest of the setup for the story beat.", 6.0,
-              "ticker tape falling, flat vector, cream palette",
+              "printed teletype dispatch strip falling, flat vector, cream palette",
               fg_type="B — Symbolic figure"),
     ]
     images = [

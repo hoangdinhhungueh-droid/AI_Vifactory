@@ -149,12 +149,12 @@
       "H6_MARK": {
         "action_verb": "swipes in a high-velocity 0.3s stroke from coordinate {initial_pos} across target line {target_contact_pos} of",
         "contact_point": "critical text row at {target_contact_pos}",
-        "physical_reaction": "translucent neon highlight band soaks instantly into newsprint grain, stopping dead in place at {k1_dead_stop}",
+        "physical_reaction": "matte archival crimson line scores cleanly into newsprint grain, stopping dead in place at {k1_dead_stop}",
         "secondary_reaction": {
           "object": "desk_surface",
-          "reaction": "highlighted text pops forward"
+          "reaction": "marked text stands out in sharp relief"
         },
-        "residue": "vibrant fluorescent highlighter band"
+        "residue": "crisp archival crimson documentary underline"
       },
       "H7_DISPLACE": {
         "action_verb": "pushes outward in a rapid 0.4s friction slide, unfolding along {vector_reveal_direction} crease line onto coordinate {target_contact_pos} of",
@@ -211,8 +211,8 @@
       "H6_MARK": {
         "action_verb": "originates directly from contact coordinate {target_contact_pos}, wiping in a rapid 0.4s {vector_reveal_direction} vector reveal across coordinate bounds {bounding_box_bounds} of",
         "contact_point": "highlighted anomaly coordinate {bounding_box_bounds}",
-        "physical_reaction": "neon highlight band illuminates key typography with crisp editorial contrast, locking dead still at {k2_dead_stop}",
-        "residue": "striking translucent neon stripe"
+        "physical_reaction": "matte archival crimson line emphasizes key typography with crisp editorial contrast, locking dead still at {k2_dead_stop}",
+        "residue": "matte crimson documentary score mark"
       },
       "H7_DISPLACE": {
         "action_verb": "feeds across frame along {vector_reveal_direction} vector to coordinate {dock_pin_pos} in a rapid 0.4s paper slide across",

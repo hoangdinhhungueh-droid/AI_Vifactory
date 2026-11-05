@@ -70,7 +70,7 @@ Một đoạn văn liền mạch 2–5 câu, bắt buộc chứa đủ 5 thành 
 - **Cắt xé Dao / Kéo ($H_3$)**: `clean shear slice, fiber tearing rip, falling paper flutter`
 - **Sợi chỉ đỏ căng ($H_4$)**: `pushpin wooden tap, string tension twang, taut hum`
 - **Kính lúp lướt ($H_5$)**: `smooth glass glide, brass friction rub, optical focus chime`
-- **Bút dạ quang ($H_6$)**: `felt nib squeak, ink saturation hiss, neon pulse whoosh`
+- **Bút chì sáp đỏ / Dấu kiểm chứng ($H_6$)**: `matte pencil friction glide, wax paper score, registry stamp thud`
 - **Số đếm tăng tốc (Counter)**: `rapid mechanical ticker clicks, bell ring at peak, air release`
 - **Nền không gian**: `low newsroom hum` hoặc `quiet archival room tone`.
 

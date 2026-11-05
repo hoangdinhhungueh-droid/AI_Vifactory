@@ -8,7 +8,7 @@ cross-market semantic classification across 5 Forensic Archetypes:
 2. CorporateEntityArchetype: Developer dossiers, business registrations, corporate foldouts (H2 Clamp / H7 Unfold).
 3. ParadoxClaimArchetype: False promotional ads stamped 'REVOKED/FRAUDULENT' (H3 Tear / H1 Reject).
 4. QuantitativeMetricArchetype: Financial balance sheets, binder clamps, metric discrepancy pins (H2 Constraint).
-5. InvestigativeMediaArchetype: Teletype ticker, news broadcast headlines, optical magnifying glass (H5 Optical / H6 Ink).
+5. InvestigativeMediaArchetype: Teletype dispatch strip, news broadcast headlines, optical magnifying glass (H5 Optical / H6 Ink).
 
 Conforms to:
 - Rule 118: Zero-Mock Data & Factual Grounding.
@@ -206,17 +206,17 @@ _ARCHETYPE_VARIANTS: Dict[ForensicArchetype, List[ExtractedEvidence]] = {
             camera_directive="Top-down steady overhead frame under warm 3200K tungsten lighting",
             sound_foley="heavy_glass_lens_slide_on_paper",
         ),
-        # Variant 2: Fluorescent Neon Highlighter & Streaming Ticker Tape
+        # Variant 2: Archival Crimson Grease Pencil & Official Registry Seal
         ExtractedEvidence(
             archetype=ForensicArchetype.INVESTIGATIVE_MEDIA,
             dominant_family="H6_MARK",
-            hero_anchor_prop="printed news article clipping and diagonal paper banner strips on aged newsprint",
-            interacting_tool_prop="fluorescent neon amber highlighter rule and streaming ticker tape",
-            tactile_action_verb="sweeps briskly across the investigative column, laying down a vibrant translucent stroke over",
-            physical_reaction="paper fibers absorb the neon ink, text blooming with vibrant glow against the aged newsprint",
-            tactile_residue="bold fluorescent highlighter bar with soft ink feathering along fibrous cardstock edges",
+            hero_anchor_prop="printed news article clipping and teletype dispatch strip on aged newsprint",
+            interacting_tool_prop="archival crimson grease pencil and official registry seal",
+            tactile_action_verb="scores firmly under the critical disclosure headline, laying down a matte crimson documentary underline across",
+            physical_reaction="waxy crimson pigment embeds directly into the fibrous newsprint grain without artificial neon bloom, emphasizing core evidence",
+            tactile_residue="matte crimson grease-pencil underline and official registry seal impression",
             layout_type="top_right_diagonal",
-            camera_directive="Macro slides along the document surface, focus racking alongside the moving highlighter stroke",
+            camera_directive="Macro slides along the document surface, focus racking alongside the moving crimson pencil mark",
             sound_foley="marker_felt_tip_friction_swipe",
         ),
         # Variant 3: Archival Dossier Tabs & Seal Slam (STAMP)

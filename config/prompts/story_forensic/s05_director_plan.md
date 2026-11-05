@@ -27,7 +27,7 @@ Translate each line of the approved script into sequential shots optimized for a
 - `H3_SEVER`: Paper shears, razor blade cutting through contracts, confetti paper drop.
 - `H4_TETHER`: Copper pins, taut red evidence yarn stretching across archival board.
 - `H5_OPTICAL`: Brass magnifying loupe sliding across fine print, 1.4x barrel distortion.
-- `H6_MARK`: Neon highlighter stroke permeating paper grain, data light pulses.
+- `H6_MARK`: Archival crimson grease pencil underline scoring paper grain, official verification registry seal.
 - `H7_DISPLACE`: Sliding paper layers, fan-out unfolding document dossier.
 
 ## Output Schema Requirements

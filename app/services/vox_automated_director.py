@@ -1121,7 +1121,7 @@ class VoxAutomatedDirector:
                 device = "diagonal rubber stamp stamped in red vermilion ink 'IMPORTANT EVIDENCE'"
             else:
                 label_text = "LIQUIDATED // 100%"
-                device = "thick fluorescent yellow highlighter bar beneath bold headline"
+                device = "matte archival crimson grease-pencil underline beneath bold headline"
 
             thumb_prompt = (
                 f"High-contrast YouTube documentary paper-collage thumbnail. "

@@ -55,7 +55,7 @@ Settle [where].
 faded world map · torn ledger page · newspaper column wall · blueprint grid · stock chart engraving · passport stamp field · circuit trace print · topographic map · index-card wall · shipping manifest
 
 **Foreground elements**
-cards · torn strips · logo plates · giant stat number · halftone cutout person · coin chips · arrows · stamps · pins with thread · folder tabs · ticker tape
+cards · torn strips · logo plates · giant stat number · halftone cutout person · coin chips · arrows · stamps · pins with thread · folder tabs · teletype dispatch strip
 
 **Depth cue (mandatory)** — always state layers explicitly
 "at three different depths" · "one near the lens, two deep" · "stacked receding into the frame" · "the nearest whipping past the lens with motion blur"
